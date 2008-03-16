@@ -1,0 +1,59 @@
+
+                GCS CONNECTION STATES
+           (from the application viewpoint)
+
+Since GCS is a library to be utilized by an application, it has to export some sort of a Group handle to the application. So far this handle was attempted to have a connection-oriented socket semantics. Reasons for that being:
+
+1) It is better to expand on a well understood and established concept rather than invent something.
+2) The whole idea of GCS is to avoid exporting Group Communication concepts to application. It is much easier to work with a socket.
+3) The main point of the Group is a linearly serialized stream of messages with a Group being a single source/sink of the messages. This effectively makes Group communication a point-to-point connection.
+
+Initially this seemed rather plain to me: when we're part of the primary configuration, we can send and receive messages. When not - all calls just return -ENOTCONN.
+
+However, there are certain aspects to GC that make its interpretation as a socket not so straightforward. These are configuration changes, primary/non-primary configurations and state snapshot. For the demo these were deemed not essential and were not addressed. As we're moving on this has to be addressed since we have to settle the API the sooner the better.
+
+Basically it goes this way. Whenever DBMS process joins the primary configuration any other way than by configuration change from the previous primary configuration, it has to take a state snapshot (be it incremental or complete) and only after that it can be considered a part of the quorum. It could be done the following way:
+
+1) Process receives configuration change message and decides whether it needs to take a state snapshot.
+2) If "yes" then it sends snapshot request message. One of quorum members is dispatches snapshot to the joiner.
+3) When the snapshot is complete, the joiner sends the final join message. (maybe "join" is not a good term here, but I'll use it just for now)
+4) When the join message is received, every configuration member puts the process in the quorum member list. Only now the process is a full-fledged member of the Group.
+
+Note that I've been speaking of two separate memberships here: "configuration" and "quorum". A process is a member of the configuration as soon as it receives a configuration change message (bear in mind, I'm assuming Spread as a communication backend now), so it can receive and theoretically - send messages. However, it does not have the up-to-date state and in case of DBMS:
+
+1) Cannot really apply messages (write sets in our case).
+2) Cannot give a snapshot in case of another configuration change, so it cannot be used in quorum calculation.
+
+All this makes the process a sort of the "2nd grade" configuration member until it gets a snapshot. The problem is that every configuration member has to be notified when the snapshot is complete, hence we need this "join" message. As a result, state machine for the GCS connection will get one more state:
+
+                       own JOIN message received
+                      +-------------------------+        ______
+                      |                         V       V      \
+   gcs_open()   +----------+              +---------------+    | conf.
+ -------------->| GCS_OPEN |              | GCS_CONNECTED |    | change
+                +----------+              +---------------+    | to PRIM
+                      ^                         |       \______/
+                      +-------------------------+       
+                       own LEAVE message received,
+                        conf. change to NON-PRIM
+                      
+
+Rough explanation:
+
+GCS_OPEN (perhaps should be split into OPEN_PRIM and OPEN_NON_PRIM). Only snapshot request and join messages are allowed. Attempt to send anything else results in -ENOTCONN. Attempt to send join message when in non-primary configuration should result in -ECONNREFUSED.
+
+GCS_CONNECTED. Attempt to send snapshot request or join message results in -EISCONN. Application messages are sent alright.
+
+When GCS_CONNECTED->GCS_OPEN change happens all pending GCS calls return -ECONNRESET.
+
+So GCS API is about to get more complicated.
+
+And here we have two alternatives:
+
+1) Implicitly expose GCS connection state to the application through those error codes. Application will have to keep its own track of GCS connection state and not forget to send join message. In this case API can stay the same, but it's usage will get a bit more complicated.
+
+2) Application can provide request_snapshot(), send_snapshot() and receive_snapshot() callbacks to the library. Then all this could be handled by the library and application would not have to know anything about snapshot request or join messages. This won't simplify the application much though: callbacks will have to be able to communicate and synchronize with other threads, since in this case application will have no control on when the send or receive callback is called. This also would mean additional 4 parameters for gcs_open() (3 callbacks + context) and make GCS connection much less of a "socket".
+
+
+
+

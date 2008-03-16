@@ -1,0 +1,56 @@
+These coding conventions were not set from the very beginning. They emerged as a result of coding. Therefore they have some practical basis for it. Not all code adheres to them, but that's what it should be like. Attempt was made to justify at least some of these conventions, but it's not about right or wrong really. It's about consistency.
+
+
+1. Indentation.
+Tab width is 4, tabs filled with spaces. No real tabs. There is a controversy about this issue among programmers. In defense of this decision I can say that indentation is some sort of ASCII art and ASCII art does not always work good with tabs, especially when you need to alter it by hand. In other words: spaces are less flexible, but more predictable.
+
+2. Braces position.
+Opening brace on the same line as the statement, see example below.
+
+3. Spaces between tokens.
+See example below.
+
+4. Function declarations/definitions.
+See example below.
+
+5. Naming conventions.
+All names and identifiers are all lower case with underscores except macros which are all UPPER case.
+
+5.1 File names.
+All C file names are prefixed with 'gcs' to avoid collisions in the file namespace with headers from other software. Prefix is followed by the module name. If module consists of more than one unit, unit names follow module name. Like gcs_module_unit1.[h|c], gcs_module_unit2.[h|c] and so on.
+
+5.2 Symbol names.
+All global symbols - exported through header files - are prefixed with 'gcs' (or 'GCS' where appropriate) followed by the module name. This is done again to avoid namespace collisions with the third party software and with global symbols from other modules that may be called similarly. Static symbols defined in the *.c files simply start with the module name. This is done to easily distinguish between global and static symbols and to prevent collisions of static symbols from different modules when doing tags search.
+
+
+Example:
+
+int gcs_module_external_var;
+
+static int
+module_static_function (int a,
+                        int b)
+{
+    int c;
+
+    if (a < b) {
+        c = b - a;
+    }
+    else {
+        c = a - b;
+    }
+    
+    return c;
+}
+
+6. Long lines.
+Lines should not exceed 80 characters in length. One more reason to use spaces instead of tabs. (Suppose you have tabs of width 4 and then some other person reads the code with tabs width of 8. Many lines will grow more than 80 characters and may not fit in the screen.)
+
+7. Spaces at the end of line.
+Should be avoided to minimize the diff.
+
+8. NO COMPILER WARNINGS WHATSOEVER.
+
+These conventions are not set in stone and can be altered eventually. However, for the sake of consistency, try to follow these conventions unless there is a REAL (and well articulated) need to do otherwise.
+
+IF IN DOUBT - SEE HOW SIMILAR THINGS ARE DONE IN RECENT FILES.

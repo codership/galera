@@ -1,0 +1,41 @@
+This directory contains both wsdb library and
+clones replication library. Clones is just a 
+work name for the library until the final library 
+name will be fixed.
+
+There is only one makefile, which builds both wsdb
+and clones libraries. There are autoconf/make files
+also, but they should not be used yet.
+
+wsdb - write set database
+  C library for managing write sets of some transaction
+  processing system.
+
+  wsdb builds into libwsdb.a, wsdb_api.h declares all 
+  public objects.
+
+clones - application replication library
+  clones.c and clones.h constitute the replication 
+  layer on top of libwsdb and libgcs. 
+  makefile builds libclones.o, which is relocatable
+  object file linked with libwsdb.a and libgcs.a.
+  libclones.o exports symbols from clones.h and should
+  be linked with the application using clones.h.
+
+Subdirectory test contains check unit tests for libwsdb.
+There is a makefile, which builds into wsdb_test.
+You can run tests simply by:
+  $ cd test
+  $ make
+  $ make test
+Test directory has further subdirectory: data, which stores
+files used during test runs.
+
+Clones has some hard coded configurations. One important
+configuration parameter is the work directory, which
+is by default: 
+
+  /var/lib/mysql/clones
+
+You should create this directory and make sure it is
+writeable by the application linking with libclones.o

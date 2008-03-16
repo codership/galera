@@ -1,0 +1,13 @@
+This directory contains all wsdb unit tests.
+Tests are written with check utility. All modules, which
+have some tests should have corresponding test_'module'.c
+in this directory.
+
+wsdb_test.c is the test main function, which calls each
+test_* tests.
+
+subdirectory data is for temporary test data files, nothing
+care about.
+
+The makefile builds into wsdb_test. Just run ./wsdb_test to
+see how we are doing today...

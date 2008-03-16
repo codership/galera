@@ -1,0 +1,8 @@
+2007-11-01 Alex
+    Fixed thread safe compilation without MySQL
+    Tagged release 0.2.5
+
+2007-10-18 Alex
+    Fixed compilation. Added gtohl/htogl/gtohs/htogs functions.
+    Tagged release 0.2.4
+    
