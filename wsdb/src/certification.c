@@ -252,6 +252,8 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     return WSDB_OK;
 }
 
-int wsdb_delete_global_trx( trx_seqno_t trx_seqno ) {
+int wsdb_delete_global_trx(trx_seqno_t trx_seqno) 
+{
+
     return WSDB_OK;
 }

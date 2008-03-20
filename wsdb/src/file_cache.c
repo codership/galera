@@ -311,7 +311,8 @@ void *file_cache_get(struct file_cache *cache, cache_id_t id) {
                 cache->block_size, entry->data
             );
         } else {
-            gu_error("No cached ws entry for: %d", entry->cache_id);
+            gu_fatal("No cached ws entry for: %d", entry->cache_id);
+	    abort();
         }
     }
 

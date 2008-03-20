@@ -137,7 +137,10 @@ static int file_close(struct wsdb_file *file) {
 static file_addr_t file_append_block(
     struct wsdb_file *file, uint16_t len, void *data
 ) {
-    file_write_block(file, ++(file->hdr.last_block), len, data);
+    ++(file->hdr.last_block);
+    if (file->hdr.last_block == 0)
+	file->hdr.last_block = 1;
+    file_write_block(file, file->hdr.last_block, len, data);
     return file->hdr.last_block;
 }
 

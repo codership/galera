@@ -8,6 +8,7 @@
 #include <getopt.h> // for getopt_long
 
 #include <errno.h>
+#include <ctype.h>
 
 #include "wsdb_priv.h"
 #include "hash.h"
@@ -322,7 +323,7 @@ static int dump_action(struct block_info *bi) {
 static int dump_row_key(struct block_info *bi) {
     uint16_t len;
     struct file_row_key *row_key;
-    int i = 0;
+    int i = 0, j;
     int rcode;
 
     if (Debug) fprintf(stderr, "dump_row_key begin\n");
@@ -337,10 +338,16 @@ static int dump_row_key(struct block_info *bi) {
     rcode = get_data_from_block(bi, len, (void *)row_key); 
     if (rcode != WSDB_OK) return rcode;
 
-    fprintf(stdout, "TABLE: %d %s", row_key->dbtable_len,row_key->dbtable);
-    fprintf(stdout, "KEY: %d", row_key->key_len);
+    fprintf(stdout, "TABLE: %d ", row_key->dbtable_len);
+    for (j = 0; j < row_key->dbtable_len; j++) {
+	if (isprint(row_key->dbtable[j]))
+	    fprintf(stdout, "%c", row_key->dbtable[j]);
+	else
+	    fprintf(stdout, ".");
+    }
+    fprintf(stdout, " KEY: %d", row_key->key_len);
     while(i < row_key->key_len) {
-      fprintf(stdout, "%c", row_key->key[i++]);
+	fprintf(stdout, "%2.2ux", (unsigned char)row_key->key[i++]);
     }
     fprintf(stdout, "\n");
 

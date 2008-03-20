@@ -143,7 +143,8 @@ START_TEST (test_wsdb_api)
                     trx->rows_sent = 0;
                     trx->trx_id += 10;
                 } else {
-                    rcode = wsdb_append_query(trx->trx_id, query);
+                    rcode = wsdb_append_query(trx->trx_id, query, time(NULL),
+					      rand());
                     fail_if(rcode, "wsdb_append_query failed: %d", rcode);
                     trx->state = query_sent;
                     trx->queries_sent++;

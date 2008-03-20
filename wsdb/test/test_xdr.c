@@ -89,7 +89,7 @@ START_TEST (test_xdr)
 
             mark_point();
         
-            rcode = wsdb_append_query(trx, query);
+            rcode = wsdb_append_query(trx, query, time(NULL), rand());
             fail_if(rcode, "wsdb_append_query failed: %d", rcode);
         
             for (k=0; k < max_keys; k++) {

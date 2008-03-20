@@ -141,6 +141,7 @@ struct file_row_key *wsdb_key_2_file_row_key(struct wsdb_key_rec *key) {
     memcpy(row_key->dbtable, key->dbtable, key->dbtable_len);
     row_key->key_len     = key_len;
     row_key->dbtable_len = key->dbtable_len;
+    gu_free(key_data);
     return row_key;
 }
 

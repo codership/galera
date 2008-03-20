@@ -227,6 +227,13 @@ gcs_seqno_t gcs_to_seqno (gcs_to_t* to);
  */
 int gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno);
 
+
+/*!
+ *
+ * Self cancel to without attempting to enter critical secion
+ */
+void gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno);
+
 /*! @brief withdraws from TO monitor waiting state.
  *  The caller can later retry the wait operation, but it must
  *  first renew the wait operation with 'gcs_to_renew' call.
