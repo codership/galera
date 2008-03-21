@@ -66,7 +66,7 @@ do
 	    RELEASE=yes   # Compile without debug
 	    ;;
 	-d|--debug)
-	    DEBUG=yes   # Compile without debug
+	    DEBUG=yes     # Compile with debug
 	    ;;
 	--help)
 	    usage
@@ -198,26 +198,6 @@ if test $initial_stage = "wsdb" || $building = "true"
 then
     build $wsdb_branch $conf_flags $galera_flags
     CPPFLAGS="$CPPFLAGS -I$wsdb_branch/include" # non-standard location
-    building="true"
-fi
-
-if test $last_stage != "mysql"
-then
-    exit 0
-fi
-
-if test $initial_stage = "mysql" || $building = "true"
-then
-    export CPPFLAGS
-    export LD_LIBRARY_PATH
-    pushd $mysql_branch
-    if [ "$DEBUG" == "yes" ]; then
-        ./BUILD/compile-pentium-debug-galera
-    else
-        ./BUILD/compile-pentium-galera
-    fi
-    $gainroot make install
-    popd
     building="true"
 fi
 
