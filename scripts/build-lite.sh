@@ -18,7 +18,7 @@ have_ccache="false"
 #
 #fi
 
-initial_stage="galeracomm"
+initial_stage="galerautils"
 last_stage="wsdb"
 gainroot=""
 
@@ -146,12 +146,14 @@ build()
     pushd $build_dir
     export LD_LIBRARY_PATH
     export CPPFLAGS
+    export LDFLAGS
     if [ "$BOOTSTRAP" == "yes" ]; then ./bootstrap.sh; CONFIGURE=yes ; fi
     if [ "$CONFIGURE" == "yes" ]; then ./configure $@; SCRATCH=yes ; fi
     if [ "$SCRATCH"   == "yes" ]; then make clean ; fi
     make
     LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$build_dir/src/.libs
     CPPFLAGS="$CPPFLAGS -I$build_dir/src "
+    LDFLAGS="$LDFLAGS -L$build_dir/src/.libs"
 #    $gainroot make install
     popd
 }
@@ -178,6 +180,11 @@ fi
 if test $initial_stage = "galeracomm" || $building = "true"
 then
     build $galeracomm_branch $conf_flags $galera_flags
+    CPPFLAGS="$CPPFLAGS -I$galeracomm_branch/vs/include" # non-standard location
+    CPPFLAGS="$CPPFLAGS -I$galeracomm_branch/common/include" # non-standard location
+    LDFLAGS="$LDFLAGS -L$galeracomm_branch/common/src/.libs"
+    LDFLAGS="$LDFLAGS -L$galeracomm_branch/transport/src/.libs"
+    LDFLAGS="$LDFLAGS -L$galeracomm_branch/vs/src/.libs"
     building="true"
 fi
 
