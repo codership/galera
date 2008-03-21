@@ -22,10 +22,7 @@ if test "$enable_debug" != "no"
 then
     CFLAGS="-g -O1 -fno-inline  -DDEBUG_MALLOC -DDEBUG_MUTEX -DDEBUG_ASSERT"
 else
-    if test "$CFLAGS" == ""
-    then
-	CFLAGS=" -O2 "
-    fi
+    CFLAGS=${CFLAGS:-" -O2 -g "}
     CFLAGS="$CFLAGS -DNDEBUG "
 fi
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
