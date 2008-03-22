@@ -151,19 +151,21 @@ int gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
 	if (seqno == to->seqno) {
 	    w->state = HOLDER;
 	} else if (seqno < to->seqno) {
-	    gu_fatal("Trying to grab outdated seqno");
-	    abort();
-	} else { /* seqno > to->seqno */
+	    gu_error("Trying to grab outdated seqno");
+	    err = -ECANCELED;
+	} else { /* seqno > to->seqno, wait for my turn */
 	    w->state = WAIT;
 	    to->used++;
 	    gu_cond_wait(&w->cond, &to->lock);
 	    to->used--;
-	    if (w->state == CANCELED) {
-		err = -ECANCELED;
-	    } else if (w->state == WAIT)
+	    if (w->state == WAIT) { // should be most probable
+                assert (seqno == to->seqno);
 		w->state = HOLDER;
+	    } else if (w->state > WAIT)
+		err = -ECANCELED;
 	    else {
-		gu_fatal("Invalid cond wait exit state %d", w->state);
+		gu_fatal("Invalid cond wait exit state %d, seqno %llu(%llu)",
+                         w->state, seqno, to->seqno);
 		abort();
 	    }
 	}
