@@ -191,15 +191,11 @@ int main (int argc, char* argv[])
                 seqno_max, time_spent, ((double) seqno_max)/time_spent);
         printf ("Grabbed:        %9lu\n"
                 "Failed:         %9lu\n"
-                "Canceled:       %9lu\n"
-                "Self-cancelled: %9lu\n",
+                "Self-cancelled: %9lu\n"
+                "Canceled:       %9lu (can exceed total number of seqnos)\n",
                 thread[0].stat_grabs,   thread[0].stat_fails,
-                thread[0].stat_cancels, thread[0].stat_self
+                thread[0].stat_self, thread[0].stat_cancels
             );
-        if (thread[0].stat_fails != thread[0].stat_cancels) {
-            fprintf (stderr, "Error: failed number doesn't match cancelled.\n");
-            exit (EXIT_FAILURE);
-        }
         if (seqno_max !=
             (thread[0].stat_grabs+thread[0].stat_fails+thread[0].stat_self)) {
             fprintf (stderr, "Error: total number of grabbed, failed and "
