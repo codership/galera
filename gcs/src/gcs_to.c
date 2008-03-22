@@ -140,6 +140,12 @@ int gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
 	return -ECANCELED;
     }
 
+    // Check for queue overflow. Tell application that it should wait.
+    if (seqno >= to->seqno + to->qlen) {
+	gu_mutex_unlock(&to->lock);
+	return -EAGAIN;
+    }        
+
     w = to_get_waiter (to, seqno);
 
 
@@ -239,6 +245,12 @@ int gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno)
 	abort();
     }
     
+    // Check for queue overflow. This is totally unrecoverable. Abort.
+    if (seqno >= to->seqno + to->qlen) {
+	gu_mutex_unlock(&to->lock);
+	abort();
+    }        
+
     w = to_get_waiter (to, seqno);
     if (seqno > to->seqno) {
 	w->state = CANCELED;
