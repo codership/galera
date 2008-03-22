@@ -1,0 +1,211 @@
+// Copyright (C) 2007 Codership Oy <info@codership.com>
+
+#include <stdint.h>
+#include <pthread.h>
+#include <stdio.h>  // printf()
+#include <string.h> // strerror()
+#include <stdlib.h> // strtol(), EXIT_SUCCESS, EXIT_FAILURE
+#include <errno.h>
+#include <sys/time.h>
+#include <check.h>
+
+#include <galerautils.h>
+#include "gcs.h" // gcs_to.c functions declared there
+
+struct thread_ctx
+{
+    pthread_t thread;
+    long thread_id;
+    long stat_grabs;  // how many times gcs_to_grab() was successful
+    long stat_cancels;// how many times gcs_to_cancel() was called
+    long stat_fails;  // how many times gcs_to_grab() failed
+    long stat_self;   // how many times gcs_self_cancel() was called
+};
+
+/* returns a semirandom number (hash) from seqno */
+static inline ulong
+my_rnd (uint64_t x)
+{
+    x= 2654435761U * x; // http://www.concentric.net/~Ttwang/tech/inthash.htm
+    return (ulong)(x ^ (x >> 32)); // combine upper and lower halfs for better
+                                   // randomness
+}
+
+/* whether to cancel self */
+static inline ulong
+self_cancel (ulong rnd)
+{
+    return !(rnd & 0xf); // will return TRUE once in 16
+}
+
+/* how many other seqnos to cancel */
+static inline ulong
+cancel (ulong rnd)
+{
+    return (rnd & 0x70) >> 4; // returns 0 - 6
+}
+
+/* offset of seqnos to cancel */
+static inline ulong
+cancel_offset (ulong rnd)
+{
+    return ((rnd & 0x700) >> 8) + 1; // returns 1 - 7
+}
+
+static gcs_to_t*   to          = NULL;
+static ulong       thread_max  = 16;   // default number of threads
+static gcs_seqno_t seqno_max   = 8192; // default number of seqnos to check
+
+/* mutex to synchronize threads start */
+static pthread_mutex_t sync  = PTHREAD_MUTEX_INITIALIZER;
+
+void* run_thread(void* ctx)
+{
+    struct thread_ctx* thd = ctx;
+    gcs_seqno_t seqno = thd->thread_id; // each thread starts with own offset
+                                        // to guarantee uniqueness of seqnos
+                                        // without having to lock mutex
+    pthread_mutex_lock   (&sync); // wait for start signal
+    pthread_mutex_unlock (&sync);
+
+    while (seqno < seqno_max) {
+        long ret;
+        ulong rnd = my_rnd(seqno);
+
+        if (gu_unlikely(self_cancel(rnd))) {
+            printf("Self-cancelling seqno %8llu...", seqno);
+            ret = gcs_to_self_cancel(to, seqno);
+            if (gu_unlikely(ret)) {
+                printf ("failed\n");
+                fprintf (stderr, "gcs_to_self_cancel() returned %ld (%s)\n",
+                         ret, strerror(-ret));
+                exit (EXIT_FAILURE);
+            }
+            else {
+                printf ("success\n");
+                thd->stat_self++;
+            }
+        }
+        else {
+            printf("Grabbing seqno %8llu...", seqno);
+            ret = gcs_to_grab (to, seqno);
+            if (gu_unlikely(ret)) {
+                if (gu_likely(-ECANCELED == ret)) {
+                    printf ("canceled\n");
+                    thd->stat_fails++;
+                }
+                else {
+                    printf ("failed\n");
+                    fprintf (stderr, "gcs_to_grab() returned %ld (%s)\n",
+                             ret, strerror(-ret));
+                    exit (EXIT_FAILURE);
+                }
+            }
+            else {
+                long cancels = cancel(rnd);
+                printf ("success, cancels = %ld\n", cancels);
+                if (gu_likely(cancels)) {
+                    long offset = cancel_offset (rnd);
+                    gcs_seqno_t cancel_seqno = seqno + offset;
+
+                    while (cancels-- && (cancel_seqno < seqno_max)) {
+                        ret = gcs_to_cancel(to, cancel_seqno);
+                        cancel_seqno += offset;
+                        thd->stat_cancels++;
+                    }
+                }
+                thd->stat_grabs++;
+                ret = gcs_to_release(to, seqno);
+            }
+        }
+
+        seqno += thread_max; // this together with unique starting point
+                             // guarantees that seqnos are unique
+    }
+
+    return NULL;
+}
+
+int main (int argc, char* argv[])
+{
+    // minimum to length required by internal logic
+    long to_len = cancel(0xffffffff) * cancel_offset(0xffffffff);
+
+    errno = 0;
+    if (argc > 1) seqno_max  = (1 << atol(argv[0]));
+    if (argc > 2) thread_max = (1 << atol(argv[1]));
+    if (errno) {
+        fprintf (stderr, "Usage: %s [seqno [threads]]\nBoth seqno and threads"
+                 "are exponents of 2^n.\n", argv[0]);
+        exit(errno);
+    }
+    printf ("Starting with %lu threads and %llu maximum seqno.\n",
+            thread_max, seqno_max);
+
+    /* starting with 0, enough space for all threads and cancels */
+    to_len = to_len > thread_max ? to_len : thread_max;
+    to = gcs_to_create (to_len * 2, 0);
+
+    /* main block */
+    {
+        long i, ret;
+        struct timeval begin, end;
+        double time_spent;
+        struct thread_ctx thread[thread_max];
+
+        pthread_mutex_lock (&sync); {
+            /* initialize threads */
+            for (i = 0; i < thread_max; i++) {
+                thread[i].thread_id    = i;
+                thread[i].stat_grabs   = 0;
+                thread[i].stat_cancels = 0;
+                thread[i].stat_fails   = 0;
+                thread[i].stat_self    = 0;
+                ret = pthread_create(&(thread[i].thread), NULL, run_thread,
+                                     &thread[i]);
+                if (ret) {
+                    fprintf (stderr, "Failed to create thread %ld: %s",
+                             i, strerror(ret));
+                    exit (EXIT_FAILURE);
+                }
+            }
+            gettimeofday (&begin, NULL);
+        } pthread_mutex_unlock (&sync); // release threads
+
+        /* wait for threads to complete and accumulate statistics */
+        pthread_join (thread[0].thread, NULL);
+        for (i = 1; i < thread_max; i++) {
+            pthread_join (thread[i].thread, NULL);
+            thread[0].stat_grabs   += thread[i].stat_grabs;
+            thread[0].stat_cancels += thread[i].stat_cancels;
+            thread[0].stat_fails   += thread[i].stat_fails;
+            thread[0].stat_self    += thread[i].stat_self;
+        }
+        gettimeofday (&end, NULL);
+        time_spent = ((double)(end.tv_sec - begin.tv_sec)) * 1.0e06 +
+            end.tv_usec - begin.tv_usec;
+        time_spent = time_spent * 1.0e-06; // to seconds
+
+        /* print statistics */
+        printf ("%llu seqnos in %.3f seconds (%.3f seqno/sec)\n",
+                seqno_max, time_spent, ((double) seqno_max)/time_spent);
+        printf ("Grabbed:        %9lu\n"
+                "Failed:         %9lu\n"
+                "Canceled:       %9lu\n"
+                "Self-cancelled: %9lu\n",
+                thread[0].stat_grabs,   thread[0].stat_fails,
+                thread[0].stat_cancels, thread[0].stat_self
+            );
+        if (thread[0].stat_fails != thread[0].stat_cancels) {
+            fprintf (stderr, "Error: failed number doesn't match cancelled.\n");
+            exit (EXIT_FAILURE);
+        }
+        if (seqno_max !=
+            (thread[0].stat_grabs+thread[0].stat_fails+thread[0].stat_self)) {
+            fprintf (stderr, "Error: total number of grabbed, failed and "
+                     "self-cancelled waiters does not match total seqnos.\n");
+            exit (EXIT_FAILURE);
+        }
+    }
+    return 0;
+}

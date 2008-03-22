@@ -6,8 +6,8 @@
 #include <check.h>
 
 #include "gcs_comp_test.h"
-#include "gcs_uuid_test.h"
 #include "gcs_proto_test.h"
+//#include "gcs_uuid_test.h"
 
 typedef Suite *(*suite_creator_t)(void);
 
@@ -15,7 +15,7 @@ static suite_creator_t suites[] =
     {
 	gcs_comp_suite,
 	gcs_proto_suite,
-	gcs_uuid_suite,
+//	gcs_uuid_suite,
 	NULL
     };
 
