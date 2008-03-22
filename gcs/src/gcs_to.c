@@ -50,12 +50,6 @@ to_get_waiter (gcs_to_t* to, gcs_seqno_t seqno)
     return (to->queue + (seqno & to->qmask));
 }
 
-#ifdef REMOVED
-static set_bit(struct gcs_to *to, gcs_seqno_t seqno) {
-  to->aborted[seqno / sizeof(char)] |= (1 << (seqno % sizeof(char));
-}
-#endif
-
 gcs_to_t *gcs_to_create (int len, gcs_seqno_t seqno)
 {
     gcs_to_t *ret;
@@ -183,6 +177,19 @@ int gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
     return err;
 }
 
+static inline void
+to_release_and_wake_next (gcs_to_t* to, to_waiter_t* w) {
+    w->state = RELEASED;
+    /* Iterate over CANCELED waiters and set states as RELEASED */
+    for (to->seqno++;
+         (w = to_get_waiter(to, to->seqno)) && w->state == CANCELED;
+         to->seqno++) {
+        w->state = RELEASED;
+    }
+    if (w->state == WAIT)
+        gu_cond_signal(&w->cond);
+}
+
 int gcs_to_release (gcs_to_t *to, gcs_seqno_t seqno)
 {
     int err;
@@ -196,14 +203,7 @@ int gcs_to_release (gcs_to_t *to, gcs_seqno_t seqno)
     w = to_get_waiter (to, seqno);
     
     if (seqno == to->seqno) {
-	w->state = RELEASED;
-	/* Iterate over CANCELED waiters and set states as RELEASED */
-	for (to->seqno++; (w = to_get_waiter(to, to->seqno)) && 
-		 w->state == CANCELED; to->seqno++) {
-	    w->state = RELEASED;
-	}
-	if (w->state == WAIT)
-	    gu_cond_signal(&w->cond);
+        to_release_and_wake_next (to, w);
     } else if (seqno > to->seqno) {
 	if (w->state != CANCELED) {
 	    gu_fatal("Illegal state in premature release: %d", w->state);
@@ -257,24 +257,32 @@ int gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno)
 
 int gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
 {
-    int err;
+    int err = 0;
     to_waiter_t *w;
+
     if ((err = gu_mutex_lock (&to->lock))) {
 	gu_fatal("Mutex lock failed (%d): %s", err, strerror(err));
 	abort();
     }
 
-    if (seqno < to->seqno) {
+    w = to_get_waiter(to, seqno);
+
+    if (seqno > to->seqno) { // most probable case
+        w->state = CANCELED;
+    }
+    else if (seqno == to->seqno) {
+        // have to wake the next waiter as if we grabbed and now releasing TO
+        to_release_and_wake_next (to, w);
+    }
+    else { // (seqno < to->seqno)
 	gu_fatal("Cannot self cancel utdated seqno: seqno %llu TO seqno %llu", seqno, to->seqno);
-	return -ECANCELED;
+	err = -ECANCELED;
     }
     
-    w = to_get_waiter(to, seqno);
-    w->state = CANCELED;
 
     gu_mutex_unlock(&to->lock);
     
-    return 0;
+    return err;
 }
 
 int gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno)
