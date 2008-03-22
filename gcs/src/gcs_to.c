@@ -255,7 +255,7 @@ int gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno)
     return err;
 }
 
-void gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
+int gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
 {
     int err;
     to_waiter_t *w;
@@ -265,14 +265,16 @@ void gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
     }
 
     if (seqno < to->seqno) {
-	gu_fatal("Cannot self cancel seqno that hasn't tried to grab: seqno %llu TO seqno %llu", seqno, to->seqno);
-	abort();
+	gu_fatal("Cannot self cancel utdated seqno: seqno %llu TO seqno %llu", seqno, to->seqno);
+	return -ECANCELED;
     }
     
     w = to_get_waiter(to, seqno);
     w->state = CANCELED;
 
     gu_mutex_unlock(&to->lock);
+    
+    return 0;
 }
 
 int gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno)
