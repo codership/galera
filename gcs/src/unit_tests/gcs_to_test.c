@@ -2,11 +2,12 @@
 
 #include <stdint.h>
 #include <pthread.h>
-#include <stdio.h>  // printf()
-#include <string.h> // strerror()
-#include <stdlib.h> // strtol(), EXIT_SUCCESS, EXIT_FAILURE
-#include <errno.h>
-#include <sys/time.h>
+#include <stdio.h>    // printf()
+#include <string.h>   // strerror()
+#include <stdlib.h>   // strtol(), exit(), EXIT_SUCCESS, EXIT_FAILURE
+#include <errno.h>    // errno
+#include <sys/time.h> // gettimeofday()
+#include <unistd.h>   // usleep()
 #include <check.h>
 
 #include <galerautils.h>
@@ -42,22 +43,32 @@ self_cancel (ulong rnd)
 static inline ulong
 cancel (ulong rnd)
 {
-    return (rnd & 0x70) >> 4; // returns 0 - 6
+#if 0
+    // this causes probablity of conflict 88%
+    // and average conflicts per seqno 3.5. Reveals a lot of corner cases
+    return (rnd & 0x70) >> 4; // returns 0..7
+#else
+    // this is more realistic. 
+    // probaboility of conflict 25%, conflict rate 0.375
+    register ulong ret = (rnd & 0x70) >> 4;
+    // returns 0,0,0,0,0,0,1,2
+    if (gu_likely(ret < 5)) return 0; else return (ret - 5); 
+#endif
 }
 
 /* offset of seqnos to cancel */
 static inline ulong
 cancel_offset (ulong rnd)
 {
-    return ((rnd & 0x700) >> 8) + 1; // returns 1 - 7
+    return ((rnd & 0x700) >> 8) + 1; // returns 1 - 8
 }
 
 static gcs_to_t*   to          = NULL;
 static ulong       thread_max  = 16;   // default number of threads
-static gcs_seqno_t seqno_max   = 8192; // default number of seqnos to check
+static gcs_seqno_t seqno_max   = 1<<7; // default number of seqnos to check
 
 /* mutex to synchronize threads start */
-static pthread_mutex_t sync  = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t start  = PTHREAD_MUTEX_INITIALIZER;
 
 void* run_thread(void* ctx)
 {
@@ -65,53 +76,60 @@ void* run_thread(void* ctx)
     gcs_seqno_t seqno = thd->thread_id; // each thread starts with own offset
                                         // to guarantee uniqueness of seqnos
                                         // without having to lock mutex
-    pthread_mutex_lock   (&sync); // wait for start signal
-    pthread_mutex_unlock (&sync);
+    pthread_mutex_lock   (&start); // wait for start signal
+    pthread_mutex_unlock (&start);
 
     while (seqno < seqno_max) {
         long ret;
         ulong rnd = my_rnd(seqno);
 
         if (gu_unlikely(self_cancel(rnd))) {
-            printf("Self-cancelling seqno %8llu...", seqno);
+            printf("Self-cancelling %8llu\n", seqno);
             ret = gcs_to_self_cancel(to, seqno);
             if (gu_unlikely(ret)) {
-                printf ("failed\n");
-                fprintf (stderr, "gcs_to_self_cancel() returned %ld (%s)\n",
-                         ret, strerror(-ret));
+                fprintf (stderr, "gcs_to_self_cancel(%llu) returned %ld (%s)\n",
+                         seqno, ret, strerror(-ret));
                 exit (EXIT_FAILURE);
             }
             else {
-                printf ("success\n");
+                printf ("Self-cancel success (%llu)\n", seqno);
                 thd->stat_self++;
             }
         }
         else {
-            printf("Grabbing seqno %8llu...", seqno);
-            ret = gcs_to_grab (to, seqno);
+            printf("Grabbing %8llu\n", seqno);
+            while ((ret = gcs_to_grab (to, seqno)) == -EAGAIN) usleep (10000);
             if (gu_unlikely(ret)) {
                 if (gu_likely(-ECANCELED == ret)) {
-                    printf ("canceled\n");
+                    printf ("canceled (%llu)\n", seqno);
                     thd->stat_fails++;
                 }
                 else {
-                    printf ("failed\n");
-                    fprintf (stderr, "gcs_to_grab() returned %ld (%s)\n",
-                             ret, strerror(-ret));
+                    fprintf (stderr, "gcs_to_grab(%llu) returned %ld (%s)\n",
+                             seqno, ret, strerror(-ret));
                     exit (EXIT_FAILURE);
                 }
             }
             else {
                 long cancels = cancel(rnd);
-                printf ("success, cancels = %ld\n", cancels);
+                printf ("success (%llu), cancels = %ld\n", seqno, cancels);
                 if (gu_likely(cancels)) {
                     long offset = cancel_offset (rnd);
                     gcs_seqno_t cancel_seqno = seqno + offset;
 
                     while (cancels-- && (cancel_seqno < seqno_max)) {
                         ret = gcs_to_cancel(to, cancel_seqno);
-                        cancel_seqno += offset;
-                        thd->stat_cancels++;
+                        if (gu_unlikely(ret)) {
+                            fprintf (stderr, "gcs_to_cancel(%llu) by %llu "
+                                     "failed: %s\n", cancel_seqno, seqno,
+                                     strerror (ret));
+                        }
+                        else {
+                            printf ("%llu canceled %llu\n",
+                                    seqno, cancel_seqno);
+                            cancel_seqno += offset;
+                            thd->stat_cancels++;
+                        }
                     }
                 }
                 thd->stat_grabs++;
@@ -122,7 +140,8 @@ void* run_thread(void* ctx)
         seqno += thread_max; // this together with unique starting point
                              // guarantees that seqnos are unique
     }
-
+    printf ("Thread %ld exiting. Last seqno = %llu\n",
+            thd->thread_id, seqno - thread_max);
     return NULL;
 }
 
@@ -153,7 +172,7 @@ int main (int argc, char* argv[])
         double time_spent;
         struct thread_ctx thread[thread_max];
 
-        pthread_mutex_lock (&sync); {
+        pthread_mutex_lock (&start); {
             /* initialize threads */
             for (i = 0; i < thread_max; i++) {
                 thread[i].thread_id    = i;
@@ -170,7 +189,7 @@ int main (int argc, char* argv[])
                 }
             }
             gettimeofday (&begin, NULL);
-        } pthread_mutex_unlock (&sync); // release threads
+        } pthread_mutex_unlock (&start); // release threads
 
         /* wait for threads to complete and accumulate statistics */
         pthread_join (thread[0].thread, NULL);
