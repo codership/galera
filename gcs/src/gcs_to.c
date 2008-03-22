@@ -277,11 +277,10 @@ int gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
         to_release_and_wake_next (to, w);
     }
     else { // (seqno < to->seqno)
-	gu_fatal("Cannot self cancel utdated seqno: seqno %llu TO seqno %llu", seqno, to->seqno);
-	err = -ECANCELED;
+        // This waiter must have been canceled or even released by preceding
+        // waiter. Do nothing.
     }
     
-
     gu_mutex_unlock(&to->lock);
     
     return err;
