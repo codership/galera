@@ -45,6 +45,7 @@ libwsdb_la_LDFLAGS = \
 	-Wl,--whole-archive -lgalerautils -Wl,--no-whole-archive \
 	-version-info $(WSDB_INTERFACE):$(WSDB_REVISION):$(WSDB_AGE)
 libwsdb_la_CFLAGS = $(CFLAGS) -fno-strict-aliasing
+libwsdb_la_CPPFLAGS = $(CPPFLAGS)
 # </libwsdb>
 
 # <libgalera>
@@ -65,7 +66,7 @@ GALERA_REVISION  = 0
 GALERA_AGE       = 0
 libgalera_la_LDFLAGS = \
 	-version-info $(GALERA_INTERFACE):$(GALERA_REVISION):$(GALERA_AGE)
-
+libgalera_la_CPPFLAGS = $(CPPFLAGS)
 # </libgalera>
 
 #.PHONY: tags dumpwsdb

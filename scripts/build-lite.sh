@@ -85,7 +85,6 @@ done
 set -x
 
 # Build process base directory
-#build_base=`pwd`
 build_base=$(cd $(dirname $0); cd ..; pwd -P)
 
 # Define branches to be used
@@ -101,30 +100,12 @@ if ! test -d $build_base/build ; then
 fi
 
 
-# Install destination setup
-prefix=${GALERA_BUILD_PREFIX:-"opt/galera"}
-destdir=${GALERA_BUILD_DEST:-"$build_base/build/dest"}
-
-export GALERA_DEST="$destdir/$prefix"
-
-
-#
-# export DESTDIR=$destdir
-# export LIBDIR="$destdir/lib"
-
-# Export this for configure scripts
-# For example wsdb conf calls AC_FUNC_MALLOC which tries
-# to link against -lgcs, which obviously is not found from
-# standard locations. 
-
-export LD_LIBRARY_PATH="$GALERA_DEST/lib"
-
-# Export build prefix also for mysql
-export MYSQL_BUILD_PREFIX=$GALERA_DEST
-
-# Flags for configure scripts 
-conf_flags="--prefix=$GALERA_DEST"
-galera_flags="--with-galera=$GALERA_DEST"
+# Flags for configure scripts
+if test -n GALERA_DEST
+then
+    conf_flags="--prefix=$GALERA_DEST"
+    galera_flags="--with-galera=$GALERA_DEST"
+fi
 
 if [ "$RELEASE" == "yes" ]
 then
@@ -148,7 +129,7 @@ build()
     export CPPFLAGS
     export LDFLAGS
     if [ "$BOOTSTRAP" == "yes" ]; then ./bootstrap.sh; CONFIGURE=yes ; fi
-    if [ "$CONFIGURE" == "yes" ]; then ./configure $@; SCRATCH=yes ; fi
+    if [ "$CONFIGURE" == "yes" ]; then rm -rf config.status; ./configure $@; SCRATCH=yes ; fi
     if [ "$SCRATCH"   == "yes" ]; then make clean ; fi
     make
     LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$build_dir/src/.libs

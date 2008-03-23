@@ -183,8 +183,8 @@ int gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
             pthread_mutex_lock (&w->mtx);
             pthread_mutex_unlock (&to->lock);
             pthread_mutex_lock (&w->mtx); // wait for unlock by other thread
-            pthread_mutex_unlock (&w->mtx);
             pthread_mutex_lock (&to->lock);
+            pthread_mutex_unlock (&w->mtx);
 #endif
 	    to->used--;
 	    if (w->state == WAIT) { // should be most probable
