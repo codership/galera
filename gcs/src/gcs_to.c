@@ -16,6 +16,8 @@
 
 #include "gcs.h"
 
+#define TO_USE_SIGNAL 1
+
 typedef enum  {
   HOLDER = 0, //!< current TO holder
   WAIT,       //!< actively waiting in the queue
@@ -26,9 +28,13 @@ typedef enum  {
 
 typedef struct
 {
-    gu_cond_t cond;
-    waiter_state_t state;
-    int       has_aborted;
+#ifdef TO_USE_SIGNAL
+    gu_cond_t       cond;
+#else
+    pthread_mutex_t mtx;  // have to use native pthread for double locking
+#endif
+    waiter_state_t  state;
+    int             has_aborted;
 }
 to_waiter_t;
 
@@ -38,7 +44,6 @@ struct gcs_to
     size_t               used;
     size_t               qlen;
     size_t               qmask;
-    //gu_cond_t  *queue;
     to_waiter_t*         queue;
     gu_mutex_t           lock;
 };
@@ -78,7 +83,11 @@ gcs_to_t *gcs_to_create (int len, gcs_seqno_t seqno)
 	    size_t i;
 	    for (i = 0; i < ret->qlen; i++) {
                 to_waiter_t *w = ret->queue + i;
+#ifdef TO_USE_SIGNAL
 		gu_cond_init (&w->cond, NULL);
+#else
+                pthread_mutex_init (&w->mtx, NULL);
+#endif
                 w->state       = RELEASED;
                 w->has_aborted = 0;
 	    }
@@ -107,10 +116,17 @@ int gcs_to_destroy (gcs_to_t** to)
     
     for (i = 0; i < t->qlen; i++) {
         to_waiter_t *w = t->queue + i;
+#ifdef TO_USE_SIGNAL
 	if (gu_cond_destroy (&w->cond)) {
             // @todo: what if someone is waiting?
 	    gu_warn ("Failed to destroy condition %d. Should not happen", i);
 	}
+#else
+	if (pthread_mutex_destroy (&w->mtx)) {
+            // @todo: what if someone is waiting?
+	    gu_warn ("Failed to destroy mutex %d. Should not happen", i);
+	}
+#endif
     }    
     t->qlen = 0;
     
@@ -148,7 +164,6 @@ int gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
 
     w = to_get_waiter (to, seqno);
 
-
     switch (w->state) {
     case CANCELED:
 	err = -ECANCELED;
@@ -162,7 +177,15 @@ int gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
 	} else { /* seqno > to->seqno, wait for my turn */
 	    w->state = WAIT;
 	    to->used++;
+#ifdef TO_USE_SIGNAL
 	    gu_cond_wait(&w->cond, &to->lock);
+#else
+            pthread_mutex_lock (&w->mtx);
+            pthread_mutex_unlock (&to->lock);
+            pthread_mutex_lock (&w->mtx); // wait for unlock by other thread
+            pthread_mutex_unlock (&w->mtx);
+            pthread_mutex_lock (&to->lock);
+#endif
 	    to->used--;
 	    if (w->state == WAIT) { // should be most probable
                 assert (seqno == to->seqno);
@@ -185,6 +208,24 @@ int gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
     return err;
 }
 
+static inline long
+to_wake_waiter (to_waiter_t* w)
+{
+    long err = 0;
+
+    if (w->state == WAIT) {
+#ifdef TO_USE_SIGNAL
+        err = gu_cond_signal (&w->cond);
+#else
+        err = pthread_mutex_unlock (&w->mtx);
+#endif
+        if (err) {
+            gu_fatal ("gu_cond_signal failed: %d", err);
+        }
+    }
+    return err;
+}
+
 static inline void
 to_release_and_wake_next (gcs_to_t* to, to_waiter_t* w) {
     w->state = RELEASED;
@@ -194,8 +235,7 @@ to_release_and_wake_next (gcs_to_t* to, to_waiter_t* w) {
          to->seqno++) {
         w->state = RELEASED;
     }
-    if (w->state == WAIT)
-        gu_cond_signal(&w->cond);
+    to_wake_waiter (w);
 }
 
 int gcs_to_release (gcs_to_t *to, gcs_seqno_t seqno)
@@ -253,16 +293,16 @@ int gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno)
 
     w = to_get_waiter (to, seqno);
     if (seqno > to->seqno) {
+        err = to_wake_waiter (w);
 	w->state = CANCELED;
-	err = gu_cond_signal (&w->cond);
-	if (err) 
-	    gu_warn("gu_cond_signal failed: %d", err);
     } else if (seqno == to->seqno) {
-	gu_warn("tried to cancel holder: state %d seqno %llu",
+	gu_warn("tried to cancel myself: state %d seqno %llu",
 		 w->state, seqno);
+        err = -ECANCELED;
     } else {
 	gu_warn("trying to cancel used seqno: state %d cancel seqno = %llu, "
 		"TO seqno = %llu", w->state, seqno, to->seqno);
+        err = -ECANCELED;        
     }
     
     gu_mutex_unlock (&to->lock);
@@ -278,6 +318,12 @@ int gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
 	gu_fatal("Mutex lock failed (%d): %s", err, strerror(err));
 	abort();
     }
+
+    // Check for queue overflow. Tell application that it should wait.
+    if (seqno >= to->seqno + to->qlen) {
+	gu_mutex_unlock(&to->lock);
+	return -EAGAIN;
+    }        
 
     w = to_get_waiter(to, seqno);
 
@@ -312,7 +358,7 @@ int gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno)
             to_waiter_t *w = to_get_waiter (to, seqno);
             w->state       = WITHDRAW;
             w->has_aborted = 0;
-            rcode = gu_cond_signal (&w->cond);
+            rcode = to_wake_waiter (w);
         } else {
             gu_warn ("trying to withdraw used seqno: cancel seqno = %llu, "
                      "TO seqno = %llu", seqno, to->seqno);

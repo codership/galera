@@ -64,11 +64,13 @@ cancel_offset (ulong rnd)
 }
 
 static gcs_to_t*   to          = NULL;
-static ulong       thread_max  = 16;   // default number of threads
-static gcs_seqno_t seqno_max   = 1<<7; // default number of seqnos to check
+static ulong       thread_max  = 16;    // default number of threads
+static gcs_seqno_t seqno_max   = 1<<20; // default number of seqnos to check
 
 /* mutex to synchronize threads start */
 static pthread_mutex_t start  = PTHREAD_MUTEX_INITIALIZER;
+
+static const useconds_t t = 10; // optimal sleep time
 
 void* run_thread(void* ctx)
 {
@@ -80,28 +82,28 @@ void* run_thread(void* ctx)
     pthread_mutex_unlock (&start);
 
     while (seqno < seqno_max) {
-        long ret;
+        long  ret;
         ulong rnd = my_rnd(seqno);
 
         if (gu_unlikely(self_cancel(rnd))) {
-            printf("Self-cancelling %8llu\n", seqno);
-            ret = gcs_to_self_cancel(to, seqno);
+//            printf("Self-cancelling %8llu\n", seqno);
+            while ((ret = gcs_to_self_cancel(to, seqno)) == -EAGAIN) usleep (t);
             if (gu_unlikely(ret)) {
                 fprintf (stderr, "gcs_to_self_cancel(%llu) returned %ld (%s)\n",
                          seqno, ret, strerror(-ret));
                 exit (EXIT_FAILURE);
             }
             else {
-                printf ("Self-cancel success (%llu)\n", seqno);
+//                printf ("Self-cancel success (%llu)\n", seqno);
                 thd->stat_self++;
             }
         }
         else {
-            printf("Grabbing %8llu\n", seqno);
-            while ((ret = gcs_to_grab (to, seqno)) == -EAGAIN) usleep (10000);
+//            printf("Grabbing %8llu\n", seqno);
+            while ((ret = gcs_to_grab (to, seqno)) == -EAGAIN) usleep (t);
             if (gu_unlikely(ret)) {
                 if (gu_likely(-ECANCELED == ret)) {
-                    printf ("canceled (%llu)\n", seqno);
+//                    printf ("canceled (%llu)\n", seqno);
                     thd->stat_fails++;
                 }
                 else {
@@ -112,7 +114,7 @@ void* run_thread(void* ctx)
             }
             else {
                 long cancels = cancel(rnd);
-                printf ("success (%llu), cancels = %ld\n", seqno, cancels);
+//                printf ("success (%llu), cancels = %ld\n", seqno, cancels);
                 if (gu_likely(cancels)) {
                     long offset = cancel_offset (rnd);
                     gcs_seqno_t cancel_seqno = seqno + offset;
@@ -125,8 +127,8 @@ void* run_thread(void* ctx)
                                      strerror (ret));
                         }
                         else {
-                            printf ("%llu canceled %llu\n",
-                                    seqno, cancel_seqno);
+//                            printf ("%llu canceled %llu\n",
+//                                    seqno, cancel_seqno);
                             cancel_seqno += offset;
                             thd->stat_cancels++;
                         }
@@ -140,8 +142,8 @@ void* run_thread(void* ctx)
         seqno += thread_max; // this together with unique starting point
                              // guarantees that seqnos are unique
     }
-    printf ("Thread %ld exiting. Last seqno = %llu\n",
-            thd->thread_id, seqno - thread_max);
+//    printf ("Thread %ld exiting. Last seqno = %llu\n",
+//            thd->thread_id, seqno - thread_max);
     return NULL;
 }
 
@@ -168,7 +170,7 @@ int main (int argc, char* argv[])
     /* main block */
     {
         long i, ret;
-        struct timeval begin, end;
+        clock_t start_clock, stop_clock;
         double time_spent;
         struct thread_ctx thread[thread_max];
 
@@ -188,7 +190,7 @@ int main (int argc, char* argv[])
                     exit (EXIT_FAILURE);
                 }
             }
-            gettimeofday (&begin, NULL);
+            start_clock = clock();
         } pthread_mutex_unlock (&start); // release threads
 
         /* wait for threads to complete and accumulate statistics */
@@ -200,14 +202,14 @@ int main (int argc, char* argv[])
             thread[0].stat_fails   += thread[i].stat_fails;
             thread[0].stat_self    += thread[i].stat_self;
         }
-        gettimeofday (&end, NULL);
-        time_spent = ((double)(end.tv_sec - begin.tv_sec)) * 1.0e06 +
-            end.tv_usec - begin.tv_usec;
-        time_spent = time_spent * 1.0e-06; // to seconds
+        stop_clock = clock();
+        time_spent = ((double)(stop_clock - start_clock)) / CLOCKS_PER_SEC;
 
         /* print statistics */
         printf ("%llu seqnos in %.3f seconds (%.3f seqno/sec)\n",
                 seqno_max, time_spent, ((double) seqno_max)/time_spent);
+        printf ("Overhead at 10000 actions/second: %.2f%%\n",
+                (time_spent * 10000 * 100/* for % */)/seqno_max);
         printf ("Grabbed:        %9lu\n"
                 "Failed:         %9lu\n"
                 "Self-cancelled: %9lu\n"
