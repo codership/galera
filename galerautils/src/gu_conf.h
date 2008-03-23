@@ -3,6 +3,8 @@
 /**
  * @file
  * Configuration interface for libgalerautils
+ *
+ * $Id$
  */
 
 #ifndef _gu_conf_h_

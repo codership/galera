@@ -3,7 +3,7 @@
 /**
  * @file Assert macro definition
  *
- * $ Id: $
+ * $Id$
  */
 
 #ifndef _gu_assert_h_

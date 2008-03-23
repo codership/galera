@@ -68,6 +68,8 @@
  *      Alexey Yurchenko:
  *      Renamed global symbols for use with galera project to avoid
  *      collisions with other software (notably MySQL)
+ *
+ * $Id$
  */
 
 #ifndef _dbug_h

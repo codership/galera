@@ -1,12 +1,17 @@
 // Copyright (C) 2007 Codership Oy <info@codership.com>
 
-#include "galerautils.h"
-#include "gu_mem.h"
-#include "gu_log.h"
+/**
+ * Debugging versions of memmory functions
+ *
+ * $Id$
+ */
 
 #include <stdint.h>
 #include <limits.h>
 #include <assert.h>
+
+#include "gu_mem.h"
+#include "gu_log.h"
 
 /* Some global counters - can be inspected by gdb */
 static volatile ssize_t gu_mem_total  = 0;

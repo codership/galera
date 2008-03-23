@@ -2,6 +2,8 @@
 
 /**
  * @file Logging API
+ *
+ * $Id$
  */
 
 #ifndef _gu_log_h_

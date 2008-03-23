@@ -2,6 +2,8 @@
 /**
  * @file
  * Declarations of memory allocation functions and macros
+ *
+ * $Id$
  */
 
 #ifndef _gu_mem_h_

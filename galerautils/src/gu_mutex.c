@@ -1,11 +1,14 @@
 // Copyright (C) 2007 Codership Oy <info@codership.com>
 
+/**
+ * Debug versions of thread functions
+ *
+ * $Id$
+ */
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include "gu_assert.h"
-#include "gu_mutex.h"
-#include "gu_log.h"
+#include "galerautils.h"
 
 /* Is it usable? */
 static const struct gu_mutex
@@ -18,17 +21,6 @@ gu_mutex_init = { .target_mutex      = PTHREAD_MUTEX_INITIALIZER,
 		  .file              = __FILE__,
 		  .line              = __LINE__
 };
-
-/*
-typedef struct gu_mutex_info
-{
-    struct gu_mutex_info *next;
-    struct gu_mutex_info *prev;
-    const  char          *init_file;
-    unsigned int          init_line;
-}
-gu_mutex_info_t;
-*/
 
 int gu_mutex_init_dbg (struct gu_mutex *m,
 		       const pthread_mutexattr_t* attr,
@@ -86,17 +78,18 @@ int gu_mutex_lock_dbg(struct gu_mutex *m,
         assert(0);
     }
     else {
-        if (m->holder_count != 0) {
-            gu_fatal("Mutex granted %d times at %s:%d",
+        if (gu_likely(m->holder_count == 0)) {
+            m->thread = pthread_self();
+            m->lock_waiter_count--;
+            m->holder_count++;
+            m->file = file;
+            m->line = line;
+        }
+        else {
+            gu_fatal("Mutex lock granted %d times at %s:%d",
                      m->holder_count, file, line);
             assert(0);
         }
-        
-        m->thread = pthread_self();
-        m->lock_waiter_count--;
-        m->holder_count++;
-        m->file = file;
-        m->line = line;
         pthread_mutex_unlock(&m->control_mutex);
     }
 
@@ -134,12 +127,7 @@ int gu_mutex_unlock_dbg (struct gu_mutex *m,
         }
         
         err = pthread_mutex_unlock (&m->target_mutex);
-        if (err) {
-            gu_fatal("Error: (%d,%d) during mutex unlock at %s:%d", 
-                     err, errno, file, line);
-            assert(0);
-        }
-        else {
+        if (gu_likely(!err)) {
             m->file   = file;
             m->line   = line;
             m->thread = 0;
@@ -147,18 +135,23 @@ int gu_mutex_unlock_dbg (struct gu_mutex *m,
              * normally or from cancellation handler, if holder_count not 0 -
              * assume it is normal unlock, otherwise we decrement
              * cond_waiter_count */
-            if (m->holder_count) {
+            if (gu_likely(m->holder_count)) {
                 m->holder_count--;
             }
             else {
-                if (0 == m->cond_waiter_count) {
+                if (gu_likely(0 != m->cond_waiter_count)) {
+                    m->cond_waiter_count--;
+                } else {
                     gu_fatal ("Internal galerautils error: both holder_count "
                               "and cond_waiter_count are 0");
                     assert (0);
-                } else {
-                    m->cond_waiter_count--;
                 }
             }
+        }
+        else {
+            gu_fatal("Error: (%d,%d) during mutex unlock at %s:%d", 
+                     err, errno, file, line);
+            assert(0);
 	}
     }
     pthread_mutex_unlock(&m->control_mutex);
@@ -231,7 +224,7 @@ int gu_cond_wait_dbg (pthread_cond_t *cond, struct gu_mutex *m,
 
     pthread_mutex_lock (&m->control_mutex);
     {
-	if (m->holder_count <= 0) {
+	if (gu_unlikely(m->holder_count <= 0)) {
 	    gu_fatal ("%lu tries to wait for condition on unlocked mutex "
 	              "at %s %d",
 		      pthread_self(), file, line);

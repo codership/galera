@@ -76,7 +76,7 @@
  *      - Changed initialization so that it is done on the first
  *        call to _gu_db_push().
  *      
- *      
+ * $Id$     
  */
 
 #ifdef GU_DBUG_OFF

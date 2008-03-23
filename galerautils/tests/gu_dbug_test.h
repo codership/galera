@@ -1,4 +1,6 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+// Copyright (C) 2008 Codership Oy <info@codership.com>
+
+// $Id$
 
 #ifndef __gu_dbug_test__
 #define __gu_dbug_test__

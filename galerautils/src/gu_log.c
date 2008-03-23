@@ -1,6 +1,9 @@
 // Copyright (C) 2007 Codership Oy <info@codership.com>
+
 /**
- * @file Ligging functions definitions
+ * @file Logging functions definitions
+ *
+ * $Id$
  */
 
 #include <stdarg.h>
@@ -9,8 +12,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <sys/time.h>
-#include "gu_log.h"
-#include "gu_conf.h"
+#include "galerautils.h"
 
 /* Global configurable variables */
 static FILE* gu_log_file        = NULL;
@@ -97,18 +99,6 @@ gu_log_default (int severity, const char* string)
 
     if (gu_log_file) log_file = gu_log_file;
 
-#if 0 // Timestamping happens in gu_log(). This way timestamps can be
-      // enabled for the log_handle() supplied by application. The drawback
-      // (cosmetic) is that if this function is used, timestamp goes after
-      // severity. (It is contained in the log string passed to this func.)  
-    if (gu_log_self_tstamp) {
-        int   tstamp_len = 128;
-        char  tstamp[tstamp_len];
-	tstamp_len = gu_log_tstamp (tstamp, tstamp_len);
-	fprintf (log_file, "%s", tstamp);
-    }
-#endif
-
     fprintf (log_file, "%s: %s\n", sev, string);
     fflush (log_file);
 
@@ -159,12 +149,12 @@ gu_log (gu_log_severity_t severity,
 	max_string -= len;
     }
 
-    if (max_string > 0) {
+    if (gu_likely(max_string > 0)) {
 	len = snprintf (str, max_string, "%s:%s():%d: ",
 			file, function, line);
 	str += len;
 	max_string -= len;
-	if (max_string > 0 && format) {
+	if (gu_likely(max_string > 0 && format)) {
 	    va_start (ap, format);
 	    vsnprintf (str, max_string, format, ap);
 	    va_end (ap);

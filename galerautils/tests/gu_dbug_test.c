@@ -1,3 +1,7 @@
+// Copyright (C) 2008 Codership Oy <info@codership.com>
+
+// $Id$
+
 /* Pthread yield */
 #define _GNU_SOURCE 1
 #include <pthread.h>

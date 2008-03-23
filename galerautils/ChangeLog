@@ -1,3 +1,10 @@
+2008-03-23 Alex
+    Added gu_timeval_diff() and gu_clock_diff() functions.
+    Bumped interface version.
+
+2008-02-21 Teemu
+    Made DBUG thread safe.
+    
 2007-11-01 Alex
     Fixed thread safe compilation without MySQL
     Tagged release 0.2.5

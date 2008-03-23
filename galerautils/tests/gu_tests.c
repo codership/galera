@@ -1,5 +1,7 @@
 // Copyright (C) 2007 Codership Oy <info@codership.com>
 
+// $Id$
+
 #include <stdio.h>  // printf()
 #include <string.h> // strcmp()
 #include <stdlib.h> // EXIT_SUCCESS | EXIT_FAILURE
@@ -7,6 +9,7 @@
 #include "gu_mem_test.h"
 #include "gu_bswap_test.h"
 #include "gu_dbug_test.h"
+#include "gu_time_test.h"
 
 typedef Suite *(*suite_creator_t)(void);
 
@@ -15,6 +18,7 @@ static suite_creator_t suites[] =
 	gu_mem_suite,
 	gu_bswap_suite,
 	gu_dbug_suite,
+        gu_time_suite,
 	NULL
     };
 

@@ -1,7 +1,9 @@
 // Copyright (C) 2007 Codership Oy <info@codership.com>
 
 /**
- * @file Special mutex replacements for debugging
+ * @file Special mutex replacements for debugging/porting
+ *
+ * $Id$
  */
  
 #ifndef _gu_mutex_h_

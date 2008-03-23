@@ -1,5 +1,7 @@
 // Copyright (C) 2007 Codership Oy <info@codership.com>
 
+// $Id$
+
 #include <stdint.h>
 #include <check.h>
 #include "gu_bswap_test.h"

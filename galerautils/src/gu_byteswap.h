@@ -3,7 +3,7 @@
 /**
  * @file Byte swapping functions/macros
  *
- * $Id:$
+ * $Id$
  */
 
 #ifndef _gu_byteswap_h_
