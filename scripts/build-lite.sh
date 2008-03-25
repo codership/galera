@@ -31,7 +31,7 @@ usage()
 	"    -s|--scratch    build everything from scratch\n"\
 	"    -c|--configure  reconfigure the build system (implies -s)\n"\
 	"    -b|--bootstap   rebuild the build system (implies -c)\n"\
-	"    -r|--release    configure build with debug disabled (implies -c)\n"
+	"    -r|--release    configure build with debug disabled (implies -c)\n" \
 	"    -d|--debug      configure build with debug disabled (implies -c)\n"
 
 }
