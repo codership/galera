@@ -51,6 +51,7 @@ static galera_log_cb_t           galera_log_handler = NULL;
 
 /* gcs parameters */
 static gcs_to_t           *to_queue    = NULL;
+static gcs_to_t           *commit_queue = NULL;
 static gcs_conn_t         *gcs_conn    = NULL;
 static gcs_backend_type_t  gcs_backend = GCS_BACKEND_DUMMY;
 static char               *gcs_channel = "dummy_galera";
@@ -175,6 +176,9 @@ enum galera_status galera_init(galera_gcs_backend_t backend,
     /* initialize total order queue */
     to_queue = gcs_to_create(16384, 1);
 
+    /* initialize commit queue */
+    commit_queue = gcs_to_create(16384, 1);
+
     Galera.repl_state = GALERA_INITIALIZED;
 
     gu_mutex_init(&commit_mtx, NULL);
@@ -206,6 +210,7 @@ void galera_dbug_pop (void)
 
 enum galera_status galera_tear_down() {
     if (to_queue) gcs_to_destroy(&to_queue);
+    if (commit_queue) gcs_to_destroy(&commit_queue);
     return GALERA_OK;
 }
 
@@ -444,7 +449,17 @@ static void process_conn_write_set(
 	gu_fatal("Failed to grab to_queue: %llu", seqno_l);
 	abort();
     }
+
+    /* release total order */
+    gcs_to_release(to_queue, seqno_l);
     
+
+    /* Grab commit resource */
+    if (gcs_to_grab(commit_queue, seqno_l) != 0) {
+	gu_fatal("Failed to grab commit_queue: %llu", seqno_l);
+	abort();
+    }
+
     /* certification ok */
     rcode = apply_write_set(app_ctx, ws);
     if (rcode) {
@@ -453,8 +468,8 @@ static void process_conn_write_set(
 	    );
     }
     
-    /* release total order */
-    gcs_to_release(to_queue, seqno_l);
+    gcs_to_release(commit_queue, seqno_l);
+
     return;
 }
 
@@ -464,6 +479,7 @@ static void process_query_write_set(
 ) {
     int rcode;
     struct job_context ctx;
+    int is_retry = 0;
 
     galera_log(111, "recv gcs_to_grab: %llu", seqno_l);
     /* wait for total order */
@@ -474,6 +490,10 @@ static void process_query_write_set(
 
     /* certification test */
     rcode = wsdb_append_write_set(seqno_g, ws);
+
+    /* release total order */
+    gcs_to_release(to_queue, seqno_l);
+
 
     //print_ws(wslog_G, ws, seqno_l);
 
@@ -496,18 +516,26 @@ static void process_query_write_set(
 	/* NOTE: In case of failure, wouldn't it be more correct to 
 	 * apply rollback than blindly commit? */
 	
+	if (is_retry == 0) {
+	    /* On first try grab commit_queue */
+	    if (gcs_to_grab(commit_queue, seqno_l) != 0) {
+		gu_fatal("Failed to grab to_queue: %llu", seqno_l);
+		abort();
+	    }
+	}
 	rcode = apply_query(app_ctx, "commit\0", 7);
-	
+
+
         if (rcode) {
 	    gu_warn("ws apply commit failed for: %llu, last_seen: %llu", 
 		    seqno_g, ws->last_seen_trx);
 	    rcode = WSDB_OK;
+	    is_retry = 1;
 	    goto retry;
         }
 
-	/* release total order */
-	gcs_to_release(to_queue, seqno_l);
-
+	gcs_to_release(commit_queue, seqno_l);
+	
         /* register committed transaction */
         if (!rcode) {
             wsdb_set_global_trx_committed(seqno_g);
@@ -520,8 +548,12 @@ static void process_query_write_set(
         /* certification failed, release */
         gu_warn("trx certification failed: %llu - %llu", seqno_l, ws->last_seen_trx);
         print_ws(wslog_G, ws, seqno_l);
-	/* release total order */
-	gcs_to_release(to_queue, seqno_l);
+	/* Cancel commit queue */
+	if (is_retry == 0 && gcs_to_self_cancel(commit_queue, seqno_l)) {
+	    gu_fatal("Failed to cancel commit_queue: %llu", seqno_l);
+	    abort();
+	}
+	gcs_to_release(commit_queue, seqno_l);
         break;
     default:  
         gu_error(
@@ -621,6 +653,13 @@ enum galera_status galera_recv(void *app_ctx) {
 		abort();
 	    }
 	    gcs_to_release (to_queue, seqno_l);
+	    
+	    if (gcs_to_self_cancel(commit_queue, seqno_l) != 0) {
+		gu_fatal("Failed to cancel commit_queue: %llu", seqno_l);
+		abort();
+	    }
+	    gcs_to_release (commit_queue, seqno_l);
+
 	    gu_free (action);
             break;
         default:
@@ -692,9 +731,19 @@ uint32_t galera_get_timestamp() {
 
 enum galera_status galera_committed(trx_id_t trx_id) {
 
+    trx_seqno_t seqno_l;
     GU_DBUG_ENTER("galera_committed");
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
+
+    if ((seqno_l = wsdb_get_local_trx_seqno(trx_id)) > 0 &&
+	seqno_l < GALERA_ABORT_SEQNO) {
+	if (gcs_to_release(commit_queue, seqno_l)) {
+	    gu_fatal("Could not release commit resource for %llu", seqno_l);
+	    abort();
+	}
+    }
+
     
     wsdb_set_local_trx_committed(trx_id);
     wsdb_delete_local_trx_info(trx_id);
@@ -704,9 +753,19 @@ enum galera_status galera_committed(trx_id_t trx_id) {
 
 enum galera_status galera_rolledback(trx_id_t trx_id) {
 
+    trx_seqno_t seqno_l;
+
     GU_DBUG_ENTER("galera_rolledback");
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
+
+    if ((seqno_l = wsdb_get_local_trx_seqno(trx_id)) > 0 &&
+	seqno_l < GALERA_ABORT_SEQNO) {
+	if (gcs_to_release(commit_queue, seqno_l)) {
+	    gu_fatal("Could not release commit resource for %llu", seqno_l);
+	    abort();
+	}
+    }
 
     wsdb_delete_local_trx_info(trx_id);
 
@@ -790,6 +849,8 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
 	/* Call self cancel to allow gcs_to_release() to skip this seqno */
 	gcs_to_self_cancel(to_queue, seqno_l);
 	gcs_to_release(to_queue, seqno_l);
+	gcs_to_self_cancel(commit_queue, seqno_l);
+	gcs_to_release(commit_queue, seqno_l);
 	GU_DBUG_RETURN(GALERA_TRX_FAIL);
     }
     
@@ -833,9 +894,25 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
     }
     
 after_cert_test:
+
     if (seqno_l > 0 && gcs_to_release(to_queue, seqno_l)) {
 	gu_warn("to release failed for %llu", seqno_l);
     }
+
+    if (retcode == GALERA_OK) {
+	/* Grab commit queue for commit time */
+	if (seqno_l > 0 && gcs_to_grab(commit_queue, seqno_l)) {
+	    gu_fatal("Failed to grab commit queue for %llu", seqno_l);
+	    abort();
+	}
+    } else {
+	/* Cancel commit queue since we are going to rollback */
+	if (seqno_l > 0 && gcs_to_self_cancel(commit_queue, seqno_l)) {
+	    gu_fatal("Failed to cancel commit queue for %llu", seqno_l);
+	    abort();
+	}
+    }
+
     wsdb_write_set_free(ws);
     GU_DBUG_RETURN(retcode);
 }
@@ -995,8 +1072,17 @@ enum galera_status galera_to_execute_start(
     /* record sequence number in connection info */
     conn_set_seqno(conn_id, seqno_g);
 
+    gcs_to_release(to_queue, seqno_l);
+
     /* release write set */
     wsdb_write_set_free(ws);
+
+
+    /* Grab commit queue */
+    if (gcs_to_grab(commit_queue, seqno_l) != 0) {
+	gu_fatal("Failed to grab commit_queue: %llu", seqno_l);
+	abort();
+    }
 
     GU_DBUG_RETURN(GALERA_OK);
 }
@@ -1012,10 +1098,10 @@ enum galera_status galera_to_execute_end(conn_id_t conn_id) {
         galera_log(GALERA_CONN_FAIL, "missing connection seqno: %llu",conn_id);
         GU_DBUG_RETURN(GALERA_CONN_FAIL);
     }
-
-    /* release total order */
-    gcs_to_release(to_queue, seqno);
-
+    
+    /* release commit queue */
+    gcs_to_release(commit_queue, seqno);
+    
     /* cleanup seqno reference */
     conn_set_seqno(conn_id, 0);
     
