@@ -1,7 +1,7 @@
 // Copyright (C) 2007 Codership Oy <info@codership.com>
 /*
  * Implementation of the generic communication layer.
- * See gcs_generic.h 
+ * See gcs_core.h 
  */
 
 #include <string.h> // for mempcpy
@@ -13,21 +13,21 @@
 #include "gcs_comp_msg.h"
 #include "gcs_fifo.h"
 #include "gcs_act_proto.h"
-#include "gcs_generic.h"
+#include "gcs_core.h"
 
-#define GENERIC_FIFO_LEN 1<<15 // 32K elements (128/256K bytes)
+#define CORE_FIFO_LEN 1<<15 // 32K elements (128/256K bytes)
 
-typedef struct generic_recv_msg
+typedef struct core_recv_msg
 {
-    void* buf;
-    long  buf_len;
-    long  size;
-    long  sender_id;    
+    void*          buf;
+    long           buf_len;
+    long           size;
+    long           sender_id;    
     gcs_msg_type_t type;
 }
-generic_recv_msg_t;
+core_recv_msg_t;
 
-typedef struct generic_recv_act
+typedef struct core_recv_act
 {
     gcs_seqno_t    send_no;
     uint8_t*       head; // head of action buffer
@@ -36,23 +36,23 @@ typedef struct generic_recv_act
     size_t         received;
     gcs_act_type_t type;
 }
-generic_recv_act_t;
+core_recv_act_t;
 
-typedef enum generic_state
+typedef enum core_state
 {
-    GENERIC_PRIMARY,
-    GENERIC_NON_PRIMARY,
-    GENERIC_CLOSED
+    CORE_PRIMARY,
+    CORE_NON_PRIMARY,
+    CORE_CLOSED
 }
-generic_state_t;
+core_state_t;
 
-struct gcs_generic_conn
+struct gcs_core_conn
 {
     /* connection per se */
-    long             my_id;
-    long             prim_comp_no;
-    generic_state_t  state;
-    gcs_comp_msg_t*  comp;
+    long            my_id;
+    long            prim_comp_no;
+    core_state_t    state;
+    gcs_comp_msg_t* comp;
 //    gu_mutex_t      prim_lock;
 //    gu_cond_t       prim_cond;
 //    gu_mutex_t      lock; // must get rid of it.
@@ -70,25 +70,25 @@ struct gcs_generic_conn
     gcs_fifo_t*     fifo;
 
     /* recv part */
-    gu_mutex_t          recv_lock;
-    generic_recv_msg_t  recv_msg;
+    gu_mutex_t      recv_lock;
+    core_recv_msg_t recv_msg;
     /* array of actions currently being received */
-    generic_recv_act_t *recv_acts;
-    long                recv_acts_num;
-    gcs_seqno_t         recv_act_no;  // actions must be numbered in the upper
-                                      // layer, remove in future refactoring
+    core_recv_act_t *recv_acts;
+    long             recv_acts_num;
+    gcs_seqno_t      recv_act_no;  // actions must be numbered in the upper
+                                   // layer, remove in future refactoring
 
     /* backend part */
-    size_t           msg_size;
-    gcs_backend_t    backend;         // message IO context
+    size_t          msg_size;
+    gcs_backend_t   backend;         // message IO context
 };
 
-long gcs_generic_open (gcs_generic_conn_t **generic,
-		       const char* const channel,
-		       const char* const backend_uri)
+long gcs_core_open (gcs_core_conn_t** core,
+                    const char* const channel,
+                    const char* const backend_uri)
 {
-    long                err = 0;
-    gcs_generic_conn_t *conn = GU_CALLOC (1, gcs_generic_conn_t);
+    long             err  = 0;
+    gcs_core_conn_t* conn = GU_CALLOC (1, gcs_core_conn_t);
 
     if (NULL == conn) return -ENOMEM;
 
@@ -108,13 +108,13 @@ long gcs_generic_open (gcs_generic_conn_t **generic,
     conn->recv_msg.buf_len = RECV_INIT_BUF;
 #undef RECV_INIT_BUF
 
-    conn->fifo = gcs_fifo_create (GENERIC_FIFO_LEN);
+    conn->fifo = gcs_fifo_create (CORE_FIFO_LEN);
     if (!conn->fifo) {
 	err = -ENOMEM;
 	goto out1;
     }
 
-    conn->state = GENERIC_NON_PRIMARY;
+    conn->state = CORE_NON_PRIMARY;
 
     gu_mutex_init (&conn->send_lock, NULL);
     gu_mutex_init (&conn->recv_lock, NULL);
@@ -135,12 +135,13 @@ long gcs_generic_open (gcs_generic_conn_t **generic,
 	uint8_t         *action;
 	int ret;
 	do {
-	    ret = gcs_generic_recv
-		(conn, &action, &act_type, &act_id);
+	    ret = gcs_core_recv (conn, &action, &act_type, &act_id);
 	    if (ret < 0) return ret;
+
 	    gu_debug ("Received action: act_id = %llu, act_type = %d, "
                       "act_size = %d, action = %p",
                       act_id, act_type, ret, action);
+
 	    if (action) free (action); // hide action from upper layer
 	} while (act_type != GCS_ACT_PRIMARY);
     }
@@ -150,7 +151,7 @@ long gcs_generic_open (gcs_generic_conn_t **generic,
 
     conn->proto_ver = 0;
     
-    *generic = conn;
+    *core = conn;
     return 0;
 
 out1:
@@ -158,15 +159,15 @@ out1:
 out:
     conn->backend.close (&conn->backend);
     gu_free (conn);
-    *generic = NULL;
+    *core = NULL;
     return err;
 }
 
 ssize_t
-gcs_generic_send (gcs_generic_conn_t* const conn,
-		  const uint8_t*            action,
-		  size_t                    act_size,
-		  gcs_act_type_t      const act_type)
+gcs_core_send (gcs_core_conn_t* const conn,
+               const uint8_t*         action,
+               size_t                 act_size,
+               gcs_act_type_t   const act_type)
 {
     ssize_t        ret  = 0;
     size_t         sent = 0;
@@ -174,7 +175,7 @@ gcs_generic_send (gcs_generic_conn_t* const conn,
     size_t         head_size;
     size_t         send_size;
 
-    if (conn->state != GENERIC_PRIMARY)           return -ENOTCONN;
+    if (conn->state != CORE_PRIMARY)           return -ENOTCONN;
     if ((ret = gu_mutex_lock (&conn->send_lock))) return -ret;
 
     /* 
@@ -253,11 +254,11 @@ out:
     return ret;
 }
 
-/* A helper for gcs_generic_recv().
+/* A helper for gcs_core_recv().
  * Deals with fetching complete message from backend
  * and reallocates recv buf if needed */
 static inline long
-generic_msg_recv (gcs_backend_t* backend, generic_recv_msg_t* recv_msg)
+core_msg_recv (gcs_backend_t* backend, core_recv_msg_t* recv_msg)
 {
     long ret;
 
@@ -311,9 +312,9 @@ generic_msg_recv (gcs_backend_t* backend, generic_recv_msg_t* recv_msg)
  *  Returns 1 in case full action is received, negative error code otherwise
  */
 static inline long
-generic_handle_action_msg (generic_recv_act_t*       act,
-			   const generic_recv_msg_t* msg,
-			   bool                      foreign)
+core_handle_action_msg (core_recv_act_t*       act,
+                        const core_recv_msg_t* msg,
+                        bool                   foreign)
 {
     long           ret;
     gcs_act_frag_t frg;
@@ -361,9 +362,9 @@ generic_handle_action_msg (generic_recv_act_t*       act,
  * is held in conn->recv_msg, so conn is the only needed parameter.
  */
 static inline uint8_t*
-generic_pop_action (gcs_generic_conn_t* conn,
-		    generic_recv_act_t* act,
-		    long sender_id)
+core_pop_action (gcs_core_conn_t* conn,
+                 core_recv_act_t* act,
+                 long             sender_id)
 {
     uint8_t* ret;
 
@@ -388,16 +389,16 @@ generic_pop_action (gcs_generic_conn_t* conn,
  * to continue.
  *
  * @return
- *        GENERIC_PRIMARY or GENERIC_NON_PRIMARY in case of success or
+ *        CORE_PRIMARY or CORE_NON_PRIMARY in case of success or
  *        negative error code.
  */
 static long
-generic_handle_component (gcs_generic_conn_t* conn,
+core_handle_component (gcs_core_conn_t* conn,
 			  gcs_comp_msg_t* comp)
 {
     long recv_acts_num = 0;
     long new_idx, old_idx;
-    generic_recv_act_t *recv_acts = NULL;
+    core_recv_act_t *recv_acts = NULL;
 
     gu_debug ("primary = %s, my_id = %d, memb_num = %d, conn_state = %d",
 	      gcs_comp_msg_primary(comp) ? "yes" : "no",
@@ -408,10 +409,10 @@ generic_handle_component (gcs_generic_conn_t* conn,
 	/* Got PRIMARY COMPONENT - Hooray! */
 	/* create new recv_acts array according to new membrship */
 	recv_acts_num = gcs_comp_msg_num(comp);
-	recv_acts     = GU_CALLOC (recv_acts_num, generic_recv_act_t);
+	recv_acts     = GU_CALLOC (recv_acts_num, core_recv_act_t);
 	if (!recv_acts) return -ENOMEM;
 	
-	if (conn->state == GENERIC_PRIMARY) {
+	if (conn->state == CORE_PRIMARY) {
 	    /* we come from previous primary configuration */
 	    /* remap old array to new one to preserve action continuity */
 	    assert (conn->comp);
@@ -435,15 +436,15 @@ generic_handle_component (gcs_generic_conn_t* conn,
 	    /* It happened so that we missed some primary configurations */
 	    gu_debug ("Discontinuity in primary configurations!");
 	    gu_debug ("State snapshot is needed!");
-	    conn->state = GENERIC_PRIMARY;
+	    conn->state = CORE_PRIMARY;
 	}
     }
     else {
 	/* Got NON-PRIMARY COMPONENT - cleanup */
-	if (conn->state == GENERIC_PRIMARY) {
+	if (conn->state == CORE_PRIMARY) {
 	    /* All sending threads must be aborted with -ENOTCONN,
 	     * local action FIFO must be flushed. Not implemented: FIXME! */
-	    conn->state = GENERIC_NON_PRIMARY;
+	    conn->state = CORE_NON_PRIMARY;
 	}
     }
 
@@ -471,19 +472,19 @@ generic_handle_component (gcs_generic_conn_t* conn,
 //static void recv_lock_cleanup (void *m) { gu_mutex_unlock (m); }
 
 /*! Receives action */
-ssize_t gcs_generic_recv (gcs_generic_conn_t* conn,
-			  uint8_t**           action,
-			  gcs_act_type_t*     act_type,
-			  gcs_seqno_t*        act_id) // should not be here!!!
+ssize_t gcs_core_recv (gcs_core_conn_t* conn,
+                       uint8_t**        action,
+                       gcs_act_type_t*  act_type,
+                       gcs_seqno_t*     act_id) // should not be here!!!
 {
-    generic_recv_msg_t* recv_msg = &conn->recv_msg;
+    core_recv_msg_t* recv_msg = &conn->recv_msg;
     long ret = 0;
 
     *action   = NULL;
     *act_type = GCS_ACT_ERROR;
 
     if (gu_mutex_lock (&conn->recv_lock)) return -EBADFD;
-    if (GENERIC_CLOSED == conn->state) {
+    if (CORE_CLOSED == conn->state) {
 	gu_mutex_unlock (&conn->recv_lock);
 	return -EBADFD;
     }
@@ -493,17 +494,17 @@ ssize_t gcs_generic_recv (gcs_generic_conn_t* conn,
     while (1)
     {
 	long sender_id;
-	ret = generic_msg_recv (&conn->backend, recv_msg);
+	ret = core_msg_recv (&conn->backend, recv_msg);
 	if (ret < 0) goto out; /* backend error while receiving message */
 	sender_id = recv_msg->sender_id;
 
 	switch (recv_msg->type) {
 	case GCS_MSG_ACTION:
             assert (sender_id >= 0);
-	    if (GENERIC_PRIMARY == conn->state) {
-		generic_recv_act_t* recv_act  = conn->recv_acts + sender_id;
+	    if (CORE_PRIMARY == conn->state) {
+		core_recv_act_t* recv_act  = conn->recv_acts + sender_id;
 
-		ret = generic_handle_action_msg (recv_act,
+		ret = core_handle_action_msg (recv_act,
 						 recv_msg,
 						 sender_id != conn->my_id);
 		if (ret == 1) {
@@ -511,7 +512,7 @@ ssize_t gcs_generic_recv (gcs_generic_conn_t* conn,
 		    *act_id   = ++conn->recv_act_no;
 		    *act_type = recv_act->type;
 		    ret       = recv_act->size;
-		    *action   = generic_pop_action (conn, recv_act, sender_id);
+		    *action   = core_pop_action (conn, recv_act, sender_id);
 //                   gu_debug ("Received action: sender: %d, size: %d, act: %p",
 //                              conn->recv_msg.sender_id, ret, *action);
 //                    gu_debug ("%s", (char*) *action);
@@ -529,9 +530,9 @@ ssize_t gcs_generic_recv (gcs_generic_conn_t* conn,
 	    break;
 	case GCS_MSG_COMPONENT:
 	    *action = NULL;
-	    if ((ret = generic_handle_component (conn, recv_msg->buf)) >= 0) {
+	    if ((ret = core_handle_component (conn, recv_msg->buf)) >= 0) {
 		assert (ret == conn->state);
-		if (GENERIC_PRIMARY == ret) {
+		if (CORE_PRIMARY == ret) {
 		    *act_type = GCS_ACT_PRIMARY;
                     *act_id   = conn->recv_act_no;
 		} else {
@@ -540,7 +541,7 @@ ssize_t gcs_generic_recv (gcs_generic_conn_t* conn,
                     *act_id   = conn->recv_act_no;
 		}
 		gu_info ("Received %s component event.",
-			 GENERIC_PRIMARY == ret ? "primary" : "non-primary");
+			 CORE_PRIMARY == ret ? "primary" : "non-primary");
 		ret = 0; // return size
 	    }
 	    else {
@@ -564,19 +565,19 @@ out:
     return ret;
 }
 
-long gcs_generic_close (gcs_generic_conn_t** generic)
+long gcs_core_close (gcs_core_conn_t** core)
 {
-    gcs_generic_conn_t *conn = *generic;
+    gcs_core_conn_t *conn = *core;
     uint8_t* dead_action = NULL;
     int i = 0;
 
     if (!conn) return -EINVAL;
     if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
-    if (GENERIC_CLOSED == conn->state) {
+    if (CORE_CLOSED == conn->state) {
 	gu_mutex_unlock (&conn->send_lock);
 	return -EBADFD;
     }
-    conn->state = GENERIC_CLOSED;
+    conn->state = CORE_CLOSED;
     gu_mutex_unlock (&conn->send_lock);
     /* at this point all send attempts are isolated */
 
@@ -604,12 +605,12 @@ long gcs_generic_close (gcs_generic_conn_t** generic)
     gu_free (conn->recv_msg.buf);
     gu_free (conn->send_buf);
     gu_free (conn);
-    *generic = NULL;
+    *core = NULL;
     return 0;
 }
 
 long
-gcs_generic_set_pkt_size (gcs_generic_conn_t* conn, ulong pkt_size)
+gcs_core_set_pkt_size (gcs_core_conn_t* conn, ulong pkt_size)
 {
     long msg_size = conn->backend.msg_size (&conn->backend, pkt_size);
     long hdr_size = gcs_act_proto_hdr_size (conn->proto_ver);
@@ -628,7 +629,7 @@ gcs_generic_set_pkt_size (gcs_generic_conn_t* conn, ulong pkt_size)
               conn->send_buf_len, msg_size);
 
     if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
-    if (GENERIC_CLOSED != conn->state) {
+    if (CORE_CLOSED != conn->state) {
         new_send_buf = gu_realloc (conn->send_buf, msg_size);
         if (new_send_buf) {
             conn->send_buf     = new_send_buf;

@@ -13,7 +13,7 @@
 #include <galerautils.h>
 
 #include "gcs.h"
-#include "gcs_generic.h"
+#include "gcs_core.h"
 #include "gcs_fifo.h"
 #include "gcs_queue.h"
 
@@ -52,8 +52,8 @@ struct gcs_conn
 //    /* A condition for threads which called gcs_recv()  */
 //    gu_cond_t *recv_cond;
 
-    gcs_generic_conn_t *generic; // the context that is returned by
-                   // the generic group communication system
+    gcs_core_conn_t *core; // the context that is returned by
+                              // the generic group communication system
 };
 
 typedef struct gcs_act
@@ -87,12 +87,12 @@ static void *gcs_recv_thread (void *arg)
 
     while (conn->state == GCS_CONN_OPEN)
     {
-	if ((act_size = gcs_generic_recv (conn->generic,
-					  &action,
-					  &act_type,
-					  &act_id)) < 0) {
+	if ((act_size = gcs_core_recv (conn->core,
+                                       &action,
+                                       &act_type,
+                                       &act_id)) < 0) {
 	    ret = act_size;
-	    gu_debug ("gcs_generic_recv returned %d: %s", gcs_strerror(ret));
+	    gu_debug ("gcs_core_recv returned %d: %s", gcs_strerror(ret));
 	    break;
 	}
 
@@ -190,10 +190,10 @@ int gcs_open (gcs_conn_t **gcs, const char *channel, const char *backend)
     conn->state = -GCS_CONN_CLOSED;
 
     /* Some conn fields must be initialized during this call */
-    if ((err = gcs_generic_open (&conn->generic, channel, backend)))
+    if ((err = gcs_core_open (&conn->core, channel, backend)))
 	return err;
 
-    if ((err = gcs_generic_set_pkt_size (conn->generic, GCS_DEFAULT_PKT_SIZE)))
+    if ((err = gcs_core_set_pkt_size (conn->core, GCS_DEFAULT_PKT_SIZE)))
 	return err;
 
     conn->repl_q  = gcs_fifo_create (GCS_MAX_REPL_THREADS);
@@ -267,7 +267,7 @@ int gcs_close (gcs_conn_t **gcs)
     /** @note: We have to close connection before joining RECV thread
      *         since it may be blocked in gcs_backend_receive().
      *         That also means, that RECV thread should surely exit here. */
-    if ((err = gcs_generic_close (&conn->generic))) return err;
+    if ((err = gcs_core_close (&conn->core))) return err;
 
 
     //  /* Cancel main recv_thread if it is not blocked in gcs_backend_recv() */
@@ -296,7 +296,7 @@ int gcs_send (gcs_conn_t *conn, const gcs_act_type_t act_type,
      *         because they block indefinitely waiting for actions */
     if (!gu_mutex_lock (&conn->lock)) { 
         if (GCS_CONN_OPEN == conn->state) {
-            ret = gcs_generic_send (conn->generic, action, act_size, act_type);
+            ret = gcs_core_send (conn->core, action, act_size, act_type);
         }
         gu_mutex_unlock (&conn->lock);
     }
@@ -341,10 +341,7 @@ int gcs_repl (gcs_conn_t          *conn,
         {
             if (!(ret = gcs_fifo_put (conn->repl_q, &act)))
             {
-                ret = gcs_generic_send (conn->generic,
-                                        action,
-                                        act_size,
-                                        act_type);
+                ret = gcs_core_send (conn->core, action, act_size, act_type);
                 if (ret < 0) {
                     /* sending failed - remove item from the queue */
                     if (gcs_fifo_remove(conn->repl_q)) {
@@ -424,5 +421,5 @@ int gcs_recv (gcs_conn_t *conn, gcs_act_type_t *act_type,
 long
 gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size)
 {
-    return gcs_generic_set_pkt_size (conn->generic, pkt_size);
+    return gcs_core_set_pkt_size (conn->core, pkt_size);
 }

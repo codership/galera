@@ -5,22 +5,22 @@ AM_CFLAGS += -DGCS_DEBUG_GCS
 AM_CFLAGS += -DGCS_DEBUG_QUEUE
 AM_CFLAGS += -DGCS_DEBUG_PROTO
 AM_CFLAGS += -DGCS_DEBUG_SPREAD
-AM_CFLAGS += -DGCS_DEBUG_GENERIC
+AM_CFLAGS += -DGCS_DEBUG_CORE
 AM_CFLAGS += -DGCS_LOGGING
 endif
 
 GCS_SRCS = \
-	gcs_conf.c     \
-	gcs_error.c    \
-	gcs_fifo.c     \
-	gcs_queue.c    \
-	gcs_to.c       \
-	gcs_uuid.c     \
-	gcs_comp_msg.c \
-	gcs_dummy.c    \
-	gcs_backend.c  \
+	gcs_conf.c      \
+	gcs_error.c     \
+	gcs_fifo.c      \
+	gcs_queue.c     \
+	gcs_to.c        \
+	gcs_uuid.c      \
+	gcs_comp_msg.c  \
+	gcs_dummy.c     \
+	gcs_backend.c   \
 	gcs_act_proto.c \
-	gcs_generic.c  \
+	gcs_core.c      \
 	gcs.c
 
 if ENABLE_SPREAD
