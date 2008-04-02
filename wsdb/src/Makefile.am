@@ -61,7 +61,7 @@ libgalera_la_SOURCES = \
 #endif
 libgalera_la_DEPENDENCIES = libwsdb.la
 libgalera_la_LIBADD       = libwsdb.la
-GALERA_INTERFACE = 3
+GALERA_INTERFACE = 4
 GALERA_REVISION  = 0
 GALERA_AGE       = 0
 libgalera_la_LDFLAGS = \

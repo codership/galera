@@ -44,9 +44,9 @@ lib_LTLIBRARIES   = libgcs.la
 libgcs_la_SOURCES = $(GCS_SRCS) $(GCS_INCS)
 libgcs_la_LIBADD = $(GCOMM_LIBS)
 #libgcs_la_LDADD =
-INTERFACE = 2
-REVISION  = 1
-AGE       = 1
+INTERFACE = 3
+REVISION  = 0
+AGE       = 0
 libgcs_la_LDFLAGS = \
 	-version-info $(INTERFACE):$(REVISION):$(AGE)
 
