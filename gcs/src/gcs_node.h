@@ -7,6 +7,11 @@
 #ifndef _gcs_node_h_
 #define _gcs_node_h_
 
+#include "gcs.h"
+
+#define GCS_COMP_MSG_ACCESS
+#include "gcs_comp_msg.h"
+
 typedef struct node_recv_act
 {
     gcs_seqno_t    send_no;

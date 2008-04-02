@@ -20,6 +20,8 @@ GCS_SRCS = \
 	gcs_dummy.c     \
 	gcs_backend.c   \
 	gcs_act_proto.c \
+	gcs_node.c      \
+	gcs_group.c     \
 	gcs_core.c      \
 	gcs.c
 
