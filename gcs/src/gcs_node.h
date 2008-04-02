@@ -9,7 +9,6 @@
 
 #include "gcs.h"
 
-#define GCS_COMP_MSG_ACCESS
 #include "gcs_comp_msg.h"
 
 typedef struct node_recv_act
@@ -28,10 +27,20 @@ struct gcs_node
     gcs_seqno_t     last_applied; // last applied action on that node
     long            queue_len;    // action queue length on that node
     node_recv_act_t app;          // defragmenter for application actions
-    node_recv_act_t service;      // defragmenter for out-of-band service acts.
-    gcs_comp_memb_t id;           // unique identifier provided by backend
+    node_recv_act_t oob;          // defragmenter for out-of-band service acts.
+
+    // globally unique id from the component message
+    const char      id[GCS_COMP_MEMB_ID_MAX_LEN + 1];
 };
 
 typedef struct gcs_node gcs_node_t;
+
+/*! Move data from one node object to another */
+extern void
+gcs_node_move (gcs_node_t* dest, gcs_node_t* src);
+
+/*! Deallocate resources associated with the node object */
+extern void
+gcs_node_cleanup (gcs_node_t* node);
 
 #endif /* _gcs_node_h_ */

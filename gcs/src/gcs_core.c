@@ -394,7 +394,7 @@ core_pop_action (gcs_core_conn_t* conn,
  */
 static long
 core_handle_component (gcs_core_conn_t* conn,
-			  gcs_comp_msg_t* comp)
+                       gcs_comp_msg_t* comp)
 {
     long recv_acts_num = 0;
     long new_idx, old_idx;

@@ -7,6 +7,7 @@
 #ifndef _gcs_component_h_
 #define _gcs_component_h_
 
+#include <string.h>
 #include <stdbool.h>
 
 #define GCS_COMP_MEMB_ID_MAX_LEN 39 // should accommodate human readable UUID
@@ -26,6 +27,7 @@ typedef struct gcs_comp_msg
     gcs_comp_memb_t memb[0];   /// member array
 }
 gcs_comp_msg_t;
+
 #else
 typedef struct gcs_comp_msg gcs_comp_msg_t;
 #endif
