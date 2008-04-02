@@ -399,9 +399,11 @@ typedef struct gcs_test_conf
     int n_repl;
     int n_send;
     int n_recv;
-    gcs_backend_type_t backend;
+    const char* backend;
 }
 gcs_test_conf_t;
+
+static const char* DEFAULT_BACKEND = "dummy://";
 
 static int gcs_test_conf (gcs_test_conf_t *conf, int argc, char *argv[])
 {
@@ -412,7 +414,7 @@ static int gcs_test_conf (gcs_test_conf_t *conf, int argc, char *argv[])
     conf->n_repl  = 10;
     conf->n_send  = 0;
     conf->n_recv  = 0;
-    conf->backend = GCS_BACKEND_DUMMY;
+    conf->backend = DEFAULT_BACKEND;
 
     switch (argc)
     {
@@ -429,14 +431,7 @@ static int gcs_test_conf (gcs_test_conf_t *conf, int argc, char *argv[])
 	conf->n_tries = strtol (argv[2], &endptr, 10);
 	if ('\0' != *endptr) goto error;
     case 2:
-	if (!strcmp (argv[1], "dummy"))
-	    conf->backend = GCS_BACKEND_DUMMY;
-	else if (!strcmp (argv[1], "spread"))
-	    conf->backend = GCS_BACKEND_SPREAD;
-	else if (!strcmp(argv[1], "vs"))
-	    conf->backend = GCS_BACKEND_VS;
-	else
-	    goto error;
+        conf->backend = strdup (argv[1]);
 	break;
     default:
 	break;
@@ -447,7 +442,7 @@ static int gcs_test_conf (gcs_test_conf_t *conf, int argc, char *argv[])
 
     return 0;
 error:
-    printf ("Usage: %s [dummy|spread|vs] [tries:%d] [repl threads:%d] "
+    printf ("Usage: %s [backend] [tries:%d] [repl threads:%d] "
 	    "[send threads: %d] [recv threads: %d]\n",
 	    argv[0], conf->n_tries, conf->n_repl, conf->n_send, conf->n_recv);
     exit (EXIT_SUCCESS);
@@ -459,11 +454,7 @@ int main (int argc, char *argv[])
     gcs_test_conf_t conf;
     gcs_test_thread_pool_t repl_pool, send_pool, recv_pool;
     char *channel = "my_channel";
-    char *socket  = "192.168.0.1:4803";
     struct timeval t_begin, t_end;
-
-    if (getenv("GCS_TEST_SOCKET"))
-	socket = getenv("GCS_TEST_SOCKET");
 
     gcs_conf_debug_on(); // turn on debug messages
 
@@ -475,10 +466,10 @@ int main (int argc, char *argv[])
     if (!to) goto out;
 //    total_tries = conf.n_tries * (conf.n_repl + conf.n_send);
     
-    printf ("Opening connection: channel = %s, socket = %s, backend = %d\n",
-             channel, socket, conf.backend);
+    printf ("Opening connection: channel = %s, backend = %s\n",
+             channel, conf.backend);
 
-    if ((err = gcs_open (&gcs, channel, socket, conf.backend))) goto out;
+    if ((err = gcs_open (&gcs, channel, conf.backend))) goto out;
     printf ("Connected\n");
     msg_len = 1300; if (msg_len > MAX_MSG_LEN) msg_len = MAX_MSG_LEN; 
     gcs_conf_set_pkt_size (gcs, 7570); // to test fragmentation

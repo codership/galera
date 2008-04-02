@@ -33,8 +33,7 @@ typedef struct gcs_generic_conn gcs_generic_conn_t;
  */
 long gcs_generic_open  (gcs_generic_conn_t **conn,
 			const char* const channel,
-			const char* const socket,
-			gcs_backend_type_t const backend);
+			const char* const backend);
 
 /*
  * gcs_generic_close() frees resources allocated by gcs_geenric_open()

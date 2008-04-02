@@ -50,12 +50,11 @@ static galera_log_cb_t           galera_log_handler = NULL;
 //static void *app_ctx = NULL;
 
 /* gcs parameters */
-static gcs_to_t           *to_queue    = NULL;
+static gcs_to_t           *to_queue     = NULL;
 static gcs_to_t           *commit_queue = NULL;
-static gcs_conn_t         *gcs_conn    = NULL;
-static gcs_backend_type_t  gcs_backend = GCS_BACKEND_DUMMY;
-static char               *gcs_channel = "dummy_galera";
-static char               *gcs_socket  = NULL;
+static gcs_conn_t         *gcs_conn     = NULL;
+static char               *gcs_channel  = "dummy_galera";
+static char               *gcs_url      = NULL;
 
 static struct job_queue   *applier_queue = NULL;
 
@@ -126,8 +125,7 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
     return 0;
 }
 
-enum galera_status galera_init(galera_gcs_backend_t backend,
-			       const char*          group,
+enum galera_status galera_init(const char*          group,
 			       const char*          address,
 			       const char*          data_dir,
 			       galera_log_cb_t      logger)
@@ -136,36 +134,13 @@ enum galera_status galera_init(galera_gcs_backend_t backend,
     galera_log_handler = logger;
     
     /* set up GCS parameters */
-    switch (backend) {
-    case GALERA_GCS_DUMMY:
-        GU_DBUG_PRINT("galera", ("using dummy backend"));
-	gcs_backend = GCS_BACKEND_DUMMY;
-	break;
-    case GALERA_GCS_SPREAD:
-        GU_DBUG_PRINT("galera", ("using spread backend"));
-	gcs_backend = GCS_BACKEND_SPREAD;
-	if (address) {
-	    gcs_socket = strdup (address);
-	} else {
-	    gcs_socket = "localhost:4803"; /// default for Spread
-	}
-	if (group) {
-	    gcs_channel = strdup (group);
-	}
-	break;
-    case GALERA_GCS_VS:
-	GU_DBUG_PRINT("galera", ("using vs backend"));
-	gcs_backend = GCS_BACKEND_VS;
-	if (address) {
-	    gcs_socket = strdup(address);
-	} else {
-	    gcs_socket = "tcp:127.0.0.1:4567";
-	}
-	break;
-    default:
-        GU_DBUG_PRINT("galera", ("unknown backend: %d", backend));
-	/* FIXME: there must be a sensible message about unsupported backend */
-	assert (0);
+    if (address) {
+        gcs_url = strdup (address);
+    } else {
+        gcs_url = "dummy://";
+    }
+    if (group) {
+        gcs_channel = strdup (group);
     }
 
     /* initialize wsdb */
@@ -222,7 +197,7 @@ enum galera_status galera_enable() {
         GU_DBUG_RETURN(GALERA_NODE_FAIL);
     }
 
-    rcode = gcs_open(&gcs_conn, gcs_channel, gcs_socket, gcs_backend);
+    rcode = gcs_open(&gcs_conn, gcs_channel, gcs_url);
     switch(rcode) {
     case GCS_ERR_OK:
 	assert (gcs_conn);

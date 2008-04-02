@@ -20,15 +20,6 @@ typedef uint64_t gcs_seqno_t;
 * It is used to emphasize that action was not serialised */
 #define GCS_SEQNO_ILL (gcs_seqno_t) -1
 
-/*! @typedef @brief Supported group communication backends. */
-typedef enum gcs_backend_type
-{
-    GCS_BACKEND_DUMMY,  //! For testing purposes only
-    GCS_BACKEND_SPREAD, //! Based on Spread Toolkit (www.spread.org)
-    GCS_BACKEND_VS
-}
-gcs_backend_type_t;
-
 /*! Connection object */
 typedef struct gcs_conn gcs_conn_t;
 
@@ -39,18 +30,18 @@ typedef struct gcs_conn gcs_conn_t;
  *                the channel. If the channel with such name does not exist,
  *                it is established. Processes that joined the same channel
  *                receive the same actions.
- * @param socket  a string that denotes an actual connection object through
- *                which connection to the group is done. For Spread backend
- *                it can be "localhost:4803", for dummy backend it is ignored.
- * @param backend group communication backend type. Currently supported are:
- *                GCS_BACKEND_DUMMY, GCS_BACKEND_SPREAD.
- *                @see gcs_backend_type_t
+ * @param backend an URL-like string that specifies backend communication
+ *                driver in the form "TYPE://ADDRESS". For Spread backend
+ *                it can be "spread://localhost:4803", for dummy backend
+ *                ADDRESS field is ignored.
+ *
+ *                Currently supported backend types: "dummy", "spread", "gcomm"
+ *
  * @return negative error code, 0 in case of success.
  */
 int gcs_open  (gcs_conn_t **conn,
 	       const char *channel,
-	       const char *socket,
-	       const gcs_backend_type_t backend);
+	       const char *backend);
 
 /*! @brief Closes connection and frees resources associuated with it.
  *

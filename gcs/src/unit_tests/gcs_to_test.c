@@ -27,7 +27,7 @@ struct thread_ctx
 static inline ulong
 my_rnd (uint64_t x)
 {
-    x= 2654435761U * x; // http://www.concentric.net/~Ttwang/tech/inthash.htm
+    x = 2654435761U * x; // http://www.concentric.net/~Ttwang/tech/inthash.htm
     return (ulong)(x ^ (x >> 32)); // combine upper and lower halfs for better
                                    // randomness
 }

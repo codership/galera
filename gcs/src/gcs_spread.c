@@ -96,9 +96,11 @@ static long gcs_to_spread_socket (const char const *socket, char **sp_socket)
     return 0;
 }
 
-static long spread_create (spread_t **spread,
-			      const char* const channel,
-			      const char* const socket)
+static const char* spread_default_socket = "localhost:4803";
+
+static long spread_create (spread_t**  spread,
+                           const char* channel,
+                           const char* socket)
 {
     long err = 0;
     spread_t *sp = GU_CALLOC (1, spread_t);
@@ -106,6 +108,9 @@ static long spread_create (spread_t **spread,
     *spread = NULL;
     
     if (!sp) { err = -ENOMEM; goto out0; }
+
+    if (NULL == socket || strlen(socket) == 0)
+        socket = spread_default_socket;
 
     err = gcs_to_spread_socket (socket, &sp->socket);
     if (err < 0) { goto out1; }

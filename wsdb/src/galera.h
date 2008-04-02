@@ -24,13 +24,6 @@ enum galera_status {
     GALERA_FATAL,         //!< fatal error, server must abort
 };
 
-/* GCS backend types */
-typedef enum {
-    GALERA_GCS_DUMMY,
-    GALERA_GCS_SPREAD,
-    GALERA_GCS_VS
-} galera_gcs_backend_t;
-
 /*!
  * @brief retains the connection context specified by the
  *        context parameter
@@ -117,15 +110,14 @@ enum galera_status galera_tear_down();
 /*!
  * @brief initializes galera library
  *
- * @param gcs_backend what kind of group communication system to use
  * @param gcs_group   symbolic group name (serves as unique group ID)
- * @param gcs_address physical gcs connection address (backend specific)
+ * @param gcs_address URL-like gcs connection address (backend://address)
+ *                    Currently supported backends: "dummy", "spread", "gcomm".
  * @param data_dir    directory where wsdb files are kept
  * @param error_fun   handler for error logging from galeraw library
  *
  */
-enum galera_status galera_init (galera_gcs_backend_t gcs_backend,
-				const char           *gcs_group,
+enum galera_status galera_init (const char           *gcs_group,
 				const char           *gcs_address,
 				const char           *data_dir,
 				galera_log_cb_t      logger);

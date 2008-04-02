@@ -5,4 +5,4 @@
 
 extern Suite *gcs_comp_suite(void);
 
-#endif /* __gu_memb_test__ */
+#endif /* __gu_comp_test__ */

@@ -123,9 +123,8 @@ struct gcs_backend
  * (sort of like 'new')
  */
 long
-gcs_backend_init (gcs_backend_t*     const bk,
-		  const char*        const channel,
-		  const char*        const sock_addr,
-		  gcs_backend_type_t const backend);
+gcs_backend_init (gcs_backend_t* const bk,
+		  const char*    const channel,
+		  const char*    const uri);
 
 #endif /* _gcs_backend_h_ */

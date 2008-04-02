@@ -244,10 +244,16 @@ static void *conn_run(void *arg)
     return 0;
 }
 
+static const char* vs_default_socket = "tcp:127.0.0.1:4567";
+
 GCS_BACKEND_OPEN_FN(gcs_vs_open)
 {
     conn_t *conn = 0;
+    const char* sock = socket;
     
+    if (NULL == sock || strlen(sock) == 0)
+        sock = vs_default_socket;
+
     try {
 	conn = new gcs_backend_conn;	
     } catch (std::bad_alloc e) {
@@ -256,7 +262,7 @@ GCS_BACKEND_OPEN_FN(gcs_vs_open)
     
     try {
 	conn->vs_ctx.po = Poll::create("def");
-	conn->vs_ctx.vs = VS::create(socket, conn->vs_ctx.po, 
+	conn->vs_ctx.vs = VS::create(sock, conn->vs_ctx.po, 
 				     &conn->vs_ctx.monitor);
 	conn->vs_ctx.set_down_context(conn->vs_ctx.vs);
 	conn->vs_ctx.vs->connect();

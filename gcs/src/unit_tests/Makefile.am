@@ -8,11 +8,15 @@ gcs_tests_SOURCES =           \
 	gcs_tests.c           \
 	gcs_comp_test.c       \
 	../gcs_comp_msg.c     \
+	gcs_backend_test.c    \
+	../gcs_backend.c      \
 	gcs_proto_test.c      \
 	../gcs_act_proto.c
 #	gcs_uuid_test.c       \
 #	../gcs_uuid.c
 
+# For gcs_backend_test
+gcs_tests_CPPFLAGS = -DGCS_USE_SPREAD -DGCS_USE_VS
 gcs_tests_INCLUDES = @CHECK_CFLAGS@
 gcs_tests_LDADD    = @CHECK_LIBS@
 

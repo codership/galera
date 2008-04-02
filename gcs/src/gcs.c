@@ -181,8 +181,7 @@ static void *gcs_recv_thread (void *arg)
 }
 
 /* Creates a group/channel connection context*/
-int gcs_open (gcs_conn_t **gcs, const char *channel, const char *socket,
-	      const gcs_backend_type_t backend)
+int gcs_open (gcs_conn_t **gcs, const char *channel, const char *backend)
 {
     long err = 0;
     gcs_conn_t *conn = GU_CALLOC (1, gcs_conn_t);
@@ -191,11 +190,9 @@ int gcs_open (gcs_conn_t **gcs, const char *channel, const char *socket,
     conn->state = -GCS_CONN_CLOSED;
 
     /* Some conn fields must be initialized during this call */
-    if ((err = gcs_generic_open (&conn->generic,
-				 channel,
-				 socket,
-				 backend)))
+    if ((err = gcs_generic_open (&conn->generic, channel, backend)))
 	return err;
+
     if ((err = gcs_generic_set_pkt_size (conn->generic, GCS_DEFAULT_PKT_SIZE)))
 	return err;
 

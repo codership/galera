@@ -85,8 +85,7 @@ struct gcs_generic_conn
 
 long gcs_generic_open (gcs_generic_conn_t **generic,
 		       const char* const channel,
-		       const char* const socket,
-		       gcs_backend_type_t const backend_type)
+		       const char* const backend_uri)
 {
     long                err = 0;
     gcs_generic_conn_t *conn = GU_CALLOC (1, gcs_generic_conn_t);
@@ -94,7 +93,7 @@ long gcs_generic_open (gcs_generic_conn_t **generic,
     if (NULL == conn) return -ENOMEM;
 
     gu_debug ("Opening connection to backend IO layer");
-    err = gcs_backend_init (&conn->backend, channel, socket, backend_type);
+    err = gcs_backend_init (&conn->backend, channel, backend_uri);
     if (err < 0) return err;
     assert (0 == err);
     assert (NULL != conn->backend.conn);
