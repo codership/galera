@@ -1,4 +1,8 @@
-
+/*
+ * Copyright (C) 2008 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
 #ifndef _gcs_vs_h_
 #define _gcs_vs_h_
 

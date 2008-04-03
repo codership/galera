@@ -1,4 +1,8 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+/*
+ * Copyright (C) 2008 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
  
 /*!
  * @file gcs.c Public GCS API

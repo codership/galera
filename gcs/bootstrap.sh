@@ -2,6 +2,7 @@
 
 # This script bootstraps the build process for the freshly checked
 # working copy
+# $Id$
 
 LOG=$0.log
 

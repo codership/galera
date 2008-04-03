@@ -1,4 +1,7 @@
 # Copyright (C) 2007 Codership Oy <info@codership.com>
+#
+# $Id$
+
 AM_CFLAGS = -I..
 
 # gcs_to_test is separate for benchmarking purposes

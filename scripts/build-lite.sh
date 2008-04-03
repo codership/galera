@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# $Id$
+
 # Fail if any command fails
 set -e
 

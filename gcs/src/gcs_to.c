@@ -1,4 +1,8 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+/*
+ * Copyright (C) 2008 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
 
 /*! \file \brief Total order access "class" implementation.
  * Although gcs_repl() and gcs_recv() calls return sequence

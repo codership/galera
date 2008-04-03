@@ -1,4 +1,8 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+/*
+ * Copyright (C) 2008 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
 /***********************************************************/
 /*  This program imitates 3rd party application and        */
 /*  tests GCS library in a dummy standalone configuration  */

@@ -1,3 +1,7 @@
+# Copyright (C) 2008 Codership Oy <info@codership.com>
+#
+# $Id$
+
 # Initialize AM_CFLAGS to empty.
 AM_CFLAGS = -fno-strict-aliasing
 if ENABLE_DEBUG

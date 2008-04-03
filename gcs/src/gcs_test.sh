@@ -4,6 +4,7 @@
 # to verify that all actions that were sent were received
 # intact
 #
+# $Id$
 
 SEND_LOG="gcs_test_send.log"
 RECV_LOG="gcs_test_recv.log"

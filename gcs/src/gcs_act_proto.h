@@ -1,4 +1,8 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+/*
+ * Copyright (C) 2008 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
 /*
  * Interface to action protocol
  * (to be extended to support protocol versions, currently supports only v0)

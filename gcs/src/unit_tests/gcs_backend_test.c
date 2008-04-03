@@ -1,11 +1,14 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+/*
+ * Copyright (C) 2008 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
 
 #include <check.h>
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
-//#include <galerautils.h>
 
 #include "../gcs_backend.h"
 #include "gcs_backend_test.h"
