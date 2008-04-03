@@ -33,15 +33,25 @@ gcs_recv_act_handle_msg (gcs_recv_act_t*       act,
 
         if (gu_likely(act->received)) {
             /* another fragment of existing action */
-            assert (frg.frag_no  >  0);
-            assert (act->send_no == frg.act_id);
-            assert (act->type    == frg.act_type);
+            act->frag_no++;
+            if (gu_unlikely((act->sent_id != frg.act_id)  ||
+                            (act->frag_no != frg.frag_no) ||
+                            (act->type    != frg.act_type))) {
+                gu_warn  ("Wrong fragment received.");
+                gu_debug ("act_id   expected: %llu, received: %llu\n"
+                          "frag_no  expected: %ld, received: %ld\n"
+                          "act_type expected: %d, received: %d",
+                          act->sent_id, frg.act_id, act->frag_no,frg.frag_no,
+                          act->type, frg.act_type);
+                act->frag_no--; // revert counter in hope that we get good frag 
+                return -EPROTO;
+            }
         }
         else {
             /* new action */
             assert (0 == frg.frag_no);
             act->size    = frg.act_size;
-            act->send_no = frg.act_id;
+            act->sent_id = frg.act_id;
             act->type    = frg.act_type;
 
             if (gu_likely(foreign)) {
@@ -77,4 +87,3 @@ gcs_recv_act_handle_msg (gcs_recv_act_t*       act,
 	return ret;
     }
 }
-

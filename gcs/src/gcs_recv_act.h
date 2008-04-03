@@ -20,11 +20,12 @@
 
 typedef struct gcs_recv_act
 {
-    gcs_seqno_t    send_no; // send id (unique for a node)
+    gcs_seqno_t    sent_id; // sent id (unique for a node)
     uint8_t*       head;    // head of action buffer
     uint8_t*       tail;    // tail of action data
     size_t         size;
     size_t         received;
+    long           frag_no; // number of fragment received
     gcs_act_type_t type;
 }
 gcs_recv_act_t;
@@ -55,7 +56,7 @@ gcs_recv_act_pop (gcs_recv_act_t* act)
     assert (act->size == act->received);
 
     memset (act, 0, sizeof (*act));
-    act->send_no = GCS_SEQNO_ILL;
+    act->sent_id = GCS_SEQNO_ILL;
 
     return ret;
 }
