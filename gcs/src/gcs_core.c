@@ -505,8 +505,8 @@ ssize_t gcs_core_recv (gcs_core_conn_t* conn,
 		core_recv_act_t* recv_act  = conn->recv_acts + sender_id;
 
 		ret = core_handle_action_msg (recv_act,
-						 recv_msg,
-						 sender_id != conn->my_id);
+                                              recv_msg,
+                                              sender_id != conn->my_id);
 		if (ret == 1) {
 		    /* complete action received */
 		    *act_id   = ++conn->recv_act_no;
