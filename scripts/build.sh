@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# $Id$
+# $Id: build-lite.sh 261 2008-04-03 11:08:37Z alex $
 
 # Fail if any command fails
 set -e
@@ -95,12 +95,6 @@ galeracomm_branch=$build_base/galeracomm
 gcs_branch=$build_base/gcs
 wsdb_branch=$build_base/wsdb
 mysql_branch=$build_base/../../5.1/trunk
-
-# Create build directory if it does not exist
-if ! test -d $build_base/build ; then 
-    mkdir $build_base/build
-fi
-
 
 # Flags for configure scripts
 if test -n GALERA_DEST
