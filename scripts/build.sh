@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# $Id: build-lite.sh 261 2008-04-03 11:08:37Z alex $
+# $Id$
 
 # Fail if any command fails
 set -e

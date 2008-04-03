@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <galerautils.h>
 
+#include "gcs.h" // for gcs_seqno_t et al.
 #include "gcs_recv_msg.h"
 
 typedef struct gcs_recv_act
@@ -35,7 +36,7 @@ gcs_recv_act_t;
  *         size of action - success, full action received,
  *         negative       - error.
  */
-extern long
+extern ssize_t
 gcs_recv_act_handle_msg (gcs_recv_act_t*       act,
                          const gcs_recv_msg_t* msg,
                          bool                  foreign);
@@ -47,7 +48,7 @@ gcs_recv_act_handle_msg (gcs_recv_act_t*       act,
  *         fetched from local fifo.
  */
 static inline uint8_t*
-core_pop_action (gcs_recv_act_t* act)
+gcs_recv_act_pop (gcs_recv_act_t* act)
 {
     register uint8_t* ret = act->head;
 
