@@ -75,9 +75,9 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
 	}
     }
 
-    /* free actions that were left from disappeared members */
+    /* cleanup after disappeared members */
     for (old_idx = 0; old_idx < group->num; old_idx++) {
-        gcs_node_cleanup (&group->nodes[old_idx]);
+        gcs_node_free (&group->nodes[old_idx]);
     }
 
     /* replace old component data with new one
