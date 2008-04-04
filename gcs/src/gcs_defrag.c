@@ -27,15 +27,12 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
     if (gu_likely(df->received)) {
         /* another fragment of existing action */
         df->frag_no++;
-        if (gu_unlikely((df->sent_id != frg->act_id)  ||
-                        (df->frag_no != frg->frag_no) ||
-                        (df->type    != frg->act_type))) {
+        if (gu_unlikely((df->sent_id != frg->act_id) ||
+                        (df->frag_no != frg->frag_no))) {
             gu_error ("Unordered fragment received. Protocol error.");
             gu_debug ("act_id   expected: %llu, received: %llu\n"
-                      "frag_no  expected: %ld, received: %ld\n"
-                      "act_type expected: %d, received: %d",
-                      df->sent_id, frg->act_id, df->frag_no, frg->frag_no,
-                      df->type, frg->act_type);
+                      "frag_no  expected: %ld, received: %ld",
+                      df->sent_id, frg->act_id, df->frag_no, frg->frag_no);
             df->frag_no--; // revert counter in hope that we get good frag 
             return -EPROTO;
         }
@@ -45,7 +42,6 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
         if (gu_likely(0 == frg->frag_no)) {
             df->size    = frg->act_size;
             df->sent_id = frg->act_id;
-            df->type    = frg->act_type;
 
             if (gu_likely(!local)) {
                 /* A foreign action. We need to allocate buffer for it.
@@ -61,8 +57,8 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
         else {
             gu_error ("Unordered fragment received. Protocol error.");
             gu_debug ("frag_no  expected: 0(first), received: %ld\n"
-                      "act_id: %llu, act_type: %d",
-                      frg->frag_no, frg->act_id, frg->act_type);
+                      "act_id: %llu",
+                      frg->frag_no, frg->act_id);
             return -EPROTO;
         }
     }

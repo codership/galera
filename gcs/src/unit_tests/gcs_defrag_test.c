@@ -27,7 +27,6 @@ defrag_check_init (gcs_defrag_t* defrag)
     fail_if (defrag->size     != 0);
     fail_if (defrag->received != 0);
     fail_if (defrag->frag_no  != 0);
-    fail_if (defrag->type     != 0);
 }
 
 START_TEST (gcs_defrag_test)
@@ -49,7 +48,7 @@ START_TEST (gcs_defrag_test)
     const char*  frag3      = frag2 + frag2_len;
 
     // recv fragments
-    gcs_act_frag_t frg1, frg2, frg3, frg4, frg5;
+    gcs_act_frag_t frg1, frg2, frg3, frg4;
 
     gcs_defrag_t defrag;
 
@@ -80,13 +79,10 @@ START_TEST (gcs_defrag_test)
     frg3.frag_no  = frg2.frag_no + 1;
 
     // bad fragmets to be tried instead of frg2
-    frg4 = frg5 = frg2;
+    frg4 = frg2;
     frg4.frag     = "junk";
     frg4.frag_len = strlen("junk");
     frg4.act_id   = frg2.act_id + 1; // wrong action id
-    frg5.frag     = "junk";
-    frg5.frag_len = strlen("junk");
-    frg5.act_type = GCS_ACT_SERVICE; // wrong action type
 
     mark_point();
 
@@ -125,28 +121,25 @@ START_TEST (gcs_defrag_test)
     // 5. Try fouth fragment
     TRY_WRONG_2ND_FRAGMENT(&frg4);
 
-    // 6. Try fifth fragment
-    TRY_WRONG_2ND_FRAGMENT(&frg5);
-
-    // 7. Try second fragment
+    // 6. Try second fragment
     ret = gcs_defrag_handle_frag (&defrag, &frg2, FALSE);
     fail_if (ret != 0);
     fail_if (defrag.received != frag1_len + frag2_len);
     fail_if (defrag.tail != defrag.head + defrag.received);
 
-    // 8. Try third fragment, last one
+    // 7. Try third fragment, last one
     ret = gcs_defrag_handle_frag (&defrag, &frg3, FALSE);
     fail_if (ret != act_len);
     fail_if (defrag.received != act_len);
 
-    // 9. Pop the action
+    // 8. Pop the action
     act = (char*) gcs_defrag_pop (&defrag);
     fail_if (act == NULL);
     fail_if (strncmp(act, act_buf, act_len),
              "Action received: '%s', expected '%s'", act, act_buf);
     defrag_check_init (&defrag); // should be empty
 
-    // 10. Try the same with local action
+    // 9. Try the same with local action
     ret = gcs_defrag_handle_frag (&defrag, &frg1, TRUE);
     fail_if (ret != 0);
     fail_if (defrag.head != NULL);

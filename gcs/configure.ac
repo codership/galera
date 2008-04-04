@@ -72,7 +72,7 @@ AC_PROG_CC
 #AC_CHECK_PROG(AR, ar, ar)
 AC_PROG_LIBTOOL
 #AM_PATH_CHECK()
-PKG_CHECK_MODULES([CHECK], [check >= 0.8.2])
+PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 
 # Checks for libraries.
 AC_CHECK_LIB([galerautils], [gu_malloc_dbg],,

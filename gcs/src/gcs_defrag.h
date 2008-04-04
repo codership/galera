@@ -26,7 +26,6 @@ typedef struct gcs_defrag
     size_t         size;
     size_t         received;
     long           frag_no; // number of fragment received
-    gcs_act_type_t type;
 }
 gcs_defrag_t;
 
