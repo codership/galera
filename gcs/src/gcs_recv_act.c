@@ -37,7 +37,7 @@ gcs_recv_act_handle_msg (gcs_recv_act_t*       act,
             if (gu_unlikely((act->sent_id != frg.act_id)  ||
                             (act->frag_no != frg.frag_no) ||
                             (act->type    != frg.act_type))) {
-                gu_warn  ("Wrong fragment received.");
+                gu_error ("Unordered fragment received. Protocol error.");
                 gu_debug ("act_id   expected: %llu, received: %llu\n"
                           "frag_no  expected: %ld, received: %ld\n"
                           "act_type expected: %d, received: %d",
@@ -49,20 +49,28 @@ gcs_recv_act_handle_msg (gcs_recv_act_t*       act,
         }
         else {
             /* new action */
-            assert (0 == frg.frag_no);
-            act->size    = frg.act_size;
-            act->sent_id = frg.act_id;
-            act->type    = frg.act_type;
+            if (gu_likely(0 == frg.frag_no)) {
+                act->size    = frg.act_size;
+                act->sent_id = frg.act_id;
+                act->type    = frg.act_type;
 
-            if (gu_likely(foreign)) {
-                /* A foreign action. We need to allocate buffer for it.
-                 * This buffer will be returned to application,
-                 * so it must be allocated by standard malloc */
-                act->head = malloc (act->size);
-                if(gu_likely(act->head != NULL))
-                    act->tail = act->head;
-                else
-                    return -ENOMEM;
+                if (gu_likely(foreign)) {
+                    /* A foreign action. We need to allocate buffer for it.
+                     * This buffer will be returned to application,
+                     * so it must be allocated by standard malloc */
+                    act->head = malloc (act->size);
+                    if(gu_likely(act->head != NULL))
+                        act->tail = act->head;
+                    else
+                        return -ENOMEM;
+                }
+            }
+            else {
+                gu_error ("Unordered fragment received. Protocol error.");
+                gu_debug ("frag_no  expected: 0(first), received: %ld\n"
+                          "act_id: %llu, act_type: %d",
+                          frg.frag_no, frg.act_id, frg.act_type);
+                return -EPROTO;
             }
         }
 

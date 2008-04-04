@@ -11,6 +11,7 @@
 
 #include "gcs_comp_test.h"
 #include "gcs_proto_test.h"
+#include "gcs_recv_act_test.h"
 #include "gcs_backend_test.h"
 //#include "gcs_uuid_test.h"
 
@@ -20,6 +21,7 @@ static suite_creator_t suites[] =
     {
 	gcs_comp_suite,
 	gcs_proto_suite,
+	gcs_recv_act_suite,
 	gcs_backend_suite,
 //	gcs_uuid_suite,
 	NULL

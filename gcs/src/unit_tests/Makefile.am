@@ -14,7 +14,9 @@ gcs_tests_SOURCES =           \
 	gcs_backend_test.c    \
 	../gcs_backend.c      \
 	gcs_proto_test.c      \
-	../gcs_act_proto.c
+	../gcs_act_proto.c    \
+	gcs_recv_act_test.c   \
+	../gcs_recv_act.c
 #	gcs_uuid_test.c       \
 #	../gcs_uuid.c
 

@@ -30,6 +30,13 @@ typedef struct gcs_recv_act
 }
 gcs_recv_act_t;
 
+static inline void
+gcs_recv_act_init (gcs_recv_act_t* act)
+{
+    memset (act, 0, sizeof (*act));
+    act->sent_id = GCS_SEQNO_ILL;
+}
+
 /*!
  * Handle received message - action fragment
  *
@@ -54,9 +61,7 @@ gcs_recv_act_pop (gcs_recv_act_t* act)
     register uint8_t* ret = act->head;
 
     assert (act->size == act->received);
-
-    memset (act, 0, sizeof (*act));
-    act->sent_id = GCS_SEQNO_ILL;
+    gcs_recv_act_init (act);
 
     return ret;
 }
