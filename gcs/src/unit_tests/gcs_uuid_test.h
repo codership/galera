@@ -9,4 +9,4 @@
 
 extern Suite *gcs_uuid_suite(void);
 
-#endif /* __gu_mem_test__ */
+#endif /* __gu_uuid_test__ */
