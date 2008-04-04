@@ -8,17 +8,17 @@
  * Receiving action context
  */
 
-#ifndef _gcs_recv_act_h_
-#define _gcs_recv_act_h_
+#ifndef _gcs_defrag_h_
+#define _gcs_defrag_h_
 
-#include <string.h>   // for memset
+#include <string.h>   // for memset()
 #include <stdbool.h>
 #include <galerautils.h>
 
-#include "gcs.h" // for gcs_seqno_t et al.
+#include "gcs.h"     // for gcs_seqno_t et al.
 #include "gcs_act_proto.h"
 
-typedef struct gcs_recv_act
+typedef struct gcs_defrag
 {
     gcs_seqno_t    sent_id; // sent id (unique for a node)
     uint8_t*       head;    // head of action buffer
@@ -28,13 +28,13 @@ typedef struct gcs_recv_act
     long           frag_no; // number of fragment received
     gcs_act_type_t type;
 }
-gcs_recv_act_t;
+gcs_defrag_t;
 
 static inline void
-gcs_recv_act_init (gcs_recv_act_t* act)
+gcs_defrag_init (gcs_defrag_t* df)
 {
-    memset (act, 0, sizeof (*act));
-    act->sent_id = GCS_SEQNO_ILL;
+    memset (df, 0, sizeof (*df));
+    df->sent_id = GCS_SEQNO_ILL;
 }
 
 /*!
@@ -45,9 +45,9 @@ gcs_recv_act_init (gcs_recv_act_t* act)
  *         negative       - error.
  */
 extern ssize_t
-gcs_recv_act_handle_frag (gcs_recv_act_t*       act,
-                          const gcs_act_frag_t* frg,
-                          bool                  local);
+gcs_defrag_handle_frag (gcs_defrag_t*         df,
+                        const gcs_act_frag_t* frg,
+                        bool                  local);
 
 /*!
  * Pop received action buffer and get ready to receive another
@@ -56,12 +56,12 @@ gcs_recv_act_handle_frag (gcs_recv_act_t*       act,
  *         fetched from local fifo.
  */
 static inline uint8_t*
-gcs_recv_act_pop (gcs_recv_act_t* act)
+gcs_defrag_pop (gcs_defrag_t* df)
 {
-    register uint8_t* ret = act->head;
+    register uint8_t* ret = df->head;
 
-    assert (act->size == act->received);
-    gcs_recv_act_init (act);
+    assert (df->size == df->received);
+    gcs_defrag_init (df);
 
     return ret;
 }
@@ -69,17 +69,17 @@ gcs_recv_act_pop (gcs_recv_act_t* act)
 
 /*! Deassociate, but don't deallocate action resources */
 static inline void
-gcs_recv_act_forget (gcs_recv_act_t* act)
+gcs_defrag_forget (gcs_defrag_t* df)
 {
-    act->head = NULL;
+    df->head = NULL;
 }
 
-/*! Free resources associated with the action (for lost node cleanup) */
+/*! Free resources associated with defrag (for lost node cleanup) */
 static inline void
-gcs_recv_act_free (gcs_recv_act_t* act)
+gcs_defrag_free (gcs_defrag_t* df)
 {
-    free (act->head); // alloc'ed with standard malloc
-    act->head = NULL;
+    free (df->head); // alloc'ed with standard malloc
+    df->head = NULL;
 }
 
-#endif /* _gcs_recv_act_h_ */
+#endif /* _gcs_defrag_h_ */

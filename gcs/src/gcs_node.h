@@ -14,15 +14,15 @@
 #include <errno.h>
 
 #include "gcs.h"
-#include "gcs_recv_act.h"
+#include "gcs_defrag.h"
 #include "gcs_comp_msg.h"
 
 struct gcs_node
 {
     gcs_seqno_t    last_applied; // last applied action on that node
     long           queue_len;    // action queue length on that node
-    gcs_recv_act_t app;          // defragmenter for application actions
-    gcs_recv_act_t oob;          // defragmenter for out-of-band service acts.
+    gcs_defrag_t app;          // defragmenter for application actions
+    gcs_defrag_t oob;          // defragmenter for out-of-band service acts.
 
     // globally unique id from the component message
     const char      id[GCS_COMP_MEMB_ID_MAX_LEN + 1];
@@ -55,10 +55,10 @@ static inline ssize_t
 gcs_node_handle_act_frag (gcs_node_t* node, gcs_act_frag_t* frg, bool local)
 {
     if (gu_likely(GCS_ACT_DATA == frg->act_type)) {
-        return gcs_recv_act_handle_frag (&node->app, frg, local);
+        return gcs_defrag_handle_frag (&node->app, frg, local);
     }
     else if (GCS_ACT_SERVICE == frg->act_type) {
-        return gcs_recv_act_handle_frag (&node->oob, frg, local);
+        return gcs_defrag_handle_frag (&node->oob, frg, local);
     }
     else {
         return -EPROTO;

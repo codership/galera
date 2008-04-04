@@ -9,8 +9,8 @@
 #include <string.h>
 #include <errno.h>
 
-#include "gcs_recv_act_test.h"
-#include "../gcs_recv_act.h"
+#include "gcs_defrag_test.h"
+#include "../gcs_defrag.h"
 
 #define TRUE (0 == 0)
 #define FALSE (!TRUE)
@@ -19,39 +19,39 @@
 void logger (int s, const char* m) {};
 
 static void
-recv_act_check_init (gcs_recv_act_t* recv_act)
+defrag_check_init (gcs_defrag_t* defrag)
 {
-    fail_if (recv_act->sent_id  != GCS_SEQNO_ILL);
-    fail_if (recv_act->head     != NULL);
-    fail_if (recv_act->tail     != NULL);
-    fail_if (recv_act->size     != 0);
-    fail_if (recv_act->received != 0);
-    fail_if (recv_act->frag_no  != 0);
-    fail_if (recv_act->type     != 0);
+    fail_if (defrag->sent_id  != GCS_SEQNO_ILL);
+    fail_if (defrag->head     != NULL);
+    fail_if (defrag->tail     != NULL);
+    fail_if (defrag->size     != 0);
+    fail_if (defrag->received != 0);
+    fail_if (defrag->frag_no  != 0);
+    fail_if (defrag->type     != 0);
 }
 
-START_TEST (gcs_recv_act_test)
+START_TEST (gcs_defrag_test)
 {
     ssize_t ret;
 
     // The Action
-    const char   act_buf[]   = "Test action smuction";
-    size_t       act_len      = sizeof (act_buf);
+    const char   act_buf[]  = "Test action smuction";
+    size_t       act_len    = sizeof (act_buf);
 
     // lengths of three fragments of the action
-    size_t       frag1_len    = act_len / 3;
-    size_t       frag2_len    = frag1_len;
-    size_t       frag3_len    = act_len - frag1_len - frag2_len;
+    size_t       frag1_len  = act_len / 3;
+    size_t       frag2_len  = frag1_len;
+    size_t       frag3_len  = act_len - frag1_len - frag2_len;
 
     // pointer to the three fragments of the action
-    const char*  frag1         = act_buf;
-    const char*  frag2         = frag1 + frag1_len;
-    const char*  frag3         = frag2 + frag2_len;
+    const char*  frag1      = act_buf;
+    const char*  frag2      = frag1 + frag1_len;
+    const char*  frag3      = frag2 + frag2_len;
 
     // recv fragments
     gcs_act_frag_t frg1, frg2, frg3, frg4, frg5;
 
-    gcs_recv_act_t recv_act;
+    gcs_defrag_t defrag;
 
     void* tail;
     char* act;
@@ -91,30 +91,30 @@ START_TEST (gcs_recv_act_test)
     mark_point();
 
     // ready for the first fragment
-    gcs_recv_act_init (&recv_act);
-    recv_act_check_init (&recv_act);
+    gcs_defrag_init (&defrag);
+    defrag_check_init (&defrag);
 
     mark_point();
 
     // 1. Try fragment that is not the first
-    ret = gcs_recv_act_handle_frag (&recv_act, &frg3, FALSE);
+    ret = gcs_defrag_handle_frag (&defrag, &frg3, FALSE);
     fail_if (ret != -EPROTO);
     mark_point();
-    recv_act_check_init (&recv_act); // should be no changes
+    defrag_check_init (&defrag); // should be no changes
 
     // 2. Try first fragment
-    ret = gcs_recv_act_handle_frag (&recv_act, &frg1, FALSE);
+    ret = gcs_defrag_handle_frag (&defrag, &frg1, FALSE);
     fail_if (ret != 0);
-    fail_if (recv_act.head == NULL);
-    fail_if (recv_act.received != frag1_len);
-    fail_if (recv_act.tail != recv_act.head + recv_act.received);
-    tail = recv_act.tail;
+    fail_if (defrag.head == NULL);
+    fail_if (defrag.received != frag1_len);
+    fail_if (defrag.tail != defrag.head + defrag.received);
+    tail = defrag.tail;
 
 #define TRY_WRONG_2ND_FRAGMENT(frag)                         \
-    ret = gcs_recv_act_handle_frag (&recv_act, frag, FALSE);   \
+    ret = gcs_defrag_handle_frag (&defrag, frag, FALSE);   \
     fail_if (ret != -EPROTO);                                \
-    fail_if (recv_act.received != frag1_len);                \
-    fail_if (recv_act.tail != tail);                         \
+    fail_if (defrag.received != frag1_len);                \
+    fail_if (defrag.tail != tail);                         \
 
     // 3. Try first fragment again
     TRY_WRONG_2ND_FRAGMENT(&frg1);
@@ -129,45 +129,45 @@ START_TEST (gcs_recv_act_test)
     TRY_WRONG_2ND_FRAGMENT(&frg5);
 
     // 7. Try second fragment
-    ret = gcs_recv_act_handle_frag (&recv_act, &frg2, FALSE);
+    ret = gcs_defrag_handle_frag (&defrag, &frg2, FALSE);
     fail_if (ret != 0);
-    fail_if (recv_act.received != frag1_len + frag2_len);
-    fail_if (recv_act.tail != recv_act.head + recv_act.received);
+    fail_if (defrag.received != frag1_len + frag2_len);
+    fail_if (defrag.tail != defrag.head + defrag.received);
 
     // 8. Try third fragment, last one
-    ret = gcs_recv_act_handle_frag (&recv_act, &frg3, FALSE);
+    ret = gcs_defrag_handle_frag (&defrag, &frg3, FALSE);
     fail_if (ret != act_len);
-    fail_if (recv_act.received != act_len);
+    fail_if (defrag.received != act_len);
 
     // 9. Pop the action
-    act = (char*) gcs_recv_act_pop (&recv_act);
+    act = (char*) gcs_defrag_pop (&defrag);
     fail_if (act == NULL);
     fail_if (strncmp(act, act_buf, act_len),
              "Action received: '%s', expected '%s'", act, act_buf);
-    recv_act_check_init (&recv_act); // should be empty
+    defrag_check_init (&defrag); // should be empty
 
     // 10. Try the same with local action
-    ret = gcs_recv_act_handle_frag (&recv_act, &frg1, TRUE);
+    ret = gcs_defrag_handle_frag (&defrag, &frg1, TRUE);
     fail_if (ret != 0);
-    fail_if (recv_act.head != NULL);
-    ret = gcs_recv_act_handle_frag (&recv_act, &frg2, TRUE);
+    fail_if (defrag.head != NULL);
+    ret = gcs_defrag_handle_frag (&defrag, &frg2, TRUE);
     fail_if (ret != 0);
-    fail_if (recv_act.head != NULL);
-    ret = gcs_recv_act_handle_frag (&recv_act, &frg3, TRUE);
+    fail_if (defrag.head != NULL);
+    ret = gcs_defrag_handle_frag (&defrag, &frg3, TRUE);
     fail_if (ret != act_len);
-    fail_if (recv_act.head != NULL);
-    act = (char*) gcs_recv_act_pop (&recv_act);
+    fail_if (defrag.head != NULL);
+    act = (char*) gcs_defrag_pop (&defrag);
     fail_if (act != NULL); // local action, must be fetched from local fifo  
 }
 END_TEST
 
-Suite *gcs_recv_act_suite(void)
+Suite *gcs_defrag_suite(void)
 {
-  Suite *suite = suite_create("GCS Receiving actions context");
-  TCase *tcase = tcase_create("gcs_recv_act");
+  Suite *suite = suite_create("GCS defragmenter");
+  TCase *tcase = tcase_create("gcs_defrag");
 
   suite_add_tcase (suite, tcase);
-  tcase_add_test  (tcase, gcs_recv_act_test);
+  tcase_add_test  (tcase, gcs_defrag_test);
   return suite;
 }
 

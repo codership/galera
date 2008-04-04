@@ -15,8 +15,8 @@ gcs_tests_SOURCES =           \
 	../gcs_backend.c      \
 	gcs_proto_test.c      \
 	../gcs_act_proto.c    \
-	gcs_recv_act_test.c   \
-	../gcs_recv_act.c     \
+	gcs_defrag_test.c     \
+	../gcs_defrag.c       \
 	gcs_node_test.c       \
 	../gcs_node.c
 #	gcs_uuid_test.c       \
