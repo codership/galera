@@ -8,8 +8,18 @@
 
 #include "gcs_node.h"
 
+/*! Initialize node context */
+void
+gcs_node_init (gcs_node_t* node)
+{
+    node->last_applied = 0;
+    node->queue_len    = 0;
+    gcs_recv_act_init (&node->app);
+    gcs_recv_act_init (&node->oob);
+}
+
 /*! Move data from one node object to another */
-extern void
+void
 gcs_node_move (gcs_node_t* dest, gcs_node_t* src)
 {
     memcpy (dest, src, sizeof (gcs_node_t));
@@ -18,7 +28,7 @@ gcs_node_move (gcs_node_t* dest, gcs_node_t* src)
 }
 
 /*! Deallocate resources associated with the node object */
-extern void
+void
 gcs_node_free (gcs_node_t* node)
 {
     // was alloc'ed by standard malloc

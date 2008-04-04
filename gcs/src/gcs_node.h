@@ -28,6 +28,10 @@ struct gcs_node
 
 typedef struct gcs_node gcs_node_t;
 
+/*! Initialize node context */
+extern void
+gcs_node_init (gcs_node_t* node);
+
 /*! Move data from one node object to another */
 extern void
 gcs_node_move (gcs_node_t* dest, gcs_node_t* src);
@@ -35,5 +39,9 @@ gcs_node_move (gcs_node_t* dest, gcs_node_t* src);
 /*! Deallocate resources associated with the node object */
 extern void
 gcs_node_free (gcs_node_t* node);
+
+/*! Reset node's receive buffers */
+static inline void
+gcs_node_reset (gcs_node_t* node) { gcs_node_free(node); }
 
 #endif /* _gcs_node_h_ */
