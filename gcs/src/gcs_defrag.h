@@ -17,6 +17,7 @@
 
 #include "gcs.h"     // for gcs_seqno_t et al.
 #include "gcs_act_proto.h"
+#include "gcs_recv_act.h"
 
 typedef struct gcs_defrag
 {
@@ -46,31 +47,14 @@ gcs_defrag_init (gcs_defrag_t* df)
 extern ssize_t
 gcs_defrag_handle_frag (gcs_defrag_t*         df,
                         const gcs_act_frag_t* frg,
+                        gcs_recv_act_t*       act,
                         bool                  local);
-
-/*!
- * Pop received action buffer and get ready to receive another
- *
- * @return pointer to action buffer, NULL if action is local - must be
- *         fetched from local fifo.
- */
-static inline uint8_t*
-gcs_defrag_pop (gcs_defrag_t* df)
-{
-    register uint8_t* ret = df->head;
-
-    assert (df->size == df->received);
-    gcs_defrag_init (df);
-
-    return ret;
-}
-
 
 /*! Deassociate, but don't deallocate action resources */
 static inline void
 gcs_defrag_forget (gcs_defrag_t* df)
 {
-    df->head = NULL;
+    gcs_defrag_init (df);
 }
 
 /*! Free resources associated with defrag (for lost node cleanup) */
@@ -78,7 +62,7 @@ static inline void
 gcs_defrag_free (gcs_defrag_t* df)
 {
     free (df->head); // alloc'ed with standard malloc
-    df->head = NULL;
+    gcs_defrag_init (df);
 }
 
 #endif /* _gcs_defrag_h_ */

@@ -61,7 +61,9 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp);
  * @return to be determined
  */
 static inline ssize_t
-gcs_group_handle_msg (gcs_group_t* group, gcs_recv_msg_t* msg)
+gcs_group_handle_msg (gcs_group_t*    group,
+                      gcs_recv_msg_t* msg,
+                      gcs_recv_act_t* act)
 {
     if (gu_likely(GCS_MSG_ACTION == msg->type)) {
         gcs_act_frag_t frg;
@@ -69,7 +71,7 @@ gcs_group_handle_msg (gcs_group_t* group, gcs_recv_msg_t* msg)
 
         if (gu_likely(!ret)) {
             return gcs_node_handle_act_frag (&group->nodes[msg->sender_id],
-                                             &frg,
+                                             &frg, act,
                                              (msg->sender_id == group->my_idx));
         }
         else {

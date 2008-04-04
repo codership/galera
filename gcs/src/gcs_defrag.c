@@ -22,6 +22,7 @@
 ssize_t
 gcs_defrag_handle_frag (gcs_defrag_t*         df,
                         const gcs_act_frag_t* frg,
+                        gcs_recv_act_t*       act,
                         bool                  local)
 {
     if (gu_likely(df->received)) {
@@ -77,7 +78,9 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
     }
     else {
         assert (df->received == df->size);
-        return df->received;
+        act->buf     = df->head;
+        act->buf_len = df->received;
+        gcs_defrag_init (df);
+        return act->buf_len;
     }
 }
-

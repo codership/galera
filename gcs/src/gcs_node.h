@@ -52,16 +52,20 @@ gcs_node_reset (gcs_node_t* node) { gcs_node_free(node); }
  * @return
  */
 static inline ssize_t
-gcs_node_handle_act_frag (gcs_node_t* node, gcs_act_frag_t* frg, bool local)
+gcs_node_handle_act_frag (gcs_node_t*     node,
+                          gcs_act_frag_t* frg,
+                          gcs_recv_act_t* act,
+                          bool            local)
 {
     if (gu_likely(GCS_ACT_DATA == frg->act_type)) {
-        return gcs_defrag_handle_frag (&node->app, frg, local);
+        return gcs_defrag_handle_frag (&node->app, frg, act, local);
     }
     else if (GCS_ACT_SERVICE == frg->act_type) {
-        return gcs_defrag_handle_frag (&node->oob, frg, local);
+        return gcs_defrag_handle_frag (&node->oob, frg, act, local);
     }
     else {
         return -EPROTO;
     }
 }
+
 #endif /* _gcs_node_h_ */

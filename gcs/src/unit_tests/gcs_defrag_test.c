@@ -51,9 +51,9 @@ START_TEST (gcs_defrag_test)
     gcs_act_frag_t frg1, frg2, frg3, frg4;
 
     gcs_defrag_t defrag;
+    gcs_recv_act_t recv_act;
 
     void* tail;
-    char* act;
 
     gu_conf_set_log_callback (logger); // set empty logger
 
@@ -93,24 +93,24 @@ START_TEST (gcs_defrag_test)
     mark_point();
 
     // 1. Try fragment that is not the first
-    ret = gcs_defrag_handle_frag (&defrag, &frg3, FALSE);
+    ret = gcs_defrag_handle_frag (&defrag, &frg3, &recv_act, FALSE);
     fail_if (ret != -EPROTO);
     mark_point();
     defrag_check_init (&defrag); // should be no changes
 
     // 2. Try first fragment
-    ret = gcs_defrag_handle_frag (&defrag, &frg1, FALSE);
+    ret = gcs_defrag_handle_frag (&defrag, &frg1, &recv_act, FALSE);
     fail_if (ret != 0);
     fail_if (defrag.head == NULL);
     fail_if (defrag.received != frag1_len);
     fail_if (defrag.tail != defrag.head + defrag.received);
     tail = defrag.tail;
 
-#define TRY_WRONG_2ND_FRAGMENT(frag)                         \
-    ret = gcs_defrag_handle_frag (&defrag, frag, FALSE);   \
-    fail_if (ret != -EPROTO);                                \
-    fail_if (defrag.received != frag1_len);                \
-    fail_if (defrag.tail != tail);                         \
+#define TRY_WRONG_2ND_FRAGMENT(frag)                                \
+    ret = gcs_defrag_handle_frag (&defrag, frag, &recv_act, FALSE); \
+    fail_if (ret != -EPROTO);                                       \
+    fail_if (defrag.received != frag1_len);                         \
+    fail_if (defrag.tail != tail);
 
     // 3. Try first fragment again
     TRY_WRONG_2ND_FRAGMENT(&frg1);
@@ -122,35 +122,36 @@ START_TEST (gcs_defrag_test)
     TRY_WRONG_2ND_FRAGMENT(&frg4);
 
     // 6. Try second fragment
-    ret = gcs_defrag_handle_frag (&defrag, &frg2, FALSE);
+    ret = gcs_defrag_handle_frag (&defrag, &frg2, &recv_act, FALSE);
     fail_if (ret != 0);
     fail_if (defrag.received != frag1_len + frag2_len);
     fail_if (defrag.tail != defrag.head + defrag.received);
 
     // 7. Try third fragment, last one
-    ret = gcs_defrag_handle_frag (&defrag, &frg3, FALSE);
+    ret = gcs_defrag_handle_frag (&defrag, &frg3, &recv_act, FALSE);
     fail_if (ret != act_len);
-    fail_if (defrag.received != act_len);
 
-    // 8. Pop the action
-    act = (char*) gcs_defrag_pop (&defrag);
-    fail_if (act == NULL);
-    fail_if (strncmp(act, act_buf, act_len),
-             "Action received: '%s', expected '%s'", act, act_buf);
+    // 8. Check the action
+    fail_if (recv_act.buf_len != act_len);
+    fail_if (strncmp(recv_act.buf, act_buf, act_len),
+             "Action received: '%s', expected '%s'", recv_act.buf, act_buf);
     defrag_check_init (&defrag); // should be empty
 
     // 9. Try the same with local action
-    ret = gcs_defrag_handle_frag (&defrag, &frg1, TRUE);
+    ret = gcs_defrag_handle_frag (&defrag, &frg1, &recv_act, TRUE);
     fail_if (ret != 0);
     fail_if (defrag.head != NULL);
-    ret = gcs_defrag_handle_frag (&defrag, &frg2, TRUE);
+    ret = gcs_defrag_handle_frag (&defrag, &frg2, &recv_act, TRUE);
     fail_if (ret != 0);
     fail_if (defrag.head != NULL);
-    ret = gcs_defrag_handle_frag (&defrag, &frg3, TRUE);
+    ret = gcs_defrag_handle_frag (&defrag, &frg3, &recv_act, TRUE);
     fail_if (ret != act_len);
     fail_if (defrag.head != NULL);
-    act = (char*) gcs_defrag_pop (&defrag);
-    fail_if (act != NULL); // local action, must be fetched from local fifo  
+
+    // 10. Check the action
+    fail_if (recv_act.buf_len != act_len);
+    fail_if (recv_act.buf != NULL);
+    defrag_check_init (&defrag); // should be empty
 }
 END_TEST
 
