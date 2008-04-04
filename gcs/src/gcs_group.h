@@ -70,13 +70,17 @@ gcs_group_handle_msg (gcs_group_t*    group,
         register long  ret = gcs_act_proto_read (&frg, msg->buf, msg->size);
 
         if (gu_likely(!ret)) {
-            return gcs_node_handle_act_frag (&group->nodes[msg->sender_id],
-                                             &frg, act,
-                                             (msg->sender_id == group->my_idx));
+
+            ret = gcs_node_handle_act_frag (&group->nodes[msg->sender_id],
+                                            &frg, act,
+                                            (msg->sender_id == group->my_idx));
+            if (gu_unlikely(ret > 0)) {
+                act->type      = frg.act_type;
+                act->sender_id = msg->sender_id;
+            }
         }
-        else {
-            return ret;
-        }
+
+        return ret;
     }
     else {
         return -EBADMSG; // expected action message
