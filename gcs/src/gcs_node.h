@@ -11,6 +11,8 @@
 #ifndef _gcs_node_h_
 #define _gcs_node_h_
 
+#include <errno.h>
+
 #include "gcs.h"
 #include "gcs_recv_act.h"
 #include "gcs_comp_msg.h"
@@ -44,4 +46,22 @@ gcs_node_free (gcs_node_t* node);
 static inline void
 gcs_node_reset (gcs_node_t* node) { gcs_node_free(node); }
 
+/*!
+ * Handles action message. Is called often - therefore, inlined
+ *
+ * @return
+ */
+static inline ssize_t
+gcs_node_handle_act_frag (gcs_node_t* node, gcs_act_frag_t* frg, bool local)
+{
+    if (gu_likely(GCS_ACT_DATA == frg->act_type)) {
+        return gcs_recv_act_handle_frag (&node->app, frg, local);
+    }
+    else if (GCS_ACT_SERVICE == frg->act_type) {
+        return gcs_recv_act_handle_frag (&node->oob, frg, local);
+    }
+    else {
+        return -EPROTO;
+    }
+}
 #endif /* _gcs_node_h_ */

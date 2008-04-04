@@ -78,7 +78,8 @@ int gcs_close (gcs_conn_t **conn);
  */
 typedef enum gcs_act_type
 {
-    GCS_ACT_DATA,       //! application action
+    GCS_ACT_DATA,       //! application action, sent by application
+    GCS_ACT_SERVICE,    //! service action, sent by GCS
     GCS_ACT_SNAPSHOT,   //! request for state snapshot
     GCS_ACT_PRIMARY,    //! reached primary configuration
     GCS_ACT_NON_PRIMARY,//! reached non-primary configuration

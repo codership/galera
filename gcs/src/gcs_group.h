@@ -12,6 +12,7 @@
 #define _gcs_group_h_
 
 #include "gcs_node.h"
+#include "gcs_recv_msg.h"
 
 typedef enum group_state
 {
@@ -54,4 +55,29 @@ gcs_group_free (gcs_group_t* group);
 extern long
 gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp);
 
+/*!
+ * Handles action message. Is called often - therefore, inlined
+ *
+ * @return to be determined
+ */
+static inline ssize_t
+gcs_group_handle_msg (gcs_group_t* group, gcs_recv_msg_t* msg)
+{
+    if (gu_likely(GCS_MSG_ACTION == msg->type)) {
+        gcs_act_frag_t frg;
+        register long  ret = gcs_act_proto_read (&frg, msg->buf, msg->size);
+
+        if (gu_likely(!ret)) {
+            return gcs_node_handle_act_frag (&group->nodes[msg->sender_id],
+                                             &frg,
+                                             (msg->sender_id == group->my_idx));
+        }
+        else {
+            return ret;
+        }
+    }
+    else {
+        return -EBADMSG; // expected action message
+    }
+}
 #endif /* _gcs_group_h_ */

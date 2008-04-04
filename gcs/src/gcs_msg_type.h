@@ -13,7 +13,7 @@
 typedef enum gcs_msg_type
 {
     GCS_MSG_ERROR,     // error happened when recv()
-    GCS_MSG_ACTION,    // application action
+    GCS_MSG_ACTION,    // action fragment
     GCS_MSG_COMPONENT, // new component
     GCS_MSG_SYNC,      // synchronization message
     GCS_MSG_QUORUM,    // quorum votes

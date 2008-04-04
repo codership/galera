@@ -16,7 +16,7 @@
 #include <galerautils.h>
 
 #include "gcs.h" // for gcs_seqno_t et al.
-#include "gcs_recv_msg.h"
+#include "gcs_act_proto.h"
 
 typedef struct gcs_recv_act
 {
@@ -38,16 +38,16 @@ gcs_recv_act_init (gcs_recv_act_t* act)
 }
 
 /*!
- * Handle received message - action fragment
+ * Handle received action fragment
  *
  * @return 0              - success,
  *         size of action - success, full action received,
  *         negative       - error.
  */
 extern ssize_t
-gcs_recv_act_handle_msg (gcs_recv_act_t*       act,
-                         const gcs_recv_msg_t* msg,
-                         bool                  foreign);
+gcs_recv_act_handle_frag (gcs_recv_act_t*       act,
+                          const gcs_act_frag_t* frg,
+                          bool                  local);
 
 /*!
  * Pop received action buffer and get ready to receive another
