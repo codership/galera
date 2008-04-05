@@ -56,7 +56,7 @@ dnl	      AM_CONDITIONAL(ENABLE_RELEASE, test 0))
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_LIBTOOL
-AM_PATH_CHECK
+PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 
 # Checks for libraries.
 
