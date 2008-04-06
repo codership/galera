@@ -19,13 +19,16 @@
 
 struct gcs_node
 {
-    gcs_seqno_t    last_applied; // last applied action on that node
-    long           queue_len;    // action queue length on that node
+    gcs_seqno_t  last_applied; // last applied action on that node
+    long         protocol;     // highest supported protocol
+    long         queue_len;    // action queue length on that node
+    bool         joined;       // if the node has sent JOIN message
+                               // (confirmed state transfer)
     gcs_defrag_t app;          // defragmenter for application actions
     gcs_defrag_t oob;          // defragmenter for out-of-band service acts.
 
     // globally unique id from the component message
-    const char      id[GCS_COMP_MEMB_ID_MAX_LEN + 1];
+    const char   id[GCS_COMP_MEMB_ID_MAX_LEN + 1];
 };
 
 typedef struct gcs_node gcs_node_t;
@@ -68,4 +71,15 @@ gcs_node_handle_act_frag (gcs_node_t*     node,
     }
 }
 
+static inline void
+gcs_node_set_last_applied (gcs_node_t* node, gcs_seqno_t seqno)
+{
+    node->last_applied = seqno;
+}
+
+static inline gcs_seqno_t
+gcs_node_get_last_applied (gcs_node_t* node)
+{
+    return node->last_applied;
+}
 #endif /* _gcs_node_h_ */

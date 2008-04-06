@@ -16,6 +16,7 @@ gcs_group_init (gcs_group_t* group)
     group->my_idx       = -1;
     group->state        = GROUP_NON_PRIMARY;
     group->last_applied = GCS_SEQNO_ILL; // mark for recalculation
+    group->last_node    = -1;
     group->nodes        = NULL;
     return 0;
 }
@@ -61,6 +62,25 @@ group_nodes_reset (gcs_group_t* group)
     }
 }
 
+/* Find node with the smallest last_applied */
+static inline void
+group_redo_last_applied (gcs_group_t* group)
+{
+    long n;
+
+    group->last_node    = 0;
+    group->last_applied = gcs_node_get_last_applied (&group->nodes[0]);
+
+    for (n = 1; n < group->num; n++) {
+        gcs_seqno_t seqno = gcs_node_get_last_applied (&group->nodes[n]);
+        if (seqno < group->last_applied) {
+            group->last_applied = seqno;
+            group->last_node    = n;
+        }
+    }
+}
+
+// NOTE: new_memb should be cleared only after handling SYNC message
 long
 gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
 {
@@ -71,8 +91,6 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
     gu_debug ("primary = %s, my_id = %d, memb_num = %d, group_state = %d",
 	      gcs_comp_msg_primary(comp) ? "yes" : "no",
 	      gcs_comp_msg_self(comp), gcs_comp_msg_num (comp), group->state);
-
-    group->new_memb = 0;
 
     if (gcs_comp_msg_primary(comp)) {
 	/* Got PRIMARY COMPONENT - Hooray! */
@@ -110,9 +128,9 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
 	    /* It happened so that we missed some primary configurations */
 	    gu_warn ("Discontinuity in primary configurations!");
 	    gu_warn ("State snapshot is needed!");
-	    group->state = GROUP_PRIMARY;
             /* we can't go to PRIMARY without joining some other PRIMARY guys */
             group->new_memb |= 1;
+	    group->state = GROUP_PRIMARY;
 	}
     }
     else {
@@ -132,9 +150,34 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
     group->my_idx = gcs_comp_msg_self (comp);
 
     /* if new nodes joined, reset ongoing actions */
-    group_nodes_reset (group);
+    if (group->new_memb) {
+        group_nodes_reset (group);
+    }
+    group_redo_last_applied (group);
 
     return group->state;
+}
+
+void
+gcs_group_handle_last_msg (gcs_group_t* group, gcs_recv_msg_t* msg)
+{
+    gcs_seqno_t seqno;
+
+    assert (GCS_MSG_LAST        == msg->type);
+    assert (sizeof(gcs_seqno_t) == msg->buf_len);
+
+    seqno = gcs_seqno_le(*(gcs_seqno_t*)msg);
+
+    assert (seqno >= group->last_applied);
+
+    gcs_node_set_last_applied (&group->nodes[msg->sender_id], seqno);
+
+    if (msg->sender_id == group->last_node &&
+        seqno > group->last_applied) {
+        /* node that was responsible for the last value, has changed it.
+         * need to recompute it */
+        group_redo_last_applied (group);
+    }
 }
 
 void
