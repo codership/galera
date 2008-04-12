@@ -75,6 +75,7 @@ static gcs_seqno_t seqno_max   = 1<<20; // default number of seqnos to check
 static pthread_mutex_t start  = PTHREAD_MUTEX_INITIALIZER;
 
 static const useconds_t t = 10; // optimal sleep time
+static const struct timespec tsleep = { 0, 10000000 }; // 10 ms
 
 void* run_thread(void* ctx)
 {
@@ -91,35 +92,36 @@ void* run_thread(void* ctx)
         ulong rnd = my_rnd(seqno);
 
         if (gu_unlikely(self_cancel(rnd))) {
-//            printf("Self-cancelling %8llu\n", seqno);
+//            printf("Self-cancelling %8llu\n", (unsigned long long)seqno);
             while ((ret = gcs_to_self_cancel(to, seqno)) == -EAGAIN) usleep (t);
             if (gu_unlikely(ret)) {
                 fprintf (stderr, "gcs_to_self_cancel(%llu) returned %ld (%s)\n",
-                         seqno, ret, strerror(-ret));
+                         (unsigned long long)seqno, ret, strerror(-ret));
                 exit (EXIT_FAILURE);
             }
             else {
-//                printf ("Self-cancel success (%llu)\n", seqno);
+//                printf ("Self-cancel success (%llu)\n", (unsigned long long)seqno);
                 thd->stat_self++;
             }
         }
         else {
-//            printf("Grabbing %8llu\n", seqno);
-            while ((ret = gcs_to_grab (to, seqno)) == -EAGAIN) usleep (t);
+//            printf("Grabbing %8llu\n", (unsigned long long)seqno);
+            while ((ret = gcs_to_grab (to, seqno)) == -EAGAIN)
+                nanosleep (&tsleep, NULL);
             if (gu_unlikely(ret)) {
                 if (gu_likely(-ECANCELED == ret)) {
-//                    printf ("canceled (%llu)\n", seqno);
+//                    printf ("canceled (%llu)\n", (unsigned long long)seqno);
                     thd->stat_fails++;
                 }
                 else {
                     fprintf (stderr, "gcs_to_grab(%llu) returned %ld (%s)\n",
-                             seqno, ret, strerror(-ret));
+                             (unsigned long long)seqno, ret, strerror(-ret));
                     exit (EXIT_FAILURE);
                 }
             }
             else {
                 long cancels = cancel(rnd);
-//                printf ("success (%llu), cancels = %ld\n", seqno, cancels);
+//                printf ("success (%llu), cancels = %ld\n", (unsigned long long)seqno, cancels);
                 if (gu_likely(cancels)) {
                     long offset = cancel_offset (rnd);
                     gcs_seqno_t cancel_seqno = seqno + offset;
@@ -128,8 +130,11 @@ void* run_thread(void* ctx)
                         ret = gcs_to_cancel(to, cancel_seqno);
                         if (gu_unlikely(ret)) {
                             fprintf (stderr, "gcs_to_cancel(%llu) by %llu "
-                                     "failed: %s\n", cancel_seqno, seqno,
-                                     strerror (ret));
+                                     "failed: %s\n",
+                                     (unsigned long long)cancel_seqno,
+                                     (unsigned long long)seqno,
+                                     strerror (-ret));
+                            exit (EXIT_FAILURE);
                         }
                         else {
 //                            printf ("%llu canceled %llu\n",
@@ -141,21 +146,26 @@ void* run_thread(void* ctx)
                 }
                 thd->stat_grabs++;
                 ret = gcs_to_release(to, seqno);
+                if (gu_unlikely(ret)) {
+                    fprintf (stderr, "gcs_to_release(%llu) failed: %ld(%s)\n",
+                             (unsigned long long)seqno, ret, strerror(-ret));
+                    exit (EXIT_FAILURE);
+                }
             }
         }
 
         seqno += thread_max; // this together with unique starting point
                              // guarantees that seqnos are unique
     }
-//    printf ("Thread %ld exiting. Last seqno = %llu\n",
-//            thd->thread_id, seqno - thread_max);
+    //    printf ("Thread %ld exiting. Last seqno = %llu\n",
+    //        thd->thread_id, (unsigned long long)(seqno - thread_max));
     return NULL;
 }
 
 int main (int argc, char* argv[])
 {
     // minimum to length required by internal logic
-    long to_len = cancel(0xffffffff) * cancel_offset(0xffffffff);
+    ulong to_len = cancel(0xffffffff) * cancel_offset(0xffffffff);
 
     errno = 0;
     if (argc > 1) seqno_max  = (1 << atol(argv[0]));
@@ -166,11 +176,18 @@ int main (int argc, char* argv[])
         exit(errno);
     }
     printf ("Starting with %lu threads and %llu maximum seqno.\n",
-            thread_max, seqno_max);
+            thread_max, (unsigned long long)seqno_max);
 
     /* starting with 0, enough space for all threads and cancels */
-    to_len = to_len > thread_max ? to_len : thread_max;
-    to = gcs_to_create (to_len * 2, 0);
+    // 4 is a magic number to get it working without excessive sleep on amd64
+    to_len = to_len > thread_max ? to_len : thread_max; to_len *= 4;
+    to = gcs_to_create (to_len, 0);
+    if (to != NULL) {
+        printf ("Created TO monitor of length %lu\n", to_len);
+    }
+    else {
+        exit (-ENOMEM);
+    }
 
     /* main block */
     {
@@ -212,7 +229,8 @@ int main (int argc, char* argv[])
 
         /* print statistics */
         printf ("%llu seqnos in %.3f seconds (%.3f seqno/sec)\n",
-                seqno_max, time_spent, ((double) seqno_max)/time_spent);
+                (unsigned long long)seqno_max, time_spent,
+                ((double) seqno_max)/time_spent);
         printf ("Overhead at 10000 actions/second: %.2f%%\n",
                 (time_spent * 10000 * 100/* for % */)/seqno_max);
         printf ("Grabbed:        %9lu\n"
