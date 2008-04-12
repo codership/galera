@@ -393,7 +393,7 @@ static int dump_block(struct block_info *bi) {
 	default:
             fprintf(stderr, "Bad rec type: %c\n", rec_type);
             fprintf(stderr, "at pos: %ld, block len: %d\n", 
-                    (bi->pos - bi->block), bi->block_len);
+                    (long)(bi->pos - bi->block), bi->block_len);
             exit(1);
             break;
 	}
