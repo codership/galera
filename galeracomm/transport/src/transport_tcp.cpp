@@ -148,7 +148,7 @@ Transport *TCPTransport::accept(Poll *poll, Protolay *up_ctx)
 
 
     sockaddr sa;
-    size_t sa_size = sizeof(sockaddr);
+    socklen_t sa_size = sizeof(sockaddr);
 
     int acc_fd;
     if ((acc_fd = ::accept(fd, &sa, &sa_size)) == -1)
