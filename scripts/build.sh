@@ -90,11 +90,11 @@ set -x
 build_base=$(cd $(dirname $0); cd ..; pwd -P)
 
 # Define branches to be used
-galerautils_branch=$build_base/galerautils
-galeracomm_branch=$build_base/galeracomm
-gcs_branch=$build_base/gcs
-wsdb_branch=$build_base/wsdb
-mysql_branch=$build_base/../../5.1/trunk
+galerautils_src=$build_base/galerautils
+galeracomm_src=$build_base/galeracomm
+gcs_src=$build_base/gcs
+wsdb_src=$build_base/wsdb
+mysql_src=$build_base/../../5.1/trunk
 
 # Flags for configure scripts
 if test -n GALERA_DEST
@@ -128,11 +128,17 @@ build()
     if [ "$CONFIGURE" == "yes" ]; then rm -rf config.status; ./configure $@; SCRATCH=yes ; fi
     if [ "$SCRATCH"   == "yes" ]; then make clean ; fi
     make
+#    $gainroot make install
+    popd
+}
+
+# Updates build flags for the next stage
+build_flags()
+{
+    local build_dir=$1
     LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$build_dir/src/.libs
     CPPFLAGS="$CPPFLAGS -I$build_dir/src "
     LDFLAGS="$LDFLAGS -L$build_dir/src/.libs"
-#    $gainroot make install
-    popd
 }
 
 building="false"
@@ -150,33 +156,40 @@ fi
 
 if test $initial_stage = "galerautils" || $building = "true"
 then
-    build $galerautils_branch $conf_flags
+    build $galerautils_src $conf_flags
     building="true"
 fi
+
+build_flags $galerautils_src
 
 if test $initial_stage = "galeracomm" || $building = "true"
 then
-    build $galeracomm_branch $conf_flags $galera_flags
-    CPPFLAGS="$CPPFLAGS -I$galeracomm_branch/vs/include" # non-standard location
-    CPPFLAGS="$CPPFLAGS -I$galeracomm_branch/common/include" # non-standard location
-    LDFLAGS="$LDFLAGS -L$galeracomm_branch/common/src/.libs"
-    LDFLAGS="$LDFLAGS -L$galeracomm_branch/transport/src/.libs"
-    LDFLAGS="$LDFLAGS -L$galeracomm_branch/vs/src/.libs"
+    build $galeracomm_src $conf_flags $galera_flags
     building="true"
 fi
+
+CPPFLAGS="$CPPFLAGS -I$galeracomm_src/vs/include" # non-standard location
+CPPFLAGS="$CPPFLAGS -I$galeracomm_src/common/include" # non-standard location
+LDFLAGS="$LDFLAGS -L$galeracomm_src/common/src/.libs"
+LDFLAGS="$LDFLAGS -L$galeracomm_src/transport/src/.libs"
+LDFLAGS="$LDFLAGS -L$galeracomm_src/vs/src/.libs"
 
 if test $initial_stage = "gcs" || $building = "true"
 then
-    build $gcs_branch $conf_flags $galera_flags
+    build $gcs_src $conf_flags $galera_flags
     building="true"
 fi
 
+build_flags $gcs_src
+
 if test $initial_stage = "wsdb" || $building = "true"
 then
-    build $wsdb_branch $conf_flags $galera_flags
-    CPPFLAGS="$CPPFLAGS -I$wsdb_branch/include" # non-standard location
+    build $wsdb_src $conf_flags $galera_flags
+#    CPPFLAGS="$CPPFLAGS -I$wsdb_src/include" # non-standard location
     building="true"
 fi
+
+build_flags $wsdb_src
 
 if test $building != "true"
 then
