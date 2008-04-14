@@ -1,6 +1,7 @@
 extern "C" {
 #include "gcs_vs.h"
 #include "gu_mutex.h"
+#include "gu_log.h"
 }
 #include <gcomm/vs.hpp>
 // We access data comp msg struct directly
@@ -253,6 +254,8 @@ GCS_BACKEND_OPEN_FN(gcs_vs_open)
     
     if (NULL == sock || strlen(sock) == 0)
         sock = vs_default_socket;
+
+    gu_debug ("Opening conneciton to '%s'", sock);
 
     try {
 	conn = new gcs_backend_conn;	

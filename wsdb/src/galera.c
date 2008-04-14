@@ -204,7 +204,8 @@ enum galera_status galera_enable() {
 	galera_log (GALERA_LOG_INFO, "Successfully opened gcs connection");
 	break;
     default:
-	galera_log (GALERA_NODE_FAIL, "gcs_open() failed");
+	galera_log (GALERA_NODE_FAIL, "gcs_open(%p, %s, %s) failed: %d (%s)",
+                    &gcs_conn, gcs_channel, gcs_url, rcode, strerror(-rcode));
 	GU_DBUG_RETURN(GALERA_NODE_FAIL);
     }
 

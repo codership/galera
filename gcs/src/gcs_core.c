@@ -16,47 +16,25 @@
 #include "gcs_backend.h"
 #include "gcs_comp_msg.h"
 #include "gcs_fifo.h"
-#include "gcs_act_proto.h"
+#include "gcs_group.h"
 #include "gcs_core.h"
 
 #define CORE_FIFO_LEN 1<<15 // 32K elements (128/256K bytes)
-
-typedef struct core_recv_msg
-{
-    void*          buf;
-    long           buf_len;
-    long           size;
-    long           sender_id;    
-    gcs_msg_type_t type;
-}
-core_recv_msg_t;
-
-typedef struct core_recv_act
-{
-    gcs_seqno_t    send_no;
-    uint8_t*       head; // head of action buffer
-    uint8_t*       tail; // tail of action data
-    size_t         size;
-    size_t         received;
-    gcs_act_type_t type;
-}
-core_recv_act_t;
 
 typedef enum core_state
 {
     CORE_PRIMARY,
     CORE_NON_PRIMARY,
+    CORE_CLOSING,
     CORE_CLOSED
 }
 core_state_t;
 
-struct gcs_core_conn
+struct gcs_core
 {
     /* connection per se */
-    long            my_id;
     long            prim_comp_no;
     core_state_t    state;
-    gcs_comp_msg_t* comp;
 //    gu_mutex_t      prim_lock;
 //    gu_cond_t       prim_cond;
 //    gu_mutex_t      lock; // must get rid of it.
@@ -66,39 +44,44 @@ struct gcs_core_conn
 
     /* send part */
     gu_mutex_t      send_lock;
+    bool            send_restart; // action send must be restarted.
     void*           send_buf;
     size_t          send_buf_len;
     gcs_seqno_t     send_act_no;
 
+    /* recv part */
+    gcs_recv_msg_t  recv_msg;
+    gcs_seqno_t     recv_act_no;
+
     /* local action FIFO */
     gcs_fifo_t*     fifo;
 
-    /* recv part */
-    gu_mutex_t      recv_lock;
-    core_recv_msg_t recv_msg;
-    /* array of actions currently being received */
-    core_recv_act_t *recv_acts;
-    long             recv_acts_num;
-    gcs_seqno_t      recv_act_no;  // actions must be numbered in the upper
-                                   // layer, remove in future refactoring
+    /* group context */
+    gcs_group_t     group;
 
     /* backend part */
     size_t          msg_size;
     gcs_backend_t   backend;         // message IO context
 };
 
-long gcs_core_open (gcs_core_conn_t** core,
+long gcs_core_open (gcs_core_t** core,
                     const char* const channel,
                     const char* const backend_uri)
 {
     long             err  = 0;
-    gcs_core_conn_t* conn = GU_CALLOC (1, gcs_core_conn_t);
+    gcs_core_t* conn = GU_CALLOC (1, gcs_core_t);
 
     if (NULL == conn) return -ENOMEM;
 
     gu_debug ("Opening connection to backend IO layer");
     err = gcs_backend_init (&conn->backend, channel, backend_uri);
-    if (err < 0) return err;
+    if (err < 0) {
+        gu_error ("Failed to initialize backend: %d (%s)",
+                  err, gcs_strerror(err));
+        gu_error ("Arguments: %p, %s, %s",
+                  &conn->backend, channel, backend_uri);
+        return err;
+    }
     assert (0 == err);
     assert (NULL != conn->backend.conn);
 
@@ -121,15 +104,14 @@ long gcs_core_open (gcs_core_conn_t** core,
     conn->state = CORE_NON_PRIMARY;
 
     gu_mutex_init (&conn->send_lock, NULL);
-    gu_mutex_init (&conn->recv_lock, NULL);
 /* REMOVE
     gu_mutex_init (&conn->lock, NULL);
     gu_mutex_init (&conn->prim_lock, NULL);
 
     pthread_cond_init  (&conn->prim_cond, NULL);
 */
-    conn->recv_acts_num = 0;
-    conn->recv_acts = NULL;
+    gcs_group_init (&conn->group);
+
     /* receive primary configuration message to get our id and stuff.
      * This will have to be removed in order to pass the RPIM event to the
      * application. We don't need to wait for anything here. */
@@ -150,9 +132,6 @@ long gcs_core_open (gcs_core_conn_t** core,
 	} while (act_type != GCS_ACT_PRIMARY);
     }
 
-    assert (conn->recv_acts_num);
-    assert (conn->recv_acts);
-
     conn->proto_ver = 0;
     
     *core = conn;
@@ -167,8 +146,74 @@ out:
     return err;
 }
 
+/*!
+ * Performs an attempt at sending a message (action fragment) with all
+ * required checks while holding a lock, ensuring exclusive access to backend.
+ *
+ * restart flag may be raised if configuration changes and new nodes are
+ * added - that would require all previous members to resend partially sent
+ * actions.
+ */
+static inline ssize_t
+core_msg_send (gcs_core_t*    core,
+               const void*    buf,
+               size_t         buf_len,
+               gcs_msg_type_t type)
+{
+    ssize_t ret;
+
+    ret = gu_mutex_lock (&core->send_lock);
+    if (gu_likely(0 == ret)) {
+        // TODO: nothing here can tell between GCS_ACT_DATA and GCS_ACT_SERVICE
+        // when GCS_ACT_SERVICE will be implemented, we'll have to have two
+        // restart flags - one for each of ongoing actions
+        register bool restart = core->send_restart && (type == GCS_MSG_ACTION);
+        if (gu_likely(core->state == CORE_PRIMARY && !restart)) {
+            ret = core->backend.send (&core->backend, buf, buf_len, type);
+        }
+        else {
+            if (core->state == CORE_PRIMARY && restart) {
+                core->send_restart = false; // next action doesn't need it
+                ret = -ERESTART;            // ask to restart action sending
+            }
+            else {
+                switch (core->state) {
+                case CORE_NON_PRIMARY: ret = -ENOTCONN; break;
+                case CORE_CLOSING:
+                case CORE_CLOSED:      ret = -ECONNABORTED; break;
+                default: assert(0);
+                }
+            }
+        }
+        gu_mutex_unlock (&core->send_lock);
+    }
+//    gu_debug ("returning: %d (%s)", ret, gcs_strerror(ret));
+    return ret;
+}
+
+/*!
+ * Repeats attempt at sending the message if -EAGAIN was returned
+ * by core_msg_send()
+ */
+static inline ssize_t
+core_msg_send_retry (gcs_core_t*    core,
+                     const void*    buf,
+                     size_t         buf_len,
+                     gcs_msg_type_t type)
+{
+    ssize_t ret;
+    while ((ret = core_msg_send (core, buf, buf_len, type))
+           == -EAGAIN) {
+        /* wait for primary configuration - sleep 0.01 sec */
+        gu_debug ("Backend requested wait\n");
+        usleep (10000);
+    }
+//    gu_debug ("returning: %d (%s)", ret, gcs_strerror(ret));
+    return ret;
+}
+
 ssize_t
-gcs_core_send (gcs_core_conn_t* const conn,
+gcs_core_send (gcs_core_t*      const conn,
                const uint8_t*         action,
                size_t                 act_size,
                gcs_act_type_t   const act_type)
@@ -178,9 +223,6 @@ gcs_core_send (gcs_core_conn_t* const conn,
     gcs_act_frag_t frg;
     size_t         head_size;
     size_t         send_size;
-
-    if (conn->state != CORE_PRIMARY)           return -ENOTCONN;
-    if ((ret = gu_mutex_lock (&conn->send_lock))) return -ret;
 
     /* 
      * Action header will be replicated with every message.
@@ -211,32 +253,40 @@ gcs_core_send (gcs_core_conn_t* const conn,
 	memcpy ((char*)frg.frag, action, chunk_size);
 	
 	send_size = head_size + chunk_size;
-//        assert(send_size < 1346);
-	while ((ret = conn->backend.send (&conn->backend,
-					  conn->send_buf,
-					  send_size,
-					  GCS_MSG_ACTION))
-	       == -EAGAIN) {
-	    /* wait for primary configuration - sleep 0.01 sec */
-	    gu_debug ("Backend requested wait\n");
-	    usleep (10000);
+
+        ret = core_msg_send_retry (conn, conn->send_buf, send_size,
+                                   GCS_MSG_ACTION);
+
+	if (gu_likely(ret > (ssize_t)head_size)) {
+
+            assert (ret <= (ssize_t)send_size);
+
+            ret -= head_size;
+
+            sent     += ret;
+            action   += ret;
+            act_size -= ret;
+
+            // adjust frag_len, don't copy more than we could send
+            frg.frag_len = ret;
+        }
+        else {
+            if (ret >= 0) {
+                // we managed to send less than a header, fail
+                gu_fatal ("Cannot send message: header is too big");
+                ret = -ENOTRECOVERABLE;
+            }
+            /* At this point we have an unsent action in local FIFO
+             * and parts of this action already could have been received
+             * by other group members.
+             * 1. Action must be removed from fifo.*/
+            gcs_fifo_remove(conn->fifo);
+            /* 2. Members will have to discard received fragments.
+             * Two reasons could lead us here: new member(s) in configuration
+             * change or broken connection (leave group). In both cases other
+             * members discard fragments */
+            goto out;
 	}
-
-	if (ret < head_size) { 
-	    // we managed to send less than a header, fail
-            gu_error ("Cannot send message: header is too big");
-	    goto out1;
-	}
-
-	assert (ret <= send_size);
-
-	ret -= head_size;
-
-	sent     += ret;
-	action   += ret;
-	act_size -= ret;
-
-	if (ret > 0) frg.frag_len = ret; // don't copy more than we can send
 
     } while (act_size && gcs_act_proto_inc(conn->send_buf));
 
@@ -245,16 +295,8 @@ gcs_core_send (gcs_core_conn_t* const conn,
     /* successfully sent action, increment send counter */
     conn->send_act_no++;
 
-out1:
-    /* At this point we can have unsent action in local FIFO
-     * and parts of this action already could have been received
-     * by other group members.
-     * This should be only due to NON_PRIM configuration.
-     * Action must be popped up from fifo. Members will have to discard received
-     * fragments. FIXME.
-     */
 out:
-    gu_mutex_unlock (&conn->send_lock);
+//    gu_debug ("returning: %d (%s)", ret, gcs_strerror(ret));
     return ret;
 }
 
@@ -262,7 +304,7 @@ out:
  * Deals with fetching complete message from backend
  * and reallocates recv buf if needed */
 static inline long
-core_msg_recv (gcs_backend_t* backend, core_recv_msg_t* recv_msg)
+core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg)
 {
     long ret;
 
@@ -310,216 +352,57 @@ core_msg_recv (gcs_backend_t* backend, core_recv_msg_t* recv_msg)
     return ret;
 }
 
-/*
- *  Allocates memory and performs defragmentation for foreign actions.
- *  Keeps track of local actions.
- *  Returns 1 in case full action is received, negative error code otherwise
- */
-static inline long
-core_handle_action_msg (core_recv_act_t*       act,
-                        const core_recv_msg_t* msg,
-                        bool                   foreign)
-{
-    long           ret;
-    gcs_act_frag_t frg;
-
-    if ((ret = gcs_act_proto_read (&frg, msg->buf, msg->size)))
-	return ret;
-
-    if (!act->received) {
-	/* new action */
-	assert (0 == frg.frag_no);
-	act->size    = frg.act_size;
-	act->send_no = frg.act_id;
-	act->type    = frg.act_type;
-	if (foreign) {
-	    /* A foreign action. We need to allocate buffer for it.
-             * This buffer will be returned to application,
-	     * so it must be allocated by standard malloc */
-	    if(!(act->head = malloc (act->size))) return -ENOMEM;
-	    act->tail = act->head;
-	}
-    }
-    else {
-	/* another fragment of existing action */
-        assert (frg.frag_no  >  0);
-	assert (act->send_no == frg.act_id);
-	assert (act->type    == frg.act_type);
-    }
-    
-    act->received += frg.frag_len;
-    assert (act->received <= act->size);
-
-    if (foreign) {
-	assert (act->tail);
-	memcpy (act->tail, frg.frag, frg.frag_len);
-	act->tail += frg.frag_len;
-    }
-
-    return (act->received == act->size);
-}
-
-/*
- * This function returns pointer to received action and reinitializes
- * recv_act_t structure.
- * It is called in the context of the last received message, which
- * is held in conn->recv_msg, so conn is the only needed parameter.
- */
-static inline uint8_t*
-core_pop_action (gcs_core_conn_t* conn,
-                 core_recv_act_t* act,
-                 long             sender_id)
-{
-    uint8_t* ret;
-
-    assert (act->size == act->received);
-
-    if (conn->my_id != sender_id) {
-	ret = act->head;
-    }
-    else { /* local action, get from FIFO */
-	ret = gcs_fifo_get (conn->fifo);
-    }
-    
-    memset (act, 0, sizeof (*act));
-    act->send_no = GCS_SEQNO_ILL;
-
-    return ret;
-}
-
-/*!
- * Handles component message - installs new membership,
- * cleans old one, renews process id and signals waiting send threads
- * to continue.
- *
- * @return
- *        CORE_PRIMARY or CORE_NON_PRIMARY in case of success or
- *        negative error code.
- */
-static long
-core_handle_component (gcs_core_conn_t* conn,
-                       gcs_comp_msg_t* comp)
-{
-    long recv_acts_num = 0;
-    long new_idx, old_idx;
-    core_recv_act_t *recv_acts = NULL;
-
-    gu_debug ("primary = %s, my_id = %d, memb_num = %d, conn_state = %d",
-	      gcs_comp_msg_primary(comp) ? "yes" : "no",
-	      gcs_comp_msg_self(comp), gcs_comp_msg_num (comp),
-              conn->state);
-
-    if (gcs_comp_msg_primary(comp)) {
-	/* Got PRIMARY COMPONENT - Hooray! */
-	/* create new recv_acts array according to new membrship */
-	recv_acts_num = gcs_comp_msg_num(comp);
-	recv_acts     = GU_CALLOC (recv_acts_num, core_recv_act_t);
-	if (!recv_acts) return -ENOMEM;
-	
-	if (conn->state == CORE_PRIMARY) {
-	    /* we come from previous primary configuration */
-	    /* remap old array to new one to preserve action continuity */
-	    assert (conn->comp);
-	    assert (conn->recv_acts);
-	    gu_debug ("\tMembers:");
-	    for (new_idx = 0; new_idx < recv_acts_num; new_idx++) {
-		/* find member index in old component by unique member id */
-		gu_debug ("\t%s", gcs_comp_msg_id (comp, new_idx));
-		old_idx  = gcs_comp_msg_idx (conn->comp,
-					     gcs_comp_msg_id (comp, new_idx));
-		if (old_idx >= 0) {
-		    /* the node was in previous configuration with us */
-		    assert (old_idx < conn->recv_acts_num);
-		    /* move recv buf to new recv array */
-		    recv_acts[new_idx] = conn->recv_acts[old_idx];
-		    conn->recv_acts[old_idx].head = NULL;
-		}
-	    }
-	}
-	else {
-	    /* It happened so that we missed some primary configurations */
-	    gu_debug ("Discontinuity in primary configurations!");
-	    gu_debug ("State snapshot is needed!");
-	    conn->state = CORE_PRIMARY;
-	}
-    }
-    else {
-	/* Got NON-PRIMARY COMPONENT - cleanup */
-	if (conn->state == CORE_PRIMARY) {
-	    /* All sending threads must be aborted with -ENOTCONN,
-	     * local action FIFO must be flushed. Not implemented: FIXME! */
-	    conn->state = CORE_NON_PRIMARY;
-	}
-    }
-
-    /* free actions that were left from disappeared members */
-    for (old_idx = 0; old_idx < conn->recv_acts_num; old_idx++) {
-        if (conn->recv_acts[old_idx].head) {
-	    // was alloced by normal malloc
-            free (conn->recv_acts[old_idx].head);
-        }
-    }
-
-    /* replace old component data with new one
-     * (recv_acts is null when first primary configuration comes) */
-    if (conn->recv_acts) gu_free (conn->recv_acts);
-    if (conn->comp)      gcs_comp_msg_delete (conn->comp);
-    conn->recv_acts     = recv_acts;
-    conn->recv_acts_num = recv_acts_num;
-    conn->comp          = gcs_comp_msg_copy (comp);
-    conn->my_id         = gcs_comp_msg_self (comp);
-
-    return conn->state;
-}
-
-
-//static void recv_lock_cleanup (void *m) { gu_mutex_unlock (m); }
-
 /*! Receives action */
-ssize_t gcs_core_recv (gcs_core_conn_t* conn,
+ssize_t gcs_core_recv (gcs_core_t* conn,
                        uint8_t**        action,
                        gcs_act_type_t*  act_type,
                        gcs_seqno_t*     act_id) // should not be here!!!
 {
-    core_recv_msg_t* recv_msg = &conn->recv_msg;
+    gcs_recv_msg_t* recv_msg = &conn->recv_msg;
+    gcs_group_t*    group    = &conn->group;
     long ret = 0;
 
     *action   = NULL;
     *act_type = GCS_ACT_ERROR;
 
-    if (gu_mutex_lock (&conn->recv_lock)) return -EBADFD;
-    if (CORE_CLOSED == conn->state) {
-	gu_mutex_unlock (&conn->recv_lock);
+    if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
+    if (conn->state >= CORE_CLOSING) {
+	gu_mutex_unlock (&conn->send_lock);
 	return -EBADFD;
     }
+    gu_mutex_unlock (&conn->send_lock);
 
     /* receive messages from group and demultiplex them 
      * until finally some complete action is ready */
     while (1)
     {
-	long sender_id;
 	ret = core_msg_recv (&conn->backend, recv_msg);
-	if (ret < 0) goto out; /* backend error while receiving message */
-	sender_id = recv_msg->sender_id;
+	if (gu_unlikely (ret < 0)) {
+            goto out; /* backend error while receiving message */
+        }
 
 	switch (recv_msg->type) {
 	case GCS_MSG_ACTION:
-            assert (sender_id >= 0);
-	    if (CORE_PRIMARY == conn->state) {
-		core_recv_act_t* recv_act  = conn->recv_acts + sender_id;
+            if (gcs_group_is_primary(group)) {
+		gcs_recv_act_t recv_act;
 
-		ret = core_handle_action_msg (recv_act,
-                                              recv_msg,
-                                              sender_id != conn->my_id);
-		if (ret == 1) {
+		ret = gcs_group_handle_act_msg (group, recv_msg, &recv_act);
+		if (ret > 0) {
 		    /* complete action received */
 		    *act_id   = ++conn->recv_act_no;
-		    *act_type = recv_act->type;
-		    ret       = recv_act->size;
-		    *action   = core_pop_action (conn, recv_act, sender_id);
+		    *act_type = recv_act.type;
+                    if (gu_likely(recv_act.buf != NULL)) {
+                        assert (gcs_group_my_idx(group) != recv_act.sender_id);
+                        *action = recv_act.buf;
+                    }
+                    else {
+                        assert (gcs_group_my_idx(group) == recv_act.sender_id);
+                        /* local action, get from FIFO */
+                        *action = gcs_fifo_get (conn->fifo);
+                    }
 //                   gu_debug ("Received action: sender: %d, size: %d, act: %p",
 //                              conn->recv_msg.sender_id, ret, *action);
-//                    gu_debug ("%s", (char*) *action);
+//                   gu_debug ("%s", (char*) *action);
 		    goto out; /* exit loop */
 		}
 		else if (ret < 0) {
@@ -528,25 +411,47 @@ ssize_t gcs_core_recv (gcs_core_conn_t* conn,
 	    }
 	    else { /* Non-primary - ignore action */
 		gu_debug ("Action message in non-primary configuration from "
-			  "member %d (%s)",
-			  sender_id, gcs_comp_msg_id(conn->comp, sender_id));
+			  "member %d", recv_msg->sender_id);
+	    }
+	    break;
+        case GCS_MSG_LAST:
+            if (gcs_group_is_primary(group)) {
+                gcs_group_handle_last_msg (group, recv_msg);
+	    }
+	    else { /* Non-primary - ignore last message */
+		gu_debug ("Last Applied Action message "
+                          "in non-primary configuration from member %d",
+			  recv_msg->sender_id);
 	    }
 	    break;
 	case GCS_MSG_COMPONENT:
 	    *action = NULL;
-	    if ((ret = core_handle_component (conn, recv_msg->buf)) >= 0) {
-		assert (ret == conn->state);
-		if (CORE_PRIMARY == ret) {
-		    *act_type = GCS_ACT_PRIMARY;
-                    *act_id   = conn->recv_act_no;
-		} else {
-		    *act_type = GCS_ACT_NON_PRIMARY;
-                    //don't increment according to spec
-                    *act_id   = conn->recv_act_no;
-		}
-		gu_info ("Received %s component event.",
-			 CORE_PRIMARY == ret ? "primary" : "non-primary");
-		ret = 0; // return size
+            ret = gcs_group_handle_comp_msg (group, recv_msg->buf);
+	    if (ret >= 0) {
+                gu_mutex_lock (&conn->send_lock);
+                {
+                    if (gcs_group_is_primary (group)) {
+                        *act_type = GCS_ACT_PRIMARY;
+                        *act_id   = conn->recv_act_no;
+                        // if new members are added, need to resend ongoing
+                        // action
+                        conn->send_restart = gcs_group_new_members (group);
+                        // if state is CLOSING or CLOSED we don't change that
+                        if (conn->state == CORE_NON_PRIMARY)
+                            conn->state = CORE_PRIMARY;
+                    } else {
+                        *act_type = GCS_ACT_NON_PRIMARY;
+                        //don't increment according to spec
+                        *act_id   = conn->recv_act_no;
+                        if (conn->state == CORE_PRIMARY)
+                            conn->state = CORE_NON_PRIMARY;
+                    }
+                    gu_info ("Received %s component event.",
+                             gcs_group_is_primary(group) ?
+                             "primary" : "non-primary");
+                    ret = 0; // return size
+                }
+                gu_mutex_unlock (&conn->send_lock);
 	    }
 	    else {
 		*act_id   = GCS_SEQNO_ILL;
@@ -563,58 +468,67 @@ ssize_t gcs_core_recv (gcs_core_conn_t* conn,
 	    // continue looping
         }
     } /* end of recv loop */
-
 out:
-    gu_mutex_unlock (&conn->recv_lock);
+#ifdef GCS_DEBUG_CORE
+    if (ret < 0)
+        gu_debug ("Returning %d", ret);
+#endif
     return ret;
 }
 
-long gcs_core_close (gcs_core_conn_t** core)
+long gcs_core_stop (gcs_core_t* conn)
 {
-    gcs_core_conn_t *conn = *core;
-    uint8_t* dead_action = NULL;
-    int i = 0;
+    long ret;
 
-    if (!conn) return -EINVAL;
+    if (!conn) return -EBADFD;
+    if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
+    if (conn->state >= CORE_CLOSING) {
+	gu_mutex_unlock (&conn->send_lock);
+	return -EBADFD;
+    }
+
+    conn->state = CORE_CLOSING;
+    ret = conn->backend.close (&conn->backend);
+    gu_mutex_unlock (&conn->send_lock);
+
+    return ret;
+}
+
+long gcs_core_close (gcs_core_t* conn)
+{
+    if (!conn) return -EBADFD;
     if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
     if (CORE_CLOSED == conn->state) {
 	gu_mutex_unlock (&conn->send_lock);
 	return -EBADFD;
     }
+    if (CORE_CLOSING != conn->state) {
+        gu_error ("Calling close() before stop().");
+	gu_mutex_unlock (&conn->send_lock);
+	return -ECANCELED;
+    }
     conn->state = CORE_CLOSED;
     gu_mutex_unlock (&conn->send_lock);
     /* at this point all send attempts are isolated */
 
-    conn->backend.close (&conn->backend);
-    /* after that receiving thread should abort,
-     * we can sync with recv thread */
-    gu_mutex_lock   (&conn->recv_lock);
-    gu_mutex_unlock (&conn->recv_lock);
-
     /* after that we must be able to destroy mutexes */
     while (gu_mutex_destroy (&conn->send_lock));
-    while (gu_mutex_destroy (&conn->recv_lock));
-    /* now noone will interfere */
 
+    /* now noone will interfere */
     gcs_fifo_destroy (&conn->fifo);
 
-    /* clean up non-received actions */
-    for (i = 0; i < conn->recv_acts_num; i++) {
-	dead_action = conn->recv_acts[i].head;
-	if (dead_action) gu_free (dead_action);
-    }
-    gu_free (conn->recv_acts);
+    gcs_group_free (&conn->group);
 
     /* free buffers */
     gu_free (conn->recv_msg.buf);
     gu_free (conn->send_buf);
     gu_free (conn);
-    *core = NULL;
+
     return 0;
 }
 
 long
-gcs_core_set_pkt_size (gcs_core_conn_t* conn, ulong pkt_size)
+gcs_core_set_pkt_size (gcs_core_t* conn, ulong pkt_size)
 {
     long msg_size = conn->backend.msg_size (&conn->backend, pkt_size);
     long hdr_size = gcs_act_proto_hdr_size (conn->proto_ver);
@@ -633,7 +547,7 @@ gcs_core_set_pkt_size (gcs_core_conn_t* conn, ulong pkt_size)
               conn->send_buf_len, msg_size);
 
     if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
-    if (CORE_CLOSED != conn->state) {
+    if (CORE_CLOSING > conn->state) {
         new_send_buf = gu_realloc (conn->send_buf, msg_size);
         if (new_send_buf) {
             conn->send_buf     = new_send_buf;
@@ -646,4 +560,23 @@ gcs_core_set_pkt_size (gcs_core_conn_t* conn, ulong pkt_size)
         return 0;
     else
         return -ENOMEM;
+}
+
+long
+gcs_core_set_last_applied (gcs_core_t* core, gcs_seqno_t seqno)
+{
+    ssize_t ret;
+    seqno = gcs_seqno_le (seqno);
+    ret = core_msg_send_retry (core, &seqno, sizeof(seqno), GCS_MSG_LAST);
+    if (ret > 0) {
+        assert(ret == sizeof(seqno));
+        ret = 0;
+    }
+    return ret;
+}
+
+gcs_seqno_t
+gcs_core_get_last_applied (gcs_core_t* core)
+{
+    return gcs_group_get_last_applied (&core->group);
 }

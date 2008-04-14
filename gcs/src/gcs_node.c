@@ -10,10 +10,13 @@
 
 /*! Initialize node context */
 void
-gcs_node_init (gcs_node_t* node)
+gcs_node_init (gcs_node_t* node, const char* id)
 {
-    node->last_applied = 0;
-    node->queue_len    = 0;
+    assert(strlen(id) > 0);
+    assert(strlen(id) < sizeof(node->id));
+
+    memset (node, 0, sizeof (gcs_node_t));
+    strncpy ((char*)node->id, id, sizeof(node->id) - 1);
     gcs_defrag_init (&node->app);
     gcs_defrag_init (&node->oob);
 }

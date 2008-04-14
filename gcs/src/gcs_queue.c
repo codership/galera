@@ -68,14 +68,13 @@ int gcs_queue_push (gcs_queue_t *queue, void *data)
 #ifdef GCS_DEBUG_QUEUE
             queue->length++;
 #endif
+//            gu_debug ("queue %p: tail: %p data: %p\n",
+//                      queue, queue->tail, queue->tail->data);
+            /* signal to whoever could be waiting for queue */
             gu_cond_signal  (&queue->ready);
             gu_mutex_unlock (&queue->lock);
-//	printf ("queue %p: tail: %p data: %p\n",
-//		queue, queue->tail, queue->tail->data);
         }
     }
-
-    /* signal to whoever could be waiting for queue */
 
     return queue->err;
 }
@@ -247,14 +246,16 @@ int gcs_queue_free (gcs_queue_t **queue)
         // grab a mutex at this point
 	while (gu_mutex_destroy (&q->lock))
 	{  /* wait till the mutex is freed by other threads */
-	    gu_debug ("Waiting for other threads to release the mutex");
-            usleep (10000);
+	    //gu_debug ("Waiting for other threads to release the mutex");
+            usleep (50000);
 	    gu_mutex_lock (&q->lock);
 	    gu_mutex_unlock (&q->lock);
 	}
+        //gu_debug ("Mutex destoryed successfully");
 
 	/* Now we can safely free allocated memory */
 	gu_free (q);
+        //gu_debug ("Queue freed successfully");
 	/* Wow! */
 	*queue = NULL;
 	return 0;

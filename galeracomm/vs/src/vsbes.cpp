@@ -343,11 +343,18 @@ public:
 #ifdef COMPILE_SERVER
 
 #include <csignal>
+#include <string>
+using namespace std;
+
 int main(int argc, char *argv[])
 {
     log.log(1, "start");
     ::signal(SIGPIPE, SIG_IGN);
 
+    if (argc < 2) {
+	cerr << "Usage: " << argv[0] << " <address>" << endl;
+	exit (-1);
+    }
 //    try {
 	Server s(argv[1]);
 	s.run();

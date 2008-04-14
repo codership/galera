@@ -73,7 +73,9 @@ GCS_BACKEND_CLOSE_FN(dummy_close)
     
     if (!dummy) return -EBADFD;
 
+//    gu_debug ("Deallocating message queue (serializer)");
     gcs_queue_free    (&dummy->gc_q);
+//    gu_debug ("Freeing message object.");
     dummy_msg_destroy (&dummy->msg);
     gu_free (dummy);
     backend->conn = NULL;
@@ -127,6 +129,7 @@ GCS_BACKEND_RECV_FN(dummy_recv)
                 // wait was aborted while no data - connection closing
                 ret = -ECONNABORTED;
             }
+            gu_debug ("Returning %d: %s", ret, gcs_strerror(ret));
             return ret;
         }
         else {

@@ -16,7 +16,7 @@
 #define FALSE (!TRUE)
 
 // empty logger to prevent default output to stderr, Check closes it.
-void logger (int s, const char* m) {};
+static void logger (int s, const char* m) {};
 
 static void
 defrag_check_init (gcs_defrag_t* defrag)

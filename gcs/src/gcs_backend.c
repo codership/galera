@@ -40,7 +40,7 @@ struct {
 
 static const char backend_sep[] = "://";
 
-/* Returns 1 is backend matches, 0 otherwise */
+/* Returns 1 if backend matches, 0 otherwise */
 static long
 backend_type_is (const char* uri, const char* type, const size_t len)
 {
@@ -73,8 +73,11 @@ gcs_backend_init (gcs_backend_t* const bk,
         }
 
         /* no backends matched */
+        gu_error ("Backend not supported: %s", uri);
         return -ESOCKTNOSUPPORT;
     }
+
+    gu_error ("Invalid backend URI: %s", uri);
     return -EINVAL;
 }
 

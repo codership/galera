@@ -429,10 +429,10 @@ GCS_BACKEND_RECV_FN(spread_recv)
 	    }
 	    case ILLEGAL_SESSION:
                 gu_debug ("Error in SP_receive: ILLEGAL_SESSION");
-                return -ENOTCONN;
+                return -ECONNABORTED;
 	    case CONNECTION_CLOSED:
                 gu_debug ("Error in SP_receive: CONNECTION_CLOSED");
-                return -ECONNRESET;
+                return -ECONNABORTED;
 	    case ILLEGAL_MESSAGE:
                 gu_debug ("Error in SP_receive: ILLEGAL_MESSAGE");
                 continue; // wait for a legal one?
@@ -447,8 +447,8 @@ GCS_BACKEND_RECV_FN(spread_recv)
 	
 	if (Is_regular_mess (serv_type))
 	{
-	    gu_debug ("received REGULAR message of type %d\n",
-                mess_type);
+//	    gu_debug ("received REGULAR message of type %d\n",
+//                mess_type);
 
 	    assert (endian_mismatch >= 0); /* BUFFER_TOO_SMALL
 					    * must be handled before */

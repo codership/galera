@@ -12,6 +12,8 @@
 /*!
  * Handle action fragment
  *
+ * Unless a whole action is returned, contents of act is undefined
+ *
  * In order to optimize branch prediction used gu_likely macros and odered and
  * nested if/else blocks according to branch probability.
  *

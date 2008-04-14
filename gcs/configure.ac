@@ -4,7 +4,7 @@
 # $Id$
 #
 AC_PREREQ(2.50)
-AC_INIT([libgcs], [0.3.1], [info@codership.com])
+AC_INIT([libgcs], [0.3.2], [info@codership.com])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CANONICAL_SYSTEM
 AC_CONFIG_HEADER([config.h])
@@ -22,7 +22,7 @@ AC_ARG_ENABLE(debug,
 	      enable_debug="yes")
 if test "$enable_debug" != "no"
 then
-    CFLAGS="-g -O1 -fno-inline  -DDEBUG_MALLOC -DDEBUG_MUTEX -DDEBUG_ASSERT"
+    CFLAGS="-g -O0 -fno-inline  -DDEBUG_MALLOC -DDEBUG_MUTEX -DDEBUG_ASSERT"
 else
     CFLAGS=${CFLAGS:-" -O2 -g "}
     CFLAGS="$CFLAGS -DNDEBUG "

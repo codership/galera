@@ -35,7 +35,7 @@ typedef struct gcs_node gcs_node_t;
 
 /*! Initialize node context */
 extern void
-gcs_node_init (gcs_node_t* node);
+gcs_node_init (gcs_node_t* node, const char* id);
 
 /*! Move data from one node object to another */
 extern void
@@ -55,10 +55,10 @@ gcs_node_reset (gcs_node_t* node) { gcs_node_free(node); }
  * @return
  */
 static inline ssize_t
-gcs_node_handle_act_frag (gcs_node_t*     node,
-                          gcs_act_frag_t* frg,
-                          gcs_recv_act_t* act,
-                          bool            local)
+gcs_node_handle_act_frag (gcs_node_t*           node,
+                          const gcs_act_frag_t* frg,
+                          gcs_recv_act_t*       act,
+                          bool                  local)
 {
     if (gu_likely(GCS_ACT_DATA == frg->act_type)) {
         return gcs_defrag_handle_frag (&node->app, frg, act, local);
@@ -74,7 +74,13 @@ gcs_node_handle_act_frag (gcs_node_t*     node,
 static inline void
 gcs_node_set_last_applied (gcs_node_t* node, gcs_seqno_t seqno)
 {
-    node->last_applied = seqno;
+    if (gu_unlikely(seqno < node->last_applied)) {
+        gu_warn ("Received bogus LAST message: %llu, from node %s, "
+                 "expected >= %llu. Ignoring.",
+                 seqno, node->id, node->last_applied);
+    } else {
+        node->last_applied = seqno;
+    }
 }
 
 static inline gcs_seqno_t

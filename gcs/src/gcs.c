@@ -56,8 +56,8 @@ struct gcs_conn
 //    /* A condition for threads which called gcs_recv()  */
 //    gu_cond_t *recv_cond;
 
-    gcs_core_conn_t *core; // the context that is returned by
-                              // the generic group communication system
+    gcs_core_t  *core; // the context that is returned by
+                       // the core group communication system
 };
 
 typedef struct gcs_act
@@ -83,7 +83,7 @@ static void *gcs_recv_thread (void *arg)
     gcs_act_t     *act  = NULL;
     gcs_seqno_t    act_id;
     gcs_act_type_t act_type;
-    size_t         act_size;
+    ssize_t        act_size;
     uint8_t       *action;
     uint8_t       *action_repl = NULL;
 
@@ -96,7 +96,7 @@ static void *gcs_recv_thread (void *arg)
                                        &act_type,
                                        &act_id)) < 0) {
 	    ret = act_size;
-	    gu_debug ("gcs_core_recv returned %d: %s", gcs_strerror(ret));
+	    gu_debug ("gcs_core_recv returned %d: %s", ret, gcs_strerror(ret));
 	    break;
 	}
 
@@ -108,7 +108,7 @@ static void *gcs_recv_thread (void *arg)
         } else {
 	    /* not interested, continue loop */
 	    if (action) free (action); // was allocated by standard malloc()
-//            gu_debug ("Ignoring action after #%llu", conn->local_act_id);
+            gu_debug ("Ignoring action after #%llu", conn->local_act_id);
 	    continue;
         }
 
@@ -163,17 +163,18 @@ static void *gcs_recv_thread (void *arg)
 
 	    act->act_size     = act_size;
 	    act->act_type     = act_type;
-	    act->act_id       = act_id;
-//	    act->act_id       = conn->local_act_id;
+//	    act->act_id       = act_id;
+	    act->act_id       = conn->local_act_id;
             act->local_act_id = conn->local_act_id;
 	    act->action       = action;
 
-//            gu_mutex_lock (&conn->recv_lock);
-//            act = gcs_fifo_put (conn->recv_q, act);
 	    if ((ret = gcs_queue_push (conn->recv_q, act))) {
 		break;
             }
 	    act = NULL;
+//            gu_debug("Received action of type %d, size %d, id=%llu, "
+//                     "local id=%llu, action %p",
+//                     act_type, act_size, act_id, conn->local_act_id, action);
 	}
         // below I can't use any references to act
 //       gu_debug("Received action of type %d, size %d, id=%llu, local id=%llu",
@@ -194,8 +195,11 @@ int gcs_open (gcs_conn_t **gcs, const char *channel, const char *backend)
     conn->state = -GCS_CONN_CLOSED;
 
     /* Some conn fields must be initialized during this call */
-    if ((err = gcs_core_open (&conn->core, channel, backend)))
+    if ((err = gcs_core_open (&conn->core, channel, backend))) {
+        gu_error ("Failed to create connection: %d (%s)",
+                  err, gcs_strerror(err));
 	return err;
+    }
 
     if ((err = gcs_core_set_pkt_size (conn->core, GCS_DEFAULT_PKT_SIZE)))
 	return err;
@@ -246,7 +250,7 @@ int gcs_close (gcs_conn_t **gcs)
 
     /* abort all pending repl calls */
     /* destroying repl_lock will prevent repl threads from queueing */
-    gu_debug ("Destroying repl_lock");
+//    gu_debug ("Destroying repl_lock");
     while (gu_mutex_destroy (&conn->repl_lock)) {
         if ((err = gu_mutex_lock (&conn->repl_lock))) return -err;
         gu_mutex_unlock (&conn->repl_lock);
@@ -254,24 +258,24 @@ int gcs_close (gcs_conn_t **gcs)
 
     /* now that recv thread is cancelled, and no repl requests can be queued,
      * we can safely destroy repl_q */
-    gu_debug ("Waking up repl threads");
+//    gu_debug ("Waking up repl threads");
     while ((act = gcs_fifo_get(conn->repl_q))) {
         /* This will wake up repl threads in repl_q - 
          * they'll quit on their own,
          * they don't depend on the connection object after waking */
         gu_cond_signal (&act->wait_cond);
     }
-    gu_debug ("Destroying repl_q");
+//    gu_debug ("Destroying repl_q");
     if ((err = gcs_fifo_destroy (&conn->repl_q))) return err;
 
     /* this should cancel all recv calls */
-    gu_debug ("Destroying recv_q");
+//    gu_debug ("Destroying recv_q");
     if ((err = gcs_queue_free (&conn->recv_q))) return err;
 
-    /** @note: We have to close connection before joining RECV thread
+    /** @note: We have to stop connection before joining RECV thread
      *         since it may be blocked in gcs_backend_receive().
      *         That also means, that RECV thread should surely exit here. */
-    if ((err = gcs_core_close (&conn->core))) return err;
+    if ((err = gcs_core_stop (conn->core))) return err;
 
 
     //  /* Cancel main recv_thread if it is not blocked in gcs_backend_recv() */
@@ -279,6 +283,8 @@ int gcs_close (gcs_conn_t **gcs)
     //  gu_debug ("recv_thread() cancelled.");
     gu_thread_join   (conn->recv_thread, NULL);
     gu_debug ("recv_thread() joined.");
+
+    if ((err = gcs_core_close (conn->core))) return err;
 
     /* This must not last for long */
     while (gu_mutex_destroy (&conn->lock));
@@ -300,7 +306,19 @@ int gcs_send (gcs_conn_t *conn, const gcs_act_type_t act_type,
      *         because they block indefinitely waiting for actions */
     if (!gu_mutex_lock (&conn->lock)) { 
         if (GCS_CONN_OPEN == conn->state) {
-            ret = gcs_core_send (conn->core, action, act_size, act_type);
+            /* need to make a copy of the action, since receiving thread
+             * has no way of knowing that it shares this buffer.
+             * also the contents of action may be changed afterwards by
+             * the sending thread */
+            void* act = malloc (act_size);
+            if (act != NULL) {
+                memcpy (act, action, act_size);
+                while ((ret = gcs_core_send (conn->core, act,
+                                             act_size, act_type)) == -ERESTART);
+            }
+            else {
+                ret = -ENOMEM;
+            }
         }
         gu_mutex_unlock (&conn->lock);
     }
@@ -345,7 +363,9 @@ int gcs_repl (gcs_conn_t          *conn,
         {
             if (!(ret = gcs_fifo_put (conn->repl_q, &act)))
             {
-                ret = gcs_core_send (conn->core, action, act_size, act_type);
+                // Keep on trying until something else comes out
+                while ((ret = gcs_core_send (conn->core, action,
+                                             act_size, act_type)) == -ERESTART);
                 if (ret < 0) {
                     /* sending failed - remove item from the queue */
                     if (gcs_fifo_remove(conn->repl_q)) {
@@ -426,4 +446,16 @@ long
 gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size)
 {
     return gcs_core_set_pkt_size (conn->core, pkt_size);
+}
+
+long
+gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
+{
+    return gcs_core_set_last_applied (conn->core, seqno);
+}
+
+gcs_seqno_t
+gcs_get_last_applied (gcs_conn_t* conn)
+{
+    return gcs_core_get_last_applied (conn->core);
 }

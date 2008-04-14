@@ -22,7 +22,6 @@
 #include <galerautils.h>
 
 #include "gcs.h"
-//#include "gcs_utils.h"
 
 typedef enum gcs_fifo_safe
 {

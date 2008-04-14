@@ -23,15 +23,16 @@ gcs_group_init (gcs_group_t* group)
 
 /* Initialize nodes array */
 static inline gcs_node_t*
-group_nodes_init (long nodes_num)
+group_nodes_init (gcs_comp_msg_t* comp)
 {
     gcs_node_t* ret = NULL;
+    long nodes_num = gcs_comp_msg_num (comp);
     register long i;
 
     ret = GU_CALLOC (nodes_num, gcs_node_t);
     if (ret) {
         for (i = 0; i < nodes_num; i++) {
-            gcs_node_init (&ret[i]);
+            gcs_node_init (&ret[i], gcs_comp_msg_id (comp, i));
         }
     }
     return ret;
@@ -96,7 +97,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
 	/* Got PRIMARY COMPONENT - Hooray! */
 	/* create new nodes array according to new membrship */
 	new_nodes_num = gcs_comp_msg_num(comp);
-	new_nodes     = group_nodes_init (new_nodes_num);
+	new_nodes     = group_nodes_init (comp);
 	if (!new_nodes) return -ENOMEM;
 	
 	if (group->state == GROUP_PRIMARY) {
@@ -106,22 +107,20 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
 	    gu_debug ("\tMembers:");
 	    for (new_idx = 0; new_idx < new_nodes_num; new_idx++) {
 		/* find member index in old component by unique member id */
-                const char* new_id = gcs_comp_msg_id (comp, new_idx);
-		gu_debug ("\t%s", new_id);
-                
                 for (old_idx = 0; old_idx < group->num; old_idx++) {
                     // just scan through old group
-                    if (!strcmp(group->nodes[old_idx].id, new_id)) {
+                    if (!strcmp(group->nodes[old_idx].id,
+                                new_nodes[new_idx].id)) {
                         /* the node was in previous configuration with us */
                         /* move node context to new node array */
                         gcs_node_move (&new_nodes[new_idx],
                                        &group->nodes[old_idx]);
-                        continue;
+                        break;
                     }
-                    /* wasn't found in new configuration, new member -
-                     * need to resend actions in process */
-                    group->new_memb |= 1;
                 }
+                /* if wasn't found in new configuration, new member -
+                 * need to resend actions in process */
+                group->new_memb |= (old_idx == group->num);
 	    }
 	}
 	else {
@@ -164,9 +163,9 @@ gcs_group_handle_last_msg (gcs_group_t* group, gcs_recv_msg_t* msg)
     gcs_seqno_t seqno;
 
     assert (GCS_MSG_LAST        == msg->type);
-    assert (sizeof(gcs_seqno_t) == msg->buf_len);
+    assert (sizeof(gcs_seqno_t) == msg->size);
 
-    seqno = gcs_seqno_le(*(gcs_seqno_t*)msg);
+    seqno = gcs_seqno_le(*(gcs_seqno_t*)(msg->buf));
 
     assert (seqno >= group->last_applied);
 

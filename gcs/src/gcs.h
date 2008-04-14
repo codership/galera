@@ -150,6 +150,7 @@ int gcs_repl (gcs_conn_t *conn,
 	      gcs_seqno_t *act_id,
 	      gcs_seqno_t *local_act_id);
 
+
 /*! Total Order object */
 typedef struct gcs_to gcs_to_t;
 
@@ -252,6 +253,13 @@ int gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno);
  */
 int gcs_to_renew_wait (gcs_to_t *to, gcs_seqno_t seqno);
 
+/* Service functions */
+
+/*! Informs group about the last applied action on this node */
+long gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno);
+
+/*! Returns group-wide last applied action */
+gcs_seqno_t gcs_get_last_applied (gcs_conn_t* conn);
 
 
 /* GCS Configuration */

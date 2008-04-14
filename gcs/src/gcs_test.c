@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <string.h>
 #include <sys/time.h>
+#include <stdbool.h>
 
 #include "gcs.h"
 #include "gcs_test.h"
@@ -33,7 +34,11 @@ gcs_test_log_t;
 
 #define SEND_LOG "/dev/shm/gcs_test_send.log"
 #define RECV_LOG "/dev/shm/gcs_test_recv.log"
+
 static gcs_test_log_t *send_log, *recv_log;
+
+static bool throughput = true;  // bech for throughput
+static bool total      = false; // also inact TO locking
 
 typedef enum
 {
@@ -46,20 +51,21 @@ gcs_test_repl_t;
 typedef struct gcs_test_thread
 {
     pthread_t       thread;
-    int             id;
+    long            id;
     gcs_test_repl_t type;
     gcs_seqno_t     act_id;
     gcs_seqno_t     local_act_id;
     gcs_act_type_t  act_type;
-    int             n_tries;
+    long            n_tries;
     size_t          msg_len;
     char           *msg;
     char           *log_msg;
 }
 gcs_test_thread_t;
 
-#define MAX_MSG_LEN 8192
-static int gcs_test_thread_create (gcs_test_thread_t *t, int id, int n_tries)
+#define MAX_MSG_LEN 1 << 16
+
+static long gcs_test_thread_create (gcs_test_thread_t *t, long id, long n_tries)
 {
     t->id           = id;
     t->act_id       = GCS_SEQNO_ILL;
@@ -77,7 +83,7 @@ static int gcs_test_thread_create (gcs_test_thread_t *t, int id, int n_tries)
     return errno;
 }
 
-static int gcs_test_thread_destroy (gcs_test_thread_t *t)
+static long gcs_test_thread_destroy (gcs_test_thread_t *t)
 {
     if (t->msg)     free (t->msg);
     if (t->log_msg) free (t->log_msg);
@@ -86,21 +92,21 @@ static int gcs_test_thread_destroy (gcs_test_thread_t *t)
 
 typedef struct gcs_test_thread_pool
 {
-    int               n_threads;
-    int               n_tries;
-    int               n_started;
+    long              n_threads;
+    long              n_tries;
+    long              n_started;
     gcs_test_repl_t   type;
     gcs_test_thread_t *threads;
 }
 gcs_test_thread_pool_t;
 
-static int gcs_test_thread_pool_create (gcs_test_thread_pool_t *pool,
+static long gcs_test_thread_pool_create (gcs_test_thread_pool_t *pool,
 					const gcs_test_repl_t   type,
-					const int               n_threads,
-					const int               n_tries)
+					const long              n_threads,
+					const long              n_tries)
 {
-    int err = 0;
-    int i;
+    long err = 0;
+    long i;
 
 //    pool = gcs_malloc (gcs_test_thread_pool_t);
 //    if (!pool) { err = errno; goto out; }
@@ -115,7 +121,7 @@ static int gcs_test_thread_pool_create (gcs_test_thread_pool_t *pool,
     if (!pool->threads)
     {
 	error (0, errno,
-	       "Failed to allocate %d thread objects", n_threads);
+	       "Failed to allocate %ld thread objects", n_threads);
 	err = errno; 
 	goto out1;
     }
@@ -125,12 +131,12 @@ static int gcs_test_thread_pool_create (gcs_test_thread_pool_t *pool,
 	if ((err = gcs_test_thread_create (pool->threads + i, i, n_tries)))
 	{
 	    error (0, errno,
-		   "Failed to create thread object %d", i);
+		   "Failed to create thread object %ld", i);
 	    err = errno;
 	    goto out2;
 	}
     }
-    printf ("Created %d thread objects\n", i);
+//    printf ("Created %ld thread objects\n", i);
     return 0;
 
 out2:
@@ -146,21 +152,40 @@ out1:
     return err;
 }
 
-static pthread_mutex_t make_msg_lock = PTHREAD_MUTEX_INITIALIZER;
-//static int total_tries;
+static void
+gcs_test_thread_pool_destroy (gcs_test_thread_pool_t* pool)
+{
+    long i;
+    if (pool->threads) {
+        for (i = 0; i < pool->n_threads; i++) {
+            gcs_test_thread_destroy (pool->threads + i);
+        }
+        free (pool->threads);
+    }
+}
 
-static int gcs_test_make_msg (char* msg, const long mlen)
+static pthread_mutex_t make_msg_lock = PTHREAD_MUTEX_INITIALIZER;
+//static long total_tries;
+
+static inline long
+test_make_msg (char* msg, const long mlen)
 {
     static gcs_seqno_t count = 1;
     size_t len = 0;
     gcs_seqno_t tmp;
 
-    pthread_mutex_lock   (&make_msg_lock);
-    tmp = count++;
-    pthread_mutex_unlock (&make_msg_lock);
+    if (!throughput) {
+        pthread_mutex_lock   (&make_msg_lock);
+        tmp = count++;
+        pthread_mutex_unlock (&make_msg_lock);
 
-    len = snprintf (msg, mlen, "%10d %9lld %s",
-                    rand(), (long long)count++, gcs_test_data);
+        len = snprintf (msg, mlen, "%10d %9llu %s",
+                        rand(), count++, gcs_test_data);
+    }
+    else {
+        len = rand() % mlen + 1; // just random length, we don't care about
+                                 // contents
+    }
 
     if (len >= mlen)
         return mlen;
@@ -168,7 +193,8 @@ static int gcs_test_make_msg (char* msg, const long mlen)
         return len;
 }
 
-static int gcs_test_log_open (gcs_test_log_t **log, const char *name)
+static long
+test_log_open (gcs_test_log_t **log, const char *name)
 {
     char real_name[1024];
     gcs_test_log_t *l = gcs_malloc (gcs_test_log_t);
@@ -182,9 +208,10 @@ static int gcs_test_log_open (gcs_test_log_t **log, const char *name)
     return 0;
 }
 
-static int gcs_test_log_close (gcs_test_log_t **log)
+static long
+test_log_close (gcs_test_log_t **log)
 {
-    int err = 0;
+    long err = 0;
     gcs_test_log_t *l = *log;
     
     if (l)
@@ -197,13 +224,11 @@ static int gcs_test_log_close (gcs_test_log_t **log)
     return err;
 }
 
-static int gcs_test_log_msg (gcs_test_log_t *log, const char *msg)
+static inline long
+gcs_test_log_msg (gcs_test_log_t *log, const char *msg)
 {
-    int err = 0;
-    pthread_mutex_lock (&log->lock);
+    long err = 0;
     err = fprintf (log->file, "%s\n", msg);
-//    fflush (log->file);
-    pthread_mutex_unlock (&log->lock);
     return err;
 }
 
@@ -215,26 +240,126 @@ long msg_recvd = 0;
 long msg_repld = 0;
 long msg_len   = 0;
 
+size_t size_sent  = 0;
+size_t size_repld = 0;
+size_t size_recvd = 0;
+
+static inline long
+test_recv_log_create(gcs_test_thread_t* thread)
+{
+    return
+        snprintf (thread->log_msg, MAX_MSG_LEN,
+                  "Thread %3ld(REPL): act_id = %llu, local_act_id = %llu, "
+                  "len = %llu: %s",
+                  thread->id,
+                  (long long unsigned int)thread->act_id,
+                  (long long unsigned int)thread->local_act_id,
+                  (long long unsigned int)thread->msg_len, thread->msg);
+}
+
+static inline long
+test_send_log_create(gcs_test_thread_t* thread)
+{
+    return
+        snprintf (thread->log_msg, MAX_MSG_LEN,
+                  "Thread %3ld (REPL): len = %llu, %s",
+                  thread->id, (long long unsigned int) thread->msg_len,
+                  thread->msg);
+}
+
+static inline long
+test_log_msg (gcs_test_log_t* log, const char* msg)
+{
+    long ret;
+    pthread_mutex_lock (&log->lock);
+    ret = fprintf (recv_log->file, "%s\n", msg);
+    pthread_mutex_lock (&log->lock);
+    return ret;
+}
+
+static inline long
+test_log_in_to (gcs_to_t* to, gcs_seqno_t seqno, const char* msg)
+{
+    long ret = 0;
+    while ((ret = gcs_to_grab (to, seqno)) == -EAGAIN)
+        usleep(10000);
+    if (!ret) {// success
+        if (msg != NULL) gcs_test_log_msg (recv_log, msg);
+        ret = gcs_to_release (to, seqno);
+    }
+    return ret;
+}
+
+static inline long
+test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
+{
+    long ret = 0;
+#define SEND_LAST_MASK ((1 << 10) - 1) // 1024
+    if (!(my_seqno & SEND_LAST_MASK)) {
+        gcs_seqno_t group_seqno;
+            ret = gcs_set_last_applied (gcs, my_seqno);
+            if (ret) {
+                fprintf (stderr,"gcs_set_last_applied(%llu) returned %ld\n",
+                         my_seqno, ret);
+            }
+            group_seqno = gcs_get_last_applied (gcs);
+            if (!throughput) {
+                fprintf (stdout, "Last applied: my = %llu, group = %llu\n",
+                         my_seqno, group_seqno);
+            }
+    }
+    return ret;
+}
+
+static inline long
+test_before_send (gcs_test_thread_t* thread)
+{
+    long ret = 0;
+
+    /* create a message */
+    thread->msg_len = test_make_msg (thread->msg, msg_len);
+    if (thread->msg_len <= 0) return -1;
+    
+    if (!throughput) {
+        /* log message before replication */
+        ret = test_send_log_create (thread);
+        ret = test_log_msg (send_log, thread->log_msg);
+    }
+    return ret;
+}
+
+static inline long
+test_after_recv (gcs_test_thread_t* thread)
+{
+    long ret;
+
+    if (!throughput) {
+        /* log message after replication */
+        ret = test_recv_log_create (thread);
+        ret = test_log_in_to (to, thread->local_act_id, thread->log_msg);
+    }
+    else if (total) {
+        ret = test_log_in_to (to, thread->local_act_id, NULL);
+    }
+
+    ret = test_send_last_applied (gcs, thread->local_act_id);
+
+    return ret;
+}
+
 void *gcs_test_repl (void *arg)
 {
     gcs_test_thread_t *thread = arg;
-//    int i = thread->n_tries;
-    int ret = 0;
+//    long i = thread->n_tries;
+    long ret = 0;
 
     pthread_mutex_lock   (&gcs_test_lock);
     pthread_mutex_unlock (&gcs_test_lock);
 
     while (thread->n_tries)
     {
-	/* create a message */
-	thread->msg_len = gcs_test_make_msg (thread->msg, msg_len);
-	if (thread->msg_len <= 0) break;
-	
-	/* log message before replication */
-	snprintf (thread->log_msg, MAX_MSG_LEN,
-		  "Thread %3d (repl): %s", thread->id, thread->msg);
-	gcs_test_log_msg (send_log, thread->log_msg);
-//	puts (thread->log_msg); fflush (stdout);
+        ret = test_before_send (thread);
+        if (ret < 0) break;
 
 	/* replicate message */
 	ret = gcs_repl (gcs, GCS_ACT_DATA, thread->msg_len,
@@ -245,45 +370,31 @@ void *gcs_test_repl (void *arg)
             assert (thread->local_act_id == GCS_SEQNO_ILL);
             break;
         }
-        msg_repld++;
 
+        msg_repld++;
+        size_repld += thread->msg_len;
 //	usleep ((rand() & 1) << 1);
-	
-	/* log message after replication */	  
-	snprintf (thread->log_msg, MAX_MSG_LEN,
-		  "Thread %3d (repl): %s, act_id = %llu, local_act_id = %llu",
-		  thread->id,thread->msg,
-		  (long long unsigned int)thread->act_id,
-		  (long long unsigned int)thread->local_act_id);
-	gcs_to_grab      (to, thread->local_act_id);
-	gcs_test_log_msg (recv_log, thread->log_msg);
-	gcs_to_release   (to, thread->local_act_id);
+        test_after_recv (thread);
 //	puts (thread->log_msg); fflush (stdout);
     }
-    fprintf (stderr, "REPL thread %d exiting: %s\n",
-             thread->id, gcs_strerror(ret));
+//    fprintf (stderr, "REPL thread %ld exiting: %s\n",
+//             thread->id, gcs_strerror(ret));
     return NULL;
 }
 
 void *gcs_test_send (void *arg)
 {
-    int ret = 0;
+    long ret = 0;
     gcs_test_thread_t *thread = arg;
-//    int i = thread->n_tries;
+//    long i = thread->n_tries;
 
     pthread_mutex_lock   (&gcs_test_lock);
     pthread_mutex_unlock (&gcs_test_lock);
 
     while (thread->n_tries)
     {
-	/* create message */
-	thread->msg_len = gcs_test_make_msg (thread->msg, msg_len);
-	
-	/* log message before replication */
-	snprintf (thread->log_msg, MAX_MSG_LEN,
-		  "Thread %3d (send): %s", thread->id, thread->msg);
-	gcs_test_log_msg (send_log, thread->log_msg);
-//	puts (thread->log_msg);
+        ret = test_before_send (thread);
+        if (ret < 0) break;
 	
 	/* send message to group */
 	ret = gcs_send (gcs, GCS_ACT_DATA, thread->msg_len,
@@ -291,15 +402,16 @@ void *gcs_test_send (void *arg)
         if (ret < 0) break;
 	//sleep (1);
         msg_sent++;
+        size_sent += thread->msg_len;
     }
-    fprintf (stderr, "SEND thread %d exiting: %s\n",
-             thread->id, gcs_strerror(ret));
+//    fprintf (stderr, "SEND thread %ld exiting: %s\n",
+//             thread->id, gcs_strerror(ret));
     return NULL;
 }
 
 void *gcs_test_recv (void *arg)
 {
-    int ret = 0;
+    long ret = 0;
     gcs_test_thread_t *thread = arg;
 
     while (thread->n_tries)
@@ -317,28 +429,21 @@ void *gcs_test_recv (void *arg)
             break;
 	}
 	msg_recvd++;
+        size_recvd += thread->msg_len;
 
-	/* log message after replication */
-	snprintf (thread->log_msg, MAX_MSG_LEN,
-		  "Thread %3d (recv): %s, act_id = %llu, local_act_id = %llu",
-		  thread->id, thread->msg,
-		  (long long unsigned int)thread->act_id,
-		  (long long unsigned int)thread->local_act_id);
-	gcs_to_grab      (to, thread->local_act_id);
-	gcs_test_log_msg (recv_log, thread->log_msg);
-	gcs_to_release   (to, thread->local_act_id);
-//	puts (thread->log_msg); fflush (stdout);
+        test_after_recv (thread);
+	//puts (thread->log_msg); fflush (stdout);
 	free (thread->msg);
     }
-    fprintf (stderr, "RECV thread %d exiting: %s\n",
-             thread->id, gcs_strerror(ret));
+//    fprintf (stderr, "RECV thread %ld exiting: %s\n",
+//             thread->id, gcs_strerror(ret));
     return NULL;
 }
 
-static int gcs_test_thread_pool_start (gcs_test_thread_pool_t *pool)
+static long gcs_test_thread_pool_start (gcs_test_thread_pool_t *pool)
 {
-    int i;
-    int err = 0;
+    long i;
+    long err = 0;
     void * (* thread_routine) (void *);
 
     switch (pool->type)
@@ -353,7 +458,7 @@ static int gcs_test_thread_pool_start (gcs_test_thread_pool_t *pool)
 	thread_routine = gcs_test_recv;
 	break;
     default:
-	error (0, 0, "Bad repl type %d\n", pool->type);
+	error (0, 0, "Bad repl type %u\n", pool->type);
 	return -1;
     }
 
@@ -365,51 +470,59 @@ static int gcs_test_thread_pool_start (gcs_test_thread_pool_t *pool)
     }
     pool->n_started = i;
     
-    printf ("Started %d threads of %s type\n", pool->n_started,
+    printf ("Started %ld threads of %s type (pool: %p)\n",
+            pool->n_started,
 	     GCS_TEST_REPL == pool->type ? "REPL" :
-	    (GCS_TEST_SEND == pool->type ? "SEND" :"RECV"));
+	    (GCS_TEST_SEND == pool->type ? "SEND" :"RECV"), pool);
 
     return 0;
 }
 
-static int gcs_test_thread_pool_join (const gcs_test_thread_pool_t *pool)
+static long gcs_test_thread_pool_join (const gcs_test_thread_pool_t *pool)
 {
-    int i;
-    for (i = 0; i < pool->n_started; i++)
+    long i;
+    for (i = 0; i < pool->n_started; i++) {
 	pthread_join (pool->threads[i].thread, NULL);
+    }
     return 0;
 }
 
-static int gcs_test_thread_pool_stop (const gcs_test_thread_pool_t *pool)
+static long gcs_test_thread_pool_stop (const gcs_test_thread_pool_t *pool)
 {
-    int i;
-    for (i = 0; i < pool->n_started; i++)
+    long i;
+    for (i = 0; i < pool->n_started; i++) {
         pool->threads[i].n_tries = 0;
+    }
     return 0;
 }
 
-static int gcs_test_thread_pool_cancel (const gcs_test_thread_pool_t *pool)
+long gcs_test_thread_pool_cancel (const gcs_test_thread_pool_t *pool)
 {
-    int i;
-    for (i = 0; i < pool->n_started; i++)
-	pthread_cancel ((pool->threads[i].thread));
+    long i;
+    printf ("Canceling pool: %p\n", pool); fflush(stdout);
+    printf ("pool type: %u, pool threads: %ld\n", pool->type, pool->n_started);
+    fflush(stdout);
+    for (i = 0; i < pool->n_started; i++) {
+        printf ("Cancelling %ld\n", i); fflush(stdout);
+	pthread_cancel (pool->threads[i].thread);
         pool->threads[i].n_tries = 0;
+    }
     return 0;
 }
 
 typedef struct gcs_test_conf
 {
-    int n_tries;
-    int n_repl;
-    int n_send;
-    int n_recv;
+    long n_tries;
+    long n_repl;
+    long n_send;
+    long n_recv;
     const char* backend;
 }
 gcs_test_conf_t;
 
 static const char* DEFAULT_BACKEND = "dummy://";
 
-static int gcs_test_conf (gcs_test_conf_t *conf, int argc, char *argv[])
+static long gcs_test_conf (gcs_test_conf_t *conf, long argc, char *argv[])
 {
     char *endptr;
 
@@ -435,26 +548,36 @@ static int gcs_test_conf (gcs_test_conf_t *conf, int argc, char *argv[])
 	conf->n_tries = strtol (argv[2], &endptr, 10);
 	if ('\0' != *endptr) goto error;
     case 2:
-        conf->backend = strdup (argv[1]);
+        conf->backend = argv[1];
 	break;
     default:
 	break;
     }
     
-    printf ("Config: n_tries = %d, n_repl = %d, n_send = %d, n_recv = %d\n",
-	    conf->n_tries, conf->n_repl, conf->n_send, conf->n_recv);
+    printf ("Config: n_tries = %ld, n_repl = %ld, n_send = %ld, n_recv = %ld, "
+            "backend = %s\n",
+	    conf->n_tries, conf->n_repl, conf->n_send, conf->n_recv,
+            conf->backend);
 
     return 0;
 error:
-    printf ("Usage: %s [backend] [tries:%d] [repl threads:%d] "
-	    "[send threads: %d] [recv threads: %d]\n",
+    printf ("Usage: %s [backend] [tries:%ld] [repl threads:%ld] "
+	    "[send threads: %ld] [recv threads: %ld]\n",
 	    argv[0], conf->n_tries, conf->n_repl, conf->n_send, conf->n_recv);
     exit (EXIT_SUCCESS);
 }
 
+static inline void
+test_print_stat (long msgs, size_t size, double interval)
+{
+    printf ("%7ld (%7.1f per sec.) / %7uKb (%7.1f Kb/s)\n",
+            msgs, (double)msgs/interval,
+            size >> 10, (double)(size >> 10)/interval);
+}
+
 int main (int argc, char *argv[])
 {
-    int err = 0;
+    long err = 0;
     gcs_test_conf_t conf;
     gcs_test_thread_pool_t repl_pool, send_pool, recv_pool;
     char *channel = "my_channel";
@@ -463,10 +586,12 @@ int main (int argc, char *argv[])
     gcs_conf_debug_on(); // turn on debug messages
 
     if ((err = gcs_test_conf     (&conf, argc, argv)))   goto out;
-    if ((err = gcs_test_log_open (&send_log, SEND_LOG))) goto out;
-    if ((err = gcs_test_log_open (&recv_log, RECV_LOG))) goto out;
+    if (!throughput) {
+        if ((err = test_log_open (&send_log, SEND_LOG))) goto out;
+        if ((err = test_log_open (&recv_log, RECV_LOG))) goto out;
+    }
 
-    to = gcs_to_create (conf.n_repl + conf.n_recv + 1, 1);
+    to = gcs_to_create ((conf.n_repl + conf.n_recv + 1)*2, 1);
     if (!to) goto out;
 //    total_tries = conf.n_tries * (conf.n_repl + conf.n_send);
     
@@ -475,7 +600,9 @@ int main (int argc, char *argv[])
 
     if ((err = gcs_open (&gcs, channel, conf.backend))) goto out;
     printf ("Connected\n");
-    msg_len = 1300; if (msg_len > MAX_MSG_LEN) msg_len = MAX_MSG_LEN; 
+
+    msg_len = 1300;
+    if (msg_len > MAX_MSG_LEN) msg_len = MAX_MSG_LEN; 
     gcs_conf_set_pkt_size (gcs, 7570); // to test fragmentation
 
     if ((err = gcs_test_thread_pool_create
@@ -494,45 +621,70 @@ int main (int argc, char *argv[])
     printf ("Press any key to start the load:");
     fgetc (stdin);
 
-    gettimeofday (&t_begin, NULL);
-    pthread_mutex_unlock (&gcs_test_lock);
     puts ("Started load\n");
-    printf ("Waiting for %d seconds\n", conf.n_tries);
+    gettimeofday (&t_begin, NULL);
+    printf ("Waiting for %ld seconds\n", conf.n_tries);
     fflush (stdout);
+    pthread_mutex_unlock (&gcs_test_lock);
 
-    sleep (conf.n_tries);
+    usleep (conf.n_tries*1000000);
+
+    puts ("Stopping threads");
+    fflush(stdout); fflush(stderr);
 
     gcs_test_thread_pool_stop (&send_pool);
     gcs_test_thread_pool_stop (&repl_pool);
+    puts ("Threads stopped");
+
     gcs_test_thread_pool_join (&send_pool);
     gcs_test_thread_pool_join (&repl_pool);
+    puts ("Threads joined");
+
     gettimeofday (&t_end, NULL);
     {
         double interval = (t_end.tv_sec - t_begin.tv_sec) +
             0.000001*t_end.tv_usec - 0.000001*t_begin.tv_usec;
 
-        printf ("Messages sent:       %ld (%6.2f per sec.)\n",
-                msg_sent, (double)msg_sent/interval);
-        printf ("Messages received:   %ld (%6.2f per sec.)\n",
-                msg_recvd, (double)msg_recvd/interval);
-        printf ("Messages replicated: %ld (%6.2f per sec.)\n\n",
-                msg_repld, (double)msg_repld/interval);
+        printf ("Actions sent:       ");
+        test_print_stat (msg_sent, size_sent, interval); 
+        printf ("Actions received:   ");
+        test_print_stat (msg_recvd, size_recvd, interval); 
+        printf ("Actions replicated: ");
+        test_print_stat (msg_repld, size_repld, interval);
+        puts("---------------------------------------------------------------");
+        printf ("Total throughput:    ");
+        test_print_stat (msg_repld + msg_recvd, size_repld + size_recvd,
+                         interval);
+        printf ("Overhead at 10000 actions/sec: %5.2f%%\n",
+                1000000.0 * interval / (msg_repld + msg_recvd));
+        puts("");
     }
+
     printf ("Press any key to exit the program:\n");
     fgetc (stdin);
 
+    /* Cancelling recv thread here in case we receive messages from other node*/
     gcs_test_thread_pool_cancel (&recv_pool);
+    gcs_test_thread_pool_join (&recv_pool);
+
     printf ("Closing GCS connection...");
 //    gcs_test_thread_pool_stop (&recv_pool);
     if ((err = gcs_close (&gcs))) goto out;
     printf ("done\n"); fflush (stdout);
-    gcs_test_thread_pool_join (&recv_pool);
     printf ("Disconnected\n");
 
-    printf ("Closing send log\n");
-    gcs_test_log_close (&send_log);
-    printf ("Closing recv log\n");
-    gcs_test_log_close (&recv_log);
+    gcs_test_thread_pool_destroy (&repl_pool);
+    gcs_test_thread_pool_destroy (&send_pool);
+    gcs_test_thread_pool_destroy (&recv_pool);
+
+    gcs_to_destroy(&to);
+
+    if (!throughput) {
+        printf ("Closing send log\n");
+        test_log_close (&send_log);
+        printf ("Closing recv log\n");
+        test_log_close (&recv_log);
+    }
 
     {
         ssize_t total;
@@ -545,13 +697,13 @@ int main (int argc, char *argv[])
                 "Memory still allocated: %10lld\n"
                 "Times allocated:        %10lld\n"
                 "Times freed:            %10lld\n",
-                (long long int)total,
-		(long long int)allocs,
-		(long long int)deallocs);
+                (long long)total,
+		(long long)allocs,
+		(long long)deallocs);
     }
 
     return 0;
 out:
-    printf ("Error: %d(%s)\n", err, gcs_strerror (err));
+    printf ("Error: %ld(%s)\n", err, gcs_strerror (err));
     return err;
 }

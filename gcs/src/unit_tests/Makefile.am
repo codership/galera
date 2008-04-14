@@ -9,6 +9,7 @@ noinst_PROGRAMS   = gcs_tests gcs_to_test
 
 gcs_tests_SOURCES =           \
 	gcs_tests.c           \
+	../gcs_error.c        \
 	gcs_comp_test.c       \
 	../gcs_comp_msg.c     \
 	gcs_backend_test.c    \
@@ -18,7 +19,9 @@ gcs_tests_SOURCES =           \
 	gcs_defrag_test.c     \
 	../gcs_defrag.c       \
 	gcs_node_test.c       \
-	../gcs_node.c
+	../gcs_node.c         \
+	gcs_group_test.c      \
+	../gcs_group.c
 #	gcs_uuid_test.c       \
 #	../gcs_uuid.c
 

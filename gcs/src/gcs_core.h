@@ -25,8 +25,8 @@
 #include <stdlib.h>
 #include "gcs.h"
 
-struct gcs_core_conn;
-typedef struct gcs_core_conn gcs_core_conn_t; 
+struct gcs_core;
+typedef struct gcs_core gcs_core_t; 
 
 /*
  * gcs_core_open() initialises connection context private to
@@ -35,17 +35,25 @@ typedef struct gcs_core_conn gcs_core_conn_t;
  * zero     - success
  * negative - error code
  */
-long gcs_core_open  (gcs_core_conn_t** conn,
+long gcs_core_open  (gcs_core_t**      conn,
                      const char* const channel,
                      const char* const backend);
 
 /*
- * gcs_core_close() frees resources allocated by gcs_geenric_open()
+ * gcs_core_stop() canceles listening thread before closing the connection
  * Return values:
  * zero     - success
  * negative - error code
  */
-long gcs_core_close (gcs_core_conn_t** conn);
+long gcs_core_stop (gcs_core_t* conn);
+
+/*
+ * gcs_core_close() frees resources allocated by gcs_core_open()
+ * Return values:
+ * zero     - success
+ * negative - error code
+ */
+long gcs_core_close (gcs_core_t* conn);
 
 /* 
  * gcs_core_send() atomically sends action to group.
@@ -53,7 +61,7 @@ long gcs_core_close (gcs_core_conn_t** conn);
  * non-negative - amount of action bytes sent (sans headers)
  * negative     - error code
  */
-ssize_t gcs_core_send (gcs_core_conn_t* const conn,
+ssize_t gcs_core_send (gcs_core_t*      const conn,
                        const uint8_t*         action,
                        size_t                 act_size,
                        gcs_act_type_t   const act_type);
@@ -63,7 +71,7 @@ ssize_t gcs_core_send (gcs_core_conn_t* const conn,
  * non-negative - the size of action received
  * negative     - error code
  */
-ssize_t gcs_core_recv (gcs_core_conn_t* const conn,
+ssize_t gcs_core_recv (gcs_core_t*      const conn,
                        uint8_t**        const action,
                        gcs_act_type_t*  const act_type,
                        gcs_seqno_t*     const act_id);
@@ -71,6 +79,14 @@ ssize_t gcs_core_recv (gcs_core_conn_t* const conn,
 /* Configuration functions */
 /* Sets maximum message size to achieve requested network packet size. 
  * In case of failure returns -EMSGSIZE */
-long gcs_core_set_pkt_size (gcs_core_conn_t *conn, ulong pkt_size);
+long gcs_core_set_pkt_size (gcs_core_t *conn, ulong pkt_size);
+
+/* sends this node's last applied value to group */
+extern long
+gcs_core_set_last_applied (gcs_core_t* core, gcs_seqno_t seqno);
+
+/* gets last applied vote from group */
+extern gcs_seqno_t
+gcs_core_get_last_applied (gcs_core_t* core);
 
 #endif // _gcs_core_h_
