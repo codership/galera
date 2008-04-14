@@ -64,9 +64,8 @@ gcs_backend_init (gcs_backend_t* const bk,
 
     if (NULL != sep) {
         size_t type_len  = sep - uri;
-        const char* addr = sep + strlen(sep);
+        const char* addr = sep + strlen(backend_sep);
         long i;
-
         /* try to match any of specified backends */
         for (i = 0; backend[i].id != NULL; i++) {
             if (backend_type_is (uri, backend[i].id, type_len))
