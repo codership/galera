@@ -349,6 +349,7 @@ int file_cache_forget(struct file_cache *cache, cache_id_t id) {
     entry = (struct cache_entry *)wsdb_hash_search(
         cache->hash, sizeof(cache_id_t), (char *)&id
     );
+    assert (entry);
     if (entry->state != BLOCK_ACTIVE) {
         gu_mutex_unlock(&cache->mutex);
         GU_DBUG_RETURN(WSDB_OK);
