@@ -180,7 +180,7 @@ test_make_msg (char* msg, const long mlen)
         pthread_mutex_unlock (&make_msg_lock);
 
         len = snprintf (msg, mlen, "%10d %9llu %s",
-                        rand(), count++, gcs_test_data);
+                        rand(), (unsigned long long)count++, gcs_test_data);
     }
     else {
         len = rand() % mlen + 1; // just random length, we don't care about
@@ -300,12 +300,13 @@ test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
             ret = gcs_set_last_applied (gcs, my_seqno);
             if (ret) {
                 fprintf (stderr,"gcs_set_last_applied(%llu) returned %ld\n",
-                         my_seqno, ret);
+                         (unsigned long long)my_seqno, ret);
             }
             group_seqno = gcs_get_last_applied (gcs);
             if (!throughput) {
                 fprintf (stdout, "Last applied: my = %llu, group = %llu\n",
-                         my_seqno, group_seqno);
+                         (unsigned long long)my_seqno,
+                         (unsigned long long)group_seqno);
             }
     }
     return ret;
@@ -570,7 +571,7 @@ error:
 static inline void
 test_print_stat (long msgs, size_t size, double interval)
 {
-    printf ("%7ld (%7.1f per sec.) / %7uKb (%7.1f Kb/s)\n",
+    printf ("%7zu (%7.1f per sec.) / %7zuKb (%7.1f Kb/s)\n",
             msgs, (double)msgs/interval,
             size >> 10, (double)(size >> 10)/interval);
 }
