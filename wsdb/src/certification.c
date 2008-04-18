@@ -142,11 +142,7 @@ static int update_index(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
             prev = match;
             match = match->next;
         }
-        if (match && match->trx_seqno == trx_seqno) {
-	  gu_warn ("duplicate index entry: %llu", trx_seqno);
-          //gu_free(serial_key);
-          //return WSDB_OK;
-	} else {
+        if (match && match->trx_seqno != trx_seqno) {
           new_trx = (struct index_rec *) gu_malloc (sizeof(struct index_rec));
           new_trx->trx_seqno = trx_seqno;
           if (prev) {
