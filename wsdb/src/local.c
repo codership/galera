@@ -505,6 +505,13 @@ static int copy_from_block(
             }
         }
     }
+    /* len=0 if full event was found */
+    if (len) {
+      gu_error(
+          "Could not read full record from cache blocks, remaining: %d", len
+      );
+    }
+
     return len;
 }
 
