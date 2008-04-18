@@ -619,7 +619,10 @@ static int get_write_set_do(
     while (bi.block) {
         char rec_type;
 
-        if (copy_from_block((char *)&rec_type, 1, &bi, &pos)) break;
+        if (copy_from_block((char *)&rec_type, 1, &bi, &pos)) {
+          gu_error("could not retrieve write set for trx: %lu", trx->id);
+          return WSDB_ERR_WS_FAIL;
+        }
 
         GU_DBUG_PRINT("wsdb",("rec: %c", rec_type));
         GU_DBUG_PRINT("wsdb",("block: %p %d", bi.block, bi.cache_id));
@@ -628,8 +631,10 @@ static int get_write_set_do(
             uint16_t query_len;
             
             /* get the length of the SQL query */
-            copy_from_block((char *)(&query_len), 2, &bi, &pos);
-
+            if (copy_from_block((char *)(&query_len), 2, &bi, &pos)) {
+              gu_error("could not retrieve write set for trx: %lu", trx->id);
+              return WSDB_ERR_WS_FAIL;
+            }
             if (mode == WS_OPER_CREATE) {
                 ws->queries[query_count].query_len = query_len;
                 ws->queries[query_count].query =
@@ -639,22 +644,31 @@ static int get_write_set_do(
                 );
             }
 
-            copy_from_block(
+            if (copy_from_block(
                 (mode == WS_OPER_COUNT) ? NULL :
                 (char *)ws->queries[query_count].query, 
                 query_len, &bi, &pos
-            );
+            )) {
+              gu_error("could not retrive write set for trx: %lu", trx->id);
+              return WSDB_ERR_WS_FAIL;
+            }
 
-            copy_from_block(
+            if (copy_from_block(
                 (mode == WS_OPER_COUNT) ? NULL :
                 (char *)(&ws->queries[query_count].timeval), 
                 4, &bi, &pos
-            );
-            copy_from_block(
+            )) {
+              gu_error("could not retrive write set for trx: %lu", trx->id);
+              return WSDB_ERR_WS_FAIL;
+            }
+            if (copy_from_block(
                 (mode == WS_OPER_COUNT) ? NULL :
                 (char *)(&ws->queries[query_count].randseed), 
                 4, &bi, &pos
-            );
+            )) {
+              gu_error("could not retrive write set for trx: %lu", trx->id);
+              return WSDB_ERR_WS_FAIL;
+            }
 
             query_count++;
             break;
@@ -662,14 +676,21 @@ static int get_write_set_do(
         case REC_TYPE_ACTION: {
             uint16_t len;
 
-            copy_from_block((char *)&len, 2, &bi, &pos);
+            if (copy_from_block((char *)&len, 2, &bi, &pos)) {
+              gu_error("could not retrive write set for trx: %lu", trx->id);
+              return WSDB_ERR_WS_FAIL;
+            }
             if (len != 1) {
                 gu_error("wsdb action len: %d", len);
                 assert(len == 1);
             }
-            copy_from_block(
+            if (copy_from_block(
                 (mode == WS_OPER_COUNT) ? NULL :
-                (char *)&(ws->items[item_count].action), len, &bi, &pos);
+                (char *)&(ws->items[item_count].action), len, &bi, &pos
+            )) {
+              gu_error("could not retrive write set for trx: %lu", trx->id);
+              return WSDB_ERR_WS_FAIL;
+            }
 
             item_count++;
             break;
@@ -684,13 +705,25 @@ static int get_write_set_do(
             if (mode == WS_OPER_CREATE) {
                 key = ws->items[item_count-1].key = (struct wsdb_key_rec *)
                     gu_malloc (sizeof(struct wsdb_key_rec));
-                copy_from_block((char *)&key->dbtable_len, 2, &bi, &pos);
+                if (copy_from_block((char *)&key->dbtable_len, 2, &bi, &pos)){
+                  gu_error("could not retrive write set for trx: %lu", trx->id);
+                  return WSDB_ERR_WS_FAIL;
+                }
                 key->dbtable = (char *) gu_malloc ((size_t)key->dbtable_len);
-                copy_from_block(key->dbtable, key->dbtable_len, &bi, &pos);
+                if (copy_from_block(key->dbtable, key->dbtable_len, &bi, &pos)){
+                  gu_error("could not retrive write set for trx: %lu", trx->id);
+                  return WSDB_ERR_WS_FAIL;
+                }
             } else {
                 uint16_t dbtable_len;
-                copy_from_block((char *)&dbtable_len, 2, &bi, &pos);
-                copy_from_block(NULL, dbtable_len, &bi, &pos);
+                if (copy_from_block((char *)&dbtable_len, 2, &bi, &pos)) {
+                  gu_error("could not retrive write set for trx: %lu", trx->id);
+                  return WSDB_ERR_WS_FAIL;
+                }
+                if (copy_from_block(NULL, dbtable_len, &bi, &pos)) {
+                  gu_error("could not retrive write set for trx: %lu", trx->id);
+                  return WSDB_ERR_WS_FAIL;
+                }
             }
 
             /* number of key parts */
@@ -698,37 +731,78 @@ static int get_write_set_do(
                 key->key = tkey = (struct wsdb_table_key *) gu_malloc (
                     sizeof(struct wsdb_table_key)
                 );
-                copy_from_block((char *)&tkey->key_part_count, 2, &bi, &pos);
-            
+                if (copy_from_block(
+                    (char *)&tkey->key_part_count, 2, &bi, &pos
+                )) {
+                  gu_error("could not retrive write set for trx: %lu", trx->id);
+                  return WSDB_ERR_WS_FAIL;
+                }            
                 tkey->key_parts = (struct wsdb_key_part *) gu_malloc (
                     tkey->key_part_count * sizeof(struct wsdb_key_part)
                 );
             } else {
-                copy_from_block((char *)&key_part_count, 2, &bi, &pos);
+                if (copy_from_block((char *)&key_part_count, 2, &bi, &pos)) {
+                  gu_error("could not retrive write set for trx: %lu", trx->id);
+                  return WSDB_ERR_WS_FAIL;
+                }
             }
             if (mode == WS_OPER_CREATE) {
                 for (i=0; i<tkey->key_part_count; i++) {
                     struct wsdb_key_part *kp = &tkey->key_parts[i];
-                    copy_from_block((char *)&kp->type, (uint16_t)1, &bi,&pos);
-                    copy_from_block((char *)&kp->length,(uint16_t)2,&bi,&pos);
+                    if (copy_from_block(
+                        (char *)&kp->type, (uint16_t)1, &bi,&pos
+                    )) {
+                      gu_error(
+                          "could not retrieve write set for trx: %lu", trx->id
+                      );
+                      return WSDB_ERR_WS_FAIL;
+                    }
+
+                    if (copy_from_block(
+                        (char *)&kp->length,(uint16_t)2,&bi,&pos
+                    )) {
+                      gu_error(
+                          "could not retrieve write set for trx: %lu", trx->id
+                      );
+                      return WSDB_ERR_WS_FAIL;
+                    }
+
                     kp->data = gu_malloc ((size_t)kp->length);
-                    copy_from_block((char *)kp->data, kp->length, &bi, &pos);
+                    if (copy_from_block(
+                        (char *)kp->data, kp->length, &bi, &pos
+                    )) {
+                      gu_error(
+                          "could not retrieve write set for trx: %lu", trx->id
+                      );
+                      return WSDB_ERR_WS_FAIL;
+                    }
+
                 }
             } else {
                 for (i=0; i<key_part_count; i++) {
                     uint16_t kp_len;
-                    copy_from_block(NULL, (uint16_t)1, &bi, &pos);
-                    copy_from_block((char *)&kp_len, (uint16_t)2, &bi, &pos);
-                    copy_from_block(NULL, kp_len, &bi, &pos);
+                    if (copy_from_block(NULL, (uint16_t)1, &bi, &pos)) {
+                      gu_error(
+                          "could not retrive write set for trx: %lu", trx->id
+                      );
+                      return WSDB_ERR_WS_FAIL;
+                    }
+                    if (copy_from_block(
+                        (char *)&kp_len, (uint16_t)2, &bi, &pos
+                    )) {
+                      gu_error(
+                          "could not retrive write set for trx: %lu", trx->id
+                      );
+                      return WSDB_ERR_WS_FAIL;
+                    }
+                    if (copy_from_block(NULL, kp_len, &bi, &pos)) {
+                      gu_error(
+                          "could not retrive write set for trx: %lu", trx->id
+                      );
+                      return WSDB_ERR_WS_FAIL;
+                    }                
                 }
             }
-#ifdef REMOVED
-            copy_from_block((char *)&row_key, key_len, &bi, &pos);
-            if (mode == WS_OPER_CREATE) {
-                ws->items[item_count].key = file_row_key_2_wsdb_key(&row_key);
-                GU_DBUG_PRINT("wsdb",("key: %p, len: %d", row_key.key, key_len));
-            }
-#endif
             break;
         }
 
@@ -738,13 +812,35 @@ static int get_write_set_do(
             /* retrieve row length and data */
             if (mode == WS_OPER_CREATE) {
                 row = &ws->items[item_count-1].u.row;
-                copy_from_block((char *)&row->length, 2, &bi, &pos);
+                if (copy_from_block((char *)&row->length, 2, &bi, &pos)) {
+                  gu_error(
+                      "could not retrieve write set for trx: %lu", trx->id
+                  );
+                  return WSDB_ERR_WS_FAIL;
+                }
+
                 row->data = (char *) gu_malloc ((size_t)row->length);
-                copy_from_block(row->data, row->length, &bi, &pos);
+                if (copy_from_block(row->data, row->length, &bi, &pos)) {
+                  gu_error(
+                      "could not retrieve write set for trx: %lu", trx->id
+                  );
+                  return WSDB_ERR_WS_FAIL;
+                }
             } else {
                 uint16_t len;
-                copy_from_block((char *)&len, 2, &bi, &pos);
-                copy_from_block(NULL, len, &bi, &pos);
+                if (copy_from_block((char *)&len, 2, &bi, &pos)) {
+                  gu_error(
+                      "could not retrieve write set for trx: %lu", trx->id
+                  );
+                  return WSDB_ERR_WS_FAIL;
+                }
+
+                if (copy_from_block(NULL, len, &bi, &pos)) {
+                  gu_error(
+                      "could not retrieve write set for trx: %lu", trx->id
+                  );
+                  return WSDB_ERR_WS_FAIL;
+                }
             }
 
             break;
@@ -776,15 +872,7 @@ struct wsdb_write_set *wsdb_get_write_set(
 ) {
     struct trx_info       *trx = get_trx_info(trx_id);
     struct wsdb_write_set *ws;
-/* @unused:
-    cache_id_t             cache_id;
-    struct items          *items_first, *items_last, *im;
-    struct queries        *queries_first, *queries_last, *q;
-    struct block_hdr      *block;
-    char                  *pos;
 
-    struct block_info bi;
-*/
     GU_DBUG_ENTER("wsdb_get_write_set");
 
     if (!trx) {
@@ -801,7 +889,9 @@ struct wsdb_write_set *wsdb_get_write_set(
     conn_build_connection_queries(ws, conn_id);
 
     /* count the number of queries and items */
-    get_write_set_do(ws, trx, WS_OPER_COUNT);
+    if (get_write_set_do(ws, trx, WS_OPER_COUNT)) {
+        GU_DBUG_RETURN(NULL);
+    }
 
     ws->items = (struct wsdb_item_rec *) gu_malloc (
         ws->item_count * sizeof(struct wsdb_item_rec)
@@ -815,7 +905,10 @@ struct wsdb_write_set *wsdb_get_write_set(
     memset(ws->queries, '\0', ws->query_count * sizeof(struct wsdb_query));
 
     /* allocate queries and items */
-    get_write_set_do(ws, trx, WS_OPER_CREATE);
+    if (get_write_set_do(ws, trx, WS_OPER_CREATE)) {
+        gu_error("write set extracting failed at allocate phase");
+        GU_DBUG_RETURN(NULL);
+    }
 
     ws->local_trx_id  = trx_id;
     ws->last_seen_trx = get_last_committed_trx();
