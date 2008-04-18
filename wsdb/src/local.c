@@ -747,7 +747,10 @@ static int get_write_set_do(
         }
     }
 
-    file_cache_forget(local_cache, bi.cache_id);
+    if (file_cache_forget(local_cache, bi.cache_id)) {
+      gu_warn("cache forget failure, query count: %u , item count: %u",
+              query_count, item_count);
+    }
     
     ws->query_count = query_count;
     ws->item_count  = item_count;
