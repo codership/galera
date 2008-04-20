@@ -177,3 +177,47 @@ void *wsdb_hash_delete(struct wsdb_hash *hash, uint16_t key_len, char key[]) {
         GU_DBUG_RETURN(NULL);
     }
 }
+
+int wsdb_hash_delete_range(
+    struct wsdb_hash *hash, void *ctx,
+    hash_verdict_fun_t verdict
+) {
+    int deleted = 0;
+    int i;
+
+    GU_DBUG_ENTER("wsdb_hash_delete_range");
+
+    gu_mutex_lock(&hash->mutex);
+
+    for (i=0; i<hash->elem_count; i++) {
+        struct hash_entry *entry = hash->elems[i];
+        struct hash_entry *prev  = NULL;
+
+        while (entry) {
+            /* caller determines, if index entry must be purged */
+            if (verdict(ctx, entry->data)) {
+                /* to delete */
+                if (prev) {
+                    prev->next = entry->next;
+                } else {
+                    hash->elems[i] = entry->next;
+                }
+                if (entry->key_len > 4) {
+                    gu_free(entry->key);
+                }
+                hash->curr_size--;
+                if (!entry->data) {
+                    gu_warn("purging hash index entry with no data value");
+                } else {
+                    gu_free(entry->data);
+                }
+                gu_free(entry);
+            }
+            prev  = entry;
+            entry = entry->next;
+        }
+    }
+
+    gu_mutex_unlock(&hash->mutex);
+    GU_DBUG_RETURN(deleted);
+}

@@ -80,4 +80,28 @@ void *wsdb_hash_delete(struct wsdb_hash *hash, uint16_t key_len, char *key);
 int wsdb_hash_push(
     struct wsdb_hash *hash, uint16_t key_len, char *key, void *data
 );
+/*!
+ * @brief gives verdict for pruning given entry from index
+ * @param key current key value
+ * @return the next hash key value
+ */
+typedef int (* hash_verdict_fun_t)(void *, void *);
+
+/*!
+ * @brief deletes a range of elements from hash
+ *
+ * function calls verdict function to let the caller determine 
+ * if each entry should be deleted
+ * 
+ * 
+ * @param hash the hash index to delete from
+ * @param verdcit decision function to be called for each entry
+ *
+ * @return number of entries deleted
+ */
+int wsdb_hash_delete_range(
+    struct wsdb_hash *hash, void *ctx, hash_verdict_fun_t verdict
+);
+
+
 #endif

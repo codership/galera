@@ -399,6 +399,20 @@ int wsdb_delete_local_trx_info(local_trxid_t trx_id );
 int wsdb_delete_global_trx(trx_seqno_t trx_id );
 
 /*!
+ * @brief removes transactions' write sets from global trx index
+ * 
+ * The write set data remains store in disk, just the search 
+ * index will be removed. Therefore, you cannot certify anymore
+ * against trx's with lower seqnos.
+ *
+ * All write sets with seqno less than the one passed here, 
+ * will be removed.
+ *
+ * @param trx_id transaction seqno, older ones will bre removed
+ */
+int wsdb_purge_trxs_upto(trx_seqno_t trx_id );
+
+/*!
  * @brief returns the whole write set for a transaction.
  * 
  * 

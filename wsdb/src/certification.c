@@ -124,6 +124,11 @@ int wsdb_certification_test(
     return WSDB_OK;
 }
 
+/*
+ * for each modification for a row (identified with a key),
+ * we maintain a list of trxs who have changed the row.
+ * This list mentions the seqnos for each trx responsible for the changes
+ */
 static int update_index(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
     uint16_t i;
     
@@ -138,11 +143,15 @@ static int update_index(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
         prev = match = (struct index_rec *)wsdb_hash_search(
             key_index, key_len, serial_key
         );
+
+        /* find among the entries for this key, the one with last seqno */
         while (match && match->trx_seqno < trx_seqno) {
             prev = match;
             match = match->next;
         }
-        if (match && match->trx_seqno != trx_seqno) {
+        
+        /* simply: if the match is not for the same seqno */
+        if (!match || match->trx_seqno > trx_seqno) {
           new_trx = (struct index_rec *) gu_malloc (sizeof(struct index_rec));
           new_trx->trx_seqno = trx_seqno;
           if (prev) {
@@ -157,6 +166,13 @@ static int update_index(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
     }
     return WSDB_OK;
 }
+
+/* 
+ * @brief: write certified write set permanently in file
+ * @param: ws the write set to write
+ * @param: trx_seqno seqno for the transaction
+ * @returns: success code for the write operation
+ */
 static int write_to_file(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
     uint16_t i;
     struct trx_hdr trx;
@@ -248,8 +264,41 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     return WSDB_OK;
 }
 
+/*
+ * @brief: determine if trx can be purged
+ * @return 1 if purging is ok, otherwise 0
+ */
+static int delete_verdict(void *ctx, void *data) {
+    struct index_rec *entry = (struct index_rec *)data;
+    
+    if (entry->trx_seqno < (*(trx_seqno_t *)ctx)) {
+        return 1;
+    }
+    return 0;
+}
+
+int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
+    int deleted;
+
+    /* purge entries from table index */
+    deleted = wsdb_hash_delete_range(
+        table_index, (void *)&trx_id, delete_verdict
+    );
+    gu_debug("purged %d entries from table index", deleted);
+
+    /* purge entries from row index */
+    deleted = wsdb_hash_delete_range(
+        key_index, (void *)&trx_id, delete_verdict
+    );
+    gu_debug("purged %d entries from key index", deleted);
+
+    return WSDB_OK;
+}
+
+/* @todo: this function seems to be obsolete */
 int wsdb_delete_global_trx(trx_seqno_t trx_seqno) 
 {
 
     return WSDB_OK;
 }
+
