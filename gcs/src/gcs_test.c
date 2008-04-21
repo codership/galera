@@ -571,7 +571,7 @@ error:
 static inline void
 test_print_stat (long msgs, size_t size, double interval)
 {
-    printf ("%7zu (%7.1f per sec.) / %7zuKb (%7.1f Kb/s)\n",
+    printf ("%7ld (%7.1f per sec.) / %7zuKb (%7.1f Kb/s)\n",
             msgs, (double)msgs/interval,
             size >> 10, (double)(size >> 10)/interval);
 }
