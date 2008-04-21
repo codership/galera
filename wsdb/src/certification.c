@@ -290,7 +290,7 @@ int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
     deleted = wsdb_hash_delete_range(
         key_index, (void *)&trx_id, delete_verdict
     );
-    gu_debug("purged %d entries from key index", deleted);
+    gu_debug("purged %d entries from key index, up-to: %lu", deleted, trx_id);
 
     return WSDB_OK;
 }

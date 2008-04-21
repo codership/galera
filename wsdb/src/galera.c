@@ -586,6 +586,8 @@ enum galera_status galera_recv(void *app_ctx) {
     int rcode;
     struct job_worker *applier;
 
+    int trx_counter = 0;
+
     /* we must have gcs connection */
     if (!gcs_conn) {
         return GALERA_NODE_FAIL;
@@ -615,6 +617,21 @@ enum galera_status galera_recv(void *app_ctx) {
 	     * (teemu 12.3.2008)
 	     */
 	    free(action);
+
+            /* count received trxs, and do periodical cleanup */
+            if (trx_counter++ > 1024) {
+                trx_seqno_t min_seqno;
+
+                gcs_set_last_applied(gcs_conn, wsdb_get_last_committed_trx());
+
+                /* get the minimum trx applying state in the group */
+                min_seqno = gcs_get_last_applied(gcs_conn);
+                
+                wsdb_purge_trxs_upto(min_seqno);
+
+                trx_counter = 0;
+            }
+
             break;
         case GCS_ACT_SNAPSHOT:
         case GCS_ACT_PRIMARY:
@@ -860,7 +877,7 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
 	abort();
         break;
     }
-    
+
 after_cert_test:
 
     if (seqno_l > 0 && gcs_to_release(to_queue, seqno_l)) {

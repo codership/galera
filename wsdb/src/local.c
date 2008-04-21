@@ -50,13 +50,14 @@ static void set_last_committed_trx(trx_seqno_t seqno) {
     last_committed_trx= seqno;
     gu_mutex_unlock(&last_committed_trx_mtx);
 }
-static trx_seqno_t get_last_committed_trx() {
+trx_seqno_t wsdb_get_last_committed_trx() {
     trx_seqno_t tmp;
     gu_mutex_lock(&last_committed_trx_mtx);
     tmp= last_committed_trx;
     gu_mutex_unlock(&last_committed_trx_mtx);
     return tmp;
 }
+
 
 /* not used
 static uint32_t hash_fun_16(uint32_t max_size, uint16_t len, char *key) {
@@ -911,7 +912,7 @@ struct wsdb_write_set *wsdb_get_write_set(
     }
 
     ws->local_trx_id  = trx_id;
-    ws->last_seen_trx = get_last_committed_trx();
+    ws->last_seen_trx = wsdb_get_last_committed_trx();
     ws->level         = WSDB_WS_QUERY;
 
     if (ws->last_seen_trx == 0) {
@@ -983,12 +984,12 @@ int wsdb_set_global_trx_committed(trx_seqno_t trx_seqno) {
     GU_DBUG_ENTER("wsdb_set_global_trx_committed");
     GU_DBUG_PRINT("wsdb",("last committed: %llu", trx_seqno));
 
-    if (get_last_committed_trx() < trx_seqno) {
+    if (wsdb_get_last_committed_trx() < trx_seqno) {
         set_last_committed_trx(trx_seqno);
     } else {
 	GU_DBUG_PRINT(
             "wsdb",("setting (G) last_committed_trx to lower value: %llu %llu",
-                           trx_seqno, get_last_committed_trx())
+                           trx_seqno, wsdb_get_last_committed_trx())
         );
     }
 
@@ -1004,12 +1005,12 @@ int wsdb_set_local_trx_committed(local_trxid_t trx_id) {
     }
     GU_DBUG_PRINT("wsdb",("last committed: %llu->%llu", trx_id, trx->seqno_g));
 
-    if (get_last_committed_trx() < trx->seqno_g) {
+    if (wsdb_get_last_committed_trx() < trx->seqno_g) {
         set_last_committed_trx(trx->seqno_g);
     } else {
 	GU_DBUG_PRINT(
             "wsdb",("setting last_committed_trx to lower value: %llu %llu",
-                           trx->seqno_g, get_last_committed_trx())
+                           trx->seqno_g, wsdb_get_last_committed_trx())
         );
     }
 

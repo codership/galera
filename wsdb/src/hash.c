@@ -22,9 +22,8 @@ struct entry_match {
 struct wsdb_hash {
     char               ident;
     gu_mutex_t         mutex;
-    uint32_t           max_size;
-    uint32_t           curr_size;
-    uint32_t           elem_count;
+    uint32_t           array_size; // number of many bucket lists allocated
+    uint32_t           elem_count; // number of elements currently in hash
     hash_fun_t         hash_fun;
     hash_cmp_t         hash_cmp;
     struct hash_entry *elems[];
@@ -40,24 +39,27 @@ struct wsdb_hash *wsdb_hash_open(
     MAKE_OBJ_SIZE(hash, wsdb_hash, max_size * sizeof(struct hash_entry *));
 
     for (i=0; i<max_size; i++) hash->elems[i] = NULL;
-    hash->max_size   = max_size;
-    hash->curr_size  = 0;
+    hash->array_size = max_size;
     hash->elem_count = 0;
-    hash->hash_fun = hash_fun;
-    hash->hash_cmp = hash_cmp;
+    hash->hash_fun   = hash_fun;
+    hash->hash_cmp   = hash_cmp;
 
     /* initialize the mutex */
     gu_mutex_init(&hash->mutex, NULL);
 
     return hash;
 }
+
+static int verdict_true(void *ctx, void *entry) {
+    return 1;
+}
+
 int wsdb_hash_close(struct wsdb_hash *hash) {
-    uint32_t i;
     CHECK_OBJ(hash, wsdb_hash);
 
-    for (i=0; i<hash->elem_count; i++) { 
-        if (hash->elems[i]) gu_free(hash->elems[i]);
-    }
+    /* free all elements in the hash */
+    wsdb_hash_delete_range(hash, NULL, verdict_true);
+
     gu_free(hash);
     return WSDB_OK;
 }
@@ -71,7 +73,7 @@ static void hash_search_entry(
     CHECK_OBJ(hash, wsdb_hash);
 
     match->entry = match->prev = NULL;
-    match->idx = hash->hash_fun(hash->max_size, key_len, key);
+    match->idx = hash->hash_fun(hash->array_size, key_len, key);
     e = hash->elems[match->idx];
     while (e) {
         switch(hash->hash_cmp(
@@ -102,8 +104,8 @@ int wsdb_hash_push(
     
     gu_mutex_lock(&hash->mutex);
     //if (hash->curr_size == hash->max_size) return WSDB_ERROR;
-    hash->curr_size++;
-        
+    hash->elem_count++;
+
     entry = (struct hash_entry *) gu_malloc (sizeof (struct hash_entry));
     /* use directly key pointer as key value if key is shorter 
      * than pointer size 
@@ -165,7 +167,7 @@ void *wsdb_hash_delete(struct wsdb_hash *hash, uint16_t key_len, char key[]) {
         }
         if (key_len > 4) gu_free(match.entry->key);
         gu_free(match.entry);
-        hash->curr_size--;
+        hash->elem_count--;
         gu_mutex_unlock(&hash->mutex);
         if (!data) {
             GU_DBUG_PRINT("wsdb",("del entry null: %d, %s", key_len, key));
@@ -189,7 +191,7 @@ int wsdb_hash_delete_range(
 
     gu_mutex_lock(&hash->mutex);
 
-    for (i=0; i<hash->elem_count; i++) {
+    for (i=0; i<hash->array_size; i++) {
         struct hash_entry *entry = hash->elems[i];
         struct hash_entry *prev  = NULL;
 
@@ -205,16 +207,23 @@ int wsdb_hash_delete_range(
                 if (entry->key_len > 4) {
                     gu_free(entry->key);
                 }
-                hash->curr_size--;
+                hash->elem_count--;
                 if (!entry->data) {
                     gu_warn("purging hash index entry with no data value");
                 } else {
                     gu_free(entry->data);
                 }
-                gu_free(entry);
+                // prev will not be stepped ahead
+                {
+                    struct hash_entry *entry_next = entry->next;
+                    gu_free(entry);
+                    entry = entry_next;
+                }
+                deleted++;
+            } else {
+              prev  = entry;
+              entry = entry->next;
             }
-            prev  = entry;
-            entry = entry->next;
         }
     }
 

@@ -388,6 +388,12 @@ int wsdb_assign_trx(
   */
 trx_seqno_t wsdb_get_local_trx_seqno(local_trxid_t trx_id);
  
+ /*!
+  * @brief returns the seqno of latest trx, which has committed
+  *
+  */
+trx_seqno_t wsdb_get_last_committed_trx();
+
 /*!
  * @brief removes transaction's write set from wsdb
  *
