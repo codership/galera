@@ -42,7 +42,7 @@ WSDB_INTERFACE = 1
 WSDB_REVISION  = 0
 WSDB_AGE       = 0
 libwsdb_la_LDFLAGS = \
-	-Wl,--whole-archive -lgalerautils -Wl,--no-whole-archive \
+	-Wl,--whole-archive -lgalerautils -lgalera -Wl,--no-whole-archive \
 	-version-info $(WSDB_INTERFACE):$(WSDB_REVISION):$(WSDB_AGE)
 libwsdb_la_CFLAGS = $(CFLAGS) -fno-strict-aliasing
 libwsdb_la_CPPFLAGS = $(CPPFLAGS)
