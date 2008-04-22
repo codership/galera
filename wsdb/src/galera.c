@@ -45,6 +45,7 @@ static galera_bf_execute_fun     bf_execute_cb      = NULL;
 static galera_bf_apply_row_fun   bf_apply_row_cb    = NULL;
 static galera_ws_start_fun       ws_start_cb        = NULL;
 static galera_log_cb_t           galera_log_handler = NULL;
+static galera_conf_param_fun     galera_configurator = NULL;
 
 /* application context pointer */
 //static void *app_ctx = NULL;
@@ -124,15 +125,37 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
     }
     return 0;
 }
+void *galera_conf_get_param(
+    enum galera_conf_param_id id, enum galera_conf_param_type type
+) {
+    GU_DBUG_ENTER("galera_get_conf_param");
+    if (!galera_configurator) {
+      GU_DBUG_RETURN(NULL);
+    } else {
+      GU_DBUG_RETURN(galera_configurator(id, type));
+    }
+}
+
+enum galera_status galera_set_conf_param_cb(
+    galera_conf_param_fun configurator
+) {
+    GU_DBUG_ENTER("galera_set_conf_param_cb");
+
+    galera_configurator = configurator;
+
+    GU_DBUG_RETURN(GALERA_OK);
+}
 
 enum galera_status galera_init(const char*          group,
 			       const char*          address,
 			       const char*          data_dir,
-			       galera_log_cb_t      logger)
+			       galera_log_cb_t      logger,
+                               galera_conf_param_fun configurator)
 {
     GU_DBUG_ENTER("galera_init");
-    galera_log_handler = logger;
-    
+
+    galera_configurator = configurator;
+
     /* set up GCS parameters */
     if (address) {
         gcs_url = strdup (address);

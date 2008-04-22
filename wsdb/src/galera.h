@@ -24,6 +24,51 @@ enum galera_status {
     GALERA_FATAL,         //!< fatal error, server must abort
 };
 
+/* configuration parameters */
+enum galera_conf_param_id {
+    GALERA_CONF_LOCAL_CACHE_SIZE, //!< max size for local cache
+    GALERA_CONF_WS_APPLIERS,
+};
+
+enum galera_conf_param_type {
+    GALERA_TYPE_INT,     //!< integer type
+    GALERA_TYPE_DOUBLE,  //!< float
+    GALERA_TYPE_STRING,  //!< null terminated string
+};
+
+/*!
+ * @brief callback to return configuration parameter value
+ *        The function should be able to return values for all
+ *        parameters defined in enum galera_conf_param_id
+ *
+ * @param configuration parameter identifier
+ */
+typedef void * (*galera_conf_param_fun)(
+    enum galera_conf_param_id, enum galera_conf_param_type
+);
+
+/*!
+ * @brief galera utility to call the conf_param_fun callback.
+ *        For application, this is useful only for testing if
+ *        parameter callback works correctly. This is mostly used
+ *        from inside of galera library.
+ *
+ * @param configuration parameter identifier
+ * @return pointer to the conf parameter or NULL, if callback
+ *         or parameter itself does not exist.
+ */
+void *galera_conf_get_param (enum galera_conf_param_id, enum galera_conf_param_type);
+
+/*!
+ * @brief sets the configuration parameter callback
+ *
+ * @param configurator   handler for returning configuration parameter values
+ *
+ */
+enum galera_status galera_set_conf_param_cb(
+    galera_conf_param_fun configurator
+);
+
 /*!
  * @brief retains the connection context specified by the
  *        context parameter
@@ -120,7 +165,8 @@ enum galera_status galera_tear_down();
 enum galera_status galera_init (const char           *gcs_group,
 				const char           *gcs_address,
 				const char           *data_dir,
-				galera_log_cb_t      logger);
+				galera_log_cb_t       logger,
+                                galera_conf_param_fun configurator);
 /*!
  * @brief Push/pop DBUG control string to galera own DBUG implementation.
  *        (optional)
