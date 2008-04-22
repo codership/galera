@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "galera.h"
 #include "wsdb_priv.h"
 #include "hash.h"
 #include "version_file.h"
@@ -247,15 +248,22 @@ static int write_to_file(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
 
 int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     int rcode;
+    char *persistency = galera_conf_get_param(
+        GALERA_CONF_WS_PERSISTENCY, GALERA_TYPE_STRING
+    );
           
     /* certification test */
     rcode = wsdb_certification_test(ws, trx_seqno); 
     if (rcode) {
         return rcode;
     }
-    /* append write set */
-    write_to_file(ws, trx_seqno);
-      
+
+    if (persistency && !strcmp(persistency, "FILE")) {
+        gu_debug("writing trx WS in file");
+        /* append write set */
+        write_to_file(ws, trx_seqno);
+    }
+
     /* update index */
     rcode = update_index(ws, trx_seqno); 
     if (rcode) {

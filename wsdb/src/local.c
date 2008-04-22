@@ -8,6 +8,7 @@
 #include "file_cache.h"
 #include "hash.h"
 #include "file.h"
+#include "galera.h"
 
 /* static variables */
 static struct file_cache *local_cache;
@@ -88,10 +89,11 @@ int local_open(
     const char *dir,
     const char *file,
     uint16_t    block_size,
-    uint16_t    limit
+    uint16_t    trxs_max
 ) {
     char full_name[256];
     int rcode;
+    int cache_size;
 
     memset(full_name, 256, '\0');
     sprintf(
@@ -99,13 +101,19 @@ int local_open(
         PATH_SEPARATOR,
         (file) ? file : DEFAULT_LOCAL_FILE
     );
-    local_file = file_create(
-        full_name, (block_size) ? block_size : DEFAULT_BLOCK_SIZE
+    block_size = (block_size) ? block_size : DEFAULT_BLOCK_SIZE;
+    local_file = file_create(full_name, block_size);
+
+    /* consult application for desired local cache size */
+    cache_size = galera_conf_get_param(GALERA_CONF_LOCAL_CACHE_SIZE, GALERA_TYPE_INT) ?
+      *(int *)galera_conf_get_param(GALERA_CONF_LOCAL_CACHE_SIZE, GALERA_TYPE_INT) : LOCAL_CACHE_LIMIT;
+
+    /* limit local cache size to 'cache_size' bytes */
+    local_cache = file_cache_open(
+        local_file, cache_size, cache_size/block_size
     );
 
-    /* assume 5000 trx write blocks */
-    local_cache = file_cache_open(local_file, LOCAL_CACHE_LIMIT, 5000);
-    trx_limit = (limit) ? limit : TRX_LIMIT;
+    trx_limit = (trxs_max) ? trxs_max : TRX_LIMIT;
     trx_hash  = wsdb_hash_open(trx_limit, hash_fun_64, hash_cmp_64);
 
     rcode = conn_init(0);

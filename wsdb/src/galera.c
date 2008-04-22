@@ -149,12 +149,9 @@ enum galera_status galera_set_conf_param_cb(
 enum galera_status galera_init(const char*          group,
 			       const char*          address,
 			       const char*          data_dir,
-			       galera_log_cb_t      logger,
-                               galera_conf_param_fun configurator)
+			       galera_log_cb_t      logger)
 {
     GU_DBUG_ENTER("galera_init");
-
-    galera_configurator = configurator;
 
     /* set up GCS parameters */
     if (address) {

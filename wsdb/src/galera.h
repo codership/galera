@@ -27,7 +27,7 @@ enum galera_status {
 /* configuration parameters */
 enum galera_conf_param_id {
     GALERA_CONF_LOCAL_CACHE_SIZE, //!< max size for local cache
-    GALERA_CONF_WS_APPLIERS,
+    GALERA_CONF_WS_PERSISTENCY,   //!< WS persistency policy
 };
 
 enum galera_conf_param_type {
@@ -165,8 +165,7 @@ enum galera_status galera_tear_down();
 enum galera_status galera_init (const char           *gcs_group,
 				const char           *gcs_address,
 				const char           *data_dir,
-				galera_log_cb_t       logger,
-                                galera_conf_param_fun configurator);
+				galera_log_cb_t       logger);
 /*!
  * @brief Push/pop DBUG control string to galera own DBUG implementation.
  *        (optional)
