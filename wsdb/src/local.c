@@ -105,8 +105,8 @@ int local_open(
     local_file = file_create(full_name, block_size);
 
     /* consult application for desired local cache size */
-    cache_size = galera_conf_get_param(GALERA_CONF_LOCAL_CACHE_SIZE, GALERA_TYPE_INT) ?
-      *(int *)galera_conf_get_param(GALERA_CONF_LOCAL_CACHE_SIZE, GALERA_TYPE_INT) : LOCAL_CACHE_LIMIT;
+    cache_size = wsdb_conf_get_param(GALERA_CONF_LOCAL_CACHE_SIZE, GALERA_TYPE_INT) ?
+      *(int *)wsdb_conf_get_param(GALERA_CONF_LOCAL_CACHE_SIZE, GALERA_TYPE_INT) : LOCAL_CACHE_LIMIT;
 
     /* limit local cache size to 'cache_size' bytes */
     local_cache = file_cache_open(

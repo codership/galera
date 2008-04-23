@@ -11,6 +11,8 @@
 #ifndef WSDB_API
 #define WSDB_API
 
+#include "galera.h"
+
 #include <limits.h>
 #include <stdint.h>
 #include <time.h>
@@ -522,5 +524,13 @@ int wsdb_store_set_database(
     connid_t conn_id, char *set_db, uint16_t set_db_len
 );
 
+/*!
+ * @brief functions for providing conf parameter querying from app
+ */
+void *wsdb_conf_get_param (enum galera_conf_param_id, enum galera_conf_param_type);
+
+void wsdb_set_conf_param_cb(
+    galera_conf_param_fun configurator
+);
 
 #endif

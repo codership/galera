@@ -48,18 +48,6 @@ typedef void * (*galera_conf_param_fun)(
 );
 
 /*!
- * @brief galera utility to call the conf_param_fun callback.
- *        For application, this is useful only for testing if
- *        parameter callback works correctly. This is mostly used
- *        from inside of galera library.
- *
- * @param configuration parameter identifier
- * @return pointer to the conf parameter or NULL, if callback
- *         or parameter itself does not exist.
- */
-void *galera_conf_get_param (enum galera_conf_param_id, enum galera_conf_param_type);
-
-/*!
  * @brief sets the configuration parameter callback
  *
  * @param configurator   handler for returning configuration parameter values

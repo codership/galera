@@ -11,6 +11,8 @@ static struct wsdb_hash *table_name_hash;
 static uint32_t s_last_table_id;
 static uint32_t s_max_table_id;
 
+static galera_conf_param_fun     wsdb_configurator = NULL;
+
 /* djb2
  * This algorithm was first reported by Dan Bernstein
  * many years ago in comp.lang.c
@@ -207,4 +209,20 @@ uint32_t get_table_id(char *dbtable) {
     }
 
     return id;
+}
+
+void *wsdb_conf_get_param (
+    enum galera_conf_param_id id, enum galera_conf_param_type type
+) {
+    if (!wsdb_configurator) {
+        return(NULL);
+    } else {
+        return(wsdb_configurator(id, type));
+    }
+}
+
+void wsdb_set_conf_param_cb(
+    galera_conf_param_fun configurator
+) {
+    wsdb_configurator = configurator;
 }
