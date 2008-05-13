@@ -96,7 +96,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
     if (gcs_comp_msg_primary(comp)) {
 	/* Got PRIMARY COMPONENT - Hooray! */
 	/* create new nodes array according to new membrship */
-	new_nodes_num = gcs_comp_msg_num(comp);
+	new_nodes_num = gcs_comp_msg_num (comp);
 	new_nodes     = group_nodes_init (comp);
 	if (!new_nodes) return -ENOMEM;
 	
@@ -148,11 +148,13 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
     group->num    = new_nodes_num;
     group->my_idx = gcs_comp_msg_self (comp);
 
-    /* if new nodes joined, reset ongoing actions */
-    if (group->new_memb) {
-        group_nodes_reset (group);
+    if (group->num > 0) {
+        /* if new nodes joined, reset ongoing actions */
+        if (group->new_memb) {
+            group_nodes_reset (group);
+        }
+        group_redo_last_applied (group);
     }
-    group_redo_last_applied (group);
 
     return group->state;
 }
