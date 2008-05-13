@@ -810,7 +810,10 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
         GU_DBUG_RETURN(GALERA_OK);
     }
 
-
+    /* ws can be removed from local cache already now */
+    if ((rcode = wsdb_delete_local_trx(trx_id))) {
+      gu_warn("could not delete trx: %llu", trx_id);
+    }
 
     /* encode with xdr */
     /* TODO: is not optimal to allocate data buffer for xdr encoding

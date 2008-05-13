@@ -248,8 +248,8 @@ static int write_to_file(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
 
 int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     int rcode;
-    char *persistency = wsdb_conf_get_param(
-        GALERA_CONF_WS_PERSISTENCY, GALERA_TYPE_STRING
+    int *persistency = (int *)wsdb_conf_get_param(
+        GALERA_CONF_WS_PERSISTENCY, GALERA_TYPE_INT
     );
           
     /* certification test */
@@ -258,7 +258,7 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
         return rcode;
     }
 
-    if (persistency && !strcmp(persistency, "FILE")) {
+    if (persistency && *persistency) {
         gu_debug("writing trx WS in file");
         /* append write set */
         write_to_file(ws, trx_seqno);
