@@ -1,3 +1,8 @@
+2008-05-14 Alex
+    Added gcs_create() and gcs_destroy() for safe and clean initialization and deinitialization
+    of GCS connection handle.
+
 2008-03-23 Alex
     Added gcs_set_last_applied() and gcs_get_last_applied() - calls for voting for the last
     applied action.
+

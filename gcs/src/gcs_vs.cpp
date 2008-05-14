@@ -217,23 +217,6 @@ static GCS_BACKEND_NAME_FN(gcs_vs_name)
     return name;
 }
 
-static GCS_BACKEND_CLOSE_FN(gcs_vs_close)
-{
-    conn_t *conn = backend->conn;
-    if (conn == 0)
-	return -EBADFD;
-    
-    conn->vs_ctx.vs->leave(0);
-    gu_thread_join(conn->thr, 0);
-    conn->vs_ctx.vs->close();
-    delete conn->vs_ctx.vs;
-    delete conn->vs_ctx.po;
-    delete conn;
-    backend->conn = 0;
-    fprintf(stderr, "gcs_vs_close(): return 0}\n");
-    return 0;
-}
-
 static void *conn_run(void *arg)
 {
     conn_t *conn = reinterpret_cast<conn_t*>(arg);
@@ -245,9 +228,54 @@ static void *conn_run(void *arg)
     return 0;
 }
 
+static GCS_BACKEND_OPEN_FN(gcs_vs_open)
+{
+    conn_t *conn = backend->conn;
+
+    if (!conn) return -EBADFD;
+
+    try {
+	conn->vs_ctx.vs->join(0, &conn->vs_ctx);
+	int err = gu_thread_create(&conn->thr, 0, &conn_run, conn);
+	if (err != 0)
+	    return -err;
+    } catch (Exception e) {
+	return -EINVAL;
+    }
+    
+    return 0;
+}
+
+static GCS_BACKEND_CLOSE_FN(gcs_vs_close)
+{
+    conn_t *conn = backend->conn;
+    if (conn == 0)
+	return -EBADFD;
+
+    conn->vs_ctx.vs->leave(0);
+    gu_thread_join(conn->thr, 0);
+
+    return 0;
+}
+
+static GCS_BACKEND_DESTROY_FN(gcs_vs_destroy)
+{
+    conn_t *conn = backend->conn;
+    if (conn == 0)
+	return -EBADFD;
+    
+    conn->vs_ctx.vs->close();
+    delete conn->vs_ctx.vs;
+    delete conn->vs_ctx.po;
+    delete conn;
+    backend->conn = 0;
+    fprintf(stderr, "gcs_vs_close(): return 0}\n");
+    return 0;
+}
+
 static const char* vs_default_socket = "tcp:127.0.0.1:4567";
 
-GCS_BACKEND_OPEN_FN(gcs_vs_open)
+GCS_BACKEND_CREATE_FN(gcs_vs_create)
 {
     conn_t *conn = 0;
     const char* sock = socket;
@@ -269,21 +297,20 @@ GCS_BACKEND_OPEN_FN(gcs_vs_open)
 				     &conn->vs_ctx.monitor);
 	conn->vs_ctx.set_down_context(conn->vs_ctx.vs);
 	conn->vs_ctx.vs->connect();
-	conn->vs_ctx.vs->join(0, &conn->vs_ctx);
-	int err = gu_thread_create(&conn->thr, 0, &conn_run, conn);
-	if (err != 0)
-	    return -err;
     } catch (Exception e) {
 	delete conn;
 	return -EINVAL;
     }
     
-    backend->close = &gcs_vs_close;
-    backend->send  = &gcs_vs_send;
-    backend->recv  = &gcs_vs_recv;
-    backend->name  = &gcs_vs_name;
+    backend->open     = &gcs_vs_open;
+    backend->close    = &gcs_vs_close;
+    backend->destroy  = &gcs_vs_destroy;
+    backend->send     = &gcs_vs_send;
+    backend->recv     = &gcs_vs_recv;
+    backend->name     = &gcs_vs_name;
     backend->msg_size = &gcs_vs_msg_size;
-    backend->conn = conn;
+    backend->conn     = conn;
     
     return 0;
 }
+

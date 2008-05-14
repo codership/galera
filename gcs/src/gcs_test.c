@@ -37,8 +37,8 @@ gcs_test_log_t;
 
 static gcs_test_log_t *send_log, *recv_log;
 
-static bool throughput = true;  // bech for throughput
-static bool total      = false; // also inact TO locking
+static bool throughput = true;  // bench for throughput
+static bool total      = false; // also enable TO locking
 
 typedef enum
 {
@@ -294,7 +294,7 @@ static inline long
 test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
 {
     long ret = 0;
-#define SEND_LAST_MASK ((1 << 10) - 1) // 1024
+#define SEND_LAST_MASK ((1 << 13) - 1) // every 8192nd seqno
     if (!(my_seqno & SEND_LAST_MASK)) {
         gcs_seqno_t group_seqno;
             ret = gcs_set_last_applied (gcs, my_seqno);
@@ -303,11 +303,11 @@ test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
                          (unsigned long long)my_seqno, ret);
             }
             group_seqno = gcs_get_last_applied (gcs);
-            if (!throughput) {
+//            if (!throughput) {
                 fprintf (stdout, "Last applied: my = %llu, group = %llu\n",
                          (unsigned long long)my_seqno,
                          (unsigned long long)group_seqno);
-            }
+//            }
     }
     return ret;
 }
@@ -599,7 +599,8 @@ int main (int argc, char *argv[])
     printf ("Opening connection: channel = %s, backend = %s\n",
              channel, conf.backend);
 
-    if ((err = gcs_open (&gcs, channel, conf.backend))) goto out;
+    if (!(gcs = gcs_create (conf.backend))) goto out;
+    if ((err = gcs_open    (gcs, channel))) goto out;
     printf ("Connected\n");
 
     msg_len = 1300;
@@ -630,16 +631,24 @@ int main (int argc, char *argv[])
 
     usleep (conf.n_tries*1000000);
 
-    puts ("Stopping threads");
+    puts ("Stopping threads...");
     fflush(stdout); fflush(stderr);
 
     gcs_test_thread_pool_stop (&send_pool);
     gcs_test_thread_pool_stop (&repl_pool);
-    puts ("Threads stopped");
+    gcs_test_thread_pool_stop (&recv_pool);
+    puts ("Threads stopped.");
 
     gcs_test_thread_pool_join (&send_pool);
     gcs_test_thread_pool_join (&repl_pool);
-    puts ("Threads joined");
+    puts ("SEND and REPL threads joined.");
+
+    printf ("Closing GCS connection... ");
+    if ((err = gcs_close (gcs))) goto out;
+    puts ("done.");
+
+    gcs_test_thread_pool_join (&recv_pool);
+    puts ("RECV threads joined.");
 
     gettimeofday (&t_end, NULL);
     {
@@ -664,15 +673,10 @@ int main (int argc, char *argv[])
     printf ("Press any key to exit the program:\n");
     fgetc (stdin);
 
-    /* Cancelling recv thread here in case we receive messages from other node*/
-    gcs_test_thread_pool_cancel (&recv_pool);
-    gcs_test_thread_pool_join (&recv_pool);
-
-    printf ("Closing GCS connection...");
-//    gcs_test_thread_pool_stop (&recv_pool);
-    if ((err = gcs_close (&gcs))) goto out;
+    printf ("Freeing GCS connection handle...");
+    if ((err = gcs_destroy (gcs))) goto out;
+    gcs = NULL;
     printf ("done\n"); fflush (stdout);
-    printf ("Disconnected\n");
 
     gcs_test_thread_pool_destroy (&repl_pool);
     gcs_test_thread_pool_destroy (&send_pool);

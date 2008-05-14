@@ -318,6 +318,15 @@ START_TEST (gcs_group_configuration)
     // cleanup
     free (act.buf);
     memset (&act, 0, sizeof(act));
+
+    // Leave group
+    comp = gcs_comp_msg_new (FALSE, -1, 0);
+    fail_if (comp == NULL);
+
+    ret = gcs_group_handle_comp_msg (&group, comp);
+    fail_if (ret < 0);
+    fail_if (gcs_group_is_primary(&group));
+    // comment until implemented: fail_if (!gcs_group_new_members(&group)); RECEIVE_SYNC();
 }
 END_TEST
 

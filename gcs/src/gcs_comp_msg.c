@@ -26,8 +26,7 @@ gcs_comp_msg_new (bool prim, long my_idx, long memb_num)
 {
     gcs_comp_msg_t* ret;
 
-    assert (memb_num > 0);
-    assert (my_idx >= 0 && my_idx < memb_num);
+    assert ((memb_num > 0 && my_idx >= 0) || (memb_num == 0 && my_idx == -1));
 
     ret = gu_calloc (1, comp_msg_size(memb_num));
 
@@ -38,6 +37,12 @@ gcs_comp_msg_new (bool prim, long my_idx, long memb_num)
     }
 
     return ret;
+}
+
+gcs_comp_msg_t*
+gcs_comp_msg_leave ()
+{
+    return gcs_comp_msg_new (false, -1, 0);
 }
 
 /*! Destroys component message */

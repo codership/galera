@@ -29,31 +29,37 @@ struct gcs_core;
 typedef struct gcs_core gcs_core_t; 
 
 /*
- * gcs_core_open() initialises connection context private to
+ * Allocates context resources  private to
  * generic communicaton layer - send/recieve buffers and the like.
+ */
+gcs_core_t* gcs_core_create (const char* const backend);
+
+/*
+ * gcs_core_open() initialises opens connection
  * Return values:
  * zero     - success
  * negative - error code
  */
-long gcs_core_open  (gcs_core_t**      conn,
-                     const char* const channel,
-                     const char* const backend);
+long gcs_core_open  (gcs_core_t*       conn,
+                     const char* const channel);
+
 
 /*
- * gcs_core_stop() canceles listening thread before closing the connection
- * Return values:
- * zero     - success
- * negative - error code
- */
-long gcs_core_stop (gcs_core_t* conn);
-
-/*
- * gcs_core_close() frees resources allocated by gcs_core_open()
+ * gcs_core_close() puts connection in a closed state,
+ * cancelling all ongoing calls.
  * Return values:
  * zero     - success
  * negative - error code
  */
 long gcs_core_close (gcs_core_t* conn);
+
+/*
+ * gcs_core_destroy() frees resources allocated by gcs_core_create()
+ * Return values:
+ * zero     - success
+ * negative - error code
+ */
+long gcs_core_destroy (gcs_core_t* conn);
 
 /* 
  * gcs_core_send() atomically sends action to group.

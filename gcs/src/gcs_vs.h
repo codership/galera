@@ -9,6 +9,6 @@
 
 #include "gcs_backend.h"
 
-extern GCS_BACKEND_OPEN_FN (gcs_vs_open);
+extern GCS_BACKEND_CREATE_FN (gcs_vs_create);
 
 #endif /* _gcs_vs_h_ */

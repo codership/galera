@@ -36,9 +36,18 @@ gcs_comp_msg_t;
 typedef struct gcs_comp_msg gcs_comp_msg_t;
 #endif
 
-/*! Allocates component message */
+/*! Allocates new component message 
+ * @param prim     whether component is primary or not
+ * @param my_idx   this node index in the membership
+ * @param memb_num number of members in component
+ * @return
+ *        allocated message buffer */
 extern gcs_comp_msg_t*
-gcs_comp_msg_new    (bool prim, long my_id, long memb_num);
+gcs_comp_msg_new    (bool prim, long my_idx, long memb_num);
+
+/*! Standard empty "leave" component message (to be returned on shutdown) */
+extern gcs_comp_msg_t*
+gcs_comp_msg_leave ();
 
 /*! Destroys component message */
 extern void

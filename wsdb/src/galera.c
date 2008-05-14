@@ -193,6 +193,7 @@ void galera_dbug_pop (void)
 }
 
 enum galera_status galera_tear_down() {
+    if (gcs_conn) gcs_destroy (gcs_conn);
     if (to_queue) gcs_to_destroy(&to_queue);
     if (commit_queue) gcs_to_destroy(&commit_queue);
     return GALERA_OK;
@@ -206,11 +207,17 @@ enum galera_status galera_enable() {
         GU_DBUG_RETURN(GALERA_NODE_FAIL);
     }
 
-    rcode = gcs_open(&gcs_conn, gcs_channel, gcs_url);
+    gcs_conn = gcs_create(gcs_url);
+    if (!gcs_conn) {
+        gu_error ("Failed to create GCS conection handle");
+        GU_DBUG_RETURN(GALERA_NODE_FAIL);
+    }
+
+    rcode = gcs_open(gcs_conn, gcs_channel);
     switch(rcode) {
     case GCS_ERR_OK:
 	assert (gcs_conn);
-	gu_info("Successfully opened gcs connection");
+	gu_info("Successfully opened GCS connection");
 	break;
     default:
 	gu_error("gcs_open(%p, %s, %s) failed: %d (%s)",
@@ -229,8 +236,15 @@ enum galera_status galera_disable() {
     if (!gcs_conn) {
         GU_DBUG_RETURN(GALERA_NODE_FAIL);
     }
-    rcode = gcs_close(&gcs_conn);
-    gcs_conn = NULL;
+
+    rcode = gcs_close(gcs_conn);
+    if (rcode) {
+        gu_error ("Failed to close GCS connection handle: %d (%s)",
+                  rcode, strerror(-rcode));
+        GU_DBUG_RETURN(GALERA_NODE_FAIL);
+    }
+
+    gu_info("Closed GCS connection");
 
     Galera.repl_state = GALERA_DISABLED;
     GU_DBUG_RETURN(GALERA_OK);

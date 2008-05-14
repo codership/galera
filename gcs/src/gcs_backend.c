@@ -24,17 +24,17 @@
 static
 struct {
     const char* id;
-    gcs_backend_open_t open;
+    gcs_backend_create_t create;
 }
     const backend[] =
     {
 #ifdef    GCS_USE_VS
-        { "gcomm", gcs_vs_open },
+        { "gcomm", gcs_vs_create },
 #endif /* GCS_USE_VS */
 #ifdef    GCS_USE_SPREAD
-        { "spread", gcs_spread_open },
+        { "spread", gcs_spread_create },
 #endif /* GCS_USE_SPREAD */
-        { "dummy", gcs_dummy_open },
+        { "dummy", gcs_dummy_create },
         { NULL, NULL } // terminating pair
     };
 
@@ -52,7 +52,6 @@ backend_type_is (const char* uri, const char* type, const size_t len)
 
 long
 gcs_backend_init (gcs_backend_t* const bk,
-		  const char*    const channel,
 		  const char*    const uri)
 {
     char* sep;
@@ -69,7 +68,7 @@ gcs_backend_init (gcs_backend_t* const bk,
         /* try to match any of specified backends */
         for (i = 0; backend[i].id != NULL; i++) {
             if (backend_type_is (uri, backend[i].id, type_len))
-                return backend[i].open(bk, channel, addr);
+                return backend[i].create (bk, addr);
         }
 
         /* no backends matched */

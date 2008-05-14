@@ -23,11 +23,22 @@ typedef struct gcs_backend gcs_backend_t;
  * The macros below are declarations of backend functions
  * (kind of function signatures)
  */
+
+/*! Allocates backend context and sets up the backend structure */
+#define GCS_BACKEND_CREATE_FN(fn)         \
+long fn (gcs_backend_t*    backend,       \
+         const char* const socket)
+
+/*! Deallocates backend context */
+#define GCS_BACKEND_DESTROY_FN(fn)        \
+long fn (gcs_backend_t*    backend)
+
+/*! Puts backend handle into operating state */
 #define GCS_BACKEND_OPEN_FN(fn)           \
 long fn (gcs_backend_t*    backend,       \
-	 const char* const channel,       \
-	 const char* const socket)
+	 const char* const channel)
 
+/*! Puts backend handle into non-operating state */
 #define GCS_BACKEND_CLOSE_FN(fn)          \
 long fn (gcs_backend_t*    backend)
 
@@ -87,8 +98,8 @@ static const long GCS_SENDER_NONE = -1; /** When there's no sender */
 const char* fn (void)
 
 /*!
- * Returns the size of the message such that network packet won't exceed
- * given value.
+ * Returns the size of the message such that resulting network packet won't
+ * exceed given value (basically, pkt_size - headers).
  *
  * @param backend
  *        backend handle
@@ -105,6 +116,8 @@ const char* fn (void)
 long fn (gcs_backend_t* const backend,    \
          ulong          const pkt_size)
 
+typedef GCS_BACKEND_CREATE_FN   ((*gcs_backend_create_t));
+typedef GCS_BACKEND_DESTROY_FN  ((*gcs_backend_destroy_t));
 typedef GCS_BACKEND_OPEN_FN     ((*gcs_backend_open_t));
 typedef GCS_BACKEND_CLOSE_FN    ((*gcs_backend_close_t));
 typedef GCS_BACKEND_SEND_FN     ((*gcs_backend_send_t));
@@ -115,7 +128,9 @@ typedef GCS_BACKEND_MSG_SIZE_FN ((*gcs_backend_msg_size_t));
 struct gcs_backend
 {
     gcs_backend_conn_t*    conn;
+    gcs_backend_open_t     open;
     gcs_backend_close_t    close;
+    gcs_backend_destroy_t  destroy;
     gcs_backend_send_t     send;
     gcs_backend_recv_t     recv;
     gcs_backend_name_t     name;
@@ -128,7 +143,6 @@ struct gcs_backend
  */
 long
 gcs_backend_init (gcs_backend_t* const bk,
-		  const char*    const channel,
 		  const char*    const uri);
 
 #endif /* _gcs_backend_h_ */

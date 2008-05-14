@@ -209,60 +209,112 @@ int gcs_queue_next_wait (gcs_queue_t *queue, void **data)
 }
 
 /* this one is not fool proof */
-int gcs_queue_free (gcs_queue_t **queue)
+int gcs_queue_abort (gcs_queue_t *queue)
 {
-    gcs_queue_t *q = *queue;
     gcs_queue_memb_t *m = NULL;
 
     /* This could deadlock if some thread waiting for "ready" condition
      * was cancelled. Is there any better solution that installing cleanup
      * handlers every time in gcs_queue_*_wait functions ? */
-    if (!gu_mutex_lock (&q->lock) && !q->err)
+    if (!gu_mutex_lock (&queue->lock) && !queue->err)
     {
-	q->err = -ENODATA;
-	gu_mutex_unlock (&q->lock);
+	queue->err = -ECONNABORTED;
+	gu_mutex_unlock (&queue->lock);
 
 	/* at this point no items will be appended to queue and
 	 * no more threads will go waiting for condition */
 
 	/* Signal everybody who's been waiting for signal 
 	 * to go and complete their deeds */
-	while (gu_cond_destroy (&q->ready))
-	    gu_cond_signal (&q->ready);
+        gu_cond_broadcast (&queue->ready);
 	
 	/* at this point there will be no more threads waiting for signal */
 	/* if there still are some items in the queue, free them manually */
-
-	while ((m = q->head))
+	while ((m = queue->head))
 	{
-	    q->head = m->next;
+	    queue->head = m->next;
 	    gu_free (m->data);
 	    gu_free (m);
 	}
-	q->next = NULL;
+	queue->next = NULL;
 	
-	/* We can't go around this */
-        // it seems like not all threads that were woken up manage to
-        // grab a mutex at this point
-	while (gu_mutex_destroy (&q->lock))
-	{  /* wait till the mutex is freed by other threads */
-	    //gu_debug ("Waiting for other threads to release the mutex");
-            usleep (50000);
-	    gu_mutex_lock (&q->lock);
-	    gu_mutex_unlock (&q->lock);
-	}
-        //gu_debug ("Mutex destoryed successfully");
-
-	/* Now we can safely free allocated memory */
-	gu_free (q);
-        //gu_debug ("Queue freed successfully");
-	/* Wow! */
-	*queue = NULL;
+#ifdef GCS_DEBUG_QUEUE
+        queue->length = 0;
+#endif
 	return 0;
     }
     else
     {
-	gu_mutex_unlock (&q->lock);
-	return q->err;
+	gu_mutex_unlock (&queue->lock);
+	return queue->err;
+    }
+}
+
+int gcs_queue_reset (gcs_queue_t *queue)
+{
+    long ret;
+
+    ret = gu_mutex_lock (&queue->lock);
+    if (!ret)
+    {
+	queue->err = 0;
+	gu_mutex_unlock (&queue->lock);
+    }
+    return ret;
+}
+
+int gcs_queue_free (gcs_queue_t *queue)
+{
+    gcs_queue_memb_t *m = NULL;
+
+    /* This could deadlock if some thread waiting for "ready" condition
+     * was cancelled. Is there any better solution that installing cleanup
+     * handlers every time in gcs_queue_*_wait functions ? */
+    if (!gu_mutex_lock (&queue->lock) && (queue->err != -ENODATA))
+    {
+	queue->err = -ENODATA;
+	gu_mutex_unlock (&queue->lock);
+
+	/* at this point no items will be appended to queue and
+	 * no more threads will go waiting for condition */
+
+	/* Signal everybody who's been waiting for signal 
+	 * to go and complete their deeds */
+	while (gu_cond_destroy (&queue->ready))
+	    gu_cond_signal (&queue->ready);
+	
+	/* at this point there will be no more threads waiting for signal */
+	/* if there still are some items in the queue, free them manually */
+
+	while ((m = queue->head))
+	{
+	    queue->head = m->next;
+	    gu_free (m->data);
+	    gu_free (m);
+	}
+	queue->next = NULL;
+	
+	/* We can't go around this */
+        // it seems like not all threads that were woken up manage to
+        // grab a mutex at this point
+	while (gu_mutex_destroy (&queue->lock))
+	{  /* wait till the mutex is freed by other threads */
+	    //gu_debug ("Waiting for other threads to release the mutex");
+            usleep (50000);
+	    gu_mutex_lock (&queue->lock);
+	    gu_mutex_unlock (&queue->lock);
+	}
+        //gu_debug ("Mutex destoryed successfully");
+
+	/* Now we can safely free allocated memory */
+	gu_free (queue);
+        //gu_debug ("Queue freed successfully");
+	/* Wow! */
+	return 0;
+    }
+    else
+    {
+	gu_mutex_unlock (&queue->lock);
+	return queue->err;
     }
 }

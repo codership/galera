@@ -49,7 +49,11 @@ int gcs_queue_pop_wait  (gcs_queue_t *queue, void **data);
 int gcs_queue_next      (gcs_queue_t *queue, void **data);
 /* blocking iterator */
 int gcs_queue_next_wait (gcs_queue_t *queue, void **data);
+/* abort all waiters */
+int gcs_queue_abort     (gcs_queue_t *queue);
+/* reset error state on queue */
+int gcs_queue_reset     (gcs_queue_t *queue);
 /* destructor - would block until all members are dequeued */
-int gcs_queue_free      (gcs_queue_t **queue);
+int gcs_queue_free      (gcs_queue_t *queue);
 
 #endif // _gcs_queue_h_

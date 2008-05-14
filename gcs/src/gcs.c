@@ -21,12 +21,13 @@
 #include "gcs_fifo.h"
 #include "gcs_queue.h"
 
-#define GCS_MAX_REPL_THREADS 16384
+const long GCS_MAX_REPL_THREADS = 16384;
 
 typedef enum
 {
     GCS_CONN_OPEN,
-    GCS_CONN_CLOSED
+    GCS_CONN_CLOSED,
+    GCS_CONN_DESTROYED
 }
 gcs_conn_state_t;
 
@@ -46,8 +47,6 @@ struct gcs_conn
     /* A queue for threads waiting for replicated actions */
     gcs_fifo_t*  repl_q;
     gu_thread_t  send_thread;
-    gu_mutex_t   repl_lock; /*! this lock is needed to share the lock_q
-                             *  with gcs_recv_thread() */
 
     /* A queue for threads waiting for received actions */
     gcs_queue_t* recv_q;
@@ -72,13 +71,50 @@ typedef struct gcs_act
 }
 gcs_act_t;
 
+/* Creates a group connection handle */
+gcs_conn_t*
+gcs_create (const char *backend)
+{
+    gcs_conn_t *conn = GU_CALLOC (1, gcs_conn_t);
+
+    if (conn) {
+        conn->state = GCS_CONN_DESTROYED;
+
+        conn->core = gcs_core_create (backend);
+        if (conn->core) {
+
+            if (!(gcs_core_set_pkt_size (conn->core, GCS_DEFAULT_PKT_SIZE))) {
+
+                conn->repl_q  = gcs_fifo_create (GCS_MAX_REPL_THREADS);
+                if (conn->repl_q) {
+
+                    conn->recv_q  = gcs_queue ();
+                    if (conn->recv_q) {
+                        gu_mutex_init (&conn->lock,      NULL);
+                        conn->state = GCS_CONN_CLOSED;
+                        return conn; // success
+                    }
+                    gcs_fifo_destroy (&conn->repl_q);
+                }
+            }
+            gcs_core_destroy (conn->core);
+        }
+
+        gu_free (conn);
+    }
+
+    gu_error ("Failed to create GCS connection handle");
+
+    return NULL; // failure
+}
+
 /*
  * gcs_recv_thread() receives whatever actions arrive from group,
  * and performs necessary actions based on action type.
  */
 static void *gcs_recv_thread (void *arg)
 {
-    long           ret  = -ENOTCONN;
+    long           ret  = -ECONNABORTED;
     gcs_conn_t    *conn = arg;
     gcs_act_t     *act  = NULL;
     gcs_seqno_t    act_id;
@@ -185,112 +221,140 @@ static void *gcs_recv_thread (void *arg)
     return NULL;
 }
 
-/* Creates a group/channel connection context*/
-int gcs_open (gcs_conn_t **gcs, const char *channel, const char *backend)
+/* Opens connection to group */
+int gcs_open (gcs_conn_t *conn, const char *channel)
 {
-    long err = 0;
-    gcs_conn_t *conn = GU_CALLOC (1, gcs_conn_t);
+    long ret = 0;
 
-    if (NULL == conn) return errno;
-    conn->state = -GCS_CONN_CLOSED;
+    if ((ret = gcs_queue_reset (conn->recv_q))) return ret;
 
-    /* Some conn fields must be initialized during this call */
-    if ((err = gcs_core_open (&conn->core, channel, backend))) {
-        gu_error ("Failed to create connection: %d (%s)",
-                  err, gcs_strerror(err));
-	return err;
+    if ((ret = gu_mutex_lock (&conn->lock))) return ret;
+    {
+        if (GCS_CONN_CLOSED == conn->state) {
+
+            if (!(ret = gcs_core_open (conn->core, channel))) {
+                
+                if (!(ret = gu_thread_create (&conn->recv_thread,
+                                              NULL,
+                                              gcs_recv_thread,
+                                              conn))) {
+                    gu_info ("Joined channel '%s'", channel);
+                    conn->state = GCS_CONN_OPEN;
+                }
+                else {
+                    gcs_core_close (conn->core);
+                }
+            }
+            else {
+                gu_error ("Failed to join channel '%s': %d (%s)",
+                          channel, ret, gcs_strerror(ret));
+            }
+        }
+        else {
+            ret = -EBADFD;
+        }
     }
 
-    if ((err = gcs_core_set_pkt_size (conn->core, GCS_DEFAULT_PKT_SIZE)))
-	return err;
-
-    conn->repl_q  = gcs_fifo_create (GCS_MAX_REPL_THREADS);
-    conn->recv_q  = gcs_queue ();
-    conn->state   = GCS_CONN_OPEN;
-
-    if ((err = gu_thread_create (&conn->recv_thread,
-				 NULL,
-				 gcs_recv_thread,
-				 conn)))
-	return err;
-    
-    gu_mutex_init (&conn->lock,      NULL);
-    gu_mutex_init (&conn->repl_lock, NULL);
-    *gcs = conn;
-    return 0;
+    gu_mutex_unlock (&conn->lock);
+    return ret;
 }
 
-/* Frees resources associated with group connection */
-/* FIXME: this function is likely to be broken and may crash/deadlock 
- * hopefully we don't need it for the demo */
-/* there still can be races between gcs_close() and repl/recv functions,
- * gcs_send() locks connection so it is safe. */
-int gcs_close (gcs_conn_t **gcs)
+/* Closes group connection */
+/* After it returns, application should have all time in the world to cancel
+ * and join threads which try to access the handle, before calling gcs_destroy()
+ * on it. */
+int gcs_close (gcs_conn_t *conn)
 {
-    int         err;
-    gcs_conn_t *conn = *gcs;
+    long        ret;
     gcs_act_t  *act;
 
-    if (!(gu_mutex_lock (&conn->lock)))
+    if ((ret = gu_mutex_lock (&conn->lock))) return ret;
     {
-        if (GCS_CONN_CLOSED == conn->state)
+        if (GCS_CONN_CLOSED <= conn->state)
         {
             gu_mutex_unlock (&conn->lock);
-            return -ENOTCONN;
+            return -EBADFD;
         }
         conn->state = GCS_CONN_CLOSED;
-        conn->err   = -ENOTCONN;
+        conn->err   = -ECONNABORTED;
+
+        /** @note: We have to close connection before joining RECV thread
+         *         since it may be blocked in gcs_backend_recv().
+         *         That also means, that RECV thread should surely exit here. */
+        if ((ret = gcs_core_close (conn->core))) {
+            return ret;
+        }
+
+        gu_thread_join (conn->recv_thread, NULL);
+        gu_debug ("recv_thread() joined.");
+
+        /* At this point (state == CLOSED) no new threads should be able to
+         * queue for repl (check gcs_repl()), and recv thread is joined, so no
+         * new actions will be received. Abort threads that are still waiting
+         * in repl queue */
+        while ((act = gcs_fifo_get(conn->repl_q))) {
+            /* This will wake up repl threads in repl_q - 
+             * they'll quit on their own,
+             * they don't depend on the connection object after waking */
+            gu_cond_signal (&act->wait_cond);
+        }
+
+        /* wake all gcs_recv() threads */
+        ret = gcs_queue_abort (conn->recv_q);
+    }
+    gu_mutex_unlock (&conn->lock);
+    return ret;
+}
+
+/* Frees resources associated with GCS connection handle */
+int gcs_destroy (gcs_conn_t *conn)
+{
+    int         err;
+
+    if (!(err = gu_mutex_lock (&conn->lock)))
+    {
+        if (GCS_CONN_CLOSED != conn->state)
+        {
+            if (GCS_CONN_CLOSED > conn->state)
+                gu_error ("Attempt to call gcs_destroy() before gcs_close()");
+            gu_mutex_unlock (&conn->lock);
+            return -EBADFD;
+        }
+        conn->state = GCS_CONN_DESTROYED;
+        conn->err   = -EBADFD;
         /* we must unlock the mutex here to allow unfortunate threads
          * to acquire the lock and give up gracefully */
         gu_mutex_unlock (&conn->lock);
     }
     else {
-        return -EBADFD;
+        return err;
     }
 
-    /* abort all pending repl calls */
-    /* destroying repl_lock will prevent repl threads from queueing */
-//    gu_debug ("Destroying repl_lock");
-    while (gu_mutex_destroy (&conn->repl_lock)) {
-        if ((err = gu_mutex_lock (&conn->repl_lock))) return -err;
-        gu_mutex_unlock (&conn->repl_lock);
-    }
-
-    /* now that recv thread is cancelled, and no repl requests can be queued,
-     * we can safely destroy repl_q */
-//    gu_debug ("Waking up repl threads");
-    while ((act = gcs_fifo_get(conn->repl_q))) {
-        /* This will wake up repl threads in repl_q - 
-         * they'll quit on their own,
-         * they don't depend on the connection object after waking */
-        gu_cond_signal (&act->wait_cond);
-    }
 //    gu_debug ("Destroying repl_q");
-    if ((err = gcs_fifo_destroy (&conn->repl_q))) return err;
+    if ((err = gcs_fifo_destroy (&conn->repl_q))) {
+        gu_debug ("Error destroying repl FIFO: %d (%s)",
+                  err, gcs_strerror (err));
+        return err;
+    }
 
     /* this should cancel all recv calls */
 //    gu_debug ("Destroying recv_q");
-    if ((err = gcs_queue_free (&conn->recv_q))) return err;
+    if ((err = gcs_queue_free (conn->recv_q))) {
+        gu_debug ("Error destroying recv queue: %d (%s)",
+                  err, gcs_strerror (err));
+        return err;
+    }
 
-    /** @note: We have to stop connection before joining RECV thread
-     *         since it may be blocked in gcs_backend_receive().
-     *         That also means, that RECV thread should surely exit here. */
-    if ((err = gcs_core_stop (conn->core))) return err;
-
-
-    //  /* Cancel main recv_thread if it is not blocked in gcs_backend_recv() */
-    //  gu_thread_cancel (conn->recv_thread);
-    //  gu_debug ("recv_thread() cancelled.");
-    gu_thread_join   (conn->recv_thread, NULL);
-    gu_debug ("recv_thread() joined.");
-
-    if ((err = gcs_core_close (conn->core))) return err;
+    if ((err = gcs_core_destroy (conn->core))) {
+        gu_debug ("Error destroying core: %d (%s)",
+                  err, gcs_strerror (err));
+        return err;
+    }
 
     /* This must not last for long */
     while (gu_mutex_destroy (&conn->lock));
     
     gu_free (conn);
-    *gcs = NULL;
 
     return 0;
 }
@@ -304,7 +368,7 @@ int gcs_send (gcs_conn_t *conn, const gcs_act_type_t act_type,
     /*! locking connection here to avoid race with gcs_close()
      *  @note: gcs_repl() and gcs_recv() cannot lock connection
      *         because they block indefinitely waiting for actions */
-    if (!gu_mutex_lock (&conn->lock)) { 
+    if (!(ret = gu_mutex_lock (&conn->lock))) { 
         if (GCS_CONN_OPEN == conn->state) {
             /* need to make a copy of the action, since receiving thread
              * has no way of knowing that it shares this buffer.
@@ -345,8 +409,6 @@ int gcs_repl (gcs_conn_t          *conn,
     *act_id       = GCS_SEQNO_ILL;
     *local_act_id = GCS_SEQNO_ILL;
 
-    if (GCS_CONN_CLOSED == conn->state) return -ENOTCONN;
-
     assert (act_size > 0); // FIXME!!! see recv_thread() -
     assert (action);       // cannot gcs_repl() NULL messages
 
@@ -357,11 +419,18 @@ int gcs_repl (gcs_conn_t          *conn,
      * we need to lock a mutex before we can go wait for signal */
     if (!(ret = gu_mutex_lock (&act.wait_mutex)))
     {
-        /* make sure it is put in fifo and sent in the same order -
-         * lock repl_lock */
-        if (!(ret = gu_mutex_lock (&conn->repl_lock)))
+        // Lock here does the following:
+        // 1. serializes gcs_core_send() access between gcs_repl() and
+        //    gcs_send()
+        // 2. avoids race with gcs_close() and gcs_destroy()
+        if (!(ret = gu_mutex_lock (&conn->lock)))
         {
-            if (!(ret = gcs_fifo_put (conn->repl_q, &act)))
+            // some hack here to achieve one if() instead of two:
+            // if (conn->state != GCS_CONN_OPEN) ret will be -EBADFD,
+            // otherwise it will be set to what gcs_fifo_put() returns.
+            ret = -EBADFD;
+            if ((GCS_CONN_OPEN == conn->state) &&
+                !(ret = gcs_fifo_put (conn->repl_q, &act)))
             {
                 // Keep on trying until something else comes out
                 while ((ret = gcs_core_send (conn->core, action,
@@ -374,7 +443,7 @@ int gcs_repl (gcs_conn_t          *conn,
                     }
                 }
             }
-            gu_mutex_unlock (&conn->repl_lock);
+            gu_mutex_unlock (&conn->lock);
         }
 
         /* now having unlocked repl_q we can go waiting for action delivery */
@@ -422,8 +491,15 @@ int gcs_recv (gcs_conn_t *conn, gcs_act_type_t *act_type,
     {
 	assert (NULL == void_ptr);
         if (GCS_CONN_CLOSED == conn->state) {
-            gu_error ("gcs_recv() error: %d (%s)", err, gcs_strerror(err));
-            return -ENOTCONN;
+            // Almost any error (like ENODATA or ENOTCONN) at this point
+            // is probably Ok
+            if (-ENOTRECOVERABLE != err) {
+                return -ENOTCONN;
+            }
+            else {
+                gu_error ("gcs_recv() error: %d (%s)", err, gcs_strerror(err));
+                return err;
+            }
         } else {
             gu_error ("gcs_recv() error: %d (%s)", err, gcs_strerror(err));
             return err;

@@ -33,7 +33,7 @@ typedef struct gcs_backend_conn
 {
     gcs_queue_t     *gc_q;   /* "serializator" */
     dummy_msg_t     *msg;    /* last undelivered message */
-//    bool             pc_sent;
+    bool             closed;
     gcs_seqno_t      msg_id;
     size_t           msg_max_size;
 }
@@ -56,7 +56,8 @@ dummy_msg_create (gcs_msg_type_t const type,
     return msg;
 }
 
-static inline long dummy_msg_destroy (dummy_msg_t **msg)
+static inline long
+dummy_msg_destroy (dummy_msg_t **msg)
 {
     if (*msg)
     {
@@ -67,14 +68,14 @@ static inline long dummy_msg_destroy (dummy_msg_t **msg)
 }
 
 static
-GCS_BACKEND_CLOSE_FN(dummy_close)
+GCS_BACKEND_DESTROY_FN(dummy_destroy)
 {
     dummy_t* dummy = backend->conn;
     
-    if (!dummy) return -EBADFD;
+    if (!dummy || !dummy->closed) return -EBADFD;
 
 //    gu_debug ("Deallocating message queue (serializer)");
-    gcs_queue_free    (&dummy->gc_q);
+    gcs_queue_free    (dummy->gc_q);
 //    gu_debug ("Freeing message object.");
     dummy_msg_destroy (&dummy->msg);
     gu_free (dummy);
@@ -104,7 +105,8 @@ GCS_BACKEND_SEND_FN(dummy_send)
 	    err = -ENOMEM;
     }
     else
-	err = -EFAULT;
+	err = -EBADFD;
+
     return err;
 }
 
@@ -176,35 +178,66 @@ GCS_BACKEND_MSG_SIZE_FN(dummy_msg_size)
 }
 
 static
-const gcs_backend_t dummy_backend =
+GCS_BACKEND_OPEN_FN(dummy_open)
 {
-    .conn     = NULL,
-    .close    = dummy_close,
-    .send     = dummy_send,
-    .recv     = dummy_recv,
-    .name     = dummy_name,
-    .msg_size = dummy_msg_size
-};
+    long     ret   = -ENOMEM;
+    dummy_t* dummy = backend->conn;
+    gcs_comp_msg_t* comp;
 
-/* A function to simulate primary component message,
- * as usual returns the total size of the message that would be */
-static long dummy_create_pc (gcs_backend_t* dummy)
-{
-    gcs_comp_msg_t* comp = gcs_comp_msg_new (true, 0, 1);
-    long            ret  = -ENOMEM; // assume the worst
+    if (!dummy) {
+        gu_debug ("Backend not initialized");
+        return -EBADFD;
+    }
+
+    comp = gcs_comp_msg_new (true, 0, 1);
 
     if (comp) {
 	ret = gcs_comp_msg_add (comp, "Dummy localhost");
 	assert (0 == ret); // we have only one member, index = 0
         // put it in the queue, like a usual message 
         ret = gcs_comp_msg_size(comp);
-        ret = dummy_send (dummy, comp, ret, GCS_MSG_COMPONENT);
+        ret = dummy_send (backend, comp, ret, GCS_MSG_COMPONENT);
+        if (ret > 0) ret = 0;
+	gcs_comp_msg_delete (comp);
+    }
+    gu_debug ("Opened backend connection: %d (%s)", ret, gcs_strerror(ret));
+    return ret;
+}
+
+static
+GCS_BACKEND_CLOSE_FN(dummy_close)
+{
+    long     ret   = -ENOMEM;
+    dummy_t* dummy = backend->conn;
+    gcs_comp_msg_t* comp;
+    
+    if (!dummy) return -EBADFD;
+
+    comp = gcs_comp_msg_leave ();
+
+    if (comp) {
+        ret = gcs_comp_msg_size(comp);
+        ret = dummy_send (backend, comp, ret, GCS_MSG_COMPONENT);
+        if (ret > 0) ret = 0;
 	gcs_comp_msg_delete (comp);
     }
     return ret;
 }
 
-GCS_BACKEND_OPEN_FN(gcs_dummy_open)
+static
+const gcs_backend_t dummy_backend =
+{
+    .conn     = NULL,
+    .open     = dummy_open,
+    .close    = dummy_close,
+    .destroy  = dummy_destroy,
+    .send     = dummy_send,
+    .recv     = dummy_recv,
+    .name     = dummy_name,
+    .msg_size = dummy_msg_size
+};
+
+GCS_BACKEND_CREATE_FN(gcs_dummy_create)
 {
     long     ret   = -ENOMEM;
     dummy_t *dummy = NULL;
@@ -216,19 +249,14 @@ GCS_BACKEND_OPEN_FN(gcs_dummy_open)
 
     dummy->msg          = NULL;
     dummy->msg_id       = 0;
-//    dummy->pc_sent      = false;
+    dummy->closed       = true;
     dummy->msg_max_size = sysconf (_SC_PAGESIZE);
 
     *backend      = dummy_backend; // set methods
     backend->conn = dummy;         // set data
 
-    ret = dummy_create_pc (backend);
-    if (ret < 0) goto out2;
-
     return 0;
 
-out2:
-    gcs_queue_free (&dummy->gc_q);
 out1:
     gu_free (dummy);
 out0:

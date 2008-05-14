@@ -19,14 +19,15 @@
 #include "gcs_group.h"
 #include "gcs_core.h"
 
-#define CORE_FIFO_LEN 1<<15 // 32K elements (128/256K bytes)
+const size_t CORE_FIFO_LEN = 1<<15; // 32K elements (128/256K bytes)
+const size_t CORE_INIT_BUF_SIZE = 4096;
 
 typedef enum core_state
 {
     CORE_PRIMARY,
     CORE_NON_PRIMARY,
-    CORE_CLOSING,
-    CORE_CLOSED
+    CORE_CLOSED,
+    CORE_DESTROYED
 }
 core_state_t;
 
@@ -35,9 +36,6 @@ struct gcs_core
     /* connection per se */
     long            prim_comp_no;
     core_state_t    state;
-//    gu_mutex_t      prim_lock;
-//    gu_cond_t       prim_cond;
-//    gu_mutex_t      lock; // must get rid of it.
 
     /* protocol */
     long            proto_ver;
@@ -64,86 +62,96 @@ struct gcs_core
     gcs_backend_t   backend;         // message IO context
 };
 
-long gcs_core_open (gcs_core_t** core,
-                    const char* const channel,
-                    const char* const backend_uri)
+gcs_core_t*
+gcs_core_create (const char* const backend_uri)
 {
-    long             err  = 0;
-    gcs_core_t* conn = GU_CALLOC (1, gcs_core_t);
+    long        err  = 0;
+    gcs_core_t* core = GU_CALLOC (1, gcs_core_t);
 
-    if (NULL == conn) return -ENOMEM;
+    if (NULL != core) {
 
-    gu_debug ("Opening connection to backend IO layer");
-    err = gcs_backend_init (&conn->backend, channel, backend_uri);
-    if (err < 0) {
-        gu_error ("Failed to initialize backend: %d (%s)",
-                  err, gcs_strerror(err));
-        gu_error ("Arguments: %p, %s, %s",
-                  &conn->backend, channel, backend_uri);
-        return err;
+        gu_debug ("Initializing backend IO layer");
+        err = gcs_backend_init (&core->backend, backend_uri);
+        if (0 == err) {
+            assert (NULL != core->backend.conn);
+
+            // Need to allocate something, otherwise Spread 3.17.3 freaks out.
+            core->recv_msg.buf = gu_malloc(CORE_INIT_BUF_SIZE);
+            if (core->recv_msg.buf) {
+                core->recv_msg.buf_len = CORE_INIT_BUF_SIZE;
+
+                core->fifo = gcs_fifo_create (CORE_FIFO_LEN);
+                if (core->fifo) {
+                    gu_mutex_init (&core->send_lock, NULL);
+                    gcs_group_init (&core->group);
+                    core->proto_ver = 0;
+                    core->state = CORE_CLOSED;
+                    return core; // success
+                }
+
+                gu_free (core->recv_msg.buf);
+            }
+            core->backend.destroy (&core->backend);
+        }
+        else {
+            gu_error ("Failed to initialize backend: %d (%s)",
+                      err, gcs_strerror(err));
+            gu_error ("Arguments: %p, %s",
+                      &core->backend, backend_uri);
+        }
+        gu_free (core);
     }
-    assert (0 == err);
-    assert (NULL != conn->backend.conn);
 
-    // Need to allocate something, otherwise Spread 3.17.3 freaks out.
-#define RECV_INIT_BUF 4096
-    conn->recv_msg.buf = gu_malloc(RECV_INIT_BUF);
-    if (!conn->recv_msg.buf) {
-        err = -ENOMEM;
-        goto out;
-    }
-    conn->recv_msg.buf_len = RECV_INIT_BUF;
-#undef RECV_INIT_BUF
+    return NULL; // failure
+}
 
-    conn->fifo = gcs_fifo_create (CORE_FIFO_LEN);
-    if (!conn->fifo) {
-	err = -ENOMEM;
-	goto out1;
+long
+gcs_core_open (gcs_core_t* core,
+               const char* const channel)
+{
+    long ret;
+
+    if (core->state != CORE_CLOSED) {
+        gu_debug ("gcs_core->state isn't CLOSED: %d", core->state);
+        return -EBADFD;
     }
 
-    conn->state = CORE_NON_PRIMARY;
+    ret = core->backend.open (&core->backend, channel);
+    core->state = CORE_NON_PRIMARY;
 
-    gu_mutex_init (&conn->send_lock, NULL);
-/* REMOVE
-    gu_mutex_init (&conn->lock, NULL);
-    gu_mutex_init (&conn->prim_lock, NULL);
-
-    pthread_cond_init  (&conn->prim_cond, NULL);
-*/
-    gcs_group_init (&conn->group);
-
-    /* receive primary configuration message to get our id and stuff.
-     * This will have to be removed in order to pass the RPIM event to the
-     * application. We don't need to wait for anything here. */
-    {
+    if (0 == ret) {
 	gcs_seqno_t     act_id;
 	gcs_act_type_t  act_type;
-	uint8_t         *action;
+	uint8_t         *action = NULL;
 	int ret;
+
+        /* receive primary configuration message to get our id and stuff.
+         * This will have to be removed in order to pass the RPIM event to the
+         * application. We don't need to wait for anything here. */
 	do {
-	    ret = gcs_core_recv (conn, &action, &act_type, &act_id);
+	    if (action) free (action); // clear previous action
+
+	    ret = gcs_core_recv (core, &action, &act_type, &act_id);
 	    if (ret < 0) return ret;
 
 	    gu_debug ("Received action: act_id = %llu, act_type = %d, "
                       "act_size = %d, action = %p",
                       act_id, act_type, ret, action);
 
-	    if (action) free (action); // hide action from upper layer
 	} while (act_type != GCS_ACT_PRIMARY);
+
+        core->state = CORE_PRIMARY;
+
+        // In future at this point primary configuration action
+        // might be passed to upper layer in order to initialize seqno
+        free (action);
+    }
+    else {
+        gu_error ("Failed to open backend connection: %d (%s)",
+                  ret, gcs_strerror(ret));
     }
 
-    conn->proto_ver = 0;
-    
-    *core = conn;
-    return 0;
-
-out1:
-    gu_free (conn->recv_msg.buf);
-out:
-    conn->backend.close (&conn->backend);
-    gu_free (conn);
-    *core = NULL;
-    return err;
+    return ret;
 }
 
 /*!
@@ -179,8 +187,8 @@ core_msg_send (gcs_core_t*    core,
             else {
                 switch (core->state) {
                 case CORE_NON_PRIMARY: ret = -ENOTCONN; break;
-                case CORE_CLOSING:
                 case CORE_CLOSED:      ret = -ECONNABORTED; break;
+                case CORE_DESTROYED:   ret = -EBADFD; break;
                 default: assert(0);
                 }
             }
@@ -366,7 +374,7 @@ ssize_t gcs_core_recv (gcs_core_t* conn,
     *act_type = GCS_ACT_ERROR;
 
     if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
-    if (conn->state >= CORE_CLOSING) {
+    if (conn->state >= CORE_CLOSED) {
 	gu_mutex_unlock (&conn->send_lock);
 	return -EBADFD;
     }
@@ -406,6 +414,7 @@ ssize_t gcs_core_recv (gcs_core_t* conn,
 		    goto out; /* exit loop */
 		}
 		else if (ret < 0) {
+                    assert (0);
 		    goto out;
 		}
 	    }
@@ -476,55 +485,59 @@ out:
     return ret;
 }
 
-long gcs_core_stop (gcs_core_t* conn)
+long gcs_core_close (gcs_core_t* conn)
 {
     long ret;
 
     if (!conn) return -EBADFD;
     if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
-    if (conn->state >= CORE_CLOSING) {
+    if (conn->state >= CORE_CLOSED) {
 	gu_mutex_unlock (&conn->send_lock);
 	return -EBADFD;
     }
 
-    conn->state = CORE_CLOSING;
+    conn->state = CORE_CLOSED;
     ret = conn->backend.close (&conn->backend);
     gu_mutex_unlock (&conn->send_lock);
 
     return ret;
 }
 
-long gcs_core_close (gcs_core_t* conn)
+long gcs_core_destroy (gcs_core_t* core)
 {
-    if (!conn) return -EBADFD;
-    if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
-    if (CORE_CLOSED == conn->state) {
-	gu_mutex_unlock (&conn->send_lock);
-	return -EBADFD;
+    long ret;
+
+    if (!core) return -EBADFD;
+
+    if (gu_mutex_lock (&core->send_lock)) return -EBADFD;
+    {
+        if (CORE_CLOSED != core->state) {
+            if (core->state < CORE_CLOSED)
+                gu_error ("Calling destroy() before close().");
+            gu_mutex_unlock (&core->send_lock);
+            return -EBADFD;
+        }
+        core->state = CORE_DESTROYED;
     }
-    if (CORE_CLOSING != conn->state) {
-        gu_error ("Calling close() before stop().");
-	gu_mutex_unlock (&conn->send_lock);
-	return -ECANCELED;
-    }
-    conn->state = CORE_CLOSED;
-    gu_mutex_unlock (&conn->send_lock);
+    gu_mutex_unlock (&core->send_lock);
     /* at this point all send attempts are isolated */
 
     /* after that we must be able to destroy mutexes */
-    while (gu_mutex_destroy (&conn->send_lock));
+    while (gu_mutex_destroy (&core->send_lock));
 
     /* now noone will interfere */
-    gcs_fifo_destroy (&conn->fifo);
-
-    gcs_group_free (&conn->group);
+    gcs_fifo_destroy (&core->fifo);
+    gcs_group_free (&core->group);
 
     /* free buffers */
-    gu_free (conn->recv_msg.buf);
-    gu_free (conn->send_buf);
-    gu_free (conn);
+    gu_free (core->recv_msg.buf);
+    gu_free (core->send_buf);
 
-    return 0;
+    ret = core->backend.destroy (&core->backend);
+
+    gu_free (core);
+
+    return ret;
 }
 
 long
@@ -533,6 +546,7 @@ gcs_core_set_pkt_size (gcs_core_t* conn, ulong pkt_size)
     long msg_size = conn->backend.msg_size (&conn->backend, pkt_size);
     long hdr_size = gcs_act_proto_hdr_size (conn->proto_ver);
     uint8_t* new_send_buf = NULL;
+    long ret = 0;
 
     if (hdr_size < 0) return hdr_size;
 
@@ -547,19 +561,24 @@ gcs_core_set_pkt_size (gcs_core_t* conn, ulong pkt_size)
               conn->send_buf_len, msg_size);
 
     if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
-    if (CORE_CLOSING > conn->state) {
-        new_send_buf = gu_realloc (conn->send_buf, msg_size);
-        if (new_send_buf) {
-            conn->send_buf     = new_send_buf;
-            conn->send_buf_len = msg_size;
+    {
+        if (conn->state != CORE_DESTROYED) {
+            new_send_buf = gu_realloc (conn->send_buf, msg_size);
+            if (new_send_buf) {
+                conn->send_buf     = new_send_buf;
+                conn->send_buf_len = msg_size;
+            }
+            else {
+                ret = -ENOMEM;
+            }
+        }
+        else {
+            ret =  -EBADFD;
         }
     }
     gu_mutex_unlock (&conn->send_lock);
 
-    if (new_send_buf)
-        return 0;
-    else
-        return -ENOMEM;
+    return ret;
 }
 
 long

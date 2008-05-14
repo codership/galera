@@ -20,20 +20,17 @@ extern "C" {
 
 /*! @typedef @brief Sequence number type. */
 typedef uint64_t gcs_seqno_t;
+
 /*! @def @brief Illegal sequence number.
 * It is used to emphasize that action was not serialised */
-#define GCS_SEQNO_ILL (gcs_seqno_t) -1
+static const gcs_seqno_t GCS_SEQNO_ILL = -1;
 
-/*! Connection object */
+/*! Connection handle type */
 typedef struct gcs_conn gcs_conn_t;
 
-/*! @brief Creates and initializes connection to group. 
+/*! @brief Creates GCS connection handle. 
  * 
- * @param conn connection object
- * @param channel a name of the channel to join. It must uniquely identify
- *                the channel. If the channel with such name does not exist,
- *                it is established. Processes that joined the same channel
- *                receive the same actions.
+ * @param conn connection handle
  * @param backend an URL-like string that specifies backend communication
  *                driver in the form "TYPE://ADDRESS". For Spread backend
  *                it can be "spread://localhost:4803", for dummy backend
@@ -41,18 +38,38 @@ typedef struct gcs_conn gcs_conn_t;
  *
  *                Currently supported backend types: "dummy", "spread", "gcomm"
  *
+ * @return pointer to GCS connection handle, NULL in case of failure.
+ */
+extern gcs_conn_t*
+gcs_create  (const char *backend);
+
+/*! @brief Opens connection to group (joins channel). 
+ * 
+ * @param conn connection object
+ * @param channel a name of the channel to join. It must uniquely identify
+ *                the channel. If the channel with such name does not exist,
+ *                it is created. Processes that joined the same channel
+ *                receive the same actions.
+ *
  * @return negative error code, 0 in case of success.
  */
-int gcs_open  (gcs_conn_t **conn,
-	       const char *channel,
-	       const char *backend);
+extern int
+gcs_open  (gcs_conn_t *conn,
+           const char *channel);
 
-/*! @brief Closes connection and frees resources associuated with it.
+/*! @brief Closes connection to group.
  *
- * @param  conn connection object
+ * @param  conn connection handle
  * @return negative error code or 0 in case of success.
  */
-int gcs_close (gcs_conn_t **conn);
+int gcs_close (gcs_conn_t *conn);
+
+/*! @brief Frees resources associuated with connection handle.
+ *
+ * @param  conn connection handle
+ * @return negative error code or 0 in case of success.
+ */
+int gcs_destroy (gcs_conn_t *conn);
 
 /*! @typedef @brief Action types.
  * There is a conceptual difference between "messages"

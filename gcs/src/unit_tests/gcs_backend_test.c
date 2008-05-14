@@ -22,7 +22,7 @@ GCS_BACKEND_NAME_FN(gcs_dummy_name)
     return "DUMMIEEEE!";
 }
 
-GCS_BACKEND_OPEN_FN(gcs_dummy_open)
+GCS_BACKEND_CREATE_FN(gcs_dummy_create)
 {
     backend->name = gcs_dummy_name;
     return 0;
@@ -33,7 +33,7 @@ GCS_BACKEND_NAME_FN(gcs_spread_name)
     return "SPREAT";
 }
 
-GCS_BACKEND_OPEN_FN(gcs_spread_open)
+GCS_BACKEND_CREATE_FN(gcs_spread_create)
 {
     backend->name = gcs_spread_name;
     return 0;
@@ -44,7 +44,7 @@ GCS_BACKEND_NAME_FN(gcs_vs_name)
     return "vsssssssss";
 }
 
-GCS_BACKEND_OPEN_FN(gcs_vs_open)
+GCS_BACKEND_CREATE_FN(gcs_vs_create)
 {
     backend->name = gcs_vs_name;
     return 0;
@@ -57,21 +57,21 @@ START_TEST (gcs_backend_test)
 
     gu_conf_set_log_callback (logger); // set empty logger
 
-    ret = gcs_backend_init (&backend, NULL, "wrong://kkk");
+    ret = gcs_backend_init (&backend, "wrong://kkk");
     fail_if (ret != -ESOCKTNOSUPPORT);
 
-    ret = gcs_backend_init (&backend, NULL, "spread:");
+    ret = gcs_backend_init (&backend, "spread:");
     fail_if (ret != -EINVAL);
 
-    ret = gcs_backend_init (&backend, NULL, "dummy://");
+    ret = gcs_backend_init (&backend, "dummy://");
     fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
     fail_if (backend.name != gcs_dummy_name);
 
-    ret = gcs_backend_init (&backend, NULL, "gcomm://kkk");
+    ret = gcs_backend_init (&backend, "gcomm://kkk");
     fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
     fail_if (backend.name != gcs_vs_name);
 
-    ret = gcs_backend_init (&backend, NULL, "spread://");
+    ret = gcs_backend_init (&backend, "spread://");
     fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
     fail_if (backend.name != gcs_spread_name);
 

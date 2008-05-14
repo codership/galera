@@ -169,7 +169,10 @@ gcs_group_handle_last_msg (gcs_group_t* group, gcs_recv_msg_t* msg)
 
     seqno = gcs_seqno_le(*(gcs_seqno_t*)(msg->buf));
 
-    assert (seqno >= group->last_applied);
+    // This assert is too restrictive. It requires application to send
+    // last applied messages while holding TO, otherwise there's a race
+    // between threads.
+    // assert (seqno >= group->last_applied);
 
     gcs_node_set_last_applied (&group->nodes[msg->sender_id], seqno);
 

@@ -103,7 +103,6 @@ static long gcs_to_spread_socket (const char const *socket, char **sp_socket)
 static const char* spread_default_socket = "localhost:4803";
 
 static long spread_create (spread_t**  spread,
-                           const char* channel,
                            const char* socket)
 {
     long err = 0;
@@ -118,9 +117,6 @@ static long spread_create (spread_t**  spread,
 
     err = gcs_to_spread_socket (socket, &sp->socket);
     if (err < 0) { goto out1; }
-    
-    sp->channel   = strdup (channel);
-    if (!sp->channel) { err = -ENOMEM; goto out2; }
     
     sp->priv_name = GU_CALLOC (MAX_PRIVATE_NAME, char);
     if (!sp->priv_name) { err = -ENOMEM; goto out3; }
@@ -137,8 +133,9 @@ static long spread_create (spread_t**  spread,
     sp->memb   = string_array_alloc (SPREAD_MAX_GROUPS);
     if (!sp->memb) { err = -ENOMEM; goto out7; }
 
-    sp->config = SPREAD_TRANSITIONAL;
-    sp->comp_msg = NULL;
+    sp->config    = SPREAD_TRANSITIONAL;
+    sp->config_id = -1;
+    sp->comp_msg  = NULL;
     
     gu_debug ("sp->priv_group: %p", sp->priv_group);
     *spread = sp;
@@ -153,32 +150,11 @@ out5:
 out4:
     gu_free (sp->priv_name);
 out3:
-    free (sp->channel); // obtained by strdup()
-out2:
     free (sp->socket);
 out1:
     gu_free (sp);
 out0:
     return err;
-}
-
-static long spread_destroy (spread_t **spread)
-{
-    spread_t *sp = *spread;
-    if (sp)
-    {
-	if (sp->memb)       string_array_free (sp->memb);
-	if (sp->groups)     string_array_free (sp->groups);
-	if (sp->sender)     gu_free (sp->sender);
-	if (sp->priv_name)  gu_free (sp->priv_name);
-//	gu_debug ("sp->priv_group: %p", sp->priv_group);
-	if (sp->priv_group) gu_free (sp->priv_group);
-	if (sp->channel)    free (sp->channel); // obtained by strdup()
-	if (sp->socket)     free (sp->socket);
-	gu_free (sp);
-	*spread = NULL;
-    }
-    return 0;
 }
 
 /* Compiles a string of MAX_PRIVATE_NAME characters
@@ -204,19 +180,47 @@ GCS_BACKEND_CLOSE_FN(spread_close)
     long err = 0;
     spread_t *spread = backend->conn;
     
-    if (!spread) return -ENOTCONN;
+    if (!spread) return -EBADFD;
 
-    if ((err = SP_leave (spread->mbox, spread->channel)))
+    err = SP_leave (spread->mbox, spread->channel);
+
+    if (err)
     {
-	SP_disconnect (spread->mbox);
+	switch (err)
+	{
+	case ILLEGAL_GROUP:     return -EADDRNOTAVAIL;
+	case ILLEGAL_SESSION:   return -ENOTCONN;
+	case CONNECTION_CLOSED: return -ECONNRESET;
+	default:                return -EOPNOTSUPP;
+	}
     }
     else
     {
-	// should we wait for the delivery of the message?
-	err = SP_disconnect (spread->mbox);
+	return 0;
     }
+}
 
-    spread_destroy (&spread);
+static
+GCS_BACKEND_DESTROY_FN(spread_destroy)
+{
+    long err = 0;
+    spread_t *spread = backend->conn;
+    
+    if (!spread) return -EBADFD;
+
+    err = SP_disconnect (spread->mbox);
+
+    if (spread->memb)       string_array_free (spread->memb);
+    if (spread->groups)     string_array_free (spread->groups);
+    if (spread->sender)     gu_free (spread->sender);
+    if (spread->priv_name)  gu_free (spread->priv_name);
+    if (spread->priv_group) gu_free (spread->priv_group);
+    if (spread->channel)    free (spread->channel); // obtained by strdup()
+    if (spread->socket)     free (spread->socket);
+    if (spread->comp_msg)   gcs_comp_msg_delete(spread->comp_msg);
+    gu_free (spread);
+
+    backend->conn = NULL;
 
     if (err)
     {
@@ -272,6 +276,8 @@ GCS_BACKEND_SEND_FN(spread_send)
     return ret;
 }
 
+/* Substitutes old member array for new (taken from groups),
+ * creates new groups buffer. */
 static inline long
 spread_update_memb (spread_t* spread)
 {
@@ -309,7 +315,7 @@ spread_comp_create (long  my_id,
 		    long  memb_num,
 		    char  names[][MAX_GROUP_NAME])
 {
-    gcs_comp_msg_t* comp  = gcs_comp_msg_new (true, my_id, memb_num);
+    gcs_comp_msg_t* comp  = gcs_comp_msg_new (memb_num > 0, my_id, memb_num);
     long ret = -ENOMEM;
 
     if (comp) {
@@ -346,10 +352,16 @@ spread_comp_deliver (spread_t* spread,
     if (ret <= len) {
 	memcpy (buf, spread->comp_msg, ret);
 	spread->config = SPREAD_REGULAR;
+        gcs_comp_msg_delete (spread->comp_msg);
 	spread->comp_msg = NULL;
         *msg_type      = GCS_MSG_COMPONENT;
 	gu_debug ("Component message delivered (length %ld)", ret);
     }
+    else {
+        // provided buffer is too small for a message:
+        // simply return required size
+    }
+
     return ret;
 }
 
@@ -443,7 +455,7 @@ GCS_BACKEND_RECV_FN(spread_recv)
 	}
 
 	/* At this point message was successfully received
-	 * and stored in buffer. Can increment message seqno */
+         * and stored in buffer. */
 	
 	if (Is_regular_mess (serv_type))
 	{
@@ -467,7 +479,6 @@ GCS_BACKEND_RECV_FN(spread_recv)
 		continue; // wrong group/channel
 	    if (Is_transition_mess (serv_type)) {
 		spread->config   = SPREAD_TRANSITIONAL;
-		// *msg_type = GCS_MSG_COMPONENT;
 		gu_info ("Received TRANSITIONAL message");
 		continue;
 	    }
@@ -511,8 +522,10 @@ GCS_BACKEND_RECV_FN(spread_recv)
 	    }
 	    else if (Is_caused_leave_mess (serv_type)) {
 		gu_info ("received SELF LEAVE message");
-		*msg_type = GCS_MSG_COMPONENT;
-		memset (buf, 0, len); // trivial component
+//		*msg_type = GCS_MSG_COMPONENT;
+//		memset (buf, 0, len); // trivial component
+		spread->comp_msg = gcs_comp_msg_leave ();
+		ret = spread_comp_deliver (spread, buf, len, msg_type);
 	    }
 	    else {
 		gu_warn ("received unknown MEMBERSHIP message");
@@ -580,9 +593,45 @@ GCS_BACKEND_MSG_SIZE_FN(spread_msg_size)
     return (ps - frames * (42 + 32) - 80);
 }
 
+static
+GCS_BACKEND_OPEN_FN(spread_open)
+{
+    long      err    = 0;
+    spread_t* spread = backend->conn;
+    
+    if (!spread) return -EBADFD;
+
+    if (!channel) {
+	gu_error ("No channel supplied.");
+	return -EINVAL;
+    }
+
+    spread->channel = strdup (channel);
+    if (!spread->channel) return -ENOMEM;
+    
+    err = SP_join (spread->mbox, spread->channel);
+
+    if (err)
+    {
+	switch (err) /* translate error codes */
+	{
+	case ILLEGAL_GROUP:     err = -EADDRNOTAVAIL; break; 
+	case ILLEGAL_SESSION:   err = -EADDRNOTAVAIL; break;
+	case CONNECTION_CLOSED: err = -ENETRESET;     break;
+	default:                err = -ENOTCONN;      break;
+	}
+        gu_error ("%s", gcs_strerror (err));
+	return err;
+    }
+
+    gu_info ("Joined channel: %s", spread->channel);
+
+    return err;
+}
+
 extern char *program_invocation_short_name;
 
-GCS_BACKEND_OPEN_FN(gcs_spread_open)
+GCS_BACKEND_CREATE_FN(gcs_spread_create)
 {
     long      err    = 0;
     long      n      = 0;
@@ -590,25 +639,19 @@ GCS_BACKEND_OPEN_FN(gcs_spread_open)
 
     backend->conn    = NULL;
     
-    if (!channel) {
-	gu_error ("No channel supplied.");
-	err = -EINVAL;
-	goto out0;
-    }
-
     if (!socket) {
 	gu_error ("No socket supplied.");
 	err = -EINVAL;
 	goto out0;
     }
 
-    if ((err = spread_create (&spread, channel, socket))) goto out0;
+    if ((err = spread_create (&spread, socket))) goto out0;
 
     do
     {   /* Try to generate unique name */
 	if (spread_priv_name (spread->priv_name,
-				  program_invocation_short_name,
-				  n++))
+                              program_invocation_short_name,
+                              n++))
 	{
 	    /* Failed to generate a name in the form
 	     * program_name_number. Let spread do it for us */
@@ -627,7 +670,7 @@ GCS_BACKEND_OPEN_FN(gcs_spread_open)
 	switch (err) /* translate error codes */
 	{
 	case ILLEGAL_SPREAD:
-	    err = -ESOCKTNOSUPPORT;            break; 
+	    err = -ESOCKTNOSUPPORT; break; 
 	case COULD_NOT_CONNECT:
 	    err = -ENETUNREACH; break;
 	case CONNECTION_CLOSED:
@@ -649,42 +692,30 @@ GCS_BACKEND_OPEN_FN(gcs_spread_open)
 	}
 	goto out1;
     }
-
-    gu_debug ("connected: priv_name = %s, priv_group = %s",
-	     spread->priv_name, spread->priv_group);
-
-    err = SP_join (spread->mbox, spread->channel);
-
-    if (err)
-    {
-	switch (err) /* translate error codes */
-	{
-	case ILLEGAL_GROUP:     err = -EADDRNOTAVAIL; break; 
-	case ILLEGAL_SESSION:   err = -EADDRNOTAVAIL; break;
-	case CONNECTION_CLOSED: err = -ENETRESET;     break;
-	default:                err = -ENOTCONN;      break;
-	}
-	goto out2;
+    else {
+        assert (err == ACCEPT_SESSION);
+        err = 0;
     }
 
-    gu_info ("Joined channel: %s", spread->channel);
-
-    if (err) gu_error ("%s", gcs_strerror (err));
+    gu_debug ("Connected to Spread: priv_name = %s, priv_group = %s",
+	     spread->priv_name, spread->priv_group);
 
     backend->conn     = spread;
+    backend->open     = spread_open;
     backend->close    = spread_close;
     backend->send     = spread_send;
     backend->recv     = spread_recv;
     backend->name     = spread_name;
     backend->msg_size = spread_msg_size;
+    backend->destroy  = spread_destroy;
 
     return err;
 
-out2:
-    SP_disconnect (spread->mbox);
 out1:
-    spread_destroy (&spread);    
+    spread_destroy (backend);
 out0:
+    gu_error ("Creating Spread backend failed: %s (%d)",
+              gcs_strerror (err), err);
     return err;
 }
 
