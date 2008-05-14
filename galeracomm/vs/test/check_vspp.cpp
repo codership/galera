@@ -450,9 +450,9 @@ static void verify_views(std::deque<Session *>& ss)
 
 }
 
-char *poll_type = "fifo";
+const char *poll_type = "fifo";
 int poll_intval = 100;
-char *vsbe_addr = "fifo";
+const char *vsbe_addr = "fifo";
 
 START_TEST(check_vs)
 {

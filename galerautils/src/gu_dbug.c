@@ -1760,7 +1760,8 @@ BaseName(const char *pathname)
     register const char *base;
 
     base = strrchr(pathname, FN_LIBCHAR);
-    if (base++ == NullS)
+//    if (base++ == NullS) - this doesn't make sense
+    if (NULL == base || '\0' == base[1])
 	base = pathname;
     return ((char *) base);
 }
