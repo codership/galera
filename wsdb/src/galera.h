@@ -28,6 +28,7 @@ enum galera_status {
 enum galera_conf_param_id {
     GALERA_CONF_LOCAL_CACHE_SIZE, //!< max size for local cache
     GALERA_CONF_WS_PERSISTENCY,   //!< WS persistency policy
+    GALERA_CONF_MARK_COMMIT_EARLY, //!< update last seen trx asap
 };
 
 enum galera_conf_param_type {

@@ -63,6 +63,8 @@ struct galera_info Galera;
 
 static gu_mutex_t commit_mtx;
 
+static bool_t mark_commit_early = FALSE;
+
 static FILE *wslog_L;
 static FILE *wslog_G;
 
@@ -131,6 +133,14 @@ enum galera_status galera_set_conf_param_cb(
     GU_DBUG_ENTER("galera_set_conf_param_cb");
 
     wsdb_set_conf_param_cb(configurator);
+
+
+    /* consult application for early commit */
+    mark_commit_early = wsdb_conf_get_param(
+        GALERA_CONF_MARK_COMMIT_EARLY, GALERA_TYPE_INT
+    ) ?
+      *(int *)wsdb_conf_get_param(GALERA_CONF_MARK_COMMIT_EARLY, GALERA_TYPE_INT) : 0;
+
 
     GU_DBUG_RETURN(GALERA_OK);
 }
@@ -756,8 +766,9 @@ enum galera_status galera_committed(trx_id_t trx_id) {
 	}
     }
 
-    
-    wsdb_set_local_trx_committed(trx_id);
+    if (!mark_commit_early) {
+        wsdb_set_local_trx_committed(trx_id);
+    }
     wsdb_delete_local_trx_info(trx_id);
 
     GU_DBUG_RETURN(GALERA_OK);
@@ -888,6 +899,11 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
     switch (rcode) {
     case WSDB_OK:
         /* certification ok */
+
+        // we can update last seen trx counter already here
+        if (mark_commit_early) {
+            wsdb_set_local_trx_committed(trx_id);
+        }
         retcode = GALERA_OK;
         break;
     case WSDB_CERTIFICATION_FAIL:
