@@ -446,6 +446,23 @@ static int apply_query(void *app_ctx, char *query, int len) {
     GU_DBUG_RETURN(GALERA_OK);
 }
 
+// once per 128 writesets
+static const ulong TRUNCATE_WRITE_SET_HISTORY_MASK = (1 << 7) - 1;
+
+static inline void truncate_write_set_history (
+    gcs_conn_t* gcs_conn, gcs_seqno_t seqno
+) { 
+    if (!(((ulong)seqno) & TRUNCATE_WRITE_SET_HISTORY_MASK)) {
+        /* tell the group about last committed */
+        gcs_set_last_applied(gcs_conn, wsdb_get_last_committed_trx());
+        /* get the minimum trx applying state in the group */
+        seqno = gcs_get_last_applied(gcs_conn);
+        /* purge the history */
+        wsdb_purge_trxs_upto(seqno);
+    }
+}
+
+
 static void process_conn_write_set( 
     struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
     gcs_seqno_t seqno_l
@@ -560,7 +577,7 @@ static void process_query_write_set(
 	    gu_fatal("Failed to cancel commit_queue: %llu", seqno_l);
 	    abort();
 	}
-	gcs_to_release(commit_queue, seqno_l);
+//	gcs_to_release(commit_queue, seqno_l); not needed
         break;
     default:  
         gu_error(
@@ -619,8 +636,6 @@ enum galera_status galera_recv(void *app_ctx) {
     int rcode;
     struct job_worker *applier;
 
-    int trx_counter = 0;
-
     /* we must have gcs connection */
     if (!gcs_conn) {
         return GALERA_NODE_FAIL;
@@ -650,21 +665,7 @@ enum galera_status galera_recv(void *app_ctx) {
 	     * (teemu 12.3.2008)
 	     */
 	    free(action);
-
-            /* count received trxs, and do periodical cleanup */
-            if (trx_counter++ > 1024) {
-                trx_seqno_t min_seqno;
-
-                gcs_set_last_applied(gcs_conn, wsdb_get_last_committed_trx());
-
-                /* get the minimum trx applying state in the group */
-                min_seqno = gcs_get_last_applied(gcs_conn);
-                
-                wsdb_purge_trxs_upto(min_seqno);
-
-                trx_counter = 0;
-            }
-
+            truncate_write_set_history(gcs_conn, seqno_g);
             break;
         case GCS_ACT_SNAPSHOT:
         case GCS_ACT_PRIMARY:
@@ -680,7 +681,7 @@ enum galera_status galera_recv(void *app_ctx) {
 		gu_fatal("Failed to cancel commit_queue: %llu", seqno_l);
 		abort();
 	    }
-	    gcs_to_release (commit_queue, seqno_l);
+//	    gcs_to_release (commit_queue, seqno_l); not needed
 
 	    gu_free (action);
             break;
@@ -770,6 +771,8 @@ enum galera_status galera_committed(trx_id_t trx_id) {
         wsdb_set_local_trx_committed(trx_id);
     }
     wsdb_delete_local_trx_info(trx_id);
+
+    truncate_write_set_history (gcs_conn, seqno_l);
 
     GU_DBUG_RETURN(GALERA_OK);
 }
@@ -873,10 +876,12 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
 		trx_id, seqno_l);
 	gu_mutex_unlock(&commit_mtx);
 	/* Call self cancel to allow gcs_to_release() to skip this seqno */
+        // gcs_to_release() should be called only after successfull
+        // gcs_to_grab() - Alex, 16.03.2008
 	gcs_to_self_cancel(to_queue, seqno_l);
-	gcs_to_release(to_queue, seqno_l);
+//	gcs_to_release(to_queue, seqno_l);
 	gcs_to_self_cancel(commit_queue, seqno_l);
-	gcs_to_release(commit_queue, seqno_l);
+//	gcs_to_release(commit_queue, seqno_l);
 	GU_DBUG_RETURN(GALERA_TRX_FAIL);
     }
     
@@ -920,11 +925,12 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
         break;
     }
 
-after_cert_test:
-
+    // call release only if grab was successfull
     if (seqno_l > 0 && gcs_to_release(to_queue, seqno_l)) {
 	gu_warn("to release failed for %llu", seqno_l);
     }
+
+after_cert_test:
 
     if (retcode == GALERA_OK) {
 	/* Grab commit queue for commit time */
