@@ -125,6 +125,11 @@ static void *gcs_recv_thread (void *arg)
 
 //    gu_debug ("Starting RECV thread");
 
+    // To avoid race between gcs_open() and the following state check in while()
+    // (I'm trying to avoid mutex locking in this loop, so lock/unlock before)
+    gu_mutex_lock   (&conn->lock); // wait till gcs_open() is done;
+    gu_mutex_unlock (&conn->lock);
+
     while (conn->state == GCS_CONN_OPEN)
     {
 	if ((act_size = gcs_core_recv (conn->core,
@@ -233,13 +238,13 @@ int gcs_open (gcs_conn_t *conn, const char *channel)
         if (GCS_CONN_CLOSED == conn->state) {
 
             if (!(ret = gcs_core_open (conn->core, channel))) {
-                
+
                 if (!(ret = gu_thread_create (&conn->recv_thread,
                                               NULL,
                                               gcs_recv_thread,
                                               conn))) {
-                    gu_info ("Joined channel '%s'", channel);
                     conn->state = GCS_CONN_OPEN;
+                    gu_info ("Joined channel '%s'", channel);
                 }
                 else {
                     gcs_core_close (conn->core);
