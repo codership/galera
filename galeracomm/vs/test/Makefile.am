@@ -1,4 +1,5 @@
 
+TESTS = check_vspp
 noinst_PROGRAMS = check_vspp
 
 INCLUDES = \
@@ -11,4 +12,5 @@ check_vspp_SOURCES = check_vspp.cpp
 check_vspp_CXXFLAGS =
 check_vspp_LDFLAGS = -lcheck
 check_vspp_LDADD = $(top_builddir)/vs/src/libgcommvspp.la \
-	$(top_builddir)/common/src/libgcommcommonpp.la
+	$(top_builddir)/vs/src/libgcommvsbes.la \
+	$(top_builddir)/common/src/libgcommcommonpp.la 

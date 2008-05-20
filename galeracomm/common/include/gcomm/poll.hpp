@@ -17,7 +17,8 @@ namespace PollEvent {
 	POLL_ERR = 1 << 2,
 	POLL_HUP = 1 << 3,
 	POLL_INVAL = 1 << 4,
-	POLL_ALL = POLL_IN | POLL_OUT | POLL_ERR | POLL_HUP | POLL_INVAL
+	POLL_TIMED = 1 << 5,
+	POLL_ALL = POLL_IN | POLL_OUT | POLL_ERR | POLL_HUP | POLL_INVAL | POLL_TIMED
     };
 }
 
@@ -38,8 +39,9 @@ public:
 };
 
 class PollContext {
+    PollEnum e;
 protected:
-    PollContext() {}
+    PollContext() : e(0) {}
 public:
     virtual ~PollContext() {}
     virtual void handle(const int, const PollEnum e) = 0;

@@ -12,12 +12,15 @@ Transport *Transport::create(const char *type, Poll *poll,
 			     Protolay *up_ctx)
 {
     Transport *ret = 0;
-    if (strncmp(type, "tcp:", strlen("tcp:")) == 0) {
+    if (strncmp(type, "tcp:", strlen("tcp:")) == 0 ||
+	strncmp(type, "asynctcp:", strlen("asynctcp:")) == 0) {
 	ret = new TCPTransport(poll);
 	if (up_ctx)
 	    ret->set_up_context(up_ctx);
+    } else {
+	throw FatalException("Unknown transport type");
     }
-
+    
     return ret;
 }
 

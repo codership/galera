@@ -1,3 +1,4 @@
+TESTS = check_commonpp
 noinst_PROGRAMS = check_commonpp
 # check_common
 INCLUDES = -I$(top_srcdir)/common/include

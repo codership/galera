@@ -4,6 +4,7 @@
 #include <gcomm/types.h>
 #include <cassert>
 #include <ostream>
+#include <sstream>
 
 class Serializable {
 protected:
@@ -211,17 +212,24 @@ public:
 	return val;
     }
 
+    std::string to_string() const {
+	std::ostringstream os;
+	os << "Address(" << static_cast<unsigned int>(get_proc_id().to_uint()) << ",";
+	os << static_cast<unsigned int>(get_service_id().to_uint()) << ",";
+	os << static_cast<unsigned int>(get_segment_id().to_uint()) << ")";
+	return os.str();
+    }
+
 };
 
 static const Address ADDRESS_INVALID;
 
 inline std::ostream& operator<<(std::ostream& os, const Address a)
 {
-    os << "Address(" << static_cast<unsigned int>(a.get_proc_id().to_uint()) << ",";
-    os << static_cast<unsigned int>(a.get_service_id().to_uint()) << ",";
-    os << static_cast<unsigned int>(a.get_segment_id().to_uint()) << ")";
-    return os;
+    return os << a.to_string();
 }
+
+
 
 // Conventional shorthand for address set
 #include <set>

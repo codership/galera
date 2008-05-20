@@ -1,5 +1,5 @@
-#ifndef TRANSPORT_TCP_HPP
-#define TRANSPORT_TCP_HPP
+#ifndef TRANSPORT_RMCAST_HPP
+#define TRANSPORT_RMCAST_HPP
 
 #include "gcomm/transport.hpp"
 #include "transport_common.hpp"
@@ -15,7 +15,8 @@
 
 
 
-class TCPTransport : public Transport, PollContext {
+
+class RMCASTTransport : public Transport, PollContext {
     int fd;
     sockaddr sa;
     size_t sa_size;
@@ -30,7 +31,7 @@ class TCPTransport : public Transport, PollContext {
     //boost::crc_32_type recv_crc;
 
     std::deque<PendingWriteBuf> pending;
-    TCPTransport(const int _fd, const sockaddr& _sa, 
+    RMCASTTransport(const int _fd, const sockaddr& _sa, 
 		 const size_t _sa_size, Poll *_poll) :
 	fd(_fd), sa(_sa), sa_size(_sa_size), poll(_poll),
 	max_pending(1024), pending_bytes(0), recv_buf_offset(0), recv_rb(0) {
@@ -40,14 +41,14 @@ class TCPTransport : public Transport, PollContext {
 	set_max_pending_bytes(10*1024*1024);
     }
 public:
-    TCPTransport(Poll *p) : 
+    RMCASTTransport(Poll *p) : 
 	fd(-1), poll(p), max_pending(1024), pending_bytes(0), 
 	recv_buf_offset(0), recv_rb(0) {
 	recv_buf_size = 65536;
 	recv_buf = reinterpret_cast<unsigned char*>(::malloc(recv_buf_size));
 	set_max_pending_bytes(1024*1024);
     }
-    ~TCPTransport() {
+    ~RMCASTTransport() {
 	if (fd != -1) {
 	    if (poll)
 		poll->erase(fd);
@@ -59,11 +60,6 @@ public:
     void close();
     void listen(const char *addr);
     Transport *accept(Poll *, Protolay *);
-
-    int recv_nointr();
-    int recv_nointr(int);
-    ssize_t send_nointr(const void *buf, const size_t buflen, 
-			const size_t offset, int flags);
 
     int handle_down(WriteBuf *, const ProtoDownMeta *);
 
@@ -77,4 +73,4 @@ public:
 
 };
 
-#endif // TRANSPORT_TCP_HPP
+#endif // TRANSPORT_RMCAST_HPP

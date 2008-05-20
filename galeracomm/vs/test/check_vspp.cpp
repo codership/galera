@@ -1,11 +1,17 @@
 
 #include "gcomm/vs.hpp"
 #include "gcomm/monitor.hpp"
+#include "gcomm/thread.hpp"
+#include "vsbes.hpp"
 
 #include <iostream>
 #include <check.h>
 #include <cassert>
+#include <csignal>
 #include <list>
+
+
+static Logger& logger = Logger::instance();
 
 START_TEST(check_vsviewid)
 {
@@ -209,11 +215,14 @@ class Session : public Toplay {
     VS *vs;
     bool connected;
     bool leaving;
+    const char *data_b;
 public:
     std::deque<Event> events;
 
 
-    Session(const char *be_addr, Poll *p, Monitor *m = 0) : connected(false), leaving(false) {
+    Session(const char *be_addr, Poll *p, Monitor *m = 0) : 
+	connected(false), leaving(false), 
+	data_b("0123456789012345678901234567890123456789"){
 	vs = VS::create(be_addr, p, m);
 	set_down_context(vs);
     }
@@ -250,8 +259,11 @@ public:
 	} else if (rb) {
 	    // fail_unless(connected);
 	    // std::cerr << "Received: ";
-	    // std::cerr << reinterpret_cast<const char *>(rb->get_buf(roff)) << "\n";
+	    // std::cerr <<  << "\n";
 	    // events.push_back(Event(0, new VSMessage(*vum->msg)));
+	    const char *recv_b = reinterpret_cast<const char *>(rb->get_buf(roff));
+	    fail_unless(rb->get_len() == strlen(data_b) + roff + 1);
+	    fail_unless(strcmp(recv_b, data_b) == 0);
 	}
     }
     bool is_connected() const {
@@ -276,8 +288,8 @@ public:
 	vs->close();
     }
     int send() {
-	const char *foo = "asdfadfasasdfasdfasdfasdfasdfadfasdfasdfasdfafdf";
-	WriteBuf wb(foo, strlen(foo) + 1);
+	const char *data_b = "0123456789012345678901234567890123456789";
+	WriteBuf wb(data_b, strlen(data_b) + 1);
 	return pass_down(&wb, 0);
     }
     
@@ -595,12 +607,13 @@ START_TEST(check_vs_random)
 	passive.push_back(*i);
     }
     
-    for (int t = 0; t < 100; t++) {
+    for (int t = 0; t < 10000; t++) {
 
 	for (std::list<Session *>::iterator i = active.begin();
 	     i != active.end(); ++i) {
 	    if ((*i)->is_connected() && (*i)->is_leaving() == false) {
-		while ((*i)->send() == 0);
+		for (unsigned int k = Random::udraw(7); k > 0; k--)
+		    (*i)->send();
 	    }
 	}
 	
@@ -655,6 +668,140 @@ START_TEST(check_vs_random)
 }
 END_TEST
 
+const char* sync_addr = "tcp:127.0.0.1:4567";
+const char* async_addr = "asynctcp:127.0.0.1:4567";
+
+class ClientSender : public Thread {
+    VS* vs;
+public:
+    ClientSender(VS* v) : vs(v) {}
+    
+    void run() {
+	char msg[128];
+	for (unsigned int i = 0; i < 128; i++) 
+	    msg[i] = i % 256;
+	while (true) {
+	    WriteBuf wb(msg, 128);
+	    if (vs->handle_down(&wb, 0))
+		::usleep(20);
+	}
+    }
+};
+
+class ClientReceiver : public Thread, public Toplay {
+    Poll* poll;
+    VS* vs;
+public:
+    ClientReceiver(Poll *p, VS *v) : poll(p), vs(v) {}
+
+    void handle_up(const int cid, const ReadBuf *rb, const size_t roff,
+		   const ProtoUpMeta *um) {
+	// Note: Ignores view events.
+	if (rb) {
+	    logger.debug(std::string("Received message"));
+	    const unsigned char* buf = reinterpret_cast<const unsigned char *>(rb->get_buf(roff));
+	    for (unsigned int i = 0; i < rb->get_len(roff); i++)
+		if (buf[i] != i % 256)
+		    abort();
+	}
+    }
+
+    void run() {
+	while (poll->poll(std::numeric_limits<int>::max()));
+    }
+
+};
+
+
+class Client {
+    Poll* poll;
+    VS* vs;
+    Monitor* mon;
+    ClientSender* sen;
+    ClientReceiver* rec;
+public:
+    Client() : sen(0), rec(0) {
+	mon = new Monitor();
+	poll = Poll::create("def");
+	vs = VS::create(sync_addr, poll, mon);	
+    }
+
+    ~Client() {
+	delete sen;
+	delete rec;
+	delete vs;
+	delete poll;
+	delete mon;
+    }
+    
+    void start() {
+	vs->connect();
+	sen = new ClientSender(vs);
+	rec = new ClientReceiver(poll, vs);
+	vs->join(0, rec);
+	// Poll for Trans View
+	if (poll->poll(500) == 0)
+	    throw FatalException("");
+	// Poll for Reg View
+	if (poll->poll(500) == 0)
+	    throw FatalException("");
+	rec->Thread::start();
+	sen->Thread::start();
+    }
+    
+    void stop() {
+	sen->Thread::stop();
+	rec->Thread::stop();
+	vs->close();
+    }
+    
+    
+};
+
+class Server : public Thread {
+    VSServer* s;
+public:
+    
+    Server() {
+	s = new VSServer(async_addr);
+    }
+    
+    void run() {
+	s->run();
+    }
+    
+    void start() {
+	s->start();
+	Thread::start();
+    }
+    
+    void stop() {
+	Thread::stop();
+	s->stop();
+    }    
+};
+
+
+START_TEST(check_vs_cliser)
+{
+    Server s;
+    Client c1, c2;
+
+    ::signal(SIGPIPE, SIG_IGN);
+
+    s.start();
+    c1.start();
+    ::sleep(1);
+    c2.start();
+    ::sleep(10);
+    c2.stop();
+    c1.stop();
+    s.stop();
+    
+}
+END_TEST
+
+
 static Suite *suite()
 {
     Suite *s = suite_create("vspp");
@@ -677,7 +824,13 @@ static Suite *suite()
     suite_add_tcase(s, tc);
 
     tc = tcase_create("check_vs_random");
+    tcase_set_timeout(tc, 15);
     tcase_add_test(tc, check_vs_random);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_vs_cliser");
+    tcase_set_timeout(tc, 15);
+    tcase_add_test(tc, check_vs_cliser);
     suite_add_tcase(s, tc);
 
     return s;

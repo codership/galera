@@ -2,14 +2,15 @@
 
 #include "gcomm/transport.hpp"
 #include "gcomm/exception.hpp"
+#include "gcomm/thread.hpp"
 
 #include <check.h>
 #include <cstdlib>
 #include <list>
 #include <iostream>
 
-const char *addr = "tcp:127.0.0.1:23456";
-
+const char* async_addr = "asynctcp:127.0.0.1:23456";
+const char* sync_addr = "tcp:127.0.0.1:4567";
 
 class Sender : Toplay {
     Transport *tp;
@@ -29,9 +30,9 @@ public:
 	return can_send;
     }
     void connect() {
-	tp = Transport::create(addr, poll, this);
+	tp = Transport::create(async_addr, poll, this);
 	set_down_context(tp);
-	tp->connect(addr);
+	tp->connect(async_addr);
 	tp->set_max_pending_bytes(1 << 31);
     }
     bool send(const size_t b) {
@@ -157,8 +158,8 @@ public:
     void start() {
 	if (tp)
 	    throw DException("");
-	tp = Transport::create(addr, poll, this);
-	tp->listen(addr);
+	tp = Transport::create(async_addr, poll, this);
+	tp->listen(async_addr);
     }
     
     void stop() {
@@ -169,7 +170,7 @@ public:
     }
 };
 
-START_TEST(check_transport)
+START_TEST(check_async_transport)
 {
     Poll *p = Poll::create("Def");
     Listener l(p);
@@ -190,14 +191,6 @@ START_TEST(check_transport)
         
     while (p->poll(1) > 0);
 
-    Receiver *r = l.get_first_receiver();
-    if (r == 0)
-	throw DException("");
-    
-    for (size_t i = 0; i < 100; ++i) {
-	s.send(1024);
-	r->recv();
-    }
     std::cerr << "Terminating\n";
 
     s.close();
@@ -206,7 +199,7 @@ START_TEST(check_transport)
 }
 END_TEST
 
-START_TEST(check_multitransport)
+START_TEST(check_async_multitransport)
 {
     Poll *p = Poll::create("Def");
     Listener l(p);
@@ -244,17 +237,146 @@ END_TEST
 
 
 
+
+class SyncSender : public Thread {
+    const char* addr;
+    Transport* tp;
+    size_t sent;
+    unsigned char* buf;
+public:
+    
+    SyncSender(const char* a) : addr(a), tp(0), sent(0), buf(0) {}
+    
+    ~SyncSender() {
+	delete[] buf;
+	std::cerr << "SyncSender: sent " << sent << " bytes\n";
+    }
+    
+    void send(size_t len) {
+	buf = new unsigned char[len];
+	for (size_t i = 0; i < len; i++)
+	    buf[i] = i % 256;
+	WriteBuf wb(buf, len);
+	tp->send(&wb, 0);
+	delete[] buf;
+	buf = 0;
+	sent += len;
+	// std::cerr << "sent " << len;
+    }
+    
+    void run() {
+	tp->connect(addr);
+	for (int i = 0; i < 40000; i++) {
+	    send(::rand()%1024);
+	}
+	tp->close();
+    }
+    
+    void start() {
+	tp = Transport::create(addr, 0);
+	Thread::start();
+    }
+
+    void stop() {
+	Thread::stop();
+	delete tp;
+    }
+
+};
+
+class SyncReceiver : public Thread {
+    Transport* tp;
+    size_t recvd;
+public:
+    SyncReceiver(Transport* t) : tp(t), recvd(0) {}
+    ~SyncReceiver() {
+	std::cerr << "SyncReceiver: received " << recvd << " bytes\n";
+    }
+
+    void run() {
+	const ReadBuf* rb;
+	while ((rb = tp->recv()) != 0) {
+	    size_t len = rb->get_len();
+	    const unsigned char *buf = reinterpret_cast<const unsigned char *>(rb->get_buf());
+	    for (size_t i = 0; i < len; i++) 
+		if (buf[i] != i % 256)
+		    fail_unless(buf[i] == i % 256);
+	    recvd += len;
+	    // std::cerr << " recv " << len;
+	}
+    }
+
+
+};
+
+class SyncListener : public Thread {
+    Transport *listener;
+    const char *addr;
+    std::list<SyncReceiver*> recvrs;
+public:
+    SyncListener(const char *a) : addr(a) {
+    }
+
+
+    void run() {
+	Transport* tp;
+	while ((tp = listener->accept(0))) {
+	    SyncReceiver* r = new SyncReceiver(tp);
+	    recvrs.push_back(r);
+	    r->start();
+	}
+    }
+    
+    void start() {
+	listener = Transport::create(addr, 0);
+	listener->listen(addr);
+	Thread::start();
+    }
+
+    void stop() {
+	Thread::stop();
+	delete listener;
+
+	for (std::list<SyncReceiver*>::iterator i = recvrs.begin();
+	     i != recvrs.end(); ++i) {
+	    (*i)->stop();
+	    delete *i;
+	}
+
+    }
+};
+
+START_TEST(check_sync_transport)
+{
+    SyncListener l(sync_addr);
+    l.start();
+
+    SyncSender s(sync_addr);
+    s.start();
+    ::sleep(2);
+
+    s.stop();
+    l.stop();
+
+}
+END_TEST
+
+
 static Suite *suite()
 {
     Suite *s = suite_create("transportpp");
     TCase *tc;
 
-    tc = tcase_create("check_transport");
-    tcase_add_test(tc, check_transport);
+    tc = tcase_create("check_async_transport");
+    tcase_add_test(tc, check_async_transport);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("check_multitransport");
-    tcase_add_test(tc, check_multitransport);
+    tc = tcase_create("check_async_multitransport");
+    tcase_add_test(tc, check_async_multitransport);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_sync_transport");
+    tcase_add_test(tc, check_sync_transport);
     suite_add_tcase(s, tc);
 
     return s;

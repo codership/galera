@@ -13,23 +13,37 @@ typedef enum {
     TRANSPORT_S_CLOSED,
     TRANSPORT_S_CONNECTING,
     TRANSPORT_S_CONNECTED,
+    TRANSPORT_S_CLOSING,
     TRANSPORT_S_LISTENING,
     TRANSPORT_S_FAILED
 } TransportState;
 
 class Transport : public Bottomlay {
 protected:
+    bool synchronous;
     TransportState state;
     int error_no;
     unsigned long contention_tout;
     unsigned long contention_tries;
     size_t max_pending_bytes;
-    Transport() : state(TRANSPORT_S_CLOSED), error_no(0),
+    Transport() : synchronous(false),
+		  state(TRANSPORT_S_CLOSED), error_no(0),
 		  contention_tout(0), contention_tries(0),
 		  max_pending_bytes(1024*1024*10) {
     }
     
 public:
+
+    virtual ~Transport() {
+    }
+
+    void set_synchronous() {
+	synchronous = true;
+    }
+    bool is_synchronous() const {
+	return synchronous;
+    }
+    
     void set_contention_params(unsigned long tout, unsigned long tries) {
 	contention_tout = tout;
 	contention_tries = tries;
@@ -38,8 +52,6 @@ public:
 	max_pending_bytes = bytes;
     }
 
-    virtual ~Transport() {
-    }
     
     TransportState get_state() const {
 	return state;

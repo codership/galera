@@ -7,6 +7,8 @@
 #include "gcomm/protolay.hpp"
 #include "gcomm/fifo.hpp"
 #include "gcomm/monitor.hpp"
+#include "gcomm/logger.hpp"
+#include "gcomm/thread.hpp"
 
 #include <cstdlib>
 #include <cerrno>
@@ -578,8 +580,9 @@ START_TEST(check_protolay)
     fail_unless(p3.get_writable() == false);
     qpoll->poll(0);
     fail_unless(p3.get_writable() == true);
-
+    
     delete wb;
+    delete qpoll;
 
 }
 END_TEST
@@ -627,12 +630,136 @@ START_TEST(check_monitor)
 }
 END_TEST
 
+
+void *run_thd_crit(void *argp)
+{
+    thd_arg *arg = reinterpret_cast<thd_arg *>(argp);
+    Monitor *m = arg->m;
+    int *val = arg->valp;
+
+    for (int i = 0; i < 10000; i++) {
+	int rn = rand()%1000;
+	{
+	    Critical crit(m);
+	    (*val) += rn;
+	    pthread_yield();
+	    fail_unless(*val == rn);
+	    (*val) -= rn;
+	}
+    }
+    return 0;
+}
+
+
+START_TEST(check_critical)
+{
+    pthread_t thds[8];
+    int val = 0;
+    Monitor m;
+    thd_arg arg(&m, &val);
+    m.enter();
+    for (int i = 0; i < 8; i++) {
+	pthread_create(&thds[i], 0, &run_thd_crit, &arg);
+    }
+    m.leave();
+    
+    for (int i = 0; i < 8; i++) {
+	pthread_join(thds[i], 0);
+    }
+}
+END_TEST
+
+class ThreadImpl : public Thread {
+    bool yield;
+public:
+
+    ThreadImpl() : yield(false) {}
+    
+    void run() {
+	if (yield)
+	    pthread_yield();
+	// std::cerr << "Thread test: ";
+	if (yield)
+	    pthread_yield();
+	for (int i = 0; i < 10; i++) {
+	    if (yield)
+		pthread_yield();
+	    // std::cerr << i;
+	}
+	// std::cerr << " sleeping" << std::endl;
+	::sleep(1000);
+    }
+
+    void set_yield() {
+	yield = true;
+    }
+
+};
+
+START_TEST(check_thread)
+{
+    ThreadImpl thd;
+
+    thd.start();
+    ::sleep(1);
+    thd.stop();
+
+    thd.start();
+    thd.stop();
+
+    try {
+	thd.stop();
+	fail("Should have thrown");
+    } catch (FatalException e) {
+
+    }
+
+    thd.start();
+    
+    try {
+	thd.start();
+	fail("Should have thrown");
+    } catch (FatalException e) {
+
+    }
+    thd.stop();
+
+
+    thd.set_yield();
+    for (int i = 0; i < 2000; i++) {
+	thd.start();
+	thd.stop();
+    }
+
+
+}
+END_TEST
+
+START_TEST(check_logger)
+{
+    ::setenv("LOGGER_LEVEL", "0", 1);
+    // TODO: Make better check
+    Logger& logger = Logger::instance();
+    
+    logger.trace("this is da trace");
+    logger.debug("this is da debug");
+    logger.info("this is da info");
+    logger.warning("this is da warning");
+    logger.error("this is da error");
+    logger.fatal("this is da fatal");
+}
+END_TEST
+
 static Suite *suite()
 {
     Suite *s;
     TCase *tc;
 
     s = suite_create("commonpp");
+
+    tc = tcase_create("check_logger");
+    tcase_add_test(tc, check_logger);
+    suite_add_tcase(s, tc);
 
     tc = tcase_create("check_address");
     tcase_add_test(tc, check_address);
@@ -657,6 +784,16 @@ static Suite *suite()
     tc = tcase_create("check_monitor");
     tcase_add_test(tc, check_monitor);
     suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_critical");
+    tcase_add_test(tc, check_critical);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_thread");
+    tcase_add_test(tc, check_thread);
+    suite_add_tcase(s, tc);
+
+
 
     return s;
 }

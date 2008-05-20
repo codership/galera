@@ -1,3 +1,4 @@
+TESTS = check_transportpp
 noinst_PROGRAMS = check_transportpp 
 bin_PROGRAMS = perftest
 

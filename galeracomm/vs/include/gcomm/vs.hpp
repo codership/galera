@@ -451,11 +451,11 @@ public:
 private:
     size_t hdrlen;
     unsigned char hdrbuf[4 + 4 + 8 + 4 + 4];
-    size_t do_cksum(void *buf, const size_t buflen, const size_t offset) const {
-	unsigned char *ptr = reinterpret_cast<unsigned char *>(buf);
-	cksum = 0;
-	cksum += *ptr, cksum *= 0xabc175db;
-	return write_uint32(cksum, buf, buflen, offset);
+    void do_cksum(const void *buf, const size_t buflen, uint32_t *ret) const {
+	const unsigned char *ptr = reinterpret_cast<const unsigned char *>(buf);
+	*ret = 0;
+	while (ptr < buflen +  reinterpret_cast<const unsigned char *>(buf))
+	    *ret += *ptr++, cksum *= 0xabc175db;
     }
 
     size_t write_hdr(void *buf, const size_t buflen, const size_t offset) const {
@@ -477,36 +477,55 @@ private:
 	    return 0;
 	if ((off = write_uint32(seq, buf, buflen, off)) == 0)
 	    return 0;
-
-	return do_cksum(buf, std::min<const size_t>(buflen, off + 4), off);
+	
+	do_cksum(reinterpret_cast<const unsigned char *>(buf) + offset, 
+		 4 + 4 + 8 + 4, &cksum);
+	return write_uint32(cksum, buf, buflen, off);
     }
 public:
     size_t read(const void *buf, const size_t buflen, const size_t offset) {
 	uint32_t w;
 	size_t off;
 
+	// Logger::instance().debug(std::string("VSMessage::read(): reading "
+	//				     "vtf, offset ") 
+	//			 + to_string(offset));
 	if ((off = read_uint32(buf, buflen, offset, &w)) == 0)
 	    return 0;
 	version = w & 0xff;
 	type = (w >> 8) & 0xff;
 	flags = (w >> 16) & 0xffff;
+
+	// Logger::instance().debug(std::string("VSMessage::read(): reading "
+	//				     "source, offset ") 
+	//			 + to_string(off));
 	if ((off = source.read(buf, buflen, off)) == 0)
 	    return 0;
+
+	// Logger::instance().debug(std::string("VSMessage::read(): reading "
+	//				     "source view, offset ") 
+	//			 + to_string(off));
 	if ((off = source_view.read(buf, buflen, off)) == 0)
 	    return 0;
+
+	// Logger::instance().debug(std::string("VSMessage::read(): reading "
+	//				     "seq, offset ") 
+	//			 + to_string(off));
 	if ((off = read_uint32(buf, buflen, off, &seq)) == 0)
 	    return 0;
-	
-	// Write hdr computes cksum
-	if ((hdrlen = write_hdr(hdrbuf, sizeof(hdrbuf), 0)) == 0)
-	    return 0;
+
+	// Compute checksum from header read so far and compare it to 
+	// checksum found from buffer
+	do_cksum(reinterpret_cast<const unsigned char *>(buf) + offset, 
+		 off - offset, &cksum);
 	uint32_t ck;
 	if ((off = read_uint32(buf, buflen, off, &ck)) == 0)
 	    return 0;
 	if (ck != cksum) {
-	    throw DException("Invalid cksum");
-	    return 0;
+	    throw FatalException("Invalid cksum");
 	}
+
+	hdrlen = off;
 
 	switch (type) {
 	case CONF:
@@ -523,6 +542,10 @@ public:
 	    break;
 	}
 
+
+//	Logger::instance().debug(std::string("VSMessage::read(): returning, "
+//					     "offset ") 
+//				 + to_string(off));
 	return off;
     }
 

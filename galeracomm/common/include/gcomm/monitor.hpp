@@ -7,6 +7,7 @@
 
 #include <pthread.h>
 #include <deque>
+#include <cassert>
 
 class Waiter {
     pthread_cond_t cond;

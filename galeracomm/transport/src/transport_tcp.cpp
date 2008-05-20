@@ -1,11 +1,12 @@
 
+#include "gcomm/logger.hpp"
 #include "transport_tcp.hpp"
 
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
+
 #include <fcntl.h>
 #include <unistd.h>
+
+static Logger& logger = Logger::instance();
 
 static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
 {
@@ -14,9 +15,12 @@ static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
      char *port;
      const char *delim;
      
-     if (strncmp(addr, "tcp:", strlen("tcp:")))
+     if (strncmp(addr, "tcp:", strlen("tcp:")) == 0)
+	 addr += strlen("tcp:");
+     else if (strncmp(addr, "asynctcp:", strlen("asynctcp:")) == 0)
+	 addr += strlen("asynctcp:");
+     else
 	 return false;
-     addr += strlen("tcp:");
 
      if (!(delim = strchr(addr, ':')))
 	 return false;
@@ -73,11 +77,13 @@ public:
 void TCPTransport::connect(const char *addr)
 {
     if (fd != -1)
-	throw DException("");
+	throw FatalException("TCPTransport::connect(): Already connected or listening");
     if (!tcp_addr_to_sa(addr, &sa, &sa_size))
-	throw DException("");
+	throw FatalException("TCPTransport::connect(): Invalid address");
+    if (::strncmp(addr, "tcp:", strlen("tcp:")) == 0)
+	set_synchronous();
     if ((fd = ::socket(PF_INET, SOCK_STREAM, 0)) == -1)
-	throw DException(::strerror(errno));
+	throw FatalException(::strerror(errno));
     linger lg = {1, 3};
     if (::setsockopt(fd, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg)) == -1) {
 	int err = errno;
@@ -85,19 +91,21 @@ void TCPTransport::connect(const char *addr)
 	fd = -1;
 	throw DException(::strerror(err));
     }
-    if (::fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-	int err = errno;
-	while (::close(fd) == -1 && errno == EINTR);
-	fd = -1;
-	throw DException(::strerror(err));
-    }
+    if (is_synchronous() == false) {
+	if (::fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+	    int err = errno;
+	    while (::close(fd) == -1 && errno == EINTR);
+	    fd = -1;
+	    throw DException(::strerror(err));
+	}
+    } 
     if (poll) {
 	poll->insert(fd, this);
 	poll->set(fd, PollEvent::POLL_IN);
     }
     if (::connect(fd, &sa, sa_size) == -1) {
 	if (errno != EINPROGRESS) {
-	    throw DException("");
+	    throw FatalException(::strerror(errno));
 	} else {
 	    if (poll)
 		poll->set(fd, PollEvent::POLL_OUT);
@@ -120,22 +128,29 @@ void TCPTransport::close()
 
 void TCPTransport::listen(const char *addr)
 {
+    logger.debug(std::string("TCPTransport::listen(") + addr + ")");
     if (fd != -1)
-	throw DException("");
+	throw FatalException("TCPTransport::listen(): Already connected or listening");
     if (!tcp_addr_to_sa(addr, &sa, &sa_size))
-	throw DException("");
+	throw FatalException("TCPTransport::listen(): Invalid address");
     if ((fd = ::socket(PF_INET, SOCK_STREAM, 0)) == -1)
-	throw DException("");
+	throw FatalException("TCPTransport::listen(): Could not open socket");
+    if (::strncmp(addr, "tcp:", strlen("tcp:")) == 0)
+	set_synchronous();
 
-    if (::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
-	throw DException("");
+    if (is_synchronous() == false && ::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
+	throw FatalException("TCPTransport::listen(): Fcntl failed");
     int reuse = 1;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1)
-	throw DException("");
-    if (::bind(fd, &sa, sa_size) == -1)
-	throw DException("");
+	throw FatalException("TCPTransport::listen(): Setsockopt faild");
+    if (::bind(fd, &sa, sa_size) == -1) {
+	int err = errno;
+	logger.fatal(std::string("TCPTransport::listen(): Bind failed to address ") + to_string(&sa) + " failed " +
+		     ::strerror(err));
+	throw FatalException("TCPTransport::listen(): Bind failed");
+    }
     if (::listen(fd, 128) == -1)
-	throw DException("");
+	throw FatalException("TCPTransport::listen(): Listen failed");
     if (poll) {
 	poll->insert(fd, this);
 	poll->set(fd, PollEvent::POLL_IN);
@@ -149,17 +164,18 @@ Transport *TCPTransport::accept(Poll *poll, Protolay *up_ctx)
 
     sockaddr sa;
     socklen_t sa_size = sizeof(sockaddr);
-
+    
     int acc_fd;
     if ((acc_fd = ::accept(fd, &sa, &sa_size)) == -1)
-	throw DException("");
+	throw FatalException("TCPTransport::accept(): Accept failed");
+    
 
-    if (::fcntl(acc_fd, F_SETFL, O_NONBLOCK) == -1) {
+    if (is_synchronous() == false && ::fcntl(acc_fd, F_SETFL, O_NONBLOCK) == -1) {
 	while (::close(acc_fd) == -1 && errno == EINTR);
-	throw DException("");
+	throw FatalException("TCPTransport::accept(): Fcntl failed");
     }
 
-
+    
     TCPTransport *ret = new TCPTransport(acc_fd, sa, sa_size, poll);
     if (up_ctx) {
 	set_up_context(up_ctx);
@@ -192,14 +208,11 @@ ssize_t TCPTransport::send_nointr(const void *buf, const size_t buflen,
 	    ret = ::send(fd, (unsigned char *)buf + offset + sent, 
 			 buflen - offset - sent, flags);
 	} while (ret == -1 && errno == EINTR);
-	// send_crc.process_bytes((unsigned char *)buf + offset + sent,
-	//		       buflen - offset - sent);
 	if (ret == -1 && errno == EAGAIN) {
 	    return sent;
 	} else if (ret == -1 || ret == 0) {
 	    return -1;
 	}
-	
 	sent += ret;
     } while (size_t(sent) + offset < buflen);
     return sent;
@@ -226,8 +239,12 @@ int TCPTransport::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 {
     if (state != TRANSPORT_S_CONNECTED)
 	return ENOTCONN;
+    if (is_synchronous())
+	return TCPTransport::send(wb, dm);
+    
     if (pending_bytes + wb->get_totlen() > max_pending_bytes) {
 	/* was: pending.size() == max_pending */
+	logger.debug("TCPTransport::handle_down(): Contention");
 	if (contention_tries > 0 ) {
 	    for (unsigned long i = 0; 
 		 i < contention_tries && 
@@ -236,8 +253,9 @@ int TCPTransport::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 		tmp_poll(fd, PollEvent::POLL_OUT, contention_tout, this);
 	    }
 	}
+
 	if (pending_bytes + wb->get_totlen() > max_pending_bytes) {
-	    std::cerr << "TCPTransport (" << fd << ") handle_down(): max_pending " << pending_bytes << "\n";
+	    logger.debug("TCPTransport::handle_down(): Contention not cleared, return EAGAIN");
 	    return EAGAIN;
 	}
     }
@@ -249,7 +267,7 @@ int TCPTransport::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 	WriteBuf *wb_copy = wb->copy();
 	pending.push_back(PendingWriteBuf(wb_copy, 0));
 	pending_bytes += wb->get_totlen();
-	// std::cerr << "TCPTransport::handle_down(): appended\n";
+	logger.debug("TCPTransport::handle_down(): Appended to pending");
 	goto out_success;
     } else {
 	ssize_t ret;
@@ -266,6 +284,7 @@ int TCPTransport::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 	    pending_bytes += wb->get_totlen();
 	    if (poll)
 		poll->set(fd, PollEvent::POLL_OUT);
+	    logger.debug("TCPTransport::handle_down(): Appended to pending in header send");
 	    goto out_success;
 	}
 	
@@ -280,6 +299,7 @@ int TCPTransport::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 	    pending_bytes += wb->get_totlen();
 	    if (poll)
 		poll->set(fd, PollEvent::POLL_OUT);
+	    logger.debug("TCPTransport::handle_down(): Appended to pending in payload send");
 	}
     }
     
@@ -288,59 +308,77 @@ out_success:
     return 0;
     
 out_epipe:
+    logger.warning("TCPTransport::handle_down(): Broken pipe");
     wb->rollback_hdr(hdr.get_raw_len());
     return EPIPE;
 }
 
 
-int TCPTransport::recv_nointr()
+int TCPTransport::recv_nointr(int flags)
 {
-    // std::cerr << "Recv (" << fd << ") roff " << recv_buf_offset << "\n";
+    
     if (recv_buf_offset < TCPTransportHdr::get_raw_len()) {
 	ssize_t ret;    
 	do {
 	    ret = ::recv(fd, recv_buf + recv_buf_offset, 
 			 TCPTransportHdr::get_raw_len() - recv_buf_offset,
-			 0);
+			 flags);
 	} while (ret == -1 && errno == EINTR);
-	if (ret == -1 && errno == EAGAIN)
+	if (ret == -1 && errno == EAGAIN) {
+	    logger.debug("TCPTransport::recv_nointr(): Return EAGAIN in header recv"); 
 	    return EAGAIN;
-	else if (ret == -1 || ret == 0)
+	}
+	else if (ret == -1 || ret == 0) {
+	    logger.debug("TCPTransport::recv_nointr(): Return error in header recv"); 
 	    return ret == -1 ? errno : EPIPE;
+	}
 	recv_buf_offset += ret;
-	if (recv_buf_offset < TCPTransportHdr::get_raw_len())
+	if (recv_buf_offset < TCPTransportHdr::get_raw_len()) {
+	    logger.debug("TCPTransport::recv_nointr(): Return EAGAIN in header recv"); 
 	    return EAGAIN;
+	}
     }
     
     TCPTransportHdr hdr(recv_buf, recv_buf_offset, 0);
-
+    
     if (recv_buf_size < hdr.get_len() + hdr.get_raw_len()) {
 	recv_buf = reinterpret_cast<unsigned char*>(
 	    ::realloc(recv_buf, hdr.get_len() + hdr.get_raw_len()));
     }
     
-    if (hdr.get_len() == 0)
-	return 0; // So some joker wants to send zero length message? So be it then...
+    if (hdr.get_len() == 0) {
+	logger.debug("TCPTransport::recv_nointr(): Zero len message"); 
+	return 0;
+    }
     
     do {
 	ssize_t ret;    
 	do {
 	    ret = ::recv(fd, recv_buf + recv_buf_offset,
 			 hdr.get_len() - (recv_buf_offset - hdr.get_raw_len()),
-			 0);
+			 flags);
 	} while (ret == -1 && errno == EINTR);
-	if (ret == -1 && errno == EAGAIN)
+	if (ret == -1 && errno == EAGAIN) {
+	    logger.debug("TCPTransport::recv_nointr(): Return EAGAIN in body recv"); 
 	    return EAGAIN;
-	else if (ret == -1 || ret == 0)
+	}
+	else if (ret == -1 || ret == 0) {
+	    logger.debug("TCPTransport::recv_nointr(): Return error in body recv"); 
 	    return ret == -1 ? errno : EPIPE;
+	}
 	recv_buf_offset += ret;
     } while (recv_buf_offset < hdr.get_len() + hdr.get_raw_len());
     return 0;
 }
 
+int TCPTransport::recv_nointr()
+{
+    return recv_nointr(MSG_DONTWAIT);
+}
+
 int TCPTransport::handle_pending()
 {
-    // std::cerr << "Handle pending: " << pending.size() << "\n";
+    logger.debug("TCPTransport::handle_pending()");
     if (pending.size() == 0)
 	return 0;
     
@@ -354,8 +392,10 @@ int TCPTransport::handle_pending()
 				   i->wb->get_totlen() > i->wb->get_hdrlen() ? MSG_MORE : 0)) == -1)
 		return EPIPE;
 	    i->offset += ret;
-	    if (size_t(ret) != i->wb->get_hdrlen())
+	    if (size_t(ret) != i->wb->get_hdrlen()) {
+		logger.debug("TCPTransport::handle_pending(): Return EAGAIN");
 		return EAGAIN;
+	    }
 	}
 	if (i->wb->get_len() &&
 	    (ret = send_nointr(i->wb->get_buf(), i->wb->get_len(),
@@ -363,8 +403,10 @@ int TCPTransport::handle_pending()
 	    return EPIPE;
 	
 	i->offset += ret;
-	if (i->offset != i->wb->get_totlen())
+	if (i->offset != i->wb->get_totlen()) {
+	    logger.debug("TCPTransport::handle_pending(): Return EAGAIN");
 	    return EAGAIN;
+	}
 	
 	pending_bytes -= i->offset;
 	delete i->wb;
@@ -376,16 +418,15 @@ int TCPTransport::handle_pending()
 void TCPTransport::handle(const int fd, const PollEnum pe)
 {
     assert(fd == this->fd);
-
-    // std::cerr << "Poll event (" << fd << "): " << pe << " state " << state << "\n";
     if (pe & PollEvent::POLL_OUT) {
+	logger.debug("TCPTransport::handle(): PollEvent::POLL_OUT");
 	int ret;
 	if (state == TRANSPORT_S_CONNECTING) {
 	    int err = 0;
 	    socklen_t errlen = sizeof(err);
 	    poll->unset(fd, PollEvent::POLL_OUT);
 	    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1)
-		throw DException("");
+		throw FatalException("TCPTransport::handle(): Getsockopt failed");
 	    if (err == 0) {
 		state = TRANSPORT_S_CONNECTED;
 	    } else {
@@ -400,6 +441,7 @@ void TCPTransport::handle(const int fd, const PollEnum pe)
 	    this->error_no = ret;
 	    state = TRANSPORT_S_FAILED;
 	    pass_up(0, 0, 0);
+	    logger.debug("TCPTransport::handle(): Failed");
 	}
     }
     if (pe & PollEvent::POLL_IN) {
@@ -414,6 +456,7 @@ void TCPTransport::handle(const int fd, const PollEnum pe)
 		this->error_no = ret;
 		state = TRANSPORT_S_FAILED;
 		pass_up(0, 0, 0);
+		logger.debug("TCPTransport::handle(): Failed");
 	    }
 	} else if (state == TRANSPORT_S_LISTENING) {
 	    pass_up(0, 0, 0);
@@ -425,13 +468,12 @@ void TCPTransport::handle(const int fd, const PollEnum pe)
 	pass_up(0, 0, 0);
     }
     if (pe & PollEvent::POLL_INVAL)
-	throw DException("Invalid file descriptor");
+	throw FatalException("TCPTransport::handle(): Invalid file descriptor");
     if (pe & PollEvent::POLL_ERR) {
 	int err = 0;
 	socklen_t errlen = sizeof(err);
 	if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) {
-	    std::cerr << "Poll error: " << err << "\n";
-	    //throw DException((std::string("Error: ") + strerror(err)).c_str());
+	    logger.warning("TCPTransport::handle(): Poll error");
 	}
     }
 }
@@ -454,7 +496,8 @@ int TCPTransport::send(WriteBuf *wb, const ProtoDownMeta *dm)
 	return err;
     
     while (sent != wb->get_hdrlen()) {
-	ret = send_nointr(wb->get_hdr(), wb->get_hdrlen(), sent, 0);
+	ret = send_nointr(wb->get_hdr(), wb->get_hdrlen(), sent, 
+			  wb->get_totlen() > wb->get_hdrlen() ? MSG_MORE : 0);
 	if (ret == -1) {
 	    err = EPIPE;
 	    goto out;
@@ -491,17 +534,17 @@ const ReadBuf *TCPTransport::recv()
 	recv_rb->release();
     recv_rb = 0;
 
-    while ((ret = recv_nointr()) == EAGAIN) {
+    while ((ret = recv_nointr(0)) == EAGAIN) {
 	while (tmp_poll(fd, PollEvent::POLL_IN, 
 			std::numeric_limits<int>::max(), 0) == 0);
     }
     if (ret != 0) {
-	std::cerr << "recv_nointr() == " << ret << "\n";
+	logger.info(std::string("TCPTransport::recv() ") + ::strerror(ret));
 	return 0;
     }
     
     recv_rb = new ReadBuf(recv_buf + TCPTransportHdr::get_raw_len(),
-		     recv_buf_offset - TCPTransportHdr::get_raw_len());
+			  recv_buf_offset - TCPTransportHdr::get_raw_len());
     recv_buf_offset = 0;
     return recv_rb;
 }

@@ -2,7 +2,9 @@
 #include "vs_backend.hpp"
 #include "vs_remote_backend.hpp"
 #include "gcomm/vs.hpp"
+#include "gcomm/logger.hpp"
 
+static Logger& logger = Logger::instance();
 
 VSRBackend::VSRBackend(Poll *p, Protolay *up_ctx) : tp(0), poll(p), state(CLOSED)
 {
@@ -24,25 +26,23 @@ void VSRBackend::handle_up(const int cid, const ReadBuf *rb, const size_t roff,
     if (rb == 0 && tp->get_state() == TRANSPORT_S_CONNECTED) {
 	return;
     } else if (rb == 0 && tp->get_state() == TRANSPORT_S_FAILED) {
-	std::cerr << "Transport failed\n";
+	logger.error("VSRBackend::handle_up(): Transport failed");
 	state = FAILED;
 	pass_up(0, 0, 0);
 	return;
     }
     
     if (msg.read(rb->get_buf(), rb->get_len(), roff) == 0)
-	throw DException("Invalid message");
-
-    // std::cerr << "VSRBackend::handle_up(): " << rb << ":" << tp->get_state() << " message " << msg.get_type() << "\n";
-
+	throw FatalException("VSRBackend::handle_up(): Invalid message");
+    
     switch (msg.get_type()) {
     case VSRMessage::HANDSHAKE: {
 	if (state != CONNECTING)
-	    throw DException("");
+	    throw FatalException("VSRBackend::handle_up(): Invalid state");
 	state = HANDSHAKE;
 	addr = msg.get_base_address();
 	if (addr == ADDRESS_INVALID)
-	    throw DException("");
+	    throw FatalException("VSRBackend::handle_up(): Invalid address");
 	VSRCommand cmd(VSRCommand::SET);
 	VSRMessage rmsg(cmd);
 	WriteBuf wb(0, 0);
@@ -71,7 +71,7 @@ void VSRBackend::handle_up(const int cid, const ReadBuf *rb, const size_t roff,
 	if (state == CONNECTED)
 	    pass_up(rb, roff + msg.get_raw_len(), um);
 	else
-	    throw DException("What's this?");
+	    throw FatalException("VSRBackend::handle_up(): Invalid state");
 	break;
     }
 }
@@ -89,7 +89,7 @@ int VSRBackend::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 
 	const VSBackendDownMeta *bdm = static_cast<const VSBackendDownMeta *>(dm);
 	if (bdm->is_sync == true) { 
-	    std::cerr << "trying to clear contention\n";
+	    logger.debug("VSRBackend::handle_down(): Trying to clear contention");
 	    tp->set_contention_params(10, 100);
 	    ret = pass_down(wb, 0);
 	    tp->set_contention_params(0, 0);
@@ -110,7 +110,7 @@ void VSRBackend::connect(const char *addr)
     do {
 	int err = poll->poll(10);
 	if (err < 0)
-	    throw DException("");
+	    throw FatalException("VSRBackend::connect(): Failed");
     } while (state == CONNECTING || state == HANDSHAKE);
 }
 
@@ -126,9 +126,9 @@ void VSRBackend::close()
 
 void VSRBackend::join(const ServiceId sid)
 {
-
+    
     Address jaddr(addr.get_proc_id(), sid, addr.get_segment_id());
-    std::cerr << "JOIN " << jaddr << "\n";
+    logger.debug(std::string("VSRBackend::join(): ") + jaddr.to_string());
     VSRCommand cmd(VSRCommand::JOIN, jaddr);
     VSRMessage msg(cmd);
     WriteBuf wb(0, 0);
@@ -140,7 +140,7 @@ void VSRBackend::leave(const ServiceId sid)
 {
 
     Address laddr(addr.get_proc_id(), sid, addr.get_segment_id());
-    std::cerr << "LEAVE " << laddr << "\n";
+    logger.debug(std::string("VSRBackend::leave(): ") + laddr.to_string());
     VSRCommand cmd(VSRCommand::LEAVE, laddr);
     VSRMessage msg(cmd);
     WriteBuf wb(0, 0);

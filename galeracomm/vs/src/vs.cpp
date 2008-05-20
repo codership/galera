@@ -1,10 +1,13 @@
 
+#include "gcomm/logger.hpp"
 #include "gcomm/vs.hpp"
 #include "vs_backend.hpp"
 
 #include <deque>
 #include <limits>
 
+
+static Logger& logger = Logger::instance();
 
 //
 //
@@ -131,12 +134,13 @@ void VSProto::deliver_data(const VSMessage *dm,
     VSMembMap::iterator membs_p = membs.find(dm->get_source());
     // std::cerr << "Message: Source(" << dm->get_source() << ")\n";
     if (membs_p == membs.end())
-	throw DException("");
+	throw FatalException("Message source not in memb"); 
     if (membs_p->second->expected_seq != dm->get_seq())
-	throw DException("");
+	throw FatalException("Gap in message sequence");
     membs_p->second->expected_seq = dm->get_seq() + 1;
     VSUpMeta um(dm);
-    pass_up(rb, roff + dm->get_data_offset(), &um);
+    logger.trace(std::string("Delivering message " + to_string(dm->get_seq())));
+    pass_up(rb, dm->get_data_offset(), &um);
 }
 
 
@@ -369,8 +373,10 @@ void VS::handle_up(const int cid, const ReadBuf *rb, const size_t roff, const Pr
 	throw DException("");
     }
     
-    msg.read(rb->get_buf(), rb->get_len(), roff);
-    // std::cerr << "VS::handle_up(): Msg type = " << msg.get_type() << "\n";
+    logger.trace("VS:handle_up()");
+    if (msg.read(rb->get_buf(), rb->get_len(), roff) == 0)
+	throw FatalException("Failed to read message");
+    logger.trace(std::string("VS::handle_up(): Msg type = ") + to_string(msg.get_type()));
 
     Critical crit(mon);
     VSProtoMap::iterator pi = proto.find(msg.get_source().get_service_id());
@@ -417,27 +423,39 @@ int VS::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 	return EINVAL;
 
     p = pi->second;
-    if (p->reg_view == 0)
+    if (p->reg_view == 0) {
+	logger.warning(std::string("VS::handle_down(): ") + strerror(ENOTCONN));
 	return ENOTCONN;
+    }
 
     
     // Transitional configuration
-    if (p->trans_view)
+    if (p->trans_view) {
+	logger.info(std::string("VS::handle_down(): ") + strerror(EAGAIN));
 	return EAGAIN;
+    }
 
     VSMembMap::iterator mi = p->membs.find(p->addr);
     if (mi == p->membs.end())
-	throw DException("");
-    if (mi->second->expected_seq + 256 == p->next_seq)
+	throw FatalException("VS::handle_down(): Internal error");
+    if (mi->second->expected_seq + 256 == p->next_seq) {
+	logger.debug(std::string("VS::handle_down(), flow control: ") + 
+		    strerror(EAGAIN));
 	return EAGAIN;
-
+    }
+    
     VSMessage msg(p->addr, p->reg_view->get_view_id(), p->next_seq, user_type);
     wb->prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
     
     int ret = pass_down(wb, 0);
-    if (ret == 0)
+    if (ret == 0) {
+	logger.trace(std::string("Sent message ") + to_string(p->next_seq));
 	p->next_seq++;
+    }
     wb->rollback_hdr(msg.get_hdrlen());
+    if (ret)
+	logger.warning(std::string("VS::handle_down(), returning ") 
+		       + strerror(ret));
     return ret;
 }
 
