@@ -351,7 +351,9 @@ int main(int argc, char *argv[])
 	exit (-1);
     }
     try {
-	VSServer s(argv[1]);
+	std::string srv_arg("async");
+	srv_arg += argv[1];
+	VSServer s(srv_arg.c_str());
 	s.start();
 	s.run();
 	s.stop();
