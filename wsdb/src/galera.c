@@ -904,11 +904,6 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
     switch (rcode) {
     case WSDB_OK:
         /* certification ok */
-
-        // we can update last seen trx counter already here
-        if (mark_commit_early) {
-            wsdb_set_local_trx_committed(trx_id);
-        }
         retcode = GALERA_OK;
         break;
     case WSDB_CERTIFICATION_FAIL:
@@ -938,6 +933,10 @@ after_cert_test:
 	    gu_fatal("Failed to grab commit queue for %llu", seqno_l);
 	    abort();
 	}
+        // we can update last seen trx counter already here
+        if (mark_commit_early) {
+            wsdb_set_local_trx_committed(trx_id);
+        }
     } else {
 	/* Cancel commit queue since we are going to rollback */
 	if (seqno_l > 0 && gcs_to_self_cancel(commit_queue, seqno_l)) {
