@@ -15,11 +15,16 @@ static Logger& logger = Logger::instance();
 
 
 class Stats {
-    unsigned long long n_msgs_out;
-    unsigned long long bytes_out;
-    unsigned long long n_msgs_in;
-    unsigned long long bytes_in;
-    unsigned long long tlast;
+//    unsigned long long n_msgs_out;
+//    unsigned long long bytes_out;
+//    unsigned long long n_msgs_in;
+//    unsigned long long bytes_in;
+//    unsigned long long tlast;
+    uint64_t n_msgs_out;
+    uint64_t bytes_out;
+    uint64_t n_msgs_in;
+    uint64_t bytes_in;
+    uint64_t tlast;
 public:
     Stats() : n_msgs_out(0), bytes_out(0), n_msgs_in(0), bytes_in(0) {
 	struct timeval tv;
