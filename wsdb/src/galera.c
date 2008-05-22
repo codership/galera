@@ -64,6 +64,7 @@ struct galera_info Galera;
 static gu_mutex_t commit_mtx;
 
 static bool_t mark_commit_early = FALSE;
+static bool_t local_commits = FALSE;
 
 static FILE *wslog_L;
 static FILE *wslog_G;
@@ -450,11 +451,25 @@ static int apply_query(void *app_ctx, char *query, int len) {
 static const ulong TRUNCATE_WRITE_SET_HISTORY_MASK = (1 << 7) - 1;
 
 static inline void truncate_write_set_history (
-    gcs_conn_t* gcs_conn, gcs_seqno_t seqno
+    gcs_conn_t* gcs_conn, gcs_seqno_t seqno, bool_t local
 ) { 
     if (!(((ulong)seqno) & TRUNCATE_WRITE_SET_HISTORY_MASK)) {
-        /* tell the group about last committed */
-        gcs_set_last_applied(gcs_conn, wsdb_get_last_committed_trx());
+        /* first report our last_seen_trx counter */
+        if (local) {
+            /* local trxs can report without delay */
+            gcs_set_last_applied(gcs_conn, seqno);
+        } else {
+           /* for remote trxs, we must know there are no pending
+            * local trxs in certification queue
+            */
+            gu_mutex_lock(&commit_mtx);
+            if (local_commits) {
+                local_commits = FALSE;
+            } else {
+                gcs_set_last_applied(gcs_conn, seqno);
+            }
+            gu_mutex_unlock(&commit_mtx);
+        }
         /* get the minimum trx applying state in the group */
         seqno = gcs_get_last_applied(gcs_conn);
         /* purge the history */
@@ -665,7 +680,10 @@ enum galera_status galera_recv(void *app_ctx) {
 	     * (teemu 12.3.2008)
 	     */
 	    free(action);
-            truncate_write_set_history(gcs_conn, seqno_g);
+
+            /* tell the group about last committed */
+            truncate_write_set_history(gcs_conn, seqno_g, FALSE);
+            
             break;
         case GCS_ACT_SNAPSHOT:
         case GCS_ACT_PRIMARY:
@@ -772,8 +790,6 @@ enum galera_status galera_committed(trx_id_t trx_id) {
     }
     wsdb_delete_local_trx_info(trx_id);
 
-    truncate_write_set_history (gcs_conn, seqno_l);
-
     GU_DBUG_RETURN(GALERA_OK);
 }
 
@@ -818,7 +834,7 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
 
     /* hold commit time mutex */
     gu_mutex_lock(&commit_mtx);
-
+    
     /* check if trx was cancelled before we got here */
     if (wsdb_get_local_trx_seqno(trx_id) == GALERA_ABORT_SEQNO) {
 	gu_info("trx has been cancelled already: %llu", trx_id);
@@ -828,6 +844,9 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
 	gu_mutex_unlock(&commit_mtx);
 	GU_DBUG_RETURN(GALERA_TRX_FAIL);
     }
+
+    /* signal cert index truncater, that local commits do happen */
+    local_commits = TRUE;
 
     /* retrieve write set */
     ws = wsdb_get_write_set(trx_id, conn_id);
@@ -926,6 +945,12 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
     }
 
 after_cert_test:
+
+    /* here is a good point to announce our oldest last_see_trx reference.
+     * We announce here a seqno, which is oldest we can have in our
+     * local "certification queue"
+     */
+    truncate_write_set_history (gcs_conn, ws->last_seen_trx, TRUE);
 
     if (retcode == GALERA_OK) {
 	/* Grab commit queue for commit time */
