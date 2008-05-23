@@ -96,10 +96,11 @@ int gcs_destroy (gcs_conn_t *conn);
 typedef enum gcs_act_type
 {
     GCS_ACT_DATA,       //! application action, sent by application
-    GCS_ACT_SERVICE,    //! service action, sent by GCS
+    GCS_ACT_COMMIT_CUT, //! group-wide action commit cut
     GCS_ACT_SNAPSHOT,   //! request for state snapshot
     GCS_ACT_PRIMARY,    //! reached primary configuration
     GCS_ACT_NON_PRIMARY,//! reached non-primary configuration
+    GCS_ACT_SERVICE,    //! service action, sent by GCS
     GCS_ACT_ERROR,      //! error happened while receiving the action
     GCS_ACT_UNKNOWN     //! undefined/unknown action type
 }
@@ -274,9 +275,6 @@ int gcs_to_renew_wait (gcs_to_t *to, gcs_seqno_t seqno);
 
 /*! Informs group about the last applied action on this node */
 long gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno);
-
-/*! Returns group-wide last applied action */
-gcs_seqno_t gcs_get_last_applied (gcs_conn_t* conn);
 
 
 /* GCS Configuration */

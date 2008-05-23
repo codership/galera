@@ -535,8 +535,3 @@ gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
     return gcs_core_set_last_applied (conn->core, seqno);
 }
 
-gcs_seqno_t
-gcs_get_last_applied (gcs_conn_t* conn)
-{
-    return gcs_core_get_last_applied (conn->core);
-}

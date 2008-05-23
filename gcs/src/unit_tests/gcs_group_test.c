@@ -382,36 +382,36 @@ START_TEST(gcs_group_last_applied)
     fail_if (!gcs_group_new_members(&group)); RECEIVE_SYNC();
 
     // 0, 0, 0, 0
-    fail_if (gcs_group_get_last_applied (&group) != 0);
+    fail_if (group.last_applied != 0);
     group_set_last_msg (&msg0, 1);
     fail_if (1 != group_get_last_msg(&msg0));
     gcs_group_handle_last_msg (&group, &msg0);
     // 1, 0, 0, 0
-    fail_if (gcs_group_get_last_applied (&group) != 0); // smallest is still 0
+    fail_if (group.last_applied != 0); // smallest is still 0
     group_set_last_msg (&msg1, 2);
     gcs_group_handle_last_msg (&group, &msg1);
     // 1, 2, 0, 0
-    fail_if (gcs_group_get_last_applied (&group) != 0); // smallest is still 0
+    fail_if (group.last_applied != 0); // smallest is still 0
     group_set_last_msg (&msg2, 3);
     gcs_group_handle_last_msg (&group, &msg2);
     // 1, 2, 3, 0
-    fail_if (gcs_group_get_last_applied (&group) != 0); // smallest is still 0
+    fail_if (group.last_applied != 0); // smallest is still 0
     group_set_last_msg (&msg3, 4);
     gcs_group_handle_last_msg (&group, &msg3);
     // 1, 2, 3, 4
-    fail_if (gcs_group_get_last_applied (&group) != 1); // now must be 1
+    fail_if (group.last_applied != 1); // now must be 1
     group_set_last_msg (&msg1, 6);
     gcs_group_handle_last_msg (&group, &msg1);
     // 1, 6, 3, 4
-    fail_if (gcs_group_get_last_applied (&group) != 1); // now must still be 1
+    fail_if (group.last_applied != 1); // now must still be 1
     group_set_last_msg (&msg0, 7);
     gcs_group_handle_last_msg (&group, &msg0);
     // 7, 6, 3, 4
-    fail_if (gcs_group_get_last_applied (&group) != 3); // now must be 3
+    fail_if (group.last_applied != 3); // now must be 3
     group_set_last_msg (&msg3, 8);
     gcs_group_handle_last_msg (&group, &msg3);
     // 7, 6, 3, 8
-    fail_if (gcs_group_get_last_applied (&group) != 3); // must still be 3
+    fail_if (group.last_applied != 3); // must still be 3
 
     // remove the lagging node
     gcs_comp_msg_delete(comp);
@@ -426,9 +426,9 @@ START_TEST(gcs_group_last_applied)
     fail_if (!gcs_group_is_primary(&group));
     fail_if (gcs_group_new_members(&group)); RECEIVE_SYNC();
     // 7, 6, 8
-    fail_if (gcs_group_get_last_applied (&group) != 6,
+    fail_if (group.last_applied != 6,
              "Expected %u, got %llu\nGroup: %d: %s, %s, %s",
-             6, gcs_group_get_last_applied(&group),
+             6, group.last_applied,
              group.num, group.nodes[0].id, group.nodes[1].id,group.nodes[2].id);
 
     // add new node
@@ -445,7 +445,7 @@ START_TEST(gcs_group_last_applied)
     fail_if (!gcs_group_is_primary(&group));
     fail_if (!gcs_group_new_members(&group));
     // 7, 6, 8, 0
-    fail_if (gcs_group_get_last_applied (&group) != 0);
+    fail_if (group.last_applied != 0);
 
 }
 END_TEST

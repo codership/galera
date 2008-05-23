@@ -361,7 +361,7 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg)
 }
 
 /*! Receives action */
-ssize_t gcs_core_recv (gcs_core_t* conn,
+ssize_t gcs_core_recv (gcs_core_t*      conn,
                        uint8_t**        action,
                        gcs_act_type_t*  act_type,
                        gcs_seqno_t*     act_id) // should not be here!!!
@@ -372,6 +372,7 @@ ssize_t gcs_core_recv (gcs_core_t* conn,
 
     *action   = NULL;
     *act_type = GCS_ACT_ERROR;
+    *act_id   = GCS_SEQNO_ILL;
 
     if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
     if (conn->state >= CORE_CLOSED) {
@@ -419,18 +420,32 @@ ssize_t gcs_core_recv (gcs_core_t* conn,
 		}
 	    }
 	    else { /* Non-primary - ignore action */
-		gu_debug ("Action message in non-primary configuration from "
+		gu_warn ("Action message in non-primary configuration from "
 			  "member %d", recv_msg->sender_id);
 	    }
 	    break;
         case GCS_MSG_LAST:
             if (gcs_group_is_primary(group)) {
-                gcs_group_handle_last_msg (group, recv_msg);
+                gcs_seqno_t commit_cut =
+                    gcs_group_handle_last_msg (group, recv_msg);
+                if (commit_cut) {
+                    /* commit cut changed */
+                    if ((*action  = malloc (sizeof (commit_cut)))) {
+                        *act_id   = ++conn->recv_act_no;
+                        *act_type = GCS_ACT_COMMIT_CUT;
+                        *((gcs_seqno_t*)*action) = commit_cut;
+                        ret = sizeof(commit_cut);
+                    }
+                    else {
+                        gu_fatal ("Out of memory for GCS_ACT_COMMIT_CUT");
+                        abort();
+                    }
+                }
 	    }
 	    else { /* Non-primary - ignore last message */
-		gu_debug ("Last Applied Action message "
-                          "in non-primary configuration from member %d",
-			  recv_msg->sender_id);
+		gu_warn ("Last Applied Action message "
+                         "in non-primary configuration from member %d",
+                         recv_msg->sender_id);
 	    }
 	    break;
 	case GCS_MSG_COMPONENT:
@@ -592,10 +607,4 @@ gcs_core_set_last_applied (gcs_core_t* core, gcs_seqno_t seqno)
         ret = 0;
     }
     return ret;
-}
-
-gcs_seqno_t
-gcs_core_get_last_applied (gcs_core_t* core)
-{
-    return gcs_group_get_last_applied (&core->group);
 }

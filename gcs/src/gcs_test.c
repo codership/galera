@@ -290,19 +290,19 @@ test_log_in_to (gcs_to_t* to, gcs_seqno_t seqno, const char* msg)
     return ret;
 }
 
+static gcs_seqno_t group_seqno = 0;
+
 static inline long
 test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
 {
     long ret = 0;
 #define SEND_LAST_MASK ((1 << 13) - 1) // every 8192nd seqno
     if (!(my_seqno & SEND_LAST_MASK)) {
-        gcs_seqno_t group_seqno;
             ret = gcs_set_last_applied (gcs, my_seqno);
             if (ret) {
                 fprintf (stderr,"gcs_set_last_applied(%llu) returned %ld\n",
                          (unsigned long long)my_seqno, ret);
             }
-            group_seqno = gcs_get_last_applied (gcs);
 //            if (!throughput) {
                 fprintf (stdout, "Last applied: my = %llu, group = %llu\n",
                          (unsigned long long)my_seqno,
@@ -432,8 +432,17 @@ void *gcs_test_recv (void *arg)
 	msg_recvd++;
         size_recvd += thread->msg_len;
 
-        test_after_recv (thread);
-	//puts (thread->log_msg); fflush (stdout);
+        switch (thread->act_type) {
+        case GCS_ACT_DATA:
+            test_after_recv (thread);
+            //puts (thread->log_msg); fflush (stdout);
+            break;
+        case GCS_ACT_COMMIT_CUT:
+            group_seqno = *(gcs_seqno_t*)thread->msg;
+            break;
+        default:
+            fprintf (stderr, "Unexpected action type: %d", thread->act_type);
+        }
 	free (thread->msg);
     }
 //    fprintf (stderr, "RECV thread %ld exiting: %s\n",

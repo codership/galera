@@ -90,14 +90,8 @@ gcs_group_handle_act_msg (gcs_group_t*    group,
     return ret;
 }
 
-extern void
+extern gcs_seqno_t
 gcs_group_handle_last_msg (gcs_group_t* group, gcs_recv_msg_t* msg);
-
-static inline gcs_seqno_t
-gcs_group_get_last_applied (gcs_group_t* group)
-{
-    return group->last_applied;
-}
 
 static inline bool
 gcs_group_new_members (gcs_group_t* group)

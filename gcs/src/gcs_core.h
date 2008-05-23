@@ -91,8 +91,4 @@ long gcs_core_set_pkt_size (gcs_core_t *conn, ulong pkt_size);
 extern long
 gcs_core_set_last_applied (gcs_core_t* core, gcs_seqno_t seqno);
 
-/* gets last applied vote from group */
-extern gcs_seqno_t
-gcs_core_get_last_applied (gcs_core_t* core);
-
 #endif // _gcs_core_h_

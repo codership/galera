@@ -64,7 +64,6 @@ struct galera_info Galera;
 static gu_mutex_t commit_mtx;
 
 static bool_t mark_commit_early = FALSE;
-static bool_t local_commits = FALSE;
 
 static FILE *wslog_L;
 static FILE *wslog_G;
@@ -228,7 +227,7 @@ enum galera_status galera_enable() {
     switch(rcode) {
     case GCS_ERR_OK:
 	assert (gcs_conn);
-	gu_info("Successfully opened GCS connection");
+	gu_info("Successfully opened GCS connection to %s", gcs_channel);
 	break;
     default:
 	gu_error("gcs_open(%p, %s, %s) failed: %d (%s)",
@@ -447,33 +446,18 @@ static int apply_query(void *app_ctx, char *query, int len) {
     GU_DBUG_RETURN(GALERA_OK);
 }
 
-// once per 128 writesets
-static const ulong TRUNCATE_WRITE_SET_HISTORY_MASK = (1 << 7) - 1;
+static inline void report_last_committed (
+    gcs_conn_t* gcs_conn, gcs_seqno_t seqno
+) {
+    static ulong const report_interval = 100;
+    static ulong counter = 0;
 
-static inline void truncate_write_set_history (
-    gcs_conn_t* gcs_conn, gcs_seqno_t seqno, bool_t local
-) { 
-    if (!(((ulong)seqno) & TRUNCATE_WRITE_SET_HISTORY_MASK)) {
-        /* first report our last_seen_trx counter */
-        if (local) {
-            /* local trxs can report without delay */
-            gcs_set_last_applied(gcs_conn, seqno);
-        } else {
-           /* for remote trxs, we must know there are no pending
-            * local trxs in certification queue
-            */
-            gu_mutex_lock(&commit_mtx);
-            if (local_commits) {
-                local_commits = FALSE;
-            } else {
-                gcs_set_last_applied(gcs_conn, seqno);
-            }
-            gu_mutex_unlock(&commit_mtx);
+    if (++counter > report_interval) {
+        /* high time to report our progress */
+        if (!gcs_set_last_applied(gcs_conn, seqno)) {
+            // success, reset counter
+            counter = 0;
         }
-        /* get the minimum trx applying state in the group */
-        seqno = gcs_get_last_applied(gcs_conn);
-        /* purge the history */
-        wsdb_purge_trxs_upto(seqno);
     }
 }
 
@@ -682,8 +666,19 @@ enum galera_status galera_recv(void *app_ctx) {
 	    free(action);
 
             /* tell the group about last committed */
-            truncate_write_set_history(gcs_conn, seqno_g, FALSE);
+            report_last_committed (gcs_conn, seqno_g);
             
+            break;
+        case GCS_ACT_COMMIT_CUT:
+            // synchronize
+            gcs_to_grab    (to_queue, seqno_g);
+            gcs_to_release (to_queue, seqno_g);
+            // After this no certifications with seqno < commit_cut
+            // Let other transaction continue to commit
+            gcs_to_self_cancel (commit_queue, seqno_g);
+            gu_info ("Purging history up to %llu", *(gcs_seqno_t*)action);
+            wsdb_purge_trxs_upto(*(gcs_seqno_t*)action);
+            free (action);
             break;
         case GCS_ACT_SNAPSHOT:
         case GCS_ACT_PRIMARY:
@@ -787,6 +782,7 @@ enum galera_status galera_committed(trx_id_t trx_id) {
 
     if (!mark_commit_early) {
         wsdb_set_local_trx_committed(trx_id);
+        report_last_committed (gcs_conn, seqno_l);
     }
     wsdb_delete_local_trx_info(trx_id);
 
@@ -844,9 +840,6 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
 	gu_mutex_unlock(&commit_mtx);
 	GU_DBUG_RETURN(GALERA_TRX_FAIL);
     }
-
-    /* signal cert index truncater, that local commits do happen */
-    local_commits = TRUE;
 
     /* retrieve write set */
     ws = wsdb_get_write_set(trx_id, conn_id);
@@ -946,12 +939,6 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
 
 after_cert_test:
 
-    /* here is a good point to announce our oldest last_see_trx reference.
-     * We announce here a seqno, which is oldest we can have in our
-     * local "certification queue"
-     */
-    truncate_write_set_history (gcs_conn, ws->last_seen_trx, TRUE);
-
     if (retcode == GALERA_OK) {
 	/* Grab commit queue for commit time */
 	if (seqno_l > 0 && gcs_to_grab(commit_queue, seqno_l)) {
@@ -961,6 +948,7 @@ after_cert_test:
         // we can update last seen trx counter already here
         if (mark_commit_early) {
             wsdb_set_local_trx_committed(trx_id);
+            report_last_committed (gcs_conn, seqno_l);
         }
     } else {
 	/* Cancel commit queue since we are going to rollback */

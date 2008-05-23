@@ -159,7 +159,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
     return group->state;
 }
 
-void
+gcs_seqno_t
 gcs_group_handle_last_msg (gcs_group_t* group, gcs_recv_msg_t* msg)
 {
     gcs_seqno_t seqno;
@@ -180,8 +180,14 @@ gcs_group_handle_last_msg (gcs_group_t* group, gcs_recv_msg_t* msg)
         seqno > group->last_applied) {
         /* node that was responsible for the last value, has changed it.
          * need to recompute it */
+        gcs_seqno_t old_val = group->last_applied;
         group_redo_last_applied (group);
+        if (old_val != group->last_applied) {
+            return group->last_applied;
+        }
     }
+
+    return 0;
 }
 
 void
