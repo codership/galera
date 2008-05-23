@@ -49,7 +49,7 @@ public:
 
     const void *get_buf(const size_t offset) const {
 	if (offset > buflen)
-	    throw DException("");
+	    throw FatalException("Trying to read past buffer end");
 	return (priv_buf ? priv_buf : buf) + offset;
     }
     
@@ -63,7 +63,7 @@ public:
     
     size_t get_len(size_t off) const {
 	if (off > buflen)
-	    throw DException("");
+	    throw FatalException("Offset greater than buffer length");
 	return buflen - off;
     }
 

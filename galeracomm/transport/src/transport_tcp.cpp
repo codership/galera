@@ -178,7 +178,7 @@ Transport *TCPTransport::accept(Poll *poll, Protolay *up_ctx)
     
     TCPTransport *ret = new TCPTransport(acc_fd, sa, sa_size, poll);
     if (up_ctx) {
-	set_up_context(up_ctx);
+	ret->set_up_context(up_ctx);
     }
     ret->state = TRANSPORT_S_CONNECTED;
     if (poll) {

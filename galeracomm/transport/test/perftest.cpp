@@ -1,6 +1,6 @@
 
-#include <gcomm/transport.hpp>
-#include <gcomm/exception.hpp>
+#include "gcomm/transport.hpp"
+#include "gcomm/exception.hpp"
 
 
 #include <cstdlib>
@@ -28,7 +28,7 @@ public:
 	tstamp *= 1000000;
 	tstamp += tv.tv_usec;
     }
-    Timeval(const unsigned char *buf, const size_t buflen) {
+    Timeval(const void *buf, const size_t buflen) {
 	if (read_uint64(buf, buflen, 0, &tstamp) == 0)
 	    throw DException("");
     }
@@ -38,37 +38,52 @@ class Message {
     Timeval tstamp;
     unsigned char *raw;
     size_t size;
+    unsigned char hdr[8];
+    size_t hdr_len;
 public:
-    Message(const size_t s) : size(s + 8) {
-	raw = new unsigned char[size];
-	if (write_uint64(tstamp.tstamp, raw, 8, 0) == 0)
-	    throw DException("");
+    
+    Message(const size_t s) : size(s), hdr_len(8) {
+	if (write_uint64(tstamp.tstamp, hdr, hdr_len, 0) == 0)
+	    throw FatalException("");
+	raw = new unsigned char[size];	
+	::memset(raw, 0xab, size); 
+    }
 
-	::memset(&raw[8], 0xab, size - 8); 
-    }
-    Message(const ReadBuf *rb, const size_t off) {
-	size = rb->get_len(off);
-	if (size < 8)
-	    throw DException("");
+    Message(const ReadBuf *rb, const size_t off) : hdr_len(8) {
+	if (rb->get_len(off) < hdr_len)
+	    throw FatalException("Short message");
+	tstamp = Timeval(rb->get_buf(off), hdr_len);
+	size = rb->get_len(off + hdr_len);
 	raw = new unsigned char[size];
-	::memcpy(raw, rb->get_buf(off), rb->get_len(off));
-	tstamp = Timeval(raw, 8);
+	::memcpy(raw, rb->get_buf(off + hdr_len), rb->get_len(off + hdr_len));
+	
     }
+
     ~Message() {
 	delete[] raw;
     }
+
     uint64_t get_period() const {
 	timeval tv;
 	::gettimeofday(&tv, 0);
 	Timeval tnow(tv);
-
 	return tnow.tstamp - tstamp.tstamp;
     }
+
     const unsigned char *get_raw() const {
 	return raw;
     }
+
     size_t get_raw_len() const {
 	return size;
+    }
+
+    const unsigned char *get_hdr() const {
+	return hdr;
+    }
+
+    size_t get_hdr_len() const {
+	return hdr_len;
     }
 };
 
@@ -120,6 +135,7 @@ public:
     
     void connect(const char *addr) {
 	tp = Transport::create(addr, poll, this);
+	set_down_context(tp);
 	tp->connect(addr);
     }
     void close() {
@@ -133,7 +149,7 @@ public:
 	    return;
 	else if (rb == 0) {
 	    if (tp->get_state() == TRANSPORT_S_FAILED)
-		throw DException("");
+		throw FatalException("Transport failed");
 	    else 
 		return; // Closed?
 	}
@@ -152,14 +168,14 @@ public:
     
     int send(const size_t nbytes) {
 	Message msg(nbytes);
-	WriteBuf *wb = new WriteBuf(msg.get_raw(), msg.get_raw_len());
+	WriteBuf wb(msg.get_raw(), msg.get_raw_len());
+	wb.prepend_hdr(msg.get_hdr(), msg.get_hdr_len());
 	int ret;
-	if ((ret = pass_down(wb, 0)) == EAGAIN) {
+	if ((ret = pass_down(&wb, 0)) == EAGAIN) {
 	    std::cerr << "EAGAIN\n";
-	    delete wb;
 	    return EAGAIN;
 	} 
-
+	
 	if (ret == 0) {
 	    if (first_sent.tstamp == 0) {
 		timeval tv;
@@ -168,7 +184,6 @@ public:
 	    }
 	    sent++;
 	}
-	delete wb;
 	return ret;
     }
     
@@ -197,20 +212,22 @@ public:
         delete tp;
 	std::cerr << "Exiting client handler, Handled: " << handled << " messages\n";
     }
-    void set_transport(Transport *t) {tp = t;}
+    void set_transport(Transport *t) {
+	tp = t;
+	set_down_context(tp);
+    }
 
     void handle_up(int cid, const ReadBuf *rb, const size_t off, const ProtoUpMeta *um) {
 	if (rb == 0 || terminated) {
 	    terminated = true;
 	    return;
 	}
-	WriteBuf *wb = new WriteBuf(rb->get_buf(off), rb->get_len(off));
-	if (pass_down(wb, 0) == EAGAIN) {
+	WriteBuf wb(rb->get_buf(off), rb->get_len(off));
+	if (pass_down(&wb, 0) == EAGAIN) {
 	    terminated = true;
 	} else {
 	    handled++;
 	}
-	delete wb;
     }
 };
 

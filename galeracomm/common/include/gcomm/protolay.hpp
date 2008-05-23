@@ -38,6 +38,7 @@ public:
     virtual void handle_up(const int cid, const ReadBuf *, const size_t, const ProtoUpMeta *) = 0;
     
     void set_up_context(Protolay *up) {
+	// Logger::instance().info(std::string("Setting up context ") + to_string(uint64_t(up)));
 	if (up_context) {
 	    Logger::instance().fatal("Protolay::set_up_context(): "
 				     "Context already exists");
@@ -47,7 +48,7 @@ public:
     }
     
     void set_up_context(Protolay *up, const int id) {
-
+	// Logger::instance().info(std::string("Setting up context ") + to_string(uint64_t(up)));
 	if (up_context) {
 	    Logger::instance().fatal("Protolay::set_up_context(): "
 				     "Context already exists");
