@@ -389,14 +389,15 @@ int TCPTransport::handle_pending()
 	if (i->offset < i->wb->get_hdrlen()) {
 	    if ((ret = send_nointr(i->wb->get_hdr(), 
 				   i->wb->get_hdrlen(), i->offset, 
-				   i->wb->get_totlen() > i->wb->get_hdrlen() ? MSG_MORE : 0)) == -1)
+				   i->wb->get_len() ? MSG_MORE : 0)) == -1)
 		return EPIPE;
 	    i->offset += ret;
-	    if (size_t(ret) != i->wb->get_hdrlen()) {
+	    if (i->offset != i->wb->get_hdrlen()) {
 		logger.debug("TCPTransport::handle_pending(): Return EAGAIN");
 		return EAGAIN;
 	    }
 	}
+	ret = 0;
 	if (i->wb->get_len() &&
 	    (ret = send_nointr(i->wb->get_buf(), i->wb->get_len(),
 			       i->offset - i->wb->get_hdrlen(), 0)) == -1)
