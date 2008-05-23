@@ -141,18 +141,19 @@ static void *gcs_recv_thread (void *arg)
 	    break;
 	}
 
-        if (act_type <= GCS_ACT_DATA) { // currently app doesn't handle
-                                        // anything else. Fixme.
+        if (act_type < GCS_ACT_NON_PRIMARY) {
 	    /* deliver to application and increment local order */
 	    conn->local_act_id++;
 //            gu_debug ("Received action #%llu", conn->local_act_id);
-        } else {
+        }
+#if removed
+ else {
 	    /* not interested, continue loop */
 	    if (action) free (action); // was allocated by standard malloc()
             gu_debug ("Ignoring action after #%llu", conn->local_act_id);
 	    continue;
         }
-
+#endif
 	if (!action_repl) {
 	    /* Check if there is any local repl action in queue */
 	    act = gcs_fifo_head (conn->repl_q);
@@ -173,8 +174,8 @@ static void *gcs_recv_thread (void *arg)
 //            gu_debug ("Local action");
 	    act = gcs_fifo_safe_get (conn->repl_q);
 	    
-	    act->act_id       = act_id;
-//	    act->act_id       = conn->local_act_id;
+//	    act->act_id       = act_id;
+	    act->act_id       = conn->local_act_id;
 	    act->local_act_id = conn->local_act_id;
 	    assert (act->action == action);
 

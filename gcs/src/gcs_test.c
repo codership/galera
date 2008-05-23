@@ -441,7 +441,7 @@ void *gcs_test_recv (void *arg)
             group_seqno = *(gcs_seqno_t*)thread->msg;
             break;
         default:
-            fprintf (stderr, "Unexpected action type: %d", thread->act_type);
+            fprintf (stderr, "Unexpected action type: %d\n", thread->act_type);
         }
 	free (thread->msg);
     }
@@ -540,7 +540,7 @@ static long gcs_test_conf (gcs_test_conf_t *conf, long argc, char *argv[])
     conf->n_tries = 10;
     conf->n_repl  = 10;
     conf->n_send  = 0;
-    conf->n_recv  = 0;
+    conf->n_recv  = 1;
     conf->backend = DEFAULT_BACKEND;
 
     switch (argc)

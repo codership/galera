@@ -435,6 +435,7 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
                         *act_type = GCS_ACT_COMMIT_CUT;
                         *((gcs_seqno_t*)*action) = commit_cut;
                         ret = sizeof(commit_cut);
+                        goto out;
                     }
                     else {
                         gu_fatal ("Out of memory for GCS_ACT_COMMIT_CUT");
@@ -447,7 +448,8 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
                          "in non-primary configuration from member %d",
                          recv_msg->sender_id);
 	    }
-	    break;
+            if (*act_type == GCS_ACT_COMMIT_CUT) gu_info ("COMMIT CUT!");
+            break;
 	case GCS_MSG_COMPONENT:
 	    *action = NULL;
             ret = gcs_group_handle_comp_msg (group, recv_msg->buf);

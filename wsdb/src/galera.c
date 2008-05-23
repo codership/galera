@@ -454,7 +454,8 @@ static inline void report_last_committed (
 
     if (++counter > report_interval) {
         /* high time to report our progress */
-        if (!gcs_set_last_applied(gcs_conn, seqno)) {
+	gu_debug ("Reporting last committed: %llu", seqno);
+        if (0 == gcs_set_last_applied(gcs_conn, seqno)) {
             // success, reset counter
             counter = 0;
         }
@@ -676,8 +677,8 @@ enum galera_status galera_recv(void *app_ctx) {
             // After this no certifications with seqno < commit_cut
             // Let other transaction continue to commit
             gcs_to_self_cancel (commit_queue, seqno_g);
-            gu_info ("Purging history up to %llu", *(gcs_seqno_t*)action);
-            wsdb_purge_trxs_upto(*(gcs_seqno_t*)action);
+            gu_debug ("Purging history up to %llu", *(gcs_seqno_t*)action - 1);
+            wsdb_purge_trxs_upto(*(gcs_seqno_t*)action - 1);
             free (action);
             break;
         case GCS_ACT_SNAPSHOT:

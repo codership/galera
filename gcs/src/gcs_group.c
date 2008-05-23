@@ -176,8 +176,7 @@ gcs_group_handle_last_msg (gcs_group_t* group, gcs_recv_msg_t* msg)
 
     gcs_node_set_last_applied (&group->nodes[msg->sender_id], seqno);
 
-    if (msg->sender_id == group->last_node &&
-        seqno > group->last_applied) {
+    if (msg->sender_id == group->last_node && seqno > group->last_applied) {
         /* node that was responsible for the last value, has changed it.
          * need to recompute it */
         gcs_seqno_t old_val = group->last_applied;
