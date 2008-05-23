@@ -21,6 +21,10 @@ public:
     Thread() : state(STOPPED) {
 	
     }
+
+    virtual ~Thread() {
+
+    }
     
     virtual void run() = 0;
     
