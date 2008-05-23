@@ -89,14 +89,22 @@ void TCPTransport::connect(const char *addr)
 	int err = errno;
 	while (::close(fd) == -1 && errno == EINTR);
 	fd = -1;
-	throw DException(::strerror(err));
+	throw FatalException(::strerror(err));
     }
+
+    if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) == -1) {
+	int err = errno;
+	while (::close(fd) == -1 && errno == EINTR);
+	fd = -1;
+	throw FatalException(::strerror(err));	
+    }
+
     if (is_synchronous() == false) {
 	if (::fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
 	    int err = errno;
 	    while (::close(fd) == -1 && errno == EINTR);
 	    fd = -1;
-	    throw DException(::strerror(err));
+	    throw FatalException(::strerror(err));
 	}
     } 
     if (poll) {
@@ -175,6 +183,12 @@ Transport *TCPTransport::accept(Poll *poll, Protolay *up_ctx)
 	throw FatalException("TCPTransport::accept(): Fcntl failed");
     }
 
+
+    if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) == -1) {
+	int err = errno;
+	while (::close(fd) == -1 && errno == EINTR);
+	throw FatalException(::strerror(err));	
+    }
     
     TCPTransport *ret = new TCPTransport(acc_fd, sa, sa_size, poll);
     if (up_ctx) {

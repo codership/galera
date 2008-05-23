@@ -17,6 +17,7 @@
 
 class TCPTransport : public Transport, PollContext {
     int fd;
+    int no_nagle;
     sockaddr sa;
     size_t sa_size;
     Poll *poll;
@@ -32,7 +33,7 @@ class TCPTransport : public Transport, PollContext {
     std::deque<PendingWriteBuf> pending;
     TCPTransport(const int _fd, const sockaddr& _sa, 
 		 const size_t _sa_size, Poll *_poll) :
-	fd(_fd), sa(_sa), sa_size(_sa_size), poll(_poll),
+	fd(_fd), no_nagle(1), sa(_sa), sa_size(_sa_size), poll(_poll),
 	max_pending(1024), pending_bytes(0), recv_buf_offset(0), recv_rb(0) {
 	
 	recv_buf_size = 65536;
@@ -41,7 +42,7 @@ class TCPTransport : public Transport, PollContext {
     }
 public:
     TCPTransport(Poll *p) : 
-	fd(-1), poll(p), max_pending(1024), pending_bytes(0), 
+	fd(-1), no_nagle(1), poll(p), max_pending(1024), pending_bytes(0), 
 	recv_buf_offset(0), recv_rb(0) {
 	recv_buf_size = 65536;
 	recv_buf = reinterpret_cast<unsigned char*>(::malloc(recv_buf_size));
