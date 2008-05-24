@@ -42,19 +42,33 @@ struct trx_info {
 #define IDENT_trx_info 'X'
 
 /* seqno of last committed transaction  */
-trx_seqno_t last_committed_trx;
-//struct gu_mutex last_committed_trx_mtx; // mutex protecting last_commit...
-gu_mutex_t last_committed_trx_mtx; // mutex protecting last_commit...
+static trx_seqno_t last_committed_trx;
+static ulong       last_committed_ctr  = 0;
+static trx_seqno_t last_referenced_trx = 0;
+static ulong       last_referenced_ctr = 0;
 
-static void set_last_committed_trx(trx_seqno_t seqno) {
+static gu_mutex_t  last_committed_trx_mtx; // mutex protecting last_commit...
+
+static inline void set_last_committed_trx(trx_seqno_t seqno) {
+    GU_DBUG_ENTER("set_last_committed_trx");
     gu_mutex_lock(&last_committed_trx_mtx);
-    last_committed_trx= seqno;
+    if (last_committed_trx < seqno) {
+        last_committed_trx = seqno;
+    }
+    else {
+	GU_DBUG_PRINT(
+            "wsdb",("setting last_committed_trx to lower value: %llu %llu",
+                    last_committed_trx, seqno)
+            );
+    }
     gu_mutex_unlock(&last_committed_trx_mtx);
+    GU_DBUG_VOID_RETURN;
 }
+
 trx_seqno_t wsdb_get_last_committed_trx() {
     trx_seqno_t tmp;
     gu_mutex_lock(&last_committed_trx_mtx);
-    tmp= last_committed_trx;
+    tmp = last_committed_trx;
     gu_mutex_unlock(&last_committed_trx_mtx);
     return tmp;
 }
@@ -992,17 +1006,11 @@ int wsdb_set_global_trx_committed(trx_seqno_t trx_seqno) {
     GU_DBUG_ENTER("wsdb_set_global_trx_committed");
     GU_DBUG_PRINT("wsdb",("last committed: %llu", trx_seqno));
 
-    if (wsdb_get_last_committed_trx() < trx_seqno) {
-        set_last_committed_trx(trx_seqno);
-    } else {
-	GU_DBUG_PRINT(
-            "wsdb",("setting (G) last_committed_trx to lower value: %llu %llu",
-                           trx_seqno, wsdb_get_last_committed_trx())
-        );
-    }
+    set_last_committed_trx(trx_seqno);
 
     GU_DBUG_RETURN( WSDB_OK);
 }
+
 int wsdb_set_local_trx_committed(local_trxid_t trx_id) {
     struct trx_info       *trx = get_trx_info(trx_id);
 
@@ -1013,14 +1021,7 @@ int wsdb_set_local_trx_committed(local_trxid_t trx_id) {
     }
     GU_DBUG_PRINT("wsdb",("last committed: %llu->%llu", trx_id, trx->seqno_g));
 
-    if (wsdb_get_last_committed_trx() < trx->seqno_g) {
-        set_last_committed_trx(trx->seqno_g);
-    } else {
-	GU_DBUG_PRINT(
-            "wsdb",("setting last_committed_trx to lower value: %llu %llu",
-                           trx->seqno_g, wsdb_get_last_committed_trx())
-        );
-    }
+    set_last_committed_trx(trx->seqno_g);
 
     GU_DBUG_RETURN( WSDB_OK);
 }

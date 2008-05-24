@@ -455,13 +455,24 @@ static inline void report_last_committed (
     if (++counter > report_interval) {
         /* high time to report our progress */
 	gu_debug ("Reporting last committed: %llu", seqno);
-        if (0 == gcs_set_last_applied(gcs_conn, seqno)) {
+        if (0 == gcs_set_last_applied(gcs_conn, seqno - report_interval)) {
             // success, reset counter
             counter = 0;
         }
     }
 }
 
+static inline void truncate_trx_history (gcs_seqno_t seqno)
+{
+    static ulong const truncate_interval = 100;
+    static gcs_seqno_t last_truncated = 0;
+
+    if (last_truncated + truncate_interval < seqno) {
+        gu_info ("Purging history up to %llu", seqno);
+//        wsdb_purge_trxs_upto(seqno);
+        last_truncated = seqno;
+    }
+}
 
 static void process_conn_write_set( 
     struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
@@ -677,8 +688,7 @@ enum galera_status galera_recv(void *app_ctx) {
             // After this no certifications with seqno < commit_cut
             // Let other transaction continue to commit
             gcs_to_self_cancel (commit_queue, seqno_g);
-            gu_debug ("Purging history up to %llu", *(gcs_seqno_t*)action - 1);
-            wsdb_purge_trxs_upto(*(gcs_seqno_t*)action - 1);
+            truncate_trx_history (*(gcs_seqno_t*)action - 1);
             free (action);
             break;
         case GCS_ACT_SNAPSHOT:
