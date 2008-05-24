@@ -42,37 +42,90 @@ struct trx_info {
 #define IDENT_trx_info 'X'
 
 /* seqno of last committed transaction  */
-static trx_seqno_t last_committed_trx;
-static ulong       last_committed_ctr  = 0;
-static trx_seqno_t last_referenced_trx = 0;
-static ulong       last_referenced_ctr = 0;
+static trx_seqno_t last_committed_seqno = 0;
+/* keeps overall count of local transactions currently referencing any seqno 
+ * via last_seen */
+static ulong       last_committed_refs = 0;
+static trx_seqno_t to_discard_seqno = 0;
+static ulong       to_discard_refs  = 0;
+static trx_seqno_t safe_to_discard  = 0;
+static const ulong discard_interval = 100;
 
-static gu_mutex_t  last_committed_trx_mtx; // mutex protecting last_commit...
+static gu_mutex_t  last_committed_seqno_mtx; // mutex protecting last_commit...
 
-static inline void set_last_committed_trx(trx_seqno_t seqno) {
+// if seqno != last_seen - local trx, decrement reference counters
+static inline void set_last_committed_seqno(trx_seqno_t seqno) {
     GU_DBUG_ENTER("set_last_committed_trx");
-    gu_mutex_lock(&last_committed_trx_mtx);
-    if (last_committed_trx < seqno) {
-        last_committed_trx = seqno;
+    gu_mutex_lock(&last_committed_seqno_mtx);
+    if (last_committed_seqno < seqno) {
+        last_committed_seqno = seqno;
+
+        // check if we need to update safe_to_discard
+        if (!to_discard_seqno && safe_to_discard + discard_interval < seqno) {
+            // high time to try to discard new seqno
+            assert (0 == to_discard_refs);
+            if (last_committed_refs) {
+                // can't do it right away, some seqnos < seqno-1 are referenced
+                to_discard_seqno = seqno - 1;
+                // all local transactions reference seqnos < to_discard_seqno
+                // wait until it gets unreferenced
+                to_discard_refs  = last_committed_refs;
+            }
+            else {
+                assert (safe_to_discard < seqno);
+                safe_to_discard = seqno - 1;
+            }
+            gu_info ("DISCARD begin: safe = %llu, to_discard = %llu, "
+                     "refs = %lu",
+                     safe_to_discard, to_discard_seqno, to_discard_refs);
+        }
     }
     else {
 	GU_DBUG_PRINT(
             "wsdb",("setting last_committed_trx to lower value: %llu %llu",
-                    last_committed_trx, seqno)
+                    last_committed_seqno, seqno)
             );
     }
-    gu_mutex_unlock(&last_committed_trx_mtx);
+    gu_mutex_unlock(&last_committed_seqno_mtx);
     GU_DBUG_VOID_RETURN;
 }
 
-trx_seqno_t wsdb_get_last_committed_trx() {
+trx_seqno_t wsdb_get_last_committed_seqno() {
     trx_seqno_t tmp;
-    gu_mutex_lock(&last_committed_trx_mtx);
-    tmp = last_committed_trx;
-    gu_mutex_unlock(&last_committed_trx_mtx);
+    gu_mutex_lock(&last_committed_seqno_mtx);
+    tmp = last_committed_seqno;
+    last_committed_refs++;
+    gu_mutex_unlock(&last_committed_seqno_mtx);
     return tmp;
 }
 
+void wsdb_deref_seqno (trx_seqno_t last_seen)
+{
+    gu_mutex_lock(&last_committed_seqno_mtx);
+    last_committed_refs--;
+    assert (last_committed_refs >= 0);
+    if (to_discard_refs && to_discard_seqno >= last_seen) {
+        // we're waiting until to_discard_seqno becomes unreferenced
+        // this trx refernced it, decrement reference counter
+        assert (to_discard_seqno);
+        to_discard_refs--;
+        if (!to_discard_refs) {
+            // no more local refrences to seqnos <= to_discard_seqno,
+            // safe to discard
+            safe_to_discard = to_discard_seqno;
+            to_discard_seqno = 0;
+        }
+        gu_info ("DISCARD cont: safe = %llu, to_discard = %llu, refs = %lu",
+                 safe_to_discard, to_discard_seqno, to_discard_refs);        
+    }
+    gu_mutex_unlock(&last_committed_seqno_mtx);
+}
+
+trx_seqno_t wsdb_get_safe_to_discard_seqno()
+{
+    // seems like no need to lock
+    return safe_to_discard;
+}
 
 /* not used
 static uint32_t hash_fun_16(uint32_t max_size, uint16_t len, char *key) {
@@ -133,7 +186,7 @@ int local_open(
     rcode = conn_init(0);
 
     /* initialize last_committed_trx mutex */
-    gu_mutex_init(&last_committed_trx_mtx, NULL);
+    gu_mutex_init(&last_committed_seqno_mtx, NULL);
 
     return WSDB_OK;
 }
@@ -885,7 +938,7 @@ static int get_write_set_do(
     ws->level         = WSDB_WS_QUERY;
 
     GU_DBUG_PRINT("wsdb",
-      ("trx: %llu, last: %llu, level: %d", trx->id, last_committed_trx, ws->level)
+      ("trx: %llu, last: %llu, level: %d", trx->id, last_committed_seqno, ws->level)
     );
     GU_DBUG_RETURN(WSDB_OK);
 }
@@ -934,7 +987,7 @@ struct wsdb_write_set *wsdb_get_write_set(
     }
 
     ws->local_trx_id  = trx_id;
-    ws->last_seen_trx = wsdb_get_last_committed_trx();
+    ws->last_seen_trx = wsdb_get_last_committed_seqno();
     ws->level         = WSDB_WS_QUERY;
 
     if (ws->last_seen_trx == 0) {
@@ -942,7 +995,7 @@ struct wsdb_write_set *wsdb_get_write_set(
     }
 
     GU_DBUG_PRINT("wsdb",
-      ("trx: %llu, last: %llu, level: %d",trx_id,last_committed_trx,ws->level)
+      ("trx: %llu, last: %llu, level: %d",trx_id,last_committed_seqno,ws->level)
     );
     GU_DBUG_RETURN(ws);
 }
@@ -1006,7 +1059,7 @@ int wsdb_set_global_trx_committed(trx_seqno_t trx_seqno) {
     GU_DBUG_ENTER("wsdb_set_global_trx_committed");
     GU_DBUG_PRINT("wsdb",("last committed: %llu", trx_seqno));
 
-    set_last_committed_trx(trx_seqno);
+    set_last_committed_seqno(trx_seqno);
 
     GU_DBUG_RETURN( WSDB_OK);
 }
@@ -1021,7 +1074,7 @@ int wsdb_set_local_trx_committed(local_trxid_t trx_id) {
     }
     GU_DBUG_PRINT("wsdb",("last committed: %llu->%llu", trx_id, trx->seqno_g));
 
-    set_last_committed_trx(trx->seqno_g);
+    set_last_committed_seqno(trx->seqno_g);
 
     GU_DBUG_RETURN( WSDB_OK);
 }

@@ -391,10 +391,22 @@ int wsdb_assign_trx(
 trx_seqno_t wsdb_get_local_trx_seqno(local_trxid_t trx_id);
  
  /*!
-  * @brief returns the seqno of latest trx, which has committed
+  * @brief returns the seqno of latest trx, which has committed,
+  * Also increments use count of last_committed
   *
   */
-trx_seqno_t wsdb_get_last_committed_trx();
+trx_seqno_t wsdb_get_last_committed_seqno();
+
+/*!
+ * @brief Decrements use count of last_committed seqno.
+ * Should be called after certification is over with last_seen argument
+ */
+void wsdb_deref_seqno (trx_seqno_t last_seen);
+
+/*!
+ * @brief Returns sequence number that is guaranteed unreferenced
+ */
+trx_seqno_t wsdb_get_safe_to_discard_seqno ();
 
 /*!
  * @brief removes transaction's write set from wsdb

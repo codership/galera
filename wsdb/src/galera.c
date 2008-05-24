@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #include <galerautils.h>
 #include <gcs.h>
@@ -446,19 +447,28 @@ static int apply_query(void *app_ctx, char *query, int len) {
     GU_DBUG_RETURN(GALERA_OK);
 }
 
-static inline void report_last_committed (
-    gcs_conn_t* gcs_conn, gcs_seqno_t seqno
-) {
-    static ulong const report_interval = 100;
-    static ulong counter = 0;
+static ulong const    report_interval = 200;
+static volatile ulong report_counter  = 0;
 
-    if (++counter > report_interval) {
-        /* high time to report our progress */
-	gu_debug ("Reporting last committed: %llu", seqno);
-        if (0 == gcs_set_last_applied(gcs_conn, seqno - report_interval)) {
-            // success, reset counter
-            counter = 0;
-        }
+// fast funciton to be run inside commit_queue critical section
+static inline bool report_check_counter ()
+{
+    return (++report_counter > report_interval && !(report_counter = 0));
+}
+
+// this shoudl be run after commit_queue is released
+static inline void report_last_committed (
+    gcs_conn_t* gcs_conn
+) {
+    gcs_seqno_t seqno = wsdb_get_safe_to_discard_seqno();
+    long ret;
+
+    gu_info ("Reporting last committed: %llu", seqno);
+    if ((ret = gcs_set_last_applied(gcs_conn, seqno))) {
+        gu_warn ("Failed to report last committed %llu, %d (%s)",
+                 seqno, -ret, gcs_strerror (ret));
+        // failure, set counter to trigger new attempt
+        report_counter += report_interval;
     }
 }
 
@@ -469,7 +479,7 @@ static inline void truncate_trx_history (gcs_seqno_t seqno)
 
     if (last_truncated + truncate_interval < seqno) {
         gu_info ("Purging history up to %llu", seqno);
-//        wsdb_purge_trxs_upto(seqno);
+        wsdb_purge_trxs_upto(seqno);
         last_truncated = seqno;
     }
 }
@@ -478,6 +488,7 @@ static void process_conn_write_set(
     struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
     gcs_seqno_t seqno_l
 ) {
+    bool do_report;
     int rcode;
 
     /* wait for total order */
@@ -504,8 +515,12 @@ static void process_conn_write_set(
 	);
     }
     
+    do_report = report_check_counter();
+
     gcs_to_release(commit_queue, seqno_l);
 
+    if (do_report) report_last_committed(gcs_conn);
+    
     return;
 }
 
@@ -513,6 +528,7 @@ static void process_query_write_set(
     struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
     gcs_seqno_t seqno_g, gcs_seqno_t seqno_l
 ) {
+    bool do_report = false;
     int rcode;
     struct job_context ctx;
     int is_retry = 0;
@@ -569,6 +585,8 @@ static void process_query_write_set(
 	    goto retry;
         }
 
+        do_report = report_check_counter ();
+
 	gcs_to_release(commit_queue, seqno_l);
 	
         /* register committed transaction */
@@ -598,7 +616,7 @@ static void process_query_write_set(
         break;
     }
 
-
+    if (do_report) report_last_committed (gcs_conn);
     /* 
      * NOTE: Is it safe to delete global trx? Should there be consensus of 
      * last applied writesets before deleting anything from certification 
@@ -676,10 +694,6 @@ enum galera_status galera_recv(void *app_ctx) {
 	     * (teemu 12.3.2008)
 	     */
 	    free(action);
-
-            /* tell the group about last committed */
-            report_last_committed (gcs_conn, seqno_g);
-            
             break;
         case GCS_ACT_COMMIT_CUT:
             // synchronize
@@ -688,7 +702,7 @@ enum galera_status galera_recv(void *app_ctx) {
             // After this no certifications with seqno < commit_cut
             // Let other transaction continue to commit
             gcs_to_self_cancel (commit_queue, seqno_g);
-            truncate_trx_history (*(gcs_seqno_t*)action - 1);
+            truncate_trx_history (*(gcs_seqno_t*)action);
             free (action);
             break;
         case GCS_ACT_SNAPSHOT:
@@ -779,12 +793,14 @@ uint32_t galera_get_timestamp() {
 enum galera_status galera_committed(trx_id_t trx_id) {
 
     trx_seqno_t seqno_l;
+    bool do_report = false;
     GU_DBUG_ENTER("galera_committed");
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
 
     if ((seqno_l = wsdb_get_local_trx_seqno(trx_id)) > 0 &&
 	seqno_l < GALERA_ABORT_SEQNO) {
+        do_report = report_check_counter ();
 	if (gcs_to_release(commit_queue, seqno_l)) {
 	    gu_fatal("Could not release commit resource for %llu", seqno_l);
 	    abort();
@@ -793,9 +809,10 @@ enum galera_status galera_committed(trx_id_t trx_id) {
 
     if (!mark_commit_early) {
         wsdb_set_local_trx_committed(trx_id);
-        report_last_committed (gcs_conn, seqno_l);
     }
     wsdb_delete_local_trx_info(trx_id);
+
+    if (do_report) report_last_committed (gcs_conn);
 
     GU_DBUG_RETURN(GALERA_OK);
 }
@@ -895,16 +912,14 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
 
     /* check if trx was cancelled before we got here */
     if (wsdb_get_local_trx_seqno(trx_id) == GALERA_ABORT_SEQNO) {
-	gu_debug("trx has been cancelled during rcs_repl(): trx_id %llu  seqno_l %llu", 
-		trx_id, seqno_l);
+	gu_debug("trx has been cancelled during rcs_repl(): "
+                 "trx_id %llu  seqno_l %llu", trx_id, seqno_l);
 	gu_mutex_unlock(&commit_mtx);
 	/* Call self cancel to allow gcs_to_release() to skip this seqno */
         // gcs_to_release() should be called only after successfull
         // gcs_to_grab() - Alex, 16.03.2008
 	gcs_to_self_cancel(to_queue, seqno_l);
-//	gcs_to_release(to_queue, seqno_l);
 	gcs_to_self_cancel(commit_queue, seqno_l);
-//	gcs_to_release(commit_queue, seqno_l);
 	GU_DBUG_RETURN(GALERA_TRX_FAIL);
     }
     
@@ -950,6 +965,9 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
 
 after_cert_test:
 
+    // was referenced by wsdb_get_write_set() above
+    wsdb_deref_seqno (ws->last_seen_trx);
+
     if (retcode == GALERA_OK) {
 	/* Grab commit queue for commit time */
 	if (seqno_l > 0 && gcs_to_grab(commit_queue, seqno_l)) {
@@ -959,7 +977,6 @@ after_cert_test:
         // we can update last seen trx counter already here
         if (mark_commit_early) {
             wsdb_set_local_trx_committed(trx_id);
-            report_last_committed (gcs_conn, seqno_l);
         }
     } else {
 	/* Cancel commit queue since we are going to rollback */
@@ -1145,6 +1162,7 @@ enum galera_status galera_to_execute_start(
 
 enum galera_status galera_to_execute_end(conn_id_t conn_id) {
     gcs_seqno_t seqno;
+    bool do_report;
 
     GU_DBUG_ENTER("galera_to_execute_end");
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
@@ -1154,13 +1172,15 @@ enum galera_status galera_to_execute_end(conn_id_t conn_id) {
         gu_warn("missing connection seqno: %llu",conn_id);
         GU_DBUG_RETURN(GALERA_CONN_FAIL);
     }
-    
+
+    do_report = report_check_counter ();
     /* release commit queue */
     gcs_to_release(commit_queue, seqno);
     
     /* cleanup seqno reference */
     conn_set_seqno(conn_id, 0);
     
+    if (do_report) report_last_committed (gcs_conn);
 
     GU_DBUG_RETURN(WSDB_OK);
 }
