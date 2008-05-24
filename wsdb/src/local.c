@@ -61,7 +61,8 @@ static inline void set_last_committed_seqno(trx_seqno_t seqno) {
         last_committed_seqno = seqno;
 
         // check if we need to update safe_to_discard
-        if (!to_discard_seqno && safe_to_discard + discard_interval < seqno) {
+        if (!to_discard_seqno && 
+            ((safe_to_discard + discard_interval) < seqno)) {
             // high time to try to discard new seqno
             assert (0 == to_discard_refs);
             if (last_committed_refs) {
