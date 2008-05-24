@@ -6,6 +6,8 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <time.h>
+#include <unistd.h>
 
 #include <galerautils.h>
 #include <gcs.h>
@@ -484,6 +486,20 @@ static inline void truncate_trx_history (gcs_seqno_t seqno)
     }
 }
 
+// a wrapper for TO funcitons which can return -EAGAIN
+static inline long galera_eagain (int (*function) (gcs_to_t*, gcs_seqno_t),
+                                  gcs_to_t* to, gcs_seqno_t seqno)
+{
+    static const struct timespec period = { 0, 10000000 }; // 10 msec
+    long rcode;
+
+    while (-EAGAIN == (rcode = function (to, seqno))) {
+        nanosleep (&period, NULL);
+    }
+
+    return rcode;
+}
+
 static void process_conn_write_set( 
     struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
     gcs_seqno_t seqno_l
@@ -502,8 +518,9 @@ static void process_conn_write_set(
     
 
     /* Grab commit resource */
-    if (gcs_to_grab(commit_queue, seqno_l) != 0) {
-	gu_fatal("Failed to grab commit_queue: %llu", seqno_l);
+    if ((rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l)) != 0) {
+	gu_fatal("Failed to grab commit_queue: %llu, %ld (%s)",
+                 seqno_l, -rcode, gcs_strerror(rcode));
 	abort();
     }
 
@@ -534,8 +551,9 @@ static void process_query_write_set(
     int is_retry = 0;
 
     /* wait for total order */
-    if (gcs_to_grab(to_queue, seqno_l) != 0) {
-	gu_fatal("Failed to grab to_queue: %llu", seqno_l);
+    if ((rcode = galera_eagain (gcs_to_grab, to_queue, seqno_l)) != 0) {
+	gu_fatal("Failed to grab to_queue: %llu, %ld (%s)",
+                 seqno_l, -rcode, gcs_strerror(rcode));
 	abort();
     }
 
@@ -569,8 +587,9 @@ static void process_query_write_set(
 	
 	if (is_retry == 0) {
 	    /* On first try grab commit_queue */
-	    if (gcs_to_grab(commit_queue, seqno_l) != 0) {
-		gu_fatal("Failed to grab to_queue: %llu", seqno_l);
+	    if ((rcode = galera_eagain(gcs_to_grab,commit_queue,seqno_l)) != 0){
+                gu_fatal("Failed to grab commit_queue: %llu, %ld (%s)",
+                         seqno_l, -rcode, gcs_strerror(rcode));
 		abort();
 	    }
 	}
@@ -602,7 +621,8 @@ static void process_query_write_set(
         gu_warn("trx certification failed: %llu - %llu", seqno_l, ws->last_seen_trx);
         print_ws(wslog_G, ws, seqno_l);
 	/* Cancel commit queue */
-	if (is_retry == 0 && gcs_to_self_cancel(commit_queue, seqno_l)) {
+        rcode = galera_eagain (gcs_to_self_cancel, commit_queue, seqno_l);
+	if (is_retry == 0 && rcode) {
 	    gu_fatal("Failed to cancel commit_queue: %llu", seqno_l);
 	    abort();
 	}
@@ -697,11 +717,12 @@ enum galera_status galera_recv(void *app_ctx) {
             break;
         case GCS_ACT_COMMIT_CUT:
             // synchronize
-            gcs_to_grab    (to_queue, seqno_g);
-            gcs_to_release (to_queue, seqno_g);
+            // TODO: implement sensible error reporting instead of abort()'s
+            if (galera_eagain (gcs_to_grab, to_queue, seqno_g)) abort();
+            if (gcs_to_release (to_queue, seqno_g)) abort();
             // After this no certifications with seqno < commit_cut
             // Let other transaction continue to commit
-            gcs_to_self_cancel (commit_queue, seqno_g);
+            if (galera_eagain(gcs_to_self_cancel,commit_queue,seqno_g)) abort();
             truncate_trx_history (*(gcs_seqno_t*)action);
             free (action);
             break;
@@ -709,17 +730,16 @@ enum galera_status galera_recv(void *app_ctx) {
         case GCS_ACT_PRIMARY:
         case GCS_ACT_NON_PRIMARY:
 	    // Must advance queue counter even if ignoring the action
-	    if (gcs_to_grab    (to_queue, seqno_l) != 0) {
+	    if (galera_eagain (gcs_to_grab, to_queue, seqno_l) != 0) {
 		gu_fatal("Failed to grab to_queue: %llu", seqno_l);
 		abort();
 	    }
 	    gcs_to_release (to_queue, seqno_l);
 	    
-	    if (gcs_to_self_cancel(commit_queue, seqno_l) != 0) {
+	    if (galera_eagain (gcs_to_self_cancel,commit_queue,seqno_l) != 0) {
 		gu_fatal("Failed to cancel commit_queue: %llu", seqno_l);
 		abort();
 	    }
-//	    gcs_to_release (commit_queue, seqno_l); not needed
 
 	    gu_free (action);
             break;
@@ -902,7 +922,7 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
     gu_mutex_unlock(&commit_mtx);
 
     /* replicate through gcs */
-    rcode= gcs_repl(gcs_conn, GCS_ACT_DATA, len, data, &seqno_g, &seqno_l);
+    rcode = gcs_repl(gcs_conn, GCS_ACT_DATA, len, data, &seqno_g, &seqno_l);
     if (rcode < 0) {
         gu_error("gcs failed for: %llu, %d", trx_id, rcode);
         GU_DBUG_RETURN(GALERA_CONN_FAIL);
@@ -918,19 +938,18 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
 	/* Call self cancel to allow gcs_to_release() to skip this seqno */
         // gcs_to_release() should be called only after successfull
         // gcs_to_grab() - Alex, 16.03.2008
-	gcs_to_self_cancel(to_queue, seqno_l);
-	gcs_to_self_cancel(commit_queue, seqno_l);
-	GU_DBUG_RETURN(GALERA_TRX_FAIL);
+	if (galera_eagain (gcs_to_self_cancel, to_queue, seqno_l)) abort();
+	if (galera_eagain (gcs_to_self_cancel, commit_queue, seqno_l)) abort();
+
+        retcode = GALERA_TRX_FAIL;
+        goto cleanup;
     }
     
     /* record seqnos for local transaction */
     wsdb_assign_trx(trx_id, seqno_l, seqno_g);
     gu_mutex_unlock(&commit_mtx);
     
-    /* wait for total order */
-    rcode = gcs_to_grab(to_queue, seqno_l);
-    
-    if (rcode) {
+    if ((rcode = galera_eagain (gcs_to_grab, to_queue, seqno_l))) {
 	gu_warn("gcs_to_grab aborted: %d seqno %llu", rcode, seqno_l);
 	retcode = GALERA_TRX_FAIL;
 	goto after_cert_test;
@@ -965,12 +984,11 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
 
 after_cert_test:
 
-    // was referenced by wsdb_get_write_set() above
-    wsdb_deref_seqno (ws->last_seen_trx);
-
     if (retcode == GALERA_OK) {
 	/* Grab commit queue for commit time */
-	if (seqno_l > 0 && gcs_to_grab(commit_queue, seqno_l)) {
+        rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l);
+
+	if (seqno_l > 0 && rcode) {
 	    gu_fatal("Failed to grab commit queue for %llu", seqno_l);
 	    abort();
 	}
@@ -980,12 +998,18 @@ after_cert_test:
         }
     } else {
 	/* Cancel commit queue since we are going to rollback */
-	if (seqno_l > 0 && gcs_to_self_cancel(commit_queue, seqno_l)) {
+        rcode = galera_eagain (gcs_to_self_cancel, commit_queue, seqno_l);
+
+	if (seqno_l > 0 && rcode) {
 	    gu_fatal("Failed to cancel commit queue for %llu", seqno_l);
 	    abort();
 	}
     }
 
+cleanup:
+
+    // was referenced by wsdb_get_write_set() above
+    wsdb_deref_seqno (ws->last_seen_trx);
     wsdb_write_set_free(ws);
     GU_DBUG_RETURN(retcode);
 }
@@ -1137,7 +1161,7 @@ enum galera_status galera_to_execute_start(
     }
 
     /* wait for total order */
-    if (gcs_to_grab(to_queue, seqno_l) != 0) {
+    if (galera_eagain (gcs_to_grab, to_queue, seqno_l) != 0) {
 	gu_fatal("Failed to grab to_queue: %llu", seqno_l);
 	abort();
     }
@@ -1152,7 +1176,7 @@ enum galera_status galera_to_execute_start(
 
 
     /* Grab commit queue */
-    if (gcs_to_grab(commit_queue, seqno_l) != 0) {
+    if (galera_eagain (gcs_to_grab, commit_queue, seqno_l) != 0) {
 	gu_fatal("Failed to grab commit_queue: %llu", seqno_l);
 	abort();
     }
