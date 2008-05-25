@@ -722,11 +722,11 @@ enum galera_status galera_recv(void *app_ctx) {
         case GCS_ACT_COMMIT_CUT:
             // synchronize
             // TODO: implement sensible error reporting instead of abort()'s
-            if (galera_eagain (gcs_to_grab, to_queue, seqno_g)) abort();
-            if (gcs_to_release (to_queue, seqno_g)) abort();
+            if (galera_eagain (gcs_to_grab, to_queue, seqno_l)) abort();
+            if (gcs_to_release (to_queue, seqno_l)) abort();
             // After this no certifications with seqno < commit_cut
             // Let other transaction continue to commit
-            if (galera_eagain(gcs_to_self_cancel,commit_queue,seqno_g)) abort();
+            if (galera_eagain(gcs_to_self_cancel,commit_queue,seqno_l)) abort();
             truncate_trx_history (*(gcs_seqno_t*)action);
             free (action);
             break;
