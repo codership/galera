@@ -702,7 +702,11 @@ enum galera_status galera_recv(void *app_ctx) {
         rcode = gcs_recv(
             gcs_conn, &action_type, &action_size, &action, &seqno_g, &seqno_l
         );
+//        gu_info ("Received: act_type: %u, act_size: %u, act_id: %llu,"
+//                 " rcode: %d", action_type, action_size, seqno_g, rcode);
+
 	if (rcode < 0) return GALERA_CONN_FAIL;
+
         switch (action_type) {
         case GCS_ACT_DATA:
             process_write_set(
@@ -729,18 +733,19 @@ enum galera_status galera_recv(void *app_ctx) {
         case GCS_ACT_SNAPSHOT:
         case GCS_ACT_PRIMARY:
         case GCS_ACT_NON_PRIMARY:
-	    // Must advance queue counter even if ignoring the action
-	    if (galera_eagain (gcs_to_grab, to_queue, seqno_l) != 0) {
-		gu_fatal("Failed to grab to_queue: %llu", seqno_l);
-		abort();
-	    }
-	    gcs_to_release (to_queue, seqno_l);
-	    
-	    if (galera_eagain (gcs_to_self_cancel,commit_queue,seqno_l) != 0) {
-		gu_fatal("Failed to cancel commit_queue: %llu", seqno_l);
-		abort();
-	    }
-
+            if (0 < seqno_l && seqno_l < GCS_SEQNO_ILL) {
+                // Must advance queue counter even if ignoring the action
+                if (galera_eagain (gcs_to_grab, to_queue, seqno_l)) {
+                    gu_fatal("Failed to grab to_queue: %llu", seqno_l);
+                    abort();
+                }
+                gcs_to_release (to_queue, seqno_l);
+                
+                if (galera_eagain (gcs_to_self_cancel,commit_queue,seqno_l)) {
+                    gu_fatal("Failed to cancel commit_queue: %llu", seqno_l);
+                    abort();
+                }
+            }
 	    gu_free (action);
             break;
         default:
@@ -923,9 +928,12 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
 
     /* replicate through gcs */
     rcode = gcs_repl(gcs_conn, GCS_ACT_DATA, len, data, &seqno_g, &seqno_l);
-    if (rcode < 0) {
-        gu_error("gcs failed for: %llu, %d", trx_id, rcode);
-        GU_DBUG_RETURN(GALERA_CONN_FAIL);
+//    gu_info ("gcs_repl: act_type: %u, act_size: %u, act_id: %llu, ret: %d",
+//             GCS_ACT_DATA, len, seqno_g, rcode);
+    if (rcode != len) {
+        gu_error("gcs failed for: %llu, len: %d, rcode: %d", trx_id,len,rcode);
+        retcode = GALERA_CONN_FAIL;
+        goto cleanup;
     }
 
     gu_mutex_lock(&commit_mtx);
@@ -1155,9 +1163,12 @@ enum galera_status galera_to_execute_start(
 
     /* replicate through gcs */
     rcode= gcs_repl(gcs_conn, GCS_ACT_DATA, len, data, &seqno_g, &seqno_l);
+//    gu_info ("Received act_type: %u, act_size: %u, act_id: %llu, ret: %d",
+//             GCS_ACT_DATA, len, seqno_g, rcode);
     if (rcode < 0) {
         gu_error("gcs failed for: %llu, %d", conn_id, rcode);
-        GU_DBUG_RETURN(GALERA_CONN_FAIL);
+        rcode = GALERA_CONN_FAIL;
+        goto cleanup;
     }
 
     /* wait for total order */
@@ -1171,17 +1182,18 @@ enum galera_status galera_to_execute_start(
 
     gcs_to_release(to_queue, seqno_l);
 
-    /* release write set */
-    wsdb_write_set_free(ws);
-
-
     /* Grab commit queue */
     if (galera_eagain (gcs_to_grab, commit_queue, seqno_l) != 0) {
 	gu_fatal("Failed to grab commit_queue: %llu", seqno_l);
 	abort();
     }
 
-    GU_DBUG_RETURN(GALERA_OK);
+    rcode = GALERA_OK;
+
+cleanup:
+
+    wsdb_write_set_free(ws);
+    GU_DBUG_RETURN(rcode);
 }
 
 enum galera_status galera_to_execute_end(conn_id_t conn_id) {

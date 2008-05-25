@@ -302,6 +302,7 @@ gcs_core_send (gcs_core_t*      const conn,
 
     /* successfully sent action, increment send counter */
     conn->send_act_no++;
+    ret = sent;
 
 out:
 //    gu_debug ("returning: %d (%s)", ret, gcs_strerror(ret));

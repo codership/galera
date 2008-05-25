@@ -63,6 +63,8 @@ gcs_to_t *gcs_to_create (int len, gcs_seqno_t seqno)
 {
     gcs_to_t *ret;
 
+    assert (seqno < GCS_SEQNO_ILL);
+
     if (len <= 0) {
 	gu_error ("Negative length parameter: %d", len);
 	return NULL;
@@ -149,6 +151,8 @@ int gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
 {
     int err;
     to_waiter_t *w;
+
+    assert (seqno < GCS_SEQNO_ILL);
 
     if ((err = gu_mutex_lock(&to->lock))) {
 	gu_fatal("Mutex lock failed (%d): %s", err, strerror(err));
@@ -247,6 +251,8 @@ int gcs_to_release (gcs_to_t *to, gcs_seqno_t seqno)
     int err;
     to_waiter_t *w;
 
+    assert (seqno < GCS_SEQNO_ILL);
+
     if ((err = gu_mutex_lock(&to->lock))) {
 	gu_fatal("Mutex lock failed (%d): %s", err, strerror(err));
 	abort();
@@ -284,6 +290,9 @@ int gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno)
 {
     int err;
     to_waiter_t *w;
+
+    assert (seqno < GCS_SEQNO_ILL);
+
     if ((err = gu_mutex_lock (&to->lock))) {
 	gu_fatal("Mutex lock failed (%d): %s", err, strerror(err));
 	abort();
@@ -317,6 +326,8 @@ int gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
 {
     int err = 0;
     to_waiter_t *w;
+
+    assert (seqno < GCS_SEQNO_ILL);
 
     if ((err = gu_mutex_lock (&to->lock))) {
 	gu_fatal("Mutex lock failed (%d): %s", err, strerror(err));
@@ -353,6 +364,8 @@ int gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno)
     int rcode;
     int err;
 
+    assert (seqno < GCS_SEQNO_ILL);
+
     if ((err = gu_mutex_lock (&to->lock))) {
 	gu_fatal("Mutex lock failed (%d): %s", err, strerror(err));
 	abort();
@@ -378,6 +391,9 @@ int gcs_to_renew_wait (gcs_to_t *to, gcs_seqno_t seqno)
 {
     int rcode;
     int err;
+
+    assert (seqno < GCS_SEQNO_ILL);
+
     if ((err = gu_mutex_lock (&to->lock))) {
 	gu_fatal("Mutex lock failed (%d): %s", err, strerror(err));
 	abort();

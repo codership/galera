@@ -65,7 +65,7 @@ typedef struct gcs_act
     gcs_act_type_t act_type;
     gcs_seqno_t    act_id;
     gcs_seqno_t    local_act_id;
-    uint8_t*       action;
+    const uint8_t* action;
     gu_mutex_t     wait_mutex;
     gu_cond_t      wait_cond;
 }
@@ -121,7 +121,7 @@ static void *gcs_recv_thread (void *arg)
     gcs_act_type_t act_type;
     ssize_t        act_size;
     uint8_t       *action;
-    uint8_t       *action_repl = NULL;
+    const uint8_t *action_repl = NULL;
 
 //    gu_debug ("Starting RECV thread");
 
@@ -132,6 +132,8 @@ static void *gcs_recv_thread (void *arg)
 
     while (conn->state == GCS_CONN_OPEN)
     {
+        gcs_seqno_t this_act_id = GCS_SEQNO_ILL;
+
 	if ((act_size = gcs_core_recv (conn->core,
                                        &action,
                                        &act_type,
@@ -141,19 +143,14 @@ static void *gcs_recv_thread (void *arg)
 	    break;
 	}
 
-        if (act_type < GCS_ACT_NON_PRIMARY) {
+        if (act_type < GCS_ACT_SNAPSHOT) {
 	    /* deliver to application and increment local order */
-	    conn->local_act_id++;
-//            gu_debug ("Received action #%llu", conn->local_act_id);
+	    this_act_id = ++conn->local_act_id;
         }
-#if removed
- else {
-	    /* not interested, continue loop */
-	    if (action) free (action); // was allocated by standard malloc()
-            gu_debug ("Ignoring action after #%llu", conn->local_act_id);
-	    continue;
-        }
-#endif
+
+//        gu_info ("Received action type: %d, size: %6d, #%llu",
+//                 act_type, act_size, this_act_id);
+
 	if (!action_repl) {
 	    /* Check if there is any local repl action in queue */
 	    act = gcs_fifo_head (conn->repl_q);
@@ -175,9 +172,10 @@ static void *gcs_recv_thread (void *arg)
 	    act = gcs_fifo_safe_get (conn->repl_q);
 	    
 //	    act->act_id       = act_id;
-	    act->act_id       = conn->local_act_id;
-	    act->local_act_id = conn->local_act_id;
-	    assert (act->action == action);
+	    act->act_id       = this_act_id;
+	    act->local_act_id = this_act_id;
+	    assert (act->action   == action);
+            assert (act->act_size == act_size);
 
 	    gu_mutex_lock   (&act->wait_mutex);
 	    gu_cond_signal  (&act->wait_cond);
@@ -206,17 +204,16 @@ static void *gcs_recv_thread (void *arg)
 	    act->act_size     = act_size;
 	    act->act_type     = act_type;
 //	    act->act_id       = act_id;
-	    act->act_id       = conn->local_act_id;
-            act->local_act_id = conn->local_act_id;
+	    act->act_id       = this_act_id;
+            act->local_act_id = this_act_id;
 	    act->action       = action;
 
 	    if ((ret = gcs_queue_push (conn->recv_q, act))) {
 		break;
             }
 	    act = NULL;
-//            gu_debug("Received action of type %d, size %d, id=%llu, "
-//                     "local id=%llu, action %p",
-//                     act_type, act_size, act_id, conn->local_act_id, action);
+//            gu_info("Received foreign action of type %d, size %d, id=%llu, "
+//                    "action %p", act_type, act_size, this_act_id, action);
 	}
         // below I can't use any references to act
 //       gu_debug("Received action of type %d, size %d, id=%llu, local id=%llu",
@@ -399,7 +396,7 @@ int gcs_send (gcs_conn_t *conn, const gcs_act_type_t act_type,
 int gcs_repl (gcs_conn_t          *conn,
 	      const gcs_act_type_t act_type,
 	      const size_t         act_size,
-	      uint8_t             *action,
+	      const uint8_t       *action,
 	      gcs_seqno_t         *act_id, 
 	      gcs_seqno_t         *local_act_id)
 {
@@ -417,6 +414,7 @@ int gcs_repl (gcs_conn_t          *conn,
 
     assert (act_size > 0); // FIXME!!! see recv_thread() -
     assert (action);       // cannot gcs_repl() NULL messages
+    assert (act.action);
 
     gu_mutex_init (&act.wait_mutex, NULL);
     gu_cond_init  (&act.wait_cond,  NULL);
@@ -448,6 +446,9 @@ int gcs_repl (gcs_conn_t          *conn,
                         ret = -ENOTRECOVERABLE;
                     }
                 }
+                else {
+                    assert (ret == act_size);
+                }
             }
             gu_mutex_unlock (&conn->lock);
         }
@@ -469,9 +470,10 @@ int gcs_repl (gcs_conn_t          *conn,
     gu_mutex_destroy (&act.wait_mutex);
     gu_cond_destroy  (&act.wait_cond);
 
-#ifdef GCS_GCS_DEBUG
-//    printf ("act_size = %d\nact_type = %d\nact_id = %d\naction = %s\n",
-//	    act.act_size, act.act_type, act.act_id, act.action);
+#ifdef GCS_DEBUG_GCS
+    gu_debug ("\nact_size = %u\nact_type = %u\n"
+              "act_id   = %llu\naction   = %p (%s)\n",
+              act.act_size, act.act_type, act.act_id, act.action, act.action);
 #endif
     return ret;
 }
@@ -517,7 +519,7 @@ int gcs_recv (gcs_conn_t *conn, gcs_act_type_t *act_type,
     *act_type     = act->act_type;
     *act_id       = act->act_id;
     *local_act_id = act->local_act_id;
-    *action       = act->action;
+    *action       = (uint8_t*)act->action;
 
     gu_free (act); /* was malloc'ed by recv_thread */
 

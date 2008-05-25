@@ -98,10 +98,10 @@ typedef enum gcs_act_type
 /* ordered actions */
     GCS_ACT_DATA,       //! application action, sent by application
     GCS_ACT_COMMIT_CUT, //! group-wide action commit cut
+/* unordered actions */
     GCS_ACT_SNAPSHOT,   //! request for state snapshot
     GCS_ACT_PRIMARY,    //! reached primary configuration
     GCS_ACT_SERVICE,    //! service action, sent by GCS
-/* unordered actions */
     GCS_ACT_NON_PRIMARY,//! reached non-primary configuration
     GCS_ACT_ERROR,      //! error happened while receiving the action
     GCS_ACT_UNKNOWN     //! undefined/unknown action type
@@ -166,7 +166,7 @@ int gcs_recv (gcs_conn_t      *conn,
 int gcs_repl (gcs_conn_t *conn,
 	      const gcs_act_type_t act_type,
 	      const size_t act_size,
-	      uint8_t *action,
+	      const uint8_t *action,
 	      gcs_seqno_t *act_id,
 	      gcs_seqno_t *local_act_id);
 
