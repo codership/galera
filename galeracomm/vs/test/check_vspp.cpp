@@ -109,6 +109,31 @@ START_TEST(check_vsview)
 }
 END_TEST
 
+class UserState : public Serializable {
+    Address addr;
+public:
+
+    UserState() {}
+    UserState(const Address& a) : addr(a) {}
+    const Address& get_addr() const {
+	return addr;
+    }
+
+
+    size_t read(const void* buf, const size_t buflen, const size_t offset) {
+	return addr.read(buf, buflen, offset);
+    }
+
+    size_t write(void* buf, const size_t buflen, const size_t off) const {
+	return addr.write(buf, buflen, off);
+    }
+
+    size_t size() const {
+	return addr.size();
+    }
+
+};
+
 START_TEST(check_vsmessage)
 {
     VSView view(true, VSViewId(4, Address(1, 4, 7)));
@@ -149,7 +174,7 @@ START_TEST(check_vsmessage)
     } catch (Exception e) {
 
     }
-    Address state_msg_user_state(12356, 212, 111);
+    UserState state_msg_user_state(Address(12356, 212, 111));
     
     VSMessage state_msg(Address(1, 0, 0), VSViewId(6, Address(1, 5, 7)), 
 			&view, 0, &state_msg_user_state);
@@ -167,9 +192,9 @@ START_TEST(check_vsmessage)
     fail_unless(state_msg2.get_source_view() == state_msg.get_source_view());
     fail_unless(state_msg2.get_seq() == state_msg.get_seq());
     const ReadBuf *smus_buf = state_msg2.get_user_state_buf();
-    Address smusa;
+    UserState smusa;
     fail_if(smusa.read(smus_buf->get_buf(), smus_buf->get_len(), 0) == 0);
-    fail_unless(smusa == state_msg_user_state);
+    fail_unless(smusa.get_addr() == state_msg_user_state.get_addr());
 
     delete[] buf;
 

@@ -38,7 +38,6 @@ public:
     virtual void handle_up(const int cid, const ReadBuf *, const size_t, const ProtoUpMeta *) = 0;
     
     void set_up_context(Protolay *up) {
-	// Logger::instance().info(std::string("Setting up context ") + to_string(uint64_t(up)));
 	if (up_context) {
 	    Logger::instance().fatal("Protolay::set_up_context(): "
 				     "Context already exists");
@@ -48,7 +47,6 @@ public:
     }
     
     void set_up_context(Protolay *up, const int id) {
-	// Logger::instance().info(std::string("Setting up context ") + to_string(uint64_t(up)));
 	if (up_context) {
 	    Logger::instance().fatal("Protolay::set_up_context(): "
 				     "Context already exists");
@@ -70,8 +68,8 @@ public:
     void pass_up(const ReadBuf *rb, const size_t roff, 
 		 const ProtoUpMeta *up_meta) {
 	if (!up_context) {
-	    Logger::instance().fatal("Protolay::pass_up(): "
-				     "Up context not defined");
+	    LOG_FATAL("Protolay::pass_up(): "
+		      "Up context not defined");
 	    throw FatalException("Up context not defined");
 	}
 	    
@@ -80,7 +78,7 @@ public:
 
     int pass_down(WriteBuf *wb, const ProtoDownMeta *down_meta) {
 	if (!down_context) {
-	    Logger::instance().fatal("Protolay::pass_down(): Down context not defined");
+	    LOG_FATAL("Protolay::pass_down(): Down context not defined");
 	    throw FatalException("Down context not defined");
 	}
 

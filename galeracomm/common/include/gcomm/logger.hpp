@@ -84,7 +84,9 @@ private:
     
 public:
 
-    
+    Level get_level() const {
+	return level;
+    }
     static Logger& instance();
     static Logger& create(std::ostream&, Level l = Info);
     
@@ -135,5 +137,38 @@ public:
     
 
 };
+
+
+#define LOG_TRACE(_a) do {				     \
+	if (Logger::instance().get_level() <= Logger::Trace) \
+	    Logger::instance().trace(_a);		     \
+    } while (0)
+
+#define LOG_DEBUG(_a) do {				     \
+	if (Logger::instance().get_level() <= Logger::Debug) \
+	    Logger::instance().trace(_a);		     \
+    } while (0)
+
+#define LOG_INFO(_a) do {				     \
+	if (Logger::instance().get_level() <= Logger::Info)  \
+	    Logger::instance().trace(_a);		     \
+    } while (0)
+
+#define LOG_WARN(_a) do {				     \
+	if (Logger::instance().get_level() <= Logger::Warning) \
+	    Logger::instance().trace(_a);		     \
+    } while (0)
+
+#define LOG_ERROR(_a) do {				     \
+	if (Logger::instance().get_level() <= Logger::Error) \
+	    Logger::instance().trace(_a);		     \
+    } while (0)
+
+
+#define LOG_FATAL(_a) do {				     \
+	if (Logger::instance().get_level() <= Logger::Fatal) \
+	    Logger::instance().trace(_a);		     \
+    } while (0)
+
 
 #endif // !LOGGER_HPP

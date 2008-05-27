@@ -4,7 +4,7 @@
 #include "gcomm/vs.hpp"
 #include "gcomm/logger.hpp"
 
-static Logger& logger = Logger::instance();
+
 
 VSRBackend::VSRBackend(Poll *p, Protolay *up_ctx) : tp(0), poll(p), state(CLOSED)
 {
@@ -26,7 +26,7 @@ void VSRBackend::handle_up(const int cid, const ReadBuf *rb, const size_t roff,
     if (rb == 0 && tp->get_state() == TRANSPORT_S_CONNECTED) {
 	return;
     } else if (rb == 0 && tp->get_state() == TRANSPORT_S_FAILED) {
-	logger.error("VSRBackend::handle_up(): Transport failed");
+	LOG_ERROR("VSRBackend::handle_up(): Transport failed");
 	state = FAILED;
 	pass_up(0, 0, 0);
 	return;
@@ -89,7 +89,7 @@ int VSRBackend::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 
 	const VSBackendDownMeta *bdm = static_cast<const VSBackendDownMeta *>(dm);
 	if (bdm->is_sync == true) { 
-	    logger.debug("VSRBackend::handle_down(): Trying to clear contention");
+	    LOG_DEBUG("VSRBackend::handle_down(): Trying to clear contention");
 	    tp->set_contention_params(10, 100);
 	    ret = pass_down(wb, 0);
 	    tp->set_contention_params(0, 0);
@@ -128,7 +128,7 @@ void VSRBackend::join(const ServiceId sid)
 {
     
     Address jaddr(addr.get_proc_id(), sid, addr.get_segment_id());
-    logger.debug(std::string("VSRBackend::join(): ") + jaddr.to_string());
+    LOG_DEBUG(std::string("VSRBackend::join(): ") + jaddr.to_string());
     VSRCommand cmd(VSRCommand::JOIN, jaddr);
     VSRMessage msg(cmd);
     WriteBuf wb(0, 0);
@@ -140,7 +140,7 @@ void VSRBackend::leave(const ServiceId sid)
 {
 
     Address laddr(addr.get_proc_id(), sid, addr.get_segment_id());
-    logger.debug(std::string("VSRBackend::leave(): ") + laddr.to_string());
+    LOG_DEBUG(std::string("VSRBackend::leave(): ") + laddr.to_string());
     VSRCommand cmd(VSRCommand::LEAVE, laddr);
     VSRMessage msg(cmd);
     WriteBuf wb(0, 0);

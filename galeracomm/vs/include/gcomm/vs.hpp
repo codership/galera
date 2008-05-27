@@ -14,7 +14,7 @@
 #include <cerrno>
 #include <iostream>
 
-class VSViewId : public Serializable {
+class VSViewId {
     uint32_t seq;
     Address repr;
 public:
@@ -106,7 +106,7 @@ static inline size_t size_aset(const std::set<Address>&addr)
     return 4 + addr.size()*ADDRESS_INVALID.size();
 }
 
-class VSView : public Serializable {
+class VSView {
     bool trans;
     VSViewId vid;
 
@@ -265,7 +265,7 @@ inline std::ostream& operator<<(std::ostream& os, const VSView& view)
 
 
 
-class VSMessage : public Serializable {
+class VSMessage {
     uint8_t version;
     uint8_t type;
     uint8_t user_type;
@@ -388,7 +388,7 @@ public:
 
     // Copy constructor
 
-    VSMessage(const VSMessage& m) : Serializable() {
+    VSMessage(const VSMessage& m) {
 	*this = m;
 	if (m.view)
 	    this->view = new VSView(*m.view);
@@ -487,7 +487,7 @@ public:
 	uint32_t w;
 	size_t off;
 
-	// Logger::instance().debug(std::string("VSMessage::read(): reading "
+	// LOG_TRACE(std::string("VSMessage::read(): reading "
 	//				     "vtf, offset ") 
 	//			 + to_string(offset));
 	if ((off = read_uint32(buf, buflen, offset, &w)) == 0)
@@ -496,19 +496,19 @@ public:
 	type = (w >> 8) & 0xff;
 	flags = (w >> 16) & 0xffff;
 
-	// Logger::instance().debug(std::string("VSMessage::read(): reading "
+	// LOG_TRACE(std::string("VSMessage::read(): reading "
 	//				     "source, offset ") 
 	//			 + to_string(off));
 	if ((off = source.read(buf, buflen, off)) == 0)
 	    return 0;
 
-	// Logger::instance().debug(std::string("VSMessage::read(): reading "
+	// LOG_TRACE(std::string("VSMessage::read(): reading "
 	//				     "source view, offset ") 
 	//			 + to_string(off));
 	if ((off = source_view.read(buf, buflen, off)) == 0)
 	    return 0;
 
-	// Logger::instance().debug(std::string("VSMessage::read(): reading "
+	// LOG_TRACE(std::string("VSMessage::read(): reading "
 	//				     "seq, offset ") 
 	//			 + to_string(off));
 	if ((off = read_uint32(buf, buflen, off, &seq)) == 0)
@@ -543,7 +543,7 @@ public:
 	}
 
 
-//	Logger::instance().debug(std::string("VSMessage::read(): returning, "
+//	LOG_TRACE(std::string("VSMessage::read(): returning, "
 //					     "offset ") 
 //				 + to_string(off));
 	return off;

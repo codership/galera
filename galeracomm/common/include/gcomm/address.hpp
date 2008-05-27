@@ -6,6 +6,7 @@
 #include <ostream>
 #include <sstream>
 
+
 class Serializable {
 protected:
     Serializable() {}
@@ -16,7 +17,8 @@ public:
     virtual size_t size() const = 0;
 };
 
-class ProcId : public Serializable {
+
+class ProcId {
     uint16_t id;
 public:
     ProcId() : id(0xffff) {}
@@ -51,7 +53,7 @@ public:
     }
 };
 
-class ServiceId : public Serializable {
+class ServiceId {
     uint8_t id;
 public:
     ServiceId() : id(0xff) {}
@@ -85,7 +87,7 @@ public:
     }
 };
 
-class SegmentId : public Serializable {
+class SegmentId {
     uint8_t id;
 public:
     SegmentId() : id(0xff) {}
@@ -118,7 +120,7 @@ public:
 };
 
 
-class Address : public Serializable {
+class Address {
     ProcId proc_id;
     ServiceId service_id;
     SegmentId segment_id;

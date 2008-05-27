@@ -11,7 +11,6 @@
 #include <sstream>
 #include <sys/time.h>
 
-static Logger& logger = Logger::instance();
 
 
 class Stats {
@@ -39,20 +38,20 @@ public:
 	tnow *= 1000000;
 	tnow += tv.tv_usec;
 	if (tlast + 5000000 < tnow) {
-	    logger.info(std::string("Queued ") + to_string(n_msgs_in) 
+	    LOG_INFO(std::string("Queued ") + to_string(n_msgs_in) 
 			+ " msgs " + to_string(bytes_in) + " bytes ");
-	    logger.info(std::string("    ") 
+	    LOG_INFO(std::string("    ") 
 			+ to_string(1.e6*double(n_msgs_in)/(tnow - tlast)) 
 			+ " msg/sec");
-	    logger.info(std::string("    ") 
+	    LOG_INFO(std::string("    ") 
 			+ to_string(1.e6*double(bytes_in)/(tnow - tlast)) + " bytes/sec");
-	    logger.info(std::string("Forwarded ") 
+	    LOG_INFO(std::string("Forwarded ") 
 			+ to_string(n_msgs_out) + " msgs " 
 			+ to_string(bytes_out) + " bytes ");
-	    logger.info(std::string("    ") 
+	    LOG_INFO(std::string("    ") 
 			+ to_string(1.e6*double(n_msgs_out)/(tnow - tlast)) 
 			+ " msg/sec");
-	    logger.info(std::string("    ") 
+	    LOG_INFO(std::string("    ") 
 			+ to_string(1.e6*double(bytes_out)/(tnow - tlast)) 
 			+ " bytes/sec");
 	    tlast = tnow;
@@ -84,7 +83,7 @@ ClientHandler::ClientHandler(Transport *t, VSBackend *v) : vs(v), tp(t)
 ClientHandler::~ClientHandler()
 {
     if (vs)
-	logger.info(std::string("deleting ") + vs->get_self().to_string());
+	LOG_INFO(std::string("deleting ") + vs->get_self().to_string());
     delete tp;
     delete vs;
 }
@@ -105,18 +104,18 @@ void ClientHandler::handle_vs(const ReadBuf *rb, const size_t roff,
 			      const ProtoUpMeta *um)
 {
     if (rb == 0) {
-	logger.info("Null message, silent drop");
+	LOG_INFO("Null message, silent drop");
     } else {
 	WriteBuf wb(rb->get_buf(roff), rb->get_len(roff));
 	VSRMessage msg;
 	wb.prepend_hdr(msg.get_raw(), msg.get_raw_len());
 	int err;
 	if ((err = tp->handle_down(&wb, 0)) == EAGAIN) {
-	    logger.info("Fixme!!!");
+	    LOG_INFO("Fixme!!!");
 	    close();
 	    return;
 	} else if (err) {
-	    logger.error(std::string("Error: ") + strerror(err));
+	    LOG_ERROR(std::string("Error: ") + strerror(err));
 	    close();
 	    return;
 	}
@@ -129,7 +128,7 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 {
     VSRMessage msg;
     if (rb == 0 && tp->get_state() == TRANSPORT_S_FAILED) {
-	logger.debug("rb = 0 and tp state = failed"); 
+	LOG_DEBUG("rb = 0 and tp state = failed"); 
 	close();
 	return;
     } else if (rb == 0 && tp->get_state() == TRANSPORT_S_CLOSED) {
@@ -145,12 +144,12 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 	    WriteBuf wb(0, 0);
 	    wb.prepend_hdr(rmsg.get_raw(),rmsg.get_raw_len());
 	    if (tp->handle_down(&wb, 0)) {
-		logger.info("error: handle_down()");
+		LOG_INFO("error: handle_down()");
 		close();
 	    }
 	    return;
 	} catch (Exception e) {
-	    logger.error(std::string("Exception: ") + e.what());
+	    LOG_ERROR(std::string("Exception: ") + e.what());
 	    close();
 	    return;
 	}
@@ -159,7 +158,7 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 	throw FatalException("What just happened?");
     } else {
 	if (msg.read(rb->get_buf(), rb->get_len(), roff) == 0) {
-	    logger.warning("Invalid message");
+	    LOG_WARN("Invalid message");
 	    close();
 	    return;
 	}
@@ -168,7 +167,7 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
     switch (state) {
     case HANDSHAKE: {
 	if (msg.get_type() != VSRMessage::CONTROL) {
-	    logger.warning(std::string("Invalid message sequence: state ") 
+	    LOG_WARN(std::string("Invalid message sequence: state ") 
 			   + to_string(uint64_t(state)) 
 			   + " message " 
 			   + to_string(uint64_t(msg.get_type())));
@@ -177,7 +176,7 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 	}
 	VSRCommand cmd = msg.get_command();
 	if (cmd.get_type() != VSRCommand::SET) {
-	    logger.warning("Invalid message sequence");
+	    LOG_WARN("Invalid message sequence");
 	    close();
 	    return;
 	}
@@ -188,7 +187,7 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 	wb.prepend_hdr(resp.get_raw(), resp.get_raw_len());
 	
 	if (tp->handle_down(&wb, 0)) {
-	    logger.error("Fixme!!!");
+	    LOG_ERROR("Fixme!!!");
 	    close();
 	}
 	break;
@@ -198,7 +197,7 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 	    VSRCommand cmd = msg.get_command();
 	    WriteBuf wb(0, 0);
 	    if (cmd.get_type() == VSRCommand::JOIN || cmd.get_type() == VSRCommand::LEAVE) {
-		logger.info(std::string("Cmd ") 
+		LOG_INFO(std::string("Cmd ") 
 			    + to_string(uint64_t(cmd.get_type())) 
 			    + " " +  cmd.get_address().to_string());
 		try {
@@ -210,7 +209,7 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 		    VSRMessage rmsg(response);
 		    wb.prepend_hdr(rmsg.get_raw(), rmsg.get_raw_len());
 		} catch (Exception e) {
-		    logger.info(e.what());
+		    LOG_INFO(e.what());
 		    VSRCommand response(VSRCommand::RESULT, VSRCommand::FAIL);
 		    VSRMessage rmsg(response);
 			
@@ -219,13 +218,13 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 	    }
 	    tp->handle_down(&wb, 0);
 	} else if (msg.get_type() == VSRMessage::VSPROTO) {
-	    logger.trace(std::string("VSPROTO: len = ") + 
+	    LOG_TRACE(std::string("VSPROTO: len = ") + 
 			 ::to_string(rb->get_len(roff + msg.get_raw_len())));
 	    WriteBuf wb(rb->get_buf(roff + msg.get_raw_len()), rb->get_len(roff + msg.get_raw_len()));
 	    vs->handle_down(&wb, 0);
 	    stats.incr_in(rb->get_len(roff + msg.get_raw_len()));
 	} else {
-	    logger.info("Invalid message");
+	    LOG_INFO("Invalid message");
 	    close();
 	    return;
 	}
@@ -260,11 +259,11 @@ void ClientHandler::start()
 	if (tp->handle_down(&wb, 0)) {
 	    close();
 	} else {
-	    logger.info("Sent handshake");
+	    LOG_INFO("Sent handshake");
 	}
 	return;
     } catch (Exception e) {
-	logger.warning(std::string("Exception: ") + e.what());
+	LOG_WARN(std::string("Exception: ") + e.what());
 	close();
 	return;
     }
@@ -348,7 +347,7 @@ int VSServer::run()
 int main(int argc, char *argv[])
 {
 
-    logger.info("start");
+    LOG_INFO("start");
     ::signal(SIGPIPE, SIG_IGN);
 
     if (argc < 2) {

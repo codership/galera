@@ -43,6 +43,6 @@ void Timer::unset(const TimerHandler *h)
 	expiration_map.erase(i->second);
 	timer_map.erase(i);
     } else {
-	Logger::instance().debug(std::string("Timer ") + h->get_name() + " not set");
+	LOG_DEBUG(std::string("Timer ") + h->get_name() + " not set");
     }
 }

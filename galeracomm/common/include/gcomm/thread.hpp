@@ -42,7 +42,7 @@ public:
 	
 	if ((err = pthread_create(
 		 &th, 0, reinterpret_cast<void* (*)(void*)>(&Thread::start_fn), this))) {
-	    Logger::instance().fatal(std::string("Thread::start(): pthread_create(): ") + ::strerror(err));
+	    LOG_FATAL(std::string("Thread::start(): pthread_create(): ") + ::strerror(err));
 	    throw FatalException("Thread::start(): Couldn't start thread");
 	}
 	state = RUNNING;
@@ -56,12 +56,12 @@ public:
 
 	state = CANCELED;
 	if ((err = pthread_cancel(th))) {
-	    Logger::instance().warning(
+	    LOG_FATAL(
 		std::string("Thread::stop(): pthread_cancel(): ") + 
 		::strerror(err));
 	}
 	if ((err = pthread_join(th, 0))) {
-	    Logger::instance().fatal(
+	    LOG_FATAL(
 		std::string("Thread::stop(): pthread_join(): ") + 
 		::strerror(err));
 	    throw FatalException("Thread::stop(): join failed");

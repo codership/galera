@@ -22,7 +22,7 @@ public:
     void lock() {
 	int err;
 	if ((err = pthread_mutex_lock(&mutex))) {
-	    Logger::instance().fatal(
+	    LOG_FATAL(
 		std::string("Mutex::lock(): pthread_mutex_lock() failed: ") + 
 		::strerror(errno));
 	    throw FatalException("Mutex::lock(): lock failed");
@@ -32,7 +32,7 @@ public:
     void unlock() {
 	int err;
 	if ((err = pthread_mutex_unlock(&mutex))) {
-	    Logger::instance().fatal(
+	    LOG_FATAL(
 		std::string("Mutex::unlock(): pthread_mutex_unlock(): ") + 
 		::strerror(errno));
 	    throw FatalException("Mutex::unlock(): unlock failed");

@@ -7,7 +7,6 @@
 #include <limits>
 
 
-static Logger& logger = Logger::instance();
 
 //
 //
@@ -139,7 +138,7 @@ void VSProto::deliver_data(const VSMessage *dm,
 	throw FatalException("Gap in message sequence");
     membs_p->second->expected_seq = dm->get_seq() + 1;
     VSUpMeta um(dm);
-    logger.trace(std::string("Delivering message " + to_string(dm->get_seq())));
+    LOG_TRACE(std::string("Delivering message " + to_string(dm->get_seq())));
     pass_up(rb, dm->get_data_offset(), &um);
 }
 
@@ -373,10 +372,10 @@ void VS::handle_up(const int cid, const ReadBuf *rb, const size_t roff, const Pr
 	throw DException("");
     }
     
-    logger.trace("VS:handle_up()");
+    LOG_TRACE("VS:handle_up()");
     if (msg.read(rb->get_buf(), rb->get_len(), roff) == 0)
 	throw FatalException("Failed to read message");
-    logger.trace(std::string("VS::handle_up(): Msg type = ") + to_string(msg.get_type()));
+    LOG_TRACE(std::string("VS::handle_up(): Msg type = ") + to_string(msg.get_type()));
 
     Critical crit(mon);
     VSProtoMap::iterator pi = proto.find(msg.get_source().get_service_id());
@@ -424,14 +423,14 @@ int VS::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 
     p = pi->second;
     if (p->reg_view == 0) {
-	logger.warning(std::string("VS::handle_down(): ") + strerror(ENOTCONN));
+	LOG_WARN(std::string("VS::handle_down(): ") + strerror(ENOTCONN));
 	return ENOTCONN;
     }
 
     
     // Transitional configuration
     if (p->trans_view) {
-	logger.info(std::string("VS::handle_down(): ") + strerror(EAGAIN));
+	LOG_INFO(std::string("VS::handle_down(): ") + strerror(EAGAIN));
 	return EAGAIN;
     }
 
@@ -439,7 +438,7 @@ int VS::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
     if (mi == p->membs.end())
 	throw FatalException("VS::handle_down(): Internal error");
     if (mi->second->expected_seq + 256 == p->next_seq) {
-	logger.debug(std::string("VS::handle_down(), flow control: ") + 
+	LOG_DEBUG(std::string("VS::handle_down(), flow control: ") + 
 		    strerror(EAGAIN));
 	return EAGAIN;
     }
@@ -449,12 +448,12 @@ int VS::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
     
     int ret = pass_down(wb, 0);
     if (ret == 0) {
-	logger.trace(std::string("Sent message ") + to_string(p->next_seq));
+	LOG_TRACE(std::string("Sent message ") + to_string(p->next_seq));
 	p->next_seq++;
     }
     wb->rollback_hdr(msg.get_hdrlen());
     if (ret)
-	logger.warning(std::string("VS::handle_down(), returning ") 
+	LOG_WARN(std::string("VS::handle_down(), returning ") 
 		       + strerror(ret));
     return ret;
 }
