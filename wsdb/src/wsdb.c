@@ -62,6 +62,10 @@ int wsdb_init(const char *data_dir, wsdb_log_cb_t logger) {
 
 int wsdb_close() {
     wsdb_hash_close(table_name_hash);
+
+    /* close certification indexes */
+    wsdb_cert_close();
+
     return WSDB_OK;
 }
 

@@ -50,15 +50,8 @@ struct wsdb_hash *wsdb_hash_open(
     return hash;
 }
 
-static int verdict_true(void *ctx, void *entry) {
-    return 1;
-}
-
 int wsdb_hash_close(struct wsdb_hash *hash) {
     CHECK_OBJ(hash, wsdb_hash);
-
-    /* free all elements in the hash */
-    wsdb_hash_delete_range(hash, NULL, verdict_true);
 
     gu_free(hash);
     return WSDB_OK;
@@ -197,7 +190,7 @@ int wsdb_hash_delete_range(
 
         while (entry) {
             /* caller determines, if index entry must be purged */
-            if (verdict(ctx, entry->data)) {
+                if (verdict(ctx, entry->data, &(entry->data))) {
                 /* to delete */
                 if (prev) {
                     prev->next = entry->next;
@@ -209,9 +202,7 @@ int wsdb_hash_delete_range(
                 }
                 hash->elem_count--;
                 if (!entry->data) {
-                    gu_warn("purging hash index entry with no data value");
-                } else {
-                    gu_free(entry->data);
+                    gu_debug("purging hash index entry with no data value");
                 }
                 // prev will not be stepped ahead
                 {

@@ -7,6 +7,7 @@
 #include <config.h>
 #include <stdio.h>
 #include <assert.h>
+#include <stdbool.h>
 
 //#ifdef HAVE_MYSQL_DBUG
 //#if !defined(HAVE_UINT)

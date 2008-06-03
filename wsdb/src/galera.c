@@ -120,6 +120,8 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
       int rcode;
 
       job1->ws->last_seen_trx = job2->seqno - 1;
+      /* @todo: this will conflict with purging, need to use certification_mtx
+       */
       rcode = wsdb_certification_test(job1->ws, (job2->seqno + 1)); 
 
       job1->ws->last_seen_trx = last_seen_saved;
@@ -483,6 +485,7 @@ static inline void truncate_trx_history (gcs_seqno_t seqno)
         gu_info ("Purging history up to %llu", seqno);
         wsdb_purge_trxs_upto(seqno);
         last_truncated = seqno;
+        gu_info ("Purging done to %llu", seqno);
     }
 }
 
@@ -565,6 +568,7 @@ static void process_query_write_set(
 
 
     //print_ws(wslog_G, ws, seqno_l);
+    gu_info ("remote trx seqno: %llu %llu last_seen_trx: %llu", seqno_l, seqno_g, ws->last_seen_trx);
 
 
  retry:
@@ -935,6 +939,7 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
         retcode = GALERA_CONN_FAIL;
         goto cleanup;
     }
+    gu_info ("local trx seqno: %llu %llu last_seen_trx: %llu", seqno_l, seqno_g, ws->last_seen_trx);
 
     gu_mutex_lock(&commit_mtx);
 

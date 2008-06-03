@@ -18,6 +18,16 @@
 int wsdb_cert_init(const char *work_dir, const char* base_name);
 
 /*!
+ * @brief shuts down certification module
+ * 
+ * This method erases certification indexes and frees memory
+ * 
+ * @return success code
+ * @retval WSDB_OK
+ */
+int wsdb_cert_close();
+
+/*!
  * @brief makes certification check for a write set
  * 
  * @param ws  write set to be certified

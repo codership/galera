@@ -24,6 +24,10 @@ struct index_rec {
     trx_seqno_t trx_seqno;
 };
 
+/* mutex to protect index_rec access during cert/purging */
+static gu_mutex_t certification_mtx;
+
+
 static struct wsdb_file *cert_trx_file;
 
 /* djb2
@@ -68,6 +72,9 @@ int wsdb_cert_init(const char* work_dir, const char* base_name) {
 
     /* open table level locks hash */
     table_index = wsdb_hash_open(1000, hash_fun, hash_cmp);
+
+    gu_mutex_init(&certification_mtx, NULL);
+
     return WSDB_OK;
 }
 
@@ -162,6 +169,8 @@ static int update_index(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
             new_trx->next = NULL;
             wsdb_hash_push(key_index, key_len, serial_key, (void *)new_trx);
           }
+        } else {
+          gu_warn("update index: %llu %llu", match->trx_seqno, trx_seqno);
         }
         gu_free(serial_key);
     }
@@ -251,10 +260,14 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     int *persistency = (int *)wsdb_conf_get_param(
         GALERA_CONF_WS_PERSISTENCY, GALERA_TYPE_INT
     );
+
+    /* protect cert phase against purging */
+    gu_mutex_lock(&certification_mtx);
           
     /* certification test */
     rcode = wsdb_certification_test(ws, trx_seqno); 
     if (rcode) {
+        gu_mutex_unlock(&certification_mtx);
         return rcode;
     }
 
@@ -267,8 +280,10 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     /* update index */
     rcode = update_index(ws, trx_seqno); 
     if (rcode) {
+        gu_mutex_unlock(&certification_mtx);
         return rcode;
     }
+    gu_mutex_unlock(&certification_mtx);
     return WSDB_OK;
 }
 
@@ -276,17 +291,30 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
  * @brief: determine if trx can be purged
  * @return 1 if purging is ok, otherwise 0
  */
-static int delete_verdict(void *ctx, void *data) {
+static int delete_verdict(void *ctx, void *data, void **new_data) {
     struct index_rec *entry = (struct index_rec *)data;
-    
-    if (entry->trx_seqno < (*(trx_seqno_t *)ctx)) {
-        return 1;
+    struct index_rec *next = NULL;
+    bool found = false;
+
+    /* find among the entries for this key, the one with last seqno */
+    while (entry && entry->trx_seqno < (*(trx_seqno_t *)ctx)) {
+        next = entry->next;
+        gu_free(entry);
+        entry = next;
+        found = true;
     }
-    return 0;
+    *new_data= (void *)entry;
+
+    if (found && entry) {
+        /* at least one seqno remains in the list */
+        return 0;
+    }
+    return 1;
 }
 
 int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
     int deleted;
+    gu_mutex_lock(&certification_mtx);
 
     /* purge entries from table index */
     deleted = wsdb_hash_delete_range(
@@ -298,7 +326,56 @@ int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
     deleted = wsdb_hash_delete_range(
         key_index, (void *)&trx_id, delete_verdict
     );
+    gu_mutex_unlock(&certification_mtx);
     gu_debug("purged %d entries from key index, up-to: %lu", deleted, trx_id);
+
+    return WSDB_OK;
+}
+
+/*
+ * @brief: free all entries
+ */
+static int shutdown_verdict(void *ctx, void *data, void **new_data) {
+    struct index_rec *entry = (struct index_rec *)data;
+    struct index_rec *next = NULL;
+    bool found = false;
+
+    /* find among the entries for this key, the one with last seqno */
+    while (entry) {
+        next = entry->next;
+        gu_free(entry);
+        entry = next;
+        found = true;
+    }
+    *new_data= NULL;
+
+    return 1;
+}
+int wsdb_cert_close() {
+    int deleted;
+    gu_mutex_lock(&certification_mtx);
+
+    /* purge entries from table index */
+    deleted = wsdb_hash_delete_range(
+        table_index, NULL, shutdown_verdict
+    );
+    gu_debug("purged %d entries from table index", deleted);
+
+    /* purge entries from row index */
+    deleted = wsdb_hash_delete_range(
+        key_index, NULL, shutdown_verdict
+    );
+    gu_mutex_unlock(&certification_mtx);
+    gu_debug("purged %d entries from key index", deleted);
+
+    /* close hashes, they are empty now */
+    if (wsdb_hash_close(table_index)) {
+        gu_error("failed to close table index");
+    }
+
+    if (wsdb_hash_close(key_index)) {
+        gu_error("failed to close key index");
+    }
 
     return WSDB_OK;
 }

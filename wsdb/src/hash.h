@@ -33,12 +33,12 @@ typedef int (* hash_cmp_t)(uint16_t, char *, uint16_t, char *);
  *
  * @param max_size max number of elements in the hash
  * @param hash_fun function for calculating hash value
- * @hash_cmp comparision function 
+ * @param hash_cmp comparision function 
  *
- * @retun pointer to iniitialized hash index
+ * @retun pointer to initialized hash index
  */
 struct wsdb_hash *wsdb_hash_open(
-    uint32_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp
+   uint32_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp
 );
 
 /*! 
@@ -82,10 +82,12 @@ int wsdb_hash_push(
 );
 /*!
  * @brief gives verdict for pruning given entry from index
- * @param key current key value
- * @return the next hash key value
+ * @param key pointer to key value of the entry, candidate for purging 
+ * @param data pointer to the data value in this entry, you can free this
+ * @param **data address of the data pointer, you can overwrite new value here
+ * @return 1=entry to be purged, 0=entry must remain in hash
  */
-typedef int (* hash_verdict_fun_t)(void *, void *);
+typedef int (* hash_verdict_fun_t)(void *, void *, void **);
 
 /*!
  * @brief deletes a range of elements from hash
