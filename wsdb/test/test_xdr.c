@@ -67,7 +67,7 @@ START_TEST (test_xdr)
 
     for (trx=1; trx<10; trx++) {
         int i;
-        int max_queries = rand() % 20;
+        int max_queries = rand() % 17 + 1;
 
         XDR xdrs;
         char data[50000];

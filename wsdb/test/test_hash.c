@@ -189,6 +189,53 @@ START_TEST (test_hash_big_64_key)
 }
 END_TEST
 
+static int delete_verdict(void *ctx, void *data, void **data_ptr) {
+    if ((unsigned long)data < (*(unsigned long *)ctx)) {
+        return 1;
+    }
+    return 0;
+}
+
+START_TEST (test_hash_purge)
+{
+    unsigned long i;
+    unsigned long p;
+    int deleted_so_far;
+
+    /* unit test code */
+    s_hash_size = 65000;
+    struct wsdb_hash *hash = wsdb_hash_open(s_hash_size, hash_fun, hash_cmp);
+    for (i=1; i<100000; i++) {
+      if (wsdb_hash_push(hash, 4, (char *)&i, (void *)(i))) {
+        fail("hash push: %d", i);
+      }
+    }
+    for (i=1; i<100000; i++) {
+      unsigned long k = (unsigned long)wsdb_hash_search(hash, 4, (char*)&i);
+      fail_unless((k == i), "hash search: %i %i", i, k);
+    }
+
+    deleted_so_far=1;
+    for (p=11000; p<100000; p+=7000) {
+      /* purge entries from hash */
+      int deleted = wsdb_hash_delete_range(
+          hash, (void *)&p, delete_verdict
+      );
+      if (deleted != p - deleted_so_far) {
+        fail("deleted: %d, expected %d", deleted, (p - deleted_so_far));
+      }
+      deleted_so_far = p;
+
+      for (i=p; i<100000; i++) {
+        unsigned long k = (unsigned long)wsdb_hash_search(hash, 4, (char*)&i);
+        fail_unless((k == i), "hash search after purge: %i %i %i", i, k, p);
+      }
+    }
+
+    fail_if(wsdb_hash_close(hash), "hash close");
+}
+END_TEST
+
 Suite *make_hash_suite(void)
 {
     Suite *s = suite_create("hash");
@@ -200,6 +247,7 @@ Suite *make_hash_suite(void)
     tcase_add_test(tc_core, test_hash_trivial);
     tcase_add_test(tc_core, test_hash_big);
     tcase_add_test(tc_core, test_hash_big_64_key);
+    tcase_add_test(tc_core, test_hash_purge);
     
     return s;
 }
