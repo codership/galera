@@ -16,6 +16,8 @@
 
 #include <galerautils.h>
 
+#define GCS_FIFO_SAFE
+
 #include "gcs.h"
 #include "gcs_core.h"
 #include "gcs_fifo.h"
@@ -85,7 +87,7 @@ gcs_create (const char *backend)
 
             if (!(gcs_core_set_pkt_size (conn->core, GCS_DEFAULT_PKT_SIZE))) {
 
-                conn->repl_q  = gcs_fifo_create (GCS_MAX_REPL_THREADS);
+                conn->repl_q  = GCS_FIFO_CREATE (GCS_MAX_REPL_THREADS);
                 if (conn->repl_q) {
 
                     conn->recv_q  = gcs_queue ();
@@ -94,7 +96,7 @@ gcs_create (const char *backend)
                         conn->state = GCS_CONN_CLOSED;
                         return conn; // success
                     }
-                    gcs_fifo_destroy (&conn->repl_q);
+                    GCS_FIFO_DESTROY (&conn->repl_q);
                 }
             }
             gcs_core_destroy (conn->core);
@@ -153,7 +155,7 @@ static void *gcs_recv_thread (void *arg)
 
 	if (!action_repl) {
 	    /* Check if there is any local repl action in queue */
-	    act = gcs_fifo_head (conn->repl_q);
+	    act = GCS_FIFO_HEAD (conn->repl_q);
 	    if (act) {
                 /* action_repl will be used to determine, whether
                  * we deliver action to REPL application thread
@@ -169,7 +171,7 @@ static void *gcs_recv_thread (void *arg)
 	{
 	    /* local action */
 //            gu_debug ("Local action");
-	    act = gcs_fifo_safe_get (conn->repl_q);
+	    act = GCS_FIFO_GET (conn->repl_q);
 	    
 //	    act->act_id       = act_id;
 	    act->act_id       = this_act_id;
@@ -295,7 +297,9 @@ int gcs_close (gcs_conn_t *conn)
          * queue for repl (check gcs_repl()), and recv thread is joined, so no
          * new actions will be received. Abort threads that are still waiting
          * in repl queue */
-        while ((act = gcs_fifo_get(conn->repl_q))) {
+// FIXME !!!!
+        conn->repl_q->destroyed = 1; // hack to avoid hanging in empty queue
+        while ((act = GCS_FIFO_GET(conn->repl_q))) {
             /* This will wake up repl threads in repl_q - 
              * they'll quit on their own,
              * they don't depend on the connection object after waking */
@@ -334,11 +338,14 @@ int gcs_destroy (gcs_conn_t *conn)
     }
 
 //    gu_debug ("Destroying repl_q");
-    if ((err = gcs_fifo_destroy (&conn->repl_q))) {
+#if 0
+// FIXME !!! - see the problem with cleaning the empty repl_q in gcs_close()
+    if ((err = GCS_FIFO_DESTROY (&conn->repl_q))) {
         gu_debug ("Error destroying repl FIFO: %d (%s)",
                   err, gcs_strerror (err));
         return err;
     }
+#endif
 
     /* this should cancel all recv calls */
 //    gu_debug ("Destroying recv_q");
@@ -434,14 +441,14 @@ int gcs_repl (gcs_conn_t          *conn,
             // otherwise it will be set to what gcs_fifo_put() returns.
             ret = -EBADFD;
             if ((GCS_CONN_OPEN == conn->state) &&
-                !(ret = gcs_fifo_put (conn->repl_q, &act)))
+                !(ret = GCS_FIFO_PUT (conn->repl_q, &act)))
             {
                 // Keep on trying until something else comes out
                 while ((ret = gcs_core_send (conn->core, action,
                                              act_size, act_type)) == -ERESTART);
                 if (ret < 0) {
                     /* sending failed - remove item from the queue */
-                    if (gcs_fifo_remove(conn->repl_q)) {
+                    if (GCS_FIFO_REMOVE (conn->repl_q)) {
                         gu_fatal ("Failed to recover repl_q");
                         ret = -ENOTRECOVERABLE;
                     }

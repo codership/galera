@@ -13,6 +13,8 @@
 
 #include <galerautils.h>
 
+#define GCS_FIFO_SAFE
+
 #include "gcs_backend.h"
 #include "gcs_comp_msg.h"
 #include "gcs_fifo.h"
@@ -80,7 +82,7 @@ gcs_core_create (const char* const backend_uri)
             if (core->recv_msg.buf) {
                 core->recv_msg.buf_len = CORE_INIT_BUF_SIZE;
 
-                core->fifo = gcs_fifo_create (CORE_FIFO_LEN);
+                core->fifo = GCS_FIFO_CREATE (CORE_FIFO_LEN);
                 if (core->fifo) {
                     gu_mutex_init (&core->send_lock, NULL);
                     gcs_group_init (&core->group);
@@ -250,7 +252,7 @@ gcs_core_send (gcs_core_t*      const conn,
 
     head_size = frg.frag - conn->send_buf; 
 
-    if ((ret = gcs_fifo_put (conn->fifo, action)))
+    if ((ret = GCS_FIFO_PUT (conn->fifo, action)))
 	goto out;
 
     do {
@@ -288,7 +290,7 @@ gcs_core_send (gcs_core_t*      const conn,
              * and parts of this action already could have been received
              * by other group members.
              * 1. Action must be removed from fifo.*/
-            gcs_fifo_remove(conn->fifo);
+            GCS_FIFO_REMOVE (conn->fifo);
             /* 2. Members will have to discard received fragments.
              * Two reasons could lead us here: new member(s) in configuration
              * change or broken connection (leave group). In both cases other
@@ -408,7 +410,7 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
                     else {
                         assert (gcs_group_my_idx(group) == recv_act.sender_id);
                         /* local action, get from FIFO */
-                        *action = gcs_fifo_get (conn->fifo);
+                        *action = GCS_FIFO_GET (conn->fifo);
                     }
 //                   gu_debug ("Received action: sender: %d, size: %d, act: %p",
 //                              conn->recv_msg.sender_id, ret, *action);
@@ -544,7 +546,7 @@ long gcs_core_destroy (gcs_core_t* core)
     while (gu_mutex_destroy (&core->send_lock));
 
     /* now noone will interfere */
-    gcs_fifo_destroy (&core->fifo);
+    GCS_FIFO_DESTROY (&core->fifo);
     gcs_group_free (&core->group);
 
     /* free buffers */

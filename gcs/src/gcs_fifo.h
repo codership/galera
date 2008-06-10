@@ -23,13 +23,6 @@
 
 #include "gcs.h"
 
-typedef enum gcs_fifo_safe
-{
-    GCS_FIFO_UNSAFE = 0,
-    GCS_FIFO_SAFE   = 1
-}
-gcs_fifo_safe_t;
-
 typedef struct gcs_fifo
 {
     const void* *fifo;
@@ -164,7 +157,7 @@ int gcs_fifo_safe_remove (gcs_fifo_t* const fifo)
 static inline
 void* gcs_fifo_safe_get (gcs_fifo_t* const fifo)
 {
-    register const void* ret;
+    register const void* ret = NULL;
 
     assert (fifo);
 
@@ -173,7 +166,7 @@ void* gcs_fifo_safe_get (gcs_fifo_t* const fifo)
     }
     
     while (0 == fifo->used) {
-	if (fifo->destroyed) return NULL;
+	if (fifo->destroyed) goto out;
 	gu_cond_wait (&fifo->free_signal, &fifo->busy_lock);
     }
     
@@ -184,7 +177,7 @@ void* gcs_fifo_safe_get (gcs_fifo_t* const fifo)
     if (1 == (fifo->length - fifo->used)) {
 	gu_cond_broadcast (&fifo->free_signal);
     }
-    
+out:
     gu_mutex_unlock (&fifo->busy_lock);
     return (void *) ret;
 }
@@ -210,5 +203,20 @@ void* gcs_fifo_safe_head (gcs_fifo_t* const fifo)
     gu_mutex_unlock (&fifo->busy_lock);
     return (void *) ret;
 }
+
+#define GCS_FIFO_CREATE(len)    gcs_fifo_create(len)
+#ifdef GCS_FIFO_SAFE
+#define GCS_FIFO_PUT(fifo,item) gcs_fifo_safe_put(fifo, item)
+#define GCS_FIFO_GET(fifo)      gcs_fifo_safe_get(fifo)
+#define GCS_FIFO_REMOVE(fifo)   gcs_fifo_safe_remove(fifo)
+#define GCS_FIFO_HEAD(fifo)     gcs_fifo_safe_head(fifo)
+#define GCS_FIFO_DESTROY(fifo)  gcs_fifo_safe_destroy(fifo)
+#else  // GCS_FIFO_SAFE
+#define GCS_FIFO_PUT(fifo,item) gcs_fifo_put(fifo, item)
+#define GCS_FIFO_GET(fifo)      gcs_fifo_get(fifo)
+#define GCS_FIFO_REMOVE(fifo)   gcs_fifo_remove(fifo)
+#define GCS_FIFO_HEAD(fifo)     gcs_fifo_head(fifo)
+#define GCS_FIFO_DESTROY(fifo)  gcs_fifo_destroy(fifo)
+#endif // GCS_FIFO_SAFE
 
 #endif /* _GCS_FIFO_H_ */
