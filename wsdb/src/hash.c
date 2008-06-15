@@ -121,15 +121,12 @@ int wsdb_hash_push(
     if (match.prev) {
         entry->next = match.prev->next;
         match.prev->next = entry;
-        gu_info("hash update, many elements at: %d", match.idx);
     } else if (match.entry) {
         entry->next = match.entry;
         hash->elems[match.idx] = entry;
-        gu_info("hash update, one element at: %d", match.idx);
     } else {
         entry->next = hash->elems[match.idx];
         hash->elems[match.idx] = entry;
-        gu_info("hash update, no elements at: %d", match.idx);
     }
     gu_mutex_unlock(&hash->mutex);
     return WSDB_OK;
@@ -197,20 +194,13 @@ int wsdb_hash_delete_range(
                 /* to delete */
                 if (prev) {
                     prev->next = entry->next;
-                    gu_info("prev != null for  %d", i);
                 } else {
-                  gu_info("purged cert index from: %d, remains: %p", i, entry->next);
                     hash->elems[i] = entry->next;
                 }
                 if (entry->key_len > 4) {
                     gu_free(entry->key);
                 }
                 hash->elem_count--;
-                if (!entry->data) {
-                    gu_debug("purging hash index entry with no data value");
-                } else {
-                  
-                }
                 // prev will not be stepped ahead
                 {
                     struct hash_entry *entry_next = entry->next;
