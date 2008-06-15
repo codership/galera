@@ -568,7 +568,7 @@ static void process_query_write_set(
 
 
     //print_ws(wslog_G, ws, seqno_l);
-    gu_info ("remote trx seqno: %llu %llu last_seen_trx: %llu", seqno_l, seqno_g, ws->last_seen_trx);
+    gu_info ("remote trx seqno: %llu %llu last_seen_trx: %llu, cert: %d", seqno_l, seqno_g, ws->last_seen_trx, rcode);
 
 
  retry:
@@ -727,11 +727,12 @@ enum galera_status galera_recv(void *app_ctx) {
             // synchronize
             // TODO: implement sensible error reporting instead of abort()'s
             if (galera_eagain (gcs_to_grab, to_queue, seqno_l)) abort();
+            truncate_trx_history (*(gcs_seqno_t*)action);
             if (gcs_to_release (to_queue, seqno_l)) abort();
             // After this no certifications with seqno < commit_cut
             // Let other transaction continue to commit
             if (galera_eagain(gcs_to_self_cancel,commit_queue,seqno_l)) abort();
-            truncate_trx_history (*(gcs_seqno_t*)action);
+            //truncate_trx_history (*(gcs_seqno_t*)action);
             free (action);
             break;
         case GCS_ACT_SNAPSHOT:
@@ -939,7 +940,6 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
         retcode = GALERA_CONN_FAIL;
         goto cleanup;
     }
-    gu_info ("local trx seqno: %llu %llu last_seen_trx: %llu", seqno_l, seqno_g, ws->last_seen_trx);
 
     gu_mutex_lock(&commit_mtx);
 
@@ -973,6 +973,9 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
     rcode = wsdb_append_write_set(seqno_g, ws);
     switch (rcode) {
     case WSDB_OK:
+        gu_debug ("local trx certified, seqno: %llu %llu last_seen_trx: %llu", 
+                  seqno_l, seqno_g, ws->last_seen_trx
+        );
         /* certification ok */
         retcode = GALERA_OK;
         break;

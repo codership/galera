@@ -152,6 +152,7 @@ static int update_index(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
             key_index, key_len, serial_key
         );
 
+#ifdef REMOVED
         /* find among the entries for this key, the one with last seqno */
         while (match && match->trx_seqno < trx_seqno) {
             prev = match;
@@ -172,6 +173,23 @@ static int update_index(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
         } else {
           gu_warn("update index: %llu %llu", match->trx_seqno, trx_seqno);
         }
+#else
+        if (!match) {
+            int rcode;
+            new_trx = (struct index_rec *) gu_malloc (sizeof(struct index_rec));
+            new_trx->trx_seqno = trx_seqno;
+            new_trx->next = NULL;
+            rcode = wsdb_hash_push(
+                key_index, key_len, serial_key, (void *)new_trx
+            );
+            if (rcode) {
+              gu_error("cert index push failed: %d", rcode);
+            }
+
+        } else {
+            match->trx_seqno = trx_seqno;
+        }
+#endif
         gu_free(serial_key);
     }
     return WSDB_OK;
@@ -293,23 +311,14 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
  */
 static int delete_verdict(void *ctx, void *data, void **new_data) {
     struct index_rec *entry = (struct index_rec *)data;
-    struct index_rec *next = NULL;
-    bool found = false;
 
-    /* find among the entries for this key, the one with last seqno */
-    while (entry && entry->trx_seqno < (*(trx_seqno_t *)ctx)) {
-        next = entry->next;
+    if (entry && entry->trx_seqno < (*(trx_seqno_t *)ctx)) {
+        *new_data= (void *)NULL;
         gu_free(entry);
-        entry = next;
-        found = true;
+        return 1;
     }
-    *new_data= (void *)entry;
 
-    if (found && entry) {
-        /* at least one seqno remains in the list */
-        return 0;
-    }
-    return 1;
+    return 0;
 }
 
 int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
