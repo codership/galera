@@ -568,7 +568,7 @@ static void process_query_write_set(
 
 
     //print_ws(wslog_G, ws, seqno_l);
-    gu_info ("remote trx seqno: %llu %llu last_seen_trx: %llu, cert: %d", seqno_l, seqno_g, ws->last_seen_trx, rcode);
+    gu_debug("remote trx seqno: %llu %llu last_seen_trx: %llu, cert: %d", seqno_l, seqno_g, ws->last_seen_trx, rcode);
 
 
  retry:

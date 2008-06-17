@@ -24,10 +24,6 @@ struct index_rec {
     trx_seqno_t trx_seqno;
 };
 
-/* mutex to protect index_rec access during cert/purging */
-static gu_mutex_t certification_mtx;
-
-
 static struct wsdb_file *cert_trx_file;
 
 /* djb2
@@ -72,8 +68,6 @@ int wsdb_cert_init(const char* work_dir, const char* base_name) {
 
     /* open table level locks hash */
     table_index = wsdb_hash_open(1000, hash_fun, hash_cmp);
-
-    gu_mutex_init(&certification_mtx, NULL);
 
     return WSDB_OK;
 }
@@ -152,33 +146,10 @@ static int update_index(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
             key_index, key_len, serial_key
         );
 
-#ifdef REMOVED
-        /* find among the entries for this key, the one with last seqno */
-        while (match && match->trx_seqno < trx_seqno) {
-            prev = match;
-            match = match->next;
-        }
-        
-        /* simply: if the match is not for the same seqno */
-        if (!match || match->trx_seqno > trx_seqno) {
-          new_trx = (struct index_rec *) gu_malloc (sizeof(struct index_rec));
-          new_trx->trx_seqno = trx_seqno;
-          if (prev) {
-            prev->next = new_trx;
-            new_trx->next = match;
-          } else {
-            new_trx->next = NULL;
-            wsdb_hash_push(key_index, key_len, serial_key, (void *)new_trx);
-          }
-        } else {
-          gu_warn("update index: %llu %llu", match->trx_seqno, trx_seqno);
-        }
-#else
         if (!match) {
             int rcode;
             new_trx = (struct index_rec *) gu_malloc (sizeof(struct index_rec));
             new_trx->trx_seqno = trx_seqno;
-            new_trx->next = NULL;
             rcode = wsdb_hash_push(
                 key_index, key_len, serial_key, (void *)new_trx
             );
@@ -189,7 +160,6 @@ static int update_index(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
         } else {
             match->trx_seqno = trx_seqno;
         }
-#endif
         gu_free(serial_key);
     }
     return WSDB_OK;
@@ -279,13 +249,9 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
         GALERA_CONF_WS_PERSISTENCY, GALERA_TYPE_INT
     );
 
-    /* protect cert phase against purging */
-    gu_mutex_lock(&certification_mtx);
-          
     /* certification test */
     rcode = wsdb_certification_test(ws, trx_seqno); 
     if (rcode) {
-        gu_mutex_unlock(&certification_mtx);
         return rcode;
     }
 
@@ -298,10 +264,8 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     /* update index */
     rcode = update_index(ws, trx_seqno); 
     if (rcode) {
-        gu_mutex_unlock(&certification_mtx);
         return rcode;
     }
-    gu_mutex_unlock(&certification_mtx);
     return WSDB_OK;
 }
 
@@ -323,7 +287,6 @@ static int delete_verdict(void *ctx, void *data, void **new_data) {
 
 int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
     int deleted;
-    gu_mutex_lock(&certification_mtx);
 
     /* purge entries from table index */
     deleted = wsdb_hash_delete_range(
@@ -335,7 +298,6 @@ int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
     deleted = wsdb_hash_delete_range(
         key_index, (void *)&trx_id, delete_verdict
     );
-    gu_mutex_unlock(&certification_mtx);
     gu_debug("purged %d entries from key index, up-to: %lu", deleted, trx_id);
 
     return WSDB_OK;
@@ -362,7 +324,6 @@ static int shutdown_verdict(void *ctx, void *data, void **new_data) {
 }
 int wsdb_cert_close() {
     int deleted;
-    gu_mutex_lock(&certification_mtx);
 
     /* purge entries from table index */
     deleted = wsdb_hash_delete_range(
@@ -374,7 +335,6 @@ int wsdb_cert_close() {
     deleted = wsdb_hash_delete_range(
         key_index, NULL, shutdown_verdict
     );
-    gu_mutex_unlock(&certification_mtx);
     gu_debug("purged %d entries from key index", deleted);
 
     /* close hashes, they are empty now */
