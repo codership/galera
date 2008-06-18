@@ -20,7 +20,6 @@ struct trx_hdr {
 };
 
 struct index_rec {
-    struct index_rec *next;
     trx_seqno_t trx_seqno;
 };
 
@@ -88,17 +87,14 @@ int wsdb_certification_test(
         match = (struct index_rec *) wsdb_hash_search (
             table_index, item->key->dbtable_len, item->key->dbtable
         );
-        while (match) {
-            if (match->trx_seqno > ws->last_seen_trx && 
+        if (match && match->trx_seqno > ws->last_seen_trx && 
                 match->trx_seqno < trx_seqno
-            ) {
-                GU_DBUG_PRINT("wsdb",
-                   ("trx: %llu conflicting table lock: %llu",
+        ) {
+            GU_DBUG_PRINT("wsdb",
+                ("trx: %llu conflicting table lock: %llu",
 		    (unsigned long long)trx_seqno, match->trx_seqno)
-		);
-                return WSDB_CERTIFICATION_FAIL;
-            }
-            match = match->next;
+            );
+            return WSDB_CERTIFICATION_FAIL;
         }
 
         /* continue with row level lock checks */
@@ -111,16 +107,13 @@ int wsdb_certification_test(
         );
         gu_free(serial_key);
 
-        while (match) {
-            if (match->trx_seqno > ws->last_seen_trx && 
+        if (match && match->trx_seqno > ws->last_seen_trx && 
                 match->trx_seqno < trx_seqno
-            ) {
-                GU_DBUG_PRINT("wsdb",
+        ) {
+            GU_DBUG_PRINT("wsdb",
                    ("trx: %llu conflicting: %llu", trx_seqno, match->trx_seqno)
-                );
-                return WSDB_CERTIFICATION_FAIL;
-            }
-            match = match->next;
+            );
+            return WSDB_CERTIFICATION_FAIL;
         }
     }
     return WSDB_OK;
@@ -308,18 +301,11 @@ int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
  */
 static int shutdown_verdict(void *ctx, void *data, void **new_data) {
     struct index_rec *entry = (struct index_rec *)data;
-    struct index_rec *next = NULL;
-    bool found = false;
 
     /* find among the entries for this key, the one with last seqno */
-    while (entry) {
-        next = entry->next;
+    if (entry) {
         gu_free(entry);
-        entry = next;
-        found = true;
     }
-    *new_data= NULL;
-
     return 1;
 }
 int wsdb_cert_close() {
