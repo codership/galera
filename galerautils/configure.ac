@@ -28,7 +28,8 @@ AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
 AC_PROG_CC
 #AC_DISABLE_SHARED
 AC_PROG_LIBTOOL
-PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
+AM_PATH_CHECK()
+#PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 
 # Checks for libraries.
 AC_CHECK_LIB([pthread], [pthread_testcancel],,
