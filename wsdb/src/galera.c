@@ -874,7 +874,8 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
     struct wsdb_write_set *ws;
     XDR                    xdrs;
     int                    data_max = 34000; /* only fixed xdr buf supported */
-    uint8_t                data[data_max];
+    //    uint8_t                data[data_max];
+    uint8_t                *data;
     int                    len;
     gcs_seqno_t            seqno_g, seqno_l;
     enum galera_status     retcode;
@@ -913,12 +914,21 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
       gu_warn("could not delete trx: %llu", trx_id);
     }
 
+
+    /* avoid sending empty write sets */
+    if (ws->query_count == 0) {
+        gu_warn("empty write set for: %llu", trx_id);
+        GU_DBUG_RETURN(GALERA_OK);
+    }
+
     /* encode with xdr */
     /* TODO: is not optimal to allocate data buffer for xdr encoding
      *       intermediate result.
      *       Should use xdrrec stream instead and encode directly on
      *       gcs channel as we go.
      */
+    data_max = xdr_estimate_wsdb_size(ws) * 2;
+    data = (uint8_t *)gu_malloc(data_max);
     memset(data, 0, data_max);
     xdrmem_create(&xdrs, (char *)data, data_max, XDR_ENCODE);
     if (!xdr_wsdb_write_set(&xdrs, ws)) {

@@ -150,7 +150,7 @@ bool_t xdr_wsdb_item_rec_ref(XDR *xdrs, struct wsdb_item_rec* item) {
 
 bool_t xdr_wsdb_query(XDR *xdrs, struct wsdb_query *q) {
 #ifndef REMOVED
-    if (!xdr_u_short(xdrs, &q->query_len))                 return FALSE;
+    if (!xdr_u_int(xdrs, &q->query_len))                 return FALSE;
     if (xdrs->x_op == XDR_DECODE) {
         q->query = (char *) gu_malloc (q->query_len);
         memset(q->query, '\0', q->query_len);
@@ -233,4 +233,44 @@ bool_t xdr_wsdb_write_set(XDR *xdrs, struct wsdb_write_set *ws) {
     }
 #endif
     return TRUE;
+}
+
+int xdr_estimate_wsdb_size(struct wsdb_write_set *ws) {
+    int i;
+    int ws_size = 0;
+    ws_size += sizeof(ws->local_trx_id);
+    ws_size += sizeof(ws->last_seen_trx);
+    ws_size += sizeof(ws->type);
+    ws_size += sizeof(ws->level);
+    ws_size += sizeof(ws->state);
+    ws_size += sizeof(ws->query_count);
+
+    for (i=0; i<ws->query_count; i++) {
+        ws_size += sizeof(ws->queries[i].query_len);
+        ws_size += ws->queries[i].query_len;
+        ws_size += sizeof(ws->queries[i].timeval);
+        ws_size += sizeof(ws->queries[i].randseed);
+    }
+    ws_size += sizeof(ws->conn_query_count);
+    for (i=0; i<ws->conn_query_count; i++) {
+        ws_size += sizeof(ws->conn_queries[i].query_len);
+        ws_size += ws->conn_queries[i].query_len;
+        ws_size += sizeof(ws->conn_queries[i].timeval);
+        ws_size += sizeof(ws->conn_queries[i].randseed);
+    }
+
+    ws_size += sizeof(ws->item_count);
+    for (i=0; i<ws->item_count; i++) {
+        int j;
+        ws_size += sizeof(ws->items[i].action);
+        ws_size += sizeof(ws->items[i].key->dbtable_len);
+        ws_size += ws->items[i].key->dbtable_len;
+        ws_size += sizeof(ws->items[i].key->key->key_part_count);
+        for ( j=0; j < ws->items[i].key->key->key_part_count; j++) {
+            ws_size += sizeof(ws->items[i].key->key->key_parts[j].type);
+            ws_size += sizeof(ws->items[i].key->key->key_parts[j].length);
+            ws_size += ws->items[i].key->key->key_parts[j].length;
+        }
+    }
+    return(ws_size);
 }
