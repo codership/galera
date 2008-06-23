@@ -28,8 +28,8 @@ static uint32_t hash_fun_64(uint32_t max_size, uint16_t len, char *key) {
 }
 
 static int hash_cmp_64(uint16_t len1, char *key1, uint16_t len2, char *key2) {
-    if ((uint64_t)(*key1) < (uint64_t)(*key2)) return -1;
-    if ((uint64_t)(*key1) > (uint64_t)(*key2)) return 1;
+    if (*(uint64_t *)key1 < *(uint64_t *)key2) return -1;
+    if (*(uint64_t *)key1 > *(uint64_t *)key2) return 1;
     return 0;
 }
 
@@ -155,8 +155,8 @@ static int handle_variable_elem(void *context, char *key, char *data) {
     ctx->ws->conn_queries[ctx->query_count].query = (char *) gu_malloc (
         strlen(data) + 1
     );
-    ctx->ws->conn_queries[ctx->query_count].query[strlen(data)] = '\0';
     strcpy(ctx->ws->conn_queries[ctx->query_count].query, data);
+    ctx->ws->conn_queries[ctx->query_count].query[strlen(data)] = '\0';
     ctx->query_count++;
     return 0;
 }

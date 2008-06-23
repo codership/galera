@@ -77,11 +77,11 @@ static struct key_array_entry *create_key_array_entry(
     );
     
     entry->key = (char *) gu_malloc (key_len + 1);
-    strcpy(entry->key, key);
+    strncpy(entry->key, key, key_len);
     entry->key[key_len] = '\0';
 
     entry->data = (char *) gu_malloc (data_len + 1);
-    strcpy(entry->data, data);
+    strncpy(entry->data, data, data_len);
     entry->data[data_len] = '\0';
 
     entry->next = NULL;
@@ -114,7 +114,7 @@ int key_array_replace(
     if (entry) {
         gu_free(entry->data);
         entry->data = (char *) gu_malloc (data_len + 1);
-        strcpy(entry->data, data);
+        strncpy(entry->data, data, data_len);
         entry->data[data_len] = '\0';
     } else {
         entry = create_key_array_entry(key, key_len, data, data_len);

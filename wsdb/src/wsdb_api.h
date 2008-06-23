@@ -182,7 +182,7 @@ struct wsdb_item_rec {
  */
 struct wsdb_query {
     char     *query;      //!< the SQL query string
-    uint16_t  query_len;  //!< length of query string
+    uint32_t  query_len;  //!< length of query string
     time_t    timeval;    //!< time value used for query processing
     uint32_t  randseed;   //!< random seed
 };
@@ -466,7 +466,7 @@ struct wsdb_write_set *wsdb_get_conn_write_set(
  * @return 
  */
 int wsdb_set_exec_query(
-    struct wsdb_write_set *ws, char *query, uint16_t query_len
+    struct wsdb_write_set *ws, char *query, uint32_t query_len
 );
 
 /*!
@@ -484,6 +484,7 @@ int wsdb_set_exec_query(
  */
 //typedef int bool;
 bool_t xdr_wsdb_write_set(XDR *xdrs, struct wsdb_write_set *ws);
+int xdr_estimate_wsdb_size(struct wsdb_write_set *ws);
 
 /*!
  * @brief frees the write set structures.

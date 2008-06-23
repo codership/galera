@@ -318,12 +318,12 @@ static void close_trx_block_access(
 }
 
 static void append_in_trx_block(
-    struct trx_info *trx, struct block_info *bi, uint16_t len, char *data
+    struct trx_info *trx, struct block_info *bi, uint32_t len, char *data
 ) {
     GU_DBUG_ENTER("append_in_trx_block");
 
     while (len) {
-        uint16_t stored;
+        uint32_t stored;
         char *ptr;
 
         //GU_DBUG_PRINT("wsdb", ("block: %d, len: %d",trx->last_block, len));
@@ -364,7 +364,7 @@ int wsdb_append_query(
 ) {
     struct trx_info  *trx = get_trx_info(trx_id);
     char              rec_type;
-    uint16_t          query_len = strlen(query) + 1;
+    uint32_t          query_len = strlen(query) + 1;
     struct block_info bi;
 
     GU_DBUG_ENTER("wsdb_append_query");
@@ -380,7 +380,7 @@ int wsdb_append_query(
     open_trx_block_access(trx, &bi);
     rec_type = REC_TYPE_QUERY;
     append_in_trx_block(trx, &bi, (uint16_t)1, &rec_type);
-    append_in_trx_block(trx, &bi, (uint16_t)2, (char *)&query_len);
+    append_in_trx_block(trx, &bi, (uint32_t)4, (char *)&query_len);
     append_in_trx_block(trx, &bi, query_len-1, query);
     append_in_trx_block(trx, &bi, 1, "\0");
     append_in_trx_block(trx, &bi, (uint16_t)4, (char *)&timeval);
@@ -535,11 +535,11 @@ int wsdb_append_row_col(
 }
 
 static int copy_from_block(
-    char *target, uint16_t len, struct block_info *bi, char **pos
+    char *target, uint32_t len, struct block_info *bi, char **pos
 ) {
     while (len && bi->block) {
         char *end = (char *)bi->block + bi->block->pos;
-        uint16_t avail = end - *pos;
+        uint32_t avail = end - *pos;
         if (target) memcpy(target, *pos, (len < avail) ? len : avail);
         if (len > avail) {
             file_cache_forget(local_cache, bi->cache_id);
@@ -705,10 +705,10 @@ static int get_write_set_do(
         GU_DBUG_PRINT("wsdb",("block: %p %d", bi.block, bi.cache_id));
         switch(rec_type) {
         case REC_TYPE_QUERY: {
-            uint16_t query_len;
+            uint32_t query_len;
             
             /* get the length of the SQL query */
-            if (copy_from_block((char *)(&query_len), 2, &bi, &pos)) {
+            if (copy_from_block((char *)(&query_len), 4, &bi, &pos)) {
               gu_error("could not retrieve write set for trx: %lu", trx->id);
               return WSDB_ERR_WS_FAIL;
             }
@@ -1027,7 +1027,7 @@ struct wsdb_write_set *wsdb_get_conn_write_set(
 }
 
 int wsdb_set_exec_query(
-    struct wsdb_write_set *ws, char *query, uint16_t query_len
+    struct wsdb_write_set *ws, char *query, uint32_t query_len
 ) {
 
     GU_DBUG_ENTER("wsdb_set_exec_query");
