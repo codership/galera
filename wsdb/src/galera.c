@@ -1034,6 +1034,7 @@ after_cert_test:
 
 cleanup:
 
+    gu_free(data);
     // was referenced by wsdb_get_write_set() above
     wsdb_deref_seqno (ws->last_seen_trx);
     wsdb_write_set_free(ws);
