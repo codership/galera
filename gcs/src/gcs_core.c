@@ -367,7 +367,7 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg)
 ssize_t gcs_core_recv (gcs_core_t*      conn,
                        uint8_t**        action,
                        gcs_act_type_t*  act_type,
-                       gcs_seqno_t*     act_id) // should not be here!!!
+                       gcs_seqno_t*     act_id) // global ID
 {
     gcs_recv_msg_t* recv_msg = &conn->recv_msg;
     gcs_group_t*    group    = &conn->group;
@@ -411,6 +411,7 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
                         assert (gcs_group_my_idx(group) == recv_act.sender_id);
                         /* local action, get from FIFO */
                         *action = GCS_FIFO_GET (conn->fifo);
+                        assert (NULL != *action);
                     }
 //                   gu_debug ("Received action: sender: %d, size: %d, act: %p",
 //                              conn->recv_msg.sender_id, ret, *action);
