@@ -128,7 +128,7 @@ gcs_core_open (gcs_core_t* core,
 	int ret;
 
         /* receive primary configuration message to get our id and stuff.
-         * This will have to be removed in order to pass the RPIM event to the
+         * This will have to be removed in order to pass the PRIM event to the
          * application. We don't need to wait for anything here. */
 	do {
 	    if (action) free (action); // clear previous action
@@ -212,8 +212,7 @@ core_msg_send_retry (gcs_core_t*    core,
                      gcs_msg_type_t type)
 {
     ssize_t ret;
-    while ((ret = core_msg_send (core, buf, buf_len, type))
-           == -EAGAIN) {
+    while ((ret = core_msg_send (core, buf, buf_len, type)) == -EAGAIN) {
         /* wait for primary configuration - sleep 0.01 sec */
         gu_debug ("Backend requested wait\n");
         usleep (10000);
@@ -452,7 +451,6 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
                          "in non-primary configuration from member %d",
                          recv_msg->sender_id);
 	    }
-            if (*act_type == GCS_ACT_COMMIT_CUT) gu_info ("COMMIT CUT!");
             break;
 	case GCS_MSG_COMPONENT:
 	    *action = NULL;

@@ -189,7 +189,7 @@ static GCS_BACKEND_RECV_FN(gcs_vs_recv)
 	//   (see fixme in CLOSE)
 	// 
 	//
-	gcs_comp_msg_t *new_comp;
+	gcs_comp_msg_t *new_comp = 0;
 	if (ev.view->is_trans() && conn->comp_msg && 
 	    ev.view->get_addr().size()*2 + ev.view->get_left().size() 
 	    < static_cast<size_t>(gcs_comp_msg_num(conn->comp_msg))) {
@@ -197,6 +197,12 @@ static GCS_BACKEND_RECV_FN(gcs_vs_recv)
 	} else {
 	    new_comp = gcs_comp_msg_new(true, 0, ev.view->get_addr().size());
 	}
+
+        if (!new_comp) {
+            gu_fatal ("Failed to allocate new component message.");
+            abort();
+        }
+
 	fill_comp(new_comp, ev.view->is_trans() ? 0 : &conn->comp_map, ev.view->get_addr(), conn->vs_ctx.vs->get_self());
 	gcs_comp_msg_delete(conn->comp_msg);
 	conn->comp_msg = new_comp;
@@ -267,6 +273,7 @@ static GCS_BACKEND_DESTROY_FN(gcs_vs_destroy)
     conn->vs_ctx.vs->close();
     delete conn->vs_ctx.vs;
     delete conn->vs_ctx.po;
+    if (conn->comp_msg) gcs_comp_msg_delete (conn->comp_msg);
     delete conn;
     backend->conn = 0;
     fprintf(stderr, "gcs_vs_close(): return 0}\n");
@@ -301,6 +308,7 @@ GCS_BACKEND_CREATE_FN(gcs_vs_create)
 	delete conn;
 	return -EINVAL;
     }
+    conn->comp_msg = 0;
     
     backend->open     = &gcs_vs_open;
     backend->close    = &gcs_vs_close;
