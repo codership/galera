@@ -92,7 +92,7 @@ gcs_create (const char *backend)
 
                     conn->recv_q  = gcs_queue ();
                     if (conn->recv_q) {
-                        gu_mutex_init (&conn->lock,      NULL);
+                        gu_mutex_init (&conn->lock, NULL);
                         conn->state = GCS_CONN_CLOSED;
                         return conn; // success
                     }
@@ -297,8 +297,7 @@ int gcs_close (gcs_conn_t *conn)
          * queue for repl (check gcs_repl()), and recv thread is joined, so no
          * new actions will be received. Abort threads that are still waiting
          * in repl queue */
-// FIXME !!!!
-        conn->repl_q->destroyed = 1; // hack to avoid hanging in empty queue
+        GCS_FIFO_CLOSE(conn->repl_q); // hack to avoid hanging in empty queue
         while ((act = GCS_FIFO_GET(conn->repl_q))) {
             /* This will wake up repl threads in repl_q - 
              * they'll quit on their own,
@@ -337,18 +336,13 @@ int gcs_destroy (gcs_conn_t *conn)
         return err;
     }
 
-//    gu_debug ("Destroying repl_q");
-#if 0
-// FIXME !!! - see the problem with cleaning the empty repl_q in gcs_close()
     if ((err = GCS_FIFO_DESTROY (&conn->repl_q))) {
         gu_debug ("Error destroying repl FIFO: %d (%s)",
                   err, gcs_strerror (err));
         return err;
     }
-#endif
 
     /* this should cancel all recv calls */
-//    gu_debug ("Destroying recv_q");
     if ((err = gcs_queue_free (conn->recv_q))) {
         gu_debug ("Error destroying recv queue: %d (%s)",
                   err, gcs_strerror (err));

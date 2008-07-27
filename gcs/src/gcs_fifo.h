@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #include <galerautils.h>
 
@@ -31,7 +32,8 @@ typedef struct gcs_fifo
     size_t       head;
     size_t       tail;
     size_t       used;
-    int          destroyed;
+    bool         closed;
+    bool         destroyed;
     gu_mutex_t   busy_lock;
     gu_cond_t    free_signal;
 }
@@ -42,6 +44,7 @@ gcs_fifo_t;
  * of overflow situation.
  */
 gcs_fifo_t* gcs_fifo_create  (const size_t length);
+int         gcs_fifo_close   (gcs_fifo_t* fifo);
 int         gcs_fifo_destroy (gcs_fifo_t** fifo);
 
 static inline
@@ -108,13 +111,13 @@ int gcs_fifo_safe_put (gcs_fifo_t* const fifo, const void* const item)
 {
     assert (fifo && item);
 
-    if (gu_mutex_lock (&fifo->busy_lock) || fifo->destroyed) {
+    if (gu_mutex_lock (&fifo->busy_lock) || fifo->closed) {
 	return -ECANCELED;
     }
     
     while (fifo->used >= fifo->length) {
 	gu_cond_wait (&fifo->free_signal, &fifo->busy_lock);
-	if (fifo->destroyed) return -ECANCELED;
+	if (fifo->closed) return -ECANCELED;
     }
     
     fifo->fifo[fifo->tail] = item;
@@ -136,7 +139,7 @@ int gcs_fifo_safe_remove (gcs_fifo_t* const fifo)
     int ret;
     assert (fifo);
 
-    if (gu_mutex_lock (&fifo->busy_lock) || fifo->destroyed) {
+    if (gu_mutex_lock (&fifo->busy_lock) || fifo->closed) {
 	return -ECANCELED;
     }
     
@@ -166,7 +169,7 @@ void* gcs_fifo_safe_get (gcs_fifo_t* const fifo)
     }
     
     while (0 == fifo->used) {
-	if (fifo->destroyed) goto out;
+	if (fifo->closed) goto out;
 	gu_cond_wait (&fifo->free_signal, &fifo->busy_lock);
     }
     
@@ -205,6 +208,7 @@ void* gcs_fifo_safe_head (gcs_fifo_t* const fifo)
 }
 
 #define GCS_FIFO_CREATE(len)    gcs_fifo_create(len)
+#define GCS_FIFO_CLOSE(fifo)    gcs_fifo_close(fifo)
 #ifdef GCS_FIFO_SAFE
 #define GCS_FIFO_PUT(fifo,item) gcs_fifo_safe_put(fifo, item)
 #define GCS_FIFO_GET(fifo)      gcs_fifo_safe_get(fifo)

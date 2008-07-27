@@ -64,6 +64,18 @@ int gcs_fifo_destroy (gcs_fifo_t** fifo)
     return 0;
 }
 
+int gcs_fifo_close (gcs_fifo_t* fifo)
+{
+    int ret = gu_mutex_lock (&fifo->busy_lock);
+
+    if (!ret) {
+        fifo->closed = true;
+        gu_cond_broadcast (&fifo->free_signal); // wake whoever is waiting
+        gu_mutex_unlock (&fifo->busy_lock);
+    }
+
+    return ret;
+}
 
 int gcs_fifo_safe_destroy (gcs_fifo_t** fifo)
 {
@@ -79,7 +91,8 @@ int gcs_fifo_safe_destroy (gcs_fifo_t** fifo)
 	    return -EALREADY;
 	}
 
-	f->destroyed = 1;
+        f->closed = true;
+	f->destroyed = true;
 
 	while (f->used) {
 	    /* there are some items in FIFO - and that means
