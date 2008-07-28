@@ -379,7 +379,7 @@ void *gcs_test_repl (void *arg)
 //	puts (thread->log_msg); fflush (stdout);
     }
 //    fprintf (stderr, "REPL thread %ld exiting: %s\n",
-//             thread->id, gcs_strerror(ret));
+//             thread->id, strerror(-ret));
     return NULL;
 }
 
@@ -406,7 +406,7 @@ void *gcs_test_send (void *arg)
         size_sent += thread->msg_len;
     }
 //    fprintf (stderr, "SEND thread %ld exiting: %s\n",
-//             thread->id, gcs_strerror(ret));
+//             thread->id, strerror(-ret));
     return NULL;
 }
 
@@ -446,7 +446,7 @@ void *gcs_test_recv (void *arg)
 	free (thread->msg);
     }
 //    fprintf (stderr, "RECV thread %ld exiting: %s\n",
-//             thread->id, gcs_strerror(ret));
+//             thread->id, strerror(-ret));
     return NULL;
 }
 
@@ -718,6 +718,6 @@ int main (int argc, char *argv[])
 
     return 0;
 out:
-    printf ("Error: %ld(%s)\n", err, gcs_strerror (err));
+    printf ("Error: %ld (%s)\n", err, strerror (-err));
     return err;
 }

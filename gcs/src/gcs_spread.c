@@ -38,7 +38,7 @@ string_array_alloc (const long n)
 {
     string_array_t *ret = NULL;
 
-    ret = gu_malloc (sizeof (string_array_t) + (n) * MAX_GROUP_NAME);
+    ret = gu_malloc (sizeof (string_array_t) + n * MAX_GROUP_NAME);
     
     if (ret) {
         ret->max_strings = n;
@@ -620,7 +620,7 @@ GCS_BACKEND_OPEN_FN(spread_open)
 	case CONNECTION_CLOSED: err = -ENETRESET;     break;
 	default:                err = -ENOTCONN;      break;
 	}
-        gu_error ("%s", gcs_strerror (err));
+        gu_error ("%s", strerror (-err));
 	return err;
     }
 
@@ -715,7 +715,7 @@ out1:
     spread_destroy (backend);
 out0:
     gu_error ("Creating Spread backend failed: %s (%d)",
-              gcs_strerror (err), err);
+              strerror (-err), err);
     return err;
 }
 

@@ -15,6 +15,7 @@ typedef enum gcs_msg_type
     GCS_MSG_ERROR,     // error happened when recv()
     GCS_MSG_ACTION,    // action fragment
     GCS_MSG_LAST,      // report about last applied action
+    GCS_MSG_FLOW,      // flow control message
     GCS_MSG_COMPONENT, // new component
     GCS_MSG_SYNC,      // synchronization message, contaning group information
     GCS_MSG_FLUSH,     // flush message - node has flushed send queues

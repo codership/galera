@@ -131,7 +131,7 @@ GCS_BACKEND_RECV_FN(dummy_recv)
                 // wait was aborted while no data - connection closing
                 ret = -ECONNABORTED;
             }
-            gu_debug ("Returning %d: %s", ret, gcs_strerror(ret));
+            gu_debug ("Returning %d: %s", ret, strerror(-ret));
             return ret;
         }
         else {
@@ -200,7 +200,7 @@ GCS_BACKEND_OPEN_FN(dummy_open)
         if (ret > 0) ret = 0;
 	gcs_comp_msg_delete (comp);
     }
-    gu_debug ("Opened backend connection: %d (%s)", ret, gcs_strerror(ret));
+    gu_debug ("Opened backend connection: %d (%s)", ret, strerror(-ret));
     return ret;
 }
 

@@ -98,9 +98,9 @@ typedef enum gcs_act_type
 /* ordered actions */
     GCS_ACT_DATA,       //! application action, sent by application
     GCS_ACT_COMMIT_CUT, //! group-wide action commit cut
-/* unordered actions */
     GCS_ACT_SNAPSHOT,   //! request for state snapshot
     GCS_ACT_PRIMARY,    //! reached primary configuration
+    GCS_ACT_FLOW,       //! flow control
     GCS_ACT_SERVICE,    //! service action, sent by GCS
     GCS_ACT_NON_PRIMARY,//! reached non-primary configuration
     GCS_ACT_ERROR,      //! error happened while receiving the action
@@ -294,32 +294,6 @@ int gcs_conf_debug_off        ();
 extern long
 gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size);
 #define GCS_DEFAULT_PKT_SIZE 1500 /* Standard Ethernet frame */
-
-/*! Error codes specific to GCS */
-#define GCS_ERR_OK 0
-#define GCS_ERR_BASE 0x100
-enum
-{
-    _GCS_ERR_OTHER = GCS_ERR_BASE,
-    _GCS_ERR_INTERNAL,
-    _GCS_ERR_CHANNEL,
-    _GCS_ERR_SOCKET,
-    _GCS_ERR_BACKEND,
-    _GCS_ERR_COULD_NOT_CONNECT,
-    _GCS_ERR_CONNECTION_CLOSED,
-    _GCS_ERR_NOT_CONNECTED,
-    _GCS_ERR_NON_PRIMARY,
-    _GCS_ERR_ABORTED,
-    GCS_ERR_MAX
-};
-
-/*! @brief Returns a brief description of an error code.
- * In the same manner as strerror().
- *
- * @param  Error code returned by GCS function.
- * @return Description string.
- */
-char *gcs_strerror (int err);
 
 /* Membership message */
 /*! Member name max length */

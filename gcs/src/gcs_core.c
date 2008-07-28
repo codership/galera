@@ -97,7 +97,7 @@ gcs_core_create (const char* const backend_uri)
         }
         else {
             gu_error ("Failed to initialize backend: %d (%s)",
-                      err, gcs_strerror(err));
+                      err, strerror(-err));
             gu_error ("Arguments: %p, %s",
                       &core->backend, backend_uri);
         }
@@ -150,7 +150,7 @@ gcs_core_open (gcs_core_t* core,
     }
     else {
         gu_error ("Failed to open backend connection: %d (%s)",
-                  ret, gcs_strerror(ret));
+                  ret, strerror(-ret));
     }
 
     return ret;
@@ -197,7 +197,7 @@ core_msg_send (gcs_core_t*    core,
         }
         gu_mutex_unlock (&core->send_lock);
     }
-//    gu_debug ("returning: %d (%s)", ret, gcs_strerror(ret));
+//    gu_debug ("returning: %d (%s)", ret, strerror(-ret));
     return ret;
 }
 
@@ -217,7 +217,7 @@ core_msg_send_retry (gcs_core_t*    core,
         gu_debug ("Backend requested wait\n");
         usleep (10000);
     }
-//    gu_debug ("returning: %d (%s)", ret, gcs_strerror(ret));
+//    gu_debug ("returning: %d (%s)", ret, strerror(-ret));
     return ret;
 }
 
@@ -306,7 +306,7 @@ gcs_core_send (gcs_core_t*      const conn,
     ret = sent;
 
 out:
-//    gu_debug ("returning: %d (%s)", ret, gcs_strerror(ret));
+//    gu_debug ("returning: %d (%s)", ret, strerror(-ret));
     return ret;
 }
 
@@ -357,7 +357,7 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg)
 	recv_msg->size = ret;
     }
     else {
-	gu_debug ("returning %d: %s\n", ret, gcs_strerror (ret));
+	gu_debug ("returning %d: %s\n", ret, strerror(-ret));
     }
     return ret;
 }
@@ -374,7 +374,7 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
 
     *action   = NULL;
     *act_type = GCS_ACT_ERROR;
-    *act_id   = GCS_SEQNO_ILL;
+    *act_id   = GCS_SEQNO_ILL; // by default action is unordered
 
     if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
     if (conn->state >= CORE_CLOSED) {
@@ -427,6 +427,9 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
 			  "member %d", recv_msg->sender_id);
 	    }
 	    break;
+        case GCS_MSG_FLOW:
+            *act_type = GCS_ACT_FLOW;
+            *action   = recv_msg->buf; // no need to malloc since it is internal
         case GCS_MSG_LAST:
             if (gcs_group_is_primary(group)) {
                 gcs_seqno_t commit_cut =
@@ -434,7 +437,7 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
                 if (commit_cut) {
                     /* commit cut changed */
                     if ((*action  = malloc (sizeof (commit_cut)))) {
-                        *act_id   = ++conn->recv_act_no;
+// remove                       *act_id   = ++conn->recv_act_no;
                         *act_type = GCS_ACT_COMMIT_CUT;
                         *((gcs_seqno_t*)*action) = commit_cut;
                         ret = sizeof(commit_cut);
@@ -460,7 +463,7 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
                 {
                     if (gcs_group_is_primary (group)) {
                         *act_type = GCS_ACT_PRIMARY;
-                        *act_id   = conn->recv_act_no;
+// remove                       *act_id   = conn->recv_act_no;
                         // if new members are added, need to resend ongoing
                         // action
                         conn->send_restart = gcs_group_new_members (group);
@@ -470,7 +473,7 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
                     } else {
                         *act_type = GCS_ACT_NON_PRIMARY;
                         //don't increment according to spec
-                        *act_id   = conn->recv_act_no;
+// remove                       *act_id   = conn->recv_act_no;
                         if (conn->state == CORE_PRIMARY)
                             conn->state = CORE_NON_PRIMARY;
                     }

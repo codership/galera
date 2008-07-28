@@ -141,7 +141,7 @@ static void *gcs_recv_thread (void *arg)
                                        &act_type,
                                        &act_id)) < 0) {
 	    ret = act_size;
-	    gu_debug ("gcs_core_recv returned %d: %s", ret, gcs_strerror(ret));
+	    gu_debug ("gcs_core_recv returned %d: %s", ret, strerror(-ret));
 	    break;
 	}
 
@@ -222,7 +222,7 @@ static void *gcs_recv_thread (void *arg)
 //                 act_type, act_size, act_id, conn->local_act_id);
     }
     
-    gu_debug ("RECV thread exiting %d: %s", ret, gcs_strerror(ret));
+    gu_debug ("RECV thread exiting %d: %s", ret, strerror(-ret));
     return NULL;
 }
 
@@ -252,7 +252,7 @@ int gcs_open (gcs_conn_t *conn, const char *channel)
             }
             else {
                 gu_error ("Failed to join channel '%s': %d (%s)",
-                          channel, ret, gcs_strerror(ret));
+                          channel, ret, strerror(-ret));
             }
         }
         else {
@@ -337,21 +337,18 @@ int gcs_destroy (gcs_conn_t *conn)
     }
 
     if ((err = GCS_FIFO_DESTROY (&conn->repl_q))) {
-        gu_debug ("Error destroying repl FIFO: %d (%s)",
-                  err, gcs_strerror (err));
+        gu_debug ("Error destroying repl FIFO: %d (%s)", err, strerror(-err));
         return err;
     }
 
     /* this should cancel all recv calls */
     if ((err = gcs_queue_free (conn->recv_q))) {
-        gu_debug ("Error destroying recv queue: %d (%s)",
-                  err, gcs_strerror (err));
+        gu_debug ("Error destroying recv queue: %d (%s)", err, strerror(-err));
         return err;
     }
 
     if ((err = gcs_core_destroy (conn->core))) {
-        gu_debug ("Error destroying core: %d (%s)",
-                  err, gcs_strerror (err));
+        gu_debug ("Error destroying core: %d (%s)", err, strerror(-err));
         return err;
     }
 
@@ -506,11 +503,11 @@ int gcs_recv (gcs_conn_t *conn, gcs_act_type_t *act_type,
                 return -ENOTCONN;
             }
             else {
-                gu_error ("gcs_recv() error: %d (%s)", err, gcs_strerror(err));
+                gu_error ("gcs_recv() error: %d (%s)", err, strerror(-err));
                 return err;
             }
         } else {
-            gu_error ("gcs_recv() error: %d (%s)", err, gcs_strerror(err));
+            gu_error ("gcs_recv() error: %d (%s)", err, strerror(-err));
             return err;
         }
     }
