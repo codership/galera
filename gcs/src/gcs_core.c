@@ -230,8 +230,10 @@ gcs_core_send (gcs_core_t*      const conn,
     ssize_t        ret  = 0;
     size_t         sent = 0;
     gcs_act_frag_t frg;
-    size_t         head_size;
     size_t         send_size;
+    const unsigned char proto_ver = conn->proto_ver;
+    const size_t   hdr_size  = gcs_act_proto_hdr_size (proto_ver);
+
 
     /* 
      * Action header will be replicated with every message.
@@ -242,14 +244,12 @@ gcs_core_send (gcs_core_t*      const conn,
     /* Initialize action constants */
     frg.act_size  = act_size;
     frg.act_type  = act_type;
-    frg.act_id    = conn->send_act_no; /* increment for every new action */
+    frg.act_id    = conn->send_act_no; /* incremented for every new action */
     frg.frag_no   = 0;
-    frg.proto_ver = conn->proto_ver;
+    frg.proto_ver = proto_ver;
 
     if ((ret = gcs_act_proto_write (&frg, conn->send_buf, conn->send_buf_len)))
 	goto out;
-
-    head_size = frg.frag - conn->send_buf; 
 
     if ((ret = GCS_FIFO_PUT (conn->fifo, action)))
 	goto out;
@@ -261,16 +261,16 @@ gcs_core_send (gcs_core_t*      const conn,
 	/* Here is the only time we have to cast frg.frag */
 	memcpy ((char*)frg.frag, action, chunk_size);
 	
-	send_size = head_size + chunk_size;
+	send_size = hdr_size + chunk_size;
 
         ret = core_msg_send_retry (conn, conn->send_buf, send_size,
                                    GCS_MSG_ACTION);
 
-	if (gu_likely(ret > (ssize_t)head_size)) {
+	if (gu_likely(ret > (ssize_t)hdr_size)) {
 
             assert (ret <= (ssize_t)send_size);
 
-            ret -= head_size;
+            ret -= hdr_size;
 
             sent     += ret;
             action   += ret;
