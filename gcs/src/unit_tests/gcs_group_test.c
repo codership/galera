@@ -291,7 +291,7 @@ START_TEST (gcs_group_configuration)
 
     // now I just continue sending messages
     ret = gcs_group_handle_act_msg (&group, &msg2, &act); // local
-    fail_if (ret != 0, "%d (%s)", ret, gcs_strerror(ret));
+    fail_if (ret != 0, "%d (%s)", ret, strerror(-ret));
     fail_if (act.buf_len != 0);
     fail_if (act.buf != NULL);
     msg_write (&msg2, &frg2, buf2, buf_len, frag2, frag2_len, 1,GCS_MSG_ACTION);
