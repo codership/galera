@@ -116,8 +116,8 @@ START_TEST (test_xdr)
                 fail_if(rcode, "wsdb_append_row failed: %d", rcode);
             }
         }
-
-        ws_send = wsdb_get_write_set(trx, 1);
+        /* TODO: rbr level is not tested here */
+        ws_send = wsdb_get_write_set(trx, 1, NULL, 0);
         fail_if(!ws_send, "write set read failed");
 
         if (!xdr_wsdb_write_set(&xdrs, ws_send)) {

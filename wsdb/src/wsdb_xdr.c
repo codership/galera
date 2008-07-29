@@ -231,6 +231,28 @@ bool_t xdr_wsdb_write_set(XDR *xdrs, struct wsdb_write_set *ws) {
     if (xdrs->x_op == XDR_FREE) {
         gu_free(ws->items);
     }
+
+    if (!xdr_u_int(xdrs, &ws->rbr_buf_len)) return FALSE;
+    if (xdrs->x_op == XDR_DECODE) {
+         if (ws->rbr_buf_len != 0) {
+              ws->rbr_buf = (char *) gu_malloc (ws->rbr_buf_len);
+              memset(ws->rbr_buf, '\0', ws->rbr_buf_len);
+         }
+    }
+    if (ws->rbr_buf_len)
+    {
+         if (!xdr_opaque(xdrs, ws->rbr_buf, (u_int) ws->rbr_buf_len)) return FALSE;
+    }
+    else
+    {
+         assert(ws->level == WSDB_WS_QUERY); //TODO -> to exact RBR
+    }
+    if (xdrs->x_op == XDR_FREE) {
+         if (ws->rbr_buf_len) {
+              gu_free(ws->rbr_buf);
+              ws->rbr_buf_len = 0;
+         }
+    }
 #endif
     return TRUE;
 }

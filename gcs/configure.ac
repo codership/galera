@@ -29,6 +29,18 @@ else
 fi
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
 
+# Check if use of DBUG macros is desired
+AC_ARG_ENABLE(dbug,
+              AC_HELP_STRING([--disable-dbug],
+              [disable Fred Fish[']s DBUG macros [[default=enabled]]]),,
+	      enable_dbug="yes")
+# Check if dbug location is provided
+if test "$enable_dbug" != "no"
+then
+    enable_dbug="yes"
+else
+    CFLAGS="$CFLAGS -DGU_DBUG_OFF"
+fi
 
 # 
 AC_ARG_WITH([galera], [Galera libs location],,with_galera="no")
@@ -119,6 +131,8 @@ AC_CONFIG_FILES([Makefile
 CFLAGS="$CFLAGS -Wall -Werror "
 AC_OUTPUT
 
+AC_MSG_NOTICE([***])
 AC_MSG_NOTICE([Spread backend: $enable_spread])
+AC_MSG_NOTICE([***])
 AC_MSG_NOTICE([CFLAGS:  $CFLAGS])
 AC_MSG_NOTICE([LDFLAGS: $LDFLAGS])

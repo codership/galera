@@ -665,6 +665,8 @@ void wsdb_write_set_free(struct wsdb_write_set *ws) {
     }
     gu_free(ws->items);
 
+    if (ws->rbr_buf_len)
+         gu_free(ws->rbr_buf);
     gu_free(ws);
 }
 
@@ -944,8 +946,14 @@ static int get_write_set_do(
     GU_DBUG_RETURN(WSDB_OK);
 }
 
+/* effectively Query level WS constructor. For mysql's rbr we
+ * need a separate one because there is a dedicated cache in mysql
+ * where WS transport struct should get the content from. So far I
+ * only add the content of mysql thd cache which affects the value of
+ * WS' level */
+
 struct wsdb_write_set *wsdb_get_write_set(
-    local_trxid_t trx_id, connid_t conn_id
+        local_trxid_t trx_id, connid_t conn_id, const char * row_buf, ulong buf_len
 ) {
     struct trx_info       *trx = get_trx_info(trx_id);
     struct wsdb_write_set *ws;
@@ -989,8 +997,17 @@ struct wsdb_write_set *wsdb_get_write_set(
 
     ws->local_trx_id  = trx_id;
     ws->last_seen_trx = wsdb_get_last_committed_seqno();
-    ws->level         = WSDB_WS_QUERY;
-
+    ws->level         = buf_len? WSDB_WS_DATA_RBR /* actually rbr; there might be other raw data representations */ : WSDB_WS_QUERY;
+    if (ws->level == WSDB_WS_DATA_RBR) {
+            ws->rbr_buf_len = buf_len;
+            ws->rbr_buf = (char *) gu_malloc(ws->rbr_buf_len);
+            memcpy(ws->rbr_buf, row_buf, ws->rbr_buf_len);
+    }
+    else
+    {
+            ws->rbr_buf_len = 0;
+            ws->rbr_buf = NULL;
+    }
     if (ws->last_seen_trx == 0) {
         gu_warn("Setting ws.last_seen_trx to 0");
     }
@@ -1052,6 +1069,7 @@ int wsdb_set_exec_query(
     strncpy(ws->queries[0].query, query, query_len);
     ws->queries[0].query[query_len] = '\0';
     ws->queries[0].query_len = query_len+1;
+    ws->rbr_buf_len = 0;
 
     GU_DBUG_RETURN(WSDB_OK);
 }

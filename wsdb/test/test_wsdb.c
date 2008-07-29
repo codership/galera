@@ -123,8 +123,9 @@ START_TEST (test_wsdb_api)
         case row_sent:
             if (trx->rows_sent == 5)  {
                 if (trx->queries_sent == 5) {
+                     /* TODO: rbr level is not tested here */
                     struct wsdb_write_set *ws = 
-                        wsdb_get_write_set(trx->trx_id, trx->conn_id);
+                         wsdb_get_write_set(trx->trx_id, trx->conn_id, NULL, 0);
                     fail_if(!ws, "write set read failed");
                     trx->state = commit_sent;
                     rcode = wsdb_delete_local_trx(trx->trx_id);

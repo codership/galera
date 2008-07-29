@@ -45,6 +45,7 @@ struct galera_info {
 static galera_context_retain_fun ctx_retain_cb      = NULL;
 static galera_context_store_fun  ctx_store_cb       = NULL;
 static galera_bf_execute_fun     bf_execute_cb      = NULL;
+static galera_bf_execute_fun     bf_execute_cb_rbr  = NULL;
 static galera_bf_apply_row_fun   bf_apply_row_cb    = NULL;
 static galera_ws_start_fun       ws_start_cb        = NULL;
 static galera_log_cb_t           galera_log_handler = NULL;
@@ -281,6 +282,11 @@ enum galera_status galera_set_execute_handler(galera_bf_execute_fun handler) {
     return GALERA_OK;
 }
 
+enum galera_status galera_set_execute_handler_rbr(galera_bf_execute_fun handler) {
+    bf_execute_cb_rbr = handler;
+    return GALERA_OK;
+}
+
 enum galera_status galera_set_apply_row_handler(
     galera_bf_apply_row_fun handler
 ) {
@@ -393,40 +399,52 @@ static int apply_write_set(void *app_ctx, struct wsdb_write_set *ws) {
     GU_DBUG_ENTER("apply_write_set");
     assert(bf_execute_cb);
 
-    /* applying connection context statements */
-    for (i=0; i < ws->conn_query_count; i++) {
-        int rcode = bf_execute_cb(
-            app_ctx, ws->conn_queries[i].query, ws->conn_queries[i].query_len,
-	    (time_t)0, 0
-        );
-        switch (rcode) {
-        case 0: break;
-        default: {
-            char *query = gu_malloc (ws->conn_queries[i].query_len + 1);
-            memset(query, '\0', ws->conn_queries[i].query_len + 1);
-            memcpy(query, ws->conn_queries[i].query, ws->conn_queries[i].query_len);
-	    gu_error("connection query apply failed: %s", query);
-            gu_free (query);
-            GU_DBUG_RETURN(GALERA_TRX_FAIL);
-            break;
-        }
-        }
+    if (WSDB_WS_QUERY == ws->level)
+    {
+         /* applying connection context statements */
+         for (i=0; i < ws->conn_query_count; i++) {
+              int rcode = bf_execute_cb(
+                   app_ctx, ws->conn_queries[i].query, ws->conn_queries[i].query_len,
+                   (time_t)0, 0
+                   );
+              switch (rcode) {
+              case 0: break;
+              default: {
+                   char *query = gu_malloc (ws->conn_queries[i].query_len + 1);
+                   memset(query, '\0', ws->conn_queries[i].query_len + 1);
+                   memcpy(query, ws->conn_queries[i].query, ws->conn_queries[i].query_len);
+                   gu_error("connection query apply failed: %s", query);
+                   gu_free (query);
+                   GU_DBUG_RETURN(GALERA_TRX_FAIL);
+                   break;
+              }
+              }
+         }
     }
-
     switch (ws->level) {
     case WSDB_WS_QUERY:     
-        rcode = apply_queries(app_ctx, ws);
-        if (rcode != GALERA_OK) GU_DBUG_RETURN(rcode);
-        break;
-    case WSDB_WS_DATA_ROW:  
-        rcode = apply_rows(app_ctx, ws);
-        if (rcode != GALERA_OK) GU_DBUG_RETURN(rcode);
-        break;
+         rcode = apply_queries(app_ctx, ws);
+         if (rcode != GALERA_OK) GU_DBUG_RETURN(rcode);
+         break;
+    case WSDB_WS_DATA_ROW:
+         // TODO: implement
+         rcode = apply_rows(app_ctx, ws);
+         break;
+    case WSDB_WS_DATA_RBR:
+         rcode = bf_execute_cb_rbr(app_ctx,
+                                   ws->rbr_buf,
+                                   ws->rbr_buf_len, 0, 0);
+         if (rcode != GALERA_OK) GU_DBUG_RETURN(rcode);
+         break;
     case WSDB_WS_DATA_COLS: 
         gu_error(
                 "column data replication is not supported yet"
             );
             GU_DBUG_RETURN(GALERA_TRX_FAIL);
+
+    default:
+         assert(0);
+         break;
     }
     GU_DBUG_RETURN(GALERA_OK);
 }
@@ -541,6 +559,9 @@ static void process_conn_write_set(
     return;
 }
 
+/*
+  similar to post gcs_repl part of `galera_commit' to apply remote WS
+*/
 static void process_query_write_set( 
     struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
     gcs_seqno_t seqno_g, gcs_seqno_t seqno_l
@@ -594,7 +615,9 @@ static void process_query_write_set(
 		abort();
 	    }
 	}
-	rcode = apply_query(app_ctx, "commit\0", 7);
+
+        /* TODO: convert into ha_commit() or smth */
+        rcode = apply_query(app_ctx, "commit\0", 7);
 
 
         if (rcode) {
@@ -865,7 +888,21 @@ enum galera_status galera_rolledback(trx_id_t trx_id) {
     GU_DBUG_RETURN(GALERA_OK);
 }
 
-enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
+/*
+  Local phase transaction commits depending on
+  the result of replication and certification performed
+  by this function.
+
+  in: trx_id, conn_id, write_set (null unless rbr)
+  out: 
+  returns GALERA_CONN_FAIL | GALERA_TRX_FAIL | GALERA_OK
+
+  todo: there is a common pattern with `process_query_write_set'
+        that could be separated into a separate inline function
+*/
+
+enum galera_status
+galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr_data_len) {
 
     int                    rcode;
     struct wsdb_write_set *ws;
@@ -898,7 +935,7 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
     }
 
     /* retrieve write set */
-    ws = wsdb_get_write_set(trx_id, conn_id);
+    ws = wsdb_get_write_set(trx_id, conn_id, rbr_data, rbr_data_len);
     if (!ws) {
         /* this is possibly autocommit query, need to let it continue */
         gu_mutex_unlock(&commit_mtx);
@@ -924,7 +961,7 @@ enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id) {
      *       Should use xdrrec stream instead and encode directly on
      *       gcs channel as we go.
      */
-    data_max = xdr_estimate_wsdb_size(ws) * 2;
+    data_max = xdr_estimate_wsdb_size(ws) * 2 + rbr_data_len;
     data = (uint8_t *)gu_malloc(data_max);
     memset(data, 0, data_max);
     xdrmem_create(&xdrs, (char *)data, data_max, XDR_ENCODE);

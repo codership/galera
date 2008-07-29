@@ -179,6 +179,13 @@ enum galera_status galera_set_context_store_handler (galera_context_store_fun);
 enum galera_status galera_set_execute_handler(galera_bf_execute_fun);
 
 /*!
+ * @brief assigns handler for brute force applying of a custom
+ *        objects carring rows info such as mysql row-based replication events
+ *
+ */
+enum galera_status galera_set_execute_handler_rbr(galera_bf_execute_fun);
+
+/*!
  * @brief assigns handler for brute force applying of data rows
  *
  */
@@ -221,6 +228,10 @@ typedef uint64_t conn_id_t;
  * otherwise must rollback.
  *
  * @param trx_id transaction which is committing
+ * @param conn_id
+ * @param rbr_data binary data when rbr is set
+ * @param data_len the size of the rbr data
+
  * @retval GALERA_OK         cluster commit succeeded
  * @retval GALERA_TRX_FAIL   must rollback transaction
  * @retval GALERA_CONN_FAIL  must close client connection
@@ -228,7 +239,7 @@ typedef uint64_t conn_id_t;
  *
  *
  */
-enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id);
+enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint data_len);
 
 /*!
  * @brief cancels a previously started commit

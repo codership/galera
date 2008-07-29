@@ -109,7 +109,8 @@ enum wsdb_ws_type {
 enum wsdb_ws_level {
     WSDB_WS_DATA_ROW = 1, /*!< ws consists of data rows */
     WSDB_WS_DATA_COLS,    /*!< ws consists of modified data columns */
-    WSDB_WS_QUERY         /*!< ws is represented by the original SQL query */
+    WSDB_WS_QUERY,         /*!< ws is represented by the original SQL query */
+    WSDB_WS_DATA_RBR      /*!< mysql custom replication events */
 };
 
 /*! transaction executes in local state until it begins the committing */
@@ -206,6 +207,8 @@ struct wsdb_write_set {
     struct wsdb_query    *conn_queries;      //!< query buffer
     uint16_t              item_count;    //!< number of items in write set
     struct wsdb_item_rec *items;         //!< write set items
+    u_int                  rbr_buf_len;    //!<  length of the following rbr placeholder
+    char                   *rbr_buf;     // !<transactional cache of mysql (rbr data)
 
     //free_wsdb_write_set_fun free;
 };
@@ -443,7 +446,7 @@ int wsdb_purge_trxs_upto(trx_seqno_t trx_id );
  *         replicated to the cluster
  */
 struct wsdb_write_set *wsdb_get_write_set(
-    local_trxid_t trx_id, connid_t conn_id
+    local_trxid_t trx_id, connid_t conn_id, const char * row_buf, ulong buf_len
 );
 
 /*!
