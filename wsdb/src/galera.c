@@ -229,16 +229,13 @@ enum galera_status galera_enable() {
     }
 
     rcode = gcs_open(gcs_conn, gcs_channel);
-    switch(rcode) {
-    case GCS_ERR_OK:
-	assert (gcs_conn);
-	gu_info("Successfully opened GCS connection to %s", gcs_channel);
-	break;
-    default:
+    if (rcode) {
 	gu_error("gcs_open(%p, %s, %s) failed: %d (%s)",
                     &gcs_conn, gcs_channel, gcs_url, rcode, strerror(-rcode));
 	GU_DBUG_RETURN(GALERA_NODE_FAIL);
     }
+
+    gu_info("Successfully opened GCS connection to %s", gcs_channel);
 
     Galera.repl_state = GALERA_ENABLED;
     GU_DBUG_RETURN(GALERA_OK);
@@ -470,7 +467,7 @@ static inline void report_last_committed (
     gu_info ("Reporting last committed: %llu", seqno);
     if ((ret = gcs_set_last_applied(gcs_conn, seqno))) {
         gu_warn ("Failed to report last committed %llu, %d (%s)",
-                 seqno, -ret, gcs_strerror (ret));
+                 seqno, ret, strerror (-ret));
         // failure, set counter to trigger new attempt
         report_counter += report_interval;
     }
@@ -523,7 +520,7 @@ static void process_conn_write_set(
     /* Grab commit resource */
     if ((rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l)) != 0) {
 	gu_fatal("Failed to grab commit_queue: %llu, %ld (%s)",
-                 seqno_l, -rcode, gcs_strerror(rcode));
+                 seqno_l, rcode, strerror(-rcode));
 	abort();
     }
 
@@ -556,7 +553,7 @@ static void process_query_write_set(
     /* wait for total order */
     if ((rcode = galera_eagain (gcs_to_grab, to_queue, seqno_l)) != 0) {
 	gu_fatal("Failed to grab to_queue: %llu, %ld (%s)",
-                 seqno_l, -rcode, gcs_strerror(rcode));
+                 seqno_l, rcode, strerror(-rcode));
 	abort();
     }
 
@@ -593,7 +590,7 @@ static void process_query_write_set(
 	    /* On first try grab commit_queue */
 	    if ((rcode = galera_eagain(gcs_to_grab,commit_queue,seqno_l)) != 0){
                 gu_fatal("Failed to grab commit_queue: %llu, %ld (%s)",
-                         seqno_l, -rcode, gcs_strerror(rcode));
+                         seqno_l, rcode, strerror(-rcode));
 		abort();
 	    }
 	}
