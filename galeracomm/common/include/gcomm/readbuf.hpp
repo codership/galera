@@ -3,6 +3,7 @@
 
 #include <gcomm/types.h>
 #include <gcomm/exception.hpp>
+#include <gcomm/monitor.hpp>
 #include <iostream>
 
 class ReadBuf {
@@ -10,11 +11,13 @@ class ReadBuf {
     const unsigned char *buf;
     mutable unsigned char *priv_buf;
     size_t buflen;
+    mutable Monitor mon;
     // Private copy operator to disallow assignment 
     ReadBuf operator=(ReadBuf& r) { return r;}
     // Private destructor to disallow allocating ReadBuf from stack
     ~ReadBuf() {
 	delete[] priv_buf;
+	mon.leave();
     }
 public:
     ReadBuf(const void *buf, const size_t buflen) {
@@ -25,6 +28,7 @@ public:
     }
     
     ReadBuf *copy() const {
+	Critical crit(&mon);
 	if (priv_buf == 0) {
 	    priv_buf = new unsigned char[buflen];
 	    memcpy(priv_buf, buf, buflen);
@@ -68,9 +72,13 @@ public:
     }
 
     void release() {
+	mon.enter();
 	// std::cerr << "release " << this << " refcnt " << refcnt << "\n";
+	assert(refcnt > 0);
 	if (--refcnt == 0)
 	    delete this; // !!!!
+	else
+	    mon.leave();
     }
 
     int get_refcnt() const {
