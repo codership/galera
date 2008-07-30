@@ -209,9 +209,16 @@ void galera_dbug_pop (void)
 }
 
 enum galera_status galera_tear_down() {
+
+    /* mysql error logger is not safe anymore during shutdown */
+    gu_conf_set_log_callback(NULL);
+
     if (gcs_conn) gcs_destroy (gcs_conn);
-    if (to_queue) gcs_to_destroy(&to_queue);
+    if (to_queue)     gcs_to_destroy(&to_queue);
     if (commit_queue) gcs_to_destroy(&commit_queue);
+
+    wsdb_close();
+
     return GALERA_OK;
 }
 

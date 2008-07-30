@@ -170,7 +170,7 @@ bool_t xdr_wsdb_query(XDR *xdrs, struct wsdb_query *q) {
 
 /* xdr conversion for wsdb_write_set */
 bool_t xdr_wsdb_write_set(XDR *xdrs, struct wsdb_write_set *ws) {
-    uint16_t i;
+    uint32_t i;
     if (!xdr_u_longlong_t(xdrs, &ws->local_trx_id))        return FALSE;
     if (!xdr_u_longlong_t(xdrs, &ws->last_seen_trx))       return FALSE;
     if (!xdr_enum(xdrs, (enum_t *)&ws->type))              return FALSE;
@@ -219,7 +219,7 @@ bool_t xdr_wsdb_write_set(XDR *xdrs, struct wsdb_write_set *ws) {
         sizeof(struct wsdb_item_rec), xdr_wsdb_item_rec_ref
     ))                                                     return FALSE;
 #else
-    if (!xdr_u_short(xdrs, &ws->item_count))               return FALSE;
+    if (!xdr_u_int(xdrs, &ws->item_count))               return FALSE;
     if (xdrs->x_op == XDR_DECODE) {
         size_t len = ws->item_count * sizeof(struct wsdb_item_rec);
         ws->items = (struct wsdb_item_rec*) gu_malloc (len);
@@ -230,6 +230,10 @@ bool_t xdr_wsdb_write_set(XDR *xdrs, struct wsdb_write_set *ws) {
     }
     if (xdrs->x_op == XDR_FREE) {
         gu_free(ws->items);
+    }
+
+    if (xdrs->x_op == XDR_DECODE) {
+        ws->key_composition = NULL;
     }
 
     if (!xdr_u_int(xdrs, &ws->rbr_buf_len)) return FALSE;
@@ -258,7 +262,7 @@ bool_t xdr_wsdb_write_set(XDR *xdrs, struct wsdb_write_set *ws) {
 }
 
 int xdr_estimate_wsdb_size(struct wsdb_write_set *ws) {
-    int i;
+    uint32_t i;
     int ws_size = 0;
     ws_size += sizeof(ws->local_trx_id);
     ws_size += sizeof(ws->last_seen_trx);

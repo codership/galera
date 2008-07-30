@@ -205,11 +205,13 @@ struct wsdb_write_set {
     struct wsdb_query    *queries;       //!< trx query buffer
     u_int16_t             conn_query_count; //!< number of connection queries
     struct wsdb_query    *conn_queries;      //!< query buffer
-    uint16_t              item_count;    //!< number of items in write set
+    uint32_t              item_count;    //!< number of items in write set
     struct wsdb_item_rec *items;         //!< write set items
     u_int                  rbr_buf_len;    //!<  length of the following rbr placeholder
     char                   *rbr_buf;     // !<transactional cache of mysql (rbr data)
 
+    char *key_composition;               //!< temp representation of keys in ws
+                                         
     //free_wsdb_write_set_fun free;
 };
 
@@ -232,6 +234,7 @@ typedef void (*wsdb_log_cb_t) (int code, const char* msg);
  * @retval WSDB_ERROR wsdb could not initialize, must abort
  */
 int wsdb_init(const char *data_dir, wsdb_log_cb_t logger);
+int wsdb_close();
 
 /*! @brief creates a write set for a transaction 
  *

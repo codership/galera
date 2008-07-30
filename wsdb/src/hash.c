@@ -218,3 +218,27 @@ int wsdb_hash_delete_range(
     gu_mutex_unlock(&hash->mutex);
     GU_DBUG_RETURN(deleted);
 }
+
+uint32_t wsdb_hash_report(
+    struct wsdb_hash *hash
+) {
+    int i;
+    uint32_t mem_usage;
+
+    GU_DBUG_ENTER("wsdb_hash_report");
+    gu_mutex_lock(&hash->mutex);
+    mem_usage = hash->array_size * sizeof(struct hash_entry *);
+
+    for (i=0; i<hash->array_size; i++) {
+        struct hash_entry *entry = hash->elems[i];
+
+        while (entry) {
+            mem_usage += sizeof(entry);
+            if (entry->key_len > 4) mem_usage += entry->key_len;
+            entry = entry->next;
+        }
+    }
+
+    gu_mutex_unlock(&hash->mutex);
+    GU_DBUG_RETURN(mem_usage);
+}

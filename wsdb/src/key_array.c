@@ -123,6 +123,7 @@ int key_array_replace(
             entry->next = prev->next;
             prev->next  = entry;
         } else {
+            entry->next  = array->elems;
             array->elems = entry;
         }
     }

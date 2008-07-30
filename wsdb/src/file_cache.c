@@ -52,10 +52,55 @@ static int hash_cmp(uint16_t len1, char *key1, uint16_t len2, char *key2) {
     }
 }
 
+static void free_entries (struct cache_entry *entry) {
+    struct cache_entry *next_entry;
+    for (; entry; entry=next_entry) {
+        next_entry = entry->next;
+        if (entry->data) gu_free(entry->data);
+        gu_free(entry);
+    }
+}
+
 int file_cache_close(struct file_cache *cache) {
+
     CHECK_OBJ(cache, file_cache);
     wsdb_hash_close(cache->hash);
+
+    /* free all cache entries, no matter in which list */
+    free_entries(cache->entries_active);
+    free_entries(cache->entries_swappable);
+    free_entries(cache->entries_swapped);
+    free_entries(cache->entries_deleted);
+
     return WSDB_OK;
+}
+
+static uint32_t report_entries(
+    struct file_cache *cache, struct cache_entry *entry
+) {
+    uint32_t mem_usage = 0;
+    for (; entry; entry=entry->next) {
+        if (entry->data) mem_usage += cache->block_size;
+        mem_usage += sizeof(entry);
+    }
+    return mem_usage;
+}
+
+uint32_t file_cache_report(struct file_cache *cache) {
+    uint32_t mem_usage = sizeof(cache);
+    CHECK_OBJ(cache, file_cache);
+    gu_mutex_lock(&cache->mutex);
+
+    mem_usage += wsdb_hash_report(cache->hash);
+
+    mem_usage += report_entries(cache, cache->entries_active);
+    mem_usage += report_entries(cache, cache->entries_swappable);
+    mem_usage += report_entries(cache, cache->entries_swapped);
+    mem_usage += report_entries(cache, cache->entries_deleted);
+
+    gu_mutex_unlock(&cache->mutex);
+
+    return mem_usage;
 }
 
 struct file_cache *file_cache_open(

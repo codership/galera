@@ -116,10 +116,12 @@ uint32_t get_table_id(char *dbtable);
 
 int local_open(const char *dir, const char *file,
 	       uint16_t block_size, uint16_t trx_limit);
+void local_close();
 
 uint16_t serialize_key(char **data, struct wsdb_table_key *key);
 
 struct wsdb_table_key *inflate_key(char *data, uint16_t data_len);
 uint16_t serialize_full_key(char **data, struct wsdb_key_rec *key);
+uint16_t serialize_all_keys(char **data, struct wsdb_write_set *ws);
 
 #endif

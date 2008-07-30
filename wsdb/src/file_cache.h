@@ -37,6 +37,14 @@ struct file_cache {
 int file_cache_close(struct file_cache *cache);
 
 /*
+ * @brief reports the memory allocation for a file cache
+ *
+ * @param cache the file cache to be reported
+ * @return bytes currently allocated for cache 
+ */
+uint32_t file_cache_report(struct file_cache *cache);
+
+/*
  * @brief opens cache for the given file with given memory limit
  *
  * @param file open wsdb file, access to this file is cached

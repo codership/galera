@@ -61,9 +61,13 @@ int wsdb_init(const char *data_dir, wsdb_log_cb_t logger) {
 }
 
 int wsdb_close() {
+    gu_info("closing wsdb");
     wsdb_hash_close(table_name_hash);
 
+    local_close();
+
     /* close certification indexes */
+    gu_info("closing certification module");
     wsdb_cert_close();
 
     return WSDB_OK;
@@ -77,14 +81,14 @@ uint16_t serialize_key_do(
     char *data, uint16_t *key_len, struct wsdb_table_key *key, int do_serialize
 ) {
     uint16_t              i;
-    char                 *ptr  = &data[0];
+    char                 *ptr  = data;
     struct wsdb_key_part *part = key->key_parts;
 
     if (do_serialize) {
         memset(data, '\0', *key_len);
         copy_ptr(&ptr, (char *)&key->key_part_count, 2);
     } else {
-        *key_len += 2;
+        *key_len = 2;
     }
     for (i=0; i<key->key_part_count; i++) {
         if (do_serialize) {
@@ -132,6 +136,63 @@ uint16_t serialize_full_key(char **data, struct wsdb_key_rec *key) {
     serialize_key_do(ptr, &key_len, key->key, 1);
 
     return full_key_len;
+}
+
+uint16_t serialize_all_keys(char **data, struct wsdb_write_set *ws) {
+    uint32_t  all_keys_len = 0;
+    char *ptr;
+
+    int i;
+
+    /* key composition will contain:
+     *
+     * (uint32_t) length of all keys
+     * for each row key: 
+     *   (uint16_t) length of full table/row key
+     *   (uint16_t) length of table name
+     *              the table name of promised length
+     *   (uint16_t) number of key parts
+     *   for each row key part:
+     *       (char)     type of row key
+     *       (uint16_t) length of this key part
+     *                  the row key
+     */
+    for (i=0; i<ws->item_count; i++) {
+        uint16_t  key_len      = 0;
+        /* calculate space requirement for this key */
+        key_len = serialize_key_do(NULL, &key_len, ws->items[i].key->key, 0);
+        all_keys_len += 2 + key_len + 2 + ws->items[i].key->dbtable_len;
+    }
+
+    /* we add the full length of the key */
+    all_keys_len += 4;
+
+    *data = (char *) gu_malloc (all_keys_len);
+    memset(*data, '\0', all_keys_len);
+    ptr = *data;
+
+    /* so, first the total length of all keys */
+    copy_ptr(&ptr, (char *)&all_keys_len, 4);
+
+    /* then each individual key */
+    for (i=0; i<ws->item_count; i++) {
+        uint16_t  key_len      = 0;
+        uint16_t full_key_len;
+        struct wsdb_item_rec *item = &(ws->items[i]);
+
+        /* calculate space requirement for this key */
+        key_len = serialize_key_do(NULL, &key_len, item->key->key, 0);
+        full_key_len = key_len + 2 + item->key->dbtable_len;
+        copy_ptr(&ptr, (char *)&(full_key_len), 2);
+        copy_ptr(&ptr, (char *)&(item->key->dbtable_len), 2);
+        copy_ptr(&ptr, (char *)item->key->dbtable, item->key->dbtable_len);
+        
+        /* serialize the key in data buffer */
+        serialize_key_do(ptr, &key_len, item->key->key, 1);
+        ptr += key_len;
+    }
+
+    return all_keys_len;
 }
 
 struct file_row_key *wsdb_key_2_file_row_key(struct wsdb_key_rec *key) {

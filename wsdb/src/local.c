@@ -192,6 +192,19 @@ int local_open(
     return WSDB_OK;
 }
 
+void local_close() {
+    uint32_t mem_usage;
+
+    mem_usage = wsdb_hash_report(trx_hash);
+    gu_info("mem usage for trx hash: %u", mem_usage);
+
+    mem_usage = file_cache_report(local_cache);
+    gu_info("mem usage for local cache: %u", mem_usage);
+
+    file_cache_close(local_cache);
+    wsdb_hash_close(trx_hash);
+}
+
 static void remove_trx_info(local_trxid_t trx_id) {
     struct trx_info *trx;
 
@@ -653,13 +666,17 @@ static void free_wsdb_query(struct wsdb_query *query) {
 }
 
 void wsdb_write_set_free(struct wsdb_write_set *ws) {
-    uint16_t i;
+    uint32_t i;
     if (!ws) return;
 
     for (i=0; i<ws->query_count; i++) {
         free_wsdb_query(&ws->queries[i]);
     }
     gu_free(ws->queries);
+    for (i=0; i<ws->conn_query_count; i++) {
+        free_wsdb_query(&ws->conn_queries[i]);
+    }
+    if (ws->conn_queries) gu_free(ws->conn_queries);
     for (i=0; i<ws->item_count; i++) {
         free_wsdb_item_rec(&ws->items[i]);
     }
@@ -682,8 +699,8 @@ static int get_write_set_do(
 ) {
 
     char *pos;
-    uint query_count = 0;
-    uint item_count  = 0;
+    uint32_t query_count = 0;
+    uint32_t item_count  = 0;
 
     struct block_info bi;
 
@@ -1011,6 +1028,8 @@ struct wsdb_write_set *wsdb_get_write_set(
     if (ws->last_seen_trx == 0) {
         gu_warn("Setting ws.last_seen_trx to 0");
     }
+
+    ws->key_composition = NULL;
 
     GU_DBUG_PRINT("wsdb",
       ("trx: %llu, last: %llu, level: %d",trx_id,last_committed_seqno,ws->level)

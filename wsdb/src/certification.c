@@ -19,12 +19,138 @@ struct trx_hdr {
     trx_seqno_t trx_seqno;
 };
 
+/* certification index record key->seqno */
 struct index_rec {
     trx_seqno_t trx_seqno;
 };
 
+/* persistent storage for certified write sets */
 static struct wsdb_file *cert_trx_file;
+#ifndef IMPROVED_PURGING
+/* list of cert index records kept in memory before purging */
+trx_seqno_t purged_up_to;
 
+struct seqno_list {
+    trx_seqno_t        seqno;
+    uint32_t           key_count;
+    char              *keys;
+    struct seqno_list *next;
+};
+
+struct {
+    struct seqno_list *active_seqnos;
+    struct seqno_list *last_active_seqno;
+    uint32_t list_len;
+    uint32_t list_size;
+} trx_info;
+
+static void add_active_seqno(
+    trx_seqno_t seqno, uint32_t keys_count, char *keys
+) {
+    struct seqno_list *seqno_elem = 
+        (struct seqno_list *)gu_malloc(sizeof(struct seqno_list));
+
+    seqno_elem->seqno = seqno;
+    seqno_elem->key_count = keys_count;
+    seqno_elem->keys = keys;
+    seqno_elem->next = NULL;
+    if (trx_info.last_active_seqno) {
+        trx_info.last_active_seqno->next = seqno_elem;
+    } else {
+      trx_info.active_seqnos = seqno_elem;
+    }
+    trx_info.last_active_seqno = seqno_elem;
+    trx_info.list_len++;
+    trx_info.list_size += sizeof(struct seqno_list);
+    if (keys) trx_info.list_size += *(uint32_t *)keys;
+}
+
+static void purge_active_seqnos(trx_seqno_t up_to) {
+    struct seqno_list *trx = trx_info.active_seqnos;
+    while (trx && trx->seqno < up_to) {
+        struct seqno_list *next_trx = trx->next;
+        char *keys = trx->keys;
+        /* length of all keys */
+        uint32_t all_keys_len;
+
+        if (!keys) continue;
+
+        all_keys_len = (*(uint32_t *)keys);
+        keys += 4;
+
+        /* remove each key from cert index */
+        uint32_t key_idx;
+        for (key_idx=0; key_idx<trx->key_count; key_idx++) {
+            /* length of this key */
+            uint16_t key_len = (*(uint16_t *)keys);
+            keys += 2;
+  
+            struct index_rec *match = (struct index_rec *)wsdb_hash_search(
+                key_index, key_len, keys
+            );
+
+            if (!match) {
+                gu_error("cert index was not found during purging");
+                gu_error("seqno: %llu, key: %d, len: %d, key_count: %d",
+                       trx->seqno, key_idx, key_len, trx->key_count
+                );
+            /* verify the match is not used by newer seqno */
+            } else if (match->trx_seqno <= trx->seqno) {
+                /* sanity check */
+                if (match->trx_seqno < trx->seqno) {
+                    gu_error("dangling cert index entry: %llu - %llu, key: %d",
+                        match->trx_seqno, trx->seqno, key_idx
+                    );
+                }
+                match = (struct index_rec *)wsdb_hash_delete(
+                    key_index, key_len, keys
+                );
+                if (!match) {
+                  gu_error("cert index delete failed");
+                  gu_error("seqno: %llu, key: %d, len: %d, key_count: %d",
+                           trx->seqno, key_idx, key_len, trx->key_count
+                  );
+                } else {
+                    gu_free(match);
+                }
+            }
+            keys += key_len;
+        }
+        /* remove active trx holder struct */
+        gu_free(trx->keys);
+        gu_free(trx);
+        trx = trx_info.active_seqnos = next_trx;
+        trx_info.list_len--;
+        trx_info.list_size -= sizeof(struct seqno_list);
+        trx_info.list_size -= all_keys_len;
+    }
+}
+enum purge_method {
+  PURGE_METHOD_FULL_SCAN=0,
+  PURGE_METHOD_BY_KEYS,
+};
+
+static enum purge_method choose_purge_method(trx_seqno_t up_to) {
+    struct seqno_list *trx = trx_info.active_seqnos;
+    while (trx && trx->seqno < up_to) {
+        if (trx->keys == NULL) return PURGE_METHOD_FULL_SCAN;
+        trx = trx->next;
+    }
+    return PURGE_METHOD_BY_KEYS;
+}
+static void purge_seqno_list(trx_seqno_t up_to) {
+    struct seqno_list *trx = trx_info.active_seqnos;
+    while (trx && trx->seqno < up_to) {
+        struct seqno_list *next_trx = trx->next;
+
+        if (trx->keys) gu_free(trx->keys);
+        gu_free(trx);
+        trx = trx_info.active_seqnos = next_trx;
+        trx_info.list_len--;
+        trx_info.list_size -= sizeof(struct seqno_list);
+    }
+}
+#endif 
 /* djb2
  * This algorithm was first reported by Dan Bernstein
  * many years ago in comp.lang.c
@@ -70,7 +196,105 @@ int wsdb_cert_init(const char* work_dir, const char* base_name) {
 
     return WSDB_OK;
 }
+#ifndef IMPROVED_PURGING
+int wsdb_certification_test(
+    struct wsdb_write_set *ws, trx_seqno_t trx_seqno
+) {
+    uint32_t i;
+    uint32_t all_keys_len;
 
+    char *all_keys = ws->key_composition;
+    if (!ws->key_composition) {
+        (void)serialize_all_keys(&all_keys, ws);
+        ws->key_composition = all_keys;
+    }
+    all_keys_len = (*(uint32_t *)all_keys);
+    all_keys +=4;
+
+    /* certification test */
+    for (i = 0; i < ws->item_count; i++) {
+        struct wsdb_item_rec *item = &ws->items[i];
+        struct index_rec *match;
+
+        uint16_t full_key_len;
+        char * full_key;
+
+        full_key_len = (*(uint16_t *)all_keys);
+        all_keys += 2;
+        full_key = all_keys;
+
+         /* check first against table level locks */
+        match = (struct index_rec *) wsdb_hash_search (
+            table_index, item->key->dbtable_len, item->key->dbtable
+        );
+        if (match && match->trx_seqno > ws->last_seen_trx && 
+                match->trx_seqno < trx_seqno
+        ) {
+            GU_DBUG_PRINT("wsdb",
+                ("trx: %llu conflicting table lock: %llu",
+		    (unsigned long long)trx_seqno, match->trx_seqno)
+            );
+            return WSDB_CERTIFICATION_FAIL;
+        }
+
+        /* continue with row level lock checks */
+        match = (struct index_rec *)wsdb_hash_search(
+            key_index, full_key_len, full_key
+        );
+        all_keys += full_key_len;
+
+        if (match && match->trx_seqno > ws->last_seen_trx && 
+                match->trx_seqno < trx_seqno
+        ) {
+            GU_DBUG_PRINT("wsdb",
+                   ("trx: %llu conflicting: %llu", trx_seqno, match->trx_seqno)
+            );
+            return WSDB_CERTIFICATION_FAIL;
+        }
+    }
+    return WSDB_OK;
+}
+
+static int update_index(
+    struct wsdb_write_set *ws, trx_seqno_t trx_seqno
+) {
+    uint32_t i;
+    char *all_keys        = ws->key_composition;
+    //uint32_t all_keys_len = (*(uint32_t *)all_keys);
+    all_keys += 4;
+
+    for (i = 0; i < ws->item_count; i++) {
+        struct index_rec *match, *new_trx = NULL;
+        
+        uint16_t key_len = (*(uint16_t *)all_keys);
+        all_keys += 2;
+        
+        match = (struct index_rec *)wsdb_hash_search(
+            key_index, key_len, all_keys
+        );
+
+        if (!match) {
+            int rcode;
+            new_trx = (struct index_rec *) gu_malloc (sizeof(struct index_rec));
+            new_trx->trx_seqno = trx_seqno;
+            rcode = wsdb_hash_push(
+                key_index, key_len, all_keys, (void *)new_trx
+            );
+            if (rcode) {
+              gu_error("cert index push failed: %d", rcode);
+            }
+
+        } else {
+          //gu_info("cert index re-used for: %llu, key: %d, old seqno: %llu", 
+          //          trx_seqno, i, match->trx_seqno);
+            match->trx_seqno = trx_seqno;
+        }
+        all_keys += key_len;
+    }
+    return WSDB_OK;
+}
+
+#else
 int wsdb_certification_test(
     struct wsdb_write_set *ws, trx_seqno_t trx_seqno
 ) {
@@ -157,7 +381,7 @@ static int update_index(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
     }
     return WSDB_OK;
 }
-
+#endif
 /* 
  * @brief: write certified write set permanently in file
  * @param: ws the write set to write
@@ -165,7 +389,7 @@ static int update_index(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
  * @returns: success code for the write operation
  */
 static int write_to_file(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
-    uint16_t i;
+    uint32_t i;
     struct trx_hdr trx;
     char rec_type = REC_TYPE_TRX;
     uint16_t len = sizeof(struct trx_hdr);
@@ -236,6 +460,49 @@ static int write_to_file(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
     return WSDB_OK;
 }
 
+#ifndef IMPROVED_PURGING
+int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
+    int rcode;
+    int *persistency = (int *)wsdb_conf_get_param(
+        GALERA_CONF_WS_PERSISTENCY, GALERA_TYPE_INT
+    );
+    uint32_t key_size;
+
+    /* certification test */
+    rcode = wsdb_certification_test(ws, trx_seqno); 
+    if (rcode) {
+        gu_free(ws->key_composition);
+        return rcode;
+    }
+
+    if (persistency && *persistency) {
+        gu_debug("writing trx WS in file");
+        /* append write set */
+        write_to_file(ws, trx_seqno);
+    }
+
+    /* update index */
+    rcode = update_index(ws, trx_seqno); 
+    if (rcode) {
+        return rcode;
+    }
+
+    /* mem usage test */
+    key_size = *(uint32_t *)ws->key_composition;
+    if (key_size > 50000) {
+        gu_info("key length: %lu for trx: %llu, not stored in RAM", 
+                key_size, trx_seqno
+        );
+        gu_free(ws->key_composition);
+        ws->key_composition = NULL;
+    }
+
+    /* remember the serialized keys */
+    add_active_seqno(trx_seqno, ws->item_count, ws->key_composition);
+
+    return WSDB_OK;
+}
+#else
 int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     int rcode;
     int *persistency = (int *)wsdb_conf_get_param(
@@ -261,7 +528,9 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     }
     return WSDB_OK;
 }
+#endif
 
+#ifndef IMPROVED_PURGING
 /*
  * @brief: determine if trx can be purged
  * @return 1 if purging is ok, otherwise 0
@@ -277,8 +546,7 @@ static int delete_verdict(void *ctx, void *data, void **new_data) {
 
     return 0;
 }
-
-int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
+int purge_seqnos_by_scan(trx_seqno_t trx_id) {
     int deleted;
 
     /* purge entries from table index */
@@ -296,6 +564,53 @@ int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
     return WSDB_OK;
 }
 
+int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
+    switch(choose_purge_method(trx_id)) {
+    case PURGE_METHOD_FULL_SCAN:
+        purge_seqno_list(trx_id);
+        purge_seqnos_by_scan(trx_id);
+        break;
+    case PURGE_METHOD_BY_KEYS:
+        purge_active_seqnos(trx_id);
+        break;
+    }
+
+    return 0;
+}
+#else
+/*
+ * @brief: determine if trx can be purged
+ * @return 1 if purging is ok, otherwise 0
+ */
+static int delete_verdict(void *ctx, void *data, void **new_data) {
+    struct index_rec *entry = (struct index_rec *)data;
+
+    if (entry && entry->trx_seqno < (*(trx_seqno_t *)ctx)) {
+        *new_data= (void *)NULL;
+        gu_free(entry);
+        return 1;
+    }
+
+    return 0;
+}
+int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
+    int deleted;
+
+    /* purge entries from table index */
+    deleted = wsdb_hash_delete_range(
+        table_index, (void *)&trx_id, delete_verdict
+    );
+    gu_debug("purged %d entries from table index", deleted);
+
+    /* purge entries from row index */
+    deleted = wsdb_hash_delete_range(
+        key_index, (void *)&trx_id, delete_verdict
+    );
+    gu_debug("purged %d entries from key index, up-to: %lu", deleted, trx_id);
+
+    return WSDB_OK;
+}
+#endif
 /*
  * @brief: free all entries
  */
@@ -311,17 +626,23 @@ static int shutdown_verdict(void *ctx, void *data, void **new_data) {
 int wsdb_cert_close() {
     int deleted;
 
+    uint32_t mem_usage;
+    mem_usage = wsdb_hash_report(table_index);
+    gu_info("mem usage for table_idex: %u", mem_usage);
+    mem_usage = wsdb_hash_report(key_index);
+    gu_info("mem usage for key_idex: %u", mem_usage);
+
     /* purge entries from table index */
     deleted = wsdb_hash_delete_range(
         table_index, NULL, shutdown_verdict
     );
-    gu_debug("purged %d entries from table index", deleted);
+    gu_info("purged %d entries from table index", deleted);
 
     /* purge entries from row index */
     deleted = wsdb_hash_delete_range(
         key_index, NULL, shutdown_verdict
     );
-    gu_debug("purged %d entries from key index", deleted);
+    gu_info("purged %d entries from key index", deleted);
 
     /* close hashes, they are empty now */
     if (wsdb_hash_close(table_index)) {
@@ -332,6 +653,9 @@ int wsdb_cert_close() {
         gu_error("failed to close key index");
     }
 
+#ifndef IMPROVED_PURGING
+    purge_seqno_list(GALERA_ABORT_SEQNO);
+#endif
     return WSDB_OK;
 }
 

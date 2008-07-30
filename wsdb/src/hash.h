@@ -105,5 +105,6 @@ int wsdb_hash_delete_range(
     struct wsdb_hash *hash, void *ctx, hash_verdict_fun_t verdict
 );
 
+uint32_t wsdb_hash_report(struct wsdb_hash *hash);
 
 #endif
