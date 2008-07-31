@@ -463,7 +463,7 @@ static int write_to_file(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
 #ifndef IMPROVED_PURGING
 int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     int rcode;
-    int *persistency = (int *)wsdb_conf_get_param(
+    my_bool *persistency = (my_bool *)wsdb_conf_get_param(
         GALERA_CONF_WS_PERSISTENCY, GALERA_TYPE_INT
     );
     uint32_t key_size;
@@ -505,7 +505,7 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
 #else
 int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     int rcode;
-    int *persistency = (int *)wsdb_conf_get_param(
+    my_bool *persistency = (my_bool *)wsdb_conf_get_param(
         GALERA_CONF_WS_PERSISTENCY, GALERA_TYPE_INT
     );
 

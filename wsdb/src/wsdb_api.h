@@ -72,6 +72,9 @@ typedef uint64_t connid_t;
 typedef uint64_t local_trxid_t;
 typedef uint64_t trx_seqno_t;
 
+/* MySQL type for boolean */
+typedef char		my_bool; /* Small bool */
+
 /* special seqno to designate a cancelled transaction */
 #ifndef ULLONG_MAX
 #   define GALERA_ABORT_SEQNO 18446744073709551615ULL

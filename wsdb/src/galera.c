@@ -67,7 +67,7 @@ struct galera_info Galera;
 
 static gu_mutex_t commit_mtx;
 
-static bool_t mark_commit_early = FALSE;
+static my_bool mark_commit_early = FALSE;
 
 static FILE *wslog_L;
 static FILE *wslog_G;
@@ -145,7 +145,7 @@ enum galera_status galera_set_conf_param_cb(
     mark_commit_early = wsdb_conf_get_param(
         GALERA_CONF_MARK_COMMIT_EARLY, GALERA_TYPE_INT
     ) ?
-      *(int *)wsdb_conf_get_param(GALERA_CONF_MARK_COMMIT_EARLY, GALERA_TYPE_INT) : 0;
+      *(my_bool *)wsdb_conf_get_param(GALERA_CONF_MARK_COMMIT_EARLY, GALERA_TYPE_INT) : 0;
 
 
     GU_DBUG_RETURN(GALERA_OK);
