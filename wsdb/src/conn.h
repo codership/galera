@@ -12,20 +12,6 @@
 #include "wsdb_api.h"
 
 /*!
- * @brief gets sequence number for the connection
- *
- * @param id for the connection
- */
-gcs_seqno_t get_conn_seqno(connid_t conn_id);
-
-/*!
- * @brief sets sequence number for the connection
- *
- * @param id for the connection
- */
-int set_conn_seqno(connid_t conn_id, gcs_seqno_t seqno);
-
-/*!
  * @brief initializes connection management
  *
  * @param limit max number of connections

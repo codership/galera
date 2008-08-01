@@ -1238,7 +1238,7 @@ enum galera_status galera_to_execute_start(
     }
     
     /* record sequence number in connection info */
-    conn_set_seqno(conn_id, seqno_g);
+    conn_set_seqno(conn_id, seqno_l);
 
     gcs_to_release(to_queue, seqno_l);
 
