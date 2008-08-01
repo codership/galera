@@ -91,7 +91,7 @@ int gcs_fifo_safe_destroy (gcs_fifo_t** fifo)
 	    return -EALREADY;
 	}
 
-        f->closed = true;
+        f->closed    = true;
 	f->destroyed = true;
 
 	while (f->used) {

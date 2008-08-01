@@ -12,6 +12,7 @@
 long
 gcs_group_init (gcs_group_t* group)
 {
+    group->conf_id      = -1;
     group->num          = 0;
     group->my_idx       = -1;
     group->state        = GROUP_NON_PRIMARY;
@@ -104,7 +105,6 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
 	    /* we come from previous primary configuration */
 	    /* remap old array to new one to preserve action continuity */
 	    assert (group->nodes);
-	    gu_debug ("\tMembers:");
 	    for (new_idx = 0; new_idx < new_nodes_num; new_idx++) {
 		/* find member index in old component by unique member id */
                 for (old_idx = 0; old_idx < group->num; old_idx++) {
@@ -131,6 +131,8 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
             group->new_memb |= 1;
 	    group->state = GROUP_PRIMARY;
 	}
+        // TODO: we must receive that from SYNC message
+        group->conf_id++;
     }
     else {
 	/* Got NON-PRIMARY COMPONENT - cleanup */
@@ -187,6 +189,26 @@ gcs_group_handle_last_msg (gcs_group_t* group, gcs_recv_msg_t* msg)
     }
 
     return 0;
+}
+
+extern gcs_act_conf_t*
+gcs_group_handle_sync_msg  (gcs_group_t* group, gcs_recv_msg_t* msg)
+{
+    // TODO: for now it just mimics the real behaviour
+    //       must be rewritten as soon as we get  sync messages
+    gcs_act_conf_t* conf = malloc (sizeof (gcs_act_conf_t) +
+                                   group->num * GCS_MEMBER_NAME_MAX);
+    if (conf) {
+        conf->seqno = GCS_SEQNO_ILL; // must have a real value from SYNC message
+        conf->memb_num = group->num;
+        conf->my_idx   = group->my_idx;
+        if (GROUP_PRIMARY == group->state)
+            conf->conf_id = group->conf_id;
+        else
+            conf->conf_id = -1;
+    }
+
+    return conf;
 }
 
 void

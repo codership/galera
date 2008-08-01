@@ -21,6 +21,8 @@
 #include "gcs.h"
 #include "gcs_test.h"
 
+#define USE_WAIT
+
 #define gcs_malloc(a) ((a*) malloc (sizeof (a)))
 
 static pthread_mutex_t gcs_test_lock = PTHREAD_MUTEX_INITIALIZER; 
@@ -52,7 +54,6 @@ typedef struct gcs_test_thread
 {
     pthread_t       thread;
     long            id;
-    gcs_test_repl_t type;
     gcs_seqno_t     act_id;
     gcs_seqno_t     local_act_id;
     gcs_act_type_t  act_type;
@@ -63,7 +64,7 @@ typedef struct gcs_test_thread
 }
 gcs_test_thread_t;
 
-#define MAX_MSG_LEN 1 << 16
+#define MAX_MSG_LEN (1 << 16)
 
 static long gcs_test_thread_create (gcs_test_thread_t *t, long id, long n_tries)
 {
@@ -73,14 +74,14 @@ static long gcs_test_thread_create (gcs_test_thread_t *t, long id, long n_tries)
     t->act_type     = GCS_ACT_DATA;
     t->n_tries      = n_tries;
     t->msg_len      = MAX_MSG_LEN;
-    t->msg = (char *) malloc (MAX_MSG_LEN * sizeof(char));
+    t->msg = calloc (MAX_MSG_LEN, sizeof(char));
     if (t->msg)
     {
-	t->log_msg = (char *) malloc (MAX_MSG_LEN * sizeof(char));
+	t->log_msg = calloc (MAX_MSG_LEN, sizeof(char));
 	if (t->log_msg) return 0;
     }
 
-    return errno;
+    return -ENOMEM;
 }
 
 static long gcs_test_thread_destroy (gcs_test_thread_t *t)
@@ -248,7 +249,7 @@ static inline long
 test_recv_log_create(gcs_test_thread_t* thread)
 {
     return
-        snprintf (thread->log_msg, MAX_MSG_LEN,
+        snprintf (thread->log_msg, MAX_MSG_LEN - 1,
                   "Thread %3ld(REPL): act_id = %llu, local_act_id = %llu, "
                   "len = %llu: %s",
                   thread->id,
@@ -261,7 +262,7 @@ static inline long
 test_send_log_create(gcs_test_thread_t* thread)
 {
     return
-        snprintf (thread->log_msg, MAX_MSG_LEN,
+        snprintf (thread->log_msg, MAX_MSG_LEN - 1,
                   "Thread %3ld (REPL): len = %llu, %s",
                   thread->id, (long long unsigned int) thread->msg_len,
                   thread->msg);
@@ -315,6 +316,7 @@ test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
 static inline long
 test_before_send (gcs_test_thread_t* thread)
 {
+    static const struct timespec wait = { 0, 10000000 };
     long ret = 0;
 
     /* create a message */
@@ -326,6 +328,9 @@ test_before_send (gcs_test_thread_t* thread)
         ret = test_send_log_create (thread);
         ret = test_log_msg (send_log, thread->log_msg);
     }
+#ifdef USE_WAIT
+    while ((ret = gcs_wait(gcs)) && ret > 0) nanosleep (&wait, NULL);
+#endif
     return ret;
 }
 
@@ -338,6 +343,7 @@ test_after_recv (gcs_test_thread_t* thread)
         /* log message after replication */
         ret = test_recv_log_create (thread);
         ret = test_log_in_to (to, thread->local_act_id, thread->log_msg);
+        free (thread->msg); thread->msg = NULL; // cleanup after each action
     }
     else if (total) {
         ret = test_log_in_to (to, thread->local_act_id, NULL);
@@ -363,8 +369,11 @@ void *gcs_test_repl (void *arg)
         if (ret < 0) break;
 
 	/* replicate message */
-	ret = gcs_repl (gcs, GCS_ACT_DATA, thread->msg_len,
-                        (uint8_t*)thread->msg, &thread->act_id,
+	ret = gcs_repl (gcs,
+                        thread->msg,
+                        thread->msg_len,
+                        GCS_ACT_DATA,
+                        &thread->act_id,
                         &thread->local_act_id);
 	if (ret < 0) {
             assert (thread->act_id       == GCS_SEQNO_ILL);
@@ -398,8 +407,10 @@ void *gcs_test_send (void *arg)
         if (ret < 0) break;
 	
 	/* send message to group */
-	ret = gcs_send (gcs, GCS_ACT_DATA, thread->msg_len,
-                        (uint8_t*)thread->msg);
+	ret = gcs_send (gcs,
+                        thread->msg,
+                        thread->msg_len,
+                        GCS_ACT_DATA);
         if (ret < 0) break;
 	//sleep (1);
         msg_sent++;
@@ -418,8 +429,11 @@ void *gcs_test_recv (void *arg)
     while (thread->n_tries)
     {
 	/* receive message from group */
-	ret = gcs_recv (gcs, &thread->act_type, &thread->msg_len,
-                        (uint8_t **) &thread->msg, &thread->act_id,
+	ret = gcs_recv (gcs,
+                        (void**)&thread->msg,
+                        &thread->msg_len,
+                        &thread->act_type,
+                        &thread->act_id,
                         &thread->local_act_id);
 	
 	if (ret < 0) {
@@ -443,7 +457,6 @@ void *gcs_test_recv (void *arg)
         default:
             fprintf (stderr, "Unexpected action type: %d\n", thread->act_type);
         }
-	free (thread->msg);
     }
 //    fprintf (stderr, "RECV thread %ld exiting: %s\n",
 //             thread->id, strerror(-ret));
@@ -612,6 +625,11 @@ int main (int argc, char *argv[])
     if ((err = gcs_open    (gcs, channel))) goto out;
     printf ("Connected\n");
 
+#ifdef USE_WAIT
+    if ((err = gcs_join    (gcs))) goto out;
+    printf ("Joined\n");
+#endif
+
     msg_len = 1300;
     if (msg_len > MAX_MSG_LEN) msg_len = MAX_MSG_LEN; 
     gcs_conf_set_pkt_size (gcs, 7570); // to test fragmentation
@@ -632,7 +650,7 @@ int main (int argc, char *argv[])
     printf ("Press any key to start the load:");
     fgetc (stdin);
 
-    puts ("Started load\n");
+    puts ("Started load.");
     gettimeofday (&t_begin, NULL);
     printf ("Waiting for %ld seconds\n", conf.n_tries);
     fflush (stdout);
@@ -648,13 +666,13 @@ int main (int argc, char *argv[])
     gcs_test_thread_pool_stop (&recv_pool);
     puts ("Threads stopped.");
 
-    gcs_test_thread_pool_join (&send_pool);
-    gcs_test_thread_pool_join (&repl_pool);
-    puts ("SEND and REPL threads joined.");
-
     printf ("Closing GCS connection... ");
     if ((err = gcs_close (gcs))) goto out;
     puts ("done.");
+
+    gcs_test_thread_pool_join (&send_pool);
+    gcs_test_thread_pool_join (&repl_pool);
+    puts ("SEND and REPL threads joined.");
 
     gcs_test_thread_pool_join (&recv_pool);
     puts ("RECV threads joined.");

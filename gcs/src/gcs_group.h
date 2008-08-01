@@ -24,6 +24,7 @@ group_state_t;
 
 typedef struct gcs_group
 {
+    long          conf_id;
     long          num;          // number of nodes
     long          my_idx;       // my index in the group
     group_state_t state;        // group state: PRIMARY | NON_PRIMARY
@@ -56,7 +57,16 @@ gcs_group_free (gcs_group_t* group);
  *        negative error code.
  */
 extern long
-gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp);
+gcs_group_handle_comp_msg  (gcs_group_t* group, gcs_comp_msg_t* msg);
+
+extern long
+gcs_group_handle_flush_msg (gcs_group_t* group, gcs_recv_msg_t* msg);
+
+extern gcs_act_conf_t*
+gcs_group_handle_sync_msg  (gcs_group_t* group, gcs_recv_msg_t* msg);
+
+extern gcs_seqno_t
+gcs_group_handle_last_msg  (gcs_group_t* group, gcs_recv_msg_t* msg);
 
 /*!
  * Handles action message. Is called often - therefore, inlined
@@ -90,9 +100,6 @@ gcs_group_handle_act_msg (gcs_group_t*    group,
     return ret;
 }
 
-extern gcs_seqno_t
-gcs_group_handle_last_msg (gcs_group_t* group, gcs_recv_msg_t* msg);
-
 static inline bool
 gcs_group_new_members (gcs_group_t* group)
 {
@@ -110,4 +117,5 @@ gcs_group_my_idx (gcs_group_t* group)
 {
     return group->my_idx;
 }
+
 #endif /* _gcs_group_h_ */

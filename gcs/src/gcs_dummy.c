@@ -93,7 +93,7 @@ GCS_BACKEND_SEND_FN(dummy_send)
 	dummy_msg_t *msg   = dummy_msg_create (msg_type, len, buf);
 	if (msg)
 	{
-	    if ((err = gcs_queue_push (backend->conn->gc_q, msg)))
+	    if ((err = gcs_queue_push (backend->conn->gc_q, msg)) < 1)
 	    {
 		dummy_msg_destroy (&msg);
 		return err;
@@ -126,7 +126,7 @@ GCS_BACKEND_RECV_FN(dummy_recv)
     if (!conn->msg)
     {
         if ((ret = gcs_queue_pop_wait (conn->gc_q,
-                                       (void**) &conn->msg))) {
+                                       (void**) &conn->msg)) < 0) {
             if (-ENODATA == ret) {
                 // wait was aborted while no data - connection closing
                 ret = -ECONNABORTED;

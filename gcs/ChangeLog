@@ -1,8 +1,13 @@
+2008-07-30 Alex
+    Added gcs_join() and gcs_wait() getting closer to final API.
+    gcs_join() moves conneciton to JOINED state.
+    gcs_wait() blocks waiting for the group memebers to catch up.
+
 2008-05-14 Alex
-    Added gcs_create() and gcs_destroy() for safe and clean initialization and deinitialization
-    of GCS connection handle.
+    Added gcs_create() and gcs_destroy() for safe and clean initialization and
+    deinitialization of GCS connection handle.
 
 2008-03-23 Alex
-    Added gcs_set_last_applied() and gcs_get_last_applied() - calls for voting for the last
-    applied action.
+    Added gcs_set_last_applied() and gcs_get_last_applied() - calls for voting
+    for the last applied action.
 

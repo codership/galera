@@ -68,7 +68,7 @@ long gcs_core_destroy (gcs_core_t* conn);
  * negative     - error code
  */
 ssize_t gcs_core_send (gcs_core_t*      const conn,
-                       const uint8_t*         action,
+                       const void*            action,
                        size_t                 act_size,
                        gcs_act_type_t   const act_type);
 /*
@@ -78,7 +78,7 @@ ssize_t gcs_core_send (gcs_core_t*      const conn,
  * negative     - error code
  */
 ssize_t gcs_core_recv (gcs_core_t*      const conn,
-                       uint8_t**        const action,
+                       void**           const action,
                        gcs_act_type_t*  const act_type,
                        gcs_seqno_t*     const act_id);
 
@@ -90,5 +90,9 @@ long gcs_core_set_pkt_size (gcs_core_t *conn, ulong pkt_size);
 /* sends this node's last applied value to group */
 extern long
 gcs_core_set_last_applied (gcs_core_t* core, gcs_seqno_t seqno);
+
+/* sends flow control message */
+extern long
+gcs_core_send_fc (gcs_core_t* core, void* fc, size_t fc_size);
 
 #endif // _gcs_core_h_

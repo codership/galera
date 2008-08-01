@@ -47,14 +47,15 @@ gcs_queue_t *gcs_queue ()
 int gcs_queue_push (gcs_queue_t *queue, void *data)
 {
     gcs_queue_memb_t *memb = GU_MALLOC (gcs_queue_memb_t);
+    int ret;
 
     if (NULL == memb) return -ENOMEM;
 
     memb->data = data;
     memb->next = NULL;
 
-    if (!gu_mutex_lock (&queue->lock)) {
-        if (!queue->err)
+    if (!(ret = gu_mutex_lock (&queue->lock))) {
+        if (!(ret = queue->err))
         {
             if (queue->tail)
                 queue->tail->next = memb;
@@ -65,9 +66,7 @@ int gcs_queue_push (gcs_queue_t *queue, void *data)
                 queue->next = memb;
 
             queue->tail = memb;
-#ifdef GCS_DEBUG_QUEUE
-            queue->length++;
-#endif
+            ret = ++queue->length;
 //            gu_debug ("queue %p: tail: %p data: %p\n",
 //                      queue, queue->tail, queue->tail->data);
             /* signal to whoever could be waiting for queue */
@@ -76,17 +75,18 @@ int gcs_queue_push (gcs_queue_t *queue, void *data)
         }
     }
 
-    return queue->err;
+    return ret;
 }
 
 int gcs_queue_pop (gcs_queue_t *queue, void **data)
 {
     gcs_queue_memb_t *head = NULL;
+    int ret;
 
     *data = NULL;
-    if (!gu_mutex_lock (&queue->lock))
+    if (!(ret = gu_mutex_lock (&queue->lock)))
     {
-	if (!queue->err && (head = queue->head))
+	if (!(ret = queue->err) && (head = queue->head))
 	{
 	    *data = head->data;
 	    queue->head = head->next;
@@ -95,15 +95,13 @@ int gcs_queue_pop (gcs_queue_t *queue, void **data)
 	    {
 		queue->tail = NULL; /* last member */
 	    }
-#ifdef GCS_DEBUG_QUEUE
-	    queue->length--;
-#endif
+	    ret = --queue->length;
             gu_free (head);
 	}
         gu_mutex_unlock (&queue->lock);
     }
 
-    return queue->err;
+    return ret;
 }
 
 void gcs_queue_cleanup (void *p) { gu_mutex_unlock (p); }
@@ -117,12 +115,12 @@ int gcs_queue_pop_wait (gcs_queue_t *queue, void **data)
 
     /* at this point it can happen that queue->err is raised and
      * lock destroyed! what to do? */
-    if (!gu_mutex_lock (&queue->lock))
+    if (!(ret = gu_mutex_lock (&queue->lock)))
     {
 	/* installing cleanup every time when thread goes to wait
 	 * seems to be expensive.
 	 * However we're going to wait anyways, ne, Akane-chan? */
-	while (NULL == queue->head && !queue->err)
+	while (NULL == queue->head && !(ret = queue->err))
 	{
 	    pthread_cleanup_push (gcs_queue_cleanup, &queue->lock);
 	    gu_cond_wait (&queue->ready, &queue->lock);
@@ -139,21 +137,19 @@ int gcs_queue_pop_wait (gcs_queue_t *queue, void **data)
 	    {
 		queue->tail = NULL; /* last member */
 	    }
-#ifdef GCS_DEBUG_QUEUE
-	    queue->length--;
-#endif
+	    ret = --queue->length;
+            assert (queue->length >= 0);
             gu_free (head);
 	}
+        else {
+            assert (ret == queue->err);
+        }
 
-	ret = queue->err;
         gu_mutex_unlock (&queue->lock);
-    }
-    else {
-	ret = -ENODATA;
     }
 
 #ifdef GCS_DEBUG_QUEUE
-    if (ret) gu_debug ("Returning %s", strerror(-ret));
+    if (ret < 0) gu_debug ("Returning %d (%s)", ret, strerror(-ret));
 #endif
     return ret;
 }
@@ -238,9 +234,7 @@ int gcs_queue_abort (gcs_queue_t *queue)
 	}
 	queue->next = NULL;
 	
-#ifdef GCS_DEBUG_QUEUE
         queue->length = 0;
-#endif
 	return 0;
     }
     else

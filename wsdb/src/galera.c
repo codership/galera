@@ -26,6 +26,9 @@
 #include "wsdb_priv.h"
 #include "job_queue.h"
 
+//#define GALERA_USE_FLOW_CONTROL 1
+#define GALERA_USLEEP 10000 // 10 ms
+
 enum galera_repl_state {
     GALERA_INITIALIZED,
     GALERA_ENABLED,
@@ -643,13 +646,14 @@ static void process_query_write_set(
         if (!rcode) {
             wsdb_set_global_trx_committed(seqno_g);
         } else {
-            gu_fatal("could not apply trx: %llu", seqno_l);
+            gu_fatal("could not apply trx: %llu", seqno_g);
 	    abort();
 	}
 	break;
     case WSDB_CERTIFICATION_FAIL:
         /* certification failed, release */
-        gu_warn("trx certification failed: %llu - %llu", seqno_l, ws->last_seen_trx);
+        gu_warn("trx certification failed: %llu - %llu",
+                seqno_l, ws->last_seen_trx);
         print_ws(wslog_G, ws, seqno_l);
 	/* Cancel commit queue */
         rcode = galera_eagain (gcs_to_self_cancel, commit_queue, seqno_l);
@@ -657,9 +661,8 @@ static void process_query_write_set(
 	    gu_fatal("Failed to cancel commit_queue: %llu", seqno_l);
 	    abort();
 	}
-//	gcs_to_release(commit_queue, seqno_l); not needed
         break;
-    default:  
+    default:
         gu_error(
             "unknown galera fail: %d trdx: %llu",rcode,seqno_l
 	    );
@@ -726,20 +729,24 @@ enum galera_status galera_recv(void *app_ctx) {
     for (;;) {
         gcs_act_type_t  action_type;
         size_t          action_size;
-        uint8_t        *action;
+        void*           action;
         gcs_seqno_t     seqno_g, seqno_l;
 
         errno = 0;
         rcode = gcs_recv(
-            gcs_conn, &action_type, &action_size, &action, &seqno_g, &seqno_l
+            gcs_conn, &action, &action_size, &action_type, &seqno_g, &seqno_l
         );
-//        gu_info ("Received: act_type: %u, act_size: %u, act_id: %llu,"
-//                 " rcode: %d", action_type, action_size, seqno_g, rcode);
+//        gu_info ("gcs_recv(): act_type: %u, act_size: %u, act_id: %lld, "
+//                "local: %llu, rcode: %d", // make seqno_g signed to display -1
+//                action_type, action_size, (long long)seqno_g, seqno_l, rcode);
 
 	if (rcode < 0) return GALERA_CONN_FAIL;
 
+        assert (GCS_SEQNO_ILL != seqno_l);
+
         switch (action_type) {
         case GCS_ACT_DATA:
+            assert (GCS_SEQNO_ILL != seqno_g);
             process_write_set(
                 applier, app_ctx, action, action_size, seqno_g, seqno_l
             );
@@ -762,9 +769,20 @@ enum galera_status galera_recv(void *app_ctx) {
             //truncate_trx_history (*(gcs_seqno_t*)action);
             free (action);
             break;
+        case GCS_ACT_CONF:
+        {
+            gcs_act_conf_t* conf = action;
+            if (conf->conf_id >= 0) {
+                // PRIMARY configuration
+#ifdef GALERA_USE_FLOW_CONTROL
+                gcs_join (gcs_conn); // pretend we have the state already
+#endif
+            }
+            else {
+                // NON PRIMARY configuraiton
+            }
+        }
         case GCS_ACT_SNAPSHOT:
-        case GCS_ACT_PRIMARY:
-        case GCS_ACT_NON_PRIMARY:
             if (0 < seqno_l && seqno_l < GCS_SEQNO_ILL) {
                 // Must advance queue counter even if ignoring the action
                 if (galera_eagain (gcs_to_grab, to_queue, seqno_l)) {
@@ -778,7 +796,7 @@ enum galera_status galera_recv(void *app_ctx) {
                     abort();
                 }
             }
-	    gu_free (action);
+	    free (action);
             break;
         default:
             return GALERA_FATAL;
@@ -930,7 +948,10 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
 
     /* hold commit time mutex */
     gu_mutex_lock(&commit_mtx);
-    
+ 
+#ifdef GALERA_USE_FLOW_CONTROL
+   do {
+#endif
     /* check if trx was cancelled before we got here */
     if (wsdb_get_local_trx_seqno(trx_id) == GALERA_ABORT_SEQNO) {
 	gu_info("trx has been cancelled already: %llu", trx_id);
@@ -940,6 +961,14 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
 	gu_mutex_unlock(&commit_mtx);
 	GU_DBUG_RETURN(GALERA_TRX_FAIL);
     }
+#ifdef GALERA_USE_FLOW_CONTROL
+    /* what is happening here:
+     * - first, gcs_wait() > 0 is evaluated, if not true, loop exits
+     * - second, (usleep(), true) is evaluated always to true, so we always
+     *   keep on looping.
+     */
+     } while ((gcs_wait (gcs_conn) > 0) && (usleep (GALERA_USLEEP), true));
+#endif
 
     /* retrieve write set */
     ws = wsdb_get_write_set(trx_id, conn_id, rbr_data, rbr_data_len);
@@ -954,7 +983,6 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
     if ((rcode = wsdb_delete_local_trx(trx_id))) {
       gu_warn("could not delete trx: %llu", trx_id);
     }
-
 
     /* avoid sending empty write sets */
     if (ws->query_count == 0) {
@@ -983,14 +1011,18 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
     gu_mutex_unlock(&commit_mtx);
 
     /* replicate through gcs */
-    rcode = gcs_repl(gcs_conn, GCS_ACT_DATA, len, data, &seqno_g, &seqno_l);
-//    gu_info ("gcs_repl: act_type: %u, act_size: %u, act_id: %llu, ret: %d",
-//             GCS_ACT_DATA, len, seqno_g, rcode);
+    rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_DATA, &seqno_g, &seqno_l);
+//    gu_info ("gcs_repl(): act_type: %u, act_size: %u, act_id: %llu, "
+//             "local: %llu, ret: %d",
+//             GCS_ACT_DATA, len, seqno_g, seqno_l, rcode);
     if (rcode != len) {
         gu_error("gcs failed for: %llu, len: %d, rcode: %d", trx_id,len,rcode);
         retcode = GALERA_CONN_FAIL;
         goto cleanup;
     }
+
+    assert (GCS_SEQNO_ILL != seqno_g);
+    assert (GCS_SEQNO_ILL != seqno_l);
 
     gu_mutex_lock(&commit_mtx);
 
@@ -1221,15 +1253,24 @@ enum galera_status galera_to_execute_start(
     }
     len = xdr_getpos(&xdrs);
 
+#ifdef GALERA_USE_FLOW_CONTROL
+    while ((rcode = gcs_wait(gcs_conn)) && rcode > 0) usleep (GALERA_USLEEP);
+    if (rcode >= 0) // execute the following operation conditionally
+#endif
+
     /* replicate through gcs */
-    rcode= gcs_repl(gcs_conn, GCS_ACT_DATA, len, data, &seqno_g, &seqno_l);
-//    gu_info ("Received act_type: %u, act_size: %u, act_id: %llu, ret: %d",
-//             GCS_ACT_DATA, len, seqno_g, rcode);
+    rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_DATA, &seqno_g, &seqno_l);
+//    gu_info ("gcs_repl(): act_type: %u, act_size: %u, act_id: %llu, "
+//             "local: %llu, ret: %d",
+//             GCS_ACT_DATA, len, seqno_g, seqno_l, rcode);
     if (rcode < 0) {
         gu_error("gcs failed for: %llu, %d", conn_id, rcode);
         rcode = GALERA_CONN_FAIL;
         goto cleanup;
     }
+
+    assert (GCS_SEQNO_ILL != seqno_g);
+    assert (GCS_SEQNO_ILL != seqno_l);
 
     /* wait for total order */
     if (galera_eagain (gcs_to_grab, to_queue, seqno_l) != 0) {
@@ -1270,6 +1311,7 @@ enum galera_status galera_to_execute_end(conn_id_t conn_id) {
     }
 
     do_report = report_check_counter ();
+
     /* release commit queue */
     gcs_to_release(commit_queue, seqno);
     

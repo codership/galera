@@ -28,9 +28,7 @@ typedef struct gcs_queue
     gu_cond_t         ready;
 //    gu_cond_t    empty;
     int               err;
-#ifdef GCS_DEBUG_QUEUE
-    size_t           length;
-#endif
+    size_t            length;
 }
 gcs_queue_t;
 
@@ -39,11 +37,11 @@ gcs_queue_t *gcs_queue (); /* constructor */
 /* Functions below return non-zero as a sign that queue is being destroyed */
 #define GCS_QUEUE_QUIT 1
 
-/* append to tail */
+/* append to tail (returns resulting length of the queue) */
 int gcs_queue_push      (gcs_queue_t *queue, void *data);
-/* pop from queue head */
+/* pop from queue head (returns remaining length of the queue) */
 int gcs_queue_pop       (gcs_queue_t *queue, void **data);
-/* pop from queue head, wait if it is empty */
+/* pop from queue head, wait if it is empty (returns length of the queue) */
 int gcs_queue_pop_wait  (gcs_queue_t *queue, void **data);
 /* iterator */
 int gcs_queue_next      (gcs_queue_t *queue, void **data);
@@ -55,5 +53,8 @@ int gcs_queue_abort     (gcs_queue_t *queue);
 int gcs_queue_reset     (gcs_queue_t *queue);
 /* destructor - would block until all members are dequeued */
 int gcs_queue_free      (gcs_queue_t *queue);
+/* momentary queue lenght */
+static inline size_t
+gcs_queue_length (gcs_queue_t *queue) { return queue->length; }
 
 #endif // _gcs_queue_h_

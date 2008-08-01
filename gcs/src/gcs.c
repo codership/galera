@@ -9,6 +9,7 @@
  */
 
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <math.h>
 #include <errno.h>
@@ -27,11 +28,19 @@ const long GCS_MAX_REPL_THREADS = 16384;
 
 typedef enum
 {
+    GCS_CONN_JOINED,
     GCS_CONN_OPEN,
     GCS_CONN_CLOSED,
     GCS_CONN_DESTROYED
 }
 gcs_conn_state_t;
+
+struct gcs_fc
+{
+    uint32_t conf_id;
+    uint32_t stop;
+}
+__attribute__((__packed__));
 
 struct gcs_conn
 {
@@ -54,9 +63,16 @@ struct gcs_conn
     gcs_queue_t* recv_q;
     gu_thread_t  recv_thread;
 
-//    /* A condition for threads which called gcs_recv()  */
-//    gu_cond_t *recv_cond;
+    /* Flow control */
+    gu_mutex_t    fc_mutex;
+    uint32_t      conf_id;     // configuration ID
+    long          stop_sent;   // how many STOPs and CONTs were send
+    long          stop_count;  // counts stop requests received
+    volatile long queue_len;   // slave queue length
+    volatile long upper_limit; // upper slave queue limit
+    volatile long lower_limit; // lower slave queue limit
 
+    /* gcs_core object */
     gcs_core_t  *core; // the context that is returned by
                        // the core group communication system
 };
@@ -67,7 +83,7 @@ typedef struct gcs_act
     gcs_act_type_t act_type;
     gcs_seqno_t    act_id;
     gcs_seqno_t    local_act_id;
-    const uint8_t* action;
+    const void*    action;
     gu_mutex_t     wait_mutex;
     gu_cond_t      wait_cond;
 }
@@ -93,6 +109,7 @@ gcs_create (const char *backend)
                     conn->recv_q  = gcs_queue ();
                     if (conn->recv_q) {
                         gu_mutex_init (&conn->lock, NULL);
+                        gu_mutex_init (&conn->fc_mutex, NULL);
                         conn->state = GCS_CONN_CLOSED;
                         return conn; // success
                     }
@@ -110,6 +127,120 @@ gcs_create (const char *backend)
     return NULL; // failure
 }
 
+static inline long
+gcs_fc_stop (gcs_conn_t* conn)
+{
+    long ret = 0;
+    struct gcs_fc fc = { htogl(conn->conf_id), 1 };
+
+    if (conn->stop_sent > 0 ||
+        gcs_queue_length (conn->recv_q) <= conn->upper_limit ||
+        GCS_CONN_JOINED != conn->state)
+        return 0; // try to avoid mutex lock
+
+    if (gu_mutex_lock (&conn->fc_mutex)) abort();
+
+    conn->queue_len = gcs_queue_length (conn->recv_q);
+
+    if ((conn->queue_len > conn->upper_limit) &&
+        GCS_CONN_JOINED == conn->state && conn->stop_sent <= 0) {
+        /* tripped upper queue limit, send stop request */
+        gu_info ("SENDING STOP");
+        ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
+        if (ret >= 0) {
+            ret = 0;
+            conn->stop_sent++;
+        }
+    }
+//   gu_info ("queue_len = %ld, upper_limit = %ld, state = %d, stop_sent = %ld",
+//            conn->queue_len, conn->upper_limit, conn->state, conn->stop_sent);
+    gu_mutex_unlock (&conn->fc_mutex);
+
+    return ret;
+}
+
+static inline long
+gcs_fc_cont (gcs_conn_t* conn)
+{
+    long ret = 0;
+    struct gcs_fc fc = { htogl(conn->conf_id), 0 };
+
+    if (conn->stop_sent <= 0 ||
+        gcs_queue_length (conn->recv_q) > conn->lower_limit ||
+        GCS_CONN_JOINED != conn->state)
+        return 0; // try to avoid mutex lock
+
+    if (gu_mutex_lock (&conn->fc_mutex)) abort();
+
+    conn->queue_len = gcs_queue_length (conn->recv_q);
+
+    if (conn->lower_limit >= conn->queue_len &&
+        GCS_CONN_JOINED == conn->state && conn->stop_sent > 0) {
+        // tripped lower slave queue limit, sent continue request
+        gu_info ("SENDING CONT");
+        ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
+        if (ret >= 0) {
+            ret = 0;
+            conn->stop_sent--;
+        }
+    }
+    gu_mutex_unlock (&conn->fc_mutex);
+
+    return ret;
+}
+
+/*!
+ * Performs work requred by action in current context.
+ * @return negative error code, 1 if action should be discarded, 0 if should be
+ *         passed to application.
+ */
+static long
+gcs_handle_actions (gcs_conn_t*    conn,
+                    void*          action,
+                    size_t         act_size,
+                    gcs_act_type_t act_type)
+{
+    long ret = 1;
+
+    switch (act_type) {
+    case GCS_ACT_CONF:
+    {
+        gcs_act_conf_t* conf = action;
+
+        if ((conn->conf_id + 1) != conf->conf_id) {
+            /* missed a configuration, need a snapshot - no longer JOINED */
+// temporary            if (conn->state == GCS_CONN_JOINED) conn->state = GCS_CONN_OPEN;
+        }
+
+        if (gu_mutex_lock (&conn->fc_mutex)) abort();
+        {
+            conn->conf_id     = conf->conf_id;
+            conn->stop_sent   = 0;
+            conn->stop_count  = 0;
+            conn->lower_limit = conf->memb_num;
+            conn->upper_limit = 2 * conn->lower_limit;
+        }
+        gu_mutex_unlock (&conn->fc_mutex);
+        ret = 0;
+        break;
+    }
+    case GCS_ACT_FLOW:
+    {
+        struct gcs_fc* fc = action;
+        assert (sizeof(*fc) == act_size);
+        gu_info ("GCS_ACT_FLOW");
+// UNCOMMENT WHEN SYNC MESSAGE IS IMPLEMENTED        if (gtohl(fc->conf_id) != conn->conf_id) break; // obsolete fc request
+        gu_info ("RECEIVED FC REQUEST: %s", fc->stop ? "STOP" : "CONT");
+        conn->stop_count += ((fc->stop != 0) << 1) - 1; // +1 if !0, -1 if 0
+        break;
+    }
+    default:
+        break;
+    }
+
+    return ret;
+}
+
 /*
  * gcs_recv_thread() receives whatever actions arrive from group,
  * and performs necessary actions based on action type.
@@ -122,7 +253,7 @@ static void *gcs_recv_thread (void *arg)
     gcs_seqno_t    act_id;
     gcs_act_type_t act_type;
     ssize_t        act_size;
-    uint8_t       *action;
+    void          *action;
     const uint8_t *action_repl = NULL;
 
 //    gu_debug ("Starting RECV thread");
@@ -132,7 +263,7 @@ static void *gcs_recv_thread (void *arg)
     gu_mutex_lock   (&conn->lock); // wait till gcs_open() is done;
     gu_mutex_unlock (&conn->lock);
 
-    while (conn->state == GCS_CONN_OPEN)
+    while (conn->state <= GCS_CONN_OPEN)
     {
         gcs_seqno_t this_act_id = GCS_SEQNO_ILL;
 
@@ -145,13 +276,21 @@ static void *gcs_recv_thread (void *arg)
 	    break;
 	}
 
-        if (act_type < GCS_ACT_SNAPSHOT) {
-	    /* deliver to application and increment local order */
-	    this_act_id = ++conn->local_act_id;
+//        gu_info ("Received action type: %d, size: %d, global seqno: %lld",
+//                 act_type, act_size, (long long)act_id);
+
+        if (act_type >= GCS_ACT_CONF) {
+            ret = gcs_handle_actions (conn, action, act_size, act_type);
+            if (ret < 0) {         // error
+                gu_debug ("gcs_handle_actions returned %d: %s",
+                          ret, strerror(-ret));
+                break;
+            }
+            if (ret > 0) continue; // not for application
         }
 
-//        gu_info ("Received action type: %d, size: %6d, #%llu",
-//                 act_type, act_size, this_act_id);
+        /* deliver to application and increment local order */
+        this_act_id = ++conn->local_act_id;
 
 	if (!action_repl) {
 	    /* Check if there is any local repl action in queue */
@@ -173,8 +312,7 @@ static void *gcs_recv_thread (void *arg)
 //            gu_debug ("Local action");
 	    act = GCS_FIFO_GET (conn->repl_q);
 	    
-//	    act->act_id       = act_id;
-	    act->act_id       = this_act_id;
+	    act->act_id       = act_id;
 	    act->local_act_id = this_act_id;
 	    assert (act->action   == action);
             assert (act->act_size == act_size);
@@ -189,7 +327,6 @@ static void *gcs_recv_thread (void *arg)
 	else
 	{
 	    /* slave action */
-//            gu_debug ("Foreign action");
 /** @todo   Implement mallocless queue for RECV threads and
 //          (mostly) mallocless buffering for actions.
 //          Otherwise we're having two extra mallocs here.
@@ -205,14 +342,31 @@ static void *gcs_recv_thread (void *arg)
 
 	    act->act_size     = act_size;
 	    act->act_type     = act_type;
-//	    act->act_id       = act_id;
-	    act->act_id       = this_act_id;
+	    act->act_id       = act_id;
             act->local_act_id = this_act_id;
 	    act->action       = action;
 
-	    if ((ret = gcs_queue_push (conn->recv_q, act))) {
-		break;
+	    if ((ret = gcs_queue_push (conn->recv_q, act)) < 0) {
+                gu_debug ("gcs_queue_push() returned %d: %s",
+                          ret, strerror (-ret));
+                break;
             }
+            /* NOTE: there's a race condition here, I wonder if it matters:
+             * application thread which is calling gcs_recv() can pick item
+             * from queue and decrement queue_len before the next line.
+             * However, I believe that +/- 1 doesn't really matter here. 
+             * Holding a lock here will simply prevent application thread
+             * fron decrementing queue ASAP.
+             * Update: because of the race it may happen so, that STOP
+             *         request will be sent after the queue is empty. This will
+             *         block the node, but holding a lock here is a bad
+             *         solution. Must find a way to handle out-of-order FC
+             *         requests. */
+            if ((ret = gcs_fc_stop(conn))) {
+                gu_debug ("gcs_fc_stop() returned %d: %s", ret, strerror(-ret));
+                break;
+            }
+
 	    act = NULL;
 //            gu_info("Received foreign action of type %d, size %d, id=%llu, "
 //                    "action %p", act_type, act_size, this_act_id, action);
@@ -222,6 +376,7 @@ static void *gcs_recv_thread (void *arg)
 //                 act_type, act_size, act_id, conn->local_act_id);
     }
     
+    if (ret > 0) ret = 0;
     gu_debug ("RECV thread exiting %d: %s", ret, strerror(-ret));
     return NULL;
 }
@@ -244,14 +399,14 @@ int gcs_open (gcs_conn_t *conn, const char *channel)
                                               gcs_recv_thread,
                                               conn))) {
                     conn->state = GCS_CONN_OPEN;
-                    gu_info ("Joined channel '%s'", channel);
+                    gu_info ("Opened channel '%s'", channel);
                 }
                 else {
                     gcs_core_close (conn->core);
                 }
             }
             else {
-                gu_error ("Failed to join channel '%s': %d (%s)",
+                gu_error ("Failed to open channel '%s': %d (%s)",
                           channel, ret, strerror(-ret));
             }
         }
@@ -322,7 +477,8 @@ int gcs_destroy (gcs_conn_t *conn)
         if (GCS_CONN_CLOSED != conn->state)
         {
             if (GCS_CONN_CLOSED > conn->state)
-                gu_error ("Attempt to call gcs_destroy() before gcs_close()");
+                gu_error ("Attempt to call gcs_destroy() before gcs_close(): "
+                          "state = %d", conn->state);
             gu_mutex_unlock (&conn->lock);
             return -EBADFD;
         }
@@ -354,6 +510,7 @@ int gcs_destroy (gcs_conn_t *conn)
 
     /* This must not last for long */
     while (gu_mutex_destroy (&conn->lock));
+    while (gu_mutex_destroy (&conn->fc_mutex));
     
     gu_free (conn);
 
@@ -361,8 +518,10 @@ int gcs_destroy (gcs_conn_t *conn)
 }
 
 /* Puts action in the send queue and returns */
-int gcs_send (gcs_conn_t *conn, const gcs_act_type_t act_type,
-	      const size_t act_size, const uint8_t *action)
+int gcs_send (gcs_conn_t*          conn,
+              const void*          action,
+	      const size_t         act_size,
+              const gcs_act_type_t act_type)
 {
     int ret = -ENOTCONN;
 
@@ -370,7 +529,7 @@ int gcs_send (gcs_conn_t *conn, const gcs_act_type_t act_type,
      *  @note: gcs_repl() and gcs_recv() cannot lock connection
      *         because they block indefinitely waiting for actions */
     if (!(ret = gu_mutex_lock (&conn->lock))) { 
-        if (GCS_CONN_OPEN == conn->state) {
+        if (GCS_CONN_OPEN >= conn->state) {
             /* need to make a copy of the action, since receiving thread
              * has no way of knowing that it shares this buffer.
              * also the contents of action may be changed afterwards by
@@ -392,9 +551,9 @@ int gcs_send (gcs_conn_t *conn, const gcs_act_type_t act_type,
 
 /* Puts action in the send queue and returns after it is replicated */
 int gcs_repl (gcs_conn_t          *conn,
-	      const gcs_act_type_t act_type,
+	      const void          *action,
 	      const size_t         act_size,
-	      const uint8_t       *action,
+	      const gcs_act_type_t act_type,
 	      gcs_seqno_t         *act_id, 
 	      gcs_seqno_t         *local_act_id)
 {
@@ -428,10 +587,10 @@ int gcs_repl (gcs_conn_t          *conn,
         if (!(ret = gu_mutex_lock (&conn->lock)))
         {
             // some hack here to achieve one if() instead of two:
-            // if (conn->state != GCS_CONN_OPEN) ret will be -EBADFD,
+            // if (conn->state != GCS_CONN_JOINED) ret will be -ENOTCONN,
             // otherwise it will be set to what gcs_fifo_put() returns.
-            ret = -EBADFD;
-            if ((GCS_CONN_OPEN == conn->state) &&
+            ret = -ENOTCONN;
+            if ((GCS_CONN_OPEN >= conn->state) &&
                 !(ret = GCS_FIFO_PUT (conn->repl_q, &act)))
             {
                 // Keep on trying until something else comes out
@@ -452,7 +611,7 @@ int gcs_repl (gcs_conn_t          *conn,
         }
 
         /* now having unlocked repl_q we can go waiting for action delivery */
-        if (ret >= 0 && conn->state == GCS_CONN_OPEN) {
+        if (ret >= 0 && GCS_CONN_OPEN >= conn->state) {
             gu_cond_wait (&act.wait_cond, &act.wait_mutex);
             if (act.act_id != GCS_SEQNO_ILL) {
                 *act_id       = act.act_id;       /* set by recv_thread */
@@ -469,17 +628,20 @@ int gcs_repl (gcs_conn_t          *conn,
     gu_cond_destroy  (&act.wait_cond);
 
 #ifdef GCS_DEBUG_GCS
-    gu_debug ("\nact_size = %u\nact_type = %u\n"
-              "act_id   = %llu\naction   = %p (%s)\n",
-              act.act_size, act.act_type, act.act_id, act.action, act.action);
+//    gu_debug ("\nact_size = %u\nact_type = %u\n"
+//              "act_id   = %llu\naction   = %p (%s)\n",
+//              act.act_size, act.act_type, act.act_id, act.action, act.action);
 #endif
     return ret;
 }
 
 /* Returns when an action from another process is received */
-int gcs_recv (gcs_conn_t *conn, gcs_act_type_t *act_type,
-	      size_t *act_size, uint8_t **action,
-	      gcs_seqno_t *act_id, gcs_seqno_t *local_act_id)
+int gcs_recv (gcs_conn_t*     conn,
+              void**          action,
+	      size_t*         act_size,
+              gcs_act_type_t* act_type,
+	      gcs_seqno_t*    act_id,
+              gcs_seqno_t*    local_act_id)
 {
     int        err;
     void      *void_ptr = NULL;
@@ -493,7 +655,7 @@ int gcs_recv (gcs_conn_t *conn, gcs_act_type_t *act_type,
 
     if (GCS_CONN_CLOSED == conn->state) return -ENOTCONN;
 
-    if ((err = gcs_queue_pop_wait (conn->recv_q, &void_ptr)))
+    if ((err = gcs_queue_pop_wait (conn->recv_q, &void_ptr)) < 0)
     {
 	assert (NULL == void_ptr);
         if (GCS_CONN_CLOSED == conn->state) {
@@ -512,6 +674,8 @@ int gcs_recv (gcs_conn_t *conn, gcs_act_type_t *act_type,
         }
     }
 
+    if ((err = gcs_fc_cont(conn))) return err;
+
     act = void_ptr;
     *act_size     = act->act_size;
     *act_type     = act->act_type;
@@ -522,6 +686,37 @@ int gcs_recv (gcs_conn_t *conn, gcs_act_type_t *act_type,
     gu_free (act); /* was malloc'ed by recv_thread */
 
     return *act_size;
+}
+
+int
+gcs_wait (gcs_conn_t* conn)
+{
+    if (gu_likely(GCS_CONN_OPEN >= conn->state)) {
+        return (conn->stop_count > 0 || (conn->queue_len > conn->upper_limit));
+    }
+    else {
+        switch (conn->state) {
+        case GCS_CONN_CLOSED:
+            return -ENOTCONN;
+        case GCS_CONN_DESTROYED:
+        default:
+            return -EBADFD;
+        }
+    }
+}
+
+int
+gcs_join (gcs_conn_t* conn)
+{
+    int ret;
+
+    if (!(ret = gu_mutex_lock (&conn->lock)))
+    {
+        conn->state = GCS_CONN_JOINED;
+        gu_info ("JOINED");
+        gu_mutex_unlock (&conn->lock);
+    }
+    return ret;
 }
 
 long

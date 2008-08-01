@@ -71,6 +71,21 @@ int gcs_close (gcs_conn_t *conn);
  */
 int gcs_destroy (gcs_conn_t *conn);
 
+/*! @brief Waits until the group catches up.
+ * This call checks if any member of the group (including this one) has a
+ * long slave queue. Should be called before gcs_repl(), gcs_send() or
+ * gcs_join().
+ *
+ * @return negative error code, 1 if wait is required, 0 otherwise
+ */
+int gcs_wait (gcs_conn_t *conn);
+
+/*! @brief Signals the group that it contains full image of group state.
+ * Must be called upon completion of the state transfer before starting to
+ * send any actions to group (gcs_send(), gcs_repl()).
+ */
+int gcs_join (gcs_conn_t* conn);
+
 /*! @typedef @brief Action types.
  * There is a conceptual difference between "messages"
  * and "actions". Messages are ELEMENTARY pieces of information
@@ -99,10 +114,9 @@ typedef enum gcs_act_type
     GCS_ACT_DATA,       //! application action, sent by application
     GCS_ACT_COMMIT_CUT, //! group-wide action commit cut
     GCS_ACT_SNAPSHOT,   //! request for state snapshot
-    GCS_ACT_PRIMARY,    //! reached primary configuration
+    GCS_ACT_CONF,       //! new configuration
     GCS_ACT_FLOW,       //! flow control
     GCS_ACT_SERVICE,    //! service action, sent by GCS
-    GCS_ACT_NON_PRIMARY,//! reached non-primary configuration
     GCS_ACT_ERROR,      //! error happened while receiving the action
     GCS_ACT_UNKNOWN     //! undefined/unknown action type
 }
@@ -122,9 +136,9 @@ gcs_act_type_t;
  * @return negative error code, action size in case of success
  */
 int gcs_send (gcs_conn_t          *conn,
-	      const gcs_act_type_t act_type,
+	      const void          *action,
 	      const size_t         act_size,
-	      const uint8_t       *action);
+	      const gcs_act_type_t act_type);
 
 /*! @brief Receives an action from group.
  * Blocks if no actions are available. Action buffer is allocated by GCS
@@ -144,9 +158,9 @@ int gcs_send (gcs_conn_t          *conn,
  * @return negative error code, action size in case of success
  */
 int gcs_recv (gcs_conn_t      *conn,
-	      gcs_act_type_t  *act_type,
+	      void           **action,
 	      size_t          *act_size,
-	      uint8_t        **action,
+	      gcs_act_type_t  *act_type,
 	      gcs_seqno_t     *act_id,
 	      gcs_seqno_t     *local_act_id);
 
@@ -163,13 +177,12 @@ int gcs_recv (gcs_conn_t      *conn,
  * @param local_act_id local action ID (sequence number)
  * @return negative error code, action size in case of success
  */
-int gcs_repl (gcs_conn_t *conn,
+int gcs_repl (gcs_conn_t          *conn,
+	      const void          *action,
+	      const size_t         act_size,
 	      const gcs_act_type_t act_type,
-	      const size_t act_size,
-	      const uint8_t *action,
-	      gcs_seqno_t *act_id,
-	      gcs_seqno_t *local_act_id);
-
+	      gcs_seqno_t         *act_id,
+	      gcs_seqno_t         *local_act_id);
 
 /*! Total Order object */
 typedef struct gcs_to gcs_to_t;
@@ -297,15 +310,15 @@ gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size);
 
 /* Membership message */
 /*! Member name max length */
-extern const size_t GCS_MEMBER_NAME_MAX;
+#define GCS_MEMBER_NAME_MAX 40
 
 typedef struct {
-    gcs_seqno_t  seqno;    /// next action seqno (TO must be initialized to it)
-    long         conf_id;  /// configuration ID
+    gcs_seqno_t  seqno;    /// next action seqno
+    long         conf_id;  /// configuration ID (-1 if non-primary)
     size_t       memb_num; /// number of members in configuration
-    size_t       my_id;    /// index of this node in the configuration
+    size_t       my_idx;   /// index of this node in the configuration
     uint8_t      data[0];  /// member array
-} gcs_conf_act_t;
+} gcs_act_conf_t;
 
 #ifdef	__cplusplus
 }

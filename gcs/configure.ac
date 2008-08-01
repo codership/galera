@@ -4,7 +4,7 @@
 # $Id$
 #
 AC_PREREQ(2.50)
-AC_INIT([libgcs], [0.4.0], [info@codership.com])
+AC_INIT([libgcs], [0.5.0], [info@codership.com])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CANONICAL_SYSTEM
 AC_CONFIG_HEADER([config.h])
