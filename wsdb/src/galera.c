@@ -26,7 +26,7 @@
 #include "wsdb_priv.h"
 #include "job_queue.h"
 
-//#define GALERA_USE_FLOW_CONTROL 1
+#define GALERA_USE_FLOW_CONTROL 1
 #define GALERA_USLEEP 10000 // 10 ms
 
 enum galera_repl_state {
@@ -948,12 +948,9 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
 
 #ifdef GALERA_USE_FLOW_CONTROL
    do {
-    /* hold commit time mutex */
-    gu_mutex_lock(&commit_mtx);
-#else
-    /* hold commit time mutex */
-    gu_mutex_lock(&commit_mtx);
 #endif
+    /* hold commit time mutex */
+    gu_mutex_lock(&commit_mtx);
     /* check if trx was cancelled before we got here */
     if (wsdb_get_local_trx_seqno(trx_id) == GALERA_ABORT_SEQNO) {
 	gu_info("trx has been cancelled already: %llu", trx_id);
@@ -965,12 +962,13 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
     }
 #ifdef GALERA_USE_FLOW_CONTROL
     /* what is happening here:
-     * - first, gcs_wait() > 0 is evaluated, if not true, loop exits
-     * - second, (usleep(), true) is evaluated always to true, so we always
-     *   keep on looping.
+     * - first,  (gcs_wait() > 0) is evaluated, if not true, loop exits
+     * - second, (unlock(), usleep(), true) is evaluated always to true,
+     *   so we always keep on looping.
+     *   AFAIK usleep() is evaluated after unlock()
      */
      } while ((gcs_wait (gcs_conn) > 0) && 
-              (usleep (GALERA_USLEEP), gu_mutex_unlock(&commit_mtx), true)
+              (gu_mutex_unlock(&commit_mtx), usleep (GALERA_USLEEP), true)
      );
 #endif
 

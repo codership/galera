@@ -145,7 +145,7 @@ gcs_fc_stop (gcs_conn_t* conn)
     if ((conn->queue_len > conn->upper_limit) &&
         GCS_CONN_JOINED == conn->state && conn->stop_sent <= 0) {
         /* tripped upper queue limit, send stop request */
-        gu_info ("SENDING STOP");
+        gu_info ("SENDING STOP (%llu)", conn->local_act_id); //track frequency
         ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
         if (ret >= 0) {
             ret = 0;
@@ -228,9 +228,8 @@ gcs_handle_actions (gcs_conn_t*    conn,
     {
         struct gcs_fc* fc = action;
         assert (sizeof(*fc) == act_size);
-        gu_info ("GCS_ACT_FLOW");
 // UNCOMMENT WHEN SYNC MESSAGE IS IMPLEMENTED        if (gtohl(fc->conf_id) != conn->conf_id) break; // obsolete fc request
-        gu_info ("RECEIVED FC REQUEST: %s", fc->stop ? "STOP" : "CONT");
+        gu_info ("RECEIVED %s", fc->stop ? "STOP" : "CONT");
         conn->stop_count += ((fc->stop != 0) << 1) - 1; // +1 if !0, -1 if 0
         break;
     }
@@ -691,8 +690,11 @@ int gcs_recv (gcs_conn_t*     conn,
 int
 gcs_wait (gcs_conn_t* conn)
 {
+//    if (gu_likely(GCS_CONN_OPEN >= conn->state)) {
+//       return (conn->stop_count > 0 || (conn->queue_len > conn->upper_limit));
+//    }
     if (gu_likely(GCS_CONN_OPEN >= conn->state)) {
-        return (conn->stop_count > 0 || (conn->queue_len > conn->upper_limit));
+        return (conn->stop_count > 0);
     }
     else {
         switch (conn->state) {
