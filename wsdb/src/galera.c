@@ -946,11 +946,13 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
 
     errno = 0;
 
-    /* hold commit time mutex */
-    gu_mutex_lock(&commit_mtx);
- 
 #ifdef GALERA_USE_FLOW_CONTROL
    do {
+    /* hold commit time mutex */
+    gu_mutex_lock(&commit_mtx);
+#else
+    /* hold commit time mutex */
+    gu_mutex_lock(&commit_mtx);
 #endif
     /* check if trx was cancelled before we got here */
     if (wsdb_get_local_trx_seqno(trx_id) == GALERA_ABORT_SEQNO) {
@@ -967,7 +969,9 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
      * - second, (usleep(), true) is evaluated always to true, so we always
      *   keep on looping.
      */
-     } while ((gcs_wait (gcs_conn) > 0) && (usleep (GALERA_USLEEP), true));
+     } while ((gcs_wait (gcs_conn) > 0) && 
+              (usleep (GALERA_USLEEP), gu_mutex_unlock(&commit_mtx), true)
+     );
 #endif
 
     /* retrieve write set */
