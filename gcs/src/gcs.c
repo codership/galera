@@ -133,7 +133,7 @@ gcs_fc_stop (gcs_conn_t* conn)
     long ret = 0;
     struct gcs_fc fc = { htogl(conn->conf_id), 1 };
 
-    if (conn->stop_sent > 0 ||
+    if (conn->stop_count > 0 || conn->stop_sent > 0 ||
         gcs_queue_length (conn->recv_q) <= conn->upper_limit ||
         GCS_CONN_JOINED != conn->state)
         return 0; // try to avoid mutex lock
@@ -143,7 +143,8 @@ gcs_fc_stop (gcs_conn_t* conn)
     conn->queue_len = gcs_queue_length (conn->recv_q);
 
     if ((conn->queue_len > conn->upper_limit) &&
-        GCS_CONN_JOINED == conn->state && conn->stop_sent <= 0) {
+        GCS_CONN_JOINED == conn->state &&
+        conn->stop_count <= 0 && conn->stop_sent <= 0) {
         /* tripped upper queue limit, send stop request */
         gu_info ("SENDING STOP (%llu)", conn->local_act_id); //track frequency
         ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
@@ -217,7 +218,7 @@ gcs_handle_actions (gcs_conn_t*    conn,
             conn->conf_id     = conf->conf_id;
             conn->stop_sent   = 0;
             conn->stop_count  = 0;
-            conn->lower_limit = conf->memb_num;
+            conn->lower_limit = 2 * conf->memb_num;
             conn->upper_limit = 2 * conn->lower_limit;
         }
         gu_mutex_unlock (&conn->fc_mutex);
@@ -690,12 +691,12 @@ int gcs_recv (gcs_conn_t*     conn,
 int
 gcs_wait (gcs_conn_t* conn)
 {
-//    if (gu_likely(GCS_CONN_OPEN >= conn->state)) {
-//       return (conn->stop_count > 0 || (conn->queue_len > conn->upper_limit));
-//    }
     if (gu_likely(GCS_CONN_OPEN >= conn->state)) {
-        return (conn->stop_count > 0);
+       return (conn->stop_count > 0 || (conn->queue_len > conn->upper_limit));
     }
+//    if (gu_likely(GCS_CONN_OPEN >= conn->state)) {
+//        return (conn->stop_count > 0);
+//    }
     else {
         switch (conn->state) {
         case GCS_CONN_CLOSED:
