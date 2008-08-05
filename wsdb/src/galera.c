@@ -652,9 +652,9 @@ static void process_query_write_set(
 	break;
     case WSDB_CERTIFICATION_FAIL:
         /* certification failed, release */
-        gu_warn("trx certification failed: %llu - %llu",
-                seqno_l, ws->last_seen_trx);
-        print_ws(wslog_G, ws, seqno_l);
+        gu_warn("trx certification failed: (%llu %llu) last_seen: %llu",
+                seqno_l, seqno_g, ws->last_seen_trx);
+        print_ws(wslog_G, ws, seqno_g);
 	/* Cancel commit queue */
         rcode = galera_eagain (gcs_to_self_cancel, commit_queue, seqno_l);
 	if (is_retry == 0 && rcode) {
@@ -900,6 +900,7 @@ enum galera_status galera_rolledback(trx_id_t trx_id) {
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
 
+    gu_mutex_lock(&commit_mtx);
     if ((seqno_l = wsdb_get_local_trx_seqno(trx_id)) > 0 &&
 	seqno_l < GALERA_ABORT_SEQNO) {
 	if (gcs_to_release(commit_queue, seqno_l)) {
@@ -908,8 +909,11 @@ enum galera_status galera_rolledback(trx_id_t trx_id) {
 	}
     }
 
+    wsdb_delete_local_trx(trx_id);
     wsdb_delete_local_trx_info(trx_id);
+    gu_mutex_unlock(&commit_mtx);
 
+    //gu_warn("GALERA rolledback, removed trx: %lu %llu", trx_id, seqno_l);
     GU_DBUG_RETURN(GALERA_OK);
 }
 

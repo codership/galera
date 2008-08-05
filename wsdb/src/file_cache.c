@@ -395,11 +395,12 @@ int file_cache_forget(struct file_cache *cache, cache_id_t id) {
         cache->hash, sizeof(cache_id_t), (char *)&id
     );
     if (!entry) {
-      /* currently unknown situation, block is not in the cache
-       * and yet, the application wants to close access to it
-       */
-      gu_warn("cache block not found in file_cache_forget: %lu", id);
-      GU_DBUG_RETURN(WSDB_WARNING);
+        /* currently unknown situation, block is not in the cache
+         * and yet, the application wants to close access to it
+         */
+        gu_warn("cache block not found in file_cache_forget: %lu", id);
+        gu_mutex_unlock(&cache->mutex);
+        GU_DBUG_RETURN(WSDB_WARNING);
     }
 
     if (entry->state != BLOCK_ACTIVE) {

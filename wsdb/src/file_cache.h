@@ -12,6 +12,7 @@ struct cache_id {
 };
 
 typedef uint32_t cache_id_t;
+#define INVALID_CACHE_ID 0
 
 /*!
  * @struct

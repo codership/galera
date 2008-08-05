@@ -977,7 +977,7 @@ struct wsdb_write_set *wsdb_get_write_set(
 
     GU_DBUG_ENTER("wsdb_get_write_set");
 
-    if (!trx) {
+    if (!trx | !trx->first_block) {
 	GU_DBUG_PRINT("wsdb",
 		   ("trx does not exist in wsdb_get_write_set: %llu", trx_id)
         );
@@ -1130,9 +1130,13 @@ int wsdb_delete_local_trx(local_trxid_t trx_id) {
     }
 
     cache_id = trx->first_block;
+    if (!cache_id) GU_DBUG_RETURN(WSDB_OK);
+
     block = (struct block_hdr *)file_cache_get(local_cache, cache_id);
     if (!block) {
         gu_error("trx has empty cache block: %llu", cache_id);
+        trx->first_block = 0;
+        trx->last_block  = 0;
         GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
     }
 
@@ -1142,6 +1146,9 @@ int wsdb_delete_local_trx(local_trxid_t trx_id) {
         cache_id = next_cb;
         block = (struct block_hdr *)file_cache_get(local_cache, cache_id);
     }
+
+    trx->first_block = 0;
+    trx->last_block  = 0;
 
     GU_DBUG_RETURN(WSDB_OK);
 }
@@ -1170,7 +1177,9 @@ int wsdb_assign_trx(
                           trx_id, seqno_l, seqno_g));
 
     if (!trx) {
-        gu_error("trx does not exist in assign_trx: %llu", trx_id);
+        gu_error("trx does not exist in assign_trx, trx: %llu seqno: %llu", 
+                 trx_id, seqno_g
+        );
         GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
     }
 
