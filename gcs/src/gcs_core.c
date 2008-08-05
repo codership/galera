@@ -537,7 +537,12 @@ long gcs_core_destroy (gcs_core_t* core)
 
     /* now noone will interfere */
     GCS_FIFO_CLOSE   (core->fifo);
-    while ((tmp = GCS_FIFO_GET (core->fifo))) { free (tmp); }
+    while ((tmp = GCS_FIFO_GET (core->fifo))) { 
+	/* 
+	 * Note: Must not free this, it's user allocated pointer.
+	 * free (tmp); 
+	 */
+    }
     GCS_FIFO_DESTROY (&core->fifo);
     gcs_group_free (&core->group);
 

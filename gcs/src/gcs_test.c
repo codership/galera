@@ -343,7 +343,6 @@ test_after_recv (gcs_test_thread_t* thread)
         /* log message after replication */
         ret = test_recv_log_create (thread);
         ret = test_log_in_to (to, thread->local_act_id, thread->log_msg);
-        free (thread->msg); thread->msg = NULL; // cleanup after each action
     }
     else if (total) {
         ret = test_log_in_to (to, thread->local_act_id, NULL);
@@ -428,6 +427,13 @@ void *gcs_test_recv (void *arg)
 
     while (thread->n_tries)
     {
+	/* 
+	 * gcs_recv() allocates memory for new messages, thread_create() 
+	 * pre-allocates thread->msg, so free() and set to NULL before 
+	 * passing to gcs_recv()
+	 */
+	free(thread->msg);
+	thread->msg = NULL;
 	/* receive message from group */
 	ret = gcs_recv (gcs,
                         (void**)&thread->msg,
@@ -456,7 +462,9 @@ void *gcs_test_recv (void *arg)
             break;
         default:
             fprintf (stderr, "Unexpected action type: %d\n", thread->act_type);
-        }
+
+	}
+
     }
 //    fprintf (stderr, "RECV thread %ld exiting: %s\n",
 //             thread->id, strerror(-ret));
