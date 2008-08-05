@@ -241,6 +241,7 @@ static int tmp_poll(int fd, PollEnum pe, int tout, PollContext *ctx)
 {
     DummyPollContext dummy;
     Poll *tmp_poll = Poll::create("Def");
+    LOG_DEBUG("tmp_poll");
     tmp_poll->insert(fd, ctx ? ctx : &dummy);
     tmp_poll->set(fd, pe);
     int ret = tmp_poll->poll(tout);
@@ -462,10 +463,11 @@ void TCPTransport::handle(const int fd, const PollEnum pe)
 	if (state == TRANSPORT_S_CONNECTED) {
 	    ssize_t ret = recv_nointr();
 	    if (ret == 0) {
-		ReadBuf *rb = new ReadBuf(recv_buf, recv_buf_offset);
-		pass_up(rb, TCPTransportHdr::get_raw_len(), 0);
+		up_rb = new ReadBuf(recv_buf, recv_buf_offset);
+		pass_up(up_rb, TCPTransportHdr::get_raw_len(), 0);
 		recv_buf_offset = 0;
-		rb->release();
+		up_rb->release();
+		up_rb = 0;
 	    } else if (ret != EAGAIN) {
 		this->error_no = ret;
 		state = TRANSPORT_S_FAILED;
@@ -517,7 +519,7 @@ int TCPTransport::send(WriteBuf *wb, const ProtoDownMeta *dm)
 	    goto out;
 	}
 	sent += ret;
-	if (sent != wb->get_hdrlen()) {
+	if (sent != wb->get_hdrlen() && is_synchronous() == false) {
 	    while (tmp_poll(fd, PollEvent::POLL_OUT, 
 			    std::numeric_limits<int>::max(), 0) == 0);
 	}
@@ -530,7 +532,7 @@ int TCPTransport::send(WriteBuf *wb, const ProtoDownMeta *dm)
 	    goto out;
 	}
 	sent += ret;
-	if (sent != wb->get_hdrlen()) {
+	if (sent != wb->get_hdrlen() && is_synchronous() == false) {
 	    while (tmp_poll(fd, PollEvent::POLL_OUT, 
 			    std::numeric_limits<int>::max(), 0) == 0);
 	}

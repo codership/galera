@@ -1,5 +1,21 @@
 #include "gcomm/logger.hpp"
 
+
+class Logger_s
+{
+public:
+    Logger *logger;
+    Logger_s() : logger(0) {}
+    ~Logger_s() {
+	delete logger;
+    }
+    void set(Logger *l) {
+	logger = l;
+    }
+};
+
+static Logger_s logger_s;
+
 Logger *Logger::logger = 0;
 
 Logger& Logger::instance()
@@ -13,6 +29,7 @@ Logger& Logger::instance()
 	if (l <= Logger::Warning)
 	    std::cerr << "Logger init: (stderr," << l << ")\n";
 	Logger::logger = new Logger(std::cerr, Logger::Level(l));
+	logger_s.set(Logger::logger);
     }
     return *Logger::logger;
 }

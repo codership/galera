@@ -59,8 +59,9 @@ inline std::string to_string(const double u)
     return os.str();
 }
 
-
+class Logger_s;
 class Logger {
+    friend class Logger_s;
 public:
     enum Level {
 	Trace,

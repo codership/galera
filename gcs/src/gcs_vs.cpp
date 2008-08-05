@@ -39,6 +39,19 @@ public:
 	gu_mutex_init(&mutex, 0);
 	gu_cond_init(&cond, 0);
     }
+    ~gcs_vs() {
+	for (std::deque<vs_ev>::iterator i = eq.begin(); i != eq.end(); ++i) {
+	    if (i->rb)
+		i->rb->release();
+	    if (i->msg)
+		delete i->msg;
+	    if (i->view)
+		delete i->view;
+	}
+	gu_cond_destroy(&cond);
+	gu_mutex_destroy(&mutex);
+    }
+    
     void handle_up(const int cid, const ReadBuf *rb, const size_t roff, 
 		   const ProtoUpMeta *um) {
 	const VSUpMeta *vum = static_cast<const VSUpMeta *>(um);
@@ -72,7 +85,8 @@ public:
 	while (eq.size() == 0 && state != LEFT) {
 	    gu_cond_wait(&cond, &mutex);
 	}
-	std::pair<vs_ev, bool> ret(eq.front(), eq.size() ? true : false);
+	std::pair<vs_ev, bool> ret(eq.front(), eq.size() && state != LEFT 
+				   ? true : false);
 	gu_mutex_unlock(&mutex);
 	return ret;
     }
@@ -269,13 +283,14 @@ static GCS_BACKEND_DESTROY_FN(gcs_vs_destroy)
     conn_t *conn = backend->conn;
     if (conn == 0)
 	return -EBADFD;
+    backend->conn = 0;
     
     conn->vs_ctx.vs->close();
     delete conn->vs_ctx.vs;
     delete conn->vs_ctx.po;
     if (conn->comp_msg) gcs_comp_msg_delete (conn->comp_msg);
     delete conn;
-    backend->conn = 0;
+
     fprintf(stderr, "gcs_vs_close(): return 0}\n");
     return 0;
 }

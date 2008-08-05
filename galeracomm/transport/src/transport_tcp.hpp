@@ -27,6 +27,10 @@ class TCPTransport : public Transport, PollContext {
     size_t recv_buf_size;
     size_t recv_buf_offset;
     ReadBuf *recv_rb;
+    // Used to hold pointer to ReadBuf that has been passed upwards. 
+    // If receiver is running in separate thread and thread exits 
+    // in handle_up(), reference to pointer is lost.
+    ReadBuf *up_rb;
     //boost::crc_32_type send_crc;
     //boost::crc_32_type recv_crc;
 
@@ -34,7 +38,8 @@ class TCPTransport : public Transport, PollContext {
     TCPTransport(const int _fd, const sockaddr& _sa, 
 		 const size_t _sa_size, Poll *_poll) :
 	fd(_fd), no_nagle(1), sa(_sa), sa_size(_sa_size), poll(_poll),
-	max_pending(1024), pending_bytes(0), recv_buf_offset(0), recv_rb(0) {
+	max_pending(1024), pending_bytes(0), recv_buf_offset(0), recv_rb(0),
+	up_rb(0) {
 	
 	recv_buf_size = 65536;
 	recv_buf = reinterpret_cast<unsigned char*>(::malloc(recv_buf_size));
@@ -43,7 +48,7 @@ class TCPTransport : public Transport, PollContext {
 public:
     TCPTransport(Poll *p) : 
 	fd(-1), no_nagle(1), poll(p), max_pending(1024), pending_bytes(0), 
-	recv_buf_offset(0), recv_rb(0) {
+	recv_buf_offset(0), recv_rb(0), up_rb(0) {
 	recv_buf_size = 65536;
 	recv_buf = reinterpret_cast<unsigned char*>(::malloc(recv_buf_size));
 	set_max_pending_bytes(1024*1024);
@@ -55,6 +60,8 @@ public:
 	    while (::close(fd) == -1 && errno == EINTR);
 	}
 	free(recv_buf);
+	if (up_rb)
+	    up_rb->release();
     }
     void connect(const char *addr);
     void close();
