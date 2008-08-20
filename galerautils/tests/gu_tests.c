@@ -10,6 +10,7 @@
 #include "gu_bswap_test.h"
 #include "gu_dbug_test.h"
 #include "gu_time_test.h"
+#include "gu_fifo_test.h"
 
 typedef Suite *(*suite_creator_t)(void);
 
@@ -19,6 +20,7 @@ static suite_creator_t suites[] =
 	gu_bswap_suite,
 	gu_dbug_suite,
         gu_time_suite,
+        gu_fifo_suite,
 	NULL
     };
 

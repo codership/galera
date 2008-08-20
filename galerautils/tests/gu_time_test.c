@@ -3,7 +3,7 @@
 // $Id$
 
 #include <check.h>
-#include "gu_bswap_test.h"
+#include "gu_time_test.h"
 #include "../src/gu_time.h"
 
 START_TEST (gu_time_test)
