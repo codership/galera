@@ -40,7 +40,6 @@ class TCPTransport : public Transport, PollContext {
 	fd(_fd), no_nagle(1), sa(_sa), sa_size(_sa_size), poll(_poll),
 	max_pending(1024), pending_bytes(0), recv_buf_offset(0), recv_rb(0),
 	up_rb(0) {
-	
 	recv_buf_size = 65536;
 	recv_buf = reinterpret_cast<unsigned char*>(::malloc(recv_buf_size));
 	set_max_pending_bytes(10*1024*1024);
@@ -63,6 +62,11 @@ public:
 	if (up_rb)
 	    up_rb->release();
     }
+
+    size_t get_max_msg_size() const {
+	return 1024*1024;
+    }
+
     void connect(const char *addr);
     void close();
     void listen(const char *addr);

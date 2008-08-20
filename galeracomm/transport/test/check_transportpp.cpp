@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <list>
 #include <iostream>
+#include <map>
 
 const char* async_addr = "asynctcp:127.0.0.1:23456";
 const char* sync_addr = "tcp:127.0.0.1:4567";
@@ -361,6 +362,145 @@ START_TEST(check_sync_transport)
 }
 END_TEST
 
+const char* tipc_addr = "tipc:100.1";
+
+class Mcaster : public Toplay {
+    Transport *tp;
+    unsigned char buf[128];
+    uint32_t seq;
+    size_t recvd;
+    size_t hc;
+    double recvd_b;
+    std::map<Sockaddr,uint32_t> seq_map;
+public:
+    Mcaster(Poll *p) : seq(0), recvd(0), hc(0), recvd_b(0) {
+	for (size_t i = 0; i < 128; ++i) {
+	    buf[i] = i;
+	}
+	tp = Transport::create(tipc_addr, p, this);
+	set_down_context(tp);
+    }
+    ~Mcaster() {
+	LOG_INFO(std::string("Received ") + to_string(recvd) + " msgs " + 
+		 to_string(recvd_b) + " bytes hc " + to_string(hc));
+	for (std::map<Sockaddr,uint32_t>::iterator i = seq_map.begin(); 
+	     i != seq_map.end(); ++i) {
+	    LOG_INFO(std::string("seqno ") + to_string(i->second));;
+	}
+	delete tp;
+    }
+
+    void connect() {
+	tp->connect(tipc_addr);
+    }
+
+    void close() {
+	tp->close();
+    }
+
+    void handle_up(const int cid, const ReadBuf *rb, 
+		   const size_t roff, const ProtoUpMeta *um) {
+	// LOG_DEBUG(std::string("Mcaster::handle_up()"));
+	hc++;
+	const TransportNotification *tn = static_cast<const TransportNotification *>(um);
+	if (rb) {
+/*
+	    for (size_t i = 0; i < tn->sa_size; ++i)
+		fprintf(stderr, "%2.2x ", ((unsigned char*)&tn->local_sa)[i]);
+	    fprintf(stderr, "\n");
+	    for (size_t i = 0; i < tn->sa_size; ++i)
+		fprintf(stderr, "%2.2x ", ((unsigned char*)&tn->source_sa)[i]);
+	    fprintf(stderr, "\n");
+*/    
+	    uint32_t rs;
+	    read_uint32(rb->get_buf(), rb->get_len(), 0, &rs);
+	    // printf("%u\n", rs);
+
+	    Sockaddr cmp(&tn->source_sa, tn->sa_size);	    
+	    std::map<Sockaddr,uint32_t>::iterator i = seq_map.find(cmp);
+	    if (i == seq_map.end()) {
+		LOG_INFO(std::string("Unknown source, seqno start ") +
+			 to_string(rs));
+		seq_map.insert(std::pair<Sockaddr, uint32_t>(
+				   Sockaddr(&tn->source_sa, 
+					    tn->sa_size), rs));
+	    } else {
+		if (i->second + 1 != rs) {
+		    LOG_WARN(std::string("Seqno gap: ") + to_string(i->second) + 
+			     " -> " + to_string(rs));
+		}
+		i->second = rs;
+	    }
+	    
+	    LOG_TRACE(std::string("seqno: ") + to_string(rs));
+	    recvd++;
+	    recvd_b += rb->get_len();
+	} else if (um) {
+	    if (tn->ntype == TRANSPORT_N_SUBSCRIBED) {
+		fprintf(stderr, "subs: ");
+		seq_map.insert(std::pair<Sockaddr, uint32_t>(
+				   Sockaddr(&tn->source_sa, 
+					    tn->sa_size), 0xffffffffU));
+	    } else if (tn->ntype == TRANSPORT_N_WITHDRAWN) {
+
+		Sockaddr cmp(&tn->source_sa, tn->sa_size);
+		std::map<Sockaddr,uint32_t>::iterator i = seq_map.find(cmp);
+		if (i != seq_map.end()) {
+		    fprintf(stderr, "with (seq = %u): ", i->second);
+		    seq_map.erase(i);
+		}
+	    }
+	    for (size_t i = 0; i < tn->sa_size; ++i)
+		fprintf(stderr, "%2.2x ", ((unsigned char*)&tn->source_sa)[i]);
+	    fprintf(stderr, "\n");
+	} else {
+	    LOG_WARN("Empty");
+	}
+    }
+    
+    void send() {
+	
+	WriteBuf wb(buf, sizeof(buf));
+	unsigned char buf[sizeof(seq)];
+	write_uint32(seq, buf, sizeof(buf), 0);
+	wb.prepend_hdr(buf, sizeof(buf));
+	int ret;
+	if ((ret = pass_down(&wb, 0)) == 0)
+	    seq++;
+	else
+	    LOG_WARN(std::string("Pass down: ") + to_string(ret));
+    }
+};
+
+START_TEST(check_tipc_multicast)
+{
+    std::cerr << "check_tipc_multicast\n";
+    Poll *p = Poll::create("def");
+    Mcaster m1(p);
+    Mcaster m2(p);
+    int cnt = 0;
+    m1.connect();
+    p->poll(1000);
+    m2.connect();
+    p->poll(1000);
+    int pcnt = 0;
+    while (cnt++ < 10000) {
+	m1.send();
+	m2.send();
+	if (::rand() % 6 == 0)
+	    while (p->poll(0) > 0);
+    }
+    LOG_INFO(std::string("pcnt: ") + to_string(pcnt));
+    while (p->poll(100) > 0);
+    m2.send();
+    while (p->poll(100) > 0);
+
+    m1.close();
+    p->poll(1000);
+    m2.close();
+    delete p;
+}
+END_TEST
 
 static Suite *suite()
 {
@@ -369,16 +509,20 @@ static Suite *suite()
 
     tc = tcase_create("check_async_transport");
     tcase_add_test(tc, check_async_transport);
-    suite_add_tcase(s, tc);
+    // suite_add_tcase(s, tc);
 
     tc = tcase_create("check_async_multitransport");
     tcase_add_test(tc, check_async_multitransport);
-    suite_add_tcase(s, tc);
+    // suite_add_tcase(s, tc);
 
     tc = tcase_create("check_sync_transport");
     tcase_add_test(tc, check_sync_transport);
-    suite_add_tcase(s, tc);
+    // suite_add_tcase(s, tc);
 
+    tc = tcase_create("check_tipc_multicast");
+    tcase_add_test(tc, check_tipc_multicast);
+    suite_add_tcase(s, tc);    
+    
     return s;
 }
 

@@ -3,6 +3,10 @@
 
 #include <gcomm/poll.hpp>
 #include <gcomm/protolay.hpp>
+#include <gcomm/sockaddr.hpp>
+
+
+#include <vector>
 
 typedef enum {
     TRANSPORT_NONE,
@@ -17,6 +21,26 @@ typedef enum {
     TRANSPORT_S_LISTENING,
     TRANSPORT_S_FAILED
 } TransportState;
+
+typedef enum {
+    TRANSPORT_N_SOURCE,     // Source notification
+    TRANSPORT_N_FAILURE,    // Failure notification
+    TRANSPORT_N_SUBSCRIBED, // Subscription notification
+    TRANSPORT_N_WITHDRAWN   // Withdrawal notification
+} TransportNotificationType;
+
+
+
+
+struct TransportNotification : public ProtoUpMeta {
+    const char* type;
+    TransportState state;
+    TransportNotificationType ntype;
+    size_t sa_size;
+    sockaddr local_sa;
+    sockaddr source_sa;
+};
+
 
 class Transport : public Bottomlay {
 protected:
@@ -51,6 +75,8 @@ public:
     void set_max_pending_bytes(size_t bytes) {
 	max_pending_bytes = bytes;
     }
+    
+    virtual size_t get_max_msg_size() const = 0;
 
     
     TransportState get_state() const {
@@ -59,9 +85,13 @@ public:
     int get_errno() const {
 	return error_no;
     }
-
+    
     virtual void connect(const char *addr) = 0;
     virtual void close() = 0;
+    // Override for transports that support multiple connect/bind operations
+    virtual void close(const char *addr) {
+	throw FatalException("Transport::close(const char*): Not supported");
+    }
     virtual void listen(const char *addr) = 0;
     virtual Transport* accept(Poll *poll, Protolay *up_ctx) = 0;
     Transport *accept(Poll *p) {
