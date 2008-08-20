@@ -4,7 +4,7 @@
 
 #include "gcomm/poll.hpp"
 #include "gcomm/fifo.hpp"
-
+#include "gcomm/logger.hpp"
 
 #include <cstdlib>
 #include <cstring>
@@ -116,7 +116,7 @@ int PollDef::poll(const int timeout)
 {
     int p_ret;
     int err = 0;
-
+    int p_cnt = 0;
     p_ret = ::poll(pfds, n_pfds, timeout);
     err = errno;
     if (p_ret == -1 && err == EINTR) {
@@ -132,12 +132,19 @@ int PollDef::poll(const int timeout)
 		    if (map_i->second == 0)
 			throw DException("");
 		    map_i->second->handle(pfds[i].fd, e);
+		    p_cnt++;
 		} else {
-		    throw DException("");
+		    throw FatalException("No ctx for fd found");
+		}
+	    } else {
+		if (pfds[i].revents) {
+		    LOG_ERROR("Unhandled poll events");
+		    throw FatalException("");
 		}
 	    }
 	}
     }
+    assert(p_ret == p_cnt);
     return p_ret;
 }
 
