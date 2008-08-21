@@ -46,5 +46,6 @@
 #include "gu_dbug.h"
 #include "gu_byteswap.h"
 #include "gu_time.h"
+#include "gu_fifo.h"
 
 #endif /* _galerautils_h_ */
