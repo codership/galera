@@ -2,8 +2,8 @@
  * Copyright (C) 2008 Codership Oy <info@codership.com>
  *
  * $Id$
- */
-/*
+ *
+ *
  * Implementation of the generic communication layer.
  * See gcs_core.h 
  */

@@ -32,7 +32,7 @@ struct gu_fifo
     ulong col_mask;
     ulong row_shift;
     ulong row_mask;
-    ulong unit_size;
+    ulong item_size;
     ulong head;
     ulong tail;
     ulong next;
@@ -96,7 +96,7 @@ static inline long gu_fifo_lock      (gu_fifo_t *q)
 /* lock the queue and wait if it is empty */
 static inline long gu_fifo_lock_wait (gu_fifo_t *q)
 {
-    register long ret = gu_mutex_lock (&q->lock);
+    register long ret = gu_fifo_lock (q);
     if (0 == ret && 0 == q->used) {
         q->waiting++;
         ret = gu_cond_wait (&q->ready, &q->lock);
@@ -136,8 +136,8 @@ static inline long gu_fifo_push      (gu_fifo_t *q, void *data)
             q->alloc -= q->row_size;
             return -ENOMEM;
         }
-	memcpy (q->rows[row] + GU_FIFO_COL(q, q->tail) * q->unit_size,
-		data, q->unit_size);
+	memcpy (q->rows[row] + GU_FIFO_COL(q, q->tail) * q->item_size,
+		data, q->item_size);
 	q->tail = GU_FIFO_ADD (q, q->tail);
 	q->used++;
 	return q->used;
@@ -163,8 +163,8 @@ static inline long gu_fifo_pop       (gu_fifo_t *q, void *data)
     if (q->used > 0) {
 	register ulong row = GU_FIFO_ROW (q, q->head);
 	memcpy (data,
-		q->rows[row] + GU_FIFO_COL(q, q->head) * q->unit_size,
-		q->unit_size);
+		q->rows[row] + GU_FIFO_COL(q, q->head) * q->item_size,
+		q->item_size);
 	q->head = GU_FIFO_ADD (q, q->head);
 	q->used--;
 	if (0 == GU_FIFO_COL (q, q->head)) {
@@ -195,8 +195,8 @@ static inline long gu_fifo_next      (gu_fifo_t *q, void *data)
     if (q->used > 0 && !q->next_stop) {
 	register size_t row = GU_FIFO_ROW (q, q->next);
 	memcpy (data,
-		q->rows[row] + GU_FIFO_COL(q, q->next) * q->unit_size,
-		q->unit_size);
+		q->rows[row] + GU_FIFO_COL(q, q->next) * q->item_size,
+		q->item_size);
 	q->next = GU_FIFO_ADD (q, q->next);
         q->next_stop = (q->next == q->tail); // reached end
 	return 0;

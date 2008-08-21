@@ -16,13 +16,13 @@
  * "unnecessary" pointer comparison.
  */
 
-#define GU_MAX(x,y) ({ \
+#define GU_MAX(x,y) ({       \
         typeof(x) _x = (x);  \
         typeof(y) _y = (y);  \
         (void) (&_x == &_y); \
         _x > _y ? _x : _y; })
 
-#define GU_MIN(x,y) ({ \
+#define GU_MIN(x,y) ({       \
         typeof(x) _x = (x);  \
         typeof(y) _y = (y);  \
         (void) (&_x == &_y); \
@@ -38,6 +38,7 @@
 #define gu_unlikely(x) (x)
 #endif
 
+#include "gu_limits.h"
 #include "gu_log.h"
 #include "gu_assert.h"
 #include "gu_mem.h"

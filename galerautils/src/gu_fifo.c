@@ -14,29 +14,29 @@
  */
 
 #include <pthread.h>
-#include <unistd.h>
 #include <stdio.h>
 
 #include "gu_assert.h"
+#include "gu_limits.h"
 #include "gu_fifo.h"
 
 /* Don't make rows less than 1K */
 #define GCS_FIFO_MIN_ROW_POWER 10
 
 /* constructor */
-gu_fifo_t *gu_fifo_create (size_t length, size_t unit_size)
+gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
 {
     size_t row_pwr    = GCS_FIFO_MIN_ROW_POWER;
     size_t row_len    = 1 << row_pwr;
-    size_t row_size   = row_len * unit_size;
+    size_t row_size   = row_len * item_size;
     size_t array_pwr  = 0;
     size_t array_len  = 1 << array_pwr;
     size_t array_size = array_len * sizeof(void*);
-    size_t mem_limit  = sysconf (_SC_AVPHYS_PAGES) * sysconf (_SC_PAGESIZE);
+    size_t mem_limit  = GU_PHYS_PAGES * GU_PAGE_SIZE;
     size_t alloc_size = 0;
     gu_fifo_t *ret    = NULL;
 
-    if (length > 0 && unit_size > 0) {
+    if (length > 0 && item_size > 0) {
 	/* find the best ratio of width and height:
 	 * the size of a row array must be equal to that of the row */
 	while (array_len * row_len < length) {
@@ -48,12 +48,11 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t unit_size)
             else {
                 row_pwr++;
                 row_len = 1 << row_pwr;
-                row_size = row_len * unit_size;
+                row_size = row_len * item_size;
             }
 	    if ((array_size * row_size) > mem_limit ||
-                (array_len * row_len) > (sysconf (_SC_ULONG_MAX) >> 1)) {
-                return NULL;  // LONG_MAX^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                              // must make sure there is no overflow of 'long'
+                (array_len * row_len) > GU_LONG_MAX) {
+                return NULL;
             }
         }
 
@@ -67,7 +66,7 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t unit_size)
             ret->row_mask    = array_len - 1;
             ret->length      = row_len * array_len;
             ret->length_mask = ret->length - 1;
-            ret->unit_size   = unit_size;
+            ret->item_size   = item_size;
             ret->row_size    = row_size;
             ret->alloc       = alloc_size;
             gu_mutex_init (&ret->lock, NULL);
@@ -82,6 +81,11 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t unit_size)
 long gu_fifo_destroy   (gu_fifo_t *queue)
 {
     gu_mutex_lock (&queue->lock);
+    if (0 == queue->length) {
+        gu_mutex_unlock (&queue->lock);
+        return -EALREADY;
+    }
+
     queue->length = 0; /* prevent appending */
     while (queue->used) {
 	gu_mutex_unlock (&queue->lock);
@@ -125,7 +129,7 @@ char *gu_fifo_print (gu_fifo_t *queue)
 	      queue->length,
 	      queue->row_mask + 1,
 	      queue->col_mask + 1,
-	      queue->used, queue->used * queue->unit_size,
+	      queue->used, queue->used * queue->item_size,
 	      queue->alloc,
               queue->head, queue->tail, queue->next
 	);
