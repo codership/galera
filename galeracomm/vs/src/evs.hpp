@@ -8,6 +8,11 @@
 
 class EVSProto;
 
+struct EVSProtoUpMeta {
+    const Sockaddr& source;
+    EVSProtoUpMeta(const Sockaddr& source_) : source(source_) {}
+};
+
 class EVS : public Protolay {
     Transport *tp;
     EVSProto *proto;

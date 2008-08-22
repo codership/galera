@@ -8,6 +8,8 @@
 #include "evs_seqno.hpp"
 
 #include <map>
+#include <set>
+
 
 struct EVSRange {
     uint32_t low;
@@ -22,16 +24,25 @@ class EVSInputMapItem {
     Sockaddr sa;
     EVSMessage msg;
     const ReadBuf* rb;
+    ReadBuf* priv_rb;
     size_t roff;
     static const Sockaddr null_sa;
     static const EVSMessage null_msg;
 public:
     EVSInputMapItem(const Sockaddr& sa_, const EVSMessage& msg_, 
-		    const ReadBuf* rb_, const size_t roff_ = 0) :
-	sa(sa_), msg(msg_), rb(rb_), roff(roff_) {}
+		    const ReadBuf* rb_, const size_t roff_) :
+	sa(sa_), msg(msg_), rb(rb_), priv_rb(0), roff(roff_) {}
+    
+    EVSInputMapItem(const Sockaddr& sa_, const EVSMessage& msg_, 
+		    ReadBuf* rb_) : sa(sa_), msg(msg_), rb(rb_), 
+				    priv_rb(rb_), roff(0) {}
+    
+    EVSInputMapItem() : sa(null_sa), msg(null_msg), rb(0), priv_rb(0), roff(0){}
 
-    EVSInputMapItem() : sa(null_sa), msg(null_msg), rb(0), roff(0){}
-
+    ~EVSInputMapItem() {
+	if (priv_rb)
+	    priv_rb->release();
+    }
 
 
     const Sockaddr& get_sockaddr() const {
@@ -58,33 +69,38 @@ const EVSMessage EVSInputMapItem::null_msg = EVSMessage();
 class EVSInputMap {
     // Map from sockaddr to instance index
 
-    struct MsgMapLstr {
-	bool operator()(const uint32_t a, const uint32_t b) const {
-	    return seqno_lt(a, b);
-	}
-    };
-    
-    typedef std::pair<const EVSMessage, ReadBuf*> Msg;
-    typedef std::map<const uint32_t, Msg, MsgMapLstr> MsgMap;
-    typedef std::pair<const uint32_t, Msg> MsgMapItem;
+
+
 
     struct Instance {
-	MsgMap messages;
 	EVSRange gap;
 	uint32_t safe_seq;
 	Instance() : safe_seq(SEQNO_MAX) {}
 	~Instance() {
-	    for (MsgMap::iterator mi = messages.begin(); mi != messages.end();
-		 ++mi) {
-		if (mi->second.second)
-		    mi->second.second->release();
-	    }
 	}
+
     };
     
     typedef std::map<const Sockaddr, Instance> IMap;
     typedef std::pair<const Sockaddr, Instance> IMapItem;
     IMap instances;
+
+
+    struct MLogLstr {
+	bool operator()(const EVSInputMapItem& a, const EVSInputMapItem& b) {
+	    if (seqno_lt(a.get_evs_message().get_seq(), 
+			 b.get_evs_message().get_seq()))
+		return true;
+	    else if (seqno_gt(a.get_evs_message().get_seq(), 
+			      b.get_evs_message().get_seq()))
+		return false;
+	    return a.get_sockaddr() < b.get_sockaddr();;
+	}
+    };
+
+    typedef std::set<EVSInputMapItem, MLogLstr> MLog;
+    MLog recovery_log;
+    MLog msg_log;
 
     uint32_t safe_seq;
     uint32_t aru_seq;
@@ -94,7 +110,7 @@ public:
     
     void set_safe(const Sockaddr& s, const uint32_t seq) {
 	if (seqno_eq(aru_seq, SEQNO_MAX) || seqno_gt(seq, aru_seq))
-	    throw FatalException("Seqno out of range");
+	    throw FatalException("Safe seqno out of range");
 	IMap::iterator ii = instances.find(s);
 	if (ii == instances.end())
 	    throw FatalException("Instance not found");
@@ -155,101 +171,13 @@ public:
 	return aru_seq;
     }
     
-    struct iterator {
-	friend class EVSInputMap;
-    private:
-	const EVSInputMap* imp;
-	EVSInputMapItem item;
-	iterator(const EVSInputMap* imp_, const EVSInputMapItem& item_) :
-	    imp(imp_), item(item_) {}
-    public:
-	iterator() : imp(0), item() {}
-	bool operator!=(const iterator& cmp) const {
-	    return !(item.get_sockaddr() == cmp.item.get_sockaddr() && 
-		     seqno_eq(item.get_evs_message().get_seq(), 
-			      cmp.item.get_evs_message().get_seq()));
-	}
-	iterator& operator++() {
-	    return imp->next(*this);
-	}
-	const EVSInputMapItem& operator*() const {
-	    return item;
-	}
-	const EVSInputMapItem* operator->() const {
-	    return &item;
-	}
-    };
-    
 
-private:    
-    iterator& next(iterator& iter) const {
-	IMap::const_iterator ii = instances.find(iter->get_sockaddr());
-	if (ii == instances.end())
-	    throw FatalException("Instance not found");
-	IMap::const_iterator ii_begin = ii;
-	uint32_t seq = iter->get_evs_message().get_seq();
-	size_t empty_cnt;
-	do {
-	    empty_cnt = 0;
-	    do {
-		++ii;
-		if (ii == instances.end()) {
-		    ii = instances.begin();
-		    seq = seqno_next(seq);
-		}
-		
-		// LOG_TRACE(std::string("\t") + ii->first.to_string() + " " + to_string(seq));
-		if (ii->second.messages.empty() == false) {
-		    MsgMap::const_iterator mi = ii->second.messages.find(seq);
-		    if (mi != ii->second.messages.end()) {
-			iter = iterator(this, EVSInputMapItem(ii->first, mi->second.first, mi->second.second));
-			return iter;
-		    } else if ((mi = ii->second.messages.upper_bound(seq)) == 
-			       ii->second.messages.end()) {
-			empty_cnt++;
-		    } else {
-			// TODO: Estimate next seqno using upper bound
-		    }
-		} else {
-		    empty_cnt++;
-		}
-	    } while (ii != ii_begin);
-	    LOG_TRACE(std::string("EVSInputMap::next(): Empty cnt = ") + to_string(empty_cnt));
-	} while (empty_cnt != instances.size());
-	LOG_TRACE("EVSInputMap::next(): end");
-	return iter = end();
+    typedef MLog::iterator iterator;
+    iterator begin() {
+	return msg_log.begin();
     }
-
-    iterator end_tag;
-    
-public:
-    iterator begin() const {
-	uint32_t min_seq = SEQNO_MAX;
-	IMap::const_iterator min_ii = instances.end();
-	MsgMap::const_iterator min_mi;
-	for (IMap::const_iterator ii = instances.begin(); 
-	     ii != instances.end(); ++ii) {
-	    if (ii->second.messages.empty() == false) {
-		MsgMap::const_iterator mi = ii->second.messages.begin();
-		if (seqno_eq(min_seq, SEQNO_MAX) || 
-		    seqno_lt(mi->first, min_seq)) {
-		    min_seq = mi->first;
-		    min_ii = ii;
-		    min_mi = mi;
-		}
-	    }
-	}
-	if (!seqno_eq(min_seq, SEQNO_MAX)) {
-	    return iterator(this, EVSInputMapItem(min_ii->first, 
-						  min_mi->second.first, 
-						  min_mi->second.second));
-	}
-	return end();
-    }
-
-    
-    const iterator& end() const {
-	return end_tag;
+    iterator end() {
+	return msg_log.end();
     }
 
     bool is_safe(const iterator& i) const {
@@ -275,11 +203,9 @@ public:
 	if (ii == instances.end())
 	    throw FatalException("Instance not found");
 	EVSRange& gap(ii->second.gap);
-	MsgMap& mmap(ii->second.messages);
-	
 	uint32_t seq = item.get_evs_message().get_seq();
 	uint8_t seq_range = item.get_evs_message().get_seq_range();
-
+	
 	uint32_t wseq = seqno_eq(aru_seq, SEQNO_MAX) ? 0 : aru_seq;
 	if (seqno_gt(seq, seqno_add(wseq, SEQNO_MAX/4)) ||
 	    seqno_lt(seq, seqno_dec(wseq, SEQNO_MAX/4))) {
@@ -289,63 +215,89 @@ public:
 	}
 	
 	assert(!seqno_eq(gap.low, SEQNO_MAX) || seqno_eq(gap.high, SEQNO_MAX));
+
 	
 	for (uint32_t i = seq; !seqno_gt(i, seqno_add(seq, seq_range)); 
 	     i = seqno_next(i)) {
-	    std::pair<MsgMap::iterator, bool> iret;
+	    std::pair<iterator, bool> iret;
 	    if (seqno_eq(i, seq)) {
-		iret = mmap.insert(
-		    MsgMapItem(i, Msg(item.get_evs_message(), 
-				      item.get_readbuf() ? 
-				      item.get_readbuf()->copy(
-					  item.get_readbuf_offset()
-					  + item.get_evs_message().size()) : 0)));
+		iret = msg_log.insert(
+		    EVSInputMapItem(item.get_sockaddr(), 
+				    item.get_evs_message(),
+				    item.get_readbuf() ? 
+				    item.get_readbuf()->copy(
+					item.get_readbuf_offset()) :
+				    0));
+		
 	    } else {
-		// TODO: Inserting dummy messages can probably be 
-		// optimized away at some point.
-		iret = mmap.insert(
-		    MsgMapItem(i, Msg(EVSMessage(EVSMessage::USER,
-						 EVSMessage::DROP,
-						 i, 0,
-						 item.get_evs_message().get_source_view(), 0), 0)));
+		iret = msg_log.insert(
+		    EVSInputMapItem(
+			item.get_sockaddr(),
+			EVSMessage(EVSMessage::USER,
+				   EVSMessage::DROP,
+				   i, 0, 
+				   item.get_evs_message().get_aru_seq(),
+				   item.get_evs_message().get_source_view(), 
+				   0), 
+			0));
 	    }
 	    if (iret.second) {
-		LOG_TRACE(std::string("") + to_string(i));
-		for (MsgMap::iterator mi = iret.first; mi != mmap.end(); ++mi) {
-		    if ((seqno_eq(gap.low, SEQNO_MAX) && 
-			 seqno_eq(mi->first, 0)) ||
-			seqno_eq(gap.low, mi->first)) {
-			gap.low = seqno_next(mi->first);
-		    } else {
-			break;
-		    }
-		}
-		if (seqno_eq(gap.high, SEQNO_MAX) || seqno_gt(i, gap.high))
+		if (seqno_eq(gap.high, SEQNO_MAX) || 
+		    seqno_gt(i, gap.high)) {
 		    gap.high = i;
+		}
+		if ((seqno_eq(gap.low, SEQNO_MAX) && seqno_eq(i, 0)) ||
+		    seqno_eq(i, gap.low)) {
+		    gap.low = seqno_next(gap.low);
+		    if (!seqno_gt(gap.low, gap.high)) {
+			MLog::iterator mi = iret.first;
+			for (++mi; mi != msg_log.end(); ++mi) {
+			    // Yes, this is not optimal, but this should
+			    // be quite rare routine under considerably 
+			    // small message loss
+			    LOG_TRACE(std::string("\t") +
+				      to_string(mi->get_evs_message().get_seq()) + " " + to_string(gap.low));
+			    if (mi->get_sockaddr() == item.get_sockaddr()) {
+				if (seqno_eq(mi->get_evs_message().get_seq(),
+					     gap.low)) {
+				    gap.low = seqno_next(gap.low);
+				} else {
+				    break;
+				}
+			    }
+			    LOG_TRACE(std::string("\t") + to_string(gap.low));
+			}
+		    }
+		} 
 	    } else {
 		// TODO: Sanity check
 	    }
 	}
+
+#if 0
+	for (MLog::iterator i = msg_log.begin(); i != msg_log.end(); ++i) {
+	    LOG_TRACE(std::string("MLog: ") + i->get_sockaddr().to_string() + " " + to_string(i->get_evs_message().get_seq()));
+	}
+#endif 
 	LOG_TRACE(std::string("EVSInputMap::insert(): ") 
 		  + " aru_seq = " + to_string(aru_seq)
+		  + " safe_seq = " + to_string(safe_seq)
 		  + " low = " + to_string(gap.low)
 		  + " high = " + to_string(gap.high));
 	if (seqno_eq(aru_seq, SEQNO_MAX) || seqno_gt(gap.low, aru_seq)) {
 	    update_aru();
 	}
+	if (!seqno_eq(item.get_evs_message().get_aru_seq(), SEQNO_MAX))
+	    set_safe(ii->first, item.get_evs_message().get_aru_seq());
 	return EVSRange(gap);
     }
     
     void erase(const iterator& i) {
-	IMap::iterator ii = instances.find(i->get_sockaddr());
-	if (ii == instances.end())
-	    throw FatalException("Instance not found");
-	MsgMap::iterator mi = ii->second.messages.find(i->get_evs_message().get_seq());
-	if (mi == ii->second.messages.end())
-	    throw FatalException("Message not found");
-	ii->second.messages.erase(mi);
+	msg_log.erase(i);
     }
+
     
+
     void insert_sa(const Sockaddr& sa) {
 	if (!seqno_eq(aru_seq, SEQNO_MAX))
 	    throw FatalException("Can't add instance after aru has been updated");
@@ -361,10 +313,18 @@ public:
 	    throw FatalException("Instance does not exist");
 	instances.erase(sa);
     }
+
+    EVSRange get_sa_gap(const Sockaddr& sa) const {
+	IMap::const_iterator ii = instances.find(sa);
+	if (ii == instances.end())
+	    throw FatalException("Instance does not exist");
+	return ii->second.gap;
+    }
     
     void clear() {
 	if (instances.empty() == false)
 	    instances.clear();
+	msg_log.clear();
 	safe_seq = aru_seq = SEQNO_MAX;
     }
 };

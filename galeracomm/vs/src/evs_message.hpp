@@ -74,6 +74,7 @@ private:
     SafetyPrefix safety_prefix;
     uint32_t seq;
     uint8_t seq_range;
+    uint32_t aru_seq;
     uint8_t flags;
     EVSViewId source_view;
 public:    
@@ -86,12 +87,14 @@ public:
 	       const SafetyPrefix sp_, 
 	       const uint32_t seq_, 
 	       const uint8_t seq_range_,
+	       const uint32_t aru_seq_,
 	       const EVSViewId vid_, const uint8_t flags_) : 
 	version(0), 
 	type(type_), 
 	safety_prefix(sp_), 
 	seq(seq_), 
 	seq_range(seq_range_),
+	aru_seq(aru_seq_),
 	flags(flags_),
 	source_view(vid_) {
 	if (type != USER)
@@ -113,6 +116,10 @@ public:
     
     uint8_t get_seq_range() const {
 	return seq_range;
+    }
+
+    uint32_t get_aru_seq() const {
+	return aru_seq;
     }
 
     uint8_t get_flags() const {
@@ -141,6 +148,8 @@ public:
 	    return 0;
 	if ((off = read_uint32(buf, buflen, off, &seq)) == 0)
 	    return 0;
+	if ((off = read_uint32(buf, buflen, off, &aru_seq)) == 0)
+	    return 0;
 	if ((off = source_view.read(buf, buflen, off)) == 0)
 	    return 0;
 	return off;
@@ -163,6 +172,8 @@ public:
 	    return 0;
 	if ((off = write_uint32(seq, buf, buflen, off)) == 0)
 	    return 0;
+	if ((off = write_uint32(aru_seq, buf, buflen, off)) == 0)
+	    return 0;
 	if ((off = source_view.write(buf, buflen, off)) == 0)
 	    return 0;
 	return off;
@@ -170,7 +181,7 @@ public:
     
     size_t size() const {
 	if (type == EVSMessage::USER)
-	    return 4 + 4 + source_view.size(); // bits + seq + view
+	    return 4 + 4 + 4 + source_view.size(); // bits + seq + aru_seq + view
 	return 0;
     }
     

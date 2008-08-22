@@ -38,8 +38,7 @@
 
 struct EVSGap {
     Sockaddr source;
-    uint32_t lwm;
-    uint32_t hwm;
+    EVSRange range;
 };
 
 
@@ -63,9 +62,10 @@ struct EVSInstance {
     // True if instance can be trusted (is reasonably well behaved)
     bool trusted;
     // Known aru map of the instance
-    std::map<const Sockaddr, uint32_t> aru;
+    // Commented out, this is needed only on recovery time and 
+    // should be found from join message std::map<const Sockaddr, uint32_t> aru;
     // Next expected seq from the instance
-    uint32_t expected;
+    // Commented out, this should be found from input map uint32_t expected;
     // True if it is known that the instance has installed current view
     bool installed;
     // Last received JOIN message
@@ -74,8 +74,7 @@ struct EVSInstance {
     EVSInstance() : 
 	operational(false), 
 	trusted(true), 
-	expected(SEQNO_MAX),
-	installed(false) {}
+	installed(false), join_message(0) {}
 };
 
 
@@ -97,26 +96,19 @@ public:
     std::map<const Sockaddr, EVSInstance*> known;
     // Current view id
     EVSViewId* current_view;
-    // Aru map, updated based on instance arus
-    std::map<const Sockaddr, uint32_t> aru;
-    // 
-    uint32_t max_aru;
-    uint32_t min_aru;
-    InputMap input_map;
+
+    // Map containing received messages and aru/safe seqnos
+    EVSInputMap input_map;
     
     // Last received install message
     EVSMessage* install_message;
     // 
     uint32_t last_delivered_safe;
     
-
     // Last sent seq
     uint32_t last_sent;
     // Send window size
     uint32_t send_window;
-    // Low water mark for self originated messages that have been delivered
-    // by all instances in the view
-    uint32_t safe_aru;
     // Output message queue
     std::deque<WriteBuf*> output;
     
@@ -148,7 +140,7 @@ public:
     }
 
     
-    int send_user(WriteBuf* wb);
+    int send_user(WriteBuf* wb, const uint32_t range = SEQNO_MAX);
     int send_user();
 
     void send_gap(const Sockaddr&, const uint32_t, const uint32_t);
@@ -182,27 +174,27 @@ public:
 // Message sending
 /////////////////////////////////////////////////////////////////////////////
 
-int EVSProto::send_user(WriteBuf* wb)
+int EVSProto::send_user(WriteBuf* wb, const uint32_t up_to_seqno)
 {
     int ret;
     uint32_t seq = seqno_next(last_sent);
     
     // Flow control
-    if (seqno_add(safe_aru, send_window) == seq)
+    if (seqno_lt(seqno_add(input_map.get_aru_seq(), send_window), seq))
 	return EAGAIN;
     
-    EVSMessage msg(EVSMessage::USER, seq, *current_view);
+    uint32_t seq_range = up_to_seqno == SEQNO_MAX ? 0 : seqno_dec(up_to_seqno, seq);
+    assert(seq_range < 0x100U);
+    EVSMessage msg(EVSMessage::USER, seq, seq_range & 0xffU, 
+		   input_map.get_aru_seq(), *current_view, 0);
     
     wb->prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
     if ((ret = pass_down(wb, 0)) == 0) {
-	std::pair<Sockaddr, EVSInstance*> i = known.find(my_addr);
-	assert(i != known.end());
 	last_sent = seq;
 	ReadBuf* rb = wb->to_readbuf();
-	input.insert(msg, rb);
-	std::map<Sockaddr, uint32_t>::iterator ai = aru.find(my_addr);
-	assert(seqno_next(ai->second) == last_sent);
-	ai->second = last_sent;
+	EVSRange range = input_map.insert(EVSInputMapItem(my_addr, msg, rb));
+	assert(seqno_eq(range.high, last_sent));
+	rb->release();
     }
     wb->rollback_hdr(msg.get_hdrlen());
     return ret;
@@ -213,8 +205,7 @@ int EVSProto::send_user()
     
     if (output.empty())
 	return 0;
-    if (state != OPERATIONAL)
-	return EAGAIN;
+    assert(state == OPERATIONAL);
     WriteBuf* wb = output.front();
     int ret;
     if ((ret = send_user(wb)) == 0) {
@@ -226,7 +217,8 @@ int EVSProto::send_user()
 
 int EVSProto::send_delegate(const ReadBuf* rb)
 {
-
+    // TODO:
+    return ENOPROTOSUPP;
 }
 
 void EVSProto::send_gap(const Sockaddr& target, const uint32_t expected, 
@@ -236,10 +228,10 @@ void EVSProto::send_gap(const Sockaddr& target, const uint32_t expected,
     // message loss happen most probably during congestion and 
     // flooding network with gap messages won't probably make 
     // conditions better
-
+    
     std::map<const Sockaddr, EVSInstance*>::iterator i = known.find(my_addr);
     assert(i != known.end());
-    EVSMessage gm(EVSMessage::GAP, i->second->aru, target, expected, current);
+    EVSMessage gm(EVSMessage::GAP, i->second.last_sent, target, expected, current);
     
     size_t bufsize = gm.size();
     unsigned char* buf = new unsigned char[bufsize];
@@ -259,12 +251,12 @@ void EVSProto::send_gap(const Sockaddr& target, const uint32_t expected,
 void EVSProto::send_join()
 {
     EVSMessage jm(EVSMessage::JOIN, 
-		  current_view ? *current_view : EVSViewId(my_addr, 0));
+		  current_view ? *current_view : EVSViewId(my_addr, 0), 
+		  input_map.get_aru_seq(), input_map.get_safe_seq());
     for (std::map<const Sockaddr, EVSInstance*>::iterator i = known.begin();
 	 i != known.end(); ++i) {
 	if (i->second->trusted && i->second->operational) {
-	    jm.add_operational_instance(i->first, i->second->expected, 
-					i->second->aru);
+	    jm.add_operational_instance(i->first, input_map.get_sa_gap());
 	} else if (i->second->trusted == false) {
 	    jm.add_untrusted_instance(i->first);
 	} else if (i->second->operational == false) {
@@ -291,7 +283,7 @@ void EVSProto::send_leave()
     unsigned char* buf = new unsigned char[bufsize];
     if (lm.write(buf, bufsize, 0) == 0)
 	throw FatalException("");
-
+    
     WriteBuf wb(buf, bufsize);
     int err;
     if ((err = pass_down(&wb, 0))) {
@@ -307,12 +299,16 @@ void EVSProto::send_install()
     EVSMessage im(EVSMessage::INSTALL, 
 		  EVSViewId(my_addr, current_view ? 
 			    current_view->seq + 1 : 1),
-		  self->second->aru);
+		  input_map.get_aru_seq(), input_map.get_safe_seq());
     for (std::map<const Sockaddr, EVSInstance*>::iterator i = known.begin();
-	 i != known.end(); ++i)
+	 i != known.end(); ++i) {
 	if (i->second->trusted && i->second->operational)
-	    im.add_instance(i->first);
-
+	    im.add_operational_instance(i->first);
+	else if (i->second->trusted == false)
+	    im.add_untrusted_instance(i->first);
+	else if (i->second->operational == false)
+	    im.add_unoperational_instance(i->first);
+    }
     size_t bufsize = im.size();
     unsigned char* buf = new unsigned char[bufsize];
     if (im.write(buf, bufsize, 0) == 0)
@@ -338,28 +334,15 @@ void EVSProto::resend(const Sockaddr& gap_source, const EVSGap& gap)
 		  + to_string(gap.hwm));
 	return;
     }
-
-    std::map<const Sockaddr, EVSInstance*>::iterator self = known.find(my_addr);
-    InputMap::iterator i = self->second->input.find(gap.lwm == SEQNO_MAX ? 
-						    0 : gap.lwm);
-    if (i == self->second->input.end()) {
-	// Either this or the gap source instance is getting it wrong, 
-	// untrust the other and shift to recovery.
-	LOG_WARN(std::string("EVSProto::resend(): Can't resend the gap: ")
-		 + to_string(gap.lwm) + " -> " 
-		 + to_string(gap.hwm));
-	std::map<const Sockaddr, EVSInstance*>::iterator gsi = 
-	    known.find(gap_source);
-	gsi->second->trusted = false;
-	shift_to(RECOVERY);
-    } else {
-	for (; i != self->second->input.end(); ++i) {
-	    WriteBuf wb(i->second->second->get_buf(),
-			i->second->second->get_len());
-	    if (pass_down(&wb, 0))
-		break;
-	    if (seqno_next(i->first) == gap.hwm)
-		break;
+    
+    for (uint32_t seq = gap.low; !seqno_gt(seq, gap.high); 
+	 seq = seqno_next(seq)) {
+	EVSInputMap::iterator i = input_map.find(my_addr, seq);
+	if (i == input_map.end()) {
+	    IMap::iterator ii = known.find();
+	    assert(ii != known.end());
+	    ii->second.trusted = false;
+	    shift_to(RECOVERY);
 	}
     }
 }
@@ -494,6 +477,11 @@ void EVSProto::shift_to(const State& s)
 	deliver_trans_view();
 	deliver_trans();
 	deliver_reg_view();
+	// Reset input map
+	input_map.clear();
+	for (IMap::iterator i = known.begin(); i != known.end(); ++i)
+	    if (i->second.installed)
+		input_map.insert_sa(i->first);
 	state = OPERATIONAL;
 	break;
     default:
@@ -509,22 +497,96 @@ void EVSProto::deliver()
 {
     if (state != OPERATIONAL || state != RECOVERY)
 	throw FatalException("Invalid state");
-    
-    // Deliver all safe messages
-    std::map<EVSMessage, ReadBuf*>::iterator i;
-    if (min_aru != SEQNO_MAX) {
-	for (i = input.begin(); i != input.end(); i = input.begin()) {
-	    if (i->first.get_seq() <= min_aru) {
-		if (i->first.get_safety_prefix() == SAFE) {
-		    if (i->first.contains_payload())
-			pass_up(i->second, i->first.get_payload_offset(), 0);
-		    input.erase(i);
-		}
-	    }
-	}
+    assert(current_view);
+    EVSInputMap::iterator i, i_next;
+    // First deliver all messages that qualify at least as safe
+    for (i = input_map.begin();
+	 i != input_map.end() && input_map.is_safe(i); i = i_next) {
+	i_next = i;
+	++i_next;
+	assert(current_view->find(i->get_sockaddr()));
+	EVSProtoUpMeta um(i->get_sockaddr());
+	pass_up(i->get_readbuf(), i->get_readbuf_offset(), &um);
+	input_map.erase(i);
     }
+    // Deliver all messages that qualify as agreed
+    for (; i != input_map.end() && 
+	     i->get_evs_message().get_safety_prefix() == EVSMessage::AGREED &&
+	     input_map.is_agreed(i); i = i_next) {
+	i_next = i;
+	++i_next;
+	assert(current_view->find(i->get_sockaddr())); 
+	EVSProtoUpMeta um(i->get_sockaddr());
+	pass_up(i->get_readbuf(), i->get_readbuf_offset(), &um);
+	input_map.erase(i);
+    }
+    // And finally FIFO or less 
+    for (; i != input_map.end() &&
+	     i->get_evs_message().get_safety_prefix() == EVSMessage::FIFO &&
+	     input_map.is_fifo(i); i = i_next) {
+	i_next = i;
+	++i_next;
+	assert(current_view->find(i->get_sockaddr())); 
+	EVSProtoUpMeta um(i->get_sockaddr());
+	pass_up(i->get_readbuf(), i->get_readbuf_offset(), &um);
+	input_map.erase();
+    }
+}
 
-
+void EVSProto::deliver_trans()
+{
+    if (state != RECOVERY)
+	throw FatalException("Invalid state");
+    assert(current_view);
+    // In transitional configuration we must deliver all messages that 
+    // are fifo. This is because:
+    // - We know that it is possible to deliver all fifo messages originated
+    //   from partitioned component as safe in partitioned component
+    // - Aru in this component is at least the max known fifo seq
+    //   from partitioned component due to message recovery 
+    // - All FIFO messages originated from this component must be 
+    //   delivered to fulfill self delivery requirement and
+    // - FIFO messages originated from this component qualify as AGREED
+    //   in transitional configuration
+    
+    EVSInputMap::iterator i, i_next;
+    for (i = input_map.begin(); i != input_map.end() && 
+	     i->get_evs_message().get_safety_prefix() == EVSMessage::AGREED &&
+	     input_map.is_agreed(i); i = i_next) {
+	i_next = i;
+	++i_next;
+	assert(current_view->find(i->get_sockaddr())); 
+	EVSProtoUpMeta um(i->get_sockaddr());
+	pass_up(i->get_readbuf(), i->get_readbuf_offset(), &um);
+	input_map.erase(i);
+    }
+    
+    for (; i != input_map.end() &&
+	     i->get_evs_message().get_safety_prefix() == EVSMessage::FIFO &&
+	     input_map.is_fifo(i); i = i_next) {
+	i_next = i;
+	++i_next;
+	assert(known.find(i->get_sockaddr()) && 
+	       known.find(i->get_sockaddr())->second.installed); 
+	EVSProtoUpMeta um(i->get_sockaddr());
+	pass_up(i->get_readbuf(), i->get_readbuf_offset(), &um);
+	input_map.erase();
+    }
+    
+    // Sanity check:
+    // There must not be any messages left that 
+    // - Are originated from outside of trans conf and are FIFO
+    // - Are originated from trans conf
+    for (i = input_map.begin(); i != input_map.end(); i = i_next) {    
+	i_next = i;
+	++i_next;
+	IMap::iterator ii = known.find();
+	if (ii->second.installed)
+	    throw FatalException("Protocol error in transitional delivery (self delivery constraint)");
+	else if (input_map.is_fifo(i))
+	    throw FatalException("Protocol error in transitional delivery (fifo  from partitioned component)");
+	input_map.erase(i);
+    }
 }
 
 
@@ -626,24 +688,28 @@ void EVSProto::handle_user(const EVSMessage& msg, const Sockaddr& source,
 	   msg.get_source_view() == *current_view);
     
     
-    EVSGap gap(input_map.insert(msg, rb));
-    if (gap.lwm == i->second->expected) {
-	assert(gap.lwm == gap.hwm);
-	i->second->expected = seqno_next(i->second->expected);
-    } else {
-	send_gap(i->first, gap);
-    }
+    EVSRange gap(input_map.insert(msg, rb));
 
-    // Message not originated from this instance, output queue is empty
-    // so local seqno should be advanced.
-    if (i->first != my_addr && output.empty() &&
-	i->second->expected == seqno_next(last_sent)) {
+    // Some messages are missing
+    if (seqno_gt(gap.high, gap.low))
+	send_gap(i->first, gap);
+    
+
+    if (i->first != my_addr && (
+	    (output.empty() && !(msg.get_flags() & EVSMessage::F_MSG_MORE)) ||
+	    state == RECOVERY
+	    ) && seqno_lt(seqno_next(last_sent), gap.low)) {
+	// Message not originated from this instance, output queue is empty
+	// and last_sent seqno should be advanced
 	WriteBuf wb(0, 0);
-	send_user(&wb);
+	send_user(&wb, gap.low);
+    } else if (output.empty() && !seqno_eq(input_map.get_aru_seq(), 
+					   input_map.get_safe_seq())) {
+	resend(EVSGap(my_addr, EVSRange(last_sent, last_sent)));
     }
     
     deliver();
-    while (output.empty() == false)
+    while (state == OPERATIONAL && output.empty() == false)
 	if (send_user())
 	    break;
 }
@@ -712,13 +778,11 @@ void EVSProto::handle_gap(const EVSMessage& msg, const Sockaddr& source)
 	    recover(*g);
     }
 
-    // Update source aru map
-    update_aru(i->second, msg.get_aru());
-
     // If it seems that some messages from source instance are missing,
     // send gap message
-    if (seqno_next(msg.get_seq()) != i->second->expected)
-	send_gap(source, i->second->expected, msg.get_seq());
+    EVSRange source_gap(input_map.get_sa_gap());
+    if (seqno_next(msg.get_seq()) != input_map.get_sa_gap().low)
+	send_gap(source, source_gap.low, msg.get_seq());
 
     // Deliver messages 
     deliver();

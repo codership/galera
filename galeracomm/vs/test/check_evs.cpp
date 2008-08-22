@@ -45,17 +45,18 @@ END_TEST
 
 START_TEST(check_msg)
 {
-    EVSMessage umsg(EVSMessage::USER, EVSMessage::SAFE, 0x037b137bU, 0x17U, 
+    EVSMessage umsg(EVSMessage::USER, EVSMessage::SAFE, 0x037b137bU, 0x17U,
+		    0x0534555,
 		    EVSViewId(Sockaddr(7), 0x7373b173U), EVSMessage::F_MSG_MORE);
-
+    
     size_t buflen = umsg.size();
     uint8_t* buf = new uint8_t[buflen];
-
-
+    
+    
     fail_unless(umsg.write(buf, buflen, 1) == 0);
     fail_unless(umsg.write(buf, buflen, 0) == buflen);
-
-
+    
+    
     EVSMessage umsg2;
     fail_unless(umsg2.read(buf, buflen, 1) == 0);
     fail_unless(umsg2.read(buf, buflen, 0) == buflen);
@@ -64,6 +65,7 @@ START_TEST(check_msg)
     fail_unless(umsg.get_safety_prefix() == umsg2.get_safety_prefix());
     fail_unless(umsg.get_seq() == umsg2.get_seq());
     fail_unless(umsg.get_seq_range() == umsg2.get_seq_range());
+    fail_unless(umsg.get_aru_seq() == umsg2.get_aru_seq());
     fail_unless(umsg.get_flags() == umsg2.get_flags());
     fail_unless(umsg.get_source_view() == umsg2.get_source_view());
 }
@@ -102,16 +104,16 @@ START_TEST(check_input_map_basic)
     fail_unless(seqno_eq(im.get_aru_seq(), SEQNO_MAX) && seqno_eq(im.get_safe_seq(), SEQNO_MAX));
     im.insert(EVSInputMapItem(
 		  sa1, 
-		  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 0, 0, vid, 0),
+		  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 0, 0, SEQNO_MAX, vid, 0),
 		  0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
     
     im.insert(EVSInputMapItem(sa1, 
-			      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 2, 0, vid, 0),
+			      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 2, 0, SEQNO_MAX, vid, 0),
 			      0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
     im.insert(EVSInputMapItem(sa1, 
-			      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 1, 0, vid, 0),
+			      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 1, 0, SEQNO_MAX, vid, 0),
 			      0));
     fail_unless(seqno_eq(im.get_aru_seq(), 2));
 
@@ -121,7 +123,7 @@ START_TEST(check_input_map_basic)
     EVSRange gap = im.insert(
 	EVSInputMapItem(sa1, 
 			EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 
-				   seqno_add(2, SEQNO_MAX/4 + 1), 0, vid, 0),
+				   seqno_add(2, SEQNO_MAX/4 + 1), 0, SEQNO_MAX, vid, 0),
 			0));
     fail_unless(seqno_eq(gap.low, 3) && seqno_eq(gap.high, 2));
     fail_unless(seqno_eq(im.get_aru_seq(), 2));
@@ -135,22 +137,22 @@ START_TEST(check_input_map_basic)
     }
     
     im.clear();
-
+    
     // Simple two instance case
     Sockaddr sa2(2);
     
     im.insert_sa(sa1);
     im.insert_sa(sa2);
- 
+    
     for (uint32_t i = 0; i < 3; i++)
 	im.insert(EVSInputMapItem(sa1,
-				  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, i, 0, vid, 0),
+				  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, i, 0, SEQNO_MAX, vid, 0),
 				  0));
     fail_unless(seqno_eq(im.get_aru_seq(), SEQNO_MAX));   
     
     for (uint32_t i = 0; i < 3; i++) {
 	im.insert(EVSInputMapItem(sa2,
-				  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, i, 0, vid, 0),
+				  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, i, 0, SEQNO_MAX, vid, 0),
 				  0));
 	fail_unless(seqno_eq(im.get_aru_seq(), i));
     }
@@ -203,10 +205,13 @@ START_TEST(check_input_map_overwrap)
     size_t n_msg = 0;
     for (uint32_t seqi = 0; seqi < 2*SEQNO_MAX; seqi++) {
 	uint32_t seq = seqi % SEQNO_MAX;
-	
+// #define aru_seq SEQNO_MAX
+#define aru_seq (seqi < 7 ? SEQNO_MAX : seqno_dec(im.get_aru_seq(), ::rand()%3))
 	for (size_t j = 0; j < nodes; j++) {
 	    im.insert(EVSInputMapItem(sas[j],
-				      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, seq, 0, vid, 0),
+				      EVSMessage(EVSMessage::USER, 
+						 EVSMessage::SAFE, 
+						 seq, 0, aru_seq, vid, 0),
 				      0));	
 	    n_msg++;
 	}
