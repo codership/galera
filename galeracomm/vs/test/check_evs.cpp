@@ -1,4 +1,4 @@
-#define EVS_SEQNO_MAX 0x8000U
+#define EVS_SEQNO_MAX 0x800U
 #include "../src/evs_seqno.hpp"
 #include "../src/evs_input_map.hpp"
 
@@ -69,7 +69,7 @@ START_TEST(check_msg)
 }
 END_TEST
 
-START_TEST(check_input_map)
+START_TEST(check_input_map_basic)
 {
     EVSInputMap im;
 
@@ -100,18 +100,30 @@ START_TEST(check_input_map)
     Sockaddr sa1(1);
     im.insert_sa(sa1);
     fail_unless(seqno_eq(im.get_aru_seq(), SEQNO_MAX) && seqno_eq(im.get_safe_seq(), SEQNO_MAX));
-    im.insert(sa1, 
-	      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 0, 0, vid, 0),
-	      0, 0);
+    im.insert(EVSInputMapItem(
+		  sa1, 
+		  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 0, 0, vid, 0),
+		  0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
     
-    im.insert(sa1, 
-	      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 2, 0, vid, 0),
-	      0, 0);
+    im.insert(EVSInputMapItem(sa1, 
+			      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 2, 0, vid, 0),
+			      0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
-    im.insert(sa1, 
-	      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 1, 0, vid, 0),
-	      0, 0);
+    im.insert(EVSInputMapItem(sa1, 
+			      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 1, 0, vid, 0),
+			      0));
+    fail_unless(seqno_eq(im.get_aru_seq(), 2));
+
+
+    // Messge out of allowed window (approx aru_seq +- SEQNO_MAX/4)
+    // must dropped:
+    EVSRange gap = im.insert(
+	EVSInputMapItem(sa1, 
+			EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 
+				   seqno_add(2, SEQNO_MAX/4 + 1), 0, vid, 0),
+			0));
+    fail_unless(seqno_eq(gap.low, 3) && seqno_eq(gap.high, 2));
     fail_unless(seqno_eq(im.get_aru_seq(), 2));
     
     // Must not allow insertin second instance before clear()
@@ -131,31 +143,31 @@ START_TEST(check_input_map)
     im.insert_sa(sa2);
  
     for (uint32_t i = 0; i < 3; i++)
-	im.insert(sa1,
-		  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, i, 0, vid, 0),
-		  0, 0);
+	im.insert(EVSInputMapItem(sa1,
+				  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, i, 0, vid, 0),
+				  0));
     fail_unless(seqno_eq(im.get_aru_seq(), SEQNO_MAX));   
     
     for (uint32_t i = 0; i < 3; i++) {
-	im.insert(sa2,
-		  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, i, 0, vid, 0),
-		  0, 0);
+	im.insert(EVSInputMapItem(sa2,
+				  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, i, 0, vid, 0),
+				  0));
 	fail_unless(seqno_eq(im.get_aru_seq(), i));
     }
-
+    
     fail_unless(seqno_eq(im.get_safe_seq(), SEQNO_MAX));
-
+    
     im.set_safe(sa1, 1);
     im.set_safe(sa2, 2);
     fail_unless(seqno_eq(im.get_safe_seq(), 1));
-
+    
     im.set_safe(sa1, 2);
     fail_unless(seqno_eq(im.get_safe_seq(), 2));
-
+    
     
     for (EVSInputMap::iterator i = im.begin(); i != im.end(); 
 	 ++i) {
-	std::cerr << i.get_sockaddr().to_string() << " " << i.get_evs_message().get_seq() << "\n";
+	std::cerr << i->get_sockaddr().to_string() << " " << i->get_evs_message().get_seq() << "\n";
     }
     
     EVSInputMap::iterator i_next;
@@ -163,13 +175,21 @@ START_TEST(check_input_map)
 	 i = i_next) {
 	i_next = i;
 	++i_next;
-	std::cerr << i.get_sockaddr().to_string() << " " << i.get_evs_message().get_seq() << "\n";
+	std::cerr << i->get_sockaddr().to_string() << " " << i->get_evs_message().get_seq() << "\n";
 	im.erase(i);
     }
     
 
     im.clear();
 
+}
+END_TEST
+
+
+START_TEST(check_input_map_overwrap)
+{
+    EVSInputMap im;
+    EVSViewId vid(Sockaddr(0), 3);
     static const size_t nodes = 16;
     static const size_t qlen = 32;
     Sockaddr sas[nodes];
@@ -185,9 +205,9 @@ START_TEST(check_input_map)
 	uint32_t seq = seqi % SEQNO_MAX;
 	
 	for (size_t j = 0; j < nodes; j++) {
-	    im.insert(sas[j],
-		      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, seq, 0, vid, 0),
-		      0, 0);	
+	    im.insert(EVSInputMapItem(sas[j],
+				      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, seq, 0, vid, 0),
+				      0));	
 	    n_msg++;
 	}
 	if (seqi > 0 && seqi % qlen == 0) {
@@ -197,9 +217,9 @@ START_TEST(check_input_map)
 		 mi = mi_next) {
 		mi_next = mi;
 		++mi_next;
-		if (seqno_lt(mi.get_evs_message().get_seq(), seqto))
+		if (seqno_lt(mi->get_evs_message().get_seq(), seqto))
 		    im.erase(mi);
-		else if (seqno_eq(mi.get_evs_message().get_seq(), seqto) &&
+		else if (seqno_eq(mi->get_evs_message().get_seq(), seqto) &&
 			 ::rand() % 8 != 0)
 		    im.erase(mi);
 		else
@@ -219,6 +239,14 @@ START_TEST(check_input_map)
 }
 END_TEST
 
+START_TEST(check_input_map_random)
+{
+
+    
+
+
+}
+END_TEST
 
 static Suite* suite()
 {
@@ -233,8 +261,16 @@ static Suite* suite()
     tcase_add_test(tc, check_msg);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("check_input_map");
-    tcase_add_test(tc, check_input_map);
+    tc = tcase_create("check_input_map_basic");
+    tcase_add_test(tc, check_input_map_basic);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_input_map_overwrap");
+    tcase_add_test(tc, check_input_map_overwrap);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_input_map_random");
+    tcase_add_test(tc, check_input_map_random);
     suite_add_tcase(s, tc);
 
     return s;
