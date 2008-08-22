@@ -24,7 +24,7 @@ class EVSInputMapItem {
     Sockaddr sa;
     EVSMessage msg;
     const ReadBuf* rb;
-    ReadBuf* priv_rb;
+    mutable ReadBuf* priv_rb;
     size_t roff;
     static const Sockaddr null_sa;
     static const EVSMessage null_msg;
@@ -44,6 +44,11 @@ public:
 	    priv_rb->release();
     }
 
+    ReadBuf* steal_priv_readbuf() const {
+	ReadBuf* ret = priv_rb;
+	priv_rb = 0;
+	return ret;
+    }
 
     const Sockaddr& get_sockaddr() const {
 	return sa;
@@ -87,7 +92,7 @@ class EVSInputMap {
 
 
     struct MLogLstr {
-	bool operator()(const EVSInputMapItem& a, const EVSInputMapItem& b) {
+	bool operator()(const EVSInputMapItem& a, const EVSInputMapItem& b) const {
 	    if (seqno_lt(a.get_evs_message().get_seq(), 
 			 b.get_evs_message().get_seq()))
 		return true;
@@ -104,8 +109,24 @@ class EVSInputMap {
 
     uint32_t safe_seq;
     uint32_t aru_seq;
+
+// Some stats
+    uint64_t n_messages;
+    uint64_t msg_log_size_cum;
+    uint64_t recovery_log_size_cum;
+    
 public:
-    EVSInputMap() : safe_seq(SEQNO_MAX), aru_seq(SEQNO_MAX) {
+    EVSInputMap() : safe_seq(SEQNO_MAX), aru_seq(SEQNO_MAX),
+		    n_messages(0), msg_log_size_cum(0), 
+		    recovery_log_size_cum(0) {
+    }
+
+    ~EVSInputMap() {
+	LOG_INFO(std::string("~EVSInputMap(): ")
+		 + to_string(double(msg_log_size_cum)/double(n_messages + 1)) 
+		 + " " 
+		 + to_string(double(recovery_log_size_cum)/
+			     double(n_messages + 1)));
     }
     
     void set_safe(const Sockaddr& s, const uint32_t seq) {
@@ -129,14 +150,27 @@ public:
 		    min_seq = SEQNO_MAX;
 		}
 	    }
-	    safe_seq = min_seq;
+	    if (!seqno_eq(safe_seq, min_seq)) {
+		assert(seqno_eq(safe_seq, SEQNO_MAX) || 
+		       seqno_gt(min_seq, safe_seq));
+		safe_seq = min_seq;
+		MLog::iterator i_next;
+		for (MLog::iterator i = recovery_log.begin(); 
+		     i != recovery_log.end() && 
+			 !seqno_gt(i->get_evs_message().get_seq(), safe_seq);
+		     i = i_next) {
+		    i_next = i;
+		    ++i_next;
+		    recovery_log.erase(i);
+		}
+	    }
 	}
     }
-
+    
     uint32_t get_safe_seq() const {
 	return safe_seq;
     }
-
+    
     void update_aru() {
 	if (instances.empty())
 	    throw FatalException("Instance not found");
@@ -269,6 +303,8 @@ public:
 			}
 		    }
 		} 
+		n_messages++;
+		msg_log_size_cum += msg_log.size();
 	    } else {
 		// TODO: Sanity check
 	    }
@@ -293,9 +329,28 @@ public:
     }
     
     void erase(const iterator& i) {
+	if (is_safe(i) == false) {
+	    i->steal_priv_readbuf();
+	    std::pair<MLog::iterator, bool> iret = recovery_log.insert(*i);
+	    assert(iret.second == true);
+	    recovery_log_size_cum += recovery_log.size();
+	}
 	msg_log.erase(i);
     }
 
+    std::pair<EVSInputMapItem, bool> 
+    recover(const Sockaddr& sa, const uint32_t seq) const {
+	EVSInputMapItem tmp(sa, EVSMessage(EVSMessage::USER, 
+					   EVSMessage::DROP, 
+					   seq, 0, 0, EVSViewId(), 0), 0, 0);
+	MLog::iterator i;
+	if ((i = msg_log.find(tmp)) == msg_log.end() && 
+	    (i = recovery_log.find(tmp)) == recovery_log.end()) {
+	    
+	    return std::pair<EVSInputMapItem, bool>(EVSInputMapItem(), false);
+	}
+	return std::pair<EVSInputMapItem, bool>(*i, true);
+    }
     
 
     void insert_sa(const Sockaddr& sa) {
@@ -325,6 +380,7 @@ public:
 	if (instances.empty() == false)
 	    instances.clear();
 	msg_log.clear();
+	recovery_log.clear();
 	safe_seq = aru_seq = SEQNO_MAX;
     }
 };

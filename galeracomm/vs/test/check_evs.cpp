@@ -169,7 +169,7 @@ START_TEST(check_input_map_basic)
     
     for (EVSInputMap::iterator i = im.begin(); i != im.end(); 
 	 ++i) {
-	std::cerr << i->get_sockaddr().to_string() << " " << i->get_evs_message().get_seq() << "\n";
+	// std::cerr << i->get_sockaddr().to_string() << " " << i->get_evs_message().get_seq() << "\n";
     }
     
     EVSInputMap::iterator i_next;
@@ -177,7 +177,7 @@ START_TEST(check_input_map_basic)
 	 i = i_next) {
 	i_next = i;
 	++i_next;
-	std::cerr << i->get_sockaddr().to_string() << " " << i->get_evs_message().get_seq() << "\n";
+	// std::cerr << i->get_sockaddr().to_string() << " " << i->get_evs_message().get_seq() << "\n";
 	im.erase(i);
     }
     
@@ -193,7 +193,7 @@ START_TEST(check_input_map_overwrap)
     EVSInputMap im;
     EVSViewId vid(Sockaddr(0), 3);
     static const size_t nodes = 16;
-    static const size_t qlen = 32;
+    static const size_t qlen = 8;
     Sockaddr sas[nodes];
     for (size_t i = 0; i < nodes; ++i) {
 	sas[i] = Sockaddr(i + i);
