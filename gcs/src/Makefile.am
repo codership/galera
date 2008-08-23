@@ -16,7 +16,6 @@ endif
 GCS_SRCS = \
 	gcs_conf.c      \
 	gcs_error.c     \
-	gcs_fifo.c      \
 	gcs_fifo_lite.c \
 	gcs_queue.c     \
 	gcs_to.c        \
@@ -53,7 +52,7 @@ libgcs_la_SOURCES = $(GCS_SRCS) $(GCS_INCS)
 libgcs_la_LIBADD = $(GCOMM_LIBS)
 #libgcs_la_LDADD =
 INTERFACE = 6
-REVISION  = 1
+REVISION  = 2
 AGE       = 0
 libgcs_la_LDFLAGS = \
 	-version-info $(INTERFACE):$(REVISION):$(AGE)

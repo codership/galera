@@ -12,8 +12,8 @@ START_TEST (gcs_fifo_lite_test)
 {
     gcs_fifo_lite_t* fifo;
     long ret;
-    long i, j;
-//    size_t used;
+    long i;
+    long* item;
 
     fifo = gcs_fifo_lite_create (0, 1);
     fail_if (fifo != NULL);
@@ -33,9 +33,10 @@ START_TEST (gcs_fifo_lite_test)
 
     // fill FIFO
     for (i = 1; i <= FIFO_LENGTH; i++) {
-        ret = gcs_fifo_lite_put (fifo, &i);
-        fail_if (ret != i, "gcs_fifo_lite_put() returned %ld, expected %ld",
-                 ret, i);
+        item = gcs_fifo_lite_get_tail (fifo);
+        fail_if (NULL == item, "gcs_fifo_lite_get_tail() returned NULL");
+        *item = i;
+        gcs_fifo_lite_push_tail (fifo);
     }
     fail_if (fifo->used != FIFO_LENGTH, "fifo->used is %zu, expected %zu", 
              fifo->used, FIFO_LENGTH);
@@ -43,29 +44,37 @@ START_TEST (gcs_fifo_lite_test)
     // test remove
     for (i = 1; i <= FIFO_LENGTH; i++) {
         ret = gcs_fifo_lite_remove (fifo);
-        fail_if (ret != (FIFO_LENGTH - i),
-                 "gcs_fifo_lite_remove() failed: %ld, i = %ld",
-                 ret, i);
+        fail_if (0 == ret, "gcs_fifo_lite_remove() failed, i = %ld", i);
     }
     fail_if (fifo->used != 0, "fifo->used is %zu, expected %zu", 
              fifo->used, 0);
 
+    // try remove on empty queue
+    ret = gcs_fifo_lite_remove (fifo);
+    fail_if (0 != ret, "gcs_fifo_lite_remove() from empty FIFO returned true");
+
     // it should be possible to fill FIFO again
     for (i = 1; i <= FIFO_LENGTH; i++) {
-        ret = gcs_fifo_lite_put (fifo, &i);
-        fail_if (ret != i, "gcs_fifo_lite_put() returned %ld, expected %ld",
-                 ret, i);
+        item = gcs_fifo_lite_get_tail (fifo);
+        fail_if (NULL == item, "gcs_fifo_lite_get_tail() returned NULL");
+        *item = i;
+        gcs_fifo_lite_push_tail (fifo);
     }
     fail_if (fifo->used != FIFO_LENGTH, "fifo->used is %zu, expected %zu", 
              fifo->used, FIFO_LENGTH);
 
     // test get
     for (i = 1; i <= FIFO_LENGTH; i++) {
-        ret = gcs_fifo_lite_get (fifo, &j);
-        fail_if (ret != (FIFO_LENGTH - i), "gcs_fifo_lite_get() returned %ld,"
-                 " expected %ld", ret, (FIFO_LENGTH - i));
-        fail_if (j != i, "gcs_fifo_lite_get() data passed %ld, expected %ld",
-                 j, i);
+        item = gcs_fifo_lite_get_head (fifo);
+        fail_if (NULL == item, "gcs_fifo_lite_get_head() returned NULL");
+        fail_if (*item != i, "gcs_fifo_lite_get_head() returned %ld, "
+                 "expected %ld", *item, i);
+        gcs_fifo_lite_release (fifo);
+        item = gcs_fifo_lite_get_head (fifo);
+        fail_if (NULL == item, "gcs_fifo_lite_get_head() returned NULL");
+        fail_if (*item != i, "gcs_fifo_lite_get_head() returned %ld, "
+                 "expected %ld", *item, i);
+        gcs_fifo_lite_pop_head (fifo);
     }
 
     fail_if (fifo->used != 0, "fifo->used for empty queue is %ld", fifo->used);

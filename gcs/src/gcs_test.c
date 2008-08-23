@@ -460,6 +460,14 @@ void *gcs_test_recv (void *arg)
         case GCS_ACT_COMMIT_CUT:
             group_seqno = *(gcs_seqno_t*)thread->msg;
             break;
+	case GCS_ACT_CONF:
+	    {
+                gcs_act_conf_t* conf = (void*)thread->msg;
+                fprintf (stdout, "Got GCS_ACT_CONF: Conf ID: %ld, "
+                         "members: %zu, my idx: %zu\n",
+                         conf->conf_id, conf->memb_num, conf->my_idx);
+            }
+	    break;
         default:
             fprintf (stderr, "Unexpected action type: %d\n", thread->act_type);
 

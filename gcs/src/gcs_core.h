@@ -78,7 +78,7 @@ ssize_t gcs_core_send (gcs_core_t*      const conn,
  * negative     - error code
  */
 ssize_t gcs_core_recv (gcs_core_t*      const conn,
-                       void**           const action,
+                       const void**     const action,
                        gcs_act_type_t*  const act_type,
                        gcs_seqno_t*     const act_id);
 

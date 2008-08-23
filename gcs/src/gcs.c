@@ -17,11 +17,9 @@
 
 #include <galerautils.h>
 
-#define GCS_FIFO_SAFE
-
 #include "gcs.h"
 #include "gcs_core.h"
-#include "gcs_fifo.h"
+#include "gcs_fifo_lite.h"
 #include "gcs_queue.h"
 
 const long GCS_MAX_REPL_THREADS = 16384;
@@ -56,7 +54,7 @@ struct gcs_conn
     volatile gcs_seqno_t local_act_id; /* local seqno of the action  */
 
     /* A queue for threads waiting for replicated actions */
-    gcs_fifo_t*  repl_q;
+    gcs_fifo_lite_t*  repl_q;
     gu_thread_t  send_thread;
 
     /* A queue for threads waiting for received actions */
@@ -103,7 +101,8 @@ gcs_create (const char *backend)
 
             if (!(gcs_core_set_pkt_size (conn->core, GCS_DEFAULT_PKT_SIZE))) {
 
-                conn->repl_q  = GCS_FIFO_CREATE (GCS_MAX_REPL_THREADS);
+                conn->repl_q = gcs_fifo_lite_create (GCS_MAX_REPL_THREADS,
+                                                     sizeof (gcs_act_t*));
                 if (conn->repl_q) {
 
                     conn->recv_q  = gcs_queue ();
@@ -113,7 +112,7 @@ gcs_create (const char *backend)
                         conn->state = GCS_CONN_CLOSED;
                         return conn; // success
                     }
-                    GCS_FIFO_DESTROY (&conn->repl_q);
+                    gcs_fifo_lite_destroy (conn->repl_q);
                 }
             }
             gcs_core_destroy (conn->core);
@@ -142,8 +141,8 @@ gcs_fc_stop (gcs_conn_t* conn)
 
     conn->queue_len = gcs_queue_length (conn->recv_q);
 
-    if ((conn->queue_len > conn->upper_limit) &&
-        GCS_CONN_JOINED == conn->state &&
+    if ((conn->queue_len >  conn->upper_limit) &&
+        GCS_CONN_JOINED  == conn->state        &&
         conn->stop_count <= 0 && conn->stop_sent <= 0) {
         /* tripped upper queue limit, send stop request */
         gu_info ("SENDING STOP (%llu)", conn->local_act_id); //track frequency
@@ -197,7 +196,7 @@ gcs_fc_cont (gcs_conn_t* conn)
  */
 static long
 gcs_handle_actions (gcs_conn_t*    conn,
-                    void*          action,
+                    const void*    action,
                     size_t         act_size,
                     gcs_act_type_t act_type)
 {
@@ -206,7 +205,7 @@ gcs_handle_actions (gcs_conn_t*    conn,
     switch (act_type) {
     case GCS_ACT_CONF:
     {
-        gcs_act_conf_t* conf = action;
+        const gcs_act_conf_t* conf = action;
 
         if ((conn->conf_id + 1) != conf->conf_id) {
             /* missed a configuration, need a snapshot - no longer JOINED */
@@ -227,7 +226,7 @@ gcs_handle_actions (gcs_conn_t*    conn,
     }
     case GCS_ACT_FLOW:
     {
-        struct gcs_fc* fc = action;
+        const struct gcs_fc* fc = action;
         assert (sizeof(*fc) == act_size);
 // UNCOMMENT WHEN SYNC MESSAGE IS IMPLEMENTED        if (gtohl(fc->conf_id) != conn->conf_id) break; // obsolete fc request
         gu_info ("RECEIVED %s", fc->stop ? "STOP" : "CONT");
@@ -248,13 +247,14 @@ gcs_handle_actions (gcs_conn_t*    conn,
 static void *gcs_recv_thread (void *arg)
 {
     long           ret  = -ECONNABORTED;
-    gcs_conn_t    *conn = arg;
-    gcs_act_t     *act  = NULL;
+    gcs_conn_t*    conn = arg;
+    gcs_act_t*     act;
+    gcs_act_t**    act_ptr;
     gcs_seqno_t    act_id;
     gcs_act_type_t act_type;
     ssize_t        act_size;
-    void          *action;
-    const uint8_t *action_repl = NULL;
+    const void*    action;
+    const void*    local_action = NULL;
 
 //    gu_debug ("Starting RECV thread");
 
@@ -292,37 +292,43 @@ static void *gcs_recv_thread (void *arg)
         /* deliver to application and increment local order */
         this_act_id = ++conn->local_act_id;
 
-	if (!action_repl) {
-	    /* Check if there is any local repl action in queue */
-	    act = GCS_FIFO_HEAD (conn->repl_q);
-	    if (act) {
-                /* action_repl will be used to determine, whether
-                 * we deliver action to REPL application thread
-                 * or to RECV application thread */
-		action_repl = act->action;
-	    }	    
-	}
+	if (!local_action && (act_ptr = gcs_fifo_lite_get_head(conn->repl_q))) {
+	    /* Check if there is any local action in REPL queue head */
+            /* local_action will be used to determine, whether we deliver
+             * action to REPL application thread or to RECV application thread*/
+            local_action = (*act_ptr)->action;
+            assert (local_action != NULL);
+            gcs_fifo_lite_release (conn->repl_q);
+        }
 
 	/* Since this is the only way, NULL-sized actions cannot be REPL'ed */
-	if (action_repl           /* there is REPL thread waiting for action */
+	if (local_action          /* there is REPL thread waiting for action */
             &&
-            action == action_repl) /* this is the action it is waiting for */
+            action == local_action) /* this is the action it is waiting for */
 	{
 	    /* local action */
 //            gu_debug ("Local action");
-	    act = GCS_FIFO_GET (conn->repl_q);
-	    
-	    act->act_id       = act_id;
-	    act->local_act_id = this_act_id;
-	    assert (act->action   == action);
-            assert (act->act_size == act_size);
+	    if ((act_ptr = gcs_fifo_lite_get_head (conn->repl_q))) {
+                act = *act_ptr;
+                gcs_fifo_lite_pop_head (conn->repl_q);
 
-	    gu_mutex_lock   (&act->wait_mutex);
-	    gu_cond_signal  (&act->wait_cond);
-	    gu_mutex_unlock (&act->wait_mutex);
+                assert (act->action   == action);
+                assert (act->act_size == act_size);
 
-	    action_repl = NULL;
-	    act  = NULL;
+                act->act_id       = act_id;
+                act->local_act_id = this_act_id;
+
+                gu_mutex_lock   (&act->wait_mutex);
+                gu_cond_signal  (&act->wait_cond);
+                gu_mutex_unlock (&act->wait_mutex);
+
+                local_action = NULL;
+            }
+            else {
+                gu_fatal ("Failed to get local action pointer");
+                assert (0);
+                abort();
+            }
 	}
 	else
 	{
@@ -351,17 +357,8 @@ static void *gcs_recv_thread (void *arg)
                           ret, strerror (-ret));
                 break;
             }
-            /* NOTE: there's a race condition here, I wonder if it matters:
-             * application thread which is calling gcs_recv() can pick item
-             * from queue and decrement queue_len before the next line.
-             * However, I believe that +/- 1 doesn't really matter here. 
-             * Holding a lock here will simply prevent application thread
-             * fron decrementing queue ASAP.
-             * Update: because of the race it may happen so, that STOP
-             *         request will be sent after the queue is empty. This will
-             *         block the node, but holding a lock here is a bad
-             *         solution. Must find a way to handle out-of-order FC
-             *         requests. */
+
+            // Send FC_STOP if it is necessary
             if ((ret = gcs_fc_stop(conn))) {
                 gu_debug ("gcs_fc_stop() returned %d: %s", ret, strerror(-ret));
                 break;
@@ -426,10 +423,11 @@ int gcs_open (gcs_conn_t *conn, const char *channel)
 int gcs_close (gcs_conn_t *conn)
 {
     long        ret;
-    gcs_act_t  *act;
 
     if ((ret = gu_mutex_lock (&conn->lock))) return ret;
     {
+        gcs_act_t** act_ptr;
+
         if (GCS_CONN_CLOSED <= conn->state)
         {
             gu_mutex_unlock (&conn->lock);
@@ -452,12 +450,17 @@ int gcs_close (gcs_conn_t *conn)
          * queue for repl (check gcs_repl()), and recv thread is joined, so no
          * new actions will be received. Abort threads that are still waiting
          * in repl queue */
-        GCS_FIFO_CLOSE(conn->repl_q); // hack to avoid hanging in empty queue
-        while ((act = GCS_FIFO_GET(conn->repl_q))) {
+        gcs_fifo_lite_close (conn->repl_q);
+        while ((act_ptr = gcs_fifo_lite_get_head (conn->repl_q))) {
+            gcs_act_t* act = *act_ptr;
+            gcs_fifo_lite_pop_head (conn->repl_q);
+
             /* This will wake up repl threads in repl_q - 
              * they'll quit on their own,
-             * they don't depend on the connection object after waking */
-            gu_cond_signal (&act->wait_cond);
+             * they don't depend on the conn object after waking */
+            gu_mutex_lock   (&act->wait_mutex);
+            gu_cond_signal  (&act->wait_cond);
+            gu_mutex_unlock (&act->wait_mutex);
         }
 
         /* wake all gcs_recv() threads */
@@ -492,7 +495,7 @@ int gcs_destroy (gcs_conn_t *conn)
         return err;
     }
 
-    if ((err = GCS_FIFO_DESTROY (&conn->repl_q))) {
+    if ((err = gcs_fifo_lite_destroy (conn->repl_q))) {
         gu_debug ("Error destroying repl FIFO: %d (%s)", err, strerror(-err));
         return err;
     }
@@ -586,19 +589,21 @@ int gcs_repl (gcs_conn_t          *conn,
         // 2. avoids race with gcs_close() and gcs_destroy()
         if (!(ret = gu_mutex_lock (&conn->lock)))
         {
+            gcs_act_t** act_ptr;
             // some hack here to achieve one if() instead of two:
-            // if (conn->state != GCS_CONN_JOINED) ret will be -ENOTCONN,
-            // otherwise it will be set to what gcs_fifo_put() returns.
+            // if (conn->state != GCS_CONN_JOINED) ret will be -ENOTCONN
             ret = -ENOTCONN;
             if ((GCS_CONN_OPEN >= conn->state) &&
-                !(ret = GCS_FIFO_PUT (conn->repl_q, &act)))
+                (act_ptr = gcs_fifo_lite_get_tail (conn->repl_q)))
             {
+                *act_ptr = &act;
+                gcs_fifo_lite_push_tail (conn->repl_q);
                 // Keep on trying until something else comes out
                 while ((ret = gcs_core_send (conn->core, action,
                                              act_size, act_type)) == -ERESTART);
                 if (ret < 0) {
                     /* sending failed - remove item from the queue */
-                    if (GCS_FIFO_REMOVE (conn->repl_q)) {
+                    if (gcs_fifo_lite_remove (conn->repl_q)) {
                         gu_fatal ("Failed to recover repl_q");
                         ret = -ENOTRECOVERABLE;
                     }
@@ -609,7 +614,7 @@ int gcs_repl (gcs_conn_t          *conn,
             }
             gu_mutex_unlock (&conn->lock);
         }
-
+        assert(ret);
         /* now having unlocked repl_q we can go waiting for action delivery */
         if (ret >= 0 && GCS_CONN_OPEN >= conn->state) {
             gu_cond_wait (&act.wait_cond, &act.wait_mutex);

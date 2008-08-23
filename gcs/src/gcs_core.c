@@ -13,11 +13,9 @@
 
 #include <galerautils.h>
 
-#define GCS_FIFO_SAFE
-
 #include "gcs_backend.h"
 #include "gcs_comp_msg.h"
-#include "gcs_fifo.h"
+#include "gcs_fifo_lite.h"
 #include "gcs_group.h"
 #include "gcs_core.h"
 
@@ -54,7 +52,7 @@ struct gcs_core
     gcs_seqno_t     recv_act_no;
 
     /* local action FIFO */
-    gcs_fifo_t*     fifo;
+    gcs_fifo_lite_t*     fifo;
 
     /* group context */
     gcs_group_t     group;
@@ -63,6 +61,14 @@ struct gcs_core
     size_t          msg_size;
     gcs_backend_t   backend;         // message IO context
 };
+
+// this is to pass local action info from send to recv thread.
+typedef struct core_act
+{
+    gcs_seqno_t send_act_no;
+    const void* action;
+}
+core_act_t;
 
 gcs_core_t*
 gcs_core_create (const char* const backend_uri)
@@ -82,7 +88,8 @@ gcs_core_create (const char* const backend_uri)
             if (core->recv_msg.buf) {
                 core->recv_msg.buf_len = CORE_INIT_BUF_SIZE;
 
-                core->fifo = GCS_FIFO_CREATE (CORE_FIFO_LEN);
+                core->fifo = gcs_fifo_lite_create (CORE_FIFO_LEN,
+                                                   sizeof (core_act_t));
                 if (core->fifo) {
                     gu_mutex_init (&core->send_lock, NULL);
                     gcs_group_init (&core->group);
@@ -208,6 +215,7 @@ gcs_core_send (gcs_core_t*      const conn,
     const unsigned char proto_ver = conn->proto_ver;
     const size_t   hdr_size  = gcs_act_proto_hdr_size (proto_ver);
 
+    core_act_t*     local_act;
 
     /* 
      * Action header will be replicated with every message.
@@ -225,8 +233,15 @@ gcs_core_send (gcs_core_t*      const conn,
     if ((ret = gcs_act_proto_write (&frg, conn->send_buf, conn->send_buf_len)))
 	goto out;
 
-    if ((ret = GCS_FIFO_PUT (conn->fifo, action)))
+    if ((local_act = gcs_fifo_lite_get_tail (conn->fifo))) {
+        *local_act  = (typeof(*local_act)){ conn->send_act_no, action };
+        gcs_fifo_lite_push_tail (conn->fifo);
+    }
+    else {
+        gu_fatal ("Could not get FIFO tail.");
+        ret = -ENOTRECOVERABLE;
 	goto out;
+    }
 
     do {
 	const size_t chunk_size =
@@ -262,8 +277,11 @@ gcs_core_send (gcs_core_t*      const conn,
             /* At this point we have an unsent action in local FIFO
              * and parts of this action already could have been received
              * by other group members.
+             * (first parts of action might be even received by this node,
+             *  so that there is nothing to remove, but we cannot know for sure)
+             *
              * 1. Action must be removed from fifo.*/
-            GCS_FIFO_REMOVE (conn->fifo);
+            gcs_fifo_lite_remove (conn->fifo);
             /* 2. Members will have to discard received fragments.
              * Two reasons could lead us here: new member(s) in configuration
              * change or broken connection (leave group). In both cases other
@@ -344,7 +362,7 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg)
 
 /*! Receives action */
 ssize_t gcs_core_recv (gcs_core_t*      conn,
-                       void**           action,
+                       const void**     action,
                        gcs_act_type_t*  act_type,
                        gcs_seqno_t*     act_id) // global ID
 {
@@ -379,18 +397,25 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
 
 		ret = gcs_group_handle_act_msg (group, recv_msg, &recv_act);
 		if (ret > 0) {
+                    size_t act_size = ret;
 		    /* complete action received */
-		    *act_id   = ++conn->recv_act_no;
+                    *act_id   = ++conn->recv_act_no;
 		    *act_type = recv_act.type;
                     if (gu_likely(recv_act.buf != NULL)) {
                         assert (gcs_group_my_idx(group) != recv_act.sender_id);
                         *action = recv_act.buf;
                     }
                     else {
+                        core_act_t* local_act;
                         assert (gcs_group_my_idx(group) == recv_act.sender_id);
-                        /* local action, get from FIFO */
-                        *action = GCS_FIFO_GET (conn->fifo);
-                        assert (NULL != *action);
+                        /* local action, get from FIFO, should be there already
+                         */
+                        if ((local_act = gcs_fifo_lite_get_head (conn->fifo))){
+                            *action = local_act->action;
+                            gcs_fifo_lite_pop_head (conn->fifo);
+                            ret = act_size;
+                            assert (NULL != *action);
+                        }
                     }
 //                   gu_debug ("Received action: sender: %d, size: %d, act: %p",
 //                              conn->recv_msg.sender_id, ret, *action);
@@ -515,7 +540,7 @@ long gcs_core_close (gcs_core_t* conn)
 long gcs_core_destroy (gcs_core_t* core)
 {
     long ret;
-    void* tmp;
+    core_act_t* tmp;
 
     if (!core) return -EBADFD;
 
@@ -536,14 +561,13 @@ long gcs_core_destroy (gcs_core_t* core)
     while (gu_mutex_destroy (&core->send_lock));
 
     /* now noone will interfere */
-    GCS_FIFO_CLOSE   (core->fifo);
-    while ((tmp = GCS_FIFO_GET (core->fifo))) { 
-	/* 
-	 * Note: Must not free this, it's user allocated pointer.
-	 * free (tmp); 
-	 */
+    gcs_fifo_lite_close (core->fifo);
+    while ((tmp = gcs_fifo_lite_get_head (core->fifo))) {
+        // whatever is in tmp.action is allocated by application,
+        // just forget it.
+        gcs_fifo_lite_pop_head (core->fifo);
     }
-    GCS_FIFO_DESTROY (&core->fifo);
+    gcs_fifo_lite_destroy (core->fifo);
     gcs_group_free (&core->group);
 
     /* free buffers */
