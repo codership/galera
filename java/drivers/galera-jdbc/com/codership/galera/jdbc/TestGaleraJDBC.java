@@ -12,6 +12,7 @@ public class TestGaleraJDBC
     public TestGaleraJDBC() throws Exception
     {
         System.setProperty("com.codership.galera_hosts", "localhost,127.0.0.1");
+        System.setProperty("com.codership.galera_dbms_driver", "com.mysql.jdbc.Driver");
         Class.forName("com.codership.galera.jdbc.Driver").newInstance();
 
     }
