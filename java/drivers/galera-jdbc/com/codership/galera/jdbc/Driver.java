@@ -2,10 +2,25 @@
 package com.codership.galera.jdbc;
 
 import java.sql.SQLException;
-import java.sql.Connection;
+import java.sql.SQLClientInfoException;
+
 import java.sql.DriverPropertyInfo;
 import java.sql.DriverManager;
+import java.sql.Statement;
+import java.sql.DatabaseMetaData;
+import java.sql.SQLWarning;
+import java.sql.CallableStatement;
+import java.sql.PreparedStatement;
+import java.sql.Savepoint;
+import java.sql.Clob;
+import java.sql.NClob;
+import java.sql.Blob;
+import java.sql.Array;
+import java.sql.Struct;
+import java.sql.SQLXML;
+
 import java.util.Properties;
+import java.util.Map;
 
 /*
  * System parameters:
@@ -18,17 +33,341 @@ import java.util.Properties;
  */
 class Driver implements java.sql.Driver
 {
-    static String   hosts[];
-    static int      cur        = 0;
     java.sql.Driver realDriver = null;
+
+    class HostList
+    {
+        String[] hosts = null;
+        int      cur   = 0;
+        int[]    cnt   = null;
+
+        public HostList(String hstr)
+        {
+            hosts = hstr.split(",");
+            cnt = new int[hosts.length];
+            for (int i = 0; i < cnt.length; ++i)
+                cnt[i] = 0;
+        }
+
+        public String getNextHost()
+        {
+            if (hosts.length == 0)
+                return null;
+            String host = null;
+            synchronized (this)
+            {
+                host = hosts[cur];
+                cur = (cur + 1) % hosts.length;
+            }
+            return host;
+        }
+        public void increment(String host)
+        {
+            // TODO
+            // System.err.println("Hosts increment " + host);
+        }
+        public void decrement(String host)
+        {
+            // TODO
+            // System.err.println("Hosts decrement " + host);
+        }
+    }
+
+    static HostList hosts = null;
+
+    class Connection implements java.sql.Connection
+    {
+        java.sql.Connection conn = null;
+        String host = null;
+        
+        public Connection(String host, java.sql.Connection conn)
+        {
+            this.host = host;
+            this.conn = conn;
+            hosts.increment(host);
+        }
+        
+        public Connection(java.sql.Connection conn)
+        {
+            this.conn = conn;
+        }
+
+        public Properties getClientInfo() throws SQLException
+        {
+            return conn.getClientInfo();
+        }
+
+        public void setClientInfo(Properties properties)
+                throws SQLClientInfoException
+        {
+            conn.setClientInfo(properties);
+        }
+
+        public String getClientInfo(String name) throws SQLException
+        {
+            return conn.getClientInfo(name);
+        }
+
+        public void setClientInfo(String name, String value)
+                throws SQLClientInfoException
+        {
+            conn.setClientInfo(name, value);
+        }
+
+        public void clearWarnings() throws SQLException
+        {
+            conn.clearWarnings();
+        }
+
+        public void close() throws SQLException
+        {
+            if (host != null) {
+                hosts.decrement(host);
+                host = null;
+            }
+            conn.close();
+        }
+
+        public void commit() throws SQLException
+        {
+            conn.commit();
+        }
+
+        public Statement createStatement() throws SQLException
+        {
+            return conn.createStatement();
+        }
+
+        public Statement createStatement(int resultSetType,
+                int resultSetConcurrency) throws SQLException
+        {
+            return conn.createStatement(resultSetType, resultSetConcurrency);
+        }
+
+        public Statement createStatement(int resultSetType,
+                int resultSetConcurrency, int resultSetHoldability)
+                throws SQLException
+        {
+            return conn.createStatement(resultSetType, resultSetConcurrency,
+                    resultSetHoldability);
+        }
+
+        public Struct createStruct(String typeName, Object[] attributes)
+                throws SQLException
+        {
+            return conn.createStruct(typeName, attributes);
+        }
+
+        public boolean getAutoCommit() throws SQLException
+        {
+            return conn.getAutoCommit();
+        }
+
+        public String getCatalog() throws SQLException
+        {
+            return conn.getCatalog();
+        }
+
+        public int getHoldability() throws SQLException
+        {
+            return conn.getHoldability();
+        }
+
+        public DatabaseMetaData getMetaData() throws SQLException
+        {
+            return conn.getMetaData();
+        }
+
+        public int getTransactionIsolation() throws SQLException
+        {
+            return conn.getTransactionIsolation();
+        }
+
+        public Map<String, Class<?>> getTypeMap() throws SQLException
+        {
+            return conn.getTypeMap();
+        }
+
+        public SQLWarning getWarnings() throws SQLException
+        {
+            return conn.getWarnings();
+        }
+
+        public boolean isClosed() throws SQLException
+        {
+            return conn.isClosed();
+        }
+
+        public boolean isReadOnly() throws SQLException
+        {
+            return conn.isReadOnly();
+        }
+
+        public boolean isValid(int timeout) throws SQLException
+        {
+            return conn.isValid(timeout);
+        }
+
+        public String nativeSQL(String sql) throws SQLException
+        {
+            return conn.nativeSQL(sql);
+        }
+
+        public CallableStatement prepareCall(String sql) throws SQLException
+        {
+            return conn.prepareCall(sql);
+        }
+
+        public CallableStatement prepareCall(String sql, int resultSetType,
+                int resultSetConcurrency) throws SQLException
+        {
+            return conn.prepareCall(sql, resultSetType, resultSetConcurrency);
+        }
+
+        public CallableStatement prepareCall(String sql, int resultSetType,
+                int resultSetConcurrency, int resultSetHoldability)
+                throws SQLException
+        {
+            return conn.prepareCall(sql, resultSetType, resultSetConcurrency,
+                    resultSetHoldability);
+        }
+
+        public PreparedStatement prepareStatement(String sql)
+                throws SQLException
+        {
+            return conn.prepareStatement(sql);
+        }
+
+        public PreparedStatement prepareStatement(String sql,
+                int autoGeneratedKeys) throws SQLException
+        {
+            return conn.prepareStatement(sql, autoGeneratedKeys);
+        }
+
+        public PreparedStatement prepareStatement(String sql,
+                int[] columnIndexes) throws SQLException
+        {
+            return conn.prepareStatement(sql, columnIndexes);
+        }
+
+        public PreparedStatement prepareStatement(String sql,
+                int resultSetType, int resultSetConcurrency)
+                throws SQLException
+        {
+            return conn.prepareStatement(sql, resultSetType,
+                    resultSetConcurrency);
+        }
+
+        public PreparedStatement prepareStatement(String sql,
+                int resultSetType, int resultSetConcurrency,
+                int resultSetHoldability) throws SQLException
+        {
+            return conn.prepareStatement(sql, resultSetType,
+                    resultSetConcurrency, resultSetHoldability);
+        }
+
+        public PreparedStatement prepareStatement(String sql,
+                String[] columnNames) throws SQLException
+        {
+            return conn.prepareStatement(sql, columnNames);
+        }
+
+        public void releaseSavepoint(Savepoint savepoint) throws SQLException
+        {
+            conn.releaseSavepoint(savepoint);
+        }
+
+        public void rollback() throws SQLException
+        {
+            conn.rollback();
+        }
+
+        public void rollback(Savepoint savepoint) throws SQLException
+        {
+            conn.rollback(savepoint);
+        }
+
+        public void setAutoCommit(boolean autoCommit) throws SQLException
+        {
+            conn.setAutoCommit(autoCommit);
+        }
+
+        public void setCatalog(String catalog) throws SQLException
+        {
+            conn.setCatalog(catalog);
+        }
+
+        public void setHoldability(int holdability) throws SQLException
+        {
+            conn.setHoldability(holdability);
+        }
+
+        public void setReadOnly(boolean readOnly) throws SQLException
+        {
+            conn.setReadOnly(readOnly);
+        }
+
+        public Savepoint setSavepoint() throws SQLException
+        {
+            return conn.setSavepoint();
+        }
+
+        public Savepoint setSavepoint(String name) throws SQLException
+        {
+            return conn.setSavepoint(name);
+        }
+
+        public void setTransactionIsolation(int level) throws SQLException
+        {
+            conn.setTransactionIsolation(level);
+        }
+
+        public void setTypeMap(Map<String, Class<?>> map) throws SQLException
+        {
+            conn.setTypeMap(map);
+        }
+
+        public NClob createNClob() throws SQLException
+        {
+            return conn.createNClob();
+        }
+
+        public Clob createClob() throws SQLException
+        {
+            return conn.createClob();
+        }
+
+        public SQLXML createSQLXML() throws SQLException
+        {
+            return conn.createSQLXML();
+        }
+
+        public Blob createBlob() throws SQLException
+        {
+            return conn.createBlob();
+        }
+
+        public Array createArrayOf(String typeName, Object[] elements)
+                throws SQLException
+        {
+            return conn.createArrayOf(typeName, elements);
+        }
+
+        public boolean isWrapperFor(Class<?> iface) throws SQLException
+        {
+            return conn.isWrapperFor(iface);
+        }
+
+        public <T> T unwrap(Class<T> iface) throws SQLException
+        {
+            return unwrap(iface);
+        }
+    }
 
     public Driver() throws Exception
     {
         String hstr = System.getProperty("com.codership.galera_hosts");
-        if (hstr != null)
-        {
-            hosts = hstr.split(",");
-        }
+        hosts = new HostList(hstr);
         realDriver = (java.sql.Driver) Class.forName(
                 System.getProperty("com.codership.galera_dbms_driver"))
                 .newInstance();
@@ -40,21 +379,16 @@ class Driver implements java.sql.Driver
     {
         // System.err.println("connect(" + uri + ")");
         Connection ret = null;
-        if (hosts.length == 0)
+        String host = null;
+        if ((host = hosts.getNextHost()) == null)
         {
-            ret = realDriver.connect(uri.replace("galera:", ""), prop);
+            ret = new Connection(realDriver.connect(uri.replace("galera:", ""),
+                    prop));
         }
         else
         {
-            String realUri = null;
-            synchronized (this)
-            {
-                realUri = uri.replaceFirst("<galera-host>", hosts[cur])
-                        .replace("galera:", "");
-                System.err.println("URI: " + realUri);
-                cur = (cur + 1) % hosts.length;
-            }
-            ret = realDriver.connect(realUri, prop);
+            ret = new Connection(host, realDriver.connect(uri.replace(
+                    "<galera-host>", host).replace("galera:", ""), prop));
         }
         // System.err.println("Return: " + ret);
         return ret;
