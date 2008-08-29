@@ -603,6 +603,8 @@ int gcs_repl (gcs_conn_t          *conn,
                                              act_size, act_type)) == -ERESTART);
                 if (ret < 0) {
                     /* sending failed - remove item from the queue */
+                    gu_warn ("Send action returned %d (%s)",
+                             ret, strerror(-ret));
                     if (gcs_fifo_lite_remove (conn->repl_q)) {
                         gu_fatal ("Failed to recover repl_q");
                         ret = -ENOTRECOVERABLE;
