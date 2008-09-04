@@ -303,10 +303,12 @@ int gcs_conf_debug_on         ();
 int gcs_conf_debug_off        ();
 
 /* Sending options */
-/* Sets maximum network packet size (fragmentation) */
+/* Sets maximum DESIRED network packet size.
+ * For best results should be multiple of MTU */
 extern long
 gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size);
-#define GCS_DEFAULT_PKT_SIZE 1500 /* Standard Ethernet frame */
+//#define GCS_DEFAULT_PKT_SIZE 1500 /* Standard Ethernet frame */
+#define GCS_DEFAULT_PKT_SIZE 66000 /* 44 Eth. frames to carry max IP packet */
 
 /* Membership message */
 /*! Member name max length */
