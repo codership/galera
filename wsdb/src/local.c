@@ -977,7 +977,7 @@ struct wsdb_write_set *wsdb_get_write_set(
 
     GU_DBUG_ENTER("wsdb_get_write_set");
 
-    if (!trx | !trx->first_block) {
+    if (!trx || !trx->first_block) {
 	GU_DBUG_PRINT("wsdb",
 		   ("trx does not exist in wsdb_get_write_set: %llu", trx_id)
         );
