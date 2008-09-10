@@ -320,7 +320,8 @@ public:
 		  + " safe_seq = " + to_string(safe_seq)
 		  + " low = " + to_string(gap.low)
 		  + " high = " + to_string(gap.high));
-	if (seqno_eq(aru_seq, SEQNO_MAX) || seqno_gt(gap.low, aru_seq)) {
+	if (seqno_eq(aru_seq, SEQNO_MAX) || 
+	    seqno_gt(gap.low, seqno_next(aru_seq))) {
 	    update_aru();
 	}
 	if (!seqno_eq(item.get_evs_message().get_aru_seq(), SEQNO_MAX))
