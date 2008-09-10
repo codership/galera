@@ -4,6 +4,7 @@
 
 #include <check.h>
 #include <cstdlib>
+#include <vector>
 
 START_TEST(check_seqno)
 {
@@ -246,10 +247,47 @@ END_TEST
 
 START_TEST(check_input_map_random)
 {
+    // Construct set of messages to be inserted 
+
+    // Fetch messages randomly and insert to input map
+
+    // Iterate over input map - outcome must be 
+    EVSViewId vid(Sockaddr(0), 3);    
+    std::vector<EVSMessage> msgs(SEQNO_MAX/4);
+    
+    for (uint32_t i = 0; i < SEQNO_MAX/4; ++i)
+	msgs[i] = EVSMessage(
+			EVSMessage::USER, 
+			EVSMessage::SAFE, 
+			i,
+			0,
+			SEQNO_MAX,
+			vid,
+			0);
+    
+    EVSInputMap im;
+    im.insert_sa(Sockaddr(1));
+    im.insert_sa(Sockaddr(2));
+    im.insert_sa(Sockaddr(3));
+    im.insert_sa(Sockaddr(4));
+    
+    for (size_t i = 1; i <= 4; ++i) {
+	for (size_t j = msgs.size(); j > 0; --j) {
+	    size_t n = ::rand() % j;
+	    im.insert(EVSInputMapItem(Sockaddr(i), msgs[n], 0));
+	    std::swap(msgs[n], msgs[j - 1]);
+	}
+    }
+
+    size_t cnt = 0;
+    for (EVSInputMap::iterator i = im.begin();
+	 i != im.end(); ++i) {
+	fail_unless(i->get_sockaddr() == Sockaddr(cnt % 4 + 1));
+	fail_unless(seqno_eq(i->get_evs_message().get_seq(), cnt/4));
+	++cnt;
+    }
 
     
-
-
 }
 END_TEST
 
