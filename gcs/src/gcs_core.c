@@ -65,7 +65,7 @@ struct gcs_core
 // this is to pass local action info from send to recv thread.
 typedef struct core_act
 {
-    gcs_seqno_t send_act_no;
+    gcs_seqno_t sent_act_id;
     const void* action;
 }
 core_act_t;
@@ -233,13 +233,19 @@ gcs_core_send (gcs_core_t*      const conn,
     if ((ret = gcs_act_proto_write (&frg, conn->send_buf, conn->send_buf_len)))
 	goto out;
 
-    if ((local_act = gcs_fifo_lite_get_tail (conn->fifo))) {
+    if (gcs_fifo_lite_not_full (conn->fifo) &&
+        (local_act = gcs_fifo_lite_get_tail (conn->fifo))) {
         *local_act  = (typeof(*local_act)){ conn->send_act_no, action };
         gcs_fifo_lite_push_tail (conn->fifo);
     }
     else {
-        gu_fatal ("Could not get FIFO tail.");
-        ret = -ENOTRECOVERABLE;
+        if (gcs_fifo_lite_not_full (conn->fifo)) {
+            gu_fatal ("Could not get FIFO tail.");
+            ret = -ENOTRECOVERABLE;
+        }
+        else {
+            ret = -ERESTART;
+        }
 	goto out;
     }
 
@@ -393,28 +399,44 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
 	switch (recv_msg->type) {
 	case GCS_MSG_ACTION:
             if (gcs_group_is_primary(group)) {
+                gcs_act_frag_t frg;
 		gcs_recv_act_t recv_act;
 
-		ret = gcs_group_handle_act_msg (group, recv_msg, &recv_act);
-		if (ret > 0) {
+                ret = gcs_act_proto_read (&frg, recv_msg->buf, recv_msg->size);
+                if (gu_unlikely(ret)) goto out;
+
+		ret = gcs_group_handle_act_msg (group,&frg,recv_msg,&recv_act);
+
+		if (ret > 0) { /* complete action received */
                     size_t act_size = ret;
-		    /* complete action received */
+
                     *act_id   = ++conn->recv_act_no;
 		    *act_type = recv_act.type;
                     if (gu_likely(recv_act.buf != NULL)) {
                         assert (gcs_group_my_idx(group) != recv_act.sender_id);
                         *action = recv_act.buf;
                     }
-                    else {
+                    else { /* local action, get from FIFO,
+                            * should be there already */
                         core_act_t* local_act;
+                        gcs_seqno_t sent_act_id;
                         assert (gcs_group_my_idx(group) == recv_act.sender_id);
-                        /* local action, get from FIFO, should be there already
-                         */
+
                         if ((local_act = gcs_fifo_lite_get_head (conn->fifo))){
-                            *action = local_act->action;
+                            *action     = local_act->action;
+                            sent_act_id = local_act->sent_act_id;
                             gcs_fifo_lite_pop_head (conn->fifo);
-                            ret = act_size;
-                            assert (NULL != *action);
+                            /* sanity check */
+                            if (sent_act_id == frg.act_id) {
+                                ret = act_size;
+                                assert (NULL != *action);
+                            }
+                            else {
+                                gu_fatal ("Protocol error: "
+                                          "expected send_act_id %llu "
+                                          "found %llu",
+                                          sent_act_id, frg.act_id);
+                            }
                         }
                     }
 //                   gu_debug ("Received action: sender: %d, size: %d, act: %p",

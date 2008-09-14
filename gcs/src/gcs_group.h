@@ -74,27 +74,23 @@ gcs_group_handle_last_msg  (gcs_group_t* group, gcs_recv_msg_t* msg);
  * @return to be determined
  */
 static inline ssize_t
-gcs_group_handle_act_msg (gcs_group_t*    group,
+gcs_group_handle_act_msg (gcs_group_t*          group,
+                          const gcs_act_frag_t* frg,
                           const gcs_recv_msg_t* msg,
-                          gcs_recv_act_t* act)
+                          gcs_recv_act_t*       act)
 {
-    gcs_act_frag_t frg;
     register long sender_id = msg->sender_id;
     register ssize_t ret;
 
     assert (GCS_MSG_ACTION == msg->type);
     assert (sender_id < group->num);
 
-    ret = gcs_act_proto_read (&frg, msg->buf, msg->size);
-    if (gu_likely(!ret)) {
-        ret = gcs_node_handle_act_frag (&group->nodes[sender_id],
-                                        &frg, act,
-                                        (sender_id == group->my_idx));
-        if (gu_unlikely(ret > 0)) {
-            assert (ret == act->buf_len);
-            act->type      = frg.act_type;
-            act->sender_id = sender_id;
-        }
+    ret = gcs_node_handle_act_frag (&group->nodes[sender_id],
+                                    frg, act, (sender_id == group->my_idx));
+    if (gu_unlikely(ret > 0)) {
+        assert (ret == act->buf_len);
+        act->type      = frg->act_type;
+        act->sender_id = sender_id;
     }
 
     return ret;

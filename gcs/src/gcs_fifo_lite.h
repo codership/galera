@@ -113,8 +113,8 @@ gcs_fifo_lite_get_head (gcs_fifo_lite_t* fifo)
             fifo->get_wait++;
             gu_cond_wait (&fifo->get_cond, &fifo->lock);
         }
-        assert (fifo->closed || fifo->used > 0);
 */
+        assert (fifo->closed || fifo->used > 0);
         if (gu_likely(fifo->used > 0)) {
             ret = _gcs_fifo_lite_head (fifo);
         }
@@ -169,6 +169,12 @@ gcs_fifo_lite_remove (gcs_fifo_lite_t* const fifo)
     gu_mutex_unlock (&fifo->lock);
 
     return ret;
+}
+
+static inline bool
+gcs_fifo_lite_not_full (const gcs_fifo_lite_t* const fifo)
+{
+    return (fifo->used < fifo->length);
 }
 
 #endif /* _GCS_FIFO_LITE_H_ */
