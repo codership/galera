@@ -316,7 +316,9 @@ test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
 static inline long
 test_before_send (gcs_test_thread_t* thread)
 {
+#ifdef USE_WAIT
     static const struct timespec wait = { 0, 10000000 };
+#endif
     long ret = 0;
 
     /* create a message */
