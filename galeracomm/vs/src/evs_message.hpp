@@ -5,6 +5,8 @@
 
 #include "gcomm/exception.hpp"
 
+#include "evs_seqno.hpp"
+
 class EVSViewId {
     uint8_t uuid[8];
 public:

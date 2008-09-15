@@ -2,6 +2,7 @@
 #define EVS_HPP
 
 #include "gcomm/transport.hpp"
+#include "gcomm/address.hpp"
 
 #include <map>
 #include <set>

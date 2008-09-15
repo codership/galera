@@ -33,7 +33,7 @@
 //
 
 #include "evs.hpp"
-
+#include "evs_input_map.hpp"
 
 
 struct EVSGap {
@@ -41,19 +41,6 @@ struct EVSGap {
     EVSRange range;
 };
 
-
-
-static struct EVSMessageLstr {
-    bool operator()(const EVSMessage& a, const EVSMessage& b) const {
-	assert(a.get_type() == EVSMessage::USER && 
-	       b.get_type() == EVSMessage::USER);
-	if (a.get_seq() < b.get_seq())
-	    return true;
-	if (a.get_seq() > b.get_seq())
-	    return false;
-	return a.get_source() < b.get_source();
-    }
-} EVSMessageLstr;
 
 
 struct EVSInstance {
