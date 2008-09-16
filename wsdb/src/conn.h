@@ -19,6 +19,11 @@
 int conn_init(uint16_t limit);
 
 /*!
+ * @brief closes connection management and releases allocated resources
+ */
+void conn_close();
+
+/*!
  * @brief removes connection 
  *
  * @param conn_id ID for the connection

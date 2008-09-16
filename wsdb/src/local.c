@@ -203,6 +203,7 @@ void local_close() {
 
     file_cache_close(local_cache);
     wsdb_hash_close(trx_hash);
+    conn_close();
 }
 
 static void remove_trx_info(local_trxid_t trx_id) {

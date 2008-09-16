@@ -39,6 +39,19 @@ int conn_init(uint16_t limit) {
     return 0;
 }
 
+static int cleanup_verdict(void *ctx, void *data, void **new_data)
+{
+    gu_free(data);
+    *new_data = (void*) NULL;
+    return 1;
+}
+
+void conn_close()
+{
+    wsdb_hash_delete_range(conn_hash, NULL, &cleanup_verdict);
+    wsdb_hash_close(conn_hash);
+}
+
 void conn_remove_conn(connid_t conn_id) {
     struct conn_info *conn;
 
