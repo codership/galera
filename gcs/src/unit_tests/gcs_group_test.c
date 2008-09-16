@@ -81,7 +81,7 @@ START_TEST (gcs_group_configuration)
 
     // recv message structures
     gcs_recv_msg_t msg1, msg2, msg3, msg4, msg5;
-    gcs_act_frag_t frg1, frg2, frg3, frg4, frg5;
+    gcs_act_frag_t frg1, frg2, frg3, frg4, frg5, frg;
 
     gcs_recv_act_t act;
     
@@ -135,47 +135,56 @@ START_TEST (gcs_group_configuration)
     fail_if (!gcs_group_is_primary(&group));
     fail_if (!gcs_group_new_members(&group)); RECEIVE_SYNC();
 
+#define TRY_MESSAGE(msg) \
+    ret = gcs_act_proto_read (&frg, (msg).buf, (msg).size);     \
+    ret = gcs_group_handle_act_msg (&group, &frg, &(msg), &act);
+
     // 1. Try fragment that is not the first
-    memset (&act, 0, sizeof(act)); 
-    ret = gcs_group_handle_act_msg (&group, &msg3, &act);
+    memset (&act, 0, sizeof(act));
+//    ret = gcs_group_handle_act_msg (&group, &frg, &msg3, &act);
+    TRY_MESSAGE(msg3);
     fail_if (ret != -EPROTO);
     fail_if (act.buf != NULL);
     fail_if (act.buf_len != 0);
     mark_point();
 
     // 2. Try first fragment
-    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+    TRY_MESSAGE(msg1);
     fail_if (ret != 0);
     fail_if (act.buf != NULL);
     fail_if (act.buf_len != 0);
 
 #define TRY_WRONG_2ND_FRAGMENT(frag)                      \
-    ret = gcs_group_handle_act_msg (&group, frag, &act);  \
+    /*ret = gcs_group_handle_act_msg (&group, &frag, &act);*/    \
+    TRY_MESSAGE(frag);                                    \
     fail_if (ret != -EPROTO);                             \
     fail_if (act.buf_len != 0);
 
     // 3. Try first fragment again
-    TRY_WRONG_2ND_FRAGMENT(&msg1);
+    TRY_WRONG_2ND_FRAGMENT(msg1);
 
     // 4. Try third fragment
-    TRY_WRONG_2ND_FRAGMENT(&msg3);
+    TRY_WRONG_2ND_FRAGMENT(msg3);
 
     // 5. Try fouth fragment
-    TRY_WRONG_2ND_FRAGMENT(&msg4);
+    TRY_WRONG_2ND_FRAGMENT(msg4);
 
     // 6. Try fifth fragment
-    TRY_WRONG_2ND_FRAGMENT(&msg5);
+    TRY_WRONG_2ND_FRAGMENT(msg5);
 
-    // 7. Try second fragment
-    ret = gcs_group_handle_act_msg (&group, &msg2, &act);
+    // 7. Try correct second fragment
+//    ret = gcs_group_handle_act_msg (&group, &msg2, &act);
+    TRY_MESSAGE(msg2);
     fail_if (ret != 0);
     fail_if (act.buf != NULL); act.buf = (void*)0x12354; // shall be NULLed
     fail_if (act.buf_len != 0);
 
     // 8. Try third fragment, last one
-    ret = gcs_group_handle_act_msg (&group, &msg3, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg3, &act);
+    TRY_MESSAGE(msg3);
     fail_if (ret != act_len);
-    fail_if (act.sender_id != 0);
+    fail_if (act.sender_idx != 0);
     fail_if (act.buf != NULL); // local action, must be fetched from local fifo
     fail_if (act.buf_len != act_len);
     // cleanup
@@ -194,21 +203,24 @@ START_TEST (gcs_group_configuration)
     fail_if (!gcs_group_new_members(&group)); RECEIVE_SYNC();
     
     // 11. Try the same with foreign action (now my index is 1, sender is 0)
-    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+    TRY_MESSAGE(msg1);
     fail_if (ret != 0);
     fail_if (act.buf_len != 0);
     fail_if (act.buf != NULL);
-    ret = gcs_group_handle_act_msg (&group, &msg2, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg2, &act);
+    TRY_MESSAGE(msg2);
     fail_if (ret != 0);
     fail_if (act.buf_len != 0);
     fail_if (act.buf != NULL);
-    ret = gcs_group_handle_act_msg (&group, &msg3, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg3, &act);
+    TRY_MESSAGE(msg3);
     fail_if (ret != act_len);
     fail_if (act.buf_len != act_len);
     fail_if (act.buf == NULL);
     fail_if (strncmp(act.buf, act_buf, act_len),
              "Action received: '%s', expected '%s'", act_buf);
-    fail_if (act.sender_id != 0);
+    fail_if (act.sender_idx != 0);
     fail_if (act.type != GCS_ACT_DATA);
     // cleanup
     free (act.buf);
@@ -222,7 +234,8 @@ START_TEST (gcs_group_configuration)
     fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
     fail_if (gcs_comp_msg_add (comp, DISTANTHOST) < 0);
 
-    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+    TRY_MESSAGE(msg1);
     fail_if (ret != 0);
     fail_if (act.buf_len != 0);
     fail_if (act.buf != NULL);
@@ -233,21 +246,24 @@ START_TEST (gcs_group_configuration)
     fail_if (!gcs_group_new_members(&group)); RECEIVE_SYNC();
     
     // now I must be able to resend the action from scratch
-    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+    TRY_MESSAGE(msg1);
     fail_if (ret != 0);
     fail_if (act.buf_len != 0);
     fail_if (act.buf != NULL);
-    ret = gcs_group_handle_act_msg (&group, &msg2, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg2, &act);
+    TRY_MESSAGE(msg2);
     fail_if (ret != 0);
     fail_if (act.buf_len != 0);
     fail_if (act.buf != NULL);
-    ret = gcs_group_handle_act_msg (&group, &msg3, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg3, &act);
+    TRY_MESSAGE(msg3);
     fail_if (ret != act_len);
     fail_if (act.buf_len != act_len);
     fail_if (act.buf == NULL);
     fail_if (strncmp(act.buf, act_buf, act_len),
              "Action received: '%s', expected '%s'", act_buf);
-    fail_if (act.sender_id != 0);
+    fail_if (act.sender_idx != 0);
     fail_if (act.type != GCS_ACT_DATA);
     // cleanup
     free (act.buf);
@@ -262,19 +278,22 @@ START_TEST (gcs_group_configuration)
     fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
 
     // Each node sends a message
-    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+    TRY_MESSAGE(msg1);
     fail_if (ret != 0);
     fail_if (act.buf_len != 0);
     fail_if (act.buf != NULL);
 
     msg_write (&msg1, &frg1, buf1, buf_len, frag1, frag1_len, 1,GCS_MSG_ACTION);
-    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+    TRY_MESSAGE(msg1);
     fail_if (ret != 0);
     fail_if (act.buf_len != 0);
     fail_if (act.buf != NULL);
 
     msg_write (&msg1, &frg1, buf1, buf_len, frag1, frag1_len, 2,GCS_MSG_ACTION);
-    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+    TRY_MESSAGE(msg1);
     fail_if (ret != 0);
     fail_if (act.buf_len != 0);
     fail_if (act.buf != NULL);
@@ -290,30 +309,34 @@ START_TEST (gcs_group_configuration)
     gcs_comp_msg_delete (comp);
 
     // now I just continue sending messages
-    ret = gcs_group_handle_act_msg (&group, &msg2, &act); // local
+//    ret = gcs_group_handle_act_msg (&group, &msg2, &act); // local
+    TRY_MESSAGE(msg2);
     fail_if (ret != 0, "%d (%s)", ret, strerror(-ret));
     fail_if (act.buf_len != 0);
     fail_if (act.buf != NULL);
     msg_write (&msg2, &frg2, buf2, buf_len, frag2, frag2_len, 1,GCS_MSG_ACTION);
-    ret = gcs_group_handle_act_msg (&group, &msg2, &act); // foreign
+//    ret = gcs_group_handle_act_msg (&group, &msg2, &act); // foreign
+    TRY_MESSAGE(msg2);
     fail_if (ret != 0);
     fail_if (act.buf_len != 0);
     fail_if (act.buf != NULL); act.buf = (void*)0x11111; // shall be NULLed
-    ret = gcs_group_handle_act_msg (&group, &msg3, &act); // local
+//    ret = gcs_group_handle_act_msg (&group, &msg3, &act); // local
+    TRY_MESSAGE(msg3);
     fail_if (ret != act_len);
     fail_if (act.buf_len != act_len);
     fail_if (act.buf != NULL);
-    fail_if (act.sender_id != 0);
+    fail_if (act.sender_idx != 0);
     fail_if (act.type != GCS_ACT_DATA);
 
     msg_write (&msg3, &frg3, buf3, buf_len, frag3, frag3_len, 1,GCS_MSG_ACTION);
-    ret = gcs_group_handle_act_msg (&group, &msg3, &act); // foreign
+//    ret = gcs_group_handle_act_msg (&group, &msg3, &act); // foreign
+    TRY_MESSAGE(msg3);
     fail_if (ret != act_len);
     fail_if (act.buf_len != act_len);
     fail_if (act.buf == NULL);
     fail_if (strncmp(act.buf, act_buf, act_len),
              "Action received: '%s', expected '%s'", act_buf);
-    fail_if (act.sender_id != 1);
+    fail_if (act.sender_idx != 1);
     fail_if (act.type != GCS_ACT_DATA);
     // cleanup
     free (act.buf);
