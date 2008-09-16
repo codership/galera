@@ -154,6 +154,13 @@ enum galera_status galera_set_conf_param_cb(
     GU_DBUG_RETURN(GALERA_OK);
 }
 
+enum galera_status galera_set_logger(galera_log_cb_t logger)
+{
+    GU_DBUG_ENTER("galera_set_logger");
+    gu_conf_set_log_callback(logger);
+    GU_DBUG_RETURN(GALERA_OK);
+}
+
 enum galera_status galera_init(const char*          group,
 			       const char*          address,
 			       const char*          data_dir,
@@ -212,9 +219,6 @@ void galera_dbug_pop (void)
 }
 
 enum galera_status galera_tear_down() {
-
-    /* mysql error logger is not safe anymore during shutdown */
-    gu_conf_set_log_callback(NULL);
 
     if (gcs_conn) gcs_destroy (gcs_conn);
     if (to_queue)     gcs_to_destroy(&to_queue);

@@ -142,6 +142,15 @@ typedef int (*galera_bf_apply_row_fun)(void *ctx, void *data, uint len);
 enum galera_status galera_tear_down();
 
 /*!
+ * @brief sets the logger callback for galera library
+ * If logger is NULL, logger callback is not active
+ *
+ * @param error_fun   handler for error logging from galera library
+ *
+ */
+enum galera_status galera_set_logger(galera_log_cb_t logger);
+
+/*!
  * @brief initializes galera library
  *
  * @param gcs_group   symbolic group name (serves as unique group ID)

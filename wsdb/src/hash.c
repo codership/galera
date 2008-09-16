@@ -67,6 +67,12 @@ static void hash_search_entry(
 
     match->entry = match->prev = NULL;
     match->idx = hash->hash_fun(hash->array_size, key_len, key);
+
+    if (match->idx >= hash->array_size) {
+        gu_error("hash array size exceeded: %d", match->idx);
+        assert(0);
+    }
+
     e = hash->elems[match->idx];
     while (e) {
         switch(hash->hash_cmp(
