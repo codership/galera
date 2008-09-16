@@ -37,11 +37,7 @@ int wsdb_cert_close();
  * @retval WSDB_OK
  * @retval WSDB_CERTIFICATION_FAIL certification failed, trx must abort
  */
-#ifndef IMPROVED_PURGING
 int wsdb_certification_test(
     struct wsdb_write_set *ws, trx_seqno_t trx_seqno
 );
-#else
-int wsdb_certification_test(struct wsdb_write_set *ws, trx_seqno_t trx_seqno);
-#endif
 #endif
