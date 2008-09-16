@@ -51,7 +51,22 @@ struct wsdb_hash *wsdb_hash_open(
 }
 
 int wsdb_hash_close(struct wsdb_hash *hash) {
+    int i;
     CHECK_OBJ(hash, wsdb_hash);
+    /* Should we lock here? gu_mutex_lock(&hash->mutex); */
+    for (i = 0; i < hash->array_size; i++) {
+	if (hash->elems[i]) {
+	    struct hash_entry *e = (struct hash_entry *) hash->elems[i];
+	    struct hash_entry *e_next;
+	    for (; e; e = e_next) {
+		e_next = e->next;
+		if (e->key_len > 4)
+		    gu_free(e->key);
+		gu_free(e);
+	    }
+	}
+	hash->elems[i] = NULL;
+    }
 
     gu_free(hash);
     return WSDB_OK;
