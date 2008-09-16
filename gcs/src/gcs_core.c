@@ -19,7 +19,7 @@
 #include "gcs_group.h"
 #include "gcs_core.h"
 
-const size_t CORE_FIFO_LEN = 1<<3; // 8 elements
+const size_t CORE_FIFO_LEN = 1<<8; // 256 elements (no need to have more)
 const size_t CORE_INIT_BUF_SIZE = 4096;
 
 typedef enum core_state
