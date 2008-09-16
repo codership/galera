@@ -541,9 +541,7 @@ int gcs_send (gcs_conn_t*          conn,
             if (act != NULL) {
                 memcpy (act, action, act_size);
                 while ((ret = gcs_core_send (conn->core, act,
-                                             act_size, act_type)) == -ERESTART){
-                    usleep (1000);
-                }
+                                             act_size, act_type)) == -ERESTART);
             }
             else {
                 ret = -ENOMEM;
@@ -602,9 +600,7 @@ int gcs_repl (gcs_conn_t          *conn,
                 gcs_fifo_lite_push_tail (conn->repl_q);
                 // Keep on trying until something else comes out
                 while ((ret = gcs_core_send (conn->core, action,
-                                             act_size, act_type)) == -ERESTART){
-                    usleep (1000);
-                }
+                                             act_size, act_type)) == -ERESTART);
                 if (ret < 0) {
                     /* sending failed - remove item from the queue */
                     gu_warn ("Send action returned %d (%s)",

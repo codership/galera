@@ -137,6 +137,18 @@ gcs_core_open (gcs_core_t* core,
     return ret;
 }
 
+/* Translates different core states into standard errors */
+static ssize_t
+core_error (core_state_t state)
+{
+    switch (state) {
+    case CORE_NON_PRIMARY: return -ENOTCONN;
+    case CORE_CLOSED:      return -ECONNABORTED;
+    case CORE_DESTROYED:   return -EBADFD;
+    default: assert(0);    return -ENOTRECOVERABLE;
+    }
+}
+
 /*!
  * Performs an attempt at sending a message (action fragment) with all
  * required checks while holding a lock, ensuring exclusive access to backend.
@@ -168,12 +180,7 @@ core_msg_send (gcs_core_t*    core,
                 ret = -ERESTART;            // ask to restart action sending
             }
             else {
-                switch (core->state) {
-                case CORE_NON_PRIMARY: ret = -ENOTCONN; break;
-                case CORE_CLOSED:      ret = -ECONNABORTED; break;
-                case CORE_DESTROYED:   ret = -EBADFD; break;
-                default: assert(0);
-                }
+                ret = core_error (core->state);
             }
         }
         gu_mutex_unlock (&core->send_lock);
@@ -233,19 +240,13 @@ gcs_core_send (gcs_core_t*      const conn,
     if ((ret = gcs_act_proto_write (&frg, conn->send_buf, conn->send_buf_len)))
 	goto out;
 
-    if (gcs_fifo_lite_not_full (conn->fifo) &&
-        (local_act = gcs_fifo_lite_get_tail (conn->fifo))) {
+    if ((local_act = gcs_fifo_lite_get_tail (conn->fifo))) {
         *local_act  = (typeof(*local_act)){ conn->send_act_no, action };
         gcs_fifo_lite_push_tail (conn->fifo);
     }
     else {
-        if (gcs_fifo_lite_not_full (conn->fifo)) {
-            gu_fatal ("Could not get FIFO tail.");
-            ret = -ENOTRECOVERABLE;
-        }
-        else {
-            ret = -ERESTART;
-        }
+        ret = core_error (conn->state);
+        gu_error ("Failed to access core FIFO: %d (%s)", ret, strerror (-ret));
 	goto out;
     }
 
