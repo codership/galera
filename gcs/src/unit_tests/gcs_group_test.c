@@ -184,7 +184,7 @@ START_TEST (gcs_group_configuration)
 //    ret = gcs_group_handle_act_msg (&group, &msg3, &act);
     TRY_MESSAGE(msg3);
     fail_if (ret != act_len);
-    fail_if (act.sender_idx != 0);
+    fail_if (act.sender_id != 0);
     fail_if (act.buf != NULL); // local action, must be fetched from local fifo
     fail_if (act.buf_len != act_len);
     // cleanup
@@ -220,7 +220,7 @@ START_TEST (gcs_group_configuration)
     fail_if (act.buf == NULL);
     fail_if (strncmp(act.buf, act_buf, act_len),
              "Action received: '%s', expected '%s'", act_buf);
-    fail_if (act.sender_idx != 0);
+    fail_if (act.sender_id != 0);
     fail_if (act.type != GCS_ACT_DATA);
     // cleanup
     free (act.buf);
@@ -263,7 +263,7 @@ START_TEST (gcs_group_configuration)
     fail_if (act.buf == NULL);
     fail_if (strncmp(act.buf, act_buf, act_len),
              "Action received: '%s', expected '%s'", act_buf);
-    fail_if (act.sender_idx != 0);
+    fail_if (act.sender_id != 0);
     fail_if (act.type != GCS_ACT_DATA);
     // cleanup
     free (act.buf);
@@ -325,7 +325,7 @@ START_TEST (gcs_group_configuration)
     fail_if (ret != act_len);
     fail_if (act.buf_len != act_len);
     fail_if (act.buf != NULL);
-    fail_if (act.sender_idx != 0);
+    fail_if (act.sender_id != 0);
     fail_if (act.type != GCS_ACT_DATA);
 
     msg_write (&msg3, &frg3, buf3, buf_len, frag3, frag3_len, 1,GCS_MSG_ACTION);
@@ -336,7 +336,7 @@ START_TEST (gcs_group_configuration)
     fail_if (act.buf == NULL);
     fail_if (strncmp(act.buf, act_buf, act_len),
              "Action received: '%s', expected '%s'", act_buf);
-    fail_if (act.sender_idx != 1);
+    fail_if (act.sender_id != 1);
     fail_if (act.type != GCS_ACT_DATA);
     // cleanup
     free (act.buf);
