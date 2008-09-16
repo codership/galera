@@ -178,6 +178,7 @@ static GCS_BACKEND_RECV_FN(gcs_vs_recv)
     if (conn == 0)
 	return -EBADFD;
     
+retry:
     std::pair<vs_ev, bool> wr(conn->vs_ctx.wait_event());
     if (wr.second == false)
 	return -ENOTCONN;
@@ -208,6 +209,10 @@ static GCS_BACKEND_RECV_FN(gcs_vs_recv)
 	    ev.view->get_addr().size()*2 + ev.view->get_left().size() 
 	    < static_cast<size_t>(gcs_comp_msg_num(conn->comp_msg))) {
 	    new_comp = gcs_comp_msg_new(false, 0, ev.view->get_addr().size());
+	} else if (ev.view->is_trans()) {
+	    // Drop transitional views that lead to prim comp
+	    conn->vs_ctx.release_event();
+	    goto retry;
 	} else {
 	    new_comp = gcs_comp_msg_new(true, 0, ev.view->get_addr().size());
 	}
