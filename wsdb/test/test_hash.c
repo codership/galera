@@ -53,8 +53,7 @@ START_TEST (test_hash_cache)
 {
     unsigned long i = 0;
     unsigned long k;
-    fail_if((i==1), "dummy");
-	
+
     /* unit test code */
     s_hash_size = 5000;
     struct wsdb_hash *hash = wsdb_hash_open(
@@ -97,7 +96,6 @@ END_TEST
 START_TEST (test_hash_trivial)
 {
     unsigned long i = 0;
-    fail_if((i==1), "dummy");
 	
     /* unit test code */
     s_hash_size = 100;
@@ -189,6 +187,70 @@ START_TEST (test_hash_big_64_key)
 }
 END_TEST
 
+START_TEST (test_hash_huge_64_key)
+{
+    int round=0;
+    int mem_size=0;
+    /* unit test code */
+    s_hash_size = 64000;
+    struct wsdb_hash *hash = wsdb_hash_open(s_hash_size, hash_fun, hash_cmp);
+
+    for (round=1; round<10000; round++) {
+        uint64_t i;
+        mark_point();
+        for (i=1; i<1000; i++) {
+            int *val = (int *)malloc(sizeof(int));
+            uint64_t key = i*round;
+            *val = 10000+i;
+            if(wsdb_hash_push(hash,sizeof(uint64_t),(char *)&key,(void *)val)){
+                fail("hash push: %d", i);
+            }
+        }
+        if (mem_size == 0) {
+            mem_size = wsdb_hash_report(hash);
+        } else {
+            fail_if(mem_size != wsdb_hash_report(hash),
+                "allocation difference, round: %d mem now: %d previous: %d",
+                round, wsdb_hash_report(hash), mem_size
+            );
+        }
+
+        mark_point();
+        for (i=1; i<1000; i++) {
+            uint64_t key = i*round;
+            int *val = (int *)wsdb_hash_search(
+                hash, sizeof(uint64_t), (char *)&key
+            );
+            fail_unless((*val == 10000+i), 
+                "hash search, round: %d idx: %i val: %i", round, i, *val
+            );
+        }
+        mark_point();
+        for (i=1; i<1000; i++) {
+            uint64_t key = i*round;
+            int *val = (int *)wsdb_hash_delete(
+                hash, sizeof(uint64_t), (char *)&key
+            );
+            fail_unless((*val == 10000+i), "hash delete: %i %i", i, *val);
+            free(val);
+        }
+        mark_point();
+        for (i=1; i<1000; i++) {
+            uint64_t key = i*round;
+            int *val = (int *)wsdb_hash_search(
+                hash, sizeof(uint64_t), (char *)&key
+            );
+            fail_unless((val == NULL), "hash search found deleted item: %i", i);
+        }
+    }
+    
+    printf("after round: %d mem: %d\n", round, wsdb_hash_report(hash));
+    fail_if(wsdb_hash_close(hash), "hash close");
+    printf("hash closed\n");
+
+}
+END_TEST
+
 static int delete_verdict(void *ctx, void *data, void **data_ptr) {
     if ((unsigned long)data < (*(unsigned long *)ctx)) {
         return 1;
@@ -241,7 +303,7 @@ Suite *make_hash_suite(void)
     Suite *s = suite_create("hash");
     TCase *tc_core = tcase_create("Core");
     
-    suite_add_tcase (s, tc_core);
+    tcase_add_test(tc_core, test_hash_huge_64_key);
     tcase_add_test(tc_core, test_hash_cache);
     tcase_add_test(tc_core, test_hash_overflow);
     tcase_add_test(tc_core, test_hash_trivial);
@@ -249,6 +311,8 @@ Suite *make_hash_suite(void)
     tcase_add_test(tc_core, test_hash_big_64_key);
     tcase_add_test(tc_core, test_hash_purge);
     
+    suite_add_tcase (s, tc_core);
+
     return s;
 }
 
