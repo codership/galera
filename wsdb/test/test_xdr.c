@@ -140,6 +140,7 @@ START_TEST (test_xdr)
         }
         mark_point();
     }
+    wsdb_close();
 }
 END_TEST
 Suite *make_xdr_suite(void)

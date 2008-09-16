@@ -174,6 +174,7 @@ START_TEST (test_wsdb_api)
             break;
         }
     }
+    wsdb_close();
 }
 END_TEST
 #ifdef REMOVED
