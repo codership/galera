@@ -12,6 +12,7 @@
 long
 gcs_group_init (gcs_group_t* group)
 {
+    group->act_id           = 0;
     group->conf_id      = -1;
     group->num          = 0;
     group->my_idx       = -1;

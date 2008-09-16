@@ -49,7 +49,6 @@ struct gcs_core
 
     /* recv part */
     gcs_recv_msg_t  recv_msg;
-    gcs_seqno_t     recv_act_no;
 
     /* local action FIFO */
     gcs_fifo_lite_t*     fifo;
@@ -367,19 +366,180 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg)
     return ret;
 }
 
+/*!
+ * Helper for gcs_core_recv(). Handles GCS_MSG_ACTION.
+ *
+ * @return action size, negative error code or 0 to continue.
+ */
+static inline ssize_t
+core_handle_act_msg (gcs_core_t*     core,
+                     gcs_recv_msg_t* msg,
+                     gcs_recv_act_t* act)
+{
+    ssize_t        ret = 0;
+    gcs_group_t*   group = &core->group;
+    gcs_act_frag_t frg;
+
+    assert (GCS_MSG_ACTION == msg->type);
+
+    if (gcs_group_is_primary(group)) {
+
+        ret = gcs_act_proto_read (&frg, msg->buf, msg->size);
+        if (gu_unlikely(ret)) return ret;
+
+        ret = gcs_group_handle_act_msg (group, &frg, msg, act);
+
+        if (ret > 0) { /* complete action received */
+
+            if (gu_likely(gcs_group_my_idx(group) != act->sender_idx)) {
+                /* foreign action, must be passed from gcs_group */
+                assert (act->buf != NULL);
+            }
+            else {
+                /* local action, get from FIFO, should be there already */
+                core_act_t* local_act;
+                gcs_seqno_t sent_act_id;
+                assert (act->buf == NULL);
+
+                if ((local_act = gcs_fifo_lite_get_head (core->fifo))){
+                    act->buf    = local_act->action;
+                    sent_act_id = local_act->sent_act_id;
+                    assert (NULL != act->buf);
+                    gcs_fifo_lite_pop_head (core->fifo);
+                    /* sanity check */
+                    if (gu_unlikely(sent_act_id != frg.act_id)) {
+                        gu_fatal ("FIFO violation: expected sent_act_id %llu "
+                                  "found %llu", sent_act_id, frg.act_id);
+                        ret = -ENOTRECOVERABLE;
+                    }
+                }
+                else {
+                    gu_fatal ("FIFO violation: queue empty when local action "
+                              "received");
+                    ret = -ENOTRECOVERABLE;
+                }
+            }
+//          gu_debug ("Received action: seqno: %llu, sender: %d, size: %d, act: %p",
+//                     act->id, msg->sender_id, ret, act->buf);
+//          gu_debug ("%s", (char*) act->buf);
+        }
+    }
+    else { /* Non-primary - ignore action */
+        gu_warn ("Action message in non-primary configuration from "
+                 "member %d", msg->sender_id);
+    }
+
+    return ret;
+}
+
+/*!
+ * Helper for gcs_core_recv(). Handles GCS_MSG_LAST.
+ *
+ * @return action size, negative error code or 0 to continue.
+ */
+static ssize_t
+core_handle_last_msg (gcs_core_t*     core,
+                      gcs_recv_msg_t* msg,
+                      gcs_recv_act_t* act)
+{
+    assert (GCS_MSG_LAST == msg->type);
+
+    if (gcs_group_is_primary(&core->group)) {
+        gcs_seqno_t commit_cut =
+            gcs_group_handle_last_msg (&core->group, msg);
+        if (commit_cut) {
+            /* commit cut changed */
+            if ((act->buf = malloc (sizeof (commit_cut)))) {
+                act->type                 = GCS_ACT_COMMIT_CUT;
+                *((gcs_seqno_t*)act->buf) = commit_cut;
+                return sizeof(commit_cut);
+            }
+            else {
+                gu_fatal ("Out of memory for GCS_ACT_COMMIT_CUT");
+                return -ENOMEM;
+            }
+        }
+    }
+    else { /* Non-primary - ignore last message */
+        gu_warn ("Last Applied Action message "
+                 "in non-primary configuration from member %d",
+                 msg->sender_id);
+    }
+    return 0;
+}
+
+/*!
+ * Helper for gcs_core_recv(). Handles GCS_MSG_COMPONENT.
+ *
+ * @return action size, negative error code or 0 to continue.
+ */
+static ssize_t
+core_handle_comp_msg (gcs_core_t*     core,
+                      gcs_recv_msg_t* msg,
+                      gcs_recv_act_t* act)
+{
+    ssize_t      ret;
+    gcs_group_t* group = &core->group;
+
+    assert (GCS_MSG_COMPONENT == msg->type);
+
+    ret = gcs_group_handle_comp_msg (group, msg->buf);
+    if (ret >= 0) {
+        /* How it should really be:
+         * 1. When GCS_MSG_COMPONENT is received, we send GCS_MSG_STATE
+         * 2. When all GCS_MSG_STATE received, we can create calculate
+         *    quorum, determine global seqno and create GCS_ACT_CONF
+         */
+        // no more SYNC messages!
+        act->buf = gcs_group_handle_sync_msg (group, NULL);
+        if (!act->buf) {
+            gu_fatal ("Failed to handle SYNC msg.");
+            abort();
+        }
+        act->type = GCS_ACT_CONF;
+
+        gu_info ("Received %s component event. conf_id = %ld",
+                 gcs_group_is_primary(group) ?
+                 "primary" : "non-primary", group->conf_id);
+        ret = core_act_conf_size ((gcs_act_conf_t*)act->buf);
+
+        if (gu_mutex_lock (&core->send_lock)) abort();
+        {
+            if (gcs_group_is_primary (group)) {
+                // if new members are added, need to resend ongoing actions
+                core->send_restart = gcs_group_new_members (group);
+                // if state is CLOSING or CLOSED we don't change that
+                if (core->state == CORE_NON_PRIMARY)
+                    core->state =  CORE_PRIMARY;
+            } else {
+                if (core->state == CORE_PRIMARY)
+                    core->state =  CORE_NON_PRIMARY;
+            }
+        }
+        gu_mutex_unlock (&core->send_lock);
+    }
+    else {
+        gu_fatal ("Failed to handle component message: '%s'!",
+                  strerror (ret));
+        assert(0);
+    }
+
+    return ret;
+}
+
 /*! Receives action */
 ssize_t gcs_core_recv (gcs_core_t*      conn,
                        const void**     action,
                        gcs_act_type_t*  act_type,
                        gcs_seqno_t*     act_id) // global ID
 {
+    gcs_recv_act_t  recv_act;
     gcs_recv_msg_t* recv_msg = &conn->recv_msg;
-    gcs_group_t*    group    = &conn->group;
     ssize_t         ret      = 0;
 
-    *action   = NULL;
-    *act_type = GCS_ACT_ERROR;
-    *act_id   = GCS_SEQNO_ILL; // by default action is unordered
+    recv_act.buf  = NULL;
+    recv_act.type = GCS_ACT_ERROR;
+    recv_act.id   = GCS_SEQNO_ILL; // by default action is unordered
 
     if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
     if (conn->state >= CORE_CLOSED) {
@@ -399,132 +559,32 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
 
 	switch (recv_msg->type) {
 	case GCS_MSG_ACTION:
-            if (gcs_group_is_primary(group)) {
-                gcs_act_frag_t frg;
-		gcs_recv_act_t recv_act;
-
-                ret = gcs_act_proto_read (&frg, recv_msg->buf, recv_msg->size);
-                if (gu_unlikely(ret)) goto out;
-
-		ret = gcs_group_handle_act_msg (group,&frg,recv_msg,&recv_act);
-
-		if (ret > 0) { /* complete action received */
-                    size_t act_size = ret;
-
-                    *act_id   = ++conn->recv_act_no;
-		    *act_type = recv_act.type;
-                    if (gu_likely(recv_act.buf != NULL)) {
-                        assert (gcs_group_my_idx(group) != recv_act.sender_id);
-                        *action = recv_act.buf;
-                    }
-                    else { /* local action, get from FIFO,
-                            * should be there already */
-                        core_act_t* local_act;
-                        gcs_seqno_t sent_act_id;
-                        assert (gcs_group_my_idx(group) == recv_act.sender_id);
-
-                        if ((local_act = gcs_fifo_lite_get_head (conn->fifo))){
-                            *action     = local_act->action;
-                            sent_act_id = local_act->sent_act_id;
-                            gcs_fifo_lite_pop_head (conn->fifo);
-                            /* sanity check */
-                            if (sent_act_id == frg.act_id) {
-                                ret = act_size;
-                                assert (NULL != *action);
-                            }
-                            else {
-                                gu_fatal ("Protocol error: "
-                                          "expected send_act_id %llu "
-                                          "found %llu",
-                                          sent_act_id, frg.act_id);
-                            }
-                        }
-                    }
-//                   gu_debug ("Received action: sender: %d, size: %d, act: %p",
-//                              conn->recv_msg.sender_id, ret, *action);
-//                   gu_debug ("%s", (char*) *action);
-		    goto out; /* exit loop */
-		}
-		else if (ret < 0) {
-                    assert (0);
-		    goto out;
-		}
-	    }
-	    else { /* Non-primary - ignore action */
-		gu_warn ("Action message in non-primary configuration from "
-			  "member %d", recv_msg->sender_id);
+            ret = core_handle_act_msg(conn, recv_msg, &recv_act);
+            if (ret) { // either complete action or error
+                assert (ret > 0); // hang on error in debug mode
+                goto out; // break from loop
 	    }
 	    break;
         case GCS_MSG_FLOW:
-            *act_type = GCS_ACT_FLOW;
-            *action   = recv_msg->buf; // no need to malloc since it is internal
+            recv_act.type = GCS_ACT_FLOW;
+            // no need to malloc since it is for internal use
+            // do we need a size sanity check here?
+            recv_act.buf  = recv_msg->buf;
             goto out;
         case GCS_MSG_LAST:
-            if (gcs_group_is_primary(group)) {
-                gcs_seqno_t commit_cut =
-                    gcs_group_handle_last_msg (group, recv_msg);
-                if (commit_cut) {
-                    /* commit cut changed */
-                    if ((*action  = malloc (sizeof (commit_cut)))) {
-                        *act_type = GCS_ACT_COMMIT_CUT;
-                        *((gcs_seqno_t*)*action) = commit_cut;
-                        ret = sizeof(commit_cut);
-                        goto out;
-                    }
-                    else {
-                        gu_fatal ("Out of memory for GCS_ACT_COMMIT_CUT");
-                        abort();
-                    }
-                }
-	    }
-	    else { /* Non-primary - ignore last message */
-		gu_warn ("Last Applied Action message "
-                         "in non-primary configuration from member %d",
-                         recv_msg->sender_id);
+            ret = core_handle_last_msg(conn, recv_msg, &recv_act);
+            if (ret) { // either complete action or error
+                assert (ret > 0);
+                goto out; // break from loop
 	    }
             break;
 	case GCS_MSG_COMPONENT:
-            ret = gcs_group_handle_comp_msg (group, recv_msg->buf);
-	    if (ret >= 0) {
-                /* How it should really be:
-                 * 1. When GCS_MSG_COMPONENT is received, we send GCS_MSG_FLUSH
-                 * 2. When this component representative receives all FLUSH
-                 *    messages, it sends SYNC message.
-                 * 3. When GCS_MSG_SYNC received, we can create GCS_ACT_CONF
-                 */
-                *action = gcs_group_handle_sync_msg (group, NULL);
-                if (!action) {
-                    gu_fatal ("Failed to handle SYNC msg.");
-                    abort();
-                }
-                *act_type = GCS_ACT_CONF;
-
-                if ((ret = gu_mutex_lock (&conn->send_lock))) abort();
-                {
-                    if (gcs_group_is_primary (group)) {
-                        // if new members are added, need to resend ongoing
-                        // action
-                        conn->send_restart = gcs_group_new_members (group);
-                        // if state is CLOSING or CLOSED we don't change that
-                        if (conn->state == CORE_NON_PRIMARY)
-                            conn->state = CORE_PRIMARY;
-                    } else {
-                        if (conn->state == CORE_PRIMARY)
-                            conn->state = CORE_NON_PRIMARY;
-                    }
-                    gu_info ("Received %s component event. conf_id = %ld",
-                             gcs_group_is_primary(group) ?
-                             "primary" : "non-primary", group->conf_id);
-                    ret = core_act_conf_size ((gcs_act_conf_t*)*action);
-                }
-                gu_mutex_unlock (&conn->send_lock);
+            ret = core_handle_comp_msg (conn, recv_msg, &recv_act);
+            if (ret) { // either complete action or error
+                assert (ret > 0);
+                goto out; // break from loop
 	    }
-	    else {
-		gu_fatal ("Failed to handle component message: '%s'!",
-			  strerror (ret));
-                abort();
-	    }
-	    goto out;
+            break;
 	default:
 	    // this normaly should not happen, shall we bother with
 	    // protection?
@@ -534,11 +594,16 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
 	    // continue looping
         }
     } /* end of recv loop */
+
 out:
-#ifdef GCS_DEBUG_CORE
-    if (ret < 0)
-        gu_debug ("Returning %d", ret);
-#endif
+    assert (ret);
+
+    *action   = recv_act.buf;
+    *act_type = recv_act.type;
+    *act_id   = recv_act.id;
+
+//    gu_debug ("Returning %d", ret);
+
     return ret;
 }
 

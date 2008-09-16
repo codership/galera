@@ -24,7 +24,8 @@ group_state_t;
 
 typedef struct gcs_group
 {
-    long          conf_id;
+    gcs_seqno_t   act_id;       // current action seqno
+    long          conf_id;      // current configuration seqno
     long          num;          // number of nodes
     long          my_idx;       // my index in the group
     group_state_t state;        // group state: PRIMARY | NON_PRIMARY
@@ -79,18 +80,19 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
                           const gcs_recv_msg_t* msg,
                           gcs_recv_act_t*       act)
 {
-    register long sender_id = msg->sender_id;
+    register long sender_idx = msg->sender_id;
     register ssize_t ret;
 
     assert (GCS_MSG_ACTION == msg->type);
     assert (sender_id < group->num);
 
-    ret = gcs_node_handle_act_frag (&group->nodes[sender_id],
-                                    frg, act, (sender_id == group->my_idx));
+    ret = gcs_node_handle_act_frag (&group->nodes[sender_idx],
+                                    frg, act, (sender_idx == group->my_idx));
     if (gu_unlikely(ret > 0)) {
         assert (ret == act->buf_len);
-        act->type      = frg->act_type;
-        act->sender_id = sender_id;
+        act->id         = group->act_id++;
+        act->type       = frg->act_type;
+        act->sender_idx = sender_idx;
     }
 
     return ret;

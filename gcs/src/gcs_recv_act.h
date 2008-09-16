@@ -15,10 +15,11 @@
 
 typedef struct gcs_recv_act
 {
-    void*          buf;
+    gcs_seqno_t    id;        // total order seqno
+    const void*    buf;
     ssize_t        buf_len;
     gcs_act_type_t type;
-    long           sender_id;    
+    long           sender_idx;    
 }
 gcs_recv_act_t;
 
