@@ -9,7 +9,6 @@ noinst_PROGRAMS   = gcs_tests gcs_to_test
 
 gcs_tests_SOURCES =           \
 	gcs_tests.c           \
-	../gcs_error.c        \
 	gcs_fifo_test.c       \
 	../gcs_fifo_lite.c    \
 	gcs_comp_test.c       \

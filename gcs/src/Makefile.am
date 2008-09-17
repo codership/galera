@@ -15,7 +15,6 @@ endif
 
 GCS_SRCS = \
 	gcs_conf.c      \
-	gcs_error.c     \
 	gcs_fifo_lite.c \
 	gcs_queue.c     \
 	gcs_to.c        \
