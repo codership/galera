@@ -26,6 +26,9 @@ struct wsdb_hash {
     uint32_t           elem_count; // number of elements currently in hash
     hash_fun_t         hash_fun;
     hash_cmp_t         hash_cmp;
+    struct mempool     *entry_pool; // memory pool for entry structs
+    struct mempool     *key_pool;   // memory pool for key allocations
+    int                key_pool_limit; // limit for key len stored in key_pool
     struct hash_entry *elems[];
 };
 
@@ -47,6 +50,18 @@ struct wsdb_hash *wsdb_hash_open(
     /* initialize the mutex */
     gu_mutex_init(&hash->mutex, NULL);
 
+    /* create mempool for hash entries and optional short keys */
+    hash->entry_pool = mempool_create(sizeof(struct hash_entry), 131072);
+    if (!hash->entry_pool) {
+        gu_error("failed to create mempool for hash entries");
+    }
+
+    hash->key_pool_limit = 64;
+    hash->key_pool       = mempool_create(hash->key_pool_limit, 131072);
+    if (!hash->key_pool) {
+        gu_error("failed to create mempool for hash keys");
+    }
+
     return hash;
 }
 
@@ -59,14 +74,34 @@ int wsdb_hash_close(struct wsdb_hash *hash) {
 	    struct hash_entry *e = (struct hash_entry *) hash->elems[i];
 	    struct hash_entry *e_next;
 	    for (; e; e = e_next) {
+                int rcode;
 		e_next = e->next;
-		if (e->key_len > 4)
-		    gu_free(e->key);
-		gu_free(e);
+		if (e->key_len > 4) {
+                    //gu_free(e->key);
+                    if (e->key_len <= hash->key_pool_limit) {
+                        rcode = mempool_free(hash->key_pool, e->key);
+                        if (rcode) {
+                            gu_error("hash key free failed: %d", rcode);
+                            return WSDB_FATAL;
+                        }
+                    } else {
+                        gu_free(e->key);
+                    }
+                }
+		//gu_free(e);
+                rcode = mempool_free(hash->entry_pool, e);
+                if (rcode) {
+                    gu_error("hash entry free failed: %d", rcode);
+                    return WSDB_FATAL;
+                }
 	    }
 	}
 	hash->elems[i] = NULL;
     }
+
+    /* release mempools */
+    mempool_close(hash->entry_pool);
+    mempool_close(hash->key_pool);
 
     gu_free(hash);
     return WSDB_OK;
@@ -120,7 +155,10 @@ int wsdb_hash_push(
     //if (hash->curr_size == hash->max_size) return WSDB_ERROR;
     hash->elem_count++;
 
-    entry = (struct hash_entry *) gu_malloc (sizeof (struct hash_entry));
+    //entry = (struct hash_entry *) gu_malloc (sizeof (struct hash_entry));
+    entry = (struct hash_entry *)mempool_alloc(
+        hash->entry_pool, sizeof (struct hash_entry)
+    );
     /* use directly key pointer as key value if key is shorter 
      * than pointer size 
      */
@@ -132,7 +170,12 @@ int wsdb_hash_push(
             *e=*k;
         }
     } else {
-        entry->key = (void *) gu_malloc (key_len);
+        //entry->key = (void *) gu_malloc (key_len);
+        if (key_len <= hash->key_pool_limit) {
+            entry->key = (void *) mempool_alloc(hash->key_pool, key_len);
+        } else {
+            entry->key = (void *) gu_malloc (key_len);
+        }
         memcpy(entry->key, key, key_len);
     }
     entry->key_len = key_len;
@@ -173,14 +216,28 @@ void *wsdb_hash_delete(struct wsdb_hash *hash, uint16_t key_len, char key[]) {
     gu_mutex_lock(&hash->mutex);
     hash_search_entry(&match, hash, key_len, key);
     if (match.entry) {
+        int rcode;
         void *data = match.entry->data;
         if (match.prev) {
             match.prev->next = match.entry->next;
         } else {
             hash->elems[match.idx] = match.entry->next;
         }
-        if (key_len > 4) gu_free(match.entry->key);
-        gu_free(match.entry);
+        if (key_len > 4) {
+            if (key_len <= hash->key_pool_limit) {
+                rcode = mempool_free(hash->key_pool, match.entry->key);
+                if (rcode) {
+                    gu_error("hash key free failed: %d", rcode);
+                }
+            } else {
+                gu_free(match.entry->key);
+            }
+        }
+        //gu_free(match.entry);
+        rcode = mempool_free(hash->entry_pool, match.entry);
+        if (rcode) {
+            gu_error("hash entry free failed: %d", rcode);
+        }
         hash->elem_count--;
         gu_mutex_unlock(&hash->mutex);
         if (!data) {
@@ -199,7 +256,7 @@ int wsdb_hash_delete_range(
     hash_verdict_fun_t verdict
 ) {
     int deleted = 0;
-    int i;
+    int i, rcode;
 
     GU_DBUG_ENTER("wsdb_hash_delete_range");
 
@@ -219,13 +276,27 @@ int wsdb_hash_delete_range(
                     hash->elems[i] = entry->next;
                 }
                 if (entry->key_len > 4) {
-                    gu_free(entry->key);
+                    //gu_free(entry->key);
+                    if (entry->key_len <= hash->key_pool_limit) {
+                        rcode = mempool_free(hash->key_pool, entry->key);
+                        if (rcode) {
+                            gu_error("hash key free failed: %d", rcode);
+                            return WSDB_FATAL;
+                        }
+                    } else {
+                        gu_free(entry->key);
+                    }
                 }
                 hash->elem_count--;
                 // prev will not be stepped ahead
                 {
                     struct hash_entry *entry_next = entry->next;
-                    gu_free(entry);
+                    //gu_free(entry);
+                    rcode = mempool_free(hash->entry_pool, entry);
+                    if (rcode) {
+                        gu_error("hash entry free failed: %d", rcode);
+                        return WSDB_FATAL;
+                    }
                     entry = entry_next;
                 }
                 deleted++;

@@ -42,6 +42,7 @@
 #include "key_array.h"
 #include "conn.h"
 #include "certification.h"
+#include "mempool.h"
 
 #define LOCAL_CACHE_LIMIT 1000000
 #define TRX_LIMIT         USHRT_MAX

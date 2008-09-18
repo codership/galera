@@ -15,6 +15,9 @@ static struct wsdb_hash *key_index;
 /* index for table level locks */
 static struct wsdb_hash *table_index;
 
+/* mempool for index_rec and seqno_list allocations */
+static struct mempool *index_pool;
+
 struct trx_hdr {
     trx_seqno_t trx_seqno;
 };
@@ -47,8 +50,10 @@ struct {
 static void add_active_seqno(
     trx_seqno_t seqno, uint32_t keys_count, char *keys
 ) {
+    //struct seqno_list *seqno_elem = 
+    //      (struct seqno_list *)gu_malloc(sizeof(struct seqno_list));
     struct seqno_list *seqno_elem = 
-        (struct seqno_list *)gu_malloc(sizeof(struct seqno_list));
+      (struct seqno_list *)mempool_alloc(index_pool, sizeof(struct seqno_list));
 
     seqno_elem->seqno = seqno;
     seqno_elem->key_count = keys_count;
@@ -68,6 +73,7 @@ static void add_active_seqno(
 static void purge_active_seqnos(trx_seqno_t up_to) {
     struct seqno_list *trx = trx_info.active_seqnos;
     while (trx && trx->seqno < up_to) {
+        int rcode;
         struct seqno_list *next_trx = trx->next;
         char *keys = trx->keys;
         /* length of all keys */
@@ -113,7 +119,11 @@ static void purge_active_seqnos(trx_seqno_t up_to) {
                              trx->seqno, key_idx, key_len, trx->key_count
                         );
                     } else {
-                        gu_free(match);
+                        //gu_free(match);
+                        rcode = mempool_free(index_pool, match);
+                        if (rcode) {
+                            gu_error("cert index free failed: %d", rcode);
+                        }
                     }
                 }
                 keys += key_len;
@@ -121,7 +131,12 @@ static void purge_active_seqnos(trx_seqno_t up_to) {
         }
         /* remove active trx holder struct */
         if (trx->keys) gu_free(trx->keys);
-        gu_free(trx);
+        //gu_free(trx);
+        rcode = mempool_free(index_pool, trx);
+        if (rcode) {
+            gu_error("cert seqno list free failed: %d", rcode);
+        }
+
         trx = trx_info.active_seqnos = next_trx;
         trx_info.list_len--;
         trx_info.list_size -= sizeof(struct seqno_list);
@@ -144,10 +159,15 @@ static enum purge_method choose_purge_method(trx_seqno_t up_to) {
 static void purge_seqno_list(trx_seqno_t up_to) {
     struct seqno_list *trx = trx_info.active_seqnos;
     while (trx && trx->seqno < up_to) {
+        int rcode;
         struct seqno_list *next_trx = trx->next;
 
         if (trx->keys) gu_free(trx->keys);
-        gu_free(trx);
+        //gu_free(trx);
+        rcode = mempool_free(index_pool, trx);
+        if (rcode) {
+            gu_error("cert seqno list free failed: %d", rcode);
+        }
         trx = trx_info.active_seqnos = next_trx;
         trx_info.list_len--;
         trx_info.list_size -= sizeof(struct seqno_list);
@@ -187,7 +207,7 @@ static int hash_cmp(uint16_t len1, char *key1, uint16_t len2, char *key2) {
 
 int wsdb_cert_init(const char* work_dir, const char* base_name) {
     /* open row level locks hash */
-    key_index = wsdb_hash_open(64000, hash_fun, hash_cmp);
+    key_index = wsdb_hash_open(262144, hash_fun, hash_cmp);
     cert_trx_file = version_file_open(
         (work_dir)  ? work_dir  : DEFAULT_WORK_DIR,
         (base_name) ? base_name : DEFAULT_CERT_FILE,
@@ -196,6 +216,12 @@ int wsdb_cert_init(const char* work_dir, const char* base_name) {
 
     /* open table level locks hash */
     table_index = wsdb_hash_open(1000, hash_fun, hash_cmp);
+    
+    index_pool = mempool_create(
+        (sizeof(struct index_rec) > sizeof(struct seqno_list)) ?
+         sizeof(struct index_rec) : sizeof(struct seqno_list),
+        131072
+    );
 
     return WSDB_OK;
 }
@@ -278,7 +304,10 @@ static int update_index(
 
         if (!match) {
             int rcode;
-            new_trx = (struct index_rec *) gu_malloc (sizeof(struct index_rec));
+            //new_trx=(struct index_rec *) gu_malloc (sizeof(struct index_rec));
+            new_trx = (struct index_rec *) mempool_alloc(
+                index_pool, sizeof(struct index_rec)
+            );
             new_trx->trx_seqno = trx_seqno;
             rcode = wsdb_hash_push(
                 key_index, key_len, all_keys, (void *)new_trx
@@ -381,7 +410,6 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
         GALERA_CONF_WS_PERSISTENCY, GALERA_TYPE_INT
     );
     uint32_t key_size;
-
     /* certification test */
     rcode = wsdb_certification_test(ws, trx_seqno); 
     if (rcode) {
@@ -429,8 +457,13 @@ static int delete_verdict(void *ctx, void *data, void **new_data) {
     struct index_rec *entry = (struct index_rec *)data;
 
     if (entry && entry->trx_seqno < (*(trx_seqno_t *)ctx)) {
+        int rcode;
         *new_data= (void *)NULL;
-        gu_free(entry);
+        //gu_free(entry);
+        rcode = mempool_free(index_pool, entry);
+        if (rcode) {
+            gu_error("cert index free failed (delete_verdict): %d", rcode);
+        }
         return 1;
     }
 
@@ -476,7 +509,12 @@ static int shutdown_verdict(void *ctx, void *data, void **new_data) {
 
     /* find among the entries for this key, the one with last seqno */
     if (entry) {
-        gu_free(entry);
+        int rcode;
+        //gu_free(entry);
+        rcode = mempool_free(index_pool, entry);
+        if (rcode) {
+            gu_error("cert index free failed (shutdown_verdict): %d", rcode);
+        }
     }
     return 1;
 }
@@ -515,6 +553,8 @@ int wsdb_cert_close() {
     }
 
     purge_seqno_list(GALERA_ABORT_SEQNO);
+
+    mempool_close(index_pool);
 
     return WSDB_OK;
 }
