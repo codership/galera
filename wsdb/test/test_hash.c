@@ -195,7 +195,7 @@ START_TEST (test_hash_huge_64_key)
     s_hash_size = 64000;
     struct wsdb_hash *hash = wsdb_hash_open(s_hash_size, hash_fun, hash_cmp);
 
-    for (round=1; round<10000; round++) {
+    for (round=1; round<1000; round++) {
         uint64_t i;
         mark_point();
         for (i=1; i<1000; i++) {
@@ -244,9 +244,7 @@ START_TEST (test_hash_huge_64_key)
         }
     }
     
-    printf("after round: %d mem: %d\n", round, wsdb_hash_report(hash));
     fail_if(wsdb_hash_close(hash), "hash close");
-    printf("hash closed\n");
 
 }
 END_TEST
