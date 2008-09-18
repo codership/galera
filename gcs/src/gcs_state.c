@@ -10,8 +10,8 @@
 
 #include "galerautils.h"
 
-#define   GCS_STATE_ACCESS
-#include "gcs_state_msg.h"
+#define GCS_STATE_ACCESS
+#include "gcs_state.h"
 
 extern gcs_state_t*
 gcs_state_create (gcs_seqno_t act_id,

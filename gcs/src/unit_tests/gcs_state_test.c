@@ -4,9 +4,9 @@
 
 #include <check.h>
 #include <string.h>
-#include "gcs_state_msg_test.h"
+#include "gcs_state_test.h"
 #define GCS_STATE_ACCESS
-#include "../gcs_state_msg.h"
+#include "../gcs_state.h"
 
 START_TEST (gcs_state_test)
 {
@@ -56,7 +56,7 @@ START_TEST (gcs_state_test)
 }
 END_TEST
 
-Suite *gcs_state_msg_suite(void)
+Suite *gcs_state_suite(void)
 {
   Suite *s  = suite_create("GCS state message");
   TCase *tc = tcase_create("gcs_state");

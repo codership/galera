@@ -20,11 +20,11 @@ GCS_SRCS = \
 	gcs_to.c        \
 	gcs_uuid.c      \
 	gcs_comp_msg.c  \
-	gcs_state_msg.c \
 	gcs_dummy.c     \
 	gcs_backend.c   \
 	gcs_act_proto.c \
 	gcs_defrag.c    \
+	gcs_state.c     \
 	gcs_node.c      \
 	gcs_group.c     \
 	gcs_core.c      \
