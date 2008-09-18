@@ -11,7 +11,10 @@
 #ifndef _gcs_act_proto_h_
 #define _gcs_act_proto_h_
 
-#include <gcs.h> // for gcs_seqno_t
+#include "gcs.h" // for gcs_seqno_t
+
+#include <stdint.h>
+typedef uint8_t gcs_proto_t;
 
 /*! Internal action fragment data representation */
 typedef struct gcs_act_frag
@@ -22,7 +25,7 @@ typedef struct gcs_act_frag
     size_t         frag_len;
     long           frag_no;
     gcs_act_type_t act_type;
-    unsigned char  proto_ver;
+    gcs_proto_t    proto_ver;
 }
 gcs_act_frag_t;
 

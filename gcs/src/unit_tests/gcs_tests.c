@@ -10,6 +10,7 @@
 #include <check.h>
 
 #include "gcs_comp_test.h"
+#include "gcs_state_msg_test.h"
 #include "gcs_fifo_test.h"
 #include "gcs_proto_test.h"
 #include "gcs_defrag_test.h"
@@ -23,6 +24,7 @@ typedef Suite *(*suite_creator_t)(void);
 static suite_creator_t suites[] =
     {
 	gcs_comp_suite,
+	gcs_state_msg_suite,
 	gcs_fifo_suite,
 	gcs_proto_suite,
 	gcs_defrag_suite,

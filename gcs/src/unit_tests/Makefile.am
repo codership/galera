@@ -13,6 +13,8 @@ gcs_tests_SOURCES =           \
 	../gcs_fifo_lite.c    \
 	gcs_comp_test.c       \
 	../gcs_comp_msg.c     \
+	gcs_state_msg_test.c  \
+	../gcs_state_msg.c    \
 	gcs_backend_test.c    \
 	../gcs_backend.c      \
 	gcs_proto_test.c      \
