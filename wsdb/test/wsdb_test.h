@@ -8,4 +8,5 @@ Suite *make_cache_suite(void);
 Suite *make_xdr_suite(void);
 Suite *make_log_suite(void);
 Suite *make_version_file_suite(void);
+Suite *make_mempool_suite(void);
 #endif

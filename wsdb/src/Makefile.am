@@ -36,7 +36,10 @@ libwsdb_la_SOURCES =    \
 	wsdb_file.h     \
 	job_queue.c     \
 	job_queue.h     \
-	wsdb_xdr.h      
+	wsdb_xdr.h      \
+	mempool.c 	\
+	mempool.h
+
 
 WSDB_INTERFACE = 1
 WSDB_REVISION  = 0

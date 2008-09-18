@@ -14,6 +14,7 @@ static suite_creator_t suites[] = {
 	make_wsdb_suite,
 	make_xdr_suite,
 	make_log_suite,
+	make_mempool_suite,
 	NULL
 };
 int main(int argc, char **argv) {
