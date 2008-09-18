@@ -25,8 +25,6 @@ gcs_tests_SOURCES =           \
 	../gcs_node.c         \
 	gcs_group_test.c      \
 	../gcs_group.c
-#	gcs_uuid_test.c       \
-#	../gcs_uuid.c
 
 # For gcs_backend_test
 gcs_tests_CPPFLAGS = -DGCS_USE_SPREAD -DGCS_USE_VS

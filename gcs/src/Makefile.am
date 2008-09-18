@@ -18,7 +18,6 @@ GCS_SRCS = \
 	gcs_fifo_lite.c \
 	gcs_queue.c     \
 	gcs_to.c        \
-	gcs_uuid.c      \
 	gcs_comp_msg.c  \
 	gcs_dummy.c     \
 	gcs_backend.c   \
