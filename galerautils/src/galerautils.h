@@ -48,5 +48,6 @@
 #include "gu_byteswap.h"
 #include "gu_time.h"
 #include "gu_fifo.h"
+#include "gu_uuid.h"
 
 #endif /* _galerautils_h_ */

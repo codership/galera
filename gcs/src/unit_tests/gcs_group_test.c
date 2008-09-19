@@ -18,9 +18,6 @@
 #define TRUE (0 == 0)
 #define FALSE (!TRUE)
 
-// empty logger to prevent default output to stderr, Check closes it.
-static void logger (int s, const char* m) {};
-
 /*
  * header will be written to buf from frg, act_len of payload will be copied
  * from act, msg structure will be filled in
@@ -87,8 +84,6 @@ START_TEST (gcs_group_configuration)
     gcs_recv_act_t act;
     
     gcs_comp_msg_t* comp;
-
-    gu_conf_set_log_callback (logger); // set empty logger
 
     mark_point();
 
@@ -389,8 +384,6 @@ START_TEST(gcs_group_last_applied)
     uint8_t         buf1[sizeof(gcs_seqno_t)];
     uint8_t         buf2[sizeof(gcs_seqno_t)];
     uint8_t         buf3[sizeof(gcs_seqno_t)];
-
-    gu_conf_set_log_callback (logger); // set empty logger
 
     // set up message structures
     msg0.type = GCS_MSG_LAST;

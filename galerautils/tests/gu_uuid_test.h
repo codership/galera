@@ -4,9 +4,9 @@
  * $Id$
  */
 
-#ifndef __gcs_uuid_test__
-#define __gcs_uuid_test__
+#ifndef __gu_uuid_test__
+#define __gu_uuid_test__
 
-extern Suite *gcs_uuid_suite(void);
+extern Suite *gu_uuid_suite(void);
 
 #endif /* __gu_uuid_test__ */

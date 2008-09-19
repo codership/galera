@@ -4,9 +4,8 @@
  * $Id$
  */
 /*
- * Universally Unique IDentifier for Group.
- * Serves to guarantee that nodes from two different
- * groups will never merge by mistake
+ * Universally Unique IDentifier. RFC 4122.
+ * Time-based implementation.
  *
  */
 
@@ -18,10 +17,12 @@
 #include <errno.h>    // for errno
 #include <stddef.h>
 
-#include <galerautils.h>
-#include "gcs_uuid.h"
+#include "gu_byteswap.h"
+#include "gu_log.h"
+#include "gu_assert.h"
+#include "gu_uuid.h"
 
-const gcs_uuid_t GCS_UUID_NIL = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};
+const gu_uuid_t GU_UUID_NIL = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};
 
 #define UUID_NODE_LEN 6
 
@@ -35,11 +36,14 @@ uuid_get_time ()
 	    0x01B21DD213814000LL); // offset since the start of 15 October 1582
 }
 
+#ifndef UUID_URAND
+// This function can't be called too often,
+// apparently due to lack of entropy in the pool.
 /** Fills node part of the uuid with true random data from /dev/urand */
 static int
 uuid_urand_node (uint8_t* node, size_t node_len)
 {
-    static const char urand_name[] = "/dev/urand";
+    static const char urand_name[] = "/dev/urandom";
     FILE*       urand;
     size_t      i = 0;
     int         c;
@@ -47,7 +51,7 @@ uuid_urand_node (uint8_t* node, size_t node_len)
     urand = fopen (urand_name, "r");
 
     if (NULL == urand) {
-	gu_warn ("Failed to open %s for reading (%d).", urand_name, -errno);
+	gu_debug ("Failed to open %s for reading (%d).", urand_name, -errno);
 	return -errno;
     }
 
@@ -59,6 +63,9 @@ uuid_urand_node (uint8_t* node, size_t node_len)
 
     return 0;
 }
+#else
+#define uuid_urand_node(a,b) true
+#endif
 
 /** Fills node part with pseudorandom data from rand_r() */
 static void
@@ -89,13 +96,12 @@ static void
 uuid_fill_node (uint8_t* node, size_t node_len)
 {
     if (uuid_urand_node (node, node_len)) {
-	gu_warn ("Node part of the UUID will be pseudorandom.");
 	uuid_rand_node (node, node_len);
     }
 }
 
 void
-gcs_uuid_generate (gcs_uuid_t* uuid, const uint8_t* node, size_t node_len)
+gu_uuid_generate (gu_uuid_t* uuid, const void* node, size_t node_len)
 {
     uint32_t*  uuid32 = (uint32_t*) uuid->data;
     uint16_t*  uuid16 = (uint16_t*) uuid->data;
@@ -130,15 +136,15 @@ gcs_uuid_generate (gcs_uuid_t* uuid, const uint8_t* node, size_t node_len)
  * Compare two UUIDs
  * @return -1, 0, 1 if left is respectively less, equal or greater than right
  */
-int
-gcs_uuid_compare (const gcs_uuid_t* left,
-                  const gcs_uuid_t* right)
+long
+gu_uuid_compare (const gu_uuid_t* left,
+                 const gu_uuid_t* right)
 {
-    return memcmp (left, right, sizeof(gcs_uuid_t));
+    return memcmp (left, right, sizeof(gu_uuid_t));
 }
 
 static uint64_t
-uuid_time (const gcs_uuid_t* uuid)
+uuid_time (const gu_uuid_t* uuid)
 {
     uint64_t uuid_time;
 
@@ -154,17 +160,16 @@ uuid_time (const gcs_uuid_t* uuid)
 
 /** 
  * Compare ages of two UUIDs
- * @return -1, 0, 1 if left is respectively older, equal or younger than right
+ * @return -1, 0, 1 if left is respectively younger, equal or older than right
  */
-int
-gcs_uuid_older (const gcs_uuid_t* left,
-		const gcs_uuid_t* right)
+long
+gu_uuid_older (const gu_uuid_t* left,
+               const gu_uuid_t* right)
 {
     uint64_t time_left  = uuid_time (left);
     uint64_t time_right = uuid_time (right);
 
-    if (time_left < time_right) return -1;
-    if (time_left > time_right) return  1;
+    if (time_left < time_right) return 1;
+    if (time_left > time_right) return -1;
     return 0;
 }
-

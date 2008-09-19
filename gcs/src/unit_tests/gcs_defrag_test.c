@@ -15,9 +15,6 @@
 #define TRUE (0 == 0)
 #define FALSE (!TRUE)
 
-// empty logger to prevent default output to stderr, Check closes it.
-static void logger (int s, const char* m) {};
-
 static void
 defrag_check_init (gcs_defrag_t* defrag)
 {
@@ -54,8 +51,6 @@ START_TEST (gcs_defrag_test)
     gcs_recv_act_t recv_act;
 
     void* tail;
-
-    gu_conf_set_log_callback (logger); // set empty logger
 
     mark_point();
 

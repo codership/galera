@@ -14,9 +14,6 @@
 #include "../gcs_backend.h"
 #include "gcs_backend_test.h"
 
-// empty logger to prevent default output to stderr, Check closes it.
-static void logger (int s, const char* m) {};
-
 GCS_BACKEND_NAME_FN(gcs_dummy_name)
 {
     return "DUMMIEEEE!";
@@ -54,8 +51,6 @@ START_TEST (gcs_backend_test)
 {
     gcs_backend_t backend;
     long ret;
-
-    gu_conf_set_log_callback (logger); // set empty logger
 
     ret = gcs_backend_init (&backend, "wrong://kkk");
     fail_if (ret != -ESOCKTNOSUPPORT);
