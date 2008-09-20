@@ -47,8 +47,8 @@ msg_write (gcs_recv_msg_t* msg,
 
 // just pretend we received SYNC message
 #define RECEIVE_SYNC() group.new_memb = FALSE;
-#define LOCALHOST "localhost"
-#define REMOTEHOST "remotehost"
+#define LOCALHOST   "localhost"
+#define REMOTEHOST  "remotehost"
 #define DISTANTHOST "distanthost"
 
 // This tests tests configuration changes

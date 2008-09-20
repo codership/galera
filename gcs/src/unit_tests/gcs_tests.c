@@ -50,6 +50,9 @@ int main(int argc, char* argv[])
   while (suites[i]) {
       SRunner* sr = srunner_create(suites[i]());
 
+      gu_info ("###########################################");
+      gu_info ("Test %d.", i);
+      gu_info ("###########################################");
       if (no_fork) srunner_set_fork_status(sr, CK_NOFORK);
       srunner_run_all (sr, CK_NORMAL);
       failed += srunner_ntests_failed (sr);

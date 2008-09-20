@@ -11,11 +11,17 @@
 START_TEST (gcs_state_test)
 {
     ssize_t send_len, ret;
+    gu_uuid_t    state_uuid;
+    gu_uuid_t    group_uuid;
     gcs_state_t* send_state;
     gcs_state_t* recv_state;
 
-    send_state = gcs_state_create (1234, 3465, 457, false, true,
-                                     "My Name", "192.168.0.1:2345", 0, 1);
+    gu_uuid_generate (&state_uuid, NULL, 0);
+    gu_uuid_generate (&group_uuid, NULL, 0);
+
+    send_state = gcs_state_create (&state_uuid, &group_uuid, 3465, 457,
+                                   GCS_STATE_JOINED,
+                                   "My Name", "192.168.0.1:2345", 0, 1);
     fail_if (NULL == send_state);
 
     send_len = gcs_state_msg_len (send_state);
@@ -35,9 +41,10 @@ START_TEST (gcs_state_test)
     fail_if (send_state->proto_min != recv_state->proto_min);
     fail_if (send_state->proto_max != recv_state->proto_max);
     fail_if (send_state->act_id    != recv_state->act_id);
-    fail_if (send_state->comp_id   != recv_state->comp_id);
     fail_if (send_state->conf_id   != recv_state->conf_id);
-    fail_if (send_state->joined    != recv_state->joined);
+    fail_if (send_state->status    != recv_state->status);
+    fail_if (gu_uuid_compare (&recv_state->state_uuid, &state_uuid));
+    fail_if (gu_uuid_compare (&recv_state->group_uuid, &group_uuid));
     fail_if (strcmp(send_state->name,     recv_state->name));
     fail_if (strcmp(send_state->inc_addr, recv_state->inc_addr));
 
