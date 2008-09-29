@@ -46,9 +46,9 @@ END_TEST
 
 START_TEST(check_msg)
 {
-    EVSMessage umsg(EVSMessage::USER, EVSMessage::SAFE, 0x037b137bU, 0x17U,
+    EVSMessage umsg(EVSMessage::USER, SAFE, 0x037b137bU, 0x17U,
 		    0x0534555,
-		    EVSViewId(Sockaddr(7), 0x7373b173U), EVSMessage::F_MSG_MORE);
+		    EVSViewId(Address(7, 0, 0), 0x7373b173U), EVSMessage::F_MSG_MORE);
     
     size_t buflen = umsg.size();
     uint8_t* buf = new uint8_t[buflen];
@@ -77,21 +77,21 @@ START_TEST(check_input_map_basic)
     EVSInputMap im;
 
     // Test adding and removing instances
-    im.insert_sa(Sockaddr(1));
-    im.insert_sa(Sockaddr(2));
-    im.insert_sa(Sockaddr(3));
+    im.insert_sa(Address(1, 0, 0));
+    im.insert_sa(Address(2, 0, 0));
+    im.insert_sa(Address(3, 0, 0));
 
     try {
-	im.insert_sa(Sockaddr(2));
+	im.insert_sa(Address(2, 0, 0));
 	fail();
     } catch (FatalException e) {
 
     }
 
-    im.erase_sa(Sockaddr(2));
+    im.erase_sa(Address(2, 0, 0));
 
     try {
-	im.erase_sa(Sockaddr(2));
+	im.erase_sa(Address(2, 0, 0));
 	fail();
     } catch (FatalException e) {
 
@@ -99,22 +99,22 @@ START_TEST(check_input_map_basic)
     im.clear();
 
     // Test message insert with one instance
-    EVSViewId vid(Sockaddr(0), 1);
-    Sockaddr sa1(1);
+    EVSViewId vid(Address(0, 0, 0), 1);
+    Address sa1(1, 0, 0);
     im.insert_sa(sa1);
     fail_unless(seqno_eq(im.get_aru_seq(), SEQNO_MAX) && seqno_eq(im.get_safe_seq(), SEQNO_MAX));
     im.insert(EVSInputMapItem(
 		  sa1, 
-		  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 0, 0, SEQNO_MAX, vid, 0),
+		  EVSMessage(EVSMessage::USER, SAFE, 0, 0, SEQNO_MAX, vid, 0),
 		  0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
     
     im.insert(EVSInputMapItem(sa1, 
-			      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 2, 0, SEQNO_MAX, vid, 0),
+			      EVSMessage(EVSMessage::USER, SAFE, 2, 0, SEQNO_MAX, vid, 0),
 			      0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
     im.insert(EVSInputMapItem(sa1, 
-			      EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 1, 0, SEQNO_MAX, vid, 0),
+			      EVSMessage(EVSMessage::USER, SAFE, 1, 0, SEQNO_MAX, vid, 0),
 			      0));
     fail_unless(seqno_eq(im.get_aru_seq(), 2));
 
@@ -123,7 +123,7 @@ START_TEST(check_input_map_basic)
     // must dropped:
     EVSRange gap = im.insert(
 	EVSInputMapItem(sa1, 
-			EVSMessage(EVSMessage::USER, EVSMessage::SAFE, 
+			EVSMessage(EVSMessage::USER, SAFE, 
 				   seqno_add(2, SEQNO_MAX/4 + 1), 0, SEQNO_MAX, vid, 0),
 			0));
     fail_unless(seqno_eq(gap.low, 3) && seqno_eq(gap.high, 2));
@@ -131,7 +131,7 @@ START_TEST(check_input_map_basic)
     
     // Must not allow insertin second instance before clear()
     try {
-	im.insert_sa(Sockaddr(2));
+	im.insert_sa(Address(2, 0, 0));
 	fail();
     } catch (FatalException e) {
 	
@@ -140,20 +140,20 @@ START_TEST(check_input_map_basic)
     im.clear();
     
     // Simple two instance case
-    Sockaddr sa2(2);
+    Address sa2(2, 0, 0);
     
     im.insert_sa(sa1);
     im.insert_sa(sa2);
     
     for (uint32_t i = 0; i < 3; i++)
 	im.insert(EVSInputMapItem(sa1,
-				  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, i, 0, SEQNO_MAX, vid, 0),
+				  EVSMessage(EVSMessage::USER, SAFE, i, 0, SEQNO_MAX, vid, 0),
 				  0));
     fail_unless(seqno_eq(im.get_aru_seq(), SEQNO_MAX));   
     
     for (uint32_t i = 0; i < 3; i++) {
 	im.insert(EVSInputMapItem(sa2,
-				  EVSMessage(EVSMessage::USER, EVSMessage::SAFE, i, 0, SEQNO_MAX, vid, 0),
+				  EVSMessage(EVSMessage::USER, SAFE, i, 0, SEQNO_MAX, vid, 0),
 				  0));
 	fail_unless(seqno_eq(im.get_aru_seq(), i));
     }
@@ -192,12 +192,12 @@ END_TEST
 START_TEST(check_input_map_overwrap)
 {
     EVSInputMap im;
-    EVSViewId vid(Sockaddr(0), 3);
+    EVSViewId vid(Address(0, 0, 0), 3);
     static const size_t nodes = 16;
     static const size_t qlen = 8;
-    Sockaddr sas[nodes];
+    Address sas[nodes];
     for (size_t i = 0; i < nodes; ++i) {
-	sas[i] = Sockaddr(i + i);
+	sas[i] = Address(i + 1, 0, 0);
 	im.insert_sa(sas[i]);
     }
     
@@ -211,13 +211,13 @@ START_TEST(check_input_map_overwrap)
 	for (size_t j = 0; j < nodes; j++) {
 	    im.insert(EVSInputMapItem(sas[j],
 				      EVSMessage(EVSMessage::USER, 
-						 EVSMessage::SAFE, 
+						 SAFE, 
 						 seq, 0, aru_seq, vid, 0),
 				      0));	
 	    n_msg++;
 	}
 	if (seqi > 0 && seqi % qlen == 0) {
-	    uint32_t seqto = seqno_dec(seq, ::rand() % qlen + 1);
+	    uint32_t seqto = seqno_dec(seq, (::rand() % qlen + 1)*2);
 	    EVSInputMap::iterator mi_next;
 	    for (EVSInputMap::iterator mi = im.begin(); mi != im.end();
 		 mi = mi_next) {
@@ -252,13 +252,13 @@ START_TEST(check_input_map_random)
     // Fetch messages randomly and insert to input map
 
     // Iterate over input map - outcome must be 
-    EVSViewId vid(Sockaddr(0), 3);    
+    EVSViewId vid(Address(0, 0, 0), 3);    
     std::vector<EVSMessage> msgs(SEQNO_MAX/4);
     
     for (uint32_t i = 0; i < SEQNO_MAX/4; ++i)
 	msgs[i] = EVSMessage(
 			EVSMessage::USER, 
-			EVSMessage::SAFE, 
+			SAFE, 
 			i,
 			0,
 			SEQNO_MAX,
@@ -266,15 +266,15 @@ START_TEST(check_input_map_random)
 			0);
     
     EVSInputMap im;
-    im.insert_sa(Sockaddr(1));
-    im.insert_sa(Sockaddr(2));
-    im.insert_sa(Sockaddr(3));
-    im.insert_sa(Sockaddr(4));
+    im.insert_sa(Address(1, 0, 0));
+    im.insert_sa(Address(2, 0, 0));
+    im.insert_sa(Address(3, 0, 0));
+    im.insert_sa(Address(4, 0, 0));
     
     for (size_t i = 1; i <= 4; ++i) {
 	for (size_t j = msgs.size(); j > 0; --j) {
 	    size_t n = ::rand() % j;
-	    im.insert(EVSInputMapItem(Sockaddr(i), msgs[n], 0));
+	    im.insert(EVSInputMapItem(Address(i, 0, 0), msgs[n], 0));
 	    std::swap(msgs[n], msgs[j - 1]);
 	}
     }
@@ -282,7 +282,7 @@ START_TEST(check_input_map_random)
     size_t cnt = 0;
     for (EVSInputMap::iterator i = im.begin();
 	 i != im.end(); ++i) {
-	fail_unless(i->get_sockaddr() == Sockaddr(cnt % 4 + 1));
+	fail_unless(i->get_sockaddr() == Address(cnt % 4 + 1, 0, 0));
 	fail_unless(seqno_eq(i->get_evs_message().get_seq(), cnt/4));
 	++cnt;
     }
