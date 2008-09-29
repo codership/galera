@@ -350,7 +350,7 @@ test_after_recv (gcs_test_thread_t* thread)
         ret = test_log_in_to (to, thread->local_act_id, NULL);
     }
 
-    ret = test_send_last_applied (gcs, thread->local_act_id);
+    ret = test_send_last_applied (gcs, thread->act_id);
 
     return ret;
 }
@@ -465,9 +465,9 @@ void *gcs_test_recv (void *arg)
 	case GCS_ACT_CONF:
 	    {
                 gcs_act_conf_t* conf = (void*)thread->msg;
-                fprintf (stdout, "Got GCS_ACT_CONF: Conf ID: %ld, "
-                         "members: %zu, my idx: %zu\n",
-                         conf->conf_id, conf->memb_num, conf->my_idx);
+                fprintf (stdout, "Got GCS_ACT_CONF: Conf ID: %lld, "
+                         "seqno: %lld, members: %zu, my idx: %zu\n",
+                         conf->conf_id, conf->seqno, conf->memb_num, conf->my_idx);
             }
 	    break;
         default:

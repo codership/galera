@@ -11,25 +11,33 @@
 #ifndef _gcs_group_h_
 #define _gcs_group_h_
 
+#include <galerautils.h>
+
 #include "gcs_node.h"
 #include "gcs_recv_msg.h"
 #include "gcs_seqno.h"
+#include "gcs_state.h"
 
-typedef enum group_state
+typedef enum gcs_group_state
 {
-    GROUP_PRIMARY,
-    GROUP_NON_PRIMARY
+    GCS_GROUP_NON_PRIMARY,
+    GCS_GROUP_WAIT_STATE_UUID,
+    GCS_GROUP_WAIT_STATE_MSG,
+    GCS_GROUP_PRIMARY,
+    GCS_GROUP_STATE_MAX
 }
-group_state_t;
+gcs_group_state_t;
 
 typedef struct gcs_group
 {
     gcs_seqno_t   act_id;       // current action seqno
-    long          conf_id;      // current configuration seqno
+    gcs_seqno_t   conf_id;      // current configuration seqno
+    gu_uuid_t     state_uuid;   // state exchange id
+    gu_uuid_t     group_uuid;   // group UUID
+    gcs_proto_t   proto;        // protocol version to use
     long          num;          // number of nodes
     long          my_idx;       // my index in the group
-    group_state_t state;        // group state: PRIMARY | NON_PRIMARY
-    bool          new_memb;     // new members in last configuration change
+    gcs_group_state_t state;    // group state: PRIMARY | NON_PRIMARY
     volatile
     gcs_seqno_t   last_applied; // last_applied action group-wide
     long          last_node;    // node that reported last_applied
@@ -54,20 +62,20 @@ gcs_group_free (gcs_group_t* group);
  * cleans old one.
  *
  * @return
- *        > 0 in case of success or
+ *        group state in case of success or
  *        negative error code.
  */
-extern long
-gcs_group_handle_comp_msg  (gcs_group_t* group, gcs_comp_msg_t* msg);
+extern gcs_group_state_t
+gcs_group_handle_comp_msg  (gcs_group_t* group, const gcs_comp_msg_t* msg);
 
-extern long
-gcs_group_handle_flush_msg (gcs_group_t* group, gcs_recv_msg_t* msg);
+extern gcs_group_state_t
+gcs_group_handle_uuid_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
 
-extern gcs_act_conf_t*
-gcs_group_handle_sync_msg  (gcs_group_t* group, gcs_recv_msg_t* msg);
+extern gcs_group_state_t
+gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg);
 
 extern gcs_seqno_t
-gcs_group_handle_last_msg  (gcs_group_t* group, gcs_recv_msg_t* msg);
+gcs_group_handle_last_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
 
 /*!
  * Handles action message. Is called often - therefore, inlined
@@ -84,7 +92,7 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
     register ssize_t ret;
 
     assert (GCS_MSG_ACTION == msg->type);
-    assert (sender_id < group->num);
+    assert (sender_idx < group->num);
 
     ret = gcs_node_handle_act_frag (&group->nodes[sender_idx],
                                     frg, act, (sender_idx == group->my_idx));
@@ -98,16 +106,16 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
     return ret;
 }
 
-static inline bool
-gcs_group_new_members (gcs_group_t* group)
+static inline gcs_group_state_t
+gcs_group_state (gcs_group_t* group)
 {
-    return group->new_memb;
+    return group->state;
 }
 
 static inline bool
 gcs_group_is_primary (gcs_group_t* group)
 {
-    return (GROUP_PRIMARY == group->state);
+    return (GCS_GROUP_PRIMARY == group->state);
 }
 
 static inline long
@@ -115,5 +123,13 @@ gcs_group_my_idx (gcs_group_t* group)
 {
     return group->my_idx;
 }
+
+/*! Creates new configuration action */
+extern ssize_t
+gcs_group_act_conf (gcs_group_t* group, gcs_recv_act_t* act);
+
+/*! Returns state object for state message */
+extern gcs_state_t*
+gcs_group_get_state (gcs_group_t* group);
 
 #endif /* _gcs_group_h_ */

@@ -223,7 +223,7 @@ retry:
         }
 
 	fill_comp(new_comp, ev.view->is_trans() ? 0 : &conn->comp_map, ev.view->get_addr(), conn->vs_ctx.vs->get_self());
-	gcs_comp_msg_delete(conn->comp_msg);
+	if (conn->comp_msg) gcs_comp_msg_delete(conn->comp_msg);
 	conn->comp_msg = new_comp;
 	cpy = std::min(static_cast<size_t>(gcs_comp_msg_size(conn->comp_msg)), len);
 	ret = std::max(static_cast<size_t>(gcs_comp_msg_size(conn->comp_msg)), len);

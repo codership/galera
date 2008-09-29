@@ -8,7 +8,7 @@
 #define GCS_STATE_ACCESS
 #include "../gcs_state.h"
 
-START_TEST (gcs_state_test)
+START_TEST (gcs_state_test_basic)
 {
     ssize_t send_len, ret;
     gu_uuid_t    state_uuid;
@@ -63,13 +63,29 @@ START_TEST (gcs_state_test)
 }
 END_TEST
 
+START_TEST (gcs_state_test_quorum)
+{
+    gcs_state_t* st1, *st2, *st3;
+    gu_uuid_t    g1, g2, g3;
+
+    gu_uuid_generate (&g1, NULL, 0);
+    gu_uuid_generate (&g2, NULL, 0);
+    gu_uuid_generate (&g3, NULL, 0);
+    
+    st1 = st2 = st3 = NULL;
+    
+    mark_point();
+}
+END_TEST
+
 Suite *gcs_state_suite(void)
 {
   Suite *s  = suite_create("GCS state message");
   TCase *tc = tcase_create("gcs_state");
 
   suite_add_tcase (s, tc);
-  tcase_add_test  (tc, gcs_state_test);
+  tcase_add_test  (tc, gcs_state_test_basic);
+  tcase_add_test  (tc, gcs_state_test_quorum);
   return s;
 }
 

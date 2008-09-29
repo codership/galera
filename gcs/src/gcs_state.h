@@ -20,10 +20,11 @@
 typedef enum gcs_state_node
 {
     GCS_STATE_NON_PRIM,      // comes from non-primary configuration
-    GCS_STATE_PRIM,          // comes from primary configuration
+    GCS_STATE_PRIM,          // comes from primary configuration, empty
     GCS_STATE_JOINED,        // comes from primary conf, joined
     GCS_STATE_SYNCED,        // comes from primary conf, joined, synced
-    GCS_STATE_DONOR          // comes from primary conf, joined, synced, donor
+    GCS_STATE_DONOR,         // comes from primary conf, joined, synced, donor
+    GCS_STATE_MAX
 }
 gcs_state_node_t;
 
@@ -45,6 +46,17 @@ gcs_state_t;
 typedef struct gcs_state gcs_state_t;
 #endif
 
+/*! Quorum decisions */
+typedef struct gcs_state_quorum
+{
+    gu_uuid_t   group_uuid; // group UUID
+    gcs_seqno_t act_id;     // next global seqno
+    gcs_seqno_t conf_id;    // configuration id
+    bool        primary;    // primary configuration or not
+    long        proto;      // protocol to use
+}
+gcs_state_quorum_t;
+
 extern gcs_state_t*
 gcs_state_create (const gu_uuid_t* state_uuid,
                   const gu_uuid_t* group_uuid,
@@ -60,7 +72,7 @@ extern void
 gcs_state_destroy (gcs_state_t* state);
 
 /* Returns length needed to serialize gcs_state_msg_t for sending */
-extern ssize_t
+extern size_t
 gcs_state_msg_len (gcs_state_t* state);
 
 /* Serialize gcs_state_t into message */
@@ -70,6 +82,24 @@ gcs_state_msg_write (void* msg, const gcs_state_t* state);
 /* De-serialize gcs_state_t from message */
 extern gcs_state_t*
 gcs_state_msg_read (const void* msg, size_t msg_len);
+
+/* Get state uuid */
+extern const gu_uuid_t*
+gcs_state_uuid (const gcs_state_t* state);
+
+/* Get group uuid */
+extern const gu_uuid_t*
+gcs_state_group_uuid (const gcs_state_t* state);
+
+/* Get action seqno */
+extern gcs_seqno_t
+gcs_state_act_id (const gcs_state_t* state);
+
+/* Get quorum decision from state messages */
+extern long
+gcs_state_get_quorum (const gcs_state_t*  states[],
+                      long                states_num,
+                      gcs_state_quorum_t* quorum);
 
 /* Print state message contents to buffer */
 extern int

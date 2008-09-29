@@ -16,21 +16,26 @@
 #include "gcs.h"
 #include "gcs_defrag.h"
 #include "gcs_comp_msg.h"
+#include "gcs_state.h"
 
 struct gcs_node
 {
-    gcs_seqno_t  last_applied; // last applied action on that node
-    long         protocol;     // highest supported protocol
-    long         queue_len;    // action queue length on that node
-    bool         joined;       // if the node has sent JOIN message
-                               // (confirmed state transfer)
-    gcs_defrag_t app;          // defragmenter for application actions
-    gcs_defrag_t oob;          // defragmenter for out-of-band service acts.
+    gcs_seqno_t      last_applied; // last applied action on that node
+//    long             protocol;     // highest supported protocol
+//    long             queue_len;    // action queue length on that node
+    gcs_state_node_t status;       // node status
+    gcs_proto_t      proto_min;    // supported protocol versions
+    gcs_proto_t      proto_max;    // 
+    gcs_defrag_t     app;          // defragmenter for application actions
+    gcs_defrag_t     oob;          // defragmenter for out-of-band service acts.
 
     // globally unique id from the component message
-    const char   id[GCS_COMP_MEMB_ID_MAX_LEN + 1];
-};
+    const char       id[GCS_COMP_MEMB_ID_MAX_LEN + 1];
 
+    const char*      name;         // human-given name
+    const char*      inc_addr;     // incoming address - for load balancer
+    const gcs_state_t* state;      // state message
+};
 typedef struct gcs_node gcs_node_t;
 
 /*! Initialize node context */
@@ -46,8 +51,8 @@ extern void
 gcs_node_free (gcs_node_t* node);
 
 /*! Reset node's receive buffers */
-static inline void
-gcs_node_reset (gcs_node_t* node) { gcs_node_free(node); }
+extern void
+gcs_node_reset (gcs_node_t* node);
 
 /*!
  * Handles action message. Is called often - therefore, inlined
@@ -75,8 +80,8 @@ static inline void
 gcs_node_set_last_applied (gcs_node_t* node, gcs_seqno_t seqno)
 {
     if (gu_unlikely(seqno < node->last_applied)) {
-        gu_warn ("Received bogus LAST message: %llu, from node %s, "
-                 "expected >= %llu. Ignoring.",
+        gu_warn ("Received bogus LAST message: %lld, from node %s, "
+                 "expected >= %lld. Ignoring.",
                  seqno, node->id, node->last_applied);
     } else {
         node->last_applied = seqno;
@@ -88,4 +93,13 @@ gcs_node_get_last_applied (gcs_node_t* node)
 {
     return node->last_applied;
 }
+
+/*! Record state message from the node */
+extern void
+gcs_node_record_state (gcs_node_t* node, gcs_state_t* state);
+
+/*! Update node status according to quorum decisions */
+extern void
+gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum);
+
 #endif /* _gcs_node_h_ */

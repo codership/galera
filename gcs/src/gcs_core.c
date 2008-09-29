@@ -25,6 +25,7 @@ const size_t CORE_INIT_BUF_SIZE = 4096;
 typedef enum core_state
 {
     CORE_PRIMARY,
+    CORE_EXCHANGE,
     CORE_NON_PRIMARY,
     CORE_CLOSED,
     CORE_DESTROYED
@@ -170,7 +171,8 @@ core_msg_send (gcs_core_t*    core,
         // when GCS_ACT_SERVICE will be implemented, we'll have to have two
         // restart flags - one for each of ongoing actions
         register bool restart = core->send_restart && (type == GCS_MSG_ACTION);
-        if (gu_likely(core->state == CORE_PRIMARY && !restart)) {
+        if (gu_likely((core->state == CORE_PRIMARY  && !restart) ||
+                      (core->state == CORE_EXCHANGE && type == GCS_MSG_STATE_MSG))) {
             ret = core->backend.send (&core->backend, buf, buf_len, type);
         }
         else {
@@ -308,12 +310,6 @@ out:
     return ret;
 }
 
-static inline size_t
-core_act_conf_size (gcs_act_conf_t* act)
-{
-    return (sizeof (gcs_act_conf_t) + GCS_MEMBER_NAME_MAX * act->memb_num);
-}
-
 /* A helper for gcs_core_recv().
  * Deals with fetching complete message from backend
  * and reallocates recv buf if needed */
@@ -408,8 +404,8 @@ core_handle_act_msg (gcs_core_t*     core,
                     gcs_fifo_lite_pop_head (core->fifo);
                     /* sanity check */
                     if (gu_unlikely(sent_act_id != frg.act_id)) {
-                        gu_fatal ("FIFO violation: expected sent_act_id %llu "
-                                  "found %llu", sent_act_id, frg.act_id);
+                        gu_fatal ("FIFO violation: expected sent_act_id %lld "
+                                  "found %lld", sent_act_id, frg.act_id);
                         ret = -ENOTRECOVERABLE;
                     }
                 }
@@ -419,7 +415,7 @@ core_handle_act_msg (gcs_core_t*     core,
                     ret = -ENOTRECOVERABLE;
                 }
             }
-//          gu_debug ("Received action: seqno: %llu, sender: %d, size: %d, act: %p",
+//          gu_debug ("Received action: seqno: %lld, sender: %d, size: %d, act: %p",
 //                     act->id, msg->sender_id, ret, act->buf);
 //          gu_debug ("%s", (char*) act->buf);
         }
@@ -478,52 +474,226 @@ core_handle_comp_msg (gcs_core_t*     core,
                       gcs_recv_msg_t* msg,
                       gcs_recv_act_t* act)
 {
-    ssize_t      ret;
+    ssize_t      ret = 0;
     gcs_group_t* group = &core->group;
 
     assert (GCS_MSG_COMPONENT == msg->type);
 
     ret = gcs_group_handle_comp_msg (group, msg->buf);
-    if (ret >= 0) {
-        /* How it should really be:
-         * 1. When GCS_MSG_COMPONENT is received, we send GCS_MSG_STATE
-         * 2. When all GCS_MSG_STATE received, we can create calculate
-         *    quorum, determine global seqno and create GCS_ACT_CONF
-         */
-        // no more SYNC messages!
-        act->buf = gcs_group_handle_sync_msg (group, NULL);
-        if (!act->buf) {
-            gu_fatal ("Failed to handle SYNC msg.");
-            abort();
-        }
-        act->type = GCS_ACT_CONF;
 
-        gu_info ("Received %s component event. conf_id = %ld",
-                 gcs_group_is_primary(group) ?
-                 "primary" : "non-primary", group->conf_id);
-        ret = core_act_conf_size ((gcs_act_conf_t*)act->buf);
-
+    switch (ret) {
+    case GCS_GROUP_PRIMARY:
+        /* New primary configuration. This happens if: 
+         * - this is first node in group OR
+         * - some nodes disappeared no new nodes appeared
+         * No need for state exchange, return new conf_act right away */
         if (gu_mutex_lock (&core->send_lock)) abort();
         {
-            if (gcs_group_is_primary (group)) {
-                // if new members are added, need to resend ongoing actions
-                core->send_restart = gcs_group_new_members (group);
-                // if state is CLOSING or CLOSED we don't change that
-                if (core->state == CORE_NON_PRIMARY)
-                    core->state =  CORE_PRIMARY;
-            } else {
-                if (core->state == CORE_PRIMARY)
-                    core->state =  CORE_NON_PRIMARY;
+            assert (CORE_EXCHANGE != core->state);
+            if (CORE_NON_PRIMARY == core->state) core->state = CORE_PRIMARY;
+            core->send_restart = false;
+        }
+        gu_mutex_unlock (&core->send_lock);
+
+        ret = gcs_group_act_conf (group, act);
+        if (ret < 0) {
+            gu_fatal ("Failed create PRIM CONF action: %d (%s)",
+                      ret, strerror (-ret));
+            assert (0);
+            ret = -ENOTRECOVERABLE;
+        }
+        break;
+    case GCS_GROUP_WAIT_STATE_UUID:
+        /* New members, need state exchange. If representative, send UUID */
+        if (gu_mutex_lock (&core->send_lock)) abort();
+        {
+            // if state is CLOSED or DESTROYED we don't do anything
+            if (CORE_CLOSED > core->state) {
+                if (0 == gcs_group_my_idx(group)) { // I'm representative
+                    gu_uuid_t uuid;
+                    gu_uuid_generate (&uuid, NULL, 0);
+                    ret = core->backend.send (&core->backend,
+                                              &uuid,
+                                              sizeof(uuid),
+                                              GCS_MSG_STATE_UUID);
+                    if (ret < 0) {
+                        // if send() failed, it means new configuration change 
+                        // is on the way. Probably should ignore.
+                        gu_warn ("Failed to send state UUID: %d (%s)",
+                                 ret, strerror (-ret));
+                    }
+                    else {
+                        gu_info ("STATE_EXCHANGE: sent state UUID: "
+                                 GU_UUID_FORMAT, GU_UUID_ARGS(&uuid));
+                    }
+                }
+                else {
+                    gu_info ("STATE EXCHANGE: Waiting for state UUID.");
+                }
+                core->state = CORE_EXCHANGE;
+                // since new members were added, need to resend ongoing actions
+                core->send_restart = true;
+            }
+            ret = 0; // no action to return, continue
+        }
+        gu_mutex_unlock (&core->send_lock);
+        break;
+    case GCS_GROUP_NON_PRIMARY:
+        /* Lost primary component */
+        if (gu_mutex_lock (&core->send_lock)) abort();
+        {
+            // if state is CLOSING or CLOSED we don't change that
+            if (CORE_PRIMARY  == core->state ||
+                CORE_EXCHANGE == core->state) {
+                    core->state = CORE_NON_PRIMARY;
             }
         }
         gu_mutex_unlock (&core->send_lock);
-    }
-    else {
-        gu_fatal ("Failed to handle component message: '%s'!",
-                  strerror (ret));
+
+        ret = gcs_group_act_conf (group, act);
+        if (ret < 0) {
+            gu_fatal ("Failed create NON-PRIM CONF action: %d (%s)",
+                      ret, strerror (-ret));
+            assert (0);
+            ret = -ENOTRECOVERABLE;
+        }
+        break;
+    case GCS_GROUP_WAIT_STATE_MSG:
+        gu_fatal ("Internal error: gcs_group_handle_comp() returned "
+                  "WAIT_STATE_MSG. Can't continue.");
+        ret = -ENOTRECOVERABLE;
+        assert(0);
+    default:
+        gu_fatal ("Failed to handle component message: %d (%s)!",
+                  ret, strerror (-ret));
         assert(0);
     }
 
+    return ret;
+}
+
+/*!
+ * Helper for gcs_core_recv(). Handles GCS_MSG_STATE_UUID.
+ *
+ * @return negative error code or 0 to continue.
+ */
+static ssize_t
+core_handle_uuid_msg (gcs_core_t*     core,
+                      gcs_recv_msg_t* msg)
+{
+    ssize_t      ret   = 0;
+    gcs_group_t* group = &core->group;
+
+    assert (GCS_MSG_STATE_UUID == msg->type);
+
+    if (GCS_GROUP_WAIT_STATE_UUID == gcs_group_state (group)) {
+
+        ret = gcs_group_handle_uuid_msg (group, msg);
+
+        switch (ret) {
+        case GCS_GROUP_WAIT_STATE_MSG:
+            // Need to send state message for state exchange
+            {
+                gcs_state_t* state = gcs_group_get_state (group);
+                if (state) {
+                    size_t           state_len = gcs_state_msg_len (state);
+                    uint8_t          state_buf[state_len];
+                    const gu_uuid_t* state_uuid = gcs_state_uuid (state);
+
+                    gcs_state_msg_write (state_buf, state);
+                    ret = core_msg_send_retry (core,
+                                               state_buf,
+                                               state_len,
+                                               GCS_MSG_STATE_MSG);
+                    if (ret > 0) {
+                        gu_info ("STATE EXCHANGE: sent state msg: "
+                                 GU_UUID_FORMAT, GU_UUID_ARGS(state_uuid));
+                    }
+                    else {
+                        // This may happen if new configuraiton chage goes on.
+                        // What shall we do in this case? Is it unrecoverable?
+                        gu_error ("STATE EXCHANGE: failed for: "GU_UUID_FORMAT
+                                 ": %d (%s)",
+                                 GU_UUID_ARGS(state_uuid), ret, strerror(-ret));
+                    }
+                    gcs_state_destroy (state);
+                }
+                else {
+                    gu_fatal ("Failed to allocate state object.");
+                    ret = -ENOTRECOVERABLE;
+                }
+            }
+            break;
+        default:
+            assert (ret < 0);
+            gu_error ("Failed to handle state UUID: %d (%s)",
+                      ret, strerror (-ret));
+        }
+    }
+
+    return ret;
+}
+
+/*!
+ * Helper for gcs_core_recv(). Handles GCS_MSG_STATE_MSG.
+ *
+ * @return action size, negative error code or 0 to continue.
+ */
+static ssize_t
+core_handle_state_msg (gcs_core_t*     core,
+                       gcs_recv_msg_t* msg,
+                       gcs_recv_act_t* act)
+{
+    ssize_t      ret = 0;
+    gcs_group_t* group = &core->group;
+
+    assert (GCS_MSG_STATE_MSG == msg->type);
+
+    if (GCS_GROUP_WAIT_STATE_MSG == gcs_group_state (group)) {
+
+        ret = gcs_group_handle_state_msg (group, msg);
+
+        switch (ret) {
+        case GCS_GROUP_PRIMARY:
+        case GCS_GROUP_NON_PRIMARY:
+            // state exchange is over, create configuration action
+            if (gu_mutex_lock (&core->send_lock)) abort();
+            {
+                // if core is closing we do nothing    
+                if (CORE_CLOSED > core->state) {
+                    assert (CORE_EXCHANGE == core->state);
+                    switch (ret) {
+                    case GCS_GROUP_PRIMARY:
+                        core->state = CORE_PRIMARY;
+                        break;
+                    case GCS_GROUP_NON_PRIMARY:
+                        core->state = CORE_NON_PRIMARY;
+                        break;
+                    default:
+                        assert (0);
+                    }
+                }
+            }
+            gu_mutex_unlock (&core->send_lock);
+
+            ret = gcs_group_act_conf (group, act);
+            if (ret < 0) {
+                gu_fatal ("Failed create CONF action: %d (%s)",
+                          ret, strerror (-ret));
+                assert (0);
+                ret = -ENOTRECOVERABLE;
+            }
+            break;
+        case GCS_GROUP_WAIT_STATE_MSG:
+            // waiting for more state messages
+            ret = 0;
+            break;
+        default:
+            assert (ret < 0);
+            gu_error ("Failed to handle state message: %d (%s)",
+                      ret, strerror (-ret));
+        }
+    }
     return ret;
 }
 
@@ -550,7 +720,7 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
 
     /* receive messages from group and demultiplex them 
      * until finally some complete action is ready */
-    while (1)
+    while (0 == ret)
     {
 	ret = core_msg_recv (&conn->backend, recv_msg);
 	if (gu_unlikely (ret < 0)) {
@@ -560,30 +730,31 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
 	switch (recv_msg->type) {
 	case GCS_MSG_ACTION:
             ret = core_handle_act_msg(conn, recv_msg, &recv_act);
-            if (ret) { // either complete action or error
-                assert (ret > 0); // hang on error in debug mode
-                goto out; // break from loop
-	    }
+            assert (ret >= 0); // hang on error in debug mode
 	    break;
         case GCS_MSG_FLOW:
             recv_act.type = GCS_ACT_FLOW;
             // no need to malloc since it is for internal use
             // do we need a size sanity check here?
-            recv_act.buf  = recv_msg->buf;
-            goto out;
+            recv_act.buf = recv_msg->buf;
+            ret          = recv_msg->size;
+            break;
         case GCS_MSG_LAST:
             ret = core_handle_last_msg(conn, recv_msg, &recv_act);
-            if (ret) { // either complete action or error
-                assert (ret > 0);
-                goto out; // break from loop
-	    }
+            assert (ret >= 0); // hang on error in debug mode
             break;
 	case GCS_MSG_COMPONENT:
             ret = core_handle_comp_msg (conn, recv_msg, &recv_act);
-            if (ret) { // either complete action or error
-                assert (ret > 0);
-                goto out; // break from loop
-	    }
+            assert (ret >= 0); // hang on error in debug mode
+            break;
+        case GCS_MSG_STATE_UUID:
+            ret = core_handle_uuid_msg (conn, recv_msg);
+            assert (ret >= 0); // hang on error in debug mode
+            ret = 0;           // continue waiting for state messages
+            break;
+        case GCS_MSG_STATE_MSG:
+            ret = core_handle_state_msg (conn, recv_msg, &recv_act);
+            assert (ret >= 0); // hang on error in debug mode
             break;
 	default:
 	    // this normaly should not happen, shall we bother with
@@ -714,13 +885,14 @@ gcs_core_set_pkt_size (gcs_core_t* conn, ulong pkt_size)
 long
 gcs_core_set_last_applied (gcs_core_t* core, gcs_seqno_t seqno)
 {
-    ssize_t ret;
-    seqno = gcs_seqno_le (seqno);
-    ret = core_msg_send_retry (core, &seqno, sizeof(seqno), GCS_MSG_LAST);
+    gcs_seqno_t seqno_le = gcs_seqno_le (seqno);
+    ssize_t     ret      = core_msg_send_retry (core, &seqno_le,
+                                                sizeof(seqno_le), GCS_MSG_LAST);
     if (ret > 0) {
         assert(ret == sizeof(seqno));
         ret = 0;
     }
+    // gu_debug ("Sent last msg: %lld", seqno);
     return ret;
 }
 

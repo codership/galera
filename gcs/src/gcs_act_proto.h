@@ -16,6 +16,10 @@
 #include <stdint.h>
 typedef uint8_t gcs_proto_t;
 
+/*! Supported protocol range (for now only version 0 is supported) */
+#define GCS_ACT_PROTO_MIN 0
+#define GCS_ACT_PROTO_MAX 0
+
 /*! Internal action fragment data representation */
 typedef struct gcs_act_frag
 {
@@ -45,6 +49,6 @@ gcs_act_proto_inc (void* buf);
 
 /*! Returns protocol header size */
 extern long
-gcs_act_proto_hdr_size (unsigned char version);
+gcs_act_proto_hdr_size (long version);
 
 #endif /* _gcs_act_proto_h_ */

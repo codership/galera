@@ -17,8 +17,10 @@ typedef enum gcs_msg_type
     GCS_MSG_LAST,      // report about last applied action
     GCS_MSG_FLOW,      // flow control message
     GCS_MSG_COMPONENT, // new component
-    GCS_MSG_SYNC,      // synchronization message, contaning group information
-    GCS_MSG_FLUSH,     // flush message - node has flushed send queues
+    GCS_MSG_STATE_UUID,// state exchange UUID message
+    GCS_MSG_STATE_MSG, // state exchange message
+    GCS_MSG_JOIN,      // massage saying that the node completed state transfer
+    GCS_MSG_SYNC,      // message saying that the node has synced with group
     GCS_MSG_OTHER      // some other message we don't care about yet
 }
 gcs_msg_type_t;

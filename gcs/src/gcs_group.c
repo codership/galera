@@ -5,27 +5,43 @@
  */
 
 #include <errno.h>
-#include <galerautils.h>
 
 #include "gcs_group.h"
+
+static const char* group_state_str[GCS_GROUP_STATE_MAX] =
+{
+    "GCS_GROUP_NON_PRIMARY",
+    "GCS_GROUP_WAIT_STATE_UUID",
+    "GCS_GROUP_WAIT_STATE_MSG",
+    "GCS_GROUP_PRIMARY"
+};
 
 long
 gcs_group_init (gcs_group_t* group)
 {
-    group->act_id           = 0;
-    group->conf_id      = -1;
-    group->num          = 0;
-    group->my_idx       = -1;
-    group->state        = GROUP_NON_PRIMARY;
+    // here we also create default node instance.
+    group->act_id       = 0;
+    group->conf_id      = GCS_SEQNO_ILL;
+    group->state_uuid   = GU_UUID_NIL;
+    group->group_uuid   = GU_UUID_NIL;
+    group->proto        = -1;
+    group->num          = 1;
+    group->my_idx       = 0;
+    group->state        = GCS_GROUP_NON_PRIMARY;
     group->last_applied = GCS_SEQNO_ILL; // mark for recalculation
     group->last_node    = -1;
-    group->nodes        = NULL;
+    group->nodes        =  GU_CALLOC(group->num, gcs_node_t);
+
+    if (!group->nodes) return -ENOMEM;
+
+    gcs_node_init (&group->nodes[group->my_idx], "No ID");
+
     return 0;
 }
 
-/* Initialize nodes array */
+/* Initialize nodes array from component message */
 static inline gcs_node_t*
-group_nodes_init (gcs_comp_msg_t* comp)
+group_nodes_init (const gcs_comp_msg_t* comp)
 {
     gcs_node_t* ret = NULL;
     long nodes_num = gcs_comp_msg_num (comp);
@@ -54,6 +70,12 @@ group_nodes_free (gcs_group_t* group)
     if (group->nodes) gu_free (group->nodes);
 }
 
+void
+gcs_group_free (gcs_group_t* group)
+{
+    group_nodes_free (group);
+}
+
 /* Reset nodes array without breaking the statistics */
 static inline void
 group_nodes_reset (gcs_group_t* group)
@@ -73,9 +95,11 @@ group_redo_last_applied (gcs_group_t* group)
 
     group->last_node    = 0;
     group->last_applied = gcs_node_get_last_applied (&group->nodes[0]);
+//    gu_debug (" last_applied[0]: %lld", group->last_applied);
 
     for (n = 1; n < group->num; n++) {
         gcs_seqno_t seqno = gcs_node_get_last_applied (&group->nodes[n]);
+//        gu_debug ("last_applied[%ld]: %lld", n, seqno);
         if (seqno < group->last_applied) {
             group->last_applied = seqno;
             group->last_node    = n;
@@ -83,17 +107,91 @@ group_redo_last_applied (gcs_group_t* group)
     }
 }
 
-// NOTE: new_memb should be cleared only after handling SYNC message
-long
-gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
+static void
+group_go_non_primary (gcs_group_t* group)
+{
+    group->state   = GCS_GROUP_NON_PRIMARY;
+    group->conf_id = GCS_SEQNO_ILL;
+    // what else? Do we want to change anything about the node here?
+    // Probably we should keep old node status until next configuration
+    // change.
+}
+
+/*! Processes state messages and sets group parameters accordingly */
+static void
+group_post_state_exchange (gcs_group_t* group)
+{
+    const gcs_state_t* states[group->num];
+    gcs_state_quorum_t quorum;
+    long i;
+
+    /* Looping here every time is suboptimal, but simply counting state messages
+     * is not straightforward too: nodes may disappear, so the final count may
+     * inlcude messages from the disappeared nodes.
+     * Let's put it this way: looping here is reliable and not that expensive.*/
+    for (i = 0; i < group->num; i++) {
+        if (group->nodes[i].state)
+            states[i] = group->nodes[i].state;
+        else
+            return; // not all states received, wait more
+    }
+
+    gu_debug ("STATE EXCHANGE: "GU_UUID_FORMAT" complete.",
+              GU_UUID_ARGS(&group->state_uuid));
+
+    gcs_state_get_quorum (states, group->num, &quorum);
+
+    if (quorum.primary) {
+        // primary configuration
+        group->proto = quorum.proto;
+        if (gu_uuid_compare (&group->state_uuid, &GU_UUID_NIL)) {
+            // new state exchange happened
+            group->state      = GCS_GROUP_PRIMARY;
+            group->act_id     = quorum.act_id;
+            group->conf_id    = quorum.conf_id + 1;
+            group->group_uuid = quorum.group_uuid;
+            group->state_uuid = GU_UUID_NIL;
+
+            // Update each node state based on quorum outcome:
+            // is it up to date, does it need SST and stuff
+            for (i = 0; i < group->num; i++) {
+                gcs_node_update_status (&group->nodes[i], &quorum);
+            }
+        }
+        else {
+            // no state exchange happend, processing old state messages
+            assert (GCS_GROUP_PRIMARY == group->state);
+            group->conf_id++;
+        }
+    }
+    else {
+        // non-primary configuration
+        group_go_non_primary (group);
+    }
+
+    gu_debug ("Quorum results:"
+              "\n\t%s,"
+              "\n\tact_id     = %lld,"
+              "\n\tconf_id    = %lld,"
+              "\n\tlast_appl. = %lld,"
+              "\n\tprotocol   = %hd,"
+              "\n\tgroup UUID = "GU_UUID_FORMAT,
+              quorum.primary ? "PRIMARY" : "NON-PRIMARY",
+              group->act_id, group->conf_id, group->last_applied, group->proto,
+              GU_UUID_ARGS(&quorum.group_uuid));
+}
+
+gcs_group_state_t
+gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
 {
     long        new_idx, old_idx;
     long        new_nodes_num = 0;
     gcs_node_t *new_nodes = NULL;
+    ulong       new_memb = 0;
 
-    gu_debug ("primary = %s, my_id = %d, memb_num = %d, group_state = %d",
+    gu_debug ("primary = %s, my_id = %d, memb_num = %d",
 	      gcs_comp_msg_primary(comp) ? "yes" : "no",
-	      gcs_comp_msg_self(comp), gcs_comp_msg_num (comp), group->state);
+	      gcs_comp_msg_self(comp), gcs_comp_msg_num (comp));
 
     if (gcs_comp_msg_primary(comp)) {
 	/* Got PRIMARY COMPONENT - Hooray! */
@@ -102,46 +200,61 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
 	new_nodes     = group_nodes_init (comp);
 	if (!new_nodes) return -ENOMEM;
 	
-	if (group->state == GROUP_PRIMARY) {
+	if (group->state == GCS_GROUP_PRIMARY) {
 	    /* we come from previous primary configuration */
-	    /* remap old array to new one to preserve action continuity */
-	    assert (group->nodes);
-	    for (new_idx = 0; new_idx < new_nodes_num; new_idx++) {
-		/* find member index in old component by unique member id */
-                for (old_idx = 0; old_idx < group->num; old_idx++) {
-                    // just scan through old group
-                    if (!strcmp(group->nodes[old_idx].id,
-                                new_nodes[new_idx].id)) {
-                        /* the node was in previous configuration with us */
-                        /* move node context to new node array */
-                        gcs_node_move (&new_nodes[new_idx],
-                                       &group->nodes[old_idx]);
-                        break;
-                    }
-                }
-                /* if wasn't found in new configuration, new member -
-                 * need to resend actions in process */
-                group->new_memb |= (old_idx == group->num);
-	    }
 	}
 	else {
-	    /* It happened so that we missed some primary configurations */
-	    gu_warn ("Discontinuity in primary configurations!");
-	    gu_warn ("State snapshot is needed!");
-            /* we can't go to PRIMARY without joining some other PRIMARY guys */
-            group->new_memb |= 1;
-	    group->state = GROUP_PRIMARY;
-	}
-        // TODO: we must receive that from SYNC message
-        group->conf_id++;
+            if (1 == new_nodes_num && 0 == group->act_id &&
+                GCS_SEQNO_ILL == group->conf_id) {
+                /* First node in the group. Generate new group UUID */
+                assert (GCS_GROUP_NON_PRIMARY == group->state);
+                assert (1 == group->num);
+                assert (0 == group->my_idx);
+                gu_uuid_generate (&group->group_uuid, NULL, 0);
+                group->conf_id = 0; // this bootstraps configuration ID
+                group->state   = GCS_GROUP_PRIMARY;
+                group->nodes[group->my_idx].status = GCS_STATE_JOINED;
+                /* initialize node ID to the one given by the backend - this way
+                 * we'll be recognized as coming from prev. conf. below */
+                strncpy ((char*)group->nodes[group->my_idx].id, new_nodes[0].id,
+                         sizeof (new_nodes[0].id) - 1);
+                /* forge own state message - for group_post_state_exchange() */
+                gcs_node_record_state (&group->nodes[group->my_idx],
+                                       gcs_group_get_state (group));
+                gu_info ("Starting new group: " GU_UUID_FORMAT,
+                         GU_UUID_ARGS(&group->group_uuid));
+            }
+            else {
+                /* It happened so that we missed some primary configurations */
+                gu_warn ("Discontinuity in primary configurations!");
+                gu_warn ("State snapshot is needed!");
+            }
+            /* Move information about this node to new node array */
+        }
     }
     else {
 	/* Got NON-PRIMARY COMPONENT - cleanup */
-	if (group->state == GROUP_PRIMARY) {
-	    /* All sending threads must be aborted with -ENOTGROUP,
-	     * local action FIFO must be flushed. Not implemented: FIXME! */
-	    group->state = GROUP_NON_PRIMARY;
-	}
+        /* All sending threads must be aborted with -ENOTCONN,
+         * local action FIFO must be flushed. Not implemented: FIXME! */
+        group_go_non_primary (group);
+    }
+
+    /* remap old array to new one to preserve action continuity */
+    assert (group->nodes);
+    for (new_idx = 0; new_idx < new_nodes_num; new_idx++) {
+        /* find member index in old component by unique member id */
+        for (old_idx = 0; old_idx < group->num; old_idx++) {
+            // just scan through old group
+            if (!strcmp(group->nodes[old_idx].id, new_nodes[new_idx].id)) {
+                /* the node was in previous configuration with us */
+                /* move node context to new node array */
+                gcs_node_move (&new_nodes[new_idx], &group->nodes[old_idx]);
+                break;
+            }
+        }
+        /* if wasn't found in new configuration, new member -
+         * need to do state exchange */
+        new_memb |= (old_idx == group->num);
     }
 
     /* free old nodes array */
@@ -151,10 +264,24 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
     group->num    = new_nodes_num;
     group->my_idx = gcs_comp_msg_self (comp);
 
-    if (group->num > 0) {
-        /* if new nodes joined, reset ongoing actions */
-        if (group->new_memb) {
+    if (gcs_comp_msg_primary(comp)) {
+        /* FIXME: for now pretend that we always have new nodes and perform
+         * state exchange because old states can carry outdated node status.
+         * However this means aborting ongoing actions. Find a way to avoid
+         * this extra state exchange. */
+        new_memb = true;
+        /* if new nodes joined, reset ongoing actions and state messages */
+        if (new_memb) {
             group_nodes_reset (group);
+            group->state      = GCS_GROUP_WAIT_STATE_UUID;
+            group->state_uuid = GU_UUID_NIL; // prepare for state exchange
+        }
+        else {
+            if (GCS_GROUP_PRIMARY == group->state) {
+                /* since we don't have any new nodes since last PRIMARY,
+                   we skip state exchange */
+                group_post_state_exchange (group);
+            }
         }
         group_redo_last_applied (group);
     }
@@ -162,8 +289,61 @@ gcs_group_handle_comp_msg (gcs_group_t* group, gcs_comp_msg_t* comp)
     return group->state;
 }
 
+gcs_group_state_t
+gcs_group_handle_uuid_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
+{
+    assert (msg->size == sizeof(gu_uuid_t));
+
+    if (GCS_GROUP_WAIT_STATE_UUID == group->state) {
+        group->state_uuid = *(gu_uuid_t*)msg->buf;
+        group->state      = GCS_GROUP_WAIT_STATE_MSG;
+    }
+    else {
+        gu_debug ("Stray state UUID msg: "GU_UUID_FORMAT
+                  " from node %d, current group state %s",
+                  GU_UUID_ARGS(&group->state_uuid), msg->sender_id,
+                  group_state_str[group->state]);
+    }
+
+    return group->state;
+}
+
+gcs_group_state_t
+gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
+{
+    if (GCS_GROUP_WAIT_STATE_MSG == group->state) {
+        gcs_state_t* state = gcs_state_msg_read (msg->buf, msg->size);
+
+        if (state) {
+            const gu_uuid_t* state_uuid = gcs_state_uuid (state);
+
+            if (!gu_uuid_compare(&group->state_uuid, state_uuid)) {
+                gu_info ("STATE EXCHANGE: got state msg: "GU_UUID_FORMAT
+                         " from %d",
+                         GU_UUID_ARGS(state_uuid), msg->sender_id);
+                gcs_node_record_state (&group->nodes[msg->sender_id], state);
+                group_post_state_exchange (group);
+            }
+            else {
+                gu_debug ("STATE EXCHANGE: stray state msg: "GU_UUID_FORMAT
+                          "from node %d, current state UUID: "GU_UUID_FORMAT,
+                          GU_UUID_ARGS(state_uuid), msg->sender_id,
+                          GU_UUID_ARGS(&group->state_uuid));
+                gcs_state_destroy (state);
+            }
+        }
+        else {
+            gu_warn ("Could not parse state message from node %d",
+                     msg->sender_id);
+        }
+    }
+
+    return group->state;
+}
+
+/*! Returns new last applied value if it has changes, 0 otherwise */
 gcs_seqno_t
-gcs_group_handle_last_msg (gcs_group_t* group, gcs_recv_msg_t* msg)
+gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 {
     gcs_seqno_t seqno;
 
@@ -192,28 +372,40 @@ gcs_group_handle_last_msg (gcs_group_t* group, gcs_recv_msg_t* msg)
     return 0;
 }
 
-extern gcs_act_conf_t*
-gcs_group_handle_sync_msg  (gcs_group_t* group, gcs_recv_msg_t* msg)
+ssize_t
+gcs_group_act_conf (gcs_group_t* group, gcs_recv_act_t* act)
 {
-    // TODO: for now it just mimics the real behaviour
-    //       must be rewritten as soon as we get  sync messages
-    gcs_act_conf_t* conf = malloc (sizeof (gcs_act_conf_t) +
-                                   group->num * GCS_MEMBER_NAME_MAX);
+    ssize_t conf_size = sizeof(gcs_act_conf_t) + group->num*GCS_MEMBER_NAME_MAX;
+    gcs_act_conf_t* conf = malloc (conf_size);
     if (conf) {
-        conf->seqno = GCS_SEQNO_ILL; // must have a real value from SYNC message
+        conf->seqno    = group->act_id;
+        conf->conf_id  = group->conf_id;
         conf->memb_num = group->num;
         conf->my_idx   = group->my_idx;
-        if (GROUP_PRIMARY == group->state)
-            conf->conf_id = group->conf_id;
-        else
-            conf->conf_id = -1;
+
+        act->buf  = conf;
+        act->type = GCS_ACT_CONF;
+        return conf_size;
     }
-
-    return conf;
+    else {
+        return -ENOMEM;
+    }
 }
 
-void
-gcs_group_free (gcs_group_t* group)
-{
-    group_nodes_free (group);
+/*! Returns state object for state message */
+extern gcs_state_t*
+gcs_group_get_state (gcs_group_t* group) {
+    const gcs_node_t* my_node = &group->nodes[group->my_idx];
+    return gcs_state_create (
+        &group->state_uuid,
+        &group->group_uuid,
+        group->act_id,
+        group->conf_id,
+        my_node->status,
+        my_node->name,
+        my_node->inc_addr,
+        my_node->proto_min,
+        my_node->proto_max
+        );
 }
+

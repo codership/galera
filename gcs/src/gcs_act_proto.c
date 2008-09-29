@@ -116,9 +116,9 @@ gcs_act_proto_inc (void* buf)
 
 /*! Returns protocol header size */
 long
-gcs_act_proto_hdr_size (unsigned char version)
+gcs_act_proto_hdr_size (long version)
 {
-    if (0 != version) {
+    if (GCS_ACT_PROTO_MAX < version || GCS_ACT_PROTO_MIN > version) {
         return -EPROTONOSUPPORT;
     }
     return PROTO_DATA_OFFSET;

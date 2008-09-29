@@ -19,7 +19,7 @@ extern "C" {
 #include <stdio.h>
 
 /*! @typedef @brief Sequence number type. */
-typedef uint64_t gcs_seqno_t;
+typedef int64_t gcs_seqno_t;
 
 /*! @def @brief Illegal sequence number.
 * It is used to emphasize that action was not serialised */
@@ -316,7 +316,7 @@ gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size);
 
 typedef struct {
     gcs_seqno_t  seqno;    /// next action seqno
-    long         conf_id;  /// configuration ID (-1 if non-primary)
+    gcs_seqno_t  conf_id;  /// configuration ID (-1 if non-primary)
     size_t       memb_num; /// number of members in configuration
     size_t       my_idx;   /// index of this node in the configuration
     uint8_t      data[0];  /// member array

@@ -787,7 +787,7 @@ enum galera_status galera_recv(void *app_ctx) {
             }
         }
         case GCS_ACT_SNAPSHOT:
-            if (0 < seqno_l && seqno_l < GCS_SEQNO_ILL) {
+            if (0 < seqno_l) {
                 // Must advance queue counter even if ignoring the action
                 if (galera_eagain (gcs_to_grab, to_queue, seqno_l)) {
                     gu_fatal("Failed to grab to_queue: %llu", seqno_l);

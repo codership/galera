@@ -13,7 +13,7 @@
 #define GCS_STATE_ACCESS
 #include "gcs_state.h"
 
-extern gcs_state_t*
+gcs_state_t*
 gcs_state_create (const gu_uuid_t* state_uuid,
                   const gu_uuid_t* group_uuid,
                   gcs_seqno_t      act_id,
@@ -44,14 +44,14 @@ gcs_state_create (const gu_uuid_t* state_uuid,
     return ret;
 }
 
-extern void
+void
 gcs_state_destroy (gcs_state_t* state)
 {
     gu_free (state);
 }
 
 /* Returns length needed to serialize gcs_state_msg_t for sending */
-extern ssize_t
+size_t
 gcs_state_msg_len (gcs_state_t* state)
 {
     return (
@@ -80,7 +80,7 @@ gcs_state_msg_len (gcs_state_t* state)
     _const char*      name       = (char*)(conf_id + 1);
 
 /* Serialize gcs_state_msg_t into buf */
-extern ssize_t
+ssize_t
 gcs_state_msg_write (void* buf, const gcs_state_t* state)
 {
     STATE_MSG_FIELDS_V0(,buf);
@@ -101,7 +101,7 @@ gcs_state_msg_write (void* buf, const gcs_state_t* state)
 }
 
 /* De-serialize gcs_state_msg_t from buf */
-extern gcs_state_t*
+gcs_state_t*
 gcs_state_msg_read (const void* buf, size_t buf_len)
 {
     switch (*((uint8_t*)buf)) {
@@ -137,18 +137,19 @@ static const char* state_node_status[] =
 };
 
 /* Print state message contents to buffer */
-extern int
+int
 gcs_state_snprintf (char* str, size_t size, const gcs_state_t* state)
 {
-    return snprintf (str, size,
-                     "Protocols    : %u-%u\n"
-                     "Status       : %s\n"
-                     "Global seqno : %llu\n"
-                     "Configuration: %llu\n"
-                     "State UUID   : "GU_UUID_FORMAT"\n"
-                     "Group UUID   : "GU_UUID_FORMAT"\n"
-                     "Name         : '%s'\n"
-                     "Incoming addr: '%s'\n",
+    str[size - 1] = '\0'; // preventive termination
+    return snprintf (str, size - 1,
+                     "\n\tProtocols    : %u-%u"
+                     "\n\tStatus       : %s"
+                     "\n\tGlobal seqno : %lld"
+                     "\n\tConfiguration: %lld"
+                     "\n\tState UUID   : "GU_UUID_FORMAT
+                     "\n\tGroup UUID   : "GU_UUID_FORMAT
+                     "\n\tName         : '%s'"
+                     "\n\tIncoming addr: '%s'\n",
                      state->proto_min, state->proto_max,
                      state_node_status[state->status],
                      state->act_id, state->conf_id,
@@ -157,5 +158,142 @@ gcs_state_snprintf (char* str, size_t size, const gcs_state_t* state)
                      state->name,
                      state->inc_addr
         );
+}
+
+/* Get state uuid */
+const gu_uuid_t*
+gcs_state_uuid (const gcs_state_t* state)
+{
+    return &state->state_uuid;
+}
+
+/* Get group uuid */
+const gu_uuid_t*
+gcs_state_group_uuid (const gcs_state_t* state)
+{
+    return &state->group_uuid;
+}
+
+/* Get action seqno */
+gcs_seqno_t
+gcs_state_act_id (const gcs_state_t* state)
+{
+    return state->act_id;
+}
+
+/* Returns the node which is more representative of a group */
+static const gcs_state_t*
+state_nodes_compare (const gcs_state_t* left, const gcs_state_t* right)
+{
+    assert (0 == gu_uuid_compare(&left->group_uuid, &right->group_uuid));
+    assert (left->conf_id  != GCS_SEQNO_ILL);
+    assert (right->conf_id != GCS_SEQNO_ILL);
+
+    if (left->act_id < right->act_id) {
+        return right;
+    }
+    else if (left->act_id > right->act_id) {
+        return left;
+    }
+    else {
+        // act_id's are equal, choose the one with higher conf_id.
+        if ((int64_t)left->conf_id < (int64_t)right->conf_id) {
+            return right;
+        }
+        else {
+            return left;
+        }
+    }
+}
+
+/* Prints out all significant (JOINED) nodes */
+static void
+state_report_conflicting_uuids (const gcs_state_t* states[], long states_num)
+{
+    long j;
+    for (j = 0; j < states_num; j++) {
+        if (states[j]->conf_id != GCS_SEQNO_ILL &&
+            states[j]->status  >= GCS_STATE_JOINED) {
+            size_t st_len = 1024;
+            char   st[st_len];
+            gcs_state_snprintf (st, st_len, states[j]);
+            st[st_len - 1] = '\0';
+            gu_fatal ("%s", st);
+        }        
+    }
+}
+
+/* Get quorum decision from state messages */
+long 
+gcs_state_get_quorum (const gcs_state_t*  states[],
+                      long                states_num,
+                      gcs_state_quorum_t* quorum)
+{
+    /* We count only nodes which come from primary configuraton -
+     * conf_id != GCS_SEQNO_ILL
+     * They all must have the same group_uuid or otherwise quorum is impossible.
+     * Of those we need to find at least one that has complete state - 
+     * status >= GCS_STATE_JOINED. If we find none - configuration is
+     * non-primary.
+     * Of those with the status >= GCS_STATE_JOINED we choose the most
+     * representative: with the highest act_id and conf_id.
+     */
+
+    long i, j;
+    const gcs_state_t* rep = NULL;
+    gcs_state_quorum_t GCS_STATE_QUORUM_NON_PRIMARY =
+        {
+            GU_UUID_NIL,
+            GCS_SEQNO_ILL,
+            GCS_SEQNO_ILL,
+            false,
+            -1
+        };
+
+    *quorum = GCS_STATE_QUORUM_NON_PRIMARY; // pessimistic assumption
+
+    // find at least one JOINED
+    for (i = 0; i < states_num; i++) {
+        if (states[i]->conf_id >= 0 &&
+            states[i]->status  >= GCS_STATE_JOINED) {
+            rep = states[i];
+            break;
+        }
+    }
+
+    if (!rep) {
+        gu_debug ("No node with complete state");
+        return 0;
+    }
+
+    // Check that all JOINED have the same group UUID and find most updated
+    for (j = i+1; j < states_num; j++) {
+        if (states[j]->conf_id != GCS_SEQNO_ILL &&
+            states[j]->status  >= GCS_STATE_JOINED) {
+            if (gu_uuid_compare (&rep->group_uuid, &states[i]->group_uuid)) {
+                // for now just freak out and print all conflicting nodes
+                gu_fatal ("Quorum impossible: conflicting group UUIDs:");
+                state_report_conflicting_uuids (states, states_num);
+                return 0;
+            }
+            rep = state_nodes_compare (rep, states[i]);
+        }
+    }
+
+    // select the most suitable protocol
+    quorum->proto = rep->proto_max;
+    for (i = 0; i < states_num; i++) {
+        if (states[i]->proto_max <  quorum->proto &&
+            states[i]->proto_max >= rep->proto_min) {
+            quorum->proto = states[i]->proto_max;
+        }
+    }
+
+    quorum->act_id     = rep->act_id;
+    quorum->conf_id    = rep->conf_id;
+    quorum->group_uuid = rep->group_uuid;
+    quorum->primary    = true;
+
+    return 0;
 }
 
