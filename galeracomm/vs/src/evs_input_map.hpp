@@ -11,29 +11,25 @@
 #include <set>
 
 
-struct EVSRange {
-    uint32_t low;
-    uint32_t high;
-    EVSRange() : low(SEQNO_MAX), high(SEQNO_MAX) {}
-};
+
 
 
 
 class EVSInputMapItem {
     
-    Sockaddr sa;
+    EVSPid sa;
     EVSMessage msg;
     const ReadBuf* rb;
     mutable ReadBuf* priv_rb;
     size_t roff;
-    static const Sockaddr null_sa;
+    static const EVSPid null_sa;
     static const EVSMessage null_msg;
 public:
-    EVSInputMapItem(const Sockaddr& sa_, const EVSMessage& msg_, 
+    EVSInputMapItem(const EVSPid& sa_, const EVSMessage& msg_, 
 		    const ReadBuf* rb_, const size_t roff_) :
 	sa(sa_), msg(msg_), rb(rb_), priv_rb(0), roff(roff_) {}
     
-    EVSInputMapItem(const Sockaddr& sa_, const EVSMessage& msg_, 
+    EVSInputMapItem(const EVSPid& sa_, const EVSMessage& msg_, 
 		    ReadBuf* rb_) : sa(sa_), msg(msg_), rb(rb_), 
 				    priv_rb(rb_), roff(0) {}
     
@@ -50,7 +46,7 @@ public:
 	return ret;
     }
 
-    const Sockaddr& get_sockaddr() const {
+    const EVSPid& get_sockaddr() const {
 	return sa;
     }
     const EVSMessage& get_evs_message() const {
@@ -68,7 +64,7 @@ public:
     }
 };
 
-const Sockaddr EVSInputMapItem::null_sa = Sockaddr(0);
+const EVSPid EVSInputMapItem::null_sa = ADDRESS_INVALID;
 const EVSMessage EVSInputMapItem::null_msg = EVSMessage();
 
 class EVSInputMap {
@@ -86,8 +82,8 @@ class EVSInputMap {
 
     };
     
-    typedef std::map<const Sockaddr, Instance> IMap;
-    typedef std::pair<const Sockaddr, Instance> IMapItem;
+    typedef std::map<const EVSPid, Instance> IMap;
+    typedef std::pair<const EVSPid, Instance> IMapItem;
     IMap instances;
 
 
@@ -129,7 +125,7 @@ public:
 			     double(n_messages + 1)));
     }
     
-    void set_safe(const Sockaddr& s, const uint32_t seq) {
+    void set_safe(const EVSPid& s, const uint32_t seq) {
 	if (seqno_eq(aru_seq, SEQNO_MAX) || seqno_gt(seq, aru_seq))
 	    throw FatalException("Safe seqno out of range");
 	IMap::iterator ii = instances.find(s);
@@ -268,7 +264,7 @@ public:
 		    EVSInputMapItem(
 			item.get_sockaddr(),
 			EVSMessage(EVSMessage::USER,
-				   EVSMessage::DROP,
+				   DROP,
 				   i, 0, 
 				   item.get_evs_message().get_aru_seq(),
 				   item.get_evs_message().get_source_view(), 
@@ -340,9 +336,9 @@ public:
     }
 
     std::pair<EVSInputMapItem, bool> 
-    recover(const Sockaddr& sa, const uint32_t seq) const {
+    recover(const EVSPid& sa, const uint32_t seq) const {
 	EVSInputMapItem tmp(sa, EVSMessage(EVSMessage::USER, 
-					   EVSMessage::DROP, 
+					   DROP, 
 					   seq, 0, 0, EVSViewId(), 0), 0, 0);
 	MLog::iterator i;
 	if ((i = msg_log.find(tmp)) == msg_log.end() && 
@@ -354,7 +350,7 @@ public:
     }
     
 
-    void insert_sa(const Sockaddr& sa) {
+    void insert_sa(const EVSPid& sa) {
 	if (!seqno_eq(aru_seq, SEQNO_MAX))
 	    throw FatalException("Can't add instance after aru has been updated");
 	std::pair<IMap::iterator, bool> iret = 
@@ -363,14 +359,14 @@ public:
 	    throw FatalException("Instance already exists");
     }
     
-    void erase_sa(const Sockaddr& sa) {
+    void erase_sa(const EVSPid& sa) {
 	IMap::iterator ii = instances.find(sa);
 	if (ii == instances.end())
 	    throw FatalException("Instance does not exist");
 	instances.erase(sa);
     }
 
-    EVSRange get_sa_gap(const Sockaddr& sa) const {
+    EVSRange get_sa_gap(const EVSPid& sa) const {
 	IMap::const_iterator ii = instances.find(sa);
 	if (ii == instances.end())
 	    throw FatalException("Instance does not exist");

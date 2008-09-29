@@ -9,9 +9,9 @@
 
 class EVSProto;
 
-struct EVSProtoUpMeta {
-    const Sockaddr& source;
-    EVSProtoUpMeta(const Sockaddr& source_) : source(source_) {}
+struct EVSProtoUpMeta : public ProtoUpMeta {
+    const Address& source;
+    EVSProtoUpMeta(const Address& source_) : source(source_) {}
 };
 
 class EVS : public Protolay {

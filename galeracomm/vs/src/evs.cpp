@@ -35,14 +35,6 @@
 #include "evs.hpp"
 #include "evs_input_map.hpp"
 
-
-struct EVSGap {
-    Sockaddr source;
-    EVSRange range;
-};
-
-
-
 struct EVSInstance {
     // True if instance is considered to be operational (has produced messages)
     bool operational;
@@ -50,7 +42,7 @@ struct EVSInstance {
     bool trusted;
     // Known aru map of the instance
     // Commented out, this is needed only on recovery time and 
-    // should be found from join message std::map<const Sockaddr, uint32_t> aru;
+    // should be found from join message std::map<const EVSPid, uint32_t> aru;
     // Next expected seq from the instance
     // Commented out, this should be found from input map uint32_t expected;
     // True if it is known that the instance has installed current view
@@ -67,20 +59,21 @@ struct EVSInstance {
 
 
 
-class EVSProto : public Protolay {
+class EVSProto : public Bottomlay {
 public:
     Transport* tp;
     EVSProto(Transport* t) : tp(t),
-			     my_addr(Sockaddr::ADDR_INVALID), 
+			     my_addr(ADDRESS_INVALID), 
 			     current_view(0),
 			     install_message(0),
 			     last_sent(SEQNO_MAX),
-			     send_window(16),
-			     safe_aru(SEQNO_MAX) {}
-    Sockaddr my_addr;
+			     send_window(16), 
+			     max_output_size(1024),
+			     state(CLOSED) {}
+    EVSPid my_addr;
     // 
     // Known instances 
-    std::map<const Sockaddr, EVSInstance*> known;
+    std::map<const EVSPid, EVSInstance> known;
     // Current view id
     EVSViewId* current_view;
 
@@ -98,7 +91,7 @@ public:
     uint32_t send_window;
     // Output message queue
     std::deque<WriteBuf*> output;
-    
+    uint32_t max_output_size;
     enum State {
 	CLOSED,
 	JOINING,
@@ -107,9 +100,12 @@ public:
 	OPERATIONAL,
 	STATE_MAX
     };
-    State state = CLOSED;
+    State state;
 
-    static std::string to_string(const State s) const {
+
+
+
+    static std::string to_string(const State s) {
 	switch (s) {
 	case CLOSED:
 	    return "CLOSED";
@@ -127,41 +123,111 @@ public:
     }
 
     
-    int send_user(WriteBuf* wb, const uint32_t range = SEQNO_MAX);
+    int send_user(WriteBuf* wb, EVSSafetyPrefix sp, 
+		  const uint32_t range = SEQNO_MAX);
     int send_user();
-
-    void send_gap(const Sockaddr&, const EVSRange&);
+    int send_delegate(const EVSPid&, WriteBuf*);
+    void send_gap(const EVSPid&, const EVSRange&);
     void send_join();
     void send_leave();
     void send_install();
 
-    void resend(const EVSGap&);
-    void recover();
+    void resend(const EVSPid&, const EVSGap&);
+    void recover(const EVSGap&);
     void deliver();
+    void deliver_trans();
+    void deliver_reg_view() {
+	// TODO
+	LOG_DEBUG("Reg view");
+    }
+    void deliver_trans_view() {
+	// TODO
+	LOG_DEBUG("Trans view");
+    }
+
+    void setall_installed(bool val) {
+	for (std::map<const EVSPid, EVSInstance>::iterator i = known.begin();
+	     i != known.end(); ++i) {
+	    i->second.installed = val;
+	}
+    }
+
+    bool is_all_installed() const {
+	for (std::map<const EVSPid, EVSInstance>::const_iterator i = known.begin();
+	     i != known.end(); ++i) {
+	    if (i->second.operational && 
+		i->second.trusted && 
+		i->second.installed == false)
+		return false;
+	}
+	return true;
+    }
     
-    // Update aru map, return true if map was changed, otherwise false
-    bool update_aru(const Sockaddr&, std::map<Sockaddr, uint32_t>);
+    // Compares join message against current state
+    bool is_consistent(const EVSMessage* jm) const {
+	return false;
+    }
+
+
+    bool is_consensus() const {
+	const EVSMessage* my_jm = known.find(my_addr)->second.join_message;
+	if (my_jm == 0)
+	    return false;
+	if (is_consistent(my_jm) == false)
+	    return false;
+	
+	for (std::map<const EVSPid, EVSInstance>::const_iterator 
+		 i = known.begin(); i != known.end(); ++i) {
+	    if (!(i->second.operational && i->second.trusted))
+		continue;
+	    if (i->second.join_message == 0)
+		return false;
+	    if (equal(my_jm, i->second.join_message) == false)
+		return false;
+	}
+	return true;
+    }
+    
+    bool is_representative(const EVSPid& pid) const {
+	for (std::map<const EVSPid, EVSInstance>::const_iterator i = known.begin();
+	     i != known.end(); ++i) {
+	    if (i->second.operational && i->second.trusted) {
+		if (pid == i->first)
+		    return true;
+		else
+		    return false;
+	    }
+	}
+	return false;
+    }
+
     
     void shift_to(const State);
 
 
     // Message handlers
     void handle_notification(const TransportNotification*);
-    void handle_user(const EVSMessage&, const Sockaddr&, 
+    void handle_user(const EVSMessage&, const EVSPid&, 
 		     const ReadBuf*, const size_t);
-    void handle_delegate(const EVSMEssage&, const Sockaddr&, 
+    void handle_delegate(const EVSMessage&, const EVSPid&, 
 			 const ReadBuf*, const size_t);
-    void handle_gap(const EVSMessage&, const Sockaddr&);
-    void handle_join(const EVSMessage&, const Sockaddr&);
-    void handle_leave(const EVSMessage&, const Sockaddr&);
-    void handle_install(const EVSMessage&, const Sockaddr&);
+    void handle_gap(const EVSMessage&, const EVSPid&);
+    void handle_join(const EVSMessage&, const EVSPid&);
+    void handle_leave(const EVSMessage&, const EVSPid&);
+    void handle_install(const EVSMessage&, const EVSPid&);
+
+    // Protolay
+    int handle_down(WriteBuf* wb, const ProtoDownMeta* dm);
+
+    //
+    void cleanup() {}
 };
 
 /////////////////////////////////////////////////////////////////////////////
 // Message sending
 /////////////////////////////////////////////////////////////////////////////
 
-int EVSProto::send_user(WriteBuf* wb, const SafetypPrefix sp, 
+int EVSProto::send_user(WriteBuf* wb, const EVSSafetyPrefix sp, 
 			const uint32_t up_to_seqno)
 {
     int ret;
@@ -181,7 +247,7 @@ int EVSProto::send_user(WriteBuf* wb, const SafetypPrefix sp,
 	last_sent = seq;
 	ReadBuf* rb = wb->to_readbuf();
 	EVSRange range = input_map.insert(EVSInputMapItem(my_addr, msg, rb, 0));
-	assert(seqno_eq(range.high, last_sent));
+	assert(seqno_eq(range.get_high(), last_sent));
 	rb->release();
     }
     wb->rollback_hdr(msg.get_hdrlen());
@@ -196,30 +262,28 @@ int EVSProto::send_user()
     assert(state == OPERATIONAL);
     WriteBuf* wb = output.front();
     int ret;
-    if ((ret = send_user(wb, EVSMessage::SAFE)) == 0) {
+    if ((ret = send_user(wb, SAFE)) == 0) {
 	output.pop_front();
 	delete wb;
     }
     return ret;
 }
 
-int EVSProto::send_delegate(const Sockaddr& sa, WriteBuf* wb)
+int EVSProto::send_delegate(const EVSPid& sa, WriteBuf* wb)
 {
     EVSMessage dm(EVSMessage::DELEGATE, sa);
-    wb.prepend_hdr(dm.get_hdr(), dm.get_hdrlen());
+    wb->prepend_hdr(dm.get_hdr(), dm.get_hdrlen());
     return pass_down(wb, 0);
 }
 
-void EVSProto::send_gap(const EVSGap& gap)
+void EVSProto::send_gap(const EVSPid& pid, const EVSRange& range)
 {
     // TODO: Investigate if gap sending can be somehow limited, 
     // message loss happen most probably during congestion and 
     // flooding network with gap messages won't probably make 
     // conditions better
-    
-    std::map<const Sockaddr, EVSInstance*>::iterator i = known.find(my_addr);
-    assert(i != known.end());
-    EVSMessage gm(EVSMessage::GAP, i->second.last_sent, gap);
+    EVSGap gap(pid, range);
+    EVSMessage gm(EVSMessage::GAP, last_sent, gap);
     
     size_t bufsize = gm.size();
     unsigned char* buf = new unsigned char[bufsize];
@@ -241,13 +305,13 @@ void EVSProto::send_join()
     EVSMessage jm(EVSMessage::JOIN, 
 		  current_view ? *current_view : EVSViewId(my_addr, 0), 
 		  input_map.get_aru_seq(), input_map.get_safe_seq());
-    for (std::map<const Sockaddr, EVSInstance*>::iterator i = known.begin();
+    for (std::map<const EVSPid, EVSInstance>::iterator i = known.begin();
 	 i != known.end(); ++i) {
-	if (i->second->trusted && i->second->operational) {
-	    jm.add_operational_instance(i->first, input_map.get_sa_gap());
-	} else if (i->second->trusted == false) {
+	if (i->second.trusted && i->second.operational) {
+	    jm.add_operational_instance(i->first, input_map.get_sa_gap(i->first));
+	} else if (i->second.trusted == false) {
 	    jm.add_untrusted_instance(i->first);
-	} else if (i->second->operational == false) {
+	} else if (i->second.operational == false) {
 	    jm.add_unoperational_instance(i->first);
 	}
     }
@@ -283,18 +347,18 @@ void EVSProto::send_leave()
 
 void EVSProto::send_install()
 {
-    std::map<const Sockaddr, EVSInstance*>::iterator self = known.find(my_addr);
+    std::map<const EVSPid, EVSInstance>::iterator self = known.find(my_addr);
     EVSMessage im(EVSMessage::INSTALL, 
 		  EVSViewId(my_addr, current_view ? 
-			    current_view->seq + 1 : 1),
+			    current_view->get_seq() + 1 : 1),
 		  input_map.get_aru_seq(), input_map.get_safe_seq());
-    for (std::map<const Sockaddr, EVSInstance*>::iterator i = known.begin();
+    for (std::map<const EVSPid, EVSInstance>::iterator i = known.begin();
 	 i != known.end(); ++i) {
-	if (i->second->trusted && i->second->operational)
-	    im.add_operational_instance(i->first);
-	else if (i->second->trusted == false)
+	if (i->second.trusted && i->second.operational)
+	    im.add_operational_instance(i->first, input_map.get_sa_gap(i->first));
+	else if (i->second.trusted == false)
 	    im.add_untrusted_instance(i->first);
-	else if (i->second->operational == false)
+	else if (i->second.operational == false)
 	    im.add_unoperational_instance(i->first);
     }
     size_t bufsize = im.size();
@@ -312,29 +376,29 @@ void EVSProto::send_install()
 }
 
 
-void EVSProto::resend(const Sockaddr& gap_source, const EVSGap& gap)
+void EVSProto::resend(const EVSPid& gap_source, const EVSGap& gap)
 {
     
     assert(gap.source == my_addr);
-    if (gap.low == gap.high) {
+    if (gap.get_low() == gap.get_high()) {
 	LOG_DEBUG(std::string("EVSProto::resend(): Empty gap") 
-		  + to_string(gap.lwm) + " -> " 
-		  + to_string(gap.hwm));
+		  + ::to_string(gap.get_low()) + " -> " 
+		  + ::to_string(gap.get_high()));
 	return;
     }
     
-    for (uint32_t seq = gap.low; !seqno_gt(seq, gap.high); 
+    for (uint32_t seq = gap.get_low(); !seqno_gt(seq, gap.get_high()); 
 	 seq = seqno_next(seq)) {
 	std::pair<EVSInputMapItem, bool> i = input_map.recover(my_addr, seq);
 	if (i.second == false) {
-	    IMap::iterator ii = known.find();
+	    std::map<const EVSPid, EVSInstance>::iterator ii = known.find(gap_source);
 	    assert(ii != known.end());
 	    ii->second.trusted = false;
 	    shift_to(RECOVERY);
 	    return;
 	} else {
 	    const ReadBuf* rb = i.first.get_readbuf();
-	    const EVSMessge& msg = i.first.get_evs_messge();
+	    const EVSMessage& msg = i.first.get_evs_message();
 	    WriteBuf wb(rb, rb ? rb->get_len() : 0);
 	    wb.prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
 	    if (pass_down(&wb, 0))
@@ -346,22 +410,22 @@ void EVSProto::resend(const Sockaddr& gap_source, const EVSGap& gap)
 void EVSProto::recover(const EVSGap& gap)
 {
 
-    if (gap.low == gap.high) {
+    if (gap.get_low() == gap.get_high()) {
 	LOG_WARN(std::string("EVSProto::recover(): Empty gap: ") 
-		 + to_string(gap.lwm) + " -> " 
-		 + to_string(gap.hwm));
+		 + ::to_string(gap.get_low()) + " -> " 
+		 + ::to_string(gap.get_high()));
 	return;
     }
     
     // TODO: Find out a way to select only single instance that
     // is allowed to recover messages
     
-    for (uint32_t seq = gap.low; !seqno_gt(seq, gap.high); 
+    for (uint32_t seq = gap.get_low(); !seqno_gt(seq, gap.get_high()); 
 	 seq = seqno_next(seq)) {
 	std::pair<EVSInputMapItem, bool> i = input_map.recover(gap.source, seq);
 	if (i.second == true) {
 	    const ReadBuf* rb = i.first.get_readbuf();
-	    const EVSMessge& msg = i.first.get_evs_messge();
+	    const EVSMessage& msg = i.first.get_evs_message();
 	    WriteBuf wb(rb, rb ? rb->get_len() : 0);
 	    wb.prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
 	    if (send_delegate(gap.source, &wb))
@@ -378,16 +442,17 @@ int EVSProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 {
     int ret = 0;
     if (output.empty()) {
-	int err = send_user(wb, EVSMessage::SAFE);
+	int err = send_user(wb, SAFE);
 	switch (err) {
-	case EAGAIN:
+	case EAGAIN: {
 	    WriteBuf* priv_wb = wb->copy();
 	    output.push_back(priv_wb);
+	}
 	    // Fall through
 	case 0:
 	    break;
 	default:
-	    LOG_ERR(std::string("Send error: ") + to_string(err));
+	    LOG_ERROR(std::string("Send error: ") + ::to_string(err));
 	    ret = err;
 	}
     } else if (output.size() < max_output_size) {
@@ -404,7 +469,7 @@ int EVSProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 // State handler
 /////////////////////////////////////////////////////////////////////////////
 
-void EVSProto::shift_to(const State& s)
+void EVSProto::shift_to(const State s)
 {
     static const bool allowed[STATE_MAX][STATE_MAX] = {
 	// CLOSED
@@ -439,7 +504,7 @@ void EVSProto::shift_to(const State& s)
 	// Haven't got address from transport yet, this usually means
 	// asynchronous transport connect operation. Join is sent once
 	// connect notification is passed up
-	if (my_addr != Sockaddr::ADDR_INVALID)
+	if (!(my_addr == ADDRESS_INVALID))
 	    send_join();
 	state = JOINING;
 	break;
@@ -456,14 +521,14 @@ void EVSProto::shift_to(const State& s)
 	break;
     case OPERATIONAL:
 	assert(is_consensus() == true);
-	assert(all_installed() == true);
+	assert(is_all_installed() == true);
 	deliver();
 	deliver_trans_view();
 	deliver_trans();
 	deliver_reg_view();
 	// Reset input map
 	input_map.clear();
-	for (IMap::iterator i = known.begin(); i != known.end(); ++i)
+	for (std::map<const EVSPid, EVSInstance>::iterator i = known.begin(); i != known.end(); ++i)
 	    if (i->second.installed)
 		input_map.insert_sa(i->first);
 	state = OPERATIONAL;
@@ -489,7 +554,7 @@ void EVSProto::deliver()
 	i_next = i;
 	++i_next;
 	assert(current_view->find(i->get_sockaddr()));
-	if (i->get_evs_message().get_safety_prefix() != EVSMessage::DROP) {
+	if (i->get_evs_message().get_safety_prefix() != DROP) {
 	    EVSProtoUpMeta um(i->get_sockaddr());
 	    pass_up(i->get_readbuf(), i->get_readbuf_offset(), &um);
 	}
@@ -497,7 +562,7 @@ void EVSProto::deliver()
     }
     // Deliver all messages that qualify as agreed
     for (; i != input_map.end() && 
-	     i->get_evs_message().get_safety_prefix() == EVSMessage::AGREED &&
+	     i->get_evs_message().get_safety_prefix() == AGREED &&
 	     input_map.is_agreed(i); i = i_next) {
 	i_next = i;
 	++i_next;
@@ -508,14 +573,14 @@ void EVSProto::deliver()
     }
     // And finally FIFO or less 
     for (; i != input_map.end() &&
-	     i->get_evs_message().get_safety_prefix() == EVSMessage::FIFO &&
+	     i->get_evs_message().get_safety_prefix() == FIFO &&
 	     input_map.is_fifo(i); i = i_next) {
 	i_next = i;
 	++i_next;
 	assert(current_view->find(i->get_sockaddr())); 
 	EVSProtoUpMeta um(i->get_sockaddr());
 	pass_up(i->get_readbuf(), i->get_readbuf_offset(), &um);
-	input_map.erase();
+	input_map.erase(i);
     }
 }
 
@@ -541,7 +606,7 @@ void EVSProto::deliver_trans()
 	i_next = i;
 	++i_next;
 	assert(current_view->find(i->get_sockaddr())); 
-	if (i->get_evs_message().get_safety_prefix() != EVSMessage::DROP) {
+	if (i->get_evs_message().get_safety_prefix() != DROP) {
 	    EVSProtoUpMeta um(i->get_sockaddr());
 	    pass_up(i->get_readbuf(), i->get_readbuf_offset(), &um);
 	}
@@ -554,7 +619,7 @@ void EVSProto::deliver_trans()
 	++i_next;
 	assert(known.find(i->get_sockaddr()) && 
 	       known.find(i->get_sockaddr())->second.installed); 
-	if (i->get_evs_message().get_safety_prefix() != EVSMessage::DROP) {
+	if (i->get_evs_message().get_safety_prefix() != DROP) {
 	    EVSProtoUpMeta um(i->get_sockaddr());
 	    pass_up(i->get_readbuf(), i->get_readbuf_offset(), &um);
 	}
@@ -568,7 +633,7 @@ void EVSProto::deliver_trans()
     for (i = input_map.begin(); i != input_map.end(); i = i_next) {    
 	i_next = i;
 	++i_next;
-	IMap::iterator ii = known.find();
+	std::map<const EVSPid, EVSInstance>::iterator ii = known.find(i->get_sockaddr());
 	if (ii->second.installed)
 	    throw FatalException("Protocol error in transitional delivery (self delivery constraint)");
 	else if (input_map.is_fifo(i))
@@ -584,10 +649,11 @@ void EVSProto::deliver_trans()
 
 void EVSProto::handle_notification(const TransportNotification *tn)
 {
-    std::map<Sockaddr, EVSInstance>::iterator i = known.find(tn->source_sa);
+#if 0
+    std::map<EVSPid, EVSInstance>::iterator i = known.find(tn->source_sa);
 
     if (i == known.end() && tn->ntype == TRANSPORT_N_SUBSCRIBED) {
-	known.insert(std::pair<Sockaddr, EVSInstance >(source, EVSInstance()));
+	known.insert(std::pair<EVSPid, EVSInstance >(source, EVSInstance()));
     } else if (i != known.end() && tn->ntype == TRANSPORT_N_WITHDRAWN) {
 	if (i->second->operational == true) {
 	    // Instance was operational but now it has withdrawn, 
@@ -606,21 +672,25 @@ void EVSProto::handle_notification(const TransportNotification *tn)
     } else {
 	LOG_WARN("Unhandled transport notification: " + to_string(tn->ntype));
     }
-    if (my_addr != Sockaddr::ADDR_INVALID || state == JOINING)
+    if (my_addr != ADDRESS_INVALID || state == JOINING)
 	send_join();
+#endif // 0
 }
 
-void EVSProto::handle_user(const EVSMessage& msg, const Sockaddr& source, 
+void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source, 
 			   const ReadBuf* rb, const size_t roff)
 {
 
-    std::map<Sockaddr, EVSInstance>::iterator i = known.find(source);
+    std::map<const EVSPid, EVSInstance>::iterator i = known.find(source);
     if (i == known.end()) {
 	// Previously unknown instance has appeared and it seems to
 	// be operational, assume that it can be trusted and start
 	// merge/recovery
-	i = known.insert(std::pair<Sockaddr, EVSInstance());
-	i->second->operational = true;
+	std::pair<std::map<const EVSPid, EVSInstance>::iterator, bool> iret;
+	iret = known.insert(std::pair<EVSPid, EVSInstance>(source, EVSInstance()));
+	assert(iret.second == true);
+	i = iret.first;
+	i->second.operational = true;
 	if (state == RECOVERY || state == OPERATIONAL)
 	    shift_to(RECOVERY);
 	return;
@@ -632,18 +702,18 @@ void EVSProto::handle_user(const EVSMessage& msg, const Sockaddr& source,
 	    throw FatalException("No view in OPERATIONAL state");
 	// Drop message
 	return;
-    } else if (msg.get_source_view() != *current_view) {
-	if (i->second->trusted == false) {
+    } else if ((msg.get_source_view() == *current_view)) {
+	if (i->second.trusted == false) {
 	    // Do nothing, just discard message
 	    return;
-	} else if (i->second->operational == false) {
+	} else if (i->second.operational == false) {
 	    // This is probably partition merge, see if it works out
-	    i->second->operational = true;
+	    i->second.operational = true;
 	    shift_to(RECOVERY);
 	    return;
-	} else if (i->second->installed == false) {
+	} else if (i->second.installed == false) {
 	    if (install_message && 
-		msg.get_source_view() == install_message->get_view()) {
+		msg.get_source_view() == install_message->get_source_view()) {
 		assert(state == RECOVERY);
 		// Other instances installed view before this one, so it is 
 		// safe to shift to OPERATIONAL if consensus has been reached
@@ -658,39 +728,39 @@ void EVSProto::handle_user(const EVSMessage& msg, const Sockaddr& source,
 		// partition/remerge. In order to do it in organized fashion,
 		// don't trust the source instance during recovery phase.
 		LOG_WARN("Setting source status to no-trust");
-		i->second->trusted = false;
+		i->second.trusted = false;
 		shift_to(RECOVERY);
 		return;
 	    }
 	} else {
-	    i->second->trusted = false;
+	    i->second.trusted = false;
 	    shift_to(RECOVERY);
 	    return;
 	}
     }
 
-    assert(i->second->trusted == true && 
-	   i->second->operational == true &&
-	   i->second->installed == true &&
+    assert(i->second.trusted == true && 
+	   i->second.operational == true &&
+	   i->second.installed == true &&
 	   current_view &&
 	   msg.get_source_view() == *current_view);
     
     
-    EVSRange gap(input_map.insert(msg, rb));
+    EVSRange range(input_map.insert(EVSInputMapItem(source, msg, rb, roff)));
 
     // Some messages are missing
-    if (seqno_gt(gap.high, gap.low))
-	send_gap(EVSGap(i->first, gap));
+    if (seqno_gt(range.get_high(), range.get_low()))
+	send_gap(i->first, range);
     
-
-    if (i->first != my_addr && (
+    
+    if (!(i->first == my_addr) && (
 	    (output.empty() && !(msg.get_flags() & EVSMessage::F_MSG_MORE)) ||
 	    state == RECOVERY
-	    ) && seqno_lt(seqno_next(last_sent), gap.low)) {
+	    ) && seqno_lt(seqno_next(last_sent), range.get_low())) {
 	// Message not originated from this instance, output queue is empty
 	// and last_sent seqno should be advanced
 	WriteBuf wb(0, 0);
-	send_user(&wb, EVSMessage::DROP, gap.low);
+	send_user(&wb, DROP, range.get_low());
     } else if (output.empty() && !seqno_eq(input_map.get_aru_seq(), 
 					   input_map.get_safe_seq())) {
 	resend(my_addr, EVSGap(my_addr, EVSRange(last_sent, last_sent)));
@@ -702,22 +772,25 @@ void EVSProto::handle_user(const EVSMessage& msg, const Sockaddr& source,
 	    break;
 }
 
-void EVSProto::handle_delegate(const EVSMessage& msg, const Sockaddr& source,
+void EVSProto::handle_delegate(const EVSMessage& msg, const EVSPid& source,
 			       const ReadBuf* rb, const size_t roff)
 {
     EVSMessage umsg;
-    umsg.read(rb->get_buf(roff + msg.size()), 
-	      rb->get_len(roff + msg.size()));
-    handle_user(umsg, msg.get_user_source(), rb, 
+    umsg.read(rb->get_buf(roff), 
+	      rb->get_len(roff), msg.size());
+    handle_user(umsg, umsg.get_source(), rb, 
 		roff + msg.size() + umsg.size());
 }
 
-void EVSProto::handle_gap(const EVSMessage& msg, const Sockaddr& source)
+void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
 {
-    std::map<Sockaddr, EVSInstance>::iterator i = known.find(source);
+    std::map<EVSPid, EVSInstance>::iterator i = known.find(source);
     if (i == known.end()) {
-	i = known.insert(std::pair<Sockaddr, EVSInstance());
-	i->second->operational = true;
+	std::pair<std::map<const EVSPid, EVSInstance>::iterator, bool> iret;
+	iret = known.insert(std::pair<const EVSPid, EVSInstance>(source, EVSInstance()));
+	assert(iret.second == true);
+	i = iret.first;
+	i->second.operational = true;
 	if (state == RECOVERY || state == OPERATIONAL)
 	    shift_to(RECOVERY);
 	return;
@@ -725,55 +798,54 @@ void EVSProto::handle_gap(const EVSMessage& msg, const Sockaddr& source)
 	// Silent drop
 	return;
     } else if (state == RECOVERY && install_message && 
-	       install_message->get_view() == msg.get_source_view()) {
-	i->second->installed = true;
-	if (all_installed())
+	       install_message->get_source_view() == msg.get_source_view()) {
+	i->second.installed = true;
+	if (is_all_installed())
 	    shift_to(OPERATIONAL);
     } else if (current_view == 0) {
 	// This message has no use
 	return;
-    } else if (msg.get_source_view() != *current_view) {
-	if (i->second->trusted == false) {
+    } else if (!(msg.get_source_view() == *current_view)) {
+	if (i->second.trusted == false) {
 	    // Do nothing, just discard message
-	} else if (i->second->operational == false) {
+	} else if (i->second.operational == false) {
 	    // This is probably partition merge, see if it works out
-	    i->second->operational = true;
+	    i->second.operational = true;
 	    shift_to(RECOVERY);
-	} else if (i->second->installed == false) {
+	} else if (i->second.installed == false) {
 	    // Probably caused by network partitioning during recovery
 	    // state, this will most probably lead to view 
 	    // partition/remerge. In order to do it in organized fashion,
 	    // don't trust the source instance during recovery phase.
 	    LOG_WARN("Setting source status to no-trust");
-	    i->second->trusted = false;
+	    i->second.trusted = false;
 	    shift_to(RECOVERY);
 	} else {
-	    i->second->trusted = false;
+	    i->second.trusted = false;
 	    shift_to(RECOVERY);
 	}
 	return;
     }
 
-    assert(i->second->trusted == true && 
-	   i->second->operational == true &&
-	   i->second->installed == true &&
+    assert(i->second.trusted == true && 
+	   i->second.operational == true &&
+	   i->second.installed == true &&
 	   current_view &&
 	   msg.get_source_view() == *current_view);
 
     // Scan through gap list and resend or recover messages if appropriate.
-    std::list<EVSGap> gap = msg.get_gap();
-    for (std::list<EVSGap>::iterator g = gap.begin(); g != gap.end(); ++g) {
-	if (g->source == my_addr)
-	    resend(i->first, *g);
-	else if (state == RECOVERY)
-	    recover(*g);
-    }
+    EVSGap gap = msg.get_gap();
+    if (gap.get_source() == my_addr)
+	resend(i->first, gap);
+    else if (state == RECOVERY)
+	recover(gap);
+    
 
     // If it seems that some messages from source instance are missing,
     // send gap message
     EVSRange source_gap(input_map.get_sa_gap(source));
-    if (!seqno_eq(seqno_next(msg.get_seq()), source_gap.low))
-	send_gap(EVSGap(source, EVSRange(source_gap.low, msg.get_seq())));
+    if (!seqno_eq(seqno_next(msg.get_seq()), source_gap.get_low()))
+	send_gap(source, EVSRange(source_gap.get_low(), msg.get_seq()));
 		 
     // Deliver messages 
     deliver();
@@ -782,17 +854,20 @@ void EVSProto::handle_gap(const EVSMessage& msg, const Sockaddr& source)
 	    break;
 }
 
-void EVSProto::handle_join(const EVSMessage& msg, const Sockaddr& source)
+void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
 {
-    std::map<Sockaddr, EVSInstance>::iterator i = known.find(source);
+    std::map<const EVSPid, EVSInstance>::iterator i = known.find(source);
     if (i == known.end()) {
-	i = known.insert(std::pair<Sockaddr, EVSInstance());
-	i->second->operational = true;
+	std::pair<std::map<const EVSPid, EVSInstance>::iterator, bool> iret;
+	iret = known.insert(std::pair<const EVSPid, EVSInstance>(source, EVSInstance()));
+	assert(iret.second == true);
+	i = iret.first;
+	i->second.operational = true;
 	if (state == RECOVERY || state == OPERATIONAL ||
 	    (state == JOINING && source == my_addr))
 	    shift_to(RECOVERY);
 	return;
-    } else if (i->second->trusted == false) {
+    } else if (i->second.trusted == false) {
 	// Silently drop
 	return;
     }
@@ -800,13 +875,13 @@ void EVSProto::handle_join(const EVSMessage& msg, const Sockaddr& source)
     if (state == OPERATIONAL || install_message)
 	shift_to(RECOVERY);
 
-    assert(i->second->trusted == true && i->second->installed == false);
+    assert(i->second.trusted == true && i->second.installed == false);
 
     bool send_join_p = false;
 
     // 
-    if (i->second->operational == false) {
-	i->second->operational = true;
+    if (i->second.operational == false) {
+	i->second.operational = true;
 	send_join_p = true;
     } 
     
@@ -815,8 +890,8 @@ void EVSProto::handle_join(const EVSMessage& msg, const Sockaddr& source)
     }
     
     EVSRange source_gap(input_map.get_sa_gap(source));
-    if (!seqno_eq(seqno_next(msg.get_seq()), source_gap.low)) {
-	send_gap(EVSGap(source, EVSRange(source_gap.low, msg.get_seq())));
+    if (!seqno_eq(seqno_next(msg.get_seq()), source_gap.get_low())) {
+	send_gap(source, EVSRange(source_gap.get_low(), msg.get_seq()));
 	send_join_p = true;
     } 
     
@@ -824,11 +899,19 @@ void EVSProto::handle_join(const EVSMessage& msg, const Sockaddr& source)
     // highest known seq. If greater than last_sent, 
     // send range message to cover the gap.
 
-
-    if (i->second->join_message) {
-	delete i->second->join_message;
+    const std::map<EVSPid, EVSRange>* opinst = msg.get_operational_insntace();
+    for (std::map<EVSPid, EVSRange>::const_iterator i = opinst->begin();
+	 i != opinst->end(); ++i) {
+	if (!seqno_eq(i->second.get_hwm(), SEQNO_MAX) && 
+	    (seqno_eq(input_map.get_aru_seq(), SEQNO_MAX) ||
+	     seqno_gt(i->second.get_hwm(), input_map.get_aru_seq())
     }
-    i->second->join_message = new EVSMessage(msg);
+
+
+    if (i->second.join_message) {
+	delete i->second.join_message;
+    }
+    i->second.join_message = new EVSMessage(msg);
 
     if (send_join_p) {
 	send_join();
@@ -837,9 +920,9 @@ void EVSProto::handle_join(const EVSMessage& msg, const Sockaddr& source)
     }
 }
 
-void EVSProto::handle_leave(const EVSMessage& msg, const Sockaddr& source)
+void EVSProto::handle_leave(const EVSMessage& msg, const EVSPid& source)
 {
-    std::map<Sockaddr, EVSInstance>::iterator i = known.find(source);
+    std::map<EVSPid, EVSInstance>::iterator i = known.find(source);
 
     if (source == my_addr) {
 	assert(state == LEAVING);
@@ -847,9 +930,9 @@ void EVSProto::handle_leave(const EVSMessage& msg, const Sockaddr& source)
 	return;
     }
 
-    if (i->second->trusted == false) {
+    if (i->second.trusted == false) {
 	return;
-    } else if (current_view != 0 && msg.get_source_view() != *current_view) {
+    } else if (current_view != 0 && !(msg.get_source_view() == *current_view)) {
 	return;
     }
     if (i != known.end())
@@ -857,27 +940,29 @@ void EVSProto::handle_leave(const EVSMessage& msg, const Sockaddr& source)
     shift_to(RECOVERY);
 }
 
-void EVSProto::handle_install(const EVSMessage& msg, const Sockaddr& source)
+void EVSProto::handle_install(const EVSMessage& msg, const EVSPid& source)
 {
-    std::map<Sockaddr, EVSInstance>::iterator i = known.find(source);
+    std::map<EVSPid, EVSInstance>::iterator i = known.find(source);
 
     if (i == known.end()) {
-	i = known.insert(std::pair<Sockaddr, EVSInstance());
-	i->second->operational = true;
+	std::pair<std::map<const EVSPid, EVSInstance>::iterator, bool> iret;
+	iret = known.insert(std::pair<const EVSPid, EVSInstance>(source, EVSInstance()));
+	assert(iret.second == true);
+	i = iret.first;
 	if (state == RECOVERY || state == OPERATIONAL)
 	    shift_to(RECOVERY);
 	return;	
     } else if (state == JOINING || state == CLOSED) {
 	// Silent drop
 	return;
-    } else if (i->second->trusted == false) {
+    } else if (i->second.trusted == false) {
 	// Silent drop
 	return;
-    } else if (i->second->operational == false) {
-	i->second->operational = true;
+    } else if (i->second.operational == false) {
+	i->second.operational = true;
 	shift_to(RECOVERY);
 	return;
-    } else if (install_message || i->second->installed == true) {
+    } else if (install_message || i->second.installed == true) {
 	shift_to(RECOVERY);
 	return;
     } else if (is_representative(source) == false) {
@@ -891,7 +976,7 @@ void EVSProto::handle_install(const EVSMessage& msg, const Sockaddr& source)
     assert(install_message == 0);
 
     install_message = new EVSMessage(msg);
-    send_gap(my_addr, SEQNO_MAX, SEQNO_MAX);
+    send_gap(my_addr, EVSRange(SEQNO_MAX, SEQNO_MAX));
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -907,24 +992,24 @@ void EVS::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
 	throw FatalException("EVS::handle_up(): Invalid input rb == 0 && um == 0");
     const TransportNotification* tn = 
 	static_cast<const TransportNotification*>(um);
-
+    
     if (rb == 0 && tn) {
-	if (proto->my_addr == Sockaddr::ADDR_INVALID)
-	    proto->my_addr = tp->get_sockaddr();
+	// if (proto->my_addr == ADDRESS_INVALID)
+	//   proto->my_addr = tp->get_sockaddr();
 	proto->handle_notification(tn);
 	return;
     }
-
+    
     if (msg.read(rb->get_buf(), rb->get_len(), roff) == 0) {
 	LOG_WARN("EVS::handle_up(): Invalid message");
 	return;
     }
 
-    Sockaddr source(&tn.source_sa, tn.sa_size);
+    EVSPid source(msg.get_source());
 
     switch (msg.get_type()) {
     case EVSMessage::USER:
-	proto->handle_gap(msg, source, rb, roff);
+	proto->handle_gap(msg, source);
 	break;
     case EVSMessage::DELEGATE:
 	proto->handle_delegate(msg, source, rb, roff);
@@ -951,21 +1036,18 @@ void EVS::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
 void EVS::join(const ServiceId sid, Protolay *up)
 {
     proto->set_up_context(up);
-    proto->shift_to(JOINING);
+    proto->shift_to(EVSProto::JOINING);
 }
 
 void EVS::leave(const ServiceId sid)
 {
-    proto->shift_to(LEAVING);
+    proto->shift_to(EVSProto::LEAVING);
 }
 
 void EVS::connect(const char* addr)
 {
     tp->connect(addr);
     proto = new EVSProto(tp);
-    Sockaddr addr = tp->get_sockaddr();
-    if (addr != Sockaddr::ADDR_INVALID)
-	proto->my_addr = addr;
 }
 
 void EVS::close()
@@ -973,10 +1055,6 @@ void EVS::close()
     tp->close();
 }
 
-EVS::EVS()
-{
-
-}
 
 EVS* EVS::create(const char *addr, Poll *p)
 {
