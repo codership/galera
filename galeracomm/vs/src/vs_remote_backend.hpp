@@ -9,17 +9,23 @@ class VSRCommand : public Serializable {
 public:
     enum Type {SET, JOIN, LEAVE, RESULT} type;
     enum Result {SUCCESS, FAIL} result;
+    enum Flags {
+	/* Tell backend provider to drop data from self originated messages */
+	F_DROP_OWN_DATA = 0x1 
+    } flags;
     
-    VSRCommand() {
-
-    }
-    VSRCommand(const Type t) : type(t), result(SUCCESS) {
+    VSRCommand() : flags(static_cast<Flags>(0)) {
 	
     }
-    VSRCommand(const Type t, const Address a) : addr(a), type(t), result(SUCCESS) {
+
+    VSRCommand(const Type t) : type(t), result(SUCCESS), flags(static_cast<Flags>(0)) {
+	
     }
 
-    VSRCommand(const Type t, const Result r) : type(t), result(r) {
+    VSRCommand(const Type t, const Address a) : addr(a), type(t), result(SUCCESS), flags(static_cast<Flags>(0)) {
+    }
+
+    VSRCommand(const Type t, const Result r) : type(t), result(r), flags(static_cast<Flags>(0)) {
 
     }
     
@@ -34,6 +40,14 @@ public:
 	return result;
     }
 
+    void set_flags(Flags f) {
+	flags = static_cast<Flags>(flags | f);
+    }
+    
+    Flags get_flags() const {
+	return flags;
+    }
+    
     size_t read(const void *buf, const size_t buflen, const size_t offset) {
 	uint32_t w;
 	size_t off;
@@ -41,6 +55,7 @@ public:
 	    return 0;
 	type = static_cast<Type>(w & 0xff);
 	result = static_cast<Result>((w >> 8) & 0xff);
+	flags = static_cast<Flags>((w >> 16) & 0xff);
 	switch (type) {
 	case JOIN:
 	case LEAVE:
@@ -55,7 +70,7 @@ public:
     }
     size_t write(void *buf, const size_t buflen, const size_t offset) const {
 	size_t off;
-	uint32_t w = type | (result << 8);
+	uint32_t w = type | (result << 8) | (flags << 16);
 	if ((off = write_uint32(w, buf, buflen, offset)) == 0)
 	    return 0;
 	if ((off = addr.write(buf, buflen, off)) == 0)

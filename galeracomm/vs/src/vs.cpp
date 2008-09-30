@@ -26,6 +26,7 @@ public:
     uint32_t next_seq;
     VSMembMap membs;
     std::deque<std::pair<ReadBuf *, size_t> > trans_msgs;
+    std::map<const uint32_t, ReadBuf*> local_msgs;
     const Serializable *user_state;
     VSProto(const Address a, Protolay *up_ctx, const Serializable *us) : 
 	addr(a), trans_view(0), reg_view(0), 
@@ -39,11 +40,16 @@ public:
 	for (VSMembMap::iterator i = membs.begin(); i != membs.end(); ++i) {
 	    delete i->second;
 	}
+	clear_local();
+	for (std::deque<std::pair<ReadBuf*, size_t> >::iterator i = trans_msgs.begin(); i != trans_msgs.end(); ++i) {
+	    i->first->release();
+	}
+	trans_msgs.clear();
     }
-    void deliver_data(const VSMessage *, const ReadBuf *, const size_t);
+    void deliver_data(const VSMessage *, const ReadBuf *);
     void handle_conf(const VSMessage *);
     void handle_state(const VSMessage *);
-    void handle_data(const VSMessage *, const ReadBuf *, const size_t);
+    void handle_data(const VSMessage *, const ReadBuf *, const size_t, const bool);
 
     void handle_up(const int cid, const ReadBuf *, const size_t, const ProtoUpMeta *) {
 	// Dummy
@@ -54,8 +60,46 @@ public:
 	throw DException("");
     }
 
+    void store_local(const WriteBuf* wb, const uint32_t seq);
+    ReadBuf *get_local(const uint32_t seq);
+    void clear_local();
 };
 
+
+void VSProto::store_local(const WriteBuf* wb, const uint32_t seq)
+{
+    ReadBuf* rb = wb->to_readbuf();
+    std::pair<std::map<const uint32_t, ReadBuf*>::iterator, bool> iret;
+    iret = local_msgs.insert(std::pair<const uint32_t, ReadBuf*>(seq, rb));
+    if (iret.second == false) {
+	rb->release();
+	LOG_FATAL(std::string("Message ") + ::to_string(seq) + " already exists in local buffer");
+	throw FatalException("Duplicate local entry");
+    }
+}
+
+ReadBuf* VSProto::get_local(const uint32_t seq)
+{
+    ReadBuf* ret;
+    std::map<const uint32_t, ReadBuf*>::iterator i = local_msgs.find(seq);
+    if (i == local_msgs.end()) {
+	LOG_FATAL(std::string("Could not find local message") + ::to_string(seq) + " from local buffer");
+	throw FatalException("Local entry not found");
+	
+    }
+    ret = i->second;
+    local_msgs.erase(i);
+    return ret;
+}
+
+void VSProto::clear_local()
+{
+    for (std::map<const uint32_t, ReadBuf*>::iterator i = local_msgs.begin();
+	 i != local_msgs.end(); ++i) {
+	i->second->release();
+    }
+    local_msgs.clear();
+}
 
 void VSProto::handle_conf(const VSMessage *cm)
 {
@@ -128,7 +172,7 @@ void VSProto::handle_conf(const VSMessage *cm)
 }
 
 void VSProto::deliver_data(const VSMessage *dm, 
-		      const ReadBuf *rb, const size_t roff)
+			   const ReadBuf *rb)
 {
     VSMembMap::iterator membs_p = membs.find(dm->get_source());
     // std::cerr << "Message: Source(" << dm->get_source() << ")\n";
@@ -210,7 +254,7 @@ void VSProto::handle_state(const VSMessage *sm)
 		throw DException("");
 	    }
 	    
-	    deliver_data(&dm, rb, roff);
+	    deliver_data(&dm, rb);
 	    trans_msgs.pop_front();
 	    rb->release();
 	}
@@ -258,7 +302,7 @@ void VSProto::handle_state(const VSMessage *sm)
     }
 }
 
-void VSProto::handle_data(const VSMessage *dm, const ReadBuf *rb, const size_t roff)
+void VSProto::handle_data(const VSMessage *dm, const ReadBuf *rb, const size_t roff, const bool be_drop_own_data)
 {
     if (reg_view == 0)
 	return;
@@ -266,12 +310,31 @@ void VSProto::handle_data(const VSMessage *dm, const ReadBuf *rb, const size_t r
     // Verify send view correctness 
     if (!(dm->get_source_view() == reg_view->get_view_id()))
 	throw DException("");
-    
-    // Transitional configuration
-    if (trans_view) {
-	trans_msgs.push_back(std::pair<ReadBuf *, size_t>(rb->copy(), roff));
+
+    if (dm->get_source() == addr && be_drop_own_data) {
+	ReadBuf* own_rb = get_local(dm->get_seq());
+	VSMessage own_dm;
+	if (own_dm.read(own_rb->get_buf(), own_rb->get_len(), 0) == 0) {
+	    LOG_FATAL("Could not reconstruct own message");
+	    throw FatalException("Corrupted message");
+	}
+	if (!(own_dm == *dm)) {
+	    LOG_FATAL("Locally stored message does not match to received");
+	    throw FatalException("Invalid or corrupted message");
+	}
+	if (trans_view) {
+	    trans_msgs.push_back(std::pair<ReadBuf*, size_t>(own_rb, 0));
+	} else {
+	    deliver_data(&own_dm, own_rb);
+	    own_rb->release();
+	}
     } else {
-	deliver_data(dm, rb, roff);
+	// Transitional configuration
+	if (trans_view) {
+	    trans_msgs.push_back(std::pair<ReadBuf*, size_t>(rb->copy(), roff));
+	} else {
+	    deliver_data(dm, rb);
+	}
     }
 }
 
@@ -392,7 +455,7 @@ void VS::handle_up(const int cid, const ReadBuf *rb, const size_t roff, const Pr
 	p->handle_state(&msg);
 	break;
     case VSMessage::DATA:
-	p->handle_data(&msg, rb, roff);
+	p->handle_data(&msg, rb, roff, be->get_flags() & VSBackend::F_DROP_OWN_DATA);
 	break;
     default:
 	std::cerr << "Unknown message type\n";
@@ -450,6 +513,9 @@ int VS::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
     if (ret == 0) {
 	LOG_TRACE(std::string("Sent message ") + to_string(p->next_seq));
 	p->next_seq++;
+	if (be->get_flags() & VSBackend::F_DROP_OWN_DATA) {
+	    p->store_local(wb, msg.get_seq());
+	}
     }
     wb->rollback_hdr(msg.get_hdrlen());
     if (ret)
@@ -467,6 +533,8 @@ VS *VS::create(const char *conf, Poll *poll, Monitor *m)
     try {
 	vs = new VS(m);
 	vs->be = VSBackend::create(conf, poll, vs);
+	if (::getenv("VS_RECV_ALL_DATA") == 0)
+	    vs->be->set_flags(VSBackend::F_DROP_OWN_DATA);
 	vs->be_addr = strdup(conf);
 	vs->set_down_context(vs->be);
     } catch (Exception e) {

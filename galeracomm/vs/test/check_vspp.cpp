@@ -822,7 +822,6 @@ START_TEST(check_vs_cliser)
     c2.stop();
     c1.stop();
     s.stop();
-    
 }
 END_TEST
 

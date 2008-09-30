@@ -4,7 +4,7 @@
 
 // Message and command definitions
 #include "vs_remote_backend.hpp"
-
+#include "gcomm/vs.hpp"
 
 #include <cstring>
 #include <iostream>
@@ -106,7 +106,21 @@ void ClientHandler::handle_vs(const ReadBuf *rb, const size_t roff,
     if (rb == 0) {
 	LOG_INFO("Null message, silent drop");
     } else {
-	WriteBuf wb(rb->get_buf(roff), rb->get_len(roff));
+	size_t read_len = rb->get_len(roff);
+	
+	if (flags & F_DROP_OWN_DATA) {
+	    VSMessage vmsg;
+	    if (vmsg.read(rb->get_buf(), rb->get_len(), roff) == 0) {
+		LOG_FATAL("Detected data corruption");
+		throw FatalException("Data corruption");
+	    }
+	    if (vmsg.get_type() == VSMessage::DATA && vmsg.get_source() == vs->get_self()) {
+		read_len = vmsg.get_hdrlen();
+		LOG_TRACE(std::string("Dropping data, hdr len") + ::to_string(read_len));
+	    }
+	}
+	
+	WriteBuf wb(rb->get_buf(roff), read_len);
 	VSRMessage msg;
 	wb.prepend_hdr(msg.get_raw(), msg.get_raw_len());
 	int err;
@@ -119,8 +133,8 @@ void ClientHandler::handle_vs(const ReadBuf *rb, const size_t roff,
 	    close();
 	    return;
 	}
-	stats.incr_out(rb->get_len(roff));
-    }    
+	stats.incr_out(read_len);
+    }
 }
     
 void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
@@ -180,6 +194,8 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 	    close();
 	    return;
 	}
+	if (cmd.get_flags() & VSRCommand::F_DROP_OWN_DATA)
+	    flags = F_DROP_OWN_DATA;
 	state = CONNECTED;
 	VSRCommand respcmd(VSRCommand::RESULT, VSRCommand::SUCCESS);
 	VSRMessage resp(respcmd);
@@ -220,11 +236,19 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 	} else if (msg.get_type() == VSRMessage::VSPROTO) {
 	    LOG_TRACE(std::string("VSPROTO: len = ") + 
 			 ::to_string(rb->get_len(roff + msg.get_raw_len())));
+	    // TODO: Validate
+	    VSMessage vmsg;
+	    if (vmsg.read(rb->get_buf(),
+			  rb->get_len(), roff + msg.get_raw_len()) == 0) {
+		LOG_WARN("Couldn't read protocol message");
+		close();
+		return;
+	    }
 	    WriteBuf wb(rb->get_buf(roff + msg.get_raw_len()), rb->get_len(roff + msg.get_raw_len()));
 	    vs->handle_down(&wb, 0);
 	    stats.incr_in(rb->get_len(roff + msg.get_raw_len()));
 	} else {
-	    LOG_INFO("Invalid message");
+	    LOG_WARN("Invalid message");
 	    close();
 	    return;
 	}

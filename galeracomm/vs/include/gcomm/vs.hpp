@@ -490,8 +490,10 @@ public:
 	// LOG_TRACE(std::string("VSMessage::read(): reading "
 	//				     "vtf, offset ") 
 	//			 + to_string(offset));
-	if ((off = read_uint32(buf, buflen, offset, &w)) == 0)
+	if ((off = read_uint32(buf, buflen, offset, &w)) == 0) {
+	    LOG_WARN("VSMessage::read() failed at hdr read");
 	    return 0;
+	}
 	version = w & 0xff;
 	type = (w >> 8) & 0xff;
 	flags = (w >> 16) & 0xffff;
@@ -499,40 +501,50 @@ public:
 	// LOG_TRACE(std::string("VSMessage::read(): reading "
 	//				     "source, offset ") 
 	//			 + to_string(off));
-	if ((off = source.read(buf, buflen, off)) == 0)
+	if ((off = source.read(buf, buflen, off)) == 0) {
+	    LOG_WARN("VSMessage::read() failed at source read");
 	    return 0;
+	}
 
 	// LOG_TRACE(std::string("VSMessage::read(): reading "
 	//				     "source view, offset ") 
 	//			 + to_string(off));
-	if ((off = source_view.read(buf, buflen, off)) == 0)
+	if ((off = source_view.read(buf, buflen, off)) == 0) {
+	    LOG_WARN("VSMessage::read() failed at view id read");
 	    return 0;
+	}
 
 	// LOG_TRACE(std::string("VSMessage::read(): reading "
 	//				     "seq, offset ") 
 	//			 + to_string(off));
-	if ((off = read_uint32(buf, buflen, off, &seq)) == 0)
+	if ((off = read_uint32(buf, buflen, off, &seq)) == 0) {
+	    LOG_WARN("VSMessage::read() failed at seq read");
 	    return 0;
-
+	}
+	
 	// Compute checksum from header read so far and compare it to 
 	// checksum found from buffer
 	do_cksum(reinterpret_cast<const unsigned char *>(buf) + offset, 
 		 off - offset, &cksum);
 	uint32_t ck;
-	if ((off = read_uint32(buf, buflen, off, &ck)) == 0)
+	if ((off = read_uint32(buf, buflen, off, &ck)) == 0) {
+	    LOG_WARN("VSMessage::read() failed at cksum read");
 	    return 0;
+	}
 	if (ck != cksum) {
 	    throw FatalException("Invalid cksum");
 	}
-
+	
 	hdrlen = off;
-
+	
 	switch (type) {
 	case CONF:
 	case STATE:
 	    view = new VSView();
-	    if ((off = view->read(buf, buflen, off)) == 0)
+	    if ((off = view->read(buf, buflen, off)) == 0) {
+		LOG_WARN("VSMessage::read() failed at view read");
 		return 0;
+	    }
 	    if (flags & F_USER_STATE) {
 		user_state_buf = new ReadBuf((char*)buf + off, buflen - off);
 	    }
@@ -541,7 +553,7 @@ public:
 	    data_offset = off;
 	    break;
 	}
-
+	
 
 //	LOG_TRACE(std::string("VSMessage::read(): returning, "
 //					     "offset ") 

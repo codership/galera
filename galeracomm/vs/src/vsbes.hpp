@@ -14,6 +14,9 @@ public:
     enum {
 	TP, VS
     };
+    enum Flags {
+	F_DROP_OWN_DATA = 0x1
+    } flags;
     ClientHandler(Transport*, VSBackend*);
     ~ClientHandler();
     State get_state() const;

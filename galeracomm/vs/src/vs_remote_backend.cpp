@@ -44,6 +44,8 @@ void VSRBackend::handle_up(const int cid, const ReadBuf *rb, const size_t roff,
 	if (addr == ADDRESS_INVALID)
 	    throw FatalException("VSRBackend::handle_up(): Invalid address");
 	VSRCommand cmd(VSRCommand::SET);
+	if (get_flags() & F_DROP_OWN_DATA)
+	    cmd.set_flags(VSRCommand::F_DROP_OWN_DATA);
 	VSRMessage rmsg(cmd);
 	WriteBuf wb(0, 0);
 	wb.prepend_hdr(rmsg.get_raw(), rmsg.get_raw_len());
