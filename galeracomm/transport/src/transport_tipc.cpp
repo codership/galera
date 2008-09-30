@@ -18,6 +18,7 @@ static bool tipc_addr_to_sa(const char* addr, struct sockaddr* s,
 			    size_t* s_size)
 {
     sockaddr_tipc sa;
+    long long tmp;
     uint32_t type;
     uint32_t instance;
     const char* ptr = addr;
@@ -33,11 +34,12 @@ static bool tipc_addr_to_sa(const char* addr, struct sockaddr* s,
     
     ptr += strlen("tipc:");
     
-    type = strtoul(ptr, 0, 0);
-    if (type == ULONG_MAX && errno == ERANGE) {
-	LOG_ERROR(std::string("Invalid TIPC addrss: ") + addr);
+    tmp = strtoll(ptr, 0, 0);
+    if (tmp < 0 || tmp > 0xffffffffL) {
+	LOG_ERROR(std::string("Invalid TIPC address: ") + addr);
 	return false;
     }
+    type = tmp;
 
     if (type < 64) {
 	LOG_ERROR(std::string("Invalid TIPC name type (must be ge 64): ") 
@@ -50,11 +52,12 @@ static bool tipc_addr_to_sa(const char* addr, struct sockaddr* s,
 	return false;	
     }
     
-    instance = strtoul(addr, 0, 0);
-    if (instance == ULONG_MAX && errno == ERANGE) {
+    tmp = strtoll(addr, 0, 0);
+    if (tmp < 0 && tmp > 0xffffffffL) {
 	LOG_ERROR(std::string("Invalid TIPC addrss: ") + addr);
 	return false;
     }    
+    instance = tmp;
     
     sa.family = AF_TIPC;
     sa.addrtype = TIPC_ADDR_MCAST;
@@ -134,7 +137,7 @@ void TIPCTransport::connect(const char* addr)
     tipc_sa->addrtype = TIPC_ADDR_MCAST;
     LOG_INFO(std::string("Bind: ") + to_string(ret));
 
-    size_t local_sa_size = sizeof(local_sa);
+    socklen_t local_sa_size = sizeof(local_sa);
     if (getsockname(fd, &local_sa, &local_sa_size) == -1) {
 	int err = errno;
 	LOG_ERROR(std::string("getsockname() returned: ") + strerror(err));

@@ -152,7 +152,7 @@ gcs_state_snprintf (char* str, size_t size, const gcs_state_t* state)
                      "\n\tIncoming addr: '%s'\n",
                      state->proto_min, state->proto_max,
                      state_node_status[state->status],
-                     state->act_id, state->conf_id,
+                     (long long)state->act_id, (long long)state->conf_id,
                      GU_UUID_ARGS(&state->state_uuid),
                      GU_UUID_ARGS(&state->group_uuid),
                      state->name,

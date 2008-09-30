@@ -467,7 +467,8 @@ void *gcs_test_recv (void *arg)
                 gcs_act_conf_t* conf = (void*)thread->msg;
                 fprintf (stdout, "Got GCS_ACT_CONF: Conf ID: %lld, "
                          "seqno: %lld, members: %zu, my idx: %zu\n",
-                         conf->conf_id, conf->seqno, conf->memb_num, conf->my_idx);
+                         (long long)conf->conf_id, (long long)conf->seqno,
+			 conf->memb_num, conf->my_idx);
             }
 	    break;
         default:
