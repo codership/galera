@@ -28,7 +28,6 @@ public:
 	    throw FatalException("Must not call dtor explicitly, object not in stack");
 	}
 	delete[] priv_buf;
-	mon.leave();
     }
 
     ReadBuf(const void* buf, const size_t buflen, bool inst) {
@@ -120,6 +119,7 @@ public:
 	assert(refcnt > 0);
 	if (--refcnt == 0) {
 	    instack = true;
+	    mon.leave();
 	    delete this; // !!!!
 	} else {
 	    mon.leave();
