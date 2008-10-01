@@ -26,7 +26,7 @@ public:
     uint32_t next_seq;
     VSMembMap membs;
     std::deque<std::pair<ReadBuf *, size_t> > trans_msgs;
-    std::map<const uint32_t, ReadBuf*> local_msgs;
+    std::deque<ReadBuf*> local_msgs;
     const Serializable *user_state;
     VSProto(const Address a, Protolay *up_ctx, const Serializable *us) : 
 	addr(a), trans_view(0), reg_view(0), 
@@ -60,43 +60,33 @@ public:
 	throw DException("");
     }
 
-    void store_local(const WriteBuf* wb, const uint32_t seq);
-    ReadBuf *get_local(const uint32_t seq);
+    void store_local(const WriteBuf* wb);
+    ReadBuf *get_local();
     void clear_local();
 };
 
 
-void VSProto::store_local(const WriteBuf* wb, const uint32_t seq)
+void VSProto::store_local(const WriteBuf* wb)
 {
     ReadBuf* rb = wb->to_readbuf();
-    std::pair<std::map<const uint32_t, ReadBuf*>::iterator, bool> iret;
-    iret = local_msgs.insert(std::pair<const uint32_t, ReadBuf*>(seq, rb));
-    if (iret.second == false) {
-	rb->release();
-	LOG_FATAL(std::string("Message ") + ::to_string(seq) + " already exists in local buffer");
-	throw FatalException("Duplicate local entry");
-    }
+    local_msgs.push_back(rb);
 }
 
-ReadBuf* VSProto::get_local(const uint32_t seq)
+ReadBuf* VSProto::get_local()
 {
     ReadBuf* ret;
-    std::map<const uint32_t, ReadBuf*>::iterator i = local_msgs.find(seq);
-    if (i == local_msgs.end()) {
-	LOG_FATAL(std::string("Could not find local message") + ::to_string(seq) + " from local buffer");
-	throw FatalException("Local entry not found");
-	
-    }
-    ret = i->second;
-    local_msgs.erase(i);
+    if (local_msgs.empty())
+	throw FatalException("Local msgs empty");
+    ret = local_msgs.front();
+    local_msgs.pop_front();
     return ret;
 }
 
 void VSProto::clear_local()
 {
-    for (std::map<const uint32_t, ReadBuf*>::iterator i = local_msgs.begin();
+    for (std::deque<ReadBuf*>::iterator i = local_msgs.begin();
 	 i != local_msgs.end(); ++i) {
-	i->second->release();
+	(*i)->release();
     }
     local_msgs.clear();
 }
@@ -312,7 +302,7 @@ void VSProto::handle_data(const VSMessage *dm, const ReadBuf *rb, const size_t r
 	throw DException("");
 
     if (dm->get_source() == addr && be_drop_own_data) {
-	ReadBuf* own_rb = get_local(dm->get_seq());
+	ReadBuf* own_rb = get_local();
 	VSMessage own_dm;
 	if (own_dm.read(own_rb->get_buf(), own_rb->get_len(), 0) == 0) {
 	    LOG_FATAL("Could not reconstruct own message");
@@ -514,7 +504,7 @@ int VS::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 	LOG_TRACE(std::string("Sent message ") + to_string(p->next_seq));
 	p->next_seq++;
 	if (be->get_flags() & VSBackend::F_DROP_OWN_DATA) {
-	    p->store_local(wb, msg.get_seq());
+	    p->store_local(wb);
 	}
     }
     wb->rollback_hdr(msg.get_hdrlen());
