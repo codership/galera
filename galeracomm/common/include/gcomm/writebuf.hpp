@@ -64,18 +64,12 @@ public:
 	return get_hdrlen() + get_len();
     }
 
-    /* TODO: This method uses one unnecessary temporary buffer, optimize */
     ReadBuf *to_readbuf() const {
-	unsigned char *tmp_buf = new unsigned char[get_totlen()];
-	memcpy(tmp_buf, get_hdr(), get_hdrlen());
-	memcpy(tmp_buf + get_hdrlen(), get_buf(), get_len());
-	ReadBuf *rb = new ReadBuf(tmp_buf, get_totlen());
-	ReadBuf *ret = rb->copy();
-	rb->release();
-	delete[] tmp_buf;
-	return ret;
+	const void* bufs[2] = {get_hdr(), rb ? rb->get_buf() : 0};
+	size_t buflens[2] = {hdrlen, rb ? rb->get_len() : 0};
+	return new ReadBuf(bufs, buflens, rb ? 2 : 1, get_totlen());
     }
-
+    
 };
 
 

@@ -26,6 +26,20 @@ public:
 	this->buflen = buflen;
 	this->priv_buf = 0;
     }
+
+    ReadBuf(const void* bufs[], const size_t buflens[], const size_t nbufs, 
+	    const size_t tot_len) {
+	refcnt = 1;
+	buf = 0;
+	priv_buf = new unsigned char[tot_len];
+	buflen = 0;
+	for (size_t i = 0; i < nbufs; ++i) {
+	    memcpy(priv_buf + buflen, bufs[i], buflens[i]);
+	    buflen += buflens[i];
+	}
+	if (buflen != tot_len)
+	    throw FatalException("");
+    }
     
     ReadBuf *copy() const {
 	Critical crit(&mon);

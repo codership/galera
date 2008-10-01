@@ -166,6 +166,14 @@ START_TEST(check_readbuf)
     for (size_t i = 0; i < 64; i++)
 	fail_unless(ptr[i] == i + 64);
     rb_trunc->release();
+
+
+    const void* bufs[3] = {buf, buf + 17, buf + 17 + 45};
+    size_t buflens[3] = {17, 45, bufsize - 17 - 45};
+    ReadBuf* mrb = new ReadBuf(bufs, buflens, 3, bufsize);
+    fail_unless(mrb->get_len() == bufsize);
+    fail_unless(memcmp(buf, mrb->get_buf(), bufsize) == 0);
+    mrb->release();
 }
 END_TEST
 
