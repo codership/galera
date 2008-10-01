@@ -545,6 +545,16 @@ static void process_conn_write_set(
 	abort();
     }
 
+    /* certification ok */
+    rcode = apply_write_set(app_ctx, ws);
+    if (rcode) {
+        gu_error(
+            "unknown galera fail: %d trx: %llu", rcode,seqno_l
+	);
+    }
+    
+    do_report = report_check_counter();
+
     /* release total order */
     gcs_to_release(to_queue, seqno_l);
     
@@ -555,16 +565,6 @@ static void process_conn_write_set(
                  seqno_l, rcode, strerror(-rcode));
 	abort();
     }
-
-    /* certification ok */
-    rcode = apply_write_set(app_ctx, ws);
-    if (rcode) {
-        gu_error(
-            "unknown galera fail: %d trx: %llu", rcode,seqno_l
-	);
-    }
-    
-    do_report = report_check_counter();
 
     gcs_to_release(commit_queue, seqno_l);
 
