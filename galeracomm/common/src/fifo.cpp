@@ -6,7 +6,7 @@
 int Fifo::push_back(const WriteBuf *wb) 
 {
     if (is_full() == false) {
-	std::deque<ReadBuf *>::push_back(wb->to_readbuf());
+	dq.push_back(wb->to_readbuf());
 	return 0;
     } else {
 	return EAGAIN;
@@ -16,7 +16,7 @@ int Fifo::push_back(const WriteBuf *wb)
 int Fifo::push_front(const WriteBuf *wb) 
 {
     if (is_full() == false) {
-	std::deque<ReadBuf *>::push_front(wb->to_readbuf());
+	dq.push_front(wb->to_readbuf());
 	return 0;
     } else {
 	return EAGAIN;
@@ -26,9 +26,9 @@ int Fifo::push_front(const WriteBuf *wb)
 int Fifo::push_after(Fifo::iterator i, const WriteBuf *wb)
 {
     if (is_full() == false) {
-	if (i != std::deque<ReadBuf *>::end())
+	if (i != dq.end())
 	    ++i;
-	std::deque<ReadBuf *>::insert(i, wb->to_readbuf());
+	dq.insert(i, wb->to_readbuf());
 	return 0;
     } else {
 	return EAGAIN;
@@ -39,7 +39,7 @@ ReadBuf *Fifo::pop_front() {
     ReadBuf *rb = 0;
     if (size() > 0) {
 	rb = *begin();
-	std::deque<ReadBuf *>::pop_front();
+	dq.pop_front();
     }
     return rb;
 }

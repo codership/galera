@@ -463,11 +463,9 @@ void TCPTransport::handle(const int fd, const PollEnum pe)
 	if (state == TRANSPORT_S_CONNECTED) {
 	    ssize_t ret = recv_nointr();
 	    if (ret == 0) {
-		up_rb = new ReadBuf(recv_buf, recv_buf_offset);
-		pass_up(up_rb, TCPTransportHdr::get_raw_len(), 0);
+		ReadBuf rb(recv_buf, recv_buf_offset, true);
+		pass_up(&rb, TCPTransportHdr::get_raw_len(), 0);
 		recv_buf_offset = 0;
-		up_rb->release();
-		up_rb = 0;
 	    } else if (ret != EAGAIN) {
 		this->error_no = ret;
 		state = TRANSPORT_S_FAILED;

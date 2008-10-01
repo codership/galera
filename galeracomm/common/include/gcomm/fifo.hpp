@@ -7,10 +7,11 @@
 #include <set>
 #include <map>
 #include <deque>
+#include <list>
 #include <cerrno>
 
 
-class Fifo : public std::deque<ReadBuf *> {
+class Fifo {
     size_t mque_max_size;
     static void release(ReadBuf *rb) {
 	rb->release();
@@ -18,6 +19,8 @@ class Fifo : public std::deque<ReadBuf *> {
     int read_fd;
     int write_fd;
     
+    std::list<ReadBuf*> dq;
+
     static size_t max_fds;
     static int last_fd;
     static std::map<int, Fifo *> fifo_map;
@@ -43,6 +46,19 @@ public:
     
     int push_back(const WriteBuf *);
     int push_front(const WriteBuf *);
+
+
+    typedef std::list<ReadBuf*>::iterator iterator;
+    iterator begin() {
+	return dq.begin();
+    }
+    iterator end() {
+	return dq.end();
+    }
+    size_t size() const {
+	return dq.size();
+    }
+
     int push_after(Fifo::iterator, const WriteBuf *);
     
     ReadBuf *pop_front();

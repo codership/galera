@@ -7,6 +7,7 @@
 
 #include <pthread.h>
 #include <deque>
+#include <list>
 #include <cassert>
 
 class Waiter {
@@ -31,7 +32,7 @@ public:
 
 class Monitor {
     pthread_mutex_t mutex;
-    std::deque<Waiter *> waiters;
+    std::list<Waiter *> waiters;
     bool busy;
     unsigned long last_id;
 public:
