@@ -129,15 +129,14 @@ static GCS_BACKEND_SEND_FN(gcs_vs_send)
 	return -EBADFD;
     if (conn->vs_ctx.vs == 0)
 	return -ENOTCONN;
-
+    if (msg_type < 0 || msg_type > 0xff)
+	return -EINVAL;
     int err = 0;
     WriteBuf wb(buf, len);
-    unsigned char hdr[4];
-    write_uint32(msg_type, hdr, sizeof(hdr), 0);
-    wb.prepend_hdr(hdr, sizeof(hdr));
     
     try {
-	err = conn->vs_ctx.pass_down(&wb, 0);
+	VSDownMeta vdm (0, msg_type);
+	err = conn->vs_ctx.pass_down(&wb, &vdm);
     } catch (Exception e) {
 	return -ENOTCONN;
     }
@@ -186,16 +185,13 @@ retry:
     assert((ev.rb && ev.msg) || ev.view);
 
     if (ev.msg) {
-	uint32_t type;
-	read_uint32(ev.rb->get_buf(ev.msg->get_data_offset()), 
-		    ev.rb->get_len(ev.msg->get_data_offset()), 0, &type);
-	*msg_type = static_cast<gcs_msg_type_t>(type);
+	*msg_type = static_cast<gcs_msg_type_t>(ev.msg->get_user_type());
 	std::map<Address, long>::iterator i = conn->comp_map.find(ev.msg->get_source());
 	assert(i != conn->comp_map.end());
 	*sender_id = i->second;
-	cpy = std::min(ev.rb->get_len(ev.msg->get_data_offset() + 4), len);
-	ret = ev.rb->get_len(ev.msg->get_data_offset() + 4);
-	memcpy(buf, ev.rb->get_buf(ev.msg->get_data_offset() + 4), cpy);
+	cpy = std::min(ev.rb->get_len(ev.msg->get_data_offset()), len);
+	ret = ev.rb->get_len(ev.msg->get_data_offset());
+	memcpy(buf, ev.rb->get_buf(ev.msg->get_data_offset()), cpy);
     } else {
 	// This check should be enough:
 	// - Reg view will definitely have more members than previous 
