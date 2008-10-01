@@ -73,7 +73,7 @@ public:
 static Stats stats;
 
 
-ClientHandler::ClientHandler(Transport *t, VSBackend *v) : vs(v), tp(t)
+ClientHandler::ClientHandler(Transport *t, VSBackend *v) : vs(v), tp(t), flags(static_cast<Flags>(0))
 {
     state = HANDSHAKE;
     tp->set_up_context(this, TP);
