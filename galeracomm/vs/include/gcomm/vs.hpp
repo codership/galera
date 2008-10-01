@@ -464,7 +464,8 @@ private:
 	
 	flags |= F_CKSUM; // We do cksum for now on
 	
-	w = flags, w <<= 8;
+	w = user_type, w <<= 8;
+	w |= flags, w <<= 8;
 	w |= type & 0xff, w <<= 8;
 	w |= version & 0xff;
 	
@@ -496,7 +497,8 @@ public:
 	}
 	version = w & 0xff;
 	type = (w >> 8) & 0xff;
-	flags = (w >> 16) & 0xffff;
+	flags = (w >> 16) & 0xff;
+	user_type = (w >> 24) & 0xff;
 
 	// LOG_TRACE(std::string("VSMessage::read(): reading "
 	//				     "source, offset ") 

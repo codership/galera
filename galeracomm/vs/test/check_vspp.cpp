@@ -201,7 +201,7 @@ START_TEST(check_vsmessage)
     //
     // Data message
     //
-    VSMessage data_msg(Address(1, 5, 7), VSViewId(6, Address(1, 5, 7)), 5);
+    VSMessage data_msg(Address(1, 5, 7), VSViewId(6, Address(1, 5, 7)), 5, 7);
     fail_unless(data_msg.get_type() == VSMessage::DATA);
 
     buf = new char[128];
@@ -222,6 +222,8 @@ START_TEST(check_vsmessage)
     fail_unless(data_msg2.get_source() == data_msg.get_source());
     fail_unless(data_msg2.get_source_view() == data_msg.get_source_view());
     fail_unless(data_msg2.get_seq() == data_msg.get_seq());
+    fail_unless(data_msg2.get_user_type() == 7);
+    fail_unless(data_msg2.get_user_type() == data_msg.get_user_type());
     fail_unless(data_msg2.get_data_offset() > 0 && 
 		data_msg2.get_data_offset() == data_msg2.get_hdrlen());
 
