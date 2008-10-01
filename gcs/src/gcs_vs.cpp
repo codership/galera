@@ -15,10 +15,11 @@ struct vs_ev {
     ReadBuf *rb;
     VSMessage *msg;
     VSView *view;
-    vs_ev(const ReadBuf *r, const VSMessage *m, const VSView *v) :
-	rb(0), msg(0), view(0) {
+    size_t msg_size;
+    vs_ev(const ReadBuf *r, const size_t ms, const VSMessage *m, const VSView *v) :
+	rb(0), msg_size(ms), msg(0), view(0) {
 	if (r)
-	    rb = r->copy();
+	    rb = r->copy(m->get_data_offset());
 	if (m)
 	    msg = new VSMessage(*m);
 	if (v)
@@ -31,11 +32,13 @@ public:
     VS *vs;
     Poll *po;
     std::deque<vs_ev> eq;
+    void *waiter_buf;
+    size_t waiter_buf_len;
     gu_mutex_t mutex;
     gu_cond_t cond;
     Monitor monitor;
     enum State {JOINING, JOINED, LEFT} state;
-    gcs_vs() : vs(0), po(0), state(JOINING) {
+    gcs_vs() : vs(0), po(0), waiter_buf(0), waiter_buf_len(0), state(JOINING) {
 	gu_mutex_init(&mutex, 0);
 	gu_cond_init(&cond, 0);
     }
@@ -76,13 +79,29 @@ public:
 	    }
 	}
 	gu_mutex_lock(&mutex);
-	eq.push_back(vs_ev(rb, vum->msg, vum->view));
+	/* 
+	 * if (rb)
+	 * fprintf(stderr, "recv %lu, msg off %lu roff %lu\n", 
+	 * rb->get_len(roff), vum->msg->get_data_offset(), roff);
+	 */
+	if (vum->msg && eq.empty() && rb->get_len(roff) <= waiter_buf_len) {
+	    memcpy(waiter_buf, rb->get_buf(roff), rb->get_len(roff));
+	    eq.push_back(vs_ev(0, rb->get_len(roff), vum->msg, vum->view));
+	    // Zero pointer/len here to avoid rewriting the buffer if 
+	    // waiter does not wake up before next message
+	    waiter_buf = 0;
+	    waiter_buf_len = 0;
+	} else {
+	    eq.push_back(vs_ev(rb, 0, vum->msg, vum->view));
+	}
 	gu_cond_signal(&cond);
 	gu_mutex_unlock(&mutex);
     }
-    std::pair<vs_ev, bool> wait_event() {
+    std::pair<vs_ev, bool> wait_event(void* wb, size_t wb_len) {
 	gu_mutex_lock(&mutex);
 	while (eq.size() == 0 && state != LEFT) {
+	    waiter_buf = wb;
+	    waiter_buf_len = wb_len;
 	    gu_cond_wait(&cond, &mutex);
 	}
 	std::pair<vs_ev, bool> ret(eq.front(), eq.size() && state != LEFT 
@@ -106,11 +125,14 @@ public:
 typedef struct gcs_backend_conn {
     size_t last_view_size;
     size_t max_msg_size;
+    unsigned long long n_received;
+    unsigned long long n_copied;
     gcs_vs vs_ctx;
     gu_thread_t thr;
     gcs_comp_msg_t *comp_msg;
     std::map<Address, long> comp_map;
     gcs_backend_conn() : last_view_size(0), max_msg_size(1 << 20),
+			 n_received(0), n_copied(0),
 			 comp_msg(0) {}
 } conn_t;
 
@@ -133,7 +155,7 @@ static GCS_BACKEND_SEND_FN(gcs_vs_send)
 	return -EINVAL;
     int err = 0;
     WriteBuf wb(buf, len);
-    
+    /* fprintf(stderr, "send %lu\n", len); */
     try {
 	VSDownMeta vdm (0, msg_type);
 	err = conn->vs_ctx.pass_down(&wb, &vdm);
@@ -178,20 +200,27 @@ static GCS_BACKEND_RECV_FN(gcs_vs_recv)
 	return -EBADFD;
     
 retry:
-    std::pair<vs_ev, bool> wr(conn->vs_ctx.wait_event());
+    std::pair<vs_ev, bool> wr(conn->vs_ctx.wait_event(buf, len));
     if (wr.second == false)
 	return -ENOTCONN;
     vs_ev& ev(wr.first);
-    assert((ev.rb && ev.msg) || ev.view);
+    assert((ev.msg && (ev.rb || ev.msg_size))|| ev.view);
 
     if (ev.msg) {
 	*msg_type = static_cast<gcs_msg_type_t>(ev.msg->get_user_type());
 	std::map<Address, long>::iterator i = conn->comp_map.find(ev.msg->get_source());
 	assert(i != conn->comp_map.end());
 	*sender_id = i->second;
-	cpy = std::min(ev.rb->get_len(ev.msg->get_data_offset()), len);
-	ret = ev.rb->get_len(ev.msg->get_data_offset());
-	memcpy(buf, ev.rb->get_buf(ev.msg->get_data_offset()), cpy);
+	if (ev.rb) {
+	    ret = ev.rb->get_len();
+	    if (ret <= len) {
+		memcpy(buf, ev.rb->get_buf(), ret);
+		conn->n_copied++;
+	    }
+	} else {
+	    assert(ev.msg_size > 0);
+	    ret = ev.msg_size;
+	}
     } else {
 	// This check should be enough:
 	// - Reg view will definitely have more members than previous 
@@ -226,8 +255,10 @@ retry:
 	memcpy(buf, conn->comp_msg, cpy);
 	*msg_type = GCS_MSG_COMPONENT;
     }
-    if (static_cast<size_t>(ret) <= len)
+    if (static_cast<size_t>(ret) <= len) {
 	conn->vs_ctx.release_event();
+	conn->n_received++;
+    }
     
     return ret;
 }
@@ -290,9 +321,12 @@ static GCS_BACKEND_DESTROY_FN(gcs_vs_destroy)
     delete conn->vs_ctx.vs;
     delete conn->vs_ctx.po;
     if (conn->comp_msg) gcs_comp_msg_delete (conn->comp_msg);
-    delete conn;
 
-    fprintf(stderr, "gcs_vs_close(): return 0}\n");
+    fprintf(stderr, "received %llu copied %llu\n", conn->n_received, conn->n_copied);
+
+    delete conn;
+    
+    fprintf(stderr, "gcs_vs_close(): return 0\n");
     return 0;
 }
 
