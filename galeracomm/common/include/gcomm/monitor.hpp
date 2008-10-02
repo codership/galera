@@ -35,11 +35,19 @@ class Monitor {
     std::list<Waiter *> waiters;
     bool busy;
     unsigned long last_id;
+    static bool skip_locking;
 public:
+
+    static void set_skip_locking(const bool val) {
+	skip_locking = val;
+    }
+    
     Monitor() : busy(false), last_id(0) {
 	pthread_mutex_init(&mutex, 0);
     }
     void enter() {
+	if (skip_locking)
+	    return;
 	if (pthread_mutex_lock(&mutex))
 	    throw DException("");
 	if (busy) {
@@ -56,6 +64,8 @@ public:
 	    throw DException("");
     }
     void leave() {
+	if (skip_locking)
+	    return;
 	assert(busy == true);
 	if (pthread_mutex_lock(&mutex))
 	    throw DException("");

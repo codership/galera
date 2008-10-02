@@ -373,6 +373,7 @@ int main(int argc, char *argv[])
 
     LOG_INFO("start");
     ::signal(SIGPIPE, SIG_IGN);
+    Monitor::set_skip_locking(::getenv("VSBES_EXPLICIT_LOCKING") ? false : true);
 
     if (argc < 2) {
 	std::cerr << "Usage: " << argv[0] << " <address>" << std::endl;
