@@ -43,7 +43,8 @@ public:
     }
     
     Monitor() : busy(false), last_id(0) {
-	pthread_mutex_init(&mutex, 0);
+	if (skip_locking == false)
+	    pthread_mutex_init(&mutex, 0);
     }
     void enter() {
 	if (skip_locking)
