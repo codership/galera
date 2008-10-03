@@ -94,13 +94,14 @@ struct EVSGap {
     }
 };
 
-    enum EVSSafetyPrefix {
-	DROP,
-	UNRELIABLE,
-	FIFO,
-	AGREED,
-	SAFE
-    };
+enum EVSSafetyPrefix {
+    DROP,
+    UNRELIABLE,
+    FIFO,
+    AGREED,
+    SAFE
+};
+
 
 
 class EVSMessage {
@@ -131,13 +132,41 @@ private:
     EVSViewId source_view;
     EVSPid source;
     EVSGap gap;
-    std::map<EVSPid, EVSRange>* oper_inst;
-    std::set<EVSPid>* untr_inst;
-    std::set<EVSPid>* unop_inst;
+public:
+    class Instance {
+	EVSPid pid;
+	bool operational;
+	bool trusted;
+	EVSViewId view_id;
+	EVSRange range;
+    public:
+	Instance(const EVSPid pid_, const bool oper_, const bool trusted_, 
+		 const EVSViewId& view_id_,
+		 const EVSRange range_) :
+	    pid(pid_), operational(oper_), trusted(trusted_), 
+	    view_id(view_id_), range(range_) {}
+	const EVSPid& get_pid() const {
+	    return pid;
+	}
+	bool get_operational() const {
+	    return operational;
+	}
+	bool get_trusted() const {
+	    return trusted;
+	}
+	const EVSViewId& get_view_id() const {
+	    return view_id;
+	}
+	const EVSRange& get_range() const {
+	    return range;
+	}
+    };
+private:
+    std::map<EVSPid, Instance>* instances;
 public:    
-
-
-    EVSMessage() : seq(SEQNO_MAX) {}
+    
+    
+    EVSMessage() : seq(SEQNO_MAX), instances(0) {}
     
     // User message
     EVSMessage(const Type type_, 
@@ -154,9 +183,7 @@ public:
 	aru_seq(aru_seq_),
 	flags(flags_),
 	source_view(vid_), 
-	oper_inst(0), 
-	untr_inst(0), 
-	unop_inst(0) {
+	instances(0) {
 	if (type != USER)
 	    throw FatalException("Invalid type");
     }
@@ -165,9 +192,7 @@ public:
     EVSMessage(const Type type_, const EVSPid& source_) :
 	type(type_), 
 	source(source_), 
-	oper_inst(0), 
-	untr_inst(0), 
-	unop_inst(0) {
+	instances(0) {
 	if (type != DELEGATE)
 	    throw FatalException("Invalid type");
     }
@@ -177,9 +202,7 @@ public:
 	type(type_), 
 	seq(seq_), 
 	gap(gap_),
-	oper_inst(0), 
-	untr_inst(0), 
-	unop_inst(0) {
+	instances(0) {
 	if (type != GAP)
 	    throw FatalException("Invalid type");
     } 
@@ -193,15 +216,14 @@ public:
 	source_view(vid_)  {
 	if (type != JOIN && type != INSTALL)
 	    throw FatalException("Invalid type");
-	oper_inst = new std::map<EVSPid, EVSRange>;
-	untr_inst = new std::set<EVSPid>;
-	unop_inst = new std::set<EVSPid>;
+        instances = new std::map<EVSPid, Instance>;
     }
     
     // Leave message
     EVSMessage(const Type type_, const EVSViewId& vid_) :
 	type(type_),
-	source_view(vid_) {
+	source_view(vid_),
+	instances(0) {
 	if (type != LEAVE)
 	    throw FatalException("Invalid type");
     }
@@ -210,9 +232,7 @@ public:
 	
     
     ~EVSMessage() {
-	delete oper_inst;
-	delete untr_inst;
-	delete unop_inst;
+	delete instances;
     }
     
     Type get_type() const {
@@ -251,27 +271,19 @@ public:
 	return gap;
     }
 
-    const std::map<EVSPid, EVSRange>* get_operational() const {
-	return oper_inst;
+    const std::map<EVSPid, Instance>* get_instances() const {
+	return instances;
     }
-
-    void add_operational_instance(const EVSPid& pid, const EVSRange& range) {
-	std::pair<std::map<EVSPid, EVSRange>::iterator, bool> i = 
-	    oper_inst->insert(std::pair<EVSPid, EVSRange>(pid, range));
-	if (i.second == false)
-	    throw FatalException("");
-    }
-
-    void add_untrusted_instance(const EVSPid& pid) {
-	std::pair<std::set<EVSPid>::iterator, bool> i = 
-	    untr_inst->insert(pid);
-	if (i.second == false)
-	    throw FatalException("");
-    }
-
-    void add_unoperational_instance(const EVSPid& pid) {
-	std::pair<std::set<EVSPid>::iterator, bool> i = 
-	    unop_inst->insert(pid);
+    
+    void add_instance(const EVSPid& pid, const bool operational, 
+		      const bool trusted, 
+		      const EVSViewId& view_id, 
+		      const EVSRange& range) {
+	std::pair<std::map<EVSPid, Instance>::iterator, bool> i = 
+	    instances->insert(std::pair<EVSPid, Instance>(
+				  pid, 
+				  Instance(pid, operational, trusted, 
+					   view_id, range)));
 	if (i.second == false)
 	    throw FatalException("");
     }

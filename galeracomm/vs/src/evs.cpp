@@ -35,6 +35,8 @@
 #include "evs.hpp"
 #include "evs_input_map.hpp"
 
+#include "gcomm/time.hpp"
+
 struct EVSInstance {
     // True if instance is considered to be operational (has produced messages)
     bool operational;
@@ -49,11 +51,13 @@ struct EVSInstance {
     bool installed;
     // Last received JOIN message
     EVSMessage* join_message;
+    // Last activity timestamp
+    Time tstamp;
     // CTOR
     EVSInstance() : 
 	operational(false), 
 	trusted(true), 
-	installed(false), join_message(0) {}
+	installed(false), join_message(0), tstamp(Time::now()) {}
 };
 
 
@@ -64,6 +68,7 @@ public:
     Transport* tp;
     EVSProto(Transport* t) : tp(t),
 			     my_addr(ADDRESS_INVALID), 
+			     inactive_timeout(Time(5, 0)),
 			     current_view(0),
 			     install_message(0),
 			     last_sent(SEQNO_MAX),
@@ -74,6 +79,10 @@ public:
     // 
     // Known instances 
     std::map<const EVSPid, EVSInstance> known;
+
+    // 
+    Time inactive_timeout;
+
     // Current view id
     EVSViewId* current_view;
 
@@ -164,10 +173,8 @@ public:
     }
     
     // Compares join message against current state
-    bool is_consistent(const EVSMessage* jm) const {
-	return false;
-    }
 
+    bool is_consistent(const EVSMessage* jm) const;
 
     bool is_consensus() const {
 	const EVSMessage* my_jm = known.find(my_addr)->second.join_message;
@@ -182,7 +189,7 @@ public:
 		continue;
 	    if (i->second.join_message == 0)
 		return false;
-	    if (equal(my_jm, i->second.join_message) == false)
+	    if (is_consistent(i->second.join_message) == false)
 		return false;
 	}
 	return true;
@@ -222,6 +229,71 @@ public:
     //
     void cleanup() {}
 };
+
+
+bool EVSProto::is_consistent(const EVSMessage* jm) const
+{
+    std::map<const EVSPid, EVSRange> local_insts;
+    std::map<const EVSPid, EVSRange> jm_insts;
+
+    if (current_view && jm->get_source_view() == *current_view) {
+	// Compare instances that originate from the current view and 
+	// should proceed to next view
+	for (std::map<const EVSPid, EVSInstance>::const_iterator i = known.begin();
+	     i != known.end(); ++i) {
+	    if (i->second.operational == true && i->second.trusted == true &&
+		i->second.join_message && 
+		i->second.join_message->get_source_view() == *current_view)
+		local_insts.insert(std::pair<const EVSPid, EVSRange>(
+				       i->first, input_map.get_sa_gap(i->first)));
+	}
+	const std::map<EVSPid, EVSMessage::Instance>* jm_instances = 
+	    jm->get_instances();
+	for (std::map<EVSPid, EVSMessage::Instance>::const_iterator 
+		 i = jm_instances->begin(); i != jm_instances->end(); ++i) {
+	    if (i->second.get_operational() == true && 
+		i->second.get_trusted() == true &&
+		i->second.get_view_id() == *current_view) {
+		jm_insts.insert(
+		    std::pair<const EVSPid, EVSRange>(
+			i->second.get_pid(), i->second.get_range()));
+	    } 
+	}
+	if (jm_insts != local_insts)
+	    return false;
+	jm_insts.clear();
+	local_insts.clear();
+	
+	// Compare instances that originate from the current view but 
+	// are not going to proceed to next view
+	
+	for (std::map<const EVSPid, EVSInstance>::const_iterator 
+		 i = known.begin(); i != known.end(); ++i) {
+	    if (!(i->second.operational == true && i->second.trusted == true)) {
+		local_insts.insert(std::pair<const EVSPid, EVSRange>(
+				       i->first, input_map.contains_sa(i->first) ? input_map.get_sa_gap(i->first) : EVSRange()));
+	    }
+	    const std::map<EVSPid, EVSMessage::Instance>* jm_instances = 
+		jm->get_instances();
+	    for (std::map<EVSPid, EVSMessage::Instance>::const_iterator 
+		     i = jm_instances->begin(); i != jm_instances->end(); ++i) {
+		if (!(i->second.get_operational() == true && 
+		      i->second.get_trusted() == true)) {
+		    jm_insts.insert(
+			std::pair<const EVSPid, EVSRange>(
+			    i->second.get_pid(), i->second.get_range()));
+		} 
+	    }
+	}
+	if (jm_insts != local_insts)
+	    return false;
+	jm_insts.clear();
+	local_insts.clear();
+
+
+    }
+    return true;
+}
 
 /////////////////////////////////////////////////////////////////////////////
 // Message sending
@@ -307,13 +379,13 @@ void EVSProto::send_join()
 		  input_map.get_aru_seq(), input_map.get_safe_seq());
     for (std::map<const EVSPid, EVSInstance>::iterator i = known.begin();
 	 i != known.end(); ++i) {
-	if (i->second.trusted && i->second.operational) {
-	    jm.add_operational_instance(i->first, input_map.get_sa_gap(i->first));
-	} else if (i->second.trusted == false) {
-	    jm.add_untrusted_instance(i->first);
-	} else if (i->second.operational == false) {
-	    jm.add_unoperational_instance(i->first);
-	}
+	jm.add_instance(i->first, i->second.operational, i->second.trusted,
+			i->second.join_message ? 
+			i->second.join_message->get_source_view() : 
+			(current_view && input_map.contains_sa(i->first) ? 
+			 *current_view : EVSViewId()), 
+			input_map.contains_sa(i->first) ? 
+			input_map.get_sa_gap(i->first) : EVSRange());
     }
     size_t bufsize = jm.size();
     unsigned char* buf = new unsigned char[bufsize];
@@ -354,12 +426,15 @@ void EVSProto::send_install()
 		  input_map.get_aru_seq(), input_map.get_safe_seq());
     for (std::map<const EVSPid, EVSInstance>::iterator i = known.begin();
 	 i != known.end(); ++i) {
-	if (i->second.trusted && i->second.operational)
-	    im.add_operational_instance(i->first, input_map.get_sa_gap(i->first));
-	else if (i->second.trusted == false)
-	    im.add_untrusted_instance(i->first);
-	else if (i->second.operational == false)
-	    im.add_unoperational_instance(i->first);
+	im.add_instance(i->first, 
+			i->second.operational,
+			i->second.trusted,
+			i->second.join_message ? 
+			i->second.join_message->get_source_view() : 
+			(current_view && input_map.contains_sa(i->first) ? 
+			 *current_view : EVSViewId()), 
+			input_map.contains_sa(i->first) ? 
+			input_map.get_sa_gap(i->first) : EVSRange());
     }
     size_t bufsize = im.size();
     unsigned char* buf = new unsigned char[bufsize];
@@ -874,45 +949,104 @@ void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
 
     if (state == OPERATIONAL || install_message)
 	shift_to(RECOVERY);
-
+    
     assert(i->second.trusted == true && i->second.installed == false);
-
+    
     bool send_join_p = false;
-
-    // 
+    
+    // Instance previously declared unoperational seems to be operational now
     if (i->second.operational == false) {
 	i->second.operational = true;
 	send_join_p = true;
     } 
     
+    // Aru seqs are not the same
     if (!seqno_eq(msg.get_aru_seq(), input_map.get_aru_seq())) {
 	send_join_p = true;
     }
     
+    // Safe seqs are not the same
+    if (!seqno_eq(msg.get_seq(), input_map.get_safe_seq())) {
+	send_join_p = true;
+    }
+    
+#if 0
+    // TODO: Figure out if this is really needed, join message 
+    // comparision below contains more complete information
+    // Some from message source are missing
     EVSRange source_gap(input_map.get_sa_gap(source));
     if (!seqno_eq(seqno_next(msg.get_seq()), source_gap.get_low())) {
 	send_gap(source, EVSRange(source_gap.get_low(), msg.get_seq()));
 	send_join_p = true;
-    } 
-    
-    // FIXME: iterate over join message instances and find 
-    // highest known seq. If greater than last_sent, 
-    // send range message to cover the gap.
-
-    const std::map<EVSPid, EVSRange>* opinst = msg.get_operational_insntace();
-    for (std::map<EVSPid, EVSRange>::const_iterator i = opinst->begin();
-	 i != opinst->end(); ++i) {
-	if (!seqno_eq(i->second.get_hwm(), SEQNO_MAX) && 
-	    (seqno_eq(input_map.get_aru_seq(), SEQNO_MAX) ||
-	     seqno_gt(i->second.get_hwm(), input_map.get_aru_seq())
     }
+#endif /* 0 */    
 
+    // Converge towards consensus
+    const std::map<EVSPid, EVSMessage::Instance>* instances = 
+	msg.get_instances();
+    std::map<EVSPid, EVSMessage::Instance>::const_iterator selfi = 
+	instances->find(my_addr);
+    if (selfi == instances->end()) {
+	// Source instance does not know about this instance, so there 
+	// is no sense to compare states yet
+	send_join_p = true;
+    } else if (selfi->second.get_trusted() == false) {
+	// Source instance does not trust this instance, this feeling
+	// must be mutual
+	i->second.trusted = false;
+	send_join_p = true;
+    } else if (current_view == 0 || !(*current_view == msg.get_source_view())) {
+	// Not coming from same views, there's no point to compare 
+	// states further
+    } else {
+	// Now compare states
+	for (std::map<EVSPid, EVSMessage::Instance>::const_iterator ii =
+		 instances->begin(); ii != instances->end(); ++ii) {
+	    std::map<EVSPid, EVSInstance>::iterator local_ii = known.find(ii->second.get_pid());
+	    if (local_ii->second.operational != ii->second.get_operational()) {
+		if (local_ii->second.operational == true) {
+		    if (local_ii->second.tstamp + inactive_timeout < Time::now()) {
+			local_ii->second.operational = false;
+			send_join_p = true;
+		    }
+		} else {
+		    send_join_p = true;
+		}
+	    }
+	    if (local_ii->second.trusted != ii->second.get_trusted()) {
+		if (local_ii->second.trusted == true) {
+		    local_ii->second.trusted = false;
+		}
+		send_join_p = true;
+	    }
+	    EVSRange range(input_map.get_sa_gap(ii->second.get_pid()));
+	    if (!seqno_eq(range.get_low(), ii->second.get_range().get_low()) ||
+		!seqno_eq(range.get_high(), ii->second.get_range().get_high())) {
+		assert(seqno_eq(range.get_low(), SEQNO_MAX) || 
+		       !seqno_eq(range.get_high(), SEQNO_MAX));
 
+		if (!seqno_eq(range.get_low(), SEQNO_MAX) &&
+		    seqno_gt(range.get_high(), 
+			     ii->second.get_range().get_high())) {
+		    // This instance knows more
+		    // TODO: Optimize to recover only required messages
+		    recover(EVSGap(ii->second.get_pid(), range));
+		} else {
+		    // The other instance knows more, sending join message
+		    // should generate message recovery on more knowledgeble
+		    // instance
+		    send_join_p = true;
+		}
+	    }
+	}
+    }
+    
+    
     if (i->second.join_message) {
 	delete i->second.join_message;
     }
     i->second.join_message = new EVSMessage(msg);
-
+    
     if (send_join_p) {
 	send_join();
     } else if (is_consensus() && is_representative(my_addr)) {
@@ -1032,6 +1166,10 @@ void EVS::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
     }    
 }
 
+int EVS::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
+{
+    return proto->handle_down(wb, dm);
+}
 
 void EVS::join(const ServiceId sid, Protolay *up)
 {

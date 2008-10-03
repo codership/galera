@@ -350,6 +350,11 @@ public:
     }
     
 
+    bool contains_sa(const EVSPid& sa) const {
+	IMap::const_iterator ii = instances.find(sa);
+	return !(ii == instances.end());
+    }
+
     void insert_sa(const EVSPid& sa) {
 	if (!seqno_eq(aru_seq, SEQNO_MAX))
 	    throw FatalException("Can't add instance after aru has been updated");
