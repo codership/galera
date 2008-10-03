@@ -21,6 +21,8 @@ class Time {
     static const time_t Second;
     Time(const uint64_t t) : time(t) {}
 public:
+    Time() : time(0) {}
+
     /*!
      *
      */
