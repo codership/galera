@@ -1,6 +1,7 @@
 #define EVS_SEQNO_MAX 0x800U
 #include "../src/evs_seqno.hpp"
 #include "../src/evs_input_map.hpp"
+#include "../src/evs.cpp"
 
 #include <check.h>
 #include <cstdlib>
@@ -291,6 +292,22 @@ START_TEST(check_input_map_random)
 }
 END_TEST
 
+
+
+START_TEST(check_evs_proto)
+{
+    Address a1(1, 0, 0);
+    EVSProto* ep = new EVSProto(0, Address(1, 0, 0));
+    ep->shift_to(EVSProto::JOINING);
+    EVSViewId vid(a1, 0);
+    EVSMessage jm(EVSMessage::JOIN, vid, SEQNO_MAX, SEQNO_MAX);
+    jm.add_instance(a1, true, true, vid, EVSRange());
+    ep->handle_join(jm, a1);
+    
+
+}
+END_TEST
+
 static Suite* suite()
 {
     Suite* s = suite_create("evs");
@@ -315,6 +332,12 @@ static Suite* suite()
     tc = tcase_create("check_input_map_random");
     tcase_add_test(tc, check_input_map_random);
     suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_evs_proto");
+    tcase_add_test(tc, check_evs_proto);
+    suite_add_tcase(s, tc);
+
+
 
     return s;
 }

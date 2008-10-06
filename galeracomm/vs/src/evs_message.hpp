@@ -20,7 +20,7 @@ public:
 	memset(uuid, 0, 8);
     }
     EVSViewId(const EVSPid& sa, const uint32_t seq) {
-	write_uint32(::rand(), uuid, sizeof(uuid), 0);
+	sa.write(uuid, 4, 0);
 	write_uint32(seq, uuid, sizeof(uuid), 4);
     }
 
@@ -29,6 +29,12 @@ public:
 	if (read_uint32(uuid, sizeof(uuid), 4, &ret) == 0)
 	    throw FatalException("");
 	return ret;
+    }
+
+    EVSPid get_pid() const {
+	Address sa;
+	sa.read(uuid, 4, 0);
+	return sa;
     }
     
     size_t read(const void* buf, const size_t buflen, const size_t offset) {
@@ -55,6 +61,11 @@ public:
     bool operator==(const EVSViewId& cmp) const {
 	return memcmp(uuid, cmp.uuid, 8) == 0;
     }
+
+    std::string to_string() const {
+	return get_pid().to_string() + ":" + ::to_string(get_seq());
+    }
+
 };
 
 

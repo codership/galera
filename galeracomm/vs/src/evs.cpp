@@ -66,15 +66,20 @@ struct EVSInstance {
 class EVSProto : public Bottomlay {
 public:
     Transport* tp;
-    EVSProto(Transport* t) : tp(t),
-			     my_addr(ADDRESS_INVALID), 
-			     inactive_timeout(Time(5, 0)),
-			     current_view(0),
-			     install_message(0),
-			     last_sent(SEQNO_MAX),
-			     send_window(16), 
-			     max_output_size(1024),
-			     state(CLOSED) {}
+    EVSProto(Transport* t, const EVSPid& my_addr_) : 
+	tp(t),
+	my_addr(my_addr_), 
+	inactive_timeout(Time(5, 0)),
+	current_view(0),
+	install_message(0),
+	last_sent(SEQNO_MAX),
+	send_window(16), 
+	max_output_size(1024),
+	state(CLOSED) {
+	known.insert(std::pair<const EVSPid, EVSInstance>(my_addr, EVSInstance()));
+	current_view = new EVSViewId(my_addr, 0);
+	input_map.insert_sa(my_addr);
+    }
     EVSPid my_addr;
     // 
     // Known instances 
@@ -289,8 +294,31 @@ bool EVSProto::is_consistent(const EVSMessage* jm) const
 	    return false;
 	jm_insts.clear();
 	local_insts.clear();
-
-
+    } else {
+	// Instances are originating from different view, need to check
+	// only that new view is consistent
+	for (std::map<const EVSPid, EVSInstance>::const_iterator i = known.begin();
+	     i != known.end(); ++i) {
+	    if (i->second.operational == true && i->second.trusted == true &&
+		i->second.join_message)
+		local_insts.insert(std::pair<const EVSPid, EVSRange>(
+				       i->first, EVSRange()));
+	}
+	const std::map<EVSPid, EVSMessage::Instance>* jm_instances = 
+	    jm->get_instances();
+	for (std::map<EVSPid, EVSMessage::Instance>::const_iterator 
+		 i = jm_instances->begin(); i != jm_instances->end(); ++i) {
+	    if (i->second.get_operational() == true && 
+		i->second.get_trusted() == true) {
+		jm_insts.insert(
+		    std::pair<const EVSPid, EVSRange>(
+			i->second.get_pid(), EVSRange()));
+	    } 
+	}
+	if (jm_insts != local_insts)
+	    return false;
+	jm_insts.clear();
+	local_insts.clear();
     }
     return true;
 }
@@ -315,7 +343,7 @@ int EVSProto::send_user(WriteBuf* wb, const EVSSafetyPrefix sp,
 		   input_map.get_aru_seq(), *current_view, 0);
     
     wb->prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
-    if ((ret = pass_down(wb, 0)) == 0) {
+    if ((ret = tp->handle_down(wb, 0)) == 0) {
 	last_sent = seq;
 	ReadBuf* rb = wb->to_readbuf();
 	EVSRange range = input_map.insert(EVSInputMapItem(my_addr, msg, rb, 0));
@@ -345,7 +373,7 @@ int EVSProto::send_delegate(const EVSPid& sa, WriteBuf* wb)
 {
     EVSMessage dm(EVSMessage::DELEGATE, sa);
     wb->prepend_hdr(dm.get_hdr(), dm.get_hdrlen());
-    return pass_down(wb, 0);
+    return tp->handle_down(wb, 0);
 }
 
 void EVSProto::send_gap(const EVSPid& pid, const EVSRange& range)
@@ -364,7 +392,7 @@ void EVSProto::send_gap(const EVSPid& pid, const EVSRange& range)
     
     WriteBuf wb(buf, bufsize);
     int err;
-    if ((err = pass_down(&wb, 0))) {
+    if ((err = tp->handle_down(&wb, 0))) {
 	LOG_WARN(std::string("EVSProto::send_leave(): Send failed ") 
 		 + strerror(err));
     }
@@ -390,10 +418,10 @@ void EVSProto::send_join()
     size_t bufsize = jm.size();
     unsigned char* buf = new unsigned char[bufsize];
     if (jm.write(buf, bufsize, 0) == 0)
-	throw FatalException("");
+	throw FatalException("Failed to serialize join message");
     WriteBuf wb(buf, bufsize);
     int err;
-    if ((err = pass_down(&wb, 0))) {
+    if ((err = tp->handle_down(&wb, 0))) {
 	LOG_WARN(std::string("EVSProto::send_join(): Send failed ") 
 		 + strerror(err));
     }
@@ -410,7 +438,7 @@ void EVSProto::send_leave()
     
     WriteBuf wb(buf, bufsize);
     int err;
-    if ((err = pass_down(&wb, 0))) {
+    if ((err = tp->handle_down(&wb, 0))) {
 	LOG_WARN(std::string("EVSProto::send_leave(): Send failed ") 
 		 + strerror(err));
     }
@@ -443,7 +471,7 @@ void EVSProto::send_install()
     
     WriteBuf wb(buf, bufsize);
     int err;
-    if ((err = pass_down(&wb, 0))) {
+    if ((err = tp->handle_down(&wb, 0))) {
 	LOG_WARN(std::string("EVSProto::send_leave(): Send failed ") 
 		 + strerror(err));
     }
@@ -476,7 +504,7 @@ void EVSProto::resend(const EVSPid& gap_source, const EVSGap& gap)
 	    const EVSMessage& msg = i.first.get_evs_message();
 	    WriteBuf wb(rb, rb ? rb->get_len() : 0);
 	    wb.prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
-	    if (pass_down(&wb, 0))
+	    if (tp->handle_down(&wb, 0))
 		break;
 	}
     }
@@ -576,11 +604,6 @@ void EVSProto::shift_to(const State s)
 	state = CLOSED;
 	break;
     case JOINING:
-	// Haven't got address from transport yet, this usually means
-	// asynchronous transport connect operation. Join is sent once
-	// connect notification is passed up
-	if (!(my_addr == ADDRESS_INVALID))
-	    send_join();
 	state = JOINING;
 	break;
     case LEAVING:
@@ -591,7 +614,6 @@ void EVSProto::shift_to(const State s)
 	setall_installed(false);
 	delete install_message;
 	install_message = 0;
-	send_join();
 	state = RECOVERY;
 	break;
     case OPERATIONAL:
@@ -933,6 +955,7 @@ void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
 {
     std::map<const EVSPid, EVSInstance>::iterator i = known.find(source);
     if (i == known.end()) {
+	LOG_DEBUG("EVSProto::handle_join(): new instance");
 	std::pair<std::map<const EVSPid, EVSInstance>::iterator, bool> iret;
 	iret = known.insert(std::pair<const EVSPid, EVSInstance>(source, EVSInstance()));
 	assert(iret.second == true);
@@ -943,11 +966,12 @@ void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
 	    shift_to(RECOVERY);
 	return;
     } else if (i->second.trusted == false) {
+	LOG_DEBUG("EVSProto::handle_join(): untrusted");
 	// Silently drop
 	return;
     }
 
-    if (state == OPERATIONAL || install_message)
+    if (state == JOINING || state == OPERATIONAL || install_message)
 	shift_to(RECOVERY);
     
     assert(i->second.trusted == true && i->second.installed == false);
@@ -957,16 +981,19 @@ void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
     // Instance previously declared unoperational seems to be operational now
     if (i->second.operational == false) {
 	i->second.operational = true;
+	LOG_DEBUG("EVSProto::handle_join(): unop -> op");
 	send_join_p = true;
     } 
     
     // Aru seqs are not the same
     if (!seqno_eq(msg.get_aru_seq(), input_map.get_aru_seq())) {
+	LOG_DEBUG("EVSProto::handle_join(): noneq aru");
 	send_join_p = true;
     }
     
     // Safe seqs are not the same
     if (!seqno_eq(msg.get_seq(), input_map.get_safe_seq())) {
+	LOG_DEBUG("EVSProto::handle_join(): noneq seq");
 	send_join_p = true;
     }
     
@@ -989,16 +1016,20 @@ void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
     if (selfi == instances->end()) {
 	// Source instance does not know about this instance, so there 
 	// is no sense to compare states yet
+	LOG_DEBUG("EVSProto::handle_join(): this not known by source");
 	send_join_p = true;
     } else if (selfi->second.get_trusted() == false) {
 	// Source instance does not trust this instance, this feeling
 	// must be mutual
+	LOG_DEBUG("EVSProto::handle_join(): mutual untrust");
 	i->second.trusted = false;
 	send_join_p = true;
     } else if (current_view == 0 || !(*current_view == msg.get_source_view())) {
 	// Not coming from same views, there's no point to compare 
 	// states further
+	LOG_DEBUG(std::string("EVSProto::handle_join(): different view ") + msg.get_source_view().to_string());
     } else {
+	LOG_DEBUG("EVSProto::handle_join(): states compare");
 	// Now compare states
 	for (std::map<EVSPid, EVSMessage::Instance>::const_iterator ii =
 		 instances->begin(); ii != instances->end(); ++ii) {
@@ -1048,8 +1079,10 @@ void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
     i->second.join_message = new EVSMessage(msg);
     
     if (send_join_p) {
+	LOG_DEBUG("EVSProto::handle_join(): send join");
 	send_join();
     } else if (is_consensus() && is_representative(my_addr)) {
+	LOG_DEBUG("EVSProto::handle_join(): is consensus and representative");
 	send_install();
     }
 }
@@ -1185,7 +1218,7 @@ void EVS::leave(const ServiceId sid)
 void EVS::connect(const char* addr)
 {
     tp->connect(addr);
-    proto = new EVSProto(tp);
+    proto = new EVSProto(tp, ADDRESS_INVALID);
 }
 
 void EVS::close()
