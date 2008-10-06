@@ -8,16 +8,17 @@
 #include "wsdb_priv.h"
 #include "hash.h"
 #include "version_file.h"
+//#define USE_MEMPOOL
 
 /* index for table row level keys */
 static struct wsdb_hash *key_index;
 
 /* index for table level locks */
 static struct wsdb_hash *table_index;
-
+#ifdef USE_MEMPOOL
 /* mempool for index_rec and seqno_list allocations */
 static struct mempool *index_pool;
-
+#endif
 struct trx_hdr {
     trx_seqno_t trx_seqno;
 };
@@ -50,11 +51,13 @@ struct {
 static void add_active_seqno(
     trx_seqno_t seqno, uint32_t keys_count, char *keys
 ) {
-    //struct seqno_list *seqno_elem = 
-    //      (struct seqno_list *)gu_malloc(sizeof(struct seqno_list));
+#ifndef USE_MEMPOOL
+    struct seqno_list *seqno_elem = 
+          (struct seqno_list *)gu_malloc(sizeof(struct seqno_list));
+#else
     struct seqno_list *seqno_elem = 
       (struct seqno_list *)mempool_alloc(index_pool, sizeof(struct seqno_list));
-
+#endif
     seqno_elem->seqno = seqno;
     seqno_elem->key_count = keys_count;
     seqno_elem->keys = keys;
@@ -73,7 +76,9 @@ static void add_active_seqno(
 static void purge_active_seqnos(trx_seqno_t up_to) {
     struct seqno_list *trx = trx_info.active_seqnos;
     while (trx && trx->seqno < up_to) {
+#ifdef USE_MEMPOOL
         int rcode;
+#endif
         struct seqno_list *next_trx = trx->next;
         char *keys = trx->keys;
         /* length of all keys */
@@ -96,8 +101,8 @@ static void purge_active_seqnos(trx_seqno_t up_to) {
                 );
 
                 if (!match) {
-                    gu_error("cert index was not found during purging");
-                    gu_error("seqno: %llu, key: %d, len: %d, key_count: %d",
+                    gu_warn("cert index was not found during purging");
+                    gu_warn("seqno: %llu, key: %d, len: %d, key_count: %d",
                          trx->seqno, key_idx, key_len, trx->key_count
                     );
                     /* verify the match is not used by newer seqno */
@@ -119,11 +124,14 @@ static void purge_active_seqnos(trx_seqno_t up_to) {
                              trx->seqno, key_idx, key_len, trx->key_count
                         );
                     } else {
-                        //gu_free(match);
+#ifndef USE_MEMPOOL
+                        gu_free(match);
+#else
                         rcode = mempool_free(index_pool, match);
                         if (rcode) {
                             gu_error("cert index free failed: %d", rcode);
                         }
+#endif
                     }
                 }
                 keys += key_len;
@@ -131,12 +139,14 @@ static void purge_active_seqnos(trx_seqno_t up_to) {
         }
         /* remove active trx holder struct */
         if (trx->keys) gu_free(trx->keys);
-        //gu_free(trx);
+#ifndef USE_MEMPOOL
+        gu_free(trx);
+#else
         rcode = mempool_free(index_pool, trx);
         if (rcode) {
             gu_error("cert seqno list free failed: %d", rcode);
         }
-
+#endif
         trx = trx_info.active_seqnos = next_trx;
         trx_info.list_len--;
         trx_info.list_size -= sizeof(struct seqno_list);
@@ -159,15 +169,20 @@ static enum purge_method choose_purge_method(trx_seqno_t up_to) {
 static void purge_seqno_list(trx_seqno_t up_to) {
     struct seqno_list *trx = trx_info.active_seqnos;
     while (trx && trx->seqno < up_to) {
+#ifdef USE_MEMPOOL
         int rcode;
+#endif
         struct seqno_list *next_trx = trx->next;
 
         if (trx->keys) gu_free(trx->keys);
-        //gu_free(trx);
+#ifndef USE_MEMPOOL
+        gu_free(trx);
+#else
         rcode = mempool_free(index_pool, trx);
         if (rcode) {
             gu_error("cert seqno list free failed: %d", rcode);
         }
+#endif
         trx = trx_info.active_seqnos = next_trx;
         trx_info.list_len--;
         trx_info.list_size -= sizeof(struct seqno_list);
@@ -217,12 +232,14 @@ int wsdb_cert_init(const char* work_dir, const char* base_name) {
     /* open table level locks hash */
     table_index = wsdb_hash_open(1000, hash_fun, hash_cmp);
     
+#ifdef USE_MEMPOOL
     index_pool = mempool_create(
         (sizeof(struct index_rec) > sizeof(struct seqno_list)) ?
          sizeof(struct index_rec) : sizeof(struct seqno_list),
-        131072
+        32000,
+        MEMPOOL_NON_STICKY, false, "cert index"
     );
-
+#endif
     return WSDB_OK;
 }
 
@@ -304,10 +321,13 @@ static int update_index(
 
         if (!match) {
             int rcode;
-            //new_trx=(struct index_rec *) gu_malloc (sizeof(struct index_rec));
+#ifndef USE_MEMPOOL
+            new_trx=(struct index_rec *) gu_malloc (sizeof(struct index_rec));
+#else
             new_trx = (struct index_rec *) mempool_alloc(
                 index_pool, sizeof(struct index_rec)
             );
+#endif
             new_trx->trx_seqno = trx_seqno;
             rcode = wsdb_hash_push(
                 key_index, key_len, all_keys, (void *)new_trx
@@ -457,13 +477,18 @@ static int delete_verdict(void *ctx, void *data, void **new_data) {
     struct index_rec *entry = (struct index_rec *)data;
 
     if (entry && entry->trx_seqno < (*(trx_seqno_t *)ctx)) {
+#ifdef USE_MEMPOOL
         int rcode;
+#endif
         *new_data= (void *)NULL;
-        //gu_free(entry);
+#ifndef USE_MEMPOOL
+        gu_free(entry);
+#else
         rcode = mempool_free(index_pool, entry);
         if (rcode) {
             gu_error("cert index free failed (delete_verdict): %d", rcode);
         }
+#endif
         return 1;
     }
 
@@ -509,12 +534,17 @@ static int shutdown_verdict(void *ctx, void *data, void **new_data) {
 
     /* find among the entries for this key, the one with last seqno */
     if (entry) {
+#ifdef USE_MEMPOOL
         int rcode;
-        //gu_free(entry);
+#endif
+#ifndef USE_MEMPOOL
+        gu_free(entry);
+#else
         rcode = mempool_free(index_pool, entry);
         if (rcode) {
             gu_error("cert index free failed (shutdown_verdict): %d", rcode);
         }
+#endif
     }
     return 1;
 }
@@ -554,8 +584,9 @@ int wsdb_cert_close() {
 
     purge_seqno_list(GALERA_ABORT_SEQNO);
 
+#ifdef USE_MEMPOOL
     mempool_close(index_pool);
-
+#endif
     return WSDB_OK;
 }
 

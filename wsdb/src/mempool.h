@@ -6,6 +6,11 @@
 
 struct mempool;
 
+enum pooltype {
+  MEMPOOL_DYNAMIC, // reuse freed items for following mallocs
+  MEMPOOL_STICKY,  // don't reuse items, free block when all entries released
+};
+
 /*
  * @brief creates a mempool for buffering small fixed sized mem allocations
  *     You can allocate fixed sized (of item_size) memory buffers from this
@@ -17,10 +22,16 @@ struct mempool;
  *     allocator will malloc from system. Allocator will malloc a number of 
  *     memory blocks, from where it returns pointers to fixed memory locations
  *     for the user.
+ * @param pool_type MEMPOOL_DYNAMIC or MEMPOOL_STICKY
+ * @param use_mutex should mutex be used to control access allocator
+ * @param owner free form name for the allocator
  *
  * @return address to the allocated mempool
  */
-struct mempool *mempool_create(int item_size, int items_in_block);
+struct mempool *mempool_create(
+    int item_size, int items_in_block, enum pooltype pool_type, bool use_mutex,
+    char * owner
+);
 
 /*
  * @brief to close the memory buffer. All data is freed
