@@ -17,7 +17,7 @@ START_TEST (test_mempool)
 
     int i = 0;
     /* unit test code */
-    struct mempool *pool = mempool_create(sizeof(struct elem), 100);
+    struct mempool *pool = mempool_create(sizeof(struct elem), 100, MEMPOOL_STICKY, false, "test allocator");
     if (!pool) {
         fail("mempool create");
     }
@@ -49,7 +49,7 @@ START_TEST (test_mempool_rand)
     int i;
 
     /* unit test code */
-    struct mempool *pool = mempool_create(sizeof(struct elem), 90);
+    struct mempool *pool = mempool_create(sizeof(struct elem), 90, MEMPOOL_DYNAMIC, false, "dynamic allocator");
     if (!pool) {
         fail("mempool create");
     }
