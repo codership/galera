@@ -18,6 +18,7 @@ extern "C" {
 enum galera_status {
     GALERA_OK        = 0, //!< success
     GALERA_WARNING,       //!< minor warning, error logged
+    GALERA_TRX_MISSING,   //!< transaction is not known by galera
     GALERA_TRX_FAIL,      //!< transaction aborted, server can continue
     GALERA_CONN_FAIL,     //!< error in client connection, must abort
     GALERA_NODE_FAIL,     //!< error in node state, galera must reinit

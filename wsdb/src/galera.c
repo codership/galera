@@ -810,7 +810,7 @@ enum galera_status galera_recv(void *app_ctx) {
 }
 
 enum galera_status galera_cancel_commit(trx_id_t victim_trx) {
-    enum galera_status ret_code;
+    enum galera_status ret_code = GALERA_OK;
     int rcode;
 
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
@@ -822,7 +822,30 @@ enum galera_status galera_cancel_commit(trx_id_t victim_trx) {
     gcs_seqno_t victim_seqno = wsdb_get_local_trx_seqno(victim_trx);
     
     /* continue to kill the victim */
-    if (victim_seqno) {
+    switch (victim_seqno) {
+    case GALERA_ABORT_SEQNO:
+        gu_info("trx marketed aborting already: %llu", victim_trx);
+        break;
+
+    case GALERA_MISSING_SEQNO:
+        gu_info("trx missing at cancel commit: %llu", victim_trx);
+        break;
+
+    case 0:
+        ret_code = GALERA_WARNING;
+        rcode = wsdb_assign_trx(
+            victim_trx, GALERA_ABORT_SEQNO, GALERA_ABORT_SEQNO
+        );
+        if (rcode) {
+            /* this is going to hang */
+            gu_error("could not mark trx, aborting: %llu", victim_trx);
+            //abort();
+        } else {
+          gu_warn("no seqno for trx, marked trx aborted: %llu", victim_trx);
+        }
+        break;
+
+    default:
         gu_info("cancelling trx commit: trx_id %llu seqno %llu", 
 		victim_trx, victim_seqno);
         rcode = gcs_to_cancel(to_queue, victim_seqno);
@@ -832,10 +855,6 @@ enum galera_status galera_cancel_commit(trx_id_t victim_trx) {
         } else {
 	    ret_code = GALERA_OK;
         }
-    } else {
-	ret_code = GALERA_WARNING;
-	wsdb_assign_trx(victim_trx, GALERA_ABORT_SEQNO, GALERA_ABORT_SEQNO);
-	gu_warn("no seqno for trx, marking trx aborted: %lu", victim_trx);
     }
     gu_mutex_unlock(&commit_mtx);
     
@@ -878,7 +897,7 @@ enum galera_status galera_committed(trx_id_t trx_id) {
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
 
     if ((seqno_l = wsdb_get_local_trx_seqno(trx_id)) > 0 &&
-	seqno_l < GALERA_ABORT_SEQNO) {
+	seqno_l < GALERA_MISSING_SEQNO) {
         do_report = report_check_counter ();
 	if (gcs_to_release(commit_queue, seqno_l)) {
 	    gu_fatal("Could not release commit resource for %llu", seqno_l);
@@ -906,7 +925,7 @@ enum galera_status galera_rolledback(trx_id_t trx_id) {
 
     gu_mutex_lock(&commit_mtx);
     if ((seqno_l = wsdb_get_local_trx_seqno(trx_id)) > 0 &&
-	seqno_l < GALERA_ABORT_SEQNO) {
+	seqno_l < GALERA_MISSING_SEQNO) {
 	if (gcs_to_release(commit_queue, seqno_l)) {
 	    gu_fatal("Could not release commit resource for %llu", seqno_l);
 	    abort();
@@ -960,13 +979,22 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
     /* hold commit time mutex */
     gu_mutex_lock(&commit_mtx);
     /* check if trx was cancelled before we got here */
-    if (wsdb_get_local_trx_seqno(trx_id) == GALERA_ABORT_SEQNO) {
+    switch (wsdb_get_local_trx_seqno(trx_id)) {
+    case GALERA_ABORT_SEQNO:
 	gu_info("trx has been cancelled already: %llu", trx_id);
 	if ((rcode = wsdb_delete_local_trx(trx_id))) {
 	    gu_info("could not delete trx: %llu", trx_id);
 	}
 	gu_mutex_unlock(&commit_mtx);
 	GU_DBUG_RETURN(GALERA_TRX_FAIL);
+        break;
+    case GALERA_MISSING_SEQNO:
+	gu_warn("trx is missing from galera: %llu", trx_id);
+	gu_mutex_unlock(&commit_mtx);
+	GU_DBUG_RETURN(GALERA_TRX_MISSING);
+        break;
+    default:
+      break;
     }
 #ifdef GALERA_USE_FLOW_CONTROL
     /* what is happening here:
