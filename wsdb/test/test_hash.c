@@ -57,23 +57,23 @@ START_TEST (test_hash_cache)
     /* unit test code */
     s_hash_size = 5000;
     struct wsdb_hash *hash = wsdb_hash_open(
-        s_hash_size, hash_fun_cache, hash_cmp_cache
+        s_hash_size, hash_fun_cache, hash_cmp_cache, true
     );
     fail_if((!hash), "no hash");
     mark_point();
     i = 1;
     fail_if (
-        wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i)), 
+             wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i)), 
         "hash push at %ull", i
     );
     i = 256;
     fail_if (
-        wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i)), 
+             wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i)), 
         "hash push at %d", i
     );
     i = 257;
     fail_if (
-        wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i)), 
+             wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i)), 
         "hash push at %d", i
     );
     mark_point();
@@ -99,12 +99,14 @@ START_TEST (test_hash_trivial)
 	
     /* unit test code */
     s_hash_size = 100;
-    struct wsdb_hash *hash = wsdb_hash_open(s_hash_size, hash_fun, hash_cmp);
+    struct wsdb_hash *hash = wsdb_hash_open(
+        s_hash_size, hash_fun, hash_cmp, true
+    );
     fail_if((!hash), "no hash");
     for (i=1; i<100; i++) {
         mark_point();
         fail_if (
-            wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i)), 
+                 wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i)), 
             "hash push at %d", i
         );
         mark_point();
@@ -132,9 +134,11 @@ START_TEST (test_hash_overflow)
     unsigned long i;
     /* unit test code */
     s_hash_size = 10;
-    struct wsdb_hash *hash = wsdb_hash_open(s_hash_size, hash_fun, hash_cmp);
+    struct wsdb_hash *hash = wsdb_hash_open(
+        s_hash_size, hash_fun, hash_cmp, true
+    );
     for (i=1; i<50; i++) {
-        if (wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i))) {
+      if (wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i))) {
             fail("hash push: %d", i);
         }
     }
@@ -151,9 +155,11 @@ START_TEST (test_hash_big)
     unsigned long i;
     /* unit test code */
     s_hash_size = 65000;
-    struct wsdb_hash *hash = wsdb_hash_open(s_hash_size, hash_fun, hash_cmp);
+    struct wsdb_hash *hash = wsdb_hash_open(
+        s_hash_size, hash_fun, hash_cmp, true
+    );
     for (i=1; i<100000; i++) {
-        if (wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i))) {
+      if (wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i))) {
             fail("hash push: %d", i);
         }
     }
@@ -170,7 +176,9 @@ START_TEST (test_hash_big_64_key)
     uint64_t i;
     /* unit test code */
     s_hash_size = 32000;
-    struct wsdb_hash *hash = wsdb_hash_open(s_hash_size, hash_fun, hash_cmp);
+    struct wsdb_hash *hash = wsdb_hash_open(
+        s_hash_size, hash_fun, hash_cmp, true
+    );
     for (i=1; i<100000; i++) {
         int *val = (int *)malloc(sizeof(int));
         *val = 10000+i;
@@ -193,7 +201,9 @@ START_TEST (test_hash_huge_64_key)
     int mem_size=0;
     /* unit test code */
     s_hash_size = 64000;
-    struct wsdb_hash *hash = wsdb_hash_open(s_hash_size, hash_fun, hash_cmp);
+    struct wsdb_hash *hash = wsdb_hash_open(
+        s_hash_size, hash_fun, hash_cmp, true
+    );
 
     for (round=1; round<1000; round++) {
         uint64_t i;
@@ -264,7 +274,9 @@ START_TEST (test_hash_purge)
 
     /* unit test code */
     s_hash_size = 65000;
-    struct wsdb_hash *hash = wsdb_hash_open(s_hash_size, hash_fun, hash_cmp);
+    struct wsdb_hash *hash = wsdb_hash_open(
+        s_hash_size, hash_fun, hash_cmp, true
+    );
     for (i=1; i<100000; i++) {
       if (wsdb_hash_push(hash, 4, (char *)&i, (void *)(i))) {
         fail("hash push: %d", i);
