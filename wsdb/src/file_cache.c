@@ -128,7 +128,8 @@ struct file_cache *file_cache_open(
 
     /* allocate hash array */
     cache->hash = wsdb_hash_open(
-        (max_blocks > max_elems) ? max_blocks : max_elems, hash_fun, hash_cmp
+        (max_blocks > max_elems) ? max_blocks : max_elems, 
+        hash_fun, hash_cmp, true
     );
     cache->curr_size  = 0;
     cache->max_size   = (max_blocks > max_elems) ? max_blocks : max_elems;
@@ -280,7 +281,8 @@ static void swap_entry(struct file_cache *cache, struct cache_entry *entry) {
 
 void *file_cache_new(struct file_cache *cache, cache_id_t id) {
     struct cache_entry *entry;
-    
+    int rcode;
+
     CHECK_OBJ(cache, file_cache);
     gu_mutex_lock(&cache->mutex);
     entry = (struct cache_entry *)wsdb_hash_search(
@@ -297,9 +299,14 @@ void *file_cache_new(struct file_cache *cache, cache_id_t id) {
     entry->file_addr = 0;
     entry->data      = NULL;
 
-    wsdb_hash_push(
+    rcode = wsdb_hash_push(
         cache->hash, sizeof(cache_id_t), (void *)&id, (void *)entry
     );
+    if (rcode) {
+        gu_error("file cache hash push failed,: %d %lu-%lu", rcode, id);
+        gu_mutex_unlock(&cache->mutex);
+        return NULL;
+    }
 
     /* create or reuse cache data block */
     if (cache->curr_size < cache->max_size) {

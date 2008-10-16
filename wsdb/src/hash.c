@@ -22,6 +22,7 @@ struct entry_match {
 
 struct wsdb_hash {
     char               ident;
+    bool               unique;     // is index unique
     gu_mutex_t         mutex;
     uint32_t           array_size; // number of many bucket lists allocated
     uint32_t           elem_count; // number of elements currently in hash
@@ -38,17 +39,19 @@ struct wsdb_hash {
 #define IDENT_wsdb_hash 'h'
 
 struct wsdb_hash *wsdb_hash_open(
-    uint32_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp
+    uint32_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp, bool unique
 ) {
     struct wsdb_hash *hash;
     int i;
     MAKE_OBJ_SIZE(hash, wsdb_hash, max_size * sizeof(struct hash_entry *));
 
+    hash->unique     = unique;
     for (i=0; i<max_size; i++) hash->elems[i] = NULL;
     hash->array_size = max_size;
     hash->elem_count = 0;
     hash->hash_fun   = hash_fun;
     hash->hash_cmp   = hash_cmp;
+    hash->unique     = unique;
 
     /* initialize the mutex */
     gu_mutex_init(&hash->mutex, NULL);
@@ -168,6 +171,16 @@ int wsdb_hash_push(
     CHECK_OBJ(hash, wsdb_hash);
     
     gu_mutex_lock(&hash->mutex);
+
+    /* locate the point in bucket lists */
+    hash_search_entry(&match, hash, key_len, key);
+
+    if (hash->unique && match.entry) {
+        /* duplicate found, bail out */
+        gu_mutex_unlock(&hash->mutex);
+        return WSDB_ERR_HASH_DUPLICATE;
+    }
+
     //if (hash->curr_size == hash->max_size) return WSDB_ERROR;
     hash->elem_count++;
 
@@ -178,6 +191,7 @@ int wsdb_hash_push(
         hash->entry_pool, sizeof (struct hash_entry)
     );
 #endif
+
     /* use directly key pointer as key value if key is shorter 
      * than pointer size 
      */
@@ -203,7 +217,6 @@ int wsdb_hash_push(
     entry->key_len = key_len;
     entry->data    = data;
 
-    hash_search_entry(&match, hash, key_len, key);
     if (match.prev) {
         entry->next = match.prev->next;
         match.prev->next = entry;
@@ -348,6 +361,30 @@ int wsdb_hash_delete_range(
 
     gu_mutex_unlock(&hash->mutex);
     GU_DBUG_RETURN(deleted);
+}
+
+int wsdb_hash_scan(
+    struct wsdb_hash *hash, void *ctx, hash_scan_fun_t scan_cb
+) {
+    int count = 0;
+    int i;
+
+    GU_DBUG_ENTER("wsdb_hash_scan");
+
+    gu_mutex_lock(&hash->mutex);
+
+    for (i=0; i<hash->array_size; i++) {
+        struct hash_entry *entry = hash->elems[i];
+
+        while (entry) {
+            scan_cb(ctx, entry->data);
+            count++;
+            entry = entry->next;
+        }
+    }
+
+    gu_mutex_unlock(&hash->mutex);
+    GU_DBUG_RETURN(count);
 }
 
 uint32_t wsdb_hash_report(

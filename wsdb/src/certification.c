@@ -222,7 +222,7 @@ static int hash_cmp(uint16_t len1, char *key1, uint16_t len2, char *key2) {
 
 int wsdb_cert_init(const char* work_dir, const char* base_name) {
     /* open row level locks hash */
-    key_index = wsdb_hash_open(262144, hash_fun, hash_cmp);
+    key_index = wsdb_hash_open(262144, hash_fun, hash_cmp, true);
     cert_trx_file = version_file_open(
         (work_dir)  ? work_dir  : DEFAULT_WORK_DIR,
         (base_name) ? base_name : DEFAULT_CERT_FILE,
@@ -230,7 +230,7 @@ int wsdb_cert_init(const char* work_dir, const char* base_name) {
     );
 
     /* open table level locks hash */
-    table_index = wsdb_hash_open(1000, hash_fun, hash_cmp);
+    table_index = wsdb_hash_open(1000, hash_fun, hash_cmp, true);
     
 #ifdef USE_MEMPOOL
     index_pool = mempool_create(

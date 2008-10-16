@@ -182,7 +182,7 @@ int local_open(
     );
 
     trx_limit = (trxs_max) ? trxs_max : TRX_LIMIT;
-    trx_hash  = wsdb_hash_open(trx_limit, hash_fun_64, hash_cmp_64);
+    trx_hash  = wsdb_hash_open(trx_limit, hash_fun_64, hash_cmp_64, true);
 
     rcode = conn_init(0);
 
@@ -276,13 +276,14 @@ static void new_trx_block(struct trx_info *trx) {
 
 static struct trx_info *new_trx_info(local_trxid_t trx_id) {
     struct trx_info *trx;
-          
+    int rcode;
+
     /* get the block for transaction */
     trx = (struct trx_info *)wsdb_hash_search(
         trx_hash, sizeof(local_trxid_t), (char *)&trx_id
     );
     if (trx) {
-        gu_error("trx exist already: %llu", trx_id);
+        gu_warn("trx exist already: %llu", trx_id);
         return NULL;
     }
 
@@ -295,9 +296,26 @@ static struct trx_info *new_trx_info(local_trxid_t trx_id) {
 
     GU_DBUG_PRINT("wsdb", ("created new trx: %llu", trx_id));
 
-    wsdb_hash_push(
+    rcode = wsdb_hash_push(
         trx_hash, sizeof(local_trxid_t), (char *)&trx_id, trx
     );
+    switch (rcode) {
+    case WSDB_OK: 
+        break;
+    case WSDB_ERR_HASH_DUPLICATE:
+        /* somebody pushed the trx just before us, read again... */
+        trx = (struct trx_info *)wsdb_hash_search(
+            trx_hash, sizeof(local_trxid_t), (char *)&trx_id
+        );
+        if (!trx) {
+            gu_error("trx does not exist already: %llu", trx_id);
+            return NULL;
+        }
+        break;
+    default:
+        gu_error("trx push failed for: %llu, rcode: %d", trx_id, rcode);
+        return NULL;
+    }
 
     /* create first block for the trx */
     new_trx_block(trx);
@@ -1160,12 +1178,23 @@ int wsdb_delete_local_trx_info(local_trxid_t trx_id) {
     GU_DBUG_ENTER("wsdb_delete_local_trx_info");
     GU_DBUG_PRINT("wsdb",("trx: %llu", trx_id));
 
+    gu_info("deleting local trx info: %llu", trx_id);
+
     if (!trx) {
+        gu_warn("trx info did not exist: %llu", trx_id);
         GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
     }
     remove_trx_info(trx_id);
 
     GU_DBUG_RETURN(WSDB_OK);
+}
+
+static void print_trx_hash(void *ctx, void *data) {
+    struct trx_info *trx = (struct trx_info *)data;
+    gu_info(
+        "trx, id: %llu seqno-g: %llu, seqno-l: %llu", 
+        trx->id, trx->seqno_g, trx->seqno_l
+    );
 }
 
 int wsdb_assign_trx(
@@ -1178,9 +1207,17 @@ int wsdb_assign_trx(
                           trx_id, seqno_l, seqno_g));
 
     if (!trx) {
+        int elems;
         gu_error("trx does not exist in assign_trx, trx: %llu seqno: %llu", 
                  trx_id, seqno_g
         );
+
+        elems = wsdb_hash_scan(trx_hash, NULL, print_trx_hash);
+        gu_info("galera, found %d elements in trx hash", elems);
+
+        /* try adding this trx in hash... */
+        //trx = new_trx_info(trx_id);
+
         GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
     }
 
@@ -1196,7 +1233,8 @@ trx_seqno_t wsdb_get_local_trx_seqno(local_trxid_t trx_id) {
     GU_DBUG_ENTER("wsdb_get_local_trx_seqno");
     if (!trx) {
 	GU_DBUG_PRINT("wsdb",("trx not found, : %llu",trx_id));
-        GU_DBUG_RETURN(0);
+        gu_info("no trx info at get_local_trx_seqno: %llu", trx_id);
+        GU_DBUG_RETURN(GALERA_MISSING_SEQNO);
     }
     GU_DBUG_RETURN(trx->seqno_l);
 }

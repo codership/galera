@@ -47,6 +47,8 @@
 #define WSDB_ERR_ARRAY_EMPTY    601
 #define WSDB_ERR_ARRAY_SIZE     602
 #define WSDB_ERR_ARRAY_FAIL     603
+#define WSDB_ERR_HASH           701
+#define WSDB_ERR_HASH_DUPLICATE 702
 
 
 #define DEFAULT_WORK_DIR "/var/wsdb/data"
@@ -77,9 +79,11 @@ typedef char		my_bool; /* Small bool */
 
 /* special seqno to designate a cancelled transaction */
 #ifndef ULLONG_MAX
-#   define GALERA_ABORT_SEQNO 18446744073709551615ULL
+#   define GALERA_ABORT_SEQNO   18446744073709551615ULL
+#   define GALERA_MISSING_SEQNO 18446744073709551614ULL
 #else
-#   define GALERA_ABORT_SEQNO ULLONG_MAX
+#   define GALERA_ABORT_SEQNO   ULLONG_MAX
+#   define GALERA_MISSING_SEQNO ULLONG_MAX-1
 #endif
 
 
