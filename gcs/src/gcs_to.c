@@ -108,11 +108,11 @@ gcs_to_t *gcs_to_create (int len, gcs_seqno_t seqno)
     return NULL;
 }
 
-int gcs_to_destroy (gcs_to_t** to)
+long gcs_to_destroy (gcs_to_t** to)
 {
     gcs_to_t *t = *to;
-    int ret;
-    size_t i;
+    long      ret;
+    size_t    i;
 
     gu_mutex_lock (&t->lock);
     if (t->used) {
@@ -147,9 +147,9 @@ int gcs_to_destroy (gcs_to_t** to)
     return 0;
 }
 
-int gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
+long gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
 {
-    int err;
+    long err;
     to_waiter_t *w;
 
     assert (seqno >= 0);
@@ -246,9 +246,9 @@ to_release_and_wake_next (gcs_to_t* to, to_waiter_t* w) {
     to_wake_waiter (w);
 }
 
-int gcs_to_release (gcs_to_t *to, gcs_seqno_t seqno)
+long gcs_to_release (gcs_to_t *to, gcs_seqno_t seqno)
 {
-    int err;
+    long         err;
     to_waiter_t *w;
 
     assert (seqno >= 0);
@@ -286,9 +286,9 @@ gcs_seqno_t gcs_to_seqno (gcs_to_t* to)
     return to->seqno - 1;
 }
 
-int gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno)
+long gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno)
 {
-    int err;
+    long         err;
     to_waiter_t *w;
 
     assert (seqno >= 0);
@@ -322,9 +322,9 @@ int gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno)
     return err;
 }
 
-int gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
+long gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
 {
-    int err = 0;
+    long         err = 0;
     to_waiter_t *w;
 
     assert (seqno >= 0);
@@ -359,10 +359,10 @@ int gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
     return err;
 }
 
-int gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno)
+long gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno)
 {
-    int rcode;
-    int err;
+    long rcode;
+    long err;
 
     assert (seqno >= 0);
 
@@ -387,10 +387,10 @@ int gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno)
     return rcode;
 }
 
-int gcs_to_renew_wait (gcs_to_t *to, gcs_seqno_t seqno)
+long gcs_to_renew_wait (gcs_to_t *to, gcs_seqno_t seqno)
 {
-    int rcode;
-    int err;
+    long rcode;
+    long err;
 
     assert (seqno >= 0);
 

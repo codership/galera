@@ -379,7 +379,7 @@ static void *gcs_recv_thread (void *arg)
 }
 
 /* Opens connection to group */
-int gcs_open (gcs_conn_t *conn, const char *channel)
+long gcs_open (gcs_conn_t *conn, const char *channel)
 {
     long ret = 0;
 
@@ -420,9 +420,9 @@ int gcs_open (gcs_conn_t *conn, const char *channel)
 /* After it returns, application should have all time in the world to cancel
  * and join threads which try to access the handle, before calling gcs_destroy()
  * on it. */
-int gcs_close (gcs_conn_t *conn)
+long gcs_close (gcs_conn_t *conn)
 {
-    long        ret;
+    long ret;
 
     if ((ret = gu_mutex_lock (&conn->lock))) return ret;
     {
@@ -471,9 +471,9 @@ int gcs_close (gcs_conn_t *conn)
 }
 
 /* Frees resources associated with GCS connection handle */
-int gcs_destroy (gcs_conn_t *conn)
+long gcs_destroy (gcs_conn_t *conn)
 {
-    int         err;
+    long err;
 
     if (!(err = gu_mutex_lock (&conn->lock)))
     {
@@ -521,12 +521,12 @@ int gcs_destroy (gcs_conn_t *conn)
 }
 
 /* Puts action in the send queue and returns */
-int gcs_send (gcs_conn_t*          conn,
-              const void*          action,
-	      const size_t         act_size,
-              const gcs_act_type_t act_type)
+long gcs_send (gcs_conn_t*          conn,
+               const void*          action,
+               const size_t         act_size,
+               const gcs_act_type_t act_type)
 {
-    int ret = -ENOTCONN;
+    long ret = -ENOTCONN;
 
     /*! locking connection here to avoid race with gcs_close()
      *  @note: gcs_repl() and gcs_recv() cannot lock connection
@@ -553,12 +553,12 @@ int gcs_send (gcs_conn_t*          conn,
 }
 
 /* Puts action in the send queue and returns after it is replicated */
-int gcs_repl (gcs_conn_t          *conn,
-	      const void          *action,
-	      const size_t         act_size,
-	      const gcs_act_type_t act_type,
-	      gcs_seqno_t         *act_id, 
-	      gcs_seqno_t         *local_act_id)
+long gcs_repl (gcs_conn_t          *conn,
+               const void          *action,
+               const size_t         act_size,
+               const gcs_act_type_t act_type,
+               gcs_seqno_t         *act_id, 
+               gcs_seqno_t         *local_act_id)
 {
     long ret;
 
@@ -643,14 +643,14 @@ int gcs_repl (gcs_conn_t          *conn,
 }
 
 /* Returns when an action from another process is received */
-int gcs_recv (gcs_conn_t*     conn,
-              void**          action,
-	      size_t*         act_size,
-              gcs_act_type_t* act_type,
-	      gcs_seqno_t*    act_id,
-              gcs_seqno_t*    local_act_id)
+long gcs_recv (gcs_conn_t*     conn,
+               void**          action,
+               size_t*         act_size,
+               gcs_act_type_t* act_type,
+               gcs_seqno_t*    act_id,
+               gcs_seqno_t*    local_act_id)
 {
-    int        err;
+    long       err;
     void      *void_ptr = NULL;
     gcs_act_t *act      = NULL;
 
@@ -695,7 +695,7 @@ int gcs_recv (gcs_conn_t*     conn,
     return *act_size;
 }
 
-int
+long
 gcs_wait (gcs_conn_t* conn)
 {
     if (gu_likely(GCS_CONN_OPEN >= conn->state)) {
@@ -715,10 +715,10 @@ gcs_wait (gcs_conn_t* conn)
     }
 }
 
-int
+long
 gcs_join (gcs_conn_t* conn)
 {
-    int ret;
+    long ret;
 
     if (!(ret = gu_mutex_lock (&conn->lock)))
     {

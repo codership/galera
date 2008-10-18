@@ -53,23 +53,22 @@ gcs_create  (const char *backend);
  *
  * @return negative error code, 0 in case of success.
  */
-extern int
-gcs_open  (gcs_conn_t *conn,
-           const char *channel);
+extern long gcs_open  (gcs_conn_t *conn,
+                       const char *channel);
 
 /*! @brief Closes connection to group.
  *
  * @param  conn connection handle
  * @return negative error code or 0 in case of success.
  */
-int gcs_close (gcs_conn_t *conn);
+extern long gcs_close (gcs_conn_t *conn);
 
 /*! @brief Frees resources associuated with connection handle.
  *
  * @param  conn connection handle
  * @return negative error code or 0 in case of success.
  */
-int gcs_destroy (gcs_conn_t *conn);
+extern long gcs_destroy (gcs_conn_t *conn);
 
 /*! @brief Waits until the group catches up.
  * This call checks if any member of the group (including this one) has a
@@ -78,13 +77,13 @@ int gcs_destroy (gcs_conn_t *conn);
  *
  * @return negative error code, 1 if wait is required, 0 otherwise
  */
-int gcs_wait (gcs_conn_t *conn);
+extern long gcs_wait (gcs_conn_t *conn);
 
 /*! @brief Signals the group that it contains full image of group state.
  * Must be called upon completion of the state transfer before starting to
  * send any actions to group (gcs_send(), gcs_repl()).
  */
-int gcs_join (gcs_conn_t* conn);
+extern long gcs_join (gcs_conn_t* conn);
 
 /*! @typedef @brief Action types.
  * There is a conceptual difference between "messages"
@@ -113,8 +112,10 @@ typedef enum gcs_act_type
 /* ordered actions */
     GCS_ACT_DATA,       //! application action, sent by application
     GCS_ACT_COMMIT_CUT, //! group-wide action commit cut
-    GCS_ACT_SNAPSHOT,   //! request for state snapshot
+    GCS_ACT_STATE,      //! request for state transfer
     GCS_ACT_CONF,       //! new configuration
+    GCS_ACT_JOIN,       //! state transfer status
+    GCS_ACT_JOIN_SELF,  //! join without state transfer
     GCS_ACT_FLOW,       //! flow control
     GCS_ACT_SERVICE,    //! service action, sent by GCS
     GCS_ACT_ERROR,      //! error happened while receiving the action
@@ -135,10 +136,10 @@ gcs_act_type_t;
  * @param action action buffer
  * @return negative error code, action size in case of success
  */
-int gcs_send (gcs_conn_t          *conn,
-	      const void          *action,
-	      const size_t         act_size,
-	      const gcs_act_type_t act_type);
+extern long gcs_send (gcs_conn_t          *conn,
+                      const void          *action,
+                      const size_t         act_size,
+                      const gcs_act_type_t act_type);
 
 /*! @brief Receives an action from group.
  * Blocks if no actions are available. Action buffer is allocated by GCS
@@ -157,12 +158,12 @@ int gcs_send (gcs_conn_t          *conn,
  * @param local_act_id local action ID (sequence number)
  * @return negative error code, action size in case of success
  */
-int gcs_recv (gcs_conn_t      *conn,
-	      void           **action,
-	      size_t          *act_size,
-	      gcs_act_type_t  *act_type,
-	      gcs_seqno_t     *act_id,
-	      gcs_seqno_t     *local_act_id);
+extern long gcs_recv (gcs_conn_t      *conn,
+                      void           **action,
+                      size_t          *act_size,
+                      gcs_act_type_t  *act_type,
+                      gcs_seqno_t     *act_id,
+                      gcs_seqno_t     *local_act_id);
 
 /*! @brief Replicates an action.
  * Sends action to group and blocks until it is received. Upon return global
@@ -177,12 +178,14 @@ int gcs_recv (gcs_conn_t      *conn,
  * @param local_act_id local action ID (sequence number)
  * @return negative error code, action size in case of success
  */
-int gcs_repl (gcs_conn_t          *conn,
-	      const void          *action,
-	      const size_t         act_size,
-	      const gcs_act_type_t act_type,
-	      gcs_seqno_t         *act_id,
-	      gcs_seqno_t         *local_act_id);
+extern long gcs_repl (gcs_conn_t          *conn,
+                      const void          *action,
+                      const size_t         act_size,
+                      const gcs_act_type_t act_type,
+                      gcs_seqno_t         *act_id,
+                      gcs_seqno_t         *local_act_id);
+
+
 
 /*! Total Order object */
 typedef struct gcs_to gcs_to_t;
@@ -198,7 +201,7 @@ typedef struct gcs_to gcs_to_t;
  * @param seqno A starting sequence number. Normally 1.
  * @return Pointer to TO object or NULL in case of error.
  */
-gcs_to_t* gcs_to_create (int len, gcs_seqno_t seqno);
+extern gcs_to_t* gcs_to_create (int len, gcs_seqno_t seqno);
 
 /*! @brief Destroys TO object.
  *
@@ -206,7 +209,7 @@ gcs_to_t* gcs_to_create (int len, gcs_seqno_t seqno);
  * @return 0 in case of success, negative code in case of error.
  *         In particular -EBUSY means the object is used by other threads.
  */
-int gcs_to_destroy (gcs_to_t** to);
+extern long gcs_to_destroy (gcs_to_t** to);
 
 /*! @brief Grabs TO resource in the specified order.
  * On successful return the mutex associated with specified TO is locked.
@@ -220,7 +223,7 @@ int gcs_to_destroy (gcs_to_t** to);
  *         -EAGAIN means that there are too many threads waiting for TO
  *         already. It is safe to try again later.
  */
-int gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno);
+extern long gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno);
 
 /*! @brief Releases TO specified resource.
  * On succesful return unlocks the mutex associated with TO.
@@ -232,7 +235,7 @@ int gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno);
  *         here is an application error - attempt to release TO resource
  *         out of order (not paired with gcs_to_grab()).
  */
-int gcs_to_release (gcs_to_t* to, gcs_seqno_t seqno);
+extern long gcs_to_release (gcs_to_t* to, gcs_seqno_t seqno);
 
 /*! @brief The last sequence number that had been used to access TO object.
  * Note that since no locks are held, it is a conservative estimation.
@@ -242,7 +245,7 @@ int gcs_to_release (gcs_to_t* to, gcs_seqno_t seqno);
  * @return GCS sequence number. Since GCS TO sequence starts with 1, this
  *         sequence can start with 0.
  */
-gcs_seqno_t gcs_to_seqno (gcs_to_t* to);
+extern gcs_seqno_t gcs_to_seqno (gcs_to_t* to);
 
 /*! @brief cancels a TO monitor waiter making it return immediately
  * It is assumed that the caller is currenly holding the TO.
@@ -255,14 +258,14 @@ gcs_seqno_t gcs_to_seqno (gcs_to_t* to);
  * @return 0 for success and -ERANGE, if trying to cancel an earlier
  *         transaction
  */
-int gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno);
+extern long gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno);
 
 
 /*!
  *
  * Self cancel to without attempting to enter critical secion
  */
-int gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno);
+extern long gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno);
 
 /*! @brief withdraws from TO monitor waiting state.
  *  The caller can later retry the wait operation, but it must
@@ -273,7 +276,7 @@ int gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno);
  * @return 0 for success and -ERANGE, if trying to withdra an already
  *         used transaction
  */
-int gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno);
+extern long gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno);
     
 /*! @brief renews TO monitor waiter state
  * This call is to assure, that the waiter will retry the TO
@@ -284,23 +287,23 @@ int gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno);
  * @return 0 for success and -ERANGE, if trying to renew already used
  *         transaction
  */
-int gcs_to_renew_wait (gcs_to_t *to, gcs_seqno_t seqno);
+extern long gcs_to_renew_wait (gcs_to_t *to, gcs_seqno_t seqno);
 
 /* Service functions */
 
 /*! Informs group about the last applied action on this node */
-long gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno);
+extern long gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno);
 
 
 /* GCS Configuration */
 
 /* Logging options */
-int gcs_conf_set_log_file     (FILE *file);
-int gcs_conf_set_log_callback (void (*logger) (int, const char*));
-int gcs_conf_self_tstamp_on   ();
-int gcs_conf_self_tstamp_off  ();
-int gcs_conf_debug_on         ();
-int gcs_conf_debug_off        ();
+extern long gcs_conf_set_log_file     (FILE *file);
+extern long gcs_conf_set_log_callback (void (*logger) (int, const char*));
+extern long gcs_conf_self_tstamp_on   ();
+extern long gcs_conf_self_tstamp_off  ();
+extern long gcs_conf_debug_on         ();
+extern long gcs_conf_debug_off        ();
 
 /* Sending options */
 /* Sets maximum DESIRED network packet size.
