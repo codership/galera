@@ -1,13 +1,26 @@
-2008-07-30 Alex
+2008-10-21 Alex 
+    First implementation of state transfer request protocol. Bumped package
+    version to 0.7.0, library interface to 8.0.0.
+
+2008-09-29 Alex (postfactum)
+    State exchange (GCS state exchange, not application state exchange)
+    implemented. Now we have some sort of quourum calculations and global-scope
+    sequence numbers. New nodes can join without having to restart the whole
+    group. Bumped package version to 0.6.0.
+    
+2008-08-01 Alex (postfactum)
+    START/STOP-based flow control. A little bit ahead of the plan.
+    
+2008-07-30 Alex 
     Added gcs_join() and gcs_wait() getting closer to final API.
     gcs_join() moves conneciton to JOINED state.
     gcs_wait() blocks waiting for the group memebers to catch up.
 
-2008-05-14 Alex
+2008-05-14 Alex 
     Added gcs_create() and gcs_destroy() for safe and clean initialization and
     deinitialization of GCS connection handle.
 
-2008-03-23 Alex
+2008-03-23 Alex 
     Added gcs_set_last_applied() and gcs_get_last_applied() - calls for voting
     for the last applied action.
 

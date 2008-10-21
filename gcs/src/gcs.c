@@ -26,7 +26,7 @@ const long GCS_MAX_REPL_THREADS = 16384;
 
 typedef enum
 {
-    GCS_CONN_JOINED,
+    GCS_CONN_SYNCED,
     GCS_CONN_OPEN,
     GCS_CONN_CLOSED,
     GCS_CONN_DESTROYED
@@ -110,6 +110,7 @@ gcs_create (const char *backend)
                         gu_mutex_init (&conn->lock, NULL);
                         gu_mutex_init (&conn->fc_mutex, NULL);
                         conn->state = GCS_CONN_CLOSED;
+                        conn->local_act_id = GCS_SEQNO_FIRST;
                         return conn; // success
                     }
                     gcs_fifo_lite_destroy (conn->repl_q);
@@ -134,7 +135,7 @@ gcs_fc_stop (gcs_conn_t* conn)
 
     if (conn->stop_count > 0 || conn->stop_sent > 0 ||
         gcs_queue_length (conn->recv_q) <= conn->upper_limit ||
-        GCS_CONN_JOINED != conn->state)
+        GCS_CONN_SYNCED != conn->state)
         return 0; // try to avoid mutex lock
 
     if (gu_mutex_lock (&conn->fc_mutex)) abort();
@@ -142,7 +143,7 @@ gcs_fc_stop (gcs_conn_t* conn)
     conn->queue_len = gcs_queue_length (conn->recv_q);
 
     if ((conn->queue_len >  conn->upper_limit) &&
-        GCS_CONN_JOINED  == conn->state        &&
+        GCS_CONN_SYNCED  == conn->state        &&
         conn->stop_count <= 0 && conn->stop_sent <= 0) {
         /* tripped upper queue limit, send stop request */
         gu_info ("SENDING STOP (%llu)", conn->local_act_id); //track frequency
@@ -167,7 +168,7 @@ gcs_fc_cont (gcs_conn_t* conn)
 
     if (conn->stop_sent <= 0 ||
         gcs_queue_length (conn->recv_q) > conn->lower_limit ||
-        GCS_CONN_JOINED != conn->state)
+        GCS_CONN_SYNCED != conn->state)
         return 0; // try to avoid mutex lock
 
     if (gu_mutex_lock (&conn->fc_mutex)) abort();
@@ -175,7 +176,7 @@ gcs_fc_cont (gcs_conn_t* conn)
     conn->queue_len = gcs_queue_length (conn->recv_q);
 
     if (conn->lower_limit >= conn->queue_len &&
-        GCS_CONN_JOINED == conn->state && conn->stop_sent > 0) {
+        GCS_CONN_SYNCED == conn->state && conn->stop_sent > 0) {
         // tripped lower slave queue limit, sent continue request
         gu_info ("SENDING CONT");
         ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
@@ -290,7 +291,7 @@ static void *gcs_recv_thread (void *arg)
         }
 
         /* deliver to application and increment local order */
-        this_act_id = ++conn->local_act_id;
+        this_act_id = conn->local_act_id++;
 
 	if (!local_action && (act_ptr = gcs_fifo_lite_get_head(conn->repl_q))) {
 	    /* Check if there is any local action in REPL queue head */
@@ -396,6 +397,8 @@ long gcs_open (gcs_conn_t *conn, const char *channel)
                                               gcs_recv_thread,
                                               conn))) {
                     conn->state = GCS_CONN_OPEN;
+                    // remove this when SYNC message is implemented.
+                    conn->state = GCS_CONN_SYNCED;
                     gu_info ("Opened channel '%s'", channel);
                 }
                 else {
@@ -642,6 +645,26 @@ long gcs_repl (gcs_conn_t          *conn,
     return ret;
 }
 
+long gcs_request_state_transfer (gcs_conn_t  *conn,
+                                 const void  *req,
+                                 size_t       size,
+                                 gcs_seqno_t *local)
+{
+    gcs_seqno_t global;
+
+    long ret = gcs_repl(conn, req, size, GCS_ACT_STATE_REQ, &global, local);
+
+    if (ret > 0) {
+        assert (ret == size);
+        if (global > 0)
+            ret = global; // index of donor is in the global seqno
+        else
+            ret = global; //... not sure if we need to overwrite error here
+    }
+
+    return ret;
+}
+
 /* Returns when an action from another process is received */
 long gcs_recv (gcs_conn_t*     conn,
                void**          action,
@@ -716,20 +739,6 @@ gcs_wait (gcs_conn_t* conn)
 }
 
 long
-gcs_join (gcs_conn_t* conn)
-{
-    long ret;
-
-    if (!(ret = gu_mutex_lock (&conn->lock)))
-    {
-        conn->state = GCS_CONN_JOINED;
-        gu_info ("JOINED");
-        gu_mutex_unlock (&conn->lock);
-    }
-    return ret;
-}
-
-long
 gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size)
 {
     return gcs_core_set_pkt_size (conn->core, pkt_size);
@@ -741,3 +750,8 @@ gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
     return gcs_core_set_last_applied (conn->core, seqno);
 }
 
+long
+gcs_join (gcs_conn_t* conn, gcs_seqno_t seqno)
+{
+    return gcs_core_send_join (conn->core, seqno);
+}

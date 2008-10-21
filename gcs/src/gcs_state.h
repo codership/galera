@@ -95,6 +95,24 @@ gcs_state_group_uuid (const gcs_state_t* state);
 extern gcs_seqno_t
 gcs_state_act_id (const gcs_state_t* state);
 
+/* Get node status */
+extern gcs_state_node_t
+gcs_state_status (const gcs_state_t* state);
+
+/* Get node name */
+extern const char*
+gcs_state_name (const gcs_state_t* state);
+
+/* Get node incoming address */
+extern const char*
+gcs_state_inc_addr (const gcs_state_t* state);
+
+/* Get supported protocols */
+extern gcs_proto_t
+gcs_state_proto_min (const gcs_state_t* state);
+extern gcs_proto_t
+gcs_state_proto_max (const gcs_state_t* state);
+
 /* Get quorum decision from state messages */
 extern long
 gcs_state_get_quorum (const gcs_state_t*  states[],

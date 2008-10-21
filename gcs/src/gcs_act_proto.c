@@ -84,8 +84,16 @@ gcs_act_proto_read (gcs_act_frag_t* frag, const void* buf, size_t buf_len)
 {
     frag->proto_ver = ((uint8_t*)buf)[PROTO_PV_OFFSET];
 #ifdef GCS_DEBUG_PROTO
-    if (frag->proto_ver != PROTO_VERSION)     return -EPROTO;
-    if (buf_len         <  PROTO_DATA_OFFSET) return -EMSGSIZE;
+    if (gu_unlikely(frag->proto_ver != PROTO_VERSION)) {
+        gu_error ("Bad protocol version %d, expected %d",
+                  frag->proto_ver, PROTO_VERSION);
+        return -EPROTO;
+    }
+    if (gu_unlikely(buf_len < PROTO_DATA_OFFSET)) {
+        gu_error ("Action message too short: %zu, expected at least %d",
+                  buf_len, PROTO_DATA_OFFSET);
+        return -EMSGSIZE;
+    }
 #endif
     ((uint8_t*)buf)[PROTO_PV_OFFSET] = 0x0;
     frag->act_id   = gu_be64(*(uint64_t*)buf);

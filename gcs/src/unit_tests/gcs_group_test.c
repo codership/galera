@@ -27,7 +27,7 @@ msg_write (gcs_recv_msg_t* msg,
            gcs_act_frag_t* frg,
            char*           buf,  size_t         buf_len,
            const char*     data, size_t         data_len,
-           long       sender_id, gcs_msg_type_t type)
+           long       sender_idx, gcs_msg_type_t type)
 {
     long ret;
     ret = gcs_act_proto_write (frg, buf, buf_len);
@@ -38,11 +38,11 @@ msg_write (gcs_recv_msg_t* msg,
              "Refactor the test and increase buf_len.", frg->frag_len,data_len);
     memcpy ((void*)frg->frag, data, data_len);
 
-    msg->buf       = buf;
-    msg->buf_len   = buf_len;
-    msg->size      = (buf_len - frg->frag_len + data_len);
-    msg->sender_id = sender_id;
-    msg->type      = type;
+    msg->buf        = buf;
+    msg->buf_len    = buf_len;
+    msg->size       = (buf_len - frg->frag_len + data_len);
+    msg->sender_idx = sender_idx;
+    msg->type       = type;
 }
 
 // just pretend we received SYNC message
@@ -57,7 +57,7 @@ START_TEST (gcs_group_configuration)
 {
     ssize_t     ret;
     gcs_group_t group;
-    gcs_seqno_t seqno = 0;
+    gcs_seqno_t seqno = 1;
 
     // The Action
     const char   act_buf[]   = "Test action smuction";
@@ -392,8 +392,8 @@ START_TEST(gcs_group_last_applied)
     msg0.size = sizeof(gcs_seqno_t);
     msg1 = msg2 = msg3 = msg0;
     msg0.buf = buf0; msg1.buf = buf1; msg2.buf = buf2; msg3.buf = buf3;
-    msg0.sender_id = 0; msg1.sender_id = 1;
-    msg2.sender_id = 2; msg3.sender_id = 3;
+    msg0.sender_idx = 0; msg1.sender_idx = 1;
+    msg2.sender_idx = 2; msg3.sender_idx = 3;
 
     // Create 4-node component
     comp = gcs_comp_msg_new (TRUE, 0, 4);

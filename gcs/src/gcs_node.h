@@ -20,21 +20,25 @@
 
 struct gcs_node
 {
-    gcs_seqno_t      last_applied; // last applied action on that node
+    gcs_seqno_t        last_applied; // last applied action on that node
 //    long             protocol;     // highest supported protocol
 //    long             queue_len;    // action queue length on that node
-    gcs_state_node_t status;       // node status
-    gcs_proto_t      proto_min;    // supported protocol versions
-    gcs_proto_t      proto_max;    // 
-    gcs_defrag_t     app;          // defragmenter for application actions
-    gcs_defrag_t     oob;          // defragmenter for out-of-band service acts.
+    gcs_state_node_t   status;       // node status
+    gcs_proto_t        proto_min;    // supported protocol versions
+    gcs_proto_t        proto_max;    // 
+    gcs_defrag_t       app;          // defragmenter for application actions
+    gcs_defrag_t       oob;        // defragmenter for out-of-band service acts.
 
     // globally unique id from the component message
-    const char       id[GCS_COMP_MEMB_ID_MAX_LEN + 1];
+    const char         id[GCS_COMP_MEMB_ID_MAX_LEN + 1];
 
-    const char*      name;         // human-given name
-    const char*      inc_addr;     // incoming address - for load balancer
-    const gcs_state_t* state;      // state message
+    // to track snapshot status
+    char               joiner[GCS_COMP_MEMB_ID_MAX_LEN + 1];
+    char               donor [GCS_COMP_MEMB_ID_MAX_LEN + 1];
+
+    const char*        name;         // human-given name
+    const char*        inc_addr;     // incoming address - for load balancer
+    const gcs_state_t* state;        // state message
 };
 typedef struct gcs_node gcs_node_t;
 
@@ -65,7 +69,7 @@ gcs_node_handle_act_frag (gcs_node_t*           node,
                           gcs_recv_act_t*       act,
                           bool                  local)
 {
-    if (gu_likely(GCS_ACT_DATA == frg->act_type)) {
+    if (gu_likely(GCS_ACT_SERVICE != frg->act_type)) {
         return gcs_defrag_handle_frag (&node->app, frg, act, local);
     }
     else if (GCS_ACT_SERVICE == frg->act_type) {

@@ -77,10 +77,18 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg);
 extern gcs_seqno_t
 gcs_group_handle_last_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
 
+/*! @return 0 for success or negative error code */
+extern long
+gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
+
+extern long
+gcs_group_handle_state_request (gcs_group_t*    group,
+                                long            joiner_idx,
+                                gcs_recv_act_t* act);
 /*!
  * Handles action message. Is called often - therefore, inlined
  *
- * @return to be determined
+ * @return negative - error code, 0 - continue, positive - complete action
  */
 static inline ssize_t
 gcs_group_handle_act_msg (gcs_group_t*          group,
@@ -88,7 +96,7 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
                           const gcs_recv_msg_t* msg,
                           gcs_recv_act_t*       act)
 {
-    register long sender_idx = msg->sender_id;
+    register long sender_idx = msg->sender_idx;
     register ssize_t ret;
 
     assert (GCS_MSG_ACTION == msg->type);
@@ -97,10 +105,18 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
     ret = gcs_node_handle_act_frag (&group->nodes[sender_idx],
                                     frg, act, (sender_idx == group->my_idx));
     if (gu_unlikely(ret > 0)) {
+
         assert (ret == act->buf_len);
-        act->id         = group->act_id++;
+
         act->type       = frg->act_type;
         act->sender_idx = sender_idx;
+
+        if (gu_likely(act->type == GCS_ACT_DATA)) {
+            // increment act_id only for DATA (should it be renamed to ORDERED?)
+            act->id = group->act_id++;
+        } else if (act->type == GCS_ACT_STATE_REQ) {
+            ret = gcs_group_handle_state_request (group, sender_idx, act);
+        }
     }
 
     return ret;

@@ -322,7 +322,7 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg)
 			 recv_msg->buf,
 			 recv_msg->buf_len,
 			 &recv_msg->type,
-			 &recv_msg->sender_id);
+			 &recv_msg->sender_idx);
 
     while (ret > recv_msg->buf_len) {
 	/* recv_buf too small, reallocate */
@@ -340,7 +340,7 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg)
 				 recv_msg->buf,
 				 recv_msg->buf_len,
 				 &recv_msg->type,
-				 &recv_msg->sender_id);
+				 &recv_msg->sender_idx);
 
 	    /* should be either an error or an exact match */
 	    assert ((ret < 0) || (ret >= recv_msg->buf_len));
@@ -381,7 +381,12 @@ core_handle_act_msg (gcs_core_t*     core,
     if (gcs_group_is_primary(group)) {
 
         ret = gcs_act_proto_read (&frg, msg->buf, msg->size);
-        if (gu_unlikely(ret)) return ret;
+        if (gu_unlikely(ret)) {
+            gu_fatal ("Error parsing action fragment header: %zd (%s).",
+                      ret, strerror (-ret));
+            assert (ret == 0);
+            return -ENOTRECOVERABLE;
+        }
 
         ret = gcs_group_handle_act_msg (group, &frg, msg, act);
 
@@ -416,13 +421,19 @@ core_handle_act_msg (gcs_core_t*     core,
                 }
             }
 //          gu_debug ("Received action: seqno: %lld, sender: %d, size: %d, act: %p",
-//                     act->id, msg->sender_id, ret, act->buf);
+//                     act->id, msg->sender_idx, ret, act->buf);
 //          gu_debug ("%s", (char*) act->buf);
+        }
+        else if (gu_unlikely(ret < 0)){
+            gu_fatal ("Failed to handle action fragment: %zd (%s)",
+                      ret, strerror(ret));
+            assert (0);
+            return -ENOTRECOVERABLE;
         }
     }
     else { /* Non-primary - ignore action */
         gu_warn ("Action message in non-primary configuration from "
-                 "member %d", msg->sender_id);
+                 "member %d", msg->sender_idx);
     }
 
     return ret;
@@ -459,7 +470,7 @@ core_handle_last_msg (gcs_core_t*     core,
     else { /* Non-primary - ignore last message */
         gu_warn ("Last Applied Action message "
                  "in non-primary configuration from member %d",
-                 msg->sender_id);
+                 msg->sender_idx);
     }
     return 0;
 }
@@ -756,12 +767,16 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
             ret = core_handle_state_msg (conn, recv_msg, &recv_act);
             assert (ret >= 0); // hang on error in debug mode
             break;
+        case GCS_MSG_JOIN:
+            ret = gcs_group_handle_join_msg (&conn->group, recv_msg);
+            assert (ret >= 0); // hang on error in debug mode
+            break;
 	default:
 	    // this normaly should not happen, shall we bother with
 	    // protection?
 	    gu_warn ("Received unsupported message type: %d, length: %d, "
                      "sender: %d",
-		     recv_msg->type, recv_msg->size, recv_msg->sender_id);
+		     recv_msg->type, recv_msg->size, recv_msg->sender_idx);
 	    // continue looping
         }
     } /* end of recv loop */
@@ -882,18 +897,29 @@ gcs_core_set_pkt_size (gcs_core_t* conn, ulong pkt_size)
     return ret;
 }
 
-long
-gcs_core_set_last_applied (gcs_core_t* core, gcs_seqno_t seqno)
+static inline long
+core_send_seqno (gcs_core_t* core, gcs_seqno_t seqno, gcs_msg_type_t msg_type)
 {
     gcs_seqno_t seqno_le = gcs_seqno_le (seqno);
     ssize_t     ret      = core_msg_send_retry (core, &seqno_le,
-                                                sizeof(seqno_le), GCS_MSG_LAST);
+                                                sizeof(seqno_le), msg_type);
     if (ret > 0) {
         assert(ret == sizeof(seqno));
         ret = 0;
     }
-    // gu_debug ("Sent last msg: %lld", seqno);
     return ret;
+}
+
+long
+gcs_core_set_last_applied (gcs_core_t* core, gcs_seqno_t seqno)
+{
+    return core_send_seqno (core, seqno, GCS_MSG_LAST);
+}
+
+long
+gcs_core_send_join (gcs_core_t* core, gcs_seqno_t seqno)
+{
+    return core_send_seqno (core, seqno, GCS_MSG_JOIN);
 }
 
 long

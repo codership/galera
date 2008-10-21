@@ -63,6 +63,12 @@ static gcs_conn_t         *gcs_conn     = NULL;
 static char               *gcs_channel  = "dummy_galera";
 static char               *gcs_url      = NULL;
 
+/* state trackers */
+// Suggestion: galera_init() can take initial seqno and UUID at start-up
+static gcs_seqno_t         my_seqno;
+static gu_uuid_t           my_uuid;
+static long                my_idx;
+
 static struct job_queue   *applier_queue = NULL;
 
 /* global status structure */
@@ -178,16 +184,21 @@ enum galera_status galera_init(const char*          group,
         gcs_channel = strdup (group);
     }
 
+    /* set up initial state */
+    my_seqno = GCS_SEQNO_NIL;
+    my_uuid  = GU_UUID_NIL;
+    my_idx   = 0;
+
     /* initialize wsdb */
     wsdb_init(data_dir, logger);
 
     gu_conf_set_log_callback(logger);
 
     /* initialize total order queue */
-    to_queue = gcs_to_create(16384, 1);
+    to_queue = gcs_to_create(16384, GCS_SEQNO_FIRST);
 
     /* initialize commit queue */
-    commit_queue = gcs_to_create(16384, 1);
+    commit_queue = gcs_to_create(16384, GCS_SEQNO_FIRST);
 
     Galera.repl_state = GALERA_INITIALIZED;
 
@@ -519,7 +530,7 @@ static inline void truncate_trx_history (gcs_seqno_t seqno)
 }
 
 // a wrapper for TO funcitons which can return -EAGAIN
-static inline long galera_eagain (int (*function) (gcs_to_t*, gcs_seqno_t),
+static inline long galera_eagain (long (*function) (gcs_to_t*, gcs_seqno_t),
                                   gcs_to_t* to, gcs_seqno_t seqno)
 {
     static const struct timespec period = { 0, 10000000 }; // 10 msec
@@ -719,6 +730,86 @@ static void process_write_set(
     return;
 }
 
+/*!
+ * @return
+ *        donor index (own index in case when no state transfer needed)
+ *        or negative error code (-1 if configuration in non-primary)
+ */
+static long
+galera_handle_configuration (const gcs_act_conf_t* conf)
+{
+    gu_uuid_t* group_uuid = (gu_uuid_t*)conf->group_uuid;
+
+    gu_info ("New %s configuration: %lld, "
+             "seqno: %lld, group UUID: "GU_UUID_FORMAT
+             ", members: %zu, my idx: %zu",
+             conf->conf_id > 0 ? "PRIMARY" : "NON-PRIMARY",
+             (long long)conf->conf_id, (long long)conf->seqno,
+             GU_UUID_ARGS(group_uuid), conf->memb_num, conf->my_idx);
+
+    my_idx = conf->my_idx; // this is always true.
+
+    if (conf->conf_id >= 0) {
+        // PRIMARY configuration
+        long ret;
+
+        if (GCS_SEQNO_FIRST == conf->conf_id && 
+            GCS_SEQNO_NIL   == my_seqno) {
+            // Neither group nor myself has applied any actions yet.
+            // Set group history UUID to one provided by the group.
+            gu_info ("Forming new group: "GU_UUID_FORMAT,
+                     GU_UUID_ARGS(group_uuid));
+            my_uuid  = *group_uuid;
+            ret = my_idx;
+        }
+        else if ((my_seqno + 1) != conf->seqno ||
+                 gu_uuid_compare (&my_uuid, group_uuid)) {
+            // We're missing some/all of the history.
+            // Need to request state transfer.
+
+            gu_info ("Gap in the action history:"
+                     // seqno length chosen to fit in 80 columns
+                     "\n\tLocal  seqno: %14lld, UUID: "GU_UUID_FORMAT
+                     "\n\tGlobal seqno: %14lld, UUID: "GU_UUID_FORMAT,
+                     my_seqno, GU_UUID_ARGS(&my_uuid),
+                     conf->seqno, GU_UUID_ARGS(group_uuid));
+
+            /* TODO: Here start waiting for state transfer to begin. */
+
+            do {
+                // Actually this loop can be done even in this thread:
+                // until we succeed in sending state transfer request, there's
+                // nothing else for us to do.
+                // Note, this request is very simplyfied.
+                gcs_seqno_t seqno_l;
+                ret = gcs_request_state_transfer (gcs_conn, &my_seqno, 
+                                                  sizeof(my_seqno), &seqno_l);
+                if (ret < 0) {
+                    gu_error ("Requesting state transfer: ", strerror(-ret));
+                }
+                if (seqno_l > GCS_SEQNO_NIL) {
+                    if (gcs_to_self_cancel (to_queue, seqno_l)) abort();
+                    if (gcs_to_self_cancel (commit_queue, seqno_l)) abort();
+                }
+            } while ((ret == -EAGAIN) && (usleep(1000000), true));
+            if (ret < 0) return ret;
+
+            gu_info ("Requesting state transfer: success, donor %ld", ret);
+            assert (ret != my_idx);
+
+            /* TODO: Here wait for state transfer to complete, get my_seqno */
+            // for now pretend that state transfer was complete
+            my_uuid  = *group_uuid;
+            my_seqno = conf->seqno - 1; // anything below this must be ignored
+        }
+        return ret;
+    }
+    else {
+        // NON PRIMARY configuraiton
+        return -1;
+    }
+}
+
 enum galera_status galera_recv(void *app_ctx) {
     int rcode;
     struct job_worker *applier;
@@ -751,15 +842,20 @@ enum galera_status galera_recv(void *app_ctx) {
         switch (action_type) {
         case GCS_ACT_DATA:
             assert (GCS_SEQNO_ILL != seqno_g);
-            process_write_set(
-                applier, app_ctx, action, action_size, seqno_g, seqno_l
-            );
-            /* gu_free(action) causes segfault 
-	     * It seems that action is allocated by gcs using 
-	     * standard malloc(), so standard free() should work ok.
-	     * (teemu 12.3.2008)
-	     */
-	    free(action);
+            if (gu_likely(seqno_g > my_seqno)) {
+                assert (my_seqno + 1 == seqno_g);
+                my_seqno = seqno_g; //Is it a right place to track seqno?
+                                    // What about parallel appliers?
+                process_write_set(
+                    applier, app_ctx, action, action_size, seqno_g, seqno_l
+                    );
+            }
+            else { // skip action, it is outdated
+                if (galera_eagain(gcs_to_self_cancel,to_queue,seqno_l))
+                    abort();
+                if (galera_eagain(gcs_to_self_cancel,commit_queue,seqno_l))
+                    abort();
+            }
             break;
         case GCS_ACT_COMMIT_CUT:
             // synchronize
@@ -771,40 +867,44 @@ enum galera_status galera_recv(void *app_ctx) {
             // Let other transaction continue to commit
             if (galera_eagain(gcs_to_self_cancel,commit_queue,seqno_l)) abort();
             //truncate_trx_history (*(gcs_seqno_t*)action);
-            free (action);
             break;
         case GCS_ACT_CONF:
         {
-            gcs_act_conf_t* conf = action;
-            if (conf->conf_id >= 0) {
-                // PRIMARY configuration
-#ifdef GALERA_USE_FLOW_CONTROL
-                gcs_join (gcs_conn); // pretend we have the state already
-#endif
-            }
-            else {
-                // NON PRIMARY configuraiton
-            }
+            if (galera_eagain (gcs_to_grab, to_queue, seqno_l)) abort();
+            if (galera_eagain (gcs_to_grab, commit_queue, seqno_l)) abort();
+            galera_handle_configuration (action);
+            if (gcs_to_release (commit_queue, seqno_l)) abort();
+            if (gcs_to_release (to_queue, seqno_l)) abort();
+            break;
         }
-        case GCS_ACT_SNAPSHOT:
+        case GCS_ACT_STATE_REQ:
             if (0 < seqno_l) {
+                gu_info ("Got state transfer request.");
+
                 // Must advance queue counter even if ignoring the action
                 if (galera_eagain (gcs_to_grab, to_queue, seqno_l)) {
                     gu_fatal("Failed to grab to_queue: %llu", seqno_l);
                     abort();
                 }
-                gcs_to_release (to_queue, seqno_l);
                 
-                if (galera_eagain (gcs_to_self_cancel,commit_queue,seqno_l)) {
-                    gu_fatal("Failed to cancel commit_queue: %llu", seqno_l);
+                if (galera_eagain (gcs_to_grab, commit_queue, seqno_l)) {
+                    gu_fatal("Failed to grab commit_queue: %llu", seqno_l);
                     abort();
                 }
+
+                /* At this point do the state transfer */
+
+                gcs_to_release (commit_queue, seqno_l);
+                gcs_to_release (to_queue, seqno_l);
+
+                gu_info ("State transfer complete, sending JOIN: %s",
+                         strerror (-gcs_join(gcs_conn, 0)));
             }
-	    free (action);
             break;
         default:
             return GALERA_FATAL;
         }
+        free (action); /* TODO: cache DATA actions here for incremental ST */
     }
     return GALERA_OK;
 }

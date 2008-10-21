@@ -422,6 +422,35 @@ void *gcs_test_send (void *arg)
     return NULL;
 }
 
+static void
+gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
+{
+    static gcs_seqno_t conf_id = 0;
+    gcs_act_conf_t* conf = (void*)thread->msg;
+
+    fprintf (stdout, "Got GCS_ACT_CONF: Conf: %lld, "
+             "seqno: %lld, members: %zu, my idx: %zu\n",
+             (long long)conf->conf_id, (long long)conf->seqno,
+             conf->memb_num, conf->my_idx);
+    fflush (stdout);
+
+    // NOTE: what really needs to be checked is seqno and group_uuid, but here
+    //       we don't keep track of them (and don't do real transfers),
+    //       so for simplicity, just check conf_id.
+    if (conf_id + 1 != conf->conf_id) {
+        gcs_seqno_t seqno;
+        fprintf (stdout, "Gap in configurations: ours: %lld, group: %lld.\n",
+                 conf_id, conf->conf_id);
+        fflush (stdout);
+        fprintf (stdout, "Requesting state transfer: %s\n",
+                 strerror (-gcs_request_state_transfer (gcs, &conf_id,
+                                                        sizeof(conf_id),
+                                                        &seqno)));
+        gcs_to_self_cancel (to, seqno);
+    }
+    conf_id = conf->conf_id;
+}
+
 void *gcs_test_recv (void *arg)
 {
     long ret = 0;
@@ -463,14 +492,13 @@ void *gcs_test_recv (void *arg)
             group_seqno = *(gcs_seqno_t*)thread->msg;
             break;
 	case GCS_ACT_CONF:
-	    {
-                gcs_act_conf_t* conf = (void*)thread->msg;
-                fprintf (stdout, "Got GCS_ACT_CONF: Conf ID: %lld, "
-                         "seqno: %lld, members: %zu, my idx: %zu\n",
-                         (long long)conf->conf_id, (long long)conf->seqno,
-			 conf->memb_num, conf->my_idx);
-            }
+            gcs_test_handle_configuration (gcs, thread);
 	    break;
+        case GCS_ACT_STATE_REQ:
+            fprintf (stdout, "Got STATE_REQ\n");
+            fprintf (stdout, "Sending JOIN: %s\n", strerror(-gcs_join(gcs, 0)));
+            fflush (stdout);
+            break;
         default:
             fprintf (stderr, "Unexpected action type: %d\n", thread->act_type);
 
@@ -633,7 +661,7 @@ int main (int argc, char *argv[])
         if ((err = test_log_open (&recv_log, RECV_LOG))) goto out;
     }
 
-    to = gcs_to_create ((conf.n_repl + conf.n_recv + 1)*2, 1);
+    to = gcs_to_create ((conf.n_repl + conf.n_recv + 1)*2, GCS_SEQNO_FIRST);
     if (!to) goto out;
 //    total_tries = conf.n_tries * (conf.n_repl + conf.n_send);
     
@@ -643,11 +671,6 @@ int main (int argc, char *argv[])
     if (!(gcs = gcs_create (conf.backend))) goto out;
     if ((err = gcs_open    (gcs, channel))) goto out;
     printf ("Connected\n");
-
-#ifdef USE_WAIT
-    if ((err = gcs_join    (gcs))) goto out;
-    printf ("Joined\n");
-#endif
 
     msg_len = 1300;
     if (msg_len > MAX_MSG_LEN) msg_len = MAX_MSG_LEN; 

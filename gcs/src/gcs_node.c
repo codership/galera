@@ -79,6 +79,17 @@ gcs_node_record_state (gcs_node_t* node, gcs_state_t* state)
         gcs_state_destroy ((gcs_state_t*)node->state);
     }
     node->state = state;
+
+    // copy relevant stuff from state into node
+    node->status    = gcs_state_status (state);
+    node->proto_min = gcs_state_proto_min (state);
+    node->proto_max = gcs_state_proto_max (state);
+
+    if (node->name) free ((char*)node->name);
+    node->name = strdup (gcs_state_name (state));
+
+    if (node->inc_addr) free ((char*)node->inc_addr);
+    node->inc_addr = strdup (gcs_state_inc_addr (state));
 }
 
 /*! Update node status according to quorum decisions */
@@ -108,8 +119,6 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
                 node->status = GCS_STATE_PRIM;
             }
         }
-        // TODO: remove when JOIN message is implemented
-        node->status = GCS_STATE_JOINED;
     }
     else {
         /* Probably don't want to change anything here, quorum was a failure

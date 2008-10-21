@@ -91,6 +91,10 @@ long gcs_core_set_pkt_size (gcs_core_t *conn, ulong pkt_size);
 extern long
 gcs_core_set_last_applied (gcs_core_t* core, gcs_seqno_t seqno);
 
+/* sends status of the ended snapshot (snapshot seqno or error code) */
+extern long
+gcs_core_send_join (gcs_core_t* core, gcs_seqno_t seqno);
+
 /* sends flow control message */
 extern long
 gcs_core_send_fc (gcs_core_t* core, void* fc, size_t fc_size);

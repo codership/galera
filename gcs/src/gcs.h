@@ -21,9 +21,12 @@ extern "C" {
 /*! @typedef @brief Sequence number type. */
 typedef int64_t gcs_seqno_t;
 
-/*! @def @brief Illegal sequence number.
-* It is used to emphasize that action was not serialised */
-static const gcs_seqno_t GCS_SEQNO_ILL = -1;
+/*! @def @brief Illegal sequence number. Action not serialized. */
+static const gcs_seqno_t GCS_SEQNO_ILL   = -1;
+/*! @def @brief Empty state. No actions applied. */
+static const gcs_seqno_t GCS_SEQNO_NIL   =  0;
+/*! @def @brief Start of the sequence */
+static const gcs_seqno_t GCS_SEQNO_FIRST =  1;
 
 /*! Connection handle type */
 typedef struct gcs_conn gcs_conn_t;
@@ -79,12 +82,6 @@ extern long gcs_destroy (gcs_conn_t *conn);
  */
 extern long gcs_wait (gcs_conn_t *conn);
 
-/*! @brief Signals the group that it contains full image of group state.
- * Must be called upon completion of the state transfer before starting to
- * send any actions to group (gcs_send(), gcs_repl()).
- */
-extern long gcs_join (gcs_conn_t* conn);
-
 /*! @typedef @brief Action types.
  * There is a conceptual difference between "messages"
  * and "actions". Messages are ELEMENTARY pieces of information
@@ -112,10 +109,9 @@ typedef enum gcs_act_type
 /* ordered actions */
     GCS_ACT_DATA,       //! application action, sent by application
     GCS_ACT_COMMIT_CUT, //! group-wide action commit cut
-    GCS_ACT_STATE,      //! request for state transfer
+    GCS_ACT_STATE_REQ,  //! request for state transfer
     GCS_ACT_CONF,       //! new configuration
     GCS_ACT_JOIN,       //! state transfer status
-    GCS_ACT_JOIN_SELF,  //! join without state transfer
     GCS_ACT_FLOW,       //! flow control
     GCS_ACT_SERVICE,    //! service action, sent by GCS
     GCS_ACT_ERROR,      //! error happened while receiving the action
@@ -185,7 +181,34 @@ extern long gcs_repl (gcs_conn_t          *conn,
                       gcs_seqno_t         *act_id,
                       gcs_seqno_t         *local_act_id);
 
+/*! @brief Sends state transfer request
+ * Broadcasts state transfer request which will be passed to one of the
+ * suitable group members.
+ *
+ * @param conn opened connection to group
+ * @param req  opaque byte array that contains data required for the state
+ *             transfer (application dependent)
+ * @param size request size
+ * @return negative error code, index of state transfer donor in case of success
+ *         (notably, -EAGAIN means try later)
+ */
+extern long gcs_request_state_transfer (gcs_conn_t  *conn,
+                                        const void  *req,
+                                        size_t       size,
+                                        gcs_seqno_t *local_act_id);
 
+/*! @brief Informs group on behalf of donor that state stransfer is over.
+ * If status is non-negative, joiner will be considered fully joined to group.
+ *
+ * @param conn opened connection to group
+ * @param status negative error code in case of state transfer failure,
+ *               0 or (optional) seqno corresponding to transferred state.
+ * @return negative error code, 0 in case of success
+ */
+extern long gcs_join (gcs_conn_t *conn, gcs_seqno_t status);
+
+
+///////////////////////////////////////////////////////////////////////////////
 
 /*! Total Order object */
 typedef struct gcs_to gcs_to_t;
@@ -262,7 +285,6 @@ extern long gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno);
 
 
 /*!
- *
  * Self cancel to without attempting to enter critical secion
  */
 extern long gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno);
@@ -318,11 +340,12 @@ gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size);
 #define GCS_MEMBER_NAME_MAX 40
 
 typedef struct {
-    gcs_seqno_t  seqno;    /// next action seqno
-    gcs_seqno_t  conf_id;  /// configuration ID (-1 if non-primary)
-    size_t       memb_num; /// number of members in configuration
-    size_t       my_idx;   /// index of this node in the configuration
-    uint8_t      data[0];  /// member array
+    gcs_seqno_t  seqno;         /// next action seqno
+    gcs_seqno_t  conf_id;       /// configuration ID (-1 if non-primary)
+    uint8_t      group_uuid[16];/// group UUID
+    size_t       memb_num;      /// number of members in configuration
+    size_t       my_idx;        /// index of this node in the configuration
+    uint8_t      data[0];       /// member array
 } gcs_act_conf_t;
 
 #ifdef	__cplusplus

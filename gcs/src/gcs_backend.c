@@ -9,6 +9,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <stdbool.h>
 #include <galerautils.h>
 #include "gcs_backend.h"
 
@@ -40,14 +41,14 @@ struct {
 
 static const char backend_sep[] = "://";
 
-/* Returns 1 if backend matches, 0 otherwise */
-static long
+/* Returns true if backend matches, false otherwise */
+static bool
 backend_type_is (const char* uri, const char* type, const size_t len)
 {
     if (len == strlen(type)) {
-        if (!strncmp (uri, type, len)) return 1;
+        if (!strncmp (uri, type, len)) return true;
     }
-    return 0;
+    return false;
 }
 
 long

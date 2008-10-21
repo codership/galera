@@ -142,7 +142,7 @@ gcs_state_snprintf (char* str, size_t size, const gcs_state_t* state)
 {
     str[size - 1] = '\0'; // preventive termination
     return snprintf (str, size - 1,
-                     "\n\tProtocols    : %u-%u"
+                     "\n\tProtocols    : %u - %u"
                      "\n\tStatus       : %s"
                      "\n\tGlobal seqno : %lld"
                      "\n\tConfiguration: %lld"
@@ -179,6 +179,40 @@ gcs_seqno_t
 gcs_state_act_id (const gcs_state_t* state)
 {
     return state->act_id;
+}
+
+/* Get node status */
+gcs_state_node_t
+gcs_state_status (const gcs_state_t* state)
+{
+    return state->status;
+}
+
+/* Get node name */
+const char*
+gcs_state_name (const gcs_state_t* state)
+{
+    return state->name;
+}
+
+/* Get node incoming address */
+const char*
+gcs_state_inc_addr (const gcs_state_t* state)
+{
+    return state->inc_addr;
+}
+
+/* Get supported protocols */
+gcs_proto_t
+gcs_state_proto_min (const gcs_state_t* state)
+{
+    return state->proto_min;
+}
+
+gcs_proto_t
+gcs_state_proto_max (const gcs_state_t* state)
+{
+    return state->proto_max;
 }
 
 /* Returns the node which is more representative of a group */
