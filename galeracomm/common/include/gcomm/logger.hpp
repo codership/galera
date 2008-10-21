@@ -139,10 +139,11 @@ public:
 
 };
 
+#define DEBUG_PREFIX std::string(__FILE__) + ":" + __FUNCTION__ + ":" + ::to_string(__LINE__) + ": "
 
 #define LOG_TRACE(_a) do {				     \
 	if (Logger::instance().get_level() <= Logger::Trace) \
-	    Logger::instance().trace(_a);		     \
+	    Logger::instance().trace(DEBUG_PREFIX + _a); \
     } while (0)
 
 #define LOG_DEBUG(_a) do {				     \

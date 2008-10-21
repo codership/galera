@@ -2,6 +2,7 @@
 #include "../src/evs_seqno.hpp"
 #include "../src/evs_input_map.hpp"
 #include "../src/evs.cpp"
+#include "../../transport/src/transport_dummy.hpp"
 
 #include <check.h>
 #include <cstdlib>
@@ -47,7 +48,8 @@ END_TEST
 
 START_TEST(check_msg)
 {
-    EVSMessage umsg(EVSMessage::USER, SAFE, 0x037b137bU, 0x17U,
+    EVSPid pid(1, 2, 3);
+    EVSMessage umsg(EVSMessage::USER, pid, SAFE, 0x037b137bU, 0x17U,
 		    0x0534555,
 		    EVSViewId(Address(7, 0, 0), 0x7373b173U), EVSMessage::F_MSG_MORE);
     
@@ -64,12 +66,15 @@ START_TEST(check_msg)
     fail_unless(umsg2.read(buf, buflen, 0) == buflen);
     
     fail_unless(umsg.get_type() == umsg2.get_type());
+    fail_unless(umsg.get_source() == umsg2.get_source());
     fail_unless(umsg.get_safety_prefix() == umsg2.get_safety_prefix());
     fail_unless(umsg.get_seq() == umsg2.get_seq());
     fail_unless(umsg.get_seq_range() == umsg2.get_seq_range());
     fail_unless(umsg.get_aru_seq() == umsg2.get_aru_seq());
     fail_unless(umsg.get_flags() == umsg2.get_flags());
     fail_unless(umsg.get_source_view() == umsg2.get_source_view());
+
+    delete[] buf;
 }
 END_TEST
 
@@ -106,16 +111,16 @@ START_TEST(check_input_map_basic)
     fail_unless(seqno_eq(im.get_aru_seq(), SEQNO_MAX) && seqno_eq(im.get_safe_seq(), SEQNO_MAX));
     im.insert(EVSInputMapItem(
 		  sa1, 
-		  EVSMessage(EVSMessage::USER, SAFE, 0, 0, SEQNO_MAX, vid, 0),
+		  EVSMessage(EVSMessage::USER, sa1, SAFE, 0, 0, SEQNO_MAX, vid, 0),
 		  0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
     
     im.insert(EVSInputMapItem(sa1, 
-			      EVSMessage(EVSMessage::USER, SAFE, 2, 0, SEQNO_MAX, vid, 0),
+			      EVSMessage(EVSMessage::USER, sa1, SAFE, 2, 0, SEQNO_MAX, vid, 0),
 			      0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
     im.insert(EVSInputMapItem(sa1, 
-			      EVSMessage(EVSMessage::USER, SAFE, 1, 0, SEQNO_MAX, vid, 0),
+			      EVSMessage(EVSMessage::USER, sa1, SAFE, 1, 0, SEQNO_MAX, vid, 0),
 			      0));
     fail_unless(seqno_eq(im.get_aru_seq(), 2));
 
@@ -124,7 +129,7 @@ START_TEST(check_input_map_basic)
     // must dropped:
     EVSRange gap = im.insert(
 	EVSInputMapItem(sa1, 
-			EVSMessage(EVSMessage::USER, SAFE, 
+			EVSMessage(EVSMessage::USER, sa1, SAFE, 
 				   seqno_add(2, SEQNO_MAX/4 + 1), 0, SEQNO_MAX, vid, 0),
 			0));
     fail_unless(seqno_eq(gap.low, 3) && seqno_eq(gap.high, 2));
@@ -148,13 +153,13 @@ START_TEST(check_input_map_basic)
     
     for (uint32_t i = 0; i < 3; i++)
 	im.insert(EVSInputMapItem(sa1,
-				  EVSMessage(EVSMessage::USER, SAFE, i, 0, SEQNO_MAX, vid, 0),
+				  EVSMessage(EVSMessage::USER, sa1, SAFE, i, 0, SEQNO_MAX, vid, 0),
 				  0));
     fail_unless(seqno_eq(im.get_aru_seq(), SEQNO_MAX));   
     
     for (uint32_t i = 0; i < 3; i++) {
 	im.insert(EVSInputMapItem(sa2,
-				  EVSMessage(EVSMessage::USER, SAFE, i, 0, SEQNO_MAX, vid, 0),
+				  EVSMessage(EVSMessage::USER, sa2, SAFE, i, 0, SEQNO_MAX, vid, 0),
 				  0));
 	fail_unless(seqno_eq(im.get_aru_seq(), i));
     }
@@ -212,6 +217,7 @@ START_TEST(check_input_map_overwrap)
 	for (size_t j = 0; j < nodes; j++) {
 	    im.insert(EVSInputMapItem(sas[j],
 				      EVSMessage(EVSMessage::USER, 
+						 sas[j],
 						 SAFE, 
 						 seq, 0, aru_seq, vid, 0),
 				      0));	
@@ -253,12 +259,14 @@ START_TEST(check_input_map_random)
     // Fetch messages randomly and insert to input map
 
     // Iterate over input map - outcome must be 
-    EVSViewId vid(Address(0, 0, 0), 3);    
+    EVSPid pid(1, 2, 3);
+    EVSViewId vid(pid, 3);    
     std::vector<EVSMessage> msgs(SEQNO_MAX/4);
     
     for (uint32_t i = 0; i < SEQNO_MAX/4; ++i)
 	msgs[i] = EVSMessage(
 			EVSMessage::USER, 
+			pid,
 			SAFE, 
 			i,
 			0,
@@ -297,14 +305,68 @@ END_TEST
 START_TEST(check_evs_proto)
 {
     Address a1(1, 0, 0);
-    EVSProto* ep = new EVSProto(0, Address(1, 0, 0));
+    DummyTransport* tp = static_cast<DummyTransport*>(Transport::create("dummy:", 0, 0));
+    EVSProto* ep = new EVSProto(tp, Address(1, 0, 0));
+    tp->set_up_context(ep);
+
+
+    // Initial state is joining
     ep->shift_to(EVSProto::JOINING);
+    
+    // Handle own join message in JOINING state, must produce emitted 
+    // join message along with state change to RECOVERY
     EVSViewId vid(a1, 0);
-    EVSMessage jm(EVSMessage::JOIN, vid, SEQNO_MAX, SEQNO_MAX);
+    EVSMessage jm(EVSMessage::JOIN, a1, vid, SEQNO_MAX, SEQNO_MAX);
     jm.add_instance(a1, true, true, vid, EVSRange());
     ep->handle_join(jm, a1);
     
+    ReadBuf* rb = tp->get_out();
+    fail_unless(rb != 0);
+    
+    EVSMessage ojm;
+    fail_unless(ojm.read(rb->get_buf(), rb->get_len(), 0));
+    rb->release();
+    
+    fail_unless(ojm.get_type() == EVSMessage::JOIN);
+    fail_unless(ep->get_state() == EVSProto::RECOVERY);
 
+    // Handle own join message in RECOVERY state, must reach consensus
+    // and emit install message
+    ep->handle_join(ojm, ojm.get_source());
+    
+    rb = tp->get_out();
+    fail_unless(rb != 0);
+    
+    EVSMessage im;
+    fail_unless(im.read(rb->get_buf(), rb->get_len(), 0));
+    rb->release();
+    
+    fail_unless(im.get_type() == EVSMessage::INSTALL);
+    fail_unless(ep->get_state() == EVSProto::RECOVERY);
+    
+    // Handle install message, must emit gap message
+    ep->handle_install(im, im.get_source());
+    
+    rb = tp->get_out();
+    fail_unless(rb != 0);
+    
+    EVSMessage gm;
+    fail_unless(gm.read(rb->get_buf(), rb->get_len(), 0));
+    rb->release();
+    fail_unless(gm.get_type() == EVSMessage::GAP);
+    fail_unless(ep->get_state() == EVSProto::RECOVERY);
+    
+    // Handle gap message, state must shift to OPERATIONAL
+    ep->handle_gap(gm, gm.get_source());
+
+    fail_unless(ep->get_state() == EVSProto::OPERATIONAL);
+    
+    rb = tp->get_out();
+    fail_unless(rb == 0);
+
+    delete ep;
+    delete tp;
+    
 }
 END_TEST
 

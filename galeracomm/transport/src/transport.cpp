@@ -7,6 +7,7 @@
 
 #include "transport_tcp.hpp"
 #include "transport_tipc.hpp"
+#include "transport_dummy.hpp"
 
 #include <linux/tipc.h>
 
@@ -22,6 +23,8 @@ Transport *Transport::create(const char *type, Poll *poll,
 	ret = new TCPTransport(poll);
     } else if (strncmp(type, "tipc:", strlen("tipc:")) == 0) {
 	ret = new TIPCTransport(poll);
+    } else if (strncmp(type, "dummy:", strlen("dummy:")) == 0) {
+	ret = new DummyTransport(0);
     } else {
 	throw FatalException("Unknown transport type");
     }

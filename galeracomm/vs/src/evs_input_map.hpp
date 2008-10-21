@@ -244,7 +244,7 @@ public:
 	    return EVSRange(gap);
 	}
 	
-	assert(!seqno_eq(gap.low, SEQNO_MAX) || seqno_eq(gap.high, SEQNO_MAX));
+	assert(!seqno_eq(gap.high, SEQNO_MAX) || seqno_eq(gap.low, SEQNO_MAX));
 
 	
 	for (uint32_t i = seq; !seqno_gt(i, seqno_add(seq, seq_range)); 
@@ -264,6 +264,7 @@ public:
 		    EVSInputMapItem(
 			item.get_sockaddr(),
 			EVSMessage(EVSMessage::USER,
+				   item.get_evs_message().get_source(),
 				   DROP,
 				   i, 0, 
 				   item.get_evs_message().get_aru_seq(),
@@ -278,7 +279,7 @@ public:
 		}
 		if ((seqno_eq(gap.low, SEQNO_MAX) && seqno_eq(i, 0)) ||
 		    seqno_eq(i, gap.low)) {
-		    gap.low = seqno_next(gap.low);
+		    gap.low = seqno_eq(gap.low, SEQNO_MAX) ? 1 : seqno_next(gap.low);
 		    if (!seqno_gt(gap.low, gap.high)) {
 			MLog::iterator mi = iret.first;
 			for (++mi; mi != msg_log.end(); ++mi) {
@@ -338,6 +339,7 @@ public:
     std::pair<EVSInputMapItem, bool> 
     recover(const EVSPid& sa, const uint32_t seq) const {
 	EVSInputMapItem tmp(sa, EVSMessage(EVSMessage::USER, 
+					   sa,
 					   DROP, 
 					   seq, 0, 0, EVSViewId(), 0), 0, 0);
 	MLog::iterator i;

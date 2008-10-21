@@ -58,6 +58,9 @@ struct EVSInstance {
 	operational(false), 
 	trusted(true), 
 	installed(false), join_message(0), tstamp(Time::now()) {}
+    ~EVSInstance() {
+	delete join_message;
+    }
 };
 
 
@@ -70,16 +73,19 @@ public:
 	tp(t),
 	my_addr(my_addr_), 
 	inactive_timeout(Time(5, 0)),
-	current_view(0),
+	current_view(my_addr, 0),
 	install_message(0),
 	last_sent(SEQNO_MAX),
 	send_window(16), 
 	max_output_size(1024),
 	state(CLOSED) {
 	known.insert(std::pair<const EVSPid, EVSInstance>(my_addr, EVSInstance()));
-	current_view = new EVSViewId(my_addr, 0);
 	input_map.insert_sa(my_addr);
     }
+    ~EVSProto() {
+	delete install_message;
+    }
+
     EVSPid my_addr;
     // 
     // Known instances 
@@ -89,7 +95,7 @@ public:
     Time inactive_timeout;
 
     // Current view id
-    EVSViewId* current_view;
+    EVSViewId current_view;
 
     // Map containing received messages and aru/safe seqnos
     EVSInputMap input_map;
@@ -116,8 +122,10 @@ public:
     };
     State state;
 
-
-
+    State get_state() const {
+	return state;
+    }
+    
 
     static std::string to_string(const State s) {
 	switch (s) {
@@ -141,7 +149,7 @@ public:
 		  const uint32_t range = SEQNO_MAX);
     int send_user();
     int send_delegate(const EVSPid&, WriteBuf*);
-    void send_gap(const EVSPid&, const EVSRange&);
+    void send_gap(const EVSPid&, const EVSViewId&, const EVSRange&);
     void send_join();
     void send_leave();
     void send_install();
@@ -241,14 +249,14 @@ bool EVSProto::is_consistent(const EVSMessage* jm) const
     std::map<const EVSPid, EVSRange> local_insts;
     std::map<const EVSPid, EVSRange> jm_insts;
 
-    if (current_view && jm->get_source_view() == *current_view) {
+    if (jm->get_source_view() == current_view) {
 	// Compare instances that originate from the current view and 
 	// should proceed to next view
 	for (std::map<const EVSPid, EVSInstance>::const_iterator i = known.begin();
 	     i != known.end(); ++i) {
 	    if (i->second.operational == true && i->second.trusted == true &&
 		i->second.join_message && 
-		i->second.join_message->get_source_view() == *current_view)
+		i->second.join_message->get_source_view() == current_view)
 		local_insts.insert(std::pair<const EVSPid, EVSRange>(
 				       i->first, input_map.get_sa_gap(i->first)));
 	}
@@ -258,7 +266,7 @@ bool EVSProto::is_consistent(const EVSMessage* jm) const
 		 i = jm_instances->begin(); i != jm_instances->end(); ++i) {
 	    if (i->second.get_operational() == true && 
 		i->second.get_trusted() == true &&
-		i->second.get_view_id() == *current_view) {
+		i->second.get_view_id() == current_view) {
 		jm_insts.insert(
 		    std::pair<const EVSPid, EVSRange>(
 			i->second.get_pid(), i->second.get_range()));
@@ -339,8 +347,8 @@ int EVSProto::send_user(WriteBuf* wb, const EVSSafetyPrefix sp,
     
     uint32_t seq_range = up_to_seqno == SEQNO_MAX ? 0 : seqno_dec(up_to_seqno, seq);
     assert(seq_range < 0x100U);
-    EVSMessage msg(EVSMessage::USER, sp, seq, seq_range & 0xffU, 
-		   input_map.get_aru_seq(), *current_view, 0);
+    EVSMessage msg(EVSMessage::USER, my_addr, sp, seq, seq_range & 0xffU, 
+		   input_map.get_aru_seq(), current_view, 0);
     
     wb->prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
     if ((ret = tp->handle_down(wb, 0)) == 0) {
@@ -376,14 +384,15 @@ int EVSProto::send_delegate(const EVSPid& sa, WriteBuf* wb)
     return tp->handle_down(wb, 0);
 }
 
-void EVSProto::send_gap(const EVSPid& pid, const EVSRange& range)
+void EVSProto::send_gap(const EVSPid& pid, const EVSViewId& source_view, 
+			const EVSRange& range)
 {
     // TODO: Investigate if gap sending can be somehow limited, 
     // message loss happen most probably during congestion and 
     // flooding network with gap messages won't probably make 
     // conditions better
     EVSGap gap(pid, range);
-    EVSMessage gm(EVSMessage::GAP, last_sent, gap);
+    EVSMessage gm(EVSMessage::GAP, my_addr, source_view, last_sent, gap);
     
     size_t bufsize = gm.size();
     unsigned char* buf = new unsigned char[bufsize];
@@ -403,15 +412,16 @@ void EVSProto::send_gap(const EVSPid& pid, const EVSRange& range)
 void EVSProto::send_join()
 {
     EVSMessage jm(EVSMessage::JOIN, 
-		  current_view ? *current_view : EVSViewId(my_addr, 0), 
+		  my_addr,
+		  current_view, 
 		  input_map.get_aru_seq(), input_map.get_safe_seq());
     for (std::map<const EVSPid, EVSInstance>::iterator i = known.begin();
 	 i != known.end(); ++i) {
 	jm.add_instance(i->first, i->second.operational, i->second.trusted,
 			i->second.join_message ? 
 			i->second.join_message->get_source_view() : 
-			(current_view && input_map.contains_sa(i->first) ? 
-			 *current_view : EVSViewId()), 
+			(input_map.contains_sa(i->first) ? 
+			 current_view : EVSViewId()), 
 			input_map.contains_sa(i->first) ? 
 			input_map.get_sa_gap(i->first) : EVSRange());
     }
@@ -430,7 +440,7 @@ void EVSProto::send_join()
 
 void EVSProto::send_leave()
 {
-    EVSMessage lm(EVSMessage::LEAVE, *current_view);
+    EVSMessage lm(EVSMessage::LEAVE, my_addr, current_view);
     size_t bufsize = lm.size();
     unsigned char* buf = new unsigned char[bufsize];
     if (lm.write(buf, bufsize, 0) == 0)
@@ -449,8 +459,8 @@ void EVSProto::send_install()
 {
     std::map<const EVSPid, EVSInstance>::iterator self = known.find(my_addr);
     EVSMessage im(EVSMessage::INSTALL, 
-		  EVSViewId(my_addr, current_view ? 
-			    current_view->get_seq() + 1 : 1),
+		  my_addr,
+		  EVSViewId(my_addr, current_view.get_seq() + 1),
 		  input_map.get_aru_seq(), input_map.get_safe_seq());
     for (std::map<const EVSPid, EVSInstance>::iterator i = known.begin();
 	 i != known.end(); ++i) {
@@ -459,8 +469,8 @@ void EVSProto::send_install()
 			i->second.trusted,
 			i->second.join_message ? 
 			i->second.join_message->get_source_view() : 
-			(current_view && input_map.contains_sa(i->first) ? 
-			 *current_view : EVSViewId()), 
+			(input_map.contains_sa(i->first) ? 
+			 current_view : EVSViewId()), 
 			input_map.contains_sa(i->first) ? 
 			input_map.get_sa_gap(i->first) : EVSRange());
     }
@@ -628,6 +638,7 @@ void EVSProto::shift_to(const State s)
 	for (std::map<const EVSPid, EVSInstance>::iterator i = known.begin(); i != known.end(); ++i)
 	    if (i->second.installed)
 		input_map.insert_sa(i->first);
+	current_view = install_message->get_source_view();
 	state = OPERATIONAL;
 	break;
     default:
@@ -641,16 +652,15 @@ void EVSProto::shift_to(const State s)
 
 void EVSProto::deliver()
 {
-    if (state != OPERATIONAL || state != RECOVERY)
+    if (state != OPERATIONAL && state != RECOVERY)
 	throw FatalException("Invalid state");
-    assert(current_view);
     EVSInputMap::iterator i, i_next;
     // First deliver all messages that qualify at least as safe
     for (i = input_map.begin();
 	 i != input_map.end() && input_map.is_safe(i); i = i_next) {
 	i_next = i;
 	++i_next;
-	assert(current_view->find(i->get_sockaddr()));
+	assert(i->get_evs_message().get_source_view() == current_view);
 	if (i->get_evs_message().get_safety_prefix() != DROP) {
 	    EVSProtoUpMeta um(i->get_sockaddr());
 	    pass_up(i->get_readbuf(), i->get_readbuf_offset(), &um);
@@ -663,7 +673,7 @@ void EVSProto::deliver()
 	     input_map.is_agreed(i); i = i_next) {
 	i_next = i;
 	++i_next;
-	assert(current_view->find(i->get_sockaddr())); 
+	assert(i->get_evs_message().get_source_view() == current_view);
 	EVSProtoUpMeta um(i->get_sockaddr());
 	pass_up(i->get_readbuf(), i->get_readbuf_offset(), &um);
 	input_map.erase(i);
@@ -674,7 +684,7 @@ void EVSProto::deliver()
 	     input_map.is_fifo(i); i = i_next) {
 	i_next = i;
 	++i_next;
-	assert(current_view->find(i->get_sockaddr())); 
+	assert(i->get_evs_message().get_source_view() == current_view);
 	EVSProtoUpMeta um(i->get_sockaddr());
 	pass_up(i->get_readbuf(), i->get_readbuf_offset(), &um);
 	input_map.erase(i);
@@ -685,7 +695,6 @@ void EVSProto::deliver_trans()
 {
     if (state != RECOVERY)
 	throw FatalException("Invalid state");
-    assert(current_view);
     // In transitional configuration we must deliver all messages that 
     // are fifo. This is because:
     // - We know that it is possible to deliver all fifo messages originated
@@ -702,7 +711,7 @@ void EVSProto::deliver_trans()
 	     input_map.is_agreed(i); i = i_next) {
 	i_next = i;
 	++i_next;
-	assert(current_view->find(i->get_sockaddr())); 
+	assert(i->get_evs_message().get_source_view() == current_view);
 	if (i->get_evs_message().get_safety_prefix() != DROP) {
 	    EVSProtoUpMeta um(i->get_sockaddr());
 	    pass_up(i->get_readbuf(), i->get_readbuf_offset(), &um);
@@ -714,7 +723,7 @@ void EVSProto::deliver_trans()
 	     input_map.is_fifo(i); i = i_next) {
 	i_next = i;
 	++i_next;
-	assert(known.find(i->get_sockaddr()) && 
+	assert(known.find(i->get_sockaddr()) != known.end() && 
 	       known.find(i->get_sockaddr())->second.installed); 
 	if (i->get_evs_message().get_safety_prefix() != DROP) {
 	    EVSProtoUpMeta um(i->get_sockaddr());
@@ -794,12 +803,7 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
     } else if (state == JOINING || state == CLOSED) {
 	// Drop message
 	return;
-    } else if (current_view == 0) {
-	if (state != RECOVERY)
-	    throw FatalException("No view in OPERATIONAL state");
-	// Drop message
-	return;
-    } else if ((msg.get_source_view() == *current_view)) {
+    } else if ((msg.get_source_view() == current_view)) {
 	if (i->second.trusted == false) {
 	    // Do nothing, just discard message
 	    return;
@@ -839,15 +843,14 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
     assert(i->second.trusted == true && 
 	   i->second.operational == true &&
 	   i->second.installed == true &&
-	   current_view &&
-	   msg.get_source_view() == *current_view);
+	   msg.get_source_view() == current_view);
     
     
     EVSRange range(input_map.insert(EVSInputMapItem(source, msg, rb, roff)));
 
     // Some messages are missing
     if (seqno_gt(range.get_high(), range.get_low()))
-	send_gap(i->first, range);
+	send_gap(i->first, current_view, range);
     
     
     if (!(i->first == my_addr) && (
@@ -881,6 +884,8 @@ void EVSProto::handle_delegate(const EVSMessage& msg, const EVSPid& source,
 
 void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
 {
+    LOG_TRACE("source: " + msg.get_source().to_string() + " source view: " + 
+		 msg.get_source_view().to_string());
     std::map<EVSPid, EVSInstance>::iterator i = known.find(source);
     if (i == known.end()) {
 	std::pair<std::map<const EVSPid, EVSInstance>::iterator, bool> iret;
@@ -899,10 +904,7 @@ void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
 	i->second.installed = true;
 	if (is_all_installed())
 	    shift_to(OPERATIONAL);
-    } else if (current_view == 0) {
-	// This message has no use
-	return;
-    } else if (!(msg.get_source_view() == *current_view)) {
+    } else if (!(msg.get_source_view() == current_view)) {
 	if (i->second.trusted == false) {
 	    // Do nothing, just discard message
 	} else if (i->second.operational == false) {
@@ -927,8 +929,7 @@ void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
     assert(i->second.trusted == true && 
 	   i->second.operational == true &&
 	   i->second.installed == true &&
-	   current_view &&
-	   msg.get_source_view() == *current_view);
+	   msg.get_source_view() == current_view);
 
     // Scan through gap list and resend or recover messages if appropriate.
     EVSGap gap = msg.get_gap();
@@ -941,9 +942,10 @@ void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
     // If it seems that some messages from source instance are missing,
     // send gap message
     EVSRange source_gap(input_map.get_sa_gap(source));
-    if (!seqno_eq(seqno_next(msg.get_seq()), source_gap.get_low()))
-	send_gap(source, EVSRange(source_gap.get_low(), msg.get_seq()));
-		 
+    if (!seqno_eq(msg.get_seq(), SEQNO_MAX) && 
+	!seqno_eq(seqno_next(msg.get_seq()), source_gap.get_low()))
+	send_gap(source, current_view, EVSRange(source_gap.get_low(), msg.get_seq()));
+    
     // Deliver messages 
     deliver();
     while (output.empty() == false)
@@ -1003,7 +1005,8 @@ void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
     // Some from message source are missing
     EVSRange source_gap(input_map.get_sa_gap(source));
     if (!seqno_eq(seqno_next(msg.get_seq()), source_gap.get_low())) {
-	send_gap(source, EVSRange(source_gap.get_low(), msg.get_seq()));
+	send_gap(source, current_view, 
+		 EVSRange(source_gap.get_low(), msg.get_seq()));
 	send_join_p = true;
     }
 #endif /* 0 */    
@@ -1024,7 +1027,7 @@ void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
 	LOG_DEBUG("EVSProto::handle_join(): mutual untrust");
 	i->second.trusted = false;
 	send_join_p = true;
-    } else if (current_view == 0 || !(*current_view == msg.get_source_view())) {
+    } else if (!(current_view == msg.get_source_view())) {
 	// Not coming from same views, there's no point to compare 
 	// states further
 	LOG_DEBUG(std::string("EVSProto::handle_join(): different view ") + msg.get_source_view().to_string());
@@ -1099,7 +1102,7 @@ void EVSProto::handle_leave(const EVSMessage& msg, const EVSPid& source)
 
     if (i->second.trusted == false) {
 	return;
-    } else if (current_view != 0 && !(msg.get_source_view() == *current_view)) {
+    } else if (!(msg.get_source_view() == current_view)) {
 	return;
     }
     if (i != known.end())
@@ -1109,6 +1112,8 @@ void EVSProto::handle_leave(const EVSMessage& msg, const EVSPid& source)
 
 void EVSProto::handle_install(const EVSMessage& msg, const EVSPid& source)
 {
+    LOG_TRACE("source: " + msg.get_source().to_string() + " source view: " + 
+	      msg.get_source_view().to_string());
     std::map<EVSPid, EVSInstance>::iterator i = known.find(source);
 
     if (i == known.end()) {
@@ -1143,7 +1148,7 @@ void EVSProto::handle_install(const EVSMessage& msg, const EVSPid& source)
     assert(install_message == 0);
 
     install_message = new EVSMessage(msg);
-    send_gap(my_addr, EVSRange(SEQNO_MAX, SEQNO_MAX));
+    send_gap(my_addr, install_message->get_source_view(), EVSRange(SEQNO_MAX, SEQNO_MAX));
 }
 
 /////////////////////////////////////////////////////////////////////////////

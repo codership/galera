@@ -36,7 +36,7 @@ public:
 	sa.read(uuid, 4, 0);
 	return sa;
     }
-    
+
     size_t read(const void* buf, const size_t buflen, const size_t offset) {
 	if (offset + 8 > buflen)
 	    return 0;
@@ -51,7 +51,7 @@ public:
 	return offset + 8;
     }
 
-    size_t size() const {
+    static size_t size() {
 	return 8;
     }
 
@@ -151,6 +151,7 @@ public:
 	EVSViewId view_id;
 	EVSRange range;
     public:
+	Instance() {}
 	Instance(const EVSPid pid_, const bool oper_, const bool trusted_, 
 		 const EVSViewId& view_id_,
 		 const EVSRange range_) :
@@ -171,6 +172,58 @@ public:
 	const EVSRange& get_range() const {
 	    return range;
 	}
+	
+	size_t write(void* buf, 
+		     const size_t buflen, const size_t offset) {
+	    size_t off;
+	    uint32_t b = (operational ? 0x1 : 0x0) | (trusted ? 0x10 : 0x0);
+	    if ((off = write_uint32(b, buf, buflen, offset)) == 0) {
+		LOG_TRACE("");
+		return 0;
+	    }
+	    if ((off = pid.write(buf, buflen, off)) == 0) {
+		LOG_TRACE("");
+		return 0;
+	    }
+	    if ((off = view_id.write(buf, buflen, off)) == 0) {
+		LOG_TRACE("");
+		return 0;
+	    }
+	    if ((off = write_uint32(range.get_low(), buf, buflen, off)) == 0) {
+		LOG_TRACE("");
+		return 0;
+	    }
+	    if ((off = write_uint32(range.get_high(), buf, buflen, off)) == 0) {
+		LOG_TRACE("");
+		return 0;
+	    }
+	    return off;
+	}
+	
+	size_t read(const void* buf, 
+			   const size_t buflen, const size_t offset) {
+	    size_t off;
+	    uint32_t b;
+	    if ((off = read_uint32(buf, buflen, offset, &b)) == 0)
+		return 0;
+	    operational = b & 0x1;
+	    trusted = b & 0x10;
+	    if ((off = pid.read(buf, buflen, off)) == 0)
+		return 0;
+	    if ((off = view_id.read(buf, buflen, off)) == 0)
+		return 0;
+	    uint32_t low, high;
+	    if ((off = read_uint32(buf, buflen, off, &low)) == 0)
+		return 0;
+	    if ((off = read_uint32(buf, buflen, off, &high)) == 0)
+		return 0;
+	    range = EVSRange(low, high);
+	    return off;
+	}
+
+	static size_t size() {
+	    return 4 + 4 + EVSViewId::size() + 4 + 4;
+	}
     };
 private:
     std::map<EVSPid, Instance>* instances;
@@ -178,9 +231,18 @@ public:
     
     
     EVSMessage() : seq(SEQNO_MAX), instances(0) {}
+
+    EVSMessage(const EVSMessage& m) {
+	*this = m;
+	if (m.instances) {
+	    instances = new std::map<EVSPid, Instance>();
+	    *instances = *m.instances;
+	}
+    }
     
     // User message
     EVSMessage(const Type type_, 
+	       const EVSPid& source_,
 	       const EVSSafetyPrefix sp_, 
 	       const uint32_t seq_, 
 	       const uint8_t seq_range_,
@@ -194,6 +256,7 @@ public:
 	aru_seq(aru_seq_),
 	flags(flags_),
 	source_view(vid_), 
+	source(source_),
 	instances(0) {
 	if (type != USER)
 	    throw FatalException("Invalid type");
@@ -201,6 +264,7 @@ public:
     
     // Delegate message
     EVSMessage(const Type type_, const EVSPid& source_) :
+	version(0), 
 	type(type_), 
 	source(source_), 
 	instances(0) {
@@ -209,9 +273,14 @@ public:
     }
     
     // Gap message
-    EVSMessage(const Type type_, const uint32_t seq_, const EVSGap& gap_) :
+    EVSMessage(const Type type_, const EVSPid& source_, 
+	       const EVSViewId& source_view_, 
+	       const uint32_t seq_, const EVSGap& gap_) :
+	version(0), 
 	type(type_), 
 	seq(seq_), 
+	source_view(source_view_),
+	source(source_),
 	gap(gap_),
 	instances(0) {
 	if (type != GAP)
@@ -219,21 +288,32 @@ public:
     } 
 
     // Join and install messages
-    EVSMessage(const Type type_, const EVSViewId& vid_, 
+    EVSMessage(const Type type_, const EVSPid& source_, 
+	       const EVSViewId& vid_, 
 	       const uint32_t aru_seq_, const uint32_t safe_seq_) :
+	version(0),
 	type(type_),
 	seq(safe_seq_),
 	aru_seq(aru_seq_),
-	source_view(vid_)  {
+	source_view(vid_),
+	source(source_)  {
+	
 	if (type != JOIN && type != INSTALL)
 	    throw FatalException("Invalid type");
-        instances = new std::map<EVSPid, Instance>;
+        instances = new std::map<EVSPid, Instance>();
     }
     
     // Leave message
-    EVSMessage(const Type type_, const EVSViewId& vid_) :
+    EVSMessage(const Type type_, const EVSPid& source_, 
+	       const EVSViewId& vid_) :
+	version(0),	
 	type(type_),
+	safety_prefix(AGREED),
+	seq(0),
+	seq_range(0),
+	flags(0),
 	source_view(vid_),
+	source(source_),
 	instances(0) {
 	if (type != LEAVE)
 	    throw FatalException("Invalid type");
@@ -309,24 +389,39 @@ public:
 	    return 0;
 	version = b & 0xf;
 	type = static_cast<Type>((b >> 4) & 0xf);
-	if (type == USER) {
-	    if ((off = read_uint8(buf, buflen, off, &b)) == 0)
-		return 0;
-	    safety_prefix = static_cast<EVSSafetyPrefix>(b & 0xf);
-	    if ((off = read_uint8(buf, buflen, off, &seq_range)) == 0)
-		return 0;
-	    if ((off = read_uint8(buf, buflen, off, &flags)) == 0)
-		return 0;
+	
+	if ((off = read_uint8(buf, buflen, off, &b)) == 0)
+	    return 0;
+	safety_prefix = static_cast<EVSSafetyPrefix>(b & 0xf);
+	if ((off = read_uint8(buf, buflen, off, &seq_range)) == 0)
+	    return 0;
+	if ((off = read_uint8(buf, buflen, off, &flags)) == 0)
+	    return 0;
+	if ((off = source.read(buf, buflen, off)) == 0)
+	    return 0;
+
+	if (type == USER || type == JOIN || type == INSTALL || type == LEAVE || type == GAP) {
 	    if ((off = read_uint32(buf, buflen, off, &seq)) == 0)
 		return 0;
 	    if ((off = read_uint32(buf, buflen, off, &aru_seq)) == 0)
 		return 0;
 	    if ((off = source_view.read(buf, buflen, off)) == 0)
 		return 0;
-	} else if (type == DELEGATE) {
-	    off += 3; // Skip padding
-	    if (source.read(buf, buflen, off) == 0)
-		return 0;
+	    if (type == JOIN || type == INSTALL) {
+		size_t n;
+		if ((off = read_uint32(buf, buflen, off, &n)) == 0)
+		    return 0;
+		instances = new std::map<EVSPid, Instance>();
+		for (size_t i = 0; i < n; ++i) {
+		    Instance inst;
+		    if ((off = inst.read(buf, buflen, off)) == 0)
+			return 0;
+		    std::pair<std::map<EVSPid, Instance>::iterator, bool> ii = 		    
+			instances->insert(std::pair<EVSPid, Instance>(inst.get_pid(), inst));
+		    if (ii.second  == false)
+			return 0;
+		}
+	    }
 	}
 	return off;
     }
@@ -335,38 +430,78 @@ public:
 	uint8_t b;
 	size_t off;
 	
+	/* Common header for all messages */
+	/* Version, type */
 	b = (version & 0xf) | ((type << 4) & 0xf0);
-	if ((off = write_uint8(b, buf, buflen, offset)) == 0)
+	if ((off = write_uint8(b, buf, buflen, offset)) == 0) {
+	    LOG_TRACE("");
 	    return 0;
-	if (type == USER) {
-	    b = safety_prefix & 0xf;	
-	    if ((off = write_uint8(b, buf, buflen, off)) == 0)
-		return 0;
-	    if ((off = write_uint8(seq_range, buf, buflen, off)) == 0)
-		return 0;
-	    if ((off = write_uint8(flags, buf, buflen, off)) == 0)
-		return 0;
-	    if ((off = write_uint32(seq, buf, buflen, off)) == 0)
-		return 0;
-	    if ((off = write_uint32(aru_seq, buf, buflen, off)) == 0)
-		return 0;
-	    if ((off = source_view.write(buf, buflen, off)) == 0)
-		return 0;
-	} else if (type == DELEGATE) {
-	    for (int i = 0; i < 3; ++i)
-		if ((off = write_uint8(0, buf, buflen, off)) == 0)
-		    return 0;
-	    if ((off = source.write(buf, buflen, off)) == 0)
-		return 0;
 	}
+	/* Safety prefix */
+	b = safety_prefix & 0xf;	
+	if ((off = write_uint8(b, buf, buflen, off)) == 0) {
+	    LOG_TRACE("");
+	    return 0;
+	}
+	/* Seq range */
+	if ((off = write_uint8(seq_range, buf, buflen, off)) == 0) {
+	    LOG_TRACE("");
+	    return 0;
+	}
+	/* Flags */
+	if ((off = write_uint8(flags, buf, buflen, off)) == 0) {
+	    LOG_TRACE("");
+	    return 0;
+	}
+	/* Message source pid */
+	if ((off = source.write(buf, buflen, off)) == 0) {
+	    LOG_TRACE("");
+	    return 0;
+	}
+	
+	if (type == USER || type == JOIN || type == INSTALL || type == LEAVE ||
+	    type == GAP) {
+	    if ((off = write_uint32(seq, buf, buflen, off)) == 0) {
+		LOG_TRACE("");
+		return 0;
+	    }
+	    if ((off = write_uint32(aru_seq, buf, buflen, off)) == 0) {
+		LOG_TRACE("");
+		return 0;
+	    }
+	    if ((off = source_view.write(buf, buflen, off)) == 0) {
+		LOG_TRACE("");
+		return 0;
+	    }
+	    if (type == JOIN || type == INSTALL) {
+		if ((off = write_uint32(instances->size(), buf, buflen, off)) == 0) {
+		    LOG_TRACE("");
+		    return 0;
+		}
+		for (std::map<EVSPid, Instance>::iterator i = instances->begin(); i != instances->end(); ++i) {
+		    if ((off = i->second.write(buf, buflen, off)) == 0) {
+			LOG_TRACE("");
+			return 0;
+		    }
+		}
+	    }  
+	} 
 	return off;
     }
     
     size_t size() const {
-	if (type == EVSMessage::USER)
-	    return 4 + 4 + 4 + source_view.size(); // bits + seq + aru_seq + view
-	if (type == DELEGATE)
+	switch (type) {
+	case USER:
+	case GAP:
+	    return 4 + 4 + 4 + source.size() + source_view.size(); // bits + seq + aru_seq + view
+	case DELEGATE:
 	    return 4 + source.size(); // 
+	case JOIN:
+	case INSTALL:
+	    return 4 + 4 + 4 + source.size() + source_view.size() + 4 + instances->size()*Instance::size();
+	case LEAVE:
+	    return 4 + 4 + 4 + source_view.size();
+	}
 	return 0;
     }
 
