@@ -514,10 +514,15 @@ START_TEST(check_evs_proto_double_boot)
 END_TEST
 
 
-struct Inst {
+struct Inst : public Toplay {
     DummyTransport* tp;
     EVSProto* ep;
     Inst(DummyTransport* tp_, EVSProto* ep_) : tp(tp_), ep(ep_) {}
+    void handle_up(const int ctx, const ReadBuf* rb, const size_t roff, 
+		   const ProtoUpMeta* um) {
+	std::cerr << "delivery: " << rb << " " << rb->get_len() << " " << roff << "\n";
+	// std::cout << (char*)rb->get_buf(roff) << "\n";
+    }
 };
 
 static bool all_operational(const std::vector<Inst*>* pvec)
@@ -530,6 +535,35 @@ static bool all_operational(const std::vector<Inst*>* pvec)
     return true;
 }
 
+static void multicast(std::vector<Inst*>* pvec, ReadBuf* rb)
+{
+    EVSMessage msg;
+    fail_unless(msg.read(rb->get_buf(), rb->get_len(), 0));
+    for (std::vector<Inst*>::iterator j = pvec->begin();
+	 j != pvec->end(); ++j) {
+	switch (msg.get_type()) {
+	case EVSMessage::USER:
+	    (*j)->ep->handle_user(msg, msg.get_source(), rb, 0);
+	    break;
+	case EVSMessage::DELEGATE:
+	    (*j)->ep->handle_delegate(msg, msg.get_source(), rb, 0);
+	    break;
+	case EVSMessage::GAP:
+	    (*j)->ep->handle_gap(msg, msg.get_source());
+	    break;
+	case EVSMessage::JOIN:
+	    (*j)->ep->handle_join(msg, msg.get_source());
+	    break;
+	case EVSMessage::LEAVE:
+	    (*j)->ep->handle_leave(msg, msg.get_source());
+	    break;
+	case EVSMessage::INSTALL:
+	    (*j)->ep->handle_install(msg, msg.get_source());
+	    break;
+	}
+    }
+}
+
 static void reach_operational(std::vector<Inst*>* pvec)
 {
     while (all_operational(pvec) == false) {
@@ -537,31 +571,7 @@ static void reach_operational(std::vector<Inst*>* pvec)
 	     i != pvec->end(); ++i) {
 	    ReadBuf* rb = (*i)->tp->get_out();
 	    if (rb) {
-		EVSMessage msg;
-		fail_unless(msg.read(rb->get_buf(), rb->get_len(), 0));
-		for (std::vector<Inst*>::iterator j = pvec->begin();
-		     j != pvec->end(); ++j) {
-		    switch (msg.get_type()) {
-		    case EVSMessage::USER:
-			(*j)->ep->handle_user(msg, msg.get_source(), rb, 0);
-			break;
-		    case EVSMessage::DELEGATE:
-			(*j)->ep->handle_delegate(msg, msg.get_source(), rb, 0);
-			break;
-		    case EVSMessage::GAP:
-			(*j)->ep->handle_gap(msg, msg.get_source());
-			break;
-		    case EVSMessage::JOIN:
-			(*j)->ep->handle_join(msg, msg.get_source());
-			break;
-		    case EVSMessage::LEAVE:
-			(*j)->ep->handle_leave(msg, msg.get_source());
-			break;
-		    case EVSMessage::INSTALL:
-			(*j)->ep->handle_install(msg, msg.get_source());
-			break;
-		    }
-		}
+		multicast(pvec, rb);
 		rb->release();
 	    }
 	}
@@ -596,6 +606,52 @@ START_TEST(check_evs_proto_converge_1by1)
 	reach_operational(&vec);
     }
 
+}
+END_TEST
+
+
+static void send_msgs(std::vector<Inst*>* vec)
+{
+    for (std::vector<Inst*>::iterator i = vec->begin(); i != vec->end(); 
+	 ++i) {
+	char buf[8] = {'1', '2', '3', '4', '5', '6', '7', '\0'};
+	WriteBuf wb(buf, sizeof(buf));
+	(*i)->ep->handle_down(&wb, 0); 
+    }
+}
+
+static void deliver_msgs(std::vector<Inst*>* pvec)
+{
+    bool empty;
+    do {
+	empty = true;
+	for (std::vector<Inst*>::iterator i = pvec->begin();
+	     i != pvec->end(); ++i) {
+	    ReadBuf* rb = (*i)->tp->get_out();
+	    if (rb) {
+		empty = true;
+		multicast(pvec, rb);
+		rb->release();
+	    }
+	}
+    } while (empty == false);
+}
+
+
+START_TEST(check_evs_proto_user_msg)
+{
+    std::vector<Inst*> vec;
+    for (size_t n = 0; n < 1; ++n) {
+	vec.resize(n + 1);
+	DummyTransport* tp = new DummyTransport(0);
+	vec[n] = new Inst(tp, new EVSProto(tp, EVSPid(n + 1, 0, 0)));
+	vec[n]->ep->set_up_context(vec[n]);
+	vec[n]->ep->shift_to(EVSProto::JOINING);
+	vec[n]->ep->send_join();
+	reach_operational(&vec);
+	send_msgs(&vec);
+	deliver_msgs(&vec);
+    }
 }
 END_TEST
 
@@ -639,6 +695,10 @@ static Suite* suite()
 
     tc = tcase_create("check_evs_proto_converge_1by1");
     tcase_add_test(tc, check_evs_proto_converge_1by1);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_evs_proto_user_msg");
+    tcase_add_test(tc, check_evs_proto_user_msg);
     suite_add_tcase(s, tc);
 
 

@@ -350,13 +350,14 @@ int EVSProto::send_user(WriteBuf* wb, const EVSSafetyPrefix sp,
 			const uint32_t up_to_seqno)
 {
     int ret;
-    uint32_t seq = seqno_next(last_sent);
+    uint32_t seq = seqno_eq(last_sent, SEQNO_MAX) ? 0 : seqno_next(last_sent);
     
     // Flow control
-    if (seqno_lt(seqno_add(input_map.get_aru_seq(), send_window), seq))
+    if (!seqno_eq(input_map.get_aru_seq(), SEQNO_MAX) && 
+	seqno_lt(seqno_add(input_map.get_aru_seq(), send_window), seq))
 	return EAGAIN;
     
-    uint32_t seq_range = up_to_seqno == SEQNO_MAX ? 0 : seqno_dec(up_to_seqno, seq);
+    uint32_t seq_range = seqno_eq(up_to_seqno, SEQNO_MAX) ? 0 : seqno_dec(up_to_seqno, seq);
     assert(seq_range < 0x100U);
     EVSMessage msg(EVSMessage::USER, my_addr, sp, seq, seq_range & 0xffU, 
 		   input_map.get_aru_seq(), current_view, 0);
@@ -367,7 +368,8 @@ int EVSProto::send_user(WriteBuf* wb, const EVSSafetyPrefix sp,
 	ReadBuf* rb = wb->to_readbuf();
 	EVSRange range = input_map.insert(EVSInputMapItem(my_addr, msg, rb, 0));
 	assert(seqno_eq(range.get_high(), last_sent));
-	rb->release();
+	input_map.set_safe(my_addr, seq);
+	// rb->release();
     }
     wb->rollback_hdr(msg.get_hdrlen());
     return ret;
@@ -669,6 +671,9 @@ void EVSProto::deliver()
 {
     if (state != OPERATIONAL && state != RECOVERY)
 	throw FatalException("Invalid state");
+
+    LOG_DEBUG("aru_seq: " + ::to_string(input_map.get_aru_seq()) + " safe_seq: " + ::to_string(input_map.get_safe_seq()));
+
     EVSInputMap::iterator i, i_next;
     // First deliver all messages that qualify at least as safe
     for (i = input_map.begin();
@@ -801,12 +806,13 @@ void EVSProto::handle_notification(const TransportNotification *tn)
 void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source, 
 			   const ReadBuf* rb, const size_t roff)
 {
-
+    LOG_DEBUG("source: " + source.to_string() + " seq: " + ::to_string(msg.get_seq()));
     std::map<const EVSPid, EVSInstance>::iterator i = known.find(source);
     if (i == known.end()) {
 	// Previously unknown instance has appeared and it seems to
 	// be operational, assume that it can be trusted and start
 	// merge/recovery
+	LOG_INFO("new instance");
 	std::pair<std::map<const EVSPid, EVSInstance>::iterator, bool> iret;
 	iret = known.insert(std::pair<EVSPid, EVSInstance>(source, EVSInstance()));
 	assert(iret.second == true);
@@ -819,13 +825,16 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
 	return;
     } else if (state == JOINING || state == CLOSED) {
 	// Drop message
+	LOG_DEBUG("dropping");
 	return;
-    } else if ((msg.get_source_view() == current_view)) {
+    } else if (!(msg.get_source_view() == current_view)) {
 	if (i->second.trusted == false) {
+	    LOG_DEBUG("untrusted source");
 	    // Do nothing, just discard message
 	    return;
 	} else if (i->second.operational == false) {
 	    // This is probably partition merge, see if it works out
+	    LOG_DEBUG("unoperational source");
 	    i->second.operational = true;
 	    shift_to(RECOVERY);
 	    send_join();
@@ -834,6 +843,7 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
 	    if (install_message && 
 		msg.get_source_view() == install_message->get_source_view()) {
 		assert(state == RECOVERY);
+		LOG_DEBUG("recovery user message source");
 		// Other instances installed view before this one, so it is 
 		// safe to shift to OPERATIONAL if consensus has been reached
 		if (is_consensus()) {
@@ -841,6 +851,7 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
 		} else {
 		    shift_to(RECOVERY);
 		    send_join();
+		    return;
 		}
 	    } else {
 		// Probably caused by network partitioning during recovery
@@ -873,7 +884,8 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
     if (seqno_gt(range.get_high(), range.get_low()))
 	send_gap(i->first, current_view, range);
     
-    
+
+
     if (!(i->first == my_addr) && (
 	    (output.empty() && !(msg.get_flags() & EVSMessage::F_MSG_MORE)) ||
 	    state == RECOVERY
