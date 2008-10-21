@@ -573,15 +573,29 @@ START_TEST(check_evs_proto_converge)
 {
     size_t n = 8;
     std::vector<Inst*> vec(n);
-
+    
     for (size_t i = 0; i < n; ++i) {
 	DummyTransport* tp = new DummyTransport(0);
 	vec[i] = new Inst(tp, new EVSProto(tp, EVSPid(i + 1, 0, 0)));
 	vec[i]->ep->shift_to(EVSProto::JOINING);
 	vec[i]->ep->send_join();
     }
-    
     reach_operational(&vec);
+}
+END_TEST
+
+START_TEST(check_evs_proto_converge_1by1)
+{
+    std::vector<Inst*> vec;
+    for (size_t n = 0; n < 8; ++n) {
+	vec.resize(n + 1);
+	DummyTransport* tp = new DummyTransport(0);
+	vec[n] = new Inst(tp, new EVSProto(tp, EVSPid(n + 1, 0, 0)));
+	vec[n]->ep->shift_to(EVSProto::JOINING);
+	vec[n]->ep->send_join();
+	reach_operational(&vec);
+    }
+
 }
 END_TEST
 
@@ -621,6 +635,10 @@ static Suite* suite()
 
     tc = tcase_create("check_evs_proto_converge");
     tcase_add_test(tc, check_evs_proto_converge);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_evs_proto_converge_1by1");
+    tcase_add_test(tc, check_evs_proto_converge_1by1);
     suite_add_tcase(s, tc);
 
 
