@@ -302,7 +302,7 @@ END_TEST
 
 
 
-START_TEST(check_evs_proto_single)
+START_TEST(check_evs_proto_single_boot)
 {
     Address a1(1, 0, 0);
     DummyTransport* tp = static_cast<DummyTransport*>(Transport::create("dummy:", 0, 0));
@@ -375,7 +375,7 @@ START_TEST(check_evs_proto_single)
 END_TEST
 
 
-START_TEST(check_evs_proto_double)
+START_TEST(check_evs_proto_double_boot)
 {
     EVSPid p1(1, 0, 0);
     EVSPid p2(2, 0, 0);
@@ -501,6 +501,7 @@ START_TEST(check_evs_proto_double)
     ep1->handle_gap(gm2, gm2.get_source());
     ep2->handle_gap(gm2, gm2.get_source());
 
+    // And finally operational states should have been reached
     fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
     fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
 
@@ -511,6 +512,79 @@ START_TEST(check_evs_proto_double)
 
 }
 END_TEST
+
+
+struct Inst {
+    DummyTransport* tp;
+    EVSProto* ep;
+    Inst(DummyTransport* tp_, EVSProto* ep_) : tp(tp_), ep(ep_) {}
+};
+
+static bool all_operational(const std::vector<Inst*>* pvec)
+{
+    for (std::vector<Inst*>::const_iterator i = pvec->begin(); 
+	 i != pvec->end(); ++i) {
+	if ((*i)->ep->get_state() != EVSProto::OPERATIONAL)
+	    return false;
+    }
+    return true;
+}
+
+static void reach_operational(std::vector<Inst*>* pvec)
+{
+    while (all_operational(pvec) == false) {
+	for (std::vector<Inst*>::iterator i = pvec->begin();
+	     i != pvec->end(); ++i) {
+	    ReadBuf* rb = (*i)->tp->get_out();
+	    if (rb) {
+		EVSMessage msg;
+		fail_unless(msg.read(rb->get_buf(), rb->get_len(), 0));
+		for (std::vector<Inst*>::iterator j = pvec->begin();
+		     j != pvec->end(); ++j) {
+		    switch (msg.get_type()) {
+		    case EVSMessage::USER:
+			(*j)->ep->handle_user(msg, msg.get_source(), rb, 0);
+			break;
+		    case EVSMessage::DELEGATE:
+			(*j)->ep->handle_delegate(msg, msg.get_source(), rb, 0);
+			break;
+		    case EVSMessage::GAP:
+			(*j)->ep->handle_gap(msg, msg.get_source());
+			break;
+		    case EVSMessage::JOIN:
+			(*j)->ep->handle_join(msg, msg.get_source());
+			break;
+		    case EVSMessage::LEAVE:
+			(*j)->ep->handle_leave(msg, msg.get_source());
+			break;
+		    case EVSMessage::INSTALL:
+			(*j)->ep->handle_install(msg, msg.get_source());
+			break;
+		    }
+		}
+		rb->release();
+	    }
+	}
+    }
+}
+
+
+START_TEST(check_evs_proto_converge)
+{
+    size_t n = 8;
+    std::vector<Inst*> vec(n);
+
+    for (size_t i = 0; i < n; ++i) {
+	DummyTransport* tp = new DummyTransport(0);
+	vec[i] = new Inst(tp, new EVSProto(tp, EVSPid(i + 1, 0, 0)));
+	vec[i]->ep->shift_to(EVSProto::JOINING);
+	vec[i]->ep->send_join();
+    }
+    
+    reach_operational(&vec);
+}
+END_TEST
+
 
 static Suite* suite()
 {
@@ -537,12 +611,16 @@ static Suite* suite()
     tcase_add_test(tc, check_input_map_random);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("check_evs_proto_single");
-    tcase_add_test(tc, check_evs_proto_single);
+    tc = tcase_create("check_evs_proto_single_boot");
+    tcase_add_test(tc, check_evs_proto_single_boot);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("check_evs_proto_double");
-    tcase_add_test(tc, check_evs_proto_double);
+    tc = tcase_create("check_evs_proto_double_boot");
+    tcase_add_test(tc, check_evs_proto_double_boot);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_evs_proto_converge");
+    tcase_add_test(tc, check_evs_proto_converge);
     suite_add_tcase(s, tc);
 
 

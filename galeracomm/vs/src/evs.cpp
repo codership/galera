@@ -75,6 +75,7 @@ public:
 	inactive_timeout(Time(5, 0)),
 	current_view(my_addr, 0),
 	install_message(0),
+	installing(false),
 	last_sent(SEQNO_MAX),
 	send_window(16), 
 	max_output_size(1024),
@@ -107,6 +108,7 @@ public:
     // Last received install message
     EVSMessage* install_message;
     // 
+    bool installing;
     uint32_t last_delivered_safe;
     
     // Last sent seq
@@ -116,6 +118,7 @@ public:
     // Output message queue
     std::deque<WriteBuf*> output;
     uint32_t max_output_size;
+    
     enum State {
 	CLOSED,
 	JOINING,
@@ -191,7 +194,7 @@ public:
     
     // Compares join message against current state
 
-    bool is_consistent(const EVSMessage* jm) const;
+    bool is_consistent(const EVSMessage& jm) const;
 
     bool is_consensus() const {
 	const EVSMessage* my_jm = known.find(my_addr)->second.join_message;
@@ -199,7 +202,7 @@ public:
 	    LOG_DEBUG("is_consensus(): no own join message");
 	    return false;
 	}
-	if (is_consistent(my_jm) == false) {
+	if (is_consistent(*my_jm) == false) {
 	    LOG_DEBUG("is_consistent(): own join message is not consistent");
 	    return false;
 	}
@@ -210,7 +213,7 @@ public:
 		continue;
 	    if (i->second.join_message == 0)
 		return false;
-	    if (is_consistent(i->second.join_message) == false)
+	    if (is_consistent(*i->second.join_message) == false)
 		return false;
 	}
 	return true;
@@ -252,12 +255,12 @@ public:
 };
 
 
-bool EVSProto::is_consistent(const EVSMessage* jm) const
+bool EVSProto::is_consistent(const EVSMessage& jm) const
 {
     std::map<const EVSPid, EVSRange> local_insts;
     std::map<const EVSPid, EVSRange> jm_insts;
 
-    if (jm->get_source_view() == current_view) {
+    if (jm.get_source_view() == current_view) {
 	// Compare instances that originate from the current view and 
 	// should proceed to next view
 	for (std::map<const EVSPid, EVSInstance>::const_iterator i = known.begin();
@@ -269,7 +272,7 @@ bool EVSProto::is_consistent(const EVSMessage* jm) const
 				       i->first, input_map.get_sa_gap(i->first)));
 	}
 	const std::map<EVSPid, EVSMessage::Instance>* jm_instances = 
-	    jm->get_instances();
+	    jm.get_instances();
 	for (std::map<EVSPid, EVSMessage::Instance>::const_iterator 
 		 i = jm_instances->begin(); i != jm_instances->end(); ++i) {
 	    if (i->second.get_operational() == true && 
@@ -295,7 +298,7 @@ bool EVSProto::is_consistent(const EVSMessage* jm) const
 				       i->first, input_map.contains_sa(i->first) ? input_map.get_sa_gap(i->first) : EVSRange()));
 	    }
 	    const std::map<EVSPid, EVSMessage::Instance>* jm_instances = 
-		jm->get_instances();
+		jm.get_instances();
 	    for (std::map<EVSPid, EVSMessage::Instance>::const_iterator 
 		     i = jm_instances->begin(); i != jm_instances->end(); ++i) {
 		if (!(i->second.get_operational() == true && 
@@ -321,7 +324,7 @@ bool EVSProto::is_consistent(const EVSMessage* jm) const
 				       i->first, EVSRange()));
 	}
 	const std::map<EVSPid, EVSMessage::Instance>* jm_instances = 
-	    jm->get_instances();
+	    jm.get_instances();
 	for (std::map<EVSPid, EVSMessage::Instance>::const_iterator 
 		 i = jm_instances->begin(); i != jm_instances->end(); ++i) {
 	    if (i->second.get_operational() == true && 
@@ -465,6 +468,8 @@ void EVSProto::send_leave()
 
 void EVSProto::send_install()
 {
+    if (installing)
+	return;
     std::map<const EVSPid, EVSInstance>::iterator self = known.find(my_addr);
     EVSMessage im(EVSMessage::INSTALL, 
 		  my_addr,
@@ -494,6 +499,7 @@ void EVSProto::send_install()
 		 + strerror(err));
     }
     delete[] buf;
+    installing = true;
 }
 
 
@@ -632,6 +638,7 @@ void EVSProto::shift_to(const State s)
 	setall_installed(false);
 	delete install_message;
 	install_message = 0;
+	installing = false;
 	state = RECOVERY;
 	break;
     case OPERATIONAL:
@@ -997,6 +1004,11 @@ void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
 	return;
     }
 
+    if (state == RECOVERY && install_message && is_consistent(msg)) {
+	LOG_DEBUG("redundant join message");
+	return;
+    }
+
     bool send_join_p = false;
     if (state == JOINING || state == OPERATIONAL || install_message) {
 	send_join_p = true;
@@ -1222,7 +1234,7 @@ void EVS::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
 
     switch (msg.get_type()) {
     case EVSMessage::USER:
-	proto->handle_gap(msg, source);
+	proto->handle_user(msg, source, rb, roff);
 	break;
     case EVSMessage::DELEGATE:
 	proto->handle_delegate(msg, source, rb, roff);
