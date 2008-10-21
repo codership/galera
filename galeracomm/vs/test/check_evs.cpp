@@ -302,7 +302,7 @@ END_TEST
 
 
 
-START_TEST(check_evs_proto)
+START_TEST(check_evs_proto_single)
 {
     Address a1(1, 0, 0);
     DummyTransport* tp = static_cast<DummyTransport*>(Transport::create("dummy:", 0, 0));
@@ -312,15 +312,19 @@ START_TEST(check_evs_proto)
 
     // Initial state is joining
     ep->shift_to(EVSProto::JOINING);
+    ep->send_join();
+    ReadBuf* rb = tp->get_out();
+    fail_unless(rb != 0);    
     
     // Handle own join message in JOINING state, must produce emitted 
     // join message along with state change to RECOVERY
-    EVSViewId vid(a1, 0);
-    EVSMessage jm(EVSMessage::JOIN, a1, vid, SEQNO_MAX, SEQNO_MAX);
-    jm.add_instance(a1, true, true, vid, EVSRange());
+    EVSMessage jm;
+    fail_unless(jm.read(rb->get_buf(), rb->get_len(), 0));
+    rb->release();
+
     ep->handle_join(jm, a1);
     
-    ReadBuf* rb = tp->get_out();
+    rb = tp->get_out();
     fail_unless(rb != 0);
     
     EVSMessage ojm;
@@ -370,6 +374,144 @@ START_TEST(check_evs_proto)
 }
 END_TEST
 
+
+START_TEST(check_evs_proto_double)
+{
+    EVSPid p1(1, 0, 0);
+    EVSPid p2(2, 0, 0);
+
+
+    DummyTransport* tp1 = new DummyTransport(0);
+    EVSProto* ep1 = new EVSProto(tp1, p1);
+    
+    DummyTransport* tp2 = new DummyTransport(0);
+    EVSProto* ep2 = new EVSProto(tp2, p2);
+
+
+    ep1->shift_to(EVSProto::JOINING);
+    ep2->shift_to(EVSProto::JOINING);
+
+    // 
+    ep1->send_join();
+    ReadBuf* rb = tp1->get_out();
+    fail_unless(rb != 0);
+    
+    EVSMessage jm1;
+    fail_unless(jm1.read(rb->get_buf(), rb->get_len(), 0));
+    rb->release();
+    fail_unless(jm1.get_type() == EVSMessage::JOIN);
+    
+    // after this 1 known by 1 and 2
+    ep1->handle_join(jm1, jm1.get_source());
+    fail_unless(ep1->get_state() == EVSProto::RECOVERY);
+    ep2->handle_join(jm1, jm1.get_source());
+    fail_unless(ep2->get_state() == EVSProto::RECOVERY);
+    
+    rb = tp1->get_out();
+    fail_unless(rb != 0);
+    fail_unless(jm1.read(rb->get_buf(), rb->get_len(), 0));
+    rb->release();
+    fail_unless(jm1.get_type() == EVSMessage::JOIN);
+    
+    // after this 1 known by 1 and 2 (and 2 knows that 1 does not know 2)
+    // note: no jm1 for ep1 to avoid reaching consensus before handling 
+    // jm2 on ep1
+    // ep1->handle_join(jm1, jm1.get_source());
+    // fail_unless(ep1->get_state() == EVSProto::RECOVERY);
+    ep2->handle_join(jm1, jm1.get_source());
+    fail_unless(ep2->get_state() == EVSProto::RECOVERY);
+    
+    EVSMessage jm2;
+    
+    rb = tp2->get_out();
+    fail_unless(rb != 0);
+    
+    fail_unless(jm2.read(rb->get_buf(), rb->get_len(), 0));
+    rb->release();
+    fail_unless(jm2.get_type() == EVSMessage::JOIN);
+    
+    // after this 1 and 2 know 1 and 2 (but 2 thinks that 1 does not know 2)
+    ep1->handle_join(jm2, jm2.get_source());
+    fail_unless(ep1->get_state() == EVSProto::RECOVERY);
+    // ep2->handle_join(jm2, jm2.get_source());
+    // fail_unless(ep2->get_state() == EVSProto::RECOVERY);
+    
+    rb = tp1->get_out();
+    fail_unless(rb != 0);
+    fail_unless(jm1.read(rb->get_buf(), rb->get_len(), 0));
+    rb->release();
+    fail_unless(jm1.get_type() == EVSMessage::JOIN);
+    
+    // 2 learns that 1 knows about 2
+    ep2->handle_join(jm1, jm1.get_source());
+    fail_unless(ep2->get_state() == EVSProto::RECOVERY);
+    
+    rb = tp2->get_out();
+    fail_unless(rb != 0);
+    
+    fail_unless(jm2.read(rb->get_buf(), rb->get_len(), 0));
+    rb->release();
+    fail_unless(jm2.get_type() == EVSMessage::JOIN);    
+    
+    // 1 learns that 2 knows that 1 knows about 2
+    ep1->handle_join(jm2, jm2.get_source());
+    // 2 receives join that matches its current view, should not emit 
+    // join anymore
+    ep2->handle_join(jm2, jm2.get_source());
+    fail_unless(tp2->get_out() == 0);
+
+    rb = tp1->get_out();
+    fail_unless(rb != 0);
+
+
+
+    // This should already be install message
+    EVSMessage im;
+    fail_unless(im.read(rb->get_buf(), rb->get_len(), 0));
+    rb->release();
+    fail_unless(im.get_type() == EVSMessage::INSTALL);
+    
+    ep1->handle_install(im, im.get_source());
+    ep2->handle_install(im, im.get_source());
+    
+    fail_unless(ep1->get_state() == EVSProto::RECOVERY);
+    fail_unless(ep2->get_state() == EVSProto::RECOVERY);
+    
+    // Now both should have outgoing gap messages 
+    rb = tp1->get_out();
+    fail_unless(rb != 0);
+    EVSMessage gm1;
+    fail_unless(gm1.read(rb->get_buf(), rb->get_len(), 0));
+    rb->release();
+    fail_unless(gm1.get_type() == EVSMessage::GAP);
+    
+    ep1->handle_gap(gm1, gm1.get_source());
+    ep2->handle_gap(gm1, gm1.get_source());
+    
+    fail_unless(ep1->get_state() == EVSProto::RECOVERY);
+    fail_unless(ep2->get_state() == EVSProto::RECOVERY);
+
+    rb = tp2->get_out();
+    fail_unless(rb != 0);
+    EVSMessage gm2;
+    fail_unless(gm2.read(rb->get_buf(), rb->get_len(), 0));
+    rb->release();
+    fail_unless(gm2.get_type() == EVSMessage::GAP);
+    
+    ep1->handle_gap(gm2, gm2.get_source());
+    ep2->handle_gap(gm2, gm2.get_source());
+
+    fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
+    fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
+
+    delete ep1;
+    delete ep2;
+    delete tp1;
+    delete tp2;
+
+}
+END_TEST
+
 static Suite* suite()
 {
     Suite* s = suite_create("evs");
@@ -395,8 +537,12 @@ static Suite* suite()
     tcase_add_test(tc, check_input_map_random);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("check_evs_proto");
-    tcase_add_test(tc, check_evs_proto);
+    tc = tcase_create("check_evs_proto_single");
+    tcase_add_test(tc, check_evs_proto_single);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_evs_proto_double");
+    tcase_add_test(tc, check_evs_proto_double);
     suite_add_tcase(s, tc);
 
 

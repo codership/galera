@@ -79,7 +79,11 @@ public:
 	send_window(16), 
 	max_output_size(1024),
 	state(CLOSED) {
-	known.insert(std::pair<const EVSPid, EVSInstance>(my_addr, EVSInstance()));
+	std::pair<std::map<const EVSPid, EVSInstance>::iterator, bool> i =
+	    known.insert(std::pair<const EVSPid, EVSInstance>(my_addr, 
+							      EVSInstance()));
+	assert(i.second == true);
+	i.first->second.operational = true;
 	input_map.insert_sa(my_addr);
     }
     ~EVSProto() {
@@ -191,10 +195,14 @@ public:
 
     bool is_consensus() const {
 	const EVSMessage* my_jm = known.find(my_addr)->second.join_message;
-	if (my_jm == 0)
+	if (my_jm == 0) {
+	    LOG_DEBUG("is_consensus(): no own join message");
 	    return false;
-	if (is_consistent(my_jm) == false)
+	}
+	if (is_consistent(my_jm) == false) {
+	    LOG_DEBUG("is_consistent(): own join message is not consistent");
 	    return false;
+	}
 	
 	for (std::map<const EVSPid, EVSInstance>::const_iterator 
 		 i = known.begin(); i != known.end(); ++i) {
@@ -797,8 +805,10 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
 	assert(iret.second == true);
 	i = iret.first;
 	i->second.operational = true;
-	if (state == RECOVERY || state == OPERATIONAL)
+	if (state == JOINING || state == RECOVERY || state == OPERATIONAL) {
 	    shift_to(RECOVERY);
+	    send_join();
+	}
 	return;
     } else if (state == JOINING || state == CLOSED) {
 	// Drop message
@@ -811,6 +821,7 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
 	    // This is probably partition merge, see if it works out
 	    i->second.operational = true;
 	    shift_to(RECOVERY);
+	    send_join();
 	    return;
 	} else if (i->second.installed == false) {
 	    if (install_message && 
@@ -822,6 +833,7 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
 		    shift_to(OPERATIONAL);
 		} else {
 		    shift_to(RECOVERY);
+		    send_join();
 		}
 	    } else {
 		// Probably caused by network partitioning during recovery
@@ -831,11 +843,13 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
 		LOG_WARN("Setting source status to no-trust");
 		i->second.trusted = false;
 		shift_to(RECOVERY);
+		send_join();
 		return;
 	    }
 	} else {
 	    i->second.trusted = false;
 	    shift_to(RECOVERY);
+	    send_join();
 	    return;
 	}
     }
@@ -884,7 +898,7 @@ void EVSProto::handle_delegate(const EVSMessage& msg, const EVSPid& source,
 
 void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
 {
-    LOG_TRACE("source: " + msg.get_source().to_string() + " source view: " + 
+    LOG_TRACE("this: " + my_addr.to_string() + " source: " + msg.get_source().to_string() + " source view: " + 
 		 msg.get_source_view().to_string());
     std::map<EVSPid, EVSInstance>::iterator i = known.find(source);
     if (i == known.end()) {
@@ -893,8 +907,10 @@ void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
 	assert(iret.second == true);
 	i = iret.first;
 	i->second.operational = true;
-	if (state == RECOVERY || state == OPERATIONAL)
+	if (state == JOINING || state == RECOVERY || state == OPERATIONAL) {
 	    shift_to(RECOVERY);
+	    send_join();
+	}
 	return;
     } else if (state == JOINING || state == CLOSED) {	
 	// Silent drop
@@ -904,6 +920,7 @@ void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
 	i->second.installed = true;
 	if (is_all_installed())
 	    shift_to(OPERATIONAL);
+	return;
     } else if (!(msg.get_source_view() == current_view)) {
 	if (i->second.trusted == false) {
 	    // Do nothing, just discard message
@@ -911,6 +928,7 @@ void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
 	    // This is probably partition merge, see if it works out
 	    i->second.operational = true;
 	    shift_to(RECOVERY);
+	    send_join();
 	} else if (i->second.installed == false) {
 	    // Probably caused by network partitioning during recovery
 	    // state, this will most probably lead to view 
@@ -919,9 +937,11 @@ void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
 	    LOG_WARN("Setting source status to no-trust");
 	    i->second.trusted = false;
 	    shift_to(RECOVERY);
+	    send_join();
 	} else {
 	    i->second.trusted = false;
 	    shift_to(RECOVERY);
+	    send_join();
 	}
 	return;
     }
@@ -955,17 +975,21 @@ void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
 
 void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
 {
+    LOG_DEBUG("this: " + my_addr.to_string() + " source: " + msg.get_source().to_string() + " source view: " + 
+		 msg.get_source_view().to_string());
     std::map<const EVSPid, EVSInstance>::iterator i = known.find(source);
     if (i == known.end()) {
+	assert(!(source == my_addr));
 	LOG_DEBUG("EVSProto::handle_join(): new instance");
 	std::pair<std::map<const EVSPid, EVSInstance>::iterator, bool> iret;
 	iret = known.insert(std::pair<const EVSPid, EVSInstance>(source, EVSInstance()));
 	assert(iret.second == true);
 	i = iret.first;
 	i->second.operational = true;
-	if (state == RECOVERY || state == OPERATIONAL ||
-	    (state == JOINING && source == my_addr))
+	if (state == JOINING || state == RECOVERY || state == OPERATIONAL) {
 	    shift_to(RECOVERY);
+	    send_join();
+	}
 	return;
     } else if (i->second.trusted == false) {
 	LOG_DEBUG("EVSProto::handle_join(): untrusted");
@@ -973,12 +997,15 @@ void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
 	return;
     }
 
-    if (state == JOINING || state == OPERATIONAL || install_message)
+    bool send_join_p = false;
+    if (state == JOINING || state == OPERATIONAL || install_message) {
+	send_join_p = true;
 	shift_to(RECOVERY);
+    }
     
     assert(i->second.trusted == true && i->second.installed == false);
     
-    bool send_join_p = false;
+
     
     // Instance previously declared unoperational seems to be operational now
     if (i->second.operational == false) {
@@ -1019,7 +1046,7 @@ void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
     if (selfi == instances->end()) {
 	// Source instance does not know about this instance, so there 
 	// is no sense to compare states yet
-	LOG_DEBUG("EVSProto::handle_join(): this not known by source");
+	LOG_DEBUG("EVSProto::handle_join(): this instance not known by source instance");
 	send_join_p = true;
     } else if (selfi->second.get_trusted() == false) {
 	// Source instance does not trust this instance, this feeling
@@ -1053,23 +1080,26 @@ void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
 		}
 		send_join_p = true;
 	    }
-	    EVSRange range(input_map.get_sa_gap(ii->second.get_pid()));
-	    if (!seqno_eq(range.get_low(), ii->second.get_range().get_low()) ||
-		!seqno_eq(range.get_high(), ii->second.get_range().get_high())) {
-		assert(seqno_eq(range.get_low(), SEQNO_MAX) || 
-		       !seqno_eq(range.get_high(), SEQNO_MAX));
 
-		if (!seqno_eq(range.get_low(), SEQNO_MAX) &&
-		    seqno_gt(range.get_high(), 
-			     ii->second.get_range().get_high())) {
-		    // This instance knows more
-		    // TODO: Optimize to recover only required messages
-		    recover(EVSGap(ii->second.get_pid(), range));
-		} else {
-		    // The other instance knows more, sending join message
-		    // should generate message recovery on more knowledgeble
-		    // instance
-		    send_join_p = true;
+	    if (ii->second.get_view_id() == current_view) {
+		EVSRange range(input_map.get_sa_gap(ii->second.get_pid()));
+		if (!seqno_eq(range.get_low(), ii->second.get_range().get_low()) ||
+		    !seqno_eq(range.get_high(), ii->second.get_range().get_high())) {
+		    assert(seqno_eq(range.get_low(), SEQNO_MAX) || 
+			   !seqno_eq(range.get_high(), SEQNO_MAX));
+		    
+		    if (!seqno_eq(range.get_low(), SEQNO_MAX) &&
+			seqno_gt(range.get_high(), 
+				 ii->second.get_range().get_high())) {
+			// This instance knows more
+			// TODO: Optimize to recover only required messages
+			recover(EVSGap(ii->second.get_pid(), range));
+		    } else {
+			// The other instance knows more, sending join message
+			// should generate message recovery on more knowledgeble
+			// instance
+			send_join_p = true;
+		    }
 		}
 	    }
 	}
@@ -1108,11 +1138,12 @@ void EVSProto::handle_leave(const EVSMessage& msg, const EVSPid& source)
     if (i != known.end())
 	known.erase(i);
     shift_to(RECOVERY);
+    send_join();
 }
 
 void EVSProto::handle_install(const EVSMessage& msg, const EVSPid& source)
 {
-    LOG_TRACE("source: " + msg.get_source().to_string() + " source view: " + 
+    LOG_DEBUG("this: " + my_addr.to_string() + " source: " + msg.get_source().to_string() + " source view: " + 
 	      msg.get_source_view().to_string());
     std::map<EVSPid, EVSInstance>::iterator i = known.find(source);
 
@@ -1121,8 +1152,10 @@ void EVSProto::handle_install(const EVSMessage& msg, const EVSPid& source)
 	iret = known.insert(std::pair<const EVSPid, EVSInstance>(source, EVSInstance()));
 	assert(iret.second == true);
 	i = iret.first;
-	if (state == RECOVERY || state == OPERATIONAL)
+	if (state == RECOVERY || state == OPERATIONAL) {
 	    shift_to(RECOVERY);
+	    send_join();
+	}
 	return;	
     } else if (state == JOINING || state == CLOSED) {
 	// Silent drop
@@ -1131,22 +1164,30 @@ void EVSProto::handle_install(const EVSMessage& msg, const EVSPid& source)
 	// Silent drop
 	return;
     } else if (i->second.operational == false) {
+	LOG_DEBUG("setting other as operational");
 	i->second.operational = true;
 	shift_to(RECOVERY);
+	send_join();
 	return;
     } else if (install_message || i->second.installed == true) {
+	LOG_DEBUG("woot?");
 	shift_to(RECOVERY);
+	send_join();
 	return;
     } else if (is_representative(source) == false) {
+	LOG_DEBUG("source is not supposed to be representative");
 	shift_to(RECOVERY);
+	send_join();
 	return;
     } else if (is_consensus() == false) {
+	LOG_DEBUG("is not consensus");
 	shift_to(RECOVERY);
+	send_join();
 	return;
     }
-
+    
     assert(install_message == 0);
-
+    
     install_message = new EVSMessage(msg);
     send_gap(my_addr, install_message->get_source_view(), EVSRange(SEQNO_MAX, SEQNO_MAX));
 }

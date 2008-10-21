@@ -411,6 +411,7 @@ public:
 		size_t n;
 		if ((off = read_uint32(buf, buflen, off, &n)) == 0)
 		    return 0;
+		delete instances;
 		instances = new std::map<EVSPid, Instance>();
 		for (size_t i = 0; i < n; ++i) {
 		    Instance inst;
