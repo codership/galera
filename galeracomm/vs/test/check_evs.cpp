@@ -1,3 +1,4 @@
+#include "gcomm/logger.hpp"
 #define EVS_SEQNO_MAX 0x800U
 #include "../src/evs_seqno.hpp"
 #include "../src/evs_input_map.hpp"
@@ -108,20 +109,22 @@ START_TEST(check_input_map_basic)
     EVSViewId vid(Address(0, 0, 0), 1);
     Address sa1(1, 0, 0);
     im.insert_sa(sa1);
-    fail_unless(seqno_eq(im.get_aru_seq(), SEQNO_MAX) && seqno_eq(im.get_safe_seq(), SEQNO_MAX));
-    im.insert(EVSInputMapItem(
-		  sa1, 
+    fail_unless(seqno_eq(im.get_aru_seq(), SEQNO_MAX) && 
+                seqno_eq(im.get_safe_seq(), SEQNO_MAX));
+    im.insert(EVSInputMapItem(sa1,
 		  EVSMessage(EVSMessage::USER, sa1, SAFE, 0, 0, SEQNO_MAX, vid, 0),
-		  0));
+                              0, 0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
     
+    
+    
     im.insert(EVSInputMapItem(sa1, 
-			      EVSMessage(EVSMessage::USER, sa1, SAFE, 2, 0, SEQNO_MAX, vid, 0),
-			      0));
+			      EVSMessage(EVSMessage::USER, sa1, SAFE, 2, 0, 
+                                         SEQNO_MAX, vid, 0), 0, 0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
     im.insert(EVSInputMapItem(sa1, 
 			      EVSMessage(EVSMessage::USER, sa1, SAFE, 1, 0, SEQNO_MAX, vid, 0),
-			      0));
+			      0, 0));
     fail_unless(seqno_eq(im.get_aru_seq(), 2));
 
 
@@ -131,7 +134,7 @@ START_TEST(check_input_map_basic)
 	EVSInputMapItem(sa1, 
 			EVSMessage(EVSMessage::USER, sa1, SAFE, 
 				   seqno_add(2, SEQNO_MAX/4 + 1), 0, SEQNO_MAX, vid, 0),
-			0));
+			0, 0));
     fail_unless(seqno_eq(gap.low, 3) && seqno_eq(gap.high, 2));
     fail_unless(seqno_eq(im.get_aru_seq(), 2));
     
@@ -154,13 +157,13 @@ START_TEST(check_input_map_basic)
     for (uint32_t i = 0; i < 3; i++)
 	im.insert(EVSInputMapItem(sa1,
 				  EVSMessage(EVSMessage::USER, sa1, SAFE, i, 0, SEQNO_MAX, vid, 0),
-				  0));
+				  0, 0));
     fail_unless(seqno_eq(im.get_aru_seq(), SEQNO_MAX));   
     
     for (uint32_t i = 0; i < 3; i++) {
 	im.insert(EVSInputMapItem(sa2,
 				  EVSMessage(EVSMessage::USER, sa2, SAFE, i, 0, SEQNO_MAX, vid, 0),
-				  0));
+				  0, 0));
 	fail_unless(seqno_eq(im.get_aru_seq(), i));
     }
     
@@ -203,52 +206,54 @@ START_TEST(check_input_map_overwrap)
     static const size_t qlen = 8;
     Address sas[nodes];
     for (size_t i = 0; i < nodes; ++i) {
-	sas[i] = Address(i + 1, 0, 0);
-	im.insert_sa(sas[i]);
+        sas[i] = Address(i + 1, 0, 0);
+        im.insert_sa(sas[i]);
     }
     
     Time start(Time::now());
     
     size_t n_msg = 0;
     for (uint32_t seqi = 0; seqi < 2*SEQNO_MAX; seqi++) {
-	uint32_t seq = seqi % SEQNO_MAX;
+        uint32_t seq = seqi % SEQNO_MAX;
 // #define aru_seq SEQNO_MAX
 #define aru_seq (seqi < 7 ? SEQNO_MAX : seqno_dec(im.get_aru_seq(), ::rand()%3))
-	for (size_t j = 0; j < nodes; j++) {
-	    im.insert(EVSInputMapItem(sas[j],
-				      EVSMessage(EVSMessage::USER, 
-						 sas[j],
-						 SAFE, 
-						 seq, 0, aru_seq, vid, 0),
-				      0));	
-	    n_msg++;
-	}
-	if (seqi > 0 && seqi % qlen == 0) {
-	    uint32_t seqto = seqno_dec(seq, (::rand() % qlen + 1)*2);
-	    EVSInputMap::iterator mi_next;
-	    for (EVSInputMap::iterator mi = im.begin(); mi != im.end();
-		 mi = mi_next) {
-		mi_next = mi;
-		++mi_next;
-		if (seqno_lt(mi->get_evs_message().get_seq(), seqto))
-		    im.erase(mi);
-		else if (seqno_eq(mi->get_evs_message().get_seq(), seqto) &&
-			 ::rand() % 8 != 0)
-		    im.erase(mi);
-		else
-		    break;
-	    }
-	}
+        for (size_t j = 0; j < nodes; j++) {
+            im.insert(EVSInputMapItem(sas[j],
+                                      EVSMessage(EVSMessage::USER, 
+                                                 sas[j],
+                                                 SAFE, 
+                                                 seq, 0, aru_seq, vid, 0),
+                                      0, 0));	
+            n_msg++;
+        }
+        if (seqi > 0 && seqi % qlen == 0) {
+            uint32_t seqto = seqno_dec(seq, (::rand() % qlen + 1)*2);
+            EVSInputMap::iterator mi_next;
+            for (EVSInputMap::iterator mi = im.begin(); mi != im.end();
+                 mi = mi_next) {
+                     mi_next = mi;
+                     ++mi_next;
+                     if (seqno_lt(mi->get_evs_message().get_seq(), seqto))
+                         im.erase(mi);
+                     else if (seqno_eq(mi->get_evs_message().get_seq(), seqto)
+&&
+                              ::rand() % 8 != 0)
+                         im.erase(mi);
+                     else
+                         break;
+                 }
+        }
     }
     EVSInputMap::iterator mi_next;
     for (EVSInputMap::iterator mi = im.begin(); mi != im.end();
-	 mi = mi_next) {
-	mi_next = mi;
-	++mi_next;
-	im.erase(mi);
-    }
+         mi = mi_next) {
+             mi_next = mi;
+             ++mi_next;
+             im.erase(mi);
+         }
     Time stop(Time::now());
-    std::cerr << "Msg rate " << n_msg/(stop.to_double() - start.to_double()) << "\n";
+    std::cerr << "Msg rate " << n_msg/(stop.to_double() - start.to_double()) <<
+"\n";
 }
 END_TEST
 
@@ -264,15 +269,14 @@ START_TEST(check_input_map_random)
     std::vector<EVSMessage> msgs(SEQNO_MAX/4);
     
     for (uint32_t i = 0; i < SEQNO_MAX/4; ++i)
-	msgs[i] = EVSMessage(
-			EVSMessage::USER, 
-			pid,
-			SAFE, 
-			i,
-			0,
-			SEQNO_MAX,
-			vid,
-			0);
+        msgs[i] = EVSMessage(EVSMessage::USER, 
+                             pid,
+                             SAFE, 
+                             i,
+                             0,
+                             SEQNO_MAX,
+                             vid,
+                             0);
     
     EVSInputMap im;
     im.insert_sa(Address(1, 0, 0));
@@ -283,7 +287,7 @@ START_TEST(check_input_map_random)
     for (size_t i = 1; i <= 4; ++i) {
 	for (size_t j = msgs.size(); j > 0; --j) {
 	    size_t n = ::rand() % j;
-	    im.insert(EVSInputMapItem(Address(i, 0, 0), msgs[n], 0));
+	    im.insert(EVSInputMapItem(Address(i, 0, 0), msgs[n], 0, 0));
 	    std::swap(msgs[n], msgs[j - 1]);
 	}
     }
@@ -518,10 +522,13 @@ struct Inst : public Toplay {
     DummyTransport* tp;
     EVSProto* ep;
     Inst(DummyTransport* tp_, EVSProto* ep_) : tp(tp_), ep(ep_) {}
-    void handle_up(const int ctx, const ReadBuf* rb, const size_t roff, 
-		   const ProtoUpMeta* um) {
-	std::cerr << "delivery: " << rb << " " << rb->get_len() << " " << roff << "\n";
-	// std::cout << (char*)rb->get_buf(roff) << "\n";
+    void handle_up(const int ctx, const ReadBuf* rb, const size_t roff,
+                   const ProtoUpMeta* um)
+    {
+        // std::cerr << "delivery: " << rb << " " << rb->get_len() << " " << roff << "\n";
+        // std::cout << (char*)rb->get_buf(roff) << "\n";
+        // const EVSProtoUpMeta* eum = static_cast<const EVSProtoUpMeta*>(um);
+        // std::cout << "msg from " << eum->source.to_string() << " " << (char*)rb->get_buf(roff) << "\n";
     }
 };
 
@@ -535,10 +542,55 @@ static bool all_operational(const std::vector<Inst*>* pvec)
     return true;
 }
 
-static void multicast(std::vector<Inst*>* pvec, ReadBuf* rb)
+struct Stats {
+    uint64_t sent_msgs;
+    uint64_t total_msgs;
+    std::vector<uint64_t> msgs;
+
+    Stats() : sent_msgs(0), total_msgs(0) {
+        msgs.resize(6, 0);
+    }
+
+    ~Stats() {
+        // if (total_msgs) {
+        //  print();
+        // }
+    }
+
+    void print() {
+        LOG_INFO("Sent messages: " + ::to_string(sent_msgs));
+        LOG_INFO("Total messages: " + ::to_string(total_msgs));
+        for (size_t i = 0; i < 6; ++i) {
+            LOG_INFO("Type " + ::to_string(i) + " messages: " + ::to_string(msgs[i]));
+        }
+    }
+
+    void clear() {
+        sent_msgs = 0;
+        total_msgs = 0;
+        for (size_t i = 0; i < 6; ++i)
+            msgs[i] = 0;
+    }
+
+    void acc_mcast(const int type) {
+        total_msgs++;
+        msgs[type]++;
+    }
+
+    void acc_sent() {
+        sent_msgs++;
+    }
+
+};
+
+Stats stats;
+
+static void multicast(std::vector<Inst*>* pvec, const ReadBuf* rb)
 {
     EVSMessage msg;
     fail_unless(msg.read(rb->get_buf(), rb->get_len(), 0));
+    LOG_DEBUG(std::string("msg: ") + ::to_string(msg.get_type()));
+    stats.acc_mcast(msg.get_type());
     for (std::vector<Inst*>::iterator j = pvec->begin();
 	 j != pvec->end(); ++j) {
 	switch (msg.get_type()) {
@@ -605,7 +657,6 @@ START_TEST(check_evs_proto_converge_1by1)
 	vec[n]->ep->send_join();
 	reach_operational(&vec);
     }
-
 }
 END_TEST
 
@@ -617,6 +668,44 @@ static void send_msgs(std::vector<Inst*>* vec)
 	char buf[8] = {'1', '2', '3', '4', '5', '6', '7', '\0'};
 	WriteBuf wb(buf, sizeof(buf));
 	(*i)->ep->handle_down(&wb, 0); 
+        stats.acc_sent();
+    }
+}
+
+static void send_msgs_rnd(std::vector<Inst*>* vec, size_t max_n)
+{
+    static uint32_t seq = 0;
+    for (std::vector<Inst*>::iterator i = vec->begin(); i != vec->end(); 
+	 ++i) {
+        for (size_t n = ::rand() % (max_n + 1); n > 0; --n) { 
+            char buf[10];
+            memset(buf, 0, sizeof(buf));
+            sprintf(buf, "%x", seq);
+            WriteBuf wb(buf, sizeof(buf));
+            (*i)->ep->handle_down(&wb, 0); 
+            ++seq;
+            stats.acc_sent();
+        }
+    }
+}
+
+static void send_msgs_rnd_single(std::vector<Inst*>* vec, size_t max_n)
+{
+    static uint32_t seq = 0;
+    for (std::vector<Inst*>::iterator i = vec->begin(); i != vec->end(); 
+	 ++i) {
+        size_t n_to_send = ::rand() % (max_n + 1);
+        for (size_t n = n_to_send; n > 0; --n) { 
+            char buf[10];
+            memset(buf, 0, sizeof(buf));
+            sprintf(buf, "%x", seq);
+            WriteBuf wb(buf, sizeof(buf));
+            (*i)->ep->handle_down(&wb, 0); 
+            ++seq;
+            stats.acc_sent();
+        }
+        if (n_to_send)
+            break;
     }
 }
 
@@ -629,7 +718,7 @@ static void deliver_msgs(std::vector<Inst*>* pvec)
 	     i != pvec->end(); ++i) {
 	    ReadBuf* rb = (*i)->tp->get_out();
 	    if (rb) {
-		empty = true;
+		empty = false;
 		multicast(pvec, rb);
 		rb->release();
 	    }
@@ -638,20 +727,93 @@ static void deliver_msgs(std::vector<Inst*>* pvec)
 }
 
 
+
+
 START_TEST(check_evs_proto_user_msg)
 {
     std::vector<Inst*> vec;
-    for (size_t n = 0; n < 1; ++n) {
-	vec.resize(n + 1);
-	DummyTransport* tp = new DummyTransport(0);
-	vec[n] = new Inst(tp, new EVSProto(tp, EVSPid(n + 1, 0, 0)));
-	vec[n]->ep->set_up_context(vec[n]);
-	vec[n]->ep->shift_to(EVSProto::JOINING);
-	vec[n]->ep->send_join();
-	reach_operational(&vec);
-	send_msgs(&vec);
-	deliver_msgs(&vec);
+    for (size_t n = 0; n < 8; ++n) {
+        vec.resize(n + 1);
+        DummyTransport* tp = new DummyTransport(0);
+        vec[n] = new Inst(tp, new EVSProto(tp, EVSPid(n + 1, 0, 0)));
+        vec[n]->ep->set_up_context(vec[n]);
+        vec[n]->ep->shift_to(EVSProto::JOINING);
+        vec[n]->ep->send_join();
+        reach_operational(&vec);
+        send_msgs(&vec);
+        deliver_msgs(&vec);
+
+        send_msgs(&vec);
+        send_msgs(&vec);
+        deliver_msgs(&vec);
+        stats.print();
+        stats.clear();
     }
+
+
+    LOG_INFO("random sending 1");
+
+    for (int i = 0; i < 50; ++i) {
+        send_msgs_rnd(&vec, 1);
+        deliver_msgs(&vec);
+    }
+
+    stats.print();
+    stats.clear();
+
+
+    LOG_INFO("random sending 3");
+
+    for (int i = 0; i < 50; ++i) {
+        send_msgs_rnd(&vec, 3);
+        deliver_msgs(&vec);
+    }
+
+    stats.print();
+    stats.clear();
+
+
+    LOG_INFO("random sending 5");
+
+    for (int i = 0; i < 50; ++i) {
+        send_msgs_rnd(&vec, 5);
+        deliver_msgs(&vec);
+    }
+
+    stats.print();
+    stats.clear();
+
+
+    LOG_INFO("random sending 7");
+
+    for (int i = 0; i < 50; ++i) {
+        send_msgs_rnd(&vec, 7);
+        deliver_msgs(&vec);
+    }
+
+    stats.print();
+    stats.clear();
+
+    LOG_INFO("random sending 16");
+
+    for (int i = 0; i < 50; ++i) {
+        send_msgs_rnd(&vec, 16);
+        deliver_msgs(&vec);
+    }
+
+    stats.print();
+    stats.clear();
+
+    LOG_INFO("random single sending 64");
+
+    for (int i = 0; i < 50; ++i) {
+        send_msgs_rnd_single(&vec, 64);
+        deliver_msgs(&vec);
+    }
+
+    stats.print();
+    stats.clear();
+
 }
 END_TEST
 

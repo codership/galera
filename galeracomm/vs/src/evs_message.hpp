@@ -201,7 +201,7 @@ public:
 	}
 	
 	size_t read(const void* buf, 
-			   const size_t buflen, const size_t offset) {
+                    const size_t buflen, const size_t offset) {
 	    size_t off;
 	    uint32_t b;
 	    if ((off = read_uint32(buf, buflen, offset, &b)) == 0)
@@ -255,7 +255,7 @@ public:
 	seq_range(seq_range_),
 	aru_seq(aru_seq_),
 	flags(flags_),
-	source_view(vid_), 
+        source_view(vid_), 
 	source(source_),
 	instances(0) {
 	if (type != USER)
@@ -275,17 +275,19 @@ public:
     // Gap message
     EVSMessage(const Type type_, const EVSPid& source_, 
 	       const EVSViewId& source_view_, 
-	       const uint32_t seq_, const EVSGap& gap_) :
-	version(0), 
-	type(type_), 
-	seq(seq_), 
-	source_view(source_view_),
-	source(source_),
-	gap(gap_),
-	instances(0) {
-	if (type != GAP)
-	    throw FatalException("Invalid type");
-    } 
+	       const uint32_t seq_, const uint32_t aru_seq_, const EVSGap& gap_) :
+        version(0), 
+        type(type_), 
+        seq(seq_),
+        aru_seq(aru_seq_),
+        source_view(source_view_),
+        source(source_),
+        gap(gap_),
+        instances(0)
+        {
+            if (type != GAP)
+	        throw FatalException("Invalid type");
+        } 
 
     // Join and install messages
     EVSMessage(const Type type_, const EVSPid& source_, 
