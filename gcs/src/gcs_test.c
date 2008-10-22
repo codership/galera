@@ -437,7 +437,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     // NOTE: what really needs to be checked is seqno and group_uuid, but here
     //       we don't keep track of them (and don't do real transfers),
     //       so for simplicity, just check conf_id.
-    if (conf_id + 1 != conf->conf_id) {
+    if (conf->st_required) {
         gcs_seqno_t seqno;
         fprintf (stdout, "Gap in configurations: ours: %lld, group: %lld.\n",
                  conf_id, conf->conf_id);

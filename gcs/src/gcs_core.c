@@ -115,6 +115,21 @@ gcs_core_create (const char* const backend_uri)
 }
 
 long
+gcs_core_init (gcs_core_t* core, gcs_seqno_t seqno, const gu_uuid_t* uuid)
+{
+    if (core->state == CORE_CLOSED) {
+        return gcs_group_init_history (&core->group, seqno, uuid);
+    }
+    else {
+        gu_error ("State must be CLOSED");
+        if (core->state < CORE_CLOSED)
+            return -EBUSY;
+        else // DESTROYED
+            return -EBADFD;
+    }
+}
+
+long
 gcs_core_open (gcs_core_t* core,
                const char* const channel)
 {

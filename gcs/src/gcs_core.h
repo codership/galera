@@ -32,7 +32,12 @@ typedef struct gcs_core gcs_core_t;
  * Allocates context resources  private to
  * generic communicaton layer - send/recieve buffers and the like.
  */
-gcs_core_t* gcs_core_create (const char* const backend);
+extern gcs_core_t*
+gcs_core_create (const char* const backend);
+
+/* initializes action history (global seqno, group UUID). See gcs.h */
+extern long
+gcs_core_init (gcs_core_t* core, gcs_seqno_t seqno, const gu_uuid_t* uuid);
 
 /*
  * gcs_core_open() initialises opens connection
@@ -40,8 +45,9 @@ gcs_core_t* gcs_core_create (const char* const backend);
  * zero     - success
  * negative - error code
  */
-long gcs_core_open  (gcs_core_t*       conn,
-                     const char* const channel);
+extern long
+gcs_core_open  (gcs_core_t*       conn,
+                const char* const channel);
 
 
 /*
@@ -51,7 +57,8 @@ long gcs_core_open  (gcs_core_t*       conn,
  * zero     - success
  * negative - error code
  */
-long gcs_core_close (gcs_core_t* conn);
+extern long
+gcs_core_close (gcs_core_t* conn);
 
 /*
  * gcs_core_destroy() frees resources allocated by gcs_core_create()
@@ -59,7 +66,8 @@ long gcs_core_close (gcs_core_t* conn);
  * zero     - success
  * negative - error code
  */
-long gcs_core_destroy (gcs_core_t* conn);
+extern long
+gcs_core_destroy (gcs_core_t* conn);
 
 /* 
  * gcs_core_send() atomically sends action to group.
@@ -67,25 +75,28 @@ long gcs_core_destroy (gcs_core_t* conn);
  * non-negative - amount of action bytes sent (sans headers)
  * negative     - error code
  */
-ssize_t gcs_core_send (gcs_core_t*      const conn,
-                       const void*            action,
-                       size_t                 act_size,
-                       gcs_act_type_t   const act_type);
+extern ssize_t
+gcs_core_send (gcs_core_t*      const conn,
+               const void*            action,
+               size_t                 act_size,
+               gcs_act_type_t   const act_type);
 /*
  * gcs_core_recv() blocks until some action is returned from group.
  * Return values:
  * non-negative - the size of action received
  * negative     - error code
  */
-ssize_t gcs_core_recv (gcs_core_t*      const conn,
-                       const void**     const action,
-                       gcs_act_type_t*  const act_type,
-                       gcs_seqno_t*     const act_id);
+extern ssize_t
+gcs_core_recv (gcs_core_t*      const conn,
+               const void**     const action,
+               gcs_act_type_t*  const act_type,
+               gcs_seqno_t*     const act_id);
 
 /* Configuration functions */
 /* Sets maximum message size to achieve requested network packet size. 
  * In case of failure returns -EMSGSIZE */
-long gcs_core_set_pkt_size (gcs_core_t *conn, ulong pkt_size);
+extern long
+gcs_core_set_pkt_size (gcs_core_t *conn, ulong pkt_size);
 
 /* sends this node's last applied value to group */
 extern long

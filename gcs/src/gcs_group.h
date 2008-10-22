@@ -30,7 +30,7 @@ gcs_group_state_t;
 
 typedef struct gcs_group
 {
-    gcs_seqno_t   act_id;       // current action seqno
+    gcs_seqno_t   act_id;       // current(last) action seqno
     gcs_seqno_t   conf_id;      // current configuration seqno
     gu_uuid_t     state_uuid;   // state exchange id
     gu_uuid_t     group_uuid;   // group UUID
@@ -46,10 +46,18 @@ typedef struct gcs_group
 gcs_group_t;
 
 /*!
- * Initialized group at startup
+ * Initialize group at startup
  */
 extern long
 gcs_group_init (gcs_group_t* group);
+
+/*!
+ * Initialize group action history parameters. See gcs.h
+ */
+extern long
+gcs_group_init_history (gcs_group_t*     group,
+                        gcs_seqno_t      seqno,
+                        const gu_uuid_t* uuid);
 
 /*!
  * Free group resources
@@ -112,8 +120,8 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
         act->sender_idx = sender_idx;
 
         if (gu_likely(act->type == GCS_ACT_DATA)) {
-            // increment act_id only for DATA (should it be renamed to ORDERED?)
-            act->id = group->act_id++;
+            // increment act_id only for DATA (should it be renamed to TOTAL?)
+            act->id = ++group->act_id;
         } else if (act->type == GCS_ACT_STATE_REQ) {
             ret = gcs_group_handle_state_request (group, sender_idx, act);
         }

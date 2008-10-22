@@ -753,21 +753,9 @@ galera_handle_configuration (const gcs_act_conf_t* conf)
         // PRIMARY configuration
         long ret;
 
-        if (GCS_SEQNO_FIRST == conf->conf_id && 
-            GCS_SEQNO_NIL   == my_seqno) {
-            // Neither group nor myself has applied any actions yet.
-            // Set group history UUID to one provided by the group.
-            gu_info ("Forming new group: "GU_UUID_FORMAT,
-                     GU_UUID_ARGS(group_uuid));
-            my_uuid  = *group_uuid;
-            ret = my_idx;
-        }
-        else if ((my_seqno + 1) != conf->seqno ||
-                 gu_uuid_compare (&my_uuid, group_uuid)) {
-            // We're missing some/all of the history.
-            // Need to request state transfer.
-
-            gu_info ("Gap in the action history:"
+        if (conf->st_required) {
+            // GCS determined that we need to request state transfer.
+            gu_info ("State Transfer required:"
                      // seqno length chosen to fit in 80 columns
                      "\n\tLocal  seqno: %14lld, UUID: "GU_UUID_FORMAT
                      "\n\tGlobal seqno: %14lld, UUID: "GU_UUID_FORMAT,
@@ -799,9 +787,14 @@ galera_handle_configuration (const gcs_act_conf_t* conf)
 
             /* TODO: Here wait for state transfer to complete, get my_seqno */
             // for now pretend that state transfer was complete
-            my_uuid  = *group_uuid;
-            my_seqno = conf->seqno - 1; // anything below this must be ignored
+            my_seqno = conf->seqno; // anything below this must be ignored
         }
+        else {
+            my_seqno = conf->seqno; // anything below this must be ignored
+        }
+
+        my_uuid  = *group_uuid;
+
         return ret;
     }
     else {
@@ -866,7 +859,6 @@ enum galera_status galera_recv(void *app_ctx) {
             // After this no certifications with seqno < commit_cut
             // Let other transaction continue to commit
             if (galera_eagain(gcs_to_self_cancel,commit_queue,seqno_l)) abort();
-            //truncate_trx_history (*(gcs_seqno_t*)action);
             break;
         case GCS_ACT_CONF:
         {

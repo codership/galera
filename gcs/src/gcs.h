@@ -16,6 +16,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 /*! @typedef @brief Sequence number type. */
@@ -27,6 +28,8 @@ static const gcs_seqno_t GCS_SEQNO_ILL   = -1;
 static const gcs_seqno_t GCS_SEQNO_NIL   =  0;
 /*! @def @brief Start of the sequence */
 static const gcs_seqno_t GCS_SEQNO_FIRST =  1;
+/*! @def @brief history UUID length */
+#define GCS_UUID_LEN 16
 
 /*! Connection handle type */
 typedef struct gcs_conn gcs_conn_t;
@@ -45,6 +48,26 @@ typedef struct gcs_conn gcs_conn_t;
  */
 extern gcs_conn_t*
 gcs_create  (const char *backend);
+
+/*! @brief Initialize group history values (optional). 
+ * Serves to provide group history persistence after process restart (in case
+ * these data were saved somewhere on persistent storage or the like). If these
+ * values are provided, it is only a hint for the group, as they might be
+ * outdated. Actual seqno and UUID are returned in GCS_ACT_CONF action (see
+ * below) and are determined by quorum.
+ *
+ * This function must be called before gcs_open() or after gcs_close().
+ *
+ * @param seqno Sequence number of the application state (last action applied).
+ * @param uuid  UUID of the sequence (group ID).
+ *
+ * @return 0 in case of success, -EBUSY if conneciton is already opened,
+ *         -EBADFD if connection object is being destroyed.
+ */
+extern long
+gcs_init (gcs_conn_t   *conn,
+          gcs_seqno_t   seqno,
+          const uint8_t uuid[GCS_UUID_LEN]);
 
 /*! @brief Opens connection to group (joins channel). 
  * 
@@ -335,17 +358,18 @@ gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size);
 //#define GCS_DEFAULT_PKT_SIZE 1500 /* Standard Ethernet frame */
 #define GCS_DEFAULT_PKT_SIZE 66000 /* 44 Eth. frames to carry max IP packet */
 
-/* Membership message */
-/*! Member name max length */
+/* Configuration action */
+/*! Member name max length (including terminating null) */
 #define GCS_MEMBER_NAME_MAX 40
 
 typedef struct {
     gcs_seqno_t  seqno;         /// next action seqno
     gcs_seqno_t  conf_id;       /// configuration ID (-1 if non-primary)
-    uint8_t      group_uuid[16];/// group UUID
+    uint8_t      group_uuid[GCS_UUID_LEN];/// group UUID
+    bool         st_required;   /// state transfer is required (gap in seqnos)
     size_t       memb_num;      /// number of members in configuration
     size_t       my_idx;        /// index of this node in the configuration
-    uint8_t      data[0];       /// member array
+    char         data[0];       /// member array (null-terminated IDs)
 } gcs_act_conf_t;
 
 #ifdef	__cplusplus

@@ -20,7 +20,7 @@ long
 gcs_group_init (gcs_group_t* group)
 {
     // here we also create default node instance.
-    group->act_id       = 0;
+    group->act_id       = GCS_SEQNO_ILL;
     group->conf_id      = GCS_SEQNO_ILL;
     group->state_uuid   = GU_UUID_NIL;
     group->group_uuid   = GU_UUID_NIL;
@@ -36,6 +36,16 @@ gcs_group_init (gcs_group_t* group)
 
     gcs_node_init (&group->nodes[group->my_idx], "No ID");
 
+    return 0;
+}
+
+long
+gcs_group_init_history (gcs_group_t*     group,
+                        gcs_seqno_t      seqno,
+                        const gu_uuid_t* uuid)
+{
+    group->act_id     = seqno;
+    group->group_uuid = *uuid;
     return 0;
 }
 
@@ -206,16 +216,24 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
 	    /* we come from previous primary configuration */
 	}
 	else {
-            if (1 == new_nodes_num && 0 == group->act_id &&
-                GCS_SEQNO_ILL == group->conf_id) {
-                /* First node in the group. Generate new group UUID */
+            if (1 == new_nodes_num && GCS_SEQNO_ILL == group->conf_id) {
+                /* First configuration for this process, only node in group:
+                 * bootstrap new configuration by default. */
                 assert (GCS_GROUP_NON_PRIMARY == group->state);
                 assert (1 == group->num);
                 assert (0 == group->my_idx);
-                gu_uuid_generate (&group->group_uuid, NULL, 0);
+
                 group->conf_id = 0; // this bootstraps configuration ID
-                group->act_id  = 1;
                 group->state   = GCS_GROUP_PRIMARY;
+
+                if (GCS_SEQNO_ILL == group->act_id) {
+                    // no history provided: start a new one
+                    group->act_id  = GCS_SEQNO_NIL;
+                    gu_uuid_generate (&group->group_uuid, NULL, 0);
+                    gu_info ("Starting new group from scratch: "GU_UUID_FORMAT,
+                             GU_UUID_ARGS(&group->group_uuid));
+                }
+
                 group->nodes[group->my_idx].status = GCS_STATE_JOINED;
                 /* initialize node ID to the one given by the backend - this way
                  * we'll be recognized as coming from prev. conf. below */
@@ -224,8 +242,6 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                 /* forge own state message - for group_post_state_exchange() */
                 gcs_node_record_state (&group->nodes[group->my_idx],
                                        gcs_group_get_state (group));
-                gu_info ("Starting new group: " GU_UUID_FORMAT,
-                         GU_UUID_ARGS(&group->group_uuid));
             }
             else {
                 /* It happened so that we missed some primary configurations */
@@ -548,11 +564,23 @@ gcs_group_act_conf (gcs_group_t* group, gcs_recv_act_t* act)
     ssize_t conf_size = sizeof(gcs_act_conf_t) + group->num*GCS_MEMBER_NAME_MAX;
     gcs_act_conf_t* conf = malloc (conf_size);
     if (conf) {
-        conf->seqno    = group->act_id;
-        conf->conf_id  = group->conf_id;
-        conf->memb_num = group->num;
-        conf->my_idx   = group->my_idx;
+        long idx;
+
+        conf->seqno       = group->act_id;
+        conf->conf_id     = group->conf_id;
+        conf->memb_num    = group->num;
+        conf->my_idx      = group->my_idx;
+        conf->st_required =
+            (group->nodes[group->my_idx].status < GCS_STATE_JOINED);
+
         memcpy (conf->group_uuid, &group->group_uuid, sizeof (gu_uuid_t));
+
+        for (idx = 0; idx < group->num; idx++)
+        {
+            char* node_id = &conf->data[idx * GCS_MEMBER_NAME_MAX];
+            strncpy (node_id, group->nodes[idx].id, GCS_MEMBER_NAME_MAX);
+            node_id[GCS_MEMBER_NAME_MAX - 1] = '\0';
+        }
 
         act->buf  = conf;
         act->type = GCS_ACT_CONF;

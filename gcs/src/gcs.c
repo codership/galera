@@ -26,8 +26,10 @@ const long GCS_MAX_REPL_THREADS = 16384;
 
 typedef enum
 {
-    GCS_CONN_SYNCED,
-    GCS_CONN_OPEN,
+    GCS_CONN_OPEN_SYNCED,
+    GCS_CONN_OPEN_JOINED,
+    GCS_CONN_OPEN_DONOR,
+    GCS_CONN_OPEN_JOINER,
     GCS_CONN_CLOSED,
     GCS_CONN_DESTROYED
 }
@@ -127,6 +129,21 @@ gcs_create (const char *backend)
     return NULL; // failure
 }
 
+long
+gcs_init (gcs_conn_t* conn, gcs_seqno_t seqno, const uint8_t uuid[GU_UUID_LEN])
+{
+    if (conn->state == GCS_CONN_CLOSED) {
+        return gcs_core_init (conn->core, seqno, (const gu_uuid_t*)uuid);
+    }
+    else {
+        gu_error ("State must be CLOSED");
+        if (conn->state < GCS_CONN_CLOSED)
+            return -EBUSY;
+        else // DESTROYED
+            return -EBADFD;
+    }
+}
+
 static inline long
 gcs_fc_stop (gcs_conn_t* conn)
 {
@@ -135,7 +152,7 @@ gcs_fc_stop (gcs_conn_t* conn)
 
     if (conn->stop_count > 0 || conn->stop_sent > 0 ||
         gcs_queue_length (conn->recv_q) <= conn->upper_limit ||
-        GCS_CONN_SYNCED != conn->state)
+        GCS_CONN_OPEN_SYNCED != conn->state)
         return 0; // try to avoid mutex lock
 
     if (gu_mutex_lock (&conn->fc_mutex)) abort();
@@ -143,7 +160,7 @@ gcs_fc_stop (gcs_conn_t* conn)
     conn->queue_len = gcs_queue_length (conn->recv_q);
 
     if ((conn->queue_len >  conn->upper_limit) &&
-        GCS_CONN_SYNCED  == conn->state        &&
+        GCS_CONN_OPEN_SYNCED  == conn->state        &&
         conn->stop_count <= 0 && conn->stop_sent <= 0) {
         /* tripped upper queue limit, send stop request */
         gu_info ("SENDING STOP (%llu)", conn->local_act_id); //track frequency
@@ -168,7 +185,7 @@ gcs_fc_cont (gcs_conn_t* conn)
 
     if (conn->stop_sent <= 0 ||
         gcs_queue_length (conn->recv_q) > conn->lower_limit ||
-        GCS_CONN_SYNCED != conn->state)
+        GCS_CONN_OPEN_SYNCED != conn->state)
         return 0; // try to avoid mutex lock
 
     if (gu_mutex_lock (&conn->fc_mutex)) abort();
@@ -176,7 +193,7 @@ gcs_fc_cont (gcs_conn_t* conn)
     conn->queue_len = gcs_queue_length (conn->recv_q);
 
     if (conn->lower_limit >= conn->queue_len &&
-        GCS_CONN_SYNCED == conn->state && conn->stop_sent > 0) {
+        GCS_CONN_OPEN_SYNCED == conn->state && conn->stop_sent > 0) {
         // tripped lower slave queue limit, sent continue request
         gu_info ("SENDING CONT");
         ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
@@ -210,7 +227,7 @@ gcs_handle_actions (gcs_conn_t*    conn,
 
         if ((conn->conf_id + 1) != conf->conf_id) {
             /* missed a configuration, need a snapshot - no longer JOINED */
-// temporary            if (conn->state == GCS_CONN_JOINED) conn->state = GCS_CONN_OPEN;
+// temporary            if (conn->state == GCS_CONN_JOINED) conn->state = GCS_CONN_OPEN_JOINER;
         }
 
         if (gu_mutex_lock (&conn->fc_mutex)) abort();
@@ -264,7 +281,7 @@ static void *gcs_recv_thread (void *arg)
     gu_mutex_lock   (&conn->lock); // wait till gcs_open() is done;
     gu_mutex_unlock (&conn->lock);
 
-    while (conn->state <= GCS_CONN_OPEN)
+    while (conn->state <= GCS_CONN_OPEN_JOINER)
     {
         gcs_seqno_t this_act_id = GCS_SEQNO_ILL;
 
@@ -396,9 +413,9 @@ long gcs_open (gcs_conn_t *conn, const char *channel)
                                               NULL,
                                               gcs_recv_thread,
                                               conn))) {
-                    conn->state = GCS_CONN_OPEN;
+                    conn->state = GCS_CONN_OPEN_JOINER;
                     // remove this when SYNC message is implemented.
-                    conn->state = GCS_CONN_SYNCED;
+                    conn->state = GCS_CONN_OPEN_SYNCED;
                     gu_info ("Opened channel '%s'", channel);
                 }
                 else {
@@ -535,7 +552,7 @@ long gcs_send (gcs_conn_t*          conn,
      *  @note: gcs_repl() and gcs_recv() cannot lock connection
      *         because they block indefinitely waiting for actions */
     if (!(ret = gu_mutex_lock (&conn->lock))) { 
-        if (GCS_CONN_OPEN >= conn->state) {
+        if (GCS_CONN_OPEN_JOINER >= conn->state) {
             /* need to make a copy of the action, since receiving thread
              * has no way of knowing that it shares this buffer.
              * also the contents of action may be changed afterwards by
@@ -596,7 +613,7 @@ long gcs_repl (gcs_conn_t          *conn,
             // some hack here to achieve one if() instead of two:
             // if (conn->state != GCS_CONN_JOINED) ret will be -ENOTCONN
             ret = -ENOTCONN;
-            if ((GCS_CONN_OPEN >= conn->state) &&
+            if ((GCS_CONN_OPEN_JOINER >= conn->state) &&
                 (act_ptr = gcs_fifo_lite_get_tail (conn->repl_q)))
             {
                 *act_ptr = &act;
@@ -621,7 +638,7 @@ long gcs_repl (gcs_conn_t          *conn,
         }
         assert(ret);
         /* now having unlocked repl_q we can go waiting for action delivery */
-        if (ret >= 0 && GCS_CONN_OPEN >= conn->state) {
+        if (ret >= 0 && GCS_CONN_OPEN_JOINER >= conn->state) {
             gu_cond_wait (&act.wait_cond, &act.wait_mutex);
             if (act.act_id != GCS_SEQNO_ILL) {
                 *act_id       = act.act_id;       /* set by recv_thread */
@@ -721,10 +738,10 @@ long gcs_recv (gcs_conn_t*     conn,
 long
 gcs_wait (gcs_conn_t* conn)
 {
-    if (gu_likely(GCS_CONN_OPEN >= conn->state)) {
+    if (gu_likely(GCS_CONN_OPEN_JOINER >= conn->state)) {
        return (conn->stop_count > 0 || (conn->queue_len > conn->upper_limit));
     }
-//    if (gu_likely(GCS_CONN_OPEN >= conn->state)) {
+//    if (gu_likely(GCS_CONN_OPEN_JOINER >= conn->state)) {
 //        return (conn->stop_count > 0);
 //    }
     else {
