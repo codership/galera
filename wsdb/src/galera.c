@@ -930,7 +930,9 @@ enum galera_status galera_cancel_commit(trx_id_t victim_trx) {
         );
         if (rcode) {
             /* this is going to hang */
-            gu_error("could not mark trx, aborting: %llu", victim_trx);
+            gu_error("could not mark trx, aborting: trx %llu seqno: %llu", 
+                     victim_trx, victim_seqno
+            );
             //abort();
         } else {
           gu_warn("no seqno for trx, marked trx aborted: %llu", victim_trx);
@@ -942,8 +944,14 @@ enum galera_status galera_cancel_commit(trx_id_t victim_trx) {
 		victim_trx, victim_seqno);
         rcode = gcs_to_cancel(to_queue, victim_seqno);
         if (rcode) {
-	    gu_warn("trx cancel fail: %d", rcode);
-	    ret_code = GALERA_WARNING;
+	    gu_warn("trx cancel fail in to_queue: %d", rcode);
+	    ret_code = GALERA_OK;
+            rcode = gcs_to_cancel(commit_queue, victim_seqno);
+            if (rcode) {
+              gu_warn("trx cancel fail in commit_queue: %d", rcode);
+              ret_code = GALERA_WARNING;
+            }
+
         } else {
 	    ret_code = GALERA_OK;
         }
@@ -988,19 +996,19 @@ enum galera_status galera_committed(trx_id_t trx_id) {
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
 
-    if ((seqno_l = wsdb_get_local_trx_seqno(trx_id)) > 0 &&
-	seqno_l < GALERA_MISSING_SEQNO) {
+    seqno_l = wsdb_get_local_trx_seqno(trx_id);
+    if ((seqno_l > 0) && (seqno_l < GALERA_MISSING_SEQNO)) {
         do_report = report_check_counter ();
 	if (gcs_to_release(commit_queue, seqno_l)) {
 	    gu_fatal("Could not release commit resource for %llu", seqno_l);
 	    abort();
 	}
-    }
 
-    if (!mark_commit_early) {
-        wsdb_set_local_trx_committed(trx_id);
+        if (!mark_commit_early) {
+            wsdb_set_local_trx_committed(trx_id);
+        }
+        wsdb_delete_local_trx_info(trx_id);
     }
-    wsdb_delete_local_trx_info(trx_id);
 
     if (do_report) report_last_committed (gcs_conn);
 
@@ -1016,16 +1024,16 @@ enum galera_status galera_rolledback(trx_id_t trx_id) {
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
 
     gu_mutex_lock(&commit_mtx);
-    if ((seqno_l = wsdb_get_local_trx_seqno(trx_id)) > 0 &&
-	seqno_l < GALERA_MISSING_SEQNO) {
+    seqno_l = wsdb_get_local_trx_seqno(trx_id);
+    if ((seqno_l > 0) && (seqno_l < GALERA_MISSING_SEQNO)) {
 	if (gcs_to_release(commit_queue, seqno_l)) {
 	    gu_fatal("Could not release commit resource for %llu", seqno_l);
 	    abort();
 	}
+        wsdb_delete_local_trx(trx_id);
+        wsdb_delete_local_trx_info(trx_id);
     }
 
-    wsdb_delete_local_trx(trx_id);
-    wsdb_delete_local_trx_info(trx_id);
     gu_mutex_unlock(&commit_mtx);
 
     //gu_warn("GALERA rolledback, removed trx: %lu %llu", trx_id, seqno_l);
@@ -1217,10 +1225,18 @@ after_cert_test:
 	/* Grab commit queue for commit time */
         rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l);
 
-	if (seqno_l > 0 && rcode) {
+	if (seqno_l > 0) {
+          switch (rcode) {
+          case 0: break;
+          case -ECANCELED:
+	    gu_warn("canceled in commit queue for %llu", seqno_l);
+            break;
+          default:
 	    gu_fatal("Failed to grab commit queue for %llu", seqno_l);
 	    abort();
-	}
+          }
+        }
+
         // we can update last seen trx counter already here
         if (mark_commit_early) {
             wsdb_set_local_trx_committed(trx_id);
