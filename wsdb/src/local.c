@@ -1178,8 +1178,6 @@ int wsdb_delete_local_trx_info(local_trxid_t trx_id) {
     GU_DBUG_ENTER("wsdb_delete_local_trx_info");
     GU_DBUG_PRINT("wsdb",("trx: %llu", trx_id));
 
-    gu_info("deleting local trx info: %llu", trx_id);
-
     if (!trx) {
         gu_warn("trx info did not exist: %llu", trx_id);
         GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
@@ -1233,7 +1231,6 @@ trx_seqno_t wsdb_get_local_trx_seqno(local_trxid_t trx_id) {
     GU_DBUG_ENTER("wsdb_get_local_trx_seqno");
     if (!trx) {
 	GU_DBUG_PRINT("wsdb",("trx not found, : %llu",trx_id));
-        gu_info("no trx info at get_local_trx_seqno: %llu", trx_id);
         GU_DBUG_RETURN(GALERA_MISSING_SEQNO);
     }
     GU_DBUG_RETURN(trx->seqno_l);
