@@ -557,11 +557,21 @@ struct Stats {
         // }
     }
 
+    static double fraction_of(const uint64_t a, const uint64_t b) {
+        if (b == 0)
+            return 0;
+        else 
+            return double(a)/double(b);
+    }
+
     void print() {
         LOG_INFO("Sent messages: " + ::to_string(sent_msgs));
         LOG_INFO("Total messages: " + ::to_string(total_msgs));
         for (size_t i = 0; i < 6; ++i) {
-            LOG_INFO("Type " + ::to_string(i) + " messages: " + ::to_string(msgs[i]));
+            LOG_INFO("Type " + EVSMessage::to_string(static_cast<EVSMessage::Type>(i)) 
+                     + " messages: " + ::to_string(msgs[i]) 
+                     + " fraction of sent: " + ::to_string(fraction_of(msgs[i], sent_msgs)) 
+                     + " fraction of total: " + ::to_string(fraction_of(msgs[i], total_msgs)));
         }
     }
 
@@ -689,6 +699,7 @@ static void send_msgs_rnd(std::vector<Inst*>* vec, size_t max_n)
     }
 }
 
+#if 0
 static void send_msgs_rnd_single(std::vector<Inst*>* vec, size_t max_n)
 {
     static uint32_t seq = 0;
@@ -708,6 +719,7 @@ static void send_msgs_rnd_single(std::vector<Inst*>* vec, size_t max_n)
             break;
     }
 }
+#endif
 
 static void deliver_msgs(std::vector<Inst*>* pvec)
 {
@@ -731,6 +743,7 @@ static void deliver_msgs(std::vector<Inst*>* pvec)
 
 START_TEST(check_evs_proto_user_msg)
 {
+    stats.clear();
     std::vector<Inst*> vec;
     for (size_t n = 0; n < 8; ++n) {
         vec.resize(n + 1);
@@ -803,17 +816,26 @@ START_TEST(check_evs_proto_user_msg)
 
     stats.print();
     stats.clear();
+}
+END_TEST
 
-    LOG_INFO("random single sending 64");
-
-    for (int i = 0; i < 50; ++i) {
-        send_msgs_rnd_single(&vec, 64);
-        deliver_msgs(&vec);
-    }
-
-    stats.print();
+START_TEST(check_evs_proto_transitional)
+{
     stats.clear();
+    std::vector<Inst*> vec;
 
+    for (size_t n = 0; n < 8; ++n) {
+        send_msgs_rnd(&vec, 8);
+        vec.resize(n + 1);
+        DummyTransport* tp = new DummyTransport(0);
+        vec[n] = new Inst(tp, new EVSProto(tp, EVSPid(n + 1, 0, 0)));
+        vec[n]->ep->set_up_context(vec[n]);
+        vec[n]->ep->shift_to(EVSProto::JOINING);
+        vec[n]->ep->send_join();
+        reach_operational(&vec);
+        stats.print();
+        stats.clear();
+    }
 }
 END_TEST
 
@@ -861,6 +883,10 @@ static Suite* suite()
 
     tc = tcase_create("check_evs_proto_user_msg");
     tcase_add_test(tc, check_evs_proto_user_msg);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_evs_proto_transitional");
+    tcase_add_test(tc, check_evs_proto_transitional);
     suite_add_tcase(s, tc);
 
 

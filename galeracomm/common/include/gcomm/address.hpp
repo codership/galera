@@ -151,6 +151,10 @@ public:
     size_t size() const {
 	return proc_id.size() + service_id.size() + segment_id.size();
     }
+
+
+
+
     bool is_invalid() const {
 	return proc_id.is_invalid() || service_id.is_invalid() || segment_id.is_invalid();
     }
@@ -216,7 +220,7 @@ public:
 
     std::string to_string() const {
 	std::ostringstream os;
-	os << "Address(" << static_cast<unsigned int>(get_proc_id().to_uint()) << ",";
+	os << "(" << static_cast<unsigned int>(get_proc_id().to_uint()) << ",";
 	os << static_cast<unsigned int>(get_service_id().to_uint()) << ",";
 	os << static_cast<unsigned int>(get_segment_id().to_uint()) << ")";
 	return os.str();

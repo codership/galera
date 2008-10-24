@@ -127,6 +127,24 @@ public:
 	INSTALL   // Install message
     };
 
+    static std::string to_string(const Type t) {
+        switch (t) {
+        case USER:
+            return "USER";
+        case DELEGATE:
+            return "DELEGATE";
+        case GAP:
+            return "GAP";
+        case JOIN:
+            return "JOIN";
+        case LEAVE:
+            return "LEAVE";
+        case INSTALL:
+            return "INSTALL";
+        }
+        return "";
+    }
+
 
     enum Flag {
 	F_MSG_MORE = 0x1
