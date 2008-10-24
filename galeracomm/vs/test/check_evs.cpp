@@ -595,7 +595,7 @@ struct Stats {
 
 Stats stats;
 
-static void multicast(std::vector<Inst*>* pvec, const ReadBuf* rb)
+static void multicast(std::vector<Inst*>* pvec, const ReadBuf* rb, const int ploss)
 {
     EVSMessage msg;
     fail_unless(msg.read(rb->get_buf(), rb->get_len(), 0));
@@ -603,6 +603,14 @@ static void multicast(std::vector<Inst*>* pvec, const ReadBuf* rb)
     stats.acc_mcast(msg.get_type());
     for (std::vector<Inst*>::iterator j = pvec->begin();
 	 j != pvec->end(); ++j) {
+
+        if (::rand() % 10000 < ploss) {
+            LOG_INFO("dropping " + EVSMessage::to_string(msg.get_type()) + 
+                      " from " + msg.get_source().to_string() + " to " + 
+                     (*j)->ep->my_addr.to_string() + " seq " + ::to_string(msg.get_seq()) );
+            continue;
+        }
+        
 	switch (msg.get_type()) {
 	case EVSMessage::USER:
 	    (*j)->ep->handle_user(msg, msg.get_source(), rb, 0);
@@ -633,7 +641,7 @@ static void reach_operational(std::vector<Inst*>* pvec)
 	     i != pvec->end(); ++i) {
 	    ReadBuf* rb = (*i)->tp->get_out();
 	    if (rb) {
-		multicast(pvec, rb);
+		multicast(pvec, rb, 0);
 		rb->release();
 	    }
 	}
@@ -731,7 +739,24 @@ static void deliver_msgs(std::vector<Inst*>* pvec)
 	    ReadBuf* rb = (*i)->tp->get_out();
 	    if (rb) {
 		empty = false;
-		multicast(pvec, rb);
+		multicast(pvec, rb, 0);
+		rb->release();
+	    }
+	}
+    } while (empty == false);
+}
+
+static void deliver_msgs_lossy(std::vector<Inst*>* pvec, int ploss)
+{
+    bool empty;
+    do {
+	empty = true;
+	for (std::vector<Inst*>::iterator i = pvec->begin();
+	     i != pvec->end(); ++i) {
+	    ReadBuf* rb = (*i)->tp->get_out();
+	    if (rb) {
+		empty = false;
+		multicast(pvec, rb, ploss);
 		rb->release();
 	    }
 	}
@@ -819,7 +844,7 @@ START_TEST(check_evs_proto_user_msg)
 }
 END_TEST
 
-START_TEST(check_evs_proto_transitional)
+START_TEST(check_evs_proto_consensus_with_user_msg)
 {
     stats.clear();
     std::vector<Inst*> vec;
@@ -839,6 +864,28 @@ START_TEST(check_evs_proto_transitional)
 }
 END_TEST
 
+START_TEST(check_evs_proto_msg_loss)
+{
+    stats.clear();
+    std::vector<Inst*> vec;
+    for (size_t n = 0; n < 8; ++n) {
+        vec.resize(n + 1);
+        DummyTransport* tp = new DummyTransport(0);
+        vec[n] = new Inst(tp, new EVSProto(tp, EVSPid(n + 1, 0, 0)));
+        vec[n]->ep->set_up_context(vec[n]);
+        vec[n]->ep->shift_to(EVSProto::JOINING);
+        vec[n]->ep->send_join();
+    }
+    reach_operational(&vec);
+
+    send_msgs_rnd(&vec, 64);
+    deliver_msgs_lossy(&vec, 50);
+
+    stats.print();
+    stats.clear();
+
+}
+END_TEST
 
 static Suite* suite()
 {
@@ -885,11 +932,13 @@ static Suite* suite()
     tcase_add_test(tc, check_evs_proto_user_msg);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("check_evs_proto_transitional");
-    tcase_add_test(tc, check_evs_proto_transitional);
+    tc = tcase_create("check_evs_proto_consensus_with_user_msg");
+    tcase_add_test(tc, check_evs_proto_consensus_with_user_msg);
     suite_add_tcase(s, tc);
 
-
+    tc = tcase_create("check_evs_proto_msg_loss");
+    tcase_add_test(tc, check_evs_proto_msg_loss);
+    suite_add_tcase(s, tc);
 
     return s;
 }

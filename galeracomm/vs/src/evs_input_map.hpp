@@ -226,9 +226,34 @@ public:
     
     bool is_fifo(const iterator& i) const {
         IMap::const_iterator ii = instances.find(i->get_sockaddr());
-        if (ii != instances.end())
+        if (ii == instances.end())
             throw FatalException("Instance not found");
         return !seqno_lt(ii->second.gap.low, i->get_evs_message().get_seq());
+    }
+
+    std::list<EVSRange> get_gap_list(const EVSPid& pid) const {
+        IMap::const_iterator ii = instances.find(pid);
+        if (ii == instances.end())
+            throw FatalException("Instance not found");
+        std::list<EVSRange> lst;
+        assert(!seqno_eq(ii->second.gap.get_high(), SEQNO_MAX));
+        uint32_t start_seq = seqno_eq(ii->second.gap.get_low(), SEQNO_MAX) ? 
+            0 : ii->second.gap.get_low();
+        
+        for (uint32_t seq = start_seq; !seqno_gt(seq, ii->second.gap.get_high());
+             seq = seqno_next(seq)) {
+            EVSInputMapItem tmp(pid, EVSMessage(EVSMessage::USER, 
+                                                pid,
+                                                DROP, 
+                                                seq, 0, 0, EVSViewId(), 0), 0, 0);
+            MLog::iterator i;
+            if ((i = msg_log.find(tmp)) == msg_log.end() && 
+                (i = recovery_log.find(tmp)) == recovery_log.end()) {
+                EVSRange r(seq, seq);
+                lst.push_back(r);
+            }
+        }
+        return lst;
     }
     
     
@@ -263,6 +288,8 @@ public:
                     EVSInputMapItem(item.get_sockaddr(), 
                                     item.get_evs_message(),
                                     new_rb));
+                if (iret.second == false && new_rb)
+                    new_rb->release();
             } else {
                 iret = msg_log.insert(
                     EVSInputMapItem(

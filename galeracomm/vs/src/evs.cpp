@@ -91,6 +91,7 @@ public:
         last_sent(SEQNO_MAX),
         send_window(8), 
         max_output_size(1024),
+        self_loopback(false),
         state(CLOSED) {
             std::pair<std::map<const EVSPid, EVSInstance>::iterator, bool> i =
                 known.insert(std::pair<const EVSPid, EVSInstance>(my_addr, 
@@ -130,6 +131,9 @@ public:
     // Output message queue
     std::deque<WriteBuf*> output;
     uint32_t max_output_size;
+
+
+    bool self_loopback;
     
     enum State {
         CLOSED,
@@ -445,11 +449,11 @@ int EVSProto::send_user(WriteBuf* wb, const EVSSafetyPrefix sp,
     if ((ret = tp->handle_down(wb, 0)) == 0) {
         last_sent = last_msg_seq;
 
-        //ReadBuf* rb = wb->to_readbuf();
-        //EVSRange range = input_map.insert(EVSInputMapItem(my_addr, msg, rb, 0));
-        //assert(seqno_eq(range.get_high(), last_sent));
-        //input_map.set_safe(my_addr, last_sent);
-        //rb->release();
+        ReadBuf* rb = wb->to_readbuf();
+        EVSRange range = input_map.insert(EVSInputMapItem(my_addr, msg, rb, 0));
+        assert(seqno_eq(range.get_high(), last_sent));
+        input_map.set_safe(my_addr, last_sent);
+        rb->release();
     }
     wb->rollback_hdr(msg.get_hdrlen());
     return ret;
@@ -480,7 +484,7 @@ int EVSProto::send_delegate(const EVSPid& sa, WriteBuf* wb)
 void EVSProto::send_gap(const EVSPid& pid, const EVSViewId& source_view, 
                         const EVSRange& range)
 {
-    LOG_DEBUG("send gap");
+    LOG_DEBUG("send gap at " + my_addr.to_string() + " to "  + pid.to_string() + " requesting range " + range.to_string());
     // TODO: Investigate if gap sending can be somehow limited, 
     // message loss happen most probably during congestion and 
     // flooding network with gap messages won't probably make 
@@ -590,35 +594,51 @@ void EVSProto::send_install()
 
 void EVSProto::resend(const EVSPid& gap_source, const EVSGap& gap)
 {
-    
     assert(gap.source == my_addr);
-    if (gap.get_low() == gap.get_high()) {
-        LOG_DEBUG(std::string("EVSProto::resend(): Empty gap") 
+    if (seqno_eq(gap.get_high(), SEQNO_MAX)) {
+        LOG_DEBUG(std::string("empty gap") 
+                  + ::to_string(gap.get_low()) + " -> " 
+                  + ::to_string(gap.get_high()));
+        return;
+    } else if (!seqno_eq(gap.get_low(), SEQNO_MAX) &&
+               seqno_gt(gap.get_low(), gap.get_high())) {
+        LOG_DEBUG(std::string("empty gap") 
                   + ::to_string(gap.get_low()) + " -> " 
                   + ::to_string(gap.get_high()));
         return;
     }
     
-    for (uint32_t seq = gap.get_low(); !seqno_gt(seq, gap.get_high()); 
+    uint32_t start_seq = seqno_eq(gap.get_low(), SEQNO_MAX) ? 0 : gap.get_low();
+    LOG_INFO("resending at " + my_addr.to_string() + " requested by " + gap_source.to_string() + " " + ::to_string(start_seq) + " -> " + ::to_string(gap.get_high()));
+    for (uint32_t seq = start_seq; !seqno_gt(seq, gap.get_high()); 
          seq = seqno_next(seq)) {
-             std::pair<EVSInputMapItem, bool> i = input_map.recover(my_addr,
-seq);
-             if (i.second == false) {
-                 std::map<const EVSPid, EVSInstance>::iterator ii =
-known.find(gap_source);
-                 assert(ii != known.end());
-                 ii->second.trusted = false;
-                 shift_to(RECOVERY);
-                 return;
-             } else {
-                 const ReadBuf* rb = i.first.get_readbuf();
-                 const EVSMessage& msg = i.first.get_evs_message();
-                 WriteBuf wb(rb, rb ? rb->get_len() : 0);
-                 wb.prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
-                 if (tp->handle_down(&wb, 0))
-                     break;
-             }
-         }
+        std::pair<EVSInputMapItem, bool> i = input_map.recover(my_addr,
+                                                               seq);
+        if (i.second == false) {
+            std::map<const EVSPid, EVSInstance>::iterator ii =
+                known.find(gap_source);
+            assert(ii != known.end());
+            ii->second.trusted = false;
+            shift_to(RECOVERY);
+            return;
+        } else {
+            const ReadBuf* rb = i.first.get_readbuf();
+            const EVSMessage& msg = i.first.get_evs_message();
+            assert(seqno_eq(msg.get_seq(), seq));
+            EVSMessage new_msg(msg.get_type(), 
+                               msg.get_source(), 
+                               msg.get_safety_prefix(),
+                               msg.get_seq(), 
+                               msg.get_seq_range(),
+                               input_map.get_aru_seq(),
+                               msg.get_source_view(), 
+                               EVSMessage::F_RESEND);
+            WriteBuf wb(rb ? rb->get_buf() : 0, rb ? rb->get_len() : 0);
+            wb.prepend_hdr(new_msg.get_hdr(), new_msg.get_hdrlen());
+            if (tp->handle_down(&wb, 0))
+                break;
+        }
+    }
 }
 
 void EVSProto::recover(const EVSGap& gap)
@@ -887,7 +907,7 @@ void EVSProto::handle_notification(const TransportNotification *tn)
     // TODO: Do it a bit more gently
     throw FatalException("Transport lost");
     } else {
-    LOG_WARN("Unhandled transport notification: " + to_string(tn->ntype));
+        LOG_WARN("Unhandled transport notification: " + to_string(tn->ntype));
     }
     if (my_addr != ADDRESS_INVALID || state == JOINING)
     send_join();
@@ -971,12 +991,27 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
            (i->second.installed == true || get_state() == RECOVERY) &&
            msg.get_source_view() == current_view);
     
+    if (source == my_addr) {
+        // own messages must already exist in input_map
+        return;
+    }
+
+
     uint32_t prev_aru = input_map.get_aru_seq();
     EVSRange range(input_map.insert(EVSInputMapItem(source, msg, rb, roff)));
     
     // Some messages are missing
-    if (seqno_gt(range.get_high(), range.get_low()))
-        send_gap(i->first, current_view, range);
+    if ((seqno_eq(range.get_low(), SEQNO_MAX) ||
+         seqno_gt(range.get_high(), range.get_low())) &&
+        !(msg.get_flags() & EVSMessage::F_RESEND)) {
+        LOG_INFO("requesting at " + my_addr.to_string() + " from " + source.to_string() + " " + range.to_string() + " due to input map gap, aru " + ::to_string(input_map.get_aru_seq()));
+        std::list<EVSRange> gap_list = input_map.get_gap_list(source);
+        for (std::list<EVSRange>::iterator gi = gap_list.begin();
+             gi != gap_list.end(); ++gi) {
+            LOG_INFO(gi->to_string());
+            send_gap(source, current_view, *gi);
+        }
+    }
     
     if (!(i->first == my_addr) && 
         ((output.empty() && !(msg.get_flags() & EVSMessage::F_MSG_MORE)) ||
@@ -989,9 +1024,10 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
         LOG_DEBUG("sending dummy: " + ::to_string(last_sent) + " -> " + ::to_string(range.get_high()));
         WriteBuf wb(0, 0);
         send_user(&wb, DROP, send_window, range.get_high());
-    } else if (output.empty() && 
-               (seqno_eq(input_map.get_aru_seq(), SEQNO_MAX) ||
-                !seqno_eq(input_map.get_aru_seq(), prev_aru))) {
+    } else if ((output.empty() && 
+                (seqno_eq(input_map.get_aru_seq(), SEQNO_MAX) ||
+                 !seqno_eq(input_map.get_aru_seq(), prev_aru))) &&
+               !(msg.get_flags() & EVSMessage::F_RESEND)) {
         // Output queue empty and aru changed, send gap to inform others
         LOG_DEBUG("sending gap");
         send_gap(source, current_view, EVSRange(SEQNO_MAX, SEQNO_MAX));
@@ -1083,6 +1119,7 @@ void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
     
     // Scan through gap list and resend or recover messages if appropriate.
     EVSGap gap = msg.get_gap();
+    LOG_DEBUG("gap source " + gap.get_source().to_string());
     if (gap.get_source() == my_addr)
         resend(i->first, gap);
     else if (get_state() == RECOVERY && !seqno_eq(gap.get_high(), SEQNO_MAX))
@@ -1093,9 +1130,14 @@ void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
     // send gap message
     EVSRange source_gap(input_map.get_sa_gap(source));
     if (!seqno_eq(msg.get_seq(), SEQNO_MAX) && 
-        !seqno_eq(seqno_next(msg.get_seq()), source_gap.get_low()))
-        send_gap(source, current_view, EVSRange(source_gap.get_low(),
-                                                msg.get_seq()));
+        (seqno_eq(source_gap.get_low(), SEQNO_MAX) ||
+         !seqno_gt(source_gap.get_low(), msg.get_seq()))) {
+        // TODO: Sending gaps here causes excessive flooding, need to 
+        // investigate if gaps can be sent only in send_user
+        // LOG_INFO("requesting at " + my_addr.to_string() + " from " + source.to_string() + " " + EVSRange(source_gap.get_low(), msg.get_seq()).to_string() + " due to gap message");
+        // send_gap(source, current_view, EVSRange(source_gap.get_low(),
+        //                                      msg.get_seq()));
+    }
     
     // Deliver messages 
     deliver();

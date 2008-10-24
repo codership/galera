@@ -84,6 +84,9 @@ struct EVSRange {
     bool operator==(const EVSRange& cmp) const {
 	return cmp.get_low() == low && cmp.get_high() == high;
     }
+    std::string to_string() const {
+        return std::string("[") + ::to_string(low) + "," + ::to_string(high) + "]";
+    }
 };
 
 struct EVSGap {
@@ -103,6 +106,34 @@ struct EVSGap {
     uint32_t get_high() const {
 	return range.high;
     }
+
+    size_t read(const void* buf, const size_t buflen, const size_t offset) {
+        size_t off;
+        if ((off = source.read(buf, buflen, offset)) == 0)
+            return 0;
+        if ((off = read_uint32(buf, buflen, off, &range.low)) == 0)
+            return 0;
+        if ((off = read_uint32(buf, buflen, off, &range.high)) == 0)
+            return 0;
+        return off;
+    }
+
+    size_t write(void* buf, const size_t buflen, const size_t offset) const {
+        size_t off;
+        if ((off = source.write(buf, buflen, offset)) == 0)
+            return 0;
+        if ((off = write_uint32(range.low, buf, buflen, off)) == 0)
+            return 0;
+        if ((off = write_uint32(range.high, buf, buflen, off)) == 0)
+            return 0;
+        return off;
+    }
+
+    size_t size() const {
+        return source.size() + 8;
+    }
+
+
 };
 
 enum EVSSafetyPrefix {
@@ -147,7 +178,8 @@ public:
 
 
     enum Flag {
-	F_MSG_MORE = 0x1
+	F_MSG_MORE = 0x1,
+        F_RESEND = 0x2
     };
 
 private:
@@ -442,7 +474,10 @@ public:
 		    if (ii.second  == false)
 			return 0;
 		}
-	    }
+	    } else if (type == GAP) {
+                if ((off = gap.read(buf, buflen, off)) == 0)
+                    return 0;
+            }
 	}
 	return off;
     }
@@ -505,7 +540,10 @@ public:
 			return 0;
 		    }
 		}
-	    }  
+	    } else if (type == GAP) {
+                if ((off = gap.write(buf, buflen, off)) == 0)
+                    return 0;
+            }
 	} 
 	return off;
     }
@@ -513,8 +551,9 @@ public:
     size_t size() const {
 	switch (type) {
 	case USER:
-	case GAP:
 	    return 4 + 4 + 4 + source.size() + source_view.size(); // bits + seq + aru_seq + view
+	case GAP:
+	    return 4 + 4 + 4 + source.size() + source_view.size() + gap.size(); // bits + seq + aru_seq + view + gap
 	case DELEGATE:
 	    return 4 + source.size(); // 
 	case JOIN:
