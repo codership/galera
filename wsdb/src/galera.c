@@ -205,7 +205,7 @@ enum galera_status galera_init(const char*          group,
     gu_mutex_init(&commit_mtx, NULL);
 
     /* create worker queue */
-    applier_queue = job_queue_create(2, ws_conflict_check);
+    applier_queue = job_queue_create(8, ws_conflict_check);
 
     /* debug level printing to /tmp directory */
     {
@@ -611,8 +611,9 @@ static void process_query_write_set(
 
 
     //print_ws(wslog_G, ws, seqno_l);
-    gu_debug("remote trx seqno: %llu %llu last_seen_trx: %llu, cert: %d", seqno_l, seqno_g, ws->last_seen_trx, rcode);
-
+    gu_debug("remote trx seqno: %llu %llu last_seen_trx: %llu, cert: %d", 
+             seqno_l, seqno_g, ws->last_seen_trx, rcode
+    );
 
  retry:
     switch (rcode) {
@@ -624,7 +625,9 @@ static void process_query_write_set(
         job_queue_start_job(applier_queue, applier, (void *)&ctx);
 
         while((rcode = apply_write_set(app_ctx, ws))) {
-	    gu_warn("ws apply failed for: %llu, last_seen: %llu", seqno_g, ws->last_seen_trx);
+	    gu_warn("ws apply failed for: %llu, last_seen: %llu", 
+                    seqno_g, ws->last_seen_trx
+            );
         }
         
         job_queue_end_job(applier_queue, applier);
@@ -643,7 +646,6 @@ static void process_query_write_set(
 
         /* TODO: convert into ha_commit() or smth */
         rcode = apply_query(app_ctx, "commit\0", 7);
-
 
         if (rcode) {
 	    gu_warn("ws apply commit failed for: %llu, last_seen: %llu", 
@@ -813,7 +815,13 @@ enum galera_status galera_recv(void *app_ctx) {
     }
 
     applier = job_queue_new_worker(applier_queue);
-
+    if (!applier) {
+        gu_error("galera, could not create applier");
+        gu_info("active_workers: %d, max_workers: %d",
+                 applier_queue->active_workers,applier_queue->max_workers
+        );
+        return GALERA_NODE_FAIL;
+    }
     for (;;) {
         gcs_act_type_t  action_type;
         size_t          action_size;
@@ -831,6 +839,8 @@ enum galera_status galera_recv(void *app_ctx) {
 	if (rcode < 0) return GALERA_CONN_FAIL;
 
         assert (GCS_SEQNO_ILL != seqno_l);
+
+        gu_debug("worker: %d recvd", applier->id);
 
         switch (action_type) {
         case GCS_ACT_DATA:

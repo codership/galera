@@ -53,8 +53,10 @@ int job_queue_destroy(struct job_queue *queue) {
 struct job_worker *job_queue_new_worker(struct job_queue *queue) {
     struct job_worker *worker;
     CHECK_OBJ(queue, job_queue);
+    gu_mutex_lock(&(queue->mutex));
 
     if (queue->active_workers == queue->max_workers) {
+        gu_mutex_unlock(&(queue->mutex));
         return NULL;
     }
 
@@ -62,6 +64,7 @@ struct job_worker *job_queue_new_worker(struct job_queue *queue) {
 
     worker->id = queue->active_workers;
     queue->active_workers++;
+    gu_mutex_unlock(&(queue->mutex));
 
     return (worker);
 }
@@ -82,7 +85,9 @@ int job_queue_start_job(
 
     /* check against all active jobs */
     for (i=0; i<queue->active_workers; i++) {
-        if (queue->jobs[i].state == JOB_RUNNING) {
+        if (queue->jobs[i].state == JOB_RUNNING && 
+            queue->jobs[i].id != worker->id
+        ) {
             if (queue->conflict_test(ctx, queue->jobs[i].ctx)) {
                 queue->jobs[i].waiters[worker->id] = 1;
                 gu_warn ("job %d  waiting for: %d", worker->id, i);
@@ -95,6 +100,7 @@ int job_queue_start_job(
     worker->ctx   = ctx;
     worker->state = JOB_RUNNING;
 
+    gu_debug("job: %d starting", worker->id);
     gu_mutex_unlock(&(queue->mutex));
     return WSDB_OK;
 }
@@ -117,6 +123,7 @@ int job_queue_end_job(struct job_queue *queue, struct job_worker *worker
     queue->jobs[worker->id].state = JOB_COMPLETED;
     queue->jobs[worker->id].ctx   = NULL;
     
+    gu_debug("job: %d complete", worker->id);
     gu_mutex_unlock(&(queue->mutex));
 
     return WSDB_OK;
