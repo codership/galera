@@ -108,6 +108,7 @@ public:
     }
     
     EVSPid my_addr;
+    typedef std::map<const EVSPid, EVSInstance> InstMap;
     // 
     // Known instances 
     std::map<const EVSPid, EVSInstance> known;
@@ -183,6 +184,19 @@ public:
     
     void resend(const EVSPid&, const EVSGap&);
     void recover(const EVSGap&);
+
+
+
+    void cleanup_unoperational() {
+        InstMap::iterator i, i_next;
+        for (i = known.begin(); i != known.end(); i = i_next) {
+            i_next = i, ++i_next;
+            if (i->second.trusted == true && i->second.operational == false) {
+                known.erase(i);
+            }
+        }
+    }
+
     void deliver();
     void deliver_trans();
     void deliver_reg_view() {
@@ -746,6 +760,7 @@ void EVSProto::shift_to(const State s)
     
     switch (s) {
     case CLOSED:
+        cleanup_unoperational();
         cleanup();
         state = CLOSED;
         break;
@@ -772,6 +787,7 @@ void EVSProto::shift_to(const State s)
         deliver_reg_view();
     // Reset input map
         input_map.clear();
+        cleanup_unoperational();
         for (std::map<const EVSPid, EVSInstance>::iterator i = known.begin(); i
 != known.end(); ++i)
             if (i->second.installed)
@@ -791,7 +807,8 @@ void EVSProto::shift_to(const State s)
 
 void EVSProto::deliver()
 {
-    if (state != OPERATIONAL && state != RECOVERY && get_state() != LEAVING)
+    if (get_state() != OPERATIONAL && get_state() != RECOVERY && 
+        get_state() != LEAVING)
         throw FatalException("Invalid state");
     
     LOG_DEBUG("aru_seq: " + ::to_string(input_map.get_aru_seq()) + " safe_seq: "
@@ -836,7 +853,7 @@ void EVSProto::deliver()
 
 void EVSProto::deliver_trans()
 {
-    if (state != RECOVERY)
+    if (get_state() != RECOVERY && get_state() != LEAVING)
         throw FatalException("Invalid state");
     // In transitional configuration we must deliver all messages that 
     // are fifo. This is because:
@@ -1379,6 +1396,39 @@ void EVSProto::handle_leave(const EVSMessage& msg, const EVSPid& source)
     
     if (source == my_addr) {
         assert(state == LEAVING);
+        // Move all unsent messages into input map
+        std::deque<WriteBuf*>::iterator i;
+        for (i = output.begin(); i != output.end(); i = output.begin()) {
+            last_sent = seqno_eq(last_sent, SEQNO_MAX) ? 0 : 
+                seqno_next(last_sent);
+            WriteBuf* wb = (*i);
+            output.erase(i);
+            EVSMessage msg(EVSMessage::USER, my_addr, SAFE, last_sent, 
+                           0, 
+                           input_map.get_aru_seq(), current_view, 
+                           0);            
+            ReadBuf* rb = wb->to_readbuf();
+            delete wb;
+            EVSRange range = input_map.insert(EVSInputMapItem(my_addr, 
+                                                              msg, rb, 0));
+            assert(seqno_eq(range.get_high(), last_sent));
+            input_map.set_safe(my_addr, last_sent);
+            rb->release();
+
+        }
+        // Set all other instances as unoperational
+        for (std::map<const EVSPid, EVSInstance>::iterator i = known.begin();
+             i != known.end(); ++i) {
+            if (!(i->first == my_addr))
+                i->second.operational = false;
+        }
+        // Deliver all undelivered 
+        deliver();
+        // Deliver trans view
+        deliver_trans_view();
+        // Deliver trans messages
+        deliver_trans();
+        // Deliver empty view to denote end of operation
         deliver_empty_view();
         shift_to(CLOSED);
         return;
