@@ -536,7 +536,8 @@ static bool all_operational(const std::vector<Inst*>* pvec)
 {
     for (std::vector<Inst*>::const_iterator i = pvec->begin(); 
 	 i != pvec->end(); ++i) {
-	if ((*i)->ep->get_state() != EVSProto::OPERATIONAL)
+	if ((*i)->ep->get_state() != EVSProto::OPERATIONAL &&
+            (*i)->ep->get_state() != EVSProto::CLOSED)
 	    return false;
     }
     return true;
@@ -604,12 +605,16 @@ static void multicast(std::vector<Inst*>* pvec, const ReadBuf* rb, const int plo
     for (std::vector<Inst*>::iterator j = pvec->begin();
 	 j != pvec->end(); ++j) {
 
+        if ((*j)->ep->get_state() == EVSProto::CLOSED)
+            continue;
+        
         if (::rand() % 10000 < ploss) {
             LOG_INFO("dropping " + EVSMessage::to_string(msg.get_type()) + 
-                      " from " + msg.get_source().to_string() + " to " + 
+                     " from " + msg.get_source().to_string() + " to " + 
                      (*j)->ep->my_addr.to_string() + " seq " + ::to_string(msg.get_seq()) );
             continue;
         }
+        
         
 	switch (msg.get_type()) {
 	case EVSMessage::USER:
@@ -878,11 +883,41 @@ START_TEST(check_evs_proto_msg_loss)
     }
     reach_operational(&vec);
 
-    send_msgs_rnd(&vec, 64);
-    deliver_msgs_lossy(&vec, 50);
-
+    for (int i = 0; i < 50; ++i) {
+        send_msgs_rnd(&vec, 8);
+        deliver_msgs_lossy(&vec, 50);
+    }
     stats.print();
     stats.clear();
+
+}
+END_TEST
+
+
+START_TEST(check_evs_proto_leave)
+{
+    stats.clear();
+    std::vector<Inst*> vec;
+
+    for (size_t n = 0; n < 8; ++n) {
+        send_msgs_rnd(&vec, 8);
+        vec.resize(n + 1);
+        DummyTransport* tp = new DummyTransport(0);
+        vec[n] = new Inst(tp, new EVSProto(tp, EVSPid(n + 1, 0, 0)));
+        vec[n]->ep->set_up_context(vec[n]);
+        vec[n]->ep->shift_to(EVSProto::JOINING);
+        vec[n]->ep->send_join();
+        reach_operational(&vec);
+        stats.print();
+        stats.clear();
+    }
+
+    for (size_t n = 8; n > 0; --n) {
+        send_msgs_rnd(&vec, 8);
+        vec[n - 1]->ep->shift_to(EVSProto::LEAVING);
+        vec[n - 1]->ep->send_leave();
+        reach_operational(&vec);
+    }
 
 }
 END_TEST
@@ -938,6 +973,10 @@ static Suite* suite()
 
     tc = tcase_create("check_evs_proto_msg_loss");
     tcase_add_test(tc, check_evs_proto_msg_loss);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_evs_proto_leave");
+    tcase_add_test(tc, check_evs_proto_leave);
     suite_add_tcase(s, tc);
 
     return s;

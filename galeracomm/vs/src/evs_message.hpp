@@ -560,7 +560,7 @@ public:
 	case INSTALL:
 	    return 4 + 4 + 4 + source.size() + source_view.size() + 4 + instances->size()*Instance::size();
 	case LEAVE:
-	    return 4 + 4 + 4 + source_view.size();
+	    return 4 + 4 + 4 + source.size() + source_view.size();
 	}
 	return 0;
     }
