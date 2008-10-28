@@ -329,6 +329,7 @@ public:
         version(0), 
         type(type_), 
         seq(seq_),
+        seq_range(0),
         aru_seq(aru_seq_),
         source_view(source_view_),
         source(source_),
@@ -346,29 +347,16 @@ public:
 	version(0),
 	type(type_),
 	seq(safe_seq_),
+        seq_range(0),
 	aru_seq(aru_seq_),
 	source_view(vid_),
-	source(source_)  {
-	
-	if (type != JOIN && type != INSTALL)
-	    throw FatalException("Invalid type");
-        instances = new std::map<EVSPid, Instance>();
-    }
-    
-    // Leave message
-    EVSMessage(const Type type_, const EVSPid& source_, 
-	       const EVSViewId& vid_) :
-	version(0),	
-	type(type_),
-	safety_prefix(AGREED),
-	seq(0),
-	seq_range(0),
-	flags(0),
-	source_view(vid_),
 	source(source_),
-	instances(0) {
-	if (type != LEAVE)
+        instances(0) {
+	
+	if (type != JOIN && type != INSTALL && type != LEAVE)
 	    throw FatalException("Invalid type");
+        if (type != LEAVE)
+            instances = new std::map<EVSPid, Instance>();
     }
 
 
