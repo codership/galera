@@ -328,12 +328,17 @@ static int update_index(
                 index_pool, sizeof(struct index_rec)
             );
 #endif
+            if (!new_trx) {
+                gu_error("cert index rec malloc failed: %d", errno);
+                return WSDB_OUT_OF_MEM;
+            }
             new_trx->trx_seqno = trx_seqno;
             rcode = wsdb_hash_push(
                 key_index, key_len, all_keys, (void *)new_trx
             );
             if (rcode) {
-              gu_error("cert index push failed: %d", rcode);
+                gu_error("cert index push failed: %d", rcode);
+                return WSDB_CERT_UPDATE_FAIL;
             }
 
         } else {
@@ -447,6 +452,7 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     /* update index */
     rcode = update_index(ws, trx_seqno); 
     if (rcode) {
+        gu_debug("certified WS failed to update in certification index");
         gu_free(ws->key_composition);
         ws->key_composition = NULL;
         return rcode;

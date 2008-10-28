@@ -28,6 +28,8 @@
 /* WSDB detailed return codes */
 #define WSDB_CERTIFICATION_PASS 101 //!<  certification test passed
 #define WSDB_CERTIFICATION_FAIL 102 //!< certification test failed
+#define WSDB_CERT_UPDATE_FAIL   103 //!< problem in certification index
+#define WSDB_OUT_OF_MEM         200
 #define WSDB_ERR_TRX_UNKNOWN    201
 #define WSDB_ERR_TOO_LONG_KEY   202
 #define WSDB_ERR_NO_KEY         203

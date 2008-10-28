@@ -72,6 +72,9 @@ int file_cache_close(struct file_cache *cache) {
     free_entries(cache->entries_swapped);
     free_entries(cache->entries_deleted);
 
+    gu_cond_destroy(&cache->cond);
+    gu_mutex_destroy(&cache->mutex);
+
     return WSDB_OK;
 }
 
@@ -135,7 +138,8 @@ struct file_cache *file_cache_open(
     cache->max_size   = (max_blocks > max_elems) ? max_blocks : max_elems;
     
     /* initialize the mutex */
-    gu_mutex_init (&cache->mutex, NULL);
+    gu_mutex_init(&cache->mutex, NULL);
+    gu_cond_init(&cache->cond, NULL);
 
     return cache;
 }
@@ -216,7 +220,7 @@ static void swap_entry_from_list(
 
 static void swap_entry(struct file_cache *cache, struct cache_entry *entry) {
     GU_DBUG_ENTER("swap_entry");
-
+ start:
     if (cache->entries_deleted) {
         struct cache_entry *deleted = cache->entries_deleted;
 
@@ -234,42 +238,12 @@ static void swap_entry(struct file_cache *cache, struct cache_entry *entry) {
         gu_free(deleted);
 
     } else if (cache->entries_swappable) {
-#ifdef REMOVED
-        struct cache_entry *swapped = cache->entries_swappable;
-
-        CHECK_OBJ(swapped, cache_entry);
-        GU_DBUG_PRINT("wsdb",
-                   ("swap: %d over %d",entry->cache_id, swapped->cache_id)
-        );
-        /* steal block from swapped */
-        swapped->state = BLOCK_SWAPPED;
-        entry->data    = swapped->data;
-
-        /* write swapped to disk */
-        if (swapped->file_addr) {
-            GU_DBUG_PRINT("wsdb",("writing to cache file"));
-            cache->file->write_block(
-                cache->file, swapped->file_addr, 
-                cache->block_size, swapped->data
-            );
-        } else {
-            GU_DBUG_PRINT("wsdb",("appending to cache file"));
-            swapped->file_addr = cache->file->append_block(
-                cache->file, cache->block_size, swapped->data
-            );
-        }
-        swapped->data  = NULL;
-
-        /* remove swapped from swappable list */
-        RM_FROM_LIST((cache->entries_swappable), swapped);
-
-        /* put swapped in swapped list */
-        ADD_TO_LIST((cache->entries_swapped), swapped);
-#endif
         swap_entry_from_list(cache, &cache->entries_swappable, entry);
-
     } else if (cache->entries_active) {
-        swap_entry_from_list(cache, &cache->entries_active, entry);
+      //swap_entry_from_list(cache, &cache->entries_active, entry);
+      gu_debug("waiting for file cache block");
+      gu_cond_wait(&cache->cond, &cache->mutex);
+      goto start;
     } else {
 
         /* cache full, need to wait */
@@ -282,8 +256,13 @@ static void swap_entry(struct file_cache *cache, struct cache_entry *entry) {
 void *file_cache_new(struct file_cache *cache, cache_id_t id) {
     struct cache_entry *entry;
     int rcode;
+    GU_DBUG_ENTER("file_cache_new");
 
     CHECK_OBJ(cache, file_cache);
+    if (!id) {
+        gu_warn("trying to create cache block with id 0");
+        GU_DBUG_RETURN(NULL);
+    }
     gu_mutex_lock(&cache->mutex);
     entry = (struct cache_entry *)wsdb_hash_search(
         cache->hash, sizeof(cache_id_t), (char *)&id
@@ -291,7 +270,7 @@ void *file_cache_new(struct file_cache *cache, cache_id_t id) {
     if (entry) {
         gu_error("file cache entry exists: %lu-%lu", id, entry->cache_id);
         gu_mutex_unlock(&cache->mutex);
-        return NULL;
+        GU_DBUG_RETURN(NULL);
     }
 
     MAKE_OBJ(entry, cache_entry);
@@ -305,7 +284,7 @@ void *file_cache_new(struct file_cache *cache, cache_id_t id) {
     if (rcode) {
         gu_error("file cache hash push failed,: %d %lu-%lu", rcode, id);
         gu_mutex_unlock(&cache->mutex);
-        return NULL;
+        GU_DBUG_RETURN(NULL);
     }
 
     /* create or reuse cache data block */
@@ -327,7 +306,7 @@ void *file_cache_new(struct file_cache *cache, cache_id_t id) {
 
     gu_mutex_unlock(&cache->mutex);
 
-    return entry->data;
+    GU_DBUG_RETURN(entry->data);
 }
 
 void *file_cache_get(struct file_cache *cache, cache_id_t id) {
@@ -336,6 +315,10 @@ void *file_cache_get(struct file_cache *cache, cache_id_t id) {
     GU_DBUG_ENTER("file_cache_get");
 
     CHECK_OBJ(cache, file_cache);
+    if (!id) {
+        gu_warn("trying to fetch cache block with id 0");
+        GU_DBUG_RETURN(NULL);
+    }
     gu_mutex_lock(&cache->mutex);
     entry = (struct cache_entry *)wsdb_hash_search(
         cache->hash, sizeof(cache_id_t), (char *)&id
@@ -397,6 +380,10 @@ int file_cache_forget(struct file_cache *cache, cache_id_t id) {
 
     GU_DBUG_ENTER("file_cache_forget");
     CHECK_OBJ(cache, file_cache);
+    if (!id) {
+        gu_warn("trying to forget cache block with id 0");
+        GU_DBUG_RETURN(WSDB_WARNING);
+    }
     gu_mutex_lock(&cache->mutex);
     entry = (struct cache_entry *)wsdb_hash_search(
         cache->hash, sizeof(cache_id_t), (char *)&id
@@ -424,6 +411,7 @@ int file_cache_forget(struct file_cache *cache, cache_id_t id) {
     /* add in swappable list */
     ADD_TO_LIST((cache->entries_swappable), entry);
 
+    gu_cond_signal(&cache->cond);
     gu_mutex_unlock(&cache->mutex);
 
     /* keep data block */
@@ -436,6 +424,10 @@ int file_cache_delete(struct file_cache *cache, cache_id_t id) {
     
     GU_DBUG_ENTER("file_cache_delete");
     CHECK_OBJ(cache, file_cache);
+    if (!id) {
+        gu_warn("trying to delete cache block with id 0");
+        GU_DBUG_RETURN(WSDB_WARNING);
+    }
     gu_mutex_lock(&cache->mutex);
     entry = (struct cache_entry *)wsdb_hash_delete(
         cache->hash, sizeof(cache_id_t), (char *)&id
@@ -450,6 +442,7 @@ int file_cache_delete(struct file_cache *cache, cache_id_t id) {
     /* remove entry from active list */
     switch (entry->state) {
     case BLOCK_ACTIVE:    RM_FROM_LIST((cache->entries_active), entry);
+        gu_cond_signal(&cache->cond);
         break;
     case BLOCK_SWAPPABLE: RM_FROM_LIST((cache->entries_swappable), entry);
         break;
@@ -475,7 +468,7 @@ cache_id_t file_cache_allocate_id(struct file_cache *cache) {
 
     gu_mutex_lock(&cache->mutex);
 
-    if (cache->last_cache_id == UINT_MAX) {
+    if (cache->last_cache_id == UINT_MAX-1) {
         cache->last_cache_id = 0;
     }
     retval =  ++cache->last_cache_id;

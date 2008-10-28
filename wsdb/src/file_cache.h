@@ -33,6 +33,7 @@ struct file_cache {
     struct cache_entry *entries_deleted;   //!< deleted entries
 
     gu_mutex_t          mutex;             //!< some privacy needed
+    gu_cond_t           cond;
 };
 #define IDENT_file_cache 'C'
 int file_cache_close(struct file_cache *cache);
