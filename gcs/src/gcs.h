@@ -135,6 +135,7 @@ typedef enum gcs_act_type
     GCS_ACT_STATE_REQ,  //! request for state transfer
     GCS_ACT_CONF,       //! new configuration
     GCS_ACT_JOIN,       //! state transfer status
+    GCS_ACT_SYNC,       //! synchronized with group
     GCS_ACT_FLOW,       //! flow control
     GCS_ACT_SERVICE,    //! service action, sent by GCS
     GCS_ACT_ERROR,      //! error happened while receiving the action
@@ -240,11 +241,12 @@ typedef struct gcs_to gcs_to_t;
  * TO object can be used to serialize access to application
  * critical section using sequence number.
  *
- * @param len A length of the waiting queue. Should be no less than the
- *            possible maximum number of threads competing for the resource,
- *            but should not be too high either. Perhaps 1024 is good enough
- *            for most applications.
- * @param seqno A starting sequence number. Normally 1.
+ * @param len   A length of the waiting queue. Should be no less than the
+ *              possible maximum number of threads competing for the resource,
+ *              but should not be too high either. Perhaps 1024 is good enough
+ *              for most applications.
+ * @param seqno A starting sequence number
+ *              (the first to be used by gcs_to_grab()).
  * @return Pointer to TO object or NULL in case of error.
  */
 extern gcs_to_t* gcs_to_create (int len, gcs_seqno_t seqno);
@@ -356,14 +358,14 @@ extern long gcs_conf_debug_off        ();
 extern long
 gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size);
 //#define GCS_DEFAULT_PKT_SIZE 1500 /* Standard Ethernet frame */
-#define GCS_DEFAULT_PKT_SIZE 66000 /* 44 Eth. frames to carry max IP packet */
+#define GCS_DEFAULT_PKT_SIZE 64500 /* 43 Eth. frames to carry max IP packet */
 
 /* Configuration action */
 /*! Member name max length (including terminating null) */
 #define GCS_MEMBER_NAME_MAX 40
 
 typedef struct {
-    gcs_seqno_t  seqno;         /// next action seqno
+    gcs_seqno_t  seqno;         /// last global seqno applied by this group
     gcs_seqno_t  conf_id;       /// configuration ID (-1 if non-primary)
     uint8_t      group_uuid[GCS_UUID_LEN];/// group UUID
     bool         st_required;   /// state transfer is required (gap in seqnos)

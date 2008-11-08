@@ -18,9 +18,10 @@ GCS_SRCS = \
 	gcs_fifo_lite.c \
 	gcs_queue.c     \
 	gcs_to.c        \
+	gcs_msg_type.c  \
 	gcs_comp_msg.c  \
-	gcs_dummy.c     \
 	gcs_backend.c   \
+	gcs_dummy.c     \
 	gcs_act_proto.c \
 	gcs_defrag.c    \
 	gcs_state.c     \
@@ -50,7 +51,7 @@ lib_LTLIBRARIES   = libgcs.la
 libgcs_la_SOURCES = $(GCS_SRCS) $(GCS_INCS)
 libgcs_la_LIBADD = $(GCOMM_LIBS)
 #libgcs_la_LDADD =
-INTERFACE = 8
+INTERFACE = 9
 REVISION  = 0
 AGE       = 0
 libgcs_la_LDFLAGS = \

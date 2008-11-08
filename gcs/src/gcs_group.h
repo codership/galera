@@ -85,9 +85,15 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg);
 extern gcs_seqno_t
 gcs_group_handle_last_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
 
-/*! @return 0 for success or negative error code */
+/*! @return 0 for success, 1 for (success && i_am_sender)
+ * or negative error code */
 extern long
 gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
+
+/*! @return 0 for success, 1 for (success && i_am_sender)
+ * or negative error code */
+extern long
+gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
 
 extern long
 gcs_group_handle_state_request (gcs_group_t*    group,

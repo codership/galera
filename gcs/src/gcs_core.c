@@ -19,7 +19,7 @@
 #include "gcs_group.h"
 #include "gcs_core.h"
 
-const size_t CORE_FIFO_LEN = 1<<8; // 256 elements (no need to have more)
+const size_t CORE_FIFO_LEN = 1 << 8; // 256 elements (no need to have more)
 const size_t CORE_INIT_BUF_SIZE = 4096;
 
 typedef enum core_state
@@ -723,6 +723,59 @@ core_handle_state_msg (gcs_core_t*     core,
     return ret;
 }
 
+/*!
+ * Some service actions are for internal use and consist of a single message
+ * (FLOW, JOIN, SYNC)
+ * In this case we can simply use msg->buf as an action buffer, since we
+ * can guarantee that we don't deallocate it. Action here is just a wrapper
+ * to deliver message to the upper level.
+ */
+static ssize_t
+core_msg_to_action (gcs_core_t*     core,
+                    gcs_recv_msg_t* msg,
+                    gcs_recv_act_t* act)
+{
+    ssize_t      ret = 0;
+    gcs_group_t* group = &core->group;
+
+    if (GCS_GROUP_PRIMARY == gcs_group_state (group)) {
+        gcs_act_type_t act_type;
+
+        switch (msg->type) {
+        case GCS_MSG_FLOW: // most frequent
+            ret = 1;
+            act_type = GCS_ACT_FLOW;
+            break;
+        case GCS_MSG_JOIN:
+            ret = gcs_group_handle_join_msg (group, msg);
+            act_type = GCS_ACT_JOIN;
+            break;
+        case GCS_MSG_SYNC:
+            ret = gcs_group_handle_sync_msg (group, msg);
+            act_type = GCS_ACT_SYNC;
+            break;
+        default:
+            gu_error ("Iternal error. Unexpected message type %s from ld%",
+                      gcs_msg_type_string[msg->type], msg->sender_idx);
+            assert (0);
+            ret = -EPROTO;
+        }
+
+        if (ret > 0) {
+            act->type = act_type;
+            act->buf  = msg->buf;
+            ret       = msg->size;
+        }
+    }
+    else {
+        gu_warn ("%s message from member %ld in non-primary configuration",
+                 gcs_msg_type_string[msg->type], msg->sender_idx);
+        assert(0);
+    }
+
+    return ret;
+}
+
 /*! Receives action */
 ssize_t gcs_core_recv (gcs_core_t*      conn,
                        const void**     action,
@@ -758,13 +811,6 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
             ret = core_handle_act_msg(conn, recv_msg, &recv_act);
             assert (ret >= 0); // hang on error in debug mode
 	    break;
-        case GCS_MSG_FLOW:
-            recv_act.type = GCS_ACT_FLOW;
-            // no need to malloc since it is for internal use
-            // do we need a size sanity check here?
-            recv_act.buf = recv_msg->buf;
-            ret          = recv_msg->size;
-            break;
         case GCS_MSG_LAST:
             ret = core_handle_last_msg(conn, recv_msg, &recv_act);
             assert (ret >= 0); // hang on error in debug mode
@@ -783,8 +829,9 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
             assert (ret >= 0); // hang on error in debug mode
             break;
         case GCS_MSG_JOIN:
-            ret = gcs_group_handle_join_msg (&conn->group, recv_msg);
-            assert (ret >= 0); // hang on error in debug mode
+        case GCS_MSG_SYNC:
+        case GCS_MSG_FLOW:
+            ret = core_msg_to_action (conn, recv_msg, &recv_act);
             break;
 	default:
 	    // this normaly should not happen, shall we bother with

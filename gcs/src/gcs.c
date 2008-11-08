@@ -35,16 +35,27 @@ typedef enum
 }
 gcs_conn_state_t;
 
+static const char* gcs_conn_state_string[GCS_CONN_DESTROYED + 1] =
+{
+    "OPEN_SYNCED",
+    "OPEN_JOINED",
+    "OPEN_DONOR",
+    "OPEN_JOINER",
+    "CLOSED",
+    "DESTROYED"
+};
+
+/** Flow control message */
 struct gcs_fc
 {
-    uint32_t conf_id;
-    uint32_t stop;
+    uint32_t conf_id; // least significant part of configuraiton seqno
+    uint32_t stop;    // boolean value
 }
 __attribute__((__packed__));
 
 struct gcs_conn
 {
-    int    my_id;
+    int    my_idx;
     char  *my_name;
     char  *channel;
     char  *socket;
@@ -111,7 +122,8 @@ gcs_create (const char *backend)
                     if (conn->recv_q) {
                         gu_mutex_init (&conn->lock, NULL);
                         gu_mutex_init (&conn->fc_mutex, NULL);
-                        conn->state = GCS_CONN_CLOSED;
+                        conn->state        = GCS_CONN_CLOSED;
+                        conn->my_idx       = -1;
                         conn->local_act_id = GCS_SEQNO_FIRST;
                         return conn; // success
                     }
@@ -208,49 +220,147 @@ gcs_fc_cont (gcs_conn_t* conn)
 }
 
 /*!
+ * State transition functions - just in case we want to add something there.
+ */
+static void
+gcs_become_joiner (gcs_conn_t* conn)
+{
+    if (conn->state < GCS_CONN_OPEN_JOINER) conn->state = GCS_CONN_OPEN_JOINER;
+}
+
+// returns 1 if accepts, 0 if rejects, negative error code if fails.
+static long
+gcs_become_donor (gcs_conn_t* conn)
+{
+    if (conn->state <= GCS_CONN_OPEN_JOINED) {
+        conn->state = GCS_CONN_OPEN_DONOR;
+        return 1;
+    }
+    else if (conn->state <= GCS_CONN_CLOSED){
+        ssize_t err;
+        gu_warn ("Received State Transfer Request in wrong state %s. "
+                 "Rejecting.", gcs_conn_state_string[conn->state]);
+        // reject the request.
+        // error handling currently is way too simplistic
+        err = gcs_join (conn, -EPROTO);
+        if (err < 0 && !(err == -ENOTCONN || err == -EBADFD)) {
+            gu_fatal ("Failed to send State Transfer Request rejection: "
+                      "%zd (%s)", err, (strerror (-err)));
+            assert (0);
+            return -ENOTRECOVERABLE; // failed to clear donor status,
+        }
+    }
+    return 0; // do not pass to application
+}
+
+static void
+gcs_become_joined (gcs_conn_t* conn)
+{
+    if (GCS_CONN_OPEN_JOINER == conn->state ||
+        GCS_CONN_OPEN_DONOR  == conn->state) {
+        conn->state = GCS_CONN_OPEN_JOINED;
+        conn->state = GCS_CONN_OPEN_SYNCED; // remove when SYNC message is ready
+    }
+    else if (conn->state <= GCS_CONN_CLOSED){
+        gu_warn ("Received JOIN action in wrong state %s",
+                 gcs_conn_state_string[conn->state]);
+        assert (0);
+    }
+}
+
+static void
+gcs_become_synced (gcs_conn_t* conn)
+{
+    if (GCS_CONN_OPEN_JOINED == conn->state) {
+        conn->state = GCS_CONN_OPEN_SYNCED;
+    }
+    else if (conn->state < GCS_CONN_CLOSED){
+        gu_warn ("Received SYNC action in wrong state %d",
+                 gcs_conn_state_string[conn->state]);
+        assert (0);
+    }
+}
+
+/*! Handles configuration action */
+static void
+gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
+{
+    const gcs_act_conf_t* conf = action;
+
+    conn->my_idx = conf->my_idx;
+
+    if (conf->st_required) {
+        gcs_become_joiner (conn);
+    }
+    else if (conf->seqno == GCS_SEQNO_NIL) {
+        /* Exceptional rule: no actions have been yet applied,
+         * we're as good as SYNCED */
+        if (conn->state < GCS_CONN_CLOSED) 
+            conn->state = GCS_CONN_OPEN_SYNCED;
+    }
+
+    /* reset flow control as membership is most likely changed */
+    if (gu_mutex_lock (&conn->fc_mutex)) abort();
+    {
+        conn->conf_id     = conf->conf_id;
+        conn->stop_sent   = 0;
+        conn->stop_count  = 0;
+        conn->lower_limit = 2 * conf->memb_num;
+        conn->upper_limit = 2 * conn->lower_limit;
+    }
+    gu_mutex_unlock (&conn->fc_mutex);
+}
+
+/*!
  * Performs work requred by action in current context.
- * @return negative error code, 1 if action should be discarded, 0 if should be
+ * @return negative error code, 0 if action should be discarded, 1 if should be
  *         passed to application.
  */
 static long
 gcs_handle_actions (gcs_conn_t*    conn,
                     const void*    action,
                     size_t         act_size,
-                    gcs_act_type_t act_type)
+                    gcs_act_type_t act_type,
+                    gcs_seqno_t    act_id)
 {
-    long ret = 1;
+    long ret = 0;
 
     switch (act_type) {
-    case GCS_ACT_CONF:
-    {
-        const gcs_act_conf_t* conf = action;
-
-        if ((conn->conf_id + 1) != conf->conf_id) {
-            /* missed a configuration, need a snapshot - no longer JOINED */
-// temporary            if (conn->state == GCS_CONN_JOINED) conn->state = GCS_CONN_OPEN_JOINER;
-        }
-
-        if (gu_mutex_lock (&conn->fc_mutex)) abort();
-        {
-            conn->conf_id     = conf->conf_id;
-            conn->stop_sent   = 0;
-            conn->stop_count  = 0;
-            conn->lower_limit = 2 * conf->memb_num;
-            conn->upper_limit = 2 * conn->lower_limit;
-        }
-        gu_mutex_unlock (&conn->fc_mutex);
-        ret = 0;
-        break;
-    }
     case GCS_ACT_FLOW:
-    {
+    { // this is frequent, so leave it inlined.
         const struct gcs_fc* fc = action;
         assert (sizeof(*fc) == act_size);
-// UNCOMMENT WHEN SYNC MESSAGE IS IMPLEMENTED        if (gtohl(fc->conf_id) != conn->conf_id) break; // obsolete fc request
+        if (gtohl(fc->conf_id) != (uint32_t)conn->conf_id) {
+            // obsolete fc request
+            break;
+        }
         gu_info ("RECEIVED %s", fc->stop ? "STOP" : "CONT");
         conn->stop_count += ((fc->stop != 0) << 1) - 1; // +1 if !0, -1 if 0
         break;
     }
+    case GCS_ACT_CONF:
+        gcs_handle_act_conf (conn, action);
+        ret = 1;
+        break;
+    case GCS_ACT_STATE_REQ:
+        gu_info ("Got GCS_ACT_STATE_REQ to %lld, my idx: %ld",
+                 act_id, conn->my_idx);
+        if ((gcs_seqno_t)conn->my_idx == act_id) {
+            ret = gcs_become_donor (conn);
+            gu_info ("Becoming donor: %s", 1 == ret ? "yes" : "no");
+        }
+        else {
+            ret = 1;
+        }
+        break; 
+    case GCS_ACT_JOIN:
+        gu_info ("Got GCS_ACT_JOIN");
+        gcs_become_joined (conn);
+        break;
+    case GCS_ACT_SYNC:
+        gu_info ("Got GCS_ACT_SYNC");
+        gcs_become_synced (conn);
+        break;
     default:
         break;
     }
@@ -274,8 +384,6 @@ static void *gcs_recv_thread (void *arg)
     const void*    action;
     const void*    local_action = NULL;
 
-//    gu_debug ("Starting RECV thread");
-
     // To avoid race between gcs_open() and the following state check in while()
     // (I'm trying to avoid mutex locking in this loop, so lock/unlock before)
     gu_mutex_lock   (&conn->lock); // wait till gcs_open() is done;
@@ -297,14 +405,14 @@ static void *gcs_recv_thread (void *arg)
 //        gu_info ("Received action type: %d, size: %d, global seqno: %lld",
 //                 act_type, act_size, (long long)act_id);
 
-        if (act_type >= GCS_ACT_CONF) {
-            ret = gcs_handle_actions (conn, action, act_size, act_type);
+        if (gu_unlikely(act_type >= GCS_ACT_STATE_REQ)) {
+            ret = gcs_handle_actions (conn, action, act_size, act_type, act_id);
             if (ret < 0) {         // error
                 gu_debug ("gcs_handle_actions returned %d: %s",
                           ret, strerror(-ret));
                 break;
             }
-            if (ret > 0) continue; // not for application
+            if (gu_likely(ret <= 0)) continue; // not for application
         }
 
         /* deliver to application and increment local order */
@@ -413,9 +521,8 @@ long gcs_open (gcs_conn_t *conn, const char *channel)
                                               NULL,
                                               gcs_recv_thread,
                                               conn))) {
-                    conn->state = GCS_CONN_OPEN_JOINER;
-                    // remove this when SYNC message is implemented.
-                    conn->state = GCS_CONN_OPEN_SYNCED;
+                    conn->state = GCS_CONN_OPEN_JOINER; // by default
+
                     gu_info ("Opened channel '%s'", channel);
                 }
                 else {
@@ -552,7 +659,7 @@ long gcs_send (gcs_conn_t*          conn,
      *  @note: gcs_repl() and gcs_recv() cannot lock connection
      *         because they block indefinitely waiting for actions */
     if (!(ret = gu_mutex_lock (&conn->lock))) { 
-        if (GCS_CONN_OPEN_JOINER >= conn->state) {
+        if (GCS_CONN_CLOSED > conn->state) {
             /* need to make a copy of the action, since receiving thread
              * has no way of knowing that it shares this buffer.
              * also the contents of action may be changed afterwards by
@@ -738,12 +845,9 @@ long gcs_recv (gcs_conn_t*     conn,
 long
 gcs_wait (gcs_conn_t* conn)
 {
-    if (gu_likely(GCS_CONN_OPEN_JOINER >= conn->state)) {
+    if (gu_likely(GCS_CONN_OPEN_SYNCED == conn->state)) {
        return (conn->stop_count > 0 || (conn->queue_len > conn->upper_limit));
     }
-//    if (gu_likely(GCS_CONN_OPEN_JOINER >= conn->state)) {
-//        return (conn->stop_count > 0);
-//    }
     else {
         switch (conn->state) {
         case GCS_CONN_CLOSED:

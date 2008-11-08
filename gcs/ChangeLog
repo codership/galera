@@ -1,3 +1,8 @@
+2008-11-09 Alex 
+    Changed state transfer protocol to require join message to be sent by
+    both parties involved in state transfer. Package version 0.7.1, library
+    interface 9.0.0.
+
 2008-10-21 Alex 
     First implementation of state transfer request protocol. Bumped package
     version to 0.7.0, library interface to 8.0.0.

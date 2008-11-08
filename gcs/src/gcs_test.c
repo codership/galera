@@ -349,6 +349,9 @@ test_after_recv (gcs_test_thread_t* thread)
     else if (total) {
         ret = test_log_in_to (to, thread->local_act_id, NULL);
     }
+    else {
+        gcs_to_self_cancel (to, thread->local_act_id);
+    }
 
     ret = test_send_last_applied (gcs, thread->act_id);
 
@@ -425,28 +428,46 @@ void *gcs_test_send (void *arg)
 static void
 gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
 {
+    long ret;
     static gcs_seqno_t conf_id = 0;
     gcs_act_conf_t* conf = (void*)thread->msg;
 
     fprintf (stdout, "Got GCS_ACT_CONF: Conf: %lld, "
-             "seqno: %lld, members: %zu, my idx: %zu\n",
+             "seqno: %lld, members: %zu, my idx: %zu, local seqno: %lld\n",
              (long long)conf->conf_id, (long long)conf->seqno,
-             conf->memb_num, conf->my_idx);
+             conf->memb_num, conf->my_idx, thread->local_act_id);
     fflush (stdout);
 
     // NOTE: what really needs to be checked is seqno and group_uuid, but here
     //       we don't keep track of them (and don't do real transfers),
     //       so for simplicity, just check conf_id.
-    if (conf->st_required) {
-        gcs_seqno_t seqno;
-        fprintf (stdout, "Gap in configurations: ours: %lld, group: %lld.\n",
-                 conf_id, conf->conf_id);
-        fflush (stdout);
-        fprintf (stdout, "Requesting state transfer: %s\n",
-                 strerror (-gcs_request_state_transfer (gcs, &conf_id,
-                                                        sizeof(conf_id),
-                                                        &seqno)));
-        gcs_to_self_cancel (to, seqno);
+    while (-EAGAIN == (ret = gcs_to_grab (to, thread->local_act_id)));
+    if (0 == ret) {
+        if (conf->st_required) {
+            gcs_seqno_t seqno, s;
+            fprintf (stdout, "Gap in configurations: ours: %lld, group: %lld.\n",
+                     conf_id, conf->conf_id);
+            fflush (stdout);
+            
+            fprintf (stdout, "Requesting state transfer up to %lld: %s\n",
+                     conf->seqno, // this is global seqno
+                     strerror (-gcs_request_state_transfer (gcs, &conf->seqno,
+                                                            sizeof(conf->seqno),
+                                                            &seqno)));
+
+            // pretend that state transfer is complete, cancel every action up
+            // to seqno
+            for (s = thread->local_act_id + 1; s <= seqno; s++) {
+                gcs_to_self_cancel (to, seqno); // this is local seqno
+            }
+
+            fprintf (stdout, "Sending JOIN: %s\n", strerror(-gcs_join(gcs, 0)));
+            fflush (stdout);
+        }
+        gcs_to_release (to, thread->local_act_id);
+    }
+    else {
+        fprintf (stderr, "Failed to grab TO: %ld (%s)", ret, strerror(ret));
     }
     conf_id = conf->conf_id;
 }
@@ -490,20 +511,22 @@ void *gcs_test_recv (void *arg)
             break;
         case GCS_ACT_COMMIT_CUT:
             group_seqno = *(gcs_seqno_t*)thread->msg;
+            gcs_to_self_cancel (to, thread->local_act_id);
             break;
 	case GCS_ACT_CONF:
             gcs_test_handle_configuration (gcs, thread);
 	    break;
         case GCS_ACT_STATE_REQ:
             fprintf (stdout, "Got STATE_REQ\n");
+            gcs_to_grab (to, thread->local_act_id);
             fprintf (stdout, "Sending JOIN: %s\n", strerror(-gcs_join(gcs, 0)));
             fflush (stdout);
+            gcs_to_release (to, thread->local_act_id);
             break;
         default:
             fprintf (stderr, "Unexpected action type: %d\n", thread->act_type);
 
 	}
-
     }
 //    fprintf (stderr, "RECV thread %ld exiting: %s\n",
 //             thread->id, strerror(-ret));

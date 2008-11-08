@@ -21,9 +21,9 @@ typedef enum gcs_state_node
 {
     GCS_STATE_NON_PRIM,      // comes from non-primary configuration
     GCS_STATE_PRIM,          // comes from primary configuration, empty
+    GCS_STATE_DONOR,         // comes from primary conf, joined, donor
     GCS_STATE_JOINED,        // comes from primary conf, joined
     GCS_STATE_SYNCED,        // comes from primary conf, joined, synced
-    GCS_STATE_DONOR,         // comes from primary conf, joined, synced, donor
     GCS_STATE_MAX
 }
 gcs_state_node_t;

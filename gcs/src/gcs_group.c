@@ -407,66 +407,90 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 long
 gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 {
-    long        donor_idx  = msg->sender_idx;
-    gcs_node_t* donor      = &group->nodes[donor_idx];
+    long        sender_idx = msg->sender_idx;
+    gcs_node_t* sender     = &group->nodes[sender_idx];
+
+    assert (GCS_MSG_JOIN == msg->type);
+
+    // TODO: define an explicit type for the join message, like gcs_join_msg_t
     assert (msg->size == sizeof(gcs_seqno_t));
 
-    if (GCS_STATE_DONOR == donor->status) {
+    if (GCS_STATE_DONOR == sender->status ||
+        GCS_STATE_PRIM  == sender->status) {
         long j;
-        gcs_seqno_t seqno      = gu_le64(*(gcs_seqno_t*)msg->buf);
-        gcs_node_t* joiner     = NULL;
-        long        joiner_idx = -1;
+        gcs_seqno_t seqno     = gu_le64(*(gcs_seqno_t*)msg->buf);
+        gcs_node_t* peer      = NULL;
+        const char* peer_id   = NULL;
+        const char* peer_name = "left the group";
+        long        peer_idx  = -1;
+        const char* st_dir    = NULL; // state transfer direction symbol
 
-        // release donor
-        donor->status = GCS_STATE_JOINED;
+        if (GCS_STATE_DONOR == sender->status) {
+            peer_id = sender->joiner;
+            st_dir  = ">>>";
+            sender->status = GCS_STATE_JOINED;
+        }
+        else {
+            peer_id = sender->donor;
+            st_dir  = "<<<";
+            if (seqno >= 0) sender->status = GCS_STATE_JOINED;
+        }
 
-        // Find joiner. Seek backwards as most likely new node is at the end
-        for (j = group->num - 1; j >= 0; j--) {
-            if (j == donor_idx) continue;
-            if (!memcmp(donor->joiner, group->nodes[j].id,
-                        GCS_COMP_MEMB_ID_MAX_LEN + 1)) {
-                joiner_idx = j;
-                joiner     = &group->nodes[joiner_idx];
+        // Try to find peer.
+        for (j = 0; j < group->num; j++) {
+            if (j == sender_idx) continue;
+            if (!memcmp(peer_id, group->nodes[j].id,
+                        sizeof (group->nodes[j].id))) {
+                peer_idx  = j;
+                peer      = &group->nodes[peer_idx];
+                peer_name = peer->name;
             }
         }
 
         if (seqno < 0) {
-            gu_warn ("State Transfer %ld(%s) -> %ld(%s) failed: %d (%s)",
-                     (int)seqno, strerror((int)-seqno),
-                     donor_idx, donor->name, joiner_idx,
-                     joiner ? joiner->name : "");
-            return 0;
+            gu_warn ("State Transfer %ld(%s) %s %ld(%s) failed: %d (%s)",
+                     sender_idx, sender->name, st_dir, peer_idx, peer_name,
+                     (int)seqno, strerror((int)-seqno));
         }
-        // NOTE: even in case of successful ST, joiner may be no longer in the
-        // view
+        else {
+            gu_info ("State Transfer %ld(%s) %s %ld(%s) complete.",
+                     sender_idx, sender->name, st_dir, peer_idx, peer_name);
+        }
 
-        // If joiner is still in the group, mark it as JOINED too.
-        // Make sure that joiner is still using that donor
-        if (joiner && !memcmp(joiner->donor, donor->id,
-                              GCS_COMP_MEMB_ID_MAX_LEN + 1))
-        {
-            // If joiner already received state transfer from that donor,
-            // donor can't be pointing at this joiner and be GCS_STATE_DONOR
-            // at the same time.
-            assert (GCS_STATE_PRIM == joiner->status);
-            joiner->status = GCS_STATE_JOINED;
-        }
-        // NOTE: by the time this message about successful ST is delivered,
-        // joiner theoretically can break from the group, join again and start
-        // new ST from another donor.
-        gu_info ("State Transfer %ld(%s) -> %ld(%s) complete.",
-                 donor_idx, donor->name, joiner_idx,
-                 joiner ? joiner->name : "");
+        return (sender_idx == group->my_idx);
     }
     else {
-        gu_error ("Protocol violation. JOIN message sender %ld is not a donor",
+        // should we freak out and return an error?
+        gu_warn ("Protocol violation. JOIN message sender %ld is not "
+                 "in state transfer. Message ignored.",
                    msg->sender_idx);
         assert (0);
-        // should we return an error?
-        return -EPROTO;
+        return 0;
     }
-    
-    return 0;
+}
+
+long
+gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
+{
+    long        sender_idx = msg->sender_idx;
+    gcs_node_t* sender     = &group->nodes[sender_idx];
+
+    assert (GCS_MSG_SYNC == msg->type);
+
+    if (GCS_STATE_JOINED == sender->status) {
+
+        sender->status = GCS_STATE_SYNCED;
+
+        return (sender_idx == group->my_idx);
+    }
+    else {
+        // should we freak out and return an error?
+        gu_warn ("Protocol violation. SYNC message sender %ld is not joined."
+                  " Message ignored.",
+                   msg->sender_idx);
+        assert (0);
+        return 0;
+    }
 }
 
 static long
@@ -550,7 +574,7 @@ gcs_group_handle_state_request (gcs_group_t*    group,
     // It will be used to detect error conditions (no availabale donor,
     // donor crashed and the like).
     // This may be ugly, well, any ideas?
-    if (group->my_idx == joiner_idx) act->id = donor_idx;
+    act->id = donor_idx;
 
     gu_info ("Node %ld requested State Transfer. "
              "Selected %ld as donor.", joiner_idx, donor_idx);

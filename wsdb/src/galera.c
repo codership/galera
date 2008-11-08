@@ -57,7 +57,7 @@ static galera_log_cb_t           galera_log_handler = NULL;
 //static void *app_ctx = NULL;
 
 /* gcs parameters */
-static gcs_to_t           *to_queue     = NULL;
+static gcs_to_t           *to_queue     = NULL; // rename to cert_queue?
 static gcs_to_t           *commit_queue = NULL;
 static gcs_conn_t         *gcs_conn     = NULL;
 static char               *gcs_channel  = "dummy_galera";
@@ -65,7 +65,7 @@ static char               *gcs_url      = NULL;
 
 /* state trackers */
 // Suggestion: galera_init() can take initial seqno and UUID at start-up
-static gcs_seqno_t         my_seqno;
+static gcs_seqno_t         my_seqno; // global state seqno
 static gu_uuid_t           my_uuid;
 static long                my_idx;
 
@@ -543,41 +543,116 @@ static inline long galera_eagain (long (*function) (gcs_to_t*, gcs_seqno_t),
     return rcode;
 }
 
+// the following are made as macros to allow for correct line number reporting
+#define GALERA_GRAB_TO_QUEUE(seqno)                                  \
+{                                                                    \
+    long ret = galera_eagain (gcs_to_grab, to_queue, seqno);         \
+    if (gu_unlikely(ret)) {                                          \
+        gu_fatal("Failed to grab to_queue at %lld: %ld (%s)",        \
+                 seqno, ret, strerror(-ret));                        \
+        assert(0);                                                   \
+        abort();                                                     \
+    }                                                                \
+}
+
+#define GALERA_RELEASE_TO_QUEUE(seqno)                               \
+{                                                                    \
+    long ret = gcs_to_release (to_queue, seqno);                     \
+    if (gu_unlikely(ret)) {                                          \
+        gu_fatal("Failed to release to_queue at %lld: %ld (%s)",     \
+                 seqno, ret, strerror(-ret));                        \
+        assert(0);                                                   \
+        abort();                                                     \
+    }                                                                \
+}
+
+#define GALERA_SELF_CANCEL_TO_QUEUE(seqno)                           \
+{                                                                    \
+    long ret = galera_eagain (gcs_to_self_cancel, to_queue, seqno);  \
+    if (gu_unlikely(ret)) {                                          \
+        gu_fatal("Failed to self-cancel to_queue at %lld: %ld (%s)", \
+                 seqno, ret, strerror(-ret));                        \
+        assert(0);                                                   \
+        abort();                                                     \
+    }                                                                \
+}
+
+#define GALERA_GRAB_COMMIT_QUEUE(seqno)                                  \
+{                                                                        \
+    long ret = galera_eagain (gcs_to_grab, commit_queue, seqno);         \
+    if (gu_unlikely(ret)) {                                              \
+        gu_fatal("Failed to grab commit_queue at %lld: %ld (%s)",        \
+                 seqno, ret, strerror(-ret));                            \
+        assert(0);                                                       \
+        abort();                                                         \
+    }                                                                    \
+}
+
+#define GALERA_RELEASE_COMMIT_QUEUE(seqno)                               \
+{                                                                        \
+    long ret = gcs_to_release (commit_queue, seqno);                     \
+    if (gu_unlikely(ret)) {                                              \
+        gu_fatal("Failed to release commit_queue at %lld: %ld (%s)",     \
+                 seqno, ret, strerror(-ret));                            \
+        assert(0);                                                       \
+        abort();                                                         \
+    }                                                                    \
+}
+
+#define GALERA_SELF_CANCEL_COMMIT_QUEUE(seqno)                           \
+{                                                                        \
+    long ret = galera_eagain (gcs_to_self_cancel, commit_queue, seqno);  \
+    if (gu_unlikely(ret)) {                                              \
+        gu_fatal("Failed to self-cancel commit_queue at %lld: %ld (%s)", \
+                 seqno, ret, strerror(-ret));                            \
+        assert(0);                                                       \
+        abort();                                                         \
+    }                                                                    \
+}
+
+// returns true if action to be applied and false if to be skipped
+// should always be called while holding go_queue
+static inline bool
+galera_update_global_seqno (seqno)
+{
+    // Seems like we cannot enforce sanity check here - some replicated
+    // writesets get cancelled and never make it to this point. Hence
+    // holes in global seqno are inevitable here.
+    if (gu_likely (my_seqno < seqno)) {
+        my_seqno = seqno;
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
 static void process_conn_write_set( 
     struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
-    gcs_seqno_t seqno_l
+    gcs_seqno_t seqno_g, gcs_seqno_t seqno_l
 ) {
     bool do_report;
     int rcode;
 
     /* wait for total order */
-    if (gcs_to_grab(to_queue, seqno_l) != 0) {
-	gu_fatal("Failed to grab to_queue: %llu", seqno_l);
-	abort();
-    }
+    GALERA_GRAB_TO_QUEUE (seqno_l);
 
-    /* certification ok */
-    rcode = apply_write_set(app_ctx, ws);
-    if (rcode) {
-        gu_error(
-            "unknown galera fail: %d trx: %llu", rcode,seqno_l
-	);
+    if (gu_likely(galera_update_global_seqno(seqno_g))) {
+        /* Global seqno ok, certification ok (not needed?) */
+        rcode = apply_write_set(app_ctx, ws);
+        if (rcode) {
+            gu_error ("unknown galera fail: %d trx: %llu", rcode,seqno_l);
+        }
     }
     
     do_report = report_check_counter();
 
     /* release total order */
-    gcs_to_release(to_queue, seqno_l);
-    
+    GALERA_RELEASE_TO_QUEUE (seqno_l);
 
-    /* Grab commit resource */
-    if ((rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l)) != 0) {
-	gu_fatal("Failed to grab commit_queue: %llu, %ld (%s)",
-                 seqno_l, rcode, strerror(-rcode));
-	abort();
-    }
-
-    gcs_to_release(commit_queue, seqno_l);
+    /* Synchronize with commit resource */
+    GALERA_GRAB_COMMIT_QUEUE (seqno_l);
+    GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
 
     if (do_report) report_last_committed(gcs_conn);
     
@@ -597,17 +672,19 @@ static void process_query_write_set(
     int is_retry = 0;
 
     /* wait for total order */
-    if ((rcode = galera_eagain (gcs_to_grab, to_queue, seqno_l)) != 0) {
-	gu_fatal("Failed to grab to_queue: %llu, %ld (%s)",
-                 seqno_l, rcode, strerror(-rcode));
-	abort();
+    GALERA_GRAB_TO_QUEUE (seqno_l);
+
+    if (gu_likely(galera_update_global_seqno(seqno_g))) {
+        /* Global seqno OK, do certification test */
+        rcode = wsdb_append_write_set(seqno_g, ws);
+    }
+    else {
+        /* Outdated writeset, skip */
+        rcode = WSDB_CERTIFICATION_SKIP;
     }
 
-    /* certification test */
-    rcode = wsdb_append_write_set(seqno_g, ws);
-
     /* release total order */
-    gcs_to_release(to_queue, seqno_l);
+    GALERA_RELEASE_TO_QUEUE (seqno_l);
 
 
     //print_ws(wslog_G, ws, seqno_l);
@@ -637,11 +714,7 @@ static void process_query_write_set(
 	
 	if (is_retry == 0) {
 	    /* On first try grab commit_queue */
-	    if ((rcode = galera_eagain(gcs_to_grab,commit_queue,seqno_l)) != 0){
-                gu_fatal("Failed to grab commit_queue: %llu, %ld (%s)",
-                         seqno_l, rcode, strerror(-rcode));
-		abort();
-	    }
+            GALERA_GRAB_COMMIT_QUEUE (seqno_l);
 	}
 
         /* TODO: convert into ha_commit() or smth */
@@ -657,7 +730,7 @@ static void process_query_write_set(
 
         do_report = report_check_counter ();
 
-	gcs_to_release(commit_queue, seqno_l);
+	GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
 	
         /* register committed transaction */
         if (!rcode) {
@@ -672,12 +745,9 @@ static void process_query_write_set(
         gu_warn("trx certification failed: (%llu %llu) last_seen: %llu",
                 seqno_l, seqno_g, ws->last_seen_trx);
         print_ws(wslog_G, ws, seqno_g);
+    case WSDB_CERTIFICATION_SKIP:
 	/* Cancel commit queue */
-        rcode = galera_eagain (gcs_to_self_cancel, commit_queue, seqno_l);
-	if (is_retry == 0 && rcode) {
-	    gu_fatal("Failed to cancel commit_queue: %llu", seqno_l);
-	    abort();
-	}
+        GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
         break;
     default:
         gu_error(
@@ -719,7 +789,7 @@ static void process_write_set(
         process_query_write_set(applier, app_ctx, &ws, seqno_g, seqno_l);
         break;
     case WSDB_WS_TYPE_CONN:
-        process_conn_write_set(applier, app_ctx, &ws, seqno_l);
+        process_conn_write_set(applier, app_ctx, &ws, seqno_g, seqno_l);
         break;
     }
 
@@ -738,7 +808,7 @@ static void process_write_set(
  *        or negative error code (-1 if configuration in non-primary)
  */
 static long
-galera_handle_configuration (const gcs_act_conf_t* conf)
+galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
 {
     gu_uuid_t* group_uuid = (gu_uuid_t*)conf->group_uuid;
 
@@ -764,13 +834,15 @@ galera_handle_configuration (const gcs_act_conf_t* conf)
                      my_seqno, GU_UUID_ARGS(&my_uuid),
                      conf->seqno, GU_UUID_ARGS(group_uuid));
 
-            /* TODO: Here start waiting for state transfer to begin. */
+            GALERA_GRAB_COMMIT_QUEUE (conf_seqno);
 
+            /* TODO: Here start waiting for state transfer to begin. */
+            
             do {
                 // Actually this loop can be done even in this thread:
                 // until we succeed in sending state transfer request, there's
                 // nothing else for us to do.
-                // Note, this request is very simplyfied.
+                // Note, this request is very simplified.
                 gcs_seqno_t seqno_l;
                 ret = gcs_request_state_transfer (gcs_conn, &my_seqno, 
                                                   sizeof(my_seqno), &seqno_l);
@@ -778,8 +850,8 @@ galera_handle_configuration (const gcs_act_conf_t* conf)
                     gu_error ("Requesting state transfer: ", strerror(-ret));
                 }
                 if (seqno_l > GCS_SEQNO_NIL) {
-                    if (gcs_to_self_cancel (to_queue, seqno_l)) abort();
-                    if (gcs_to_self_cancel (commit_queue, seqno_l)) abort();
+                    GALERA_SELF_CANCEL_TO_QUEUE (seqno_l);
+                    GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
                 }
             } while ((ret == -EAGAIN) && (usleep(1000000), true));
             if (ret < 0) return ret;
@@ -788,11 +860,18 @@ galera_handle_configuration (const gcs_act_conf_t* conf)
             assert (ret != my_idx);
 
             /* TODO: Here wait for state transfer to complete, get my_seqno */
-            // for now pretend that state transfer was complete
-            my_seqno = conf->seqno; // anything below this must be ignored
+                     // for now pretend that state transfer was complete
+
+            GALERA_RELEASE_COMMIT_QUEUE (conf_seqno);
+
+            gu_info ("State transfer complete, sending JOIN: %s",
+                     strerror (-gcs_join(gcs_conn, conf->seqno)));
+
+            my_seqno = conf->seqno; // anything below this seqno must be ignored
         }
         else {
-            my_seqno = conf->seqno; // anything below this must be ignored
+            assert (my_seqno == conf->seqno); // global seqno
+            GALERA_SELF_CANCEL_COMMIT_QUEUE (conf_seqno); // local seqno
         }
 
         my_uuid  = *group_uuid;
@@ -845,68 +924,48 @@ enum galera_status galera_recv(void *app_ctx) {
         switch (action_type) {
         case GCS_ACT_DATA:
             assert (GCS_SEQNO_ILL != seqno_g);
-            if (gu_likely(seqno_g > my_seqno)) {
-                assert (my_seqno + 1 == seqno_g);
-                my_seqno = seqno_g; //Is it a right place to track seqno?
-                                    // What about parallel appliers?
-                process_write_set(
-                    applier, app_ctx, action, action_size, seqno_g, seqno_l
-                    );
-            }
-            else { // skip action, it is outdated
-                if (galera_eagain(gcs_to_self_cancel,to_queue,seqno_l))
-                    abort();
-                if (galera_eagain(gcs_to_self_cancel,commit_queue,seqno_l))
-                    abort();
-            }
+            process_write_set(
+                applier, app_ctx, action, action_size, seqno_g, seqno_l
+                );
             break;
         case GCS_ACT_COMMIT_CUT:
             // synchronize
-            // TODO: implement sensible error reporting instead of abort()'s
-            if (galera_eagain (gcs_to_grab, to_queue, seqno_l)) abort();
+            GALERA_GRAB_TO_QUEUE (seqno_l);
             truncate_trx_history (*(gcs_seqno_t*)action);
-            if (gcs_to_release (to_queue, seqno_l)) abort();
-            // After this no certifications with seqno < commit_cut
+            GALERA_RELEASE_TO_QUEUE (seqno_l);
+
             // Let other transaction continue to commit
-            if (galera_eagain(gcs_to_self_cancel,commit_queue,seqno_l)) abort();
+            GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
             break;
         case GCS_ACT_CONF:
         {
-            if (galera_eagain (gcs_to_grab, to_queue, seqno_l)) abort();
-            if (galera_eagain (gcs_to_grab, commit_queue, seqno_l)) abort();
-            galera_handle_configuration (action);
-            if (gcs_to_release (commit_queue, seqno_l)) abort();
-            if (gcs_to_release (to_queue, seqno_l)) abort();
+            GALERA_GRAB_TO_QUEUE (seqno_l);
+            galera_handle_configuration (action, seqno_l);
+            GALERA_RELEASE_TO_QUEUE (seqno_l);
             break;
         }
         case GCS_ACT_STATE_REQ:
-            if (0 < seqno_l) {
+            if (0 <= seqno_l) { // should it be an assert?
                 gu_info ("Got state transfer request.");
 
-                // Must advance queue counter even if ignoring the action
-                if (galera_eagain (gcs_to_grab, to_queue, seqno_l)) {
-                    gu_fatal("Failed to grab to_queue: %llu", seqno_l);
-                    abort();
-                }
-                
-                if (galera_eagain (gcs_to_grab, commit_queue, seqno_l)) {
-                    gu_fatal("Failed to grab commit_queue: %llu", seqno_l);
-                    abort();
-                }
+                // synchronize with app.
+                GALERA_GRAB_TO_QUEUE (seqno_l);
+                GALERA_GRAB_COMMIT_QUEUE (seqno_l);
 
-                /* At this point do the state transfer */
+                /* At this point database is still, do the state transfer */
 
-                gcs_to_release (commit_queue, seqno_l);
-                gcs_to_release (to_queue, seqno_l);
+                GALERA_RELEASE_TO_QUEUE (seqno_l);
+                GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
 
                 gu_info ("State transfer complete, sending JOIN: %s",
-                         strerror (-gcs_join(gcs_conn, 0)));
+                         strerror (-gcs_join(gcs_conn, seqno_g)));
             }
             break;
         default:
             return GALERA_FATAL;
         }
-        free (action); /* TODO: cache DATA actions here for incremental ST */
+        free (action); /* TODO: cache DATA actions at the end of commit queue
+                        * processing. Therefore do not free them here. */
     }
     return GALERA_OK;
 }
@@ -1165,6 +1224,7 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
 //             GCS_ACT_DATA, len, seqno_g, seqno_l, rcode);
     if (rcode != len) {
         gu_error("gcs failed for: %llu, len: %d, rcode: %d", trx_id,len,rcode);
+        assert (GCS_SEQNO_ILL == seqno_l);
         retcode = GALERA_CONN_FAIL;
         goto cleanup;
     }
@@ -1182,8 +1242,8 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
 	/* Call self cancel to allow gcs_to_release() to skip this seqno */
         // gcs_to_release() should be called only after successfull
         // gcs_to_grab() - Alex, 16.03.2008
-	if (galera_eagain (gcs_to_self_cancel, to_queue, seqno_l)) abort();
-	if (galera_eagain (gcs_to_self_cancel, commit_queue, seqno_l)) abort();
+        GALERA_SELF_CANCEL_TO_QUEUE (seqno_l);
+        GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
 
         retcode = GALERA_TRX_FAIL;
         goto cleanup;
@@ -1192,60 +1252,73 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
     /* record seqnos for local transaction */
     wsdb_assign_trx(trx_id, seqno_l, seqno_g);
     gu_mutex_unlock(&commit_mtx);
-    
+
+    // cant use it here - GALERA_GRAB_TO_QUEUE (seqno_l);
     if ((rcode = galera_eagain (gcs_to_grab, to_queue, seqno_l))) {
 	gu_warn("gcs_to_grab aborted: %d seqno %llu", rcode, seqno_l);
 	retcode = GALERA_TRX_FAIL;
 	goto after_cert_test;
     }
-    
-    /* certification test */
-    //print_ws(wslog_L, ws, seqno_l);
-    rcode = wsdb_append_write_set(seqno_g, ws);
-    switch (rcode) {
-    case WSDB_OK:
-        gu_debug ("local trx certified, seqno: %llu %llu last_seen_trx: %llu", 
-                  seqno_l, seqno_g, ws->last_seen_trx
-        );
-        /* certification ok */
-        retcode = GALERA_OK;
-        break;
-    case WSDB_CERTIFICATION_FAIL:
-        /* certification failed, release */
+
+    if (gu_likely(galera_update_global_seqno (seqno_g))) {
+        /* Gloabl seqno OK, do certification test */
+        //print_ws(wslog_L, ws, seqno_l);
+        rcode = wsdb_append_write_set(seqno_g, ws);
+        switch (rcode) {
+        case WSDB_OK:
+            gu_debug ("local trx certified, "
+                      "seqno: %llu %llu last_seen_trx: %llu", 
+                      seqno_l, seqno_g, ws->last_seen_trx);
+            /* certification ok */
+            retcode = GALERA_OK;
+            break;
+        case WSDB_CERTIFICATION_FAIL:
+            /* certification failed, release */
+            retcode = GALERA_TRX_FAIL;
+            gu_info("local trx commit certification failed: %llu - %llu",
+                    seqno_l, ws->last_seen_trx);
+            print_ws(wslog_L, ws, seqno_l);
+            break;
+        default:  
+            retcode = GALERA_CONN_FAIL;
+            gu_fatal("wsdb append failed: seqno_g %llu seqno_l %llu",
+                     seqno_g, seqno_l);
+            abort();
+            break;
+        }
+    }
+    else {
+        // theoretically it is possible with poorly written application
+        // (trying to replicate something before completing state transfer)
+        gu_warn ("Local action replicated with outdated seqno: "
+                 "current seqno %lld, action seqno %lld", my_seqno, seqno_g);
+        // this situation is as good as cancelled transaction. See above.
         retcode = GALERA_TRX_FAIL;
-        gu_info("local trx commit certification failed: %llu - %llu",
-		seqno_l, ws->last_seen_trx);
-        print_ws(wslog_L, ws, seqno_l);
-        break;
-    default:  
-        retcode = GALERA_CONN_FAIL;
-        gu_fatal("wsdb append failed: seqno_g %llu seqno_l %llu", seqno_g, seqno_l);
-	abort();
-        break;
+        // commit queue will be cancelled below.
     }
 
     // call release only if grab was successfull
-    if (seqno_l > 0 && gcs_to_release(to_queue, seqno_l)) {
-	gu_warn("to release failed for %llu", seqno_l);
-    }
+    GALERA_RELEASE_TO_QUEUE (seqno_l);
 
 after_cert_test:
 
     if (retcode == GALERA_OK) {
+        assert (seqno_l > 0);
 	/* Grab commit queue for commit time */
+        // can't use it here GALERA_GRAB_COMMIT_QUEUE (seqno_l);
         rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l);
 
-	if (seqno_l > 0) {
-          switch (rcode) {
-          case 0: break;
-          case -ECANCELED:
+//	if (seqno_l > 0) {
+        switch (rcode) {
+        case 0: break;
+        case -ECANCELED:
 	    gu_warn("canceled in commit queue for %llu", seqno_l);
             break;
-          default:
+        default:
 	    gu_fatal("Failed to grab commit queue for %llu", seqno_l);
 	    abort();
-          }
         }
+//        }
 
         // we can update last seen trx counter already here
         if (mark_commit_early) {
@@ -1253,17 +1326,12 @@ after_cert_test:
         }
     } else {
 	/* Cancel commit queue since we are going to rollback */
-        rcode = galera_eagain (gcs_to_self_cancel, commit_queue, seqno_l);
-
-	if (seqno_l > 0 && rcode) {
-	    gu_fatal("Failed to cancel commit queue for %llu", seqno_l);
-	    abort();
-	}
+        GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
     }
 
 cleanup:
 
-    gu_free(data);
+    gu_free(data); // TODO: cache writeset for 
     // was referenced by wsdb_get_write_set() above
     wsdb_deref_seqno (ws->last_seen_trx);
     wsdb_write_set_free(ws);
@@ -1381,6 +1449,7 @@ enum galera_status galera_to_execute_start(
     uint8_t                data[data_max];
     int                    len;
     gcs_seqno_t            seqno_g, seqno_l;
+    bool                   do_apply;
 
     GU_DBUG_ENTER("galera_to_execute_start");
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
@@ -1421,6 +1490,7 @@ enum galera_status galera_to_execute_start(
 //             GCS_ACT_DATA, len, seqno_g, seqno_l, rcode);
     if (rcode < 0) {
         gu_error("gcs failed for: %llu, %d", conn_id, rcode);
+        assert (GCS_SEQNO_ILL == seqno_l);
         rcode = GALERA_CONN_FAIL;
         goto cleanup;
     }
@@ -1429,27 +1499,34 @@ enum galera_status galera_to_execute_start(
     assert (GCS_SEQNO_ILL != seqno_l);
 
     /* wait for total order */
-    if (galera_eagain (gcs_to_grab, to_queue, seqno_l) != 0) {
-	gu_fatal("Failed to grab to_queue: %llu", seqno_l);
-	abort();
-    }
+    GALERA_GRAB_TO_QUEUE (seqno_l);
     
-    /* record sequence number in connection info */
-    conn_set_seqno(conn_id, seqno_l);
-
-    gcs_to_release(to_queue, seqno_l);
-
-    /* Grab commit queue */
-    if (galera_eagain (gcs_to_grab, commit_queue, seqno_l) != 0) {
-	gu_fatal("Failed to grab commit_queue: %llu", seqno_l);
-	abort();
+    /* update global seqno */
+    if ((do_apply = galera_update_global_seqno (seqno_g))) {
+        /* record local sequence number in connection info */
+        conn_set_seqno(conn_id, seqno_l);
     }
 
-    rcode = GALERA_OK;
+    GALERA_RELEASE_TO_QUEUE (seqno_l);
+
+    if (do_apply) {
+        /* Grab commit queue */
+        GALERA_GRAB_COMMIT_QUEUE (seqno_l);
+        rcode = GALERA_OK;
+    }
+    else {
+        // theoretically it is possible with poorly written application
+        // (trying to replicate something before completing state transfer)
+        gu_warn ("Local action replicated with outdated seqno: "
+                 "current seqno %lld, action seqno %lld", my_seqno, seqno_g);
+        GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
+        // this situation is as good as failed gcs_repl() call.
+        rcode = GALERA_CONN_FAIL;
+    }
 
 cleanup:
 
-    wsdb_write_set_free(ws);
+    wsdb_write_set_free(ws); // cache for incremental state transfer if applied
     GU_DBUG_RETURN(rcode);
 }
 
@@ -1469,7 +1546,7 @@ enum galera_status galera_to_execute_end(conn_id_t conn_id) {
     do_report = report_check_counter ();
 
     /* release commit queue */
-    gcs_to_release(commit_queue, seqno);
+    GALERA_RELEASE_COMMIT_QUEUE (seqno);
     
     /* cleanup seqno reference */
     conn_set_seqno(conn_id, 0);
