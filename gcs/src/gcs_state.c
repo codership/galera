@@ -127,13 +127,14 @@ gcs_state_msg_read (const void* buf, size_t buf_len)
     }
 }
 
-static const char* state_node_status[] =
+const char* gcs_state_node_string[GCS_STATE_MAX] =
 {
     "Non-primary",
     "Primary",
+    "Joiner",
+    "Donor",
     "Joined",
-    "Synced",
-    "Donor"
+    "Synced"
 };
 
 /* Print state message contents to buffer */
@@ -151,7 +152,7 @@ gcs_state_snprintf (char* str, size_t size, const gcs_state_t* state)
                      "\n\tName         : '%s'"
                      "\n\tIncoming addr: '%s'\n",
                      state->proto_min, state->proto_max,
-                     state_node_status[state->status],
+                     gcs_state_node_string[state->status],
                      (long long)state->act_id, (long long)state->conf_id,
                      GU_UUID_ARGS(&state->state_uuid),
                      GU_UUID_ARGS(&state->group_uuid),
@@ -247,7 +248,7 @@ state_report_conflicting_uuids (const gcs_state_t* states[], long states_num)
     long j;
     for (j = 0; j < states_num; j++) {
         if (states[j]->conf_id != GCS_SEQNO_ILL &&
-            states[j]->status  >= GCS_STATE_JOINED) {
+            states[j]->status  >= GCS_STATE_DONOR) {
             size_t st_len = 1024;
             char   st[st_len];
             gcs_state_snprintf (st, st_len, states[j]);
@@ -286,10 +287,10 @@ gcs_state_get_quorum (const gcs_state_t*  states[],
 
     *quorum = GCS_STATE_QUORUM_NON_PRIMARY; // pessimistic assumption
 
-    // find at least one JOINED
+    // find at least one JOINED/DONOR (donor was once joined)
     for (i = 0; i < states_num; i++) {
         if (states[i]->conf_id >= 0 &&
-            states[i]->status  >= GCS_STATE_JOINED) {
+            states[i]->status  >= GCS_STATE_DONOR) {
             rep = states[i];
             break;
         }
@@ -300,10 +301,11 @@ gcs_state_get_quorum (const gcs_state_t*  states[],
         return 0;
     }
 
-    // Check that all JOINED have the same group UUID and find most updated
+    // Check that all JOINED/DONOR have the same group UUID
+    // and find most updated
     for (j = i+1; j < states_num; j++) {
         if (states[j]->conf_id != GCS_SEQNO_ILL &&
-            states[j]->status  >= GCS_STATE_JOINED) {
+            states[j]->status  >= GCS_STATE_DONOR) {
             if (gu_uuid_compare (&rep->group_uuid, &states[i]->group_uuid)) {
                 // for now just freak out and print all conflicting nodes
                 gu_fatal ("Quorum impossible: conflicting group UUIDs:");

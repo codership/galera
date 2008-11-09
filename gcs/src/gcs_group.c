@@ -415,8 +415,8 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     // TODO: define an explicit type for the join message, like gcs_join_msg_t
     assert (msg->size == sizeof(gcs_seqno_t));
 
-    if (GCS_STATE_DONOR == sender->status ||
-        GCS_STATE_PRIM  == sender->status) {
+    if (GCS_STATE_DONOR  == sender->status ||
+        GCS_STATE_JOINER == sender->status) {
         long j;
         gcs_seqno_t seqno     = gu_le64(*(gcs_seqno_t*)msg->buf);
         gcs_node_t* peer      = NULL;
@@ -460,11 +460,16 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         return (sender_idx == group->my_idx);
     }
     else {
-        // should we freak out and return an error?
-        gu_warn ("Protocol violation. JOIN message sender %ld is not "
-                 "in state transfer. Message ignored.",
-                   msg->sender_idx);
-        assert (0);
+        if (GCS_STATE_PRIM == sender->status) {
+            gu_warn ("Rejecting JOIN message: new State Transfer required.");
+        }
+        else {
+            // should we freak out and return an error?
+            gu_warn ("Protocol violation. JOIN message sender %ld is not "
+                     "in state transfer (%s). Message ignored.",
+                     msg->sender_idx, gcs_state_node_string[sender->status]);
+            assert (0);
+        }
         return 0;
     }
 }
@@ -506,6 +511,7 @@ group_find_node_by_status (gcs_group_t* group, gcs_state_node_t status)
 
 /*!
  * Selects and returns the index of state transfer donor, if available.
+ * Updates donor and joiner status if state transfer is possible
  *
  * @return
  *         donor index or negative error code. -1 in case of lack
@@ -529,9 +535,10 @@ group_select_donor (gcs_group_t* group, long joiner_idx)
 
     assert(idx != joiner_idx);
 
-    // reserve donor
+    // reserve donor, confirm joiner
     donor = &group->nodes[idx];
-    donor->status = GCS_STATE_DONOR;
+    donor->status  = GCS_STATE_DONOR;
+    joiner->status = GCS_STATE_JOINER;
     memcpy (donor->joiner, joiner->id, GCS_COMP_MEMB_ID_MAX_LEN+1);
     memcpy (joiner->donor, donor->id,  GCS_COMP_MEMB_ID_MAX_LEN+1);
 
@@ -566,18 +573,26 @@ gcs_group_handle_state_request (gcs_group_t*    group,
     donor_idx = group_select_donor(group, joiner_idx);
     assert (donor_idx != joiner_idx);
 
+    if (donor_idx >= 0) {
+        gu_info ("Node %ld requested State Transfer. "
+                 "Selected %ld as donor.", joiner_idx, donor_idx);
+    }
+    else {
+        gu_warn ("Node %ld requested State Transfer. "
+                 "However failed to select State Transfer donor.");
+    }
+
     if (group->my_idx != joiner_idx && group->my_idx != donor_idx) {
+        // if neither DONOR nor JOINER, ignore message
         free ((void*)act->buf);
         return 0;
     }
+
     // Return index of donor (or error) in the seqno field to sender.
     // It will be used to detect error conditions (no availabale donor,
     // donor crashed and the like).
     // This may be ugly, well, any ideas?
     act->id = donor_idx;
-
-    gu_info ("Node %ld requested State Transfer. "
-             "Selected %ld as donor.", joiner_idx, donor_idx);
 
     return act->buf_len;
 }
@@ -595,7 +610,7 @@ gcs_group_act_conf (gcs_group_t* group, gcs_recv_act_t* act)
         conf->memb_num    = group->num;
         conf->my_idx      = group->my_idx;
         conf->st_required =
-            (group->nodes[group->my_idx].status < GCS_STATE_JOINED);
+            (group->nodes[group->my_idx].status < GCS_STATE_DONOR);
 
         memcpy (conf->group_uuid, &group->group_uuid, sizeof (gu_uuid_t));
 

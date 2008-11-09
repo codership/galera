@@ -17,16 +17,21 @@
 #include "gcs_act_proto.h"
 
 /* Possible node status */
+/* NOTE! when changing this dont forget to change gcs_state_node_string[] in
+ * gcs_state.c */
 typedef enum gcs_state_node
 {
     GCS_STATE_NON_PRIM,      // comes from non-primary configuration
     GCS_STATE_PRIM,          // comes from primary configuration, empty
-    GCS_STATE_DONOR,         // comes from primary conf, joined, donor
+    GCS_STATE_JOINER,        // comes from primary conf, requests state trnsfer
+    GCS_STATE_DONOR,         // comes from primary conf, donates state transfer
     GCS_STATE_JOINED,        // comes from primary conf, joined
     GCS_STATE_SYNCED,        // comes from primary conf, joined, synced
     GCS_STATE_MAX
 }
 gcs_state_node_t;
+
+extern const char* gcs_state_node_string[GCS_STATE_MAX];
 
 #ifdef GCS_STATE_ACCESS
 typedef struct gcs_state
