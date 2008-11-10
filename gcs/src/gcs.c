@@ -197,23 +197,49 @@ gcs_fc_cont (gcs_conn_t* conn)
     long ret = 0;
     struct gcs_fc fc = { htogl(conn->conf_id), 0 };
 
+    assert (GCS_CONN_SYNCED == conn->state);
+
     if (conn->stop_sent <= 0 ||
-        gcs_queue_length (conn->recv_q) > conn->lower_limit ||
-        GCS_CONN_SYNCED != conn->state)
+        gcs_queue_length (conn->recv_q) > conn->lower_limit)
         return 0; // try to avoid mutex lock
 
     if (gu_mutex_lock (&conn->fc_mutex)) abort();
 
     conn->queue_len = gcs_queue_length (conn->recv_q);
 
-    if (conn->lower_limit >= conn->queue_len &&
-        GCS_CONN_SYNCED == conn->state && conn->stop_sent > 0) {
+    if (conn->lower_limit >= conn->queue_len &&  conn->stop_sent > 0) {
         // tripped lower slave queue limit, sent continue request
         gu_info ("SENDING CONT");
         ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
         if (ret >= 0) {
             ret = 0;
             conn->stop_sent--;
+        }
+    }
+    gu_mutex_unlock (&conn->fc_mutex);
+
+    return ret;
+}
+
+static inline long
+gcs_send_sync (gcs_conn_t* conn) {
+    long ret = 0;
+
+    assert (GCS_CONN_JOINED == conn->state);
+
+    if (gcs_queue_length (conn->recv_q) > conn->lower_limit)
+        return 0; // try to avoid mutex lock
+
+    if (gu_mutex_lock (&conn->fc_mutex)) abort();
+
+    conn->queue_len = gcs_queue_length (conn->recv_q);
+
+    if (conn->lower_limit >= conn->queue_len) {
+        // tripped lower slave queue limit, sent continue request
+        gu_info ("SENDING SYNC");
+        ret = gcs_core_send_sync (conn->core, 0);
+        if (ret >= 0) {
+            ret = 0;
         }
     }
     gu_mutex_unlock (&conn->fc_mutex);
@@ -244,7 +270,7 @@ gcs_become_donor (gcs_conn_t* conn)
         conn->state = GCS_CONN_DONOR;
         return 1;
     }
-    else if (conn->state <= GCS_CONN_CLOSED){
+    else if (conn->state < GCS_CONN_OPEN){
         ssize_t err;
         gu_warn ("Received State Transfer Request in wrong state %s. "
                  "Rejecting.", gcs_conn_state_string[conn->state]);
@@ -266,10 +292,17 @@ gcs_become_joined (gcs_conn_t* conn)
 {
     if (GCS_CONN_JOINER == conn->state ||
         GCS_CONN_DONOR  == conn->state) {
+        long ret;
+
         conn->state = GCS_CONN_JOINED;
-        conn->state = GCS_CONN_SYNCED; // remove when SYNC message is ready
+//       conn->state = GCS_CONN_SYNCED; // remove when SYNC is ready.
+
+        /* One of the cases when the node can become SYNCED */
+        if ((ret = gcs_send_sync (conn))) {
+            gu_warn ("Sending SYNC failed: %ld (%s)", ret, strerror (-ret));
+        }
     }
-    else if (conn->state <= GCS_CONN_CLOSED){
+    else if (conn->state < GCS_CONN_OPEN){
         gu_warn ("Received JOIN action in wrong state %s",
                  gcs_conn_state_string[conn->state]);
         assert (0);
@@ -282,10 +315,10 @@ gcs_become_synced (gcs_conn_t* conn)
     if (GCS_CONN_JOINED == conn->state) {
         conn->state = GCS_CONN_SYNCED;
     }
-    else if (conn->state < GCS_CONN_CLOSED){
-        gu_warn ("Received SYNC action in wrong state %d",
+    else if (conn->state < GCS_CONN_OPEN && conn->state > GCS_CONN_SYNCED) {
+        gu_warn ("Received SYNC action in wrong state %s",
                  gcs_conn_state_string[conn->state]);
-        assert (0);
+        // assert (0); may happen 
     }
 }
 
@@ -294,6 +327,7 @@ static void
 gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
 {
     const gcs_act_conf_t* conf = action;
+    long ret;
 
     conn->my_idx = conf->my_idx;
 
@@ -303,9 +337,9 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     else if (conf->seqno == GCS_SEQNO_NIL) {
         /* Exceptional rule: no actions have been yet applied,
          * we're as good as SYNCED */
-        if (conn->state < GCS_CONN_CLOSED) {
+        if (GCS_CONN_OPEN == conn->state) { // TODO: change to GCS_CONN_PRIMARY
             conn->state = GCS_CONN_JOINED;
-            conn->state = GCS_CONN_SYNCED; // remove when SYNC is ready.
+//            conn->state = GCS_CONN_SYNCED; // remove when SYNC is ready.
         }
     }
 
@@ -319,6 +353,11 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         conn->upper_limit = 2 * conn->lower_limit;
     }
     gu_mutex_unlock (&conn->fc_mutex);
+
+    /* One of the cases when the node can become SYNCED */
+    if (GCS_CONN_JOINED == conn->state && (ret = gcs_send_sync (conn))) {
+        gu_warn ("Sending SYNC failed: %ld (%s)", ret, strerror (-ret));
+    }
 }
 
 /*!
@@ -839,7 +878,12 @@ long gcs_recv (gcs_conn_t*     conn,
         }
     }
 
-    if ((err = gcs_fc_cont(conn))) return err;
+    if (GCS_CONN_SYNCED == conn->state && (err = gcs_fc_cont(conn))) {
+        return err;
+    }
+    else if (GCS_CONN_JOINED == conn->state && (err = gcs_send_sync(conn))) {
+        return err;
+    }
 
     act = void_ptr;
     *act_size     = act->act_size;

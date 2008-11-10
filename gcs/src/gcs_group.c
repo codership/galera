@@ -486,6 +486,9 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
         sender->status = GCS_STATE_SYNCED;
 
+        gu_info ("Member %ld (%s) synced with group.",
+                 sender_idx, sender->name);
+
         return (sender_idx == group->my_idx);
     }
     else {

@@ -985,6 +985,12 @@ gcs_core_send_join (gcs_core_t* core, gcs_seqno_t seqno)
 }
 
 long
+gcs_core_send_sync (gcs_core_t* core, gcs_seqno_t seqno)
+{
+    return core_send_seqno (core, seqno, GCS_MSG_SYNC);
+}
+
+long
 gcs_core_send_fc (gcs_core_t* core, void* fc, size_t fc_size)
 {
     ssize_t ret;

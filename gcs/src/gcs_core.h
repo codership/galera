@@ -106,6 +106,10 @@ gcs_core_set_last_applied (gcs_core_t* core, gcs_seqno_t seqno);
 extern long
 gcs_core_send_join (gcs_core_t* core, gcs_seqno_t seqno);
 
+/* sends SYNC notice, seqno currently has no meaning */
+extern long
+gcs_core_send_sync (gcs_core_t* core, gcs_seqno_t seqno);
+
 /* sends flow control message */
 extern long
 gcs_core_send_fc (gcs_core_t* core, void* fc, size_t fc_size);
