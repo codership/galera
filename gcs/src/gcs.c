@@ -878,11 +878,24 @@ long gcs_recv (gcs_conn_t*     conn,
         }
     }
 
+    // FIXME: We have successfully received an action, but failes to send
+    // important control message. What do we do? Inability to send CONT can
+    // block the whole cluster. There are only conn->lower_limit attempts
+    // to do that. Perhaps if the last attempt fails, we should crash.
     if (GCS_CONN_SYNCED == conn->state && (err = gcs_fc_cont(conn))) {
-        return err;
+        if (conn->queue_len > 0) {
+            gu_warn ("Failed to send CONT message: %d (%s). Attempts left: %ld",
+                     err, strerror(-err), conn->queue_len);
+        }
+        else {
+            gu_fatal ("Last opportunity to send CONT message failed : %d (%s)."
+                      " Crashing to avoid cluster lock-up",
+                      err, strerror(-err));
+            abort();
+        }
     }
     else if (GCS_CONN_JOINED == conn->state && (err = gcs_send_sync(conn))) {
-        return err;
+        gu_warn ("Failed to send JOIN message: %d (%s)", err, strerror(-err));
     }
 
     act = void_ptr;
