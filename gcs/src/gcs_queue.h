@@ -28,7 +28,7 @@ typedef struct gcs_queue
     gu_cond_t         ready;
 //    gu_cond_t    empty;
     int               err;
-    size_t            length;
+    volatile size_t   length;
 }
 gcs_queue_t;
 
