@@ -168,11 +168,15 @@ then
     building="true"
 fi
 
+# Galera comm is not particularly easy to handle
 CPPFLAGS="$CPPFLAGS -I$galeracomm_src/vs/include" # non-standard location
 CPPFLAGS="$CPPFLAGS -I$galeracomm_src/common/include" # non-standard location
 LDFLAGS="$LDFLAGS -L$galeracomm_src/common/src/.libs"
 LDFLAGS="$LDFLAGS -L$galeracomm_src/transport/src/.libs"
 LDFLAGS="$LDFLAGS -L$galeracomm_src/vs/src/.libs"
+LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/common/src/.libs"
+LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/transport/src/.libs"
+LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/vs/src/.libs"
 
 if test $initial_stage = "gcs" || $building = "true"
 then

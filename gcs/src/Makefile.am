@@ -40,7 +40,6 @@ if ENABLE_VS
     GCS_SRCS  += gcs_vs.cpp
 # Enforce C++ linker
     CCLD=$(CXX)
-    GCOMM_LIBS = -lgcommcommonpp -lgcommtransportpp -lgcommvspp
 endif
 
 GCS_INCS = $(wildcard *.h)
@@ -49,8 +48,6 @@ GCS_INCS = $(wildcard *.h)
 include_HEADERS   = gcs.h
 lib_LTLIBRARIES   = libgcs.la
 libgcs_la_SOURCES = $(GCS_SRCS) $(GCS_INCS)
-libgcs_la_LIBADD = $(GCOMM_LIBS)
-#libgcs_la_LDADD =
 INTERFACE = 9
 REVISION  = 0
 AGE       = 0

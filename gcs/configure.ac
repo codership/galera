@@ -42,15 +42,6 @@ else
     CFLAGS="$CFLAGS -DGU_DBUG_OFF"
 fi
 
-# 
-AC_ARG_WITH([galera], [Galera libs location],,with_galera="no")
-if test x"$with_galera" != "no"
-then
-    CFLAGS="$CFLAGS -I$with_galera/include"
-    CXXFLAGS="$CXXFLAGS -I$with_galera/include"
-    LDFLAGS="$LDFLAGS -L$with_galera/lib"
-fi
-
 # Check if Spread backend is desired
 AC_ARG_ENABLE(spread,
               AC_HELP_STRING([--disable-spread],
@@ -90,16 +81,26 @@ AM_PATH_CHECK()
 AC_CHECK_LIB([galerautils], [gu_malloc_dbg],,
 	     AC_MSG_ERROR([*** galerautils not found! ***]))
 
-# FIXME: Replace `main' with a function in `-lpthread':
 AC_CHECK_LIB([pthread], [pthread_testcancel],,
 	     AC_MSG_ERROR([*** POSIX threads not found! ***]))
 
 if test "$enable_spread" != no; then
-# FIXME: Replace `main' with a function in `-ltspread':
 AC_CHECK_LIB([tspread], [SP_error],,
              AC_MSG_WARN([*** Spread library not found! ***]);
              enable_spread="no")
 fi
+
+# FIXME: find a way to check for real functions in those libs
+#        currently it just tests abilty to link
+for vslib in "vspp" "transportpp" "commonpp"
+do
+    if test "$enable_vs" != no; then
+    AC_CHECK_LIB([gcomm$vslib], [main],,
+                AC_MSG_WARN([*** libgcomm$vslib not found! ***]);
+                enable_vs="no")
+    fi
+done
+
 AM_CONDITIONAL(ENABLE_SPREAD, test "$enable_spread" != "no")
 AM_CONDITIONAL(ENABLE_VS, test "$enable_vs" != "no")
 
@@ -133,6 +134,7 @@ AC_OUTPUT
 
 AC_MSG_NOTICE([***])
 AC_MSG_NOTICE([Spread backend: $enable_spread])
+AC_MSG_NOTICE([Gcomm  backend: $enable_vs])
 AC_MSG_NOTICE([***])
 AC_MSG_NOTICE([CFLAGS:  $CFLAGS])
 AC_MSG_NOTICE([LDFLAGS: $LDFLAGS])
