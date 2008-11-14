@@ -21,7 +21,7 @@ have_ccache="false"
 #fi
 
 initial_stage="galerautils"
-last_stage="wsdb"
+last_stage="galera"
 gainroot=""
 
 usage()
@@ -94,7 +94,8 @@ galerautils_src=$build_base/galerautils
 galeracomm_src=$build_base/galeracomm
 gcs_src=$build_base/gcs
 wsdb_src=$build_base/wsdb
-mysql_src=$build_base/../../5.1/trunk
+galera_src=$build_base/wsdb
+#mysql_src=$build_base/../../5.1/trunk
 
 # Flags for configure scripts
 if test -n GALERA_DEST
@@ -189,11 +190,18 @@ build_flags $gcs_src
 if test $initial_stage = "wsdb" || $building = "true"
 then
     build $wsdb_src $conf_flags $galera_flags
-#    CPPFLAGS="$CPPFLAGS -I$wsdb_src/include" # non-standard location
     building="true"
 fi
 
 build_flags $wsdb_src
+
+#if test $initial_stage = "galera" || $building = "true"
+#then
+#    build $galera_src $conf_flags $galera_flags
+#    building="true"
+#fi
+#
+#build_flags $galera_src
 
 if test $building != "true"
 then

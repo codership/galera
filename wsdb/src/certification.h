@@ -27,6 +27,7 @@ int wsdb_cert_init(const char *work_dir, const char* base_name);
  */
 int wsdb_cert_close();
 
+#if 0 // moved to wsdb_api.h
 /*!
  * @brief makes certification check for a write set
  * 
@@ -40,4 +41,6 @@ int wsdb_cert_close();
 int wsdb_certification_test(
     struct wsdb_write_set *ws, trx_seqno_t trx_seqno
 );
-#endif
+#endif // 0
+
+#endif // WSDB_CERTIFICATION_INCLUDED

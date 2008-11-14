@@ -17,13 +17,10 @@
 #define __USE_BSD 1
 #include <sys/time.h>
 
-#include "wsdb_api.h"
-#include "conn.h"
+#include <galerautils.h>
+#include <gcs.h>
+#include <wsdb_api.h>
 #include "galera.h"
-#include "wsdb_api.h"
-#include "gcs.h"
-#include "galerautils.h"
-#include "wsdb_priv.h"
 #include "job_queue.h"
 
 #define GALERA_USE_FLOW_CONTROL 1
@@ -1504,7 +1501,7 @@ enum galera_status galera_to_execute_start(
     /* update global seqno */
     if ((do_apply = galera_update_global_seqno (seqno_g))) {
         /* record local sequence number in connection info */
-        conn_set_seqno(conn_id, seqno_l);
+        wsdb_conn_set_seqno(conn_id, seqno_l);
     }
 
     GALERA_RELEASE_TO_QUEUE (seqno_l);
@@ -1537,7 +1534,7 @@ enum galera_status galera_to_execute_end(conn_id_t conn_id) {
     GU_DBUG_ENTER("galera_to_execute_end");
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
 
-    seqno = conn_get_seqno(conn_id);
+    seqno = wsdb_conn_get_seqno(conn_id);
     if (!seqno) {
         gu_warn("missing connection seqno: %llu",conn_id);
         GU_DBUG_RETURN(GALERA_CONN_FAIL);
@@ -1549,7 +1546,7 @@ enum galera_status galera_to_execute_end(conn_id_t conn_id) {
     GALERA_RELEASE_COMMIT_QUEUE (seqno);
     
     /* cleanup seqno reference */
-    conn_set_seqno(conn_id, 0);
+    wsdb_conn_set_seqno(conn_id, 0);
     
     if (do_report) report_last_committed (gcs_conn);
 

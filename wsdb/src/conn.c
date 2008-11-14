@@ -225,7 +225,7 @@ int conn_build_connection_queries(
     GU_DBUG_RETURN(WSDB_OK);
 }
 
-int conn_set_seqno(
+int wsdb_conn_set_seqno(
     connid_t conn_id, gcs_seqno_t seqno
 ) {
     struct conn_info *conn = get_conn_info(conn_id);
@@ -241,7 +241,7 @@ int conn_set_seqno(
     GU_DBUG_RETURN(WSDB_OK);
 }
 
-gcs_seqno_t conn_get_seqno(
+gcs_seqno_t wsdb_conn_get_seqno(
     connid_t conn_id
 ) {
     struct conn_info *conn = get_conn_info(conn_id);

@@ -171,8 +171,8 @@ bool_t xdr_wsdb_query(XDR *xdrs, struct wsdb_query *q) {
 /* xdr conversion for wsdb_write_set */
 bool_t xdr_wsdb_write_set(XDR *xdrs, struct wsdb_write_set *ws) {
     uint32_t i;
-    if (!xdr_u_longlong_t(xdrs, &ws->local_trx_id))        return FALSE;
-    if (!xdr_u_longlong_t(xdrs, &ws->last_seen_trx))       return FALSE;
+    if (!xdr_longlong_t(xdrs, &ws->local_trx_id))          return FALSE;
+    if (!xdr_longlong_t(xdrs, &ws->last_seen_trx))         return FALSE;
     if (!xdr_enum(xdrs, (enum_t *)&ws->type))              return FALSE;
     if (!xdr_enum(xdrs, (enum_t *)&ws->level))             return FALSE;
     if (!xdr_enum(xdrs, (enum_t *)&ws->state))             return FALSE;

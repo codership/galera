@@ -73,20 +73,25 @@ struct wsdb_info {
 /* @typedef
  * types for local and global transaction identifiers
  */
-typedef uint64_t connid_t;
-typedef uint64_t local_trxid_t;
-typedef uint64_t trx_seqno_t;
+typedef int64_t connid_t;
+typedef int64_t local_trxid_t;
+typedef int64_t trx_seqno_t;
 
 /* MySQL type for boolean */
 typedef char		my_bool; /* Small bool */
 
 /* special seqno to designate a cancelled transaction */
+#ifdef UNSIGNED_SEQNO
 #ifndef ULLONG_MAX
 #   define GALERA_ABORT_SEQNO   18446744073709551615ULL
 #   define GALERA_MISSING_SEQNO 18446744073709551614ULL
 #else
 #   define GALERA_ABORT_SEQNO   ULLONG_MAX
-#   define GALERA_MISSING_SEQNO ULLONG_MAX-1
+#   define GALERA_MISSING_SEQNO (ULLONG_MAX-1)
+#endif
+#else // SIGNED_SEQNO
+#   define GALERA_ABORT_SEQNO   -1
+#   define GALERA_MISSING_SEQNO -2
 #endif
 
 
@@ -520,15 +525,16 @@ void wsdb_write_set_free(struct wsdb_write_set *ws);
 struct wsdb_query_block *wsdb_get_write_set_queries(trx_seqno_t trx_seqno);
 
 /*!
- * @brief certifies a transaction
+ * @brief makes certification check for a write set
  * 
- * Obsolete
+ * @param ws  write set to be certified
+ * @param trx_seqno sequence number for the trx
  *
- * @return certification test result 
- * @retval WSDB_CERTIFIED Certification test passed, TRX can commit
- * @retval WSDB_CONFLICT  Certification test failed, TRX must abort
+ * @return success code, certification fail code or error code
+ * @retval WSDB_OK Certification test passed, TRX can commit
+ * @retval WSDB_CERTIFICATION_FAIL Certification test failed, TRX must abort
  */
-int wsdb_certify(trx_seqno_t trx_seqno);
+int wsdb_certification_test (struct wsdb_write_set *ws, trx_seqno_t trx_seqno);
 
 /*!
  * @brief builds connection management queries for write set
@@ -554,9 +560,25 @@ int wsdb_store_set_database(
 );
 
 /*!
+ * @brief assigns seqno to connection
+ *
+ * @param conn_id ID for the connection
+ * @param seqno   connection sequence (for ordering)
+ */
+int wsdb_conn_set_seqno (connid_t conn_id, trx_seqno_t seqno);
+
+/*!
+ * @brief queries connection seqno
+ *
+ * @param conn_id ID for the connection
+ */
+trx_seqno_t wsdb_conn_get_seqno (connid_t conn_id);
+
+/*!
  * @brief functions for providing conf parameter querying from app
  */
-void *wsdb_conf_get_param (enum galera_conf_param_id, enum galera_conf_param_type);
+void *wsdb_conf_get_param (enum galera_conf_param_id,
+                           enum galera_conf_param_type);
 
 void wsdb_set_conf_param_cb(
     galera_conf_param_fun configurator

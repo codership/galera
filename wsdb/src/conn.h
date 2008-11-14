@@ -59,7 +59,7 @@ int conn_build_connection_queries(
     struct wsdb_write_set *ws, connid_t conn_id
 );
 
-
+#ifdef IN_WSDB_API
 /*!
  * @brief assigns seqno to connection
  *
@@ -74,5 +74,6 @@ int conn_set_seqno (connid_t conn_id, gcs_seqno_t seqno);
  * @param conn_id ID for the connection
  */
 gcs_seqno_t conn_get_seqno (connid_t conn_id);
+#endif // IN_WSDB_API
 
-#endif
+#endif // CONN_H_INCLUDED

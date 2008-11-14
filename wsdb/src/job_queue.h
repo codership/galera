@@ -3,7 +3,8 @@
 #ifndef WSDB_JOB_QUEUE
 #define WSDB_JOB_QUEUE
 
-#include "wsdb_priv.h"
+#include "galerautils.h"
+#include "wsdb_api.h"
 
 #define MAX_JOBS 8
 
@@ -126,4 +127,31 @@ int job_queue_start_job(
 int job_queue_end_job(
     struct job_queue *queue, struct job_worker *worker);
 
-#endif
+#define _MAKE_OBJ(obj, def, size)                    \
+{                                                    \
+    obj = (struct def *) gu_malloc (size);           \
+    if (!obj) {                                      \
+        gu_error ("internal error");                 \
+        assert(0);                                   \
+    }                                                \
+    obj->ident = IDENT_##def;                        \
+}
+#define MAKE_OBJ(obj, def)                           \
+{                                                    \
+    _MAKE_OBJ(obj, def, sizeof(struct def));         \
+}
+#define MAKE_OBJ_SIZE(obj, def, extra)               \
+{                                                    \
+    _MAKE_OBJ(obj, def, sizeof(struct def) + extra); \
+}
+    
+
+#define CHECK_OBJ(obj, def)                          \
+{                                                    \
+    if (!obj || obj->ident != IDENT_##def) {         \
+        gu_error ("internal error");                 \
+        assert(0);                                   \
+    }                                                \
+}
+
+#endif // WSDB_JOB_QUEUE
