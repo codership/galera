@@ -25,6 +25,7 @@
 
 #include "gu_mem.h"
 #include "gu_mutex.h"
+#include "gu_log.h"
 
 struct gu_fifo
 {
@@ -35,192 +36,209 @@ struct gu_fifo
     ulong item_size;
     ulong head;
     ulong tail;
-    ulong next;
-    ulong row_length;
     ulong row_size;
     ulong length;
     ulong length_mask;
     ulong used;
     ulong alloc;
-    ulong waiting;
-    bool  next_stop;
+    long  get_wait;
+    long  put_wait;
+    bool  closed;
     
     gu_mutex_t   lock;
-    gu_cond_t    ready;
-    long         err;
+    gu_cond_t    get_cond;
+    gu_cond_t    put_cond;
 
     void* rows[];
 };
 typedef struct gu_fifo gu_fifo_t;
 
-#define GU_FIFO_ROW(q,x) ((x) >> (q->col_shift)) /* div by row width */
-#define GU_FIFO_COL(q,x) ((x) &  (q->col_mask))  /* remnant */
-#define GU_FIFO_ADD(q,x) (((x) + 1) & (q->length_mask))
-
-/* constructor */
+/*! constructor */
 gu_fifo_t *gu_fifo_create (size_t length, size_t unit);
-/* destructor - would block until all members are dequeued */
-long  gu_fifo_destroy (gu_fifo_t *queue);
-/* for logging purposes */
+/*! puts FIFO into clise state */
+void  gu_fifo_close (gu_fifo_t *queue);
+/*! destructor - would block until all members are dequeued */
+void  gu_fifo_destroy (gu_fifo_t *queue);
+/*! for logging purposes */
 char *gu_fifo_print (gu_fifo_t *queue);
 
-/* lock the queue */
-static inline long gu_fifo_lock      (gu_fifo_t *q);
-/* lock the queue and wait if it is empty */
-static inline long gu_fifo_lock_wait (gu_fifo_t *q);
-/* signal to waiting thread */
-static inline void gu_fifo_signal    (gu_fifo_t *q);
-/* unlock the queue */
-static inline long gu_fifo_unlock    (gu_fifo_t *q);
-/* append to tail */
-static inline long gu_fifo_push      (gu_fifo_t *q, void *data);
-/* append to tail, under lock */
-static inline long gu_fifo_push_lock (gu_fifo_t *q, void *data);
-/* pop from queue head */
-static inline long gu_fifo_pop       (gu_fifo_t *q, void *data);
-/* pop from queue head, wait if it is empty */
-static inline long gu_fifo_pop_wait  (gu_fifo_t *q, void *data);
-/* iterator */
-static inline long gu_fifo_next      (gu_fifo_t *q, void *data);
-/* blocking iterator */
-static inline long gu_fifo_next_wait (gu_fifo_t *q, void *data);
-/* reset iterator to queue head */
-static inline long gu_fifo_next_reset (gu_fifo_t *q);
+/*! Release FIFO */
+static inline long  gu_fifo_release   (gu_fifo_t *q);
+/*! Lock FIFO and get pointer to head item */
+static inline void* gu_fifo_get_head  (gu_fifo_t* q);
+/*! Advance FIFO head pointer and release FIFO. */
+static inline void  gu_fifo_pop_head  (gu_fifo_t* q);
+/*! Lock FIFO and get pointer to tail item */
+static inline void* gu_fifo_get_tail  (gu_fifo_t* q);
+/*! Advance FIFO tail pointer and release FIFO. */
+static inline void  gu_fifo_push_tail (gu_fifo_t* q);
+/*! Return how many items are in the queue */
+static inline ulong gu_fifo_length    (gu_fifo_t* q);
+
+//////////////////// Nothing usable below /////////////////////////////
 
 /* lock the queue */
-static inline long gu_fifo_lock      (gu_fifo_t *q)
+static inline long _gu_fifo_lock      (gu_fifo_t *q)
 {
     return -(gu_mutex_lock (&q->lock));
 }
 
-/* lock the queue and wait if it is empty */
-static inline long gu_fifo_lock_wait (gu_fifo_t *q)
-{
-    register long ret = gu_fifo_lock (q);
-    if (0 == ret && 0 == q->used) {
-        q->waiting++;
-        ret = gu_cond_wait (&q->ready, &q->lock);
-        if (0 == ret && 0 == q->used) {
-            // mutex locked but no data
-            gu_mutex_unlock (&q->lock);
-            ret = -EINTR;
-        }
-    }
-    return ret;
-}
-
 /* unlock the queue */
-static inline long gu_fifo_unlock    (gu_fifo_t *q)
+static inline long gu_fifo_release    (gu_fifo_t *q)
 {
     return -(gu_mutex_unlock (&q->lock));
 }
 
-/* signal to waiting thread */
-static inline void gu_fifo_signal    (gu_fifo_t *q)
+/* lock the queue and wait if it is empty */
+static inline long _gu_fifo_lock_get (gu_fifo_t *q)
 {
-    if (q->waiting > 0) {
-        // FIFO was empty and somebody's waiting, signal
-        q->waiting--;
-        gu_cond_signal (&q->ready);
+    register long ret = _gu_fifo_lock (q);
+
+    while (0 == ret && 0 == q->used && !q->closed) {
+        q->get_wait++;
+        ret = gu_cond_wait (&q->get_cond, &q->lock);
+    }
+ 
+    return ret;
+}
+
+/* unlock the queue after getting item */
+static inline long _gu_fifo_unlock_get (gu_fifo_t *q)
+{
+    assert (q->used < q->length);
+
+    if (q->put_wait > 0) {
+        q->put_wait--;
+        gu_cond_signal (&q->put_cond);
+    }
+
+    return gu_fifo_release (q);
+}
+
+/* lock the queue and wait if it is full */
+static inline long _gu_fifo_lock_put (gu_fifo_t *q)
+{
+    register long ret = _gu_fifo_lock (q);
+
+    while (0 == ret && q->used == q->length && !q->closed) {
+        q->put_wait++;
+        ret = gu_cond_wait (&q->put_cond, &q->lock);
+    }
+
+    return ret;
+}
+
+/* unlock the queue after putting item */
+static inline long _gu_fifo_unlock_put (gu_fifo_t *q)
+{
+    assert (q->used > 0);
+
+    if (q->get_wait > 0) {
+        q->get_wait--;
+        gu_cond_signal (&q->get_cond);
+    }
+
+    return gu_fifo_release (q);
+}
+
+#define _GU_FIFO_ROW(q,x) ((x) >> (q)->col_shift) /* div by row width */
+#define _GU_FIFO_COL(q,x) ((x) &  (q)->col_mask)  /* remnant */
+#define _GU_FIFO_PTR(q,x) ((q)->rows[_GU_FIFO_ROW(q, x)] +      \
+                           _GU_FIFO_COL(q, x) * (q)->item_size)
+
+/* Increment and roll over */
+#define _GU_FIFO_INC(q,x) (((x) + 1) & (q)->length_mask)
+
+
+/*! If FIFO is not empty, returns pointer to the head item and locks FIFO,
+ *  otherwise blocks. Or returns NULL if FIFO is closed. */
+static inline void*
+gu_fifo_get_head (gu_fifo_t* q)
+{
+    if (_gu_fifo_lock_get (q)) {
+        gu_fatal ("Faled to lock queue to get item.");
+        abort();
+    }
+
+    if (gu_likely(q->used)) { // keep fetching items even if closed, until 0
+        return (_GU_FIFO_PTR(q, q->head));
+    }
+    else {
+        assert (q->closed);
+        gu_fifo_release (q);
+        return NULL;
     }
 }
 
-/* append to tail */
-static inline long gu_fifo_push      (gu_fifo_t *q, void *data)
+/*! Advances FIFO head and unlocks FIFO. */
+static inline void
+gu_fifo_pop_head (gu_fifo_t* q)
 {
-    if (q->used < q->length) {
-	register ulong row = GU_FIFO_ROW (q, q->tail);
+    if (_GU_FIFO_COL(q, q->head) == q->col_mask) {
+        /* removing last unit from the row */
+	register ulong row = _GU_FIFO_ROW (q, q->head);
+        gu_free (q->rows[row]);
+        q->rows[row] = NULL;
+        q->alloc -= q->row_size;
+    }
+
+    q->head = _GU_FIFO_INC (q, q->head);
+    q->used--;
+
+    if (_gu_fifo_unlock_get(q)) {
+        gu_fatal ("Faled to unlock queue to get item.");
+        abort();
+    }
+}
+
+/*! If FIFO is not full, returns pointer to the tail item and locks FIFO,
+ *  otherwise blocks. Or returns NULL if FIFO is closed. */
+static inline void*
+gu_fifo_get_tail (gu_fifo_t* q)
+{
+    if (_gu_fifo_lock_put (q)) {
+        gu_fatal ("Faled to lock queue to put item.");
+        abort();
+    }
+
+    if (gu_likely(!q->closed)) { // stop adding items when closed
+	register ulong row = _GU_FIFO_ROW (q, q->tail);
+        
+        assert (q->used < q->length);
+
+        // check if row is allocated and allocate if not.
 	if (NULL == q->rows[row] &&
             NULL == (q->alloc += q->row_size, 
                      q->rows[row] = gu_malloc(q->row_size))) {
             q->alloc -= q->row_size;
-            return -ENOMEM;
         }
-	memcpy (q->rows[row] + GU_FIFO_COL(q, q->tail) * q->item_size,
-		data, q->item_size);
-	q->tail = GU_FIFO_ADD (q, q->tail);
-	q->used++;
-	return q->used;
+        else {
+            return (q->rows[row] + _GU_FIFO_COL(q, q->tail) * q->item_size);
+        }
     }
-    return -EAGAIN;
+
+    gu_fifo_release (q);
+    return NULL;
 }
 
-/* append to tail, under lock */
-static inline long gu_fifo_push_lock (gu_fifo_t *q, void *data)
+/*! Advances FIFO tail and unlocks FIFO. */
+static inline void
+gu_fifo_push_tail (gu_fifo_t* q)
 {
-    register long ret = gu_fifo_lock (q);
-    if (0 == ret) {
-        ret = gu_fifo_push (q, data);
-        gu_fifo_signal (q);
-        gu_fifo_unlock (q);
+    q->tail = _GU_FIFO_INC (q, q->tail);
+    q->used++;
+
+    if (_gu_fifo_unlock_put(q)) {
+        gu_fatal ("Faled to unlock queue to put item.");
+        abort();
     }
-    return ret;
 }
 
-/* pop from queue head */
-static inline long gu_fifo_pop       (gu_fifo_t *q, void *data)
+/*! returns how many items are in the queue */
+static inline ulong
+gu_fifo_length (gu_fifo_t* q)
 {
-    if (q->used > 0) {
-	register ulong row = GU_FIFO_ROW (q, q->head);
-	memcpy (data,
-		q->rows[row] + GU_FIFO_COL(q, q->head) * q->item_size,
-		q->item_size);
-	q->head = GU_FIFO_ADD (q, q->head);
-	q->used--;
-	if (0 == GU_FIFO_COL (q, q->head)) {
-	    /* removed last unit from the row */
-	    gu_free (q->rows[row]);
-            q->rows[row] = NULL;
-	    q->alloc -= q->row_size;
-	}
-	return q->used;
-    }
-    return -EAGAIN;
-}
-
-/* pop from queue head, wait if it is empty */
-static inline long gu_fifo_pop_wait  (gu_fifo_t *q, void *data)
-{
-    register long ret;
-    if (!(ret = gu_fifo_lock_wait (q))) {
-	ret = gu_fifo_pop (q, data);
-	gu_fifo_unlock (q);
-    }
-    return ret;
-}
-
-/* iterator */
-static inline long gu_fifo_next      (gu_fifo_t *q, void *data)
-{
-    if (q->used > 0 && !q->next_stop) {
-	register size_t row = GU_FIFO_ROW (q, q->next);
-	memcpy (data,
-		q->rows[row] + GU_FIFO_COL(q, q->next) * q->item_size,
-		q->item_size);
-	q->next = GU_FIFO_ADD (q, q->next);
-        q->next_stop = (q->next == q->tail); // reached end
-	return 0;
-    }
-    return -EAGAIN;
-}
-
-/* blocking iterator */
-static inline long gu_fifo_next_wait (gu_fifo_t *q, void *data)
-{
-    register long ret;
-    if (!(ret = gu_fifo_lock_wait (q))) {
-	ret = gu_fifo_next (q, data);
-	gu_fifo_unlock (q);
-    }
-    return ret;    
-}
-
-/* reset iterator to queue head */
-static inline long gu_fifo_next_reset (gu_fifo_t *q)
-{
-    q->next      = q->head;
-    q->next_stop = false;
-    return 0;
+    return q->used;
 }
 
 #endif // _gu_fifo_h_
