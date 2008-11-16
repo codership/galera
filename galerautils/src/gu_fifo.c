@@ -13,15 +13,16 @@
  * minimum space when there are few items in the queue. 
  */
 
-#include <pthread.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
 
-//#include "gu_assert.h"
-//#include "gu_limits.h"
-//#include "gu_fifo.h"
-//#include "gu_mem.h"
-//#include "gu_mutex.h"
-//#include "gu_log.h"
+#include "gu_assert.h"
+#include "gu_limits.h"
+#include "gu_mem.h"
+#include "gu_mutex.h"
+#include "gu_log.h"
+#include "gu_fifo.h"
 
 #include "galerautils.h"
 

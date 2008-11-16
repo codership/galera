@@ -18,21 +18,16 @@
 #ifndef _gu_fifo_h_
 #define _gu_fifo_h_
 
-#include <pthread.h>
-#include <string.h>
-#include <errno.h>
-#include <stdbool.h>
-
 typedef struct gu_fifo gu_fifo_t;
 
 /*! constructor */
-gu_fifo_t *gu_fifo_create (size_t length, size_t unit);
+extern gu_fifo_t* gu_fifo_create (size_t length, size_t unit);
 /*! puts FIFO into closed state */
-void  gu_fifo_close (gu_fifo_t *queue);
+extern void gu_fifo_close (gu_fifo_t *queue);
 /*! destructor - would block until all members are dequeued */
-void  gu_fifo_destroy (gu_fifo_t *queue);
+extern void gu_fifo_destroy (gu_fifo_t *queue);
 /*! for logging purposes */
-char *gu_fifo_print (gu_fifo_t *queue);
+extern char* gu_fifo_print (gu_fifo_t *queue);
 
 /*! Lock FIFO */
 extern long  gu_fifo_lock      (gu_fifo_t *q);

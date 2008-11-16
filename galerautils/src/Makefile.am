@@ -34,9 +34,9 @@ libgalerautils_la_SOURCES = \
 	gu_fifo.c  \
 	gu_uuid.c
 
-INTERFACE = 6
+INTERFACE = 7
 REVISION  = 0
-AGE       = 5
+AGE       = 0
 libgalerautils_la_LDFLAGS = \
 	-version-info $(INTERFACE):$(REVISION):$(AGE)
 

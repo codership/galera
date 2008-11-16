@@ -14,9 +14,10 @@
 #include "gu_log.h"
 
 /* Some global counters - can be inspected by gdb */
-static volatile ssize_t gu_mem_total  = 0;
-static volatile ssize_t gu_mem_allocs = 0;
-static volatile ssize_t gu_mem_frees  = 0;
+static volatile ssize_t gu_mem_total    = 0;
+static volatile ssize_t gu_mem_allocs   = 0;
+static volatile ssize_t gu_mem_reallocs = 0;
+static volatile ssize_t gu_mem_frees    = 0;
 
 typedef struct mem_head
 {
@@ -96,10 +97,10 @@ void* gu_realloc_dbg (void* ptr, size_t size,
 	    
 	    ret = (mem_head_t*) realloc (ret, total_size);
 	    if (ret) {
-		gu_mem_allocs++;
-		gu_mem_total  -= ret->allocated;
+		gu_mem_reallocs++;
+		gu_mem_total  -= ret->allocated; // old size
 		ret->allocated = total_size;
-		gu_mem_total  += ret->allocated;
+		gu_mem_total  += ret->allocated; // new size
 		ret->used      = size;
 		ret->file      = file;
 		ret->line      = line;
@@ -154,9 +155,10 @@ void  gu_free_dbg    (void* ptr,
     free (head);
 }
 
-void gu_mem_stats (ssize_t* total, ssize_t* allocs, ssize_t* deallocs)
+void gu_mem_stats (ssize_t* total, ssize_t* allocs, ssize_t* reallocs, ssize_t* deallocs)
 {
     *total    = gu_mem_total;
     *allocs   = gu_mem_allocs;
+    *reallocs = gu_mem_reallocs;
     *deallocs = gu_mem_frees;
 }
