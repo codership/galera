@@ -20,7 +20,6 @@
 #include "gcs.h"
 #include "gcs_core.h"
 #include "gcs_fifo_lite.h"
-//#include "gcs_queue.h"
 
 const long GCS_MAX_REPL_THREADS = 16384;
 
@@ -133,12 +132,10 @@ gcs_create (const char *backend)
                 if (conn->repl_q) {
                     size_t recv_q_len = GU_AVPHYS_PAGES * GU_PAGE_SIZE /
                         sizeof(gcs_slave_act_t);
-                    gu_debug ("Requesting recv queue len: %zu", recv_q_len);
+                    gu_info ("Requesting recv queue len: %zu", recv_q_len);
                     conn->recv_q = gu_fifo_create (recv_q_len,
                                                    sizeof(gcs_slave_act_t));
                     if (conn->recv_q) {
-//                        gu_mutex_init (&conn->lock, NULL);
-//                        gu_mutex_init (&conn->fc_mutex, NULL);
                         conn->state        = GCS_CONN_CLOSED;
                         conn->my_idx       = -1;
                         conn->local_act_id = GCS_SEQNO_FIRST;
@@ -182,15 +179,6 @@ gcs_fc_stop (gcs_conn_t* conn)
     long ret = 0;
     struct gcs_fc fc = { htogl(conn->conf_id), 1 };
 
-#if 0
-    if (conn->stop_count > 0 || conn->stop_sent > 0 ||
-        gcs_queue_length (conn->recv_q) <= conn->upper_limit ||
-        GCS_CONN_SYNCED != conn->state)
-        return 0; // try to avoid mutex lock
-
-    if (gu_mutex_lock (&conn->fc_mutex)) abort();
-#endif
-
     conn->queue_len = gu_fifo_length (conn->recv_q);
 
     if ((conn->queue_len >  conn->upper_limit) &&
@@ -206,9 +194,7 @@ gcs_fc_stop (gcs_conn_t* conn)
     }
 //   gu_info ("queue_len = %ld, upper_limit = %ld, state = %d, stop_sent = %ld",
 //            conn->queue_len, conn->upper_limit, conn->state, conn->stop_sent);
-#if 0
-    gu_mutex_unlock (&conn->fc_mutex);
-#endif
+
     return ret;
 }
 
@@ -219,14 +205,6 @@ gcs_fc_cont (gcs_conn_t* conn)
     struct gcs_fc fc = { htogl(conn->conf_id), 0 };
 
     assert (GCS_CONN_SYNCED == conn->state);
-
-#if 0
-    if (conn->stop_sent <= 0 ||
-        gcs_queue_length (conn->recv_q) > conn->lower_limit)
-        return 0; // try to avoid mutex lock
-
-    if (gu_mutex_lock (&conn->fc_mutex)) abort();
-#endif
 
     conn->queue_len = gu_fifo_length (conn->recv_q);
 
@@ -239,9 +217,7 @@ gcs_fc_cont (gcs_conn_t* conn)
             conn->stop_sent--;
         }
     }
-#if 0
-    gu_mutex_unlock (&conn->fc_mutex);
-#endif
+
     return ret;
 }
 
@@ -250,12 +226,7 @@ gcs_send_sync (gcs_conn_t* conn) {
     long ret = 0;
 
     assert (GCS_CONN_JOINED == conn->state);
-#if 0
-    if (gcs_queue_length (conn->recv_q) > conn->lower_limit)
-        return 0; // try to avoid mutex lock
 
-    if (gu_mutex_lock (&conn->fc_mutex)) abort();
-#endif
     conn->queue_len = gu_fifo_length (conn->recv_q);
 
     if (conn->lower_limit >= conn->queue_len) {
@@ -266,9 +237,7 @@ gcs_send_sync (gcs_conn_t* conn) {
             ret = 0;
         }
     }
-#if 0
-    gu_mutex_unlock (&conn->fc_mutex);
-#endif
+
     return ret;
 }
 
@@ -320,7 +289,6 @@ gcs_become_joined (gcs_conn_t* conn)
         long ret;
 
         conn->state = GCS_CONN_JOINED;
-//       conn->state = GCS_CONN_SYNCED; // remove when SYNC is ready.
 
         /* One of the cases when the node can become SYNCED */
         if ((ret = gcs_send_sync (conn))) {
@@ -364,7 +332,6 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
          * we're as good as SYNCED */
         if (GCS_CONN_OPEN == conn->state) { // TODO: change to GCS_CONN_PRIMARY
             conn->state = GCS_CONN_JOINED;
-//            conn->state = GCS_CONN_SYNCED; // remove when SYNC is ready.
         }
     }
 
@@ -706,7 +673,6 @@ long gcs_destroy (gcs_conn_t *conn)
 
     /* This must not last for long */
     while (gu_mutex_destroy (&conn->lock));
-//    while (gu_mutex_destroy (&conn->fc_mutex));
     
     gu_free (conn);
 

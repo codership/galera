@@ -96,6 +96,12 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
         }
 
         alloc_size = sizeof (gu_fifo_t) + array_size;
+
+        gu_info ("Creating FIFO of %lu elements, memory min used: "
+                 "%zu, max used: %zu",
+                 array_len * row_len, alloc_size,
+                 alloc_size + array_len*row_size);
+
         ret = gu_malloc (alloc_size);
         if (ret) {
             memset (ret, 0, alloc_size);
@@ -111,6 +117,9 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
             gu_cond_init  (&ret->get_cond, NULL);
             gu_cond_init  (&ret->put_cond, NULL);
 	}
+        else {
+            gu_error ("Failed to allocate %zu bytes for FIFO", alloc_size);
+        }
     }
     
     return ret;
