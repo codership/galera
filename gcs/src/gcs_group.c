@@ -492,11 +492,16 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         return (sender_idx == group->my_idx);
     }
     else {
-        // should we freak out and return an error?
-        gu_warn ("Protocol violation. SYNC message sender %ld is not joined."
-                  " Message ignored.",
-                   msg->sender_idx);
-        assert (0);
+        if (GCS_STATE_SYNCED != sender->status) {
+            gu_warn ("Protocol violation. SYNC message sender %ld (%s) "
+                     "is not joined. Message ignored.",
+                     msg->sender_idx, sender->name);
+            assert (0);
+        }
+        else {
+            gu_debug ("Redundant SYNC message from %ld (%s).",
+                      msg->sender_idx, sender->name);
+        }
         return 0;
     }
 }

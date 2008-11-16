@@ -501,6 +501,7 @@ void *gcs_test_recv (void *arg)
             assert (thread->local_act_id == GCS_SEQNO_ILL);
             break;
 	}
+	
 	msg_recvd++;
         size_recvd += thread->msg_len;
 
@@ -728,7 +729,7 @@ int main (int argc, char *argv[])
 
     gcs_test_thread_pool_stop (&send_pool);
     gcs_test_thread_pool_stop (&repl_pool);
-    gcs_test_thread_pool_stop (&recv_pool);
+//    gcs_test_thread_pool_stop (&recv_pool);
     puts ("Threads stopped.");
 
     printf ("Closing GCS connection... ");
@@ -786,16 +787,19 @@ int main (int argc, char *argv[])
     {
         ssize_t total;
         ssize_t allocs;
+        ssize_t reallocs;
         ssize_t deallocs;
 
-        void gu_mem_stats (ssize_t*, ssize_t*, ssize_t*);
-        gu_mem_stats (&total, &allocs, &deallocs);
+        void gu_mem_stats (ssize_t*, ssize_t*, ssize_t*, ssize_t*);
+        gu_mem_stats (&total, &allocs, &reallocs, &deallocs);
         printf ("Memory statistics:\n"
                 "Memory still allocated: %10lld\n"
                 "Times allocated:        %10lld\n"
+                "Times reallocated:      %10lld\n"
                 "Times freed:            %10lld\n",
                 (long long)total,
 		(long long)allocs,
+		(long long)reallocs,
 		(long long)deallocs);
     }
 

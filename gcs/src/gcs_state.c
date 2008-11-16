@@ -8,7 +8,8 @@
  *
  */
 
-#include "galerautils.h"
+#include <string.h>
+#include <galerautils.h>
 
 #define GCS_STATE_ACCESS
 #include "gcs_state.h"
