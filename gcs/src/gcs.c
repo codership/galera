@@ -20,7 +20,7 @@
 #include "gcs.h"
 #include "gcs_core.h"
 #include "gcs_fifo_lite.h"
-#include "gcs_queue.h"
+//#include "gcs_queue.h"
 
 const long GCS_MAX_REPL_THREADS = 16384;
 
@@ -464,7 +464,7 @@ static void *gcs_recv_thread (void *arg)
     gu_mutex_lock   (&conn->lock); // wait till gcs_open() is done;
     gu_mutex_unlock (&conn->lock);
 
-    while (conn->state < GCS_CONN_CLOSED)
+    while (conn->state <= GCS_CONN_CLOSED)
     {
         gcs_seqno_t this_act_id = GCS_SEQNO_ILL;
 

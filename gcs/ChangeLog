@@ -1,3 +1,10 @@
+2008-11-16 Alex 
+    Many bugfixes. 
+    Fixed handling of self-leave meassages.
+    Switched to "mallocless" FIFO implementaiton in gu_fifo.c
+    Resolved apparent race condition and optimized FC message sending.
+    Package version 0.7.2
+
 2008-11-09 Alex 
     Changed state transfer protocol to require join message to be sent by
     both parties involved in state transfer. Package version 0.7.1, library

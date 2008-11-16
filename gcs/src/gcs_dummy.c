@@ -17,7 +17,7 @@
 
 #include <galerautils.h>
 
-#include "gcs_queue.h"
+//#include "gcs_queue.h"
 #include "gcs_comp_msg.h"
 #include "gcs_dummy.h"
 
@@ -31,7 +31,8 @@ dummy_msg_t;
 
 typedef struct gcs_backend_conn
 {
-    gcs_queue_t     *gc_q;   /* "serializator" */
+//    gcs_queue_t     *gc_q;   /* "serializator" */
+    gu_fifo_t      *gc_q;   /* "serializator" */
     dummy_msg_t     *msg;    /* last undelivered message */
     bool             closed;
     gcs_seqno_t      msg_id;
@@ -71,11 +72,13 @@ static
 GCS_BACKEND_DESTROY_FN(dummy_destroy)
 {
     dummy_t* dummy = backend->conn;
+//    dummy_msg_t** ptr;
     
     if (!dummy || !dummy->closed) return -EBADFD;
 
 //    gu_debug ("Deallocating message queue (serializer)");
-    gcs_queue_free    (dummy->gc_q);
+//    gcs_queue_free    (dummy->gc_q);
+    gu_fifo_destroy  (dummy->gc_q);
 //    gu_debug ("Freeing message object.");
     dummy_msg_destroy (&dummy->msg);
     gu_free (dummy);
@@ -93,13 +96,17 @@ GCS_BACKEND_SEND_FN(dummy_send)
 	dummy_msg_t *msg   = dummy_msg_create (msg_type, len, buf);
 	if (msg)
 	{
-	    if ((err = gcs_queue_push (backend->conn->gc_q, msg)) < 1)
-	    {
+            dummy_msg_t** ptr = gu_fifo_get_tail (backend->conn->gc_q);
+//	    if ((err = gcs_queue_push (backend->conn->gc_q, msg)) < 1)
+	    if (gu_likely(ptr != NULL)) {
+                *ptr = msg;
+                gu_fifo_push_tail (backend->conn->gc_q);
+                return len;
+            }
+	    else {
 		dummy_msg_destroy (&msg);
-		return err;
+		err = -EBADFD; // closed
 	    }
-	    else
-		return len;
 	}
 	else
 	    err = -ENOMEM;
@@ -125,19 +132,26 @@ GCS_BACKEND_RECV_FN(dummy_recv)
      * in the previous call */
     if (!conn->msg)
     {
-        if ((ret = gcs_queue_pop_wait (conn->gc_q,
-                                       (void**) &conn->msg)) < 0) {
-            if (-ENODATA == ret) {
-                // wait was aborted while no data - connection closing
-                ret = -ECONNABORTED;
-            }
+        dummy_msg_t** ptr = gu_fifo_get_head (conn->gc_q);
+        if (gu_likely(ptr != NULL)) {
+            /* Always the same sender */
+            conn->msg = *ptr;
+            gu_fifo_pop_head (conn->gc_q);
+        }
+        else {
+//        if ((ret = gcs_queue_pop_wait (conn->gc_q,
+//                                       (void**) &conn->msg)) < 0) {
+//            if (-ENODATA == ret) {
+//                // wait was aborted while no data - connection closing
+//                ret = -ECONNABORTED;
+//            }
+            ret = -EBADFD; // closing
             gu_debug ("Returning %d: %s", ret, strerror(-ret));
             return ret;
         }
-        else {
-                /* Alaways the same sender */
-
-        }
+//        else {
+//
+//        }
     }
 
     *sender_id=0;	    
@@ -218,6 +232,9 @@ GCS_BACKEND_CLOSE_FN(dummy_close)
     if (comp) {
         ret = gcs_comp_msg_size(comp);
         ret = dummy_send (backend, comp, ret, GCS_MSG_COMPONENT);
+        // FIXME: here's a race condition - some other thread can send something
+        // after leave message.
+        gu_fifo_close (dummy->gc_q);
         if (ret > 0) ret = 0;
 	gcs_comp_msg_delete (comp);
     }
@@ -244,7 +261,8 @@ GCS_BACKEND_CREATE_FN(gcs_dummy_create)
 
     if (!(dummy = GU_MALLOC(dummy_t)))
 	goto out0;
-    if (!(dummy->gc_q = gcs_queue()))
+//    if (!(dummy->gc_q = gcs_queue()))
+    if (!(dummy->gc_q = gu_fifo_create (100000,sizeof(void*))))
 	goto out1;
 
     dummy->msg          = NULL;
