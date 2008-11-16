@@ -608,13 +608,13 @@ static inline long galera_eagain (long (*function) (gcs_to_t*, gcs_seqno_t),
 }
 
 // returns true if action to be applied and false if to be skipped
-// should always be called while holding go_queue
+// should always be called while holding to_queue
 static inline bool
 galera_update_global_seqno (seqno)
 {
     // Seems like we cannot enforce sanity check here - some replicated
-    // writesets get cancelled and never make it to this point. Hence
-    // holes in global seqno are inevitable here.
+    // writesets get cancelled and never make it to this point (TO monitor).
+    // Hence holes in global seqno are inevitable here.
     if (gu_likely (my_seqno < seqno)) {
         my_seqno = seqno;
         return true;
@@ -638,7 +638,7 @@ static void process_conn_write_set(
         /* Global seqno ok, certification ok (not needed?) */
         rcode = apply_write_set(app_ctx, ws);
         if (rcode) {
-            gu_error ("unknown galera fail: %d trx: %llu", rcode,seqno_l);
+            gu_error ("unknown galera fail: %d trx: %llu", rcode, seqno_l);
         }
     }
     
@@ -851,7 +851,11 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
                     GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
                 }
             } while ((ret == -EAGAIN) && (usleep(1000000), true));
-            if (ret < 0) return ret;
+
+            if (ret < 0) {
+                GALERA_RELEASE_COMMIT_QUEUE (conf_seqno);
+                return ret;
+            }
 
             gu_info ("Requesting state transfer: success, donor %ld", ret);
             assert (ret != my_idx);
@@ -867,8 +871,10 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
             my_seqno = conf->seqno; // anything below this seqno must be ignored
         }
         else {
+            /* no state transfer required */
             assert (my_seqno == conf->seqno); // global seqno
             GALERA_SELF_CANCEL_COMMIT_QUEUE (conf_seqno); // local seqno
+            ret = my_idx;
         }
 
         my_uuid  = *group_uuid;
@@ -877,6 +883,7 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
     }
     else {
         // NON PRIMARY configuraiton
+        GALERA_SELF_CANCEL_COMMIT_QUEUE (conf_seqno); // local seqno
         return -1;
     }
 }
