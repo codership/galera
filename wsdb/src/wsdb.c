@@ -45,7 +45,9 @@ static int hash_cmp(uint16_t len1, char *key1, uint16_t len2, char *key2) {
     return 0;
 }
 
-int wsdb_init(const char *data_dir, wsdb_log_cb_t logger) {
+int wsdb_init(
+    const char *data_dir, wsdb_log_cb_t logger, trx_seqno_t void_seqno
+) {
     gu_conf_set_log_callback(logger);
     
     s_max_table_id = 64000;
@@ -53,7 +55,7 @@ int wsdb_init(const char *data_dir, wsdb_log_cb_t logger) {
     s_last_table_id = 1;
 
     /* open DB for local state trx */
-    local_open(data_dir, NULL, 0, 10000);
+    local_open(data_dir, NULL, 0, 10000, void_seqno);
 
     /* open certification database */
     wsdb_cert_init(data_dir, NULL);

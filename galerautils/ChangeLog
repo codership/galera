@@ -1,3 +1,6 @@
+2008-11-16 Alex
+    Added gu_fifo_t class for mallocless FIFO queue. Version 0.2.9.
+    
 2008-03-23 Alex
     Added gu_timeval_diff() and gu_clock_diff() functions.
     Bumped interface version.

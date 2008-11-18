@@ -13,7 +13,7 @@ START_TEST (gu_fifo_test)
     gu_fifo_t* fifo;
     long i;
     long* item;
-    size_t alloc, used;
+    size_t used;
 
     fifo = gu_fifo_create (0, 1);
     fail_if (fifo != NULL);
@@ -23,22 +23,16 @@ START_TEST (gu_fifo_test)
 
     fifo = gu_fifo_create (1, 1);
     fail_if (fifo == NULL);
-    fail_if (fifo->length == 1); // must be longer
     gu_fifo_destroy (fifo);
     mark_point();
 
     fifo = gu_fifo_create (FIFO_LENGTH, sizeof(i));
     fail_if (fifo == NULL);
-    fail_if ((fifo->length) < FIFO_LENGTH,
-             "Total fifo length %lu, expected > %lu",
-             fifo->length, FIFO_LENGTH);
-    fail_if (fifo->used != 0, "fifo->used is %lu for an empty FIFO",
-             fifo->used);
-
-    alloc = fifo->alloc; // remember how much allocated for empty FIFO.
+    fail_if (gu_fifo_length(fifo) != 0, "fifo->used is %lu for an empty FIFO",
+             gu_fifo_length(fifo));
 
     // fill FIFO
-    for (i = 0; i < fifo->length; i++) {
+    for (i = 0; i < FIFO_LENGTH; i++) {
         item = gu_fifo_get_tail (fifo);
         fail_if (item == NULL, "could not get item %ld", i);
         *item = i;
@@ -46,13 +40,8 @@ START_TEST (gu_fifo_test)
     }
 
     used = i;
-    fail_if (fifo->length != used, "used is %zu, expected %zu", 
-             used, fifo->length);
-    fail_if (fifo->used != used, "fifo->used is %zu, expected %zu", 
-             fifo->used, used);
-    fail_if (fifo->used != gu_fifo_length (fifo),
-             "gu_fifo_length() shows %ld, should  %lu",
-             gu_fifo_length(fifo), fifo->used);
+    fail_if (gu_fifo_length(fifo) != used, "used is %zu, expected %zu", 
+             used, gu_fifo_length(fifo));
 
     // test pop
     for (i = 0; i < used; i++) {
@@ -62,11 +51,9 @@ START_TEST (gu_fifo_test)
         gu_fifo_pop_head (fifo);
     }
 
-    fail_if (fifo->used != 0, "fifo->used for empty queue is %ld", fifo->used);
-    fail_if (fifo->alloc != alloc,
-             "After emtying fifo, alloc counter is not "
-             "the same as in the beginning: was %lu, got %lu",
-             alloc, fifo->alloc);
+    fail_if (gu_fifo_length(fifo) != 0,
+             "gu_fifo_length() for empty queue is %ld",
+             gu_fifo_length(fifo));
 
     gu_fifo_close (fifo);
     mark_point ();

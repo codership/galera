@@ -369,8 +369,8 @@ typedef struct {
     gcs_seqno_t  conf_id;       /// configuration ID (-1 if non-primary)
     uint8_t      group_uuid[GCS_UUID_LEN];/// group UUID
     bool         st_required;   /// state transfer is required (gap in seqnos)
-    size_t       memb_num;      /// number of members in configuration
-    size_t       my_idx;        /// index of this node in the configuration
+    long         memb_num;      /// number of members in configuration
+    long         my_idx;        /// index of this node in the configuration
     char         data[0];       /// member array (null-terminated IDs)
 } gcs_act_conf_t;
 

@@ -15,9 +15,9 @@
  * @brief initializes connection management
  *
  * @param limit max number of connections
+ * @param void_seqno un-initialized seqno value
  */
-int conn_init(uint16_t limit);
-
+int conn_init(uint16_t limit, trx_seqno_t void_seqno);
 /*!
  * @brief closes connection management and releases allocated resources
  */

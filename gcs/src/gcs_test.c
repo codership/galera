@@ -39,8 +39,8 @@ gcs_test_log_t;
 
 static gcs_test_log_t *send_log, *recv_log;
 
-static bool throughput = true;  // bench for throughput
-static bool total      = false; // also enable TO locking
+static bool throughput = true; // bench for throughput
+static bool total      = true; // also enable TO locking
 
 typedef enum
 {
@@ -354,6 +354,7 @@ test_after_recv (gcs_test_thread_t* thread)
     }
 
     ret = test_send_last_applied (gcs, thread->act_id);
+//    fprintf (stdout, "SEQNO applied %lld", thread->local_act_id);
 
     return ret;
 }
@@ -433,7 +434,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     gcs_act_conf_t* conf = (void*)thread->msg;
 
     fprintf (stdout, "Got GCS_ACT_CONF: Conf: %lld, "
-             "seqno: %lld, members: %zu, my idx: %zu, local seqno: %lld\n",
+             "seqno: %lld, members: %ld, my idx: %ld, local seqno: %lld\n",
              (long long)conf->conf_id, (long long)conf->seqno,
              conf->memb_num, conf->my_idx, thread->local_act_id);
     fflush (stdout);
@@ -458,7 +459,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
             // pretend that state transfer is complete, cancel every action up
             // to seqno
             for (s = thread->local_act_id + 1; s <= seqno; s++) {
-                gcs_to_self_cancel (to, seqno); // this is local seqno
+                gcs_to_self_cancel (to, s); // this is local seqno
             }
 
             fprintf (stdout, "Sending JOIN: %s\n", strerror(-gcs_join(gcs, 0)));
@@ -501,6 +502,7 @@ void *gcs_test_recv (void *arg)
             assert (thread->local_act_id == GCS_SEQNO_ILL);
             break;
 	}
+	
 	msg_recvd++;
         size_recvd += thread->msg_len;
 
@@ -723,21 +725,20 @@ int main (int argc, char *argv[])
 
     usleep (conf.n_tries*1000000);
 
-    puts ("Stopping threads...");
+    puts ("Stopping SEND and REPL threads...");
     fflush(stdout); fflush(stderr);
 
     gcs_test_thread_pool_stop (&send_pool);
     gcs_test_thread_pool_stop (&repl_pool);
-    gcs_test_thread_pool_stop (&recv_pool);
     puts ("Threads stopped.");
-
-    printf ("Closing GCS connection... ");
-    if ((err = gcs_close (gcs))) goto out;
-    puts ("done.");
 
     gcs_test_thread_pool_join (&send_pool);
     gcs_test_thread_pool_join (&repl_pool);
     puts ("SEND and REPL threads joined.");
+
+    printf ("Closing GCS connection... ");
+    if ((err = gcs_close (gcs))) goto out;
+    puts ("done.");
 
     gcs_test_thread_pool_join (&recv_pool);
     puts ("RECV threads joined.");
@@ -786,16 +787,19 @@ int main (int argc, char *argv[])
     {
         ssize_t total;
         ssize_t allocs;
+        ssize_t reallocs;
         ssize_t deallocs;
 
-        void gu_mem_stats (ssize_t*, ssize_t*, ssize_t*);
-        gu_mem_stats (&total, &allocs, &deallocs);
+        void gu_mem_stats (ssize_t*, ssize_t*, ssize_t*, ssize_t*);
+        gu_mem_stats (&total, &allocs, &reallocs, &deallocs);
         printf ("Memory statistics:\n"
                 "Memory still allocated: %10lld\n"
                 "Times allocated:        %10lld\n"
+                "Times reallocated:      %10lld\n"
                 "Times freed:            %10lld\n",
                 (long long)total,
 		(long long)allocs,
+		(long long)reallocs,
 		(long long)deallocs);
     }
 

@@ -790,12 +790,13 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
     recv_act.type = GCS_ACT_ERROR;
     recv_act.id   = GCS_SEQNO_ILL; // by default action is unordered
 
-    if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
-    if (conn->state >= CORE_CLOSED) {
-	gu_mutex_unlock (&conn->send_lock);
-	return -EBADFD;
-    }
-    gu_mutex_unlock (&conn->send_lock);
+// remove
+//    if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
+//    if (conn->state >= CORE_CLOSED) {
+//	gu_mutex_unlock (&conn->send_lock);
+//	return -EBADFD;
+//    }
+//    gu_mutex_unlock (&conn->send_lock);
 
     /* receive messages from group and demultiplex them 
      * until finally some complete action is ready */

@@ -248,7 +248,9 @@ typedef void (*wsdb_log_cb_t) (int code, const char* msg);
  * @retval WSDB_OK successful operation 
  * @retval WSDB_ERROR wsdb could not initialize, must abort
  */
-int wsdb_init(const char *data_dir, wsdb_log_cb_t logger);
+int wsdb_init(
+    const char *data_dir, wsdb_log_cb_t logger, trx_seqno_t void_seqno
+);
 int wsdb_close();
 
 /*! @brief creates a write set for a transaction 

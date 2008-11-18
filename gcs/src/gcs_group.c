@@ -201,15 +201,18 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     gcs_node_t *new_nodes = NULL;
     ulong       new_memb = 0;
 
+    group->my_idx = gcs_comp_msg_self (comp);
+    new_nodes_num = gcs_comp_msg_num  (comp);
+
     gu_debug ("primary = %s, my_id = %d, memb_num = %d",
 	      gcs_comp_msg_primary(comp) ? "yes" : "no",
-	      gcs_comp_msg_self(comp), gcs_comp_msg_num (comp));
+	      group->my_idx, new_nodes_num);
 
     if (gcs_comp_msg_primary(comp)) {
 	/* Got PRIMARY COMPONENT - Hooray! */
 	/* create new nodes array according to new membrship */
-	new_nodes_num = gcs_comp_msg_num (comp);
-	new_nodes     = group_nodes_init (comp);
+        assert (new_nodes_num);
+	new_nodes = group_nodes_init (comp);
 	if (!new_nodes) return -ENOMEM;
 	
 	if (group->state == GCS_GROUP_PRIMARY) {
@@ -234,13 +237,13 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                              GU_UUID_ARGS(&group->group_uuid));
                 }
 
-                group->nodes[group->my_idx].status = GCS_STATE_JOINED;
+                group->nodes[0].status = GCS_STATE_JOINED;
                 /* initialize node ID to the one given by the backend - this way
                  * we'll be recognized as coming from prev. conf. below */
-                strncpy ((char*)group->nodes[group->my_idx].id, new_nodes[0].id,
+                strncpy ((char*)group->nodes[0].id, new_nodes[0].id,
                          sizeof (new_nodes[0].id) - 1);
                 /* forge own state message - for group_post_state_exchange() */
-                gcs_node_record_state (&group->nodes[group->my_idx],
+                gcs_node_record_state (&group->nodes[0],
                                        gcs_group_get_state (group));
             }
             else {
@@ -252,6 +255,12 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
         }
     }
     else {
+        if (group->my_idx < 0) {
+            // Self-leave message
+            assert (0 == new_nodes_num);
+            new_nodes = NULL;
+            gu_info ("Received self-leave message.");
+        }
 	/* Got NON-PRIMARY COMPONENT - cleanup */
         /* All sending threads must be aborted with -ENOTCONN,
          * local action FIFO must be flushed. Not implemented: FIXME! */
@@ -281,7 +290,6 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
 
     group->nodes  = new_nodes;
     group->num    = new_nodes_num;
-    group->my_idx = gcs_comp_msg_self (comp);
 
     if (gcs_comp_msg_primary(comp)) {
         /* FIXME: for now pretend that we always have new nodes and perform
@@ -492,11 +500,16 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         return (sender_idx == group->my_idx);
     }
     else {
-        // should we freak out and return an error?
-        gu_warn ("Protocol violation. SYNC message sender %ld is not joined."
-                  " Message ignored.",
-                   msg->sender_idx);
-        assert (0);
+        if (GCS_STATE_SYNCED != sender->status) {
+            gu_warn ("Protocol violation. SYNC message sender %ld (%s) "
+                     "is not joined. Message ignored.",
+                     msg->sender_idx, sender->name);
+            assert (0);
+        }
+        else {
+            gu_debug ("Redundant SYNC message from %ld (%s).",
+                      msg->sender_idx, sender->name);
+        }
         return 0;
     }
 }
@@ -605,6 +618,7 @@ gcs_group_act_conf (gcs_group_t* group, gcs_recv_act_t* act)
 {
     ssize_t conf_size = sizeof(gcs_act_conf_t) + group->num*GCS_MEMBER_NAME_MAX;
     gcs_act_conf_t* conf = malloc (conf_size);
+
     if (conf) {
         long idx;
 
@@ -612,16 +626,25 @@ gcs_group_act_conf (gcs_group_t* group, gcs_recv_act_t* act)
         conf->conf_id     = group->conf_id;
         conf->memb_num    = group->num;
         conf->my_idx      = group->my_idx;
-        conf->st_required =
-            (group->nodes[group->my_idx].status < GCS_STATE_DONOR);
-
         memcpy (conf->group_uuid, &group->group_uuid, sizeof (gu_uuid_t));
 
-        for (idx = 0; idx < group->num; idx++)
-        {
-            char* node_id = &conf->data[idx * GCS_MEMBER_NAME_MAX];
-            strncpy (node_id, group->nodes[idx].id, GCS_MEMBER_NAME_MAX);
-            node_id[GCS_MEMBER_NAME_MAX - 1] = '\0';
+        if (group->num) {
+            assert (conf->my_idx >= 0);
+            conf->st_required =
+                (group->nodes[group->my_idx].status < GCS_STATE_DONOR);
+
+            for (idx = 0; idx < group->num; idx++)
+            {
+                char* node_id = &conf->data[idx * GCS_MEMBER_NAME_MAX];
+                strncpy (node_id, group->nodes[idx].id, GCS_MEMBER_NAME_MAX);
+                node_id[GCS_MEMBER_NAME_MAX - 1] = '\0';
+            }
+        }
+        else {
+            // leave message
+            assert (conf->conf_id < 0);
+            assert (conf->my_idx < 0);
+            conf->st_required = false;
         }
 
         act->buf  = conf;

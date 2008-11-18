@@ -15,6 +15,7 @@ static struct file_cache *local_cache;
 static struct wsdb_file  *local_file;
 static struct wsdb_hash  *trx_hash;
 static uint16_t trx_limit;
+static  trx_seqno_t local_void_seqno;
 
 enum wsdb_block_states {
     BLOCK_ACTIVE,
@@ -157,11 +158,14 @@ int local_open(
     const char *dir,
     const char *file,
     uint16_t    block_size,
-    uint16_t    trxs_max
+    uint16_t    trxs_max,
+    trx_seqno_t void_seqno
 ) {
     char full_name[256];
     int rcode;
     int cache_size;
+
+    local_void_seqno = void_seqno;
 
     memset(full_name, 256, '\0');
     sprintf(
@@ -184,7 +188,7 @@ int local_open(
     trx_limit = (trxs_max) ? trxs_max : TRX_LIMIT;
     trx_hash  = wsdb_hash_open(trx_limit, hash_fun_64, hash_cmp_64, true);
 
-    rcode = conn_init(0);
+    rcode = conn_init(0, void_seqno);
 
     /* initialize last_committed_trx mutex */
     gu_mutex_init(&last_committed_seqno_mtx, NULL);
@@ -289,8 +293,8 @@ static struct trx_info *new_trx_info(local_trxid_t trx_id) {
 
     MAKE_OBJ(trx, trx_info);
     trx->id          = trx_id;
-    trx->seqno_g     = 0;
-    trx->seqno_l     = 0;
+    trx->seqno_g     = local_void_seqno;
+    trx->seqno_l     = local_void_seqno;
     trx->first_block = 0;
     trx->last_block  = 0;
 
