@@ -90,6 +90,7 @@ typedef char		my_bool; /* Small bool */
 #   define GALERA_MISSING_SEQNO (ULLONG_MAX-1)
 #endif
 #else // SIGNED_SEQNO
+#   define GALERA_VOID_SEQNO     0
 #   define GALERA_ABORT_SEQNO   -1
 #   define GALERA_MISSING_SEQNO -2
 #endif

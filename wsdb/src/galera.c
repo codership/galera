@@ -187,7 +187,7 @@ enum galera_status galera_init(const char*          group,
     my_idx   = 0;
 
     /* initialize wsdb */
-    wsdb_init(data_dir, logger, GALERA_MISSING_SEQNO);
+    wsdb_init(data_dir, logger, GALERA_VOID_SEQNO);
 
     gu_conf_set_log_callback(logger);
 
@@ -434,7 +434,8 @@ static int apply_write_set(void *app_ctx, struct wsdb_write_set *ws) {
               default: {
                    char *query = gu_malloc (ws->conn_queries[i].query_len + 1);
                    memset(query, '\0', ws->conn_queries[i].query_len + 1);
-                   memcpy(query, ws->conn_queries[i].query, ws->conn_queries[i].query_len);
+                   memcpy(query, ws->conn_queries[i].query, 
+                          ws->conn_queries[i].query_len);
                    gu_error("connection query apply failed: %s", query);
                    gu_free (query);
                    GU_DBUG_RETURN(GALERA_TRX_FAIL);
@@ -456,7 +457,10 @@ static int apply_write_set(void *app_ctx, struct wsdb_write_set *ws) {
          rcode = bf_execute_cb_rbr(app_ctx,
                                    ws->rbr_buf,
                                    ws->rbr_buf_len, 0, 0);
-         if (rcode != GALERA_OK) GU_DBUG_RETURN(rcode);
+         if (rcode != GALERA_OK) {
+             gu_error("RBR apply failed: %d", rcode);
+             GU_DBUG_RETURN(rcode);
+         }
          break;
     case WSDB_WS_DATA_COLS: 
         gu_error(
@@ -688,69 +692,76 @@ static void process_query_write_set(
     gu_debug("remote trx seqno: %llu %llu last_seen_trx: %llu, cert: %d", 
              seqno_l, seqno_g, ws->last_seen_trx, rcode
     );
-
+#define MAX_RETRIES 3
  retry:
     switch (rcode) {
     case WSDB_OK:   /* certification ok */
-        
+      {
+        int retries = 0;
         /* synchronize with other appliers */
         ctx.seqno = seqno_l;
         ctx.ws    = ws;
         job_queue_start_job(applier_queue, applier, (void *)&ctx);
 
         while((rcode = apply_write_set(app_ctx, ws))) {
-	    gu_warn("ws apply failed for: %llu, last_seen: %llu", 
+            gu_warn("ws apply failed for: %llu, last_seen: %llu", 
                     seqno_g, ws->last_seen_trx
             );
+            if (retries++ == MAX_RETRIES) break;
         }
-        
+        if (retries == MAX_RETRIES) {
+            gu_warn("ws applying is not possible");
+            //abort();
+        }
+
         job_queue_end_job(applier_queue, applier);
-	
-	/* NOTE: In case of failure, wouldn't it be more correct to 
-	 * apply rollback than blindly commit? */
-	
-	if (is_retry == 0) {
-	    /* On first try grab commit_queue */
+
+        /* NOTE: In case of failure, wouldn't it be more correct to 
+         * apply rollback than blindly commit? */
+
+        if (is_retry == 0) {
+            /* On first try grab commit_queue */
             GALERA_GRAB_COMMIT_QUEUE (seqno_l);
-	}
+        }
 
         /* TODO: convert into ha_commit() or smth */
         rcode = apply_query(app_ctx, "commit\0", 7);
 
         if (rcode) {
-	    gu_warn("ws apply commit failed for: %llu, last_seen: %llu", 
-		    seqno_g, ws->last_seen_trx);
-	    rcode = WSDB_OK;
-	    is_retry = 1;
-	    goto retry;
+            gu_warn("ws apply commit failed for: %llu, last_seen: %llu", 
+                    seqno_g, ws->last_seen_trx);
+            rcode = WSDB_OK;
+            is_retry = 1;
+            goto retry;
         }
 
         do_report = report_check_counter ();
 
-	GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
-	
+        GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
+       
         /* register committed transaction */
         if (!rcode) {
             wsdb_set_global_trx_committed(seqno_g);
         } else {
             gu_fatal("could not apply trx: %llu", seqno_g);
-	    abort();
-	}
-	break;
+            abort();
+        }
+        break;
+      }
     case WSDB_CERTIFICATION_FAIL:
         /* certification failed, release */
         gu_warn("trx certification failed: (%llu %llu) last_seen: %llu",
                 seqno_l, seqno_g, ws->last_seen_trx);
         print_ws(wslog_G, ws, seqno_g);
     case WSDB_CERTIFICATION_SKIP:
-	/* Cancel commit queue */
+        /* Cancel commit queue */
         GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
         break;
     default:
         gu_error(
             "unknown galera fail: %d trdx: %llu",rcode,seqno_l
-	    );
-	abort();
+        );
+        abort();
         break;
     }
 
@@ -820,7 +831,7 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
 
     if (conf->conf_id >= 0) {
         // PRIMARY configuration
-        long ret;
+        long ret = 0;
 
         if (conf->st_required) {
             // GCS determined that we need to request state transfer.
@@ -1117,18 +1128,61 @@ enum galera_status galera_rolledback(trx_id_t trx_id) {
     GU_DBUG_RETURN(GALERA_OK);
 }
 
-/*
-  Local phase transaction commits depending on
-  the result of replication and certification performed
-  by this function.
+static int check_certification_status_for_aborted(
+    trx_seqno_t seqno_l, trx_seqno_t seqno_g, struct wsdb_write_set *ws
+) {
+    int rcode;
+    /*
+     * not sure if certification needs to wait for total order or not.
+     * local trx has conflicted with some remote trx and we are interested 
+     * to find out if this is a true conflict or dbms lock granularity issue.
+     *
+     * It would be safe to wait for all preceding trxs to certificate before
+     * us. However, this is not simple to guarantee. There is a limited number 
+     * of slave threads and each slave will eventually end up waiting for 
+     * commit_queue. Therefore, all preceding remote trxs might not have passed
+     * to_queue and we would hang here waiting for to_queue => deadlock.
+     * 
+     * for the time being, I just certificate here with all trxs which were
+     * fast enough to certificate. This is wrong, and must be fixed.
+     *
+     * Maybe 'light weight' to_queue would work here: We would just check that
+     * seqno_l - 1 has certified and then do our certification.
+     */
 
-  in: trx_id, conn_id, write_set (null unless rbr)
-  out: 
-  returns GALERA_CONN_FAIL | GALERA_TRX_FAIL | GALERA_OK
+    //if ((rcode = galera_eagain (gcs_to_grab, to_queue, seqno_l))) {
+    //   gu_warn("gcs_to_grab aborted: %d seqno %llu", rcode, seqno_l);
+    //   retcode = GALERA_TRX_FAIL;
+    //   goto after_cert_test;
+    //}
 
-  todo: there is a common pattern with `process_query_write_set'
-        that could be separated into a separate inline function
-*/
+    //if (gu_likely(galera_update_global_seqno (seqno_g))) {
+        /* Gloabl seqno OK, do certification test */
+        //print_ws(wslog_L, ws, seqno_l);
+        rcode = wsdb_append_write_set(seqno_g, ws);
+        switch (rcode) {
+        case WSDB_OK:
+            gu_warn ("BF conflicting local trx has certified, "
+                      "seqno: %llu %llu last_seen_trx: %llu", 
+                      seqno_l, seqno_g, ws->last_seen_trx);
+            /* certification ok */
+            return GALERA_OK;
+
+        case WSDB_CERTIFICATION_FAIL:
+            /* certification failed, release */
+            gu_info("BF conflicting local trx certification fail: %llu - %llu",
+                    seqno_l, ws->last_seen_trx);
+            print_ws(wslog_L, ws, seqno_l);
+            return GALERA_TRX_FAIL;
+
+        default:  
+            gu_fatal("wsdb append failed: seqno_g %llu seqno_l %llu",
+                     seqno_g, seqno_l);
+            abort();
+            break;
+        }
+}
+
 
 enum galera_status
 galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr_data_len) {
@@ -1166,7 +1220,7 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
 	GU_DBUG_RETURN(GALERA_TRX_FAIL);
         break;
     case GALERA_MISSING_SEQNO:
-	gu_warn("trx is missing from galera: %llu", trx_id);
+	gu_debug("trx is missing from galera: %llu", trx_id);
 	gu_mutex_unlock(&commit_mtx);
 	GU_DBUG_RETURN(GALERA_TRX_MISSING);
         break;
@@ -1244,16 +1298,21 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
 
     /* check if trx was cancelled before we got here */
     if (wsdb_get_local_trx_seqno(trx_id) == GALERA_ABORT_SEQNO) {
-	gu_debug("trx has been cancelled during rcs_repl(): "
-                 "trx_id %llu  seqno_l %llu", trx_id, seqno_l);
+        gu_warn("trx has been cancelled during gcs_repl(): "
+                "trx_id %llu  seqno_l %llu seqno_g: %llu", 
+                trx_id, seqno_l, seqno_g
+        );
 	gu_mutex_unlock(&commit_mtx);
-	/* Call self cancel to allow gcs_to_release() to skip this seqno */
+        /* Call self cancel to allow gcs_to_release() to skip this seqno */
         // gcs_to_release() should be called only after successfull
         // gcs_to_grab() - Alex, 16.03.2008
         GALERA_SELF_CANCEL_TO_QUEUE (seqno_l);
         GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
 
-        retcode = GALERA_TRX_FAIL;
+        retcode = check_certification_status_for_aborted(seqno_l, seqno_g, ws);
+        if ((retcode == GALERA_OK) && mark_commit_early) {
+            wsdb_set_local_trx_committed(trx_id);
+        }
         goto cleanup;
     }
     
@@ -1265,7 +1324,17 @@ galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr
     if ((rcode = galera_eagain (gcs_to_grab, to_queue, seqno_l))) {
 	gu_warn("gcs_to_grab aborted: %d seqno %llu", rcode, seqno_l);
 	retcode = GALERA_TRX_FAIL;
-	goto after_cert_test;
+
+        retcode = check_certification_status_for_aborted(seqno_l, seqno_g, ws);
+        if (retcode == GALERA_OK) {
+          if (mark_commit_early) {
+            wsdb_set_local_trx_committed(trx_id);
+          }
+          GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
+          goto cleanup;
+        } else {
+          goto after_cert_test;
+        }
     }
 
     if (gu_likely(galera_update_global_seqno (seqno_g))) {
