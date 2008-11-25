@@ -20,7 +20,7 @@ void xdr_log_cb(int code, const char *fmt) {
     }
     sprintf(FMT, "WSDB Error (%u): %s", code, fmt);
     strcat(msg, SYS_ERR);
-    fprintf(stderr, msg);
+    fprintf(stderr, "%s", msg);
 }
 #define RAND_ID(table, max) (table[rand() % max])
 
@@ -59,7 +59,7 @@ START_TEST (test_xdr)
     }
 
     /* unit test code */
-    rcode = wsdb_init("./data", xdr_log_cb);
+    rcode = wsdb_init("./data", xdr_log_cb, 0);
     if (rcode) {
         fail("wsdb init: %d", rcode);
     }

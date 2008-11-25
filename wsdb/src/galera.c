@@ -96,7 +96,7 @@ void galera_log(galera_severity_t code, char *fmt, ...) {
     if (galera_log_handler) {
     	    galera_log_handler(code, msg);
     } else {
-        fprintf(stderr, msg);
+        fprintf(stderr, "%s", msg);
     }
     GU_DBUG_VOID_RETURN;
 }

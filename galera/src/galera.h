@@ -143,10 +143,7 @@ typedef int (*galera_bf_apply_row_fun)(void *ctx, void *data, size_t len);
 
 
 
-#ifdef GALERA_DEPRECATED
-/*
- * Old interface definitions, maintained for backwards compatibility
- */
+
 
 
 /*!
@@ -378,7 +375,7 @@ enum galera_status galera_to_execute_start(
 );
 enum galera_status galera_to_execute_end(conn_id_t conn_id);
 
-#endif /* GALERA_DEPRECATED */
+
 
 
 

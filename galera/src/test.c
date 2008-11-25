@@ -8,7 +8,7 @@
 int main(int argc, char **argv)
 {
     int err;
-    galera_t *g = NULL;
+    // galera_t *g = NULL;
 
     if (argc != 2) {
         fprintf(stderr, "Usage: test <filename>\n");
@@ -17,13 +17,14 @@ int main(int argc, char **argv)
     
 
 
-    if ((err = galera_load(argv[1], &g)) != 0) {
+    if ((err = galera_load(argv[1], NULL)) != 0) {
         fprintf(stderr, "Failed to load '%s': '%s'\n", 
                 argv[1], strerror(err));
+        return EXIT_FAILURE;
     } else {
         fprintf(stderr, "Library loaded successfully\n");
-        galera_unload(g);
+        galera_unload(NULL);
     }
-    
+
     return EXIT_SUCCESS;
 }

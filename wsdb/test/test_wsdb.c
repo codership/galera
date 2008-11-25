@@ -23,7 +23,7 @@ void wsdb_log_cb(int code, const char *fmt) {
     sprintf(FMT, "WSDB Error (%u): %s", code, fmt);
     //sprintf(msg, FMT, ap);
     strcat(msg, SYS_ERR);
-    fprintf(stderr, msg);
+    fprintf(stderr, "%s", msg);
 }
 
 #define RAND_ID(table, max) (table[rand() % max])
@@ -86,7 +86,7 @@ START_TEST (test_wsdb_api)
         sprintf(key_parts[i]->data, "i:%d", i);
     }
     /* unit test code */
-    rcode = wsdb_init("./data", wsdb_log_cb);
+    rcode = wsdb_init("./data", wsdb_log_cb, 0);
     if (rcode) {
         fail("wsdb init: %d", rcode);
     }

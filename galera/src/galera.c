@@ -1,5 +1,5 @@
 
-#define GALERA_DEPRECATED 1
+
 #include "galera.h"
 
 
@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <string.h>
-
+#include <stdio.h>
 
 
 /*
@@ -16,21 +16,16 @@
 static galera_t *galera_ctx = NULL;
 
 
+
+
 enum galera_status galera_init(const char *gcs_group, 
                                const char *gcs_address, 
                                const char *data_dir,
                                galera_log_cb_t logger)
 {
-    const char *library;
-
-    if (!(library = getenv("GALERA_LIBRARY")))
-        return GALERA_FATAL;
-
-    if (galera_load(library, &galera_ctx))
-        return GALERA_FATAL;
 
     assert(galera_ctx);
-
+    fprintf(stderr, "library loaded successfully\n");
     return galera_ctx->init(galera_ctx, gcs_group, gcs_address, data_dir, logger);
 }
 
@@ -190,7 +185,6 @@ enum galera_status galera_to_execute_end(conn_id_t conn_id)
 }
 
 
-#undef GALERA_DEPRECATED
 
 /**************************************************************************
  * Library loader
@@ -234,18 +228,26 @@ int galera_load(const char *spec, galera_t **hptr)
     void *dlh = NULL;
     galera_loader_fun dlfun;
 
-    if (!(spec && hptr))
+    if (!spec)
         return EINVAL;
 
-    *hptr = NULL;
+    fprintf(stderr, "galera_load(): loading %s\n", spec);
+
+    if (!hptr) {
+        if (galera_ctx)
+            return EBUSY;
+        hptr = &galera_ctx;
+    } else {
+        *hptr = NULL;
+    }
     
     if (!(dlh = dlopen(spec, RTLD_LOCAL))) {
-        ret = errno;
+        ret = EINVAL;
         goto out;
     }
     
     if (!(*(void **)(&dlfun) = dlsym(dlh, "galera_loader"))) {
-        ret = errno;
+        ret = EINVAL;
         goto out;
         
     }
@@ -254,12 +256,15 @@ int galera_load(const char *spec, galera_t **hptr)
     
     if (ret == 0 && !*hptr)
         ret = EACCES;
-    if (ret == 0)
-        ret = verify(*hptr, GALERA_INTERFACE_VERSION);
+    if (ret == 0 && 
+        (ret = verify(*hptr, GALERA_INTERFACE_VERSION)) != 0 &&
+        (*hptr)->tear_down) {
+        (*hptr)->tear_down(*hptr);
+    }
     if (ret == 0)
         (*hptr)->dlh = dlh;
 out:
-    if (!*hptr)
+    if (ret != 0 && dlh)
         dlclose(dlh);
     return ret;
 }
@@ -269,10 +274,15 @@ out:
 void galera_unload(galera_t *hptr)
 {
     void *dlh;
+    if (!hptr) {
+        hptr = galera_ctx;
+        galera_ctx = NULL;
+    }
     assert(hptr);
     dlh = hptr->dlh;
     hptr->tear_down(hptr);
     if (dlh)
         dlclose(dlh);
+
 }
 
