@@ -98,6 +98,8 @@ typedef enum galera_severity
  */
 typedef void (*galera_log_cb_t)(int, const char *);
 
+typedef uint64_t ws_id_t;
+
 /*!
  * @brief transaction initialization function
  *
@@ -107,7 +109,7 @@ typedef void (*galera_log_cb_t)(int, const char *);
  * @param context pointer provided by the application
  * @param sequence number
  */
-typedef int (*galera_ws_start_fun)(void *ctx, uint64_t seqno);
+typedef int (*galera_ws_start_fun)(void *ctx, ws_id_t seqno);
 
 /*!
  * @brief brute force apply function
@@ -173,14 +175,6 @@ void galera_dbug_push (const char* control);
 void galera_dbug_pop  (void);
 
 /*!
- * @brief connection context management, possibly obsolete
- */
-enum galera_status galera_set_context_retain_handler(
-    galera_context_retain_fun
-);
-enum galera_status galera_set_context_store_handler (galera_context_store_fun);
-
-/*!
  * @brief assigns handler for brute force applying of SQL statements
  *
  */
@@ -192,12 +186,6 @@ enum galera_status galera_set_execute_handler(galera_bf_execute_fun);
  *
  */
 enum galera_status galera_set_execute_handler_rbr(galera_bf_execute_fun);
-
-/*!
- * @brief assigns handler for brute force applying of data rows
- *
- */
-enum galera_status galera_set_apply_row_handler(galera_bf_apply_row_fun);
 
 /*!
  * @brief assigns handler for starting of write set applying
@@ -218,14 +206,7 @@ enum galera_status galera_disable();
  */
 enum galera_status galera_recv(void *ctx);
 
-/*!
- * @brief timestamp management, possibly obsolete
- */
-enum galera_status galera_assign_timestamp(uint32_t timestamp);
-uint32_t galera_get_timestamp();
-
 typedef uint64_t trx_id_t;
-typedef uint64_t trx_seqno_t;
 typedef uint64_t conn_id_t;
 
 
@@ -316,21 +297,6 @@ typedef enum galera_action {
 } galera_action_t;
 
 /*!
- * @brief appends a row data in transaction's write set
- *
- * @param trx_id      transaction ID
- * @param dbtable     unique name of the table "db.table"
- * @param dbtable_len length of table name (does not end with 0)
- * @param data        binary data for the row
- * @param len         length of the data
- */
-enum galera_status galera_append_row(
-    trx_id_t trx_id,
-    uint16_t len,
-    uint8_t *data
-);
-
-/*!
  * @brief appends a row reference in transaction's write set
  *
  * @param trx_id      transaction ID
@@ -375,14 +341,6 @@ enum galera_status galera_set_database(
     conn_id_t conn_id, char *query, uint16_t query_len
 );
 
-/*!
- * @brief closes a connection, connection write set is removed
- *
- * @param conn_id     connection ID
- */
-enum galera_status galera_close_connection(
-    conn_id_t conn_id
-);
 
 /*!
  * @brief executes a query under total order control
@@ -405,10 +363,21 @@ enum galera_status galera_to_execute_start(
 );
 enum galera_status galera_to_execute_end(conn_id_t conn_id);
 
+
+
+
+
+/*
+ * Galera interface for dynamically loadable libraries
+ */
 typedef struct galera_ galera_t;
 struct galera_ {
-    
-    galera_status_t (*init)(galera_t *);
+    const char *version;
+    galera_status_t (*init)(galera_t *, 
+                            const char *gcs_group, 
+                            const char *gcs_address, 
+                            const char *data_dir,
+                            galera_log_cb_t logger);
     galera_status_t (*deinit)(galera_t *);
     
     galera_status_t (*enable)(galera_t *);
@@ -424,20 +393,15 @@ struct galera_ {
     void (*dbug_pop)(galera_t *);
     
     galera_status_t (*set_logger)(galera_t *, galera_log_cb_t logger);
-    
-    galera_status_t (*set_context_retain_handler)(galera_t *, 
-                                                  galera_context_retain_fun);
-    galera_status_t (*set_context_store_handler)(galera_t *,
-                                                 galera_context_store_fun);
 
+    galera_status_t (*set_conf_param_cb)(galera_t *, galera_conf_param_fun);
+    
     galera_status_t (*set_execute_handler)(galera_t *,
                                            galera_bf_execute_fun);
 
     galera_status_t (*set_execute_handler_rbr)(galera_t *, 
                                                galera_bf_execute_fun);
 
-    galera_status_t (*set_apply_row_handler)(galera_t *,
-                                             galera_bf_apply_row_fun);
 
     galera_status_t (*set_ws_start_handler)(galera_t *, galera_ws_start_fun);
     
@@ -449,7 +413,7 @@ struct galera_ {
 
     
     galera_status_t (*cancel_commit)(galera_t *, const trx_id_t);
-    galera_status_t (*withdraw_commit)(galera_t *, const trx_seqno_t);
+    galera_status_t (*withdraw_commit)(galera_t *, const ws_id_t);
 
     galera_status_t (*committed)(galera_t *, const trx_id_t);
     galera_status_t (*rolledback)(galera_t *, const trx_id_t);
@@ -472,12 +436,11 @@ struct galera_ {
     galera_status_t (*set_database)(galera_t *, const conn_id_t, 
                                     const char *query, const size_t query_len);
     
-    galera_status_t (*close_connection)(galera_t *, const conn_id_t);
-    
     galera_status_t (*to_execute_start)(galera_t *, 
                                         const conn_id_t, 
                                         const char *query, 
                                         const size_t query_len);
+    galera_status_t (*to_execute_end)(galera_t *, conn_id_t conn_id);
 
     void (*tear_down)(galera_t *);
     void *dlh;
