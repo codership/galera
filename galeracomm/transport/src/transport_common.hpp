@@ -18,6 +18,11 @@ public:
     }
 };
 
+inline void closefd(int fd)
+{
+    while (::close(fd) == -1 && errno == EINTR) {}
+}
+
 static inline std::string to_string(const sockaddr* sa)
 {
     std::string ret;

@@ -5,7 +5,7 @@
 
 #include <deque>
 #include <limits>
-
+#include <algorithm>
 
 
 //

@@ -56,7 +56,7 @@ public:
 	if (fd != -1) {
 	    if (poll)
 		poll->erase(fd);
-	    while (::close(fd) == -1 && errno == EINTR);
+            closefd(fd);
 	}
 	free(recv_buf);
 	if (up_rb)

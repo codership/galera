@@ -527,22 +527,22 @@ START_TEST(check_vs)
 	Session u1(vsbe_addr, p);
 	u1.connect();
 	u1.join();
-	while (p->poll(poll_intval));
+	while (p->poll(poll_intval)) {}
 	fail_unless(u1.is_connected());
 	u1.send();
-	while (p->poll(poll_intval));
+	while (p->poll(poll_intval)) {}
 	Session u2(vsbe_addr, p);
 	u2.connect();
 	u2.join();
-	while (p->poll(poll_intval));
+	while (p->poll(poll_intval)) {}
 	fail_unless(u2.is_connected());
 	u1.leave();
-	while (p->poll(poll_intval));
+	while (p->poll(poll_intval)) {}
 	fail_if(u1.is_connected());
 	u2.send();
-	while (p->poll(poll_intval));
+	while (p->poll(poll_intval)) {}
 	u2.leave();
-	while (p->poll(poll_intval));	
+	while (p->poll(poll_intval)) {}
 	fail_if(u2.is_connected());
 	std::deque<Session *> ss;
 	ss.push_back(&u1);
@@ -562,7 +562,7 @@ START_TEST(check_vs)
 
 	// 
 	u1.join();
-	while (p->poll(poll_intval));
+	while (p->poll(poll_intval)) {}
 	fail_unless(u1.is_connected());
 	u1.send();
 	u1.send();
@@ -573,7 +573,7 @@ START_TEST(check_vs)
 	// Trans conf messages was put first in queue, reg conf msg as last
 	u1.send();
 	// Now we should survive...
-	while (p->poll(poll_intval));
+	while (p->poll(poll_intval)) {}
 	fail_unless(u1.is_connected());
 	u1.leave();
 	u2.leave();
@@ -669,7 +669,7 @@ START_TEST(check_vs_random)
 	}
 	
 	
-	while (p->poll(1));
+	while (p->poll(1)) {}
 	
 	std::list<Session *>::iterator i_next;
 	for (std::list<Session *>::iterator i = active.begin();
@@ -684,7 +684,7 @@ START_TEST(check_vs_random)
 	}
 
 	if (t % 100 == 0) {
-	    while (p->poll(poll_intval) > 0);
+	    while (p->poll(poll_intval) > 0) {}
 	    verify_views(sessions);
 	}
     }
@@ -734,7 +734,7 @@ public:
     }
 
     void run() {
-	while (poll->poll(std::numeric_limits<int>::max()));
+	while (poll->poll(std::numeric_limits<int>::max())) {}
     }
 
 };

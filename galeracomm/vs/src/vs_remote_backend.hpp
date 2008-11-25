@@ -172,7 +172,8 @@ public:
     const void *get_raw() const {
 	return raw;
     }
-    const size_t get_raw_len() const {
+    
+    size_t get_raw_len() const {
 	return raw_len;
     }
 };

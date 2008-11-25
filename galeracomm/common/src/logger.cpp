@@ -1,5 +1,5 @@
 #include "gcomm/logger.hpp"
-
+#include <cstdlib>
 
 class Logger_s
 {

@@ -66,7 +66,7 @@ public:
     static size_t get_raw_len() {
 	return 4;
     }
-    const size_t get_len() const {
+    size_t get_len() const {
 	return len;
     }
 };
@@ -86,14 +86,14 @@ void TCPTransport::connect(const char *addr)
     linger lg = {1, 3};
     if (::setsockopt(fd, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg)) == -1) {
 	int err = errno;
-	while (::close(fd) == -1 && errno == EINTR);
+        closefd(fd);
 	fd = -1;
 	throw FatalException(::strerror(err));
     }
 
     if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) == -1) {
 	int err = errno;
-	while (::close(fd) == -1 && errno == EINTR);
+        closefd(fd);
 	fd = -1;
 	throw FatalException(::strerror(err));	
     }
@@ -101,7 +101,7 @@ void TCPTransport::connect(const char *addr)
     if (is_synchronous() == false) {
 	if (::fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
 	    int err = errno;
-	    while (::close(fd) == -1 && errno == EINTR);
+            closefd(fd);
 	    fd = -1;
 	    throw FatalException(::strerror(err));
 	}
@@ -128,7 +128,7 @@ void TCPTransport::close()
     if (fd != -1) {
 	if (poll)
 	    poll->erase(fd);
-	while (::close(fd) == -1 && errno == EINTR);
+        closefd(fd);
 	fd = -1;
     }
 }
@@ -178,14 +178,14 @@ Transport *TCPTransport::accept(Poll *poll, Protolay *up_ctx)
     
 
     if (is_synchronous() == false && ::fcntl(acc_fd, F_SETFL, O_NONBLOCK) == -1) {
-	while (::close(acc_fd) == -1 && errno == EINTR);
+        closefd(fd);
 	throw FatalException("TCPTransport::accept(): Fcntl failed");
     }
 
 
     if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) == -1) {
 	int err = errno;
-	while (::close(fd) == -1 && errno == EINTR);
+        closefd(fd);
 	throw FatalException(::strerror(err));	
     }
     
@@ -505,7 +505,7 @@ int TCPTransport::send(WriteBuf *wb, const ProtoDownMeta *dm)
     size_t sent = 0;
     int err = 0;
 
-    while (pending.size() && (err = handle_pending()) == 0);
+    while (pending.size() && (err = handle_pending()) == 0) {}
     if (err)
 	return err;
     
@@ -519,7 +519,7 @@ int TCPTransport::send(WriteBuf *wb, const ProtoDownMeta *dm)
 	sent += ret;
 	if (sent != wb->get_hdrlen() && is_synchronous() == false) {
 	    while (tmp_poll(fd, PollEvent::POLL_OUT, 
-			    std::numeric_limits<int>::max(), 0) == 0);
+			    std::numeric_limits<int>::max(), 0) == 0) {}
 	}
     }
     sent = 0;
@@ -532,7 +532,7 @@ int TCPTransport::send(WriteBuf *wb, const ProtoDownMeta *dm)
 	sent += ret;
 	if (sent != wb->get_hdrlen() && is_synchronous() == false) {
 	    while (tmp_poll(fd, PollEvent::POLL_OUT, 
-			    std::numeric_limits<int>::max(), 0) == 0);
+			    std::numeric_limits<int>::max(), 0) == 0) {}
 	}
     }
 out:
@@ -550,7 +550,7 @@ const ReadBuf *TCPTransport::recv()
 
     while ((ret = recv_nointr(0)) == EAGAIN) {
 	while (tmp_poll(fd, PollEvent::POLL_IN, 
-			std::numeric_limits<int>::max(), 0) == 0);
+			std::numeric_limits<int>::max(), 0) == 0) {}
     }
     if (ret != 0) {
 	LOG_INFO(std::string("TCPTransport::recv() ") + ::strerror(ret));

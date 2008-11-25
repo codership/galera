@@ -310,7 +310,7 @@ int main(int argc, char *argv[])
 		msgs = ::strtoull(argv[3], 0, 0);
 	    if (argc > 4)
 		nbytes = ::strtoull(argv[4], 0, 0);
-	    while (c.is_connected() == false && p->poll(1000) >= 0);
+	    while (c.is_connected() == false && p->poll(1000) >= 0) {}
 	    for (unsigned long long i = 0; i < msgs && terminated == false;) {
 		int ret;
 		if ((ret = c.send((rand()%nbytes)*2)) == 0)

@@ -230,8 +230,8 @@ public:
 	    for (MemberMap::iterator i = members.begin(); 
 		 i != members.end(); ++i) {
 		if (i->first.is_same_service(vmsg.get_source()) &&
-		    i->second.state == Member::JOINED || 
-		    i->second.state == Member::LEAVING)
+		    (i->second.state == Member::JOINED || 
+                     i->second.state == Member::LEAVING))
 		    i->second.pl->handle_up(0, rb, 0, 0);
 	    }
 	}
