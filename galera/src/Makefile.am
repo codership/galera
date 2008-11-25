@@ -1,0 +1,17 @@
+# 
+lib_LTLIBRARIES = libgalera.la libdummy.la
+noinst_PROGRAMS = test
+
+
+libgalera_la_SOURCES = galera.c galera.h
+INTERFACE = 1
+REVISION  = 0
+AGE       = 0
+libgalera_la_LDFLAGS = -version-info $(INTERFACE):$(REVISION):$(AGE)
+
+libdummy_la_SOURCES = dummy.c
+
+
+test_SOURCES = test.c
+test_LDADD = libgalera.la
+test_LDFLAGS = -ldl
