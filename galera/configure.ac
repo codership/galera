@@ -64,7 +64,7 @@ AC_CONFIG_FILES([Makefile
                  src/Makefile
                  test/Makefile])
 
-CFLAGS="$CFLAGS -std=c99 -Wall -Werror -Wextra -pedantic -Wno-unused-parameter"
+CFLAGS="$CFLAGS -std=c99 -Wall -Werror -Wextra -pedantic -Wno-unused-parameter -Wmissing-prototypes"
 AC_OUTPUT
 AC_MSG_NOTICE([dbug enabled: $enable_dbug])
 AC_MSG_NOTICE(CFLAGS:   $CFLAGS)

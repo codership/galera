@@ -37,6 +37,20 @@ typedef enum galera_conf_param_type {
     GALERA_TYPE_STRING,  //!< null terminated string
 } galera_conf_param_type_t;
 
+
+
+typedef enum galera_action {
+    GALERA_UPDATE,
+    GALERA_DELETE,
+    GALERA_INSERT,
+} galera_action_t;
+
+
+typedef uint64_t ws_id_t;
+typedef uint64_t trx_id_t;
+typedef uint64_t conn_id_t;
+
+
 /*!
  * @brief callback to return configuration parameter value
  *        The function should be able to return values for all
@@ -48,15 +62,6 @@ typedef void * (*galera_conf_param_fun)(
     enum galera_conf_param_id, enum galera_conf_param_type
 );
 
-/*!
- * @brief sets the configuration parameter callback
- *
- * @param configurator   handler for returning configuration parameter values
- *
- */
-enum galera_status galera_set_conf_param_cb(
-    galera_conf_param_fun configurator
-);
 
 /*!
  * @brief retains the connection context specified by the
@@ -98,7 +103,7 @@ typedef enum galera_severity
  */
 typedef void (*galera_log_cb_t)(int, const char *);
 
-typedef uint64_t ws_id_t;
+
 
 /*!
  * @brief transaction initialization function
@@ -136,11 +141,29 @@ typedef int (*galera_bf_execute_fun)(
  */
 typedef int (*galera_bf_apply_row_fun)(void *ctx, void *data, size_t len);
 
+
+
+#ifdef GALERA_DEPRECATED
+/*
+ * Old interface definitions, maintained for backwards compatibility
+ */
+
+
+/*!
+ * @brief sets the configuration parameter callback
+ *
+ * @param configurator   handler for returning configuration parameter values
+ *
+ */
+enum galera_status galera_set_conf_param_cb(
+    galera_conf_param_fun configurator
+);
+
 /*!
  * @brief galera shutdown, all memory objects are freed.
  *
  */
-enum galera_status galera_tear_down();
+enum galera_status galera_tear_down(void);
 
 /*!
  * @brief sets the logger callback for galera library
@@ -194,8 +217,8 @@ enum galera_status galera_set_execute_handler_rbr(galera_bf_execute_fun);
 enum galera_status galera_set_ws_start_handler(galera_ws_start_fun);
 
 /* replication enable/disable */
-enum galera_status galera_enable();
-enum galera_status galera_disable();
+enum galera_status galera_enable(void);
+enum galera_status galera_disable(void);
 
 
 /*!
@@ -206,8 +229,6 @@ enum galera_status galera_disable();
  */
 enum galera_status galera_recv(void *ctx);
 
-typedef uint64_t trx_id_t;
-typedef uint64_t conn_id_t;
 
 
 /*!
@@ -290,12 +311,6 @@ enum galera_status galera_append_query(
     trx_id_t trx_id, char *query, time_t timeval, uint32_t randseed
 );
 
-typedef enum galera_action {
-    GALERA_UPDATE,
-    GALERA_DELETE,
-    GALERA_INSERT,
-} galera_action_t;
-
 /*!
  * @brief appends a row reference in transaction's write set
  *
@@ -363,7 +378,7 @@ enum galera_status galera_to_execute_start(
 );
 enum galera_status galera_to_execute_end(conn_id_t conn_id);
 
-
+#endif /* GALERA_DEPRECATED */
 
 
 

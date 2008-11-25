@@ -1,4 +1,5 @@
 
+#define GALERA_DEPRECATED 1
 #include "galera.h"
 
 
@@ -6,6 +7,8 @@
 #include <errno.h>
 #include <assert.h>
 #include <string.h>
+
+
 
 /*
  * Backwards compatibility stuff
@@ -85,14 +88,14 @@ enum galera_status galera_set_ws_start_handler(galera_ws_start_fun fun)
 enum galera_status galera_enable()
 {
     assert(galera_ctx);
-    return galera_enable(galera_ctx);
+    return galera_ctx->enable(galera_ctx);
 }
 
 
 enum galera_status galera_disable()
 {
     assert(galera_ctx);
-    return galera_disable(galera_ctx);
+    return galera_ctx->disable(galera_ctx);
 }
 
 enum galera_status galera_recv(void *ctx)
@@ -186,6 +189,8 @@ enum galera_status galera_to_execute_end(conn_id_t conn_id)
     return galera_ctx->to_execute_end(galera_ctx, conn_id);
 }
 
+
+#undef GALERA_DEPRECATED
 
 /**************************************************************************
  * Library loader

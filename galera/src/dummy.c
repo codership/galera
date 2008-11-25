@@ -4,6 +4,10 @@
 #include <errno.h>
 #include <string.h>
 
+
+int galera_loader(galera_t **);
+
+
 typedef struct dg_ {
     int foo;
 } dg_t;
