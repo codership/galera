@@ -3,9 +3,17 @@
 
 #include <errno.h>
 #include <string.h>
-
+#include <stdio.h>
+#include <limits.h>
+#include <unistd.h>
 
 int galera_loader(galera_t **);
+
+static int debug_on = 0;
+#define DBUG(_s) do {                                      \
+        if (debug_on)                                      \
+            fprintf(stderr, "%s: %s\n", __FUNCTION__, _s); \
+    } while (0)
 
 
 typedef struct dg_ {
@@ -18,6 +26,7 @@ typedef struct dg_ {
 static void dg_tear_down(galera_t *hptr)
 {
     dg_t *dg = PRIV(hptr);
+    DBUG("");
     free(dg);
     free(hptr);
 }
@@ -27,87 +36,102 @@ static galera_status_t dg_init(galera_t *g, const char *gcs_group,
                                const char *gcs_address, 
                                const char *data_dir, galera_log_cb_t logger)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_deinit(galera_t *g)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_enable(galera_t *g)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_disable(galera_t *g)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_recv(galera_t *g, void *ctx)
 {
+    DBUG("");
+    sleep(LONG_MAX);
     return GALERA_OK;
 }
 
 static void dg_dbug_push(galera_t *g, const char *ctrl)
 {
-
+    DBUG("");
 }
 
 static void dg_dbug_pop(galera_t *g)
 {
-
+    DBUG("");
 }
 
 static galera_status_t dg_set_logger(galera_t *g, galera_log_cb_t logger)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_set_conf_param_cb(galera_t *g, galera_conf_param_fun fun)
 {
-
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_set_execute_handler(galera_t *g, galera_bf_execute_fun fun)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_set_execute_handler_rbr(galera_t *g, galera_bf_execute_fun fun)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_set_ws_start_handler(galera_t *g, galera_ws_start_fun fun)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_commit(galera_t *g, const trx_id_t trx_id, const conn_id_t conn_id, const char *query, const size_t query_len)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_cancel_commit(galera_t *g, const trx_id_t trx_id)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_withdraw_commit(galera_t *g, const ws_id_t seqno)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_committed(galera_t *g, const trx_id_t trx_id)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_rolledback(galera_t *g, const trx_id_t trx_id)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
@@ -116,6 +140,7 @@ static galera_status_t dg_append_query(galera_t *g, const trx_id_t trx_id,
                                        const char *query, const time_t timeval,
                                        const uint32_t randseed)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
@@ -127,6 +152,7 @@ static galera_status_t dg_append_row_key(galera_t *g,
                                          const size_t key_len, 
                                          const galera_action_t action)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
@@ -135,6 +161,7 @@ static galera_status_t dg_set_variable(galera_t *g, const conn_id_t conn_id,
                                        const char *key, const size_t key_len,
                                        const char *query, const size_t query_len)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
@@ -143,6 +170,7 @@ static galera_status_t dg_set_database(galera_t *g,
                                        const char *query, 
                                        const size_t query_len)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
@@ -151,12 +179,14 @@ static galera_status_t dg_to_execute_start(galera_t *g,
                                            const char *query, 
                                            const size_t query_len)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
 static galera_status_t dg_to_execute_end(galera_t *g,
                                          const conn_id_t conn_id)
 {
+    DBUG("");
     return GALERA_OK;
 }
 
@@ -195,7 +225,9 @@ int galera_loader(galera_t **hptr)
 {
     if (!hptr)
         return EINVAL;
-    
+    if (getenv("GALERA_DUMMY_DEBUG"))
+        debug_on = 1;
+    DBUG("");
     *hptr = malloc(sizeof(galera_t));
     if (!*hptr)
         return ENOMEM;
