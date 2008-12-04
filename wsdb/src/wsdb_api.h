@@ -77,7 +77,7 @@ typedef int64_t connid_t;
 typedef int64_t local_trxid_t;
 typedef int64_t trx_seqno_t;
 
-enum wsdb_trx_state2 {
+enum wsdb_trx_state {
   WSDB_TRX_VOID = 0,      //!< sequencing 
   WSDB_TRX_REPLICATING,   //!< gcs_repl() has been called
   WSDB_TRX_REPLICATED,    //!< valid sequence numbers have been assigned
@@ -94,7 +94,7 @@ enum wsdb_trx_position {
 typedef struct {
     trx_seqno_t            seqno_l;  //!< local solid sequence
     trx_seqno_t            seqno_g;  //!< cluster wide sequence number
-    enum wsdb_trx_state2   state;    //!< state of sequencing
+    enum wsdb_trx_state    state;    //!< state of sequencing
     struct wsdb_write_set *ws;       //!<
     enum wsdb_trx_position position; //!>
 } wsdb_trx_info_t;
@@ -151,7 +151,7 @@ enum wsdb_ws_level {
 };
 
 /*! transaction executes in local state until it begins the committing */
-enum wsdb_trx_state {
+enum wsdb_trx_state2 {
     LOCAL,      /*!< TRX is executing in local state */
     COMMITTING, /*!< TRX has replicated and is in committing state */
     COMMITTED,  /*!< TRX has certified successfully */
@@ -236,7 +236,7 @@ struct wsdb_write_set {
     trx_seqno_t           last_seen_trx; //!< id of last committed trx
     enum wsdb_ws_type     type;
     enum wsdb_ws_level    level;
-    enum wsdb_trx_state   state;
+  //    enum wsdb_trx_state2  state;
     u_int16_t             query_count;   //!< number of queries in trx buffer
     //char                **queries;
     struct wsdb_query    *queries;       //!< trx query buffer
@@ -426,14 +426,14 @@ int wsdb_set_trx_committing(local_trxid_t trx_id);
 int wsdb_set_global_trx_committed(trx_seqno_t trx_seqno);
 int wsdb_set_local_trx_committed(local_trxid_t trx_id);
 int wsdb_assign_trx_seqno(
-    local_trxid_t trx_id, 
-    trx_seqno_t seqno_l, 
-    trx_seqno_t seqno_g, 
-    enum wsdb_trx_state2 state
+    local_trxid_t       trx_id, 
+    trx_seqno_t         seqno_l, 
+    trx_seqno_t         seqno_g, 
+    enum wsdb_trx_state state
 );
 int wsdb_assign_trx_state(
-    local_trxid_t trx_id, 
-    enum wsdb_trx_state2 state
+    local_trxid_t        trx_id, 
+    enum wsdb_trx_state  state
 );
 int wsdb_assign_trx_ws(
     local_trxid_t trx_id, struct wsdb_write_set *ws

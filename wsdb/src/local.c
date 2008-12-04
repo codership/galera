@@ -1314,7 +1314,7 @@ static void print_trx_hash(void *ctx, void *data) {
 
 int wsdb_assign_trx_seqno(
     local_trxid_t trx_id, trx_seqno_t seqno_l, trx_seqno_t seqno_g, 
-    enum wsdb_trx_state2 state
+    enum wsdb_trx_state state
 ) {
     struct trx_info       *trx = get_trx_info(trx_id);
  
@@ -1344,7 +1344,7 @@ int wsdb_assign_trx_seqno(
     GU_DBUG_RETURN(WSDB_OK);
 }
 
-int wsdb_assign_trx_state(local_trxid_t trx_id, enum wsdb_trx_state2 state) {
+int wsdb_assign_trx_state(local_trxid_t trx_id, enum wsdb_trx_state state) {
     struct trx_info       *trx = get_trx_info(trx_id);
  
     GU_DBUG_ENTER("wsdb_assign_trx_state");
