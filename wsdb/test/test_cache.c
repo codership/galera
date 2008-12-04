@@ -54,7 +54,7 @@ START_TEST (test_cache_overflow)
 
     /* 50 blocks should fit in this cache */
     struct wsdb_file *file = file_create("./test_cached_file", block_size);
-    struct file_cache *cache = file_cache_open(file, 10000, 50);
+    struct file_cache *cache = file_cache_open(file, 10000, 60);
     
     if (!file) {
         fail("cached file create: %d");
@@ -64,7 +64,7 @@ START_TEST (test_cache_overflow)
     }
 
     /* ~80 blocks should overflow */
-    for (i=0; i<100; i++) {
+    for (i=0; i<80; i++) {
         char *data;
         cache_id_t cache_id = file_cache_allocate_id(cache);
 
@@ -72,22 +72,33 @@ START_TEST (test_cache_overflow)
 
         data = (char *)file_cache_new(cache, cache_id);
         *(int *)(data) = i;
-        memset(data + sizeof(int), 'b', block_size - sizeof(int));        
+        memset(data + sizeof(int), 'b', block_size - sizeof(int));
+
+        if (i%3 == 0) {
+            int rcode = file_cache_forget(cache, cache_id);
+            fail_if(rcode, "cache forget: %d", rcode);
+        }
     }
-    for (i=0; i<100; i++) {
+    mark_point();
+
+    for (i=0; i<80; i++) {
         char *data;
 
         data = file_cache_get(cache, cids[i]);
 	fail_unless(!!data, "no data for id %d", cids[i]);
         fail_if((int)(*data) != i, "bad i: %d != %d", i, *(int*)(data));
+        if (i%2 == 0) {
+            int rcode = file_cache_forget(cache, cids[i]);
+            fail_if(rcode, "cache forget: %d", rcode);
+        }
     }
-
-    for (i=5; i<100; i +=10) {
+    mark_point();
+    for (i=10; i<70; i += 3) {
         int rcode = file_cache_forget(cache, cids[i]);
         fail_if(rcode, "cache forget: %d", rcode);
     }
-
-    for (i=100; i<130; i++) {
+    mark_point();
+    for (i=80; i<130; i++) {
         char *data;
         cache_id_t cache_id = file_cache_allocate_id(cache);
 
@@ -96,7 +107,12 @@ START_TEST (test_cache_overflow)
         data = (char *)file_cache_new(cache, cache_id);
         *(int *)(data) = i;
         memset(data + sizeof(int), 'b', block_size - sizeof(int));        
+        if (i%2 == 0) {
+            int rcode = file_cache_forget(cache, cache_id);
+            fail_if(rcode, "cache forget: %d", rcode);
+        }
     }
+    mark_point();
 
     for (i=21; i<130; i +=11) {
         int rcode = file_cache_delete(cache, cids[i]);
