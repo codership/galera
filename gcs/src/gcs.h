@@ -270,6 +270,8 @@ extern long gcs_to_destroy (gcs_to_t** to);
  * @return 0 in case of success, negative code in case of error.
  *         -EAGAIN means that there are too many threads waiting for TO
  *         already. It is safe to try again later.
+ *         -ECANCEL if waiter was canceled, seqno is skipped in TO
+ *         -EINTR if wait was interrupted, must retry grabbing later
  */
 extern long gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno);
 
@@ -314,29 +316,20 @@ extern long gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno);
  */
 extern long gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno);
 
-/*! @brief withdraws from TO monitor waiting state.
- *  The caller can later retry the wait operation, but it must
- *  first renew the wait operation with 'gcs_to_renew' call.
+/*! @brief interrupts from TO monitor waiting state.
+ *  Seqno remains valid in the queue and later seqnos still need to
+ *  wait for this seqno to be released.
+ * 
+ *  The caller can (and must) later try gcs_to_grab() again or cancel
+ *  the seqno with gcs_to_self_cancel().
  *
  * @param to A pointer to TO object.
- * @param seqno Seqno of the waiter object to be withdrawn
- * @return 0 for success and -ERANGE, if trying to withdra an already
+ * @param seqno Seqno of the waiter object to be interrupted
+ * @return 0 for success and -ERANGE, if trying to interrupt an already
  *         used transaction
  */
-extern long gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno);
 extern long gcs_to_interrupt (gcs_to_t *to, gcs_seqno_t seqno);
     
-/*! @brief renews TO monitor waiter state
- * This call is to assure, that the waiter will retry the TO
- * semaphor operation.
- *
- * @param to A pointer to TO object.
- * @param seqno Seqno of the waiter object to be cancelled
- * @return 0 for success and -ERANGE, if trying to renew already used
- *         transaction
- */
-extern long gcs_to_renew_wait (gcs_to_t *to, gcs_seqno_t seqno);
-
 /* Service functions */
 
 /*! Informs group about the last applied action on this node */
