@@ -77,6 +77,28 @@ typedef int64_t connid_t;
 typedef int64_t local_trxid_t;
 typedef int64_t trx_seqno_t;
 
+enum wsdb_trx_state2 {
+  WSDB_TRX_VOID = 0,      //!< sequencing 
+  WSDB_TRX_REPLICATING,   //!< gcs_repl() has been called
+  WSDB_TRX_REPLICATED,    //!< valid sequence numbers have been assigned
+  WSDB_TRX_ABORTED,       //!< BF trx has marked this trx as victim
+  WSDB_TRX_MISSING,       //!< trx is not in local hash
+};
+
+enum wsdb_trx_position {
+    WSDB_TRX_POS_VOID = 1  ,       /*!< position not defined        */
+    WSDB_TRX_POS_TO_QUEUE,         /*!< before to_queue monitor     */
+    WSDB_TRX_POS_COMMIT_QUEUE,     /*!< before commit_queue monitor */
+};
+
+typedef struct {
+    trx_seqno_t            seqno_l;  //!< local solid sequence
+    trx_seqno_t            seqno_g;  //!< cluster wide sequence number
+    enum wsdb_trx_state2   state;    //!< state of sequencing
+    struct wsdb_write_set *ws;       //!<
+    enum wsdb_trx_position position; //!>
+} wsdb_trx_info_t;
+
 /* MySQL type for boolean */
 typedef char		my_bool; /* Small bool */
 
@@ -94,7 +116,6 @@ typedef char		my_bool; /* Small bool */
 #   define GALERA_ABORT_SEQNO   -1
 #   define GALERA_MISSING_SEQNO -2
 #endif
-
 
 #ifdef REMOVED
 /*! @enum 
@@ -404,15 +425,33 @@ int wsdb_set_trx_committing(local_trxid_t trx_id);
   */
 int wsdb_set_global_trx_committed(trx_seqno_t trx_seqno);
 int wsdb_set_local_trx_committed(local_trxid_t trx_id);
-int wsdb_assign_trx(
-    local_trxid_t trx_id, trx_seqno_t seqno_l, trx_seqno_t seqno_g);
+int wsdb_assign_trx_seqno(
+    local_trxid_t trx_id, 
+    trx_seqno_t seqno_l, 
+    trx_seqno_t seqno_g, 
+    enum wsdb_trx_state2 state
+);
+int wsdb_assign_trx_state(
+    local_trxid_t trx_id, 
+    enum wsdb_trx_state2 state
+);
+int wsdb_assign_trx_ws(
+    local_trxid_t trx_id, struct wsdb_write_set *ws
+);
+int wsdb_assign_trx_pos(
+    local_trxid_t trx_id, enum wsdb_trx_position
+);
 
  /*!
   * @brief returns the local seqno associated with transaction
   *
   * This can be called after transaction has associated seqnos 
   */
-trx_seqno_t wsdb_get_local_trx_seqno(local_trxid_t trx_id);
+void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info);
+
+//trx_seqno_t wsdb_get_local_trx_seqno_g(local_trxid_t trx_id);
+//struct wsdb_write_set *wsdb_get_local_trx_ws(local_trxid_t trx_id);
+//enum wsdb_trx_position wsdb_get_local_trx_pos(local_trxid_t trx_id);
  
  /*!
   * @brief returns the seqno of latest trx, which has committed,
@@ -454,7 +493,7 @@ int wsdb_delete_global_trx(trx_seqno_t trx_id );
  *
  * @param trx_id transaction seqno, older ones will bre removed
  */
-int wsdb_purge_trxs_upto(trx_seqno_t trx_id );
+int wsdb_purge_trxs_upto(trx_seqno_t trx_id);
 
 /*!
  * @brief returns the whole write set for a transaction.

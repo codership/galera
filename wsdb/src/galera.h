@@ -20,6 +20,7 @@ enum galera_status {
     GALERA_WARNING,       //!< minor warning, error logged
     GALERA_TRX_MISSING,   //!< transaction is not known by galera
     GALERA_TRX_FAIL,      //!< transaction aborted, server can continue
+    GALERA_BF_ABORT,      //!< trx was victim of brute force abort 
     GALERA_CONN_FAIL,     //!< error in client connection, must abort
     GALERA_NODE_FAIL,     //!< error in node state, galera must reinit
     GALERA_FATAL,         //!< fatal error, server must abort
@@ -244,12 +245,38 @@ typedef uint64_t conn_id_t;
 
  * @retval GALERA_OK         cluster commit succeeded
  * @retval GALERA_TRX_FAIL   must rollback transaction
+ * @retval GALERA_BF_ABORT   brute force abort happened after trx was replicated
+ *                           must rollback transaction and try to replay
  * @retval GALERA_CONN_FAIL  must close client connection
  * @retval GALERA_NODE_FAIL  must close all connections and reinit
  *
+ */
+enum galera_status galera_commit(
+    trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint data_len
+);
+
+/*!
+ * @brief galera_replay_trx
+ *
+ * If local trx has been aborted by brute force, and it has already
+ * replicated before this abort, we must try if we can apply it as
+ * slave trx. Note that slave nodes see only trx write sets and certification
+ * test based on write set content can be different to DBMS lock conflicts.
+ *
+ * @param trx_id transaction which is committing
+ * @param conn_id
+ * @param rbr_data binary data when rbr is set
+ * @param data_len the size of the rbr data
+
+ * @retval GALERA_OK         cluster commit succeeded
+ * @retval GALERA_TRX_FAIL   must rollback transaction
+ * @retval GALERA_BF_ABORT   brute force abort happened after trx was replicated
+ *                           must rollback transaction and try to replay
+ * @retval GALERA_CONN_FAIL  must close client connection
+ * @retval GALERA_NODE_FAIL  must close all connections and reinit
  *
  */
-enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint data_len);
+enum galera_status galera_replay_trx(trx_id_t trx_id, void *app_ctx);
 
 /*!
  * @brief cancels a previously started commit
@@ -285,6 +312,9 @@ enum galera_status galera_cancel_commit(
  *
  */
 enum galera_status galera_withdraw_commit(uint64_t victim_seqno);
+enum galera_status galera_withdraw_commit_by_trx(
+    trx_id_t victim_trx
+);
 
 /*!
  * @brief marks the transaction as committed

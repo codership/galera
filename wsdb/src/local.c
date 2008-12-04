@@ -33,12 +33,11 @@ struct block_hdr {
 
 /* blocks for a transaction */
 struct trx_info {
-    char          ident;
-    local_trxid_t id;
-    trx_seqno_t   seqno_g;
-    trx_seqno_t   seqno_l;
-    cache_id_t    first_block;
-    cache_id_t    last_block;
+    char            ident;
+    local_trxid_t   id;
+    wsdb_trx_info_t info;
+    cache_id_t      first_block;
+    cache_id_t      last_block;
 };
 #define IDENT_trx_info 'X'
 
@@ -292,11 +291,14 @@ static struct trx_info *new_trx_info(local_trxid_t trx_id) {
     }
 
     MAKE_OBJ(trx, trx_info);
-    trx->id          = trx_id;
-    trx->seqno_g     = local_void_seqno;
-    trx->seqno_l     = local_void_seqno;
-    trx->first_block = 0;
-    trx->last_block  = 0;
+    trx->id            = trx_id;
+    trx->info.seqno_g  = local_void_seqno;
+    trx->info.seqno_l  = local_void_seqno;
+    trx->first_block   = 0;
+    trx->last_block    = 0;
+    trx->info.ws       = 0;
+    trx->info.position = WSDB_TRX_POS_VOID;
+    trx->info.state    = WSDB_TRX_VOID;
 
     GU_DBUG_PRINT("wsdb", ("created new trx: %llu", trx_id));
 
@@ -1239,9 +1241,9 @@ int wsdb_set_local_trx_committed(local_trxid_t trx_id) {
 	GU_DBUG_PRINT("wsdb",("trx not found, set_local_trx_commit: %llu",trx_id));
         GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
     }
-    GU_DBUG_PRINT("wsdb",("last committed: %llu->%llu", trx_id, trx->seqno_g));
+    GU_DBUG_PRINT("wsdb",("last committed: %llu->%llu", trx_id, trx->info.seqno_g));
 
-    set_last_committed_seqno(trx->seqno_g);
+    set_last_committed_seqno(trx->info.seqno_g);
 
     GU_DBUG_RETURN( WSDB_OK);
 }
@@ -1306,12 +1308,13 @@ static void print_trx_hash(void *ctx, void *data) {
     struct trx_info *trx = (struct trx_info *)data;
     gu_info(
         "trx, id: %llu seqno-g: %llu, seqno-l: %llu", 
-        trx->id, trx->seqno_g, trx->seqno_l
+        trx->id, trx->info.seqno_g, trx->info.seqno_l
     );
 }
 
-int wsdb_assign_trx(
-    local_trxid_t trx_id, trx_seqno_t seqno_l, trx_seqno_t seqno_g
+int wsdb_assign_trx_seqno(
+    local_trxid_t trx_id, trx_seqno_t seqno_l, trx_seqno_t seqno_g, 
+    enum wsdb_trx_state2 state
 ) {
     struct trx_info       *trx = get_trx_info(trx_id);
  
@@ -1334,12 +1337,80 @@ int wsdb_assign_trx(
         GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
     }
 
-    trx->seqno_l = seqno_l;
-    trx->seqno_g = seqno_g;
+    trx->info.seqno_l = seqno_l;
+    trx->info.seqno_g = seqno_g;
+    trx->info.state   = state;
 
     GU_DBUG_RETURN(WSDB_OK);
 }
 
+int wsdb_assign_trx_state(local_trxid_t trx_id, enum wsdb_trx_state2 state) {
+    struct trx_info       *trx = get_trx_info(trx_id);
+ 
+    GU_DBUG_ENTER("wsdb_assign_trx_state");
+    if (!trx) {
+        gu_error("trx does not exist in assign_trx_state, trx: %lld", trx_id);
+
+        GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
+    }
+
+    trx->info.state   = state;
+
+    GU_DBUG_RETURN(WSDB_OK);
+}
+
+int wsdb_assign_trx_ws(
+    local_trxid_t trx_id, struct wsdb_write_set *ws
+) {
+    struct trx_info       *trx = get_trx_info(trx_id);
+ 
+    GU_DBUG_ENTER("wsdb_assign_trx_ws");
+
+    if (!trx) {
+        gu_error("trx does not exist in assign_trx_ws, trx: %llu", trx_id);
+        GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
+    }
+
+    trx->info.ws = ws;
+
+    GU_DBUG_RETURN(WSDB_OK);
+}
+
+int wsdb_assign_trx_pos(
+    local_trxid_t trx_id, enum wsdb_trx_position pos
+) {
+    struct trx_info       *trx = get_trx_info(trx_id);
+ 
+    GU_DBUG_ENTER("wsdb_assign_trx_pos");
+
+    if (!trx) {
+        gu_error("trx does not exist in assign_trx_pos, trx: %llu", trx_id);
+        GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
+    }
+
+    trx->info.position = pos;
+
+    GU_DBUG_RETURN(WSDB_OK);
+}
+
+void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info) {
+    struct trx_info       *trx = get_trx_info(trx_id);
+
+    GU_DBUG_ENTER("wsdb_get_local_trx_info");
+    if (!trx) {
+	GU_DBUG_PRINT("wsdb",("trx not found, : %llu",trx_id));
+        info->state = WSDB_TRX_MISSING;
+        GU_DBUG_VOID_RETURN;
+    }
+    info->seqno_l  = trx->info.seqno_l;
+    info->seqno_g  = trx->info.seqno_g;
+    info->ws       = trx->info.ws;
+    info->position = trx->info.position;
+    info->state    = trx->info.state;
+
+
+    GU_DBUG_VOID_RETURN;
+}
 trx_seqno_t wsdb_get_local_trx_seqno(local_trxid_t trx_id) {
     struct trx_info       *trx = get_trx_info(trx_id);
 
@@ -1348,5 +1419,35 @@ trx_seqno_t wsdb_get_local_trx_seqno(local_trxid_t trx_id) {
 	GU_DBUG_PRINT("wsdb",("trx not found, : %llu",trx_id));
         GU_DBUG_RETURN(GALERA_MISSING_SEQNO);
     }
-    GU_DBUG_RETURN(trx->seqno_l);
+    GU_DBUG_RETURN(trx->info.seqno_l);
+}
+trx_seqno_t wsdb_get_local_trx_seqno_g(local_trxid_t trx_id) {
+    struct trx_info       *trx = get_trx_info(trx_id);
+
+    GU_DBUG_ENTER("wsdb_get_local_trx_seqno_g");
+    if (!trx) {
+	GU_DBUG_PRINT("wsdb",("trx not found, : %llu",trx_id));
+        GU_DBUG_RETURN(GALERA_MISSING_SEQNO);
+    }
+    GU_DBUG_RETURN(trx->info.seqno_g);
+}
+struct wsdb_write_set *wsdb_get_local_trx_ws(local_trxid_t trx_id) {
+    struct trx_info       *trx = get_trx_info(trx_id);
+
+    GU_DBUG_ENTER("wsdb_get_local_trx_write_set");
+    if (!trx) {
+	GU_DBUG_PRINT("wsdb",("trx not found, : %llu",trx_id));
+        GU_DBUG_RETURN(NULL);
+    }
+    GU_DBUG_RETURN(trx->info.ws);
+}
+enum wsdb_trx_position wsdb_get_local_trx_pos(local_trxid_t trx_id) {
+    struct trx_info       *trx = get_trx_info(trx_id);
+
+    GU_DBUG_ENTER("wsdb_get_local_trx_pos");
+    if (!trx) {
+	GU_DBUG_PRINT("wsdb",("trx not found, : %llu",trx_id));
+        GU_DBUG_RETURN(WSDB_TRX_POS_VOID);
+    }
+    GU_DBUG_RETURN(trx->info.position);
 }
