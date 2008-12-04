@@ -324,6 +324,7 @@ extern long gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno);
  *         used transaction
  */
 extern long gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno);
+extern long gcs_to_interrupt (gcs_to_t *to, gcs_seqno_t seqno);
     
 /*! @brief renews TO monitor waiter state
  * This call is to assure, that the waiter will retry the TO

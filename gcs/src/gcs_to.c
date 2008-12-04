@@ -174,6 +174,7 @@ long gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
 
     switch (w->state) {
     case CANCELED:
+    case WITHDRAW:
 	err = -ECANCELED;
 	break;
     case RELEASED:
@@ -263,7 +264,7 @@ long gcs_to_release (gcs_to_t *to, gcs_seqno_t seqno)
     if (seqno == to->seqno) {
         to_release_and_wake_next (to, w);
     } else if (seqno > to->seqno) {
-	if (w->state != CANCELED) {
+	if (w->state != CANCELED && w->state != WITHDRAW) {
 	    gu_fatal("Illegal state in premature release: %d", w->state);
 	    abort();
 	}
@@ -361,7 +362,7 @@ long gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
 
 long gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno)
 {
-    long rcode;
+    long rcode = 0;
     long err;
 
     assert (seqno >= 0);
@@ -373,9 +374,20 @@ long gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno)
     {
         if (seqno >= to->seqno) {
             to_waiter_t *w = to_get_waiter (to, seqno);
-            w->state       = WITHDRAW;
-            w->has_aborted = 0;
-            rcode = to_wake_waiter (w);
+            if (w->state == HOLDER) {
+                gu_warn ("trying to withdraw in use seqno: seqno = %llu, "
+                     "TO seqno = %llu", seqno, to->seqno);
+                /* gu_mutex_unlock (&to->lock); */
+                rcode = -ERANGE;
+            } else if (w->state == CANCELED) {
+                gu_warn ("trying to withdraw canceled seqno: seqno = %llu, "
+                     "TO seqno = %llu", seqno, to->seqno);
+                /* gu_mutex_unlock (&to->lock); */
+                rcode = -ERANGE;
+            } else {
+                rcode    = to_wake_waiter (w);
+                w->state = WITHDRAW;
+            }
         } else {
             gu_warn ("trying to withdraw used seqno: cancel seqno = %llu, "
                      "TO seqno = %llu", seqno, to->seqno);
