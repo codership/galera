@@ -86,7 +86,7 @@ START_TEST (test_wsdb_api)
         sprintf(key_parts[i]->data, "i:%d", i);
     }
     /* unit test code */
-    rcode = wsdb_init("./data", wsdb_log_cb, 0);
+    rcode = wsdb_init("./data", wsdb_log_cb);
     if (rcode) {
         fail("wsdb init: %d", rcode);
     }

@@ -26,6 +26,9 @@
 #define GALERA_USE_FLOW_CONTROL 1
 #define GALERA_USLEEP 10000 // 10 ms
 
+/* configuration parameter call back in application */
+static galera_conf_param_fun app_configurator=NULL;
+
 enum galera_repl_state {
     GALERA_INITIALIZED,
     GALERA_ENABLED,
@@ -138,13 +141,25 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
     }
     return 0;
 }
+static void *galera_configurator (
+    enum wsdb_conf_param_id id, enum wsdb_conf_param_type type
+) {
+    if (!app_configurator) {
+        return(NULL);
+    } else {
+        return(app_configurator(
+            (enum galera_conf_param_id)id, (enum galera_conf_param_type)type)
+        );
+    }
+}
 
 enum galera_status galera_set_conf_param_cb(
     galera_conf_param_fun configurator
 ) {
     GU_DBUG_ENTER("galera_set_conf_param_cb");
 
-    wsdb_set_conf_param_cb(configurator);
+    app_configurator = configurator;
+    wsdb_set_conf_param_cb(galera_configurator);
 
 
     /* consult application for early commit */
@@ -187,7 +202,7 @@ enum galera_status galera_init(const char*          group,
     my_idx   = 0;
 
     /* initialize wsdb */
-    wsdb_init(data_dir, logger, GALERA_VOID_SEQNO);
+    wsdb_init(data_dir, logger);
 
     gu_conf_set_log_callback(logger);
 
@@ -1610,25 +1625,25 @@ cleanup:
 }
 
 enum galera_status galera_to_execute_end(conn_id_t conn_id) {
-    gcs_seqno_t seqno;
     bool do_report;
+    struct wsdb_conn_info conn_info;
+    int rcode;
 
     GU_DBUG_ENTER("galera_to_execute_end");
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
 
-    seqno = wsdb_conn_get_seqno(conn_id);
-    if (seqno == GALERA_MISSING_SEQNO) {
-        gu_warn("missing connection seqno: %llu",conn_id);
+    if ((rcode = wsdb_conn_get_info(conn_id, &conn_info) != WSDB_OK)) {
+        gu_warn("missing connection for: %lld, rcode: %d", conn_id, rcode);
         GU_DBUG_RETURN(GALERA_CONN_FAIL);
     }
 
     do_report = report_check_counter ();
 
     /* release commit queue */
-    GALERA_RELEASE_COMMIT_QUEUE (seqno);
+    GALERA_RELEASE_COMMIT_QUEUE (conn_info.seqno);
     
     /* cleanup seqno reference */
-    wsdb_conn_set_seqno(conn_id, GALERA_MISSING_SEQNO);
+    wsdb_conn_reset_seqno(conn_id);
     
     if (do_report) report_last_committed (gcs_conn);
 

@@ -8,16 +8,14 @@
 #ifndef CONN_H_INCLUDED
 #define CONN_H_INCLUDED
 
-#include <gcs.h>
 #include "wsdb_api.h"
 
 /*!
  * @brief initializes connection management
  *
  * @param limit max number of connections
- * @param void_seqno un-initialized seqno value
  */
-int conn_init(uint16_t limit, trx_seqno_t void_seqno);
+int conn_init(uint16_t limit);
 /*!
  * @brief closes connection management and releases allocated resources
  */

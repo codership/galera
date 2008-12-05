@@ -11,8 +11,6 @@
 #ifndef WSDB_API
 #define WSDB_API
 
-#include "galera.h"
-
 #include <limits.h>
 #include <stdint.h>
 #include <time.h>
@@ -77,6 +75,23 @@ typedef int64_t connid_t;
 typedef int64_t local_trxid_t;
 typedef int64_t trx_seqno_t;
 
+#define TRX_SEQNO_MAX LLONG_MAX
+
+enum wsdb_conn_state {
+  WSDB_CONN_IDLE = 0,     //!< 
+  WSDB_CONN_TRX,          //!< processing transaction
+};
+
+
+struct wsdb_conn_info {
+    connid_t         id;
+
+    enum wsdb_conn_state state;
+
+    /* TO sequence number for direct executed query */
+    trx_seqno_t  seqno;
+};
+
 enum wsdb_trx_state {
   WSDB_TRX_VOID = 0,      //!< sequencing 
   WSDB_TRX_REPLICATING,   //!< gcs_repl() has been called
@@ -101,32 +116,6 @@ typedef struct {
 
 /* MySQL type for boolean */
 typedef char		my_bool; /* Small bool */
-
-/* special seqno to designate a cancelled transaction */
-#ifdef UNSIGNED_SEQNO
-#ifndef ULLONG_MAX
-#   define GALERA_ABORT_SEQNO   18446744073709551615ULL
-#   define GALERA_MISSING_SEQNO 18446744073709551614ULL
-#else
-#   define GALERA_ABORT_SEQNO   ULLONG_MAX
-#   define GALERA_MISSING_SEQNO (ULLONG_MAX-1)
-#endif
-#else // SIGNED_SEQNO
-#   define GALERA_VOID_SEQNO     0
-#   define GALERA_ABORT_SEQNO   -1
-#   define GALERA_MISSING_SEQNO -2
-#endif
-
-#ifdef REMOVED
-/*! @enum 
- * @brief action codes 
- */
-enum wsdb_action {
-    INSERT = 1, /*!< insert operation */
-    UPDATE,     /*!< update operation */
-    DELETE,     /*!< delete operation */
-};
-#endif
 
 #define WSDB_ACTION_INSERT 'I'
 #define WSDB_ACTION_DELETE 'D'
@@ -271,7 +260,7 @@ typedef void (*wsdb_log_cb_t) (int code, const char* msg);
  * @retval WSDB_ERROR wsdb could not initialize, must abort
  */
 int wsdb_init(
-    const char *data_dir, wsdb_log_cb_t logger, trx_seqno_t void_seqno
+    const char *data_dir, wsdb_log_cb_t logger
 );
 int wsdb_close();
 
@@ -443,16 +432,13 @@ int wsdb_assign_trx_pos(
 );
 
  /*!
-  * @brief returns the local seqno associated with transaction
+  * @brief returns the local trx information associated with transaction
   *
-  * This can be called after transaction has associated seqnos 
+  * @param trx_id trasnaction identifier in the application context
+  * @param info pointer to wsdb_trx_info struct, will be filled by the call
   */
 void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info);
 
-//trx_seqno_t wsdb_get_local_trx_seqno_g(local_trxid_t trx_id);
-//struct wsdb_write_set *wsdb_get_local_trx_ws(local_trxid_t trx_id);
-//enum wsdb_trx_position wsdb_get_local_trx_pos(local_trxid_t trx_id);
- 
  /*!
   * @brief returns the seqno of latest trx, which has committed,
   * Also increments use count of last_committed
@@ -610,20 +596,45 @@ int wsdb_store_set_database(
 int wsdb_conn_set_seqno (connid_t conn_id, trx_seqno_t seqno);
 
 /*!
- * @brief queries connection seqno
+ * @brief removes seqno from connection
  *
  * @param conn_id ID for the connection
  */
-trx_seqno_t wsdb_conn_get_seqno (connid_t conn_id);
+int wsdb_conn_reset_seqno (connid_t conn_id);
+
+/*!
+ * @brief queries connection info
+ *
+ * @param conn_id ID for the connection
+ */
+int wsdb_conn_get_info (connid_t conn_id, struct wsdb_conn_info *info);
+
+
+enum wsdb_conf_param_id {
+    WSDB_CONF_LOCAL_CACHE_SIZE,  //!< max size for local cache
+    WSDB_CONF_WS_PERSISTENCY,    //!< WS persistency policy
+    WSDB_CONF_MARK_COMMIT_EARLY, //!< update last seen trx asap
+};
+
+enum wsdb_conf_param_type {
+    WSDB_CONF_TYPE_INT,     //!< integer type
+    WSDB_CONF_TYPE_DOUBLE,  //!< float
+    WSDB_CONFTYPE_STRING,  //!< null terminated string
+};
+
+typedef void * (*wsdb_conf_param_fun)(
+    enum wsdb_conf_param_id, enum wsdb_conf_param_type
+);
 
 /*!
  * @brief functions for providing conf parameter querying from app
  */
-void *wsdb_conf_get_param (enum galera_conf_param_id,
-                           enum galera_conf_param_type);
+void *wsdb_conf_get_param (enum wsdb_conf_param_id,
+                           enum wsdb_conf_param_type);
+
 
 void wsdb_set_conf_param_cb(
-    galera_conf_param_fun configurator
+    wsdb_conf_param_fun configurator
 );
 
 #endif

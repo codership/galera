@@ -11,7 +11,7 @@ static struct wsdb_hash *table_name_hash;
 static uint32_t s_last_table_id;
 static uint32_t s_max_table_id;
 
-static galera_conf_param_fun     wsdb_configurator = NULL;
+static wsdb_conf_param_fun     wsdb_configurator = NULL;
 
 /* djb2
  * This algorithm was first reported by Dan Bernstein
@@ -46,7 +46,7 @@ static int hash_cmp(uint16_t len1, char *key1, uint16_t len2, char *key2) {
 }
 
 int wsdb_init(
-    const char *data_dir, wsdb_log_cb_t logger, trx_seqno_t void_seqno
+    const char *data_dir, wsdb_log_cb_t logger
 ) {
     gu_conf_set_log_callback(logger);
     
@@ -55,7 +55,7 @@ int wsdb_init(
     s_last_table_id = 1;
 
     /* open DB for local state trx */
-    local_open(data_dir, NULL, 0, 10000, void_seqno);
+    local_open(data_dir, NULL, 0, 10000);
 
     /* open certification database */
     wsdb_cert_init(data_dir, NULL);
@@ -279,7 +279,7 @@ uint32_t get_table_id(char *dbtable) {
 }
 
 void *wsdb_conf_get_param (
-    enum galera_conf_param_id id, enum galera_conf_param_type type
+    enum wsdb_conf_param_id id, enum wsdb_conf_param_type type
 ) {
     if (!wsdb_configurator) {
         return(NULL);
@@ -289,7 +289,7 @@ void *wsdb_conf_get_param (
 }
 
 void wsdb_set_conf_param_cb(
-    galera_conf_param_fun configurator
+    wsdb_conf_param_fun configurator
 ) {
     wsdb_configurator = configurator;
 }

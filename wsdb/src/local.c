@@ -8,14 +8,12 @@
 #include "file_cache.h"
 #include "hash.h"
 #include "file.h"
-#include "galera.h"
 
 /* static variables */
 static struct file_cache *local_cache;
 static struct wsdb_file  *local_file;
 static struct wsdb_hash  *trx_hash;
 static uint16_t trx_limit;
-static  trx_seqno_t local_void_seqno;
 
 enum wsdb_block_states {
     BLOCK_ACTIVE,
@@ -157,14 +155,11 @@ int local_open(
     const char *dir,
     const char *file,
     uint16_t    block_size,
-    uint16_t    trxs_max,
-    trx_seqno_t void_seqno
+    uint16_t    trxs_max
 ) {
     char full_name[256];
     int rcode;
     int cache_size;
-
-    local_void_seqno = void_seqno;
 
     memset(full_name, 256, '\0');
     sprintf(
@@ -176,8 +171,11 @@ int local_open(
     local_file = file_create(full_name, block_size);
 
     /* consult application for desired local cache size */
-    cache_size = wsdb_conf_get_param(GALERA_CONF_LOCAL_CACHE_SIZE, GALERA_TYPE_INT) ?
-      *(int *)wsdb_conf_get_param(GALERA_CONF_LOCAL_CACHE_SIZE, GALERA_TYPE_INT) : LOCAL_CACHE_LIMIT;
+    cache_size = wsdb_conf_get_param(
+        WSDB_CONF_LOCAL_CACHE_SIZE, WSDB_TYPE_INT) ?
+            *(int *)wsdb_conf_get_param(
+                 WSDB_CONF_LOCAL_CACHE_SIZE, WSDB_TYPE_INT) : 
+            LOCAL_CACHE_LIMIT;
 
     /* limit local cache size to 'cache_size' bytes */
     local_cache = file_cache_open(
@@ -187,7 +185,7 @@ int local_open(
     trx_limit = (trxs_max) ? trxs_max : TRX_LIMIT;
     trx_hash  = wsdb_hash_open(trx_limit, hash_fun_64, hash_cmp_64, true);
 
-    rcode = conn_init(0, void_seqno);
+    rcode = conn_init(0);
 
     /* initialize last_committed_trx mutex */
     gu_mutex_init(&last_committed_seqno_mtx, NULL);
@@ -292,8 +290,8 @@ static struct trx_info *new_trx_info(local_trxid_t trx_id) {
 
     MAKE_OBJ(trx, trx_info);
     trx->id            = trx_id;
-    trx->info.seqno_g  = local_void_seqno;
-    trx->info.seqno_l  = local_void_seqno;
+    trx->info.seqno_g  = TRX_SEQNO_MAX;
+    trx->info.seqno_l  = TRX_SEQNO_MAX;
     trx->first_block   = 0;
     trx->last_block    = 0;
     trx->info.ws       = 0;
@@ -1410,44 +1408,4 @@ void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info) {
 
 
     GU_DBUG_VOID_RETURN;
-}
-trx_seqno_t wsdb_get_local_trx_seqno(local_trxid_t trx_id) {
-    struct trx_info       *trx = get_trx_info(trx_id);
-
-    GU_DBUG_ENTER("wsdb_get_local_trx_seqno");
-    if (!trx) {
-	GU_DBUG_PRINT("wsdb",("trx not found, : %llu",trx_id));
-        GU_DBUG_RETURN(GALERA_MISSING_SEQNO);
-    }
-    GU_DBUG_RETURN(trx->info.seqno_l);
-}
-trx_seqno_t wsdb_get_local_trx_seqno_g(local_trxid_t trx_id) {
-    struct trx_info       *trx = get_trx_info(trx_id);
-
-    GU_DBUG_ENTER("wsdb_get_local_trx_seqno_g");
-    if (!trx) {
-	GU_DBUG_PRINT("wsdb",("trx not found, : %llu",trx_id));
-        GU_DBUG_RETURN(GALERA_MISSING_SEQNO);
-    }
-    GU_DBUG_RETURN(trx->info.seqno_g);
-}
-struct wsdb_write_set *wsdb_get_local_trx_ws(local_trxid_t trx_id) {
-    struct trx_info       *trx = get_trx_info(trx_id);
-
-    GU_DBUG_ENTER("wsdb_get_local_trx_write_set");
-    if (!trx) {
-	GU_DBUG_PRINT("wsdb",("trx not found, : %llu",trx_id));
-        GU_DBUG_RETURN(NULL);
-    }
-    GU_DBUG_RETURN(trx->info.ws);
-}
-enum wsdb_trx_position wsdb_get_local_trx_pos(local_trxid_t trx_id) {
-    struct trx_info       *trx = get_trx_info(trx_id);
-
-    GU_DBUG_ENTER("wsdb_get_local_trx_pos");
-    if (!trx) {
-	GU_DBUG_PRINT("wsdb",("trx not found, : %llu",trx_id));
-        GU_DBUG_RETURN(WSDB_TRX_POS_VOID);
-    }
-    GU_DBUG_RETURN(trx->info.position);
 }

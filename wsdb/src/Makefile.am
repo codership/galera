@@ -41,7 +41,7 @@ libwsdb_la_SOURCES =    \
 	mempool.h
 
 
-WSDB_INTERFACE = 1
+WSDB_INTERFACE = 2
 WSDB_REVISION  = 0
 WSDB_AGE       = 0
 libwsdb_la_LDFLAGS = \
@@ -64,7 +64,7 @@ libgalera_la_SOURCES = \
 #endif
 libgalera_la_DEPENDENCIES = libwsdb.la
 libgalera_la_LIBADD       = libwsdb.la
-GALERA_INTERFACE = 4
+GALERA_INTERFACE = 5
 GALERA_REVISION  = 0
 GALERA_AGE       = 0
 libgalera_la_LDFLAGS = \

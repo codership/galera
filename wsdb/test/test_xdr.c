@@ -59,7 +59,7 @@ START_TEST (test_xdr)
     }
 
     /* unit test code */
-    rcode = wsdb_init("./data", xdr_log_cb, 0);
+    rcode = wsdb_init("./data", xdr_log_cb);
     if (rcode) {
         fail("wsdb init: %d", rcode);
     }
