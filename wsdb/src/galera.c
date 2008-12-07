@@ -1739,5 +1739,9 @@ enum galera_status galera_replay_trx( trx_id_t trx_id, void *app_ctx) {
     //wsdb_delete_local_trx_info(trx_id);
 
     //ws_start_cb(app_ctx, 0);
+    if (trx.ws->rbr_buf) gu_free(trx.ws->rbr_buf); 
+    wsdb_deref_seqno (trx.ws->last_seen_trx);
+    wsdb_write_set_free(trx.ws);
+
     return GALERA_OK;
 }
