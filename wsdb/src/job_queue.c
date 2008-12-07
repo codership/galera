@@ -88,7 +88,7 @@ void job_queue_remove_worker(
     gu_mutex_lock(&(queue->mutex));
 
     assert(worker->state==JOB_IDLE);
-    assert(job->id <= queue->active_workers);
+    assert(worker->id <= queue->active_workers);
 
     worker->state = JOB_VOID;
     queue->active_workers--;
