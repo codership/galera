@@ -368,6 +368,26 @@ int wsdb_append_table_lock(
 );
 
 /*!
+ * @brief performs certification test for a write set
+ * 
+ * This method can be called after replication has received the write set.
+ * Caller must provide the write set received from replication intact and the 
+ * sequence number determined for the replication event.
+ * 
+ * @return certification verdict
+ * 
+ * @param write_set  The write set to be appended
+ * @param trx_seqno  the cluster wide agreed commit order for the transaction.
+ * 
+ * @return success code, certification fail code or error code
+ * @retval WSDB_OK
+ * @retval WSDB_CERTIFICATION_FAIL certification failed
+ */
+int wsdb_certification_test(
+    struct wsdb_write_set *write_set, trx_seqno_t trx_seqno
+);
+
+/*!
  * @brief appends whole write_set
  * 
  * This method can be called after replication has received the write set.

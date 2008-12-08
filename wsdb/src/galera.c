@@ -1172,37 +1172,28 @@ static int check_certification_status_for_aborted(
      * seqno_l - 1 has certified and then do our certification.
      */
 
-    //if ((rcode = galera_eagain (gcs_to_grab, to_queue, seqno_l))) {
-    //   gu_warn("gcs_to_grab aborted: %d seqno %llu", rcode, seqno_l);
-    //   retcode = GALERA_TRX_FAIL;
-    //   goto after_cert_test;
-    //}
+    rcode = wsdb_certification_test(ws, seqno_g);
+    switch (rcode) {
+    case WSDB_OK:
+        gu_warn ("BF conflicting local trx has certified, "
+                 "seqno: %llu %llu last_seen_trx: %llu", 
+                 seqno_l, seqno_g, ws->last_seen_trx);
+        /* certification ok */
+        return GALERA_OK;
 
-    //if (gu_likely(galera_update_global_seqno (seqno_g))) {
-        /* Gloabl seqno OK, do certification test */
-        //print_ws(wslog_L, ws, seqno_l);
-        rcode = wsdb_append_write_set(seqno_g, ws);
-        switch (rcode) {
-        case WSDB_OK:
-            gu_warn ("BF conflicting local trx has certified, "
-                      "seqno: %llu %llu last_seen_trx: %llu", 
-                      seqno_l, seqno_g, ws->last_seen_trx);
-            /* certification ok */
-            return GALERA_OK;
+    case WSDB_CERTIFICATION_FAIL:
+        /* certification failed, release */
+        gu_info("BF conflicting local trx certification fail: %llu - %llu",
+                seqno_l, ws->last_seen_trx);
+        print_ws(wslog_L, ws, seqno_l);
+        return GALERA_TRX_FAIL;
 
-        case WSDB_CERTIFICATION_FAIL:
-            /* certification failed, release */
-            gu_info("BF conflicting local trx certification fail: %llu - %llu",
-                    seqno_l, ws->last_seen_trx);
-            print_ws(wslog_L, ws, seqno_l);
-            return GALERA_TRX_FAIL;
-
-        default:  
-            gu_fatal("wsdb append failed: seqno_g %llu seqno_l %llu",
-                     seqno_g, seqno_l);
-            abort();
-            break;
-        }
+    default:  
+        gu_fatal("wsdb append failed: seqno_g %llu seqno_l %llu",
+                 seqno_g, seqno_l);
+        abort();
+        break;
+    }
 }
 
 
@@ -1684,32 +1675,12 @@ enum galera_status galera_replay_trx( trx_id_t trx_id, void *app_ctx) {
 
         switch (trx.position) {
         case WSDB_TRX_POS_TO_QUEUE:
-#ifdef REMOVED
-            rcode = gcs_to_renew_wait(to_queue, trx.seqno_l);
-
-            gu_info("to_queue renew %d", rcode );
-            if (rcode) {
-                gu_error("gcs to renew to_queue failed for: %d", rcode);
-                job_queue_remove_worker(applier_queue, applier);
-                return GALERA_NODE_FAIL;
-            }
-#endif
             process_query_write_set(
                 applier, app_ctx, trx.ws, trx.seqno_g, trx.seqno_l
             );
             break;
 
         case WSDB_TRX_POS_COMMIT_QUEUE:
-#ifdef REMOVED
-            rcode = gcs_to_renew_wait(commit_queue, trx.seqno_l);
-            gu_info("commit_queue renew %d", rcode );
-
-            if (rcode) {
-                gu_error("gcs to renew commit_queue failed for: %d", rcode);
-                job_queue_remove_worker(applier_queue, applier);
-                return GALERA_NODE_FAIL;
-            }
-#endif
             rcode = process_query_write_set_applying( 
               applier, app_ctx, trx.ws, trx.seqno_g, trx.seqno_l
             );
@@ -1739,7 +1710,6 @@ enum galera_status galera_replay_trx( trx_id_t trx_id, void *app_ctx) {
     //wsdb_delete_local_trx_info(trx_id);
 
     //ws_start_cb(app_ctx, 0);
-    if (trx.ws->rbr_buf) gu_free(trx.ws->rbr_buf); 
     wsdb_deref_seqno (trx.ws->last_seen_trx);
     wsdb_write_set_free(trx.ws);
 

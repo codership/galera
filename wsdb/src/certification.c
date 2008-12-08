@@ -281,6 +281,11 @@ int wsdb_certification_test(
                 ("trx: %llu conflicting table lock: %llu",
 		    (unsigned long long)trx_seqno, match->trx_seqno)
             );
+
+            /* key composition is not needed anymore */
+            gu_free(ws->key_composition);
+            ws->key_composition = NULL;
+
             return WSDB_CERTIFICATION_FAIL;
         }
 
@@ -296,6 +301,10 @@ int wsdb_certification_test(
             GU_DBUG_PRINT("wsdb",
                    ("trx: %llu conflicting: %llu", trx_seqno, match->trx_seqno)
             );
+            /* key composition is not needed anymore */
+            gu_free(ws->key_composition);
+            ws->key_composition = NULL;
+
             return WSDB_CERTIFICATION_FAIL;
         }
     }
