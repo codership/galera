@@ -1,0 +1,356 @@
+#!/bin/bash
+
+SELF=$(cd $(dirname $0); pwd -P)/$(basename $0)
+# Copyright (C) 2007, 2008 Codership Oy <info@codership.com>
+#
+# This file is free software; as a special exception the author gives
+# unlimited permission to copy and/or distribute it, with or without
+# modifications, as long as this notice is preserved.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
+# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+# WHAT IT IS:
+# This script starts mysqld from Galera test distribution. It may be adapted
+# to be run from /etc/init.d directory for automatic server startup.
+#
+# USAGE:
+# GCS_ADDRESS=<address> mysqld_galera start|stop|restart|check|create
+#
+# By default empty backend is "dummy".
+#
+# 'check' command takes options: [database [table_to_ignore] [table_to_ignore]...]
+#
+# USEFUL ENVIRONMENT VARIABLES:
+#
+# MY_CNF         - specifies the configuration file
+# GCS_ADDRESS    - overrides setting in my.cnf
+# MYSQL_PORT     - port to listen for client connections (default: 3306)
+#
+# Convention: mysql pid file is stored in mysql data dir under name 'mysql.pid'
+#
+# Normally only the following parameters need to be changed:
+
+# Where mysql data directory is located (by default - inside mysql installation)
+# MYSQL_DATA_DIR
+
+# Where mysql installation is located (by default determined from this script location)
+MYSQL_BASE_DIR=${MYSQL_BASE_DIR:-"$(dirname $SELF)/mysql"}
+GALERA_BASE_DIR=${GALERA_BASE_DIR:-"$(dirname $SELF)/galera"}
+
+# MySQL configuration file
+MY_CNF=${MYSQL_CNF:-"$MYSQL_BASE_DIR/etc/my.cnf"}
+if test -s "$MY_CNF"
+then
+    DEFAULTS_OPTION=" --defaults-file=$MY_CNF "
+    my_cnf_datadir=$(grep ^datadir $MY_CNF | sed s/[^/]*//)
+else
+    DEFAULTS_OPTION=" --no-defaults "
+fi
+# If it was not given explicitely, take it from my.cnf
+MYSQL_DATA_DIR=${MYSQL_DATA_DIR:-"$my_cnf_datadir"}
+# If it was not found in my.cnf, use distribution default
+MYSQL_DATA_DIR=${MYSQL_DATA_DIR:-"$MYSQL_BASE_DIR/var"}
+
+
+#=======================================================================
+##
+## Tweak the following if needed
+##
+# use mysqld server directly, better not have automatic restarting
+MYSQLD="$MYSQL_BASE_DIR/libexec/mysqld"
+MYSQLADMIN="$MYSQL_BASE_DIR/bin/mysqladmin"
+# Port, socket and pid files
+MYSQL_PORT=${MYSQL_PORT:-3306}
+MYSQL_SOCKET=${MYSQL_SOCKET:-"$MYSQL_DATA_DIR/mysqld.sock"}
+MYSQL_PID=${MYSQL_PID:-"$MYSQL_DATA_DIR/mysqld.pid"}
+# Shutdown wait timeout.
+MYSQL_SHUTDOWN_WAIT=30
+#============= Nothing servicable below ================================
+
+# User to run as if started under superuser
+MYSQLD_USER=$(whoami)
+if test "$MYSQLD_USER" = "root"
+then
+    MYSQLD_USER=mysql
+fi
+ROOT_USER=${ROOT_USER:-"-uroot"}
+ROOT_PSWD=${ROOT_PSWD:-"-prootpass"}
+
+LD_LIBRARY_PATH="$GALERA_BASE_DIR/lib"
+
+# Mandatory stuff
+INNODB_OPTS=" --default-storage-engine=InnoDB --innodb_lock_wait_timeout=9999999 "
+
+# --debug terribly affects performance
+#DEBUG_OPTS=" --debug "
+#DEBUG_OPTS=" --debug=d,galera,wsdb:t:i:o,$MYSQL_DATA_DIR/mysqld.trc"
+
+err_log="$MYSQL_DATA_DIR/$(hostname).err"
+mysql_log="$MYSQL_DATA_DIR/$(hostname).log"
+
+
+usage() { cat - << EOF
+
+usage: mysql-galera [options] command
+
+Options:
+    -d|--debug       : enable debug
+    -l|--log         : enable mysql query log
+    -g|--gcs_address : address of gcs server (spread://locahost:4803)
+    --slave_threads  : number of consurrent ws appliers (1)
+    --data_dir       : location for mysql data directories
+    -u|--user        : mysql root user
+    -p|--password    : mysql root user password
+    -c|--command     : command to execute (status)
+    --mysql-opt      : an option to the server to follow
+    --db             : name of database to check
+    --ignore_table   : table to ignore in checking
+    --valgrind       : run under valgrind
+    --ws_level       : RBR (default) or SQL
+
+Commands:
+check                : check cosistency either locally or through network
+start                : start servers
+stop                 : stop servers
+restart              : stop and start servers
+status               : show running servers
+
+EOF
+}
+
+# Checks if a process with a given PID is still running
+find_pid()
+{
+    ps axc | grep mysqld | grep -w ^\ *$1 > /dev/null
+}
+
+galera_start()
+{
+    local failed
+    
+    if ! test -x $MYSQLD
+    then
+	echo "$MYSQLD executable not found"
+	exit -1
+    fi
+    
+    if test -f $MYSQL_PID
+    then
+        echo "Found existing '$MYSQL_PID'. Please run '$0 stop'"
+        exit -1;
+    fi
+
+    if [ -n "$MYSQL_LOG" ]
+    then
+        LOGGING_OPTS=" --log=$mysql_log --log_output=FILE "
+    fi
+
+    if [ "$WS_LEVEL" == "RBR" ]
+    then
+        RBR_OPTS=" --log-bin --binlog_format=ROW "
+    else
+        RBR_OPTS=""
+    fi
+
+    if test -n "$GCS_ADDRESS"
+    then
+        GALERA_OPTS=" --galera_slave_threads=$SLAVE_THREADS --galera_gcs_address=$GCS_ADDRESS"
+    fi
+
+    echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening to port $MYSQL_PORT and socket $MYSQL_SOCKET..."
+
+    export LD_LIBRARY_PATH	
+    nohup $VALGRIND $MYSQLD \
+	    $DEFAULTS_OPTION \
+	    --user="$MYSQLD_USER" \
+	    --basedir="$MYSQL_BASE_DIR" \
+	    --datadir="$MYSQL_DATA_DIR" \
+	    --pid-file="$MYSQL_PID" \
+	    --port=$MYSQL_PORT \
+	    --socket=$MYSQL_SOCKET \
+	    --skip-locking \
+            --log_error=$err_log \
+            $INNODB_OPTS \
+	    $GALERA_OPTS \
+	    $DEBUG_OPTS \
+	    $LOGGING_OPTS \
+	    $RBR_OPTS \
+    1>/dev/null 2>>$err_log &
+            
+    my_pid=$!
+	
+#    echo "Waiting for pid file" 
+    while ! test -r $MYSQL_PID
+    do
+        sleep 1
+        if find_pid $my_pid
+        then
+            # process is alive, wait for pid file
+	    echo -n "."
+	else
+            failed="yes"
+	    break
+	fi		
+    done
+
+    if test "$failed" != "yes"
+    then
+        echo " Done (PID:$(cat $MYSQL_PID))"
+    else
+        echo " Failed (PID:$my_pid)"
+    fi
+}
+
+galera_stop()
+{
+    # check pid file
+    if test -r $MYSQL_PID
+    then
+        # check if corresponding mysqld is running
+#        if ps axc | grep mysqld | grep $(cat $MYSQL_PID) >/dev/null 2>&1
+        if find_pid $(cat $MYSQL_PID)
+        then
+            echo -n "Killing PID $(cat $MYSQL_PID)"
+	    kill $(cat $MYSQL_PID)
+            # wait for pid file to disappear
+	    for second in $(seq 1 $MYSQL_SHUTDOWN_WAIT)
+	    do
+	        echo -n "."
+	        sleep 1
+	        if test ! -r $MYSQL_PID
+	        then
+	            break
+		fi
+	    done
+	    echo ""
+	    if test "$second" = "$MYSQL_SHUTDOWN_WAIT"
+	    then
+	        echo -n "Failed to stop mysqld safely. Killing with -9... "
+	        kill -9 $(cat $MYSQL_PID; rm -rf $MYSQL_PID)
+	    fi
+	else
+	    echo -n "Removing stale PID file $MYSQL_PID... "
+	    rm -rf $MYSQL_PID
+	fi
+	    
+	echo "Done"
+    else
+	echo "PID file not found: $MYSQL_PID"
+    fi
+}
+
+galera_restart()
+{
+    galera_stop
+    galera_start
+}
+
+checksum()
+{
+
+CS=`mysqldump --opt $ROOT_USER $ROOT_PSWD -h127.0.0.1 -P$MYSQL_PORT $IGNORE_TABLES $DB | \
+    grep -v '\-\-'  | md5sum`
+
+echo $CS
+}
+
+# to use valgrind or not
+VALGRIND=""
+
+# write set level, SQL, RBR or ROW
+WS_LEVEL="RBR"
+
+SLAVE_THREADS=1
+
+DB="test" # use 'test' database if none given
+IGNORE_TABLES=""
+
+if [ $# -eq 0 ]; then usage; exit 1; fi
+
+while [ $# -gt 0 ]; do
+case $1 in
+    -h|--help)
+            usage
+            exit 0
+            ;;
+    -d|--debug)
+            DEBUG_OPTS=" --debug=d,galera,wsdb:t:i:o"
+            ;;
+    -l|--log)
+            MYSQL_LOG="log"
+            ;;
+    --valgrind)
+            VALGRIND="valgrind --log-file=/tmp/mysql_vg --leak-check=full"
+            ;;
+    -g|--gcs_address)
+            GCS_ADDRESS=$2
+            shift
+            ;;
+    --slave_threads)
+            SLAVE_THREADS=$2
+            shift
+            ;;
+    --db)
+            DB=$2
+            shift
+            ;;
+    --ignore_table)
+            IGNORE_TABLES=" $IGNORE_TABLES --ignore-table=$DB.$2 "
+            shift
+            ;;
+    --ws_level)
+            WS_LEVEL=$2
+            shift
+            ;;
+    -u|--user)
+            ROOT_USER="-u$2"
+            shift
+            ;;
+    -p|--password)
+            ROOT_PSWD="-p$2"
+            shift
+            ;;
+    --data_dir)
+            MYSQL_DATA_DIR=$2
+            shift
+            ;;
+    -c|--command)
+            COMMAND=$2
+            ;;
+    --mysql-opt)
+            OPT_MYSQLD="$OPT_MYSQLD $2"
+	    shift
+            ;;
+'check')
+            COMMAND="checksum"
+            ;;
+'start')
+            COMMAND=galera_start
+            ;;
+'stop')
+            COMMAND=galera_stop
+            ;;
+'restart')
+            COMMAND=galera_restart
+            ;;
+'status')
+            COMMAND=status
+            ;;
+'create')
+            COMMAND="create_data_dir $2"
+            shift
+            ;;
+    *)
+        # must be command
+            usage
+            exit 1
+            ;;
+esac
+shift
+done
+
+$COMMAND
+
+#

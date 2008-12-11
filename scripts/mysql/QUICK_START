@@ -1,0 +1,50 @@
+This is an informal guide to quick setup of MySQL/Galera cluster for experienced users. For more detailed information please see README.
+
+MySQL/Galera cluster is a multi-master MySQL server cluster. It provides both true service high-availability (all nodes always have the same data) and performance scalability. This distribution is all you need. You don't need to be root or to uninstall/disable any software.
+
+MYSQL CLUSTER IN 3 EASY STEPS:
+
+To setup MySQL/Galera cluster all you need is to start an arbitrator and connect mysqld instances to it. Here's an example of how to do it:
+
+Suppose you have three networked computers Node1, Node2, Node3 of roughly the same performance and Node1 has IP address a.b.c.d.
+
+1. Copy and unpack this distribution on every node.
+
+2. Start arbitrator on Node1. For that just run gcomm script from this distribution.
+
+3. Start MySQL server on each node with the following command:
+
+GCS_ADDRESS=gcomm://tcp:a.b.c.d:4567 <distribution path>/mysql-galera start
+
+where a.b.c.d is IP address of Node1 and <distribution path> is the path to unpacked MySQL/Galera distribution.
+
+This will start mysqld with data directory at <distribution path>/mysql/var and listening at default mysqld port 3306. If you already have another mysqld using this port, prepend the above command with MYSQL_PORT=<another port>
+
+That's it. You've got a multi-master MySQL/Galera cluster. Root password is 'rootpass' and there is also 'test' user with password 'testpass' and privileges on 'test.*'. You can now populate your database with mysqldump by loading your database dump to one of the nodes.
+
+
+LIMITATIONS:
+
+1. Currently replication works only with InnoDB storage. Any modifications to tables of other types, including system (mysql.*) tables are not replicated. E.g. if you want to add another user, you have to do it manually on every node where you want that user to connect to. It has no effect on data consistency across the nodes, only on the ability to connect to particular node.
+
+2. Currently MySQL/Galera cluster lacks automatic state transfer. Every time you add a new node to the cluster and/or restart a node you need to manually synchronize database contents on the nodes. See README for details.
+
+
+QUICK ANSWERS:
+
+1. Yes, arbitrator can run on any node or even on a separate machine. Arbitrator consumes little CPU/RAM resources but will benefit from fast network connection.
+
+2. Yes, currently arbitrator is a single point of failure. It will change soon.
+
+3. Yes, it works anywhere TCP works, including Amazon EC2(TM).
+
+4. Yes, it'd be faster if there were a dedicated network for arbitrator connections and a separate network for MySQL client connections.
+
+5. Yes, it is highly configurable and flexible. For more info see README, mysql-galera --help, <distribution path>/mysql/etc/my.cnf.
+
+6. If your application cannot utilize more than one server, you can use TCP connection balancer like pen (http://siag.nu/pen/) or GLB (http://www.codership.com/products/downloads). Note however, that SQL traffic balancing is very CPU consuming (a lot of small packets), so it is recommended to to have a dedicated machine for load balancer.
+
+7. Galera patch for MySQL can be found at ... FIXME!!!
+
+Please direct all your suggestions, opinions and inquiries to info@codership.com
+

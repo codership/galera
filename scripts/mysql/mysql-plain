@@ -1,0 +1,155 @@
+#!/bin/bash
+
+SELF=$(cd $(dirname $0); pwd -P)/$(basename $0)
+
+# Where mysql installation is located (by default determined from this script location)
+if test -z "$MYSQL_BASE_DIR"
+then
+    echo "MYSQL_BASE_DIR is not set"
+    exit 1
+fi
+
+# MySQL configuration file
+MY_CNF=${MYSQL_CNF:-"$MYSQL_BASE_DIR/etc/my.cnf"}
+if test -s "$MY_CNF"
+then
+    DEFAULTS_OPTION=" --defaults-file=$MY_CNF "
+    my_cnf_datadir=$(grep ^datadir $MY_CNF | sed s/[^/]*//)
+else
+    DEFAULTS_OPTION=" --no-defaults "
+fi
+
+# If it was not given explicitely, take it from my.cnf
+MYSQL_DATA_DIR=${MYSQL_DATA_DIR:-"$my_cnf_datadir"}
+# If it was not found in my.cnf, use default
+MYSQL_DATA_DIR=${MYSQL_DATA_DIR:-"$MYSQL_BASE_DIR/var"}
+
+# use mysqld server directly, better not have automatic restarting
+MYSQLD=${MYSQLD:-"$(dirname $SELF)/../sql/mysqld"}
+# Port, socket and pid files
+MYSQL_PORT=${MYSQL_PORT:-3307}
+MYSQL_SOCKET=${MYSQL_SOCKET:-"$MYSQL_DATA_DIR/mysqld.sock"}
+MYSQL_PID=${MYSQL_PID:-"$MYSQL_DATA_DIR/mysqld.pid"}
+err_log="$MYSQL_DATA_DIR/$(hostname).err"
+
+# Checks if a process with a given PID is still running
+find_pid()
+{
+    ps axc | grep mysqld | grep -w ^\ *$1 > /dev/null
+}
+
+mysql_start()
+{
+    local failed
+    
+    if ! test -x "$MYSQLD"
+    then
+	echo "$MYSQLD executable not found"
+	exit -1
+    fi
+    
+    if test -f $MYSQL_PID
+    then
+        echo "Found existing '$MYSQL_PID'. Please run '$0 stop'"
+        exit -1;
+    fi
+    echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening to port $MYSQL_PORT and socket $MYSQL_SOCKET..."
+set -x
+    nohup $MYSQLD \
+	    $DEFAULTS_OPTION \
+	    --basedir="$MYSQL_BASE_DIR" \
+	    --datadir="$MYSQL_DATA_DIR" \
+	    --pid-file="$MYSQL_PID" \
+	    --port=$MYSQL_PORT \
+	    --socket=$MYSQL_SOCKET \
+	    --skip-locking \
+            --log_error=$err_log \
+    1>/dev/null 2>>$err_log &
+            
+    my_pid=$!
+set +x	
+#    echo "Waiting for pid file" 
+    while ! test -r $MYSQL_PID
+    do
+        sleep 1
+        if find_pid $my_pid
+        then
+            # process is alive, wait for pid file
+	    echo -n "."
+	else
+            failed="yes"
+	    break
+	fi		
+    done
+
+    if test "$failed" != "yes"
+    then
+        echo " Done (PID:$(cat $MYSQL_PID))"
+    else
+        echo " Failed (PID:$my_pid)"
+    fi
+}
+
+mysql_stop()
+{
+    # check pid file
+    if test -r $MYSQL_PID
+    then
+        # check if corresponding mysqld is running
+#        if ps axc | grep mysqld | grep $(cat $MYSQL_PID) >/dev/null 2>&1
+        if find_pid $(cat $MYSQL_PID)
+        then
+            echo -n "Killing PID $(cat $MYSQL_PID)"
+	    kill $(cat $MYSQL_PID)
+            # wait for pid file to disappear
+	    for second in $(seq 1 $MYSQL_SHUTDOWN_WAIT)
+	    do
+	        echo -n "."
+	        sleep 1
+	        if test ! -r $MYSQL_PID
+	        then
+	            break
+		fi
+	    done
+	    echo ""
+	    if test "$second" = "$MYSQL_SHUTDOWN_WAIT"
+	    then
+	        echo -n "Failed to stop mysqld safely. Killing with -9... "
+	        kill -9 $(cat $MYSQL_PID; rm -rf $MYSQL_PID)
+	    fi
+	else
+	    echo -n "Removing stale PID file $MYSQL_PID... "
+	    rm -rf $MYSQL_PID
+	fi
+	    
+	echo "Done"
+    else
+	echo "PID file not found: $MYSQL_PID"
+    fi
+}
+
+mysql_restart()
+{
+    mysql_stop
+    mysql_start
+}
+
+case "$1" in
+    'start')
+	mysql_start $2
+    ;;
+    'stop')
+	mysql_stop
+    ;;
+    'restart')
+	mysql_restart $2
+    ;;
+    'check')
+	shift;
+	checksum $*
+    ;;
+    *)
+	echo "Usage: $0 start|stop|restart|check"
+esac
+
+#

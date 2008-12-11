@@ -1,0 +1,77 @@
+Codership Oy
+http://www.codership.com
+<info@codership.com>
+
+DISCLAIMER
+
+THIS DEMO SOFTWARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER
+EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+IN NO EVENT SHALL CODERSHIP OY BE HELD LIABLE TO ANY PARTY FOR ANY DAMAGES
+RESULTING DIRECTLY OR INDIRECTLY FROM THE USE OF THIS SOFTWARE.
+
+Trademark Information.
+
+MySQL is a trademark or registered trademark of Sun Microsystems, Inc. or
+its subsidiaries in the US and other countries. Other marks are the property
+of their respective owners.
+
+Licensing Information.
+
+Please see ./mysql/LICENSE.mysql and ./galera/LICENSE.galera
+
+
+0. WHAT IS MYSQL/GALERA DEMO CLUSTER
+
+MySQL/Galera demo cluster is a synchronous multi-master MySQL server cluster.
+It consists of a single group communication daemon gcomm and several MySQL server instances which connect to it in a star-like fashion:
+
+     ,--------.   ,---------.   ,--------.
+     | mysqld |---|  gcomm  |---| mysqld |
+     `--------'   `---------'   `--------'
+                   /       \
+            ,--------.   ,--------.
+            | mysqld |   | mysqld |
+            `--------'   `--------'
+
+Server states are synchronized by replicating transaction changes at commit time. The cluster is virtually synchronous: this means that no node will commit a transaction unless it is guaranteed to be committed on all other nodes. Together with flow control this makes the cluster
+
+* Truly highly available: no transaction is ever lost in case of a node crash. All nodes always have consistent state.
+
+* True multi-master: all cluster nodes can handle WRITE load concurrently.
+
+* Highly transparent: the cluster is intended as a drop-in replacement for a single MySQL server. (See LIMITATIONS below)
+
+* Scalable even with WRITE-intensive applications.
+
+This package contains all software you'll need to setup MySQL/Galera demo cluster.
+You don't need administrative privileges or to uninstall/disable previously
+installed MySQL software to use this demo.
+
+
+1. CLUSTER SETUP
+               
+To setup the cluster you will need several networked computers - one for each mysqld instance you plan to use. For best performance those computers should be of approximately same configuration: Galera replication is synchronous and one slow machine will slow down the whole cluster.
+
+You must also select one machine that would host group communication daemon (arbitrator). For best performance it should be a separate computer, but it also can be one of the MySQL nodes. The only requirement is that arbitrator is accessible to all other cluster nodes.
+
+It takes 3 steps to set up the cluster:
+1. Copy demo distribution to all prospective nodes of the cluster and unpack it.
+2. Start group communication daemon on arbitrator node.
+3. Start MySQL servers.
+
+(NOTE: You can easily set up the cluster on a single computer, following the instructions below. However this makes little sense, as you won't see the the benefits of high availability and scalability.)
+
+
+2. USING THE CLUSTER
+
+
+3. LOAD BALANCER
+
+
+4. CONFIGURATION
+
+5. Using MySQL/Galera cluster on Amazon EC2 service
+
+6. LIMITATIONS
+
