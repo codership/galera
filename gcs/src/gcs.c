@@ -185,7 +185,7 @@ gcs_fc_stop (gcs_conn_t* conn)
         GCS_CONN_SYNCED  == conn->state        &&
         conn->stop_count <= 0 && conn->stop_sent <= 0) {
         /* tripped upper queue limit, send stop request */
-        gu_info ("SENDING STOP (%llu)", conn->local_act_id); //track frequency
+//        gu_info ("SENDING STOP (%llu)", conn->local_act_id); //track frequency
         ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
         if (ret >= 0) {
             ret = 0;
@@ -210,7 +210,7 @@ gcs_fc_cont (gcs_conn_t* conn)
 
     if (conn->lower_limit >= conn->queue_len &&  conn->stop_sent > 0) {
         // tripped lower slave queue limit, sent continue request
-        gu_info ("SENDING CONT");
+//        gu_info ("SENDING CONT");
         ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
         if (ret >= 0) {
             ret = 0;
@@ -375,7 +375,7 @@ gcs_handle_actions (gcs_conn_t*    conn,
             // obsolete fc request
             break;
         }
-        gu_info ("RECEIVED %s", fc->stop ? "STOP" : "CONT");
+//        gu_info ("RECEIVED %s", fc->stop ? "STOP" : "CONT");
         conn->stop_count += ((fc->stop != 0) << 1) - 1; // +1 if !0, -1 if 0
         break;
     }
