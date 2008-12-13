@@ -518,7 +518,7 @@ static inline void report_last_committed (
     gcs_seqno_t seqno = wsdb_get_safe_to_discard_seqno();
     long ret;
 
-    gu_info ("Reporting last committed: %llu", seqno);
+    gu_debug("Reporting last committed: %llu", seqno);
     if ((ret = gcs_set_last_applied(gcs_conn, seqno))) {
         gu_warn ("Failed to report last committed %llu, %d (%s)",
                  seqno, ret, strerror (-ret));
@@ -533,10 +533,10 @@ static inline void truncate_trx_history (gcs_seqno_t seqno)
     static gcs_seqno_t last_truncated = 0;
 
     if (last_truncated + truncate_interval < seqno) {
-        gu_info ("Purging history up to %llu", seqno);
+        gu_debug ("Purging history up to %llu", seqno);
         wsdb_purge_trxs_upto(seqno);
         last_truncated = seqno;
-        gu_info ("Purging done to %llu", seqno);
+        gu_debug ("Purging done to %llu", seqno);
     }
 }
 
@@ -1018,11 +1018,11 @@ enum galera_status galera_cancel_commit(trx_id_t victim_trx) {
     /* continue to kill the victim */
     switch (victim.state) {
     case WSDB_TRX_ABORTED:
-        gu_info("trx marketed aborting already: %lld", victim.seqno_l);
+        gu_debug("trx marketed aborting already: %lld", victim.seqno_l);
         break;
 
     case WSDB_TRX_MISSING:
-        gu_info("trx missing at cancel commit: %lld", victim.seqno_l);
+        gu_debug("trx missing at cancel commit: %lld", victim.seqno_l);
         break;
 
     case WSDB_TRX_VOID:
@@ -1040,24 +1040,24 @@ enum galera_status galera_cancel_commit(trx_id_t victim_trx) {
         break;
 
     case WSDB_TRX_REPLICATING:
-        gu_info("victim trx is replicating: %lld", victim.seqno_l);
+        gu_debug("victim trx is replicating: %lld", victim.seqno_l);
         while (victim.state == WSDB_TRX_REPLICATING ) {
           gu_mutex_unlock(&commit_mtx);
           usleep (GALERA_USLEEP);
           gu_mutex_lock(&commit_mtx);
           wsdb_get_local_trx_info(victim_trx, &victim);
         }
-        gu_info("victim trx has replicated: %lld", victim.seqno_l);
+        gu_debug("victim trx has replicated: %lld", victim.seqno_l);
 
         //falling through, we have valid seqno now
 
     default:
-        gu_info("interrupting trx commit: trx_id %lld seqno %lld", 
+        gu_debug("interrupting trx commit: trx_id %lld seqno %lld", 
                 victim_trx, victim.seqno_l);
         //rcode = gcs_to_cancel(to_queue, victim_seqno);
         rcode = gcs_to_interrupt(to_queue, victim.seqno_l);
         if (rcode) {
-            gu_warn("trx interupt fail in to_queue: %d", rcode);
+            gu_debug("trx interupt fail in to_queue: %d", rcode);
             ret_code = GALERA_OK;
             rcode = gcs_to_interrupt(commit_queue, victim.seqno_l);
             if (rcode) {
@@ -1108,7 +1108,7 @@ enum galera_status galera_committed(trx_id_t trx_id) {
         }
         wsdb_delete_local_trx_info(trx_id);
     } else if (trx.state != WSDB_TRX_MISSING) {
-        gu_info("trx state: %d at galera_committed for: %lld", 
+        gu_debug("trx state: %d at galera_committed for: %lld", 
                  trx.state, trx.seqno_l
         );
     }
@@ -1139,7 +1139,7 @@ enum galera_status galera_rolledback(trx_id_t trx_id) {
         wsdb_delete_local_trx(trx_id);
         wsdb_delete_local_trx_info(trx_id);
     } else if (trx.state != WSDB_TRX_MISSING) {
-        gu_info("trx state: %d at galera_rolledback for: %lld", 
+        gu_debug("trx state: %d at galera_rolledback for: %lld", 
                  trx.state, trx.seqno_l
         );
     }
@@ -1183,7 +1183,7 @@ static int check_certification_status_for_aborted(
 
     case WSDB_CERTIFICATION_FAIL:
         /* certification failed, release */
-        gu_info("BF conflicting local trx certification fail: %llu - %llu",
+        gu_debug("BF conflicting local trx certification fail: %llu - %llu",
                 seqno_l, ws->last_seen_trx);
         print_ws(wslog_L, ws, seqno_l);
         return GALERA_TRX_FAIL;
@@ -1229,9 +1229,9 @@ galera_commit(
     wsdb_get_local_trx_info(trx_id, &trx);
     switch (trx.state) {
     case WSDB_TRX_ABORTED:
-	gu_info("trx has been cancelled already: %llu", trx_id);
+	gu_debug("trx has been cancelled already: %llu", trx_id);
 	if ((rcode = wsdb_delete_local_trx(trx_id))) {
-	    gu_info("could not delete trx: %llu", trx_id);
+	    gu_debug("could not delete trx: %llu", trx_id);
 	}
 	gu_mutex_unlock(&commit_mtx);
 	GU_DBUG_RETURN(GALERA_TRX_FAIL);
@@ -1354,7 +1354,7 @@ galera_commit(
         case WSDB_CERTIFICATION_FAIL:
             /* certification failed, release */
             retcode = GALERA_TRX_FAIL;
-            gu_info("local trx commit certification failed: %llu - %llu",
+            gu_debug("local trx commit certification failed: %llu - %llu",
                     seqno_l, ws->last_seen_trx);
             print_ws(wslog_L, ws, seqno_l);
             break;
@@ -1648,7 +1648,7 @@ enum galera_status galera_replay_trx( trx_id_t trx_id, void *app_ctx) {
 
     wsdb_get_local_trx_info(trx_id, &trx);
 
-    gu_info("trx_replay for: %lld %lld state: %d, rbr len: %d", 
+    gu_debug("trx_replay for: %lld %lld state: %d, rbr len: %d", 
             trx.seqno_l, trx.seqno_g, trx.state, trx.ws->rbr_buf_len);
 
     switch (trx.state) {
@@ -1667,7 +1667,7 @@ enum galera_status galera_replay_trx( trx_id_t trx_id, void *app_ctx) {
         );
         return GALERA_NODE_FAIL;
     }
-    gu_info("applier %d", applier->id );
+    gu_debug("applier %d", applier->id );
 
     //ws_start_cb(app_ctx, trx.seqno_l);
 
