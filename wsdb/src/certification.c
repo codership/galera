@@ -4,8 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
 
-#include "galera.h"
 #include "wsdb_priv.h"
 #include "hash.h"
 #include "version_file.h"
@@ -281,6 +281,11 @@ int wsdb_certification_test(
                 ("trx: %llu conflicting table lock: %llu",
 		    (unsigned long long)trx_seqno, match->trx_seqno)
             );
+
+            /* key composition is not needed anymore */
+            gu_free(ws->key_composition);
+            ws->key_composition = NULL;
+
             return WSDB_CERTIFICATION_FAIL;
         }
 
@@ -296,6 +301,10 @@ int wsdb_certification_test(
             GU_DBUG_PRINT("wsdb",
                    ("trx: %llu conflicting: %llu", trx_seqno, match->trx_seqno)
             );
+            /* key composition is not needed anymore */
+            gu_free(ws->key_composition);
+            ws->key_composition = NULL;
+
             return WSDB_CERTIFICATION_FAIL;
         }
     }
@@ -433,7 +442,7 @@ static int write_to_file(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
 int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     int rcode;
     my_bool *persistency = (my_bool *)wsdb_conf_get_param(
-        GALERA_CONF_WS_PERSISTENCY, GALERA_TYPE_INT
+        WSDB_CONF_WS_PERSISTENCY, WSDB_TYPE_INT
     );
     uint32_t key_size;
     /* certification test */
@@ -589,7 +598,7 @@ int wsdb_cert_close() {
         gu_error("failed to close key index");
     }
 
-    purge_seqno_list(GALERA_ABORT_SEQNO);
+    purge_seqno_list(ULLONG_MAX);
 
 #ifdef USE_MEMPOOL
     mempool_close(index_pool);

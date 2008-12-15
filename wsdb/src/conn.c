@@ -9,20 +9,17 @@
 
 struct conn_info {
     char             ident;
-    connid_t         id;
+    struct wsdb_conn_info info;
+
     struct key_array variables;
 
     /* SQL statement to set the default database */
     char   *set_default_db;
-
-    /* TO sequence number for direct executed query */
-    trx_seqno_t  seqno;
 };
 #define IDENT_conn_info 'C'
 
 static struct wsdb_hash  *conn_hash;
 static uint16_t conn_limit;
-static trx_seqno_t conn_void_seqno;
 
 static uint32_t hash_fun_64(uint32_t max_size, uint16_t len, char *key) {
     return (*(uint64_t *)key) % conn_limit;
@@ -34,10 +31,9 @@ static int hash_cmp_64(uint16_t len1, char *key1, uint16_t len2, char *key2) {
     return 0;
 }
 
-int conn_init(uint16_t limit, trx_seqno_t void_seqno) {
+int conn_init(uint16_t limit) {
     conn_limit = (limit) ? limit : CONN_LIMIT;
     conn_hash  = wsdb_hash_open(conn_limit, hash_fun_64, hash_cmp_64, true);
-    conn_void_seqno = void_seqno;
     return 0;
 }
 
@@ -83,7 +79,7 @@ static struct conn_info *get_conn_info(
     );
     if (conn) {
         GU_DBUG_PRINT("wsdb", 
-           ("found conn: %lu == %lu", conn_id, conn->id)
+           ("found conn: %lu == %lu", conn_id, conn->info.id)
         );
         CHECK_OBJ(conn, conn_info);
     } else {
@@ -108,10 +104,11 @@ static struct conn_info *new_conn_info(
     }
 
     MAKE_OBJ(conn, conn_info);
-    conn->id         = conn_id;
-    key_array_open(&conn->variables);
+    conn->info.id        = conn_id;
+    conn->info.state     = WSDB_CONN_IDLE;
+    conn->info.seqno     = LLONG_MAX;
     conn->set_default_db = NULL;
-    conn->seqno          = conn_void_seqno;
+    key_array_open(&conn->variables);
 
     GU_DBUG_PRINT("wsdb", ("created new connection: %lu", conn_id));
 
@@ -228,7 +225,7 @@ int conn_build_connection_queries(
 }
 
 int wsdb_conn_set_seqno(
-    connid_t conn_id, gcs_seqno_t seqno
+    connid_t conn_id, trx_seqno_t seqno
 ) {
     struct conn_info *conn = get_conn_info(conn_id);
     GU_DBUG_ENTER("conn_set_seqno");
@@ -238,21 +235,42 @@ int wsdb_conn_set_seqno(
     }
     GU_DBUG_PRINT("wsdb",("set seqno for conn: %lu : %lu", conn_id, seqno));
 
-    conn->seqno = seqno;
+    conn->info.seqno   = seqno;
+    conn->info.state   = WSDB_CONN_TRX;
 
     GU_DBUG_RETURN(WSDB_OK);
 }
 
-gcs_seqno_t wsdb_conn_get_seqno(
-    connid_t conn_id
+int wsdb_conn_reset_seqno( connid_t conn_id ) {
+    struct conn_info *conn = get_conn_info(conn_id);
+    GU_DBUG_ENTER("conn_set_seqno");
+    if (!conn) {
+        gu_error("no connection in conn_set_seqno",conn_id);
+        GU_DBUG_RETURN(WSDB_ERR_CONN_UNKNOWN);
+    }
+    GU_DBUG_PRINT("wsdb",("reset seqno for conn: %lu", conn_id));
+
+    conn->info.state   = WSDB_CONN_IDLE;
+
+    GU_DBUG_RETURN(WSDB_OK);
+}
+
+int wsdb_conn_get_info(
+    connid_t conn_id, 
+    struct wsdb_conn_info *info
 ) {
     struct conn_info *conn = get_conn_info(conn_id);
     GU_DBUG_ENTER("conn_get_seqno");
     if (!conn) {
         gu_error("no connection in conn_get_seqno",conn_id);
-        return conn_void_seqno;
+        return WSDB_ERR_CONN_UNKNOWN;
     }
-    GU_DBUG_PRINT("wsdb",("get seqno for conn: %lu : %lu", conn_id, conn->seqno));
+    GU_DBUG_PRINT("wsdb",("get seqno for conn: %lld : %lu", 
+        conn_id, conn->info.seqno
+    ));
+    info->id    = conn->info.id;
+    info->seqno = conn->info.seqno;
+    info->state = conn->info.state;
 
-    return conn->seqno;
+    return WSDB_OK;
 }

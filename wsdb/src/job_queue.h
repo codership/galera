@@ -57,7 +57,7 @@ struct job_id {
 enum job_state {
     JOB_VOID,
     JOB_RUNNING,
-    JOB_COMPLETED
+    JOB_IDLE
 };
 
 
@@ -107,6 +107,15 @@ int job_queue_destroy(struct job_queue *queue);
  * @param job_queue job queue, where worker is working
  */
 struct job_worker *job_queue_new_worker(struct job_queue *queue);
+
+/*
+ * @brief remove worker resource
+ * @param job_queue job queue, where worker is working
+ * @param worker worker to loose
+ */
+void job_queue_remove_worker(
+    struct job_queue *queue, struct job_worker *worker
+);
 
 /*
  * @brief starts a new job for a worker

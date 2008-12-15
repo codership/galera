@@ -436,7 +436,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     fprintf (stdout, "Got GCS_ACT_CONF: Conf: %lld, "
              "seqno: %lld, members: %ld, my idx: %ld, local seqno: %lld\n",
              (long long)conf->conf_id, (long long)conf->seqno,
-             conf->memb_num, conf->my_idx, thread->local_act_id);
+             conf->memb_num, conf->my_idx, (long long)thread->local_act_id);
     fflush (stdout);
 
     // NOTE: what really needs to be checked is seqno and group_uuid, but here
@@ -447,11 +447,11 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
         if (conf->st_required) {
             gcs_seqno_t seqno, s;
             fprintf (stdout, "Gap in configurations: ours: %lld, group: %lld.\n",
-                     conf_id, conf->conf_id);
+                     (long long)conf_id, (long long)conf->conf_id);
             fflush (stdout);
             
             fprintf (stdout, "Requesting state transfer up to %lld: %s\n",
-                     conf->seqno, // this is global seqno
+                     (long long)conf->seqno, // this is global seqno
                      strerror (-gcs_request_state_transfer (gcs, &conf->seqno,
                                                             sizeof(conf->seqno),
                                                             &seqno)));

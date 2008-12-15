@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <limits.h>
 
 //#ifdef HAVE_MYSQL_DBUG
 //#if !defined(HAVE_UINT)
@@ -43,10 +44,22 @@
 #include "conn.h"
 #include "certification.h"
 #include "mempool.h"
+#include "local.h"
 
 #define LOCAL_CACHE_LIMIT 1000000
 #define TRX_LIMIT         USHRT_MAX
 #define CONN_LIMIT        10000
+
+/* make sure 64bit integer limits are defined */
+# ifndef LLONG_MIN
+#  define LLONG_MIN	(-LLONG_MAX-1)
+# endif
+# ifndef LLONG_MAX
+#  define LLONG_MAX	__LONG_LONG_MAX__
+# endif
+# ifndef ULLONG_MAX
+#  define ULLONG_MAX	(LLONG_MAX * 2ULL + 1)
+# endif
 
 #define _MAKE_OBJ(obj, def, size)                    \
 {                                                    \
@@ -114,10 +127,6 @@ struct file_row_key *wsdb_key_2_file_row_key(struct wsdb_key_rec *key);
 struct wsdb_key_rec *file_row_key_2_wsdb_key(struct file_row_key *row_key);
 
 uint32_t get_table_id(char *dbtable);
-
-int local_open(const char *dir, const char *file,
-	       uint16_t block_size, uint16_t trx_limit, trx_seqno_t void_seqno);
-void local_close();
 
 uint16_t serialize_key(char **data, struct wsdb_table_key *key);
 

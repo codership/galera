@@ -11,8 +11,6 @@
 #ifndef WSDB_API
 #define WSDB_API
 
-#include "galera.h"
-
 #include <limits.h>
 #include <stdint.h>
 #include <time.h>
@@ -77,35 +75,47 @@ typedef int64_t connid_t;
 typedef int64_t local_trxid_t;
 typedef int64_t trx_seqno_t;
 
+#define TRX_SEQNO_MAX LLONG_MAX
+
+enum wsdb_conn_state {
+  WSDB_CONN_IDLE = 0,     //!< 
+  WSDB_CONN_TRX,          //!< processing transaction
+};
+
+
+struct wsdb_conn_info {
+    connid_t         id;
+
+    enum wsdb_conn_state state;
+
+    /* TO sequence number for direct executed query */
+    trx_seqno_t  seqno;
+};
+
+enum wsdb_trx_state {
+  WSDB_TRX_VOID = 0,      //!< sequencing 
+  WSDB_TRX_REPLICATING,   //!< gcs_repl() has been called
+  WSDB_TRX_REPLICATED,    //!< valid sequence numbers have been assigned
+  WSDB_TRX_ABORTED,       //!< BF trx has marked this trx as victim
+  WSDB_TRX_MISSING,       //!< trx is not in local hash
+};
+
+enum wsdb_trx_position {
+    WSDB_TRX_POS_VOID = 1  ,       /*!< position not defined        */
+    WSDB_TRX_POS_TO_QUEUE,         /*!< before to_queue monitor     */
+    WSDB_TRX_POS_COMMIT_QUEUE,     /*!< before commit_queue monitor */
+};
+
+typedef struct {
+    trx_seqno_t            seqno_l;  //!< local solid sequence
+    trx_seqno_t            seqno_g;  //!< cluster wide sequence number
+    enum wsdb_trx_state    state;    //!< state of sequencing
+    struct wsdb_write_set *ws;       //!<
+    enum wsdb_trx_position position; //!>
+} wsdb_trx_info_t;
+
 /* MySQL type for boolean */
 typedef char		my_bool; /* Small bool */
-
-/* special seqno to designate a cancelled transaction */
-#ifdef UNSIGNED_SEQNO
-#ifndef ULLONG_MAX
-#   define GALERA_ABORT_SEQNO   18446744073709551615ULL
-#   define GALERA_MISSING_SEQNO 18446744073709551614ULL
-#else
-#   define GALERA_ABORT_SEQNO   ULLONG_MAX
-#   define GALERA_MISSING_SEQNO (ULLONG_MAX-1)
-#endif
-#else // SIGNED_SEQNO
-#   define GALERA_VOID_SEQNO     0
-#   define GALERA_ABORT_SEQNO   -1
-#   define GALERA_MISSING_SEQNO -2
-#endif
-
-
-#ifdef REMOVED
-/*! @enum 
- * @brief action codes 
- */
-enum wsdb_action {
-    INSERT = 1, /*!< insert operation */
-    UPDATE,     /*!< update operation */
-    DELETE,     /*!< delete operation */
-};
-#endif
 
 #define WSDB_ACTION_INSERT 'I'
 #define WSDB_ACTION_DELETE 'D'
@@ -130,7 +140,7 @@ enum wsdb_ws_level {
 };
 
 /*! transaction executes in local state until it begins the committing */
-enum wsdb_trx_state {
+enum wsdb_trx_state2 {
     LOCAL,      /*!< TRX is executing in local state */
     COMMITTING, /*!< TRX has replicated and is in committing state */
     COMMITTED,  /*!< TRX has certified successfully */
@@ -215,7 +225,7 @@ struct wsdb_write_set {
     trx_seqno_t           last_seen_trx; //!< id of last committed trx
     enum wsdb_ws_type     type;
     enum wsdb_ws_level    level;
-    enum wsdb_trx_state   state;
+  //    enum wsdb_trx_state2  state;
     u_int16_t             query_count;   //!< number of queries in trx buffer
     //char                **queries;
     struct wsdb_query    *queries;       //!< trx query buffer
@@ -250,7 +260,7 @@ typedef void (*wsdb_log_cb_t) (int code, const char* msg);
  * @retval WSDB_ERROR wsdb could not initialize, must abort
  */
 int wsdb_init(
-    const char *data_dir, wsdb_log_cb_t logger, trx_seqno_t void_seqno
+    const char *data_dir, wsdb_log_cb_t logger
 );
 int wsdb_close();
 
@@ -358,6 +368,26 @@ int wsdb_append_table_lock(
 );
 
 /*!
+ * @brief performs certification test for a write set
+ * 
+ * This method can be called after replication has received the write set.
+ * Caller must provide the write set received from replication intact and the 
+ * sequence number determined for the replication event.
+ * 
+ * @return certification verdict
+ * 
+ * @param write_set  The write set to be appended
+ * @param trx_seqno  the cluster wide agreed commit order for the transaction.
+ * 
+ * @return success code, certification fail code or error code
+ * @retval WSDB_OK
+ * @retval WSDB_CERTIFICATION_FAIL certification failed
+ */
+int wsdb_certification_test(
+    struct wsdb_write_set *write_set, trx_seqno_t trx_seqno
+);
+
+/*!
  * @brief appends whole write_set
  * 
  * This method can be called after replication has received the write set.
@@ -404,16 +434,31 @@ int wsdb_set_trx_committing(local_trxid_t trx_id);
   */
 int wsdb_set_global_trx_committed(trx_seqno_t trx_seqno);
 int wsdb_set_local_trx_committed(local_trxid_t trx_id);
-int wsdb_assign_trx(
-    local_trxid_t trx_id, trx_seqno_t seqno_l, trx_seqno_t seqno_g);
+int wsdb_assign_trx_seqno(
+    local_trxid_t       trx_id, 
+    trx_seqno_t         seqno_l, 
+    trx_seqno_t         seqno_g, 
+    enum wsdb_trx_state state
+);
+int wsdb_assign_trx_state(
+    local_trxid_t        trx_id, 
+    enum wsdb_trx_state  state
+);
+int wsdb_assign_trx_ws(
+    local_trxid_t trx_id, struct wsdb_write_set *ws
+);
+int wsdb_assign_trx_pos(
+    local_trxid_t trx_id, enum wsdb_trx_position
+);
 
  /*!
-  * @brief returns the local seqno associated with transaction
+  * @brief returns the local trx information associated with transaction
   *
-  * This can be called after transaction has associated seqnos 
+  * @param trx_id trasnaction identifier in the application context
+  * @param info pointer to wsdb_trx_info struct, will be filled by the call
   */
-trx_seqno_t wsdb_get_local_trx_seqno(local_trxid_t trx_id);
- 
+void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info);
+
  /*!
   * @brief returns the seqno of latest trx, which has committed,
   * Also increments use count of last_committed
@@ -454,7 +499,7 @@ int wsdb_delete_global_trx(trx_seqno_t trx_id );
  *
  * @param trx_id transaction seqno, older ones will bre removed
  */
-int wsdb_purge_trxs_upto(trx_seqno_t trx_id );
+int wsdb_purge_trxs_upto(trx_seqno_t trx_id);
 
 /*!
  * @brief returns the whole write set for a transaction.
@@ -571,20 +616,45 @@ int wsdb_store_set_database(
 int wsdb_conn_set_seqno (connid_t conn_id, trx_seqno_t seqno);
 
 /*!
- * @brief queries connection seqno
+ * @brief removes seqno from connection
  *
  * @param conn_id ID for the connection
  */
-trx_seqno_t wsdb_conn_get_seqno (connid_t conn_id);
+int wsdb_conn_reset_seqno (connid_t conn_id);
+
+/*!
+ * @brief queries connection info
+ *
+ * @param conn_id ID for the connection
+ */
+int wsdb_conn_get_info (connid_t conn_id, struct wsdb_conn_info *info);
+
+
+enum wsdb_conf_param_id {
+    WSDB_CONF_LOCAL_CACHE_SIZE,  //!< max size for local cache
+    WSDB_CONF_WS_PERSISTENCY,    //!< WS persistency policy
+    WSDB_CONF_MARK_COMMIT_EARLY, //!< update last seen trx asap
+};
+
+enum wsdb_conf_param_type {
+    WSDB_CONF_TYPE_INT,     //!< integer type
+    WSDB_CONF_TYPE_DOUBLE,  //!< float
+    WSDB_CONFTYPE_STRING,  //!< null terminated string
+};
+
+typedef void * (*wsdb_conf_param_fun)(
+    enum wsdb_conf_param_id, enum wsdb_conf_param_type
+);
 
 /*!
  * @brief functions for providing conf parameter querying from app
  */
-void *wsdb_conf_get_param (enum galera_conf_param_id,
-                           enum galera_conf_param_type);
+void *wsdb_conf_get_param (enum wsdb_conf_param_id,
+                           enum wsdb_conf_param_type);
+
 
 void wsdb_set_conf_param_cb(
-    galera_conf_param_fun configurator
+    wsdb_conf_param_fun configurator
 );
 
 #endif

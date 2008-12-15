@@ -1,0 +1,121 @@
+#!/bin/bash
+
+SELF=$(cd $(dirname $0); pwd -P)/$(basename $0)
+# Copyright (C) 2007, 2008 Codership Oy <info@codership.com>
+#
+# This file is free software; as a special exception the author gives
+# unlimited permission to copy and/or distribute it, with or without
+# modifications, as long as this notice is preserved.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
+# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+
+# This script starts Galera group communication daemon
+# to be run from /etc/init.d directory for automatic server startup.
+#
+# ENVIRONMENT VARIABLES:
+#
+# GALERA_BASE_DIR - specifies the Galera installation root
+# GCS_ADDRESS     - overrides default listening address tcp:0.0.0.0:4567
+#                   (currently only TCP transport is supported)
+
+# Where Galera installation is located
+# (by default determined from this script location)
+GALERA_BASE_DIR=${GALERA_BASE_DIR:-"$(dirname $SELF)/galera"}
+LD_LIBRARY_PATH="$GALERA_BASE_DIR/lib"
+
+# Group Communication Address
+GCS_ADDRESS=${GCS_ADDRESS:-"tcp:0.0.0.0:4567"}
+# allow users to specify full gcs address (for cut'n'paste)
+GCS_ADDRESS_STRIPPED=$(echo $GCS_ADDRESS | sed s/gcomm:\\/\\///)
+
+GCOMM=$GALERA_BASE_DIR/sbin/vsbes
+
+GCOMM_PID=/tmp/gcomm.pid
+GCOMM_ERR=/tmp/gcomm.err
+
+# Checks if a process with a given PID is still running
+find_pid()
+{
+    ps axc | grep $(basename $GCOMM) | grep -w ^\ *$1 > /dev/null
+}
+
+gcomm_start()
+{
+    local failed
+    
+    if ! test -x $GCOMM
+    then
+	echo "$GCOMM executable not found"
+	exit -1
+    fi
+    
+    if test -f $GCOMM_PID
+    then
+        echo "Found existing '$GCOMM_PID'. Please run '$0 stop'"
+        exit 1;
+    fi
+
+    export LD_LIBRARY_PATH	
+    nohup $GCOMM $GCS_ADDRESS_STRIPPED 1>/dev/null 2>$GCOMM_ERR &
+    pid=$!
+    
+    if find_pid $pid
+    then
+        echo "Done (PID:$pid)"
+	echo $pid > $GCOMM_PID
+	exit 0
+    else
+        echo "Failed (PID:$pid)"
+	exit 1
+    fi
+}
+
+gcomm_stop()
+{
+    # check pid file
+    if test -r $GCOMM_PID
+    then
+        if find_pid $(cat $GCOMM_PID)
+        then
+            echo -n "Killing PID $(cat $GCOMM_PID)... "
+	    kill $(cat $GCOMM_PID)
+	else
+	    echo -n "Removing stale PID file $GCOMM_PID... "
+	fi
+        rm -rf $GCOMM_PID
+	echo "Done"
+    else
+	echo "PID file not found: $GCOMM_PID"
+    fi
+}
+
+gcomm_restart()
+{
+    gcomm_stop
+    gcomm_start
+}
+
+cmd=${1:-start} # start by default
+
+case $cmd in
+'start')
+            COMMAND=gcomm_start
+            ;;
+'stop')
+            COMMAND=gcomm_stop
+            ;;
+'restart')
+            COMMAND=gcomm_restart
+            ;;
+    *)
+            echo "Usage: [GCS_ADDRESS=tcp:<ip>:<port>] $0 [start|stop|restart]"
+	    exit 1
+            ;;
+esac
+
+$COMMAND
+
+#

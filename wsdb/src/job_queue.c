@@ -51,7 +51,9 @@ int job_queue_destroy(struct job_queue *queue) {
 
 
 struct job_worker *job_queue_new_worker(struct job_queue *queue) {
-    struct job_worker *worker;
+    struct job_worker *worker = NULL;
+    int i=0;
+
     CHECK_OBJ(queue, job_queue);
     gu_mutex_lock(&(queue->mutex));
 
@@ -59,14 +61,38 @@ struct job_worker *job_queue_new_worker(struct job_queue *queue) {
         gu_mutex_unlock(&(queue->mutex));
         return NULL;
     }
+    
+    while (i<queue->max_workers && !worker) {
+        if (queue->jobs[i].state == JOB_VOID) {
+            worker = &(queue->jobs[i]);
+        }
+        i++;
+    }
+    if (!worker) {
+        gu_mutex_unlock(&(queue->mutex));
+        return NULL;
+    }
 
-    worker = &(queue->jobs[queue->active_workers]);
-
-    worker->id = queue->active_workers;
     queue->active_workers++;
+    worker->state = JOB_IDLE;
     gu_mutex_unlock(&(queue->mutex));
 
     return (worker);
+}
+void job_queue_remove_worker(
+    struct job_queue *queue, struct job_worker *worker
+) {
+    CHECK_OBJ(queue, job_queue);
+    CHECK_OBJ(worker, job_worker);
+
+    gu_mutex_lock(&(queue->mutex));
+
+    assert(worker->state==JOB_IDLE);
+    assert(worker->id <= queue->active_workers);
+
+    worker->state = JOB_VOID;
+    queue->active_workers--;
+    gu_mutex_unlock(&(queue->mutex));
 }
 
 int job_queue_start_job(
@@ -120,7 +146,7 @@ int job_queue_end_job(struct job_queue *queue, struct job_worker *worker
           gu_cond_signal(&queue->jobs[i].cond);
         }
     }
-    queue->jobs[worker->id].state = JOB_COMPLETED;
+    queue->jobs[worker->id].state = JOB_IDLE;
     queue->jobs[worker->id].ctx   = NULL;
     
     gu_debug("job: %d complete", worker->id);

@@ -26,8 +26,8 @@ typedef enum  {
   HOLDER = 0, //!< current TO holder
   WAIT,       //!< actively waiting in the queue
   CANCELED,   //!< Waiter has canceled its to request
-  WITHDRAW,   //!< marked to be withdrawn
-  RELEASED    //!< has been released, free entry now
+  INTERRUPTED,//!< marked to be interrupted
+  RELEASED,    //!< has been released, free entry now
 } waiter_state_t;
 
 typedef struct
@@ -38,14 +38,13 @@ typedef struct
     pthread_mutex_t mtx;  // have to use native pthread for double locking
 #endif
     waiter_state_t  state;
-    int             has_aborted;
 }
 to_waiter_t;
 
 struct gcs_to
 {
     volatile gcs_seqno_t seqno;
-    size_t               used;
+    size_t               used; /* number of active waiters */
     size_t               qlen;
     size_t               qmask;
     to_waiter_t*         queue;
@@ -95,13 +94,11 @@ gcs_to_t *gcs_to_create (int len, gcs_seqno_t seqno)
                 pthread_mutex_init (&w->mtx, NULL);
 #endif
                 w->state       = RELEASED;
-                w->has_aborted = 0;
 	    }
 	    gu_mutex_init (&ret->lock, NULL);
 	
 	    return ret;
 	}
-
 	gu_free (ret);
     }
 
@@ -173,6 +170,10 @@ long gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
     w = to_get_waiter (to, seqno);
 
     switch (w->state) {
+    case INTERRUPTED:
+        w->state = RELEASED;
+	err = -EINTR;
+	break;
     case CANCELED:
 	err = -ECANCELED;
 	break;
@@ -195,12 +196,24 @@ long gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
             pthread_mutex_unlock (&w->mtx);
 #endif
 	    to->used--;
-	    if (w->state == WAIT) { // should be most probable
+	    switch (w->state) { 
+            case WAIT:// should be most probable
                 assert (seqno == to->seqno);
 		w->state = HOLDER;
-	    } else if (w->state > WAIT)
+                break;
+	    case INTERRUPTED:
+                w->state = RELEASED;
+		err      = -EINTR;
+                break;
+	    case CANCELED:
 		err = -ECANCELED;
-	    else {
+                break;
+	    case RELEASED:
+                /* this waiter has been cancelled */
+                assert(seqno < to->seqno);
+		err = -ECANCELED;
+                break;
+	    default:
 		gu_fatal("Invalid cond wait exit state %d, seqno %llu(%llu)",
                          w->state, seqno, to->seqno);
 		abort();
@@ -305,11 +318,12 @@ long gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno)
     }        
 
     w = to_get_waiter (to, seqno);
-    if (seqno > to->seqno) {
+    if ((seqno > to->seqno) || 
+        (seqno == to->seqno && w->state != HOLDER)) {
         err = to_wake_waiter (w);
 	w->state = CANCELED;
-    } else if (seqno == to->seqno) {
-	gu_warn("tried to cancel myself: state %d seqno %llu",
+    } else if (seqno == to->seqno && w->state == HOLDER) {
+	gu_warn("tried to cancel current TO holder, state %d seqno %llu",
 		 w->state, seqno);
         err = -ECANCELED;
     } else {
@@ -359,9 +373,9 @@ long gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
     return err;
 }
 
-long gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno)
+long gcs_to_interrupt (gcs_to_t *to, gcs_seqno_t seqno)
 {
-    long rcode;
+    long rcode = 0;
     long err;
 
     assert (seqno >= 0);
@@ -373,11 +387,22 @@ long gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno)
     {
         if (seqno >= to->seqno) {
             to_waiter_t *w = to_get_waiter (to, seqno);
-            w->state       = WITHDRAW;
-            w->has_aborted = 0;
-            rcode = to_wake_waiter (w);
+            if (w->state == HOLDER) {
+                gu_warn ("trying to interrupt in use seqno: seqno = %llu, "
+                     "TO seqno = %llu", seqno, to->seqno);
+                /* gu_mutex_unlock (&to->lock); */
+                rcode = -ERANGE;
+            } else if (w->state == CANCELED) {
+                gu_warn ("trying to interrupt canceled seqno: seqno = %llu, "
+                     "TO seqno = %llu", seqno, to->seqno);
+                /* gu_mutex_unlock (&to->lock); */
+                rcode = -ERANGE;
+            } else {
+                rcode    = to_wake_waiter (w);
+                w->state = INTERRUPTED;
+            }
         } else {
-            gu_warn ("trying to withdraw used seqno: cancel seqno = %llu, "
+            gu_warn ("trying to interrupt used seqno: cancel seqno = %llu, "
                      "TO seqno = %llu", seqno, to->seqno);
             /* gu_mutex_unlock (&to->lock); */
             rcode = -ERANGE;
@@ -387,30 +412,4 @@ long gcs_to_withdraw (gcs_to_t *to, gcs_seqno_t seqno)
     return rcode;
 }
 
-long gcs_to_renew_wait (gcs_to_t *to, gcs_seqno_t seqno)
-{
-    long rcode;
-    long err;
-
-    assert (seqno >= 0);
-
-    if ((err = gu_mutex_lock (&to->lock))) {
-	gu_fatal("Mutex lock failed (%d): %s", err, strerror(err));
-	abort();
-    }
-    {
-        if (seqno >= to->seqno) {
-            to_waiter_t *w = to_get_waiter (to, seqno);
-            w->state       = RELEASED;
-            w->has_aborted = 0;
-            rcode = 0;
-        } else {
-            gu_warn ("trying to renew used seqno: cancel seqno = %llu, "
-                     "TO seqno = %llu", seqno, to->seqno);
-            rcode = -ERANGE;
-        }
-    }
-    gu_mutex_unlock (&to->lock);
-    return rcode;
-}
 
