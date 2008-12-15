@@ -61,8 +61,7 @@ AC_FUNC_MALLOC
 AC_CHECK_FUNCS([memset mkdir strerror])
 
 AC_CONFIG_FILES([Makefile
-                 src/Makefile
-                 test/Makefile])
+                 src/Makefile])
 
 CFLAGS="$CFLAGS -std=c99 -Wall -Werror -Wextra -pedantic -Wno-unused-parameter -Wmissing-prototypes"
 AC_OUTPUT

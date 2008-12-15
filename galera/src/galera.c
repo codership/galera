@@ -222,12 +222,24 @@ static int verify(const galera_t *gh, const char *iface_ver)
     return 0;
 }
 
+
+static galera_loader_fun galera_dlf(void *dlh, const char *sym)
+{
+    union {
+	galera_loader_fun dlfun;
+	void *obj;
+    } alias;
+    alias.obj = dlsym(dlh, sym);
+    return alias.dlfun;
+}
+
 int galera_load(const char *spec, galera_t **hptr)
 {
     int ret = 0;
     void *dlh = NULL;
     galera_loader_fun dlfun;
 
+    
     if (!spec)
         return EINVAL;
 
@@ -245,8 +257,8 @@ int galera_load(const char *spec, galera_t **hptr)
         ret = EINVAL;
         goto out;
     }
-    
-    if (!(*(void **)(&dlfun) = dlsym(dlh, "galera_loader"))) {
+
+    if (!(dlfun = galera_dlf(dlh, "galera_loader"))) {
         ret = EINVAL;
         goto out;
         

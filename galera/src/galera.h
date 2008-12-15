@@ -1,3 +1,4 @@
+/* Copyright (C) 2007 Codership Oy <info@codership.com> */
 #ifndef GALERA_H
 #define GALERA_H
 
@@ -19,6 +20,7 @@ typedef enum galera_status {
     GALERA_WARNING,       //!< minor warning, error logged
     GALERA_TRX_MISSING,   //!< transaction is not known by galera
     GALERA_TRX_FAIL,      //!< transaction aborted, server can continue
+    GALERA_BF_ABORT,      //!< trx was victim of brute force abort 
     GALERA_CONN_FAIL,     //!< error in client connection, must abort
     GALERA_NODE_FAIL,     //!< error in node state, galera must reinit
     GALERA_FATAL,         //!< fatal error, server must abort
@@ -50,7 +52,6 @@ typedef uint64_t ws_id_t;
 typedef uint64_t trx_id_t;
 typedef uint64_t conn_id_t;
 
-
 /*!
  * @brief callback to return configuration parameter value
  *        The function should be able to return values for all
@@ -61,23 +62,6 @@ typedef uint64_t conn_id_t;
 typedef void * (*galera_conf_param_fun)(
     enum galera_conf_param_id, enum galera_conf_param_type
 );
-
-
-/*!
- * @brief retains the connection context specified by the
- *        context parameter
- *
- * @param context pointer to context info provided by application
- */
-typedef int (*galera_context_retain_fun)(void *context);
-
-/*!
- * @brief stores the connection context specified by the
- *        context parameter
- *
- * @return context pointer to context info provided by application
- */
-typedef void* (*galera_context_store_fun)();
 
 /*! 
  * Log severity levels, passed as first argument to log handler
@@ -226,8 +210,6 @@ enum galera_status galera_disable(void);
  */
 enum galera_status galera_recv(void *ctx);
 
-
-
 /*!
  * @brief performs commit time operations
  *
@@ -249,6 +231,29 @@ enum galera_status galera_recv(void *ctx);
  *
  */
 enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, size_t data_len);
+
+/*!
+ * @brief galera_replay_trx
+ *
+ * If local trx has been aborted by brute force, and it has already
+ * replicated before this abort, we must try if we can apply it as
+ * slave trx. Note that slave nodes see only trx write sets and certification
+ * test based on write set content can be different to DBMS lock conflicts.
+ *
+ * @param trx_id transaction which is committing
+ * @param conn_id
+ * @param rbr_data binary data when rbr is set
+ * @param data_len the size of the rbr data
+
+ * @retval GALERA_OK         cluster commit succeeded
+ * @retval GALERA_TRX_FAIL   must rollback transaction
+ * @retval GALERA_BF_ABORT   brute force abort happened after trx was replicated
+ *                           must rollback transaction and try to replay
+ * @retval GALERA_CONN_FAIL  must close client connection
+ * @retval GALERA_NODE_FAIL  must close all connections and reinit
+ *
+ */
+enum galera_status galera_replay_trx(trx_id_t trx_id, void *app_ctx);
 
 /*!
  * @brief cancels a previously started commit
@@ -284,6 +289,9 @@ enum galera_status galera_cancel_commit(
  *
  */
 enum galera_status galera_withdraw_commit(uint64_t victim_seqno);
+enum galera_status galera_withdraw_commit_by_trx(
+    trx_id_t victim_trx
+);
 
 /*!
  * @brief marks the transaction as committed
