@@ -131,7 +131,7 @@ gcs_create (const char *backend)
                                                      sizeof (gcs_act_t*));
                 if (conn->repl_q) {
                     size_t recv_q_len = GU_AVPHYS_PAGES * GU_PAGE_SIZE /
-                        sizeof(gcs_slave_act_t);
+                        sizeof(gcs_slave_act_t) / 4;
                     gu_info ("Requesting recv queue len: %zu", recv_q_len);
                     conn->recv_q = gu_fifo_create (recv_q_len,
                                                    sizeof(gcs_slave_act_t));
