@@ -431,10 +431,12 @@ struct galera_ {
                               const char *, const size_t);
     
 
-    
+    galera_status_t (*replay_trx)(galera_t *, const trx_id_t trx_id, void *app_ctx);    
     galera_status_t (*cancel_commit)(galera_t *, const trx_id_t);
-    galera_status_t (*withdraw_commit)(galera_t *, const ws_id_t);
 
+    galera_status_t (*withdraw_commit)(galera_t *, const ws_id_t);
+    galera_status_t (*withdraw_commit_by_trx)(galera_t *, const trx_id_t victim_trx);
+    
     galera_status_t (*committed)(galera_t *, const trx_id_t);
     galera_status_t (*rolledback)(galera_t *, const trx_id_t);
     

@@ -9,20 +9,16 @@
 #include <string.h>
 #include <stdio.h>
 
-
-/*
- * Backwards compatibility stuff
- */
 static galera_t *galera_ctx = NULL;
-
-
-
+static int dummy_mode = 0;
 
 enum galera_status galera_init(const char *gcs_group, 
                                const char *gcs_address, 
                                const char *data_dir,
                                galera_log_cb_t logger)
 {
+    if (dummy_mode)
+	return GALERA_OK;
 
     assert(galera_ctx);
     fprintf(stderr, "library loaded successfully\n");
@@ -32,6 +28,9 @@ enum galera_status galera_init(const char *gcs_group,
 
 enum galera_status galera_tear_down()
 {
+    if (dummy_mode)
+	return GALERA_OK;
+
     assert(galera_ctx);
     galera_unload(galera_ctx);
     return GALERA_OK;
@@ -39,24 +38,36 @@ enum galera_status galera_tear_down()
 
 enum galera_status galera_set_conf_param_cb(galera_conf_param_fun configurator)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->set_conf_param_cb(galera_ctx, configurator);
 }
 
 enum galera_status galera_set_logger(galera_log_cb_t logger)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->set_logger(galera_ctx, logger);
 }
 
 void galera_dbug_push(const char *control)
 {
+    if (dummy_mode)
+	return;
+    
     assert(galera_ctx);
     galera_ctx->dbug_push(galera_ctx, control);
 }
 
 void galera_dbug_pop()
 {
+    if (dummy_mode)
+	return;
+    
     assert(galera_ctx);
     galera_ctx->dbug_pop(galera_ctx);
 }
@@ -64,24 +75,36 @@ void galera_dbug_pop()
 
 enum galera_status galera_set_execute_handler(galera_bf_execute_fun fun)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->set_execute_handler(galera_ctx, fun);
 }
 
 enum galera_status galera_set_execute_handler_rbr(galera_bf_execute_fun fun)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->set_execute_handler_rbr(galera_ctx, fun);
 }
 
 enum galera_status galera_set_ws_start_handler(galera_ws_start_fun fun)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->set_ws_start_handler(galera_ctx, fun);
 }
 
 enum galera_status galera_enable()
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->enable(galera_ctx);
 }
@@ -89,12 +112,18 @@ enum galera_status galera_enable()
 
 enum galera_status galera_disable()
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->disable(galera_ctx);
 }
 
 enum galera_status galera_recv(void *ctx)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->recv(galera_ctx, ctx);
 }
@@ -103,12 +132,27 @@ enum galera_status galera_recv(void *ctx)
 enum galera_status galera_commit(trx_id_t trx_id, conn_id_t conn_id, 
                                  const char *rbr_data, size_t data_len)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->commit(galera_ctx, trx_id, conn_id, rbr_data, data_len);
 }
 
+enum galera_status galera_replay_trx(trx_id_t trx_id, void *app_ctx)
+{
+    if (dummy_mode)
+	return GALERA_OK;
+    
+    assert(galera_ctx);
+    return galera_ctx->replay_trx(galera_ctx, trx_id, app_ctx);
+}
+
 enum galera_status galera_cancel_commit(trx_id_t victim_trx)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->cancel_commit(galera_ctx, victim_trx);
 }
@@ -116,18 +160,36 @@ enum galera_status galera_cancel_commit(trx_id_t victim_trx)
 
 enum galera_status galera_withdraw_commit(uint64_t seqno)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->withdraw_commit(galera_ctx, seqno);
 }
 
+enum galera_status galera_withdraw_commit_by_trx(trx_id_t victim_trx)
+{
+    if (dummy_mode)
+	return GALERA_OK;
+    
+    assert(galera_ctx);
+    return galera_ctx->withdraw_commit(galera_ctx, victim_trx);
+}
+
 enum galera_status galera_committed(trx_id_t trx_id)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->committed(galera_ctx, trx_id);
 }
 
 enum galera_status galera_rolledback(trx_id_t trx_id)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->rolledback(galera_ctx, trx_id);
 }
@@ -136,6 +198,9 @@ enum galera_status galera_append_query(
     trx_id_t trx_id, char *query, time_t timeval, uint32_t randseed
 )
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->append_query(galera_ctx, trx_id, query, timeval, randseed);
 }
@@ -149,6 +214,9 @@ enum galera_status galera_append_row_key(
     uint16_t key_len,
     enum galera_action action)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->append_row_key(galera_ctx, trx_id, dbtable, dbtable_len,
                                       (char*)key, key_len, action);
@@ -159,6 +227,9 @@ enum galera_status galera_set_variable(
     char *key,   uint16_t key_len, 
     char *query, uint16_t query_len)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->set_variable(galera_ctx, conn_id, key, key_len, query, query_len);
 }
@@ -166,6 +237,9 @@ enum galera_status galera_set_variable(
 enum galera_status galera_set_database(
     conn_id_t conn_id, char *query, uint16_t query_len)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->set_database(galera_ctx, conn_id, query, query_len);
 }
@@ -174,12 +248,18 @@ enum galera_status galera_to_execute_start(
     conn_id_t conn_id, char *query, uint16_t query_len
 )
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->to_execute_start(galera_ctx, conn_id, query, query_len);
 }
 
 enum galera_status galera_to_execute_end(conn_id_t conn_id)
 {
+    if (dummy_mode)
+	return GALERA_OK;
+    
     assert(galera_ctx);
     return galera_ctx->to_execute_end(galera_ctx, conn_id);
 }
@@ -209,8 +289,10 @@ static int verify(const galera_t *gh, const char *iface_ver)
     VERIFY(gh->set_execute_handler_rbr);
     VERIFY(gh->set_ws_start_handler);
     VERIFY(gh->commit);
+    VERIFY(gh->replay_trx);
     VERIFY(gh->cancel_commit);
     VERIFY(gh->withdraw_commit);
+    VERIFY(gh->withdraw_commit_by_trx);
     VERIFY(gh->committed);
     VERIFY(gh->rolledback);
     VERIFY(gh->append_query);
@@ -244,6 +326,11 @@ int galera_load(const char *spec, galera_t **hptr)
         return EINVAL;
 
     fprintf(stderr, "galera_load(): loading %s\n", spec);
+
+    if (strcmp(spec, "dummy") == 0) {
+	dummy_mode = 1;
+	return 0;
+    }
 
     if (!hptr) {
         if (galera_ctx)
@@ -286,6 +373,12 @@ out:
 void galera_unload(galera_t *hptr)
 {
     void *dlh;
+
+    if (dummy_mode) {
+	dummy_mode = 0;
+	return;
+    }
+    
     if (!hptr) {
         hptr = galera_ctx;
         galera_ctx = NULL;
@@ -295,6 +388,5 @@ void galera_unload(galera_t *hptr)
     hptr->tear_down(hptr);
     if (dlh)
         dlclose(dlh);
-
 }
 
