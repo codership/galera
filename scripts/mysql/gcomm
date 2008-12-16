@@ -61,6 +61,7 @@ gcomm_start()
     export LD_LIBRARY_PATH	
     nohup $GCOMM $GCS_ADDRESS_STRIPPED 1>/dev/null 2>$GCOMM_ERR &
     pid=$!
+    sleep 1
     
     if find_pid $pid
     then
