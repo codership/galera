@@ -132,7 +132,7 @@ install -m 644 LICENSE.mysql $MYSQL_DIST_DIR
 install -m 644 README $DIST_DIR
 install -m 644 QUICK_START $DIST_DIR
 install -D -m 644 $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/mysql/english/errmsg.sys
-install -D -m 755 $MYSQL_SRC/sql/.libs/mysqld $MYSQL_DIST_DIR/libexec/mysqld
+install -D -m 755 $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/libexec/mysqld
 install -D -m 644 my.cnf $MYSQL_DIST_DIR/etc/my.cnf
 tar -xzf mysql_var.tgz -C $MYSQL_DIST_DIR
 
