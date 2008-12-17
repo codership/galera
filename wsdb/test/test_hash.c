@@ -57,7 +57,7 @@ START_TEST (test_hash_cache)
     /* unit test code */
     s_hash_size = 5000;
     struct wsdb_hash *hash = wsdb_hash_open(
-        s_hash_size, hash_fun_cache, hash_cmp_cache, true
+        s_hash_size, hash_fun_cache, hash_cmp_cache, true, false
     );
     fail_if((!hash), "no hash");
     mark_point();
@@ -100,7 +100,7 @@ START_TEST (test_hash_trivial)
     /* unit test code */
     s_hash_size = 100;
     struct wsdb_hash *hash = wsdb_hash_open(
-        s_hash_size, hash_fun, hash_cmp, true
+        s_hash_size, hash_fun, hash_cmp, true, false
     );
     fail_if((!hash), "no hash");
     for (i=1; i<100; i++) {
@@ -135,7 +135,7 @@ START_TEST (test_hash_overflow)
     /* unit test code */
     s_hash_size = 10;
     struct wsdb_hash *hash = wsdb_hash_open(
-        s_hash_size, hash_fun, hash_cmp, true
+        s_hash_size, hash_fun, hash_cmp, true, false
     );
     for (i=1; i<50; i++) {
       if (wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i))) {
@@ -156,7 +156,7 @@ START_TEST (test_hash_big)
     /* unit test code */
     s_hash_size = 65000;
     struct wsdb_hash *hash = wsdb_hash_open(
-        s_hash_size, hash_fun, hash_cmp, true
+        s_hash_size, hash_fun, hash_cmp, true, false
     );
     for (i=1; i<100000; i++) {
       if (wsdb_hash_push(hash, 4, (char *)&i, (void *)(10000 + i))) {
@@ -177,7 +177,7 @@ START_TEST (test_hash_big_64_key)
     /* unit test code */
     s_hash_size = 32000;
     struct wsdb_hash *hash = wsdb_hash_open(
-        s_hash_size, hash_fun, hash_cmp, true
+        s_hash_size, hash_fun, hash_cmp, true, false
     );
     for (i=1; i<100000; i++) {
         int *val = (int *)malloc(sizeof(int));
@@ -202,7 +202,7 @@ START_TEST (test_hash_huge_64_key)
     /* unit test code */
     s_hash_size = 64000;
     struct wsdb_hash *hash = wsdb_hash_open(
-        s_hash_size, hash_fun, hash_cmp, true
+        s_hash_size, hash_fun, hash_cmp, true, false
     );
 
     for (round=1; round<1000; round++) {
@@ -275,7 +275,7 @@ START_TEST (test_hash_purge)
     /* unit test code */
     s_hash_size = 65000;
     struct wsdb_hash *hash = wsdb_hash_open(
-        s_hash_size, hash_fun, hash_cmp, true
+        s_hash_size, hash_fun, hash_cmp, true, false
     );
     for (i=1; i<100000; i++) {
       if (wsdb_hash_push(hash, 4, (char *)&i, (void *)(i))) {
