@@ -126,9 +126,10 @@ static void purge_active_seqnos(trx_seqno_t up_to) {
                         );
                     } else {
 #ifndef USE_MEMPOOL
-                        gu_free(match);
+                        /* cannot free here, key is in key_composition */
+                        //gu_free(match);
 #else
-                        rcode = mempool_free(index_pool, match);
+                        //rcode = mempool_free(index_pool, match);
                         if (rcode) {
                             gu_error("cert index free failed: %d", rcode);
                         }
