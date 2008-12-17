@@ -9,7 +9,7 @@
 #include "wsdb_priv.h"
 #include "hash.h"
 #include "version_file.h"
-//#define USE_MEMPOOL
+#define USE_MEMPOOL
 
 /* index for table row level keys */
 static struct wsdb_hash *key_index;
@@ -238,7 +238,7 @@ int wsdb_cert_init(const char* work_dir, const char* base_name) {
         (sizeof(struct index_rec) > sizeof(struct seqno_list)) ?
          sizeof(struct index_rec) : sizeof(struct seqno_list),
         32000,
-        MEMPOOL_NON_STICKY, false, "cert index"
+        MEMPOOL_DYNAMIC, false, "cert index"
     );
 #endif
     return WSDB_OK;
@@ -318,7 +318,6 @@ static int update_index(
     char *all_keys        = ws->key_composition;
     //uint32_t all_keys_len = (*(uint32_t *)all_keys);
     all_keys += 4;
-
     for (i = 0; i < ws->item_count; i++) {
         struct index_rec *match, *new_trx = NULL;
         
@@ -471,8 +470,9 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     /* mem usage test */
     key_size = *(uint32_t *)ws->key_composition;
 
-    if (key_size > 50000) {
-        gu_info("key length: %lu for trx: %llu, not stored in RAM", 
+    //if (key_size > 50000) {
+    if (key_size >= 0) {
+        gu_debug("key length: %lu for trx: %llu, not stored in RAM", 
                 key_size, trx_seqno
         );
         gu_free(ws->key_composition);
@@ -492,6 +492,9 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
 static int delete_verdict(void *ctx, void *data, void **new_data) {
     struct index_rec *entry = (struct index_rec *)data;
 
+    if (!entry) {
+        gu_warn("hash delete_verdict has null entry pointer");
+    }
     if (entry && entry->trx_seqno < (*(trx_seqno_t *)ctx)) {
 #ifdef USE_MEMPOOL
         int rcode;
@@ -529,6 +532,13 @@ int purge_seqnos_by_scan(trx_seqno_t trx_id) {
 }
 
 int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
+    int mem_usage = wsdb_hash_report(key_index);
+    gu_info("PURGE, mem usage for key_idex: %u", mem_usage);
+
+    gu_info("active seqno list len: %d, size: %d", 
+            trx_info.list_len, trx_info.list_size
+    );
+
     switch(choose_purge_method(trx_id)) {
     case PURGE_METHOD_FULL_SCAN:
         purge_seqno_list(trx_id);
