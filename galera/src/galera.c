@@ -259,7 +259,11 @@ enum galera_status galera_to_execute_end(conn_id_t conn_id)
 
 static int verify(const galera_t *gh, const char *iface_ver)
 {
-#define VERIFY(_p) if (!(_p)) return EINVAL;
+#define VERIFY(_p) if (!(_p)) {					\
+	fprintf(stderr, "galera_load(): verify(): %s\n", # _p);	\
+	return EINVAL;						\
+    }
+
     VERIFY(gh);
     VERIFY(gh->version);
     VERIFY(strcmp(gh->version, iface_ver) == 0);
@@ -324,12 +328,14 @@ int galera_load(const char *spec, galera_t **hptr)
         *hptr = NULL;
     }
     
-    if (!(dlh = dlopen(spec, RTLD_LOCAL))) {
+    if (!(dlh = dlopen(spec, RTLD_NOW | RTLD_LOCAL))) {
+	fprintf(stderr, "galera_load(): dlopen(): %s\n", dlerror());
         ret = EINVAL;
         goto out;
     }
 
     if (!(dlfun = galera_dlf(dlh, "galera_loader"))) {
+	fprintf(stderr, "galera_load(): dlopen(): %s\n", dlerror());
         ret = EINVAL;
         goto out;
         
@@ -337,11 +343,14 @@ int galera_load(const char *spec, galera_t **hptr)
 
     ret = (*dlfun)(hptr);
     
-    if (ret == 0 && !*hptr)
+    if (ret == 0 && !*hptr) {
+	fprintf(stderr, "galera_load(): loader failed\n");
         ret = EACCES;
+    }
     if (ret == 0 && 
         (ret = verify(*hptr, GALERA_INTERFACE_VERSION)) != 0 &&
         (*hptr)->tear_down) {
+	fprintf(stderr, "galera_load(): interface version mismatch\n");
         (*hptr)->tear_down(*hptr);
     }
     if (ret == 0)
