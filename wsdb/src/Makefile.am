@@ -52,11 +52,11 @@ libwsdb_la_CPPFLAGS = $(CPPFLAGS)
 # </libwsdb>
 
 # <libgalera>
-include_HEADERS += galera.h
+include_HEADERS +=
 lib_LTLIBRARIES += libgalera.la
 libgalera_la_SOURCES = \
-	galera.c       \
-	galera.h
+	galera.c       
+
 
 #GALERA_RELEASE =
 #if ENABLE_RELEASE

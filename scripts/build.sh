@@ -20,8 +20,8 @@ have_ccache="false"
 #
 #fi
 
-initial_stage="galerautils"
-last_stage="galera"
+initial_stage="galera"
+last_stage="wsdb"
 gainroot=""
 
 usage()
@@ -147,13 +147,24 @@ building="false"
 
 if test $initial_stage = "scratch"
 then
-    rm -rf
+# Commented out, not sure where this does its tricks (teemu)
+#    rm -rf
     if test $have_ccache = "true"
     then
 	ccache -C
     fi
     building="true"
 fi
+
+if test $initial_stage = "galera" || $building = "true"
+then
+    build $galera_src $conf_flags $galera_flags
+    building="true"
+fi
+
+build_flags $galera_src
+
+echo "CPPFLAGS: $CPPFLAGS"
 
 if test $initial_stage = "galerautils" || $building = "true"
 then
@@ -195,13 +206,7 @@ fi
 
 build_flags $wsdb_src
 
-if test $initial_stage = "galera" || $building = "true"
-then
-    build $galera_src $conf_flags $galera_flags
-    building="true"
-fi
 
-build_flags $galera_src
 
 if test $building != "true"
 then

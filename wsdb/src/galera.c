@@ -45,8 +45,8 @@ struct galera_info {
 };
 
 /* application's handlers */
-static galera_context_retain_fun ctx_retain_cb      = NULL;
-static galera_context_store_fun  ctx_store_cb       = NULL;
+//static galera_context_retain_fun ctx_retain_cb      = NULL;
+//static galera_context_store_fun  ctx_store_cb       = NULL;
 static galera_bf_execute_fun     bf_execute_cb      = NULL;
 static galera_bf_execute_fun     bf_execute_cb_rbr  = NULL;
 static galera_bf_apply_row_fun   bf_apply_row_cb    = NULL;
@@ -300,6 +300,7 @@ enum galera_status galera_disable() {
     GU_DBUG_RETURN(GALERA_OK);
 }
 
+/*
 enum galera_status galera_set_context_retain_handler(
     galera_context_retain_fun handler
 ) {
@@ -310,9 +311,10 @@ enum galera_status galera_set_context_retain_handler(
 enum galera_status galera_set_context_store_handler(
     galera_context_store_fun handler
 ) {
-    ctx_store_cb = handler;
+       ctx_store_cb = handler;
     return GALERA_OK;
 }
+*/
 
 enum galera_status galera_set_execute_handler(galera_bf_execute_fun handler) {
     bf_execute_cb = handler;
