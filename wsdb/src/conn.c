@@ -120,8 +120,8 @@ static struct conn_info *new_conn_info(
 }
 
 int wsdb_store_set_variable(
-    connid_t conn_id, char *key, uint16_t key_len,
-    char *data, uint16_t data_len
+    connid_t conn_id, char *key, size_t key_len,
+    char *data, size_t data_len
 ) {
     struct conn_info *conn = get_conn_info(conn_id);
     GU_DBUG_ENTER("wsdb_store_set_variable");
@@ -136,7 +136,7 @@ int wsdb_store_set_variable(
 }
 
 int wsdb_store_set_database(
-    connid_t conn_id, char *set_db, uint16_t set_db_len
+    connid_t conn_id, char *set_db, size_t set_db_len
 ) {
     struct conn_info *conn = get_conn_info(conn_id);
     GU_DBUG_ENTER("wsdb_store_set_database");
@@ -148,9 +148,9 @@ int wsdb_store_set_database(
     if (conn->set_default_db) {
         gu_free(conn->set_default_db);
     }
-    conn->set_default_db = (char *) gu_malloc (strlen(set_db) + 1);
-    strcpy(conn->set_default_db, set_db);
-    conn->set_default_db[strlen(set_db)] = '\0';
+    conn->set_default_db = (char *) gu_malloc (set_db_len + 1);
+    memcpy(conn->set_default_db, set_db, set_db_len);
+    conn->set_default_db[set_db_len] = '\0';
 
     GU_DBUG_RETURN(WSDB_OK);
 }
@@ -162,13 +162,14 @@ struct variable_ctx {
 
 static int handle_variable_elem(void *context, char *key, char *data) {
     struct variable_ctx *ctx = (struct variable_ctx *)context;
+    register size_t data_len = strlen(data);
 
-    ctx->ws->conn_queries[ctx->query_count].query_len = strlen(data);
+    ctx->ws->conn_queries[ctx->query_count].query_len = data_len;
     ctx->ws->conn_queries[ctx->query_count].query = (char *) gu_malloc (
-        strlen(data) + 1
+        data_len + 1
     );
-    strcpy(ctx->ws->conn_queries[ctx->query_count].query, data);
-    ctx->ws->conn_queries[ctx->query_count].query[strlen(data)] = '\0';
+    memcpy(ctx->ws->conn_queries[ctx->query_count].query, data, data_len);
+    ctx->ws->conn_queries[ctx->query_count].query[data_len] = '\0';
     ctx->query_count++;
     return 0;
 }
