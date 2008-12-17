@@ -6,7 +6,7 @@
 
 #include "wsdb_priv.h"
 #include "hash.h"
-//#define USE_MEMPOOL
+#define USE_MEMPOOL
 
 struct hash_entry {
     struct hash_entry *next;
@@ -406,6 +406,8 @@ uint32_t wsdb_hash_report(
             entry = entry->next;
         }
     }
+
+    gu_info("hash entries: %d", hash->elem_count);
 
     gu_mutex_unlock(&hash->mutex);
     GU_DBUG_RETURN(mem_usage);
