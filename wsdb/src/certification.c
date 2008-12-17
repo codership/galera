@@ -223,7 +223,9 @@ static int hash_cmp(uint16_t len1, char *key1, uint16_t len2, char *key2) {
 
 int wsdb_cert_init(const char* work_dir, const char* base_name) {
     /* open row level locks hash */
-    key_index = wsdb_hash_open(262144, hash_fun, hash_cmp, true);
+
+    /* tell hash to reuse key_composition as key values */
+    key_index = wsdb_hash_open(262144, hash_fun, hash_cmp, true, true);
     cert_trx_file = version_file_open(
         (work_dir)  ? work_dir  : DEFAULT_WORK_DIR,
         (base_name) ? base_name : DEFAULT_CERT_FILE,
@@ -231,7 +233,7 @@ int wsdb_cert_init(const char* work_dir, const char* base_name) {
     );
 
     /* open table level locks hash */
-    table_index = wsdb_hash_open(1000, hash_fun, hash_cmp, true);
+    table_index = wsdb_hash_open(1000, hash_fun, hash_cmp, true, false);
     
 #ifdef USE_MEMPOOL
     index_pool = mempool_create(
@@ -470,15 +472,16 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     /* mem usage test */
     key_size = *(uint32_t *)ws->key_composition;
 
+#ifdef REMOVED
     //if (key_size > 50000) {
-    if (key_size >= 0) {
+    if (key_size >= 100000) {
         gu_debug("key length: %lu for trx: %llu, not stored in RAM", 
                 key_size, trx_seqno
         );
         gu_free(ws->key_composition);
         ws->key_composition = NULL;
     }
-
+#endif
     /* remember the serialized keys */
     add_active_seqno(trx_seqno, ws->item_count, ws->key_composition);
 
@@ -497,13 +500,14 @@ static int delete_verdict(void *ctx, void *data, void **new_data) {
     }
     if (entry && entry->trx_seqno < (*(trx_seqno_t *)ctx)) {
 #ifdef USE_MEMPOOL
-        int rcode;
+        int rcode = 0;
 #endif
         *new_data= (void *)NULL;
 #ifndef USE_MEMPOOL
-        gu_free(entry);
+        /* cannot free here, key_index references keys until purge time */
+        //gu_free(entry);
 #else
-        rcode = mempool_free(index_pool, entry);
+        //rcode = mempool_free(index_pool, entry);
         if (rcode) {
             gu_error("cert index free failed (delete_verdict): %d", rcode);
         }
@@ -531,14 +535,22 @@ int purge_seqnos_by_scan(trx_seqno_t trx_id) {
     return WSDB_OK;
 }
 
+#include <malloc.h>
 int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
+#ifdef DEBUG_REPORT
     int mem_usage = wsdb_hash_report(key_index);
-    gu_info("PURGE, mem usage for key_idex: %u", mem_usage);
+    struct mallinfo mi;
+
+    gu_info("before PURGE, mem usage for key_idex: %u", mem_usage);
 
     gu_info("active seqno list len: %d, size: %d", 
             trx_info.list_len, trx_info.list_size
     );
 
+    mi = mallinfo();
+    gu_info("arena: %d ordblks: %d uordblks: %d fordblks: %d keepcost: %d  hblks: %d  hblkhd: %d",
+            mi.arena, mi.ordblks, mi.uordblks, mi.fordblks, mi.keepcost, mi.hblks, mi.hblkhd);
+#endif
     switch(choose_purge_method(trx_id)) {
     case PURGE_METHOD_FULL_SCAN:
         purge_seqno_list(trx_id);
@@ -548,7 +560,14 @@ int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
         purge_active_seqnos(trx_id);
         break;
     }
+#ifdef DEBUG_REPORT
+    mem_usage = wsdb_hash_report(key_index);
+    gu_info("after PURGE, mem usage for key_idex: %u", mem_usage);
 
+    gu_info("active seqno list len: %d, size: %d", 
+            trx_info.list_len, trx_info.list_size
+    );
+#endif
     return 0;
 }
 
@@ -561,12 +580,13 @@ static int shutdown_verdict(void *ctx, void *data, void **new_data) {
     /* find among the entries for this key, the one with last seqno */
     if (entry) {
 #ifdef USE_MEMPOOL
-        int rcode;
+        int rcode = 0;
 #endif
 #ifndef USE_MEMPOOL
-        gu_free(entry);
+        /* cannot free here, key_index references keys until purge time */
+        //gu_free(entry);
 #else
-        rcode = mempool_free(index_pool, entry);
+        //rcode = mempool_free(index_pool, entry);
         if (rcode) {
             gu_error("cert index free failed (shutdown_verdict): %d", rcode);
         }

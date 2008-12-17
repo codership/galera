@@ -51,7 +51,7 @@ int wsdb_init(
     gu_conf_set_log_callback(logger);
     
     s_max_table_id = 64000;
-    table_name_hash = wsdb_hash_open(s_max_table_id, hash_fun, hash_cmp, true);
+    table_name_hash = wsdb_hash_open(s_max_table_id, hash_fun, hash_cmp, true, false);
     s_last_table_id = 1;
 
     /* open DB for local state trx */

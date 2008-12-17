@@ -33,7 +33,7 @@ static int hash_cmp_64(uint16_t len1, char *key1, uint16_t len2, char *key2) {
 
 int conn_init(uint16_t limit) {
     conn_limit = (limit) ? limit : CONN_LIMIT;
-    conn_hash  = wsdb_hash_open(conn_limit, hash_fun_64, hash_cmp_64, true);
+    conn_hash  = wsdb_hash_open(conn_limit, hash_fun_64, hash_cmp_64,true,false);
     return 0;
 }
 

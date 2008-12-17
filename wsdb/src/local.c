@@ -183,7 +183,7 @@ int local_open(
     );
 
     trx_limit = (trxs_max) ? trxs_max : TRX_LIMIT;
-    trx_hash  = wsdb_hash_open(trx_limit, hash_fun_64, hash_cmp_64, true);
+    trx_hash  = wsdb_hash_open(trx_limit, hash_fun_64, hash_cmp_64, true,false);
 
     rcode = conn_init(0);
 

@@ -132,7 +132,7 @@ struct file_cache *file_cache_open(
     /* allocate hash array */
     cache->hash = wsdb_hash_open(
         (max_blocks > max_elems) ? max_blocks : max_elems, 
-        hash_fun, hash_cmp, true
+        hash_fun, hash_cmp, true, false
     );
     cache->curr_size  = 0;
     cache->max_size   = (max_blocks > max_elems) ? max_blocks : max_elems;

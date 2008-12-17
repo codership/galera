@@ -23,6 +23,7 @@ struct entry_match {
 struct wsdb_hash {
     char               ident;
     bool               unique;     // is index unique
+    bool               reuse_key;  // use key pointer to application
     gu_mutex_t         mutex;
     uint32_t           array_size; // number of many bucket lists allocated
     uint32_t           elem_count; // number of elements currently in hash
@@ -39,7 +40,8 @@ struct wsdb_hash {
 #define IDENT_wsdb_hash 'h'
 
 struct wsdb_hash *wsdb_hash_open(
-    uint32_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp, bool unique
+    uint32_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp, 
+    bool unique, bool reuse_key
 ) {
     struct wsdb_hash *hash;
     int i;
@@ -52,6 +54,7 @@ struct wsdb_hash *wsdb_hash_open(
     hash->hash_fun   = hash_fun;
     hash->hash_cmp   = hash_cmp;
     hash->unique     = unique;
+    hash->reuse_key  = reuse_key;
 
     /* initialize the mutex */
     gu_mutex_init(&hash->mutex, NULL);
@@ -203,16 +206,20 @@ int wsdb_hash_push(
             *e=*k;
         }
     } else {
-#ifndef USE_MEMPOOL
-        entry->key = (void *) gu_malloc (key_len);
-#else
-        if (key_len <= hash->key_pool_limit) {
-            entry->key = (void *) mempool_alloc(hash->key_pool, key_len);
+        if (hash->reuse_key) {
+            entry->key = key;
         } else {
+#ifndef USE_MEMPOOL
             entry->key = (void *) gu_malloc (key_len);
-        }
+#else
+            if (key_len <= hash->key_pool_limit) {
+                entry->key = (void *) mempool_alloc(hash->key_pool, key_len);
+            } else {
+                entry->key = (void *) gu_malloc (key_len);
+            }
 #endif
-        memcpy(entry->key, key, key_len);
+            memcpy(entry->key, key, key_len);
+        }
     }
     entry->key_len = key_len;
     entry->data    = data;
@@ -406,8 +413,6 @@ uint32_t wsdb_hash_report(
             entry = entry->next;
         }
     }
-
-    gu_info("hash entries: %d", hash->elem_count);
 
     gu_mutex_unlock(&hash->mutex);
     GU_DBUG_RETURN(mem_usage);
