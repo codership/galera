@@ -40,11 +40,6 @@ static galera_status_t dg_init(galera_t *g, const char *gcs_group,
     return GALERA_OK;
 }
 
-static galera_status_t dg_deinit(galera_t *g)
-{
-    DBUG("");
-    return GALERA_OK;
-}
 
 static galera_status_t dg_enable(galera_t *g)
 {
@@ -123,18 +118,6 @@ static galera_status_t dg_cancel_commit(galera_t *g, const trx_id_t trx_id)
     return GALERA_OK;
 }
 
-static galera_status_t dg_withdraw_commit(galera_t *g, const ws_id_t seqno)
-{
-    DBUG("");
-    return GALERA_OK;
-}
-
-static galera_status_t dg_withdraw_commit_by_trx(galera_t *g, const trx_id_t victim_trx)
-{
-    DBUG("");
-    return GALERA_OK;
-}
-
 static galera_status_t dg_committed(galera_t *g, const trx_id_t trx_id)
 {
     DBUG("");
@@ -206,7 +189,6 @@ static galera_status_t dg_to_execute_end(galera_t *g,
 static galera_t dg_init_str = {
     GALERA_INTERFACE_VERSION,
     &dg_init,
-    &dg_deinit,
     &dg_enable,
     &dg_disable,
     &dg_recv,
@@ -220,8 +202,6 @@ static galera_t dg_init_str = {
     &dg_commit,
     &dg_replay_trx,
     &dg_cancel_commit,
-    &dg_withdraw_commit,
-    &dg_withdraw_commit_by_trx,
     &dg_committed,
     &dg_rolledback,
     &dg_append_query,

@@ -128,8 +128,6 @@ typedef int (*galera_bf_apply_row_fun)(void *ctx, void *data, size_t len);
 
 
 
-
-
 /*!
  * @brief sets the configuration parameter callback
  *
@@ -383,9 +381,8 @@ enum galera_status galera_to_execute_start(
 );
 enum galera_status galera_to_execute_end(conn_id_t conn_id);
 
-
-
-
+#undef GALERA_INTERFACE_VERSION
+#define GALERA_INTERFACE_VERSION "1:0:0"
 
 /*
  * Galera interface for dynamically loadable libraries
@@ -398,7 +395,6 @@ struct galera_ {
                             const char *gcs_address, 
                             const char *data_dir,
                             galera_log_cb_t logger);
-    galera_status_t (*deinit)(galera_t *);
     
     galera_status_t (*enable)(galera_t *);
     galera_status_t (*disable)(galera_t *);
@@ -434,8 +430,6 @@ struct galera_ {
     galera_status_t (*replay_trx)(galera_t *, const trx_id_t trx_id, void *app_ctx);    
     galera_status_t (*cancel_commit)(galera_t *, const trx_id_t);
 
-    galera_status_t (*withdraw_commit)(galera_t *, const ws_id_t);
-    galera_status_t (*withdraw_commit_by_trx)(galera_t *, const trx_id_t victim_trx);
     
     galera_status_t (*committed)(galera_t *, const trx_id_t);
     galera_status_t (*rolledback)(galera_t *, const trx_id_t);

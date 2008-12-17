@@ -8,9 +8,13 @@
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
+#include <limits.h>
+#include <unistd.h>
 
 static galera_t *galera_ctx = NULL;
 static int dummy_mode = 0;
+
+#define GALERA_INTERFACE_VERSION "1:0:0"
 
 enum galera_status galera_init(const char *gcs_group, 
                                const char *gcs_address, 
@@ -121,9 +125,10 @@ enum galera_status galera_disable()
 
 enum galera_status galera_recv(void *ctx)
 {
-    if (dummy_mode)
+    if (dummy_mode) {
+	sleep(LONG_MAX);
 	return GALERA_OK;
-    
+    }
     assert(galera_ctx);
     return galera_ctx->recv(galera_ctx, ctx);
 }
@@ -157,24 +162,6 @@ enum galera_status galera_cancel_commit(trx_id_t victim_trx)
     return galera_ctx->cancel_commit(galera_ctx, victim_trx);
 }
 
-
-enum galera_status galera_withdraw_commit(uint64_t seqno)
-{
-    if (dummy_mode)
-	return GALERA_OK;
-    
-    assert(galera_ctx);
-    return galera_ctx->withdraw_commit(galera_ctx, seqno);
-}
-
-enum galera_status galera_withdraw_commit_by_trx(trx_id_t victim_trx)
-{
-    if (dummy_mode)
-	return GALERA_OK;
-    
-    assert(galera_ctx);
-    return galera_ctx->withdraw_commit(galera_ctx, victim_trx);
-}
 
 enum galera_status galera_committed(trx_id_t trx_id)
 {
@@ -277,7 +264,6 @@ static int verify(const galera_t *gh, const char *iface_ver)
     VERIFY(gh->version);
     VERIFY(strcmp(gh->version, iface_ver) == 0);
     VERIFY(gh->init);
-    VERIFY(gh->deinit);
     VERIFY(gh->enable);
     VERIFY(gh->disable);
     VERIFY(gh->recv);
@@ -291,8 +277,6 @@ static int verify(const galera_t *gh, const char *iface_ver)
     VERIFY(gh->commit);
     VERIFY(gh->replay_trx);
     VERIFY(gh->cancel_commit);
-    VERIFY(gh->withdraw_commit);
-    VERIFY(gh->withdraw_commit_by_trx);
     VERIFY(gh->committed);
     VERIFY(gh->rolledback);
     VERIFY(gh->append_query);
