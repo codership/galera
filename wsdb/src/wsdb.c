@@ -261,15 +261,16 @@ struct wsdb_table_key *inflate_key(
 }
 
 uint32_t get_table_id(char *dbtable) {
+    size_t dbtable_len = strlen (dbtable);
     uint32_t id = (uint32_t) (size_t) wsdb_hash_search (
-        table_name_hash, strlen(dbtable), dbtable
+        table_name_hash, dbtable_len, dbtable
     );
 
     if (!id) {
         // alex: @fixme: what about overflow?
         id = s_last_table_id++;
         if (wsdb_hash_push(
-            table_name_hash, strlen(dbtable), dbtable, (void*)(size_t) id
+            table_name_hash, dbtable_len, dbtable, (void*)(size_t) id
         )) {
             return WSDB_ERROR;
         }

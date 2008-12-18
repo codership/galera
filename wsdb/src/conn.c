@@ -206,12 +206,11 @@ int conn_build_connection_queries(
 
     /* copy the USE command */
     if (conn->set_default_db) {
-        ws->conn_queries[0].query_len = strlen(conn->set_default_db);
-        ws->conn_queries[0].query = (char *) gu_malloc (
-            strlen(conn->set_default_db) + 1
-        );
-        ws->conn_queries[0].query[strlen(conn->set_default_db)] = '\0';
-        strcpy(ws->conn_queries[0].query, conn->set_default_db);
+        size_t default_db_len = strlen(conn->set_default_db);
+        ws->conn_queries[0].query_len = default_db_len;
+        ws->conn_queries[0].query = (char *) gu_malloc (default_db_len + 1);
+        memcpy(ws->conn_queries[0].query, conn->set_default_db, default_db_len);
+        ws->conn_queries[0].query[default_db_len] = '\0';
         ctx.query_count = 1;
     } else {
         ctx.query_count = 0;
