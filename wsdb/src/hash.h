@@ -74,6 +74,8 @@ void *wsdb_hash_delete(struct wsdb_hash *hash, uint16_t key_len, char *key);
 
 /*!
  * @brief pushes an element in the hash
+ *  Returns error code, if push is tried for duplicate entry in unique
+ *  hash.
  * @param hash the hash index
  * @param key_len length of the key value
  * @param key key value
@@ -81,6 +83,19 @@ void *wsdb_hash_delete(struct wsdb_hash *hash, uint16_t key_len, char *key);
  * @return WSDB_OK, WSDB_ERR_HASH_DUPLICATE 
  */
 int wsdb_hash_push(
+    struct wsdb_hash *hash, uint16_t key_len, char *key, void *data
+);
+/*!
+ * @brief pushes or replaces an element in the hash
+ *    If duplicate element is found replaces the old entry with
+ *    new key and data
+ * @param hash the hash index
+ * @param key_len length of the key value
+ * @param key key value
+ * @param data data for the element
+ * @return WSDB_OK, WSDB_ERR_HASH_DUPLICATE 
+ */
+int wsdb_hash_push_replace(
     struct wsdb_hash *hash, uint16_t key_len, char *key, void *data
 );
 /*!
