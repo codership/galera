@@ -268,9 +268,11 @@ int wsdb_conn_get_info(
     GU_DBUG_PRINT("wsdb",("get seqno for conn: %lld : %lu", 
         conn_id, conn->info.seqno
     ));
+/*
     info->id    = conn->info.id;
     info->seqno = conn->info.seqno;
     info->state = conn->info.state;
-
+*/
+    *info = conn->info;
     return WSDB_OK;
 }
