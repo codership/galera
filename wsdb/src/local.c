@@ -106,7 +106,7 @@ void wsdb_deref_seqno (trx_seqno_t last_seen)
     if (next_to_discard_refs && next_to_discard_seqno >= last_seen) {
         // we're waiting until to_discard_seqno becomes unreferenced
         // this trx refernced it, decrement reference counter
-        assert (to_discard_seqno);
+        assert (next_to_discard_seqno);
         next_to_discard_refs--;
         if (!next_to_discard_refs) {
             // no more local refrences to seqnos <= next_to_discard_seqno,
