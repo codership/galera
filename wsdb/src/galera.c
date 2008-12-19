@@ -1108,7 +1108,6 @@ enum galera_status galera_committed(trx_id_t trx_id) {
         if (!mark_commit_early) {
             wsdb_set_local_trx_committed(trx_id);
         }
-        if (do_report) report_last_committed(gcs_conn);
 
         wsdb_delete_local_trx_info(trx_id);
     } else if (trx.state != WSDB_TRX_MISSING) {
