@@ -51,7 +51,7 @@ int wsdb_init(
     gu_conf_set_log_callback(logger);
     
     s_max_table_id = 64000;
-    table_name_hash = wsdb_hash_open(s_max_table_id, hash_fun, hash_cmp, true);
+    table_name_hash = wsdb_hash_open(s_max_table_id, hash_fun, hash_cmp, true, false);
     s_last_table_id = 1;
 
     /* open DB for local state trx */
@@ -261,15 +261,16 @@ struct wsdb_table_key *inflate_key(
 }
 
 uint32_t get_table_id(char *dbtable) {
+    size_t dbtable_len = strlen (dbtable);
     uint32_t id = (uint32_t) (size_t) wsdb_hash_search (
-        table_name_hash, strlen(dbtable), dbtable
+        table_name_hash, dbtable_len, dbtable
     );
 
     if (!id) {
         // alex: @fixme: what about overflow?
         id = s_last_table_id++;
         if (wsdb_hash_push(
-            table_name_hash, strlen(dbtable), dbtable, (void*)(size_t) id
+            table_name_hash, dbtable_len, dbtable, (void*)(size_t) id
         )) {
             return WSDB_ERROR;
         }

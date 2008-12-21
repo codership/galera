@@ -9,7 +9,7 @@
 #include "wsdb_priv.h"
 #include "hash.h"
 #include "version_file.h"
-//#define USE_MEMPOOL
+#define USE_MEMPOOL
 
 /* index for table row level keys */
 static struct wsdb_hash *key_index;
@@ -49,20 +49,19 @@ struct {
     uint32_t list_size;
 } trx_info;
 
-static void add_active_seqno(
+static struct seqno_list *add_active_seqno(
     trx_seqno_t seqno, uint32_t keys_count, char *keys
 ) {
-#ifndef USE_MEMPOOL
     struct seqno_list *seqno_elem = 
-          (struct seqno_list *)gu_malloc(sizeof(struct seqno_list));
-#else
-    struct seqno_list *seqno_elem = 
+#ifdef USE_MEMPOOL
       (struct seqno_list *)mempool_alloc(index_pool, sizeof(struct seqno_list));
+#else
+      (struct seqno_list *)gu_malloc(sizeof(struct seqno_list));
 #endif
-    seqno_elem->seqno = seqno;
+    seqno_elem->seqno     = seqno;
     seqno_elem->key_count = keys_count;
-    seqno_elem->keys = keys;
-    seqno_elem->next = NULL;
+    seqno_elem->keys      = keys;
+    seqno_elem->next      = NULL;
     if (trx_info.last_active_seqno) {
         trx_info.last_active_seqno->next = seqno_elem;
     } else {
@@ -72,13 +71,15 @@ static void add_active_seqno(
     trx_info.list_len++;
     trx_info.list_size += sizeof(struct seqno_list);
     if (keys) trx_info.list_size += *(uint32_t *)keys;
+
+    return seqno_elem;
 }
 
 static void purge_active_seqnos(trx_seqno_t up_to) {
     struct seqno_list *trx = trx_info.active_seqnos;
     while (trx && trx->seqno < up_to) {
 #ifdef USE_MEMPOOL
-        int rcode;
+        int rcode = 0;
 #endif
         struct seqno_list *next_trx = trx->next;
         char *keys = trx->keys;
@@ -97,25 +98,25 @@ static void purge_active_seqnos(trx_seqno_t up_to) {
                 uint16_t key_len = (*(uint16_t *)keys);
                 keys += 2;
   
-                struct index_rec *match = (struct index_rec *)wsdb_hash_search(
+                struct seqno_list *match = (struct seqno_list*)wsdb_hash_search(
                     key_index, key_len, keys
                 );
 
                 if (!match) {
-                    gu_warn("cert index was not found during purging");
-                    gu_warn("seqno: %llu, key: %d, len: %d, key_count: %d",
+                    gu_debug("cert index was not found during purging");
+                    gu_debug("seqno: %llu, key: %d, len: %d, key_count: %d",
                          trx->seqno, key_idx, key_len, trx->key_count
                     );
                     /* verify the match is not used by newer seqno */
-                } else if (match->trx_seqno <= trx->seqno) {
+                } else if (match->seqno <= trx->seqno) {
                     /* sanity check */
-                    if (match->trx_seqno < trx->seqno) {
+                    if (match->seqno < trx->seqno) {
                         gu_error(
                             "dangling cert index entry: %llu - %llu, key: %d",
-                            match->trx_seqno, trx->seqno, key_idx
+                            match->seqno, trx->seqno, key_idx
                         );
                     }
-                    match = (struct index_rec *)wsdb_hash_delete(
+                    match = (struct seqno_list *)wsdb_hash_delete(
                         key_index, key_len, keys
                     );
                     if (!match) {
@@ -126,9 +127,10 @@ static void purge_active_seqnos(trx_seqno_t up_to) {
                         );
                     } else {
 #ifndef USE_MEMPOOL
-                        gu_free(match);
+                        /* cannot free here, key is in key_composition */
+                        //gu_free(match);
 #else
-                        rcode = mempool_free(index_pool, match);
+                        //rcode = mempool_free(index_pool, match);
                         if (rcode) {
                             gu_error("cert index free failed: %d", rcode);
                         }
@@ -223,7 +225,9 @@ static int hash_cmp(uint16_t len1, char *key1, uint16_t len2, char *key2) {
 
 int wsdb_cert_init(const char* work_dir, const char* base_name) {
     /* open row level locks hash */
-    key_index = wsdb_hash_open(262144, hash_fun, hash_cmp, true);
+
+    /* tell hash to reuse key_composition as key values */
+    key_index = wsdb_hash_open(262144, hash_fun, hash_cmp, true, true);
     cert_trx_file = version_file_open(
         (work_dir)  ? work_dir  : DEFAULT_WORK_DIR,
         (base_name) ? base_name : DEFAULT_CERT_FILE,
@@ -231,14 +235,14 @@ int wsdb_cert_init(const char* work_dir, const char* base_name) {
     );
 
     /* open table level locks hash */
-    table_index = wsdb_hash_open(1000, hash_fun, hash_cmp, true);
+    table_index = wsdb_hash_open(1000, hash_fun, hash_cmp, true, false);
     
 #ifdef USE_MEMPOOL
     index_pool = mempool_create(
         (sizeof(struct index_rec) > sizeof(struct seqno_list)) ?
          sizeof(struct index_rec) : sizeof(struct seqno_list),
         32000,
-        MEMPOOL_NON_STICKY, false, "cert index"
+        MEMPOOL_DYNAMIC, false, "cert index"
     );
 #endif
     return WSDB_OK;
@@ -261,7 +265,7 @@ int wsdb_certification_test(
     /* certification test */
     for (i = 0; i < ws->item_count; i++) {
         struct wsdb_item_rec *item = &ws->items[i];
-        struct index_rec *match;
+        struct seqno_list *match;
 
         uint16_t full_key_len;
         char * full_key;
@@ -271,15 +275,15 @@ int wsdb_certification_test(
         full_key = all_keys;
 
          /* check first against table level locks */
-        match = (struct index_rec *) wsdb_hash_search (
+        match = (struct seqno_list *) wsdb_hash_search (
             table_index, item->key->dbtable_len, item->key->dbtable
         );
-        if (match && match->trx_seqno > ws->last_seen_trx && 
-                match->trx_seqno < trx_seqno
+        if (match && match->seqno > ws->last_seen_trx && 
+                match->seqno < trx_seqno
         ) {
             GU_DBUG_PRINT("wsdb",
                 ("trx: %llu conflicting table lock: %llu",
-		    (unsigned long long)trx_seqno, match->trx_seqno)
+		    (unsigned long long)trx_seqno, match->seqno)
             );
 
             /* key composition is not needed anymore */
@@ -290,16 +294,16 @@ int wsdb_certification_test(
         }
 
         /* continue with row level lock checks */
-        match = (struct index_rec *)wsdb_hash_search(
+        match = (struct seqno_list *)wsdb_hash_search(
             key_index, full_key_len, full_key
         );
         all_keys += full_key_len;
 
-        if (match && match->trx_seqno > ws->last_seen_trx && 
-                match->trx_seqno < trx_seqno
+        if (match && match->seqno > ws->last_seen_trx && 
+                match->seqno < trx_seqno
         ) {
             GU_DBUG_PRINT("wsdb",
-                   ("trx: %llu conflicting: %llu", trx_seqno, match->trx_seqno)
+                   ("trx: %llu conflicting: %llu", trx_seqno, match->seqno)
             );
             /* key composition is not needed anymore */
             gu_free(ws->key_composition);
@@ -312,7 +316,7 @@ int wsdb_certification_test(
 }
 
 static int update_index(
-    struct wsdb_write_set *ws, trx_seqno_t trx_seqno
+    struct wsdb_write_set *ws, struct seqno_list *seqno_elem
 ) {
     uint32_t i;
     char *all_keys        = ws->key_composition;
@@ -320,42 +324,21 @@ static int update_index(
     all_keys += 4;
 
     for (i = 0; i < ws->item_count; i++) {
-        struct index_rec *match, *new_trx = NULL;
-        
+        int rcode;
         uint16_t key_len = (*(uint16_t *)all_keys);
         all_keys += 2;
         
-        match = (struct index_rec *)wsdb_hash_search(
-            key_index, key_len, all_keys
+
+        /* push or replace, if duplicate was found */
+        rcode = wsdb_hash_push_replace(
+           key_index, key_len, all_keys, (void *)seqno_elem
         );
 
-        if (!match) {
-            int rcode;
-#ifndef USE_MEMPOOL
-            new_trx=(struct index_rec *) gu_malloc (sizeof(struct index_rec));
-#else
-            new_trx = (struct index_rec *) mempool_alloc(
-                index_pool, sizeof(struct index_rec)
-            );
-#endif
-            if (!new_trx) {
-                gu_error("cert index rec malloc failed: %d", errno);
-                return WSDB_OUT_OF_MEM;
-            }
-            new_trx->trx_seqno = trx_seqno;
-            rcode = wsdb_hash_push(
-                key_index, key_len, all_keys, (void *)new_trx
-            );
-            if (rcode) {
-                gu_error("cert index push failed: %d", rcode);
-                return WSDB_CERT_UPDATE_FAIL;
-            }
-
-        } else {
-          //gu_info("cert index re-used for: %llu, key: %d, old seqno: %llu", 
-          //          trx_seqno, i, match->trx_seqno);
-            match->trx_seqno = trx_seqno;
+        if (rcode) {
+            gu_error("cert index push failed: %d, key: %d", rcode, key_len);
+            return WSDB_CERT_UPDATE_FAIL;
         }
+
         all_keys += key_len;
     }
     return WSDB_OK;
@@ -444,7 +427,9 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     my_bool *persistency = (my_bool *)wsdb_conf_get_param(
         WSDB_CONF_WS_PERSISTENCY, WSDB_TYPE_INT
     );
-    uint32_t key_size;
+    //uint32_t key_size;
+    struct seqno_list *seqno_elem = NULL;
+
     /* certification test */
     rcode = wsdb_certification_test(ws, trx_seqno); 
     if (rcode) {
@@ -459,28 +444,34 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
         write_to_file(ws, trx_seqno);
     }
 
+    /* add trx in the active trx list */
+    seqno_elem = 
+      add_active_seqno(trx_seqno, ws->item_count, ws->key_composition);
+
     /* update index */
-    rcode = update_index(ws, trx_seqno); 
+    rcode = update_index(ws, seqno_elem); 
     if (rcode) {
-        gu_debug("certified WS failed to update in certification index");
+        gu_warn("certified WS failed to update cert index, rcode: %d trx: %lld",
+                rcode, trx_seqno);
         gu_free(ws->key_composition);
         ws->key_composition = NULL;
         return rcode;
     }
-
+#ifdef REMOVED
     /* mem usage test */
     key_size = *(uint32_t *)ws->key_composition;
 
-    if (key_size > 50000) {
-        gu_info("key length: %lu for trx: %llu, not stored in RAM", 
+    //if (key_size > 50000) {
+    if (key_size >= 100000) {
+        gu_debug("key length: %lu for trx: %lld, not stored in RAM", 
                 key_size, trx_seqno
         );
         gu_free(ws->key_composition);
         ws->key_composition = NULL;
     }
-
+#endif
     /* remember the serialized keys */
-    add_active_seqno(trx_seqno, ws->item_count, ws->key_composition);
+    //add_active_seqno(trx_seqno, ws->item_count, ws->key_composition);
 
     return WSDB_OK;
 }
@@ -490,17 +481,21 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
  * @return 1 if purging is ok, otherwise 0
  */
 static int delete_verdict(void *ctx, void *data, void **new_data) {
-    struct index_rec *entry = (struct index_rec *)data;
+    struct seqno_list *entry = (struct seqno_list *)data;
 
-    if (entry && entry->trx_seqno < (*(trx_seqno_t *)ctx)) {
+    if (!entry) {
+        gu_warn("hash delete_verdict has null entry pointer");
+    }
+    if (entry && entry->seqno < (*(trx_seqno_t *)ctx)) {
 #ifdef USE_MEMPOOL
-        int rcode;
+        int rcode = 0;
 #endif
         *new_data= (void *)NULL;
 #ifndef USE_MEMPOOL
-        gu_free(entry);
+        /* cannot free here, key_index references keys until purge time */
+        //gu_free(entry);
 #else
-        rcode = mempool_free(index_pool, entry);
+        //rcode = mempool_free(index_pool, entry);
         if (rcode) {
             gu_error("cert index free failed (delete_verdict): %d", rcode);
         }
@@ -528,7 +523,22 @@ int purge_seqnos_by_scan(trx_seqno_t trx_id) {
     return WSDB_OK;
 }
 
+#include <malloc.h>
 int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
+#ifdef DEBUG_REPORT
+    int mem_usage = wsdb_hash_report(key_index);
+    struct mallinfo mi;
+
+    gu_info("before PURGE, mem usage for key_idex: %u", mem_usage);
+
+    gu_info("active seqno list len: %d, size: %d", 
+            trx_info.list_len, trx_info.list_size
+    );
+
+    mi = mallinfo();
+    gu_info("arena: %d ordblks: %d uordblks: %d fordblks: %d keepcost: %d  hblks: %d  hblkhd: %d",
+            mi.arena, mi.ordblks, mi.uordblks, mi.fordblks, mi.keepcost, mi.hblks, mi.hblkhd);
+#endif
     switch(choose_purge_method(trx_id)) {
     case PURGE_METHOD_FULL_SCAN:
         purge_seqno_list(trx_id);
@@ -538,7 +548,14 @@ int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
         purge_active_seqnos(trx_id);
         break;
     }
+#ifdef DEBUG_REPORT
+    mem_usage = wsdb_hash_report(key_index);
+    gu_info("after PURGE, mem usage for key_idex: %u", mem_usage);
 
+    gu_info("active seqno list len: %d, size: %d", 
+            trx_info.list_len, trx_info.list_size
+    );
+#endif
     return 0;
 }
 
@@ -546,17 +563,18 @@ int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
  * @brief: free all entries
  */
 static int shutdown_verdict(void *ctx, void *data, void **new_data) {
-    struct index_rec *entry = (struct index_rec *)data;
+    struct seqno_list *entry = (struct seqno_list *)data;
 
     /* find among the entries for this key, the one with last seqno */
     if (entry) {
 #ifdef USE_MEMPOOL
-        int rcode;
+        int rcode = 0;
 #endif
 #ifndef USE_MEMPOOL
-        gu_free(entry);
+        /* cannot free here, key_index references keys until purge time */
+        //gu_free(entry);
 #else
-        rcode = mempool_free(index_pool, entry);
+        //rcode = mempool_free(index_pool, entry);
         if (rcode) {
             gu_error("cert index free failed (shutdown_verdict): %d", rcode);
         }

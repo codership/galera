@@ -33,7 +33,7 @@ static int hash_cmp_64(uint16_t len1, char *key1, uint16_t len2, char *key2) {
 
 int conn_init(uint16_t limit) {
     conn_limit = (limit) ? limit : CONN_LIMIT;
-    conn_hash  = wsdb_hash_open(conn_limit, hash_fun_64, hash_cmp_64, true);
+    conn_hash  = wsdb_hash_open(conn_limit, hash_fun_64, hash_cmp_64,true,false);
     return 0;
 }
 
@@ -120,8 +120,8 @@ static struct conn_info *new_conn_info(
 }
 
 int wsdb_store_set_variable(
-    connid_t conn_id, char *key, uint16_t key_len,
-    char *data, uint16_t data_len
+    connid_t conn_id, char *key, size_t key_len,
+    char *data, size_t data_len
 ) {
     struct conn_info *conn = get_conn_info(conn_id);
     GU_DBUG_ENTER("wsdb_store_set_variable");
@@ -136,7 +136,7 @@ int wsdb_store_set_variable(
 }
 
 int wsdb_store_set_database(
-    connid_t conn_id, char *set_db, uint16_t set_db_len
+    connid_t conn_id, char *set_db, size_t set_db_len
 ) {
     struct conn_info *conn = get_conn_info(conn_id);
     GU_DBUG_ENTER("wsdb_store_set_database");
@@ -148,9 +148,9 @@ int wsdb_store_set_database(
     if (conn->set_default_db) {
         gu_free(conn->set_default_db);
     }
-    conn->set_default_db = (char *) gu_malloc (strlen(set_db) + 1);
-    strcpy(conn->set_default_db, set_db);
-    conn->set_default_db[strlen(set_db)] = '\0';
+    conn->set_default_db = (char *) gu_malloc (set_db_len + 1);
+    memcpy(conn->set_default_db, set_db, set_db_len);
+    conn->set_default_db[set_db_len] = '\0';
 
     GU_DBUG_RETURN(WSDB_OK);
 }
@@ -162,13 +162,14 @@ struct variable_ctx {
 
 static int handle_variable_elem(void *context, char *key, char *data) {
     struct variable_ctx *ctx = (struct variable_ctx *)context;
+    register size_t data_len = strlen(data);
 
-    ctx->ws->conn_queries[ctx->query_count].query_len = strlen(data);
+    ctx->ws->conn_queries[ctx->query_count].query_len = data_len;
     ctx->ws->conn_queries[ctx->query_count].query = (char *) gu_malloc (
-        strlen(data) + 1
+        data_len + 1
     );
-    strcpy(ctx->ws->conn_queries[ctx->query_count].query, data);
-    ctx->ws->conn_queries[ctx->query_count].query[strlen(data)] = '\0';
+    memcpy(ctx->ws->conn_queries[ctx->query_count].query, data, data_len);
+    ctx->ws->conn_queries[ctx->query_count].query[data_len] = '\0';
     ctx->query_count++;
     return 0;
 }
@@ -205,12 +206,11 @@ int conn_build_connection_queries(
 
     /* copy the USE command */
     if (conn->set_default_db) {
-        ws->conn_queries[0].query_len = strlen(conn->set_default_db);
-        ws->conn_queries[0].query = (char *) gu_malloc (
-            strlen(conn->set_default_db) + 1
-        );
-        ws->conn_queries[0].query[strlen(conn->set_default_db)] = '\0';
-        strcpy(ws->conn_queries[0].query, conn->set_default_db);
+        size_t default_db_len = strlen(conn->set_default_db);
+        ws->conn_queries[0].query_len = default_db_len;
+        ws->conn_queries[0].query = (char *) gu_malloc (default_db_len + 1);
+        memcpy(ws->conn_queries[0].query, conn->set_default_db, default_db_len);
+        ws->conn_queries[0].query[default_db_len] = '\0';
         ctx.query_count = 1;
     } else {
         ctx.query_count = 0;
@@ -268,9 +268,11 @@ int wsdb_conn_get_info(
     GU_DBUG_PRINT("wsdb",("get seqno for conn: %lld : %lu", 
         conn_id, conn->info.seqno
     ));
+/*
     info->id    = conn->info.id;
     info->seqno = conn->info.seqno;
     info->state = conn->info.state;
-
+*/
+    *info = conn->info;
     return WSDB_OK;
 }

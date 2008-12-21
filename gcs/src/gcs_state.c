@@ -105,7 +105,9 @@ gcs_state_msg_write (void* buf, const gcs_state_t* state)
 gcs_state_t*
 gcs_state_msg_read (const void* buf, size_t buf_len)
 {
-    switch (*((uint8_t*)buf)) {
+    unsigned char version = *((uint8_t*)buf);
+
+    switch (version) {
     case 0: {
         STATE_MSG_FIELDS_V0(const,buf);
         const char* inc_addr = name + strlen (name) + 1;
@@ -123,7 +125,7 @@ gcs_state_msg_read (const void* buf, size_t buf_len)
             );
     }
     default:
-        gu_error ("Unrecognized state message v. %u", *(uint8_t*)buf);
+        gu_error ("Unrecognized state message v. %u", version);
         return NULL;
     }
 }

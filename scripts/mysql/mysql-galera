@@ -66,7 +66,7 @@ MYSQL_PORT=${MYSQL_PORT:-3306}
 MYSQL_SOCKET=${MYSQL_SOCKET:-"$MYSQL_DATA_DIR/mysqld.sock"}
 MYSQL_PID=${MYSQL_PID:-"$MYSQL_DATA_DIR/mysqld.pid"}
 # Shutdown wait timeout.
-MYSQL_SHUTDOWN_WAIT=30
+MYSQL_SHUTDOWN_WAIT=60
 #============= Nothing servicable below ================================
 
 # User to run as if started under superuser
@@ -156,7 +156,12 @@ galera_start()
 
     if test -n "$GCS_ADDRESS"
     then
-        GALERA_OPTS=" --galera_driver=${LD_LIBRARY_PATH}/libgalera.so --galera_slave_threads=$SLAVE_THREADS --galera_gcs_address=$GCS_ADDRESS"
+        GALERA_OPTS="$GALERA_OPTS --galera_gcs_address=$GCS_ADDRESS"
+    fi
+
+    if test -n "$SLAVE_THREADS"
+    then
+        GALERA_OPTS="$GALERA_OPTS --galera_slave_threads=$SLAVE_THREADS"
     fi
 
     echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening to port $MYSQL_PORT and socket $MYSQL_SOCKET..."
@@ -261,8 +266,6 @@ VALGRIND=""
 
 # write set level, SQL, RBR or ROW
 WS_LEVEL="RBR"
-
-SLAVE_THREADS=1
 
 DB="test" # use 'test' database if none given
 IGNORE_TABLES=""

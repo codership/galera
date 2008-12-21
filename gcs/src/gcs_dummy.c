@@ -168,13 +168,14 @@ GCS_BACKEND_MSG_SIZE_FN(dummy_msg_size)
 {
     long max_size = backend->conn->msg_max_size;
     if (pkt_size <= max_size) {
-	return pkt_size;
+        return (pkt_size - sizeof(dummy_msg_t));
     }
     else {
 	gu_warn ("Requested packet size: %d, maximum possible packet size: %d",
 		 pkt_size, max_size);
-	return max_size;
+        return (max_size - sizeof(dummy_msg_t));
     }
+
 }
 
 static

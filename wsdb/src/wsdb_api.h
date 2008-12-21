@@ -593,8 +593,8 @@ int wsdb_certification_test (struct wsdb_write_set *ws, trx_seqno_t trx_seqno);
  */
 int wsdb_store_set_variable(
     connid_t conn_id, 
-    char *key,  uint16_t key_len, 
-    char *data, uint16_t data_len
+    char *key,  size_t key_len, 
+    char *data, size_t data_len
 );
 
 /*!
@@ -604,7 +604,7 @@ int wsdb_store_set_variable(
  * @param set_db the set/use default database command
  */
 int wsdb_store_set_database(
-    connid_t conn_id, char *set_db, uint16_t set_db_len
+    connid_t conn_id, char *set_db, size_t set_db_len
 );
 
 /*!

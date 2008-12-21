@@ -6,7 +6,7 @@
 
 #include "wsdb_priv.h"
 #include "hash.h"
-//#define USE_MEMPOOL
+#define USE_MEMPOOL
 
 struct hash_entry {
     struct hash_entry *next;
@@ -23,6 +23,7 @@ struct entry_match {
 struct wsdb_hash {
     char               ident;
     bool               unique;     // is index unique
+    bool               reuse_key;  // use key pointer to application
     gu_mutex_t         mutex;
     uint32_t           array_size; // number of many bucket lists allocated
     uint32_t           elem_count; // number of elements currently in hash
@@ -39,7 +40,8 @@ struct wsdb_hash {
 #define IDENT_wsdb_hash 'h'
 
 struct wsdb_hash *wsdb_hash_open(
-    uint32_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp, bool unique
+    uint32_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp, 
+    bool unique, bool reuse_key
 ) {
     struct wsdb_hash *hash;
     int i;
@@ -52,6 +54,7 @@ struct wsdb_hash *wsdb_hash_open(
     hash->hash_fun   = hash_fun;
     hash->hash_cmp   = hash_cmp;
     hash->unique     = unique;
+    hash->reuse_key  = reuse_key;
 
     /* initialize the mutex */
     gu_mutex_init(&hash->mutex, NULL);
@@ -162,24 +165,15 @@ static void hash_search_entry(
     return;
 }
 
-int wsdb_hash_push(
-    struct wsdb_hash *hash, uint16_t key_len, char *key, void *data
+/* @brief create and push a new entry in the hash
+ *
+ * @param match search match, for position in the bucket list
+ */
+static int hash_push(
+    struct entry_match *match, struct wsdb_hash *hash, 
+    uint16_t key_len, char *key, void *data
 ) {
     struct hash_entry *entry;
-    struct entry_match match;
-
-    CHECK_OBJ(hash, wsdb_hash);
-    
-    gu_mutex_lock(&hash->mutex);
-
-    /* locate the point in bucket lists */
-    hash_search_entry(&match, hash, key_len, key);
-
-    if (hash->unique && match.entry) {
-        /* duplicate found, bail out */
-        gu_mutex_unlock(&hash->mutex);
-        return WSDB_ERR_HASH_DUPLICATE;
-    }
 
     //if (hash->curr_size == hash->max_size) return WSDB_ERROR;
     hash->elem_count++;
@@ -203,32 +197,84 @@ int wsdb_hash_push(
             *e=*k;
         }
     } else {
-#ifndef USE_MEMPOOL
-        entry->key = (void *) gu_malloc (key_len);
-#else
-        if (key_len <= hash->key_pool_limit) {
-            entry->key = (void *) mempool_alloc(hash->key_pool, key_len);
+        if (hash->reuse_key) {
+            entry->key = key;
         } else {
+#ifndef USE_MEMPOOL
             entry->key = (void *) gu_malloc (key_len);
-        }
+#else
+            if (key_len <= hash->key_pool_limit) {
+                entry->key = (void *) mempool_alloc(hash->key_pool, key_len);
+            } else {
+                entry->key = (void *) gu_malloc (key_len);
+            }
 #endif
-        memcpy(entry->key, key, key_len);
+            memcpy(entry->key, key, key_len);
+        }
     }
     entry->key_len = key_len;
     entry->data    = data;
 
-    if (match.prev) {
-        entry->next = match.prev->next;
-        match.prev->next = entry;
-    } else if (match.entry) {
-        entry->next = match.entry;
-        hash->elems[match.idx] = entry;
+    if (match->prev) {
+        entry->next = match->prev->next;
+        match->prev->next = entry;
+    } else if (match->entry) {
+        entry->next = match->entry;
+        hash->elems[match->idx] = entry;
     } else {
-        entry->next = hash->elems[match.idx];
-        hash->elems[match.idx] = entry;
+        entry->next = hash->elems[match->idx];
+        hash->elems[match->idx] = entry;
     }
     gu_mutex_unlock(&hash->mutex);
     return WSDB_OK;
+}
+
+int wsdb_hash_push(
+    struct wsdb_hash *hash, uint16_t key_len, char *key, void *data
+) {
+    struct entry_match match;
+
+    CHECK_OBJ(hash, wsdb_hash);
+    
+    gu_mutex_lock(&hash->mutex);
+
+    /* locate the point in bucket lists */
+    hash_search_entry(&match, hash, key_len, key);
+
+    /* check for duplicate */
+    if (match.entry && hash->unique) {
+        gu_mutex_unlock(&hash->mutex);
+        return WSDB_ERR_HASH_DUPLICATE;
+    }
+
+    /* keep mutex, hash_push will unlock */
+    return hash_push(&match, hash, key_len, key, data);
+}
+
+int wsdb_hash_push_replace(
+    struct wsdb_hash *hash, uint16_t key_len, char *key, void *data
+) {
+    struct entry_match match;
+
+    CHECK_OBJ(hash, wsdb_hash);
+    
+    gu_mutex_lock(&hash->mutex);
+
+    /* locate the point in bucket lists */
+    hash_search_entry(&match, hash, key_len, key);
+
+    /* check for duplicate */
+    if (match.entry) {
+        match.entry->key     = key;
+        match.entry->key_len = key_len;
+        match.entry->data    = data;
+
+        gu_mutex_unlock(&hash->mutex);
+        return WSDB_OK;
+    }
+
+    /* usual push, keep mutex */
+    return hash_push(&match, hash, key_len, key, data);
 }
 
 void *wsdb_hash_search(struct wsdb_hash *hash, uint16_t key_len, char key[]) {
@@ -260,9 +306,9 @@ void *wsdb_hash_delete(struct wsdb_hash *hash, uint16_t key_len, char key[]) {
         } else {
             hash->elems[match.idx] = match.entry->next;
         }
-        if (key_len > 4) {
+        if (key_len > 4 && !hash->reuse_key) {
 #ifndef USE_MEMPOOL
-          gu_free(match.entry->key);
+            gu_free(match.entry->key);
 #else
             if (key_len <= hash->key_pool_limit) {
                 rcode = mempool_free(hash->key_pool, match.entry->key);

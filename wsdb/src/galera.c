@@ -521,14 +521,14 @@ static inline bool report_check_counter ()
     return (++report_counter > report_interval && !(report_counter = 0));
 }
 
-// this shoudl be run after commit_queue is released
+// this should be run after commit_queue is released
 static inline void report_last_committed (
     gcs_conn_t* gcs_conn
 ) {
     gcs_seqno_t seqno = wsdb_get_safe_to_discard_seqno();
     long ret;
 
-    gu_debug("Reporting last committed: %llu", seqno);
+    gu_info ("Reporting last committed: %llu", seqno);
     if ((ret = gcs_set_last_applied(gcs_conn, seqno))) {
         gu_warn ("Failed to report last committed %llu, %d (%s)",
                  seqno, ret, strerror (-ret));
@@ -666,15 +666,14 @@ static void process_conn_write_set(
         }
     }
     
-    do_report = report_check_counter();
-
     /* release total order */
     GALERA_RELEASE_TO_QUEUE (seqno_l);
 
     /* Synchronize with commit resource */
     GALERA_GRAB_COMMIT_QUEUE (seqno_l);
+    do_report = report_check_counter();
     GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
-
+    wsdb_set_global_trx_committed(seqno_g);
     if (do_report) report_last_committed(gcs_conn);
     
     return;
@@ -726,6 +725,8 @@ static int process_query_write_set_applying(
 
     do_report = report_check_counter ();
     GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
+    wsdb_set_global_trx_committed(seqno_g);
+    if (do_report) report_last_committed(gcs_conn);
     return GALERA_OK;
 }
 /*
@@ -735,7 +736,7 @@ static void process_query_write_set(
     struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
     gcs_seqno_t seqno_g, gcs_seqno_t seqno_l
 ) {
-    bool do_report = false;
+//remove    bool do_report = false;
     int rcode;
 
     /* wait for total order */
@@ -753,7 +754,6 @@ static void process_query_write_set(
     /* release total order */
     GALERA_RELEASE_TO_QUEUE (seqno_l);
 
-
     //print_ws(wslog_G, ws, seqno_l);
     gu_debug("remote trx seqno: %llu %llu last_seen_trx: %llu, cert: %d", 
              seqno_l, seqno_g, ws->last_seen_trx, rcode
@@ -767,7 +767,7 @@ static void process_query_write_set(
 
         /* register committed transaction */
         if (rcode == WSDB_OK) {
-            wsdb_set_global_trx_committed(seqno_g);
+//remove            wsdb_set_global_trx_committed(seqno_g);
         } else {
             gu_fatal("could not apply trx: %llu", seqno_g);
             abort();
@@ -791,7 +791,6 @@ static void process_query_write_set(
         break;
     }
 
-    if (do_report) report_last_committed (gcs_conn);
     /* 
      * NOTE: Is it safe to delete global trx? Should there be consensus of 
      * last applied writesets before deleting anything from certification 
@@ -1107,15 +1106,19 @@ enum galera_status mm_galera_committed(galera_t *gh, trx_id_t trx_id) {
     wsdb_get_local_trx_info(trx_id, &trx);
 
     if (trx.state == WSDB_TRX_REPLICATED) {
+
         do_report = report_check_counter ();
+/*
 	if (gcs_to_release(commit_queue, trx.seqno_l)) {
 	    gu_fatal("Could not release commit resource for %lld", trx.seqno_l);
 	    abort();
 	}
-
+*/
+        GALERA_RELEASE_COMMIT_QUEUE(trx.seqno_l);
         if (!mark_commit_early) {
             wsdb_set_local_trx_committed(trx_id);
         }
+
         wsdb_delete_local_trx_info(trx_id);
     } else if (trx.state != WSDB_TRX_MISSING) {
         gu_debug("trx state: %d at galera_committed for: %lld", 
