@@ -187,8 +187,12 @@ bool_t xdr_wsdb_write_set(XDR *xdrs, struct wsdb_write_set *ws) {
 
     if (xdrs->x_op == XDR_DECODE) {
         size_t len = ws->query_count * sizeof(struct wsdb_query);
-        ws->queries = (struct wsdb_query*) gu_malloc (len);
-        memset(ws->queries, '\0', len);
+        if (len) {
+            ws->queries = (struct wsdb_query*) gu_malloc (len);
+            memset(ws->queries, '\0', len);
+        } else {
+            ws->queries = NULL;
+        }
     }
     for (i=0; i<ws->query_count; i++) {
         if (!xdr_wsdb_query(xdrs, &ws->queries[i])) return FALSE;

@@ -1128,13 +1128,13 @@ struct wsdb_write_set *wsdb_get_write_set(
         ws->query_count * sizeof(struct wsdb_query)
     );
     if (!ws->queries) {
-        gu_error("failed to allocate write set queries %d-%d for %llu", 
-                 ws->item_count, ws->query_count, trx_id
-        );
-        GU_DBUG_RETURN(NULL);
+      //gu_error("failed to allocate write set queries %d-%d for %llu", 
+      //           ws->item_count, ws->query_count, trx_id
+      //  );
+      //GU_DBUG_RETURN(NULL);
+    } else {
+        memset(ws->queries, '\0', ws->query_count * sizeof(struct wsdb_query));
     }
-    memset(ws->queries, '\0', ws->query_count * sizeof(struct wsdb_query));
-
     /* allocate queries and items */
     if (get_write_set_do(ws, trx, WS_OPER_CREATE)) {
         gu_error("write set extracting failed at allocate phase");
