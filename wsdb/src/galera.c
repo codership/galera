@@ -168,6 +168,10 @@ enum galera_status galera_set_conf_param_cb(
     ) ?
       *(my_bool *)wsdb_conf_get_param(GALERA_CONF_MARK_COMMIT_EARLY, GALERA_TYPE_INT) : 0;
 
+    /* set debug logging on, if requested by app */
+    if ( *(my_bool *)configurator(GALERA_CONF_DEBUG, GALERA_TYPE_INT)) {
+        gu_conf_debug_on();
+    }
 
     GU_DBUG_RETURN(GALERA_OK);
 }

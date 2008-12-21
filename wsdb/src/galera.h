@@ -28,9 +28,10 @@ enum galera_status {
 
 /* configuration parameters */
 enum galera_conf_param_id {
-    GALERA_CONF_LOCAL_CACHE_SIZE, //!< max size for local cache
-    GALERA_CONF_WS_PERSISTENCY,   //!< WS persistency policy
+    GALERA_CONF_LOCAL_CACHE_SIZE,  //!< max size for local cache
+    GALERA_CONF_WS_PERSISTENCY,    //!< WS persistency policy
     GALERA_CONF_MARK_COMMIT_EARLY, //!< update last seen trx asap
+    GALERA_CONF_DEBUG,             //!< enable debug level logging
 };
 
 enum galera_conf_param_type {
