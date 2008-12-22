@@ -56,7 +56,7 @@ static galera_status_t dg_disable(galera_t *g)
 static galera_status_t dg_recv(galera_t *g, void *ctx)
 {
     DBUG("");
-    sleep(LONG_MAX);
+    sleep(UINT_MAX);
     return GALERA_OK;
 }
 

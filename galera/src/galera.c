@@ -126,7 +126,7 @@ enum galera_status galera_disable()
 enum galera_status galera_recv(void *ctx)
 {
     if (dummy_mode) {
-	sleep(LONG_MAX);
+        sleep(UINT_MAX);
 	return GALERA_OK;
     }
     assert(galera_ctx);

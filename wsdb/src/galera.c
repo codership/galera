@@ -1213,7 +1213,7 @@ static int check_certification_status_for_aborted(
 enum galera_status
 mm_galera_commit(
     galera_t *gh,
-    trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, uint rbr_data_len
+    trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, size_t rbr_data_len
     )
 {
 
