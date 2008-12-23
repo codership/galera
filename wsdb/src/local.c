@@ -744,7 +744,7 @@ void wsdb_write_set_free(struct wsdb_write_set *ws) {
     for (i=0; i<ws->query_count; i++) {
         free_wsdb_query(&ws->queries[i]);
     }
-    gu_free(ws->queries);
+    if (ws->queries) gu_free(ws->queries);
     for (i=0; i<ws->conn_query_count; i++) {
         free_wsdb_query(&ws->conn_queries[i]);
     }
@@ -752,7 +752,7 @@ void wsdb_write_set_free(struct wsdb_write_set *ws) {
     for (i=0; i<ws->item_count; i++) {
         free_wsdb_item_rec(&ws->items[i]);
     }
-    gu_free(ws->items);
+    if (ws->items) gu_free(ws->items);
 
     if (ws->rbr_buf_len)
          gu_free(ws->rbr_buf);

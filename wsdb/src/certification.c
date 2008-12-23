@@ -433,7 +433,7 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     /* certification test */
     rcode = wsdb_certification_test(ws, trx_seqno); 
     if (rcode) {
-        gu_free(ws->key_composition);
+        if (ws->key_composition) gu_free(ws->key_composition);
         ws->key_composition = NULL;
         return rcode;
     }
@@ -524,6 +524,7 @@ int purge_seqnos_by_scan(trx_seqno_t trx_id) {
 }
 
 #include <malloc.h>
+//#define DEBUG_REPORT
 int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
 #ifdef DEBUG_REPORT
     int mem_usage = wsdb_hash_report(key_index);
