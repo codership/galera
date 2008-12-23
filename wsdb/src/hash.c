@@ -279,14 +279,16 @@ int wsdb_hash_push_replace(
 
 void *wsdb_hash_search(struct wsdb_hash *hash, uint16_t key_len, char key[]) {
     struct entry_match match;
+    void *ret_value = NULL;
+
     gu_mutex_lock(&hash->mutex);
     hash_search_entry(&match, hash, key_len, key);
-    gu_mutex_unlock(&hash->mutex);
     if (match.entry) {
-        return match.entry->data;
-    } else {
-        return NULL;
+        ret_value =  match.entry->data;
     }
+    gu_mutex_unlock(&hash->mutex);
+
+    return ret_value;
 }
 
 void *wsdb_hash_delete(struct wsdb_hash *hash, uint16_t key_len, char key[]) {
@@ -374,6 +376,7 @@ int wsdb_hash_delete_range(
                     if (entry->key_len <= hash->key_pool_limit) {
                         rcode = mempool_free(hash->key_pool, entry->key);
                         if (rcode) {
+                            gu_mutex_unlock(&hash->mutex);
                             gu_error("hash key free failed: %d", rcode);
                             return WSDB_FATAL;
                         }
@@ -391,6 +394,7 @@ int wsdb_hash_delete_range(
 #else
                     rcode = mempool_free(hash->entry_pool, entry);
                     if (rcode) {
+                        gu_mutex_unlock(&hash->mutex);
                         gu_error("hash entry free failed: %d", rcode);
                         return WSDB_FATAL;
                     }

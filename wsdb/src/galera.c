@@ -169,6 +169,11 @@ static enum galera_status mm_galera_set_conf_param_cb(
     ) ?
       *(my_bool *)wsdb_conf_get_param(GALERA_CONF_MARK_COMMIT_EARLY, GALERA_TYPE_INT) : 0;
 
+    /* set debug logging on, if requested by app */
+    gu_info("debug: %d",  *(my_bool *)configurator(GALERA_CONF_DEBUG, GALERA_TYPE_INT));
+    if ( *(my_bool *)configurator(GALERA_CONF_DEBUG, GALERA_TYPE_INT)) {
+        gu_conf_debug_on();
+    }
 
     GU_DBUG_RETURN(GALERA_OK);
 }
@@ -689,7 +694,7 @@ static int process_query_write_set_applying(
     int  is_retry   = 0;
     int  retries    = 0;
 
-#define MAX_RETRIES 3
+#define MAX_RETRIES 0 // loop for ever
  retry:
 
     /* synchronize with other appliers */
@@ -698,10 +703,11 @@ static int process_query_write_set_applying(
     job_queue_start_job(applier_queue, applier, (void *)&ctx);
 
     while((rcode = apply_write_set(app_ctx, ws))) {
-        gu_warn("ws apply failed for: %llu, last_seen: %llu", 
-                seqno_g, ws->last_seen_trx
-        );
-        if (retries++ == MAX_RETRIES) break;
+        if (retries == 0) 
+          gu_warn("ws apply failed for: %llu, last_seen: %llu", 
+                  seqno_g, ws->last_seen_trx
+          );
+        if (++retries == MAX_RETRIES) break;
     }
     if (retries == MAX_RETRIES) {
         gu_warn("ws applying is not possible");

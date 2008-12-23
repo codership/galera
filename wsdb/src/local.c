@@ -744,7 +744,7 @@ void wsdb_write_set_free(struct wsdb_write_set *ws) {
     for (i=0; i<ws->query_count; i++) {
         free_wsdb_query(&ws->queries[i]);
     }
-    gu_free(ws->queries);
+    if (ws->queries) gu_free(ws->queries);
     for (i=0; i<ws->conn_query_count; i++) {
         free_wsdb_query(&ws->conn_queries[i]);
     }
@@ -752,7 +752,7 @@ void wsdb_write_set_free(struct wsdb_write_set *ws) {
     for (i=0; i<ws->item_count; i++) {
         free_wsdb_item_rec(&ws->items[i]);
     }
-    gu_free(ws->items);
+    if (ws->items) gu_free(ws->items);
 
     if (ws->rbr_buf_len)
          gu_free(ws->rbr_buf);
@@ -1128,13 +1128,13 @@ struct wsdb_write_set *wsdb_get_write_set(
         ws->query_count * sizeof(struct wsdb_query)
     );
     if (!ws->queries) {
-        gu_error("failed to allocate write set queries %d-%d for %llu", 
-                 ws->item_count, ws->query_count, trx_id
-        );
-        GU_DBUG_RETURN(NULL);
+      //gu_error("failed to allocate write set queries %d-%d for %llu", 
+      //           ws->item_count, ws->query_count, trx_id
+      //  );
+      //GU_DBUG_RETURN(NULL);
+    } else {
+        memset(ws->queries, '\0', ws->query_count * sizeof(struct wsdb_query));
     }
-    memset(ws->queries, '\0', ws->query_count * sizeof(struct wsdb_query));
-
     /* allocate queries and items */
     if (get_write_set_do(ws, trx, WS_OPER_CREATE)) {
         gu_error("write set extracting failed at allocate phase");
