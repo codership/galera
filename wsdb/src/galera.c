@@ -699,7 +699,7 @@ static int process_query_write_set_applying(
           );
         if (++retries == MAX_RETRIES) break;
     }
-    if (retries == MAX_RETRIES) {
+    if (retries > 0 && retries == MAX_RETRIES) {
         gu_warn("ws applying is not possible");
         return GALERA_TRX_FAIL;
     }
@@ -1507,7 +1507,40 @@ enum galera_status galera_set_variable(
     char *key,   uint16_t key_len, 
     char *query, uint16_t query_len
 ) {
+    char var[256];
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
+
+    /*
+     * an ugly way to provide dynamic way to change galera_debug parameter.
+     *
+     * we catch here galera_debug variable change, and alter debugging state
+     * correspondingly.
+     *
+     * Note that galera-set_variable() is called for every SET command in 
+     * session. We should avoid calling this for all variables in RBR session 
+     * and for many un-meaningful variables in SQL session. When these 
+     * optimisations are made, galera_debug changing should be implemented
+     * in some other way. We should have separate calls for storing session
+     * variables for connections and for setting galera configuration variables.
+     *
+     */
+    if (!strncmp(key, "galera_debug", key_len)) {
+        char value[256];
+        memset(value, '\0', 256);
+        gu_debug("GALERA set value: %s" , value);
+        strncpy(value, query, query_len);
+        
+        if (!strncmp(query, "ON", query_len) || 
+            !strncmp(query, "1", query_len)  
+        ) {
+            gu_conf_debug_on();
+        } else {
+            gu_conf_debug_off();
+        }
+    }
+    strncpy(var, key, key_len);
+
+    gu_debug("GALERA set var: %s" , var);
 
     errno = 0;
     switch(wsdb_store_set_variable(conn_id, key, key_len, query, query_len)) {
@@ -1515,6 +1548,8 @@ enum galera_status galera_set_variable(
     case WSDB_ERR_TRX_UNKNOWN: return GALERA_TRX_FAIL;
     default:                   return GALERA_CONN_FAIL;
     }
+
+
     return GALERA_OK;
 }
 
