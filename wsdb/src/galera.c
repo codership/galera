@@ -169,7 +169,6 @@ enum galera_status galera_set_conf_param_cb(
       *(my_bool *)wsdb_conf_get_param(GALERA_CONF_MARK_COMMIT_EARLY, GALERA_TYPE_INT) : 0;
 
     /* set debug logging on, if requested by app */
-    gu_info("debug: %d",  *(my_bool *)configurator(GALERA_CONF_DEBUG, GALERA_TYPE_INT));
     if ( *(my_bool *)configurator(GALERA_CONF_DEBUG, GALERA_TYPE_INT)) {
         gu_conf_debug_on();
     }
@@ -1529,12 +1528,13 @@ enum galera_status galera_set_variable(
         memset(value, '\0', 256);
         gu_debug("GALERA set value: %s" , value);
         strncpy(value, query, query_len);
-        
-        if (!strncmp(query, "ON", query_len) || 
-            !strncmp(query, "1", query_len)  
-        ) {
+        const char *set_query= "galera_debug=ON";
+
+        if (strstr(value, set_query)) {
+            gu_info("GALERA enabling debug logging: %s" , value);
             gu_conf_debug_on();
         } else {
+            gu_info("GALERA disabling debug logging: %s" , value);
             gu_conf_debug_off();
         }
     }
