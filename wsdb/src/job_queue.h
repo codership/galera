@@ -6,7 +6,9 @@
 #include "galerautils.h"
 #include "wsdb_api.h"
 
-#define MAX_JOBS 8
+/* absolute maximum for workers */
+#define MAX_WORKERS 8
+
 
 /*!
  * Job queue abstraction
@@ -36,11 +38,18 @@
  *
  * Worker ends a job by job_queue_end_job() call. This will signal
  * all workers, which are conflicting with the ending job to continue.
+ *
+ * Job queue has a configuration for maximum concurrent job limit.
+ * Queue will guarantee that at any given time this limit is not exceeded.
+ * The concurrent job limit controls just number of active workers
+ * (workers executing a job). There can be more registered (but idle) 
+ * workers in the queue.
  */
 
 /*
  * @brief checks if two jobs can run in parallel
- * Functions is passed two job context pointers.
+ *
+ * Function is passed two job context pointers.
  * The function is supposed to tell, if the first
  * job can run together with the second job.
  *
@@ -50,6 +59,38 @@
  */
 typedef int (*job_queue_conflict_fun)(void *, void *);
 
+/*
+ * WHY job_que_cmp_fun?
+ *
+ * Current parallel applying suffers from uneven lock granularity between
+ * wsdb write sets and innodb applying. innodb needs sometimes larger lock set
+ * than what is present in write set, and this results in BF deadloacking 
+ * problems, that are hard to deal with.
+ * So we can currently process only with one applying slave thread. However,
+ * trx replaying model, requires local connection to run as BF applying worker
+ * for replaying trx. In this mode, there will be two appliers running 
+ * concurrenly and lock granularity issue can harm even one slave thread
+ * configuration.
+ * Two cope with this, we need to make sure that there is only one applying
+ * thread active at any given time. We modified job_queue to control the
+ * number of active appliers, and letting waiting appliers to enter in the
+ * correct total order. job_queue_cmp_fun is used for letting the application
+ * to tell which is the next job to start executing.
+ * 
+ */
+
+/*
+ * @brief compares the execution order of two jobs
+ * Functions is passed two job context pointers.
+ * The function is supposed to tell, if the first
+ * job should run before the second job
+ *
+ * @param ctx1 context for job 1, this is tested 
+ * @param ctx2 context for job 2, wich is already running
+ * @return -1, 0, 1 
+ */
+typedef int (*job_queue_cmp_fun)(void *, void *);
+
 struct job_id {
     ushort    job_id;
 };
@@ -57,7 +98,8 @@ struct job_id {
 enum job_state {
     JOB_VOID,
     JOB_RUNNING,
-    JOB_IDLE
+    JOB_IDLE,
+    JOB_WAITING,
 };
 
 
@@ -65,23 +107,25 @@ enum job_state {
  * @struct job queue
  */
 struct job_worker {
-    char ident;
-    ushort id;                  //!< array index in job queue
-    enum job_state state;     //!< current state
-    void *ctx;                //!< context pointer to application structure
-    ushort waiters[MAX_JOBS]; //!< jobs waiting for this to complete
-    gu_cond_t cond;           //!< used together with queue mutex
+    char           ident;
+    ushort         id;                  //!< array index in job queue
+    enum job_state state;               //!< current state
+    void           *ctx;                //!< context pointer to application
+    ushort         waiters[MAX_WORKERS];//!< jobs waiting for this to complete
+    gu_cond_t      cond;                //!< used together with queue mutex
 };
 
 #define IDENT_job_worker 'j'
 
 struct job_queue {
     char                   ident;
-    ushort                 max_workers;
-    ushort                 active_workers;
-    struct job_worker      jobs[MAX_JOBS];
+    ushort                 max_concurrent_workers; //!< limit for active workers
+    ushort                 registered_workers;     //!< # of workers in total
+    ushort                 active_workers;         //!< # of running jobs
+    struct job_worker      jobs[MAX_WORKERS];      //!< all workers
     gu_mutex_t             mutex;
-    job_queue_conflict_fun conflict_test;
+    job_queue_conflict_fun conflict_test;          //!< test for parallel job
+    job_queue_cmp_fun      job_cmp_order;          //!< test for best job order
 };
 
 #define IDENT_job_queue 'J'
@@ -93,7 +137,8 @@ struct job_queue {
  * @param max_elems estimated max number of elems
  * @return pointer to the cache
  */
-struct job_queue *job_queue_create(ushort max_workers, job_queue_conflict_fun);
+struct job_queue *job_queue_create(
+    ushort max_workers, job_queue_conflict_fun, job_queue_cmp_fun);
 
 /*
  * @brief @fixme: 

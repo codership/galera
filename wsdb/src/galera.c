@@ -141,6 +141,18 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
     }
     return 0;
 }
+/*
+ * @brief compare seqno order of two applying jobs
+ */
+static int ws_cmp_order(void *ctx1, void *ctx2) {
+    struct job_context *job1 = (struct job_context *)ctx1;
+    struct job_context *job2 = (struct job_context *)ctx2;
+
+    if (job1->seqno < job2->seqno) return -1;
+    if (job1->seqno > job2->seqno) return 1;
+    return 0;
+}
+
 static void *galera_configurator (
     enum wsdb_conf_param_id id, enum wsdb_conf_param_type type
 ) {
@@ -221,7 +233,7 @@ enum galera_status galera_init(const char*          group,
     gu_mutex_init(&commit_mtx, NULL);
 
     /* create worker queue */
-    applier_queue = job_queue_create(8, ws_conflict_check);
+    applier_queue = job_queue_create(8, ws_conflict_check, ws_cmp_order);
 
     /* debug level printing to /tmp directory */
     {
@@ -932,7 +944,7 @@ enum galera_status galera_recv(void *app_ctx) {
     if (!applier) {
         gu_error("galera, could not create applier");
         gu_info("active_workers: %d, max_workers: %d",
-                 applier_queue->active_workers,applier_queue->max_workers
+            applier_queue->active_workers, applier_queue->max_concurrent_workers
         );
         return GALERA_NODE_FAIL;
     }
@@ -1534,7 +1546,7 @@ enum galera_status galera_set_variable(
             gu_info("GALERA enabling debug logging: %s" , value);
             gu_conf_debug_on();
         } else {
-            gu_info("GALERA disabling debug logging: %s" , value);
+          gu_info("GALERA disabling debug logging: %s %s" , value, set_query);
             gu_conf_debug_off();
         }
     }
@@ -1707,7 +1719,7 @@ enum galera_status galera_replay_trx( trx_id_t trx_id, void *app_ctx) {
     if (!applier) {
         gu_error("galera, could not create applier");
         gu_info("active_workers: %d, max_workers: %d",
-                 applier_queue->active_workers, applier_queue->max_workers
+            applier_queue->active_workers, applier_queue->max_concurrent_workers
         );
         return GALERA_NODE_FAIL;
     }

@@ -6,8 +6,6 @@
 
 #include "job_queue.h"
 
-#define MAX_JOBS 8
-
 static void init_worker(struct job_worker *worker, ushort id, ushort workers) {
     ushort i;
     worker->ident = IDENT_job_worker;
@@ -23,21 +21,25 @@ static void init_worker(struct job_worker *worker, ushort id, ushort workers) {
 }
 
 struct job_queue *job_queue_create(
-    ushort max_workers, job_queue_conflict_fun conflict_test
+     ushort max_workers, job_queue_conflict_fun conflict_test, 
+     job_queue_cmp_fun cmp_order
 ) {
     struct job_queue *queue;
     ushort i;
 
     MAKE_OBJ(queue, job_queue);
 
-    queue->active_workers = 0;
-    queue->max_workers    = max_workers;
-    queue->conflict_test  = conflict_test;
+    queue->active_workers         = 0;
+    queue->registered_workers     = 0;
+    queue->max_concurrent_workers = (max_workers < MAX_WORKERS) ?
+      max_workers :  MAX_WORKERS;
+    queue->conflict_test          = conflict_test;
+    queue->job_cmp_order          = cmp_order;
 
     gu_mutex_init(&queue->mutex, NULL);
 
-    for (i=0; i<max_workers; i++) {
-        init_worker(&(queue->jobs[i]), i, max_workers);
+    for (i=0; i<MAX_WORKERS; i++) {
+        init_worker(&(queue->jobs[i]), i, MAX_WORKERS);
     }
 
     return queue;
@@ -57,12 +59,12 @@ struct job_worker *job_queue_new_worker(struct job_queue *queue) {
     CHECK_OBJ(queue, job_queue);
     gu_mutex_lock(&(queue->mutex));
 
-    if (queue->active_workers == queue->max_workers) {
+    if (queue->registered_workers == MAX_WORKERS) {
         gu_mutex_unlock(&(queue->mutex));
         return NULL;
     }
     
-    while (i<queue->max_workers && !worker) {
+    while (i<MAX_WORKERS && !worker) {
         if (queue->jobs[i].state == JOB_VOID) {
             worker = &(queue->jobs[i]);
         }
@@ -73,7 +75,7 @@ struct job_worker *job_queue_new_worker(struct job_queue *queue) {
         return NULL;
     }
 
-    queue->active_workers++;
+    queue->registered_workers++;
     worker->state = JOB_IDLE;
     gu_mutex_unlock(&(queue->mutex));
 
@@ -88,10 +90,10 @@ void job_queue_remove_worker(
     gu_mutex_lock(&(queue->mutex));
 
     assert(worker->state==JOB_IDLE);
-    assert(worker->id <= queue->active_workers);
+    assert(worker->id <= queue->registered_workers);
 
     worker->state = JOB_VOID;
-    queue->active_workers--;
+    queue->registered_workers--;
     gu_mutex_unlock(&(queue->mutex));
 }
 
@@ -109,8 +111,18 @@ int job_queue_start_job(
 
     gu_mutex_lock(&(queue->mutex));
 
+    /* cannot start, if max concurrent worker count is reached */
+    if (queue->active_workers == queue->max_concurrent_workers) {
+        gu_warn ("job queue full for: %d", worker->id);
+        worker->state = JOB_WAITING;
+        gu_cond_wait(&worker->cond, &queue->mutex);
+        gu_warn ("job queue released for: %d", worker->id);
+    }
+
+    queue->active_workers++;
+
     /* check against all active jobs */
-    for (i=0; i<queue->active_workers; i++) {
+    for (i=0; i<queue->registered_workers; i++) {
         if (queue->jobs[i].state == JOB_RUNNING && 
             queue->jobs[i].id != worker->id
         ) {
@@ -134,21 +146,41 @@ int job_queue_start_job(
 int job_queue_end_job(struct job_queue *queue, struct job_worker *worker
 ) {
     ushort i;
+    int min_job = -1;
     CHECK_OBJ(queue, job_queue);
     CHECK_OBJ(worker, job_worker);
 
     //assert(worker == queue->jobs[worker->id]);
 
     gu_mutex_lock(&queue->mutex);
-    for (i=0; i<queue->active_workers; i++) {
+    /* if some job is depending on me, release it to continue */
+    for (i=0; i<queue->registered_workers; i++) {
         if (queue->jobs[worker->id].waiters[i]) {
-	  gu_warn ("job queue signal for: %d", i);
-          gu_cond_signal(&queue->jobs[i].cond);
+	    gu_warn ("job queue signal for: %d", i);
+            gu_cond_signal(&queue->jobs[i].cond);
         }
     }
     queue->jobs[worker->id].state = JOB_IDLE;
     queue->jobs[worker->id].ctx   = NULL;
-    
+   
+    /* if queue was full, find next in order to get in */
+    for (i=0; i<queue->registered_workers; i++) {
+        if (queue->jobs[i].state == JOB_WAITING) {
+            if (min_job > -1) {
+                if (queue->job_cmp_order(
+                     &queue->jobs[i].ctx, &queue->jobs[min_job].ctx) == -1) {
+                      min_job = i;
+                }
+          }
+        }
+    }
+
+    if (min_job > -1) {
+        gu_warn ("job queue signal for: %d", min_job);
+        gu_cond_signal(&queue->jobs[min_job].cond);
+    }
+
+    queue->active_workers--;
     gu_debug("job: %d complete", worker->id);
     gu_mutex_unlock(&(queue->mutex));
 
