@@ -141,7 +141,8 @@ static void purge_active_seqnos(trx_seqno_t up_to) {
             }
         }
         /* remove active trx holder struct */
-        if (trx->keys) gu_free(trx->keys);
+        if (trx->keys) { gu_free(trx->keys); trx->keys = NULL; }
+
 #ifndef USE_MEMPOOL
         gu_free(trx);
 #else
@@ -177,7 +178,7 @@ static void purge_seqno_list(trx_seqno_t up_to) {
 #endif
         struct seqno_list *next_trx = trx->next;
 
-        if (trx->keys) gu_free(trx->keys);
+        if (trx->keys) { gu_free(trx->keys); trx->keys = NULL; }
 #ifndef USE_MEMPOOL
         gu_free(trx);
 #else
@@ -433,8 +434,10 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     /* certification test */
     rcode = wsdb_certification_test(ws, trx_seqno); 
     if (rcode) {
-        if (ws->key_composition) gu_free(ws->key_composition);
-        ws->key_composition = NULL;
+        if (ws->key_composition) {
+            gu_free(ws->key_composition); 
+            ws->key_composition = NULL;
+        }
         return rcode;
     }
 
