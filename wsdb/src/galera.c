@@ -1017,7 +1017,9 @@ enum galera_status galera_recv(void *app_ctx) {
     return GALERA_OK;
 }
 
-enum galera_status galera_cancel_commit(trx_id_t victim_trx) {
+enum galera_status galera_cancel_commit(
+    uint64_t bf_seqno, trx_id_t victim_trx
+) {
     enum galera_status ret_code = GALERA_OK;
     int rcode;
     wsdb_trx_info_t victim;
@@ -1068,21 +1070,26 @@ enum galera_status galera_cancel_commit(trx_id_t victim_trx) {
         //falling through, we have valid seqno now
 
     default:
-        gu_debug("interrupting trx commit: trx_id %lld seqno %lld", 
-                victim_trx, victim.seqno_l);
-        //rcode = gcs_to_cancel(to_queue, victim_seqno);
-        rcode = gcs_to_interrupt(to_queue, victim.seqno_l);
-        if (rcode) {
-            gu_debug("trx interupt fail in to_queue: %d", rcode);
-            ret_code = GALERA_OK;
-            rcode = gcs_to_interrupt(commit_queue, victim.seqno_l);
-            if (rcode) {
-                gu_warn("trx interrupt fail in commit_queue: %d", rcode);
-                ret_code = GALERA_WARNING;
-            }
-
+        if (victim.seqno_l < bf_seqno) {
+            gu_debug("trying to interrupt earlier trx:  %lld - %lld", 
+                     victim.seqno_l, bf_seqno);
+            ret_code = GALERA_WARNING;
         } else {
-            ret_code = GALERA_OK;
+            gu_debug("interrupting trx commit: trx_id %lld seqno %lld", 
+                     victim_trx, victim.seqno_l);
+
+            rcode = gcs_to_interrupt(to_queue, victim.seqno_l);
+            if (rcode) {
+                gu_debug("trx interupt fail in to_queue: %d", rcode);
+                ret_code = GALERA_OK;
+                rcode = gcs_to_interrupt(commit_queue, victim.seqno_l);
+                if (rcode) {
+                    gu_warn("trx interrupt fail in commit_queue: %d", rcode);
+                    ret_code = GALERA_WARNING;
+                }
+            } else {
+              ret_code = GALERA_OK;
+            }
         }
     }
     gu_mutex_unlock(&commit_mtx);
@@ -1408,12 +1415,12 @@ galera_commit(
         switch (rcode) {
         case 0: break;
         case -ECANCELED:
-	    gu_warn("canceled in commit queue for %llu", seqno_l);
+	    gu_debug("canceled in commit queue for %llu", seqno_l);
             wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTED);
             GU_DBUG_RETURN(GALERA_TRX_FAIL);
             break;
         case -EINTR:
-	    gu_warn("interrupted in commit queue for %llu", seqno_l);
+	    gu_debug("interrupted in commit queue for %llu", seqno_l);
             retcode = GALERA_BF_ABORT;
             wsdb_assign_trx_ws(trx_id, ws);
             wsdb_assign_trx_pos(trx_id, WSDB_TRX_POS_COMMIT_QUEUE);
@@ -1725,7 +1732,11 @@ enum galera_status galera_replay_trx( trx_id_t trx_id, void *app_ctx) {
     }
     gu_debug("applier %d", applier->id );
 
-    //ws_start_cb(app_ctx, trx.seqno_l);
+    /*
+     * tell app, that replaying will start with allocated seqno
+     * when job is done, we will reset the seqno back to 0
+     */
+    ws_start_cb(app_ctx, trx.seqno_l);
 
     if (trx.ws->type == WSDB_WS_TYPE_TRX) {
 
@@ -1759,13 +1770,15 @@ enum galera_status galera_replay_trx( trx_id_t trx_id, void *app_ctx) {
         job_queue_remove_worker(applier_queue, applier);
     } else {
         gu_error("replayed trx ws has bad type: %d", trx.ws->type);
+        ws_start_cb(app_ctx, 0);
         return GALERA_NODE_FAIL;
         job_queue_remove_worker(applier_queue, applier);
     }
     wsdb_assign_trx_state(trx_id, WSDB_TRX_REPLICATED);
     //wsdb_delete_local_trx_info(trx_id);
 
-    //ws_start_cb(app_ctx, 0);
+    ws_start_cb(app_ctx, 0);
+
     wsdb_deref_seqno (trx.ws->last_seen_trx);
     wsdb_write_set_free(trx.ws);
 

@@ -289,6 +289,7 @@ enum galera_status galera_replay_trx(trx_id_t trx_id, void *app_ctx);
  * The kill routine checks that cancel is not tried against a transaction
  * who is front of the caller (in total order).
  *
+ * @param bf_seqno seqno of brute force trx, running this cancel
  * @param victim_trx transaction to be killed, and which is committing
  *
  * @retval GALERA_OK         successful kill operaton
@@ -296,7 +297,7 @@ enum galera_status galera_replay_trx(trx_id_t trx_id, void *app_ctx);
  *
  */
 enum galera_status galera_cancel_commit(
-    trx_id_t victim_trx
+    uint64_t bf_seqno, trx_id_t victim_trx
 );
 
 /*!
