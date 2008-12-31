@@ -142,6 +142,18 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
     }
     return 0;
 }
+/*
+ * @brief compare seqno order of two applying jobs
+ */
+static int ws_cmp_order(void *ctx1, void *ctx2) {
+    struct job_context *job1 = (struct job_context *)ctx1;
+    struct job_context *job2 = (struct job_context *)ctx2;
+
+    if (job1->seqno < job2->seqno) return -1;
+    if (job1->seqno > job2->seqno) return 1;
+    return 0;
+}
+
 static void *galera_configurator (
     enum wsdb_conf_param_id id, enum wsdb_conf_param_type type
 ) {
@@ -154,7 +166,7 @@ static void *galera_configurator (
     }
 }
 
-static enum galera_status mm_galera_set_conf_param_cb(
+enum galera_status mm_galera_set_conf_param_cb(
     galera_t *gh, galera_conf_param_fun configurator
 ) {
     GU_DBUG_ENTER("galera_set_conf_param_cb");
@@ -170,7 +182,6 @@ static enum galera_status mm_galera_set_conf_param_cb(
       *(my_bool *)wsdb_conf_get_param(GALERA_CONF_MARK_COMMIT_EARLY, GALERA_TYPE_INT) : 0;
 
     /* set debug logging on, if requested by app */
-    gu_info("debug: %d",  *(my_bool *)configurator(GALERA_CONF_DEBUG, GALERA_TYPE_INT));
     if ( *(my_bool *)configurator(GALERA_CONF_DEBUG, GALERA_TYPE_INT)) {
         gu_conf_debug_on();
     }
@@ -224,7 +235,7 @@ enum galera_status mm_galera_init(galera_t *gh,
     gu_mutex_init(&commit_mtx, NULL);
 
     /* create worker queue */
-    applier_queue = job_queue_create(8, ws_conflict_check);
+    applier_queue = job_queue_create(8, ws_conflict_check, ws_cmp_order);
 
     /* debug level printing to /tmp directory */
     {
@@ -662,6 +673,7 @@ static void process_conn_write_set(
 
     /* wait for total order */
     GALERA_GRAB_TO_QUEUE (seqno_l);
+    GALERA_GRAB_COMMIT_QUEUE (seqno_l);
 
     if (gu_likely(galera_update_global_seqno(seqno_g))) {
         /* Global seqno ok, certification ok (not needed?) */
@@ -673,11 +685,14 @@ static void process_conn_write_set(
     
     /* release total order */
     GALERA_RELEASE_TO_QUEUE (seqno_l);
-
+    do_report = report_check_counter();
+    GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
+#ifdef REMOVED
     /* Synchronize with commit resource */
     GALERA_GRAB_COMMIT_QUEUE (seqno_l);
     do_report = report_check_counter();
     GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
+#endif
     wsdb_set_global_trx_committed(seqno_g);
     if (do_report) report_last_committed(gcs_conn);
     
@@ -709,23 +724,52 @@ static int process_query_write_set_applying(
           );
         if (++retries == MAX_RETRIES) break;
     }
-    if (retries == MAX_RETRIES) {
+    if (retries > 0 && retries == MAX_RETRIES) {
         gu_warn("ws applying is not possible");
         return GALERA_TRX_FAIL;
     }
 
     job_queue_end_job(applier_queue, applier);
 
+ retry_commit:
     if (is_retry == 0) {
         /* On first try grab commit_queue */
-        GALERA_GRAB_COMMIT_QUEUE (seqno_l);
+
+	/* Grab commit queue for commit time */
+        // can't use it here GALERA_GRAB_COMMIT_QUEUE (seqno_l);
+        rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l);
+
+        switch (rcode) {
+        case 0: break;
+        case -ECANCELED:
+	    gu_debug("BF canceled in commit queue for %llu", seqno_l);
+            // falling through
+        case -EINTR:
+	    gu_debug("BF interrupted in commit queue for %llu", seqno_l);
+
+            if (retries > 0) {
+              retries = 0;
+              goto retry_commit;
+            }
+            rcode = apply_query(app_ctx, "rollback\0", 9);
+            if (rcode) {
+              gu_warn("ws apply rollback failed for: %llu, last_seen: %llu", 
+                      seqno_g, ws->last_seen_trx);
+              //is_retry = 1;
+              goto retry;
+            }
+            break;
+        default:
+	    gu_fatal("Failed to grab BF commit queue for %llu", seqno_l);
+	    abort();
+        }
     }
 
     rcode = apply_query(app_ctx, "commit\0", 7);
     if (rcode) {
         gu_warn("ws apply commit failed for: %llu, last_seen: %llu", 
                 seqno_g, ws->last_seen_trx);
-        is_retry = 1;
+        //is_retry = 1;
         goto retry;
     }
 
@@ -943,7 +987,7 @@ enum galera_status mm_galera_recv(galera_t *gh, void *app_ctx) {
     if (!applier) {
         gu_error("galera, could not create applier");
         gu_info("active_workers: %d, max_workers: %d",
-                 applier_queue->active_workers,applier_queue->max_workers
+            applier_queue->active_workers, applier_queue->max_concurrent_workers
         );
         return GALERA_NODE_FAIL;
     }
@@ -1016,7 +1060,9 @@ enum galera_status mm_galera_recv(galera_t *gh, void *app_ctx) {
     return GALERA_OK;
 }
 
-enum galera_status mm_galera_cancel_commit(galera_t *gh, trx_id_t victim_trx) {
+enum galera_status mm_galera_cancel_commit(galera_t *gh,
+    uint64_t bf_seqno, trx_id_t victim_trx
+) {
     enum galera_status ret_code = GALERA_OK;
     int rcode;
     wsdb_trx_info_t victim;
@@ -1067,21 +1113,62 @@ enum galera_status mm_galera_cancel_commit(galera_t *gh, trx_id_t victim_trx) {
         //falling through, we have valid seqno now
 
     default:
-        gu_debug("interrupting trx commit: trx_id %lld seqno %lld", 
-                victim_trx, victim.seqno_l);
-        //rcode = gcs_to_cancel(to_queue, victim_seqno);
-        rcode = gcs_to_interrupt(to_queue, victim.seqno_l);
-        if (rcode) {
-            gu_debug("trx interupt fail in to_queue: %d", rcode);
-            ret_code = GALERA_OK;
-            rcode = gcs_to_interrupt(commit_queue, victim.seqno_l);
+        if (victim.seqno_l < bf_seqno) {
+            gu_debug("trying to interrupt earlier trx:  %lld - %lld", 
+                     victim.seqno_l, bf_seqno);
+            ret_code = GALERA_WARNING;
+        } else {
+            gu_debug("interrupting trx commit: trx_id %lld seqno %lld", 
+                     victim_trx, victim.seqno_l);
+
+            rcode = gcs_to_interrupt(to_queue, victim.seqno_l);
             if (rcode) {
-                gu_warn("trx interrupt fail in commit_queue: %d", rcode);
+                gu_debug("trx interupt fail in to_queue: %d", rcode);
+                ret_code = GALERA_OK;
+                rcode = gcs_to_interrupt(commit_queue, victim.seqno_l);
+                if (rcode) {
+                    gu_warn("trx interrupt fail in commit_queue: %d", rcode);
+                    ret_code = GALERA_WARNING;
+                }
+            } else {
+              ret_code = GALERA_OK;
+            }
+        }
+    }
+    gu_mutex_unlock(&commit_mtx);
+    
+    return ret_code;
+}
+
+enum galera_status mm_galera_cancel_slave(
+    galera_t *gh, uint64_t bf_seqno, uint64_t victim_seqno
+) {
+    enum galera_status ret_code = GALERA_OK;
+    int rcode;
+
+    if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
+    /* take commit mutex to be sure, committing trx does not
+     * conflict with us
+     */
+    
+    gu_mutex_lock(&commit_mtx);
+
+    if (victim_seqno < bf_seqno) {
+        gu_debug("trying to interrupt earlier trx:  %lld - %lld", 
+                 victim_seqno, bf_seqno);
+        ret_code = GALERA_WARNING;
+    } else {
+        gu_debug("interrupting trx commit: seqno %lld", 
+                 victim_seqno);
+
+        rcode = gcs_to_interrupt(to_queue, victim_seqno);
+        if (rcode) {
+            gu_debug("BF trx interupt fail in to_queue: %d", rcode);
+            rcode = gcs_to_interrupt(commit_queue, victim_seqno);
+            if (rcode) {
+                gu_warn("BF trx interrupt fail in commit_queue: %d", rcode);
                 ret_code = GALERA_WARNING;
             }
-
-        } else {
-            ret_code = GALERA_OK;
         }
     }
     gu_mutex_unlock(&commit_mtx);
@@ -1409,12 +1496,12 @@ mm_galera_commit(
         switch (rcode) {
         case 0: break;
         case -ECANCELED:
-	    gu_warn("canceled in commit queue for %llu", seqno_l);
+	    gu_debug("canceled in commit queue for %llu", seqno_l);
             wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTED);
             GU_DBUG_RETURN(GALERA_TRX_FAIL);
             break;
         case -EINTR:
-	    gu_warn("interrupted in commit queue for %llu", seqno_l);
+	    gu_debug("interrupted in commit queue for %llu", seqno_l);
             retcode = GALERA_BF_ABORT;
             wsdb_assign_trx_ws(trx_id, ws);
             wsdb_assign_trx_pos(trx_id, WSDB_TRX_POS_COMMIT_QUEUE);
@@ -1522,7 +1609,41 @@ enum galera_status mm_galera_set_variable(
     const char *key,  const  size_t key_len, 
     const char *query, const size_t query_len
 ) {
+    char var[256];
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
+
+    /*
+     * an ugly way to provide dynamic way to change galera_debug parameter.
+     *
+     * we catch here galera_debug variable change, and alter debugging state
+     * correspondingly.
+     *
+     * Note that galera-set_variable() is called for every SET command in 
+     * session. We should avoid calling this for all variables in RBR session 
+     * and for many un-meaningful variables in SQL session. When these 
+     * optimisations are made, galera_debug changing should be implemented
+     * in some other way. We should have separate calls for storing session
+     * variables for connections and for setting galera configuration variables.
+     *
+     */
+    if (!strncmp(key, "galera_debug", key_len)) {
+        char value[256];
+        memset(value, '\0', 256);
+        gu_debug("GALERA set value: %s" , value);
+        strncpy(value, query, query_len);
+        const char *set_query= "galera_debug=ON";
+
+        if (strstr(value, set_query)) {
+            gu_info("GALERA enabling debug logging: %s" , value);
+            gu_conf_debug_on();
+        } else {
+          gu_info("GALERA disabling debug logging: %s %s" , value, set_query);
+            gu_conf_debug_off();
+        }
+    }
+    strncpy(var, key, key_len);
+
+    gu_debug("GALERA set var: %s" , var);
 
     errno = 0;
     switch(wsdb_store_set_variable(conn_id, (char*)key, key_len, 
@@ -1531,6 +1652,8 @@ enum galera_status mm_galera_set_variable(
     case WSDB_ERR_TRX_UNKNOWN: return GALERA_TRX_FAIL;
     default:                   return GALERA_CONN_FAIL;
     }
+
+
     return GALERA_OK;
 }
 
@@ -1690,13 +1813,17 @@ enum galera_status mm_galera_replay_trx(galera_t *gh, const trx_id_t trx_id, voi
     if (!applier) {
         gu_error("galera, could not create applier");
         gu_info("active_workers: %d, max_workers: %d",
-                 applier_queue->active_workers, applier_queue->max_workers
+            applier_queue->active_workers, applier_queue->max_concurrent_workers
         );
         return GALERA_NODE_FAIL;
     }
     gu_debug("applier %d", applier->id );
 
-    //ws_start_cb(app_ctx, trx.seqno_l);
+    /*
+     * tell app, that replaying will start with allocated seqno
+     * when job is done, we will reset the seqno back to 0
+     */
+    ws_start_cb(app_ctx, trx.seqno_l);
 
     if (trx.ws->type == WSDB_WS_TYPE_TRX) {
 
@@ -1730,13 +1857,15 @@ enum galera_status mm_galera_replay_trx(galera_t *gh, const trx_id_t trx_id, voi
         job_queue_remove_worker(applier_queue, applier);
     } else {
         gu_error("replayed trx ws has bad type: %d", trx.ws->type);
+        ws_start_cb(app_ctx, 0);
         return GALERA_NODE_FAIL;
         job_queue_remove_worker(applier_queue, applier);
     }
     wsdb_assign_trx_state(trx_id, WSDB_TRX_REPLICATED);
     //wsdb_delete_local_trx_info(trx_id);
 
-    //ws_start_cb(app_ctx, 0);
+    ws_start_cb(app_ctx, 0);
+
     wsdb_deref_seqno (trx.ws->last_seen_trx);
     wsdb_write_set_free(trx.ws);
 
@@ -1761,6 +1890,7 @@ static galera_t mm_galera_str = {
     &mm_galera_commit,
     &mm_galera_replay_trx,
     &mm_galera_cancel_commit,
+    &mm_galera_cancel_slave,
     &mm_galera_committed,
     &mm_galera_rolledback,
     &mm_galera_append_query,

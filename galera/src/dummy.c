@@ -112,7 +112,13 @@ static galera_status_t dg_replay_trx(galera_t *g, const trx_id_t trx_id, void *a
     return GALERA_OK;
 }
 
-static galera_status_t dg_cancel_commit(galera_t *g, const trx_id_t trx_id)
+static galera_status_t dg_cancel_commit(galera_t *g, const trx_id_t trx_id, const uint64_t bf_seqno)
+{
+    DBUG("");
+    return GALERA_OK;
+}
+
+static galera_status_t dg_cancel_slave(galera_t *g, const uint64_t bf_seqno, const uint64_t victim_seqno)
 {
     DBUG("");
     return GALERA_OK;
@@ -202,6 +208,7 @@ static galera_t dg_init_str = {
     &dg_commit,
     &dg_replay_trx,
     &dg_cancel_commit,
+    &dg_cancel_slave,
     &dg_committed,
     &dg_rolledback,
     &dg_append_query,

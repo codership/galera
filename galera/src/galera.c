@@ -153,15 +153,23 @@ enum galera_status galera_replay_trx(trx_id_t trx_id, void *app_ctx)
     return galera_ctx->replay_trx(galera_ctx, trx_id, app_ctx);
 }
 
-enum galera_status galera_cancel_commit(trx_id_t victim_trx)
+enum galera_status galera_cancel_commit(trx_id_t victim_trx, uint64_t bf_seqno)
 {
     if (dummy_mode)
 	return GALERA_OK;
     
     assert(galera_ctx);
-    return galera_ctx->cancel_commit(galera_ctx, victim_trx);
+    return galera_ctx->cancel_commit(galera_ctx, victim_trx, bf_seqno);
 }
 
+
+enum galera_status galera_cancel_slave(uint64_t bf_seqno, uint64_t victim_seqno)
+{
+    if (dummy_mode)
+        return GALERA_OK;
+    assert(galera_ctx);
+    return galera_ctx->cancel_commit(galera_ctx, bf_seqno, victim_seqno);
+}
 
 enum galera_status galera_committed(trx_id_t trx_id)
 {
@@ -358,6 +366,9 @@ int galera_load(const char *spec, galera_t **hptr)
 out:
     if (ret != 0 && dlh)
         dlclose(dlh);
+    if (ret == 0) {
+      fprintf(stderr, "galera_load(): driver loaded succesfully\n");
+    }
     return ret;
 }
 
