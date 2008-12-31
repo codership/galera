@@ -663,6 +663,7 @@ static void process_conn_write_set(
 
     /* wait for total order */
     GALERA_GRAB_TO_QUEUE (seqno_l);
+    GALERA_GRAB_COMMIT_QUEUE (seqno_l);
 
     if (gu_likely(galera_update_global_seqno(seqno_g))) {
         /* Global seqno ok, certification ok (not needed?) */
@@ -674,11 +675,14 @@ static void process_conn_write_set(
     
     /* release total order */
     GALERA_RELEASE_TO_QUEUE (seqno_l);
-
+    do_report = report_check_counter();
+    GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
+#ifdef REMOVED
     /* Synchronize with commit resource */
     GALERA_GRAB_COMMIT_QUEUE (seqno_l);
     do_report = report_check_counter();
     GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
+#endif
     wsdb_set_global_trx_committed(seqno_g);
     if (do_report) report_last_committed(gcs_conn);
     
@@ -717,16 +721,45 @@ static int process_query_write_set_applying(
 
     job_queue_end_job(applier_queue, applier);
 
+ retry_commit:
     if (is_retry == 0) {
         /* On first try grab commit_queue */
-        GALERA_GRAB_COMMIT_QUEUE (seqno_l);
+
+	/* Grab commit queue for commit time */
+        // can't use it here GALERA_GRAB_COMMIT_QUEUE (seqno_l);
+        rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l);
+
+        switch (rcode) {
+        case 0: break;
+        case -ECANCELED:
+	    gu_debug("BF canceled in commit queue for %llu", seqno_l);
+            // falling through
+        case -EINTR:
+	    gu_debug("BF interrupted in commit queue for %llu", seqno_l);
+
+            if (retries > 0) {
+              retries = 0;
+              goto retry_commit;
+            }
+            rcode = apply_query(app_ctx, "rollback\0", 9);
+            if (rcode) {
+              gu_warn("ws apply rollback failed for: %llu, last_seen: %llu", 
+                      seqno_g, ws->last_seen_trx);
+              //is_retry = 1;
+              goto retry;
+            }
+            break;
+        default:
+	    gu_fatal("Failed to grab BF commit queue for %llu", seqno_l);
+	    abort();
+        }
     }
 
     rcode = apply_query(app_ctx, "commit\0", 7);
     if (rcode) {
         gu_warn("ws apply commit failed for: %llu, last_seen: %llu", 
                 seqno_g, ws->last_seen_trx);
-        is_retry = 1;
+        //is_retry = 1;
         goto retry;
     }
 
@@ -1089,6 +1122,42 @@ enum galera_status galera_cancel_commit(
                 }
             } else {
               ret_code = GALERA_OK;
+            }
+        }
+    }
+    gu_mutex_unlock(&commit_mtx);
+    
+    return ret_code;
+}
+
+enum galera_status galera_cancel_slave(
+    uint64_t bf_seqno, uint64_t victim_seqno
+) {
+    enum galera_status ret_code = GALERA_OK;
+    int rcode;
+
+    if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
+    /* take commit mutex to be sure, committing trx does not
+     * conflict with us
+     */
+    
+    gu_mutex_lock(&commit_mtx);
+
+    if (victim_seqno < bf_seqno) {
+        gu_debug("trying to interrupt earlier trx:  %lld - %lld", 
+                 victim_seqno, bf_seqno);
+        ret_code = GALERA_WARNING;
+    } else {
+        gu_debug("interrupting trx commit: seqno %lld", 
+                 victim_seqno);
+
+        rcode = gcs_to_interrupt(to_queue, victim_seqno);
+        if (rcode) {
+            gu_debug("BF trx interupt fail in to_queue: %d", rcode);
+            rcode = gcs_to_interrupt(commit_queue, victim_seqno);
+            if (rcode) {
+                gu_warn("BF trx interrupt fail in commit_queue: %d", rcode);
+                ret_code = GALERA_WARNING;
             }
         }
     }

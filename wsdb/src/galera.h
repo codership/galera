@@ -299,7 +299,9 @@ enum galera_status galera_replay_trx(trx_id_t trx_id, void *app_ctx);
 enum galera_status galera_cancel_commit(
     uint64_t bf_seqno, trx_id_t victim_trx
 );
-
+enum galera_status galera_cancel_slave(
+    uint64_t bf_seqno, uint64_t victim_seqno
+                                       );
 /*!
  * @brief withdraws a previously started commit
  *
