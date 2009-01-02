@@ -153,17 +153,17 @@ enum galera_status galera_replay_trx(trx_id_t trx_id, void *app_ctx)
     return galera_ctx->replay_trx(galera_ctx, trx_id, app_ctx);
 }
 
-enum galera_status galera_cancel_commit(trx_id_t victim_trx, uint64_t bf_seqno)
+enum galera_status galera_cancel_commit(bf_seqno_t bf_seqno, trx_id_t victim_trx)
 {
     if (dummy_mode)
 	return GALERA_OK;
     
     assert(galera_ctx);
-    return galera_ctx->cancel_commit(galera_ctx, victim_trx, bf_seqno);
+    return galera_ctx->cancel_commit(galera_ctx, bf_seqno, victim_trx);
 }
 
 
-enum galera_status galera_cancel_slave(uint64_t bf_seqno, uint64_t victim_seqno)
+enum galera_status galera_cancel_slave(bf_seqno_t bf_seqno, bf_seqno_t victim_seqno)
 {
     if (dummy_mode)
         return GALERA_OK;

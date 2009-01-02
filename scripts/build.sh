@@ -20,8 +20,8 @@ have_ccache="false"
 #
 #fi
 
-initial_stage="galera"
-last_stage="wsdb"
+initial_stage="galerautils"
+last_stage="galera"
 gainroot=""
 
 usage()
@@ -156,13 +156,6 @@ then
     building="true"
 fi
 
-if test $initial_stage = "galera" || $building = "true"
-then
-    build $galera_src $conf_flags $galera_flags
-    building="true"
-fi
-
-build_flags $galera_src
 
 echo "CPPFLAGS: $CPPFLAGS"
 
@@ -206,6 +199,13 @@ fi
 
 build_flags $wsdb_src
 
+if test $initial_stage = "galera" || $building = "true"
+then
+    build $galera_src $conf_flags $galera_flags
+    building="true"
+fi
+
+build_flags $galera_src
 
 
 if test $building != "true"

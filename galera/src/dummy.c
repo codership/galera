@@ -112,13 +112,13 @@ static galera_status_t dg_replay_trx(galera_t *g, const trx_id_t trx_id, void *a
     return GALERA_OK;
 }
 
-static galera_status_t dg_cancel_commit(galera_t *g, const trx_id_t trx_id, const uint64_t bf_seqno)
+static galera_status_t dg_cancel_commit(galera_t *g, const bf_seqno_t bf_seqno, const trx_id_t trx_id)
 {
     DBUG("");
     return GALERA_OK;
 }
 
-static galera_status_t dg_cancel_slave(galera_t *g, const uint64_t bf_seqno, const uint64_t victim_seqno)
+static galera_status_t dg_cancel_slave(galera_t *g, const bf_seqno_t bf_seqno, const bf_seqno_t victim_seqno)
 {
     DBUG("");
     return GALERA_OK;

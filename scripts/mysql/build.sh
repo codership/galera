@@ -147,7 +147,7 @@ cp -P $GALERA_SRC/galeracomm/transport/src/.libs/libgcommtransportpp.so* $GALERA
 cp -P $GALERA_SRC/galeracomm/vs/src/.libs/libgcommvspp.so* $GALERA_LIBS
 cp -P $GALERA_SRC/gcs/src/.libs/libgcs.so* $GALERA_LIBS
 cp -P $GALERA_SRC/wsdb/src/.libs/libwsdb.so* $GALERA_LIBS
-cp -P $GALERA_SRC/wsdb/src/.libs/libgalera.so* $GALERA_LIBS
+cp -P $GALERA_SRC/galera/src/.libs/libmmgalera.so* $GALERA_LIBS
 
 # Install vs backend daemon
 GALERA_SBIN=$GALERA_DIST_DIR/sbin

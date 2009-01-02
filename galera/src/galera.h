@@ -52,6 +52,7 @@ typedef enum galera_action {
 typedef uint64_t ws_id_t;
 typedef uint64_t trx_id_t;
 typedef uint64_t conn_id_t;
+typedef int64_t bf_seqno_t;
 
 /*!
  * @brief callback to return configuration parameter value
@@ -272,10 +273,10 @@ enum galera_status galera_replay_trx(trx_id_t trx_id, void *app_ctx);
  *
  */
 enum galera_status galera_cancel_commit(
-    uint64_t bf_seqno, trx_id_t victim_trx
+    bf_seqno_t bf_seqno, trx_id_t victim_trx
 );
 enum galera_status galera_cancel_slave(
-    uint64_t bf_seqno, uint64_t victim_seqno
+    bf_seqno_t bf_seqno, bf_seqno_t victim_seqno
                                        );
 /*!
  * @brief withdraws a previously started commit
@@ -290,7 +291,7 @@ enum galera_status galera_cancel_slave(
  * @retval GALERA_WARNING    could not kill the victim
  *
  */
-enum galera_status galera_withdraw_commit(uint64_t victim_seqno);
+enum galera_status galera_withdraw_commit(bf_seqno_t victim_seqno);
 enum galera_status galera_withdraw_commit_by_trx(
     trx_id_t victim_trx
 );
@@ -432,8 +433,8 @@ struct galera_ {
     
 
     galera_status_t (*replay_trx)(galera_t *, const trx_id_t trx_id, void *app_ctx);    
-    galera_status_t (*cancel_commit)(galera_t *, const uint64_t bf_seqno, const trx_id_t);
-    galera_status_t (*cancel_slave)(galera_t *, const uint64_t bf_seqno, const uint64_t victim_seqno);
+    galera_status_t (*cancel_commit)(galera_t *, const bf_seqno_t bf_seqno, const trx_id_t);
+    galera_status_t (*cancel_slave)(galera_t *, const bf_seqno_t bf_seqno, const bf_seqno_t victim_seqno);
     
     galera_status_t (*committed)(galera_t *, const trx_id_t);
     galera_status_t (*rolledback)(galera_t *, const trx_id_t);

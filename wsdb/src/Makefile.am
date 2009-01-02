@@ -51,27 +51,6 @@ libwsdb_la_CFLAGS = $(CFLAGS) -fno-strict-aliasing
 libwsdb_la_CPPFLAGS = $(CPPFLAGS)
 # </libwsdb>
 
-# <libgalera>
-include_HEADERS +=
-lib_LTLIBRARIES += libgalera.la
-libgalera_la_SOURCES = \
-	galera.c       
-
-
-#GALERA_RELEASE =
-#if ENABLE_RELEASE
-#GALERA_RELEASE = -Wl,--whole-archive .libs/libwsdb.a -Wl,--no-whole-archive
-#endif
-libgalera_la_DEPENDENCIES = libwsdb.la
-libgalera_la_LIBADD       = libwsdb.la
-GALERA_INTERFACE = 5
-GALERA_REVISION  = 0
-GALERA_AGE       = 0
-libgalera_la_LDFLAGS = \
-	-version-info $(GALERA_INTERFACE):$(GALERA_REVISION):$(GALERA_AGE)
-libgalera_la_CPPFLAGS = $(CPPFLAGS)
-# </libgalera>
-
 #.PHONY: tags dumpwsdb
 .PHONY: tags clean
 tags: TAGS

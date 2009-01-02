@@ -17,7 +17,7 @@ AC_ARG_ENABLE(debug,
 if test "$enable_debug" != "no"
 then
     enable_debug="yes"
-    CFLAGS="-g -O0 "
+    CFLAGS= ${CFLAGS:-" -g -O0 "}
 else
     CFLAGS=${CFLAGS:-" -O2 -g "}
     CFLAGS="$CFLAGS -DNDEBUG "
@@ -63,7 +63,7 @@ AC_CHECK_FUNCS([memset mkdir strerror])
 AC_CONFIG_FILES([Makefile
                  src/Makefile])
 
-CFLAGS="$CFLAGS -std=c99 -Wall -Werror -Wextra -pedantic -Wno-unused-parameter -Wmissing-prototypes"
+CFLAGS="$CFLAGS -Wall -Werror -Wextra -Wno-unused-parameter -Wmissing-prototypes"
 AC_OUTPUT
 AC_MSG_NOTICE([dbug enabled: $enable_dbug])
 AC_MSG_NOTICE(CFLAGS:   $CFLAGS)

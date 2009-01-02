@@ -155,9 +155,9 @@ galera_start()
         RBR_OPTS=""
     fi
 
-    if test -f $GALERA_BASE_DIR/lib/libgalera.so
+    if test -f $GALERA_BASE_DIR/lib/libmmgalera.so
     then
-	GALERA_OPTS="$GALERA_OPTS --galera_driver=$GALERA_BASE_DIR/lib/libgalera.so"
+	GALERA_OPTS="$GALERA_OPTS --galera_driver=$GALERA_BASE_DIR/lib/libmmgalera.so"
     fi
 
     if test -n "$GCS_ADDRESS"
