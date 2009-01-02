@@ -715,7 +715,7 @@ static int process_query_write_set_applying(
     int  is_retry   = 0;
     int  retries    = 0;
 
-#define MAX_RETRIES 0 // loop for ever
+#define MAX_RETRIES 10 // retry 10 times
  retry:
 
     /* synchronize with other appliers */
@@ -728,6 +728,12 @@ static int process_query_write_set_applying(
           gu_warn("ws apply failed for: %llu, last_seen: %llu", 
                   seqno_g, ws->last_seen_trx
           );
+
+        rcode = apply_query(app_ctx, "rollback\0", 9);
+        if (rcode) {
+            gu_warn("ws apply rollback failed for: %llu, last_seen: %llu", 
+                    seqno_g, ws->last_seen_trx);
+        }
         if (++retries == MAX_RETRIES) break;
     }
     if (retries > 0 && retries == MAX_RETRIES) {
