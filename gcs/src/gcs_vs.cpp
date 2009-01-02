@@ -10,6 +10,7 @@ extern "C" {
 #include "gcs_comp_msg.h"
 }
 
+#include <limits>
 
 struct vs_ev {
     ReadBuf *rb;
@@ -273,7 +274,7 @@ static void *conn_run(void *arg)
 {
     conn_t *conn = reinterpret_cast<conn_t*>(arg);
     while (true) {
-	int err = conn->vs_ctx.po->poll(INT_MAX);
+	int err = conn->vs_ctx.po->poll(std::numeric_limits<int>::max());
 	if (err < 0)
 	    abort();
     }

@@ -94,7 +94,7 @@ galerautils_src=$build_base/galerautils
 galeracomm_src=$build_base/galeracomm
 gcs_src=$build_base/gcs
 wsdb_src=$build_base/wsdb
-galera_src=$build_base/wsdb
+galera_src=$build_base/galera
 #mysql_src=$build_base/../../5.1/trunk
 
 # Flags for configure scripts
@@ -147,13 +147,17 @@ building="false"
 
 if test $initial_stage = "scratch"
 then
-    rm -rf
+# Commented out, not sure where this does its tricks (teemu)
+#    rm -rf
     if test $have_ccache = "true"
     then
 	ccache -C
     fi
     building="true"
 fi
+
+
+echo "CPPFLAGS: $CPPFLAGS"
 
 if test $initial_stage = "galerautils" || $building = "true"
 then
@@ -195,13 +199,14 @@ fi
 
 build_flags $wsdb_src
 
-#if test $initial_stage = "galera" || $building = "true"
-#then
-#    build $galera_src $conf_flags $galera_flags
-#    building="true"
-#fi
-#
-#build_flags $galera_src
+if test $initial_stage = "galera" || $building = "true"
+then
+    build $galera_src $conf_flags $galera_flags
+    building="true"
+fi
+
+build_flags $galera_src
+
 
 if test $building != "true"
 then

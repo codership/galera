@@ -1,5 +1,6 @@
 
 #include "transport_tipc.hpp"
+#include "transport_common.hpp"
 
 #include <linux/tipc.h>
 #include <arpa/inet.h>
@@ -181,13 +182,13 @@ void TIPCTransport::close()
     
     if (poll)
 	poll->erase(tsfd);
-    while (::close(tsfd) == -1 && errno == EINTR);
+    closefd(fd);
     tsfd = -1;
 
     if (fd != -1) {
 	if (poll)
 	    poll->erase(fd);
-	while (::close(fd) == -1 && errno == EINTR);
+        closefd(fd);
 	fd = -1;
     }
 

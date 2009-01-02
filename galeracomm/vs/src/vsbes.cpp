@@ -351,7 +351,7 @@ int VSServer::run()
     int err;
     terminate = false;
     while ((err = tp_poll->poll(1000)) >= 0 && terminate == false) {
-	while ((err = fifo_poll->poll(0)) > 0);
+	while ((err = fifo_poll->poll(0)) > 0) {}
 	if (err < 0 ) {
 	    terminate = true;
 	    break;

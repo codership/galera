@@ -28,10 +28,9 @@ enum galera_status {
 
 /* configuration parameters */
 enum galera_conf_param_id {
-    GALERA_CONF_LOCAL_CACHE_SIZE,  //!< max size for local cache
-    GALERA_CONF_WS_PERSISTENCY,    //!< WS persistency policy
+    GALERA_CONF_LOCAL_CACHE_SIZE, //!< max size for local cache
+    GALERA_CONF_WS_PERSISTENCY,   //!< WS persistency policy
     GALERA_CONF_MARK_COMMIT_EARLY, //!< update last seen trx asap
-    GALERA_CONF_DEBUG,             //!< enable debug level logging
 };
 
 enum galera_conf_param_type {
@@ -289,7 +288,6 @@ enum galera_status galera_replay_trx(trx_id_t trx_id, void *app_ctx);
  * The kill routine checks that cancel is not tried against a transaction
  * who is front of the caller (in total order).
  *
- * @param bf_seqno seqno of brute force trx, running this cancel
  * @param victim_trx transaction to be killed, and which is committing
  *
  * @retval GALERA_OK         successful kill operaton
@@ -297,11 +295,9 @@ enum galera_status galera_replay_trx(trx_id_t trx_id, void *app_ctx);
  *
  */
 enum galera_status galera_cancel_commit(
-    uint64_t bf_seqno, trx_id_t victim_trx
+    trx_id_t victim_trx
 );
-enum galera_status galera_cancel_slave(
-    uint64_t bf_seqno, uint64_t victim_seqno
-                                       );
+
 /*!
  * @brief withdraws a previously started commit
  *

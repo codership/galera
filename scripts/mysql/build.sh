@@ -89,6 +89,7 @@ scripts/build.sh $@
 ##                                  ##
 ######################################
 # Obtain MySQL version and revision of Galera patch
+cp $GALERA_SRC/galera/src/galera.[ch] $MYSQL_SRC/galera/
 cd $MYSQL_SRC
 MYSQL_REV=$(svnversion)
 
@@ -132,7 +133,7 @@ install -m 644 LICENSE.mysql $MYSQL_DIST_DIR
 install -m 644 README $DIST_DIR
 install -m 644 QUICK_START $DIST_DIR
 install -D -m 644 $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/mysql/english/errmsg.sys
-install -D -m 755 $MYSQL_SRC/sql/.libs/mysqld $MYSQL_DIST_DIR/libexec/mysqld
+install -D -m 755 $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/libexec/mysqld
 install -D -m 644 my.cnf $MYSQL_DIST_DIR/etc/my.cnf
 tar -xzf mysql_var.tgz -C $MYSQL_DIST_DIR
 
@@ -146,7 +147,7 @@ cp -P $GALERA_SRC/galeracomm/transport/src/.libs/libgcommtransportpp.so* $GALERA
 cp -P $GALERA_SRC/galeracomm/vs/src/.libs/libgcommvspp.so* $GALERA_LIBS
 cp -P $GALERA_SRC/gcs/src/.libs/libgcs.so* $GALERA_LIBS
 cp -P $GALERA_SRC/wsdb/src/.libs/libwsdb.so* $GALERA_LIBS
-cp -P $GALERA_SRC/wsdb/src/.libs/libgalera.so* $GALERA_LIBS
+cp -P $GALERA_SRC/galera/src/.libs/libmmgalera.so* $GALERA_LIBS
 
 # Install vs backend daemon
 GALERA_SBIN=$GALERA_DIST_DIR/sbin

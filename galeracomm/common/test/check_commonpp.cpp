@@ -361,7 +361,7 @@ START_TEST(check_poll)
 	MyContext ctx;
 	p->insert(fds[0], &ctx);
 	p->set(fds[0], PollEvent::POLL_IN);
-	write(fds[1], buf, 1);
+	fail_unless(write(fds[1], buf, 1) == 1);
 	p->poll(1);
 	
 	p->insert(fds[1], &ctx);

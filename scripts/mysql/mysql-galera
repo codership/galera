@@ -108,6 +108,7 @@ Options:
     --db             : name of database to check
     --ignore_table   : table to ignore in checking
     --valgrind       : run under valgrind
+    --gdb            : run under gdb
     --ws_level       : RBR (default) or SQL
 
 Commands:
@@ -154,6 +155,11 @@ galera_start()
         RBR_OPTS=""
     fi
 
+    if test -f $GALERA_BASE_DIR/lib/libmmgalera.so
+    then
+	GALERA_OPTS="$GALERA_OPTS --galera_driver=$GALERA_BASE_DIR/lib/libmmgalera.so"
+    fi
+
     if test -n "$GCS_ADDRESS"
     then
         GALERA_OPTS="$GALERA_OPTS --galera_gcs_address=$GCS_ADDRESS"
@@ -167,7 +173,10 @@ galera_start()
     echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening to port $MYSQL_PORT and socket $MYSQL_SOCKET..."
 
     export LD_LIBRARY_PATH	
-    nohup $VALGRIND $MYSQLD \
+
+    if test -z $GDB
+    then
+	nohup $VALGRIND $MYSQLD \
 	    $DEFAULTS_OPTION \
 	    --user="$MYSQLD_USER" \
 	    --basedir="$MYSQL_BASE_DIR" \
@@ -182,8 +191,24 @@ galera_start()
 	    $DEBUG_OPTS \
 	    $LOGGING_OPTS \
 	    $RBR_OPTS \
-    1>/dev/null 2>>$err_log &
-            
+	    1>/dev/null 2>>$err_log &
+    else
+	$GDB --args $MYSQLD \
+	    $DEFAULTS_OPTION \
+	    --user="$MYSQLD_USER" \
+	    --basedir="$MYSQL_BASE_DIR" \
+	    --datadir="$MYSQL_DATA_DIR" \
+	    --pid-file="$MYSQL_PID" \
+	    --port=$MYSQL_PORT \
+	    --socket=$MYSQL_SOCKET \
+	    --skip-locking \
+            --log_error=$err_log \
+            $INNODB_OPTS \
+	    $GALERA_OPTS \
+	    $DEBUG_OPTS \
+	    $LOGGING_OPTS \
+	    $RBR_OPTS 
+    fi
     my_pid=$!
 	
 #    echo "Waiting for pid file" 
@@ -287,6 +312,9 @@ case $1 in
     --valgrind)
             VALGRIND="valgrind --log-file=/tmp/mysql_vg --leak-check=full"
             ;;
+    --gdb)
+	    GDB="gdb"
+	    ;;
     -g|--gcs_address)
             GCS_ADDRESS=$2
             shift

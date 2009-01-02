@@ -3,7 +3,7 @@
 
 class VSFifoBackend : public VSBackend {
 public:
-    VSFifoBackend(Poll *p, Protolay *p);
+    VSFifoBackend(Poll *p, Protolay *pr);
     ~VSFifoBackend();
     void handle_up(const int cid, const ReadBuf *rb, const size_t roff, 
 		   const ProtoUpMeta *um);

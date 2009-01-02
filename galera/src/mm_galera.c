@@ -1,7 +1,5 @@
 // Copyright (C) 2007 Codership Oy <info@codership.com>
 
-#error "this file should not be used anymore, use galera/src/mm_galera.c instead"
-
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
@@ -54,7 +52,9 @@ static galera_bf_execute_fun     bf_execute_cb      = NULL;
 static galera_bf_execute_fun     bf_execute_cb_rbr  = NULL;
 static galera_bf_apply_row_fun   bf_apply_row_cb    = NULL;
 static galera_ws_start_fun       ws_start_cb        = NULL;
+#ifdef UNUSED
 static galera_log_cb_t           galera_log_handler = NULL;
+#endif
 
 /* application context pointer */
 //static void *app_ctx = NULL;
@@ -84,7 +84,8 @@ static my_bool mark_commit_early = FALSE;
 static FILE *wslog_L;
 static FILE *wslog_G;
 
-void galera_log(galera_severity_t code, char *fmt, ...) {
+#ifdef UNUSED
+static void galera_log(galera_severity_t code, char *fmt, ...) {
     va_list ap;
     char msg[1024] = {0};
     char FMT[1024] = {0};
@@ -106,6 +107,7 @@ void galera_log(galera_severity_t code, char *fmt, ...) {
     }
     GU_DBUG_VOID_RETURN;
 }
+#endif
 
 /* @struct contains one write set and its TO sequence number
  */
@@ -168,7 +170,7 @@ static void *galera_configurator (
     }
 }
 
-enum galera_status mm_galera_set_conf_param_cb(
+static enum galera_status mm_galera_set_conf_param_cb(
     galera_t *gh, galera_conf_param_fun configurator
 ) {
     GU_DBUG_ENTER("galera_set_conf_param_cb");
@@ -191,14 +193,14 @@ enum galera_status mm_galera_set_conf_param_cb(
     GU_DBUG_RETURN(GALERA_OK);
 }
 
-enum galera_status mm_galera_set_logger(galera_t *gh, galera_log_cb_t logger)
+static enum galera_status mm_galera_set_logger(galera_t *gh, galera_log_cb_t logger)
 {
     GU_DBUG_ENTER("galera_set_logger");
     gu_conf_set_log_callback(logger);
     GU_DBUG_RETURN(GALERA_OK);
 }
 
-enum galera_status mm_galera_init(galera_t *gh,
+static enum galera_status mm_galera_init(galera_t *gh,
 				  const char*          group,
 				  const char*          address,
 				  const char*          data_dir,
@@ -251,17 +253,17 @@ enum galera_status mm_galera_init(galera_t *gh,
     GU_DBUG_RETURN(GALERA_OK);
 }
 
-void mm_galera_dbug_push (galera_t *gh, const char* control)
+static void mm_galera_dbug_push (galera_t *gh, const char* control)
 {
     GU_DBUG_PUSH(control);
 }
 
-void mm_galera_dbug_pop (galera_t *gh)
+static void mm_galera_dbug_pop (galera_t *gh)
 {
     GU_DBUG_POP();
 }
 
-void mm_galera_tear_down(galera_t *gh)
+static void mm_galera_tear_down(galera_t *gh)
 {
     if (Galera.repl_state == GALERA_UNINITIALIZED)
 	return;
@@ -273,7 +275,7 @@ void mm_galera_tear_down(galera_t *gh)
     wsdb_close();
 }
 
-enum galera_status mm_galera_enable(galera_t *gh) {
+static enum galera_status mm_galera_enable(galera_t *gh) {
     int rcode;
 
     GU_DBUG_ENTER("galera_enable");
@@ -300,7 +302,7 @@ enum galera_status mm_galera_enable(galera_t *gh) {
     GU_DBUG_RETURN(GALERA_OK);
 }
 
-enum galera_status mm_galera_disable(galera_t *gh) {
+static enum galera_status mm_galera_disable(galera_t *gh) {
     int rcode;
 
     GU_DBUG_ENTER("galera_disable");
@@ -337,27 +339,29 @@ enum galera_status galera_set_context_store_handler(
 }
 */
 
-enum galera_status mm_galera_set_execute_handler(galera_t *gh, 
+static enum galera_status mm_galera_set_execute_handler(galera_t *gh, 
 						 galera_bf_execute_fun handler) {
     bf_execute_cb = handler;
     return GALERA_OK;
 }
 
-enum galera_status mm_galera_set_execute_handler_rbr(galera_t *gh, 
+static enum galera_status mm_galera_set_execute_handler_rbr(galera_t *gh, 
 						     galera_bf_execute_fun handler) {
     bf_execute_cb_rbr = handler;
     return GALERA_OK;
 }
 
-enum galera_status mm_galera_set_apply_row_handler(
+#ifdef UNUSED
+static enum galera_status mm_galera_set_apply_row_handler(
     galera_t *gh,
     galera_bf_apply_row_fun handler
 ) {
     bf_apply_row_cb = handler;
     return GALERA_OK;
 }
+#endif
 
-enum galera_status mm_galera_set_ws_start_handler(
+static enum galera_status mm_galera_set_ws_start_handler(
     galera_t *gh,
     galera_ws_start_fun handler) {
     ws_start_cb = handler;
@@ -557,7 +561,7 @@ static inline void report_last_committed (
 
 static inline void truncate_trx_history (gcs_seqno_t seqno)
 {
-    static ulong const truncate_interval = 100;
+    static long const truncate_interval = 100;
     static gcs_seqno_t last_truncated = 0;
 
     if (last_truncated + truncate_interval < seqno) {
@@ -652,7 +656,7 @@ static inline long galera_eagain (long (*function) (gcs_to_t*, gcs_seqno_t),
 // returns true if action to be applied and false if to be skipped
 // should always be called while holding to_queue
 static inline bool
-galera_update_global_seqno (seqno)
+galera_update_global_seqno (gcs_seqno_t seqno)
 {
     // Seems like we cannot enforce sanity check here - some replicated
     // writesets get cancelled and never make it to this point (TO monitor).
@@ -711,7 +715,7 @@ static int process_query_write_set_applying(
     int  is_retry   = 0;
     int  retries    = 0;
 
-#define MAX_RETRIES 0 // loop for ever
+#define MAX_RETRIES 10 // retry 10 times
  retry:
 
     /* synchronize with other appliers */
@@ -724,6 +728,12 @@ static int process_query_write_set_applying(
           gu_warn("ws apply failed for: %llu, last_seen: %llu", 
                   seqno_g, ws->last_seen_trx
           );
+
+        rcode = apply_query(app_ctx, "rollback\0", 9);
+        if (rcode) {
+            gu_warn("ws apply rollback failed for: %llu, last_seen: %llu", 
+                    seqno_g, ws->last_seen_trx);
+        }
         if (++retries == MAX_RETRIES) break;
     }
     if (retries > 0 && retries == MAX_RETRIES) {
@@ -976,7 +986,7 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
     }
 }
 
-enum galera_status mm_galera_recv(galera_t *gh, void *app_ctx) {
+static enum galera_status mm_galera_recv(galera_t *gh, void *app_ctx) {
     int rcode;
     struct job_worker *applier;
 
@@ -1062,8 +1072,8 @@ enum galera_status mm_galera_recv(galera_t *gh, void *app_ctx) {
     return GALERA_OK;
 }
 
-enum galera_status mm_galera_cancel_commit(galera_t *gh,
-    uint64_t bf_seqno, trx_id_t victim_trx
+static enum galera_status mm_galera_cancel_commit(galera_t *gh,
+    const bf_seqno_t bf_seqno, const trx_id_t victim_trx
 ) {
     enum galera_status ret_code = GALERA_OK;
     int rcode;
@@ -1142,8 +1152,8 @@ enum galera_status mm_galera_cancel_commit(galera_t *gh,
     return ret_code;
 }
 
-enum galera_status mm_galera_cancel_slave(
-    galera_t *gh, uint64_t bf_seqno, uint64_t victim_seqno
+static enum galera_status mm_galera_cancel_slave(
+    galera_t *gh, bf_seqno_t bf_seqno, bf_seqno_t victim_seqno
 ) {
     enum galera_status ret_code = GALERA_OK;
     int rcode;
@@ -1178,17 +1188,19 @@ enum galera_status mm_galera_cancel_slave(
     return ret_code;
 }
 
-enum galera_status galera_assign_timestamp(uint32_t timestamp) {
+#ifdef UNUSED
+static enum galera_status galera_assign_timestamp(uint32_t timestamp) {
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
     return 0;
 }
 
-uint32_t galera_get_timestamp() {
+static uint32_t galera_get_timestamp() {
     if (Galera.repl_state != GALERA_ENABLED) return GALERA_OK;
     return 0;
 }
+#endif
 
-enum galera_status mm_galera_committed(galera_t *gh, trx_id_t trx_id) {
+static enum galera_status mm_galera_committed(galera_t *gh, trx_id_t trx_id) {
 
     bool do_report = false;
     wsdb_trx_info_t trx;
@@ -1228,7 +1240,7 @@ enum galera_status mm_galera_committed(galera_t *gh, trx_id_t trx_id) {
     GU_DBUG_RETURN(GALERA_OK);
 }
 
-enum galera_status mm_galera_rolledback(galera_t *gh, trx_id_t trx_id) {
+static enum galera_status mm_galera_rolledback(galera_t *gh, trx_id_t trx_id) {
 
     wsdb_trx_info_t trx;
 
@@ -1305,7 +1317,7 @@ static int check_certification_status_for_aborted(
 }
 
 
-enum galera_status
+static enum galera_status
 mm_galera_commit(
     galera_t *gh,
     trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, size_t rbr_data_len
@@ -1533,7 +1545,7 @@ cleanup:
     GU_DBUG_RETURN(retcode);
 }
 
-enum galera_status mm_galera_append_query(
+static enum galera_status mm_galera_append_query(
     galera_t *gh,
     const trx_id_t trx_id, const char *query, const time_t timeval, const uint32_t randseed) {
 
@@ -1548,7 +1560,8 @@ enum galera_status mm_galera_append_query(
     return GALERA_OK;
 }
 
-enum galera_status galera_append_row(
+#ifdef UNUSED
+static enum galera_status galera_append_row(
     trx_id_t trx_id,
     uint16_t len,
     uint8_t *data
@@ -1562,8 +1575,9 @@ enum galera_status galera_append_row(
     default:                    return GALERA_CONN_FAIL;
     }
 }
+#endif
 
-enum galera_status mm_galera_append_row_key(
+static enum galera_status mm_galera_append_row_key(
     galera_t *gh,
     const trx_id_t trx_id,
     const char    *dbtable,
@@ -1605,7 +1619,7 @@ enum galera_status mm_galera_append_row_key(
     }
 }
 
-enum galera_status mm_galera_set_variable(
+static enum galera_status mm_galera_set_variable(
     galera_t *gh,
     const conn_id_t  conn_id,
     const char *key,  const  size_t key_len, 
@@ -1659,7 +1673,7 @@ enum galera_status mm_galera_set_variable(
     return GALERA_OK;
 }
 
-enum galera_status mm_galera_set_database(
+static enum galera_status mm_galera_set_database(
     galera_t *gh,
     const conn_id_t conn_id, const char *query, const size_t query_len
 ) {
@@ -1674,7 +1688,7 @@ enum galera_status mm_galera_set_database(
     return GALERA_OK;
 }
 
-enum galera_status mm_galera_to_execute_start(
+static enum galera_status mm_galera_to_execute_start(
     galera_t *gh,
     const conn_id_t conn_id, const char *query, const size_t query_len
 ) {
@@ -1767,7 +1781,7 @@ cleanup:
     GU_DBUG_RETURN(rcode);
 }
 
-enum galera_status mm_galera_to_execute_end(galera_t *gh, const conn_id_t conn_id) {
+static enum galera_status mm_galera_to_execute_end(galera_t *gh, const conn_id_t conn_id) {
     bool do_report;
     struct wsdb_conn_info conn_info;
     int rcode;
@@ -1793,7 +1807,7 @@ enum galera_status mm_galera_to_execute_end(galera_t *gh, const conn_id_t conn_i
     GU_DBUG_RETURN(WSDB_OK);
 }
 
-enum galera_status mm_galera_replay_trx(galera_t *gh, const trx_id_t trx_id, void *app_ctx) {
+static enum galera_status mm_galera_replay_trx(galera_t *gh, const trx_id_t trx_id, void *app_ctx) {
     struct job_worker *applier;
     int                rcode;
     wsdb_trx_info_t    trx;
@@ -1906,8 +1920,8 @@ static galera_t mm_galera_str = {
     NULL
 };
 
-
-
+/* Prototype to make compiler happy */
+int galera_loader(galera_t **hptr);
 
 int galera_loader(galera_t **hptr)
 {

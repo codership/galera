@@ -9,7 +9,7 @@
 #include <deque>
 #include <list>
 #include <cerrno>
-
+#include <algorithm>
 
 class Fifo {
     size_t mque_max_size;

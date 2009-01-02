@@ -190,7 +190,7 @@ START_TEST(check_async_transport)
 	p->poll(1);
     }
         
-    while (p->poll(1) > 0);
+    while (p->poll(1) > 0) {}
 
     std::cerr << "Terminating\n";
 
@@ -224,7 +224,7 @@ START_TEST(check_async_multitransport)
 	p->poll(1);
     }
     
-    while (p->poll(1) > 0);
+    while (p->poll(1) > 0) {}
     
     std::cerr << "Terminating\n";
     
@@ -488,12 +488,12 @@ START_TEST(check_tipc_multicast)
 	m1.send();
 	m2.send();
 	if (::rand() % 6 == 0)
-	    while (p->poll(0) > 0);
+	    while (p->poll(0) > 0) {}
     }
     LOG_INFO(std::string("pcnt: ") + to_string(pcnt));
-    while (p->poll(100) > 0);
+    while (p->poll(100) > 0) {}
     m2.send();
-    while (p->poll(100) > 0);
+    while (p->poll(100) > 0) {}
 
     m1.close();
     p->poll(1000);
