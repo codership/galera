@@ -89,7 +89,6 @@ scripts/build.sh $@
 ##                                  ##
 ######################################
 # Obtain MySQL version and revision of Galera patch
-cp $GALERA_SRC/galera/src/galera.[ch] $MYSQL_SRC/galera/
 cd $MYSQL_SRC
 MYSQL_REV=$(svnversion)
 
