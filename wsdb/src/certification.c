@@ -116,6 +116,7 @@ static void purge_active_seqnos(trx_seqno_t up_to) {
                             match->seqno, trx->seqno, key_idx
                         );
                     }
+
                     match = (struct seqno_list *)wsdb_hash_delete(
                         key_index, key_len, keys
                     );
@@ -250,7 +251,7 @@ int wsdb_cert_init(const char* work_dir, const char* base_name) {
 }
 
 int wsdb_certification_test(
-    struct wsdb_write_set *ws, trx_seqno_t trx_seqno
+    struct wsdb_write_set *ws, trx_seqno_t trx_seqno, bool_t save_keys
 ) {
     uint32_t i;
     uint32_t all_keys_len;
@@ -287,11 +288,13 @@ int wsdb_certification_test(
 		    (unsigned long long)trx_seqno, match->seqno)
             );
 
-            /* key composition is not needed anymore */
-            gu_free(ws->key_composition);
-            ws->key_composition = NULL;
+            if (!save_keys) {
+                /* key composition is not needed anymore */
+                gu_free(ws->key_composition);
+                ws->key_composition = NULL;
 
-            return WSDB_CERTIFICATION_FAIL;
+                return WSDB_CERTIFICATION_FAIL;
+            }
         }
 
         /* continue with row level lock checks */
@@ -432,12 +435,8 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     struct seqno_list *seqno_elem = NULL;
 
     /* certification test */
-    rcode = wsdb_certification_test(ws, trx_seqno); 
+    rcode = wsdb_certification_test(ws, trx_seqno, false); 
     if (rcode) {
-        if (ws->key_composition) {
-            gu_free(ws->key_composition); 
-            ws->key_composition = NULL;
-        }
         return rcode;
     }
 

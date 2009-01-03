@@ -27,20 +27,4 @@ int wsdb_cert_init(const char *work_dir, const char* base_name);
  */
 int wsdb_cert_close();
 
-#if 0 // moved to wsdb_api.h
-/*!
- * @brief makes certification check for a write set
- * 
- * @param ws  write set to be certified
- * @param trx_seqno sequence number for the trx
- * 
- * @return success code, certification fail code or error code
- * @retval WSDB_OK
- * @retval WSDB_CERTIFICATION_FAIL certification failed, trx must abort
- */
-int wsdb_certification_test(
-    struct wsdb_write_set *ws, trx_seqno_t trx_seqno
-);
-#endif // 0
-
 #endif // WSDB_CERTIFICATION_INCLUDED

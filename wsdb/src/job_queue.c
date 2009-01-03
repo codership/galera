@@ -176,7 +176,7 @@ int job_queue_end_job(struct job_queue *queue, struct job_worker *worker
     }
 
     if (min_job > -1) {
-        gu_warn ("job queue signal for: %d", min_job);
+        gu_warn ("job full queue signal for: %d", min_job);
         gu_cond_signal(&queue->jobs[min_job].cond);
     }
 

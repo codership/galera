@@ -378,13 +378,14 @@ int wsdb_append_table_lock(
  * 
  * @param write_set  The write set to be appended
  * @param trx_seqno  the cluster wide agreed commit order for the transaction.
+ * @param save_keys save key composition after testing
  * 
  * @return success code, certification fail code or error code
  * @retval WSDB_OK
  * @retval WSDB_CERTIFICATION_FAIL certification failed
  */
 int wsdb_certification_test(
-    struct wsdb_write_set *write_set, trx_seqno_t trx_seqno
+    struct wsdb_write_set *ws, trx_seqno_t trx_seqno, bool_t save_keys
 );
 
 /*!
@@ -571,18 +572,6 @@ void wsdb_write_set_free(struct wsdb_write_set *ws);
  * @return the query block for the transaction
  */
 struct wsdb_query_block *wsdb_get_write_set_queries(trx_seqno_t trx_seqno);
-
-/*!
- * @brief makes certification check for a write set
- * 
- * @param ws  write set to be certified
- * @param trx_seqno sequence number for the trx
- *
- * @return success code, certification fail code or error code
- * @retval WSDB_OK Certification test passed, TRX can commit
- * @retval WSDB_CERTIFICATION_FAIL Certification test failed, TRX must abort
- */
-int wsdb_certification_test (struct wsdb_write_set *ws, trx_seqno_t trx_seqno);
 
 /*!
  * @brief builds connection management queries for write set
