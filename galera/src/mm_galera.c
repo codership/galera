@@ -842,9 +842,9 @@ static void process_query_write_set(
       }
     case WSDB_CERTIFICATION_FAIL:
         /* certification failed, release */
-        gu_warn("trx certification failed: (%llu %llu) last_seen: %llu",
+        gu_debug("trx certification failed: (%llu %llu) last_seen: %llu",
                 seqno_l, seqno_g, ws->last_seen_trx);
-        print_ws(wslog_G, ws, seqno_g);
+        //print_ws(wslog_G, ws, seqno_g);
     case WSDB_CERTIFICATION_SKIP:
         /* Cancel commit queue */
         GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
@@ -1320,7 +1320,7 @@ static int check_certification_status_for_aborted(
         /* certification failed, release */
         gu_debug("BF conflicting local trx certification fail: %llu - %llu",
                 seqno_l, ws->last_seen_trx);
-        print_ws(wslog_L, ws, seqno_l);
+        //print_ws(wslog_L, ws, seqno_l);
         return GALERA_TRX_FAIL;
 
     default:  
