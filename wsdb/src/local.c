@@ -74,7 +74,7 @@ static inline void set_last_committed_seqno(trx_seqno_t seqno) {
                 assert (safe_to_discard_seqno < seqno);
                 safe_to_discard_seqno = seqno - 1;
             }
-            gu_info ("DISCARD begin: safe = %llu, next = %llu, next refs = %lu",
+            gu_debug("DISCARD begin: safe = %llu, next = %llu, next refs = %lu",
                      safe_to_discard_seqno, next_to_discard_seqno,
                      next_to_discard_refs);
         }
