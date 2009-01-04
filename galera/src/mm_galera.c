@@ -1154,7 +1154,7 @@ static enum galera_status mm_galera_cancel_commit(galera_t *gh,
                 ret_code = GALERA_OK;
                 rcode = gcs_to_interrupt(commit_queue, victim.seqno_l);
                 if (rcode) {
-                    gu_warn("trx interrupt fail in commit_queue: %d", rcode);
+                    gu_debug("trx interrupt fail in commit_queue: %d", rcode);
                     ret_code = GALERA_WARNING;
                 }
             } else {
@@ -1457,7 +1457,7 @@ mm_galera_commit(
 
     // cant use it here - GALERA_GRAB_TO_QUEUE (seqno_l);
     if ((rcode = galera_eagain (gcs_to_grab, to_queue, seqno_l))) {
-        gu_warn("gcs_to_grab aborted: %d seqno %llu", rcode, seqno_l);
+        gu_debug("gcs_to_grab aborted: %d seqno %llu", rcode, seqno_l);
         retcode = GALERA_TRX_FAIL;
 
         if (check_certification_status_for_aborted(

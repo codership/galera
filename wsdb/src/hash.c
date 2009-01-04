@@ -369,7 +369,7 @@ int wsdb_hash_delete_range(
                 } else {
                     hash->elems[i] = entry->next;
                 }
-                if (entry->key_len > 4) {
+                if (entry->key_len > 4 && !hash->reuse_key) {
 #ifndef USE_MEMPOOL
                     gu_free(entry->key);
 #else

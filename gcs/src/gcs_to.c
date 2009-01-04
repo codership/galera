@@ -393,7 +393,7 @@ long gcs_to_interrupt (gcs_to_t *to, gcs_seqno_t seqno)
                 /* gu_mutex_unlock (&to->lock); */
                 rcode = -ERANGE;
             } else if (w->state == CANCELED) {
-                gu_warn ("trying to interrupt canceled seqno: seqno = %llu, "
+                gu_debug ("trying to interrupt canceled seqno: seqno = %llu, "
                      "TO seqno = %llu", seqno, to->seqno);
                 /* gu_mutex_unlock (&to->lock); */
                 rcode = -ERANGE;
@@ -402,7 +402,7 @@ long gcs_to_interrupt (gcs_to_t *to, gcs_seqno_t seqno)
                 w->state = INTERRUPTED;
             }
         } else {
-            gu_warn ("trying to interrupt used seqno: cancel seqno = %llu, "
+            gu_debug ("trying to interrupt used seqno: cancel seqno = %llu, "
                      "TO seqno = %llu", seqno, to->seqno);
             /* gu_mutex_unlock (&to->lock); */
             rcode = -ERANGE;
