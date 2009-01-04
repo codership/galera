@@ -106,7 +106,7 @@ const char* fn (void)
  * @param pkt_size
  *        desired size of a network packet
  * @return
- *        - message size coresponding to the desired packet size OR
+ *        - message size coresponding to the desired network packet size OR
  *        - maximum message size the backend supports if requested packet size
  *          is too big OR
  *        - negative amount by which the packet size must be increased in order

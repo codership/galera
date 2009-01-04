@@ -230,7 +230,7 @@ gcs_send_sync (gcs_conn_t* conn) {
     conn->queue_len = gu_fifo_length (conn->recv_q);
 
     if (conn->lower_limit >= conn->queue_len) {
-        // tripped lower slave queue limit, sent continue request
+        // tripped lower slave queue limit, send SYNC message
         gu_info ("SENDING SYNC");
         ret = gcs_core_send_sync (conn->core, 0);
         if (ret >= 0) {
@@ -329,7 +329,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     }
     else if (conf->seqno == GCS_SEQNO_NIL) {
         /* Exceptional rule: no actions have been yet applied,
-         * we're as good as SYNCED */
+         * we're as good as JOINED */
         if (GCS_CONN_OPEN == conn->state) { // TODO: change to GCS_CONN_PRIMARY
             conn->state = GCS_CONN_JOINED;
         }
@@ -858,7 +858,7 @@ long gcs_recv (gcs_conn_t*     conn,
             }
         }
         else if (GCS_CONN_JOINED == conn->state && (err=gcs_send_sync(conn))) {
-            gu_warn ("Failed to send JOIN message: %d (%s). Will try later.",
+            gu_warn ("Failed to send SYNC message: %d (%s). Will try later.",
                      err, strerror(-err));
         }
 
