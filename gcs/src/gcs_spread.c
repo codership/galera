@@ -572,7 +572,7 @@ GCS_BACKEND_MSG_SIZE_FN(spread_msg_size)
     long frames = 0;
     const long eth_frame_size      = 1514;
     const long spread_header_size  = 154;   // total headers in Spread packet
-    const long spread_max_pkt_size = 65102; // 43 Ethernet frames
+    const long spread_max_pkt_size = 31794; // 21 Ethernet frames
 
     if (pkt_size <= spread_header_size) {
         ps = spread_header_size + 1;

@@ -27,6 +27,7 @@ SELF=$(cd $(dirname $0); pwd -P)/$(basename $0)
 # MY_CNF         - specifies the configuration file
 # GCS_ADDRESS    - overrides setting in my.cnf
 # MYSQL_PORT     - port to listen for client connections (default: 3306)
+# LIBGALERA      - location of the galera shared library file
 #
 # Convention: mysql pid file is stored in mysql data dir under name 'mysql.pid'
 #
@@ -155,9 +156,10 @@ galera_start()
         RBR_OPTS=""
     fi
 
-    if test -f $GALERA_BASE_DIR/lib/libmmgalera.so
+    LIBGALERA=${LIBGALERA:-"$GALERA_BASE_DIR/lib/libmmgalera.so"}
+    if test -f $LIBGALERA
     then
-	GALERA_OPTS="$GALERA_OPTS --galera_driver=$GALERA_BASE_DIR/lib/libmmgalera.so"
+	GALERA_OPTS="$GALERA_OPTS --galera_driver=$LIBGALERA"
     fi
 
     if test -n "$GCS_ADDRESS"
@@ -240,10 +242,11 @@ galera_stop()
     then
         # check if corresponding mysqld is running
 #        if ps axc | grep mysqld | grep $(cat $MYSQL_PID) >/dev/null 2>&1
-        if find_pid $(cat $MYSQL_PID)
+	local my_pid=$(cat $MYSQL_PID)
+        if find_pid $my_pid
         then
-            echo -n "Killing PID $(cat $MYSQL_PID)"
-	    kill $(cat $MYSQL_PID)
+            echo -n "Killing PID $my_pid"
+	    kill $my_pid
             # wait for pid file to disappear
 	    for second in $(seq 1 $MYSQL_SHUTDOWN_WAIT)
 	    do
@@ -258,13 +261,13 @@ galera_stop()
 	    if test "$second" = "$MYSQL_SHUTDOWN_WAIT"
 	    then
 	        echo -n "Failed to stop mysqld safely. Killing with -9... "
-	        kill -9 $(cat $MYSQL_PID; rm -rf $MYSQL_PID)
+	        kill -9 $my_pid
 	    fi
 	else
 	    echo -n "Removing stale PID file $MYSQL_PID... "
-	    rm -rf $MYSQL_PID
 	fi
-	    
+	
+	rm -rf $MYSQL_PID
 	echo "Done"
     else
 	echo "PID file not found: $MYSQL_PID"
