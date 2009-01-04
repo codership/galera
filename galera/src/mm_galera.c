@@ -274,6 +274,8 @@ static void mm_galera_tear_down(galera_t *gh)
     if (commit_queue) gcs_to_destroy(&commit_queue);
 
     wsdb_close();
+
+    mm_galera_set_logger(gh, NULL);
 }
 
 static enum galera_status mm_galera_enable(galera_t *gh) {
