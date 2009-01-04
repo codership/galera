@@ -108,6 +108,8 @@ void VSRBackend::connect(const char *addr)
     set_down_context(tp);
     state = CONNECTING;
     
+    tp->set_max_pending_bytes(50*1024*1024);
+    tp->set_contention_params(1, 500);
     tp->connect(addr);
     do {
 	int err = poll->poll(10);

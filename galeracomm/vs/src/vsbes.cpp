@@ -314,7 +314,8 @@ void VSServer::handle_up(const int cid, const ReadBuf *rb, const size_t roff,
 			 const ProtoUpMeta *um)
 {
     Transport *tp = listener->accept(tp_poll);
-    tp->set_contention_params(1, 5);
+    tp->set_contention_params(1, 500);
+    tp->set_max_pending_bytes(50*1024*1024);
     VSBackend *vs = VSBackend::create("fifo", fifo_poll);
     ClientHandler *cl = new ClientHandler(tp, vs);
     clients.push_back(cl);
