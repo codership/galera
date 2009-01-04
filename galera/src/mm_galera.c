@@ -124,6 +124,7 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
 
     /* job1 is sequenced after job2, must check if they conflict */
 
+    if (job1->ws->last_seen_trx >= job2->seqno)
     {
       /* serious mis-use of certification test
        * we mangle ws seqno's so that certification_test certifies
@@ -137,7 +138,7 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
       job1->ws->last_seen_trx = job2->seqno - 1;
       /* @todo: this will conflict with purging, need to use certification_mtx
        */
-      rcode = wsdb_certification_test(job1->ws, (job2->seqno + 1)); 
+      rcode = wsdb_certification_test(job1->ws, (job2->seqno + 1), true); 
 
       job1->ws->last_seen_trx = last_seen_saved;
       if (rcode) {
@@ -550,7 +551,7 @@ static inline void report_last_committed (
     gcs_seqno_t seqno = wsdb_get_safe_to_discard_seqno();
     long ret;
 
-    gu_info ("Reporting last committed: %llu", seqno);
+    gu_debug ("Reporting last committed: %llu", seqno);
     if ((ret = gcs_set_last_applied(gcs_conn, seqno))) {
         gu_warn ("Failed to report last committed %llu, %d (%s)",
                  seqno, ret, strerror (-ret));
@@ -716,13 +717,13 @@ static int process_query_write_set_applying(
     int  retries    = 0;
 
 #define MAX_RETRIES 10 // retry 10 times
- retry:
 
     /* synchronize with other appliers */
     ctx.seqno = seqno_l;
     ctx.ws    = ws;
     job_queue_start_job(applier_queue, applier, (void *)&ctx);
 
+ retry:
     while((rcode = apply_write_set(app_ctx, ws))) {
         if (retries == 0) 
           gu_warn("ws apply failed for: %llu, last_seen: %llu", 
@@ -740,8 +741,6 @@ static int process_query_write_set_applying(
         gu_warn("ws applying is not possible");
         return GALERA_TRX_FAIL;
     }
-
-    job_queue_end_job(applier_queue, applier);
 
  retry_commit:
     if (is_retry == 0) {
@@ -768,8 +767,8 @@ static int process_query_write_set_applying(
               gu_warn("ws apply rollback failed for: %llu, last_seen: %llu", 
                       seqno_g, ws->last_seen_trx);
               //is_retry = 1;
-              goto retry;
             }
+            goto retry;
             break;
         default:
 	    gu_fatal("Failed to grab BF commit queue for %llu", seqno_l);
@@ -777,6 +776,7 @@ static int process_query_write_set_applying(
         }
     }
 
+    gu_debug("GALERA ws commit for: %lld", seqno_l); 
     rcode = apply_query(app_ctx, "commit\0", 7);
     if (rcode) {
         gu_warn("ws apply commit failed for: %llu, last_seen: %llu", 
@@ -784,6 +784,8 @@ static int process_query_write_set_applying(
         //is_retry = 1;
         goto retry;
     }
+
+    job_queue_end_job(applier_queue, applier);
 
     do_report = report_check_counter ();
     GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
@@ -873,8 +875,17 @@ static void process_write_set(
 
     xdrmem_create(&xdrs, (char *)data, data_len, XDR_DECODE);
     if (!xdr_wsdb_write_set(&xdrs, &ws)) {
-        gu_error("XDR allocation failed");
-        return;
+        gu_fatal("GALERA XDR allocation failed, len: %d seqno: (%lld %lld)", 
+                 data_len, seqno_g, seqno_l
+        );
+        abort();
+    }
+
+    /* key composition is not sent through xdr */
+    if (ws.key_composition) {
+        gu_warn("GALERA XDR encoding returned key comp, seqno: (%lld %lld)",
+                seqno_g, seqno_l
+        );
     }
 
     ws_start_cb(app_ctx, seqno_l);
@@ -1021,7 +1032,9 @@ static enum galera_status mm_galera_recv(galera_t *gh, void *app_ctx) {
 
         assert (GCS_SEQNO_ILL != seqno_l);
 
-        gu_debug("worker: %d recvd", applier->id);
+        gu_debug("worker: %d with seqno: (%lld - %lld) type: %d recvd", 
+                 applier->id, seqno_g, seqno_l, action_type
+        );
 
         switch (action_type) {
         case GCS_ACT_DATA:
@@ -1292,7 +1305,7 @@ static int check_certification_status_for_aborted(
      * seqno_l - 1 has certified and then do our certification.
      */
 
-    rcode = wsdb_certification_test(ws, seqno_g);
+    rcode = wsdb_certification_test(ws, seqno_g, false);
     switch (rcode) {
     case WSDB_OK:
         gu_warn ("BF conflicting local trx has certified, "
