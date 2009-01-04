@@ -112,13 +112,13 @@ void wsdb_deref_seqno (trx_seqno_t last_seen)
             // no more local refrences to seqnos <= next_to_discard_seqno,
             // next is now safe to discard
             safe_to_discard_seqno = next_to_discard_seqno;
-            gu_info ("DISCARD end: safe = %llu, next = %llu, next refs = %lu",
+            gu_debug ("DISCARD end: safe = %llu, next = %llu, next refs = %lu",
                      safe_to_discard_seqno, next_to_discard_seqno,
                      next_to_discard_refs);
             next_to_discard_seqno = 0;
         }
         else {
-            gu_info ("DISCARD cont: safe = %llu, next = %llu, next refs = %lu",
+            gu_debug ("DISCARD cont: safe = %llu, next = %llu, next refs = %lu",
                      safe_to_discard_seqno, next_to_discard_seqno,
                      next_to_discard_refs);        
         }
