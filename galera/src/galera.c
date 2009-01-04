@@ -36,7 +36,7 @@ enum galera_status galera_tear_down()
 	return GALERA_OK;
 
     assert(galera_ctx);
-    galera_unload(galera_ctx);
+    galera_ctx->tear_down(galera_ctx);
     return GALERA_OK;
 }
 
@@ -389,7 +389,6 @@ void galera_unload(galera_t *hptr)
     }
     assert(hptr);
     dlh = hptr->dlh;
-    hptr->tear_down(hptr);
     if (dlh)
         dlclose(dlh);
 }
