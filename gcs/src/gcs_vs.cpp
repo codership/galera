@@ -67,8 +67,8 @@ public:
 	    state = JOINED;
 	    return;
 	} else if (vum->view && vum->view->is_trans()) {
-	    fprintf(stderr, "trans view: size = %u\n", 
-		    vum->view->get_addr().size());
+	    gu_debug("trans view: size = %u", 
+		     vum->view->get_addr().size());
 	    // Reached the end
 	    // Todo: add gu_thread_exit() to gu library
 	    if (vum->view->get_addr().size() == 0) {
@@ -80,11 +80,6 @@ public:
 	    }
 	}
 	gu_mutex_lock(&mutex);
-	/* 
-	 * if (rb)
-	 * fprintf(stderr, "recv %lu, msg off %lu roff %lu\n", 
-	 * rb->get_len(roff), vum->msg->get_data_offset(), roff);
-	 */
 	if (vum->msg && eq.empty() && rb->get_len(roff) <= waiter_buf_len) {
 	    memcpy(waiter_buf, rb->get_buf(roff), rb->get_len(roff));
 	    eq.push_back(vs_ev(0, rb->get_len(roff), vum->msg, vum->view));
@@ -156,7 +151,6 @@ static GCS_BACKEND_SEND_FN(gcs_vs_send)
 	return -EINVAL;
     int err = 0;
     WriteBuf wb(buf, len);
-    /* fprintf(stderr, "send %lu\n", len); */
     try {
 	VSDownMeta vdm (0, msg_type);
 	err = conn->vs_ctx.pass_down(&wb, &vdm);
@@ -323,11 +317,11 @@ static GCS_BACKEND_DESTROY_FN(gcs_vs_destroy)
     delete conn->vs_ctx.po;
     if (conn->comp_msg) gcs_comp_msg_delete (conn->comp_msg);
 
-    fprintf(stderr, "received %llu copied %llu\n", conn->n_received, conn->n_copied);
+    gu_debug("received %llu copied %llu", conn->n_received, conn->n_copied);
 
     delete conn;
     
-    fprintf(stderr, "gcs_vs_close(): return 0\n");
+    gu_debug("gcs_vs_close(): return 0");
     return 0;
 }
 
