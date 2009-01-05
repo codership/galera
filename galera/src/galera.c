@@ -168,7 +168,7 @@ enum galera_status galera_cancel_slave(bf_seqno_t bf_seqno, bf_seqno_t victim_se
     if (dummy_mode)
         return GALERA_OK;
     assert(galera_ctx);
-    return galera_ctx->cancel_commit(galera_ctx, bf_seqno, victim_seqno);
+    return galera_ctx->cancel_slave(galera_ctx, bf_seqno, victim_seqno);
 }
 
 enum galera_status galera_committed(trx_id_t trx_id)
@@ -289,6 +289,7 @@ static int verify(const galera_t *gh, const char *iface_ver)
     VERIFY(gh->commit);
     VERIFY(gh->replay_trx);
     VERIFY(gh->cancel_commit);
+    VERIFY(gh->cancel_slave);
     VERIFY(gh->committed);
     VERIFY(gh->rolledback);
     VERIFY(gh->append_query);
