@@ -204,9 +204,9 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     group->my_idx = gcs_comp_msg_self (comp);
     new_nodes_num = gcs_comp_msg_num  (comp);
 
-    gu_debug ("primary = %s, my_id = %d, memb_num = %d",
-	      gcs_comp_msg_primary(comp) ? "yes" : "no",
-	      group->my_idx, new_nodes_num);
+    gu_info ("New COMPONENT: primary = %s, my_id = %d, memb_num = %d",
+             gcs_comp_msg_primary(comp) ? "yes" : "no",
+             group->my_idx, new_nodes_num);
 
     if (gcs_comp_msg_primary(comp)) {
 	/* Got PRIMARY COMPONENT - Hooray! */

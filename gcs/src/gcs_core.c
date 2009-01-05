@@ -157,6 +157,7 @@ static ssize_t
 core_error (core_state_t state)
 {
     switch (state) {
+    case CORE_EXCHANGE:    return -EAGAIN;
     case CORE_NON_PRIMARY: return -ENOTCONN;
     case CORE_CLOSED:      return -ECONNABORTED;
     case CORE_DESTROYED:   return -EBADFD;
@@ -789,14 +790,6 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
     recv_act.buf  = NULL;
     recv_act.type = GCS_ACT_ERROR;
     recv_act.id   = GCS_SEQNO_ILL; // by default action is unordered
-
-// remove
-//    if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
-//    if (conn->state >= CORE_CLOSED) {
-//	gu_mutex_unlock (&conn->send_lock);
-//	return -EBADFD;
-//    }
-//    gu_mutex_unlock (&conn->send_lock);
 
     /* receive messages from group and demultiplex them 
      * until finally some complete action is ready */
