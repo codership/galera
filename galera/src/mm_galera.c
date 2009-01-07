@@ -718,7 +718,7 @@ static int process_query_write_set_applying(
     int  is_retry   = 0;
     int  retries    = 0;
 
-#define MAX_RETRIES 10 // retry 10 times
+#define MAX_RETRIES 0 // retry 10 times
 
     /* synchronize with other appliers */
     ctx.seqno = seqno_l;
@@ -738,13 +738,21 @@ static int process_query_write_set_applying(
                     seqno_g, ws->last_seen_trx);
         }
         if (++retries == MAX_RETRIES) break;
+        if (retries == 1) {
+          char file[256];
+          memset(file, '\0', 256);
+          sprintf(file, "/tmp/galera/ws_%llu.bin", seqno_l);
+          FILE *fd= fopen(file, "w");
+          fwrite(ws->rbr_buf, 1, ws->rbr_buf_len, fd);
+          fclose(fd); 
+        }
     }
     if (retries > 0 && retries == MAX_RETRIES) {
         gu_warn("ws applying is not possible");
         return GALERA_TRX_FAIL;
     }
 
- retry_commit:
+    // retry_commit:
     if (is_retry == 0) {
         /* On first try grab commit_queue */
 
@@ -762,7 +770,8 @@ static int process_query_write_set_applying(
 
             if (retries > 0) {
               retries = 0;
-              goto retry_commit;
+              //goto retry_commit;
+              gu_info("BF interrupted (retries>0) in commit queue for %llu", seqno_l);
             }
             rcode = apply_query(app_ctx, "rollback\0", 9);
             if (rcode) {
