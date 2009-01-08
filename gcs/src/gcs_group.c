@@ -567,20 +567,24 @@ gcs_group_handle_state_request (gcs_group_t*    group,
                                 gcs_recv_act_t* act)
 {
     // pass only to sender and to one potential donor
-    long donor_idx;
+    long             donor_idx;
+    gcs_state_node_t joiner_state = group->nodes[joiner_idx].status;
 
     assert (GCS_ACT_STATE_REQ == act->type);
 
-    if (group->nodes[joiner_idx].status != GCS_STATE_PRIM) {
+    if (joiner_state != GCS_STATE_PRIM) {
+
+        const char* joiner_state_string = gcs_state_node_string[joiner_state];
+
         if (group->my_idx == joiner_idx) {
-            gu_error ("Requesting state transfer while joined. "
-                      "Ignoring.");
+            gu_error ("Requesting state transfer while in %s. "
+                      "Ignoring.", joiner_state_string);
             act->id = -ECANCELED;
             return act->buf_len;
         }
         else {
             gu_error ("Node %ld requested state transfer, "
-                      "but it is joined already.", joiner_idx);
+                      "but it is in %s. Ignoring.", joiner_state_string);
             free ((void*)act->buf);
             return 0;
         }

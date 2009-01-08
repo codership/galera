@@ -466,8 +466,14 @@ static void *gcs_recv_thread (void *arg)
             if (gu_likely(ret <= 0)) continue; // not for application
         }
 
-        /* deliver to application and increment local order */
-        this_act_id = conn->local_act_id++;
+        /* deliver to application */
+        // FIXME: this condition is very unclear and might be not good.
+        // the idea is that local seqno is only given to user actions with valid
+        // global TO.
+        if (gu_likely (act_id >= 0 || act_type != GCS_ACT_DATA)) {
+            /* successful delivery - increment local order */
+            this_act_id = conn->local_act_id++;
+        }
 
 	if (!local_action && (act_ptr = gcs_fifo_lite_get_head(conn->repl_q))) {
 	    /* Check if there is any local action in REPL queue head */
@@ -788,13 +794,20 @@ long gcs_repl (gcs_conn_t          *conn,
         /* now having unlocked repl_q we can go waiting for action delivery */
         if (ret >= 0 && GCS_CONN_CLOSED > conn->state) {
             gu_cond_wait (&act.wait_cond, &act.wait_mutex);
-            if (act.act_id != GCS_SEQNO_ILL) {
-                *act_id       = act.act_id;       /* set by recv_thread */
-                *local_act_id = act.local_act_id; /* set by recv_thread */
-            }
-            else {
-                /* action was not replicated for some reason */
-                ret = -EINTR;
+
+            *act_id       = act.act_id;       /* set by recv_thread */
+            *local_act_id = act.local_act_id; /* set by recv_thread */
+
+            if (act.act_id < 0) {
+                assert (GCS_SEQNO_ILL == act.local_act_id);
+                if (act.act_id == GCS_SEQNO_ILL) {
+                    /* action was not replicated for some reason */
+                    ret = -EINTR;
+                }
+                else {
+                    /* core provided an error code */
+                    ret = act.act_id;
+                }
             }
         }
         gu_mutex_unlock  (&act.wait_mutex);
@@ -821,10 +834,8 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
 
     if (ret > 0) {
         assert (ret == size);
-        if (global > 0)
-            ret = global; // index of donor is in the global seqno
-        else
-            ret = global; //... not sure if we need to overwrite error here
+        assert (global >= 0);
+        ret = global; // index of donor is in the global seqno
     }
 
     return ret;

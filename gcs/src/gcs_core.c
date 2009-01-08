@@ -43,10 +43,10 @@ struct gcs_core
 
     /* send part */
     gu_mutex_t      send_lock;
-    bool            send_restart; // action send must be restarted.
     void*           send_buf;
     size_t          send_buf_len;
     gcs_seqno_t     send_act_no;
+    bool            act_restart; // action send must be restarted.
 
     /* recv part */
     gcs_recv_msg_t  recv_msg;
@@ -186,15 +186,15 @@ core_msg_send (gcs_core_t*    core,
         // TODO: nothing here can tell between GCS_ACT_DATA and GCS_ACT_SERVICE
         // when GCS_ACT_SERVICE will be implemented, we'll have to have two
         // restart flags - one for each of ongoing actions
-        register bool restart = core->send_restart && (type == GCS_MSG_ACTION);
+        register bool restart = core->act_restart && (type == GCS_MSG_ACTION);
         if (gu_likely((core->state == CORE_PRIMARY  && !restart) ||
                       (core->state == CORE_EXCHANGE && type == GCS_MSG_STATE_MSG))) {
             ret = core->backend.send (&core->backend, buf, buf_len, type);
         }
         else {
             if (core->state == CORE_PRIMARY && restart) {
-                core->send_restart = false; // next action doesn't need it
-                ret = -ERESTART;            // ask to restart action sending
+                core->act_restart = false; // next action doesn't need it
+                ret = -ERESTART;           // ask to restart action sending
             }
             else {
                 ret = core_error (core->state);
@@ -391,10 +391,17 @@ core_handle_act_msg (gcs_core_t*     core,
     ssize_t        ret = 0;
     gcs_group_t*   group = &core->group;
     gcs_act_frag_t frg;
+    register bool  my_msg = (gcs_group_my_idx(group) == msg->sender_idx);
 
     assert (GCS_MSG_ACTION == msg->type);
 
-    if (gcs_group_is_primary(group)) {
+    if (CORE_PRIMARY == core->state ||
+        (CORE_EXCHANGE == core->state && my_msg)) {
+        /* CORE_PRIMARY  - normal state
+         * CORE_EXCHANGE - must handle own message to return -ERESTART
+         *                 to caller (there is a race between actual view
+         *                 change in the backend and new COMP_MSG delivery,
+         *                 so a message can slip in) */
 
         ret = gcs_act_proto_read (&frg, msg->buf, msg->size);
         if (gu_unlikely(ret)) {
@@ -408,7 +415,7 @@ core_handle_act_msg (gcs_core_t*     core,
 
         if (ret > 0) { /* complete action received */
 
-            if (gu_likely(gcs_group_my_idx(group) != act->sender_idx)) {
+            if (gu_likely(!my_msg)) {
                 /* foreign action, must be passed from gcs_group */
                 assert (act->buf != NULL);
             }
@@ -423,6 +430,7 @@ core_handle_act_msg (gcs_core_t*     core,
                     sent_act_id = local_act->sent_act_id;
                     assert (NULL != act->buf);
                     gcs_fifo_lite_pop_head (core->fifo);
+                    /* NOTE! local_act cannot be used after this point */
                     /* sanity check */
                     if (gu_unlikely(sent_act_id != frg.act_id)) {
                         gu_fatal ("FIFO violation: expected sent_act_id %lld "
@@ -434,6 +442,14 @@ core_handle_act_msg (gcs_core_t*     core,
                     gu_fatal ("FIFO violation: queue empty when local action "
                               "received");
                     ret = -ENOTRECOVERABLE;
+                }
+
+                if (gu_unlikely(CORE_EXCHANGE == core->state)) {
+                    assert (core->act_restart);
+                    /* Just like with state requests, use act->id to pass
+                     * error code. Since this will be returned to the app,
+                     * use conventional EAGAIN */
+                    act->id = -EAGAIN;
                 }
             }
 //          gu_debug ("Received action: seqno: %lld, sender: %d, size: %d, act: %p",
@@ -447,8 +463,9 @@ core_handle_act_msg (gcs_core_t*     core,
             return -ENOTRECOVERABLE;
         }
     }
-    else { /* Non-primary - ignore action */
-        gu_warn ("Action message in non-primary configuration from "
+    else {
+        /* Non-primary - ignore action on slaves, return -EAGAIN on master */
+        gu_debug ("Action message in non-primary configuration from "
                  "member %d", msg->sender_idx);
     }
 
@@ -518,7 +535,8 @@ core_handle_comp_msg (gcs_core_t*     core,
         {
             assert (CORE_EXCHANGE != core->state);
             if (CORE_NON_PRIMARY == core->state) core->state = CORE_PRIMARY;
-            core->send_restart = false;
+// remove. send thread must clean this flag
+//            core->act_restart = false;
         }
         gu_mutex_unlock (&core->send_lock);
 
@@ -559,7 +577,7 @@ core_handle_comp_msg (gcs_core_t*     core,
                 }
                 core->state = CORE_EXCHANGE;
                 // since new members were added, need to resend ongoing actions
-                core->send_restart = true;
+                core->act_restart = true;
             }
             ret = 0; // no action to return, continue
         }
@@ -769,9 +787,9 @@ core_msg_to_action (gcs_core_t*     core,
         }
     }
     else {
-        gu_warn ("%s message from member %ld in non-primary configuration",
-                 gcs_msg_type_string[msg->type], msg->sender_idx);
-        assert(0);
+        gu_warn ("%s message from member %ld in non-primary configuration. "
+                 "Ignoring.", gcs_msg_type_string[msg->type], msg->sender_idx);
+//        assert(0);
     }
 
     return ret;
@@ -803,7 +821,6 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
 	switch (recv_msg->type) {
 	case GCS_MSG_ACTION:
             ret = core_handle_act_msg(conn, recv_msg, &recv_act);
-            assert (ret >= 0); // hang on error in debug mode
 	    break;
         case GCS_MSG_LAST:
             ret = core_handle_last_msg(conn, recv_msg, &recv_act);

@@ -45,6 +45,15 @@ msg_write (gcs_recv_msg_t* msg,
     msg->type       = type;
 }
 
+static long
+new_component (gcs_group_t* group, const gcs_comp_msg_t* comp)
+{
+    long ret = gcs_group_handle_comp_msg (group, comp);
+    // modelling real state exchange is really tedious here, just fake it
+    group->state = GCS_GROUP_PRIMARY;
+    return ret;
+}
+
 // just pretend we received SYNC message
 //#define RECEIVE_SYNC() group.new_memb = FALSE;
 #define RECEIVE_SYNC()
@@ -127,7 +136,7 @@ START_TEST (gcs_group_configuration)
     fail_if (comp == NULL);
     fail_if (gcs_comp_msg_add (comp, LOCALHOST));
 
-    ret = gcs_group_handle_comp_msg (&group, comp);
+    ret = new_component (&group, comp);
     fail_if (ret < 0);
 //    fail_if (!gcs_group_is_primary(&group));
 //    fail_if (!gcs_group_new_members(&group)); RECEIVE_SYNC();
@@ -196,7 +205,7 @@ START_TEST (gcs_group_configuration)
     fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
     fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
 
-    ret = gcs_group_handle_comp_msg (&group, comp);
+    ret = new_component (&group, comp);
     fail_if (ret < 0);
 //    fail_if (!gcs_group_is_primary(&group));
 //    fail_if (!gcs_group_new_members(&group)); RECEIVE_SYNC();
@@ -241,7 +250,7 @@ START_TEST (gcs_group_configuration)
     fail_if (act.buf_len != 0);
     fail_if (act.buf != NULL);
 
-    ret = gcs_group_handle_comp_msg (&group, comp);
+    ret = new_component (&group, comp);
     fail_if (ret < 0);
 //    fail_if (!gcs_group_is_primary(&group));
 //    fail_if (!gcs_group_new_members(&group)); RECEIVE_SYNC();
@@ -303,7 +312,7 @@ START_TEST (gcs_group_configuration)
     fail_if (comp == NULL);
     fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
     fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
-    ret = gcs_group_handle_comp_msg (&group, comp);
+    ret = new_component (&group, comp);
     fail_if (ret < 0);
 //    fail_if (!gcs_group_is_primary(&group));
 //    fail_if (gcs_group_new_members(&group), "Nodes: %d: node0 - '%s', "
@@ -355,7 +364,7 @@ return;
     comp = gcs_comp_msg_new (FALSE, -1, 0);
     fail_if (comp == NULL);
 
-    ret = gcs_group_handle_comp_msg (&group, comp);
+    ret = new_component (&group, comp);
     fail_if (ret < 0);
 //    fail_if (gcs_group_is_primary(&group));
     // comment until implemented: fail_if (!gcs_group_new_members(&group)); RECEIVE_SYNC();
@@ -406,7 +415,7 @@ START_TEST(gcs_group_last_applied)
 
     gcs_group_init(&group);
     mark_point();
-    ret = gcs_group_handle_comp_msg (&group, comp);
+    ret = new_component (&group, comp);
     fail_if (ret < 0);
 //    fail_if (!gcs_group_is_primary(&group));
 //    fail_if (!gcs_group_new_members(&group)); RECEIVE_SYNC();
@@ -451,7 +460,7 @@ START_TEST(gcs_group_last_applied)
     fail_if (gcs_comp_msg_add (comp, REMOTEHOST) < 0);
     fail_if (gcs_comp_msg_add (comp, DISTANTHOST"2") < 0);
 
-    ret = gcs_group_handle_comp_msg (&group, comp);
+    ret = new_component (&group, comp);
     fail_if (ret < 0);
 //    fail_if (!gcs_group_is_primary(&group));
 //    fail_if (gcs_group_new_members(&group)); RECEIVE_SYNC();
@@ -470,7 +479,7 @@ START_TEST(gcs_group_last_applied)
     fail_if (gcs_comp_msg_add (comp, DISTANTHOST"2") < 0);
     fail_if (gcs_comp_msg_add (comp, DISTANTHOST"1") < 0);
 
-    ret = gcs_group_handle_comp_msg (&group, comp);
+    ret = new_component (&group, comp);
     fail_if (ret < 0);
 //    fail_if (!gcs_group_is_primary(&group));
 //    fail_if (!gcs_group_new_members(&group));

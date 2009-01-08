@@ -1422,7 +1422,9 @@ mm_galera_commit(
     gu_mutex_unlock(&commit_mtx);
 
     /* replicate through gcs */
-    rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_DATA, &seqno_g, &seqno_l);
+    do {
+        rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_DATA, &seqno_g, &seqno_l);
+    } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP), true));
 //    gu_info ("gcs_repl(): act_type: %u, act_size: %u, act_id: %llu, "
 //             "local: %llu, ret: %d",
 //             GCS_ACT_DATA, len, seqno_g, seqno_l, rcode);
@@ -1737,7 +1739,10 @@ static enum galera_status mm_galera_to_execute_start(
 #endif
 
     /* replicate through gcs */
-    rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_DATA, &seqno_g, &seqno_l);
+    do {
+        rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_DATA, &seqno_g, &seqno_l);
+    } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP), true));
+
     if (rcode < 0) {
         gu_error("gcs failed for: %llu, %d", conn_id, rcode);
         assert (GCS_SEQNO_ILL == seqno_l);

@@ -125,8 +125,10 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
         act->type       = frg->act_type;
         act->sender_idx = sender_idx;
 
-        if (gu_likely(act->type == GCS_ACT_DATA)) {
+        if (gu_likely(GCS_ACT_DATA == act->type &&
+                      GCS_GROUP_PRIMARY == group->state)) {
             // increment act_id only for DATA (should it be renamed to TOTAL?)
+            // and only in PRIM (skip messages while in state exchange)
             act->id = ++group->act_id;
         } else if (act->type == GCS_ACT_STATE_REQ) {
             ret = gcs_group_handle_state_request (group, sender_idx, act);
