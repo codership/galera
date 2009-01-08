@@ -47,6 +47,7 @@ public:
 	trans_msgs.clear();
     }
     void deliver_data(const VSMessage *, const ReadBuf *);
+    void deliver_eof();
     void handle_conf(const VSMessage *);
     void handle_state(const VSMessage *);
     void handle_data(const VSMessage *, const ReadBuf *, const size_t, const bool);
@@ -172,10 +173,15 @@ void VSProto::deliver_data(const VSMessage *dm,
 	throw FatalException("Gap in message sequence");
     membs_p->second->expected_seq = dm->get_seq() + 1;
     VSUpMeta um(dm);
-    LOG_TRACE(std::string("Delivering message " + to_string(dm->get_seq())));
+    LOG_TRACE("Delivering message " + to_string(dm->get_seq()));
     pass_up(rb, dm->get_data_offset(), &um);
 }
 
+void VSProto::deliver_eof()
+{
+    LOG_DEBUG("delivering eof");
+    pass_up(0, 0, 0);
+}
 
 void VSProto::handle_state(const VSMessage *sm)
 {
@@ -422,7 +428,10 @@ void VS::handle_up(const int cid, const ReadBuf *rb, const size_t roff, const Pr
     VSProto *p = 0;
 
     if (rb == 0) {
-	throw DException("");
+	// for (VSProtoMap::iterator pi = proto.begin(); pi != proto.end(); ++pi) {
+	//  pi->second->deliver_eof();
+	// }
+	throw FatalException("broken backend connection");
     }
     
     LOG_TRACE("VS:handle_up()");
