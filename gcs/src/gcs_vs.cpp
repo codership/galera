@@ -59,6 +59,15 @@ public:
     void handle_up(const int cid, const ReadBuf *rb, const size_t roff, 
 		   const ProtoUpMeta *um) {
 	const VSUpMeta *vum = static_cast<const VSUpMeta *>(um);
+	// null rb and um denotes eof (broken connection)
+	if (!(rb || vum)) {
+	    gu_mutex_lock(&mutex);
+	    eq.push_back(vs_ev(0, 0, 0, 0));
+	    gu_cond_signal(&cond);
+	    gu_mutex_unlock(&mutex);
+	    return;
+	}
+
 	assert((rb && vum->msg) || vum->view);
 	if (state == JOINING) {
 	    assert(vum->view);
@@ -199,6 +208,10 @@ retry:
     if (wr.second == false)
 	return -ENOTCONN;
     vs_ev& ev(wr.first);
+
+    if (!(ev.msg || ev.view))
+	return -ENOTCONN;
+
     assert((ev.msg && (ev.rb || ev.msg_size))|| ev.view);
 
     if (ev.msg) {
@@ -267,10 +280,18 @@ static GCS_BACKEND_NAME_FN(gcs_vs_name)
 static void *conn_run(void *arg)
 {
     conn_t *conn = reinterpret_cast<conn_t*>(arg);
-    while (true) {
-	int err = conn->vs_ctx.po->poll(std::numeric_limits<int>::max());
-	if (err < 0)
-	    abort();
+    try {
+
+	while (true) {
+	    int err = conn->vs_ctx.po->poll(std::numeric_limits<int>::max());
+	    if (err < 0) {
+		gu_fatal("unrecoverable error: '%s'", strerror(err));
+		abort();
+	    }
+	}
+    } catch (Exception e) {
+	gu_error("poll error: '%s', thread exiting", e.what());
+	conn->vs_ctx.handle_up(-1, 0, 0, 0);
     }
     return 0;
 }
@@ -335,7 +356,7 @@ GCS_BACKEND_CREATE_FN(gcs_vs_create)
     if (NULL == sock || strlen(sock) == 0)
         sock = vs_default_socket;
 
-    gu_debug ("Opening conneciton to '%s'", sock);
+    gu_debug ("Opening connection to '%s'", sock);
 
     try {
 	conn = new gcs_backend_conn;	

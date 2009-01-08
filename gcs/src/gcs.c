@@ -439,8 +439,17 @@ static void *gcs_recv_thread (void *arg)
                                        &action,
                                        &act_type,
                                        &act_id)) < 0) {
-	    ret = act_size;
-	    gu_debug ("gcs_core_recv returned %d: %s", ret, strerror(-ret));
+
+	    gcs_act_t *slave_act = gu_fifo_get_tail(conn->recv_q);
+            slave_act->act_size     = 0;
+            slave_act->act_type     = GCS_ACT_ERROR;
+            slave_act->act_id       = GCS_SEQNO_ILL;
+            slave_act->local_act_id = GCS_SEQNO_ILL;
+            slave_act->action       = NULL;
+            gu_fifo_push_tail(conn->recv_q);
+
+            ret = act_size;
+            gu_debug ("gcs_core_recv returned %d: %s", ret, strerror(-ret));
 	    break;
 	}
 
