@@ -159,17 +159,17 @@ galera_start()
     LIBGALERA=${LIBGALERA:-"$GALERA_BASE_DIR/lib/libmmgalera.so"}
     if test -f $LIBGALERA
     then
-	GALERA_OPTS="$GALERA_OPTS --galera_driver=$LIBGALERA"
+	GALERA_OPTS="$GALERA_OPTS --wsrep_driver=$LIBGALERA"
     fi
 
     if test -n "$GCS_ADDRESS"
     then
-        GALERA_OPTS="$GALERA_OPTS --galera_gcs_address=$GCS_ADDRESS"
+        GALERA_OPTS="$GALERA_OPTS --wsrep_gcs_address=$GCS_ADDRESS"
     fi
 
     if test -n "$SLAVE_THREADS"
     then
-        GALERA_OPTS="$GALERA_OPTS --galera_slave_threads=$SLAVE_THREADS"
+        GALERA_OPTS="$GALERA_OPTS --wsrep_slave_threads=$SLAVE_THREADS"
     fi
 
     echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening to port $MYSQL_PORT and socket $MYSQL_SOCKET..."
