@@ -3,7 +3,7 @@ lib_LTLIBRARIES = libgalera.la libdummy.la
 noinst_PROGRAMS = test
 
 
-libgalera_la_SOURCES = galera.c galera.h
+libgalera_la_SOURCES = wsrep.c wsrep.h
 libgalera_la_CFLAGS = -DGALERA_INTERFACE_VERSION=\"$(INTERFACE):$(REVISION):$(AGE)\"
 INTERFACE = 1
 REVISION  = 0

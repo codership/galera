@@ -1,5 +1,5 @@
 
-#include <galera.h>
+#include <wsrep.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,13 +17,13 @@ int main(int argc, char **argv)
     
 
 
-    if ((err = galera_load(argv[1], NULL)) != 0) {
+    if ((err = wsrep_load(argv[1], NULL)) != 0) {
         fprintf(stderr, "Failed to load '%s': '%s'\n", 
                 argv[1], strerror(err));
         return EXIT_FAILURE;
     } else {
         fprintf(stderr, "Library loaded successfully\n");
-        galera_unload(NULL);
+        wsrep_unload(NULL);
     }
 
     return EXIT_SUCCESS;
