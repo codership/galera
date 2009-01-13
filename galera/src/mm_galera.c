@@ -1109,7 +1109,7 @@ static enum wsrep_status mm_galera_cancel_commit(wsrep_t *gh,
             );
             //abort();
         } else {
-          gu_warn("no seqno for trx, marked trx aborted: %llu", victim_trx);
+            gu_debug("no seqno for trx, marked trx aborted: %llu", victim_trx);
         }
         break;
 
