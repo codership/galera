@@ -96,15 +96,18 @@ export MYSQL_REV
 export GALERA_REV
 export GALERA_SRC
 
+uname -m | grep -q i686
+if test $? == 0; then CPU=pentium; else CPU=amd64; fi
+
 # Build mysqld
 if [ "$CONFIGURE" == "yes" ]
 then
     rm -f config.status
     if [ "$DEBUG" == "yes" ]
     then
-        BUILD/compile-pentium-debug-galera
+        BUILD/compile-$CPU-debug-wsrep
     else
-        BUILD/compile-pentium-galera
+        BUILD/compile-$CPU-wsrep
     fi
 else # just recompile and relink with old configuration
     make
