@@ -470,7 +470,7 @@ struct wsrep_ {
     void *opaque;
 };
     
-typedef int (*wsrep_loader_fun)(wsrep_t **);
+typedef int (*wsrep_loader_fun)(wsrep_t *);
 
 
 /*!

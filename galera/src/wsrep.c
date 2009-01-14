@@ -11,253 +11,278 @@
 #include <limits.h>
 #include <unistd.h>
 
-static wsrep_t *wsrep_ctx = NULL;
-static int dummy_mode = 0;
-
 #define WSREP_INTERFACE_VERSION "1:0:0"
 
-enum wsrep_status wsrep_init(const char *gcs_group, 
-                               const char *gcs_address, 
-                               const char *data_dir,
-                               wsrep_log_cb_t logger)
-{
-    if (dummy_mode)
-	return WSREP_OK;
 
-    assert(wsrep_ctx);
-    fprintf(stderr, "library loaded successfully\n");
-    return wsrep_ctx->init(wsrep_ctx, gcs_group, gcs_address, data_dir, logger);
+struct dummy_wsrep
+{
+    wsrep_log_cb_t log_fn;
+};
+
+/* Get pointer to dummy_wsrep from wsrep_t pointer */
+#define DUMMY_PRIV(_p) ((struct dummy_wsrep *) (_p)->opaque)
+
+#define DBUG_ENTER(_w) do {                                             \
+        if (DUMMY_PRIV(_w)->log_fn)                                     \
+            DUMMY_PRIV(_w)->log_fn(WSREP_LOG_DEBUG, __FUNCTION__);      \
+    } while (0)
+
+
+static void dummy_tear_down(wsrep_t *w)
+{
+    DBUG_ENTER(w);
+    free(w->opaque);
+    w->opaque = NULL;
 }
 
-
-enum wsrep_status wsrep_tear_down()
+static wsrep_status_t dummy_init(
+    wsrep_t *w, 
+    const char *gcs_group __attribute__((unused)), 
+    const char *gcs_address __attribute__((unused)), 
+    const char *data_dir __attribute__((unused)), 
+    wsrep_log_cb_t logger)
 {
-    if (dummy_mode)
-	return WSREP_OK;
-
-    assert(wsrep_ctx);
-    wsrep_ctx->tear_down(wsrep_ctx);
+    DUMMY_PRIV(w)->log_fn = logger;
+    DBUG_ENTER(w);
     return WSREP_OK;
 }
 
-enum wsrep_status wsrep_set_conf_param_cb(wsrep_conf_param_fun configurator)
+
+static wsrep_status_t dummy_enable(wsrep_t *w)
 {
-    if (dummy_mode)
-	return WSREP_OK;
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_disable(wsrep_t *w)
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_recv(wsrep_t *w, void *ctx __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    sleep(UINT_MAX);
+    return WSREP_OK;
+}
+
+static void dummy_dbug_push(wsrep_t *w, const char *ctrl __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+}
+
+static void dummy_dbug_pop(wsrep_t *w)
+{
+    DBUG_ENTER(w);
+}
+
+static wsrep_status_t dummy_set_logger(wsrep_t *w, wsrep_log_cb_t logger)
+{
+    DUMMY_PRIV(w)->log_fn = logger;
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_set_conf_param_cb(
+    wsrep_t *w, 
+    wsrep_conf_param_fun fun __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_set_execute_handler(
+    wsrep_t *w, 
+    wsrep_bf_execute_fun fun __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_set_execute_handler_rbr(
+    wsrep_t *w, 
+    wsrep_bf_execute_fun fun __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_set_ws_start_handler(
+    wsrep_t *w, 
+    wsrep_ws_start_fun fun __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_commit(
+    wsrep_t *w, 
+    const trx_id_t trx_id __attribute__((unused)), 
+    const conn_id_t conn_id __attribute__((unused)), 
+    const char *query __attribute__((unused)), 
+    const size_t query_len __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_replay_trx(
+    wsrep_t *w, 
+    const trx_id_t trx_id __attribute__((unused)), 
+    void *app_ctx __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_cancel_commit(
+    wsrep_t *w, 
+    const bf_seqno_t bf_seqno __attribute__((unused)), 
+    const trx_id_t trx_id __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_cancel_slave(
+    wsrep_t *w, 
+    const bf_seqno_t bf_seqno __attribute__((unused)), 
+    const bf_seqno_t victim_seqno __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_committed(
+    wsrep_t *w, 
+    const trx_id_t trx_id __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_rolledback(
+    wsrep_t *w, 
+    const trx_id_t trx_id __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+
+static wsrep_status_t dummy_append_query(
+    wsrep_t *w, 
+    const trx_id_t trx_id __attribute__((unused)), 
+    const char *query __attribute__((unused)), 
+    const time_t timeval __attribute__((unused)),
+    const uint32_t randseed __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_append_row_key(
+    wsrep_t *w, 
+    const trx_id_t trx_id __attribute__((unused)), 
+    const char *dbtable __attribute__((unused)),
+    const size_t dbtable_len __attribute__((unused)),
+    const char *key __attribute__((unused)), 
+    const size_t key_len __attribute__((unused)), 
+    const wsrep_action_t action __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+
+static wsrep_status_t dummy_set_variable(
+    wsrep_t *w, 
+    const conn_id_t conn_id __attribute__((unused)), 
+    const char *key __attribute__((unused)), 
+    const size_t key_len __attribute__((unused)),
+    const char *query __attribute__((unused)), 
+    const size_t query_len __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_set_database(
+    wsrep_t *w, 
+    const conn_id_t conn_id __attribute__((unused)), 
+    const char *query __attribute__((unused)), 
+    const size_t query_len __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_to_execute_start(
+    wsrep_t *w, 
+    const conn_id_t conn_id __attribute__((unused)),
+    const char *query __attribute__((unused)), 
+    const size_t query_len __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_to_execute_end(
+    wsrep_t *w,
+    const conn_id_t conn_id __attribute__((unused)))
+{
+    DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+
+static wsrep_t dummy_init_str = {
+    WSREP_INTERFACE_VERSION,
+    &dummy_init,
+    &dummy_enable,
+    &dummy_disable,
+    &dummy_recv,
+    &dummy_dbug_push,
+    &dummy_dbug_pop,
+    &dummy_set_logger,
+    &dummy_set_conf_param_cb,
+    &dummy_set_execute_handler,
+    &dummy_set_execute_handler_rbr,
+    &dummy_set_ws_start_handler,
+    &dummy_commit,
+    &dummy_replay_trx,
+    &dummy_cancel_commit,
+    &dummy_cancel_slave,
+    &dummy_committed,
+    &dummy_rolledback,
+    &dummy_append_query,
+    &dummy_append_row_key,
+    &dummy_set_variable,
+    &dummy_set_database,
+    &dummy_to_execute_start,
+    &dummy_to_execute_end,
+    &dummy_tear_down,
+    NULL,
+    NULL
+};
+
+
+static int dummy_loader(wsrep_t *hptr)
+{
+    if (!hptr)
+        return EINVAL;
     
-    assert(wsrep_ctx);
-    return wsrep_ctx->set_conf_param_cb(wsrep_ctx, configurator);
-}
-
-enum wsrep_status wsrep_set_logger(wsrep_log_cb_t logger)
-{
-    if (dummy_mode)
-	return WSREP_OK;
+    *hptr = dummy_init_str;
     
-    assert(wsrep_ctx);
-    return wsrep_ctx->set_logger(wsrep_ctx, logger);
-}
-
-void wsrep_dbug_push(const char *control)
-{
-    if (dummy_mode)
-	return;
+    if (!(hptr->opaque = malloc(sizeof(struct dummy_wsrep))))
+        return ENOMEM;
     
-    assert(wsrep_ctx);
-    wsrep_ctx->dbug_push(wsrep_ctx, control);
-}
-
-void wsrep_dbug_pop()
-{
-    if (dummy_mode)
-	return;
+    DUMMY_PRIV(hptr)->log_fn = NULL;
     
-    assert(wsrep_ctx);
-    wsrep_ctx->dbug_pop(wsrep_ctx);
+    return 0;
 }
 
-
-enum wsrep_status wsrep_set_execute_handler(wsrep_bf_execute_fun fun)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->set_execute_handler(wsrep_ctx, fun);
-}
-
-enum wsrep_status wsrep_set_execute_handler_rbr(wsrep_bf_execute_fun fun)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->set_execute_handler_rbr(wsrep_ctx, fun);
-}
-
-enum wsrep_status wsrep_set_ws_start_handler(wsrep_ws_start_fun fun)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->set_ws_start_handler(wsrep_ctx, fun);
-}
-
-enum wsrep_status wsrep_enable()
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->enable(wsrep_ctx);
-}
-
-
-enum wsrep_status wsrep_disable()
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->disable(wsrep_ctx);
-}
-
-enum wsrep_status wsrep_recv(void *ctx)
-{
-    if (dummy_mode) {
-        sleep(UINT_MAX);
-	return WSREP_OK;
-    }
-    assert(wsrep_ctx);
-    return wsrep_ctx->recv(wsrep_ctx, ctx);
-}
-
-
-enum wsrep_status wsrep_commit(trx_id_t trx_id, conn_id_t conn_id, 
-                                 const char *rbr_data, size_t data_len)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->commit(wsrep_ctx, trx_id, conn_id, rbr_data, data_len);
-}
-
-enum wsrep_status wsrep_replay_trx(trx_id_t trx_id, void *app_ctx)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->replay_trx(wsrep_ctx, trx_id, app_ctx);
-}
-
-enum wsrep_status wsrep_cancel_commit(bf_seqno_t bf_seqno, trx_id_t victim_trx)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->cancel_commit(wsrep_ctx, bf_seqno, victim_trx);
-}
-
-
-enum wsrep_status wsrep_cancel_slave(bf_seqno_t bf_seqno, bf_seqno_t victim_seqno)
-{
-    if (dummy_mode)
-        return WSREP_OK;
-    assert(wsrep_ctx);
-    return wsrep_ctx->cancel_slave(wsrep_ctx, bf_seqno, victim_seqno);
-}
-
-enum wsrep_status wsrep_committed(trx_id_t trx_id)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->committed(wsrep_ctx, trx_id);
-}
-
-enum wsrep_status wsrep_rolledback(trx_id_t trx_id)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->rolledback(wsrep_ctx, trx_id);
-}
-
-enum wsrep_status wsrep_append_query(
-    trx_id_t trx_id, const char *query, time_t timeval, uint32_t randseed
-)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->append_query(wsrep_ctx, trx_id, query, timeval, randseed);
-}
-
-
-enum wsrep_status wsrep_append_row_key(
-    trx_id_t trx_id,
-    char    *dbtable,
-    uint16_t dbtable_len,
-    uint8_t *key,
-    uint16_t key_len,
-    enum wsrep_action action)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->append_row_key(wsrep_ctx, trx_id, dbtable, dbtable_len,
-                                      (char*)key, key_len, action);
-}
-
-enum wsrep_status wsrep_set_variable(    
-    conn_id_t conn_id, 
-    char *key,   uint16_t key_len, 
-    char *query, uint16_t query_len)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->set_variable(wsrep_ctx, conn_id, key, key_len, query, query_len);
-}
-
-enum wsrep_status wsrep_set_database(
-    conn_id_t conn_id, char *query, uint16_t query_len)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->set_database(wsrep_ctx, conn_id, query, query_len);
-}
-
-enum wsrep_status wsrep_to_execute_start(
-    conn_id_t conn_id, char *query, uint16_t query_len
-)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->to_execute_start(wsrep_ctx, conn_id, query, query_len);
-}
-
-enum wsrep_status wsrep_to_execute_end(conn_id_t conn_id)
-{
-    if (dummy_mode)
-	return WSREP_OK;
-    
-    assert(wsrep_ctx);
-    return wsrep_ctx->to_execute_end(wsrep_ctx, conn_id);
-}
 
 
 
@@ -265,39 +290,39 @@ enum wsrep_status wsrep_to_execute_end(conn_id_t conn_id)
  * Library loader
  **************************************************************************/
 
-static int verify(const wsrep_t *gh, const char *iface_ver)
+static int verify(const wsrep_t *wh, const char *iface_ver)
 {
 #define VERIFY(_p) if (!(_p)) {					\
 	fprintf(stderr, "wsrep_load(): verify(): %s\n", # _p);	\
 	return EINVAL;						\
     }
 
-    VERIFY(gh);
-    VERIFY(gh->version);
-    VERIFY(strcmp(gh->version, iface_ver) == 0);
-    VERIFY(gh->init);
-    VERIFY(gh->enable);
-    VERIFY(gh->disable);
-    VERIFY(gh->recv);
-    VERIFY(gh->dbug_push);
-    VERIFY(gh->dbug_pop);
-    VERIFY(gh->set_logger);
-    VERIFY(gh->set_conf_param_cb);
-    VERIFY(gh->set_execute_handler);
-    VERIFY(gh->set_execute_handler_rbr);
-    VERIFY(gh->set_ws_start_handler);
-    VERIFY(gh->commit);
-    VERIFY(gh->replay_trx);
-    VERIFY(gh->cancel_commit);
-    VERIFY(gh->cancel_slave);
-    VERIFY(gh->committed);
-    VERIFY(gh->rolledback);
-    VERIFY(gh->append_query);
-    VERIFY(gh->append_row_key);
-    VERIFY(gh->set_variable);
-    VERIFY(gh->set_database);
-    VERIFY(gh->to_execute_start);
-    VERIFY(gh->to_execute_end);
+    VERIFY(wh);
+    VERIFY(wh->version);
+    VERIFY(strcmp(wh->version, iface_ver) == 0);
+    VERIFY(wh->init);
+    VERIFY(wh->enable);
+    VERIFY(wh->disable);
+    VERIFY(wh->recv);
+    VERIFY(wh->dbug_push);
+    VERIFY(wh->dbug_pop);
+    VERIFY(wh->set_logger);
+    VERIFY(wh->set_conf_param_cb);
+    VERIFY(wh->set_execute_handler);
+    VERIFY(wh->set_execute_handler_rbr);
+    VERIFY(wh->set_ws_start_handler);
+    VERIFY(wh->commit);
+    VERIFY(wh->replay_trx);
+    VERIFY(wh->cancel_commit);
+    VERIFY(wh->cancel_slave);
+    VERIFY(wh->committed);
+    VERIFY(wh->rolledback);
+    VERIFY(wh->append_query);
+    VERIFY(wh->append_row_key);
+    VERIFY(wh->set_variable);
+    VERIFY(wh->set_database);
+    VERIFY(wh->to_execute_start);
+    VERIFY(wh->to_execute_end);
     return 0;
 }
 
@@ -317,24 +342,21 @@ int wsrep_load(const char *spec, wsrep_t **hptr)
     int ret = 0;
     void *dlh = NULL;
     wsrep_loader_fun dlfun;
-
     
-    if (!spec)
+    if (!(spec && hptr))
         return EINVAL;
-
+    
+    if (!(*hptr = malloc(sizeof(wsrep_t))))
+        return ENOMEM;
+    
     fprintf(stderr, "wsrep_load(): loading %s\n", spec);
-
+    
     if (strcmp(spec, "dummy") == 0) {
-	dummy_mode = 1;
-	return 0;
-    }
-
-    if (!hptr) {
-        if (wsrep_ctx)
-            return EBUSY;
-        hptr = &wsrep_ctx;
-    } else {
-        *hptr = NULL;
+        if ((ret = dummy_loader(*hptr)) != 0) {
+            free(*hptr);
+            *hptr = NULL;
+        }
+	return ret;
     }
     
     if (!(dlh = dlopen(spec, RTLD_NOW | RTLD_LOCAL))) {
@@ -342,34 +364,38 @@ int wsrep_load(const char *spec, wsrep_t **hptr)
         ret = EINVAL;
         goto out;
     }
-
+    
     if (!(dlfun = wsrep_dlf(dlh, "wsrep_loader"))) {
 	fprintf(stderr, "wsrep_load(): dlopen(): %s\n", dlerror());
         ret = EINVAL;
         goto out;
         
     }
-
-    ret = (*dlfun)(hptr);
     
-    if (ret == 0 && !*hptr) {
-	fprintf(stderr, "wsrep_load(): loader failed\n");
-        ret = EACCES;
+    if ((ret = (*dlfun)(*hptr)) != 0) {
+        fprintf(stderr, "wsrep_load(): loader failed: %s\n", strerror(ret));
+        goto out;
     }
-    if (ret == 0 && 
-        (ret = verify(*hptr, WSREP_INTERFACE_VERSION)) != 0 &&
+    
+    if ((ret = verify(*hptr, WSREP_INTERFACE_VERSION)) != 0 &&
         (*hptr)->tear_down) {
 	fprintf(stderr, "wsrep_load(): interface version mismatch\n");
         (*hptr)->tear_down(*hptr);
+        goto out;
     }
-    if (ret == 0)
-        (*hptr)->dlh = dlh;
+    
+    (*hptr)->dlh = dlh;
+
 out:
-    if (ret != 0 && dlh)
-        dlclose(dlh);
-    if (ret == 0) {
-      fprintf(stderr, "wsrep_load(): driver loaded succesfully\n");
+    if (ret != 0) {
+        if (dlh)
+            dlclose(dlh);
+        free(*hptr);
+        *hptr = NULL;
+    } else {
+        fprintf(stderr, "wsrep_load(): driver loaded succesfully\n");
     }
+
     return ret;
 }
 
@@ -377,20 +403,12 @@ out:
 
 void wsrep_unload(wsrep_t *hptr)
 {
-    void *dlh;
-
-    if (dummy_mode) {
-	dummy_mode = 0;
-	return;
-    }
-    
     if (!hptr) {
-        hptr = wsrep_ctx;
-        wsrep_ctx = NULL;
+        fprintf(stderr, "wsrep_unload(): null pointer\n");
+    } else {
+        if (hptr->dlh)
+            dlclose(hptr->dlh);
+        free(hptr);
     }
-    assert(hptr);
-    dlh = hptr->dlh;
-    if (dlh)
-        dlclose(dlh);
 }
 

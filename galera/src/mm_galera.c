@@ -1928,12 +1928,12 @@ static wsrep_t mm_galera_str = {
 };
 
 /* Prototype to make compiler happy */
-int wsrep_loader(wsrep_t **hptr);
+int wsrep_loader(wsrep_t *hptr);
 
-int wsrep_loader(wsrep_t **hptr)
+int wsrep_loader(wsrep_t *hptr)
 {
     if (!hptr)
 	return EINVAL;
-    *hptr = &mm_galera_str;
+    *hptr = mm_galera_str;
     return WSREP_OK;
 }
