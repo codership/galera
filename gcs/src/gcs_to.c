@@ -388,7 +388,7 @@ long gcs_to_interrupt (gcs_to_t *to, gcs_seqno_t seqno)
         if (seqno >= to->seqno) {
             to_waiter_t *w = to_get_waiter (to, seqno);
             if (w->state == HOLDER) {
-                gu_warn ("trying to interrupt in use seqno: seqno = %llu, "
+                gu_debug ("trying to interrupt in use seqno: seqno = %llu, "
                      "TO seqno = %llu", seqno, to->seqno);
                 /* gu_mutex_unlock (&to->lock); */
                 rcode = -ERANGE;
