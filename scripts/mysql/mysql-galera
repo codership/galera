@@ -159,7 +159,7 @@ galera_start()
     WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera.so"}
     if test -f $WSREP || test $WSREP == "none"
     then
-	WSREP_OPTS="$WSREP_OPTS --wsrep_driver=$WSREP"
+	WSREP_OPTS="$WSREP_OPTS --wsrep_provider=$WSREP"
     else
 	echo "WSREP driver '$WSREP' not found"
 	exit -1

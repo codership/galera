@@ -1,8 +1,19 @@
+/* Copyright (C) 2009 Codership Oy <info@codersihp.com>
 
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; version 2 of the License.
 
-#include "wsrep.h"
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
 
-
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+ 
 #include <dlfcn.h>
 #include <errno.h>
 #include <assert.h>
@@ -11,8 +22,9 @@
 #include <limits.h>
 #include <unistd.h>
 
-#define WSREP_INTERFACE_VERSION "1:0:0"
+#include "wsrep.h"
 
+const char* const WSREP_NONE = "none";
 
 struct dummy_wsrep
 {
@@ -47,7 +59,6 @@ static wsrep_status_t dummy_init(
     return WSREP_OK;
 }
 
-
 static wsrep_status_t dummy_enable(wsrep_t *w)
 {
     DBUG_ENTER(w);
@@ -63,7 +74,6 @@ static wsrep_status_t dummy_disable(wsrep_t *w)
 static wsrep_status_t dummy_recv(wsrep_t *w, void *ctx __attribute__((unused)))
 {
     DBUG_ENTER(w);
-    sleep(UINT_MAX);
     return WSREP_OK;
 }
 
@@ -236,7 +246,6 @@ static wsrep_status_t dummy_to_execute_end(
     return WSREP_OK;
 }
 
-
 static wsrep_t dummy_init_str = {
     WSREP_INTERFACE_VERSION,
     &dummy_init,
@@ -266,7 +275,6 @@ static wsrep_t dummy_init_str = {
     NULL,
     NULL
 };
-
 
 static int dummy_loader(wsrep_t *hptr)
 {
@@ -346,14 +354,16 @@ int wsrep_load(const char *spec, wsrep_t **hptr)
     if (!(spec && hptr))
         return EINVAL;
     
-    if (!(*hptr = malloc(sizeof(wsrep_t))))
+    fprintf(stderr, "wsrep_load(): loading provider library '%s'\n", spec);
+    
+    if (!(*hptr = malloc(sizeof(wsrep_t)))) {
+	fprintf(stderr, "wsrep_load(): out of memory");
         return ENOMEM;
-    
-    fprintf(stderr, "wsrep_load(): loading %s\n", spec);
-    
-    if (strcmp(spec, "dummy") == 0) {
+    }
+
+    if (strcmp(spec, WSREP_NONE) == 0) {
         if ((ret = dummy_loader(*hptr)) != 0) {
-            free(*hptr);
+	    free (*hptr);
             *hptr = NULL;
         }
 	return ret;
@@ -362,14 +372,12 @@ int wsrep_load(const char *spec, wsrep_t **hptr)
     if (!(dlh = dlopen(spec, RTLD_NOW | RTLD_LOCAL))) {
 	fprintf(stderr, "wsrep_load(): dlopen(): %s\n", dlerror());
         ret = EINVAL;
-        goto out;
+	goto out;
     }
     
     if (!(dlfun = wsrep_dlf(dlh, "wsrep_loader"))) {
-	fprintf(stderr, "wsrep_load(): dlopen(): %s\n", dlerror());
         ret = EINVAL;
-        goto out;
-        
+	goto out;
     }
     
     if ((ret = (*dlfun)(*hptr)) != 0) {
@@ -393,7 +401,7 @@ out:
         free(*hptr);
         *hptr = NULL;
     } else {
-        fprintf(stderr, "wsrep_load(): driver loaded succesfully\n");
+        fprintf(stderr, "wsrep_load(): provider loaded succesfully\n");
     }
 
     return ret;
@@ -411,4 +419,3 @@ void wsrep_unload(wsrep_t *hptr)
         free(hptr);
     }
 }
-

@@ -79,8 +79,6 @@ struct galera_info Galera;
 
 static gu_mutex_t commit_mtx;
 
-static my_bool mark_commit_early = FALSE;
-
 //#define EXTRA_DEBUG
 #ifdef EXTRA_DEBUG
 static FILE *wslog_L;
@@ -182,12 +180,6 @@ static enum wsrep_status mm_galera_set_conf_param_cb(
     app_configurator = configurator;
     wsdb_set_conf_param_cb(galera_configurator);
 
-
-    /* consult application for early commit */
-    mark_commit_early = wsdb_conf_get_param(
-        WSREP_CONF_MARK_COMMIT_EARLY, WSREP_TYPE_INT
-    ) ?
-      *(my_bool *)wsdb_conf_get_param(WSREP_CONF_MARK_COMMIT_EARLY, WSREP_TYPE_INT) : 0;
 
     /* set debug logging on, if requested by app */
     if ( *(my_bool *)configurator(WSREP_CONF_DEBUG, WSREP_TYPE_INT)) {
@@ -1216,16 +1208,8 @@ static enum wsrep_status mm_galera_committed(wsrep_t *gh, trx_id_t trx_id) {
     if (trx.state == WSDB_TRX_REPLICATED) {
 
         do_report = report_check_counter ();
-/*
-	if (gcs_to_release(commit_queue, trx.seqno_l)) {
-	    gu_fatal("Could not release commit resource for %lld", trx.seqno_l);
-	    abort();
-	}
-*/
+
         GALERA_RELEASE_COMMIT_QUEUE(trx.seqno_l);
-        if (!mark_commit_early) {
-            wsdb_set_local_trx_committed(trx_id);
-        }
 
         wsdb_delete_local_trx_info(trx_id);
     } else if (trx.state != WSDB_TRX_MISSING) {
@@ -1533,9 +1517,7 @@ mm_galera_commit(
         }
 
         // we can update last seen trx counter already here
-        if (mark_commit_early) {
-            wsdb_set_local_trx_committed(trx_id);
-        }
+        wsdb_set_local_trx_committed(trx_id);
     } else {
 	/* Cancel commit queue since we are going to rollback */
         GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);

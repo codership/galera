@@ -1,4 +1,19 @@
-/* Copyright (C) 2007 Codership Oy <info@codership.com> */
+/* Copyright (C) 2009 Codership Oy <info@codership.com>
+
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; version 2 of the License.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
 #ifndef WSREP_H
 #define WSREP_H
 
@@ -13,6 +28,11 @@ extern "C" {
 /*
  *  wsrep replication API
  */
+
+#define WSREP_INTERFACE_VERSION "1:0:0"
+
+/* Empty wsrep backend */
+extern const char* const WSREP_NONE;
 
 /* status codes */
 typedef enum wsrep_status {
@@ -30,7 +50,6 @@ typedef enum wsrep_status {
 typedef enum wsrep_conf_param_id {
     WSREP_CONF_LOCAL_CACHE_SIZE,  //!< max size for local cache
     WSREP_CONF_WS_PERSISTENCY,    //!< WS persistency policy
-    WSREP_CONF_MARK_COMMIT_EARLY, //!< update last seen trx asap
     WSREP_CONF_DEBUG,             //!< enable debug level logging
 } wsrep_conf_param_id_t;
 
@@ -40,14 +59,11 @@ typedef enum wsrep_conf_param_type {
     WSREP_TYPE_STRING,  //!< null terminated string
 } wsrep_conf_param_type_t;
 
-
-
 typedef enum wsrep_action {
     WSREP_UPDATE,
     WSREP_DELETE,
     WSREP_INSERT,
 } wsrep_action_t;
-
 
 typedef uint64_t ws_id_t;
 typedef uint64_t trx_id_t;
@@ -160,10 +176,10 @@ enum wsrep_status wsrep_set_logger(wsrep_log_cb_t logger);
  * @param error_fun   handler for error logging from wsrepw library
  *
  */
-enum wsrep_status wsrep_init (const char           *gcs_group,
-				const char           *gcs_address,
-				const char           *data_dir,
-				wsrep_log_cb_t       logger);
+enum wsrep_status wsrep_init (const char     *gcs_group,
+                              const char     *gcs_address,
+                              const char     *data_dir,
+                              wsrep_log_cb_t  logger);
 /*!
  * @brief Push/pop DBUG control string to wsrep own DBUG implementation.
  *        (optional)
@@ -226,9 +242,9 @@ enum wsrep_status wsrep_recv(void *ctx);
  *
  */
 enum wsrep_status wsrep_commit(trx_id_t    trx_id,
-                                 conn_id_t   conn_id,
-                                 const char *rbr_data,
-                                 size_t      data_len);
+                               conn_id_t   conn_id,
+                               const char *rbr_data,
+                               size_t      data_len);
 
 /*!
  * @brief wsrep_replay_trx
@@ -273,25 +289,22 @@ enum wsrep_status wsrep_replay_trx(trx_id_t trx_id, void *app_ctx);
 enum wsrep_status wsrep_cancel_commit(
     bf_seqno_t bf_seqno, trx_id_t victim_trx
 );
-enum wsrep_status wsrep_cancel_slave(
-    bf_seqno_t bf_seqno, bf_seqno_t victim_seqno
-);
+
 /*!
- * @brief withdraws a previously started commit
+ * @brief cancel another brute force transaction
  *
- * wsrep_commit may stay waiting for total order semaphor
- * It is possible, that some other brute force transaction needs
- * to abort this commit operation.
+ * This routine is needed only if parallel applying is allowed
+ * to happen.
  *
- * @param victim_seqno seqno of transaction, who needs to rollback
+ * @param bf_seqno seqno of brute force trx, running this cancel
+ * @param victim_seqno seqno of transaction to be killed
  *
  * @retval WSREP_OK         successful kill operaton
  * @retval WSREP_WARNING    could not kill the victim
  *
  */
-enum wsrep_status wsrep_withdraw_commit(bf_seqno_t victim_seqno);
-enum wsrep_status wsrep_withdraw_commit_by_trx(
-    trx_id_t victim_trx
+enum wsrep_status wsrep_cancel_slave(
+    bf_seqno_t bf_seqno, bf_seqno_t victim_seqno
 );
 
 /*!
@@ -362,7 +375,6 @@ enum wsrep_status wsrep_set_database(
     conn_id_t conn_id, char *query, uint16_t query_len
 );
 
-
 /*!
  * @brief executes a query under total order control
  *
@@ -384,9 +396,6 @@ enum wsrep_status wsrep_to_execute_start(
 );
 enum wsrep_status wsrep_to_execute_end(conn_id_t conn_id);
 
-#undef WSREP_INTERFACE_VERSION
-#define WSREP_INTERFACE_VERSION "1:0:0"
-
 /*
  * wsrep interface for dynamically loadable libraries
  */
@@ -394,19 +403,17 @@ typedef struct wsrep_ wsrep_t;
 struct wsrep_ {
     const char *version;
     wsrep_status_t (*init)(wsrep_t *, 
-                            const char *gcs_group, 
-                            const char *gcs_address, 
-                            const char *data_dir,
-                            wsrep_log_cb_t logger);
+                           const char *gcs_group, 
+                           const char *gcs_address, 
+                           const char *data_dir,
+                           wsrep_log_cb_t logger);
     
     wsrep_status_t (*enable)(wsrep_t *);
-    wsrep_status_t (*disable)(wsrep_t *);
     
+    wsrep_status_t (*disable)(wsrep_t *);
     
     wsrep_status_t (*recv)(wsrep_t *, void *);
     
-
-
     void (*dbug_push)(wsrep_t *, const char* ctrl);
     
     void (*dbug_pop)(wsrep_t *);
