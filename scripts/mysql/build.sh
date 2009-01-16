@@ -90,7 +90,7 @@ scripts/build.sh $@
 ######################################
 # Obtain MySQL version and revision of Galera patch
 cd $MYSQL_SRC
-MYSQL_REV=$(svnversion)
+MYSQL_REV=$(bzr revno)
 
 export MYSQL_REV
 export GALERA_REV
