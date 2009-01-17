@@ -25,7 +25,7 @@ That's it. You've got a multi-master MySQL/Galera cluster. Root password is 'roo
 
 LIMITATIONS:
 
-1. Currently replication works only with InnoDB storage. Any modifications to tables of other types, including system (mysql.*) tables are not replicated. E.g. if you want to add another user, you have to do it manually on every node where you want that user to connect to. It has no effect on data consistency across the nodes, only on the ability to connect to particular node.
+1. Currently replication works only with InnoDB storage. Any modifications to tables of other types, including system (mysql.*) tables are not replicated. E.g. if you want to add another user, you have to do it manually on every node where you want that user to connect to.
 
 2. Currently MySQL/Galera cluster lacks automatic state transfer. Every time you add a new node to the cluster and/or restart a node you need to manually synchronize database contents on the nodes. See README for details.
 
@@ -40,11 +40,11 @@ QUICK ANSWERS:
 
 4. Yes, it'd be faster if there were a dedicated network for arbitrator connections and a separate network for MySQL client connections.
 
-5. Yes, it is highly configurable and flexible. For more info see README, mysql-galera --help, <distribution path>/mysql/etc/my.cnf.
+5. Yes, it is highly configurable and flexible. For more info see README, mysql-galera --help and my.cnf that comes with the distribution.
 
 6. If your application cannot utilize more than one server, you can use TCP connection balancer like pen (http://siag.nu/pen/) or GLB (http://www.codership.com/products/downloads). Note however, that SQL traffic balancing is very CPU consuming (a lot of small packets), so it is recommended to to have a dedicated machine for load balancer.
 
-7. Galera patch for MySQL can be found at ... FIXME!!!
+7. The patch for MySQL can be obtained at: bzr branch lp:codership-mysql
 
 Please direct all your suggestions, opinions and inquiries to info@codership.com
 
