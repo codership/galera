@@ -96,8 +96,8 @@ export MYSQL_REV
 export GALERA_REV
 export GALERA_SRC
 
-uname -m | grep -q i686
-if test $? == 0; then CPU=pentium; else CPU=amd64; fi
+# must be single line or set -e will abort the script on amd64
+uname -m | grep -q i686 && export CPU=pentium || export CPU=amd64
 
 # Build mysqld
 if [ "$CONFIGURE" == "yes" ]
