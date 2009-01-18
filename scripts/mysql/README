@@ -20,6 +20,9 @@ Licensing Information.
 
 Please see ./mysql/LICENSE.mysql and ./galera/LICENSE.galera
 
+ABOUT THIS DOCUMENT
+
+This document only covers issues specific to MySQL/Galera demo. It does not cover the use or administration of MySQL server per se. The reader is assumed to know how to install, configure, administer and use MySQL server.
 
 0. WHAT IS MYSQL/GALERA DEMO CLUSTER
 
@@ -35,10 +38,9 @@ server instances which connect to it in a star-like fashion:
             | mysqld |   | mysqld |
             `--------'   `--------'
 
-Server states are synchronized by replicating transaction changes at commit 
-time. The cluster is virtually synchronous: this means that no node will commit
-a transaction unless it is guaranteed to be committed on all other nodes. 
-Together with flow control this makes the cluster
+Server states are synchronized by replicating transaction changes at commit time. The cluster is virtually synchronous: this means that each node commits transactions in exactly the same order, although not necessarily at the same physical moment. (The latter is not that important as it may seem, since in most cases dbms gives no guarantee on when the transaction is actually executed.) Built-in flow control keeps nodes within fraction of a second from each other, this is more than enough for most practical purposes.
+
+Main features of MySQL/Galera cluster:
 
 * Truly highly available: no transaction is ever lost in case of a node crash. 
   All nodes always have consistent state.
@@ -50,9 +52,9 @@ Together with flow control this makes the cluster
 
 * Scalable even with WRITE-intensive applications.
 
-This package contains all software you'll need to setup MySQL/Galera demo 
-cluster. You don't need administrative privileges or to uninstall/disable 
-previously installed MySQL software to use this demo.
+This package contains all software you'll need to setup MySQL/Galera demo cluster. It is essentially a self-contained MySQL server installation with its own configuration file, data directory and preconfigured empty database.
+You don't need administrative privileges or to uninstall/disable previously
+installed MySQL software to use this demo.
 
 
 1. CLUSTER SETUP
@@ -62,30 +64,114 @@ mysqld instance you plan to use. For best performance those computers should be
 of approximately same configuration: Galera replication is synchronous and one 
 slow machine will slow down the whole cluster.
 
-You must also select one machine that would host group communication daemon 
-(arbitrator). For best performance it should be a separate computer, but it 
-also can be one of the MySQL nodes. The only requirement is that arbitrator is 
-accessible to all other cluster nodes.
+You must also select one machine that would host group communication daemon (hereafter arbitrator). For best performance it should be a separate computer, but it also can be one of the MySQL nodes. The only requirement is that arbitrator is accessible to all other cluster nodes.
+
+For your convenience this demo comes with a preconfigured empty database with users 'root' (password 'rootpass') and 'test' (password 'testpass', privileges on database 'test'). There are also certain defaults for InnoDB storage engine. As a result installation will require 1Gb of free space by default. Please see CONFIGURATION chapter if you wish to change that.
 
 It takes 3 steps to set up the cluster:
-1. Copy demo distribution to all prospective nodes of the cluster and unpack it.
-2. Start group communication daemon on arbitrator node.
-3. Start MySQL servers.
+1) Copy demo distribution to all prospective nodes of the cluster and unpack it to location of your choice.
+2) Start group communication daemon on arbitrator node by running gcomm script from the distribution.
+3) Start MySQL servers.
 
-(NOTE: You can easily set up the cluster on a single computer, following the 
-instructions below. However this makes little sense, as you won't see the the 
-benefits of high availability and scalability.)
+(NOTE: You can easily set up the cluster on a single computer. However this makes little sense, as you won't see the the benefits of high availability and scalability. Hence it is not covered by this document.)
+
+1.1 COPY DEMO DISTRIBUTION TO THE NODES
+
+Just copy and unpack the demo to wherever you have privileges. The location of choice must have enough free space for InnoDB files. By default it is 1Gb. You can change this requirement by changing InnoDB configuration in the my.cnf or by using different data directory.
+
+1.2 START GROUP COMMUNICATION DAEMON
+
+1.3 START MYSQL SERVERS
+
+If you're doing it as a superuser, you have to make sure there is 'mysql' user in the system and it has sufficient privileges on the demo directory. 
 
 
 2. USING THE CLUSTER
 
+After you have successfully started all cluster nodes, the cluster is ready to use.
+
+From the client point of view each cluster node works like a usual MySQL server - client-side application does not have to be changed in any way. Each node can be accessed independently and asynchronously. Just direct SQL load to any one or more of the cluster nodes. For most practical purposes you can treat MySQL/Galera cluster as a single MySQL server listening on multiple interfaces with the exception that you might see transaction deadlocks where you previously hadn't.
+
+Some of the many possible ways to use MySQL/Galera cluster with database applications:
+
+              ,---------.              ,---------. ,---------. ,---------.
+              | clients |              | client1 | | client2 | | client3 |
+              `---------'              `---------' `---------' `---------'
+                 | | |                       |          |          |
+            ,-------------.               ,------.   ,------.  ,------.
+            | application |               | app1 |   | app2 |  | app3 |
+            `-------------'               `------'   `------'  `------'
+            /      |      \                  |          |          |
+     ,-------. ,-------. ,-------.       ,-------.  ,-------.  ,-------.
+     | node1 | | node2 | | node3 |       | node1 |  | node2 |  | node3 |
+     `-------' `-------' `-------'       `-------'  `-------'  `-------'
+      <===== cluster nodes =====>         <====== cluster nodes ======>
+
 
 3. LOAD BALANCER
+
+If your application cannot utilize several database servers (most don't) you will need to use SQL proxy or a TCP load balancer to distribute load between the MySQL/Galera nodes. This is needed not only to increase performance, but also for a quick switch in case of a node failure. If performance of your application is DBMS-bound, you can run the balancer on the same machine as application/client. Be aware, however, that SQL load balancing might be a CPU hungry operation: usually SQL traffic consists of many small packets. For best results we recommend to carefully examine CPU consumption of the balancer and if needed dedicate a separate machine for it.
+
+Unlike traditional MySQL master-slave cluster MySQL/Galera cluster does not require any SQL traffic filtering or redirection of write requests - it is a truly multi-master cluster. As such it does not require SQL-parsing proxies to operate correctly and plain TCP connection balancer would suffice. (However under certain conditions intelligent load balancing may improve performance.)
+
+TCP connection balancers that were successfully used with MySQL/Galera:
+- GLB (http://www.codership.com/products/downloads) 
+- Pen (http://siag.nu/pen/)
 
 
 4. CONFIGURATION
 
-5. Using MySQL/Galera cluster on Amazon EC2 service
+There are two way how you can configure MySQL/Galera node:
+- through options to mysql-galera script
+- through provided my.cnf file
+
+Each MySQL/Galera node is configured just like the usual MySQL server, we just added few configuration variables to my.cnf. There are also few mandatory options, required for correct cluster operation. 
+
+wsrep_provider=none
+
+wsrep_gcs_address="dummy://"
+
+wsrep_gcs_group="my_cluster"
+
+wsrep_slave_threads=1
+
+wsrep_dbug_option
+
+wsrep_local_cache_size=16777216
+
+wsrep_ws_persistency=0
+
+wsrep_debug=0
+
+Mandatory configuration options:
+
+log_bin=mysql-bin
+binlog_format=ROW
+Those two options are required to use ROW-level replication as opposed to statement-level. For performance and consistency considerations don't change that.
+
+innodb_lock_wait_timeout=9999999
+This option is required for correct conflict resolution.
+
+
+5. Using MySQL/Galera demo in Amazon EC2
+
+MySQL/Galera demo works anywhere TCP/IP works. Therefore using MySQL/Galera demo in Amazon EC2 environment is no different than in LAN. Just launch several instances of your favourite AMI, copy and unpack the distribution, start gcomm on one of them and then start servers telling them where to find the arbitrator. Don't forget to use external arbitrator address if your nodes are running in different accessibility zones (obviously running in different accessibility zones degrades performance somewhat).
+
+NOTE: this demo may be binary incompatible with some older Linux distributions. Please use CentOS 5.0 or newer.
 
 6. LIMITATIONS
+
+1. Currently replication works only with InnoDB storage engine. Any writes to 
+   tables of other types, including system (mysql.*) tables are not replicated. 
+   E.g. if you want to add another user, you have to do it manually on every
+   node where you want that user to connect to.
+
+2. Currently MySQL/Galera demo lacks automatic state transfer. Every time 
+   you add a new node to the cluster and/or restart a node you need to manually 
+   synchronize database contents on the nodes. See README for details.
+
+3. Unsupported in this demo:
+   commands: LOAD DATA.
+   features: LOCKed sessions.
+   Use at your own risk.
 

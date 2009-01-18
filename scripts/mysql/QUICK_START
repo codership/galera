@@ -17,8 +17,9 @@ connect mysqld instances to it. Here's an example of how to do it:
 Suppose you have three networked computers Node1, Node2, Node3 of roughly the 
 same performance and Node1 has IP address 192.168.1.1
 
-1. Copy and unpack this distribution on each node to your default
-   installation directory (INSTALL_DIR)
+1. Copy and unpack this distribution on each node to the directory of your
+   choice (hereafter INSTALL_DIR). The location must have at least 1Gb of free
+   space for database files.
 
 2. Start arbitrator on Node1. For that just run gcomm script from this 
    distribution:
@@ -52,13 +53,13 @@ with mysqldump by loading your database dump to (any) one of the nodes.
 LIMITATIONS:
 
 1. Currently replication works only with InnoDB storage engine. Any writes to 
-tables of other types, including system (mysql.*) tables are not replicated. 
-E.g. if you want to add another user, you have to do it manually on every node 
-where you want that user to connect to.
+   tables of other types, including system (mysql.*) tables are not replicated. 
+   E.g. if you want to add another user, you have to do it manually on every
+   node where you want that user to connect to.
 
-2. Currently MySQL/Galera cluster lacks automatic state transfer. Every time 
-you add a new node to the cluster and/or restart a node you need to manually 
-synchronize database contents on the nodes. See README for details.
+2. Currently MySQL/Galera demo lacks automatic state transfer. Every time 
+   you add a new node to the cluster and/or restart a node you need to manually 
+   synchronize database contents on the nodes. See README for details.
 
 
 QUICK ANSWERS:
@@ -81,7 +82,7 @@ QUICK ANSWERS:
    connection balancer like GLB (http://www.codership.com/products/downloads) 
    or pen (http://siag.nu/pen/).
    Note however, that SQL traffic balancing is very CPU consuming (due to high
-   number of small packets), so it is recommended to to have a dedicated 
+   number of small packets), so it is recommended to have a dedicated 
    machine for load balancer.
 
 7. The patch for MySQL can be obtained at: bzr branch lp:codership-mysql
