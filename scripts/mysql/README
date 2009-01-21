@@ -171,13 +171,14 @@ As was mentioned above, for the client application each node looks like a normal
        <===== cluster nodes =====>
 
    In the case of primary node failure application can instantly switch to
-   another node without.
+   another node.
 
 2) Seeking High Availability and improved performance through uniform load
    distribution. If there are several client connections to the database, they
    can be uniformly distributed between cluster nodes resulting in better
    performance. The exact degree of performance improvement depends on
-   application. Transaction rollback rate may also increase.
+   application's SQL profile. Note, that transaction rollback rate may also 
+   increase.
 
              ,-------------.
              | application |
@@ -188,7 +189,8 @@ As was mentioned above, for the client application each node looks like a normal
       `-------' `-------' `-------'
        <===== cluster nodes =====>
 
-   In the case of a node failure application can keep on using remaining nodes.
+   In the case of a node failure application can keep on using the remaining 
+   healthy nodes.
 
    In this setup application can also be clustered with a dedicated application
    instance per database node, thus achieving HA not only for the database,
