@@ -33,7 +33,7 @@ same performance and Node1 has IP address 192.168.1.1
    need to modify only the wsrep_gcs_address option to contain your arbitrator
    node address:
 
-   wsrep_gcs_address= 192.168.1.1
+   wsrep_gcs_address=gcomm://tcp:192.168.1.1:4567
 
    After this change, you can start the server with following command:
 
@@ -42,6 +42,9 @@ same performance and Node1 has IP address 192.168.1.1
    This will start mysqld with data directory at <INSTALL_DIR>/mysql/var and 
    listening at default mysqld port 3306.
 
+   Alternatively you can provide arbitrator address as a command line option:
+
+   <INSTALL_DIR>/mysql-galera -g "gcomm://tcp:192.168.1.1:4567" start
 
 That's it. You've got a multi-master MySQL/Galera cluster. Node1, Node2 and 
 Node3 will now synchronize all writes to the whole cluster.
