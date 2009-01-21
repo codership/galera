@@ -57,9 +57,18 @@ LIMITATIONS:
    E.g. if you want to add another user, you have to do it manually on every
    node where you want that user to connect to.
 
-2. Currently MySQL/Galera demo lacks automatic state transfer. Every time 
+2. Rows in tables without primary keys may appear in different order on
+   different nodes. As a result SELECT...LIMIT... may return slightly different
+   sets.
+
+3. Currently MySQL/Galera demo lacks automatic state transfer. Every time 
    you add a new node to the cluster and/or restart a node you need to manually 
    synchronize database contents on the nodes. See README for details.
+
+4. Unsupported in this demo:
+   commands: LOAD DATA.
+   features: LOCKed sessions.
+   Use at your own risk.
 
 
 QUICK ANSWERS:
