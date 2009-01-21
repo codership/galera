@@ -368,9 +368,10 @@ wsrep_local_cache_size=16777216
    stored on the hard drive in MySQL data directory
 
 wsrep_ws_persistency=0
+   Save writesets in binary files. For debugging purposes only.
 
 wsrep_debug=0
-
+   Enable debug-level logging.
 
 
 4. Using MySQL/Galera demo in Amazon EC2
