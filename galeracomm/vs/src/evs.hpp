@@ -9,10 +9,7 @@
 
 class EVSProto;
 
-struct EVSProtoUpMeta : public ProtoUpMeta {
-    const Address& source;
-    EVSProtoUpMeta(const Address& source_) : source(source_) {}
-};
+
 
 class EVS : public Protolay {
     Transport *tp;

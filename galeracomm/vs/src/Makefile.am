@@ -1,5 +1,5 @@
 
-lib_LTLIBRARIES = libgcommvspp.la libgcommvsbes.la
+lib_LTLIBRARIES = libgcommvspp.la libgcommvsbes.la libgcommevs.la
 sbin_PROGRAMS = vsbes
 
 INCLUDES = \
@@ -23,3 +23,7 @@ vsbes_CXXFLAGS = -DCOMPILE_SERVER
 vsbes_LDADD = libgcommvspp.la \
 	$(top_builddir)/transport/src/libgcommtransportpp.la \
 	$(top_builddir)/common/src/libgcommcommonpp.la
+
+libgcommevs_la_SOURCES = evs.cpp evs.hpp \
+	evs_proto.cpp evs_proto.hpp \
+	evs_input_map.cpp evs_input_map.hpp evs_message.hpp

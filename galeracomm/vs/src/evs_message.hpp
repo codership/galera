@@ -448,7 +448,7 @@ public:
 	    if ((off = source_view.read(buf, buflen, off)) == 0)
 		return 0;
 	    if (type == JOIN || type == INSTALL) {
-		size_t n;
+		uint32_t n;
 		if ((off = read_uint32(buf, buflen, off, &n)) == 0)
 		    return 0;
 		delete instances;

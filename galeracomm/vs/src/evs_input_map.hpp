@@ -1,7 +1,6 @@
 #ifndef EVS_INPUT_MAP_HPP
 #define EVS_INPUT_MAP_HPP
 
-#include "gcomm/sockaddr.hpp"
 #include "gcomm/readbuf.hpp"
 #include "gcomm/logger.hpp"
 #include "evs_message.hpp"
@@ -56,7 +55,8 @@ public:
     const ReadBuf* get_readbuf() const {
         return rb;
     }
-    const size_t get_readbuf_offset() const {
+   
+    size_t get_readbuf_offset() const {
         return roff;
     }
     
@@ -70,8 +70,6 @@ public:
     }
 };
 
-const EVSPid EVSInputMapItem::null_sa = ADDRESS_INVALID;
-const EVSMessage EVSInputMapItem::null_msg = EVSMessage();
 
 class EVSInputMap {
     // Map from sockaddr to instance index

@@ -2,7 +2,7 @@
 #define EVS_SEQNO_MAX 0x800U
 #include "../src/evs_seqno.hpp"
 #include "../src/evs_input_map.hpp"
-#include "../src/evs.cpp"
+#include "../src/evs_proto.hpp"
 #include "../../transport/src/transport_dummy.hpp"
 
 #include <check.h>
