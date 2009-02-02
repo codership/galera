@@ -97,27 +97,27 @@ usage() { cat - << EOF
 usage: mysql-galera [options] command
 
 Options:
-    -d|--debug       : enable debug
-    -l|--log         : enable mysql query log
-    -g|--gcs_address : address of gcs server (spread://locahost:4803)
-    --slave_threads  : number of consurrent ws appliers (1)
-    --data_dir       : location for mysql data directories
-    -u|--user        : mysql root user
-    -p|--password    : mysql root user password
-    -c|--command     : command to execute (status)
-    --mysql-opt      : an option to the server to follow
-    --db             : name of database to check
-    --ignore_table   : table to ignore in checking
-    --valgrind       : run under valgrind
-    --gdb            : run under gdb
-    --ws_level       : RBR (default) or SQL
+    -d|--debug        : enable debug
+    -l|--log          : enable mysql query log
+    -g|--gcs_address  : address of gcs server (spread://locahost:4803)
+    --slave_threads   : number of consurrent ws appliers (1)
+    --data_dir        : location for mysql data directories
+    -u|--user         : mysql root user
+    -p|--password     : mysql root user password
+    -c|--command      : command to execute (status)
+    --mysql-opt       : an option to the server to follow
+    --db              : name of database to check
+    -i|--ignore_table : table to ignore in checking
+    --valgrind        : run under valgrind
+    --gdb             : run under gdb
+    --ws_level        : RBR (default) or SQL
 
 Commands:
-check                : check cosistency either locally or through network
-start                : start servers
-stop                 : stop servers
-restart              : stop and start servers
-status               : show running servers
+check                 : check cosistency either locally or through network
+start                 : start servers
+stop                  : stop servers
+restart               : stop and start servers
+status                : show running servers
 
 EOF
 }
@@ -333,7 +333,7 @@ case $1 in
             DB=$2
             shift
             ;;
-    --ignore_table)
+    -i|--ignore_table)
             IGNORE_TABLES=" $IGNORE_TABLES --ignore-table=$DB.$2 "
             shift
             ;;
