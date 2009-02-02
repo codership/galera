@@ -144,7 +144,14 @@ int PollDef::poll(const int timeout)
 	    }
 	}
     }
-    assert(p_ret == p_cnt);
+    // assert(p_ret == p_cnt);
+    if (p_ret != p_cnt) {
+        LOG_WARN(std::string("p_ret (") 
+                 + ::to_string(p_ret) 
+                 + ") != p_cnt (" 
+                 + ::to_string(p_cnt) 
+                 + ")");
+    }
     return p_ret;
 }
 
