@@ -1,0 +1,20 @@
+#!/bin/sh
+
+TEST_HOME=$(cd $(dirname $0); pwd -P)
+MYSQL_HOST=${MYSQL_HOST:-"127.0.0.1"}
+MYSQL_PORT=${MYSQL_PORT:-"3306"}
+MYSQL_USER=${MYSQL_USER:-"root"}
+MYSQL_PSWD=${MYSQL_PSWD:-"rootpass"}
+
+# Prepare permissions
+mysql -u$MYSQL_USER -p$MYSQL_PSWD -h$MYSQL_HOST -P$MYSQL_PORT -e \
+"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, CREATE
+TEMPORARY TABLES, LOCK TABLES
+ON drupaldb.*
+TO 'drupal'@'127.0.0.1'  IDENTIFIED BY 'password'"
+
+mysql -u$MYSQL_USER -p$MYSQL_PSWD -h$MYSQL_HOST -P$MYSQL_PORT -e \
+"FLUSH PRIVILEGES"
+
+zcat $TEST_HOME/drupaldb.sql.gz | \
+mysql -u$MYSQL_USER -p$MYSQL_PSWD -h$MYSQL_HOST -P$MYSQL_PORT
