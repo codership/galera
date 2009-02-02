@@ -285,9 +285,9 @@ galera_restart()
 
 checksum()
 {
-
-CS=`mysqldump --opt $ROOT_USER $ROOT_PSWD -h127.0.0.1 -P$MYSQL_PORT $IGNORE_TABLES $DB | \
-    grep -v '\-\-'  | md5sum`
+local DUMP_OPTIONS=" --compact --flush-logs --extended-insert --lock-all-tables --no-create-db --no-create-info --quick --routines "
+CS=`mysqldump $DUMP_OPTIONS $ROOT_USER $ROOT_PSWD -h127.0.0.1 -P$MYSQL_PORT  \
+              $IGNORE_TABLES $DB | md5sum`
 
 echo $CS
 }

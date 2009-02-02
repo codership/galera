@@ -16,7 +16,7 @@ usage()
 	"    -c|--configure  reconfigure the build system (implies -s)\n"\
 	"    -b|--bootstap   rebuild the build system (implies -c)\n"\
 	"    -r|--release    configure build with debug disabled (implies -c)\n"\
-	"    -d|--debug      configure build with debug disabled (implies -c)\n"\
+	"    -d|--debug      configure build with debug enabled (implies -c)\n"\
 	"    --no-strip      prevent stripping of release binaries\n"\
         "\n -s and -b options affect only Galera build.\n"
 }
