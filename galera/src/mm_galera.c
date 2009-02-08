@@ -21,13 +21,11 @@
 #include <gcs.h>
 #include <wsdb_api.h>
 #include "wsrep.h"
+#include "galera_info.h"
 #include "job_queue.h"
 
 #define GALERA_USE_FLOW_CONTROL 1
 #define GALERA_USLEEP 10000 // 10 ms
-
-/* configuration parameter call back in application */
-static wsrep_conf_param_fun app_configurator=NULL;
 
 enum galera_repl_state {
     GALERA_UNINITIALIZED,
@@ -46,14 +44,14 @@ struct galera_info {
 };
 
 /* application's handlers */
-//static galera_context_retain_fun ctx_retain_cb      = NULL;
-//static galera_context_store_fun  ctx_store_cb       = NULL;
-static wsrep_bf_execute_fun     bf_execute_cb      = NULL;
-static wsrep_bf_execute_fun     bf_execute_cb_rbr  = NULL;
-static wsrep_bf_apply_row_fun   bf_apply_row_cb    = NULL;
-static wsrep_ws_start_fun       ws_start_cb        = NULL;
+static wsrep_conf_param_cb_t    app_configurator   = NULL;
+static wsrep_bf_execute_cb_t    bf_execute_cb      = NULL;
+static wsrep_bf_execute_cb_t    bf_execute_cb_rbr  = NULL;
+static wsrep_bf_apply_row_cb_t  bf_apply_row_cb    = NULL;
+static wsrep_ws_start_cb_t      ws_start_cb        = NULL;
+static wsrep_view_cb_t          view_handler_cb    = NULL;
 #ifdef UNUSED
-static galera_log_cb_t           galera_log_handler = NULL;
+static galera_log_cb_t          galera_log_handler = NULL;
 #endif
 
 /* application context pointer */
@@ -172,6 +170,7 @@ static void *galera_configurator (
     }
 }
 
+#if DELETED
 static enum wsrep_status mm_galera_set_conf_param_cb(
     wsrep_t *gh, wsrep_conf_param_fun configurator
 ) {
@@ -196,34 +195,56 @@ static enum wsrep_status mm_galera_set_logger(
     gu_conf_set_log_callback(logger);
     GU_DBUG_RETURN(WSREP_OK);
 }
+#endif // DELETED
 
-static enum wsrep_status mm_galera_init(wsrep_t *gh,
-				  const char*          group,
-				  const char*          address,
-				  const char*          data_dir,
-				  wsrep_log_cb_t      logger)
+static enum wsrep_status mm_galera_init(wsrep_t* gh,
+                                        const wsrep_init_args_t* args)
 {
     GU_DBUG_ENTER("galera_init");
 
     /* set up GCS parameters */
-    if (address) {
-        gcs_url = strdup (address);
+    if (args->gcs_address) {
+        gcs_url = strdup (args->gcs_address);
     } else {
         gcs_url = "dummy://";
     }
-    if (group) {
-        gcs_channel = strdup (group);
+    if (args->gcs_group) {
+        gcs_channel = strdup (args->gcs_group);
     }
 
     /* set up initial state */
-    my_seqno = GCS_SEQNO_NIL;
-    my_uuid  = GU_UUID_NIL;
-    my_idx   = 0;
+    if (WSREP_SEQNO_UNDEFINED == args->state_seqno) {
+        my_seqno = GCS_SEQNO_NIL;
+    } else {
+        my_seqno = args->state_seqno;
+    }
+    if (memcmp(&WSREP_UUID_UNDEFINED, &args->state_uuid, sizeof(wsrep_uuid_t))){
+        my_uuid = *(gu_uuid_t*)&args->state_uuid;
+    } else {
+        my_uuid = GU_UUID_NIL;
+    }
+    my_idx = 0;
 
     /* initialize wsdb */
-    wsdb_init(data_dir, logger);
+    wsdb_init(args->data_dir, (gu_log_cb_t)args->logger_cb);
 
-    gu_conf_set_log_callback(logger);
+    gu_conf_set_log_callback((gu_log_cb_t)args->logger_cb);
+
+    /* setup configurator */
+    app_configurator = args->conf_param_cb;
+    wsdb_set_conf_param_cb(galera_configurator);
+
+    /* set debug logging on, if requested by app */
+    if (*(my_bool*)app_configurator(WSREP_CONF_DEBUG, WSREP_TYPE_INT)) {
+        gu_conf_debug_on();
+    }
+
+    /* set the rest of callbacks */
+    bf_execute_cb     = args->bf_execute_sql_cb;
+    bf_execute_cb_rbr = args->bf_execute_rbr_cb;
+    bf_apply_row_cb   = args->bf_apply_row_cb; // ??? is it used?
+    ws_start_cb       = args->ws_start_cb;
+    view_handler_cb   = args->view_handler_cb;
 
     /* initialize total order queue */
     to_queue = gcs_to_create(16384, GCS_SEQNO_FIRST);
@@ -273,7 +294,9 @@ static void mm_galera_tear_down(wsrep_t *gh)
 
     wsdb_close();
 
+#if DELETED
     mm_galera_set_logger(gh, NULL);
+#endif
 }
 
 static enum wsrep_status mm_galera_enable(wsrep_t *gh) {
@@ -324,6 +347,7 @@ static enum wsrep_status mm_galera_disable(wsrep_t *gh) {
     GU_DBUG_RETURN(WSREP_OK);
 }
 
+#if DELETED
 static enum wsrep_status mm_galera_set_execute_handler(
     wsrep_t *gh, wsrep_bf_execute_fun handler
 ) {
@@ -355,6 +379,7 @@ static enum wsrep_status mm_galera_set_ws_start_handler(
     ws_start_cb = handler;
     return WSREP_OK;
 }
+#endif //DELETED
 
 #ifdef EXTRA_DEBUG
 static void print_ws(FILE* fid, struct wsdb_write_set *ws, gcs_seqno_t seqno) {
@@ -403,6 +428,7 @@ static int apply_queries(void *app_ctx, struct wsdb_write_set *ws) {
     }
     GU_DBUG_RETURN(WSREP_OK);
 }
+
 static int apply_rows(void *app_ctx, struct wsdb_write_set *ws) {
     u_int16_t i;
     GU_DBUG_ENTER("apply_rows");
@@ -922,8 +948,9 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
 
             GALERA_GRAB_COMMIT_QUEUE (conf_seqno);
 
+            view_handler_cb (galera_view_info_create (conf));
+
             /* TODO: Here start waiting for state transfer to begin. */
-            
             do {
                 // Actually this loop can be done even in this thread:
                 // until we succeed in sending state transfer request, there's
@@ -961,8 +988,11 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
         }
         else {
             /* no state transfer required */
+            GALERA_GRAB_COMMIT_QUEUE (conf_seqno);
+            view_handler_cb (galera_view_info_create (conf));
+            GALERA_RELEASE_COMMIT_QUEUE (conf_seqno);
+
             assert (my_seqno == conf->seqno); // global seqno
-            GALERA_SELF_CANCEL_COMMIT_QUEUE (conf_seqno); // local seqno
             ret = my_idx;
         }
 
@@ -1066,7 +1096,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
 }
 
 static enum wsrep_status mm_galera_cancel_commit(wsrep_t *gh,
-    const bf_seqno_t bf_seqno, const trx_id_t victim_trx
+    const wsrep_seqno_t bf_seqno, const trx_id_t victim_trx
 ) {
     enum wsrep_status ret_code = WSREP_OK;
     int rcode;
@@ -1146,7 +1176,7 @@ static enum wsrep_status mm_galera_cancel_commit(wsrep_t *gh,
 }
 
 static enum wsrep_status mm_galera_cancel_slave(
-    wsrep_t *gh, bf_seqno_t bf_seqno, bf_seqno_t victim_seqno
+    wsrep_t *gh, wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno
 ) {
     enum wsrep_status ret_code = WSREP_OK;
     int rcode;
@@ -1884,14 +1914,9 @@ static wsrep_t mm_galera_str = {
     &mm_galera_init,
     &mm_galera_enable,
     &mm_galera_disable,
-    &mm_galera_recv,
     &mm_galera_dbug_push,
     &mm_galera_dbug_pop,
-    &mm_galera_set_logger,
-    &mm_galera_set_conf_param_cb,
-    &mm_galera_set_execute_handler,
-    &mm_galera_set_execute_handler_rbr,
-    &mm_galera_set_ws_start_handler,
+    &mm_galera_recv,
     &mm_galera_commit,
     &mm_galera_replay_trx,
     &mm_galera_cancel_commit,
