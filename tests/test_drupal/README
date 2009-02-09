@@ -1,0 +1,19 @@
+Files in this test distro are:
+
+loaddb.sh       -- script to create drupaldb database and test user
+                   Also load drupaldb.sql dump
+drupaldb.sql.gz -- dump of drupal 5 MySQL database
+drupal.jmx      -- jmeter configuration file
+
+To test:
+
+1. Install drupal 5 in each cluster node
+2. Prepare drupaldb database by running loaddb.sh
+3. In the test server, start tcp load balancer (pen or glb)
+   to share load from 127.0.0.1:80 to each cluster node
+   in round robin method
+4. Start jmeter test by:
+ 
+ jakarta-jmeter-2.3.2/bin/jmeter -H127.0.0.1 -P80 -n -t ~/drupal.jmx -l jmeter.log
+
+Results go into jmeter.log
