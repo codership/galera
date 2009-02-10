@@ -151,9 +151,9 @@ galera_start()
 
     if [ "$WS_LEVEL" == "RBR" ]
     then
-        RBR_OPTS=" --log-bin --binlog_format=ROW "
+        RBR_OPTS=" --binlog_format=ROW "
     else
-        RBR_OPTS=""
+        RBR_OPTS=" --binlog_format=STATEMENT "
     fi
 
     WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera.so"}
