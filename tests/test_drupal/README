@@ -4,16 +4,46 @@ loaddb.sh       -- script to create drupaldb database and test user
                    Also load drupaldb.sql dump
 drupaldb.sql.gz -- dump of drupal 5 MySQL database
 drupal.jmx      -- jmeter configuration file
+drupal5.diff    -- patch to make drupal replay transactions
 
 To test:
 
-1. Install drupal 5 in each cluster node
-2. Prepare drupaldb database by running loaddb.sh
-3. In the test server, start tcp load balancer (pen or glb)
+1. Install drupal 5 in each cluster node. Configure it to use user 'drupal' and
+   password 'password' to connect to 'drupaldb' database. For that edit
+   $db_url setting in sites/default/settings.php
+
+2. Apply drupal5.diff to each drupal installation to make it use and replay
+   transactions.
+
+3. Prepare drupaldb database by running loaddb.sh. If it is run for the first
+   time it must be repeated on every node to create drupal user privileges.
+
+4. In the test server, start tcp load balancer (pen or glb)
    to share load from 127.0.0.1:80 to each cluster node
    in round robin method
-4. Start jmeter test by:
- 
- jakarta-jmeter-2.3.2/bin/jmeter -H127.0.0.1 -P80 -n -t ~/drupal.jmx -l jmeter.log
+   
+5. Start jmeter test by (also see note below):
 
-Results go into jmeter.log
+   $ jmeter --nongui --testfile drupal.jmx --logfile /tmp/results.jtl
+   
+6. Examine results by starting jmeter in GUI mode and loading the results
+
+   $ jmeter --testfile drupal.jmx
+   
+NOTE: connection options are set in drupal.jmx. You may need to edit them in
+order to get it working. For that you can either load this file in jmeter,
+edit it in HTTP request defaults and save, or use your favourite sed editor on
+that file, it is XML. Defaults are 127.0.0.1:80
+
+NOTE1: test file by default configured to exit thread if error is encountered.
+Only creator threads don't exit since they are deliberately configurared to
+request forbidden pages. This policy can be changed in jmeter. Beware that
+enabling threads to continue in case of error can produce false performance
+figures.
+
+NOTE2: browser threads don't seem to be able to login with Java throwing
+connection refused exception. This happens in my local network, but seemed to
+work in Amamzon. What causes "connection refused" - i have no idea.
+
+NOTE3: simple tcp load balancer may not work properly with HTTP. You may need
+to configure apache balancer module to rewrite HTTP headers.
