@@ -5,7 +5,7 @@
 
 AC_PREREQ(2.50)
 AC_INIT([libgalera], [0.2.1], [info@codership.com])
-AC_CONFIG_SRCDIR([src/wsrep.c])
+AC_CONFIG_SRCDIR([src/mm_galera.c])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE  # AC_INIT sets version and package name
 
