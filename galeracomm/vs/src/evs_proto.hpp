@@ -26,8 +26,6 @@ struct EVSInstance {
     bool installed;
     // Last received JOIN message
     EVSMessage* join_message;
-    //
-    EVSMessage* leave_message;
     // Last activity timestamp
     Time tstamp;
     // CTOR
@@ -35,11 +33,10 @@ struct EVSInstance {
         operational(false), 
         trusted(true), 
         installed(false), join_message(0), 
-        leave_message(0), 
         tstamp(Time::now()) {}
+
     ~EVSInstance() {
         delete join_message;
-        delete leave_message;
     }
 
     std::string to_string() const {
@@ -119,11 +116,11 @@ public:
     
     enum State {
         CLOSED,
-            JOINING,
-            LEAVING,
-            RECOVERY, 
-            OPERATIONAL,
-            STATE_MAX
+        JOINING,
+        LEAVING,
+        RECOVERY, 
+        OPERATIONAL,
+        STATE_MAX
     };
     State state;
     

@@ -328,6 +328,7 @@ public:
 	       const uint32_t seq_, const uint32_t aru_seq_, const EVSGap& gap_) :
         version(0), 
         type(type_), 
+        safety_prefix(DROP),
         seq(seq_),
         seq_range(0),
         aru_seq(aru_seq_),
@@ -340,12 +341,13 @@ public:
 	        throw FatalException("Invalid type");
         } 
 
-    // Join and install messages
+    // Join, leave and install messages
     EVSMessage(const Type type_, const EVSPid& source_, 
 	       const EVSViewId& vid_, 
 	       const uint32_t aru_seq_, const uint32_t safe_seq_) :
 	version(0),
 	type(type_),
+        safety_prefix(SAFE),
 	seq(safe_seq_),
         seq_range(0),
 	aru_seq(aru_seq_),

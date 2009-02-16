@@ -1,8 +1,7 @@
 #include "gcomm/logger.hpp"
 #define EVS_SEQNO_MAX 0x800U
-#include "../src/evs_seqno.hpp"
-#include "../src/evs_input_map.hpp"
-#include "../src/evs_proto.hpp"
+#include "../src/evs_proto.cpp"
+#include "../src/evs_input_map.cpp"
 #include "../../transport/src/transport_dummy.hpp"
 
 #include <check.h>
@@ -609,10 +608,15 @@ static void multicast(std::vector<Inst*>* pvec, const ReadBuf* rb, const int plo
             continue;
         
         if (::rand() % 10000 < ploss) {
-            LOG_INFO("dropping " + EVSMessage::to_string(msg.get_type()) + 
-                     " from " + msg.get_source().to_string() + " to " + 
-                     (*j)->ep->my_addr.to_string() + " seq " + ::to_string(msg.get_seq()) );
-            continue;
+            if (::rand() % 3 == 0) {
+                LOG_INFO("dropping " + EVSMessage::to_string(msg.get_type()) + 
+                         " from " + msg.get_source().to_string() + " to " + 
+                         (*j)->ep->my_addr.to_string() + " seq " + ::to_string(msg.get_seq()) );
+                continue;
+            } else {
+                LOG_INFO("dropping " + EVSMessage::to_string(msg.get_type()) + " from " + msg.get_source().to_string() + " to all");
+                break;
+            }
         }
         
         
@@ -922,6 +926,84 @@ START_TEST(check_evs_proto_leave)
 }
 END_TEST
 
+static void join_inst(std::list<std::vector<Inst* >* >& vlist, 
+               std::vector<Inst*>& vec, 
+               size_t *n)
+{
+    std::cout << *n << "\n";
+    vec.resize(*n + 1);
+    DummyTransport* tp = new DummyTransport(0);
+    vec[*n] = new Inst(tp, new EVSProto(tp, EVSPid(*n + 1, 0, 0)));
+    vec[*n]->ep->set_up_context(vec[*n]);
+    vec[*n]->ep->shift_to(EVSProto::JOINING);
+    vec[*n]->ep->send_join();
+
+    std::list<std::vector<Inst* >* >::iterator li;
+    if (vlist.size() == 0) {
+        vlist.push_back(new std::vector<Inst*>);
+    }
+    li = vlist.begin();
+    (*li)->push_back(vec[*n]);
+    *n = *n + 1;
+}
+
+static void leave_inst(std::vector<Inst*>& vec)
+{
+    for (std::vector<Inst*>::iterator i = vec.begin();
+         i != vec.end(); ++i) {
+        if ((*i)->ep->get_state() == EVSProto::OPERATIONAL ||
+            (*i)->ep->get_state() == EVSProto::RECOVERY) {
+            (*i)->ep->shift_to(EVSProto::LEAVING);
+            (*i)->ep->send_leave();
+        }
+    }
+}
+
+
+static void split_inst(std::list<std::vector<Inst* >* >& vlist)
+{
+
+}
+
+
+static void merge_inst(std::list<std::vector<Inst* >* > *vlist)
+{
+
+}
+
+
+
+START_TEST(check_evs_proto_full)
+{
+    size_t n = 0;
+    std::vector<Inst*> vec;
+    std::list<std::vector<Inst* >* > vlist;
+
+    stats.clear();
+
+    for (size_t i = 0; i < 1000; ++i) {
+        send_msgs_rnd(&vec, 8);
+        if (::rand() % 70 == 0)
+            join_inst(vlist, vec, &n);
+        if (::rand() % 200 == 0)
+            leave_inst(vec);
+        if (::rand() % 400 == 0)
+            split_inst(vlist);
+        else if (::rand() % 50 == 0)
+            merge_inst(&vlist);
+        
+        send_msgs_rnd(&vec, 8);
+        for (std::list<std::vector<Inst* >* >::iterator li = vlist.begin();
+             li != vlist.end(); ++li)
+            deliver_msgs_lossy(*li, 50);
+    }
+    
+    stats.print();
+
+}
+END_TEST
+
+
 static Suite* suite()
 {
     Suite* s = suite_create("evs");
@@ -964,10 +1046,12 @@ static Suite* suite()
     suite_add_tcase(s, tc);
 
     tc = tcase_create("check_evs_proto_user_msg");
+    tcase_set_timeout(tc, 30);
     tcase_add_test(tc, check_evs_proto_user_msg);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("check_evs_proto_consensus_with_user_msg");
+    tcase_set_timeout(tc, 30);
     tcase_add_test(tc, check_evs_proto_consensus_with_user_msg);
     suite_add_tcase(s, tc);
 
@@ -977,6 +1061,11 @@ static Suite* suite()
 
     tc = tcase_create("check_evs_proto_leave");
     tcase_add_test(tc, check_evs_proto_leave);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("check_evs_proto_full");
+    tcase_set_timeout(tc, 30);
+    tcase_add_test(tc, check_evs_proto_full);
     suite_add_tcase(s, tc);
 
     return s;
