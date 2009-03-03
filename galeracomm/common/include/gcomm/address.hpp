@@ -12,8 +12,8 @@ protected:
     Serializable() {}
 public:
     virtual ~Serializable() {}
-    virtual size_t read(const void *buf, const size_t buflen, const size_t offset) = 0;
-    virtual size_t write(void *buf, const size_t buflen, const size_t offset) const = 0;
+    virtual size_t read(const void *buf, size_t buflen, size_t offset) = 0;
+    virtual size_t write(void *buf, size_t buflen, size_t offset) const = 0;
     virtual size_t size() const = 0;
 };
 
