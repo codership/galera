@@ -1,10 +1,16 @@
 Files in this test distro are:
 
-loaddb.sh       -- script to create drupaldb database and test user
-                   Also load drupaldb.sql dump
-drupaldb.sql.gz -- dump of drupal 5 MySQL database
-drupal.jmx      -- jmeter configuration file
-drupal5.diff    -- patch to make drupal replay transactions
+loaddb.sh        -- script to create drupaldb database and test user
+                    Also load drupaldb.sql dump
+drupaldb.sql.gz  -- dump of drupal 5 MySQL database
+drupal.jmx       -- jmeter configuration file
+drupal5.diff     -- patch to make drupal replay transactions
+
+drupal6.sql.gz   -- dump of drupal 6 MySQL database
+drupal6_8080.jmx -- jmeter test file for drupal6, verified to work with
+                    127.0.0.1:8080 address
+drupal6.jmx      -- attempt to make universal test file out of drupal6_8080.jmx
+                    work in progress
 
 To test:
 
