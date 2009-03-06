@@ -1,5 +1,5 @@
-GStorage is a library to provide transparent on-disk memory buffer access using
-memory-mapping. The purpose is to allow (almost) arbitrarily big action cache
+GCache is a library to provide transparent on-disk memory buffer cache.
+The purpose is to allow (almost) arbitrarily big action cache
 without RAM consumption.
 
 It provides the usual malloc(), realloc(), free() calls plus:
