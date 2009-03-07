@@ -59,13 +59,9 @@ AC_FUNC_ERROR_AT_LINE
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([gettimeofday localtime_r memset strdup strerror strrchr strtol])
-AC_CHECK_FUNCS([htonl htons ntohl ntohs],,
-		AC_MSG_ERROR([*** htonl() and friends not found! ***]))
 
 AC_CONFIG_FILES([Makefile
-                 doc/Makefile
-                 src/Makefile
-		 src/unit_tests/Makefile])
+                 src/Makefile])
 		 
 CFLAGS="$CFLAGS -Wall -Werror -I../include "
 CXXFLAGS="$CFLAGS"
