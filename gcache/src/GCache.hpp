@@ -68,23 +68,25 @@ namespace gcache
 
     private:
 
+        size_t          size_mmap; // total mmap_size
+
         Mutex           mtx;
 
-        FileDescriptor  fd; // cache file descriptor
+        FileDescriptor  fd;       // cache file descriptor
 
-        size_t          size_total;
+        char*        preamble; // ASCII text preamble
+        uint8_t*     header;   // cache binary header
+        uint8_t*     begin;    // beginning of cache area
+        uint8_t*     end;      // first byte after cache area
+        uint8_t*           first;    // pointer to the first (oldest) buffer
+        uint8_t*           next;     // pointer to the next free space
+
+        size_t          size_cache;
         size_t          size_free;
         size_t          size_used;
 
         long long       mallocs;
         long long       reallocs;
-
-        void*           preamble; // text preamble
-        void*           header;   // cache binary header
-        void*           begin;    // beginning of cache area
-        void*           end;      // first byte after cache area
-        void*           first;    // pointer to the first (oldest) buffer
-        void*           next;     // pointer to the next free space
 
         int64_t         seqno_locked;
         int64_t         seqno_min;
@@ -93,8 +95,6 @@ namespace gcache
         char            version;
 
         std::map<int64_t, void*> seqno2ptr;
-
-        void init();
 
         // disable copying
         GCache (const GCache&);

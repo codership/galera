@@ -6,8 +6,6 @@
 #ifndef __GCACHE_FILEDES__
 #define __GCACHE_FILEDES__
 
-#include <fcntl.h> // for flags and mode macros
-
 namespace gcache
 {
     class FileDescriptor
@@ -20,17 +18,22 @@ namespace gcache
 
     public:
 
-        FileDescriptor (std::string& fname, int flags, mode_t mode);
+        FileDescriptor (const std::string& fname, int flags, mode_t mode);
+
+        FileDescriptor (const std::string& fname, bool create);
 
         virtual ~FileDescriptor ();
 
-        int get() { return value; };
+        int get() const throw() { return value; };
+        const std::string& get_name() const throw() { return name; };
 
     private:
 
         // This class is definitely non-copyable
         FileDescriptor (const FileDescriptor&);
         FileDescriptor& operator = (const FileDescriptor);
+
+        void constructor_common();
     };
 }
 

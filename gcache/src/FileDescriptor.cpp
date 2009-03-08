@@ -16,13 +16,35 @@
 
 namespace gcache
 {
-    FileDescriptor::FileDescriptor (std::string& fname, int flags, mode_t mode)
+    FileDescriptor::FileDescriptor (const std::string& fname,
+                                    int                flags,
+                                    mode_t             mode)
         : value(open (fname.c_str(), flags, mode)), name(fname)
+    {
+        constructor_common();
+    }
+
+    static int open_flags (bool create)
+    {
+        int flags = O_RDWR|O_NOATIME;
+        if (create) flags |= O_CREAT;
+        return flags;
+    }
+
+    FileDescriptor::FileDescriptor (const std::string& fname, bool create)
+        : value(open (fname.c_str(), open_flags(create), S_IRUSR|S_IWUSR)),
+          name(fname)
+    {
+        constructor_common();
+    }
+
+    void
+    FileDescriptor::constructor_common()
     {
         if (value < 0) {
             int err = errno;
-            std::string msg = "Failed to open cache file '" + name +
-                "': " + strerror (err);
+            std::string msg ("Failed to open cache file '" + name +
+                             "': " + strerror (err));
             throw Exception (msg.c_str(), err);
         }
 
