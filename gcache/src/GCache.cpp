@@ -3,21 +3,67 @@
  */
 
 #include "GCache.hpp"
+#include "Exception.hpp"
+#include "Logger.hpp"
+#include "Lock.hpp"
+#include <cerrno>
+
+// file descriptor related stuff
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+
+#include "Lock.hpp"
 
 namespace gcache
 {
-    const size_t preamble_len = 1024;
+    const size_t  PREAMBLE_LEN = 1024;
+    const int64_t SEQNO_NONE   = 0;
 
     GCache::GCache (std::string& fname, size_t megs)
+        : mtx()
     {
+        if (megs != ((megs << 20) >> 20)) {
+            std::ostringstream msg;
+            msg << "Requested too high cache size: " << megs;
+            throw Exception (msg.str().c_str(), ERANGE);
+        }
+
+        fd = open (fname.c_str(), O_RDWR|O_CREAT|O_NOATIME, S_IRUSR|S_IWUSR);
+        if (fd < 0) {
+            std::string msg = "Failed to open cache file '" + fname + "': " + 
+                strerror (errno);
+            throw Exception (msg.c_str(), errno);
+        }
+
+        preamble = mmap (NULL, megs << 20, PROT_READ|PROT_WRITE,
+                         MAP_PRIVATE|MAP_NORESERVE|MAP_POPULATE, fd, 0);
+        if (0 == preamble) {
+            std::string msg = "mmap() failed: ";
+            msg = msg + strerror(errno);
+            throw Exception (msg.c_str(), errno);
+        }
+
     }
 
     GCache::GCache (std::string& fname)
+        : mtx()
     {
+        fd = open (fname.c_str(), O_RDWR|O_NOATIME, S_IRUSR|S_IWUSR);
+        if (fd < 0) {
+            std::string msg = "Failed to open cache file '" + fname + "': " + 
+                strerror (errno);
+            throw Exception (msg.c_str());
+        }
     }
 
     GCache::~GCache ()
     {
+        Lock lock(mtx);
+        fsync (fd);
+        close (fd);
     }
 
     /*! prints object properties */

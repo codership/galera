@@ -7,32 +7,41 @@
 #define __GCACHE_LOCK__
 
 #include <pthread.h>
+#include <cerrno>
+
+#include "Exception.hpp"
+#include "Logger.hpp"
 
 namespace gcache
 {
     class Lock
     {
+
     private:
-        pthread_mutex_t* mutex;
+
+        pthread_mutex_t* value;
 
     public:
-        Lock (pthread_mutex_t* mtx)
-        {
-            int err;
 
-            mutex = mtx;
-            err = pthread_mutex_lock (mutex);
+        Lock (Mutex& mtx)
+        {
+            value = &mtx.value;
+
+            int err = pthread_mutex_lock (value);
 
             if (err) {
-                throw Exception("Mutex lock failed");
+                std::string msg = "Mutex lock failed: ";
+                msg = msg + strerror(err);
+                throw Exception(msg.c_str(), err);
             }
         };
 
         virtual ~Lock ()
         {
-            pthread_mutex_unlock (mutex);
+            pthread_mutex_unlock (value);
+            log_debug << "Unlocked mutex " << value;
         };
-    }
+    };
 }
 
-#endif __GCACHE_LOCK__
+#endif /* __GCACHE_LOCK__ */

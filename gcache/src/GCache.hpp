@@ -10,8 +10,11 @@
 #include <tr1/cstdint>
 #include <map>
 
+#include "Mutex.hpp"
+
 namespace gcache
 {
+
     class GCache
     {
 
@@ -64,25 +67,37 @@ namespace gcache
 
     private:
 
-        pthread_mutex_t lock;
+        Mutex           mtx;
 
-        size_t          total_size;
-        size_t          free_size;
-        size_t          used_size;
+        int             fd; // cache file descriptor
+
+        size_t          size_total;
+        size_t          size_free;
+        size_t          size_used;
 
         long long       mallocs;
         long long       reallocs;
 
-        void*           begin;
-        void*           end;
-        void*           first;
-        void*           last;
+        void*           preamble; // text preamble
+        void*           header;   // cache binary header
+        void*           begin;    // beginning of cache area
+        void*           end;      // first byte after cache area
+        void*           first;    // pointer to the first (oldest) buffer
+        void*           next;     // pointer to the next free space
 
-        int64_t         locked_seqno;
+        int64_t         seqno_locked;
+        int64_t         seqno_min;
+        int64_t         seqno_max;
 
         char            version;
 
         std::map<int64_t, void*> seqno2ptr;
+
+        void init();
+
+        // disable copying
+        GCache (const GCache&);
+        GCache& operator = (const GCache);
     };
 }
 
