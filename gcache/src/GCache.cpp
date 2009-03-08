@@ -2,20 +2,18 @@
  * Copyright (C) 2009 Codership Oy <info@codership.com>
  */
 
-#include "GCache.hpp"
-#include "Exception.hpp"
-#include "Logger.hpp"
-#include "Lock.hpp"
 #include <cerrno>
 
 // file descriptor related stuff
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+//#include <sys/types.h>
+//#include <sys/stat.h>
 #include <unistd.h>
 #include <sys/mman.h>
 
+#include "Exception.hpp"
+#include "Logger.hpp"
 #include "Lock.hpp"
+#include "GCache.hpp"
 
 namespace gcache
 {
@@ -23,7 +21,7 @@ namespace gcache
     const int64_t SEQNO_NONE   = 0;
 
     GCache::GCache (std::string& fname, size_t megs)
-        : mtx()
+        : mtx(), fd(fname, O_RDWR|O_CREAT|O_NOATIME, S_IRUSR|S_IWUSR)
     {
         if (megs != ((megs << 20) >> 20)) {
             std::ostringstream msg;
@@ -31,15 +29,8 @@ namespace gcache
             throw Exception (msg.str().c_str(), ERANGE);
         }
 
-        fd = open (fname.c_str(), O_RDWR|O_CREAT|O_NOATIME, S_IRUSR|S_IWUSR);
-        if (fd < 0) {
-            std::string msg = "Failed to open cache file '" + fname + "': " + 
-                strerror (errno);
-            throw Exception (msg.c_str(), errno);
-        }
-
         preamble = mmap (NULL, megs << 20, PROT_READ|PROT_WRITE,
-                         MAP_PRIVATE|MAP_NORESERVE|MAP_POPULATE, fd, 0);
+                         MAP_PRIVATE|MAP_NORESERVE|MAP_POPULATE, fd.get(), 0);
         if (0 == preamble) {
             std::string msg = "mmap() failed: ";
             msg = msg + strerror(errno);
@@ -49,21 +40,16 @@ namespace gcache
     }
 
     GCache::GCache (std::string& fname)
-        : mtx()
+        : mtx(), fd(fname, O_RDWR|O_NOATIME, S_IRUSR|S_IWUSR)
     {
-        fd = open (fname.c_str(), O_RDWR|O_NOATIME, S_IRUSR|S_IWUSR);
-        if (fd < 0) {
-            std::string msg = "Failed to open cache file '" + fname + "': " + 
-                strerror (errno);
-            throw Exception (msg.c_str());
-        }
+
     }
 
     GCache::~GCache ()
     {
         Lock lock(mtx);
-        fsync (fd);
-        close (fd);
+//        fsync (fd);
+//        close (fd);
     }
 
     /*! prints object properties */

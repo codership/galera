@@ -11,6 +11,7 @@
 
 #include "Exception.hpp"
 #include "Logger.hpp"
+#include "Mutex.hpp"
 
 namespace gcache
 {

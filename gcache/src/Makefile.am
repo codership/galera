@@ -9,6 +9,7 @@ AM_CFLAGS =
 GCACHE_SRCS =               \
 	Exception.cpp       \
 	Logger.cpp          \
+	FileDescriptor.cpp  \
 	GCache.cpp
 
 #GCACHE_INCS = $(wildcard *.hpp)

@@ -11,6 +11,7 @@
 #include <map>
 
 #include "Mutex.hpp"
+#include "FileDescriptor.hpp"
 
 namespace gcache
 {
@@ -69,7 +70,7 @@ namespace gcache
 
         Mutex           mtx;
 
-        int             fd; // cache file descriptor
+        FileDescriptor  fd; // cache file descriptor
 
         size_t          size_total;
         size_t          size_free;
