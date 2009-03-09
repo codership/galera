@@ -13,20 +13,21 @@ namespace gcache
     class MMap
     {
 
-    private:
-
-        void*  const value;
-        size_t const length;
-
     public:
 
-        MMap (size_t length, const FileDescriptor& fd);
+        void*  const value;
+        size_t const size;
+
+        MMap (const FileDescriptor& fd);
 
         virtual ~MMap ();
 
-        void* get() const throw() { return value; };
+        void  sync() const;
+        void  unmap();
 
     private:
+
+        bool  mapped;
 
         // This class is definitely non-copyable
         MMap (const MMap&);

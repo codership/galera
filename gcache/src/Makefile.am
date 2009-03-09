@@ -10,13 +10,14 @@ GCACHE_SRCS =               \
 	Exception.cpp       \
 	Logger.cpp          \
 	FileDescriptor.cpp  \
+	MMap.cpp            \
 	GCache.cpp
 
 #GCACHE_INCS = $(wildcard *.hpp)
 
 # Describe libGCACHE library target
 #include_HEADERS   = GCache.hpp
-lib_LTLIBRARIES   = libgcache.la
+lib_LTLIBRARIES      = libgcache.la
 libgcache_la_SOURCES = $(GCACHE_SRCS) $(GCACHE_INCS)
 INTERFACE = 1
 REVISION  = 0

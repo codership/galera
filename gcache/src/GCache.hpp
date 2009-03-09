@@ -12,6 +12,7 @@
 
 #include "Mutex.hpp"
 #include "FileDescriptor.hpp"
+#include "MMap.hpp"
 
 namespace gcache
 {
@@ -68,20 +69,20 @@ namespace gcache
 
     private:
 
-        size_t          size_mmap; // total mmap_size
-
         Mutex           mtx;
 
         FileDescriptor  fd;       // cache file descriptor
 
-        char*        preamble; // ASCII text preamble
-        uint8_t*     header;   // cache binary header
-        uint8_t*     begin;    // beginning of cache area
-        uint8_t*     end;      // first byte after cache area
-        uint8_t*           first;    // pointer to the first (oldest) buffer
-        uint8_t*           next;     // pointer to the next free space
+        MMap            mmap;
 
-        size_t          size_cache;
+        char*    const  preamble; // ASCII text preamble
+        uint8_t* const  header;   // cache binary header
+        uint8_t* const  begin;    // beginning of cache area
+        uint8_t* const  end;      // first byte after cache area
+        uint8_t*        first;    // pointer to the first (oldest) buffer
+        uint8_t*        next;     // pointer to the next free space
+
+        size_t   const  size_cache;
         size_t          size_free;
         size_t          size_used;
 
@@ -92,7 +93,7 @@ namespace gcache
         int64_t         seqno_min;
         int64_t         seqno_max;
 
-        char            version;
+        char     const  version;
 
         std::map<int64_t, void*> seqno2ptr;
 

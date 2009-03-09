@@ -16,26 +16,24 @@
 
 namespace gcache
 {
-    FileDescriptor::FileDescriptor (const std::string& fname,
-                                    int                flags,
-                                    mode_t             mode)
-        : value(open (fname.c_str(), flags, mode)), name(fname)
+    static const int OPEN_FLAGS   = O_RDWR | O_NOATIME;
+    static const int CREATE_FLAGS = OPEN_FLAGS | O_CREAT | O_TRUNC;
+ 
+    FileDescriptor::FileDescriptor (const std::string& fname)
+        : value(open (fname.c_str(), OPEN_FLAGS, S_IRUSR | S_IWUSR)),
+          name(fname),
+          size(lseek (value, 0, SEEK_END))
     {
         constructor_common();
     }
 
-    static int open_flags (bool create)
-    {
-        int flags = O_RDWR | O_NOATIME;
-        if (create) flags |= O_CREAT | O_TRUNC;
-        return flags;
-    }
-
-    FileDescriptor::FileDescriptor (const std::string& fname, bool create)
-        : value(open (fname.c_str(), open_flags(create), S_IRUSR | S_IWUSR)),
-          name(fname)
+    FileDescriptor::FileDescriptor (const std::string& fname, size_t length)
+        : value(open (fname.c_str(), CREATE_FLAGS, S_IRUSR | S_IWUSR)),
+          name(fname),
+          size(length)
     {
         constructor_common();
+        prealloc();
     }
 
     void
@@ -90,5 +88,34 @@ namespace gcache
         }
 
         log_debug << "Synced  file '" << name << "'";
+    }
+
+    void
+    FileDescriptor::prealloc()
+    {
+        uint8_t const byte      = 0;
+        size_t  const page_size = sysconf (_SC_PAGE_SIZE);
+
+        size_t  offset = page_size - 1; // last byte of the page
+
+        log_info << "Preallocating " << size << " bytes in '" << name
+                 << "'...";
+
+        while (offset < size &&
+               lseek (value, offset, SEEK_SET) > 0 &&
+               write (value, &byte, sizeof(byte)) == sizeof(byte)) {
+            offset += page_size;
+        }
+
+        if (offset > size && fsync (value) == 0) {
+            log_info << "Preallocating " << size << " bytes in '" << name
+                     << "' done.";
+            return;
+        }
+
+        int err = errno;
+        std::string msg ("File preallocation failed: ");
+        msg = msg + strerror (err);
+        throw Exception (msg.c_str(), err);
     }
 }
