@@ -24,8 +24,9 @@ namespace gcache
 
         virtual ~FileDescriptor ();
 
-        int get() const throw() { return value; };
+        int                get()      const throw() { return value; };
         const std::string& get_name() const throw() { return name; };
+        void               sync()     const;
 
     private:
 

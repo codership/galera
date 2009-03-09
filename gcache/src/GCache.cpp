@@ -32,6 +32,26 @@ namespace gcache
         return (megs << 20);
     }
 
+    static void preallocate_cache (int fd, size_t length)
+    {
+        uint8_t byte = 0;
+        size_t  page_size = sysconf (_SC_PAGE_SIZE);
+        size_t  offset = page_size - 1; // last byte of the page
+
+        while (offset < length &&
+               lseek (fd, offset, SEEK_SET) > 0 &&
+               write (fd, &byte, sizeof(byte)) == sizeof(byte)) {
+            offset += page_size;
+        }
+
+        if (offset > length && fsync (fd) == 0) return;
+
+        int err = errno;
+        std::string msg ("Cache preallocation failed: ");
+        msg = msg + strerror (err);
+        throw Exception (msg.c_str(), err);
+    }
+
     static void* mmap_fd (const FileDescriptor& fd, size_t length)
     {
         void* ret = mmap (NULL, length, PROT_READ|PROT_WRITE,
@@ -54,7 +74,12 @@ namespace gcache
           mtx        (),
           fd         (fname, true)
     {
+        log_info << "Preallocating cache on disk...";
+        preallocate_cache (fd.get(), size_mmap);
+        log_info << "Preallocating cache on disk done.";
+
         preamble   = (char*)(mmap_fd (fd, size_mmap));
+
         header     = (uint8_t*)(preamble + PREAMBLE_SIZE);
         begin      = header + HEADER_SIZE;
         size_cache = size_mmap - PREAMBLE_SIZE - HEADER_SIZE;
@@ -76,12 +101,24 @@ namespace gcache
 
     static void munmap_fd (void* ptr, size_t length)
     {
-        int err = munmap (ptr, length);
+        log_info << "Syncing memory map to disk...";
+
+        int err = msync (ptr, length, MS_SYNC);
         if (err < 0) {
             err = errno;
-            std::string msg ("munmap() failed: ");
-            msg = msg + strerror(err);
-            throw Exception (msg.c_str(), err);
+            std::ostringstream msg;
+            msg << "msync(" << ptr << ", " << length << ") failed: "
+                << strerror(err);
+            throw Exception (msg.str().c_str(), err);
+        }
+
+        err = munmap (ptr, length);
+        if (err < 0) {
+            err = errno;
+            std::ostringstream msg;
+            msg << "fsync(" << ptr << ", " << length << ") failed: "
+                << strerror(err);
+            throw Exception (msg.str().c_str(), err);
         }
 
         log_debug << "Memory unmapped: " << ptr << " (" << length <<" bytes)";

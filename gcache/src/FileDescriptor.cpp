@@ -26,13 +26,13 @@ namespace gcache
 
     static int open_flags (bool create)
     {
-        int flags = O_RDWR|O_NOATIME;
-        if (create) flags |= O_CREAT;
+        int flags = O_RDWR | O_NOATIME;
+        if (create) flags |= O_CREAT | O_TRUNC;
         return flags;
     }
 
     FileDescriptor::FileDescriptor (const std::string& fname, bool create)
-        : value(open (fname.c_str(), open_flags(create), S_IRUSR|S_IWUSR)),
+        : value(open (fname.c_str(), open_flags(create), S_IRUSR | S_IWUSR)),
           name(fname)
     {
         constructor_common();
@@ -75,5 +75,20 @@ namespace gcache
         }
 
         throw Exception (msg.c_str(), err);
+    }
+
+    void
+    FileDescriptor::sync () const
+    {
+        log_debug << "Syncing file '" << name << "'";
+
+        if (fsync (value) < 0) {
+            int err = errno;
+            std::string msg("fsync() on '" + name + "' failed: " +
+                            strerror(err));
+            throw Exception (msg.c_str(), err);
+        }
+
+        log_debug << "Synced  file '" << name << "'";
     }
 }

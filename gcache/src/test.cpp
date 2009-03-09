@@ -21,7 +21,11 @@ main (int argc, char* argv[])
     log_debug << "DEBUG output enabled";
 
     if (argc > 1) fname.assign(argv[1]); // take supplied file name if any
-    GCache* cache = new GCache (fname, 1);
+    GCache* cache = new GCache (fname, 50);
+
+    log_info << "";
+    log_info << "...do something...";
+    log_info << "";
 
     delete cache;
 
