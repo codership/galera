@@ -11,6 +11,7 @@
 #include <map>
 
 #include "Mutex.hpp"
+#include "Cond.hpp"
 #include "FileDescriptor.hpp"
 #include "MMap.hpp"
 
@@ -70,6 +71,7 @@ namespace gcache
     private:
 
         Mutex           mtx;
+        Cond            cond;
 
         FileDescriptor  fd;       // cache file descriptor
 
@@ -94,8 +96,6 @@ namespace gcache
         long long       mallocs;
         long long       reallocs;
 
-        static int64_t const SEQNO_NONE;
-
         int64_t         seqno_locked;
         int64_t         seqno_min;
         int64_t         seqno_max;
@@ -110,6 +110,8 @@ namespace gcache
 
         void reset_cache();
         void constructor_common();
+
+        void* get_new_buffer (size_t size);
 
         // disable copying
         GCache (const GCache&);

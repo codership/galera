@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cerrno>
 
+#include "SeqnoNone.hpp"
 #include "BufferHeader.hpp"
 #include "Exception.hpp"
 #include "Logger.hpp"
@@ -98,9 +99,19 @@ namespace gcache
                 seqno2ptr.insert (std::pair<int64_t, void*>(bh->seqno, bh + 1));
             }
 
+            if (!BH_is_released (bh)) {
+                log_warn << "Unreleased buffer found. Releasing.";
+                BH_release (bh);
+            }
+
             buf += bh->size;
-            if (buf >= end) buf = start;
+            if (buf > (end - sizeof(BufferHeader))) break;
             bh = BH (buf);
+            if (0 == bh->size && buf != next) {
+                // buffer list continues from the beginning
+                buf = start;
+                bh = BH (buf);
+            }
         }
 
         if (buf != next) {
@@ -152,29 +163,38 @@ namespace gcache
                              "--------------------\n");
 
         written += snprintf (preamble + written, to_write - written,
-                             "Version      : %llu\n", header[HEADER_VERSION]);
+                             "Version         : %llu\n",
+                             header[HEADER_VERSION]);
 
         written += snprintf (preamble + written, to_write - written,
-                             "Size         : %llu bytes\n", header[FILE_SIZE]);
+                             "Size            : %llu bytes\n",
+                             header[FILE_SIZE]);
 
         written += snprintf (preamble + written, to_write - written,
-                             "Closed       : %s\n",
+                             "Closed          : %s\n",
                              header[FILE_OPEN] ? "no":"yes");
 
         written += snprintf (preamble + written, to_write - written,
-                             "Data offset  : %llu\n", header[DATA_OFFSET]);
+                             "Data offset     : %llu\n", header[DATA_OFFSET]);
 
         written += snprintf (preamble + written, to_write - written,
-                             "First buffer : %llu\n", header[FIRST_OFFSET]);
+                             "First buffer    : %llu\n", header[FIRST_OFFSET]);
 
         written += snprintf (preamble + written, to_write - written,
-                             "Next buffer  : %llu\n", header[NEXT_OFFSET]);
+                             "Next buffer     : %llu\n", header[NEXT_OFFSET]);
 
         written += snprintf (preamble + written, to_write - written,
-                             "Min. seqno   : %llu\n", header[SEQNO_MIN]);
+                             "Min. seqno      : %lld\n",
+                             (int64_t)header[SEQNO_MIN]);
 
         written += snprintf (preamble + written, to_write - written,
-                             "Max. seqno   : %llu\n", header[SEQNO_MAX]);
+                             "Max. seqno      : %lld\n",
+                             (int64_t)header[SEQNO_MAX]);
+
+        written += snprintf (preamble + written, to_write - written,
+                             "Ordered buffers : %lld\n",
+                             (int64_t)header[SEQNO_MAX] -
+                             (int64_t)header[SEQNO_MIN]);
 
         written += snprintf (preamble + written, to_write - written,
                              "--------------------\n");

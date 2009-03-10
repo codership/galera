@@ -15,7 +15,6 @@
 namespace gcache
 {
     const size_t  GCache::PREAMBLE_LEN = 1024; // reserved for text preamble
-    const int64_t GCache::SEQNO_NONE   = 0;
 
     static size_t check_size (size_t megs)
     {
@@ -34,7 +33,7 @@ namespace gcache
         first = start;
         next  = start;
 
-        BH_zero (next);
+        BH_clear (BH (next));
 
         size_free = size_cache;
         size_used = 0;
@@ -53,8 +52,12 @@ namespace gcache
 
         seqno_locked = SEQNO_NONE;
 
-        mallocs  = 0;
-        reallocs = 0;
+        // when we start, no buffers are referenced
+        size_free = size_cache;
+        size_used = 0;
+
+        mallocs   = 0;
+        reallocs  = 0;
     }
 
     GCache::GCache (std::string& fname, size_t megs)
@@ -106,21 +109,6 @@ namespace gcache
     /*! prints object properties */
     void print (std::ostream& os)
     {
-    }
-
-    /* Memory allocation functions */
-    void* malloc (size_t size)
-    {
-        return 0;
-    }
-
-    void  free (void* ptr)
-    {
-    }
-
-    void* realloc (void* ptr, size_t size)
-    {
-        return 0;
     }
 
     /* Seqno related functions */

@@ -12,6 +12,7 @@
 #include "Exception.hpp"
 #include "Logger.hpp"
 #include "Mutex.hpp"
+#include "Cond.hpp"
 
 namespace gcache
 {
@@ -35,6 +36,7 @@ namespace gcache
                 msg = msg + strerror(err);
                 throw Exception(msg.c_str(), err);
             }
+
         };
 
         virtual ~Lock ()
@@ -42,6 +44,14 @@ namespace gcache
             pthread_mutex_unlock (value);
             log_debug << "Unlocked mutex " << value;
         };
+
+        inline void wait (Cond& cond)
+        {
+            cond.ref_count++;
+            pthread_cond_wait (&(cond.cond), value);
+            cond.ref_count--;
+        };
+
     };
 }
 
