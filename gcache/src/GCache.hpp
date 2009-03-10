@@ -75,19 +75,26 @@ namespace gcache
 
         MMap            mmap;
 
-        char*    const  preamble; // ASCII text preamble
-        uint8_t* const  header;   // cache binary header
-        uint8_t* const  begin;    // beginning of cache area
-        uint8_t* const  end;      // first byte after cache area
+        bool            open;
+
+        static size_t  const PREAMBLE_LEN;
+
+        char*     const preamble; // ASCII text preamble
+        uint64_t* const header;   // cache binary header
+        size_t    const header_len;
+        uint8_t*  const start;    // start of cache area
+        uint8_t*  const end;      // first byte after cache area
         uint8_t*        first;    // pointer to the first (oldest) buffer
         uint8_t*        next;     // pointer to the next free space
 
-        size_t   const  size_cache;
+        size_t    const size_cache;
         size_t          size_free;
         size_t          size_used;
 
         long long       mallocs;
         long long       reallocs;
+
+        static int64_t const SEQNO_NONE;
 
         int64_t         seqno_locked;
         int64_t         seqno_min;
@@ -96,6 +103,13 @@ namespace gcache
         char     const  version;
 
         std::map<int64_t, void*> seqno2ptr;
+
+        void header_read();
+        void header_write();
+        void preamble_write();
+
+        void reset_cache();
+        void constructor_common();
 
         // disable copying
         GCache (const GCache&);

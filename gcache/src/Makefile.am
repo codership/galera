@@ -11,7 +11,8 @@ GCACHE_SRCS =               \
 	Logger.cpp          \
 	FileDescriptor.cpp  \
 	MMap.cpp            \
-	GCache.cpp
+	GCache.cpp          \
+	GCache_header.cpp
 
 #GCACHE_INCS = $(wildcard *.hpp)
 

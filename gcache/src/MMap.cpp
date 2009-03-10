@@ -13,11 +13,11 @@
 namespace gcache
 {
     MMap::MMap (const FileDescriptor& fd)
-        : value (mmap (NULL, fd.get_size(), PROT_READ|PROT_WRITE,
-                       MAP_PRIVATE|MAP_NORESERVE|MAP_POPULATE, fd.get(), 0)),
+        : ptr (mmap (NULL, fd.get_size(), PROT_READ|PROT_WRITE,
+                       MAP_SHARED|MAP_NORESERVE|MAP_POPULATE, fd.get(), 0)),
           size  (fd.get_size())
     {
-        if (value == MAP_FAILED) {
+        if (ptr == MAP_FAILED) {
             int err = errno;
             std::string msg ("mmap() on '" + fd.get_name() + "' failed: " +
                              strerror(err));
@@ -26,7 +26,7 @@ namespace gcache
 
         mapped = true;
 
-        log_debug << "Memory mapped: " << value << " (" << size << " bytes)";
+        log_debug << "Memory mapped: " << ptr << " (" << size << " bytes)";
     }
 
     void
@@ -34,10 +34,10 @@ namespace gcache
     {
         log_info << "Flushing memory map to disk...";
 
-        if (msync (value, size, MS_SYNC) < 0) {
+        if (msync (ptr, size, MS_SYNC) < 0) {
             int err = errno;
             std::ostringstream msg;
-            msg << "msync(" << value << ", " << size << ") failed: "
+            msg << "msync(" << ptr << ", " << size << ") failed: "
                 << strerror(err);
             throw Exception (msg.str().c_str(), err);
         }
@@ -46,17 +46,17 @@ namespace gcache
     void
     MMap::unmap ()
     {
-        if (munmap (value, size) < 0) {
+        if (munmap (ptr, size) < 0) {
             int err = errno;
             std::ostringstream msg;
-            msg << "munmap(" << value << ", " << size << ") failed: "
+            msg << "munmap(" << ptr << ", " << size << ") failed: "
                 << strerror(err);
             throw Exception (msg.str().c_str(), err);
         }
 
         mapped = false;
 
-        log_debug << "Memory unmapped: " << value << " (" << size <<" bytes)";
+        log_debug << "Memory unmapped: " << ptr << " (" << size <<" bytes)";
     }
 
     MMap::~MMap ()

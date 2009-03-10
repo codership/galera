@@ -15,7 +15,7 @@ namespace gcache
 
     public:
 
-        void*  const value;
+        void*  const ptr;
         size_t const size;
 
         MMap (const FileDescriptor& fd);

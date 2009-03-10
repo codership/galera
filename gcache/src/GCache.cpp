@@ -4,22 +4,18 @@
 
 #include <cerrno>
 
-// file descriptor related stuff
-//#include <sys/types.h>
-//#include <sys/stat.h>
 #include <unistd.h>
-#include <sys/mman.h>
 
 #include "Exception.hpp"
 #include "Logger.hpp"
 #include "Lock.hpp"
+#include "BufferHeader.hpp"
 #include "GCache.hpp"
 
 namespace gcache
 {
-    const size_t  PREAMBLE_SIZE = 1024; // reserved for text preamble
-    const size_t  HEADER_SIZE   = 1024; // reserved for binary header
-    const int64_t SEQNO_NONE    = 0;
+    const size_t  GCache::PREAMBLE_LEN = 1024; // reserved for text preamble
+    const int64_t GCache::SEQNO_NONE   = 0;
 
     static size_t check_size (size_t megs)
     {
@@ -32,41 +28,76 @@ namespace gcache
         return (megs << 20);
     }
 
-    GCache::GCache (std::string& fname, size_t megs)
-        : mtx      (),
-          fd       (fname, check_size(megs)),
-          mmap     (fd),
-          preamble (static_cast<char*>(mmap.value)),
-          header   (reinterpret_cast<uint8_t*>(preamble + PREAMBLE_SIZE)),
-          begin    (header + HEADER_SIZE),
-          end      (reinterpret_cast<uint8_t*>(preamble + mmap.size)),
-          size_cache (end - begin),
-          version  (0)
+    void
+    GCache::reset_cache()
     {
-        first = begin;
-        next  = begin;
+        first = start;
+        next  = start;
+
+        BH_zero (next);
+
+        size_free = size_cache;
+        size_used = 0;
+
+        seqno_min = SEQNO_NONE;
+        seqno_max = SEQNO_NONE;
+    }
+
+    void
+    GCache::constructor_common()
+    {
+        open = true;
+
+        header_write ();
+        preamble_write ();
+
+        seqno_locked = SEQNO_NONE;
 
         mallocs  = 0;
         reallocs = 0;
     }
 
-    GCache::GCache (std::string& fname)
-        : mtx      (),
-          fd       (fname),
-          mmap     (fd),
-          preamble (static_cast<char*>(mmap.value)),
-          header   (reinterpret_cast<uint8_t*>(preamble + PREAMBLE_SIZE)),
-          begin    (header + HEADER_SIZE),
-          end      (reinterpret_cast<uint8_t*>(preamble + mmap.size)),
-          size_cache (end - begin),
-          version  (0)
+    GCache::GCache (std::string& fname, size_t megs)
+        : mtx       (),
+          fd        (fname, check_size(megs)),
+          mmap      (fd),
+          preamble  (static_cast<char*>(mmap.ptr)),
+          header    (reinterpret_cast<uint64_t*>(preamble + PREAMBLE_LEN)),
+          header_len(32),
+          start     (reinterpret_cast<uint8_t*>(header + header_len)),
+          end       (reinterpret_cast<uint8_t*>(preamble + mmap.size)),
+          size_cache(end - start),
+          version   (0)
     {
-        
+        reset_cache ();
+        constructor_common ();
+    }
+
+    GCache::GCache (std::string& fname)
+        : mtx       (),
+          fd        (fname),
+          mmap      (fd),
+          preamble  (static_cast<char*>(mmap.ptr)),
+          header    (reinterpret_cast<uint64_t*>(preamble + PREAMBLE_LEN)),
+          header_len(header[0]),
+          start     (reinterpret_cast<uint8_t*>(header + header_len)),
+          end       (reinterpret_cast<uint8_t*>(preamble + mmap.size)),
+          size_cache(end - start),
+          version   (0)
+    {
+        header_read ();
+        constructor_common ();
     }
 
     GCache::~GCache ()
     {
         Lock lock(mtx);
+
+        mmap.sync();
+
+        open = false;
+        header_write ();
+        preamble_write ();
 
         mmap.sync();
         mmap.unmap();
