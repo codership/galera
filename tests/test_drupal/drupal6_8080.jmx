@@ -103,7 +103,7 @@
           </HeaderManager>
           <hashTree/>
         </hashTree>
-        <HTTPSampler guiclass="HttpTestSampleGui" testclass="HTTPSampler" testname="/drupal6/sites/default/files/css/4e73ed892da4b33f96ae41a88df296d8.css" enabled="true">
+        <HTTPSampler guiclass="HttpTestSampleGui" testclass="HTTPSampler" testname="/drupal6/sites/default/files/css/4e73ed892da4b33f96ae41a88df296d8.css" enabled="false">
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" enabled="true">
             <collectionProp name="Arguments.arguments"/>
           </elementProp>
@@ -166,7 +166,7 @@
           </HeaderManager>
           <hashTree/>
         </hashTree>
-        <HTTPSampler guiclass="HttpTestSampleGui" testclass="HTTPSampler" testname="/drupal6/sites/default/files/css/217c09558a102a72eafbe111b6ac3ac2.css" enabled="true">
+        <HTTPSampler guiclass="HttpTestSampleGui" testclass="HTTPSampler" testname="/drupal6/sites/default/files/css/217c09558a102a72eafbe111b6ac3ac2.css" enabled="false">
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" enabled="true">
             <collectionProp name="Arguments.arguments"/>
           </elementProp>
