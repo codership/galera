@@ -213,8 +213,13 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
 	/* create new nodes array according to new membrship */
         assert (new_nodes_num);
 	new_nodes = group_nodes_init (comp);
-	if (!new_nodes) return -ENOMEM;
-	
+	if (!new_nodes) {
+            gu_fatal ("Could not allocate memory for %ld node component.",
+                      gcs_comp_msg_num (comp));
+            assert(0);
+            return -ENOMEM;
+	}
+
 	if (group->state == GCS_GROUP_PRIMARY) {
 	    /* we come from previous primary configuration */
 	}
