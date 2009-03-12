@@ -8,90 +8,23 @@ extern "C" {
 extern "C" {
 #define GCS_COMP_MSG_ACCESS 1
 #include "gcs_comp_msg.h"
-#include "gu_uuid.h"
 }
 
 #include <limits>
-
-class UUID : public Serializable
-{
-    gu_uuid_t uuid;
-public:
-    UUID() {
-        uuid = GU_UUID_NIL;
-    }
-
-    UUID(const void* node, size_t node_len) {
-        gu_uuid_generate(&uuid, node, node_len);
-    }
-
-    size_t read(const void* buf, size_t buflen, size_t offset) {
-        if (buflen < offset + sizeof(gu_uuid_t))
-            return 0;
-        memcpy(&uuid, (const char*)buf + offset, sizeof(gu_uuid_t));
-        return sizeof(gu_uuid_t);
-    }
-
-    size_t write(void* buf, size_t buflen, size_t offset) const {
-        if (buflen < offset + sizeof(gu_uuid_t))
-            return 0;
-        memcpy((char*)buf + offset, &uuid, sizeof(gu_uuid_t));
-        return sizeof(gu_uuid_t);
-    }
-    
-    size_t size() const {
-        return sizeof(gu_uuid_t);
-    }
-    
-    const gu_uuid_t* get_uuid_ptr() const {
-        return &uuid;
-    }
-
-};
-
-typedef std::map<const Address, UUID> UUIDMap;
-
-static inline bool operator<(const UUID& a, const UUID& b)
-{
-    return gu_uuid_compare(a.get_uuid_ptr(), b.get_uuid_ptr()) < 0;
-}
-
 
 struct vs_ev {
     ReadBuf *rb;
     VSMessage *msg;
     VSView *view;
-    UUIDMap* uuids;
     size_t msg_size;
-    vs_ev(const ReadBuf *r, const size_t ms, const VSMessage *m, const VSView *v, const VSUserStateMap* usmap) :
-	rb(0), msg_size(ms), msg(0), view(0), uuids(0) {
+    vs_ev(const ReadBuf *r, const size_t ms, const VSMessage *m, const VSView *v) :
+	rb(0), msg_size(ms), msg(0), view(0) {
 	if (r)
 	    rb = r->copy(m->get_data_offset());
 	if (m)
 	    msg = new VSMessage(*m);
-	if (v) {
+	if (v)
 	    view = new VSView(*v);
-            uuids = new UUIDMap();
-            for (Aset::const_iterator i = v->get_addr().begin();
-                 i != v->get_addr().end(); ++i) {
-                VSUserStateMap::const_iterator uuid_i = usmap->find(*i);
-                UUID uuid;
-                if (uuid_i == usmap->end()) {
-                    gu_warn("missing uuid");                    
-                }
-                if (uuid.read(uuid_i->second->get_buf(), 
-                              uuid_i->second->get_len(), 0) == 0) {
-                    gu_warn("unable to deserialize uuid: %p %u", 
-                            uuid_i->second->get_buf(), 
-                            uuid_i->second->get_len());
-                }
-                std::string addr_str = i->to_string();
-                gu_debug("uuid %s: " GU_UUID_FORMAT, 
-                         addr_str.c_str(),
-                         GU_UUID_ARGS(uuid.get_uuid_ptr()));
-                uuids->insert(std::pair<const Address, UUID>(*i, uuid));
-            }
-        }
     }
 };
 
@@ -118,8 +51,6 @@ public:
 		delete i->msg;
 	    if (i->view)
 		delete i->view;
-            if (i->uuids)
-                delete i->uuids;
 	}
 	gu_cond_destroy(&cond);
 	gu_mutex_destroy(&mutex);
@@ -131,7 +62,7 @@ public:
 	// null rb and um denotes eof (broken connection)
 	if (!(rb || vum)) {
 	    gu_mutex_lock(&mutex);
-	    eq.push_back(vs_ev(0, 0, 0, 0, 0));
+	    eq.push_back(vs_ev(0, 0, 0, 0));
 	    gu_cond_signal(&cond);
 	    gu_mutex_unlock(&mutex);
 	    return;
@@ -160,13 +91,13 @@ public:
 	gu_mutex_lock(&mutex);
 	if (vum->msg && eq.empty() && rb->get_len(roff) <= waiter_buf_len) {
 	    memcpy(waiter_buf, rb->get_buf(roff), rb->get_len(roff));
-	    eq.push_back(vs_ev(0, rb->get_len(roff), vum->msg, vum->view, vum->state_map));
+	    eq.push_back(vs_ev(0, rb->get_len(roff), vum->msg, vum->view));
 	    // Zero pointer/len here to avoid rewriting the buffer if 
 	    // waiter does not wake up before next message
 	    waiter_buf = 0;
 	    waiter_buf_len = 0;
 	} else {
-	    eq.push_back(vs_ev(rb, 0, vum->msg, vum->view, vum->state_map));
+	    eq.push_back(vs_ev(rb, 0, vum->msg, vum->view));
 	}
 	gu_cond_signal(&cond);
 	gu_mutex_unlock(&mutex);
@@ -192,7 +123,6 @@ public:
 	    ev.rb->release();
 	delete ev.msg;
 	delete ev.view;
-        delete ev.uuids;
 	gu_mutex_unlock(&mutex);
     }
 };
@@ -205,12 +135,10 @@ typedef struct gcs_backend_conn {
     gcs_vs vs_ctx;
     gu_thread_t thr;
     gcs_comp_msg_t *comp_msg;
-    UUID self;
-    std::map<Address, long> addr_map;
-    std::map<UUID, long> comp_map;
+    std::map<Address, long> comp_map;
     gcs_backend_conn() : last_view_size(0), max_msg_size(1 << 20),
 			 n_received(0), n_copied(0),
-			 comp_msg(0), self(0, 0) {}
+			 comp_msg(0) {}
 } conn_t;
 
 
@@ -246,28 +174,23 @@ static GCS_BACKEND_SEND_FN(gcs_vs_send)
 
 
 static void fill_comp(gcs_comp_msg_t *msg, 
-                      std::map<Address, long>* addr_map,
-		      std::map<UUID, long>* comp_map, 
-		      const Aset& addrs, 
-                      const Address& self, 
-                      const UUIDMap& uuids)
+		      std::map<Address, long> *comp_map, 
+		      Aset addrs, Address self)
 {
     size_t n = 0;
-    assert(comp_map && addr_map);
     assert(msg != 0 && static_cast<size_t>(msg->memb_num) == addrs.size());
-    comp_map->clear();
+    if (comp_map)
+	comp_map->clear();
     for (Aset::iterator i = addrs.begin(); i != addrs.end(); ++i) {
-        UUIDMap::const_iterator uuid_i = uuids.find(*i);
-        assert(uuid_i != uuids.end());
-	snprintf(msg->memb[n].id, sizeof(msg->memb[n].id), 
-                 GU_UUID_FORMAT,
-                 GU_UUID_ARGS(uuid_i->second.get_uuid_ptr()));
-        
+	snprintf(msg->memb[n].id, sizeof(msg->memb[n].id), "%4.4x.%2.2x.%2.2x",
+		 i->get_proc_id().to_uint(), 
+		 i->get_segment_id().to_uint(),		 
+		 i->get_service_id().to_uint());
 	if (*i == self)
 	    msg->my_idx = n;
-        addr_map->insert(std::pair<Address, long>(*i, n));
-        comp_map->insert(std::pair<UUID, long>(uuid_i->second, n));
-	n++;
+	if (comp_map)
+	    comp_map->insert(std::pair<Address, long>(*i, n));
+	n++;	    
     }
 }
 
@@ -293,8 +216,8 @@ retry:
 
     if (ev.msg) {
 	*msg_type = static_cast<gcs_msg_type_t>(ev.msg->get_user_type());
-	std::map<Address, long>::iterator i = conn->addr_map.find(ev.msg->get_source());
-	assert(i != conn->addr_map.end());
+	std::map<Address, long>::iterator i = conn->comp_map.find(ev.msg->get_source());
+	assert(i != conn->comp_map.end());
 	*sender_id = i->second;
 	if (ev.rb) {
 	    ret = ev.rb->get_len();
@@ -332,12 +255,7 @@ retry:
             abort();
         }
 
-	fill_comp(new_comp, 
-                  ev.view->is_trans() ? 0 : &conn->addr_map,
-                  ev.view->is_trans() ? 0 : &conn->comp_map,
-                  ev.view->get_addr(), 
-                  conn->vs_ctx.vs->get_self(),
-                  *ev.uuids);
+	fill_comp(new_comp, ev.view->is_trans() ? 0 : &conn->comp_map, ev.view->get_addr(), conn->vs_ctx.vs->get_self());
 	if (conn->comp_msg) gcs_comp_msg_delete(conn->comp_msg);
 	conn->comp_msg = new_comp;
 	cpy = std::min(static_cast<size_t>(gcs_comp_msg_size(conn->comp_msg)), len);
@@ -385,8 +303,7 @@ static GCS_BACKEND_OPEN_FN(gcs_vs_open)
     if (!conn) return -EBADFD;
 
     try {
-	conn->vs_ctx.vs->connect();
-	conn->vs_ctx.vs->join(0, &conn->vs_ctx, &conn->self);
+	conn->vs_ctx.vs->join(0, &conn->vs_ctx);
 	int err = gu_thread_create(&conn->thr, 0, &conn_run, conn);
 	if (err != 0)
 	    return -err;
@@ -402,10 +319,9 @@ static GCS_BACKEND_CLOSE_FN(gcs_vs_close)
     conn_t *conn = backend->conn;
     if (conn == 0)
 	return -EBADFD;
-    
+
     conn->vs_ctx.vs->leave(0);
     gu_thread_join(conn->thr, 0);
-    conn->vs_ctx.vs->close();
 
     return 0;
 }
@@ -417,6 +333,7 @@ static GCS_BACKEND_DESTROY_FN(gcs_vs_destroy)
 	return -EBADFD;
     backend->conn = 0;
     
+    conn->vs_ctx.vs->close();
     delete conn->vs_ctx.vs;
     delete conn->vs_ctx.po;
     if (conn->comp_msg) gcs_comp_msg_delete (conn->comp_msg);
@@ -442,7 +359,7 @@ GCS_BACKEND_CREATE_FN(gcs_vs_create)
     gu_debug ("Opening connection to '%s'", sock);
 
     try {
-	conn = new gcs_backend_conn();	
+	conn = new gcs_backend_conn;	
     } catch (std::bad_alloc e) {
 	return -ENOMEM;
     }
@@ -452,6 +369,7 @@ GCS_BACKEND_CREATE_FN(gcs_vs_create)
 	conn->vs_ctx.vs = VS::create(sock, conn->vs_ctx.po, 
 				     &conn->vs_ctx.monitor);
 	conn->vs_ctx.set_down_context(conn->vs_ctx.vs);
+	conn->vs_ctx.vs->connect();
     } catch (Exception e) {
 	delete conn;
 	return -EINVAL;
