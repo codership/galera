@@ -236,6 +236,7 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
 
     /* set debug logging on, if requested by app */
     if (*(my_bool*)app_configurator(WSREP_CONF_DEBUG, WSREP_TYPE_INT)) {
+        gu_info("setting debug level logging");
         gu_conf_debug_on();
     }
 
@@ -1659,12 +1660,12 @@ static enum wsrep_status mm_galera_set_variable(
      * variables for connections and for setting galera configuration variables.
      *
      */
-    if (!strncmp(key, "galera_debug", key_len)) {
+    if (!strncmp(key, "wsrep_debug", key_len)) {
         char value[256];
         memset(value, '\0', 256);
         gu_debug("GALERA set value: %s" , value);
         strncpy(value, query, query_len);
-        const char *set_query= "galera_debug=ON";
+        const char *set_query= "wsrep_debug=ON";
 
         if (strstr(value, set_query)) {
             gu_info("GALERA enabling debug logging: %s" , value);
