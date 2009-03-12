@@ -38,6 +38,7 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                       "frag_no  expected: %ld, received: %ld",
                       df->sent_id, frg->act_id, df->frag_no, frg->frag_no);
             df->frag_no--; // revert counter in hope that we get good frag
+            assert(0);
             return -EPROTO;
         }
     }
@@ -57,6 +58,7 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                 else {
                     gu_error ("Could not allocate memory for new foreign "
                               "action of size: %z", df->size);
+                    assert(0);
                     return -ENOMEM;
                 }
             }
@@ -66,6 +68,7 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
             gu_debug ("frag_no  expected: 0(first), received: %ld\n"
                       "act_id: %llu",
                       frg->frag_no, frg->act_id);
+            assert(0);
             return -EPROTO;
         }
     }

@@ -77,6 +77,7 @@ gcs_node_handle_act_frag (gcs_node_t*           node,
     }
     else {
         gu_warn ("Unrecognised action type: %d", frg->act_type);
+        assert(0);
         return -EPROTO;
     }
 }
