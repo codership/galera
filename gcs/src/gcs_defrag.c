@@ -54,8 +54,11 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                 df->head = malloc (df->size);
                 if(gu_likely(df->head != NULL))
                     df->tail = df->head;
-                else
+                else {
+                    gu_error ("Could not allocate memory for new foreign "
+                              "action of size: %z", df->size);
                     return -ENOMEM;
+                }
             }
         }
         else {
