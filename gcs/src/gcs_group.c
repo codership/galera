@@ -327,15 +327,16 @@ gcs_group_handle_uuid_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 {
     assert (msg->size == sizeof(gu_uuid_t));
 
-    if (GCS_GROUP_WAIT_STATE_UUID == group->state) {
+    if (GCS_GROUP_WAIT_STATE_UUID == group->state &&
+        0 == msg->sender_idx /* check that it is from the representative */) {
         group->state_uuid = *(gu_uuid_t*)msg->buf;
         group->state      = GCS_GROUP_WAIT_STATE_MSG;
     }
     else {
-        gu_debug ("Stray state UUID msg: "GU_UUID_FORMAT
-                  " from node %d, current group state %s",
-                  GU_UUID_ARGS(&group->state_uuid), msg->sender_idx,
-                  group_state_str[group->state]);
+        gu_warn ("Stray state UUID msg: "GU_UUID_FORMAT
+                 " from node %d, current group state %s",
+                 GU_UUID_ARGS(&group->state_uuid), msg->sender_idx,
+                 group_state_str[group->state]);
     }
 
     return group->state;
