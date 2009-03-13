@@ -460,7 +460,7 @@ core_handle_act_msg (gcs_core_t*     core,
         }
         else if (gu_unlikely(ret < 0)){
             gu_fatal ("Failed to handle action fragment: %zd (%s)",
-                      ret, strerror(ret));
+                      ret, strerror(-ret));
             assert (0);
             return -ENOTRECOVERABLE;
         }

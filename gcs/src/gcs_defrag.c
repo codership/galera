@@ -34,7 +34,7 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
         if (gu_unlikely((df->sent_id != frg->act_id) ||
                         (df->frag_no != frg->frag_no))) {
             gu_error ("Unordered fragment received. Protocol error.");
-            gu_debug ("\nact_id   expected: %llu, received: %llu\n"
+            gu_error ("\nact_id   expected: %llu, received: %llu\n"
                       "frag_no  expected: %ld, received: %ld",
                       df->sent_id, frg->act_id, df->frag_no, frg->frag_no);
             df->frag_no--; // revert counter in hope that we get good frag
