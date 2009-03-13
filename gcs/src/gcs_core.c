@@ -13,6 +13,8 @@
 
 #include <galerautils.h>
 
+#define GCS_COMP_MSG_ACCESS
+
 #include "gcs_backend.h"
 #include "gcs_comp_msg.h"
 #include "gcs_fifo_lite.h"
@@ -522,6 +524,11 @@ core_handle_comp_msg (gcs_core_t*     core,
     gcs_group_t* group = &core->group;
 
     assert (GCS_MSG_COMPONENT == msg->type);
+
+    if (msg->size < sizeof (gcs_comp_msg_t)) {
+        gu_error ("Malformed component message. Ignoring");
+        return 0;
+    }
 
     ret = gcs_group_handle_comp_msg (group, msg->buf);
 
