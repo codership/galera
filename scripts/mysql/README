@@ -322,15 +322,11 @@ passed to mysql-galera startup script (see mysql-galera --help).
 
 3.1 MANDATORY CONFIGURATION OPTIONS
 
-log_bin=mysql-bin
 binlog_format=ROW
-Those two options are required to use ROW-level replication as opposed to
+This option is required to use row-level replication as opposed to
 statement-level. For performance and consistency considerations don't change
-that. As a side effect, binlog is temporarily disabled. In future those options
-won't have special meaning.
-
-innodb_lock_wait_timeout=9999999
-This option is required for correct conflict resolution.
+that. As a side effect, binlog, if tuned on, can be ROW only. In future this
+option won't have special meaning.
 
 Mandatory options are hardcoded both in demo my.cnf file and in mysql-galera
 script.
@@ -373,7 +369,24 @@ wsrep_ws_persistency=0
 wsrep_debug=0
    Enable debug-level logging.  
 
+NEW since demo1:
 
+wsrep_convert_LOCK_to_trx=1
+   Implicitly convert locking sessions into transactions inside mysqld. By
+   itself it does not mean support for locking sessions, but it prevents the
+   database from going into logically inconsistent state.
+   
+wsrep_retry_autocommit=1
+   Retry autocommit queries and single statement transactions should they fail
+   certification test. This is analogous to rescheduling an autocommit query
+   should it go into deadlock with other transactions in the database lock
+   manager.
+   
+wsrep_auto_increment_control=1
+   Automatically adjust auto_increment_increment and auto_increment_offset
+   variables based on the number of nodes in the cluster. Significantly reduces
+   certification conflic rate for INSERTS.
+   
 4. Using MySQL/Galera demo in Amazon EC2
 
 MySQL/Galera demo works anywhere TCP/IP works. Therefore using MySQL/Galera
