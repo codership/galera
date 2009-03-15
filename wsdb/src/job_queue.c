@@ -52,7 +52,9 @@ int job_queue_destroy(struct job_queue *queue) {
 }
 
 
-struct job_worker *job_queue_new_worker(struct job_queue *queue) {
+struct job_worker *job_queue_new_worker(
+    struct job_queue *queue, enum job_type type
+) {
     struct job_worker *worker = NULL;
     int i=0;
 
@@ -77,6 +79,7 @@ struct job_worker *job_queue_new_worker(struct job_queue *queue) {
 
     queue->registered_workers++;
     worker->state = JOB_IDLE;
+    worker->type  = type;
     gu_mutex_unlock(&(queue->mutex));
 
     return (worker);

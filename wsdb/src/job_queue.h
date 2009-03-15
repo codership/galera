@@ -102,6 +102,15 @@ enum job_state {
     JOB_WAITING,
 };
 
+/*
+ * JOB_SLAVE     = usual remote slave applying job
+ * JOB_REPLAYING = replicated and certified local trx, which is replaying 
+ *                 to earlier BF abort
+ */
+enum job_type {
+    JOB_SLAVE,
+    JOB_REPLAYING,
+};
 
 /*!
  * @struct job queue
@@ -113,6 +122,7 @@ struct job_worker {
     void           *ctx;                //!< context pointer to application
     ushort         waiters[MAX_WORKERS];//!< jobs waiting for this to complete
     gu_cond_t      cond;                //!< used together with queue mutex
+    enum job_type  type;                //!< slave or replaying job 
 };
 
 #define IDENT_job_worker 'j'
@@ -151,7 +161,8 @@ int job_queue_destroy(struct job_queue *queue);
  * @brief create new worker
  * @param job_queue job queue, where worker is working
  */
-struct job_worker *job_queue_new_worker(struct job_queue *queue);
+struct job_worker *job_queue_new_worker(
+    struct job_queue *queue, enum job_type type);
 
 /*
  * @brief remove worker resource
