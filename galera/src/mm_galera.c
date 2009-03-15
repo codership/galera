@@ -752,8 +752,15 @@ static int process_query_write_set_applying(
 
     /* Grab commit queue for commit time */
     // can't use it here GALERA_GRAB_COMMIT_QUEUE (seqno_l);
-    rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l);
-
+    switch (applier->type) {
+    case JOB_SLAVE:
+      rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l);
+      break;
+    case JOB_REPLAYING:
+      /* replaying jobs have reserved commit_queue in the beginning */
+      rcode = 0;
+      break;
+    }
     switch (rcode) {
     case 0: break;
     case -ECANCELED:
@@ -860,7 +867,12 @@ static void process_query_write_set(
 
     case WSDB_CERTIFICATION_SKIP:
         /* Cancel commit queue */
-        GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
+        if (applier->type == JOB_SLAVE) {
+            GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
+        } else {
+            /* replaying job has garbbed commit queue in the begin */
+            GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
+        }
         break;
     default:
         gu_error(
@@ -1017,7 +1029,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
         return WSREP_NODE_FAIL;
     }
 
-    applier = job_queue_new_worker(applier_queue);
+    applier = job_queue_new_worker(applier_queue, JOB_SLAVE);
     if (!applier) {
         gu_error("galera, could not create applier");
         gu_info("active_workers: %d, max_workers: %d",
@@ -1847,7 +1859,7 @@ static enum wsrep_status mm_galera_replay_trx(
         return WSREP_NODE_FAIL;
     }
 
-    applier = job_queue_new_worker(applier_queue);
+    applier = job_queue_new_worker(applier_queue, JOB_REPLAYING);
     if (!applier) {
         gu_error("galera, could not create applier");
         gu_info("active_workers: %d, max_workers: %d",
@@ -1856,6 +1868,29 @@ static enum wsrep_status mm_galera_replay_trx(
         return WSREP_NODE_FAIL;
     }
     gu_debug("applier %d", applier->id );
+
+    /*
+     * grab to_queue already here, to make sure the conflicting BF applier
+     * has completed before we start.
+     * commit_queue is released inside process_query or process_query_applying
+     */
+    rcode = galera_eagain (gcs_to_grab, commit_queue, trx.seqno_l);
+
+    switch (rcode) {
+    case 0: break;
+    case -ECANCELED:
+        gu_warn("replaying canceled in commit queue for %lld %lld", 
+                 trx.seqno_g, trx.seqno_l);
+        break;
+    case -EINTR:
+        gu_warn("replaying interrupted when starting %llu", trx.seqno_l);
+        break;
+
+    default:
+        gu_fatal("replaying tcommit queue grab fail(%lld %lld)", 
+                 trx.seqno_g, trx.seqno_l);
+        abort();
+    }
 
     /*
      * tell app, that replaying will start with allocated seqno
