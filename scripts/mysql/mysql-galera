@@ -97,7 +97,7 @@ usage() { cat - << EOF
 usage: mysql-galera [options] command
 
 Options:
-    -d|--debug        : enable debug
+    -d|--debug        : enable debug output
     -l|--log          : enable mysql query log
     -g|--gcs_address  : address of gcs server (spread://locahost:4803)
     --slave_threads   : number of consurrent ws appliers (1)
@@ -144,10 +144,10 @@ galera_start()
         exit -1;
     fi
 
-    if [ -n "$MYSQL_LOG" ]
-    then
-        LOGGING_OPTS=" --log=$mysql_log --log_output=FILE "
-    fi
+#    if [ -n "$MYSQL_LOG" ]
+#    then
+#        LOGGING_OPTS=" --general_log=1 --log_output=FILE "
+#    fi
 
     if [ "$WS_LEVEL" == "RBR" ]
     then
@@ -175,7 +175,7 @@ galera_start()
         WSREP_OPTS="$WSREP_OPTS --wsrep_slave_threads=$SLAVE_THREADS"
     fi
 
-    echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening to port $MYSQL_PORT and socket $MYSQL_SOCKET..."
+    echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening at port $MYSQL_PORT and socket $MYSQL_SOCKET..."
 
     export LD_LIBRARY_PATH	
 
@@ -310,10 +310,14 @@ case $1 in
             exit 0
             ;;
     -d|--debug)
-            DEBUG_OPTS=" --debug=d,galera,wsdb:t:i:o"
+            DEBUG_OPTS=" --wsrep_debug=1 "
+	    ;;
+    --dbug)
+            DBUG_OPTS=" --debug=d,galera,wsdb:t:i:o"
             ;;
     -l|--log)
-            MYSQL_LOG="log"
+            LOGGING_OPTS=" --general_log=1 --log_output=FILE "
+#            MYSQL_LOG="log"
             ;;
     --valgrind)
             VALGRIND="valgrind --log-file=/tmp/mysql_vg --leak-check=full"

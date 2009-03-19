@@ -415,7 +415,13 @@ NOTE: this demo may be binary incompatible with some older Linux distributions.
    you add a new node to the cluster and/or restart a node you need to manually 
    synchronize database contents on the nodes. See README for details.
 
-4) Unsupported in this demo:
+4) Not replicated in this demo:
+   CREATE/DROP anything but TABLE/DATATBASE.
+   GRANT privileges.
+   Those commands are not replicated, and should be applied on each node
+   separately.
+
+   Unsupported in this demo:
    commands: LOAD DATA.
    features: LOCKing sessions.
    Use at your own risk.
