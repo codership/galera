@@ -1,55 +1,93 @@
-Files in this test distro are:
+FILES IN THIS DIRECTORY:
 
-loaddb.sh        -- script to create drupaldb database and test user
-                    Also load drupaldb.sql dump
+Drupal 5 files (obsolete):
+
 drupaldb.sql.gz  -- dump of drupal 5 MySQL database
 drupal.jmx       -- jmeter configuration file
 drupal5.diff     -- patch to make drupal replay transactions
 
+Drupal 6 files:
+
+drupal6.10.tgz   -- Drupal 6 installation configured for drupal:password login.
+                    Unpack it into webserver root (/var/www)
 drupal6.sql.gz   -- dump of drupal 6 MySQL database
 drupal6_8080.jmx -- jmeter test file for drupal6, verified to work with
                     127.0.0.1:8080 address
 drupal6.jmx      -- attempt to make universal test file out of drupal6_8080.jmx
                     work in progress
 
-To test:
+loaddb.sh        -- script to create drupal databases and grant permissions.
 
-1. Install drupal 5 in each cluster node. Configure it to use user 'drupal' and
-   password 'password' to connect to 'drupaldb' database. For that edit
+
+SETTING UP THE NODES:
+
+First, running the test requires nodes to be set up: Drupal installed and
+Apache configured. This script cannot do it automatically. How to do it is
+described below. It needs to be done only once.
+
+Second, the address of Drupal site is hardcoded into the Jmeter test
+script: http://127.0.0.8080/drupal6. This requires glbd be listening on the
+client host at port 8080, and Drupal files be installed under
+<webserver root>/drupal6 (e.g. /var/www/drupal6 on Ubuntu)
+
+1. Install Drupal 6 in each cluster node so that it can be found at
+   http://<address>/drupal6 path. Configure it to use user 'drupal'
+   and password 'password' to connect to 'drupal6' database. For that edit
    $db_url setting in sites/default/settings.php
-
-2. Apply drupal5.diff to each drupal installation to make it use and replay
-   transactions.
-
-3. Prepare drupaldb database by running loaddb.sh. If it is run for the first
-   time it must be repeated on every node to create drupal user privileges.
-
-4. In the test server, start tcp load balancer (pen or glb)
-   to share load from 127.0.0.1:80 to each cluster node
-   in round robin method
    
-5. Start jmeter test by (also see note below):
+   Alternatively you can just unpack the provided drupal6.10.tgz package in
+   the webserver root directory and grant webserver rw permissions to it
 
-   $ jmeter --nongui --testfile drupal.jmx --logfile /tmp/results.jtl
+2. Fix Apache to use clean URLs by adding the following to Apache config
+   (in Ubuntu it is normally /etc/apache2/sites-enabled/000-default):
+
+   <Directory /var/www/drupal6>
+      Options -Indexes FollowSymLinks MultiViews
+      AllowOverride All
+      Order allow,deny
+      allow from all
+   </Directory>
+
+RUNNING THE TEST:
+
+1. Initialize drupal database by running loaddb.sh. See the script for the
+   configuration options. Galera distribution does not come prepared with 
+   Drupal user privileges, and currently does not support GRANT command
+   replication. That means that GRANT command must be manually repeated on
+   every node to create drupal user privileges.
    
-6. Examine results by starting jmeter in GUI mode and loading the results
-
-   $ jmeter --testfile drupal.jmx
+   Alternatively you can run loaddb.sh against each node in turn. After that
+   you need to run it olny one when you want to reset the test.
    
-NOTE: connection options are set in drupal.jmx. You may need to edit them in
-order to get it working. For that you can either load this file in jmeter,
-edit it in HTTP request defaults and save, or use your favourite sed editor on
-that file, it is XML. Defaults are 127.0.0.1:80
+2. After database initialization, Drupal needs yet another action to run
+   properly:
 
-NOTE1: test file by default configured to exit thread if error is encountered.
-Only creator threads don't exit since they are deliberately configurared to
-request forbidden pages. This policy can be changed in jmeter. Beware that
-enabling threads to continue in case of error can produce false performance
-figures.
+   You need to login to your Drupal site as root:rootpass, say, using links,
+   and then go to the following link:
+   
+   Administration->Reports->Status Report->run manually (cron jobs)
 
-NOTE2: browser threads don't seem to be able to login with Java throwing
-connection refused exception. This happens in my local network, but seemed to
-work in Amamzon. What causes "connection refused" - i have no idea.
+   Without doing that, some of the pages for some reason become inaccessible
+   (no idea why) and you'll get false error positives. This procedure needs
+   to be performed every time drupal databse is reloaded. I don't know how to
+   fix that or how to make it automatic.
 
-NOTE3: simple tcp load balancer may not work properly with HTTP. You may need
-to configure apache balancer module to rewrite HTTP headers.
+3. Start glbd on a client machine like that:
+   
+   ./glbd -t 2 8080 node1:80 node2:80 node3:80
+   
+4. Start jmeter:
+
+   $ jmeter --testfile drupal6_8080.jmx
+   
+   Hit Ctrl-R to start the test.
+   
+NOTE1:
+During the first few runs it will stop with error about unable to find
+requested JavaScript file. But after 2-3 runs this file will misteriously
+appear on all cluster nodes and it won't be a problem after that. One solution
+would be to keep Drupal files directory on a shared disk.
+
+NOTE2:
+It is essential to run jmeter in GUI mode to be able to catch and analyze
+errors.

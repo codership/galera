@@ -6,25 +6,28 @@ MYSQL_PORT=${MYSQL_PORT:-"3306"}
 MYSQL_USER=${MYSQL_USER:-"root"}
 MYSQL_PSWD=${MYSQL_PSWD:-"rootpass"}
 
-# Prepare permissions
-mysql -u$MYSQL_USER -p$MYSQL_PSWD -h$MYSQL_HOST -P$MYSQL_PORT -e \
+MYSQL_CMD="mysql -u$MYSQL_USER -p$MYSQL_PSWD -h$MYSQL_HOST -P$MYSQL_PORT "
+
+set -e
+
+#Prepare drupaldb database
+$MYSQL_CMD -e \
 "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, CREATE
 TEMPORARY TABLES, LOCK TABLES
 ON drupaldb.*
 TO 'drupal'@'%'  IDENTIFIED BY 'password'"
 
-mysql -u$MYSQL_USER -p$MYSQL_PSWD -h$MYSQL_HOST -P$MYSQL_PORT -e \
+zcat $TEST_HOME/drupaldb.sql.gz | $MYSQL_CMD
+
+
+# Prepare drupal6 database
+$MYSQL_CMD -e \
 "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, CREATE
 TEMPORARY TABLES, LOCK TABLES
 ON drupal6.*
 TO 'drupal'@'%'  IDENTIFIED BY 'password'"
 
-mysql -u$MYSQL_USER -p$MYSQL_PSWD -h$MYSQL_HOST -P$MYSQL_PORT -e \
-"FLUSH PRIVILEGES"
+zcat $TEST_HOME/drupal6.sql.gz | $MYSQL_CMD
 
-zcat $TEST_HOME/drupaldb.sql.gz | \
-mysql -u$MYSQL_USER -p$MYSQL_PSWD -h$MYSQL_HOST -P$MYSQL_PORT
-
-zcat $TEST_HOME/drupal6.sql.gz | \
-mysql -u$MYSQL_USER -p$MYSQL_PSWD -h$MYSQL_HOST -P$MYSQL_PORT
+$MYSQL_CMD -e "FLUSH PRIVILEGES"
 
