@@ -65,7 +65,7 @@ namespace gcache
           fd        (fname, check_size(megs)),
           mmap      (fd),
           preamble  (static_cast<char*>(mmap.ptr)),
-          header    (reinterpret_cast<uint64_t*>(preamble + PREAMBLE_LEN)),
+          header    (reinterpret_cast<int64_t*>(preamble + PREAMBLE_LEN)),
           header_len(32),
           start     (reinterpret_cast<uint8_t*>(header + header_len)),
           end       (reinterpret_cast<uint8_t*>(preamble + mmap.size)),
@@ -81,7 +81,7 @@ namespace gcache
           fd        (fname),
           mmap      (fd),
           preamble  (static_cast<char*>(mmap.ptr)),
-          header    (reinterpret_cast<uint64_t*>(preamble + PREAMBLE_LEN)),
+          header    (reinterpret_cast<int64_t*>(preamble + PREAMBLE_LEN)),
           header_len(header[0]),
           start     (reinterpret_cast<uint8_t*>(header + header_len)),
           end       (reinterpret_cast<uint8_t*>(preamble + mmap.size)),
@@ -108,40 +108,6 @@ namespace gcache
 
     /*! prints object properties */
     void print (std::ostream& os)
-    {
-    }
-
-    /* Seqno related functions */
-
-    /*!
-     * Assign sequence number to buffer pointed to by ptr
-     */
-    void    seqno_assign  (void* ptr, int64_t seqno)
-    {
-    }
-
-    /*!
-     * Get the smallest seqno present in the cache.
-     * Locks seqno from removal.
-     */
-    int64_t seqno_get_min ()
-    {
-        return -1;
-    }
-
-    /*!
-     * Get pointer to buffer identified by seqno.
-     * Moves lock to the given seqno.
-     */
-    void*   seqno_get_ptr (int64_t seqno)
-    {
-        return 0;
-    }
-
-    /*!
-     * Releases any seqno locks present.
-     */
-    void    seqno_release ()
     {
     }
 }

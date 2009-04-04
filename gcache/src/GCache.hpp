@@ -82,7 +82,7 @@ namespace gcache
         static size_t  const PREAMBLE_LEN;
 
         char*     const preamble; // ASCII text preamble
-        uint64_t* const header;   // cache binary header
+        int64_t*  const header;   // cache binary header
         size_t    const header_len;
         uint8_t*  const start;    // start of cache area
         uint8_t*  const end;      // first byte after cache area
@@ -90,8 +90,8 @@ namespace gcache
         uint8_t*        next;     // pointer to the next free space
 
         size_t    const size_cache;
-        size_t          size_free;
-        size_t          size_used;
+        ssize_t         size_free;
+        ssize_t         size_used;
 
         long long       mallocs;
         long long       reallocs;
@@ -102,7 +102,8 @@ namespace gcache
 
         char     const  version;
 
-        std::map<int64_t, void*> seqno2ptr;
+        typedef std::map<int64_t, void*> seqno2ptr_t;
+        seqno2ptr_t     seqno2ptr;
 
         void header_read();
         void header_write();
@@ -113,6 +114,8 @@ namespace gcache
 
         void* get_new_buffer (size_t size);
 
+        inline void order_buffer   (void* ptr, int64_t seqno);
+        inline void discard_buffer (void* bh);
         // disable copying
         GCache (const GCache&);
         GCache& operator = (const GCache);

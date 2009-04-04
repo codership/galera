@@ -13,7 +13,8 @@ GCACHE_SRCS =               \
 	MMap.cpp            \
 	GCache.cpp          \
 	GCache_header.cpp   \
-	GCache_memops.cpp
+	GCache_memops.cpp   \
+	GCache_seqno.cpp
 
 #GCACHE_INCS = $(wildcard *.hpp)
 
