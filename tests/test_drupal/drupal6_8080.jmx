@@ -40,7 +40,7 @@
         <longProp name="ThreadGroup.end_time">1236113809000</longProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">stoptest</stringProp>
-        <stringProp name="ThreadGroup.duration">900</stringProp>
+        <stringProp name="ThreadGroup.duration">9000</stringProp>
         <stringProp name="ThreadGroup.delay">0</stringProp>
       </ThreadGroup>
       <hashTree>
@@ -108,8 +108,8 @@
           </HeaderManager>
           <hashTree/>
           <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
-            <stringProp name="ConstantTimer.delay">7000</stringProp>
-            <stringProp name="RandomTimer.range">3000.0</stringProp>
+            <stringProp name="ConstantTimer.delay">15000</stringProp>
+            <stringProp name="RandomTimer.range">7000.0</stringProp>
           </GaussianRandomTimer>
           <hashTree/>
         </hashTree>
@@ -968,8 +968,8 @@
           </HeaderManager>
           <hashTree/>
           <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
-            <stringProp name="ConstantTimer.delay">7000</stringProp>
-            <stringProp name="RandomTimer.range">3000.0</stringProp>
+            <stringProp name="ConstantTimer.delay">15000</stringProp>
+            <stringProp name="RandomTimer.range">7000.0</stringProp>
           </GaussianRandomTimer>
           <hashTree/>
         </hashTree>
@@ -1032,8 +1032,8 @@
           </HeaderManager>
           <hashTree/>
           <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
-            <stringProp name="ConstantTimer.delay">7000</stringProp>
-            <stringProp name="RandomTimer.range">3000.0</stringProp>
+            <stringProp name="ConstantTimer.delay">10000</stringProp>
+            <stringProp name="RandomTimer.range">7000.0</stringProp>
           </GaussianRandomTimer>
           <hashTree/>
         </hashTree>
@@ -1096,8 +1096,8 @@
           </HeaderManager>
           <hashTree/>
           <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
-            <stringProp name="ConstantTimer.delay">7000</stringProp>
-            <stringProp name="RandomTimer.range">3000.0</stringProp>
+            <stringProp name="ConstantTimer.delay">15000</stringProp>
+            <stringProp name="RandomTimer.range">7000.0</stringProp>
           </GaussianRandomTimer>
           <hashTree/>
         </hashTree>
@@ -1160,8 +1160,8 @@
           </HeaderManager>
           <hashTree/>
           <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
-            <stringProp name="ConstantTimer.delay">7000</stringProp>
-            <stringProp name="RandomTimer.range">3000.0</stringProp>
+            <stringProp name="ConstantTimer.delay">15000</stringProp>
+            <stringProp name="RandomTimer.range">7000.0</stringProp>
           </GaussianRandomTimer>
           <hashTree/>
         </hashTree>
@@ -1300,8 +1300,8 @@
           </HeaderManager>
           <hashTree/>
           <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
-            <stringProp name="ConstantTimer.delay">7000</stringProp>
-            <stringProp name="RandomTimer.range">3000.0</stringProp>
+            <stringProp name="ConstantTimer.delay">30000</stringProp>
+            <stringProp name="RandomTimer.range">10000.0</stringProp>
           </GaussianRandomTimer>
           <hashTree/>
         </hashTree>
@@ -1439,8 +1439,8 @@
           </HeaderManager>
           <hashTree/>
           <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
-            <stringProp name="ConstantTimer.delay">7000</stringProp>
-            <stringProp name="RandomTimer.range">3000.0</stringProp>
+            <stringProp name="ConstantTimer.delay">10000</stringProp>
+            <stringProp name="RandomTimer.range">7000.0</stringProp>
           </GaussianRandomTimer>
           <hashTree/>
         </hashTree>
@@ -1567,8 +1567,8 @@
           </HeaderManager>
           <hashTree/>
           <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
-            <stringProp name="ConstantTimer.delay">7000</stringProp>
-            <stringProp name="RandomTimer.range">3000.0</stringProp>
+            <stringProp name="ConstantTimer.delay">10000</stringProp>
+            <stringProp name="RandomTimer.range">7000.0</stringProp>
           </GaussianRandomTimer>
           <hashTree/>
         </hashTree>
@@ -1630,9 +1630,9 @@
             </collectionProp>
           </HeaderManager>
           <hashTree/>
-          <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+          <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="false">
             <stringProp name="ConstantTimer.delay">7000</stringProp>
-            <stringProp name="RandomTimer.range">3000.0</stringProp>
+            <stringProp name="RandomTimer.range">1000.0</stringProp>
           </GaussianRandomTimer>
           <hashTree/>
         </hashTree>
@@ -1680,7 +1680,7 @@
         <longProp name="ThreadGroup.end_time">1236125829000</longProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">stoptest</stringProp>
-        <stringProp name="ThreadGroup.duration">900</stringProp>
+        <stringProp name="ThreadGroup.duration">9000</stringProp>
         <stringProp name="ThreadGroup.delay">0</stringProp>
       </ThreadGroup>
       <hashTree>
@@ -1690,8 +1690,8 @@
         </CookieManager>
         <hashTree/>
         <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
-          <stringProp name="ConstantTimer.delay">7000</stringProp>
-          <stringProp name="RandomTimer.range">3000.0</stringProp>
+          <stringProp name="ConstantTimer.delay">15000</stringProp>
+          <stringProp name="RandomTimer.range">7000.0</stringProp>
         </GaussianRandomTimer>
         <hashTree/>
         <HTTPSampler guiclass="HttpTestSampleGui" testclass="HTTPSampler" testname="connect" enabled="true">
@@ -2464,7 +2464,7 @@ Comments rule!</stringProp>
         <longProp name="ThreadGroup.end_time">1236126574000</longProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">stoptest</stringProp>
-        <stringProp name="ThreadGroup.duration">900</stringProp>
+        <stringProp name="ThreadGroup.duration">9000</stringProp>
         <stringProp name="ThreadGroup.delay">0</stringProp>
       </ThreadGroup>
       <hashTree>
@@ -2474,8 +2474,8 @@ Comments rule!</stringProp>
         </CookieManager>
         <hashTree/>
         <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
-          <stringProp name="ConstantTimer.delay">7000</stringProp>
-          <stringProp name="RandomTimer.range">3000.0</stringProp>
+          <stringProp name="ConstantTimer.delay">15000</stringProp>
+          <stringProp name="RandomTimer.range">7000.0</stringProp>
         </GaussianRandomTimer>
         <hashTree/>
         <HTTPSampler guiclass="HttpTestSampleGui" testclass="HTTPSampler" testname="connect" enabled="true">
@@ -3292,6 +3292,38 @@ Comments rule!</stringProp>
       </ResultCollector>
       <hashTree/>
       <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="Summary Report" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>true</xml>
+            <fieldNames>false</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+          </value>
+        </objProp>
+        <stringProp name="filename"></stringProp>
+      </ResultCollector>
+      <hashTree/>
+      <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
         <boolProp name="ResultCollector.error_logging">false</boolProp>
         <objProp>
           <name>saveConfig</name>
