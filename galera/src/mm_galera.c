@@ -1357,12 +1357,11 @@ mm_galera_commit(
     int                    rcode;
     struct wsdb_write_set *ws;
     XDR                    xdrs;
-    int                    data_max = 34000; /* only fixed xdr buf supported */
-    //    uint8_t                data[data_max];
+    int                    data_max;
     uint8_t                *data;
     int                    len;
     gcs_seqno_t            seqno_g, seqno_l;
-    enum wsrep_status     retcode;
+    enum wsrep_status      retcode;
     wsdb_trx_info_t        trx;
 
     GU_DBUG_ENTER("galera_commit");
@@ -1434,7 +1433,11 @@ mm_galera_commit(
      *       Should use xdrrec stream instead and encode directly on
      *       gcs channel as we go.
      */
-    data_max = xdr_estimate_wsdb_size(ws) * 2 + rbr_data_len;
+    /* using xdr_sizeof to determine length of buffer. 
+       For some reason this requires one additional byte at the end
+    */
+    data_max = xdr_sizeof((xdrproc_t)xdr_wsdb_write_set, (void *)ws) + 1;
+
     data = (uint8_t *)gu_malloc(data_max);
     memset(data, 0, data_max);
     xdrmem_create(&xdrs, (char *)data, data_max, XDR_ENCODE);

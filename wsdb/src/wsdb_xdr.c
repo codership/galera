@@ -175,7 +175,6 @@ bool_t xdr_wsdb_write_set(XDR *xdrs, struct wsdb_write_set *ws) {
     if (!xdr_longlong_t(xdrs, &ws->last_seen_trx))         return FALSE;
     if (!xdr_enum(xdrs, (enum_t *)&ws->type))              return FALSE;
     if (!xdr_enum(xdrs, (enum_t *)&ws->level))             return FALSE;
-    //if (!xdr_enum(xdrs, (enum_t *)&ws->state))             return FALSE;
 
 #ifdef  REMOVED
     if (!xdr_array(
