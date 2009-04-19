@@ -45,6 +45,7 @@ struct galera_info {
 
 /* application's handlers */
 static wsrep_conf_param_cb_t    app_configurator   = NULL;
+static wsrep_stat_param_cb_t    app_stat_cb        = NULL;
 static wsrep_bf_execute_cb_t    bf_execute_cb      = NULL;
 static wsrep_bf_execute_cb_t    bf_execute_cb_rbr  = NULL;
 static wsrep_bf_apply_row_cb_t  bf_apply_row_cb    = NULL;
@@ -239,6 +240,8 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
         gu_info("setting debug level logging");
         gu_conf_debug_on();
     }
+
+    app_stat_cb = args->stat_param_cb;
 
     /* set the rest of callbacks */
     bf_execute_cb     = args->bf_execute_sql_cb;
@@ -810,6 +813,9 @@ static int process_query_write_set_applying(
     job_queue_end_job(applier_queue, applier);
 
     do_report = report_check_counter ();
+    if (app_stat_cb) {
+        app_stat_cb(WSREP_STAT_MAX_SEQNO, WSREP_TYPE_INT, (void *)&seqno_g);
+    }
     GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
     wsdb_set_global_trx_committed(seqno_g);
     if (do_report) report_last_committed(gcs_conn);
@@ -1247,6 +1253,10 @@ static enum wsrep_status mm_galera_committed(wsrep_t *gh, trx_id_t trx_id) {
 
     gu_mutex_lock(&commit_mtx);
     wsdb_get_local_trx_info(trx_id, &trx);
+
+    if (app_stat_cb) {
+        app_stat_cb(WSREP_STAT_MAX_SEQNO, WSREP_TYPE_INT, (void *)&trx.seqno_g);
+    }
 
     if (trx.state == WSDB_TRX_REPLICATED) {
 

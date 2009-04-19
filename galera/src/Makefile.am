@@ -32,7 +32,7 @@ libmmgalera_la_SOURCES =   \
 #endif
 #libmmgalera_la_DEPENDENCIES = libwsdb.la
 libmmgalera_la_LIBADD       = -lwsdb
-GALERA_INTERFACE = 5
+GALERA_INTERFACE = 6
 GALERA_REVISION  = 0
 GALERA_AGE       = 0
 libmmgalera_la_LDFLAGS = \

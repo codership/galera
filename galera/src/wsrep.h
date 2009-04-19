@@ -72,6 +72,11 @@ typedef enum wsrep_conf_param_type {
     WSREP_TYPE_STRING,  //!< null terminated string
 } wsrep_conf_param_type_t;
 
+/* statistic parameters */
+typedef enum wsrep_stat_param_id {
+    WSREP_STAT_MAX_SEQNO,             //!< max seqno applied
+} wsrep_stat_param_id_t;
+
 /*!
  * @brief callback to return configuration parameter value
  *        The function should be able to return values for all
@@ -82,6 +87,19 @@ typedef enum wsrep_conf_param_type {
  */
 typedef void * (*wsrep_conf_param_cb_t)(wsrep_conf_param_id_t,
                                         wsrep_conf_param_type_t);
+
+/*!
+ * @brief callback to set statistic parameter value
+ *        The function should be able to set values for all
+ *        parameters defined in enum wsrep_stat_param_id
+ *
+ * @param statistic parameter identifier
+ * @param parameter type (same as for configuration parameters)
+ * @param value of the parameter
+ */
+typedef void (*wsrep_stat_param_cb_t)(wsrep_stat_param_id_t,
+                                      wsrep_conf_param_type_t,
+                                      void* value);
 
 /*! 
  * Log severity levels, passed as first argument to log handler
@@ -235,6 +253,7 @@ typedef struct wsrep_init_args {
     /* Application callbacks */
     wsrep_log_cb_t          logger_cb;
     wsrep_conf_param_cb_t   conf_param_cb;
+    wsrep_stat_param_cb_t   stat_param_cb;
     wsrep_view_cb_t         view_handler_cb;
     wsrep_ws_start_cb_t     ws_start_cb;
     wsrep_bf_execute_cb_t   bf_execute_sql_cb;
