@@ -359,7 +359,7 @@ wsrep_dbug_option
    Options for the built-in DBUG library (independent from what MySQL uses).
    Empty by default.
 
-wsrep_local_cache_size=16777216
+wsrep_local_cache_size=20M
    Amount of RAM reserved for writeset cache in bytes. Excess writesets are
    stored on the hard drive in MySQL data directory
 
@@ -386,7 +386,21 @@ wsrep_auto_increment_control=1
    Automatically adjust auto_increment_increment and auto_increment_offset
    variables based on the number of nodes in the cluster. Significantly reduces
    certification conflic rate for INSERTS.
-   
+
+New since demo2:
+
+innodb_autoinc_lock_mode=2
+   This is a required parameter. Without it INSERTs into tables with
+   AUTO_INCREMENT column may fail.
+
+wsrep_drupal_282555_workaround=1
+   MySQL seems to have an obscure bug when INSERT into table with
+   AUTO_INCREMENT column with NULL value for that column may fail due to
+   duplicate key. When this option is on, it retries such INSERTs. Required for
+   Drupal. Documented at:
+      http://bugs.mysql.com/bug.php?id=41984
+      http://drupal.org/node/282555
+
 4. Using MySQL/Galera demo in Amazon EC2
 
 MySQL/Galera demo works anywhere TCP/IP works. Therefore using MySQL/Galera
