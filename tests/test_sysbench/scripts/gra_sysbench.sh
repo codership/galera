@@ -1,5 +1,8 @@
 #!/bin/bash
 
+SYSBENCH_ROOT=$(cd $(dirname $0)/..; pwd -P)
+SYSBENCH=$SYSBENCH_ROOT/sysbench/sysbench
+
 run() {
     local CMD=$@
     local rcode
@@ -16,15 +19,21 @@ load_db() {
     local host=$1
     local port=$2
     log "creating tables"
-    run ~/benchmark/sysbench/sysbench --test=oltp --db-driver=mysql --mysql-user
-=$user --mysql-password=$password --mysql-host=$host --mysql-port=$port --mysql-
-db=test  cleanup
-    run ~/benchmark/sysbench/sysbench --test=oltp --db-driver=mysql --mysql-user
-=$user --mysql-password=$password --mysql-host=$host --mysql-port=$port  --mysql
--table-engine=innodb --mysql-db=test --oltp-table-size=$rows --oltp-auto-inc=off
- prepare
+    run $SYSBENCH --test=oltp --db-driver=mysql \
+                  --mysql-user=$user --mysql-password=$password \
+                  --mysql-host=$host --mysql-port=$port \
+                  --mysql-db=test \
+                  cleanup
+                  
+    run $SYSBENCH --test=oltp --db-driver=mysql \
+                  --mysql-user=$user --mysql-password=$password \
+                  --mysql-host=$host --mysql-port=$port  \
+                  --mysql-table-engine=innodb --mysql-db=test \
+                  --oltp-table-size=$rows --oltp-auto-inc=off \
+                  prepare
 
 }
+
 run_load() {
     local port=$1
     shift
@@ -40,11 +49,15 @@ run_load() {
 
     log "running against $hosts $port with $users"
 
-    run ~/benchmark/sysbench/sysbench --test=oltp --db-driver=mysql --mysql-user
-=$user --mysql-password=$password --mysql-host=$hosts --mysql-port=$port  --mysq
-l-table-engine=innodb --mysql-db=test --oltp-table-size=$rows --oltp-test-mode=$
-mode --oltp-read-only=$readonly --mysql-ignore-duplicates=on --num-threads=$user
-s --max-time=$duration --max-requests=$requests run
+    run $SYSBENCH --test=oltp --db-driver=mysql \
+                  --mysql-user=$user --mysql-password=$password \
+                  --mysql-host=$hosts --mysql-port=$port  \
+                  --mysql-table-engine=innodb --mysql-db=test \
+                  --oltp-table-size=$rows --oltp-test-mode=$mode \
+                  --oltp-read-only=$readonly --mysql-ignore-duplicates=on \
+                  --num-threads=$users --max-time=$duration \
+                  --max-requests=$requests \
+                  run
 }
 
 test_galera() {
@@ -72,7 +85,7 @@ test_galera() {
         run ~/galera stop
         run ~/galera --ws_level $level $hosts start 
 
-        load_db ardennes 3306
+        load_db $primary_node 3306
         sleep 5
 
        # run load against pen or use sqlgen multihost for LB        
@@ -101,9 +114,10 @@ test_galera() {
     done
 }
 
-test_dir=$1
-
-cd $test_dir
+set -x
+#set -e
+#test_dir=$1
+#cd $test_dir
 load_balancer=multihost
 requests=10000
 source sysbench.conf
@@ -127,20 +141,20 @@ echo $RUN_NUMBER > ${RUN_FILE}
 
 echo "sysbench for: $test_dir at `date`" | tee $OUTPUT
 
-log  "stopping servers"
-run ~/mysql-plain stop
-run ~/galera stop
+#log  "stopping servers"
+#run ~/mysql-plain stop
+#run ~/galera stop
 #
 # testing against plain mysql
 #
-log "starting mysql plain"
-run ~/mysql-plain start
+#log "starting mysql plain"
+#run ~/mysql-plain start
 
 load_db $primary_node 3306
 run_load 3306 $users $primary_node
 
-log "stopping plain mysql"
-run ~/mysql-plain stop
+#log "stopping plain mysql"
+#run ~/mysql-plain stop
 
 #
 # testing against galera cluster
@@ -156,16 +170,16 @@ run ~/mysql-plain stop
 
 #log "stopping spread"
 #killall spread
-killall vsbes
-log "starting vsbes"
-~/vsbes_start
-#test_galera vsbes 'SQL'
-test_galera vsbes 'RBR'
-
-
-log "stopping vsbes"
 #killall vsbes
-log "exiting at `date`"
+#log "starting vsbes"
+#~/vsbes_start
+#test_galera vsbes 'SQL'
+#test_galera vsbes 'RBR'
 
-cd ..
+
+#log "stopping vsbes"
+#killall vsbes
+#log "exiting at `date`"
+
+#cd ..
 exit

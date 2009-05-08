@@ -1,34 +1,33 @@
 libsbmysql_a-drv_mysql.o libsbmysql_a-drv_mysql.o: drv_mysql.c \
   ../../../config/config.h /usr/include/string.h /usr/include/features.h \
   /usr/include/sys/cdefs.h /usr/include/bits/wordsize.h \
-  /usr/include/gnu/stubs.h /usr/include/gnu/stubs-32.h \
-  /usr/lib/gcc/i486-linux-gnu/4.2.3/include/stddef.h \
+  /usr/include/gnu/stubs.h /usr/include/gnu/stubs-64.h \
+  /usr/lib/gcc/x86_64-redhat-linux/4.1.1/include/stddef.h \
   /usr/include/xlocale.h /usr/include/bits/string.h \
   /usr/include/bits/string2.h /usr/include/endian.h \
   /usr/include/bits/endian.h /usr/include/bits/types.h \
   /usr/include/bits/typesizes.h /usr/include/stdlib.h \
-  /usr/include/strings.h /usr/local/mysql/include/mysql/mysql.h \
-  /usr/include/sys/types.h /usr/include/time.h /usr/include/sys/select.h \
-  /usr/include/bits/select.h /usr/include/bits/sigset.h \
-  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
-  /usr/include/bits/pthreadtypes.h \
-  /usr/local/mysql/include/mysql/mysql_version.h \
-  /usr/local/mysql/include/mysql/mysql_com.h \
-  /usr/local/mysql/include/mysql/mysql_time.h \
-  /usr/local/mysql/include/mysql/my_list.h \
-  /usr/local/mysql/include/mysql/typelib.h \
-  /usr/local/mysql/include/mysql/my_alloc.h \
-  /usr/local/mysql/include/mysql/mysqld_error.h ../../sb_options.h \
+  /usr/include/bits/string3.h /usr/include/strings.h \
+  /usr/include/mysql/mysql.h /usr/include/sys/types.h /usr/include/time.h \
+  /usr/include/sys/select.h /usr/include/bits/select.h \
+  /usr/include/bits/sigset.h /usr/include/bits/time.h \
+  /usr/include/sys/sysmacros.h /usr/include/bits/pthreadtypes.h \
+  /usr/include/mysql/mysql_version.h /usr/include/mysql/mysql_com.h \
+  /usr/include/mysql/mysql_time.h /usr/include/mysql/my_list.h \
+  /usr/include/mysql/typelib.h /usr/include/mysql/my_alloc.h \
+  /usr/include/mysql/mysqld_error.h ../../sb_options.h \
   ../../../config/config.h /usr/include/stdio.h /usr/include/libio.h \
-  /usr/include/_G_config.h /usr/include/wchar.h \
-  /usr/lib/gcc/i486-linux-gnu/4.2.3/include/stdarg.h \
+  /usr/include/_G_config.h /usr/include/wchar.h /usr/include/bits/wchar.h \
+  /usr/include/gconv.h \
+  /usr/lib/gcc/x86_64-redhat-linux/4.1.1/include/stdarg.h \
   /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
-  /usr/include/bits/stdio.h ../../sb_list.h ../../db_driver.h \
-  ../../sysbench.h /usr/include/bits/waitflags.h \
+  /usr/include/bits/stdio.h /usr/include/bits/stdio2.h ../../sb_list.h \
+  ../../db_driver.h ../../sysbench.h /usr/include/bits/waitflags.h \
   /usr/include/bits/waitstatus.h /usr/include/alloca.h \
-  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
-  /usr/include/bits/environments.h /usr/include/bits/confname.h \
-  /usr/include/getopt.h /usr/include/pthread.h /usr/include/sched.h \
+  /usr/include/bits/stdlib.h /usr/include/unistd.h \
+  /usr/include/bits/posix_opt.h /usr/include/bits/environments.h \
+  /usr/include/bits/confname.h /usr/include/getopt.h \
+  /usr/include/bits/unistd.h /usr/include/pthread.h /usr/include/sched.h \
   /usr/include/bits/sched.h /usr/include/signal.h \
   /usr/include/bits/setjmp.h ../../sb_options.h ../../sb_timer.h \
   /usr/include/sys/time.h ../../sb_logger.h ../../tests/sb_cpu.h \
@@ -48,9 +47,9 @@ libsbmysql_a-drv_mysql.o libsbmysql_a-drv_mysql.o: drv_mysql.c \
 
 /usr/include/gnu/stubs.h:
 
-/usr/include/gnu/stubs-32.h:
+/usr/include/gnu/stubs-64.h:
 
-/usr/lib/gcc/i486-linux-gnu/4.2.3/include/stddef.h:
+/usr/lib/gcc/x86_64-redhat-linux/4.1.1/include/stddef.h:
 
 /usr/include/xlocale.h:
 
@@ -68,9 +67,11 @@ libsbmysql_a-drv_mysql.o libsbmysql_a-drv_mysql.o: drv_mysql.c \
 
 /usr/include/stdlib.h:
 
+/usr/include/bits/string3.h:
+
 /usr/include/strings.h:
 
-/usr/local/mysql/include/mysql/mysql.h:
+/usr/include/mysql/mysql.h:
 
 /usr/include/sys/types.h:
 
@@ -88,19 +89,19 @@ libsbmysql_a-drv_mysql.o libsbmysql_a-drv_mysql.o: drv_mysql.c \
 
 /usr/include/bits/pthreadtypes.h:
 
-/usr/local/mysql/include/mysql/mysql_version.h:
+/usr/include/mysql/mysql_version.h:
 
-/usr/local/mysql/include/mysql/mysql_com.h:
+/usr/include/mysql/mysql_com.h:
 
-/usr/local/mysql/include/mysql/mysql_time.h:
+/usr/include/mysql/mysql_time.h:
 
-/usr/local/mysql/include/mysql/my_list.h:
+/usr/include/mysql/my_list.h:
 
-/usr/local/mysql/include/mysql/typelib.h:
+/usr/include/mysql/typelib.h:
 
-/usr/local/mysql/include/mysql/my_alloc.h:
+/usr/include/mysql/my_alloc.h:
 
-/usr/local/mysql/include/mysql/mysqld_error.h:
+/usr/include/mysql/mysqld_error.h:
 
 ../../sb_options.h:
 
@@ -114,13 +115,19 @@ libsbmysql_a-drv_mysql.o libsbmysql_a-drv_mysql.o: drv_mysql.c \
 
 /usr/include/wchar.h:
 
-/usr/lib/gcc/i486-linux-gnu/4.2.3/include/stdarg.h:
+/usr/include/bits/wchar.h:
+
+/usr/include/gconv.h:
+
+/usr/lib/gcc/x86_64-redhat-linux/4.1.1/include/stdarg.h:
 
 /usr/include/bits/stdio_lim.h:
 
 /usr/include/bits/sys_errlist.h:
 
 /usr/include/bits/stdio.h:
+
+/usr/include/bits/stdio2.h:
 
 ../../sb_list.h:
 
@@ -134,6 +141,8 @@ libsbmysql_a-drv_mysql.o libsbmysql_a-drv_mysql.o: drv_mysql.c \
 
 /usr/include/alloca.h:
 
+/usr/include/bits/stdlib.h:
+
 /usr/include/unistd.h:
 
 /usr/include/bits/posix_opt.h:
@@ -143,6 +152,8 @@ libsbmysql_a-drv_mysql.o libsbmysql_a-drv_mysql.o: drv_mysql.c \
 /usr/include/bits/confname.h:
 
 /usr/include/getopt.h:
+
+/usr/include/bits/unistd.h:
 
 /usr/include/pthread.h:
 
