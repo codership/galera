@@ -81,13 +81,16 @@ echo $RUN_NUMBER > ${RUN_FILE}
 
 echo "sysbench for: $test_dir at `date`" | tee $OUTPUT
 
-NODE=${1:-"$primary_node"}
+NODES=${1:-"$primary_node"}
 PORT=${2:-"3306"}
 USERS=${3:-"$users"}
 
-load_db  $NODE $PORT
+# get the first node from the comma-separated list
+PRIM_NODE=$(echo $NODES | awk -F ',' '{ print $1 }')
+
+load_db  $PRIM_NODE $PORT
 echo ""
-run_load $NODE $PORT $USERS
+run_load $NODES $PORT $USERS
 
 exit
 #
