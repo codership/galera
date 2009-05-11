@@ -126,14 +126,19 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
 
     if (job1->ws->last_seen_trx >= job2->seqno)
     {
+      trx_seqno_t last_seen_saved = job1->ws->last_seen_trx;
+      int rcode;
+
+      /* check for inserts */
+      if (wsdb_insert_test(job1->ws)) return 1;
+      if (wsdb_insert_test(job2->ws)) return 1;
+
       /* serious mis-use of certification test
        * we mangle ws seqno's so that certification_test certifies
        * against just only the job2 ws.
        * If somebody cares to modify wsdb_certification_test, it might
        * break this logic => take care
        */
-      trx_seqno_t last_seen_saved = job1->ws->last_seen_trx;
-      int rcode;
 
       job1->ws->last_seen_trx = job2->seqno - 1;
       /* @todo: this will conflict with purging, need to use certification_mtx
@@ -1254,12 +1259,12 @@ static enum wsrep_status mm_galera_committed(wsrep_t *gh, trx_id_t trx_id) {
     gu_mutex_lock(&commit_mtx);
     wsdb_get_local_trx_info(trx_id, &trx);
 
-    if (app_stat_cb) {
-        app_stat_cb(WSREP_STAT_MAX_SEQNO, WSREP_TYPE_INT, (void *)&trx.seqno_g);
-    }
-
     if (trx.state == WSDB_TRX_REPLICATED) {
-
+        if (app_stat_cb) {
+            app_stat_cb(
+                WSREP_STAT_MAX_SEQNO, WSREP_TYPE_INT, (void *)&trx.seqno_g
+            );
+        }
         do_report = report_check_counter ();
 
         GALERA_RELEASE_COMMIT_QUEUE(trx.seqno_l);
