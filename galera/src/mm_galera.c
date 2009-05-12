@@ -129,10 +129,6 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
       trx_seqno_t last_seen_saved = job1->ws->last_seen_trx;
       int rcode;
 
-      /* check for inserts */
-      if (wsdb_insert_test(job1->ws)) return 1;
-      if (wsdb_insert_test(job2->ws)) return 1;
-
       /* serious mis-use of certification test
        * we mangle ws seqno's so that certification_test certifies
        * against just only the job2 ws.
