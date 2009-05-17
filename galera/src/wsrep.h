@@ -29,7 +29,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "2:0:0"
+#define WSREP_INTERFACE_VERSION "3:0:0"
 
 /* Empty backend spec */
 #define WSREP_NONE "none"
@@ -74,7 +74,8 @@ typedef enum wsrep_conf_param_type {
 
 /* statistic parameters */
 typedef enum wsrep_stat_param_id {
-    WSREP_STAT_MAX_SEQNO,             //!< max seqno applied
+    WSREP_STAT_LAST_SEQNO, //!< last seqno applied
+    WSREP_STAT_MAX
 } wsrep_stat_param_id_t;
 
 /*!
@@ -136,6 +137,20 @@ typedef struct wsrep_uuid {
 static const wsrep_uuid_t WSREP_UUID_UNDEFINED = {{0,}};
 
 /*!
+ * Scan UUID from string
+ * @return length of UUID string representation or negative error code 
+ */
+extern ssize_t
+wsrep_uuid_scan (const char* str, size_t str_len, wsrep_uuid_t* uuid);
+
+/*!
+ * Print UUID to string
+ * @return length of UUID string representation or negative error code 
+ */
+extern ssize_t
+wsrep_uuid_print (const wsrep_uuid_t* uuid, char* str, size_t str_len);
+
+/*!
  * Maximum logical member name length
  */
 #define WSREP_MEMBER_NAME_LEN 32
@@ -157,23 +172,22 @@ typedef enum wsrep_member_status {
 typedef struct wsrep_member_info {
     wsrep_uuid_t  id;
     char          name[WSREP_MEMBER_NAME_LEN];//!< human-readable name
-    uint32_t      ip_incoming;                //!< IP for client requests 
-    uint32_t      ip_repl;                    //!< IP in replication network
-    uint32_t      ip_sst;                     //!< IP for state transfer
-    wsrep_member_status_t status;             //!< member status
     wsrep_seqno_t last_committed;             //!< last committed seqno
     wsrep_seqno_t slave_queue_len;            //!< length of the slave queue
+    wsrep_member_status_t status;             //!< member status
     int           cpu_usage;                  //!< CPU utilization (%) 0..100
     int           load_avg;                   //!< Load average (%) can be > 100
+    char*         incoming;                   //!< address for client requests 
 } wsrep_member_info_t;
 
 /*!
  * Group status
  */
 typedef enum wsrep_view_status {
-    WSREP_VIEW_PRIMARY,     //!< Primary group configuration (quorum present)
-    WSREP_VIEW_NON_PRIMARY, //!< Non-primary group configuration (quorum lost)
-    WSREP_VIEW_DISCONNECTED //!< Not connected to group, retrying.
+    WSREP_VIEW_PRIMARY,      //!< Primary group configuration (quorum present)
+    WSREP_VIEW_NON_PRIMARY,  //!< Non-primary group configuration (quorum lost)
+    WSREP_VIEW_DISCONNECTED, //!< Not connected to group, retrying.
+    WSREP_VIEW_MAX
 } wsrep_view_status_t;
 
 /*!
@@ -237,6 +251,31 @@ typedef int (*wsrep_bf_execute_cb_t)(
 typedef int (*wsrep_bf_apply_row_cb_t)(void *ctx, void *data, size_t len);
 
 /*!
+ * @brief a callback to prepare the application to receive state transfer
+ *
+ *        This handler is called from wsrep library when it detects that
+ *        this node needs state transfer (misses some actions).
+ *        No group actions will be delivered for the duration of this call.
+ *
+ * @param msg state trasfer request message
+ * @return size of the message or negative error code
+ */
+typedef ssize_t (*wsrep_state_prepare_cb_t) (void** msg);
+
+/*!
+ * @brief a callback to donate state transfer
+ *
+ *        This handler is called from wsrep library when it needs this node
+ *        to deliver state to a new cluster member.
+ *        No state changes will be committed for the duration of this call.
+ *
+ * @param msg state transfer request message
+ * @param msg_len state transfer request message length
+ * @return 0 for success of negative error code
+ */
+typedef int (*wsrep_state_donate_cb_t) (const void* msg, size_t msg_len);
+
+/*!
  * Initialization parameters for wsrep, used as arguments for wsrep_init()
  */
 typedef struct wsrep_init_args {
@@ -245,20 +284,23 @@ typedef struct wsrep_init_args {
     const char* gcs_address;//!< URL-like gcs handle address (backend://address)
     const char* data_dir;   //!< directory where wsdb files are kept
     const char* name;       //!< Symbolic name of this process (e.g. hostname)
+    const char* incoming;   //!< Incoming address for client connections
 
     /* Application state information */
     wsrep_uuid_t  state_uuid;  //! Application state group UUID
     wsrep_seqno_t state_seqno; //! Applicaiton state sequence number
 
     /* Application callbacks */
-    wsrep_log_cb_t          logger_cb;
-    wsrep_conf_param_cb_t   conf_param_cb;
-    wsrep_stat_param_cb_t   stat_param_cb;
-    wsrep_view_cb_t         view_handler_cb;
-    wsrep_ws_start_cb_t     ws_start_cb;
-    wsrep_bf_execute_cb_t   bf_execute_sql_cb;
-    wsrep_bf_execute_cb_t   bf_execute_rbr_cb;
-    wsrep_bf_apply_row_cb_t bf_apply_row_cb;
+    wsrep_log_cb_t            logger_cb;
+    wsrep_conf_param_cb_t     conf_param_cb;
+    wsrep_stat_param_cb_t     stat_param_cb;
+    wsrep_view_cb_t           view_handler_cb;
+    wsrep_ws_start_cb_t       ws_start_cb;
+    wsrep_bf_execute_cb_t     bf_execute_sql_cb;
+    wsrep_bf_execute_cb_t     bf_execute_rbr_cb;
+    wsrep_bf_apply_row_cb_t   bf_apply_row_cb;
+    wsrep_state_prepare_cb_t  state_prepare_cb;
+    wsrep_state_donate_cb_t   state_donate_cb;
 } wsrep_init_args_t;
 
 /*
@@ -484,6 +526,26 @@ struct wsrep_ {
                                        size_t      query_len);
 
     wsrep_status_t (*to_execute_end)(wsrep_t *, conn_id_t conn_id);
+
+/*!
+ * @brief signals to wsrep provider that state has been sent to joiner
+ *
+ * @param uuid   sequence UUID (group UUID)
+ * @param seqno  sequence number or negative error code of the operation
+ */
+    wsrep_status_t (*state_sent) (wsrep_t *,
+                                  const wsrep_uuid_t* uuid,
+                                  wsrep_seqno_t       seqno);
+
+/*!
+ * @brief signals to wsrep provider that new state has been received.
+ *        May deadlock if called from state_prepare_cb.
+ * @param uuid  sequence UUID (group UUID)
+ * @param seqno sequence number or negative error code of the operation
+ */
+    wsrep_status_t (*state_received) (wsrep_t *,
+                                      const wsrep_uuid_t* uuid,
+                                      wsrep_seqno_t       seqno);
 
 /*!
  * @brief wsrep shutdown, all memory objects are freed.

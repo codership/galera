@@ -209,10 +209,12 @@ extern long gcs_repl (gcs_conn_t          *conn,
  * Broadcasts state transfer request which will be passed to one of the
  * suitable group members.
  *
- * @param conn opened connection to group
- * @param req  opaque byte array that contains data required for the state
- *             transfer (application dependent)
- * @param size request size
+ * @param conn  connection to group
+ * @param req   opaque byte array that contains data required for
+ *              the state transfer (application dependent)
+ * @param size  request size
+ * @param seqno response to request was ordered with this seqno.
+ *              Must be skipped in local queues.
  * @return negative error code, index of state transfer donor in case of success
  *         (notably, -EAGAIN means try later)
  */

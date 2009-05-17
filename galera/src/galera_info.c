@@ -32,9 +32,7 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf)
             snprintf ((char*)&member->id,   sizeof(wsrep_uuid_t), "%s", str);
             str = str + strlen (str) + 1;
             snprintf (member->name, WSREP_MEMBER_NAME_LEN, "unknown");
-            member->ip_incoming     = 0;
-            member->ip_repl         = 0;
-            member->ip_sst          = 0;
+            member->incoming        = 0;
             member->status          = WSREP_MEMBER_EMPTY;
             member->last_committed  = WSREP_SEQNO_UNDEFINED;
             member->slave_queue_len = WSREP_SEQNO_UNDEFINED;

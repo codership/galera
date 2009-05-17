@@ -177,7 +177,8 @@ galera_start()
 
     echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening at port $MYSQL_PORT and socket $MYSQL_SOCKET..."
 
-    export LD_LIBRARY_PATH	
+    export LD_LIBRARY_PATH
+    export PATH=$MYSQL_BASE_DIR/bin:$PATH
 
     if test -z $GDB
     then
@@ -283,11 +284,21 @@ galera_restart()
     galera_start
 }
 
+dump()
+{
+#local ROUTINES="--routines" # don't dump routines yet, will cause false err.
+local DUMP_OPTIONS=" --skip-opt --compact --flush-logs --lock-all-tables \
+           --quick --create-options --set-charset --skip-comments $ROUTINES "
+DB=${DB:-"--all-databases"}
+#set -x
+mysqldump $DUMP_OPTIONS $ROOT_USER $ROOT_PSWD -h127.0.0.1 -P$MYSQL_PORT  \
+          $IGNORE_TABLES $DB
+#set +x
+}
+
 checksum()
 {
-local DUMP_OPTIONS=" --skip-opt --compact --flush-logs --lock-all-tables --no-create-db --no-create-info --quick --routines "
-CS=`mysqldump $DUMP_OPTIONS $ROOT_USER $ROOT_PSWD -h127.0.0.1 -P$MYSQL_PORT  \
-              $IGNORE_TABLES $DB | md5sum`
+CS=`dump | md5sum`
 
 echo $CS
 }
@@ -298,7 +309,7 @@ VALGRIND=""
 # write set level, SQL, RBR or ROW
 WS_LEVEL="RBR"
 
-DB="test" # use 'test' database if none given
+#DB="test" # use 'test' database if none given
 IGNORE_TABLES=""
 
 if [ $# -eq 0 ]; then usage; exit 1; fi
@@ -363,6 +374,9 @@ case $1 in
     --mysql-opt)
             OPT_MYSQLD="$OPT_MYSQLD $2"
 	    shift
+            ;;
+'dump')
+            COMMAND="dump"
             ;;
 'check')
             COMMAND="checksum"
