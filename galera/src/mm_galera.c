@@ -52,7 +52,7 @@ static wsrep_bf_apply_row_cb_t  bf_apply_row_cb    = NULL;
 static wsrep_ws_start_cb_t      ws_start_cb        = NULL;
 static wsrep_view_cb_t          view_handler_cb    = NULL;
 static wsrep_state_prepare_cb_t state_prepare_cb   = NULL;
-static wsrep_state_donate_cb_t  state_donate_cb   = NULL;
+static wsrep_state_donate_cb_t  state_donate_cb    = NULL;
 #ifdef UNUSED
 static galera_log_cb_t          galera_log_handler = NULL;
 #endif
@@ -68,9 +68,11 @@ static char               *gcs_channel  = "dummy_galera";
 static char               *gcs_url      = NULL;
 
 /* state trackers */
-// Suggestion: galera_init() can take initial seqno and UUID at start-up
-static gcs_seqno_t         my_seqno; // global state seqno
-static gu_uuid_t           my_uuid;
+static gcs_seqno_t         state_seqno;  // received in state transfer
+static gu_uuid_t           state_uuid;   // received in state transfer
+static gcs_seqno_t         last_recved;  // last received from group
+static gcs_seqno_t         last_applied; // last applied by application
+static gu_uuid_t           last_uuid;
 static long                my_idx;
 
 static struct job_queue   *applier_queue = NULL;
@@ -220,14 +222,17 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
 
     /* set up initial state */
     if (WSREP_SEQNO_UNDEFINED == args->state_seqno) {
-        my_seqno = GCS_SEQNO_NIL;
+        last_applied = GCS_SEQNO_NIL;
     } else {
-        my_seqno = args->state_seqno;
+        last_applied = args->state_seqno;
     }
+
+    last_recved = last_applied;
+
     if (memcmp(&WSREP_UUID_UNDEFINED, &args->state_uuid, sizeof(wsrep_uuid_t))){
-        my_uuid = *(gu_uuid_t*)&args->state_uuid;
+        last_uuid = *(gu_uuid_t*)&args->state_uuid;
     } else {
-        my_uuid = GU_UUID_NIL;
+        last_uuid = GU_UUID_NIL;
     }
     my_idx = 0;
 
@@ -565,7 +570,9 @@ static inline void report_last_committed (
     gcs_seqno_t seqno = wsdb_get_safe_to_discard_seqno();
     long ret;
 
-    gu_debug ("Reporting last committed: %llu", seqno);
+    gu_debug ("Reporting last applied: %lld, last received: %lld",
+              last_applied, last_recved);
+
     if ((ret = gcs_set_last_applied(gcs_conn, seqno))) {
         gu_warn ("Failed to report last committed %llu, %d (%s)",
                  seqno, ret, strerror (-ret));
@@ -676,14 +683,24 @@ galera_update_global_seqno (gcs_seqno_t seqno)
     // Seems like we cannot enforce sanity check here - some replicated
     // writesets get cancelled and never make it to this point (TO monitor).
     // Hence holes in global seqno are inevitable here.
-    if (gu_likely (my_seqno < seqno)) {
-        my_seqno = seqno;
+    if (gu_likely (last_recved < seqno)) {
+        last_recved = seqno;
         return true;
     }
     else {
         return false;
     }
 }
+
+#define GALERA_UPDATE_LAST_APPLIED(seqno) \
+    assert (last_applied <= seqno);       \
+    last_applied = seqno;                 \
+    assert (last_applied <= last_recved); \
+    if (app_stat_cb) {                    \
+        app_stat_cb(WSREP_STAT_LAST_SEQNO, WSREP_TYPE_INT, &last_applied); \
+    }
+
+
 
 static void process_conn_write_set( 
     struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
@@ -706,10 +723,12 @@ static void process_conn_write_set(
     
     /* release total order */
     GALERA_RELEASE_TO_QUEUE (seqno_l);
+    GALERA_UPDATE_LAST_APPLIED (seqno_g);
     do_report = report_check_counter();
     GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
 
     wsdb_set_global_trx_committed(seqno_g);
+
     if (do_report) report_last_committed(gcs_conn);
     
     return;
@@ -818,17 +837,18 @@ static int process_query_write_set_applying(
                 seqno_g, seqno_l, ws->last_seen_trx);
         goto retry;
     }
-
     job_queue_end_job(applier_queue, applier);
 
+    GALERA_UPDATE_LAST_APPLIED (seqno_g);
+
     do_report = report_check_counter ();
-    if (app_stat_cb) {
-        app_stat_cb(WSREP_STAT_LAST_SEQNO, WSREP_TYPE_INT, (void *)&seqno_g);
-    }
 
     GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
+
     wsdb_set_global_trx_committed(seqno_g);
+
     if (do_report) report_last_committed(gcs_conn);
+
     return WSREP_OK;
 }
 /*
@@ -887,6 +907,7 @@ static void process_query_write_set(
             GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
         } else {
             /* replaying job has garbbed commit queue in the begin */
+            GALERA_UPDATE_LAST_APPLIED (seqno_g);
             GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
         }
         break;
@@ -979,7 +1000,7 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
                      // seqno length chosen to fit in 80 columns
                      "\n\tLocal  seqno: %14lld, UUID: "GU_UUID_FORMAT
                      "\n\tGlobal seqno: %14lld, UUID: "GU_UUID_FORMAT,
-                     my_seqno, GU_UUID_ARGS(&my_uuid),
+                     last_recved, GU_UUID_ARGS(&last_uuid),
                      conf->seqno, GU_UUID_ARGS(group_uuid));
 
             gu_mutex_lock (&state_mtx);
@@ -1021,24 +1042,26 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
                  * which will set my_uuid and my_seqno */
                 gu_cond_wait (&state_cond, &state_mtx);
 
-                if (gu_uuid_compare (&my_uuid, group_uuid) ||
-                    my_seqno < conf->seqno) {
+                if (gu_uuid_compare (&state_uuid, group_uuid) ||
+                    state_seqno < conf->seqno) {
                     gu_fatal ("Applicaiton received wrong state:"
                               "\n\tReceived: UUID:"GU_UUID_FORMAT
                               ", seqno:    %lld"
                               "\n\tRequired: UUID:"GU_UUID_FORMAT
                               ", seqno: >= %lld",
-                              GU_UUID_ARGS(&my_uuid), my_seqno,
+                              GU_UUID_ARGS(&state_uuid), state_seqno,
                               GU_UUID_ARGS(group_uuid), conf->seqno);
                     assert(0);
                     abort(); // just abort for now. Ideally reconnect to group.
                 }
                 else {
+                    last_uuid    = state_uuid;
+                    last_recved  = state_seqno;
                     gu_info ("Applicaiton state transfer comlete: "
                              GU_UUID_FORMAT":%lld",
-                             GU_UUID_ARGS(&my_uuid), my_seqno);
+                             GU_UUID_ARGS(&last_uuid), last_applied);
 
-                    while (-EAGAIN == (ret = gcs_join (gcs_conn, my_seqno)))
+                    while (-EAGAIN == (ret = gcs_join (gcs_conn, last_recved)))
                         usleep (100000);
                 }
             }
@@ -1047,9 +1070,18 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
         }
         else {
             /* no state transfer required */
-            assert (my_seqno == conf->seqno); // global seqno
+            assert (last_recved == conf->seqno); // global seqno
+
+            if (1 == conf->conf_id) {
+                last_uuid = *group_uuid;
+            }
+            else {
+                assert (0 == gu_uuid_compare (&last_uuid, group_uuid));
+            }
             ret = my_idx;
         }
+
+        GALERA_UPDATE_LAST_APPLIED(last_recved); // mandatory here!
     }
     else {
         // NON PRIMARY configuraiton
@@ -1289,11 +1321,8 @@ static enum wsrep_status mm_galera_committed(wsrep_t *gh, trx_id_t trx_id) {
     wsdb_get_local_trx_info(trx_id, &trx);
 
     if (trx.state == WSDB_TRX_REPLICATED) {
-        if (app_stat_cb) {
-            app_stat_cb(
-                WSREP_STAT_LAST_SEQNO, WSREP_TYPE_INT, (void *)&trx.seqno_g
-            );
-        }
+        GALERA_UPDATE_LAST_APPLIED (trx.seqno_g);
+
         do_report = report_check_counter ();
 
         GALERA_RELEASE_COMMIT_QUEUE(trx.seqno_l);
@@ -1571,7 +1600,7 @@ mm_galera_commit(
         // theoretically it is possible with poorly written application
         // (trying to replicate something before completing state transfer)
         gu_warn ("Local action replicated with outdated seqno: "
-                 "current seqno %lld, action seqno %lld", my_seqno, seqno_g);
+                 "current seqno %lld, action seqno %lld", last_recved, seqno_g);
         // this situation is as good as cancelled transaction. See above.
         retcode = WSREP_TRX_FAIL;
         // commit queue will be cancelled below.
@@ -1832,7 +1861,7 @@ static enum wsrep_status mm_galera_to_execute_start(
     /* update global seqno */
     if ((do_apply = galera_update_global_seqno (seqno_g))) {
         /* record local sequence number in connection info */
-        wsdb_conn_set_seqno(conn_id, seqno_l);
+        wsdb_conn_set_seqno(conn_id, seqno_l, seqno_g);
     }
 
     GALERA_RELEASE_TO_QUEUE (seqno_l);
@@ -1846,7 +1875,7 @@ static enum wsrep_status mm_galera_to_execute_start(
         // theoretically it is possible with poorly written application
         // (trying to replicate something before completing state transfer)
         gu_warn ("Local action replicated with outdated seqno: "
-                 "current seqno %lld, action seqno %lld", my_seqno, seqno_g);
+                 "current seqno %lld, action seqno %lld", last_recved, seqno_g);
         GALERA_SELF_CANCEL_COMMIT_QUEUE (seqno_l);
         // this situation is as good as failed gcs_repl() call.
         rcode = WSREP_CONN_FAIL;
@@ -1873,10 +1902,12 @@ static enum wsrep_status mm_galera_to_execute_end(
         GU_DBUG_RETURN(WSREP_CONN_FAIL);
     }
 
+    GALERA_UPDATE_LAST_APPLIED (conn_info.seqno_g)
+
     do_report = report_check_counter ();
 
     /* release commit queue */
-    GALERA_RELEASE_COMMIT_QUEUE (conn_info.seqno);
+    GALERA_RELEASE_COMMIT_QUEUE (conn_info.seqno_l);
     
     /* cleanup seqno reference */
     wsdb_conn_reset_seqno(conn_id);
@@ -1998,13 +2029,19 @@ static wsrep_status_t mm_galera_state_complete (wsrep_t* gh,
 {
     long err;
 
-    if (!memcmp (uuid, &my_uuid, sizeof(wsrep_uuid_t))) {
-        // WARNING: Here we have application block on this call which
-        //          may prevent application from resolving the issue.
-        //          (Not that we expect that application can resolve it.)
-        while (-EAGAIN == (err = gcs_join (gcs_conn, seqno))) usleep (100000);
-        if (!err) return WSREP_OK;
+    if (memcmp (uuid, &last_uuid, sizeof(wsrep_uuid_t))) {
+        // state we have sent no longer corresponds to the current group state
+        // mark an error.
+        seqno = -EREMCHG;
     }
+
+    // WARNING: Here we have application block on this call which
+    //          may prevent application from resolving the issue.
+    //          (Not that we expect that application can resolve it.)
+    while (-EAGAIN == (err = gcs_join (gcs_conn, seqno))) usleep (100000);
+
+    if (!err) return WSREP_OK;
+
     return WSREP_CONN_FAIL;
 }
 
@@ -2014,8 +2051,8 @@ static wsrep_status_t mm_galera_state_received (wsrep_t* gh,
 {
     gu_mutex_lock (&state_mtx);
     {
-        my_uuid  = *(gu_uuid_t*)uuid;
-        my_seqno = seqno;
+        state_uuid  = *(gu_uuid_t*)uuid;
+        state_seqno = seqno;
     }
     gu_cond_signal  (&state_cond);
     gu_mutex_unlock (&state_mtx);

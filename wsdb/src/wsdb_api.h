@@ -89,7 +89,8 @@ struct wsdb_conn_info {
     enum wsdb_conn_state state;
 
     /* TO sequence number for direct executed query */
-    trx_seqno_t  seqno;
+    trx_seqno_t seqno_l;
+    trx_seqno_t seqno_g;
 };
 
 enum wsdb_trx_state {
@@ -600,9 +601,11 @@ int wsdb_store_set_database(
  * @brief assigns seqno to connection
  *
  * @param conn_id ID for the connection
- * @param seqno   connection sequence (for ordering)
+ * @param seqno_l local  connection seqno (for ordering)
+ * @param seqno_g global connection seqno (for tracking last applied)
  */
-int wsdb_conn_set_seqno (connid_t conn_id, trx_seqno_t seqno);
+int wsdb_conn_set_seqno (connid_t conn_id,
+                         trx_seqno_t seqno_l, trx_seqno_t seqno_g);
 
 /*!
  * @brief removes seqno from connection

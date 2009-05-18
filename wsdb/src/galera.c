@@ -1747,7 +1747,7 @@ enum galera_status mm_galera_to_execute_start(
     /* update global seqno */
     if ((do_apply = galera_update_global_seqno (seqno_g))) {
         /* record local sequence number in connection info */
-        wsdb_conn_set_seqno(conn_id, seqno_l);
+        wsdb_conn_set_seqno(conn_id, seqno_l, seqno_g);
     }
 
     GALERA_RELEASE_TO_QUEUE (seqno_l);

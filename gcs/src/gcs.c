@@ -23,6 +23,8 @@
 
 const long GCS_MAX_REPL_THREADS = 16384;
 
+const long base_queue_limit = 4;
+
 typedef enum
 {
     GCS_CONN_SYNCED,   // caught up with the rest of the group
@@ -184,7 +186,7 @@ gcs_fc_stop (gcs_conn_t* conn)
     if ((conn->queue_len >  conn->upper_limit) &&
         GCS_CONN_SYNCED  == conn->state        &&
         conn->stop_count <= 0 && conn->stop_sent <= 0) {
-        /* tripped upper queue limit, send stop request */
+        /* tripped upper slave queue limit: send stop request */
 //        gu_info ("SENDING STOP (%llu)", conn->local_act_id); //track frequency
         ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
         if (ret >= 0) {
@@ -209,7 +211,7 @@ gcs_fc_cont (gcs_conn_t* conn)
     conn->queue_len = gu_fifo_length (conn->recv_q);
 
     if (conn->lower_limit >= conn->queue_len &&  conn->stop_sent > 0) {
-        // tripped lower slave queue limit, sent continue request
+        // tripped lower slave queue limit: send continue request
 //        gu_info ("SENDING CONT");
         ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
         if (ret >= 0) {
@@ -341,7 +343,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         conn->conf_id     = conf->conf_id;
         conn->stop_sent   = 0;
         conn->stop_count  = 0;
-        conn->lower_limit = 2 * conf->memb_num;
+        conn->lower_limit = base_queue_limit * sqrt(conf->memb_num);
         conn->upper_limit = 2 * conn->lower_limit;
     }
     gu_fifo_release (conn->recv_q);
@@ -860,7 +862,7 @@ long gcs_recv (gcs_conn_t*     conn,
 
     if ((act = gu_fifo_get_head (conn->recv_q)))
     {
-        // FIXME: We have successfully received an action, but failes to send
+        // FIXME: We have successfully received an action, but failed to send
         // important control message. What do we do? Inability to send CONT can
         // block the whole cluster. There are only conn->lower_limit attempts
         // to do that. Perhaps if the last attempt fails, we should crash.
