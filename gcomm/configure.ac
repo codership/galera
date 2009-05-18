@@ -49,7 +49,7 @@ AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
 # TODO: Find out the most wide set of warning flags  
 #       which is still useful (eats system header files etc.)
 CFLAGS="$CFLAGS -std=c99 -Wall -Werror -Wextra -pedantic -Wno-unused-parameter"
-CXXFLAGS="$CXXFLAGS -Wall -Werror -Wextra -pedantic -Wno-long-long -Wno-unused-parameter -Wno-deprecated"
+CXXFLAGS="$CXXFLAGS -Wall -Werror -Wextra -pedantic -Wno-long-long -Wno-unused-parameter -Wno-deprecated -fno-rtti"
 
 
 

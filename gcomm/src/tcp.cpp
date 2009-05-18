@@ -207,7 +207,7 @@ Transport *TCP::accept()
 	throw FatalException(::strerror(err));	
     }
     
-    TCP *ret = new TCP(uri, event_loop);
+    TCP *ret = new TCP(uri, event_loop, mon);
     ret->fd = acc_fd;
     ret->state = S_CONNECTED;
     

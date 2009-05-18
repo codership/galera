@@ -107,10 +107,11 @@ struct EVSInstance {
 class EVSProto : public Protolay
 {
 public:
-    Monitor mon;
+    Monitor* mon;
     Transport* tp;
     EVSProto(EventLoop* poll_, Transport* t, const UUID& my_addr_, 
-             const string& name) : 
+             const string& name, Monitor* mon_) : 
+        mon(mon_),
         tp(t),
         my_addr(my_addr_), 
         my_name(name),
@@ -322,7 +323,7 @@ public:
         CleanupTimerHandler(EVSProto* p_) : TimerHandler("cleanup"), p(p_) {}
         void handle() 
         {
-            Critical crit(&p->mon);
+            Critical crit(p->mon);
             p->cleanup_unoperational();
         }
         ~CleanupTimerHandler() {
@@ -338,7 +339,7 @@ public:
         InactivityTimerHandler(EVSProto* p_) : TimerHandler("inact"), p(p_) {}
         void handle() 
         {
-            Critical crit(&p->mon);
+            Critical crit(p->mon);
             p->check_inactive();
         }
         
@@ -366,7 +367,7 @@ public:
 
         void handle()
         {
-            Critical crit(&p->mon);
+            Critical crit(p->mon);
             LOG_DEBUG("CONSENSUS TIMER");
             if (p->get_state() == RECOVERY)
             {
@@ -396,7 +397,7 @@ public:
         }
         void handle()
         {
-            Critical crit(&p->mon);
+            Critical crit(p->mon);
             if (p->get_state() == OPERATIONAL)
             {
                 LOG_DEBUG("resend timer handler at " + p->self_string());

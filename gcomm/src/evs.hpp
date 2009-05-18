@@ -18,10 +18,9 @@ class EVS : public Transport
 {
     Transport *tp;
     EVSProto *proto;
-    Monitor mon;
 public:
     
-    EVS(const URI& uri_, EventLoop* event_loop_);
+    EVS(const URI& uri_, EventLoop* event_loop_, Monitor*);
     ~EVS();
 
     void connect();

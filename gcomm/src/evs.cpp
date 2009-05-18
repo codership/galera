@@ -47,13 +47,13 @@ BEGIN_GCOMM_NAMESPACE
 void EVS::handle_up(const int cid, const ReadBuf* rb, const size_t roff, 
                     const ProtoUpMeta* um)
 {
-    Critical crit(&mon);
+    Critical crit(mon);
     pass_up(rb, roff, um);
 }
 
 int EVS::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 {
-    Critical crit(&mon);
+    Critical crit(mon);
     return proto->handle_down(wb, dm);
 }
 
@@ -88,7 +88,7 @@ void EVS::connect()
     {
         name = get_query_value(i);
     }
-    proto = new EVSProto(event_loop, tp, uuid, name);
+    proto = new EVSProto(event_loop, tp, uuid, name, mon);
     tp->set_up_context(proto);
     proto->set_down_context(tp);
     proto->set_up_context(this);
@@ -157,12 +157,12 @@ size_t EVS::get_max_msg_size() const
 }
 
 
-EVS::EVS(const URI& uri_, EventLoop* event_loop_) :
-    Transport(uri_, event_loop_),
+EVS::EVS(const URI& uri_, EventLoop* event_loop_, Monitor* mon_) :
+    Transport(uri_, event_loop_, mon_),
     tp(0),
     proto(0)
 {
-
+    
     if (uri.get_scheme() != Conf::EvsScheme)
     {
         LOG_FATAL("invalid uri: " + uri.to_string());

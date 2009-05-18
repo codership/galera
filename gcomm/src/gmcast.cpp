@@ -390,8 +390,8 @@ static bool check_uri(const URI& uri)
 }
 
 
-GMCast::GMCast(const URI& uri, EventLoop* event_loop) :
-    Transport(uri, event_loop),
+GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon_) :
+    Transport(uri, event_loop, mon_),
     uuid(0, 0)
 {
     
@@ -870,6 +870,7 @@ void GMCast::reconnect()
 
 void GMCast::handle_event(const int fd, const Event& pe) 
 {
+    Critical crit(mon);
     LOG_DEBUG("handle event");
 
     update_addresses();
@@ -905,6 +906,7 @@ void GMCast::forward_message(const int cid, const ReadBuf* rb,
 void GMCast::handle_up(const int cid, const ReadBuf* rb, 
                       const size_t offset, const ProtoUpMeta* um) 
 {
+    Critical crit(mon);
     if (listener == 0)
     {
         LOG_WARN("");
@@ -995,7 +997,7 @@ void GMCast::handle_up(const int cid, const ReadBuf* rb,
 
 int GMCast::handle_down(WriteBuf* wb, const ProtoDownMeta* dm) 
 {
-    Critical crit(&mon);
+    Critical crit(mon);
     
     for (ProtoMap::iterator i = spanning_tree.begin();
          i != spanning_tree.end(); ++i)

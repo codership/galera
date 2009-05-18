@@ -82,7 +82,7 @@ typedef map<const UUID, VSInstance> VSInstMap;
 class VSProto : public Protolay
 {
 
-    Monitor mon;
+    Monitor* mon;
 public:
     enum State {JOINING, JOINED, LEAVING, LEFT} state;
     UUID addr;
@@ -148,7 +148,8 @@ public:
     TransQueue trans_msgs;
     
 
-    VSProto(const UUID& a) : 
+    VSProto(const UUID& a, Monitor* mon_) : 
+        mon(mon_),
         state(JOINING),
 	addr(a), 
         trans_view(0), 
@@ -173,7 +174,7 @@ public:
     void handle_up(const int cid, const ReadBuf* rb, const size_t roff, 
                    const ProtoUpMeta* um)
     {
-        Critical crit(&mon);
+        Critical crit(mon);
 
         VSMessage msg;
 
@@ -210,7 +211,7 @@ public:
     }
     int handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
     {
-        Critical crit(&mon);
+        Critical crit(mon);
 
         uint8_t user_type = dm ? dm->get_user_type() : 0xff;
         
@@ -565,10 +566,10 @@ void VS::connect()
         name = get_query_value(i);
     }
     
-    evs_proto = new EVSProto(event_loop, tp, uuid, name);
+    evs_proto = new EVSProto(event_loop, tp, uuid, name, mon);
     tp->set_up_context(evs_proto);
     evs_proto->set_down_context(tp);
-    proto = new VSProto(uuid);
+    proto = new VSProto(uuid, mon);
     evs_proto->set_up_context(proto);
     proto->set_down_context(evs_proto);
     proto->set_up_context(this);
@@ -675,8 +676,8 @@ const UUID& VS::get_uuid() const
     return tp->get_uuid();
 }
 
-VS::VS(const URI& uri_, EventLoop* event_loop_) : 
-    Transport(uri_, event_loop_)
+VS::VS(const URI& uri_, EventLoop* event_loop_, Monitor* mon_) : 
+    Transport(uri_, event_loop_, mon_)
 {
 }
 

@@ -391,7 +391,6 @@ typedef multimap<const UUID, string> UUIDToAddressMap;
 
 class GMCast : public Transport, EventContext
 {
-    Monitor mon;
     UUID uuid;
 
     /* */
@@ -507,7 +506,7 @@ public:
     
     list<string> get_addresses();
     /* Constructor */
-    GMCast(const URI&, EventLoop*);
+    GMCast(const URI&, EventLoop*, Monitor*);
     // const string& listen_addr_, 
     //    const list<string>& remote_addrs_, 
     //     const list<string>& groups_);

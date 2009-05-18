@@ -379,9 +379,11 @@ static GCS_BACKEND_OPEN_FN(gcs_gcomm_open)
         }
 
         uri_str += "gmcast.group=" + conn->channel;
+        gu_debug("uri: %s", uri_str.c_str());
 	conn->vs_ctx.vs = Transport::create(uri_str, conn->vs_ctx.el);
-	conn->vs_ctx.vs->connect();
         gcomm::connect(conn->vs_ctx.vs, &conn->vs_ctx);
+	conn->vs_ctx.vs->connect();
+
 	int err = gu_thread_create(&conn->thr, 0, &conn_run, conn);
 	if (err != 0)
 	    return -err;

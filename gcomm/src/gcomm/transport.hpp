@@ -22,13 +22,14 @@ typedef enum {
 class Transport : public Protolay
 {
 protected:
+    Monitor* mon;
     URI uri;
     TransportState state;
     int error_no;
     EventLoop* event_loop;
     int fd;
     void set_state(TransportState);
-    Transport(const URI& uri_, EventLoop* event_loop_);
+    Transport(const URI& uri_, EventLoop* event_loop_, Monitor*);
 public:
     virtual ~Transport();
 

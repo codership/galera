@@ -27,7 +27,7 @@ class DummyTransport : public Transport
     deque<ReadBuf*> out;
 public:
     DummyTransport() : 
-        Transport(URI(), 0)
+        Transport(URI(), 0, 0)
     {
     }
     
@@ -482,7 +482,7 @@ START_TEST(test_evs_proto_single_boot)
     UUID pid(0, 0);
     DummyTransport* tp = new DummyTransport();
     DummyUser du;
-    EVSProto* ep = new EVSProto(&el, tp, pid, "n1");
+    EVSProto* ep = new EVSProto(&el, tp, pid, "n1", 0);
     connect(tp, ep);
     connect(ep, &du);
 
@@ -503,7 +503,7 @@ START_TEST(test_evs_proto_double_boot)
 
     DummyTransport* tp1 = new DummyTransport();
     DummyUser du1;
-    EVSProto* ep1 = new EVSProto(&el, tp1, p1, "n1");
+    EVSProto* ep1 = new EVSProto(&el, tp1, p1, "n1", 0);
 
     connect(tp1, ep1);
     connect(ep1, &du1);
@@ -512,7 +512,7 @@ START_TEST(test_evs_proto_double_boot)
 
     DummyUser du2;
     DummyTransport* tp2 = new DummyTransport();
-    EVSProto* ep2 = new EVSProto(&el, tp2, p2, "n2");
+    EVSProto* ep2 = new EVSProto(&el, tp2, p2, "n2", 0);
 
     connect(tp2, ep2);
     connect(ep2, &du2);
@@ -826,7 +826,7 @@ START_TEST(test_evs_proto_converge)
     for (size_t i = 0; i < n; ++i) {
         DummyTransport* tp = new DummyTransport();
         vec[i] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0),
-                                           "n" + Size(i).to_string()));
+                                           "n" + Size(i).to_string(), 0));
         vec[i]->ep->shift_to(EVSProto::JOINING);
         vec[i]->ep->send_join(false);
     }
@@ -843,7 +843,7 @@ START_TEST(test_evs_proto_converge_1by1)
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0),
-                                           "n" + Size(n).to_string()));
+                                           "n" + Size(n).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(n == 0);
         fail_unless(vec[n]->ep->get_state() == (n == 0 ? EVSProto::OPERATIONAL: EVSProto::JOINING));
@@ -924,7 +924,7 @@ START_TEST(test_evs_proto_user_msg)
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0),
-                                           "n" + Size(n).to_string()));
+                                           "n" + Size(n).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(n == 0);
         reach_operational(&vec);
@@ -1006,7 +1006,7 @@ START_TEST(test_evs_proto_consensus_with_user_msg)
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0), "n" 
-                                           + Size(n).to_string()));
+                                           + Size(n).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(n == 0);
         reach_operational(&vec);
@@ -1025,7 +1025,7 @@ START_TEST(test_evs_proto_msg_loss)
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0), "n" + 
-                                           Size(n).to_string()));
+                                           Size(n).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(false);
     }
@@ -1053,7 +1053,7 @@ START_TEST(test_evs_proto_leave)
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0), "n" 
-                                           + Size(n).to_string()));
+                                           + Size(n).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(n == 0);
         reach_operational(&vec);
@@ -1081,7 +1081,7 @@ static void join_inst(EventLoop* el,
     vec.resize(*n + 1);
     DummyTransport* tp = new DummyTransport();
     vec[*n] = new Inst(tp, new EVSProto(el, tp, UUID(0, 0), "n" 
-                                        + Size(*n).to_string()));
+                                        + Size(*n).to_string(), 0));
     vec[*n]->ep->shift_to(EVSProto::JOINING);
     vec[*n]->ep->send_join(false);
 

@@ -775,7 +775,7 @@ void EVSProto::handle_msg(const EVSMessage& msg, const UUID& source,
 void EVSProto::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
                          const ProtoUpMeta* um)
 {
-    Critical crit(&mon);
+    Critical crit(mon);
     
     EVSMessage msg;
     
@@ -803,7 +803,7 @@ void EVSProto::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
 
 int EVSProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 {
-    Critical crit(&mon);
+    Critical crit(mon);
 
     LOG_TRACE("user message in state " + to_string(get_state()));
 

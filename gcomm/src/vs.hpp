@@ -19,7 +19,6 @@ class VS : public Transport
     Transport* tp;
     EVSProto* evs_proto;
     VSProto* proto;
-    Monitor mon;
 public:
     void connect();
     void close();
@@ -32,7 +31,7 @@ public:
     bool supports_uuid() const;
     const UUID& get_uuid() const;
 
-    VS(const URI&, EventLoop*);
+    VS(const URI&, EventLoop*, Monitor*);
     ~VS();
 };
 

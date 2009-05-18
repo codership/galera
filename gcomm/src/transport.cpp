@@ -66,7 +66,8 @@ const ReadBuf* Transport::recv()
 
 // CTOR/DTOR
 
-Transport::Transport(const URI& uri_, EventLoop* event_loop_) :
+Transport::Transport(const URI& uri_, EventLoop* event_loop_, Monitor* mon_) :
+    mon(mon_),
     uri(uri_),
     state(S_CLOSED),
     error_no(0),
@@ -82,26 +83,26 @@ Transport::~Transport()
 
 // Factory method
 
-
+static Monitor transport_mon;
 
 Transport* Transport::create(const URI& uri, EventLoop* event_loop)
 {
     
     if (uri.get_scheme() == Conf::TcpScheme)
     {
-        return new TCP(uri, event_loop);
+        return new TCP(uri, event_loop, &transport_mon);
     }
     else if (uri.get_scheme() == Conf::GMCastScheme)
     {
-        return new GMCast(uri, event_loop);
+        return new GMCast(uri, event_loop, &transport_mon);
     }
     else if (uri.get_scheme() == Conf::EvsScheme)
     {
-        return new EVS(uri, event_loop);
+        return new EVS(uri, event_loop, &transport_mon);
     }
     else if (uri.get_scheme() == Conf::VsScheme)
     {
-        return new VS(uri, event_loop);
+        return new VS(uri, event_loop, &transport_mon);
     }
     throw FatalException("scheme not supported");
 }
