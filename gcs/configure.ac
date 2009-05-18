@@ -60,6 +60,14 @@ then
 		[ CFLAGS="$CFLAGS -I$withval"])
 fi
 
+AC_ARG_ENABLE([gcomm],
+	AC_HELP_STRING([--disable-gcomm],
+		[disable GComm backend [[default=enabled]]]),,)
+if test "$enable_gcomm" != "no"
+then
+    enable_gcomm="yes"
+fi
+
 AC_ARG_ENABLE([vs],
 	AC_HELP_STRING([--disable-vs],
 		[disable VS backend [[default=enabled]]]),,)
@@ -91,6 +99,12 @@ AC_CHECK_LIB([tspread], [SP_error],,
              enable_spread="no")
 fi
 
+if test "$enable_gcomm" != no; then
+   AC_CHECK_LIB([gcomm], [main],,
+                AC_MSG_WARN([*** libgcomm not found! ***]);
+                enable_gcomm="no")
+fi
+
 # FIXME: find a way to check for real functions in those libs
 #        currently it just tests abilty to link
 for vslib in "vspp" "transportpp" "commonpp"
@@ -103,6 +117,7 @@ do
 done
 
 AM_CONDITIONAL(ENABLE_SPREAD, test "$enable_spread" != "no")
+AM_CONDITIONAL(ENABLE_GCOMM, test "$enable_gcomm" != "no")
 AM_CONDITIONAL(ENABLE_VS, test "$enable_vs" != "no")
 
 # Checks for header files.
@@ -135,7 +150,8 @@ AC_OUTPUT
 
 AC_MSG_NOTICE([***])
 AC_MSG_NOTICE([Spread backend: $enable_spread])
-AC_MSG_NOTICE([Gcomm  backend: $enable_vs])
+AC_MSG_NOTICE([Gcomm  backend: $enable_gcomm])
+AC_MSG_NOTICE([Vsbes  backend: $enable_vs])
 AC_MSG_NOTICE([***])
 AC_MSG_NOTICE([CFLAGS:  $CFLAGS])
 AC_MSG_NOTICE([LDFLAGS: $LDFLAGS])

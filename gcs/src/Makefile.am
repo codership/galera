@@ -35,12 +35,20 @@ if ENABLE_SPREAD
     GCS_SRCS  += gcs_spread.c
 endif
 
+
+if ENABLE_GCOMM
+    AM_CFLAGS += -DGCS_USE_GCOMM
+    GCS_SRCS += gcs_gcomm.cpp
+    CCLD=$(CXX)
+endif
+
 if ENABLE_VS
     AM_CFLAGS += -DGCS_USE_VS
     GCS_SRCS  += gcs_vs.cpp
 # Enforce C++ linker
     CCLD=$(CXX)
 endif
+
 
 GCS_INCS = $(wildcard *.h)
 

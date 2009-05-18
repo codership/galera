@@ -6,6 +6,8 @@ then
     exit -1
 fi
 
+GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
+
 usage()
 {
     echo -e "Usage: build.sh [OPTIONS] \n" \
@@ -145,9 +147,14 @@ GALERA_LIBS=$GALERA_DIST_DIR/lib
 mkdir -p $GALERA_LIBS
 install -m 644 LICENSE.galera $GALERA_DIST_DIR
 cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils.so* $GALERA_LIBS
-cp -P $GALERA_SRC/galeracomm/common/src/.libs/libgcommcommonpp.so* $GALERA_LIBS
-cp -P $GALERA_SRC/galeracomm/transport/src/.libs/libgcommtransportpp.so* $GALERA_LIBS
-cp -P $GALERA_SRC/galeracomm/vs/src/.libs/libgcommvspp.so* $GALERA_LIBS
+if test $GCOMM_IMPL = "galeracomm"
+then
+    cp -P $GALERA_SRC/galeracomm/common/src/.libs/libgcommcommonpp.so* $GALERA_LIBS
+    cp -P $GALERA_SRC/galeracomm/transport/src/.libs/libgcommtransportpp.so* $GALERA_LIBS
+    cp -P $GALERA_SRC/galeracomm/vs/src/.libs/libgcommvspp.so* $GALERA_LIBS
+else
+    cp -P $GALERA_SRC/gcomm/src/.libs/libgcomm.so* $GALERA_LIBS
+fi
 cp -P $GALERA_SRC/gcs/src/.libs/libgcs.so* $GALERA_LIBS
 cp -P $GALERA_SRC/wsdb/src/.libs/libwsdb.so* $GALERA_LIBS
 cp -P $GALERA_SRC/galera/src/.libs/libmmgalera.so* $GALERA_LIBS

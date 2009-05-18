@@ -24,6 +24,8 @@ initial_stage="galerautils"
 last_stage="galera"
 gainroot=""
 
+GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
+
 usage()
 {
     echo -e "Usage: build.sh [OPTIONS] \n" \
@@ -92,6 +94,7 @@ build_base=$(cd $(dirname $0); cd ..; pwd -P)
 # Define branches to be used
 galerautils_src=$build_base/galerautils
 galeracomm_src=$build_base/galeracomm
+gcomm_src=$build_base/gcomm
 gcs_src=$build_base/gcs
 wsdb_src=$build_base/wsdb
 galera_src=$build_base/galera
@@ -167,25 +170,41 @@ fi
 
 build_flags $galerautils_src
 
-if test $initial_stage = "galeracomm" || $building = "true"
-then
-    build $galeracomm_src $conf_flags $galera_flags
-    building="true"
+if test $GCOMM_IMPL = "galeracomm"
+then 
+    if test $initial_stage = "galeracomm" || $building = "true"
+    then
+        build $galeracomm_src $conf_flags $galera_flags
+        building="true"
+    fi
+    
+    # Galera comm is not particularly easy to handle
+    CPPFLAGS="$CPPFLAGS -I$galeracomm_src/vs/include" # non-standard location
+    CPPFLAGS="$CPPFLAGS -I$galeracomm_src/common/include" # non-standard location
+    LDFLAGS="$LDFLAGS -L$galeracomm_src/common/src/.libs"
+    LDFLAGS="$LDFLAGS -L$galeracomm_src/transport/src/.libs"
+    LDFLAGS="$LDFLAGS -L$galeracomm_src/vs/src/.libs"
+    LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/common/src/.libs"
+    LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/transport/src/.libs"
+    LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/vs/src/.libs"
+else
+    if test $initial_stage = "gcomm" || $building = "true"
+    then
+        build $gcomm_src $conf_flags $galera_flags
+        building="true"
+    fi
+    build_flags $gcomm_src
 fi
-
-# Galera comm is not particularly easy to handle
-CPPFLAGS="$CPPFLAGS -I$galeracomm_src/vs/include" # non-standard location
-CPPFLAGS="$CPPFLAGS -I$galeracomm_src/common/include" # non-standard location
-LDFLAGS="$LDFLAGS -L$galeracomm_src/common/src/.libs"
-LDFLAGS="$LDFLAGS -L$galeracomm_src/transport/src/.libs"
-LDFLAGS="$LDFLAGS -L$galeracomm_src/vs/src/.libs"
-LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/common/src/.libs"
-LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/transport/src/.libs"
-LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/vs/src/.libs"
 
 if test $initial_stage = "gcs" || $building = "true"
 then
-    build $gcs_src $conf_flags $galera_flags
+    if test $GCOMM_IMPL = "galeracomm"
+    then
+        gcs_conf_flags="$conf_flags --disable-gcomm --enable-vs"
+    else
+        gcs_conf_flags="$conf_flags --disable-vs --enable-gcomm"
+    fi
+    build $gcs_src $gcs_conf_flags $galera_flags
     building="true"
 fi
 

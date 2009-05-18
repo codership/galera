@@ -20,6 +20,9 @@
 #ifdef    GCS_USE_VS
 #include "gcs_vs.h"
 #endif /* GCS_USE_VS */
+#ifdef    GCS_USE_GCOMM
+#include "gcs_gcomm.h"
+#endif /* GCS_USE_GCOMM */
 
 /* Static array describing backend ID - open() pairs */
 static
@@ -29,6 +32,9 @@ struct {
 }
     const backend[] =
     {
+#ifdef    GCS_USE_GCOMM
+        { "gcomm", gcs_gcomm_create},
+#endif /* GCS_USE_GCOMM */
 #ifdef    GCS_USE_VS
         { "gcomm", gcs_vs_create },
 #endif /* GCS_USE_VS */
