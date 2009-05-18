@@ -89,7 +89,7 @@ START_TEST(test_serialization)
     check_serialization(UInt8(0xab), 1, UInt8(0));
     check_serialization(UInt16(0xabab), 2, UInt16(0));
     check_serialization(UInt32(0xabababab), 4, UInt32(0));
-    check_serialization(UInt64(0xabababababababab), 8, UInt64(0));
+    check_serialization(UInt64(0xababababababababLLU), 8, UInt64(0));
 }
 END_TEST
 
