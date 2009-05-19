@@ -51,8 +51,8 @@ static wsrep_bf_execute_cb_t    bf_execute_cb_rbr  = NULL;
 static wsrep_bf_apply_row_cb_t  bf_apply_row_cb    = NULL;
 static wsrep_ws_start_cb_t      ws_start_cb        = NULL;
 static wsrep_view_cb_t          view_handler_cb    = NULL;
-static wsrep_state_prepare_cb_t state_prepare_cb   = NULL;
-static wsrep_state_donate_cb_t  state_donate_cb    = NULL;
+static wsrep_sst_prepare_cb_t   sst_prepare_cb     = NULL;
+static wsrep_sst_donate_cb_t    sst_donate_cb      = NULL;
 #ifdef UNUSED
 static galera_log_cb_t          galera_log_handler = NULL;
 #endif
@@ -68,11 +68,11 @@ static char               *gcs_channel  = "dummy_galera";
 static char               *gcs_url      = NULL;
 
 /* state trackers */
-static gcs_seqno_t         state_seqno;  // received in state transfer
-static gu_uuid_t           state_uuid;   // received in state transfer
+static gcs_seqno_t         sst_seqno;    // received in state transfer
+static gu_uuid_t           sst_uuid;     // received in state transfer
 static gcs_seqno_t         last_recved;  // last received from group
 static gcs_seqno_t         last_applied; // last applied by application
-static gu_uuid_t           last_uuid;
+static gu_uuid_t           group_uuid;
 static long                my_idx;
 
 static struct job_queue   *applier_queue = NULL;
@@ -81,8 +81,8 @@ static struct job_queue   *applier_queue = NULL;
 struct galera_info Galera;
 
 static gu_mutex_t commit_mtx;
-static gu_mutex_t state_mtx;
-static gu_cond_t  state_cond;
+static gu_mutex_t sst_mtx;
+static gu_cond_t  sst_cond;
 
 //#define EXTRA_DEBUG
 #ifdef EXTRA_DEBUG
@@ -230,9 +230,9 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     last_recved = last_applied;
 
     if (memcmp(&WSREP_UUID_UNDEFINED, &args->state_uuid, sizeof(wsrep_uuid_t))){
-        last_uuid = *(gu_uuid_t*)&args->state_uuid;
+        group_uuid = *(gu_uuid_t*)&args->state_uuid;
     } else {
-        last_uuid = GU_UUID_NIL;
+        group_uuid = GU_UUID_NIL;
     }
     my_idx = 0;
 
@@ -259,8 +259,8 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     bf_apply_row_cb   = args->bf_apply_row_cb; // ??? is it used?
     ws_start_cb       = args->ws_start_cb;
     view_handler_cb   = args->view_handler_cb;
-    state_prepare_cb  = args->state_prepare_cb;
-    state_donate_cb   = args->state_donate_cb;
+    sst_prepare_cb    = args->sst_prepare_cb;
+    sst_donate_cb     = args->sst_donate_cb;
 
     /* initialize total order queue */
     to_queue = gcs_to_create(16384, GCS_SEQNO_FIRST);
@@ -271,8 +271,8 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     Galera.repl_state = GALERA_INITIALIZED;
 
     gu_mutex_init(&commit_mtx, NULL);
-    gu_mutex_init(&state_mtx,  NULL);
-    gu_cond_init (&state_cond, NULL);
+    gu_mutex_init(&sst_mtx,  NULL);
+    gu_cond_init (&sst_cond, NULL);
 
     /* create worker queue */
     applier_queue = job_queue_create(8, ws_conflict_check, ws_cmp_order);
@@ -973,14 +973,14 @@ static long
 galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
 {
     long ret = 0;
-    gu_uuid_t* group_uuid = (gu_uuid_t*)conf->group_uuid;
+    gu_uuid_t* conf_uuid = (gu_uuid_t*)conf->group_uuid;
 
     gu_info ("New %s configuration: %lld, "
              "seqno: %lld, group UUID: "GU_UUID_FORMAT
              ", members: %zu, my idx: %zu",
              conf->conf_id > 0 ? "PRIMARY" : "NON-PRIMARY",
              (long long)conf->conf_id, (long long)conf->seqno,
-             GU_UUID_ARGS(group_uuid), conf->memb_num, conf->my_idx);
+             GU_UUID_ARGS(conf_uuid), conf->memb_num, conf->my_idx);
 
     my_idx = conf->my_idx; // this is always true.
 
@@ -1000,12 +1000,13 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
                      // seqno length chosen to fit in 80 columns
                      "\n\tLocal  seqno: %14lld, UUID: "GU_UUID_FORMAT
                      "\n\tGlobal seqno: %14lld, UUID: "GU_UUID_FORMAT,
-                     last_recved, GU_UUID_ARGS(&last_uuid),
-                     conf->seqno, GU_UUID_ARGS(group_uuid));
+                     last_recved, GU_UUID_ARGS(&group_uuid),
+                     conf->seqno, GU_UUID_ARGS(conf_uuid));
 
-            gu_mutex_lock (&state_mtx);
+            /* Starting state snapshot transfer */
+            gu_mutex_lock (&sst_mtx);
 
-            app_req_len = state_prepare_cb (&app_req);
+            app_req_len = sst_prepare_cb (&app_req);
             if (app_req_len < 0) {
                 ret = app_req_len;
                 gu_error ("Application failed to prepare to receive "
@@ -1040,43 +1041,43 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
 
                 /* Here wait for application to call galera_state_received(),
                  * which will set my_uuid and my_seqno */
-                gu_cond_wait (&state_cond, &state_mtx);
+                gu_cond_wait (&sst_cond, &sst_mtx);
 
-                if (gu_uuid_compare (&state_uuid, group_uuid) ||
-                    state_seqno < conf->seqno) {
+                if (gu_uuid_compare (&sst_uuid, conf_uuid) ||
+                    sst_seqno < conf->seqno) {
                     gu_fatal ("Applicaiton received wrong state:"
                               "\n\tReceived: UUID:"GU_UUID_FORMAT
                               ", seqno:    %lld"
                               "\n\tRequired: UUID:"GU_UUID_FORMAT
                               ", seqno: >= %lld",
-                              GU_UUID_ARGS(&state_uuid), state_seqno,
-                              GU_UUID_ARGS(group_uuid), conf->seqno);
+                              GU_UUID_ARGS(&sst_uuid), sst_seqno,
+                              GU_UUID_ARGS(conf_uuid), conf->seqno);
                     assert(0);
                     abort(); // just abort for now. Ideally reconnect to group.
                 }
                 else {
-                    last_uuid    = state_uuid;
-                    last_recved  = state_seqno;
+                    group_uuid    = sst_uuid;
+                    last_recved  = sst_seqno;
                     gu_info ("Applicaiton state transfer comlete: "
                              GU_UUID_FORMAT":%lld",
-                             GU_UUID_ARGS(&last_uuid), last_applied);
+                             GU_UUID_ARGS(&group_uuid), last_applied);
 
                     while (-EAGAIN == (ret = gcs_join (gcs_conn, last_recved)))
                         usleep (100000);
                 }
             }
 
-            gu_mutex_unlock (&state_mtx);
+            gu_mutex_unlock (&sst_mtx);
         }
         else {
             /* no state transfer required */
             assert (last_recved == conf->seqno); // global seqno
 
             if (1 == conf->conf_id) {
-                last_uuid = *group_uuid;
+                group_uuid = *conf_uuid;
             }
             else {
-                assert (0 == gu_uuid_compare (&last_uuid, group_uuid));
+                assert (0 == gu_uuid_compare (&group_uuid, conf_uuid));
             }
             ret = my_idx;
         }
@@ -1163,12 +1164,12 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
                 GALERA_GRAB_TO_QUEUE (seqno_l);
                 GALERA_GRAB_COMMIT_QUEUE (seqno_l);
 
-                state_donate_cb (action, action_size);
+                sst_donate_cb (action, action_size);
 
                 GALERA_RELEASE_TO_QUEUE (seqno_l);
                 GALERA_RELEASE_COMMIT_QUEUE (seqno_l);
                 /* To snap out of donor state application must call
-                 * wsrep->state_sent() when it is really done */
+                 * wsrep->sst_sent() when it is really done */
             }
             break;
         default:
@@ -2023,13 +2024,13 @@ static enum wsrep_status mm_galera_replay_trx(
     return WSREP_OK;
 }
 
-static wsrep_status_t mm_galera_state_complete (wsrep_t* gh,
-                                                const wsrep_uuid_t* uuid,
-                                                wsrep_seqno_t seqno)
+static wsrep_status_t mm_galera_sst_sent (wsrep_t* gh,
+                                          const wsrep_uuid_t* uuid,
+                                          wsrep_seqno_t seqno)
 {
     long err;
 
-    if (memcmp (uuid, &last_uuid, sizeof(wsrep_uuid_t))) {
+    if (memcmp (uuid, &group_uuid, sizeof(wsrep_uuid_t))) {
         // state we have sent no longer corresponds to the current group state
         // mark an error.
         seqno = -EREMCHG;
@@ -2045,17 +2046,17 @@ static wsrep_status_t mm_galera_state_complete (wsrep_t* gh,
     return WSREP_CONN_FAIL;
 }
 
-static wsrep_status_t mm_galera_state_received (wsrep_t* gh,
-                                                const wsrep_uuid_t* uuid,
-                                                wsrep_seqno_t seqno)
+static wsrep_status_t mm_galera_sst_received (wsrep_t* gh,
+                                              const wsrep_uuid_t* uuid,
+                                              wsrep_seqno_t seqno)
 {
-    gu_mutex_lock (&state_mtx);
+    gu_mutex_lock (&sst_mtx);
     {
-        state_uuid  = *(gu_uuid_t*)uuid;
-        state_seqno = seqno;
+        sst_uuid  = *(gu_uuid_t*)uuid;
+        sst_seqno = seqno;
     }
-    gu_cond_signal  (&state_cond);
-    gu_mutex_unlock (&state_mtx);
+    gu_cond_signal  (&sst_cond);
+    gu_mutex_unlock (&sst_mtx);
 
     return WSREP_OK;
 }
@@ -2080,8 +2081,8 @@ static wsrep_t mm_galera_str = {
     &mm_galera_set_database,
     &mm_galera_to_execute_start,
     &mm_galera_to_execute_end,
-    &mm_galera_state_complete,
-    &mm_galera_state_received,
+    &mm_galera_sst_sent,
+    &mm_galera_sst_received,
     &mm_galera_tear_down,
     NULL,
     NULL

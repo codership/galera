@@ -251,7 +251,7 @@ typedef int (*wsrep_bf_execute_cb_t)(
 typedef int (*wsrep_bf_apply_row_cb_t)(void *ctx, void *data, size_t len);
 
 /*!
- * @brief a callback to prepare the application to receive state transfer
+ * @brief a callback to prepare the application to receive state snapshot
  *
  *        This handler is called from wsrep library when it detects that
  *        this node needs state transfer (misses some actions).
@@ -260,10 +260,10 @@ typedef int (*wsrep_bf_apply_row_cb_t)(void *ctx, void *data, size_t len);
  * @param msg state trasfer request message
  * @return size of the message or negative error code
  */
-typedef ssize_t (*wsrep_state_prepare_cb_t) (void** msg);
+typedef ssize_t (*wsrep_sst_prepare_cb_t) (void** msg);
 
 /*!
- * @brief a callback to donate state transfer
+ * @brief a callback to donate state snapshot
  *
  *        This handler is called from wsrep library when it needs this node
  *        to deliver state to a new cluster member.
@@ -273,7 +273,7 @@ typedef ssize_t (*wsrep_state_prepare_cb_t) (void** msg);
  * @param msg_len state transfer request message length
  * @return 0 for success of negative error code
  */
-typedef int (*wsrep_state_donate_cb_t) (const void* msg, size_t msg_len);
+typedef int (*wsrep_sst_donate_cb_t) (const void* msg, size_t msg_len);
 
 /*!
  * Initialization parameters for wsrep, used as arguments for wsrep_init()
@@ -299,8 +299,8 @@ typedef struct wsrep_init_args {
     wsrep_bf_execute_cb_t     bf_execute_sql_cb;
     wsrep_bf_execute_cb_t     bf_execute_rbr_cb;
     wsrep_bf_apply_row_cb_t   bf_apply_row_cb;
-    wsrep_state_prepare_cb_t  state_prepare_cb;
-    wsrep_state_donate_cb_t   state_donate_cb;
+    wsrep_sst_prepare_cb_t    sst_prepare_cb;
+    wsrep_sst_donate_cb_t     sst_donate_cb;
 } wsrep_init_args_t;
 
 /*
@@ -528,24 +528,25 @@ struct wsrep_ {
     wsrep_status_t (*to_execute_end)(wsrep_t *, conn_id_t conn_id);
 
 /*!
- * @brief signals to wsrep provider that state has been sent to joiner
+ * @brief signals to wsrep provider that state snapshot has been sent to
+ *        joiner.
  *
  * @param uuid   sequence UUID (group UUID)
  * @param seqno  sequence number or negative error code of the operation
  */
-    wsrep_status_t (*state_sent) (wsrep_t *,
-                                  const wsrep_uuid_t* uuid,
-                                  wsrep_seqno_t       seqno);
+    wsrep_status_t (*sst_sent) (wsrep_t *,
+                                const wsrep_uuid_t* uuid,
+                                wsrep_seqno_t       seqno);
 
 /*!
- * @brief signals to wsrep provider that new state has been received.
- *        May deadlock if called from state_prepare_cb.
+ * @brief signals to wsrep provider that new state snapshot has been received.
+ *        May deadlock if called from sst_prepare_cb.
  * @param uuid  sequence UUID (group UUID)
  * @param seqno sequence number or negative error code of the operation
  */
-    wsrep_status_t (*state_received) (wsrep_t *,
-                                      const wsrep_uuid_t* uuid,
-                                      wsrep_seqno_t       seqno);
+    wsrep_status_t (*sst_received) (wsrep_t *,
+                                    const wsrep_uuid_t* uuid,
+                                    wsrep_seqno_t       seqno);
 
 /*!
  * @brief wsrep shutdown, all memory objects are freed.
