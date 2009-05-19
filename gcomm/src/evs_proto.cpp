@@ -32,6 +32,9 @@ void EVSProto::check_inactive()
             get_instance(i).operational == true &&
             get_instance(i).tstamp + inactive_timeout < Time::now())
         {
+            LOG_WARN("detected inactive node: " +
+                     get_pid(i).to_string() + ":" 
+                     + get_instance(i).get_name());
             i->second.operational = false;
             has_inactive = true;
         }
@@ -65,6 +68,7 @@ void EVSProto::cleanup_views()
     {
         if (i->second + Time(300, 0) < now)
         {
+            LOG_WARN("erasing view: " + i->first.to_string());
             previous_views.erase(i);
         }
         else
@@ -99,7 +103,7 @@ void EVSProto::deliver_reg_view()
         throw FatalException("");
     }
     const View& prev_view(previous_views.back().first);
-    for (InstMap::const_iterator i = known.begin(); i != known.end(); ++i)
+    for (InstMap::iterator i = known.begin(); i != known.end(); ++i)
     {
         if (get_instance(i).installed)
         {
@@ -126,6 +130,7 @@ void EVSProto::deliver_reg_view()
                                          get_instance(i).get_name());
                 }
             }
+            i->second.operational = false;
         }
     }
     LOG_DEBUG(view.to_string());
@@ -721,7 +726,10 @@ void EVSProto::resend(const UUID& gap_source, const EVSGap& gap)
                                    input_map.get_aru_seq(),
                                    msg.get_source_view(), 
                                    EVSMessage::F_RESEND);
-            WriteBuf wb(rb ? rb->get_buf() : 0, rb ? rb->get_len() : 0);
+            LOG_WARN("resend: " 
+                     + make_int(i.first.get_payload_offset()).to_string());
+            WriteBuf wb(rb ? rb->get_buf(i.first.get_payload_offset()) : 0, 
+                        rb ? rb->get_len(i.first.get_payload_offset()) : 0);
             wb.prepend_hdr(new_msg.get_hdr(), new_msg.get_hdrlen());
             if (pass_down(&wb, 0))
                 break;
@@ -733,6 +741,7 @@ void EVSProto::resend(const UUID& gap_source, const EVSGap& gap)
 void EVSProto::recover(const EVSGap& gap)
 {
     
+    LOG_WARN("recovering message");
     if (gap.get_low() == gap.get_high()) {
         LOG_WARN(std::string("EVSProto::recover(): Empty gap: ") 
                  + UInt32(gap.get_low()).to_string() + " -> " 
@@ -749,6 +758,11 @@ void EVSProto::recover(const EVSGap& gap)
         if (i.second == true) {
             const ReadBuf* rb = i.first.get_readbuf();
             const EVSMessage& msg = i.first.get_evs_message();
+            if (i.first.get_payload_offset() != 0)
+            {
+                // See message construction from resend() above
+                throw FatalException("EVSProto::recover(): FIXME");
+            }
             WriteBuf wb(rb);
             wb.prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
             if (send_delegate(gap.source, &wb))
@@ -1127,6 +1141,14 @@ void EVSProto::deliver_trans()
 void EVSProto::handle_user(const EVSMessage& msg, const UUID& source, 
                            const ReadBuf* rb, const size_t roff)
 {
+
+    if (msg.get_flags() & EVSMessage::F_RESEND)
+    {
+        LOG_WARN("msg with resend flag: " 
+                 + msg.to_string());
+    }
+
+
     LOG_DEBUG("this: " + self_string() + " source: "
               + source.to_string() + " seq: " 
               + UInt32(msg.get_seq()).to_string());
@@ -1211,9 +1233,13 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
                 return;
             }
         } else {
-            i->second.trusted = false;
-            SHIFT_TO(RECOVERY);
-            send_join();
+            // i->second.trusted = false;
+            // SHIFT_TO(RECOVERY);
+            // send_join();
+            LOG_WARN("me: " 
+                     + self_string()
+                     + " unknown message: "
+                     + msg.to_string());
             return;
         }
     } else if (i->second.trusted == false) {

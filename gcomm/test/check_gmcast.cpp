@@ -254,7 +254,7 @@ START_TEST(test_gmcast_w_user_messages)
 
         void handle_event(const int cfd, const Event& e)
         {
-            char buf[16];
+            byte_t buf[16];
             memset(buf, 'a', sizeof(buf));
 
             WriteBuf wb(buf, sizeof(buf));

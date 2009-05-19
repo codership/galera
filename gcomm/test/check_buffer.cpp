@@ -13,8 +13,8 @@ using namespace gcomm;
 START_TEST(test_readbuf)
 {
     const size_t bufsize = 128;
-    char buf[bufsize];
-    const unsigned char *ptr;
+    byte_t buf[bufsize];
+    const byte_t *ptr;
     ReadBuf *rb = new ReadBuf(buf, bufsize);
 
     fail_unless(rb->get_refcnt() == 1);
@@ -27,7 +27,7 @@ START_TEST(test_readbuf)
     fail_unless(rb_copy->get_refcnt() == 1);
     memset(buf, 0, bufsize);
 
-    ptr = reinterpret_cast<const unsigned char *>(rb_copy->get_buf(0));
+    ptr = rb_copy->get_buf(0);
     for (size_t i = 0; i < bufsize; i++)
         fail_unless(ptr[i] == i);
 
@@ -35,13 +35,13 @@ START_TEST(test_readbuf)
 
     rb_copy->release();
 
-    ptr = reinterpret_cast<const unsigned char *>(rb_trunc->get_buf(0));
+    ptr = rb_trunc->get_buf(0);
     for (size_t i = 0; i < 64; i++)
         fail_unless(ptr[i] == i + 64);
     rb_trunc->release();
 
 
-    const void* bufs[3] = {buf, buf + 17, buf + 17 + 45};
+    const byte_t* bufs[3] = {buf, buf + 17, buf + 17 + 45};
     size_t buflens[3] = {17, 45, bufsize - 17 - 45};
     ReadBuf* mrb = new ReadBuf(bufs, buflens, 3, bufsize);
     fail_unless(mrb->get_len() == bufsize);
@@ -54,8 +54,8 @@ END_TEST
 START_TEST(test_writebuf)
 {
     const size_t buflen = 128;
-    unsigned char buf[buflen];
-    const unsigned char *ptr;
+    byte_t buf[buflen];
+    const byte_t *ptr;
 
     for (size_t i = 0; i < buflen; i++)
         buf[i] = i;
@@ -66,7 +66,7 @@ START_TEST(test_writebuf)
         wb_copy = wb.copy();
     }
 
-    ptr = reinterpret_cast<const unsigned char *>(wb_copy->get_buf());
+    ptr = wb_copy->get_buf();
     for (size_t i = 0; i < buflen; i++)
         fail_unless(ptr[i] == i);
     delete wb_copy;
@@ -77,7 +77,7 @@ START_TEST(test_writebuf)
     delete wbp;
 
     memset(buf, 0, buflen);
-    ptr = reinterpret_cast<const unsigned char *>(wb_copy->get_buf());
+    ptr = wb_copy->get_buf();
     for (size_t i = 0; i < buflen; i++)
         fail_unless(ptr[i] == i);
     delete wb_copy;
@@ -85,14 +85,14 @@ START_TEST(test_writebuf)
 
     wbp = new WriteBuf(0, 0);
 
-    unsigned char hdr1[3] = {1, 2, 3};
-    unsigned char hdr2[2] = {4, 5};
+    byte_t hdr1[3] = {1, 2, 3};
+    byte_t hdr2[2] = {4, 5};
 
     wbp->prepend_hdr(hdr1, 3);
     fail_unless(wbp->get_hdrlen() == 3);
     wbp->prepend_hdr(hdr2, 2);
     fail_unless(wbp->get_hdrlen() == 5);
-    ptr = reinterpret_cast<const unsigned char *>(wbp->get_hdr());
+    ptr = wbp->get_hdr();
     fail_unless(ptr[0] == 4);
     fail_unless(ptr[1] == 5);
     fail_unless(ptr[2] == 1);
@@ -100,7 +100,7 @@ START_TEST(test_writebuf)
     fail_unless(ptr[4] == 3);
     wbp->rollback_hdr(2);
     fail_unless(wbp->get_hdrlen() == 3);
-    ptr = reinterpret_cast<const unsigned char *>(wbp->get_hdr());
+    ptr = wbp->get_hdr();
     fail_unless(ptr[0] == 1);
     fail_unless(ptr[1] == 2);
     fail_unless(ptr[2] == 3);
@@ -118,12 +118,12 @@ START_TEST(test_writebuf)
     wbp->rollback_hdr(2);
 
     fail_unless(wbp->get_hdrlen() == 1);
-    ptr = reinterpret_cast<const unsigned char *>(wbp->get_hdr());
+    ptr = wbp->get_hdr();
     fail_unless(ptr[0] == 3);
 
 
     fail_unless(wb_copy->get_hdrlen() == 3);
-    ptr = reinterpret_cast<const unsigned char *>(wb_copy->get_hdr());
+    ptr = wb_copy->get_hdr();
     fail_unless(ptr[0] == 1);
     fail_unless(ptr[1] == 2);
     fail_unless(ptr[2] == 3);
@@ -132,7 +132,7 @@ START_TEST(test_writebuf)
     memset(buf, 0, buflen);
 
     fail_unless(wb_copy->get_len() == buflen);
-    ptr = reinterpret_cast<const unsigned char *>(wb_copy->get_buf());
+    ptr = wb_copy->get_buf();
     for (size_t i = 0; i < buflen; i++)
         fail_unless(ptr[i] == i);
     delete wb_copy;
@@ -143,7 +143,7 @@ END_TEST
 START_TEST(test_wb_to_rb)
 {
 
-    char buf[64];
+    byte_t buf[64];
     for (size_t i = 0; i < sizeof(buf); ++i)
     {
         buf[i] = i % 256;
@@ -158,7 +158,7 @@ START_TEST(test_wb_to_rb)
 
     fail_unless(rb->get_len() == 16 + sizeof(buf));
     
-    const unsigned char* ptr = reinterpret_cast<const unsigned char*>(rb->get_buf());
+    const byte_t* ptr = rb->get_buf();
     
     for (size_t i = 0; i < 16; ++i)
     {
@@ -186,7 +186,7 @@ START_TEST(test_wb_to_rb)
     wb2.rollback_hdr(16);
     rb2->release();
 
-    ptr = reinterpret_cast<const unsigned char*>(rb->get_buf());
+    ptr = rb->get_buf();
     
     for (size_t i = 0; i < 16; ++i)
     {

@@ -171,7 +171,7 @@ public:
 
     void send_msg(const GMCastMessage& msg)
     {
-        char* buf = new char[msg.size()];
+        byte_t* buf = new byte_t[msg.size()];
         if (msg.write(buf, msg.size(), 0) == 0) 
         {
             delete[] buf;
@@ -896,7 +896,7 @@ void GMCast::forward_message(const int cid, const ReadBuf* rb,
     {
         if (i->first != cid)
         {
-            LOG_DEBUG(string("forwarding message ") + msg.get_source_uuid().to_string() + " -> " + i->second->get_remote_uuid().to_string());
+            LOG_INFO(string("forwarding message ") + msg.get_source_uuid().to_string() + " -> " + i->second->get_remote_uuid().to_string());
             i->second->get_transport()->handle_down(&wb, 0);
         }
     }

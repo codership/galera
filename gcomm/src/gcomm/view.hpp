@@ -143,6 +143,7 @@ public:
     const NodeList& get_partitioned() const;
     Type get_type() const;
     const ViewId& get_id() const;
+    const UUID& get_representative() const;
     bool is_empty() const;
     size_t read(const void* buf, const size_t buflen, const size_t offset);
     size_t write(void* buf, const size_t buflen, const size_t offset) const;

@@ -651,7 +651,7 @@ struct Inst : public Toplay {
     
     void send(WriteBuf* wb)
     {
-        char buf[4];
+        byte_t buf[4];
         if (make_int(sent_seq + 1).write(buf, sizeof(buf), 0) == 0)
         {
             throw FatalException("");
@@ -857,7 +857,7 @@ static void send_msgs(vector<Inst*>* vec)
 {
     for (vector<Inst*>::iterator i = vec->begin(); i != vec->end();
          ++i) {
-        char buf[8] = {'1', '2', '3', '4', '5', '6', '7', '\0'};
+        byte_t buf[8] = {'1', '2', '3', '4', '5', '6', '7', '\0'};
         WriteBuf wb(buf, sizeof(buf));
         (*i)->send(&wb);
         stats.acc_sent();
@@ -870,9 +870,9 @@ static void send_msgs_rnd(vector<Inst*>* vec, size_t max_n)
     for (vector<Inst*>::iterator i = vec->begin(); i != vec->end();
          ++i) {
         for (size_t n = ::rand() % (max_n + 1); n > 0; --n) {
-            char buf[10];
+            byte_t buf[10];
             memset(buf, 0, sizeof(buf));
-            sprintf(buf, "%x", seq);
+            sprintf(reinterpret_cast<char*>(buf), "%x", seq);
             WriteBuf wb(buf, sizeof(buf));
             (*i)->send(&wb);
             ++seq;
@@ -1273,8 +1273,8 @@ public:
         fail_unless(ev.get_cause() == Event::E_USER);
         if (state == OPERATIONAL)
         {
-            char databuf[8] = "1234567";
-            char buf[4];
+            byte_t databuf[8] = "1234567";
+            byte_t buf[4];
             WriteBuf wb(databuf, sizeof(databuf));
             if (make_int(sent_seq + 1).write(buf, sizeof(buf), 0) == 0)
             {

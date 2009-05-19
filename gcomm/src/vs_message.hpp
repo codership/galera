@@ -11,7 +11,7 @@ BEGIN_GCOMM_NAMESPACE
 class VSMessage
 {
 public:
-    enum Type {T_NONE, T_STATE, T_DATA, T_MAX};
+    enum Type {T_NONE, T_STATE, T_DATA, T_LEAVE, T_MAX};
 private:
     int version;
     Type type;
@@ -42,6 +42,18 @@ protected:
 
 public:    
 
+    string to_string() const
+    {
+        return "vsmsg("
+            + make_int(version).to_string() + ","
+            + make_int(type).to_string() + ","
+            + Int(user_type).to_string() + ","
+            + source.to_string() + ","
+            + source_view.to_string() + ","
+            + make_int(seq).to_string() + ","
+            + (view ? view->to_string() : ")");
+    }
+
     VSMessage() : 
         version(0),
         type(T_MAX),
@@ -50,7 +62,7 @@ public:
         seq(SEQNO_MAX),
         view(0) 
     {
-
+        
     }
 
     VSMessage(const VSMessage& msg)
@@ -222,6 +234,20 @@ struct VSDataMessage : VSMessage
                   0)
     {
 
+    }
+};
+
+struct VSLeaveMessage : VSMessage
+{
+    VSLeaveMessage(const ViewId& source_view,
+                   const uint32_t seq) :
+        VSMessage(0,
+                  VSMessage::T_LEAVE,
+                  0xff,
+                  source_view,
+                  seq,
+                  0)
+    {
     }
 };
 

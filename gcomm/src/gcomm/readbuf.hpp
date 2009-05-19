@@ -9,14 +9,22 @@
 
 #include <cstring>
 
+#include <map>
+using std::map;
+
 BEGIN_GCOMM_NAMESPACE
+
+typedef unsigned char byte_t;
+
+
+#if 1
 
 class ReadBuf
 {
     mutable volatile int refcnt;
     bool instack;
-    const unsigned char *buf;
-    mutable unsigned char *priv_buf;
+    const byte_t* buf;
+    mutable byte_t* priv_buf;
     size_t buflen;
     mutable Monitor mon;
     // Private copy operator to disallow assignment 
@@ -35,29 +43,30 @@ public:
 	delete[] priv_buf;
     }
 
-    ReadBuf(const void* buf, const size_t buflen, bool inst) {
+    ReadBuf(const byte_t* buf, const size_t buflen, bool inst) {
 	instack = inst;
 	refcnt = 1;
-	this->buf = reinterpret_cast<const unsigned char *>(buf);
+	this->buf = buf; // reinterpret_cast<const byte_t *>(buf);
 	this->buflen = buflen;
 	this->priv_buf = 0;
     }
     
     
-    ReadBuf(const void *buf, const size_t buflen) {
+    ReadBuf(const byte_t *buf, const size_t buflen) {
 	instack = false;
 	refcnt = 1;
-	this->buf = reinterpret_cast<const unsigned char *>(buf);
+	this->buf = buf; // reinterpret_cast<const byte_t *>(buf);
 	this->buflen = buflen;
 	this->priv_buf = 0;
     }
 
-    ReadBuf(const void* bufs[], const size_t buflens[], const size_t nbufs, 
+    ReadBuf(const byte_t* bufs[], const size_t buflens[], 
+            const size_t nbufs, 
 	    const size_t tot_len) {
 	instack = false;
 	refcnt = 1;
 	buf = 0;
-	priv_buf = new unsigned char[tot_len];
+	priv_buf = new byte_t[tot_len];
 	buflen = 0;
 	for (size_t i = 0; i < nbufs; ++i) {
 	    memcpy(priv_buf + buflen, bufs[i], buflens[i]);
@@ -76,7 +85,7 @@ public:
 	} else {
 	    Critical crit(&mon);
 	    if (priv_buf == 0) {
-		priv_buf = new unsigned char[buflen];
+		priv_buf = new byte_t[buflen];
 		memcpy(priv_buf, buf, buflen);
 	    }
 	    ++refcnt;
@@ -98,13 +107,13 @@ public:
 	}
     }
 
-    const void *get_buf(const size_t offset) const {
+    const byte_t *get_buf(const size_t offset) const {
 	if (offset > buflen)
 	    throw FatalException("Trying to read past buffer end");
 	return (priv_buf ? priv_buf : buf) + offset;
     }
     
-    const void *get_buf() const {
+    const byte_t *get_buf() const {
 	return priv_buf ? priv_buf : buf;
     }
     
@@ -135,6 +144,129 @@ public:
 	return refcnt;
     }
 };
+
+#else
+
+
+
+
+class ReadBuf
+{
+    byte_t* buf;
+    size_t buflen;
+
+public:
+    
+    
+    ~ReadBuf() {
+	delete[] buf;
+    }
+
+    ReadBuf(const byte_t* buf, const size_t buflen, bool inst) 
+    {
+	this->buf = new byte_t[buflen];
+        memcpy(this->buf, buf, buflen); 
+	this->buflen = buflen;
+    }
+    
+    
+    ReadBuf(const byte_t *buf, const size_t buflen) 
+    {
+	this->buf = new byte_t[buflen];
+        memcpy(this->buf, buf, buflen); 
+	this->buflen = buflen;
+    }
+
+    ReadBuf(const byte_t* bufs[], const size_t buflens[], 
+            const size_t nbufs, 
+	    const size_t tot_len) {
+        buf = new byte_t[tot_len];
+	buflen = 0;
+	for (size_t i = 0; i < nbufs; ++i) {
+	    memcpy(buf + buflen, bufs[i], buflens[i]);
+	    buflen += buflens[i];
+	}
+	if (buflen != tot_len)
+	    throw FatalException("");
+    }
+    
+    ReadBuf *copy() const {
+        return new ReadBuf(buf, buflen);
+    }
+    
+    
+    ReadBuf *copy(const size_t offset) const {
+	if (offset > buflen)
+	    throw FatalException("");
+        return new ReadBuf(get_buf(offset), buflen - offset);
+    }
+
+    const byte_t *get_buf(const size_t offset) const 
+    {
+	if (offset > buflen)
+	    throw FatalException("Trying to read past buffer end");
+	return buf + offset;
+    }
+    
+    const byte_t *get_buf() const 
+    {
+	return buf;
+    }
+    
+    size_t get_len() const 
+    {
+	return buflen;
+    }
+    
+    size_t get_len(size_t off) const {
+	if (off > buflen)
+	    throw FatalException("Offset greater than buffer length");
+	return buflen - off;
+    }
+    
+    void release() 
+    {
+        memset(buf, 0xff, buflen);
+        delete this;
+    }
+    
+    int get_refcnt() const 
+    {
+        return 1;
+    }
+};
+
+
+#endif
+
+
+
+#include <cstdio>
+#include <ctype.h>
+
+static inline void dump(const ReadBuf* rb)
+{
+    fprintf(stderr, "rb buf ptr %p, len %lu\n\n",
+            rb->get_buf(), rb->get_len());
+    fprintf(stderr, "*******************dump********************\n\n");
+    for (size_t i = 0; i < rb->get_len(); ++i)
+    {
+        fprintf(stderr, "%2.2x ", *rb->get_buf(i));
+        if (i % 16 == 15)
+            fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "\n\n");
+    for (size_t i = 0; i < rb->get_len(); ++i)
+    {
+        if (isalnum(*rb->get_buf(i)))
+            fprintf(stderr, "%c", *rb->get_buf(i));
+        else
+            fprintf(stderr, ".");
+    }
+    fprintf(stderr, "\n\n");    
+    fprintf(stderr, "*******************dump********************\n\n");
+}
+
 
 END_GCOMM_NAMESPACE
 

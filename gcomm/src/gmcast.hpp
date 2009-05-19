@@ -280,7 +280,7 @@ public:
             return 0;
         if ((off = source_uuid.read(buf, buflen, off)) == 0)
             return 0;
-
+        
         if (flags & F_NODE_ADDRESS)
         {
             char* addr = 0;
@@ -313,9 +313,9 @@ public:
                 node_list->push_back(node);
             }
         }
-        LOG_DEBUG(UInt8(type).to_string() + "," 
-                  + UInt8(flags).to_string() + "," 
-                  + UInt8(ttl).to_string() + ","
+        LOG_DEBUG(Int(type).to_string() + "," 
+                  + Int(flags).to_string() + "," 
+                  + Int(ttl).to_string() + ","
                   + (F_GROUP_NAME ? group_name : ""));
         return off;
     }

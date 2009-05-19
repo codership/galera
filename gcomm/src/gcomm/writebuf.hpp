@@ -10,20 +10,20 @@ static const size_t WRITEBUF_MAX_HDRLEN = 128;
 
 class WriteBuf
 {
-    unsigned char hdr[WRITEBUF_MAX_HDRLEN];
+    byte_t hdr[WRITEBUF_MAX_HDRLEN];
     size_t hdrlen;
     ReadBuf *rb;
     
     WriteBuf& operator=(WriteBuf& w) {return w;}
 
-    WriteBuf(const void *hdr, const size_t hdrlen, ReadBuf *rb) {
+    WriteBuf(const byte_t* hdr, const size_t hdrlen, ReadBuf *rb) {
 	memcpy(this->hdr + (WRITEBUF_MAX_HDRLEN - hdrlen), hdr, hdrlen);
 	this->hdrlen = hdrlen;
 	this->rb = rb ? rb->copy() : 0;
     }
 public:
 
-    WriteBuf(const void *buf, const size_t buflen) {
+    WriteBuf(const byte_t* buf, const size_t buflen) {
 	this->rb = buflen ? new ReadBuf(buf, buflen) : 0;
 	this->hdrlen = 0;
     }
@@ -55,13 +55,13 @@ public:
 	hdrlen -= hl;
     }
     
-    const void *get_hdr() const {
+    const byte_t *get_hdr() const {
 	return hdr + (WRITEBUF_MAX_HDRLEN - hdrlen);
     }
     size_t get_hdrlen() const {
 	return hdrlen;
     }
-    const void *get_buf() const {
+    const byte_t *get_buf() const {
 	return rb ? rb->get_buf() : 0;
     }
 
@@ -74,7 +74,7 @@ public:
     }
 
     ReadBuf *to_readbuf() const {
-	const void* bufs[2] = {get_hdr(), rb ? rb->get_buf() : 0};
+	const byte_t* bufs[2] = {get_hdr(), rb ? rb->get_buf() : 0};
 	size_t buflens[2] = {hdrlen, rb ? rb->get_len() : 0};
 	return new ReadBuf(bufs, buflens, rb ? 2 : 1, get_totlen());
     }

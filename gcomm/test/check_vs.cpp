@@ -26,12 +26,14 @@ class VSUser : public Toplay, EventContext
     State state;
     int fd;
     uint64_t recvd;
+    bool sending;
 public:
-    VSUser(const char* uri_str, EventLoop* el_) :
+    VSUser(const char* uri_str, EventLoop* el_, bool sending_) :
         vs(0),
         el(el_),
         state(CLOSED),
-        recvd(0)
+        recvd(0),
+        sending(sending_)
     {
         URI uri(uri_str);
         LOG_INFO(uri.to_string());
@@ -80,7 +82,12 @@ public:
                 fail_unless(um->get_view()->get_type() == View::V_TRANS);
                 fail_unless(um->get_view()->get_members().length() == 1);
                 state = OPERATIONAL;
-                el->queue_event(fd, Event(Event::E_USER, Time(Time::now() + Time(0, 50))));
+                if (sending)
+                {
+                    el->queue_event(fd, 
+                                    Event(Event::E_USER, 
+                                          Time(Time::now() + Time(0, 50))));
+                }
             }
             LOG_INFO("received in prev view: " + make_int(recvd).to_string());
             recvd = 0;
@@ -93,7 +100,7 @@ public:
         fail_unless(ev.get_cause() == Event::E_USER);
         if (state == OPERATIONAL)
         {
-            char buf[6] = "evsms";
+            byte_t buf[6] = "evsms";
             WriteBuf wb(buf, sizeof(buf));
             int ret = pass_down(&wb, 0);
             Time next;
@@ -116,9 +123,62 @@ START_TEST(test_vs)
 {
     EventLoop el;
 
-    VSUser u1("gcomm+vs://127.0.0.1:10001?gmcast.group=evs&node.name=n1&evs.join_wait=500", &el);
-    VSUser u2("gcomm+vs://127.0.0.1:10002?gmcast.group=evs&gmcast.node=gcomm+tcp://127.0.0.1:10001&node.name=n2", &el);
-    VSUser u3("gcomm+vs://127.0.0.1:10003?gmcast.group=evs&gmcast.node=gcomm+tcp://127.0.0.1:10001&node.name=n3", &el);
+    VSUser u1("gcomm+vs://127.0.0.1:10001?gmcast.group=evs&node.name=n1&evs.join_wait=500", &el, false);
+    VSUser u2("gcomm+vs://127.0.0.1:10002?gmcast.group=evs&gmcast.node=gcomm+tcp://127.0.0.1:10001&node.name=n2", &el, false);
+    VSUser u3("gcomm+vs://127.0.0.1:10003?gmcast.group=evs&gmcast.node=gcomm+tcp://127.0.0.1:10001&node.name=n3", &el, false);
+    
+    u1.start();
+
+    Time stop = Time(Time::now() + Time(5, 0));
+    do
+    {
+        el.poll(100);
+    }
+    while (Time::now() < stop);
+
+    u2.start();
+    stop = Time(Time::now() + Time(5, 0));
+    do
+    {
+        el.poll(100);
+    }
+    while (Time::now() < stop);
+
+
+    u3.start();
+    stop = Time(Time::now() + Time(5, 0));
+    do
+    {
+        el.poll(100);
+    }
+    while (Time::now() < stop);
+
+    u1.stop();
+    stop = Time(Time::now() + Time(5, 0));
+    do
+    {
+        el.poll(100);
+    }
+    while (Time::now() < stop);
+    u3.stop();
+
+    stop = Time(Time::now() + Time(5, 0));
+    do
+    {
+        el.poll(100);
+    }
+    while (Time::now() < stop);
+    u2.stop();
+}
+END_TEST
+
+START_TEST(test_vs_w_user_messages)
+{
+    EventLoop el;
+
+    VSUser u1("gcomm+vs://127.0.0.1:10001?gmcast.group=evs&node.name=n1&evs.join_wait=500", &el, true);
+    VSUser u2("gcomm+vs://127.0.0.1:10002?gmcast.group=evs&gmcast.node=gcomm+tcp://127.0.0.1:10001&node.name=n2", &el, true);
+    VSUser u3("gcomm+vs://127.0.0.1:10003?gmcast.group=evs&gmcast.node=gcomm+tcp://127.0.0.1:10001&node.name=n3", &el, true);
     
     u1.start();
 
@@ -174,6 +234,11 @@ Suite* vs_suite()
 
     tc = tcase_create("test_vs");
     tcase_add_test(tc, test_vs);
+    tcase_set_timeout(tc, 60);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_vs_w_user_messages");
+    tcase_add_test(tc, test_vs_w_user_messages);
     tcase_set_timeout(tc, 60);
     suite_add_tcase(s, tc);
     

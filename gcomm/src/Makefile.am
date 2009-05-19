@@ -10,9 +10,11 @@ libgcomm_la_SOURCES = 		\
 	string.cpp 		\
 	time.cpp		\
 	uri.cpp			\
+	uuid.cpp		\
 	logger.cpp 		\
 	monitor.cpp		\
 	pseudofd.cpp		\
+	readbuf.cpp		\
 	event.cpp		\
 	timer.cpp		\
 	transport.cpp		\

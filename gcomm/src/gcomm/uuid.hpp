@@ -17,6 +17,11 @@ BEGIN_GCOMM_NAMESPACE
 class UUID 
 {
     gu_uuid_t uuid;
+    static const UUID uuid_nil;
+    UUID(gu_uuid_t uuid_) :
+        uuid(uuid_)
+    {
+    }
 public:
     UUID() 
     {
@@ -28,9 +33,9 @@ public:
         gu_uuid_generate(&uuid, node, node_len);
     }
     
-    static UUID nil()
+    static const UUID& nil()
     {
-        return UUID();
+        return uuid_nil;
     }
     
     size_t read(const void* buf, const size_t buflen, const size_t offset) 

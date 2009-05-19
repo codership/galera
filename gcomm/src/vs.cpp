@@ -81,16 +81,36 @@ typedef map<const UUID, VSInstance> VSInstMap;
 
 class VSProto : public Protolay
 {
-
+    EventLoop* el;
     Monitor* mon;
 public:
-    enum State {JOINING, JOINED, LEAVING, LEFT} state;
+    enum State {CLOSED, JOINING, JOINED, LEAVING} state;
     UUID addr;
+    string name;
     View *trans_view;
     View *reg_view;
     View *proposed_view;
     uint32_t next_seq;
     VSInstMap membs;
+
+    string self_str() const
+    {
+        return "vs(" + addr.to_string() + ":" + name + ")";
+    }
+
+    void shift_to(State s)
+    {
+        LOG_INFO(self_str()
+                 + ")state change: " + make_int(state).to_string() + 
+                 " -> " + make_int(s).to_string());
+        state = s;
+    }
+
+    State get_state() const
+    {
+        return state;
+    }
+
 
     static const UUID& get_pid(VSInstMap::iterator i)
     {
@@ -148,10 +168,13 @@ public:
     TransQueue trans_msgs;
     
 
-    VSProto(const UUID& a, Monitor* mon_) : 
+    VSProto(const UUID& a, const string& name_, 
+            EventLoop* el_, Monitor* mon_) : 
+        el(el_),
         mon(mon_),
-        state(JOINING),
+        state(CLOSED),
 	addr(a), 
+        name(name_),
         trans_view(0), 
         reg_view(0), 
 	proposed_view(0), 
@@ -167,8 +190,11 @@ public:
 	trans_msgs.clear();
     }
     void deliver_data(const VSMessage *, const ReadBuf *, const size_t roff);
+    void deliver_trans();
     void handle_conf(const View*);
     void handle_state(const VSMessage *);
+    int send_leave();
+    void handle_leave(const VSMessage *);
     void handle_data(const VSMessage *, const ReadBuf *, const size_t);
     
     void handle_up(const int cid, const ReadBuf* rb, const size_t roff, 
@@ -181,17 +207,31 @@ public:
         if (rb == 0 && um->get_view() == 0) {
             throw FatalException("broken backend connection");
         }
+
+        if (get_state() == CLOSED)
+        {
+            LOG_WARN("message in closed state, dropping");
+            return;
+        }
         
         if (um->get_view())
         {
-            LOG_INFO("VS: " + um->get_view()->to_string());
             handle_conf(um->get_view());
             return;
         }
         
         if (msg.read(rb->get_buf(), rb->get_len(), roff) == 0)
         {
-            LOG_FATAL("failed to read message");
+            LOG_FATAL(self_str() 
+                      + "failed to read message from "
+                      + um->get_source().to_string());
+            gcomm::dump(rb);
+            // try if valgrind catches this
+            byte_t* ptr = const_cast<byte_t*>(rb->get_buf());
+            for (size_t i = 0; i < rb->get_len(); ++i)
+            {
+                ptr[i] = 0xff;
+            }
             throw FatalException("failed to read message");
         }
         LOG_TRACE("VSProto::handle_up(): msg type = " 
@@ -205,6 +245,9 @@ public:
         case VSMessage::T_DATA:
             handle_data(&msg, rb, roff);
             break;
+        case VSMessage::T_LEAVE:
+            handle_leave(&msg);
+            break;
         default:
             LOG_WARN("unknown message type, dropping");
         }
@@ -212,10 +255,10 @@ public:
     int handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
     {
         Critical crit(mon);
-
+        
         uint8_t user_type = dm ? dm->get_user_type() : 0xff;
         
-        if (reg_view == 0)
+        if (reg_view == 0 || get_state() != JOINED)
         {
             LOG_WARN(std::string("VS::handle_down(): ") + strerror(ENOTCONN));
             return ENOTCONN;
@@ -236,9 +279,9 @@ public:
         }
         if (get_instance(mi).get_expected_seq() + 256 == next_seq)
         {
-            LOG_INFO("VS::handle_down(), flow control: " 
-                     + UInt32(get_instance(mi).get_expected_seq()).to_string() 
-                     + " " + UInt32(next_seq).to_string());
+            LOG_DEBUG("VS::handle_down(), flow control: " 
+                      + UInt32(get_instance(mi).get_expected_seq()).to_string() 
+                      + " " + UInt32(next_seq).to_string());
             return EAGAIN;
         }
         
@@ -254,8 +297,11 @@ public:
         wb->prepend_hdr(hdrbuf, hdrbuflen);
         
         int ret = pass_down(wb, 0);
-        if (ret == 0) {
-            LOG_TRACE(std::string("Sent message ") + UInt32(next_seq).to_string());
+        if (ret == 0) 
+        {
+            LOG_TRACE(self_str() 
+                      + "Sent message " 
+                      + UInt32(next_seq).to_string());
             next_seq++;
         }
         wb->rollback_hdr(hdrbuflen);
@@ -274,14 +320,17 @@ public:
 void VSProto::handle_conf(const View* const view)
 {
 
-    if (state == LEAVING && view->is_empty()) 
+    LOG_INFO(self_str() + 
+             " view from EVS:"
+             + view->to_string());
+    if (get_state() == LEAVING && view->is_empty()) 
     {
         LOG_INFO("LEAVING");
         // TODO: Check that no messages missing (i.e. EVS self delivery is 
         // fulfilled)
 	ProtoUpMeta um(view);
 	pass_up(0, 0, &um);
-	state = LEFT;
+        shift_to(CLOSED);
 	return;
     }
     
@@ -301,7 +350,8 @@ void VSProto::handle_conf(const View* const view)
         }
     }
     
-    if (trans_view == 0 && reg_view == 0) {
+    if (trans_view == 0 && reg_view == 0) 
+    {
         if (view->get_type() != View::V_TRANS)
         {
             throw FatalException("");
@@ -311,7 +361,8 @@ void VSProto::handle_conf(const View* const view)
 	    throw FatalException("");
         }
 	trans_view = new View(*view);
-    } else if (view->get_type() == View::V_TRANS) {
+    } else if (view->get_type() == View::V_TRANS) 
+    {
 	delete proposed_view;
 	proposed_view = 0;
 	for (VSInstMap::iterator i = membs.begin(); 
@@ -330,8 +381,8 @@ void VSProto::handle_conf(const View* const view)
 	trans_view = 0;
 	
 	trans_view = new View(View::V_TRANS, reg_view ? 
-				reg_view->get_id() : 
-				ViewId());
+                              reg_view->get_id() : 
+                              ViewId());
 	trans_view->add_members(addr_inter.begin(), addr_inter.end());
 	if (reg_view && includes(reg_view->get_members().begin(),
                                  reg_view->get_members().end(),
@@ -340,16 +391,21 @@ void VSProto::handle_conf(const View* const view)
         {
 	    throw FatalException("");
 	} 
-    } else {
+    } 
+    else 
+    {
 	if (trans_view == 0 || proposed_view != 0)
 	    throw FatalException("");
 	proposed_view = new View(View::V_REG, view->get_id());
 	proposed_view->add_members(view->get_members().begin(), view->get_members().end());
+        
 	VSStateMessage state_msg(proposed_view->get_id(), 
                                  *proposed_view, 
                                  next_seq);
         
-        LOG_INFO("VS: sending state message with view " + proposed_view->to_string());
+        LOG_INFO(self_str()
+                 + ": sending state message with view " 
+                 + proposed_view->to_string());
         
 	unsigned char *buf = new unsigned char[state_msg.size()];
 	if (state_msg.write(buf, state_msg.size(), 0) == 0)
@@ -367,7 +423,29 @@ void VSProto::handle_conf(const View* const view)
         {
 	    throw FatalException(strerror(errno));
 	} 
+        VSMessage cm;
+        if (cm.read(buf, state_msg.size(), 0) == 0)
+        {
+            throw FatalException("");
+        }
 	delete[] buf;
+    }
+}
+
+void VSProto::deliver_trans()
+{
+    for (TransQueue::iterator tm = trans_msgs.begin();
+         trans_msgs.empty() == false; tm = trans_msgs.begin()) {
+        const ReadBuf* rb = tm->get_readbuf();
+        size_t roff = tm->get_roff();
+        const UUID& source = tm->get_source();
+        VSMessage dm;
+        if (dm.read(rb->get_buf(), rb->get_len(), roff) == 0) {
+            throw FatalException("");
+        }
+        dm.set_source(source);
+        deliver_data(&dm, rb, roff);
+        trans_msgs.pop_front();
     }
 }
 
@@ -382,7 +460,8 @@ void VSProto::deliver_data(const VSMessage *dm,
     }
     if (get_instance(membs_p).get_expected_seq() != dm->get_seq())
     {
-        LOG_FATAL("gap in message sequence, expected " + UInt32(get_instance(membs_p).get_expected_seq()).to_string() + " got " + UInt32(dm->get_seq()).to_string());
+        LOG_FATAL("gap in message sequence, expected " 
+                  + UInt32(get_instance(membs_p).get_expected_seq()).to_string() + " got " + UInt32(dm->get_seq()).to_string());
         throw FatalException("gap in message sequence");
     }
     get_instance(membs_p).set_expected_seq(dm->get_seq() + 1);
@@ -445,32 +524,20 @@ void VSProto::handle_state(const VSMessage *sm)
 	    n_state_msgs++;
     }
 
-    LOG_INFO("proposed view: " + proposed_view->to_string());
-    LOG_INFO("state msgs: " + UInt32(n_state_msgs).to_string());
+    LOG_INFO("VS: proposed view: " + proposed_view->to_string());
+    LOG_INFO("VS: state msgs: " + UInt32(n_state_msgs).to_string());
     if (n_state_msgs == proposed_view->get_members().length()) 
     {
-        LOG_INFO("received all state messages");
+        LOG_INFO("VS: received all state messages");
 	if (trans_msgs.size() && reg_view == 0)
         {
 	    throw FatalException("Trans msgs without preceding reg view");
         }
-	state = JOINED;
-        LOG_INFO("deliver view: " + trans_view->to_string());
+        shift_to(JOINED);
+        LOG_INFO("VS: deliver view: " + trans_view->to_string());
 	ProtoUpMeta um(trans_view);
 	pass_up(0, 0, &um);
-	for (TransQueue::iterator tm = trans_msgs.begin();
-	     trans_msgs.empty() == false; tm = trans_msgs.begin()) {
-	    const ReadBuf* rb = tm->get_readbuf();
-	    size_t roff = tm->get_roff();
-            const UUID& source = tm->get_source();
-	    VSMessage dm;
-	    if (dm.read(rb->get_buf(), rb->get_len(), roff) == 0) {
-		throw FatalException("");
-	    }
-	    dm.set_source(source);
-	    deliver_data(&dm, rb, roff);
-	    trans_msgs.pop_front();
-	}
+        deliver_trans();
 	
 	// Erase members that have left
 	VSInstMap::iterator i_next;
@@ -505,7 +572,7 @@ void VSProto::handle_state(const VSMessage *sm)
 	reg_view = proposed_view;
 	proposed_view = 0;
         
-        LOG_INFO("deliver view: " + reg_view->to_string());
+        LOG_INFO("VS: deliver view: " + reg_view->to_string());
 	ProtoUpMeta umr(reg_view);
 	pass_up(0, 0, &umr);
     }
@@ -515,11 +582,23 @@ void VSProto::handle_data(const VSMessage *dm, const ReadBuf *rb,
                           const size_t roff)
 {
     if (reg_view == 0)
+    {
+        LOG_WARN("handle data, no reg view, state " 
+                 + make_int(get_state()).to_string());
 	return;
-    
+    }
+
     // Verify send view correctness 
     if (dm->get_source_view() != reg_view->get_id())
     {
+        // Data message from incorrect view
+        LOG_FATAL("me: " + self_str() 
+                  + " source: " 
+                  + dm->get_source().to_string()
+                  + " source view: " 
+                  + dm->get_source_view().to_string()
+                  + " this view: "
+                  + reg_view->get_id().to_string());
 	throw FatalException("");
     }
 
@@ -534,6 +613,135 @@ void VSProto::handle_data(const VSMessage *dm, const ReadBuf *rb,
     }
 }
 
+void VSProto::handle_leave(const VSMessage* msg)
+{
+    LOG_INFO(self_str()
+             + " leave message from " + msg->get_source().to_string());
+    VSInstMap::iterator i = membs.find(msg->get_source());
+    if (i == membs.end())
+    {
+        LOG_WARN("leave message from unknown instance");
+        return;
+    }
+    
+    if (get_instance(i).get_expected_seq() != msg->get_seq())
+    {
+        LOG_FATAL("message gap in handle leave");
+        throw FatalException("");
+    }
+    
+    if (msg->get_source() == addr)
+    {
+        if (get_state() != LEAVING)
+        {
+            throw FatalException("");
+        }
+        View trans(View::V_TRANS, reg_view->get_id());
+        NodeList::const_iterator ni = reg_view->get_members().find(addr);
+        if (ni == reg_view->get_members().end())
+        {
+            throw FatalException("");
+        }
+        trans.add_member(get_uuid(ni), get_name(ni));
+        for (ni = reg_view->get_members().begin(); 
+             ni != reg_view->get_members().end(); ++ni)
+        {
+            if (get_uuid(ni) != addr)
+            {
+                trans.add_left(get_uuid(ni), get_name(ni));
+            }
+        }
+        ProtoUpMeta tum(&trans);
+        pass_up(0, 0, &tum);
+        deliver_trans();
+        View empty;
+        ProtoUpMeta eum(&empty);
+        pass_up(0, 0, &eum);
+        shift_to(CLOSED);
+    }
+    else
+    {
+        View trans(View::V_TRANS, reg_view->get_id());
+        NodeList::const_iterator ni = reg_view->get_members().find(msg->get_source());
+        if (ni == reg_view->get_members().end())
+        {
+            throw FatalException("");
+        }
+        
+        trans.add_left(get_uuid(ni), get_name(ni));
+        for (ni = reg_view->get_members().begin(); 
+             ni != reg_view->get_members().end(); ++ni)
+        {
+            if (get_uuid(ni) != msg->get_source())
+            {
+                trans.add_member(get_uuid(ni), get_name(ni));
+            }
+        }
+
+        if (trans_view == 0)
+        {
+            assert(trans_msgs.size() == 0);
+            ProtoUpMeta tum(&trans);
+            pass_up(0, 0, &tum);
+            View* new_reg = new View(View::V_REG, trans.get_id());
+            new_reg->add_members(trans.get_members().begin(),
+                                 trans.get_members().end());
+            // TODO: Sanity check, new reg subset of current reg
+            delete reg_view;
+            reg_view = new_reg;
+            ProtoUpMeta rum(reg_view);
+            pass_up(0, 0, &rum);
+        }
+        else
+        {
+            // Here it gets a bit hairy, but lets see if 
+            // triggered EVS view changes work until this is 
+            // implemented
+        }
+            
+    }
+    
+
+}
+
+
+int VSProto::send_leave()
+{
+    if (reg_view == 0)
+    {
+        LOG_WARN("send leave without reg view");
+        return 0;
+    }
+
+    if (trans_view)
+    {
+        LOG_INFO("trans view, waiting until new reg view is formed");
+    }
+    
+    while (trans_view)
+    {
+        el->poll(50);
+    }
+    
+    VSLeaveMessage lm(reg_view->get_id(), next_seq);
+    
+    byte_t* buf = new byte_t[lm.size()];
+    if (lm.write(buf, lm.size(), 0) == 0)
+    {
+        throw FatalException("");
+    }
+    WriteBuf wb(buf, lm.size());
+
+    
+    int err = pass_down(&wb, 0);
+    if (err != 0)
+    {
+        LOG_WARN(string("could not send leave message ") + ::strerror(errno));
+    }
+    delete[] buf;
+    return err;
+}
+
 //
 //
 // VS
@@ -544,6 +752,7 @@ void VSProto::handle_data(const VSMessage *dm, const ReadBuf *rb,
 void VS::connect()
 {
     
+    Critical crit(mon);
     URI tp_uri = uri;
     tp_uri.set_scheme(Conf::GMCastScheme);
     tp = Transport::create(tp_uri, event_loop);
@@ -569,12 +778,13 @@ void VS::connect()
     evs_proto = new EVSProto(event_loop, tp, uuid, name, mon);
     tp->set_up_context(evs_proto);
     evs_proto->set_down_context(tp);
-    proto = new VSProto(uuid, mon);
+    proto = new VSProto(uuid, name, event_loop, mon);
     evs_proto->set_up_context(proto);
     proto->set_down_context(evs_proto);
     proto->set_up_context(this);
     set_down_context(proto);
 
+    proto->shift_to(VSProto::JOINING);
     // boot up EVS proto
     evs_proto->shift_to(EVSProto::JOINING);
     Time stop(Time::now() + Time(5, 0));
@@ -593,20 +803,46 @@ void VS::connect()
     LOG_INFO("EVS Proto initial state: " + evs_proto->to_string());
     LOG_INFO("EVS Proto sending join request");
     evs_proto->send_join();
+
+    do
+    {
+        int ret = event_loop->poll(5);
+        if (ret < 0)
+        {
+            LOG_WARN("poll returned " + make_int(ret).to_string());
+        }
+    }
+    while (proto->get_state() == VSProto::JOINING);
+    LOG_INFO("VS joined");
+    
 }
 
 
 void VS::close()
 {
+    Critical crit(mon);
     if (tp == 0)
     {
         LOG_FATAL("vs not connected");
         throw FatalException("");
     }
     LOG_INFO("VS Proto leaving");
-    proto->state = VSProto::LEAVING;
+    proto->shift_to(VSProto::LEAVING);
+
+    if (proto->send_leave() == 0)
+    {
+        do
+        {
+            int ret = event_loop->poll(50);
+            if (ret < 0)
+            {
+                LOG_WARN("poll returned: " + Int(ret).to_string());
+            }
+        }
+        while (proto->get_state() == VSProto::LEAVING);        
+    }
+    
     evs_proto->shift_to(EVSProto::LEAVING);
-    LOG_INFO("VS Proto sending leave notification");
     evs_proto->send_leave();
     do
     {
@@ -617,10 +853,12 @@ void VS::close()
         }
     }
     while (evs_proto->get_state() != EVSProto::CLOSED);
-    if (proto->state != VSProto::LEFT)
+    
+    if (proto->get_state() != VSProto::CLOSED)
     {
         LOG_WARN("VS didn't terminate properly");
     }
+
     tp->close();
     delete tp;
     tp = 0;

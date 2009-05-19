@@ -45,7 +45,7 @@ struct EVSInstance {
     string name;
     // CTOR
     EVSInstance(const string& name_) : 
-        operational(false), 
+        operational(true), 
         trusted(true), 
         installed(false), 
         join_message(0), 
@@ -93,14 +93,14 @@ struct EVSInstance {
 
 #define SHIFT_TO(_s) do                                         \
     {                                                           \
-        LOG_DEBUG(string(__FILE__) + ":" + __FUNCTION__ + ":" + Int(__LINE__).to_string()); \
+        LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + Int(__LINE__).to_string()); \
         shift_to(_s);                                           \
     }                                                           \
     while (0)
 
 #define SHIFT_TO_P(_p, _s) do                                     \
     {                                                           \
-        LOG_DEBUG(string(__FILE__) + ":" + __FUNCTION__ + ":" + Int(__LINE__).to_string()); \
+        LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + Int(__LINE__).to_string()); \
         (_p)->shift_to(_s);                                            \
     }                                                           \
     while (0)

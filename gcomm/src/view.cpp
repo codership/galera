@@ -231,6 +231,18 @@ const ViewId& View::get_id() const
     return view_id;
 }
 
+const UUID& View::get_representative() const
+{
+    if (members.empty())
+    {
+        return UUID::nil();
+    }
+    else
+    {
+        return get_uuid(members.begin());
+    }
+}
+
 bool View::is_empty() const
 {
     return view_id == ViewId() && members.length() == 0;
