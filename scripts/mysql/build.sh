@@ -159,16 +159,23 @@ cp -P $GALERA_SRC/gcs/src/.libs/libgcs.so* $GALERA_LIBS
 cp -P $GALERA_SRC/wsdb/src/.libs/libwsdb.so* $GALERA_LIBS
 cp -P $GALERA_SRC/galera/src/.libs/libmmgalera.so* $GALERA_LIBS
 
+GALERA_SBIN=""
+if test $GCOMM_IMPL = "galeracomm"
+    then
 # Install vs backend daemon
-GALERA_SBIN=$GALERA_DIST_DIR/sbin
-mkdir -p $GALERA_SBIN
-install -D -m 755 $GALERA_SRC/galeracomm/vs/src/.libs/vsbes $GALERA_SBIN/vsbes
+    GALERA_SBIN=$GALERA_DIST_DIR/sbin
+    mkdir -p $GALERA_SBIN
+    install -D -m 755 $GALERA_SRC/galeracomm/vs/src/.libs/vsbes $GALERA_SBIN/vsbes
+fi
 
 # Strip binaries if not instructed otherwise
 if test "$NO_STRIP" != "yes"
 then
     strip $GALERA_LIBS/lib*.so
-    strip $GALERA_SBIN/*
+    if test $GCOMM_IMPL = "galeracomm"
+	then
+	strip $GALERA_SBIN/*
+    fi
 fi
 
 # original MYSQL_VER=$(grep AM_INIT_AUTOMAKE\(mysql, configure.in | awk '{ print $2 }' | sed s/\)//)
