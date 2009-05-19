@@ -361,7 +361,8 @@ void VSProto::handle_conf(const View* const view)
 	    throw FatalException("");
         }
 	trans_view = new View(*view);
-    } else if (view->get_type() == View::V_TRANS) 
+    } 
+    else if (view->get_type() == View::V_TRANS) 
     {
 	delete proposed_view;
 	proposed_view = 0;
@@ -398,6 +399,19 @@ void VSProto::handle_conf(const View* const view)
 	    throw FatalException("");
 	proposed_view = new View(View::V_REG, view->get_id());
 	proposed_view->add_members(view->get_members().begin(), view->get_members().end());
+        if (reg_view)
+        {
+            for (NodeList::const_iterator i = reg_view->get_members().begin(); 
+                 i != reg_view->get_members().end(); ++i)
+            {
+                if (proposed_view->get_members().find(get_uuid(i)) == 
+                    proposed_view->get_members().end())
+                {
+                    proposed_view->add_partitioned(get_uuid(i), get_name(i));
+                }
+            }
+        }
+        
         
 	VSStateMessage state_msg(proposed_view->get_id(), 
                                  *proposed_view, 
@@ -567,7 +581,7 @@ void VSProto::handle_state(const VSMessage *sm)
 	
 	delete trans_view;
 	trans_view = 0;
-	
+	        
 	delete reg_view;
 	reg_view = proposed_view;
 	proposed_view = 0;

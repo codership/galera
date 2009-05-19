@@ -76,7 +76,7 @@ public:
         {
             
             fail_unless(um->get_view() != 0);
-            LOG_INFO("view message: " + um->get_view()->to_string());
+            LOG_INFO("VSUser: view message: " + um->get_view()->to_string());
             if (state == JOINING)
             {
                 fail_unless(um->get_view()->get_type() == View::V_TRANS);
