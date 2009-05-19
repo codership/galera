@@ -136,19 +136,30 @@ void EVSProto::deliver_trans_view(bool local)
         }
         else if (get_instance(i).installed == false)
         {
-            const EVSMessage::InstMap* instances = install_message->get_instances();
-            EVSMessage::InstMap::const_iterator inst_i;
-            if ((inst_i = instances->find(get_pid(i))) != instances->end())
+            if (local == false)
             {
-                if (inst_i->second.get_left())
+                const EVSMessage::InstMap* instances = install_message->get_instances();
+                EVSMessage::InstMap::const_iterator inst_i;
+                if ((inst_i = instances->find(get_pid(i))) != instances->end())
                 {
-                    view.add_left(get_pid(i), get_instance(i).get_name());
+                    if (inst_i->second.get_left())
+                    {
+                        view.add_left(get_pid(i), get_instance(i).get_name());
+                    }
+                    else
+                    {
+                        view.add_partitioned(get_pid(i), 
+                                             get_instance(i).get_name());
+                    }
                 }
-                else
-                {
-                    view.add_partitioned(get_pid(i), 
-                                         get_instance(i).get_name());
-                }
+            }
+            else
+            {
+                // Just assume others have partitioned, it does not matter
+                // for leaving node anyway and it is not guaranteed if
+                // the others get the leave message, so it is not safe
+                // to assume then as left.
+                view.add_partitioned(get_pid(i), get_instance(i).get_name());
             }
         }
     }

@@ -430,6 +430,7 @@ Suite* tcp_suite()
 
     tc = tcase_create("test_nonblock_multi");
     tcase_add_test(tc, test_nonblock_multi);
+    tcase_set_timeout(tc, 10);
     suite_add_tcase(s, tc);
 
 

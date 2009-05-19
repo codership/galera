@@ -481,7 +481,29 @@ void TCP::handle_event(const int fd, const Event& pe)
     {
         throw FatalException("");
     }
-    if (pe.get_cause() & Event::E_OUT) {
+    
+    if (pe.get_cause() & Event::E_HUP)
+    {
+	this->error_no = ENOTCONN;
+	state = S_FAILED;
+	pass_up(0, 0, 0);
+        return;
+    }
+    else if (pe.get_cause() & Event::E_ERR)
+    {
+	int err = 0;
+	socklen_t errlen = sizeof(err);
+	if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) 
+        {
+	    LOG_WARN("TCP::handle(): Poll error");
+	}
+	this->error_no = ENOTCONN;
+	state = S_FAILED;
+	pass_up(0, 0, 0);
+        return;
+    }
+    else if (pe.get_cause() & Event::E_OUT)
+    {
 	LOG_DEBUG("TCP::handle(): Event::E_OUT");
 	int ret;
 	if (state == S_CONNECTING) {
@@ -530,24 +552,9 @@ void TCP::handle_event(const int fd, const Event& pe)
 	    pass_up(0, 0, 0);
 	}
     }
-    else if (pe.get_cause() & Event::E_HUP) 
-    {
-	this->error_no = ENOTCONN;
-	state = S_FAILED;
-	pass_up(0, 0, 0);
-        return;
-    }
     else if (pe.get_cause() & Event::E_INVAL)
     {
 	throw FatalException("TCP::handle(): Invalid file descriptor");
-    }
-    else if (pe.get_cause() & Event::E_ERR)
-    {
-	int err = 0;
-	socklen_t errlen = sizeof(err);
-	if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) {
-	    LOG_WARN("TCP::handle(): Poll error");
-	}
     }
     else
     {
