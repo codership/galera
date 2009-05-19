@@ -39,6 +39,8 @@ struct EVSInstance {
     EVSMessage* leave_message;
     // 
     Time tstamp;
+    //
+    EVSRange prev_range;
     // Human readable name
     string name;
     // CTOR
@@ -49,6 +51,7 @@ struct EVSInstance {
         join_message(0), 
         leave_message(0),
         tstamp(Time::now()),
+        prev_range(SEQNO_MAX, SEQNO_MAX),
         name(name_)
     {
     }
@@ -115,9 +118,10 @@ public:
         tp(t),
         my_addr(my_addr_), 
         my_name(name),
-        inactive_timeout(Time(1, 0)),
+        inactive_timeout(Time(5, 0)),
+        inactive_check_period(Time(1, 0)),
         consensus_timeout(Time(1, 0)),
-        resend_timeout(Time(1, 0)),
+        resend_period(Time(1, 0)),
         timer(poll_),
         current_view(View::V_TRANS, ViewId(my_addr, 0)),
         install_message(0),
@@ -183,8 +187,9 @@ public:
     
     // 
     Time inactive_timeout;
+    Period inactive_check_period;
     Time consensus_timeout;
-    Time resend_timeout;
+    Period resend_period;
     Timer timer;
     
     // Current view id
@@ -325,6 +330,8 @@ public:
         {
             Critical crit(p->mon);
             p->cleanup_unoperational();
+            p->cleanup_views();
+            p->timer.set(this, Period(Time(30, 0)));
         }
         ~CleanupTimerHandler() {
             if (p->timer.is_set(this))
@@ -341,6 +348,7 @@ public:
         {
             Critical crit(p->mon);
             p->check_inactive();
+            p->timer.set(this, Period(Time(1, 0)));
         }
         
         ~InactivityTimerHandler() {
@@ -410,7 +418,7 @@ public:
                 {
                     p->send_user();
                 }
-                p->timer.set(this, Period(p->resend_timeout));
+                p->timer.set(this, p->resend_period);
             }
         }
     };
@@ -420,22 +428,39 @@ public:
     ConsensusTimerHandler* consth;
     ResendTimerHandler* resendth;
     
-    void set_inactivity_timer() {
-        timer.set(ith, Period(inactive_timeout));
+    void start_inactivity_timer() 
+    {
+        timer.set(ith, inactive_check_period);
     }
 
+    void stop_inactivity_timer()
+    {
+        if (timer.is_set(ith) == false)
+        {
+            LOG_WARN("inactivity timer is not set, state: " 
+                     + to_string(get_state()));
+        }
+        else
+        {
+            timer.unset(ith);
+        }
+    }
+    
     void set_consensus_timer()
     {
         timer.set(consth, Period(consensus_timeout));
     }
-
+    
     void unset_consensus_timer()
     {
-        if (timer.is_set(consth))
+        if (timer.is_set(consth) == false)
         {
             LOG_DEBUG("consensus timer is not set");
         }
-        timer.unset(consth);
+        else
+        {
+            timer.unset(consth);
+        }
     }
     
     bool is_set_consensus_timer()
@@ -445,7 +470,7 @@ public:
 
     void start_resend_timer()
     {
-        timer.set(resendth, Period(resend_timeout));
+        timer.set(resendth, resend_period);
     }
 
     void stop_resend_timer()

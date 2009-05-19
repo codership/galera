@@ -25,6 +25,22 @@ static bool msg_from_previous_view(const list<pair<View, Time> >& views,
 
 void EVSProto::check_inactive()
 {
+    bool has_inactive = false;
+    for (InstMap::iterator i = known.begin(); i != known.end(); ++i)
+    {
+        if (get_pid(i) != my_addr &&
+            get_instance(i).operational == true &&
+            get_instance(i).tstamp + inactive_timeout < Time::now())
+        {
+            i->second.operational = false;
+            has_inactive = true;
+        }
+    }
+    if (has_inactive == true)
+    {
+        SHIFT_TO(RECOVERY);
+        send_join();
+    }
 }
 
 void EVSProto::cleanup_unoperational()
@@ -882,6 +898,7 @@ void EVSProto::shift_to(const State s)
     
     switch (s) {
     case CLOSED:
+        stop_inactivity_timer();
         cleanup_unoperational();
         cleanup_views();
         cleanup();
@@ -890,10 +907,12 @@ void EVSProto::shift_to(const State s)
     case JOINING:
         // tp->set_loopback(true);
         state = JOINING;
+        start_inactivity_timer();
         break;
     case LEAVING:
         // send_leave();
         // tp->set_loopback(true);
+        unset_consensus_timer();
         state = LEAVING;
         break;
     case RECOVERY:
@@ -1209,16 +1228,25 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
            (i->second.installed == true || get_state() == RECOVERY) &&
            msg.get_source_view() == current_view.get_id());
 
-    uint32_t prev_aru = input_map.get_aru_seq();
-    uint32_t prev_safe = input_map.get_safe_seq();
-    EVSRange range(input_map.insert(EVSInputMapItem(source, msg, rb, roff)));
+
+
+    const uint32_t prev_aru = input_map.get_aru_seq();
+    const uint32_t prev_safe = input_map.get_safe_seq();
+    const EVSRange range(input_map.insert(EVSInputMapItem(source, msg, rb, roff)));
     
+    if (!seqno_eq(range.low, i->second.prev_range.low))
+    {
+        i->second.tstamp = Time::now();
+    }
+    i->second.prev_range = range;
+
     if (!seqno_eq(input_map.get_safe_seq(), prev_safe))
+    {
         LOG_DEBUG(self_string() + " safe seq " 
                   + UInt32(input_map.get_safe_seq()).to_string() 
                   + " prev " 
                   + UInt32(prev_safe).to_string());
-    
+    }
     
     
     // Some messages are missing
@@ -1549,7 +1577,7 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
         return;
     }
     
-    
+    i->second.tstamp = Time::now();    
     i->second.set_name(msg.get_source_name());
     
     bool send_join_p = false;
@@ -1686,6 +1714,7 @@ void EVSProto::handle_leave(const EVSMessage& msg, const UUID& source)
             return;
         }
         
+        ii->second.operational = false;
         ii->second.trusted = false;
         SHIFT_TO(RECOVERY);
         send_join();
@@ -1755,6 +1784,7 @@ void EVSProto::handle_install(const EVSMessage& msg, const UUID& source)
     
     assert(install_message == 0);
 
+    i->second.tstamp = Time::now();
     i->second.set_name(msg.get_source_name());
     
     install_message = new EVSMessage(msg);
