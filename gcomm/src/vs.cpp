@@ -81,10 +81,14 @@ typedef map<const UUID, VSInstance> VSInstMap;
 
 class VSProto : public Protolay
 {
+public:
+    enum State {CLOSED, JOINING, JOINED, LEAVING};
+private:
     EventLoop* el;
     Monitor* mon;
+    State state;
 public:
-    enum State {CLOSED, JOINING, JOINED, LEAVING} state;
+
     UUID addr;
     string name;
     View *trans_view;
@@ -103,6 +107,19 @@ public:
         LOG_INFO(self_str()
                  + ")state change: " + make_int(state).to_string() + 
                  " -> " + make_int(s).to_string());
+        static const bool allowed[4][4] =
+        {
+            {false, true, false, false},
+            {false, false, true, false},
+            {false, false, true, true},
+            {true, false, false, false}
+        };
+        
+        if (allowed[state][s] == false)
+        {
+            throw FatalException("invalid state change");
+        }
+
         state = s;
     }
 
@@ -166,6 +183,22 @@ public:
 
     typedef deque<TransQueueMsg> TransQueue;
     TransQueue trans_msgs;
+
+    VSMessage get_vsmsg(const TransQueueMsg& msg) const
+    {
+        if (trans_msgs.empty())
+        {
+            throw FatalException("");
+        }
+        VSMessage ret;
+        if (ret.read(msg.get_readbuf()->get_buf(),
+                     msg.get_readbuf()->get_len(),
+                     msg.get_roff()) == 0)
+        {
+            throw FatalException("");
+        }
+        return ret;
+    }
     
 
     VSProto(const UUID& a, const string& name_, 
@@ -191,10 +224,11 @@ public:
     }
     void deliver_data(const VSMessage *, const ReadBuf *, const size_t roff);
     void deliver_trans();
+    void deliver_final_view(bool);
     void handle_conf(const View*);
     void handle_state(const VSMessage *);
     int send_leave();
-    void handle_leave(const VSMessage *);
+    void handle_leave(const VSMessage *, const ReadBuf*, const size_t);
     void handle_data(const VSMessage *, const ReadBuf *, const size_t);
     
     void handle_up(const int cid, const ReadBuf* rb, const size_t roff, 
@@ -210,7 +244,7 @@ public:
 
         if (get_state() == CLOSED)
         {
-            LOG_WARN("message in closed state, dropping");
+            LOG_DEBUG("message in closed state, dropping");
             return;
         }
         
@@ -246,7 +280,7 @@ public:
             handle_data(&msg, rb, roff);
             break;
         case VSMessage::T_LEAVE:
-            handle_leave(&msg);
+            handle_leave(&msg, rb, roff);
             break;
         default:
             LOG_WARN("unknown message type, dropping");
@@ -458,7 +492,40 @@ void VSProto::deliver_trans()
             throw FatalException("");
         }
         dm.set_source(source);
-        deliver_data(&dm, rb, roff);
+        switch (dm.get_type())
+        {
+        case VSMessage::T_DATA:
+            deliver_data(&dm, rb, roff);
+            break;
+        case VSMessage::T_LEAVE:
+        {            
+            VSInstMap::iterator i = membs.find(dm.get_source());
+            if (i == membs.end())
+            {
+                throw FatalException("");
+            }
+            if (dm.get_seq() != get_instance(i).get_expected_seq())
+            {
+                LOG_FATAL(self_str() 
+                          + " message gap in handle leave: expected: "
+                          + make_int(get_instance(i).get_expected_seq()).to_string()
+                          + " "
+                          + dm.to_string());
+                throw FatalException("");
+            }
+            if (dm.get_source() == addr)
+            {
+                deliver_final_view(false);
+            }
+            else
+            {
+                LOG_WARN("discarding leave message in trans view");
+            }
+            break;
+        }
+        default:
+            throw FatalException("");
+        }
         trans_msgs.pop_front();
     }
 }
@@ -547,7 +614,8 @@ void VSProto::handle_state(const VSMessage *sm)
         {
 	    throw FatalException("Trans msgs without preceding reg view");
         }
-        shift_to(JOINED);
+        if (get_state() == JOINING)
+            shift_to(JOINED);
         LOG_INFO("VS: deliver view: " + trans_view->to_string());
 	ProtoUpMeta um(trans_view);
 	pass_up(0, 0, &um);
@@ -627,7 +695,42 @@ void VSProto::handle_data(const VSMessage *dm, const ReadBuf *rb,
     }
 }
 
-void VSProto::handle_leave(const VSMessage* msg)
+void VSProto::deliver_final_view(const bool delivery)
+{
+    if (get_state() != LEAVING)
+    {
+        throw FatalException("");
+    }
+    View trans(View::V_TRANS, reg_view->get_id());
+    NodeList::const_iterator ni = reg_view->get_members().find(addr);
+    if (ni == reg_view->get_members().end())
+    {
+        throw FatalException("");
+    }
+    trans.add_member(get_uuid(ni), get_name(ni));
+    for (ni = reg_view->get_members().begin(); 
+         ni != reg_view->get_members().end(); ++ni)
+    {
+        if (get_uuid(ni) != addr)
+        {
+            trans.add_left(get_uuid(ni), get_name(ni));
+        }
+    }
+    ProtoUpMeta tum(&trans);
+    pass_up(0, 0, &tum);
+    if (delivery)
+    {
+        deliver_trans();
+    }
+    View empty;
+    ProtoUpMeta eum(&empty);
+    pass_up(0, 0, &eum);
+    shift_to(CLOSED);
+}
+
+void VSProto::handle_leave(const VSMessage* msg, 
+                           const ReadBuf* rb,
+                           const size_t roff)
 {
     LOG_INFO(self_str()
              + " leave message from " + msg->get_source().to_string());
@@ -638,40 +741,25 @@ void VSProto::handle_leave(const VSMessage* msg)
         return;
     }
     
+    if (trans_view != 0)
+    {
+        trans_msgs.push_back(TransQueueMsg(rb, roff, msg->get_source()));
+        return;
+    }
+    
     if (get_instance(i).get_expected_seq() != msg->get_seq())
     {
-        LOG_FATAL("message gap in handle leave");
-        throw FatalException("");
+        LOG_FATAL(self_str() 
+                  + " message gap in handle leave: expected: "
+                  + make_int(get_instance(i).get_expected_seq()).to_string()
+                  + " "
+                  + msg->to_string());
+            throw FatalException("");
     }
     
     if (msg->get_source() == addr)
     {
-        if (get_state() != LEAVING)
-        {
-            throw FatalException("");
-        }
-        View trans(View::V_TRANS, reg_view->get_id());
-        NodeList::const_iterator ni = reg_view->get_members().find(addr);
-        if (ni == reg_view->get_members().end())
-        {
-            throw FatalException("");
-        }
-        trans.add_member(get_uuid(ni), get_name(ni));
-        for (ni = reg_view->get_members().begin(); 
-             ni != reg_view->get_members().end(); ++ni)
-        {
-            if (get_uuid(ni) != addr)
-            {
-                trans.add_left(get_uuid(ni), get_name(ni));
-            }
-        }
-        ProtoUpMeta tum(&trans);
-        pass_up(0, 0, &tum);
-        deliver_trans();
-        View empty;
-        ProtoUpMeta eum(&empty);
-        pass_up(0, 0, &eum);
-        shift_to(CLOSED);
+        deliver_final_view(true);
     }
     else
     {
@@ -691,7 +779,7 @@ void VSProto::handle_leave(const VSMessage* msg)
                 trans.add_member(get_uuid(ni), get_name(ni));
             }
         }
-
+        
         if (trans_view == 0)
         {
             assert(trans_msgs.size() == 0);
