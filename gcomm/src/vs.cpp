@@ -944,6 +944,19 @@ void VS::close()
         while (proto->get_state() == VSProto::LEAVING);        
     }
     
+    // Give EVS some time to deliver VS LEAVE messages on 
+    // other nodes before triggering EVS VIEW change.
+    Time start(Time::now());
+    do
+    {
+        int ret = event_loop->poll(50);
+        if (ret < 0)
+        {
+            LOG_WARN("poll returned: " + Int(ret).to_string());
+        }
+    }
+    while (start + Time(0, 500000) > Time::now());
+    
     evs_proto->shift_to(EVSProto::LEAVING);
     evs_proto->send_leave();
     do
