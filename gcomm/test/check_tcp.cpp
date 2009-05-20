@@ -11,8 +11,8 @@ using namespace gcomm;
 
 
 
-const char* nonblock_addr = "gcomm+tcp://127.0.0.1:23456?tcp.non_blocking=1";
-const char* block_addr = "gcomm+tcp://127.0.0.1:4567";
+const char* nonblock_addr = "gcomm+tcp://localhost:4567?tcp.non_blocking=1";
+const char* block_addr = "gcomm+tcp://localhost:4567";
 
 class Sender : Toplay
 {
