@@ -458,7 +458,7 @@ int EVSProto::send_user(WriteBuf* wb,
         ReadBuf* rb = wb->to_readbuf();
         EVSRange range = input_map.insert(EVSInputMapItem(my_addr, msg, rb, 0));
         assert(seqno_eq(range.get_high(), last_sent));
-        input_map.set_safe(my_addr, last_sent);
+        input_map.set_safe(my_addr, input_map.get_aru_seq());
         rb->release();
     }
     wb->rollback_hdr(msg.get_hdrlen());

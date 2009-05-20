@@ -622,6 +622,8 @@ struct Inst : public Toplay {
     ~Inst()
     {
         check_completeness();
+        delete ep;
+        delete tp;
     }
     
     void check_completeness()
@@ -665,6 +667,14 @@ struct Inst : public Toplay {
     }
 
 };
+
+void release_instvec(vector<Inst*>* vec)
+{
+    for (vector<Inst*>::iterator i = vec->begin(); i != vec->end(); ++i)
+    {
+        delete *i;
+    }
+}
 
 
 static bool all_operational(const vector<Inst*>* pvec)
@@ -832,6 +842,7 @@ START_TEST(test_evs_proto_converge)
     }
     reach_operational(&vec);
     flush(&vec);
+    release_instvec(&vec);
 }
 END_TEST
 
@@ -850,6 +861,7 @@ START_TEST(test_evs_proto_converge_1by1)
         reach_operational(&vec);
         flush(&vec);
     }
+    release_instvec(&vec);
 }
 END_TEST
 
@@ -991,6 +1003,8 @@ START_TEST(test_evs_proto_user_msg)
 
     stats.print();
     stats.clear();
+
+    release_instvec(&vec);
 }
 END_TEST
 
@@ -1013,6 +1027,8 @@ START_TEST(test_evs_proto_consensus_with_user_msg)
         stats.print();
         stats.clear();
     }
+
+    release_instvec(&vec);
 }
 END_TEST
 
@@ -1038,6 +1054,7 @@ START_TEST(test_evs_proto_msg_loss)
     stats.print();
     stats.clear();
 
+    release_instvec(&vec);
 }
 END_TEST
 
@@ -1068,6 +1085,7 @@ START_TEST(test_evs_proto_leave)
         reach_operational(&vec);
     }
 
+    release_instvec(&vec);
 }
 END_TEST
 
@@ -1144,7 +1162,7 @@ START_TEST(test_evs_proto_full)
     }
 
     stats.print();
-
+    release_instvec(&vec);
 }
 END_TEST
 

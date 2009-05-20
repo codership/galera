@@ -48,6 +48,7 @@ public:
         el->erase(fd);
         PseudoFd::release_fd(fd);
         delete vs;
+        
     }
 
     void start()
@@ -181,7 +182,7 @@ START_TEST(test_vs_w_user_messages)
     VSUser u3("gcomm+vs://127.0.0.1:10003?gmcast.group=evs&gmcast.node=gcomm+tcp://127.0.0.1:10001&node.name=n3", &el, true);
     
     u1.start();
-
+    
     Time stop = Time(Time::now() + Time(5, 0));
     do
     {
@@ -197,7 +198,7 @@ START_TEST(test_vs_w_user_messages)
     }
     while (Time::now() < stop);
 
-
+    
     u3.start();
     stop = Time(Time::now() + Time(5, 0));
     do
@@ -205,7 +206,7 @@ START_TEST(test_vs_w_user_messages)
         el.poll(100);
     }
     while (Time::now() < stop);
-
+    
     u1.stop();
     stop = Time(Time::now() + Time(5, 0));
     do
@@ -214,7 +215,7 @@ START_TEST(test_vs_w_user_messages)
     }
     while (Time::now() < stop);
     u3.stop();
-
+    
     stop = Time(Time::now() + Time(5, 0));
     do
     {

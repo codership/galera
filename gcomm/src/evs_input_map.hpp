@@ -131,6 +131,19 @@ public:
                           double(n_messages + 1)).to_string());
     }
     
+    void validate_state() const
+    {
+        if (seqno_eq(aru_seq, SEQNO_MAX) && !seqno_eq(safe_seq, SEQNO_MAX))
+        {
+            throw FatalException("validate state: aru_seq == SEQNO_MAX, safe_seq != SEQNO_MAX");
+        }
+        if (!seqno_eq(aru_seq, SEQNO_MAX) && !seqno_eq(safe_seq, SEQNO_MAX)
+            && seqno_gt(safe_seq, aru_seq))
+        {
+            throw FatalException("validate state: safe_seq > aru_seq");
+        }
+    }
+
     void set_safe(const UUID& s, const uint32_t seq) {
         //if (seqno_eq(aru_seq, SEQNO_MAX) || seqno_gt(seq, aru_seq))
         //    throw FatalException("Safe seqno out of range");
@@ -167,13 +180,18 @@ public:
                 }
             }
         }
+        validate_state();
     }
     
-    uint32_t get_safe_seq() const {
+    uint32_t get_safe_seq() const 
+    {
+        validate_state();
         return safe_seq;
     }
     
-    void update_aru() {
+private:
+    void update_aru() 
+    {
         if (instances.empty())
             throw FatalException("Instance not found");
         uint32_t min_seq = SEQNO_MAX;
@@ -201,9 +219,13 @@ public:
                   + " aru_seq = " + UInt32(aru_seq).to_string() 
                   + " min_seq = " + UInt32(min_seq).to_string());
         aru_seq = min_seq;
+        validate_state();
     }
-    
-    uint32_t get_aru_seq() const {
+
+public:    
+    uint32_t get_aru_seq() const 
+    {
+        validate_state();
         return aru_seq;
     }
     

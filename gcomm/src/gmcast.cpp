@@ -433,7 +433,9 @@ GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon_) :
 GMCast::~GMCast()
 {
     if (listener != 0)
+    {
         stop();
+    }
     PseudoFd::release_fd(fd);
 }
 
@@ -467,16 +469,16 @@ void GMCast::stop()
     listener->close();
     delete listener;
     listener = 0;
-    
+
+    spanning_tree.clear();
     for (ProtoMap::iterator i = proto_map.begin(); i != proto_map.end(); ++i)
     {
         Transport* tp = get_gmcast_proto(i)->get_transport();
-        delete get_gmcast_proto(i);
         tp->close();
-        delete tp;
+        event_loop->release_protolay(tp);
+        delete get_gmcast_proto(i);
     }
     proto_map.clear();
-    spanning_tree.clear();
 }
 
 
@@ -546,7 +548,7 @@ void GMCast::handle_failed(GMCastProto* rp)
     if (tp->get_state() == S_FAILED) 
     {
         LOG_DEBUG(string("transport ") + Int(tp->get_fd()).to_string() 
-                 + " failed: " + ::strerror(tp->get_errno()));
+                  + " failed: " + ::strerror(tp->get_errno()));
     } 
     else 
     {

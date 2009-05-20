@@ -55,7 +55,7 @@ struct EVSInstance {
         name(name_)
     {
     }
-
+    
     ~EVSInstance() 
     {
         delete join_message;
