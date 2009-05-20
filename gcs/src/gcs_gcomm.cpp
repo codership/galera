@@ -207,7 +207,7 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
 	return -EINVAL;
     }
     int err = 0;
-    WriteBuf wb(buf, len);
+    WriteBuf wb(static_cast<const gcomm::byte_t*>(buf), len);
     try {
 	ProtoDownMeta vdm(msg_type);
 	err = conn->vs_ctx.pass_down(&wb, &vdm);
