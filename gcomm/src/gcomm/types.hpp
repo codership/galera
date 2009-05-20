@@ -223,6 +223,7 @@ public:
     string to_string() const
     {
         ostringstream os;
+        
         os << d;
         return os.str();
     }
@@ -266,7 +267,7 @@ public:
         os.setf(ostringstream::hex);
         for (size_t i = 0; i < sizeof(sa.sa_data); ++i)
         {
-            os << sa.sa_data[i];
+            os << Int(sa.sa_data[i]).to_string();
         }
         ret += ")";
         return ret;

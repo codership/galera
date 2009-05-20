@@ -27,19 +27,12 @@ static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
      const char *delim;
      
      if (!(delim = strchr(addr, ':')))
+     {
+         LOG_ERROR("no host-service delimiter");
 	 return false;
-     
+     }
      ipaddr = strndup(addr, delim - addr);
      port = strdup(delim + 1);
-
-#if 0
-     sa = (struct sockaddr_in *) s;
-     if (inet_pton(AF_INET, ipaddr, &sa->sin_addr) <= 0) {
-	  free(ipaddr);
-	  free(port);
-	  return false;
-     }
-#endif
 
      addrinfo addrhint = {
          0,
@@ -59,20 +52,22 @@ static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
          LOG_ERROR("getaddrinfo: " + make_int(err).to_string());
          return false;
      }
-
+     
      if (addri == 0)
      {
+         LOG_ERROR("no address found");
          throw FatalException("");
      }
-
+     
      if (addri->ai_socktype != SOCK_STREAM)
      {
-         LOG_FATAL("");
+         LOG_FATAL("returned socket is not stream");
          throw FatalException("");
      }
      
      *s = *addri->ai_addr;
      *s_size = addri->ai_addrlen;
+     LOG_WARN(Sockaddr(*s).to_string());
      freeaddrinfo(addri);
      free(ipaddr);
      free(port);
@@ -122,7 +117,7 @@ void TCP::connect()
 
     set_blocking_mode();
 
-    if ((fd = ::socket(PF_INET, SOCK_STREAM, 0)) == -1)
+    if ((fd = ::socket(sa.sa_family, SOCK_STREAM, 0)) == -1)
 	throw FatalException(::strerror(errno));
     LOG_DEBUG("socket " + Int(fd).to_string());
     linger lg = {1, 3};
@@ -154,6 +149,7 @@ void TCP::connect()
     }
     if (::connect(fd, &sa, sa_size) == -1) {
 	if (errno != EINPROGRESS) {
+            LOG_ERROR(string("connect(): ") + ::strerror(errno));
 	    throw RuntimeException(::strerror(errno));
 	} else {
 	    if (event_loop)
@@ -183,7 +179,7 @@ void TCP::listen()
 	throw FatalException("TCP::listen(): Already connected or listening");
     if (!tcp_addr_to_sa(uri.get_authority().c_str(), &sa, &sa_size))
 	throw FatalException("TCP::listen(): Invalid address");
-    if ((fd = ::socket(PF_INET, SOCK_STREAM, 0)) == -1)
+    if ((fd = ::socket(sa.sa_family, SOCK_STREAM, 0)) == -1)
 	throw FatalException("TCP::listen(): Could not open socket");
     
     set_blocking_mode();
