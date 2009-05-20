@@ -11,6 +11,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 
 BEGIN_GCOMM_NAMESPACE
 
@@ -21,33 +22,58 @@ static inline void closefd(int fd)
 
 static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
 {
-     struct sockaddr_in *sa;
      char *ipaddr;
      char *port;
      const char *delim;
      
-     /*
-      * if (strncmp(addr, "tcp:", strlen("tcp:")) == 0)
-      * addr += strlen("tcp:");
-      * else if (strncmp(addr, "asynctcp:", strlen("asynctcp:")) == 0)
-      * addr += strlen("asynctcp:");
-      * else
-      * return false;
-      */
      if (!(delim = strchr(addr, ':')))
 	 return false;
      
      ipaddr = strndup(addr, delim - addr);
      port = strdup(delim + 1);
+
+#if 0
      sa = (struct sockaddr_in *) s;
      if (inet_pton(AF_INET, ipaddr, &sa->sin_addr) <= 0) {
 	  free(ipaddr);
 	  free(port);
 	  return false;
      }
-     sa->sin_family = AF_INET;
-     sa->sin_port = htons(strtol(port, NULL, 0));
-     *s_size = sizeof(struct sockaddr_in);
+#endif
+
+     addrinfo addrhint = {
+         0,
+         AF_UNSPEC,
+         SOCK_STREAM,
+         0,
+         *s_size,
+         s,
+         0,
+         0
+     };
+     addrinfo* addri = 0;
+
+     int err;
+     if ((err = getaddrinfo(ipaddr, port, &addrhint, &addri)) != 0)
+     {
+         LOG_ERROR("getaddrinfo: " + make_int(err).to_string());
+         return false;
+     }
+
+     if (addri == 0)
+     {
+         throw FatalException("");
+     }
+
+     if (addri->ai_socktype != SOCK_STREAM)
+     {
+         LOG_FATAL("");
+         throw FatalException("");
+     }
+     
+     *s = *addri->ai_addr;
+     *s_size = addri->ai_addrlen;
+     freeaddrinfo(addri);
      free(ipaddr);
      free(port);
      return true;

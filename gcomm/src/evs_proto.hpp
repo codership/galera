@@ -348,7 +348,10 @@ public:
         {
             Critical crit(p->mon);
             p->check_inactive();
-            p->timer.set(this, Period(Time(1, 0)));
+            if (p->timer.is_set(this) == false)
+            {
+                p->timer.set(this, Period(Time(1, 0)));
+            }
         }
         
         ~InactivityTimerHandler() {
@@ -418,7 +421,10 @@ public:
                 {
                     p->send_user();
                 }
-                p->timer.set(this, p->resend_period);
+                if (p->timer.is_set(this) == false)
+                {
+                    p->timer.set(this, p->resend_period);
+                }
             }
         }
     };
