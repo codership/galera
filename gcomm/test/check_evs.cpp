@@ -1201,7 +1201,6 @@ START_TEST(test_evs_proto_full)
     // FIXME: This test freezes for some reason after about 500 iterations,
     // increase iterations again when testing with lossy transport.
     for (size_t i = 0; i < 300; ++i) {
-        LOG_WARN("proto_full: " + make_int(i).to_string());
         send_msgs_rnd(&vec, 8);
         if (::rand() % 70 == 0)
             join_inst(&el, vlist, vec, &n);
