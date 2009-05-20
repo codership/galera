@@ -136,7 +136,8 @@ public:
 
     enum Flag {
 	F_MSG_MORE = 0x1,
-        F_RESEND = 0x2
+        F_RESEND =   0x2,
+        F_SOURCE =   0x4
     };
 
 private:
@@ -281,11 +282,14 @@ protected:
         flags(flags_),
         source_view(source_view_),
         source(source_),
-        // name(name_),
         gap(gap_),
         instances(instances_)
     {
         strncpy(name, name_.c_str(), sizeof(name));
+        if (source != UUID::nil())
+        {
+            flags |= F_SOURCE;
+        }
     }
 
 public:        
@@ -313,9 +317,15 @@ public:
 	return safety_prefix;
     }
     
-    UUID get_source() const {
+    const UUID& get_source() const {
 	return source;
     }
+    
+    void set_source(const UUID& uuid)
+    {
+        source = uuid;
+    }
+    
     
     string get_source_name() const
     {
@@ -404,8 +414,12 @@ public:
 	    return 0;
 	if ((off = gcomm::read(buf, buflen, off, &flags)) == 0)
 	    return 0;
-	if ((off = source.read(buf, buflen, off)) == 0)
-	    return 0;
+        
+        if (flags & F_SOURCE)
+        {
+            if ((off = source.read(buf, buflen, off)) == 0)
+                return 0;
+        }
 
 	if (type == USER || type == JOIN || type == INSTALL || type == LEAVE || type == GAP) {
 	    if ((off = gcomm::read(buf, buflen, off, &seq)) == 0)
@@ -467,11 +481,14 @@ public:
 	    LOG_TRACE("");
 	    return 0;
 	}
-	/* Message source pid */
-	if ((off = source.write(buf, buflen, off)) == 0) {
-	    LOG_TRACE("");
-	    return 0;
-	}
+        if (flags & F_SOURCE)
+        {
+            /* Message source pid */
+            if ((off = source.write(buf, buflen, off)) == 0) {
+                LOG_TRACE("");
+                return 0;
+            }
+        }
 	
 	if (type == USER || type == JOIN || type == INSTALL || type == LEAVE ||
 	    type == GAP) {
@@ -513,21 +530,22 @@ public:
     }
     
     size_t size() const {
+        size_t source_size = flags & F_SOURCE ? source.size() : 0;
 	switch (type) {
         case NONE:
             throw FatalException("");
 	case USER:
-	    return 4 + 4 + 4 + source.size() + source_view.size(); // bits + seq + aru_seq + view
+	    return 4 + 4 + 4 + source_size + source_view.size(); // bits + seq + aru_seq + view
 	case GAP:
-	    return 4 + 4 + 4 + source.size() + source_view.size() + gap.size(); // bits + seq + aru_seq + view + gap
+	    return 4 + 4 + 4 + source_size + source_view.size() + gap.size(); // bits + seq + aru_seq + view + gap
 	case DELEGATE:
 	    return 4 + source.size(); // 
 	case JOIN:
 	case INSTALL:
-	    return 4 + 4 + 4 + source.size() + source_view.size() + sizeof(name)
+	    return 4 + 4 + 4 + source_size + source_view.size() + sizeof(name)
                 + 4 + instances->size()*Instance::size();
 	case LEAVE:
-	    return 4 + 4 + 4 + source.size() + source_view.size();
+	    return 4 + 4 + 4 + source_size + source_view.size();
 	}
 	return 0;
     }

@@ -726,7 +726,7 @@ void EVSProto::resend(const UUID& gap_source, const EVSGap& gap)
                                    input_map.get_aru_seq(),
                                    msg.get_source_view(), 
                                    EVSMessage::F_RESEND);
-            LOG_WARN("resend: " 
+            LOG_DEBUG("resend: " 
                      + make_int(i.first.get_payload_offset()).to_string());
             WriteBuf wb(rb ? rb->get_buf(i.first.get_payload_offset()) : 0, 
                         rb ? rb->get_len(i.first.get_payload_offset()) : 0);
@@ -741,7 +741,7 @@ void EVSProto::resend(const UUID& gap_source, const EVSGap& gap)
 void EVSProto::recover(const EVSGap& gap)
 {
     
-    LOG_WARN("recovering message");
+    LOG_DEBUG("recovering message");
     if (gap.get_low() == gap.get_high()) {
         LOG_WARN(std::string("EVSProto::recover(): Empty gap: ") 
                  + UInt32(gap.get_low()).to_string() + " -> " 
@@ -758,12 +758,8 @@ void EVSProto::recover(const EVSGap& gap)
         if (i.second == true) {
             const ReadBuf* rb = i.first.get_readbuf();
             const EVSMessage& msg = i.first.get_evs_message();
-            if (i.first.get_payload_offset() != 0)
-            {
-                // See message construction from resend() above
-                throw FatalException("EVSProto::recover(): FIXME");
-            }
-            WriteBuf wb(rb);
+            WriteBuf wb(rb ? rb->get_buf(i.first.get_payload_offset()) : 0,
+                        rb ? rb->get_len(i.first.get_payload_offset()) : 0);
             wb.prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
             if (send_delegate(gap.source, &wb))
                 break;
@@ -833,6 +829,14 @@ void EVSProto::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
     {
         LOG_WARN("EVS::handle_up(): Invalid message");
         return;
+    }
+    if (um)
+    {
+        msg.set_source(um->get_source());
+    }
+    if (msg.get_source() == UUID::nil())
+    {
+        throw FatalException("");
     }
     
     LOG_TRACE(self_string() + " message " + EVSMessage::to_string(msg.get_type()) + " from " + msg.get_source().to_string());
@@ -1144,8 +1148,7 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
 
     if (msg.get_flags() & EVSMessage::F_RESEND)
     {
-        LOG_WARN("msg with resend flag: " 
-                 + msg.to_string());
+        LOG_DEBUG("msg with resend flag: " + msg.to_string());
     }
 
 
@@ -1333,10 +1336,12 @@ void EVSProto::handle_delegate(const EVSMessage& msg, const UUID& source,
                                const ReadBuf* rb, const size_t roff)
 {
     EVSMessage umsg;
-    umsg.read(rb->get_buf(roff), 
-              rb->get_len(roff), msg.size());
-    handle_user(umsg, umsg.get_source(), rb, 
-                roff + msg.size() + umsg.size());
+    if (umsg.read(rb->get_buf(roff), 
+                  rb->get_len(roff), msg.size()) == 0)
+    {
+        throw FatalException("failed to read user msg from delegate");
+    }
+    handle_user(umsg, umsg.get_source(), rb, roff + msg.size());
 }
 
 void EVSProto::handle_gap(const EVSMessage& msg, const UUID& source)

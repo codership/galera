@@ -926,7 +926,8 @@ void GMCast::handle_up(const int cid, const ReadBuf* rb,
                 throw RuntimeException("message unserialization");
             if (msg.get_type() >= GMCastMessage::P_USER_BASE)
             {
-                pass_up(rb, off, 0);
+                ProtoUpMeta um(msg.get_source_uuid());
+                pass_up(rb, off, &um);
                 if (msg.get_ttl() > 1)
                 {
                     msg.dec_ttl();
