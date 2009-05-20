@@ -67,7 +67,7 @@ static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
      
      *s = *addri->ai_addr;
      *s_size = addri->ai_addrlen;
-     LOG_WARN(Sockaddr(*s).to_string());
+     // LOG_WARN(Sockaddr(*s).to_string());
      freeaddrinfo(addri);
      free(ipaddr);
      free(port);

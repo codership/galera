@@ -475,7 +475,7 @@ void GMCast::stop()
     {
         Transport* tp = get_gmcast_proto(i)->get_transport();
         tp->close();
-        event_loop->release_protolay(tp);
+        delete tp;
         delete get_gmcast_proto(i);
     }
     proto_map.clear();
@@ -490,7 +490,7 @@ void GMCast::gmcast_accept()
         proto_map.insert(
             make_pair(tp->get_fd(), 
                       new GMCastProto(tp, listen_addr, string(""), 
-                                     uuid, group_name)));
+                                      uuid, group_name)));
     if (ret.second == false)
         throw FatalException("");
     ret.first->second->send_handshake();

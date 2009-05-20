@@ -1220,6 +1220,11 @@ START_TEST(test_evs_proto_full)
 
     stats.print();
     release_instvec(&vec);
+    for (list<vector<Inst*>* >::iterator i = vlist.begin();
+         i != vlist.end(); ++i)
+    {
+        delete *i;
+    }
 }
 END_TEST
 
