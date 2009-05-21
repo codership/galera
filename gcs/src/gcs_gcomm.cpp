@@ -304,7 +304,7 @@ retry:
 	gcs_comp_msg_t *new_comp = 0;
 	if (ev.view->get_type() == View::V_TRANS && conn->comp_msg && 
 	    ev.view->get_members().length()*2 + ev.view->get_left().length() 
-	    < static_cast<size_t>(gcs_comp_msg_num(conn->comp_msg))) {
+	    <= static_cast<size_t>(gcs_comp_msg_num(conn->comp_msg))) {
 	    new_comp = gcs_comp_msg_new(false, 0, ev.view->get_members().length());
 	} else if (ev.view->get_type() == View::V_TRANS) {
 	    // Drop transitional views that lead to prim comp
@@ -367,7 +367,7 @@ static GCS_BACKEND_OPEN_FN(gcs_gcomm_open)
 
     try {
         conn->channel = channel;
-        string uri_str = string("gcomm+vs://");
+        string uri_str = string("gcomm+evs://");
         uri_str += conn->sock;
         if (conn->sock.find_first_of('?') == string::npos)
         {
