@@ -152,7 +152,7 @@ size_t EVS::get_max_msg_size() const
     }
     else
     {
-        EVSUserMessage evsm(UUID(), SAFE, 0, 0, 0, ViewId(UUID(), 0), 0);
+        EVSUserMessage evsm(UUID(0, 0), 0xff, SAFE, 0, 0, 0, ViewId(UUID(), 0), 0);
         if (tp->get_max_msg_size() < evsm.size())
         {
             LOG_FATAL("transport max msg size too small: " +

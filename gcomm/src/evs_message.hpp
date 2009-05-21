@@ -143,6 +143,7 @@ public:
 private:
     int version;
     Type type;
+    uint8_t user_type;
     EVSSafetyPrefix safety_prefix;
     uint32_t seq;
     uint8_t seq_range;
@@ -263,6 +264,7 @@ protected:
 
     EVSMessage(const int version_, 
                const Type type_,
+               const uint8_t user_type_,
                const EVSSafetyPrefix safety_prefix_,
                const uint32_t seq_,
                const uint8_t seq_range_,
@@ -275,6 +277,7 @@ protected:
                map<UUID, Instance>* instances_) :
         version(version_),
         type(type_),
+        user_type(user_type_),
         safety_prefix(safety_prefix_),
         seq(seq_),
         seq_range(seq_range_),
@@ -313,6 +316,11 @@ public:
 	return type;
     }
     
+    uint8_t get_user_type() const
+    {
+        return user_type;
+    }
+
     EVSSafetyPrefix get_safety_prefix() const {
 	return safety_prefix;
     }
@@ -394,22 +402,30 @@ public:
 	size_t off;
 	if ((off = gcomm::read(buf, buflen, offset, &b)) == 0)
 	    return 0;
-	version = b & 0xf;
+	version = b & 0x3;
+	type = static_cast<Type>((b >> 2) & 0x7);
+	safety_prefix = static_cast<EVSSafetyPrefix>((b >> 5) & 0x7);
+
         if (version != 0)
         {
-            LOG_TRACE("");
-            return 0;
-        }
-	type = static_cast<Type>((b >> 4) & 0xf);
-        if (type <= NONE || type > INSTALL)
-        {
-            LOG_TRACE("");
-            return 0;
+            LOG_WARN("version: " + Int(version).to_string());
+            return  0;
         }
 
-	if ((off = gcomm::read(buf, buflen, off, &b)) == 0)
+        if (type <= NONE || type > INSTALL)
+        {
+            LOG_WARN("type: " + Int(type).to_string());
+            return 0;
+        }
+        
+        if (safety_prefix < DROP || safety_prefix > SAFE)
+        {
+            LOG_TRACE("safety_prefix: " + Int(safety_prefix).to_string());
+            return 0;
+        }
+        
+	if ((off = gcomm::read(buf, buflen, off, &user_type)) == 0)
 	    return 0;
-	safety_prefix = static_cast<EVSSafetyPrefix>(b & 0xf);
 	if ((off = gcomm::read(buf, buflen, off, &seq_range)) == 0)
 	    return 0;
 	if ((off = gcomm::read(buf, buflen, off, &flags)) == 0)
@@ -459,15 +475,18 @@ public:
 	size_t off;
 	
 	/* Common header for all messages */
-	/* Version, type */
-	b = (version & 0xf) | ((type << 4) & 0xf0);
+	/* Version, type, safety_prefix */
+        b = safety_prefix & 0x7;
+        b <<= 3;
+        b |= (type & 0x7);
+        b <<= 2;
+	b |= (version & 0x3);
 	if ((off = gcomm::write(b, buf, buflen, offset)) == 0) {
 	    LOG_TRACE("");
 	    return 0;
 	}
-	/* Safety prefix */
-	b = safety_prefix & 0xf;	
-	if ((off = gcomm::write(b, buf, buflen, off)) == 0) {
+        /* User type */
+	if ((off = gcomm::write(user_type, buf, buflen, off)) == 0) {
 	    LOG_TRACE("");
 	    return 0;
 	}
@@ -595,6 +614,7 @@ inline bool equal(const EVSMessage* a, const EVSMessage* b)
 struct EVSUserMessage : EVSMessage
 {
     EVSUserMessage(const UUID& pid, 
+                   const uint8_t user_type,
                    const EVSSafetyPrefix sp,
                    const uint32_t seq,
                    const uint8_t seq_range,
@@ -603,6 +623,7 @@ struct EVSUserMessage : EVSMessage
                    const uint8_t flags) :
         EVSMessage(0,
                    EVSMessage::USER,
+                   user_type,
                    sp,
                    seq,
                    seq_range,
@@ -622,6 +643,7 @@ struct EVSDelegateMessage : EVSMessage
     EVSDelegateMessage(const UUID& pid) :
         EVSMessage(0,
                    EVSMessage::DELEGATE,
+                   0xff,
                    UNRELIABLE,
                    0,
                    0,
@@ -645,6 +667,7 @@ struct EVSGapMessage : EVSMessage
                   const EVSGap& gap) :
         EVSMessage(0,
                    EVSMessage::GAP,
+                   0xff,
                    UNRELIABLE,
                    seq,
                    0,
@@ -669,6 +692,7 @@ struct EVSJoinMessage : EVSMessage
                    const uint32_t safe_seq) :
         EVSMessage(0,
                    EVSMessage::JOIN, 
+                   0xff,
                    UNRELIABLE,
                    safe_seq,
                    uint8_t(0),
@@ -693,6 +717,7 @@ struct EVSLeaveMessage : EVSMessage
                     const uint32_t safe_seq) :
         EVSMessage(0,
                    EVSMessage::LEAVE, 
+                   0xff,
                    UNRELIABLE,
                    safe_seq,
                    uint8_t(0),
@@ -717,6 +742,7 @@ struct EVSInstallMessage : EVSMessage
                    const uint32_t safe_seq) :
         EVSMessage(0,
                    EVSMessage::INSTALL, 
+                   0xff,
                    UNRELIABLE,
                    safe_seq,
                    uint8_t(0),

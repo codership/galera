@@ -13,6 +13,7 @@
 
 #include <check.h>
 
+#include "check_templ.hpp"
 
 using std::vector;
 using std::deque;
@@ -126,14 +127,46 @@ START_TEST(test_seqno)
 }
 END_TEST
 
+BEGIN_GCOMM_NAMESPACE
+
+static bool operator==(const EVSMessage& a, const EVSMessage& b)
+{
+    return a.get_type()      == b.get_type() &&
+        a.get_user_type()     == b.get_user_type() &&
+        a.get_safety_prefix() == b.get_safety_prefix() &&
+        a.get_source()        == b.get_source() &&
+        // a.get_source_name()   == b.get_source_name() &&
+        a.get_seq()           == b.get_seq() &&
+        a.get_seq_range()     == b.get_seq_range() &&
+        a.get_aru_seq()       == b.get_aru_seq() &&
+        a.get_flags()         == b.get_flags() && 
+        a.get_source_view()   == b.get_source_view();
+}
+
+END_GCOMM_NAMESPACE
+
 
 START_TEST(test_msg)
 {
     UUID pid(0, 0);
-    EVSUserMessage umsg(pid, SAFE, 0x037b137bU, 0x17U,
+    EVSUserMessage umsg(pid, 0x10, 
+                        SAFE, 0x037b137bU, 0x17U,
                         0x0534555,
                         ViewId(UUID(0, 0), 0x7373b173U), EVSMessage::F_MSG_MORE);
 
+    check_serialization(umsg, umsg.size(), 
+                        EVSUserMessage(UUID(), 
+                                       0, 
+                                       UNRELIABLE, 
+                                       0, 0, 0,
+                                       ViewId(UUID(0,0), 0),
+                                       0));
+
+
+    EVSDelegateMessage dmsg(pid);
+    check_serialization(dmsg, dmsg.size(), EVSDelegateMessage(UUID::nil()));
+
+#if 0
     size_t buflen = umsg.size();
     uint8_t* buf = new uint8_t[buflen];
 
@@ -147,6 +180,7 @@ START_TEST(test_msg)
     fail_unless(umsg2.read(buf, buflen, 0) == buflen);
 
     fail_unless(umsg.get_type() == umsg2.get_type());
+    fail_unless(umsg.get_user_type() == umsg2.get_user_type());
     fail_unless(umsg.get_source() == umsg2.get_source());
     fail_unless(umsg.get_safety_prefix() == umsg2.get_safety_prefix());
     fail_unless(umsg.get_seq() == umsg2.get_seq());
@@ -156,6 +190,7 @@ START_TEST(test_msg)
     fail_unless(umsg.get_source_view() == umsg2.get_source_view());
 
     delete[] buf;
+#endif
 }
 END_TEST
 
@@ -195,15 +230,15 @@ START_TEST(test_input_map_basic)
                 seqno_eq(im.get_safe_seq(), SEQNO_MAX));
     im.insert(
         EVSInputMapItem(pid1,
-                        EVSUserMessage(pid1, SAFE, 0, 0, SEQNO_MAX, vid, 0),
+                        EVSUserMessage(pid1, 0x10, SAFE, 0, 0, SEQNO_MAX, vid, 0),
                         0, 0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
    im.insert(EVSInputMapItem(pid1,
-                              EVSUserMessage(pid1, SAFE, 2, 0,
+                             EVSUserMessage(pid1, 0x10, SAFE, 2, 0,
                                          SEQNO_MAX, vid, 0), 0, 0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
     im.insert(EVSInputMapItem(pid1,
-                              EVSUserMessage(pid1, SAFE, 1, 0,
+                              EVSUserMessage(pid1, 0x10, SAFE, 1, 0,
                                          SEQNO_MAX, vid, 0),
                               0, 0));
     fail_unless(seqno_eq(im.get_aru_seq(), 2));
@@ -213,7 +248,7 @@ START_TEST(test_input_map_basic)
     // must dropped:
     EVSRange gap = im.insert(
         EVSInputMapItem(pid1,
-                        EVSUserMessage(pid1, SAFE,
+                        EVSUserMessage(pid1, 0x10, SAFE,
                                        seqno_add(2, SEQNO_MAX/4 + 1), 0, SEQNO_MAX, vid, 0),
                         0, 0));
     fail_unless(seqno_eq(gap.low, 3) && seqno_eq(gap.high, 2));
@@ -236,13 +271,15 @@ START_TEST(test_input_map_basic)
 
     for (uint32_t i = 0; i < 3; i++)
         im.insert(EVSInputMapItem(pid1,
-                                  EVSUserMessage(pid1, SAFE, i, 0, SEQNO_MAX, vid, 0),
+                                  EVSUserMessage(pid1, 0x10,
+                                                 SAFE, i, 0, SEQNO_MAX, vid, 0),
                                   0, 0));
     fail_unless(seqno_eq(im.get_aru_seq(), SEQNO_MAX));
 
     for (uint32_t i = 0; i < 3; i++) {
         im.insert(EVSInputMapItem(pid2,
-                                  EVSUserMessage(pid2, SAFE, i, 0, SEQNO_MAX, vid, 0),
+                                  EVSUserMessage(pid2, 0x10, 
+                                                 SAFE, i, 0, SEQNO_MAX, vid, 0),
                                   0, 0));
         fail_unless(seqno_eq(im.get_aru_seq(), i));
     }
@@ -305,6 +342,7 @@ START_TEST(test_input_map_overwrap)
             im.insert(EVSInputMapItem(pids[j],
                                       EVSUserMessage(
                                           pids[j],
+                                          0x10,
                                           SAFE,
                                           seq, 0, aru_seq, vid, 0),
                                       0, 0));
@@ -360,6 +398,7 @@ START_TEST(test_input_map_random)
     for (uint32_t i = 0; i < SEQNO_MAX/4; ++i)
         msgs[i] = EVSUserMessage(
             pid,
+            0x10,
             SAFE,
             i,
             0,
@@ -1303,6 +1342,7 @@ public:
                         state == LEAVING2);
             LOG_DEBUG("regular message from " + um->get_source().to_string());
             recvd++;
+            fail_unless(um->get_user_type() == 0xab);
             if (um->get_source() == evs->get_uuid())
             {
                 UInt32 rseq(0xffffffff);
@@ -1370,7 +1410,8 @@ public:
                 throw FatalException("");
             }
             wb.prepend_hdr(buf, sizeof(buf));
-            int ret = pass_down(&wb, 0);
+            ProtoDownMeta dm(0xab);
+            int ret = pass_down(&wb, &dm);
             wb.rollback_hdr(sizeof(buf));
             if (ret != 0)
             {

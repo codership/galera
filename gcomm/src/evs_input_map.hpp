@@ -276,6 +276,7 @@ public:
              seq = seqno_next(seq)) {
             EVSInputMapItem tmp(pid, EVSUserMessage(
                                     pid,
+                                    0xff,
                                     DROP, 
                                     seq, 0, 0, ViewId(), 0), 0, 0);
             MLog::iterator i;
@@ -311,6 +312,7 @@ public:
     recover(const UUID& sa, const uint32_t seq) const {
         EVSInputMapItem tmp(sa, EVSUserMessage(
                                 sa,
+                                0xff,
                                 DROP, 
                                 seq, 0, 0, ViewId(), 0), 0, 0);
         MLog::iterator i;

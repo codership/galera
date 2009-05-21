@@ -155,10 +155,10 @@ public:
     }
     
     ~EVSProto() {
-        for (deque<WriteBuf*>::iterator i = output.begin(); i != output.end();
+        for (deque<pair<WriteBuf*, ProtoDownMeta> >::iterator i = output.begin(); i != output.end();
              ++i)
         {
-            delete *i;
+            delete i->first;
         }
         output.clear();
         delete install_message;
@@ -218,7 +218,8 @@ public:
     // Send window size
     uint32_t send_window;
     // Output message queue
-    deque<WriteBuf*> output;
+    deque<pair<WriteBuf*, ProtoDownMeta> > output;
+    
     uint32_t max_output_size;
 
 
@@ -257,7 +258,8 @@ public:
     }
     
     bool is_flow_control(const uint32_t seq, const uint32_t win) const;
-    int send_user(WriteBuf* wb, EVSSafetyPrefix sp, 
+    int send_user(WriteBuf* wb, const uint8_t,
+                  EVSSafetyPrefix sp, 
                   const uint32_t, 
                   const uint32_t, bool local = false);
     int send_user();
@@ -424,7 +426,7 @@ public:
                 if (p->output.empty())
                 {
                     WriteBuf wb(0, 0);
-                    p->send_user(&wb, DROP, p->send_window, SEQNO_MAX);
+                    p->send_user(&wb, 0xff, DROP, p->send_window, SEQNO_MAX);
                 }
                 else
                 {

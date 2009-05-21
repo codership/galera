@@ -59,6 +59,7 @@ EVSRange EVSInputMap::insert(const EVSInputMapItem& item)
                     item.get_sockaddr(),
                     EVSUserMessage(
                         item.get_evs_message().get_source(),
+                        0xff,
                         DROP,
                         i, 0, 
                         item.get_evs_message().get_aru_seq(),

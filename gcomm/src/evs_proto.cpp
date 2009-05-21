@@ -423,6 +423,7 @@ bool EVSProto::is_flow_control(const uint32_t seq, const uint32_t win) const
 }
 
 int EVSProto::send_user(WriteBuf* wb, 
+                        const uint8_t user_type,
                         const EVSSafetyPrefix sp, 
                         const uint32_t win,
                         const uint32_t up_to_seqno,
@@ -457,8 +458,13 @@ int EVSProto::send_user(WriteBuf* wb,
         flags = EVSMessage::F_MSG_MORE;
     }
     
-    EVSUserMessage msg(my_addr, sp, seq, seq_range & 0xffU, 
-                       input_map.get_aru_seq(), current_view.get_id(), 
+    EVSUserMessage msg(my_addr, 
+                       user_type,
+                       sp, 
+                       seq, 
+                       seq_range & 0xffU, 
+                       input_map.get_aru_seq(), 
+                       current_view.get_id(), 
                        flags);
     
     wb->prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
@@ -491,11 +497,12 @@ int EVSProto::send_user()
     if (output.empty())
         return 0;
     assert(get_state() == OPERATIONAL || get_state() == RECOVERY);
-    WriteBuf* wb = output.front();
+    pair<WriteBuf*, ProtoDownMeta> wb = output.front();
     int ret;
-    if ((ret = send_user(wb, SAFE, send_window, SEQNO_MAX)) == 0) {
+    if ((ret = send_user(wb.first, wb.second.get_user_type(), 
+                         SAFE, send_window, SEQNO_MAX)) == 0) {
         output.pop_front();
-        delete wb;
+        delete wb.first;
     }
     return ret;
 }
@@ -758,6 +765,7 @@ void EVSProto::resend(const UUID& gap_source, const EVSGap& gap)
             assert(msg.get_type() == EVSMessage::USER);
             assert(seqno_eq(msg.get_seq(), seq));
             EVSUserMessage new_msg(msg.get_source(), 
+                                   msg.get_user_type(),
                                    msg.get_safety_prefix(),
                                    msg.get_seq(), 
                                    msg.get_seq_range(),
@@ -899,18 +907,25 @@ int EVSProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
         LOG_WARN("user message in state " + to_string(get_state()));
         return ENOTCONN;
     }
+
+    if (dm && dm->get_user_type() == 0xff)
+    {
+        return EINVAL;
+    }
+    
     int ret = 0;
     
     if (output.empty()) 
     {
-        int err = send_user(wb, SAFE, send_window/2, SEQNO_MAX);
+        int err = send_user(wb, dm ? dm->get_user_type() : 0xff,
+                            SAFE, send_window/2, SEQNO_MAX);
         switch (err) 
         {
         case EAGAIN:
         {
             LOG_DEBUG("EVSProto::handle_down(): flow control");
             WriteBuf* priv_wb = wb->copy();
-            output.push_back(priv_wb);
+            output.push_back(make_pair(priv_wb, dm ? ProtoDownMeta(*dm) : ProtoDownMeta(0xff)));
             // Fall through
         }
         case 0:
@@ -924,7 +939,7 @@ int EVSProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
     {
         LOG_DEBUG("EVSProto::handle_down(): queued message");
         WriteBuf* priv_wb = wb->copy();
-        output.push_back(priv_wb);
+        output.push_back(make_pair(priv_wb, dm ? ProtoDownMeta(*dm) : ProtoDownMeta(0xff)));
     } 
     else 
     {
@@ -1082,7 +1097,7 @@ void EVSProto::deliver()
         validate_reg_msg(i->get_evs_message());
         if (i->get_evs_message().get_safety_prefix() != DROP)
         {
-            ProtoUpMeta um(i->get_sockaddr());
+            ProtoUpMeta um(i->get_sockaddr(), i->get_evs_message().get_user_type());
             pass_up(i->get_readbuf(), i->get_payload_offset(), &um);
         }
         input_map.erase(i);
@@ -1095,7 +1110,7 @@ void EVSProto::deliver()
         i_next = i;
         ++i_next;
         validate_reg_msg(i->get_evs_message());
-        ProtoUpMeta um(i->get_sockaddr());
+        ProtoUpMeta um(i->get_sockaddr(), i->get_evs_message().get_user_type());
         pass_up(i->get_readbuf(), i->get_payload_offset(), &um);
         input_map.erase(i);
     }
@@ -1106,7 +1121,7 @@ void EVSProto::deliver()
         i_next = i;
         ++i_next;
         validate_reg_msg(i->get_evs_message());
-        ProtoUpMeta um(i->get_sockaddr());
+        ProtoUpMeta um(i->get_sockaddr(), i->get_evs_message().get_user_type());
         pass_up(i->get_readbuf(), i->get_payload_offset(), &um);
         input_map.erase(i);
     }
@@ -1150,7 +1165,7 @@ void EVSProto::deliver_trans()
         validate_trans_msg(i->get_evs_message());
         if (i->get_evs_message().get_safety_prefix() != DROP)
         {
-            ProtoUpMeta um(i->get_sockaddr());
+            ProtoUpMeta um(i->get_sockaddr(), i->get_evs_message().get_user_type());
             pass_up(i->get_readbuf(), i->get_payload_offset(), &um);
         }
         input_map.erase(i);
@@ -1163,7 +1178,7 @@ void EVSProto::deliver_trans()
         validate_trans_msg(i->get_evs_message());
         if (i->get_evs_message().get_safety_prefix() != DROP)
         {
-            ProtoUpMeta um(i->get_sockaddr());
+            ProtoUpMeta um(i->get_sockaddr(), i->get_evs_message().get_user_type());
             pass_up(i->get_readbuf(), i->get_payload_offset(), &um);
         }
         input_map.erase(i);
@@ -1373,7 +1388,7 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
         LOG_DEBUG("sending dummy: " + UInt32(last_sent).to_string() + " -> " 
                   + UInt32(range.get_high()).to_string());
         WriteBuf wb(0, 0);
-        send_user(&wb, DROP, send_window, range.get_high());
+        send_user(&wb, 0xff, DROP, send_window, range.get_high());
     } else if (((output.empty() && 
                  (seqno_eq(input_map.get_aru_seq(), SEQNO_MAX) ||
                   !seqno_eq(input_map.get_aru_seq(), prev_aru))) &&
@@ -1614,7 +1629,7 @@ bool EVSProto::states_compare(const EVSMessage& msg)
          seqno_lt(last_sent, high_seq))) {
         LOG_DEBUG("completing seqno to " + UInt32(high_seq).to_string());
         WriteBuf wb(0, 0);
-        send_user(&wb, DROP, send_window, high_seq);
+        send_user(&wb, 0xff, DROP, send_window, high_seq);
     }
     
     
@@ -1776,13 +1791,15 @@ void EVSProto::handle_leave(const EVSMessage& msg, const UUID& source)
         /* Move all pending messages from output to input map */
         while (output.empty() == false)
         {
-            WriteBuf* wb = output.front();
-            if (send_user(wb, SAFE, 0, SEQNO_MAX, true) != 0)
+            pair<WriteBuf*, ProtoDownMeta> wb = output.front();
+            if (send_user(wb.first, 
+                          wb.second.get_user_type(), 
+                          SAFE, 0, SEQNO_MAX, true) != 0)
             {
                 throw FatalException("");
             }
             output.pop_front();
-            delete wb;
+            delete wb.first;
         }
         /* Deliver all possible messages in reg view */
         deliver();
