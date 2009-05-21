@@ -246,8 +246,8 @@ public:
 
 static inline void dump(const ReadBuf* rb)
 {
-    fprintf(stderr, "rb buf ptr %p, len %lu\n\n",
-            rb->get_buf(), rb->get_len());
+//    fprintf(stderr, "rb buf ptr %p, len %lu\n\n",
+//            rb->get_buf(), rb->get_len());
     fprintf(stderr, "*******************dump********************\n\n");
     for (size_t i = 0; i < rb->get_len(); ++i)
     {
