@@ -34,6 +34,12 @@ public:
 
     size_t get_max_msg_size() const;
 
+
+    EVSProto* get_proto() const
+    {
+        return proto;
+    }
+
 };
 
 END_GCOMM_NAMESPACE

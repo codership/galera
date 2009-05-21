@@ -120,6 +120,13 @@ void EVS::close()
         int ret = event_loop->poll(500);
         LOG_DEBUG(string("poll returned ") + Int(ret).to_string());
     } while (proto->get_state() == EVSProto::LEAVING);
+
+    int cnt = 0;
+    do
+    {
+        event_loop->poll(50);
+    } while (cnt++ < 50);
+    
     tp->close();
     delete tp;
     tp = 0;

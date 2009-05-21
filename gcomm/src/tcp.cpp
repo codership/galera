@@ -147,7 +147,8 @@ void TCP::connect()
 	event_loop->insert(fd, this);
 	event_loop->set(fd, Event::E_IN);
     }
-    if (::connect(fd, &sa, sa_size) == -1) {
+    if (::connect(fd, &sa, sa_size) == -1) 
+    {
 	if (errno != EINPROGRESS) {
             LOG_ERROR(string("connect(): ") + ::strerror(errno));
 	    throw RuntimeException(::strerror(errno));

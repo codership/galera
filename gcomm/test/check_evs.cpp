@@ -5,6 +5,7 @@
 
 
 #include "evs_proto.hpp"
+#include "evs.hpp"
 #include "gcomm/pseudofd.hpp"
 
 #include <vector>
@@ -653,6 +654,10 @@ struct Inst : public Toplay {
     
     void send(WriteBuf* wb)
     {
+        if (ep->get_state() != EVSProto::OPERATIONAL)
+        {
+            return;
+        }
         byte_t buf[4];
         if (make_int(sent_seq + 1).write(buf, sizeof(buf), 0) == 0)
         {
@@ -1340,6 +1345,11 @@ public:
                 fail_unless(um->get_view()->get_members().length() == 0);
                 state = CLOSED;
             }
+            else if (um->get_view()->get_type() == View::V_REG)
+            {
+                EVSProto* p = ((EVS*)evs)->get_proto();
+                fail_unless(p->get_state() == EVSProto::OPERATIONAL);
+            }
             LOG_INFO("received in prev view: " 
                      + UInt64(recvd).to_string());
             recvd = 0;
@@ -1364,7 +1374,7 @@ public:
             wb.rollback_hdr(sizeof(buf));
             if (ret != 0)
             {
-                LOG_WARN(string("return: ") + strerror(ret));
+                LOG_INFO(string("return: ") + strerror(ret));
             }
             else
             {

@@ -39,10 +39,13 @@ void EVSProto::check_inactive()
             has_inactive = true;
         }
     }
-    if (has_inactive == true)
+    if (has_inactive == true && get_state() == OPERATIONAL)
     {
-        SHIFT_TO(RECOVERY);
-        send_join();
+        SHIFT_TO_P(this, RECOVERY, true);
+        if (is_consensus() && is_representative(my_addr))
+        {
+            send_install();
+        }
     }
 }
 
@@ -233,8 +236,9 @@ bool EVSProto::is_consensus() const
         LOG_DEBUG("is_consensus(): no own join message");
         return false;
     }
-    if (is_consistent(*my_jm) == false) {
-        LOG_DEBUG("is_consensus(): own join message is not consistent");
+    if (is_consistent(*my_jm) == false) 
+    {
+        LOG_INFO("is_consensus(): own join message is not consistent");
         return false;
     }
     
@@ -294,22 +298,23 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
             return false;
         }
         
-        for (std::map<const UUID, EVSInstance>::const_iterator i =
-                 known.begin();
-             i != known.end(); ++i) {
+        for (InstMap::const_iterator i = known.begin(); i != known.end(); ++i) 
+        {
             if (i->second.operational == true && 
                 i->second.trusted == true &&
                 i->second.join_message && 
                 i->second.join_message->get_source_view() == current_view.get_id())
-                local_insts.insert(std::pair<const UUID, EVSRange>(
-                                       i->first, input_map.get_sa_gap(i->first)));
+                local_insts.insert(make_pair(i->first, 
+                                             input_map.get_sa_gap(i->first)));
         }
         const std::map<UUID, EVSMessage::Instance>* jm_instances = 
             jm.get_instances();
         for (std::map<UUID, EVSMessage::Instance>::const_iterator 
-                 i = jm_instances->begin(); i != jm_instances->end(); ++i) {
+                 i = jm_instances->begin(); i != jm_instances->end(); ++i) 
+        {
             if (i->second.get_operational() == true && 
                 i->second.get_trusted() == true &&
+                i->second.get_left() == false &&
                 i->second.get_view_id() == current_view.get_id()) {
                 jm_insts.insert(
                     std::pair<const UUID, EVSRange>(
@@ -319,7 +324,14 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
         }
         if (jm_insts != local_insts)
         {
-            LOG_DEBUG(self_string() + " not consistent: join message instances");
+            LOG_DEBUG(self_string() 
+                      + " not consistent: join message instances");
+#ifdef STRICT_JOIN_CHECK
+            if (jm.get_source() == my_addr)
+            {
+                throw FatalException("");
+            }
+#endif
             return false;
         }
         jm_insts.clear();
@@ -416,13 +428,19 @@ int EVSProto::send_user(WriteBuf* wb,
                         const uint32_t up_to_seqno,
                         bool local)
 {
-    assert(get_state() == LEAVING || get_state() == RECOVERY || get_state() == OPERATIONAL);
+    assert(get_state() == LEAVING || 
+           get_state() == RECOVERY || 
+           get_state() == OPERATIONAL);
     int ret;
     uint32_t seq = seqno_eq(last_sent, SEQNO_MAX) ? 0 : seqno_next(last_sent);
     
-    if (local == false && is_flow_control(seq, win))
+    // Allow flow control only in OPERATIONAL state to make 
+    // RECOVERY state output flush possible.
+    if (local == false && get_state() == OPERATIONAL && 
+        is_flow_control(seq, win))
+    {
         return EAGAIN;
-    
+    }
     uint32_t seq_range = seqno_eq(up_to_seqno, SEQNO_MAX) ? 0 :
         seqno_dec(up_to_seqno, seq);
     assert(seq_range < 0x100U);
@@ -452,7 +470,8 @@ int EVSProto::send_user(WriteBuf* wb,
     {
         ret = 0;
     }
-    if (ret == 0) {
+    if (ret == 0) 
+    {
         last_sent = last_msg_seq;
         
         ReadBuf* rb = wb->to_readbuf();
@@ -471,7 +490,7 @@ int EVSProto::send_user()
     
     if (output.empty())
         return 0;
-    assert(get_state() == OPERATIONAL);
+    assert(get_state() == OPERATIONAL || get_state() == RECOVERY);
     WriteBuf* wb = output.front();
     int ret;
     if ((ret = send_user(wb, SAFE, send_window, SEQNO_MAX)) == 0) {
@@ -541,6 +560,12 @@ EVSJoinMessage EVSProto::create_join() const
                         (input_map.contains_sa(pid) ? 
                          input_map.get_sa_gap(pid) : EVSRange()));
     }
+#ifdef STRICT_JOIN_CHECK
+    if (is_consistent(jm) == false)
+    {
+        throw FatalException("");
+    }
+#endif
     return jm;
 }
 
@@ -585,6 +610,7 @@ void EVSProto::set_leave(const EVSMessage& lm, const UUID& source)
 
 void EVSProto::send_join(bool handle)
 {
+    assert(output.empty());
     LOG_DEBUG("send join at " + self_string());
     EVSJoinMessage jm = create_join();
     size_t bufsize = jm.size();
@@ -630,6 +656,19 @@ void EVSProto::send_leave()
                  + strerror(err));
     }
     delete[] buf;
+#if 0
+    if (el)
+    {
+        Time start(Time::now());
+        do
+        {
+            if (el->poll(50) < 0)
+                break;
+        }
+        while (!seqno_eq(input_map.get_safe_seq(), seq) &&
+               start + Time(1, 0) > Time::now());
+    }
+#endif // 0
     handle_leave(lm, my_addr);
 }
 
@@ -711,7 +750,6 @@ void EVSProto::resend(const UUID& gap_source, const EVSGap& gap)
             ii->second.trusted = false;
             if (get_state() != LEAVING) {
                 SHIFT_TO(RECOVERY);
-                send_join();
             }
             return;
         } else {
@@ -849,36 +887,47 @@ void EVSProto::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
 int EVSProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 {
     Critical crit(mon);
-
+    
     LOG_TRACE("user message in state " + to_string(get_state()));
-
-    if (get_state() != RECOVERY && get_state() != OPERATIONAL)
+    
+    if (get_state() == RECOVERY)
     {
-        // LOG_ERROR("user message in state " + to_string(get_state()));
+        return EAGAIN;
+    }
+    else if (get_state() != OPERATIONAL)
+    {
+        LOG_WARN("user message in state " + to_string(get_state()));
         return ENOTCONN;
     }
     int ret = 0;
     
-    if (output.empty() && get_state() == OPERATIONAL) {
+    if (output.empty()) 
+    {
         int err = send_user(wb, SAFE, send_window/2, SEQNO_MAX);
-        switch (err) {
-        case EAGAIN: {
+        switch (err) 
+        {
+        case EAGAIN:
+        {
             LOG_DEBUG("EVSProto::handle_down(): flow control");
             WriteBuf* priv_wb = wb->copy();
             output.push_back(priv_wb);
-        }
             // Fall through
+        }
         case 0:
             break;
         default:
-            LOG_ERROR(std::string("Send error: ") + Int(err).to_string());
+            LOG_ERROR("Send error: " + Int(err).to_string());
             ret = err;
         }
-    } else if (output.size() < max_output_size) {
+    } 
+    else if (output.size() < max_output_size)
+    {
         LOG_DEBUG("EVSProto::handle_down(): queued message");
         WriteBuf* priv_wb = wb->copy();
         output.push_back(priv_wb);
-    } else {
+    } 
+    else 
+    {
         LOG_WARN("Output queue full");
         ret = EAGAIN;
     }
@@ -889,7 +938,7 @@ int EVSProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 // State handler
 /////////////////////////////////////////////////////////////////////////////
 
-void EVSProto::shift_to(const State s)
+void EVSProto::shift_to(const State s, const bool send_j)
 {
     static const bool allowed[STATE_MAX][STATE_MAX] = {
     // CLOSED
@@ -911,9 +960,11 @@ void EVSProto::shift_to(const State s)
         throw FatalException("invalid state transition");
     }
     
-    LOG_DEBUG(self_string() + ": state change: " + 
-             to_string(state) + " -> " + to_string(s));
-    
+    if (get_state() != s)
+    {
+        LOG_INFO(self_string() + ": state change: " + 
+                 to_string(state) + " -> " + to_string(s));
+    }
     switch (s) {
     case CLOSED:
         stop_inactivity_timer();
@@ -934,21 +985,29 @@ void EVSProto::shift_to(const State s)
         state = LEAVING;
         break;
     case RECOVERY:
+    {
         // tp->set_loopback(true);
         stop_resend_timer();
         setall_installed(false);
         delete install_message;
         install_message = 0;
         installing = false;
-        if (state == RECOVERY && is_set_consensus_timer())
+        if (is_set_consensus_timer())
         {
             unset_consensus_timer();
         }
         set_consensus_timer();
+        if (output.empty() && send_j == true)
+        {
+            send_join(false);
+
+        }
         state = RECOVERY;
         break;
+    }
     case OPERATIONAL:
         // tp->set_loopback(false);
+        assert(output.empty() == true);
         assert(is_consensus() == true);
         assert(is_all_installed() == true);
         unset_consensus_timer();
@@ -976,10 +1035,13 @@ void EVSProto::shift_to(const State s)
         cleanup_unoperational();
         cleanup_views();
         LOG_DEBUG("new view: " + current_view.to_string());
-        while (output.empty() == false)
-            if (send_user())
-                break;
+        /*
+         * while (output.empty() == false)
+         * if (send_user())
+         * break;
+         */
         start_resend_timer();
+        assert(get_state() == OPERATIONAL);
         break;
     default:
         throw FatalException("Invalid state");
@@ -1169,7 +1231,6 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
         i->second.operational = true;
         if (state == JOINING || state == RECOVERY || state == OPERATIONAL) {
             SHIFT_TO(RECOVERY);
-            send_join();
         }
         return;
     } else if (state == JOINING || state == CLOSED) {
@@ -1197,7 +1258,6 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
             LOG_DEBUG("unoperational source");
             i->second.operational = true;
             SHIFT_TO(RECOVERY);
-            send_join();
             return;
         } else if (i->second.installed == false) {
             if (install_message && 
@@ -1220,7 +1280,6 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
                     SHIFT_TO(OPERATIONAL);
                 } else {
                     SHIFT_TO(RECOVERY);
-                    send_join();
                     return;
                 }
             } else {
@@ -1232,13 +1291,11 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
                 // i->second.trusted = false;
                 // Note: setting other instance to non-trust here is too harsh
                 // shift_to(RECOVERY);
-                // send_join();
                 return;
             }
         } else {
             // i->second.trusted = false;
             // SHIFT_TO(RECOVERY);
-            // send_join();
             LOG_WARN("me: " 
                      + self_string()
                      + " unknown message: "
@@ -1327,9 +1384,15 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
     }
     
     deliver();
-    while (get_state() == OPERATIONAL && output.empty() == false)
+    while (output.empty() == false)
+    {
         if (send_user())
             break;
+    }
+    if (get_state() == RECOVERY && output.empty())
+    {
+        send_join();
+    }
 }
 
 void EVSProto::handle_delegate(const EVSMessage& msg, const UUID& source,
@@ -1361,7 +1424,6 @@ void EVSProto::handle_gap(const EVSMessage& msg, const UUID& source)
         i->second.operational = true;
         if (state == JOINING || state == RECOVERY || state == OPERATIONAL) {
             SHIFT_TO(RECOVERY);
-            send_join();
         }
         return;
     } else if (state == JOINING || state == CLOSED) {	
@@ -1385,7 +1447,6 @@ void EVSProto::handle_gap(const EVSMessage& msg, const UUID& source)
             // This is probably partition merge, see if it works out
             i->second.operational = true;
             SHIFT_TO(RECOVERY);
-            send_join();
         } else if (i->second.installed == false) {
             // Probably caused by network partitioning during recovery
             // state, this will most probably lead to view 
@@ -1395,11 +1456,9 @@ void EVSProto::handle_gap(const EVSMessage& msg, const UUID& source)
             // LOG_WARN("Setting source status to no-trust");
             // i->second.trusted = false;
             // SHIFT_TO(RECOVERY);
-            // send_join();
         } else {
             i->second.trusted = false;
             SHIFT_TO(RECOVERY);
-            send_join();
         }
         return;
     } else if (i->second.trusted == false) {
@@ -1416,30 +1475,30 @@ void EVSProto::handle_gap(const EVSMessage& msg, const UUID& source)
     
     uint32_t prev_safe = input_map.get_safe_seq();
     // Update safe seq for source
-    if (!seqno_eq(msg.get_aru_seq(), SEQNO_MAX)) {
+    if (!seqno_eq(msg.get_aru_seq(), SEQNO_MAX))
+    {
         input_map.set_safe(source, msg.get_aru_seq());
-        if (!seqno_eq(input_map.get_safe_seq(), prev_safe)) {
+        if (!seqno_eq(input_map.get_safe_seq(), prev_safe)) 
+        {
             LOG_DEBUG("handle gap " + self_string() +  " safe seq " 
                       + UInt32(input_map.get_safe_seq()).to_string() 
                       + " aru seq " 
                       + UInt32(input_map.get_aru_seq()).to_string());
         }
-        // All instances have received leave message
-
     }
     
-    if (get_state() == RECOVERY && 
-        !seqno_eq(prev_safe, input_map.get_safe_seq()))
-        send_join();
-    
+
     // Scan through gap list and resend or recover messages if appropriate.
     EVSGap gap = msg.get_gap();
     LOG_DEBUG("gap source " + gap.get_source().to_string());
     if (gap.get_source() == my_addr)
+    {
         resend(i->first, gap);
+    }
     else if (get_state() == RECOVERY && !seqno_eq(gap.get_high(), SEQNO_MAX))
+    {
         recover(gap);
-
+    }
 
     
     
@@ -1448,7 +1507,8 @@ void EVSProto::handle_gap(const EVSMessage& msg, const UUID& source)
     EVSRange source_gap(input_map.get_sa_gap(source));
     if (!seqno_eq(msg.get_seq(), SEQNO_MAX) && 
         (seqno_eq(source_gap.get_low(), SEQNO_MAX) ||
-         !seqno_gt(source_gap.get_low(), msg.get_seq()))) {
+         !seqno_gt(source_gap.get_low(), msg.get_seq()))) 
+    {
         // TODO: Sending gaps here causes excessive flooding, need to 
         // investigate if gaps can be sent only in send_user
         // LOG_DEBUG("requesting at " + self_string() + " from " + source.to_string() + " " + EVSRange(source_gap.get_low(), msg.get_seq()).to_string() + " due to gap message");
@@ -1459,9 +1519,17 @@ void EVSProto::handle_gap(const EVSMessage& msg, const UUID& source)
     // Deliver messages 
     deliver();
     while (get_state() == OPERATIONAL && output.empty() == false)
+    {
         if (send_user())
             break;
-
+    }
+    
+    if (get_state() == RECOVERY && 
+        !seqno_eq(prev_safe, input_map.get_safe_seq()) &&
+        output.empty() == true)
+    {
+        send_join();
+    }
 }
 
 
@@ -1571,7 +1639,8 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
     }
     
     std::map<const UUID, EVSInstance>::iterator i = known.find(source);
-    if (i == known.end()) {
+    if (i == known.end()) 
+    {
         if (source == my_addr)
         {
             throw FatalException("");
@@ -1587,7 +1656,6 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
         if (get_state() == JOINING || get_state() == RECOVERY || 
             get_state() == OPERATIONAL) {
             SHIFT_TO(RECOVERY);
-            send_join();
         }
         return;
     } else if (i->second.trusted == false) {
@@ -1612,16 +1680,18 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
     i->second.set_name(msg.get_source_name());
     
     bool send_join_p = false;
-    if (state == JOINING || state == OPERATIONAL || install_message) {
+    if (get_state() == JOINING || get_state() == OPERATIONAL || 
+        install_message) 
+    {
         send_join_p = true;
-        SHIFT_TO(RECOVERY);
+        SHIFT_TO2(RECOVERY, false);
     }
     
     assert(i->second.trusted == true && i->second.installed == false);
     
-    
     // Instance previously declared unoperational seems to be operational now
-    if (i->second.operational == false) {
+    if (i->second.operational == false) 
+    {
         i->second.operational = true;
         LOG_DEBUG("unop -> op");
         send_join_p = true;
@@ -1677,11 +1747,7 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
             send_join_p = true;
     }
 
-    if (source == my_addr)
-    {
-        EVSJoinMessage jm = create_join();
-        set_join(jm, my_addr);
-    }
+    set_join(create_join(), my_addr);
     
     if (is_consensus())
     { 
@@ -1691,7 +1757,7 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
             send_install();
         }
     }    
-    else if (send_join_p)
+    else if (send_join_p && output.empty() == true)
     {
         LOG_DEBUG("send join");
         send_join(false);
@@ -1701,7 +1767,7 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
 
 void EVSProto::handle_leave(const EVSMessage& msg, const UUID& source)
 {
-    LOG_DEBUG("leave message at " + self_string() + " source: " +
+    LOG_INFO("leave message at " + self_string() + " source: " +
               msg.get_source().to_string() + " source view: " + 
               msg.get_source_view().to_string());
     set_leave(msg, source);
@@ -1744,11 +1810,13 @@ void EVSProto::handle_leave(const EVSMessage& msg, const UUID& source)
             LOG_WARN("instance not found");
             return;
         }
-        
         ii->second.operational = false;
         ii->second.trusted = false;
-        SHIFT_TO(RECOVERY);
-        send_join();
+        SHIFT_TO_P(this, RECOVERY, true);
+        if (is_consensus() && is_representative(my_addr))
+        {
+            send_install();
+        }
     }
 
 }
@@ -1774,7 +1842,6 @@ void EVSProto::handle_install(const EVSMessage& msg, const UUID& source)
         i = iret.first;
         if (state == RECOVERY || state == OPERATIONAL) {
             SHIFT_TO(RECOVERY);
-            send_join();
         }
         return;	
     } else if (state == JOINING || state == CLOSED) {
@@ -1787,29 +1854,24 @@ void EVSProto::handle_install(const EVSMessage& msg, const UUID& source)
         LOG_DEBUG("setting other as operational");
         i->second.operational = true;
         SHIFT_TO(RECOVERY);
-        send_join();
         return;
     } else if (install_message || i->second.installed == true) {
         LOG_DEBUG("woot?");
         SHIFT_TO(RECOVERY);
-        send_join();
         return;
     } else if (is_representative(source) == false) {
         LOG_DEBUG("source is not supposed to be representative");
         SHIFT_TO(RECOVERY);
-        send_join();
         return;
     } else if (is_consensus() == false) {
         LOG_DEBUG("is not consensus");
         SHIFT_TO(RECOVERY);
-        send_join();
         return;
     }
     else if (msg_from_previous_view(previous_views, msg))
     {
         LOG_DEBUG("install message from previous view");
         SHIFT_TO(RECOVERY);
-        send_join();
         return;
     }
     

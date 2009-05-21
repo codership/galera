@@ -833,12 +833,12 @@ int VSProto::send_leave()
         throw FatalException("");
     }
     WriteBuf wb(buf, lm.size());
-
+    
     
     int err = pass_down(&wb, 0);
     if (err != 0)
     {
-        LOG_WARN(string("could not send leave message ") + ::strerror(errno));
+        LOG_WARN(string("could not send leave message ") + ::strerror(err));
     }
     delete[] buf;
     return err;
@@ -931,22 +931,32 @@ void VS::close()
     LOG_INFO("VS Proto leaving");
     proto->shift_to(VSProto::LEAVING);
 
-    if (proto->send_leave() == 0)
+    Time start(Time::now());
+    
+    while (start + Time(5, 0) > Time::now() &&
+           proto->send_leave() != 0)
     {
-        do
+        int cnt = 0;
+        while (event_loop->poll(50) > 0 && cnt++ < 30)
         {
-            int ret = event_loop->poll(50);
-            if (ret < 0)
-            {
-                LOG_WARN("poll returned: " + Int(ret).to_string());
-            }
+            
         }
-        while (proto->get_state() == VSProto::LEAVING);        
     }
+
+    do
+    {
+        int ret = event_loop->poll(50);
+        if (ret < 0)
+        {
+            LOG_WARN("poll returned: " + Int(ret).to_string());
+        }
+    }
+    while (proto->get_state() == VSProto::LEAVING);        
+
     
     // Give EVS some time to deliver VS LEAVE messages on 
     // other nodes before triggering EVS VIEW change.
-    Time start(Time::now());
+    start = Time::now();
     do
     {
         int ret = event_loop->poll(50);

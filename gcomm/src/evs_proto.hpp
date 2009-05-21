@@ -91,18 +91,25 @@ struct EVSInstance {
 };
 
 
-#define SHIFT_TO(_s) do                                         \
-    {                                                           \
+#define SHIFT_TO(_s) do                                                 \
+    {                                                                   \
         LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + Int(__LINE__).to_string()); \
-        shift_to(_s);                                           \
-    }                                                           \
+        shift_to(_s);                                                   \
+    }                                                                   \
     while (0)
 
-#define SHIFT_TO_P(_p, _s) do                                     \
-    {                                                           \
+#define SHIFT_TO2(_s, _sjb) do                                         \
+    {                                                                   \
         LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + Int(__LINE__).to_string()); \
-        (_p)->shift_to(_s);                                            \
-    }                                                           \
+        shift_to(_s, _sjb);                                       \
+    }                                                                   \
+    while (0)
+
+#define SHIFT_TO_P(_p, _s, _sjb) do                                    \
+    {                                                                   \
+        LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + Int(__LINE__).to_string()); \
+        (_p)->shift_to(_s, _sjb);                                      \
+    }                                                                   \
     while (0)
 
 
@@ -112,17 +119,19 @@ class EVSProto : public Protolay
 public:
     Monitor* mon;
     Transport* tp;
-    EVSProto(EventLoop* poll_, Transport* t, const UUID& my_addr_, 
+    EventLoop* el;
+    EVSProto(EventLoop* el_, Transport* t, const UUID& my_addr_, 
              const string& name, Monitor* mon_) : 
         mon(mon_),
         tp(t),
+        el(el_),
         my_addr(my_addr_), 
         my_name(name),
         inactive_timeout(Time(5, 0)),
         inactive_check_period(Time(1, 0)),
         consensus_timeout(Time(1, 0)),
         resend_period(Time(1, 0)),
-        timer(poll_),
+        timer(el_),
         current_view(View::V_TRANS, ViewId(my_addr, 0)),
         install_message(0),
         installing(false),
@@ -255,11 +264,7 @@ public:
     int send_delegate(const UUID&, WriteBuf*);
     void send_gap(const UUID&, const ViewId&, const EVSRange&);
     EVSJoinMessage create_join() const;
-    void send_join(bool);
-    void send_join()
-    {
-        send_join(true);
-    }
+    void send_join(bool tval = true);
     void set_join(const EVSMessage&, const UUID&);
     void set_leave(const EVSMessage&, const UUID&);
     void send_leave();
@@ -267,7 +272,7 @@ public:
     
     void resend(const UUID&, const EVSGap&);
     void recover(const EVSGap&);
-
+    
     void check_inactive();
     void cleanup_unoperational();
     void cleanup_views();
@@ -297,7 +302,7 @@ public:
     bool states_compare(const EVSMessage& );
     
     
-    void shift_to(const State);
+    void shift_to(const State, const bool send_j = true);
     
     
     // Message handlers
@@ -379,11 +384,15 @@ public:
         void handle()
         {
             Critical crit(p->mon);
-            LOG_DEBUG("CONSENSUS TIMER");
+
             if (p->get_state() == RECOVERY)
             {
-                SHIFT_TO_P(p, RECOVERY);
-                p->send_join();
+                LOG_WARN("CONSENSUS TIMER");
+                SHIFT_TO_P(p, RECOVERY, true);
+                if (p->is_consensus() && p->is_representative(p->my_addr))
+                {
+                    p->send_install();
+                }
             }
             else
             {
