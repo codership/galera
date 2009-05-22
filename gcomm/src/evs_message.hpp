@@ -351,6 +351,11 @@ public:
 	return seq_range;
     }
 
+    void set_aru_seq(const uint32_t aru_seq)
+    {
+        this->aru_seq = aru_seq;
+    }
+
     uint32_t get_aru_seq() const {
 	return aru_seq;
     }

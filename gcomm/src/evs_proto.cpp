@@ -466,8 +466,21 @@ int EVSProto::send_user(WriteBuf* wb,
                        input_map.get_aru_seq(), 
                        current_view.get_id(), 
                        flags);
-    
     wb->prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
+
+    // Insert first to input map to determine correct aru seq
+    ReadBuf* rb = wb->to_readbuf();
+    EVSRange range = input_map.insert(EVSInputMapItem(my_addr, msg, rb, 0));
+    last_sent = last_msg_seq;
+    assert(seqno_eq(range.get_high(), last_sent));
+    input_map.set_safe(my_addr, input_map.get_aru_seq());
+    rb->release();
+
+    // Rewrite message hdr to include correct aru
+    msg.set_aru_seq(input_map.get_aru_seq());
+    wb->rollback_hdr(msg.get_hdrlen());
+    wb->prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
+    
     if (local == false)
     {
         ret = pass_down(wb, 0); 
@@ -475,16 +488,6 @@ int EVSProto::send_user(WriteBuf* wb,
     else
     {
         ret = 0;
-    }
-    if (ret == 0) 
-    {
-        last_sent = last_msg_seq;
-        
-        ReadBuf* rb = wb->to_readbuf();
-        EVSRange range = input_map.insert(EVSInputMapItem(my_addr, msg, rb, 0));
-        assert(seqno_eq(range.get_high(), last_sent));
-        input_map.set_safe(my_addr, input_map.get_aru_seq());
-        rb->release();
     }
     wb->rollback_hdr(msg.get_hdrlen());
     deliver();
@@ -1328,9 +1331,9 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
            i->second.operational == true &&
            (i->second.installed == true || get_state() == RECOVERY) &&
            msg.get_source_view() == current_view.get_id());
-
-
-
+    
+    
+    
     const uint32_t prev_aru = input_map.get_aru_seq();
     const uint32_t prev_safe = input_map.get_safe_seq();
     const EVSRange range(input_map.insert(EVSInputMapItem(source, msg, rb, roff)));
@@ -1340,7 +1343,7 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
         i->second.tstamp = Time::now();
     }
     i->second.prev_range = range;
-
+    
     if (!seqno_eq(input_map.get_safe_seq(), prev_safe))
     {
         LOG_DEBUG(self_string() + " safe seq " 
@@ -1361,20 +1364,16 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
     //   and message loss is infrequent)
     if ((seqno_eq(range.get_low(), SEQNO_MAX) ||
          seqno_gt(range.get_high(), range.get_low())) &&
-        !(msg.get_flags() & EVSMessage::F_RESEND)) {
-        LOG_DEBUG("requesting at " + self_string() + " from " + source.to_string() + " " + range.to_string() + " due to input map gap, aru " + UInt32(input_map.get_aru_seq()).to_string());
-
-#if 0
-        std::list<EVSRange> gap_list = input_map.get_gap_list(source);
-        for (std::list<EVSRange>::iterator gi = gap_list.begin();
-             gi != gap_list.end(); ++gi) {
-            LOG_DEBUG(gi->to_string());
-            send_gap(source, current_view.get_id(), *gi);
-        }
-#else
+        !(msg.get_flags() & EVSMessage::F_RESEND)) 
+    {
+        LOG_DEBUG("requesting at " 
+                  + self_string() 
+                  + " from " 
+                  + source.to_string() 
+                  + " " + range.to_string() 
+                  + " due to input map gap, aru " 
+                  + UInt32(input_map.get_aru_seq()).to_string());
         send_gap(source, current_view.get_id(), range);
-#endif
-
     }
     
     if (!(i->first == my_addr) && 
@@ -1382,17 +1381,21 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
          get_state() == RECOVERY) && 
         /* !seqno_eq(range.get_high(), SEQNO_MAX) && */
         (seqno_eq(last_sent, SEQNO_MAX) || 
-         seqno_lt(last_sent, range.get_high()))) {
+         seqno_lt(last_sent, range.get_high()))) 
+    {
         // Message not originated from this instance, output queue is empty
         // and last_sent seqno should be advanced
         LOG_DEBUG("sending dummy: " + UInt32(last_sent).to_string() + " -> " 
                   + UInt32(range.get_high()).to_string());
         WriteBuf wb(0, 0);
         send_user(&wb, 0xff, DROP, send_window, range.get_high());
-    } else if (((output.empty() && 
-                 (seqno_eq(input_map.get_aru_seq(), SEQNO_MAX) ||
-                  !seqno_eq(input_map.get_aru_seq(), prev_aru))) &&
-                !(msg.get_flags() & EVSMessage::F_RESEND)) || get_state() == LEAVING) {
+    } 
+    else if (((output.empty() && 
+               (seqno_eq(input_map.get_aru_seq(), SEQNO_MAX) ||
+                !seqno_eq(input_map.get_aru_seq(), prev_aru))) &&
+              !(msg.get_flags() & EVSMessage::F_RESEND)) || 
+             get_state() == LEAVING) 
+    {
         // Output queue empty and aru changed, send gap to inform others
         LOG_DEBUG("sending gap");
         send_gap(source, current_view.get_id(), EVSRange(SEQNO_MAX, SEQNO_MAX));

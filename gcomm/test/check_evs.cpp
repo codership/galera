@@ -437,24 +437,48 @@ END_TEST
 
 class DummyUser : public Toplay
 {
+    uint32_t deliv_seq;
 public:
-    DummyUser()
+    DummyUser() :
+        deliv_seq(SEQNO_MAX)
     {
         
     }
 
-    void handle_up(const int cid, const ReadBuf* rb, const size_t roff,
-                          const ProtoUpMeta* um)
+    void send(const uint32_t seq)
     {
-
+        byte_t buf[sizeof(seq)];
+        fail_unless(make_int(seq).write(buf, sizeof(buf), 0) != 0);
+        WriteBuf wb(buf, sizeof(buf));
+        int err;
+        if ((err = pass_down(&wb, 0)) != 0)
+        {
+            LOG_WARN("dummy user, pass down: (" + make_int(err).to_string() 
+                     + "): '" + ::strerror(err) + "'");
+        }
     }
-
+    
+    void handle_up(const int cid, const ReadBuf* rb, const size_t roff,
+                   const ProtoUpMeta* um)
+    {
+        if (rb)
+        {
+            UInt32 rseq;
+            fail_unless(rseq.read(rb->get_buf(), rb->get_len(), roff));
+            deliv_seq = rseq.get();
+        }
+    }
+    
+    uint32_t get_deliv_seq() const
+    {
+        return deliv_seq;
+    }
 };
 
 
 
 /* Read EVSMessage and release rb */
-static void get_msg(ReadBuf* rb, EVSMessage* msg)
+static void get_msg(ReadBuf* rb, EVSMessage* msg, bool release = true)
 {
     if (msg == 0)
     {
@@ -468,7 +492,8 @@ static void get_msg(ReadBuf* rb, EVSMessage* msg)
     {
         fail_unless(msg->read(rb->get_buf(), rb->get_len(), 0) != 0);
         LOG_INFO("get_msg: " + msg->to_string());
-        rb->release();
+        if (release)
+            rb->release();
     }
 }
 
@@ -533,29 +558,11 @@ START_TEST(test_evs_proto_single_boot)
 }
 END_TEST
 
-
-START_TEST(test_evs_proto_double_boot)
+static void double_boot(DummyTransport* tp1, EVSProto* ep1, 
+                        DummyTransport* tp2, EVSProto* ep2)
 {
-    EventLoop el;
-    UUID p1(0, 0);
-    UUID p2(0, 0);
-
-
-    DummyTransport* tp1 = new DummyTransport();
-    DummyUser du1;
-    EVSProto* ep1 = new EVSProto(&el, tp1, p1, "n1", 0);
-
-    connect(tp1, ep1);
-    connect(ep1, &du1);
 
     single_boot(tp1, ep1);
-
-    DummyUser du2;
-    DummyTransport* tp2 = new DummyTransport();
-    EVSProto* ep2 = new EVSProto(&el, tp2, p2, "n2", 0);
-
-    connect(tp2, ep2);
-    connect(ep2, &du2);
 
     EVSMessage jm;
     EVSMessage im;
@@ -635,11 +642,119 @@ START_TEST(test_evs_proto_double_boot)
     fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
     rb = tp2->get_out();
     fail_unless(rb == 0);
+}
+
+START_TEST(test_evs_proto_double_boot)
+{
+    EventLoop el;
+    UUID p1(0, 0);
+    UUID p2(0, 0);
+
+
+    DummyTransport* tp1 = new DummyTransport();
+    DummyUser du1;
+    EVSProto* ep1 = new EVSProto(&el, tp1, p1, "n1", 0);
+    
+    connect(tp1, ep1);
+    connect(ep1, &du1);
+    
+    DummyUser du2;
+    DummyTransport* tp2 = new DummyTransport();
+    EVSProto* ep2 = new EVSProto(&el, tp2, p2, "n2", 0);
+    
+    connect(tp2, ep2);
+    connect(ep2, &du2);
+    
+    
+    double_boot(tp1, ep1, tp2, ep2);
 
     delete ep1;
     delete ep2;
     delete tp1;
     delete tp2;
+}
+END_TEST
+
+START_TEST(test_evs_proto_user_msg_basic)
+{
+    EventLoop el;
+    UUID p1(0, 0);
+    UUID p2(0, 0);
+
+
+    DummyTransport* tp1 = new DummyTransport();
+    DummyUser du1;
+    EVSProto* ep1 = new EVSProto(&el, tp1, p1, "n1", 0);
+    
+    connect(tp1, ep1);
+    connect(ep1, &du1);
+    
+    DummyUser du2;
+    DummyTransport* tp2 = new DummyTransport();
+    EVSProto* ep2 = new EVSProto(&el, tp2, p2, "n2", 0);
+    
+    connect(tp2, ep2);
+    connect(ep2, &du2);
+
+    double_boot(tp1, ep1, tp2, ep2);
+
+
+    ReadBuf* rb;
+    ReadBuf* rb_n;
+
+    du1.send(0);
+    
+    EVSMessage um1;
+    rb = tp1->get_out();
+    get_msg(rb, &um1, false);
+    fail_unless(rb != 0);
+    fail_unless(um1.get_type() == EVSMessage::USER);
+    fail_unless(um1.get_seq() == 0);
+    fail_unless(um1.get_aru_seq() == SEQNO_MAX);
+    
+    rb_n = tp1->get_out();
+    fail_unless(rb_n == 0);
+    
+    fail_unless(du1.get_deliv_seq() == SEQNO_MAX);
+    
+    EVSMessage um2;
+    
+    ep2->handle_user(um1, um1.get_source(), rb, 0);
+    rb->release();
+    rb = tp2->get_out();
+    get_msg(rb, &um2, false);
+    fail_unless(rb != 0);
+    fail_unless(um2.get_type() == EVSMessage::USER);
+    fail_unless(um2.get_seq() == 0);
+    fail_unless(um2.get_aru_seq() == 0);
+    
+    rb_n = tp2->get_out();
+    fail_unless(rb_n == 0);
+    fail_unless(du2.get_deliv_seq() == SEQNO_MAX);
+    
+    EVSMessage gm1;
+    ep1->handle_user(um2, um2.get_source(), rb, 0);
+    rb->release();
+    rb = tp1->get_out();
+    get_msg(rb, &gm1);
+    fail_unless(rb != 0);
+    fail_unless(gm1.get_type() == EVSMessage::GAP);
+    fail_unless(gm1.get_aru_seq() == 0);
+    rb_n = tp1->get_out();
+    fail_unless(rb_n == 0);
+    
+    fail_unless(du1.get_deliv_seq() == 0);
+    
+    ep2->handle_gap(gm1, gm1.get_source());
+    rb = tp2->get_out();
+    fail_unless(rb == 0);
+    
+    fail_unless(du2.get_deliv_seq() == 0);
+    
+    delete ep1;
+    delete ep2;
+    delete tp1;
+    delete tp2;    
 }
 END_TEST
 
@@ -1515,6 +1630,10 @@ Suite* evs_suite()
 
     tc = tcase_create("test_evs_proto_double_boot");
     tcase_add_test(tc, test_evs_proto_double_boot);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_evs_proto_user_msg_basic");
+    tcase_add_test(tc, test_evs_proto_user_msg_basic);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_evs_proto_converge");
