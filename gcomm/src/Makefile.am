@@ -8,6 +8,7 @@ libgcomm_la_SOURCES = 		\
 	test.cpp		\
 	util.cpp 		\
 	string.cpp 		\
+	histogram.cpp		\
 	time.cpp		\
 	uri.cpp			\
 	uuid.cpp		\

@@ -153,6 +153,7 @@ private:
     UUID source;
     char name[16];
     EVSGap gap;
+    mutable Time tstamp;
 public:
     class Instance {
 	UUID pid;
@@ -199,7 +200,7 @@ public:
 	const EVSRange& get_range() const {
 	    return range;
 	}
-	
+
 	size_t write(void* buf, 
 		     const size_t buflen, const size_t offset) {
 	    size_t off;
@@ -372,6 +373,16 @@ public:
 	return gap;
     }
 
+    void set_tstamp(const Time& t) const
+    {
+        tstamp = t;
+    }
+    
+    const Time& get_tstamp() const
+    {
+        return tstamp;
+    }
+    
     const std::map<UUID, Instance>* get_instances() const {
 	return instances;
     }

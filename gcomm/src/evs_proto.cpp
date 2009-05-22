@@ -57,7 +57,7 @@ void EVSProto::cleanup_unoperational()
         i_next = i, ++i_next;
         if (i->second.installed == false)
         {
-            LOG_INFO("Erasing " + i->first.to_string() + " at " + self_string());
+            LOG_INFO("erasing " + i->first.to_string() + " at " + self_string());
             known.erase(i);
         }
     }
@@ -71,7 +71,7 @@ void EVSProto::cleanup_views()
     {
         if (i->second + Time(300, 0) < now)
         {
-            LOG_WARN("erasing view: " + i->first.to_string());
+            LOG_INFO("erasing view: " + i->first.to_string());
             previous_views.erase(i);
         }
         else
@@ -238,7 +238,7 @@ bool EVSProto::is_consensus() const
     }
     if (is_consistent(*my_jm) == false) 
     {
-        LOG_INFO("is_consensus(): own join message is not consistent");
+        LOG_DEBUG("is_consensus(): own join message is not consistent");
         return false;
     }
     
@@ -467,9 +467,13 @@ int EVSProto::send_user(WriteBuf* wb,
                        current_view.get_id(), 
                        flags);
     wb->prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
-
+    
     // Insert first to input map to determine correct aru seq
     ReadBuf* rb = wb->to_readbuf();
+    if (collect_stats == true)
+    {
+        msg.set_tstamp(Time::now());
+    }
     EVSRange range = input_map.insert(EVSInputMapItem(my_addr, msg, rb, 0));
     last_sent = last_msg_seq;
     assert(seqno_eq(range.get_high(), last_sent));
@@ -483,15 +487,15 @@ int EVSProto::send_user(WriteBuf* wb,
     
     if (local == false)
     {
-        ret = pass_down(wb, 0); 
+        if ((ret = pass_down(wb, 0)))
+        {
+            LOG_DEBUG("pass down: " + make_int(ret).to_string());
+        }
     }
-    else
-    {
-        ret = 0;
-    }
+    
     wb->rollback_hdr(msg.get_hdrlen());
     deliver();
-    return ret;
+    return 0;
 }
 
 int EVSProto::send_user()
@@ -980,8 +984,8 @@ void EVSProto::shift_to(const State s, const bool send_j)
     
     if (get_state() != s)
     {
-        LOG_INFO(self_string() + ": state change: " + 
-                 to_string(state) + " -> " + to_string(s));
+        LOG_DEBUG(self_string() + ": state change: " + 
+                  to_string(state) + " -> " + to_string(s));
     }
     switch (s) {
     case CLOSED:
@@ -1050,6 +1054,11 @@ void EVSProto::shift_to(const State s, const bool send_j)
         last_sent = SEQNO_MAX;
         state = OPERATIONAL;
         deliver_reg_view();
+        if (collect_stats)
+        {
+            LOG_INFO("delivery stats (safe): " + hs_safe.to_string());
+        }
+        hs_safe.clear();
         cleanup_unoperational();
         cleanup_views();
         LOG_DEBUG("new view: " + current_view.to_string());
@@ -1079,6 +1088,11 @@ void EVSProto::validate_reg_msg(const EVSMessage& msg)
     if (msg.get_source_view() != current_view.get_id())
     {
         throw FatalException("reg validate: not current view");
+    }
+    if (collect_stats)
+    {
+        Time now(Time::now());
+        hs_safe.insert(now.to_double() - msg.get_tstamp().to_double());
     }
 }
 
@@ -1134,7 +1148,7 @@ void EVSProto::deliver()
 
 void EVSProto::validate_trans_msg(const EVSMessage& msg)
 {
-    LOG_INFO(msg.to_string());
+    LOG_DEBUG(msg.to_string());
     if (msg.get_type() != EVSMessage::USER)
     {
         throw FatalException("reg validate: not user message");
@@ -1142,6 +1156,11 @@ void EVSProto::validate_trans_msg(const EVSMessage& msg)
     if (msg.get_source_view() != current_view.get_id())
     {
         throw FatalException("reg validate: not current view");
+    }
+    if (collect_stats)
+    {
+        Time now(Time::now());
+        hs_safe.insert(now.to_double() - msg.get_tstamp().to_double());
     }
 }
 
@@ -1336,6 +1355,10 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
     
     const uint32_t prev_aru = input_map.get_aru_seq();
     const uint32_t prev_safe = input_map.get_safe_seq();
+    if (collect_stats == true)
+    {
+        msg.set_tstamp(Time::now());
+    }
     const EVSRange range(input_map.insert(EVSInputMapItem(source, msg, rb, roff)));
     
     if (!seqno_eq(range.low, i->second.prev_range.low))
