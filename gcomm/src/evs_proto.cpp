@@ -989,6 +989,11 @@ void EVSProto::shift_to(const State s, const bool send_j)
     }
     switch (s) {
     case CLOSED:
+        if (collect_stats)
+        {
+            LOG_INFO("delivery stats (safe): " + hs_safe.to_string());
+        }
+        hs_safe.clear();
         stop_inactivity_timer();
         cleanup_unoperational();
         cleanup_views();
@@ -1089,7 +1094,7 @@ void EVSProto::validate_reg_msg(const EVSMessage& msg)
     {
         throw FatalException("reg validate: not current view");
     }
-    if (collect_stats)
+    if (collect_stats && msg.get_safety_prefix() == SAFE)
     {
         Time now(Time::now());
         hs_safe.insert(now.to_double() - msg.get_tstamp().to_double());
@@ -1157,7 +1162,7 @@ void EVSProto::validate_trans_msg(const EVSMessage& msg)
     {
         throw FatalException("reg validate: not current view");
     }
-    if (collect_stats)
+    if (collect_stats && msg.get_safety_prefix() == SAFE)
     {
         Time now(Time::now());
         hs_safe.insert(now.to_double() - msg.get_tstamp().to_double());

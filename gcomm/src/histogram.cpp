@@ -39,9 +39,10 @@ Histogram::Histogram(const string& vals)
 
 void Histogram::insert(const double val)
 {
-    if (val < 1.e-32)
+    if (val < 0.0)
     {
-        LOG_WARN("zero value, discarding");
+        LOG_WARN("negative value (" 
+                 + Double(val).to_string() + "), discarding");
         return;
     }
     map<const double, uint64_t>::iterator i = cnt.lower_bound(val);
