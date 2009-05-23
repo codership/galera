@@ -32,7 +32,7 @@ void EVSProto::check_inactive()
             get_instance(i).operational == true &&
             get_instance(i).tstamp + inactive_timeout < Time::now())
         {
-            LOG_WARN("detected inactive node: " +
+            LOG_WARN(self_string() + " detected inactive node: " +
                      get_pid(i).to_string() + ":" 
                      + get_instance(i).get_name());
             i->second.operational = false;
@@ -293,10 +293,17 @@ bool EVSProto::is_representative(const UUID& pid) const
 
 bool EVSProto::is_consistent(const EVSMessage& jm) const
 {
+
+    if (jm.get_type() != EVSMessage::JOIN &&
+        jm.get_type() != EVSMessage::INSTALL)
+    {
+        throw FatalException("");
+    }
+
     std::map<const UUID, EVSRange> local_insts;
     std::map<const UUID, EVSRange> jm_insts;
-
-        // TODO/FIXME: 
+    
+    // TODO/FIXME: 
 
     if (jm.get_source_view() == current_view.get_id()) 
     {
@@ -601,7 +608,7 @@ EVSJoinMessage EVSProto::create_join() const
         jm.add_instance(pid, 
                         ei.name,
                         ei.operational, 
-                        (ei.leave_message ? true : false),
+                        has_leave(pid),
                         (ei.join_message ? 
                          ei.join_message->get_source_view() : 
                          (input_map.contains_sa(pid) ? current_view.get_id() : 
@@ -657,6 +664,39 @@ void EVSProto::set_leave(const EVSMessage& lm, const UUID& source)
     }
 }
 
+bool EVSProto::has_leave(const UUID& uuid) const
+{
+    InstMap::const_iterator ii = known.find(uuid);
+    if (ii == known.end())
+    {
+        throw FatalException("");
+    }
+    
+    if (ii->second.leave_message != 0)
+    {
+        return true;
+    }
+    
+    for (ii = known.begin(); ii != known.end(); ++ii)
+    {
+        if (ii->second.join_message != 0)
+        {
+            const EVSMessage::InstMap* im = 
+                ii->second.join_message->get_instances();
+            if (im == 0)
+            {
+                throw FatalException("");
+            }
+            EVSMessage::InstMap::const_iterator ji = im->find(uuid); 
+            if (ji != im->end() && ji->second.get_left() == true)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 void EVSProto::send_join(bool handle)
 {
     assert(output.empty());
@@ -710,9 +750,12 @@ void EVSProto::send_leave()
 
 void EVSProto::send_install()
 {
-    LOG_DEBUG("sending install at " + self_string() + " installing flag " + Int(installing).to_string());
+    LOG_DEBUG(self_string() 
+              + " installing flag " + Int(installing).to_string());
     if (installing)
+    {
         return;
+    }
     std::map<const UUID, EVSInstance>::iterator self = known.find(my_addr);
     EVSInstallMessage im(my_addr,
                          my_name,
@@ -728,7 +771,7 @@ void EVSProto::send_install()
         im.add_instance(pid, 
                         ei.name,
                         ei.operational,
-                        (ei.leave_message ? true : false),
+                        has_leave(pid),
                         (ei.join_message ? 
                          ei.join_message->get_source_view() : 
                          (input_map.contains_sa(pid) ? 
@@ -1934,13 +1977,20 @@ void EVSProto::handle_install(const EVSMessage& msg, const UUID& source)
     }
     
     assert(install_message == 0);
-
+    
     i->second.tstamp = Time::now();
     i->second.set_name(msg.get_source_name());
     
-    install_message = new EVSMessage(msg);
-    send_gap(my_addr, install_message->get_source_view(), 
-             EVSRange(SEQNO_MAX, SEQNO_MAX));
+    if (is_consistent(msg))
+    {
+        install_message = new EVSMessage(msg);
+        send_gap(my_addr, install_message->get_source_view(), 
+                 EVSRange(SEQNO_MAX, SEQNO_MAX));
+    }
+    else
+    {
+        SHIFT_TO_P(this, RECOVERY, true);
+    }
 }
 
 END_GCOMM_NAMESPACE

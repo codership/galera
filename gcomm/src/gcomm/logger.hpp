@@ -47,31 +47,14 @@ public:
     static Logger& instance();
     static Logger& create(std::ostream&, Level l = Info);
     
-    void print(const char *prefix, const string& s) 
-    {
-	Critical crit(&mon);
-	timeval tv;
-	::gettimeofday(&tv, 0);
-	Time time(tv.tv_sec, tv.tv_usec);
-	os.width(16);
-	os << time.to_string();
-	os.width(0);
-	os << " [";
-	os.width(5);
-	os << prefix;
-	os.width(0);
-	os << "]: " << s << std::endl;
-    }
+    void print(const string& prefix, const string& s);
     
     void trace(const string& s) {
 	if (level <= Trace)
 	    print("TRACE", s);
     }
 
-    void debug(const string& s) {
-	if (level <= Debug)
-	    print("DEBUG", s);
-    }
+    void debug(const string& pf, const string& s);
 
     void info(const string& s) {
 	if (level <= Info)
@@ -99,16 +82,16 @@ public:
 END_GCOMM_NAMESPACE
 
 #define TRACE_PREFIX string(__FILE__) + ":" + __FUNCTION__ + ":" + Int(__LINE__).to_string() + ": "
-#define DEBUG_PREFIX string(__FUNCTION__) + ": " + Int(__LINE__).to_string() + ": "
+#define DEBUG_PREFIX string(__FUNCTION__) + ":" + Int(__LINE__).to_string()
 
 #define LOG_TRACE(_a) do {				     \
 	if (Logger::instance().get_level() <= Logger::Trace) \
 	    Logger::instance().trace(TRACE_PREFIX + _a); \
     } while (0)
 
-#define LOG_DEBUG(_a) do {				     \
-	if (Logger::instance().get_level() <= Logger::Debug) \
-	    Logger::instance().debug(DEBUG_PREFIX + _a);		     \
+#define LOG_DEBUG(_a) do {                                              \
+	if (Logger::instance().get_level() <= Logger::Debug)            \
+	    Logger::instance().debug(DEBUG_PREFIX, _a);                  \
     } while (0)
 
 #define LOG_INFO(_a) do {				     \
