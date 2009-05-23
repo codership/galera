@@ -1687,6 +1687,9 @@ Suite* evs_suite()
     tcase_add_test(tc, test_evs_proto_double_boot);
     suite_add_tcase(s, tc);
 
+    if (skip)
+        return s;
+
     tc = tcase_create("test_evs_proto_user_msg_basic");
     tcase_add_test(tc, test_evs_proto_user_msg_basic);
     suite_add_tcase(s, tc);
@@ -1695,8 +1698,7 @@ Suite* evs_suite()
     tcase_add_test(tc, test_evs_proto_leave_basic);
     suite_add_tcase(s, tc);
 
-    if (skip)
-        return s;
+
 
     tc = tcase_create("test_evs_proto_converge");
     tcase_add_test(tc, test_evs_proto_converge);

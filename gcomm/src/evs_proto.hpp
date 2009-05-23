@@ -78,6 +78,8 @@ struct EVSInstance {
         ret += (operational ? "1" : "0");
         ret += ",i=";
         ret += (installed ? "1" : "0");
+        ret += ",l=";
+        ret += (leave_message ? "1" : "0");
         return ret;
     }
 
@@ -279,6 +281,7 @@ public:
     void check_inactive();
     void cleanup_unoperational();
     void cleanup_views();
+    void cleanup_joins();
 
     size_t n_operational() const;
 
@@ -291,6 +294,7 @@ public:
     void deliver_empty_view();
 
     void setall_installed(bool val);
+
 
     bool is_all_installed() const;
     
@@ -383,11 +387,11 @@ public:
             if (p->timer.is_set(this))
                 p->timer.unset(this);
         }
-
+        
         void handle()
         {
             Critical crit(p->mon);
-
+            
             if (p->get_state() == RECOVERY)
             {
                 LOG_WARN("CONSENSUS TIMER");

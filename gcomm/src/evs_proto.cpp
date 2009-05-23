@@ -202,9 +202,18 @@ void EVSProto::deliver_empty_view()
 
 void EVSProto::setall_installed(bool val)
 {
-    for (std::map<const UUID, EVSInstance>::iterator i = known.begin();
-         i != known.end(); ++i) {
+    for (InstMap::iterator i = known.begin(); i != known.end(); ++i) 
+    {
         i->second.installed = val;
+    }
+}
+
+void EVSProto::cleanup_joins()
+{
+    for (InstMap::iterator i = known.begin(); i != known.end(); ++i)
+    {
+        delete i->second.join_message;
+        i->second.join_message = 0;
     }
 }
 
@@ -232,12 +241,13 @@ bool EVSProto::is_consensus() const
     LOG_DEBUG(to_string());
     const EVSMessage* my_jm = known.find(my_addr)->second.join_message;
     if (my_jm == 0) {
-        LOG_DEBUG("is_consensus(): no own join message");
+        LOG_DEBUG(self_string() + " is_consensus(): no own join message");
         return false;
     }
     if (is_consistent(*my_jm) == false) 
     {
-        LOG_DEBUG("is_consensus(): own join message is not consistent");
+        LOG_DEBUG(self_string() 
+                  + " is_consensus(): own join message is not consistent");
         return false;
     }
     
@@ -247,12 +257,15 @@ bool EVSProto::is_consensus() const
             continue;
         if (i->second.join_message == 0)
         {
-            LOG_DEBUG("is_consensus(): no join message for " + get_pid(i).to_string());
+            LOG_DEBUG(self_string() 
+                      + " is_consensus(): no join message for " 
+                      + get_pid(i).to_string());
             return false;
         }
         if (is_consistent(*i->second.join_message) == false)
         {
-            LOG_DEBUG("is_consensus(): " + get_pid(i).to_string() + 
+            LOG_DEBUG(self_string() 
+                      + " is_consensus(): " + get_pid(i).to_string() + 
                       " join message not consistent");
             return false;
         }
@@ -285,10 +298,11 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
 
         // TODO/FIXME: 
 
-    if (jm.get_source_view() == current_view.get_id()) {
+    if (jm.get_source_view() == current_view.get_id()) 
+    {
         // Compare instances that originate from the current view and 
         // should proceed to next view
-
+        
         // First check agains input map state
         if (!(seqno_eq(input_map.get_aru_seq(), jm.get_aru_seq()) &&
               seqno_eq(input_map.get_safe_seq(), jm.get_seq())))
@@ -305,14 +319,15 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
                 local_insts.insert(make_pair(i->first, 
                                              input_map.get_sa_gap(i->first)));
         }
-        const std::map<UUID, EVSMessage::Instance>* jm_instances = 
+        const EVSMessage::InstMap* jm_instances = 
             jm.get_instances();
-        for (std::map<UUID, EVSMessage::Instance>::const_iterator 
+        for (EVSMessage::InstMap::const_iterator 
                  i = jm_instances->begin(); i != jm_instances->end(); ++i) 
         {
             if (i->second.get_operational() == true && 
                 i->second.get_left() == false &&
-                i->second.get_view_id() == current_view.get_id()) {
+                i->second.get_view_id() == current_view.get_id()) 
+            {
                 jm_insts.insert(
                     std::pair<const UUID, EVSRange>(
                         i->second.get_pid(),
@@ -323,6 +338,30 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
         {
             LOG_DEBUG(self_string() 
                       + " not consistent: join message instances");
+            LOG_DEBUG("jm_instances:");
+            for (EVSMessage::InstMap::const_iterator i = jm_instances->begin();
+                 i != jm_instances->end(); ++i)
+            {
+                LOG_DEBUG(i->second.to_string());
+            }
+            LOG_DEBUG("local_inst:");
+            for (InstMap::const_iterator i = known.begin(); i != known.end();
+                 ++i)
+            {
+                LOG_DEBUG(i->second.to_string());
+            }
+            LOG_DEBUG("jm_inst:");
+            for (map<const UUID, EVSRange>::const_iterator i = jm_insts.begin();
+                 i != jm_insts.end(); ++i)
+            {
+                LOG_DEBUG(i->first.to_string() + " " + i->second.to_string());
+            }
+            LOG_DEBUG("local_inst:");
+            for (map<const UUID, EVSRange>::const_iterator i = local_insts.begin();
+                 i != local_insts.end(); ++i)
+            {
+                LOG_DEBUG(i->first.to_string() + " " + i->second.to_string());
+            }
 #ifdef STRICT_JOIN_CHECK
             if (jm.get_source() == my_addr)
             {
@@ -994,6 +1033,10 @@ void EVSProto::shift_to(const State s, const bool send_j)
     {
         // tp->set_loopback(true);
         stop_resend_timer();
+        if (get_state() != RECOVERY)
+        {
+            cleanup_joins();
+        }
         setall_installed(false);
         delete install_message;
         install_message = 0;
@@ -1671,11 +1714,13 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
         assert(iret.second == true);
         i = iret.first;
         i->second.operational = true;
-        i->second.join_message = new EVSMessage(msg);
         if (get_state() == JOINING || get_state() == RECOVERY || 
-            get_state() == OPERATIONAL) {
+            get_state() == OPERATIONAL) 
+        {
             SHIFT_TO(RECOVERY);
         }
+        // Set join after shift to recovery, str may clean up join messages
+        set_join(msg, source);
         return;
     }
     
@@ -1686,7 +1731,8 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
         return;
     }
     
-    if (state == RECOVERY && install_message && is_consistent(msg)) {
+    if (state == RECOVERY && install_message && is_consistent(msg)) 
+    {
         LOG_DEBUG("redundant join message");
         return;
     }

@@ -61,6 +61,8 @@ int EVS::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 void EVS::connect()
 {
     
+    Critical crit(mon);
+
     URI tp_uri = uri;
     tp_uri.set_scheme(Conf::GMCastScheme);
     tp = Transport::create(tp_uri, event_loop);
@@ -106,11 +108,22 @@ void EVS::connect()
     LOG_INFO("EVS Proto initial state: " + proto->to_string());
     LOG_INFO("EVS Proto sending join request");
     proto->send_join();
+    do
+    {
+        int ret = event_loop->poll(50);
+        if (ret < 0)
+        {
+            LOG_WARN("poll(): " + make_int(ret).to_string());
+        }
+    }
+    while (proto->get_state() != EVSProto::OPERATIONAL);
 }
 
 
 void EVS::close()
 {
+    Critical crit(mon);
+
     LOG_INFO("EVS Proto leaving");
     proto->shift_to(EVSProto::LEAVING);
     LOG_INFO("EVS Proto sending leave notification");
@@ -119,13 +132,15 @@ void EVS::close()
     {
         int ret = event_loop->poll(500);
         LOG_DEBUG(string("poll returned ") + Int(ret).to_string());
-    } while (proto->get_state() == EVSProto::LEAVING);
-
+    } 
+    while (proto->get_state() != EVSProto::CLOSED);
+    
     int cnt = 0;
     do
     {
         event_loop->poll(50);
-    } while (cnt++ < 50);
+    } 
+    while (cnt++ < 10);
     
     tp->close();
     delete tp;

@@ -247,6 +247,20 @@ public:
 	static size_t size() {
 	    return 4 + UUID::size() + ViewId::size() + 4 + 4;
 	}
+
+        string to_string() const
+        {
+            string ret("inst(");
+            ret += pid.to_string() + ":" + name + ") ";
+            ret += operational ? "o=1" : "o=0";
+            ret += ",";
+            ret += left ? "l=1" : "l=0";
+            ret += " ";
+            ret += view_id.to_string() + " [";
+            ret += range.to_string();
+            return ret;
+        }
+
     };
     typedef std::map<UUID, Instance> InstMap;
 private:
