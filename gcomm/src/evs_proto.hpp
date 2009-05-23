@@ -26,13 +26,6 @@ BEGIN_GCOMM_NAMESPACE
 struct EVSInstance {
     // True if instance is considered to be operational (has produced messages)
     bool operational;
-    // True if instance can be trusted (is reasonably well behaved)
-    bool trusted;
-    // Known aru map of the instance
-    // Commented out, this is needed only on recovery time and 
-    // should be found from join message std::map<const UUID, uint32_t> aru;
-    // Next expected seq from the instance
-    // Commented out, this should be found from input map uint32_t expected;
     // True if it is known that the instance has installed current view
     bool installed;
     // Last received JOIN message
@@ -48,7 +41,6 @@ struct EVSInstance {
     // CTOR
     EVSInstance(const string& name_) : 
         operational(true), 
-        trusted(true), 
         installed(false), 
         join_message(0), 
         leave_message(0),
@@ -74,13 +66,16 @@ struct EVSInstance {
         return name;
     }
 
+    bool get_operational() const
+    {
+        return operational;
+    }
+
     string to_string() const {
         std::string ret;
         ret += "'" + name + "':";
         ret += "o=";
         ret += (operational ? "1" : "0");
-        ret += ",t=";
-        ret += (trusted ? "1" : "0");
         ret += ",i=";
         ret += (installed ? "1" : "0");
         return ret;

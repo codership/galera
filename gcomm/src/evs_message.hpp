@@ -159,7 +159,6 @@ public:
 	UUID pid;
         char name[16];
 	bool operational;
-	bool trusted;
         bool left;
 	ViewId view_id;
 	EVSRange range;
@@ -168,13 +167,11 @@ public:
 	Instance(const UUID pid_, 
                  const string& name_,
                  const bool oper_, 
-                 const bool trusted_, 
                  const bool left_,
 		 const ViewId& view_id_,
 		 const EVSRange range_) :
 	    pid(pid_),
             operational(oper_),
-            trusted(trusted_),
             left(left_),
 	    view_id(view_id_),
             range(range_) 
@@ -186,9 +183,6 @@ public:
 	}
 	bool get_operational() const {
 	    return operational;
-	}
-	bool get_trusted() const {
-	    return trusted;
 	}
         bool get_left() const
         {
@@ -205,8 +199,7 @@ public:
 		     const size_t buflen, const size_t offset) {
 	    size_t off;
 	    uint32_t b = (operational ? 0x1 : 0x0) 
-                | (trusted ? 0x10 : 0x0)
-                | (left ? 0x100 : 0x0);
+                | (left ? 0x10 : 0x0);
 	    if ((off = gcomm::write(b, buf, buflen, offset)) == 0) {
 		LOG_TRACE("");
 		return 0;
@@ -237,8 +230,7 @@ public:
 	    if ((off = gcomm::read(buf, buflen, offset, &b)) == 0)
 		return 0;
 	    operational = b & 0x1;
-	    trusted     = b & 0x10;
-            left        = b & 0x100;
+            left        = b & 0x10;
 	    if ((off = pid.read(buf, buflen, off)) == 0)
 		return 0;
 	    if ((off = view_id.read(buf, buflen, off)) == 0)
@@ -390,7 +382,6 @@ public:
     void add_instance(const UUID& pid, 
                       const string& name,
                       const bool operational, 
-		      const bool trusted, 
                       const bool left,
 		      const ViewId& view_id, 
 		      const EVSRange& range) {
@@ -400,7 +391,6 @@ public:
 				  Instance(pid, 
                                            name,
                                            operational, 
-                                           trusted, 
                                            left,
 					   view_id, 
                                            range)));

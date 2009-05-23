@@ -758,6 +758,59 @@ START_TEST(test_evs_proto_user_msg_basic)
 }
 END_TEST
 
+START_TEST(test_evs_proto_leave_basic)
+{
+    EventLoop el;
+    UUID p1(0, 0);
+    UUID p2(0, 0);
+
+
+    DummyTransport* tp1 = new DummyTransport();
+    DummyUser du1;
+    EVSProto* ep1 = new EVSProto(&el, tp1, p1, "n1", 0);
+    
+    connect(tp1, ep1);
+    connect(ep1, &du1);
+    
+    DummyUser du2;
+    DummyTransport* tp2 = new DummyTransport();
+    EVSProto* ep2 = new EVSProto(&el, tp2, p2, "n2", 0);
+    
+    connect(tp2, ep2);
+    connect(ep2, &du2);
+
+    double_boot(tp1, ep1, tp2, ep2);
+
+    ReadBuf* rb;
+    
+    EVSMessage lm1;
+    
+    ep1->shift_to(EVSProto::LEAVING);
+    ep1->send_leave();
+    fail_unless(ep1->get_state() == EVSProto::CLOSED);
+    rb = tp1->get_out();
+    fail_unless(rb != 0);
+    get_msg(rb, &lm1);
+    fail_unless(lm1.get_type() == EVSMessage::LEAVE);
+    rb = tp1->get_out();
+    fail_unless(rb == 0);
+
+    EVSMessage jm2;
+    EVSMessage im2;
+    ep2->handle_leave(lm1, lm1.get_source());
+    rb = tp2->get_out();
+    fail_unless(rb != 0);
+    get_msg(rb, &jm2);
+    fail_unless(jm2.get_type() == EVSMessage::JOIN);
+    rb = tp2->get_out();
+    fail_unless(rb != 0);
+    get_msg(rb, &im2);
+    fail_unless(im2.get_type() == EVSMessage::INSTALL);
+    fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
+
+}
+END_TEST
+
 
 struct Inst : public Toplay {
     DummyTransport* tp;
@@ -1596,6 +1649,8 @@ START_TEST(test_evs_w_gmcast)
 END_TEST
 
 
+bool skip = false;
+
 Suite* evs_suite()
 {
     Suite* s = suite_create("evs");
@@ -1635,6 +1690,13 @@ Suite* evs_suite()
     tc = tcase_create("test_evs_proto_user_msg_basic");
     tcase_add_test(tc, test_evs_proto_user_msg_basic);
     suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_evs_proto_leave_basic");
+    tcase_add_test(tc, test_evs_proto_leave_basic);
+    suite_add_tcase(s, tc);
+
+    if (skip)
+        return s;
 
     tc = tcase_create("test_evs_proto_converge");
     tcase_add_test(tc, test_evs_proto_converge);
