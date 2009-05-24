@@ -142,6 +142,33 @@ public:
         {
             throw FatalException("validate state: safe_seq > aru_seq");
         }
+        
+        uint32_t low = SEQNO_MAX;
+        for (IMap::const_iterator i = instances.begin(); i != instances.end();
+             ++i)
+        {
+            LOG_TRACE("low " + make_int(low).to_string()
+                      + " imin " + make_int(i->second.gap.low).to_string());
+            if (seqno_eq(i->second.gap.low, SEQNO_MAX))
+            {
+                low = SEQNO_MAX;
+                break;
+            }
+            else if (seqno_eq(low, SEQNO_MAX) ||
+                (seqno_eq(i->second.gap.low, SEQNO_MAX) == false &&
+                 seqno_lt(i->second.gap.low, low)))
+            {
+                low = i->second.gap.low;
+            }
+        }
+        if ((seqno_eq(low, SEQNO_MAX) == true &&
+             seqno_eq(aru_seq, SEQNO_MAX) == false) ||
+            (seqno_eq(low, SEQNO_MAX) == false && 
+             (seqno_eq(aru_seq, SEQNO_MAX) == true ||
+              seqno_eq(seqno_next(aru_seq), low) == false)))
+        {
+            throw FatalException("");
+        }
     }
 
     void set_safe(const UUID& s, const uint32_t seq) {
@@ -195,30 +222,41 @@ private:
         if (instances.empty())
             throw FatalException("Instance not found");
         uint32_t min_seq = SEQNO_MAX;
-        for (IMap::iterator ii = instances.begin(); ii != instances.end(); ++ii) {
+        LOG_DEBUG("aru_seq: " + make_int(aru_seq).to_string());
+        for (IMap::const_iterator ii = instances.begin(); ii != instances.end();
+             ++ii) 
+        {
             // Aru must always be less or equal than minimum of gap.lows
-            assert(seqno_eq(aru_seq, SEQNO_MAX) || 
+            assert(seqno_eq(aru_seq, SEQNO_MAX) ||
                    seqno_eq(ii->second.gap.low, SEQNO_MAX) ||
                    !seqno_lt(ii->second.gap.low, aru_seq));
-            if (seqno_eq(ii->second.gap.low, SEQNO_MAX)) {
+            LOG_TRACE("min_seq " + make_int(min_seq).to_string()
+                      + " imin " + make_int(ii->second.gap.low).to_string());
+            if (seqno_eq(ii->second.gap.low, SEQNO_MAX)) 
+            {
                 assert(seqno_eq(aru_seq, SEQNO_MAX));
                 min_seq = SEQNO_MAX;
                 break;
-            } else if (seqno_eq(min_seq, SEQNO_MAX) || 
-                       seqno_lt(ii->second.gap.low, min_seq)) {
+            } 
+            else if (seqno_eq(min_seq, SEQNO_MAX) || 
+                     seqno_lt(ii->second.gap.low, min_seq)) 
+            {
                 min_seq = ii->second.gap.low;
             } 
         }
         // Aru is actually one less than min_seq computed from gap lows
         // since gap low points to next seq of smallest received seq
+        uint32_t act_min = SEQNO_MAX;
         if (!seqno_eq(min_seq, SEQNO_MAX))
-            min_seq = seqno_dec(min_seq, 1);
+        {
+            act_min = seqno_dec(min_seq, 1);
+        }
         // Aru must not decrease during update
-        assert(seqno_eq(aru_seq, SEQNO_MAX) || !seqno_lt(min_seq, aru_seq));
-        LOG_TRACE(std::string("EVSInputMap::update_aru()") 
-                  + " aru_seq = " + UInt32(aru_seq).to_string() 
-                  + " min_seq = " + UInt32(min_seq).to_string());
-        aru_seq = min_seq;
+        assert(seqno_eq(aru_seq, SEQNO_MAX) || !seqno_lt(act_min, aru_seq));
+        LOG_DEBUG("aru_seq " + make_int(aru_seq).to_string()
+                  + " min_seq " + make_int(min_seq).to_string()
+                  + " act_min " + make_int(act_min).to_string());
+        aru_seq = act_min;
         validate_state();
     }
 

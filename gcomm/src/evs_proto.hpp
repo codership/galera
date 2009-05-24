@@ -266,6 +266,7 @@ public:
                   const uint32_t, 
                   const uint32_t, bool local = false);
     int send_user();
+    void complete_user(const uint32_t);
     int send_delegate(const UUID&, WriteBuf*);
     void send_gap(const UUID&, const ViewId&, const EVSRange&);
     EVSJoinMessage create_join() const;

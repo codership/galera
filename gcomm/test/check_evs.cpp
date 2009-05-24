@@ -797,6 +797,7 @@ START_TEST(test_evs_proto_leave_basic)
 
     EVSMessage jm2;
     EVSMessage im2;
+    EVSMessage gm2;
     ep2->handle_leave(lm1, lm1.get_source());
     rb = tp2->get_out();
     fail_unless(rb != 0);
@@ -807,6 +808,12 @@ START_TEST(test_evs_proto_leave_basic)
     get_msg(rb, &im2);
     fail_unless(im2.get_type() == EVSMessage::INSTALL);
     fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
+    rb = tp2->get_out();
+    fail_unless(rb != 0);
+    get_msg(rb, &gm2);
+    fail_unless(gm2.get_type() == EVSMessage::GAP);
+    rb = tp2->get_out();
+    fail_unless(rb == 0);
 
 }
 END_TEST
@@ -1649,7 +1656,7 @@ START_TEST(test_evs_w_gmcast)
 END_TEST
 
 
-bool skip = false;
+bool skip = true;
 
 Suite* evs_suite()
 {
@@ -1687,9 +1694,6 @@ Suite* evs_suite()
     tcase_add_test(tc, test_evs_proto_double_boot);
     suite_add_tcase(s, tc);
 
-    if (skip)
-        return s;
-
     tc = tcase_create("test_evs_proto_user_msg_basic");
     tcase_add_test(tc, test_evs_proto_user_msg_basic);
     suite_add_tcase(s, tc);
@@ -1712,13 +1716,17 @@ Suite* evs_suite()
 
     tc = tcase_create("test_evs_proto_user_msg");
     tcase_add_test(tc, test_evs_proto_user_msg);
-    tcase_set_timeout(tc, 30);
+    // tcase_set_timeout(tc, 30);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_evs_proto_consensus_with_user_msg");
     tcase_add_test(tc, test_evs_proto_consensus_with_user_msg);
     tcase_set_timeout(tc, 30);
     suite_add_tcase(s, tc);
+
+
+    if (skip)
+        return s;
 
     tc = tcase_create("test_evs_proto_msg_loss");
     tcase_add_test(tc, test_evs_proto_msg_loss);

@@ -113,7 +113,8 @@ public:
     };
 
 
-    static std::string to_string(const Type t) {
+    static string to_string(const Type t) 
+    {
         switch (t) {
         case NONE:
             return "NONE";
@@ -251,12 +252,12 @@ public:
         string to_string() const
         {
             string ret("inst(");
-            ret += pid.to_string() + ":" + name + ") ";
+            ret += pid.to_string() + ") ";
             ret += operational ? "o=1" : "o=0";
             ret += ",";
             ret += left ? "l=1" : "l=0";
             ret += " ";
-            ret += view_id.to_string() + " [";
+            ret += view_id.to_string() + " ";
             ret += range.to_string();
             return ret;
         }
@@ -603,13 +604,23 @@ public:
 
     string to_string() const
     {
-        return "evsmsg(" 
+        string ret = "evsmsg(" 
             + to_string(get_type()) + ","
             + make_int(safety_prefix).to_string() + ","
-            + source.to_string() + ","
+            + "(" + source.to_string() + ":" + name + "),"
             + source_view.to_string() + ","
             + make_int(seq).to_string() + ","
-            + make_int(aru_seq).to_string() + ")";
+            + make_int(aru_seq).to_string() + " ";
+        if (instances)
+        {
+            ret += "instances: ";
+            for (InstMap::const_iterator i = instances->begin(); i != instances->end(); ++i)
+            {
+                ret += i->first.to_string() + ":" + i->second.to_string() + " ";
+            }
+        }
+        ret += ")";
+        return ret;
     }
     
 };

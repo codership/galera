@@ -251,10 +251,12 @@ bool EVSProto::is_consensus() const
         return false;
     }
     
-    for (std::map<const UUID, EVSInstance>::const_iterator 
-             i = known.begin(); i != known.end(); ++i) {
+    for (InstMap::const_iterator i = known.begin(); i != known.end(); ++i)
+    {
         if (i->second.operational == false)
+        {
             continue;
+        }
         if (i->second.join_message == 0)
         {
             LOG_DEBUG(self_string() 
@@ -314,7 +316,16 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
         if (!(seqno_eq(input_map.get_aru_seq(), jm.get_aru_seq()) &&
               seqno_eq(input_map.get_safe_seq(), jm.get_seq())))
         {
-            LOG_DEBUG(self_string() + " not consistent: input map ");
+            LOG_DEBUG(self_string() + " not consistent with " 
+                      + jm.to_string() 
+                      + ": input map: aru_seqs: "
+                      + UInt32(input_map.get_aru_seq()).to_string() 
+                      + " "
+                      + UInt32(jm.get_aru_seq()).to_string() 
+                      + " safe_seqs: " 
+                      + UInt32(input_map.get_safe_seq()).to_string() 
+                      + " "
+                      + UInt32(jm.get_seq()).to_string());
             return false;
         }
         
@@ -480,7 +491,8 @@ int EVSProto::send_user(WriteBuf* wb,
     
     // Allow flow control only in OPERATIONAL state to make 
     // RECOVERY state output flush possible.
-    if (local == false && get_state() == OPERATIONAL && 
+    if (local == false && 
+        get_state() == OPERATIONAL && 
         is_flow_control(seq, win))
     {
         return EAGAIN;
@@ -555,6 +567,14 @@ int EVSProto::send_user()
         delete wb.first;
     }
     return ret;
+}
+
+void EVSProto::complete_user(const uint32_t high_seq)
+{
+    LOG_DEBUG(self_string() + " completing seqno to " 
+              + make_int(high_seq).to_string());
+    WriteBuf wb(0, 0);
+    send_user(&wb, 0xff, DROP, send_window, high_seq);
 }
 
 int EVSProto::send_delegate(const UUID& sa, WriteBuf* wb)
@@ -700,8 +720,8 @@ bool EVSProto::has_leave(const UUID& uuid) const
 void EVSProto::send_join(bool handle)
 {
     assert(output.empty());
-    LOG_DEBUG("send join at " + self_string());
     EVSJoinMessage jm = create_join();
+    LOG_DEBUG(self_string() + " sending join " + jm.to_string());
     size_t bufsize = jm.size();
     unsigned char* buf = new unsigned char[bufsize];
     if (jm.write(buf, bufsize, 0) == 0)
@@ -756,15 +776,18 @@ void EVSProto::send_install()
     {
         return;
     }
-    std::map<const UUID, EVSInstance>::iterator self = known.find(my_addr);
+    if (is_consensus() != true || is_representative(my_addr) != true)
+    {
+        throw FatalException("");
+    }
+    InstMap::const_iterator self = known.find(my_addr);
     EVSInstallMessage im(my_addr,
                          my_name,
                          ViewId(my_addr, 
                                 current_view.get_id().get_seq() + 1),
                          input_map.get_aru_seq(), 
                          input_map.get_safe_seq());
-    for (std::map<const UUID, EVSInstance>::iterator i = known.begin();
-         i != known.end(); ++i) 
+    for (InstMap::const_iterator i = known.begin(); i != known.end(); ++i) 
     {
         const UUID& pid = get_pid(i);
         const EVSInstance& ei = get_instance(i);
@@ -779,6 +802,7 @@ void EVSProto::send_install()
                         (input_map.contains_sa(pid) ? 
                          input_map.get_sa_gap(pid) : EVSRange()));
     }
+    LOG_DEBUG(self_string() + " sending install: " + im.to_string());
     size_t bufsize = im.size();
     unsigned char* buf = new unsigned char[bufsize];
     if (im.write(buf, bufsize, 0) == 0)
@@ -786,9 +810,9 @@ void EVSProto::send_install()
     
     WriteBuf wb(buf, bufsize);
     int err;
-    if ((err = pass_down(&wb, 0))) {
-        LOG_WARN(std::string("send failed ") 
-                 + strerror(err));
+    if ((err = pass_down(&wb, 0))) 
+    {
+        LOG_WARN(string("send failed ") + strerror(err));
     }
     delete[] buf;
     installing = true;
@@ -800,20 +824,24 @@ void EVSProto::resend(const UUID& gap_source, const EVSGap& gap)
 {
     assert(gap.source == my_addr);
     if (seqno_eq(gap.get_high(), SEQNO_MAX)) {
-        LOG_DEBUG(std::string("empty gap") 
+        LOG_DEBUG("empty gap: " 
                   + UInt32(gap.get_low()).to_string() + " -> " 
                   + UInt32(gap.get_high()).to_string());
         return;
     } else if (!seqno_eq(gap.get_low(), SEQNO_MAX) &&
                seqno_gt(gap.get_low(), gap.get_high())) {
-        LOG_DEBUG(std::string("empty gap") 
+        LOG_DEBUG("empty gap: " 
                   + UInt32(gap.get_low()).to_string() + " -> " 
                   + UInt32(gap.get_high()).to_string());
         return;
     }
     
     uint32_t start_seq = seqno_eq(gap.get_low(), SEQNO_MAX) ? 0 : gap.get_low();
-    LOG_DEBUG("resending at " + self_string() + " requested by " + gap_source.to_string() + " " + UInt32(start_seq).to_string() + " -> " + UInt32(gap.get_high()).to_string());
+    LOG_DEBUG(self_string() + " resending, requested by " 
+              + gap_source.to_string() 
+              + " " 
+              + make_int(start_seq).to_string() + " -> " 
+              + make_int(gap.get_high()).to_string());
 
     for (uint32_t seq = start_seq; !seqno_gt(seq, gap.get_high()); ) {
 
@@ -838,8 +866,7 @@ void EVSProto::resend(const UUID& gap_source, const EVSGap& gap)
                                    input_map.get_aru_seq(),
                                    msg.get_source_view(), 
                                    EVSMessage::F_RESEND);
-            LOG_DEBUG("resend: " 
-                     + make_int(i.first.get_payload_offset()).to_string());
+            LOG_DEBUG("resend: " + new_msg.to_string());
             WriteBuf wb(rb ? rb->get_buf(i.first.get_payload_offset()) : 0, 
                         rb ? rb->get_len(i.first.get_payload_offset()) : 0);
             wb.prepend_hdr(new_msg.get_hdr(), new_msg.get_hdrlen());
@@ -854,12 +881,16 @@ void EVSProto::resend(const UUID& gap_source, const EVSGap& gap)
 
 void EVSProto::recover(const EVSGap& gap)
 {
-    
-    LOG_DEBUG("recovering message");
-    if (gap.get_low() == gap.get_high()) {
-        LOG_WARN(std::string("EVSProto::recover(): Empty gap: ") 
-                 + UInt32(gap.get_low()).to_string() + " -> " 
-                 + UInt32(gap.get_high()).to_string());
+    if (seqno_eq(gap.get_high(), SEQNO_MAX)) {
+        LOG_DEBUG("empty gap: " 
+                  + UInt32(gap.get_low()).to_string() + " -> " 
+                  + UInt32(gap.get_high()).to_string());
+        return;
+    } else if (!seqno_eq(gap.get_low(), SEQNO_MAX) &&
+               seqno_gt(gap.get_low(), gap.get_high())) {
+        LOG_DEBUG("empty gap: " 
+                  + UInt32(gap.get_low()).to_string() + " -> " 
+                  + UInt32(gap.get_high()).to_string());
         return;
     }
     
@@ -869,16 +900,30 @@ void EVSProto::recover(const EVSGap& gap)
          !seqno_gt(seq, gap.get_high()); ) {
         std::pair<EVSInputMapItem, bool> i = input_map.recover(gap.source,
                                                                seq);
-        if (i.second == true) {
+        if (i.second == true) 
+        {
             const ReadBuf* rb = i.first.get_readbuf();
             const EVSMessage& msg = i.first.get_evs_message();
+            EVSUserMessage new_msg(msg.get_source(), 
+                                   msg.get_user_type(),
+                                   msg.get_safety_prefix(),
+                                   msg.get_seq(), 
+                                   msg.get_seq_range(),
+                                   input_map.get_aru_seq(),
+                                   msg.get_source_view(), 
+                                   EVSMessage::F_RESEND);
             WriteBuf wb(rb ? rb->get_buf(i.first.get_payload_offset()) : 0,
                         rb ? rb->get_len(i.first.get_payload_offset()) : 0);
-            wb.prepend_hdr(msg.get_hdr(), msg.get_hdrlen());
+            wb.prepend_hdr(new_msg.get_hdr(), new_msg.get_hdrlen());
+            LOG_DEBUG("recovered " + new_msg.to_string());
             if (send_delegate(gap.source, &wb))
+            {
                 break;
+            }
             seq = seqno_add(seq, msg.get_seq_range() + 1);
-        } else {
+        } 
+        else 
+        {
             seq = seqno_next(seq);
         }
     }
@@ -1089,12 +1134,17 @@ void EVSProto::shift_to(const State s, const bool send_j)
             unset_consensus_timer();
         }
         set_consensus_timer();
-        if (output.empty() && send_j == true)
+        state = RECOVERY;
+        while (output.empty() == false)
+        {
+            send_user();
+        }
+        if (send_j == true)
         {
             send_join(false);
-
+            
         }
-        state = RECOVERY;
+
         break;
     }
     case OPERATIONAL:
@@ -1317,19 +1367,20 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
 
     if (msg.get_flags() & EVSMessage::F_RESEND)
     {
-        LOG_DEBUG("msg with resend flag: " + msg.to_string());
+        LOG_DEBUG(self_string() + " msg with resend flag " + msg.to_string());
     }
-
-
-    LOG_DEBUG("this: " + self_string() + " source: "
-              + source.to_string() + " seq: " 
-              + UInt32(msg.get_seq()).to_string());
+    else 
+    {
+        
+        LOG_DEBUG(self_string() + " " + msg.to_string());
+    }
+    
     std::map<const UUID, EVSInstance>::iterator i = known.find(source);
     if (i == known.end()) {
         // Previously unknown instance has appeared and it seems to
         // be operational, assume that it can be trusted and start
         // merge/recovery
-        LOG_DEBUG("new instance");
+        LOG_DEBUG(self_string() + " new instance: " + source.to_string());
         std::pair<std::map<const UUID, EVSInstance>::iterator, bool> iret;
         iret = known.insert(make_pair(source,
                                       EVSInstance(source.to_string())));
@@ -1345,26 +1396,28 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
     else if (state == JOINING || state == CLOSED) 
     {
         // Drop message
-        LOG_DEBUG("dropping");
+        LOG_DEBUG(self_string() + " dropping: " + msg.to_string());
         return;
     } 
     else if (msg.get_source_view() != current_view.get_id()) 
     {
-        if (get_state() == LEAVING) {
-            LOG_DEBUG("dropping");
+        if (get_state() == LEAVING) 
+        {
+            LOG_DEBUG(self_string() + " leaving, dropping: " + msg.to_string());
             return;
         }
         
         if (msg_from_previous_view(previous_views, msg))
         {
-            LOG_DEBUG("user message from previous view");
+            LOG_DEBUG(self_string() + " user message " + msg.to_string() + 
+                      " from previous view");
             return;
         }
         
         if (i->second.operational == false) 
         {
             // This is probably partition merge, see if it works out
-            LOG_DEBUG("unoperational source");
+            LOG_DEBUG(self_string() + " unoperational source " + source.to_string());
             i->second.operational = true;
             SHIFT_TO(RECOVERY);
             return;
@@ -1375,7 +1428,7 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
                 msg.get_source_view() == install_message->get_source_view()) 
             {
                 assert(state == RECOVERY);
-                LOG_DEBUG("recovery user message source");
+                LOG_DEBUG(self_string() + " recovery user message source");
                 // Other instances installed view before this one, so it is 
                 // safe to shift to OPERATIONAL if consensus has been reached
                 for (EVSMessage::InstMap::const_iterator mi = install_message->get_instances()->begin(); mi != install_message->get_instances()->end(); ++mi)
@@ -1400,14 +1453,6 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
             } 
             else
             {
-                // Probably caused by network partitioning during recovery
-                // state, this will most probably lead to view 
-                // partition/remerge. In order to do it in organized fashion,
-                // don't trust the source instance during recovery phase.
-                // LOG_WARN("Setting " + source.to_string() + " status to no-trust" + " on " + self_string());
-                // i->second.trusted = false;
-                // Note: setting other instance to non-trust here is too harsh
-                // shift_to(RECOVERY);
                 return;
             }
         } 
@@ -1479,10 +1524,7 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
     {
         // Message not originated from this instance, output queue is empty
         // and last_sent seqno should be advanced
-        LOG_DEBUG("sending dummy: " + UInt32(last_sent).to_string() + " -> " 
-                  + UInt32(range.get_high()).to_string());
-        WriteBuf wb(0, 0);
-        send_user(&wb, 0xff, DROP, send_window, range.get_high());
+        complete_user(range.get_high());
     } 
     else if (((output.empty() && 
                (seqno_eq(input_map.get_aru_seq(), SEQNO_MAX) ||
@@ -1491,7 +1533,7 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
              get_state() == LEAVING) 
     {
         // Output queue empty and aru changed, send gap to inform others
-        LOG_DEBUG("sending gap");
+        LOG_DEBUG(self_string() + " sending gap");
         send_gap(source, current_view.get_id(), EVSRange(SEQNO_MAX, SEQNO_MAX));
     }
     
@@ -1501,10 +1543,30 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
         if (send_user())
             break;
     }
-    if (get_state() == RECOVERY && output.empty())
+
+    
+    if (get_state() == RECOVERY && 
+        seqno_eq(last_sent, input_map.get_aru_seq()) && 
+        (seqno_eq(prev_aru, input_map.get_aru_seq()) == false ||
+         seqno_eq(prev_safe, input_map.get_safe_seq()) == false))
     {
-        send_join();
+        assert(output.empty() == true);
+        InstMap::const_iterator self_i = known.find(my_addr);
+        if (self_i == known.end())
+        {
+            throw FatalException("");
+        }
+        
+        if (self_i->second.join_message == 0 ||
+            is_consistent(*self_i->second.join_message) == false)
+        {
+            send_join();
+        }
     }
+
+    LOG_DEBUG(self_string() 
+              + " aru_seq: " + UInt32(input_map.get_aru_seq()).to_string()
+              + " safe_seq: " + UInt32(input_map.get_safe_seq()).to_string());
 }
 
 void EVSProto::handle_delegate(const EVSMessage& msg, const UUID& source,
@@ -1637,12 +1699,23 @@ void EVSProto::handle_gap(const EVSMessage& msg, const UUID& source)
         if (send_user())
             break;
     }
-    
+
     if (get_state() == RECOVERY && 
-        !seqno_eq(prev_safe, input_map.get_safe_seq()) &&
-        output.empty() == true)
+        seqno_eq(last_sent, input_map.get_aru_seq()) && 
+        seqno_eq(prev_safe, input_map.get_safe_seq()) == false)
     {
-        send_join();
+        assert(output.empty() == true);
+        InstMap::const_iterator self_i = known.find(my_addr);
+        if (self_i == known.end())
+        {
+            throw FatalException("");
+        }
+        
+        if (self_i->second.join_message == 0 ||
+            is_consistent(*self_i->second.join_message) == false)
+        {
+            send_join();
+        }
     }
 }
 
@@ -1651,78 +1724,107 @@ void EVSProto::handle_gap(const EVSMessage& msg, const UUID& source)
 bool EVSProto::states_compare(const EVSMessage& msg) 
 {
 
-    const std::map<UUID, EVSMessage::Instance>* instances = msg.get_instances();
+    const EVSMessage::InstMap* instances = msg.get_instances();
     bool send_join_p = false;
+    uint32_t low_seq = SEQNO_MAX;
+    UUID low_uuid = UUID::nil();
     uint32_t high_seq = SEQNO_MAX;
-
-    for (std::map<UUID, EVSMessage::Instance>::const_iterator 
-             ii = instances->begin(); ii != instances->end(); ++ii) {
-        
-        std::map<UUID, EVSInstance>::iterator local_ii =
-            known.find(ii->second.get_pid());
-        
-        if (local_ii->second.operational != ii->second.get_operational()) {
-            if (local_ii->second.operational == true) {
+    
+    // Compare view of operational instances
+    for (EVSMessage::InstMap::const_iterator ii = instances->begin(); 
+         ii != instances->end(); ++ii) 
+    {
+        InstMap::iterator local_ii = known.find(ii->second.get_pid());
+        if (local_ii->second.operational != ii->second.get_operational()) 
+        {
+            if (local_ii->second.operational == true) 
+            {
                 if (local_ii->second.tstamp + inactive_timeout <
-                    Time::now()) {
+                    Time::now() ||
+                    ii->second.get_left()) 
+                {
                     LOG_DEBUG("setting " + local_ii->first.to_string() 
                               + " as unoperational at " + self_string());
                     local_ii->second.operational = false;
                     send_join_p = true;
                 }
-            } else {
+            } 
+            else 
+            {
                 send_join_p = true;
             }
         }
-        
+    }
+    
+    // Update highest known seqno
+    for (EVSMessage::InstMap::const_iterator ii = instances->begin(); 
+         ii != instances->end(); ++ii) 
+    {
         // Coming from the same view
-        if (ii->second.get_view_id() == current_view.get_id()) {
-            EVSRange range(input_map.get_sa_gap(ii->second.get_pid()));
-            if (!seqno_eq(range.get_low(),
-                          ii->second.get_range().get_low()) ||
-                !seqno_eq(range.get_high(),
-                          ii->second.get_range().get_high())) {
-                assert(seqno_eq(range.get_low(), SEQNO_MAX) || 
-                       !seqno_eq(range.get_high(), SEQNO_MAX));
-                
-                if (!seqno_eq(range.get_low(), SEQNO_MAX) &&
-                    (seqno_eq(ii->second.get_range().get_high(), SEQNO_MAX) ||
-                     seqno_gt(range.get_high(), 
-                              ii->second.get_range().get_high()))) 
+        if (ii->second.get_view_id() == current_view.get_id()) 
+        {
+            // Update highest and lowest known high seqno
+            if (!seqno_eq(ii->second.get_range().get_high(), SEQNO_MAX))
+            {
+                if ((seqno_eq(high_seq, SEQNO_MAX) || 
+                     seqno_gt(ii->second.get_range().get_high(), high_seq))) 
                 {
-                    // This instance knows more
-                    // TODO: Optimize to recover only required messages
-                    
-                    recover(EVSGap(ii->second.get_pid(), range));
-                    send_join_p = true;
-                } else {
-                    // The other instance knows more, sending join message
-                    // should generate message recovery on more knowledgeble
-                    // instance
-                    send_join_p = true;
+                    high_seq = ii->second.get_range().get_high();
                 }
-            }
-
-            // Update highest known seqno
-            if (!seqno_eq(ii->second.get_range().get_high(), SEQNO_MAX) &&
-                (seqno_eq(high_seq, SEQNO_MAX) || 
-                 seqno_gt(ii->second.get_range().get_high(), high_seq))) {
-                high_seq = ii->second.get_range().get_high();
             }
         }
     }
     
+    // Update lowest known seqno
+    for (EVSMessage::InstMap::const_iterator ii = instances->begin(); 
+         ii != instances->end(); ++ii) 
+    {
+        // Coming from the same view
+        if (ii->second.get_view_id() == current_view.get_id())
+        {
+            if (seqno_eq(ii->second.get_range().get_low(), SEQNO_MAX))
+            {
+                low_seq = SEQNO_MAX;
+                break;
+            }
+            else if (seqno_eq(low_seq, SEQNO_MAX) || 
+                     seqno_lt(ii->second.get_range().get_low(), low_seq))
+            {
+                low_uuid = ii->first;
+                low_seq = ii->second.get_range().get_low();
+            }
+        }
+    }
+    
+    // Output must be empty to seqno completion to work correctly
+    assert(output.empty());
+    
     // last locally generated seqno is not equal to high seqno, generate
     // completing dummy message
-    if (!seqno_eq(high_seq, SEQNO_MAX) &&
-        (seqno_eq(last_sent, SEQNO_MAX) || 
-         seqno_lt(last_sent, high_seq))) {
-        LOG_DEBUG("completing seqno to " + UInt32(high_seq).to_string());
-        WriteBuf wb(0, 0);
-        send_user(&wb, 0xff, DROP, send_window, high_seq);
+    if (!seqno_eq(high_seq, SEQNO_MAX))
+    {
+        if (seqno_eq(last_sent, SEQNO_MAX) || seqno_lt(last_sent, high_seq)) 
+        {
+            complete_user(high_seq);
+        }
+        else if (msg.get_source() != my_addr && msg.get_source() == low_uuid)
+        {
+            EVSRange range(low_seq, high_seq);
+            resend(msg.get_source(), EVSGap(my_addr, range));
+        }
     }
     
     
+    // Try recovery for all messages between low_seq/high_seq
+    EVSRange range(low_seq, high_seq);
+    for (InstMap::const_iterator i = known.begin(); i != known.end(); ++i)
+    {
+        if (i->second.operational == false)
+        {
+            recover(EVSGap(get_pid(i), range));
+        }
+    }
+
     return send_join_p;
 }
 
@@ -1734,16 +1836,13 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
     {
         throw FatalException("invalid input");
     }
-    LOG_DEBUG(self_string() + " source: " +
-              msg.get_source().to_string() + " source view: " + 
-              msg.get_source_view().to_string());
-    
+    LOG_DEBUG(self_string() + " join message " + msg.to_string());
     
     if (get_state() == LEAVING) {
         return;
     }
     
-    std::map<const UUID, EVSInstance>::iterator i = known.find(source);
+    InstMap::iterator i = known.find(source);
     if (i == known.end()) 
     {
         if (source == my_addr)
@@ -1776,7 +1875,9 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
     
     if (state == RECOVERY && install_message && is_consistent(msg)) 
     {
-        LOG_DEBUG("redundant join message");
+        LOG_DEBUG(self_string() + " redundant join message: "
+                  + msg.to_string() + " install message: "
+                  + install_message->to_string());
         return;
     }
     
@@ -1801,22 +1902,33 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
         send_join_p = true;
     } 
     
-    if (msg.get_source_view() == current_view.get_id()) {
+    if (msg.get_source_view() == current_view.get_id()) 
+    {
         uint32_t prev_safe = input_map.get_safe_seq();
         if (!seqno_eq(msg.get_aru_seq(), SEQNO_MAX))
+        {
             input_map.set_safe(source, msg.get_aru_seq());
-        if (!seqno_eq(prev_safe, input_map.get_safe_seq())) {
+        }
+        if (!seqno_eq(prev_safe, input_map.get_safe_seq())) 
+        {
             LOG_DEBUG("safe seq changed");
-            send_join_p = true;
         }
         // Aru seqs are not the same
-        if (!seqno_eq(msg.get_aru_seq(), input_map.get_aru_seq())) {
-            LOG_DEBUG("noneq aru");
+        if (!seqno_eq(msg.get_aru_seq(), input_map.get_aru_seq())) 
+        {
+            LOG_DEBUG(self_string() + " noneq aru, local "
+                      + make_int(input_map.get_aru_seq()).to_string() 
+                      + " msg "
+                      + make_int(msg.get_aru_seq()).to_string());
         }
         
         // Safe seqs are not the same
-        if (!seqno_eq(msg.get_seq(), input_map.get_safe_seq())) {
-            LOG_DEBUG("noneq seq, local " + UInt32(input_map.get_safe_seq()).to_string() + " msg " + UInt32(msg.get_seq()).to_string());
+        if (!seqno_eq(msg.get_seq(), input_map.get_safe_seq())) 
+        {
+            LOG_DEBUG(self_string() + " noneq safe seq, local " 
+                      + make_int(input_map.get_safe_seq()).to_string() 
+                      + " msg " 
+                      + make_int(msg.get_seq()).to_string());
         }
     }
     
@@ -1824,10 +1936,8 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
     set_join(msg, source);
     
     // Converge towards consensus
-    const std::map<UUID, EVSMessage::Instance>* instances = 
-        msg.get_instances();
-    std::map<UUID, EVSMessage::Instance>::const_iterator selfi = 
-        instances->find(my_addr);
+    const EVSMessage::InstMap* instances = msg.get_instances();
+    EVSMessage::InstMap::const_iterator selfi = instances->find(my_addr);
     if (selfi == instances->end()) 
     {
         // Source instance does not know about this instance, so there 
@@ -1839,17 +1949,37 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
     {
         // Not coming from same views, there's no point to compare 
         // states further
-        LOG_DEBUG(std::string("different view ") +
-                  msg.get_source_view().to_string());
-        send_join_p = true;
+        LOG_DEBUG(self_string() 
+                  + " join from different view " 
+                  + msg.get_source_view().to_string());
+        if (is_consistent(msg) == false)
+        {
+            send_join_p = true;
+        }
     } 
     else 
     {
         LOG_DEBUG("states compare");
-        if (states_compare(msg))
+        if (states_compare(msg) == true)
             send_join_p = true;
     }
 
+    InstMap::const_iterator self_i = known.find(my_addr);
+    if (self_i == known.end())
+    {
+        throw FatalException("");
+    }
+    if ((self_i->second.join_message == 0 ||
+         is_consistent(*self_i->second.join_message) == false) &&
+        send_join_p == true)
+    {
+        send_join_p = true;
+    }
+    else
+    {
+        send_join_p = false;
+    }
+    
     set_join(create_join(), my_addr);
     
     if (is_consensus())
@@ -1933,38 +2063,49 @@ void EVSProto::handle_install(const EVSMessage& msg, const UUID& source)
         return;
     }
 
-    LOG_DEBUG("this: " + self_string() + " source: " +
-              msg.get_source().to_string() + " source view: " + 
-              msg.get_source_view().to_string());
-    std::map<UUID, EVSInstance>::iterator i = known.find(source);
+    LOG_DEBUG(self_string() + " " + msg.to_string());
+
+    InstMap::iterator i = known.find(source);
     
-    if (i == known.end()) {
+    if (i == known.end()) 
+    {
         std::pair<std::map<const UUID, EVSInstance>::iterator, bool> iret;
         iret = known.insert(make_pair(source,
                                       EVSInstance(msg.get_source_name())));
         assert(iret.second == true);
         i = iret.first;
-        if (state == RECOVERY || state == OPERATIONAL) {
+        if (state == RECOVERY || state == OPERATIONAL) 
+        {
             SHIFT_TO(RECOVERY);
         }
         return;	
-    } else if (state == JOINING || state == CLOSED) {
+    } 
+    else if (state == JOINING || state == CLOSED) 
+    {
         LOG_DEBUG("dropping install message from " + source.to_string());
         return;
-    } else if (i->second.operational == false) {
+    } 
+    else if (i->second.operational == false) 
+    {
         LOG_DEBUG("setting other as operational");
         i->second.operational = true;
         SHIFT_TO(RECOVERY);
         return;
-    } else if (install_message || i->second.installed == true) {
+    } 
+    else if (install_message || i->second.installed == true) 
+    {
         LOG_DEBUG("woot?");
         SHIFT_TO(RECOVERY);
         return;
-    } else if (is_representative(source) == false) {
+    } 
+    else if (is_representative(source) == false) 
+    {
         LOG_DEBUG("source is not supposed to be representative");
         SHIFT_TO(RECOVERY);
         return;
-    } else if (is_consensus() == false) {
+    } 
+    else if (is_consensus() == false) 
+    {
         LOG_DEBUG("is not consensus");
         SHIFT_TO(RECOVERY);
         return;
@@ -1989,6 +2130,7 @@ void EVSProto::handle_install(const EVSMessage& msg, const UUID& source)
     }
     else
     {
+        LOG_DEBUG(self_string() + " install message not consistent with state");
         SHIFT_TO_P(this, RECOVERY, true);
     }
 }
