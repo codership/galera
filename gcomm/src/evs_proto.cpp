@@ -346,10 +346,8 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
                 i->second.get_left() == false &&
                 i->second.get_view_id() == current_view.get_id()) 
             {
-                jm_insts.insert(
-                    std::pair<const UUID, EVSRange>(
-                        i->second.get_pid(),
-                        i->second.get_range()));
+                jm_insts.insert(make_pair(i->second.get_pid(),
+                                          i->second.get_range()));
             } 
         }
         if (jm_insts != local_insts)
@@ -394,24 +392,22 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
         // Compare instances that originate from the current view but 
         // are not going to proceed to next view
         
-        for (std::map<const UUID, EVSInstance>::const_iterator 
-                 i = known.begin(); i != known.end(); ++i)
+        for (InstMap::const_iterator i = known.begin(); i != known.end(); ++i)
         {
             if (i->second.operational == false)
             {
-                local_insts.insert(std::pair<const UUID, EVSRange>(
-                                       i->first, input_map.contains_sa(i->first) ?
-                                       input_map.get_sa_gap(i->first) : EVSRange()));
+                local_insts.insert(make_pair(i->first, 
+                                             input_map.contains_sa(i->first) ?
+                                             input_map.get_sa_gap(i->first) : 
+                                             EVSRange()));
             }
-            const std::map<UUID, EVSMessage::Instance>* jm_instances =
-                jm.get_instances();
-            for (std::map<UUID, EVSMessage::Instance>::const_iterator
+            const EVSMessage::InstMap* jm_instances = jm.get_instances();
+            for (EVSMessage::InstMap::const_iterator
                      i = jm_instances->begin(); i != jm_instances->end(); ++i)
             {
                 if (i->second.get_operational() == false)
                 {
-                    jm_insts.insert(std::pair<const UUID,
-                                    EVSRange>(i->second.get_pid(),
+                    jm_insts.insert(make_pair(i->second.get_pid(),
                                               i->second.get_range()));
                 }
             }
@@ -423,28 +419,26 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
         }
         jm_insts.clear();
         local_insts.clear();
-    } else {
+    } 
+    else 
+    {
         // Instances are originating from different view, need to check
         // only that new view is consistent
-        for (std::map<const UUID, EVSInstance>::const_iterator i =
-                 known.begin();
-             i != known.end(); ++i) {
+        for (InstMap::const_iterator i = known.begin();
+             i != known.end(); ++i) 
+        {
             if (i->second.operational == true &&
                 i->second.join_message)
             {
-                local_insts.insert(std::pair<const UUID, EVSRange>(
-                                       i->first, EVSRange()));
+                local_insts.insert(make_pair(i->first, EVSRange()));
             }
         }
-        const std::map<UUID, EVSMessage::Instance>* jm_instances = 
-            jm.get_instances();
-        for (std::map<UUID, EVSMessage::Instance>::const_iterator 
+        const EVSMessage::InstMap* jm_instances = jm.get_instances();
+        for (EVSMessage::InstMap::const_iterator 
                  i = jm_instances->begin(); i != jm_instances->end(); ++i) {
             if (i->second.get_operational() == true) 
             {
-                jm_insts.insert(
-                    std::pair<const UUID, EVSRange>(
-                        i->second.get_pid(), EVSRange()));
+                jm_insts.insert(make_pair(i->second.get_pid(), EVSRange()));
             } 
         }
         if (jm_insts != local_insts)
@@ -1068,6 +1062,11 @@ int EVSProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 
 void EVSProto::shift_to(const State s, const bool send_j)
 {
+    if (shift_to_rfcnt > 0)
+    {
+        throw FatalException("");
+    }
+    shift_to_rfcnt++;
     static const bool allowed[STATE_MAX][STATE_MAX] = {
     // CLOSED
         {false, true, false, false, false},
@@ -1193,6 +1192,7 @@ void EVSProto::shift_to(const State s, const bool send_j)
     default:
         throw FatalException("Invalid state");
     }
+    shift_to_rfcnt--;
 }
 
 ////////////////////////////////////////////////////////////////////////////

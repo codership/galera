@@ -1656,7 +1656,7 @@ START_TEST(test_evs_w_gmcast)
 END_TEST
 
 
-bool skip = true;
+bool skip = false;
 
 Suite* evs_suite()
 {
@@ -1716,7 +1716,7 @@ Suite* evs_suite()
 
     tc = tcase_create("test_evs_proto_user_msg");
     tcase_add_test(tc, test_evs_proto_user_msg);
-    // tcase_set_timeout(tc, 30);
+    tcase_set_timeout(tc, 30);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_evs_proto_consensus_with_user_msg");

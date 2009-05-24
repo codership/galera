@@ -155,6 +155,7 @@ public:
         cth = new CleanupTimerHandler(this);
         consth = new ConsensusTimerHandler(this);
         resendth = new ResendTimerHandler(this);
+        shift_to_rfcnt = 0;
     }
     
     ~EVSProto() {
@@ -310,7 +311,7 @@ public:
 
     bool states_compare(const EVSMessage& );
     
-    
+    int shift_to_rfcnt;
     void shift_to(const State, const bool send_j = true);
     
     
