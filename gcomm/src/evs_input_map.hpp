@@ -218,6 +218,7 @@ public:
         return safe_seq;
     }
     
+
 private:
     void update_aru() 
     {
@@ -386,11 +387,20 @@ public:
         instances.erase(sa);
     }
     
-    EVSRange get_sa_gap(const UUID& sa) const {
+    EVSRange get_sa_gap(const UUID& sa) const 
+    {
         IMap::const_iterator ii = instances.find(sa);
         if (ii == instances.end())
             throw FatalException("Instance does not exist");
         return ii->second.gap;
+    }
+
+    uint32_t get_sa_safe_seq(const UUID& sa) const
+    {
+        IMap::const_iterator ii = instances.find(sa);
+        if (ii == instances.end())
+            throw FatalException("Instance does not exist");
+        return ii->second.safe_seq;
     }
     
     void clear() {

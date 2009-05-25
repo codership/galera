@@ -163,6 +163,7 @@ public:
         bool left;
 	ViewId view_id;
 	EVSRange range;
+        uint32_t safe_seq;
     public:
 	Instance() {}
 	Instance(const UUID pid_, 
@@ -170,12 +171,14 @@ public:
                  const bool oper_, 
                  const bool left_,
 		 const ViewId& view_id_,
-		 const EVSRange range_) :
+		 const EVSRange range_,
+                 const uint32_t safe_seq_) :
 	    pid(pid_),
             operational(oper_),
             left(left_),
 	    view_id(view_id_),
-            range(range_) 
+            range(range_),
+            safe_seq(safe_seq_)
         {
             strncpy(name, name_.c_str(), sizeof(name));
         }
@@ -195,6 +198,11 @@ public:
 	const EVSRange& get_range() const {
 	    return range;
 	}
+
+        uint32_t get_safe_seq() const
+        {
+            return safe_seq;
+        }
 
 	size_t write(void* buf, 
 		     const size_t buflen, const size_t offset) {
@@ -221,6 +229,10 @@ public:
 		LOG_TRACE("");
 		return 0;
 	    }
+            if ((off = gcomm::write(safe_seq, buf, buflen, off)) == 0)
+            {
+                LOG_TRACE("");
+            }
 	    return off;
 	}
 	
@@ -242,11 +254,13 @@ public:
 	    if ((off = gcomm::read(buf, buflen, off, &high)) == 0)
 		return 0;
 	    range = EVSRange(low, high);
+            if ((off = gcomm::read(buf, buflen, off, &safe_seq)) == 0)
+                return 0;
 	    return off;
 	}
 
 	static size_t size() {
-	    return 4 + UUID::size() + ViewId::size() + 4 + 4;
+	    return 4 + UUID::size() + ViewId::size() + 4 + 4 + 4;
 	}
 
         string to_string() const
@@ -258,7 +272,8 @@ public:
             ret += left ? "l=1" : "l=0";
             ret += " ";
             ret += view_id.to_string() + " ";
-            ret += range.to_string();
+            ret += range.to_string() + " safe_seq ";
+            ret += make_int(safe_seq).to_string();
             return ret;
         }
 
@@ -399,7 +414,9 @@ public:
                       const bool operational, 
                       const bool left,
 		      const ViewId& view_id, 
-		      const EVSRange& range) {
+		      const EVSRange& range,
+                      const uint32_t safe_seq) 
+    {
 	std::pair<std::map<UUID, Instance>::iterator, bool> i = 
 	    instances->insert(make_pair(
 				  pid, 
@@ -408,7 +425,7 @@ public:
                                            operational, 
                                            left,
 					   view_id, 
-                                           range)));
+                                           range, safe_seq)));
 	if (i.second == false)
 	    throw FatalException("");
     }

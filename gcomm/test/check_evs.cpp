@@ -819,6 +819,131 @@ START_TEST(test_evs_proto_leave_basic)
 END_TEST
 
 
+START_TEST(test_evs_proto_duplicates)
+{
+    EventLoop el;
+    UUID p1(0, 0);
+    UUID p2(0, 0);
+
+    DummyTransport* tp1 = new DummyTransport();
+    DummyUser du1;
+    EVSProto* ep1 = new EVSProto(&el, tp1, p1, "n1", 0);
+    
+    connect(tp1, ep1);
+    connect(ep1, &du1);
+    
+    DummyUser du2;
+    DummyTransport* tp2 = new DummyTransport();
+    EVSProto* ep2 = new EVSProto(&el, tp2, p2, "n2", 0);
+    
+    connect(tp2, ep2);
+    connect(ep2, &du2);
+
+    single_boot(tp1, ep1);
+    
+    EVSMessage jm1, jm2;
+    EVSMessage im;
+    EVSMessage gm;
+    EVSMessage gm2;
+    EVSMessage msg;
+    
+    ReadBuf* rb;
+    
+    ep2->shift_to(EVSProto::JOINING);
+    fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
+    fail_unless(ep2->get_state() == EVSProto::JOINING);
+    
+    // Send join message, don't handle immediately
+    ep2->send_join(false);
+    fail_unless(ep2->get_state() == EVSProto::JOINING);
+    rb = tp2->get_out();
+    fail_unless(rb != 0);
+    get_msg(rb, &jm2);
+    fail_unless(jm2.get_type() == EVSMessage::JOIN);
+    rb = tp2->get_out();
+    fail_unless(rb == 0);
+
+    ep1->handle_join(jm2, jm2.get_source());
+    fail_unless(ep1->get_state() == EVSProto::RECOVERY);
+
+    rb = tp1->get_out();
+    fail_unless(rb != 0);
+    get_msg(rb, &jm1);
+    fail_unless(jm1.get_type() == EVSMessage::JOIN);
+
+    rb = tp1->get_out();
+    get_msg(rb, &msg);
+    fail_unless(rb == 0);
+
+    ep2->handle_join(jm1, jm1.get_source());
+    fail_unless(ep2->get_state() == EVSProto::RECOVERY);
+    rb = tp2->get_out();
+    fail_unless(rb != 0);
+    get_msg(rb, &jm2);
+    fail_unless(jm2.get_type() == EVSMessage::JOIN);
+    rb = tp2->get_out();
+    get_msg(rb, &msg);
+    fail_unless(rb == 0);
+
+    ep1->handle_join(jm2, jm2.get_source());
+    ep1->handle_join(jm1, jm1.get_source());
+    ep1->handle_join(jm2, jm2.get_source());
+    fail_unless(ep1->get_state() == EVSProto::RECOVERY);
+    rb = tp1->get_out();
+    fail_unless(rb != 0);
+    get_msg(rb, &im);
+    fail_unless(im.get_type() == EVSMessage::INSTALL);
+    
+    rb = tp1->get_out();
+    fail_unless(rb != 0);
+    get_msg(rb, &gm);
+    fail_unless(gm.get_type() == EVSMessage::GAP);
+    rb = tp1->get_out();
+    fail_unless(rb == 0);
+    
+    ep1->handle_join(jm2, jm2.get_source());
+    ep1->handle_join(jm1, jm1.get_source());
+    ep1->handle_join(jm2, jm2.get_source());
+    ep1->handle_install(im, im.get_source());
+    fail_unless(ep1->get_state() == EVSProto::RECOVERY);
+    
+    ep2->handle_install(im, im.get_source());
+    fail_unless(ep2->get_state() == EVSProto::RECOVERY);
+    rb = tp2->get_out();
+    fail_unless(rb != 0);
+    get_msg(rb, &gm2);
+    fail_unless(gm2.get_type() == EVSMessage::GAP);
+
+    rb = tp2->get_out();
+    get_msg(rb, &msg);
+    fail_unless(rb == 0);
+
+    ep1->handle_gap(gm2, gm2.get_source());
+    fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
+    rb = tp1->get_out();
+    fail_unless(rb == 0);
+
+    ep2->handle_gap(gm, gm.get_source());
+    fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
+    rb = tp2->get_out();
+    fail_unless(rb == 0);
+
+    ep1->handle_join(jm2, jm2.get_source());
+    ep1->handle_join(jm1, jm1.get_source());
+    ep1->handle_join(jm2, jm2.get_source());
+    ep1->handle_install(im, im.get_source());
+    fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
+
+
+    ep2->handle_join(jm2, jm2.get_source());
+    ep2->handle_join(jm1, jm1.get_source());
+    ep2->handle_join(jm2, jm2.get_source());
+    ep2->handle_install(im, im.get_source());
+    fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
+
+}
+END_TEST
+
 struct Inst : public Toplay {
     DummyTransport* tp;
     EVSProto* ep;
@@ -1656,7 +1781,7 @@ START_TEST(test_evs_w_gmcast)
 END_TEST
 
 
-bool skip = false;
+bool skip = true;
 
 Suite* evs_suite()
 {
@@ -1703,6 +1828,13 @@ Suite* evs_suite()
     suite_add_tcase(s, tc);
 
 
+    tc = tcase_create("test_evs_proto_duplicates");
+    tcase_add_test(tc, test_evs_proto_duplicates);
+    suite_add_tcase(s, tc);
+    
+
+    if (skip)
+        return s;
 
     tc = tcase_create("test_evs_proto_converge");
     tcase_add_test(tc, test_evs_proto_converge);
@@ -1724,9 +1856,6 @@ Suite* evs_suite()
     tcase_set_timeout(tc, 30);
     suite_add_tcase(s, tc);
 
-
-    if (skip)
-        return s;
 
     tc = tcase_create("test_evs_proto_msg_loss");
     tcase_add_test(tc, test_evs_proto_msg_loss);

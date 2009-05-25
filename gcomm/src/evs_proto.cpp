@@ -279,10 +279,10 @@ bool EVSProto::is_consensus() const
 
 bool EVSProto::is_representative(const UUID& pid) const
 {
-    for (std::map<const UUID, EVSInstance>::const_iterator i =
-             known.begin();
-         i != known.end(); ++i) {
-        if (i->second.operational) {
+    for (InstMap::const_iterator i = known.begin(); i != known.end(); ++i) 
+    {
+        if (i->second.operational) 
+        {
             if (pid == i->first)
                 return true;
             else
@@ -444,7 +444,7 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
         }
         if (jm_insts != local_insts)
         {
-            LOG_DEBUG(self_string() + " not consistent: local instances, different view");
+            LOG_DEBUG(self_string() + " not consistent: local instances, different view: own state " + to_string() + " msg " + jm.to_string());
             return false;
         }
         jm_insts.clear();
@@ -629,7 +629,9 @@ EVSJoinMessage EVSProto::create_join() const
                          (input_map.contains_sa(pid) ? current_view.get_id() : 
                           ViewId())), 
                         (input_map.contains_sa(pid) ? 
-                         input_map.get_sa_gap(pid) : EVSRange()));
+                         input_map.get_sa_gap(pid) : EVSRange()),
+                        (input_map.contains_sa(pid) ?
+                         input_map.get_sa_safe_seq(pid) : SEQNO_MAX));
     }
 #ifdef STRICT_JOIN_CHECK
     if (is_consistent(jm) == false)
@@ -795,7 +797,9 @@ void EVSProto::send_install()
                          (input_map.contains_sa(pid) ? 
                           current_view.get_id() : ViewId())), 
                         (input_map.contains_sa(pid) ? 
-                         input_map.get_sa_gap(pid) : EVSRange()));
+                         input_map.get_sa_gap(pid) : EVSRange()),
+                        (input_map.contains_sa(pid) ?
+                         input_map.get_sa_safe_seq(pid) : SEQNO_MAX));
     }
     LOG_DEBUG(self_string() + " sending install: " + im.to_string());
     size_t bufsize = im.size();
@@ -1121,6 +1125,8 @@ void EVSProto::shift_to(const State s, const bool send_j)
     {
         // tp->set_loopback(true);
         stop_resend_timer();
+        stop_send_join_timer();
+        start_send_join_timer();
         if (get_state() != RECOVERY)
         {
             cleanup_joins();
@@ -1154,6 +1160,7 @@ void EVSProto::shift_to(const State s, const bool send_j)
         assert(install_message && is_consistent(*install_message));
         assert(is_all_installed() == true);
         unset_consensus_timer();
+        stop_send_join_timer();
         deliver();
         deliver_trans_view(false);
         deliver_trans();
@@ -1660,9 +1667,9 @@ void EVSProto::handle_gap(const EVSMessage& msg, const UUID& source)
         return;
     }
     
-    assert((i->second.operational == true || i->second.leave_message) &&
-           (i->second.installed == true || get_state() == RECOVERY) &&
-           msg.get_source_view() == current_view.get_id());
+//    assert((i->second.operational == true || i->second.leave_message) &&
+//           (i->second.installed == true || get_state() == RECOVERY) &&
+    assert(msg.get_source_view() == current_view.get_id());
     
     uint32_t prev_safe = input_map.get_safe_seq();
     // Update safe seq for source
@@ -1779,6 +1786,20 @@ bool EVSProto::states_compare(const EVSMessage& msg)
                 send_join_p = true;
             }
         }
+        if (input_map.contains_sa(ii->second.get_pid()))
+        {
+            uint32_t imseq = input_map.get_sa_safe_seq(ii->second.get_pid());
+            uint32_t msseq = ii->second.get_safe_seq();
+
+            if ((seqno_eq(imseq, SEQNO_MAX) && 
+                 seqno_eq(msseq, SEQNO_MAX) == false) ||
+                (seqno_eq(imseq, SEQNO_MAX) == false && 
+                 seqno_eq(msseq, SEQNO_MAX) == false &&
+                 seqno_gt(msseq, imseq)))
+            {
+                input_map.set_safe(ii->second.get_pid(), msseq);
+            }
+        }
     }
     
     // Update highest known seqno
@@ -1838,7 +1859,6 @@ bool EVSProto::states_compare(const EVSMessage& msg)
             resend(msg.get_source(), EVSGap(my_addr, range));
         }
     }
-    
     
     // Try recovery for all messages between low_seq/high_seq
     EVSRange range(low_seq, high_seq);

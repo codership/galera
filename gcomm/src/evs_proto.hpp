@@ -136,6 +136,7 @@ public:
         inactive_check_period(Time(1, 0)),
         consensus_timeout(Time(1, 0)),
         resend_period(Time(1, 0)),
+        send_join_period(Time(0, 300000)),
         timer(el_),
         current_view(View::V_TRANS, ViewId(my_addr, 0)),
         install_message(0),
@@ -157,6 +158,7 @@ public:
         cth = new CleanupTimerHandler(this);
         consth = new ConsensusTimerHandler(this);
         resendth = new ResendTimerHandler(this);
+        sjth = new SendJoinTimerHandler(this);
         shift_to_rfcnt = 0;
     }
     
@@ -172,6 +174,7 @@ public:
         delete cth;
         delete consth;
         delete resendth;
+        delete sjth;
     }
     
     UUID my_addr;
@@ -205,6 +208,7 @@ public:
     Period inactive_check_period;
     Time consensus_timeout;
     Period resend_period;
+    Period send_join_period;
     Timer timer;
     
     // Current view id
@@ -451,10 +455,42 @@ public:
         }
     };
 
+    class SendJoinTimerHandler : public TimerHandler
+    {
+        EVSProto* p;
+    public:
+        SendJoinTimerHandler(EVSProto* p_) :
+            TimerHandler("send_join"),
+            p(p_)
+        {
+        }
+        ~SendJoinTimerHandler()
+        {
+            if (p->timer.is_set(this))
+                p->timer.unset(this);
+        }
+        void handle()
+        {
+            Critical crit(p->mon);
+            if (p->get_state() == RECOVERY)
+            {
+                LOG_DEBUG("send join timer handler at " + p->self_string());
+                p->send_join(true);
+                if (p->timer.is_set(this) == false)
+                {
+                    p->timer.set(this, p->resend_period);
+                }
+            }
+        }
+    };
+
+
+
     InactivityTimerHandler* ith;
     CleanupTimerHandler* cth;
     ConsensusTimerHandler* consth;
     ResendTimerHandler* resendth;
+    SendJoinTimerHandler* sjth;
     
     void start_inactivity_timer() 
     {
@@ -506,6 +542,19 @@ public:
         if (timer.is_set(resendth))
         {
             timer.unset(resendth);
+        }
+    }
+
+    void start_send_join_timer()
+    {
+        timer.set(sjth, send_join_period);
+    }
+
+    void stop_send_join_timer()
+    {
+        if (timer.is_set(sjth))
+        {
+            timer.unset(sjth);
         }
     }
 
