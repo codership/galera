@@ -1201,16 +1201,13 @@ void EVSProto::shift_to(const State s, const bool send_j)
         hs_safe.clear();
         cleanup_unoperational();
         cleanup_views();
+        delete install_message;
+        install_message = 0;
         LOG_DEBUG("new view: " + current_view.to_string());
-        /*
-         * while (output.empty() == false)
-         * if (send_user())
-         * break;
-         */
         start_resend_timer();
         assert(get_state() == OPERATIONAL);
         break;
-             }
+    }
     default:
         throw FatalException("Invalid state");
     }
@@ -1485,11 +1482,9 @@ void EVSProto::handle_user(const EVSMessage& msg, const UUID& source,
         }
     }
     
-    assert((i->second.operational == true || i->second.leave_message) &&
-           (i->second.installed == true || get_state() == RECOVERY) &&
-           msg.get_source_view() == current_view.get_id());
-    
-    
+//    assert((i->second.operational == true || i->second.leave_message) &&
+//           (i->second.installed == true || get_state() == RECOVERY) &&
+    assert(msg.get_source_view() == current_view.get_id());
     
     const uint32_t prev_aru = input_map.get_aru_seq();
     const uint32_t prev_safe = input_map.get_safe_seq();
@@ -1918,6 +1913,13 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
         return;
     }
     
+    if (install_message)
+    {
+        LOG_WARN(self_string() 
+                 + " install message and received join, discarding");
+        return;
+    }
+    
     if (get_state() == RECOVERY && install_message && is_consistent(msg)) 
     {
         LOG_DEBUG(self_string() + " redundant join message: "
@@ -1940,8 +1942,7 @@ void EVSProto::handle_join(const EVSMessage& msg, const UUID& source)
     i->second.set_name(msg.get_source_name());
     
     bool send_join_p = false;
-    if (get_state() == JOINING || get_state() == OPERATIONAL || 
-        install_message) 
+    if (get_state() == JOINING || get_state() == OPERATIONAL)
     {
         send_join_p = true;
         SHIFT_TO2(RECOVERY, false);
