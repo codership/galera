@@ -133,6 +133,7 @@ public:
     
     void validate_state() const
     {
+#ifdef VALIDATE_STATE
         if (seqno_eq(aru_seq, SEQNO_MAX) && !seqno_eq(safe_seq, SEQNO_MAX))
         {
             throw FatalException("validate state: aru_seq == SEQNO_MAX, safe_seq != SEQNO_MAX");
@@ -169,6 +170,7 @@ public:
         {
             throw FatalException("");
         }
+#endif // VALIDATE_STATE
     }
 
     void set_safe(const UUID& s, const uint32_t seq) {

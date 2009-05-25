@@ -23,7 +23,8 @@ using std::make_pair;
 
 BEGIN_GCOMM_NAMESPACE
 
-struct EVSInstance {
+struct EVSInstance 
+{
     // True if instance is considered to be operational (has produced messages)
     bool operational;
     // True if it is known that the instance has installed current view
@@ -97,17 +98,18 @@ struct EVSInstance {
     }                                                                   \
     while (0)
 
-#define SHIFT_TO2(_s, _sjb) do                                         \
+
+#define SHIFT_TO2(_s, _sjb) do                                          \
     {                                                                   \
         LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + Int(__LINE__).to_string()); \
-        shift_to(_s, _sjb);                                       \
+        shift_to(_s, _sjb);                                             \
     }                                                                   \
     while (0)
 
-#define SHIFT_TO_P(_p, _s, _sjb) do                                    \
+#define SHIFT_TO_P(_p, _s, _sjb) do                                     \
     {                                                                   \
         LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + Int(__LINE__).to_string()); \
-        (_p)->shift_to(_s, _sjb);                                      \
+        (_p)->shift_to(_s, _sjb);                                       \
     }                                                                   \
     while (0)
 
@@ -208,7 +210,8 @@ public:
     // Current view id
     // ViewId current_view;
     View current_view;
-    list<pair<View, Time> > previous_views;
+    View previous_view;
+    list<pair<ViewId, Time> > previous_views;
     
     // Map containing received messages and aru/safe seqnos
     EVSInputMap input_map;

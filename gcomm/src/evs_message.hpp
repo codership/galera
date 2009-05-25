@@ -419,6 +419,7 @@ public:
     size_t read(const void* buf, const size_t buflen, const size_t offset) {
         delete instances;
         instances = 0;
+        memset(name, 0, sizeof(name));
 	uint8_t b;
 	size_t off;
 	if ((off = gcomm::read(buf, buflen, offset, &b)) == 0)
