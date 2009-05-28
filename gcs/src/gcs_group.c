@@ -198,7 +198,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
 {
     long        new_idx, old_idx;
     long        new_nodes_num = 0;
-    gcs_node_t *new_nodes = NULL;
+    gcs_node_t *new_nodes;
     ulong       new_memb = 0;
 
     group->my_idx = gcs_comp_msg_self (comp);
@@ -265,6 +265,9 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
             assert (0 == new_nodes_num);
             new_nodes = NULL;
             gu_info ("Received self-leave message.");
+        }
+        else {
+            new_nodes = group_nodes_init (comp);
         }
 	/* Got NON-PRIMARY COMPONENT - cleanup */
         /* All sending threads must be aborted with -ENOTCONN,
