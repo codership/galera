@@ -7,11 +7,18 @@ BASE_DIR=$(cd $(dirname $0); pwd -P)
 . $BASE_DIR/../scripts/tap-functions
 
 REPORT_DIR="$TEST_REPORT_DIR/dummy"
-mkdir $REPORT_DIR
+if ! test -d $REPORT_DIR
+then
+    mkdir $REPORT_DIR
+fi
 
-echo "args: " $@ 1>&2
-echo "pwd: " `pwd`
-echo "output: " $REPORT_DIR
+DUMMY_LOG=$REPORT_DIR/dummy.log
+
+echo "args: " $@ >> $DUMMY_LOG
+echo "pwd: " `pwd` >> $DUMMY_LOG
+echo "output: " $REPORT_DIR >> $DUMMY_LOG
+echo "nodes :" $CLUSTER_NODES >> $DUMMY_LOG
+echo "n_nodes: " $CLUSTER_N_NODES >> $DUMMY_LOG
 
 plan_tests 7
 

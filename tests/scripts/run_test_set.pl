@@ -8,11 +8,8 @@
 #
 # Usage:
 #
-# run_test_set.pl [test.conf]* [testn test args]* 
+# run_test_set.pl [-q|-v] [test.conf]* [testn test args]* 
 # 
-# Each test script is called and given arguments are passed as positional
-# parameters. Additionally this script sets environment variable
-# TEST_REPORT_DIR under which each test should output their stuff.
 # 
 #
 
@@ -52,7 +49,10 @@ sub read_tests
     {
         my $line;
         chomp($line = $_);
-        push @res, $line;
+        unless ($line =~ /^#/)
+        {
+            push @res, $line;
+        }
     }
     
     close IN;
@@ -66,6 +66,12 @@ chomp($cwd = `pwd`);
 my $self = $cwd . "/scripts/run_test_set.pl";
 die "run_test_set.pl must be run from test root" 
     unless system(("test", "-f", $self)) == 0;
+
+# Export some helpful environment variables
+
+# Count number of nodes for test scripts
+my @nvec = split(' ', $ENV{CLUSTER_NODES});
+$ENV{CLUSTER_N_NODES} = scalar(@nvec);
 
 # Report directory and test result log definitions
 # Report dir is r/yymmdd.i where yy is year, mm month, dd day and
