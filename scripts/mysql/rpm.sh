@@ -60,7 +60,7 @@ MYSQL_SRC=$(cd $MYSQL_SRC; pwd -P; cd $BUILD_ROOT)
 ##                                  ##
 ######################################
 # Obtain MySQL version and revision of Galera patch
-cd $MYSQL_SRC
+pushd $MYSQL_SRC
 
 # make dist
 if test -f Makefile
@@ -72,6 +72,7 @@ if ! test -f configure
 then
     BUILD/autorun.sh
 fi
+WSREP_REV=$(bzr revno); export WSREP_REV
 time ./configure --with-wsrep > /dev/null
 
 # MySQL has a mindblowing make system that requires extra/comp_err to be built
@@ -87,15 +88,21 @@ pushd dbug;    make > /dev/null; popd
 time make dist > /dev/null
 
 MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
-MYSQL_REV=$(bzr revno); export MYSQL_REV
-mv mysql-$MYSQL_VER.tar.gz /usr/src/redhat/SOURCES/
+
+export RPM_BUILD_ROOT=$BUILD_ROOT/redhat
+mkdir -p $RPM_BUILD_ROOT/BUILD
+mkdir -p $RPM_BUILD_ROOT/RPMS
+mkdir -p $RPM_BUILD_ROOT/SOURCES
+mkdir -p $RPM_BUILD_ROOT/SPECS
+mkdir -p $RPM_BUILD_ROOT/SRPMS
+
+mv mysql-$MYSQL_VER.tar.gz $RPM_BUILD_ROOT/SOURCES/
+
 pushd support-files
 rm -rf *.spec
-export WSREP_MAJOR=0
-export WSREP_MINOR=6
-export WSREP_REV=$MYSQL_REV
 time make
-time rpmbuild -bc --with wsrep mysql-$MYSQL_VER.spec
+time rpmbuild --buildroot $RPM_BUILD_ROOT -bc --with wsrep mysql-$MYSQL_VER.spec server
+popd
 
 # must be single line or set -e will abort the script on amd64
 uname -m | grep -q i686 && export CPU=pentium || export CPU=amd64
