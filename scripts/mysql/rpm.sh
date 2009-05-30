@@ -82,27 +82,37 @@ pushd include; make > /dev/null; popd
 pushd strings; make > /dev/null; popd
 pushd mysys;   make > /dev/null; popd
 pushd dbug;    make > /dev/null; popd
-#pushd extra   && make && popd
-#pushd scripts && make && popd
+pushd support-files; rm -rf *.spec;  make > /dev/null; popd
+pushd libmysql;   make link_sources > /dev/null; popd
+pushd libmysql_r; make link_sources > /dev/null; popd
+pushd libmysqld;  make link_sources > /dev/null; popd
+pushd client;     make link_sources > /dev/null; popd
 
 time make dist > /dev/null
 
 MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
 
-export RPM_BUILD_ROOT=$BUILD_ROOT/redhat
-mkdir -p $RPM_BUILD_ROOT/BUILD
-mkdir -p $RPM_BUILD_ROOT/RPMS
-mkdir -p $RPM_BUILD_ROOT/SOURCES
-mkdir -p $RPM_BUILD_ROOT/SPECS
-mkdir -p $RPM_BUILD_ROOT/SRPMS
+#if test -d /usr/src/redhat
+#then
+#export RPM_BUILD_ROOT=/usr/src/redhat
+#else
+RPM_BUILD_ROOT=$BUILD_ROOT/redhat
+#fi
+mkdir -p $RPM_BUILD_ROOT
+pushd $RPM_BUILD_ROOT
+mkdir -p BUILD RPMS SOURCES SPECS SRPMS
+pushd RPMS
+mkdir -p athlon i386 i486 i586 i686 noarch
+popd; popd
 
 mv mysql-$MYSQL_VER.tar.gz $RPM_BUILD_ROOT/SOURCES/
 
-pushd support-files
-rm -rf *.spec
-time make
-time rpmbuild --buildroot $RPM_BUILD_ROOT -bc --with wsrep mysql-$MYSQL_VER.spec server
-popd
+MYSQL_SPEC=$MYSQL_SRC/support-files/mysql-$MYSQL_VER.spec
+
+time rpmbuild \
+      --define "_topdir $RPM_BUILD_ROOT" \
+      --with wsrep -ba $MYSQL_SPEC \
+      > $BUILD_ROOT/rpmbuild.log
 
 # must be single line or set -e will abort the script on amd64
 uname -m | grep -q i686 && export CPU=pentium || export CPU=amd64
