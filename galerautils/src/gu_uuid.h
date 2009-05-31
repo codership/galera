@@ -25,13 +25,21 @@ extern const gu_uuid_t GU_UUID_NIL;
 
 /** Macros for pretty printing */
 #define GU_UUID_FORMAT \
-"%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
+"%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
 
+/* this is used for printing */
 #define GU_UUID_ARGS(uuid) \
 (uuid)->data[ 0], (uuid)->data[ 1], (uuid)->data[ 2], (uuid)->data[ 3],\
 (uuid)->data[ 4], (uuid)->data[ 5], (uuid)->data[ 6], (uuid)->data[ 7],\
 (uuid)->data[ 8], (uuid)->data[ 9], (uuid)->data[10], (uuid)->data[11],\
 (uuid)->data[12], (uuid)->data[13], (uuid)->data[14], (uuid)->data[15]
+
+/* this is used for scanf, variables are by reference */
+#define GU_UUID_ARGS_REF(uuid) \
+&(uuid)->data[ 0], &(uuid)->data[ 1], &(uuid)->data[ 2], &(uuid)->data[ 3],\
+&(uuid)->data[ 4], &(uuid)->data[ 5], &(uuid)->data[ 6], &(uuid)->data[ 7],\
+&(uuid)->data[ 8], &(uuid)->data[ 9], &(uuid)->data[10], &(uuid)->data[11],\
+&(uuid)->data[12], &(uuid)->data[13], &(uuid)->data[14], &(uuid)->data[15]
 
 /** 
  * Generates new UUID.
