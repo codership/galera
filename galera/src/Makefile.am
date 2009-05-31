@@ -23,7 +23,8 @@ include_HEADERS =
 lib_LTLIBRARIES = libmmgalera.la
 libmmgalera_la_SOURCES =   \
 	mm_galera.c        \
-	galera_info.c
+	galera_info.c      \
+	galera_state.c
 
 
 #GALERA_RELEASE =
