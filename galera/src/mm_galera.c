@@ -22,6 +22,7 @@
 #include <wsdb_api.h>
 #include "wsrep.h"
 #include "galera_info.h"
+#include "galera_state.h"
 #include "job_queue.h"
 
 #define GALERA_USE_FLOW_CONTROL 1
@@ -76,6 +77,8 @@ static gu_uuid_t           group_uuid;
 static long                my_idx;
 
 static struct job_queue   *applier_queue = NULL;
+
+static wsrep_init_args_t saved_args;
 
 /* global status structure */
 struct galera_info Galera;
@@ -208,7 +211,11 @@ static enum wsrep_status mm_galera_set_logger(
 static enum wsrep_status mm_galera_init(wsrep_t* gh,
                                         const wsrep_init_args_t* args)
 {
+    galera_state_t saved_state;
+    int rcode;
+
     GU_DBUG_ENTER("galera_init");
+    memcpy(&saved_args, args, sizeof(saved_args));
 
     /* set up GCS parameters */
     if (args->gcs_address) {
@@ -220,20 +227,34 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
         gcs_channel = strdup (args->gcs_group);
     }
 
-    /* set up initial state */
-    if (WSREP_SEQNO_UNDEFINED == args->state_seqno) {
-        last_applied = GCS_SEQNO_NIL;
+    /* set up initial state: */
+
+    /* 1.  initialize to NIL */
+    last_applied = GCS_SEQNO_NIL;
+    group_uuid = GU_UUID_NIL;
+
+    /* 2. read saved state from file */
+    rcode = galera_restore_state(args->data_dir, &saved_state);
+    if (rcode) {
+        gu_warn("GALERA state restore failed");
     } else {
+        group_uuid = *(&saved_state.uuid);
+        last_applied = saved_state.last_applied_seqno;
+    }
+
+    /* 3. use passed state arguments */
+    if (args->state_seqno != WSREP_SEQNO_UNDEFINED) {
         last_applied = args->state_seqno;
     }
+    if (memcmp(&WSREP_UUID_UNDEFINED, &args->state_uuid, sizeof(wsrep_uuid_t))){
+        group_uuid = *(gu_uuid_t*)&args->state_uuid;
+    }
+
+    gu_info("LAST applied: %lli", last_applied);
+    gu_info(GU_UUID_FORMAT, GU_UUID_ARGS(&(group_uuid)));
 
     last_recved = last_applied;
 
-    if (memcmp(&WSREP_UUID_UNDEFINED, &args->state_uuid, sizeof(wsrep_uuid_t))){
-        group_uuid = *(gu_uuid_t*)&args->state_uuid;
-    } else {
-        group_uuid = GU_UUID_NIL;
-    }
     my_idx = 0;
 
     /* initialize wsdb */
@@ -303,6 +324,9 @@ static void mm_galera_dbug_pop (wsrep_t *gh)
 
 static void mm_galera_tear_down(wsrep_t *gh)
 {
+    int rcode;
+    galera_state_t saved_state;
+
     if (Galera.repl_state == GALERA_UNINITIALIZED)
 	return;
 
@@ -311,6 +335,17 @@ static void mm_galera_tear_down(wsrep_t *gh)
     if (commit_queue) gcs_to_destroy(&commit_queue);
 
     wsdb_close();
+
+    /* store persistent state*/
+    memcpy(saved_state.uuid.data, group_uuid.data, GU_UUID_LEN);
+    saved_state.last_applied_seqno = last_applied;
+
+    rcode = galera_store_state(saved_args.data_dir, &saved_state);
+    if (rcode) {
+        gu_error("GALERA state store failed: %d", rcode);
+        gu_info("      last applied: %lli", last_applied);
+        gu_info(GU_UUID_FORMAT, GU_UUID_ARGS(&group_uuid));
+    }
 
 #if DELETED
     mm_galera_set_logger(gh, NULL);
