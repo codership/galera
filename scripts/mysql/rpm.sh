@@ -68,10 +68,10 @@ then
     time make maintainer-clean > /dev/null
 #    make distclean
 fi
-if ! test -f configure
-then
-    BUILD/autorun.sh
-fi
+#if ! test -f configure
+#then
+    time BUILD/autorun.sh
+#fi
 WSREP_REV=$(bzr revno); export WSREP_REV
 time ./configure --with-wsrep > /dev/null
 
@@ -87,7 +87,6 @@ pushd libmysql;   make link_sources > /dev/null; popd
 pushd libmysql_r; make link_sources > /dev/null; popd
 pushd libmysqld;  make link_sources > /dev/null; popd
 pushd client;     make link_sources > /dev/null; popd
-
 time make dist > /dev/null
 
 MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
@@ -109,16 +108,21 @@ mv mysql-$MYSQL_VER.tar.gz $RPM_BUILD_ROOT/SOURCES/
 
 MYSQL_SPEC=$MYSQL_SRC/support-files/mysql-$MYSQL_VER.spec
 
+i686_cflags="-march=i686 -mtune=i686"
+amd64_cflags="-m64 -mtune=opteron"
+fast_cflags="-O3 -fno-omit-frame-pointer"
+uname -m | grep -q i686 && \
+export RPM_OPT_FLAGS="$i686_cflags $fast_cflags"   || \
+export RPM_OPT_FLAGS="$amd64_cflags $fast_cflags"
+
 time rpmbuild \
       --define "_topdir $RPM_BUILD_ROOT" \
+      --define "optflags $RPM_OPT_FLAGS" \
       --with wsrep -ba $MYSQL_SPEC \
       > $BUILD_ROOT/rpmbuild.log
 
-# must be single line or set -e will abort the script on amd64
-uname -m | grep -q i686 && export CPU=pentium || export CPU=amd64
+exit 0
 
-
-exit
 # Build mysqld
 if [ "$CONFIGURE" == "yes" ]
 then
