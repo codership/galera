@@ -9,7 +9,7 @@
 
 static int make_state_file_name(const char *dir, char *file_name, int len) {
   if (strlen(dir) + strlen(STATE_FILE) + 1 > (uint)len) {
-        gu_error("galera state file path name too long");
+        gu_error("state file path name too long");
         return -1;
     }
     sprintf(file_name, "%s/%s", dir, STATE_FILE);
@@ -22,12 +22,12 @@ int galera_store_state(const char *dir, galera_state_t *state) {
     time_t now = time(NULL);
 
     if (make_state_file_name(dir, file_name, 256)) {
-        gu_error("GALERA: could not create state file: %s, %s", dir, file_name);
+        gu_error("could not create state file: %s, %s", dir, file_name);
         return -1;
     }
     fid = fopen(file_name, "w");
     if (!fid) {
-        gu_error("GALERA: could not open state file: %s", file_name);
+        gu_error("could not open state file: %s", file_name);
         return -1;
     }
     fprintf(fid, STATE_HEADER, 0.6, ctime(&now));
@@ -51,21 +51,24 @@ int galera_restore_state(const char *dir, galera_state_t *state) {
     int i = 0;
  
     if (make_state_file_name(dir, file_name, 256)) {
-        gu_error("GALERA: could not create state file: %s, %s", dir, file_name);
+        gu_error("could not create state file: %s, %s", dir, file_name);
         return -1;
     }
 
     fid = fopen(file_name, "r");
     if (!fid) {
-        gu_error("GALERA: could not open state file: %s", file_name);
+        gu_error("could not open state file: %s", file_name);
         return -1;
     }
 
     /* read header line */
-    fgets((char *)row, 80, fid);
+    if (!fgets((char *)row, 80, fid)) {
+        gu_error("empty state file: %s", file_name);
+        return -1;
+    }
 
     if (sscanf(row, STATE_HEADER, &version, time_str) != 2) {
-        gu_error("GALERA: unknown header in state file: %s", file_name);
+        gu_error("unknown header in state file: %s", file_name);
         gu_error("        row: %s", row);
         return -1;
     }
@@ -101,7 +104,7 @@ int galera_restore_state(const char *dir, galera_state_t *state) {
             }
         } 
         if (ferror(fid)) {
-            gu_error("GALERA: state file read fail: %d", ferror(fid));
+            gu_error("state file read fail: %d", ferror(fid));
         }
     } while(!feof(fid));
 
