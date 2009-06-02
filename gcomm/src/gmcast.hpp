@@ -62,7 +62,7 @@ public:
         return uuid;
     }
     
-    size_t read(const void* buf, const size_t buflen, const size_t offset) {
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset) {
         size_t off;
         uint8_t byte;
         if ((off = gcomm::read(buf, buflen, offset, &byte)) == 0)
@@ -86,7 +86,7 @@ public:
         return off;
     }
 
-    size_t write(void* buf, const size_t buflen, const size_t offset) const {
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const {
         size_t off;
         uint8_t byte = operational ? 0x1 : 0;
         if ((off = gcomm::write(byte, buf, buflen, offset)) == 0)
@@ -227,7 +227,7 @@ public:
     }
 
     
-    size_t write(void* buf, const size_t buflen, const size_t offset) const {
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const {
         size_t off;
         /* Version */
         if ((off = gcomm::write(version, buf, buflen, offset)) == 0)
@@ -270,7 +270,7 @@ public:
         return off;
     }
     
-    size_t read_v0(const void* buf, const size_t buflen, const size_t offset) {
+    size_t read_v0(const byte_t* buf, const size_t buflen, const size_t offset) {
         size_t off;
         if ((off = gcomm::read(buf, buflen, offset, &type)) == 0)
             return 0;
@@ -320,7 +320,7 @@ public:
         return off;
     }
     
-    size_t read(const void* buf, const size_t buflen, const size_t offset) {
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset) {
         size_t off;
         
         if ((off = gcomm::read(buf, buflen, offset, &version)) == 0)

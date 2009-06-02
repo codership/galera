@@ -321,7 +321,7 @@ public:
         
         VSDataMessage msg(reg_view->get_id(), next_seq, user_type);
         
-        char hdrbuf[28];
+        byte_t hdrbuf[28];
         size_t hdrbuflen;
         if ((hdrbuflen = msg.write(hdrbuf, sizeof(hdrbuf), 0)) == 0)
         {

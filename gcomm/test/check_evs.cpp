@@ -1781,10 +1781,14 @@ START_TEST(test_evs_w_gmcast)
 END_TEST
 
 
-bool skip = true;
+bool skip = false;
 
 Suite* evs_suite()
 {
+
+    if (::getenv("CHECK_EVS_SKIP"))
+        skip = true;
+
     Suite* s = suite_create("evs");
     TCase* tc;
 

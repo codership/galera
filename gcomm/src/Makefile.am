@@ -26,7 +26,8 @@ libgcomm_la_SOURCES = 		\
 	evs_input_map.cpp	\
 	evs_proto.cpp		\
 	evs.cpp			\
-	vs.cpp
+	vs.cpp			
+
 
 
 libgcomm_la_LDFLAGS = -lgalerautils

@@ -3,6 +3,7 @@
 #include "histogram.hpp"
 #include "gcomm/logger.hpp"
 
+
 #include "check_gcomm.hpp"
 
 #include <vector>
@@ -28,7 +29,7 @@ END_TEST
 START_TEST(test_cstring_rw)
 {
     const char* valid[5] = {"ab", "cdf", "efgh", "ijklm", "opqrst"};
-    char buf[25];
+    byte_t buf[25];
 
     size_t off = 0;
     size_t exp_off = 0;
@@ -91,6 +92,8 @@ START_TEST(test_histogram)
 }
 END_TEST
 
+
+
 Suite* util_suite()
 {
     Suite* s = suite_create("util");
@@ -111,6 +114,8 @@ Suite* util_suite()
     tc = tcase_create("test_histogram");
     tcase_add_test(tc, test_histogram);
     suite_add_tcase(s, tc);
+
+
 
     return s;
 }

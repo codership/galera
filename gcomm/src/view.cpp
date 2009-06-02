@@ -6,7 +6,7 @@
 
 BEGIN_GCOMM_NAMESPACE
 
-size_t ViewId::read(const void* buf, const size_t buflen, const size_t offset)
+size_t ViewId::read(const byte_t* buf, const size_t buflen, const size_t offset)
 {
     size_t off;
     if ((off = uuid.read(buf, buflen, offset)) == 0)
@@ -16,7 +16,7 @@ size_t ViewId::read(const void* buf, const size_t buflen, const size_t offset)
     return off;
 }
 
-size_t ViewId::write(void* buf, const size_t buflen, const size_t offset) const
+size_t ViewId::write(byte_t* buf, const size_t buflen, const size_t offset) const
 {
     size_t off;
     if ((off = uuid.write(buf, buflen, offset)) == 0)
@@ -36,7 +36,7 @@ size_t NodeList::length() const
     return map<const UUID, string>::size();
 }
 
-size_t NodeList::read(const void* buf, const size_t buflen, const size_t offset)
+size_t NodeList::read(const byte_t* buf, const size_t buflen, const size_t offset)
 {
     size_t off;
     uint32_t len;
@@ -52,7 +52,7 @@ size_t NodeList::read(const void* buf, const size_t buflen, const size_t offset)
     for (uint32_t i = 0; i < len; ++i)
     {
         UUID uuid;
-        char name[node_name_size + 1];
+        byte_t name[node_name_size + 1];
         if ((off = uuid.read(buf, buflen, off)) == 0)
         {
             LOG_WARN("read node list: read pid #" + make_int(i).to_string());
@@ -64,7 +64,7 @@ size_t NodeList::read(const void* buf, const size_t buflen, const size_t offset)
             return 0;
         }
         name[node_name_size] = '\0';
-        if (insert(make_pair(uuid, string(name))).second == false)
+        if (insert(make_pair(uuid, string(reinterpret_cast<char*>(name)))).second == false)
         {
             LOG_WARN("read node list: duplicate entry: " + uuid.to_string());
             return 0;
@@ -73,7 +73,7 @@ size_t NodeList::read(const void* buf, const size_t buflen, const size_t offset)
     return off;
 }
 
-size_t NodeList::write(void* buf, const size_t buflen, const size_t offset) const
+size_t NodeList::write(byte_t* buf, const size_t buflen, const size_t offset) const
 {
     size_t off;
         
@@ -91,8 +91,9 @@ size_t NodeList::write(void* buf, const size_t buflen, const size_t offset) cons
             LOG_WARN("write node list: write pid #" + Size(cnt).to_string());
             return 0;
         }
-        char name[node_name_size];
-        strncpy(name, get_name(i).c_str(), node_name_size);
+        byte_t name[node_name_size];
+        strncpy(reinterpret_cast<char*>(name), 
+                get_name(i).c_str(), node_name_size);
         if ((off = write_bytes(name, node_name_size, buf, buflen, off)) == 0)
         {
             LOG_WARN("write node list: write name #"
@@ -117,6 +118,10 @@ string View::to_string(const Type type) const
         return "TRANS";
     case V_REG:
         return "REG";
+    case V_NON_PRIM:
+        return "NON_PRIM";
+    case V_PRIM:
+        return "PRIM";
     default:
         break;
         /* Fall through to exception */
@@ -260,7 +265,7 @@ bool operator==(const View& a, const View& b)
 
 
 
-size_t View::read(const void* buf, const size_t buflen, const size_t offset)
+size_t View::read(const byte_t* buf, const size_t buflen, const size_t offset)
 {
     size_t off;
     UInt32 w;
@@ -303,7 +308,7 @@ size_t View::read(const void* buf, const size_t buflen, const size_t offset)
     return off;
 }
 
-size_t View::write(void* buf, const size_t buflen, const size_t offset) const
+size_t View::write(byte_t* buf, const size_t buflen, const size_t offset) const
 {
     size_t off;
     UInt32 w(type);

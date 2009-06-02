@@ -117,7 +117,7 @@ public:
 
     // Serialization
     
-    size_t read(const void* buf, const size_t buflen, const size_t offset)
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
     {
         size_t off;
         uint32_t w;
@@ -168,7 +168,7 @@ public:
         return off;
     }
 
-    size_t write(void* buf, const size_t buflen, const size_t offset) const
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
     {
         size_t off;
         uint32_t w;

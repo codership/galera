@@ -4,6 +4,7 @@
 #include <gcomm/common.hpp>
 #include <gcomm/string.hpp>
 #include <gcomm/exception.hpp>
+#include <gcomm/types.hpp>
 
 #include <sstream>
 #include <cstring>
@@ -32,9 +33,9 @@ static inline size_t read_string(const void* from, const size_t fromlen,
     return i + 1;
 }
 
-static inline size_t read_bytes(const void* from, const size_t fromlen,
+static inline size_t read_bytes(const byte_t* from, const size_t fromlen,
                                 const size_t from_offset, 
-                                void* to, const size_t tolen)
+                                byte_t* to, const size_t tolen)
 {
     if (fromlen < from_offset + tolen)
         return 0;
@@ -42,7 +43,7 @@ static inline size_t read_bytes(const void* from, const size_t fromlen,
     return from_offset + tolen;
 }
 
-static inline size_t write_string(const char* from, void* to, 
+static inline size_t write_string(const char* from, byte_t* to, 
                                   const size_t tolen, const size_t to_offset)
 {
     size_t strl = strlen(from);
@@ -53,9 +54,9 @@ static inline size_t write_string(const char* from, void* to,
     return to_offset + strl + 1;
 }
 
-static inline size_t write_bytes(const void* from, 
+static inline size_t write_bytes(const byte_t* from, 
                                  const size_t fromlen,
-                                 void* to, 
+                                 byte_t* to, 
                                  const size_t tolen, const size_t to_offset)
 {
     if (tolen < fromlen + to_offset)

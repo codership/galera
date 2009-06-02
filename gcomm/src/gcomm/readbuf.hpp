@@ -14,7 +14,7 @@ using std::map;
 
 BEGIN_GCOMM_NAMESPACE
 
-typedef unsigned char byte_t;
+
 
 
 #if 1

@@ -5,7 +5,7 @@
 #include "gcomm/uri.hpp"
 #include "gcomm/types.hpp"
 
-
+#include "inst_map.hpp"
 
 #include <utility>
 #include <iostream>
@@ -215,6 +215,134 @@ START_TEST(test_view)
 END_TEST
 
 
+class T1
+{
+    uint32_t foo;
+public:
+    
+    T1(const uint32_t foo_ = -1) : foo(foo_) {}
+    
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+    {
+        return gcomm::read(buf, buflen, offset, &foo);
+    }
+    
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    {
+        return gcomm::write(foo, buf, buflen, offset);
+    }
+    
+    static size_t size()
+    {
+        return 4;
+    }
+
+    string to_string() const
+    {
+        return make_int(foo).to_string();
+    }
+    
+    bool operator==(const T1& cmp) const
+    {
+        return foo == cmp.foo;
+    }
+};
+
+
+class T2
+{
+    static const size_t foolen = 16;
+    string foo;
+public:
+    
+    T2(const string foo_ = "") : foo(foo_, 0, foolen) {}
+    
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+    {
+        byte_t b[foolen + 1];
+        memset(b, 0, foolen + 1);
+        size_t ret = read_bytes(buf, buflen, offset, b, foolen);
+        if (ret != 0)
+        {
+            foo = string(reinterpret_cast<char*>(b));
+        }
+        return ret;
+    }
+    
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    {
+        byte_t b[foolen];
+        memset(b, 0, foolen);
+        strncpy(reinterpret_cast<char*>(b), foo.c_str(), foolen);
+        return write_bytes(b, foolen, buf, buflen, offset);
+    }
+    
+    static size_t size()
+    {
+        return foolen;
+    }
+    
+    string to_string() const
+    {
+        return foo;
+    }
+    
+    bool operator==(const T2& cmp) const
+    {
+        return foo == cmp.foo;
+    }
+};
+
+class T3
+{
+public:
+    T3() {}
+};
+
+
+START_TEST(test_inst_map)
+{
+    
+    typedef InstMap<T1> T1Map;
+    T1Map im1;
+    
+    im1.insert(make_pair(UUID(0, 0), T1(4)));
+    
+    check_serialization(im1, 24, T1Map());
+    
+    for (T1Map::const_iterator i = im1.begin(); i != im1.end(); ++i)
+    {
+        LOG_INFO(T1Map::get_uuid(i).to_string() +  " " 
+                 + T1Map::get_instance(i).to_string());
+    }
+
+
+    typedef InstMap<T2> T2Map;
+    T2Map im2;
+    im2.insert(make_pair(UUID(0, 0), T2("strstrs strstrs b")));
+    im2.insert(make_pair(UUID(0, 0), T2("strstrs strstrd ba")));
+    check_serialization(im2, 68, T2Map());
+     
+    for (T2Map::const_iterator i = im2.begin(); i != im2.end(); ++i)
+    {
+        LOG_INFO(T2Map::get_uuid(i).to_string() +  " " 
+                 + T2Map::get_instance(i).to_string());
+    }
+          
+    typedef InstMap<T3> T3Map;
+    T3Map im3;
+    im3.insert(make_pair(UUID(0, 0), T3()));
+    for (T3Map::const_iterator i = im3.begin(); i != im3.end(); ++i)
+    {
+        LOG_INFO(T3Map::get_uuid(i).to_string());
+    }
+
+
+}
+END_TEST
+
+
+
 Suite* types_suite()
 {
     Suite* s = suite_create("types");
@@ -238,6 +366,10 @@ Suite* types_suite()
 
     tc = tcase_create("test_view");
     tcase_add_test(tc, test_view);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_inst_map");
+    tcase_add_test(tc, test_inst_map);
     suite_add_tcase(s, tc);
 
     return s;

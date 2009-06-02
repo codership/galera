@@ -884,11 +884,11 @@ void GMCast::handle_event(const int fd, const Event& pe)
 
 
 void GMCast::forward_message(const int cid, const ReadBuf* rb, 
-                            const size_t offset, const GMCastMessage& msg)
+                             const size_t offset, const GMCastMessage& msg)
 {
 
     WriteBuf wb(rb->get_buf(offset), rb->get_len(offset));
-    char buf[20];
+    byte_t buf[20];
     size_t hdrlen;
     if ((hdrlen = msg.write(buf, sizeof(buf), 0)) == 0)
         throw FatalException("");
@@ -1007,7 +1007,7 @@ int GMCast::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
     {
         GMCastProto* rp = get_gmcast_proto(i);
         GMCastMessage msg(GMCastMessage::P_USER_BASE, uuid, rp->get_send_ttl());
-        char hdrbuf[20];
+        byte_t hdrbuf[20];
         size_t wlen;
         if ((wlen = msg.write(hdrbuf, sizeof(hdrbuf), 0)) == 0)
             throw FatalException("short buffer");

@@ -60,7 +60,7 @@ struct EVSGap {
 	return range.high;
     }
 
-    size_t read(const void* buf, const size_t buflen, const size_t offset) {
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset) {
         size_t off;
         if ((off = source.read(buf, buflen, offset)) == 0)
             return 0;
@@ -71,7 +71,7 @@ struct EVSGap {
         return off;
     }
 
-    size_t write(void* buf, const size_t buflen, const size_t offset) const {
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const {
         size_t off;
         if ((off = source.write(buf, buflen, offset)) == 0)
             return 0;
@@ -204,7 +204,7 @@ public:
             return safe_seq;
         }
 
-	size_t write(void* buf, 
+	size_t write(byte_t* buf, 
 		     const size_t buflen, const size_t offset) {
 	    size_t off;
 	    uint32_t b = (operational ? 0x1 : 0x0) 
@@ -236,7 +236,7 @@ public:
 	    return off;
 	}
 	
-	size_t read(const void* buf, 
+	size_t read(const byte_t* buf, 
                     const size_t buflen, const size_t offset) {
 	    size_t off;
 	    uint32_t b;
@@ -433,7 +433,7 @@ public:
     
     // Message serialization:
 
-    size_t read(const void* buf, const size_t buflen, const size_t offset) {
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset) {
         delete instances;
         instances = 0;
         memset(name, 0, sizeof(name));
@@ -484,7 +484,8 @@ public:
 	    if ((off = source_view.read(buf, buflen, off)) == 0)
 		return 0;
 	    if (type == JOIN || type == INSTALL) {
-                if ((off = read_bytes(buf, buflen, off, name, sizeof(name))) == 0)
+                if ((off = read_bytes(buf, buflen, off, 
+                                      reinterpret_cast<byte_t*>(name), sizeof(name))) == 0)
                 {
                     return 0;
                 }
@@ -509,7 +510,7 @@ public:
 	return off;
     }
     
-    size_t write(void* buf, const size_t buflen, const size_t offset) const {
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const {
 	uint8_t b;
 	size_t off;
 	
@@ -563,7 +564,7 @@ public:
 		return 0;
 	    }
 	    if (type == JOIN || type == INSTALL) {
-                if ((off = write_bytes(name, sizeof(name), buf, buflen, off)) == 0)
+                if ((off = write_bytes(reinterpret_cast<const byte_t*>(name), sizeof(name), buf, buflen, off)) == 0)
                 {
                     LOG_TRACE("");
                     return 0;
@@ -609,7 +610,7 @@ public:
     }
 
     mutable unsigned char hdrbuf[64];
-    const void* get_hdr() const {
+    const byte_t* get_hdr() const {
 	if (write(hdrbuf, sizeof(hdrbuf), 0) == 0)
 	    throw FatalException("Short buffer");
 	return hdrbuf;

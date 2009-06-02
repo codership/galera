@@ -55,7 +55,7 @@ START_TEST(test_gmcast_messages)
     /* */
     {
         GMCastMessage hdr(GMCastMessage::P_HANDSHAKE, UUID());
-        char* buf = new char[hdr.size()];
+        byte_t* buf = new byte_t[hdr.size()];
         fail_unless(hdr.write(buf, hdr.size(), 0) == hdr.size());
         GMCastMessage hdr2;
         fail_unless(hdr2.read(buf, hdr.size(), 0) == hdr.size());
@@ -66,7 +66,7 @@ START_TEST(test_gmcast_messages)
     /* */
     {
         GMCastMessage hdr(GMCastMessage::P_HANDSHAKE_OK, UUID());
-        char* buf = new char[hdr.size()];
+        byte_t* buf = new byte_t[hdr.size()];
         fail_unless(hdr.write(buf, hdr.size(), 0) == hdr.size());
         GMCastMessage hdr2;
         fail_unless(hdr2.read(buf, hdr.size(), 0) == hdr.size());
@@ -78,7 +78,7 @@ START_TEST(test_gmcast_messages)
     /* */
     {
         GMCastMessage hdr(GMCastMessage::P_HANDSHAKE_FAIL, UUID());
-        char* buf = new char[hdr.size()];
+        byte_t* buf = new byte_t[hdr.size()];
         fail_unless(hdr.write(buf, hdr.size(), 0) == hdr.size());
         GMCastMessage hdr2;
         fail_unless(hdr2.read(buf, hdr.size(), 0) == hdr.size());
@@ -91,7 +91,7 @@ START_TEST(test_gmcast_messages)
                           UUID(),
                           "gcomm+tcp://127.0.0.1:2112",
                           "test_group");
-        char* buf = new char[hdr.size()];
+        byte_t* buf = new byte_t[hdr.size()];
         fail_unless(hdr.write(buf, hdr.size(), 0) == hdr.size());
         GMCastMessage hdr2;
         fail_unless(hdr2.read(buf, hdr.size(), 0) == hdr.size());
@@ -102,7 +102,7 @@ START_TEST(test_gmcast_messages)
     /* */
     {
         GMCastMessage hdr(GMCastMessage::P_USER_BASE, UUID(), 4);
-        char* buf = new char[hdr.size()];
+        byte_t* buf = new byte_t[hdr.size()];
         fail_unless(hdr.write(buf, hdr.size(), 0) == hdr.size());
         GMCastMessage hdr2;
         fail_unless(hdr2.read(buf, hdr.size(), 0) == hdr.size());
@@ -119,7 +119,7 @@ START_TEST(test_gmcast_messages)
 
         GMCastMessage hdr(GMCastMessage::P_TOPOLOGY_CHANGE, UUID(0, 0),
                          "foobar", node_list);
-        char* buf = new char[hdr.size()];
+        byte_t* buf = new byte_t[hdr.size()];
         fail_unless(hdr.write(buf, hdr.size(), 0) == hdr.size());
         GMCastMessage hdr2;
         fail_unless(hdr2.read(buf, hdr.size(), 0) == hdr.size());

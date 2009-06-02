@@ -16,8 +16,10 @@ using std::ostringstream;
 
 BEGIN_GCOMM_NAMESPACE
 
+typedef unsigned char byte_t;
+
 template <class T> 
-inline size_t read(const void* buf, const size_t buflen, 
+inline size_t read(const byte_t* buf, const size_t buflen, 
                    const size_t offset, T* ret)
 {
     if (buflen < sizeof(T) + offset)
@@ -35,7 +37,7 @@ inline size_t read(const void* buf, const size_t buflen,
 }
 
 template <class T> 
-inline size_t write(const T val, void* buf, const size_t buflen, 
+inline size_t write(const T val, byte_t* buf, const size_t buflen, 
                     const size_t offset)
 {
     if (buflen < sizeof(T) + offset)
@@ -77,13 +79,13 @@ public:
         return os.str();
     }
     
-    size_t read(const void* from, const size_t fromlen, 
+    size_t read(const byte_t* from, const size_t fromlen, 
                 const size_t from_offset)
     {
         return gcomm::read(from, fromlen, from_offset, &t);
     }
     
-    size_t write(void* to, const size_t tolen, const size_t to_offset) const
+    size_t write(byte_t* to, const size_t tolen, const size_t to_offset) const
     {
         return gcomm::write(t, to, tolen, to_offset);
     }
@@ -274,6 +276,7 @@ public:
     }
 
 };
+
 
 
 END_GCOMM_NAMESPACE

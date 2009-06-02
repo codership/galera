@@ -50,7 +50,7 @@ public:
     
     virtual int send(WriteBuf*, const ProtoDownMeta*);
     virtual const ReadBuf* recv();
-    
+
     static Transport* create(const URI&, EventLoop*);
     static Transport* create(const string&, EventLoop*);
 };

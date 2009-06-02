@@ -39,8 +39,8 @@ public:
         return uuid;
     }
     
-    size_t read(const void* buf, const size_t buflen, const size_t offset);
-    size_t write(void* buf, const size_t buflen, const size_t offset) const;
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset);
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const;
 
     static size_t size() 
     {
@@ -74,8 +74,8 @@ struct NodeList : map<const UUID, string>
     size_t length() const;
     
     static const size_t node_name_size = 16;
-    size_t read(const void*, size_t, size_t);
-    size_t write(void*, size_t, size_t) const;
+    size_t read(const byte_t*, size_t, size_t);
+    size_t write(byte_t*, size_t, size_t) const;
     size_t size() const;
 
 };
@@ -99,7 +99,9 @@ public:
     {
         V_NONE,
         V_TRANS,
-        V_REG
+        V_REG,
+        V_NON_PRIM,
+        V_PRIM
     } Type;
 
     string to_string(const Type) const;
@@ -145,8 +147,8 @@ public:
     const ViewId& get_id() const;
     const UUID& get_representative() const;
     bool is_empty() const;
-    size_t read(const void* buf, const size_t buflen, const size_t offset);
-    size_t write(void* buf, const size_t buflen, const size_t offset) const;
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset);
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const;
     size_t size() const;
     string to_string() const;
 };
