@@ -63,8 +63,7 @@ popd; popd
 MYSQL_DIST=$(tar -tzf $MYSQL_DIST_TARBALL | head -n1)
 rm -rf $MYSQL_DIST; tar -xzf $MYSQL_DIST_TARBALL
 pushd $MYSQL_DIST
-#time make maintainer-clean
-cat $WSREP_PATCH | patch -p1 -f
+(cat $WSREP_PATCH | patch -p1 -f)
 time ./BUILD/autorun.sh
 time ./configure --with-wsrep > /dev/null
 time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/$(basename "$MYSQL_DIST_TARBALL") \
@@ -84,6 +83,9 @@ WSREP_SPEC=${WSREP_SPEC:-"$MYSQL_DIST/support-files/mysql-$MYSQL_VER.spec"}
 mv $WSREP_SPEC $RPM_BUILD_ROOT/SPECS/
 WSREP_SPEC=$RPM_BUILD_ROOT/SPECS/mysql-$MYSQL_VER.spec
 
+#cleaning intermedieate sources:
+rm -rf $MYSQL_DIST
+
 i686_cflags="-march=i686 -mtune=i686"
 amd64_cflags="-m64 -mtune=opteron"
 fast_cflags="-O3 -fno-omit-frame-pointer"
@@ -96,12 +98,13 @@ RPMBUILD="rpmbuild --clean --rmsource \
           --define \"optflags $RPM_OPT_FLAGS\" \
           --with wsrep -ba $WSREP_SPEC "
 
+cd "$RPM_BUILD_ROOT"
 if [ "$(whoami)" == "root" ]
 then
     chown -R mysql $RPM_BUILD_ROOT
-    su mysql -c "$RPMBUILD" 2>&1 > $RPM_BUILD_ROOT/rpmbuild.log
+    su mysql -c "$RPMBUILD"
 else
-    $RPMBUILD 2>&1 > $RPM_BUILD_ROOT/rpmbuild.log
+    $RPMBUILD
 fi
 
 exit 0
