@@ -63,9 +63,11 @@ popd; popd
 MYSQL_DIST=$(tar -tzf $MYSQL_DIST_TARBALL | head -n1)
 rm -rf $MYSQL_DIST; tar -xzf $MYSQL_DIST_TARBALL
 pushd $MYSQL_DIST
-(cat $WSREP_PATCH | patch -p1 -f)
+# patch freaks out on .bzrignore which doesn't exist in source dist and
+# returns error code - runnong in a subshell because of this
+(patch -p1 -f < $WSREP_PATCH)
 time ./BUILD/autorun.sh
-time ./configure --with-wsrep > /dev/null
+#time ./configure --with-wsrep > /dev/null # TODO: this should be moved one step
 time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/$(basename "$MYSQL_DIST_TARBALL") \
               "$MYSQL_DIST"
 
@@ -76,7 +78,7 @@ time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/$(basename "$MYSQL_DIST_TARBALL") \
 ######################################
 time ./configure --with-wsrep > /dev/null
 pushd support-files; rm -rf *.spec;  make > /dev/null; popd
-MYSQL_VER=$(grep 'MYSQL_NO_DASH_VERSION' $MYSQL_SRC/Makefile | cut -d ' ' -f 3)
+MYSQL_VER=$(grep 'MYSQL_NO_DASH_VERSION' Makefile | cut -d ' ' -f 3)
 popd # MYSQL_DIST
 
 WSREP_SPEC=${WSREP_SPEC:-"$MYSQL_DIST/support-files/mysql-$MYSQL_VER.spec"}

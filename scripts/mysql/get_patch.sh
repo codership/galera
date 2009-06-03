@@ -31,6 +31,6 @@ MYSQL_LP_REV=$(bzr tags | grep -m1 "$1" | awk '{ print $2 }')
 WSREP_PATCH="$THIS_DIR/$MYSQL_LP_REV-$WSREP_REV.diff"
 # normally we expect bzr diff return 1 (changes available)
 bzr diff -p1 -v --diff-options " --exclude=.bzrignore " -r$MYSQL_LP_REV > \
-    "$WSREP_PATCH" || if [ $? gt 1 ]; then exit -1; fi
+    "$WSREP_PATCH" || if [ $? -gt 1 ]; then exit -1; fi
 
 echo $WSREP_PATCH
