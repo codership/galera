@@ -2,7 +2,7 @@
 
 if test -z "$MYSQL_SRC"
 then
-    echo "MYSQL_SRC variable pointing at Galera sources is not set. Can't continue."
+    echo "MYSQL_SRC variable pointing at MySQL/wsrep sources is not set. Can't continue."
     exit -1
 fi
 
