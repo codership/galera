@@ -14,6 +14,7 @@ check_gcomm_SOURCES = 		\
 	check_gmcast.cpp	\
 	check_evs.cpp		\
 	check_vs.cpp		\
+	check_pc.cpp		\
 	check_gcomm.cpp
 check_gcomm_LDADD = $(top_builddir)/src/libgcomm.la
 check_gcomm_LDFLAGS = -lcheck -static

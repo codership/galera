@@ -89,6 +89,11 @@ struct EVSGap {
 
 };
 
+inline bool operator==(const EVSGap& a, const EVSGap& b)
+{
+    return a.range == b.range && a.source == b.source;
+}
+
 enum EVSSafetyPrefix {
     DROP,
     UNRELIABLE,
@@ -154,6 +159,7 @@ private:
     UUID source;
     char name[16];
     EVSGap gap;
+    int64_t fifo_seq;
     mutable Time tstamp;
 public:
     class Instance {
@@ -297,6 +303,7 @@ protected:
                const UUID& source_,
                const string& name_,
                const EVSGap& gap_, 
+               const int64_t fifo_seq_,
                map<UUID, Instance>* instances_) :
         version(version_),
         type(type_),
@@ -309,6 +316,7 @@ protected:
         source_view(source_view_),
         source(source_),
         gap(gap_),
+        fifo_seq(fifo_seq_),
         instances(instances_)
     {
         strncpy(name, name_.c_str(), sizeof(name));
@@ -319,26 +327,40 @@ protected:
     }
 
 public:        
-    EVSMessage() : type(NONE), seq(SEQNO_MAX), instances(0) {
+    EVSMessage() : 
+        type(NONE), 
+        seq(SEQNO_MAX), 
+        fifo_seq(-1),
+        instances(0) 
+    {
         memset(name, 0, sizeof(name));
     }
     
-    EVSMessage(const EVSMessage& m) {
+    EVSMessage(const EVSMessage& m) 
+    {
 	*this = m;
-	if (m.instances) {
+	if (m.instances) 
+        {
 	    instances = new std::map<UUID, Instance>();
 	    *instances = *m.instances;
 	}
     }
     
-    ~EVSMessage() {
+    ~EVSMessage() 
+    {
 	delete instances;
     }
     
-    Type get_type() const {
+    Type get_type() const 
+    {
 	return type;
     }
     
+    bool is_membership() const
+    {
+        return type == JOIN || type == INSTALL || type == LEAVE;
+    }
+
     uint8_t get_user_type() const
     {
         return user_type;
@@ -393,6 +415,11 @@ public:
 
     EVSGap get_gap() const {
 	return gap;
+    }
+
+    int64_t get_fifo_seq() const
+    {
+        return fifo_seq;
     }
 
     void set_tstamp(const Time& t) const
@@ -483,6 +510,15 @@ public:
 		return 0;
 	    if ((off = source_view.read(buf, buflen, off)) == 0)
 		return 0;
+            if (type == JOIN || type == INSTALL || type == LEAVE)
+            {
+                if ((off = gcomm::read(buf, buflen, off, &fifo_seq)) == 0)
+                    return 0;
+            }
+            else
+            {
+                fifo_seq = -1;
+            }
 	    if (type == JOIN || type == INSTALL) {
                 if ((off = read_bytes(buf, buflen, off, 
                                       reinterpret_cast<byte_t*>(name), sizeof(name))) == 0)
@@ -550,7 +586,8 @@ public:
         }
 	
 	if (type == USER || type == JOIN || type == INSTALL || type == LEAVE ||
-	    type == GAP) {
+	    type == GAP) 
+        {
 	    if ((off = gcomm::write(seq, buf, buflen, off)) == 0) {
 		LOG_TRACE("");
 		return 0;
@@ -563,6 +600,11 @@ public:
 		LOG_TRACE("");
 		return 0;
 	    }
+            if (type == JOIN || type == INSTALL || type == LEAVE)
+            {
+                if ((off = gcomm::write(fifo_seq, buf, buflen, off)) == 0)
+                    return 0;
+            }
 	    if (type == JOIN || type == INSTALL) {
                 if ((off = write_bytes(reinterpret_cast<const byte_t*>(name), sizeof(name), buf, buflen, off)) == 0)
                 {
@@ -601,14 +643,15 @@ public:
 	    return 4 + source.size(); // 
 	case JOIN:
 	case INSTALL:
-	    return 4 + 4 + 4 + source_size + source_view.size() + sizeof(name)
+	    return 4 + 4 + 4 + 8 
+                + source_size + source_view.size() + sizeof(name)
                 + 4 + instances->size()*Instance::size();
 	case LEAVE:
-	    return 4 + 4 + 4 + source_size + source_view.size();
+	    return 4 + 4 + 4 + 8 + source_size + source_view.size();
 	}
 	return 0;
     }
-
+    
     mutable unsigned char hdrbuf[64];
     const byte_t* get_hdr() const {
 	if (write(hdrbuf, sizeof(hdrbuf), 0) == 0)
@@ -683,6 +726,7 @@ struct EVSUserMessage : EVSMessage
                    pid,
                    string(),
                    EVSGap(UUID(), EVSRange()),
+                   -1,
                    0)
     {
     }
@@ -703,6 +747,7 @@ struct EVSDelegateMessage : EVSMessage
                    pid,
                    string(),
                    EVSGap(UUID(), EVSRange()),
+                   -1,
                    0)
     {
     }
@@ -727,6 +772,7 @@ struct EVSGapMessage : EVSMessage
                    pid,
                    string(),
                    gap, 
+                   -1,
                    0)
     {
         
@@ -739,7 +785,8 @@ struct EVSJoinMessage : EVSMessage
                    const string& name,
                    const ViewId& view_id,
                    const uint32_t aru_seq, 
-                   const uint32_t safe_seq) :
+                   const uint32_t safe_seq,
+                   const int64_t fifo_seq) :
         EVSMessage(0,
                    EVSMessage::JOIN, 
                    0xff,
@@ -752,6 +799,7 @@ struct EVSJoinMessage : EVSMessage
                    pid,
                    name,
                    EVSGap(UUID(), EVSRange()),
+                   fifo_seq,
                    new map<UUID, Instance>())
     {
         // LOG_INFO("JOIN message: " + name);
@@ -764,7 +812,8 @@ struct EVSLeaveMessage : EVSMessage
                     const string& name,
                     const ViewId& view_id,
                     const uint32_t aru_seq, 
-                    const uint32_t safe_seq) :
+                    const uint32_t safe_seq,
+                    const int64_t fifo_seq) :
         EVSMessage(0,
                    EVSMessage::LEAVE, 
                    0xff,
@@ -777,6 +826,7 @@ struct EVSLeaveMessage : EVSMessage
                    pid,
                    name,
                    EVSGap(UUID(), EVSRange()),
+                   fifo_seq,
                    0)
     {
         
@@ -786,10 +836,11 @@ struct EVSLeaveMessage : EVSMessage
 struct EVSInstallMessage : EVSMessage
 {
     EVSInstallMessage(const UUID& pid, 
-                   const string& name,
-                   const ViewId& view_id,
-                   const uint32_t aru_seq, 
-                   const uint32_t safe_seq) :
+                      const string& name,
+                      const ViewId& view_id,
+                      const uint32_t aru_seq, 
+                      const uint32_t safe_seq,
+                      const int64_t fifo_seq) :
         EVSMessage(0,
                    EVSMessage::INSTALL, 
                    0xff,
@@ -802,6 +853,7 @@ struct EVSInstallMessage : EVSMessage
                    pid,
                    name,
                    EVSGap(UUID(), EVSRange()),
+                   fifo_seq,
                    new map<UUID, Instance>())
     {
         

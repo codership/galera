@@ -608,13 +608,14 @@ void EVSProto::send_gap(const UUID& pid, const ViewId& source_view,
 }
 
 
-EVSJoinMessage EVSProto::create_join() const
+EVSJoinMessage EVSProto::create_join()
 {
     EVSJoinMessage jm(my_addr,
                       my_name,
                       current_view.get_id(), 
                       input_map.get_aru_seq(), 
-                      input_map.get_safe_seq());
+                      input_map.get_safe_seq(),
+                      ++fifo_seq);
     for (std::map<const UUID, EVSInstance>::const_iterator i = known.begin();
          i != known.end(); ++i)
     {
@@ -749,7 +750,8 @@ void EVSProto::send_leave()
                        my_name,
                        current_view.get_id(), 
                        input_map.get_aru_seq(), 
-                       last_sent);
+                       last_sent,
+                       ++fifo_seq);
     size_t bufsize = lm.size();
     unsigned char* buf = new unsigned char[bufsize];
     if (lm.write(buf, bufsize, 0) == 0)
@@ -783,7 +785,8 @@ void EVSProto::send_install()
                          ViewId(my_addr, 
                                 current_view.get_id().get_seq() + 1),
                          input_map.get_aru_seq(), 
-                         input_map.get_safe_seq());
+                         input_map.get_safe_seq(),
+                         ++fifo_seq);
     for (InstMap::const_iterator i = known.begin(); i != known.end(); ++i) 
     {
         const UUID& pid = get_pid(i);
@@ -932,6 +935,27 @@ void EVSProto::recover(const EVSGap& gap)
 void EVSProto::handle_msg(const EVSMessage& msg, const UUID& source,
                           const ReadBuf* rb, const size_t roff)
 {
+    // Filter out unwanted/duplicate membership messages
+    if (msg.is_membership())
+    {
+        InstMap::iterator ii = known.find(source);
+        if (ii != known.end())
+        {
+            if (get_instance(ii).fifo_seq >= msg.get_fifo_seq())
+            {
+                LOG_WARN("dropping non-fifo membership message");
+                return;
+            }
+            else
+            {
+                LOG_TRACE("local fifo_seq " 
+                          + make_int(get_instance(ii).fifo_seq).to_string() 
+                          + " msg fifo_seq "
+                          + make_int(msg.get_fifo_seq()).to_string());
+                get_instance(ii).fifo_seq = msg.get_fifo_seq();
+            }
+        }
+    }
 
     if (source != my_addr)
     {
@@ -1001,6 +1025,7 @@ void EVSProto::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
     
     const UUID& source(msg.get_source());
     
+
     handle_msg(msg, source, rb, roff);
 }
 

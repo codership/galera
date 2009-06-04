@@ -307,7 +307,9 @@ START_TEST(test_inst_map)
     T1Map im1;
     
     im1.insert(make_pair(UUID(0, 0), T1(4)));
-    
+    fail_unless(im1.length() == 1);
+    fail_unless(im1.size() == 24);
+
     check_serialization(im1, 24, T1Map());
     
     for (T1Map::const_iterator i = im1.begin(); i != im1.end(); ++i)
@@ -321,6 +323,9 @@ START_TEST(test_inst_map)
     T2Map im2;
     im2.insert(make_pair(UUID(0, 0), T2("strstrs strstrs b")));
     im2.insert(make_pair(UUID(0, 0), T2("strstrs strstrd ba")));
+    fail_unless(im2.length() == 2);
+    fail_unless(im2.size() == 68);
+
     check_serialization(im2, 68, T2Map());
      
     for (T2Map::const_iterator i = im2.begin(); i != im2.end(); ++i)
@@ -332,6 +337,11 @@ START_TEST(test_inst_map)
     typedef InstMap<T3> T3Map;
     T3Map im3;
     im3.insert(make_pair(UUID(0, 0), T3()));
+    im3.insert(make_pair(UUID(0, 0), T3()));
+    im3.insert(make_pair(UUID(0, 0), T3()));
+    im3.insert(make_pair(UUID(0, 0), T3()));
+    fail_unless(im3.length() == 4);
+
     for (T3Map::const_iterator i = im3.begin(); i != im3.end(); ++i)
     {
         LOG_INFO(T3Map::get_uuid(i).to_string());

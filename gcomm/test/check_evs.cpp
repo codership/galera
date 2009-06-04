@@ -23,74 +23,6 @@ using namespace gcomm;
 static const uint32_t EVS_SEQNO_MAX = 0x800U;
 
 
-class DummyTransport : public Transport 
-{
-    deque<ReadBuf*> in;
-    deque<ReadBuf*> out;
-public:
-    DummyTransport() : 
-        Transport(URI(), 0, 0)
-    {
-    }
-    
-    ~DummyTransport() 
-    {
-        for (deque<ReadBuf*>::iterator i = in.begin(); i != in.end(); ++i)
-            (*i)->release();
-        for (deque<ReadBuf*>::iterator i = out.begin(); i != out.end(); ++i)
-            (*i)->release();
-    }
-    
-    size_t get_max_msg_size() const 
-    {
-        return 1 << 31;
-    }
-
-    void connect() 
-    {
-    }
-
-    void close() 
-    {
-    }
-
-    void listen() 
-    {
-        throw FatalException("Not applicable");
-    }
-
-    Transport *accept() 
-    {
-        throw FatalException("Not applicable");
-    }
-
-    void handle_up(const int cid, const ReadBuf* rb, const size_t roff, 
-                   const ProtoUpMeta* um)
-    {
-        throw FatalException("not applicable");
-    }
-
-    int handle_down(WriteBuf *wb, const ProtoDownMeta *dm) 
-    {
-        out.push_back(wb->to_readbuf());
-        return 0;
-    }
-    
-    void pass_up(WriteBuf *wb, const ProtoUpMeta *um) 
-    {
-        in.push_back(wb->to_readbuf());
-    }
-    
-    ReadBuf* get_out() 
-    {
-        if (out.empty())
-            return 0;
-        ReadBuf* rb = out.front();
-        out.pop_front();
-        return rb;
-    }
-};
-
 START_TEST(test_seqno)
 {
     fail_unless(seqno_eq(0, 0));
@@ -140,7 +72,9 @@ static bool operator==(const EVSMessage& a, const EVSMessage& b)
         a.get_seq_range()     == b.get_seq_range() &&
         a.get_aru_seq()       == b.get_aru_seq() &&
         a.get_flags()         == b.get_flags() && 
-        a.get_source_view()   == b.get_source_view();
+        a.get_source_view()   == b.get_source_view() &&
+        a.get_gap()           == b.get_gap() &&
+        a.get_fifo_seq()      == b.get_fifo_seq();
 }
 
 END_GCOMM_NAMESPACE
@@ -233,7 +167,7 @@ START_TEST(test_input_map_basic)
                         EVSUserMessage(pid1, 0x10, SAFE, 0, 0, SEQNO_MAX, vid, 0),
                         0, 0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
-   im.insert(EVSInputMapItem(pid1,
+    im.insert(EVSInputMapItem(pid1,
                              EVSUserMessage(pid1, 0x10, SAFE, 2, 0,
                                          SEQNO_MAX, vid, 0), 0, 0));
     fail_unless(seqno_eq(im.get_aru_seq(), 0));
@@ -863,7 +797,7 @@ START_TEST(test_evs_proto_duplicates)
     rb = tp2->get_out();
     fail_unless(rb == 0);
 
-    ep1->handle_join(jm2, jm2.get_source());
+    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
     fail_unless(ep1->get_state() == EVSProto::RECOVERY);
 
     rb = tp1->get_out();
@@ -875,7 +809,7 @@ START_TEST(test_evs_proto_duplicates)
     get_msg(rb, &msg);
     fail_unless(rb == 0);
 
-    ep2->handle_join(jm1, jm1.get_source());
+    ep2->handle_msg(jm1, jm1.get_source(), 0, 0);
     fail_unless(ep2->get_state() == EVSProto::RECOVERY);
     rb = tp2->get_out();
     fail_unless(rb != 0);
@@ -885,9 +819,9 @@ START_TEST(test_evs_proto_duplicates)
     get_msg(rb, &msg);
     fail_unless(rb == 0);
 
-    ep1->handle_join(jm2, jm2.get_source());
-    ep1->handle_join(jm1, jm1.get_source());
-    ep1->handle_join(jm2, jm2.get_source());
+    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
+    ep1->handle_msg(jm1, jm1.get_source(), 0, 0);
+    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
     fail_unless(ep1->get_state() == EVSProto::RECOVERY);
     rb = tp1->get_out();
     fail_unless(rb != 0);
@@ -901,13 +835,13 @@ START_TEST(test_evs_proto_duplicates)
     rb = tp1->get_out();
     fail_unless(rb == 0);
     
-    ep1->handle_join(jm2, jm2.get_source());
-    ep1->handle_join(jm1, jm1.get_source());
-    ep1->handle_join(jm2, jm2.get_source());
-    ep1->handle_install(im, im.get_source());
+    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
+    ep1->handle_msg(jm1, jm1.get_source(), 0, 0);
+    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
+    ep1->handle_msg(im, im.get_source(), 0, 0);
     fail_unless(ep1->get_state() == EVSProto::RECOVERY);
     
-    ep2->handle_install(im, im.get_source());
+    ep2->handle_msg(im, im.get_source(), 0, 0);
     fail_unless(ep2->get_state() == EVSProto::RECOVERY);
     rb = tp2->get_out();
     fail_unless(rb != 0);
@@ -918,27 +852,27 @@ START_TEST(test_evs_proto_duplicates)
     get_msg(rb, &msg);
     fail_unless(rb == 0);
 
-    ep1->handle_gap(gm2, gm2.get_source());
+    ep1->handle_msg(gm2, gm2.get_source(), 0, 0);
     fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
     rb = tp1->get_out();
     fail_unless(rb == 0);
 
-    ep2->handle_gap(gm, gm.get_source());
+    ep2->handle_msg(gm, gm.get_source(), 0, 0);
     fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
     rb = tp2->get_out();
     fail_unless(rb == 0);
 
-    ep1->handle_join(jm2, jm2.get_source());
-    ep1->handle_join(jm1, jm1.get_source());
-    ep1->handle_join(jm2, jm2.get_source());
-    ep1->handle_install(im, im.get_source());
+    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
+    ep1->handle_msg(jm1, jm1.get_source(), 0, 0);
+    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
+    ep1->handle_msg(im, im.get_source(), 0, 0);
     fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
 
-
-    ep2->handle_join(jm2, jm2.get_source());
-    ep2->handle_join(jm1, jm1.get_source());
-    ep2->handle_join(jm2, jm2.get_source());
-    ep2->handle_install(im, im.get_source());
+    
+    ep2->handle_msg(jm2, jm2.get_source(), 0, 0);
+    ep2->handle_msg(jm1, jm1.get_source(), 0, 0);
+    ep2->handle_msg(jm2, jm2.get_source(), 0, 0);
+    ep2->handle_msg(im, im.get_source(), 0, 0);
     fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
 
 }
@@ -1800,6 +1734,8 @@ Suite* evs_suite()
     tc = tcase_create("test_msg");
     tcase_add_test(tc, test_msg);
     suite_add_tcase(s, tc);
+
+
 
     tc = tcase_create("test_input_map_basic");
     tcase_add_test(tc, test_input_map_basic);

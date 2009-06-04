@@ -27,6 +27,7 @@ static GCommSuite suites[] = {
     {"gmcast", gmcast_suite},
     {"evs", evs_suite},
     {"vs", vs_suite},
+    {"pc", pc_suite},
     {"", 0}
 };
 

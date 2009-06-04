@@ -39,6 +39,8 @@ struct EVSInstance
     EVSRange prev_range;
     // Human readable name
     string name;
+    // greatest seen FIFO seqno from this source 
+    int64_t fifo_seq;
     // CTOR
     EVSInstance(const string& name_) : 
         operational(true), 
@@ -47,7 +49,8 @@ struct EVSInstance
         leave_message(0),
         tstamp(Time::now()),
         prev_range(SEQNO_MAX, SEQNO_MAX),
-        name(name_)
+        name(name_),
+        fifo_seq(-1)
     {
     }
     
@@ -141,6 +144,7 @@ public:
         current_view(View::V_TRANS, ViewId(my_addr, 0)),
         install_message(0),
         installing(false),
+        fifo_seq(-1),
         last_sent(SEQNO_MAX),
         send_window(8), 
         max_output_size(1024),
@@ -179,7 +183,7 @@ public:
     
     UUID my_addr;
     string my_name;
-
+    
     const UUID& get_uuid() const
     {
         return my_addr;
@@ -195,7 +199,11 @@ public:
     {
         return i->first;
     }
-    const EVSInstance& get_instance(InstMap::const_iterator i) const
+    static const EVSInstance& get_instance(InstMap::const_iterator i)
+    {
+        return i->second;
+    }
+    static EVSInstance& get_instance(InstMap::iterator i)
     {
         return i->second;
     }
@@ -224,6 +232,8 @@ public:
     EVSMessage* install_message;
     // 
     bool installing;
+    // Sequence number to maintain membership message FIFO order
+    int64_t fifo_seq;
     // Last sent seq
     uint32_t last_sent;
     // Send window size
@@ -277,7 +287,7 @@ public:
     void complete_user(const uint32_t);
     int send_delegate(const UUID&, WriteBuf*);
     void send_gap(const UUID&, const ViewId&, const EVSRange&);
-    EVSJoinMessage create_join() const;
+    EVSJoinMessage create_join();
     void send_join(bool tval = true);
     void set_join(const EVSMessage&, const UUID&);
     void set_leave(const EVSMessage&, const UUID&);

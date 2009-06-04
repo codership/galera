@@ -24,6 +24,7 @@ Suite* gmcast_suite();
 Suite* evs_suite();
 /* Tests for VS trasport */
 Suite* vs_suite();
-
+/* Tests for PC transport */
+Suite* pc_suite();
 
 #endif // CHECK_GCOMM_HPP
