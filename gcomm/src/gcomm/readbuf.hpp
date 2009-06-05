@@ -14,7 +14,32 @@ using std::map;
 
 BEGIN_GCOMM_NAMESPACE
 
+class Buffer
+{
+    byte_t* buf;
+    size_t buflen;
+public:
+    Buffer(const size_t buflen_) : buflen(buflen_)
+    {
+        buf = new byte_t[buflen];
+    }
 
+    ~Buffer()
+    {
+        delete[] buf;
+    }
+
+    byte_t* get_buf() const
+    {
+        return buf;
+    }
+
+    size_t get_len() const
+    {
+        return buflen;
+    }
+
+};
 
 
 #if 1

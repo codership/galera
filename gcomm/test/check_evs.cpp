@@ -397,7 +397,7 @@ public:
     {
         if (rb)
         {
-            UInt32 rseq;
+            UInt32 rseq(SEQNO_MAX);
             fail_unless(rseq.read(rb->get_buf(), rb->get_len(), roff));
             deliv_seq = rseq.get();
         }
@@ -414,10 +414,7 @@ public:
 /* Read EVSMessage and release rb */
 static void get_msg(ReadBuf* rb, EVSMessage* msg, bool release = true)
 {
-    if (msg == 0)
-    {
-        throw FatalException("invalud argument");
-    }
+    assert(msg != 0);
     if (rb == 0)
     {
         LOG_INFO("get_msg: (null)");

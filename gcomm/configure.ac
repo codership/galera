@@ -36,8 +36,8 @@ AC_ARG_ENABLE(debug,
               enable_debug="yes")
 if test "$enable_debug" != "no"
 then
-    CFLAGS="-g -O0"
-    CXXFLAGS="-g -O0"
+    CFLAGS="-g -O1"
+    CXXFLAGS="-g -O1"
 else
     CFLAGS="-g -O3 -DNDEBUG"
     CXXFLAGS="-g -O3 -DNDEBUG"

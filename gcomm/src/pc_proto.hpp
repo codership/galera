@@ -6,20 +6,46 @@
 #include "gcomm/uuid.hpp"
 #include "gcomm/event.hpp"
 
+#include <list>
+using std::list;
+
 BEGIN_GCOMM_NAMESPACE
 
 class PCProto : public Protolay
 {
 public:
-    enum State {
+    enum State 
+    {
         S_CLOSED, 
         S_JOINING, 
         S_STATES_EXCH, 
         S_RTR, 
         S_PRIM,
-        S_NON_PRIM
+        S_NON_PRIM,
+        S_MAX
     };
     
+    const string to_string(const State s) const
+    {
+        switch (s)
+        {
+        case S_CLOSED:
+            return "CLOSED";
+        case S_JOINING:
+            return "JOINING";
+        case S_STATES_EXCH:
+            return "STATES_EXCH";
+        case S_RTR:
+            return "RTR";
+        case S_PRIM:
+            return "PRIM";
+        case S_NON_PRIM:
+            return "NON_PRIM";
+        default:
+            throw FatalException("invalid state");
+        }
+    }
+
 private:
     UUID uuid;
     EventLoop* el;
@@ -27,26 +53,55 @@ private:
     bool start_prim;
     State state;
     
-    uint16_t last_sent;
+    uint32_t last_sent;
     
     
     PCInstMap instances;
+    PCInstMap::iterator self_i;
+
+    const ViewId& get_last_prim() const
+    {
+        return PCInstMap::get_instance(self_i).get_last_prim();
+    }
+
+    void set_last_prim(const ViewId& vid)
+    {
+        return PCInstMap::get_instance(self_i).set_last_prim(vid);
+    }
+
+    typedef InstMap<PCMessage> SMMap;
+    SMMap state_msgs;
+
+    View current_view;
+    list<View> views;
 
 public:
     PCProto(const UUID& uuid_, 
             EventLoop* el_, 
             Monitor* mon_, 
             const bool start_prim_) :
-        uuid(uuid),
+        uuid(uuid_),
         el(el_),
         mon(mon_),
         start_prim(start_prim),
         state(S_CLOSED)
     {
+        pair<PCInstMap::iterator, bool> iret;
+        if ((iret = instances.insert(
+                 make_pair(uuid, PCInst()))).second == false)
+        {
+            throw FatalException("");
+        }
+        self_i = iret.first;
     }
     
     ~PCProto() 
     {
+    }
+
+    string self_string() const
+    {
+        return uuid.to_string();
     }
     
     void shift_to(State);
@@ -56,12 +111,25 @@ public:
         return state;
     }
 
+    void send_state();
+    void send_install();
+    
+    void handle_first_trans(const View&);
+    void handle_first_reg(const View&);
+    void handle_trans(const View&);
+    void handle_reg(const View&);
+
+private:
+    bool requires_rtr() const;
+    void validate_state_msgs() const;
+    void handle_state(const PCMessage&, const UUID&);
+public:
+    void handle_msg(const PCMessage&, const ReadBuf*, const size_t, const ProtoUpMeta*);
+
     void handle_up(const int, const ReadBuf*, const size_t, const ProtoUpMeta*);
     int handle_down(WriteBuf*, const ProtoDownMeta*);
-
+    
     void handle_view(const View&);
-    
-    
 };
 
 END_GCOMM_NAMESPACE

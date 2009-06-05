@@ -70,9 +70,27 @@ public:
     
 };
 
+void get_msg(ReadBuf* rb, PCMessage* msg, bool release = true)
+{
+    assert(msg != 0);
+    if (rb == 0)
+    {
+        LOG_INFO("get_msg: (null)");
+    }
+    else
+    {
+        fail_unless(msg->read(rb->get_buf(), rb->get_len(), 0) != 0);
+        LOG_INFO("get_msg: " + msg->to_string());
+        if (release)
+            rb->release();
+    }
+
+}
+
 START_TEST(test_pc_view_changes)
 {
     UUID uuid1(0, 0);
+    ProtoUpMeta sum1(uuid1);
     PCUser pu1;
     PCProto pc1(uuid1, 0, 0, true);
     DummyTransport tp1;
@@ -80,13 +98,32 @@ START_TEST(test_pc_view_changes)
     gcomm::connect(&tp1, &pc1);
     gcomm::connect(&pc1, &pu1);
     
-
-    View v1(View::V_TRANS, ViewId(uuid1, 0));
-    v1.add_member(uuid1, "n1");
     
-    ProtoUpMeta um1(&v1);
+    View vt0(View::V_TRANS, ViewId(uuid1, 0));
+    vt0.add_member(uuid1, "n1");
+    ProtoUpMeta um1(&vt0);
+    pc1.shift_to(PCProto::S_JOINING);
     pc1.handle_up(0, 0, 0, &um1);
+    fail_unless(pc1.get_state() == PCProto::S_JOINING);
     
+    View vr1(View::V_REG, ViewId(uuid1, 1));
+    vr1.add_member(uuid1, "n1");
+    ProtoUpMeta um2(&vr1);
+    pc1.handle_up(0, 0, 0, &um2);
+    fail_unless(pc1.get_state() == PCProto::S_STATES_EXCH);
+    
+    ReadBuf* rb = tp1.get_out();
+    fail_unless(rb != 0);
+    PCMessage sm1;
+    get_msg(rb, &sm1);
+    fail_unless(sm1.get_type() == PCMessage::T_STATE);
+    fail_unless(sm1.has_inst_map() == true);
+    fail_unless(sm1.get_inst_map().length() == 1);
+    fail_unless(PCInstMap::get_instance(sm1.get_inst_map().begin()).get_last_prim() == ViewId());
+
+    pc1.handle_msg(sm1, 0, 0, &sum1);
+    fail_unless(pc1.get_state() == PCProto::S_PRIM);
+
 }
 END_TEST
 

@@ -19,22 +19,22 @@ class ViewId
 public:
     ViewId() :
         uuid(),
-        seq(-1)
+        seq(0)
     {
-
+        
     }
     
     ViewId(const UUID& uuid_, const uint32_t seq_) :
         uuid(uuid_),
         seq(seq_)
     {
-
+        
     }
-    
+
     uint32_t get_seq() const {
         return seq;
     }
-
+    
     const UUID& get_uuid() const {
         return uuid;
     }

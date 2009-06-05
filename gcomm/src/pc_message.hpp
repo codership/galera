@@ -17,27 +17,33 @@ class PCInst
 {
     uint32_t last_seq;
     ViewId last_prim;
-    uint64_t to_seq; // Reserved for future use
+    int64_t to_seq; // Reserved for future use
 public:
-
+    
     PCInst() :
         last_seq(-1),
+        last_prim(),
         to_seq(-1)
     {
     }
     
     PCInst(const uint32_t last_seq_,
            const ViewId& last_prim_, 
-           const uint64_t to_seq_) :
+           const int64_t to_seq_) :
         last_seq(last_seq_),
         last_prim(last_prim_),
         to_seq(to_seq_)
     {
     }
-
+    
     uint32_t get_last_seq() const
     {
         return last_seq;
+    }
+
+    void set_last_prim(const ViewId& last_prim_)
+    {
+        last_prim = last_prim_;
     }
 
     const ViewId& get_last_prim() const
@@ -78,6 +84,14 @@ public:
     static size_t size()
     {
         return 4 + ViewId::size() + 8;
+    }
+
+
+    string to_string() const
+    {
+        return "last_seq=" + make_int(last_seq).to_string() 
+            + ",last_prim=" + last_prim.to_string()
+            + ",to_seq=" + make_int(to_seq).to_string();
     }
     
 };
@@ -195,7 +209,7 @@ public:
         return type;
     }
 
-    uint16_t get_seq() const
+    uint32_t get_seq() const
     {
         return seq;
     }
@@ -222,6 +236,21 @@ public:
         }
         return *inst;
     }
+
+    string to_string() const
+    {
+        string ret("pcmsg(");
+        ret += make_int(get_type()).to_string() + ",";
+        ret += make_int(get_seq()).to_string();
+        if (has_inst_map())
+        {
+            ret += ",";
+            ret += get_inst_map().to_string();
+        }
+        ret += ")";
+        return ret;
+    }
+
 };
 
 

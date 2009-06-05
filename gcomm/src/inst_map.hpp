@@ -16,6 +16,7 @@ template<class T> class InstMap : public map<const UUID, T>
 {
 public:
     typedef map<const UUID, T> MType;
+    typedef typename MType::iterator iterator;
     typedef typename MType::const_iterator const_iterator;
 
     size_t length() const
@@ -69,9 +70,33 @@ public:
         return 4 + length()*(UUID::size() + T::size());
     }
 
+    string to_string() const
+    {
+        string ret;
+
+        for (const_iterator i = MType::begin(); i != MType::end(); ++i)
+        {
+            const_iterator i_next = i;
+            ++i_next;
+            ret += get_uuid(i).to_string() + ": ";
+            ret += get_instance(i).to_string();
+            if (i_next != MType::end())
+            {
+                ret += ",";
+            }
+        }
+        return ret;
+    }
+
+
     static const UUID& get_uuid(const_iterator i)
     {
         return i->first;
+    }
+
+    static T& get_instance(iterator i)
+    {
+        return i->second;
     }
 
     static const T& get_instance(const_iterator i)

@@ -154,17 +154,17 @@ START_TEST(test_view)
 
     ViewId vid;
     fail_unless(vid.get_uuid() == UUID());
-    fail_unless(vid.get_seq() == (uint32_t)-1);
-
+    fail_unless(vid.get_seq() == 0);
+    
     UUID uuid(0, 0);
     
     vid = ViewId(uuid, 7);
     fail_unless(vid.get_uuid() == uuid);
     fail_unless(vid.get_seq() == 7);
-
+    
     check_serialization(vid, UUID::size() + 4, ViewId());
-
-
+    
+    
     NodeList nl;
 
     for (size_t i = 0; i < 7; ++i)
