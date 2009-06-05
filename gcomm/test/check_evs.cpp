@@ -467,7 +467,7 @@ static void single_boot(DummyTransport* tp, EVSProto* ep)
 
     // Handle join message again, must stay in OPERATIONAL, must not
     // emit anything
-    ep->handle_join(jm, jm.get_source());
+    ep->handle_msg(jm);
     rb = tp->get_out();
     get_msg(rb, &gm);
     fail_unless(rb == 0);
@@ -520,7 +520,7 @@ static void double_boot(DummyTransport* tp1, EVSProto* ep1,
     rb = tp2->get_out();
     fail_unless(rb == 0);
 
-    ep1->handle_join(jm, jm.get_source());
+    ep1->handle_msg(jm);
     fail_unless(ep1->get_state() == EVSProto::RECOVERY);
 
     rb = tp1->get_out();
@@ -532,7 +532,7 @@ static void double_boot(DummyTransport* tp1, EVSProto* ep1,
     get_msg(rb, &msg);
     fail_unless(rb == 0);
 
-    ep2->handle_join(jm, jm.get_source());
+    ep2->handle_msg(jm);
     fail_unless(ep2->get_state() == EVSProto::RECOVERY);
     rb = tp2->get_out();
     fail_unless(rb != 0);
@@ -542,7 +542,7 @@ static void double_boot(DummyTransport* tp1, EVSProto* ep1,
     get_msg(rb, &msg);
     fail_unless(rb == 0);
 
-    ep1->handle_join(jm, jm.get_source());
+    ep1->handle_msg(jm);
     fail_unless(ep1->get_state() == EVSProto::RECOVERY);
     rb = tp1->get_out();
     fail_unless(rb != 0);
@@ -556,7 +556,7 @@ static void double_boot(DummyTransport* tp1, EVSProto* ep1,
     rb = tp1->get_out();
     fail_unless(rb == 0);
 
-    ep2->handle_install(im, im.get_source());
+    ep2->handle_msg(im);
     fail_unless(ep2->get_state() == EVSProto::RECOVERY);
     rb = tp2->get_out();
     fail_unless(rb != 0);
@@ -567,12 +567,12 @@ static void double_boot(DummyTransport* tp1, EVSProto* ep1,
     get_msg(rb, &msg);
     fail_unless(rb == 0);
 
-    ep1->handle_gap(gm2, gm2.get_source());
+    ep1->handle_msg(gm2);
     fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
     rb = tp1->get_out();
     fail_unless(rb == 0);
 
-    ep2->handle_gap(gm, gm.get_source());
+    ep2->handle_msg(gm);
     fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
     rb = tp2->get_out();
     fail_unless(rb == 0);
@@ -653,7 +653,7 @@ START_TEST(test_evs_proto_user_msg_basic)
     
     EVSMessage um2;
     
-    ep2->handle_user(um1, um1.get_source(), rb, 0);
+    ep2->handle_msg(um1, rb, 0);
     rb->release();
     rb = tp2->get_out();
     get_msg(rb, &um2, false);
@@ -667,7 +667,7 @@ START_TEST(test_evs_proto_user_msg_basic)
     fail_unless(du2.get_deliv_seq() == SEQNO_MAX);
     
     EVSMessage gm1;
-    ep1->handle_user(um2, um2.get_source(), rb, 0);
+    ep1->handle_msg(um2, rb, 0);
     rb->release();
     rb = tp1->get_out();
     get_msg(rb, &gm1);
@@ -679,7 +679,7 @@ START_TEST(test_evs_proto_user_msg_basic)
     
     fail_unless(du1.get_deliv_seq() == 0);
     
-    ep2->handle_gap(gm1, gm1.get_source());
+    ep2->handle_msg(gm1);
     rb = tp2->get_out();
     fail_unless(rb == 0);
     
@@ -732,7 +732,7 @@ START_TEST(test_evs_proto_leave_basic)
     EVSMessage jm2;
     EVSMessage im2;
     EVSMessage gm2;
-    ep2->handle_leave(lm1, lm1.get_source());
+    ep2->handle_msg(lm1);
     rb = tp2->get_out();
     fail_unless(rb != 0);
     get_msg(rb, &jm2);
@@ -749,6 +749,10 @@ START_TEST(test_evs_proto_leave_basic)
     rb = tp2->get_out();
     fail_unless(rb == 0);
 
+    delete ep1;
+    delete ep2;
+    delete tp1;
+    delete tp2;
 }
 END_TEST
 
@@ -797,7 +801,7 @@ START_TEST(test_evs_proto_duplicates)
     rb = tp2->get_out();
     fail_unless(rb == 0);
 
-    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
+    ep1->handle_msg(jm2);
     fail_unless(ep1->get_state() == EVSProto::RECOVERY);
 
     rb = tp1->get_out();
@@ -809,7 +813,7 @@ START_TEST(test_evs_proto_duplicates)
     get_msg(rb, &msg);
     fail_unless(rb == 0);
 
-    ep2->handle_msg(jm1, jm1.get_source(), 0, 0);
+    ep2->handle_msg(jm1);
     fail_unless(ep2->get_state() == EVSProto::RECOVERY);
     rb = tp2->get_out();
     fail_unless(rb != 0);
@@ -819,9 +823,9 @@ START_TEST(test_evs_proto_duplicates)
     get_msg(rb, &msg);
     fail_unless(rb == 0);
 
-    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
-    ep1->handle_msg(jm1, jm1.get_source(), 0, 0);
-    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
+    ep1->handle_msg(jm2);
+    ep1->handle_msg(jm1);
+    ep1->handle_msg(jm2);
     fail_unless(ep1->get_state() == EVSProto::RECOVERY);
     rb = tp1->get_out();
     fail_unless(rb != 0);
@@ -835,13 +839,13 @@ START_TEST(test_evs_proto_duplicates)
     rb = tp1->get_out();
     fail_unless(rb == 0);
     
-    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
-    ep1->handle_msg(jm1, jm1.get_source(), 0, 0);
-    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
-    ep1->handle_msg(im, im.get_source(), 0, 0);
+    ep1->handle_msg(jm2);
+    ep1->handle_msg(jm1);
+    ep1->handle_msg(jm2);
+    ep1->handle_msg(im);
     fail_unless(ep1->get_state() == EVSProto::RECOVERY);
     
-    ep2->handle_msg(im, im.get_source(), 0, 0);
+    ep2->handle_msg(im);
     fail_unless(ep2->get_state() == EVSProto::RECOVERY);
     rb = tp2->get_out();
     fail_unless(rb != 0);
@@ -852,28 +856,34 @@ START_TEST(test_evs_proto_duplicates)
     get_msg(rb, &msg);
     fail_unless(rb == 0);
 
-    ep1->handle_msg(gm2, gm2.get_source(), 0, 0);
+    ep1->handle_msg(gm2);
     fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
     rb = tp1->get_out();
     fail_unless(rb == 0);
 
-    ep2->handle_msg(gm, gm.get_source(), 0, 0);
+    ep2->handle_msg(gm);
     fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
     rb = tp2->get_out();
     fail_unless(rb == 0);
 
-    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
-    ep1->handle_msg(jm1, jm1.get_source(), 0, 0);
-    ep1->handle_msg(jm2, jm2.get_source(), 0, 0);
-    ep1->handle_msg(im, im.get_source(), 0, 0);
+    ep1->handle_msg(jm2);
+    ep1->handle_msg(jm1);
+    ep1->handle_msg(jm2);
+    ep1->handle_msg(im);
     fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
 
     
-    ep2->handle_msg(jm2, jm2.get_source(), 0, 0);
-    ep2->handle_msg(jm1, jm1.get_source(), 0, 0);
-    ep2->handle_msg(jm2, jm2.get_source(), 0, 0);
-    ep2->handle_msg(im, im.get_source(), 0, 0);
+    ep2->handle_msg(jm2);
+    ep2->handle_msg(jm1);
+    ep2->handle_msg(jm2);
+    ep2->handle_msg(im);
     fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
+
+    delete ep1;
+    delete ep2;
+    delete tp1;
+    delete tp2;
+
 
 }
 END_TEST
@@ -1050,7 +1060,7 @@ static void multicast(vector<Inst*>* pvec, const ReadBuf* rb, const int ploss)
             }
         }
 
-        (*j)->ep->handle_msg(msg, msg.get_source(), rb, 0);
+        (*j)->ep->handle_msg(msg, rb, 0);
     }
 }
 

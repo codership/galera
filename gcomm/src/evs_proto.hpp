@@ -75,7 +75,13 @@ struct EVSInstance
         return operational;
     }
 
-    string to_string() const {
+    bool get_installed() const
+    {
+        return installed;
+    }
+
+    string to_string() const 
+    {
         std::string ret;
         ret += "'" + name + "':";
         ret += "o=";
@@ -155,9 +161,12 @@ public:
         pair<std::map<const UUID, EVSInstance>::iterator, bool> i =
             known.insert(make_pair(my_addr, EVSInstance(my_name)));
         assert(i.second == true);
-        i.first->second.operational = true;
+        self_i = i.first;
+        assert(get_instance(self_i).get_operational() == true);
+        
         input_map.insert_sa(my_addr);
         current_view.add_member(my_addr, my_name);
+        
         ith = new InactivityTimerHandler(this);
         cth = new CleanupTimerHandler(this);
         consth = new ConsensusTimerHandler(this);
@@ -210,7 +219,7 @@ public:
     // 
     // Known instances 
     InstMap known;
-    
+    InstMap::iterator self_i;
     // 
     Time inactive_timeout;
     Period inactive_check_period;
@@ -333,17 +342,23 @@ public:
     
     
     // Message handlers
-    void handle_user(const EVSMessage&, const UUID&, 
-                     const ReadBuf*, const size_t);
-    void handle_delegate(const EVSMessage&, const UUID&, 
-                         const ReadBuf*, const size_t);
-    void handle_gap(const EVSMessage&, const UUID&);
-    void handle_join(const EVSMessage&, const UUID&);
-    void handle_leave(const EVSMessage&, const UUID&);
-    void handle_install(const EVSMessage&, const UUID&);
-
-    void handle_msg(const EVSMessage& msg, const UUID& source,
-                          const ReadBuf* rb, const size_t roff);    
+private:
+    void handle_foreign(const EVSMessage&);
+    void handle_user(const EVSMessage&, 
+                     InstMap::iterator, 
+                     const ReadBuf*, 
+                     const size_t);
+    void handle_delegate(const EVSMessage&, 
+                         InstMap::iterator,
+                         const ReadBuf*, 
+                         const size_t);
+    void handle_gap(const EVSMessage&, InstMap::iterator);
+    void handle_join(const EVSMessage&, InstMap::iterator);
+    void handle_leave(const EVSMessage&, InstMap::iterator);
+    void handle_install(const EVSMessage&, InstMap::iterator);
+public:
+    void handle_msg(const EVSMessage& msg, 
+                    const ReadBuf* rb = 0, const size_t roff = 0);    
     // Protolay
     void handle_up(const int, const ReadBuf*, const size_t, const ProtoUpMeta*);
     int handle_down(WriteBuf* wb, const ProtoDownMeta* dm);

@@ -4,7 +4,6 @@
 #include "pc_message.hpp"
 
 BEGIN_GCOMM_NAMESPACE
-
 #if 0
 void PCProto::handle_first_trans(const View& view)
 {
@@ -37,11 +36,10 @@ void PCProto::handle_first_reg(const View& view)
 
 }
 
-#endif
 
 void PCProto::handle_view(const View& view)
 {
-#if 0
+
     if (view.get_type() != View::V_TRANS && view.get_type() != View::V_REG)
     {
         throw FatalException("");
@@ -61,19 +59,20 @@ void PCProto::handle_view(const View& view)
             handle_reg(view);
     }
 
-#endif
 }
-
+#endif 
 
 
 void PCProto::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
                         const ProtoUpMeta* um)
 {
+#if 0
     const View* v = um->get_view();
     if (v)
     {
         handle_view(*v);
     }
+#endif
 }
 
 int PCProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
