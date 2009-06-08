@@ -5,23 +5,26 @@
  * http://www.ddj.com/cpp/201804215?pgno=1
  */
 
-#ifndef __GCACHE_LOGGER__
-#define __GCACHE_LOGGER__
+#ifndef __GU_LOGGER__
+#define __GU_LOGGER__
 
 #include <sstream>
-//#include <wsrep.h>
 
-namespace gcache
+extern "C" {
+#include "gu_log.h"
+}
+
+namespace gu
 {
     // some portability stuff
-#ifdef WSREP_H
-    enum LogLevel { LOG_FATAL = WSREP_LOG_FATAL,
-                    LOG_ERROR = WSREP_LOG_ERROR,
-                    LOG_WARN  = WSREP_LOG_WARN,
-                    LOG_INFO  = WSREP_LOG_INFO,
-                    LOG_DEBUG = WSREP_LOG_DEBUG,
+#ifdef _gu_log_h_
+    enum LogLevel { LOG_FATAL = GU_LOG_FATAL,
+                    LOG_ERROR = GU_LOG_ERROR,
+                    LOG_WARN  = GU_LOG_WARN,
+                    LOG_INFO  = GU_LOG_INFO,
+                    LOG_DEBUG = GU_LOG_DEBUG,
                     LOG_MAX };
-    typedef wsrep_log_cb_t LogCallback;
+    typedef gu_log_cb_t LogCallback;
 #else
     enum LogLevel { LOG_FATAL,
                     LOG_ERROR,
@@ -41,27 +44,36 @@ namespace gcache
         // this function returns a stream for further logging.
 //        std::ostringstream& get(TLogLevel level = logINFO);
         inline std::ostringstream& get(const LogLevel lvl,
-                                const char*    file,
-                                const char*    func,
-                                const int      line);
+                                       const char*    file,
+                                       const char*    func,
+                                       const int      line);
     public:
+#ifndef _gu_log_h_
         static void        enable_tstamp (bool);
         static void        enable_debug  (bool);
         static void        set_logger    (LogCallback);
-        static inline bool no_log        (LogLevel lvl)
-                                         { return (lvl > max_level); };
+#endif
     protected:
         std::ostringstream os;
     private:
         Logger(const Logger&);
         Logger& operator =(const Logger&);
     private:
-        static LogLevel     max_level;
-        static bool         do_timestamp;
-        static LogCallback  logger;
-        static void         default_logger  (int, const char*);
-        void                prepare_default ();
-        LogLevel            level;
+        void               prepare_default ();
+        LogLevel           level;
+#ifndef _gu_log_h_
+        static LogLevel    max_level;
+        static bool        do_timestamp;
+        static LogCallback logger;
+        static void        default_logger  (int, const char*);
+#else
+#define max_level          gu_log_max_level
+#define logger             gu_log_cb
+#define default_logger     gu_log_cb_default
+#endif
+    public:
+        static inline bool no_log          (LogLevel lvl)
+        { return ((int)lvl > (int)max_level); };
     };
 
     Logger::~Logger()
@@ -85,11 +97,12 @@ namespace gcache
         }
         return os;
     }
-}
 
 #define LOG(level)               \
     if (Logger::no_log(level)) ; \
     else Logger().get(level, __FILE__, __PRETTY_FUNCTION__, __LINE__)
+
+// USAGE: LOG(level) << item_1 << item_2 << ... << item_n;
 
 #define log_fatal LOG(LOG_FATAL)
 #define log_error LOG(LOG_ERROR)
@@ -97,4 +110,6 @@ namespace gcache
 #define log_info  LOG(LOG_INFO)
 #define log_debug LOG(LOG_DEBUG)
 
-#endif // __GCACHE_LOGGER__
+}
+
+#endif // __GU_LOGGER__

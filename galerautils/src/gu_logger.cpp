@@ -9,10 +9,12 @@
 #include <cstdio>
 #include <ctime>
 #include <sys/time.h>
-#include "Logger.hpp"
 
-namespace gcache
+#include "gu_logger.hpp"
+
+namespace gu
 {
+#ifndef _gu_log_h_
     void
     Logger::enable_tstamp (bool yes)
     {
@@ -57,6 +59,14 @@ namespace gcache
         "DEBUG: "
     };
 
+    bool        Logger::do_timestamp = false;
+    LogLevel    Logger::max_level    = LOG_INFO;
+    LogCallback Logger::logger       = default_logger;
+#else
+#define do_timestamp       (gu_log_self_tstamp == true)
+#define level_str          gu_log_level_str
+#endif // _gu_log_h_
+
     void
     Logger::prepare_default()
     {
@@ -68,8 +78,6 @@ namespace gcache
             gettimeofday (&time, NULL);
             localtime_r  (&time.tv_sec, &date);
 
-            // save original format flags
-//            ios_base::fmtflags original_flags = os.flags();
             os << date.tm_year + 1900 << '-'
                << setw(2) << setfill('0') << date.tm_mon + 1 << '-'
                << setw(2) << setfill('0') << date.tm_mday << ' '
@@ -77,15 +85,8 @@ namespace gcache
                << setw(2) << setfill('0') << date.tm_min  << ':'
                << setw(2) << setfill('0') << date.tm_sec  << '.'
                << setw(3) << setfill('0') << ((int)time.tv_usec / 1000) << ' ';
-
-            // restore original format flags
-//            os.flags(original_flags);
         }
 
         os << level_str[level];
     }
-
-    bool        Logger::do_timestamp = false;
-    LogLevel    Logger::max_level    = LOG_INFO;
-    LogCallback Logger::logger       = default_logger;
 }

@@ -146,7 +146,8 @@ tar -xzf mysql_var.tgz -C $MYSQL_DIST_DIR
 GALERA_LIBS=$GALERA_DIST_DIR/lib
 mkdir -p $GALERA_LIBS
 install -m 644 LICENSE.galera $GALERA_DIST_DIR
-cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils.so* $GALERA_LIBS
+cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils.so*   $GALERA_LIBS
+cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils++.so* $GALERA_LIBS
 if test $GCOMM_IMPL = "galeracomm"
 then
     cp -P $GALERA_SRC/galeracomm/common/src/.libs/libgcommcommonpp.so* $GALERA_LIBS

@@ -50,7 +50,14 @@ int gu_log (gu_log_severity_t severity,
 /** This variable is made global only for the purpose of using it in
  *  gu_debug() macro and avoid calling gu_log() when debug is off.
  *  Don't use it directly! */
-extern int gu_log_debug;
+extern gu_log_severity_t gu_log_max_level;
+#define gu_log_debug (GU_LOG_DEBUG == gu_log_max_level)
+#ifdef __GU_LOGGER__
+extern bool              gu_log_self_tstamp;
+extern gu_log_cb_t       gu_log_cb;
+extern gu_log_cb_t       gu_log_cb_default;
+extern const char*       gu_log_level_str;
+#endif
 
 /**
  * @name Logging macros.
@@ -75,7 +82,7 @@ extern int gu_log_debug;
 	       format, ## __VA_ARGS__, NULL)
 
 #define gu_debug(format, ...)\
-        (!gu_log_debug ? 0 : \
+        (gu_log_max_level < GU_LOG_DEBUG ? 0 : \
         gu_log(GU_LOG_DEBUG, __FILE__, __PRETTY_FUNCTION__, __LINE__,\
 	       format, ## __VA_ARGS__, NULL))
 /*@}*/

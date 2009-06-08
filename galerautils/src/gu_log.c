@@ -12,18 +12,25 @@
 #include <stdio.h>
 #include <time.h>
 #include <sys/time.h>
+#include <stdbool.h>
 #include "galerautils.h"
 
 /* Global configurable variables */
-static FILE* gu_log_file        = NULL;
-static int   gu_log_self_tstamp = 0;
-int          gu_log_debug       = 0;
+static FILE*      gu_log_file        = NULL;
+bool              gu_log_self_tstamp = false;
+gu_log_severity_t gu_log_max_level   = GU_LOG_INFO;
 
 int
 gu_conf_set_log_file (FILE *file)
 {
     gu_debug ("Log file changed by application");
-    gu_log_file = file;
+    if (file) {
+        gu_log_file = file;
+    }
+    else {
+        gu_log_file = stderr;
+    }
+
     return 0;
 }
 
@@ -31,7 +38,7 @@ int
 gu_conf_self_tstamp_on ()
 {
     gu_debug ("Turning self timestamping on");
-    gu_log_self_tstamp = 1;
+    gu_log_self_tstamp = true;
     return 0;
 }
 
@@ -39,14 +46,14 @@ int
 gu_conf_self_tstamp_off ()
 {
     gu_debug ("Turning self timestamping off");
-    gu_log_self_tstamp = 0;
+    gu_log_self_tstamp = false;
     return 0;
 }
 
 int
 gu_conf_debug_on ()
 {
-    gu_log_debug = 1;
+    gu_log_max_level = GU_LOG_DEBUG;
     gu_debug ("Turning debug on");
     return 0;
 }
@@ -55,13 +62,13 @@ int
 gu_conf_debug_off ()
 {
     gu_debug ("Turning debug off");
-    gu_log_debug = 0;
+    gu_log_max_level = GU_LOG_INFO;
     return 0;
 }
 
 /** Returns current timestamp in the provided buffer */
 static inline int
-gu_log_tstamp (char* const tstamp, int const len)
+log_tstamp (char* tstamp, size_t const len)
 {
     int            ret = 0;
     struct tm      date;
@@ -78,48 +85,42 @@ gu_log_tstamp (char* const tstamp, int const len)
     return ret;
 }
 
+const char* gu_log_level_str[GU_LOG_DEBUG + 2] = 
+{
+    "FATAL: ",
+    "ERROR: ",
+    " WARN: ",
+    " INFO: ",
+    "DEBUG: ",
+    "XXXXX: "
+};
+
 /**
  * @function
  * Default logging function: simply writes to stderr or gu_log_file if set.
  */
 void
-gu_log_default (int severity, const char* string)
+gu_log_cb_default (int severity, const char* msg)
 {
-    FILE *log_file   = stderr;
-    char *sev        = NULL;
-
-    switch (severity) {
-    case GU_LOG_FATAL: sev = "FATAL"  ; break;
-    case GU_LOG_ERROR: sev = "ERROR"  ; break;
-    case GU_LOG_WARN:  sev = "WARN "  ; break;
-    case GU_LOG_INFO:  sev = "INFO "  ; break;
-    case GU_LOG_DEBUG: sev = "DEBUG"  ; break;
-    default:           sev = "UNKNOWN";
-    }
-
-    if (gu_log_file) log_file = gu_log_file;
-
-    fprintf (log_file, "%s: %s\n", sev, string);
-    fflush (log_file);
-
-    return;
+    fputs  (msg, gu_log_file ? gu_log_file : stderr);
+    fflush (gu_log_file);
 }
 
 /**
  * Log function handle.
  * Can be changed by application through gu_conf_set_log_callback()
  */
-gu_log_cb_t gu_log_handle = gu_log_default;
+gu_log_cb_t gu_log_cb = gu_log_cb_default;
 
 int
 gu_conf_set_log_callback (gu_log_cb_t callback)
 {
     if (callback) {
 	gu_debug ("Logging function changed by application");
-        gu_log_handle = callback;
+        gu_log_cb = callback;
     } else {
 	gu_debug ("Logging function restored to default");
-        gu_log_handle = gu_log_default;
+        gu_log_cb = gu_log_cb_default;
     }
     return 0;
 }
@@ -138,20 +139,18 @@ gu_log (gu_log_severity_t severity,
     char* str = string;
     int   len;
 
-// Modified gu_debug() macro to handle this instead of calling gu_log().
-// This way this condition is checked only in gu_debug() and if fails,
-// this function is not called.
-//    if (GU_LOG_DEBUG == severity && !gu_log_debug) return 0;
-
     if (gu_log_self_tstamp) {
-	len = gu_log_tstamp (str, max_string);
+	len = log_tstamp (str, max_string);
 	str += len;
 	max_string -= len;
     }
 
     if (gu_likely(max_string > 0)) {
-	len = snprintf (str, max_string, "%s:%s():%d: ",
-			file, function, line);
+        const char* log_level_str =
+            gu_log_cb_default == gu_log_cb ? gu_log_level_str[severity] : "";
+
+	len = snprintf (str, max_string, "%s%s:%s():%d: ",
+			log_level_str, file, function, line);
 	str += len;
 	max_string -= len;
 	if (gu_likely(max_string > 0 && format)) {
@@ -162,7 +161,7 @@ gu_log (gu_log_severity_t severity,
     }
 
     /* actual logging */
-    gu_log_handle (severity, string);
+    gu_log_cb (severity, string);
 
     return 0;
 }

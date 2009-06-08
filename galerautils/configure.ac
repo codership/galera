@@ -5,7 +5,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.50)
-AC_INIT(galerautils, 0.2.9, [info@codership.com])
+AC_INIT(galerautils, 0.3.0, [info@codership.com])
 AC_CONFIG_SRCDIR([src/gu_mutex.c])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE
@@ -19,7 +19,7 @@ if test "$enable_debug" != "no"
 then
     CFLAGS="-g -O2 -DDEBUG_ASSERT "
 else
-    CFLAGS=${CFLAGS:-" -O2 -g "}
+    CFLAGS=${CFLAGS:-" -O3 -g "}
     CFLAGS="$CFLAGS -DNDEBUG "
 fi
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")

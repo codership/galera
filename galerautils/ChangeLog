@@ -1,3 +1,7 @@
+2009-06-08 Alex
+    Started galerautils++ project. Added galerautils.hpp and C++-style
+    logger and assert variants. Version 0.3.0.
+
 2008-11-16 Alex
     Added gu_fifo_t class for mallocless FIFO queue. Version 0.2.9.
     
