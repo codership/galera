@@ -9,6 +9,9 @@
 #ifndef _galerautils_hpp_
 #define _galerautils_hpp_
 
+#include "gu_logger.hpp"
+#include "gu_assert.hpp"
+
 extern "C" {
 #include "gu_macros.h"
 #include "gu_limits.h"
@@ -23,8 +26,5 @@ extern "C" {
 #include "gu_fifo.h"
 #include "gu_uuid.h"
 }
-
-#include "gu_logger.hpp"
-#include "gu_assert.hpp"
 
 #endif /* _galerautilspp_hpp_ */

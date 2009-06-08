@@ -13,7 +13,8 @@
 #include <time.h>
 #include <sys/time.h>
 #include <stdbool.h>
-#include "galerautils.h"
+#include "gu_log.h"
+#include "gu_macros.h"
 
 /* Global configurable variables */
 static FILE*      gu_log_file        = NULL;

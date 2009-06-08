@@ -9,6 +9,7 @@
 #define __GU_LOGGER__
 
 #include <sstream>
+#include <iostream>
 
 extern "C" {
 #include "gu_log.h"
@@ -88,27 +89,26 @@ namespace gu
                 const char*    func,
                 const int      line)
     {
-        // fancy original stuff
-        // os << std::string(level > logDEBUG ? 0 : level - logDEBUG, '\t');
-        level = lvl;
-        if (logger == default_logger) {
-            // put in timestamp and log level line
+        level = lvl; // save level for ~Logger
+        if (default_logger == logger) {
+            // prefix with timestamp and log level
             prepare_default();
         }
+        os << file << ':' /* << func << ':' */ << line << ": ";
         return os;
     }
 
-#define LOG(level)               \
-    if (Logger::no_log(level)) ; \
-    else Logger().get(level, __FILE__, __PRETTY_FUNCTION__, __LINE__)
+#define GU_LOG_CPP(level)                                               \
+    if (gu::Logger::no_log(level)) ;                                    \
+    else gu::Logger().get(level, __FILE__, __PRETTY_FUNCTION__, __LINE__)
 
 // USAGE: LOG(level) << item_1 << item_2 << ... << item_n;
 
-#define log_fatal LOG(LOG_FATAL)
-#define log_error LOG(LOG_ERROR)
-#define log_warn  LOG(LOG_WARN)
-#define log_info  LOG(LOG_INFO)
-#define log_debug LOG(LOG_DEBUG)
+#define log_fatal GU_LOG_CPP(gu::LOG_FATAL)
+#define log_error GU_LOG_CPP(gu::LOG_ERROR)
+#define log_warn  GU_LOG_CPP(gu::LOG_WARN)
+#define log_info  GU_LOG_CPP(gu::LOG_INFO)
+#define log_debug GU_LOG_CPP(gu::LOG_DEBUG)
 
 }
 

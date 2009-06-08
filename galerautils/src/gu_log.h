@@ -41,23 +41,22 @@ gu_log_severity_t;
 typedef void (*gu_log_cb_t) (int severity, const char* msg);
 
 /** Helper for macros defined below. Should not be called directly. */
-int gu_log (gu_log_severity_t severity,
-	    const char*       file,
-	    const char*       function,
-	    const int         line,
-	    const char*       format, ...);
+extern int
+gu_log (gu_log_severity_t severity,
+        const char*       file,
+        const char*       function,
+        const int         line,
+        const char*       format, ...);
+
+#define GU_LOG_C(level, format, ...)\
+        gu_log(level, __FILE__, __PRETTY_FUNCTION__, __LINE__,\
+	       format "\n", ## __VA_ARGS__, NULL)
 
 /** This variable is made global only for the purpose of using it in
  *  gu_debug() macro and avoid calling gu_log() when debug is off.
  *  Don't use it directly! */
 extern gu_log_severity_t gu_log_max_level;
 #define gu_log_debug (GU_LOG_DEBUG == gu_log_max_level)
-#ifdef __GU_LOGGER__
-extern bool              gu_log_self_tstamp;
-extern gu_log_cb_t       gu_log_cb;
-extern gu_log_cb_t       gu_log_cb_default;
-extern const char*       gu_log_level_str;
-#endif
 
 /**
  * @name Logging macros.
@@ -66,25 +65,30 @@ extern const char*       gu_log_level_str;
  */
 /*@{*/
 #define gu_fatal(format, ...)\
-        gu_log(GU_LOG_FATAL, __FILE__, __PRETTY_FUNCTION__, __LINE__,\
-               format, ## __VA_ARGS__, NULL)
+    GU_LOG_C(GU_LOG_FATAL, format, ## __VA_ARGS__, NULL)
 
 #define gu_error(format, ...)\
-        gu_log(GU_LOG_ERROR, __FILE__, __PRETTY_FUNCTION__, __LINE__,\
-	       format, ## __VA_ARGS__, NULL)
+    GU_LOG_C(GU_LOG_ERROR, format, ## __VA_ARGS__, NULL)
 
 #define gu_warn(format, ...)\
-        gu_log(GU_LOG_WARN, __FILE__, __PRETTY_FUNCTION__, __LINE__,\
-               format, ## __VA_ARGS__, NULL)
+    GU_LOG_C(GU_LOG_WARN, format, ## __VA_ARGS__, NULL)
 
 #define gu_info(format, ...)\
-        gu_log(GU_LOG_INFO, __FILE__, __PRETTY_FUNCTION__, __LINE__,\
-	       format, ## __VA_ARGS__, NULL)
+    GU_LOG_C(GU_LOG_INFO, format, ## __VA_ARGS__, NULL)
 
 #define gu_debug(format, ...)\
-        (gu_log_max_level < GU_LOG_DEBUG ? 0 : \
-        gu_log(GU_LOG_DEBUG, __FILE__, __PRETTY_FUNCTION__, __LINE__,\
-	       format, ## __VA_ARGS__, NULL))
+    (gu_log_max_level < GU_LOG_DEBUG ? 0 :                      \
+     GU_LOG_C(GU_LOG_DEBUG, format, ## __VA_ARGS__, NULL))
+/*     gu_log(GU_LOG_DEBUG, __FILE__, __PRETTY_FUNCTION__, __LINE__,   \
+            format "\n", ## __VA_ARGS__, NULL))
+*/
 /*@}*/
+
+#ifdef __GU_LOGGER__ // C++ logger should use the same stuff, so export it
+extern bool        gu_log_self_tstamp;
+extern gu_log_cb_t gu_log_cb;
+extern void        gu_log_cb_default (int, const char*);
+extern const char* gu_log_level_str[];
+#endif
 
 #endif /* _gu_log_h_ */
