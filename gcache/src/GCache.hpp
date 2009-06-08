@@ -10,8 +10,8 @@
 #include <tr1/cstdint>
 #include <map>
 
-#include "Mutex.hpp"
-#include "Cond.hpp"
+#include <galerautils.hpp>
+
 #include "FileDescriptor.hpp"
 #include "MMap.hpp"
 
@@ -70,8 +70,8 @@ namespace gcache
 
     private:
 
-        Mutex           mtx;
-        Cond            cond;
+        gu::Mutex       mtx;
+        gu::Cond        cond;
 
         FileDescriptor  fd;       // cache file descriptor
 

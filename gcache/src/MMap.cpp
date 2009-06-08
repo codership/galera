@@ -6,7 +6,6 @@
 #include <cerrno>
 #include <sys/mman.h>
 
-#include "Exception.hpp"
 #include <galerautils.hpp>
 #include "MMap.hpp"
 
@@ -21,7 +20,7 @@ namespace gcache
             int err = errno;
             std::string msg ("mmap() on '" + fd.get_name() + "' failed: " +
                              strerror(err));
-            throw Exception (msg.c_str(), err);
+            throw gu::Exception (msg.c_str(), err);
         }
 
         mapped = true;
@@ -39,7 +38,7 @@ namespace gcache
             std::ostringstream msg;
             msg << "msync(" << ptr << ", " << size << ") failed: "
                 << strerror(err);
-            throw Exception (msg.str().c_str(), err);
+            throw gu::Exception (msg.str().c_str(), err);
         }
     }
 
@@ -51,7 +50,7 @@ namespace gcache
             std::ostringstream msg;
             msg << "munmap(" << ptr << ", " << size << ") failed: "
                 << strerror(err);
-            throw Exception (msg.str().c_str(), err);
+            throw gu::Exception (msg.str().c_str(), err);
         }
 
         mapped = false;

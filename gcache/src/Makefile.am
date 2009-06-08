@@ -7,7 +7,6 @@ AM_CFLAGS =
 #endif
 
 GCACHE_SRCS =               \
-	Exception.cpp       \
 	FileDescriptor.cpp  \
 	MMap.cpp            \
 	GCache.cpp          \

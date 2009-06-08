@@ -5,8 +5,7 @@
 #include <cerrno>
 #include <cassert>
 
-#include "Exception.hpp"
-#include "Lock.hpp"
+#include <galerautils.hpp>
 #include "SeqnoNone.hpp"
 #include "BufferHeader.hpp"
 #include "GCache.hpp"
@@ -32,7 +31,7 @@ namespace gcache
     void
     GCache::seqno_assign  (void* ptr, int64_t seqno)
     {
-        Lock          lock(mtx);
+        gu::Lock lock(mtx);
 
         if (seqno_max != SEQNO_NONE && seqno == seqno_max + 1) {
             // normal case
@@ -50,12 +49,12 @@ namespace gcache
             if (seqno <= seqno_max) {
                 msg << "Attempt tp assign outdated seqno: " << seqno
                     << ", expected " << (seqno_max + 1);
-                throw Exception(msg.str().c_str(), ENOTRECOVERABLE);
+                throw gu::Exception(msg.str().c_str(), ENOTRECOVERABLE);
             }
             else {
                 msg << "Attempt to assign seqno out of order: " << seqno
                     << ", expected " << (seqno_max + 1);
-                throw Exception(msg.str().c_str(), EAGAIN);
+                throw gu::Exception(msg.str().c_str(), EAGAIN);
             }
         }
     }
@@ -66,7 +65,7 @@ namespace gcache
      */
     int64_t GCache::seqno_get_min ()
     {
-        Lock lock(mtx);
+        gu::Lock lock(mtx);
 
         // This is a concurrent protection against concurrent history locking.
         // I don't envision the need for concurrent history access, so I don't
@@ -95,7 +94,7 @@ namespace gcache
      */
     void*   GCache::seqno_get_ptr (int64_t seqno)
     {
-        Lock  lock(mtx);
+        gu::Lock lock(mtx);
 
         if (seqno >= seqno_locked) {
             seqno2ptr_t::iterator p = seqno2ptr.find(seqno);
@@ -112,7 +111,7 @@ namespace gcache
             msg << "Attempt to acquire buffer by seqno out of order: "
                 << "locked seqno: " << seqno_locked << ", requested seqno: "
                 << seqno;
-            throw Exception(msg.str().c_str(), ENOTRECOVERABLE);
+            throw gu::Exception(msg.str().c_str(), ENOTRECOVERABLE);
         }
 
         return 0;
@@ -123,7 +122,7 @@ namespace gcache
      */
     void    GCache::seqno_release ()
     {
-        Lock lock(mtx);
+        gu::Lock lock(mtx);
         seqno_locked = SEQNO_NONE;
         cond.signal();
     }

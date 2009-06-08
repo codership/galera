@@ -5,7 +5,6 @@
 #include <cstdio>
 #include <cerrno>
 
-#include "Exception.hpp"
 #include <galerautils.hpp>
 #include "SeqnoNone.hpp"
 #include "BufferHeader.hpp"
@@ -33,13 +32,13 @@ namespace gcache
 
         if (version != (char)header[HEADER_VERSION]) {
             error << "unsupported version: " << header[HEADER_VERSION];
-            throw Exception (error.str().c_str(), ECANCELED);
+            throw gu::Exception (error.str().c_str(), ECANCELED);
         }
 
         if (mmap.size != header[FILE_SIZE]) {
             error << "file size does not match, declared: " << header[FILE_SIZE]
                   << ", real: " << mmap.size;
-            throw Exception (error.str().c_str(), ECANCELED);
+            throw gu::Exception (error.str().c_str(), ECANCELED);
         }
 
         if ((start - static_cast<uint8_t*>(mmap.ptr)) != 
@@ -47,7 +46,7 @@ namespace gcache
             error << "data offset " << header[DATA_OFFSET]
                   << " does not match derived: "
                   << (start - static_cast<uint8_t*>(mmap.ptr));
-            throw Exception (error.str().c_str(), ECANCELED);
+            throw gu::Exception (error.str().c_str(), ECANCELED);
         }
 
         if (true == header[FILE_OPEN]) {

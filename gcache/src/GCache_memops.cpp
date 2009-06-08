@@ -4,7 +4,7 @@
 
 #include <cassert>
 
-#include "Lock.hpp"
+#include <galerautils.hpp>
 #include "SeqnoNone.hpp"
 #include "BufferHeader.hpp"
 #include "GCache.hpp"
@@ -118,8 +118,8 @@ namespace gcache
         // as total cache area. So compare to half the space
         if (size < (size_cache >> 1)) {
 
-            Lock  lock(mtx);
-            void* ptr;
+            gu::Lock lock(mtx);
+            void*    ptr;
 
             // (size_cache - size_used) is how much memory we can potentially
             // reserve right now. If it is too low, don't even try, wait.
@@ -139,7 +139,7 @@ namespace gcache
     GCache::free (void* ptr)
     {
         BufferHeader* bh = BH(ptr) - 1;
-        Lock          lock(mtx);
+        gu::Lock      lock(mtx);
 
         size_used -= bh->size;
         // space is unused but not free
@@ -166,7 +166,7 @@ namespace gcache
             size_t   adj_size = size - bh->size;
             void*    adj_buff = 0;
 
-            Lock     lock(mtx);
+            gu::Lock lock(mtx);
 
             // do the same stuff as in malloc(), conditional that we have
             // adjacent space

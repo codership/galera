@@ -10,7 +10,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "Exception.hpp"
 #include <galerautils.hpp>
 #include "FileDescriptor.hpp"
 
@@ -43,7 +42,7 @@ namespace gcache
             int err = errno;
             std::string msg ("Failed to open cache file '" + name +
                              "': " + strerror (err));
-            throw Exception (msg.c_str(), err);
+            throw gu::Exception (msg.c_str(), err);
         }
 
         log_info << "Opened file '" << name << "'";
@@ -72,7 +71,7 @@ namespace gcache
             msg = "Failed to flush file '" + name + "': " + strerror(err);
         }
 
-        throw Exception (msg.c_str(), err);
+        throw gu::Exception (msg.c_str(), err);
     }
 
     void
@@ -84,7 +83,7 @@ namespace gcache
             int err = errno;
             std::string msg("fsync() on '" + name + "' failed: " +
                             strerror(err));
-            throw Exception (msg.c_str(), err);
+            throw gu::Exception (msg.c_str(), err);
         }
 
         log_debug << "Synced  file '" << name << "'";
@@ -116,6 +115,6 @@ namespace gcache
         int err = errno;
         std::string msg ("File preallocation failed: ");
         msg = msg + strerror (err);
-        throw Exception (msg.c_str(), err);
+        throw gu::Exception (msg.c_str(), err);
     }
 }

@@ -6,9 +6,6 @@
 
 #include <unistd.h>
 
-#include "Exception.hpp"
-#include <galerautils.hpp>
-#include "Lock.hpp"
 #include "BufferHeader.hpp"
 #include "GCache.hpp"
 
@@ -22,7 +19,7 @@ namespace gcache
         if (megs != ((megs << 20) >> 20)) {
             std::ostringstream msg;
             msg << "Requested cache size too high: " << megs << "Mb";
-            throw Exception (msg.str().c_str(), ERANGE);
+            throw gu::Exception (msg.str().c_str(), ERANGE);
         }
         return (megs << 20);
     }
@@ -94,7 +91,7 @@ namespace gcache
 
     GCache::~GCache ()
     {
-        Lock lock(mtx);
+        gu::Lock lock(mtx);
 
         mmap.sync();
 
