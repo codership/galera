@@ -164,8 +164,9 @@ void TCP::connect()
 
 void TCP::close()
 {
-    if (fd != -1) {
-        LOG_DEBUG("closing " + Int(fd).to_string());
+    if (fd != -1) 
+    {
+        LOG_DEBUG("closing " + make_int(fd).to_string());
 	if (event_loop)
 	    event_loop->erase(fd);
         closefd(fd);
@@ -223,7 +224,14 @@ Transport *TCP::accept()
 	throw FatalException("TCP::accept(): Fcntl failed");
     }
 
-
+    linger lg = {1, 3};
+    if (::setsockopt(acc_fd, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg)) == -1) 
+    {
+        closefd(acc_fd);
+	acc_fd = -1;
+	throw FatalException("TCP::accept(): set linger failed");
+    }
+    
     if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) == -1) {
 	int err = errno;
         closefd(fd);

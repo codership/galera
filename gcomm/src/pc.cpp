@@ -139,7 +139,15 @@ void PC::close()
     {
         LOG_WARN("PCProto didn't reach closed state");
     }
-    
+
+
+    int cnt = 0;
+    do
+    {
+        event_loop->poll(10);
+    }
+    while (++cnt < 15);
+
     tp->close();
     delete tp;
     tp = 0;

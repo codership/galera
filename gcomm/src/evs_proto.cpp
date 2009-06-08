@@ -978,6 +978,12 @@ void EVSProto::handle_foreign(const EVSMessage& msg)
 void EVSProto::handle_msg(const EVSMessage& msg, const ReadBuf* rb,
                           const size_t roff)
 {
+    if (get_state() == CLOSED)
+    {
+        LOG_DEBUG("dropping message in closed state");
+        return;
+    }
+
     // Figure out if the message is from known source
 
     InstMap::iterator ii = known.find(msg.get_source());

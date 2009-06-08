@@ -352,7 +352,7 @@ public:
         }
         else
         {
-            LOG_INFO("received message: " + make_int(um->get_to_seq()).to_string());
+            LOG_DEBUG("received message: " + make_int(um->get_to_seq()).to_string());
         }
     }
     
@@ -363,13 +363,13 @@ public:
             const byte_t buf[8] = "pcmsg12";
             WriteBuf wb(buf, sizeof(buf));
             int ret = pass_down(&wb, 0);
-            if (ret != 0)
+            if (ret != 0 && ret != EAGAIN)
             {
                 LOG_WARN(string("pass_down(): ") + strerror(ret));
             }
 
             event_loop->queue_event(fd, Event(Event::E_USER,
-                                              Time(Time::now() + Time(0, 5000))));
+                                              Time(Time::now() + Time(0, 10000))));
         }
     }
 
@@ -378,9 +378,9 @@ public:
 START_TEST(test_pc_transport)
 {
     EventLoop el;
-    PCUser2 pu1("gcomm+pc://localhost:10001?gmcast.group=pc", &el);
-    PCUser2 pu2("gcomm+pc://localhost:10002?gmcast.group=pc&gmcast.node=gcomm+tcp://localhost:10001", &el);
-    PCUser2 pu3("gcomm+pc://localhost:10003?gmcast.group=pc&gmcast.node=gcomm+tcp://localhost:10001", &el);
+    PCUser2 pu1("gcomm+pc://localhost:10001?gmcast.group=pc&node.name=n1", &el);
+    PCUser2 pu2("gcomm+pc://localhost:10002?gmcast.group=pc&gmcast.node=gcomm+tcp://localhost:10001&node.name=n2", &el);
+    PCUser2 pu3("gcomm+pc://localhost:10003?gmcast.group=pc&gmcast.node=gcomm+tcp://localhost:10001&node.name=n3", &el);
 
     pu1.start();
 

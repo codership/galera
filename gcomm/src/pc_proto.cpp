@@ -88,11 +88,17 @@ void PCProto::shift_to(const State s)
 {
     // State graph
     static const bool allowed[S_MAX][S_MAX] = {
+        // Closed
         {false, true, false, false, false, false},
+        // Joining
         {true, false, true, false, false, false},
-        {true, false, true, true, false, false},
+        // States exch
+        {true, false, true, true, false, true},
+        // RTR
         {true, false, true, false, true, true},
+        // Prim
         {true, false, true, false, false, true},
+        // Non-prim
         {true, false, true, false, false, false}
     };
 
