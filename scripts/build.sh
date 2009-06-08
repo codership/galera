@@ -93,6 +93,7 @@ build_base=$(cd $(dirname $0); cd ..; pwd -P)
 
 # Define branches to be used
 galerautils_src=$build_base/galerautils
+gcache_src=$build_base/gcache
 galeracomm_src=$build_base/galeracomm
 gcomm_src=$build_base/gcomm
 gcs_src=$build_base/gcs
@@ -169,6 +170,14 @@ then
 fi
 
 build_flags $galerautils_src
+
+if test $initial_stage = "gcache" || $building = "true"
+then
+    build $gcache_src $conf_flags
+    building="true"
+fi
+
+build_flags $gcache_src
 
 if test $GCOMM_IMPL = "galeracomm"
 then 
