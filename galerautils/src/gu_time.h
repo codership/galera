@@ -9,6 +9,7 @@
 #ifndef _gu_time_h_
 #define _gu_time_h_
 
+#include <sys/time.h>
 #include <time.h>
 
 /** Returns seconds */
