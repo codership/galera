@@ -81,7 +81,7 @@ public:
         to_seq = seq;
     }
 
-    uint64_t get_to_seq() const
+    int64_t get_to_seq() const
     {
         return to_seq;
     }

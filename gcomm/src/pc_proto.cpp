@@ -86,7 +86,7 @@ void PCProto::shift_to(const State s)
         {true, false, true, false, false, false}
     };
 
-    LOG_INFO("shift_to: " + to_string(get_state()) + " -> " 
+    LOG_INFO(self_string() + " shift_to: " + to_string(get_state()) + " -> " 
              + to_string(s));
  
     if (allowed[get_state()][s] == false)
@@ -175,7 +175,7 @@ void PCProto::handle_first_reg(const View& view)
     {
         if (view.get_members().length() > 1 || view.is_empty())
         {
-            LOG_FATAL("starting primary but first reg view is not singleton");
+            LOG_FATAL(self_string() + " starting primary but first reg view is not singleton");
             throw FatalException("");
         }
     }
@@ -188,9 +188,9 @@ void PCProto::handle_first_reg(const View& view)
         
         throw FatalException("decreasing view ids");
     }
+
     current_view = view;
     views.push_back(current_view);
-    
     shift_to(S_STATES_EXCH);
 }
 
@@ -198,18 +198,27 @@ void PCProto::handle_reg(const View& view)
 {
     assert(view.get_type() == View::V_REG);
     
-    assert(current_view.get_id() == ViewId() ||
-           get_last_prim() == current_view.get_id());
-    
+    if (view.get_id().get_seq() <= current_view.get_id().get_seq())
+    {
+        LOG_FATAL("decreasing view ids: current view " 
+                  + current_view.get_id().to_string() 
+                  + " new view "
+                  + view.get_id().to_string());
+        
+        throw FatalException("decreasing view ids");
+    }
+
     current_view = view;
     views.push_back(current_view);
-    set_last_prim(view.get_id());
+    shift_to(S_STATES_EXCH);
 }
 
 
 void PCProto::handle_view(const View& view)
 {
-    
+    assert(get_state() == S_JOINING || 
+           get_state() == S_PRIM ||
+           get_state() == S_NON_PRIM);
     // We accept only EVS TRANS and REG views
     if (view.get_type() != View::V_TRANS && view.get_type() != View::V_REG)
     {
@@ -272,10 +281,66 @@ void PCProto::validate_state_msgs() const
     // TODO:
 }
 
+static const PCInst& get_state(PCProto::SMMap::const_iterator smap_i, const UUID& uuid)
+{
+    PCInstMap::const_iterator i = PCProto::SMMap::get_instance(smap_i).get_inst_map().find(uuid);
+    if (i == PCProto::SMMap::get_instance(smap_i).get_inst_map().end())
+    {
+        throw FatalException("");
+    }
+    return PCInstMap::get_instance(i);
+}
+
+bool PCProto::is_prim() const
+{
+    bool prim = false;
+    ViewId last_prim;
+    int64_t to_seq = -1;
+
+
+    for (SMMap::const_iterator i = state_msgs.begin(); i != state_msgs.end();
+         ++i)
+    {
+        const PCInst& i_state(gcomm::get_state(i, SMMap::get_uuid(i)));
+        if (i_state.get_prim() == true)
+        {
+            prim = true;
+            last_prim = i_state.get_last_prim();
+            to_seq = i_state.get_to_seq();
+        }
+    }
+    
+    for (SMMap::const_iterator i = state_msgs.begin(); i != state_msgs.end();
+         ++i)
+    {
+        const PCInst& i_state(gcomm::get_state(i, SMMap::get_uuid(i)));
+        if (i_state.get_prim() == true)
+        {
+            if (i_state.get_last_prim() != last_prim)
+            {
+                LOG_FATAL("last prims not consistent");
+                throw FatalException("");
+            }
+            if (i_state.get_to_seq() != to_seq)
+            {
+                LOG_FATAL("TO seqs not consistent");
+                throw FatalException("");
+            }
+        }
+        else
+        {
+            LOG_INFO("non prim " + SMMap::get_uuid(i).to_string() + " from "
+                     + i_state.get_last_prim().to_string() 
+                     + " joining prim");
+        }
+    }
+
+    return prim;
+}
+
 void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 {
     assert(msg.get_type() == PCMessage::T_STATE);
-    assert(state_msgs.length() < instances.length());
     assert(state_msgs.length() < current_view.get_members().length());
     
     if (state_msgs.insert(make_pair(source, msg)).second == false)
@@ -285,15 +350,38 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
     
     if (state_msgs.length() == current_view.get_members().length())
     {
-        validate_state_msgs();
-        shift_to(S_RTR);
-        if (requires_rtr())
+        for (SMMap::const_iterator i = state_msgs.begin(); 
+             i != state_msgs.end();
+             ++i)
         {
-            throw FatalException("retransmission not implemented");
+            if (instances.find(SMMap::get_uuid(i)) == instances.end())
+            {
+                if (instances.insert(
+                        make_pair(SMMap::get_uuid(i),
+                                  gcomm::get_state(
+                                      i, 
+                                      SMMap::get_uuid(i)))).second == false)
+                {
+                    throw FatalException("");
+                }
+            }
         }
-        if (self_i == instances.begin())
+        validate_state_msgs();
+        if (is_prim())
         {
-            send_install();
+            shift_to(S_RTR);
+            if (requires_rtr())
+            {
+                throw FatalException("retransmission not implemented");
+            }
+            if (self_i == instances.begin())
+            {
+                send_install();
+            }
+        }
+        else
+        {
+            shift_to(S_NON_PRIM);
         }
     }
 }
@@ -301,6 +389,22 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 void PCProto::handle_install(const PCMessage& msg, const UUID& source)
 {
     assert(msg.get_type() == PCMessage::T_INSTALL);
+    assert(get_state() == S_RTR);
+    
+    PCInstMap::const_iterator mi = msg.get_inst_map().find(uuid);
+    if (mi == msg.get_inst_map().end())
+    {
+        throw FatalException("");
+    }
+    const PCInst& m_state = PCInstMap::get_instance(mi);
+    if (m_state.get_prim() != get_prim() ||
+        m_state.get_last_prim() != get_last_prim() ||
+        m_state.get_to_seq() != get_to_seq() ||
+        m_state.get_last_seq() != get_last_seq())
+    {
+        throw FatalException("install message self state does not match");
+    }
+    
     shift_to(S_PRIM);
 }
 

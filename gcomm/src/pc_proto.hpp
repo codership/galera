@@ -60,16 +60,6 @@ private:
     PCInstMap::iterator self_i;
 
 public:
-    const ViewId& get_last_prim() const
-    {
-        return PCInstMap::get_instance(self_i).get_last_prim();
-    }
-
-    void set_last_prim(const ViewId& vid)
-    {
-        PCInstMap::get_instance(self_i).set_last_prim(vid);
-    }
-
     bool get_prim() const
     {
         return PCInstMap::get_instance(self_i).get_prim();
@@ -80,15 +70,53 @@ public:
         PCInstMap::get_instance(self_i).set_prim(val);
     }
 
+    const ViewId& get_last_prim() const
+    {
+        return PCInstMap::get_instance(self_i).get_last_prim();
+    }
 
-private:
+    void set_last_prim(const ViewId& vid)
+    {
+        PCInstMap::get_instance(self_i).set_last_prim(vid);
+    }
+    
+    uint32_t get_last_seq() const
+    {
+        return PCInstMap::get_instance(self_i).get_last_seq();
+    }
+    
+    void set_last_seq(const uint32_t seq)
+    {
+        PCInstMap::get_instance(self_i).set_last_seq(seq);
+    }
+
+    int64_t get_to_seq() const
+    {
+        return PCInstMap::get_instance(self_i).get_to_seq();
+    }
+    
+    void set_to_seq(const int64_t seq)
+    {
+        PCInstMap::get_instance(self_i).set_to_seq(seq);
+    }
+
+
+
     typedef InstMap<PCMessage> SMMap;
+private:
+
     SMMap state_msgs;
 
     View current_view;
     list<View> views;
 
 public:
+
+    const View& get_current_view() const
+    {
+        return current_view;
+    }
+
     PCProto(const UUID& uuid_, 
             EventLoop* el_, 
             Monitor* mon_, 
@@ -96,7 +124,7 @@ public:
         uuid(uuid_),
         el(el_),
         mon(mon_),
-        start_prim(start_prim),
+        start_prim(start_prim_),
         state(S_CLOSED)
     {
         pair<PCInstMap::iterator, bool> iret;
@@ -134,6 +162,7 @@ public:
 
 private:
     bool requires_rtr() const;
+    bool is_prim() const;
     void validate_state_msgs() const;
     void handle_state(const PCMessage&, const UUID&);
     void handle_install(const PCMessage&, const UUID&);

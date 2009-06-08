@@ -52,8 +52,16 @@ class PCUser : public Toplay
 {
     list<View> views;
 public:
-    PCUser()
+    UUID uuid;
+    DummyTransport* tp;
+    PCProto* pc;
+    PCUser(const UUID& uuid_, DummyTransport *tp_, PCProto* pc_) :
+        uuid(uuid_),
+        tp(tp_),
+        pc(pc_)
     {
+        gcomm::connect(tp, pc);
+        gcomm::connect(pc, this);
     }
     
     void handle_up(const int cid, const ReadBuf* rb, const size_t roff,
@@ -88,32 +96,25 @@ void get_msg(ReadBuf* rb, PCMessage* msg, bool release = true)
 
 }
 
-START_TEST(test_pc_view_changes)
+void single_boot(PCUser* pu1)
 {
-    UUID uuid1(0, 0);
-    ProtoUpMeta sum1(uuid1);
-    PCUser pu1;
-    PCProto pc1(uuid1, 0, 0, true);
-    DummyTransport tp1;
+    
+    ProtoUpMeta sum1(pu1->uuid);
 
-    gcomm::connect(&tp1, &pc1);
-    gcomm::connect(&pc1, &pu1);
-    
-    
-    View vt0(View::V_TRANS, ViewId(uuid1, 0));
-    vt0.add_member(uuid1, "n1");
+    View vt0(View::V_TRANS, ViewId(pu1->uuid, 0));
+    vt0.add_member(pu1->uuid, "n1");
     ProtoUpMeta um1(&vt0);
-    pc1.shift_to(PCProto::S_JOINING);
-    pc1.handle_up(0, 0, 0, &um1);
-    fail_unless(pc1.get_state() == PCProto::S_JOINING);
+    pu1->pc->shift_to(PCProto::S_JOINING);
+    pu1->pc->handle_up(0, 0, 0, &um1);
+    fail_unless(pu1->pc->get_state() == PCProto::S_JOINING);
     
-    View vr1(View::V_REG, ViewId(uuid1, 1));
-    vr1.add_member(uuid1, "n1");
+    View vr1(View::V_REG, ViewId(pu1->uuid, 1));
+    vr1.add_member(pu1->uuid, "n1");
     ProtoUpMeta um2(&vr1);
-    pc1.handle_up(0, 0, 0, &um2);
-    fail_unless(pc1.get_state() == PCProto::S_STATES_EXCH);
+    pu1->pc->handle_up(0, 0, 0, &um2);
+    fail_unless(pu1->pc->get_state() == PCProto::S_STATES_EXCH);
     
-    ReadBuf* rb = tp1.get_out();
+    ReadBuf* rb = pu1->tp->get_out();
     fail_unless(rb != 0);
     PCMessage sm1;
     get_msg(rb, &sm1);
@@ -123,12 +124,12 @@ START_TEST(test_pc_view_changes)
     {
         const PCInst& pi1 = PCInstMap::get_instance(sm1.get_inst_map().begin());
         fail_unless(pi1.get_prim() == true);
-        fail_unless(pi1.get_last_prim() == ViewId(uuid1, 0));
+        fail_unless(pi1.get_last_prim() == ViewId(pu1->uuid, 0));
     }
-    pc1.handle_msg(sm1, 0, 0, &sum1);
-    fail_unless(pc1.get_state() == PCProto::S_RTR);
+    pu1->pc->handle_msg(sm1, 0, 0, &sum1);
+    fail_unless(pu1->pc->get_state() == PCProto::S_RTR);
     
-    rb = tp1.get_out();
+    rb = pu1->tp->get_out();
     fail_unless(rb != 0);
     PCMessage im1;
     get_msg(rb, &im1);
@@ -138,13 +139,119 @@ START_TEST(test_pc_view_changes)
     {
         const PCInst& pi1 = PCInstMap::get_instance(im1.get_inst_map().begin());
         fail_unless(pi1.get_prim() == true);
-        fail_unless(pi1.get_last_prim() == ViewId(uuid1, 0));
+        fail_unless(pi1.get_last_prim() == ViewId(pu1->uuid, 0));
     }
-    pc1.handle_msg(im1, 0, 0, &sum1);
-    fail_unless(pc1.get_state() == PCProto::S_PRIM);
+    pu1->pc->handle_msg(im1, 0, 0, &sum1);
+    fail_unless(pu1->pc->get_state() == PCProto::S_PRIM);
+}
+
+START_TEST(test_pc_view_changes_single)
+{
+    UUID uuid1(0, 0);
+
+    PCProto pc1(uuid1, 0, 0, true);
+    DummyTransport tp1;
+    PCUser pu1(uuid1, &tp1, &pc1);    
+    single_boot(&pu1);
+
 }
 END_TEST
 
+START_TEST(test_pc_view_changes_double)
+{
+    UUID uuid1(0, 0);
+    ProtoUpMeta pum1(uuid1);
+    PCProto pc1(uuid1, 0, 0, true);
+    DummyTransport tp1;
+    PCUser pu1(uuid1, &tp1, &pc1);
+    single_boot(&pu1);
+    
+    UUID uuid2(0, 0);
+    ProtoUpMeta pum2(uuid2);
+    PCProto pc2(uuid2, 0, 0, false);
+    DummyTransport tp2;
+    PCUser pu2(uuid2, &tp2, &pc2);
+    
+    View t11(View::V_TRANS, pu1.pc->get_current_view().get_id());
+    t11.add_member(uuid1, "n1");
+    pu1.pc->handle_view(t11);
+    fail_unless(pu1.pc->get_state() == PCProto::S_PRIM);
+    
+    View t12(View::V_TRANS, ViewId(uuid2, 0));
+    t12.add_member(uuid2, "n2");
+    pu2.pc->shift_to(PCProto::S_JOINING);
+    pu2.pc->handle_view(t12);
+    fail_unless(pu2.pc->get_state() == PCProto::S_JOINING);
+
+    View r1(View::V_REG, ViewId(uuid1, pu1.pc->get_current_view().get_id().get_seq() + 1));
+    r1.add_member(uuid1, "n1");
+    r1.add_member(uuid2, "n2");
+    pu1.pc->handle_view(r1);
+    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
+
+    pu2.pc->handle_view(r1);
+    fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);
+
+    ReadBuf* rb = pu1.tp->get_out();
+    fail_unless(rb != 0);
+    PCMessage sm1;
+    get_msg(rb, &sm1);
+    fail_unless(sm1.get_type() == PCMessage::T_STATE);
+
+    rb = pu2.tp->get_out();
+    fail_unless(rb != 0);
+    PCMessage sm2;
+    get_msg(rb, &sm2);
+    fail_unless(sm2.get_type() == PCMessage::T_STATE);
+
+    rb = pu1.tp->get_out();
+    fail_unless(rb == 0);
+    rb = pu2.tp->get_out();
+    fail_unless(rb == 0);
+
+    pu1.pc->handle_msg(sm1, 0, 0, &pum1);
+    rb = pu1.tp->get_out();
+    fail_unless(rb == 0);
+    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
+    pu1.pc->handle_msg(sm2, 0, 0, &pum2);
+    fail_unless(pu1.pc->get_state() == PCProto::S_RTR);
+
+    pu2.pc->handle_msg(sm1, 0, 0, &pum1);
+    rb = pu2.tp->get_out();
+    fail_unless(rb == 0);
+    fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);
+    pu2.pc->handle_msg(sm2, 0, 0, &pum2);
+    fail_unless(pu2.pc->get_state() == PCProto::S_RTR);
+
+    PCMessage im1;
+    UUID imsrc;
+    if (uuid1 < uuid2)
+    {
+        rb = pu1.tp->get_out();
+        imsrc = uuid1;
+    }
+    else
+    {
+        rb = pu2.tp->get_out();
+        imsrc = uuid2;
+    }
+
+    fail_unless(rb != 0);
+    get_msg(rb, &im1);
+    fail_unless(im1.get_type() == PCMessage::T_INSTALL);
+    
+    fail_unless(pu1.tp->get_out() == 0);
+    fail_unless(pu2.tp->get_out() == 0);
+
+    ProtoUpMeta ipum(imsrc);
+    pu1.pc->handle_msg(im1, 0, 0, &ipum);
+    fail_unless(pu1.pc->get_state() == PCProto::S_PRIM);
+
+    pu2.pc->handle_msg(im1, 0, 0, &ipum);
+    fail_unless(pu2.pc->get_state() == PCProto::S_PRIM);
+
+}
+END_TEST
 
 Suite* pc_suite()
 {
@@ -155,8 +262,12 @@ Suite* pc_suite()
     tcase_add_test(tc, test_pc_messages);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_pc_view_changes");
-    tcase_add_test(tc, test_pc_view_changes);
+    tc = tcase_create("test_pc_view_changes_single");
+    tcase_add_test(tc, test_pc_view_changes_single);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_pc_view_changes_double");
+    tcase_add_test(tc, test_pc_view_changes_double);
     suite_add_tcase(s, tc);
 
     return s;
