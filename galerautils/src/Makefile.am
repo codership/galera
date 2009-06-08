@@ -24,9 +24,13 @@ include_HEADERS =      \
 	gu_fifo.h      \
 	gu_byteswap.h  \
 	gu_uuid.h      \
-	galerautils.hpp\
-	gu_logger.hpp  \
-	gu_assert.hpp
+	galerautils.hpp  \
+	gu_exception.hpp \
+	gu_logger.hpp    \
+	gu_assert.hpp    \
+	gu_mutex.hpp     \
+	gu_cond.hpp      \
+	gu_lock.hpp
 
 lib_LTLIBRARIES = libgalerautils.la
 
@@ -47,7 +51,9 @@ libgalerautils_la_LDFLAGS = \
 lib_LTLIBRARIES += libgalerautils++.la
 
 libgalerautils___la_SOURCES = \
+	gu_exception.cpp \
 	gu_logger.cpp
+
 
 INTERFACEPP = 1
 REVISIONPP  = 0

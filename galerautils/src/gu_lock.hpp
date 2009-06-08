@@ -3,18 +3,18 @@
  *
  */
 
-#ifndef __GCACHE_LOCK__
-#define __GCACHE_LOCK__
+#ifndef __GU_LOCK__
+#define __GU_LOCK__
 
 #include <pthread.h>
 #include <cerrno>
 
-#include "Exception.hpp"
-#include <galerautils.hpp>
-#include "Mutex.hpp"
-#include "Cond.hpp"
+#include "gu_exception.hpp"
+#include "gu_logger.hpp"
+#include "gu_mutex.hpp"
+#include "gu_cond.hpp"
 
-namespace gcache
+namespace gu
 {
     class Lock
     {
@@ -55,4 +55,4 @@ namespace gcache
     };
 }
 
-#endif /* __GCACHE_LOCK__ */
+#endif /* __GU_LOCK__ */

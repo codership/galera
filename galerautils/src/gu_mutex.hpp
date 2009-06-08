@@ -3,16 +3,16 @@
  *
  */
 
-#ifndef __GCACHE_MUTEX__
-#define __GCACHE_MUTEX__
+#ifndef __GU_MUTEX__
+#define __GU_MUTEX__
 
 #include <pthread.h>
 #include <cerrno>
 
-#include "Exception.hpp"
-#include <galerautils.hpp>
+#include "gu_exception.hpp"
+#include "gu_logger.hpp"
 
-namespace gcache
+namespace gu
 {
     class Mutex
     {
@@ -41,4 +41,4 @@ namespace gcache
     };
 }
 
-#endif /* __GCACHE_MUTEX__ */
+#endif /* __GU_MUTEX__ */

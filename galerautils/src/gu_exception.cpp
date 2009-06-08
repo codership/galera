@@ -5,22 +5,14 @@
 
 #include <cstring>
 
-#include "Exception.hpp"
+#include "gu_exception.hpp"
 
-namespace gcache
+namespace gu
 {
-    Exception::Exception (const char* msg_str, int errno) throw()
-        : _errno(errno)
+    Exception::Exception (const char* msg_str, int err) throw()
+        : _errno(err)
     {
-        strncpy (msg, msg_str, EXCEPTION_MSG_SIZE);
-        msg[EXCEPTION_MSG_SIZE - 1] = '\0';
+        strncpy (msg, msg_str, GU_EXCEPTION_MSG_SIZE);
+        msg[GU_EXCEPTION_MSG_SIZE - 1] = '\0';
     }
-///*
-    Exception::Exception (const char* msg_str) throw()
-        : _errno(0)
-    {
-        strncpy (msg, msg_str, EXCEPTION_MSG_SIZE);
-        msg[EXCEPTION_MSG_SIZE - 1] = '\0';
-    }
-//*/
 }

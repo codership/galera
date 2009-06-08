@@ -9,8 +9,12 @@
 #ifndef _galerautils_hpp_
 #define _galerautils_hpp_
 
+#include "gu_exception.hpp"
 #include "gu_logger.hpp"
 #include "gu_assert.hpp"
+#include "gu_mutex.hpp"
+#include "gu_cond.hpp"
+#include "gu_lock.hpp"
 
 extern "C" {
 #include "gu_macros.h"
@@ -21,7 +25,7 @@ extern "C" {
 #include "gu_conf.h"
 //#include "gu_assert.h"
 #include "gu_mem.h"
-#include "gu_mutex.h"
+//#include "gu_mutex.h"
 #include "gu_dbug.h"
 #include "gu_fifo.h"
 #include "gu_uuid.h"

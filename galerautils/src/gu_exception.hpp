@@ -3,26 +3,25 @@
  *
  */
 
-#ifndef __GCACHE_EXCEPTION__
-#define __GCACHE_EXCEPTION__
+#ifndef __GU_EXCEPTION__
+#define __GU_EXCEPTION__
 
 #include <exception>
 
-namespace gcache
+namespace gu
 {
     class Exception: public std::exception
     {
 
     private:
 
-#define EXCEPTION_MSG_SIZE 256
-        char msg[EXCEPTION_MSG_SIZE];
+#define GU_EXCEPTION_MSG_SIZE 256
+        char msg[GU_EXCEPTION_MSG_SIZE];
         const int _errno;
 
     public:
 
-        Exception (const char* msg_str, int) throw();
-        Exception (const char* msg_str) throw();
+        Exception (const char* msg, int err = 0) throw();
         virtual ~Exception () throw() {};
 
         virtual const char* what () const throw() { return msg; };
@@ -30,4 +29,4 @@ namespace gcache
     };
 }
 
-#endif // __GCACHE_EXCEPTION__
+#endif // __GU_EXCEPTION__
