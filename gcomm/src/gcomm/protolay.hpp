@@ -206,7 +206,7 @@ public:
 	size_t down_hdrlen = wb->get_hdrlen();
 	int ret = down_context->handle_down(wb, down_meta);
 	if (down_hdrlen != wb->get_hdrlen())
-	    throw FatalException("");
+	    throw FatalException("hdr not rolled back");
 	return ret;
     }    
 };

@@ -90,7 +90,7 @@ void PCProto::shift_to(const State s)
     static const bool allowed[S_MAX][S_MAX] = {
         {false, true, false, false, false, false},
         {true, false, true, false, false, false},
-        {true, false, false, true, false, false},
+        {true, false, true, true, false, false},
         {true, false, true, false, true, true},
         {true, false, true, false, false, true},
         {true, false, true, false, false, false}
@@ -155,7 +155,6 @@ void PCProto::handle_first_trans(const View& view)
 void PCProto::handle_trans(const View& view)
 {
     assert(view.get_type() == View::V_TRANS);
-    assert(get_state() == S_PRIM || get_state() == S_NON_PRIM);
     if (view.get_id() == get_last_prim())
     {
         if (view.get_members().length()*2 + view.get_left().length() <=
@@ -207,7 +206,8 @@ void PCProto::handle_reg(const View& view)
 {
     assert(view.get_type() == View::V_REG);
     
-    if (view.get_id().get_seq() <= current_view.get_id().get_seq())
+    if (view.is_empty() == false && 
+        view.get_id().get_seq() <= current_view.get_id().get_seq())
     {
         LOG_FATAL("decreasing view ids: current view " 
                   + current_view.get_id().to_string() 
@@ -237,15 +237,7 @@ void PCProto::handle_reg(const View& view)
 
 void PCProto::handle_view(const View& view)
 {
-    if (get_state() != S_JOINING &&
-        get_state() != S_PRIM &&
-        get_state() != S_NON_PRIM)
-    {
-        LOG_FATAL("invalid input, view " + view.to_string() + " in state "
-                  + to_string(get_state()));
-        throw FatalException("invalid input");
-    }
-
+    
     // We accept only EVS TRANS and REG views
     if (view.get_type() != View::V_TRANS && view.get_type() != View::V_REG)
     {
@@ -254,10 +246,11 @@ void PCProto::handle_view(const View& view)
     }
     
     // Make sure that self exists in view
-    if (view.get_members().find(uuid) == view.get_members().end())
+    if (view.is_empty() == false &&
+        view.get_members().find(uuid) == view.get_members().end())
     {
-        LOG_FATAL("self not found from view: " + view.to_string());
-        throw FatalException("self not found from view");
+        LOG_FATAL("self not found from non empty view: " + view.to_string());
+        throw FatalException("self not found from non empty view");
     }
     
     
@@ -297,10 +290,25 @@ bool PCProto::requires_rtr() const
             throw FatalException("");
         }
         const PCInst& inst = PCInstMap::get_instance(ii);
+        max_to_seq = std::max(max_to_seq, inst.get_to_seq());
+    }
+    for (SMMap::const_iterator i = state_msgs.begin();
+         i != state_msgs.end(); ++i)
+    {
+        PCInstMap::const_iterator ii = SMMap::get_instance(i).get_inst_map().find(SMMap::get_uuid(i));
+        if (ii == SMMap::get_instance(i).get_inst_map().end())
+        {
+            throw FatalException("");
+        }
+        const PCInst& inst = PCInstMap::get_instance(ii);
         const int64_t to_seq = inst.get_to_seq();
         const ViewId last_prim = inst.get_last_prim();
         if (to_seq != -1 && to_seq != max_to_seq && last_prim != ViewId())
         {
+            LOG_INFO(self_string() + " rtr is needed: " + 
+                     make_int(to_seq).to_string()
+                     + " " 
+                     + last_prim.to_string());
             return true;
         }
     }
@@ -431,6 +439,11 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
         m_state.get_to_seq() != get_to_seq() ||
         m_state.get_last_seq() != get_last_seq())
     {
+        LOG_FATAL(self_string()
+                  + "install message self state does not match, message state: "
+                  + m_state.to_string() 
+                  + " local state: " 
+                  + PCInstMap::get_instance(self_i).to_string());
         throw FatalException("install message self state does not match");
     }
     
@@ -528,6 +541,11 @@ void PCProto::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
 
 int PCProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 {
+    if (get_state() != S_PRIM)
+    {
+        return EAGAIN;
+    }
+
     uint32_t seq = get_last_seq() + 1;
     PCUserMessage um(seq);
     byte_t buf[8];
@@ -537,7 +555,7 @@ int PCProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
     }
     wb->prepend_hdr(buf, um.size());
     int ret = pass_down(wb, dm);
-    
+    wb->rollback_hdr(um.size());
     if (ret == 0)
     {
         set_last_seq(seq);

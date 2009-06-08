@@ -332,6 +332,7 @@ public:
     
     void stop()
     {
+        sending = false;
         tp->close();
     }
 
@@ -378,7 +379,8 @@ START_TEST(test_pc_transport)
 {
     EventLoop el;
     PCUser2 pu1("gcomm+pc://localhost:10001?gmcast.group=pc", &el);
-
+    PCUser2 pu2("gcomm+pc://localhost:10002?gmcast.group=pc&gmcast.node=gcomm+tcp://localhost:10001", &el);
+    PCUser2 pu3("gcomm+pc://localhost:10003?gmcast.group=pc&gmcast.node=gcomm+tcp://localhost:10001", &el);
 
     pu1.start();
 
@@ -389,6 +391,42 @@ START_TEST(test_pc_transport)
     }
     while (Time::now() < stop);
     
+    pu2.start();
+
+    stop = Time::now() + Time(5, 0);
+    do
+    {
+        el.poll(50);
+    }
+    while (Time::now() < stop);
+
+    pu3.start();
+
+    stop = Time::now() + Time(5, 0);
+    do
+    {
+        el.poll(50);
+    }
+    while (Time::now() < stop);
+
+    pu2.stop();
+
+    stop = Time::now() + Time(5, 0);
+    do
+    {
+        el.poll(50);
+    }
+    while (Time::now() < stop);
+
+    pu1.stop();
+    stop = Time::now() + Time(5, 0);
+    do
+    {
+        el.poll(50);
+    }
+    while (Time::now() < stop);
+
+    pu3.stop();
 
 }
 END_TEST
