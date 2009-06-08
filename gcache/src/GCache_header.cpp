@@ -5,10 +5,10 @@
 #include <cstdio>
 #include <cerrno>
 
+#include "Exception.hpp"
+#include <galerautils.hpp>
 #include "SeqnoNone.hpp"
 #include "BufferHeader.hpp"
-#include "Exception.hpp"
-#include "Logger.hpp"
 #include "GCache.hpp"
 
 namespace gcache

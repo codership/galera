@@ -11,7 +11,7 @@
 #include <unistd.h>
 
 #include "Exception.hpp"
-#include "Logger.hpp"
+#include <galerautils.hpp>
 #include "FileDescriptor.hpp"
 
 namespace gcache

@@ -7,7 +7,7 @@
 #include <sys/mman.h>
 
 #include "Exception.hpp"
-#include "Logger.hpp"
+#include <galerautils.hpp>
 #include "MMap.hpp"
 
 namespace gcache

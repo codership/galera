@@ -6,6 +6,8 @@
 #ifndef __GCACHE_FILEDES__
 #define __GCACHE_FILEDES__
 
+#include <string>
+
 namespace gcache
 {
     class FileDescriptor

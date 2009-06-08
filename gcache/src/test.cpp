@@ -3,7 +3,7 @@
  *
  */
 
-#include "Logger.hpp"
+#include <galerautils.hpp>
 #include "GCache.hpp"
 
 using namespace gcache;
@@ -14,8 +14,8 @@ main (int argc, char* argv[])
     int ret = 0;
     std::string fname = "test.cache";
 
-    Logger::enable_tstamp (true);
-    Logger::enable_debug  (true);
+    gu_conf_self_tstamp_on ();
+    gu_conf_debug_on ();
 
     log_info  << "Start";
     log_debug << "DEBUG output enabled";
@@ -23,9 +23,9 @@ main (int argc, char* argv[])
     if (argc > 1) fname.assign(argv[1]); // take supplied file name if any
     GCache* cache = new GCache (fname, 50);
 
-    log_info << "";
-    log_info << "...do something...";
-    log_info << "";
+    log_info  << "";
+    log_info  << "...do something...";
+    log_info  << "";
 
     delete cache;
 

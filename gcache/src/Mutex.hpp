@@ -10,7 +10,7 @@
 #include <cerrno>
 
 #include "Exception.hpp"
-#include "Logger.hpp"
+#include <galerautils.hpp>
 
 namespace gcache
 {

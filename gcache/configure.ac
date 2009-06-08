@@ -30,17 +30,23 @@ AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
 
 # Checks for programs.
 AC_PROG_AWK
-AC_PROG_CC
+//AC_PROG_CC
+AC_LANG([C++])
 AC_PROG_CXX
-#AC_PROG_RANLIB
-#AC_CHECK_PROG(AR, ar, ar)
+AC_REQUIRE_CPP
 AC_PROG_LIBTOOL
 AM_PATH_CHECK()
 #PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 
 # Checks for libraries.
 AC_CHECK_LIB([pthread], [pthread_testcancel],,
-	     AC_MSG_ERROR([*** POSIX threads not found! ***]))
+             AC_MSG_ERROR([*** POSIX threads not found! ***]))
+
+AC_CHECK_LIB([galerautils], [gu_malloc_dbg],,
+              AC_MSG_ERROR([*** galerautils not found! ***]))
+
+AC_CHECK_LIB([galerautils++], [main],,
+              AC_MSG_ERROR([*** galerautils++ not found! ***]))
 
 # Checks for header files.
 AC_HEADER_STDC

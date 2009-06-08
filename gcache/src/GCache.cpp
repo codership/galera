@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 #include "Exception.hpp"
-#include "Logger.hpp"
+#include <galerautils.hpp>
 #include "Lock.hpp"
 #include "BufferHeader.hpp"
 #include "GCache.hpp"

@@ -17,7 +17,7 @@ namespace gcache
 
 #define EXCEPTION_MSG_SIZE 256
         char msg[EXCEPTION_MSG_SIZE];
-        const int  _errno;
+        const int _errno;
 
     public:
 
