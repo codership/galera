@@ -19,7 +19,9 @@ void check_serialization(const T& c, const size_t expected_size,
                          const T& default_c)
 {
 
-    fail_unless(c.size() == expected_size, "size = %z expected = %z", c.size(), expected_size);
+    fail_unless(c.size() == expected_size, 
+                "size = %lu expected = %lu", 
+                c.size(), expected_size);
     byte_t* buf = new byte_t[expected_size + 7];
     size_t ret;
     // Check that what is written gets also read

@@ -15,51 +15,85 @@ BEGIN_GCOMM_NAMESPACE
 
 class PCInst
 {
+    enum Flags
+    {
+        F_PRIM = 0x1
+    };
+    bool prim;
     uint32_t last_seq;
     ViewId last_prim;
-    int64_t to_seq; // Reserved for future use
+    int64_t to_seq;
 public:
+
+
     
     PCInst() :
+        prim(false),
         last_seq(-1),
         last_prim(),
         to_seq(-1)
     {
     }
     
-    PCInst(const uint32_t last_seq_,
+    PCInst(const bool prim_,
+           const uint32_t last_seq_,
            const ViewId& last_prim_, 
            const int64_t to_seq_) :
+        prim(prim_),
         last_seq(last_seq_),
         last_prim(last_prim_),
         to_seq(to_seq_)
     {
     }
     
+    void set_prim(const bool val)
+    {
+        prim = val;
+    }
+    
+    bool get_prim() const
+    {
+        return prim;
+    }
+    
+    void set_last_seq(const uint32_t seq)
+    {
+        last_seq = seq;
+    }
+    
     uint32_t get_last_seq() const
     {
         return last_seq;
     }
-
+    
     void set_last_prim(const ViewId& last_prim_)
     {
         last_prim = last_prim_;
     }
-
+    
     const ViewId& get_last_prim() const
     {
         return last_prim;
+    }
+
+    void set_to_seq(const uint64_t seq)
+    {
+        to_seq = seq;
     }
 
     uint64_t get_to_seq() const
     {
         return to_seq;
     }
-
+    
 
     size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
     {
         size_t off = offset;
+        uint32_t b;
+        if ((off = gcomm::read(buf, buflen, off, &b)) == 0)
+            return 0;
+        prim = b & F_PRIM;
         if ((off = gcomm::read(buf, buflen, off, &last_seq)) == 0)
             return 0;
         if ((off = last_prim.read(buf, buflen, off)) == 0)
@@ -72,6 +106,10 @@ public:
     size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
     {
         size_t off = offset;
+        uint32_t b = 0;
+        b |= prim ? F_PRIM : 0;
+        if ((off = gcomm::write(b, buf, buflen, off)) == 0)
+            return 0;
         if ((off = gcomm::write(last_seq, buf, buflen, off)) == 0)
             return 0;
         if ((off = last_prim.write(buf, buflen, off)) == 0)
@@ -83,13 +121,14 @@ public:
 
     static size_t size()
     {
-        return 4 + ViewId::size() + 8;
+        return 4 + 4 + ViewId::size() + 8;
     }
 
 
     string to_string() const
     {
-        return "last_seq=" + make_int(last_seq).to_string() 
+        return "prim=" + make_int(prim).to_string()
+            + ",last_seq=" + make_int(last_seq).to_string() 
             + ",last_prim=" + last_prim.to_string()
             + ",to_seq=" + make_int(to_seq).to_string();
     }
@@ -98,7 +137,8 @@ public:
 
 inline bool operator==(const PCInst& a, const PCInst& b)
 {
-    return a.get_last_seq() == b.get_last_seq() &&
+    return a.get_prim() == b.get_prim() && 
+        a.get_last_seq() == b.get_last_seq() &&
         a.get_last_prim() == b.get_last_prim() &&
         a.get_to_seq() == b.get_to_seq();
 }

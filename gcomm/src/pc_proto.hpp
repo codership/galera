@@ -59,6 +59,7 @@ private:
     PCInstMap instances;
     PCInstMap::iterator self_i;
 
+public:
     const ViewId& get_last_prim() const
     {
         return PCInstMap::get_instance(self_i).get_last_prim();
@@ -66,9 +67,21 @@ private:
 
     void set_last_prim(const ViewId& vid)
     {
-        return PCInstMap::get_instance(self_i).set_last_prim(vid);
+        PCInstMap::get_instance(self_i).set_last_prim(vid);
     }
 
+    bool get_prim() const
+    {
+        return PCInstMap::get_instance(self_i).get_prim();
+    }
+
+    void set_prim(const bool val)
+    {
+        PCInstMap::get_instance(self_i).set_prim(val);
+    }
+
+
+private:
     typedef InstMap<PCMessage> SMMap;
     SMMap state_msgs;
 
@@ -123,6 +136,8 @@ private:
     bool requires_rtr() const;
     void validate_state_msgs() const;
     void handle_state(const PCMessage&, const UUID&);
+    void handle_install(const PCMessage&, const UUID&);
+    void deliver_view();
 public:
     void handle_msg(const PCMessage&, const ReadBuf*, const size_t, const ProtoUpMeta*);
 

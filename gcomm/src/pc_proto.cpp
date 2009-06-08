@@ -31,7 +31,7 @@ void PCProto::send_state()
     {
         throw FatalException("todo");
     }
-
+    
 }
 
 void PCProto::send_install()
@@ -43,10 +43,35 @@ void PCProto::send_install()
     for (PCInstMap::const_iterator i = instances.begin(); i != instances.end();
          ++i)
     {
-        im.insert(make_pair(PCInstMap::get_uuid(i), 
-                            PCInstMap::get_instance(i)));
+        if (current_view.get_members().find(PCInstMap::get_uuid(i)) != 
+            current_view.get_members().end()
+            && im.insert(make_pair(PCInstMap::get_uuid(i), 
+                                   PCInstMap::get_instance(i))).second == false)
+        {
+            throw FatalException("");
+        }
     }
+    Buffer buf(pci.size());
+    if (pci.write(buf.get_buf(), buf.get_len(), 0) == 0)
+    {
+        throw FatalException("");
+    }
+    WriteBuf wb(buf.get_buf(), buf.get_len());
+    if (pass_down(&wb, 0))
+    {
+        throw FatalException("");
+    }
+}
 
+
+void PCProto::deliver_view()
+{
+    View v(get_prim() == true ? View::V_PRIM : View::V_NON_PRIM,
+           current_view.get_id());
+    v.add_members(current_view.get_members().begin(), 
+                  current_view.get_members().end());
+    ProtoUpMeta um(&v);
+    pass_up(0, 0, &um);
 }
 
 void PCProto::shift_to(const State s)
@@ -83,8 +108,13 @@ void PCProto::shift_to(const State s)
     case S_RTR:
         break;
     case S_PRIM:
+        set_last_prim(current_view.get_id());
+        set_prim(true);
+        deliver_view();
         break;
     case S_NON_PRIM:
+        set_prim(false);
+        deliver_view();
         break;
     default:
         ;
@@ -107,6 +137,7 @@ void PCProto::handle_first_trans(const View& view)
             throw FatalException("");
         }
         set_last_prim(view.get_id());
+        set_prim(true);
     }
     else
     {
@@ -122,7 +153,6 @@ void PCProto::handle_trans(const View& view)
         if (view.get_members().length()*2 + view.get_left().length() <=
             current_view.get_members().length())
         {
-            set_last_prim(ViewId());
             shift_to(S_NON_PRIM);
             return;
         }
@@ -245,10 +275,8 @@ void PCProto::validate_state_msgs() const
 void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 {
     assert(msg.get_type() == PCMessage::T_STATE);
-    
     assert(state_msgs.length() < instances.length());
     assert(state_msgs.length() < current_view.get_members().length());
-
     
     if (state_msgs.insert(make_pair(source, msg)).second == false)
     {
@@ -268,9 +296,13 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
             send_install();
         }
     }
-    
 }
 
+void PCProto::handle_install(const PCMessage& msg, const UUID& source)
+{
+    assert(msg.get_type() == PCMessage::T_INSTALL);
+    shift_to(S_PRIM);
+}
 
 void PCProto::handle_msg(const PCMessage& msg, 
                          const ReadBuf* rb, 
@@ -283,7 +315,7 @@ void PCProto::handle_msg(const PCMessage& msg,
         handle_state(msg, um->get_source());
         break;
     case PCMessage::T_INSTALL:
-        //
+        handle_install(msg, um->get_source());
         break;
     case PCMessage::T_USER:
         // 
