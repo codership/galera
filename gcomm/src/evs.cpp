@@ -91,10 +91,8 @@ void EVS::connect()
         name = get_query_value(i);
     }
     proto = new EVSProto(event_loop, tp, uuid, name, mon);
-    tp->set_up_context(proto);
-    proto->set_down_context(tp);
-    proto->set_up_context(this);
-    this->set_down_context(proto);
+    gcomm::connect(tp, proto);
+    gcomm::connect(proto, this);
     proto->shift_to(EVSProto::JOINING);
     Time stop(Time::now() + Time(5, 0));
     do 

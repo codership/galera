@@ -25,6 +25,9 @@ namespace Conf
 
     static const string VsPrefix = "vs";
     static const string VsScheme = GCommPrefix + SchemeDelim + VsPrefix;
+
+    static const string PcPrefix = "pc";
+    static const string PcScheme = GCommPrefix + SchemeDelim + PcPrefix;
     
     /* 
      * Transport parameters 

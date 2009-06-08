@@ -5,6 +5,7 @@
 #include "gmcast.hpp"
 #include "evs.hpp"
 #include "vs.hpp"
+#include "pc.hpp"
 #include "gcomm/conf.hpp"
 
 BEGIN_GCOMM_NAMESPACE
@@ -103,6 +104,10 @@ Transport* Transport::create(const URI& uri, EventLoop* event_loop)
     else if (uri.get_scheme() == Conf::VsScheme)
     {
         return new VS(uri, event_loop, &transport_mon);
+    }
+    else if (uri.get_scheme() == Conf::PcScheme)
+    {
+        return new PC(uri, event_loop, &transport_mon);
     }
     throw FatalException("scheme not supported");
 }

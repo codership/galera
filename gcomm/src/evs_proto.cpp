@@ -545,7 +545,10 @@ int EVSProto::send_user(WriteBuf* wb,
     }
     
     wb->rollback_hdr(msg.get_hdrlen());
-    deliver();
+    if (delivering == false)
+    {
+        deliver();
+    }
     return 0;
 }
 
@@ -1309,6 +1312,7 @@ void EVSProto::validate_reg_msg(const EVSMessage& msg)
 
 void EVSProto::deliver()
 {
+    delivering = true;
     if (get_state() != OPERATIONAL && get_state() != RECOVERY && 
         get_state() != LEAVING)
         throw FatalException("Invalid state");
@@ -1353,7 +1357,7 @@ void EVSProto::deliver()
         pass_up(i->get_readbuf(), i->get_payload_offset(), &um);
         input_map.erase(i);
     }
-    
+    delivering = false;
 
 }
 
@@ -1377,6 +1381,7 @@ void EVSProto::validate_trans_msg(const EVSMessage& msg)
 
 void EVSProto::deliver_trans()
 {
+    delivering = true;
     if (get_state() != RECOVERY && get_state() != LEAVING)
         throw FatalException("Invalid state");
     // In transitional configuration we must deliver all messages that 
@@ -1443,7 +1448,7 @@ void EVSProto::deliver_trans()
         }
         input_map.erase(i);
     }
-    
+    delivering = false;
 }
 
 

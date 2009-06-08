@@ -166,6 +166,7 @@ private:
     void validate_state_msgs() const;
     void handle_state(const PCMessage&, const UUID&);
     void handle_install(const PCMessage&, const UUID&);
+    void handle_user(const PCMessage&, const ReadBuf*, const size_t, const ProtoUpMeta*);
     void deliver_view();
 public:
     void handle_msg(const PCMessage&, const ReadBuf*, const size_t, const ProtoUpMeta*);

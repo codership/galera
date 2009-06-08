@@ -1,21 +1,29 @@
 
 #include "gcomm/transport.hpp"
 
+
 BEGIN_GCOMM_NAMESPACE
+
+class EVSProto;
+class PCProto;
+
 
 class PC : public Transport
 {
+    Transport* tp; // GMCast transport
+    EVSProto* evs; // EVS protocol layer
+    PCProto* pc;   // PC protocol layer
 public:
     PC(const URI&, EventLoop*, Monitor*);
     ~PC();
-
+     
     void connect();
     void close();
 
     void handle_up(const int, const ReadBuf*, const size_t, const ProtoUpMeta*);
     int handle_down(WriteBuf*, const ProtoDownMeta*);
 
-    bool support_uuid() const;
+    bool supports_uuid() const;
     const UUID& get_uuid() const;
     
     size_t get_max_msg_size() const;

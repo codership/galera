@@ -27,7 +27,8 @@ libgcomm_la_SOURCES = 		\
 	evs_proto.cpp		\
 	evs.cpp			\
 	vs.cpp			\
-	pc_proto.cpp
+	pc_proto.cpp		\
+	pc.cpp
 
 
 

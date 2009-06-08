@@ -148,7 +148,7 @@ typedef InstMap<PCInst> PCInstMap;
 class PCMessage
 {
 public:
-    enum Type {T_NONE, T_STATE, T_INSTALL, T_USER};
+    enum Type {T_NONE, T_STATE, T_INSTALL, T_USER, T_MAX};
 private:
     int version;
     Type type;
@@ -205,7 +205,7 @@ public:
         type = static_cast<Type>((b >> 8) & 0xff);
         if (version != 0)
             return 0;
-        if (type <= T_NONE || type > T_USER)
+        if (type <= T_NONE || type >= T_MAX)
             return 0;
         if ((off = gcomm::read(buf, buflen, off, &seq)) == 0)
             return 0;

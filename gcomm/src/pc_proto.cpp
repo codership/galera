@@ -9,6 +9,16 @@
 
 BEGIN_GCOMM_NAMESPACE
 
+static const PCInst& get_state(PCProto::SMMap::const_iterator smap_i, const UUID& uuid)
+{
+    PCInstMap::const_iterator i = PCProto::SMMap::get_instance(smap_i).get_inst_map().find(uuid);
+    if (i == PCProto::SMMap::get_instance(smap_i).get_inst_map().end())
+    {
+        throw FatalException("");
+    }
+    return PCInstMap::get_instance(i);
+}
+
 
 void PCProto::send_state()
 {
@@ -37,16 +47,16 @@ void PCProto::send_state()
 void PCProto::send_install()
 {
     LOG_INFO(self_string() + " send install");
-
+    
     PCInstallMessage pci;
     PCInstMap& im(pci.get_inst_map());
-    for (PCInstMap::const_iterator i = instances.begin(); i != instances.end();
+    for (SMMap::const_iterator i = state_msgs.begin(); i != state_msgs.end();
          ++i)
     {
-        if (current_view.get_members().find(PCInstMap::get_uuid(i)) != 
+        if (current_view.get_members().find(SMMap::get_uuid(i)) != 
             current_view.get_members().end()
-            && im.insert(make_pair(PCInstMap::get_uuid(i), 
-                                   PCInstMap::get_instance(i))).second == false)
+            && im.insert(make_pair(SMMap::get_uuid(i), 
+                                   gcomm::get_state(i, SMMap::get_uuid(i)))).second == false)
         {
             throw FatalException("");
         }
@@ -103,18 +113,15 @@ void PCProto::shift_to(const State s)
         break;
     case S_STATES_EXCH:
         state_msgs.clear();
-        send_state();
         break;
     case S_RTR:
         break;
     case S_PRIM:
         set_last_prim(current_view.get_id());
         set_prim(true);
-        deliver_view();
         break;
     case S_NON_PRIM:
         set_prim(false);
-        deliver_view();
         break;
     default:
         ;
@@ -148,6 +155,7 @@ void PCProto::handle_first_trans(const View& view)
 void PCProto::handle_trans(const View& view)
 {
     assert(view.get_type() == View::V_TRANS);
+    assert(get_state() == S_PRIM || get_state() == S_NON_PRIM);
     if (view.get_id() == get_last_prim())
     {
         if (view.get_members().length()*2 + view.get_left().length() <=
@@ -192,6 +200,7 @@ void PCProto::handle_first_reg(const View& view)
     current_view = view;
     views.push_back(current_view);
     shift_to(S_STATES_EXCH);
+    send_state();
 }
 
 void PCProto::handle_reg(const View& view)
@@ -207,18 +216,36 @@ void PCProto::handle_reg(const View& view)
         
         throw FatalException("decreasing view ids");
     }
-
+    
     current_view = view;
     views.push_back(current_view);
-    shift_to(S_STATES_EXCH);
+
+    if (current_view.is_empty())
+    {
+        set_prim(false);
+        deliver_view();
+        shift_to(S_CLOSED);
+    }
+    else
+    {
+        shift_to(S_STATES_EXCH);
+        send_state();
+    }
+    
 }
 
 
 void PCProto::handle_view(const View& view)
 {
-    assert(get_state() == S_JOINING || 
-           get_state() == S_PRIM ||
-           get_state() == S_NON_PRIM);
+    if (get_state() != S_JOINING &&
+        get_state() != S_PRIM &&
+        get_state() != S_NON_PRIM)
+    {
+        LOG_FATAL("invalid input, view " + view.to_string() + " in state "
+                  + to_string(get_state()));
+        throw FatalException("invalid input");
+    }
+
     // We accept only EVS TRANS and REG views
     if (view.get_type() != View::V_TRANS && view.get_type() != View::V_REG)
     {
@@ -240,16 +267,20 @@ void PCProto::handle_view(const View& view)
         {
             handle_first_trans(view);
         }
+        else
+        {
+            handle_trans(view);
+        }
     }
     else
     {
-        if (get_state() != S_JOINING)
+        if (get_state() == S_JOINING)
         {
-            handle_reg(view);
+            handle_first_reg(view);
         }
         else
         {
-            handle_first_reg(view);
+            handle_reg(view);
         }  
     }
 }
@@ -281,15 +312,7 @@ void PCProto::validate_state_msgs() const
     // TODO:
 }
 
-static const PCInst& get_state(PCProto::SMMap::const_iterator smap_i, const UUID& uuid)
-{
-    PCInstMap::const_iterator i = PCProto::SMMap::get_instance(smap_i).get_inst_map().find(uuid);
-    if (i == PCProto::SMMap::get_instance(smap_i).get_inst_map().end())
-    {
-        throw FatalException("");
-    }
-    return PCInstMap::get_instance(i);
-}
+
 
 bool PCProto::is_prim() const
 {
@@ -342,6 +365,8 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 {
     assert(msg.get_type() == PCMessage::T_STATE);
     assert(state_msgs.length() < current_view.get_members().length());
+
+    LOG_INFO(self_string() + " handle state: " + msg.to_string());
     
     if (state_msgs.insert(make_pair(source, msg)).second == false)
     {
@@ -374,7 +399,7 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
             {
                 throw FatalException("retransmission not implemented");
             }
-            if (self_i == instances.begin())
+            if (current_view.get_members().find(uuid) == current_view.get_members().begin())
             {
                 send_install();
             }
@@ -382,6 +407,7 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
         else
         {
             shift_to(S_NON_PRIM);
+            deliver_view();
         }
     }
 }
@@ -390,7 +416,10 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
 {
     assert(msg.get_type() == PCMessage::T_INSTALL);
     assert(get_state() == S_RTR);
+
+    LOG_INFO(self_string() + " handle install: " + msg.to_string());
     
+    // Validate own state
     PCInstMap::const_iterator mi = msg.get_inst_map().find(uuid);
     if (mi == msg.get_inst_map().end())
     {
@@ -405,14 +434,60 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
         throw FatalException("install message self state does not match");
     }
     
+    // Set TO seqno according to state message
+    int64_t to_seq = -1;
+    
+    for (mi = msg.get_inst_map().begin(); mi != msg.get_inst_map().end(); ++mi)
+    {
+        const PCInst& m_state = PCInstMap::get_instance(mi);
+        if (m_state.get_prim() == true && to_seq != -1)
+        {
+            if (m_state.get_to_seq() != to_seq)
+            {
+                throw FatalException("install message to seq inconsistent");
+            }
+        }
+        if (m_state.get_prim() == true)
+        {
+            to_seq = std::max(to_seq, m_state.get_to_seq());
+        }
+    }
+    
+    LOG_INFO(self_string() + " setting TO seq to " + make_int(to_seq).to_string());
+    set_to_seq(to_seq);
+    
     shift_to(S_PRIM);
+    deliver_view();
+}
+
+void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
+                          const size_t roff, const ProtoUpMeta* um)
+{
+    set_to_seq(get_to_seq() + 1);
+    ProtoUpMeta pum(um->get_source(), um->get_user_type(), get_to_seq());
+    pass_up(rb, roff + msg.size(), &pum);
 }
 
 void PCProto::handle_msg(const PCMessage& msg, 
                          const ReadBuf* rb, 
                          const size_t roff, 
-                         const ProtoUpMeta *um)
+                         const ProtoUpMeta* um)
 {
+    static const bool allowed[S_MAX][PCMessage::T_MAX] = {
+        {false, false, false, false},
+        {false, false, false, false},
+        {false, true, false, false},
+        {false, false, true, false},
+        {false, false, false, true},
+        {false, true, false, true}
+    };
+    if (allowed[get_state()][msg.get_type()] == false)
+    {
+        LOG_FATAL("invalid input, message " + msg.to_string() + " in state "
+                  + to_string(get_state()));
+        throw FatalException("");
+    }
+
     switch (msg.get_type())
     {
     case PCMessage::T_STATE:
@@ -422,7 +497,7 @@ void PCProto::handle_msg(const PCMessage& msg,
         handle_install(msg, um->get_source());
         break;
     case PCMessage::T_USER:
-        // 
+        handle_user(msg, rb, roff, um);
         break;
     default:
         throw FatalException("invalid message");
@@ -441,17 +516,37 @@ void PCProto::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
     else
     {
         PCMessage msg;
+
         if (msg.read(rb->get_buf(), rb->get_len(), roff) == 0)
         {
             throw FatalException("could not read message");
         }
+
         handle_msg(msg, rb, roff, um);
     }
 }
 
 int PCProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 {
-    return ENOTCONN;
+    uint32_t seq = get_last_seq() + 1;
+    PCUserMessage um(seq);
+    byte_t buf[8];
+    if (um.write(buf, sizeof(buf), 0) == 0)
+    {
+        throw FatalException("short buffer");
+    }
+    wb->prepend_hdr(buf, um.size());
+    int ret = pass_down(wb, dm);
+    
+    if (ret == 0)
+    {
+        set_last_seq(seq);
+    }
+    else if (ret != EAGAIN)
+    {
+        LOG_WARN(string("PCProto::handle_down: ") + strerror(ret));
+    }
+    return ret;
 }
 
 

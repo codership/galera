@@ -17,11 +17,13 @@ class ProtoUpMeta
 {
     const UUID source;
     const uint8_t user_type;
+    const int64_t to_seq;
     View* const view;
 public:
     ProtoUpMeta() :
         source(UUID()),
         user_type(0xff),
+        to_seq(-1),
         view(0)
     {
     }
@@ -29,34 +31,31 @@ public:
     ProtoUpMeta(const ProtoUpMeta& um) :
         source(um.source),
         user_type(um.user_type),
+        to_seq(um.to_seq),
         view(um.view ? new View(*um.view) : 0)
     {
 
     }
 
-    ProtoUpMeta(const View* view_) :
+    ProtoUpMeta(const View* view_, const int64_t to_seq_ = -1) :
         source(),
         user_type(0xff),
+        to_seq(to_seq_),
         view(new View(*view_))
     {
         
     }
     
-    ProtoUpMeta(const UUID& source_) :
-        source(source_),
-        user_type(0xff),
-        view(0)
-    {
-
-    }
-    
-    ProtoUpMeta(const UUID& source_, const uint8_t user_type_) :
+    ProtoUpMeta(const UUID& source_, const uint8_t user_type_ = 0xff,
+                const int64_t to_seq_ = -1) :
         source(source_),
         user_type(user_type_),
+        to_seq(to_seq_),
         view(0)
     {
         
     }
+
 
     ~ProtoUpMeta()
     {
@@ -71,6 +70,11 @@ public:
     uint8_t get_user_type() const
     {
         return user_type;
+    }
+
+    int64_t get_to_seq() const
+    {
+        return to_seq;
     }
 
     const View* get_view() const
@@ -157,6 +161,18 @@ public:
         up_context = new_up;
     }
 
+    void change_down_context(Protolay* old_down, Protolay* new_down)
+    {
+        if (down_context != old_down) {
+            LOG_FATAL("Protolay::change_down_context(): old context does not match: " 
+                      + Pointer(old_down).to_string() 
+                      + " " 
+                      + Pointer(down_context).to_string());
+            throw FatalException("context mismatch");
+        }
+        down_context = new_down;
+    }
+
     void set_down_context(Protolay *down, const int id) {
 	context_id = id;
 	down_context = down;
@@ -212,6 +228,12 @@ static inline void connect(Protolay* down, Protolay* up)
 {
     down->set_up_context(up);
     up->set_down_context(down);
+}
+
+static inline void disconnect(Protolay* down, Protolay* up)
+{
+    down->change_up_context(up, 0);
+    up->change_down_context(down, 0);
 }
 
 END_GCOMM_NAMESPACE

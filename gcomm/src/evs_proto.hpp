@@ -132,6 +132,7 @@ public:
     EventLoop* el;
     bool collect_stats;
     Histogram hs_safe;
+    bool delivering;
     EVSProto(EventLoop* el_, Transport* t, const UUID& my_addr_, 
              const string& name, Monitor* mon_) : 
         mon(mon_),
@@ -139,6 +140,7 @@ public:
         el(el_),
         collect_stats(true),
         hs_safe("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
+        delivering(false),
         my_addr(my_addr_), 
         my_name(name),
         inactive_timeout(Time(5, 0)),
