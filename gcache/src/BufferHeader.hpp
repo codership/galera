@@ -7,7 +7,8 @@
 #define __GCACHE_BUFHEAD__
 
 #include <cstring>
-#include <tr1/cstdint>
+//#include <tr1/cstdint>
+#include <stdint.h>
 
 #include "SeqnoNone.hpp"
 
