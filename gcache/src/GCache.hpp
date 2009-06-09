@@ -7,8 +7,8 @@
 
 #include <string>
 #include <iostream>
-#include <tr1/cstdint>
 #include <map>
+#include <stdint.h>
 
 #include <galerautils.hpp>
 

@@ -5,7 +5,8 @@
 #ifndef __GCACHE_SEQNO_NONE__
 #define __GCACHE_SEQNO_NONE__
 
-#include <tr1/cstdint>
+//#include <tr1/cstdint>
+#include <stdint.h>
 
 namespace gcache
 {
