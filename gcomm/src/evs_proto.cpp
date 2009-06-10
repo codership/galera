@@ -1011,6 +1011,20 @@ void EVSProto::handle_msg(const EVSMessage& msg, const ReadBuf* rb,
             get_instance(ii).fifo_seq = msg.get_fifo_seq();
         }
     }
+    else
+    {
+        // Accept non-membership messages only from current view
+        // or from view to be installed
+        if (msg.get_source_view() != current_view.get_id())
+        {
+            if (install_message == 0 ||
+                install_message->get_source_view() != msg.get_source_view())
+            {
+                return;
+            }
+            
+        }
+    }
 
     if (msg.get_source() != my_addr)
     {
