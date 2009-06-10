@@ -4,6 +4,7 @@
 
 
 #include <gcomm/common.hpp>
+#include <gcomm/exception.hpp>
 #include <gcomm/string.hpp>
 #include <cstring>
 
@@ -65,8 +66,14 @@ public:
     }
     
     string to_string() const {
-        char buf[40];
-        sprintf(buf, GU_UUID_FORMAT, GU_UUID_ARGS(&uuid));
+        char buf[37];
+#define GU_CPP_UUID_FORMAT "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
+        if (snprintf(buf, sizeof(buf), GU_CPP_UUID_FORMAT, GU_UUID_ARGS(&uuid))
+            != 36)
+        {
+            throw FatalException("");
+        }
+#undef GU_CPP_UUID_FORMAT
         return std::string(buf);
     }
 
