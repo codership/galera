@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 #include "galera_state.h"
 #include "galerautils.h"
 
@@ -35,7 +36,9 @@ int galera_store_state(const char *dir, galera_state_t *state) {
     //fprintf(fid, GU_UUID_FORMAT, GU_UUID_ARGS(&(state->uuid)));
     fprintf(fid, GU_UUID_FORMAT, GU_UUID_ARGS(&(state->uuid)));
     fprintf(fid, "\n");
-    fprintf(fid, "seqno:              %10llu\n", state->last_applied_seqno);
+    long long int tmp = state->last_applied_seqno;
+    fprintf(fid, "seqno:              %10lli\n", tmp);
+
 
     fclose (fid);
     
@@ -94,9 +97,11 @@ int galera_restore_state(const char *dir, galera_state_t *state) {
                     gu_error("state file has bad uuid: %s", row);
                 }
             } else if (!strncmp(name, "seqno:", 6)) {
-                if (sscanf(value, "%Li", &state->last_applied_seqno) != 1) {
+                long long int tmp;
+                if (sscanf(value, "%Li", &tmp) != 1) {
                     gu_error("state file has bad seqno: %s", row);
                 }
+                state->last_applied_seqno = tmp;
             } else {
                 gu_error("Galera: unknown parameter in state file: row: %d %s", 
                          i, name
