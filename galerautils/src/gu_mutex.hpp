@@ -8,6 +8,7 @@
 
 #include <pthread.h>
 #include <cerrno>
+#include <cstring>
 
 #include "gu_exception.hpp"
 #include "gu_logger.hpp"
