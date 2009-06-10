@@ -55,13 +55,12 @@ struct gcs_gcomm : public Toplay
     gu_mutex_t mutex;
     gu_cond_t cond;
     Monitor monitor;
-    enum State {CLOSED, JOINING, JOINED, LEFT} state;
+
     gcs_gcomm() : 
         vs(0), 
         el(0), 
         waiter_buf(0), 
-        waiter_buf_len(0), 
-        state(CLOSED)
+        waiter_buf_len(0)
     {
 	gu_mutex_init(&mutex, 0);
 	gu_cond_init(&cond, 0);
@@ -94,31 +93,20 @@ struct gcs_gcomm : public Toplay
 	    return;
 	}
         
-	assert(rb || um->get_view());
-	if (state == JOINING)
+	assert(rb || (um->get_view() && 
+                      (um->get_view()->get_type() == View::V_PRIM ||
+                       um->get_view()->get_type() == View::V_NON_PRIM)));
+        
+        if (um->get_view() && um->get_view()->is_empty()) 
         {
-            gu_info("joining");
-	    assert(um->get_view());
-	    assert(um->get_view()->get_type() == View::V_TRANS);
-	    assert(um->get_view()->get_members().length() == 0);
-	    state = JOINED;
-	    return;
-	} 
-        else if (um->get_view() && 
-                 um->get_view()->get_type() == View::V_REG) 
-        {
-	    gu_debug("reg view: size = %u", 
-		     um->get_view()->get_members().length());
+	    gu_debug("empty view, leaving");
+	    eq.push_back(vs_ev(0, 0, 0, 0, um->get_view()));            
 	    // Reached the end
 	    // Todo: add gu_thread_exit() to gu library
-	    if (um->get_view()->get_members().length() == 0) 
-            {
-		state = LEFT;
-		gu_mutex_lock(&mutex);
-		gu_cond_signal(&cond);
-		gu_mutex_unlock(&mutex);
-		pthread_exit(0);
-	    }
+            gu_mutex_lock(&mutex);
+            gu_cond_signal(&cond);
+            gu_mutex_unlock(&mutex);
+            pthread_exit(0);
 	}
 	gu_mutex_lock(&mutex);
 	if (rb && eq.empty() && rb->get_len(roff) <= waiter_buf_len)
@@ -139,16 +127,16 @@ struct gcs_gcomm : public Toplay
     }
     std::pair<vs_ev, bool> wait_event(void* wb, size_t wb_len) {
 	gu_mutex_lock(&mutex);
-	while (eq.size() == 0 && state != LEFT) {
+	while (eq.size() == 0) {
 	    waiter_buf = wb;
 	    waiter_buf_len = wb_len;
 	    gu_cond_wait(&cond, &mutex);
 	}
-	std::pair<vs_ev, bool> ret(eq.front(), eq.size() && state != LEFT 
-				   ? true : false);
+	std::pair<vs_ev, bool> ret(eq.front(), eq.size() ? true : false);
 	gu_mutex_unlock(&mutex);
 	return ret;
     }
+    
     void release_event() {
 	assert(eq.size());
 	gu_mutex_lock(&mutex);
@@ -215,6 +203,10 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
 	return -ENOTCONN;
     }
 
+    if (err != 0)
+    {
+        gu_warn("pass_down(): %s", strerror(err));
+    }
     return err == 0 ? len : -err;
 }
 
@@ -227,9 +219,11 @@ static void fill_comp(gcs_comp_msg_t *msg,
 {
     size_t n = 0;
     // TODO: 
-    assert(msg != 0 && static_cast<size_t>(msg->memb_num) == members.length());
-    if (comp_map)
-	comp_map->clear();
+    assert(msg != 0 && 
+           static_cast<size_t>(msg->memb_num) == members.length() &&
+           comp_map != 0);
+    
+    comp_map->clear();
     for (NodeList::const_iterator i = members.begin(); i != members.end(); ++i)
     {
         const UUID& pid = get_uuid(i);
@@ -240,9 +234,13 @@ static void fill_comp(gcs_comp_msg_t *msg,
             abort();
         }
 	if (pid == self)
+        {
 	    msg->my_idx = n;
+        }
 	if (comp_map)
+        {
 	    comp_map->insert(make_pair(pid, n));
+        }
 	n++;	    
     }
 }
@@ -294,40 +292,40 @@ retry:
     } 
     else 
     {
-	// This check should be enough:
-	// - Reg view will definitely have more members than previous 
-	//   trans view
-	// - Check number of members that left *ungracefully* 
-	//   (see fixme in CLOSE)
-	// 
-	//
-	gcs_comp_msg_t *new_comp = 0;
-	if (ev.view->get_type() == View::V_TRANS && conn->comp_msg && 
-	    ev.view->get_members().length()*2 + ev.view->get_left().length() 
-	    <= static_cast<size_t>(gcs_comp_msg_num(conn->comp_msg))) {
-	    new_comp = gcs_comp_msg_new(false, 0, ev.view->get_members().length());
-	} else if (ev.view->get_type() == View::V_TRANS) {
-	    // Drop transitional views that lead to prim comp
-	    conn->vs_ctx.release_event();
-	    goto retry;
-	} else {
-	    new_comp = gcs_comp_msg_new(true, 0, ev.view->get_members().length());
-	}
+	gcs_comp_msg_t *new_comp;
 
-        if (!new_comp) {
-            gu_fatal ("Failed to allocate new component message.");
-            abort();
+        if (ev.view->is_empty() == false)
+        {
+            new_comp =
+                gcs_comp_msg_new(ev.view->get_type() == View::V_PRIM, 0, 
+                                 ev.view->get_members().length());
+        }        
+        else
+        {
+            return -ENOTCONN;
+            // new_comp = gcs_comp_msg_leave();
         }
         
-	fill_comp(new_comp, ev.view->get_type() == View::V_TRANS ? 0 : &conn->comp_map, ev.view->get_members(), conn->vs_ctx.vs->get_uuid());
-	if (conn->comp_msg) gcs_comp_msg_delete(conn->comp_msg);
+        if (!new_comp) 
+        {
+            gu_fatal ("Failed to allocate new component message.");
+            return -ENOMEM;
+        }
+        
+	fill_comp(new_comp, &conn->comp_map, ev.view->get_members(), 
+                  conn->vs_ctx.vs->get_uuid());
+	if (conn->comp_msg) 
+        {
+            gcs_comp_msg_delete(conn->comp_msg);
+        }
 	conn->comp_msg = new_comp;
 	cpy = std::min(static_cast<size_t>(gcs_comp_msg_size(conn->comp_msg)), len);
 	ret = std::max(static_cast<size_t>(gcs_comp_msg_size(conn->comp_msg)), len);
 	memcpy(buf, conn->comp_msg, cpy);
 	*msg_type = GCS_MSG_COMPONENT;
     }
-    if (static_cast<size_t>(ret) <= len) {
+    if (static_cast<size_t>(ret) <= len) 
+    {
 	conn->vs_ctx.release_event();
 	conn->n_received++;
     }
@@ -336,7 +334,7 @@ retry:
 
 static GCS_BACKEND_NAME_FN(gcs_gcomm_name)
 {
-    static const char *name = "vs";
+    static const char *name = "gcomm";
     return name;
 }
 
@@ -367,7 +365,7 @@ static GCS_BACKEND_OPEN_FN(gcs_gcomm_open)
 
     try {
         conn->channel = channel;
-        string uri_str = string("gcomm+evs://");
+        string uri_str = string("gcomm+pc://");
         uri_str += conn->sock;
         if (conn->sock.find_first_of('?') == string::npos)
         {
@@ -399,12 +397,13 @@ static GCS_BACKEND_CLOSE_FN(gcs_gcomm_close)
     conn_t *conn = backend->conn;
     if (conn == 0)
 	return -EBADFD;
-
+    gu_debug("closing gcomm backend");
     conn->vs_ctx.vs->close();
     delete conn->vs_ctx.vs;
     conn->vs_ctx.vs = 0;
+    gu_debug("joining backend recv thread");
     gu_thread_join(conn->thr, 0);
-
+    gu_debug("close done");
     return 0;
 }
 
