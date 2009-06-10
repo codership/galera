@@ -36,8 +36,7 @@ int galera_store_state(const char *dir, galera_state_t *state) {
     //fprintf(fid, GU_UUID_FORMAT, GU_UUID_ARGS(&(state->uuid)));
     fprintf(fid, GU_UUID_FORMAT, GU_UUID_ARGS(&(state->uuid)));
     fprintf(fid, "\n");
-    long long int tmp = state->last_applied_seqno;
-    fprintf(fid, "seqno:              %10lli\n", tmp);
+    fprintf(fid, "seqno:              %10" PRIi64 "\n", state->last_applied_seqno);
 
 
     fclose (fid);
@@ -97,11 +96,9 @@ int galera_restore_state(const char *dir, galera_state_t *state) {
                     gu_error("state file has bad uuid: %s", row);
                 }
             } else if (!strncmp(name, "seqno:", 6)) {
-                long long int tmp;
-                if (sscanf(value, "%Li", &tmp) != 1) {
+                if (sscanf(value, "%" PRIi64, &state->last_applied_seqno) != 1) {
                     gu_error("state file has bad seqno: %s", row);
                 }
-                state->last_applied_seqno = tmp;
             } else {
                 gu_error("Galera: unknown parameter in state file: row: %d %s", 
                          i, name
