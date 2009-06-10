@@ -30,13 +30,15 @@ AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
 
 # Checks for programs.
 AC_PROG_AWK
-//AC_PROG_CC
 AC_LANG([C++])
 AC_PROG_CXX
 AC_REQUIRE_CPP
 AC_PROG_LIBTOOL
+
+AC_LANG_PUSH([C]) # AM_PATH_CHECK() is broken an doesn't #include <string.h>
 AM_PATH_CHECK()
 #PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
+AC_LANG_POP([C])
 
 # Checks for libraries.
 AC_CHECK_LIB([pthread], [pthread_testcancel],,

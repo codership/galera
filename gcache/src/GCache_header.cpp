@@ -35,17 +35,16 @@ namespace gcache
             throw gu::Exception (error.str().c_str(), ECANCELED);
         }
 
-        if (mmap.size != header[FILE_SIZE]) {
+        if ((ssize_t)mmap.size != header[FILE_SIZE]) {
             error << "file size does not match, declared: " << header[FILE_SIZE]
                   << ", real: " << mmap.size;
             throw gu::Exception (error.str().c_str(), ECANCELED);
         }
 
-        if ((start - static_cast<uint8_t*>(mmap.ptr)) != 
-            (int64_t)header[DATA_OFFSET]) {
+        ssize_t data_offset = start - static_cast<uint8_t*>(mmap.ptr);
+        if (data_offset != header[DATA_OFFSET]) {
             error << "data offset " << header[DATA_OFFSET]
-                  << " does not match derived: "
-                  << (start - static_cast<uint8_t*>(mmap.ptr));
+                  << " does not match derived: " << data_offset;
             throw gu::Exception (error.str().c_str(), ECANCELED);
         }
 

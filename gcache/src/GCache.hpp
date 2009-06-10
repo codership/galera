@@ -89,7 +89,7 @@ namespace gcache
         uint8_t*        first;    // pointer to the first (oldest) buffer
         uint8_t*        next;     // pointer to the next free space
 
-        size_t    const size_cache;
+        ssize_t   const size_cache;
         ssize_t         size_free;
         ssize_t         size_used;
 
