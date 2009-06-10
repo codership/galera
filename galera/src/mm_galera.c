@@ -47,9 +47,7 @@ struct galera_info {
 /* application's handlers */
 static wsrep_conf_param_cb_t    app_configurator   = NULL;
 static wsrep_stat_param_cb_t    app_stat_cb        = NULL;
-static wsrep_bf_execute_cb_t    bf_execute_cb      = NULL;
-static wsrep_bf_execute_cb_t    bf_execute_cb_rbr  = NULL;
-static wsrep_bf_apply_row_cb_t  bf_apply_row_cb    = NULL;
+static wsrep_bf_apply_cb_t      bf_apply_cb        = NULL;
 static wsrep_ws_start_cb_t      ws_start_cb        = NULL;
 static wsrep_view_cb_t          view_handler_cb    = NULL;
 static wsrep_sst_prepare_cb_t   sst_prepare_cb     = NULL;
@@ -275,9 +273,7 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     app_stat_cb = args->stat_param_cb;
 
     /* set the rest of callbacks */
-    bf_execute_cb     = args->bf_execute_sql_cb;
-    bf_execute_cb_rbr = args->bf_execute_rbr_cb;
-    bf_apply_row_cb   = args->bf_apply_row_cb; // ??? is it used?
+    bf_apply_cb       = args->bf_apply_cb;
     ws_start_cb       = args->ws_start_cb;
     view_handler_cb   = args->view_handler_cb;
     sst_prepare_cb    = args->sst_prepare_cb;
@@ -456,132 +452,176 @@ static void print_ws(FILE* fid, struct wsdb_write_set *ws, gcs_seqno_t seqno) {
 #define PRINT_WS(fid, ws, seqno)
 #endif
 
-static int apply_queries(void *app_ctx, struct wsdb_write_set *ws) {
+static wsrep_status_t apply_queries(void *app_ctx, struct wsdb_write_set *ws) {
     u_int16_t i;
+
     GU_DBUG_ENTER(__PRETTY_FUNCTION__);
+
+    wsrep_apply_data_t data;
+    data.type = WSREP_APPLY_SQL;
+
+    if (bf_apply_cb == NULL) {
+        gu_error("data applier has not been defined"); 
+        GU_DBUG_RETURN(WSREP_FATAL);
+    }
 
     /* SQL statement apply method */
     for (i=0; i < ws->query_count; i++) {
-        int rcode = bf_execute_cb(
-            app_ctx, ws->queries[i].query, ws->queries[i].query_len,
-            ws->queries[i].timeval, ws->queries[i].query_len
-        );
-        switch (rcode) {
-        case 0: break;
-        default: {
-            char *query = gu_malloc (ws->queries[i].query_len + 1);
-            memset(query, '\0',(ws->queries[i].query_len + 1));
-            memcpy(query, ws->queries[i].query, ws->queries[i].query_len);
-	    gu_error("query apply failed: %s", query);
-            gu_free (query);
-            GU_DBUG_RETURN(WSREP_TRX_FAIL);
-            break;
-        }
+        data.u.sql.stm      = ws->queries[i].query;
+        data.u.sql.len      = ws->queries[i].query_len;
+        data.u.sql.timeval  = ws->queries[i].timeval;
+        data.u.sql.randseed = ws->queries[i].randseed;
+
+        switch (bf_apply_cb(app_ctx, &data)) {
+        case WSREP_OK: break;
+        case WSREP_NOT_IMPLEMENTED: break;
+        case WSREP_FATAL:
+        default: 
+            {
+                char *query = gu_malloc (ws->queries[i].query_len + 1);
+                memset(query, '\0',(ws->queries[i].query_len + 1));
+                memcpy(query, ws->queries[i].query, ws->queries[i].query_len);
+                gu_error("query apply failed: %s", query);
+                gu_free (query);
+                GU_DBUG_RETURN(WSREP_TRX_FAIL);
+                break;
+            }
         }
     }
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static int apply_rows(void *app_ctx, struct wsdb_write_set *ws) {
+static wsrep_status_t apply_rows(void *app_ctx, struct wsdb_write_set *ws) {
     u_int16_t i;
+    wsrep_apply_data_t data;
     GU_DBUG_ENTER("apply_rows");
-
-    if (bf_apply_row_cb == NULL) {
-        gu_error("row data applier has not been defined"); 
-        GU_DBUG_RETURN(WSREP_FATAL);
-    }
+    data.type = WSREP_APPLY_ROW;
 
     /* row data apply method */
     for (i=0; i < ws->item_count; i++) {
-        int rcode;
+        wsrep_status_t rcode;
         if (ws->items[i].data_mode != ROW) {
             gu_error("bad row mode: %d for item: %d", 
 		     ws->items[i].data_mode, i);
             continue;
         }
 
-        rcode = bf_apply_row_cb(
-            app_ctx, ws->items[i].u.row.data, ws->items[i].u.row.length
-        );
-        switch (rcode) {
-        case 0: break;
-        default: {
-            gu_warn("row apply failed: %d", rcode);
-            GU_DBUG_RETURN(WSREP_TRX_FAIL);
-            break;
-        }
+        data.u.row.buffer = ws->items[i].u.row.data;
+        data.u.row.len = ws->items[i].u.row.length;
+
+        switch ((rcode = bf_apply_cb(app_ctx, &data))) {
+        case WSREP_OK: break;
+        case WSREP_NOT_IMPLEMENTED: break;
+        case WSREP_FATAL:
+        default:
+            {
+                gu_warn("row apply failed: %d", rcode);
+                GU_DBUG_RETURN(rcode);
+                break;
+            }
         }
     }
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static int apply_write_set(void *app_ctx, struct wsdb_write_set *ws) {
+static wsrep_status_t apply_write_set(
+    void *app_ctx, struct wsdb_write_set *ws
+) {
     u_int16_t i;
-    int rcode;
+    wsrep_status_t rcode = WSREP_OK;
 
     GU_DBUG_ENTER("apply_write_set");
-    assert(bf_execute_cb);
+    if (bf_apply_cb == NULL) {
+        gu_error("data applier has not been defined"); 
+        GU_DBUG_RETURN(WSREP_FATAL);
+    }
 
+    /* first, applying connection context statements */
     if (ws->level == WSDB_WS_QUERY) {
-        /* applying connection context statements */
+        wsrep_apply_data_t data;
+        data.type = WSREP_APPLY_SQL;
+        data.u.sql.timeval  = (time_t)0;
+        data.u.sql.randseed = 0;
+
         for (i=0; i < ws->conn_query_count; i++) {
-            int rcode = bf_execute_cb(
-                app_ctx, ws->conn_queries[i].query, 
-                ws->conn_queries[i].query_len, (time_t)0, 0
-            );
-            switch (rcode) {
-            case 0: break;
-            default: {
-                 char *query = gu_malloc (ws->conn_queries[i].query_len + 1);
-                 memset(query, '\0', ws->conn_queries[i].query_len + 1);
-                 memcpy(query, ws->conn_queries[i].query, 
-                        ws->conn_queries[i].query_len);
-                 gu_error("connection query apply failed: %s", query);
-                 gu_free (query);
-                 GU_DBUG_RETURN(WSREP_TRX_FAIL);
-                 break;
-            }}
+            data.u.sql.stm      = ws->conn_queries[i].query;
+            data.u.sql.len      = ws->conn_queries[i].query_len;
+
+            switch (bf_apply_cb(app_ctx, &data)) {
+            case WSREP_OK: break;
+            case WSREP_NOT_IMPLEMENTED: break;
+            case WSREP_FATAL: 
+            default:
+                {
+                    char *query = gu_malloc (ws->conn_queries[i].query_len + 1);
+                    memset(query, '\0', ws->conn_queries[i].query_len + 1);
+                    memcpy(query, ws->conn_queries[i].query, 
+                           ws->conn_queries[i].query_len);
+                    gu_error("connection query apply failed: %s", query);
+                    gu_free (query);
+                    GU_DBUG_RETURN(WSREP_TRX_FAIL);
+                    break;
+                }
+            }
         }
     }
     switch (ws->level) {
     case WSDB_WS_QUERY:     
-         rcode = apply_queries(app_ctx, ws);
-         if (rcode != WSREP_OK) GU_DBUG_RETURN(rcode);
-         break;
+        rcode = apply_queries(app_ctx, ws);
+        break;
     case WSDB_WS_DATA_ROW:
-         // TODO: implement
-         rcode = apply_rows(app_ctx, ws);
-         break;
-    case WSDB_WS_DATA_RBR:
-         rcode = bf_execute_cb_rbr(app_ctx,
-                                   ws->rbr_buf,
-                                   ws->rbr_buf_len, 0, 0
-         );
-         if (rcode != WSREP_OK) {
-             gu_error("RBR apply failed: %d", rcode);
-             GU_DBUG_RETURN(rcode);
-         }
-         break;
+        // TODO: implement
+        rcode = apply_rows(app_ctx, ws);
+        break;
+    case WSDB_WS_DATA_RBR: 
+        {
+            wsrep_apply_data_t data;
+            data.type = WSREP_APPLY_APP;
+            data.u.app.buffer = (uint8_t *)ws->rbr_buf;
+            data.u.app.len = ws->rbr_buf_len;
+
+            rcode = bf_apply_cb(app_ctx, &data);
+            break;
+        }
     case WSDB_WS_DATA_COLS: 
         gu_error("column data replication is not supported yet");
         GU_DBUG_RETURN(WSREP_TRX_FAIL);
     default:
-         assert(0);
-         break;
+        assert(0);
+        break;
+    }
+
+    switch (rcode) {
+    case WSREP_OK: break;
+    case WSREP_NOT_IMPLEMENTED: break;
+    case WSREP_FATAL:
+    default:
+        gu_error("apply failed for: %d, in level: %d", rcode, ws->level);
+        GU_DBUG_RETURN(WSREP_FATAL);
     }
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static int apply_query(void *app_ctx, char *query, int len) {
+static wsrep_status_t apply_query(void *app_ctx, char *query, int len) {
 
     int rcode;
+    wsrep_apply_data_t data;
 
     GU_DBUG_ENTER("apply_commit");
 
-    assert(bf_execute_cb);
+    if (bf_apply_cb == NULL) {
+        gu_error("data applier has not been defined"); 
+        GU_DBUG_RETURN(WSREP_FATAL);
+    }
 
-    rcode = bf_execute_cb(app_ctx, query, len, (time_t)0, 0);
-    if (rcode) {
+    data.type           = WSREP_APPLY_SQL;
+    data.u.sql.stm      = query;
+    data.u.sql.len      = len;
+    data.u.sql.timeval  = (time_t)0;
+    data.u.sql.randseed = 0;
+    
+    rcode = bf_apply_cb(app_ctx, &data);
+    if (rcode != WSREP_OK) {
         gu_error("query commit failed: %d query '%s'", rcode, query);
         GU_DBUG_RETURN(WSREP_TRX_FAIL);
     }
@@ -742,7 +782,7 @@ static void process_conn_write_set(
     gcs_seqno_t seqno_g, gcs_seqno_t seqno_l
 ) {
     bool do_report;
-    int rcode;
+    wsrep_status_t rcode;
 
     /* wait for total order */
     GALERA_GRAB_TO_QUEUE (seqno_l);
@@ -774,7 +814,8 @@ static int process_query_write_set_applying(
     gcs_seqno_t seqno_g, gcs_seqno_t seqno_l
 ) {
     struct job_context ctx;
-    int  rcode;
+
+    int  rcode      = 0;
     bool do_report  = false;
     int  retries    = 0;
 
@@ -786,15 +827,14 @@ static int process_query_write_set_applying(
     job_queue_start_job(applier_queue, applier, (void *)&ctx);
 
  retry:
-    while((rcode = apply_write_set(app_ctx, ws))) {
+    while((apply_write_set(app_ctx, ws))) {
         if (retries == 0) 
-          gu_warn("ws apply failed for: %llu, last_seen: %llu", 
+            gu_warn("ws apply failed for: %llu, last_seen: %llu", 
                   seqno_g, ws->last_seen_trx
-          );
+        );
 
-        rcode = apply_query(app_ctx, "rollback\0", 9);
-        if (rcode) {
-            gu_warn("ws apply rollback failed for: %llu, last_seen: %llu", 
+        if (apply_query(app_ctx, "rollback\0", 9)) {
+            gu_warn("ws apply rollback failed, seqno: %llu, last_seen: %llu", 
                     seqno_g, ws->last_seen_trx);
         }
         if (++retries == MAX_RETRIES) break;
@@ -820,12 +860,12 @@ static int process_query_write_set_applying(
     // can't use it here GALERA_GRAB_COMMIT_QUEUE (seqno_l);
     switch (applier->type) {
     case JOB_SLAVE:
-      rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l);
-      break;
+        rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l);
+        break;
     case JOB_REPLAYING:
-      /* replaying jobs have reserved commit_queue in the beginning */
-      rcode = 0;
-      break;
+        /* replaying jobs have reserved commit_queue in the beginning */
+        rcode = 0;
+        break;
     }
     switch (rcode) {
     case 0: break;
@@ -851,8 +891,7 @@ static int process_query_write_set_applying(
                     seqno_l
             );
         }
-        rcode = apply_query(app_ctx, "rollback\0", 9);
-        if (rcode) {
+        if (apply_query(app_ctx, "rollback\0", 9)) {
             gu_warn("ws apply rollback failed for: %lld %lld, last_seen: %lld", 
                     seqno_g, seqno_l, ws->last_seen_trx
             );
@@ -866,9 +905,8 @@ static int process_query_write_set_applying(
     }
 
     gu_debug("GALERA ws commit for: %lld %lld", seqno_g, seqno_l); 
-    rcode = apply_query(app_ctx, "commit\0", 7);
-    if (rcode) {
-        gu_warn("ws apply commit failed for: %lld %lld, last_seen: %lld", 
+    if (apply_query(app_ctx, "commit\0", 7)) {
+        gu_warn("ws apply commit failed, seqno: %lld %lld, last_seen: %lld", 
                 seqno_g, seqno_l, ws->last_seen_trx);
         goto retry;
     }
@@ -912,8 +950,8 @@ static void process_query_write_set(
 
     PRINT_WS(wslog_G, ws, seqno_l);
 
-    gu_debug("remote trx seqno: %llu %llu last_seen_trx: %llu, cert: %d", 
-             seqno_g, seqno_l, ws->last_seen_trx, rcode
+    gu_debug("remote trx seqno: %llu %llu last_seen_trx: %llu %llu, cert: %d", 
+             seqno_g, seqno_l, ws->last_seen_trx, last_recved, rcode
     );
     switch (rcode) {
     case WSDB_OK:   /* certification ok */
