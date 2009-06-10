@@ -26,6 +26,7 @@ AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
 
 # Checks for programs.
 AC_PROG_CC
+AC_PROG_CXX
 #AC_DISABLE_SHARED
 AC_PROG_LIBTOOL
 AM_PATH_CHECK()
