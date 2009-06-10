@@ -104,7 +104,7 @@ void
 gu_log_cb_default (int severity, const char* msg)
 {
     fputs  (msg, gu_log_file ? gu_log_file : stderr);
-    fflush (gu_log_file);
+    fflush (gu_log_file ? gu_log_file : stderr);
 }
 
 /**
