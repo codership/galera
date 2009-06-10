@@ -146,7 +146,17 @@ START_TEST(test_uri)
 }
 END_TEST
 
-
+START_TEST(test_uuid)
+{
+    UUID uuid;
+    fail_unless(uuid.to_string() == "00000000-0000-0000-0000-000000000000");
+    for (size_t i = 0; i < 159; ++i)
+    {
+        UUID uuidrnd(0, 0);
+        LOG_DEBUG(uuidrnd.to_string());
+    }
+}
+END_TEST
 
 
 START_TEST(test_view)
@@ -372,6 +382,10 @@ Suite* types_suite()
 
     tc = tcase_create("test_uri");
     tcase_add_test(tc, test_uri);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_uuid");
+    tcase_add_test(tc, test_uuid);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_view");

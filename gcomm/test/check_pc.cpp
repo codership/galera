@@ -6,9 +6,12 @@
 
 #include "check_templ.hpp"
 #include "gcomm/pseudofd.hpp"
+
 #include <check.h>
 
 #include <list>
+#include <cstdlib>
+
 using std::list;
 
 using namespace gcomm;
@@ -299,18 +302,48 @@ START_TEST(test_pc_view_changes_double)
 }
 END_TEST
 
+#if 0
+static void states_exch(vector<PCUser*> vec)
+{
+    vector<PCMessage> msgs;
+}
+#endif
+
+
+START_TEST(test_pc_state)
+{
+    UUID uuid1(0, 0);
+    ProtoUpMeta pum1(uuid1);
+    PCProto pc1(uuid1, 0, 0, true);
+    DummyTransport tp1;
+    PCUser pu1(uuid1, &tp1, &pc1);
+    single_boot(&pu1);
+    
+    UUID uuid2(0, 0);
+    ProtoUpMeta pum2(uuid2);
+    PCProto pc2(uuid2, 0, 0, false);
+    DummyTransport tp2;
+    PCUser pu2(uuid2, &tp2, &pc2);
+    
+    double_boot(&pu1, &pu2);    
+}
+END_TEST
+
+
 class PCUser2 : public Toplay, EventContext
 {
     Transport* tp;
     EventLoop* event_loop;
     bool sending;
     int fd;
+    uint8_t my_type;
 public:
     PCUser2(const string& uri, EventLoop* el) :
         tp(0),
         event_loop(el),
         sending(false),
-        fd(-1)
+        fd(-1),
+        my_type(1 + ::rand()%4)
     {
         tp = Transport::create(uri, el);
         gcomm::connect(tp, this);
@@ -353,6 +386,10 @@ public:
         else
         {
             LOG_DEBUG("received message: " + make_int(um->get_to_seq()).to_string());
+            if (um->get_source() == tp->get_uuid())
+            {
+                fail_unless(um->get_user_type() == my_type);
+            }
         }
     }
     
@@ -362,7 +399,8 @@ public:
         {
             const byte_t buf[8] = "pcmsg12";
             WriteBuf wb(buf, sizeof(buf));
-            int ret = pass_down(&wb, 0);
+            ProtoDownMeta dm(my_type);
+            int ret = pass_down(&wb, &dm);
             if (ret != 0 && ret != EAGAIN)
             {
                 LOG_WARN(string("pass_down(): ") + strerror(ret));
@@ -447,6 +485,10 @@ Suite* pc_suite()
 
     tc = tcase_create("test_pc_view_changes_double");
     tcase_add_test(tc, test_pc_view_changes_double);
+    suite_add_tcase(s, tc);
+    
+    tc = tcase_create("test_pc_state");
+    tcase_add_test(tc, test_pc_state);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_pc_transport");

@@ -551,7 +551,7 @@ int PCProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
     {
         return EAGAIN;
     }
-
+    
     uint32_t seq = get_last_seq() + 1;
     PCUserMessage um(seq);
     byte_t buf[8];
