@@ -4,8 +4,10 @@
 
 #include <cstdio>
 #include <cerrno>
+#include <cstring>
 
 #include <galerautils.hpp>
+
 #include "SeqnoNone.hpp"
 #include "BufferHeader.hpp"
 #include "GCache.hpp"
@@ -151,50 +153,23 @@ namespace gcache
     void
     GCache::preamble_write ()
     {
-        size_t written  = 0;
-        size_t to_write = PREAMBLE_LEN;
+        std::ostringstream pstream;
 
-        written += snprintf (preamble + written, to_write - written,
-                             "* GCache data file *\n");
+        pstream
+            << "* GCache data file *" << std::endl
+            << "--------------------" << std::endl
+            << "Version         : " << header[HEADER_VERSION]       << std::endl
+            << "Size            : " << header[FILE_SIZE] << "bytes" << std::endl
+            << "Closed          : " << (header[FILE_OPEN]?"no":"yes") << std::endl
+            << "Data offset     : " << header[DATA_OFFSET]  << std::endl
+            << "First buffer    : " << header[FIRST_OFFSET] << std::endl
+            << "Next buffer     : " << header[NEXT_OFFSET]  << std::endl
+            << "Min. seqno      : " << header[SEQNO_MIN]    << std::endl
+            << "Max. seqno      : " << header[SEQNO_MAX]    << std::endl
+            << "Ordered buffers : " << (header[SEQNO_MAX] - header[SEQNO_MIN]) << std::endl
+            << "--------------------" << std::endl;
 
-        written += snprintf (preamble + written, to_write - written,
-                             "--------------------\n");
-
-        written += snprintf (preamble + written, to_write - written,
-                             "Version         : %llu\n",
-                             header[HEADER_VERSION]);
-
-        written += snprintf (preamble + written, to_write - written,
-                             "Size            : %llu bytes\n",
-                             header[FILE_SIZE]);
-
-        written += snprintf (preamble + written, to_write - written,
-                             "Closed          : %s\n",
-                             header[FILE_OPEN] ? "no":"yes");
-
-        written += snprintf (preamble + written, to_write - written,
-                             "Data offset     : %llu\n", header[DATA_OFFSET]);
-
-        written += snprintf (preamble + written, to_write - written,
-                             "First buffer    : %llu\n", header[FIRST_OFFSET]);
-
-        written += snprintf (preamble + written, to_write - written,
-                             "Next buffer     : %llu\n", header[NEXT_OFFSET]);
-
-        written += snprintf (preamble + written, to_write - written,
-                             "Min. seqno      : %lld\n",
-                             (int64_t)header[SEQNO_MIN]);
-
-        written += snprintf (preamble + written, to_write - written,
-                             "Max. seqno      : %lld\n",
-                             (int64_t)header[SEQNO_MAX]);
-
-        written += snprintf (preamble + written, to_write - written,
-                             "Ordered buffers : %lld\n",
-                             (int64_t)header[SEQNO_MAX] -
-                             (int64_t)header[SEQNO_MIN]);
-
-        written += snprintf (preamble + written, to_write - written,
-                             "--------------------\n");
+        strncpy (preamble, pstream.str().c_str(), PREAMBLE_LEN - 1);
+        preamble[PREAMBLE_LEN - 1] = '\0';
     }
 }

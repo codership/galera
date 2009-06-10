@@ -116,7 +116,7 @@ namespace gcache
 
         // We can reliably allocate continuous buffer which is twice as small
         // as total cache area. So compare to half the space
-        if (size < (size_cache >> 1)) {
+        if (size < ((size_t)size_cache >> 1)) {
 
             gu::Lock lock(mtx);
             void*    ptr;
@@ -155,7 +155,7 @@ namespace gcache
 
         // We can reliably allocate continuous buffer which is twice as small
         // as total cache area. So compare to half the space
-        if (size >= (size_cache >> 1)) return 0;
+        if (size >= ((size_t)size_cache >> 1)) return 0;
 
         BufferHeader* bh = BH(ptr) - 1;
 
