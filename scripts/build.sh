@@ -36,7 +36,8 @@ usage()
 	"    -c|--configure  reconfigure the build system (implies -s)\n"\
 	"    -b|--bootstap   rebuild the build system (implies -c)\n"\
 	"    -r|--release    configure build with debug disabled (implies -c)\n" \
-	"    -d|--debug      configure build with debug disabled (implies -c)\n"
+	"    -d|--debug      configure build with debug disabled (implies -c)\n" \
+	"    -p|--package    build binary pacakges at the end.\n" \
 
 }
 
@@ -72,6 +73,9 @@ do
 	-d|--debug)
 	    DEBUG=yes     # Compile with debug
 	    ;;
+	-p|--package)
+	    PACKAGE=yes   # build binary packages
+	    ;;
 	--help)
 	    usage
 	    exit 0
@@ -99,7 +103,6 @@ gcomm_src=$build_base/gcomm
 gcs_src=$build_base/gcs
 wsdb_src=$build_base/wsdb
 galera_src=$build_base/galera
-#mysql_src=$build_base/../../5.1/trunk
 
 # Flags for configure scripts
 if test -n GALERA_DEST
@@ -144,6 +147,26 @@ build_flags()
     LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$build_dir/src/.libs
     CPPFLAGS="$CPPFLAGS -I$build_dir/src "
     LDFLAGS="$LDFLAGS -L$build_dir/src/.libs"
+}
+
+build_packages()
+{
+    local ARCH=$(uname -m)
+    local ARCH_DEB
+    local ARCH_RPM
+    if [ "$ARCH" == "i686" ]
+    then
+	ARCH_DEB=i386
+	ARCH_RPM=i386
+    else
+	ARCH_DEB=amd64
+	ARCH_RPM=x86_64
+    fi
+    
+    pushd $build_base/scripts/packages && \
+    EPM_BASE=$build_base epm -n -m "$ARCH_DEB" -a $ARCH_DEB -f "deb" galera && \
+    EPM_BASE=$build_base epm -n -m "$ARCH_RPM" -a $ARCH_RPM -f "rpm" galera || \
+    return -1    
 }
 
 building="false"
@@ -235,6 +258,10 @@ fi
 
 build_flags $galera_src
 
+if test "$PACKAGE" == "yes"
+then
+    build_packages
+fi
 
 if test $building != "true"
 then

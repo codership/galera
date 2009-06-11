@@ -1,0 +1,47 @@
+# This is Galera package description for ESP package manager
+
+%product     Galera Replication Framework
+%copyright   2007-2009 by Codership Oy, All Rights Reserved
+%vendor      Codership Oy
+%license     COPYING
+%readme      README
+%description Replication framework for transactional applications. Implements wsrep interface.
+%version     0.7.0
+
+$prefix=/usr
+
+$LIBS_DEST=${prefix}/lib/galera
+
+d 755 root root $LIBS_DEST -
+f 755 root root $LIBS_DEST $EPM_BASE/galerautils/src/.libs/libgalerautils.so.*.*.*
+f 755 root root $LIBS_DEST $EPM_BASE/galerautils/src/.libs/libgalerautils++.so.*.*.*
+f 755 root root $LIBS_DEST $EPM_BASE/galeracomm/common/src/.libs/libgcommcommonpp.so.*.*.*
+f 755 root root $LIBS_DEST $EPM_BASE/galeracomm/transport/src/.libs/libgcommtransportpp.so.*.*.*
+f 755 root root $LIBS_DEST $EPM_BASE/galeracomm/vs/src/.libs/libgcommvspp.so.*.*.*
+f 755 root root $LIBS_DEST $EPM_BASE/gcs/src/.libs/libgcs.so.*.*.*
+f 755 root root $LIBS_DEST $EPM_BASE/wsdb/src/.libs/libwsdb.so.*.*.*
+f 755 root root $LIBS_DEST $EPM_BASE/galera/src/.libs/libmmgalera.so.*.*.*
+
+$INCS_DEST=${prefix}/include/galera
+
+d 755 root root $INCS_DEST -
+f 644 root root $INCS_DEST/gcs.h    $EPM_BASE/gcs/src/gcs.h
+f 644 root root $INCS_DEST/galera.h $EPM_BASE/galera/src/wsrep.h
+
+%format deb # Debian packages come with bad file ownership
+%postinstall <<EOF_DEB
+chown -R root.root $LIBS_DEST
+chown -R root.root $INCS_DEST
+ldconfig -n $LIBS_DEST
+EOF_DEB
+
+%format rpm
+%postinstall <<EOF_RPM
+ldconfig -n $LIBS_DEST
+EOF_RPM
+
+%format all
+%preremove <<EOF2
+rm -f $$(find $LIBS_DEST -type l)
+EOF2
+#
