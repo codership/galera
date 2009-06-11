@@ -101,6 +101,7 @@ gcache_src=$build_base/gcache
 galeracomm_src=$build_base/galeracomm
 gcomm_src=$build_base/gcomm
 gcs_src=$build_base/gcs
+gemini_src=$build_base/gemini
 wsdb_src=$build_base/wsdb
 galera_src=$build_base/galera
 
@@ -241,6 +242,14 @@ then
 fi
 
 build_flags $gcs_src
+
+if test $initial_stage = "gemini" || $building = "true"
+then
+    build $gemini_src $conf_flags $galera_flags
+    building="true"
+fi
+
+build_flags $gemini_src
 
 if test $initial_stage = "wsdb" || $building = "true"
 then
