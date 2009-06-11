@@ -52,7 +52,7 @@ AC_CHECK_LIB([galerautils++], [main],,
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([stdint.h stdlib.h string.h sys/time.h unistd.h])
+#AC_CHECK_HEADERS([cstdint cstdlib cstring sys/time.h unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
