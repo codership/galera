@@ -136,7 +136,52 @@ START_TEST(test_eventloop_gc)
 }
 END_TEST
 
+class SelfInterrupt : public Protolay, EventContext
+{
+    int fd;
+    EventLoop* el;
+public:
+    SelfInterrupt(EventLoop* el_) : 
+        fd(PseudoFd::alloc_fd()), 
+        el(el_){
+        el->insert(fd, this);
+        el->queue_event(fd, Event(Event::E_USER, Time::now(), 0));
+    }
+    
+    
+    int handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
+    {
+        return EAGAIN;
+    }
+    
+    void handle_up(const int cid, const ReadBuf* rb, const size_t s,
+                   const ProtoUpMeta* um)
+    {
+        
+    }
+    
+    void handle_event(const int cid, const Event& pe)
+    {
+        LOG_INFO("self interrupt");
+        el->interrupt();
+    }
+};
 
+START_TEST(test_eventloop_interrupt)
+{
+    EventLoop el;
+
+    SelfInterrupt si(&el);
+
+    while (el.poll(10) >= 0)
+    {
+
+    }
+
+    fail_unless(el.is_interrupted() == true);
+
+}
+END_TEST
 
 Suite* event_suite()
 {
@@ -165,6 +210,10 @@ Suite* event_suite()
 
     tc = tcase_create("test_eventloop_gc");
     tcase_add_test(tc, test_eventloop_gc);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_eventloop_interrupt");
+    tcase_add_test(tc, test_eventloop_interrupt);
     suite_add_tcase(s, tc);
 
     return s;

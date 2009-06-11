@@ -1332,6 +1332,10 @@ void EVSProto::validate_reg_msg(const EVSMessage& msg)
 
 void EVSProto::deliver()
 {
+    if (delivering == true)
+    {
+        throw FatalException("recursive enter to delivery");
+    }
     delivering = true;
     if (get_state() != OPERATIONAL && get_state() != RECOVERY && 
         get_state() != LEAVING)
@@ -1401,6 +1405,10 @@ void EVSProto::validate_trans_msg(const EVSMessage& msg)
 
 void EVSProto::deliver_trans()
 {
+    if (delivering == true)
+    {
+        throw FatalException("recursive enter to delivery");
+    }
     delivering = true;
     if (get_state() != RECOVERY && get_state() != LEAVING)
         throw FatalException("Invalid state");

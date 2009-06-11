@@ -830,7 +830,7 @@ START_TEST(test_pc_transport)
 }
 END_TEST
 
-static bool skip = true;
+static bool skip = false;
 
 Suite* pc_suite()
 {
@@ -866,7 +866,7 @@ Suite* pc_suite()
 
     tc = tcase_create("test_pc_transport");
     tcase_add_test(tc, test_pc_transport);
-    tcase_set_timeout(tc, 60);
+    tcase_set_timeout(tc, 120);
     suite_add_tcase(s, tc);
 
     return s;

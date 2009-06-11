@@ -89,7 +89,7 @@ class EventLoop
     int compute_timeout(const int);
     void handle_queued_events();
     std::list<Protolay*> released;
-
+    bool interrupted;
 public:
     EventLoop();
     ~EventLoop();
@@ -103,6 +103,14 @@ public:
     void unset_signal(int fd, int signo);
     void queue_event(int fd, const Event&);
     int poll(int timeout);
+    void interrupt()
+    {
+        interrupted = true;
+    }
+    bool is_interrupted() const
+    {
+        return interrupted;
+    }
 };
 
 END_GCOMM_NAMESPACE

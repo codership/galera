@@ -57,7 +57,6 @@ void EventLoop::insert(const int fd, EventContext *pctx)
 
 void EventLoop::erase(const int fd)
 {
-
     unset(fd, Event::E_ALL);
 
 
@@ -176,7 +175,8 @@ void EventLoop::handle_queued_events()
     // Deliver queued events
     int cnt = 0;
     for (EventMap::iterator i = event_map.begin(); 
-         i != event_map.end() && i->first <= now && cnt++ < 10; 
+         i != event_map.end() && i->first <= now && cnt++ < 10 &&
+             interrupted == false; 
          i = event_map.begin()) {
         CtxMap::iterator map_i = ctx_map.find(i->second.first);
         if (map_i == ctx_map.end()) {
@@ -220,46 +220,52 @@ int EventLoop::compute_timeout(const int max_val)
 
 int EventLoop::poll(const int timeout)
 {
-
-    handle_queued_events();
-
     int p_ret;
     int err = 0;
     int p_cnt = 0;
+    interrupted = false;
+
+    handle_queued_events();
+    if (interrupted)
+        goto out;
+
+
 
     p_ret = ::poll(pfds, n_pfds, compute_timeout(timeout));
     err = errno;
 
     if (p_ret == -1 && err == EINTR) {
-	p_ret = 0;
+        p_ret = 0;
     } else if (p_ret == -1 && err != EINTR) {
-	throw FatalException("");
+        throw FatalException("");
     } else {
-	for (size_t i = 0; i < n_pfds; ) {
+        for (size_t i = 0; i < n_pfds; ) {
             size_t last_n_pfds = n_pfds;
-	    int e = map_mask_to_event(pfds[i].revents);
-	    if (e != Event::E_NONE) {
+            int e = map_mask_to_event(pfds[i].revents);
+            if (e != Event::E_NONE) {
 
-		CtxMap::iterator map_i;
-		if ((map_i = ctx_map.find(pfds[i].fd)) != ctx_map.end()) {
-		    if (map_i->second == 0)
-			throw FatalException("");
+                CtxMap::iterator map_i;
+                if ((map_i = ctx_map.find(pfds[i].fd)) != ctx_map.end()) {
+                    if (map_i->second == 0)
+                        throw FatalException("");
                     LOG_TRACE("handling "
                               + Int(pfds[i].fd).to_string() + " "
                               + Pointer(map_i->second).to_string() + " "
                               + Int(pfds[i].revents).to_string());
                     pfds[i].revents = 0;
-		    map_i->second->handle_event(pfds[i].fd, Event(e));
-		    p_cnt++;
-		} else {
-		    throw FatalException("No ctx for fd found");
-		}
-	    } else {
-		if (pfds[i].revents) {
-		    LOG_ERROR("Unhandled poll events");
-		    throw FatalException("");
-		}
-	    }
+                    map_i->second->handle_event(pfds[i].fd, Event(e));
+                    p_cnt++;
+                    if (interrupted)
+                        goto out;
+                } else {
+                    throw FatalException("No ctx for fd found");
+                }
+            } else {
+                if (pfds[i].revents) {
+                    LOG_ERROR("Unhandled poll events");
+                    throw FatalException("");
+                }
+            }
             if (last_n_pfds != n_pfds)
             {
                 /* pfds has changed, lookup for first nonzero revents from 
@@ -277,7 +283,7 @@ int EventLoop::poll(const int timeout)
             {
                 ++i;
             }
-	}
+        }
     }
     
     // assert(p_ret == p_cnt);
@@ -288,16 +294,18 @@ int EventLoop::poll(const int timeout)
                  + Int(p_cnt).to_string() 
                  + ")");
     }
-
+    
     handle_queued_events();
-
+    
     // Garbage collection
     for (std::list<Protolay*>::iterator i = released.begin(); i != released.end(); ++i)
     {
         delete *i;
     }
     released.clear();
-    
+out:
+    if (interrupted)
+        return -1;
     return p_ret;
 }
 
@@ -313,7 +321,8 @@ EventLoop::EventLoop() :
     event_map(),
     active_event(event_map.end()),
     n_pfds(0),
-    pfds(0)
+    pfds(0),
+    interrupted(false)
 {
 }
 

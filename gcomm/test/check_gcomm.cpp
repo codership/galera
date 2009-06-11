@@ -1,10 +1,15 @@
 #include "check_gcomm.hpp"
+#include "gcomm/logger.hpp"
 
 #include <string>
 #include <vector>
 #include <algorithm>
 #include <cstdlib>
 #include <check.h>
+
+
+
+using namespace gcomm;
 
 using std::string;
 using std::vector;
@@ -31,6 +36,7 @@ static GCommSuite suites[] = {
     {"", 0}
 };
 
+#if 0
 static vector<string> strsplit(const string& s, const int c)
 {
     vector<string> ret;
@@ -44,12 +50,14 @@ static vector<string> strsplit(const string& s, const int c)
     ret.push_back(s.substr(prev_pos, s.length() - prev_pos));
     return ret;
 }
+#endif
 
 int main(int argc, char* argv[])
 {
     SRunner* sr = srunner_create(0);
     vector<string>* suits = 0;
 
+    LOG_INFO("check_gcomm, start tests");
     if (::getenv("CHECK_GCOMM_SUITES"))
     {
         suits = new vector<string>(strsplit(::getenv("CHECK_GCOMM_SUITES"), ','));
@@ -67,7 +75,9 @@ int main(int argc, char* argv[])
     suits = 0;
 
     srunner_run_all(sr, CK_NORMAL);
+    LOG_INFO("check_gcomm, run all tests");
     int n_fail = srunner_ntests_failed(sr);
     srunner_free(sr);
+
     return n_fail == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

@@ -50,6 +50,14 @@ struct FatalException : Exception
     }
 }; 
 
+struct InterruptedException : Exception
+{
+    InterruptedException() :
+        Exception("interrupted")
+    {
+    }
+};
+    
 END_GCOMM_NAMESPACE
 
 #endif // EXCEPTION_HPP

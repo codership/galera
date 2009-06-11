@@ -1,8 +1,10 @@
 
+#include "gcomm/logger.hpp"
 #include "gcomm/common.hpp"
 #include "gcomm/conf.hpp"
 #include "gcomm/types.hpp"
 #include "gcomm/string.hpp"
+
 #include "gcomm/util.hpp"
 #include "gcomm/exception.hpp"
 #include "gcomm/monitor.hpp"
