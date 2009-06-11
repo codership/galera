@@ -818,10 +818,10 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
 
     /* receive messages from group and demultiplex them 
      * until finally some complete action is ready */
-    while (0 == ret)
+    do
     {
 	ret = core_msg_recv (&conn->backend, recv_msg);
-	if (gu_unlikely (ret < 0)) {
+	if (gu_unlikely (ret <= 0)) {
             goto out; /* backend error while receiving message */
         }
 
@@ -859,10 +859,10 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
 		     recv_msg->type, recv_msg->size, recv_msg->sender_idx);
 	    // continue looping
         }
-    } /* end of recv loop */
+    } while (0 == ret); /* end of recv loop */
 
 out:
-    assert (ret);
+    assert (ret || (GCS_ACT_ERROR == recv_act.type));
 
     *action   = recv_act.buf;
     *act_type = recv_act.type;

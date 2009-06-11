@@ -495,14 +495,20 @@ void *gcs_test_recv (void *arg)
                         &thread->act_id,
                         &thread->local_act_id);
 	
-	if (ret < 0) {
+	if (ret <= 0) {
+            fprintf (stderr, "gcs_recv() %s: %ld (%s). Thread exits.\n",
+                     ret < 0 ? "failed" : "connection closed",
+                     ret, strerror(-ret));
             assert (thread->msg          == NULL);
             assert (thread->msg_len      == 0);
             assert (thread->act_id       == GCS_SEQNO_ILL);
             assert (thread->local_act_id == GCS_SEQNO_ILL);
+            assert (thread->act_type     == GCS_ACT_ERROR);
             break;
 	}
-	
+
+        assert (thread->act_type < GCS_ACT_ERROR);
+
 	msg_recvd++;
         size_recvd += thread->msg_len;
 

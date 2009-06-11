@@ -95,11 +95,11 @@ struct gcs_conn
 
 typedef struct gcs_act
 {
-    size_t         act_size;
-    gcs_act_type_t act_type;
     gcs_seqno_t    act_id;
     gcs_seqno_t    local_act_id;
     const void*    action;
+    size_t         act_size;
+    gcs_act_type_t act_type;
     gu_mutex_t     wait_mutex;
     gu_cond_t      wait_cond;
 }
@@ -440,7 +440,11 @@ static void *gcs_recv_thread (void *arg)
 	if ((act_size = gcs_core_recv (conn->core,
                                        &action,
                                        &act_type,
-                                       &act_id)) < 0) {
+                                       &act_id)) <= 0) {
+
+            assert (GCS_ACT_ERROR == act_type);
+            assert (GCS_SEQNO_ILL == act_id);
+            assert (NULL == action);
 
 	    gcs_act_t *slave_act = gu_fifo_get_tail(conn->recv_q);
             slave_act->act_size     = 0;
@@ -457,6 +461,8 @@ static void *gcs_recv_thread (void *arg)
 
 //        gu_info ("Received action type: %d, size: %d, global seqno: %lld",
 //                 act_type, act_size, (long long)act_id);
+
+        assert (act_type < GCS_ACT_ERROR);
 
         if (gu_unlikely(act_type >= GCS_ACT_STATE_REQ)) {
             ret = gcs_handle_actions (conn, action, act_size, act_type, act_id);
