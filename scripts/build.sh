@@ -164,23 +164,28 @@ build_packages()
 	ARCH_RPM=x86_64
     fi
     
-    pushd $build_base/scripts/packages && \
-    EPM_BASE=$build_base epm -n -m "$ARCH_DEB" -a $ARCH_DEB -f "deb" galera && \
-    EPM_BASE=$build_base epm -n -m "$ARCH_RPM" -a $ARCH_RPM -f "rpm" galera || \
+    export BUILD_BASE=$build_base
+    pushd $build_base/scripts/packages                       && \
+    rm -rf $ARCH_DEB $ARCH_RPM                               && \
+    epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" galera     && \
+    epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" galera-dev && \
+    epm -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" galera     && \
+    epm -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" galera-dev || \
     return -1    
 }
 
 # Most modules are standard, so we can use a single function
 build_module()
 {
-    local src="$build_base/$1"
-    if test "$initial_stage" == "$1" || "$building" = "true"
+    local module="$1"
+    shift
+    local build_dir="$build_base/$module"
+    if test "$initial_stage" == "$module" || "$building" = "true"
     then
-	build $src $conf_flags
-	building="true"
+	build $build_dir $conf_flags $@ && building="true" || return -1
     fi
 
-    build_flags $src
+    build_flags $build_dir || return -1
 }
 
 building="false"
