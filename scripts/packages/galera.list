@@ -6,11 +6,14 @@
 %license     COPYING
 %readme      README
 %description Replication framework for transactional applications. Implements wsrep interface.
-%version     0.7.0
+%version     0.7.0pre
 
 $prefix=/usr
 
 $LIBS_DEST=${prefix}/lib/galera
+$INCS_DEST=${prefix}/include/galera
+$SBIN_DEST=${prefix}/sbin
+$BINS_DEST=${prefix}/bin
 
 d 755 root root $LIBS_DEST -
 f 755 root root $LIBS_DEST $EPM_BASE/galerautils/src/.libs/libgalerautils.so.*.*.*
@@ -22,16 +25,14 @@ f 755 root root $LIBS_DEST $EPM_BASE/gcs/src/.libs/libgcs.so.*.*.*
 f 755 root root $LIBS_DEST $EPM_BASE/wsdb/src/.libs/libwsdb.so.*.*.*
 f 755 root root $LIBS_DEST $EPM_BASE/galera/src/.libs/libmmgalera.so.*.*.*
 
-$INCS_DEST=${prefix}/include/galera
-
-d 755 root root $INCS_DEST -
-f 644 root root $INCS_DEST/gcs.h    $EPM_BASE/gcs/src/gcs.h
-f 644 root root $INCS_DEST/galera.h $EPM_BASE/galera/src/wsrep.h
+#d 755 root root $SBIN_DEST -
+f 755 root root $SBIN_DEST $EPM_BASE/galeracomm/vs/src/.libs/vsbes
 
 %format deb # Debian packages come with bad file ownership
 %postinstall <<EOF_DEB
 chown -R root.root $LIBS_DEST
-chown -R root.root $INCS_DEST
+chown -R root.root $SBIN_DEST
+# chown -R root.root $BINS_DEST
 ldconfig -n $LIBS_DEST
 EOF_DEB
 
@@ -44,4 +45,26 @@ EOF_RPM
 %preremove <<EOF2
 rm -f $$(find $LIBS_DEST -type l)
 EOF2
+
+%subpackage galera-dev
+d 755 root root $INCS_DEST -
+f 644 root root $INCS_DEST/gcs.h      $EPM_BASE/gcs/src/gcs.h
+f 644 root root $INCS_DEST/wsdb_api.h $EPM_BASE/wsdb/src/wsdb_api.h
+f 644 root root $INCS_DEST/galera.h   $EPM_BASE/galera/src/wsrep.h
+
+d 755 root root $LIBS_DEST -
+f 755 root root $LIBS_DEST $EPM_BASE/galerautils/src/.libs/libgalerautils.a
+f 755 root root $LIBS_DEST $EPM_BASE/galerautils/src/.libs/libgalerautils++.a
+f 755 root root $LIBS_DEST $EPM_BASE/galeracomm/common/src/.libs/libgcommcommonpp.a
+f 755 root root $LIBS_DEST $EPM_BASE/galeracomm/transport/src/.libs/libgcommtransportpp.a
+f 755 root root $LIBS_DEST $EPM_BASE/galeracomm/vs/src/.libs/libgcommvspp.a
+f 755 root root $LIBS_DEST $EPM_BASE/gcs/src/.libs/libgcs.a
+f 755 root root $LIBS_DEST $EPM_BASE/wsdb/src/.libs/libwsdb.a
+f 755 root root $LIBS_DEST $EPM_BASE/galera/src/.libs/libmmgalera.a
+
+%format deb # Debian packages come with bad file ownership
+%postinstall <<EOF_DEB2
+chown -R root.root $LIBS_DEST
+chown -R root.root $INCS_DEST
+EOF_DEB2
 #
