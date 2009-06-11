@@ -170,6 +170,19 @@ build_packages()
     return -1    
 }
 
+# Most modules are standard, so we can use a single function
+build_module()
+{
+    local src="$build_base/$1"
+    if test "$initial_stage" == "$1" || "$building" = "true"
+    then
+	build $src $conf_flags
+	building="true"
+    fi
+
+    build_flags $src
+}
+
 building="false"
 # Build projects
 
@@ -187,21 +200,8 @@ fi
 
 echo "CPPFLAGS: $CPPFLAGS"
 
-if test $initial_stage = "galerautils" || $building = "true"
-then
-    build $galerautils_src $conf_flags
-    building="true"
-fi
-
-build_flags $galerautils_src
-
-if test $initial_stage = "gcache" || $building = "true"
-then
-    build $gcache_src $conf_flags
-    building="true"
-fi
-
-build_flags $gcache_src
+build_module "galerautils"
+build_module "gcache"
 
 if test $GCOMM_IMPL = "galeracomm"
 then 
@@ -221,12 +221,7 @@ then
     LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/transport/src/.libs"
     LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/vs/src/.libs"
 else
-    if test $initial_stage = "gcomm" || $building = "true"
-    then
-        build $gcomm_src $conf_flags $galera_flags
-        building="true"
-    fi
-    build_flags $gcomm_src
+    build_module "gcomm"
 fi
 
 if test $initial_stage = "gcs" || $building = "true"
@@ -243,29 +238,9 @@ fi
 
 build_flags $gcs_src
 
-if test $initial_stage = "gemini" || $building = "true"
-then
-    build $gemini_src $conf_flags $galera_flags
-    building="true"
-fi
-
-build_flags $gemini_src
-
-if test $initial_stage = "wsdb" || $building = "true"
-then
-    build $wsdb_src $conf_flags $galera_flags
-    building="true"
-fi
-
-build_flags $wsdb_src
-
-if test $initial_stage = "galera" || $building = "true"
-then
-    build $galera_src $conf_flags $galera_flags
-    building="true"
-fi
-
-build_flags $galera_src
+build_module "gemini"
+build_module "wsdb"
+build_module "galera"
 
 if test "$PACKAGE" == "yes"
 then
