@@ -17,7 +17,7 @@ AC_ARG_ENABLE(debug,
 if test "$enable_debug" != "no"
 then
     enable_debug="yes"
-    CFLAGS= ${CFLAGS:-" -g -O0 "}
+    CFLAGS=${CFLAGS:-" -g -O0 "}
 else
     CFLAGS=${CFLAGS:-" -O2 -g "}
     CFLAGS="$CFLAGS -DNDEBUG "
