@@ -54,7 +54,6 @@ struct gcs_gcomm : public Toplay
     size_t waiter_buf_len;
     gu_mutex_t mutex;
     gu_cond_t cond;
-    Monitor monitor;
 
     gcs_gcomm() : 
         vs(0), 
@@ -90,6 +89,7 @@ struct gcs_gcomm : public Toplay
 	    eq.push_back(vs_ev(0, 0, 0, 0, 0));
 	    gu_cond_signal(&cond);
 	    gu_mutex_unlock(&mutex);
+            el->interrupt();
 	    return;
 	}
         
@@ -106,7 +106,7 @@ struct gcs_gcomm : public Toplay
             gu_mutex_lock(&mutex);
             gu_cond_signal(&cond);
             gu_mutex_unlock(&mutex);
-            pthread_exit(0);
+            el->interrupt();
 	}
 	gu_mutex_lock(&mutex);
 	if (rb && eq.empty() && rb->get_len(roff) <= waiter_buf_len)
@@ -163,9 +163,16 @@ typedef struct gcs_backend_conn
     gu_thread_t thr;
     gcs_comp_msg_t *comp_msg;
     CompMap comp_map;
-    gcs_backend_conn() : last_view_size(0), max_msg_size(1 << 20),
-			 n_received(0), n_copied(0),
-			 comp_msg(0) {}
+    volatile bool terminate;
+    gcs_backend_conn() : 
+        last_view_size(0), 
+        max_msg_size(1 << 20),
+        n_received(0), 
+        n_copied(0),
+        comp_msg(0),
+        terminate(false)
+    {
+    }
 } conn_t;
 
 
@@ -256,7 +263,11 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
         gu_warn("gcs_gcomm_recv: -EBADFD");
 	return -EBADFD;
     }
-retry:
+    if (conn->terminate == true)
+    {
+        return -ENOTCONN;
+    }
+
     std::pair<vs_ev, bool> wr(conn->vs_ctx.wait_event(buf, len));
     if (wr.second == false)
     {
@@ -302,8 +313,7 @@ retry:
         }        
         else
         {
-            return -ENOTCONN;
-            // new_comp = gcs_comp_msg_leave();
+            new_comp = gcs_comp_msg_leave();
         }
         
         if (!new_comp) 
@@ -341,19 +351,26 @@ static GCS_BACKEND_NAME_FN(gcs_gcomm_name)
 static void *conn_run(void *arg)
 {
     conn_t *conn = reinterpret_cast<conn_t*>(arg);
-    try {
-
-	while (true) {
-	    int err = conn->vs_ctx.el->poll(std::numeric_limits<int>::max());
-	    if (err < 0) {
-		gu_fatal("unrecoverable error: '%s'", strerror(err));
-		abort();
-	    }
-	}
-    } catch (Exception e) {
-	gu_error("poll error: '%s', thread exiting", e.what());
-	conn->vs_ctx.handle_up(-1, 0, 0, 0);
+    while (conn->terminate == false) 
+    {
+        int err = conn->vs_ctx.el->poll(200);
+        if (err < 0 && conn->vs_ctx.el->is_interrupted() == true) 
+        {
+            gu_info("event loop interrupted");
+            break;
+        }
+        else if (err < 0)
+        {
+            gu_fatal("unrecoverable error: '%s'", strerror(err));
+            abort();
+        }
     }
+    
+    if (conn->vs_ctx.el->is_interrupted() == false)
+    {
+        conn->vs_ctx.vs->close();
+    }
+
     return 0;
 }
 
@@ -398,11 +415,10 @@ static GCS_BACKEND_CLOSE_FN(gcs_gcomm_close)
     if (conn == 0)
 	return -EBADFD;
     gu_debug("closing gcomm backend");
-    conn->vs_ctx.vs->close();
-    delete conn->vs_ctx.vs;
-    conn->vs_ctx.vs = 0;
+    conn->terminate = true;
     gu_debug("joining backend recv thread");
     gu_thread_join(conn->thr, 0);
+    delete conn->vs_ctx.vs;
     gu_debug("close done");
     return 0;
 }
@@ -416,7 +432,7 @@ static GCS_BACKEND_DESTROY_FN(gcs_gcomm_destroy)
     
     delete conn->vs_ctx.el;
     if (conn->comp_msg) gcs_comp_msg_delete (conn->comp_msg);
-
+    
     gu_debug("received %llu copied %llu", conn->n_received, conn->n_copied);
 
     delete conn;
