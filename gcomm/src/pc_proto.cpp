@@ -7,6 +7,10 @@
 
 #include "gcomm/logger.hpp"
 
+#include <set>
+
+using std::multiset;
+
 BEGIN_GCOMM_NAMESPACE
 
 static const PCInst& get_state(PCProto::SMMap::const_iterator smap_i, const UUID& uuid)
@@ -88,27 +92,30 @@ void PCProto::shift_to(const State s)
 {
     // State graph
     static const bool allowed[S_MAX][S_MAX] = {
+        
         // Closed
-        {false, true, false, false, false, false},
+        {false, true, false, false, false, false, false},
         // Joining
-        {true, false, true, false, false, false},
+        {true, false, true, false, false, false, false},
         // States exch
-        {true, false, true, true, false, true},
+        {true, false, false, true, false, true, true},
         // RTR
-        {true, false, true, false, true, true},
+        {true, false, false, false, true, true, true},
         // Prim
-        {true, false, true, false, false, true},
+        {true, false, false, false, false, true, true},
+        // Trans
+        {true, false, true, false, false, false, false},
         // Non-prim
-        {true, false, true, false, false, false}
+        {true, false, true, false, false, false, true}
     };
-
+    
     LOG_INFO(self_string() + " shift_to: " + to_string(get_state()) + " -> " 
              + to_string(s));
- 
+    
     if (allowed[get_state()][s] == false)
     {
-        LOG_INFO("invalid state transtion: " + to_string(get_state()) + " -> " 
-                 + to_string(s));
+        LOG_FATAL("invalid state transtion: " + to_string(get_state()) + " -> " 
+                  + to_string(s));
         throw FatalException("invalid state transition");
     }
     switch (s)
@@ -125,6 +132,8 @@ void PCProto::shift_to(const State s)
     case S_PRIM:
         set_last_prim(current_view.get_id());
         set_prim(true);
+        break;
+    case S_TRANS:
         break;
     case S_NON_PRIM:
         set_prim(false);
@@ -161,6 +170,10 @@ void PCProto::handle_first_trans(const View& view)
 void PCProto::handle_trans(const View& view)
 {
     assert(view.get_type() == View::V_TRANS);
+    assert(view.get_id() == current_view.get_id());
+    LOG_INFO("handle trans, current: " + current_view.get_id().to_string()
+             + " new "
+             + view.get_id().to_string());
     if (view.get_id() == get_last_prim())
     {
         if (view.get_members().length()*2 + view.get_left().length() <=
@@ -174,8 +187,12 @@ void PCProto::handle_trans(const View& view)
     {
         if (get_last_prim() != ViewId())
         {
-            throw FatalException("partition-merge not supported");
+            LOG_WARN("trans view during " + to_string(get_state()));
         }
+    }
+    if (get_state() != S_NON_PRIM)
+    {
+        shift_to(S_TRANS);
     }
 }
 
@@ -334,7 +351,7 @@ bool PCProto::is_prim() const
     ViewId last_prim;
     int64_t to_seq = -1;
 
-
+    // Check if any of instances claims to come from prim view
     for (SMMap::const_iterator i = state_msgs.begin(); i != state_msgs.end();
          ++i)
     {
@@ -344,9 +361,12 @@ bool PCProto::is_prim() const
             prim = true;
             last_prim = i_state.get_last_prim();
             to_seq = i_state.get_to_seq();
+            break;
         }
     }
     
+    // Verify that all members are either coming from the same prim 
+    // view or from non-prim
     for (SMMap::const_iterator i = state_msgs.begin(); i != state_msgs.end();
          ++i)
     {
@@ -371,7 +391,87 @@ bool PCProto::is_prim() const
                      + " joining prim");
         }
     }
-
+    
+    // No members coming from prim view, check if last known prim 
+    // view can be recovered (all members from last prim alive)
+    if (prim == false)
+    {
+        assert(last_prim == ViewId());
+        multiset<ViewId> vset;
+        for (SMMap::const_iterator i = state_msgs.begin(); 
+             i != state_msgs.end();
+             ++i)
+        {
+            const PCInst& i_state(gcomm::get_state(i, SMMap::get_uuid(i)));
+            if (i_state.get_last_prim() != ViewId())
+            {
+                vset.insert(i_state.get_last_prim());
+            }
+        }
+        uint32_t max_view_seq = 0;
+        size_t great_view_len = 0;
+        ViewId great_view;
+        
+        for (multiset<ViewId>::const_iterator vi = vset.begin();
+             vi != vset.end(); vi = vset.upper_bound(*vi))
+        {
+            max_view_seq = std::max(max_view_seq, vi->get_seq());
+            const size_t vsc = vset.count(*vi);
+            if (vsc >= great_view_len && vi->get_seq() >= great_view.get_seq())
+            {
+                great_view_len = vsc;
+                great_view = *vi;
+            }
+        }
+        if (great_view.get_seq() == max_view_seq)
+        {
+            list<View>::const_iterator lvi;
+            for (lvi = views.begin(); lvi != views.end(); ++lvi)
+            {
+                if (lvi->get_id() == great_view)
+                {
+                    break;
+                }
+            }
+            if (lvi == views.end())
+            {
+                LOG_FATAL("view not found from list");
+                throw FatalException("view not found from list");
+            }
+            if (lvi->get_members().length() == great_view_len)
+            {
+                LOG_INFO("found common last prim view");
+                prim = true;
+                for (SMMap::const_iterator j = state_msgs.begin();
+                     j != state_msgs.end(); ++j)
+                {
+                    const PCInst& j_state(
+                        gcomm::get_state(j, SMMap::get_uuid(j)));
+                    if (j_state.get_last_prim() == great_view)
+                    {
+                        if (to_seq == -1)
+                        {
+                            to_seq = j_state.get_to_seq();
+                        }
+                        else if (j_state.get_to_seq() != to_seq)
+                        {
+                            LOG_FATAL("conflicting to_seq");
+                            throw FatalException("conflicting to_seq");
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            LOG_FATAL("max view seq " + make_int(max_view_seq).to_string()
+                      + " not equal to seq of greatest views "
+                      + make_int(great_view.get_seq()).to_string()
+                      +  ", don't know how to recover");
+            throw FatalException("");
+        }
+    }
+    
     return prim;
 }
 
@@ -492,21 +592,43 @@ void PCProto::handle_msg(const PCMessage& msg,
                          const size_t roff, 
                          const ProtoUpMeta* um)
 {
-    static const bool allowed[S_MAX][PCMessage::T_MAX] = {
-        {false, false, false, false},
-        {false, false, false, false},
-        {false, true, false, false},
-        {false, false, true, false},
-        {false, false, false, true},
-        {false, true, false, true}
+    enum Verdict 
+    {
+        ACCEPT,
+        DROP,
+        FAIL
     };
-    if (allowed[get_state()][msg.get_type()] == false)
+    static const Verdict verdict[S_MAX][PCMessage::T_MAX] = {
+        // Msg types
+        // NONE,  STATE,  INSTALL,  USER
+        // Closed
+        {FAIL,    FAIL,   FAIL,     FAIL    },
+        // Joining
+        {FAIL,    FAIL,   FAIL,     FAIL    },
+        // States exch
+        {FAIL,    ACCEPT, FAIL,     FAIL    },
+        // RTR
+        {FAIL,    FAIL,   ACCEPT,   FAIL    },
+        // PRIM
+        {FAIL,    FAIL,   FAIL,     ACCEPT  },
+        // TRANS
+        {FAIL,    DROP,   DROP,     ACCEPT    },
+        // NON-PRIM
+        {FAIL,    ACCEPT, FAIL,     ACCEPT  }
+    };
+    if (verdict[get_state()][msg.get_type()] == FAIL)
     {
         LOG_FATAL("invalid input, message " + msg.to_string() + " in state "
                   + to_string(get_state()));
         throw FatalException("");
     }
-
+    else if (verdict[get_state()][msg.get_type()] == DROP)
+    {
+        LOG_WARN("dropping input, message " + msg.to_string() + " in state "
+                 + to_string(get_state()));
+        return;
+    }
+    
     switch (msg.get_type())
     {
     case PCMessage::T_STATE:

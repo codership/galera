@@ -21,6 +21,7 @@ public:
         S_STATES_EXCH, 
         S_RTR, 
         S_PRIM,
+        S_TRANS,
         S_NON_PRIM,
         S_MAX
     };
@@ -37,6 +38,8 @@ public:
             return "STATES_EXCH";
         case S_RTR:
             return "RTR";
+        case S_TRANS:
+            return "TRANS";
         case S_PRIM:
             return "PRIM";
         case S_NON_PRIM:

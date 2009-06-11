@@ -6,6 +6,7 @@
 #include <gcomm/common.hpp>
 #include <gcomm/exception.hpp>
 #include <gcomm/string.hpp>
+#include <gcomm/types.hpp>
 #include <cstring>
 
 extern "C" {
@@ -15,7 +16,7 @@ extern "C" {
 
 BEGIN_GCOMM_NAMESPACE
 
-class UUID 
+class UUID
 {
     gu_uuid_t uuid;
     static const UUID uuid_nil;
@@ -39,7 +40,7 @@ public:
         return uuid_nil;
     }
     
-    size_t read(const void* buf, const size_t buflen, const size_t offset) 
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset) 
     {
         if (buflen < offset + sizeof(gu_uuid_t))
             return 0;
@@ -47,7 +48,7 @@ public:
         return offset + sizeof(gu_uuid_t);
     }
     
-    size_t write(void* buf, const size_t buflen, const size_t offset) const 
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const 
     {
         if (buflen < offset + sizeof(gu_uuid_t))
             return 0;
