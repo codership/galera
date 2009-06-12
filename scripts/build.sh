@@ -163,7 +163,8 @@ build_packages()
 	ARCH_DEB=amd64
 	ARCH_RPM=x86_64
     fi
-    
+
+    if [ "$GCOMM_IMPL" != "galeracomm" ]; then export GCOMM=yes; fi    
     export BUILD_BASE=$build_base
     pushd $build_base/scripts/packages                       && \
     rm -rf $ARCH_DEB $ARCH_RPM                               && \

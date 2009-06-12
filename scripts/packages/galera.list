@@ -5,21 +5,25 @@
 d 755 root root $LIBS_DEST -
 f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils.so.*.*.*
 f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils++.so.*.*.*
+%ifdef GCOMM
+f 755 root root $LIBS_DEST $BUILD_BASE//gcomm/src/.libs/libgcomm.so.*.*.*
+%else
 f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/common/src/.libs/libgcommcommonpp.so.*.*.*
 f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/transport/src/.libs/libgcommtransportpp.so.*.*.*
 f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/vs/src/.libs/libgcommvspp.so.*.*.*
+%endif
 f 755 root root $LIBS_DEST $BUILD_BASE/gcs/src/.libs/libgcs.so.*.*.*
 f 755 root root $LIBS_DEST $BUILD_BASE/wsdb/src/.libs/libwsdb.so.*.*.*
 f 755 root root $LIBS_DEST $BUILD_BASE/galera/src/.libs/libmmgalera.so.*.*.*
 
+%ifdef !GCOMM
 d 755 root root $SBIN_DEST -
 f 755 root root $SBIN_DEST/vsbes $BUILD_BASE/galeracomm/vs/src/.libs/vsbes
+%endif
 
 %format deb # Debian packages come with bad file ownership
 %postinstall <<EOF_DEB
-chown -R root.root $LIBS_DEST
-chown -R root.root $SBIN_DEST
-# chown -R root.root $BINS_DEST
+chown -R root.root $SBIN_DEST $LIBS_DEST
 ldconfig -n $LIBS_DEST
 EOF_DEB
 
