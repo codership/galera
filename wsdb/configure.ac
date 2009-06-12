@@ -39,7 +39,7 @@ fi
 
 # Define alternate Galera libraries location
 AC_ARG_WITH([galera], [Galera libs location],,with_galera="no")
-if test x"$with_galera" != "no"
+if test x"$with_galera" != x"no"
 then
     CFLAGS="$CFLAGS -I$with_galera/include"
     CXXFLAGS="$CXXFLAGS -I$with_galera/include"
