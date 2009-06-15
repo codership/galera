@@ -1198,7 +1198,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
 //                "local: %llu, rcode: %d", // make seqno_g signed to display -1
 //                action_type, action_size, (long long)seqno_g, seqno_l, rcode);
 
-	if (rcode < 0) return WSREP_CONN_FAIL;
+	if (rcode <= 0) return WSREP_CONN_FAIL;
 
         assert (GCS_SEQNO_ILL != seqno_l);
 

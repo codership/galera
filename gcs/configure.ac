@@ -87,11 +87,14 @@ AM_PATH_CHECK()
 #PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 
 # Checks for libraries.
-AC_CHECK_LIB([galerautils], [gu_malloc_dbg],,
-	     AC_MSG_ERROR([*** galerautils not found! ***]))
+AC_CHECK_LIB([m], [sqrt],,
+	     AC_MSG_ERROR([*** libm not found! ***]))
 
 AC_CHECK_LIB([pthread], [pthread_testcancel],,
 	     AC_MSG_ERROR([*** POSIX threads not found! ***]))
+
+AC_CHECK_LIB([galerautils], [gu_malloc_dbg],,
+	     AC_MSG_ERROR([*** galerautils not found! ***]))
 
 if test "$enable_spread" != no; then
 AC_CHECK_LIB([tspread], [SP_error],,

@@ -49,7 +49,8 @@ then
 else
     DEFAULTS_OPTION=" --no-defaults "
 fi
-# If it was not given explicitely, take it from my.cnf
+
+# If it was not given explicitely, use the one from my.cnf
 MYSQL_DATA_DIR=${MYSQL_DATA_DIR:-"$my_cnf_datadir"}
 # If it was not found in my.cnf, use distribution default
 MYSQL_DATA_DIR=${MYSQL_DATA_DIR:-"$MYSQL_BASE_DIR/var"}
