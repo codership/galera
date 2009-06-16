@@ -8,9 +8,11 @@
 #
 # Usage:
 #
-# run_test_set.pl [-q|-v] [test.conf]* [testn test args]* 
+# run_test_set.pl [-q|-v] [<test.conf>]* ["<test script> [test args]"]* 
 # 
-# 
+# Options:
+# -q Quiet mode (default)
+# -v Verbose mode, prints report output also to STDOUT
 #
 
 use strict;
@@ -107,7 +109,7 @@ my @args = @ARGV;
 while ($args[0] =~ /^-(\w)/)
 {
     my $opt = $1;
-    print $opt . "\n";
+#    print $opt . "\n";
     if ($opt eq "q")
     {
         $quiet = 1;
