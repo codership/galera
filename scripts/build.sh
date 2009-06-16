@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # $Id$
 
@@ -29,19 +29,17 @@ GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
 usage()
 {
     echo -e "Usage: build.sh [OPTIONS] \n" \
-	"Options:                      \n" \
-        "    --stage <initial stage>   \n" \
-	"    --last-stage <last stage> \n" \
-	"    -s|--scratch    build everything from scratch\n"\
-	"    -c|--configure  reconfigure the build system (implies -s)\n"\
-	"    -b|--bootstap   rebuild the build system (implies -c)\n"\
-	"    -r|--release    configure build with debug disabled (implies -c)\n" \
-	"    -d|--debug      configure build with debug disabled (implies -c)\n" \
-	"    -p|--package    build binary pacakges at the end.\n" \
-
+    "Options:                      \n" \
+    "    --stage <initial stage>   \n" \
+    "    --last-stage <last stage> \n" \
+    "    -s|--scratch    build everything from scratch\n"\
+    "    -c|--configure  reconfigure the build system (implies -s)\n"\
+    "    -b|--bootstap   rebuild the build system (implies -c)\n"\
+    "    -o|--opt        configure build with debug disabled (implies -c)\n" \
+    "    -d|--debug      configure build with debug enabled (implies -c)\n" \
+    "    -p|--package    build binary pacakges at the end.\n" \
+    "    --with-spread   configure build with spread backend (implies -c to gcs)\n"
 }
-
-set -x
 
 while test $# -gt 0 
 do
@@ -67,8 +65,8 @@ do
 	-s|--scratch)
 	    SCRATCH=yes   # Build from scratch (run make clean)
 	    ;;
-	-r|--release)
-	    RELEASE=yes   # Compile without debug
+	-o|--opt)
+	    OPT=yes       # Compile without debug
 	    ;;
 	-d|--debug)
 	    DEBUG=yes     # Compile with debug
@@ -76,11 +74,17 @@ do
 	-p|--package)
 	    PACKAGE=yes   # build binary packages
 	    ;;
+	--with*-spread)
+	    WITH_SPREAD="$1"
+	    ;;
 	--help)
 	    usage
 	    exit 0
 	    ;;
 	*)
+	    if test ! -z "$1"; then
+		echo "Unrecognized option: $1"
+	    fi
 	    usage
 	    exit 1
 	    ;;
@@ -88,6 +92,9 @@ do
     shift
 done
 
+if [ "$OPT"   == "yes" ]; then CONFIGURE="yes"; fi
+if [ "$DEBUG" == "yes" ]; then CONFIGURE="yes"; fi
+if [ -n "$WITH_SPREAD" ]; then CONFIGURE="yes"; fi
 
 # Be quite verbose
 set -x
@@ -112,7 +119,7 @@ then
     galera_flags="--with-galera=$GALERA_DEST"
 fi
 
-if [ "$RELEASE" == "yes" ]
+if [ "$OPT" == "yes" ]
 then
     conf_flags="$conf_flags --disable-debug"
     CONFIGURE="yes"
@@ -238,7 +245,7 @@ then
     else
         gcs_conf_flags="$conf_flags --disable-vs --enable-gcomm"
     fi
-    build $gcs_src $gcs_conf_flags $galera_flags
+    build $gcs_src $gcs_conf_flags $WITH_SPREAD $galera_flags
     building="true"
 fi
 

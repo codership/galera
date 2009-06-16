@@ -30,7 +30,7 @@ GCS_SRCS = \
 	gcs_core.c      \
 	gcs.c
 
-if ENABLE_SPREAD
+if WITH_SPREAD
     AM_CFLAGS += -DGCS_USE_SPREAD
     GCS_SRCS  += gcs_spread.c
 endif
