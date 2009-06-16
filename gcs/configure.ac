@@ -43,13 +43,14 @@ else
 fi
 
 # Check if Spread backend is desired
-AC_ARG_ENABLE(spread,
-              AC_HELP_STRING([--disable-spread],
-              [disable Spread toolkit backend [[default=enabled]]]),,)
+AC_ARG_WITH(spread,
+            AC_HELP_STRING([--with-spread],
+            [enable Spread toolkit backend [[default=disabled]]]),,
+	    with_spread="no")
 # Check if Spread location is provided
-if test "$enable_spread" != "no"
+if test "$with_spread" != "no"
 then
-    enable_spread="yes"
+    with_spread="yes"
     AC_ARG_WITH(spread-libs,
                 AC_HELP_STRING([--with-spread-libs=PATH],
                 [specify where libtspread is installed]),
@@ -61,8 +62,8 @@ then
 fi
 
 AC_ARG_ENABLE([vs],
-	AC_HELP_STRING([--disable-vs],
-		[disable VS backend [[default=enabled]]]),,)
+	      AC_HELP_STRING([--disable-vs],
+              [disable VS backend [[default=enabled]]]),,)
 if test "$enable_vs" != "no"
 then
     enable_vs="yes"
@@ -85,10 +86,10 @@ AC_CHECK_LIB([galerautils], [gu_malloc_dbg],,
 AC_CHECK_LIB([pthread], [pthread_testcancel],,
 	     AC_MSG_ERROR([*** POSIX threads not found! ***]))
 
-if test "$enable_spread" != no; then
+if test "$with_spread" != no; then
 AC_CHECK_LIB([tspread], [SP_error],,
              AC_MSG_WARN([*** Spread library not found! ***]);
-             enable_spread="no")
+             with_spread="no")
 fi
 
 # FIXME: find a way to check for real functions in those libs
@@ -102,7 +103,7 @@ do
     fi
 done
 
-AM_CONDITIONAL(ENABLE_SPREAD, test "$enable_spread" != "no")
+AM_CONDITIONAL(WITH_SPREAD, test "$with_spread" != "no")
 AM_CONDITIONAL(ENABLE_VS, test "$enable_vs" != "no")
 
 # Checks for header files.
@@ -134,7 +135,7 @@ CFLAGS="$CFLAGS -Wall -Werror "
 AC_OUTPUT
 
 AC_MSG_NOTICE([***])
-AC_MSG_NOTICE([Spread backend: $enable_spread])
+AC_MSG_NOTICE([Spread backend: $with_spread])
 AC_MSG_NOTICE([Gcomm  backend: $enable_vs])
 AC_MSG_NOTICE([***])
 AC_MSG_NOTICE([CFLAGS:  $CFLAGS])

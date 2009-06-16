@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # $Id$
 
@@ -33,12 +33,10 @@ usage()
 	"    -s|--scratch    build everything from scratch\n"\
 	"    -c|--configure  reconfigure the build system (implies -s)\n"\
 	"    -b|--bootstap   rebuild the build system (implies -c)\n"\
-	"    -r|--release    configure build with debug disabled (implies -c)\n" \
-	"    -d|--debug      configure build with debug disabled (implies -c)\n"
-
+	"    -o|--opt        configure build with debug disabled (implies -c)\n" \
+	"    -d|--debug      configure build with debug enabled (implies -c)\n" \
+        "    --with-spread   configure build with spread backend (implies -c to gcs)\n"
 }
-
-set -x
 
 while test $# -gt 0 
 do
@@ -64,17 +62,23 @@ do
 	-s|--scratch)
 	    SCRATCH=yes   # Build from scratch (run make clean)
 	    ;;
-	-r|--release)
-	    RELEASE=yes   # Compile without debug
+	-o|--opt)
+	    OPT=yes       # Compile without debug
 	    ;;
 	-d|--debug)
 	    DEBUG=yes     # Compile with debug
+	    ;;
+	--with*-spread)
+	    WITH_SPREAD="$1"
 	    ;;
 	--help)
 	    usage
 	    exit 0
 	    ;;
 	*)
+	    if test ! -z "$1"; then
+		echo "Unrecognized option: $1"
+	    fi
 	    usage
 	    exit 1
 	    ;;
@@ -82,6 +86,9 @@ do
     shift
 done
 
+if [ "$OPT"   == "yes" ]; then CONFIGURE="yes"; fi
+if [ "$DEBUG" == "yes" ]; then CONFIGURE="yes"; fi
+if [ -n "$WITH_SPREAD" ]; then CONFIGURE="yes"; fi
 
 # Be quite verbose
 set -x
@@ -104,7 +111,7 @@ then
     galera_flags="--with-galera=$GALERA_DEST"
 fi
 
-if [ "$RELEASE" == "yes" ]
+if [ "$OPT" == "yes" ]
 then
     conf_flags="$conf_flags --disable-debug"
     CONFIGURE="yes"
@@ -185,7 +192,7 @@ LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/vs/src/.libs"
 
 if test $initial_stage = "gcs" || $building = "true"
 then
-    build $gcs_src $conf_flags $galera_flags
+    build $gcs_src $conf_flags $WITH_SPREAD $galera_flags
     building="true"
 fi
 

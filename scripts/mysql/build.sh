@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 if test -z "$MYSQL_SRC"
 then
@@ -15,11 +15,14 @@ usage()
 	"    -s|--scratch    build everything from scratch\n"\
 	"    -c|--configure  reconfigure the build system (implies -s)\n"\
 	"    -b|--bootstap   rebuild the build system (implies -c)\n"\
-	"    -r|--release    configure build with debug disabled (implies -c)\n"\
+	"    -o|--opt        configure build with debug disabled (implies -c)\n"\
 	"    -d|--debug      configure build with debug enabled (implies -c)\n"\
+	"    --with-spread   configure build with Spread (implies -c)\n"\
 	"    --no-strip      prevent stripping of release binaries\n"\
+	"    -r|--release <galera release>, otherwise revisions will be used"
         "\n -s and -b options affect only Galera build.\n"
 }
+
 
 # Parse command line
 while test $# -gt 0
@@ -34,33 +37,46 @@ do
 	-s|--scratch)
             SCRATCH=yes   # Build from scratch (run make clean)
             ;;
-        -r|--release)
-            RELEASE=yes   # Compile without debug
+        -o|--opt)
+            OPT=yes       # Compile without debug
             ;;
 	-d|--debug)
             DEBUG=yes     # Compile with debug
 	    NO_STRIP=yes  # Don't strip the binaries
 	    ;;
+        -r|--release)
+            RELEASE="$2"  # Compile without debug
+	    shift
+            ;;
 	-t|--tar)
             TAR=yes       # Create a TGZ package
             ;;
 	--no-strip)
 	    NO_STRIP=yes  # Don't strip the binaries
 	    ;;
+	--with*-spread)
+	    WITH_SPREAD="$1"
+	    ;;
 	--help)
 	    usage
 	    exit 0
 	    ;;
 	*)
+	    echo "Unrecognized option: $1"
 	    usage
 	    exit 1
 	    ;;
     esac
     shift
 done
-export BOOTSTRAP CONFIGURE SCRATCH RELEASE DEBUG # for Galera build
-if [ "$RELEASE" == "yes" ]; then CONFIGURE="yes"; fi
-if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
+
+set -x
+
+# export command options for Galera build
+export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD
+
+if [ "$OPT"   == "yes" ]; then CONFIGURE="yes"; fi
+if [ "$DEBUG" == "yes" ]; then CONFIGURE="yes"; fi
 
 set -e
 
@@ -81,7 +97,7 @@ GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
 cd $GALERA_SRC
 GALERA_REV=$(svnversion | sed s/\:/,/g)
 
-scripts/build.sh $@
+scripts/build.sh # options are passed via environment variables
 
 ######################################
 ##                                  ##
@@ -165,7 +181,13 @@ fi
 
 # original MYSQL_VER=$(grep AM_INIT_AUTOMAKE\(mysql, configure.in | awk '{ print $2 }' | sed s/\)//)
 MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
-RELEASE_NAME=$(echo mysql-$MYSQL_VER-$MYSQL_REV,$GALERA_REV | sed s/\:/_/g)
+if [ "$RELEASE" != "" ]
+then
+    GALERA_RELEASE="galera-$RELEASE-$(uname -m)"
+else
+    GALERA_RELEASE="$MYSQL_REV,$GALERA_REV"
+fi
+RELEASE_NAME=$(echo mysql-$MYSQL_VER-$GALERA_RELEASE | sed s/\:/_/g)
 rm -rf $RELEASE_NAME
 mv $DIST_DIR $RELEASE_NAME
 
