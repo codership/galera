@@ -64,7 +64,7 @@ MYSQL_DIST=$(tar -tzf $MYSQL_DIST_TARBALL | head -n1)
 rm -rf $MYSQL_DIST; tar -xzf $MYSQL_DIST_TARBALL
 pushd $MYSQL_DIST
 # patch freaks out on .bzrignore which doesn't exist in source dist and
-# returns error code - runnong in a subshell because of this
+# returns error code - running in a subshell because of this
 (patch -p1 -f < $WSREP_PATCH)
 time ./BUILD/autorun.sh
 #time ./configure --with-wsrep > /dev/null # TODO: this should be moved one step
