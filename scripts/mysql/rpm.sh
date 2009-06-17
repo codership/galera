@@ -8,27 +8,25 @@ fi
 
 usage()
 {
-    echo -e "Usage: $0 <pristine src tarball> <patch> [spec file]"
+    echo -e "Usage: $0 <pristine src tarball> [patch file] [spec file]"
 }
 
 # Parse command line
-if test $# -lt 2
+if test $# -lt 1
 then
     usage
     exit 1
 fi
 
-set -x
 set -e
-
-MYSQL_DIST_TARBALL=$(cd $(dirname "$1"); pwd -P)/$(basename "$1")
-WSREP_PATCH=$(cd $(dirname "$2"); pwd -P)/$(basename "$2")
-#WSREP_SPEC="$3"
-# NOTE: later WSREP_PATCH and WSREP_SPEC can be generated from the working copy
 
 # Absolute path of this script folder
 SCRIPT_ROOT=$(cd $(dirname $0); pwd -P)
 THIS_DIR=$(pwd -P)
+
+set -x
+
+MYSQL_DIST_TARBALL=$(cd $(dirname "$1"); pwd -P)/$(basename "$1")
 
 ######################################
 ##                                  ##
@@ -39,9 +37,6 @@ THIS_DIR=$(pwd -P)
 MYSQL_SRC=$(cd $MYSQL_SRC; pwd -P; cd $THIS_DIR)
 pushd $MYSQL_SRC
 export WSREP_REV=$(bzr revno)
-#MYSQL_LP_REV=$(bzr tags | grep -m1 $MYSQL_VER | awk '{ print $2 }')
-#WSREP_PATCH="$THIS_DIR/$MYSQL_LP_REV-$WSREP_REV.diff"
-#bzr diff -p1 --diff-options=' -x .bzrignore ' > "$WSREP_PATCH"
 popd #MYSQL_SRC
 
 RPM_BUILD_ROOT=/tmp/redhat
@@ -63,11 +58,19 @@ popd; popd
 MYSQL_DIST=$(tar -tzf $MYSQL_DIST_TARBALL | head -n1)
 rm -rf $MYSQL_DIST; tar -xzf $MYSQL_DIST_TARBALL
 pushd $MYSQL_DIST
+
+if test -r "$2" # check if patch name was supplied
+then # patch as a file
+    WSREP_PATCH=$(cd $(dirname "$2"); pwd -P)/$(basename "$2")
+else # generate patch for this particular MySQL version from LP
+    MYSQL_VER=$(grep ^AM_INIT_AUTOMAKE configure.in | cut -d ',' -f 2 | sed s/[\)\ ]//g)
+    if test -z $MYSQL_VER; then exit -1; fi
+    WSREP_PATCH=$($SCRIPT_ROOT/get_patch.sh mysql-$MYSQL_VER)
+fi
 # patch freaks out on .bzrignore which doesn't exist in source dist and
 # returns error code - running in a subshell because of this
 (patch -p1 -f < $WSREP_PATCH)
-time ./BUILD/autorun.sh
-#time ./configure --with-wsrep > /dev/null # TODO: this should be moved one step
+time ./BUILD/autorun.sh # update configure script
 time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/$(basename "$MYSQL_DIST_TARBALL") \
               "$MYSQL_DIST"
 
@@ -95,10 +98,8 @@ uname -m | grep -q i686 && \
 export RPM_OPT_FLAGS="$i686_cflags $fast_cflags"   || \
 export RPM_OPT_FLAGS="$amd64_cflags $fast_cflags"
 
-RPMBUILD="rpmbuild --clean --rmsource \
-          --define \"_topdir $RPM_BUILD_ROOT\" \
-          --define \"optflags $RPM_OPT_FLAGS\" \
-          --with wsrep -ba $WSREP_SPEC "
+RPMBUILD="rpmbuild --clean --rmsource --define \"_topdir $RPM_BUILD_ROOT\" \
+          --define \"optflags $RPM_OPT_FLAGS\" --with wsrep -ba $WSREP_SPEC"
 
 cd "$RPM_BUILD_ROOT"
 if [ "$(whoami)" == "root" ]
@@ -106,8 +107,11 @@ then
     chown -R mysql $RPM_BUILD_ROOT
     su mysql -c "$RPMBUILD"
 else
-    $RPMBUILD
+    "$RPMBUILD"
 fi
+
+# remove the patch file if is was automatically generated
+if test ! -r "$2"; then rm -rf $WSREP_PATCH; fi
 
 exit 0
 
