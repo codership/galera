@@ -143,7 +143,7 @@ build()
     if [ "$BOOTSTRAP" == "yes" ]; then ./bootstrap.sh; CONFIGURE=yes ; fi
     if [ "$CONFIGURE" == "yes" ]; then rm -rf config.status; ./configure $@; SCRATCH=yes ; fi
     if [ "$SCRATCH"   == "yes" ]; then make clean ; fi
-    make
+    make || return -1
 #    $gainroot make install
     popd
 }
@@ -173,6 +173,7 @@ build_packages()
 
     if [ "$GCOMM_IMPL" != "galeracomm" ]; then export GCOMM=yes; fi    
     export BUILD_BASE=$build_base
+    echo GCOMM=$GCOMM ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
     pushd $build_base/scripts/packages                       && \
     rm -rf $ARCH_DEB $ARCH_RPM                               && \
     epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" galera     && \

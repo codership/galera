@@ -6,7 +6,7 @@ d 755 root root $LIBS_DEST -
 f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils.so.*.*.*
 f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils++.so.*.*.*
 %ifdef GCOMM
-f 755 root root $LIBS_DEST $BUILD_BASE//gcomm/src/.libs/libgcomm.so.*.*.*
+f 755 root root $LIBS_DEST $BUILD_BASE/gcomm/src/.libs/libgcomm.so.*.*.*
 %else
 f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/common/src/.libs/libgcommcommonpp.so.*.*.*
 f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/transport/src/.libs/libgcommtransportpp.so.*.*.*

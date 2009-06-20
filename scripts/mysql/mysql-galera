@@ -83,7 +83,7 @@ ROOT_PSWD=${ROOT_PSWD:-"-prootpass"}
 LD_LIBRARY_PATH="$GALERA_BASE_DIR/lib"
 
 # Mandatory stuff
-INNODB_OPTS=" --default-storage-engine=InnoDB --innodb_lock_wait_timeout=9999999 "
+INNODB_OPTS=" --default-storage-engine=InnoDB "
 
 # --debug terribly affects performance
 #DEBUG_OPTS=" --debug "
