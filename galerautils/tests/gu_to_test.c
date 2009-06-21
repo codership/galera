@@ -52,7 +52,7 @@ cancel (ulong rnd)
     return (rnd & 0x70) >> 4; // returns 0..7
 #else
     // this is more realistic. 
-    // probaboility of conflict 25%, conflict rate 0.375
+    // probability of conflict 25%, conflict rate 0.375
     register ulong ret = (rnd & 0x70) >> 4;
     // returns 0,0,0,0,0,0,1,2
     if (gu_likely(ret < 5)) return 0; else return (ret - 5); 
