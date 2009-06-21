@@ -12,7 +12,6 @@ libgcomm_la_SOURCES = 		\
 	time.cpp		\
 	uri.cpp			\
 	uuid.cpp		\
-	logger.cpp 		\
 	monitor.cpp		\
 	pseudofd.cpp		\
 	readbuf.cpp		\
@@ -32,4 +31,4 @@ libgcomm_la_SOURCES = 		\
 
 
 
-libgcomm_la_LDFLAGS = -lgalerautils
+libgcomm_la_LDFLAGS = -lgalerautils -lgalerautils++

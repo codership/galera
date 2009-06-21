@@ -84,7 +84,9 @@ void EventLoop::set(const int fd, const int e)
     struct pollfd *pfd = 0;
 
     if (fd < 0)
+    {
         LOG_WARN("negative fd");
+    }
     LOG_DEBUG("set " + Int(fd).to_string());
 
     if ((pfd = pfd_find(pfds, n_pfds, fd)) == 0) {

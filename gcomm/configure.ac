@@ -36,11 +36,11 @@ AC_ARG_ENABLE(debug,
               enable_debug="yes")
 if test "$enable_debug" != "no"
 then
-    CFLAGS="-g -O0"
-    CXXFLAGS="-g -O0"
+    CFLAGS="$CFLAGS -g -O0"
+    CXXFLAGS="$CXXFLAGS -g -O0"
 else
-    CFLAGS="-g -O3 -DNDEBUG"
-    CXXFLAGS="-g -O3 -DNDEBUG"
+    CFLAGS="$CFLAGS -g -O3 -DNDEBUG"
+    CXXFLAGS="$CXXFLAGS -g -O3 -DNDEBUG"
 fi
 
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
@@ -49,7 +49,7 @@ AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
 # TODO: Find out the most wide set of warning flags  
 #       which is still useful (eats system header files etc.)
 CFLAGS="$CFLAGS -std=c99 -Wall -Werror -Wextra -pedantic -Wno-unused-parameter"
-CXXFLAGS="$CXXFLAGS -Wall -Werror -Wextra -pedantic -Wno-long-long -Wno-unused-parameter -Wno-deprecated -fno-rtti"
+CXXFLAGS="$CXXFLAGS -Wall -Werror -Wextra -pedantic -Wno-long-long -Wno-unused-parameter -Wno-deprecated -fno-rtti -Wno-variadic-macros"
 
 
 

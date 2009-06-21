@@ -9,7 +9,7 @@
 
 
 
-using namespace gcomm;
+// <using namespace gcomm;
 
 using std::string;
 using std::vector;
@@ -36,7 +36,7 @@ static GCommSuite suites[] = {
     {"", 0}
 };
 
-#if 0
+
 static vector<string> strsplit(const string& s, const int c)
 {
     vector<string> ret;
@@ -50,7 +50,7 @@ static vector<string> strsplit(const string& s, const int c)
     ret.push_back(s.substr(prev_pos, s.length() - prev_pos));
     return ret;
 }
-#endif
+
 
 int main(int argc, char* argv[])
 {

@@ -131,8 +131,7 @@ public:
     void set_up_context(Protolay *up)
     {
 	if (up_context) {
-	    Logger::instance().fatal("Protolay::set_up_context(): "
-				     "Context already exists");
+	    LOG_FATAL("Protolay::set_up_context(): Context already exists");
 	    throw FatalException("Up context already exists");
 	}
 	up_context = up;

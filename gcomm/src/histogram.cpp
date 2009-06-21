@@ -3,7 +3,7 @@
 
 #include "gcomm/exception.hpp"
 #include "gcomm/logger.hpp"
-
+#include "gcomm/types.hpp"
 #include <sstream>
 #include <limits>
 

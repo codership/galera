@@ -6,6 +6,8 @@
 #include "gcomm/common.hpp"
 #include "gcomm/exception.hpp"
 #include "gcomm/logger.hpp"
+#include "gcomm/time.hpp"
+#include "gcomm/util.hpp"
 #include "gcomm/uuid.hpp"
 #include "gcomm/view.hpp"
 #include "evs_seqno.hpp"
