@@ -4,8 +4,7 @@
 
 AM_CFLAGS = -I..
 
-# gcs_to_test is separate for benchmarking purposes
-noinst_PROGRAMS   = gcs_tests gcs_to_test
+noinst_PROGRAMS   = gcs_tests
 
 gcs_tests_SOURCES =           \
 	gcs_tests.c           \
@@ -30,13 +29,6 @@ gcs_tests_SOURCES =           \
 gcs_tests_CPPFLAGS = -DGCS_USE_SPREAD -DGCS_USE_VS
 gcs_tests_INCLUDES = @CHECK_CFLAGS@
 gcs_tests_LDADD    = @CHECK_LIBS@
-
-gcs_to_test_SOURCES =       \
-	gcs_to_test.c       \
-	../gcs_to.c
-
-gcs_to_test_INCLUDES = @CHECK_CFLAGS@
-gcs_to_test_LDADD    = @CHECK_LIBS@
 
 TESTS              = $(noinst_PROGRAMS)
 

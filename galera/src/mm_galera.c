@@ -60,8 +60,8 @@ static galera_log_cb_t          galera_log_handler = NULL;
 //static void *app_ctx = NULL;
 
 /* gcs parameters */
-static gcs_to_t           *to_queue     = NULL; // rename to cert_queue?
-static gcs_to_t           *commit_queue = NULL;
+static gu_to_t           *to_queue     = NULL; // rename to cert_queue?
+static gu_to_t           *commit_queue = NULL;
 static gcs_conn_t         *gcs_conn     = NULL;
 static char               *gcs_channel  = "dummy_galera";
 static char               *gcs_url      = NULL;
@@ -280,10 +280,10 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     sst_donate_cb     = args->sst_donate_cb;
 
     /* initialize total order queue */
-    to_queue = gcs_to_create(16384, GCS_SEQNO_FIRST);
+    to_queue = gu_to_create(16384, GCS_SEQNO_FIRST);
 
     /* initialize commit queue */
-    commit_queue = gcs_to_create(16384, GCS_SEQNO_FIRST);
+    commit_queue = gu_to_create(16384, GCS_SEQNO_FIRST);
 
     Galera.repl_state = GALERA_INITIALIZED;
 
@@ -327,8 +327,8 @@ static void mm_galera_tear_down(wsrep_t *gh)
 	return;
 
     if (gcs_conn) gcs_destroy (gcs_conn);
-    if (to_queue)     gcs_to_destroy(&to_queue);
-    if (commit_queue) gcs_to_destroy(&commit_queue);
+    if (to_queue)     gu_to_destroy(&to_queue);
+    if (commit_queue) gu_to_destroy(&commit_queue);
 
     wsdb_close();
 
@@ -671,7 +671,7 @@ static inline void truncate_trx_history (gcs_seqno_t seqno)
 
 // a wrapper for TO funcitons which can return -EAGAIN
 static inline long galera_eagain (
-    long (*function) (gcs_to_t*, gcs_seqno_t), gcs_to_t* to, gcs_seqno_t seqno
+    long (*function) (gu_to_t*, gcs_seqno_t), gu_to_t* to, gcs_seqno_t seqno
 ) {
     static const struct timespec period = { 0, 10000000 }; // 10 msec
     long rcode;
@@ -686,7 +686,7 @@ static inline long galera_eagain (
 // the following are made as macros to allow for correct line number reporting
 #define GALERA_GRAB_TO_QUEUE(seqno)                                  \
 {                                                                    \
-    long ret = galera_eagain (gcs_to_grab, to_queue, seqno);         \
+    long ret = galera_eagain (gu_to_grab, to_queue, seqno);         \
     if (gu_unlikely(ret)) {                                          \
         gu_fatal("Failed to grab to_queue at %lld: %ld (%s)",        \
                  seqno, ret, strerror(-ret));                        \
@@ -697,7 +697,7 @@ static inline long galera_eagain (
 
 #define GALERA_RELEASE_TO_QUEUE(seqno)                               \
 {                                                                    \
-    long ret = gcs_to_release (to_queue, seqno);                     \
+    long ret = gu_to_release (to_queue, seqno);                     \
     if (gu_unlikely(ret)) {                                          \
         gu_fatal("Failed to release to_queue at %lld: %ld (%s)",     \
                  seqno, ret, strerror(-ret));                        \
@@ -708,7 +708,7 @@ static inline long galera_eagain (
 
 #define GALERA_SELF_CANCEL_TO_QUEUE(seqno)                           \
 {                                                                    \
-    long ret = galera_eagain (gcs_to_self_cancel, to_queue, seqno);  \
+    long ret = galera_eagain (gu_to_self_cancel, to_queue, seqno);  \
     if (gu_unlikely(ret)) {                                          \
         gu_fatal("Failed to self-cancel to_queue at %lld: %ld (%s)", \
                  seqno, ret, strerror(-ret));                        \
@@ -719,7 +719,7 @@ static inline long galera_eagain (
 
 #define GALERA_GRAB_COMMIT_QUEUE(seqno)                                  \
 {                                                                        \
-    long ret = galera_eagain (gcs_to_grab, commit_queue, seqno);         \
+    long ret = galera_eagain (gu_to_grab, commit_queue, seqno);         \
     if (gu_unlikely(ret)) {                                              \
         gu_fatal("Failed to grab commit_queue at %lld: %ld (%s)",        \
                  seqno, ret, strerror(-ret));                            \
@@ -730,7 +730,7 @@ static inline long galera_eagain (
 
 #define GALERA_RELEASE_COMMIT_QUEUE(seqno)                               \
 {                                                                        \
-    long ret = gcs_to_release (commit_queue, seqno);                     \
+    long ret = gu_to_release (commit_queue, seqno);                     \
     if (gu_unlikely(ret)) {                                              \
         gu_fatal("Failed to release commit_queue at %lld: %ld (%s)",     \
                  seqno, ret, strerror(-ret));                            \
@@ -741,7 +741,7 @@ static inline long galera_eagain (
 
 #define GALERA_SELF_CANCEL_COMMIT_QUEUE(seqno)                           \
 {                                                                        \
-    long ret = galera_eagain (gcs_to_self_cancel, commit_queue, seqno);  \
+    long ret = galera_eagain (gu_to_self_cancel, commit_queue, seqno);  \
     if (gu_unlikely(ret)) {                                              \
         gu_fatal("Failed to self-cancel commit_queue at %lld: %ld (%s)", \
                  seqno, ret, strerror(-ret));                            \
@@ -860,7 +860,7 @@ static int process_query_write_set_applying(
     // can't use it here GALERA_GRAB_COMMIT_QUEUE (seqno_l);
     switch (applier->type) {
     case JOB_SLAVE:
-        rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l);
+        rcode = galera_eagain (gu_to_grab, commit_queue, seqno_l);
         break;
     case JOB_REPLAYING:
         /* replaying jobs have reserved commit_queue in the beginning */
@@ -1315,11 +1315,11 @@ static enum wsrep_status mm_galera_cancel_commit(wsrep_t *gh,
             gu_debug("interrupting trx commit: trx_id %lld seqno %lld", 
                      victim_trx, victim.seqno_l);
 
-            rcode = gcs_to_interrupt(to_queue, victim.seqno_l);
+            rcode = gu_to_interrupt(to_queue, victim.seqno_l);
             if (rcode) {
                 gu_debug("trx interupt fail in to_queue: %d", rcode);
                 ret_code = WSREP_OK;
-                rcode = gcs_to_interrupt(commit_queue, victim.seqno_l);
+                rcode = gu_to_interrupt(commit_queue, victim.seqno_l);
                 if (rcode) {
                     gu_debug("trx interrupt fail in commit_queue: %d", rcode);
                     ret_code = WSREP_WARNING;
@@ -1355,10 +1355,10 @@ static enum wsrep_status mm_galera_cancel_slave(
         gu_debug("interrupting trx commit: seqno %lld", 
                  victim_seqno);
 
-        rcode = gcs_to_interrupt(to_queue, victim_seqno);
+        rcode = gu_to_interrupt(to_queue, victim_seqno);
         if (rcode) {
             gu_debug("BF trx interupt fail in to_queue: %d", rcode);
-            rcode = gcs_to_interrupt(commit_queue, victim_seqno);
+            rcode = gu_to_interrupt(commit_queue, victim_seqno);
             if (rcode) {
                 gu_warn("BF trx interrupt fail in commit_queue: %d", rcode);
                 ret_code = WSREP_WARNING;
@@ -1427,7 +1427,7 @@ static enum wsrep_status mm_galera_rolledback(wsrep_t *gh, trx_id_t trx_id) {
     wsdb_get_local_trx_info(trx_id, &trx);
     if (trx.state == WSDB_TRX_REPLICATED) {
 
-	if (gcs_to_release(commit_queue, trx.seqno_l)) {
+	if (gu_to_release(commit_queue, trx.seqno_l)) {
 	    gu_fatal("Could not release commit resource for %lld", trx.seqno_l);
 	    abort();
 	}
@@ -1623,8 +1623,8 @@ mm_galera_commit(
     gu_mutex_unlock(&commit_mtx);
 
     // cant use it here - GALERA_GRAB_TO_QUEUE (seqno_l);
-    if ((rcode = galera_eagain (gcs_to_grab, to_queue, seqno_l))) {
-        gu_debug("gcs_to_grab aborted: %d seqno %llu", rcode, seqno_l);
+    if ((rcode = galera_eagain (gu_to_grab, to_queue, seqno_l))) {
+        gu_debug("gu_to_grab aborted: %d seqno %llu", rcode, seqno_l);
         retcode = WSREP_TRX_FAIL;
 
         if (check_certification_status_for_aborted(
@@ -1687,7 +1687,7 @@ mm_galera_commit(
         assert (seqno_l >= 0);
 	/* Grab commit queue for commit time */
         // can't use it here GALERA_GRAB_COMMIT_QUEUE (seqno_l);
-        rcode = galera_eagain (gcs_to_grab, commit_queue, seqno_l);
+        rcode = galera_eagain (gu_to_grab, commit_queue, seqno_l);
 
         switch (rcode) {
         case 0: break;
@@ -2026,7 +2026,7 @@ static enum wsrep_status mm_galera_replay_trx(
      * has completed before we start.
      * commit_queue is released inside process_query or process_query_applying
      */
-    rcode = galera_eagain (gcs_to_grab, commit_queue, trx.seqno_l);
+    rcode = galera_eagain (gu_to_grab, commit_queue, trx.seqno_l);
 
     switch (rcode) {
     case 0: break;

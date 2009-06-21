@@ -1,3 +1,7 @@
+2009-06-21 Alex 
+    Moved TO module out of the library. Since it no longer offers this
+    interface, bumped minor version: 0.8.0
+
 2008-11-16 Alex 
     Many bugfixes. 
     Fixed handling of self-leave meassages.

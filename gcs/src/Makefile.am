@@ -17,7 +17,6 @@ GCS_SRCS = \
 	gcs_conf.c      \
 	gcs_fifo_lite.c \
 	gcs_queue.c     \
-	gcs_to.c        \
 	gcs_msg_type.c  \
 	gcs_comp_msg.c  \
 	gcs_backend.c   \
@@ -38,7 +37,7 @@ endif
 
 if ENABLE_GCOMM
     AM_CFLAGS += -DGCS_USE_GCOMM
-    GCS_SRCS += gcs_gcomm.cpp
+    GCS_SRCS  += gcs_gcomm.cpp
     CCLD=$(CXX)
 endif
 
@@ -56,7 +55,7 @@ GCS_INCS = $(wildcard *.h)
 include_HEADERS   = gcs.h
 lib_LTLIBRARIES   = libgcs.la
 libgcs_la_SOURCES = $(GCS_SRCS) $(GCS_INCS)
-INTERFACE = 9
+INTERFACE = 10
 REVISION  = 0
 AGE       = 0
 libgcs_la_LDFLAGS = \

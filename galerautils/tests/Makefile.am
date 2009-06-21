@@ -1,5 +1,7 @@
 # $Id$
 
+AM_CFLAGS  = -I../src
+
 noinst_PROGRAMS   = gu_tests gu_to_test
 gu_tests_SOURCES  =                      \
 	gu_tests.c                       \
@@ -14,7 +16,6 @@ gu_tests_INCLUDES = @CHECK_CFLAGS@
 gu_tests_LDADD    = ../src/libgalerautils.la @CHECK_LIBS@
 
 gu_to_test_SOURCES = gu_to_test.c
-gu_to_test_CFLAGS  = -I../src
 gu_to_test_LDADD   = ../src/libgalerautils.la
 
 TESTS = $(noinst_PROGRAMS)

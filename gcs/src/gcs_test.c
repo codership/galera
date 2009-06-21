@@ -18,6 +18,8 @@
 #include <sys/time.h>
 #include <stdbool.h>
 
+#include <galerautils.h>
+
 #include "gcs.h"
 #include "gcs_test.h"
 
@@ -234,7 +236,7 @@ gcs_test_log_msg (gcs_test_log_t *log, const char *msg)
 }
 
 gcs_conn_t *gcs = NULL;
-gcs_to_t *to = NULL;
+gu_to_t    *to  = NULL;
 
 long msg_sent  = 0;
 long msg_recvd = 0;
@@ -279,14 +281,14 @@ test_log_msg (gcs_test_log_t* log, const char* msg)
 }
 
 static inline long
-test_log_in_to (gcs_to_t* to, gcs_seqno_t seqno, const char* msg)
+test_log_in_to (gu_to_t* to, gcs_seqno_t seqno, const char* msg)
 {
     long ret = 0;
-    while ((ret = gcs_to_grab (to, seqno)) == -EAGAIN)
+    while ((ret = gu_to_grab (to, seqno)) == -EAGAIN)
         usleep(10000);
     if (!ret) {// success
         if (msg != NULL) gcs_test_log_msg (recv_log, msg);
-        ret = gcs_to_release (to, seqno);
+        ret = gu_to_release (to, seqno);
     }
     return ret;
 }
@@ -350,7 +352,7 @@ test_after_recv (gcs_test_thread_t* thread)
         ret = test_log_in_to (to, thread->local_act_id, NULL);
     }
     else {
-        gcs_to_self_cancel (to, thread->local_act_id);
+        gu_to_self_cancel (to, thread->local_act_id);
     }
 
     ret = test_send_last_applied (gcs, thread->act_id);
@@ -442,7 +444,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     // NOTE: what really needs to be checked is seqno and group_uuid, but here
     //       we don't keep track of them (and don't do real transfers),
     //       so for simplicity, just check conf_id.
-    while (-EAGAIN == (ret = gcs_to_grab (to, thread->local_act_id)));
+    while (-EAGAIN == (ret = gu_to_grab (to, thread->local_act_id)));
     if (0 == ret) {
         if (conf->st_required) {
             gcs_seqno_t seqno, s;
@@ -459,13 +461,13 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
             // pretend that state transfer is complete, cancel every action up
             // to seqno
             for (s = thread->local_act_id + 1; s <= seqno; s++) {
-                gcs_to_self_cancel (to, s); // this is local seqno
+                gu_to_self_cancel (to, s); // this is local seqno
             }
 
             fprintf (stdout, "Sending JOIN: %s\n", strerror(-gcs_join(gcs, 0)));
             fflush (stdout);
         }
-        gcs_to_release (to, thread->local_act_id);
+        gu_to_release (to, thread->local_act_id);
     }
     else {
         fprintf (stderr, "Failed to grab TO: %ld (%s)", ret, strerror(ret));
@@ -519,17 +521,17 @@ void *gcs_test_recv (void *arg)
             break;
         case GCS_ACT_COMMIT_CUT:
             group_seqno = *(gcs_seqno_t*)thread->msg;
-            gcs_to_self_cancel (to, thread->local_act_id);
+            gu_to_self_cancel (to, thread->local_act_id);
             break;
 	case GCS_ACT_CONF:
             gcs_test_handle_configuration (gcs, thread);
 	    break;
         case GCS_ACT_STATE_REQ:
             fprintf (stdout, "Got STATE_REQ\n");
-            gcs_to_grab (to, thread->local_act_id);
+            gu_to_grab (to, thread->local_act_id);
             fprintf (stdout, "Sending JOIN: %s\n", strerror(-gcs_join(gcs, 0)));
             fflush (stdout);
-            gcs_to_release (to, thread->local_act_id);
+            gu_to_release (to, thread->local_act_id);
             break;
         default:
             fprintf (stderr, "Unexpected action type: %d\n", thread->act_type);
@@ -692,7 +694,7 @@ int main (int argc, char *argv[])
         if ((err = test_log_open (&recv_log, RECV_LOG))) goto out;
     }
 
-    to = gcs_to_create ((conf.n_repl + conf.n_recv + 1)*2, GCS_SEQNO_FIRST);
+    to = gu_to_create ((conf.n_repl + conf.n_recv + 1)*2, GCS_SEQNO_FIRST);
     if (!to) goto out;
 //    total_tries = conf.n_tries * (conf.n_repl + conf.n_send);
     
@@ -781,7 +783,7 @@ int main (int argc, char *argv[])
     gcs_test_thread_pool_destroy (&send_pool);
     gcs_test_thread_pool_destroy (&recv_pool);
 
-    gcs_to_destroy(&to);
+    gu_to_destroy(&to);
 
     if (!throughput) {
         printf ("Closing send log\n");
