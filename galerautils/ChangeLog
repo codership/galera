@@ -1,3 +1,6 @@
+2009-06-21 Alex
+    Moved TO monitor module from GCS to galerautils. Version 0.3.1.
+
 2009-06-08 Alex
     Started galerautils++ project. Added galerautils.hpp and C++-style
     logger and assert variants. Version 0.3.0.

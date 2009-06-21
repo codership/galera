@@ -24,6 +24,7 @@ include_HEADERS =      \
 	gu_fifo.h      \
 	gu_byteswap.h  \
 	gu_uuid.h      \
+	gu_to.h        \
 	galerautils.hpp  \
 	gu_exception.hpp \
 	gu_logger.hpp    \
@@ -40,11 +41,12 @@ libgalerautils_la_SOURCES = \
 	gu_mutex.c \
 	gu_dbug.c  \
 	gu_fifo.c  \
-	gu_uuid.c
+	gu_uuid.c  \
+	gu_to.c
 
-INTERFACE = 8
+INTERFACE = 9
 REVISION  = 0
-AGE       = 1
+AGE       = 2
 libgalerautils_la_LDFLAGS = \
 	-version-info $(INTERFACE):$(REVISION):$(AGE)
 

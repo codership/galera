@@ -15,7 +15,6 @@
 #include <check.h>
 
 #include <galerautils.h>
-#include "gcs.h" // gcs_to.c functions declared there
 
 struct thread_ctx
 {
@@ -67,9 +66,9 @@ cancel_offset (ulong rnd)
     return ((rnd & 0x700) >> 8) + 1; // returns 1 - 8
 }
 
-static gcs_to_t*   to          = NULL;
-static ulong       thread_max  = 16;    // default number of threads
-static gcs_seqno_t seqno_max   = 1<<20; // default number of seqnos to check
+static gu_to_t*   to          = NULL;
+static ulong      thread_max  = 16;    // default number of threads
+static gu_seqno_t seqno_max   = 1<<20; // default number of seqnos to check
 
 /* mutex to synchronize threads start */
 static pthread_mutex_t start  = PTHREAD_MUTEX_INITIALIZER;
@@ -80,7 +79,7 @@ static const struct timespec tsleep = { 0, 10000000 }; // 10 ms
 void* run_thread(void* ctx)
 {
     struct thread_ctx* thd = ctx;
-    gcs_seqno_t seqno = thd->thread_id; // each thread starts with own offset
+    gu_seqno_t seqno = thd->thread_id; // each thread starts with own offset
                                         // to guarantee uniqueness of seqnos
 					// without having to lock mutex
 
@@ -93,9 +92,9 @@ void* run_thread(void* ctx)
 
         if (gu_unlikely(self_cancel(rnd))) {
 //            printf("Self-cancelling %8llu\n", (unsigned long long)seqno);
-            while ((ret = gcs_to_self_cancel(to, seqno)) == -EAGAIN) usleep (t);
+            while ((ret = gu_to_self_cancel(to, seqno)) == -EAGAIN) usleep (t);
             if (gu_unlikely(ret)) {
-                fprintf (stderr, "gcs_to_self_cancel(%llu) returned %ld (%s)\n",
+                fprintf (stderr, "gu_to_self_cancel(%llu) returned %ld (%s)\n",
                          (unsigned long long)seqno, ret, strerror(-ret));
                 exit (EXIT_FAILURE);
             }
@@ -106,7 +105,7 @@ void* run_thread(void* ctx)
         }
         else {
 //            printf("Grabbing %8llu\n", (unsigned long long)seqno);
-            while ((ret = gcs_to_grab (to, seqno)) == -EAGAIN)
+            while ((ret = gu_to_grab (to, seqno)) == -EAGAIN)
                 nanosleep (&tsleep, NULL);
             if (gu_unlikely(ret)) {
                 if (gu_likely(-ECANCELED == ret)) {
@@ -114,7 +113,7 @@ void* run_thread(void* ctx)
                     thd->stat_fails++;
                 }
                 else {
-                    fprintf (stderr, "gcs_to_grab(%llu) returned %ld (%s)\n",
+                    fprintf (stderr, "gu_to_grab(%llu) returned %ld (%s)\n",
                              (unsigned long long)seqno, ret, strerror(-ret));
                     exit (EXIT_FAILURE);
                 }
@@ -124,12 +123,12 @@ void* run_thread(void* ctx)
 //                printf ("success (%llu), cancels = %ld\n", (unsigned long long)seqno, cancels);
                 if (gu_likely(cancels)) {
                     long offset = cancel_offset (rnd);
-                    gcs_seqno_t cancel_seqno = seqno + offset;
+                    gu_seqno_t cancel_seqno = seqno + offset;
 
                     while (cancels-- && (cancel_seqno < seqno_max)) {
-                        ret = gcs_to_cancel(to, cancel_seqno);
+                        ret = gu_to_cancel(to, cancel_seqno);
                         if (gu_unlikely(ret)) {
-                            fprintf (stderr, "gcs_to_cancel(%llu) by %llu "
+                            fprintf (stderr, "gu_to_cancel(%llu) by %llu "
                                      "failed: %s\n",
                                      (unsigned long long)cancel_seqno,
                                      (unsigned long long)seqno,
@@ -145,9 +144,9 @@ void* run_thread(void* ctx)
                     }
                 }
                 thd->stat_grabs++;
-                ret = gcs_to_release(to, seqno);
+                ret = gu_to_release(to, seqno);
                 if (gu_unlikely(ret)) {
-                    fprintf (stderr, "gcs_to_release(%llu) failed: %ld(%s)\n",
+                    fprintf (stderr, "gu_to_release(%llu) failed: %ld(%s)\n",
                              (unsigned long long)seqno, ret, strerror(-ret));
                     exit (EXIT_FAILURE);
                 }
@@ -181,7 +180,7 @@ int main (int argc, char* argv[])
     /* starting with 0, enough space for all threads and cancels */
     // 4 is a magic number to get it working without excessive sleep on amd64
     to_len = to_len > thread_max ? to_len : thread_max; to_len *= 4;
-    to = gcs_to_create (to_len, 0);
+    to = gu_to_create (to_len, 0);
     if (to != NULL) {
         printf ("Created TO monitor of length %lu\n", to_len);
     }

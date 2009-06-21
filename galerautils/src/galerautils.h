@@ -21,5 +21,6 @@
 #include "gu_dbug.h"
 #include "gu_fifo.h"
 #include "gu_uuid.h"
+#include "gu_to.h"
 
 #endif /* _galerautils_h_ */

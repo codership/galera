@@ -15,10 +15,13 @@
 #include <pthread.h>
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h> // abort()
 
-#include <galerautils.h>
-
-#include "gcs.h"
+#include "gu_log.h"
+#include "gu_assert.h"
+#include "gu_mem.h"
+#include "gu_mutex.h"
+#include "gu_to.h"
 
 #define TO_USE_SIGNAL 1
 
@@ -27,7 +30,7 @@ typedef enum  {
   WAIT,       //!< actively waiting in the queue
   CANCELED,   //!< Waiter has canceled its to request
   INTERRUPTED,//!< marked to be interrupted
-  RELEASED,    //!< has been released, free entry now
+  RELEASED,   //!< has been released, free entry now
 } waiter_state_t;
 
 typedef struct
@@ -41,9 +44,9 @@ typedef struct
 }
 to_waiter_t;
 
-struct gcs_to
+struct gu_to
 {
-    volatile gcs_seqno_t seqno;
+    volatile gu_seqno_t seqno;
     size_t               used; /* number of active waiters */
     size_t               qlen;
     size_t               qmask;
@@ -53,14 +56,14 @@ struct gcs_to
 
 /** Returns pointer to the waiter with the given seqno */
 static inline to_waiter_t*
-to_get_waiter (gcs_to_t* to, gcs_seqno_t seqno)
+to_get_waiter (gu_to_t* to, gu_seqno_t seqno)
 {
     return (to->queue + (seqno & to->qmask));
 }
 
-gcs_to_t *gcs_to_create (int len, gcs_seqno_t seqno)
+gu_to_t *gu_to_create (int len, gu_seqno_t seqno)
 {
-    gcs_to_t *ret;
+    gu_to_t *ret;
 
     assert (seqno >= 0);
 
@@ -69,7 +72,7 @@ gcs_to_t *gcs_to_create (int len, gcs_seqno_t seqno)
 	return NULL;
     }
 
-    ret = GU_CALLOC (1, gcs_to_t);
+    ret = GU_CALLOC (1, gu_to_t);
     
     if (ret) {
 
@@ -105,9 +108,9 @@ gcs_to_t *gcs_to_create (int len, gcs_seqno_t seqno)
     return NULL;
 }
 
-long gcs_to_destroy (gcs_to_t** to)
+long gu_to_destroy (gu_to_t** to)
 {
-    gcs_to_t *t = *to;
+    gu_to_t *t = *to;
     long      ret;
     size_t    i;
 
@@ -144,7 +147,7 @@ long gcs_to_destroy (gcs_to_t** to)
     return 0;
 }
 
-long gcs_to_grab (gcs_to_t* to, gcs_seqno_t seqno)
+long gu_to_grab (gu_to_t* to, gu_seqno_t seqno)
 {
     long err;
     to_waiter_t *w;
@@ -248,7 +251,7 @@ to_wake_waiter (to_waiter_t* w)
 }
 
 static inline void
-to_release_and_wake_next (gcs_to_t* to, to_waiter_t* w) {
+to_release_and_wake_next (gu_to_t* to, to_waiter_t* w) {
     w->state = RELEASED;
     /* Iterate over CANCELED waiters and set states as RELEASED */
     for (to->seqno++;
@@ -259,7 +262,7 @@ to_release_and_wake_next (gcs_to_t* to, to_waiter_t* w) {
     to_wake_waiter (w);
 }
 
-long gcs_to_release (gcs_to_t *to, gcs_seqno_t seqno)
+long gu_to_release (gu_to_t *to, gu_seqno_t seqno)
 {
     long         err;
     to_waiter_t *w;
@@ -294,12 +297,12 @@ long gcs_to_release (gcs_to_t *to, gcs_seqno_t seqno)
     return err;
 }
 
-gcs_seqno_t gcs_to_seqno (gcs_to_t* to)
+gu_seqno_t gu_to_seqno (gu_to_t* to)
 {
     return to->seqno - 1;
 }
 
-long gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno)
+long gu_to_cancel (gu_to_t *to, gu_seqno_t seqno)
 {
     long         err;
     to_waiter_t *w;
@@ -336,7 +339,7 @@ long gcs_to_cancel (gcs_to_t *to, gcs_seqno_t seqno)
     return err;
 }
 
-long gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
+long gu_to_self_cancel(gu_to_t *to, gu_seqno_t seqno)
 {
     long         err = 0;
     to_waiter_t *w;
@@ -373,7 +376,7 @@ long gcs_to_self_cancel(gcs_to_t *to, gcs_seqno_t seqno)
     return err;
 }
 
-long gcs_to_interrupt (gcs_to_t *to, gcs_seqno_t seqno)
+long gu_to_interrupt (gu_to_t *to, gu_seqno_t seqno)
 {
     long rcode = 0;
     long err;
@@ -389,12 +392,12 @@ long gcs_to_interrupt (gcs_to_t *to, gcs_seqno_t seqno)
             to_waiter_t *w = to_get_waiter (to, seqno);
             if (w->state == HOLDER) {
                 gu_debug ("trying to interrupt in use seqno: seqno = %llu, "
-                     "TO seqno = %llu", seqno, to->seqno);
+                          "TO seqno = %llu", seqno, to->seqno);
                 /* gu_mutex_unlock (&to->lock); */
                 rcode = -ERANGE;
             } else if (w->state == CANCELED) {
                 gu_debug ("trying to interrupt canceled seqno: seqno = %llu, "
-                     "TO seqno = %llu", seqno, to->seqno);
+                          "TO seqno = %llu", seqno, to->seqno);
                 /* gu_mutex_unlock (&to->lock); */
                 rcode = -ERANGE;
             } else {
