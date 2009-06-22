@@ -75,6 +75,10 @@ namespace gu
     public:
         static inline bool no_log          (LogLevel lvl)
         { return ((int)lvl > (int)max_level); };
+
+        
+        static void set_debug_filter(const std::string&);
+        static bool no_debug(const std::string&, const std::string&, const int);
     };
 
     Logger::~Logger()
@@ -99,7 +103,9 @@ namespace gu
     }
 
 #define GU_LOG_CPP(level)                                               \
-    if (gu::Logger::no_log(level)) ;                                    \
+    if (gu::Logger::no_log(level)) { }                                  \
+    else if (level == gu::LOG_DEBUG &&                                  \
+    gu::Logger::no_debug(__FILE__, __FUNCTION__, __LINE__)) {}   \
     else gu::Logger().get(level, __FILE__, __PRETTY_FUNCTION__, __LINE__)
 
 // USAGE: LOG(level) << item_1 << item_2 << ... << item_n;

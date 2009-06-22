@@ -7,13 +7,87 @@
 
 #include <iomanip>
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 #include <sys/time.h>
 
 #include "gu_logger.hpp"
 
+#include <string>
+#include <vector>
+#include <set>
+
+using std::string;
+using std::vector;
+using std::set;
+
 namespace gu
 {
+
+    class DebugFilter
+    {
+        static vector<string> strsplit(const string& s, const int c)
+        {
+            vector<string> ret;
+            
+            size_t pos, prev_pos = 0;
+            while ((pos = s.find_first_of(c, prev_pos)) != string::npos)
+            {
+                ret.push_back(s.substr(prev_pos, pos - prev_pos));
+                prev_pos = pos + 1;
+            }
+            ret.push_back(s.substr(prev_pos, s.length() - prev_pos));
+            return ret;
+        }
+        set<string> filter;
+
+    public:
+        DebugFilter()
+        {
+            if (::getenv("LOGGER_DEBUG_FILTER"))
+            {
+                set_filter(::getenv("LOGGER_DEBUG_FILTER"));
+            }
+        }
+        
+        ~DebugFilter()
+        {
+        }
+        
+        void set_filter(const string& str)
+        {
+            vector<string> dvec = strsplit(str, ',');
+            for (vector<string>::const_iterator i = dvec.begin();
+                 i != dvec.end(); ++i)
+            {
+                filter.insert(*i);
+            }
+        }
+
+        size_t size() const
+        {
+            return filter.size();
+        }
+
+        bool is_set(const string& str) const
+        {
+            return filter.find(str) != filter.end() ||
+                filter.find(str.substr(0, str.find_first_of(":"))) != filter.end();
+        }
+    };
+    
+    static DebugFilter debug_filter;
+
+    void Logger::set_debug_filter(const string& str)
+    {
+        debug_filter.set_filter(str);
+    }
+
+    bool Logger::no_debug(const string& file, const string& func, const int line)
+    {
+        return debug_filter.size() > 0 && debug_filter.is_set(func) == false;
+    }
+
 #ifndef _gu_log_h_
     void
     Logger::enable_tstamp (bool yes)
