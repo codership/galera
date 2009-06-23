@@ -205,6 +205,15 @@ extern long gcs_repl (gcs_conn_t          *conn,
                       gcs_seqno_t         *act_id,
                       gcs_seqno_t         *local_act_id);
 
+/*! @brief Returns local seqno which is causally dependent on anything this
+ *         thread can be causally dependent on.
+ * After action with this seqno is applied, this thread is guaranteed to see
+ * all the changes made by the client, even on other nodes.
+ *
+ * @return sequence number or negative error code
+ */
+extern gcs_seqno_t gcs_caused();
+
 /*! @brief Sends state transfer request
  * Broadcasts state transfer request which will be passed to one of the
  * suitable group members.
