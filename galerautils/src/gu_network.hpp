@@ -84,6 +84,13 @@
 #ifndef __GU_NETWORK_HPP__
 #define __GU_NETWORK_HPP__
 
+/* size_t */
+#include <cstdlib>
+/* sockaddr */
+#include <sys/socket.h>
+
+#include <string>
+
 /*! 
  * @typedef @brief Byte buffer type
  */
@@ -182,7 +189,7 @@ public:
      * @throws std::invalid_argument If @p addr URL was not valid
      * @throws std::runtime_error If socket was blocking and connect failed
      */
-    void connect(const string& addr);
+    void connect(const std::string& addr);
 
     /*!
      * @brief Close socket
@@ -200,7 +207,7 @@ public:
      * @param[in] backlog Backlog parameter passed to underlying listen call
      *            (defaults 16)
      */
-    void listen(const string& addr, int backlog = 16);
+    void listen(const std::string& addr, int backlog = 16);
 
     /*!
      * @brief Accept new connection
@@ -250,6 +257,21 @@ public:
      * @throws std::runtime_error If other error was encountered 
      */
     int send(const Datagram* dgram = 0, int flags = 0);
+
+
+    /*!
+     * @brief Get errno corresponding to last error
+     *
+     * @return Error number corresponding to the last error
+     */
+    int get_errno() const;
+
+    /*!
+     * @brief Get human readable error string corresponding to last error
+     *
+     * @return Error string
+     */
+    const std::string get_errstr() const;
 };
 
 /*!
@@ -262,6 +284,7 @@ public:
     {
         E_IN,        /*!< Input event, socket is readable            */
         E_OUT,       /*!< Output event, socket is writable           */
+        E_LISTEN,    /*!< Listening socket has pending connection to be accepted */
         E_CONNECTED, /*!< Socket was connected (non-blocking)        */
         E_CLOSED     /*!< Socket was closed or error leading to socket close was encountered */
     };
@@ -296,6 +319,10 @@ public:
     /*
      * TODO: Define iterators
      */
+
+    class const_iterator
+    {
+    };
 
     /*!
      * @brief Get iterator to the beginning of network event list
@@ -355,3 +382,5 @@ public:
      */
     const NetworkEventList& wait_event(long timeout = 0);
 };
+
+#endif /* __GU_NETWORK_HPP__ */
