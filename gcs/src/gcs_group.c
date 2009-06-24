@@ -300,7 +300,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     group->num    = new_nodes_num;
 
     if (gcs_comp_msg_primary(comp)) {
-        /* FIXME: for now pretend that we always have new nodes and perform
+        /* TODO: for now pretend that we always have new nodes and perform
          * state exchange because old states can carry outdated node status.
          * However this means aborting ongoing actions. Find a way to avoid
          * this extra state exchange. Generate new state messages on behalf
@@ -626,6 +626,7 @@ gcs_group_handle_state_request (gcs_group_t*    group,
     return act->buf_len;
 }
 
+/* Creates new configuration action */
 ssize_t
 gcs_group_act_conf (gcs_group_t* group, gcs_recv_act_t* act)
 {
