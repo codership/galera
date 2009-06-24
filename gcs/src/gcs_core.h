@@ -74,17 +74,28 @@ gcs_core_destroy (gcs_core_t* conn);
  * Return values:
  * non-negative - amount of action bytes sent (sans headers)
  * negative     - error code
+ *                -EAGAIN   - operation should be retried
+ *                -ENOTCONN - connection to primary component lost
+ *
+ * NOTE: Successful return code here does not guarantee delivery to group.
+ *       The real status of action is determined only in gcs_core_recv() call.
  */
 extern ssize_t
 gcs_core_send (gcs_core_t*      const conn,
                const void*            action,
                size_t                 act_size,
                gcs_act_type_t   const act_type);
+
 /*
- * gcs_core_recv() blocks until some action is returned from group.
+ * gcs_core_recv() blocks until some action is received from group.
  * Return values:
  * non-negative - the size of action received
  * negative     - error code
+ *
+ * NOTE: Action status (replicated or not) is carried in act_id. E.g. -ENOTCONN
+ *       means connection to primary component was lost while sending,
+ *       -ERESTART means that action delivery was interrupted and it must be
+ *       resent.
  */
 extern ssize_t
 gcs_core_recv (gcs_core_t*      const conn,
