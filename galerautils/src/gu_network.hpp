@@ -91,40 +91,78 @@
 
 #include <string>
 
-/*! 
- * @typedef @brief Byte buffer type
- */
-typedef unsigned char byte_t;
+namespace gu
+{
 
+    /*! 
+     * @typedef @brief Byte buffer type
+     */
+    typedef unsigned char byte_t;
+    class ByteBuffer;
+    class Datagram;
+    class Socket;
+    class SocketList;
+    class Poll;
+    class NetworkEvent;
+    class Network;
+
+    namespace URLScheme
+    {
+        static const std::string tcp = "tcp";
+    }
+
+}
 /*! 
  * @brief  Datagram container
  *
  * Datagram class provides consistent interface for managing 
  * datagrams/byte buffers. 
  */
-class Datagram
+class gu::Datagram
 {
+    const byte_t* const_buf;
     byte_t* buf; /*!< Private byte buffer */
     size_t buflen; /*!< Length of byte buffer */
+    /* Disallow assignment, for copying use copy constructor */
+    Datagram operator =(const Datagram&);
 public:
-    
     /*! 
      * @brief Construct new datagram from byte buffer
      *
-     * @param buf Const pointer to data buffer
-     * @param buflen Length of data buffer
+     * @param[in] buf Const pointer to data buffer
+     * @param[in] buflen Length of data buffer
+     *
+     * @throws std::bad_alloc 
      */
-    Datagram(const byte_t* buf, size_t buflen);
-    
+    Datagram(const byte_t* buf = 0, size_t buflen = 0);
+        
+    /*!
+     * @brief Copy constructor
+     *
+     * @param[in] dgram Datagram to make copy from
+     *
+     * @throws std::bad_alloc
+     */
+    Datagram(const Datagram& dgram);
+
     /*! 
      * @brief Destruct datagram
      */
     ~Datagram();
+
+    /*!
+     * @brief Reset datagram buffer
+     *
+     * @param[in] buf New data buffer
+     * @param[in] bulen Length of new data buffer
+     */
+    void reset(const byte_t* buf, size_t buflen);
     
     /*!
      * @brief Get const pointer to data buffer
      *
-     * @param[in] offset Optional offset from the beginning of buffer (default 0)
+     * @param[in] offset Optional offset from the beginning of buffer 
+     *            (default 0)
      *
      * @return Const pointer to byte buffer at given offset
      *
@@ -135,7 +173,8 @@ public:
     /*!
      * @brief Get length of data buffer
      *
-     * @param[in] offset Optional offset from the beginning of buffer (default 0)
+     * @param[in] offset Optional offset from the beginning of buffer 
+     *            (default 0)
      *
      * @return Length of data buffer (starting from offset)
      *
@@ -144,36 +183,103 @@ public:
     size_t get_buflen(size_t offset = 0) const;
 };
 
-/* Socket needs Network forward declaration */
-class Network;
+
+    
 
 /*!
  * @brief Socket interface
  */
-class Socket
+class gu::Socket
 {
+public:
+    /* Public enumerations and typedefs */
+    /*!
+     * @brief Socket states
+     */
+    enum State
+    {
+        S_CLOSED,      /*!< Closed */
+        S_CONNECTING,  /*!< Non-blocking socket is connecting */
+        S_CONNECTED,   /*!< Socket is connected */
+        S_LISTENING,   /*!< Socket is listening for connections */
+        S_FAILED,      /*!< Socket is in failed state but not closed yet */
+        S_MAX
+    };
+private:
+    /* Private data */
     int fd;             /*!< Socket file descriptor                */
     int err_no;         /*!< Error number for last error           */
     int options;        /*!< Bitfield for general socket options   */
+    int event_mask;     /*!< Bitfield for waited network events    */
     sockaddr local_sa;  /*!< Socket address for local endpoint     */
     sockaddr remote_sa; /*!< Socket address for remote endpoint    */
     size_t sa_size;     /*!< Size of socket address                */
-    Network* net;       /*!< Network object this socket belongs to */
+        
+    size_t dgram_offset; /*!< Offset of the last read datagram */
+    Datagram dgram;       /*!< Datagram container            */
+    ByteBuffer* recv_buf;  /*!< Buffer for received data      */
+    ByteBuffer* pending;
+    State state;        /*!< Socket state                          */
+    /* Network integration */
+    friend class Network;
+    friend class Poll;
+    Network& net;       /*!< Network object this socket belongs to */
+
+    /* Private methods */
+        
+    /*!
+     * @brief Constructor
+     */
+    Socket(Network& net,
+           const int fd = -1,
+           const int options = O_NO_INTERRUPT,
+           const sockaddr* local_sa = 0, 
+           const sockaddr* remote_sa = 0,
+           const size_t sa_size = 0);
+        
+    /*!
+     * @brief Change socket state
+     */
+    void set_state(State, int err = 0);
+
+    /*!
+     * @brief Open new socket
+     *
+     * @param[in] addr Address URL
+     *
+     * @throws std::runtime_error If address could not be resolved or 
+     *         socket could not be created
+     */
+    void open_socket(const std::string& addr);
+
+    int get_fd() const
+    {
+        return fd;
+    }
+    
+    void set_event_mask(const int m)
+    {
+        event_mask = m;
+    }
+
+    int get_event_mask() const
+    {
+        return event_mask;
+    }
+
+    inline size_t get_max_pending_len() const;
+    inline int send_pending(int);
 public:
     /*!
      * Socket options
      */
     enum
     {
-        O_NON_BLOCK    = 1 << 0, /*!< Socket operations are non-blocking */
-        O_NO_INTERRUPT = 1 << 1  /*!< Socket methods calls are not interruptible */
+        O_NON_BLOCKING = 1 << 0, /*!< Socket operations are non-blocking */
+        O_NO_INTERRUPT = 1 << 1  /*!< Socket methods calls are not 
+                                  * interruptible */
     };
-    
-    /*!
-     * @brief Default constructor
-     */
-    Socket();
-    
+        
     /*!
      * @brief Destructor
      */
@@ -187,6 +293,7 @@ public:
      * @param[in] addr Address URL to make connection to
      *
      * @throws std::invalid_argument If @p addr URL was not valid
+     * @throws std::runtime_error If error was encountered in socket creation
      * @throws std::runtime_error If socket was blocking and connect failed
      */
     void connect(const std::string& addr);
@@ -222,13 +329,15 @@ public:
     /**
      * @brief Receive complete datagram from socket. 
      *
-     * @param[in] Optional flags for underlying system recv call (default none)
+     * @param[in] Optional flags for underlying system recv call 
+     *            (default none)
      *
-     * @return Const pointer to Datagram object containing received datagram or
-     *         0 if no complete datagram was received.
+     * @return Const pointer to Datagram object containing received 
+     *         datagram or 0 if no complete datagram was received.
      *
-     * @throws InterruptedException If underlying system call was interrupted
-     *         by signal and socket option O_NO_INTERRUPT was not set
+     * @throws InterruptedException If underlying system call was 
+     *         interrupted by signal and socket option O_NO_INTERRUPT 
+     *         was not set
      * @throws std::runtime_error If other error was encountered during call
      */
     const Datagram* recv(int flags = 0);
@@ -258,6 +367,26 @@ public:
      */
     int send(const Datagram* dgram = 0, int flags = 0);
 
+    /*!
+     * @brief Set socket options
+     *
+     * @throws std::invalid_argument
+     */
+    void setopt(int opts);
+
+    /*!
+     * @brief Get socket options
+     *
+     * @return Socket options mask
+     */
+    int getopt() const;
+
+    /*!
+     * @brief Get socket state
+     *
+     * @return Current state of the socket
+     */
+    State get_state() const;
 
     /*!
      * @brief Get errno corresponding to last error
@@ -277,77 +406,58 @@ public:
 /*!
  * @brief Network event class
  */
-class NetworkEvent
+class gu::NetworkEvent
 {
 public:
-    enum Type
+    /*!
+     * @brief Network event type enumeration
+     */
+    enum
     {
-        E_IN,        /*!< Input event, socket is readable            */
-        E_OUT,       /*!< Output event, socket is writable           */
-        E_LISTEN,    /*!< Listening socket has pending connection to be accepted */
-        E_CONNECTED, /*!< Socket was connected (non-blocking)        */
-        E_CLOSED     /*!< Socket was closed or error leading to socket close was encountered */
+        E_IN        = 1 << 0, /*!< Input event, socket is readable */
+        E_OUT       = 1 << 1, /*!< Output event, socket is writable */
+        E_ACCEPTED  = 1 << 2, /*!< New connection has been accepted */
+        
+        E_CONNECTED = 1 << 3, /*!< Socket connect was completed 
+                                (non-blocking socket)*/
+        E_ERROR = 1 << 4,    /*!< Socket was closed or error leading to 
+                                socket close was encountered */
+        E_TIMED = 1 << 5
     };
 private:    
-    Type type;                   /*!< Event type              */
-    Socket* socket;              /*!< Socket related to event */
+    int event_mask;             /*!< Event mask              */
+    Socket* socket;             /*!< Socket related to event */
     friend class Network;        
-    NetworkEvent(Type, Socket*); /*!< Private constructor */
+    NetworkEvent(int, Socket*); /*!< Private constructor */
 public:    
     /*!
      * @brief Get event type
      *
      * @return Event type
      */
-    Type get_type() const;
+    inline int get_event_mask() const;
     
     /*!
      * @brief Get pointer to corresponding socket
      *
      * @return Pointer to socket object
      */
-    Socket* get_socket() const;
+    inline Socket* get_socket() const;
 };
 
-/*!
- * @brief List of network events
- *
- */
-class NetworkEventList
-{
-public:
-    /*
-     * TODO: Define iterators
-     */
 
-    class const_iterator
-    {
-    };
-
-    /*!
-     * @brief Get iterator to the beginning of network event list
-     */
-    const_iterator begin() const;
-    
-    /*!
-     * @brief Get iterator to the end (one past the last) of network 
-     *        event list
-     */
-    const_iterator end() const;
-    
-    /*!
-     * @brief Get size of network event list 
-     */
-    size_t size() const;
-};
 
 /*!
  * @brief Network interface
  */
-class Network
+class gu::Network
 {
+    friend class Socket;
+    SocketList* sockets;
+    Poll* poll;
+    void erase(Socket*);
 public:
-    
+        
     /*!
      * @brief Default constructor
      */
@@ -357,30 +467,37 @@ public:
      * @brief Destructor
      */
     ~Network();
-    
-    /*!
-     * @brief Create new socket
-     *
-     * Creates new Socket and returns pointer the object. Note that 
-     * there is no need to specify socket type at this point, 
-     * it is deduced from address URL at connect/accept/listen call.
-     *
-     * @return Pointer to new socket
-     */
-    Socket* socket();
+
+    Socket* connect(const std::string& addr);
+    Socket* listen(const std::string& addr);
 
     /*!
-     * @brief Wait network events
+     * @brief Wait network event
      *
      * Poll for network events until timeout expires.
      *
-     * @return Const reference for network event list
+     * @param timeout Timeout after which waiting is interrupted
+     *
+     * @return Network event
      *
      * @throws InterruptedException If underlying system call
      *         was interrupted by signal
      * @throws std::runtime_error If error was encountered
      */
-    const NetworkEventList& wait_event(long timeout = 0);
+    NetworkEvent wait_event(long timeout = -1);
+
+    /*!
+     * @brief Set event mask for @p sock
+     *
+     * @param[in] sock Socket to set mask for
+     * @param[in] mask Event mask
+     *
+     * @throws std::invalid_argument If event mask was invalid
+     * @throws std::logic_error If socket was not found or was in 
+     *         invalid state
+     */
+    void set_event_mask(Socket* sock, int mask);
+
 };
 
 #endif /* __GU_NETWORK_HPP__ */
