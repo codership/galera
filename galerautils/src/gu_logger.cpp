@@ -12,6 +12,7 @@
 #include <sys/time.h>
 
 #include "gu_logger.hpp"
+#include "gu_string.hpp"
 
 #include <string>
 #include <vector>
@@ -26,19 +27,7 @@ namespace gu
 
     class DebugFilter
     {
-        static vector<string> strsplit(const string& s, const int c)
-        {
-            vector<string> ret;
-            
-            size_t pos, prev_pos = 0;
-            while ((pos = s.find_first_of(c, prev_pos)) != string::npos)
-            {
-                ret.push_back(s.substr(prev_pos, pos - prev_pos));
-                prev_pos = pos + 1;
-            }
-            ret.push_back(s.substr(prev_pos, s.length() - prev_pos));
-            return ret;
-        }
+
         set<string> filter;
 
     public:
@@ -56,7 +45,7 @@ namespace gu
         
         void set_filter(const string& str)
         {
-            vector<string> dvec = strsplit(str, ',');
+            vector<string> dvec = gu::strsplit(str, ',');
             for (vector<string>::const_iterator i = dvec.begin();
                  i != dvec.end(); ++i)
             {

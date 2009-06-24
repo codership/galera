@@ -31,7 +31,8 @@ include_HEADERS =      \
 	gu_assert.hpp    \
 	gu_mutex.hpp     \
 	gu_cond.hpp      \
-	gu_lock.hpp
+	gu_lock.hpp      \
+	gu_network.hpp
 
 lib_LTLIBRARIES = libgalerautils.la
 
@@ -53,8 +54,12 @@ libgalerautils_la_LDFLAGS = \
 lib_LTLIBRARIES += libgalerautils++.la
 
 libgalerautils___la_SOURCES = \
-	gu_exception.cpp \
-	gu_logger.cpp
+	gu_exception.cpp      \
+	gu_string.cpp         \
+	gu_logger.cpp         \
+	gu_url.cpp            \
+	gu_resolver.cpp	      \
+	gu_network.cpp
 
 
 INTERFACEPP = 1

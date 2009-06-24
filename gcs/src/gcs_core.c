@@ -195,17 +195,17 @@ core_msg_send (gcs_core_t*    core,
         // when GCS_ACT_SERVICE will be implemented, we'll have to have two
         // restart flags - one for each of ongoing actions
 //        register bool restart = core->act_restart && (type == GCS_MSG_ACTION);
-        if (gu_likely((core->state == CORE_PRIMARY  && !send_abort) ||
+        if (gu_likely((core->state == CORE_PRIMARY  && !core->send_abort) ||
                       (core->state == CORE_EXCHANGE && type == GCS_MSG_STATE_MSG))) {
             ret = core->backend.send (&core->backend, buf, buf_len, type);
 
-            send_ongoing = (ret > 0 && (!last || ret != buf_len)) ||
+            core->send_ongoing = (ret > 0 && (!last || ret != buf_len)) ||
                 (-EAGAIN == ret);
         }
         else {
-            if (GCS_MSG_ACTION == type && send_abort) {
-                if (send_ongoing) {
-                    ret = send_abort;
+            if (GCS_MSG_ACTION == type && core->send_abort) {
+                if (core->send_ongoing) {
+                    ret = core->send_abort;
                 }
                 else {
                     gu_fatal ("GCS internal state inconsistency: "
@@ -222,7 +222,7 @@ core_msg_send (gcs_core_t*    core,
                           "expected error condition.");
                 ret = -ENOTRECOVERABLE;
             }
-            send_ongoing = false;
+            core->send_ongoing = false;
         }
     }
     gu_mutex_unlock (&core->send_lock);
@@ -671,7 +671,7 @@ core_handle_uuid_msg (gcs_core_t*     core,
                     ret = core_msg_send_retry (core,
                                                state_buf,
                                                state_len,
-                                               GCS_MSG_STATE_MSG);
+                                               GCS_MSG_STATE_MSG, true);
                     if (ret > 0) {
                         gu_info ("STATE EXCHANGE: sent state msg: "
                                  GU_UUID_FORMAT, GU_UUID_ARGS(state_uuid));
@@ -997,7 +997,8 @@ core_send_seqno (gcs_core_t* core, gcs_seqno_t seqno, gcs_msg_type_t msg_type)
 {
     gcs_seqno_t seqno_le = gcs_seqno_le (seqno);
     ssize_t     ret      = core_msg_send_retry (core, &seqno_le,
-                                                sizeof(seqno_le), msg_type);
+                                                sizeof(seqno_le),
+                                                msg_type, true);
     if (ret > 0) {
         assert(ret == sizeof(seqno));
         ret = 0;
@@ -1027,7 +1028,7 @@ long
 gcs_core_send_fc (gcs_core_t* core, void* fc, size_t fc_size)
 {
     ssize_t ret;
-    ret = core_msg_send_retry (core, fc, fc_size, GCS_MSG_FLOW);
+    ret = core_msg_send_retry (core, fc, fc_size, GCS_MSG_FLOW, true);
     if (ret == fc_size) {
         ret = 0;
     }
