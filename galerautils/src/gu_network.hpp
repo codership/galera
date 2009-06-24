@@ -435,14 +435,14 @@ public:
      *
      * @return Event type
      */
-    inline int get_event_mask() const;
+    int get_event_mask() const;
     
     /*!
      * @brief Get pointer to corresponding socket
      *
      * @return Pointer to socket object
      */
-    inline Socket* get_socket() const;
+    Socket* get_socket() const;
 };
 
 

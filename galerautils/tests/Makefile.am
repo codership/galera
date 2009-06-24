@@ -20,6 +20,7 @@ gu_testspp_CPPFLAGS = -I$(top_srcdir)/src @CHECK_CFLAGS@
 gu_testspp_LDADD = \
 	$(top_builddir)/src/libgalerautils.la \
 	$(top_builddir)/src/libgalerautils++.la @CHECK_LIBS@
+gu_testspp_LDFLAGS = -static
 
 gu_to_test_SOURCES = gu_to_test.c
 gu_to_test_LDADD   = ../src/libgalerautils.la

@@ -18,9 +18,11 @@ AC_ARG_ENABLE(debug,
 if test "$enable_debug" != "no"
 then
     CFLAGS="-g -O2 -DDEBUG_ASSERT "
+    CXXFLAGS="$CXXFLAGS -g -O0 "
 else
     CFLAGS=${CFLAGS:-" -O3 -g "}
     CFLAGS="$CFLAGS -DNDEBUG "
+    CXXFLAGS="$CXXFLAGS -g -O3 -DNDEBUG "
 fi
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
 
@@ -59,4 +61,5 @@ AC_CONFIG_FILES([Makefile
 		 tests/Makefile])
 
 CFLAGS="$CFLAGS -Wall -Werror "
+CXXFLAGS="$CXXFLAGS -Wall -Werror -Wextra -Wno-unused-parameter"
 AC_OUTPUT

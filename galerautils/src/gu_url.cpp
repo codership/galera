@@ -63,7 +63,7 @@ void gu::URL::parse()
     regex_t reg;
     int rc;
     
-    log_debug << "uri: " << str;
+    log_debug << "URL: " << str;
     
     if ((rc = regcomp(&reg, uri_regex, REG_EXTENDED)) != 0)
     {
@@ -87,6 +87,8 @@ void gu::URL::parse()
     authority = extract_str(str, pmatch[4]);
     path = extract_str(str, pmatch[5]);
     query_list = extract_query_list(str, pmatch[7]);
+
+    log_debug << scheme << "://" << authority;
 }
 
 const string& gu::URL::get_scheme() const
