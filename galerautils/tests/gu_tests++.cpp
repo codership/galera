@@ -133,19 +133,19 @@ void* listener_thd(void* arg)
 
 START_TEST(test_network_connect)
 {
-    gu::Network net;
-    gu::Socket* listener = net.listen("localhost:2112");
-    listener_thd_args args = {&net, 2};
+    gu::Network* net = new gu::Network;
+    gu::Socket* listener = net->listen("localhost:2112");
+    listener_thd_args args = {net, 2};
     pthread_t th;
     pthread_create(&th, 0, &listener_thd, &args);
     
-    gu::Network net2;
-    gu::Socket* conn = net2.connect("localhost:2112");
+    gu::Network* net2 = new gu::Network;
+    gu::Socket* conn = net2->connect("localhost:2112");
     
     fail_unless(conn != 0);
     fail_unless(conn->get_state() == gu::Socket::S_CONNECTED);
 
-    gu::Socket* conn2 = net2.connect("localhost:2112");
+    gu::Socket* conn2 = net2->connect("localhost:2112");
     fail_unless(conn2 != 0);
     fail_unless(conn2->get_state() == gu::Socket::S_CONNECTED);
 
@@ -166,6 +166,9 @@ START_TEST(test_network_connect)
     delete listener;
 
     log_info << "test connect end";
+
+    delete net;
+    delete net2;
 
 }
 END_TEST
