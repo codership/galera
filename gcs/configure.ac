@@ -97,10 +97,9 @@ AC_CHECK_LIB([pthread], [pthread_testcancel],,
 AC_CHECK_LIB([galerautils], [gu_malloc_dbg],,
 	     AC_MSG_ERROR([*** galerautils not found! ***]))
 
-if test "$with_spread" != no; then
-AC_CHECK_LIB([tspread], [SP_error],,
-             AC_MSG_WARN([*** Spread library not found! ***]);
-             with_spread="no")
+if test "$enable_gcomm" != "no" -o "$enable_vs" != "no"; then
+   AC_CHECK_LIB([galerautils++], [main],,
+	        AC_MSG_ERROR([*** galerautils++ not found! ***]))
 fi
 
 if test "$enable_gcomm" != no; then
@@ -119,6 +118,12 @@ do
                 enable_vs="no")
     fi
 done
+
+if test "$with_spread" != no; then
+AC_CHECK_LIB([tspread], [SP_error],,
+             AC_MSG_WARN([*** Spread library not found! ***]);
+             with_spread="no")
+fi
 
 AM_CONDITIONAL(WITH_SPREAD, test "$with_spread" != "no")
 AM_CONDITIONAL(ENABLE_GCOMM, test "$enable_gcomm" != "no")

@@ -1,7 +1,7 @@
 extern "C" {
 #include "gcs_gcomm.h"
 #include "gu_mutex.h"
-#include "gu_log.h"
+//#include "gu_log.h"
 }
 
 // We access data comp msg struct directly

@@ -1,4 +1,3 @@
-
 #include "gu_logger.hpp"
 #include "gu_network.hpp"
 
@@ -93,7 +92,7 @@ END_TEST
 
 Suite* get_suite()
 {
-    Suite* s = suite_create("galerautil++");
+    Suite* s = suite_create("galerautils++");
     TCase* tc = tcase_create("test_debug_logger");
     tcase_add_checked_fixture(tc, 
                               &debug_logger_checked_setup,
@@ -114,6 +113,10 @@ Suite* get_suite()
 
 int main(int argc, char* argv[])
 {
+    FILE* log_file = fopen ("gu_tests++.log", "w");
+    if (!log_file) return EXIT_FAILURE;
+    gu_conf_set_log_file (log_file);
+
     SRunner* sr = srunner_create(get_suite());
     srunner_run_all(sr, CK_NORMAL);
     int n_fail = srunner_ntests_failed(sr);

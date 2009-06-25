@@ -72,6 +72,11 @@ AC_CHECK_LIB([galerautils], [gu_log],,
              AC_MSG_ERROR([*** libgalerautils not found! ***]);
 	    )
 
+#f FIXME: how to check for libgalerautils only if libgcs was linked with it?
+AC_CHECK_LIB([galerautils++], [main],,
+             AC_MSG_ERROR([*** libgalerautils++ not found! ***]);
+	    )
+
 AC_CHECK_LIB([gcs], [gcs_open],,
              AC_MSG_ERROR([*** libgcs not found! ***]);
 	    )

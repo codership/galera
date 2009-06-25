@@ -13,6 +13,7 @@
 
 extern "C" {
 #include "gu_log.h"
+#include "gu_conf.h"
 }
 
 namespace gu
