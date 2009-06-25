@@ -181,6 +181,10 @@ public:
      * @throws std::out_of_range If offset is greater than buffer length
      */
     size_t get_buflen(size_t offset = 0) const;
+    inline size_t get_len(size_t offset = 0) const
+    {
+        return get_buflen(offset);
+    }
 };
 
 
@@ -252,10 +256,12 @@ private:
      */
     void open_socket(const std::string& addr);
 
+public:
     int get_fd() const
     {
         return fd;
     }
+private:
     
     void set_event_mask(const int m)
     {
@@ -421,7 +427,7 @@ public:
         E_CONNECTED = 1 << 3, /*!< Socket connect was completed 
                                 (non-blocking socket)*/
         E_ERROR = 1 << 4,    /*!< Socket was closed or error leading to 
-                                socket close was encountered */
+                               socket close was encountered */
         E_TIMED = 1 << 5
     };
 private:    

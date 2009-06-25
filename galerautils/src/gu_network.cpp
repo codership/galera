@@ -55,6 +55,11 @@ static inline int to_epoll_mask(const int mask)
 static inline int to_network_event_mask(const int mask)
 {
     int ret = 0;
+    if (mask & ~(EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP))
+    {
+        log_warn << "event mask " << mask << " has unrecognized bits set";
+    }
+
     ret |= (mask & EPOLLIN ? gu::NetworkEvent::E_IN : 0);
     ret |= (mask & EPOLLOUT ? gu::NetworkEvent::E_OUT : 0);
     ret |= (mask & EPOLLERR ? gu::NetworkEvent::E_ERROR : 0);
@@ -223,6 +228,7 @@ void gu::Socket::set_state(const State s, const int err)
     };
     if (allowed[get_state()][s] == false)
     {
+        log_error << "invalid state change " << state << " -> " << s;
         throw std::logic_error("invalid state change");
     }
     state = s;
@@ -631,8 +637,7 @@ int gu::Socket::send(const Datagram* const dgram, const int flags)
             set_state(S_FAILED, ret);
         }
     }
-
-    log_debug << "return: " << ret;
+    // log_debug << "return: " << ret;
     return ret;
 }
 
@@ -660,13 +665,15 @@ const gu::Datagram* gu::Socket::recv(const int flags)
             return 0;
         default:
             set_state(S_FAILED, errno);
-            throw std::runtime_error("recv failed");
+            return 0;
+            //throw std::runtime_error("recv failed");
         }
     }
     else if (recvd == 0)
     {
-        set_state(S_FAILED, EPIPE);
-        throw std::runtime_error("recv failed");
+        close();
+        return 0;
+        // throw std::runtime_error("recv failed");
     }
     else
     {
@@ -979,6 +986,11 @@ gu::NetworkEvent gu::Network::wait_event(const long timeout)
             revent = NetworkEvent::E_ACCEPTED;
             sock = acc;
         }
+    }
+    else if (sock->get_state() == Socket::S_FAILED)
+    {
+        log_error << "failed socket " << sock->get_fd() << " in poll set";
+        throw std::logic_error("failed socket in poll set");
     }
     return NetworkEvent(revent, sock);
 }
