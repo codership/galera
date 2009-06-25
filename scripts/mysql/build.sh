@@ -21,7 +21,7 @@ usage()
 	"    -d|--debug      configure build with debug enabled (implies -c)\n"\
 	"    --with-spread   configure build with Spread (implies -c)\n"\
 	"    --no-strip      prevent stripping of release binaries\n"\
-	"    -r|--release <galera release>, otherwise revisions will be used"
+	"    -r|--release <galera release>, otherwise revisions will be used"\
         "\n -s and -b options affect only Galera build.\n"
 }
 
