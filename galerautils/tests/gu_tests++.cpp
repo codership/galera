@@ -18,7 +18,6 @@ static void log_bar()
 static void debug_logger_checked_setup()
 {
     gu_log_max_level = GU_LOG_DEBUG;
-    gu::Logger::set_debug_filter("log_foo");
 }
 
 static void debug_logger_checked_teardown()
@@ -30,6 +29,7 @@ static void debug_logger_checked_teardown()
 
 START_TEST(test_debug_logger)
 {
+    gu::Logger::set_debug_filter("log_foo");
     log_foo();
     log_bar();
 }
@@ -45,23 +45,82 @@ START_TEST(test_network_listen)
 }
 END_TEST
 
+struct listener_thd_args
+{
+    gu::Network* net;
+    int conns;
+};
+
 void* listener_thd(void* arg)
 {
-
-    // gu::Socket* listener = reinterpret_cast<gu::Socket*>(arg);
-    gu::Network* net = reinterpret_cast<gu::Network*>(arg);
-    
-    gu::NetworkEvent ev = net->wait_event(-1);
-
-    if (ev.get_event_mask() & gu::NetworkEvent::E_ACCEPTED)
+    listener_thd_args* larg = reinterpret_cast<listener_thd_args*>(arg);
+    gu::Network* net = larg->net;
+    int conns = larg->conns;
+    uint64_t bytes = 0;
+    while (conns > 0)
     {
-        log_info << "accepted socket";
+        gu::NetworkEvent ev = net->wait_event(-1);
+        
+        gu::Socket* sock = ev.get_socket();
+        const int em = ev.get_event_mask();
+        if (em & gu::NetworkEvent::E_ACCEPTED)
+        {
+            log_info << "socket accepted";
+        }
+        else if (em & gu::NetworkEvent::E_ERROR)
+        {
+            fail_unless(sock != 0);
+            if (sock->get_state() == gu::Socket::S_CLOSED)
+            {
+                log_info << "socket closed";
+                delete sock;
+                conns--;
+            }
+            else
+            {
+                fail_unless(sock->get_state() == gu::Socket::S_FAILED);
+                fail_unless(sock->get_errno() != 0);
+                log_info << "socket read failed: " << sock->get_errstr();
+                sock->close();
+                delete sock;
+                conns--;
+            }
+        }
+        else if (em & gu::NetworkEvent::E_IN)
+        {
+            const gu::Datagram* dm = sock->recv();
+            if (dm == 0)
+            {
+                switch(sock->get_state())
+                {
+                case gu::Socket::S_FAILED:
+                    log_info << "socket recv failed " << sock->get_fd() << ": " 
+                             << sock->get_errstr();
+                    sock->close();
+                case gu::Socket::S_CLOSED:
+                    delete sock;
+                    conns--;
+                    break;
+                case gu::Socket::S_CONNECTED:
+                    /* Incomplete datagram */
+                    break;
+                default:
+                    fail("unexpected state");
+                    break;
+                }
+            }
+            else
+            {
+                bytes += dm->get_len();
+            }
+        }
+        else
+        {
+            log_error <<  "socket " << sock->get_fd() << " event mask: " << ev.get_event_mask();
+            return (void*)1;
+        }
     }
-    else
-    {
-        log_error << "event mask: " << ev.get_event_mask();
-        return (void*)1;
-    }
+    log_info << "received " << bytes/(1 << 20) << "MB + " << bytes%(1 << 20) << "B";
     return 0;
 }
 
@@ -69,24 +128,84 @@ START_TEST(test_network_connect)
 {
     gu::Network net;
     gu::Socket* listener = net.listen("localhost:2112");
-    
+    listener_thd_args args = {&net, 2};
     pthread_t th;
-    pthread_create(&th, 0, &listener_thd, &net);
+    pthread_create(&th, 0, &listener_thd, &args);
     
     gu::Network net2;
     gu::Socket* conn = net.connect("localhost:2112");
     
     fail_unless(conn != 0);
     fail_unless(conn->get_state() == gu::Socket::S_CONNECTED);
-    
+
+    gu::Socket* conn2 = net.connect("localhost:2112");
+    fail_unless(conn2 != 0);
+    fail_unless(conn2->get_state() == gu::Socket::S_CONNECTED);
+
     conn->close();
     delete conn;
+
+    conn2->close();
+    delete conn2;
 
     void* rval = 0;
     pthread_join(th, &rval);
 
     listener->close();
     delete listener;
+}
+END_TEST
+
+START_TEST(test_network_send)
+{
+    gu::Network net;
+    gu::Socket* listener = net.listen("localhost:2112");
+    listener_thd_args args = {&net, 2};
+    pthread_t th;
+    pthread_create(&th, 0, &listener_thd, &args);
+    
+    gu::Network net2;
+    gu::Socket* conn = net.connect("localhost:2112");
+    
+    fail_unless(conn != 0);
+    fail_unless(conn->get_state() == gu::Socket::S_CONNECTED);
+
+    gu::Socket* conn2 = net.connect("localhost:2112");
+    fail_unless(conn2 != 0);
+    fail_unless(conn2->get_state() == gu::Socket::S_CONNECTED);
+
+    const size_t bufsize = 1 << 24;
+    gu::byte_t* buf = new gu::byte_t[bufsize];
+    for (size_t i = 0; i < bufsize; ++i)
+    {
+        buf[i] = i & 255;
+    }
+    for (int i = 0; i < 1000; ++i)
+    {
+        size_t dlen = std::min(bufsize, static_cast<size_t>(1 + i*1023*17));
+        gu::Datagram dm(buf, dlen);
+        if (i % 100 == 0)
+        {
+            log_debug << "sending " << dlen;
+        }
+        conn->send(&dm);
+
+        dm.reset(buf, ::rand() % 1023 + 1);
+    }
+    delete[] buf;
+
+    conn->close();
+    delete conn;
+
+    conn2->close();
+    delete conn2;
+
+    void* rval = 0;
+    pthread_join(th, &rval);
+
+    listener->close();
+    delete listener;
+
 }
 END_TEST
 
@@ -105,7 +224,18 @@ Suite* get_suite()
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_network_connect");
+    tcase_add_checked_fixture(tc, 
+                              &debug_logger_checked_setup,
+                              &debug_logger_checked_teardown);
     tcase_add_test(tc, test_network_connect);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_network_send");
+    tcase_add_checked_fixture(tc, 
+                              &debug_logger_checked_setup,
+                              &debug_logger_checked_teardown);
+    tcase_add_test(tc, test_network_send);
+    tcase_set_timeout(tc, 60);
     suite_add_tcase(s, tc);
 
     return s;
