@@ -65,6 +65,11 @@ public:
     {
         resize(init_size);
     }
+
+    ~ByteBuffer()
+    {
+        free(buf);
+    }
     
     void resize(const size_t to_size)
     {
@@ -269,6 +274,8 @@ gu::Socket::~Socket()
     {
         close();
     }
+    delete recv_buf;
+    delete pending;
 }
 
 /*
@@ -396,6 +403,7 @@ gu::Socket* gu::Socket::accept()
 
     sockaddr acc_sa;
     socklen_t sasz = sizeof(acc_sa);
+    memset(&acc_sa, 0, sizeof(acc_sa));
     if ((acc_fd = ::accept(fd, &acc_sa, &sasz)) == -1)
     {
         set_state(S_FAILED, errno);
