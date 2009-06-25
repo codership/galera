@@ -102,7 +102,7 @@ namespace gu
     class Datagram;
     class Socket;
     class SocketList;
-    class Poll;
+    class EPoll;
     class NetworkEvent;
     class Network;
 
@@ -110,6 +110,11 @@ namespace gu
     {
         static const std::string tcp = "tcp";
     }
+
+
+    int closefd(int fd);
+
+
 
 }
 /*! 
@@ -226,7 +231,7 @@ private:
     State state;        /*!< Socket state                          */
     /* Network integration */
     friend class Network;
-    friend class Poll;
+    friend class EPoll;
     Network& net;       /*!< Network object this socket belongs to */
 
     /* Private methods */
@@ -460,7 +465,7 @@ class gu::Network
 {
     friend class Socket;
     SocketList* sockets;
-    Poll* poll;
+    EPoll* poll;
     void erase(Socket*);
 public:
         

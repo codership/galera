@@ -59,6 +59,7 @@ libgalerautils___la_SOURCES = \
 	gu_logger.cpp         \
 	gu_url.cpp            \
 	gu_resolver.cpp	      \
+	gu_epoll.cpp	      \
 	gu_network.cpp
 
 
