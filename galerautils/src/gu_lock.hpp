@@ -41,8 +41,14 @@ namespace gu
 
         virtual ~Lock ()
         {
-            pthread_mutex_unlock (value);
-            log_debug << "Unlocked mutex " << value;
+            int err = pthread_mutex_unlock (value);
+            if (err)
+            {
+                std::string msg = "Mutex unlock failed: ";
+                msg = msg + strerror(err);
+                throw Exception(msg.c_str(), err);
+            }
+            // log_debug << "Unlocked mutex " << value;
         };
 
         inline void wait (Cond& cond)

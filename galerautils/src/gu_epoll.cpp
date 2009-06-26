@@ -68,7 +68,7 @@ gu::EPoll::~EPoll()
     free(events);
 }
     
-int gu::EPoll::set_mask(Socket* s, const int mask)
+void gu::EPoll::set_mask(Socket* s, const int mask)
 {
     log_debug << "set_mask(): " << s->get_fd() << " " 
               << s->get_event_mask() << " -> " << mask;
@@ -76,42 +76,45 @@ int gu::EPoll::set_mask(Socket* s, const int mask)
     {
         log_debug << "socket: " << s->get_fd() 
                   << " no mask update required";
-        return 0;
+        return;
     }
-        
+    
     int op = EPOLL_CTL_MOD;
-    if (mask == 0 && s->get_event_mask() != 0)
-    {
-        op = EPOLL_CTL_DEL;
-    }
-    else if (s->get_event_mask() == 0 && mask != 0)
-    {
-        op = EPOLL_CTL_ADD;
-    }
-        
-    struct epoll_event ev;
-    ev.events = to_epoll_mask(mask);
-    ev.data.ptr = s;
-        
+    struct epoll_event ev = {to_epoll_mask(mask), {s}};
     int err = epoll_ctl(e_fd, op, s->get_fd(), &ev);
+    
     if (err == -1)
     {
-        err = errno;
-        log_error << "epoll_ctl(" << op << "," << s->get_fd() << "): " << err << " '" << strerror(err) << "'";
+        log_error << "epoll_ctl(" << op << "," << s->get_fd() << "): " << err 
+                  << " '" << strerror(err) << "'";
+        throw std::runtime_error("");
     }
-    else
+}
+
+void gu::EPoll::insert(Socket* s)
+{
+    int op = EPOLL_CTL_ADD;
+    struct epoll_event ev = {s->get_event_mask(), {s}};
+    int err = epoll_ctl(e_fd, op, s->get_fd(), &ev);
+    if (err != 0)
     {
-        s->set_event_mask(mask);
-        if (op == EPOLL_CTL_ADD)
-        {
-            resize(events_size + 1);
-        }
-        else if (op == EPOLL_CTL_DEL)
-        {
-            resize(events_size - 1);
-        }
+        log_error << "epoll_ctl(" << e_fd << "," << op << "): " 
+                  << strerror(err);
+        throw std::runtime_error("");
     }
-    return err;
+    resize(events_size + 1);
+}
+
+void gu::EPoll::erase(Socket* s)
+{
+    int op = EPOLL_CTL_DEL;
+    struct epoll_event ev = {0, {0}};
+    int err = epoll_ctl(e_fd, op, s->get_fd(), &ev);
+    if (err != 0)
+    {
+        log_debug << "epoll erase: " << err;
+    }
+    resize(events_size - 1);
 }
 
 int gu::EPoll::poll(const int timeout)

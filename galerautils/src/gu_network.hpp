@@ -433,7 +433,9 @@ class gu::Network
     friend class Socket;
     SocketList* sockets;
     EPoll* poll;
+    void insert(Socket*);
     void erase(Socket*);
+    Socket* find(int);
 public:
         
     /*!

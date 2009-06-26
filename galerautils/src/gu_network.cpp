@@ -362,14 +362,19 @@ void gu::Socket::close()
         log_error << "socket not open: " << fd << " " << get_state();
         throw std::logic_error("socket not open");
     }
-    net.set_event_mask(this, 0);
-    net.erase(this);
+    
+    /* Close socket first to interrupt possible senders */
+    log_debug << "closing socket " << fd;
     int err = closefd(fd);
     if (err != 0)
     {
         set_state(S_FAILED, err);
         throw std::runtime_error("close failed");
     }
+    
+    /* Reset fd only after calling net.erase() */
+    net.erase(this);
+    
     fd = -1;
     set_state(S_CLOSED);
 }
@@ -550,10 +555,16 @@ int gu::Socket::send_pending(const int send_flags)
 
 int gu::Socket::send(const Datagram* const dgram, const int flags)
 {
+    if (get_state() != S_CONNECTED)
+    {
+        return ENOTCONN;
+    }
     bool no_block = (getopt() & O_NON_BLOCKING) ||
         (flags & MSG_DONTWAIT);
     const int send_flags = flags | (no_block ? MSG_DONTWAIT : 0);
     int ret = 0;
+    byte_t hdr[4];
+    const size_t hdrlen = sizeof(hdr);
 
     if (dgram == 0)
     {
@@ -570,15 +581,10 @@ int gu::Socket::send(const Datagram* const dgram, const int flags)
         default:
             set_state(S_FAILED, ret);
         }
-        return ret;
-    }
-
-    byte_t hdr[4];
-    const size_t hdrlen = sizeof(hdr);
-
-    if (no_block == true &&
-        pending->get_len() + dgram->get_buflen() + hdrlen > 
-        get_max_pending_len())
+    } 
+    else if (no_block == true &&
+               pending->get_len() + dgram->get_buflen() + hdrlen > 
+               get_max_pending_len())
     {
         ret = EAGAIN;
     }
@@ -622,12 +628,22 @@ int gu::Socket::send(const Datagram* const dgram, const int flags)
         }
     }
     // log_debug << "return: " << ret;
+    if (ret == EAGAIN and not get_event_mask() & gu::NetworkEvent::E_OUT)
+    {
+        net.set_event_mask(this, get_event_mask() & gu::NetworkEvent::E_OUT);
+    }
     return ret;
 }
 
 
 const gu::Datagram* gu::Socket::recv(const int flags)
 {
+    if (get_state() != S_CONNECTED)
+    {
+        err_no = ENOTCONN;
+        return 0;
+    }
+
     if (dgram_offset > 0)
     {
         recv_buf->pop(dgram_offset);
@@ -741,18 +757,15 @@ gu::Socket* gu::Network::connect(const string& addr)
 {
     Socket* sock = new Socket(*this);
     sock->connect(addr);
-    if (sockets->insert(make_pair(sock->get_fd(), sock)).second == false)
-    {
-        delete sock;
-        throw std::logic_error("");
-    }
+    insert(sock);
+
     if (sock->get_state() == Socket::S_CONNECTED)
     {
-        poll->set_mask(sock, NetworkEvent::E_IN);
+        set_event_mask(sock, NetworkEvent::E_IN);
     }
     else if (sock->get_state() == Socket::S_CONNECTING)
     {
-        poll->set_mask(sock, NetworkEvent::E_OUT);
+        set_event_mask(sock, NetworkEvent::E_OUT);
     }
     return sock;
 }
@@ -761,28 +774,47 @@ gu::Socket* gu::Network::listen(const string& addr)
 {
     Socket* sock = new Socket(*this);
     sock->listen(addr);
+    insert(sock);
+    set_event_mask(sock, NetworkEvent::E_IN);
+    return sock;
+}
+
+void gu::Network::insert(Socket* sock)
+{
     if (sockets->insert(make_pair(sock->get_fd(), sock)).second == false)
     {
         delete sock;
         throw std::logic_error("");
     }
-    poll->set_mask(sock, NetworkEvent::E_IN);
-    return sock;
+    poll->insert(sock);
 }
 
 void gu::Network::erase(Socket* s)
 {
+    /* Erases socket from poll set */
+    poll->erase(s);
     sockets->erase(s->get_fd());
+}
+
+gu::Socket* gu::Network::find(int fd)
+{
+    SocketList::iterator i;
+    if ((i = sockets->find(fd)) == sockets->end())
+    {
+        return 0;
+    }
+    return i->second;
 }
 
 void gu::Network::set_event_mask(Socket* socket, const int mask)
 {
-    if (sockets->find(socket->get_fd()) == sockets->end())
+    if (find(socket->get_fd()) == 0)
     {
-        log_error << "socket not found from socket set";
+        log_error << "socket " << socket->get_fd() << " not found from socket set";
         throw std::logic_error("invalid socket");
     }
     poll->set_mask(socket, mask);
+    socket->set_event_mask(mask);
 }
 
 gu::NetworkEvent gu::Network::wait_event(const long timeout)
@@ -807,7 +839,7 @@ gu::NetworkEvent gu::Network::wait_event(const long timeout)
         {
             // Should do more deep inspection here?
             sock->set_state(Socket::S_CONNECTED);
-            poll->set_mask(sock, NetworkEvent::E_IN);
+            set_event_mask(sock, NetworkEvent::E_IN);
             revent = NetworkEvent::E_CONNECTED;
         }
     }
@@ -816,13 +848,8 @@ gu::NetworkEvent gu::Network::wait_event(const long timeout)
         if (revent & NetworkEvent::E_IN)
         {
             Socket* acc = sock->accept();
-            if (sockets->insert(make_pair(acc->get_fd(), acc)).second == false)
-            {
-                log_error << "could not insert socket to socket set";
-                delete acc;
-                throw std::logic_error("");
-            }
-            poll->set_mask(acc, NetworkEvent::E_IN);
+            insert(acc);
+            set_event_mask(acc, NetworkEvent::E_IN);
             revent = NetworkEvent::E_ACCEPTED;
             sock = acc;
         }
