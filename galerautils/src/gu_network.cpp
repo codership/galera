@@ -4,11 +4,16 @@
  * $Id:$
  */
 
+/* Galerautil C++ includes */
 #include "gu_network.hpp"
 #include "gu_resolver.hpp"
 #include "gu_url.hpp"
 #include "gu_logger.hpp"
 #include "gu_epoll.hpp"
+
+/* Galerautil C includes */
+
+#include "gu_byteswap.h"
 
 /* C-includes */
 #include <cstring>
@@ -445,7 +450,8 @@ static size_t iov_send(const int fd,
                        int* errval)
 {
     assert(errval != 0);
-    
+    assert(tot_len > 0);
+
     const int send_flags = flags | MSG_NOSIGNAL;
     *errval = 0;
 
@@ -458,16 +464,8 @@ static size_t iov_send(const int fd,
     
     if (sent < 0)
     {
-        switch (errno)
-        {
-        case EMSGSIZE:
-            sent = slow_send(fd, iov, iov_len, 0, flags, errval);
-            break;
-        default:
-            sent = 0;
-            *errval = errno;
-            break;
-        }
+        sent = 0;
+        *errval = errno;
     }
     else if (sent == 0)
     {
@@ -523,7 +521,7 @@ size_t gu::Socket::get_max_pending_len() const
 static void write_hdr(gu::byte_t* buf, const size_t buflen, uint32_t len)
 {
     assert(buf != 0 && buflen == 4);
-    *(uint32_t*)buf = len;
+    *(uint32_t*)buf = htogl(len);
 }
 
 static void read_hdr(const gu::byte_t* buf, 
@@ -531,7 +529,7 @@ static void read_hdr(const gu::byte_t* buf,
                      uint32_t *len)
 {
     assert(buf != 0 && buflen >=  4 && len != 0);
-    *len = *(uint32_t*)buf;
+    *len = gtohl(*(uint32_t*)buf);
 }
 
 int gu::Socket::send_pending(const int send_flags)
