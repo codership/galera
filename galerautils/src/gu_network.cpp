@@ -255,6 +255,7 @@ gu::Socket::Socket(Network& net_,
     event_mask(0),
     sa_size(sa_size_),
     dgram_offset(0),
+    complete(false),
     dgram(),
     recv_buf(new ByteBuffer(1 << 16)),
     pending(new ByteBuffer(1 << 10)),
@@ -563,9 +564,10 @@ int gu::Socket::send(const Datagram* const dgram, const int flags)
         (flags & MSG_DONTWAIT);
     const int send_flags = flags | (no_block ? MSG_DONTWAIT : 0);
     int ret = 0;
+
     byte_t hdr[4];
     const size_t hdrlen = sizeof(hdr);
-
+    
     if (dgram == 0)
     {
         if (pending->get_len() > 0)
@@ -583,8 +585,8 @@ int gu::Socket::send(const Datagram* const dgram, const int flags)
         }
     } 
     else if (no_block == true &&
-               pending->get_len() + dgram->get_buflen() + hdrlen > 
-               get_max_pending_len())
+             pending->get_len() + dgram->get_buflen() + hdrlen > 
+             get_max_pending_len())
     {
         ret = EAGAIN;
     }
@@ -638,20 +640,34 @@ int gu::Socket::send(const Datagram* const dgram, const int flags)
 
 const gu::Datagram* gu::Socket::recv(const int flags)
 {
+    const size_t hdrlen = sizeof(uint32_t);
+    const int recv_flags = (flags & ~MSG_PEEK) |
+        (getopt() & O_NON_BLOCKING ? MSG_DONTWAIT : 0);
+    const bool peek = flags & MSG_PEEK;
+    
     if (get_state() != S_CONNECTED)
     {
         err_no = ENOTCONN;
         return 0;
     }
-
+    
+    if (complete == true)
+    {
+        if (peek == false)
+        {
+            dgram_offset = hdrlen + dgram.get_len();
+            complete = false;
+        }
+        return &dgram;
+    }
+    
     if (dgram_offset > 0)
     {
         recv_buf->pop(dgram_offset);
         dgram_offset = 0;
     }
+    
 
-    const int recv_flags = flags |
-        (getopt() & O_NON_BLOCKING ? MSG_DONTWAIT : 0);
     
     ssize_t recvd = ::recv(fd, 
                            recv_buf->get_buf(recv_buf->get_len()), 
@@ -677,7 +693,6 @@ const gu::Datagram* gu::Socket::recv(const int flags)
     }
     else
     {
-        const size_t hdrlen = sizeof(uint32_t);
         recv_buf->reserve(recvd);
         if (recv_buf->get_len() > hdrlen)
         {
@@ -689,8 +704,16 @@ const gu::Datagram* gu::Socket::recv(const int flags)
             }
             else if (recv_buf->get_len() >= len + hdrlen)
             {
-                dgram_offset = len + hdrlen;
                 dgram.reset(recv_buf->get_buf(hdrlen), len);
+                if (peek == false)
+                {
+                    dgram_offset = len + hdrlen;
+                    complete = false;
+                }
+                else
+                {
+                    complete = true;
+                }
                 return &dgram;
             }
         }
@@ -819,45 +842,88 @@ void gu::Network::set_event_mask(Socket* socket, const int mask)
 
 gu::NetworkEvent gu::Network::wait_event(const long timeout)
 {
-    EPoll::iterator i = poll->begin();
-    if (i == poll->end())
+    Socket* sock = 0;
+    int revent = 0;
+    
+    do
     {
-        poll->poll(timeout);
-        i = poll->begin();
-    }
-    if (i == poll->end())
-    {
-        return NetworkEvent(NetworkEvent::E_TIMED, 0);
-    }
-    Socket* sock = EPoll::get_socket(i);
-    int revent = EPoll::get_revents(i);
-    poll->pop_front();
-
-    if (sock->get_state() == Socket::S_CONNECTING)
-    {
-        if (revent & NetworkEvent::E_OUT)
+        EPoll::iterator i = poll->begin();
+        if (i == poll->end())
         {
-            // Should do more deep inspection here?
-            sock->set_state(Socket::S_CONNECTED);
-            set_event_mask(sock, NetworkEvent::E_IN);
-            revent = NetworkEvent::E_CONNECTED;
+            poll->poll(timeout);
+            i = poll->begin();
+        }
+        if (i == poll->end())
+        {
+            return NetworkEvent(NetworkEvent::E_TIMED, 0);
+        }
+        
+        sock = EPoll::get_socket(i);
+        revent = EPoll::get_revents(i);
+        poll->pop_front();
+        
+        switch (sock->get_state())
+        {
+        case Socket::S_CLOSED:
+            log_error << "closed socket " << sock->get_fd() << " in poll set";
+            throw std::logic_error("closed socket in poll set");
+            break;
+        case Socket::S_CONNECTING:
+            if (revent & NetworkEvent::E_OUT)
+            {
+                // Should do more deep inspection here?
+                sock->set_state(Socket::S_CONNECTED);
+                set_event_mask(sock, NetworkEvent::E_IN);
+                revent = NetworkEvent::E_CONNECTED;
+            }
+            break;
+        case Socket::S_LISTENING:
+            if (revent & NetworkEvent::E_IN)
+            {
+                Socket* acc = sock->accept();
+                insert(acc);
+                set_event_mask(acc, NetworkEvent::E_IN);
+                revent = NetworkEvent::E_ACCEPTED;
+                sock = acc;
+            }
+            break;
+        case Socket::S_FAILED:
+            log_error << "failed socket " << sock->get_fd() << " in poll set";
+            throw std::logic_error("failed socket in poll set");
+            break;
+        case Socket::S_CONNECTED:
+            if (revent & NetworkEvent::E_IN)
+            {
+                const gu::Datagram* dm = sock->recv(MSG_PEEK);
+                if (dm == 0)
+                {
+                    switch (sock->get_state())
+                    {
+                    case gu::Socket::S_FAILED:
+                        revent = gu::NetworkEvent::E_ERROR;
+                        break;
+                    case gu::Socket::S_CLOSED:
+                        revent = gu::NetworkEvent::E_CLOSED;
+                        break;
+                    case gu::Socket::S_CONNECTED:
+                        sock = 0;
+                    default:
+                        break;
+                    }
+                }
+            }
+            else if (revent & NetworkEvent::E_OUT)
+            {
+                sock->send();
+                sock = 0;
+            }
+            break;
+        case Socket::S_MAX:
+            throw std::logic_error("");
+            break;
         }
     }
-    else if (sock->get_state() == Socket::S_LISTENING)
-    {
-        if (revent & NetworkEvent::E_IN)
-        {
-            Socket* acc = sock->accept();
-            insert(acc);
-            set_event_mask(acc, NetworkEvent::E_IN);
-            revent = NetworkEvent::E_ACCEPTED;
-            sock = acc;
-        }
-    }
-    else if (sock->get_state() == Socket::S_FAILED)
-    {
-        log_error << "failed socket " << sock->get_fd() << " in poll set";
-        throw std::logic_error("failed socket in poll set");
-    }
+    while (sock == 0);
+    
     return NetworkEvent(revent, sock);
 }

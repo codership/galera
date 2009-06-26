@@ -97,35 +97,18 @@ void* listener_thd(void* arg)
         else if (em & gu::NetworkEvent::E_IN)
         {
             const gu::Datagram* dm = sock->recv();
-            if (dm == 0)
+            fail_unless(dm != 0);
+            bytes += dm->get_len();
+            if (buf != 0)
             {
-                switch(sock->get_state())
-                {
-                case gu::Socket::S_FAILED:
-                    log_info << "socket recv failed " << sock->get_fd() << ": " 
-                             << sock->get_errstr();
-                    sock->close();
-                case gu::Socket::S_CLOSED:
-                    delete sock;
-                    conns--;
-                    break;
-                case gu::Socket::S_CONNECTED:
-                    // log_info << "incomplete dgram";
-                    break;
-                default:
-                    fail("unexpected state");
-                    break;
-                }
+                fail_unless(dm->get_len() <= buflen);
+                fail_unless(memcmp(dm->get_buf(), buf, dm->get_len()) == 0);
             }
-            else
-            {
-                bytes += dm->get_len();
-                if (buf != 0)
-                {
-                    fail_unless(dm->get_len() <= buflen);
-                    fail_unless(memcmp(dm->get_buf(), buf, dm->get_len()) == 0);
-                }
-            }
+        }
+        else if (em & gu::NetworkEvent::E_CLOSED)
+        {
+            delete sock;
+            conns--;
         }
         else if (sock == 0)
         {
@@ -271,7 +254,7 @@ Suite* get_suite()
                               &debug_logger_checked_setup,
                               &debug_logger_checked_teardown);
     tcase_add_test(tc, test_network_send);
-    tcase_set_timeout(tc, 60);
+    tcase_set_timeout(tc, 10);
     suite_add_tcase(s, tc);
 
     return s;

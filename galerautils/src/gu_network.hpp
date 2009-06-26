@@ -173,6 +173,8 @@ private:
     size_t sa_size;     /*!< Size of socket address                */
     
     size_t dgram_offset; /*!< Offset of the last read datagram  */
+    bool complete;     /*!< Boolean denoting that compleme dgram
+                        * is waiting to be read */
     Datagram dgram;       /*!< Datagram container               */
     ByteBuffer* recv_buf;  /*!< Buffer for received data        */
     ByteBuffer* pending;  /*!< Buffer for pending outgoing data */
@@ -307,7 +309,7 @@ public:
     /**
      * @brief Receive complete datagram from socket. 
      *
-     * @param[in] Optional flags for underlying system recv call 
+     * @param[in] flags Optional flags for underlying system recv call 
      *            (default none)
      *
      * @return Const pointer to Datagram object containing received 
@@ -400,7 +402,8 @@ public:
                                 (non-blocking socket)*/
         E_ERROR = 1 << 4,    /*!< Socket was closed or error leading to 
                                socket close was encountered */
-        E_TIMED = 1 << 5
+        E_CLOSED = 1 << 5,
+        E_TIMED = 1 << 6
     };
 private:    
     int event_mask;             /*!< Event mask              */
