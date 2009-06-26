@@ -21,60 +21,11 @@
  * Example usage:
  *
  * @code
+ * // TODO: Client exampl
+ * @endcode
  *
- * // Network context 
- * Network net;
- *
- * // Create new socket
- * Socket* sock = net.socket();
- * // Connect socket, URL without scheme implies TCP/IP (v4 or v6) 
- * sock->connect("localhost:2112");
- * 
- * // Main loop
- * bool done = false;
- * do
- * {
- *     try
- *     {
- *         const Datagram* dgram;
- *         // Wait until network event or InterruptedException
- *         const NetworkEventList& el = net.wait_event(-1);
- *         // Loop over event list (obviously this one contains only one socket)
- *         for (NetworkEventList::iterator i = el.begin(); i != el.end(); ++i)
- *         {
- *             switch (i->get_type())
- *             {
- *             case E_IN:
- *                 if ((dgram = i->get_socket()->recv()) != 0)
- *                 {
- *                     // Complete datagram received
- *                     // Do something 
- *                 }
- *                 break;
- *             case E_OUT:
- *                 // There were some bytes pending from send operation
- *                 i->get_socket()->send();
- *                 break;
- *             case E_CLOSED:
- *                 // Cleanups/error handling
- *                 done = true;
- *                 break;
- *             }
- *         }
- *     }
- *     catch (Exception e)
- *     {
- *         // Handle exceptions
- *     }
- * }
- * while (done == false);
- *
- * // Close socket
- * sock->close();
- * // Delete socket, this clears also references from Network object used 
- * // to create this socket
- * delete sock; 
- *
+ * @code
+ * // TODO: Server example
  * @endcode
  *
  * @author Teemu Ollakka
@@ -105,17 +56,14 @@ namespace gu
     class EPoll;
     class NetworkEvent;
     class Network;
-
+    
     namespace URLScheme
     {
         static const std::string tcp = "tcp";
     }
-
-
+    
+    
     int closefd(int fd);
-
-
-
 }
 /*! 
  * @brief  Datagram container
@@ -223,19 +171,20 @@ private:
     sockaddr local_sa;  /*!< Socket address for local endpoint     */
     sockaddr remote_sa; /*!< Socket address for remote endpoint    */
     size_t sa_size;     /*!< Size of socket address                */
-        
-    size_t dgram_offset; /*!< Offset of the last read datagram */
-    Datagram dgram;       /*!< Datagram container            */
-    ByteBuffer* recv_buf;  /*!< Buffer for received data      */
-    ByteBuffer* pending;
-    State state;        /*!< Socket state                          */
+    
+    size_t dgram_offset; /*!< Offset of the last read datagram  */
+    Datagram dgram;       /*!< Datagram container               */
+    ByteBuffer* recv_buf;  /*!< Buffer for received data        */
+    ByteBuffer* pending;  /*!< Buffer for pending outgoing data */
+    State state;        /*!< Socket state                       */
+
     /* Network integration */
     friend class Network;
     friend class EPoll;
     Network& net;       /*!< Network object this socket belongs to */
-
+    
     /* Private methods */
-        
+    
     /*!
      * @brief Constructor
      */
@@ -262,24 +211,42 @@ private:
     void open_socket(const std::string& addr);
 
 public:
+    /*!
+     * @brief Get file descriptor corresponding to socket.
+     *
+     * @note This method should not be used except for testing.
+     */
     int get_fd() const
     {
         return fd;
     }
 private:
     
+    /*!
+     * @brief Get current event mask for socket.
+     */
     void set_event_mask(const int m)
     {
         event_mask = m;
     }
 
+    /*!
+     * @brief Set event mask for socket.
+     */
     int get_event_mask() const
     {
         return event_mask;
     }
 
-    inline size_t get_max_pending_len() const;
-    inline int send_pending(int);
+    /*!
+     * @brief Get max pending bytes
+     */
+    size_t get_max_pending_len() const;
+
+    /*!
+     * @brief Send pending bytes
+     */
+    int send_pending(int);
 public:
     /*!
      * Socket options

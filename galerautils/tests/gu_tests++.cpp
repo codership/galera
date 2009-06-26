@@ -2,6 +2,7 @@
 #include "gu_network.hpp"
 
 #include <cstdlib>
+#include <cstring>
 
 #include <check.h>
 
@@ -49,6 +50,8 @@ struct listener_thd_args
 {
     gu::Network* net;
     int conns;
+    const gu::byte_t* buf;
+    const size_t buflen;
 };
 
 void* listener_thd(void* arg)
@@ -57,6 +60,9 @@ void* listener_thd(void* arg)
     gu::Network* net = larg->net;
     int conns = larg->conns;
     uint64_t bytes = 0;
+    const gu::byte_t* buf = larg->buf;
+    const size_t buflen = larg->buflen;
+    
     while (conns > 0)
     {
         gu::NetworkEvent ev = net->wait_event(-1);
@@ -114,6 +120,11 @@ void* listener_thd(void* arg)
             else
             {
                 bytes += dm->get_len();
+                if (buf != 0)
+                {
+                    fail_unless(dm->get_len() <= buflen);
+                    fail_unless(memcmp(dm->get_buf(), buf, dm->get_len()) == 0);
+                }
             }
         }
         else if (sock == 0)
@@ -135,7 +146,7 @@ START_TEST(test_network_connect)
 {
     gu::Network* net = new gu::Network;
     gu::Socket* listener = net->listen("localhost:2112");
-    listener_thd_args args = {net, 2};
+    listener_thd_args args = {net, 2, 0, 0};
     pthread_t th;
     pthread_create(&th, 0, &listener_thd, &args);
     
@@ -175,9 +186,16 @@ END_TEST
 
 START_TEST(test_network_send)
 {
+    const size_t bufsize = 1 << 24;
+    gu::byte_t* buf = new gu::byte_t[bufsize];
+    for (size_t i = 0; i < bufsize; ++i)
+    {
+        buf[i] = i & 255;
+    }
+
     gu::Network* net = new gu::Network;
     gu::Socket* listener = net->listen("localhost:2112");
-    listener_thd_args args = {net, 2};
+    listener_thd_args args = {net, 2, buf, bufsize};
     pthread_t th;
     pthread_create(&th, 0, &listener_thd, &args);
     
@@ -191,12 +209,8 @@ START_TEST(test_network_send)
     fail_unless(conn2 != 0);
     fail_unless(conn2->get_state() == gu::Socket::S_CONNECTED);
 
-    const size_t bufsize = 1 << 24;
-    gu::byte_t* buf = new gu::byte_t[bufsize];
-    for (size_t i = 0; i < bufsize; ++i)
-    {
-        buf[i] = i & 255;
-    }
+
+
     for (int i = 0; i < 100; ++i)
     {
         size_t dlen = std::min(bufsize, static_cast<size_t>(1 + i*1023*170));
@@ -209,7 +223,7 @@ START_TEST(test_network_send)
 
         dm.reset(buf, ::rand() % 1023 + 1);
     }
-    delete[] buf;
+
     
     conn->close();
     delete conn;
@@ -219,12 +233,14 @@ START_TEST(test_network_send)
     
     void* rval = 0;
     pthread_join(th, &rval);
-
+    
     listener->close();
     delete listener;
-
+    
     delete net;
     delete net2;
+    
+    delete[] buf;
 
 }
 END_TEST
