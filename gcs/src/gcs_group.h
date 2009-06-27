@@ -11,6 +11,8 @@
 #ifndef _gcs_group_h_
 #define _gcs_group_h_
 
+#include <stdbool.h>
+
 #include <galerautils.h>
 
 #include "gcs_node.h"
@@ -41,6 +43,7 @@ typedef struct gcs_group
     volatile
     gcs_seqno_t   last_applied; // last_applied action group-wide
     long          last_node;    // node that reported last_applied
+    bool          frag_reset;   // indicate that fragmentation was reset
     gcs_node_t*   nodes;        // array of node contexts
 }
 gcs_group_t;
@@ -110,14 +113,18 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
                           const gcs_recv_msg_t* msg,
                           gcs_recv_act_t*       act)
 {
-    register long sender_idx = msg->sender_idx;
+    register long    sender_idx = msg->sender_idx;
+    register bool    local      = (sender_idx == group->my_idx);
     register ssize_t ret;
 
     assert (GCS_MSG_ACTION == msg->type);
     assert (sender_idx < group->num);
 
-    ret = gcs_node_handle_act_frag (&group->nodes[sender_idx],
-                                    frg, act, (sender_idx == group->my_idx));
+    // clear reset flag if set by own first fragment after reset flag was set
+    group->frag_reset = (group->frag_reset && (0 != frg->frag_no || !local));
+
+    ret = gcs_node_handle_act_frag (&group->nodes[sender_idx], frg, act, local);
+
     if (gu_unlikely(ret > 0)) {
 
         assert (ret == act->buf_len);
@@ -125,13 +132,30 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
         act->type       = frg->act_type;
         act->sender_idx = sender_idx;
 
-        if (gu_likely(GCS_ACT_DATA      == act->type &&
-                      GCS_GROUP_PRIMARY == group->state)) {
-            // increment act_id only for DATA (should it be renamed to TOTAL?)
-            // and only in PRIM (skip messages while in state exchange)
+        if (gu_likely(GCS_ACT_DATA      == act->type    &&
+                      GCS_GROUP_PRIMARY == group->state &&
+                      !(group->frag_reset && local))) {
+            /* Common situation -
+             * increment act_id only for DATA (should it be renamed to TOTAL?)
+             * and only in PRIM (skip messages while in state exchange) */
             act->id = ++group->act_id;
-        } else if (act->type == GCS_ACT_STATE_REQ) {
-            ret = gcs_group_handle_state_request (group, sender_idx, act);
+        }
+        else {
+            /* Rare situation */
+            if (group->frag_reset && local) {
+                /* Fragmentation was reset by configuration change.
+                 * Should be true for ANY action type. */
+                if (GCS_GROUP_PRIMARY == group->state) {
+                   act->id =  -ERESTART;
+                }
+                // else?
+            }
+            else {
+                // Some other condition
+                if (act->type == GCS_ACT_STATE_REQ) {
+                    ret = gcs_group_handle_state_request(group,sender_idx,act);
+                }
+            }
         }
     }
 

@@ -46,13 +46,14 @@ int main(int argc, char* argv[])
   if (!log_file) return EXIT_FAILURE;
   gu_conf_set_log_file (log_file);
   gu_conf_debug_on();
+  gu_conf_self_tstamp_on();
 
   while (suites[i]) {
       SRunner* sr = srunner_create(suites[i]());
 
-      gu_info ("###########################################");
+      gu_info ("#########################");
       gu_info ("Test %d.", i);
-      gu_info ("###########################################");
+      gu_info ("#########################");
       if (no_fork) srunner_set_fork_status(sr, CK_NOFORK);
       srunner_run_all (sr, CK_NORMAL);
       failed += srunner_ntests_failed (sr);

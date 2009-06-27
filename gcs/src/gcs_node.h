@@ -58,6 +58,10 @@ gcs_node_free (gcs_node_t* node);
 extern void
 gcs_node_reset (gcs_node_t* node);
 
+/*! Mark node's buffers as reset, but don't do it actually (local node only) */
+extern void
+gcs_node_reset_local (gcs_node_t* node);
+
 /*!
  * Handles action message. Is called often - therefore, inlined
  *

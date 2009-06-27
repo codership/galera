@@ -27,6 +27,7 @@ typedef struct gcs_defrag
     size_t         size;
     size_t         received;
     long           frag_no; // number of fragment received
+    bool           reset;
 }
 gcs_defrag_t;
 
@@ -63,6 +64,13 @@ gcs_defrag_free (gcs_defrag_t* df)
 {
     free (df->head); // alloc'ed with standard malloc
     gcs_defrag_init (df);
+}
+
+/*! Mark current action as reset */
+static inline void
+gcs_defrag_reset (gcs_defrag_t* df)
+{
+    df->reset = true;
 }
 
 #endif /* _gcs_defrag_h_ */

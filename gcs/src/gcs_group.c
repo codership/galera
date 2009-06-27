@@ -30,6 +30,7 @@ gcs_group_init (gcs_group_t* group)
     group->state        = GCS_GROUP_NON_PRIMARY;
     group->last_applied = GCS_SEQNO_ILL; // mark for recalculation
     group->last_node    = -1;
+    group->frag_reset   = true; // just in case
     group->nodes        =  GU_CALLOC(group->num, gcs_node_t);
 
     if (!group->nodes) return -ENOMEM;
@@ -93,8 +94,15 @@ group_nodes_reset (gcs_group_t* group)
     register long i;
     /* reset recv_acts at the nodes */
     for (i = 0; i < group->num; i++) {
-        gcs_node_reset (&group->nodes[i]);
+        if (i != group->my_idx) {
+            // don't reset own buffers - we will need them for self-delivery
+            gcs_node_reset (&group->nodes[i]);
+        }
+        else {
+            gcs_node_reset_local (&group->nodes[i]);
+        }
     }
+    group->frag_reset = true;
 }
 
 /* Find node with the smallest last_applied */

@@ -173,7 +173,9 @@ START_TEST (gcs_group_configuration)
     fail_if (act.buf_len != 0);
 
     // 3. Try first fragment again
+    gu_debug ("");
     TRY_WRONG_2ND_FRAGMENT(msg1);
+    gu_debug ("");
 
     // 4. Try third fragment
     TRY_WRONG_2ND_FRAGMENT(msg3);

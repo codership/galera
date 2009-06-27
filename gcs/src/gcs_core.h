@@ -71,6 +71,9 @@ gcs_core_destroy (gcs_core_t* conn);
 
 /* 
  * gcs_core_send() atomically sends action to group.
+ *
+ * NOT THREAD SAFE! Access should be serialized.
+ *
  * Return values:
  * non-negative - amount of action bytes sent (sans headers)
  * negative     - error code

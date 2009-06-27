@@ -52,8 +52,6 @@ struct gcs_core
     void*           send_buf;
     size_t          send_buf_len;
     gcs_seqno_t     send_act_no;
-    bool            send_ongoing;
-    long            send_abort; // a code with which ongoing send must abort
 
     /* recv part */
     gcs_recv_msg_t  recv_msg;
@@ -182,47 +180,37 @@ core_error (core_state_t state)
  */
 static inline ssize_t
 core_msg_send (gcs_core_t*    core,
-               const void*    buf,
-               size_t         buf_len,
-               gcs_msg_type_t type,
+               const void*    msg,
+               size_t         msg_len,
+               gcs_msg_type_t msg_type,
                bool           last)
 {
     ssize_t ret;
 
     if (gu_unlikely(0 != gu_mutex_lock (&core->send_lock))) abort();
     {
-        // TODO: nothing here can tell between GCS_ACT_DATA and GCS_ACT_SERVICE
-        // when GCS_ACT_SERVICE will be implemented, we'll have to have two
-        // restart flags - one for each of ongoing actions
-//        register bool restart = core->act_restart && (type == GCS_MSG_ACTION);
-        if (gu_likely((core->state == CORE_PRIMARY  && !core->send_abort) ||
-                      (core->state == CORE_EXCHANGE && type == GCS_MSG_STATE_MSG))) {
-            ret = core->backend.send (&core->backend, buf, buf_len, type);
+        if (gu_likely((CORE_PRIMARY  == core->state) ||
+                      (CORE_EXCHANGE == core->state && GCS_MSG_STATE_MSG == 
+                       msg_type))) {
 
-            core->send_ongoing = (ret > 0 && (!last || ret != buf_len)) ||
-                (-EAGAIN == ret);
+            ret = core->backend.send (&core->backend, msg, msg_len, msg_type);
+
+            if (ret > 0 && ret != msg_len) {
+                // could not send message in one piece
+                gu_error ("Failed to send complete message of %s type: "
+                          "sent %zd out of %zu bytes.",
+                          gcs_msg_type_string[msg_type], ret, msg_len);
+                ret = -EMSGSIZE;
+            }
         }
         else {
-            if (GCS_MSG_ACTION == type && core->send_abort) {
-                if (core->send_ongoing) {
-                    ret = core->send_abort;
-                }
-                else {
-                    gu_fatal ("GCS internal state inconsistency: "
-                              "expected ongoing action.");
-                    ret = -ENOTRECOVERABLE;
-                }
-                core->send_abort = 0; // next action doesn't need it
-            }
-            else {
-                ret = core_error (core->state);
-            }
+            ret = core_error (core->state);
+
             if (ret >= 0) {
                 gu_fatal ("GCS internal state inconsistency: "
                           "expected error condition.");
-                ret = -ENOTRECOVERABLE;
+                abort(); // ret = -ENOTRECOVERABLE;
             }
-            core->send_ongoing = false;
         }
     }
     gu_mutex_unlock (&core->send_lock);
@@ -262,9 +250,9 @@ gcs_core_send (gcs_core_t*      const conn,
     gcs_act_frag_t frg;
     size_t         send_size;
     const unsigned char proto_ver = conn->proto_ver;
-    const size_t   hdr_size  = gcs_act_proto_hdr_size (proto_ver);
+    const size_t   hdr_size       = gcs_act_proto_hdr_size (proto_ver);
 
-    core_act_t*     local_act;
+    core_act_t*    local_act;
 
     /* 
      * Action header will be replicated with every message.
@@ -596,8 +584,6 @@ core_handle_comp_msg (gcs_core_t*     core,
                     gu_info ("STATE EXCHANGE: Waiting for state UUID.");
                 }
                 core->state = CORE_EXCHANGE;
-                // since new members were added, need to resend ongoing actions
-                if (core->send_ongoing) core->send_abort = -ERESTART;
             }
             ret = 0; // no action to return, continue
         }
@@ -611,8 +597,6 @@ core_handle_comp_msg (gcs_core_t*     core,
             if (CORE_PRIMARY  == core->state ||
                 CORE_EXCHANGE == core->state) {
                 core->state = CORE_NON_PRIMARY;
-                // make sure that ongoing send is aborted
-                if (core->send_ongoing) core->send_abort = -ENOTCONN;
             }
         }
         gu_mutex_unlock (&core->send_lock);

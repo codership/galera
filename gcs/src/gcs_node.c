@@ -44,11 +44,20 @@ gcs_node_move (gcs_node_t* dst, gcs_node_t* src)
     src->state    = NULL;
 }
 
+/*! Mark node's buffers as reset (local node only) */
+void
+gcs_node_reset_local (gcs_node_t* node)
+{
+    gcs_defrag_reset (&node->app);
+    gcs_defrag_reset (&node->oob);
+}
+
 /*! Reset node's receive buffers */
-extern void
+void
 gcs_node_reset (gcs_node_t* node) {
     gcs_defrag_free (&node->app);
     gcs_defrag_free (&node->oob);
+    gcs_node_reset_local (node);
 }
 
 /*! Deallocate resources associated with the node object */
