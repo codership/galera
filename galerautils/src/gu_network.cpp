@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2008 Codership Oy <info@codership.com>
  *
- * $Id:$
+ * $Id$
  */
 
 /* Galerautil C++ includes */
@@ -22,17 +22,87 @@
 
 /* STD/STL includes */
 #include <stdexcept>
+#include <sstream>
 #include <map>
+#include <vector>
 
 /* System includes */
 #include <netdb.h>
-
+#include <fcntl.h>
 
 /* Using stuff to improve readability */
 using std::string;
+using std::istringstream;
+using std::vector;
 using std::map;
 using std::make_pair;
 
+class OptionMap
+{
+    map<const string, int> opt_map;
+public:
+    
+    void insert(const string& key, const int val)
+    {
+        if (opt_map.insert(make_pair(key, val)).second == false)
+        {
+            throw std::logic_error("duplicate key");
+        }
+    }
+    
+    OptionMap()
+    {
+        insert("socket.non_blocking", gu::Socket::O_NON_BLOCKING);
+    }
+    
+    std::map<const string, int>::const_iterator find(const string& key)
+    {
+        std::map<const string, int>::const_iterator i;
+        if ((i = opt_map.find(key)) == opt_map.end())
+        {
+            log_error << "invalid key '" << key << "'";
+            throw std::logic_error("invalid key");
+        }
+        return i;
+    }
+};
+
+static OptionMap option_map;
+
+template <class T> class Option
+{
+    int opt;
+    T val;
+public:
+    Option(int opt_, T val_) :
+        opt(opt_),
+        val(val_)
+    {
+    }
+    int get_opt() const
+    {
+        return opt;
+    }
+
+    const T& get_val() const
+    {
+        return val;
+    }
+};
+
+template <class T> Option<T> get_option(const string& key, const string& val)
+{
+    
+    map<const string, int>::const_iterator i = option_map.find(key);
+    istringstream is(val);
+    T ret;
+    is >> ret;
+    if (is.fail())
+    {
+        throw std::invalid_argument("");
+    }
+    return Option<T>(i->second, ret);
+}
 
 int gu::closefd(int fd)
 {
@@ -285,31 +355,38 @@ gu::Socket::~Socket()
 }
 
 /*
+ * Construct URL from string. If no scheme-authority separator is not 
+ * found from string, string is prefixed with tcp scheme.
+ */
+static gu::URL get_url(const string& str)
+{
+    string real_str;
+    if (str.find("://") == string::npos)
+    {
+        real_str = "tcp://" + str;
+    }
+    else
+    {
+        real_str = str;
+    }
+    return gu::URL(real_str);
+}
+
+/*
  * Fill in addrinfo according to addr URL
  */
-static void get_addrinfo(const string& addr, struct addrinfo** ai)
+static void get_addrinfo(const gu::URL& url, struct addrinfo** ai)
 {
-
-    string real_addr = addr;
-    if (addr.find("://") == string::npos)
-    {
-        real_addr = "tcp://" + addr;
-    }
-    log_debug << "real addr: " << real_addr;
-    gu::URL url(real_addr);
     string scheme = url.get_scheme();
-    if (scheme == "")
-    {
-        /* No scheme part in url, assume tcp */
-        scheme = gu::URLScheme::tcp;
-    }
-    gu::Resolver::resolve(scheme, url.get_authority(), ai);
+    string addr = url.get_authority();
+    gu::Resolver::resolve(scheme, addr, ai);
 }
 
 void gu::Socket::open_socket(const string& addr)
 {
     struct addrinfo* ai(0);    
-    get_addrinfo(addr, &ai);
+    URL url(get_url(addr));
+    get_addrinfo(url, &ai);
     
     if (ai == 0 || ai->ai_addr == 0)
     {
@@ -326,11 +403,43 @@ void gu::Socket::open_socket(const string& addr)
     sa_size = ai->ai_addrlen;
     
     freeaddrinfo(ai);
+
+
+    const URLQueryList& ql = url.get_query_list();
+    for (URLQueryList::const_iterator i = ql.begin(); i != ql.end(); ++i)
+    {
+        Option<int> opt = get_option<int>(i->first, i->second);
+        switch (opt.get_opt())
+        {
+        case O_NON_BLOCKING:
+            if (opt.get_val())
+            {
+                options |= O_NON_BLOCKING;
+            }
+            else
+            {
+                options &= ~O_NON_BLOCKING;
+            }
+            break;
+        default:
+            throw std::logic_error("invalid option");
+        }
+    }
     
     if ((fd = ::socket(ai_family, ai_socktype, ai_protocol)) == -1)
     {
         throw std::runtime_error("could not create socket");
     }
+    
+    if ((getopt() & O_NON_BLOCKING))
+    {
+        if (::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
+        {
+            int err = errno;
+            log_error << "could not set fd non blocking " << strerror(err);
+        }
+    }
+
 }
 
 void gu::Socket::connect(const string& addr)
@@ -341,6 +450,7 @@ void gu::Socket::connect(const string& addr)
     {
         if ((options & O_NON_BLOCKING) && errno == EINPROGRESS)
         {
+            log_debug << "non blocking connecting";
             set_state(S_CONNECTING);
         }
         else
@@ -766,11 +876,18 @@ gu::Network::Network() :
     sockets(new SocketList()),
     poll(new EPoll())
 {
-
+    if (pipe(wake_fd) == -1)
+    {
+        throw std::runtime_error("could not create pipe");
+    }
+    poll->insert(EPollEvent(wake_fd[0], NetworkEvent::E_IN, 0));
 }
 
 gu::Network::~Network()
 {
+    poll->erase(EPollEvent(wake_fd[0], 0, 0));
+    closefd(wake_fd[1]);
+    closefd(wake_fd[0]);
     // TODO: Deep cleanup
     delete sockets;
     delete poll;
@@ -809,14 +926,14 @@ void gu::Network::insert(Socket* sock)
         delete sock;
         throw std::logic_error("");
     }
-    poll->insert(sock);
+    poll->insert(EPollEvent(sock->get_fd(), sock->get_event_mask(), sock));
 }
 
-void gu::Network::erase(Socket* s)
+void gu::Network::erase(Socket* sock)
 {
     /* Erases socket from poll set */
-    poll->erase(s);
-    sockets->erase(s->get_fd());
+    poll->erase(EPollEvent(sock->get_fd(), 0, sock));
+    sockets->erase(sock->get_fd());
 }
 
 gu::Socket* gu::Network::find(int fd)
@@ -829,15 +946,15 @@ gu::Socket* gu::Network::find(int fd)
     return i->second;
 }
 
-void gu::Network::set_event_mask(Socket* socket, const int mask)
+void gu::Network::set_event_mask(Socket* sock, const int mask)
 {
-    if (find(socket->get_fd()) == 0)
+    if (find(sock->get_fd()) == 0)
     {
-        log_error << "socket " << socket->get_fd() << " not found from socket set";
+        log_error << "socket " << sock->get_fd() << " not found from socket set";
         throw std::logic_error("invalid socket");
     }
-    poll->set_mask(socket, mask);
-    socket->set_event_mask(mask);
+    poll->modify(EPollEvent(sock->get_fd(), mask, sock));
+    sock->set_event_mask(mask);
 }
 
 gu::NetworkEvent gu::Network::wait_event(const long timeout)
@@ -845,22 +962,35 @@ gu::NetworkEvent gu::Network::wait_event(const long timeout)
     Socket* sock = 0;
     int revent = 0;
     
+    if (poll->empty())
+    {
+        poll->poll(timeout);
+    }
+    
     do
     {
-        EPoll::iterator i = poll->begin();
-        if (i == poll->end())
+        if (poll->empty())
         {
-            poll->poll(timeout);
-            i = poll->begin();
-        }
-        if (i == poll->end())
-        {
-            return NetworkEvent(NetworkEvent::E_TIMED, 0);
+            return NetworkEvent(NetworkEvent::E_EMPTY, 0);
         }
         
-        sock = EPoll::get_socket(i);
-        revent = EPoll::get_revents(i);
+        EPollEvent ev = poll->front();
         poll->pop_front();
+        
+        if (ev.get_fd() == wake_fd[0])
+        {
+            byte_t buf[1];
+            if (read(wake_fd[0], buf, sizeof(buf)) != 1)
+            {
+                int err = errno;
+                log_error << "Could not read pipe: " << strerror(err);
+                throw std::runtime_error("");
+            }
+            continue;
+        }
+        
+        sock = reinterpret_cast<Socket*>(ev.get_user_data());
+        revent = ev.get_events();
         
         switch (sock->get_state())
         {
@@ -926,4 +1056,15 @@ gu::NetworkEvent gu::Network::wait_event(const long timeout)
     while (sock == 0);
     
     return NetworkEvent(revent, sock);
+}
+
+void gu::Network::interrupt()
+{
+    byte_t buf[1] = {'i'};
+    if (write(wake_fd[1], buf, sizeof(buf)) != 1)
+    {
+        int err = errno;
+        log_error << "unable to write to pipe: " << strerror(err);
+        throw std::runtime_error("unable to write to pipe");
+    }
 }

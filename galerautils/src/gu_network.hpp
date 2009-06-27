@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2008 Codership Oy <info@codership.com>
  *
- * $Id:$
+ * $Id$
  */
 
 /*!
@@ -255,6 +255,7 @@ public:
      */
     enum
     {
+        /* NOTE: O_NON_BLOCKING is needed for non-blocking connect() */
         O_NON_BLOCKING = 1 << 0, /*!< Socket operations are non-blocking */
         O_NO_INTERRUPT = 1 << 1  /*!< Socket methods calls are not 
                                   * interruptible */
@@ -403,7 +404,7 @@ public:
         E_ERROR = 1 << 4,    /*!< Socket was closed or error leading to 
                                socket close was encountered */
         E_CLOSED = 1 << 5,
-        E_TIMED = 1 << 6
+        E_EMPTY = 1 << 6
     };
 private:    
     int event_mask;             /*!< Event mask              */
@@ -435,10 +436,14 @@ class gu::Network
 {
     friend class Socket;
     SocketList* sockets;
+    int wake_fd[2];
     EPoll* poll;
     void insert(Socket*);
     void erase(Socket*);
     Socket* find(int);
+    /* Don't allow assignment or copy construction */
+    Network operator=(const Network&);
+    Network(const Network&);
 public:
         
     /*!
@@ -468,6 +473,11 @@ public:
      * @throws std::runtime_error If error was encountered
      */
     NetworkEvent wait_event(long timeout = -1);
+
+    /**
+     *
+     */
+    void interrupt();
 
     /*!
      * @brief Set event mask for @p sock

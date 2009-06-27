@@ -1,9 +1,20 @@
+/*
+ * Copyright (C) 2008 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
+
+/*!
+ * @file gu_epoll.hpp Poll interface implementation using epoll
+ * 
+ */
 
 #ifndef __GU_EPOLL_HPP__
 #define __GU_EPOLL_HPP__
 
 #include <cstdlib>
 
+/* Forward declarations */
 namespace gu
 {
     class EPollEvent;
@@ -13,56 +24,148 @@ namespace gu
 
 struct epoll_event;
 
+/*!
+ * @brief Poll event class
+ *
+ */
 class gu::EPollEvent
 {
-    int revents;
-    Socket* socket;
+    int fd;          /*! File descriptor */
+    int events;      /*! Event mask */
+    void* user_data; /*! Pointer to user context */
 public:
-    EPollEvent(int revents_, Socket* socket) :
-        revents(revents_),
-        socket(socket)
+    /*!
+     * @brief EPollEvent Constructor
+     *
+     * @param fd_ File descriptor
+     * @param events_ Event mask
+     * @param user_data_ User data
+     */
+    EPollEvent(int fd_, int events_, void* user_data_) :
+        fd(fd_),
+        events(events_),
+        user_data(user_data_)
     {
     }
-
-    int get_revents() const
+    
+    /*!
+     * @brief Get file descriptor corresponding to event
+     */
+    int get_fd() const
     {
-        return revents;
+        return fd;
     }
-
-    Socket* get_socket() const
+    
+    /*!
+     * @brief Get event mask corresponding to event
+     */
+    int get_events() const
     {
-        return socket;
+        return events;
+    }
+    
+    /*!
+     * @brief Get user data corresponding to event
+     */
+    void* get_user_data() const
+    {
+        return user_data;
     }
 };
 
+
+/*!
+ * @brief EPoll interface
+ */
 class gu::EPoll
 {
-    int e_fd;
-    struct epoll_event* events;
-    size_t events_size;
-    size_t n_events;
-    struct epoll_event* current;
+    int e_fd; /*! epoll control file descriptor */
+    struct epoll_event* events; /*! array of epoll events */
+    size_t events_size; /*! events array size */
+    size_t n_events; /*! number of unhandled events  */
+    struct epoll_event* current; /*! pointer to current event */
+
+    /*!
+     * @brief Resize events array
+     */
     void resize(const size_t to_size);
 public:
+
+    /*!
+     * @brief Constructor
+     */
     EPoll();
+    
+    /*!
+     * @brief Destructor
+     */
     ~EPoll();
     
-    void insert(Socket* s);
-    void erase(Socket* s);
-    void set_mask(Socket* s, const int mask);
-    int poll(const int timeout);
+    /*!
+     * @brief Insert new file descriptor to poll for
+     *
+     * EPollEvent @p ev must contain valid file descriptor and 
+     * initial event mask. 
+     * 
+     * @param ev EPollEvent containing required data
+     *
+     * @throws std::runtime_error if epoll control call fails
+     * @throws std::bad_alloc if call fails to allocate memory for 
+     *         internal storage
+     */
+    void insert(const EPollEvent& ev);
+
+    /*!
+     * @brief Erase file descriptor from set of polled fds
+     * 
+     * EPollEvent @p ev must contain valid file descriptor
+     *
+     * @param ev EPollEvent containing valid file descriptor
+     */
+    void erase(const EPollEvent& ev);
+
+    /*!
+     * @brief Modify event mask for polled events of existing file descriptor
+     *
+     * @param ev EPollEvent containing valid file descriptor
+     *
+     * @throws std::runtime_error if epoll control call fails
+     */
+    void modify(const EPollEvent& ev);
+
+    /*!
+     * @brief Poll until activity is detected or timeout expires
+     *
+     * Poll file descriptor until activity is detected or timeout 
+     * expires. Timeout is given in milliseconds, -1 means poll 
+     * indefinitely and 0 means return immediately. After 
+     * this call returns, list of active events is stored in
+     * internal storage.
+     *
+     * @param timeout Timeout in milliseconds
+     */
+    void poll(int timeout);
+
+    /*!
+     * @brief Check whether list of unhandled poll events is empty
+     */
+    bool empty() const;
     
-    typedef struct epoll_event* iterator;
+    /*!
+     * @brief Get (first) event from list of unhandled poll events
+     *
+     * @return EPollEvent 
+     *
+     * @throws std::logic_error if no events were available
+     */
+    EPollEvent front() const;
     
-    iterator begin();
-    iterator end();
-    bool empty();
-    EPollEvent front();
+    /*!
+     * @brief Erase the first event from the list of unhandled poll events
+     *
+     * @throws std::logic_error if no events were available
+     */
     void pop_front();
-
-    static gu::Socket* get_socket(gu::EPoll::iterator i);
-    static int get_revents(gu::EPoll::iterator i);
-
 };
 
 #endif /* __GU_EPOLL_HPP__ */

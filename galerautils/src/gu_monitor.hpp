@@ -1,3 +1,14 @@
+/*
+ * Copyright (C) 2008 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
+
+/*!
+ * @file gu_monitor.hpp
+ *
+ *
+ */
 
 #ifndef __GU_MONITOR_HPP__
 #define __GU_MONITOR_HPP__
@@ -14,7 +25,7 @@ namespace gu
 
 class gu::Monitor
 {
-    volatile int refcnt;
+    int refcnt;
     /* TODO: */
     pthread_t holder;
     Mutex mutex;
@@ -49,7 +60,7 @@ public:
         refcnt--;
         if (refcnt == 0)
         {
-            cond.broadcast();
+            cond.signal();
         }
     }
 };

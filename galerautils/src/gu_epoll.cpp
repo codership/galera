@@ -1,3 +1,9 @@
+/*
+ * Copyright (C) 2008 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
+
 
 #include "gu_epoll.hpp"
 #include "gu_network.hpp"
@@ -8,6 +14,12 @@
 #include <sys/epoll.h>
 #include <cerrno>
 #include <cstring>
+
+/*
+ * Mapping between NetworkEvent and EPoll events
+ *
+ * TODO: This mapping should be done elsewhere...
+ */
 
 static inline int to_epoll_mask(const int mask)
 {
@@ -32,6 +44,8 @@ static inline int to_network_event_mask(const int mask)
     return ret;
 }
 
+
+
 void gu::EPoll::resize(const size_t to_size)
 {
     void* tmp = realloc(events, to_size*sizeof(struct epoll_event));
@@ -42,7 +56,7 @@ void gu::EPoll::resize(const size_t to_size)
     }
     events = reinterpret_cast<struct epoll_event*>(tmp);
     events_size = to_size;
-    current = end();
+    n_events = 0;
 }
 
 gu::EPoll::EPoll() :
@@ -68,48 +82,32 @@ gu::EPoll::~EPoll()
     free(events);
 }
     
-void gu::EPoll::set_mask(Socket* s, const int mask)
-{
-    log_debug << "set_mask(): " << s->get_fd() << " " 
-              << s->get_event_mask() << " -> " << mask;
-    if (mask == s->get_event_mask())
-    {
-        log_debug << "socket: " << s->get_fd() 
-                  << " no mask update required";
-        return;
-    }
-    
-    int op = EPOLL_CTL_MOD;
-    struct epoll_event ev = {to_epoll_mask(mask), {s}};
-    int err = epoll_ctl(e_fd, op, s->get_fd(), &ev);
-    
-    if (err == -1)
-    {
-        log_error << "epoll_ctl(" << op << "," << s->get_fd() << "): " << err 
-                  << " '" << strerror(err) << "'";
-        throw std::runtime_error("");
-    }
-}
 
-void gu::EPoll::insert(Socket* s)
+
+void gu::EPoll::insert(const EPollEvent& epe)
 {
     int op = EPOLL_CTL_ADD;
-    struct epoll_event ev = {s->get_event_mask(), {s}};
-    int err = epoll_ctl(e_fd, op, s->get_fd(), &ev);
+    struct epoll_event ev = {
+        to_epoll_mask(epe.get_events()), 
+        {epe.get_user_data()}
+    };
+    int err = epoll_ctl(e_fd, op, epe.get_fd(), &ev);
     if (err != 0)
     {
+        err = errno;
         log_error << "epoll_ctl(" << e_fd << "," << op << "): " 
                   << strerror(err);
         throw std::runtime_error("");
     }
     resize(events_size + 1);
+    
 }
 
-void gu::EPoll::erase(Socket* s)
+void gu::EPoll::erase(const EPollEvent& epe)
 {
     int op = EPOLL_CTL_DEL;
     struct epoll_event ev = {0, {0}};
-    int err = epoll_ctl(e_fd, op, s->get_fd(), &ev);
+    int err = epoll_ctl(e_fd, op, epe.get_fd(), &ev);
     if (err != 0)
     {
         log_debug << "epoll erase: " << err;
@@ -117,37 +115,40 @@ void gu::EPoll::erase(Socket* s)
     resize(events_size - 1);
 }
 
-int gu::EPoll::poll(const int timeout)
+void gu::EPoll::modify(const EPollEvent& epe)
+{
+    int op = EPOLL_CTL_MOD;
+    struct epoll_event ev = {
+        to_epoll_mask(epe.get_events()), 
+        {epe.get_user_data()}
+    };
+    int err = epoll_ctl(e_fd, op, epe.get_fd(), &ev);
+    
+    if (err != 0)
+    {
+        err = errno;
+        log_error << "epoll_ctl(" << op << "," << epe.get_fd() << "): " << err 
+                  << " '" << strerror(err) << "'";
+        throw std::runtime_error("");
+    }
+}
+
+void gu::EPoll::poll(const int timeout)
 {
     int ret = epoll_wait(e_fd, events, events_size, timeout);
     if (ret == -1)
     {
         ret = errno;
         log_error << "epoll_wait(): " << ret;
-        current = end();
+        n_events = 0;
     }
     else
     {
         n_events = ret;
         current = events;
     }
-    return ret;
 }
     
-gu::EPoll::iterator gu::EPoll::begin()
-{
-    if (n_events)
-    {
-        return current;
-    }
-    return end();
-}
-    
-gu::EPoll::iterator gu::EPoll::end()
-{
-    return events + events_size;
-}
-
 void gu::EPoll::pop_front()
 {
     if (n_events == 0)
@@ -158,12 +159,16 @@ void gu::EPoll::pop_front()
     ++current;
 }
 
-gu::Socket* gu::EPoll::get_socket(gu::EPoll::iterator i)
+bool gu::EPoll::empty() const
 {
-    return reinterpret_cast<gu::Socket*>(i->data.ptr);
+    return n_events == 0;
 }
 
-int gu::EPoll::get_revents(gu::EPoll::iterator i)
+gu::EPollEvent gu::EPoll::front() const
 {
-    return to_network_event_mask(i->events);
+    if (n_events == 0)
+    {
+        throw std::logic_error("no events available");
+    }
+    return EPollEvent(-1, to_network_event_mask(current->events), current->data.ptr);
 }
