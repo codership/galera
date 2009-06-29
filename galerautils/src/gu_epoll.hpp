@@ -17,9 +17,12 @@
 /* Forward declarations */
 namespace gu
 {
-    class EPollEvent;
-    class EPoll;
-    class Socket;
+    namespace net
+    {
+        class EPollEvent;
+        class EPoll;
+        class Socket;
+    }
 }
 
 struct epoll_event;
@@ -28,7 +31,7 @@ struct epoll_event;
  * @brief Poll event class
  *
  */
-class gu::EPollEvent
+class gu::net::EPollEvent
 {
     int fd;          /*! File descriptor */
     int events;      /*! Event mask */
@@ -77,7 +80,7 @@ public:
 /*!
  * @brief EPoll interface
  */
-class gu::EPoll
+class gu::net::EPoll
 {
     int e_fd; /*! epoll control file descriptor */
     struct epoll_event* events; /*! array of epoll events */

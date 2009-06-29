@@ -45,25 +45,28 @@
 namespace gu
 {
 
-    /*! 
-     * @typedef @brief Byte buffer type
-     */
-    typedef unsigned char byte_t;
-    class ByteBuffer;
-    class Datagram;
-    class Socket;
-    class SocketList;
-    class EPoll;
-    class NetworkEvent;
-    class Network;
-    
-    namespace URLScheme
+    namespace net
     {
-        static const std::string tcp = "tcp";
+        /*! 
+         * @typedef @brief Byte buffer type
+         */
+        typedef unsigned char byte_t;
+        class ByteBuffer;
+        class Datagram;
+        class Socket;
+        class SocketList;
+        class EPoll;
+        class NetworkEvent;
+        class Network;
+        
+        namespace URLScheme
+        {
+            static const std::string tcp = "tcp";
+        }
+        
+        
+        int closefd(int fd);
     }
-    
-    
-    int closefd(int fd);
 }
 /*! 
  * @brief  Datagram container
@@ -71,7 +74,7 @@ namespace gu
  * Datagram class provides consistent interface for managing 
  * datagrams/byte buffers. 
  */
-class gu::Datagram
+class gu::net::Datagram
 {
     const byte_t* const_buf;
     byte_t* buf; /*!< Private byte buffer */
@@ -146,7 +149,7 @@ public:
 /*!
  * @brief Socket interface
  */
-class gu::Socket
+class gu::net::Socket
 {
 public:
     /* Public enumerations and typedefs */
@@ -387,7 +390,7 @@ public:
 /*!
  * @brief Network event class
  */
-class gu::NetworkEvent
+class gu::net::NetworkEvent
 {
 public:
     /*!
@@ -432,7 +435,7 @@ public:
 /*!
  * @brief Network interface
  */
-class gu::Network
+class gu::net::Network
 {
     friend class Socket;
     SocketList* sockets;

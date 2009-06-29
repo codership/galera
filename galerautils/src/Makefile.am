@@ -60,7 +60,8 @@ libgalerautils___la_SOURCES = \
 	gu_url.cpp            \
 	gu_resolver.cpp	      \
 	gu_epoll.cpp	      \
-	gu_network.cpp
+	gu_network.cpp        \
+	gu_prodcons.cpp
 
 
 INTERFACEPP = 1

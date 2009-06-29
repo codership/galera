@@ -7,7 +7,6 @@
 
 namespace gu
 {
-
     class URLQueryList : public std::multimap<const std::string, std::string>
     {
     public:

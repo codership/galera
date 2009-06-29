@@ -24,8 +24,8 @@
 static inline int to_epoll_mask(const int mask)
 {
     int ret = 0;
-    ret |= (mask & gu::NetworkEvent::E_IN ? EPOLLIN : 0);
-    ret |= (mask & gu::NetworkEvent::E_OUT ? EPOLLOUT : 0);
+    ret |= (mask & gu::net::NetworkEvent::E_IN ? EPOLLIN : 0);
+    ret |= (mask & gu::net::NetworkEvent::E_OUT ? EPOLLOUT : 0);
     return ret;
 }
 
@@ -37,16 +37,16 @@ static inline int to_network_event_mask(const int mask)
         log_warn << "event mask " << mask << " has unrecognized bits set";
     }
 
-    ret |= (mask & EPOLLIN ? gu::NetworkEvent::E_IN : 0);
-    ret |= (mask & EPOLLOUT ? gu::NetworkEvent::E_OUT : 0);
-    ret |= (mask & EPOLLERR ? gu::NetworkEvent::E_ERROR : 0);
-    ret |= (mask & EPOLLHUP ? gu::NetworkEvent::E_ERROR : 0);
+    ret |= (mask & EPOLLIN ? gu::net::NetworkEvent::E_IN : 0);
+    ret |= (mask & EPOLLOUT ? gu::net::NetworkEvent::E_OUT : 0);
+    ret |= (mask & EPOLLERR ? gu::net::NetworkEvent::E_ERROR : 0);
+    ret |= (mask & EPOLLHUP ? gu::net::NetworkEvent::E_ERROR : 0);
     return ret;
 }
 
 
 
-void gu::EPoll::resize(const size_t to_size)
+void gu::net::EPoll::resize(const size_t to_size)
 {
     void* tmp = realloc(events, to_size*sizeof(struct epoll_event));
     if (to_size > 0 && tmp == 0)
@@ -59,7 +59,7 @@ void gu::EPoll::resize(const size_t to_size)
     n_events = 0;
 }
 
-gu::EPoll::EPoll() :
+gu::net::EPoll::EPoll() :
     e_fd(-1),
     events(0),
     events_size(0),
@@ -72,7 +72,7 @@ gu::EPoll::EPoll() :
     }
 }
     
-gu::EPoll::~EPoll()
+gu::net::EPoll::~EPoll()
 {
     int err = closefd(e_fd);
     if (err != 0)
@@ -84,7 +84,7 @@ gu::EPoll::~EPoll()
     
 
 
-void gu::EPoll::insert(const EPollEvent& epe)
+void gu::net::EPoll::insert(const EPollEvent& epe)
 {
     int op = EPOLL_CTL_ADD;
     struct epoll_event ev = {
@@ -103,7 +103,7 @@ void gu::EPoll::insert(const EPollEvent& epe)
     
 }
 
-void gu::EPoll::erase(const EPollEvent& epe)
+void gu::net::EPoll::erase(const EPollEvent& epe)
 {
     int op = EPOLL_CTL_DEL;
     struct epoll_event ev = {0, {0}};
@@ -115,7 +115,7 @@ void gu::EPoll::erase(const EPollEvent& epe)
     resize(events_size - 1);
 }
 
-void gu::EPoll::modify(const EPollEvent& epe)
+void gu::net::EPoll::modify(const EPollEvent& epe)
 {
     int op = EPOLL_CTL_MOD;
     struct epoll_event ev = {
@@ -133,7 +133,7 @@ void gu::EPoll::modify(const EPollEvent& epe)
     }
 }
 
-void gu::EPoll::poll(const int timeout)
+void gu::net::EPoll::poll(const int timeout)
 {
     int ret = epoll_wait(e_fd, events, events_size, timeout);
     if (ret == -1)
@@ -149,7 +149,7 @@ void gu::EPoll::poll(const int timeout)
     }
 }
     
-void gu::EPoll::pop_front()
+void gu::net::EPoll::pop_front()
 {
     if (n_events == 0)
     {
@@ -159,12 +159,12 @@ void gu::EPoll::pop_front()
     ++current;
 }
 
-bool gu::EPoll::empty() const
+bool gu::net::EPoll::empty() const
 {
     return n_events == 0;
 }
 
-gu::EPollEvent gu::EPoll::front() const
+gu::net::EPollEvent gu::net::EPoll::front() const
 {
     if (n_events == 0)
     {

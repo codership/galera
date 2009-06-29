@@ -41,9 +41,9 @@ struct SchemeMap : map<const string, struct addrinfo>
 
 static SchemeMap scheme_map;
 
-void gu::Resolver::resolve(const string& scheme,
-                           const string& authority,
-                           struct addrinfo** ai)
+void gu::net::Resolver::resolve(const string& scheme,
+                                const string& authority,
+                                struct addrinfo** ai)
 {
     SchemeMap::iterator i;
     if ((i = scheme_map.find(scheme)) == scheme_map.end())

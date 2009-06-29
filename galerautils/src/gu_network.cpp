@@ -52,7 +52,7 @@ public:
     
     OptionMap()
     {
-        insert("socket.non_blocking", gu::Socket::O_NON_BLOCKING);
+        insert("socket.non_blocking", gu::net::Socket::O_NON_BLOCKING);
     }
     
     std::map<const string, int>::const_iterator find(const string& key)
@@ -104,7 +104,7 @@ template <class T> Option<T> get_option(const string& key, const string& val)
     return Option<T>(i->second, ret);
 }
 
-int gu::closefd(int fd)
+int gu::net::closefd(int fd)
 {
     int err;
     do
@@ -126,7 +126,7 @@ int gu::closefd(int fd)
  *
  */
 
-class gu::ByteBuffer
+class gu::net::ByteBuffer
 {
     byte_t* buf;
     size_t buf_len;
@@ -212,14 +212,14 @@ public:
  **************************************************************************/
 
 
-gu::Datagram::Datagram(const byte_t* buf_, const size_t buflen_) :
+gu::net::Datagram::Datagram(const byte_t* buf_, const size_t buflen_) :
     const_buf(buf_),
     buf(0),
     buflen(buflen_)
 {
 }
 
-gu::Datagram::Datagram(const Datagram& dgram) :
+gu::net::Datagram::Datagram(const Datagram& dgram) :
     const_buf(0),
     buf(0),
     buflen(dgram.get_buflen())
@@ -231,12 +231,12 @@ gu::Datagram::Datagram(const Datagram& dgram) :
     memcpy(buf, dgram.get_buf(), buflen);
 }
 
-gu::Datagram::~Datagram()
+gu::net::Datagram::~Datagram()
 {
     delete[] buf;
 }
 
-const gu::byte_t* gu::Datagram::get_buf(const size_t offset) const
+const gu::net::byte_t* gu::net::Datagram::get_buf(const size_t offset) const
 {
     if (offset > buflen)
     {
@@ -246,7 +246,7 @@ const gu::byte_t* gu::Datagram::get_buf(const size_t offset) const
     return b + offset;
 }
 
-size_t gu::Datagram::get_buflen(const size_t offset) const
+size_t gu::net::Datagram::get_buflen(const size_t offset) const
 {
     if (offset > buflen)
     {
@@ -255,7 +255,7 @@ size_t gu::Datagram::get_buflen(const size_t offset) const
     return buflen - offset;
 }
 
-void gu::Datagram::reset(const byte_t* b, const size_t blen)
+void gu::net::Datagram::reset(const byte_t* b, const size_t blen)
 {
     if (buf != 0)
     {
@@ -273,7 +273,7 @@ void gu::Datagram::reset(const byte_t* b, const size_t blen)
 /* 
  * State handling
  */
-void gu::Socket::set_state(const State s, const int err)
+void gu::net::Socket::set_state(const State s, const int err)
 {
     /* Allowed state transitions */
     static const bool allowed[S_MAX][S_MAX] = {
@@ -293,17 +293,17 @@ void gu::Socket::set_state(const State s, const int err)
     err_no = err;
 }
 
-gu::Socket::State gu::Socket::get_state() const
+gu::net::Socket::State gu::net::Socket::get_state() const
 {
     return state;
 }
 
-int gu::Socket::get_errno() const
+int gu::net::Socket::get_errno() const
 {
     return err_no;
 }
 
-const string gu::Socket::get_errstr() const
+const string gu::net::Socket::get_errstr() const
 {
     return ::strerror(err_no);
 }
@@ -313,7 +313,7 @@ const string gu::Socket::get_errstr() const
  * Ctor/dtor
  */
 
-gu::Socket::Socket(Network& net_, 
+gu::net::Socket::Socket(Network& net_, 
                    const int fd_,
                    const int options_,
                    const sockaddr* local_sa_,
@@ -344,7 +344,7 @@ gu::Socket::Socket(Network& net_,
     }
 }
 
-gu::Socket::~Socket()
+gu::net::Socket::~Socket()
 {
     if (fd != -1)
     {
@@ -379,10 +379,10 @@ static void get_addrinfo(const gu::URL& url, struct addrinfo** ai)
 {
     string scheme = url.get_scheme();
     string addr = url.get_authority();
-    gu::Resolver::resolve(scheme, addr, ai);
+    gu::net::Resolver::resolve(scheme, addr, ai);
 }
 
-void gu::Socket::open_socket(const string& addr)
+void gu::net::Socket::open_socket(const string& addr)
 {
     struct addrinfo* ai(0);    
     URL url(get_url(addr));
@@ -442,7 +442,7 @@ void gu::Socket::open_socket(const string& addr)
 
 }
 
-void gu::Socket::connect(const string& addr)
+void gu::net::Socket::connect(const string& addr)
 {
     open_socket(addr);
     
@@ -466,7 +466,7 @@ void gu::Socket::connect(const string& addr)
     assert(get_state() == S_CONNECTING || get_state() == S_CONNECTED);
 }
 
-void gu::Socket::close()
+void gu::net::Socket::close()
 {
     if (fd == -1 || get_state() == S_CLOSED)
     {
@@ -490,7 +490,7 @@ void gu::Socket::close()
     set_state(S_CLOSED);
 }
 
-void gu::Socket::listen(const std::string& addr, const int backlog)
+void gu::net::Socket::listen(const std::string& addr, const int backlog)
 {
     open_socket(addr);
 
@@ -517,7 +517,7 @@ void gu::Socket::listen(const std::string& addr, const int backlog)
     set_state(S_LISTENING);
 }
 
-gu::Socket* gu::Socket::accept()
+gu::net::Socket* gu::net::Socket::accept()
 {
     
     int acc_fd;
@@ -548,16 +548,15 @@ gu::Socket* gu::Socket::accept()
  * Send helpers
  */
 
-static size_t slow_send(const int fd,
-                        struct iovec const iov[],
-                        const size_t iov_len,
-                        const size_t offset,
-                        const int flags,
-                        int* errval)
-{
-    throw std::exception();
-}
-
+/*
+ * Send contents of iov 
+ *
+ * - Always return number of sent bytes
+ * - Param errval will contain error code if all of the bytes were not sent
+ *   + sendmsg() error: corresponding errno
+ *   + sendmsg() returns 0: EPIPE
+ *   + sendmsg() returns < tot_len: EAGAIN
+ */
 static size_t iov_send(const int fd, 
                        struct iovec iov[],
                        const size_t iov_len,
@@ -590,7 +589,8 @@ static size_t iov_send(const int fd,
     else if (static_cast<size_t>(sent) < tot_len)
     {
         assert(*errval == 0);
-        sent = slow_send(fd, iov, iov_len, sent, flags, errval);
+        // sent = slow_send(fd, iov, iov_len, sent, flags, errval);
+        *errval = EAGAIN;
     }
     
     assert(*errval != 0 || tot_len == static_cast<size_t>(sent));
@@ -598,10 +598,13 @@ static size_t iov_send(const int fd,
     return sent;
 }
 
+/*
+ * Push contents of iov starting from offset into byte buffer
+ */
 static void iov_push(struct iovec iov[], 
                      const size_t iov_len, 
                      const size_t offset, 
-                     gu::ByteBuffer* bb)
+                     gu::net::ByteBuffer* bb)
 {
     size_t begin_off = 0;
     size_t end_off = 0;
@@ -620,27 +623,27 @@ static void iov_push(struct iovec iov[],
             {
                 iov_base_off = 0;
             }
-            bb->push((gu::byte_t*)iov[i].iov_base + iov_base_off, 
+            bb->push((gu::net::byte_t*)iov[i].iov_base + iov_base_off, 
                      iov[i].iov_len - iov_base_off);
         }
         begin_off = end_off;
     }
 }
 
-size_t gu::Socket::get_max_pending_len() const
+size_t gu::net::Socket::get_max_pending_len() const
 {
     return 1 << 20;
 }
 
 
 
-static void write_hdr(gu::byte_t* buf, const size_t buflen, uint32_t len)
+static void write_hdr(gu::net::byte_t* buf, const size_t buflen, uint32_t len)
 {
     assert(buf != 0 && buflen == 4);
     *(uint32_t*)buf = htogl(len);
 }
 
-static void read_hdr(const gu::byte_t* buf, 
+static void read_hdr(const gu::net::byte_t* buf, 
                      const size_t buflen, 
                      uint32_t *len)
 {
@@ -648,7 +651,7 @@ static void read_hdr(const gu::byte_t* buf,
     *len = gtohl(*(uint32_t*)buf);
 }
 
-int gu::Socket::send_pending(const int send_flags)
+int gu::net::Socket::send_pending(const int send_flags)
 {
     struct iovec iov[1] = {
         {const_cast<byte_t*>(pending->get_buf()), pending->get_len()}
@@ -664,7 +667,7 @@ int gu::Socket::send_pending(const int send_flags)
     return ret;
 }
 
-int gu::Socket::send(const Datagram* const dgram, const int flags)
+int gu::net::Socket::send(const Datagram* const dgram, const int flags)
 {
     if (get_state() != S_CONNECTED)
     {
@@ -740,15 +743,15 @@ int gu::Socket::send(const Datagram* const dgram, const int flags)
         }
     }
     // log_debug << "return: " << ret;
-    if (ret == EAGAIN and not get_event_mask() & gu::NetworkEvent::E_OUT)
+    if (ret == EAGAIN and not get_event_mask() & gu::net::NetworkEvent::E_OUT)
     {
-        net.set_event_mask(this, get_event_mask() & gu::NetworkEvent::E_OUT);
+        net.set_event_mask(this, get_event_mask() & gu::net::NetworkEvent::E_OUT);
     }
     return ret;
 }
 
 
-const gu::Datagram* gu::Socket::recv(const int flags)
+const gu::net::Datagram* gu::net::Socket::recv(const int flags)
 {
     const size_t hdrlen = sizeof(uint32_t);
     const int recv_flags = (flags & ~MSG_PEEK) |
@@ -831,18 +834,18 @@ const gu::Datagram* gu::Socket::recv(const int flags)
     return 0;
 }
 
-int gu::Socket::getopt() const
+int gu::net::Socket::getopt() const
 {
     return options;
 }
 
-void gu::Socket::setopt(const int opts)
+void gu::net::Socket::setopt(const int opts)
 {
     options = opts;
 }
 
 
-class gu::SocketList : public map<const int, Socket*>
+class gu::net::SocketList : public map<const int, Socket*>
 {
 
 };
@@ -851,19 +854,19 @@ class gu::SocketList : public map<const int, Socket*>
  * Network event 
  **/
 
-gu::NetworkEvent::NetworkEvent(const int event_mask_, Socket* socket_) :
+gu::net::NetworkEvent::NetworkEvent(const int event_mask_, Socket* socket_) :
     event_mask(event_mask_),
     socket(socket_)
 {
 
 }
 
-int gu::NetworkEvent::get_event_mask() const
+int gu::net::NetworkEvent::get_event_mask() const
 {
     return event_mask;
 }
 
-gu::Socket* gu::NetworkEvent::get_socket() const
+gu::net::Socket* gu::net::NetworkEvent::get_socket() const
 {
     return socket;
 }
@@ -872,7 +875,7 @@ gu::Socket* gu::NetworkEvent::get_socket() const
  *
  **/
 
-gu::Network::Network() :
+gu::net::Network::Network() :
     sockets(new SocketList()),
     poll(new EPoll())
 {
@@ -883,7 +886,7 @@ gu::Network::Network() :
     poll->insert(EPollEvent(wake_fd[0], NetworkEvent::E_IN, 0));
 }
 
-gu::Network::~Network()
+gu::net::Network::~Network()
 {
     poll->erase(EPollEvent(wake_fd[0], 0, 0));
     closefd(wake_fd[1]);
@@ -893,7 +896,7 @@ gu::Network::~Network()
     delete poll;
 }
 
-gu::Socket* gu::Network::connect(const string& addr)
+gu::net::Socket* gu::net::Network::connect(const string& addr)
 {
     Socket* sock = new Socket(*this);
     sock->connect(addr);
@@ -910,7 +913,7 @@ gu::Socket* gu::Network::connect(const string& addr)
     return sock;
 }
 
-gu::Socket* gu::Network::listen(const string& addr)
+gu::net::Socket* gu::net::Network::listen(const string& addr)
 {
     Socket* sock = new Socket(*this);
     sock->listen(addr);
@@ -919,7 +922,7 @@ gu::Socket* gu::Network::listen(const string& addr)
     return sock;
 }
 
-void gu::Network::insert(Socket* sock)
+void gu::net::Network::insert(Socket* sock)
 {
     if (sockets->insert(make_pair(sock->get_fd(), sock)).second == false)
     {
@@ -929,14 +932,14 @@ void gu::Network::insert(Socket* sock)
     poll->insert(EPollEvent(sock->get_fd(), sock->get_event_mask(), sock));
 }
 
-void gu::Network::erase(Socket* sock)
+void gu::net::Network::erase(Socket* sock)
 {
     /* Erases socket from poll set */
     poll->erase(EPollEvent(sock->get_fd(), 0, sock));
     sockets->erase(sock->get_fd());
 }
 
-gu::Socket* gu::Network::find(int fd)
+gu::net::Socket* gu::net::Network::find(int fd)
 {
     SocketList::iterator i;
     if ((i = sockets->find(fd)) == sockets->end())
@@ -946,7 +949,7 @@ gu::Socket* gu::Network::find(int fd)
     return i->second;
 }
 
-void gu::Network::set_event_mask(Socket* sock, const int mask)
+void gu::net::Network::set_event_mask(Socket* sock, const int mask)
 {
     if (find(sock->get_fd()) == 0)
     {
@@ -957,7 +960,7 @@ void gu::Network::set_event_mask(Socket* sock, const int mask)
     sock->set_event_mask(mask);
 }
 
-gu::NetworkEvent gu::Network::wait_event(const long timeout)
+gu::net::NetworkEvent gu::net::Network::wait_event(const long timeout)
 {
     Socket* sock = 0;
     int revent = 0;
@@ -977,7 +980,7 @@ gu::NetworkEvent gu::Network::wait_event(const long timeout)
         EPollEvent ev = poll->front();
         poll->pop_front();
         
-        if (ev.get_fd() == wake_fd[0])
+        if (ev.get_user_data() == 0)
         {
             byte_t buf[1];
             if (read(wake_fd[0], buf, sizeof(buf)) != 1)
@@ -986,7 +989,7 @@ gu::NetworkEvent gu::Network::wait_event(const long timeout)
                 log_error << "Could not read pipe: " << strerror(err);
                 throw std::runtime_error("");
             }
-            continue;
+            return NetworkEvent(NetworkEvent::E_EMPTY, 0);
         }
         
         sock = reinterpret_cast<Socket*>(ev.get_user_data());
@@ -1024,18 +1027,18 @@ gu::NetworkEvent gu::Network::wait_event(const long timeout)
         case Socket::S_CONNECTED:
             if (revent & NetworkEvent::E_IN)
             {
-                const gu::Datagram* dm = sock->recv(MSG_PEEK);
+                const gu::net::Datagram* dm = sock->recv(MSG_PEEK);
                 if (dm == 0)
                 {
                     switch (sock->get_state())
                     {
-                    case gu::Socket::S_FAILED:
-                        revent = gu::NetworkEvent::E_ERROR;
+                    case gu::net::Socket::S_FAILED:
+                        revent = gu::net::NetworkEvent::E_ERROR;
                         break;
-                    case gu::Socket::S_CLOSED:
-                        revent = gu::NetworkEvent::E_CLOSED;
+                    case gu::net::Socket::S_CLOSED:
+                        revent = gu::net::NetworkEvent::E_CLOSED;
                         break;
-                    case gu::Socket::S_CONNECTED:
+                    case gu::net::Socket::S_CONNECTED:
                         sock = 0;
                     default:
                         break;
@@ -1058,7 +1061,7 @@ gu::NetworkEvent gu::Network::wait_event(const long timeout)
     return NetworkEvent(revent, sock);
 }
 
-void gu::Network::interrupt()
+void gu::net::Network::interrupt()
 {
     byte_t buf[1] = {'i'};
     if (write(wake_fd[1], buf, sizeof(buf)) != 1)
