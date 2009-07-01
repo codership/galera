@@ -61,5 +61,5 @@ AC_CONFIG_FILES([Makefile
 		 tests/Makefile])
 
 CFLAGS="$CFLAGS -Wall -Werror "
-CXXFLAGS="$CXXFLAGS -Wall -Werror -Wextra -pedantic -Wno-long-long -Wno-unused-parameter -Wno-deprecated -fno-rtti -Wno-variadic-macros"
+CXXFLAGS="$CXXFLAGS -Wall -Werror -Wextra -pedantic -Wnon-virtual-dtor -Wno-long-long -Wno-unused-parameter -Wno-deprecated -fno-rtti -Wno-variadic-macros"
 AC_OUTPUT

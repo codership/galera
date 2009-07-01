@@ -378,7 +378,7 @@ public:
     {
     }
     
-    ~Thread()
+    virtual ~Thread()
     {
     }
     
