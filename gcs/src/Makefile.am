@@ -38,14 +38,11 @@ endif
 if ENABLE_GCOMM
     AM_CFLAGS += -DGCS_USE_GCOMM
     GCS_SRCS  += gcs_gcomm.cpp
-    CCLD=$(CXX)
 endif
 
 if ENABLE_VS
     AM_CFLAGS += -DGCS_USE_VS
     GCS_SRCS  += gcs_vs.cpp
-# Enforce C++ linker
-    CCLD=$(CXX)
 endif
 
 
@@ -60,12 +57,15 @@ REVISION  = 0
 AGE       = 0
 libgcs_la_LDFLAGS = \
 	-version-info $(INTERFACE):$(REVISION):$(AGE)
+libgcs_la_DEPENDENCIES = $(GCOMM_LIBS)
+
 
 # Desclibe gcs_test binary target
 noinst_PROGRAMS  = gcs_test
 gcs_test_SOURCES = gcs_test.c
 gcs_test_LDADD   = $(lib_LTLIBRARIES) $(GCOMM_LIBS)
 gcs_test_LDFLAGS = -static
+gcs_test_LINK    = $(LIBTOOL) --tag=CXX --mode=link $(CCLD) -o $@
 
 .PHONY: lib test tags
 
