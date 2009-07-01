@@ -157,7 +157,7 @@ public:
     /*!
      * @brief Default destructor
      */
-    ~Consumer();
+    virtual ~Consumer();
 
     /*!
      * @brief Queue message and wait for ack
