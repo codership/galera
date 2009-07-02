@@ -102,6 +102,7 @@ public:
      * @param cons_ Consumer associated to this producer
      */
     Producer(Consumer& cons_) :
+        cond(),
         cons(cons_)
     {
     }
@@ -123,6 +124,10 @@ class gu::prodcons::Consumer
     Mutex mutex; /*! Mutex for internal locking */
     MessageQueue* mque; /*! Message queue for producer messages */
     MessageQueue* rque; /*! Message queue for ack messages */
+
+
+    Consumer(const Consumer&);
+    void operator=(const Consumer&);
 protected:
     /*!
      * @brief Get the first message from the message queue

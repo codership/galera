@@ -29,7 +29,7 @@ namespace gu
     public:
 
         Cond () throw()
-        : ref_count(0)
+        : cond(), ref_count(0)
         { pthread_cond_init (&cond, NULL); };
 
         ~Cond ()

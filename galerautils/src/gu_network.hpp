@@ -80,7 +80,8 @@ class gu::net::Datagram
     byte_t* buf; /*!< Private byte buffer */
     size_t buflen; /*!< Length of byte buffer */
     /* Disallow assignment, for copying use copy constructor */
-    Datagram operator =(const Datagram&);
+
+    void operator=(const Datagram&);
 public:
     /*! 
      * @brief Construct new datagram from byte buffer
@@ -214,6 +215,9 @@ private:
      *         socket could not be created
      */
     void open_socket(const std::string& addr);
+
+    Socket(const Socket&);
+    void operator=(const Socket&);
 
 public:
     /*!

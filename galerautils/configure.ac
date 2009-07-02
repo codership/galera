@@ -61,5 +61,18 @@ AC_CONFIG_FILES([Makefile
 		 tests/Makefile])
 
 CFLAGS="$CFLAGS -Wall -Werror "
-CXXFLAGS="$CXXFLAGS -Wall -Werror -Wextra -pedantic -Wnon-virtual-dtor -Wno-long-long -Wno-unused-parameter -Wno-deprecated -fno-rtti -Wno-variadic-macros"
+
+# CXXFLAGS 
+#
+# - Turn on most of the warnings, pedantic and ansi
+# - Make warnings to be handled as errors
+CXXFLAGS="$CXXFLAGS -Wall -Werror -Wextra -pedantic -ansi -Weffc++"
+# However, disable warnings for:
+# - long long datatype ([u]int64_t)
+# - unused function parameter (however, this should not be needed)
+# - some stl headers may contain deprecated features
+# - gu_log.h contains some variadic macros
+CXXFLAGS="$CXXFLAGS -Wno-long-long -Wno-unused-parameter -Wno-deprecated -Wno-variadic-macros"
+# Disable RTTI generation as we don't use it anywhere
+CXXFLAGS="$CXXFLAGS -fno-rtti"
 AC_OUTPUT

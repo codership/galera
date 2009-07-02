@@ -52,7 +52,11 @@ static gu::URLQueryList extract_query_list(const string& s,
 
 
 gu::URL::URL(const string& str_) :
-    str(str_)
+    str(str_),
+    scheme(),
+    authority(),
+    path(),
+    query_list()
 {
     parse();
 }

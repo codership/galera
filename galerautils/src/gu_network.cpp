@@ -50,7 +50,8 @@ public:
         }
     }
     
-    OptionMap()
+    OptionMap() :
+        opt_map()
     {
         insert("socket.non_blocking", gu::net::Socket::O_NON_BLOCKING);
     }
@@ -132,6 +133,8 @@ class gu::net::ByteBuffer
     size_t buf_len;
     size_t buf_size;
 
+    ByteBuffer(const ByteBuffer&);
+    void operator=(const ByteBuffer&);
 public:
     ByteBuffer(const size_t init_size = 0) :
         buf(0),
@@ -323,6 +326,8 @@ gu::net::Socket::Socket(Network& net_,
     err_no(0),
     options(options_),
     event_mask(0),
+    local_sa(),
+    remote_sa(),
     sa_size(sa_size_),
     dgram_offset(0),
     complete(false),
@@ -845,10 +850,37 @@ void gu::net::Socket::setopt(const int opts)
 }
 
 
-class gu::net::SocketList : public map<const int, Socket*>
+class gu::net::SocketList
 {
+    map<const int, Socket*> sockets;
+public:
+    SocketList() : 
+        sockets()
+    {
 
+    }
+
+    bool insert(const std::pair<const int, Socket*>& p)
+    {
+        return sockets.insert(p).second;
+    }
+
+    void erase(const int fd)
+    {
+        sockets.erase(fd);
+    }
+
+    Socket* find(const int fd)
+    {
+        std::map<const int, Socket*>::const_iterator i = sockets.find(fd);
+        if (i == sockets.end())
+        {
+            return 0;
+        }
+        return i->second;
+    }
 };
+
 
 /**
  * Network event 
@@ -924,7 +956,7 @@ gu::net::Socket* gu::net::Network::listen(const string& addr)
 
 void gu::net::Network::insert(Socket* sock)
 {
-    if (sockets->insert(make_pair(sock->get_fd(), sock)).second == false)
+    if (sockets->insert(make_pair(sock->get_fd(), sock)) == false)
     {
         delete sock;
         throw std::logic_error("");
@@ -941,12 +973,7 @@ void gu::net::Network::erase(Socket* sock)
 
 gu::net::Socket* gu::net::Network::find(int fd)
 {
-    SocketList::iterator i;
-    if ((i = sockets->find(fd)) == sockets->end())
-    {
-        return 0;
-    }
-    return i->second;
+    return sockets->find(fd);
 }
 
 void gu::net::Network::set_event_mask(Socket* sock, const int mask)

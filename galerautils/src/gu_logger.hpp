@@ -40,7 +40,9 @@ namespace gu
     class Logger
     {
     public:
-        Logger() {};
+        Logger() :
+            os(),
+            level(LOG_INFO) {}
         virtual inline ~Logger();
 
         // this function returns a stream for further logging.

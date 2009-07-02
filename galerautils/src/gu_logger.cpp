@@ -31,7 +31,8 @@ namespace gu
         set<string> filter;
 
     public:
-        DebugFilter()
+        DebugFilter() :
+            filter()
         {
             if (::getenv("LOGGER_DEBUG_FILTER"))
             {

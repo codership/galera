@@ -5,10 +5,36 @@
 
 #include <deque>
 
-using std::deque;
-
-class gu::prodcons::MessageQueue : public deque<gu::prodcons::Message>
+class gu::prodcons::MessageQueue
 {
+    std::deque<Message> que;
+public:
+    MessageQueue() :
+        que()
+    {
+    }
+    bool empty() const
+    {
+        return que.empty();
+    }
+    size_t size() const
+    {
+        return que.size();
+    }
+    const Message& front() const
+    {
+        return que.front();
+    }
+
+    void pop_front() 
+    {
+        que.pop_front();
+    }
+
+    void push_back(const Message& msg)
+    {
+        que.push_back(msg);
+    }
 };
 
 void gu::prodcons::Producer::send(const Message& msg, Message* ack)
@@ -18,7 +44,7 @@ void gu::prodcons::Producer::send(const Message& msg, Message* ack)
 
 const gu::prodcons::Message* gu::prodcons::Consumer::get_next_msg()
 {
-    Message* ret = 0;
+    const Message* ret = 0;
     Lock lock(mutex);
     if (mque->empty() == false)
     {
@@ -58,6 +84,7 @@ void gu::prodcons::Consumer::return_ack(const Message& ack)
 }
 
 gu::prodcons::Consumer::Consumer() :
+    mutex(),
     mque(new MessageQueue),
     rque(new MessageQueue)
 {

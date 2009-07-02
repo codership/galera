@@ -374,7 +374,8 @@ protected:
     virtual void run() = 0;
 public:
     Thread() : 
-        interrupted(false)
+        interrupted(false),
+        self()
     {
     }
     
@@ -430,6 +431,10 @@ class NetConsumer : public Consumer, public Thread
     Network net;
     Socket* listener;
     Socket* send_sock;
+
+    NetConsumer(const NetConsumer&);
+    void operator=(const NetConsumer&);
+
 public:
 
     void connect(const string& url)
@@ -461,9 +466,11 @@ public:
         send_sock->close();
     }
     
-    NetConsumer(const string& url)
+    NetConsumer(const string& url) :
+        net(),
+        listener(net.listen(url)),
+        send_sock(0)
     {
-        listener = net.listen(url);
     }
     
     void notify()
@@ -561,7 +568,8 @@ struct producer_thd_args
     pthread_barrier_t barrier;
     producer_thd_args(Consumer& cons_, size_t n_events_, size_t n_thds_) :
         cons(cons_),
-        n_events(n_events_)
+        n_events(n_events_),
+        barrier()
     {
         if (pthread_barrier_init(&barrier, 0, n_thds_))
         {
@@ -622,7 +630,9 @@ END_TEST
 Suite* get_suite()
 {
     Suite* s = suite_create("galerautils++");
-    TCase* tc = tcase_create("test_debug_logger");
+    TCase* tc;
+
+    tc = tcase_create("test_debug_logger");
     tcase_add_checked_fixture(tc, 
                               &debug_logger_checked_setup,
                               &debug_logger_checked_teardown);

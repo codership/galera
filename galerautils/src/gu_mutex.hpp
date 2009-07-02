@@ -26,7 +26,8 @@ namespace gu
 
     public:
 
-        Mutex ()
+        Mutex () :
+            value()
         {
             pthread_mutex_init (&value, NULL);
         };

@@ -92,6 +92,9 @@ class gu::net::EPoll
      * @brief Resize events array
      */
     void resize(const size_t to_size);
+
+    EPoll(const EPoll&);
+    void operator=(const EPoll&);
 public:
 
     /*!

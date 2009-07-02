@@ -22,12 +22,14 @@ namespace gu
     private:
 
         pthread_mutex_t* value;
-
+        
+        Lock(const Lock&);
+        void operator=(const Lock&);
     public:
 
-        Lock (Mutex& mtx)
+        Lock (Mutex& mtx) : 
+            value(&mtx.value)
         {
-            value = &mtx.value;
 
             int err = pthread_mutex_lock (value);
 

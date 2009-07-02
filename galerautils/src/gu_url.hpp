@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2008 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
+/*!
+ * @file gu_url.hpp
+ */
 
 #ifndef __GU_URL_HPP__
 #define __GU_URL_HPP__
@@ -7,11 +15,8 @@
 
 namespace gu
 {
-    class URLQueryList : public std::multimap<const std::string, std::string>
-    {
-    public:
-    };
-    
+    typedef std::multimap<const std::string, std::string> URLQueryList;
+
     class URL
     {
     private:
