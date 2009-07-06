@@ -110,7 +110,8 @@ void gu::net::EPoll::erase(const EPollEvent& epe)
     int err = epoll_ctl(e_fd, op, epe.get_fd(), &ev);
     if (err != 0)
     {
-        log_debug << "epoll erase: " << err;
+        err = errno;
+        log_debug << "epoll erase: " << err << ": " << strerror(err);
     }
     resize(events_size - 1);
 }

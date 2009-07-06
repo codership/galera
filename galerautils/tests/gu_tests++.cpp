@@ -472,6 +472,12 @@ public:
         send_sock(0)
     {
     }
+
+    ~NetConsumer()
+    {
+        delete listener;
+        delete send_sock;
+    }
     
     void notify()
     {
@@ -538,9 +544,9 @@ START_TEST(test_net_consumer)
     string url("tcp://localhost:2112?socket.non_blocking=1");
     NetConsumer cons(url);
     cons.connect(url);
-
+    
     cons.start();
-
+    
     Producer prod(cons);
     byte_t buf[128];
     memset(buf, 0xab, sizeof(buf));

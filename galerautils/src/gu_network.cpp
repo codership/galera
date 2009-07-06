@@ -353,6 +353,10 @@ gu::net::Socket::~Socket()
 {
     if (fd != -1)
     {
+        if (get_state() == S_CLOSED)
+        {
+            throw std::logic_error("fd != -1 but state S_CLOSED");
+        }
         close();
     }
     delete recv_buf;
@@ -854,6 +858,8 @@ class gu::net::SocketList
 {
     map<const int, Socket*> sockets;
 public:
+    typedef map<const int, Socket*>::iterator iterator;
+
     SocketList() : 
         sockets()
     {
@@ -878,6 +884,16 @@ public:
             return 0;
         }
         return i->second;
+    }
+
+    iterator begin()
+    {
+        return sockets.begin();
+    }
+
+    iterator end()
+    {
+        return sockets.end();
     }
 };
 
@@ -923,7 +939,16 @@ gu::net::Network::~Network()
     poll->erase(EPollEvent(wake_fd[0], 0, 0));
     closefd(wake_fd[1]);
     closefd(wake_fd[0]);
-    // TODO: Deep cleanup
+    
+    /* NOTE: Deleting socket modifies also socket list (erases corresponding
+     * entry) and iterator becomes invalid. Therefore i = sockets->begin()
+     * on each iteration. */
+    for (SocketList::iterator i = sockets->begin(); 
+         i != sockets->end(); i = sockets->begin())
+    {
+        log_warn << "open socket in network dtor: " << i->first;
+        delete i->second;
+    }
     delete sockets;
     delete poll;
 }
