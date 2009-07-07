@@ -73,7 +73,7 @@ static long gcs_test_thread_create (gcs_test_thread_t *t, long id, long n_tries)
     t->id           = id;
     t->act_id       = GCS_SEQNO_ILL;
     t->local_act_id = GCS_SEQNO_ILL;
-    t->act_type     = GCS_ACT_DATA;
+    t->act_type     = GCS_ACT_TORDERED;
     t->n_tries      = n_tries;
     t->msg_len      = MAX_MSG_LEN;
     t->msg = calloc (MAX_MSG_LEN, sizeof(char));
@@ -379,7 +379,7 @@ void *gcs_test_repl (void *arg)
 	ret = gcs_repl (gcs,
                         thread->msg,
                         thread->msg_len,
-                        GCS_ACT_DATA,
+                        GCS_ACT_TORDERED,
                         &thread->act_id,
                         &thread->local_act_id);
 	if (ret < 0) {
@@ -417,7 +417,7 @@ void *gcs_test_send (void *arg)
 	ret = gcs_send (gcs,
                         thread->msg,
                         thread->msg_len,
-                        GCS_ACT_DATA);
+                        GCS_ACT_TORDERED);
         if (ret < 0) break;
 	//sleep (1);
         msg_sent++;
@@ -515,7 +515,7 @@ void *gcs_test_recv (void *arg)
         size_recvd += thread->msg_len;
 
         switch (thread->act_type) {
-        case GCS_ACT_DATA:
+        case GCS_ACT_TORDERED:
             test_after_recv (thread);
             //puts (thread->log_msg); fflush (stdout);
             break;

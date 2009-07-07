@@ -478,7 +478,7 @@ static void *gcs_recv_thread (void *arg)
         // FIXME: this condition is very unclear and might be not good.
         // the idea is that local seqno is only given to user actions with valid
         // global TO.
-        if (gu_likely (act_id >= 0 || act_type != GCS_ACT_DATA)) {
+        if (gu_likely (act_id >= 0 || act_type != GCS_ACT_TORDERED)) {
             /* successful delivery - increment local order */
             this_act_id = conn->local_act_id++;
         }

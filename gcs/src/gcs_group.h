@@ -132,7 +132,7 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
         act->type       = frg->act_type;
         act->sender_idx = sender_idx;
 
-        if (gu_likely(GCS_ACT_DATA      == act->type    &&
+        if (gu_likely(GCS_ACT_TORDERED  == act->type    &&
                       GCS_GROUP_PRIMARY == group->state &&
                       !(group->frag_reset && local))) {
             /* Common situation -

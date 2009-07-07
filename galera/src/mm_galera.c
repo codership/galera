@@ -1207,7 +1207,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
         );
 
         switch (action_type) {
-        case GCS_ACT_DATA:
+        case GCS_ACT_TORDERED:
             assert (GCS_SEQNO_ILL != seqno_g);
             process_write_set(
                 applier, app_ctx, action, action_size, seqno_g, seqno_l
@@ -1601,11 +1601,11 @@ mm_galera_commit(
 
     /* replicate through gcs */
     do {
-        rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_DATA, &seqno_g, &seqno_l);
+        rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_TORDERED, &seqno_g, &seqno_l);
     } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP), true));
 //    gu_info ("gcs_repl(): act_type: %u, act_size: %u, act_id: %llu, "
 //             "local: %llu, ret: %d",
-//             GCS_ACT_DATA, len, seqno_g, seqno_l, rcode);
+//             GCS_ACT_TORDERED, len, seqno_g, seqno_l, rcode);
     if (rcode != len) {
         gu_error("gcs failed for: %llu, len: %d, rcode: %d", trx_id,len,rcode);
         assert (GCS_SEQNO_ILL == seqno_l);
@@ -1916,7 +1916,8 @@ static enum wsrep_status mm_galera_to_execute_start(
 
     /* replicate through gcs */
     do {
-        rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_DATA, &seqno_g, &seqno_l);
+        rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_TORDERED, &seqno_g,
+	                 &seqno_l);
     } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP), true));
 
     if (rcode < 0) {
