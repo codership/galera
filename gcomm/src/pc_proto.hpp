@@ -56,11 +56,12 @@ private:
     bool start_prim;
     State state;
     
-    uint32_t last_sent;
-    
     
     PCInstMap instances;
     PCInstMap::iterator self_i;
+
+    PCProto(const PCProto&);
+    void operator=(const PCProto&);
 
 public:
     bool get_prim() const
@@ -128,11 +129,16 @@ public:
         el(el_),
         mon(mon_),
         start_prim(start_prim_),
-        state(S_CLOSED)
+        state(S_CLOSED),
+        instances(),
+        self_i(),
+        state_msgs(),
+        current_view(),
+        views()
     {
-        pair<PCInstMap::iterator, bool> iret;
+        std::pair<PCInstMap::iterator, bool> iret;
         if ((iret = instances.insert(
-                 make_pair(uuid, PCInst()))).second == false)
+                 std::make_pair(uuid, PCInst()))).second == false)
         {
             throw FatalException("");
         }

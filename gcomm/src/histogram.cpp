@@ -12,7 +12,8 @@ using std::ostringstream;
 
 BEGIN_GCOMM_NAMESPACE
 
-Histogram::Histogram(const string& vals)
+Histogram::Histogram(const string& vals) :
+    cnt()
 {
 
     vector<string> varr = strsplit(vals, ',');

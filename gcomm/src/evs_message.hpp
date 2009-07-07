@@ -39,30 +39,42 @@ struct EVSRange {
 	return cmp.get_low() == low && cmp.get_high() == high;
     }
     std::string to_string() const {
-        return std::string("[") + UInt32(low).to_string() 
-            + "," + UInt32(high).to_string() + "]";
+        return std::string("[") + make_int(low).to_string() 
+            + "," + make_int(high).to_string() + "]";
     }
 };
 
 struct EVSGap {
     UUID source;
     EVSRange range;
-    EVSGap() {}
-    EVSGap(const UUID& source_, const EVSRange& range_) :
-	source(source_), range(range_) {}
+    EVSGap() :
+        source(),
+        range()
+    {
+    }
 
-    UUID get_source() const {
+    EVSGap(const UUID& source_, const EVSRange& range_) :
+	source(source_), 
+        range(range_) 
+    {
+    }
+
+    UUID get_source() const 
+    {
 	return source;
     }
-    uint32_t get_low() const {
+    uint32_t get_low() const 
+    {
 	return range.low;
     }
 
-    uint32_t get_high() const {
+    uint32_t get_high() const 
+    {
 	return range.high;
     }
 
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset) {
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset) 
+    {
         size_t off;
         if ((off = source.read(buf, buflen, offset)) == 0)
             return 0;
@@ -73,7 +85,8 @@ struct EVSGap {
         return off;
     }
 
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const {
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const 
+    {
         size_t off;
         if ((off = source.write(buf, buflen, offset)) == 0)
             return 0;
@@ -84,7 +97,8 @@ struct EVSGap {
         return off;
     }
 
-    size_t size() const {
+    size_t size() const 
+    {
         return source.size() + 8;
     }
 
@@ -173,7 +187,15 @@ public:
 	EVSRange range;
         uint32_t safe_seq;
     public:
-	Instance() {}
+        Instance() :
+            pid(),
+            operational(),
+            left(),
+            view_id(),
+            range(),
+            safe_seq()
+        {
+        }
 	Instance(const UUID pid_, 
                  const string& name_,
                  const bool oper_, 
@@ -290,8 +312,9 @@ public:
 private:
 
     std::map<UUID, Instance>* instances;
+
 protected:
-    
+
 
     EVSMessage(const int version_, 
                const Type type_,
@@ -319,6 +342,7 @@ protected:
         source(source_),
         gap(gap_),
         fifo_seq(fifo_seq_),
+        tstamp(),
         instances(instances_)
     {
         strncpy(name, name_.c_str(), sizeof(name));
@@ -330,17 +354,40 @@ protected:
 
 public:        
     EVSMessage() : 
+        version(),
         type(NONE), 
+        user_type(),
+        safety_prefix(),
         seq(SEQNO_MAX), 
+        seq_range(),
+        aru_seq(),
+        flags(),
+        source_view(),
+        source(),
+        gap(),
         fifo_seq(-1),
+        tstamp(),
         instances(0) 
     {
         memset(name, 0, sizeof(name));
     }
     
-    EVSMessage(const EVSMessage& m) 
+    EVSMessage(const EVSMessage& m) :
+        version(m.version),
+        type(m.type),
+        user_type(m.user_type),
+        safety_prefix(m.safety_prefix),
+        seq(m.seq),
+        seq_range(m.seq_range),
+        aru_seq(m.aru_seq),
+        flags(m.flags),
+        source_view(m.source_view),
+        source(m.source),
+        gap(m.gap),
+        fifo_seq(m.fifo_seq),
+        tstamp(m.tstamp),
+        instances(0)
     {
-	*this = m;
 	if (m.instances) 
         {
 	    instances = new std::map<UUID, Instance>();
@@ -348,9 +395,29 @@ public:
 	}
     }
     
-    ~EVSMessage() 
+    virtual ~EVSMessage() 
     {
 	delete instances;
+    }
+
+
+    EVSMessage& operator=(const EVSMessage& m)
+    {
+        version = m.version;
+        type = m.type;
+        user_type = m.user_type;
+        safety_prefix = m.safety_prefix;
+        seq = m.seq;
+        seq_range = m.seq_range;
+        aru_seq = m.aru_seq;
+        flags = m.flags;
+        source_view = m.source_view;
+        source = m.source;
+        gap = m.gap;
+        fifo_seq = m.fifo_seq;
+        tstamp = m.tstamp;
+        instances = m.instances != 0 ? new std::map<UUID, Instance>(*m.instances) : 0;
+        return *this;
     }
     
     Type get_type() const 
@@ -476,19 +543,19 @@ public:
 
         if (version != 0)
         {
-            LOG_WARN("version: " + Int(version).to_string());
+            LOG_WARN("version: " + make_int(version).to_string());
             return  0;
         }
 
         if (type <= NONE || type > INSTALL)
         {
-            LOG_WARN("type: " + Int(type).to_string());
+            LOG_WARN("type: " + make_int(type).to_string());
             return 0;
         }
         
         if (safety_prefix < DROP || safety_prefix > SAFE)
         {
-            LOG_TRACE("safety_prefix: " + Int(safety_prefix).to_string());
+            LOG_TRACE("safety_prefix: " + make_int(safety_prefix).to_string());
             return 0;
         }
         
@@ -613,7 +680,8 @@ public:
                     LOG_TRACE("");
                     return 0;
                 }
-		if ((off = gcomm::write(UInt32(instances->size()).get(), buf, buflen, off)) == 0)
+                uint32_t len = instances->size();
+		if ((off = gcomm::write(len, buf, buflen, off)) == 0)
                 {
 		    LOG_TRACE("");
 		    return 0;
@@ -700,7 +768,7 @@ inline bool equal(const EVSMessage* a, const EVSMessage* b)
 
     default:
 	LOG_DEBUG(std::string("equal() not implemented for ") + 
-                  Int(a->get_type()).to_string());
+                  make_int(a->get_type()).to_string());
     }
     return false;
 }

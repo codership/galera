@@ -56,7 +56,7 @@ static bool equals(const UUIDToAddressMap& a,
 
 static void set_tcp_params(URI* uri)
 {
-    uri->set_query_param(Conf::TcpParamNonBlocking, Int(1).to_string());
+    uri->set_query_param(Conf::TcpParamNonBlocking, make_int(1).to_string());
 }
 
 
@@ -72,6 +72,8 @@ class GMCastProto
     bool changed;
 private:
     UUIDToAddressMap uuid_map;
+    GMCastProto(const GMCastProto&);
+    void operator=(const GMCastProto&);
 public:
     
     enum State 
@@ -149,15 +151,20 @@ public:
         state = new_state;
     }
     
-    GMCastProto(Transport* tp_, string& local_addr_, const string& remote_addr_, 
-               const UUID& local_uuid_, const string& group_name_) : 
+    GMCastProto(Transport* tp_, 
+                const string& local_addr_, 
+                const string& remote_addr_, 
+                const UUID& local_uuid_, 
+                const string& group_name_) : 
         local_uuid(local_uuid_),
+        remote_uuid(),
         tp(tp_), 
         local_addr(local_addr_),
         remote_addr(remote_addr_),
         group_name(group_name_),
         send_ttl(1),
         changed(false),
+        uuid_map(),
         state(S_INIT)
     {
     }
@@ -309,7 +316,7 @@ public:
     {
 
 
-        LOG_DEBUG(string("message type: ") + Int(msg.get_type()).to_string());
+        LOG_DEBUG(string("message type: ") + make_int(msg.get_type()).to_string());
 
         switch (msg.get_type()) {
         case GMCastMessage::P_HANDSHAKE:
@@ -392,7 +399,13 @@ static bool check_uri(const URI& uri)
 
 GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon_) :
     Transport(uri, event_loop, mon_),
-    uuid(0, 0)
+    uuid(0, 0),
+    proto_map(),
+    spanning_tree(),
+    listener(0),
+    listen_addr(),
+    remote_addrs(),
+    group_name()
 {
     
     if (uri.get_scheme() != Conf::GMCastScheme)
@@ -451,7 +464,7 @@ void GMCast::start()
     listener = Transport::create(listen_uri, event_loop);
     listener->listen();
     listener->set_up_context(this, listener->get_fd());
-    LOG_DEBUG(string("Listener: ") + Int(listener->get_fd()).to_string());
+    LOG_DEBUG(string("Listener: ") + make_int(listener->get_fd()).to_string());
     for (AddrList::const_iterator i = remote_addrs.begin();
          i != remote_addrs.end(); ++i) {
         gmcast_connect(i->first);
@@ -529,7 +542,7 @@ void GMCast::gmcast_connect(const string& addr)
 void GMCast::handle_connected(GMCastProto* rp)
 {
     const Transport* tp = rp->get_transport();
-    LOG_DEBUG("transport " + Int(tp->get_fd()).to_string() + " connected");
+    LOG_DEBUG("transport " + make_int(tp->get_fd()).to_string() + " connected");
 
     
 
@@ -547,13 +560,13 @@ void GMCast::handle_failed(GMCastProto* rp)
     Transport* tp = rp->get_transport();
     if (tp->get_state() == S_FAILED) 
     {
-        LOG_DEBUG(string("transport ") + Int(tp->get_fd()).to_string() 
+        LOG_DEBUG(string("transport ") + make_int(tp->get_fd()).to_string() 
                   + " failed: " + ::strerror(tp->get_errno()));
     } 
     else 
     {
-        LOG_WARN(string("transport ") + Int(tp->get_fd()).to_string() 
-                 + " in unexpected state " + Int(tp->get_errno()).to_string());
+        LOG_WARN(string("transport ") + make_int(tp->get_fd()).to_string() 
+                 + " in unexpected state " + make_int(tp->get_errno()).to_string());
     }
     tp->close();
     event_loop->release_protolay(tp);
@@ -945,7 +958,7 @@ void GMCast::handle_up(const int cid, const ReadBuf* rb,
         if (i == proto_map.end()) 
         {
             
-            LOG_WARN(string("unknown fd ") + Int(cid).to_string());
+            LOG_WARN(string("unknown fd ") + make_int(cid).to_string());
             return;
         }
         
@@ -1013,7 +1026,7 @@ int GMCast::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
             throw FatalException("short buffer");
         if (msg.get_ttl() > 1)
         {
-            LOG_DEBUG(string("msg ttl: ") + Int(msg.get_ttl()).to_string());
+            LOG_DEBUG(string("msg ttl: ") + make_int(msg.get_ttl()).to_string());
         }
         wb->prepend_hdr(hdrbuf, wlen);
         int err;

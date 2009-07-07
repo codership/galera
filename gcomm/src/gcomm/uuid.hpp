@@ -25,12 +25,14 @@ class UUID
     {
     }
 public:
-    UUID() 
+    UUID() :
+        uuid()
     {
         uuid = GU_UUID_NIL;
     }
     
-    UUID(const void* node, const size_t node_len) 
+    UUID(const void* node, const size_t node_len) :
+        uuid()
     {
         gu_uuid_generate(&uuid, node, node_len);
     }

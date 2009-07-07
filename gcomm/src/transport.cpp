@@ -4,7 +4,6 @@
 #include "tcp.hpp"
 #include "gmcast.hpp"
 #include "evs.hpp"
-#include "vs.hpp"
 #include "pc.hpp"
 #include "gcomm/conf.hpp"
 
@@ -100,10 +99,6 @@ Transport* Transport::create(const URI& uri, EventLoop* event_loop)
     else if (uri.get_scheme() == Conf::EvsScheme)
     {
         return new EVS(uri, event_loop, &transport_mon);
-    }
-    else if (uri.get_scheme() == Conf::VsScheme)
-    {
-        return new VS(uri, event_loop, &transport_mon);
     }
     else if (uri.get_scheme() == Conf::PcScheme)
     {

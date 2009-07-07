@@ -53,7 +53,8 @@ class DummyTransport : public Transport
     deque<ReadBuf*> out;
 public:
     DummyTransport() : 
-        Transport(URI(), 0, 0)
+        Transport(URI(), 0, 0),
+        in(), out()
     {
     }
     

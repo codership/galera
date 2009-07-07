@@ -21,6 +21,7 @@ using std::deque;
 using std::pair;
 using std::make_pair;
 
+
 BEGIN_GCOMM_NAMESPACE
 
 struct EVSInstance 
@@ -51,6 +52,18 @@ struct EVSInstance
         prev_range(SEQNO_MAX, SEQNO_MAX),
         name(name_),
         fifo_seq(-1)
+    {
+    }
+
+    EVSInstance(const EVSInstance& i) :
+        operational(i.operational),
+        installed(i.installed),
+        join_message(i.join_message),
+        leave_message(i.leave_message),
+        tstamp(i.tstamp),
+        prev_range(i.prev_range),
+        name(i.name),
+        fifo_seq(i.fifo_seq)
     {
     }
     
@@ -96,13 +109,15 @@ struct EVSInstance
     void update_tstamp() {
         tstamp = Time::now();
     }
+private:
 
+    void operator=(const EVSInstance&);
 };
 
 
 #define SHIFT_TO(_s) do                                                 \
     {                                                                   \
-        LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + Int(__LINE__).to_string()); \
+        LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + make_int(__LINE__).to_string()); \
         shift_to(_s);                                                   \
     }                                                                   \
     while (0)
@@ -110,15 +125,15 @@ struct EVSInstance
 
 #define SHIFT_TO2(_s, _sjb) do                                          \
     {                                                                   \
-        LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + Int(__LINE__).to_string()); \
+        LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + make_int(__LINE__).to_string()); \
         shift_to(_s, _sjb);                                             \
     }                                                                   \
     while (0)
 
 #define SHIFT_TO_P(_p, _s, _sjb) do                                     \
     {                                                                   \
-        LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + Int(__LINE__).to_string()); \
-        (_p)->shift_to(_s, _sjb);                                       \
+        LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + make_int(__LINE__).to_string()); \
+        (_p).shift_to(_s, _sjb);                                       \
     }                                                                   \
     while (0)
 
@@ -127,84 +142,6 @@ struct EVSInstance
 class EVSProto : public Protolay
 {
 public:
-    Monitor* mon;
-    Transport* tp;
-    EventLoop* el;
-    bool collect_stats;
-    Histogram hs_safe;
-    bool delivering;
-    EVSProto(EventLoop* el_, Transport* t, const UUID& my_addr_, 
-             const string& name, Monitor* mon_) : 
-        mon(mon_),
-        tp(t),
-        el(el_),
-        collect_stats(true),
-        hs_safe("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
-        delivering(false),
-        my_addr(my_addr_), 
-        my_name(name),
-        inactive_timeout(Time(5, 0)),
-        inactive_check_period(Time(1, 0)),
-        consensus_timeout(Time(1, 0)),
-        resend_period(Time(1, 0)),
-        send_join_period(Time(0, 300000)),
-        timer(el_),
-        current_view(View::V_TRANS, ViewId(my_addr, 0)),
-        install_message(0),
-        installing(false),
-        fifo_seq(-1),
-        last_sent(SEQNO_MAX),
-        send_window(8), 
-        max_output_size(1024),
-        self_loopback(false),
-        state(CLOSED) 
-    {
-        LOG_DEBUG("EVSProto(): (" + my_addr.to_string() + "," + my_name + ")");
-        pair<std::map<const UUID, EVSInstance>::iterator, bool> i =
-            known.insert(make_pair(my_addr, EVSInstance(my_name)));
-        assert(i.second == true);
-        self_i = i.first;
-        assert(get_instance(self_i).get_operational() == true);
-        
-        input_map.insert_sa(my_addr);
-        current_view.add_member(my_addr, my_name);
-        
-        ith = new InactivityTimerHandler(this);
-        cth = new CleanupTimerHandler(this);
-        consth = new ConsensusTimerHandler(this);
-        resendth = new ResendTimerHandler(this);
-        sjth = new SendJoinTimerHandler(this);
-        shift_to_rfcnt = 0;
-    }
-    
-    ~EVSProto() {
-        for (deque<pair<WriteBuf*, ProtoDownMeta> >::iterator i = output.begin(); i != output.end();
-             ++i)
-        {
-            delete i->first;
-        }
-        output.clear();
-        delete install_message;
-        delete ith;
-        delete cth;
-        delete consth;
-        delete resendth;
-        delete sjth;
-    }
-    
-    UUID my_addr;
-    string my_name;
-    
-    const UUID& get_uuid() const
-    {
-        return my_addr;
-    }
-
-    string self_string() const
-    {
-        return "(" + my_addr.to_string() + "," + my_name + ")";
-    }
-    
     typedef std::map<const UUID, EVSInstance> InstMap;
     const UUID& get_pid(InstMap::const_iterator i) const
     {
@@ -218,6 +155,23 @@ public:
     {
         return i->second;
     }
+    enum State {
+        CLOSED,
+        JOINING,
+        LEAVING,
+        RECOVERY, 
+        OPERATIONAL,
+        STATE_MAX
+    };
+private:
+    Monitor* mon;
+    Transport* tp;
+    EventLoop* el;
+    bool collect_stats;
+    Histogram hs_safe;
+    bool delivering;
+    UUID my_addr;
+    string my_name;
     // 
     // Known instances 
     InstMap known;
@@ -256,21 +210,103 @@ public:
 
 
     bool self_loopback;
-    
-    enum State {
-        CLOSED,
-        JOINING,
-        LEAVING,
-        RECOVERY, 
-        OPERATIONAL,
-        STATE_MAX
-    };
     State state;
+    int shift_to_rfcnt;
+
+    EVSProto(const EVSProto&);
+    void operator=(const EVSProto&);
+public:
+    EVSProto(EventLoop* el_, Transport* t, const UUID& my_addr_, 
+             const string& name, Monitor* mon_) : 
+        mon(mon_),
+        tp(t),
+        el(el_),
+        collect_stats(true),
+        hs_safe("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
+        delivering(false),
+        my_addr(my_addr_), 
+        my_name(name),
+        known(),
+        self_i(),
+        inactive_timeout(Time(5, 0)),
+        inactive_check_period(Time(1, 0)),
+        consensus_timeout(Time(1, 0)),
+        resend_period(Time(1, 0)),
+        send_join_period(Time(0, 300000)),
+        timer(el_),
+        current_view(View::V_TRANS, ViewId(my_addr, 0)),
+        previous_view(),
+        previous_views(),
+        input_map(),
+        install_message(0),
+        installing(false),
+        fifo_seq(-1),
+        last_sent(SEQNO_MAX),
+        send_window(8), 
+        output(),
+        max_output_size(1024),
+        self_loopback(false),
+        state(CLOSED),
+        shift_to_rfcnt(0),
+        ith(), cth(), consth(), resendth(), sjth()
+    {
+        LOG_DEBUG("EVSProto(): (" + my_addr.to_string() + "," + my_name + ")");
+        pair<std::map<const UUID, EVSInstance>::iterator, bool> i =
+            known.insert(make_pair(my_addr, EVSInstance(my_name)));
+        assert(i.second == true);
+        self_i = i.first;
+        assert(get_instance(self_i).get_operational() == true);
+        
+        input_map.insert_sa(my_addr);
+        current_view.add_member(my_addr, my_name);
+        
+        ith = new InactivityTimerHandler(*this);
+        cth = new CleanupTimerHandler(*this);
+        consth = new ConsensusTimerHandler(*this);
+        resendth = new ResendTimerHandler(*this);
+        sjth = new SendJoinTimerHandler(*this);
+    }
+    
+    ~EVSProto() {
+        for (deque<pair<WriteBuf*, ProtoDownMeta> >::iterator i = output.begin(); i != output.end();
+             ++i)
+        {
+            delete i->first;
+        }
+        output.clear();
+        delete install_message;
+        delete ith;
+        delete cth;
+        delete consth;
+        delete resendth;
+        delete sjth;
+    }
+    
+
+    
+    const UUID& get_uuid() const
+    {
+        return my_addr;
+    }
+
+    string self_string() const
+    {
+        return "(" + my_addr.to_string() + "," + my_name + ")";
+    }
     
     State get_state() const {
         return state;
     }
+
+    size_t get_known_size() const
+    {
+        return known.size();
+    }
     
+    bool is_output_empty() const
+    {
+        return output.empty();
+    }
     
     static std::string to_string(const State s) {
         switch (s) {
@@ -339,7 +375,7 @@ public:
 
     bool states_compare(const EVSMessage& );
     
-    int shift_to_rfcnt;
+
     void shift_to(const State, const bool send_j = true);
     
     
@@ -372,48 +408,48 @@ public:
 
     class CleanupTimerHandler : public TimerHandler
     {
-        EVSProto* p;
+        EVSProto& p;
     public:
-        CleanupTimerHandler(EVSProto* p_) : TimerHandler("cleanup"), p(p_) {}
+        CleanupTimerHandler(EVSProto& p_) : TimerHandler("cleanup"), p(p_) {}
         void handle() 
         {
-            Critical crit(p->mon);
-            p->cleanup_unoperational();
-            p->cleanup_views();
-            p->timer.set(this, Period(Time(30, 0)));
+            Critical crit(p.mon);
+            p.cleanup_unoperational();
+            p.cleanup_views();
+            p.timer.set(this, Period(Time(30, 0)));
         }
         ~CleanupTimerHandler() {
-            if (p->timer.is_set(this))
-                p->timer.unset(this);
+            if (p.timer.is_set(this))
+                p.timer.unset(this);
         }
     };
     
     class InactivityTimerHandler : public TimerHandler
     {
-        EVSProto* p;
+        EVSProto& p;
     public:
-        InactivityTimerHandler(EVSProto* p_) : TimerHandler("inact"), p(p_) {}
+        InactivityTimerHandler(EVSProto& p_) : TimerHandler("inact"), p(p_) {}
         void handle() 
         {
-            Critical crit(p->mon);
-            p->check_inactive();
-            if (p->timer.is_set(this) == false)
+            Critical crit(p.mon);
+            p.check_inactive();
+            if (p.timer.is_set(this) == false)
             {
-                p->timer.set(this, Period(Time(1, 0)));
+                p.timer.set(this, Period(Time(1, 0)));
             }
         }
         
         ~InactivityTimerHandler() {
-            if (p->timer.is_set(this))
-                p->timer.unset(this);
+            if (p.timer.is_set(this))
+                p.timer.unset(this);
         }
     };
 
     class ConsensusTimerHandler : public TimerHandler
     {
-        EVSProto* p;
+        EVSProto& p;
     public:
-        ConsensusTimerHandler(EVSProto* p_) : 
+        ConsensusTimerHandler(EVSProto& p_) : 
             TimerHandler("consensus"), 
             p(p_)
         {
@@ -421,62 +457,62 @@ public:
         }
         ~ConsensusTimerHandler()
         {
-            if (p->timer.is_set(this))
-                p->timer.unset(this);
+            if (p.timer.is_set(this))
+                p.timer.unset(this);
         }
         
         void handle()
         {
-            Critical crit(p->mon);
+            Critical crit(p.mon);
             
-            if (p->get_state() == RECOVERY)
+            if (p.get_state() == RECOVERY)
             {
                 LOG_WARN("CONSENSUS TIMER");
                 SHIFT_TO_P(p, RECOVERY, true);
-                if (p->is_consensus() && p->is_representative(p->my_addr))
+                if (p.is_consensus() && p.is_representative(p.my_addr))
                 {
-                    p->send_install();
+                    p.send_install();
                 }
             }
             else
             {
-                LOG_WARN("consensus timer handler in " + to_string(p->get_state()));
+                LOG_WARN("consensus timer handler in " + to_string(p.get_state()));
             }
         }
     };
 
     class ResendTimerHandler : public TimerHandler
     {
-        EVSProto* p;
+        EVSProto& p;
     public:
-        ResendTimerHandler(EVSProto* p_) :
+        ResendTimerHandler(EVSProto& p_) :
             TimerHandler("resend"),
             p(p_)
         {
         }
         ~ResendTimerHandler()
         {
-            if (p->timer.is_set(this))
-                p->timer.unset(this);
+            if (p.timer.is_set(this))
+                p.timer.unset(this);
         }
         void handle()
         {
-            Critical crit(p->mon);
-            if (p->get_state() == OPERATIONAL)
+            Critical crit(p.mon);
+            if (p.get_state() == OPERATIONAL)
             {
-                LOG_DEBUG("resend timer handler at " + p->self_string());
-                if (p->output.empty())
+                LOG_DEBUG("resend timer handler at " + p.self_string());
+                if (p.output.empty())
                 {
                     WriteBuf wb(0, 0);
-                    p->send_user(&wb, 0xff, DROP, p->send_window, SEQNO_MAX);
+                    p.send_user(&wb, 0xff, DROP, p.send_window, SEQNO_MAX);
                 }
                 else
                 {
-                    p->send_user();
+                    p.send_user();
                 }
-                if (p->timer.is_set(this) == false)
+                if (p.timer.is_set(this) == false)
                 {
-                    p->timer.set(this, p->resend_period);
+                    p.timer.set(this, p.resend_period);
                 }
             }
         }
@@ -484,28 +520,28 @@ public:
 
     class SendJoinTimerHandler : public TimerHandler
     {
-        EVSProto* p;
+        EVSProto& p;
     public:
-        SendJoinTimerHandler(EVSProto* p_) :
+        SendJoinTimerHandler(EVSProto& p_) :
             TimerHandler("send_join"),
             p(p_)
         {
         }
         ~SendJoinTimerHandler()
         {
-            if (p->timer.is_set(this))
-                p->timer.unset(this);
+            if (p.timer.is_set(this))
+                p.timer.unset(this);
         }
         void handle()
         {
-            Critical crit(p->mon);
-            if (p->get_state() == RECOVERY)
+            Critical crit(p.mon);
+            if (p.get_state() == RECOVERY)
             {
-                LOG_DEBUG("send join timer handler at " + p->self_string());
-                p->send_join(true);
-                if (p->timer.is_set(this) == false)
+                LOG_DEBUG("send join timer handler at " + p.self_string());
+                p.send_join(true);
+                if (p.timer.is_set(this) == false)
                 {
-                    p->timer.set(this, p->resend_period);
+                    p.timer.set(this, p.resend_period);
                 }
             }
         }

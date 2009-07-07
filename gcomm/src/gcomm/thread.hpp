@@ -21,7 +21,10 @@ class Thread
     State state;
 
 public:
-    Thread() : state(STOPPED)
+    Thread() : 
+        th(),
+        monitor(),
+        state(STOPPED)
     {
 	
     }

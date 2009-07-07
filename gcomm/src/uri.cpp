@@ -47,13 +47,22 @@ static multimap<const string, string> extract_query_list(
 }
 
 
-URI::URI()
+URI::URI() :
+    str(),
+    scheme(),
+    authority(),
+    path(),
+    query_list()
 {
 
 }
 
 URI::URI(const string& str_) : 
-    str(str_)
+    str(str_),
+    scheme(),
+    authority(),
+    path(),
+    query_list()
 {
     parse();
 }

@@ -209,11 +209,14 @@ START_TEST(test_gmcast_w_user_messages)
         int fd;
         EventLoop* el;
         Transport* tp;
+        User(const User&);
+        void operator=(User&);
     public:
 
         User(EventLoop* el_, const char* listen_addr, const char* remote_addr) :
             fd(PseudoFd::alloc_fd()),
-            el(el_)
+            el(el_),
+            tp(0)
         {
             string uri("gcomm+gmcast://");
             uri += listen_addr;
@@ -268,7 +271,7 @@ START_TEST(test_gmcast_w_user_messages)
         void handle_up(const int cid, const ReadBuf* rb, const size_t roff,
                        const ProtoUpMeta* um)
         {
-            LOG_DEBUG("msg " + Size(roff).to_string());
+            LOG_DEBUG("msg " + make_int(roff).to_string());
             if (rb->get_len() < roff + 16)
             {
                 throw FatalException("offset error");

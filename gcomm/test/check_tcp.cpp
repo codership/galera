@@ -19,6 +19,8 @@ class Sender : Toplay
     Transport *tp;
     EventLoop *el;
     bool can_send;
+    Sender(const Sender&);
+    void operator=(const Sender&);
 public:
     Sender(EventLoop *el_) : 
         tp(0), 
@@ -43,7 +45,7 @@ public:
     void connect()
     {
         URI uri(nonblock_addr);
-        uri.set_query_param("tcp.max_pending", Int(1 << 25).to_string());
+        uri.set_query_param("tcp.max_pending", make_int(1 << 25).to_string());
         tp = Transport::create(uri, el);
         gcomm::connect(tp, this);
         tp->connect();
@@ -94,8 +96,14 @@ class Receiver : public Toplay
     clock_t cstop;
     uint64_t recvd;
     Transport *tp;
+    Receiver(const Receiver&);
+    void operator=(const Receiver&);
 public:
-    Receiver(Transport *t) : recvd(0), tp(t)
+    Receiver(Transport *t) : 
+        cstart(),
+        cstop(),
+        recvd(0), 
+        tp(t)
     {
         cstart = clock();
         gcomm::connect(tp, this);
@@ -106,7 +114,7 @@ public:
         clock_t ct = (cstop - cstart);
         double tput = CLOCKS_PER_SEC*double(recvd)/(cstop - cstart);
         LOG_INFO("Reciver: received " 
-                 + UInt64(recvd).to_string() 
+                 + make_int(recvd).to_string() 
                  + " bytes\n"
                  + "         used " 
                  + Double((double(ct)/CLOCKS_PER_SEC)).to_string() 
@@ -161,13 +169,16 @@ class Listener : public Toplay
     Transport* tp;
     EventLoop* el;
     std::list<std::pair<Receiver *, Transport *> > tports;
+    Listener(const Listener&);
+    void operator=(const Listener&);
 public:
     Receiver *get_first_receiver() {
         return tports.front().first;
     }
     Listener(EventLoop* el_) : 
         tp(0), 
-        el(el_)
+        el(el_),
+        tports()
     {
     }
     
@@ -198,7 +209,7 @@ public:
         if (tp)
             throw FatalException("");
         URI uri(nonblock_addr);
-        uri.set_query_param("tcp.max_pending", Int(1 << 25).to_string());
+        uri.set_query_param("tcp.max_pending", make_int(1 << 25).to_string());
         tp = Transport::create(uri, el);
         gcomm::connect(tp, this);
         tp->listen();
@@ -232,7 +243,7 @@ START_TEST(test_nonblock)
     
     for (size_t i = 1; i <= (1 << 24);)
     {
-        LOG_INFO("sending " + Size(i).to_string());
+        LOG_INFO("sending " + make_int(i).to_string());
         if (s.send(i) == true)
             i *= 2;
         el.poll(1);
@@ -286,13 +297,15 @@ class BlockSender : public Thread
     Transport* tp;
     size_t sent;
     unsigned char* buf;
+    BlockSender(const BlockSender&);
+    void operator=(const BlockSender&);
 public:
 
     BlockSender(const char* a) : addr(a), tp(0), sent(0), buf(0) {}
 
     ~BlockSender() {
         delete[] buf;
-        LOG_INFO("BlockSender: sent " + Size(sent).to_string() + " bytes");
+        LOG_INFO("BlockSender: sent " + make_int(sent).to_string() + " bytes");
     }
 
     void send(size_t len) {
@@ -332,6 +345,8 @@ public:
 class BlockReceiver : public Thread {
     Transport* tp;
     size_t recvd;
+    BlockReceiver(const BlockReceiver&);
+    void operator=(const BlockReceiver&);
 public:
     BlockReceiver(Transport* t) : 
         tp(t), 
@@ -341,7 +356,7 @@ public:
     
     ~BlockReceiver()
     {
-        LOG_INFO("BlockReceiver: received " + Size(recvd).to_string() + " bytes");
+        LOG_INFO("BlockReceiver: received " + make_int(recvd).to_string() + " bytes");
         tp->close();
         delete tp;
     }
@@ -366,8 +381,13 @@ class BlockListener : public Thread
     Transport *listener;
     const char *addr;
     std::list<BlockReceiver*> recvrs;
+    BlockListener(const BlockListener&);
+    void operator=(const BlockListener&);
 public:
-    BlockListener(const char *a) : addr(a)
+    BlockListener(const char *a) : 
+        listener(0), 
+        addr(a),
+        recvrs()
     {
     }
     

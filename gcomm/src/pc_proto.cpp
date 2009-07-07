@@ -32,8 +32,8 @@ void PCProto::send_state()
     for (PCInstMap::const_iterator i = instances.begin(); i != instances.end();
          ++i)
     {
-        im.insert(make_pair(PCInstMap::get_uuid(i), 
-                            PCInstMap::get_instance(i)));
+        im.insert(std::make_pair(PCInstMap::get_uuid(i), 
+                                 PCInstMap::get_instance(i)));
     }
     Buffer buf(pcs.size());
     if (pcs.write(buf.get_buf(), buf.get_len(), 0) == 0)
@@ -59,8 +59,9 @@ void PCProto::send_install()
     {
         if (current_view.get_members().find(SMMap::get_uuid(i)) != 
             current_view.get_members().end()
-            && im.insert(make_pair(SMMap::get_uuid(i), 
-                                   gcomm::get_state(i, SMMap::get_uuid(i)))).second == false)
+            && im.insert(std::make_pair(
+                             SMMap::get_uuid(i), 
+                             gcomm::get_state(i, SMMap::get_uuid(i)))).second == false)
         {
             throw FatalException("");
         }
@@ -482,7 +483,7 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 
     LOG_INFO(self_string() + " handle state: " + msg.to_string());
     
-    if (state_msgs.insert(make_pair(source, msg)).second == false)
+    if (state_msgs.insert(std::make_pair(source, msg)).second == false)
     {
         throw FatalException("");
     }
@@ -496,10 +497,10 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
             if (instances.find(SMMap::get_uuid(i)) == instances.end())
             {
                 if (instances.insert(
-                        make_pair(SMMap::get_uuid(i),
-                                  gcomm::get_state(
-                                      i, 
-                                      SMMap::get_uuid(i)))).second == false)
+                        std::make_pair(SMMap::get_uuid(i),
+                                       gcomm::get_state(
+                                           i, 
+                                           SMMap::get_uuid(i)))).second == false)
                 {
                     throw FatalException("");
                 }
@@ -582,8 +583,13 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
 void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
                           const size_t roff, const ProtoUpMeta* um)
 {
-    set_to_seq(get_to_seq() + 1);
-    ProtoUpMeta pum(um->get_source(), um->get_user_type(), get_to_seq());
+    int64_t to_seq = -1;
+    if (get_state() == S_PRIM)
+    {
+        set_to_seq(get_to_seq() + 1);
+        to_seq = get_to_seq();
+    }
+    ProtoUpMeta pum(um->get_source(), um->get_user_type(), to_seq);
     pass_up(rb, roff + msg.size(), &pum);
 }
 

@@ -99,6 +99,8 @@ class SelfDestruct : public Protolay, EventContext
 {
     int fd;
     EventLoop* el;
+    SelfDestruct(const SelfDestruct&);
+    void operator=(const SelfDestruct&);
 public:
     SelfDestruct(EventLoop* el_) : 
         fd(PseudoFd::alloc_fd()), 
@@ -140,6 +142,8 @@ class SelfInterrupt : public Protolay, EventContext
 {
     int fd;
     EventLoop* el;
+    SelfInterrupt(const SelfInterrupt&);
+    void operator=(const SelfInterrupt&);
 public:
     SelfInterrupt(EventLoop* el_) : 
         fd(PseudoFd::alloc_fd()), 

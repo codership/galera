@@ -14,6 +14,8 @@ BEGIN_GCOMM_NAMESPACE
  */ 
 class TimerHandler {
     const char* name;
+    TimerHandler(const TimerHandler&);
+    void operator=(const TimerHandler&);
 public:
     /*!
      *
@@ -51,6 +53,8 @@ class Timer : public EventContext {
     EventLoop *event_loop;
     TimerMap timer_map;
     ExpirationMap expiration_map;
+    Timer(const Timer&);
+    void operator=(const Timer&);
 public:
     Timer(EventLoop *);
     ~Timer();

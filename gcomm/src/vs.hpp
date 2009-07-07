@@ -19,6 +19,8 @@ class VS : public Transport
     Transport* tp;
     EVSProto* evs_proto;
     VSProto* proto;
+    VS(const VS&);
+    void operator=(const VS&);
 public:
     void connect();
     void close();

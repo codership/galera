@@ -25,17 +25,26 @@ class Time {
     static const time_t Second;
     Time(const uint64_t t) : time(t) {}
 public:
-    Time() : time(0) {}
+    Time() : 
+        time(0) 
+    {
+    }
 
     /*!
      *
      */
-    Time(const time_t sec, const time_t usec) {
+    Time(const time_t sec, const time_t usec) :
+        time()
+    {
 	if (uint64_t(sec) > std::numeric_limits<uint64_t>::max()/Second) {
 	    std::cerr << sec << " " << std::numeric_limits<time_t>::max()/Second << "\n";
 	    throw FatalException("Time value overflow");
 	}
 	time = uint64_t(sec)*uint64_t(Second) + uint64_t(usec);
+    }
+
+    virtual ~Time()
+    {
     }
 
     /*!

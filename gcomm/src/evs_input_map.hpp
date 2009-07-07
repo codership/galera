@@ -20,6 +20,7 @@ class EVSInputMapItem
     EVSMessage msg;
     ReadBuf* rb;
     size_t roff;
+    void operator=(const EVSInputMapItem&);
 public:
     EVSInputMapItem(const UUID& sa_, const EVSMessage& msg_, 
                     const ReadBuf* rb_, const size_t roff_) :
@@ -30,11 +31,12 @@ public:
     {
     }
     
-    EVSInputMapItem(const EVSInputMapItem& i)
+    EVSInputMapItem(const EVSInputMapItem& i) :
+        sa(i.sa),
+        msg(i.msg),
+        rb(i.rb ? i.rb->copy() : 0),
+        roff(i.roff)
     {
-        *this = i;
-        if (i.rb)
-            rb = i.rb->copy();
     }
     
     EVSInputMapItem() : sa(UUID()), msg(EVSMessage()), rb(0), roff(0){}
@@ -71,7 +73,7 @@ public:
     
     string to_string() const
     {
-        return sa.to_string() + " " + UInt32(msg.get_seq()).to_string();
+        return sa.to_string() + " " + make_int(msg.get_seq()).to_string();
     }
 };
 
@@ -82,7 +84,7 @@ class EVSInputMap {
     struct Instance {
         EVSRange gap;
         uint32_t safe_seq;
-        Instance() : safe_seq(SEQNO_MAX) {}
+        Instance() : gap(), safe_seq(SEQNO_MAX) {}
         ~Instance() {
         }
         
@@ -118,9 +120,16 @@ class EVSInputMap {
     uint64_t recovery_log_size_cum;
     
 public:
-    EVSInputMap() : safe_seq(SEQNO_MAX), aru_seq(SEQNO_MAX),
-                    n_messages(0), msg_log_size_cum(0), 
-                    recovery_log_size_cum(0) {
+    EVSInputMap() : 
+        instances(),
+        recovery_log(),
+        msg_log(),
+        safe_seq(SEQNO_MAX), 
+        aru_seq(SEQNO_MAX),
+        n_messages(0), 
+        msg_log_size_cum(0), 
+        recovery_log_size_cum(0) 
+    {
     }
     
     ~EVSInputMap() {
@@ -409,13 +418,13 @@ public:
         if (msg_log.size())
         {
             LOG_WARN("going to discard " 
-                     + Size(msg_log.size()).to_string() 
+                     + make_int(msg_log.size()).to_string() 
                      + " messages from msg log");
             for (MLog::const_iterator i = msg_log.begin(); i != msg_log.end();
                  ++i)
             {
                 LOG_WARN("source " + i->get_sockaddr().to_string() + " seq " 
-                         + UInt32(i->get_evs_message().get_seq()).to_string());
+                         + make_int(i->get_evs_message().get_seq()).to_string());
             }
         }
         
@@ -423,12 +432,12 @@ public:
         if (recovery_log.size())
         {
             LOG_INFO("going to discard " 
-                     + Size(recovery_log.size()).to_string() 
+                     + make_int(recovery_log.size()).to_string() 
                      + " messages from recovery log");
             for (MLog::const_iterator i = recovery_log.begin(); i != recovery_log.end();
                  ++i)
             {
-                LOG_INFO("source " + i->get_sockaddr().to_string() + " seq " + UInt32(i->get_evs_message().get_seq()).to_string());
+                LOG_INFO("source " + i->get_sockaddr().to_string() + " seq " + make_int(i->get_evs_message().get_seq()).to_string());
             }
         }
         recovery_log.clear();

@@ -27,6 +27,10 @@ class Event
     int event_cause;
     Time time;
     EventData* user_data;
+
+
+    void operator=(const Event&);
+
 public:
     enum {
 	E_NONE   = 0,
@@ -40,13 +44,28 @@ public:
         E_USER   = 1 << 7,
 	E_ALL = E_IN | E_OUT | E_ERR | E_HUP | E_INVAL | E_TIMED | E_SIGNAL | E_USER
     };
-    
-    Event(int cause) : event_cause(cause), user_data(0) {}
-    
-    Event(int cause, const Time& at) : event_cause(cause), time(at), user_data(0) {}
 
-    Event(int cause, const Time& at, EventData* user_data_) :
-        event_cause(cause), time(at), user_data(user_data_) {}
+    Event(const Event& e) :
+        event_cause(e.event_cause),
+        time(e.time),
+        user_data(e.user_data)
+
+    {
+    }
+    
+    Event(int cause) : 
+        event_cause(cause), 
+        time(),
+        user_data(0) 
+    {
+    }
+    
+    Event(int cause, const Time& at, EventData* user_data_ = 0) :
+        event_cause(cause), 
+        time(at), 
+        user_data(user_data_) 
+    {
+    }
 
     int get_cause() const {
         return event_cause;
@@ -90,6 +109,10 @@ class EventLoop
     void handle_queued_events();
     std::list<Protolay*> released;
     bool interrupted;
+
+    EventLoop(const EventLoop&);
+    void operator=(const EventLoop&);
+
 public:
     EventLoop();
     ~EventLoop();

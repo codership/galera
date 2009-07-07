@@ -12,6 +12,14 @@ BEGIN_GCOMM_NAMESPACE
 class Exception : exception
 {
     const char* msg;
+
+    void operator=(const Exception&);
+protected:
+    Exception(const Exception& e) :
+        msg()
+    {
+        msg = e.msg;
+    }
 public:
     Exception() throw() : msg("")
     {
@@ -22,7 +30,7 @@ public:
     {
     }
     
-    const char* what()
+    const char* what() const throw()
     {
         return msg;
     }

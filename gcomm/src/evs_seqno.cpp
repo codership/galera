@@ -14,7 +14,7 @@ void set_seqno_max(const uint32_t val)
 {
     if (val > MAX_SEQNO_MAX)
     {
-        LOG_FATAL("seqno max too large: " + UInt32(val).to_string());
+        LOG_FATAL("seqno max too large: " + make_int(val).to_string());
         throw FatalException("seqno max too large");
     }
     if (val != 0)

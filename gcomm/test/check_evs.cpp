@@ -142,7 +142,7 @@ START_TEST(test_input_map_basic)
 
     try {
         im.insert_sa(pid2);
-        fail();
+        fail("");
     } catch (FatalException e) {
 
     }
@@ -151,7 +151,7 @@ START_TEST(test_input_map_basic)
 
     try {
         im.erase_sa(pid2);
-        fail();
+        fail("");
     } catch (FatalException e) {
 
     }
@@ -191,7 +191,7 @@ START_TEST(test_input_map_basic)
     // Must not allow insertin second instance before clear()
     try {
         im.insert_sa(pid2);
-        fail();
+        fail("");
     } catch (FatalException e) {
 
     }
@@ -397,7 +397,7 @@ public:
     {
         if (rb)
         {
-            UInt32 rseq(SEQNO_MAX);
+            IntType<uint32_t> rseq(SEQNO_MAX);
             fail_unless(rseq.read(rb->get_buf(), rb->get_len(), roff));
             deliv_seq = rseq.get();
         }
@@ -886,6 +886,10 @@ START_TEST(test_evs_proto_duplicates)
 END_TEST
 
 struct Inst : public Toplay {
+private:
+    Inst(const Inst&);
+    void operator=(const Inst&);
+public:
     DummyTransport* tp;
     EVSProto* ep;
     uint32_t sent_seq;
@@ -919,7 +923,7 @@ struct Inst : public Toplay {
         fail_unless(um != 0);
         if (um->get_source() == ep->get_uuid())
         {
-            UInt32 rseq(0xffffffff);
+            IntType<uint32_t> rseq(0xffffffff);
             fail_unless(rseq.read(rb->get_buf(), rb->get_len(), roff) != 0);
             if (rseq.get() != delivered_seq + 1)
             {
@@ -978,7 +982,11 @@ struct Stats {
     uint64_t total_msgs;
     vector<uint64_t> msgs;
 
-    Stats() : sent_msgs(0), total_msgs(0) {
+    Stats() : 
+        sent_msgs(0), 
+        total_msgs(0),
+        msgs()
+    {
         msgs.resize(7, 0);
     }
 
@@ -998,11 +1006,11 @@ struct Stats {
     
     void print() 
     {
-        LOG_INFO("Sent messages: " + UInt64(sent_msgs).to_string());
-        LOG_INFO("Total messages: " + UInt64(total_msgs).to_string());
+        LOG_INFO("Sent messages: " + make_int(sent_msgs).to_string());
+        LOG_INFO("Total messages: " + make_int(total_msgs).to_string());
         for (size_t i = 0; i < 6; ++i) {
             LOG_INFO("Type " + EVSMessage::to_string(static_cast<EVSMessage::Type>(i))
-                     + " messages: " + UInt64(msgs[i]).to_string()
+                     + " messages: " + make_int(msgs[i]).to_string()
                      + " fraction of sent: " + fraction_of(msgs[i], sent_msgs).to_string()
                      + " fraction of total: " + fraction_of(msgs[i], total_msgs).to_string());
     }
@@ -1036,7 +1044,7 @@ static void multicast(vector<Inst*>* pvec, const ReadBuf* rb, const int ploss)
 {
     EVSMessage msg;
     fail_unless(msg.read(rb->get_buf(), rb->get_len(), 0));
-    LOG_DEBUG("msg: " + Int(msg.get_type()).to_string());
+    LOG_DEBUG("msg: " + make_int(msg.get_type()).to_string());
     stats.acc_mcast(msg.get_type());
     for (vector<Inst*>::iterator j = pvec->begin();
          j != pvec->end(); ++j) {
@@ -1048,8 +1056,8 @@ static void multicast(vector<Inst*>* pvec, const ReadBuf* rb, const int ploss)
             if (::rand() % 3 == 0) {
                 LOG_DEBUG("dropping " + EVSMessage::to_string(msg.get_type()) +
                          " from " + msg.get_source().to_string() + " to " +
-                         (*j)->ep->my_addr.to_string() 
-                         + " seq " + UInt32(msg.get_seq()).to_string());
+                          (*j)->ep->get_uuid().to_string() 
+                         + " seq " + make_int(msg.get_seq()).to_string());
                 continue;
             } else {
                 LOG_DEBUG("dropping " + EVSMessage::to_string(msg.get_type()) +" from " + msg.get_source().to_string() + " to all");
@@ -1111,7 +1119,7 @@ static void flush(vector<Inst*>* pvec)
             for (vector<Inst*>::iterator i = pvec->begin();
                  i != pvec->end(); ++i) 
             {        
-                if ((*i)->ep->output.empty() == false)
+                if ((*i)->ep->is_output_empty() == false)
                 {
                     (*i)->ep->resendth->handle();
                     not_empty = true;
@@ -1163,7 +1171,7 @@ START_TEST(test_evs_proto_converge)
     for (size_t i = 0; i < n; ++i) {
         DummyTransport* tp = new DummyTransport();
         vec[i] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0),
-                                           "n" + Size(i).to_string(), 0));
+                                           "n" + make_int(i).to_string(), 0));
         vec[i]->ep->shift_to(EVSProto::JOINING);
         vec[i]->ep->send_join(false);
     }
@@ -1181,7 +1189,7 @@ START_TEST(test_evs_proto_converge_1by1)
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0),
-                                           "n" + Size(n).to_string(), 0));
+                                           "n" + make_int(n).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(n == 0);
         fail_unless(vec[n]->ep->get_state() == (n == 0 ? EVSProto::OPERATIONAL: EVSProto::JOINING));
@@ -1275,7 +1283,7 @@ START_TEST(test_evs_proto_user_msg)
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0),
-                                           "n" + Size(n).to_string(), 0));
+                                           "n" + make_int(n).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(n == 0);
         reach_operational(&vec);
@@ -1359,7 +1367,7 @@ START_TEST(test_evs_proto_consensus_with_user_msg)
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0), "n" 
-                                           + Size(n).to_string(), 0));
+                                           + make_int(n).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(n == 0);
         reach_operational(&vec);
@@ -1380,7 +1388,7 @@ START_TEST(test_evs_proto_msg_loss)
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0), "n" + 
-                                           Size(n).to_string(), 0));
+                                           make_int(n).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(false);
     }
@@ -1410,7 +1418,7 @@ START_TEST(test_evs_proto_leave)
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0), "n" 
-                                           + Size(n).to_string(), 0));
+                                           + make_int(n).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(n == 0);
         reach_operational(&vec);
@@ -1439,7 +1447,7 @@ static void join_inst(EventLoop* el,
     vec.resize(*n + 1);
     DummyTransport* tp = new DummyTransport();
     vec[*n] = new Inst(tp, new EVSProto(el, tp, UUID(0, 0), "n" 
-                                        + Size(*n).to_string(), 0));
+                                        + make_int(*n).to_string(), 0));
     vec[*n]->ep->shift_to(EVSProto::JOINING);
     vec[*n]->ep->send_join(false);
 
@@ -1530,11 +1538,15 @@ class EVSUser : public Toplay, EventContext
     uint64_t recvd;
     uint32_t sent_seq;
     uint32_t delivered_seq;
+
+    EVSUser(const EVSUser&);
+    void operator=(const EVSUser&);
 public:
     EVSUser(const char* uri_str, EventLoop* el_) :
         evs(0),
         el(el_),
         state(CLOSED),
+        fd(-1),
         recvd(0),
         sent_seq(0),
         delivered_seq(0)
@@ -1586,7 +1598,7 @@ public:
             fail_unless(um->get_user_type() == 0xab);
             if (um->get_source() == evs->get_uuid())
             {
-                UInt32 rseq(0xffffffff);
+                IntType<uint32_t> rseq(0xffffffff);
                 fail_unless(rseq.read(rb->get_buf(), rb->get_len(), roff) != 0);
                 if (rseq.get() != delivered_seq + 1)
                 {
@@ -1632,7 +1644,7 @@ public:
                 fail_unless(p->get_state() == EVSProto::OPERATIONAL);
             }
             LOG_INFO("received in prev view: " 
-                     + UInt64(recvd).to_string());
+                     + make_int(recvd).to_string());
             recvd = 0;
         }
     }

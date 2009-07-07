@@ -27,14 +27,14 @@ int PseudoFd::alloc_fd()
 
     std::pair<std::set<int>::iterator, bool> ret = fds.insert(new_fd);
     assert(ret.second == true);
-    LOG_DEBUG(std::string("alloc fd: ") + Int(new_fd).to_string());
+    LOG_DEBUG(std::string("alloc fd: ") + make_int(new_fd).to_string());
     return new_fd;
 }
 
 void PseudoFd::release_fd(const int fd)
 {
     Critical crit(&monitor);
-    LOG_DEBUG(std::string(std::string("release fd: ") + Int(fd).to_string()));
+    LOG_DEBUG(std::string(std::string("release fd: ") + make_int(fd).to_string()));
     assert(fds.find(fd) != fds.end());
     fds.erase(fd);
 }

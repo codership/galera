@@ -36,8 +36,17 @@ class TCP : public Transport, EventContext
             wb(wb_), offset(offset_)
         {
         }
+        PendingWriteBuf(const PendingWriteBuf& p) :
+            wb(p.wb),
+            offset(p.offset)
+        {
+        }
         ~PendingWriteBuf() {
         }
+
+    private:
+
+        void operator=(const PendingWriteBuf&);
     };
 
     std::deque<PendingWriteBuf> pending;
@@ -66,17 +75,26 @@ class TCP : public Transport, EventContext
     ssize_t send_nointr(const void *buf, const size_t buflen, 
 			const size_t offset, int flags);
     
+
+
+    TCP(const TCP&);
+    void operator=(const TCP&);
 public:
     TCP(const URI& uri_, EventLoop* event_loop_, Monitor* mon) : 
 	Transport(uri_, event_loop_, mon), 
         no_nagle(1),
+        sa(),
+        sa_size(),
         max_pending_bytes(4*1024*1024), 
         pending_bytes(0), 
+        recv_buf(),
+        recv_buf_size(),
 	recv_buf_offset(0), 
         contention_tries(30),
         contention_tout(10),
         recv_rb(0),
         up_rb(0),
+        pending(),
         non_blocking(false) 
     {
         /* */
@@ -88,7 +106,7 @@ public:
         if (i != ql.end())
         {
             max_pending_bytes = read_long(get_query_value(i));
-            LOG_DEBUG("max_pending_bytes: " + Size(max_pending_bytes).to_string());
+            LOG_DEBUG("max_pending_bytes: " + make_int(max_pending_bytes).to_string());
         }
     }
 

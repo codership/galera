@@ -31,7 +31,6 @@ static GCommSuite suites[] = {
     {"tcp", tcp_suite},
     {"gmcast", gmcast_suite},
     {"evs", evs_suite},
-    {"vs", vs_suite},
     {"pc", pc_suite},
     {"", 0}
 };
@@ -56,6 +55,13 @@ int main(int argc, char* argv[])
 {
     SRunner* sr = srunner_create(0);
     vector<string>* suits = 0;
+
+    
+    if (::getenv("CHECK_GCOMM_DEBUG"))
+    {
+        gu_log_max_level = GU_LOG_DEBUG;
+        //gu::Logger::enable_debug(true);
+    }
 
     LOG_INFO("check_gcomm, start tests");
     if (::getenv("CHECK_GCOMM_SUITES"))

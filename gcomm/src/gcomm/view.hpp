@@ -10,8 +10,6 @@
 
 BEGIN_GCOMM_NAMESPACE
 
-using std::map;
-
 class ViewId
 {
     UUID uuid;
@@ -68,8 +66,52 @@ public:
 
 
 
-struct NodeList : map<const UUID, string>
+class NodeList 
 {
+public:
+    typedef std::map<const UUID, std::string> Map;
+    typedef Map::const_iterator const_iterator;
+    typedef Map::iterator iterator;
+private:
+    Map nodes;
+public:
+    NodeList() : 
+        nodes()
+    {
+    }
+    ~NodeList() 
+    {
+    }
+    
+    const_iterator begin() const
+    {
+        return nodes.begin();
+    }
+
+    const_iterator end() const
+    {
+        return nodes.end();
+    }
+    
+    const_iterator find(const UUID& uuid) const
+    {
+        return nodes.find(uuid);
+    }
+
+    std::pair<iterator, bool> insert(const std::pair<const UUID, const string>& p)
+    {
+        return nodes.insert(p);
+    }
+
+    bool empty() const
+    {
+        return nodes.empty();
+    }
+
+    bool operator==(const NodeList& other) const
+    {
+        return nodes == other.nodes;
+    }
 
     size_t length() const;
     
@@ -121,19 +163,29 @@ private:
     string pid_to_string(const UUID& pid) const;
 public:
     View() :
-        type(V_NONE)
+        type(V_NONE),
+        view_id(),
+        members(),
+        joined(),
+        left(),
+        partitioned()
     {
     }
     
     View(const Type type_, const ViewId& view_id_) : 
         type(type_),
-        view_id(view_id_)
+        view_id(view_id_),
+        members(),
+        joined(),
+        left(),
+        partitioned()
     {
     }
-
+    
     ~View()
     {
     }
+    
     void add_member(const UUID& pid, const string& name);
     void add_members(NodeList::const_iterator begin, NodeList::const_iterator end);
     void add_joined(const UUID& pid, const string& name);

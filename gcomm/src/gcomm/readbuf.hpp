@@ -18,8 +18,12 @@ class Buffer
 {
     byte_t* buf;
     size_t buflen;
+    Buffer(const Buffer&);
+    void operator=(const Buffer&);
 public:
-    Buffer(const size_t buflen_) : buflen(buflen_)
+    Buffer(const size_t buflen_) : 
+        buf(),
+        buflen(buflen_)
     {
         buf = new byte_t[buflen];
     }
@@ -52,48 +56,52 @@ class ReadBuf
     mutable byte_t* priv_buf;
     size_t buflen;
     mutable Monitor mon;
+
+    ReadBuf(const ReadBuf&);
     // Private copy operator to disallow assignment 
-    ReadBuf operator=(ReadBuf& r) { return r;}
-    // Private destructor to disallow allocating ReadBuf from stack
+    void operator=(ReadBuf& r);
+
 
 
 public:
 
 
-    ~ReadBuf() {
+    ~ReadBuf() 
+    {
 	if (instack == false) {
 	    LOG_FATAL("~ReadBuf(): Invalid call to dtor");
 	    throw FatalException("Must not call dtor explicitly, object not in stack");
 	}
 	delete[] priv_buf;
     }
+    
+    ReadBuf(const byte_t* buf_, const size_t buflen_, bool instack_ = false) :
+        refcnt(1),
+        instack(instack_),
+        buf(buf_),
+        priv_buf(0),
+        buflen(buflen_),
+        mon()
+    {
 
-    ReadBuf(const byte_t* buf, const size_t buflen, bool inst) {
-	instack = inst;
-	refcnt = 1;
-	this->buf = buf; // reinterpret_cast<const byte_t *>(buf);
-	this->buflen = buflen;
-	this->priv_buf = 0;
     }
     
     
-    ReadBuf(const byte_t *buf, const size_t buflen) {
-	instack = false;
-	refcnt = 1;
-	this->buf = buf; // reinterpret_cast<const byte_t *>(buf);
-	this->buflen = buflen;
-	this->priv_buf = 0;
-    }
+
 
     ReadBuf(const byte_t* bufs[], const size_t buflens[], 
             const size_t nbufs, 
-	    const size_t tot_len) {
-	instack = false;
-	refcnt = 1;
-	buf = 0;
+	    const size_t tot_len) :
+        refcnt(1),
+        instack(false),
+        buf(0),
+        priv_buf(0),
+        buflen(0),
+        mon()
+    {
 	priv_buf = new byte_t[tot_len];
-	buflen = 0;
-	for (size_t i = 0; i < nbufs; ++i) {
+	for (size_t i = 0; i < nbufs; ++i)
+        {
 	    memcpy(priv_buf + buflen, bufs[i], buflens[i]);
 	    buflen += buflens[i];
 	}

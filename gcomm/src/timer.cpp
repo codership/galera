@@ -7,7 +7,11 @@
 
 BEGIN_GCOMM_NAMESPACE
 
-Timer::Timer(EventLoop *p) : event_loop(p)
+Timer::Timer(EventLoop *p) : 
+    fd(-1),
+    event_loop(p),
+    timer_map(),
+    expiration_map()
 {
     fd = PseudoFd::alloc_fd();
     event_loop->insert(fd, this);

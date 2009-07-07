@@ -33,7 +33,7 @@ string ViewId::to_string() const
 
 size_t NodeList::length() const
 {
-    return map<const UUID, string>::size();
+    return nodes.size();
 }
 
 size_t NodeList::read(const byte_t* buf, const size_t buflen, const size_t offset)
@@ -42,7 +42,7 @@ size_t NodeList::read(const byte_t* buf, const size_t buflen, const size_t offse
     uint32_t len;
 
     /* Clear map */
-    clear();
+    nodes.clear();
     
     if ((off = gcomm::read(buf, buflen, offset, &len)) == 0)
     {
@@ -64,7 +64,7 @@ size_t NodeList::read(const byte_t* buf, const size_t buflen, const size_t offse
             return 0;
         }
         name[node_name_size] = '\0';
-        if (insert(make_pair(uuid, string(reinterpret_cast<char*>(name)))).second == false)
+        if (nodes.insert(make_pair(uuid, string(reinterpret_cast<char*>(name)))).second == false)
         {
             LOG_WARN("read node list: duplicate entry: " + uuid.to_string());
             return 0;
@@ -77,8 +77,8 @@ size_t NodeList::write(byte_t* buf, const size_t buflen, const size_t offset) co
 {
     size_t off;
         
-    UInt32 len(length());
-    if ((off = len.write(buf, buflen, offset)) == 0)
+    uint32_t len(length());
+    if ((off = gcomm::write(len, buf, buflen, offset)) == 0)
     {
         LOG_WARN("write node list: write len");
         return 0;
@@ -88,7 +88,7 @@ size_t NodeList::write(byte_t* buf, const size_t buflen, const size_t offset) co
     {
         if ((off = get_uuid(i).write(buf, buflen, off)) == 0)
         {
-            LOG_WARN("write node list: write pid #" + Size(cnt).to_string());
+            LOG_WARN("write node list: write pid #" + make_int(cnt).to_string());
             return 0;
         }
         byte_t name[node_name_size];
@@ -268,17 +268,17 @@ bool operator==(const View& a, const View& b)
 size_t View::read(const byte_t* buf, const size_t buflen, const size_t offset)
 {
     size_t off;
-    UInt32 w;
+    uint32_t w;
 
-    if ((off = w.read(buf, buflen, offset)) == 0)
+    if ((off = gcomm::read(buf, buflen, offset, &w)) == 0)
     {
         LOG_WARN("read type");
         return 0;
     }
-    type = static_cast<Type>(w.get());
+    type = static_cast<Type>(w);
     if (type != V_TRANS && type != V_REG)
     {
-        LOG_WARN("invalid type: " + UInt32(w).to_string());
+        LOG_WARN("invalid type: " + make_int(w).to_string());
         return 0;
     }
     if ((off = view_id.read(buf, buflen, off)) == 0)
@@ -311,8 +311,8 @@ size_t View::read(const byte_t* buf, const size_t buflen, const size_t offset)
 size_t View::write(byte_t* buf, const size_t buflen, const size_t offset) const
 {
     size_t off;
-    UInt32 w(type);
-    if ((off = w.write(buf, buflen, offset)) == 0)
+    uint32_t w(type);
+    if ((off = gcomm::write(w, buf, buflen, offset)) == 0)
     {
         LOG_WARN("write type");
         return 0;

@@ -49,19 +49,22 @@ AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
 # TODO: Find out the most wide set of warning flags  
 #       which is still useful (eats system header files etc.)
 CFLAGS="$CFLAGS -std=c99 -Wall -Werror -Wextra -pedantic -Wno-unused-parameter"
-CXXFLAGS="$CXXFLAGS -Wall -Werror -Wextra -pedantic -Wno-long-long -Wno-unused-parameter -Wno-deprecated -fno-rtti -Wno-variadic-macros"
+
+# CXXFLAGS 
+#
+# - Turn on most of the warnings, pedantic and ansi
+# - Make warnings to be handled as errors
+CXXFLAGS="$CXXFLAGS -Wall -Werror -Wextra -pedantic -ansi -Weffc++"
+# However, disable warnings for:
+# - long long datatype ([u]int64_t)
+# - unused function parameter (however, this should not be needed)
+# - some stl headers may contain deprecated features
+# - gu_log.h contains some variadic macros
+CXXFLAGS="$CXXFLAGS -Wno-long-long -Wno-unused-parameter -Wno-deprecated -Wno-variadic-macros"
+# Disable RTTI generation as we don't use it anywhere
+CXXFLAGS="$CXXFLAGS -fno-rtti"
 
 
-
-#AC_ARG_WITH([galera], [Galera libs location],,with_galera="no")
-#if test x"$with_galera" != "no"
-#then
-#    CFLAGS="$CFLAGS -I$with_galera/include"
-#    CXXFLAGS="$CXXFLAGS -I$with_galera/include"
-#fi
-
-#AC_CHECK_HEADER([gu_byteswap.h],,
-#                AC_MSG_ERROR([*** Galerautils not found ***]))
 
 # Checks for libraries.
 AC_CHECK_LIB([galerautils], [gu_malloc_dbg],,

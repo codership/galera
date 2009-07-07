@@ -19,6 +19,9 @@ class ProtoUpMeta
     const uint8_t user_type;
     const int64_t to_seq;
     View* const view;
+    
+    void operator=(const ProtoUpMeta&);
+
 public:
     ProtoUpMeta() :
         source(UUID()),
@@ -103,6 +106,10 @@ class Protolay {
     Protolay *up_context;
     Protolay *down_context;
     bool released;
+
+    Protolay(const Protolay&);
+    void operator=(const Protolay&);
+
 protected:
     Protolay() : 
         context_id(-1),
@@ -186,7 +193,7 @@ public:
 	if (!up_context) {
 	    LOG_FATAL("Protolay::pass_up(): "
 		      "Up context not defined, released = " 
-                      + Bool(released).to_string());
+                      + make_int(released).to_string());
 	    throw FatalException("Up context not defined");
 	}
         
@@ -196,7 +203,7 @@ public:
     int pass_down(WriteBuf *wb, const ProtoDownMeta *down_meta) {
 	if (!down_context) {
 	    LOG_FATAL("Protolay::pass_down(): Down context not defined, "
-                      "released = " + Bool(released).to_string());
+                      "released = " + make_int(released).to_string());
 	    throw FatalException("Down context not defined");
 	}
 

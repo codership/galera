@@ -21,6 +21,8 @@ typedef enum {
 
 class Transport : public Protolay
 {
+    Transport(const Transport&);
+    void operator=(const Transport&);
 protected:
     Monitor* mon;
     URI uri;

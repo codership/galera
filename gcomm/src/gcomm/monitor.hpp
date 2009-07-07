@@ -20,6 +20,7 @@ class Waiter {
     unsigned long id;
 public:
     Waiter(unsigned long i) : 
+        cond(),
         id(i) 
     {
 
@@ -57,6 +58,8 @@ public:
     }
     
     Monitor() : 
+        mutex(),
+        waiters(),
         busy(false), 
         last_id(0), 
         holder(0),
@@ -119,8 +122,11 @@ public:
 };
 
 
-class Critical {
+class Critical 
+{
     Monitor *mon;
+    Critical(const Critical&);
+    void operator=(const Critical&);
 public:
     Critical(Monitor *m) : mon(m) {
 	if (mon)

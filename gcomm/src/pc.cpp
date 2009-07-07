@@ -100,10 +100,10 @@ void PC::connect()
         int ret = event_loop->poll(500);
         LOG_DEBUG(string("poll returned: ") + make_int(ret).to_string());
     }
-    while (stop >= Time::now() && evs->known.size() == 1);
+    while (stop >= Time::now() && evs->get_known_size() == 1);
     LOG_INFO("PC/EVS Proto initial state: " + evs->to_string());
     
-    pc = new PCProto(uuid, event_loop, mon, evs->known.size() == 1);
+    pc = new PCProto(uuid, event_loop, mon, evs->get_known_size() == 1);
     gcomm::connect(evs, pc);
     gcomm::connect(pc, this);
     

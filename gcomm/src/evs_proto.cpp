@@ -42,7 +42,7 @@ void EVSProto::check_inactive()
     }
     if (has_inactive == true && get_state() == OPERATIONAL)
     {
-        SHIFT_TO_P(this, RECOVERY, true);
+        SHIFT_TO_P(*this, RECOVERY, true);
         if (is_consensus() && is_representative(my_addr))
         {
             send_install();
@@ -321,13 +321,13 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
             LOG_DEBUG(self_string() + " not consistent with " 
                       + jm.to_string() 
                       + ": input map: aru_seqs: "
-                      + UInt32(input_map.get_aru_seq()).to_string() 
+                      + make_int(input_map.get_aru_seq()).to_string() 
                       + " "
-                      + UInt32(jm.get_aru_seq()).to_string() 
+                      + make_int(jm.get_aru_seq()).to_string() 
                       + " safe_seqs: " 
-                      + UInt32(input_map.get_safe_seq()).to_string() 
+                      + make_int(input_map.get_safe_seq()).to_string() 
                       + " "
-                      + UInt32(jm.get_seq()).to_string());
+                      + make_int(jm.get_seq()).to_string());
             return false;
         }
         
@@ -727,7 +727,9 @@ void EVSProto::send_join(bool handle)
     size_t bufsize = jm.size();
     unsigned char* buf = new unsigned char[bufsize];
     if (jm.write(buf, bufsize, 0) == 0)
+    {
         throw FatalException("failed to serialize join message");
+    }
     WriteBuf wb(buf, bufsize);
     int err;
     if ((err = pass_down(&wb, 0))) {
@@ -749,7 +751,7 @@ void EVSProto::send_leave()
 {
     assert(get_state() == LEAVING);
     
-    LOG_DEBUG(self_string() + " send leave as " + UInt32(last_sent).to_string());
+    LOG_DEBUG(self_string() + " send leave as " + make_int(last_sent).to_string());
     EVSLeaveMessage lm(my_addr, 
                        my_name,
                        current_view.get_id(), 
@@ -774,7 +776,7 @@ void EVSProto::send_leave()
 void EVSProto::send_install()
 {
     LOG_DEBUG(self_string() 
-              + " installing flag " + Int(installing).to_string());
+              + " installing flag " + make_int(installing).to_string());
     if (installing)
     {
         return;
@@ -840,14 +842,14 @@ void EVSProto::resend(const UUID& gap_source, const EVSGap& gap)
     assert(gap.source == my_addr);
     if (seqno_eq(gap.get_high(), SEQNO_MAX)) {
         LOG_DEBUG("empty gap: " 
-                  + UInt32(gap.get_low()).to_string() + " -> " 
-                  + UInt32(gap.get_high()).to_string());
+                  + make_int(gap.get_low()).to_string() + " -> " 
+                  + make_int(gap.get_high()).to_string());
         return;
     } else if (!seqno_eq(gap.get_low(), SEQNO_MAX) &&
                seqno_gt(gap.get_low(), gap.get_high())) {
         LOG_DEBUG("empty gap: " 
-                  + UInt32(gap.get_low()).to_string() + " -> " 
-                  + UInt32(gap.get_high()).to_string());
+                  + make_int(gap.get_low()).to_string() + " -> " 
+                  + make_int(gap.get_high()).to_string());
         return;
     }
     
@@ -898,14 +900,14 @@ void EVSProto::recover(const EVSGap& gap)
 {
     if (seqno_eq(gap.get_high(), SEQNO_MAX)) {
         LOG_DEBUG("empty gap: " 
-                  + UInt32(gap.get_low()).to_string() + " -> " 
-                  + UInt32(gap.get_high()).to_string());
+                  + make_int(gap.get_low()).to_string() + " -> " 
+                  + make_int(gap.get_high()).to_string());
         return;
     } else if (!seqno_eq(gap.get_low(), SEQNO_MAX) &&
                seqno_gt(gap.get_low(), gap.get_high())) {
         LOG_DEBUG("empty gap: " 
-                  + UInt32(gap.get_low()).to_string() + " -> " 
-                  + UInt32(gap.get_high()).to_string());
+                  + make_int(gap.get_low()).to_string() + " -> " 
+                  + make_int(gap.get_high()).to_string());
         return;
     }
     
@@ -1138,7 +1140,7 @@ int EVSProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
         case 0:
             break;
         default:
-            LOG_ERROR("Send error: " + Int(err).to_string());
+            LOG_ERROR("Send error: " + make_int(err).to_string());
             ret = err;
         }
     } 
@@ -1340,9 +1342,9 @@ void EVSProto::deliver()
     if (get_state() != OPERATIONAL && get_state() != RECOVERY && 
         get_state() != LEAVING)
         throw FatalException("Invalid state");
-    LOG_DEBUG("aru_seq: " + UInt32(input_map.get_aru_seq()).to_string() 
+    LOG_DEBUG("aru_seq: " + make_int(input_map.get_aru_seq()).to_string() 
               + " safe_seq: "
-              + UInt32(input_map.get_safe_seq()).to_string());
+              + make_int(input_map.get_safe_seq()).to_string());
     
     EVSInputMap::iterator i, i_next;
     // First deliver all messages that qualify at least as safe
@@ -1596,9 +1598,9 @@ void EVSProto::handle_user(const EVSMessage& msg,
     if (!seqno_eq(input_map.get_safe_seq(), prev_safe))
     {
         LOG_DEBUG(self_string() + " safe seq " 
-                  + UInt32(input_map.get_safe_seq()).to_string() 
+                  + make_int(input_map.get_safe_seq()).to_string() 
                   + " prev " 
-                  + UInt32(prev_safe).to_string());
+                  + make_int(prev_safe).to_string());
     }
     
     
@@ -1621,7 +1623,7 @@ void EVSProto::handle_user(const EVSMessage& msg,
                   + msg.get_source().to_string() 
                   + " " + range.to_string() 
                   + " due to input map gap, aru " 
-                  + UInt32(input_map.get_aru_seq()).to_string());
+                  + make_int(input_map.get_aru_seq()).to_string());
         send_gap(msg.get_source(), current_view.get_id(), range);
     }
     
@@ -1675,8 +1677,8 @@ void EVSProto::handle_user(const EVSMessage& msg,
     }
 
     LOG_DEBUG(self_string() 
-              + " aru_seq: " + UInt32(input_map.get_aru_seq()).to_string()
-              + " safe_seq: " + UInt32(input_map.get_safe_seq()).to_string());
+              + " aru_seq: " + make_int(input_map.get_aru_seq()).to_string()
+              + " safe_seq: " + make_int(input_map.get_safe_seq()).to_string());
 }
 
 void EVSProto::handle_delegate(const EVSMessage& msg, InstMap::iterator ii,
@@ -1699,8 +1701,8 @@ void EVSProto::handle_gap(const EVSMessage& msg, InstMap::iterator ii)
     LOG_DEBUG("gap message at " + self_string() + " source " +
               msg.get_source().to_string() + " source view: " + 
               msg.get_source_view().to_string() 
-              + " seq " + UInt32(msg.get_seq()).to_string()
-              + " aru_seq " + UInt32(msg.get_aru_seq()).to_string());
+              + " seq " + make_int(msg.get_seq()).to_string()
+              + " aru_seq " + make_int(msg.get_aru_seq()).to_string());
 
     if (state == JOINING || state == CLOSED) 
     {	
@@ -1756,9 +1758,9 @@ void EVSProto::handle_gap(const EVSMessage& msg, InstMap::iterator ii)
         if (!seqno_eq(input_map.get_safe_seq(), prev_safe)) 
         {
             LOG_DEBUG("handle gap " + self_string() +  " safe seq " 
-                      + UInt32(input_map.get_safe_seq()).to_string() 
+                      + make_int(input_map.get_safe_seq()).to_string() 
                       + " aru seq " 
-                      + UInt32(input_map.get_aru_seq()).to_string());
+                      + make_int(input_map.get_aru_seq()).to_string());
         }
     }
     
@@ -2155,7 +2157,7 @@ void EVSProto::handle_leave(const EVSMessage& msg, InstMap::iterator ii)
             return;
         }
         inst.operational = false;
-        SHIFT_TO_P(this, RECOVERY, true);
+        SHIFT_TO_P(*this, RECOVERY, true);
         if (is_consensus() && is_representative(my_addr))
         {
             send_install();
@@ -2233,7 +2235,7 @@ void EVSProto::handle_install(const EVSMessage& msg, InstMap::iterator ii)
     else
     {
         LOG_DEBUG(self_string() + " install message not consistent with state");
-        SHIFT_TO_P(this, RECOVERY, true);
+        SHIFT_TO_P(*this, RECOVERY, true);
     }
 }
 

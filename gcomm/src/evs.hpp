@@ -18,6 +18,10 @@ class EVS : public Transport
 {
     Transport *tp;
     EVSProto *proto;
+    
+    EVS(const EVS&);
+    void operator=(const EVS&);
+
 public:
     
     EVS(const URI& uri_, EventLoop* event_loop_, Monitor*);

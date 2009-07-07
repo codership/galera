@@ -26,8 +26,8 @@ EVSRange EVSInputMap::insert(const EVSInputMapItem& item)
     if (seqno_gt(seq, seqno_add(wseq, SEQNO_MAX/4)) ||
         seqno_lt(seq, seqno_dec(wseq, SEQNO_MAX/4))) {
         LOG_WARN(std::string("Seqno out of window: ") + 
-                 UInt32(seq).to_string() 
-                 + " current aru " + UInt32(aru_seq).to_string());
+                 make_int(seq).to_string() 
+                 + " current aru " + make_int(aru_seq).to_string());
         return EVSRange(gap);
     }
         

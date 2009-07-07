@@ -156,6 +156,7 @@ private:
     
 private:
     PCInstMap* inst;
+    void operator=(const PCMessage&);
 public:
     PCMessage() : 
         version(-1),
@@ -179,16 +180,15 @@ public:
         }
     }
     
-    PCMessage(const PCMessage& msg)
+    PCMessage(const PCMessage& msg) :
+        version(msg.version),
+        type(msg.type),
+        seq(msg.seq),
+        inst(msg.inst != 0 ? new PCInstMap(*msg.inst) : 0)
     {
-        *this = msg;
-        if (msg.inst != 0)
-        {
-            inst = new PCInstMap(*msg.inst);
-        }
     }
     
-    ~PCMessage()
+    virtual ~PCMessage()
     {
         delete inst;
     }

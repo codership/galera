@@ -22,11 +22,6 @@ using namespace gcomm;
 
 START_TEST(test_sizes)
 {
-    fail_unless(sizeof(UInt8) == 1);
-    fail_unless(sizeof(UInt16) == 2);
-    fail_unless(sizeof(UInt32) == 4);
-    fail_unless(sizeof(UInt64) == 8);
-
     uint8_t u8(3);
     fail_unless(make_int(u8).size() == 1);
 
@@ -61,10 +56,10 @@ END_TEST
 
 START_TEST(test_serialization)
 {
-    check_serialization(UInt8(0xab), 1, UInt8(0));
-    check_serialization(UInt16(0xabab), 2, UInt16(0));
-    check_serialization(UInt32(0xabababab), 4, UInt32(0));
-    check_serialization(UInt64(0xababababababababLLU), 8, UInt64(0));
+    check_serialization(make_int<uint8_t>(0xab), 1, make_int<uint8_t>(0));
+    check_serialization(make_int<uint16_t>(0xabab), 2, make_int<uint16_t>(0));
+    check_serialization(make_int<uint32_t>(0xabababab), 4, make_int<uint32_t>(0));
+    check_serialization(make_int<uint64_t>(0xababababababababLLU), 8, make_int<uint64_t>(0));
 }
 END_TEST
 

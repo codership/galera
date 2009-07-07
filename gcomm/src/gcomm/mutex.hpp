@@ -11,9 +11,13 @@ BEGIN_GCOMM_NAMESPACE
 class Mutex
 {
     pthread_mutex_t mutex;
+
+    Mutex(const Mutex&);
+    void operator=(const Mutex&);
 public:
     
-    Mutex()
+    Mutex() :
+        mutex()
     {
 	if (pthread_mutex_init(&mutex, 0))
 	    throw FatalException("Mutex(): init failed");
@@ -54,8 +58,11 @@ public:
 class Cond
 {
     pthread_cond_t cond;
+    Cond(const Cond&);
+    void operator=(const Cond&);
 public:
-    Cond()
+    Cond() :
+        cond()
     {
         pthread_cond_init(&cond, 0);
     }
@@ -87,6 +94,8 @@ public:
 class Lock
 {
     Mutex* mutex;
+    Lock(const Lock&);
+    void operator=(const Lock&);
 public:
     Lock(Mutex* mutex_) :
         mutex(mutex_)
@@ -98,7 +107,6 @@ public:
     {
         mutex->unlock();
     }
-    
 };
 
 

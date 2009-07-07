@@ -100,9 +100,9 @@ void EVS::connect()
         /* Send join messages without handling them */
         proto->send_join(false);
         int ret = event_loop->poll(500);
-        LOG_DEBUG(string("poll returned ") + Int(ret).to_string());
+        LOG_DEBUG(string("poll returned ") + make_int(ret).to_string());
     } 
-    while (stop >= Time::now() && proto->known.size() == 1);
+    while (stop >= Time::now() && proto->get_known_size() == 1);
     LOG_INFO("EVS Proto initial state: " + proto->to_string());
     LOG_INFO("EVS Proto sending join request");
     proto->send_join();
@@ -129,7 +129,7 @@ void EVS::close()
     do
     {
         int ret = event_loop->poll(500);
-        LOG_DEBUG(string("poll returned ") + Int(ret).to_string());
+        LOG_DEBUG(string("poll returned ") + make_int(ret).to_string());
     } 
     while (proto->get_state() != EVSProto::CLOSED);
     
@@ -149,7 +149,7 @@ void EVS::close()
 
 const UUID& EVS::get_uuid() const
 {
-    return proto->my_addr;
+    return proto->get_uuid();
 }
 
 bool EVS::supports_uuid() const
@@ -169,7 +169,7 @@ size_t EVS::get_max_msg_size() const
         if (tp->get_max_msg_size() < evsm.size())
         {
             LOG_FATAL("transport max msg size too small: " +
-                      Size(tp->get_max_msg_size()).to_string());
+                      make_int(tp->get_max_msg_size()).to_string());
             throw FatalException("");
         }
         return tp->get_max_msg_size() - evsm.size();

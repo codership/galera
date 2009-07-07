@@ -13,6 +13,9 @@ class PC : public Transport
     Transport* tp; // GMCast transport
     EVSProto* evs; // EVS protocol layer
     PCProto* pc;   // PC protocol layer
+
+    PC(const PC&);
+    void operator=(const PC&);
 public:
     PC(const URI&, EventLoop*, Monitor*);
     ~PC();

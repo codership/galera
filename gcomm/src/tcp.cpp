@@ -80,12 +80,16 @@ class TCPHdr
     unsigned char raw[sizeof(uint32_t)];
     uint32_t len;
 public:
-    TCPHdr(const size_t l) : len(l) {
+    TCPHdr(const size_t l) : raw(), len(l) 
+    {
 	if (gcomm::write(len, raw, sizeof(raw), 0) == 0)
 	    throw FatalException("");
     }
     TCPHdr(const unsigned char *buf, const size_t buflen, 
-           const size_t offset) {
+           const size_t offset) :
+        raw(),
+        len()
+    {
 	if (buflen < sizeof(raw) + offset)
 	    throw FatalException("");
 	::memcpy(raw, buf + offset, sizeof(raw));
@@ -119,7 +123,7 @@ void TCP::connect()
 
     if ((fd = ::socket(sa.sa_family, SOCK_STREAM, 0)) == -1)
 	throw FatalException(::strerror(errno));
-    LOG_DEBUG("socket " + Int(fd).to_string());
+    LOG_DEBUG("socket " + make_int(fd).to_string());
     linger lg = {1, 3};
     if (::setsockopt(fd, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg)) == -1) {
 	int err = errno;
@@ -217,7 +221,7 @@ Transport *TCP::accept()
     int acc_fd;
     if ((acc_fd = ::accept(fd, &sa, &sa_size)) == -1)
 	throw FatalException("TCP::accept(): Accept failed");
-    LOG_DEBUG(std::string("accept()") + Int(acc_fd).to_string());
+    LOG_DEBUG(std::string("accept()") + make_int(acc_fd).to_string());
 
     if (is_non_blocking() && ::fcntl(acc_fd, F_SETFL, O_NONBLOCK) == -1) {
         closefd(fd);
@@ -331,9 +335,9 @@ int TCP::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 	if (pending_bytes + wb->get_totlen() > max_pending_bytes)
         {
 	    LOG_DEBUG("contention not cleared: pending " 
-                      + Size(pending_bytes).to_string()
+                      + make_int(pending_bytes).to_string()
                       + " max pending " 
-                      + Size(max_pending_bytes).to_string());
+                      + make_int(max_pending_bytes).to_string());
 	    return EAGAIN;
 	}
     }

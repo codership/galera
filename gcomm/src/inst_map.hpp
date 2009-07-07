@@ -6,22 +6,55 @@
 #include "gcomm/uuid.hpp"
 
 #include <map>
-using std::map;
-using std::pair;
-using std::make_pair;
 
 BEGIN_GCOMM_NAMESPACE
 
-template<class T> class InstMap : public map<const UUID, T>
+template<class T> class InstMap
 {
 public:
-    typedef map<const UUID, T> MType;
+    typedef std::map<const UUID, T> MType;
     typedef typename MType::iterator iterator;
     typedef typename MType::const_iterator const_iterator;
+private:
+    MType map;
+public:    
+    InstMap() :
+        map()
+    {
+    }
+
+    virtual ~InstMap()
+    {
+    }
+    
+    const_iterator begin() const
+    {
+        return map.begin();
+    }
+
+    const_iterator end() const
+    {
+        return map.end();
+    }
+
+    const_iterator find(const UUID& uuid) const
+    {
+        return map.find(uuid);
+    }
+
+    std::pair<iterator, bool> insert(const std::pair<const UUID, T>& p)
+    {
+        return map.insert(p);
+    }
+
+    void clear()
+    {
+        map.clear();
+    }
 
     size_t length() const
     {
-        return MType::size();
+        return map.size();
     }
     
     size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
@@ -29,7 +62,7 @@ public:
         size_t off = offset;
         uint32_t len;
         // Clear map in case this object is reused
-        MType::clear();
+        map.clear();
         if ((off = gcomm::read(buf, buflen, off, &len)) == 0)
             return 0;
         for (uint32_t i = 0; i < len; ++i)
@@ -40,7 +73,7 @@ public:
                 return 0;
             if ((off = t.read(buf, buflen, off)) == 0)
                 return 0;
-            if (MType::insert(make_pair(uuid, t)).second == false)
+            if (map.insert(std::make_pair(uuid, t)).second == false)
             {
                 throw FatalException("");
             }
@@ -55,7 +88,7 @@ public:
         if ((off = gcomm::write(len, buf, buflen, off)) == 0)
             return 0;
         typename MType::const_iterator i;
-        for (i = MType::begin(); i != MType::end(); ++i)
+        for (i = map.begin(); i != map.end(); ++i)
         {
             if ((off = i->first.write(buf, buflen, off)) == 0)
                 return 0;
@@ -69,18 +102,18 @@ public:
     {
         return 4 + length()*(UUID::size() + T::size());
     }
-
+    
     string to_string() const
     {
         string ret;
-
-        for (const_iterator i = MType::begin(); i != MType::end(); ++i)
+        
+        for (const_iterator i = map.begin(); i != map.end(); ++i)
         {
             const_iterator i_next = i;
             ++i_next;
             ret += get_uuid(i).to_string() + ": ";
             ret += get_instance(i).to_string();
-            if (i_next != MType::end())
+            if (i_next != map.end())
             {
                 ret += ",";
             }
@@ -88,6 +121,10 @@ public:
         return ret;
     }
 
+    bool operator==(const InstMap& other) const
+    {
+        return map == other.map;
+    }
 
     static const UUID& get_uuid(const_iterator i)
     {

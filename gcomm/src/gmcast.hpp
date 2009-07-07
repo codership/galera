@@ -36,13 +36,19 @@ class GMCastNode
     static const size_t ADDR_SIZE = 64;
     char address[ADDR_SIZE];
 public:
-    GMCastNode() : operational(false), weight(0xff), uuid() {
+    GMCastNode() : 
+        operational(false), 
+        weight(0xff), 
+        uuid() 
+    {
         memset(address, 0, sizeof(address));
     }
     
-    GMCastNode(const bool operational_, const UUID& uuid_, 
+    GMCastNode(const bool operational_, 
+               const UUID& uuid_, 
                const string& address_) :
         operational(operational_), 
+        weight(0xff),
         uuid(uuid_) {
         if (address_.size() > sizeof(address) - 1)
             throw FatalException("");
@@ -122,6 +128,8 @@ public:
     typedef std::list<GMCastNode> NodeList;
 private:
     NodeList* node_list;
+    GMCastMessage(const GMCastMessage&);
+    void operator=(const GMCastMessage&);
 public:
     
     enum Flags {
@@ -150,6 +158,7 @@ public:
         flags(0), 
         ttl(0), 
         source_uuid(), 
+        node_address(),
         group_name(),
         node_list(0)
     {
@@ -162,6 +171,7 @@ public:
         flags(0), 
         ttl(1), 
         source_uuid(source_uuid_), 
+        node_address(),
         group_name(),
         node_list(0)
     {
@@ -179,6 +189,7 @@ public:
         flags(0), 
         ttl(ttl_), 
         source_uuid(source_uuid_), 
+        node_address(),
         group_name(""),
         node_list(0)
     {
@@ -214,6 +225,7 @@ public:
         flags(F_GROUP_NAME | F_NODE_LIST), 
         ttl(1),
         source_uuid(source_uuid_),
+        node_address(),
         group_name(group_name_),
         node_list(new NodeList(nodes))
     {
@@ -313,9 +325,9 @@ public:
                 node_list->push_back(node);
             }
         }
-        LOG_DEBUG(Int(type).to_string() + "," 
-                  + Int(flags).to_string() + "," 
-                  + Int(ttl).to_string() + ","
+        LOG_DEBUG(make_int(type).to_string() + "," 
+                  + make_int(flags).to_string() + "," 
+                  + make_int(ttl).to_string() + ","
                   + (F_GROUP_NAME ? group_name : ""));
         return off;
     }
@@ -501,6 +513,10 @@ class GMCast : public Transport, EventContext
     void start();
     /* Stop gmcast engine */
     void stop();
+
+
+    GMCast(const GMCast&);
+    void operator=(GMCast&);
 
 public:
     

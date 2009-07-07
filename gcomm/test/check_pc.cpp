@@ -21,9 +21,9 @@ START_TEST(test_pc_messages)
     PCStateMessage pcs;
     PCInstMap& sim = pcs.get_inst_map();
 
-    sim.insert(make_pair(UUID(0,0), PCInst(true, 6, ViewId(UUID(0, 0), 9), 42)));
-    sim.insert(make_pair(UUID(0,0), PCInst(false, 88, ViewId(UUID(0, 0), 3), 472)));
-    sim.insert(make_pair(UUID(0,0), PCInst(true, 78, ViewId(UUID(0, 0), 87), 52)));
+    sim.insert(std::make_pair(UUID(0,0), PCInst(true, 6, ViewId(UUID(0, 0), 9), 42)));
+    sim.insert(std::make_pair(UUID(0,0), PCInst(false, 88, ViewId(UUID(0, 0), 3), 472)));
+    sim.insert(std::make_pair(UUID(0,0), PCInst(true, 78, ViewId(UUID(0, 0), 87), 52)));
     
     size_t expt_size = 4 // hdr
         + 4              // seq
@@ -33,10 +33,10 @@ START_TEST(test_pc_messages)
     PCInstallMessage pci;
     PCInstMap& iim = pci.get_inst_map();
 
-    iim.insert(make_pair(UUID(0,0), PCInst(true, 6, ViewId(UUID(0, 0), 9), 42)));
-    iim.insert(make_pair(UUID(0,0), PCInst(false, 88, ViewId(UUID(0, 0), 3), 472)));
-    iim.insert(make_pair(UUID(0,0), PCInst(true, 78, ViewId(UUID(0, 0), 87), 52)));
-    iim.insert(make_pair(UUID(0,0), PCInst(false, 457, ViewId(UUID(0, 0), 37), 56)));
+    iim.insert(std::make_pair(UUID(0,0), PCInst(true, 6, ViewId(UUID(0, 0), 9), 42)));
+    iim.insert(std::make_pair(UUID(0,0), PCInst(false, 88, ViewId(UUID(0, 0), 3), 472)));
+    iim.insert(std::make_pair(UUID(0,0), PCInst(true, 78, ViewId(UUID(0, 0), 87), 52)));
+    iim.insert(std::make_pair(UUID(0,0), PCInst(false, 457, ViewId(UUID(0, 0), 37), 56)));
 
     expt_size = 4 // hdr
         + 4              // seq
@@ -55,11 +55,14 @@ END_TEST
 class PCUser : public Toplay
 {
     list<View> views;
+    PCUser(const PCUser&);
+    void operator=(const PCUser&);
 public:
     UUID uuid;
     DummyTransport* tp;
     PCProto* pc;
     PCUser(const UUID& uuid_, DummyTransport *tp_, PCProto* pc_) :
+        views(),
         uuid(uuid_),
         tp(tp_),
         pc(pc_)
@@ -698,6 +701,8 @@ class PCUser2 : public Toplay, EventContext
     bool sending;
     int fd;
     uint8_t my_type;
+    PCUser2(const PCUser2&);
+    void operator=(const PCUser2);
 public:
     PCUser2(const string& uri, EventLoop* el) :
         tp(0),

@@ -74,7 +74,7 @@ void EventLoop::erase(const int fd)
     if (ci == ctx_map.end())
         throw FatalException("");
 
-    LOG_DEBUG("erase " + Int(fd).to_string() + " " 
+    LOG_DEBUG("erase " + make_int(fd).to_string() + " " 
               + Pointer(ci->second).to_string());    
     ctx_map.erase(ci);
 }
@@ -87,7 +87,7 @@ void EventLoop::set(const int fd, const int e)
     {
         LOG_WARN("negative fd");
     }
-    LOG_DEBUG("set " + Int(fd).to_string());
+    LOG_DEBUG("set " + make_int(fd).to_string());
 
     if ((pfd = pfd_find(pfds, n_pfds, fd)) == 0) {
 	++n_pfds;
@@ -107,8 +107,8 @@ void EventLoop::set(const int fd, const int e)
 void EventLoop::unset(const int fd, const int e)
 {
     struct pollfd *pfd = 0;
-    LOG_DEBUG("unset " + Int(fd).to_string() 
-              + " n_pfds " + Size(n_pfds).to_string());
+    LOG_DEBUG("unset " + make_int(fd).to_string() 
+              + " n_pfds " + make_int(n_pfds).to_string());
 
     if ((pfd = pfd_find(pfds, n_pfds, fd)) != 0) {
 	pfd->events &= ~map_event_to_mask(e);
@@ -140,9 +140,9 @@ void EventLoop::set_signal(const int fd, const int signo)
     } else {
         std::pair<SigSet::iterator, bool> ret = i->second.insert(signo);
         if (ret.second == false) {
-            LOG_WARN("signal " + Int(signo).to_string() 
+            LOG_WARN("signal " + make_int(signo).to_string() 
                      + " already exists in " 
-                     + Int(fd).to_string() + " sig set");
+                     + make_int(fd).to_string() + " sig set");
         }
     }
 }
@@ -151,13 +151,13 @@ void EventLoop::unset_signal(const int fd, const int signo)
 {
     SigMap::iterator i = sig_map.find(fd);
     if (i == sig_map.end()) {
-        LOG_WARN("fd " + Int(fd).to_string() + " not found from sig map");
+        LOG_WARN("fd " + make_int(fd).to_string() + " not found from sig map");
         
     } else {
         SigSet::iterator si = i->second.find(signo);
         if (si == i->second.end()) {
-            LOG_WARN("signal " + Int(signo).to_string() 
-                     + " not found from fd " + Int(fd).to_string() 
+            LOG_WARN("signal " + make_int(signo).to_string() 
+                     + " not found from fd " + make_int(fd).to_string() 
                      + " sig set");
         }
         i->second.erase(signo);
@@ -166,9 +166,7 @@ void EventLoop::unset_signal(const int fd, const int signo)
 
 void EventLoop::queue_event(const int fd, const Event& e)
 {
-    event_map.insert(
-        std::pair<const Time, std::pair<const int, Event> > (
-            e.get_time(), std::pair<const int, Event>(fd, e)));
+    event_map.insert(std::make_pair(e.get_time(), std::make_pair(fd, e)));
 }
 
 void EventLoop::handle_queued_events()
@@ -182,7 +180,7 @@ void EventLoop::handle_queued_events()
          i = event_map.begin()) {
         CtxMap::iterator map_i = ctx_map.find(i->second.first);
         if (map_i == ctx_map.end()) {
-            LOG_WARN("ctx " + Int(i->second.first).to_string() + 
+            LOG_WARN("ctx " + make_int(i->second.first).to_string() + 
                      " associated to event not found from context map");
         } else {
             active_event = i;
@@ -251,9 +249,9 @@ int EventLoop::poll(const int timeout)
                     if (map_i->second == 0)
                         throw FatalException("");
                     LOG_TRACE("handling "
-                              + Int(pfds[i].fd).to_string() + " "
+                              + make_int(pfds[i].fd).to_string() + " "
                               + Pointer(map_i->second).to_string() + " "
-                              + Int(pfds[i].revents).to_string());
+                              + make_int(pfds[i].revents).to_string());
                     pfds[i].revents = 0;
                     map_i->second->handle_event(pfds[i].fd, Event(e));
                     p_cnt++;
@@ -291,9 +289,9 @@ int EventLoop::poll(const int timeout)
     // assert(p_ret == p_cnt);
     if (p_ret != p_cnt) {
         LOG_WARN("p_ret ("
-                 + Int(p_ret).to_string() 
+                 + make_int(p_ret).to_string() 
                  + ") != p_cnt (" 
-                 + Int(p_cnt).to_string() 
+                 + make_int(p_cnt).to_string() 
                  + ")");
     }
     
@@ -324,6 +322,7 @@ EventLoop::EventLoop() :
     active_event(event_map.end()),
     n_pfds(0),
     pfds(0),
+    released(),
     interrupted(false)
 {
 }

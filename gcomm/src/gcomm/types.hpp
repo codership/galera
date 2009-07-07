@@ -134,73 +134,6 @@ inline bool operator>=(const IntType<T> a, const IntType<T> b)
     return a.get() >= b.get();
 }
 
-
-
-struct Int8 : IntType<int8_t> 
-{
-    Int8(int8_t t) : IntType<int8_t>(t) {}
-};
-
-struct Int16 : IntType<int16_t>
-{
-    Int16(int16_t t) : IntType<int16_t>(t) {}
-};
-
-struct Int32 : IntType<int32_t>
-{
-    Int32(int32_t t) : IntType<int32_t>(t) {}
-};
-
-struct Int64 : IntType<int64_t>
-{
-    Int64(int64_t t) : IntType<int64_t>(t) {}
-};
-
-struct UInt8 : IntType<uint8_t>
-{
-    UInt8() : IntType<uint8_t>() {}
-    UInt8(const uint8_t t) : IntType<uint8_t>(t) {}
-};
-
-struct UInt16 : IntType<uint16_t>
-{
-    UInt16() : IntType<uint16_t>() {}
-    UInt16(const uint16_t t) : IntType<uint16_t>(t) {}
-};
-
-struct UInt32 : IntType<uint32_t>
-{
-    UInt32() : IntType<uint32_t>() {}
-    UInt32(const uint32_t t) : IntType<uint32_t>(t) {}
-};
-
-struct UInt64 : IntType<uint64_t>
-{
-    UInt64() : IntType<uint64_t>() {}
-    UInt64(const uint64_t t) : IntType<uint64_t>(t) {}
-};
-
-struct Int : IntType<int>
-{
-    Int(const int t) : IntType<int>(t) {}
-};
-
-struct Long : IntType<long>
-{
-    Long(const long t) : IntType<long>(t) {}
-};
-
-struct Size : IntType<size_t>
-{
-    Size(const size_t t) : IntType<size_t>(t) {}
-};
-
-struct Bool : IntType<bool>
-{
-    Bool(const bool t) : IntType<bool>(t) {}
-};
-
-
 template<class T>
 inline IntType<T> make_int(T t)
 {
@@ -213,7 +146,8 @@ class Double
     double d;
 public:
 
-    Double()
+    Double() : 
+        d()
     {
     }
 
@@ -235,7 +169,10 @@ class Pointer
 {
     void* p;
 public:
-    Pointer() {}
+    Pointer() :
+        p()
+    {
+    }
     Pointer(void* const p_) :
         p(p_)
     {
@@ -253,11 +190,13 @@ class Sockaddr
 {
     sockaddr sa;
 public:
-    Sockaddr() {}
+    Sockaddr() :
+        sa()
+    {
+    }
     Sockaddr(const sockaddr& sa_) :
         sa(sa_)
     {
-
     }
 
     string to_string() const
@@ -269,7 +208,7 @@ public:
         os.setf(ostringstream::hex);
         for (size_t i = 0; i < sizeof(sa.sa_data); ++i)
         {
-            os << Int(sa.sa_data[i]).to_string();
+            os << IntType<unsigned int>(sa.sa_data[i]).to_string();
         }
         ret += ")";
         return ret;
