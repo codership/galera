@@ -1,3 +1,12 @@
+/*
+ * Copyright (C) 2008 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
+
+/*!
+ * @file inst_map.hpp Common template for UUID to class map
+ */
 
 #ifndef INST_MAP_HPP
 #define INST_MAP_HPP
@@ -7,56 +16,127 @@
 
 #include <map>
 
-BEGIN_GCOMM_NAMESPACE
-
-template<class T> class InstMap
+/* Forward declarations */
+namespace gcomm
 {
+    template<class T> class InstMap;
+}
+
+
+/*!
+ * @brief Template for mapping between UUID and class.
+ *
+ * 
+ */
+template<class T> class gcomm::InstMap
+{
+    typedef std::map<const UUID, T> MType; /*!< Internal map representation */
 public:
-    typedef std::map<const UUID, T> MType;
-    typedef typename MType::iterator iterator;
-    typedef typename MType::const_iterator const_iterator;
+
+    typedef typename MType::iterator iterator; /*!< Iterator */
+    typedef typename MType::const_iterator const_iterator; /*!< Const iterator */
 private:
-    MType map;
+    MType map; /*!< Map */
 public:    
+
+    /*!
+     * @brief Default constructor
+     */
     InstMap() :
         map()
     {
     }
 
+    /*!
+     * @brief Destructor
+     */
     virtual ~InstMap()
     {
     }
+
+    /*!
+     *
+     */
+    iterator begin()
+    {
+        return map.begin();
+    }
     
+    /*!
+     *
+     */
     const_iterator begin() const
     {
         return map.begin();
     }
 
+    /*!
+     *
+     */
+    iterator end()
+    {
+        return map.end();
+    }
+
+    /*!
+     *
+     */
     const_iterator end() const
     {
         return map.end();
     }
 
+    /*!
+     *
+     */
+    iterator find(const UUID& uuid)
+    {
+        return map.find(uuid);
+    }
+
+    /*!
+     *
+     */
     const_iterator find(const UUID& uuid) const
     {
         return map.find(uuid);
     }
 
+    /*!
+     *
+     */
     std::pair<iterator, bool> insert(const std::pair<const UUID, T>& p)
     {
         return map.insert(p);
     }
 
+    /*!
+     *
+     */
+    void erase(iterator i)
+    {
+        map.erase(i);
+    }
+
+    /*!
+     *
+     */
     void clear()
     {
         map.clear();
     }
 
+    /*!
+     *
+     */
     size_t length() const
     {
         return map.size();
     }
     
+    /*!
+     *
+     */
     size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
     {
         size_t off = offset;
@@ -80,7 +160,10 @@ public:
         }
         return off;
     }
-    
+
+    /*!
+     *
+     */    
     size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
     {
         size_t off = offset;
@@ -98,11 +181,17 @@ public:
         return off;
     }
     
+    /*!
+     *
+     */
     size_t size() const
     {
         return 4 + length()*(UUID::size() + T::size());
     }
     
+    /*!
+     *
+     */
     string to_string() const
     {
         string ret;
@@ -121,21 +210,41 @@ public:
         return ret;
     }
 
+    /*!
+     *
+     */
     bool operator==(const InstMap& other) const
     {
         return map == other.map;
     }
 
+    /*!
+     *
+     */
+    static const UUID& get_uuid(iterator i)
+    {
+        return i->first;
+    }
+
+    /*!
+     *
+     */
     static const UUID& get_uuid(const_iterator i)
     {
         return i->first;
     }
 
+    /*!
+     *
+     */
     static T& get_instance(iterator i)
     {
         return i->second;
     }
 
+    /*!
+     *
+     */
     static const T& get_instance(const_iterator i)
     {
         return i->second;
@@ -144,7 +253,5 @@ public:
     
 };
 
-
-END_GCOMM_NAMESPACE
 
 #endif // INST_MAP_HPP

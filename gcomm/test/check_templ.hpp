@@ -9,6 +9,7 @@
 #include <check.h>
 
 #include <deque>
+#include <algorithm>
 
 using std::deque;
 

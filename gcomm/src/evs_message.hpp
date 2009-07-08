@@ -215,6 +215,10 @@ public:
 	const UUID& get_pid() const {
 	    return pid;
 	}
+        const UUID& get_uuid() const
+        {
+            return pid;
+        }
 	bool get_operational() const {
 	    return operational;
 	}
@@ -449,12 +453,13 @@ public:
     }
     
     
-    string get_source_name() const
+    const string get_source_name() const
     {
         assert(type == JOIN || type == INSTALL);
-        string ret = string(name, sizeof(name));
+        // string ret = string(name, sizeof(name));
         // LOG_INFO("get_source_name(): " + ret);
-        return ret;
+        // return ret;
+        return name;
     }
 
     uint32_t get_seq() const {
@@ -594,6 +599,7 @@ public:
                 {
                     return 0;
                 }
+                name[sizeof(name) - 1] = '\0';
 		uint32_t n;
 		if ((off = gcomm::read(buf, buflen, off, &n)) == 0)
 		    return 0;

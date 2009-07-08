@@ -9,7 +9,7 @@
 #include "gcomm/protolay.hpp"
 #include "gcomm/view.hpp"
 #include "gcomm/transport.hpp"
-
+#include "inst_map.hpp"
 #include "histogram.hpp"
 
 #include <set>
@@ -142,19 +142,11 @@ private:
 class EVSProto : public Protolay
 {
 public:
-    typedef std::map<const UUID, EVSInstance> InstMap;
-    const UUID& get_pid(InstMap::const_iterator i) const
+    // typedef InstMap<EVSInstance> EVSInstMap;
+    struct EVSInstMap : InstMap<EVSInstance>
     {
-        return i->first;
-    }
-    static const EVSInstance& get_instance(InstMap::const_iterator i)
-    {
-        return i->second;
-    }
-    static EVSInstance& get_instance(InstMap::iterator i)
-    {
-        return i->second;
-    }
+    };
+
     enum State {
         CLOSED,
         JOINING,
@@ -174,8 +166,8 @@ private:
     string my_name;
     // 
     // Known instances 
-    InstMap known;
-    InstMap::iterator self_i;
+    EVSInstMap known;
+    EVSInstMap::iterator self_i;
     // 
     Time inactive_timeout;
     Period inactive_check_period;
@@ -255,7 +247,7 @@ public:
             known.insert(make_pair(my_addr, EVSInstance(my_name)));
         assert(i.second == true);
         self_i = i.first;
-        assert(get_instance(self_i).get_operational() == true);
+        assert(EVSInstMap::get_instance(self_i).get_operational() == true);
         
         input_map.insert_sa(my_addr);
         current_view.add_member(my_addr, my_name);
@@ -289,6 +281,11 @@ public:
         return my_addr;
     }
 
+    const string& get_name() const
+    {
+        return my_name;
+    }
+
     string self_string() const
     {
         return "(" + my_addr.to_string() + "," + my_name + ")";
@@ -300,7 +297,7 @@ public:
 
     size_t get_known_size() const
     {
-        return known.size();
+        return known.length();
     }
     
     bool is_output_empty() const
@@ -345,6 +342,7 @@ public:
     void resend(const UUID&, const EVSGap&);
     void recover(const EVSGap&);
     
+    void set_inactive(const UUID&);
     void check_inactive();
     void cleanup_unoperational();
     void cleanup_views();
@@ -383,17 +381,17 @@ public:
 private:
     void handle_foreign(const EVSMessage&);
     void handle_user(const EVSMessage&, 
-                     InstMap::iterator, 
+                     EVSInstMap::iterator, 
                      const ReadBuf*, 
                      const size_t);
     void handle_delegate(const EVSMessage&, 
-                         InstMap::iterator,
+                         EVSInstMap::iterator,
                          const ReadBuf*, 
                          const size_t);
-    void handle_gap(const EVSMessage&, InstMap::iterator);
-    void handle_join(const EVSMessage&, InstMap::iterator);
-    void handle_leave(const EVSMessage&, InstMap::iterator);
-    void handle_install(const EVSMessage&, InstMap::iterator);
+    void handle_gap(const EVSMessage&, EVSInstMap::iterator);
+    void handle_join(const EVSMessage&, EVSInstMap::iterator);
+    void handle_leave(const EVSMessage&, EVSInstMap::iterator);
+    void handle_install(const EVSMessage&, EVSInstMap::iterator);
 public:
     void handle_msg(const EVSMessage& msg, 
                     const ReadBuf* rb = 0, const size_t roff = 0);    

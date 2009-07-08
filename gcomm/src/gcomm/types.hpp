@@ -59,7 +59,8 @@ template <class T> class IntType
 {
     T t;
 public:
-    explicit IntType()
+    IntType() :
+        t()
     {
     }
     IntType(const T t_) : 

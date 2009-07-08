@@ -9,7 +9,10 @@
 #include "gcomm/pseudofd.hpp"
 
 #include <vector>
+#include <queue>
 #include <deque>
+#include <algorithm>
+#include <stdexcept>
 
 #include <check.h>
 
@@ -21,6 +24,15 @@ using std::deque;
 using namespace gcomm;
 
 static const uint32_t EVS_SEQNO_MAX = 0x800U;
+
+struct delete_object
+{
+    template <typename T>
+    void operator()(T* t)
+    {
+        delete t;
+    }
+};
 
 
 START_TEST(test_seqno)
@@ -417,16 +429,356 @@ static void get_msg(ReadBuf* rb, EVSMessage* msg, bool release = true)
     assert(msg != 0);
     if (rb == 0)
     {
-        LOG_INFO("get_msg: (null)");
+        log_info << "get_msg: (null)";
     }
     else
     {
         fail_unless(msg->read(rb->get_buf(), rb->get_len(), 0) != 0);
-        LOG_INFO("get_msg: " + msg->to_string());
+        log_info << "get_msg: " << msg->to_string();
         if (release)
             rb->release();
     }
 }
+
+
+
+class DummyInstance : public Toplay
+{
+    DummyTransport tp;
+    EVSProto ep;
+    
+    DummyInstance(const DummyInstance&);
+    void operator=(const DummyInstance&);
+public:
+    DummyInstance(EventLoop* el, const string& name) :
+        tp(),
+        ep(el, &tp, UUID(0, 0), name, 0)
+    {
+        gcomm::connect(&tp, &ep);
+        gcomm::connect(&ep, this);
+    }
+    
+    ~DummyInstance()
+    {
+        gcomm::disconnect(&tp, &ep);
+        gcomm::disconnect(&ep, this);
+    }
+    
+    void handle_up(const int cid, const ReadBuf* rb, const size_t roff, 
+                   const ProtoUpMeta* um)
+    {
+        const View* view = um->get_view();
+        if (view)
+        {
+            log_info << view->to_string();
+        }
+    }
+
+
+
+    void assert_state(const EVSProto::State state)
+    {
+        fail_unless(ep.get_state() == state, "expected %s real %s", 
+                    EVSProto::to_string(state).c_str(),
+                    EVSProto::to_string(ep.get_state()).c_str());
+    }
+
+    void assert_send(const EVSMessage::Type type, 
+                     const EVSProto::State before_state,
+                     const EVSProto::State after_state,
+                     const bool send_flags = true)
+    {
+        assert_state(before_state);
+        switch (type)
+        {
+        case EVSMessage::JOIN:
+            ep.send_join(send_flags);
+            break;
+        case EVSMessage::LEAVE:
+            ep.send_leave();
+            break;
+        default:
+            fail("not implemented");
+        }
+        assert_state(after_state);
+    }
+    
+    /* EVSProto must not have any output */
+    void assert_output_empty()
+    {
+        EVSMessage msg;
+        ReadBuf* rb = tp.get_out();
+        if (rb != 0)
+        {
+            get_msg(rb, &msg);
+        }
+        fail_unless(rb == 0, "%s", msg.to_string().c_str());
+    }
+    
+    /* EVSProto must have output with given type and following state */
+    void assert_output_msg(EVSMessage* msg, 
+                           const EVSMessage::Type type, 
+                           const EVSProto::State state)
+    {
+        assert_state(state);
+        ReadBuf* rb = tp.get_out();
+        fail_unless(rb != 0);
+        get_msg(rb, msg);
+        fail_unless(msg->get_type() == type, "%i %i", msg->get_type(), type);
+        assert_state(state);
+    }
+    
+    /* EVSProto must accept given message and shift to following state */
+    void assert_input_msg(const EVSMessage& msg,
+                          const EVSProto::State state)
+    {
+        ep.handle_msg(msg);
+        assert_state(state);
+    }
+
+    void input_msg(const EVSMessage& msg, const ReadBuf* rb = 0, 
+                   const size_t roff = 0)
+    {
+        ep.handle_msg(msg, rb, roff);
+    }
+
+    void assert_shift_to(const EVSProto::State from_state,
+                         const EVSProto::State to_state)
+    {
+        assert_state(from_state);
+        ep.shift_to(to_state);
+        assert_state(to_state);
+    }
+
+    ReadBuf* get_output()
+    {
+        return tp.get_out();
+    }
+    
+    const string& get_name() const
+    {
+        return ep.get_name();
+    }
+
+    const UUID& get_uuid() const
+    {
+        return ep.get_uuid();
+    }
+
+    void set_inactive(const UUID& uuid)
+    {
+        ep.set_inactive(uuid);
+    }
+
+    void check_inactive()
+    {
+        ep.check_inactive();
+    }
+
+    void send_keepalive()
+    {
+        if (ep.is_output_empty())
+        {
+            WriteBuf wb(0, 0);
+            ep.send_user(&wb, 0xf, DROP, 16, SEQNO_MAX);
+        }
+        else
+        {
+            ep.send_user();
+        }
+    }
+    
+};
+
+
+
+typedef std::list<DummyInstance*> DummyList;
+
+static void single_boot(DummyInstance* di)
+{
+    EVSMessage msg;
+
+    di->assert_shift_to(EVSProto::CLOSED, EVSProto::JOINING);
+    di->assert_send(EVSMessage::JOIN, EVSProto::JOINING, EVSProto::OPERATIONAL);
+    di->assert_output_msg(&msg, EVSMessage::JOIN, EVSProto::OPERATIONAL);
+    di->assert_output_msg(&msg, EVSMessage::INSTALL, EVSProto::OPERATIONAL);
+    di->assert_output_msg(&msg, EVSMessage::GAP, EVSProto::OPERATIONAL);
+}
+
+
+struct assert_state
+{
+    EVSProto::State state;
+    assert_state(const EVSProto::State state_) : 
+        state(state_)
+    {
+    }
+    void operator()(DummyInstance* di)
+    {
+        di->assert_state(state);
+    }
+};
+
+static void reach_operational(DummyList& dlist)
+{
+    bool empty;
+    do
+    {
+        empty = true;
+        for (DummyList::iterator i = dlist.begin();
+             i != dlist.end(); ++i)
+        {
+            ReadBuf* rb = (*i)->get_output();
+            if (rb != 0)
+            {
+                EVSMessage msg;
+                fail_unless(msg.read(rb->get_buf(), rb->get_len(), 0) != 0);
+                for (std::list<DummyInstance*>::iterator j = dlist.begin();
+                     j != dlist.end(); ++j)
+                {
+                    if (i != j)
+                    {
+                        (*j)->input_msg(msg, rb, 0);
+                    }
+                }
+                rb->release();
+                empty = false;
+            }
+        }
+    }
+    while (empty == false);
+    std::for_each(dlist.begin(), dlist.end(), assert_state(EVSProto::OPERATIONAL));
+}
+
+static void join_instance(DummyList& dlist, DummyInstance* di)
+{
+    if (dlist.size() == 0)
+    {
+        dlist.push_back(di);
+        single_boot(dlist.front());
+    }
+    else
+    {
+        std::for_each(dlist.begin(), dlist.end(), assert_state(EVSProto::OPERATIONAL));
+        di->assert_shift_to(EVSProto::CLOSED, EVSProto::JOINING);
+        di->assert_send(EVSMessage::JOIN, EVSProto::JOINING, 
+                        EVSProto::JOINING, false);
+        dlist.push_back(di);
+        reach_operational(dlist);
+    }
+}
+
+struct has_name
+{
+    const string& name;
+    has_name(const string& name_) : 
+        name(name_)
+    {
+    }
+    bool operator()(DummyInstance* di)
+    {
+        return di->get_name() == name;
+    }
+};
+
+struct set_inactive_in
+{
+    const DummyList& dlist;
+    set_inactive_in(const DummyList& dlist_) : 
+        dlist(dlist_) {}
+    void operator()(DummyInstance* di)
+    {
+        for (DummyList::const_iterator i = dlist.begin(); i != dlist.end(); ++i)
+        {
+            di->set_inactive((*i)->get_uuid());
+        }
+    }
+};
+
+struct check_inactive
+{
+    void operator()(DummyInstance* di)
+    {
+        di->check_inactive();
+    }
+};
+
+
+static void split_instances(DummyList& dlist, const string& names, DummyList& ret)
+{
+
+    size_t orig_size = dlist.size();
+    std::vector<std::string> svec = strsplit(names, ',');
+    for (std::vector<std::string>::const_iterator i = svec.begin();
+         i != svec.end(); ++i)
+    {
+        DummyList::iterator d_iter = std::find_if(dlist.begin(), dlist.end(), has_name(*i));
+        if (d_iter == dlist.end())
+        {
+            log_fatal << "name " << *i << " not found";
+            throw std::logic_error("name not found");
+        }
+        ret.splice(ret.begin(), dlist, d_iter);
+    }
+    if (ret.size() != svec.size() ||
+        orig_size != dlist.size() + svec.size())
+    {
+        throw std::logic_error(" ");
+    }
+
+
+    
+    std::for_each(dlist.begin(), dlist.end(), set_inactive_in(ret));
+    std::for_each(ret.begin(), ret.end(), set_inactive_in(dlist));
+
+    std::for_each(dlist.begin(), dlist.end(), check_inactive());
+    std::for_each(ret.begin(), ret.end(), check_inactive());
+
+    std::for_each(dlist.begin(), dlist.end(), assert_state(EVSProto::RECOVERY));
+    std::for_each(ret.begin(), ret.end(), assert_state(EVSProto::RECOVERY));
+
+    reach_operational(dlist);
+    reach_operational(ret);
+}
+
+static void merge_instances(DummyList& dlist1, DummyList& dlist2)
+{
+    size_t tot_size = dlist1.size() + dlist2.size();
+    dlist1.merge(dlist2);
+    if (dlist1.size() != tot_size)
+    {
+        throw std::logic_error(" ");
+    }
+    std::for_each(dlist1.begin(), dlist1.end(), 
+                  assert_state(EVSProto::OPERATIONAL));
+    if (dlist1.empty() == false)
+    {
+        dlist1.front()->send_keepalive();
+    }
+    reach_operational(dlist1);
+}
+
+
+START_TEST(test_evs_proto_generic_boot)
+{
+    EventLoop el;
+    DummyList dlist;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        join_instance(dlist, 
+                      new DummyInstance(&el, "n" + make_int(i).to_string()));
+    }
+    
+    DummyList dlist2;
+    split_instances(dlist, "n0,n1,n2", dlist2);
+
+    
+    merge_instances(dlist, dlist2);
+    std::for_each(dlist.begin(), dlist.end(), delete_object());
+    std::for_each(dlist2.begin(), dlist2.end(), delete_object());
+}
+END_TEST
+
 
 static void single_boot(DummyTransport* tp, EVSProto* ep)
 {
@@ -475,17 +827,23 @@ static void single_boot(DummyTransport* tp, EVSProto* ep)
 START_TEST(test_evs_proto_single_boot)
 {
     EventLoop el;
-    UUID pid(0, 0);
-    DummyTransport* tp = new DummyTransport();
-    DummyUser du;
-    EVSProto* ep = new EVSProto(&el, tp, pid, "n1", 0);
-    connect(tp, ep);
-    connect(ep, &du);
-
-    single_boot(tp, ep);
-
-    delete ep;
-    delete tp;
+    {
+        UUID pid(0, 0);
+        DummyTransport* tp = new DummyTransport();
+        DummyUser du;
+        EVSProto* ep = new EVSProto(&el, tp, pid, "n1", 0);
+        connect(tp, ep);
+        connect(ep, &du);
+        
+        single_boot(tp, ep);
+        
+        delete ep;
+        delete tp;
+    }
+    {
+        DummyInstance di(&el, "n1");
+        single_boot(&di);
+    }
 }
 END_TEST
 
@@ -880,10 +1238,10 @@ START_TEST(test_evs_proto_duplicates)
     delete ep2;
     delete tp1;
     delete tp2;
-
-
 }
 END_TEST
+
+
 
 struct Inst : public Toplay {
 private:
@@ -923,13 +1281,14 @@ public:
         fail_unless(um != 0);
         if (um->get_source() == ep->get_uuid())
         {
-            IntType<uint32_t> rseq(0xffffffff);
+            IntType<uint32_t> rseq;
             fail_unless(rseq.read(rb->get_buf(), rb->get_len(), roff) != 0);
             if (rseq.get() != delivered_seq + 1)
             {
-                LOG_ERROR("error in msg sequence: got " 
-                          + rseq.to_string() + " expected "
-                          + make_int(delivered_seq).to_string());
+                log_error << "error in msg sequence: got " 
+                          << rseq.get() 
+                          << " expected "
+                          << delivered_seq;
             }
             fail_unless(rseq.get() == delivered_seq + 1);
             ++delivered_seq;
@@ -956,15 +1315,6 @@ public:
     }
 
 };
-
-void release_instvec(vector<Inst*>* vec)
-{
-    for (vector<Inst*>::iterator i = vec->begin(); i != vec->end(); ++i)
-    {
-        delete *i;
-    }
-}
-
 
 static bool all_operational(const vector<Inst*>* pvec)
 {
@@ -1177,7 +1527,7 @@ START_TEST(test_evs_proto_converge)
     }
     reach_operational(&vec);
     flush(&vec);
-    release_instvec(&vec);
+    std::for_each(vec.begin(), vec.end(), delete_object());
 }
 END_TEST
 
@@ -1196,7 +1546,7 @@ START_TEST(test_evs_proto_converge_1by1)
         reach_operational(&vec);
         flush(&vec);
     }
-    release_instvec(&vec);
+    std::for_each(vec.begin(), vec.end(), delete_object());
 }
 END_TEST
 
@@ -1351,7 +1701,7 @@ START_TEST(test_evs_proto_user_msg)
     stats.print();
     stats.clear();
 
-    release_instvec(&vec);
+    std::for_each(vec.begin(), vec.end(), delete_object());
 }
 END_TEST
 
@@ -1375,7 +1725,7 @@ START_TEST(test_evs_proto_consensus_with_user_msg)
         stats.clear();
     }
 
-    release_instvec(&vec);
+    std::for_each(vec.begin(), vec.end(), delete_object());
 }
 END_TEST
 
@@ -1402,7 +1752,7 @@ START_TEST(test_evs_proto_msg_loss)
     stats.print();
     stats.clear();
 
-    release_instvec(&vec);
+    std::for_each(vec.begin(), vec.end(), delete_object());
 }
 END_TEST
 
@@ -1433,7 +1783,7 @@ START_TEST(test_evs_proto_leave)
         reach_operational(&vec);
     }
 
-    release_instvec(&vec);
+    std::for_each(vec.begin(), vec.end(), delete_object());
 }
 END_TEST
 
@@ -1511,12 +1861,8 @@ START_TEST(test_evs_proto_full)
     }
 
     stats.print();
-    release_instvec(&vec);
-    for (list<vector<Inst*>* >::iterator i = vlist.begin();
-         i != vlist.end(); ++i)
-    {
-        delete *i;
-    }
+    std::for_each(vec.begin(), vec.end(), delete_object());
+    std::for_each(vlist.begin(), vlist.end(), delete_object());
 }
 END_TEST
 
@@ -1734,7 +2080,7 @@ START_TEST(test_evs_w_gmcast)
 END_TEST
 
 
-bool skip = false;
+bool skip = true;
 
 Suite* evs_suite()
 {
@@ -1774,6 +2120,13 @@ Suite* evs_suite()
     tcase_add_test(tc, test_evs_proto_single_boot);
     suite_add_tcase(s, tc);
 
+    tc = tcase_create("test_evs_proto_generic_boot");
+    tcase_add_test(tc, test_evs_proto_generic_boot);
+    suite_add_tcase(s, tc);
+
+    if (skip)
+        return s;
+
     tc = tcase_create("test_evs_proto_double_boot");
     tcase_add_test(tc, test_evs_proto_double_boot);
     suite_add_tcase(s, tc);
@@ -1792,8 +2145,7 @@ Suite* evs_suite()
     suite_add_tcase(s, tc);
     
 
-    if (skip)
-        return s;
+
 
     tc = tcase_create("test_evs_proto_converge");
     tcase_add_test(tc, test_evs_proto_converge);
