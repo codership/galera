@@ -35,20 +35,22 @@ void EVSProto::check_inactive()
             EVSInstMap::get_instance(i).operational == true &&
             EVSInstMap::get_instance(i).tstamp + inactive_timeout < Time::now())
         {
-            log_warn << self_string() << " detected inactive node: " 
-                     << EVSInstMap::get_uuid(i).to_string() << ":" 
-                     << EVSInstMap::get_instance(i).get_name();
+            log_debug << self_string() << " detected inactive node: " 
+                      << EVSInstMap::get_uuid(i).to_string() << ":" 
+                      << EVSInstMap::get_instance(i).get_name();
             i->second.operational = false;
             has_inactive = true;
         }
     }
     if (has_inactive == true && get_state() == OPERATIONAL)
     {
-        SHIFT_TO_P(*this, RECOVERY, true);
+        shift_to(RECOVERY, true);
+#if 0
         if (is_consensus() && is_representative(my_addr))
         {
             send_install();
         }
+#endif
     }
 }
 
@@ -60,7 +62,7 @@ void EVSProto::set_inactive(const UUID& uuid)
         log_fatal << "could not find uuid from set ok nown nodes";
         throw std::logic_error("");
     }
-    log_warn << self_string() << " setting " << uuid.to_string() << " inactive";
+    log_debug << self_string() << " setting " << uuid.to_string() << " inactive";
     EVSInstMap::get_instance(i).tstamp = Time(0, 0);
 }
 
@@ -72,7 +74,7 @@ void EVSProto::cleanup_unoperational()
         i_next = i, ++i_next;
         if (i->second.installed == false)
         {
-            log_info << self_string() << " erasing " << i->first.to_string();
+            log_debug << self_string() << " erasing " << i->first.to_string();
             known.erase(i);
         }
     }
@@ -738,7 +740,7 @@ void EVSProto::send_join(bool handle)
 {
     assert(output.empty());
     EVSJoinMessage jm = create_join();
-    LOG_DEBUG(self_string() + " sending join " + jm.to_string());
+    log_debug << self_string() << " sending join " << jm.to_string();
     size_t bufsize = jm.size();
     unsigned char* buf = new unsigned char[bufsize];
     if (jm.write(buf, bufsize, 0) == 0)
@@ -969,7 +971,8 @@ void EVSProto::handle_foreign(const EVSMessage& msg)
         return;
     }
 
-    LOG_INFO(self_string() + " detected new source:" + msg.get_source().to_string());
+    log_debug << self_string() 
+              << " detected new source: " << msg.get_source().to_string();
     pair <EVSInstMap::iterator, bool> iret; 
     if ((iret = known.insert(
              make_pair(msg.get_source(), 
@@ -980,8 +983,8 @@ void EVSProto::handle_foreign(const EVSMessage& msg)
     assert(EVSInstMap::get_instance(iret.first).get_operational() == true);
     if (state == JOINING || state == RECOVERY || state == OPERATIONAL)
     {
-        LOG_INFO(self_string() + "shift to RECOVERY due to foreign message");
-        shift_to(RECOVERY);
+        log_debug << self_string() <<  " shift to RECOVERY due to foreign message";
+        shift_to(RECOVERY, true);
     }
     
     // Set join message after shift to recovery, shift may clean up
@@ -1260,7 +1263,6 @@ void EVSProto::shift_to(const State s, const bool send_j)
         if (send_j == true)
         {
             send_join(false);
-            
         }
 
         break;
@@ -1546,7 +1548,7 @@ void EVSProto::handle_user(const EVSMessage& msg,
             LOG_DEBUG(self_string() + " unoperational source " 
                       + msg.get_source().to_string());
             inst.operational = true;
-            SHIFT_TO(RECOVERY);
+            shift_to(RECOVERY);
             return;
         } 
         else if (inst.get_installed() == false) 
@@ -1572,11 +1574,11 @@ void EVSProto::handle_user(const EVSMessage& msg,
                 
                 if (is_consensus()) 
                 {
-                    SHIFT_TO(OPERATIONAL);
+                    shift_to(OPERATIONAL);
                 } 
                 else 
                 {
-                    SHIFT_TO(RECOVERY);
+                    shift_to(RECOVERY);
                     return;
                 }
             } 
@@ -1729,7 +1731,7 @@ void EVSProto::handle_gap(const EVSMessage& msg, EVSInstMap::iterator ii)
     {
         inst.installed = true;
         if (is_all_installed())
-            SHIFT_TO(OPERATIONAL);
+            shift_to(OPERATIONAL);
         return;
     } 
     else if (msg.get_source_view() != current_view.get_id()) 
@@ -1743,7 +1745,7 @@ void EVSProto::handle_gap(const EVSMessage& msg, EVSInstMap::iterator ii)
         {
             // This is probably partition merge, see if it works out
             inst.operational = true;
-            SHIFT_TO(RECOVERY);
+            shift_to(RECOVERY);
         } 
         else if (inst.installed == false) 
         {
@@ -1980,7 +1982,8 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
     }
     LOG_DEBUG(self_string() + " join message " + msg.to_string());
     
-    if (get_state() == LEAVING) {
+    if (get_state() == LEAVING) 
+    {
         return;
     }
     
@@ -1997,8 +2000,10 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
                  + " install message and received join, discarding");
         return;
     }
+
+    bool pre_consistent = is_consistent(msg);
     
-    if (get_state() == RECOVERY && install_message && is_consistent(msg)) 
+    if (get_state() == RECOVERY && install_message && pre_consistent) 
     {
         LOG_DEBUG(self_string() + " redundant join message: "
                   + msg.to_string() + " install message: "
@@ -2006,7 +2011,7 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
         return;
     }
     
-    if ((get_state() == OPERATIONAL || install_message) && is_consistent(msg))
+    if ((get_state() == OPERATIONAL || install_message) && pre_consistent)
     {
         LOG_DEBUG(self_string() + " redundant join message in state "
                   + to_string(get_state()) + ": "
@@ -2019,11 +2024,12 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
     inst.tstamp = Time::now();    
     inst.set_name(msg.get_source_name());
     
+    
     bool send_join_p = false;
     if (get_state() == JOINING || get_state() == OPERATIONAL)
     {
         send_join_p = true;
-        SHIFT_TO2(RECOVERY, false);
+        shift_to(RECOVERY, false);
     }
 
     assert(inst.installed == false);
@@ -2162,7 +2168,7 @@ void EVSProto::handle_leave(const EVSMessage& msg, EVSInstMap::iterator ii)
         deliver_trans_view(true);
         deliver_trans();
         deliver_empty_view();
-        SHIFT_TO(CLOSED);
+        shift_to(CLOSED);
     } 
     else 
     {
@@ -2172,7 +2178,7 @@ void EVSProto::handle_leave(const EVSMessage& msg, EVSInstMap::iterator ii)
             return;
         }
         inst.operational = false;
-        SHIFT_TO_P(*this, RECOVERY, true);
+        shift_to(RECOVERY, true);
         if (is_consensus() && is_representative(my_addr))
         {
             send_install();
@@ -2203,7 +2209,7 @@ void EVSProto::handle_install(const EVSMessage& msg, EVSInstMap::iterator ii)
     {
         LOG_DEBUG("setting other as operational");
         inst.operational = true;
-        SHIFT_TO(RECOVERY);
+        shift_to(RECOVERY);
         return;
     } 
     else if (msg_from_previous_view(previous_views, msg))
@@ -2219,19 +2225,19 @@ void EVSProto::handle_install(const EVSMessage& msg, EVSInstMap::iterator ii)
             return;
         }
         LOG_DEBUG("what?");
-        SHIFT_TO(RECOVERY);
+        shift_to(RECOVERY);
         return;
     }
     else if (inst.get_installed() == true) 
     {
         LOG_DEBUG("what?");
-        SHIFT_TO(RECOVERY);
+        shift_to(RECOVERY);
         return;
     } 
     else if (is_representative(msg.get_source()) == false) 
     {
         LOG_DEBUG("source is not supposed to be representative");
-        SHIFT_TO(RECOVERY);
+        shift_to(RECOVERY);
         return;
     } 
     
@@ -2250,7 +2256,7 @@ void EVSProto::handle_install(const EVSMessage& msg, EVSInstMap::iterator ii)
     else
     {
         LOG_DEBUG(self_string() + " install message not consistent with state");
-        SHIFT_TO_P(*this, RECOVERY, true);
+        shift_to(RECOVERY, true);
     }
 }
 

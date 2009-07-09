@@ -115,29 +115,6 @@ private:
 };
 
 
-#define SHIFT_TO(_s) do                                                 \
-    {                                                                   \
-        LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + make_int(__LINE__).to_string()); \
-        shift_to(_s);                                                   \
-    }                                                                   \
-    while (0)
-
-
-#define SHIFT_TO2(_s, _sjb) do                                          \
-    {                                                                   \
-        LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + make_int(__LINE__).to_string()); \
-        shift_to(_s, _sjb);                                             \
-    }                                                                   \
-    while (0)
-
-#define SHIFT_TO_P(_p, _s, _sjb) do                                     \
-    {                                                                   \
-        LOG_INFO(string(__FILE__) + ":" + __FUNCTION__ + ":" + make_int(__LINE__).to_string()); \
-        (_p).shift_to(_s, _sjb);                                       \
-    }                                                                   \
-    while (0)
-
-
 
 class EVSProto : public Protolay
 {
@@ -466,7 +443,7 @@ public:
             if (p.get_state() == RECOVERY)
             {
                 LOG_WARN("CONSENSUS TIMER");
-                SHIFT_TO_P(p, RECOVERY, true);
+                p.shift_to(RECOVERY, true);
                 if (p.is_consensus() && p.is_representative(p.my_addr))
                 {
                     p.send_install();

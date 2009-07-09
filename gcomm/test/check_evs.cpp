@@ -13,10 +13,12 @@
 #include <deque>
 #include <algorithm>
 #include <stdexcept>
+#include <iterator>
 
 #include <check.h>
 
 #include "check_templ.hpp"
+#include "combination.hpp"
 
 using std::vector;
 using std::deque;
@@ -440,19 +442,50 @@ static void get_msg(ReadBuf* rb, EVSMessage* msg, bool release = true)
     }
 }
 
+class InputEvent
+{
+    const View view;
+    const UUID source;
+    const uint32_t seq;
+public:
+    InputEvent(const View& view_, const UUID& source_, const uint32_t seq_) :
+        view(view_),
+        source(source_),
+        seq(seq_)
+    {
+    }
 
+    const View& get_view() const
+    {
+        return view;
+    }
+
+    const UUID& get_source() const
+    {
+        return source;
+    }
+
+    uint32_t get_seq() const
+    {
+        return seq;
+    }
+
+};
 
 class DummyInstance : public Toplay
 {
     DummyTransport tp;
     EVSProto ep;
-    
+    uint32_t send_seq;
+    std::queue<InputEvent> input;
     DummyInstance(const DummyInstance&);
     void operator=(const DummyInstance&);
 public:
     DummyInstance(EventLoop* el, const string& name) :
         tp(),
-        ep(el, &tp, UUID(0, 0), name, 0)
+        ep(el, &tp, UUID(0, 0), name, 0),
+        send_seq(0),
+        input()
     {
         gcomm::connect(&tp, &ep);
         gcomm::connect(&ep, this);
@@ -464,23 +497,31 @@ public:
         gcomm::disconnect(&ep, this);
     }
     
+    
+    void push_input(const InputEvent& ev)
+    {
+        input.push(ev);
+    }
+
     void handle_up(const int cid, const ReadBuf* rb, const size_t roff, 
                    const ProtoUpMeta* um)
     {
         const View* view = um->get_view();
         if (view)
         {
-            log_info << view->to_string();
+            log_debug << view->to_string();
         }
     }
 
+    
 
 
     void assert_state(const EVSProto::State state)
     {
-        fail_unless(ep.get_state() == state, "expected %s real %s", 
+        fail_unless(ep.get_state() == state, "expected %s real %s: %s", 
                     EVSProto::to_string(state).c_str(),
-                    EVSProto::to_string(ep.get_state()).c_str());
+                    EVSProto::to_string(ep.get_state()).c_str(),
+                    ep.to_string().c_str());
     }
 
     void assert_send(const EVSMessage::Type type, 
@@ -497,6 +538,19 @@ public:
         case EVSMessage::LEAVE:
             ep.send_leave();
             break;
+        case EVSMessage::USER:
+        {
+            byte_t buf[4];
+            gcomm::write(send_seq, buf, sizeof(buf), 0);
+            WriteBuf wb(buf, sizeof(buf));
+            int err;
+            if ((err = pass_down(&wb, 0)) != 0)
+            {
+                fail("send failed with error code %i", err);
+            }
+            send_seq++;
+            break;
+        }   
         default:
             fail("not implemented");
         }
@@ -587,12 +641,23 @@ public:
             ep.send_user();
         }
     }
+
+    void shift_to(const EVSProto::State state, const bool send_j = false)
+    {
+        ep.shift_to(state, send_j);
+    }
     
 };
 
+struct name_cmp_str
+{
+    bool operator()(const DummyInstance* a, const DummyInstance* b) const
+    {
+        return a->get_uuid() < b->get_uuid();
+    }
+};
 
-
-typedef std::list<DummyInstance*> DummyList;
+typedef std::set<DummyInstance*, name_cmp_str> DummyList;
 
 static void single_boot(DummyInstance* di)
 {
@@ -619,34 +684,48 @@ struct assert_state
     }
 };
 
-static void reach_operational(DummyList& dlist)
+static void multicast(DummyList& dlist, DummyList::iterator& src, 
+                      const ReadBuf* rb)
+{
+    EVSMessage msg;
+    fail_unless(msg.read(rb->get_buf(), rb->get_len(), 0) != 0);
+    for (DummyList::iterator j = dlist.begin();
+         j != dlist.end(); ++j)
+    {
+        if (src != j)
+        {
+            (*j)->input_msg(msg, rb, 0);
+        }
+    }
+}
+
+static void reach_operational(DummyList& dlist, const bool send_join = false)
 {
     bool empty;
     do
     {
         empty = true;
-        for (DummyList::iterator i = dlist.begin();
-             i != dlist.end(); ++i)
+        for (DummyList::iterator i = dlist.begin(); i != dlist.end(); ++i)
         {
             ReadBuf* rb = (*i)->get_output();
             if (rb != 0)
             {
-                EVSMessage msg;
-                fail_unless(msg.read(rb->get_buf(), rb->get_len(), 0) != 0);
-                for (std::list<DummyInstance*>::iterator j = dlist.begin();
-                     j != dlist.end(); ++j)
-                {
-                    if (i != j)
-                    {
-                        (*j)->input_msg(msg, rb, 0);
-                    }
-                }
+                multicast(dlist, i, rb);
                 rb->release();
                 empty = false;
             }
         }
     }
     while (empty == false);
+    for (DummyList::iterator i = dlist.begin(); i != dlist.end(); ++i)
+    {
+        ReadBuf* rb = (*i)->get_output();
+        if (rb != 0)
+        {
+            throw std::logic_error("");
+        }
+    }
+    log_info << "reach operational, checking states";
     std::for_each(dlist.begin(), dlist.end(), assert_state(EVSProto::OPERATIONAL));
 }
 
@@ -654,8 +733,8 @@ static void join_instance(DummyList& dlist, DummyInstance* di)
 {
     if (dlist.size() == 0)
     {
-        dlist.push_back(di);
-        single_boot(dlist.front());
+        dlist.insert(di);
+        single_boot(*dlist.begin());
     }
     else
     {
@@ -663,7 +742,7 @@ static void join_instance(DummyList& dlist, DummyInstance* di)
         di->assert_shift_to(EVSProto::CLOSED, EVSProto::JOINING);
         di->assert_send(EVSMessage::JOIN, EVSProto::JOINING, 
                         EVSProto::JOINING, false);
-        dlist.push_back(di);
+        dlist.insert(di);
         reach_operational(dlist);
     }
 }
@@ -703,40 +782,74 @@ struct check_inactive
     }
 };
 
-
-static void split_instances(DummyList& dlist, const string& names, DummyList& ret)
+struct init_recovery
 {
-
-    size_t orig_size = dlist.size();
-    std::vector<std::string> svec = strsplit(names, ',');
-    for (std::vector<std::string>::const_iterator i = svec.begin();
-         i != svec.end(); ++i)
+    void operator()(DummyInstance* di)
     {
-        DummyList::iterator d_iter = std::find_if(dlist.begin(), dlist.end(), has_name(*i));
+        di->shift_to(EVSProto::RECOVERY, true);
+    }
+};
+
+struct send_msgs
+{
+    int n;
+    send_msgs(const int n_) : n(n_) {}
+    void operator()(DummyInstance* di)
+    {
+        for (int i = 0; i < n; ++i)
+        {
+            di->assert_send(EVSMessage::USER, EVSProto::OPERATIONAL,
+                            EVSProto::OPERATIONAL);
+        }
+    }
+};
+
+static void split_instances(DummyList& dlist, const size_t n, DummyList& ret)
+{
+    if (n >= dlist.size())
+    {
+        throw std::logic_error("");
+    }
+    size_t orig_size = dlist.size();
+    for (size_t i = 0; i < n; ++i)
+    {
+        DummyList::iterator d_iter = dlist.begin();
         if (d_iter == dlist.end())
         {
-            log_fatal << "name " << *i << " not found";
-            throw std::logic_error("name not found");
+            throw std::logic_error("node not found");
         }
-        ret.splice(ret.begin(), dlist, d_iter);
+        ret.insert(*d_iter);
+        dlist.erase(d_iter);
     }
-    if (ret.size() != svec.size() ||
-        orig_size != dlist.size() + svec.size())
+    if (ret.size() != n ||
+        orig_size != dlist.size() + n)
     {
         throw std::logic_error(" ");
     }
-
-
     
     std::for_each(dlist.begin(), dlist.end(), set_inactive_in(ret));
     std::for_each(ret.begin(), ret.end(), set_inactive_in(dlist));
-
+    
     std::for_each(dlist.begin(), dlist.end(), check_inactive());
     std::for_each(ret.begin(), ret.end(), check_inactive());
-
+    
     std::for_each(dlist.begin(), dlist.end(), assert_state(EVSProto::RECOVERY));
     std::for_each(ret.begin(), ret.end(), assert_state(EVSProto::RECOVERY));
 
+    if (dlist.size() == 1)
+    {
+        (*dlist.begin())->assert_send(EVSMessage::JOIN, 
+                                      EVSProto::RECOVERY,
+                                      EVSProto::OPERATIONAL,
+                                      true);
+    }
+    if (ret.size() == 1)
+    {
+        (*ret.begin())->assert_send(EVSMessage::JOIN, 
+                                    EVSProto::RECOVERY,
+                                    EVSProto::OPERATIONAL,
+                                    true);
+    }
     reach_operational(dlist);
     reach_operational(ret);
 }
@@ -744,18 +857,53 @@ static void split_instances(DummyList& dlist, const string& names, DummyList& re
 static void merge_instances(DummyList& dlist1, DummyList& dlist2)
 {
     size_t tot_size = dlist1.size() + dlist2.size();
-    dlist1.merge(dlist2);
-    if (dlist1.size() != tot_size)
+
+    while (dlist2.empty() == false)
+    {
+        dlist1.insert(*dlist2.begin());
+        dlist2.erase(dlist2.begin());
+    }
+    if (dlist1.size() != tot_size || dlist2.size() != 0)
     {
         throw std::logic_error(" ");
     }
+    
     std::for_each(dlist1.begin(), dlist1.end(), 
                   assert_state(EVSProto::OPERATIONAL));
-    if (dlist1.empty() == false)
-    {
-        dlist1.front()->send_keepalive();
-    }
+    std::for_each(dlist1.begin(), dlist1.end(), init_recovery());
+    
     reach_operational(dlist1);
+}
+
+static void propagate_up_to(DummyList& dlist, const vector<int>& vec)
+{
+    vector<int> cnt(vec);
+    if (cnt.size() == 0 || dlist.size() > cnt.size())
+    {
+        throw std::logic_error("");
+    }
+    while (*std::max_element(cnt.begin(), cnt.end()) > 0)
+    {
+        int idx = 0;
+        for (DummyList::iterator i = dlist.begin(); i != dlist.end(); ++i)
+        {
+            if (cnt[idx] > 0)
+            {
+                ReadBuf* rb = (*i)->get_output();
+                if (rb != 0)
+                {
+                    multicast(dlist, i, rb);
+                    rb->release();
+                }
+                else
+                {
+                    log_warn << "no output available";
+                }
+            }
+            --cnt[idx];
+            ++idx;
+        }
+    }
 }
 
 
@@ -763,19 +911,50 @@ START_TEST(test_evs_proto_generic_boot)
 {
     EventLoop el;
     DummyList dlist;
-    for (size_t i = 0; i < 8; ++i)
+    const int n_nodes = 4;
+    const int n_msgs = 2;
+    vector<UUID> uuids;
+    
+    
+
+    for (int i = 0; i < n_nodes; ++i)
     {
         join_instance(dlist, 
                       new DummyInstance(&el, "n" + make_int(i).to_string()));
     }
     
-    DummyList dlist2;
-    split_instances(dlist, "n0,n1,n2", dlist2);
-
+    /* */
     
-    merge_instances(dlist, dlist2);
+    std::vector<int> perm(n_nodes, 0);
+    
+    gu_log_max_level = GU_LOG_DEBUG;
+    do
+    {
+        
+        for (int n = 0; n < n_msgs; ++n)
+        {
+            for (int i = 1; i < n_nodes; ++i)
+            {
+                std::cerr << "Permutation: ";
+                std::copy(perm.begin(), perm.end(), 
+                          std::ostream_iterator<int>(std::cerr, " "));
+                std::cerr << "msgs: " << n << " split: " << i;
+                std::cerr << std::endl;
+                std::for_each(dlist.begin(), dlist.end(), send_msgs(n));
+                propagate_up_to(dlist, perm);
+                log_info << "splitting: " << i;
+                DummyList dlist2;
+                split_instances(dlist, i, dlist2);
+                log_info << "merging: " << i;
+                merge_instances(dlist, dlist2);
+            }
+        }
+        
+
+    }
+    while (boost::next_mapping(perm.begin(), perm.end(), 0, n_msgs));
+    
     std::for_each(dlist.begin(), dlist.end(), delete_object());
-    std::for_each(dlist2.begin(), dlist2.end(), delete_object());
 }
 END_TEST
 
@@ -2122,6 +2301,7 @@ Suite* evs_suite()
 
     tc = tcase_create("test_evs_proto_generic_boot");
     tcase_add_test(tc, test_evs_proto_generic_boot);
+    tcase_set_timeout(tc, 10);
     suite_add_tcase(s, tc);
 
     if (skip)
