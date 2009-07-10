@@ -1256,6 +1256,8 @@ void EVSProto::shift_to(const State s, const bool send_j)
         }
         set_consensus_timer();
         state = RECOVERY;
+        log_debug << self_string() << " shift to recovery, flushing "
+                  << output.size() << " messages";
         while (output.empty() == false)
         {
             send_user();
@@ -1264,7 +1266,7 @@ void EVSProto::shift_to(const State s, const bool send_j)
         {
             send_join(false);
         }
-
+        
         break;
     }
     case OPERATIONAL:
@@ -1715,11 +1717,7 @@ void EVSProto::handle_gap(const EVSMessage& msg, EVSInstMap::iterator ii)
 {
     assert(ii != known.end());
     EVSInstance& inst(EVSInstMap::get_instance(ii));
-    LOG_DEBUG("gap message at " + self_string() + " source " +
-              msg.get_source().to_string() + " source view: " + 
-              msg.get_source_view().to_string() 
-              + " seq " + make_int(msg.get_seq()).to_string()
-              + " aru_seq " + make_int(msg.get_aru_seq()).to_string());
+    log_debug << self_string() << " " << msg.to_string();
 
     if (state == JOINING || state == CLOSED) 
     {	
@@ -1894,6 +1892,7 @@ bool EVSProto::states_compare(const EVSMessage& msg)
                  seqno_gt(msseq, imseq)))
             {
                 input_map.set_safe(ii->second.get_uuid(), msseq);
+                send_join_p = true;
             }
         }
     }
@@ -1943,7 +1942,7 @@ bool EVSProto::states_compare(const EVSMessage& msg)
     
     // last locally generated seqno is not equal to high seqno, generate
     // completing dummy message
-    if (!seqno_eq(high_seq, SEQNO_MAX))
+    if (seqno_eq(high_seq, SEQNO_MAX) == false)
     {
         if (seqno_eq(last_sent, SEQNO_MAX) || seqno_lt(last_sent, high_seq)) 
         {
@@ -1954,6 +1953,7 @@ bool EVSProto::states_compare(const EVSMessage& msg)
             EVSRange range(low_seq, high_seq);
             resend(msg.get_source(), EVSGap(my_addr, range));
         }
+        send_join_p = true;
     }
     
     // Try recovery for all messages between low_seq/high_seq
@@ -1965,7 +1965,7 @@ bool EVSProto::states_compare(const EVSMessage& msg)
             recover(EVSGap(EVSInstMap::get_uuid(i), range));
         }
     }
-
+    
     return send_join_p;
 }
 
@@ -1975,15 +1975,17 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
 {
     assert(ii != known.end());
     EVSInstance& inst(EVSInstMap::get_instance(ii));
-
+    
     if (msg.get_type() != EVSMessage::JOIN)
     {
         throw FatalException("invalid input");
     }
-    LOG_DEBUG(self_string() + " join message " + msg.to_string());
+    log_debug << "================ enter handle_join ==================";
+    log_debug << self_string() << " " << msg.to_string();
     
     if (get_state() == LEAVING) 
     {
+        log_debug << "================ leave handle_join ==================";
         return;
     }
     
@@ -1991,6 +1993,7 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
     {
         LOG_DEBUG("join message from one of the previous views " + 
                   msg.get_source_view().to_string());
+        log_debug << "================ leave handle_join ==================";
         return;
     }
     
@@ -1998,6 +2001,7 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
     {
         LOG_WARN(self_string() 
                  + " install message and received join, discarding");
+        log_debug << "================ leave handle_join ==================";
         return;
     }
 
@@ -2008,22 +2012,24 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
         LOG_DEBUG(self_string() + " redundant join message: "
                   + msg.to_string() + " install message: "
                   + install_message->to_string());
+        log_debug << "================ leave handle_join ==================";
         return;
     }
-    
+
     if ((get_state() == OPERATIONAL || install_message) && pre_consistent)
     {
         LOG_DEBUG(self_string() + " redundant join message in state "
                   + to_string(get_state()) + ": "
                   + msg.to_string() + " install message: "
                   + install_message->to_string());
+        log_debug << "================ leave handle_join ==================";
         return;
     }
 
 
     inst.tstamp = Time::now();    
     inst.set_name(msg.get_source_name());
-    
+
     
     bool send_join_p = false;
     if (get_state() == JOINING || get_state() == OPERATIONAL)
@@ -2132,9 +2138,11 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
     }    
     else if (send_join_p && output.empty() == true)
     {
-        LOG_DEBUG("send join");
         send_join(false);
     }
+    log_debug << "send_join_p: " << send_join_p 
+              << " output empty: " << output.empty();
+    log_debug << "================ leave handle_join ==================";
 }
 
 

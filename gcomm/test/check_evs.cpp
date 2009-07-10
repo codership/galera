@@ -1006,23 +1006,17 @@ static void single_boot(DummyTransport* tp, EVSProto* ep)
 START_TEST(test_evs_proto_single_boot)
 {
     EventLoop el;
-    {
-        UUID pid(0, 0);
-        DummyTransport* tp = new DummyTransport();
-        DummyUser du;
-        EVSProto* ep = new EVSProto(&el, tp, pid, "n1", 0);
-        connect(tp, ep);
-        connect(ep, &du);
-        
-        single_boot(tp, ep);
-        
-        delete ep;
-        delete tp;
-    }
-    {
-        DummyInstance di(&el, "n1");
-        single_boot(&di);
-    }
+    UUID pid(0, 0);
+    DummyTransport* tp = new DummyTransport();
+    DummyUser du;
+    EVSProto* ep = new EVSProto(&el, tp, pid, "n1", 0);
+    connect(tp, ep);
+    connect(ep, &du);
+    
+    single_boot(tp, ep);
+    
+    delete ep;
+    delete tp;
 }
 END_TEST
 
