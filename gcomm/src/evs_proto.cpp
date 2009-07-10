@@ -1273,7 +1273,8 @@ void EVSProto::shift_to(const State s, const bool send_j)
     {
         // tp->set_loopback(false);
         assert(output.empty() == true);
-        assert(install_message && is_consistent(*install_message));
+        assert(install_message && (is_representative(my_addr) == false 
+                                   || is_consistent(*install_message)));
         assert(is_all_installed() == true);
         unset_consensus_timer();
         stop_send_join_timer();
@@ -1991,16 +1992,17 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
     
     if (msg_from_previous_view(previous_views, msg))
     {
-        LOG_DEBUG("join message from one of the previous views " + 
-                  msg.get_source_view().to_string());
+        log_debug << self_string() 
+                  << " join message from one of the previous views " 
+                  << msg.get_source_view().to_string();
         log_debug << "================ leave handle_join ==================";
         return;
     }
     
     if (install_message)
     {
-        LOG_WARN(self_string() 
-                 + " install message and received join, discarding");
+        log_debug << self_string() 
+                  << " install message and received join, discarding";
         log_debug << "================ leave handle_join ==================";
         return;
     }
@@ -2115,9 +2117,9 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
     {
         throw FatalException("");
     }
-    if ((self_i->second.join_message == 0 ||
-         is_consistent(*self_i->second.join_message) == false) &&
-        send_join_p == true)
+    if (((self_i->second.join_message == 0 ||
+          is_consistent(*self_i->second.join_message) == false) &&
+         send_join_p == true) || pre_consistent == false)
     {
         send_join_p = true;
     }
@@ -2134,6 +2136,10 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
         {
             LOG_DEBUG("is consensus and representative: " + to_string());
             send_install();
+        }
+        else if (pre_consistent == false)
+        {
+            send_join(false);
         }
     }    
     else if (send_join_p && output.empty() == true)

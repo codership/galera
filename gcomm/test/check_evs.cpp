@@ -915,7 +915,6 @@ START_TEST(test_evs_proto_generic_boot)
     const int n_msgs = 2;
     vector<UUID> uuids;
     
-    
 
     for (int i = 0; i < n_nodes; ++i)
     {
@@ -925,13 +924,13 @@ START_TEST(test_evs_proto_generic_boot)
     
     /* */
     
-    std::vector<int> perm(n_nodes, 0);
+
     
-    gu_log_max_level = GU_LOG_DEBUG;
-    do
+    // gu_log_max_level = GU_LOG_DEBUG;
+    for (int n = 0; n < n_msgs; ++n)
     {
-        
-        for (int n = 0; n < n_msgs; ++n)
+        std::vector<int> perm(n_nodes, 0);
+        do
         {
             for (int i = 1; i < n_nodes; ++i)
             {
@@ -949,11 +948,8 @@ START_TEST(test_evs_proto_generic_boot)
                 merge_instances(dlist, dlist2);
             }
         }
-        
-
+        while (boost::next_mapping(perm.begin(), perm.end(), 0, n + 1));
     }
-    while (boost::next_mapping(perm.begin(), perm.end(), 0, n_msgs));
-    
     std::for_each(dlist.begin(), dlist.end(), delete_object());
 }
 END_TEST
@@ -2253,7 +2249,7 @@ START_TEST(test_evs_w_gmcast)
 END_TEST
 
 
-bool skip = true;
+bool skip = false;
 
 Suite* evs_suite()
 {
