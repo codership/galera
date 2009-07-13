@@ -88,7 +88,7 @@ long fn (gcs_backend_t*  const backend,   \
 	 void*           const buf,       \
 	 size_t          const len,       \
 	 gcs_msg_type_t* const msg_type,  \
-	 long*           const sender_id)
+	 long*           const sender_idx)
 
 /* for lack of better place define it here */
 static const long GCS_SENDER_NONE = -1; /** When there's no sender */

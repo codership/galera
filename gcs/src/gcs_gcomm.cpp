@@ -289,7 +289,7 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
 	*msg_type = static_cast<gcs_msg_type_t>(ev.um.get_user_type());
 	CompMap::const_iterator i = conn->comp_map.find(ev.um.get_source());
 	assert(i != conn->comp_map.end());
-	*sender_id = i->second;
+	*sender_idx = i->second;
 	if (ev.rb) {
 	    ret = ev.rb->get_len();
 	    if (ret <= len) {

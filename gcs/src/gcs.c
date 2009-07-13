@@ -318,6 +318,8 @@ gcs_become_synced (gcs_conn_t* conn)
 }
 
 /*! Handles configuration action */
+// TODO: this function does not provide any way for recv_thread to gracefully
+//       exit in case of self-leave message.
 static void
 gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
 {
@@ -338,7 +340,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     }
 
     /* reset flow control as membership is most likely changed */
-    if (gu_fifo_lock(conn->recv_q)) abort();
+    gu_fifo_lock(conn->recv_q);
     {
         conn->conf_id     = conf->conf_id;
         conn->stop_sent   = 0;
@@ -437,10 +439,9 @@ static void *gcs_recv_thread (void *arg)
     {
         gcs_seqno_t this_act_id = GCS_SEQNO_ILL;
 
-	if ((act_size = gcs_core_recv (conn->core,
-                                       &action,
-                                       &act_type,
-                                       &act_id)) <= 0) {
+        act_size = gcs_core_recv (conn->core, &action, &act_type, &act_id);
+
+	if (gu_unlikely(act_size <= 0)) {
 
             assert (GCS_ACT_ERROR == act_type);
             assert (GCS_SEQNO_ILL == act_id);

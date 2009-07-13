@@ -218,7 +218,7 @@ retry:
 	*msg_type = static_cast<gcs_msg_type_t>(ev.msg->get_user_type());
 	std::map<Address, long>::iterator i = conn->comp_map.find(ev.msg->get_source());
 	assert(i != conn->comp_map.end());
-	*sender_id = i->second;
+	*sender_idx = i->second;
 	if (ev.rb) {
 	    ret = ev.rb->get_len();
 	    if (ret <= len) {

@@ -299,7 +299,9 @@ static inline long
 test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
 {
     long ret = 0;
-#define SEND_LAST_MASK ((1 << 13) - 1) // every 8192nd seqno
+
+#define SEND_LAST_MASK ((1 << 14) - 1) // every 16K seqno
+
     if (!(my_seqno & SEND_LAST_MASK)) {
             ret = gcs_set_last_applied (gcs, my_seqno);
             if (ret) {

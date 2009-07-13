@@ -18,6 +18,7 @@
 #include "gcs_node_test.h"
 #include "gcs_group_test.h"
 #include "gcs_backend_test.h"
+#include "gcs_core_test.h"
 
 typedef Suite *(*suite_creator_t)(void);
 
@@ -31,6 +32,7 @@ static suite_creator_t suites[] =
 	gcs_node_suite,
 	gcs_group_suite,
 	gcs_backend_suite,
+	gcs_core_suite,
 	NULL
     };
 
@@ -64,4 +66,19 @@ int main(int argc, char* argv[])
   fclose (log_file);
   printf ("Total test failed: %d\n", failed);
   return (failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
+/* When the suite compiled in debug mode, returns number of allocated bytes */
+ssize_t
+gcs_tests_get_allocated()
+{
+    ssize_t total;
+    ssize_t allocs;
+    ssize_t reallocs;
+    ssize_t deallocs;
+
+    void gu_mem_stats (ssize_t*, ssize_t*, ssize_t*, ssize_t*);
+    gu_mem_stats (&total, &allocs, &reallocs, &deallocs);
+
+    return total;
 }

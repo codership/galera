@@ -17,66 +17,83 @@
 
 #include <galerautils.h>
 
-#include "gcs_comp_msg.h"
+#define GCS_COMP_MSG_ACCESS // for gcs_comp_memb_t
+
+#ifndef GCS_DUMMY_TESTING
+#define GCS_DUMMY_TESTING
+#endif
+
 #include "gcs_dummy.h"
 
 typedef struct dummy_msg
 {
     gcs_msg_type_t type;
     size_t         len;
+    long           sender_idx;
     uint8_t        buf[0];
 }
 dummy_msg_t;
 
-typedef struct gcs_backend_conn
-{
-    gu_fifo_t   *gc_q;   /* "serializator" */
-    dummy_msg_t *msg;    /* last undelivered message */
-    bool         closed;
-    gcs_seqno_t  msg_id;
-    size_t       msg_max_size;
-}
-dummy_t;
-
 static inline dummy_msg_t*
 dummy_msg_create (gcs_msg_type_t const type,
 		  size_t         const len,
+                  long           const sender,
 		  const void*    const buf)
 {
     dummy_msg_t *msg = NULL;
 
     if ((msg = gu_malloc (sizeof(dummy_msg_t) + len)))
     {
-	    memcpy (msg->buf, buf, len);
-	    msg->len  = len;
-	    msg->type = type;
+        memcpy (msg->buf, buf, len);
+        msg->len        = len;
+        msg->type       = type;
+        msg->sender_idx = sender;
     }
     
     return msg;
 }
 
 static inline long
-dummy_msg_destroy (dummy_msg_t **msg)
+dummy_msg_destroy (dummy_msg_t *msg)
 {
-    if (*msg)
+    if (msg)
     {
-	gu_free (*msg);
-	*msg = NULL;
+	gu_free (msg);
     }
     return 0;
 }
 
+typedef enum dummy_state
+{
+    DUMMY_CLOSED,
+    DUMMY_NON_PRIM,
+    DUMMY_TRANS,
+    DUMMY_PRIM,
+}
+dummy_state_t;
+
+typedef struct gcs_backend_conn
+{
+    gu_fifo_t*       gc_q;   /* "serializator" */
+    volatile dummy_state_t    state;
+    gcs_seqno_t      msg_id;
+    size_t           msg_max_size;
+    size_t           send_size;
+    long             my_idx;
+    long             memb_num;
+    gcs_comp_memb_t* memb;
+}
+dummy_t;
+
 static
 GCS_BACKEND_DESTROY_FN(dummy_destroy)
 {
-    dummy_t* dummy = backend->conn;
+    dummy_t*      dummy = backend->conn;
     
-    if (!dummy || !dummy->closed) return -EBADFD;
+    if (!dummy || dummy->state != DUMMY_CLOSED) return -EBADFD;
 
 //    gu_debug ("Deallocating message queue (serializer)");
     gu_fifo_destroy  (dummy->gc_q);
-//    gu_debug ("Freeing message object.");
-    dummy_msg_destroy (&dummy->msg);
     gu_free (dummy);
     backend->conn = NULL;
     return 0;
@@ -86,28 +103,19 @@ static
 GCS_BACKEND_SEND_FN(dummy_send)
 {
     int err = 0;
+    dummy_t* dummy = backend->conn;
 
-    if (backend->conn)
+    if (gu_unlikely(NULL == dummy)) return -EBADFD;
+
+    if (gu_likely(DUMMY_PRIM == dummy->state))
     {
-	dummy_msg_t *msg   = dummy_msg_create (msg_type, len, buf);
-	if (msg)
-	{
-            dummy_msg_t** ptr = gu_fifo_get_tail (backend->conn->gc_q);
-	    if (gu_likely(ptr != NULL)) {
-                *ptr = msg;
-                gu_fifo_push_tail (backend->conn->gc_q);
-                return len;
-            }
-	    else {
-		dummy_msg_destroy (&msg);
-		err = -EBADFD; // closed
-	    }
-	}
-	else
-	    err = -ENOMEM;
+        err = gcs_dummy_inject_msg (backend, buf, len, msg_type,
+                                    backend->conn->my_idx);
     }
-    else
-	err = -EBADFD;
+    else {
+        static long dummy_error[DUMMY_PRIM] = { -EBADFD, -ENOTCONN, -EAGAIN };
+	err = dummy_error[dummy->state];
+    }
 
     return err;
 }
@@ -115,43 +123,48 @@ GCS_BACKEND_SEND_FN(dummy_send)
 static
 GCS_BACKEND_RECV_FN(dummy_recv)
 {
-    int ret = 0;
+    long     ret = 0;
     dummy_t* conn = backend->conn;
 
-    *sender_id = GCS_SENDER_NONE;
-    *msg_type  = GCS_MSG_ERROR;
+    *sender_idx = GCS_SENDER_NONE;
+    *msg_type   = GCS_MSG_ERROR;
 
     assert (conn);
 
     /* skip it if we already have popped a message from the queue
      * in the previous call */
-    if (!conn->msg)
+    if (gu_likely(DUMMY_CLOSED < conn->state))
     {
         dummy_msg_t** ptr = gu_fifo_get_head (conn->gc_q);
+
         if (gu_likely(ptr != NULL)) {
-            /* Always the same sender */
-            conn->msg = *ptr;
-            gu_fifo_pop_head (conn->gc_q);
+
+            dummy_msg_t* dmsg = *ptr;
+
+            assert (NULL != dmsg);
+
+            *msg_type   = dmsg->type;
+            *sender_idx = dmsg->sender_idx;
+            ret         = dmsg->len;
+
+            if (gu_likely(dmsg->len <= len)) {
+                gu_fifo_pop_head (conn->gc_q);
+                memcpy (buf, dmsg->buf, dmsg->len);
+                dummy_msg_destroy (dmsg);
+            }
+            else {
+                // supplied recv buffer too short, leave the message in queue
+                memcpy (buf, dmsg->buf, len);
+                gu_fifo_release (conn->gc_q);
+            }
         }
         else {
             ret = -EBADFD; // closing
             gu_debug ("Returning %d: %s", ret, strerror(-ret));
-            return ret;
         }
     }
-
-    *sender_id=0;	    
-    assert (conn->msg);
-    ret = conn->msg->len;
-    
-    if (conn->msg->len <= len)
-    {
-        memcpy (buf, conn->msg->buf, conn->msg->len);
-        *msg_type = conn->msg->type;
-        dummy_msg_destroy (&conn->msg);
-    }
     else {
-        memcpy (buf, conn->msg->buf, len);
+        ret = -EBADFD;
     }
 
     return ret;
@@ -168,14 +181,15 @@ GCS_BACKEND_MSG_SIZE_FN(dummy_msg_size)
 {
     long max_size = backend->conn->msg_max_size;
     if (pkt_size <= max_size) {
-        return (pkt_size - sizeof(dummy_msg_t));
+        backend->conn->send_size = pkt_size - sizeof(dummy_msg_t);
     }
     else {
 	gu_warn ("Requested packet size: %d, maximum possible packet size: %d",
 		 pkt_size, max_size);
-        return (max_size - sizeof(dummy_msg_t));
+        backend->conn->send_size = max_size - sizeof(dummy_msg_t);
     }
 
+    return (backend->conn->send_size);
 }
 
 static
@@ -191,14 +205,19 @@ GCS_BACKEND_OPEN_FN(dummy_open)
     }
 
     comp = gcs_comp_msg_new (true, 0, 1);
-
+ 
     if (comp) {
 	ret = gcs_comp_msg_add (comp, "Dummy localhost");
 	assert (0 == ret); // we have only one member, index = 0
-        // put it in the queue, like a usual message 
-        ret = gcs_comp_msg_size(comp);
-        ret = dummy_send (backend, comp, ret, GCS_MSG_COMPONENT);
-        if (ret > 0) ret = 0;
+
+        dummy->state = DUMMY_TRANS; // required by gcs_dummy_set_component()
+        ret = gcs_dummy_set_component (backend, comp); // install new component
+        if (ret >= 0) {                                // queue the message
+            ret = gcs_comp_msg_size(comp);
+            ret = gcs_dummy_inject_msg (backend, comp, ret, GCS_MSG_COMPONENT,
+                                        GCS_SENDER_NONE);
+            if (ret > 0) ret = 0;
+        }
 	gcs_comp_msg_delete (comp);
     }
     gu_debug ("Opened backend connection: %d (%s)", ret, strerror(-ret));
@@ -218,13 +237,16 @@ GCS_BACKEND_CLOSE_FN(dummy_close)
 
     if (comp) {
         ret = gcs_comp_msg_size(comp);
-        ret = dummy_send (backend, comp, ret, GCS_MSG_COMPONENT);
-        // FIXME: here's a race condition - some other thread can send something
-        // after leave message.
+        ret = gcs_dummy_inject_msg (backend, comp, ret, GCS_MSG_COMPONENT,
+                                    GCS_SENDER_NONE);
+        // Here's a race condition - some other thread can send something
+        // after leave message. But caller should guarantee serial access.
         gu_fifo_close (dummy->gc_q);
         if (ret > 0) ret = 0;
 	gcs_comp_msg_delete (comp);
     }
+    dummy->state = DUMMY_CLOSED;
+
     return ret;
 }
 
@@ -246,15 +268,15 @@ GCS_BACKEND_CREATE_FN(gcs_dummy_create)
     long     ret   = -ENOMEM;
     dummy_t *dummy = NULL;
 
-    if (!(dummy = GU_MALLOC(dummy_t)))
+    if (!(dummy = GU_CALLOC(1, dummy_t)))
 	goto out0;
-    if (!(dummy->gc_q = gu_fifo_create (100000,sizeof(void*))))
-	goto out1;
 
-    dummy->msg          = NULL;
-    dummy->msg_id       = 0;
-    dummy->closed       = true;
-    dummy->msg_max_size = sysconf (_SC_PAGESIZE);
+    dummy->state        = DUMMY_CLOSED;
+    dummy->msg_max_size = sysconf (_SC_PAGESIZE) - sizeof(dummy_msg_t);
+    dummy->send_size    = dummy->msg_max_size;
+
+    if (!(dummy->gc_q = gu_fifo_create (1 << 16, sizeof(void*))))
+	goto out1;
 
     *backend      = dummy_backend; // set methods
     backend->conn = dummy;         // set data
@@ -268,3 +290,77 @@ out0:
     return ret;
 }
 
+/*! Injects a message in the message queue to produce a desired msg sequence. */
+long
+gcs_dummy_inject_msg (gcs_backend_t* backend,
+                      const void*    buf,
+                      size_t         buf_len,
+                      gcs_msg_type_t type,
+                      long           sender_idx)
+{
+    long         ret;
+    size_t       send_size = GU_MIN(buf_len, backend->conn->msg_max_size);
+    dummy_msg_t* msg = dummy_msg_create (type, send_size, sender_idx, buf);
+
+    if (msg)
+    {
+        dummy_msg_t** ptr = gu_fifo_get_tail (backend->conn->gc_q);
+
+        if (gu_likely(ptr != NULL)) {
+            *ptr = msg;
+            gu_fifo_push_tail (backend->conn->gc_q);
+            ret = send_size;
+        }
+        else {
+            dummy_msg_destroy (msg);
+            ret = -EBADFD; // closed
+        }
+    }
+    else {
+        ret = -ENOMEM;
+    }
+
+    return ret;
+}
+
+/*! Sets the new component view.
+ *  The same component message should be injected in the queue separately
+ *  (see gcs_dummy_inject_msg()) in order to model different race conditions */
+long
+gcs_dummy_set_component (gcs_backend_t*        backend,
+                         const gcs_comp_msg_t* comp)
+{
+    dummy_t* dummy    = backend->conn;
+    long     new_num  = gcs_comp_msg_num (comp);
+    long     i;
+
+    assert (dummy->state > DUMMY_CLOSED);
+
+    if (dummy->memb_num != new_num) {
+        void* tmp = gu_realloc (dummy->memb, new_num * sizeof(gcs_comp_memb_t));
+
+        if (NULL == tmp) return -ENOMEM;
+
+        dummy->memb     = tmp;
+        dummy->memb_num = new_num;
+    }
+
+    for (i = 0; i < dummy->memb_num; i++) {
+        strcpy ((char*)&dummy->memb[i], gcs_comp_msg_id (comp, i));
+    }
+
+    dummy->my_idx = gcs_comp_msg_self(comp);
+    dummy->state  = gcs_comp_msg_primary(comp) ? DUMMY_PRIM : DUMMY_NON_PRIM;
+    gu_debug ("Setting state to %s",
+              DUMMY_PRIM == dummy->state ? "DUMMY_PRIM" : "DUMMY_NON_PRIM");
+
+    return 0;
+}
+
+/*! Is needed to set transitional state */
+long
+gcs_dummy_set_transitional (gcs_backend_t* backend)
+{
+    backend->conn->state = DUMMY_TRANS;
+    return 0;
+}

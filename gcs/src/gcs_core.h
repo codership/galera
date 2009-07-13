@@ -23,6 +23,9 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+
+#include <galerautils.h>
+
 #include "gcs.h"
 
 struct gcs_core;
@@ -108,7 +111,8 @@ gcs_core_recv (gcs_core_t*      const conn,
 
 /* Configuration functions */
 /* Sets maximum message size to achieve requested network packet size. 
- * In case of failure returns -EMSGSIZE */
+ * In case of failure returns negative error code, in case of success -
+ * resulting message payload size (size of action fragment) */
 extern long
 gcs_core_set_pkt_size (gcs_core_t *conn, ulong pkt_size);
 
@@ -126,6 +130,41 @@ gcs_core_send_sync (gcs_core_t* core, gcs_seqno_t seqno);
 
 /* sends flow control message */
 extern long
-gcs_core_send_fc (gcs_core_t* core, void* fc, size_t fc_size);
+gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size);
 
-#endif // _gcs_core_h_
+#ifdef GCS_CORE_TESTING
+
+/* gcs_core_send() interface does not allow enough concurrency control to model
+ * various race conditions for unit testing - it is not atomic. The functions
+ * below expose gcs_core unit internals solely for the purpose of testing */
+
+#include "gcs_msg_type.h"
+#include "gcs_backend.h"
+
+extern ssize_t
+_gcs_core_msg_send (gcs_core_t*    core,
+                   const void*    msg,
+                   size_t         len,
+                   gcs_msg_type_t type);
+
+extern ssize_t
+_gcs_core_msg_send_retry (gcs_core_t*    core,
+                         const void*    msg,
+                         size_t         len,
+                         gcs_msg_type_t type);
+
+extern gcs_backend_t*
+gcs_core_get_backend (gcs_core_t* core);
+
+// switches lock-step mode on/off
+extern void
+gcs_core_send_lock_step (gcs_core_t* core, bool enable);
+
+// step through action send process (send another fragment).
+// returns positive number if there was a send thread waiting for it.
+extern long
+gcs_core_send_step (gcs_core_t* core, long timeout_ms);
+
+#endif /* GCS_CORE_TESTING */
+
+#endif /* _gcs_core_h_ */

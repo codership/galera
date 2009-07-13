@@ -375,8 +375,8 @@ GCS_BACKEND_RECV_FN(spread_recv)
     int32     endian_mismatch;
  
     /* in case of premature exit */
-    *sender_id = GCS_SENDER_NONE;
-    *msg_type  = GCS_MSG_ERROR;
+    *sender_idx = GCS_SENDER_NONE;
+    *msg_type   = GCS_MSG_ERROR;
 
     if (spread->comp_msg) { /* undelivered regular component message */
 	return spread_comp_deliver (spread, buf, len, msg_type);
@@ -468,9 +468,9 @@ GCS_BACKEND_RECV_FN(spread_recv)
 		gu_debug ("Spread returned ENDIAN_MISMATCH. Ignored.");
 	    }
 	    *msg_type  = mess_type;
-            *sender_id = spread_sender_id (spread, spread->sender);
-            assert (*sender_id >= 0);
-            assert (*sender_id < spread->memb->num_strings);
+            *sender_idx = spread_sender_id (spread, spread->sender);
+            assert (*sender_idx >= 0);
+            assert (*sender_idx < spread->memb->num_strings);
 	    break;
 	}
 	else if (Is_membership_mess (serv_type))

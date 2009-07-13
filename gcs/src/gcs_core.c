@@ -11,14 +11,13 @@
 #include <string.h> // for mempcpy
 #include <errno.h>
 
-#include <galerautils.h>
-
 #define GCS_COMP_MSG_ACCESS
 
 #include "gcs_backend.h"
 #include "gcs_comp_msg.h"
 #include "gcs_fifo_lite.h"
 #include "gcs_group.h"
+
 #include "gcs_core.h"
 
 const size_t CORE_FIFO_LEN = (1 << 8); // 256 elements (no need to have more)
@@ -64,7 +63,11 @@ struct gcs_core
 
     /* backend part */
     size_t          msg_size;
-    gcs_backend_t   backend;         // message IO context
+    gcs_backend_t   backend;   // message IO context
+
+#ifdef GCS_CORE_TESTING
+    gu_lock_step_t  ls;        // to lock-step in unit tests
+#endif
 };
 
 // this is to pass local action info from send to recv thread.
@@ -100,6 +103,9 @@ gcs_core_create (const char* const backend_uri)
                     gcs_group_init (&core->group);
                     core->proto_ver = 0;
                     core->state = CORE_CLOSED;
+#ifdef GCS_CORE_TESTING
+                    gu_lock_step_init (&core->ls);
+#endif
                     return core; // success
                 }
 
@@ -182,8 +188,7 @@ static inline ssize_t
 core_msg_send (gcs_core_t*    core,
                const void*    msg,
                size_t         msg_len,
-               gcs_msg_type_t msg_type,
-               bool           last)
+               gcs_msg_type_t msg_type)
 {
     ssize_t ret;
 
@@ -226,13 +231,12 @@ static inline ssize_t
 core_msg_send_retry (gcs_core_t*    core,
                      const void*    buf,
                      size_t         buf_len,
-                     gcs_msg_type_t type,
-                     bool           last)
+                     gcs_msg_type_t type)
 {
     ssize_t ret;
-    while ((ret = core_msg_send (core, buf, buf_len, type, last)) == -EAGAIN) {
+    while ((ret = core_msg_send (core, buf, buf_len, type)) == -EAGAIN) {
         /* wait for primary configuration - sleep 0.01 sec */
-        gu_debug ("Backend requested wait\n");
+        gu_debug ("Backend requested wait");
         usleep (10000);
     }
 //    gu_debug ("returning: %d (%s)", ret, strerror(-ret));
@@ -289,8 +293,13 @@ gcs_core_send (gcs_core_t*      const conn,
 	
 	send_size = hdr_size + chunk_size;
 
+#ifdef GCS_CORE_TESTING
+        gu_lock_step_wait (&conn->ls); // pause before sending every fragment
+        gu_info ("Sending %p of size %zu. Total sent: %zu, left: %zu",
+                 conn->send_buf + hdr_size, chunk_size, sent, act_size);
+#endif
         ret = core_msg_send_retry (conn, conn->send_buf, send_size,
-                                   GCS_MSG_ACTION, (chunk_size == act_size));
+                                   GCS_MSG_ACTION);
 
 	if (gu_likely(ret > (ssize_t)hdr_size)) {
 
@@ -317,7 +326,8 @@ gcs_core_send (gcs_core_t*      const conn,
              * (first parts of action might be even received by this node,
              *  so that there is nothing to remove, but we cannot know for sure)
              *
-             * 1. Action must be removed from fifo.*/
+             * 1. Action will never be received completely by this node. Hence
+             *    action must be removed from fifo on behalf of sending thr.: */
             gcs_fifo_lite_remove (conn->fifo);
             /* 2. Members will have to discard received fragments.
              * Two reasons could lead us here: new member(s) in configuration
@@ -655,7 +665,7 @@ core_handle_uuid_msg (gcs_core_t*     core,
                     ret = core_msg_send_retry (core,
                                                state_buf,
                                                state_len,
-                                               GCS_MSG_STATE_MSG, true);
+                                               GCS_MSG_STATE_MSG);
                     if (ret > 0) {
                         gu_info ("STATE EXCHANGE: sent state msg: "
                                  GU_UUID_FORMAT, GU_UUID_ARGS(state_uuid));
@@ -929,6 +939,10 @@ long gcs_core_destroy (gcs_core_t* core)
 
     ret = core->backend.destroy (&core->backend);
 
+#ifdef GCS_CORE_TESTING
+    gu_lock_step_destroy (&core->ls);
+#endif
+
     gu_free (core);
 
     return ret;
@@ -954,7 +968,7 @@ gcs_core_set_pkt_size (gcs_core_t* conn, ulong pkt_size)
     gu_debug ("Changing maximum message size %u -> %u",
               conn->send_buf_len, msg_size);
 
-    if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
+    if (gu_mutex_lock (&conn->send_lock)) abort();
     {
         if (conn->state != CORE_DESTROYED) {
             new_send_buf = gu_realloc (conn->send_buf, msg_size);
@@ -962,6 +976,7 @@ gcs_core_set_pkt_size (gcs_core_t* conn, ulong pkt_size)
                 conn->send_buf     = new_send_buf;
                 conn->send_buf_len = msg_size;
                 memset (conn->send_buf, 0, hdr_size); // to pacify valgrind
+                ret = msg_size - hdr_size; // message payload
             }
             else {
                 ret = -ENOMEM;
@@ -982,11 +997,12 @@ core_send_seqno (gcs_core_t* core, gcs_seqno_t seqno, gcs_msg_type_t msg_type)
     gcs_seqno_t seqno_le = gcs_seqno_le (seqno);
     ssize_t     ret      = core_msg_send_retry (core, &seqno_le,
                                                 sizeof(seqno_le),
-                                                msg_type, true);
+                                                msg_type);
     if (ret > 0) {
         assert(ret == sizeof(seqno));
         ret = 0;
     }
+
     return ret;
 }
 
@@ -1009,12 +1025,52 @@ gcs_core_send_sync (gcs_core_t* core, gcs_seqno_t seqno)
 }
 
 long
-gcs_core_send_fc (gcs_core_t* core, void* fc, size_t fc_size)
+gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size)
 {
     ssize_t ret;
-    ret = core_msg_send_retry (core, fc, fc_size, GCS_MSG_FLOW, true);
+    ret = core_msg_send_retry (core, fc, fc_size, GCS_MSG_FLOW);
     if (ret == fc_size) {
         ret = 0;
     }
     return ret;
 }
+
+#ifdef GCS_CORE_TESTING
+
+ssize_t
+_gcs_core_msg_send (gcs_core_t*    core,
+                   const void*    msg,
+                   size_t         len,
+                   gcs_msg_type_t type)
+{
+    return core_msg_send (core, msg, len, type);
+}
+
+ssize_t
+_gcs_core_msg_send_retry (gcs_core_t*    core,
+                         const void*    msg,
+                         size_t         len,
+                         gcs_msg_type_t type)
+{
+    return core_msg_send_retry (core, msg, len, type);
+}
+
+gcs_backend_t*
+gcs_core_get_backend (gcs_core_t* core)
+{
+    return &core->backend;
+}
+
+void
+gcs_core_send_lock_step (gcs_core_t* core, bool enable)
+{
+    gu_lock_step_enable (&core->ls, enable);
+}
+
+long
+gcs_core_send_step (gcs_core_t* core, long timeout_ms)
+{
+    return gu_lock_step_cont (&core->ls, timeout_ms);
+}
+
+#endif /* GCS_CORE_TESTING */

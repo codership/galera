@@ -489,11 +489,10 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             gu_warn ("Rejecting JOIN message: new State Transfer required.");
         }
         else {
-            // should we freak out and return an error?
+            // should we freak out and throw an error?
             gu_warn ("Protocol violation. JOIN message sender %ld is not "
                      "in state transfer (%s). Message ignored.",
                      msg->sender_idx, gcs_state_node_string[sender->status]);
-            assert (0);
         }
         return 0;
     }
@@ -663,7 +662,7 @@ gcs_group_act_conf (gcs_group_t* group, gcs_recv_act_t* act)
             }
         }
         else {
-            // leave message
+            // self leave message
             assert (conf->conf_id < 0);
             assert (conf->my_idx < 0);
             conf->st_required = false;

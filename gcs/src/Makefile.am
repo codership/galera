@@ -45,13 +45,10 @@ if ENABLE_VS
     GCS_SRCS  += gcs_vs.cpp
 endif
 
-
-GCS_INCS = $(wildcard *.h)
-
 # Describe libgcs library target
 include_HEADERS   = gcs.h
 lib_LTLIBRARIES   = libgcs.la
-libgcs_la_SOURCES = $(GCS_SRCS) $(GCS_INCS)
+libgcs_la_SOURCES = $(GCS_SRCS)
 INTERFACE = 10
 REVISION  = 0
 AGE       = 0

@@ -4,8 +4,10 @@
  * $Id$
  */
 
+#define _GNU_SOURCE
 #include <errno.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "gcs_act_proto.h"
 #include "gcs_defrag.h"
@@ -53,11 +55,14 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                 df->reset    = false;
             }
             else {
+                char* frag_str = strndup (frg->frag, frg->frag_len);
                 gu_error ("Unordered fragment received. Protocol error.");
                 gu_error ("Expected: %llu:%ld, received: %llu:%ld",
                           df->sent_id, df->frag_no, frg->act_id, frg->frag_no);
+                gu_error ("Contents: %s", frag_str);
                 df->frag_no--; // revert counter in hope that we get good frag
                 assert(0);
+                free (frag_str);
                 return -EPROTO;
             }
         }
@@ -96,10 +101,13 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                 return 0;
             }
             else {
+                char* frag_str = strndup (frg->frag, frg->frag_len);
                 gu_error ("Unordered fragment received. Protocol error.");
                 gu_error ("Expected: any:0(first), received: %lld:%ld",
-                          frg->frag_no, frg->act_id);
+                          frg->act_id, frg->frag_no);
+                gu_error ("Contents: %s", frag_str);
                 assert(0);
+                free (frag_str);
                 return -EPROTO;
             }
         }
