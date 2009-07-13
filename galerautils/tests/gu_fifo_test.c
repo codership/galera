@@ -23,6 +23,8 @@ START_TEST (gu_fifo_test)
 
     fifo = gu_fifo_create (1, 1);
     fail_if (fifo == NULL);
+    gu_fifo_close   (fifo);
+    mark_point();
     gu_fifo_destroy (fifo);
     mark_point();
 

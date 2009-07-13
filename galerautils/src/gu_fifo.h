@@ -22,7 +22,7 @@ typedef struct gu_fifo gu_fifo_t;
 
 /*! constructor */
 extern gu_fifo_t* gu_fifo_create (size_t length, size_t unit);
-/*! puts FIFO into closed state */
+/*! puts FIFO into closed state, waking up waiting threads */
 extern void gu_fifo_close (gu_fifo_t *queue);
 /*! destructor - would block until all members are dequeued */
 extern void gu_fifo_destroy (gu_fifo_t *queue);
@@ -30,9 +30,9 @@ extern void gu_fifo_destroy (gu_fifo_t *queue);
 extern char* gu_fifo_print (gu_fifo_t *queue);
 
 /*! Lock FIFO */
-extern long  gu_fifo_lock      (gu_fifo_t *q);
+extern void  gu_fifo_lock      (gu_fifo_t *q);
 /*! Release FIFO */
-extern long  gu_fifo_release   (gu_fifo_t *q);
+extern void  gu_fifo_release   (gu_fifo_t *q);
 /*! Lock FIFO and get pointer to head item */
 extern void* gu_fifo_get_head  (gu_fifo_t* q);
 /*! Advance FIFO head pointer and release FIFO. */

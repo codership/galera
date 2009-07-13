@@ -59,7 +59,7 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
     size_t row_pwr    = GCS_FIFO_MIN_ROW_POWER;
     size_t row_len    = 1 << row_pwr;
     size_t row_size   = row_len * item_size;
-    size_t array_pwr  = 0;
+    size_t array_pwr  = 1; // need at least 2 rows for alteration
     size_t array_len  = 1 << array_pwr;
     size_t array_size = array_len * sizeof(void*);
     size_t mem_limit  = GU_PHYS_PAGES * GU_PAGE_SIZE;
@@ -125,49 +125,73 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
     return ret;
 }
 
-void gu_fifo_close (gu_fifo_t* q)
-{
-    if (gu_fifo_lock (q)) {
-        gu_fatal ("Failed to lock queue");
-        abort();
+// defined as macro for proper line reporting
+#define fifo_lock(q)                                    \
+    if (gu_likely (0 == gu_mutex_lock (&q->lock))) {}   \
+    else {                                              \
+        gu_fatal ("Failed to lock queue");              \
+        abort();                                        \
     }
 
+#define fifo_lock2(q) (gu_mutex_lock (&q->lock)); // unused
+
+static inline long
+fifo_unlock (gu_fifo_t* q)
+{
+    return -gu_mutex_unlock (&q->lock);
+}
+
+/* lock the queue */
+void gu_fifo_lock    (gu_fifo_t *q)
+{
+    fifo_lock(q);
+}
+
+/* unlock the queue */
+void gu_fifo_release (gu_fifo_t *q)
+{
+    fifo_unlock(q);
+}
+
+void gu_fifo_close (gu_fifo_t* q)
+{
+    fifo_lock (q)
+
     if (!q->closed) {
-        q->closed = true;
+        long ret = 0;
+
+        q->length = 0;    /* prevent appending */
+        q->closed = true; /* force putters to quit */
+
+        // signal all the idle waiting threads
         gu_cond_broadcast (&q->put_cond);
         q->put_wait = 0;
         gu_cond_broadcast (&q->get_cond);
         q->get_wait = 0;
+
+        /* if there are items in the queue, wait until they are all fetched */
+        while (q->used > 0 && 0 == ret) {
+            /* will make getters to signal every time item is removed */
+            gu_warn ("Waiting for %lu items to be fetched.", q->used);
+            q->put_wait++;
+            ret = gu_cond_wait (&q->put_cond, &q->lock);
+        }
     }
 
-    gu_fifo_release (q);
-}
-
-#define FIFO_LOCK(q)   (-gu_mutex_lock   (&q->lock))
-#define FIFO_UNLOCK(q) (-gu_mutex_unlock (&q->lock))
-
-/* lock the queue */
-long gu_fifo_lock       (gu_fifo_t *q)
-{
-    return FIFO_LOCK(q);
-}
-
-/* unlock the queue */
-long gu_fifo_release    (gu_fifo_t *q)
-{
-    return FIFO_UNLOCK(q);
+    fifo_unlock (q);
 }
 
 /* lock the queue and wait if it is empty */
 static inline long fifo_lock_get (gu_fifo_t *q)
 {
-    register long ret = FIFO_LOCK(q);
+    register long ret = 0;
 
+    fifo_lock(q);
     while (0 == ret && 0 == q->used && !q->closed) {
         q->get_wait++;
-        ret = gu_cond_wait (&q->get_cond, &q->lock);
+        ret = -gu_cond_wait (&q->get_cond, &q->lock);
     }
- 
+
     return ret;
 }
 
@@ -181,17 +205,18 @@ static inline long fifo_unlock_get (gu_fifo_t *q)
         gu_cond_signal (&q->put_cond);
     }
 
-    return FIFO_UNLOCK(q);
+    return fifo_unlock(q);
 }
 
 /* lock the queue and wait if it is full */
 static inline long fifo_lock_put (gu_fifo_t *q)
 {
-    register long ret = FIFO_LOCK(q);
+    register long ret = 0;
 
+    fifo_lock(q);
     while (0 == ret && q->used == q->length && !q->closed) {
         q->put_wait++;
-        ret = gu_cond_wait (&q->put_cond, &q->lock);
+        ret = -gu_cond_wait (&q->put_cond, &q->lock);
     }
 
     return ret;
@@ -207,7 +232,7 @@ static inline long fifo_unlock_put (gu_fifo_t *q)
         gu_cond_signal (&q->get_cond);
     }
 
-    return FIFO_UNLOCK(q);
+    return fifo_unlock(q);
 }
 
 #define FIFO_ROW(q,x) ((x) >> q->col_shift) /* div by row width */
@@ -232,7 +257,7 @@ void* gu_fifo_get_head (gu_fifo_t* q)
     }
     else {
         assert (q->closed);
-        gu_fifo_release (q);
+        fifo_unlock (q);
         return NULL;
     }
 }
@@ -286,7 +311,7 @@ void* gu_fifo_get_tail (gu_fifo_t* q)
             gu_debug ("Allocating row %lu of queue %p, rows %p", row, q, q->rows);
             if (NULL == (q->rows[row] = gu_malloc(q->row_size))) {
                 gu_debug ("Allocating row %lu failed", row);
-                gu_fifo_release (q);
+                fifo_unlock (q);
                 return NULL;
             }
             q->alloc += q->row_size;
@@ -295,7 +320,7 @@ void* gu_fifo_get_tail (gu_fifo_t* q)
 #endif
     }
 
-    gu_fifo_release (q);
+    fifo_unlock (q);
     return NULL;
 }
 
@@ -320,32 +345,29 @@ ulong gu_fifo_length (gu_fifo_t* q)
 /* destructor - would block until all members are dequeued */
 void gu_fifo_destroy   (gu_fifo_t *queue)
 {
-    gu_mutex_lock (&queue->lock);
-    if (0 == queue->length) {
-        gu_mutex_unlock (&queue->lock);
-    }
+    bool closed;
 
-    queue->length = 0; /* prevent appending */
-    while (queue->used) {
-	gu_mutex_unlock (&queue->lock);
-	usleep (10000); /* wait until the queue is cleaned */
-	gu_mutex_lock (&queue->lock);
+    fifo_lock (queue);
+    closed = queue->closed;
+    fifo_unlock (queue);
+
+    if (!closed) {
+        gu_fifo_close (queue);
     }
-    gu_mutex_unlock (&queue->lock);
 
     assert (queue->tail == queue->head);
 
     while (gu_cond_destroy (&queue->put_cond)) {
-	gu_mutex_lock   (&queue->lock);
-	gu_cond_signal  (&queue->put_cond);
-	gu_mutex_unlock (&queue->lock);
+	fifo_lock      (queue);
+	gu_cond_signal (&queue->put_cond);
+	fifo_unlock    (queue);
 	/* when thread sees that ret->used == 0, it must terminate */
     }
 
     while (gu_cond_destroy (&queue->get_cond)) {
-	gu_mutex_lock   (&queue->lock);
-	gu_cond_signal  (&queue->get_cond);
-	gu_mutex_unlock (&queue->lock);
+	fifo_lock      (queue);
+	gu_cond_signal (&queue->get_cond);
+	fifo_unlock    (queue);
 	/* when thread sees that ret->used == 0, it must terminate */
     }
 

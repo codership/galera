@@ -22,5 +22,6 @@
 #include "gu_fifo.h"
 #include "gu_uuid.h"
 #include "gu_to.h"
+#include "gu_lock_step.h"
 
 #endif /* _galerautils_h_ */

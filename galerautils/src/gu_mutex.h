@@ -81,5 +81,6 @@ typedef pthread_cond_t    gu_cond_t;
 #define gu_cond_destroy   pthread_cond_destroy
 #define gu_cond_signal    pthread_cond_signal
 #define gu_cond_broadcast pthread_cond_broadcast
+#define gu_cond_timedwait pthread_cond_timedwait
 
 #endif /* _gu_mutex_h_ */

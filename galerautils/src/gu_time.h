@@ -21,6 +21,18 @@ gu_timeval_diff (struct timeval* left, struct timeval* right)
     return (((double)diff) * 1.0e-06);
 }
 
+static inline void
+gu_timeval_add (struct timeval* time, double s)
+{
+    long sec  = s;
+    long usec = (s - sec) * 1000000;
+    long carry;
+    time->tv_usec += usec;
+    carry = (time->tv_usec >= 1000000);
+    time->tv_sec  += sec + carry;
+    time->tv_usec -= carry * 1000000;
+}
+
 static const double SEC_PER_CLOCK = ((double)1.0)/CLOCKS_PER_SEC;
 
 /** Returns seconds */
