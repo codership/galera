@@ -16,6 +16,7 @@ class Exception : exception
     void operator=(const Exception&);
 protected:
     Exception(const Exception& e) :
+        exception(),
         msg()
     {
         msg = e.msg;
