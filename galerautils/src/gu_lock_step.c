@@ -65,6 +65,7 @@ gu_lock_step_wait (gu_lock_step_t* ls)
             }
             else {                                     // signal to signaller
                 gu_cond_signal (&ls->cond);
+                ls->cont--;
             }
         }
         gu_mutex_unlock (&ls->mtx);
@@ -102,14 +103,14 @@ gu_lock_step_cont (gu_lock_step_t* ls, long timeout_ms)
                 timeout.tv_nsec = now.tv_usec * 1000;
 
                 ls->cont++;
-
                 do {
                     err = gu_cond_timedwait (&ls->cond, &ls->mtx, &timeout);
                 } while (EINTR == err);
 
-                ls->cont--;
+                assert ((0 == err) || (ETIMEDOUT == err && ls->cont > 0));
 
-                ret = (0 == err); // made successful rendezvous with waiter
+                ret       = (0 == err); // successful rendezvous with waiter
+                ls->cont -= (0 != err); // self-decrement in case of no waiter
 
 //                if (err != 0) {
 //                    gu_debug ("ret = %d, ls->wait = %d, err = %d (%s)",
