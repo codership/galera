@@ -7,6 +7,7 @@
 #include <gcomm/exception.hpp>
 #include <gcomm/string.hpp>
 #include <gcomm/types.hpp>
+
 #include <cstring>
 
 extern "C" {
@@ -14,7 +15,11 @@ extern "C" {
 #include <gu_uuid.h>
 }
 
+
+
 BEGIN_GCOMM_NAMESPACE
+
+
 
 class UUID
 {
@@ -35,6 +40,15 @@ public:
         uuid()
     {
         gu_uuid_generate(&uuid, node, node_len);
+    }
+
+    UUID(const int32_t idx) :
+        uuid()
+
+    {
+        assert(idx > 0);
+        uuid = GU_UUID_NIL;
+        memcpy(&uuid, &idx, sizeof(idx));
     }
     
     static const UUID& nil()
@@ -70,16 +84,25 @@ public:
     
     string to_string() const {
         char buf[37];
-#define GU_CPP_UUID_FORMAT "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
-        if (snprintf(buf, sizeof(buf), GU_CPP_UUID_FORMAT, GU_UUID_ARGS(&uuid))
-            != 36)
+        memset(buf, 0, sizeof(buf));
+        if (memcmp((const byte_t*)&uuid + sizeof(int32_t), buf,
+                   sizeof(uuid) - sizeof(int32_t)) == 0)
         {
-            throw FatalException("");
+            const int32_t* val = reinterpret_cast<const int32_t*>(&uuid);
+            return make_int(*val).to_string();
         }
+        else
+        {
+#define GU_CPP_UUID_FORMAT "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
+            if (snprintf(buf, sizeof(buf), GU_CPP_UUID_FORMAT, GU_UUID_ARGS(&uuid))
+                != 36)
+            {
+                throw FatalException("");
+            }
 #undef GU_CPP_UUID_FORMAT
-        return std::string(buf);
+            return std::string(buf);
+        }
     }
-
 };
 
 

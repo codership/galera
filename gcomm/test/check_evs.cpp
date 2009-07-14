@@ -96,11 +96,11 @@ END_GCOMM_NAMESPACE
 
 START_TEST(test_msg)
 {
-    UUID pid(0, 0);
+    UUID pid(4);
     EVSUserMessage umsg(pid, 0x10, 
                         SAFE, 0x037b137bU, 0x17U,
                         0x0534555,
-                        ViewId(UUID(0, 0), 0x7373b173U), EVSMessage::F_MSG_MORE);
+                        ViewId(UUID(5), 0x7373b173U), EVSMessage::F_MSG_MORE);
 
     check_serialization(umsg, umsg.size(), 
                         EVSUserMessage(UUID(), 
@@ -113,32 +113,6 @@ START_TEST(test_msg)
 
     EVSDelegateMessage dmsg(pid);
     check_serialization(dmsg, dmsg.size(), EVSDelegateMessage(UUID::nil()));
-
-#if 0
-    size_t buflen = umsg.size();
-    uint8_t* buf = new uint8_t[buflen];
-
-
-    fail_unless(umsg.write(buf, buflen, 1) == 0);
-    fail_unless(umsg.write(buf, buflen, 0) == buflen);
-
-
-    EVSMessage umsg2;
-    fail_unless(umsg2.read(buf, buflen, 1) == 0);
-    fail_unless(umsg2.read(buf, buflen, 0) == buflen);
-
-    fail_unless(umsg.get_type() == umsg2.get_type());
-    fail_unless(umsg.get_user_type() == umsg2.get_user_type());
-    fail_unless(umsg.get_source() == umsg2.get_source());
-    fail_unless(umsg.get_safety_prefix() == umsg2.get_safety_prefix());
-    fail_unless(umsg.get_seq() == umsg2.get_seq());
-    fail_unless(umsg.get_seq_range() == umsg2.get_seq_range());
-    fail_unless(umsg.get_aru_seq() == umsg2.get_aru_seq());
-    fail_unless(umsg.get_flags() == umsg2.get_flags());
-    fail_unless(umsg.get_source_view() == umsg2.get_source_view());
-
-    delete[] buf;
-#endif
 }
 END_TEST
 
@@ -146,9 +120,9 @@ END_TEST
 START_TEST(test_input_map_basic)
 {
     EVSInputMap im;
-    UUID pid1(0, 0);
-    UUID pid2(0, 0);
-    UUID pid3(0, 0);
+    UUID pid1(1);
+    UUID pid2(2);
+    UUID pid3(3);
     // Test adding and removing instances
     im.insert_sa(pid1);
     im.insert_sa(pid2);
@@ -275,7 +249,7 @@ START_TEST(test_input_map_overwrap)
     static const size_t qlen = 8;
     UUID pids[nodes];
     for (size_t i = 0; i < nodes; ++i) {
-        pids[i] = UUID(0, 0);
+        pids[i] = UUID(i + 1);
         im.insert_sa(pids[i]);
     }
 
@@ -358,7 +332,7 @@ START_TEST(test_input_map_random)
     vector<UUID> pids(4);
     for (size_t i = 0; i < 4; ++i)
     {
-        pids[i] = UUID(0, 0);
+        pids[i] = UUID(i + 1);
         im.insert_sa(pids[i]);
     }
     
@@ -481,9 +455,9 @@ class DummyInstance : public Toplay
     DummyInstance(const DummyInstance&);
     void operator=(const DummyInstance&);
 public:
-    DummyInstance(EventLoop* el, const string& name) :
+    DummyInstance(EventLoop* el, const size_t idx, const string& name) :
         tp(),
-        ep(el, &tp, UUID(0, 0), name, 0),
+        ep(el, &tp, UUID(idx), name, 0),
         send_seq(0),
         input()
     {
@@ -609,11 +583,6 @@ public:
         return tp.get_out();
     }
     
-    const string& get_name() const
-    {
-        return ep.get_name();
-    }
-
     const UUID& get_uuid() const
     {
         return ep.get_uuid();
@@ -746,19 +715,6 @@ static void join_instance(DummyList& dlist, DummyInstance* di)
         reach_operational(dlist);
     }
 }
-
-struct has_name
-{
-    const string& name;
-    has_name(const string& name_) : 
-        name(name_)
-    {
-    }
-    bool operator()(DummyInstance* di)
-    {
-        return di->get_name() == name;
-    }
-};
 
 struct set_inactive_in
 {
@@ -919,7 +875,7 @@ START_TEST(test_evs_proto_generic_boot)
     for (int i = 0; i < n_nodes; ++i)
     {
         join_instance(dlist, 
-                      new DummyInstance(&el, "n" + make_int(i).to_string()));
+                      new DummyInstance(&el, i + 1, "n" + make_int(i + 1).to_string()));
     }
     
     /* */
@@ -1002,7 +958,7 @@ static void single_boot(DummyTransport* tp, EVSProto* ep)
 START_TEST(test_evs_proto_single_boot)
 {
     EventLoop el;
-    UUID pid(0, 0);
+    UUID pid(1);
     DummyTransport* tp = new DummyTransport();
     DummyUser du;
     EVSProto* ep = new EVSProto(&el, tp, pid, "n1", 0);
@@ -1105,8 +1061,8 @@ static void double_boot(DummyTransport* tp1, EVSProto* ep1,
 START_TEST(test_evs_proto_double_boot)
 {
     EventLoop el;
-    UUID p1(0, 0);
-    UUID p2(0, 0);
+    UUID p1(1);
+    UUID p2(2);
 
 
     DummyTransport* tp1 = new DummyTransport();
@@ -1136,8 +1092,8 @@ END_TEST
 START_TEST(test_evs_proto_user_msg_basic)
 {
     EventLoop el;
-    UUID p1(0, 0);
-    UUID p2(0, 0);
+    UUID p1(1);
+    UUID p2(2);
 
 
     DummyTransport* tp1 = new DummyTransport();
@@ -1219,8 +1175,8 @@ END_TEST
 START_TEST(test_evs_proto_leave_basic)
 {
     EventLoop el;
-    UUID p1(0, 0);
-    UUID p2(0, 0);
+    UUID p1(1);
+    UUID p2(2);
 
 
     DummyTransport* tp1 = new DummyTransport();
@@ -1284,8 +1240,8 @@ END_TEST
 START_TEST(test_evs_proto_duplicates)
 {
     EventLoop el;
-    UUID p1(0, 0);
-    UUID p2(0, 0);
+    UUID p1(1);
+    UUID p2(2);
 
     DummyTransport* tp1 = new DummyTransport();
     DummyUser du1;
@@ -1689,8 +1645,8 @@ START_TEST(test_evs_proto_converge)
 
     for (size_t i = 0; i < n; ++i) {
         DummyTransport* tp = new DummyTransport();
-        vec[i] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0),
-                                           "n" + make_int(i).to_string(), 0));
+        vec[i] = new Inst(tp, new EVSProto(&el, tp, UUID(i + 1),
+                                           "n" + make_int(i + 1).to_string(), 0));
         vec[i]->ep->shift_to(EVSProto::JOINING);
         vec[i]->ep->send_join(false);
     }
@@ -1707,8 +1663,8 @@ START_TEST(test_evs_proto_converge_1by1)
     for (size_t n = 0; n < 8; ++n) {
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
-        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0),
-                                           "n" + make_int(n).to_string(), 0));
+        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1),
+                                           "n" + make_int(n + 1).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(n == 0);
         fail_unless(vec[n]->ep->get_state() == (n == 0 ? EVSProto::OPERATIONAL: EVSProto::JOINING));
@@ -1801,8 +1757,8 @@ START_TEST(test_evs_proto_user_msg)
     for (size_t n = 0; n < 8; ++n) {
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
-        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0),
-                                           "n" + make_int(n).to_string(), 0));
+        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1),
+                                           "n" + make_int(n + 1).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(n == 0);
         reach_operational(&vec);
@@ -1881,12 +1837,14 @@ START_TEST(test_evs_proto_consensus_with_user_msg)
     stats.clear();
     vector<Inst*> vec;
 
+    // gu_log_max_level = GU_LOG_DEBUG;
     for (size_t n = 0; n < 8; ++n) {
+        log_info << "n = " << n;
         send_msgs_rnd(&vec, 8);
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
-        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0), "n" 
-                                           + make_int(n).to_string(), 0));
+        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1), "n" 
+                                           + make_int(n + 1).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(n == 0);
         reach_operational(&vec);
@@ -1906,8 +1864,8 @@ START_TEST(test_evs_proto_msg_loss)
     for (size_t n = 0; n < 8; ++n) {
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
-        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0), "n" + 
-                                           make_int(n).to_string(), 0));
+        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1), "n" + 
+                                           make_int(n + 1).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(false);
     }
@@ -1936,8 +1894,8 @@ START_TEST(test_evs_proto_leave)
         send_msgs_rnd(&vec, 8);
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
-        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(0, 0), "n" 
-                                           + make_int(n).to_string(), 0));
+        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1), "n" 
+                                           + make_int(n + 1).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::JOINING);
         vec[n]->ep->send_join(n == 0);
         reach_operational(&vec);
@@ -1965,8 +1923,8 @@ static void join_inst(EventLoop* el,
     // std::cout << *n << "\n";
     vec.resize(*n + 1);
     DummyTransport* tp = new DummyTransport();
-    vec[*n] = new Inst(tp, new EVSProto(el, tp, UUID(0, 0), "n" 
-                                        + make_int(*n).to_string(), 0));
+    vec[*n] = new Inst(tp, new EVSProto(el, tp, UUID(*n + 1), "n" 
+                                        + make_int(*n + 1).to_string(), 0));
     vec[*n]->ep->shift_to(EVSProto::JOINING);
     vec[*n]->ep->send_join(false);
 
@@ -2294,8 +2252,7 @@ Suite* evs_suite()
     tcase_set_timeout(tc, 10);
     suite_add_tcase(s, tc);
 
-    if (skip)
-        return s;
+
 
     tc = tcase_create("test_evs_proto_double_boot");
     tcase_add_test(tc, test_evs_proto_double_boot);
@@ -2305,9 +2262,12 @@ Suite* evs_suite()
     tcase_add_test(tc, test_evs_proto_user_msg_basic);
     suite_add_tcase(s, tc);
 
+
+
     tc = tcase_create("test_evs_proto_leave_basic");
     tcase_add_test(tc, test_evs_proto_leave_basic);
     suite_add_tcase(s, tc);
+
 
 
     tc = tcase_create("test_evs_proto_duplicates");
@@ -2315,12 +2275,11 @@ Suite* evs_suite()
     suite_add_tcase(s, tc);
     
 
-
-
     tc = tcase_create("test_evs_proto_converge");
     tcase_add_test(tc, test_evs_proto_converge);
     tcase_set_timeout(tc, 30);
     suite_add_tcase(s, tc);
+
 
     tc = tcase_create("test_evs_proto_converge_1by1");
     tcase_add_test(tc, test_evs_proto_converge_1by1);
@@ -2334,9 +2293,11 @@ Suite* evs_suite()
 
     tc = tcase_create("test_evs_proto_consensus_with_user_msg");
     tcase_add_test(tc, test_evs_proto_consensus_with_user_msg);
-    tcase_set_timeout(tc, 30);
+    tcase_set_timeout(tc, 10);
     suite_add_tcase(s, tc);
 
+    if (skip)
+        return s;
 
     tc = tcase_create("test_evs_proto_msg_loss");
     tcase_add_test(tc, test_evs_proto_msg_loss);

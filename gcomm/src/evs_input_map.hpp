@@ -87,7 +87,10 @@ class EVSInputMap {
         Instance() : gap(), safe_seq(SEQNO_MAX) {}
         ~Instance() {
         }
-        
+        std::string to_string() const
+        {
+            return "gap=" + gap.to_string() + " safe_seq=" + make_int(safe_seq).to_string();
+        }
     };
     
     typedef std::map<const UUID, Instance> IMap;
@@ -308,8 +311,8 @@ public:
         {
             return false;
         }
-        LOG_INFO("is_fifo: " + make_int(ii->second.gap.low).to_string() 
-                 + " " + make_int(i->get_evs_message().get_seq()).to_string());
+        log_debug << "is_fifo: " << ii->second.gap.low
+                  << " " << i->get_evs_message().get_seq();
         return !seqno_lt(ii->second.gap.low, i->get_evs_message().get_seq());
     }
 
@@ -431,18 +434,33 @@ public:
         msg_log.clear();
         if (recovery_log.size())
         {
-            LOG_INFO("going to discard " 
-                     + make_int(recovery_log.size()).to_string() 
-                     + " messages from recovery log");
+            log_debug << "going to discard " 
+                      << recovery_log.size()
+                      << " messages from recovery log";
             for (MLog::const_iterator i = recovery_log.begin(); i != recovery_log.end();
                  ++i)
             {
-                LOG_INFO("source " + i->get_sockaddr().to_string() + " seq " + make_int(i->get_evs_message().get_seq()).to_string());
+                log_debug << "source " << i->get_sockaddr().to_string() 
+                          << " seq " << i->get_evs_message().get_seq();
             }
         }
         recovery_log.clear();
         safe_seq = aru_seq = SEQNO_MAX;
     }
+
+    std::string to_string() const
+    {
+        std::string ret = 
+            std::string("aru_seq=") + make_int(aru_seq).to_string() + " "
+            + "safe_seq=" + make_int(safe_seq).to_string() + " ";
+        for (IMap::const_iterator i = instances.begin(); 
+             i != instances.end(); ++i)
+        {
+            ret += i->first.to_string() + " " + i->second.to_string() + " ";
+        }
+        return ret;
+    }
+
 };
 
 END_GCOMM_NAMESPACE

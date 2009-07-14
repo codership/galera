@@ -38,19 +38,16 @@ struct EVSInstance
     Time tstamp;
     //
     EVSRange prev_range;
-    // Human readable name
-    string name;
     // greatest seen FIFO seqno from this source 
     int64_t fifo_seq;
     // CTOR
-    EVSInstance(const string& name_) : 
+    EVSInstance() : 
         operational(true), 
         installed(false), 
         join_message(0), 
         leave_message(0),
         tstamp(Time::now()),
         prev_range(SEQNO_MAX, SEQNO_MAX),
-        name(name_),
         fifo_seq(-1)
     {
     }
@@ -62,7 +59,6 @@ struct EVSInstance
         leave_message(i.leave_message),
         tstamp(i.tstamp),
         prev_range(i.prev_range),
-        name(i.name),
         fifo_seq(i.fifo_seq)
     {
     }
@@ -73,16 +69,6 @@ struct EVSInstance
         delete leave_message;
     }
     
-    void set_name(const string& name)
-    {
-        this->name = name;
-    }
-
-    const string& get_name() const
-    {
-        return name;
-    }
-
     bool get_operational() const
     {
         return operational;
@@ -96,7 +82,6 @@ struct EVSInstance
     string to_string() const 
     {
         std::string ret;
-        ret += "'" + name + "':";
         ret += "o=";
         ret += (operational ? "1" : "0");
         ret += ",i=";
@@ -140,7 +125,6 @@ private:
     Histogram hs_safe;
     bool delivering;
     UUID my_addr;
-    string my_name;
     // 
     // Known instances 
     EVSInstMap known;
@@ -194,7 +178,6 @@ public:
         hs_safe("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
         delivering(false),
         my_addr(my_addr_), 
-        my_name(name),
         known(),
         self_i(),
         inactive_timeout(Time(5, 0)),
@@ -219,15 +202,15 @@ public:
         shift_to_rfcnt(0),
         ith(), cth(), consth(), resendth(), sjth()
     {
-        LOG_DEBUG("EVSProto(): (" + my_addr.to_string() + "," + my_name + ")");
+        LOG_DEBUG("EVSProto(): (" + my_addr.to_string() + ")");
         pair<std::map<const UUID, EVSInstance>::iterator, bool> i =
-            known.insert(make_pair(my_addr, EVSInstance(my_name)));
+            known.insert(make_pair(my_addr, EVSInstance()));
         assert(i.second == true);
         self_i = i.first;
         assert(EVSInstMap::get_instance(self_i).get_operational() == true);
         
         input_map.insert_sa(my_addr);
-        current_view.add_member(my_addr, my_name);
+        current_view.add_member(my_addr, "");
         
         ith = new InactivityTimerHandler(*this);
         cth = new CleanupTimerHandler(*this);
@@ -258,14 +241,10 @@ public:
         return my_addr;
     }
 
-    const string& get_name() const
-    {
-        return my_name;
-    }
 
     string self_string() const
     {
-        return "(" + my_addr.to_string() + "," + my_name + ")";
+        return "(" + my_addr.to_string() + ")";
     }
     
     State get_state() const {

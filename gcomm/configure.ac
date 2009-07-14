@@ -4,6 +4,9 @@ AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE
 
+CPPFLAGS="$CPPFLAGS"
+CFLAGS="$CFLAGS"
+CXXFLAGS="$CXXFLAGS"
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC
@@ -13,10 +16,10 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL
 
-
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stdint.h string.h])
+
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
@@ -28,6 +31,7 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T
 
+AC_MSG_NOTICE([CXXFLAGS: $CXXFLAGS])
 
 # Check for debug
 AC_ARG_ENABLE(debug,
