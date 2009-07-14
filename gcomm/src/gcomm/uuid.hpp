@@ -85,8 +85,10 @@ public:
     string to_string() const {
         char buf[37];
         memset(buf, 0, sizeof(buf));
-        if (memcmp((const byte_t*)&uuid + sizeof(int32_t), buf,
-                   sizeof(uuid) - sizeof(int32_t)) == 0)
+        if (memcmp((const byte_t*)&uuid, 
+                   buf, sizeof(int32_t)) != 0 &&
+            memcmp((const byte_t*)&uuid + sizeof(int32_t), 
+                   buf, sizeof(uuid) - sizeof(int32_t)) == 0)
         {
             const int32_t* val = reinterpret_cast<const int32_t*>(&uuid);
             return make_int(*val).to_string();
