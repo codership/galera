@@ -94,6 +94,7 @@ GCS_BACKEND_DESTROY_FN(dummy_destroy)
 
 //    gu_debug ("Deallocating message queue (serializer)");
     gu_fifo_destroy  (dummy->gc_q);
+    if (dummy->memb) gu_free (dummy->memb);
     gu_free (dummy);
     backend->conn = NULL;
     return 0;
@@ -245,6 +246,7 @@ GCS_BACKEND_CLOSE_FN(dummy_close)
         if (ret > 0) ret = 0;
 	gcs_comp_msg_delete (comp);
     }
+
     dummy->state = DUMMY_CLOSED;
 
     return ret;

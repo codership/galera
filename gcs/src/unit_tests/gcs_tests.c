@@ -24,6 +24,7 @@ typedef Suite *(*suite_creator_t)(void);
 
 static suite_creator_t suites[] =
     {
+#if 0
 	gcs_comp_suite,
 	gcs_state_suite,
 	gcs_fifo_suite,
@@ -32,6 +33,7 @@ static suite_creator_t suites[] =
 	gcs_node_suite,
 	gcs_group_suite,
 	gcs_backend_suite,
+#endif
 	gcs_core_suite,
 	NULL
     };

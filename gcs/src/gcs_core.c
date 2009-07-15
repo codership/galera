@@ -467,6 +467,7 @@ core_handle_act_msg (gcs_core_t*     core,
                 }
 
                 if (gu_unlikely(CORE_PRIMARY != core->state)) {
+                    assert (act->id < 0);
                     act->id = core_error (core->state);
                 }
             }

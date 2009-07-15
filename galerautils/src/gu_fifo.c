@@ -198,7 +198,7 @@ static inline long fifo_lock_get (gu_fifo_t *q)
 /* unlock the queue after getting item */
 static inline long fifo_unlock_get (gu_fifo_t *q)
 {
-    assert (q->used < q->length);
+    assert (q->used < q->length || 0 == q->length);
 
     if (q->put_wait > 0) {
         q->put_wait--;

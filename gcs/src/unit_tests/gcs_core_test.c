@@ -108,13 +108,21 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
     FAIL_IF (size != UNKNOWN_SIZE && size != act->size,
              "gcs_core_recv(): expected %lld, returned %zd (%s)",
              (long long) size, act->size, strerror (-act->size));
-    FAIL_IF (act->type != type, "");
-    FAIL_IF (size > 0 && act->data == NULL, "");
+    FAIL_IF (act->type != type,
+             "type does not match");
+    FAIL_IF (act->size > 0 && act->data == NULL,
+             "null buffer with positive size: %zu", act->size);
+
     // action is ordered only if it is of type GCS_ACT_TORDERED and not an error
     if (act->seqno >= GCS_SEQNO_NIL) {
-        FAIL_IF (GCS_ACT_TORDERED != act->type, "");
-        FAIL_IF ((++(*seqno)) != act->seqno, ""); // also increment seqno
+        FAIL_IF (GCS_ACT_TORDERED != act->type,
+                 "GCS_ACT_TORDERED != act->type");
+        FAIL_IF ((*seqno + 1) != act->seqno,
+                 "expected seqno %lld, got %lld",
+                 (long long)(*seqno + 1), (long long)act->seqno);
+        *seqno = *seqno + 1;
     }
+
     if (NULL != buf) {
         if (GCS_ACT_TORDERED == act->type) {
             // local action buffer should not be copied
@@ -264,6 +272,8 @@ core_test_init ()
     Backend = gcs_core_get_backend (Core);
     fail_if (NULL == Backend);
 
+    Seqno = 0; // reset seqno
+
     // this will configure backend to have desired fragment size
     ret = core_test_set_payload_size (FRAG_SIZE);
     fail_if (0 != ret, "Failed to set up the message payload size: %ld (%s)",
@@ -282,6 +292,7 @@ core_test_init ()
     ret = gcs_core_send (Core, act1, sizeof(act1), GCS_ACT_TORDERED);
     fail_if (ret != sizeof(act1), "Expected %d, got %d (%s)",
              sizeof(act1), ret, strerror (-ret));
+    gu_warn ("Next CORE_RECV_ACT fails under valgrind");
     fail_if (CORE_RECV_ACT (&act, act1, sizeof(act1), GCS_ACT_TORDERED));
 
     ret = gcs_core_send_join (Core, Seqno);
@@ -326,14 +337,12 @@ core_test_cleanup ()
     fail_if (0 != ret, "Failed to destroy core: %ld (%s)",
              ret, strerror (-ret));
 
-#if 0 // FIXME, broken
     {
         ssize_t   allocated;
         allocated = gcs_tests_get_allocated();
         fail_if (0 != allocated,
                  "Expected 0 allocated bytes, found %zd", allocated);
     }
-#endif
 }
 
 // just a smoke test for core API
@@ -585,11 +594,14 @@ START_TEST (gcs_core_test_own)
     fail_if (DUMMY_INJECT_COMPONENT (Backend, non_prim));
     fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
     fail_if (gcs_dummy_set_component(Backend, non_prim));
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 3rd frag
+    fail_if (CORE_SEND_STEP (Core, 4*tout, 1)); // 3rd frag
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
     fail_if (core_test_check_conf(act_r.data, false, 0, 1));
     free ((void*)act_r.data);
     fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
+
+    gu_free (prim);
+    gu_free (non_prim);
 
     core_test_cleanup ();
 }

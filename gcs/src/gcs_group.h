@@ -142,26 +142,21 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
         }
         else {
             /* Rare situation */
-            if (group->frag_reset && local) {
-                /* Fragmentation was reset by configuration change.
-                 * Should be true for ANY action type. */
-                if (GCS_GROUP_PRIMARY == group->state) {
-                   act->id =  -ERESTART;
-                }
-                // else?
-            }
-            else {
-                // Some other condition
-                if (act->type == GCS_ACT_STATE_REQ) {
-                    ret = gcs_group_handle_state_request(group,sender_idx,act);
+            if (GCS_GROUP_PRIMARY == group->state) {
+                if (group->frag_reset && local) {
+                    /* Fragmentation was reset by configuration change.
+                     * Should be true for ANY action type. */
+                    if (GCS_GROUP_PRIMARY == group->state) {
+                        act->id =  -ERESTART;
+                    }
+                    // else?
                 }
                 else {
-                    gu_warn ("Unexpected execution branch: act type: %d, "
-                             "act size: %zu, act sender: %ld, group state: %d, "
-                             "frag reset: %s",
-                             act->type, act->buf_len, act->sender_idx,
-                             group->state, group->frag_reset ? "true":"false");
-                    assert (0); // for debugging
+                    // Some other condition
+                    if (GCS_ACT_STATE_REQ == act->type) {
+                        ret = gcs_group_handle_state_request (group,sender_idx,
+                                                              act);
+                    }
                 }
             }
         }
