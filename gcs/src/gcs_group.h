@@ -113,9 +113,9 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
                           const gcs_recv_msg_t* msg,
                           gcs_recv_act_t*       act)
 {
-    register long    sender_idx = msg->sender_idx;
-    register bool    local      = (sender_idx == group->my_idx);
-    register ssize_t ret;
+    long    sender_idx = msg->sender_idx;
+    bool    local      = (sender_idx == group->my_idx);
+    ssize_t ret;
 
     assert (GCS_MSG_ACTION == msg->type);
     assert (sender_idx < group->num);
@@ -136,7 +136,7 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
                       GCS_GROUP_PRIMARY == group->state &&
                       !(group->frag_reset && local))) {
             /* Common situation -
-             * increment act_id only for DATA (should it be renamed to TOTAL?)
+             * increment act_id only for totally ordered actions
              * and only in PRIM (skip messages while in state exchange) */
             act->id = ++group->act_id;
         }
@@ -154,6 +154,14 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
                 // Some other condition
                 if (act->type == GCS_ACT_STATE_REQ) {
                     ret = gcs_group_handle_state_request(group,sender_idx,act);
+                }
+                else {
+                    gu_warn ("Unexpected execution branch: act type: %d, "
+                             "act size: %zu, act sender: %ld, group state: %d, "
+                             "frag reset: %s",
+                             act->type, act->buf_len, act->sender_idx,
+                             group->state, group->frag_reset ? "true":"false");
+                    assert (0); // for debugging
                 }
             }
         }

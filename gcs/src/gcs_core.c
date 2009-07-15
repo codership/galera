@@ -294,12 +294,17 @@ gcs_core_send (gcs_core_t*      const conn,
 	send_size = hdr_size + chunk_size;
 
 #ifdef GCS_CORE_TESTING
-        gu_lock_step_wait (&conn->ls); // pause before sending every fragment
-        gu_info ("Sending %p of size %zu. Total sent: %zu, left: %zu",
+        gu_lock_step_wait (&conn->ls); // pause after every fragment
+        gu_info ("Sent %p of size %zu. Total sent: %zu, left: %zu",
                  conn->send_buf + hdr_size, chunk_size, sent, act_size);
 #endif
         ret = core_msg_send_retry (conn, conn->send_buf, send_size,
                                    GCS_MSG_ACTION);
+#ifdef GCS_CORE_TESTING
+//        gu_lock_step_wait (&conn->ls); // pause after every fragment
+//        gu_info ("Sent %p of size %zu, ret: %zd. Total sent: %zu, left: %zu",
+//                 conn->send_buf + hdr_size, chunk_size, ret, sent, act_size);
+#endif
 
 	if (gu_likely(ret > (ssize_t)hdr_size)) {
 

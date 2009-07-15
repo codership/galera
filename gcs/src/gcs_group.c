@@ -95,13 +95,13 @@ group_nodes_reset (gcs_group_t* group)
     /* reset recv_acts at the nodes */
     for (i = 0; i < group->num; i++) {
         if (i != group->my_idx) {
-            // don't reset own buffers - we will need them for self-delivery
             gcs_node_reset (&group->nodes[i]);
         }
         else {
             gcs_node_reset_local (&group->nodes[i]);
         }
     }
+
     group->frag_reset = true;
 }
 
@@ -217,21 +217,21 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
              group->my_idx, new_nodes_num);
 
     if (gcs_comp_msg_primary(comp)) {
-	/* Got PRIMARY COMPONENT - Hooray! */
-	/* create new nodes array according to new membrship */
+        /* Got PRIMARY COMPONENT - Hooray! */
+        /* create new nodes array according to new membrship */
         assert (new_nodes_num);
-	new_nodes = group_nodes_init (comp);
-	if (!new_nodes) {
+        new_nodes = group_nodes_init (comp);
+        if (!new_nodes) {
             gu_fatal ("Could not allocate memory for %ld node component.",
                       gcs_comp_msg_num (comp));
             assert(0);
             return -ENOMEM;
-	}
+        }
 
-	if (group->state == GCS_GROUP_PRIMARY) {
-	    /* we come from previous primary configuration */
-	}
-	else {
+        if (group->state == GCS_GROUP_PRIMARY) {
+            /* we come from previous primary configuration */
+        }
+        else {
             if (1 == new_nodes_num && GCS_SEQNO_ILL == group->conf_id) {
                 /* First configuration for this process, only node in group:
                  * bootstrap new configuration by default. */

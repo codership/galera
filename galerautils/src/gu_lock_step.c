@@ -91,8 +91,8 @@ gu_lock_step_cont (gu_lock_step_t* ls, long timeout_ms)
                 gu_cond_signal (&ls->cond);
                 ls->wait--;
             }
-            else {                                // wait for waiter
-                // what a royal mess with times!
+            else if (timeout_ms > 0) {            // wait for waiter
+                // what a royal mess with times! Why timeval exists?
                 struct timeval  now;
                 struct timespec timeout;
                 long err;
@@ -110,12 +110,19 @@ gu_lock_step_cont (gu_lock_step_t* ls, long timeout_ms)
                 assert ((0 == err) || (ETIMEDOUT == err && ls->cont > 0));
 
                 ret       = (0 == err); // successful rendezvous with waiter
-                ls->cont -= (0 != err); // self-decrement in case of no waiter
+                ls->cont -= (0 != err); // self-decrement in case of error
+            }
+            else if (timeout_ms < 0) {         // wait forever
+                long err;
 
-//                if (err != 0) {
-//                    gu_debug ("ret = %d, ls->wait = %d, err = %d (%s)",
-//                              ret, ls->wait, err, strerror(err));
-//                }
+                ls->cont++;
+                err = gu_cond_wait (&ls->cond, &ls->mtx);
+                ret       = (0 == err); // successful rendezvous with waiter
+                ls->cont -= (0 != err); // self-decrement in case of error
+            }
+            else {
+                // don't wait
+                ret = 0;
             }
         }
         gu_mutex_unlock (&ls->mtx);

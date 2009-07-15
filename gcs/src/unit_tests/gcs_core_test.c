@@ -358,8 +358,8 @@ START_TEST (gcs_core_test_api)
         gu_info ("Iteration %ld: act: %s, size: %zu, frags: %ld",
                  i, ACT, act_size, frags);
         fail_if (CORE_SEND_START (&act_s));
-        while ((ret = gcs_core_send_step (Core, 2*tout)) > 0) {
-            frags--;
+        while ((ret = gcs_core_send_step (Core, 3*tout)) > 0) {
+            frags--; gu_info ("frags: %ld", frags);
 //            usleep (1000);
         }
         fail_if (ret != 0, "gcs_core_send_step() returned: %ld (%s)",
@@ -413,11 +413,27 @@ DUMMY_INJECT_COMPONENT (gcs_backend_t* backend, const gcs_comp_msg_t* comp)
     return false;
 }
 
+static bool
+DUMMY_INSTALL_COMPONENT (gcs_backend_t* backend, const gcs_comp_msg_t* comp)
+{
+    bool primary = gcs_comp_msg_primary (comp);
+    long my_idx  = gcs_comp_msg_self    (comp);
+    long members = gcs_comp_msg_num     (comp);
+
+    action_t act;
+
+    FAIL_IF (gcs_dummy_set_component(Backend, comp), "");
+    FAIL_IF (DUMMY_INJECT_COMPONENT (Backend, comp), "");
+    FAIL_IF (CORE_RECV_ACT (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CONF), "");
+    FAIL_IF (core_test_check_conf(act.data, primary, my_idx, members), "");
+    free ((void*)act.data);
+    return false;
+}
+
 START_TEST (gcs_core_test_own)
 {
 #undef ACT
 #define ACT act2
-    long     ret;
     long     tout = 100; // 100 ms timeout
     size_t   act_size = sizeof(ACT);
     action_t act_s    = { ACT, act_size, GCS_ACT_TORDERED, -1 };
@@ -428,8 +444,8 @@ START_TEST (gcs_core_test_own)
     gcs_comp_msg_t* non_prim = gcs_comp_msg_new (false, 0, 1);
     fail_if (NULL == prim);
     fail_if (NULL == non_prim);
-    gcs_comp_msg_add (prim,     "PRIM localhost");
-    gcs_comp_msg_add (non_prim, "NON_PRIM localhost");
+    gcs_comp_msg_add (prim,     "node1");
+    gcs_comp_msg_add (non_prim, "node1");
 
     core_test_init ();
 
@@ -439,13 +455,11 @@ START_TEST (gcs_core_test_own)
 
     fail_if (CORE_RECV_START (&act_r));
     fail_if (CORE_SEND_START (&act_s));
-    ret = gcs_core_send_step (Core, tout); // send the 1st fragment
-    fail_if (1 != ret);
+    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    usleep (10000); // resolve race between sending and setting transitional
     gcs_dummy_set_transitional (Backend);
-    ret = gcs_core_send_step (Core, tout); // send the 2nd fragment
-    fail_if (1 != ret);
-    ret = gcs_core_send_step (Core, tout);
-    fail_if (0 != ret); // should timeout
+    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    fail_if (CORE_SEND_STEP (Core, tout, 0)); // no frags left
     fail_if (NULL != act_r.data); // should not have received anything
     fail_if (gcs_dummy_set_component (Backend, prim)); // return to PRIM state
     fail_if (CORE_SEND_END (&act_s, act_size));
@@ -462,6 +476,7 @@ START_TEST (gcs_core_test_own)
     fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
     fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
     fail_if (CORE_SEND_END (&act_s, act_size));
+    fail_if (gcs_dummy_set_component(Backend, non_prim));
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
     fail_if (core_test_check_conf(act_r.data, false, 0, 1));
     free ((void*)act_r.data);
@@ -470,7 +485,7 @@ START_TEST (gcs_core_test_own)
              act_r.seqno, strerror (-act_r.seqno));
 
     /*
-     * TEST CASE 2: Backend in NON_PRIM state. There is attempt to send an
+     * TEST CASE 2: core in NON_PRIM state. There is attempt to send an
      * action.
      * EXPECTED OUTCOME: CORE_SEND_END should return -ENOTCONN after 1st
      * fragment send fails.
@@ -481,18 +496,30 @@ START_TEST (gcs_core_test_own)
     fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
 
     // restore PRIM component
-    fail_if (DUMMY_INJECT_COMPONENT (Backend, prim));
+    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
+
+    /*
+     * TEST CASE 3: Backend in NON_PRIM state. There is attempt to send an
+     * action.
+     * EXPECTED OUTCOME: CORE_SEND_END should return -ENOTCONN after 1st
+     * fragment send fails.
+     */
+    fail_if (gcs_dummy_set_component(Backend, non_prim));
+    fail_if (DUMMY_INJECT_COMPONENT (Backend, non_prim));
+    fail_if (CORE_SEND_START (&act_s));
+    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
     fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
-    fail_if (core_test_check_conf(act_r.data, true, 0, 1));
+    fail_if (core_test_check_conf(act_r.data, false, 0, 1));
     free ((void*)act_r.data);
 
     /*
-     * TEST CASE 3: Action was sent successfully, but NON_PRIM component
+     * TEST CASE 4: Action was sent successfully, but NON_PRIM component
      * happened in between delivered fragments.
      * EXPECTED OUTCOME: action is received with -ENOTCONN instead of global
      * seqno.
      */
-#if 0 // not working
+    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
     fail_if (CORE_SEND_START (&act_s));
     fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
     fail_if (DUMMY_INJECT_COMPONENT (Backend, non_prim));
@@ -504,30 +531,65 @@ START_TEST (gcs_core_test_own)
     fail_if (CORE_RECV_ACT (&act_r, ACT, act_size, GCS_ACT_TORDERED));
     fail_if (-ENOTCONN != act_r.seqno, "Expected -ENOTCONN, received %ld (%s)",
              act_r.seqno, strerror (-act_r.seqno));
-#endif
-    // restore PRIM component
-    fail_if (DUMMY_INJECT_COMPONENT (Backend, prim));
-    fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
-    fail_if (core_test_check_conf(act_r.data, true, 0, 1));
-    free ((void*)act_r.data);
 
     /*
-     * TEST CASE 4: Action has 3 fragments, 2 were sent successfully but the
+     * TEST CASE 5: Action is being sent and received concurrently. In between
+     * two fragments recv thread receives NON_PRIM and then PRIM components.
+     * EXPECTED OUTCOME: CORE_RECV_ACT should receive the action with -ERESTART
+     * instead of seqno.
+     */
+    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
+    fail_if (CORE_SEND_START (&act_s));
+    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    usleep (100000); // make sure 1st fragment gets in before new component
+    fail_if (DUMMY_INSTALL_COMPONENT (Backend, non_prim));
+    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
+    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    fail_if (CORE_SEND_END (&act_s, act_size));
+    fail_if (CORE_RECV_ACT (&act_r, ACT, act_size, GCS_ACT_TORDERED));
+    fail_if (-ERESTART != act_r.seqno, "Expected -ERESTART, received %ld (%s)",
+             act_r.seqno, strerror (-act_r.seqno));
+
+    /*
+     * TEST CASE 6: Action has 3 fragments, 2 were sent successfully but the
      * 3rd failed because backend is in NON_PRIM. In addition NON_PRIM component
      * happened in between delivered fragments.
-     * EXPECTED OUTCOME: CORE_SEND_END should return -ENOTCONN after 1st
+     * subcase 1: new component received first
+     * subcase 2: 3rd fragment is sent first
+     * EXPECTED OUTCOME: CORE_SEND_END should return -ENOTCONN after 3rd
      * fragment send fails.
      */
+#undef ACT
+#define ACT act3
+    act_size   = sizeof(ACT);
+    act_s.data = ACT;
+    act_s.size = act_size;
 
-    /*
-     * TEST CASE 5: Action is being sent and received concurrently. Sending
-     * fails due to backend going in NON_PRIM state
-     */
+    // subcase 1
+    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
+    fail_if (CORE_SEND_START (&act_s));
+    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    fail_if (DUMMY_INJECT_COMPONENT (Backend, non_prim));
+    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    fail_if (gcs_dummy_set_component(Backend, non_prim));
+    fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
+    fail_if (core_test_check_conf(act_r.data, false, 0, 1));
+    free ((void*)act_r.data);
+    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 3rd frag
+    fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
 
-    /*
-     * TEST CASE 6: Action is being sent and received concurrently. In between
-     * two fragments recv thread receives NON_PRIM and then PRIM components.
-     */
+    // subcase 2
+    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
+    fail_if (CORE_SEND_START (&act_s));
+    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    fail_if (DUMMY_INJECT_COMPONENT (Backend, non_prim));
+    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    fail_if (gcs_dummy_set_component(Backend, non_prim));
+    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 3rd frag
+    fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
+    fail_if (core_test_check_conf(act_r.data, false, 0, 1));
+    free ((void*)act_r.data);
+    fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
 
     core_test_cleanup ();
 }

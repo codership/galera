@@ -34,7 +34,8 @@ extern void
 gu_lock_step_wait (gu_lock_step_t* ls);
 
 /* returns how many waiters there were,
- * waits for timeout_ms milliseconds if no waiters */
+ * waits for timeout_ms milliseconds if no waiters, if timeout_ms < 0 waits forever,
+ * if 0 - no wait at all */
 extern long
 gu_lock_step_cont (gu_lock_step_t* ls, long timeout_ms);
 
