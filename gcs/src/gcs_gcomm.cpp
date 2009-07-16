@@ -206,7 +206,7 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
     try {
 	ProtoDownMeta vdm(msg_type);
 	err = conn->vs_ctx.pass_down(&wb, &vdm);
-    } catch (Exception e) {
+    } catch (Exception& e) {
 	return -ENOTCONN;
     }
 
@@ -402,7 +402,7 @@ static GCS_BACKEND_OPEN_FN(gcs_gcomm_open)
 	int err = gu_thread_create(&conn->thr, 0, &conn_run, conn);
 	if (err != 0)
 	    return -err;
-    } catch (Exception e) {
+    } catch (Exception& e) {
 	return -EINVAL;
     }
     
@@ -462,7 +462,7 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
     try {
 	conn->vs_ctx.el = new EventLoop();
         conn->sock = sock;
-    } catch (Exception e) {
+    } catch (Exception& e) {
 	delete conn;
 	return -EINVAL;
     }
