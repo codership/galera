@@ -1,8 +1,8 @@
 #ifndef VS_REMOTE_BACKEND_HPP
 #define VS_REMOTE_BACKEND_HPP
 
-#include "gcomm/address.hpp"
-#include "gcomm/transport.hpp"
+#include "galeracomm/address.hpp"
+#include "galeracomm/transport.hpp"
 
 class VSRCommand : public Serializable {
     Address addr;

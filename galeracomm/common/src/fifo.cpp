@@ -1,5 +1,5 @@
-#include <gcomm/fifo.hpp>
-#include <gcomm/exception.hpp>
+#include <galeracomm/fifo.hpp>
+#include <galeracomm/exception.hpp>
 
 #include <limits>
 

@@ -1,18 +1,13 @@
 #ifndef EVS_INPUT_MAP_HPP
 #define EVS_INPUT_MAP_HPP
 
-#include "gcomm/readbuf.hpp"
-#include "gcomm/logger.hpp"
+#include "galeracomm/readbuf.hpp"
+#include "galeracomm/logger.hpp"
 #include "evs_message.hpp"
 #include "evs_seqno.hpp"
 
 #include <map>
 #include <set>
-
-
-
-
-
 
 class EVSInputMapItem {
     

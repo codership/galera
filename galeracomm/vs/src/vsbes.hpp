@@ -1,7 +1,7 @@
 #ifndef VSBES_HPP
 #define VSBES_HPP
 
-#include "gcomm/transport.hpp"
+#include "galeracomm/transport.hpp"
 #include "vs_backend.hpp"
 
 #include <list>

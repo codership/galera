@@ -7,7 +7,7 @@
  * Copyright (C) 2007 Codership Oy
  */
 
-#include "gcomm/writebuf.h"
+#include "galeracomm/writebuf.h"
 
 #include <assert.h>
 #include <stdlib.h>

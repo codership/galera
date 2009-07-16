@@ -24,7 +24,7 @@ initial_stage="galerautils"
 last_stage="galera"
 gainroot=""
 
-GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
+#GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
 
 usage()
 {
@@ -217,8 +217,10 @@ echo "CPPFLAGS: $CPPFLAGS"
 build_module "galerautils"
 build_module "gcache"
 
-if test $GCOMM_IMPL = "galeracomm"
-then 
+#if test $GCOMM_IMPL != "galeracomm"
+#then 
+    build_module "gcomm"
+#else
     if test $initial_stage = "galeracomm" || $building = "true"
     then
         build $galeracomm_src $conf_flags $galera_flags
@@ -234,18 +236,16 @@ then
     LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/common/src/.libs"
     LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/transport/src/.libs"
     LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/vs/src/.libs"
-else
-    build_module "gcomm"
-fi
+#fi
 
 if test $initial_stage = "gcs" || $building = "true"
 then
-    if test $GCOMM_IMPL = "galeracomm"
-    then
-        gcs_conf_flags="$conf_flags --disable-gcomm --enable-vs"
-    else
-        gcs_conf_flags="$conf_flags --disable-vs --enable-gcomm"
-    fi
+#    if test $GCOMM_IMPL = "galeracomm"
+#    then
+#        gcs_conf_flags="$conf_flags --disable-gcomm --enable-vs"
+#    else
+#        gcs_conf_flags="$conf_flags --disable-vs --enable-gcomm"
+#    fi
     build $gcs_src $gcs_conf_flags $WITH_SPREAD $galera_flags
     building="true"
 fi

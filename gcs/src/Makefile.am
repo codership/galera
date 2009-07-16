@@ -34,7 +34,6 @@ if WITH_SPREAD
     GCS_SRCS  += gcs_spread.c
 endif
 
-
 if ENABLE_GCOMM
     AM_CFLAGS += -DGCS_USE_GCOMM
     GCS_SRCS  += gcs_gcomm.cpp

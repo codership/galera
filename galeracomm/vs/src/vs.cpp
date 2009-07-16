@@ -1,6 +1,6 @@
 
-#include "gcomm/logger.hpp"
-#include "gcomm/vs.hpp"
+#include "galeracomm/logger.hpp"
+#include "galeracomm/vs.hpp"
 #include "vs_backend.hpp"
 
 #include <deque>

@@ -83,12 +83,15 @@ extern gu_log_severity_t gu_log_max_level;
             format "\n", ## __VA_ARGS__, NULL))
 */
 /*@}*/
+#endif /* _gu_log_h_ */
 
 #ifdef __GU_LOGGER__ // C++ logger should use the same stuff, so export it
+#ifndef _gu_log_extra_
+#define _gu_log_extra_
 extern bool        gu_log_self_tstamp;
 extern gu_log_cb_t gu_log_cb;
 extern void        gu_log_cb_default (int, const char*);
 extern const char* gu_log_level_str[];
-#endif
+#endif /* _gu_log_extra_ */
+#endif /* __GU_LOGGER__ */
 
-#endif /* _gu_log_h_ */

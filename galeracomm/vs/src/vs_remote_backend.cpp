@@ -1,8 +1,8 @@
 
 #include "vs_backend.hpp"
 #include "vs_remote_backend.hpp"
-#include "gcomm/vs.hpp"
-#include "gcomm/logger.hpp"
+#include "galeracomm/vs.hpp"
+#include "galeracomm/logger.hpp"
 
 
 

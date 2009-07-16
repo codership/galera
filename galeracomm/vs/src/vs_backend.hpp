@@ -4,8 +4,8 @@
 //
 //
 
-#include "gcomm/address.hpp"
-#include "gcomm/protolay.hpp"
+#include "galeracomm/address.hpp"
+#include "galeracomm/protolay.hpp"
 
 struct VSBackendDownMeta : ProtoDownMeta {
     bool is_sync;

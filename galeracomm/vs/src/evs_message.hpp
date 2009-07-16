@@ -3,9 +3,9 @@
 
 #include <cstdlib>
 
-#include "gcomm/exception.hpp"
-#include "gcomm/address.hpp"
-#include "gcomm/logger.hpp"
+#include "galeracomm/exception.hpp"
+#include "galeracomm/address.hpp"
+#include "galeracomm/logger.hpp"
 
 #include "evs_seqno.hpp"
 

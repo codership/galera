@@ -2,9 +2,9 @@
  * Default poll implementation 
  */
 
-#include "gcomm/poll.hpp"
-#include "gcomm/fifo.hpp"
-#include "gcomm/logger.hpp"
+#include "galeracomm/poll.hpp"
+#include "galeracomm/fifo.hpp"
+#include "galeracomm/logger.hpp"
 
 #include <cstdlib>
 #include <cstring>

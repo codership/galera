@@ -1,7 +1,7 @@
 #ifndef ADDRESS_HPP
 #define ADDRESS_HPP
 
-#include <gcomm/types.h>
+#include <galeracomm/types.h>
 #include <cassert>
 #include <ostream>
 #include <sstream>

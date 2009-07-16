@@ -1,4 +1,4 @@
-#include "gcomm/logger.hpp"
+#include "galeracomm/logger.hpp"
 #include <cstdlib>
 
 class Logger_s

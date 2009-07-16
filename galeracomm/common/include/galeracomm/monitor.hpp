@@ -3,7 +3,7 @@
 
 
 
-#include <gcomm/exception.hpp>
+#include <galeracomm/exception.hpp>
 
 #include <pthread.h>
 #include <deque>

@@ -1,8 +1,8 @@
 
 
-#include "gcomm/transport.hpp"
-#include "gcomm/exception.hpp"
-#include "gcomm/thread.hpp"
+#include "galeracomm/transport.hpp"
+#include "galeracomm/exception.hpp"
+#include "galeracomm/thread.hpp"
 
 #include <check.h>
 #include <cstdlib>

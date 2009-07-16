@@ -1,11 +1,11 @@
 #ifndef VS_HPP
 #define VS_HPP
 
-#include <gcomm/protolay.hpp>
-#include <gcomm/poll.hpp>
-#include <gcomm/address.hpp>
-#include <gcomm/exception.hpp>
-#include <gcomm/monitor.hpp>
+#include <galeracomm/protolay.hpp>
+#include <galeracomm/poll.hpp>
+#include <galeracomm/address.hpp>
+#include <galeracomm/exception.hpp>
+#include <galeracomm/monitor.hpp>
 
 #include <set>
 #include <map>

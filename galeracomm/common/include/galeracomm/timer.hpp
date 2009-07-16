@@ -1,8 +1,8 @@
 #ifndef TIMER_HPP
 #define TIMER_HPP
 
-#include <gcomm/poll.hpp>
-#include <gcomm/time.hpp>
+#include <galeracomm/poll.hpp>
+#include <galeracomm/time.hpp>
 
 #include <map>
 

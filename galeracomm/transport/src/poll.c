@@ -1,4 +1,4 @@
-#include "gcomm/poll.h"
+#include "galeracomm/poll.h"
 
 #include <poll.h>
 #include <stdlib.h>

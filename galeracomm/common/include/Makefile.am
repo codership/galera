@@ -1,10 +1,10 @@
 gcommincludedir=$(includedir)/gcomm
 gcomminclude_HEADERS = \
-	gcomm/types.h \
-	gcomm/exception.hpp \
-	gcomm/poll.hpp \
-	gcomm/protolay.hpp \
-	gcomm/address.hpp \
-	gcomm/writebuf.hpp \
-	gcomm/readbuf.hpp \
-	gcomm/monitor.hpp
+	galeracomm/types.h       \
+	galeracomm/exception.hpp \
+	galeracomm/poll.hpp      \
+	galeracomm/protolay.hpp  \
+	galeracomm/address.hpp   \
+	galeracomm/writebuf.hpp  \
+	galeracomm/readbuf.hpp   \
+	galeracomm/monitor.hpp

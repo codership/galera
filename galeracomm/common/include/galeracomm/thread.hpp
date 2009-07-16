@@ -2,9 +2,9 @@
 #define THREAD_HPP
 
 #include <pthread.h>
-#include <gcomm/exception.hpp>
-#include <gcomm/logger.hpp>
-#include <gcomm/monitor.hpp>
+#include <galeracomm/exception.hpp>
+#include <galeracomm/logger.hpp>
+#include <galeracomm/monitor.hpp>
 
 
 class Thread {

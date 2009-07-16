@@ -1,8 +1,8 @@
 
-#include "gcomm/fifo.hpp"
+#include "galeracomm/fifo.hpp"
 #include "vs_backend.hpp"
 #include "vs_fifo_backend.hpp"
-#include "gcomm/vs.hpp"
+#include "galeracomm/vs.hpp"
 
 
 

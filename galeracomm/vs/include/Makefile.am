@@ -1,2 +1,2 @@
 gcommincludedir=$(includedir)/gcomm
-gcomminclude_HEADERS = gcomm/vs.hpp
+gcomminclude_HEADERS = galeracomm/vs.hpp

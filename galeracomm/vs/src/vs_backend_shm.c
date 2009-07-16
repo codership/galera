@@ -1,7 +1,7 @@
 
 #include "vs_backend_shm.h"
-#include "gcomm/vs_view.h"
-#include "gcomm/vs_msg.h"
+#include "galeracomm/vs_view.h"
+#include "galeracomm/vs_msg.h"
 #include <glib.h>
 #include <stdio.h>
 #include <stdlib.h>

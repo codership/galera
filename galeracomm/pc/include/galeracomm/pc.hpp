@@ -1,8 +1,8 @@
 #ifndef PC_HPP
 #define PC_HPP
 
-#include <gcomm/address.hpp>
-#include <gcomm/exception.hpp>
+#include <galeracomm/address.hpp>
+#include <galeracomm/exception.hpp>
 
 class PCId : public Serializable {
     std::string id;

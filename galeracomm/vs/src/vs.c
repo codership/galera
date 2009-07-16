@@ -1,4 +1,4 @@
-#include "gcomm/vs.h"
+#include "galeracomm/vs.h"
 #include "vs_backend.h"
 #include <glib.h>
 #include <errno.h>

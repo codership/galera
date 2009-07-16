@@ -1,9 +1,9 @@
 #include "vs_backend.h"
 #include "vs_backend_shm.h"
-#include "gcomm/vs_msg.h"
-#include "gcomm/vs_view.h"
-#include "gcomm/msg.h"
-#include "gcomm/addr.h"
+#include "galeracomm/vs_msg.h"
+#include "galeracomm/vs_view.h"
+#include "galeracomm/msg.h"
+#include "galeracomm/addr.h"
 
 #include <check.h>
 #include <glib.h>

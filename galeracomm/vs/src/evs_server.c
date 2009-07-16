@@ -1,7 +1,7 @@
 #define _GNU_SOURCE
-#include "gcomm/poll.h"
-#include "gcomm/transport.h"
-#include "gcomm/vs_msg.h"
+#include "galeracomm/poll.h"
+#include "galeracomm/transport.h"
+#include "galeracomm/vs_msg.h"
 
 #include "vs_backend.h"
 

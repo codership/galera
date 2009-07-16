@@ -1,7 +1,7 @@
 #ifndef EVS_SEQNO_HPP
 #define EVS_SEQNO_HPP
 
-#include "gcomm/types.h"
+#include "galeracomm/types.h"
 #include <cassert>
 
 #ifndef EVS_SEQNO_MAX

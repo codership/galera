@@ -2,7 +2,7 @@
 #include "vs_backend_evs.h"
 #include "vs_backend.h"
 
-#include "gcomm/transport.h"
+#include "galeracomm/transport.h"
 
 #include <string.h>
 #include <errno.h>

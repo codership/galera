@@ -1,8 +1,8 @@
 #ifndef LOGGER_HPP
 #define LOGGER_HPP
 
-#include <gcomm/time.hpp>
-#include <gcomm/monitor.hpp>
+#include <galeracomm/time.hpp>
+#include <galeracomm/monitor.hpp>
 
 #include <ostream>
 #include <string>

@@ -1,7 +1,7 @@
 #ifndef TIME_HPP
 #define TIME_HPP
 
-#include <gcomm/exception.hpp>
+#include <galeracomm/exception.hpp>
 
 #include <sys/time.h>
 #include <ctime>

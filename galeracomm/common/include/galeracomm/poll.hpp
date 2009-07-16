@@ -1,7 +1,7 @@
 #ifndef POLL_HPP
 #define POLL_HPP
 
-#include <gcomm/exception.hpp>
+#include <galeracomm/exception.hpp>
 #include <string>
 
 

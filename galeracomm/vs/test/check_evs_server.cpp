@@ -1,5 +1,5 @@
 extern "C" {
-#include "gcomm/vs.h"
+#include "galeracomm/vs.h"
 #include "vs_backend.h"
 #include "vs_backend_shm.h"
 }

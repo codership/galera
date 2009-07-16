@@ -1,5 +1,5 @@
 
-#include "gcomm/vs_view.h"
+#include "galeracomm/vs_view.h"
 #include <glib.h>
 #include <stdlib.h>
 

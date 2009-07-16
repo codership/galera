@@ -49,6 +49,17 @@ GCS_BACKEND_CREATE_FN(gcs_vs_create)
     return 0;
 }
 
+GCS_BACKEND_NAME_FN(gcs_gcomm_name)
+{
+    return "gCOMMMMM!!!";
+}
+
+GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
+{
+    backend->name = gcs_gcomm_name;
+    return 0;
+}
+
 START_TEST (gcs_backend_test)
 {
     gcs_backend_t backend;
@@ -66,7 +77,12 @@ START_TEST (gcs_backend_test)
 //    no longer use global gcs_dummy_create() symbol because linking with real
 //    gcs_dummy.o
 
-    ret = gcs_backend_init (&backend, "gcomm://kkk");
+    ret = gcs_backend_init (&backend,
+                  "gcomm://0.0.0.0:4567?gmcast.node=gcomm+tcp://1.2.3.4:4567");
+    fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
+    fail_if (backend.name != gcs_gcomm_name);
+
+    ret = gcs_backend_init (&backend, "vsbes://kkk");
     fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
     fail_if (backend.name != gcs_vs_name);
 

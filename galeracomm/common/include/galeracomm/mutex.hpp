@@ -2,8 +2,8 @@
 #define MUTEX_HPP
 
 #include <pthread.h>
-#include <gcomm/exception.hpp>
-#include <gcomm/logger.hpp>
+#include <galeracomm/exception.hpp>
+#include <galeracomm/logger.hpp>
 
 class Mutex {
     pthread_mutex_t mutex;

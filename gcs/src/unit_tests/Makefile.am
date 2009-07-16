@@ -29,11 +29,13 @@ gcs_tests_SOURCES =           \
 	../gcs_dummy.c        \
 	../gcs_msg_type.c
 
-# For gcs_backend_test
-gcs_tests_CPPFLAGS = -DGCS_USE_SPREAD -DGCS_USE_VS
-
 # For gcs_core_test
-gcs_tests_CPPFLAGS += -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING
+gcs_tests_CPPFLAGS = -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING
+
+# for testing gcs_backend.c enable everything
+gcs_tests_CPPFLAGS += -DGCS_USE_SPREAD
+gcs_tests_CPPFLAGS += -DGCS_USE_VS
+gcs_tests_CPPFLAGS += -DGCS_USE_GCOMM
 
 gcs_tests_INCLUDES = @CHECK_CFLAGS@
 gcs_tests_LDADD    = @CHECK_LIBS@

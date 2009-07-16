@@ -3,7 +3,7 @@ extern "C" {
 #include "gu_mutex.h"
 #include "gu_log.h"
 }
-#include <gcomm/vs.hpp>
+#include <galeracomm/vs.hpp>
 // We access data comp msg struct directly
 extern "C" {
 #define GCS_COMP_MSG_ACCESS 1

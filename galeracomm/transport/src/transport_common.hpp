@@ -1,8 +1,8 @@
 #ifndef TRANSPORT_COMMON_HPP
 #define TRANSPORT_COMMON_HPP
 
-#include "gcomm/transport.hpp"
-#include "gcomm/logger.hpp"
+#include "galeracomm/transport.hpp"
+#include "galeracomm/logger.hpp"
 
 #include <netinet/in.h>
 #include <netinet/tcp.h>

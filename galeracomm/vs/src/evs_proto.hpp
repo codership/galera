@@ -3,9 +3,9 @@
 
 #include "evs_input_map.hpp"
 #include "evs_message.hpp"
-#include "gcomm/time.hpp"
-#include "gcomm/protolay.hpp"
-#include "gcomm/transport.hpp"
+#include "galeracomm/time.hpp"
+#include "galeracomm/protolay.hpp"
+#include "galeracomm/transport.hpp"
 
 struct EVSProtoUpMeta : public ProtoUpMeta {
     const Address& source;

@@ -1,6 +1,6 @@
 
-#include "gcomm/transport.hpp"
-#include "gcomm/exception.hpp"
+#include "galeracomm/transport.hpp"
+#include "galeracomm/exception.hpp"
 
 class TIPCTransport : public Transport, PollContext {
     int fd;

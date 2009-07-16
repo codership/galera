@@ -1,8 +1,8 @@
 #ifndef WRITEBUF_HPP
 #define WRITEBUF_HPP
 
-#include <gcomm/types.h>
-#include <gcomm/readbuf.hpp>
+#include <galeracomm/types.h>
+#include <galeracomm/readbuf.hpp>
 
 static const size_t WRITEBUF_MAX_HDRLEN = 64;
 

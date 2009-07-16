@@ -1,8 +1,8 @@
 #ifndef FIFO_HPP
 #define FIFO_HPP
 
-#include <gcomm/readbuf.hpp>
-#include <gcomm/writebuf.hpp>
+#include <galeracomm/readbuf.hpp>
+#include <galeracomm/writebuf.hpp>
 
 #include <set>
 #include <map>

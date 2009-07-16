@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2007 Codership Oy
  */
-#include "gcomm/protolay.h"
+#include "galeracomm/protolay.h"
 
 #include <stdlib.h>
 #include <assert.h>

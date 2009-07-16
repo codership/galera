@@ -1,9 +1,9 @@
 #ifndef TRANSPORT_HPP
 #define TRANSPORT_HPP
 
-#include <gcomm/poll.hpp>
-#include <gcomm/protolay.hpp>
-#include <gcomm/sockaddr.hpp>
+#include <galeracomm/poll.hpp>
+#include <galeracomm/protolay.hpp>
+#include <galeracomm/sockaddr.hpp>
 
 
 #include <vector>

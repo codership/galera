@@ -1,7 +1,7 @@
 
 extern "C" {
-#include "gcomm/poll.h"
-#include "gcomm/transport.h"
+#include "galeracomm/poll.h"
+#include "galeracomm/transport.h"
 }
 
 #include <cerrno>

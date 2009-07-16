@@ -1,6 +1,6 @@
 
-#include "gcomm/timer.hpp"
-#include "gcomm/logger.hpp"
+#include "galeracomm/timer.hpp"
+#include "galeracomm/logger.hpp"
 
 
 

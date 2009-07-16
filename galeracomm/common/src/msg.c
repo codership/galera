@@ -1,5 +1,5 @@
 
-#include "gcomm/msg.h"
+#include "galeracomm/msg.h"
 
 #include <stdlib.h>
 #include <glib.h>

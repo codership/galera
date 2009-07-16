@@ -1,10 +1,10 @@
 #ifndef READBUF_HPP
 #define READBUF_HPP
 
-#include <gcomm/types.h>
-#include <gcomm/exception.hpp>
-#include <gcomm/monitor.hpp>
-#include <gcomm/logger.hpp>
+#include <galeracomm/types.h>
+#include <galeracomm/exception.hpp>
+#include <galeracomm/monitor.hpp>
+#include <galeracomm/logger.hpp>
 #include <iostream>
 
 class ReadBuf {

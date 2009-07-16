@@ -1,7 +1,7 @@
 #ifndef TRANSPORT_TCP_HPP
 #define TRANSPORT_TCP_HPP
 
-#include "gcomm/transport.hpp"
+#include "galeracomm/transport.hpp"
 #include "transport_common.hpp"
 
 #include <cerrno>

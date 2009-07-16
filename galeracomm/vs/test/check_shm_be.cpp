@@ -1,9 +1,9 @@
 extern "C" {
 #include "vs_backend.h"
 #include "vs_backend_shm.h"
-#include "gcomm/vs_msg.h"
-#include "gcomm/vs_view.h"
-#include "gcomm/protolay.h"
+#include "galeracomm/vs_msg.h"
+#include "galeracomm/vs_view.h"
+#include "galeracomm/protolay.h"
 }
 
 #include <check.h>

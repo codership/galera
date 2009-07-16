@@ -1,8 +1,4 @@
-
-
-
-#include "gcomm/pc.hpp"
-
+#include "galeracomm/pc.hpp"
 
 struct PCMessage {
     PCId pcid;     // Only in CREATE, JOIN, LEAVE
@@ -16,7 +12,6 @@ struct PCMessage {
     PCMessage(const PCId pi, const PCMemb s) : pcid(pi), source(s) {
     }
 };
-
 
 // Handlers that modify data in total order
 void PC::handle_user_msg(const ReadBuf *rb, const size_t roff, 

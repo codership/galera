@@ -1,7 +1,7 @@
 
-#include "gcomm/vs.hpp"
-#include "gcomm/monitor.hpp"
-#include "gcomm/thread.hpp"
+#include "galeracomm/vs.hpp"
+#include "galeracomm/monitor.hpp"
+#include "galeracomm/thread.hpp"
 #include "vsbes.hpp"
 
 #include <iostream>

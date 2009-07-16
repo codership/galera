@@ -1,10 +1,10 @@
 
 #include "vsbes.hpp"
-#include "gcomm/logger.hpp"
+#include "galeracomm/logger.hpp"
 
 // Message and command definitions
 #include "vs_remote_backend.hpp"
-#include "gcomm/vs.hpp"
+#include "galeracomm/vs.hpp"
 
 #include <cstring>
 #include <iostream>

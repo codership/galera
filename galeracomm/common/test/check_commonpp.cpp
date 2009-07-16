@@ -1,14 +1,14 @@
 
 
-#include "gcomm/poll.hpp"
-#include "gcomm/readbuf.hpp"
-#include "gcomm/writebuf.hpp"
-#include "gcomm/address.hpp"
-#include "gcomm/protolay.hpp"
-#include "gcomm/fifo.hpp"
-#include "gcomm/monitor.hpp"
-#include "gcomm/logger.hpp"
-#include "gcomm/thread.hpp"
+#include "galeracomm/poll.hpp"
+#include "galeracomm/readbuf.hpp"
+#include "galeracomm/writebuf.hpp"
+#include "galeracomm/address.hpp"
+#include "galeracomm/protolay.hpp"
+#include "galeracomm/fifo.hpp"
+#include "galeracomm/monitor.hpp"
+#include "galeracomm/logger.hpp"
+#include "galeracomm/thread.hpp"
 
 #include <cstdlib>
 #include <cerrno>

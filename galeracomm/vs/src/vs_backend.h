@@ -10,8 +10,8 @@
 #ifndef VS_BACKEND_H
 #define VS_BACKEND_H
 
-#include "gcomm/protolay.h"
-#include "gcomm/addr.h"
+#include "galeracomm/protolay.h"
+#include "galeracomm/addr.h"
 
 typedef struct vs_backend_ vs_backend_t;
 
@@ -70,10 +70,10 @@ addr_t vs_backend_get_self_addr(const vs_backend_t *be);
 
 #if 0
 
-#include "gcomm/vs.h"
-#include "gcomm/vs_msg.h"
-#include "gcomm/poll.h"
-#include "gcomm/protolay.h"
+#include "galeracomm/vs.h"
+#include "galeracomm/vs_msg.h"
+#include "galeracomm/poll.h"
+#include "galeracomm/protolay.h"
 
 typedef struct vs_backend_ vs_backend_t;
 typedef void (*vs_backend_cb_f)(void *, const vs_msg_t *);

@@ -1,8 +1,8 @@
 #ifndef EVS_HPP
 #define EVS_HPP
 
-#include "gcomm/transport.hpp"
-#include "gcomm/address.hpp"
+#include "galeracomm/transport.hpp"
+#include "galeracomm/address.hpp"
 
 #include <map>
 #include <set>

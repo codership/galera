@@ -1,4 +1,4 @@
-#include "gcomm/vs_msg.h"
+#include "galeracomm/vs_msg.h"
 #include <glib.h>
 #include <stdlib.h>
 #include <stdio.h>

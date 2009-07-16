@@ -2,11 +2,11 @@
 #define PROTOLAY_HPP
 
 
-#include <gcomm/poll.hpp>
-#include <gcomm/readbuf.hpp>
-#include <gcomm/writebuf.hpp>
-#include <gcomm/exception.hpp>
-#include <gcomm/logger.hpp>
+#include <galeracomm/poll.hpp>
+#include <galeracomm/readbuf.hpp>
+#include <galeracomm/writebuf.hpp>
+#include <galeracomm/exception.hpp>
+#include <galeracomm/logger.hpp>
 
 #include <cerrno>
 

@@ -7,7 +7,7 @@
  * Copyright (C) 2007 Codership Oy
  */
 
-#include "gcomm/readbuf.h"
+#include "galeracomm/readbuf.h"
 
 #include <assert.h>
 #include <stdlib.h>

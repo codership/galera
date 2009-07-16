@@ -36,7 +36,7 @@ struct {
         { "gcomm", gcs_gcomm_create},
 #endif /* GCS_USE_GCOMM */
 #ifdef    GCS_USE_VS
-        { "gcomm", gcs_vs_create },
+        { "vsbes", gcs_vs_create },
 #endif /* GCS_USE_VS */
 #ifdef    GCS_USE_SPREAD
         { "spread", gcs_spread_create },
