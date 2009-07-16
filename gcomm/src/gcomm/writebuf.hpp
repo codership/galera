@@ -1,5 +1,5 @@
-#ifndef WRITEBUF_HPP
-#define WRITEBUF_HPP
+#ifndef _GCOMM_WRITEBUF_HPP_
+#define _GCOMM_WRITEBUF_HPP_
 
 #include <gcomm/common.hpp>
 #include <gcomm/readbuf.hpp>
@@ -94,4 +94,4 @@ public:
 
 END_GCOMM_NAMESPACE
 
-#endif /* WRITEBUF_HPP */
+#endif /* _GCOMM_WRITEBUF_HPP_ */

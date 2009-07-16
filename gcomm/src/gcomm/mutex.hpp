@@ -1,9 +1,10 @@
-#ifndef MUTEX_HPP
-#define MUTEX_HPP
+#ifndef _GCOMM_MUTEX_HPP_
+#define _GCOMM_MUTEX_HPP_
+
+#include <pthread.h>
 
 #include <gcomm/common.hpp>
 #include <gcomm/types.hpp>
-#include <pthread.h>
 #include <gcomm/exception.hpp>
 
 BEGIN_GCOMM_NAMESPACE
@@ -112,4 +113,4 @@ public:
 
 END_GCOMM_NAMESPACE
 
-#endif // MUTEX_HPP
+#endif // _GCOMM_MUTEX_HPP_

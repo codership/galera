@@ -1,5 +1,5 @@
-#ifndef EXCEPTION_HPP
-#define EXCEPTION_HPP
+#ifndef _GCOMM_EXCEPTION_HPP_
+#define _GCOMM_EXCEPTION_HPP_
 
 #include <gcomm/common.hpp>
 
@@ -69,4 +69,4 @@ struct InterruptedException : Exception
     
 END_GCOMM_NAMESPACE
 
-#endif // EXCEPTION_HPP
+#endif // _GCOMM_EXCEPTION_HPP_

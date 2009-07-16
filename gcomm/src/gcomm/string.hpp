@@ -1,11 +1,10 @@
-
-#ifndef STRING_HPP
-#define STRING_HPP
-
-#include <gcomm/common.hpp>
+#ifndef _GCOMM_STRING_HPP_
+#define _GCOMM_STRING_HPP_
 
 #include <string>
 #include <vector>
+
+#include <gcomm/common.hpp>
 
 using std::string;
 using std::vector;
@@ -25,4 +24,4 @@ vector<string> strsplit(const string& s, const int c);
 END_GCOMM_NAMESPACE
 
 
-#endif // STRING_HPP
+#endif // _GCOMM_STRING_HPP_

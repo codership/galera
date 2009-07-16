@@ -1,16 +1,16 @@
-#ifndef READBUF_HPP
-#define READBUF_HPP
+#ifndef _GCOMM_READBUF_HPP_
+#define _GCOMM_READBUF_HPP_
+
+#include <iostream>
+#include <cstring>
+#include <map>
+using std::map;
 
 #include <gcomm/common.hpp>
 #include <gcomm/exception.hpp>
 #include <gcomm/monitor.hpp>
 #include <gcomm/logger.hpp>
-#include <iostream>
 
-#include <cstring>
-
-#include <map>
-using std::map;
 
 BEGIN_GCOMM_NAMESPACE
 

@@ -1,5 +1,5 @@
-#ifndef EVENT_HPP
-#define EVENT_HPP
+#ifndef _GCOMM_EVENT_HPP_
+#define _GCOMM_EVENT_HPP_
 
 #include <gcomm/common.hpp>
 #include <gcomm/exception.hpp>
@@ -138,4 +138,4 @@ public:
 
 END_GCOMM_NAMESPACE
 
-#endif /* EVENT_HPP */
+#endif /* _GCOMM_EVENT_HPP_ */

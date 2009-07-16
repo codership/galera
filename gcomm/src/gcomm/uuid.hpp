@@ -1,25 +1,19 @@
-#ifndef UUID_HPP
-#define UUID_HPP
+#ifndef _GCOMM_UUID_HPP_
+#define _GCOMM_UUID_HPP_
 
-
+#include <cstring>
 
 #include <gcomm/common.hpp>
 #include <gcomm/exception.hpp>
 #include <gcomm/string.hpp>
 #include <gcomm/types.hpp>
 
-#include <cstring>
-
 extern "C" {
 #include <stddef.h>
 #include <gu_uuid.h>
 }
 
-
-
 BEGIN_GCOMM_NAMESPACE
-
-
 
 class UUID
 {
@@ -126,4 +120,4 @@ static inline bool operator<(const UUID& a, const UUID& b)
 
 END_GCOMM_NAMESPACE
 
-#endif // UUID_HPP
+#endif // _GCOMM_UUID_HPP_

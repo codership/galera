@@ -1,8 +1,5 @@
-#ifndef TYPES_H
-#define TYPES_H
-
-#include <gcomm/common.hpp>
-#include <gcomm/string.hpp>
+#ifndef _GCOMM_TYPES_HPP_
+#define _GCOMM_TYPES_HPP_
 
 #include <assert.h>
 #include <stdint.h>
@@ -13,6 +10,8 @@
 #include <sstream>
 using std::ostringstream;
 
+#include <gcomm/common.hpp>
+#include <gcomm/string.hpp>
 
 BEGIN_GCOMM_NAMESPACE
 
@@ -221,4 +220,4 @@ public:
 
 END_GCOMM_NAMESPACE
 
-#endif /* TYPES_H */
+#endif /* _GCOMM_TYPES_HPP_ */

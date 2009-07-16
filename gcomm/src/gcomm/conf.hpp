@@ -2,8 +2,8 @@
  * Strings containing config parameter hierarchy and utility 
  * functions to read param values
  */
-#ifndef CONF_HPP
-#define CONF_HPP
+#ifndef _GCOMM_CONF_HPP_
+#define _GCOMM_CONF_HPP_
 
 #include <gcomm/common.hpp>
 #include <gcomm/string.hpp>
@@ -70,4 +70,4 @@ namespace Conf
 END_GCOMM_NAMESPACE
 
 
-#endif // CONF_HPP
+#endif // _GCOMM_CONF_HPP_

@@ -1,12 +1,12 @@
-#ifndef TRANSPORT_HPP
-#define TRANSPORT_HPP
+#ifndef _GCOMM_TRANSPORT_HPP_
+#define _GCOMM_TRANSPORT_HPP_
+
+#include <vector>
 
 #include <gcomm/common.hpp>
 #include <gcomm/uri.hpp>
 #include <gcomm/uuid.hpp>
 #include <gcomm/event.hpp>
-
-#include <vector>
 
 BEGIN_GCOMM_NAMESPACE
 
@@ -60,4 +60,4 @@ public:
 END_GCOMM_NAMESPACE
 
 
-#endif // TRANSPORT_HPP
+#endif // _GCOMM_TRANSPORT_HPP_

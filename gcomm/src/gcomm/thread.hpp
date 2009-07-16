@@ -1,5 +1,5 @@
-#ifndef THREAD_HPP
-#define THREAD_HPP
+#ifndef _GCOMM_THREAD_HPP_
+#define _GCOMM_THREAD_HPP_
 
 #include <pthread.h>
 #include <gcomm/common.hpp>
@@ -90,4 +90,4 @@ public:
 
 END_GCOMM_NAMESPACE
 
-#endif // THREAD_HPP
+#endif // _GCOMM_THREAD_HPP_

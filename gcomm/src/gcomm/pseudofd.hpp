@@ -1,5 +1,5 @@
-#ifndef PSEUDOFD_HPP
-#define PSEUDOFD_HPP
+#ifndef _GCOMM_PSEUDOFD_HPP_
+#define _GCOMM_PSEUDOFD_HPP_
 
 #include <gcomm/common.hpp>
 
@@ -13,4 +13,4 @@ struct PseudoFd
 
 END_GCOMM_NAMESPACE
 
-#endif // PSEUDOFD_HPP
+#endif // _GCOMM_PSEUDOFD_HPP_

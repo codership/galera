@@ -1,11 +1,11 @@
-#ifndef TIMER_HPP
-#define TIMER_HPP
+#ifndef _GCOMM_TIMER_HPP_
+#define _GCOMM_TIMER_HPP_
+
+#include <map>
 
 #include <gcomm/common.hpp>
 #include <gcomm/event.hpp>
 #include <gcomm/time.hpp>
-
-#include <map>
 
 BEGIN_GCOMM_NAMESPACE
 
@@ -66,4 +66,4 @@ public:
 
 END_GCOMM_NAMESPACE
 
-#endif // !TIMER_HPP
+#endif // _GCOMM_TIMER_HPP_

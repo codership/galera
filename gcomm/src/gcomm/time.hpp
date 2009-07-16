@@ -1,8 +1,5 @@
-#ifndef TIME_HPP
-#define TIME_HPP
-
-#include <gcomm/common.hpp>
-#include <gcomm/exception.hpp>
+#ifndef _GCOMM_TIME_HPP_
+#define _GCOMM_TIME_HPP_
 
 #include <sys/time.h>
 #include <ctime>
@@ -10,6 +7,9 @@
 #include <sstream>
 #include <iostream>
 #include <limits>
+
+#include <gcomm/common.hpp>
+#include <gcomm/exception.hpp>
 
 BEGIN_GCOMM_NAMESPACE
 
@@ -142,4 +142,4 @@ public:
 
 END_GCOMM_NAMESPACE
 
-#endif // TIME_HPP
+#endif // _GCOMM_TIME_HPP_

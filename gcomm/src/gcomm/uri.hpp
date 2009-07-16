@@ -1,13 +1,12 @@
-#ifndef URI_HPP
-#define URI_HPP
-
-#include <gcomm/common.hpp>
-#include <gcomm/exception.hpp>
-#include <gcomm/string.hpp>
+#ifndef _GCOMM_URI_HPP_
+#define _GCOMM_URI_HPP_
 
 #include <map>
 using std::multimap;
 
+#include <gcomm/common.hpp>
+#include <gcomm/exception.hpp>
+#include <gcomm/string.hpp>
  
 BEGIN_GCOMM_NAMESPACE
 
@@ -67,4 +66,4 @@ public:
 
 END_GCOMM_NAMESPACE
 
-#endif // URI_HPP
+#endif // _GCOMM_URI_HPP_

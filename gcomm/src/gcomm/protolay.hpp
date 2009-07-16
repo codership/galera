@@ -1,5 +1,7 @@
-#ifndef PROTOLAY_HPP
-#define PROTOLAY_HPP
+#ifndef _GCOMM_PROTOLAY_HPP_
+#define _GCOMM_PROTOLAY_HPP_
+
+#include <cerrno>
 
 #include <gcomm/common.hpp>
 #include <gcomm/util.hpp>
@@ -8,8 +10,6 @@
 #include <gcomm/view.hpp>
 #include <gcomm/exception.hpp>
 #include <gcomm/logger.hpp>
-
-#include <cerrno>
 
 BEGIN_GCOMM_NAMESPACE
 
@@ -244,4 +244,4 @@ static inline void disconnect(Protolay* down, Protolay* up)
 
 END_GCOMM_NAMESPACE
 
-#endif /* PROTOLAY_HPP */
+#endif /* _GCOMM_PROTOLAY_HPP_ */

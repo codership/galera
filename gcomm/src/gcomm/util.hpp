@@ -1,13 +1,13 @@
-#ifndef UTIL_HPP
-#define UTIL_HPP
+#ifndef _GCOMM_UTIL_HPP_
+#define _GCOMM_UTIL_HPP_
+
+#include <sstream>
+#include <cstring>
 
 #include <gcomm/common.hpp>
 #include <gcomm/string.hpp>
 #include <gcomm/exception.hpp>
 #include <gcomm/types.hpp>
-
-#include <sstream>
-#include <cstring>
 
 using std::ostringstream;
 
@@ -93,4 +93,4 @@ long read_long(const string& s);
 
 END_GCOMM_NAMESPACE
 
-#endif // UTIL_HPP
+#endif // _GCOMM_UTIL_HPP_

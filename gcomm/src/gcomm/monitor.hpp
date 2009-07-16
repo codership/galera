@@ -1,15 +1,14 @@
-#ifndef MONITOR_HPP
-#define MONITOR_HPP
-
-
-#include <gcomm/common.hpp>
-#include <gcomm/exception.hpp>
-#include <gcomm/mutex.hpp>
+#ifndef _GCOMM_MONITOR_HPP_
+#define _GCOMM_MONITOR_HPP_
 
 #include <pthread.h>
 #include <deque>
 #include <list>
 #include <cassert>
+
+#include <gcomm/common.hpp>
+#include <gcomm/exception.hpp>
+#include <gcomm/mutex.hpp>
 
 using std::list;
 
@@ -140,4 +139,4 @@ public:
 
 END_GCOMM_NAMESPACE
 
-#endif // MONITOR_HPP
+#endif // _GCOMM_MONITOR_HPP_

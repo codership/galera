@@ -1,12 +1,12 @@
-#ifndef VIEW_HPP
-#define VIEW_HPP
+#ifndef _GCOMM_VIEW_HPP_
+#define _GCOMM_VIEW_HPP_
+
+#include <map>
 
 #include <gcomm/common.hpp>
 #include <gcomm/uuid.hpp>
 #include <gcomm/string.hpp>
 #include <gcomm/logger.hpp>
-
-#include <map>
 
 BEGIN_GCOMM_NAMESPACE
 
@@ -210,4 +210,4 @@ bool operator==(const View&, const View&);
 
 END_GCOMM_NAMESPACE
 
-#endif // VIEW_HPP
+#endif // _GCOMM_VIEW_HPP_
