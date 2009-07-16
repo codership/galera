@@ -77,9 +77,9 @@ typedef struct gcs_backend_conn
     gu_fifo_t*       gc_q;   /* "serializator" */
     volatile dummy_state_t    state;
     gcs_seqno_t      msg_id;
-    size_t           max_pkt_size;
-    size_t           hdr_size;
-    size_t           send_size;
+    const size_t           max_pkt_size;
+    const size_t           hdr_size;
+    const size_t           max_send_size;
     long             my_idx;
     long             memb_num;
     gcs_comp_memb_t* memb;
@@ -182,16 +182,14 @@ static
 GCS_BACKEND_MSG_SIZE_FN(dummy_msg_size)
 {
     const size_t max_pkt_size = backend->conn->max_pkt_size;
-    if (pkt_size <= max_pkt_size) {
-        backend->conn->send_size = pkt_size - backend->conn->hdr_size;
-    }
-    else {
+
+    if (pkt_size > max_pkt_size) {
 	gu_warn ("Requested packet size: %d, maximum possible packet size: %d",
 		 pkt_size, max_pkt_size);
-        backend->conn->send_size = max_pkt_size - backend->conn->hdr_size;
+        return (max_pkt_size - backend->conn->hdr_size);
     }
 
-    return (backend->conn->send_size);
+    return (pkt_size - backend->conn->hdr_size);
 }
 
 static
@@ -269,15 +267,15 @@ const gcs_backend_t dummy_backend =
 GCS_BACKEND_CREATE_FN(gcs_dummy_create)
 {
     long     ret   = -ENOMEM;
-    dummy_t *dummy = NULL;
+    dummy_t* dummy = NULL;
 
     if (!(dummy = GU_CALLOC(1, dummy_t)))
 	goto out0;
 
-    dummy->state        = DUMMY_CLOSED;
-    dummy->max_pkt_size = sysconf (_SC_PAGESIZE);
-    dummy->hdr_size     = sizeof(dummy_msg_t);
-    dummy->send_size    = dummy->max_pkt_size - dummy->hdr_size;
+    dummy->state         = DUMMY_CLOSED;
+    *(size_t*)(&dummy->max_pkt_size)  = (size_t) sysconf (_SC_PAGESIZE);
+    *(size_t*)(&dummy->hdr_size)      = sizeof(dummy_msg_t);
+    *(size_t*)(&dummy->max_send_size) = dummy->max_pkt_size - dummy->hdr_size;
 
     if (!(dummy->gc_q = gu_fifo_create (1 << 16, sizeof(void*))))
 	goto out1;
@@ -303,7 +301,7 @@ gcs_dummy_inject_msg (gcs_backend_t* backend,
                       long           sender_idx)
 {
     long         ret;
-    size_t       send_size = GU_MIN(buf_len, backend->conn->send_size);
+    size_t       send_size = GU_MIN(buf_len, backend->conn->max_send_size);
     dummy_msg_t* msg = dummy_msg_create (type, send_size, sender_idx, buf);
 
     if (msg)
