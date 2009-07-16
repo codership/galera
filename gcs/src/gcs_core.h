@@ -141,18 +141,6 @@ gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size);
 #include "gcs_msg_type.h"
 #include "gcs_backend.h"
 
-extern ssize_t
-_gcs_core_msg_send (gcs_core_t*    core,
-                   const void*    msg,
-                   size_t         len,
-                   gcs_msg_type_t type);
-
-extern ssize_t
-_gcs_core_msg_send_retry (gcs_core_t*    core,
-                         const void*    msg,
-                         size_t         len,
-                         gcs_msg_type_t type);
-
 extern gcs_backend_t*
 gcs_core_get_backend (gcs_core_t* core);
 

@@ -119,6 +119,7 @@ gcs_slave_act_t;
 gcs_conn_t*
 gcs_create (const char *backend)
 {
+    long ret;
     gcs_conn_t *conn = GU_CALLOC (1, gcs_conn_t);
 
     if (conn) {
@@ -127,7 +128,8 @@ gcs_create (const char *backend)
         conn->core = gcs_core_create (backend);
         if (conn->core) {
 
-            if (!(gcs_core_set_pkt_size (conn->core, GCS_DEFAULT_PKT_SIZE))) {
+            ret = gcs_core_set_pkt_size (conn->core, GCS_DEFAULT_PKT_SIZE);
+            if (ret > 0) {
 
                 conn->repl_q = gcs_fifo_lite_create (GCS_MAX_REPL_THREADS,
                                                      sizeof (gcs_act_t*));
@@ -148,14 +150,26 @@ gcs_create (const char *backend)
                     }
                     gcs_fifo_lite_destroy (conn->repl_q);
                 }
+                else {
+                    gu_error ("Failed to create repl_q.");
+                }
+            }
+            else {
+                gu_error ("Failed to set packet size: %ld (%s)",
+                          ret, strerror(-ret));        
             }
             gcs_core_destroy (conn->core);
         }
-
+        else {
+            gu_error ("Failed to create core.");
+        }
         gu_free (conn);
     }
-
-    gu_error ("Failed to create GCS connection handle");
+    else {
+        gu_error ("Could not allocate GCS connection handle: %s",
+                  strerror (ENOMEM));
+    }
+    gu_error ("Failed to create GCS connection handle.");
 
     return NULL; // failure
 }

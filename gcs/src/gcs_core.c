@@ -983,6 +983,7 @@ gcs_core_set_pkt_size (gcs_core_t* conn, ulong pkt_size)
                 conn->send_buf_len = msg_size;
                 memset (conn->send_buf, 0, hdr_size); // to pacify valgrind
                 ret = msg_size - hdr_size; // message payload
+                gu_debug ("Message payload (action fragment size): %ld", ret);
             }
             else {
                 ret = -ENOMEM;
@@ -1042,24 +1043,6 @@ gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size)
 }
 
 #ifdef GCS_CORE_TESTING
-
-ssize_t
-_gcs_core_msg_send (gcs_core_t*    core,
-                   const void*    msg,
-                   size_t         len,
-                   gcs_msg_type_t type)
-{
-    return core_msg_send (core, msg, len, type);
-}
-
-ssize_t
-_gcs_core_msg_send_retry (gcs_core_t*    core,
-                         const void*    msg,
-                         size_t         len,
-                         gcs_msg_type_t type)
-{
-    return core_msg_send_retry (core, msg, len, type);
-}
 
 gcs_backend_t*
 gcs_core_get_backend (gcs_core_t* core)
