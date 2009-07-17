@@ -64,10 +64,9 @@ gcs_create  (const char *backend);
  * @return 0 in case of success, -EBUSY if conneciton is already opened,
  *         -EBADFD if connection object is being destroyed.
  */
-extern long
-gcs_init (gcs_conn_t   *conn,
-          gcs_seqno_t   seqno,
-          const uint8_t uuid[GCS_UUID_LEN]);
+extern long gcs_init (gcs_conn_t   *conn,
+                      gcs_seqno_t   seqno,
+                      const uint8_t uuid[GCS_UUID_LEN]);
 
 /*! @brief Opens connection to group (joins channel). 
  * 

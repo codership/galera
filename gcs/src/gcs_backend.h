@@ -112,8 +112,8 @@ const char* fn (void)
  *        - negative amount by which the packet size must be increased in order
  *          to send at least 1 byte.
  */
-#define GCS_BACKEND_MSG_SIZE_FN(fn)       \
-long fn (gcs_backend_t* const backend,    \
+#define GCS_BACKEND_MSG_SIZE_FN(fn)         \
+long fn (gcs_backend_t* const backend,      \
          ulong          const pkt_size)
 
 typedef GCS_BACKEND_CREATE_FN   ((*gcs_backend_create_t));

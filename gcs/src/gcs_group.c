@@ -45,6 +45,14 @@ gcs_group_init_history (gcs_group_t*     group,
                         gcs_seqno_t      seqno,
                         const gu_uuid_t* uuid)
 {
+    if (seqno < 0) {
+        gu_error ("Invalid state seqno value: %lld", (long long) seqno);
+        return -EINVAL;
+    }
+    else if (seqno > 0 && !gu_uuid_compare (uuid, &GU_UUID_NIL)) {
+        gu_error ("Positive state seqno requires non-nil group UUID.");
+        return -EINVAL;
+    }
     group->act_id     = seqno;
     group->group_uuid = *uuid;
     return 0;
