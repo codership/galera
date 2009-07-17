@@ -13,6 +13,8 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+using std::string;
+
 BEGIN_GCOMM_NAMESPACE
 
 static inline void closefd(int fd)
@@ -215,11 +217,11 @@ Transport *TCP::accept()
 {
 
 
-    sockaddr sa;
-    socklen_t sa_size = sizeof(sockaddr);
+    sockaddr acc_sa;
+    socklen_t acc_sa_size = sizeof(sockaddr);
     
     int acc_fd;
-    if ((acc_fd = ::accept(fd, &sa, &sa_size)) == -1)
+    if ((acc_fd = ::accept(fd, &acc_sa, &acc_sa_size)) == -1)
 	throw FatalException("TCP::accept(): Accept failed");
     LOG_DEBUG(std::string("accept()") + make_int(acc_fd).to_string());
 
@@ -245,7 +247,8 @@ Transport *TCP::accept()
     TCP *ret = new TCP(uri, event_loop, mon);
     ret->fd = acc_fd;
     ret->state = S_CONNECTED;
-    
+    ret->sa = acc_sa;
+    ret->sa_size = acc_sa_size;
     if (event_loop)
     {
 	event_loop->insert(ret->fd, ret);
@@ -666,6 +669,29 @@ const ReadBuf *TCP::recv()
 			  recv_buf_offset - TCPHdr::get_raw_len());
     recv_buf_offset = 0;
     return recv_rb;
+}
+
+
+
+string TCP::get_remote_url() const
+{
+    char buf[24];
+    string ret = Conf::TcpScheme + "://";
+    
+    const sockaddr_in *sin = reinterpret_cast<const sockaddr_in*>(&sa);
+    
+    const char* rb = inet_ntop(sin->sin_family, &sin->sin_addr, buf,
+                               sizeof(buf));
+    if (rb == 0)
+    {
+        log_fatal << "address conversion failed: " << strerror(errno);
+        throw FatalException("address conversion failed");
+    }
+    ret += rb;
+    ret += ":";
+    ret += make_int<int>(ntohs(sin->sin_port)).to_string();
+
+    return ret;
 }
 
 END_GCOMM_NAMESPACE

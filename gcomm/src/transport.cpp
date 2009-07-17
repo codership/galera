@@ -29,6 +29,11 @@ const UUID& Transport::get_uuid() const
     throw FatalException("UUID not supported");
 }
 
+std::string Transport::get_remote_url() const
+{
+    throw FatalException("get remote url not supported");
+}
+
 TransportState Transport::get_state() const
 {
     return state;

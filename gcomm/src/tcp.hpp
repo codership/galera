@@ -126,6 +126,9 @@ public:
     {
 	return max_pending_bytes;
     }
+
+    std::string get_local_url() const;
+    std::string get_remote_url() const;
     
     void connect();
     void close();

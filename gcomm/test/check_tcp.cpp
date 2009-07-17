@@ -28,6 +28,12 @@ public:
         can_send(false) 
     {
     }
+
+    string get_remote_url() const
+    {
+        return tp->get_remote_url();
+    }
+
     void handle_up(const int cid, const ReadBuf *rb, const size_t offset,
                    const ProtoUpMeta *um)
     {
@@ -223,6 +229,18 @@ public:
         for_each(tports.begin(), tports.end(), ::release);
         tports.clear();
     }
+
+    std::list<std::string> get_receiver_urls() const
+    {
+        std::list<std::string> ret;
+        for (std::list<std::pair<Receiver *, Transport *> >::const_iterator i
+                 = tports.begin(); i != tports.end(); ++i)
+        {
+            ret.push_back(i->second->get_remote_url());
+        }
+        return ret;
+    }
+
 };
 
 START_TEST(test_nonblock)
@@ -438,6 +456,34 @@ START_TEST(test_block)
 }
 END_TEST
 
+START_TEST(test_get_url)
+{
+    EventLoop el;
+    Listener listener(&el);
+    Sender sender(&el);
+
+    listener.start();
+    sender.connect();
+    while (sender.get_connected() == false)
+    {
+        el.poll(10);
+    }
+
+    const string url = sender.get_remote_url();
+    log_info << url;
+    fail_unless(url == "gcomm+tcp://127.0.0.1:4567");
+
+    std::list<string> lst = listener.get_receiver_urls();
+    for (std::list<string>::const_iterator i = lst.begin();
+         i != lst.end(); ++i)
+    {
+        log_info << *i;
+    }
+    
+    sender.close();
+    listener.stop();
+}
+END_TEST
 
 Suite* tcp_suite()
 {
@@ -456,6 +502,10 @@ Suite* tcp_suite()
 
     tc = tcase_create("test_block");
     tcase_add_test(tc, test_block);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_get_url");
+    tcase_add_test(tc, test_get_url);
     suite_add_tcase(s, tc);
 
     return s;

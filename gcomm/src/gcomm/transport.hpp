@@ -34,10 +34,12 @@ protected:
     Transport(const URI& uri_, EventLoop* event_loop_, Monitor*);
 public:
     virtual ~Transport();
-
+    
     virtual size_t get_max_msg_size() const = 0;
     virtual bool supports_uuid() const;
     virtual const UUID& get_uuid() const;
+    // virtual std::string get_local_url() const;
+    virtual std::string get_remote_url() const;
     TransportState get_state() const;
     int get_errno() const;
     int get_fd() const;
