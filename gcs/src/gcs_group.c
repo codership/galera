@@ -45,12 +45,16 @@ gcs_group_init_history (gcs_group_t*     group,
                         gcs_seqno_t      seqno,
                         const gu_uuid_t* uuid)
 {
-    if (seqno < 0) {
-        gu_error ("Invalid state seqno value: %lld", (long long) seqno);
+    bool negative_seqno = (seqno < 0);
+    bool nil_uuid = !gu_uuid_compare (uuid, &GU_UUID_NIL);
+
+    if (negative_seqno && !nil_uuid) {
+        gu_error ("Non-nil history UUID with negative seqno (%lld) makes "
+                  "no sense.", (long long) seqno);
         return -EINVAL;
     }
-    else if (seqno > 0 && !gu_uuid_compare (uuid, &GU_UUID_NIL)) {
-        gu_error ("Positive state seqno requires non-nil group UUID.");
+    else if (!negative_seqno && nil_uuid) {
+        gu_error ("Non-negative state seqno requires non-nil history UUID.");
         return -EINVAL;
     }
     group->act_id     = seqno;
@@ -230,14 +234,14 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
         assert (new_nodes_num);
         new_nodes = group_nodes_init (comp);
         if (!new_nodes) {
-            gu_fatal ("Could not allocate memory for %ld node component.",
+            gu_fatal ("Could not allocate memory for %ld-node component.",
                       gcs_comp_msg_num (comp));
             assert(0);
             return -ENOMEM;
         }
 
         if (group->state == GCS_GROUP_PRIMARY) {
-            /* we come from previous primary configuration */
+            /* we come from previous primary configuration, relax */
         }
         else {
             if (1 == new_nodes_num && GCS_SEQNO_ILL == group->conf_id) {
@@ -250,7 +254,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                 group->conf_id = 0; // this bootstraps configuration ID
                 group->state   = GCS_GROUP_PRIMARY;
 
-                if (GCS_SEQNO_ILL == group->act_id) {
+                if (group->act_id < 0) {
                     // no history provided: start a new one
                     group->act_id  = GCS_SEQNO_NIL;
                     gu_uuid_generate (&group->group_uuid, NULL, 0);
@@ -267,12 +271,6 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                 gcs_node_record_state (&group->nodes[0],
                                        gcs_group_get_state (group));
             }
-            else {
-                /* It happened so that we missed some primary configurations */
-                gu_warn ("Discontinuity in primary configurations!");
-                gu_warn ("State snapshot is needed!");
-            }
-            /* Move information about this node to new node array */
         }
     }
     else {
@@ -285,13 +283,11 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
         else {
             new_nodes = group_nodes_init (comp);
         }
-	/* Got NON-PRIMARY COMPONENT - cleanup */
-        /* All sending threads must be aborted with -ENOTCONN,
-         * local action FIFO must be flushed. Not implemented: FIXME! */
+
         group_go_non_primary (group);
     }
 
-    /* remap old array to new one to preserve action continuity */
+    /* remap old node array to new one to preserve action continuity */
     assert (group->nodes);
     for (new_idx = 0; new_idx < new_nodes_num; new_idx++) {
         /* find member index in old component by unique member id */
