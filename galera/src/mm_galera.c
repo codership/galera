@@ -246,9 +246,9 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
 
     /* set up initial state: */
 
-    /* 1.  initialize to NIL */
-    last_applied = GCS_SEQNO_NIL;
-    group_uuid = GU_UUID_NIL;
+    /* 1.  initialize state to undefined */
+    last_applied = GCS_SEQNO_ILL; // unset state is defined by negative seqno
+    group_uuid   = GU_UUID_NIL;
 
     /* 2. read saved state from file */
     rcode = galera_restore_state(args->data_dir, &saved_state);
