@@ -59,7 +59,9 @@ gcs_create  (const char *backend);
  * This function must be called before gcs_open() or after gcs_close().
  *
  * @param seqno Sequence number of the application state (last action applied).
+ *              Should be negative for undefined state.
  * @param uuid  UUID of the sequence (group ID).
+ *              Should be all zeroes for undefined state.
  *
  * @return 0 in case of success, -EBUSY if conneciton is already opened,
  *         -EBADFD if connection object is being destroyed.

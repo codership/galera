@@ -1139,18 +1139,16 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
                 if (gu_uuid_compare (&sst_uuid, conf_uuid) ||
                     sst_seqno < conf->seqno) {
                     gu_fatal ("Applicaiton received wrong state:"
-                              "\n\tReceived: UUID:"GU_UUID_FORMAT
-                              ", seqno:    %lld"
-                              "\n\tRequired: UUID:"GU_UUID_FORMAT
-                              ", seqno: >= %lld",
+                              "\n\tReceived: "GU_UUID_FORMAT" :    %lld"
+                              "\n\tRequired: "GU_UUID_FORMAT" : >= %lld",
                               GU_UUID_ARGS(&sst_uuid), sst_seqno,
                               GU_UUID_ARGS(conf_uuid), conf->seqno);
                     assert(0);
                     abort(); // just abort for now. Ideally reconnect to group.
                 }
                 else {
-                    group_uuid    = sst_uuid;
-                    last_recved  = sst_seqno;
+                    group_uuid  = sst_uuid;
+                    last_recved = sst_seqno;
                     gu_info ("Applicaiton state transfer comlete: "
                              GU_UUID_FORMAT":%lld",
                              GU_UUID_ARGS(&group_uuid), last_applied);
@@ -1162,15 +1160,26 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
 
             gu_mutex_unlock (&sst_mtx);
         }
-        else {
-            /* no state transfer required */
-            assert (last_recved == conf->seqno); // global seqno
+        else { /* no state transfer required */
 
             if (1 == conf->conf_id) {
-                group_uuid = *conf_uuid;
+                assert (last_recved < 0);
+                last_recved = conf->seqno;
+                group_uuid  = *conf_uuid;
             }
             else {
-                assert (0 == gu_uuid_compare (&group_uuid, conf_uuid));
+                if (last_recved != conf->seqno ||
+                    gu_uuid_compare (&group_uuid, conf_uuid)) {
+                    gu_fatal ("Internal replication error: no state transfer "
+                              "requested while this node state is not "
+                              "the same as the group."
+                              "\n\tGroup: "GU_UUID_FORMAT":%lld"
+                              "\n\tNode:  "GU_UUID_FORMAT":%lld",
+                              GU_UUID_ARGS(conf_uuid),   conf->seqno,
+                              GU_UUID_ARGS(&group_uuid), last_recved);
+                    assert(0);
+                    abort(); // just abort for now. Ideally reconnect to group.
+                }
             }
             ret = my_idx;
         }
