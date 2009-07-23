@@ -97,6 +97,28 @@ std::string sockaddr_to_uri(const std::string& scheme, const sockaddr* sa);
 
 std::string sockaddr_host_to_str(const sockaddr* sa);
 std::string sockaddr_port_to_str(const sockaddr* sa);
+bool is_anyaddr(const std::string& url);
+
+
+inline std::string parse_host(const std::string& str)
+{
+    size_t sep = str.find(':');
+    if (sep == std::string::npos)
+    {
+        throw FatalException("invalid auth str");
+    }
+    return str.substr(0, sep);
+}
+
+inline std::string parse_port(const std::string& str)
+{
+    size_t sep = str.find(':');
+    if (sep == std::string::npos)
+    {
+        throw FatalException("invalid auth str");
+    }
+    return str.substr(sep + 1);
+}
 
 END_GCOMM_NAMESPACE
 

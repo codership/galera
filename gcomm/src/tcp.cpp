@@ -2,7 +2,7 @@
 
 #include "gcomm/logger.hpp"
 #include "gcomm/types.hpp"
-
+#include "gcomm/util.hpp"
 
 
 #include <fcntl.h>
@@ -24,55 +24,49 @@ static inline void closefd(int fd)
 
 static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
 {
-     char *ipaddr;
-     char *port;
-     const char *delim;
-     
-     if (!(delim = strchr(addr, ':')))
-     {
-         LOG_ERROR("no host-service delimiter");
-	 return false;
-     }
-     ipaddr = strndup(addr, delim - addr);
-     port = strdup(delim + 1);
+    string host = parse_host(addr);
+    string port = parse_port(addr);
+    
+    if (host == "")
+    {
+        host = "0.0.0.0";
+    }
 
-     addrinfo addrhint = {
-         0,
-         AF_UNSPEC,
-         SOCK_STREAM,
-         0,
-         *s_size,
-         s,
-         0,
-         0
-     };
-     addrinfo* addri = 0;
-
-     int err;
-     if ((err = getaddrinfo(ipaddr, port, &addrhint, &addri)) != 0)
-     {
-         LOG_ERROR("getaddrinfo: " + make_int(err).to_string());
-         return false;
-     }
-     
-     if (addri == 0)
-     {
-         LOG_ERROR("no address found");
-         throw FatalException("");
-     }
-     
-     if (addri->ai_socktype != SOCK_STREAM)
-     {
-         LOG_FATAL("returned socket is not stream");
-         throw FatalException("");
-     }
-     
-     *s = *addri->ai_addr;
-     *s_size = addri->ai_addrlen;
-     freeaddrinfo(addri);
-     free(ipaddr);
-     free(port);
-     return true;
+    addrinfo addrhint = {
+        0,
+        AF_UNSPEC,
+        SOCK_STREAM,
+        0,
+        *s_size,
+        s,
+        0,
+        0
+    };
+    addrinfo* addri = 0;
+    
+    int err;
+    if ((err = getaddrinfo(host.c_str(), port.c_str(), &addrhint, &addri)) != 0)
+    {
+        LOG_ERROR("getaddrinfo: " + make_int(err).to_string());
+        return false;
+    }
+    
+    if (addri == 0)
+    {
+        LOG_ERROR("no address found");
+        throw FatalException("");
+    }
+    
+    if (addri->ai_socktype != SOCK_STREAM)
+    {
+        LOG_FATAL("returned socket is not stream");
+        throw FatalException("");
+    }
+    
+    *s = *addri->ai_addr;
+    *s_size = addri->ai_addrlen;
+    freeaddrinfo(addri);
+    return true;
 }
 
 

@@ -60,6 +60,7 @@ static void set_tcp_params(URI* uri)
 }
 
 
+
 class GMCastProto 
 {
     UUID local_uuid;
@@ -221,7 +222,7 @@ public:
         send_msg(hsr);
         set_state(S_HANDSHAKE_RESPONSE_SENT);
     }
-    
+
     void handle_handshake_response(const GMCastMessage& hs) 
     {
         if (get_state() != S_HANDSHAKE_SENT)
@@ -240,7 +241,15 @@ public:
         else 
         {
             remote_uuid = hs.get_source_uuid();
-            remote_addr = hs.get_node_address();
+
+            URI uri(hs.get_node_address());
+            string host = parse_host(uri.get_authority());
+            string port = parse_port(uri.get_authority());
+            if (host == "")
+            {
+                uri.set_authority(tp->get_remote_host() + ':' + port);
+            }
+            remote_addr = uri.to_string();
             GMCastMessage ok(GMCastMessage::P_HANDSHAKE_OK, local_uuid);
             send_msg(ok);
             set_state(S_OK);
@@ -418,10 +427,13 @@ GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon_) :
     URIQueryList::const_iterator i = uri.get_query_list().find(Conf::GMCastQueryListenAddr);
     if (i == uri.get_query_list().end())
     {
-        log_fatal << "Parameter " << Conf::GMCastQueryListenAddr << " is required";
-        throw FatalException("missing parameter");
+        listen_addr = Conf::TcpScheme + "://:4567";
+        log_info << "set default listen addr to: " << listen_addr;
     }
-    listen_addr = get_query_value(i);
+    else
+    {
+        listen_addr = get_query_value(i);
+    }
     if (check_uri(listen_addr) == false)
     {
         log_fatal << "Listen addr uri '" << listen_addr << "' is not valid";

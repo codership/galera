@@ -356,6 +356,23 @@ START_TEST(test_gmcast_w_user_messages)
 }
 END_TEST
 
+START_TEST(test_gmcast_auto_addr)
+{
+    EventLoop el;
+    Transport* tp1 = Transport::create("gcomm+gmcast://?gmcast.group=test", &el);
+    Transport* tp2 = Transport::create("gcomm+gmcast://localhost:4567?gmcast.group=test&gmcast.listen_addr=gcomm+tcp://127.0.0.1:10002", &el);
+
+    tp1->connect();
+    tp2->connect();
+    
+    for (int i = 0; i < 50; ++i)
+    {
+        el.poll(10);
+    }
+
+}
+END_TEST
+
 Suite* gmcast_suite()
 {
 
@@ -375,6 +392,10 @@ Suite* gmcast_suite()
     tc = tcase_create("test_gmcast_w_user_messages");
     tcase_add_test(tc, test_gmcast_w_user_messages);
     tcase_set_timeout(tc, 30);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_gmcast_auto_addr");
+    tcase_add_test(tc, test_gmcast_auto_addr);
     suite_add_tcase(s, tc);
 
     return s;
