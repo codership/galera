@@ -72,7 +72,7 @@ static gu_uuid_t           sst_uuid;          // received in state transfer
 static gcs_seqno_t         last_recved  = -1; // last received from group
 static gcs_seqno_t         last_applied = -1; // last applied by application
 static gu_uuid_t           group_uuid;
-static long                my_idx;
+static long                my_idx = 0;
 
 static struct job_queue   *applier_queue = NULL;
 
@@ -217,7 +217,6 @@ static enum wsrep_status mm_galera_set_logger(
 static enum wsrep_status mm_galera_init(wsrep_t* gh,
                                         const wsrep_init_args_t* args)
 {
-    gcs_seqno_t    seqno;
     galera_state_t saved_state;
     int rcode;
 
@@ -256,7 +255,6 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     /* set up initial state: */
 
     /* 1.  initialize state to undefined */
-    seqno      = GCS_SEQNO_ILL; // unset state is defined by negative seqno
     group_uuid = GU_UUID_NIL;
 
     /* 2. read saved state from file */
@@ -264,37 +262,36 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     if (rcode) {
         gu_warn("GALERA state restore failed");
     } else {
-        group_uuid = *(&saved_state.uuid);
-        seqno = saved_state.last_applied_seqno;
+        group_uuid  = *(&saved_state.uuid);
+        last_recved = saved_state.last_applied_seqno;
     }
 
-    gu_info("Found state:      " GU_UUID_FORMAT ":%lli",
-            GU_UUID_ARGS(&(group_uuid)), seqno);
+    gu_info("Found stored state: " GU_UUID_FORMAT ":%lli",
+            GU_UUID_ARGS(&(group_uuid)), last_recved);
 
     /* 3. use passed state arguments */
     if (args->state_seqno != WSREP_SEQNO_UNDEFINED) {
-        seqno = args->state_seqno;
+        last_recved = args->state_seqno;
     }
     if (memcmp(&WSREP_UUID_UNDEFINED, &args->state_uuid, sizeof(wsrep_uuid_t))){
         group_uuid = *(gu_uuid_t*)&args->state_uuid;
     }
 
-    gu_info("Configured state: " GU_UUID_FORMAT ":%lli",
-            GU_UUID_ARGS(&(group_uuid)), seqno);
+    gu_info("Configured state:   " GU_UUID_FORMAT ":%lli",
+            GU_UUID_ARGS(&(group_uuid)), last_recved);
 
     /* 4. initialize GCS state */
-    rcode = gcs_init (gcs_conn, seqno, group_uuid.data);
+    rcode = gcs_init (gcs_conn, last_recved, group_uuid.data);
     if (rcode) {
         gu_error ("Failed to initialize GCS state: %d (%s)",
                   rcode, strerror (-rcode));
         GU_DBUG_RETURN(WSREP_NODE_FAIL);            
     }
 
-    my_idx      = 0;
-    last_recved = seqno;
-
     app_stat_cb = args->stat_param_cb;
-    GALERA_UPDATE_LAST_APPLIED (seqno);
+    GALERA_UPDATE_LAST_APPLIED (last_recved);
+
+    my_idx = 0;
 
     /* initialize wsdb */
     wsdb_init(args->data_dir, (gu_log_cb_t)args->logger_cb);
@@ -380,18 +377,6 @@ static enum wsrep_status mm_galera_enable(wsrep_t *gh) {
 
     GU_DBUG_ENTER("galera_enable");
 
-#if 0 // delete
-    if (gcs_conn) {
-        GU_DBUG_RETURN(WSREP_NODE_FAIL);
-    }
-
-    gcs_conn = gcs_create(gcs_url);
-    if (!gcs_conn) {
-        gu_error ("Failed to create GCS conection handle");
-        GU_DBUG_RETURN(WSREP_NODE_FAIL);
-    }
-#endif
-
     rcode = gcs_open(gcs_conn, gcs_channel);
     if (rcode) {
 	gu_error("gcs_open(%p, %s, %s) failed: %d (%s)",
@@ -402,6 +387,20 @@ static enum wsrep_status mm_galera_enable(wsrep_t *gh) {
     gu_info("Successfully opened GCS connection to %s", gcs_channel);
 
     Galera.repl_state = GALERA_ENABLED;
+
+    /* clear persistent state - after this point crash means undefined state */
+    {
+        galera_state_t saved_state;
+        
+        memset (saved_state.uuid.data, 0, GU_UUID_LEN);
+        saved_state.last_applied_seqno = GCS_SEQNO_ILL;
+
+        rcode = galera_store_state(saved_args.data_dir, &saved_state);
+        if (rcode) {
+            gu_error("GALERA state clear failed: %d (%s)",
+                     rcode, strerror(rcode));
+        }
+    }
     GU_DBUG_RETURN(WSREP_OK);
 }
 
@@ -1163,7 +1162,6 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
         else { /* no state transfer required */
 
             if (1 == conf->conf_id) {
-//                assert (last_recved < 0);
                 last_recved = conf->seqno;
                 group_uuid  = *conf_uuid;
             }
