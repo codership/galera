@@ -95,7 +95,8 @@ long read_long(const string& s);
  */
 std::string sockaddr_to_uri(const std::string& scheme, const sockaddr* sa);
 
-
+std::string sockaddr_host_to_str(const sockaddr* sa);
+std::string sockaddr_port_to_str(const sockaddr* sa);
 
 END_GCOMM_NAMESPACE
 

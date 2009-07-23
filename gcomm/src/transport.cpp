@@ -34,6 +34,16 @@ std::string Transport::get_remote_url() const
     throw FatalException("get remote url not supported");
 }
 
+std::string Transport::get_remote_host() const
+{
+    throw FatalException("get remote host not supported");
+}
+
+std::string Transport::get_remote_port() const
+{
+    throw FatalException("get remote port not supported");
+}
+
 TransportState Transport::get_state() const
 {
     return state;

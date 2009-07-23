@@ -129,6 +129,8 @@ public:
 
     std::string get_local_url() const;
     std::string get_remote_url() const;
+    std::string get_remote_host() const;
+    std::string get_remote_port() const;
     
     void connect();
     void close();

@@ -677,4 +677,14 @@ string TCP::get_remote_url() const
     return sockaddr_to_uri(Conf::TcpScheme, &sa);
 }
 
+string TCP::get_remote_host() const
+{
+    return sockaddr_host_to_str(&sa);
+}
+
+string TCP::get_remote_port() const
+{
+    return sockaddr_port_to_str(&sa);
+}
+
 END_GCOMM_NAMESPACE

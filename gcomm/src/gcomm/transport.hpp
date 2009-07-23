@@ -40,6 +40,8 @@ public:
     virtual const UUID& get_uuid() const;
     // virtual std::string get_local_url() const;
     virtual std::string get_remote_url() const;
+    virtual std::string get_remote_host() const;
+    virtual std::string get_remote_port() const;
     TransportState get_state() const;
     int get_errno() const;
     int get_fd() const;

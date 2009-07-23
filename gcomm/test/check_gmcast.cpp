@@ -301,6 +301,8 @@ START_TEST(test_gmcast_w_user_messages)
     
     EventLoop el;
     User u1(&el, addr1, 0);
+
+    log_info << "u1 start";
     u1.start();
 
     for (int i = 0; i < 10; ++i)
@@ -308,6 +310,7 @@ START_TEST(test_gmcast_w_user_messages)
 
     fail_unless(u1.get_recvd() == 0);
     
+    log_info << "u2 start";
     User u2(&el, addr2, addr1);
     u2.start();
     
@@ -315,23 +318,27 @@ START_TEST(test_gmcast_w_user_messages)
         el.poll(100);
     
 
+    log_info << "u3 start";
     User u3(&el, addr3, addr2);
     u3.start();
 
     for (int i = 0; i < 20; ++i)
         el.poll(100);
 
+    log_info << "u4 start";
     User u4(&el, addr4, addr2);
     u4.start();
     for (int i = 0; i < 50; ++i)
         el.poll(100);
 
+    log_info << "u1 stop";
     u1.stop();
     for (int i = 0; i < 250; ++i)
         el.poll(100);
 
+    log_info << "u1 start";
     u1.start();
-
+    
     for (int i = 0; i < 250; ++i)
         el.poll(100);
 

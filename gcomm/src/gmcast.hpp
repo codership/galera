@@ -403,7 +403,7 @@ typedef multimap<const UUID, string> UUIDToAddressMap;
 
 class GMCast : public Transport, EventContext
 {
-    UUID uuid;
+    UUID my_uuid;
 
     /* */
     typedef map<const int, GMCastProto*> ProtoMap;
@@ -424,22 +424,31 @@ class GMCast : public Transport, EventContext
     Transport* listener;
     string listen_addr;
 
+    static const int max_retry_cnt = 30;
     struct Timing
     {
+        UUID uuid;
         Time last_seen;
         Time next_reconnect;
         int retry_cnt;
-        Timing(const Time& last_seen_, const Time& next_reconnect_) :
+        Timing(const Time& last_seen_, const Time& next_reconnect_,
+            const UUID& uuid_) :
+            uuid(uuid_),
             last_seen(last_seen_),
             next_reconnect(next_reconnect_),
             retry_cnt(0)
         {
-
         }
     };
     
+    std::string initial_addr;
     typedef map<const string, Timing > AddrList;
     AddrList remote_addrs;
+
+    const UUID& get_uuid(const AddrList::const_iterator& i) const
+    {
+        return i->second.uuid;
+    }
 
     const string& get_address(const AddrList::const_iterator& i) const
     {
@@ -451,7 +460,7 @@ class GMCast : public Transport, EventContext
         i->second.last_seen = t;
     }
 
-    const Time& get_last_seen(AddrList::const_iterator& i) const
+    const Time& get_last_seen(AddrList::iterator& i) const
     {
         return i->second.last_seen;
     }
@@ -462,7 +471,7 @@ class GMCast : public Transport, EventContext
         i->second.next_reconnect = t;
     }
 
-    const Time& get_next_reconnect(AddrList::const_iterator& i) const
+    const Time& get_next_reconnect(AddrList::iterator& i) const
     {
         return i->second.next_reconnect;
     }
@@ -472,7 +481,7 @@ class GMCast : public Transport, EventContext
         return i->second.retry_cnt;
     }
 
-    int get_retry_cnt(AddrList::const_iterator& i) const
+    int get_retry_cnt(AddrList::iterator& i) const
     {
         return i->second.retry_cnt;
     }
@@ -484,11 +493,13 @@ class GMCast : public Transport, EventContext
 
 
     string group_name;
-    
+
     /* Accept a new connection */
     void gmcast_accept();
     /* Connect to remote host */
     void gmcast_connect(const string&);
+    /* Forget node */
+    void gmcast_forget(const UUID&);
     /* Handle GMCastProto that has connected succesfully to remote host */
     void handle_connected(GMCastProto*);
     /* Handle GMCastProto that has finished handshake sequence */
@@ -498,8 +509,8 @@ class GMCast : public Transport, EventContext
     /* Remote proto entry */
     void remove_proto(const int);
     
-    bool addr_connected(const string& addr) const;
-    void insert_address(const string& addr);
+    bool is_connected(const std::string& addr, const UUID& uuid) const;
+    void insert_address(const string& addr, const UUID& uuid);
     void update_addresses();
     void reconnect();
 
@@ -513,6 +524,11 @@ class GMCast : public Transport, EventContext
     void start();
     /* Stop gmcast engine */
     void stop();
+
+    std::string self_string() const
+    {
+        return "(" + get_uuid().to_string() + "," + listen_addr + ")";
+    }
 
 
     GMCast(const GMCast&);
@@ -546,7 +562,7 @@ public:
 
     const UUID& get_uuid() const
     {
-        return uuid;
+        return my_uuid;
     }
 
     size_t get_max_msg_size() const
