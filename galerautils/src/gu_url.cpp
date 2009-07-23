@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2008 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
 
 #include "gu_url.hpp"
 #include "gu_logger.hpp"
@@ -44,12 +49,21 @@ static gu::URLQueryList extract_query_list(const string& s,
         {
             log_error << "invalid url query part: '" << query << "'";
             throw std::invalid_argument("invalid url query part");
-        }
+       }
         ret.insert(make_pair(kvlist[0], kvlist[1]));
     }
     return ret;
 }
 
+gu::URL::URL() :
+    str(),
+    scheme(),
+    authority(),
+    path(),
+    query_list()
+{
+
+}
 
 gu::URL::URL(const string& str_) :
     str(str_),
@@ -88,11 +102,54 @@ void gu::URL::parse()
     regfree(&reg);    
     
     scheme = extract_str(str, pmatch[2]);
+    if (scheme == "")
+    {
+        log_error << "url '" << str << "' is missing scheme"; 
+        throw std::invalid_argument("missing scheme");
+    }
     authority = extract_str(str, pmatch[4]);
     path = extract_str(str, pmatch[5]);
     query_list = extract_query_list(str, pmatch[7]);
 
     log_debug << scheme << "://" << authority;
+}
+
+void gu::URL::recompose()
+{
+    str.clear();
+    str += scheme;
+    str += "://";
+    str += authority;
+    str += path;
+
+    if (query_list.size() > 0)
+    {
+        str += "?";
+    }
+    
+    URLQueryList::const_iterator i = query_list.begin();
+    while (i != query_list.end())
+    {
+        str += i->first + "=" + i->second;
+        URLQueryList::const_iterator i_next = i;
+        ++i_next;
+        if (i_next != query_list.end())
+        {
+            str += "&";
+        }
+        i = i_next;
+    }
+}
+
+const string& gu::URL::to_string() const
+{
+    return str;
+}
+
+void gu::URL::set_scheme(const std::string& s)
+{
+    scheme = s;
+    recompose();
 }
 
 const string& gu::URL::get_scheme() const
@@ -110,7 +167,14 @@ const string& gu::URL::get_path() const
     return path;
 }
 
+void gu::URL::set_query_param(const string& key, const string& val)
+{
+    query_list.insert(make_pair(key, val));
+    recompose();
+}
+
 const gu::URLQueryList& gu::URL::get_query_list() const
 {
     return query_list;
 }
+
