@@ -69,7 +69,6 @@ static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
      
      *s = *addri->ai_addr;
      *s_size = addri->ai_addrlen;
-     // LOG_WARN(Sockaddr(*s).to_string());
      freeaddrinfo(addri);
      free(ipaddr);
      free(port);
@@ -200,7 +199,7 @@ void TCP::listen()
     if (::bind(fd, &sa, sa_size) == -1) {
 	int err = errno;
 	LOG_FATAL(std::string("TCP::listen(): Bind failed to address ") 
-                  + Sockaddr(sa).to_string() + " failed " +
+                  + sockaddr_to_uri(Conf::TcpScheme, &sa) + " failed " +
                   ::strerror(err));
 	throw FatalException("TCP::listen(): Bind failed");
     }
@@ -675,23 +674,7 @@ const ReadBuf *TCP::recv()
 
 string TCP::get_remote_url() const
 {
-    char buf[24];
-    string ret = Conf::TcpScheme + "://";
-    
-    const sockaddr_in *sin = reinterpret_cast<const sockaddr_in*>(&sa);
-    
-    const char* rb = inet_ntop(sin->sin_family, &sin->sin_addr, buf,
-                               sizeof(buf));
-    if (rb == 0)
-    {
-        log_fatal << "address conversion failed: " << strerror(errno);
-        throw FatalException("address conversion failed");
-    }
-    ret += rb;
-    ret += ":";
-    ret += make_int<int>(ntohs(sin->sin_port)).to_string();
-
-    return ret;
+    return sockaddr_to_uri(Conf::TcpScheme, &sa);
 }
 
 END_GCOMM_NAMESPACE

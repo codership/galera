@@ -414,24 +414,25 @@ GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon_) :
         throw FatalException("invalid uri scheme");
     }
     
-    listen_addr = Conf::TcpScheme + "://" + uri.get_authority();
-    pair<URIQueryList::const_iterator, URIQueryList::const_iterator> 
-        ii = uri.get_query_list().equal_range(Conf::GMCastQueryNode);
-    for (URIQueryList::const_iterator i = ii.first; i != ii.second; ++i)
+    URIQueryList::const_iterator i = uri.get_query_list().find(Conf::GMCastQueryListenAddr);
+    if (i == uri.get_query_list().end())
     {
-        LOG_DEBUG(i->first + " <-> " + i->second);
-        URI is_valid(i->second);
-        if (check_uri(is_valid) == false)
-        {
-            LOG_WARN("unsopported uri, discarding");
-        }
-        else
-        {
-            insert_address(i->second);
-        }
+        log_fatal << "Parameter " << Conf::GMCastQueryListenAddr << " is required";
+        throw FatalException("missing parameter");
+    }
+    listen_addr = get_query_value(i);
+    if (check_uri(listen_addr) == false)
+    {
+        log_fatal << "Listen addr uri '" << listen_addr << "' is not valid";
+        throw FatalException("invalid uri");
     }
     
-    URIQueryList::const_iterator i = uri.get_query_list().find(Conf::GMCastQueryGroup);
+    if (uri.get_authority() != "")
+    {
+        insert_address(Conf::TcpScheme + "://" + uri.get_authority());
+    }
+    
+    i = uri.get_query_list().find(Conf::GMCastQueryGroup);
     if (i == uri.get_query_list().end())
     {
         LOG_FATAL("group not defined in uri: " + uri.to_string());

@@ -90,6 +90,12 @@ int read_int(const string& s);
  */
 long read_long(const string& s);
 
+/*! 
+ * Convert sockaddr struct to uri
+ */
+std::string sockaddr_to_uri(const std::string& scheme, const sockaddr* sa);
+
+
 
 END_GCOMM_NAMESPACE
 

@@ -52,8 +52,9 @@ namespace Conf
     static const string GMCastPrefix = "gmcast";
     static const string GMCastScheme = GCommPrefix + SchemeDelim + GMCastPrefix;
     
-    static const string GMCastQueryNode = GMCastPrefix + ParamKeyDelim + "node";
+    // static const string GMCastQueryNode = GMCastPrefix + ParamKeyDelim + "node";
     static const string GMCastQueryGroup = GMCastPrefix + ParamKeyDelim + "group";
+    static const string GMCastQueryListenAddr = GMCastPrefix + ParamKeyDelim + "listen_addr";
     
     static const string NodePrefix = "node";
     static const string NodeQueryName = NodePrefix + ParamKeyDelim + "name";

@@ -782,9 +782,9 @@ public:
 START_TEST(test_pc_transport)
 {
     EventLoop el;
-    PCUser2 pu1("gcomm+pc://localhost:10001?gmcast.group=pc&node.name=n1", &el);
-    PCUser2 pu2("gcomm+pc://localhost:10002?gmcast.group=pc&gmcast.node=gcomm+tcp://localhost:10001&node.name=n2", &el);
-    PCUser2 pu3("gcomm+pc://localhost:10003?gmcast.group=pc&gmcast.node=gcomm+tcp://localhost:10001&node.name=n3", &el);
+    PCUser2 pu1("gcomm+pc://?gmcast.listen_addr=gcomm+tcp://127.0.0.1:10001&gmcast.group=pc&node.name=n1", &el);
+    PCUser2 pu2("gcomm+pc://localhost:10001?gmcast.group=pc&gmcast.listen_addr=gcomm+tcp://localhost:10002&node.name=n2", &el);
+    PCUser2 pu3("gcomm+pc://localhost:10001?gmcast.group=pc&gmcast.listen_addr=gcomm+tcp://localhost:10003&node.name=n3", &el);
 
     pu1.start();
 

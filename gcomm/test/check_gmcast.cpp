@@ -136,7 +136,7 @@ START_TEST(test_gmcast)
     EventLoop el;
 
 
-    Transport* tp1 = Transport::create(URI("gcomm+gmcast://127.0.0.1:10001?gmcast.group=testgrp"), &el);
+    Transport* tp1 = Transport::create("gcomm+gmcast://?gmcast.listen_addr=gcomm+tcp://127.0.0.1:10001&gmcast.group=testgrp", &el);
     
     tp1->connect();
     
@@ -147,7 +147,7 @@ START_TEST(test_gmcast)
 
     tp1->close();
 
-    Transport* tp2 = Transport::create(URI("gcomm+gmcast://127.0.0.1:10002?gmcast.group=testgrp&gmcast.node=gcomm+tcp://127.0.0.1:10001"), &el);
+    Transport* tp2 = Transport::create("gcomm+gmcast://127.0.0.1:10001?gmcast.group=testgrp&gmcast.listen_addr=gcomm+tcp://127.0.0.1:10002", &el);
     
     tp1->connect();
     tp2->connect();
@@ -167,7 +167,7 @@ START_TEST(test_gmcast)
     tp2->close();
 
 
-    Transport* tp3 = Transport::create(URI("gcomm+gmcast://127.0.0.1:10003?gmcast.group=testgrp&gmcast.node=gcomm+tcp://127.0.0.1:10002"), &el);
+    Transport* tp3 = Transport::create(URI("gcomm+gmcast://127.0.0.1:10002?gmcast.group=testgrp&gmcast.listen_addr=gcomm+tcp://127.0.0.1:10003"), &el);
 
     tp1->connect();
     tp2->connect();
@@ -209,6 +209,7 @@ START_TEST(test_gmcast_w_user_messages)
         int fd;
         EventLoop* el;
         Transport* tp;
+        size_t recvd;
         User(const User&);
         void operator=(User&);
     public:
@@ -216,19 +217,18 @@ START_TEST(test_gmcast_w_user_messages)
         User(EventLoop* el_, const char* listen_addr, const char* remote_addr) :
             fd(PseudoFd::alloc_fd()),
             el(el_),
-            tp(0)
+            tp(0),
+            recvd(0)
         {
             string uri("gcomm+gmcast://");
-            uri += listen_addr;
+            uri += remote_addr != 0 ? remote_addr : "";
             uri += "?";
             uri += "tcp.non_blocking=1";
             uri += "&";
             uri += "gmcast.group=testgrp";
-            if (remote_addr)
-            {
-                uri += "&gmcast.node=gcomm+tcp://";
-                uri += remote_addr;
-            }
+            uri += "&gmcast.listen_addr=gcomm+tcp://";
+            uri += listen_addr;
+
             tp = Transport::create(uri, el);
             set_down_context(tp);
             tp->set_up_context(this);
@@ -282,7 +282,14 @@ START_TEST(test_gmcast_w_user_messages)
             {
                 throw FatalException("content mismatch");
             }
+            recvd++;
         }
+
+        size_t get_recvd() const
+        {
+            return recvd;
+        }
+
     };
     
     const char* addr1 = "127.0.0.1:20001";
@@ -297,11 +304,16 @@ START_TEST(test_gmcast_w_user_messages)
     for (int i = 0; i < 10; ++i)
         el.poll(100);
 
+    fail_unless(u1.get_recvd() == 0);
+
     User u2(&el, addr2, addr1);
     u2.start();
 
     for (int i = 0; i < 15; ++i)
         el.poll(100);
+
+    fail_unless(u1.get_recvd() != 0);
+    fail_unless(u2.get_recvd() != 0);
 
     User u3(&el, addr3, addr2);
     u3.start();
@@ -322,6 +334,11 @@ START_TEST(test_gmcast_w_user_messages)
 
     for (int i = 0; i < 250; ++i)
         el.poll(100);
+
+    fail_unless(u1.get_recvd() != 0);
+    fail_unless(u2.get_recvd() != 0);
+    fail_unless(u3.get_recvd() != 0);
+    fail_unless(u4.get_recvd() != 0);
 
     u1.stop();
     u2.stop();

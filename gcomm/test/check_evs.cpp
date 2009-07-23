@@ -2157,9 +2157,9 @@ START_TEST(test_evs_w_gmcast)
 {
     EventLoop el;
 
-    EVSUser u1("gcomm+evs://127.0.0.1:10001?gmcast.group=evs&node.name=n1", &el);
-    EVSUser u2("gcomm+evs://127.0.0.1:10002?gmcast.group=evs&gmcast.node=gcomm+tcp://127.0.0.1:10001&node.name=n2", &el);
-    EVSUser u3("gcomm+evs://127.0.0.1:10003?gmcast.group=evs&gmcast.node=gcomm+tcp://127.0.0.1:10001&node.name=n3", &el);
+    EVSUser u1("gcomm+evs://?gmcast.listen_addr=gcomm+tcp://127.0.0.1:10001&gmcast.group=evs&node.name=n1", &el);
+    EVSUser u2("gcomm+evs://127.0.0.1:10001?gmcast.group=evs&gmcast.listen_addr=gcomm+tcp://127.0.0.1:10002&node.name=n2", &el);
+    EVSUser u3("gcomm+evs://127.0.0.1:10001?gmcast.group=evs&gmcast.listen_addr=gcomm+tcp://127.0.0.1:10003&node.name=n3", &el);
 
     u1.start();
 
