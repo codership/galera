@@ -10,7 +10,6 @@ libgcomm_la_SOURCES = 		\
 	string.cpp 		\
 	histogram.cpp		\
 	time.cpp		\
-	uri.cpp			\
 	uuid.cpp		\
 	monitor.cpp		\
 	pseudofd.cpp		\

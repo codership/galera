@@ -9,6 +9,7 @@
 
 #include <utility>
 #include <iostream>
+#include <stdexcept>
 
 using std::pair;
 using std::make_pair;
@@ -68,10 +69,10 @@ START_TEST(test_uri)
 {
     try
     {
-        URI too_simple("http:");
+        URI too_simple("http");
         fail("too simple accepted");
     }
-    catch (URISubexpNotFoundException e)
+    catch (std::invalid_argument& e)
     {
 
     }
@@ -97,10 +98,10 @@ START_TEST(test_uri)
 
     fail_unless(with_query.get_authority() == "example.com");
     fail_unless(with_query.get_path() == "");
-    const multimap<const string, string>& qlist = with_query.get_query_list();
+    const URIQueryList& qlist = with_query.get_query_list();
     fail_unless(qlist.size() == 2);
 
-    multimap<const string, string>::const_iterator i;
+    URIQueryList::const_iterator i;
     i = qlist.find("key1");
     fail_unless(i != qlist.end() && i->second == "val1");
     i = qlist.find("key2");
@@ -109,11 +110,11 @@ START_TEST(test_uri)
     URI with_uri_in_query("gcomm+gmcast://localhost:10001?gmcast.node=gcomm+tcp://localhost:10002&gmcast.node=gcomm+tcp://localhost:10003");
     fail_unless(with_uri_in_query.get_scheme() == "gcomm+gmcast");
     fail_unless(with_uri_in_query.get_authority() == "localhost:10001");
-    const multimap<const string, string>& qlist2 = with_uri_in_query.get_query_list();
+    const URIQueryList& qlist2 = with_uri_in_query.get_query_list();
     fail_unless(qlist2.size() == 2);
 
-    pair<multimap<const string, string>::const_iterator,
-        multimap<const string, string>::const_iterator> ii;
+    pair<URIQueryList::const_iterator,
+        URIQueryList::const_iterator> ii;
     ii = qlist2.equal_range("gmcast.node");
     fail_unless(ii.first != qlist2.end());
     for (i = ii.first; i != ii.second; ++i)
@@ -129,7 +130,7 @@ START_TEST(test_uri)
         URI invalid1("http://example.com/?key1");
         fail("invalid query accepted");
     }
-    catch (URIParseException e)
+    catch (std::invalid_argument& e)
     {
 
     }

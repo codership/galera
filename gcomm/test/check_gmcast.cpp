@@ -296,6 +296,8 @@ START_TEST(test_gmcast_w_user_messages)
     const char* addr2 = "127.0.0.1:20002";
     const char* addr3 = "127.0.0.1:20003";
     const char* addr4 = "127.0.0.1:20004";
+
+    // gu_log_max_level = GU_LOG_DEBUG;
     
     EventLoop el;
     User u1(&el, addr1, 0);
@@ -305,15 +307,13 @@ START_TEST(test_gmcast_w_user_messages)
         el.poll(100);
 
     fail_unless(u1.get_recvd() == 0);
-
+    
     User u2(&el, addr2, addr1);
     u2.start();
-
-    for (int i = 0; i < 15; ++i)
+    
+    while (u1.get_recvd() == 0 || u2.get_recvd() == 0)
         el.poll(100);
-
-    fail_unless(u1.get_recvd() != 0);
-    fail_unless(u2.get_recvd() != 0);
+    
 
     User u3(&el, addr3, addr2);
     u3.start();
