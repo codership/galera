@@ -157,10 +157,18 @@ const string& gu::URL::get_scheme() const
     return scheme;
 }
 
+
+void gu::URL::set_authority(const std::string& s)
+{
+    authority = s;
+    recompose();
+}
+
 const string& gu::URL::get_authority() const
 {
     return authority;
 }
+
 
 const string& gu::URL::get_path() const
 {

@@ -86,13 +86,15 @@ namespace gu
          */
         const std::string& get_scheme() const;
 
+        void set_authority(const std::string& auth);
+
         /*!
          * @brief Get URL authority
          *
          * @return URL authority
          */
         const std::string& get_authority() const;
-
+        
         /*!
          * @brief Get URL path
          *
