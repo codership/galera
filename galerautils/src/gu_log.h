@@ -48,9 +48,10 @@ gu_log (gu_log_severity_t severity,
         const int         line,
         const char*       format, ...);
 
+// NOTE: don't add "\n" here even if you really want to do it
 #define GU_LOG_C(level, format, ...)\
         gu_log(level, __FILE__, __PRETTY_FUNCTION__, __LINE__,\
-	       format "\n", ## __VA_ARGS__, NULL)
+	       format, ## __VA_ARGS__, NULL)
 
 /** This variable is made global only for the purpose of using it in
  *  gu_debug() macro and avoid calling gu_log() when debug is off.

@@ -86,7 +86,7 @@ namespace gu
 
     Logger::~Logger()
     {
-        os << std::endl;
+//        os << std::endl; becomes extra newline with most loggers
         logger (level, os.str().c_str());
     }
 

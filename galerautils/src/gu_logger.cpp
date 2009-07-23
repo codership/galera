@@ -99,7 +99,7 @@ namespace gu
     void
     Logger::default_logger (int lvl, const char* msg)
     {
-        fputs  (msg, stderr);
+        fputs  (msg, stderr); fputc ('\n', stderr);
         fflush (stderr);
     }
 
