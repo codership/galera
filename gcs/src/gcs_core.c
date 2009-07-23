@@ -79,7 +79,9 @@ typedef struct core_act
 core_act_t;
 
 gcs_core_t*
-gcs_core_create (const char* const backend_uri)
+gcs_core_create (const char* backend_uri,
+                 const char* node_name,
+                 const char* inc_addr)
 {
     long        err  = 0;
     gcs_core_t* core = GU_CALLOC (1, gcs_core_t);
@@ -99,8 +101,8 @@ gcs_core_create (const char* const backend_uri)
                 core->fifo = gcs_fifo_lite_create (CORE_FIFO_LEN,
                                                    sizeof (core_act_t));
                 if (core->fifo) {
-                    gu_mutex_init (&core->send_lock, NULL);
-                    gcs_group_init (&core->group);
+                    gu_mutex_init  (&core->send_lock, NULL);
+                    gcs_group_init (&core->group, node_name, inc_addr);
                     core->proto_ver = 0;
                     core->state = CORE_CLOSED;
 #ifdef GCS_CORE_TESTING
@@ -142,7 +144,7 @@ gcs_core_init (gcs_core_t* core, gcs_seqno_t seqno, const gu_uuid_t* uuid)
 
 long
 gcs_core_open (gcs_core_t* core,
-               const char* const channel)
+               const char* channel)
 {
     long ret;
 
@@ -471,8 +473,8 @@ core_handle_act_msg (gcs_core_t*     core,
                     act->id = core_error (core->state);
                 }
             }
-//          gu_debug ("Received action: seqno: %lld, sender: %d, size: %d, act: %p",
-//                     act->id, msg->sender_idx, ret, act->buf);
+//          gu_debug ("Received action: seqno: %lld, sender: %d, size: %d, "
+//                    "act: %p", act->id, msg->sender_idx, ret, act->buf);
 //          gu_debug ("%s", (char*) act->buf);
         }
         else if (gu_unlikely(ret < 0)){

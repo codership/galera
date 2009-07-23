@@ -17,7 +17,7 @@ static const char* group_state_str[GCS_GROUP_STATE_MAX] =
 };
 
 long
-gcs_group_init (gcs_group_t* group)
+gcs_group_init (gcs_group_t* group, const char* node_name, const char* inc_addr)
 {
     // here we also create default node instance.
     group->act_id       = GCS_SEQNO_ILL;
@@ -27,15 +27,18 @@ gcs_group_init (gcs_group_t* group)
     group->proto        = -1;
     group->num          = 1;
     group->my_idx       = 0;
+    group->my_name      = strdup(node_name ? node_name : NODE_NO_NAME);
+    group->my_address   = strdup(inc_addr  ? inc_addr  : NODE_NO_ADDR);
     group->state        = GCS_GROUP_NON_PRIMARY;
     group->last_applied = GCS_SEQNO_ILL; // mark for recalculation
     group->last_node    = -1;
     group->frag_reset   = true; // just in case
-    group->nodes        =  GU_CALLOC(group->num, gcs_node_t);
+    group->nodes        = GU_CALLOC(group->num, gcs_node_t);
 
     if (!group->nodes) return -ENOMEM;
 
-    gcs_node_init (&group->nodes[group->my_idx], "No ID");
+    gcs_node_init (&group->nodes[group->my_idx], NODE_NO_ID,
+                   group->my_name, group->my_address);
 
     return 0;
 }
@@ -64,16 +67,23 @@ gcs_group_init_history (gcs_group_t*     group,
 
 /* Initialize nodes array from component message */
 static inline gcs_node_t*
-group_nodes_init (const gcs_comp_msg_t* comp)
+group_nodes_init (const gcs_group_t* group, const gcs_comp_msg_t* comp)
 {
-    gcs_node_t* ret = NULL;
-    long nodes_num = gcs_comp_msg_num (comp);
-    register long i;
+    const long my_idx     = gcs_comp_msg_self (comp);
+    const long nodes_num  = gcs_comp_msg_num  (comp);
+    gcs_node_t* ret = GU_CALLOC (nodes_num, gcs_node_t);
+    long i;
 
-    ret = GU_CALLOC (nodes_num, gcs_node_t);
     if (ret) {
         for (i = 0; i < nodes_num; i++) {
-            gcs_node_init (&ret[i], gcs_comp_msg_id (comp, i));
+            if (my_idx != i) {
+                gcs_node_init (&ret[i], gcs_comp_msg_id (comp, i), NULL, NULL);
+            }
+            else { // this node
+                gcs_node_init (&ret[i], gcs_comp_msg_id (comp, i),
+                               group->nodes[group->my_idx].name,
+                               group->nodes[group->my_idx].inc_addr);
+            }
         }
     }
     return ret;
@@ -96,6 +106,8 @@ group_nodes_free (gcs_group_t* group)
 void
 gcs_group_free (gcs_group_t* group)
 {
+    if (group->my_name)    free ((char*)group->my_name);
+    if (group->my_address) free ((char*)group->my_address);
     group_nodes_free (group);
 }
 
@@ -166,7 +178,7 @@ group_post_state_exchange (gcs_group_t* group)
         if (NULL == states[i] ||
             (new_exchange &&
              gu_uuid_compare (&group->state_uuid, gcs_state_uuid(states[i]))))
-            return; // not all states from THIS state exch. received, wait more
+            return; // not all states from THIS state exch. received, wait
     }
     gu_debug ("STATE EXCHANGE: "GU_UUID_FORMAT" complete.",
               GU_UUID_ARGS(&group->state_uuid));
@@ -217,36 +229,51 @@ gcs_group_state_t
 gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
 {
     long        new_idx, old_idx;
-    long        new_nodes_num = 0;
-    gcs_node_t *new_nodes;
-    ulong       new_memb = 0;
+    gcs_node_t* new_nodes = NULL;
+    ulong       new_memb  = 0;
 
-    group->my_idx = gcs_comp_msg_self (comp);
-    new_nodes_num = gcs_comp_msg_num  (comp);
+    const bool prim_comp     = gcs_comp_msg_primary(comp);
+    const long new_my_idx    = gcs_comp_msg_self   (comp);
+    const long new_nodes_num = gcs_comp_msg_num    (comp);
 
-    gu_info ("New COMPONENT: primary = %s, my_id = %d, memb_num = %d",
-             gcs_comp_msg_primary(comp) ? "yes" : "no",
-             group->my_idx, new_nodes_num);
+    if (new_my_idx >= 0) {
+        assert (new_nodes_num > 0);
 
-    if (gcs_comp_msg_primary(comp)) {
-        /* Got PRIMARY COMPONENT - Hooray! */
-        /* create new nodes array according to new membrship */
-        assert (new_nodes_num);
-        new_nodes = group_nodes_init (comp);
+        gu_info ("New COMPONENT: primary = %s, my_id = %d, memb_num = %d",
+                 prim_comp ? "yes" : "no", new_my_idx, new_nodes_num);
+
+        new_nodes = group_nodes_init (group, comp);
+
         if (!new_nodes) {
             gu_fatal ("Could not allocate memory for %ld-node component.",
                       gcs_comp_msg_num (comp));
             assert(0);
             return -ENOMEM;
         }
+    }
+    else {
+        // Self-leave message
+        assert (0 == new_nodes_num);
+        assert (!prim_comp);
+        gu_info ("Received self-leave message.");
+    }
 
+    if (prim_comp) {
+        /* Got PRIMARY COMPONENT - Hooray! */
+        assert (new_my_idx >= 0);
         if (group->state == GCS_GROUP_PRIMARY) {
             /* we come from previous primary configuration, relax */
         }
         else {
-            if (1 == new_nodes_num && GCS_SEQNO_ILL == group->conf_id) {
-                /* First configuration for this process, only node in group:
-                 * bootstrap new configuration by default. */
+            const bool first_component =
+#ifndef GCS_CORE_TESTING
+            (1 == group->num) && !strcmp (NODE_NO_ID, group->nodes[0].id);
+#else
+            (1 == group->num);
+#endif
+
+            if (1 == new_nodes_num && first_component) {
+                /* bootstrap new configuration */
                 assert (GCS_GROUP_NON_PRIMARY == group->state);
                 assert (1 == group->num);
                 assert (0 == group->my_idx);
@@ -267,23 +294,15 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                  * we'll be recognized as coming from prev. conf. below */
                 strncpy ((char*)group->nodes[0].id, new_nodes[0].id,
                          sizeof (new_nodes[0].id) - 1);
+#if 0 //delete
                 /* forge own state message - for group_post_state_exchange() */
                 gcs_node_record_state (&group->nodes[0],
                                        gcs_group_get_state (group));
+#endif
             }
         }
     }
     else {
-        if (group->my_idx < 0) {
-            // Self-leave message
-            assert (0 == new_nodes_num);
-            new_nodes = NULL;
-            gu_info ("Received self-leave message.");
-        }
-        else {
-            new_nodes = group_nodes_init (comp);
-        }
-
         group_go_non_primary (group);
     }
 
@@ -308,8 +327,9 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     /* free old nodes array */
     group_nodes_free (group);
 
-    group->nodes  = new_nodes;
+    group->my_idx = new_my_idx;
     group->num    = new_nodes_num;
+    group->nodes  = new_nodes;
 
     if (gcs_comp_msg_primary(comp)) {
         /* TODO: for now pretend that we always have new nodes and perform
@@ -349,8 +369,9 @@ gcs_group_handle_uuid_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     }
     else {
         gu_warn ("Stray state UUID msg: "GU_UUID_FORMAT
-                 " from node %d, current group state %s",
-                 GU_UUID_ARGS(&group->state_uuid), msg->sender_idx,
+                 " from node %ld (%s), current group state %s",
+                 GU_UUID_ARGS(&group->state_uuid),
+                 msg->sender_idx, group->nodes[msg->sender_idx].name,
                  group_state_str[group->state]);
     }
 
@@ -369,25 +390,31 @@ gcs_group_state_t
 gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 {
     if (GCS_GROUP_WAIT_STATE_MSG == group->state) {
-        gcs_state_t* state = gcs_state_msg_read (msg->buf, msg->size);
+
+        gcs_state_t* state       = gcs_state_msg_read (msg->buf, msg->size);
 
         if (state) {
+
             const gu_uuid_t* state_uuid = gcs_state_uuid (state);
 
             if (!gu_uuid_compare(&group->state_uuid, state_uuid)) {
+
                 gu_info ("STATE EXCHANGE: got state msg: "GU_UUID_FORMAT
-                         " from %d",
-                         GU_UUID_ARGS(state_uuid), msg->sender_idx);
+                         " from %ld (%s)", GU_UUID_ARGS(state_uuid),
+                         msg->sender_idx, gcs_state_name(state));
                 if (gu_log_debug) group_print_state_debug(state);
 
                 gcs_node_record_state (&group->nodes[msg->sender_idx], state);
                 group_post_state_exchange (group);
+
             }
             else {
-                gu_debug ("STATE EXCHANGE: stray state msg: "GU_UUID_FORMAT
-                          "from node %d, current state UUID: "GU_UUID_FORMAT,
-                          GU_UUID_ARGS(state_uuid), msg->sender_idx,
-                          GU_UUID_ARGS(&group->state_uuid));
+                gu_warn ("STATE EXCHANGE: stray state msg: "GU_UUID_FORMAT
+                         "from node %ld (%s), current state UUID: "
+                         GU_UUID_FORMAT,
+                         GU_UUID_ARGS(state_uuid),
+                         msg->sender_idx, gcs_state_name(state),
+                         GU_UUID_ARGS(&group->state_uuid));
                 if (gu_log_debug) group_print_state_debug(state);
 
                 gcs_state_destroy (state);
@@ -395,7 +422,7 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
         }
         else {
             gu_warn ("Could not parse state message from node %d",
-                     msg->sender_idx);
+                     msg->sender_idx, group->nodes[msg->sender_idx].name);
         }
     }
 
@@ -477,12 +504,12 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         }
 
         if (seqno < 0) {
-            gu_warn ("State Transfer %ld(%s) %s %ld(%s) failed: %d (%s)",
+            gu_warn ("State Transfer %ld (%s) %s %ld (%s) failed: %d (%s)",
                      sender_idx, sender->name, st_dir, peer_idx, peer_name,
                      (int)seqno, strerror((int)-seqno));
         }
         else {
-            gu_info ("State Transfer %ld(%s) %s %ld(%s) complete.",
+            gu_info ("State Transfer %ld (%s) %s %ld (%s) complete.",
                      sender_idx, sender->name, st_dir, peer_idx, peer_name);
         }
 
@@ -494,9 +521,9 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         }
         else {
             // should we freak out and throw an error?
-            gu_warn ("Protocol violation. JOIN message sender %ld is not "
-                     "in state transfer (%s). Message ignored.",
-                     msg->sender_idx, gcs_state_node_string[sender->status]);
+            gu_warn ("Protocol violation. JOIN message sender %ld (%s) is not "
+                     "in state transfer (%s). Message ignored.", sender_idx,
+                     sender->name, gcs_state_node_string[sender->status]);
         }
         return 0;
     }
@@ -588,6 +615,7 @@ gcs_group_handle_state_request (gcs_group_t*    group,
 {
     // pass only to sender and to one potential donor
     long             donor_idx;
+    const char*      joiner_name  = group->nodes[joiner_idx].name;
     gcs_state_node_t joiner_state = group->nodes[joiner_idx].status;
 
     assert (GCS_ACT_STATE_REQ == act->type);
@@ -603,8 +631,9 @@ gcs_group_handle_state_request (gcs_group_t*    group,
             return act->buf_len;
         }
         else {
-            gu_error ("Node %ld requested state transfer, "
-                      "but it is in %s. Ignoring.", joiner_state_string);
+            gu_error ("Node %ld (%s) requested state transfer, "
+                      "but it is in %s. Ignoring.",
+                      joiner_idx, joiner_name, joiner_state_string);
             free ((void*)act->buf);
             return 0;
         }
@@ -614,12 +643,14 @@ gcs_group_handle_state_request (gcs_group_t*    group,
     assert (donor_idx != joiner_idx);
 
     if (donor_idx >= 0) {
-        gu_info ("Node %ld requested State Transfer. "
-                 "Selected %ld as donor.", joiner_idx, donor_idx);
+        gu_info ("Node %ld (%s) requested State Transfer. "
+                 "Selected %ld (%s) as donor.", joiner_idx, joiner_name,
+                 donor_idx,  group->nodes[donor_idx].name);
     }
     else {
-        gu_warn ("Node %ld requested State Transfer. "
-                 "However failed to select State Transfer donor.");
+        gu_warn ("Node %ld (%s) requested State Transfer, "
+                 "but it is impossible to select State Transfer donor.",
+                 joiner_idx, joiner_name);
     }
 
     if (group->my_idx != joiner_idx && group->my_idx != donor_idx) {
@@ -685,6 +716,7 @@ gcs_group_act_conf (gcs_group_t* group, gcs_recv_act_t* act)
 extern gcs_state_t*
 gcs_group_get_state (gcs_group_t* group) {
     const gcs_node_t* my_node = &group->nodes[group->my_idx];
+
     return gcs_state_create (
         &group->state_uuid,
         &group->group_uuid,

@@ -29,6 +29,7 @@ gcs_state_create (const gu_uuid_t* state_uuid,
     size_t addr_len  = strlen(inc_addr) + 1;
     gcs_state_t* ret =
         gu_calloc (1, sizeof (gcs_state_t) + name_len + addr_len);
+
     if (ret) {
         ret->state_uuid = *state_uuid;
         ret->group_uuid = *group_uuid;
@@ -42,6 +43,7 @@ gcs_state_create (const gu_uuid_t* state_uuid,
         strcpy ((char*)ret->name, name);
         strcpy ((char*)ret->inc_addr, inc_addr);
     }
+
     return ret;
 }
 
@@ -244,7 +246,7 @@ state_nodes_compare (const gcs_state_t* left, const gcs_state_t* right)
     }
 }
 
-/* Prints out all significant (JOINED) nodes */
+/* Helper - just prints out all significant (JOINED) nodes */
 static void
 state_report_conflicting_uuids (const gcs_state_t* states[], long states_num)
 {

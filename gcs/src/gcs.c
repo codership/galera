@@ -117,15 +117,15 @@ gcs_slave_act_t;
 
 /* Creates a group connection handle */
 gcs_conn_t*
-gcs_create (const char *backend)
+gcs_create (const char* backend, const char* node_name, const char* inc_addr)
 {
     long ret;
-    gcs_conn_t *conn = GU_CALLOC (1, gcs_conn_t);
+    gcs_conn_t* conn = GU_CALLOC (1, gcs_conn_t);
 
     if (conn) {
         conn->state = GCS_CONN_DESTROYED;
 
-        conn->core = gcs_core_create (backend);
+        conn->core = gcs_core_create (backend, node_name, inc_addr);
         if (conn->core) {
 
             ret = gcs_core_set_pkt_size (conn->core, GCS_DEFAULT_PKT_SIZE);
@@ -247,7 +247,7 @@ gcs_send_sync (gcs_conn_t* conn) {
 
     if (conn->lower_limit >= conn->queue_len) {
         // tripped lower slave queue limit, send SYNC message
-        gu_info ("SENDING SYNC");
+        gu_debug ("SENDING SYNC");
         ret = gcs_core_send_sync (conn->core, 0);
         if (ret >= 0) {
             ret = 0;
@@ -345,12 +345,10 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     if (conf->st_required) {
         gcs_become_open (conn);
     }
-    else if (conf->seqno == GCS_SEQNO_NIL) {
-        /* Exceptional rule: no actions have been yet applied,
-         * we're as good as JOINED */
-        if (GCS_CONN_OPEN == conn->state) { // TODO: change to GCS_CONN_PRIMARY
-            conn->state = GCS_CONN_JOINED;
-        }
+    else if (GCS_CONN_OPEN == conn->state) {
+        /* if quorum decided that state transfer is not needed, we're as good
+         * as joined. */
+        conn->state = GCS_CONN_JOINED;
     }
 
     /* reset flow control as membership is most likely changed */
@@ -414,11 +412,11 @@ gcs_handle_actions (gcs_conn_t*    conn,
         }
         break; 
     case GCS_ACT_JOIN:
-        gu_info ("Got GCS_ACT_JOIN");
+        gu_debug ("Got GCS_ACT_JOIN");
         gcs_become_joined (conn);
         break;
     case GCS_ACT_SYNC:
-        gu_info ("Got GCS_ACT_SYNC");
+        gu_debug ("Got GCS_ACT_SYNC");
         gcs_become_synced (conn);
         break;
     default:
@@ -574,7 +572,7 @@ static void *gcs_recv_thread (void *arg)
     }
     
     if (ret > 0) ret = 0;
-    gu_debug ("RECV thread exiting %d: %s", ret, strerror(-ret));
+    gu_info ("RECV thread exiting %d: %s", ret, strerror(-ret));
     return NULL;
 }
 
@@ -665,6 +663,8 @@ long gcs_close (gcs_conn_t *conn)
         }
 
         /* wake all gcs_recv() threads */
+        // FIXME: this can block waiting for applicaiton threads to fetch all
+        // items. In certain situations this can block forever. Ticket #113
         gu_fifo_close (conn->recv_q);
     }
     gu_mutex_unlock (&conn->lock);

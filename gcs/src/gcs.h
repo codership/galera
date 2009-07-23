@@ -44,10 +44,14 @@ typedef struct gcs_conn gcs_conn_t;
  *
  *                Currently supported backend types: "dummy", "spread", "gcomm"
  *
+ * @param node_name human readable name of the node, can be null.
+ * @param inc_addr  address at which application accepts incoming requests.
+ *                  Used for load balancing, can be null.
+ *
  * @return pointer to GCS connection handle, NULL in case of failure.
  */
 extern gcs_conn_t*
-gcs_create  (const char *backend);
+gcs_create  (const char *backend, const char* node_name, const char* inc_addr);
 
 /*! @brief Initialize group history values (optional). 
  * Serves to provide group history persistence after process restart (in case

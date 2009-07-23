@@ -39,6 +39,8 @@ typedef struct gcs_group
     gcs_proto_t   proto;        // protocol version to use
     long          num;          // number of nodes
     long          my_idx;       // my index in the group
+    const char*   my_name;
+    const char*   my_address;
     gcs_group_state_t state;    // group state: PRIMARY | NON_PRIMARY
     volatile
     gcs_seqno_t   last_applied; // last_applied action group-wide
@@ -52,7 +54,9 @@ gcs_group_t;
  * Initialize group at startup
  */
 extern long
-gcs_group_init (gcs_group_t* group);
+gcs_group_init (gcs_group_t* group,
+                const char*  node_name, ///< can be null
+                const char*  inc_addr); ///< can be null
 
 /*!
  * Initialize group action history parameters. See gcs.h

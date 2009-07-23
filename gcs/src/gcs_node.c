@@ -8,12 +8,12 @@
 
 #include "gcs_node.h"
 
-#define NODE_DEFAULT_NAME  "no name"
-#define NODE_DEFAULT_ADDR  "no addr"
-
 /*! Initialize node context */
 void
-gcs_node_init (gcs_node_t* node, const char* id)
+gcs_node_init (gcs_node_t* node,
+               const char* id,
+               const char* name,
+               const char* inc_addr)
 {
     assert(strlen(id) > 0);
     assert(strlen(id) < sizeof(node->id));
@@ -21,8 +21,8 @@ gcs_node_init (gcs_node_t* node, const char* id)
     memset (node, 0, sizeof (gcs_node_t));
     strncpy ((char*)node->id, id, sizeof(node->id) - 1);
     node->status    = GCS_STATE_NON_PRIM;
-    node->name      = strdup (NODE_DEFAULT_NAME);
-    node->inc_addr  = strdup (NODE_DEFAULT_ADDR);
+    node->name      = strdup (name     ? name     : NODE_NO_NAME);
+    node->inc_addr  = strdup (inc_addr ? inc_addr : NODE_NO_ADDR);
     node->proto_min = GCS_ACT_PROTO_MIN;
     node->proto_max = GCS_ACT_PROTO_MAX;
     gcs_defrag_init (&node->app);
@@ -123,6 +123,12 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
                 // gap in sequence numbers, needs a snapshot, demote status
                 node->status = GCS_STATE_PRIM;
             }
+            else if (GCS_STATE_PRIM >= node->status &&
+                     node_act_id    == quorum->act_id) {
+                // node state matches quorum's, promote status
+                node->status = GCS_STATE_JOINED;
+            }
+
             if (GCS_STATE_PRIM > node->status) {
                 // node must be at least GCS_STATE_PRIM
                 node->status = GCS_STATE_PRIM;

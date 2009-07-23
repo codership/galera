@@ -132,7 +132,7 @@ START_TEST (gcs_group_configuration)
     mark_point();
 
     // ready
-    gcs_group_init (&group);
+    gcs_group_init (&group, "my node", "my addr");
     fail_if (gcs_group_is_primary(&group));
     fail_if (group.num != 1);
 
@@ -420,7 +420,7 @@ START_TEST(gcs_group_last_applied)
     fail_if (gcs_comp_msg_add (comp, DISTANTHOST"2") < 0);
     fail_if (gcs_comp_msg_add (comp, DISTANTHOST"2") >= 0);
 
-    gcs_group_init(&group);
+    gcs_group_init(&group, "", "");
     mark_point();
     ret = new_component (&group, comp);
     fail_if (ret < 0);

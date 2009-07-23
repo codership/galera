@@ -67,10 +67,10 @@ static char               *gcs_channel  = "dummy_galera";
 static char               *gcs_url      = NULL;
 
 /* state trackers */
-static gcs_seqno_t         sst_seqno;    // received in state transfer
-static gu_uuid_t           sst_uuid;     // received in state transfer
-static gcs_seqno_t         last_recved;  // last received from group
-static gcs_seqno_t         last_applied; // last applied by application
+static gcs_seqno_t         sst_seqno;         // received in state transfer
+static gu_uuid_t           sst_uuid;          // received in state transfer
+static gcs_seqno_t         last_recved  = -1; // last received from group
+static gcs_seqno_t         last_applied = -1; // last applied by application
 static gu_uuid_t           group_uuid;
 static long                my_idx;
 
@@ -206,9 +206,18 @@ static enum wsrep_status mm_galera_set_logger(
 }
 #endif // DELETED
 
+#define GALERA_UPDATE_LAST_APPLIED(seqno)                               \
+    assert (last_applied <= seqno);                                     \
+    last_applied = seqno;                                               \
+    assert (last_applied <= last_recved);                               \
+    if (app_stat_cb) {                                                  \
+        app_stat_cb(WSREP_STAT_LAST_SEQNO, WSREP_TYPE_INT, &last_applied); \
+    }
+
 static enum wsrep_status mm_galera_init(wsrep_t* gh,
                                         const wsrep_init_args_t* args)
 {
+    gcs_seqno_t    seqno;
     galera_state_t saved_state;
     int rcode;
 
@@ -238,7 +247,7 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
         gcs_channel = strdup (args->gcs_group);
     }
 
-    gcs_conn = gcs_create(gcs_url);
+    gcs_conn = gcs_create(gcs_url, args->name, NULL);
     if (!gcs_conn) {
         gu_error ("Failed to create GCS conection handle");
         GU_DBUG_RETURN(WSREP_NODE_FAIL);
@@ -247,8 +256,8 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     /* set up initial state: */
 
     /* 1.  initialize state to undefined */
-    last_applied = GCS_SEQNO_ILL; // unset state is defined by negative seqno
-    group_uuid   = GU_UUID_NIL;
+    seqno      = GCS_SEQNO_ILL; // unset state is defined by negative seqno
+    group_uuid = GU_UUID_NIL;
 
     /* 2. read saved state from file */
     rcode = galera_restore_state(args->data_dir, &saved_state);
@@ -256,38 +265,39 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
         gu_warn("GALERA state restore failed");
     } else {
         group_uuid = *(&saved_state.uuid);
-        last_applied = saved_state.last_applied_seqno;
+        seqno = saved_state.last_applied_seqno;
     }
 
     gu_info("Found state:      " GU_UUID_FORMAT ":%lli",
-            GU_UUID_ARGS(&(group_uuid)), last_applied);
+            GU_UUID_ARGS(&(group_uuid)), seqno);
 
     /* 3. use passed state arguments */
     if (args->state_seqno != WSREP_SEQNO_UNDEFINED) {
-        last_applied = args->state_seqno;
+        seqno = args->state_seqno;
     }
     if (memcmp(&WSREP_UUID_UNDEFINED, &args->state_uuid, sizeof(wsrep_uuid_t))){
         group_uuid = *(gu_uuid_t*)&args->state_uuid;
     }
 
     gu_info("Configured state: " GU_UUID_FORMAT ":%lli",
-            GU_UUID_ARGS(&(group_uuid)), last_applied);
+            GU_UUID_ARGS(&(group_uuid)), seqno);
 
     /* 4. initialize GCS state */
-    rcode = gcs_init (gcs_conn, last_applied, group_uuid.data);
+    rcode = gcs_init (gcs_conn, seqno, group_uuid.data);
     if (rcode) {
         gu_error ("Failed to initialize GCS state: %d (%s)",
                   rcode, strerror (-rcode));
         GU_DBUG_RETURN(WSREP_NODE_FAIL);            
     }
 
-    last_recved = last_applied;
     my_idx      = 0;
+    last_recved = seqno;
+
+    app_stat_cb = args->stat_param_cb;
+    GALERA_UPDATE_LAST_APPLIED (seqno);
 
     /* initialize wsdb */
     wsdb_init(args->data_dir, (gu_log_cb_t)args->logger_cb);
-
-    app_stat_cb = args->stat_param_cb;
 
     /* set the rest of callbacks */
     bf_apply_cb       = args->bf_apply_cb;
@@ -706,7 +716,7 @@ static inline long galera_eagain (
 // the following are made as macros to allow for correct line number reporting
 #define GALERA_GRAB_TO_QUEUE(seqno)                                  \
 {                                                                    \
-    long ret = galera_eagain (gu_to_grab, to_queue, seqno);         \
+    long ret = galera_eagain (gu_to_grab, to_queue, seqno);          \
     if (gu_unlikely(ret)) {                                          \
         gu_fatal("Failed to grab to_queue at %lld: %ld (%s)",        \
                  seqno, ret, strerror(-ret));                        \
@@ -717,7 +727,7 @@ static inline long galera_eagain (
 
 #define GALERA_RELEASE_TO_QUEUE(seqno)                               \
 {                                                                    \
-    long ret = gu_to_release (to_queue, seqno);                     \
+    long ret = gu_to_release (to_queue, seqno);                      \
     if (gu_unlikely(ret)) {                                          \
         gu_fatal("Failed to release to_queue at %lld: %ld (%s)",     \
                  seqno, ret, strerror(-ret));                        \
@@ -728,7 +738,7 @@ static inline long galera_eagain (
 
 #define GALERA_SELF_CANCEL_TO_QUEUE(seqno)                           \
 {                                                                    \
-    long ret = galera_eagain (gu_to_self_cancel, to_queue, seqno);  \
+    long ret = galera_eagain (gu_to_self_cancel, to_queue, seqno);   \
     if (gu_unlikely(ret)) {                                          \
         gu_fatal("Failed to self-cancel to_queue at %lld: %ld (%s)", \
                  seqno, ret, strerror(-ret));                        \
@@ -737,20 +747,20 @@ static inline long galera_eagain (
     }                                                                \
 }
 
-#define GALERA_GRAB_COMMIT_QUEUE(seqno)                                  \
-{                                                                        \
+#define GALERA_GRAB_COMMIT_QUEUE(seqno)                                 \
+{                                                                       \
     long ret = galera_eagain (gu_to_grab, commit_queue, seqno);         \
-    if (gu_unlikely(ret)) {                                              \
-        gu_fatal("Failed to grab commit_queue at %lld: %ld (%s)",        \
-                 seqno, ret, strerror(-ret));                            \
-        assert(0);                                                       \
-        abort();                                                         \
-    }                                                                    \
+    if (gu_unlikely(ret)) {                                             \
+        gu_fatal("Failed to grab commit_queue at %lld: %ld (%s)",       \
+                 seqno, ret, strerror(-ret));                           \
+        assert(0);                                                      \
+        abort();                                                        \
+    }                                                                   \
 }
 
 #define GALERA_RELEASE_COMMIT_QUEUE(seqno)                               \
 {                                                                        \
-    long ret = gu_to_release (commit_queue, seqno);                     \
+    long ret = gu_to_release (commit_queue, seqno);                      \
     if (gu_unlikely(ret)) {                                              \
         gu_fatal("Failed to release commit_queue at %lld: %ld (%s)",     \
                  seqno, ret, strerror(-ret));                            \
@@ -761,7 +771,7 @@ static inline long galera_eagain (
 
 #define GALERA_SELF_CANCEL_COMMIT_QUEUE(seqno)                           \
 {                                                                        \
-    long ret = galera_eagain (gu_to_self_cancel, commit_queue, seqno);  \
+    long ret = galera_eagain (gu_to_self_cancel, commit_queue, seqno);   \
     if (gu_unlikely(ret)) {                                              \
         gu_fatal("Failed to self-cancel commit_queue at %lld: %ld (%s)", \
                  seqno, ret, strerror(-ret));                            \
@@ -786,16 +796,6 @@ galera_update_global_seqno (gcs_seqno_t seqno)
         return false;
     }
 }
-
-#define GALERA_UPDATE_LAST_APPLIED(seqno) \
-    assert (last_applied <= seqno);       \
-    last_applied = seqno;                 \
-    assert (last_applied <= last_recved); \
-    if (app_stat_cb) {                    \
-        app_stat_cb(WSREP_STAT_LAST_SEQNO, WSREP_TYPE_INT, &last_applied); \
-    }
-
-
 
 static void process_conn_write_set( 
     struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
@@ -1138,7 +1138,7 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
 
                 if (gu_uuid_compare (&sst_uuid, conf_uuid) ||
                     sst_seqno < conf->seqno) {
-                    gu_fatal ("Applicaiton received wrong state:"
+                    gu_fatal ("Application received wrong state:"
                               "\n\tReceived: "GU_UUID_FORMAT" :    %lld"
                               "\n\tRequired: "GU_UUID_FORMAT" : >= %lld",
                               GU_UUID_ARGS(&sst_uuid), sst_seqno,
@@ -1148,10 +1148,10 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
                 }
                 else {
                     group_uuid  = sst_uuid;
-                    last_recved = sst_seqno;
-                    gu_info ("Applicaiton state transfer comlete: "
+                    last_recved = sst_seqno; // last_applied is updated below
+                    gu_info ("Application state transfer complete: "
                              GU_UUID_FORMAT":%lld",
-                             GU_UUID_ARGS(&group_uuid), last_applied);
+                             GU_UUID_ARGS(&group_uuid), last_recved);
 
                     while (-EAGAIN == (ret = gcs_join (gcs_conn, last_recved)))
                         usleep (100000);
@@ -1163,7 +1163,7 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
         else { /* no state transfer required */
 
             if (1 == conf->conf_id) {
-                assert (last_recved < 0);
+//                assert (last_recved < 0);
                 last_recved = conf->seqno;
                 group_uuid  = *conf_uuid;
             }

@@ -12,6 +12,8 @@
 #include "../gcs_node.h"
 
 #define NODE_ID "owpiefd[woie"
+#define NODE_NAME "strange name"
+#define NODE_ADDR "0.0.0.0:0"
 
 START_TEST (gcs_node_test)
 {
@@ -19,11 +21,17 @@ START_TEST (gcs_node_test)
     gcs_node_t node1, node2;
     static const gcs_seqno_t seqno = 333;
     
-    gcs_node_init (&node1, NODE_ID);
-    gcs_node_init (&node2, "baka");
+    gcs_node_init (&node1, NODE_ID, NODE_NAME, NODE_ADDR);
+    gcs_node_init (&node2, "baka", NULL, NULL);
     
     fail_if (strcmp(node1.id, NODE_ID), "Expected node id '%s', found '%s'",
              NODE_ID, node1.id);
+
+    fail_if (strcmp(node1.name, NODE_NAME), "Expected node name '%s', "
+             "found '%s'", NODE_NAME, node1.name);
+
+    fail_if (strcmp(node1.inc_addr, NODE_ADDR), "Expected node id '%s', "
+             "found '%s'", NODE_ADDR, node1.inc_addr);
 
     fail_if (gcs_node_get_last_applied(&node1));
     

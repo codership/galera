@@ -18,6 +18,10 @@
 #include "gcs_comp_msg.h"
 #include "gcs_state.h"
 
+#define NODE_NO_ID   "undefined"
+#define NODE_NO_NAME "unknown"
+#define NODE_NO_ADDR "unknown"
+
 struct gcs_node
 {
     gcs_seqno_t        last_applied; // last applied action on that node
@@ -29,7 +33,7 @@ struct gcs_node
     gcs_defrag_t       app;          // defragmenter for application actions
     gcs_defrag_t       oob;        // defragmenter for out-of-band service acts.
 
-    // globally unique id from the component message
+    // globally unique id from a component message
     const char         id[GCS_COMP_MEMB_ID_MAX_LEN + 1];
 
     // to track snapshot status
@@ -44,7 +48,10 @@ typedef struct gcs_node gcs_node_t;
 
 /*! Initialize node context */
 extern void
-gcs_node_init (gcs_node_t* node, const char* id);
+gcs_node_init (gcs_node_t* node,
+               const char* id,
+               const char* name,      ///< can be null
+               const char* inc_addr); ///< can be null
 
 /*! Move data from one node object to another */
 extern void

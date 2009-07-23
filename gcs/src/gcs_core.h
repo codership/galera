@@ -36,7 +36,9 @@ typedef struct gcs_core gcs_core_t;
  * generic communicaton layer - send/recieve buffers and the like.
  */
 extern gcs_core_t*
-gcs_core_create (const char* const backend);
+gcs_core_create (const char* backend,
+                 const char* node_name,
+                 const char* inc_addr);
 
 /* initializes action history (global seqno, group UUID). See gcs.h */
 extern long
@@ -49,8 +51,8 @@ gcs_core_init (gcs_core_t* core, gcs_seqno_t seqno, const gu_uuid_t* uuid);
  * negative - error code
  */
 extern long
-gcs_core_open  (gcs_core_t*       conn,
-                const char* const channel);
+gcs_core_open  (gcs_core_t* conn,
+                const char* channel);
 
 
 /*

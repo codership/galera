@@ -263,10 +263,13 @@ core_test_init ()
 
     mark_point();
 
-    Core = gcs_core_create ("poiewqjfow");
+    Core = gcs_core_create ("poiewqjfow", NULL, NULL);
     fail_if (NULL != Core);
 
-    Core = gcs_core_create ("dummy://xxx.yyy.zzz");
+    Core = gcs_core_create ("dummy://xxx.yyy.zzz",
+                            "core_test",
+                            "aaa.bbb.ccc.ddd:xxxx");
+
     fail_if (NULL == Core);
 
     Backend = gcs_core_get_backend (Core);
@@ -448,7 +451,7 @@ START_TEST (gcs_core_test_own)
     action_t act_s    = { ACT, act_size, GCS_ACT_TORDERED, -1 };
     action_t act_r    = { NULL, -1, -1, -1 };
 
-    // Create primary and non-primary componen messages
+    // Create primary and non-primary component messages
     gcs_comp_msg_t* prim     = gcs_comp_msg_new (true,  0, 1);
     gcs_comp_msg_t* non_prim = gcs_comp_msg_new (false, 0, 1);
     fail_if (NULL == prim);
@@ -504,15 +507,13 @@ START_TEST (gcs_core_test_own)
     fail_if (CORE_SEND_STEP (Core, tout, 0)); // bail out after 1st frag
     fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
 
-    // restore PRIM component
-    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
-
     /*
      * TEST CASE 3: Backend in NON_PRIM state. There is attempt to send an
      * action.
      * EXPECTED OUTCOME: CORE_SEND_END should return -ENOTCONN after 1st
      * fragment send fails.
      */
+    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
     fail_if (gcs_dummy_set_component(Backend, non_prim));
     fail_if (DUMMY_INJECT_COMPONENT (Backend, non_prim));
     fail_if (CORE_SEND_START (&act_s));
