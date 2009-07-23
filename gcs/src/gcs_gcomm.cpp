@@ -441,16 +441,12 @@ static GCS_BACKEND_DESTROY_FN(gcs_gcomm_destroy)
     return 0;
 }
 
-static const char* vs_default_socket = "gcomm+vs://127.0.0.1:4567?gmcast.group=local";
 
 GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
 {
     conn_t *conn = 0;
     const char* sock = socket;
     
-    if (NULL == sock || strlen(sock) == 0)
-        sock = vs_default_socket;
-
     gu_debug ("Opening connection to '%s'", sock);
 
     try {
