@@ -369,6 +369,11 @@ START_TEST(test_gmcast_auto_addr)
     {
         el.poll(10);
     }
+    tp1->close();
+    tp2->close();
+
+    delete tp1;
+    delete tp2;
 
 }
 END_TEST

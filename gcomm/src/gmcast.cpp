@@ -938,7 +938,6 @@ void GMCast::reconnect()
 {
     /* Loop over known remote addresses and connect if proto entry 
      * does not exist */
-    log_debug << self_string() << "=========== begin reconnect ============";
     Time now = Time::now();
     AddrList::iterator i_next;
     for (AddrList::iterator i = remote_addrs.begin();
@@ -980,13 +979,12 @@ void GMCast::reconnect()
         }
         else if (ic == true)
         {
-            log_debug << self_string() 
-                      << " connected to " << get_uuid(i).to_string() << " "
-                      << get_address(i);
+            // log_debug << self_string() 
+            //       << " connected to " << get_uuid(i).to_string() << " "
+            //        << get_address(i);
             set_retry_cnt(i, 0);
         }
     }
-    log_debug << self_string() << "=========== end reconnect ============";
 }
 
 void GMCast::handle_event(const int fd, const Event& pe) 

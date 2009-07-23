@@ -219,7 +219,7 @@ Transport *TCP::accept()
     LOG_DEBUG(std::string("accept()") + make_int(acc_fd).to_string());
 
     if (is_non_blocking() && ::fcntl(acc_fd, F_SETFL, O_NONBLOCK) == -1) {
-        closefd(fd);
+        closefd(acc_fd);
 	throw FatalException("TCP::accept(): Fcntl failed");
     }
 
@@ -231,9 +231,9 @@ Transport *TCP::accept()
 	throw FatalException("TCP::accept(): set linger failed");
     }
     
-    if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) == -1) {
+    if (::setsockopt(acc_fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) == -1) {
 	int err = errno;
-        closefd(fd);
+        closefd(acc_fd);
 	throw FatalException(::strerror(err));	
     }
     
