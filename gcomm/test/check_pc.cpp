@@ -722,6 +722,7 @@ public:
         event_loop->erase(fd);
         PseudoFd::release_fd(fd);
         gcomm::disconnect(tp, this);
+        delete tp;
     }
     
     void start()
