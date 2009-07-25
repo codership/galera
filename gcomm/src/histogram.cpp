@@ -59,7 +59,7 @@ void Histogram::clear()
     for (map<const double, uint64_t>::iterator i = cnt.begin();
          i != cnt.end(); ++i)
     {
-        i->second = 0.0;
+        i->second = 0;
     }
 }
 
