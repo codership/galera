@@ -1090,8 +1090,8 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
             // GCS determined that we need to request state transfer.
             gu_info ("State transfer required:"
                      // seqno length chosen to fit in 80 columns
-                     "\n\tGroup state: "GU_UUID_FORMAT":lld"
-                     "\n\tLocal state: "GU_UUID_FORMAT":lld",
+                     "\n\tGroup state: "GU_UUID_FORMAT":%lld"
+                     "\n\tLocal state: "GU_UUID_FORMAT":%lld",
                      GU_UUID_ARGS(conf_uuid), conf->seqno,
                      GU_UUID_ARGS(&group_uuid), last_recved);
 
