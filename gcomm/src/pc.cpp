@@ -91,8 +91,8 @@ void PC::connect()
 
     gcomm::connect(tp, evs);
 
+    const bool start_prim = uri.get_authority() == "";
     evs->shift_to(EVSProto::JOINING);
-    Time stop(Time::now() + Time(5, 0));
     do
     {
         /* Send join messages without handling them */
@@ -100,10 +100,10 @@ void PC::connect()
         int ret = event_loop->poll(500);
         LOG_DEBUG(string("poll returned: ") + make_int(ret).to_string());
     }
-    while (stop >= Time::now() && evs->get_known_size() == 1);
+    while (start_prim == false && evs->get_known_size() == 1);
     LOG_INFO("PC/EVS Proto initial state: " + evs->to_string());
     
-    pc = new PCProto(uuid, event_loop, mon, evs->get_known_size() == 1);
+    pc = new PCProto(uuid, event_loop, mon, start_prim);
     gcomm::connect(evs, pc);
     gcomm::connect(pc, this);
     

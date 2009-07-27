@@ -305,6 +305,26 @@ START_TEST(test_pc_view_changes_double)
 }
 END_TEST
 
+/* Test that UUID ordering does not matter when starting nodes */
+START_TEST(test_pc_view_changes_reverse)
+{
+    UUID uuid1(0, 0);
+    ProtoUpMeta pum1(uuid1);
+    PCProto pc1(uuid1, 0, 0, false);
+    DummyTransport tp1;
+    PCUser pu1(uuid1, &tp1, &pc1);
+
+    
+    UUID uuid2(0, 0);
+    ProtoUpMeta pum2(uuid2);
+    PCProto pc2(uuid2, 0, 0, true);
+    DummyTransport tp2;
+    PCUser pu2(uuid2, &tp2, &pc2);
+
+    single_boot(&pu2);    
+    double_boot(&pu2, &pu1);
+}
+END_TEST
 
 
 #if 0
@@ -701,15 +721,17 @@ class PCUser2 : public Toplay, EventContext
     bool sending;
     int fd;
     uint8_t my_type;
+    bool send;
     PCUser2(const PCUser2&);
     void operator=(const PCUser2);
 public:
-    PCUser2(const string& uri, EventLoop* el) :
+    PCUser2(const string& uri, EventLoop* el, const bool send_ = true) :
         tp(0),
         event_loop(el),
         sending(false),
         fd(-1),
-        my_type(1 + ::rand()%4)
+        my_type(1 + ::rand()%4),
+        send(send_)
     {
         tp = Transport::create(uri, el);
         gcomm::connect(tp, this);
@@ -743,7 +765,7 @@ public:
         if (view)
         {
             LOG_INFO(view->to_string());
-            if (view->get_type() == View::V_PRIM)
+            if (view->get_type() == View::V_PRIM && send == true)
             {
                 sending = true;
                 event_loop->queue_event(fd, Event(Event::E_USER,
@@ -772,7 +794,7 @@ public:
             {
                 LOG_WARN(string("pass_down(): ") + strerror(ret));
             }
-
+            
             event_loop->queue_event(fd, Event(Event::E_USER,
                                               Time(Time::now() + Time(0, 10000))));
         }
@@ -836,7 +858,9 @@ START_TEST(test_pc_transport)
 }
 END_TEST
 
-static bool skip = false;
+
+
+// static bool skip = false;
 
 Suite* pc_suite()
 {
@@ -854,6 +878,10 @@ Suite* pc_suite()
     tc = tcase_create("test_pc_view_changes_double");
     tcase_add_test(tc, test_pc_view_changes_double);
     suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_pc_view_changes_reverse");
+    tcase_add_test(tc, test_pc_view_changes_reverse);
+    suite_add_tcase(s, tc);
     
     tc = tcase_create("test_pc_state1");
     tcase_add_test(tc, test_pc_state1);
@@ -866,9 +894,6 @@ Suite* pc_suite()
     tc = tcase_create("test_pc_state3");
     tcase_add_test(tc, test_pc_state3);
     suite_add_tcase(s, tc);
-
-    if (skip == true)
-        return s;
 
     tc = tcase_create("test_pc_transport");
     tcase_add_test(tc, test_pc_transport);
