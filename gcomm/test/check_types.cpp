@@ -151,6 +151,12 @@ START_TEST(test_uuid)
         UUID uuidrnd(0, 0);
         LOG_DEBUG(uuidrnd.to_string());
     }
+
+    UUID uuid1(0, 0);
+    UUID uuid2(0, 0);
+
+    fail_unless(uuid1 < uuid2);
+
 }
 END_TEST
 
@@ -357,6 +363,20 @@ START_TEST(test_inst_map)
 }
 END_TEST
 
+START_TEST(test_exception)
+{
+
+    try
+    {
+        throw std::logic_error(string("logic error message: ") + make_int(1).to_string());
+    }
+    catch (std::logic_error e)
+    {
+        log_info << e.what();
+    }
+
+}
+END_TEST
 
 
 Suite* types_suite()
@@ -390,6 +410,10 @@ Suite* types_suite()
 
     tc = tcase_create("test_inst_map");
     tcase_add_test(tc, test_inst_map);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_exception");
+    tcase_add_test(tc, test_exception);
     suite_add_tcase(s, tc);
 
     return s;

@@ -220,12 +220,11 @@ void PCProto::handle_first_reg(const View& view)
     }
     if (view.get_id().get_seq() <= current_view.get_id().get_seq())
     {
-        LOG_FATAL("decreasing view ids: current view " 
-                  + current_view.get_id().to_string() 
-                  + " new view "
-                  + view.get_id().to_string());
-        
-        throw FatalException("decreasing view ids");
+        log_fatal << "non-increasing view ids: current view " 
+                  << current_view.get_id().to_string() 
+                  << " new view "
+                  << view.get_id().to_string();
+        throw std::logic_error("non-increasing view ids");
     }
 
     current_view = view;
@@ -241,12 +240,11 @@ void PCProto::handle_reg(const View& view)
     if (view.is_empty() == false && 
         view.get_id().get_seq() <= current_view.get_id().get_seq())
     {
-        LOG_FATAL("decreasing view ids: current view " 
-                  + current_view.get_id().to_string() 
-                  + " new view "
-                  + view.get_id().to_string());
-        
-        throw FatalException("decreasing view ids");
+        log_fatal << "non-increasing view ids: current view " 
+                  << current_view.get_id().to_string() 
+                  << " new view "
+                  << view.get_id().to_string();
+        throw std::logic_error("non-increasing view ids");
     }
     
     current_view = view;
@@ -490,6 +488,30 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
     assert(state_msgs.length() < current_view.get_members().length());
 
     LOG_INFO(self_string() + " handle state: " + msg.to_string());
+
+    if (get_prim() == true)
+    {
+        const PCInst& si = PCInstMap::get_instance(msg.get_inst_map().find(source));
+        if (si.get_prim() == true && si.get_last_prim() != get_last_prim())
+        {
+            log_warn << self_string() << " conflicting prims: my prim " 
+                     << get_last_prim().to_string() 
+                     << " other prim: " 
+                     << si.get_last_prim().to_string();
+            if (get_last_prim() < si.get_last_prim())
+            {
+                
+                log_warn << "discarding other";
+                return;
+            }
+            else
+            {
+                log_fatal << "aborting";
+                throw std::runtime_error(self_string() 
+                                         + " aborting due to conflicting prims");
+            }
+        }
+    }
     
     if (state_msgs.insert(std::make_pair(source, msg)).second == false)
     {

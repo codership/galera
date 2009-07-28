@@ -47,7 +47,7 @@ public:
 
     bool operator<(const ViewId& cmp) const
     {
-        return uuid < cmp.uuid && seq < cmp.seq;
+        return uuid < cmp.uuid || (uuid == cmp.uuid && seq < cmp.seq);
     }
 
     bool operator==(const ViewId& cmp) const
@@ -186,7 +186,7 @@ public:
     {
     }
     
-    void add_member(const UUID& pid, const string& name);
+    void add_member(const UUID& pid, const string& name = "");
     void add_members(NodeList::const_iterator begin, NodeList::const_iterator end);
     void add_joined(const UUID& pid, const string& name);
     void add_left(const UUID& pid, const string& name);

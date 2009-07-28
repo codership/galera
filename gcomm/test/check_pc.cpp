@@ -327,13 +327,6 @@ START_TEST(test_pc_view_changes_reverse)
 END_TEST
 
 
-#if 0
-static void states_exch(vector<PCUser*>& vec)
-{
-    vector<PCMessage> msgs;
-}
-#endif
-
 
 START_TEST(test_pc_state1)
 {
@@ -713,6 +706,77 @@ START_TEST(test_pc_state3)
 }
 END_TEST
 
+START_TEST(test_pc_conflicting_prims)
+{
+    UUID uuid1(0, 0);
+    ProtoUpMeta pum1(uuid1);
+    PCProto pc1(uuid1, 0, 0, true);
+    DummyTransport tp1;
+    PCUser pu1(uuid1, &tp1, &pc1);
+    single_boot(&pu1);
+    
+    UUID uuid2(0, 0);
+    ProtoUpMeta pum2(uuid2);
+    PCProto pc2(uuid2, 0, 0, true);
+    DummyTransport tp2;
+    PCUser pu2(uuid2, &tp2, &pc2);
+    single_boot(&pu2);
+
+    View tr1(View::V_TRANS, pu1.pc->get_current_view().get_id());
+    tr1.add_member(uuid1);
+    pu1.pc->handle_view(tr1);
+    View tr2(View::V_TRANS, pu2.pc->get_current_view().get_id());
+    tr2.add_member(uuid2);
+    pu2.pc->handle_view(tr2);
+    
+    View reg(View::V_REG, ViewId(uuid1, tr1.get_id().get_seq() + 1));
+    reg.add_member(uuid1);
+    reg.add_member(uuid2);
+    pu1.pc->handle_view(reg);
+    pu2.pc->handle_view(reg);
+    
+    PCMessage msg1, msg2;
+
+    /* First node must discard msg2 and stay in states exch waiting for
+     * trans view */
+    get_msg(pu1.tp->get_out(), &msg1);
+    get_msg(pu2.tp->get_out(), &msg2);
+    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
+    
+    pu1.pc->handle_msg(msg1, 0, 0, &pum1);
+    pu1.pc->handle_msg(msg2, 0, 0, &pum2);
+    
+    /* Second node must abort */
+    try
+    {
+        pu2.pc->handle_msg(msg1, 0, 0, &pum1);
+        fail("not aborted");
+    }
+    catch (std::runtime_error& e)
+    {
+        log_info << e.what();
+    }
+
+    fail_unless(pu1.tp->get_out() == 0);
+    
+    View tr3(View::V_TRANS, reg.get_id());
+    tr3.add_member(uuid1);
+    pu1.pc->handle_view(tr3);
+    View reg3(View::V_REG, ViewId(uuid1, tr3.get_id().get_seq() + 1));
+    reg3.add_member(uuid1);
+    pu1.pc->handle_view(reg3);
+
+    get_msg(pu1.tp->get_out(), &msg1);
+    pu1.pc->handle_msg(msg1, 0, 0, &pum1);
+
+    get_msg(pu1.tp->get_out(), &msg1);
+    pu1.pc->handle_msg(msg1, 0, 0, &pum1);
+    
+    fail_unless(pu1.pc->get_state() == PCProto::S_PRIM);
+
+}
+END_TEST
+
 
 class PCUser2 : public Toplay, EventContext
 {
@@ -860,7 +924,7 @@ END_TEST
 
 
 
-// static bool skip = false;
+static bool skip = true;
 
 Suite* pc_suite()
 {
@@ -894,6 +958,13 @@ Suite* pc_suite()
     tc = tcase_create("test_pc_state3");
     tcase_add_test(tc, test_pc_state3);
     suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_pc_conflicting_prims");
+    tcase_add_test(tc, test_pc_conflicting_prims);
+    suite_add_tcase(s, tc);
+
+    if (skip == true)
+        return s;
 
     tc = tcase_create("test_pc_transport");
     tcase_add_test(tc, test_pc_transport);
