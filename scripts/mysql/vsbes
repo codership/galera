@@ -29,44 +29,44 @@ LD_LIBRARY_PATH="$GALERA_BASE_DIR/lib"
 # Group Communication Address
 GCS_ADDRESS=${GCS_ADDRESS:-"tcp:0.0.0.0:4567"}
 # allow users to specify full gcs address (for cut'n'paste)
-GCS_ADDRESS_STRIPPED=$(echo $GCS_ADDRESS | sed s/gcomm:\\/\\///)
+GCS_ADDRESS_STRIPPED=$(echo $GCS_ADDRESS | sed s/vsbes:\\/\\///)
 
-GCOMM=$GALERA_BASE_DIR/sbin/vsbes
+VSBES=$GALERA_BASE_DIR/sbin/vsbes
 
-GCOMM_PID=/tmp/gcomm.pid
-GCOMM_ERR=/tmp/gcomm.err
+VSBES_PID=/tmp/vsbes.pid
+VSBES_ERR=/tmp/vsbes.err
 
 # Checks if a process with a given PID is still running
 find_pid()
 {
-    ps axc | grep $(basename $GCOMM) | grep -w ^\ *$1 > /dev/null
+    ps axc | grep $(basename $VSBES) | grep -w ^\ *$1 > /dev/null
 }
 
-gcomm_start()
+vsbes_start()
 {
     local failed
     
-    if ! test -x $GCOMM
+    if ! test -x $VSBES
     then
-	echo "$GCOMM executable not found"
+	echo "$VSBES executable not found"
 	exit -1
     fi
     
-    if test -f $GCOMM_PID
+    if test -f $VSBES_PID
     then
-        echo "Found existing '$GCOMM_PID'. Please run '$0 stop'"
+        echo "Found existing '$VSBES_PID'. Please run '$0 stop'"
         exit 1;
     fi
 
     export LD_LIBRARY_PATH	
-    nohup $GCOMM $GCS_ADDRESS_STRIPPED 1>/dev/null 2>$GCOMM_ERR &
+    nohup $VSBES $GCS_ADDRESS_STRIPPED 1>/dev/null 2>$VSBES_ERR &
     pid=$!
     sleep 1
     
     if find_pid $pid
     then
         echo "Done (PID:$pid)"
-	echo $pid > $GCOMM_PID
+	echo $pid > $VSBES_PID
 	exit 0
     else
         echo "Failed (PID:$pid)"
@@ -74,42 +74,42 @@ gcomm_start()
     fi
 }
 
-gcomm_stop()
+vsbes_stop()
 {
     # check pid file
-    if test -r $GCOMM_PID
+    if test -r $VSBES_PID
     then
-        if find_pid $(cat $GCOMM_PID)
+        if find_pid $(cat $VSBES_PID)
         then
-            echo -n "Killing PID $(cat $GCOMM_PID)... "
-	    kill $(cat $GCOMM_PID)
+            echo -n "Killing PID $(cat $VSBES_PID)... "
+	    kill $(cat $VSBES_PID)
 	else
-	    echo -n "Removing stale PID file $GCOMM_PID... "
+	    echo -n "Removing stale PID file $VSBES_PID... "
 	fi
-        rm -rf $GCOMM_PID
+        rm -rf $VSBES_PID
 	echo "Done"
     else
-	echo "PID file not found: $GCOMM_PID"
+	echo "PID file not found: $VSBES_PID"
     fi
 }
 
-gcomm_restart()
+vsbes_restart()
 {
-    gcomm_stop
-    gcomm_start
+    vsbes_stop
+    vsbes_start
 }
 
 cmd=${1:-start} # start by default
 
 case $cmd in
 'start')
-            COMMAND=gcomm_start
+            COMMAND=vsbes_start
             ;;
 'stop')
-            COMMAND=gcomm_stop
+            COMMAND=vsbes_stop
             ;;
 'restart')
-            COMMAND=gcomm_restart
+            COMMAND=vsbes_restart
             ;;
     *)
             echo "Usage: [GCS_ADDRESS=tcp:<ip>:<port>] $0 [start|stop|restart]"
