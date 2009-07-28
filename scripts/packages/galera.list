@@ -7,7 +7,8 @@ f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils.so.*
 f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils++.so.*.*.*
 %ifdef GCOMM
 f 755 root root $LIBS_DEST $BUILD_BASE/gcomm/src/.libs/libgcomm.so.*.*.*
-%else
+%endif
+%ifdef VSBES
 f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/common/src/.libs/libgcommcommonpp.so.*.*.*
 f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/transport/src/.libs/libgcommtransportpp.so.*.*.*
 f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/vs/src/.libs/libgcommvspp.so.*.*.*
@@ -16,7 +17,7 @@ f 755 root root $LIBS_DEST $BUILD_BASE/gcs/src/.libs/libgcs.so.*.*.*
 f 755 root root $LIBS_DEST $BUILD_BASE/wsdb/src/.libs/libwsdb.so.*.*.*
 f 755 root root $LIBS_DEST $BUILD_BASE/galera/src/.libs/libmmgalera.so.*.*.*
 
-%ifdef !GCOMM
+%ifdef VSBES
 d 755 root root $SBIN_DEST -
 f 755 root root $SBIN_DEST/vsbes $BUILD_BASE/galeracomm/vs/src/.libs/vsbes
 %endif

@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 # $Id$
 
@@ -24,8 +24,6 @@ initial_stage="galerautils"
 last_stage="galera"
 gainroot=""
 
-#GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
-
 usage()
 {
     echo -e "Usage: build.sh [OPTIONS] \n" \
@@ -38,7 +36,8 @@ usage()
     "    -o|--opt        configure build with debug disabled (implies -c)\n" \
     "    -d|--debug      configure build with debug enabled (implies -c)\n" \
     "    -p|--package    build binary pacakges at the end.\n" \
-    "    --with-spread   configure build with spread backend (implies -c to gcs)\n"
+    "    --with-spread   configure build with spread backend (implies -c to gcs)\n" \
+    "\nSet GCOMM_DISABLED/VSBES_DISABLED to 'yes' to disable respective modules"
 }
 
 while test $# -gt 0 
@@ -92,7 +91,7 @@ do
     shift
 done
 
-if [ "$OPT"   == "yes" ]; then CONFIGURE="yes"; fi
+if [ "$OPT"   == "yes" ]; then CONFIGURE="yes"; conf_flags="$conf_flags --disable-debug"; fi
 if [ "$DEBUG" == "yes" ]; then CONFIGURE="yes"; fi
 if [ -n "$WITH_SPREAD" ]; then CONFIGURE="yes"; fi
 
@@ -111,24 +110,6 @@ gcs_src=$build_base/gcs
 gemini_src=$build_base/gemini
 wsdb_src=$build_base/wsdb
 galera_src=$build_base/galera
-
-# Flags for configure scripts
-if test -n GALERA_DEST
-then
-    conf_flags="--prefix=$GALERA_DEST"
-    galera_flags="--with-galera=$GALERA_DEST"
-fi
-
-if [ "$OPT" == "yes" ]
-then
-    conf_flags="$conf_flags --disable-debug"
-    CONFIGURE="yes"
-fi
-if [ "$DEBUG" == "yes" ]
-then
-    CONFIGURE="yes"
-fi
-
 
 # Function to build single project
 build()
@@ -171,9 +152,11 @@ build_packages()
 	ARCH_RPM=x86_64
     fi
 
-    if [ "$GCOMM_IMPL" != "galeracomm" ]; then export GCOMM=yes; fi    
+    if [ "$GCOMM_DISABLED" != "yes" ]; then export GCOMM=yes; fi
+    if [ "$VSBES_DISABLED" != "yes" ]; then export VSBES=yes; fi
+    
     export BUILD_BASE=$build_base
-    echo GCOMM=$GCOMM ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
+    echo GCOMM=$GCOMM VSBES=$VSBES ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
     pushd $build_base/scripts/packages                       && \
     rm -rf $ARCH_DEB $ARCH_RPM                               && \
     epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" galera     && \
@@ -217,13 +200,18 @@ echo "CPPFLAGS: $CPPFLAGS"
 build_module "galerautils"
 build_module "gcache"
 
-#if test $GCOMM_IMPL != "galeracomm"
-#then 
+if test "$GCOMM_DISABLED" != "yes"
+then 
     build_module "gcomm"
-#else
+else
+    gcs_conf_flags="$gcs_conf_flags --disable-gcomm"
+fi
+
+if test "$VSBES_DISABLED" != "yes"
+then 
     if test $initial_stage = "galeracomm" || $building = "true"
     then
-        build $galeracomm_src $conf_flags $galera_flags
+        build $galeracomm_src $conf_flags
         building="true"
     fi
     
@@ -236,22 +224,11 @@ build_module "gcache"
     LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/common/src/.libs"
     LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/transport/src/.libs"
     LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/vs/src/.libs"
-#fi
-
-if test $initial_stage = "gcs" || $building = "true"
-then
-#    if test $GCOMM_IMPL = "galeracomm"
-#    then
-#        gcs_conf_flags="$conf_flags --disable-gcomm --enable-vs"
-#    else
-#        gcs_conf_flags="$conf_flags --disable-vs --enable-gcomm"
-#    fi
-    build $gcs_src $gcs_conf_flags $WITH_SPREAD $galera_flags
-    building="true"
+else
+    gcs_conf_flags="$gcs_conf_flags --disable-vs"
 fi
 
-build_flags $gcs_src
-
+build_module "gcs" $gcs_conf_flags
 build_module "gemini"
 build_module "wsdb"
 build_module "galera"

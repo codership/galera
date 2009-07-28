@@ -149,7 +149,7 @@ rm -rf $DIST_DIR
 mkdir -p $MYSQL_DIST_DIR
 install -m 644 LICENSE $DIST_DIR
 install -m 755 mysql-galera $DIST_DIR
-install -m 755 gcomm $DIST_DIR
+install -m 755 vsbes $DIST_DIR
 install -m 644 LICENSE.mysql $MYSQL_DIST_DIR
 install -m 644 README $DIST_DIR
 install -m 644 QUICK_START $DIST_DIR
@@ -179,22 +179,22 @@ cp -P $GALERA_SRC/wsdb/src/.libs/libwsdb.so* $GALERA_LIBS
 cp -P $GALERA_SRC/galera/src/.libs/libmmgalera.so* $GALERA_LIBS
 
 GALERA_SBIN=""
-if test $GCOMM_IMPL = "galeracomm"
-    then
+#if test $GCOMM_IMPL = "galeracomm"
+#    then
 # Install vs backend daemon
     GALERA_SBIN=$GALERA_DIST_DIR/sbin
     mkdir -p $GALERA_SBIN
     install -D -m 755 $GALERA_SRC/galeracomm/vs/src/.libs/vsbes $GALERA_SBIN/vsbes
-fi
+#fi
 
 # Strip binaries if not instructed otherwise
 if test "$NO_STRIP" != "yes"
 then
     strip $GALERA_LIBS/lib*.so
-    if test $GCOMM_IMPL = "galeracomm"
-	then
+#    if test $GCOMM_IMPL = "galeracomm"
+#	then
 	strip $GALERA_SBIN/*
-    fi
+#    fi
 fi
 
 # original MYSQL_VER=$(grep AM_INIT_AUTOMAKE\(mysql, configure.in | awk '{ print $2 }' | sed s/\)//)

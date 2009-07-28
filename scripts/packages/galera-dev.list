@@ -12,7 +12,8 @@ f 755 root root $LIBS_DEST/libgalerautils.a      $BUILD_BASE/galerautils/src/.li
 f 755 root root $LIBS_DEST/libgalerautils++.a    $BUILD_BASE/galerautils/src/.libs/libgalerautils++.a
 %ifdef GCOMM
 #f 755 root root $LIBS_DEST/libgcomm.a            $BUILD_BASE//gcomm/src/.libs/libgcomm.a
-%else
+%endif
+%ifdef VSBES
 f 755 root root $LIBS_DEST/libgcommcommonpp.a    $BUILD_BASE/galeracomm/common/src/.libs/libgcommcommonpp.a
 f 755 root root $LIBS_DEST/libgcommtransportpp.a $BUILD_BASE/galeracomm/transport/src/.libs/libgcommtransportpp.a
 f 755 root root $LIBS_DEST/libgcommvspp.a        $BUILD_BASE/galeracomm/vs/src/.libs/libgcommvspp.a
