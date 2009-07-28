@@ -48,6 +48,17 @@ static bool operator==(const GMCastMessage& a, const GMCastMessage& b)
     return ret;
 }
 
+static void event_loop(EventLoop* el, time_t secs, time_t msecs = 0)
+{
+    assert(msecs < 1000);
+    Time stop = Time::now() + Time(secs, msecs*1000);
+    do
+    {
+        el->poll(10);
+    }
+    while (stop >= Time::now());
+}
+
 END_GCOMM_NAMESPACE
 
 START_TEST(test_gmcast_messages)
@@ -139,60 +150,35 @@ START_TEST(test_gmcast)
     Transport* tp1 = Transport::create("gcomm+gmcast://?gmcast.listen_addr=gcomm+tcp://127.0.0.1:10001&gmcast.group=testgrp", &el);
     
     tp1->connect();
-    
-    for (int i = 0; i < 15; ++i)
-    {
-        el.poll(200);
-    }
-
+    event_loop(&el, 0, 200);
     tp1->close();
-
+    
     Transport* tp2 = Transport::create("gcomm+gmcast://127.0.0.1:10001?gmcast.group=testgrp&gmcast.listen_addr=gcomm+tcp://127.0.0.1:10002", &el);
     
     tp1->connect();
     tp2->connect();
 
-
-    for (int i = 0; i < 15; ++i)
-    {
-        el.poll(200);
-    }
-
+    event_loop(&el, 0, 200);
     tp1->close();
 
-    for (int i = 0; i < 15; ++i)
-    {
-        el.poll(200);
-    }
+    event_loop(&el, 0, 200);
     tp2->close();
-
-
+    
+    
     Transport* tp3 = Transport::create(URI("gcomm+gmcast://127.0.0.1:10002?gmcast.group=testgrp&gmcast.listen_addr=gcomm+tcp://127.0.0.1:10003"), &el);
 
     tp1->connect();
     tp2->connect();
-
-    for (int i = 0; i < 15; ++i)
-    {
-        el.poll(200);
-    }
+    event_loop(&el, 0, 200);
 
     tp3->connect();
-
-    for (int i = 0; i < 15; ++i)
-    {
-        el.poll(200);
-    }
-
+    event_loop(&el, 0, 200);
+    
     tp3->close();
     tp2->close();
     tp1->close();
 
-
-    for (int i = 0; i < 15; ++i)
-    {
-        el.poll(200);
-    }
+    event_loop(&el, 0, 200);
 
     delete tp3;
     delete tp2;
@@ -305,8 +291,7 @@ START_TEST(test_gmcast_w_user_messages)
     log_info << "u1 start";
     u1.start();
 
-    for (int i = 0; i < 10; ++i)
-        el.poll(100);
+    event_loop(&el, 0, 100);
 
     fail_unless(u1.get_recvd() == 0);
     
@@ -322,36 +307,34 @@ START_TEST(test_gmcast_w_user_messages)
     User u3(&el, addr3, addr2);
     u3.start();
 
-    for (int i = 0; i < 20; ++i)
-        el.poll(100);
-
+    event_loop(&el, 0, 200);
+    
     log_info << "u4 start";
     User u4(&el, addr4, addr2);
     u4.start();
-    for (int i = 0; i < 50; ++i)
-        el.poll(100);
+
+    event_loop(&el, 0, 200);
 
     log_info << "u1 stop";
     u1.stop();
-    for (int i = 0; i < 250; ++i)
-        el.poll(100);
 
+    event_loop(&el, 0, 200);
+    
     log_info << "u1 start";
     u1.start();
     
-    for (int i = 0; i < 250; ++i)
-        el.poll(100);
+    event_loop(&el, 0, 200);
 
     fail_unless(u1.get_recvd() != 0);
     fail_unless(u2.get_recvd() != 0);
     fail_unless(u3.get_recvd() != 0);
     fail_unless(u4.get_recvd() != 0);
-
+    
     u1.stop();
     u2.stop();
     u3.stop();
     u4.stop();
-
+    
 
 }
 END_TEST
@@ -375,6 +358,34 @@ START_TEST(test_gmcast_auto_addr)
     delete tp1;
     delete tp2;
 
+}
+END_TEST
+
+
+
+START_TEST(test_gmcast_forget)
+{
+    EventLoop el;
+    Transport* tp1 = Transport::create("gcomm+gmcast://?gmcast.group=test", &el);
+    Transport* tp2 = Transport::create("gcomm+gmcast://127.0.0.1:4567?gmcast.group=test&gmcast.listen_addr=gcomm+tcp://127.0.0.1:10002", &el);
+    Transport* tp3 = Transport::create("gcomm+gmcast://127.0.0.1:4567?gmcast.group=test&gmcast.listen_addr=gcomm+tcp://127.0.0.1:10003", &el);
+
+    tp1->connect();
+    tp2->connect();
+    tp3->connect();
+    event_loop(&el, 1, 0);
+    
+    UUID uuid1 = tp1->get_uuid();
+    
+    tp1->close();
+    tp2->close(uuid1);
+    tp3->close(uuid1);
+    tp1->connect();
+    log_info << "####";
+    event_loop(&el, 1, 0);
+    
+    tp1->close();
+    tp2->close();
 }
 END_TEST
 
@@ -402,6 +413,12 @@ Suite* gmcast_suite()
     tc = tcase_create("test_gmcast_auto_addr");
     tcase_add_test(tc, test_gmcast_auto_addr);
     suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_gmcast_forget");
+    tcase_add_test(tc, test_gmcast_forget);
+    suite_add_tcase(s, tc);
+
+
 
     return s;
 

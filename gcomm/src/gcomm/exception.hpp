@@ -3,6 +3,7 @@
 
 #include <gcomm/common.hpp>
 
+#include <stdexcept>
 #include <exception>
 
 using std::exception;

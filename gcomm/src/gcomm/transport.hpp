@@ -48,6 +48,11 @@ public:
     
     virtual void connect() = 0;
     virtual void close() = 0;
+    virtual void close(const UUID& uuid)
+    {
+        
+        throw std::logic_error("close(UUID) not supported by " + uri.get_scheme());
+    }
     virtual void listen();
     virtual Transport* accept();
     

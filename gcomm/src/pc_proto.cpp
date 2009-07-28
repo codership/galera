@@ -85,6 +85,14 @@ void PCProto::deliver_view()
            current_view.get_id());
     v.add_members(current_view.get_members().begin(), 
                   current_view.get_members().end());
+    for (PCInstMap::const_iterator i = instances.begin(); 
+         i != instances.end(); ++i)
+    {
+        if (current_view.get_members().find(PCInstMap::get_uuid(i)) == current_view.get_members().end())
+        {
+            v.add_partitioned(PCInstMap::get_uuid(i), "");
+        }
+    }
     ProtoUpMeta um(&v);
     pass_up(0, 0, &um);
 }

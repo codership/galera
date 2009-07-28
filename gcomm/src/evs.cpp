@@ -48,6 +48,16 @@ void EVS::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
                     const ProtoUpMeta* um)
 {
     Critical crit(mon);
+    if (um->get_view() != 0 && um->get_view()->get_type() == View::V_REG)
+    {
+        /* Call close gmcast transport for all nodes that left 
+         * gracefully */
+        for (NodeList::const_iterator i = um->get_view()->get_left().begin();
+             i != um->get_view()->get_left().end(); ++i)
+        {
+            tp->close(gcomm::get_uuid(i));
+        }
+    }
     pass_up(rb, roff, um);
 }
 

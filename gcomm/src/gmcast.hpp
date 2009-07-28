@@ -412,7 +412,7 @@ class GMCast : public Transport, EventContext
         return i->second;
     }
 
-    const GMCastProto* get_gmcast_proto(ProtoMap::const_iterator& i) const
+    const GMCastProto* get_gmcast_proto(ProtoMap::const_iterator i) const
     {
         return i->second;
     }
@@ -425,6 +425,7 @@ class GMCast : public Transport, EventContext
     string listen_addr;
 
     static const int max_retry_cnt = 30;
+
     struct Timing
     {
         UUID uuid;
@@ -442,51 +443,54 @@ class GMCast : public Transport, EventContext
     };
     
     std::string initial_addr;
+
     typedef map<const string, Timing > AddrList;
+
+    AddrList pending_addrs;
     AddrList remote_addrs;
 
-    const UUID& get_uuid(const AddrList::const_iterator& i) const
+    const UUID& get_uuid(const AddrList::const_iterator i) const
     {
         return i->second.uuid;
     }
 
-    const string& get_address(const AddrList::const_iterator& i) const
+    const string& get_address(const AddrList::const_iterator i) const
     {
         return i->first;
     }
 
-    void set_last_seen(AddrList::iterator& i, const Time& t)
+    void set_last_seen(AddrList::iterator i, const Time& t)
     {
         i->second.last_seen = t;
     }
 
-    const Time& get_last_seen(AddrList::iterator& i) const
+    const Time& get_last_seen(AddrList::iterator i) const
     {
         return i->second.last_seen;
     }
     
 
-    void set_next_reconnect(AddrList::iterator& i, const Time& t)
+    void set_next_reconnect(AddrList::iterator i, const Time& t)
     {
         i->second.next_reconnect = t;
     }
 
-    const Time& get_next_reconnect(AddrList::iterator& i) const
+    const Time& get_next_reconnect(AddrList::iterator i) const
     {
         return i->second.next_reconnect;
     }
 
-    int get_retry_cnt(AddrList::iterator& i)
+    int get_retry_cnt(AddrList::iterator i)
     {
         return i->second.retry_cnt;
     }
 
-    int get_retry_cnt(AddrList::iterator& i) const
+    int get_retry_cnt(AddrList::iterator i) const
     {
         return i->second.retry_cnt;
     }
 
-    void set_retry_cnt(AddrList::iterator& i, const int cnt)
+    void set_retry_cnt(AddrList::iterator i, const int cnt)
     {
         i->second.retry_cnt = cnt;
     }
@@ -510,7 +514,7 @@ class GMCast : public Transport, EventContext
     void remove_proto(const int);
     
     bool is_connected(const std::string& addr, const UUID& uuid) const;
-    void insert_address(const string& addr, const UUID& uuid);
+    void insert_address(const string& addr, const UUID& uuid, AddrList&);
     void update_addresses();
     void reconnect();
 
@@ -580,6 +584,10 @@ public:
         stop();
     }
 
+    void close(const UUID& uuid)
+    {
+        gmcast_forget(uuid);
+    }
     
 
     void listen()
