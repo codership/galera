@@ -6,6 +6,7 @@
 #include "gcomm/types.hpp"
 
 #include "inst_map.hpp"
+#include "map.hpp"
 
 #include <utility>
 #include <iostream>
@@ -363,6 +364,18 @@ START_TEST(test_inst_map)
 }
 END_TEST
 
+START_TEST(test_map)
+{
+    typedef Map<IntType<int>, IntType<int>, std::map<IntType<int>, IntType<int> > > IntMap;
+
+    IntMap m;
+    check_new_serialization(m, 4, IntMap());
+
+    m.insert(make_pair(make_int<int>(1), make_int<int>(2)));
+
+}
+END_TEST
+
 START_TEST(test_exception)
 {
 
@@ -410,6 +423,10 @@ Suite* types_suite()
 
     tc = tcase_create("test_inst_map");
     tcase_add_test(tc, test_inst_map);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_map");
+    tcase_add_test(tc, test_map);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_exception");

@@ -46,6 +46,37 @@ void check_serialization(const T& c, const size_t expected_size,
     delete[] buf;
 }
 
+template<class T>
+void check_new_serialization(const T& c, const size_t expected_size, 
+                             const T& default_c)
+{
+    
+    fail_unless(c.serial_size() == expected_size, 
+                "size = %lu expected = %lu", 
+                c.serial_size(), expected_size);
+    byte_t* buf = new byte_t[expected_size + 7];
+    size_t ret;
+    // Check that what is written gets also read
+    fail_unless(c.serialize(buf, expected_size, 1) == 0);
+    fail_unless(c.serialize(buf, expected_size, 0) == expected_size);
+    
+    T c2(default_c);
+
+    fail_unless(c2.unserialize(buf, expected_size, 1) == 0);
+    ret = c2.unserialize(buf, expected_size, 0);
+    fail_unless(ret == expected_size, "expected %z ret %z", expected_size, ret);
+    fail_unless(c == c2);
+    
+    // Check that read/write return offset properly
+    
+    fail_unless(c.serialize(buf, expected_size + 7, 5) == expected_size + 5);
+    fail_unless(c2.unserialize(buf, expected_size + 7, 5) == expected_size + 5);
+    
+    fail_unless(c == c2);
+
+    delete[] buf;
+}
+
 
 
 class DummyTransport : public Transport 

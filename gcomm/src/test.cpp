@@ -1,4 +1,6 @@
 
+#include "map.hpp"
+
 #include "gcomm/logger.hpp"
 #include "gcomm/common.hpp"
 #include "gcomm/conf.hpp"

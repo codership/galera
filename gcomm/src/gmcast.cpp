@@ -2,12 +2,394 @@
 
 #include "gcomm/conf.hpp"
 #include "gcomm/util.hpp"
+#include "map.hpp"
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/kruskal_min_spanning_tree.hpp>
 
 using std::pair;
 using std::make_pair;
+
+
+class gcomm::GMCastProtoMap : 
+    public Map<const int, GMCastProto*, std::map<const int, GMCastProto*> >
+{
+};
+
+class gcomm::UUIDToAddressMap :
+    public MultiMap<const UUID, string, std::multimap<const UUID, string> >
+{
+};
+
+class gcomm::GMCastNode
+{
+    bool operational;
+    uint8_t weight;
+    UUID uuid;
+    static const size_t ADDR_SIZE = 64;
+    char address[ADDR_SIZE];
+public:
+    GMCastNode() : 
+        operational(false), 
+        weight(0xff), 
+        uuid() 
+    {
+        memset(address, 0, sizeof(address));
+    }
+    
+    GMCastNode(const bool operational_, 
+               const UUID& uuid_, 
+               const string& address_) :
+        operational(operational_), 
+        weight(0xff),
+        uuid(uuid_) {
+        if (address_.size() > sizeof(address) - 1)
+            throw FatalException("");
+        memset(address, 0, sizeof(address));
+        strcpy(address, address_.c_str());
+    }
+    
+    void set_operational(bool op) {
+        operational = op;
+    }
+    
+    bool is_operational() const {
+        return operational;
+    }
+    
+    const UUID& get_uuid() const {
+        return uuid;
+    }
+    
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset) {
+        size_t off;
+        uint8_t byte;
+        if ((off = gcomm::read(buf, buflen, offset, &byte)) == 0)
+            return 0;
+        operational = byte & 0x1;
+        if ((off = uuid.read(buf, buflen, off)) == 0)
+            return 0;
+        if (off + ADDR_SIZE > buflen)
+            return 0;
+        memcpy(address, (char*)buf + off, ADDR_SIZE);
+        size_t i;
+        for (i = 0; i < ADDR_SIZE; ++i) {
+            if (address[i] == '\0')
+                break;
+        }
+        if (i == ADDR_SIZE) {
+            LOG_WARN("address was not '\0' terminated");
+            return 0;
+        }
+        off += ADDR_SIZE;
+        return off;
+    }
+
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const {
+        size_t off;
+        uint8_t byte = operational ? 0x1 : 0;
+        if ((off = gcomm::write(byte, buf, buflen, offset)) == 0)
+            return 0;
+        if ((off = uuid.write(buf, buflen, off)) == 0)
+            return 0;
+        if (off + ADDR_SIZE > buflen)
+            return 0;
+        memcpy((char*)buf + off, address, ADDR_SIZE);
+        off += ADDR_SIZE;
+        return off;
+    }
+    
+    string get_address() const {
+        return string(address);
+    }
+    
+    static size_t size() {
+        return 1 + UUID::size() + ADDR_SIZE;
+    }
+};
+
+class gcomm::GMCastMessage
+{
+    uint8_t version;
+    uint8_t type;
+    uint8_t flags;
+    uint8_t ttl;
+    UUID source_uuid;
+    string node_address;
+    string group_name;
+public:
+    typedef std::list<GMCastNode> NodeList;
+private:
+    NodeList* node_list;
+    GMCastMessage(const GMCastMessage&);
+    void operator=(const GMCastMessage&);
+public:
+    
+    enum Flags {
+        F_GROUP_NAME = 1 << 0,
+        F_NODE_NAME = 1 << 1,
+        F_NODE_ADDRESS = 1 << 2,
+        F_NODE_LIST = 1 << 3
+    };
+    
+    enum PacketType 
+    {
+        P_INVALID = 0,
+        P_HANDSHAKE = 1,
+        P_HANDSHAKE_RESPONSE = 2,
+        P_HANDSHAKE_OK = 3,
+        P_HANDSHAKE_FAIL = 4,
+        P_TOPOLOGY_CHANGE = 5,
+        /* Leave room for future use */
+        P_USER_BASE = 8
+    };
+    
+    /* Default ctor */
+    GMCastMessage() :
+        version(0), 
+        type(0), 
+        flags(0), 
+        ttl(0), 
+        source_uuid(), 
+        node_address(),
+        group_name(),
+        node_list(0)
+    {
+    }
+    
+    /* Ctor for handshake, handshake ok and handshake fail */
+    GMCastMessage(const uint8_t type_, const UUID& source_uuid_) :
+        version(0), 
+        type(type_), 
+        flags(0), 
+        ttl(1), 
+        source_uuid(source_uuid_), 
+        node_address(),
+        group_name(),
+        node_list(0)
+    {
+        if (type != P_HANDSHAKE && type != P_HANDSHAKE_OK && 
+            type != P_HANDSHAKE_FAIL)
+            throw FatalException("invalid message type");
+        
+    }
+    
+    /* Ctor for user message */
+    GMCastMessage(const uint8_t type_, const UUID& source_uuid_, 
+                 const uint8_t ttl_) :
+        version(0), 
+        type(type_), 
+        flags(0), 
+        ttl(ttl_), 
+        source_uuid(source_uuid_), 
+        node_address(),
+        group_name(""),
+        node_list(0)
+    {
+        if (type < P_USER_BASE)
+            throw FatalException("invalid message type");
+    }
+    
+    /* Ctor for handshake response */
+    GMCastMessage(const uint8_t type_, const UUID& source_uuid_,
+                 const string& node_address_,
+                 const char* group_name_) : 
+        version(0), 
+        type(type_), 
+        flags(F_GROUP_NAME | F_NODE_ADDRESS), 
+        ttl(1),
+        source_uuid(source_uuid_),
+        node_address(node_address_),
+        group_name(group_name_),
+        node_list(0)
+
+    {
+        if (type != P_HANDSHAKE_RESPONSE)
+            throw FatalException("invalid message type");
+    }
+
+    /* Ctor for topology change */
+    GMCastMessage(const uint8_t type_, 
+                 const UUID& source_uuid_,
+                 const string& group_name_,
+                 const NodeList& nodes) :
+        version(0),
+        type(type_),
+        flags(F_GROUP_NAME | F_NODE_LIST), 
+        ttl(1),
+        source_uuid(source_uuid_),
+        node_address(),
+        group_name(group_name_),
+        node_list(new NodeList(nodes))
+    {
+        if (type != P_TOPOLOGY_CHANGE)
+            throw FatalException("invalid message type");
+    }
+    
+    ~GMCastMessage() 
+    {
+        delete node_list;
+    }
+
+    
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const {
+        size_t off;
+        /* Version */
+        if ((off = gcomm::write(version, buf, buflen, offset)) == 0)
+            return 0;
+        /* Type */
+        if ((off = gcomm::write(type, buf, buflen, off)) == 0)
+            return 0;
+        /* Flags  */
+        if ((off = gcomm::write(flags, buf, buflen, off)) == 0)
+            return 0;
+        /* TTL */
+        if ((off = gcomm::write(ttl, buf, buflen, off)) == 0)
+            return 0;
+        if ((off = source_uuid.write(buf, buflen, off)) == 0)
+            return 0;
+
+        if (flags & F_NODE_ADDRESS)
+        {
+            if ((off = write_string(node_address.c_str(), buf, buflen, off)) == 0)
+                return 0;
+        }
+        if (flags & F_GROUP_NAME) 
+        {
+            if ((off = write_string(group_name.c_str(), buf, buflen, off)) == 0)
+                return 0;
+        }
+        
+        if (flags & F_NODE_LIST) 
+        {
+            if ((off = gcomm::write(static_cast<uint16_t>(node_list->size()), 
+                                    buf, buflen, off)) == 0)
+                return 0;
+            for (NodeList::const_iterator i = node_list->begin();
+                 i != node_list->end(); ++i) 
+            {
+                if ((off = i->write(buf, buflen, off)) == 0)
+                    return 0;
+            }
+        }
+        return off;
+    }
+    
+    size_t read_v0(const byte_t* buf, const size_t buflen, const size_t offset) {
+        size_t off;
+        if ((off = gcomm::read(buf, buflen, offset, &type)) == 0)
+            return 0;
+        if ((off = gcomm::read(buf, buflen, off, &flags)) == 0)
+            return 0;
+        if ((off = gcomm::read(buf, buflen, off, &ttl)) == 0)
+            return 0;
+        if ((off = source_uuid.read(buf, buflen, off)) == 0)
+            return 0;
+        
+        if (flags & F_NODE_ADDRESS)
+        {
+            char* addr = 0;
+            if ((off = read_string(buf, buflen, off, &addr)) == 0)
+                return 0;
+            node_address = addr;
+            free(addr);
+        }
+        
+        if (flags & F_GROUP_NAME) 
+        {
+            char* grp = 0;
+            if ((off = read_string(buf, buflen, off, &grp)) == 0)
+                return 0;
+            group_name = grp;
+            free(grp);
+        }
+        
+        if (flags & F_NODE_LIST)
+        {
+            node_list = new NodeList();
+            uint16_t size;
+            if ((off = gcomm::read(buf, buflen, off, &size)) == 0)
+                return 0;
+            for (uint16_t i = 0; i < size; ++i) 
+            {
+                GMCastNode node;
+                if ((off = node.read(buf, buflen, off)) == 0)
+                    return 0;
+                node_list->push_back(node);
+            }
+        }
+        LOG_DEBUG(make_int(type).to_string() + "," 
+                  + make_int(flags).to_string() + "," 
+                  + make_int(ttl).to_string() + ","
+                  + (F_GROUP_NAME ? group_name : ""));
+        return off;
+    }
+    
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset) {
+        size_t off;
+        
+        if ((off = gcomm::read(buf, buflen, offset, &version)) == 0)
+            return 0;
+        switch (version) {
+        case 0:
+            return read_v0(buf, buflen, off);
+        default:
+            return 0;
+        }
+    }
+    
+    size_t size() const {
+        return 4                 /* Common header */ 
+            + source_uuid.size() /* Source uuid */
+            /* GMCast address if set */
+            + (flags & F_NODE_ADDRESS ? node_address.size() + 1 : 0)
+            /* Group name if set */
+            + (flags & F_GROUP_NAME ? group_name.size() + 1 : 0)
+            /* Node list if set */
+            + (flags & F_NODE_LIST ? 
+               2 + node_list->size()*GMCastNode::size() : 0);
+    }
+    
+    uint8_t get_version() const {
+        return version;
+    }
+    
+    uint8_t get_type() const {
+        return type;
+    }
+
+    uint8_t get_ttl() const {
+        return ttl;
+    }
+    
+    void dec_ttl()
+    {
+        if (ttl == 0)
+            throw FatalException("");
+        ttl--;
+    }
+
+    
+    uint8_t get_flags() const {
+        return flags;
+    }
+
+    const UUID& get_source_uuid() const {
+        return source_uuid;
+    }
+    const string& get_node_address() const {
+        return node_address;
+    }
+
+    const char* get_group_name() const {
+        return group_name.c_str();
+    }
+
+    const NodeList* get_node_list() const {
+        return node_list;
+    }
+
+};
 
 
 BEGIN_GCOMM_NAMESPACE
@@ -409,8 +791,8 @@ static bool check_uri(const URI& uri)
 GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon_) :
     Transport(uri, event_loop, mon_),
     my_uuid(0, 0),
-    proto_map(),
-    spanning_tree(),
+    proto_map(new ProtoMap()),
+    spanning_tree(new ProtoMap()),
     listener(0),
     listen_addr(),
     initial_addr(),
@@ -465,6 +847,8 @@ GMCast::~GMCast()
         stop();
     }
     PseudoFd::release_fd(fd);
+    delete proto_map;
+    delete spanning_tree;
 }
 
 
@@ -498,15 +882,15 @@ void GMCast::stop()
     delete listener;
     listener = 0;
     
-    spanning_tree.clear();
-    for (ProtoMap::iterator i = proto_map.begin(); i != proto_map.end(); ++i)
+    spanning_tree->clear();
+    for (ProtoMap::iterator i = proto_map->begin(); i != proto_map->end(); ++i)
     {
-        Transport* tp = get_gmcast_proto(i)->get_transport();
+        Transport* tp = ProtoMap::get_value(i)->get_transport();
         tp->close();
         delete tp;
-        delete get_gmcast_proto(i);
+        delete ProtoMap::get_value(i);
     }
-    proto_map.clear();
+    proto_map->clear();
     pending_addrs.clear();
     remote_addrs.clear();
 }
@@ -517,7 +901,7 @@ void GMCast::gmcast_accept()
     Transport* tp = listener->accept();
     tp->set_up_context(this, tp->get_fd());
     pair<ProtoMap::iterator, bool> ret = 
-        proto_map.insert(
+        proto_map->insert(
             make_pair(tp->get_fd(), 
                       new GMCastProto(tp, listen_addr, string(""), 
                                       get_uuid(), group_name)));
@@ -548,7 +932,7 @@ void GMCast::gmcast_connect(const string& addr)
             
     tp->set_up_context(this, tp->get_fd());
     std::pair<ProtoMap::iterator, bool> ret = 
-        proto_map.insert(
+        proto_map->insert(
             make_pair(tp->get_fd(), new GMCastProto(tp, listen_addr, 
                                                     addr, get_uuid(), group_name)));
     if (ret.second == false)
@@ -561,16 +945,16 @@ void GMCast::gmcast_forget(const UUID& uuid)
     /* Close all proto entries corresponding to uuid */
     
     ProtoMap::iterator pi, pi_next;
-    for (pi = proto_map.begin(); pi != proto_map.end(); pi = pi_next)
+    for (pi = proto_map->begin(); pi != proto_map->end(); pi = pi_next)
     {
         pi_next = pi, ++pi_next;
-        GMCastProto* rp = get_gmcast_proto(pi);
+        GMCastProto* rp = ProtoMap::get_value(pi);
         if (rp->get_remote_uuid() == uuid)
         {
             rp->get_transport()->close();
             event_loop->release_protolay(rp->get_transport());
             delete rp;
-            proto_map.erase(pi);
+            proto_map->erase(pi);
         }
     }
     
@@ -656,19 +1040,19 @@ void GMCast::handle_failed(GMCastProto* rp)
 void GMCast::remove_proto(const int fd)
 {
 
-    proto_map.erase(fd);
-    spanning_tree.erase(fd);
+    proto_map->erase(fd);
+    spanning_tree->erase(fd);
 }
 
 
 
 bool GMCast::is_connected(const string& addr, const UUID& uuid) const
 {
-    for (ProtoMap::const_iterator i = proto_map.begin();
-         i != proto_map.end(); ++i)
+    for (ProtoMap::const_iterator i = proto_map->begin();
+         i != proto_map->end(); ++i)
     {
-        if (addr == get_gmcast_proto(i)->get_remote_addr() || 
-            uuid == get_gmcast_proto(i)->get_remote_uuid())
+        if (addr == ProtoMap::get_value(i)->get_remote_addr() || 
+            uuid == ProtoMap::get_value(i)->get_remote_uuid())
             return true;
     }
     return false;
@@ -755,7 +1139,7 @@ void GMCast::compute_spanning_tree(const UUIDToAddressMap& uuid_map)
     /* Construct lists of edges and weights */
     list<E> edges;
     list<int> weights;
-    for (ProtoMap::const_iterator i = proto_map.begin(); i != proto_map.end();
+    for (ProtoMap::const_iterator i = proto_map->begin(); i != proto_map->end();
          ++i)
     {
         if (i->second->get_state() != GMCastProto::S_OK)
@@ -791,8 +1175,8 @@ void GMCast::compute_spanning_tree(const UUIDToAddressMap& uuid_map)
     kruskal_minimum_spanning_tree(graph, std::back_inserter(st));
 
     /* Reset spanning_tree and proto map states */
-    spanning_tree.clear();
-    for (ProtoMap::iterator i = proto_map.begin(); i != proto_map.end(); ++i)
+    spanning_tree->clear();
+    for (ProtoMap::iterator i = proto_map->begin(); i != proto_map->end(); ++i)
     {
         i->second->set_send_ttl(1);
     }
@@ -815,7 +1199,7 @@ void GMCast::compute_spanning_tree(const UUIDToAddressMap& uuid_map)
             if (up_target != uuid_to_proto.end())
             {
                 // std::cerr << up_target->second.first << " ";
-                if (spanning_tree.insert(
+                if (spanning_tree->insert(
                         make_pair(up_target->second.first, 
                                   up_target->second.second)).second == false)
                     throw FatalException("");
@@ -831,7 +1215,7 @@ void GMCast::compute_spanning_tree(const UUIDToAddressMap& uuid_map)
         log_debug << "multihop route detected, looking up for proper route";
         const UUID& source_uuid = find_safe(idx_to_uuid, source(*ei, graph));
         ProtoMap::iterator i;
-        for (i = spanning_tree.begin(); i != spanning_tree.end(); ++i)
+        for (i = spanning_tree->begin(); i != spanning_tree->end(); ++i)
         {
             if (i->second->get_remote_uuid() == source_uuid)
             {
@@ -839,7 +1223,7 @@ void GMCast::compute_spanning_tree(const UUIDToAddressMap& uuid_map)
                 break;
             }
         }
-        if (i == spanning_tree.end())
+        if (i == spanning_tree->end())
         {
             LOG_WARN(string("no outgoing route found for ") + source_uuid.to_string());
         }
@@ -847,11 +1231,11 @@ void GMCast::compute_spanning_tree(const UUIDToAddressMap& uuid_map)
 
     if (st.begin() == st.end())
     {
-        log_debug << self_string() << " single hop spanning tree of size " << spanning_tree.size();
+        log_debug << self_string() << " single hop spanning tree of size " << spanning_tree->size();
     }
     else
     {
-        log_debug << self_string() << " multi hop spanning tree of size " << spanning_tree.size();
+        log_debug << self_string() << " multi hop spanning tree of size " << spanning_tree->size();
     }
 
 }
@@ -866,9 +1250,9 @@ void GMCast::update_addresses()
 
     /* Add all established connections into uuid_map and update 
      * list of remote addresses */
-    for (ProtoMap::iterator i = proto_map.begin(); i != proto_map.end(); ++i)
+    for (ProtoMap::iterator i = proto_map->begin(); i != proto_map->end(); ++i)
     {
-        GMCastProto* rp = get_gmcast_proto(i);
+        GMCastProto* rp = ProtoMap::get_value(i);
         if (rp->get_state() == GMCastProto::S_OK)
         {
             if (rp->get_remote_addr() == "" || rp->get_remote_uuid() == UUID())
@@ -901,18 +1285,18 @@ void GMCast::update_addresses()
     
     /* Send topology change message containing only established 
      * connections */
-    for (ProtoMap::iterator i = proto_map.begin(); i != proto_map.end(); ++i)
+    for (ProtoMap::iterator i = proto_map->begin(); i != proto_map->end(); ++i)
     {
-        GMCastProto* gp = get_gmcast_proto(i);
+        GMCastProto* gp = ProtoMap::get_value(i);
         if (gp->get_state() == GMCastProto::S_OK)
             gp->send_topology_change(uuid_map);
     }
 
     /* Add entries reported by all other nodes to get complete view 
      * of existing uuids/addresses */
-    for (ProtoMap::iterator i = proto_map.begin(); i != proto_map.end(); ++i)
+    for (ProtoMap::iterator i = proto_map->begin(); i != proto_map->end(); ++i)
     {
-        GMCastProto* rp = get_gmcast_proto(i);
+        GMCastProto* rp = ProtoMap::get_value(i);
         if (rp->get_state() == GMCastProto::S_OK)
         {
             for (UUIDToAddressMap::const_iterator 
@@ -1043,7 +1427,7 @@ void GMCast::forward_message(const int cid, const ReadBuf* rb,
     if ((hdrlen = msg.write(buf, sizeof(buf), 0)) == 0)
         throw FatalException("");
     wb.prepend_hdr(buf, hdrlen);
-    for (ProtoMap::iterator i = spanning_tree.begin(); i != spanning_tree.end();
+    for (ProtoMap::iterator i = spanning_tree->begin(); i != spanning_tree->end();
          ++i)
     {
         if (i->first != cid)
@@ -1091,15 +1475,15 @@ void GMCast::handle_up(const int cid, const ReadBuf* rb,
         
         
         bool changed = false;
-        ProtoMap::iterator i = proto_map.find(cid);
-        if (i == proto_map.end()) 
+        ProtoMap::iterator i = proto_map->find(cid);
+        if (i == proto_map->end()) 
         {
             
             LOG_WARN(string("unknown fd ") + make_int(cid).to_string());
             return;
         }
         
-        GMCastProto* rp = get_gmcast_proto(i);
+        GMCastProto* rp = ProtoMap::get_value(i);
         if (rb == 0) 
         {
             
@@ -1152,10 +1536,10 @@ int GMCast::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 {
     Critical crit(mon);
     
-    for (ProtoMap::iterator i = spanning_tree.begin();
-         i != spanning_tree.end(); ++i)
+    for (ProtoMap::iterator i = spanning_tree->begin();
+         i != spanning_tree->end(); ++i)
     {
-        GMCastProto* rp = get_gmcast_proto(i);
+        GMCastProto* rp = ProtoMap::get_value(i);
         GMCastMessage msg(GMCastMessage::P_USER_BASE, get_uuid(), rp->get_send_ttl());
         byte_t hdrbuf[20];
         size_t wlen;
