@@ -2,7 +2,7 @@
 
 #include "gcomm/conf.hpp"
 #include "gcomm/util.hpp"
-#include "map.hpp"
+#include "gcomm/map.hpp"
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/kruskal_min_spanning_tree.hpp>

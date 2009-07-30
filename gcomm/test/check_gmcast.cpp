@@ -386,6 +386,10 @@ START_TEST(test_gmcast_forget)
     
     tp1->close();
     tp2->close();
+    tp3->close();
+    delete tp1;
+    delete tp2;
+    delete tp3;
 }
 END_TEST
 

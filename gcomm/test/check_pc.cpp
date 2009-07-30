@@ -924,7 +924,7 @@ END_TEST
 
 
 
-static bool skip = true;
+static bool skip = false;
 
 Suite* pc_suite()
 {

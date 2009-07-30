@@ -1,5 +1,5 @@
 
-#include "map.hpp"
+#include "gcomm/map.hpp"
 
 #include "gcomm/logger.hpp"
 #include "gcomm/common.hpp"

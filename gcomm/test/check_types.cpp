@@ -6,7 +6,7 @@
 #include "gcomm/types.hpp"
 
 #include "inst_map.hpp"
-#include "map.hpp"
+#include "gcomm/map.hpp"
 
 #include <utility>
 #include <iostream>
