@@ -1,10 +1,10 @@
-MYSQL_BASE_DIR=/home/alex/codership/galera/mysql
+MYSQL_BASE_DIR=
 # MYSQLD=
 # MYSQL_DATA_DIR=
 # MYSQL_CNF=
 MYSQL_ROOT_USER=root
 MYSQL_ROOT_PSWD=rootpass
-WSREP_PROVIDER=/home/alex/codership/galera/galera/lib/libmmgalera.so
+WSREP_PROVIDER=
 WSREP_GCS_ADDRESS="dummy://"
 # WSREP_GCS_GROUP=
 WSREP_SST_METHOD=mysqldump
