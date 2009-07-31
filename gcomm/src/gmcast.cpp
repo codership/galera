@@ -929,7 +929,7 @@ void GMCast::gmcast_connect(const string& addr)
         delete tp;
         return;
     }
-            
+    
     tp->set_up_context(this, tp->get_fd());
     std::pair<ProtoMap::iterator, bool> ret = 
         proto_map->insert(
@@ -995,11 +995,15 @@ void GMCast::handle_established(GMCastProto* rp)
         pending_addrs.erase(i);
     }
     
-    if (remote_addrs.find(rp->get_remote_addr()) == remote_addrs.end())
+    if ((i = remote_addrs.find(rp->get_remote_addr())) == remote_addrs.end())
     {
         insert_address(rp->get_remote_addr(), rp->get_remote_uuid(),
                        remote_addrs);
+        i = remote_addrs.find(rp->get_remote_addr());
     }
+    
+    set_retry_cnt(i, -1);
+    
 }
 
 void GMCast::handle_failed(GMCastProto* rp)
@@ -1027,9 +1031,10 @@ void GMCast::handle_failed(GMCastProto* rp)
             (i = remote_addrs.find(remote_addr)) != remote_addrs.end())
         {
             set_retry_cnt(i, get_retry_cnt(i) + 1);
-            int rsecs = std::min(get_retry_cnt(i)*get_retry_cnt(i), 30);
+            int rsecs = 1;
             Time rtime = Time::now() + Time(rsecs, 0);
-            LOG_DEBUG(string("setting next reconnect time to ") + rtime.to_string() + " for " + remote_addr);
+            log_debug << "setting next reconnect time to "
+                      << rtime.to_string() << " for " << remote_addr;
             set_next_reconnect(i, rtime);
         }
     }
@@ -1326,7 +1331,7 @@ void GMCast::update_addresses()
                     log_debug << "proto refers but no addr on addr list for "
                               << j->second;
                     insert_address(j->second, j->first, pending_addrs);
-                    set_retry_cnt(pending_addrs.find(j->second), max_retry_cnt - 3);
+                    set_retry_cnt(pending_addrs.find(j->second), max_retry_cnt - 60);
                 }
             }
         }
@@ -1381,9 +1386,13 @@ void GMCast::reconnect()
                 }
                 else 
                 {
-                    log_info << self_string() << " reconnecting " 
-                             << get_uuid(i).to_string() 
-                             << " " << get_address(i);
+                    if (get_retry_cnt(i) % 60 == 0)
+                    {
+                        log_info << self_string() << " reconnecting " 
+                                 << get_uuid(i).to_string() 
+                                 << " " << get_address(i)
+                                 << " attempt " << get_retry_cnt(i);
+                    }
                     gmcast_connect(get_address(i));
                 }
             }
@@ -1394,12 +1403,7 @@ void GMCast::reconnect()
                           << get_address(i) << " "
                           << get_next_reconnect(i).to_string() << " "
                           << now.to_string();
-                
             }
-        }
-        else
-        {
-            set_retry_cnt(i, 0);
         }
     }
 }

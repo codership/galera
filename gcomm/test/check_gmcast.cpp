@@ -318,7 +318,7 @@ START_TEST(test_gmcast_w_user_messages)
     log_info << "u1 stop";
     u1.stop();
 
-    event_loop(&el, 0, 200);
+    event_loop(&el, 3, 0);
     
     log_info << "u1 start";
     u1.start();
@@ -380,6 +380,7 @@ START_TEST(test_gmcast_forget)
     tp1->close();
     tp2->close(uuid1);
     tp3->close(uuid1);
+    event_loop(&el, 10, 0);
     tp1->connect();
     log_info << "####";
     event_loop(&el, 1, 0);
@@ -420,6 +421,7 @@ Suite* gmcast_suite()
 
     tc = tcase_create("test_gmcast_forget");
     tcase_add_test(tc, test_gmcast_forget);
+    tcase_set_timeout(tc, 20);
     suite_add_tcase(s, tc);
 
 

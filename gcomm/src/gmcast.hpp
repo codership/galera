@@ -42,7 +42,7 @@ class GMCast : public Transport, EventContext
     Transport* listener;
     string listen_addr;
 
-    static const int max_retry_cnt = 30;
+    static const long max_retry_cnt = 1 << 24;
 
     struct Timing
     {
