@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# Copuright (C) 2009 Codership Oy <info@codership.com>
+
+echo "Operation is redundant: $(basename $0 | sed s/\.sh//)" 
+exit 0
