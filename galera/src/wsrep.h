@@ -319,17 +319,17 @@ typedef int (*wsrep_sst_donate_cb_t) (const void* msg, size_t msg_len);
 /*!
  * Initialization parameters for wsrep, used as arguments for wsrep_init()
  */
-typedef struct wsrep_init_args {
+struct wsrep_init_args {
     /* Configuration options */
-    const char* gcs_group;  //!< Symbolic group name
-    const char* gcs_address;//!< URL-like gcs handle address (backend://address)
-    const char* data_dir;   //!< directory where wsdb files are kept
-    const char* name;       //!< Symbolic name of this process (e.g. hostname)
-    const char* incoming;   //!< Incoming address for client connections
+    const char* cluster_name; //!< Symbolic cluster name
+    const char* cluster_addr; //!< URL-like cluster address (backend://address)
+    const char* node_name;    //!< Symbolic name of this node (e.g. hostname)
+    const char* node_incoming;//!< Address for incoming client connections
+    const char* data_dir;     //!< directory where wsrep files are kept if any
 
     /* Application state information */
-    wsrep_uuid_t  state_uuid;  //! Application state group UUID
-    wsrep_seqno_t state_seqno; //! Applicaiton state sequence number
+    wsrep_uuid_t  state_uuid; //!< Application state sequence UUID
+    wsrep_seqno_t state_seqno;//!< Applicaiton state sequence number
 
     /* Application callbacks */
     wsrep_log_cb_t            logger_cb;       //!< logging handler
@@ -338,13 +338,13 @@ typedef struct wsrep_init_args {
     wsrep_view_cb_t           view_handler_cb; //!< group view change handler
 
     /* applier callbacks */
-    wsrep_bf_apply_cb_t       bf_apply_cb; //!< applying callback
-    wsrep_ws_start_cb_t       ws_start_cb; //!< ws applying start handler
+    wsrep_bf_apply_cb_t       bf_apply_cb;     //!< applying callback
+    wsrep_ws_start_cb_t       ws_start_cb;     //!< ws applying start handler
 
     /* state snapshot transfer callbacks */
-    wsrep_sst_prepare_cb_t    sst_prepare_cb; //!< donor side prepare handler
-    wsrep_sst_donate_cb_t     sst_donate_cb;  //!< starting to donate
-} wsrep_init_args_t;
+    wsrep_sst_prepare_cb_t    sst_prepare_cb;  //!< donor side prepare handler
+    wsrep_sst_donate_cb_t     sst_donate_cb;   //!< starting to donate
+};
 
 typedef struct wsrep_ wsrep_t;
 /*!
@@ -359,7 +359,7 @@ struct wsrep_ {
    *
    * @param args wsrep initialization parameters
    */
-    wsrep_status_t (*init)(wsrep_t *, const wsrep_init_args_t *args);
+    wsrep_status_t (*init)   (wsrep_t *, const struct wsrep_init_args *args);
     
   /*!
    * @brief replication enable

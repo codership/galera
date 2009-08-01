@@ -76,7 +76,7 @@ static long                my_idx = 0;
 
 static struct job_queue   *applier_queue = NULL;
 
-static wsrep_init_args_t saved_args;
+static struct wsrep_init_args saved_args;
 
 /* global status structure */
 struct galera_info Galera;
@@ -215,7 +215,7 @@ static enum wsrep_status mm_galera_set_logger(
     }
 
 static enum wsrep_status mm_galera_init(wsrep_t* gh,
-                                        const wsrep_init_args_t* args)
+                                        const struct wsrep_init_args* args)
 {
     galera_state_t saved_state;
     int rcode;
@@ -237,16 +237,16 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     }
 
     /* set up GCS parameters */
-    if (args->gcs_address) {
-        gcs_url = strdup (args->gcs_address);
+    if (args->cluster_addr) {
+        gcs_url = strdup (args->cluster_addr);
     } else {
         gcs_url = "dummy://";
     }
-    if (args->gcs_group) {
-        gcs_channel = strdup (args->gcs_group);
+    if (args->cluster_name) {
+        gcs_channel = strdup (args->cluster_name);
     }
 
-    gcs_conn = gcs_create(gcs_url, args->name, NULL);
+    gcs_conn = gcs_create(gcs_url, args->node_name, args->node_incoming);
     if (!gcs_conn) {
         gu_error ("Failed to create GCS conection handle");
         GU_DBUG_RETURN(WSREP_NODE_FAIL);
