@@ -29,7 +29,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "7:0:0"
+#define WSREP_INTERFACE_VERSION "8"
 
 /* Empty backend spec */
 #define WSREP_NONE "none"
@@ -50,14 +50,14 @@ typedef enum wsrep_action {
 
 /*! wsrep status codes */
 typedef enum wsrep_status {
-    WSREP_OK        = 0, //!< success
-    WSREP_WARNING,       //!< minor warning, error logged
-    WSREP_TRX_MISSING,   //!< transaction is not known by wsrep
-    WSREP_TRX_FAIL,      //!< transaction aborted, server can continue
-    WSREP_BF_ABORT,      //!< trx was victim of brute force abort 
-    WSREP_CONN_FAIL,     //!< error in client connection, must abort
-    WSREP_NODE_FAIL,     //!< error in node state, wsrep must reinit
-    WSREP_FATAL,         //!< fatal error, server must abort
+    WSREP_OK        = 0,   //!< success
+    WSREP_WARNING,         //!< minor warning, error logged
+    WSREP_TRX_MISSING,     //!< transaction is not known by wsrep
+    WSREP_TRX_FAIL,        //!< transaction aborted, server can continue
+    WSREP_BF_ABORT,        //!< trx was victim of brute force abort 
+    WSREP_CONN_FAIL,       //!< error in client connection, must abort
+    WSREP_NODE_FAIL,       //!< error in node state, wsrep must reinit
+    WSREP_FATAL,           //!< fatal error, server must abort
     WSREP_NOT_IMPLEMENTED, //!< feature not implemented
 } wsrep_status_t;
 
@@ -619,7 +619,7 @@ struct wsrep_ {
    * @param uuid   sequence UUID (group UUID)
    * @param seqno  sequence number or negative error code of the operation
    */
-    wsrep_status_t (*sst_sent) (wsrep_t *,
+    wsrep_status_t (*sst_sent)(wsrep_t *,
                                 const wsrep_uuid_t* uuid,
                                 wsrep_seqno_t       seqno);
 
@@ -630,7 +630,7 @@ struct wsrep_ {
    * @param uuid  sequence UUID (group UUID)
    * @param seqno sequence number or negative error code of the operation
    */
-    wsrep_status_t (*sst_received) (wsrep_t *,
+    wsrep_status_t (*sst_received)(wsrep_t *,
                                     const wsrep_uuid_t* uuid,
                                     wsrep_seqno_t       seqno);
 
@@ -641,7 +641,7 @@ struct wsrep_ {
     void (*tear_down)(wsrep_t *);
 
     void *dlh;    //!< reserved for future use
-    void *opaque; //!< reserved for future use
+    void *ctx;    //!< reserved for implemetation private context
 };
     
 typedef int (*wsrep_loader_fun)(wsrep_t *);
@@ -651,8 +651,10 @@ typedef int (*wsrep_loader_fun)(wsrep_t *);
  *
  * @brief loads wsrep library
  *
- * @param spec path to wsrep library 
- * @param hptr location to store wsrep handle
+ * @param spec   path to wsrep library. If NULL or WSREP_NONE initialises dummy
+ *               pass-through implementation.
+ * @param hptr   wsrep handle
+ * @param log_cb callback to handle loader messages. Otherwise writes to stderr.
  *
  * @return zero on success, errno on failure
  */

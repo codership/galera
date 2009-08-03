@@ -20,7 +20,8 @@
 #include <galerautils.h>
 #include <gcs.h>
 #include <wsdb_api.h>
-#include "wsrep.h"
+
+#include "wsrep_api.h"
 #include "galera_info.h"
 #include "galera_state.h"
 #include "job_queue.h"

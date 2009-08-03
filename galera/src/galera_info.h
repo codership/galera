@@ -4,7 +4,7 @@
 #define __GALERA_INFO_H__
 
 #include <gcs.h>
-#include "wsrep.h"
+#include "wsrep_api.h"
 
 /* create view info out of configuration message */
 extern wsrep_view_info_t*
