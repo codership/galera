@@ -28,4 +28,11 @@ int galera_store_state(const char *dir, galera_state_t *state);
  */
 int galera_restore_state(const char *dir, galera_state_t *state);
 
+/*!
+ * @brief invalidates stored state
+ * @param dir    file path where state file resides
+ * @returns 0 if successful, -1 otherwise
+ */
+int galera_invalidate_state(const char *dir);
+
 #endif // __GALERA_STATE_H__

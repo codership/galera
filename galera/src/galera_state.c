@@ -2,8 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+
+#include <gcs.h>
+#include <galerautils.h>
 #include "galera_state.h"
-#include "galerautils.h"
 
 #define STATE_FILE "grastate.dat"
 #define STATE_HEADER "# GALERA saved state, version: %f, date: %s"
@@ -31,7 +33,7 @@ int galera_store_state(const char *dir, galera_state_t *state) {
         gu_error("could not open state file: %s", file_name);
         return -1;
     }
-    fprintf(fid, STATE_HEADER, 0.6, ctime(&now));
+    fprintf(fid, STATE_HEADER, 0.7, ctime(&now));
     fprintf(fid, "uuid:               ");
     //fprintf(fid, GU_UUID_FORMAT, GU_UUID_ARGS(&(state->uuid)));
     fprintf(fid, GU_UUID_FORMAT, GU_UUID_ARGS(&(state->uuid)));
@@ -112,4 +114,11 @@ int galera_restore_state(const char *dir, galera_state_t *state) {
 
     fclose(fid);
     return 0;
+}
+
+int galera_invalidate_state(const char *dir)
+{
+    galera_state_t state = { GCS_SEQNO_ILL, GU_UUID_NIL };
+
+    return galera_store_state (dir, &state);
 }

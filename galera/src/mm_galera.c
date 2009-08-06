@@ -392,7 +392,7 @@ static void mm_galera_tear_down(wsrep_t *gh)
 
 static long galera_handle_configuration (wsrep_t* gh,
                                          const gcs_act_conf_t*, gcs_seqno_t);
-
+#if UNUSED
 /*! Waits for and processes the first configuration action.
  *
  *  In case of PRIMARY configuration it means that state transfer is
@@ -439,6 +439,7 @@ static enum wsrep_status galera_wait_conf (wsrep_t *gh)
 
     GU_DBUG_RETURN(rcode);
 }
+#endif
 
 static enum wsrep_status mm_galera_connect (wsrep_t *gh,
                                             const char* cluster_name,
@@ -460,23 +461,10 @@ static enum wsrep_status mm_galera_connect (wsrep_t *gh,
 
     Galera.repl_state = GALERA_ENABLED;
 
-    rcode = galera_wait_conf (gh);
-    if (WSREP_OK != rcode) GU_DBUG_RETURN(rcode);
+    // Can't wait for configuration here for now
+    //rcode = galera_wait_conf (gh);
 
-    /* clear persistent state - after this point crash means undefined state */
-    {
-        galera_state_t saved_state;
-        
-        memset (saved_state.uuid.data, 0, GU_UUID_LEN);
-        saved_state.last_applied_seqno = GCS_SEQNO_ILL;
-
-        rcode = galera_store_state(saved_args.data_dir, &saved_state);
-        if (rcode) {
-            gu_error("GALERA state clear failed: %d (%s)",
-                     rcode, strerror(rcode));
-        }
-    }
-    GU_DBUG_RETURN(WSREP_OK);
+    GU_DBUG_RETURN(rcode);
 }
 
 static enum wsrep_status mm_galera_disconnect(wsrep_t *gh) {
@@ -1075,11 +1063,17 @@ galera_handle_configuration (wsrep_t* gh,
                 gcs_seqno_t seqno_l;
 
                 assert (app_req);
+
+                if (galera_invalidate_state (saved_args.data_dir)) abort();
+
                 ret = gcs_request_state_transfer (gcs_conn, app_req, 
                                                   app_req_len, &seqno_l);
                 if (ret < 0) {
+                    galera_state_t st = { last_applied, group_uuid };
                     gu_error ("Requesting state transfer: %d (%s)",
                               ret, strerror(-ret));
+                    // try not to lose state information if RST fails
+                    galera_store_state (saved_args.data_dir, &st);
                 }
 
                 if (seqno_l > GCS_SEQNO_NIL) {
@@ -1143,6 +1137,9 @@ galera_handle_configuration (wsrep_t* gh,
                     abort(); // just abort for now. Ideally reconnect to group.
                 }
             }
+
+            if (galera_invalidate_state (saved_args.data_dir)) abort();
+
             ret = my_idx;
         }
 
@@ -1150,6 +1147,17 @@ galera_handle_configuration (wsrep_t* gh,
     }
     else {
         // NON PRIMARY configuraiton
+        if (last_applied >= 0 &&
+            gu_uuid_compare (&group_uuid, &GU_UUID_NIL)) {
+            // try not to lose state information
+            galera_state_t st = { last_applied, group_uuid };
+            galera_store_state (saved_args.data_dir, &st);
+        }
+        else {
+            assert (last_applied < 0 &&
+                    !gu_uuid_compare (&group_uuid, &GU_UUID_NIL));
+        }
+
         ret = -1;
     }
 
@@ -1194,8 +1202,8 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
 
         assert (GCS_SEQNO_ILL != seqno_l);
 
-        gu_debug("worker: %d with seqno: (%lld - %lld) type: %d recvd", 
-                 applier->id, seqno_g, seqno_l, action_type
+        gu_debug("worker: %d with seqno: (%lld - %lld) type: %s recvd", 
+                 applier->id, seqno_g, seqno_l, galera_act_type_str[action_type]
         );
 
         switch (action_type) {
@@ -1582,9 +1590,9 @@ mm_galera_commit(
         rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_TORDERED,
                          &seqno_g, &seqno_l);
     } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP), true));
-//    gu_info ("gcs_repl(): act_type: %u, act_size: %u, act_id: %llu, "
+//    gu_info ("gcs_repl(): act_type: %s, act_size: %u, act_id: %llu, "
 //             "local: %llu, ret: %d",
-//             GCS_ACT_TORDERED, len, seqno_g, seqno_l, rcode);
+//             "GCS_ACT_TORDERED", len, seqno_g, seqno_l, rcode);
     if (rcode != len) {
         gu_error("gcs failed for: %llu, len: %d, rcode: %d", trx_id,len,rcode);
         assert (GCS_SEQNO_ILL == seqno_l);
