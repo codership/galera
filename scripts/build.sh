@@ -95,6 +95,9 @@ if [ "$OPT"   == "yes" ]; then CONFIGURE="yes"; conf_flags="$conf_flags --disabl
 if [ "$DEBUG" == "yes" ]; then CONFIGURE="yes"; fi
 if [ -n "$WITH_SPREAD" ]; then CONFIGURE="yes"; fi
 
+# Disable gcpmm until fixed
+GCOMM_DISABLED=${GCOMM_DISABLED:-"yes"}
+
 # Be quite verbose
 set -x
 
