@@ -64,8 +64,6 @@ static galera_log_cb_t          galera_log_handler = NULL;
 static gu_to_t            *to_queue     = NULL; // rename to cert_queue?
 static gu_to_t            *commit_queue = NULL;
 static gcs_conn_t         *gcs_conn     = NULL;
-static char               *gcs_channel  = "dummy_galera";
-static char               *gcs_url      = NULL;
 
 /* state trackers */
 static gcs_seqno_t         sst_seqno;         // received in state transfer
@@ -215,6 +213,34 @@ static enum wsrep_status mm_galera_set_logger(
         app_stat_cb(WSREP_STAT_LAST_SEQNO, WSREP_TYPE_INT, &last_applied); \
     }
 
+static gcs_conn_t* galera_init_gcs (wsrep_t*      gh,
+                                    const char*   node_name,
+                                    const char*   node_incoming,
+                                    gcs_seqno_t   last_recved,
+                                    const uint8_t uuid[GCS_UUID_LEN])
+{
+    gcs_conn_t* ret;
+    long rcode;
+
+    GU_DBUG_ENTER("galera_init_gcs");
+
+    ret = gcs_create(node_name, node_incoming);
+    if (!ret) {
+        gu_error ("Failed to create GCS conection handle");
+        GU_DBUG_RETURN(NULL);
+    }
+
+    rcode = gcs_init (ret, last_recved, group_uuid.data);
+    if (rcode) {
+        gu_error ("Failed to initialize GCS state: %d (%s)",
+                  rcode, strerror (-rcode));
+        gcs_destroy (ret);
+        GU_DBUG_RETURN(NULL);            
+    }
+
+    GU_DBUG_RETURN(ret);
+}
+
 static enum wsrep_status mm_galera_init(wsrep_t* gh,
                                         const struct wsrep_init_args* args)
 {
@@ -235,22 +261,6 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     if (*(my_bool*)app_configurator(WSREP_CONF_DEBUG, WSREP_TYPE_INT)) {
         gu_info("setting debug level logging");
         gu_conf_debug_on();
-    }
-
-    /* set up GCS parameters */
-    if (args->cluster_addr) {
-        gcs_url = strdup (args->cluster_addr);
-    } else {
-        gcs_url = "dummy://";
-    }
-    if (args->cluster_name) {
-        gcs_channel = strdup (args->cluster_name);
-    }
-
-    gcs_conn = gcs_create(gcs_url, args->node_name, args->node_incoming);
-    if (!gcs_conn) {
-        gu_error ("Failed to create GCS conection handle");
-        GU_DBUG_RETURN(WSREP_NODE_FAIL);
     }
 
     /* set up initial state: */
@@ -281,9 +291,10 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     gu_info("Configured state:   " GU_UUID_FORMAT ":%lli",
             GU_UUID_ARGS(&(group_uuid)), last_recved);
 
-    /* 4. initialize GCS state */
-    rcode = gcs_init (gcs_conn, last_recved, group_uuid.data);
-    if (rcode) {
+    /* 4. create and initialize GCS handle */
+    gcs_conn = galera_init_gcs (gh, args->node_name, args->node_incoming,
+                                last_recved, group_uuid.data);
+    if (!gcs_conn) {
         gu_error ("Failed to initialize GCS state: %d (%s)",
                   rcode, strerror (-rcode));
         GU_DBUG_RETURN(WSREP_NODE_FAIL);            
@@ -373,19 +384,23 @@ static void mm_galera_tear_down(wsrep_t *gh)
 #endif
 }
 
-static enum wsrep_status mm_galera_enable(wsrep_t *gh) {
+static enum wsrep_status mm_galera_connect (wsrep_t *gh,
+                                            const char* cluster_name,
+                                            const char* cluster_url)
+{
     int rcode;
 
     GU_DBUG_ENTER("galera_enable");
 
-    rcode = gcs_open(gcs_conn, gcs_channel);
+    rcode = gcs_open(gcs_conn, cluster_name, cluster_url);
     if (rcode) {
 	gu_error("gcs_open(%p, %s, %s) failed: %d (%s)",
-                    &gcs_conn, gcs_channel, gcs_url, rcode, strerror(-rcode));
+                 &gcs_conn, cluster_name, cluster_url,
+                 rcode, strerror(-rcode));
 	GU_DBUG_RETURN(WSREP_NODE_FAIL);
     }
 
-    gu_info("Successfully opened GCS connection to %s", gcs_channel);
+    gu_info("Successfully opened GCS connection to %s", cluster_name);
 
     Galera.repl_state = GALERA_ENABLED;
 
@@ -405,7 +420,7 @@ static enum wsrep_status mm_galera_enable(wsrep_t *gh) {
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static enum wsrep_status mm_galera_disable(wsrep_t *gh) {
+static enum wsrep_status mm_galera_disconnect(wsrep_t *gh) {
     int rcode;
 
     GU_DBUG_ENTER("galera_disable");
@@ -1070,7 +1085,7 @@ galera_handle_configuration (const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
 
     gu_info ("New %s configuration: %lld, "
              "seqno: %lld, group UUID: "GU_UUID_FORMAT
-             ", members: %zu, my idx: %zu",
+             ", members: %zu, my idx: %zd",
              conf->conf_id > 0 ? "PRIMARY" : "NON-PRIMARY",
              (long long)conf->conf_id, (long long)conf->seqno,
              GU_UUID_ARGS(conf_uuid), conf->memb_num, conf->my_idx);
@@ -2166,8 +2181,8 @@ static wsrep_status_t mm_galera_sst_received (wsrep_t* gh,
 static wsrep_t mm_galera_str = {
     WSREP_INTERFACE_VERSION,
     &mm_galera_init,
-    &mm_galera_enable,
-    &mm_galera_disable,
+    &mm_galera_connect,
+    &mm_galera_disconnect,
     &mm_galera_dbug_push,
     &mm_galera_dbug_pop,
     &mm_galera_recv,

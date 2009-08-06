@@ -36,8 +36,7 @@ typedef struct gcs_core gcs_core_t;
  * generic communicaton layer - send/recieve buffers and the like.
  */
 extern gcs_core_t*
-gcs_core_create (const char* backend,
-                 const char* node_name,
+gcs_core_create (const char* node_name,
                  const char* inc_addr);
 
 /* initializes action history (global seqno, group UUID). See gcs.h */
@@ -45,14 +44,15 @@ extern long
 gcs_core_init (gcs_core_t* core, gcs_seqno_t seqno, const gu_uuid_t* uuid);
 
 /*
- * gcs_core_open() initialises opens connection
+ * gcs_core_open() opens connection
  * Return values:
  * zero     - success
  * negative - error code
  */
 extern long
 gcs_core_open  (gcs_core_t* conn,
-                const char* channel);
+                const char* channel,
+                const char* url);
 
 
 /*
@@ -89,10 +89,10 @@ gcs_core_destroy (gcs_core_t* conn);
  *       The real status of action is determined only in gcs_core_recv() call.
  */
 extern ssize_t
-gcs_core_send (gcs_core_t*      const conn,
-               const void*            action,
-               size_t                 act_size,
-               gcs_act_type_t   const act_type);
+gcs_core_send (gcs_core_t*     conn,
+               const void*     action,
+               size_t          act_size,
+               gcs_act_type_t  act_type);
 
 /*
  * gcs_core_recv() blocks until some action is received from group.
@@ -106,17 +106,17 @@ gcs_core_send (gcs_core_t*      const conn,
  *       resent.
  */
 extern ssize_t
-gcs_core_recv (gcs_core_t*      const conn,
-               const void**     const action,
-               gcs_act_type_t*  const act_type,
-               gcs_seqno_t*     const act_id);
+gcs_core_recv (gcs_core_t*     conn,
+               const void**    action,
+               gcs_act_type_t* act_type,
+               gcs_seqno_t*    act_id);
 
 /* Configuration functions */
 /* Sets maximum message size to achieve requested network packet size. 
  * In case of failure returns negative error code, in case of success -
  * resulting message payload size (size of action fragment) */
 extern long
-gcs_core_set_pkt_size (gcs_core_t *conn, ulong pkt_size);
+gcs_core_set_pkt_size (gcs_core_t* conn, ulong pkt_size);
 
 /* sends this node's last applied value to group */
 extern long

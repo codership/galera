@@ -4,7 +4,7 @@
 #sinclude(config/ac-macros/galera.m4)
 
 AC_PREREQ(2.50)
-AC_INIT([libgalera], [0.2.1], [info@codership.com])
+AC_INIT([libgalera], [0.3.0], [info@codership.com])
 AC_CONFIG_SRCDIR([src/mm_galera.c])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE  # AC_INIT sets version and package name
@@ -63,8 +63,13 @@ AC_CHECK_FUNCS([memset mkdir strerror])
 AC_CONFIG_FILES([Makefile
                  src/Makefile])
 
+WSREP_INTERFACE_VERSION=$(grep WSREP_INTERFACE_VERSION src/wsrep_api.h | awk '{ print $3 }' | sed s/\"//g)
+AC_SUBST(WSREP_INTERFACE_VERSION)
+
 CFLAGS="$CFLAGS -Wall -Werror -Wextra -Wno-unused-parameter -Wmissing-prototypes"
+
 AC_OUTPUT
+AC_MSG_NOTICE([wsrep API version: $WSREP_API_VERSION])
 AC_MSG_NOTICE([dbug enabled: $enable_dbug])
 AC_MSG_NOTICE(CFLAGS:   $CFLAGS)
 AC_MSG_NOTICE(LDFLAGS:  $LDFLAGS)

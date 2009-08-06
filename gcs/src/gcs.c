@@ -117,47 +117,41 @@ gcs_slave_act_t;
 
 /* Creates a group connection handle */
 gcs_conn_t*
-gcs_create (const char* backend, const char* node_name, const char* inc_addr)
+gcs_create (const char* node_name, const char* inc_addr)
 {
-    long ret;
     gcs_conn_t* conn = GU_CALLOC (1, gcs_conn_t);
 
     if (conn) {
         conn->state = GCS_CONN_DESTROYED;
+        conn->core  = gcs_core_create (node_name, inc_addr);
 
-        conn->core = gcs_core_create (backend, node_name, inc_addr);
         if (conn->core) {
+            conn->repl_q = gcs_fifo_lite_create (GCS_MAX_REPL_THREADS,
+                                                 sizeof (gcs_act_t*));
 
-            ret = gcs_core_set_pkt_size (conn->core, GCS_DEFAULT_PKT_SIZE);
-            if (ret > 0) {
+            if (conn->repl_q) {
+                size_t recv_q_len = GU_AVPHYS_PAGES * GU_PAGE_SIZE /
+                                    sizeof(gcs_slave_act_t) / 4;
+                gu_debug ("Requesting recv queue len: %zu", recv_q_len);
+                conn->recv_q = gu_fifo_create (recv_q_len,
+                                               sizeof(gcs_slave_act_t));
 
-                conn->repl_q = gcs_fifo_lite_create (GCS_MAX_REPL_THREADS,
-                                                     sizeof (gcs_act_t*));
-                if (conn->repl_q) {
-                    size_t recv_q_len = GU_AVPHYS_PAGES * GU_PAGE_SIZE /
-                        sizeof(gcs_slave_act_t) / 4;
-                    gu_debug ("Requesting recv queue len: %zu", recv_q_len);
-                    conn->recv_q = gu_fifo_create (recv_q_len,
-                                                   sizeof(gcs_slave_act_t));
-                    if (conn->recv_q) {
-                        conn->state        = GCS_CONN_CLOSED;
-                        conn->my_idx       = -1;
-                        conn->local_act_id = GCS_SEQNO_FIRST;
-                        return conn; // success
-                    }
-                    else {
-                        gu_error ("Failed to create recv_q.");
-                    }
-                    gcs_fifo_lite_destroy (conn->repl_q);
+                if (conn->recv_q) {
+                    conn->state        = GCS_CONN_CLOSED;
+                    conn->my_idx       = -1;
+                    conn->local_act_id = GCS_SEQNO_FIRST;
+                    return conn; // success
                 }
                 else {
-                    gu_error ("Failed to create repl_q.");
+                    gu_error ("Failed to create recv_q.");
                 }
+
+                gcs_fifo_lite_destroy (conn->repl_q);
             }
             else {
-                gu_error ("Failed to set packet size: %ld (%s)",
-                          ret, strerror(-ret));        
+                gu_error ("Failed to create repl_q.");
             }
+
             gcs_core_destroy (conn->core);
         }
         else {
@@ -447,7 +441,7 @@ static void *gcs_recv_thread (void *arg)
     gu_mutex_lock   (&conn->lock); // wait till gcs_open() is done;
     gu_mutex_unlock (&conn->lock);
 
-    while (conn->state <= GCS_CONN_CLOSED)
+    while (conn->state < GCS_CONN_CLOSED)
     {
         gcs_seqno_t this_act_id = GCS_SEQNO_ILL;
 
@@ -488,9 +482,6 @@ static void *gcs_recv_thread (void *arg)
         }
 
         /* deliver to application */
-        // FIXME: this condition is very unclear and might be not good.
-        // the idea is that local seqno is only given to user actions with valid
-        // global TO.
         if (gu_likely (act_id >= 0 || act_type != GCS_ACT_TORDERED)) {
             /* successful delivery - increment local order */
             this_act_id = conn->local_act_id++;
@@ -577,41 +568,54 @@ static void *gcs_recv_thread (void *arg)
 }
 
 /* Opens connection to group */
-long gcs_open (gcs_conn_t *conn, const char *channel)
+long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
 {
     long ret = 0;
 
 //    if ((ret = gcs_queue_reset (conn->recv_q))) return ret;
 
-    if ((ret = gu_mutex_lock (&conn->lock))) return ret;
-    {
+    if (!(ret = gu_mutex_lock (&conn->lock))) {
+
         if (GCS_CONN_CLOSED == conn->state) {
 
-            if (!(ret = gcs_core_open (conn->core, channel))) {
+            if (!(ret = gcs_core_open (conn->core, channel, url))) {
 
-                if (!(ret = gu_thread_create (&conn->recv_thread,
-                                              NULL,
-                                              gcs_recv_thread,
-                                              conn))) {
-                    conn->state = GCS_CONN_OPEN; // by default
+                if (0 < (ret = gcs_core_set_pkt_size (conn->core,
+                                                      GCS_DEFAULT_PKT_SIZE))) {
 
-                    gu_info ("Opened channel '%s'", channel);
+                    if (!(ret = gu_thread_create (&conn->recv_thread,
+                                                  NULL,
+                                                  gcs_recv_thread,
+                                                  conn))) {
+                        conn->state = GCS_CONN_OPEN; // by default
+                        gu_info ("Opened channel '%s'", channel);
+                        goto out;
+                    }
+                    else {
+                        gu_error ("Failed to create main receive thread: "
+                                  "%ld (%s)", ret, strerror(-ret));
+                    }
+
                 }
                 else {
-                    gcs_core_close (conn->core);
+                    gu_error ("Failed to set packet size: %ld (%s)",
+                              ret, strerror(-ret));        
                 }
+
+                gcs_core_close (conn->core);
             }
             else {
-                gu_error ("Failed to open channel '%s': %d (%s)",
-                          channel, ret, strerror(-ret));
+                gu_error ("Failed to open channel '%s' at '%s': %d (%s)",
+                          channel, url, ret, strerror(-ret));
             }
         }
         else {
             ret = -EBADFD;
         }
+out:
+        gu_mutex_unlock (&conn->lock);
     }
 
-    gu_mutex_unlock (&conn->lock);
     return ret;
 }
 
@@ -632,8 +636,6 @@ long gcs_close (gcs_conn_t *conn)
             gu_mutex_unlock (&conn->lock);
             return -EBADFD;
         }
-        conn->state = GCS_CONN_CLOSED;
-        conn->err   = -ECONNABORTED;
 
         /** @note: We have to close connection before joining RECV thread
          *         since it may be blocked in gcs_backend_recv().
@@ -641,6 +643,9 @@ long gcs_close (gcs_conn_t *conn)
         if ((ret = gcs_core_close (conn->core))) {
             return ret;
         }
+
+        conn->state = GCS_CONN_CLOSED;
+        conn->err   = -ECONNABORTED;
 
         gu_thread_join (conn->recv_thread, NULL);
         gu_debug ("recv_thread() joined.");
@@ -876,7 +881,7 @@ long gcs_recv (gcs_conn_t*     conn,
     gcs_slave_act_t *act = NULL;
 
     *act_size     = 0;
-    *act_type     = GCS_ACT_UNKNOWN;
+    *act_type     = GCS_ACT_ERROR;
     *act_id       = GCS_SEQNO_ILL;
     *local_act_id = GCS_SEQNO_ILL;
     *action       = NULL;

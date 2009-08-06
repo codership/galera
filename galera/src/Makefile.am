@@ -1,22 +1,4 @@
-# 
-#lib_LTLIBRARIES = libgalera.la libdummy.la
-
-
-#libgalera_la_SOURCES = wsrep.c wsrep.h
-#libgalera_la_CFLAGS = -DGALERA_INTERFACE_VERSION=\"$(INTERFACE):$(REVISION):$(AGE)\"
-#INTERFACE = 1
-#REVISION  = 0
-#AGE       = 0
-#libgalera_la_LDFLAGS = -version-info $(INTERFACE):$(REVISION):$(AGE)
-
-#libdummy_la_SOURCES = dummy.c
-#libdummy_la_CFLAGS = 
-
-#noinst_PROGRAMS = test
-#test_SOURCES = test.c
-#test_LDADD = libgalera.la
-#test_LDFLAGS = -ldl
-
+# Copyright (C) 2007-2009 Codership Oy <info@codership.com>
 
 # <libgalera>
 include_HEADERS =
@@ -33,7 +15,8 @@ libmmgalera_la_SOURCES =   \
 #endif
 #libmmgalera_la_DEPENDENCIES = libwsdb.la
 libmmgalera_la_LIBADD       = -lwsdb
-GALERA_INTERFACE = 7
+GALERA_INTERFACE = @WSREP_INTERFACE_VERSION@
+#grep WSREP_INTERFACE_VERSION wsrep_api.h | awk '{ print $2 }' | sed s/\"//g
 GALERA_REVISION  = 0
 GALERA_AGE       = 0
 libmmgalera_la_LDFLAGS = \

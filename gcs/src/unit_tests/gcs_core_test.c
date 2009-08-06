@@ -263,11 +263,7 @@ core_test_init ()
 
     mark_point();
 
-    Core = gcs_core_create ("poiewqjfow", NULL, NULL);
-    fail_if (NULL != Core);
-
-    Core = gcs_core_create ("dummy://xxx.yyy.zzz",
-                            "core_test",
+    Core = gcs_core_create ("core_test",
                             "aaa.bbb.ccc.ddd:xxxx");
 
     fail_if (NULL == Core);
@@ -277,13 +273,21 @@ core_test_init ()
 
     Seqno = 0; // reset seqno
 
+    ret = core_test_set_payload_size (FRAG_SIZE);
+    fail_if (-EBADFD != ret, "Expected -EBADFD, got: %ld (%s)",
+             ret, strerror(-ret));
+
+    ret = gcs_core_open (Core, "yadda-yadda", "owkmevc");
+    fail_if (-EINVAL != ret, "Expected -EINVAL, got %ld (%s)",
+             ret, strerror(-ret));
+
+    ret = gcs_core_open (Core, "yadda-yadda", "dummy://");
+    fail_if (0 != ret, "Failed to open core connection: %ld (%s)",
+             ret, strerror(-ret));
+
     // this will configure backend to have desired fragment size
     ret = core_test_set_payload_size (FRAG_SIZE);
     fail_if (0 != ret, "Failed to set up the message payload size: %ld (%s)",
-             ret, strerror(-ret));   
-
-    ret = gcs_core_open (Core, "yadda-yadda");
-    fail_if (0 != ret, "Failed to open core connection: %ld (%s)",
              ret, strerror(-ret));
 
     // receive first configuration message

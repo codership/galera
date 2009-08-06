@@ -79,48 +79,35 @@ typedef struct core_act
 core_act_t;
 
 gcs_core_t*
-gcs_core_create (const char* backend_uri,
-                 const char* node_name,
+gcs_core_create (const char* node_name,
                  const char* inc_addr)
 {
-    long        err  = 0;
     gcs_core_t* core = GU_CALLOC (1, gcs_core_t);
 
     if (NULL != core) {
 
-        gu_debug ("Initializing backend IO layer");
-        err = gcs_backend_init (&core->backend, backend_uri);
-        if (0 == err) {
-            assert (NULL != core->backend.conn);
+        // Need to allocate something, otherwise Spread 3.17.3 freaks out.
+        core->recv_msg.buf = gu_malloc(CORE_INIT_BUF_SIZE);
+        if (core->recv_msg.buf) {
 
-            // Need to allocate something, otherwise Spread 3.17.3 freaks out.
-            core->recv_msg.buf = gu_malloc(CORE_INIT_BUF_SIZE);
-            if (core->recv_msg.buf) {
-                core->recv_msg.buf_len = CORE_INIT_BUF_SIZE;
+            core->recv_msg.buf_len = CORE_INIT_BUF_SIZE;
 
-                core->fifo = gcs_fifo_lite_create (CORE_FIFO_LEN,
-                                                   sizeof (core_act_t));
-                if (core->fifo) {
-                    gu_mutex_init  (&core->send_lock, NULL);
-                    gcs_group_init (&core->group, node_name, inc_addr);
-                    core->proto_ver = 0;
-                    core->state = CORE_CLOSED;
+            core->fifo = gcs_fifo_lite_create (CORE_FIFO_LEN,
+                                               sizeof (core_act_t));
+            if (core->fifo) {
+                gu_mutex_init  (&core->send_lock, NULL);
+                gcs_group_init (&core->group, node_name, inc_addr);
+                core->proto_ver = 0;
+                core->state = CORE_CLOSED;
 #ifdef GCS_CORE_TESTING
-                    gu_lock_step_init (&core->ls);
+                gu_lock_step_init (&core->ls);
 #endif
-                    return core; // success
-                }
-
-                gu_free (core->recv_msg.buf);
+                return core; // success
             }
-            core->backend.destroy (&core->backend);
+
+            gu_free (core->recv_msg.buf);
         }
-        else {
-            gu_error ("Failed to initialize backend: %d (%s)",
-                      err, strerror(-err));
-            gu_error ("Arguments: %p, %s",
-                      &core->backend, backend_uri);
-        }
+
         gu_free (core);
     }
 
@@ -144,7 +131,8 @@ gcs_core_init (gcs_core_t* core, gcs_seqno_t seqno, const gu_uuid_t* uuid)
 
 long
 gcs_core_open (gcs_core_t* core,
-               const char* channel)
+               const char* channel,
+               const char* url)
 {
     long ret;
 
@@ -153,13 +141,26 @@ gcs_core_open (gcs_core_t* core,
         return -EBADFD;
     }
 
-    ret = core->backend.open (&core->backend, channel);
-    if (!ret) {
-        core->state = CORE_NON_PRIMARY;
+    assert (NULL == core->backend.conn);
+
+    gu_debug ("Initializing backend IO layer");
+    if (!(ret = gcs_backend_init (&core->backend, url))) {
+
+        assert (NULL != core->backend.conn);
+
+        if (!(ret = core->backend.open (&core->backend, channel))) {
+            core->state = CORE_NON_PRIMARY;
+        }
+        else {
+            gu_error ("Failed to open backend connection: %d (%s)",
+                      ret, strerror(-ret));
+            core->backend.destroy (&core->backend);
+        }
+
     }
     else {
-        gu_error ("Failed to open backend connection: %d (%s)",
-                  ret, strerror(-ret));
+        gu_error ("Failed to initialize backend using '%s': %d (%s)",
+                  url, ret, strerror(-ret));
     }
 
     return ret;
@@ -468,9 +469,13 @@ core_handle_act_msg (gcs_core_t*     core,
                     ret = -ENOTRECOVERABLE;
                 }
 
+                assert (act->id < 0 || CORE_PRIMARY == core->state);
+
                 if (gu_unlikely(CORE_PRIMARY != core->state)) {
-                    assert (act->id < 0);
-                    act->id = core_error (core->state);
+                    // there can be a tiny race with gcs_core_close(),
+                    // so CORE_CLOSED allows TO delivery.
+                    assert (act->id < 0 || CORE_CLOSED == core->state);
+                    if (act->id < 0) act->id = core_error (core->state);
                 }
             }
 //          gu_debug ("Received action: seqno: %lld, sender: %d, size: %d, "
@@ -890,27 +895,29 @@ out:
     return ret;
 }
 
-long gcs_core_close (gcs_core_t* conn)
+long gcs_core_close (gcs_core_t* core)
 {
     long ret;
 
-    if (!conn) return -EBADFD;
-    if (gu_mutex_lock (&conn->send_lock)) return -EBADFD;
-    if (conn->state >= CORE_CLOSED) {
-	gu_mutex_unlock (&conn->send_lock);
-	return -EBADFD;
+    if (!core) return -EBADFD;
+    if (gu_mutex_lock (&core->send_lock)) return -EBADFD;
+
+    if (core->state >= CORE_CLOSED) {
+	ret = -EBADFD;
+    }
+    else {
+        ret = core->backend.close (&core->backend);
+        core->backend.destroy (&core->backend);
+        core->state = CORE_CLOSED;
     }
 
-    conn->state = CORE_CLOSED;
-    ret = conn->backend.close (&conn->backend);
-    gu_mutex_unlock (&conn->send_lock);
+    gu_mutex_unlock (&core->send_lock);
 
     return ret;
 }
 
 long gcs_core_destroy (gcs_core_t* core)
 {
-    long ret;
     core_act_t* tmp;
 
     if (!core) return -EBADFD;
@@ -945,27 +952,31 @@ long gcs_core_destroy (gcs_core_t* core)
     gu_free (core->recv_msg.buf);
     gu_free (core->send_buf);
 
-    ret = core->backend.destroy (&core->backend);
-
 #ifdef GCS_CORE_TESTING
     gu_lock_step_destroy (&core->ls);
 #endif
 
     gu_free (core);
 
-    return ret;
+    return 0;
 }
 
 long
-gcs_core_set_pkt_size (gcs_core_t* conn, ulong pkt_size)
+gcs_core_set_pkt_size (gcs_core_t* core, ulong pkt_size)
 {
-    long msg_size = conn->backend.msg_size (&conn->backend, pkt_size);
-    long hdr_size = gcs_act_proto_hdr_size (conn->proto_ver);
+    long     hdr_size, msg_size;
     uint8_t* new_send_buf = NULL;
-    long ret = 0;
+    long     ret = 0;
 
+    if (core->state >= CORE_CLOSED) {
+        gu_error ("Attempt to set packet size on a closed connection.");
+        return -EBADFD;
+    }
+
+    hdr_size = gcs_act_proto_hdr_size (core->proto_ver);
     if (hdr_size < 0) return hdr_size;
 
+    msg_size = core->backend.msg_size (&core->backend, pkt_size);
     if (msg_size <= hdr_size) {
         gu_warn ("Requested packet size %d is too small, "
                  "using smallest possible: %d",
@@ -974,16 +985,16 @@ gcs_core_set_pkt_size (gcs_core_t* conn, ulong pkt_size)
     }
 
     gu_debug ("Changing maximum message size %u -> %u",
-              conn->send_buf_len, msg_size);
+              core->send_buf_len, msg_size);
 
-    if (gu_mutex_lock (&conn->send_lock)) abort();
+    if (gu_mutex_lock (&core->send_lock)) abort();
     {
-        if (conn->state != CORE_DESTROYED) {
-            new_send_buf = gu_realloc (conn->send_buf, msg_size);
+        if (core->state != CORE_DESTROYED) {
+            new_send_buf = gu_realloc (core->send_buf, msg_size);
             if (new_send_buf) {
-                conn->send_buf     = new_send_buf;
-                conn->send_buf_len = msg_size;
-                memset (conn->send_buf, 0, hdr_size); // to pacify valgrind
+                core->send_buf     = new_send_buf;
+                core->send_buf_len = msg_size;
+                memset (core->send_buf, 0, hdr_size); // to pacify valgrind
                 ret = msg_size - hdr_size; // message payload
                 gu_debug ("Message payload (action fragment size): %ld", ret);
             }
@@ -995,7 +1006,7 @@ gcs_core_set_pkt_size (gcs_core_t* conn, ulong pkt_size)
             ret =  -EBADFD;
         }
     }
-    gu_mutex_unlock (&conn->send_lock);
+    gu_mutex_unlock (&core->send_lock);
 
     return ret;
 }

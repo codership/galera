@@ -37,13 +37,6 @@ typedef struct gcs_conn gcs_conn_t;
 /*! @brief Creates GCS connection handle. 
  * 
  * @param conn connection handle
- * @param backend an URL-like string that specifies backend communication
- *                driver in the form "TYPE://ADDRESS". For Spread backend
- *                it can be "spread://localhost:4803", for dummy backend
- *                ADDRESS field is ignored.
- *
- *                Currently supported backend types: "dummy", "spread", "gcomm"
- *
  * @param node_name human readable name of the node, can be null.
  * @param inc_addr  address at which application accepts incoming requests.
  *                  Used for load balancing, can be null.
@@ -51,7 +44,7 @@ typedef struct gcs_conn gcs_conn_t;
  * @return pointer to GCS connection handle, NULL in case of failure.
  */
 extern gcs_conn_t*
-gcs_create  (const char *backend, const char* node_name, const char* inc_addr);
+gcs_create  (const char* node_name, const char* inc_addr);
 
 /*! @brief Initialize group history values (optional). 
  * Serves to provide group history persistence after process restart (in case
@@ -81,11 +74,17 @@ extern long gcs_init (gcs_conn_t   *conn,
  *                the channel. If the channel with such name does not exist,
  *                it is created. Processes that joined the same channel
  *                receive the same actions.
+ * @param url     an URL-like string that specifies backend communication
+ *                driver in the form "TYPE://ADDRESS?options". For gcomm
+ *                backend it can be "gcomm://localhost:4567", for dummy backend
+ *                ADDRESS field is ignored.
+ *                Currently supported backend types: "dummy", "vsbes", "gcomm"
  *
  * @return negative error code, 0 in case of success.
  */
 extern long gcs_open  (gcs_conn_t *conn,
-                       const char *channel);
+                       const char *channel,
+		       const char *url);
 
 /*! @brief Closes connection to group.
  *

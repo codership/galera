@@ -29,7 +29,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "8"
+#define WSREP_INTERFACE_VERSION "9"
 
 /* Empty backend spec */
 #define WSREP_NONE "none"
@@ -241,9 +241,9 @@ typedef int (*wsrep_ws_start_cb_t)(void *ctx, wsrep_seqno_t seqno);
  * applying data representations
  */
 typedef enum wsrep_apply_data_type {
-    WSREP_APPLY_SQL,//!< SQL statement as a string
-    WSREP_APPLY_ROW,//!< row data buffers
-    WSREP_APPLY_APP //!< application specific data buffer
+    WSREP_APPLY_SQL, //!< SQL statement as a string
+    WSREP_APPLY_ROW, //!< row data buffers
+    WSREP_APPLY_APP  //!< application specific data buffer
 } wsrep_apply_data_type_t;
 
 /*!
@@ -320,9 +320,7 @@ typedef int (*wsrep_sst_donate_cb_t) (const void* msg, size_t msg_len);
  * Initialization parameters for wsrep, used as arguments for wsrep_init()
  */
 struct wsrep_init_args {
-    /* Configuration options */
-    const char* cluster_name; //!< Symbolic cluster name
-    const char* cluster_addr; //!< URL-like cluster address (backend://address)
+    /* Configuration parameters */
     const char* node_name;    //!< Symbolic name of this node (e.g. hostname)
     const char* node_incoming;//!< Address for incoming client connections
     const char* data_dir;     //!< directory where wsrep files are kept if any
@@ -355,23 +353,31 @@ struct wsrep_ {
   const char *version; //!< interface version string
 
   /*!
-   * @brief initializes wsrep library
+   * @brief initializes wsrep provider
    *
    * @param args wsrep initialization parameters
    */
     wsrep_status_t (*init)   (wsrep_t *, const struct wsrep_init_args *args);
     
   /*!
-   * @brief replication enable
+   * @brief open connection to cluster
+   *
+   * Returns when either node is ready to operate as a part of the clsuter
+   * or fails to reach operating status.
+   *
    * @param wsrep this wsrep handler
+   * @param cluster_name symbolic cluster name to uniquely identify the cluster
+   * @param cluster_addr URL-like cluster address (backend://address)
    */
-    wsrep_status_t (*enable) (wsrep_t *);    
+    wsrep_status_t (*connect) (wsrep_t *,
+                            const char* cluster_name,
+                            const char* cluster_addr);
 
   /*!
-   * @brief replication disable 
+   * @brief close connection to cluster 
    * @param wsrep this wsrep handler
    */
-    wsrep_status_t (*disable)(wsrep_t *);
+    wsrep_status_t (*disconnect)(wsrep_t *);
     
   /*!
    * @brief push DBUG control string to wsrep own DBUG implementation.
@@ -635,10 +641,10 @@ struct wsrep_ {
                                     wsrep_seqno_t       seqno);
 
   /*!
-   * @brief wsrep shutdown, all memory objects are freed
+   * @brief frees allocated resources before unloading the library.
    * @param wsrep this wsrep handler
    */
-    void (*tear_down)(wsrep_t *);
+    void (*free)(wsrep_t *);
 
     void *dlh;    //!< reserved for future use
     void *ctx;    //!< reserved for implemetation private context

@@ -168,7 +168,7 @@ galera_start()
 
     if test -n "$GCS_ADDRESS"
     then
-        WSREP_OPTS="$WSREP_OPTS --wsrep_gcs_address=$GCS_ADDRESS"
+        WSREP_OPTS="$WSREP_OPTS --wsrep_cluster_address=$GCS_ADDRESS"
     fi
 
     if test -n "$SLAVE_THREADS"

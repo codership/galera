@@ -703,8 +703,9 @@ int main (int argc, char *argv[])
     printf ("Opening connection: channel = %s, backend = %s\n",
              channel, conf.backend);
 
-    if (!(gcs = gcs_create (conf.backend, NULL, NULL))) goto out;
-    if ((err = gcs_open    (gcs, channel))) goto out;
+    if (!(gcs = gcs_create (NULL, NULL))) goto out;
+    puts ("debug"); fflush(stdout);
+    if ((err  = gcs_open   (gcs, channel, conf.backend))) goto out;
     printf ("Connected\n");
 
     msg_len = 1300;

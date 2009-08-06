@@ -1,0 +1,5 @@
+2009-08-06 Alex 
+    Changes to match new wsrep API: cluster connection url is now passed to
+    mm_galera_connect() instead of mm_galera_init(). Brought library interface
+    version in sync with wsrep API version.
+    Version 0.3.0.

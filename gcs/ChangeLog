@@ -1,3 +1,9 @@
+2009-08-06 Alex 
+    Refactored interface. Now connection URL is supplied to gcs_open() and
+    not gcs_create(). It is done to satisfy wsrep API changes and is generally
+    cleaner as it separates library initialisation from connection
+    establishment. Version: 0.10.0
+
 2009-07-21 Alex 
     Added node name and incoming address arguments to gcs_create(). Thus
     it should be possible to give nodes sensible names and see them in logs.
