@@ -5,7 +5,7 @@
 PLUGIN_BASE_DIR=$(cd $(dirname $0); pwd -P)
 SELF=$PLUGIN_BASE_DIR/$(basename $0)
 
-WSREP_GCS_GROUP=${1:-"tor_galera_cluster"}
+WSREP_CLUSTER_NAME=${1:-"tor_galera_cluster"}
 WSREP_NODE_NAME=${2:-"$(hostname)"}
 PLUGIN_CONF=${3:-"$PLUGIN_BASE_DIR/plugin.cnf"}
 
@@ -98,7 +98,8 @@ galera_start()
     fi
 
     WSREP_OPTS="$WSREP_OPTS \
-                --wsrep_gcs_address=$WSREP_GCS_ADDRESS \
+		--wsrep_cluster_name=$WSREP_CLUSTER_NAME \
+                --wsrep_cluster_address=$WSREP_CLUSTER_ADDRESS \
 		--wsrep_sst_method=$WSREP_SST_METHOD \
 		--wsrep_local_cache_size=$WSREP_LOCAL_CACHE_SIZE \
 		--wsrep_start_position=$WSREP_START_POSITION \
