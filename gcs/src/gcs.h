@@ -209,12 +209,11 @@ extern long gcs_repl (gcs_conn_t          *conn,
                       gcs_seqno_t         *act_id,
                       gcs_seqno_t         *local_act_id);
 
-/*! @brief Returns local seqno which is causally dependent on anything this
- *         thread can be causally dependent on.
+/*!
  * After action with this seqno is applied, this thread is guaranteed to see
  * all the changes made by the client, even on other nodes.
  *
- * @return sequence number or negative error code
+ * @return local sequence number or negative error code
  */
 extern gcs_seqno_t gcs_caused();
 
@@ -226,14 +225,18 @@ extern gcs_seqno_t gcs_caused();
  * @param req   opaque byte array that contains data required for
  *              the state transfer (application dependent)
  * @param size  request size
+ * @param donor desired state transfer donor name. Supply empty string to
+ *              choose automatically.
  * @param seqno response to request was ordered with this seqno.
  *              Must be skipped in local queues.
  * @return negative error code, index of state transfer donor in case of success
- *         (notably, -EAGAIN means try later)
+ *         (notably, -EAGAIN means try later, -EHOSTUNREACH means desired donor
+ *         is unavailable)
  */
 extern long gcs_request_state_transfer (gcs_conn_t  *conn,
                                         const void  *req,
                                         size_t       size,
+                                        const char  *donor,
                                         gcs_seqno_t *local_act_id);
 
 /*! @brief Informs group on behalf of donor that state stransfer is over.

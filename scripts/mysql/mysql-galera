@@ -101,6 +101,7 @@ Options:
     -d|--debug        : enable debug output
     -l|--log          : enable mysql query log
     -g|--gcs_address  : address of gcs server (spread://locahost:4803)
+    --donor           : desired state transfer donor
     --slave_threads   : number of consurrent ws appliers (1)
     --data_dir        : location for mysql data directories
     -u|--user         : mysql root user
@@ -169,6 +170,11 @@ galera_start()
     if test -n "$GCS_ADDRESS"
     then
         WSREP_OPTS="$WSREP_OPTS --wsrep_cluster_address=$GCS_ADDRESS"
+    fi
+
+    if test -n "$WSREP_SST_DONOR"
+    then
+        WSREP_OPTS="$WSREP_OPTS --wsrep_sst_donor=$WSREP_SST_DONOR"
     fi
 
     if test -n "$SLAVE_THREADS"
@@ -339,6 +345,10 @@ case $1 in
 	    ;;
     -g|--gcs_address)
             GCS_ADDRESS=$2
+            shift
+            ;;
+    --donor)
+            WSREP_SST_DONOR=$2
             shift
             ;;
     --slave_threads)

@@ -140,12 +140,12 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
                       GCS_GROUP_PRIMARY == group->state &&
                       !(group->frag_reset && local))) {
             /* Common situation -
-             * increment act_id only for totally ordered actions
+             * increment and assign act_id only for totally ordered actions
              * and only in PRIM (skip messages while in state exchange) */
             act->id = ++group->act_id;
         }
         else {
-            /* Rare situation */
+            /* Rare situations */
             if (GCS_GROUP_PRIMARY == group->state) {
                 if (group->frag_reset && local) {
                     /* Fragmentation was reset by configuration change.
@@ -154,13 +154,6 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
                         act->id =  -ERESTART;
                     }
                     // else?
-                }
-                else {
-                    // Some other condition
-                    if (GCS_ACT_STATE_REQ == act->type) {
-                        ret = gcs_group_handle_state_request (group,sender_idx,
-                                                              act);
-                    }
                 }
             }
         }

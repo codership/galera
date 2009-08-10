@@ -478,6 +478,11 @@ core_handle_act_msg (gcs_core_t*     core,
                     if (act->id < 0) act->id = core_error (core->state);
                 }
             }
+
+            if (gu_unlikely(GCS_ACT_STATE_REQ == act->type && ret > 0)) {
+                ret = gcs_group_handle_state_request (group, msg->sender_idx,
+                                                      act);
+            }
 //          gu_debug ("Received action: seqno: %lld, sender: %d, size: %d, "
 //                    "act: %p", act->id, msg->sender_idx, ret, act->buf);
 //          gu_debug ("%s", (char*) act->buf);

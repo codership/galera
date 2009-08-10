@@ -29,7 +29,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "9"
+#define WSREP_INTERFACE_VERSION "10"
 
 /* Empty backend spec */
 #define WSREP_NONE "none"
@@ -367,11 +367,13 @@ struct wsrep_ {
    *
    * @param wsrep this wsrep handler
    * @param cluster_name symbolic cluster name to uniquely identify the cluster
-   * @param cluster_addr URL-like cluster address (backend://address)
+   * @param cluster_url  URL-like cluster address (backend://address)
+   * @param state_donor  name of the node to be asked for state transfer.
    */
     wsrep_status_t (*connect) (wsrep_t *,
-                            const char* cluster_name,
-                            const char* cluster_addr);
+                               const char* cluster_name,
+                               const char* cluster_url,
+                               const char* state_donor);
 
   /*!
    * @brief close connection to cluster 

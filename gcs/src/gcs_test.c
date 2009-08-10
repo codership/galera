@@ -458,6 +458,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
                      (long long)conf->seqno, // this is global seqno
                      strerror (-gcs_request_state_transfer (gcs, &conf->seqno,
                                                             sizeof(conf->seqno),
+							    "",
                                                             &seqno)));
 
             // pretend that state transfer is complete, cancel every action up

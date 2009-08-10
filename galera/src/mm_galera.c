@@ -67,9 +67,6 @@ static wsrep_view_cb_t          view_handler_cb    = NULL;
 static wsrep_sst_prepare_cb_t   sst_prepare_cb     = NULL;
 static wsrep_sst_donate_cb_t    sst_donate_cb      = NULL;
 
-/* application context pointer */
-//static void *app_ctx = NULL;
-
 /* gcs parameters */
 static gu_to_t            *to_queue     = NULL; // rename to cert_queue?
 static gu_to_t            *commit_queue = NULL;
@@ -85,7 +82,8 @@ static long                my_idx = 0;
 
 static struct job_queue   *applier_queue = NULL;
 
-static struct wsrep_init_args saved_args;
+static const char* data_dir  = NULL;
+static const char* sst_donor = NULL;
 
 /* global status structure */
 struct galera_info Galera;
@@ -121,7 +119,7 @@ static inline long galera_to_eagain (
     return rcode;
 }
 
-#define GALERA_QUEUE_NAME(queue)                     \
+#define GALERA_QUEUE_NAME(queue)                        \
     ((queue) == to_queue ? "to_queue" : "commit_queue")
 
 // the following are made as macros to allow for correct line number reporting
@@ -257,7 +255,9 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     int rcode;
 
     GU_DBUG_ENTER("galera_init");
-    memcpy(&saved_args, args, sizeof(saved_args));
+
+    data_dir = strdup (args->data_dir);
+    if (!data_dir) return WSREP_FATAL;
 
     /* Set up logging */
     gu_conf_set_log_callback((gu_log_cb_t)args->logger_cb);
@@ -278,7 +278,7 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     group_uuid = GU_UUID_NIL;
 
     /* 2. read saved state from file */
-    rcode = galera_restore_state(args->data_dir, &saved_state);
+    rcode = galera_restore_state(data_dir, &saved_state);
     if (rcode) {
         gu_warn("GALERA state restore failed");
     } else {
@@ -315,7 +315,7 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     my_idx = 0;
 
     /* initialize wsdb */
-    wsdb_init(args->data_dir, (gu_log_cb_t)args->logger_cb);
+    wsdb_init(data_dir, (gu_log_cb_t)args->logger_cb);
 
     /* set the rest of callbacks */
     bf_apply_cb       = args->bf_apply_cb;
@@ -381,18 +381,21 @@ static void mm_galera_tear_down(wsrep_t *gh)
     memcpy(saved_state.uuid.data, group_uuid.data, GU_UUID_LEN);
     saved_state.last_applied_seqno = last_applied;
 
-    rcode = galera_store_state(saved_args.data_dir, &saved_state);
+    rcode = galera_store_state(data_dir, &saved_state);
     if (rcode) {
         gu_error("GALERA state store failed: %d", rcode);
         gu_info("      last applied: %lli", last_applied);
         gu_info(GU_UUID_FORMAT, GU_UUID_ARGS(&group_uuid));
     }
 
+    if (data_dir)  free ((char*)data_dir);
+    if (sst_donor) free ((char*)sst_donor);
 }
 
+#if UNUSED // looks like we cannot block in galera_connect()
 static long galera_handle_configuration (wsrep_t* gh,
                                          const gcs_act_conf_t*, gcs_seqno_t);
-#if UNUSED
+
 /*! Waits for and processes the first configuration action.
  *
  *  In case of PRIMARY configuration it means that state transfer is
@@ -443,11 +446,17 @@ static enum wsrep_status galera_wait_conf (wsrep_t *gh)
 
 static enum wsrep_status mm_galera_connect (wsrep_t *gh,
                                             const char* cluster_name,
-                                            const char* cluster_url)
+                                            const char* cluster_url,
+                                            const char* state_donor)
 {
     int rcode;
 
     GU_DBUG_ENTER("galera_connect");
+
+    // save donor name for using in configuration handler
+    if (sst_donor) free ((char*)sst_donor);
+    sst_donor = strdup (state_donor);
+    if (!sst_donor) GU_DBUG_RETURN(WSREP_FATAL);
 
     rcode = gcs_open(gcs_conn, cluster_name, cluster_url);
     if (rcode) {
@@ -1053,7 +1062,7 @@ galera_handle_configuration (wsrep_t* gh,
             app_req_len = sst_prepare_cb (&app_req);
             if (app_req_len < 0) {
                 ret = app_req_len;
-                gu_error ("Application failed to prepare to receive "
+                gu_error ("Application failed to prepare for receiving "
                           "state transfer: %d (%s)", -ret, strerror(-ret));
             }
             else do {
@@ -1064,16 +1073,17 @@ galera_handle_configuration (wsrep_t* gh,
 
                 assert (app_req);
 
-                if (galera_invalidate_state (saved_args.data_dir)) abort();
+                if (galera_invalidate_state (data_dir)) abort();
 
-                ret = gcs_request_state_transfer (gcs_conn, app_req, 
-                                                  app_req_len, &seqno_l);
+                ret = gcs_request_state_transfer (gcs_conn,
+                                                  app_req, app_req_len,
+                                                  sst_donor, &seqno_l);
                 if (ret < 0) {
                     galera_state_t st = { last_applied, group_uuid };
-                    gu_error ("Requesting state transfer: %d (%s)",
+                    gu_error ("Requesting state transfer failed: %d (%s)",
                               ret, strerror(-ret));
                     // try not to lose state information if RST fails
-                    galera_store_state (saved_args.data_dir, &st);
+                    galera_store_state (data_dir, &st);
                 }
 
                 if (seqno_l > GCS_SEQNO_NIL) {
@@ -1114,6 +1124,14 @@ galera_handle_configuration (wsrep_t* gh,
                         usleep (100000);
                 }
             }
+            else {
+                // Until we develop a clean way out of this situation: return
+                // from this function means unlocking queues and letting
+                // slave threads to apply actions over unsynchronized state.
+                gu_fatal ("Aborting to prevent state corruption.");
+                assert(0);
+                abort();
+            }
 
             gu_mutex_unlock (&sst_mtx);
         }
@@ -1138,7 +1156,7 @@ galera_handle_configuration (wsrep_t* gh,
                 }
             }
 
-            if (galera_invalidate_state (saved_args.data_dir)) abort();
+            if (galera_invalidate_state (data_dir)) abort();
 
             ret = my_idx;
         }
@@ -1151,7 +1169,7 @@ galera_handle_configuration (wsrep_t* gh,
             gu_uuid_compare (&group_uuid, &GU_UUID_NIL)) {
             // try not to lose state information
             galera_state_t st = { last_applied, group_uuid };
-            galera_store_state (saved_args.data_dir, &st);
+            galera_store_state (data_dir, &st);
         }
         else {
             assert (last_applied < 0 &&

@@ -12,6 +12,7 @@ WSREP_CLUSTER_ADDRESS="dummy://"
 WSREP_SST_METHOD=mysqldump
 WSREP_SST_AUTH=$MYSQL_ROOT_USER:$MYSQL_ROOT_PSWD
 # WSREP_SST_ADDRESS=
+# WSREP_SST_DONOR=""
 
 #
 # Parameters below rarely require changing

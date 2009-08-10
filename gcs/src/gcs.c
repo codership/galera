@@ -394,9 +394,9 @@ gcs_handle_actions (gcs_conn_t*    conn,
         ret = 1;
         break;
     case GCS_ACT_STATE_REQ:
-        gu_info ("Got GCS_ACT_STATE_REQ to %lld, my idx: %ld",
-                 act_id, conn->my_idx);
         if ((gcs_seqno_t)conn->my_idx == act_id) {
+            gu_info ("Got GCS_ACT_STATE_REQ to %lld, my idx: %ld",
+                     act_id, conn->my_idx);
             ret = gcs_become_donor (conn);
             gu_info ("Becoming donor: %s", 1 == ret ? "yes" : "no");
         }
@@ -437,8 +437,7 @@ static void *gcs_recv_thread (void *arg)
     const void*     local_action = NULL;
 
     // To avoid race between gcs_open() and the following state check in while()
-    // (I'm trying to avoid mutex locking in this loop, so lock/unlock before)
-    gu_mutex_lock   (&conn->lock); // wait till gcs_open() is done;
+    gu_mutex_lock   (&conn->lock);
     gu_mutex_unlock (&conn->lock);
 
     while (conn->state < GCS_CONN_CLOSED)
@@ -453,7 +452,7 @@ static void *gcs_recv_thread (void *arg)
             assert (GCS_SEQNO_ILL == act_id);
             assert (NULL == action);
 
-	    gcs_act_t *slave_act = gu_fifo_get_tail(conn->recv_q);
+	    gcs_act_t *slave_act    = gu_fifo_get_tail(conn->recv_q);
             slave_act->act_size     = 0;
             slave_act->act_type     = GCS_ACT_ERROR;
             slave_act->act_id       = GCS_SEQNO_ILL;
@@ -481,7 +480,8 @@ static void *gcs_recv_thread (void *arg)
             if (gu_likely(ret <= 0)) continue; // not for application
         }
 
-        /* deliver to application */
+        /* deliver to application (note matching assert in the bottom-half of
+         * gcs_repl()) */
         if (gu_likely (act_id >= 0 || act_type != GCS_ACT_TORDERED)) {
             /* successful delivery - increment local order */
             this_act_id = conn->local_act_id++;
@@ -827,7 +827,8 @@ long gcs_repl (gcs_conn_t          *conn,
             *local_act_id = act.local_act_id; /* set by recv_thread */
 
             if (act.act_id < 0) {
-                assert (GCS_SEQNO_ILL == act.local_act_id);
+                assert (GCS_SEQNO_ILL    == act.local_act_id ||
+                        GCS_ACT_TORDERED != act_type);
                 if (act.act_id == GCS_SEQNO_ILL) {
                     /* action was not replicated for some reason */
                     ret = -EINTR;
@@ -854,16 +855,33 @@ long gcs_repl (gcs_conn_t          *conn,
 long gcs_request_state_transfer (gcs_conn_t  *conn,
                                  const void  *req,
                                  size_t       size,
+                                 const char  *donor,
                                  gcs_seqno_t *local)
 {
     gcs_seqno_t global;
+    long   ret       = -ENOMEM;
+    size_t donor_len = strlen(donor) + 1; // include terminating \0
+    size_t rst_size  = size + donor_len;
+    void*  rst       = gu_malloc (rst_size);
 
-    long ret = gcs_repl(conn, req, size, GCS_ACT_STATE_REQ, &global, local);
+    if (rst) {
+        /* RST format: |donor name|\0|app request|
+         * anything more complex will require a special (de)serializer.
+         * NOTE: this is sender part. Check gcs_group_handle_state_request()
+         *       for the receiver part. */
+        memcpy (rst, donor, donor_len);
+        memcpy (rst + donor_len, req, size);
 
-    if (ret > 0) {
-        assert (ret == size);
-        assert (global >= 0);
-        ret = global; // index of donor is in the global seqno
+        ret = gcs_repl(conn, rst, rst_size, GCS_ACT_STATE_REQ, &global, local);
+
+        if (ret > 0) {
+            assert (ret == rst_size);
+            assert (global >= 0);
+        }
+
+        ret = global; // index of donor or error code is in the global seqno
+
+        gu_free (rst);
     }
 
     return ret;

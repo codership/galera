@@ -4,7 +4,7 @@
 #sinclude(config/ac-macros/galera.m4)
 
 AC_PREREQ(2.50)
-AC_INIT([libgalera], [0.3.0], [info@codership.com])
+AC_INIT([libgalera], [0.4.0], [info@codership.com])
 AC_CONFIG_SRCDIR([src/mm_galera.c])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE  # AC_INIT sets version and package name
@@ -17,7 +17,7 @@ AC_ARG_ENABLE(debug,
 if test "$enable_debug" != "no"
 then
     enable_debug="yes"
-    CFLAGS=${CFLAGS:-" -g -O0 "}
+    CFLAGS=${CFLAGS:-" -g -O0 -DDEBUG_MALLOC -DDEBUG_MUTEX -DDEBUG_ASSERT "}
 else
     CFLAGS=${CFLAGS:-" -O2 -g "}
     CFLAGS="$CFLAGS -DNDEBUG "
