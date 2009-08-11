@@ -1123,7 +1123,9 @@ galera_handle_configuration (wsrep_t* gh,
                 }
                 else {
                     group_uuid  = sst_uuid;
-                    last_recved = sst_seqno; // last_applied is updated below
+                    last_recved = sst_seqno;
+                    // last_applied is updated below, but to satisfy asserts:
+                    last_applied = last_recved;
                     gu_info ("Application state transfer complete: "
                              GU_UUID_FORMAT":%lld",
                              GU_UUID_ARGS(&group_uuid), last_recved);
