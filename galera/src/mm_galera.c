@@ -753,7 +753,7 @@ galera_update_global_seqno (gcs_seqno_t seqno)
     }
 }
 
-static void process_conn_write_set( 
+static wsrep_status_t process_conn_write_set( 
     struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
     gcs_seqno_t seqno_g, gcs_seqno_t seqno_l
 ) {
@@ -782,7 +782,7 @@ static void process_conn_write_set(
 
     if (do_report) report_last_committed(gcs_conn);
     
-    return;
+    return rcode;
 }
 
 static int process_query_write_set_applying(
@@ -793,9 +793,9 @@ static int process_query_write_set_applying(
 
     int  rcode      = 0;
     bool do_report  = false;
-    int  retries    = 0;
+    int  attempts   = 0;
 
-#define MAX_RETRIES 100 // retry 100 times
+#define MAX_APPLY_ATTEMPTS 10 // try applying 10 times
 
     /* synchronize with other appliers */
     ctx.seqno = seqno_l;
@@ -803,21 +803,20 @@ static int process_query_write_set_applying(
     job_queue_start_job(applier_queue, applier, (void *)&ctx);
 
  retry:
-    while((apply_write_set(app_ctx, ws))) {
-        if (retries == 0) 
-            gu_warn("ws apply failed for: %llu, last_seen: %llu", 
-                  seqno_g, ws->last_seen_trx
+    while((rcode = apply_write_set(app_ctx, ws))) {
+        if (attempts == 0) 
+            gu_warn("ws apply failed, rcode: %d, seqno: %llu, last_seen: %llu", 
+                    rcode, seqno_g, ws->last_seen_trx
         );
 
         if (apply_query(app_ctx, "rollback\0", 9)) {
             gu_warn("ws apply rollback failed, seqno: %llu, last_seen: %llu", 
                     seqno_g, ws->last_seen_trx);
         }
-        if (++retries == MAX_RETRIES) break;
 
 #ifdef EXTRA_DEBUG
         /* print conflicting rbr buffer for later analysis */
-        if (retries == 1) {
+        if (attempts == 1) {
             char file[256];
             memset(file, '\0', 256);
             sprintf(file, "/tmp/galera/ws_%llu.bin", seqno_l);
@@ -826,8 +825,16 @@ static int process_query_write_set_applying(
             fclose(fd); 
         }
 #endif
+        ++attempts;
+
+        /* avoid retrying if fatal error happened */
+        if (rcode == WSREP_FATAL) attempts = MAX_APPLY_ATTEMPTS;
+
+        /* break if retry limit has been reached */
+        if (attempts == MAX_APPLY_ATTEMPTS) break;
+
     }
-    if (retries > 0 && retries == MAX_RETRIES) {
+    if (attempts == MAX_APPLY_ATTEMPTS) {
         gu_warn("ws applying is not possible, %lld - %lld", seqno_g, seqno_l);
         return WSREP_TRX_FAIL;
     }
@@ -860,8 +867,8 @@ static int process_query_write_set_applying(
          * This needs a better implementation, to identify if interrupt
          * is real or not.
          */
-        if (retries > 0) {
-            retries = 0;
+        if (attempts > 0) {
+            attempts = 0;
             //goto retry_commit;
             gu_info("BF interrupted (retries>0) in commit queue for %lld", 
                     seqno_l
@@ -903,7 +910,7 @@ static int process_query_write_set_applying(
 /*
   similar to post gcs_repl part of `galera_commit' to apply remote WS
 */
-static void process_query_write_set( 
+static enum wsrep_status process_query_write_set( 
     struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
     gcs_seqno_t seqno_g, gcs_seqno_t seqno_l
 ) {
@@ -936,10 +943,10 @@ static void process_query_write_set(
             applier, app_ctx, ws, seqno_g, seqno_l
         );
 
-        /* register committed transaction */
+        /* stop for any dbms error */
         if (rcode != WSDB_OK) {
             gu_fatal("could not apply trx: %lld %lld", seqno_g, seqno_l);
-            abort();
+            return WSREP_FATAL;
         }
         break;
     }
@@ -964,19 +971,20 @@ static void process_query_write_set(
         gu_error(
             "unknown galera fail: %d trdx: %lld %lld", rcode, seqno_g, seqno_l
         );
-        abort();
+        return WSREP_FATAL;
         break;
     }
 
-    return;
+    return WSREP_OK;
 }
 
-static void process_write_set( 
+static wsrep_status_t process_write_set( 
     struct job_worker *applier, void *app_ctx, uint8_t *data, size_t data_len, 
     gcs_seqno_t seqno_g, gcs_seqno_t seqno_l
 ) {
     struct wsdb_write_set ws;
     XDR xdrs;
+    wsrep_status_t rcode = WSREP_OK;
 
     xdrmem_create(&xdrs, (char *)data, data_len, XDR_DECODE);
     if (!xdr_wsdb_write_set(&xdrs, &ws)) {
@@ -997,10 +1005,10 @@ static void process_write_set(
 
     switch (ws.type) {
     case WSDB_WS_TYPE_TRX:
-        process_query_write_set(applier, app_ctx, &ws, seqno_g, seqno_l);
+        rcode = process_query_write_set(applier, app_ctx, &ws, seqno_g,seqno_l);
         break;
     case WSDB_WS_TYPE_CONN:
-        process_conn_write_set(applier, app_ctx, &ws, seqno_g, seqno_l);
+        rcode = process_conn_write_set(applier, app_ctx, &ws, seqno_g, seqno_l);
         break;
     }
 
@@ -1010,7 +1018,7 @@ static void process_write_set(
     xdrs.x_op = XDR_FREE;
     xdr_wsdb_write_set(&xdrs, &ws);
 
-    return;
+    return rcode;
 }
 
 /*!
@@ -1188,6 +1196,7 @@ galera_handle_configuration (wsrep_t* gh,
 static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
     int rcode;
     struct job_worker *applier;
+    bool shutdown = false;
 
     /* we must have gcs connection */
     if (!gcs_conn) {
@@ -1202,20 +1211,20 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
         );
         return WSREP_NODE_FAIL;
     }
-    for (;;) {
+    while (!shutdown) {
         gcs_act_type_t  action_type;
         size_t          action_size;
         void*           action;
         gcs_seqno_t     seqno_g, seqno_l;
 
-        errno = 0;
         rcode = gcs_recv(
             gcs_conn, &action, &action_size, &action_type, &seqno_g, &seqno_l
         );
-//        gu_info ("gcs_recv(): act_type: %u, act_size: %u, act_id: %lld, "
-//                "local: %llu, rcode: %d", // make seqno_g signed to display -1
-//                action_type, action_size, (long long)seqno_g, seqno_l, rcode);
-
+#ifdef EXTRA_DEBUG
+        gu_info ("gcs_recv(): act_type: %u, act_size: %u, act_id: %lld, "
+                "local: %llu, rcode: %d", // make seqno_g signed to display -1
+                action_type, action_size, (long long)seqno_g, seqno_l, rcode);
+#endif
 	if (rcode <= 0) return WSREP_CONN_FAIL;
 
         assert (GCS_SEQNO_ILL != seqno_l);
@@ -1226,11 +1235,16 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
 
         switch (action_type) {
         case GCS_ACT_TORDERED:
+        {
             assert (GCS_SEQNO_ILL != seqno_g);
-            process_write_set(
-                applier, app_ctx, action, action_size, seqno_g, seqno_l
-                );
+            if (process_write_set(
+                   applier, app_ctx, action, action_size, seqno_g, seqno_l
+                )!= WSREP_OK
+            ) {
+              shutdown = true;
+            } 
             break;
+        }
         case GCS_ACT_COMMIT_CUT:
             // synchronize
             GALERA_GRAB_QUEUE (to_queue, seqno_l);
