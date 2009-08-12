@@ -65,11 +65,11 @@ struct gcs_conn
     char  *channel;
     char  *socket;
 
-    volatile gcs_conn_state_t state;
-    volatile int err;
+    gcs_conn_state_t state;
+    int err;
     gu_mutex_t   lock;
 
-    volatile gcs_seqno_t local_act_id; /* local seqno of the action  */
+    gcs_seqno_t local_act_id; /* local seqno of the action  */
 
     /* A queue for threads waiting for replicated actions */
     gcs_fifo_lite_t*  repl_q;
@@ -336,6 +336,13 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
 
     conn->my_idx = conf->my_idx;
 
+    if (conf->conf_id < 0) {
+        assert (conf->my_idx < 0);
+        gu_info ("Received self-leave message. Closing connection.");
+        conn->state = GCS_CONN_CLOSED;
+        return;
+    }
+
     if (conf->st_required) {
         gcs_become_open (conn);
     }
@@ -561,7 +568,7 @@ static void *gcs_recv_thread (void *arg)
 //       gu_debug("Received action of type %d, size %d, id=%llu, local id=%llu",
 //                 act_type, act_size, act_id, conn->local_act_id);
     }
-    
+
     if (ret > 0) ret = 0;
     gu_info ("RECV thread exiting %d: %s", ret, strerror(-ret));
     return NULL;
@@ -644,17 +651,16 @@ long gcs_close (gcs_conn_t *conn)
             return ret;
         }
 
-        conn->state = GCS_CONN_CLOSED;
-        conn->err   = -ECONNABORTED;
-
         gu_thread_join (conn->recv_thread, NULL);
         gu_debug ("recv_thread() joined.");
+
+        conn->state = GCS_CONN_CLOSED;
+        conn->err   = -ECONNABORTED;
 
         /* At this point (state == CLOSED) no new threads should be able to
          * queue for repl (check gcs_repl()), and recv thread is joined, so no
          * new actions will be received. Abort threads that are still waiting
          * in repl queue */
-        gcs_fifo_lite_close (conn->repl_q);
         while ((act_ptr = gcs_fifo_lite_get_head (conn->repl_q))) {
             gcs_act_t* act = *act_ptr;
             gcs_fifo_lite_pop_head (conn->repl_q);
@@ -666,13 +672,16 @@ long gcs_close (gcs_conn_t *conn)
             gu_cond_signal  (&act->wait_cond);
             gu_mutex_unlock (&act->wait_mutex);
         }
-
-        /* wake all gcs_recv() threads */
-        // FIXME: this can block waiting for applicaiton threads to fetch all
-        // items. In certain situations this can block forever. Ticket #113
-        gu_fifo_close (conn->recv_q);
+        gcs_fifo_lite_close (conn->repl_q);
     }
     gu_mutex_unlock (&conn->lock);
+
+        /* wake all gcs_recv() threads () */
+        // FIXME: this can block waiting for applicaiton threads to fetch all
+        // items. In certain situations this can block forever. Ticket #113
+        gu_info ("Closing slave action queue.");
+        gu_fifo_close (conn->recv_q);
+
     return ret;
 }
 
@@ -734,7 +743,7 @@ long gcs_send (gcs_conn_t*          conn,
      *  @note: gcs_repl() and gcs_recv() cannot lock connection
      *         because they block indefinitely waiting for actions */
     if (!(ret = gu_mutex_lock (&conn->lock))) { 
-        if (GCS_CONN_CLOSED > conn->state) {
+        if (GCS_CONN_OPEN >= conn->state) {
             /* need to make a copy of the action, since receiving thread
              * has no way of knowing that it shares this buffer.
              * also the contents of action may be changed afterwards by
@@ -795,7 +804,7 @@ long gcs_repl (gcs_conn_t          *conn,
             // some hack here to achieve one if() instead of two:
             // if (conn->state >= GCS_CONN_CLOSE) ret will be -ENOTCONN
             ret = -ENOTCONN;
-            if ((GCS_CONN_CLOSED > conn->state) &&
+            if ((GCS_CONN_OPEN >= conn->state) &&
                 (act_ptr = gcs_fifo_lite_get_tail (conn->repl_q)))
             {
                 *act_ptr = &act;
@@ -820,7 +829,8 @@ long gcs_repl (gcs_conn_t          *conn,
         }
         assert(ret);
         /* now having unlocked repl_q we can go waiting for action delivery */
-        if (ret >= 0 && GCS_CONN_CLOSED > conn->state) {
+//        if (ret >= 0 && GCS_CONN_CLOSED > conn->state) {
+        if (ret >= 0) {
             gu_cond_wait (&act.wait_cond, &act.wait_mutex);
 
             *act_id       = act.act_id;       /* set by recv_thread */
