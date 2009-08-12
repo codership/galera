@@ -310,7 +310,12 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     }
 
     app_stat_cb = args->stat_param_cb;
-    GALERA_UPDATE_LAST_APPLIED (last_recved);
+    last_applied = last_recved;
+
+// begin workaround for #411814
+    memcpy ((void*)&args->state_uuid, &group_uuid, sizeof(wsrep_uuid_t));
+    *(wsrep_seqno_t*)&args->state_seqno = last_applied;
+// end   workaround for #411814
 
     my_idx = 0;
 
