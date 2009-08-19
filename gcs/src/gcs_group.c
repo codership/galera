@@ -225,6 +225,25 @@ group_post_state_exchange (gcs_group_t* group)
               GU_UUID_ARGS(&quorum.group_uuid));
 }
 
+// does basic sanity check of the component message (in response to #145)
+static void
+group_check_comp_msg (bool prim, long my_idx, long members)
+{
+    if (my_idx >= 0) {
+        if (my_idx < members) return;
+    }
+    else {
+        if (!prim && (0 == members)) return;
+    }
+
+    gu_fatal ("Malformed component message from backend: "
+              "%s, idx = %ld, members = %ld",
+              prim ? "PRIMARY" : "NON-PRIMARY", my_idx, members);
+
+    assert (0);
+    abort ();
+}
+
 gcs_group_state_t
 gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
 {
@@ -236,10 +255,10 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     const long new_my_idx    = gcs_comp_msg_self   (comp);
     const long new_nodes_num = gcs_comp_msg_num    (comp);
 
-    if (new_my_idx >= 0) {
-        assert (new_nodes_num > 0);
+    group_check_comp_msg (prim_comp, new_my_idx, new_nodes_num);
 
-        gu_info ("New COMPONENT: primary = %s, my_id = %d, memb_num = %d",
+    if (new_my_idx >= 0) {
+        gu_info ("New COMPONENT: primary = %s, my_idx = %d, memb_num = %d",
                  prim_comp ? "yes" : "no", new_my_idx, new_nodes_num);
 
         new_nodes = group_nodes_init (group, comp);
@@ -253,9 +272,9 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     }
     else {
         // Self-leave message
+        gu_info ("Received self-leave message.");
         assert (0 == new_nodes_num);
         assert (!prim_comp);
-        gu_info ("Received self-leave message.");
     }
 
     if (prim_comp) {
@@ -294,11 +313,6 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                  * we'll be recognized as coming from prev. conf. below */
                 strncpy ((char*)group->nodes[0].id, new_nodes[0].id,
                          sizeof (new_nodes[0].id) - 1);
-#if 0 //delete
-                /* forge own state message - for group_post_state_exchange() */
-                gcs_node_record_state (&group->nodes[0],
-                                       gcs_group_get_state (group));
-#endif
             }
         }
     }
