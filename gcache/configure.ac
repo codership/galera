@@ -21,12 +21,15 @@ AC_ARG_ENABLE(debug,
 	      enable_debug="yes")
 if test "$enable_debug" != "no"
 then
-    CFLAGS="-g -O0 -fno-inline"
+    CFLAGS=${CFLAGS:-"-O1"} # to detect uninitialized variables
+    AM_CFLAGS="-g -fno-inline"
 else
-    CFLAGS=${CFLAGS:-" -O2 -g "}
-    CFLAGS="$CFLAGS -DNDEBUG "
+    CFLAGS=${CFLAGS:-"-O3"}
+    AM_CFLAGS="-g"
+    AM_CPPFLAGS="-DNDEBUG"
 fi
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
+CXXFLAGS=${CXXFLAGS:-"$CFLAGS"}
 
 # Checks for programs.
 AC_PROG_AWK
@@ -35,7 +38,7 @@ AC_PROG_CXX
 AC_REQUIRE_CPP
 AC_PROG_LIBTOOL
 
-AC_LANG_PUSH([C]) # AM_PATH_CHECK() is broken an doesn't #include <string.h>
+AC_LANG_PUSH([C]) # AM_PATH_CHECK() is broken and doesn't #include <string.h>
 AM_PATH_CHECK()
 #PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 AC_LANG_POP([C])
@@ -71,10 +74,26 @@ AC_CHECK_FUNCS([gettimeofday localtime_r memset strdup strerror strrchr strtol])
 AC_CONFIG_FILES([Makefile
                  src/Makefile])
 		 
-CFLAGS="$CFLAGS -Wall -Werror -I../include "
-CXXFLAGS="$CFLAGS"
+AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -pedantic -Wno-unused-parameter"
+AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -fno-rtti -Wno-long-long"
+AM_CFLAGS="$AM_CFLAGS -std=c99"
+AM_LDFLAGS="-Wl,--warn-common -Wl,--fatal-warnings"
+
+AC_SUBST(AM_CFLAGS)
+AC_SUBST(AM_CXXFLAGS)
+AC_SUBST(AM_CPPFLAGS)
+AC_SUBST(AM_LDFLAGS)
+
 AC_OUTPUT
 
-AC_MSG_NOTICE([CFLAGS:   $CFLAGS])
-AC_MSG_NOTICE([CXXFLAGS: $CXXFLAGS])
-AC_MSG_NOTICE([LDFLAGS:  $LDFLAGS])
+AC_MSG_NOTICE([])
+AC_MSG_NOTICE([   CFLAGS:   $CFLAGS])
+AC_MSG_NOTICE([AM_CFLAGS:   $AM_CFLAGS])
+AC_MSG_NOTICE([   CXXFLAGS: $CXXFLAGS])
+AC_MSG_NOTICE([AM_CXXFLAGS: $AM_CXXFLAGS])
+AC_MSG_NOTICE([   CPPFLAGS: $CPPFLAGS])
+AC_MSG_NOTICE([AM_CPPFLAGS: $AM_CPPFLAGS])
+AC_MSG_NOTICE([   LDFLAGS:  $LDFLAGS])
+AC_MSG_NOTICE([AM_LDFLAGS:  $AM_LDFLAGS])
+AC_MSG_NOTICE([   LIBS:     $LIBS])
+AC_MSG_NOTICE([])

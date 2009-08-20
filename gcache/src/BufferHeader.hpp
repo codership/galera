@@ -25,7 +25,7 @@ namespace gcache
     }__attribute__((__packed__));
 
     static inline BufferHeader*
-    BH (void* ptr) { return static_cast<BufferHeader*>(ptr); };
+    BH (void* ptr) { return static_cast<BufferHeader*>(ptr); }
 
     static inline void
     BH_clear (BufferHeader* bh)
@@ -33,7 +33,7 @@ namespace gcache
         bh->size  = 0;
         bh->seqno = SEQNO_NONE;
         bh->flags = 0;
-    };
+    }
 
     static inline void
     BH_release (BufferHeader* bh)

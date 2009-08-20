@@ -14,7 +14,8 @@ namespace gcache
     MMap::MMap (const FileDescriptor& fd)
         : ptr (mmap (NULL, fd.get_size(), PROT_READ|PROT_WRITE,
                        MAP_SHARED|MAP_NORESERVE|MAP_POPULATE, fd.get(), 0)),
-          size  (fd.get_size())
+          size  (fd.get_size()),
+	  mapped (true)
     {
         if (ptr == MAP_FAILED) {
             int err = errno;

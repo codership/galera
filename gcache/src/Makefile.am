@@ -1,11 +1,6 @@
 # Copyright (C) 2009 Codership Oy <info@codership.com>
 #
 
-# Initialize AM_CFLAGS to empty.
-AM_CFLAGS = 
-#if ENABLE_DEBUG
-#endif
-
 GCACHE_SRCS =               \
 	FileDescriptor.cpp  \
 	MMap.cpp            \
@@ -24,22 +19,19 @@ INTERFACE = 1
 REVISION  = 0
 AGE       = 0
 libgcache_la_LDFLAGS = \
-	-version-info $(INTERFACE):$(REVISION):$(AGE)
+	@AM_LDFLAGS@ -version-info $(INTERFACE):$(REVISION):$(AGE)
 
 # Desclibe GCACHE_test binary target
 noinst_PROGRAMS  = test
 test_SOURCES     = test.cpp
 test_LDADD       = $(lib_LTLIBRARIES)
-test_LDFLAGS     = -static
+test_LDFLAGS     = @AM_LDFLAGS@ -static
 
 .PHONY: lib test tags
 
 lib:  $(lib_LTLIBRARIES)
 
 #test: GCACHE_test
-
-#%.o: %.c $(include_HEADERS) Makefile
-#	@CC@ @CFLAGS@ $(AM_CFLAGS) -c -o $@ $<
 
 tags: TAGS
 

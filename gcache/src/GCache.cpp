@@ -42,48 +42,61 @@ namespace gcache
     void
     GCache::constructor_common()
     {
-        open = true;
-
         header_write ();
         preamble_write ();
-
-        seqno_locked = SEQNO_NONE;
-
-        // when we start, no buffers are referenced
-        size_free = size_cache;
-        size_used = 0;
-
-        mallocs   = 0;
-        reallocs  = 0;
     }
 
     GCache::GCache (std::string& fname, size_t megs)
         : mtx       (),
+          cond      (),
           fd        (fname, check_size(megs)),
           mmap      (fd),
+          open      (true),
           preamble  (static_cast<char*>(mmap.ptr)),
           header    (reinterpret_cast<int64_t*>(preamble + PREAMBLE_LEN)),
           header_len(32),
           start     (reinterpret_cast<uint8_t*>(header + header_len)),
           end       (reinterpret_cast<uint8_t*>(preamble + mmap.size)),
+          first     (start),
+          next      (first),
           size_cache(end - start),
-          version   (0)
+          size_free (size_cache),
+          size_used (0),
+          mallocs   (0),
+          reallocs  (0),
+          seqno_locked(SEQNO_NONE),
+          seqno_min   (SEQNO_NONE),
+          seqno_max   (SEQNO_NONE),
+          version   (0),
+          seqno2ptr ()
     {
-        reset_cache ();
+        BH_clear (BH (next));
         constructor_common ();
     }
 
     GCache::GCache (std::string& fname)
         : mtx       (),
+          cond      (),
           fd        (fname),
           mmap      (fd),
+          open      (true),
           preamble  (static_cast<char*>(mmap.ptr)),
           header    (reinterpret_cast<int64_t*>(preamble + PREAMBLE_LEN)),
           header_len(header[0]),
           start     (reinterpret_cast<uint8_t*>(header + header_len)),
           end       (reinterpret_cast<uint8_t*>(preamble + mmap.size)),
-          size_cache(end - start),
-          version   (0)
+          first     (0),
+          next      (first),
+          size_cache(-1),
+          size_free (size_cache),
+          size_used (0),
+          mallocs   (0),
+          reallocs  (0),
+          seqno_locked(SEQNO_NONE),
+          seqno_min   (SEQNO_NONE),
+          seqno_max   (SEQNO_NONE),
+          version   (0),
+          seqno2ptr ()
     {
         header_read ();
         constructor_common ();
