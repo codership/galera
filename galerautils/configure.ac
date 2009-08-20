@@ -74,7 +74,7 @@ AM_CXXFLAGS="$AM_CXXFLAGS -Wextra -pedantic -ansi -Weffc++"
 # - unused function parameter (however, this should not be needed)
 # - some stl headers may contain deprecated features
 # - gu_log.h contains some variadic macros
-AM_CXXFLAGS="$AM_CXXFLAGS -Wno-long-long -Wno-unused-parameter -Wno-deprecated -Wno-variadic-macros"
+AM_CXXFLAGS="$AM_CXXFLAGS -Wno-long-long -Wno-unused-parameter -Wno-deprecated"
 # Disable RTTI generation as we don't use it anywhere
 AM_CXXFLAGS="$AM_CXXFLAGS -fno-rtti"
 

@@ -48,16 +48,17 @@ gu_log (gu_log_severity_t severity,
         const int         line,
         const char*       format, ...);
 
-// NOTE: don't add "\n" here even if you really want to do it
-#define GU_LOG_C(level, format, ...)\
-        gu_log(level, __FILE__, __PRETTY_FUNCTION__, __LINE__,\
-	       format, ## __VA_ARGS__, NULL)
-
 /** This variable is made global only for the purpose of using it in
  *  gu_debug() macro and avoid calling gu_log() when debug is off.
  *  Don't use it directly! */
 extern gu_log_severity_t gu_log_max_level;
 #define gu_log_debug (GU_LOG_DEBUG == gu_log_max_level)
+
+#ifndef __cplusplus
+// NOTE: don't add "\n" here even if you really want to do it
+#define GU_LOG_C(level, format, ...)\
+        gu_log(level, __FILE__, __PRETTY_FUNCTION__, __LINE__,\
+	       format, ## __VA_ARGS__, NULL)
 
 /**
  * @name Logging macros.
@@ -84,6 +85,7 @@ extern gu_log_severity_t gu_log_max_level;
             format "\n", ## __VA_ARGS__, NULL))
 */
 /*@}*/
+#endif /* __cplusplus */
 #endif /* _gu_log_h_ */
 
 #ifdef __GU_LOGGER__ // C++ logger should use the same stuff, so export it
