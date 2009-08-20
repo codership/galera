@@ -2,6 +2,7 @@
 
 // $Id$
 
+#include <math.h>
 #include <check.h>
 #include "gu_time_test.h"
 #include "../src/gu_time.h"
@@ -10,9 +11,14 @@ START_TEST (gu_time_test)
 {
     struct timeval left  = { 1, 900000 }; // 1.9 sec
     struct timeval right = { 5, 400000 }; // 5.4 sec
-    
-    fail_if (-3.5 != gu_timeval_diff (&left, &right));
-    fail_if ( 3.5 != gu_timeval_diff (&right, &left));
+    double diff;
+
+    diff = gu_timeval_diff (&left, &right);
+    fail_if (fabs(3.5L + diff) > 1.0e-100,
+             "Expected %f, got %f, delta: %e", -3.5, diff, 3.5L + diff);
+    diff = gu_timeval_diff (&right, &left);
+    fail_if (fabs(3.5L - diff) > 1.0e-100,
+             "Expected %f, got %f, delta: %e", 3.5, diff, 3.5L - diff);
 }
 END_TEST
 

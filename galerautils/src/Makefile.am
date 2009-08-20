@@ -2,14 +2,6 @@
 #
 # $Id$
 
-# Initialize AM_CFLAGS to empty. 
-#AM_CFLAGS =
-#if ENABLE_DEBUG
-#AM_CFLAGS += -DGLR_DEBUG_GLR
-#AM_CFLAGS += -DGLR_DEBUG_QUEUE
-#AM_CFLAGS += -DGLR_LOGGING
-#endif
-
 # Describe libgalerautils library target
 include_HEADERS =      \
 	galerautils.h  \
@@ -50,7 +42,7 @@ libgalerautils_la_SOURCES = \
 INTERFACE = 10
 REVISION  = 0
 AGE       = 0
-libgalerautils_la_LDFLAGS = \
+libgalerautils_la_LDFLAGS = @AM_LDFLAGS@ \
 	-version-info $(INTERFACE):$(REVISION):$(AGE)
 
 lib_LTLIBRARIES += libgalerautils++.la
@@ -69,7 +61,7 @@ libgalerautils___la_SOURCES = \
 INTERFACEPP = 1
 REVISIONPP  = 0
 AGEPP       = 0
-libgalerautils___la_LDFLAGS = \
+libgalerautils___la_LDFLAGS = @AM_LDFLAGS@ \
 	-version-info $(INTERFACEPP):$(REVISIONPP):$(AGEPP)
 
 tags: TAGS
