@@ -10,7 +10,7 @@ check_transportpp_SOURCES = check_transportpp.cpp
 check_transportpp_LDADD = \
 	$(top_builddir)/common/src/libgcommcommonpp.la \
 	$(top_builddir)/transport/src/libgcommtransportpp.la
-check_transportpp_LDFLAGS = -lcheck
+check_transportpp_LDFLAGS = @AM_LDFLAGS@ -lcheck
 
 perftest_SOURCES = perftest.cpp
 perftest_LDADD = \

@@ -11,5 +11,3 @@ libgcommcommonpp_la_SOURCES = \
 	time.cpp   \
 	timer.cpp  \
 	monitor.cpp
-libgcommcommonpp_la_CXXFLAGS =
-libgcommcommonpp_la_LDFLAGS = -lpthread

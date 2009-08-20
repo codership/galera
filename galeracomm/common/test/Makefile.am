@@ -4,5 +4,5 @@ noinst_PROGRAMS = check_commonpp
 INCLUDES = -I$(top_srcdir)/common/include
 
 check_commonpp_SOURCES = check_commonpp.cpp
-check_commonpp_LDFLAGS = -lcheck -lpthread
-check_commonpp_LDADD = $(top_builddir)/common/src/libgcommcommonpp.la
+check_commonpp_LDADD = \
+	$(top_builddir)/common/src/libgcommcommonpp.la -lcheck -lpthread
