@@ -42,6 +42,6 @@ extern void* gu_fifo_get_tail  (gu_fifo_t* q);
 /*! Advance FIFO tail pointer and release FIFO. */
 extern void  gu_fifo_push_tail (gu_fifo_t* q);
 /*! Return how many items are in the queue */
-extern ulong gu_fifo_length    (gu_fifo_t* q);
+extern unsigned long gu_fifo_length    (gu_fifo_t* q);
 
 #endif // _gu_fifo_h_

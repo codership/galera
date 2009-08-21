@@ -73,7 +73,7 @@ static gu_seqno_t seqno_max   = 1<<20; // default number of seqnos to check
 /* mutex to synchronize threads start */
 static pthread_mutex_t start  = PTHREAD_MUTEX_INITIALIZER;
 
-static const useconds_t t = 10; // optimal sleep time
+static const unsigned int t = 10; // optimal sleep time
 static const struct timespec tsleep = { 0, 10000000 }; // 10 ms
 
 void* run_thread(void* ctx)

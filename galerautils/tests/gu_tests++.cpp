@@ -135,12 +135,12 @@ void* listener_thd(void* arg)
         else if (sock == 0)
         {
             log_error << "wut?: " << em;
-            return (void*)1;
+            return reinterpret_cast<void*>(1);
         }
         else
         {
             log_error <<  "socket " << sock->get_fd() << " event mask: " << ev.get_event_mask();
-            return (void*)1;
+            return reinterpret_cast<void*>(1);
         }
     }
     log_info << "received " << bytes/(1 << 20) << "MB + " << bytes%(1 << 20) << "B";

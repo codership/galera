@@ -13,6 +13,8 @@
  * minimum space when there are few items in the queue. 
  */
 
+#define _BSD_SOURCE
+
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -89,9 +91,9 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
                       "limit %zu", max_size, mem_limit);
             return NULL;
         }
-        if ((array_len * row_len) > GU_LONG_MAX) {
+        if ((array_len * row_len) > (size_t)GU_LONG_MAX) {
             gu_error ("Resulting queue length %zu exceeds max allowed %zu",
-                      array_len * row_len, GU_LONG_MAX);
+                      array_len * row_len, (size_t)GU_LONG_MAX);
             return NULL;
         }
 
@@ -237,7 +239,8 @@ static inline long fifo_unlock_put (gu_fifo_t *q)
 
 #define FIFO_ROW(q,x) ((x) >> q->col_shift) /* div by row width */
 #define FIFO_COL(q,x) ((x) &  q->col_mask)  /* remnant */
-#define FIFO_PTR(q,x) (q->rows[FIFO_ROW(q, x)] + FIFO_COL(q, x) * q->item_size)
+#define FIFO_PTR(q,x) \
+    ((uint8_t*)q->rows[FIFO_ROW(q, x)] + FIFO_COL(q, x) * q->item_size)
 
 /* Increment and roll over */
 #define FIFO_INC(q,x) (((x) + 1) & q->length_mask)
@@ -304,7 +307,8 @@ void* gu_fifo_get_tail (gu_fifo_t* q)
             q->alloc -= q->row_size;
         }
         else {
-            return (q->rows[row] + FIFO_COL(q, q->tail) * q->item_size);
+            return ((uint8_t*)q->rows[row] +
+                    FIFO_COL(q, q->tail) * q->item_size);
         }
 #if 0 // for debugging
 	if (NULL == q->rows[row]) {
@@ -404,7 +408,7 @@ char *gu_fifo_print (gu_fifo_t *queue)
               "\thead    = %lu, tail = %lu"
               //", next = %lu"
               ,
-	      queue,
+	      (void*)queue,
 	      queue->length,
 	      queue->rows_num,
 	      queue->col_mask + 1,

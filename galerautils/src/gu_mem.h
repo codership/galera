@@ -27,7 +27,8 @@ void  gu_free_dbg    (void* ptr,
 
 /** Reports statistics on the current amount of allocated memory
  *  total number of allocations and deallocations */
-void gu_mem_stats (ssize_t* total, ssize_t* allocs, ssize_t* reallocs, ssize_t* deallocs);
+void gu_mem_stats (ssize_t* total, ssize_t* allocs, ssize_t* reallocs,
+                   ssize_t* deallocs);
 
 /** @name Applications should use the following macros */
 /*@{*/

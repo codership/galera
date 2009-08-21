@@ -78,6 +78,9 @@
 #include <stdio.h>
 #include <sys/types.h>
 
+typedef unsigned int uint;
+typedef unsigned long ulong;
+
 #define THREAD 1
 
 #ifdef	__cplusplus

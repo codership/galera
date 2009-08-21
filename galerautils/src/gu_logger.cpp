@@ -68,12 +68,14 @@ namespace gu
     
     static DebugFilter debug_filter;
 
-    void Logger::set_debug_filter(const string& str)
+    void
+    Logger::set_debug_filter(const string& str)
     {
         debug_filter.set_filter(str);
     }
 
-    bool Logger::no_debug(const string& file, const string& func, const int line)
+    bool
+    Logger::no_debug(const string& file, const string& func, const int line)
     {
         return debug_filter.size() > 0 && debug_filter.is_set(func) == false;
     }
@@ -148,7 +150,7 @@ namespace gu
                << setw(2) << setfill('0') << date.tm_hour << ':'
                << setw(2) << setfill('0') << date.tm_min  << ':'
                << setw(2) << setfill('0') << date.tm_sec  << '.'
-               << setw(3) << setfill('0') << ((int)time.tv_usec / 1000) << ' ';
+               << setw(3) << setfill('0') << (time.tv_usec / 1000) << ' ';
         }
 
         os << level_str[level];

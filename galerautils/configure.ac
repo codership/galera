@@ -19,7 +19,7 @@ if test "$enable_debug" != "no"
 then
     CFLAGS=${CFLAGS:-"-O1"} # -O1 to detect unitialized vars
     AM_CFLAGS="-g -fno-inline"
-    AM_CPPFLAGS="-DDEBUG_ASSERT"
+    AM_CPPFLAGS="-DDEBUG_ASSERT -D_FORTIFY_SOURCE=1"
 else
     CFLAGS=${CFLAGS:-"-O3"}
     AM_CFLAGS="-g"
@@ -27,8 +27,6 @@ else
 fi
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
 
-AM_CFLAGS="$AM_CFLAGS -Wall -Werror"
-AM_CXXFLAGS="$AM_CFLAGS"
 CXXFLAGS=${CXXFLAGS:-"$CFLAGS"}
 
 # Checks for programs.
@@ -65,19 +63,21 @@ AC_CONFIG_FILES([Makefile
                  src/Makefile
 		 tests/Makefile])
 
+AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wno-unused-parameter -pedantic"
 # CXXFLAGS 
 #
 # - Turn on most of the warnings, pedantic and ansi
-AM_CXXFLAGS="$AM_CXXFLAGS -Wextra -pedantic -ansi -Weffc++"
+AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -Wold-style-cast -Wconversion"
 # However, disable warnings for:
 # - long long datatype ([u]int64_t)
 # - unused function parameter (however, this should not be needed)
 # - some stl headers may contain deprecated features
 # - gu_log.h contains some variadic macros
-AM_CXXFLAGS="$AM_CXXFLAGS -Wno-long-long -Wno-unused-parameter -Wno-deprecated"
+AM_CXXFLAGS="$AM_CXXFLAGS -Wno-long-long -Wno-deprecated"
 # Disable RTTI generation as we don't use it anywhere
 AM_CXXFLAGS="$AM_CXXFLAGS -fno-rtti"
-
+AM_CFLAGS="$AM_CFLAGS -std=c99"
+AM_CPPFLAGS="$AM_CPPFLAGS -D_XOPEN_SOURCE=600"
 AM_LDFLAGS="-Wl,--warn-common -Wl,--fatal-warnings"
 
 AC_SUBST(AM_CFLAGS)

@@ -632,8 +632,9 @@ static void iov_push(struct iovec iov[],
             {
                 iov_base_off = 0;
             }
-            bb->push((gu::net::byte_t*)iov[i].iov_base + iov_base_off, 
-                     iov[i].iov_len - iov_base_off);
+            bb->push(
+                static_cast<gu::net::byte_t*>(iov[i].iov_base) + iov_base_off, 
+                iov[i].iov_len - iov_base_off);
         }
         begin_off = end_off;
     }
@@ -649,7 +650,7 @@ size_t gu::net::Socket::get_max_pending_len() const
 static void write_hdr(gu::net::byte_t* buf, const size_t buflen, uint32_t len)
 {
     assert(buf != 0 && buflen == 4);
-    *(uint32_t*)buf = htogl(len);
+    *reinterpret_cast<uint32_t*>(buf) = htogl(len);
 }
 
 static void read_hdr(const gu::net::byte_t* buf, 
@@ -657,13 +658,13 @@ static void read_hdr(const gu::net::byte_t* buf,
                      uint32_t *len)
 {
     assert(buf != 0 && buflen >=  4 && len != 0);
-    *len = gtohl(*(uint32_t*)buf);
+    *len = gtohl(*reinterpret_cast<const uint32_t*>(buf));
 }
 
 int gu::net::Socket::send_pending(const int send_flags)
 {
     struct iovec iov[1] = {
-        {const_cast<byte_t*>(pending->get_buf()), pending->get_len()}
+        { pending->get_buf(), pending->get_len() }
     };
     int ret = 0;
     size_t sent = iov_send(fd, 

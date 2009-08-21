@@ -46,7 +46,8 @@ gu_log (gu_log_severity_t severity,
         const char*       file,
         const char*       function,
         const int         line,
-        const char*       format, ...);
+        ...);
+//        const char*       format, ...);
 
 /** This variable is made global only for the purpose of using it in
  *  gu_debug() macro and avoid calling gu_log() when debug is off.
@@ -56,9 +57,9 @@ extern gu_log_severity_t gu_log_max_level;
 
 #ifndef __cplusplus
 // NOTE: don't add "\n" here even if you really want to do it
-#define GU_LOG_C(level, format, ...)\
+#define GU_LOG_C(level, ...)\
         gu_log(level, __FILE__, __PRETTY_FUNCTION__, __LINE__,\
-	       format, ## __VA_ARGS__, NULL)
+	       ## __VA_ARGS__, NULL)
 
 /**
  * @name Logging macros.
@@ -66,24 +67,21 @@ extern gu_log_severity_t gu_log_max_level;
  * they are called.
  */
 /*@{*/
-#define gu_fatal(format, ...)\
-    GU_LOG_C(GU_LOG_FATAL, format, ## __VA_ARGS__, NULL)
+#define gu_fatal(...)\
+    GU_LOG_C(GU_LOG_FATAL, ## __VA_ARGS__, NULL)
 
-#define gu_error(format, ...)\
-    GU_LOG_C(GU_LOG_ERROR, format, ## __VA_ARGS__, NULL)
+#define gu_error(...)\
+    GU_LOG_C(GU_LOG_ERROR, ## __VA_ARGS__, NULL)
 
-#define gu_warn(format, ...)\
-    GU_LOG_C(GU_LOG_WARN, format, ## __VA_ARGS__, NULL)
+#define gu_warn(...)\
+    GU_LOG_C(GU_LOG_WARN, ## __VA_ARGS__, NULL)
 
-#define gu_info(format, ...)\
-    GU_LOG_C(GU_LOG_INFO, format, ## __VA_ARGS__, NULL)
+#define gu_info(...)\
+    GU_LOG_C(GU_LOG_INFO, ## __VA_ARGS__, NULL)
 
-#define gu_debug(format, ...)\
+#define gu_debug(...)\
     (gu_log_max_level < GU_LOG_DEBUG ? 0 :                      \
-     GU_LOG_C(GU_LOG_DEBUG, format, ## __VA_ARGS__, NULL))
-/*     gu_log(GU_LOG_DEBUG, __FILE__, __PRETTY_FUNCTION__, __LINE__,   \
-            format "\n", ## __VA_ARGS__, NULL))
-*/
+     GU_LOG_C(GU_LOG_DEBUG, ## __VA_ARGS__, NULL))
 /*@}*/
 #endif /* __cplusplus */
 #endif /* _gu_log_h_ */

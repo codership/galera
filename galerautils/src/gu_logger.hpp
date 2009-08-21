@@ -77,7 +77,7 @@ namespace gu
 #endif
     public:
         static inline bool no_log          (LogLevel lvl)
-        { return ((int)lvl > (int)max_level); };
+        { return (static_cast<int>(lvl) > static_cast<int>(max_level)); };
 
         
         static void set_debug_filter(const std::string&);
