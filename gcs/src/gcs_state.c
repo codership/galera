@@ -40,7 +40,12 @@ gcs_state_create (const gu_uuid_t* state_uuid,
         ret->proto_max  = proto_max;
         ret->name       = (void*)(ret) + sizeof (gcs_state_t);
         ret->inc_addr   = ret->name + name_len;
+
+        // tmp is a workaround for some combination of GCC flags which don't
+        // allow passing ret->name and ret->inc_addr directly even with casting
+        // char* tmp = (char*)ret->name;
         strcpy ((char*)ret->name, name);
+        // tmp = (char*)ret->inc_addr;
         strcpy ((char*)ret->inc_addr, inc_addr);
     }
 

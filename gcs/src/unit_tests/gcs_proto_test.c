@@ -4,12 +4,13 @@
  * $Id$
  */
 
-#include <check.h>
 #include <unistd.h>
 #include <string.h>
+#include <check.h>
+
+#include "../gcs_act_proto.h"
 
 #include "gcs_proto_test.h"
-#include "../gcs_act_proto.h"
 
 static long
 frgcmp (gcs_act_frag_t* f1, gcs_act_frag_t* f2)

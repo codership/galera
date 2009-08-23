@@ -7,6 +7,8 @@
 
 #include <galerautils.hpp>
 
+#include <gcomm/gcomm.hpp>
+
 extern "C" {
 #include "gcs_gcomm.h"
 #include "gu_mutex.h"
@@ -17,8 +19,6 @@ extern "C" {
 #define GCS_COMP_MSG_ACCESS 1
 #include "gcs_comp_msg.h"
 }
-
-#include <gcomm/gcomm.hpp>
 
 using std::deque;
 using std::map;
@@ -48,6 +48,28 @@ struct vs_ev
 	if (v)
 	    view = new View(*v);
     }
+
+    vs_ev (const vs_ev& ev) :
+        rb       (0),
+        um       (ev.um),
+        view     (0),
+        msg_size (ev.msg_size)
+    {
+	if (ev.rb)
+	    rb = ev.rb->copy(0);
+	if (ev.view)
+	    view = new View(*ev.view);
+    }
+
+    ~vs_ev ()
+    {
+        if (rb)   delete (rb);
+        if (view) delete (view);
+    }
+
+private:
+
+    vs_ev& operator= (const vs_ev&);
 };
 
 struct gcs_gcomm : public Toplay
@@ -60,9 +82,10 @@ struct gcs_gcomm : public Toplay
     gu::Mutex    mutex;
     gu::Cond     cond;
 
-    gcs_gcomm() : 
-        vs(0), 
-        el(0), 
+    gcs_gcomm() :
+        vs(0),
+        el(0),
+        eq(),
         waiter_buf(0), 
         waiter_buf_len(0),
         mutex(),
@@ -154,6 +177,11 @@ struct gcs_gcomm : public Toplay
 
 	delete ev.view;
     }
+
+private:
+
+    gcs_gcomm (const gcs_gcomm&);
+    gcs_gcomm& operator= (const gcs_gcomm&);
 };
 
 typedef map<const UUID, long> CompMap;
@@ -171,16 +199,27 @@ typedef struct gcs_backend_conn
     gcs_comp_msg_t *comp_msg;
     CompMap comp_map;
     volatile bool terminate;
-    gcs_backend_conn() : 
+    gcs_backend_conn() :
+        sock(),
+        channel(),
         last_view_size(0), 
         max_msg_size(1 << 20),
         n_received(0), 
         n_copied(0),
+        vs_ctx(),
+        thr(0),
         comp_msg(0),
+        comp_map(),
         terminate(false)
     {
     }
-} conn_t;
+
+private:
+
+    gcs_backend_conn (const gcs_backend_conn&);
+    gcs_backend_conn& operator= (const gcs_backend_conn&);
+}
+conn_t;
 
 
 
@@ -242,7 +281,8 @@ static void fill_comp(gcs_comp_msg_t *msg,
     {
         const UUID& pid = get_uuid(i);
 	if (snprintf(msg->memb[n].id, sizeof(msg->memb[n].id), "%s",
-                     pid.to_string().c_str()) >= (int)sizeof(msg->memb[n].id))
+                     pid.to_string().c_str())
+            >= static_cast<ssize_t>(sizeof(msg->memb[n].id)))
         {
             log_fatal << "PID string does not fit into comp msg buffer";
             abort();

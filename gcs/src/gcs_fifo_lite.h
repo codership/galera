@@ -27,12 +27,12 @@
 
 typedef struct gcs_fifo_lite
 {
-    ulong       length;
+    long       length;
     ulong       item_size;
     ulong       mask;
     ulong       head;
     ulong       tail;
-    ulong       used;
+    long        used;
     bool        closed;
     bool        destroyed;
     long        put_wait;
@@ -55,13 +55,13 @@ long             gcs_fifo_lite_destroy (gcs_fifo_lite_t* fifo);
 static inline void*
 _gcs_fifo_lite_tail (gcs_fifo_lite_t* f)
 {
-    return (f->queue + f->tail * f->item_size);
+    return ((char*)f->queue + f->tail * f->item_size);
 }
 
 static inline void*
 _gcs_fifo_lite_head (gcs_fifo_lite_t* f)
 {
-    return (f->queue + f->head * f->item_size);
+    return ((char*)f->queue + f->head * f->item_size);
 }
 
 /*! If FIFO is not full, returns pointer to the tail item and locks FIFO,
@@ -133,7 +133,7 @@ gcs_fifo_lite_pop_head (gcs_fifo_lite_t* fifo)
 {
     fifo->head = (fifo->head + 1) & fifo->mask;
     fifo->used--;
-    assert (fifo->used != (typeof(fifo->used)) -1);
+    assert (fifo->used != -1);
     if (fifo->put_wait > 0) {
         fifo->put_wait--;
         gu_cond_signal (&fifo->put_cond);

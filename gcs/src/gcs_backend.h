@@ -114,7 +114,7 @@ const char* fn (void)
  */
 #define GCS_BACKEND_MSG_SIZE_FN(fn)         \
 long fn (gcs_backend_t* const backend,      \
-         ulong          const pkt_size)
+         long           const pkt_size)
 
 typedef GCS_BACKEND_CREATE_FN   ((*gcs_backend_create_t));
 typedef GCS_BACKEND_DESTROY_FN  ((*gcs_backend_destroy_t));

@@ -2,8 +2,8 @@
 #
 # $Id$
 
-# Initialize AM_CFLAGS to empty.
-AM_CFLAGS = -fno-strict-aliasing
+AM_CFLAGS += -fno-strict-aliasing
+
 if ENABLE_DEBUG
 AM_CFLAGS += -DGCS_DEBUG_GCS
 AM_CFLAGS += -DGCS_DEBUG_QUEUE
@@ -16,7 +16,6 @@ endif
 GCS_SRCS = \
 	gcs_conf.c      \
 	gcs_fifo_lite.c \
-	gcs_queue.c     \
 	gcs_msg_type.c  \
 	gcs_comp_msg.c  \
 	gcs_backend.c   \

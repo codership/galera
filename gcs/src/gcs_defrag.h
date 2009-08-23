@@ -26,7 +26,7 @@ typedef struct gcs_defrag
     uint8_t*       tail;    // tail of action data
     size_t         size;
     size_t         received;
-    long           frag_no; // number of fragment received
+    ulong          frag_no; // number of fragment received
     bool           reset;
 }
 gcs_defrag_t;

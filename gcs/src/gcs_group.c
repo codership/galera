@@ -708,7 +708,7 @@ gcs_group_handle_state_request (gcs_group_t*    group,
     }
     else if (group->my_idx == donor_idx) {
         act->buf_len -= donor_name_len + 1;
-        memmove ((void*)act->buf, act->buf + donor_name_len + 1, act->buf_len);
+        memmove (*(void**)&act->buf, act->buf + donor_name_len+1, act->buf_len);
         // now action starts with request, see gcs_request_state_transfer()
     }
 

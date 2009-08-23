@@ -203,7 +203,7 @@ core_msg_send (gcs_core_t*    core,
 
             ret = core->backend.send (&core->backend, msg, msg_len, msg_type);
 
-            if (ret > 0 && ret != msg_len) {
+            if (ret > 0 && (size_t)ret != msg_len) {
                 // could not send message in one piece
                 gu_error ("Failed to send complete message of %s type: "
                           "sent %zd out of %zu bytes.",
@@ -554,7 +554,7 @@ core_handle_comp_msg (gcs_core_t*     core,
 
     assert (GCS_MSG_COMPONENT == msg->type);
 
-    if (msg->size < sizeof (gcs_comp_msg_t)) {
+    if (msg->size < (ssize_t)sizeof(gcs_comp_msg_t)) {
         gu_error ("Malformed component message. Ignoring");
         return 0;
     }
@@ -1054,7 +1054,7 @@ gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size)
 {
     ssize_t ret;
     ret = core_msg_send_retry (core, fc, fc_size, GCS_MSG_FLOW);
-    if (ret == fc_size) {
+    if (ret == (ssize_t)fc_size) {
         ret = 0;
     }
     return ret;

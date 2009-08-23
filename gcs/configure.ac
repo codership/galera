@@ -24,7 +24,8 @@ if test "$enable_debug" != "no"
 then
     CFLAGS=${CFLAGS:-"-O1"} # -O1 to detect unitialized variables
     AM_CFLAGS="-g -fno-inline"
-    AM_CPPFLAGS="-DDEBUG_MALLOC -DDEBUG_MUTEX -DDEBUG_ASSERT -D_FORTIFY_SOURCE=1"
+#    AM_CPPFLAGS="-DDEBUG_MALLOC -DDEBUG_MUTEX -DDEBUG_ASSERT -D_FORTIFY_SOURCE=1"
+    AM_CPPFLAGS="-DDEBUG_MALLOC -DDEBUG_MUTEX -DDEBUG_ASSERT"
 else
     CFLAGS=${CFLAGS:-"-O3"}
     AM_CFLAGS="-g"
@@ -159,10 +160,11 @@ AC_CONFIG_FILES([Makefile
 		 src/unit_tests/Makefile])
 
 # Compiler and linker flags
-AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -pedantic -Wno-unused-parameter"
-AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -Wold-style-cast -Wconversion -fno-rtti \
--Wno-long-long"
-AM_CFLAGS="$AM_CFLAGS -std=c99"
+AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -Wno-unused-parameter"
+# we have to omit -pedantic here to allow zero-sized arrays in structs
+AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -Wold-style-cast -Wconversion \
+-fno-rtti -Wno-long-long"
+AM_CFLAGS="$AM_CFLAGS -std=gnu99"
 AM_CPPFLAGS="$AM_CPPFLAGS -D_XOPEN_SOURCE=600"
 AM_LDFLAGS="-Wl,--warn-common -Wl,--fatal-warnings"
 

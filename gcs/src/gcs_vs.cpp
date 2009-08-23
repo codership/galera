@@ -2,11 +2,13 @@
 
 #include <galerautils.hpp>
 
+#include <galeracomm/vs.hpp>
+
 extern "C" {
 #include "gcs_vs.h"
 #include "gu_mutex.h"
 }
-#include <galeracomm/vs.hpp>
+
 // We access data comp msg struct directly
 extern "C" {
 #define GCS_COMP_MSG_ACCESS 1
@@ -26,16 +28,45 @@ struct vs_ev {
 	rb(0), msg(0), view(0), msg_size(ms)
     {
 	if (r)
-	    rb = r->copy(m->get_data_offset());
+	    rb = r->copy(m->get_data_offset()); // what if m is 0?
 	if (m)
 	    msg = new VSMessage(*m);
 	if (v)
 	    view = new VSView(*v);
     }
+
+    vs_ev (const vs_ev& ev) :
+        rb       (0),
+        msg      (0),
+        view     (0),
+        msg_size (ev.msg_size)
+    {
+	if (ev.rb)   rb   = ev.rb->copy(ev.msg->get_data_offset());
+
+	if (ev.msg)  msg  = new VSMessage(*msg);
+
+	if (ev.view) view = new VSView(*ev.view);
+    }
+
+    ~vs_ev ()
+    {
+        if (rb)   delete (rb);
+        if (msg)  delete (msg);
+        if (view) delete (view);
+    }
+
+private:
+
+    vs_ev& operator= (const vs_ev&);    
 };
 
-class gcs_vs : public Toplay {
+class gcs_vs : public Toplay
+{
+    gcs_vs (const gcs_vs&);
+    gcs_vs& operator= (const gcs_vs&);
+
 public:
+
     VS *vs;
     Poll *po;
     std::deque<vs_ev> eq;
@@ -46,8 +77,8 @@ public:
     Monitor   monitor;
     enum State {JOINING, JOINED, LEFT} state;
 
-    gcs_vs() : vs(0), po(0), waiter_buf(0), waiter_buf_len(0), mutex(),
-               cond(), state(JOINING)
+    gcs_vs() : vs(0), po(0), eq(), waiter_buf(0), waiter_buf_len(0), mutex(),
+               cond(), monitor(), state(JOINING)
     {}
 
     ~gcs_vs()
@@ -153,10 +184,21 @@ struct gcs_backend_conn {
     gcs_comp_msg_t *comp_msg;
     std::map<Address, long> comp_map;
 
-    gcs_backend_conn() : last_view_size(0), max_msg_size(1 << 20),
-			 n_received(0), n_copied(0),
-			 comp_msg(0)
+    gcs_backend_conn() :
+        last_view_size (0),
+        max_msg_size   (1 << 20),
+	n_received     (0),
+        n_copied       (0),
+        vs_ctx         (),
+        thr            (),
+        comp_msg       (0),
+        comp_map       ()
     {}
+
+private:
+
+    gcs_backend_conn (const gcs_backend_conn&);
+    gcs_backend_conn operator= (const gcs_backend_conn&);
 };
 
 static GCS_BACKEND_MSG_SIZE_FN(gcs_vs_msg_size)

@@ -11,10 +11,10 @@
 #ifndef _gcs_act_proto_h_
 #define _gcs_act_proto_h_
 
-#include "gcs.h" // for gcs_seqno_t
-
 #include <stdint.h>
 typedef uint8_t gcs_proto_t;
+
+#include "gcs.h" // for gcs_seqno_t
 
 /*! Supported protocol range (for now only version 0 is supported) */
 #define GCS_ACT_PROTO_MIN 0
@@ -27,7 +27,7 @@ typedef struct gcs_act_frag
     size_t         act_size;
     const void*    frag;     // shall override it only once
     size_t         frag_len;
-    long           frag_no;
+    unsigned long  frag_no;
     gcs_act_type_t act_type;
     gcs_proto_t    proto_ver;
 }

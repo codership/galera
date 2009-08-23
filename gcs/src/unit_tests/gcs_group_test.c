@@ -70,12 +70,12 @@ START_TEST (gcs_group_configuration)
 
     // The Action
     const char   act_buf[]   = "Test action smuction";
-    size_t       act_len      = sizeof (act_buf);
+    long         act_len     = sizeof (act_buf);
 
     // lengths of three fragments of the action
-    size_t       frag1_len    = act_len / 3;
-    size_t       frag2_len    = frag1_len;
-    size_t       frag3_len    = act_len - frag1_len - frag2_len;
+    long         frag1_len    = act_len / 3;
+    long         frag2_len    = frag1_len;
+    long         frag3_len    = act_len - frag1_len - frag2_len;
 
     // pointer to the three fragments of the action
     const char*  frag1         = act_buf;
@@ -83,7 +83,7 @@ START_TEST (gcs_group_configuration)
     const char*  frag3         = frag2 + frag2_len;
 
     // message buffers
-    const size_t buf_len      = 64;
+    const long buf_len      = 64;
     char         buf1[buf_len], buf2[buf_len], buf3[buf_len],
                  buf4[buf_len], buf5[buf_len];
 

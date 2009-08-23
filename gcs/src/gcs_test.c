@@ -174,7 +174,7 @@ static inline long
 test_make_msg (char* msg, const long mlen)
 {
     static gcs_seqno_t count = 1;
-    size_t len = 0;
+    long len = 0;
     gcs_seqno_t tmp;
 
     if (!throughput) {

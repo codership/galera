@@ -129,10 +129,10 @@ START_TEST (gcs_defrag_test)
 
     // 7. Try third fragment, last one
     ret = gcs_defrag_handle_frag (&defrag, &frg3, &recv_act, FALSE);
-    fail_if (ret != act_len);
+    fail_if (ret != (long)act_len);
 
     // 8. Check the action
-    fail_if (recv_act.buf_len != act_len);
+    fail_if (recv_act.buf_len != (long)act_len);
     fail_if (strncmp(recv_act.buf, act_buf, act_len),
              "Action received: '%s', expected '%s'", recv_act.buf, act_buf);
     defrag_check_init (&defrag); // should be empty
@@ -145,11 +145,11 @@ START_TEST (gcs_defrag_test)
     fail_if (ret != 0);
     fail_if (defrag.head != NULL);
     ret = gcs_defrag_handle_frag (&defrag, &frg3, &recv_act, TRUE);
-    fail_if (ret != act_len);
+    fail_if (ret != (long)act_len);
     fail_if (defrag.head != NULL);
 
     // 10. Check the action
-    fail_if (recv_act.buf_len != act_len);
+    fail_if (recv_act.buf_len != (long)act_len);
     fail_if (recv_act.buf != NULL);
     defrag_check_init (&defrag); // should be empty
 }

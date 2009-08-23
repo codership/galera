@@ -30,7 +30,7 @@ typedef struct dummy_msg
     gcs_msg_type_t type;
     size_t         len;
     long           sender_idx;
-    uint8_t        buf[0];
+    uint8_t        buf[];
 }
 dummy_msg_t;
 
@@ -181,7 +181,7 @@ GCS_BACKEND_NAME_FN(dummy_name)
 static
 GCS_BACKEND_MSG_SIZE_FN(dummy_msg_size)
 {
-    const size_t max_pkt_size = backend->conn->max_pkt_size;
+    const long max_pkt_size = backend->conn->max_pkt_size;
 
     if (pkt_size > max_pkt_size) {
 	gu_warn ("Requested packet size: %d, maximum possible packet size: %d",

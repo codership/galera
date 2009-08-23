@@ -62,7 +62,7 @@ typedef struct action {
 } action_t;
 
 //static struct action_t RecvAct;
-static const size_t FRAG_SIZE = 4; // desirable action fragment size
+static const ssize_t FRAG_SIZE = 4; // desirable action fragment size
 static const char act1[] = "101";         // 1-fragment action
 static const char act2[] = "202122";      // 2-fragment action
 static const char act3[] = "3031323334";  // 3-fragment action
@@ -234,10 +234,10 @@ core_test_check_conf (const gcs_act_conf_t* conf,
 }
 
 static long
-core_test_set_payload_size (size_t s)
+core_test_set_payload_size (ssize_t s)
 {
-    long         ret;
-    const size_t arbitrary_pkt_size = s + 64; // big enough for payload to fit
+    long          ret;
+    const ssize_t arbitrary_pkt_size = s + 64; // big enough for payload to fit
 
     ret = gcs_core_set_pkt_size (Core, arbitrary_pkt_size);
     if (ret <= 0) {
@@ -359,7 +359,7 @@ START_TEST (gcs_core_test_api)
     long     ret;
     long     tout = 100; // 100 ms timeout
     size_t   act_size = sizeof(ACT);
-    action_t act_s    = { ACT, act_size, GCS_ACT_TORDERED, -1 };
+    action_t act_s    = { ACT, act_size, GCS_ACT_TORDERED, -1, -1 };
     action_t act_r;
     long i = 5;
 
@@ -452,8 +452,8 @@ START_TEST (gcs_core_test_own)
 #define ACT act2
     long     tout = 100; // 100 ms timeout
     size_t   act_size = sizeof(ACT);
-    action_t act_s    = { ACT, act_size, GCS_ACT_TORDERED, -1 };
-    action_t act_r    = { NULL, -1, -1, -1 };
+    action_t act_s    = { ACT, act_size, GCS_ACT_TORDERED, -1, -1 };
+    action_t act_r    = { NULL, -1, -1, -1, -1 };
 
     // Create primary and non-primary component messages
     gcs_comp_msg_t* prim     = gcs_comp_msg_new (true,  0, 1);

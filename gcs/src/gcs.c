@@ -515,7 +515,7 @@ static void *gcs_recv_thread (void *arg)
                 gcs_fifo_lite_pop_head (conn->repl_q);
 
                 assert (act->action   == action);
-                assert (act->act_size == act_size);
+                assert (act->act_size == (size_t)act_size);
 
                 act->act_id       = act_id;
                 act->local_act_id = this_act_id;
@@ -783,7 +783,6 @@ long gcs_repl (gcs_conn_t          *conn,
     *act_id       = GCS_SEQNO_ILL;
     *local_act_id = GCS_SEQNO_ILL;
 
-    assert (act_size > 0); // FIXME!!! see recv_thread() -
     assert (action);       // cannot gcs_repl() NULL messages
     assert (act.action);
 
@@ -822,7 +821,7 @@ long gcs_repl (gcs_conn_t          *conn,
                     }
                 }
                 else {
-                    assert (ret == act_size);
+                    assert (ret == (ssize_t)act_size);
                 }
             }
             gu_mutex_unlock (&conn->lock);
@@ -885,7 +884,7 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
         ret = gcs_repl(conn, rst, rst_size, GCS_ACT_STATE_REQ, &global, local);
 
         if (ret > 0) {
-            assert (ret == rst_size);
+            assert (ret == (ssize_t)rst_size);
             assert (global >= 0);
         }
 
