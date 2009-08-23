@@ -288,7 +288,7 @@ typedef struct {
     bool         st_required;   /// state transfer is required (gap in seqnos)
     long         memb_num;      /// number of members in configuration
     long         my_idx;        /// index of this node in the configuration
-    char         data[0];       /// member array (null-terminated IDs)
+    char         data[];        /// member array (null-terminated IDs)
 } gcs_act_conf_t;
 
 #ifdef	__cplusplus

@@ -22,10 +22,13 @@ AC_ARG_ENABLE(debug,
 	      enable_debug="yes")
 if test "$enable_debug" != "no"
 then
-    CFLAGS="-g -O0 -fno-inline  -DDEBUG_MALLOC -DDEBUG_MUTEX -DDEBUG_ASSERT"
+    CFLAGS=${CFLAGS:-"-O1"} # -O1 to detect unitialized variables
+    AM_CFLAGS="-g -fno-inline"
+    AM_CPPFLAGS="-DDEBUG_MALLOC -DDEBUG_MUTEX -DDEBUG_ASSERT -D_FORTIFY_SOURCE=1"
 else
-    CFLAGS=${CFLAGS:-" -O2 -g "}
-    CFLAGS="$CFLAGS -DNDEBUG "
+    CFLAGS=${CFLAGS:-"-O3"}
+    AM_CFLAGS="-g"
+    AM_CPPFLAGS="-DNDEBUG"
 fi
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
 
@@ -154,8 +157,25 @@ AC_CONFIG_FILES([Makefile
                  doc/Makefile
                  src/Makefile
 		 src/unit_tests/Makefile])
+
+# Compiler and linker flags
+AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -pedantic -Wno-unused-parameter"
+AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -Wold-style-cast -Wconversion -fno-rtti -
+AM_CFLAGS="$AM_CFLAGS -std=c99"
+AM_CPPFLAGS="$AM_CPPFLAGS -D_XOPEN_SOURCE=600"
+AM_LDFLAGS="-Wl,--warn-common -Wl,--fatal-warnings"
+
+AC_SUBST(AM_CFLAGS)
+AC_SUBST(AM_CXXFLAGS)
+AC_SUBST(AM_CPPFLAGS)
+AC_SUBST(AM_LDFLAGS)
+
+
+AC_SUBST(AM_CFLAGS)
+AC_SUBST(AM_CXXFLAGS)
+AC_SUBST(AM_CPPFLAGS)
+AC_SUBST(AM_LDFLAGS)
 		 
-CFLAGS="$CFLAGS -Wall -Werror "
 AC_OUTPUT
 
 AC_MSG_NOTICE([***])
@@ -163,5 +183,13 @@ AC_MSG_NOTICE([Spread backend: $with_spread])
 AC_MSG_NOTICE([Gcomm  backend: $enable_gcomm])
 AC_MSG_NOTICE([Vsbes  backend: $enable_vs])
 AC_MSG_NOTICE([***])
-AC_MSG_NOTICE([CFLAGS:  $CFLAGS])
-AC_MSG_NOTICE([LDFLAGS: $LDFLAGS])
+AC_MSG_NOTICE([   CFLAGS:   $CFLAGS])
+AC_MSG_NOTICE([AM_CFLAGS:   $AM_CFLAGS])
+AC_MSG_NOTICE([   CXXFLAGS: $CXXFLAGS])
+AC_MSG_NOTICE([AM_CXXFLAGS: $AM_CXXFLAGS])
+AC_MSG_NOTICE([   CPPFLAGS: $CPPFLAGS])
+AC_MSG_NOTICE([AM_CPPFLAGS: $AM_CPPFLAGS])
+AC_MSG_NOTICE([   LDFLAGS:  $LDFLAGS])
+AC_MSG_NOTICE([AM_LDFLAGS:  $AM_LDFLAGS])
+AC_MSG_NOTICE([   LIBS:     $LIBS])
+AC_MSG_NOTICE([])

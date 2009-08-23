@@ -2,8 +2,6 @@
 #
 # $Id$
 
-AM_CFLAGS = -I..
-
 noinst_PROGRAMS   = gcs_tests
 
 gcs_tests_SOURCES =           \
@@ -30,7 +28,7 @@ gcs_tests_SOURCES =           \
 	../gcs_msg_type.c
 
 # For gcs_core_test
-gcs_tests_CPPFLAGS = -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING
+gcs_tests_CPPFLAGS = @AM_CPPFLAGS@ -I.. -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING
 
 # for testing gcs_backend.c enable everything
 gcs_tests_CPPFLAGS += -DGCS_USE_SPREAD
