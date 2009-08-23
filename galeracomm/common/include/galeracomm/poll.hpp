@@ -1,9 +1,8 @@
 #ifndef POLL_HPP
 #define POLL_HPP
 
-#include <galeracomm/exception.hpp>
+//#include <galeracomm/exception.hpp>
 #include <string>
-
 
 
 class PollContext;
@@ -21,8 +20,6 @@ namespace PollEvent {
 	POLL_ALL = POLL_IN | POLL_OUT | POLL_ERR | POLL_HUP | POLL_INVAL | POLL_TIMED
     };
 }
-
-
 
 
 class Poll {
@@ -46,8 +43,6 @@ public:
     virtual ~PollContext() {}
     virtual void handle(const int, const PollEnum e) = 0;
 };
-
-
 
 
 #endif /* POLL_HPP */

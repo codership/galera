@@ -10,12 +10,18 @@ struct Member {
     Protolay *pl;
     enum State {JOINING, JOINED, LEAVING, CLOSED} state;
     Member(Protolay *p) : pl(p), state(JOINING) {}
+    Member (const Member& m) : pl(m.pl), state(m.state) {}
+
+private:
+
+    Member& operator= (const Member&);
 };
+
 typedef std::map<const Address, Member> MemberMap;
 struct Group {
     uint32_t last_view_seq;
     std::set<MemberMap::iterator> mi;
-    Group() : last_view_seq(0) {}
+    Group() : last_view_seq(0), mi() {}
 };
 typedef std::map<const ServiceId, Group> GroupMap;
 
@@ -28,8 +34,9 @@ static bool operator<(const MemberMap::iterator& a,
 struct ConfMessage {
     Address addr;
     enum Type {JOIN, LEAVE, PARTITION} type;
+
     ConfMessage(const Address a, const Type t) : addr(a), type(t) {}
-    ConfMessage(const ReadBuf *rb) {
+    ConfMessage(const ReadBuf *rb) : addr(), type() {
 	size_t off = 0;
 	uint32_t val;
 	if ((off = addr.read(rb->get_buf(), rb->get_len(), off)) == 0)
@@ -70,10 +77,20 @@ class VSFifoBackendProvider : public PollContext {
     Aset addresses;
     Poll *poll;
 
+    VSFifoBackendProvider (const VSFifoBackendProvider&);
+    VSFifoBackendProvider& operator= (const VSFifoBackendProvider&);
+
 public:
 
-    VSFifoBackendProvider(const SegmentId segid, Poll *p) : 
-        last_proc_id(0), segment_id(segid), poll(p) {
+    VSFifoBackendProvider(const SegmentId segid, Poll *p) :
+        msgs(),
+        members(),
+        groups(),
+        last_proc_id(0),
+        segment_id(segid),
+        addresses(),
+        poll(p)
+    {
 	if (segid == 0)
 	    throw DException("Invalid segment id");
 	if (poll) {

@@ -14,6 +14,12 @@ class EVSProto;
 class EVS : public Protolay {
     Transport *tp;
     EVSProto *proto;
+
+    EVS (const EVS&);
+    EVS& operator= (const EVS&);
+
+    EVS () : tp(0), proto(0) {}
+
 public:
     void connect(const char *addr);
     void close();

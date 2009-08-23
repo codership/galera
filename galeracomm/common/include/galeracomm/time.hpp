@@ -1,14 +1,15 @@
 #ifndef TIME_HPP
 #define TIME_HPP
 
-#include <galeracomm/exception.hpp>
-
-#include <sys/time.h>
 #include <ctime>
 #include <string>
 #include <sstream>
 #include <iostream>
 #include <limits>
+#include <sys/time.h>
+
+#include <galerautils.hpp>
+#include <galeracomm/exception.hpp>
 
 /*!
  * Class for time representation. 
@@ -16,24 +17,32 @@
  * 
  */
 class Time {
+
     uint64_t time;
     static const time_t MicroSecond;
     static const time_t MilliSecond;
     static const time_t Second;
     Time(const uint64_t t) : time(t) {}
+
 public:
+
     Time() : time(0) {}
 
     /*!
      *
      */
-    Time(const time_t sec, const time_t usec) {
-	if (uint64_t(sec) > std::numeric_limits<uint64_t>::max()/Second) {
-	    std::cerr << sec << " " << std::numeric_limits<time_t>::max()/Second << "\n";
-	    throw FatalException("Time value overflow");
+    Time(const time_t sec, const time_t usec) :
+	time(uint64_t(sec)*uint64_t(Second) + uint64_t(usec))
+    {
+        uint64_t limit = std::numeric_limits<uint64_t>::max()/Second;
+	if (uint64_t(sec) > limit) {
+            std::ostringstream msg;
+            msg << "Time value overflow: " << sec << " > " << limit;
+	    throw FatalException(msg.str().c_str(), ERANGE);
 	}
-	time = uint64_t(sec)*uint64_t(Second) + uint64_t(usec);
     }
+
+    virtual ~Time() {}
 
     /*!
      *
@@ -108,9 +117,11 @@ class Period : public Time {
 public:
     Period(const Time& t) : Time(t) {
 	if (t.get_seconds() > 3600) {
-	    std::cerr << "warning: period of " << t.to_string() << " seconds\n";
+	    log_warn << "warning: period of " << t.to_string() << " seconds\n";
 	}
     }
+
+    ~Period() {}
 };
 
 

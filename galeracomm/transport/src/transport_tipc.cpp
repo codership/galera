@@ -74,7 +74,6 @@ static bool tipc_addr_to_sa(const char* addr, struct sockaddr* s,
     return true;
 }
 
-
 void TIPCTransport::connect(const char* addr)
 {
     sockaddr_tipc *tipc_sa = reinterpret_cast<sockaddr_tipc*>(&sa);
@@ -109,7 +108,10 @@ void TIPCTransport::connect(const char* addr)
     tipc_subscr subscr = {{tipc_sa->addr.name.name.type, 
 			   tipc_sa->addr.name.name.instance, 
 			   tipc_sa->addr.name.name.instance},
-			  TIPC_WAIT_FOREVER, TIPC_SUB_PORTS, {}};
+			  static_cast<unsigned int>(TIPC_WAIT_FOREVER),
+                          TIPC_SUB_PORTS,
+                          {}
+    };
     
     if (::send(tsfd, &subscr, sizeof(subscr), 0) != sizeof(subscr)) {
 	int err = errno;
@@ -326,10 +328,12 @@ size_t TIPCTransport::get_max_msg_size() const
     return TIPC_MAX_USER_MSG_SIZE;
 }
 
-TIPCTransport::TIPCTransport(Poll *p) : fd(-1), tsfd(-1), sa_size(0), poll(p) {
-    max_msg_size = TIPC_MAX_USER_MSG_SIZE;
-    recv_buf = new unsigned char[max_msg_size];
-}
+TIPCTransport::TIPCTransport(Poll *p) :
+    fd(-1), tsfd(-1), sa(), local_sa(), sa_size(0),
+    max_msg_size (TIPC_MAX_USER_MSG_SIZE),
+    recv_buf(new unsigned char[max_msg_size]),
+    poll(p)
+{}
 
 TIPCTransport::~TIPCTransport()
 {

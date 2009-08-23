@@ -11,7 +11,12 @@
  * Timer handler interface.
  */ 
 class TimerHandler {
+
     const char *name;
+
+    TimerHandler (const TimerHandler&);
+    void operator= (const TimerHandler&);
+
 public:
     /*!
      *
@@ -45,10 +50,16 @@ typedef std::map<const char *, ExpirationMap::iterator> TimerMap;
  * Timer
  */
 class Timer {
+
     Poll *poll;
     TimerMap timer_map;
     ExpirationMap expiration_map;
+
+    Timer (const Timer&);
+    void operator= (const Timer&);
+
 public:
+
     Timer(Poll *);
     ~Timer();
     void set(TimerHandler *, const Period&);

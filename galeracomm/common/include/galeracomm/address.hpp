@@ -44,7 +44,7 @@ public:
     bool operator<(const ProcId& cmp) const {
 	return id < cmp.id;
     }
-    ProcId& operator++(int) {
+    ProcId operator++(int) {
 	id++;
 	return *this;
     }
@@ -125,7 +125,7 @@ class Address {
     ServiceId service_id;
     SegmentId segment_id;
 public:
-    Address() {}
+    Address() : proc_id(), service_id(), segment_id() {}
     Address(const ProcId pid, const ServiceId srid, const SegmentId sgid) 
 	: proc_id(pid), service_id(srid), segment_id(sgid) {}
 

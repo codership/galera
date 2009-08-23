@@ -7,23 +7,27 @@
 static const size_t WRITEBUF_MAX_HDRLEN = 64;
 
 class WriteBuf {
+
     unsigned char hdr[WRITEBUF_MAX_HDRLEN];
     size_t hdrlen;
     ReadBuf *rb;
-    
-    WriteBuf& operator=(WriteBuf& w) {return w;}
 
-    WriteBuf(const void *hdr, const size_t hdrlen, ReadBuf *rb) {
+    WriteBuf (const WriteBuf&);
+    WriteBuf& operator=(WriteBuf& w);// {return w;}
+
+    WriteBuf(const void *hdr, const size_t hdrlen, ReadBuf *rb) :
+        hdrlen (hdrlen),
+        rb (rb ? rb->copy() : 0)
+    {
 	memcpy(this->hdr + (WRITEBUF_MAX_HDRLEN - hdrlen), hdr, hdrlen);
-	this->hdrlen = hdrlen;
-	this->rb = rb ? rb->copy() : 0;
     }
+
 public:
 
-    WriteBuf(const void *buf, const size_t buflen) {
-	this->rb = buflen ? new ReadBuf(buf, buflen) : 0;
-	this->hdrlen = 0;
-    }
+    WriteBuf(const void *buf, const size_t buflen) :
+        hdrlen (0),
+        rb (buflen ? new ReadBuf(buf, buflen) : 0)
+    {}
 
     ~WriteBuf() {
 	if (rb)

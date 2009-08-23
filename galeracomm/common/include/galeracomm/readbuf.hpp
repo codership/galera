@@ -2,20 +2,24 @@
 #define READBUF_HPP
 
 #include <galeracomm/types.h>
-#include <galeracomm/exception.hpp>
+//#include <galeracomm/exception.hpp>
 #include <galeracomm/monitor.hpp>
 #include <galeracomm/logger.hpp>
 #include <iostream>
 
 class ReadBuf {
+
     mutable volatile int refcnt;
     bool instack;
     const unsigned char *buf;
     mutable unsigned char *priv_buf;
     size_t buflen;
     mutable Monitor mon;
+
+    // Disable copy constructor
+    ReadBuf (const ReadBuf&);
     // Private copy operator to disallow assignment 
-    ReadBuf operator=(ReadBuf& r) { return r;}
+    ReadBuf& operator=(ReadBuf& r);// { return r;}
     // Private destructor to disallow allocating ReadBuf from stack
 
 
@@ -30,36 +34,31 @@ public:
 	delete[] priv_buf;
     }
 
-    ReadBuf(const void* buf, const size_t buflen, bool inst) {
-	instack = inst;
-	refcnt = 1;
-	this->buf = reinterpret_cast<const unsigned char *>(buf);
-	this->buflen = buflen;
-	this->priv_buf = 0;
-    }
+    ReadBuf(const void* buf, const size_t buflen, bool inst) :
+	refcnt(1), instack(inst),
+        buf(reinterpret_cast<const unsigned char *>(buf)),
+        priv_buf(0), buflen(buflen), mon()
+    {}
     
     
-    ReadBuf(const void *buf, const size_t buflen) {
-	instack = false;
-	refcnt = 1;
-	this->buf = reinterpret_cast<const unsigned char *>(buf);
-	this->buflen = buflen;
-	this->priv_buf = 0;
-    }
+    ReadBuf(const void *buf, const size_t buflen) :
+	refcnt(1), instack(false),
+        buf(reinterpret_cast<const unsigned char *>(buf)),
+        priv_buf(0), buflen(buflen), mon()
+    {}
 
     ReadBuf(const void* bufs[], const size_t buflens[], const size_t nbufs, 
-	    const size_t tot_len) {
-	instack = false;
-	refcnt = 1;
-	buf = 0;
-	priv_buf = new unsigned char[tot_len];
-	buflen = 0;
+	    const size_t tot_len) :
+	refcnt(1), instack(false), buf(0),
+        priv_buf(new unsigned char[tot_len]), buflen(0), mon()
+    {
 	for (size_t i = 0; i < nbufs; ++i) {
 	    memcpy(priv_buf + buflen, bufs[i], buflens[i]);
 	    buflen += buflens[i];
 	}
+
 	if (buflen != tot_len)
-	    throw FatalException("");
+	    throw FatalException("buflen != tot_len");
     }
     
     ReadBuf *copy() const {
@@ -81,8 +80,8 @@ public:
     
     
     ReadBuf *copy(const size_t offset) const {
-	if (offset > buflen)
-	    throw DException("");
+	if (offset > buflen) throw DException("offset > buflen");
+
 	if (offset > 0) {
 	    ReadBuf *ret = new ReadBuf(get_buf(offset), buflen - offset);
 	    ret->copy();

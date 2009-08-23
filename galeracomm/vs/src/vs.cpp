@@ -17,6 +17,8 @@
 
 
 class VSProto : public Protolay {
+    VSProto (const VSProto&);
+    VSProto& operator= (const VSProto&);
 public:
     enum State {JOINING, JOINED, LEAVING, LEFT} state;
     Address addr;
@@ -28,11 +30,22 @@ public:
     std::deque<std::pair<ReadBuf *, size_t> > trans_msgs;
     std::deque<ReadBuf*> local_msgs;
     const Serializable *user_state;
-    VSProto(const Address a, Protolay *up_ctx, const Serializable *us) : 
-	addr(a), trans_view(0), reg_view(0), 
-	proposed_view(0), next_seq(0), user_state(us) {
+
+    VSProto(const Address a, Protolay *up_ctx, const Serializable *us) :
+        state(JOINING),
+	addr(a),
+        trans_view(0),
+        reg_view(0), 
+	proposed_view(0),
+        next_seq(0),
+        membs(),
+        trans_msgs(),
+        local_msgs(),
+        user_state(us)
+    {
 	set_up_context(up_ctx);
     }
+
     ~VSProto() {
 	delete trans_view;
 	delete reg_view;
@@ -340,15 +353,9 @@ void VSProto::handle_data(const VSMessage *dm, const ReadBuf *rb, const size_t r
 //
 //
 
-VS::VS() : be(0), be_addr(0), mon(0)
-{
+VS::VS() : be(0), be_addr(0), proto(), mon(0) {}
 
-}
-
-VS::VS(Monitor *m) : be(0), be_addr(0), mon(m)
-{
-
-}
+VS::VS(Monitor *m) : be(0), be_addr(0), proto(), mon(m) {}
 
 static void release_proto(std::pair<const ServiceId, VSProto *> p)
 {
@@ -536,7 +543,7 @@ VS *VS::create(const char *conf, Poll *poll, Monitor *m)
 	    vs->be->set_flags(VSBackend::F_DROP_OWN_DATA);
 	vs->be_addr = strdup(conf);
 	vs->set_down_context(vs->be);
-    } catch (Exception e) {
+    } catch (std::exception e) {
 	delete vs;
 	throw;
     }

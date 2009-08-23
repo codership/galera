@@ -21,7 +21,12 @@ class EVSInputMapItem {
     EVSInputMapItem(const EVSPid& sa_, const EVSMessage& msg_, 
                     ReadBuf* rb_) : sa(sa_), msg(msg_), rb(rb_), 
         priv_rb(rb_), roff(0) {}
+
+    EVSInputMapItem& operator= (const EVSInputMapItem&);
 public:
+    EVSInputMapItem (const EVSInputMapItem& i) :
+        sa(i.sa), msg(i.msg), rb(i.rb), priv_rb(i.priv_rb), roff(i.roff) {}
+
     EVSInputMapItem(const EVSPid& sa_, const EVSMessage& msg_, 
                     const ReadBuf* rb_, const size_t roff_) :
         sa(sa_), msg(msg_), rb(rb_), priv_rb(0), roff(roff_) {}
@@ -73,7 +78,7 @@ class EVSInputMap {
     struct Instance {
         EVSRange gap;
         uint32_t safe_seq;
-        Instance() : safe_seq(SEQNO_MAX) {}
+        Instance() : gap(), safe_seq(SEQNO_MAX) {}
         ~Instance() {
         }
         
@@ -85,7 +90,9 @@ class EVSInputMap {
     
     
     struct MLogLstr {
-        bool operator()(const EVSInputMapItem& a, const EVSInputMapItem& b) const {
+        bool operator() (const EVSInputMapItem& a,
+                         const EVSInputMapItem& b) const
+        {
             if (seqno_lt(a.get_evs_message().get_seq(), 
                          b.get_evs_message().get_seq()))
                 return true;
@@ -109,9 +116,15 @@ class EVSInputMap {
     uint64_t recovery_log_size_cum;
     
 public:
-    EVSInputMap() : safe_seq(SEQNO_MAX), aru_seq(SEQNO_MAX),
-                    n_messages(0), msg_log_size_cum(0), 
-                    recovery_log_size_cum(0) {
+    EVSInputMap() :
+        instances(),
+        recovery_log(),
+        msg_log(),
+        safe_seq(SEQNO_MAX),
+        aru_seq(SEQNO_MAX),
+        n_messages(0),
+        msg_log_size_cum(0), 
+        recovery_log_size_cum(0) {
     }
     
     ~EVSInputMap() {

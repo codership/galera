@@ -10,15 +10,9 @@
  */
 
 
-Timer::Timer(Poll *p)
-{
-    
-}
+Timer::Timer(Poll *p) : poll(p), timer_map(), expiration_map() {}
 
-Timer::~Timer()
-{
-    
-}
+Timer::~Timer() {}
 
 typedef std::pair<const char *, ExpirationMap::iterator> TimerPair;
 typedef std::pair<const Time, TimerHandler *> ExpirationPair;

@@ -17,7 +17,12 @@ class Sender : Toplay {
     Transport *tp;
     Poll *poll;
     bool can_send;
+
+    Sender (const Sender&);
+    void operator= (const Sender&);
+
 public:
+
     Sender(Poll *p) : tp(0), poll(p), can_send(false) {}
     void handle_up(const int cid, const ReadBuf *rb, const size_t offset, 
 		   const ProtoUpMeta *um) {
@@ -34,7 +39,7 @@ public:
 	tp = Transport::create(async_addr, poll, this);
 	set_down_context(tp);
 	tp->connect(async_addr);
-	tp->set_max_pending_bytes(1 << 31);
+	tp->set_max_pending_bytes(1U << 31);
     }
     bool send(const size_t b) {
 	unsigned char *buf = new unsigned char[b];
@@ -77,11 +82,17 @@ class Receiver : public Toplay {
     clock_t cstop;
     uint64_t recvd;
     Transport *tp;
+
+    Receiver (const Receiver&);
+    void operator= (const Receiver&);
+
 public:
-    Receiver(Transport *t) : recvd(0), tp(t) {
-	cstart = clock();
+
+    Receiver(Transport *t) : cstart(clock()), cstop(cstart), recvd(0), tp(t)
+    {
 	tp->set_up_context(this);
     }
+
     ~Receiver() {
 	cstop = clock();
 	clock_t ct = (cstop - cstart);
@@ -130,11 +141,18 @@ class Listener : public Toplay {
     Transport *tp;
     Poll *poll;
     std::list<std::pair<Receiver *, Transport *> > tports;
+
+    Listener (const Listener&);
+    void operator= (const Listener&);
+
 public:
+
     Receiver *get_first_receiver() {
 	return tports.front().first;
     }
-    Listener(Poll *_poll) : tp(0), poll(_poll) {}
+
+    Listener(Poll *_poll) : tp(0), poll(_poll), tports() {}
+
     ~Listener() {
 	delete tp;
 	tp = 0;
@@ -237,13 +255,15 @@ START_TEST(check_async_multitransport)
 END_TEST
 
 
-
-
 class SyncSender : public Thread {
     const char* addr;
     Transport* tp;
     size_t sent;
     unsigned char* buf;
+
+    SyncSender (const SyncSender&);
+    void operator= (const SyncSender&);
+
 public:
     
     SyncSender(const char* a) : addr(a), tp(0), sent(0), buf(0) {}
@@ -288,8 +308,14 @@ public:
 class SyncReceiver : public Thread {
     Transport* tp;
     size_t recvd;
+
+    SyncReceiver (const SyncReceiver&);
+    void operator= (const SyncReceiver&);
+
 public:
+
     SyncReceiver(Transport* t) : tp(t), recvd(0) {}
+
     ~SyncReceiver() {
 	std::cerr << "SyncReceiver: received " << recvd << " bytes\n";
     }
@@ -298,7 +324,8 @@ public:
 	const ReadBuf* rb;
 	while ((rb = tp->recv()) != 0) {
 	    size_t len = rb->get_len();
-	    const unsigned char *buf = reinterpret_cast<const unsigned char *>(rb->get_buf());
+	    const unsigned char *buf =
+                reinterpret_cast<const unsigned char *>(rb->get_buf());
 	    for (size_t i = 0; i < len; i++) 
 		if (buf[i] != i % 256)
 		    fail_unless(buf[i] == i % 256);
@@ -306,18 +333,19 @@ public:
 	    // std::cerr << " recv " << len;
 	}
     }
-
-
 };
 
 class SyncListener : public Thread {
     Transport *listener;
     const char *addr;
     std::list<SyncReceiver*> recvrs;
-public:
-    SyncListener(const char *a) : addr(a) {
-    }
 
+    SyncListener (const SyncListener&);
+    void operator= (const SyncListener&);
+
+public:
+
+    SyncListener(const char *a) : listener(0), addr(a), recvrs() {}
 
     void run() {
 	Transport* tp;
@@ -372,14 +400,26 @@ class Mcaster : public Toplay {
     size_t hc;
     double recvd_b;
     std::map<Sockaddr,uint32_t> seq_map;
+
+    Mcaster (const Mcaster&);
+    void operator= (const Mcaster&);
+
 public:
-    Mcaster(Poll *p) : seq(0), recvd(0), hc(0), recvd_b(0) {
+
+    Mcaster(Poll *p) :
+	tp      (Transport::create(tipc_addr, p, this)),
+        seq     (0),
+        recvd   (0),
+        hc      (0),
+        recvd_b (0),
+        seq_map ()
+    {
 	for (size_t i = 0; i < 128; ++i) {
 	    buf[i] = i;
 	}
-	tp = Transport::create(tipc_addr, p, this);
 	set_down_context(tp);
     }
+
     ~Mcaster() {
 	LOG_INFO(std::string("Received ") + to_string(recvd) + " msgs " + 
 		 to_string(recvd_b) + " bytes hc " + to_string(hc));
@@ -450,8 +490,10 @@ public:
 		    seq_map.erase(i);
 		}
 	    }
-	    for (size_t i = 0; i < tn->sa_size; ++i)
-		fprintf(stderr, "%2.2x ", ((unsigned char*)&tn->source_sa)[i]);
+	    for (size_t i = 0; i < tn->sa_size; ++i) {
+		fprintf(stderr, "%2.2x ",
+                (reinterpret_cast<const unsigned char*>(&tn->source_sa))[i]);
+            }
 	    fprintf(stderr, "\n");
 	} else {
 	    LOG_WARN("Empty");

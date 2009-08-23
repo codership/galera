@@ -23,8 +23,8 @@ class TCPTransport : public Transport, PollContext {
     Poll *poll;
     size_t max_pending;
     size_t pending_bytes;
-    unsigned char *recv_buf;
     size_t recv_buf_size;
+    unsigned char *recv_buf;
     size_t recv_buf_offset;
     ReadBuf *recv_rb;
     // Used to hold pointer to ReadBuf that has been passed upwards. 
@@ -33,25 +33,39 @@ class TCPTransport : public Transport, PollContext {
     ReadBuf *up_rb;
     //boost::crc_32_type send_crc;
     //boost::crc_32_type recv_crc;
-
     std::deque<PendingWriteBuf> pending;
+
+    TCPTransport (const TCPTransport&);
+    void operator= (const TCPTransport&);
+
     TCPTransport(const int _fd, const sockaddr& _sa, 
 		 const size_t _sa_size, Poll *_poll) :
 	fd(_fd), no_nagle(1), sa(_sa), sa_size(_sa_size), poll(_poll),
-	max_pending(1024), pending_bytes(0), recv_buf_offset(0), recv_rb(0),
-	up_rb(0) {
-	recv_buf_size = 65536;
-	recv_buf = reinterpret_cast<unsigned char*>(::malloc(recv_buf_size));
+	max_pending(1024),
+        pending_bytes(0),
+	recv_buf_size(65536),
+	recv_buf (reinterpret_cast<unsigned char*>(::malloc(recv_buf_size))),
+        recv_buf_offset(0),
+        recv_rb(0),
+	up_rb(0),
+        pending()
+    {
 	set_max_pending_bytes(10*1024*1024);
     }
+
 public:
+
     TCPTransport(Poll *p) : 
-	fd(-1), no_nagle(1), poll(p), max_pending(1024), pending_bytes(0), 
-	recv_buf_offset(0), recv_rb(0), up_rb(0) {
-	recv_buf_size = 65536;
-	recv_buf = reinterpret_cast<unsigned char*>(::malloc(recv_buf_size));
+	fd(-1), no_nagle(1), sa(), sa_size(0), poll(p), // FIXME!!!
+        max_pending(1024), pending_bytes(0), 
+	recv_buf_size(65536),
+	recv_buf (reinterpret_cast<unsigned char*>(::malloc(recv_buf_size))),
+	recv_buf_offset(0), recv_rb(0), up_rb(0),
+        pending()
+    {
 	set_max_pending_bytes(1024*1024);
     }
+
     ~TCPTransport() {
 	if (fd != -1) {
 	    if (poll)

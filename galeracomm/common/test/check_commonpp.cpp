@@ -20,6 +20,7 @@
 #include <check.h>
 #include <unistd.h>
 
+#include <galerautils.hpp>
 
 START_TEST(check_address)
 {
@@ -295,7 +296,7 @@ START_TEST(check_poll)
 	p = Poll::create("Def");
 	delete p;
     }
-    catch (Exception e) {
+    catch (gu::Exception e) {
 	fail(e.what());
     }
 
@@ -303,7 +304,7 @@ START_TEST(check_poll)
 	p = Poll::create("unDef");
 	fail("");
     }
-    catch (Exception e) {
+    catch (gu::Exception e) {
     }
 
     // Check others
@@ -311,7 +312,7 @@ START_TEST(check_poll)
     try {
 	p = Poll::create("Def");	
     }
-    catch (Exception e) {
+    catch (gu::Exception e) {
 	fail(e.what());
     }
 
@@ -320,14 +321,14 @@ START_TEST(check_poll)
     try {
 	p->insert(c1.get_fd(), &c1);
     }
-    catch (Exception e) {
+    catch (gu::Exception e) {
 	fail(e.what());
     }
 
     try {
 	p->insert(c2.get_fd(), &c2);
     }
-    catch (Exception e) {
+    catch (gu::Exception e) {
 	fail(e.what());
     }
 
@@ -335,7 +336,7 @@ START_TEST(check_poll)
 	p->insert(c3.get_fd(), &c3);
 	fail("");
     }
-    catch (Exception e) {
+    catch (gu::Exception e) {
 	std::cout << "Expected exception: " << e.what() << "\n";
     }
     
@@ -349,11 +350,10 @@ START_TEST(check_poll)
 	p->erase(c1.get_fd());
 	p->erase(c2.get_fd());
     }
-    catch (Exception e) {
+    catch (gu::Exception e) {
 	fail(e.what());
     }
 
-    
     try {
 	int fds[2];
 	char buf[1] = {0};
@@ -378,7 +378,7 @@ START_TEST(check_poll)
 	
 	p->erase(fds[0]);
     }
-    catch(Exception e) {
+    catch (gu::Exception e) {
 	fail(e.what());
     }
     delete p;
@@ -505,7 +505,9 @@ START_TEST(check_protolay)
 	Proto1() {}
 	void handle_up(const int cid, const ReadBuf *rb, const size_t off, const ProtoUpMeta *up_meta) {
 	    
-	    std::cout << "Proto1::handle_up(): " << (char*)rb->get_buf() << "\n";
+	    std::cout << "Proto1::handle_up(): "
+                      << (reinterpret_cast<const char*>(rb->get_buf()))
+                      << "\n";
 	}
     };
     
@@ -527,6 +529,10 @@ START_TEST(check_protolay)
 	Poll *poll;
 	Fifo *qtrans;
 	bool writable;
+
+        Proto3 (const Proto3&);
+        void operator= (const Proto3&);
+
     public:
 	Proto3(Poll *p, Fifo *qt) : poll(p),
 				    qtrans(qt),

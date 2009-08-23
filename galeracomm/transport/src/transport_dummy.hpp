@@ -1,10 +1,13 @@
 
 class DummyTransport : public Transport {
+
     std::deque<ReadBuf*> in;
     std::deque<ReadBuf*> out;
+
 public:
-    DummyTransport(Poll *p) {
-    }
+
+    DummyTransport(Poll *p) : in(), out() {}
+
     ~DummyTransport() {
 	for (std::deque<ReadBuf*>::iterator i = in.begin(); i != in.end(); ++i)
 	    (*i)->release();
@@ -13,7 +16,7 @@ public:
     }
     
     size_t get_max_msg_size() const {
-	return 1 << 31;
+	return 1U << 31;
     }
     void connect(const char *addr) {
     }

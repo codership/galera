@@ -9,7 +9,9 @@ extern "C" {
 #include <exception>
 #include <string>
 #include <iostream>
+#include <galerautils.h>
 
+#if 0
 class Exception : public std::exception {
     std::string reason;
 public:
@@ -19,6 +21,7 @@ public:
 	return reason.c_str();
     }
 };
+#endif // 0
 
 const char *addr = "127.0.0.1:25678";
 /* Message producer and consumer */
@@ -48,7 +51,7 @@ public:
 	poll_insert(poll, transport_fd(listen), this, &event_cb);
 	poll_set(poll, transport_fd(listen), POLL_IN);
 	if (ret != 0)
-	    throw Exception("Transport listen returned error");
+	    throw gu_Exception("Transport listen returned error", -1);
     }
     
 
@@ -57,7 +60,7 @@ public:
 	MessagePC *mpc = reinterpret_cast<MessagePC*>(
 	    protolay_get_priv(pl));
 	if (mpc->rcv == 0 || mpc->snd == 0)
-	    throw Exception("Wtf in pl_up_cb");
+	    throw gu_Exception("Wtf in pl_up_cb", -1);
 	if (rb == 0 && transport_get_state(mpc->snd) == TRANSPORT_S_CONNECTED) {
 	    mpc->state = CONNECTED;
 	} else if (rb && transport_get_state(mpc->rcv) == TRANSPORT_S_CONNECTED) {
@@ -65,7 +68,7 @@ public:
 	    mpc->tport_offset = roff;
 	} else if (transport_get_state(mpc->snd) == TRANSPORT_S_FAILED ||
 		   transport_get_state(mpc->rcv) == TRANSPORT_S_FAILED) {
-	    throw Exception("Transport has failed");
+	    throw gu_Exception("Transport has failed", -1);
 	} else {
 	    std::cout << "Unknown event \n";
 	}
@@ -77,7 +80,7 @@ public:
 	snd = transport_new(TRANSPORT_TCP, poll, pl, &pl_up_cb);
 	ret = transport_connect(snd, addr);
 	if (ret != 0 && ret != EINPROGRESS)
-	    throw Exception("Transport connect returned error");
+	    throw gu_Exception("Transport connect returned error", -1);
     }
     
     static void event_cb(void *ctx, int fd, poll_e ev) {
@@ -88,7 +91,7 @@ public:
 	    poll_unset(mpc->poll, transport_fd(mpc->listen), POLL_IN);
 	    std::cout << "Accept\n";
 	} else {
-	    throw Exception("Unexpected event in listener cb");
+	    throw gu_Exception("Unexpected event in listener cb", -1);
 	}
     }
 
@@ -96,7 +99,7 @@ public:
 	while (state == CONNECTING) {
 	    std::cout << "poll\n";
 	    if (poll_until(poll, 1000))
-		throw Exception("Poll failed");
+		throw gu_Exception("Poll failed", -1);
 	}
 	poll_erase(poll, transport_fd(listen));
     }
@@ -117,7 +120,7 @@ public:
 	
 	do {
 	    if (poll_until(poll, 1000))
-		throw Exception("Poll failed");
+		throw gu_Exception("Poll failed", -1);
 	} while (recv_msg == 0);
 	
 	readbuf_free(recv_msg);

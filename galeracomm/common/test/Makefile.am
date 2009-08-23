@@ -5,4 +5,5 @@ INCLUDES = -I$(top_srcdir)/common/include
 
 check_commonpp_SOURCES = check_commonpp.cpp
 check_commonpp_LDADD = \
-	$(top_builddir)/common/src/libgcommcommonpp.la -lcheck -lpthread
+	$(top_builddir)/common/src/libgcommcommonpp.la \
+	-lgalerautils -lgalerautils++ -lcheck -lpthread

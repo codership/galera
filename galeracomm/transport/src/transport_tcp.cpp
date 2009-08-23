@@ -26,7 +26,7 @@ static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
      
      ipaddr = strndup(addr, delim - addr);
      port = strdup(delim + 1);
-     sa = (struct sockaddr_in *) s;
+     sa = reinterpret_cast<struct sockaddr_in*>(s);
      if (inet_pton(AF_INET, ipaddr, &sa->sin_addr) <= 0) {
 	  free(ipaddr);
 	  free(port);
@@ -45,18 +45,22 @@ class TCPTransportHdr {
     unsigned char raw[sizeof(uint32_t)];
     uint32_t len;
 public:
-    TCPTransportHdr(const size_t l) : len(l) {
+    TCPTransportHdr(const size_t l) : len(l)
+    {
 	if (write_uint32(len, raw, sizeof(raw), 0) == 0)
 	    throw DException("");
     }
+
     TCPTransportHdr(const unsigned char *buf, const size_t buflen, 
-		    const size_t offset) {
+		    const size_t offset) : len(0)
+    {
 	if (buflen < sizeof(raw) + offset)
 	    throw DException("");
 	::memcpy(raw, buf + offset, sizeof(raw));
 	if (read_uint32(raw, sizeof(raw), 0, &len) == 0)
 	    throw DException("");
     }
+
     const void* get_raw() const {
 	return raw;
     }
@@ -218,7 +222,7 @@ ssize_t TCPTransport::send_nointr(const void *buf, const size_t buflen,
 	return 0;
     do {
 	do {
-	    ret = ::send(fd, (unsigned char *)buf + offset + sent, 
+	    ret = ::send(fd, static_cast<const char*>(buf) + offset + sent, 
 			 buflen - offset - sent, flags);
 	} while (ret == -1 && errno == EINTR);
 	if (ret == -1 && errno == EAGAIN) {

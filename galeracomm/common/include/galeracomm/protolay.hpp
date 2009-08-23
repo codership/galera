@@ -11,9 +11,11 @@
 #include <cerrno>
 
 struct ProtoUpMeta {
+    virtual ~ProtoUpMeta() {}
 };
 
 struct ProtoDownMeta {
+    virtual ~ProtoDownMeta() {}
 };
 
 class Protolay {
@@ -22,7 +24,12 @@ class Protolay {
     Protolay *down_context;
 //    Poll *poll;
 //    PollContext *poll_context;
+
+    Protolay (const Protolay&);
+    void operator= (const Protolay&);
+
 protected:
+
     Protolay() : context_id(-1), up_context(0), down_context(0) {}
 
 //     Protolay(Poll *p, PollContext *pctx) : 

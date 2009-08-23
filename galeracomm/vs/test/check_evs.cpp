@@ -89,7 +89,7 @@ START_TEST(check_input_map_basic)
 
     try {
 	im.insert_sa(Address(2, 0, 0));
-	fail();
+	fail("");
     } catch (FatalException e) {
 
     }
@@ -98,7 +98,7 @@ START_TEST(check_input_map_basic)
 
     try {
 	im.erase_sa(Address(2, 0, 0));
-	fail();
+	fail("");
     } catch (FatalException e) {
 
     }    
@@ -140,7 +140,7 @@ START_TEST(check_input_map_basic)
     // Must not allow insertin second instance before clear()
     try {
 	im.insert_sa(Address(2, 0, 0));
-	fail();
+	fail("");
     } catch (FatalException e) {
 	
     }
@@ -264,18 +264,19 @@ START_TEST(check_input_map_random)
 
     // Iterate over input map - outcome must be 
     EVSPid pid(1, 2, 3);
-    EVSViewId vid(pid, 3);    
-    std::vector<EVSMessage> msgs(SEQNO_MAX/4);
+    EVSViewId vid(pid, 3);
+    const size_t msgs_num = SEQNO_MAX/4;
+    std::vector<EVSMessage*> msgs(msgs_num);
     
-    for (uint32_t i = 0; i < SEQNO_MAX/4; ++i)
-        msgs[i] = EVSMessage(EVSMessage::USER, 
-                             pid,
-                             SAFE, 
-                             i,
-                             0,
-                             SEQNO_MAX,
-                             vid,
-                             0);
+    for (uint32_t i = 0; i < msgs_num; ++i)
+        msgs[i] = new EVSMessage(EVSMessage::USER, 
+                                 pid,
+                                 SAFE, 
+                                 i,
+                                 0,
+                                 SEQNO_MAX,
+                                 vid,
+                                 0);
     
     EVSInputMap im;
     im.insert_sa(Address(1, 0, 0));
@@ -286,7 +287,7 @@ START_TEST(check_input_map_random)
     for (size_t i = 1; i <= 4; ++i) {
 	for (size_t j = msgs.size(); j > 0; --j) {
 	    size_t n = ::rand() % j;
-	    im.insert(EVSInputMapItem(Address(i, 0, 0), msgs[n], 0, 0));
+	    im.insert(EVSInputMapItem(Address(i, 0, 0), *msgs[n], 0, 0));
 	    std::swap(msgs[n], msgs[j - 1]);
 	}
     }
@@ -299,7 +300,8 @@ START_TEST(check_input_map_random)
 	++cnt;
     }
 
-    
+    for (uint32_t i = 0; i < msgs_num; ++i)
+        delete msgs[i];
 }
 END_TEST
 
@@ -529,6 +531,11 @@ struct Inst : public Toplay {
         // const EVSProtoUpMeta* eum = static_cast<const EVSProtoUpMeta*>(um);
         // std::cout << "msg from " << eum->source.to_string() << " " << (char*)rb->get_buf(roff) << "\n";
     }
+
+private:
+
+    Inst (const Inst&);
+    Inst& operator= (const Inst&);
 };
 
 static bool all_operational(const std::vector<Inst*>* pvec)
@@ -547,7 +554,7 @@ struct Stats {
     uint64_t total_msgs;
     std::vector<uint64_t> msgs;
 
-    Stats() : sent_msgs(0), total_msgs(0) {
+    Stats() : sent_msgs(0), total_msgs(0), msgs() {
         msgs.resize(6, 0);
     }
 

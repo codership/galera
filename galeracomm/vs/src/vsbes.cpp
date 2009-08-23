@@ -25,7 +25,13 @@ class Stats {
     uint64_t bytes_in;
     uint64_t tlast;
 public:
-    Stats() : n_msgs_out(0), bytes_out(0), n_msgs_in(0), bytes_in(0) {
+    Stats() :
+        n_msgs_out(0),
+        bytes_out(0),
+        n_msgs_in(0),
+        bytes_in(0),
+        tlast(0)
+    {
 	struct timeval tv;
 	::gettimeofday(&tv, 0);
 	tlast = tv.tv_sec, tlast *= 1000000;
@@ -73,9 +79,12 @@ public:
 static Stats stats;
 
 
-ClientHandler::ClientHandler(Transport *t, VSBackend *v) : vs(v), tp(t), flags(static_cast<Flags>(0))
+ClientHandler::ClientHandler(Transport *t, VSBackend *v) :
+    vs(v),
+    tp(t),
+    state(HANDSHAKE),
+    flags(static_cast<Flags>(0))
 {
-    state = HANDSHAKE;
     tp->set_up_context(this, TP);
     vs->set_up_context(this, VS);
 }
@@ -162,7 +171,7 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 		close();
 	    }
 	    return;
-	} catch (Exception e) {
+	} catch (std::exception e) {
 	    LOG_ERROR(std::string("Exception: ") + e.what());
 	    close();
 	    return;
@@ -224,7 +233,7 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 		    VSRCommand response(VSRCommand::RESULT, VSRCommand::SUCCESS);
 		    VSRMessage rmsg(response);
 		    wb.prepend_hdr(rmsg.get_raw(), rmsg.get_raw_len());
-		} catch (Exception e) {
+		} catch (std::exception e) {
 		    LOG_INFO(e.what());
 		    VSRCommand response(VSRCommand::RESULT, VSRCommand::FAIL);
 		    VSRMessage rmsg(response);
@@ -286,7 +295,7 @@ void ClientHandler::start()
 	    LOG_INFO("Sent handshake");
 	}
 	return;
-    } catch (Exception e) {
+    } catch (std::exception e) {
 	LOG_WARN(std::string("Exception: ") + e.what());
 	close();
 	return;
@@ -294,12 +303,14 @@ void ClientHandler::start()
 }
 
 
-VSServer::VSServer(const char *a) : listener(0), terminate(false) 
-{
-    addr = ::strdup(a);
-    tp_poll = Poll::create("def");
-    fifo_poll = Poll::create("fifo");
-}
+VSServer::VSServer(const char *a) :
+    clients   (),
+    listener  (0),
+    addr      (::strdup(a)),
+    tp_poll   (Poll::create("def")),
+    fifo_poll (Poll::create("fifo")),
+    terminate (false)
+{}
 
 VSServer::~VSServer()
 {
@@ -369,11 +380,13 @@ int VSServer::run()
 #include <csignal>
 #include <string>
 
+extern "C" { static void (* const _SIG_IGN)(int) = SIG_IGN; }
+
 int main(int argc, char *argv[])
 {
 
     LOG_INFO("start");
-    ::signal(SIGPIPE, SIG_IGN);
+    ::signal(SIGPIPE, _SIG_IGN);
     Monitor::set_skip_locking(::getenv("VSBES_EXPLICIT_LOCKING") ? false : true);
 
     if (argc < 2) {
@@ -387,7 +400,7 @@ int main(int argc, char *argv[])
 	s.start();
 	s.run();
 	s.stop();
-    } catch (Exception e) {
+    } catch (std::exception e) {
 	std::cerr << e.what() << "\n";
 	return 1;
     }

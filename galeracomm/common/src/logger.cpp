@@ -3,7 +3,11 @@
 
 class Logger_s
 {
+    Logger_s (const Logger_s&);
+    void operator= (const Logger_s&);
+
 public:
+
     Logger *logger;
     Logger_s() : logger(0) {}
     ~Logger_s() {

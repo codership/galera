@@ -72,15 +72,17 @@ public:
 	Fatal,
 	None
     };
+
 private:
+
     std::ostream& os;
     Level level;
     static Logger *logger;
     Monitor mon;
-    Logger() : os(std::cerr), level(Info) {}
-    Logger(std::ostream& s) : os(s), level(Info) {}
-    Logger(std::ostream& s, Level l) : os(s), level(l) {}
-    Logger(Level l) : os(std::cerr), level(l) {}
+    Logger() : os(std::cerr), level(Info), mon() {}
+    Logger(std::ostream& s) : os(s), level(Info), mon() {}
+    Logger(std::ostream& s, Level l) : os(s), level(l), mon() {}
+    Logger(Level l) : os(std::cerr), level(l), mon() {}
     ~Logger() {}
     
 public:

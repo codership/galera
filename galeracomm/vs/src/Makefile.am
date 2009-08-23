@@ -13,13 +13,14 @@ libgcommvspp_la_LIBADD = \
 	$(top_builddir)/common/src/libgcommcommonpp.la
 
 libgcommvsbes_la_SOURCES = vsbes.cpp
-libgcommvsbes_la_LIBADD = libgcommvspp.la
+libgcommvsbes_la_LIBADD  = libgcommvspp.la
 
 vsbes_SOURCES = vsbes.cpp
 vsbes_CPPFLAGS = @AM_CPPFLAGS@ -DCOMPILE_SERVER
 vsbes_LDADD = libgcommvspp.la \
 	$(top_builddir)/transport/src/libgcommtransportpp.la \
-	$(top_builddir)/common/src/libgcommcommonpp.la
+	$(top_builddir)/common/src/libgcommcommonpp.la \
+	-lgalerautils++ -lgalerautils
 
 libgcommevs_la_SOURCES = evs.cpp evs.hpp \
 	evs_proto.cpp evs_proto.hpp \

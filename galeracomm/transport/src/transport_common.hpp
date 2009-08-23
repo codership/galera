@@ -12,8 +12,18 @@ class PendingWriteBuf {
 public:
     WriteBuf *wb;
     size_t offset;
-    PendingWriteBuf(WriteBuf *_wb, size_t _offset) : wb(_wb), offset(_offset)
-	{}
+
+    PendingWriteBuf(WriteBuf *_wb, size_t _offset) : wb(_wb), offset(_offset) {}
+
+    PendingWriteBuf (const PendingWriteBuf& pwb) :
+        wb(pwb.wb), offset(pwb.offset)
+    {}
+
+    PendingWriteBuf& operator= (const PendingWriteBuf& pwb)
+    {
+        wb = pwb.wb; offset = pwb.offset; return *this;
+    }
+
     ~PendingWriteBuf() {
     }
 };

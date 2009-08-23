@@ -1,3 +1,4 @@
+#include <galerautils.hpp>
 
 #include "galeracomm/vs.hpp"
 #include "galeracomm/monitor.hpp"
@@ -11,7 +12,7 @@
 #include <list>
 
 
-static Logger& logger = Logger::instance();
+//static Logger& logger = Logger::instance();
 
 START_TEST(check_vsviewid)
 {
@@ -78,28 +79,28 @@ START_TEST(check_vsview)
 	    view1.addr_insert(*i);
 	    fail("add_insert");
 	}
-	catch (Exception e) {
+	catch (std::exception e) {
 	    
 	}
 	try {
 	    view1.joined_insert(*i);
 	    fail("joined_insert");
 	}
-	catch (Exception e) {
+	catch (std::exception e) {
 	    
 	}
 	try {
 	    view1.left_insert(*i);
 	    fail("left_insert");
 	}
-	catch (Exception e) {
+	catch (std::exception e) {
 	    
 	}
 	try {
 	    view1.partitioned_insert(*i);
 	    fail("partitioned_insert");
 	}
-	catch (Exception e) {
+	catch (std::exception e) {
 	    
 	}
     }
@@ -113,7 +114,7 @@ class UserState : public Serializable {
     Address addr;
 public:
 
-    UserState() {}
+    UserState() : addr() {}
     UserState(const Address& a) : addr(a) {}
     const Address& get_addr() const {
 	return addr;
@@ -171,7 +172,7 @@ START_TEST(check_vsmessage)
 	VSMessage state_msg_inv(
 	    Address(1, 1, 0), VSViewId(6, Address(1, 5, 7)), &view, 0, 0);
 	fail("");
-    } catch (Exception e) {
+    } catch (std::exception e) {
 
     }
     UserState state_msg_user_state(Address(12356, 212, 111));
@@ -243,14 +244,22 @@ class Session : public Toplay {
     bool connected;
     bool leaving;
     const char *data_b;
+
+    Session (const Session&);
+    Session& operator= (const Session&);
+
 public:
+
     std::deque<Event> events;
 
 
-    Session(const char *be_addr, Poll *p, Monitor *m = 0) : 
-	connected(false), leaving(false), 
-	data_b("0123456789012345678901234567890123456789"){
-	vs = VS::create(be_addr, p, m);
+    Session(const char *be_addr, Poll *p, Monitor *m = 0) :
+        vs(VS::create(be_addr, p, m)),
+	connected(false),
+        leaving(false), 
+	data_b("0123456789012345678901234567890123456789"),
+        events()
+    {
 	set_down_context(vs);
     }
     
@@ -353,6 +362,11 @@ struct CompleteView {
 	    return a->trans_view->get_view_id() < b->trans_view->get_view_id();
 	}
     };
+
+private:
+
+    CompleteView (const CompleteView&);
+    CompleteView& operator= (const CompleteView&);
 };
 
 static CompleteView *get_complete_view(Session *s)
@@ -504,7 +518,7 @@ START_TEST(check_vs)
     try {
 	vs = VS::create(vsbe_addr, p, 0);
 	fail_unless(!!vs);
-    } catch (Exception e) {
+    } catch (std::exception e) {
 	fail(e.what());
     }
 
@@ -512,8 +526,8 @@ START_TEST(check_vs)
     try {
 	VS *vs2 = VS::create("asdfasdf", p2, 0);
 	delete vs2;
-	fail();
-    } catch (Exception e) {
+	fail("");
+    } catch (std::exception e) {
 	std::cerr << "Expected exception: " << e.what() << "\n";
     }
     delete p2;
@@ -548,7 +562,7 @@ START_TEST(check_vs)
 	ss.push_back(&u1);
 	ss.push_back(&u2);
 	verify_views(ss);
-    } catch (Exception e) {
+    } catch (std::exception e) {
 	std::cerr << e.what() << "\n";
 	fail(e.what());
     }
@@ -581,7 +595,7 @@ START_TEST(check_vs)
 	ss.push_back(&u1);
 	ss.push_back(&u2);
 	verify_views(ss);
-    } catch (Exception e) {
+    } catch (std::exception e) {
 	std::cerr << e.what() << "\n";
 	fail(e.what());
     }
@@ -700,6 +714,10 @@ const char* async_addr = "asynctcp:127.0.0.1:4567";
 
 class ClientSender : public Thread {
     VS* vs;
+
+    ClientSender (const ClientSender&);
+    ClientSender& operator= (const ClientSender&);
+
 public:
     ClientSender(VS* v) : vs(v) {}
     
@@ -718,6 +736,10 @@ public:
 class ClientReceiver : public Thread, public Toplay {
     Poll* poll;
     VS* vs;
+
+    ClientReceiver (const ClientReceiver&);
+    ClientReceiver& operator= (const ClientReceiver&);
+
 public:
     ClientReceiver(Poll *p, VS *v) : poll(p), vs(v) {}
 
@@ -725,7 +747,7 @@ public:
 		   const ProtoUpMeta *um) {
 	// Note: Ignores view events.
 	if (rb) {
-	    logger.debug(std::string("Received message"));
+	    log_debug << "Received message";
 	    const unsigned char* buf = reinterpret_cast<const unsigned char *>(rb->get_buf(roff));
 	    for (unsigned int i = 0; i < rb->get_len(roff); i++)
 		if (buf[i] != i % 256)
@@ -746,12 +768,19 @@ class Client {
     Monitor* mon;
     ClientSender* sen;
     ClientReceiver* rec;
+
+    Client (const Client&);
+    Client& operator= (const Client);
+
 public:
-    Client() : sen(0), rec(0) {
-	mon = new Monitor();
-	poll = Poll::create("def");
-	vs = VS::create(sync_addr, poll, mon);	
-    }
+
+    Client() :
+	poll (Poll::create("def")),
+	vs   (VS::create(sync_addr, poll, mon)),
+	mon  (new Monitor()),
+        sen  (0),
+        rec  (0) 
+    {}
 
     ~Client() {
 	delete sen;
@@ -787,11 +816,13 @@ public:
 
 class Server : public Thread {
     VSServer* s;
+
+    Server (const Server&);
+    Server& operator= (const Server&);
+
 public:
     
-    Server() {
-	s = new VSServer(async_addr);
-    }
+    Server() : s(new VSServer(async_addr)) {}
     
     void run() {
 	s->run();
@@ -808,13 +839,14 @@ public:
     }    
 };
 
+extern "C" { static void (* const _SIG_IGN)(int) = SIG_IGN; }
 
 START_TEST(check_vs_cliser)
 {
     Server s;
     Client c1, c2;
 
-    ::signal(SIGPIPE, SIG_IGN);
+    ::signal(SIGPIPE, _SIG_IGN);
 
     s.start();
     c1.start();

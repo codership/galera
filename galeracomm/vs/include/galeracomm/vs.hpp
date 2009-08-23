@@ -116,9 +116,16 @@ class VSView {
     std::set<Address> partitioned;
 
 public:
-    VSView() {}
+    VSView() :
+        trans(), vid(),
+        addr(), joined(), left(), partitioned()
+    {}
+
     VSView(const bool it, VSViewId v) :
-	trans(it), vid(v) {}
+	trans(it), vid(v),
+        addr(), joined(), left(), partitioned()
+    {}
+
     ~VSView() {}
 /*
   bool operator==(const VSView& a) const {
@@ -279,6 +286,7 @@ class VSMessage {
     size_t data_offset;
     const Serializable *user_state;
     ReadBuf *user_state_buf;
+    size_t hdrlen;
 public:
     enum Type {NONE, CONF, STATE, DATA};
     enum {
@@ -288,14 +296,35 @@ public:
 	F_AGREED     = 1 << 3  // Message may be delivered using agreed cons
     };
 
-    VSMessage() : version(1), 
-		  type(NONE), 
-		  user_type(0),
-		  flags(0), 
-		  view(0), 
-		  seq(0), 
-		  data_offset(0), 
-		  user_state(0), user_state_buf(0), hdrlen(0) {}
+    VSMessage() :
+        version(1), 
+        type(NONE), 
+        user_type(0),
+        flags(0),
+        view(0),
+        source(Address(0, 0, 0)),
+        source_view(),
+        destination(Address(0, 0, 0)),
+        seq(0),
+        cksum(0),
+        data_offset(0),
+        user_state(0),
+        user_state_buf(0),
+        hdrlen(0)
+    {}
+
+    VSMessage& operator= (const VSMessage& m)
+    {
+	if (view)           delete view;
+	if (user_state_buf) user_state_buf->release();
+
+        *this = m;
+
+	if (m.view)           view = new VSView(*m.view);
+	if (m.user_state_buf) user_state_buf = m.user_state_buf->copy();
+
+        return *this;
+    };
 
     // Ctor for conf message
     VSMessage(const ServiceId sid, const VSView *v) : 
@@ -304,15 +333,19 @@ public:
 	user_type(0),
 	flags(0),
 	view(0),
-	source(Address(0, sid, 0)), 
+	source(Address(0, sid, 0)),
+        source_view(),
 	destination(Address(0, 0, 0)),
-	seq(0), 
-	data_offset(0), user_state(0), user_state_buf(0) {
-	if (!v)
-	    throw DException("");
+	seq(0),
+        cksum(0),
+	data_offset(0),
+        user_state(0),
+        user_state_buf(0),
+        hdrlen (write_hdr(hdrbuf, sizeof(hdrbuf), 0))
+    {
+	if (!v) throw DException("");
+	if (hdrlen == 0) throw DException("");
 	view = new VSView(*v);
-	if ((hdrlen = write_hdr(hdrbuf, sizeof(hdrbuf), 0)) == 0)
-	    throw DException("");
     }
     
     // Ctor for state message
@@ -326,22 +359,25 @@ public:
 	source(s), 
 	source_view(sv),
 	destination(Address(0, 0, 0)),
-	seq(last_seq), 
+	seq(last_seq),
+        cksum(0),
 	data_offset(0),
 	user_state(us),
-	user_state_buf(0) {
+	user_state_buf(0),
+        hdrlen (write_hdr(hdrbuf, sizeof(hdrbuf), 0))
+    {
 	if (type != STATE)
 	    throw DException("");
 	if (!v)
 	    throw DException("");
 	if (source.get_service_id() != ServiceId(0))
 	    throw DException("");
-
-	flags |= user_state ? F_USER_STATE : 0;
+	if (hdrlen == 0)
+	    throw DException("");
 
 	view = new VSView(*v);
-	if ((hdrlen = write_hdr(hdrbuf, sizeof(hdrbuf), 0)) == 0)
-	    throw DException("");
+
+	flags |= user_state ? F_USER_STATE : 0;
     }
 
     // Ctor for broadcast data message
@@ -355,13 +391,16 @@ public:
 	source(s), 
 	source_view(sv),
 	destination(0, s.get_service_id(), 0),
-	seq(sq), 
+	seq(sq),
+        cksum(0),
 	data_offset(0),
 	user_state(0),
-	user_state_buf(0) {
+	user_state_buf(0),
+        hdrlen (write_hdr(hdrbuf, sizeof(hdrbuf), 0))
+    {
 	if (type != DATA)
 	    throw DException("");
-	if ((hdrlen = write_hdr(hdrbuf, sizeof(hdrbuf), 0)) == 0)
+	if (hdrlen == 0)
 	    throw DException("");
     }
     
@@ -376,19 +415,36 @@ public:
 	source(s), 
 	source_view(sv),
 	destination(d),
-	seq(sq), 
+	seq(sq),
+        cksum(0),
 	data_offset(0),
 	user_state(0),
-	user_state_buf(0) {
+	user_state_buf(0),
+        hdrlen (write_hdr(hdrbuf, sizeof(hdrbuf), 0))
+    {
 	if (type != DATA)
 	    throw DException("");
-	if ((hdrlen = write_hdr(hdrbuf, sizeof(hdrbuf), 0)) == 0)
+	if (hdrlen == 0)
 	    throw DException("");
     }
 
     // Copy constructor
-
-    VSMessage(const VSMessage& m) {
+    VSMessage(const VSMessage& m) :
+	version(m.version),
+	type(m.type), 
+	user_type(m.user_type),
+	flags(m.flags),
+	view(0),
+	source(m.source), 
+	source_view(m.source_view),
+	destination(m.destination),
+	seq(m.seq),
+        cksum(m.cksum),
+	data_offset(m.data_offset),
+	user_state(m.user_state),
+	user_state_buf(0),
+        hdrlen(m.hdrlen)
+    {
 	*this = m;
 	if (m.view)
 	    this->view = new VSView(*m.view);
@@ -449,7 +505,6 @@ public:
 	return hdrlen;
     }
 private:
-    size_t hdrlen;
     unsigned char hdrbuf[4 + 4 + 8 + 4 + 4];
     void do_cksum(const void *buf, const size_t buflen, uint32_t *ret) const {
 	const unsigned char *ptr = reinterpret_cast<const unsigned char *>(buf);
@@ -548,7 +603,9 @@ public:
 		return 0;
 	    }
 	    if (flags & F_USER_STATE) {
-		user_state_buf = new ReadBuf((char*)buf + off, buflen - off);
+		user_state_buf =
+                    new ReadBuf(reinterpret_cast<const char*>(buf) + off,
+                                buflen - off);
 	    }
 	    break;
 	case DATA:
@@ -616,6 +673,8 @@ class VSBackend;
 
 
 class VSMemb {
+    VSMemb (const VSMemb&);
+    void operator= (const VSMemb&);
 public:
     Address addr;
     uint32_t expected_seq;
@@ -646,8 +705,12 @@ struct VSUpMeta : ProtoUpMeta {
     VSUpMeta(const VSView *v, const VSUserStateMap *sm) : 
 	view(v), state_map(sm), msg(0) {}
     VSUpMeta(const VSMessage *m) : view(0), state_map(0), msg(m) {}
-};
 
+private:
+
+    VSUpMeta (const VSUpMeta&);
+    void operator= (const VSUpMeta&);
+};
 
 
 /*
@@ -672,7 +735,12 @@ class VS : public Protolay {
     char *be_addr;
     VSProtoMap proto;
     Monitor *mon;
+
+    VS (const VS&);
+    void operator= (const VS&);
+
 public:
+
     int handle_down(WriteBuf *, const ProtoDownMeta *);
     void handle_up(const int, const ReadBuf *, const size_t, const ProtoUpMeta *);
     Address get_self() const;

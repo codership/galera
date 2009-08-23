@@ -20,7 +20,7 @@ protected:
     enum State {CLOSED, CONNECTED} state;
     Flags flags;
 protected:
-    VSBackend() : state(CLOSED), flags(static_cast<Flags>(0)) {}
+    VSBackend() : addr(), state(CLOSED), flags(static_cast<Flags>(0)) {}
 public:
     
     virtual ~VSBackend() {

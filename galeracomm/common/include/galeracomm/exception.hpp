@@ -1,49 +1,32 @@
 #ifndef EXCEPTION_HPP
 #define EXCEPTION_HPP
 
-
-#include <exception>
+#include <string>
 #include <iostream>
-
-class Exception : public std::exception {
-    const char *msg;
-public:
-    Exception() throw() {}
-    Exception(const char *file, const char *function, const int line, 
-	      const char *umsg) throw() {
-	std::cerr << "Exception: ";
-	std::cerr << file << ':' << function << ':'; 
-	std::cerr << line << ':' << umsg << "\n";
-	msg = umsg;
-    }
-    Exception(const char *_msg) throw() : msg(_msg) {
-	
-    }
-    
-    const char *what() const throw() {
-	return msg;
-    }
-};
+#include <galerautils.hpp>
 
 /*!
  * Macro to throw exceptions with debug information
  */
-#define DException(_msg_) Exception(__FILE__, __FUNCTION__, __LINE__, _msg_)
+#define DException(_msg_)                                       \
+    gu::Exception(_msg_, 255, __FILE__, __FUNCTION__, __LINE__)
 
 /*!
  * Type of exception which is recoverable.
  */
-class RuntimeException : public Exception {
+class RuntimeException : public gu::Exception {
 public:
-    RuntimeException(const char *msg) : Exception(msg) {}
+    RuntimeException(const char *msg, int err = 0) :
+        gu::Exception(msg, err) {}
 };
 
 /*!
  * Type of exception which is unrecoverable.
  */
-class FatalException : public Exception {
+class FatalException : public gu::Exception {
 public:
-    FatalException(const char *msg) : Exception(msg) {}
+    FatalException(const char *msg, int err = 0) :
+        gu::Exception(msg, err) {}
 }; 
 
 #endif // EXCEPTION_HPP

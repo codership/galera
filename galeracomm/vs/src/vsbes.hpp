@@ -9,7 +9,12 @@
 class ClientHandler : public Toplay {
     VSBackend *vs;
     Transport *tp;
+
+    ClientHandler (const ClientHandler&);
+    ClientHandler& operator= (const ClientHandler&);
+
 public:
+
     enum State {CLOSED, HANDSHAKE, CONNECTED} state;
     enum {
 	TP, VS
@@ -36,6 +41,9 @@ class VSServer : public Toplay {
     Poll *fifo_poll;
     bool terminate;
     void cleanup();
+
+    VSServer (const VSServer&);
+    VSServer& operator= (const VSServer&);
 public:
     VSServer(const char *a);
     ~VSServer();

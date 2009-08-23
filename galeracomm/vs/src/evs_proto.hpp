@@ -10,6 +10,10 @@
 struct EVSProtoUpMeta : public ProtoUpMeta {
     const Address& source;
     EVSProtoUpMeta(const Address& source_) : source(source_) {}
+private:
+    EVSProtoUpMeta(const EVSProtoUpMeta& evs) :
+        ProtoUpMeta(), source(evs.source) {}
+    EVSProtoUpMeta& operator= (const EVSProtoUpMeta& evs);
 };
 
 struct EVSInstance {
@@ -50,23 +54,40 @@ struct EVSInstance {
         return ret;
     }
 
+    EVSInstance (const EVSInstance& i) :
+        operational  (i.operational),
+        trusted      (i.trusted),
+        installed    (i.installed),
+        join_message (i.join_message),
+        tstamp       (i.tstamp)
+    {}
+
+private:
+
+    EVSInstance& operator= (const EVSInstance&);
 };
 
 
 
 
 class EVSProto : public Bottomlay {
+    EVSProto (const EVSProto&);
+    EVSProto& operator= (const EVSProto&);
 public:
     Transport* tp;
     EVSProto(Transport* t, const EVSPid& my_addr_) : 
         tp(t),
-        my_addr(my_addr_), 
+        my_addr(my_addr_),
+        known(),
         inactive_timeout(Time(5, 0)),
         current_view(my_addr, 0),
+        input_map(),
         install_message(0),
         installing(false),
+        last_delivered_safe(),
         last_sent(SEQNO_MAX),
-        send_window(8), 
+        send_window(8),
+        output(),
         max_output_size(1024),
         self_loopback(false),
         state(CLOSED) {

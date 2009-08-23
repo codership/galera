@@ -14,20 +14,33 @@ public:
 	F_DROP_OWN_DATA = 0x1 
     } flags;
     
-    VSRCommand() : flags(static_cast<Flags>(0)) {
-	
-    }
+    VSRCommand() :
+        addr(),
+        type(),
+        result(SUCCESS),
+        flags(static_cast<Flags>(0))
+    {}
 
-    VSRCommand(const Type t) : type(t), result(SUCCESS), flags(static_cast<Flags>(0)) {
-	
-    }
+    VSRCommand(const Type t) :
+        addr(),
+        type(t),
+        result(SUCCESS),
+        flags(static_cast<Flags>(0))
+    {}
 
-    VSRCommand(const Type t, const Address a) : addr(a), type(t), result(SUCCESS), flags(static_cast<Flags>(0)) {
-    }
+    VSRCommand(const Type t, const Address a) :
+        addr(a),
+        type(t),
+        result(SUCCESS),
+        flags(static_cast<Flags>(0))
+    {}
 
-    VSRCommand(const Type t, const Result r) : type(t), result(r), flags(static_cast<Flags>(0)) {
-
-    }
+    VSRCommand(const Type t, const Result r) :
+        addr(),
+        type(t),
+        result(r),
+        flags(static_cast<Flags>(0))
+    {}
     
     Address get_address() const {
 	return addr;
@@ -91,19 +104,31 @@ class VSRMessage : public Serializable {
 public:
     enum Type {HANDSHAKE, CONTROL, VSPROTO} type;
     
-    VSRMessage() : type(VSPROTO) {
-	if ((raw_len = write(raw, sizeof(raw), 0)) == 0)
-	    throw DException("");
+    VSRMessage() :
+        base_addr(),
+        cmd(),
+        raw_len(write(raw, sizeof(raw), 0)),
+        type(VSPROTO)
+    {
+	if (raw_len == 0) throw DException("");
     }
 
-    VSRMessage(const Address a) : base_addr(a), type(HANDSHAKE) {
-	if ((raw_len = write(raw, sizeof(raw), 0)) == 0)
-	    throw DException("");
+    VSRMessage(const Address a) :
+        base_addr(a),
+        cmd(),
+        raw_len(write(raw, sizeof(raw), 0)),
+        type(HANDSHAKE)
+    {
+	if (raw_len == 0) throw DException("");
     }
     
-    VSRMessage(const VSRCommand& c) : cmd(c) , type(CONTROL) {
-	if ((raw_len = write(raw, sizeof(raw), 0)) == 0)
-	    throw DException("");
+    VSRMessage(const VSRCommand& c) :
+        base_addr(),
+        cmd(c),
+        raw_len(write(raw, sizeof(raw), 0)),
+        type(CONTROL)
+    {
+	if (raw_len == 0) throw DException("");
     } 
     
     Type get_type() const {
@@ -182,7 +207,12 @@ public:
 class VSRBackend : public VSBackend {
     Transport *tp;
     Poll *poll;
+
+    VSRBackend (const VSRBackend&);
+    VSRBackend& operator= (const VSRBackend&);
+
 public:
+
     enum State {CLOSED, CONNECTING, HANDSHAKE, CONNECTED, FAILED} state;
     State get_state() const {
 	return state;

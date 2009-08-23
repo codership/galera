@@ -15,10 +15,16 @@
 #include <iostream>
 
 class PollDef : public Poll {
+
     std::map<const int, PollContext *> ctx_map;
     size_t n_pfds;
     struct pollfd *pfds;
+
+    PollDef (const PollDef&);
+    void operator=(const PollDef&);
+
 public:
+
     PollDef();
     ~PollDef();
     void insert(const int, PollContext *);
@@ -155,10 +161,7 @@ int PollDef::poll(const int timeout)
     return p_ret;
 }
 
-PollDef::PollDef() : n_pfds(0), pfds(0)
-{
-    
-}
+PollDef::PollDef() : ctx_map(), n_pfds(0), pfds(0) {}
 
 PollDef::~PollDef()
 {
@@ -169,8 +172,13 @@ PollDef::~PollDef()
 
 
 class FifoPoll : public Poll {
+
     std::map<const int, std::pair<PollContext *, PollEnum> > ctx_map;
+
 public:
+
+    FifoPoll() : Poll(), ctx_map() {}
+
     void insert(const int fd, PollContext *ctx) {
 	if (ctx_map.insert(
 		std::pair<const int, std::pair<PollContext *, PollEnum> >(

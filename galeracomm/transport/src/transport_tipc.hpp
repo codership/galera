@@ -11,7 +11,12 @@ class TIPCTransport : public Transport, PollContext {
     size_t max_msg_size;
     unsigned char* recv_buf;
     Poll *poll;
+
+    TIPCTransport (const TIPCTransport&);
+    void operator= (const TIPCTransport&);
+
 public:
+
     TIPCTransport(Poll* p);
     ~TIPCTransport();
     

@@ -40,14 +40,14 @@ public:
     size_t read(const void* buf, const size_t buflen, const size_t offset) {
 	if (offset + 8 > buflen)
 	    return 0;
-	memcpy(uuid, (const uint8_t*)buf + offset, 8);
+	memcpy(uuid, reinterpret_cast<const uint8_t*>(buf) + offset, 8);
 	return offset + 8;
     }
 
     size_t write(void* buf, const size_t buflen, const size_t offset) const {
 	if (offset + 8 > buflen)
 	    return 0;
-	memcpy((uint8_t*)buf + offset, uuid, 8);
+	memcpy(reinterpret_cast<uint8_t*>(buf) + offset, uuid, 8);
 	return offset + 8;
     }
 
@@ -92,9 +92,11 @@ struct EVSRange {
 struct EVSGap {
     EVSPid source;
     EVSRange range;
-    EVSGap() {}
+    EVSGap() : source(), range() {}
     EVSGap(const EVSPid& source_, const EVSRange& range_) :
-	source(source_), range(range_) {}
+	source (source_),
+        range  (range_)
+    {}
 
     EVSPid get_source() const {
 	return source;
@@ -201,7 +203,7 @@ public:
 	EVSViewId view_id;
 	EVSRange range;
     public:
-	Instance() {}
+	Instance() : pid(), operational(), trusted(), view_id(), range() {}
 	Instance(const EVSPid pid_, const bool oper_, const bool trusted_, 
 		 const EVSViewId& view_id_,
 		 const EVSRange range_) :
@@ -277,13 +279,37 @@ public:
     };
 private:
     std::map<EVSPid, Instance>* instances;
+    EVSMessage& operator= (const EVSMessage&);
 public:    
     
     
-    EVSMessage() : seq(SEQNO_MAX), instances(0) {}
+    EVSMessage() :
+	version(0), 
+	type(),
+	safety_prefix(), 
+        seq(SEQNO_MAX),
+	seq_range(),
+	aru_seq(),
+	flags(),
+        source_view(), 
+	source(),
+        gap(),
+        instances(0)
+    {}
 
-    EVSMessage(const EVSMessage& m) {
-	*this = m;
+    EVSMessage(const EVSMessage& m) :
+	version(m.version), 
+	type(m.type),
+	safety_prefix(m.safety_prefix), 
+        seq(m.seq),
+	seq_range(m.seq_range),
+	aru_seq(m.aru_seq),
+	flags(m.flags),
+        source_view(m.source_view), 
+	source(m.source),
+        gap(m.gap),
+        instances(0)
+    {
 	if (m.instances) {
 	    instances = new std::map<EVSPid, Instance>();
 	    *instances = *m.instances;
@@ -307,6 +333,7 @@ public:
 	flags(flags_),
         source_view(vid_), 
 	source(source_),
+        gap(),
 	instances(0) {
 	if (type != USER)
 	    throw FatalException("Invalid type");
@@ -316,7 +343,14 @@ public:
     EVSMessage(const Type type_, const EVSPid& source_) :
 	version(0), 
 	type(type_), 
-	source(source_), 
+	safety_prefix(), 
+        seq(SEQNO_MAX),
+	seq_range(),
+	aru_seq(),
+	flags(),
+        source_view(), 
+	source(source_),
+        gap(),
 	instances(0) {
 	if (type != DELEGATE)
 	    throw FatalException("Invalid type");
@@ -325,13 +359,15 @@ public:
     // Gap message
     EVSMessage(const Type type_, const EVSPid& source_, 
 	       const EVSViewId& source_view_, 
-	       const uint32_t seq_, const uint32_t aru_seq_, const EVSGap& gap_) :
+	       const uint32_t seq_,
+               const uint32_t aru_seq_, const EVSGap& gap_) :
         version(0), 
         type(type_), 
         safety_prefix(DROP),
         seq(seq_),
         seq_range(0),
         aru_seq(aru_seq_),
+	flags(),
         source_view(source_view_),
         source(source_),
         gap(gap_),
@@ -351,8 +387,10 @@ public:
 	seq(safe_seq_),
         seq_range(0),
 	aru_seq(aru_seq_),
+        flags(),
 	source_view(vid_),
 	source(source_),
+        gap(),
         instances(0) {
 	
 	if (type != JOIN && type != INSTALL && type != LEAVE)

@@ -26,21 +26,29 @@ class Fifo {
     static std::map<int, Fifo *> fifo_map;
     static int alloc_fd(Fifo *);
     static void release_fd(const int);
-public:
-    Fifo() : mque_max_size(std::numeric_limits<size_t>::max()) {
-	read_fd = alloc_fd(this);
-	write_fd = alloc_fd(this);
 
-    }
-    Fifo(const size_t ms) : mque_max_size(ms) {
-	read_fd = alloc_fd(this);
-	write_fd = alloc_fd(this);
-    }
+public:
+
+    Fifo() :
+        mque_max_size(std::numeric_limits<size_t>::max()),
+        read_fd (alloc_fd(this)),
+        write_fd (alloc_fd(this)),
+        dq()
+    {}
+
+    Fifo(const size_t ms) :
+        mque_max_size(ms),
+        read_fd (alloc_fd(this)),
+        write_fd (alloc_fd(this)),
+        dq()
+    {}
+
     ~Fifo() {
 	release_fd(read_fd);
 	release_fd(write_fd);
 	for_each(begin(), end(), release);
     }
+
     int get_read_fd() const {return read_fd;}
     int get_write_fd() const {return write_fd;}
     

@@ -11,21 +11,19 @@ struct Sockaddr {
     sockaddr sa;
     size_t sa_len;
 
-    Sockaddr(const sockaddr* s, const size_t s_len) {
-	sa_len = s_len;
+    Sockaddr(const sockaddr* s, const size_t s_len) : sa(), sa_len(s_len)
+    {
 	memcpy(&sa, s, s_len);
     }
-    Sockaddr(const unsigned char b) {
-	sa_len = sizeof(sockaddr);
+
+    Sockaddr(const unsigned char b) : sa(), sa_len(sizeof(sockaddr))
+    {
 	memset(&sa, b, sa_len);
     }
-    Sockaddr(const Sockaddr& s) {
-	sa = s.sa;
-	sa_len = s.sa_len;
-    }
-    Sockaddr() {
-	sa_len = 0;
-    }
+
+    Sockaddr(const Sockaddr& s) : sa(s.sa), sa_len(s.sa_len) {}
+
+    Sockaddr() : sa(), sa_len(0) {}
 
     bool operator<(const Sockaddr& cmp) const {
 	return memcmp(&sa, &cmp.sa, std::min(sa_len, cmp.sa_len)) < 0;

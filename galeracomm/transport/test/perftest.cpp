@@ -15,7 +15,7 @@
 class Timeval {
 public:
     uint64_t tstamp;
-    Timeval() {
+    Timeval() : tstamp(0) {
 	timeval tv;
 	::gettimeofday(&tv, 0);
 	tstamp = tv.tv_sec;
@@ -23,40 +23,43 @@ public:
 	tstamp += tv.tv_usec;
     }
     Timeval(const uint64_t t) : tstamp(t) {}
-    Timeval(const timeval& tv) {
-	tstamp = tv.tv_sec;
-	tstamp *= 1000000;
-	tstamp += tv.tv_usec;
-    }
-    Timeval(const void *buf, const size_t buflen) {
-	if (read_uint64(buf, buflen, 0, &tstamp) == 0)
-	    throw DException("");
+    Timeval(const timeval& tv) : tstamp (tv.tv_sec * 1000000 + tv.tv_usec) {}
+    Timeval(const void *buf, const size_t buflen) : tstamp(0)
+    {
+	if (read_uint64(buf, buflen, 0, &tstamp) == 0) throw DException("");
     }
 };
 
 class Message {
-    Timeval tstamp;
-    unsigned char *raw;
-    size_t size;
-    unsigned char hdr[8];
     size_t hdr_len;
+    unsigned char hdr[8];
+    Timeval tstamp;
+    size_t size;
+    unsigned char *raw;
+
+    Message (const Message&);
+    void operator= (const Message&);
+
 public:
     
-    Message(const size_t s) : size(s), hdr_len(8) {
+    Message(const size_t s) :
+        hdr_len(sizeof(hdr)), tstamp(), size(s), raw(new unsigned char[size])
+    {
 	if (write_uint64(tstamp.tstamp, hdr, hdr_len, 0) == 0)
 	    throw FatalException("");
-	raw = new unsigned char[size];	
+		
 	::memset(raw, 0xab, size); 
     }
 
-    Message(const ReadBuf *rb, const size_t off) : hdr_len(8) {
-	if (rb->get_len(off) < hdr_len)
-	    throw FatalException("Short message");
-	tstamp = Timeval(rb->get_buf(off), hdr_len);
-	size = rb->get_len(off + hdr_len);
-	raw = new unsigned char[size];
+    Message(const ReadBuf *rb, const size_t off) :
+        hdr_len (sizeof(hdr)),
+        tstamp  (rb->get_buf(off), rb->get_len(off)),
+	size    (rb->get_len(off + hdr_len)),
+	raw     (new unsigned char[size])
+    {
+	if (rb->get_len(off) < hdr_len) throw FatalException("Short message");
+
 	::memcpy(raw, rb->get_buf(off + hdr_len), rb->get_len(off + hdr_len));
-	
     }
 
     ~Message() {
@@ -100,14 +103,19 @@ class Client : public Toplay {
     uint64_t max_period;
     uint64_t min_period;
     bool terminated;
+
+    Client (const Client&);
+    void operator= (const Client&);
+
 public:
     Client(Poll *p) : tp(0), poll(p), 
 		      sent(0), recvd(0),
 		      first_sent(0),
 		      last_recvd(1),
 		      bytes(0),
+                      periods(),
 		      max_period(0),
-		      min_period((uint64_t)-1), 
+		      min_period(static_cast<uint64_t>(-1)), 
 		      terminated(false) {}
     ~Client() {
 
@@ -203,6 +211,8 @@ public:
 class ClientHandler : public Toplay {
     Transport *tp;
     unsigned long long handled;
+    ClientHandler (const ClientHandler&);
+    void operator= (const ClientHandler&);
 public:
     bool terminated;
     ClientHandler() : tp(0), handled(0), terminated(false) {}
@@ -235,8 +245,10 @@ class Server : public Toplay {
     Transport *tp;
     Poll *poll;
     std::list<ClientHandler *> clients;
+    Server (const Server&);
+    void operator= (const Server&);
 public:
-    Server(Poll *p) : tp(0), poll(p) {}
+    Server(Poll *p) : tp(0), poll(p), clients() {}
     ~Server() {
 	cleanup();
 	delete tp;
@@ -276,6 +288,8 @@ void sigint(int signo)
     terminated = true;
 }
 
+extern "C" { void (*_SIG_IGN)(int) = SIG_IGN; } // avoid old-cast warnings
+
 int main(int argc, char *argv[])
 {
     bool is_realtime = false;
@@ -286,7 +300,7 @@ int main(int argc, char *argv[])
 	return EXIT_FAILURE;
     }
     
-    ::signal(SIGPIPE, SIG_IGN);
+    ::signal(SIGPIPE,_SIG_IGN);
     ::signal(SIGINT, &sigint);
     if (::getenv("PERF_REALTIME")) {
 	sched_param sp;
@@ -363,7 +377,7 @@ int main(int argc, char *argv[])
 	    return EXIT_FAILURE;
 	}
     }
-    catch (Exception e) {
+    catch (gu::Exception e) {
 	std::cerr << e.what() << "\n";
 	return EXIT_FAILURE;
     }

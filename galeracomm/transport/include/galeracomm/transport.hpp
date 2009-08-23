@@ -39,6 +39,14 @@ struct TransportNotification : public ProtoUpMeta {
     size_t sa_size;
     sockaddr local_sa;
     sockaddr source_sa;
+
+    TransportNotification() :
+        type(0), state(), ntype(), sa_size(), local_sa(), source_sa()
+    {}
+
+private:
+    TransportNotification (const TransportNotification&);
+    void operator= (const TransportNotification&);
 };
 
 
