@@ -47,7 +47,7 @@ START_TEST(test_pc_messages)
     PCUserMessage pcu(7);
     
     expt_size = 4 + 4;
-    check_serialization(pcu, expt_size, PCUserMessage(-1));
+    check_serialization(pcu, expt_size, PCUserMessage(-1U));
 
 }
 END_TEST

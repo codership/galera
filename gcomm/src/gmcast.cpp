@@ -71,7 +71,7 @@ public:
             return 0;
         if (off + ADDR_SIZE > buflen)
             return 0;
-        memcpy(address, (char*)buf + off, ADDR_SIZE);
+        memcpy(address, buf + off, ADDR_SIZE);
         size_t i;
         for (i = 0; i < ADDR_SIZE; ++i) {
             if (address[i] == '\0')
@@ -94,7 +94,7 @@ public:
             return 0;
         if (off + ADDR_SIZE > buflen)
             return 0;
-        memcpy((char*)buf + off, address, ADDR_SIZE);
+        memcpy(buf + off, address, ADDR_SIZE);
         off += ADDR_SIZE;
         return off;
     }

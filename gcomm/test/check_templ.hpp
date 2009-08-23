@@ -100,7 +100,7 @@ public:
     
     size_t get_max_msg_size() const 
     {
-        return 1 << 31;
+        return (1U << 31);
     }
 
     void connect() 

@@ -54,7 +54,7 @@ public:
     {
         if (buflen < offset + sizeof(gu_uuid_t))
             return 0;
-        memcpy(&uuid, (const char*)buf + offset, sizeof(gu_uuid_t));
+        memcpy(&uuid, buf + offset, sizeof(gu_uuid_t));
         return offset + sizeof(gu_uuid_t);
     }
     
@@ -62,7 +62,7 @@ public:
     {
         if (buflen < offset + sizeof(gu_uuid_t))
             return 0;
-        memcpy((char*)buf + offset, &uuid, sizeof(gu_uuid_t));
+        memcpy(buf + offset, &uuid, sizeof(gu_uuid_t));
         return offset + sizeof(gu_uuid_t);
     }
     
@@ -79,19 +79,18 @@ public:
     string to_string() const {
         char buf[37];
         memset(buf, 0, sizeof(buf));
-        if (memcmp((const byte_t*)&uuid, 
-                   buf, sizeof(int32_t)) != 0 &&
-            memcmp((const byte_t*)&uuid + sizeof(int32_t), 
-                   buf, sizeof(uuid) - sizeof(int32_t)) == 0)
+
+        const int32_t* val = reinterpret_cast<const int32_t*>(&uuid);
+        if (*val != 0 &&
+            memcmp(val + 1, buf, sizeof(uuid) - sizeof(int32_t)) == 0)
         {
-            const int32_t* val = reinterpret_cast<const int32_t*>(&uuid);
             return make_int(*val).to_string();
         }
         else
         {
 #define GU_CPP_UUID_FORMAT "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
-            if (snprintf(buf, sizeof(buf), GU_CPP_UUID_FORMAT, GU_UUID_ARGS(&uuid))
-                != 36)
+            if (36 != snprintf(buf, sizeof(buf), GU_CPP_UUID_FORMAT,
+                               GU_UUID_ARGS(&uuid)))
             {
                 throw FatalException("");
             }

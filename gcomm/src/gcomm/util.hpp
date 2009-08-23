@@ -23,13 +23,16 @@ static inline size_t read_string(const void* from, const size_t fromlen,
     }
     /* Scan for termination character */
     size_t i;
-    for (i = from_offset; i < fromlen && *((char*)from + i) != '\0'; 
-         ++i) { } 
+    const char* from_str = reinterpret_cast<const char*>(from);
+
+    for (i = from_offset; i < fromlen && *(from_str + i) != '\0'; ++i) {}
+ 
     /* Buffer didn't contain '\0' */
     if (i == fromlen)
         return 0;
+
     /* Safe to strdup now */
-    *to = strdup((char*) from + from_offset);
+    *to = strdup(from_str + from_offset);
     return i + 1;
 }
 
@@ -39,7 +42,7 @@ static inline size_t read_bytes(const byte_t* from, const size_t fromlen,
 {
     if (fromlen < from_offset + tolen)
         return 0;
-    memcpy(to, (const uint8_t *)from + from_offset, tolen);
+    memcpy(to, from + from_offset, tolen);
     return from_offset + tolen;
 }
 
@@ -50,7 +53,7 @@ static inline size_t write_string(const char* from, byte_t* to,
     if (tolen < strl + 1 + to_offset)
         return 0;
     /* Copy string including '\0' */
-    memcpy((uint8_t*)to + to_offset, from, strl + 1);
+    memcpy(to + to_offset, from, strl + 1);
     return to_offset + strl + 1;
 }
 
@@ -61,7 +64,7 @@ static inline size_t write_bytes(const byte_t* from,
 {
     if (tolen < fromlen + to_offset)
         return 0;
-    memcpy((uint8_t*)to + to_offset, from, fromlen);
+    memcpy(to + to_offset, from, fromlen);
     return to_offset + fromlen;
 }
 

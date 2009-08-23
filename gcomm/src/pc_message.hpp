@@ -19,14 +19,13 @@ class PCInst
     {
         F_PRIM = 0x1
     };
-    bool prim;
-    uint32_t last_seq;
-    ViewId last_prim;
+    bool    prim;
+    int32_t last_seq;
+    ViewId  last_prim;
     int64_t to_seq;
+
 public:
 
-
-    
     PCInst() :
         prim(false),
         last_seq(-1),
@@ -121,7 +120,9 @@ public:
 
     static size_t size()
     {
-        return 4 + 4 + ViewId::size() + 8;
+        PCInst* pcinst = reinterpret_cast<PCInst*>(0);
+        return (sizeof(pcinst->prim) + sizeof(pcinst->last_seq) + 
+                ViewId::size() + sizeof(pcinst->to_seq));
     }
 
 
@@ -236,6 +237,7 @@ public:
     
     size_t size() const
     {
+        // what are these numbers?
         return 4 + 4 + (inst != 0 ? inst->size() : 0);
     }
     

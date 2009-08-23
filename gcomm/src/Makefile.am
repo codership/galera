@@ -1,8 +1,5 @@
 
-
 lib_LTLIBRARIES = libgcomm.la
-
-
 
 libgcomm_la_SOURCES = 		\
 	test.cpp		\
@@ -27,6 +24,3 @@ libgcomm_la_SOURCES = 		\
 	pc_proto.cpp		\
 	pc.cpp
 
-
-
-libgcomm_la_LDFLAGS = -lgalerautils -lgalerautils++

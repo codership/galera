@@ -258,7 +258,7 @@ Transport *TCP::accept()
 //
 
 ssize_t TCP::send_nointr(const void *buf, const size_t buflen, 
-				  const size_t offset, int flags)
+                         const size_t offset, int flags)
 {
     ssize_t ret;
     ssize_t sent = 0;
@@ -269,8 +269,10 @@ ssize_t TCP::send_nointr(const void *buf, const size_t buflen,
 	return 0;
     do {
 	do {
-	    ret = ::send(fd, (unsigned char *)buf + offset + sent, 
-			 buflen - offset - sent, flags);
+	    ret = ::send(fd,
+                         reinterpret_cast<const char*>(buf) + offset + sent, 
+			 buflen - offset - sent,
+                         flags);
 	} while (ret == -1 && errno == EINTR);
 	if (ret == -1 && errno == EAGAIN) {
 	    return sent;

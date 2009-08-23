@@ -2113,7 +2113,7 @@ public:
             }
             else if (um->get_view()->get_type() == View::V_REG)
             {
-                EVSProto* p = ((EVS*)evs)->get_proto();
+                EVSProto* p = static_cast<EVS*>(evs)->get_proto();
                 fail_unless(p->get_state() == EVSProto::OPERATIONAL);
             }
             LOG_INFO("received in prev view: " 

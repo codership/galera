@@ -15,5 +15,5 @@ check_gcomm_SOURCES = 		\
 	check_evs.cpp		\
 	check_pc.cpp		\
 	check_gcomm.cpp
-check_gcomm_LDADD = $(top_builddir)/src/libgcomm.la
-check_gcomm_LDFLAGS = -lgalerautils++ -lcheck -static
+check_gcomm_LDADD = $(top_builddir)/src/libgcomm.la -lgalerautils++ -lcheck
+check_gcomm_LDFLAGS = @AM_LDFLAGS@ -static

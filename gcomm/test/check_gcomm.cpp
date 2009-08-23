@@ -56,6 +56,14 @@ int main(int argc, char* argv[])
     SRunner* sr = srunner_create(0);
     vector<string>* suits = 0;
 
+    if (argc > 1 && !strcmp(argv[1],"nofork")) {
+        srunner_set_fork_status(sr, CK_NOFORK);
+    }
+    else { // running in the background, loggin' to file
+        FILE* log_file = fopen ("check_gcomm.log", "w");
+        if (!log_file) return EXIT_FAILURE;
+        gu_conf_set_log_file (log_file);
+    }
     
     if (::getenv("CHECK_GCOMM_DEBUG"))
     {

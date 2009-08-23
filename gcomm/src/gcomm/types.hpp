@@ -26,7 +26,7 @@ inline size_t read(const byte_t* buf, const size_t buflen,
         return 0;
     }
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-    *ret = *reinterpret_cast<T*>((char*) buf + offset);
+    *ret = *reinterpret_cast<const T*>(buf + offset);
 #elif __BYTE_ORDER == __BIG_ENDIAN
 #error "Big endian not supported yet"
 #else
@@ -44,7 +44,7 @@ inline size_t write(const T val, byte_t* buf, const size_t buflen,
         return 0;
     }
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-    *reinterpret_cast<T*>((char*) buf + offset) = val;
+    *reinterpret_cast<T*>(buf + offset) = val;
 #elif __BYTE_ORDER == __BIG_ENDIAN
 #error "Big endian not supported yet"
 #else

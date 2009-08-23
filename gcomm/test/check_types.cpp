@@ -230,10 +230,10 @@ END_TEST
 
 class T1
 {
-    uint32_t foo;
+    int32_t foo;
 public:
     
-    T1(const uint32_t foo_ = -1) : foo(foo_) {}
+    T1(const int32_t foo_ = -1) : foo(foo_) {}
     
     size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
     {
