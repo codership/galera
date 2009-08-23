@@ -18,7 +18,7 @@ gu_timeval_diff (struct timeval* left, struct timeval* right)
 {
     register long long diff = left->tv_sec;
     diff = ((diff - right->tv_sec) * 1000000) + left->tv_usec - right->tv_usec;
-    return (((double)diff) * 1.0e-06L);
+    return (((double)diff) * 1.0e-06);
 }
 
 static inline void
