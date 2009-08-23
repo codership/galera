@@ -15,6 +15,7 @@
 #include "gu_mutex.hpp"
 #include "gu_cond.hpp"
 #include "gu_lock.hpp"
+#include "gu_macros.hpp"
 
 extern "C" {
 #include "gu_macros.h"

@@ -1,3 +1,5 @@
+// Copyright (C) 2009 Codership Oy <info@codership.com>
+
 #include "gu_logger.hpp"
 #include "gu_network.hpp"
 #include "gu_lock.hpp"
@@ -139,11 +141,13 @@ void* listener_thd(void* arg)
         }
         else
         {
-            log_error <<  "socket " << sock->get_fd() << " event mask: " << ev.get_event_mask();
+            log_error <<  "socket " << sock->get_fd()
+                      << " event mask: " << ev.get_event_mask();
             return reinterpret_cast<void*>(1);
         }
     }
-    log_info << "received " << bytes/(1 << 20) << "MB + " << bytes%(1 << 20) << "B";
+    log_info << "received " << bytes/(1 << 20) << "MB + "
+             << bytes%(1 << 20) << "B";
     return 0;
 }
 
@@ -195,7 +199,7 @@ START_TEST(test_network_send)
     byte_t* buf = new byte_t[bufsize];
     for (size_t i = 0; i < bufsize; ++i)
     {
-        buf[i] = i & 255;
+        buf[i] = static_cast<byte_t>(i);
     }
 
     Network* net = new Network;
