@@ -23,6 +23,7 @@ if test "$enable_debug" != "no"
 then
     CFLAGS=${CFLAGS:-"-O1"} # to detect uninitialized variables
     AM_CFLAGS="-g -fno-inline"
+    AM_CPPFLAGS="-D_FORTIFY_SOURCE=1"
 else
     CFLAGS=${CFLAGS:-"-O3"}
     AM_CFLAGS="-g"
@@ -75,7 +76,8 @@ AC_CONFIG_FILES([Makefile
                  src/Makefile])
 		 
 AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -pedantic -Wno-unused-parameter"
-AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -fno-rtti -Wno-long-long"
+AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -Wold-style-cast -Wconversion"
+AM_CXXFLAGS="$AM_CXXFLAGS -fno-rtti -Wno-long-long"
 AM_CFLAGS="$AM_CFLAGS -std=c99"
 AM_LDFLAGS="-Wl,--warn-common -Wl,--fatal-warnings"
 

@@ -9,6 +9,9 @@
 #include <galerautils.hpp>
 #include "MMap.hpp"
 
+// to avoid -Wold-style-cast
+extern "C" { static const void* const GCACHE_MAP_FAILED = MAP_FAILED; }
+
 namespace gcache
 {
     MMap::MMap (const FileDescriptor& fd)
@@ -17,7 +20,7 @@ namespace gcache
           size  (fd.get_size()),
 	  mapped (true)
     {
-        if (ptr == MAP_FAILED) {
+        if (ptr == GU_MAP_FAILED) {
             int err = errno;
             std::string msg ("mmap() on '" + fd.get_name() + "' failed: " +
                              strerror(err));

@@ -32,12 +32,12 @@ namespace gcache
         std::ostringstream error;
         error << "Can't load gcache data file: ";
 
-        if (version != (char)header[HEADER_VERSION]) {
+        if (version != static_cast<char>(header[HEADER_VERSION])) {
             error << "unsupported version: " << header[HEADER_VERSION];
             throw gu::Exception (error.str().c_str(), ECANCELED);
         }
 
-        if ((ssize_t)mmap.size != header[FILE_SIZE]) {
+        if (mmap.size != static_cast<size_t>(header[FILE_SIZE])) {
             error << "file size does not match, declared: " << header[FILE_SIZE]
                   << ", real: " << mmap.size;
             throw gu::Exception (error.str().c_str(), ECANCELED);

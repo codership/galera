@@ -29,7 +29,7 @@ namespace gcache
         ssize_t const size_next = size + sizeof(BufferHeader);
 
         // don't even try if there's not enough unused space
-        if (size_next > ((ssize_t)size_cache - size_used)) return 0;
+        if (size_next > (size_cache - size_used)) return 0;
 
         uint8_t* ret = next;
 
@@ -116,7 +116,7 @@ namespace gcache
 
         // We can reliably allocate continuous buffer which is twice as small
         // as total cache area. So compare to half the space
-        if (size < ((size_t)size_cache >> 1)) {
+        if (static_cast<ssize_t>(size) < (size_cache / 2)) {
 
             gu::Lock lock(mtx);
             void*    ptr;
@@ -155,7 +155,7 @@ namespace gcache
 
         // We can reliably allocate continuous buffer which is twice as small
         // as total cache area. So compare to half the space
-        if (size >= ((size_t)size_cache >> 1)) return 0;
+        if (static_cast<ssize_t>(size) >= (size_cache / 2)) return 0;
 
         BufferHeader* bh = BH(ptr) - 1;
 
