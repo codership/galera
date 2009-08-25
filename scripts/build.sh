@@ -37,7 +37,7 @@ usage()
     "    -d|--debug      configure build with debug enabled (implies -c)\n" \
     "    -p|--package    build binary pacakges at the end.\n" \
     "    --with-spread   configure build with spread backend (implies -c to gcs)\n" \
-    "\nSet GCOMM_DISABLED/VSBES_DISABLED to 'yes' to disable respective modules"
+    "\nSet DISABLE_GCOMM/DISABLE_VSBES to 'yes' to disable respective modules"
 }
 
 while test $# -gt 0 
@@ -95,8 +95,8 @@ if [ "$OPT"   == "yes" ]; then CONFIGURE="yes"; conf_flags="$conf_flags --disabl
 if [ "$DEBUG" == "yes" ]; then CONFIGURE="yes"; fi
 if [ -n "$WITH_SPREAD" ]; then CONFIGURE="yes"; fi
 
-# Disable gcpmm until fixed
-GCOMM_DISABLED=${GCOMM_DISABLED:-"yes"}
+# Disable gcomm until fixed
+DISABLE_GCOMM=${DISABLE_GCOMM:-"yes"}
 
 # Be quite verbose
 set -x
@@ -155,8 +155,8 @@ build_packages()
 	ARCH_RPM=x86_64
     fi
 
-    if [ "$GCOMM_DISABLED" != "yes" ]; then export GCOMM=yes; fi
-    if [ "$VSBES_DISABLED" != "yes" ]; then export VSBES=yes; fi
+    if [ "$DISABLE_GCOMM" != "yes" ]; then export GCOMM=yes; fi
+    if [ "$DISABLE_VSBES" != "yes" ]; then export VSBES=yes; fi
     
     export BUILD_BASE=$build_base
     echo GCOMM=$GCOMM VSBES=$VSBES ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
@@ -203,14 +203,14 @@ echo "CPPFLAGS: $CPPFLAGS"
 build_module "galerautils"
 build_module "gcache"
 
-if test "$GCOMM_DISABLED" != "yes"
+if test "$DISABLE_GCOMM" != "yes"
 then 
     build_module "gcomm"
 else
     gcs_conf_flags="$gcs_conf_flags --disable-gcomm"
 fi
 
-if test "$VSBES_DISABLED" != "yes"
+if test "$DISABLE_VSBES" != "yes"
 then 
     if test $initial_stage = "galeracomm" || $building = "true"
     then
