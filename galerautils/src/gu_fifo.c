@@ -75,7 +75,7 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
 	while (array_len * row_len < length) {
             if (array_size < row_size) {
                 array_pwr++;
-                array_len = 1<< array_pwr;
+                array_len = 1 << array_pwr;
                 array_size = array_len * sizeof(void*);
             }
             else {
@@ -99,9 +99,9 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
 
         alloc_size = sizeof (gu_fifo_t) + array_size;
 
-        gu_debug ("Creating FIFO buffer of %lu elements, memory min used: "
-                  "%zu, max used: %zu",
-                  array_len * row_len, alloc_size,
+        gu_debug ("Creating FIFO buffer of %zu elements of size %zu, "
+                  "memory min used: %zu, max used: %zu",
+                  array_len * row_len, item_size, alloc_size,
                   alloc_size + array_len*row_size);
 
         ret = gu_malloc (alloc_size);
