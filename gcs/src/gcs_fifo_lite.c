@@ -12,7 +12,6 @@
  * protection, and thus are simplified for speed.
  */
 
-//#include <unistd.h>
 #include <galerautils.h>
 
 #include "gcs_fifo_lite.h"
@@ -24,7 +23,7 @@
 gcs_fifo_lite_t* gcs_fifo_lite_create (size_t length, size_t item_size)
 {
     gcs_fifo_lite_t* ret = NULL;
-    size_t l = 1;
+    uint64_t l = 1;
 
     /* check limits */
     if (length < 1 || item_size < 1)
@@ -32,15 +31,21 @@ gcs_fifo_lite_t* gcs_fifo_lite_create (size_t length, size_t item_size)
 
     /* Find real length. It must be power of 2*/
     while (l < length) l = l << 1;
-    if (l             > (ulong) GU_LONG_MAX) return NULL;
-    if (l * item_size > (ulong) GU_ULONG_MAX) return NULL;
+
+    if (l * item_size > (uint64_t)GU_LONG_MAX) {
+        gu_error ("Resulting FIFO size %lld exceeds signed limit: %lld",
+                  (long long)(l*item_size), (long long)GU_LONG_MAX);
+        return NULL;
+    }
 
     ret = GU_CALLOC (1, gcs_fifo_lite_t);
+
     if (ret) {
         ret->item_size = item_size;
         ret->length    = l;
 	ret->mask      = ret->length - 1;
 	ret->queue     = gu_malloc (ret->length * item_size);
+
 	if (ret->queue) {
 	    gu_mutex_init (&ret->lock,     NULL);
 	    gu_cond_init  (&ret->put_cond, NULL);

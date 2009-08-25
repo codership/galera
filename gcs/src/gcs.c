@@ -98,7 +98,7 @@ typedef struct gcs_act
     gcs_seqno_t    act_id;
     gcs_seqno_t    local_act_id;
     const void*    action;
-    size_t         act_size;
+    ssize_t        act_size;
     gcs_act_type_t act_type;
     gu_mutex_t     wait_mutex;
     gu_cond_t      wait_cond;
@@ -515,7 +515,7 @@ static void *gcs_recv_thread (void *arg)
                 gcs_fifo_lite_pop_head (conn->repl_q);
 
                 assert (act->action   == action);
-                assert (act->act_size == (size_t)act_size);
+                assert (act->act_size == act_size);
 
                 act->act_id       = act_id;
                 act->local_act_id = this_act_id;

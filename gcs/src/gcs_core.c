@@ -203,7 +203,7 @@ core_msg_send (gcs_core_t*    core,
 
             ret = core->backend.send (&core->backend, msg, msg_len, msg_type);
 
-            if (ret > 0 && (size_t)ret != msg_len) {
+            if (ret > 0 && ret != (ssize_t)msg_len) {
                 // could not send message in one piece
                 gu_error ("Failed to send complete message of %s type: "
                           "sent %zd out of %zu bytes.",

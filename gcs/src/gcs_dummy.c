@@ -77,9 +77,9 @@ typedef struct gcs_backend_conn
     gu_fifo_t*       gc_q;   /* "serializator" */
     volatile dummy_state_t    state;
     gcs_seqno_t      msg_id;
-    const size_t           max_pkt_size;
-    const size_t           hdr_size;
-    const size_t           max_send_size;
+    const size_t     max_pkt_size;
+    const size_t     hdr_size;
+    const size_t     max_send_size;
     long             my_idx;
     long             memb_num;
     gcs_comp_memb_t* memb;
