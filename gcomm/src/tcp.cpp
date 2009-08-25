@@ -37,8 +37,8 @@ static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
         AF_UNSPEC,
         SOCK_STREAM,
         0,
-        *s_size,
-        s,
+        0,
+        0,
         0,
         0
     };

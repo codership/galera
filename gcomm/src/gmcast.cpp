@@ -318,10 +318,11 @@ public:
                 node_list->push_back(node);
             }
         }
-        LOG_DEBUG(make_int(type).to_string() + "," 
-                  + make_int(flags).to_string() + "," 
-                  + make_int(ttl).to_string() + ","
-                  + (F_GROUP_NAME ? group_name : ""));
+
+        log_debug << "type: " << type << ", flags: " << flags
+                  << ", ttl: " << ttl << ", group_name: "
+                  << (F_GROUP_NAME ? group_name : "");
+
         return off;
     }
     
@@ -707,7 +708,7 @@ public:
     {
 
 
-        LOG_DEBUG(string("message type: ") + make_int(msg.get_type()).to_string());
+        log_debug << "message type: " << msg.get_type();
 
         switch (msg.get_type()) {
         case GMCastMessage::P_HANDSHAKE:
