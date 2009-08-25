@@ -42,12 +42,20 @@ static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
         0,
         0
     };
+
     addrinfo* addri = 0;
     
     int err;
+    log_debug << "Calling getaddrinfo(" << host << ", " << port << ", "
+              << addrhint.ai_addrlen << ", " << &addri << ')';
     if ((err = getaddrinfo(host.c_str(), port.c_str(), &addrhint, &addri)) != 0)
     {
-        LOG_ERROR("getaddrinfo: " + make_int(err).to_string());
+        log_error << "getaddrinfo failed: " << err
+                  << " (" << gai_strerror(err) << ')';
+        if (EAI_SYSTEM == err) {
+            log_error << "System error: " << errno
+                  << " (" << strerror(errno) << ')';
+        }
         return false;
     }
     
