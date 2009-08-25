@@ -514,7 +514,7 @@ int wsdb_purge_trxs_upto(trx_seqno_t trx_id);
  *         replicated to the cluster
  */
 struct wsdb_write_set *wsdb_get_write_set(
-    local_trxid_t trx_id, connid_t conn_id, const char * row_buf, ulong buf_len
+    local_trxid_t trx_id, connid_t conn_id, const char * row_buf, size_t buf_len
 );
 
 /*!
@@ -537,7 +537,7 @@ struct wsdb_write_set *wsdb_get_conn_write_set(
  * @return 
  */
 int wsdb_set_exec_query(
-    struct wsdb_write_set *ws, char *query, uint32_t query_len
+    struct wsdb_write_set *ws, char *query, size_t query_len
 );
 
 /*!

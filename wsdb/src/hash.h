@@ -39,7 +39,7 @@ typedef int (* hash_cmp_t)(uint16_t, char *, uint16_t, char *);
  * @retun pointer to initialized hash index
  */
 struct wsdb_hash *wsdb_hash_open(
-    uint32_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp,
+    size_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp,
     bool unique, bool reuse_key
 );
 

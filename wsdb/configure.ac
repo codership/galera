@@ -17,12 +17,17 @@ AC_ARG_ENABLE(debug,
 if test "$enable_debug" != "no"
 then
     enable_debug="yes"
-    CFLAGS="-g -O0 -DDEBUG_MALLOC -DDEBUG_MUTEX "
+    CFLAGS=${CFLAGS:-"-O1"}
+    AM_CFLAGS="-g -fno-inline"
+    AM_CPPFLAGS="-DDEBUG_MALLOC -DDEBUG_MUTEX -D_FORTIFY_SOURCE=1"
 else
-    CFLAGS=${CFLAGS:-" -O2 -g "}
-    CFLAGS="$CFLAGS -DNDEBUG "
+    AM_CFLAGS="-g"
+    AM_CPPFLAGS="-DNDEBUG"
 fi
+
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
+
+CXXFLAGS=${CXXFLAGS:-"$CFLAGS"}
 
 # Check if use of DBUG macros is desired
 AC_ARG_ENABLE(dbug,
@@ -34,17 +39,17 @@ if test "$enable_dbug" != "no"
 then
     enable_dbug="yes"
 else
-    CFLAGS="$CFLAGS -DGU_DBUG_OFF"
+    AM_CPPFLAGS="$AM_CPPFLAGS -DGU_DBUG_OFF"
 fi
 
 # Define alternate Galera libraries location
-AC_ARG_WITH([galera], [Galera libs location],,with_galera="no")
-if test x"$with_galera" != x"no"
-then
-    CFLAGS="$CFLAGS -I$with_galera/include"
-    CXXFLAGS="$CXXFLAGS -I$with_galera/include"
-    LDFLAGS="$LDFLAGS -L$with_galera/lib"
-fi
+#AC_ARG_WITH([galera], [Galera libs location],,with_galera="no")
+#if test x"$with_galera" != x"no"
+#then
+#    CFLAGS="$CFLAGS -I$with_galera/include"
+#    CXXFLAGS="$CXXFLAGS -I$with_galera/include"
+#    LDFLAGS="$LDFLAGS -L$with_galera/lib"
+#fi
 
 dnl # Check if release version of Galera library is required
 dnl AC_ARG_ENABLE(release,
@@ -107,9 +112,29 @@ AC_CONFIG_FILES([Makefile
                  test/Makefile
 		 doc/Makefile])
 
-CFLAGS="$CFLAGS -Wall -Werror "
+AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -pedantic -Wno-unused-parameter"
+AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -Wold-style-cast -Wconversion"
+AM_CXXFLAGS="$AM_CXXFLAGS -fno-rtti -Wno-long-long"
+AM_CFLAGS="$AM_CFLAGS -std=c99"
+AM_CPPFLAGS="$AM_CPPFLAGS -D_XOPEN_SOURCE=600"
+AM_LDFLAGS="-Wl,--warn-common -Wl,--fatal-warnings"
+
+AC_SUBST(AM_CFLAGS)
+AC_SUBST(AM_CXXFLAGS)
+AC_SUBST(AM_CPPFLAGS)
+AC_SUBST(AM_LDFLAGS)
+
 AC_OUTPUT
+
+AC_MSG_NOTICE([])
 AC_MSG_NOTICE([dbug enabled: $enable_dbug])
-AC_MSG_NOTICE(CFLAGS:   $CFLAGS)
-AC_MSG_NOTICE(LDFLAGS:  $LDFLAGS)
-AC_MSG_NOTICE(CPPFLAGS: $CPPFLAGS)
+AC_MSG_NOTICE([   CFLAGS:    $CFLAGS])
+AC_MSG_NOTICE([AM_CFLAGS:    $AM_CFLAGS])
+AC_MSG_NOTICE([   CXXFLAGS:  $CXXFLAGS])
+AC_MSG_NOTICE([AM_CXXFLAGS:  $AM_CXXFLAGS])
+AC_MSG_NOTICE([   CPPFLAGS:  $CPPFLAGS])
+AC_MSG_NOTICE([AM_CPPFLAGS:  $AM_CPPFLAGS])
+AC_MSG_NOTICE([   LDFLAGS:   $LDFLAGS])
+AC_MSG_NOTICE([AM_LDFLAGS:   $AM_LDFLAGS])
+AC_MSG_NOTICE([   LIBS:      $LIBS])
+AC_MSG_NOTICE([])

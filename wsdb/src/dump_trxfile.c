@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 
 #include <unistd.h> // for getopt
 #include <getopt.h> // for getopt_long
@@ -194,7 +195,7 @@ static int get_data_from_block(
                       read_len, len);
             }
 
-            param += read_len;
+            param = (char*)param + read_len;
             rcode = bi->trx_file->read_next_block(
                 bi->trx_file, bi->block_len, bi->block
             );

@@ -6,8 +6,10 @@
 
 #include "job_queue.h"
 
-static void init_worker(struct job_worker *worker, ushort id, ushort workers) {
-    ushort i;
+static void init_worker(
+    struct job_worker *worker, unsigned short id, unsigned short workers
+) {
+    unsigned short i;
     worker->ident = IDENT_job_worker;
     worker->state = JOB_VOID;
     worker->ctx   = NULL;
@@ -21,11 +23,11 @@ static void init_worker(struct job_worker *worker, ushort id, ushort workers) {
 }
 
 struct job_queue *job_queue_create(
-     ushort max_workers, job_queue_conflict_fun conflict_test, 
+     unsigned short max_workers, job_queue_conflict_fun conflict_test, 
      job_queue_cmp_fun cmp_order
 ) {
     struct job_queue *queue;
-    ushort i;
+    unsigned short i;
 
     MAKE_OBJ(queue, job_queue);
 
@@ -103,7 +105,7 @@ void job_queue_remove_worker(
 int job_queue_start_job(
     struct job_queue *queue, struct job_worker *worker, void *ctx
 ) {
-    ushort i;
+    unsigned short i;
     CHECK_OBJ(queue, job_queue);
     CHECK_OBJ(worker, job_worker);
 
@@ -148,7 +150,7 @@ int job_queue_start_job(
 
 int job_queue_end_job(struct job_queue *queue, struct job_worker *worker
 ) {
-    ushort i;
+    unsigned short i;
     int min_job = -1;
     CHECK_OBJ(queue, job_queue);
     CHECK_OBJ(worker, job_worker);

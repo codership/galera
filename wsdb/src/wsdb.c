@@ -144,7 +144,7 @@ uint16_t serialize_all_keys(char **data, struct wsdb_write_set *ws) {
     uint32_t  all_keys_len = 0;
     char *ptr;
 
-    int i;
+    size_t i;
 
     /* key composition will contain:
      *
@@ -178,7 +178,7 @@ uint16_t serialize_all_keys(char **data, struct wsdb_write_set *ws) {
 
     /* then each individual key */
     for (i=0; i<ws->item_count; i++) {
-        uint16_t  key_len      = 0;
+        uint16_t key_len      = 0;
         uint16_t full_key_len;
         struct wsdb_item_rec *item = &(ws->items[i]);
 

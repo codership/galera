@@ -13,7 +13,7 @@
 static struct file_cache *local_cache;
 static struct wsdb_file  *local_file;
 static struct wsdb_hash  *trx_hash;
-static uint16_t trx_limit;
+static        uint16_t    trx_limit;
 
 enum wsdb_block_states {
     BLOCK_ACTIVE,
@@ -43,11 +43,11 @@ struct trx_info {
 static trx_seqno_t last_committed_seqno = 0;
 /* keeps overall count of local transactions currently referencing any seqno 
  * via last_seen */
-static ulong       last_committed_refs   = 0;
+static long        last_committed_refs   = 0;
 static trx_seqno_t next_to_discard_seqno = 0;
 static ulong       next_to_discard_refs  = 0;
 static trx_seqno_t safe_to_discard_seqno = 0;
-static const ulong discard_interval = 100;
+static const ulong discard_interval      = 100;
 
 static gu_mutex_t  last_committed_seqno_mtx; // mutex protecting last_commit...
 
@@ -369,7 +369,7 @@ static void append_in_trx_block(
         char *ptr;
 
         //GU_DBUG_PRINT("wsdb", ("block: %d, len: %d",trx->last_block, len));
-        stored = (len > local_cache->block_size - bi->block->pos) ? 
+        stored = (len > (local_cache->block_size - bi->block->pos)) ? 
             local_cache->block_size - bi->block->pos : len;
 
         assert(bi->block->pos + stored <= local_cache->block_size);
@@ -1082,7 +1082,8 @@ static int get_write_set_do(
  * WS' level */
 
 struct wsdb_write_set *wsdb_get_write_set(
-        local_trxid_t trx_id, connid_t conn_id, const char * row_buf, ulong buf_len
+        local_trxid_t trx_id, connid_t conn_id,
+        const char * row_buf, size_t buf_len
 ) {
     struct trx_info       *trx = get_trx_info(trx_id);
     struct wsdb_write_set *ws;

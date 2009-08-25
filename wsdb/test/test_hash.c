@@ -95,7 +95,7 @@ START_TEST (test_hash_cache)
 END_TEST
 START_TEST (test_hash_trivial)
 {
-    unsigned long i = 0;
+    long i = 0;
 	
     /* unit test code */
     s_hash_size = 100;
@@ -113,16 +113,16 @@ START_TEST (test_hash_trivial)
     }
     mark_point();
     for (i=1; i<100; i++) {
-        int k = (unsigned long)wsdb_hash_search(hash, 4, (char *)&i);
+        long k = (long)wsdb_hash_search(hash, 4, (char *)&i);
         fail_unless((k == 10000+i), "hash search: %i", i);
     }
     for (i=1; i<100; i += 2) {
-        int k = (unsigned long)wsdb_hash_delete(hash, 4, (char *)&i);
+        long k = (long)wsdb_hash_delete(hash, 4, (char *)&i);
         fail_unless((k == 10000+i), "hash delete: %i", i);
     }
     mark_point();
     for (i=2; i<100; i += 2) {
-        int k = (unsigned long)wsdb_hash_search(hash, 4, (char *)&i);
+        long k = (long)wsdb_hash_search(hash, 4, (char *)&i);
         fail_unless((k == 10000+i), "later delete, hash search: %i", i);
     }
     fail_if(wsdb_hash_close(hash), "hash close");
@@ -131,7 +131,7 @@ END_TEST
 
 START_TEST (test_hash_overflow)
 {
-    unsigned long i;
+    long i;
     /* unit test code */
     s_hash_size = 10;
     struct wsdb_hash *hash = wsdb_hash_open(
@@ -143,7 +143,7 @@ START_TEST (test_hash_overflow)
         }
     }
     for (i=1; i<50; i++) {
-        unsigned long k = (unsigned long)wsdb_hash_search(hash, 4, (char *)&i);
+        long k = (long)wsdb_hash_search(hash, 4, (char *)&i);
         fail_unless((k == 10000+i), "hash search: %i %i", i, k);
     }
     fail_if(wsdb_hash_close(hash), "hash close");
@@ -173,7 +173,7 @@ END_TEST
 
 START_TEST (test_hash_big_64_key)
 {
-    uint64_t i;
+    int64_t i;
     /* unit test code */
     s_hash_size = 32000;
     struct wsdb_hash *hash = wsdb_hash_open(
@@ -206,7 +206,7 @@ START_TEST (test_hash_huge_64_key)
     );
 
     for (round=1; round<1000; round++) {
-        uint64_t i;
+        int64_t i;
         mark_point();
         for (i=1; i<1000; i++) {
             int *val = (int *)malloc(sizeof(int));
@@ -219,7 +219,7 @@ START_TEST (test_hash_huge_64_key)
         if (mem_size == 0) {
             mem_size = wsdb_hash_report(hash);
         } else {
-            fail_if(mem_size != wsdb_hash_report(hash),
+            fail_if(mem_size != (int)wsdb_hash_report(hash),
                 "allocation difference, round: %d mem now: %d previous: %d",
                 round, wsdb_hash_report(hash), mem_size
             );
@@ -268,9 +268,9 @@ static int delete_verdict(void *ctx, void *data, void **data_ptr) {
 
 START_TEST (test_hash_purge)
 {
-    unsigned long i;
-    unsigned long p;
-    int deleted_so_far;
+    long i;
+    long p;
+    long deleted_so_far;
 
     /* unit test code */
     s_hash_size = 65000;
@@ -283,14 +283,14 @@ START_TEST (test_hash_purge)
       }
     }
     for (i=1; i<100000; i++) {
-      unsigned long k = (unsigned long)wsdb_hash_search(hash, 4, (char*)&i);
+        long k = (long)wsdb_hash_search(hash, 4, (char*)&i);
       fail_unless((k == i), "hash search: %i %i", i, k);
     }
 
     deleted_so_far=1;
     for (p=11000; p<100000; p+=7000) {
       /* purge entries from hash */
-      int deleted = wsdb_hash_delete_range(
+      long deleted = wsdb_hash_delete_range(
           hash, (void *)&p, delete_verdict
       );
       if (deleted != p - deleted_so_far) {
@@ -299,7 +299,7 @@ START_TEST (test_hash_purge)
       deleted_so_far = p;
 
       for (i=p; i<100000; i++) {
-        unsigned long k = (unsigned long)wsdb_hash_search(hash, 4, (char*)&i);
+        long k = (long)wsdb_hash_search(hash, 4, (char*)&i);
         fail_unless((k == i), "hash search after purge: %i %i %i", i, k, p);
       }
     }

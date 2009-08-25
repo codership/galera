@@ -38,7 +38,7 @@ bool_t xdr_wsdb_key_part(XDR *xdrs, void *ptr, ...) {
 bool_t xdr_wsdb_table_key(XDR *xdrs, void *ptr, ...) {
     struct wsdb_table_key *table_key = ptr;
 #ifndef REMOVED
-    ushort i;
+    size_t i;
     if (!xdr_u_short(xdrs, &table_key->key_part_count)) return FALSE;
 
     if (xdrs->x_op == XDR_DECODE) {

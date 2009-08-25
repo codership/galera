@@ -92,7 +92,7 @@ typedef int (*job_queue_conflict_fun)(void *, void *);
 typedef int (*job_queue_cmp_fun)(void *, void *);
 
 struct job_id {
-    ushort    job_id;
+    unsigned short job_id;
 };
 
 enum job_state {
@@ -117,10 +117,10 @@ enum job_type {
  */
 struct job_worker {
     char           ident;
-    ushort         id;                  //!< array index in job queue
+    unsigned short id;                  //!< array index in job queue
     enum job_state state;               //!< current state
     void           *ctx;                //!< context pointer to application
-    ushort         waiters[MAX_WORKERS];//!< jobs waiting for this to complete
+    unsigned short waiters[MAX_WORKERS];//!< jobs waiting for this to complete
     gu_cond_t      cond;                //!< used together with queue mutex
     enum job_type  type;                //!< slave or replaying job 
 };
@@ -129,9 +129,9 @@ struct job_worker {
 
 struct job_queue {
     char                   ident;
-    ushort                 max_concurrent_workers; //!< limit for active workers
-    ushort                 registered_workers;     //!< # of workers in total
-    ushort                 active_workers;         //!< # of running jobs
+    unsigned short         max_concurrent_workers; //!< limit for active workers
+    unsigned short         registered_workers;     //!< # of workers in total
+    unsigned short         active_workers;         //!< # of running jobs
     struct job_worker      jobs[MAX_WORKERS];      //!< all workers
     gu_mutex_t             mutex;
     job_queue_conflict_fun conflict_test;          //!< test for parallel job
@@ -148,7 +148,7 @@ struct job_queue {
  * @return pointer to the cache
  */
 struct job_queue *job_queue_create(
-    ushort max_workers, job_queue_conflict_fun, job_queue_cmp_fun);
+    unsigned short max_workers, job_queue_conflict_fun, job_queue_cmp_fun);
 
 /*
  * @brief @fixme: 

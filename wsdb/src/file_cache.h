@@ -22,10 +22,10 @@ struct file_cache {
     struct wsdb_hash   *hash;
     struct wsdb_file   *file;
     cache_id_t          last_cache_id;
-    uint16_t            block_size;
+    size_t              block_size;
 
-    uint32_t            max_size;
-    uint32_t            curr_size;
+    size_t              max_size;
+    size_t              curr_size;
 
     struct cache_entry *entries_active;    //!< list of active entries
     struct cache_entry *entries_swapped;   //!< entries swapped in disk

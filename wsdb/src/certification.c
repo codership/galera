@@ -619,7 +619,7 @@ int wsdb_cert_close() {
         gu_error("failed to close key index");
     }
 
-    purge_seqno_list(ULLONG_MAX);
+    purge_seqno_list(LLONG_MAX);
 
 #ifdef USE_MEMPOOL
     mempool_close(index_pool);

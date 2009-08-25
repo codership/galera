@@ -88,7 +88,7 @@ static int file_write_block(
     int rcode;
     struct file_info *info = (struct file_info *)file->info;
     char *pad = "###########################################\0";
-    const size_t pad_len = strlen(pad);
+    const ssize_t pad_len = strlen(pad);
 
     CHECK_OBJ(file, wsdb_file);
     CHECK_OBJ(info, file_info);
@@ -107,7 +107,8 @@ static int file_write_block(
         gu_error ("failed to write file: %s", file->hdr.name);
     }
     while (len < file->hdr.block_size) {
-        size_t write_len = (file->hdr.block_size - len > pad_len) ? 
+        ssize_t write_len =
+            (file->hdr.block_size - len > pad_len) ? 
             pad_len : file->hdr.block_size - len;  
         rcode = fwrite((void *)pad, 1, write_len, info->fd);
         if (rcode != write_len) {

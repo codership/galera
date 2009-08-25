@@ -204,12 +204,12 @@ static file_addr_t put_in_block(
     addr += vf->file->hdr.last_block;
 
     while (len) {
-        uint16_t stored = (len > vf->block_size - vf->block_pos) ? 
+        size_t stored = (len > vf->block_size - vf->block_pos) ? 
             vf->block_size - vf->block_pos : len;
-        memcpy(vf->block + vf->block_pos, data, stored);
+        memcpy((char*)vf->block + vf->block_pos, data, stored);
         vf->block_pos += stored;
-        len -= stored;
-        data += stored;
+        len  -= stored;
+        data = (char*)data + stored;
         if (len) accumulate_block(vf);
     }
     return addr;

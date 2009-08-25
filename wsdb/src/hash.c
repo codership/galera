@@ -10,10 +10,11 @@
 
 struct hash_entry {
     struct hash_entry *next;
-    uint16_t           key_len;
     void              *key;
     void              *data;
+    uint16_t           key_len;
 };
+
 struct entry_match {
     struct hash_entry *entry;
     struct hash_entry *prev;
@@ -25,8 +26,8 @@ struct wsdb_hash {
     bool               unique;     // is index unique
     bool               reuse_key;  // use key pointer to application
     gu_mutex_t         mutex;
-    uint32_t           array_size; // number of many bucket lists allocated
-    uint32_t           elem_count; // number of elements currently in hash
+    size_t             array_size; // number of many bucket lists allocated
+    size_t             elem_count; // number of elements currently in hash
     hash_fun_t         hash_fun;
     hash_cmp_t         hash_cmp;
 #ifdef USE_MEMPOOL
@@ -40,15 +41,17 @@ struct wsdb_hash {
 #define IDENT_wsdb_hash 'h'
 
 struct wsdb_hash *wsdb_hash_open(
-    uint32_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp, 
+    size_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp, 
     bool unique, bool reuse_key
 ) {
     struct wsdb_hash *hash;
-    int i;
+    size_t i;
+
     MAKE_OBJ_SIZE(hash, wsdb_hash, max_size * sizeof(struct hash_entry *));
 
+    for (i=0; i < max_size; i++) hash->elems[i] = NULL;
+
     hash->unique     = unique;
-    for (i=0; i<max_size; i++) hash->elems[i] = NULL;
     hash->array_size = max_size;
     hash->elem_count = 0;
     hash->hash_fun   = hash_fun;
@@ -80,8 +83,10 @@ struct wsdb_hash *wsdb_hash_open(
 }
 
 int wsdb_hash_close(struct wsdb_hash *hash) {
-    int i;
+    size_t i;
+
     CHECK_OBJ(hash, wsdb_hash);
+
     /* Should we lock here? gu_mutex_lock(&hash->mutex); */
     for (i = 0; i < hash->array_size; i++) {
 	if (hash->elems[i]) {
@@ -348,7 +353,7 @@ int wsdb_hash_delete_range(
     hash_verdict_fun_t verdict
 ) {
     int deleted = 0;
-    int i;
+    size_t i;
 #ifdef USE_MEMPOOL
     int rcode;
 #endif
@@ -417,7 +422,7 @@ int wsdb_hash_scan(
     struct wsdb_hash *hash, void *ctx, hash_scan_fun_t scan_cb
 ) {
     int count = 0;
-    int i;
+    size_t i;
 
     GU_DBUG_ENTER("wsdb_hash_scan");
 
@@ -440,8 +445,8 @@ int wsdb_hash_scan(
 uint32_t wsdb_hash_report(
     struct wsdb_hash *hash
 ) {
-    int i;
-    uint32_t mem_usage;
+    size_t i;
+    size_t mem_usage;
 
     GU_DBUG_ENTER("wsdb_hash_report");
     gu_mutex_lock(&hash->mutex);
