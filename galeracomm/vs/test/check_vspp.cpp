@@ -709,8 +709,8 @@ START_TEST(check_vs_random)
 }
 END_TEST
 
-const char* sync_addr = "tcp:127.0.0.1:4567";
-const char* async_addr = "asynctcp:127.0.0.1:4567";
+static const char* const sync_addr = "tcp:127.0.0.1:4567";
+static const char* const async_addr = "asynctcp:127.0.0.1:4567";
 
 class ClientSender : public Thread {
     VS* vs;
@@ -764,8 +764,8 @@ public:
 
 class Client {
     Poll* poll;
-    VS* vs;
     Monitor* mon;
+    VS* vs;
     ClientSender* sen;
     ClientReceiver* rec;
 
@@ -776,13 +776,14 @@ public:
 
     Client() :
 	poll (Poll::create("def")),
-	vs   (VS::create(sync_addr, poll, mon)),
 	mon  (new Monitor()),
+	vs   (VS::create(sync_addr, poll, mon)),
         sen  (0),
         rec  (0) 
     {}
 
-    ~Client() {
+    ~Client()
+    {
 	delete sen;
 	delete rec;
 	delete vs;
@@ -844,7 +845,8 @@ extern "C" { static void (* const _SIG_IGN)(int) = SIG_IGN; }
 START_TEST(check_vs_cliser)
 {
     Server s;
-    Client c1, c2;
+    Client c1;
+    Client c2;
 
     ::signal(SIGPIPE, _SIG_IGN);
 
