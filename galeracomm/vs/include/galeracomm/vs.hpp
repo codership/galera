@@ -117,7 +117,7 @@ class VSView {
 
 public:
     VSView() :
-        trans(), vid(),
+        trans(0), vid(),
         addr(), joined(), left(), partitioned()
     {}
 

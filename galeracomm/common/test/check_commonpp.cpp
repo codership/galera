@@ -749,6 +749,7 @@ START_TEST(check_thread)
 }
 END_TEST
 
+#if 0
 START_TEST(check_logger)
 {
     ::setenv("LOGGER_LEVEL", "0", 1);
@@ -763,6 +764,7 @@ START_TEST(check_logger)
     logger.fatal("this is da fatal");
 }
 END_TEST
+#endif
 
 static Suite *suite()
 {
@@ -771,9 +773,11 @@ static Suite *suite()
 
     s = suite_create("commonpp");
 
+#if 0
     tc = tcase_create("check_logger");
     tcase_add_test(tc, check_logger);
     suite_add_tcase(s, tc);
+#endif
 
     tc = tcase_create("check_address");
     tcase_add_test(tc, check_address);

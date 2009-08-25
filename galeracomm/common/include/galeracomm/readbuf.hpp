@@ -2,7 +2,7 @@
 #define READBUF_HPP
 
 #include <galeracomm/types.h>
-//#include <galeracomm/exception.hpp>
+#include <galeracomm/exception.hpp>
 #include <galeracomm/monitor.hpp>
 #include <galeracomm/logger.hpp>
 #include <iostream>

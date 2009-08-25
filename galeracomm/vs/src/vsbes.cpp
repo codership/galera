@@ -44,22 +44,18 @@ public:
 	tnow *= 1000000;
 	tnow += tv.tv_usec;
 	if (tlast + 5000000 < tnow) {
-	    LOG_INFO(std::string("Queued ") + to_string(n_msgs_in) 
-			+ " msgs " + to_string(bytes_in) + " bytes ");
-	    LOG_INFO(std::string("    ") 
-			+ to_string(1.e6*double(n_msgs_in)/(tnow - tlast)) 
-			+ " msg/sec");
-	    LOG_INFO(std::string("    ") 
-			+ to_string(1.e6*double(bytes_in)/(tnow - tlast)) + " bytes/sec");
-	    LOG_INFO(std::string("Forwarded ") 
-			+ to_string(n_msgs_out) + " msgs " 
-			+ to_string(bytes_out) + " bytes ");
-	    LOG_INFO(std::string("    ") 
-			+ to_string(1.e6*double(n_msgs_out)/(tnow - tlast)) 
-			+ " msg/sec");
-	    LOG_INFO(std::string("    ") 
-			+ to_string(1.e6*double(bytes_out)/(tnow - tlast)) 
-			+ " bytes/sec");
+	    log_info << "Queued:    " << n_msgs_in << " msgs "
+	                              << bytes_in  << " bytes";
+	    log_info << "    "
+		     << (1.e6*double(n_msgs_in)/(tnow - tlast)) << " msg/sec";
+	    log_info << "    "
+		     << (1.e6*double(bytes_in)/(tnow - tlast)) << " bytes/sec";
+	    log_info << "Forwarded: " << n_msgs_out << " msgs " 
+			              << bytes_out << " bytes ";
+	    log_info << "    "
+		     << (1.e6*double(n_msgs_out)/(tnow - tlast)) << " msg/sec";
+	    log_info << "    " 
+		     << (1.e6*double(bytes_out)/(tnow - tlast)) <<" bytes/sec";
 	    tlast = tnow;
 	    n_msgs_out = bytes_out = n_msgs_in = bytes_in = 0;
 	}
@@ -92,7 +88,7 @@ ClientHandler::ClientHandler(Transport *t, VSBackend *v) :
 ClientHandler::~ClientHandler()
 {
     if (vs)
-	LOG_INFO(std::string("deleting ") + vs->get_self().to_string());
+	log_info << "deleting " + vs->get_self().to_string();
     delete tp;
     delete vs;
 }
@@ -125,7 +121,7 @@ void ClientHandler::handle_vs(const ReadBuf *rb, const size_t roff,
 	    }
 	    if (vmsg.get_type() == VSMessage::DATA && vmsg.get_source() == vs->get_self()) {
 		read_len = vmsg.get_hdrlen();
-		LOG_TRACE(std::string("Dropping data, hdr len") + ::to_string(read_len));
+		log_debug << "Dropping data, hdr len" << read_len;
 	    }
 	}
 	
@@ -190,16 +186,14 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
     switch (state) {
     case HANDSHAKE: {
 	if (msg.get_type() != VSRMessage::CONTROL) {
-	    LOG_WARN(std::string("Invalid message sequence: state ") 
-			   + to_string(uint64_t(state)) 
-			   + " message " 
-			   + to_string(uint64_t(msg.get_type())));
+	    log_warn << "Invalid message sequence: state: " << state
+                     << ", message type: " << msg.get_type();
 	    close();
 	    return;
 	}
 	VSRCommand cmd = msg.get_command();
 	if (cmd.get_type() != VSRCommand::SET) {
-	    LOG_WARN("Invalid message sequence");
+	    log_warn << "Invalid message sequence";
 	    close();
 	    return;
 	}
@@ -222,9 +216,8 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 	    VSRCommand cmd = msg.get_command();
 	    WriteBuf wb(0, 0);
 	    if (cmd.get_type() == VSRCommand::JOIN || cmd.get_type() == VSRCommand::LEAVE) {
-		LOG_INFO(std::string("Cmd ") 
-			    + to_string(uint64_t(cmd.get_type())) 
-			    + " " +  cmd.get_address().to_string());
+		log_info << "Cmd: " << cmd.get_type()  << " from "
+		         << cmd.get_address().to_string();
 		try {
 		    if (cmd.get_type() == VSRCommand::JOIN)
 			vs->join(cmd.get_address().get_service_id());
@@ -243,8 +236,8 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 	    }
 	    tp->handle_down(&wb, 0);
 	} else if (msg.get_type() == VSRMessage::VSPROTO) {
-	    LOG_TRACE(std::string("VSPROTO: len = ") + 
-			 ::to_string(rb->get_len(roff + msg.get_raw_len())));
+	    log_debug << "VSPROTO: len = "
+	              << rb->get_len(roff + msg.get_raw_len());
 	    // TODO: Validate
 	    VSMessage vmsg;
 	    if (vmsg.read(rb->get_buf(),
@@ -388,6 +381,8 @@ int main(int argc, char *argv[])
     LOG_INFO("start");
     ::signal(SIGPIPE, _SIG_IGN);
     Monitor::set_skip_locking(::getenv("VSBES_EXPLICIT_LOCKING") ? false : true);
+
+    (::getenv("VSBES_DEBUG")) ? gu_conf_debug_on() : gu_conf_debug_off();
 
     if (argc < 2) {
 	std::cerr << "Usage: " << argv[0] << " <address>" << std::endl;

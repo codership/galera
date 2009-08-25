@@ -9,7 +9,8 @@ static void print_state(const EVSProto* p)
     for (std::map<const EVSPid, EVSInstance>::const_iterator i = p->known.begin();
          i != p->known.end(); ++i)
         v += i->first.to_string() + ":" + i->second.to_string() + " ";
-    LOG_DEBUG("State: " + p->my_addr.to_string() + ": " + p->current_view.to_string() + " " + v);
+    log_debug << "State: " << p->my_addr.to_string() << ": "
+              << p->current_view.to_string() << ' ' << v;
 }
 
 void EVSProto::cleanup_unoperational()
@@ -383,7 +384,7 @@ void EVSProto::send_leave()
     assert(get_state() == LEAVING);
     last_sent = seqno_eq(last_sent, SEQNO_MAX) ? 0 : seqno_next(last_sent);
     
-    LOG_INFO(my_addr.to_string() + " send leave as " + ::to_string(last_sent));
+    log_info << my_addr.to_string() << " send leave as " << last_sent;
     EVSMessage lm(EVSMessage::LEAVE, my_addr, current_view, 
                   input_map.get_aru_seq(), last_sent);
     size_t bufsize = lm.size();
@@ -403,7 +404,8 @@ void EVSProto::send_leave()
 
 void EVSProto::send_install()
 {
-    LOG_DEBUG("sending install at " + my_addr.to_string() + " installing flag " + ::to_string(installing));
+    log_debug << "sending install at " << my_addr.to_string()
+              << " installing flag " << installing;
     if (installing)
         return;
     std::map<const EVSPid, EVSInstance>::iterator self = known.find(my_addr);
@@ -443,20 +445,18 @@ void EVSProto::resend(const EVSPid& gap_source, const EVSGap& gap)
 {
     assert(gap.source == my_addr);
     if (seqno_eq(gap.get_high(), SEQNO_MAX)) {
-        LOG_DEBUG(std::string("empty gap") 
-                  + ::to_string(gap.get_low()) + " -> " 
-                  + ::to_string(gap.get_high()));
+        log_debug << "empty gap: " << gap.get_low() << " -> " << gap.get_high();
         return;
     } else if (!seqno_eq(gap.get_low(), SEQNO_MAX) &&
                seqno_gt(gap.get_low(), gap.get_high())) {
-        LOG_DEBUG(std::string("empty gap") 
-                  + ::to_string(gap.get_low()) + " -> " 
-                  + ::to_string(gap.get_high()));
+        log_debug << "empty gap: " << gap.get_low() << " -> " << gap.get_high();
         return;
     }
     
     uint32_t start_seq = seqno_eq(gap.get_low(), SEQNO_MAX) ? 0 : gap.get_low();
-    LOG_DEBUG("resending at " + my_addr.to_string() + " requested by " + gap_source.to_string() + " " + ::to_string(start_seq) + " -> " + ::to_string(gap.get_high()));
+    log_debug << "resending at " << my_addr.to_string() << " requested by "
+              << gap_source.to_string() << ' ' << start_seq << " -> "
+	      << gap.get_high();
 
     for (uint32_t seq = start_seq; !seqno_gt(seq, gap.get_high()); ) {
 
@@ -499,9 +499,8 @@ void EVSProto::recover(const EVSGap& gap)
 {
     
     if (gap.get_low() == gap.get_high()) {
-        LOG_WARN(std::string("EVSProto::recover(): Empty gap: ") 
-                 + ::to_string(gap.get_low()) + " -> " 
-                 + ::to_string(gap.get_high()));
+        log_warn << "EVSProto::recover(): Empty gap: " << gap.get_low()
+	         << " -> " << gap.get_high();
         return;
     }
     
@@ -547,14 +546,14 @@ int EVSProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
         case 0:
             break;
         default:
-            LOG_ERROR(std::string("Send error: ") + ::to_string(err));
+            log_error << "Send error: " << err;
             ret = err;
         }
     } else if (output.size() < max_output_size) {
         WriteBuf* priv_wb = wb->copy();
         output.push_back(priv_wb);
     } else {
-        LOG_WARN("Output queue full");
+        log_warn << "Output queue full";
         ret = EAGAIN;
     }
     return ret;
@@ -643,8 +642,8 @@ void EVSProto::deliver()
     if (get_state() != OPERATIONAL && get_state() != RECOVERY && 
         get_state() != LEAVING)
         throw FatalException("Invalid state");
-    LOG_DEBUG("aru_seq: " + ::to_string(input_map.get_aru_seq()) + " safe_seq: "
-              + ::to_string(input_map.get_safe_seq()));
+    log_debug << "aru_seq: " << input_map.get_aru_seq() << " safe_seq: "
+              << input_map.get_safe_seq();
     
     EVSInputMap::iterator i, i_next;
     // First deliver all messages that qualify at least as safe
@@ -789,14 +788,15 @@ void EVSProto::handle_notification(const TransportNotification *tn)
 void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source, 
                            const ReadBuf* rb, const size_t roff)
 {
-    LOG_DEBUG("this: " + my_addr.to_string() + " source: "
-              + source.to_string() + " seq: " + ::to_string(msg.get_seq()));
+    log_debug << "this: " << my_addr.to_string() << ", source: "
+              << source.to_string() << ", seq: " << msg.get_seq();
+
     std::map<const EVSPid, EVSInstance>::iterator i = known.find(source);
     if (i == known.end()) {
         // Previously unknown instance has appeared and it seems to
         // be operational, assume that it can be trusted and start
         // merge/recovery
-        LOG_INFO("new instance");
+        log_info << "new instance";
         std::pair<std::map<const EVSPid, EVSInstance>::iterator, bool> iret;
         iret = known.insert(std::pair<EVSPid, EVSInstance>(source,
                                                            EVSInstance()));
@@ -877,7 +877,8 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
     EVSRange range(input_map.insert(EVSInputMapItem(source, msg, rb, roff)));
     
     if (!seqno_eq(input_map.get_safe_seq(), prev_safe))
-        LOG_DEBUG(my_addr.to_string() + " safe seq " + ::to_string(input_map.get_safe_seq()) + " prev " + ::to_string(prev_safe));
+        log_debug << my_addr.to_string() << " safe seq "
+	          << input_map.get_safe_seq() << " prev " << prev_safe;
     
     
     
@@ -893,7 +894,9 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
     if ((seqno_eq(range.get_low(), SEQNO_MAX) ||
          seqno_gt(range.get_high(), range.get_low())) &&
         !(msg.get_flags() & EVSMessage::F_RESEND)) {
-        LOG_DEBUG("requesting at " + my_addr.to_string() + " from " + source.to_string() + " " + range.to_string() + " due to input map gap, aru " + ::to_string(input_map.get_aru_seq()));
+        log_debug << "requesting at " << my_addr.to_string() << " from "
+	          << source.to_string() << ' ' << range.to_string() 
+		  << " due to input map gap, aru " << input_map.get_aru_seq();
 
 #if 0
         std::list<EVSRange> gap_list = input_map.get_gap_list(source);
@@ -916,7 +919,8 @@ void EVSProto::handle_user(const EVSMessage& msg, const EVSPid& source,
          seqno_lt(last_sent, range.get_high()))) {
         // Message not originated from this instance, output queue is empty
         // and last_sent seqno should be advanced
-        LOG_DEBUG("sending dummy: " + ::to_string(last_sent) + " -> " + ::to_string(range.get_high()));
+        log_debug << "sending dummy: " << last_sent << " -> "
+	          << range.get_high();
         WriteBuf wb(0, 0);
         send_user(&wb, DROP, send_window, range.get_high());
     } else if (((output.empty() && 
@@ -946,11 +950,10 @@ void EVSProto::handle_delegate(const EVSMessage& msg, const EVSPid& source,
 
 void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
 {
-    LOG_DEBUG("gap message at " + my_addr.to_string() + " source " +
-              msg.get_source().to_string() + " source view: " + 
-              msg.get_source_view().to_string() 
-              + " seq " + ::to_string(msg.get_seq())
-              + " aru_seq " + ::to_string(msg.get_aru_seq()));
+    log_debug << "gap message at " << my_addr.to_string() << " source "
+              << msg.get_source().to_string() << " source view: " 
+              << msg.get_source_view().to_string() 
+              << " seq " << msg.get_seq() <<" aru_seq " << msg.get_aru_seq();
     std::map<EVSPid, EVSInstance>::iterator i = known.find(source);
     if (i == known.end()) {
         std::pair<std::map<const EVSPid, EVSInstance>::iterator, bool> iret;
@@ -1014,10 +1017,9 @@ void EVSProto::handle_gap(const EVSMessage& msg, const EVSPid& source)
     if (!seqno_eq(msg.get_aru_seq(), SEQNO_MAX)) {
         input_map.set_safe(source, msg.get_aru_seq());
         if (!seqno_eq(input_map.get_safe_seq(), prev_safe)) {
-            LOG_DEBUG("handle gap " + my_addr.to_string() +  " safe seq " 
-                      + ::to_string(input_map.get_safe_seq()) 
-                      + " aru seq " 
-                      + ::to_string(input_map.get_aru_seq()));
+            log_debug << "handle gap: " << my_addr.to_string()
+	              << ", safe seq: "  << input_map.get_safe_seq()
+                      << ", aru seq: "   << input_map.get_aru_seq();
         }
         // All instances have received leave message
 
@@ -1136,7 +1138,7 @@ bool EVSProto::states_compare(const EVSMessage& msg)
     if (!seqno_eq(high_seq, SEQNO_MAX) &&
         (seqno_eq(last_sent, SEQNO_MAX) || 
          seqno_lt(last_sent, high_seq))) {
-        LOG_DEBUG("completing seqno to " + ::to_string(high_seq));
+        log_debug << "completing seqno to " << high_seq;
         WriteBuf wb(0, 0);
         send_user(&wb, DROP, send_window, high_seq);
     }
@@ -1213,7 +1215,8 @@ void EVSProto::handle_join(const EVSMessage& msg, const EVSPid& source)
         
         // Safe seqs are not the same
         if (!seqno_eq(msg.get_seq(), input_map.get_safe_seq())) {
-            LOG_DEBUG("noneq seq, local " + ::to_string(input_map.get_safe_seq()) + " msg " + ::to_string(msg.get_seq()));
+            log_debug << "noneq seq, local " << input_map.get_safe_seq()
+	              << " msg " << msg.get_seq();
         }
     }
     

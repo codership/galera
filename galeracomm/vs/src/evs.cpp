@@ -83,8 +83,8 @@ void EVS::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
         proto->handle_install(msg, source);
         break;
     default:
-        LOG_WARN(std::string("EVS::handle_up(): Invalid message type: ") 
-                 + to_string(msg.get_type()));
+        log_warn << "EVS::handle_up(): Invalid message type: "
+	         << msg.get_type();
     }    
 }
 

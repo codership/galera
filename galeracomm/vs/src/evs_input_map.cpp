@@ -24,8 +24,8 @@ EVSRange EVSInputMap::insert(const EVSInputMapItem& item)
     // Check whether this message is inside allowed seqno windon
     if (seqno_gt(seq, seqno_add(wseq, SEQNO_MAX/4)) ||
         seqno_lt(seq, seqno_dec(wseq, SEQNO_MAX/4))) {
-        LOG_WARN(std::string("Seqno out of window: ") + 
-                 to_string(seq) + " current aru " + to_string(aru_seq));
+        log_warn << "Seqno out of window: "
+	         << seq << " current aru " << aru_seq;
         return EVSRange(gap);
     }
         

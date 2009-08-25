@@ -35,15 +35,15 @@ inline void closefd(int fd)
 
 static inline std::string to_string(const sockaddr* sa)
 {
-    std::string ret;
+    std::ostringstream ret;
     if (sa->sa_family == AF_INET) {
-	ret += ::inet_ntoa(reinterpret_cast<const sockaddr_in*>(sa)->sin_addr);
-	ret += ":";
-	ret += to_string(gu_be16(reinterpret_cast<const sockaddr_in*>(sa)->sin_port));
+	ret << ::inet_ntoa(reinterpret_cast<const sockaddr_in*>(sa)->sin_addr)
+	    << ":"
+	    << gu_be16(reinterpret_cast<const sockaddr_in*>(sa)->sin_port);
     }
     else
-	ret = "Unknown address family " + ::to_string(int64_t(sa->sa_family));
-    return ret;
+	ret << "Unknown address family: " << (sa->sa_family);
+    return ret.str();
 }
 
 

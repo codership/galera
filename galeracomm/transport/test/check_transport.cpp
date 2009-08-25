@@ -148,11 +148,11 @@ int main()
      MessagePC mpc;
 
      mpc.start_listen();
-     std::cout << "Listening\n";
+     log_info << "Listening";
      mpc.start_snd();
-     std::cout << "Connecting\n";
+     log_info << "Connecting";
      mpc.connect();
-     std::cout << "Connected\n";
+     log_info << "Connected";
      for (size_t i = 1; i <= (1 << 20); i <<= 1)  {
 	  mpc.check(i);
      }

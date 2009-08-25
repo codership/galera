@@ -5,6 +5,7 @@
 #include "galeracomm/poll.hpp"
 #include "galeracomm/fifo.hpp"
 #include "galeracomm/logger.hpp"
+#include "galeracomm/exception.hpp"
 
 #include <cstdlib>
 #include <cstring>
@@ -152,11 +153,7 @@ int PollDef::poll(const int timeout)
     }
     // assert(p_ret == p_cnt);
     if (p_ret != p_cnt) {
-        LOG_WARN(std::string("p_ret (") 
-                 + ::to_string(p_ret) 
-                 + ") != p_cnt (" 
-                 + ::to_string(p_cnt) 
-                 + ")");
+        log_warn << "p_ret (" << p_ret << ") != p_cnt (" << p_cnt << ")";
     }
     return p_ret;
 }

@@ -402,7 +402,7 @@ class Mcaster : public Toplay {
     std::map<Sockaddr,uint32_t> seq_map;
 
     Mcaster (const Mcaster&);
-    void operator= (const Mcaster&);
+    Mcaster& operator= (const Mcaster&);
 
 public:
 
@@ -421,11 +421,11 @@ public:
     }
 
     ~Mcaster() {
-	LOG_INFO(std::string("Received ") + to_string(recvd) + " msgs " + 
-		 to_string(recvd_b) + " bytes hc " + to_string(hc));
+	log_info << "Received " << recvd << " msgs " << recvd_b
+	         << " bytes hc " << hc;
 	for (std::map<Sockaddr,uint32_t>::iterator i = seq_map.begin(); 
 	     i != seq_map.end(); ++i) {
-	    LOG_INFO(std::string("seqno ") + to_string(i->second));;
+	    log_info << "seqno " << i->second;
 	}
 	delete tp;
     }
@@ -459,20 +459,18 @@ public:
 	    Sockaddr cmp(&tn->source_sa, tn->sa_size);	    
 	    std::map<Sockaddr,uint32_t>::iterator i = seq_map.find(cmp);
 	    if (i == seq_map.end()) {
-		LOG_INFO(std::string("Unknown source, seqno start ") +
-			 to_string(rs));
+		log_info << "Unknown source, seqno start " << rs;
 		seq_map.insert(std::pair<Sockaddr, uint32_t>(
 				   Sockaddr(&tn->source_sa, 
 					    tn->sa_size), rs));
 	    } else {
 		if (i->second + 1 != rs) {
-		    LOG_WARN(std::string("Seqno gap: ") + to_string(i->second) + 
-			     " -> " + to_string(rs));
+		    log_warn << "Seqno gap: " << i->second << " -> " << rs;
 		}
 		i->second = rs;
 	    }
 	    
-	    LOG_TRACE(std::string("seqno: ") + to_string(rs));
+	    // LOG_TRACE << "seqno: " << rs;
 	    recvd++;
 	    recvd_b += rb->get_len();
 	} else if (um) {
@@ -510,7 +508,7 @@ public:
 	if ((ret = pass_down(&wb, 0)) == 0)
 	    seq++;
 	else
-	    LOG_WARN(std::string("Pass down: ") + to_string(ret));
+	    log_warn << "Pass down: " << ret;
     }
 };
 
@@ -532,7 +530,7 @@ START_TEST(check_tipc_multicast)
 	if (::rand() % 6 == 0)
 	    while (p->poll(0) > 0) {}
     }
-    LOG_INFO(std::string("pcnt: ") + to_string(pcnt));
+    log_info << "pcnt: " << pcnt;
     while (p->poll(100) > 0) {}
     m2.send();
     while (p->poll(100) > 0) {}

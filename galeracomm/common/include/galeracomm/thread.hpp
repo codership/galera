@@ -18,7 +18,7 @@ class Thread {
     State state;
 
 public:
-    Thread() : th(), monitor(), state(STOPPED) {
+    Thread() : th(0), monitor(), state(STOPPED) {
 	
     }
 

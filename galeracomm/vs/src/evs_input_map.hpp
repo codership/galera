@@ -63,8 +63,9 @@ public:
     }
     
     std::string to_string() const {
-        return std::string("") + sa.to_string() + " "
-            + ::to_string(msg.get_seq());
+        std::ostringstream ret;
+        ret << sa.to_string() << ' ' << msg.get_seq();
+	return ret.str();
     }
 };
 
@@ -128,11 +129,10 @@ public:
     }
     
     ~EVSInputMap() {
-        LOG_INFO(std::string("~EVSInputMap(): ")
-                 + to_string(double(msg_log_size_cum)/double(n_messages + 1)) 
-                 + " "
-                 + to_string(double(recovery_log_size_cum)/
-                             double(n_messages + 1)));
+        log_info << "~EVSInputMap(): "
+                 << (double(msg_log_size_cum)/double(n_messages + 1)) 
+                 << ' '
+                 << (double(recovery_log_size_cum)/double(n_messages + 1));
     }
     
     void set_safe(const EVSPid& s, const uint32_t seq) {

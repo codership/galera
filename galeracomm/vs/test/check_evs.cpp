@@ -572,13 +572,15 @@ struct Stats {
     }
 
     void print() {
-        LOG_INFO("Sent messages: " + ::to_string(sent_msgs));
-        LOG_INFO("Total messages: " + ::to_string(total_msgs));
+        log_info << "Sent messages: " << sent_msgs;
+        log_info << "Total messages: " << total_msgs;
         for (size_t i = 0; i < 6; ++i) {
-            LOG_INFO("Type " + EVSMessage::to_string(static_cast<EVSMessage::Type>(i)) 
-                     + " messages: " + ::to_string(msgs[i]) 
-                     + " fraction of sent: " + ::to_string(fraction_of(msgs[i], sent_msgs)) 
-                     + " fraction of total: " + ::to_string(fraction_of(msgs[i], total_msgs)));
+            log_info << "Type: "
+	             << EVSMessage::to_string(static_cast<EVSMessage::Type>(i)) 
+                     << " messages: " << msgs[i]
+                     << " fraction of sent: " << fraction_of(msgs[i], sent_msgs)
+                     << " fraction of total: "
+		     << fraction_of(msgs[i], total_msgs);
         }
     }
 
@@ -606,7 +608,7 @@ static void multicast(std::vector<Inst*>* pvec, const ReadBuf* rb, const int plo
 {
     EVSMessage msg;
     fail_unless(msg.read(rb->get_buf(), rb->get_len(), 0));
-    LOG_DEBUG(std::string("msg: ") + ::to_string(msg.get_type()));
+    log_debug << "msg: " << msg.get_type();
     stats.acc_mcast(msg.get_type());
     for (std::vector<Inst*>::iterator j = pvec->begin();
 	 j != pvec->end(); ++j) {
@@ -616,9 +618,11 @@ static void multicast(std::vector<Inst*>* pvec, const ReadBuf* rb, const int plo
         
         if (::rand() % 10000 < ploss) {
             if (::rand() % 3 == 0) {
-                LOG_INFO("dropping " + EVSMessage::to_string(msg.get_type()) + 
-                         " from " + msg.get_source().to_string() + " to " + 
-                         (*j)->ep->my_addr.to_string() + " seq " + ::to_string(msg.get_seq()) );
+                log_info << "dropping "
+		         << EVSMessage::to_string(msg.get_type()) 
+                         << " from " << msg.get_source().to_string() << " to "
+			 << (*j)->ep->my_addr.to_string() << " seq "
+			 << msg.get_seq();
                 continue;
             } else {
                 LOG_INFO("dropping " + EVSMessage::to_string(msg.get_type()) + " from " + msg.get_source().to_string() + " to all");

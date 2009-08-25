@@ -20,8 +20,6 @@ void VSRBackend::handle_up(const int cid, const ReadBuf *rb, const size_t roff,
 			   const ProtoUpMeta *um)
 {
     VSRMessage msg;
-    
-
 
     if (rb == 0 && tp->get_state() == TRANSPORT_S_CONNECTED) {
 	return;
@@ -43,16 +41,21 @@ void VSRBackend::handle_up(const int cid, const ReadBuf *rb, const size_t roff,
 	addr = msg.get_base_address();
 	if (addr == ADDRESS_INVALID)
 	    throw FatalException("VSRBackend::handle_up(): Invalid address");
+
 	VSRCommand cmd(VSRCommand::SET);
+
 	if (get_flags() & F_DROP_OWN_DATA)
-	    cmd.set_flags(VSRCommand::F_DROP_OWN_DATA);
+            cmd.set_flags(VSRCommand::F_DROP_OWN_DATA);
+
 	VSRMessage rmsg(cmd);
-	WriteBuf wb(0, 0);
+	WriteBuf   wb(0, 0);
 	wb.prepend_hdr(rmsg.get_raw(), rmsg.get_raw_len());
+
 	if (pass_down(&wb, 0)) {
 	    state = FAILED;
 	    pass_up(0, 0, 0);
 	}
+
 	break;
     }
 	

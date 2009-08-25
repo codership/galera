@@ -96,19 +96,27 @@ public:
     }
 };
 
-class VSRMessage : public Serializable {
-    Address base_addr;
-    VSRCommand cmd;
-    size_t raw_len;
+class VSRMessage : public Serializable
+{
+public :
+
+    enum Type {HANDSHAKE, CONTROL, VSPROTO};
+
+private:
+
+    Address       base_addr;
+    VSRCommand    cmd;
+    enum Type     type;
+    size_t        raw_len;
     unsigned char raw[64];
+
 public:
-    enum Type {HANDSHAKE, CONTROL, VSPROTO} type;
     
     VSRMessage() :
         base_addr(),
         cmd(),
-        raw_len(write(raw, sizeof(raw), 0)),
-        type(VSPROTO)
+        type(VSPROTO),
+        raw_len(write(raw, sizeof(raw), 0))
     {
 	if (raw_len == 0) throw DException("");
     }
@@ -116,8 +124,8 @@ public:
     VSRMessage(const Address a) :
         base_addr(a),
         cmd(),
-        raw_len(write(raw, sizeof(raw), 0)),
-        type(HANDSHAKE)
+        type(HANDSHAKE),
+        raw_len(write(raw, sizeof(raw), 0))
     {
 	if (raw_len == 0) throw DException("");
     }
@@ -125,8 +133,8 @@ public:
     VSRMessage(const VSRCommand& c) :
         base_addr(),
         cmd(c),
-        raw_len(write(raw, sizeof(raw), 0)),
-        type(CONTROL)
+        type(CONTROL),
+        raw_len(write(raw, sizeof(raw), 0))
     {
 	if (raw_len == 0) throw DException("");
     } 
@@ -147,6 +155,7 @@ public:
 	size_t off;
 	uint32_t w;
 	w = type;
+	log_debug << "writing message of type: " << w << '(' << type << ')';
 	if ((off = write_uint32(w, buf, buflen, offset)) == 0)
 	    return 0;
 	switch (type) {
@@ -160,6 +169,8 @@ public:
 	    break;
 	case VSPROTO:
 	    break;
+        default:
+            assert (0);
 	}
 	if (type == CONTROL)
 	    assert(off == offset + 12);

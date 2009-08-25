@@ -138,7 +138,7 @@ void TIPCTransport::connect(const char* addr)
 	throw FatalException("TIPCTransport::connect()");
     }
     tipc_sa->addrtype = TIPC_ADDR_MCAST;
-    LOG_INFO(std::string("Bind: ") + to_string(ret));
+    log_info << "Bind: " << ret;
 
     socklen_t local_sa_size = sizeof(local_sa);
     if (getsockname(fd, &local_sa, &local_sa_size) == -1) {
@@ -172,9 +172,8 @@ void TIPCTransport::connect(const char* addr)
     }
     state = TRANSPORT_S_CONNECTED;
     sockaddr_tipc *id_sa = reinterpret_cast<sockaddr_tipc*>(&local_sa);
-    LOG_INFO(std::string("Connected to ") + addr + " port id " + 
-	     to_string(id_sa->addr.id.ref) + ":" 
-	     + to_string(id_sa->addr.id.node));
+    log_info << "Connected to " << addr << " port id " << id_sa->addr.id.ref
+             << ":" << id_sa->addr.id.node;
 }
 
 void TIPCTransport::close()
@@ -252,7 +251,8 @@ void TIPCTransport::handle(int fd, PollEnum pe)
 	    rb->release();
 	} else if (fd == this->tsfd) {
 	    if (ret != sizeof(tipc_event)) {
-		LOG_WARN(std::string("Invalid sized topology server message, size ") + to_string(ret));
+		log_warn << "Invalid sized topology server message, size: "
+		         << ret;
 		return;
 	    }
 	    tipc_event *te = reinterpret_cast<tipc_event*>(recv_buf);
@@ -261,7 +261,7 @@ void TIPCTransport::handle(int fd, PollEnum pe)
 	    } else if (te->event == TIPC_WITHDRAWN) {
 		tn.ntype = TRANSPORT_N_WITHDRAWN;
 	    } else {
-		LOG_WARN(std::string("Unknown event: ") + to_string(te->event));
+		log_warn << "Unknown event: " << te->event;
 		return;
 	    }
 	    
@@ -276,7 +276,7 @@ void TIPCTransport::handle(int fd, PollEnum pe)
 	    pass_up(0, 0, &tn);
 		
 	} else {
-	    LOG_FATAL(std::string("Invalid fd: ") + to_string(fd));
+	    log_fatal << "Invalid fd: " << fd;
 	    throw FatalException("TIPCTransport::handle()");
 	}
 	

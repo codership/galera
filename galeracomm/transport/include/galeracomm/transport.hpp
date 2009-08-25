@@ -41,7 +41,7 @@ struct TransportNotification : public ProtoUpMeta {
     sockaddr source_sa;
 
     TransportNotification() :
-        type(0), state(), ntype(), sa_size(), local_sa(), source_sa()
+        type(0), state(), ntype(), sa_size(0), local_sa(), source_sa()
     {}
 
 private:

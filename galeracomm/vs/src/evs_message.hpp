@@ -63,7 +63,9 @@ public:
     }
 
     std::string to_string() const {
-	return get_pid().to_string() + ":" + ::to_string(get_seq());
+	std::ostringstream ret;
+	ret << get_pid().to_string() << ':' << get_seq();
+	return ret.str();
     }
 
 };
@@ -85,7 +87,9 @@ struct EVSRange {
 	return cmp.get_low() == low && cmp.get_high() == high;
     }
     std::string to_string() const {
-        return std::string("[") + ::to_string(low) + "," + ::to_string(high) + "]";
+	std::ostringstream ret;
+        ret << '[' << low << ", " << high << ']';
+	return ret.str();
     }
 };
 
@@ -288,9 +292,9 @@ public:
 	type(),
 	safety_prefix(), 
         seq(SEQNO_MAX),
-	seq_range(),
-	aru_seq(),
-	flags(),
+	seq_range(0),
+	aru_seq(0),
+	flags(0),
         source_view(), 
 	source(),
         gap(),
@@ -345,9 +349,9 @@ public:
 	type(type_), 
 	safety_prefix(), 
         seq(SEQNO_MAX),
-	seq_range(),
-	aru_seq(),
-	flags(),
+	seq_range(0),
+	aru_seq(0),
+	flags(0),
         source_view(), 
 	source(source_),
         gap(),
@@ -367,7 +371,7 @@ public:
         seq(seq_),
         seq_range(0),
         aru_seq(aru_seq_),
-	flags(),
+	flags(0),
         source_view(source_view_),
         source(source_),
         gap(gap_),
@@ -387,7 +391,7 @@ public:
 	seq(safe_seq_),
         seq_range(0),
 	aru_seq(aru_seq_),
-        flags(),
+        flags(0),
 	source_view(vid_),
 	source(source_),
         gap(),
@@ -616,7 +620,8 @@ inline bool equal(const EVSMessage* a, const EVSMessage* b)
     case EVSMessage::JOIN:
 
     default:
-	LOG_DEBUG(std::string("equal() not implemented for ") + ::to_string(a->get_type()));
+	log_debug << "equal() not implemented for "
+	          << EVSMessage::to_string(a->get_type());
     }
     return false;
 }

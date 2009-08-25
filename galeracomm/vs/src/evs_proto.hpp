@@ -84,7 +84,7 @@ public:
         input_map(),
         install_message(0),
         installing(false),
-        last_delivered_safe(),
+        last_delivered_safe(0),
         last_sent(SEQNO_MAX),
         send_window(8),
         output(),
