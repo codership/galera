@@ -28,7 +28,7 @@
  * // TODO: Server example
  * @endcode
  *
- * @author Teemu Ollakka
+ * @author Teemu Ollakka <teemu.ollakka@codership.com>
  *
  */
 
@@ -174,7 +174,7 @@ private:
     int event_mask;     /*!< Bitfield for waited network events    */
     sockaddr local_sa;  /*!< Socket address for local endpoint     */
     sockaddr remote_sa; /*!< Socket address for remote endpoint    */
-    size_t sa_size;     /*!< Size of socket address                */
+    socklen_t sa_size;     /*!< Size of socket address                */
     
     size_t dgram_offset; /*!< Offset of the last read datagram  */
     bool complete;     /*!< Boolean denoting that compleme dgram
@@ -199,7 +199,7 @@ private:
            const int options = O_NO_INTERRUPT,
            const sockaddr* local_sa = 0, 
            const sockaddr* remote_sa = 0,
-           const size_t sa_size = 0);
+           const socklen_t sa_size = 0);
         
     /*!
      * @brief Change socket state
@@ -479,7 +479,7 @@ public:
      *         was interrupted by signal
      * @throws std::runtime_error If error was encountered
      */
-    NetworkEvent wait_event(long timeout = -1);
+    NetworkEvent wait_event(int timeout = -1);
 
     /**
      *

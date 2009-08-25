@@ -576,7 +576,8 @@ struct producer_thd_args
     Consumer& cons;
     size_t n_events;
     pthread_barrier_t barrier;
-    producer_thd_args(Consumer& cons_, size_t n_events_, size_t n_thds_) :
+    producer_thd_args(Consumer& cons_, size_t n_events_,
+                      unsigned int n_thds_) :
         cons(cons_),
         n_events(n_events_),
         barrier()

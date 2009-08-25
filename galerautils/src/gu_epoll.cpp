@@ -46,7 +46,7 @@ static inline int to_network_event_mask(const int mask)
 
 
 
-void gu::net::EPoll::resize(const size_t to_size)
+void gu::net::EPoll::resize(const int to_size)
 {
     void* tmp = realloc(events, to_size*sizeof(struct epoll_event));
     if (to_size > 0 && tmp == 0)

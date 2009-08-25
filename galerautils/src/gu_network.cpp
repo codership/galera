@@ -317,11 +317,11 @@ const string gu::net::Socket::get_errstr() const
  */
 
 gu::net::Socket::Socket(Network& net_, 
-                   const int fd_,
-                   const int options_,
-                   const sockaddr* local_sa_,
-                   const sockaddr* remote_sa_,
-                   const size_t sa_size_) :
+                        const int fd_,
+                        const int options_,
+                        const sockaddr* local_sa_,
+                        const sockaddr* remote_sa_,
+                        const socklen_t sa_size_) :
     fd(fd_),
     err_no(0),
     options(options_),
@@ -715,7 +715,7 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
     }
     else if (no_block == true && pending->get_len() > 0)
     {
-        write_hdr(hdr, hdrlen, dgram->get_buflen());
+        write_hdr(hdr, hdrlen, static_cast<const uint32_t>(dgram->get_buflen()));
         pending->push(hdr, hdrlen);
         pending->push(dgram->get_buf(), dgram->get_buflen());
     }
@@ -730,7 +730,7 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
         }
         assert(pending->get_len() == 0);
         assert(ret == 0);
-        write_hdr(hdr, hdrlen, dgram->get_buflen());
+        write_hdr(hdr, hdrlen, static_cast<const uint32_t>(dgram->get_buflen()));
         struct iovec iov[2] = {
             {hdr, hdrlen},
             {const_cast<byte_t*>(dgram->get_buf()), dgram->get_buflen()}
@@ -1013,7 +1013,7 @@ void gu::net::Network::set_event_mask(Socket* sock, const int mask)
     sock->set_event_mask(mask);
 }
 
-gu::net::NetworkEvent gu::net::Network::wait_event(const long timeout)
+gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout)
 {
     Socket* sock = 0;
     int revent = 0;

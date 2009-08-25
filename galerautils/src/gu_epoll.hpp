@@ -12,7 +12,6 @@
 #ifndef __GU_EPOLL_HPP__
 #define __GU_EPOLL_HPP__
 
-#include <cstdlib>
 
 /* Forward declarations */
 namespace gu
@@ -84,14 +83,14 @@ class gu::net::EPoll
 {
     int e_fd; /*! epoll control file descriptor */
     struct epoll_event* events; /*! array of epoll events */
-    size_t events_size; /*! events array size */
-    size_t n_events; /*! number of unhandled events  */
+    int events_size; /*! events array size */
+    int n_events; /*! number of unhandled events  */
     struct epoll_event* current; /*! pointer to current event */
 
     /*!
      * @brief Resize events array
      */
-    void resize(const size_t to_size);
+    void resize(const int to_size);
 
     EPoll(const EPoll&);
     void operator=(const EPoll&);
