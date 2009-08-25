@@ -313,7 +313,8 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     last_applied = last_recved;
 
 // begin workaround for #411814
-    memcpy ((void*)&args->state_uuid, &group_uuid, sizeof(wsrep_uuid_t));
+    void* uuid = (void*)&args->state_uuid; // outsmart FORTIFY_SOURCE?
+    memcpy (uuid, &group_uuid, sizeof(wsrep_uuid_t));
     *(wsrep_seqno_t*)&args->state_seqno = last_applied;
 // end   workaround for #411814
 
@@ -763,7 +764,7 @@ static wsrep_status_t process_conn_write_set(
     gcs_seqno_t seqno_g, gcs_seqno_t seqno_l
 ) {
     bool do_report;
-    wsrep_status_t rcode;
+    wsrep_status_t rcode = WSREP_OK;
 
     /* wait for total order */
     GALERA_GRAB_QUEUE (to_queue,     seqno_l);

@@ -14,12 +14,11 @@ libmmgalera_la_SOURCES =   \
 #GALERA_RELEASE = -Wl,--whole-archive .libs/libwsdb.a -Wl,--no-whole-archive
 #endif
 #libmmgalera_la_DEPENDENCIES = libwsdb.la
-libmmgalera_la_LIBADD       = -lwsdb
+libmmgalera_la_LIBADD = -lwsdb
 GALERA_INTERFACE = @WSREP_INTERFACE_VERSION@
 #grep WSREP_INTERFACE_VERSION wsrep_api.h | awk '{ print $2 }' | sed s/\"//g
 GALERA_REVISION  = 0
 GALERA_AGE       = 0
-libmmgalera_la_LDFLAGS = \
+libmmgalera_la_LDFLAGS = @AM_LDFLAGS@ \
 	-version-info $(GALERA_INTERFACE):$(GALERA_REVISION):$(GALERA_AGE)
-libmmgalera_la_CPPFLAGS = $(CPPFLAGS)
 # </libgalera>
