@@ -1,15 +1,15 @@
 #ifndef THREAD_HPP
 #define THREAD_HPP
 
+#include <galerautils.hpp>
+
 #include <pthread.h>
 #include <galeracomm/exception.hpp>
 #include <galeracomm/logger.hpp>
-#include <galeracomm/monitor.hpp>
-
 
 class Thread {
     pthread_t th;
-    Monitor monitor;
+    gu::Monitor monitor;
     enum State {
 	STOPPED, 
 	RUNNING,
@@ -36,7 +36,7 @@ public:
     void start() {
 	int err;
 	
-	Critical crit(&monitor);
+	gu::Critical crit(monitor);
 	if (state != STOPPED)
 	    throw FatalException("Tread::start(): invalid state");
 	
@@ -50,7 +50,7 @@ public:
     
     void stop() {
 	int err;
-	Critical crit(&monitor);
+	gu::Critical crit(monitor);
 	if (state != RUNNING)
 	    throw FatalException("Thread::stop(): invalid state");
 

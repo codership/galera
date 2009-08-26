@@ -1,9 +1,10 @@
 #ifndef READBUF_HPP
 #define READBUF_HPP
 
+#include <galerautils.hpp>
+
 #include <galeracomm/types.h>
 #include <galeracomm/exception.hpp>
-#include <galeracomm/monitor.hpp>
 #include <galeracomm/logger.hpp>
 #include <iostream>
 
@@ -14,7 +15,7 @@ class ReadBuf {
     const unsigned char *buf;
     mutable unsigned char *priv_buf;
     size_t buflen;
-    mutable Monitor mon;
+    gu::Monitor mon;
 
     // Disable copy constructor
     ReadBuf (const ReadBuf&);
@@ -69,7 +70,7 @@ public:
 	    ret->release();
 	    return ret;
 	} else {
-	    Critical crit(&mon);
+	    gu::Critical crit(mon);
 	    if (priv_buf == 0) {
 		priv_buf = new unsigned char[buflen];
 		memcpy(priv_buf, buf, buflen);

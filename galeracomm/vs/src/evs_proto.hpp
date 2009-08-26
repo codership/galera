@@ -1,6 +1,8 @@
 #ifndef EVS_PROTO_HPP
 #define EVS_PROTO_HPP
 
+#include <deque>
+
 #include "evs_input_map.hpp"
 #include "evs_message.hpp"
 #include "galeracomm/time.hpp"

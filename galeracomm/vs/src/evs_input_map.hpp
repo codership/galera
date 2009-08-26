@@ -8,6 +8,7 @@
 
 #include <map>
 #include <set>
+#include <list>
 
 class EVSInputMapItem {
     

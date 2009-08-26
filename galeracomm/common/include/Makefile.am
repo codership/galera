@@ -6,5 +6,4 @@ gcomminclude_HEADERS = \
 	galeracomm/protolay.hpp  \
 	galeracomm/address.hpp   \
 	galeracomm/writebuf.hpp  \
-	galeracomm/readbuf.hpp   \
-	galeracomm/monitor.hpp
+	galeracomm/readbuf.hpp

@@ -31,7 +31,7 @@ public:
     std::deque<ReadBuf*> local_msgs;
     const Serializable *user_state;
 
-    VSProto(const Address a, Protolay *up_ctx, const Serializable *us) :
+    VSProto(const Address a, Protolay& up_ctx, const Serializable *us) :
         state(JOINING),
 	addr(a),
         trans_view(0),
@@ -43,7 +43,7 @@ public:
         local_msgs(),
         user_state(us)
     {
-	set_up_context(up_ctx);
+	set_up_context(&up_ctx);
     }
 
     ~VSProto() {
@@ -353,9 +353,9 @@ void VSProto::handle_data(const VSMessage *dm, const ReadBuf *rb, const size_t r
 //
 //
 
-VS::VS() : be(0), be_addr(0), proto(), mon(0) {}
+// VS::VS() : be(0), be_addr(0), proto(), mon(0) {}
 
-VS::VS(Monitor *m) : be(0), be_addr(0), proto(), mon(m) {}
+VS::VS(const gu::Monitor& m) : be(0), be_addr(0), proto(), mon(m) {}
 
 static void release_proto(std::pair<const ServiceId, VSProto *> p)
 {
@@ -384,12 +384,13 @@ void VS::close()
     be->close();
 }
 
-void VS::join(const ServiceId sid, Protolay *up_ctx, const Serializable *user_state)
+void VS::join(const ServiceId sid, Toplay& up_ctx, const Serializable *user_state)
 {
     if (!be)
 	throw DException("Not connected");
 
-    Critical crit(mon);
+    gu::Critical crit(mon);
+
     VSProtoMap::iterator i;
     if ((i = proto.find(sid)) != proto.end())
 	throw DException("Already joined");
@@ -412,7 +413,7 @@ void VS::leave(const ServiceId sid)
 {
     if (!be)
 	throw DException("Not connected");
-    Critical crit(mon);
+    gu::Critical crit(mon);
     VSProtoMap::iterator i;
     if ((i = proto.find(sid)) == proto.end())
 	throw DException("Not joined");
@@ -446,7 +447,7 @@ void VS::handle_up(const int cid, const ReadBuf *rb, const size_t roff, const Pr
 	throw FatalException("Failed to read message");
     LOG_TRACE(std::string("VS::handle_up(): Msg type = ") + to_string(msg.get_type()));
 
-    Critical crit(mon);
+    gu::Critical crit(mon);
     VSProtoMap::iterator pi = proto.find(msg.get_source().get_service_id());
     if (pi == proto.end()) {
 	std::cerr << "Dropping message, no protoent\n";
@@ -486,7 +487,7 @@ int VS::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
     ServiceId sid = vdm ? vdm->sid : 0;
     uint8_t user_type = vdm ? vdm->user_type : 0;
 
-    Critical crit(mon);
+    gu::Critical crit(mon);
     if ((pi = proto.find(sid)) == proto.end())
 	return EINVAL;
 
@@ -531,7 +532,7 @@ int VS::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 }
 
 
-VS *VS::create(const char *conf, Poll *poll, Monitor *m)
+VS *VS::create(const char *conf, Poll *poll, const gu::Monitor& m)
 {
 
     VS *vs = 0;
@@ -543,7 +544,8 @@ VS *VS::create(const char *conf, Poll *poll, Monitor *m)
 	    vs->be->set_flags(VSBackend::F_DROP_OWN_DATA);
 	vs->be_addr = strdup(conf);
 	vs->set_down_context(vs->be);
-    } catch (std::exception e) {
+    } catch (std::exception& e) {
+	log_error << e.what();
 	delete vs;
 	throw;
     }

@@ -1,4 +1,5 @@
 
+#include <galerautils.hpp>
 
 #include "galeracomm/poll.hpp"
 #include "galeracomm/readbuf.hpp"
@@ -6,7 +7,6 @@
 #include "galeracomm/address.hpp"
 #include "galeracomm/protolay.hpp"
 #include "galeracomm/fifo.hpp"
-#include "galeracomm/monitor.hpp"
 #include "galeracomm/logger.hpp"
 #include "galeracomm/thread.hpp"
 
@@ -19,8 +19,6 @@
 
 #include <check.h>
 #include <unistd.h>
-
-#include <galerautils.hpp>
 
 START_TEST(check_address)
 {
@@ -602,25 +600,25 @@ START_TEST(check_protolay)
 END_TEST
 
 struct thd_arg {
-    Monitor *m;
+    const gu::Monitor& m;
     int *valp;
-    thd_arg(Monitor *mm, int *va) : m(mm), valp(va) {}
+    thd_arg(const gu::Monitor& mm, int *va) : m(mm), valp(va) {}
 };
 
 void *run_thd(void *argp)
 {
     thd_arg *arg = reinterpret_cast<thd_arg *>(argp);
-    Monitor *m = arg->m;
+    const gu::Monitor& m = arg->m;
     int *val = arg->valp;
 
     for (int i = 0; i < 10000; i++) {
 	int rn = rand()%1000;
-	m->enter();
+	m.enter();
 	(*val) += rn;
 	pthread_yield();
 	fail_unless(*val == rn);
 	(*val) -= rn;
-	m->leave();
+	m.leave();
     }
     return 0;
 }
@@ -629,8 +627,8 @@ START_TEST(check_monitor)
 {
     pthread_t thds[8];
     int val = 0;
-    Monitor m;
-    thd_arg arg(&m, &val);
+    gu::Monitor m;
+    thd_arg arg(m, &val);
     m.enter();
     for (int i = 0; i < 8; i++) {
 	pthread_create(&thds[i], 0, &run_thd, &arg);
@@ -648,13 +646,13 @@ END_TEST
 void *run_thd_crit(void *argp)
 {
     thd_arg *arg = reinterpret_cast<thd_arg *>(argp);
-    Monitor *m = arg->m;
+    const gu::Monitor& m = arg->m;
     int *val = arg->valp;
 
     for (int i = 0; i < 10000; i++) {
 	int rn = rand()%1000;
 	{
-	    Critical crit(m);
+	    gu::Critical crit(m);
 	    (*val) += rn;
 	    pthread_yield();
 	    fail_unless(*val == rn);
@@ -669,8 +667,8 @@ START_TEST(check_critical)
 {
     pthread_t thds[8];
     int val = 0;
-    Monitor m;
-    thd_arg arg(&m, &val);
+    gu::Monitor m;
+    thd_arg arg(m, &val);
     m.enter();
     for (int i = 0; i < 8; i++) {
 	pthread_create(&thds[i], 0, &run_thd_crit, &arg);

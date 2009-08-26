@@ -1,7 +1,6 @@
 #include <galerautils.hpp>
 
 #include "galeracomm/vs.hpp"
-#include "galeracomm/monitor.hpp"
 #include "galeracomm/thread.hpp"
 #include "vsbes.hpp"
 
@@ -79,28 +78,28 @@ START_TEST(check_vsview)
 	    view1.addr_insert(*i);
 	    fail("add_insert");
 	}
-	catch (std::exception e) {
+	catch (std::exception& e) {
 	    
 	}
 	try {
 	    view1.joined_insert(*i);
 	    fail("joined_insert");
 	}
-	catch (std::exception e) {
+	catch (std::exception& e) {
 	    
 	}
 	try {
 	    view1.left_insert(*i);
 	    fail("left_insert");
 	}
-	catch (std::exception e) {
+	catch (std::exception& e) {
 	    
 	}
 	try {
 	    view1.partitioned_insert(*i);
 	    fail("partitioned_insert");
 	}
-	catch (std::exception e) {
+	catch (std::exception& e) {
 	    
 	}
     }
@@ -237,6 +236,15 @@ START_TEST(check_vsmessage)
 }
 END_TEST
 
+class Proto : public Toplay
+{
+public :
+//    Proto() {}
+//    ~Proto() {}
+    int  handle_down (WriteBuf*, const ProtoDownMeta*) { return 0; }
+//    void handle_up   (int, const ReadBuf*, size_t, const ProtoUpMeta*) {}
+};
+
 typedef std::pair<VSView *, VSMessage *> Event;
 
 class Session : public Toplay {
@@ -253,7 +261,7 @@ public:
     std::deque<Event> events;
 
 
-    Session(const char *be_addr, Poll *p, Monitor *m = 0) :
+    Session(const char *be_addr, Poll *p, const gu::Monitor& m) :
         vs(VS::create(be_addr, p, m)),
 	connected(false),
         leaving(false), 
@@ -314,7 +322,7 @@ public:
     }
     void join() {
 	leaving = false;
-	vs->join(0, this);
+	vs->join(0, *this);
     }
     void leave() {
 	vs->leave(0);
@@ -512,11 +520,11 @@ START_TEST(check_vs)
     VS *vs = 0;
 
     Poll *p = Poll::create(poll_type);
+
+    gu::Monitor m;
     
-
-
     try {
-	vs = VS::create(vsbe_addr, p, 0);
+	vs = VS::create(vsbe_addr, p, m);
 	fail_unless(!!vs);
     } catch (std::exception e) {
 	fail(e.what());
@@ -524,7 +532,7 @@ START_TEST(check_vs)
 
     Poll *p2 = Poll::create(poll_type);
     try {
-	VS *vs2 = VS::create("asdfasdf", p2, 0);
+	VS *vs2 = VS::create("asdfasdf", p2, m);
 	delete vs2;
 	fail("");
     } catch (std::exception e) {
@@ -533,19 +541,15 @@ START_TEST(check_vs)
     delete p2;
     delete vs;
 
-
-
-
-
     try {
-	Session u1(vsbe_addr, p);
+	Session u1(vsbe_addr, p, m);
 	u1.connect();
 	u1.join();
 	while (p->poll(poll_intval)) {}
 	fail_unless(u1.is_connected());
 	u1.send();
 	while (p->poll(poll_intval)) {}
-	Session u2(vsbe_addr, p);
+	Session u2(vsbe_addr, p, m);
 	u2.connect();
 	u2.join();
 	while (p->poll(poll_intval)) {}
@@ -568,10 +572,9 @@ START_TEST(check_vs)
     }
 
     try {
-
-	Session u1(vsbe_addr, p);
+	Session u1(vsbe_addr, p, m);
 	u1.connect();
-	Session u2(vsbe_addr, p);
+	Session u2(vsbe_addr, p, m);
 	u2.connect();
 
 	// 
@@ -633,7 +636,7 @@ public:
 START_TEST(check_vs_random)
 {
     
-    Monitor mon;
+    gu::Monitor mon;
     std::deque<Session *> sessions;
     std::list<Session *> active;
     std::deque<Session *> passive;
@@ -641,7 +644,7 @@ START_TEST(check_vs_random)
     Poll *p = Poll::create(poll_type);
     
     for (int i = 0; i < 4; i++)
-	sessions.push_back(new Session(vsbe_addr, p, &mon));
+	sessions.push_back(new Session(vsbe_addr, p, mon));
     
     for (std::deque<Session *>::iterator i = sessions.begin();
 	 i != sessions.end(); ++i) {
@@ -764,7 +767,7 @@ public:
 
 class Client {
     Poll* poll;
-    Monitor* mon;
+    gu::Monitor mon;
     VS* vs;
     ClientSender* sen;
     ClientReceiver* rec;
@@ -776,7 +779,7 @@ public:
 
     Client() :
 	poll (Poll::create("def")),
-	mon  (new Monitor()),
+	mon  (),
 	vs   (VS::create(sync_addr, poll, mon)),
         sen  (0),
         rec  (0) 
@@ -788,14 +791,13 @@ public:
 	delete rec;
 	delete vs;
 	delete poll;
-	delete mon;
     }
     
     void start() {
 	vs->connect();
 	sen = new ClientSender(vs);
 	rec = new ClientReceiver(poll, vs);
-	vs->join(0, rec);
+	vs->join(0, *rec);
 	// Poll for Trans View
 	if (poll->poll(500) == 0)
 	    throw FatalException("");

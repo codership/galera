@@ -1,11 +1,12 @@
 #ifndef VS_HPP
 #define VS_HPP
 
+#include <galerautils.hpp>
+
 #include <galeracomm/protolay.hpp>
 #include <galeracomm/poll.hpp>
 #include <galeracomm/address.hpp>
 #include <galeracomm/exception.hpp>
-#include <galeracomm/monitor.hpp>
 
 #include <set>
 #include <map>
@@ -749,7 +750,7 @@ class VS : public Protolay {
     VSBackend *be;
     char *be_addr;
     VSProtoMap proto;
-    Monitor *mon;
+    const gu::Monitor& mon;
 
     VS (const VS&);
     void operator= (const VS&);
@@ -762,8 +763,8 @@ public:
     Address get_self(const ServiceId) const;
     
     
-    VS();
-    VS(Monitor *m);
+//    VS();
+    VS(const gu::Monitor& m);
     ~VS();
     
     // Connect to backend
@@ -771,11 +772,11 @@ public:
     // Close backend
     void close();
     // Join to service
-    void join(const ServiceId, Protolay *, const Serializable *user_state = 0);
+    void join(const ServiceId, Toplay&, const Serializable *user_state = 0);
     // Leave service
     void leave(const ServiceId);
     
-    static VS *create(const char *, Poll *, Monitor *);
+    static VS *create(const char *, Poll *, const gu::Monitor&);
 };
 
 #endif // VS_HPP

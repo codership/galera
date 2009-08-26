@@ -170,7 +170,7 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 		close();
 	    }
 	    return;
-	} catch (std::exception e) {
+	} catch (std::exception& e) {
 	    LOG_ERROR(std::string("Exception: ") + e.what());
 	    close();
 	    return;
@@ -229,7 +229,7 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 		    VSRCommand response(VSRCommand::RESULT, VSRCommand::SUCCESS);
 		    VSRMessage rmsg(response);
 		    wb.prepend_hdr(rmsg.get_raw(), rmsg.get_raw_len());
-		} catch (std::exception e) {
+		} catch (std::exception& e) {
 		    LOG_INFO(e.what());
 		    VSRCommand response(VSRCommand::RESULT, VSRCommand::FAIL);
 		    VSRMessage rmsg(response);
@@ -291,7 +291,7 @@ void ClientHandler::start()
 	    LOG_INFO("Sent handshake");
 	}
 	return;
-    } catch (std::exception e) {
+    } catch (std::exception& e) {
 	LOG_WARN(std::string("Exception: ") + e.what());
 	close();
 	return;
@@ -391,8 +391,6 @@ int main(int argc, char *argv[])
     
     ::signal(SIGPIPE, _SIG_IGN);
     
-    Monitor::set_skip_locking(::getenv("VSBES_EXPLICIT_LOCKING") ? false : true);
-
     (::getenv("VSBES_DEBUG")) ? gu_conf_debug_on() : gu_conf_debug_off();
 
     try {

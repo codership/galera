@@ -8,7 +8,6 @@ libgcommcommonpp_la_SOURCES = \
 	pollpp.cpp \
 	fifo.cpp   \
 	time.cpp   \
-	timer.cpp  \
-	monitor.cpp
+	timer.cpp
 
 #	logger.cpp
