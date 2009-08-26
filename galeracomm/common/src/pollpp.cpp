@@ -17,9 +17,13 @@
 
 class PollDef : public Poll {
 
-    std::map<const int, PollContext *> ctx_map;
-    size_t n_pfds;
-    struct pollfd *pfds;
+    typedef std::map <const int, PollContext*> PollContextMap;
+    typedef std::pair<const int, PollContext*> PollContextMapPair;
+    typedef std::map <const int, PollContext*>::iterator PollContextMapIterator;
+
+    PollContextMap ctx_map;
+    size_t         n_pfds;
+    struct pollfd* pfds;
 
     PollDef (const PollDef&);
     void operator=(const PollDef&);
@@ -47,10 +51,10 @@ static inline int map_event_to_mask(const PollEnum e)
 static inline PollEnum map_mask_to_event(const int m)
 {
     PollEnum ret = PollEvent::POLL_NONE;
-    ret |= (m & POLLIN) ? PollEvent::POLL_IN : PollEvent::POLL_NONE;
-    ret |= (m & POLLOUT) ? PollEvent::POLL_OUT : PollEvent::POLL_NONE;
-    ret |= (m & POLLERR) ? PollEvent::POLL_ERR : PollEvent::POLL_NONE;
-    ret |= (m & POLLHUP) ? PollEvent::POLL_HUP : PollEvent::POLL_NONE;
+    ret |= (m & POLLIN)   ? PollEvent::POLL_IN    : PollEvent::POLL_NONE;
+    ret |= (m & POLLOUT)  ? PollEvent::POLL_OUT   : PollEvent::POLL_NONE;
+    ret |= (m & POLLERR)  ? PollEvent::POLL_ERR   : PollEvent::POLL_NONE;
+    ret |= (m & POLLHUP)  ? PollEvent::POLL_HUP   : PollEvent::POLL_NONE;
     ret |= (m & POLLNVAL) ? PollEvent::POLL_INVAL : PollEvent::POLL_NONE;
     return ret;
 }
@@ -69,7 +73,8 @@ static struct pollfd *pfd_find(struct pollfd *pfds, const size_t n_pfds,
 void PollDef::insert(const int fd, PollContext *pctx)
 {
 
-    if (ctx_map.insert(std::pair<const int, PollContext*>(fd, pctx)).second == false)
+    if (ctx_map.insert(PollContextMapPair(fd, pctx)).second ==
+        false)
 	throw DException("Insert");
 }
 
@@ -81,8 +86,7 @@ void PollDef::erase(const int fd)
     size_t s = ctx_map.size();
     ctx_map.erase(fd);
     if (ctx_map.size() + 1 != s) {
-	std::cerr << "Warn: Fd didn't exist in poll set, map size = ";
-	std::cerr << ctx_map.size() << "\n";
+	log_warn << "Fd didn't exist in poll set, map size: " << ctx_map.size();
     }
 }
 
@@ -94,7 +98,8 @@ void PollDef::set(const int fd, const PollEnum e)
 //	std::cerr << "fd " << fd << " set POLL_OUT\n";
     if ((pfd = pfd_find(pfds, n_pfds, fd)) == 0) {
 	++n_pfds;
-	pfds = reinterpret_cast<struct pollfd *>(realloc(pfds, n_pfds*sizeof(struct pollfd)));
+	pfds = reinterpret_cast<struct pollfd *>
+            (realloc(pfds, n_pfds*sizeof(struct pollfd)));
 	pfd = &pfds[n_pfds - 1];
 	pfd->fd = fd;
 	pfd->events = 0;
@@ -113,39 +118,54 @@ void PollDef::unset(const int fd, const PollEnum e)
 	pfd->events &= ~map_event_to_mask(e);
 	if (pfd->events == 0) {
 	    --n_pfds;
-	    memmove(&pfd[0], &pfd[1], (n_pfds - (pfd - pfds))*sizeof(struct pollfd));
-	    pfds = reinterpret_cast<struct pollfd *>(realloc(pfds, n_pfds*sizeof(struct pollfd)));
+	    memmove (&pfd[0], &pfd[1],
+                     (n_pfds - (pfd - pfds))*sizeof(struct pollfd));
+	    pfds = reinterpret_cast<struct pollfd *>
+                (realloc(pfds, n_pfds*sizeof(struct pollfd)));
 	}
     }
 }
 
 int PollDef::poll(const int timeout)
 {
-    int p_ret;
-    int err = 0;
     int p_cnt = 0;
-    p_ret = ::poll(pfds, n_pfds, timeout);
-    err = errno;
+    int p_ret = ::poll(pfds, n_pfds, timeout);
+    int err   = errno;
+
     if (p_ret == -1 && err == EINTR) {
 	p_ret = 0;
-    } else if (p_ret == -1 && err != EINTR) {
+    }
+    else if (p_ret == -1 && err != EINTR) {
 	throw DException("");
-    } else {
+    }
+    else {
 	for (size_t i = 0; i < n_pfds; i++) {
+
 	    PollEnum e = map_mask_to_event(pfds[i].revents);
+
 	    if (e != PollEvent::POLL_NONE) {
-		std::map<const int, PollContext *>::iterator map_i;
+
+		PollContextMapIterator map_i;
+
 		if ((map_i = ctx_map.find(pfds[i].fd)) != ctx_map.end()) {
-		    if (map_i->second == 0)
-			throw DException("");
-		    map_i->second->handle(pfds[i].fd, e);
+
+		    if (map_i->second == 0) throw DException("");
+
+                    try {
+                        map_i->second->handle(pfds[i].fd, e);
+                    }
+                    catch (std::exception& e) {
+                        throw DException (e.what());
+                    }
+
 		    p_cnt++;
-		} else {
+		}
+                else {
 		    throw FatalException("No ctx for fd found");
 		}
 	    } else {
 		if (pfds[i].revents) {
-		    LOG_ERROR("Unhandled poll events");
+		    log_error << "Unhandled poll events";
 		    throw FatalException("");
 		}
 	    }

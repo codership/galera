@@ -109,19 +109,22 @@ void ClientHandler::handle_vs(const ReadBuf *rb, const size_t roff,
 			      const ProtoUpMeta *um)
 {
     if (rb == 0) {
-	LOG_INFO("Null message, silent drop");
+	log_info << "Null message, silent drop";
     } else {
 	size_t read_len = rb->get_len(roff);
 	
 	if (flags & F_DROP_OWN_DATA) {
 	    VSMessage vmsg;
+
 	    if (vmsg.read(rb->get_buf(), rb->get_len(), roff) == 0) {
-		LOG_FATAL("Detected data corruption");
+		log_fatal << "Detected data corruption";
 		throw FatalException("Data corruption");
 	    }
-	    if (vmsg.get_type() == VSMessage::DATA && vmsg.get_source() == vs->get_self()) {
+
+	    if (vmsg.get_type()   == VSMessage::DATA &&
+                vmsg.get_source() == vs->get_self()) {
 		read_len = vmsg.get_hdrlen();
-		log_debug << "Dropping data, hdr len" << read_len;
+		log_debug << "Dropping own data, hdr len: " << read_len;
 	    }
 	}
 	

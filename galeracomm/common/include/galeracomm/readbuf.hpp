@@ -22,13 +22,14 @@ class ReadBuf {
     ReadBuf& operator=(ReadBuf& r);// { return r;}
     // Private destructor to disallow allocating ReadBuf from stack
 
-
 public:
-
 
     ~ReadBuf() {
 	if (instack == false) {
 	    LOG_FATAL("~ReadBuf(): Invalid call to dtor");
+#ifdef DEBUG_ASSERT
+            while (1) { sleep (1); }
+#endif
 	    throw FatalException("Must not call dtor explicitly, object not in stack");
 	}
 	delete[] priv_buf;
@@ -80,7 +81,13 @@ public:
     
     
     ReadBuf *copy(const size_t offset) const {
-	if (offset > buflen) throw DException("offset > buflen");
+	if (offset > buflen) {
+            log_error << "offset: " << offset << " > buflen: " << buflen;
+#ifdef DEBUG_ASSERT
+            while (1) sleep (1);
+#endif
+            throw DException("offset > buflen");
+        }
 
 	if (offset > 0) {
 	    ReadBuf *ret = new ReadBuf(get_buf(offset), buflen - offset);
@@ -114,7 +121,7 @@ public:
 
     void release() {
 	mon.enter();
-	// std::cerr << "release " << this << " refcnt " << refcnt << "\n";
+	// log_debug << "release: " << this << ", refcnt: " << refcnt;
 	assert(refcnt > 0);
 	if (--refcnt == 0) {
 	    instack = true;
