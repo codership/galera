@@ -25,38 +25,49 @@ namespace gu
 
 class gu::Monitor
 {
-    int refcnt;
-    /* TODO: */
-    pthread_t holder;
-    Mutex mutex;
-    Cond cond;
+    int mutable refcnt;
+    Mutex       mutex;
+    Cond        cond;
+
+#ifndef NDEBUG
+    pthread_t mutable holder;
+#endif
+
+    // copy contstructor and operator= disabled by mutex and cond members.
 
 public:
-    Monitor() :
-        refcnt(0),
-        holder(0)
-    {
-    }
-    ~Monitor()
-    {
-    }
 
-    void enter()
+#ifndef NDEBUG
+    Monitor() : refcnt(0), mutex(), cond(), holder(0) {}
+#else
+    Monitor() : refcnt(0), mutex(), cond {}
+#endif
+
+    ~Monitor() {}
+
+    void enter() const
     {
         Lock lock(mutex);
-        while (refcnt > 0 && pthread_equal(holder, pthread_self()) == 0)
+
+// Teemu, pthread_equal() check seems redundant, refcnt too (counted in cond)	
+//        while (refcnt > 0 && pthread_equal(holder, pthread_self()) == 0)
+        while (refcnt)
         {
             lock.wait(cond);
         }
         refcnt++;
+#ifndef NDEBUG
         holder = pthread_self();
+#endif
     }
     
-    void leave()
+    void leave() const
     {
         Lock lock(mutex);
+	
         assert(refcnt > 0);
         assert(pthread_equal(holder, pthread_self()) != 0);
+	
         refcnt--;
         if (refcnt == 0)
         {
@@ -67,10 +78,14 @@ public:
 
 class gu::Critical
 {
-    Monitor& mon;
+    const Monitor& mon;
+
+    Critical (const Critical&);
+    Critical& operator= (const Critical&);
+    
 public:
-    Critical(Monitor& mon_) :
-        mon(mon_)
+
+    Critical(const Monitor& m) : mon(m)
     {
         mon.enter();
     }

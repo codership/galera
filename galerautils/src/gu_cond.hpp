@@ -23,14 +23,15 @@ namespace gu
 
     protected:
 
-        pthread_cond_t cond;
-        long           ref_count;
+        pthread_cond_t mutable cond;
+        long           mutable ref_count;
 
     public:
 
-        Cond () throw()
-        : cond(), ref_count(0)
-        { pthread_cond_init (&cond, NULL); };
+        Cond () throw() : cond(), ref_count(0)
+        {
+	    pthread_cond_init (&cond, NULL);
+	}
 
         ~Cond ()
         {
@@ -39,9 +40,9 @@ namespace gu
 		{ usleep (100); }
             if (gu_unlikely(ret != 0))
                 throw Exception("pthread_cond_destroy() failed", ret);
-        };
+        }
 
-        inline void signal ()
+        inline void signal () const
         {
             if (ref_count > 0) {
                 register int ret = pthread_cond_signal (&cond);
@@ -50,7 +51,7 @@ namespace gu
             }
         }
 
-        inline void broadcast ()
+        inline void broadcast () const
         {
             if (ref_count > 0) {
                 register int ret = pthread_cond_broadcast (&cond);

@@ -18,28 +18,24 @@ namespace gu
 {
     class Lock
     {
+        pthread_mutex_t* const value;
 
-    private:
+        Lock (const Lock&);
+        Lock& operator=(const Lock&);
 
-        pthread_mutex_t* value;
-        
-        Lock(const Lock&);
-        void operator=(const Lock&);
     public:
 
-        Lock (Mutex& mtx) : 
-            value(&mtx.value)
+        Lock (const Mutex& mtx) : value(&mtx.value)
         {
 
             int err = pthread_mutex_lock (value);
-
-            if (err) {
+            if (err)
+	    {
                 std::string msg = "Mutex lock failed: ";
                 msg = msg + strerror(err);
                 throw Exception(msg.c_str(), err);
             }
-
-        };
+        }
 
         virtual ~Lock ()
         {
@@ -51,14 +47,14 @@ namespace gu
                 throw Exception(msg.c_str(), err);
             }
             // log_debug << "Unlocked mutex " << value;
-        };
+        }
 
-        inline void wait (Cond& cond)
+        inline void wait (const Cond& cond)
         {
             cond.ref_count++;
             pthread_cond_wait (&(cond.cond), value);
             cond.ref_count--;
-        };
+        }
 
     };
 }
