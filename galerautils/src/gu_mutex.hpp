@@ -32,13 +32,12 @@ namespace gu
             pthread_mutex_init (&value, NULL);
         };
 
-        virtual ~Mutex ()
+        ~Mutex ()
         {
             int err = pthread_mutex_destroy (&value);
             if (err != 0) {
                 throw Exception (strerror(err), err);
             }
-            log_debug << "Destroyed mutex " << &value;
         };
     };
 }
