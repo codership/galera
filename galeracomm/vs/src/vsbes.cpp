@@ -380,17 +380,21 @@ extern "C" { static void (* const _SIG_IGN)(int) = SIG_IGN; }
 
 int main(int argc, char *argv[])
 {
-
-    LOG_INFO("start");
-    ::signal(SIGPIPE, _SIG_IGN);
-    Monitor::set_skip_locking(::getenv("VSBES_EXPLICIT_LOCKING") ? false : true);
-
-    (::getenv("VSBES_DEBUG")) ? gu_conf_debug_on() : gu_conf_debug_off();
-
     if (argc < 2) {
 	std::cerr << "Usage: " << argv[0] << " <address>" << std::endl;
 	exit (-1);
     }
+
+    gu_conf_self_tstamp_on(); // turn on the timestamps
+    
+    log_info << "start";
+    
+    ::signal(SIGPIPE, _SIG_IGN);
+    
+    Monitor::set_skip_locking(::getenv("VSBES_EXPLICIT_LOCKING") ? false : true);
+
+    (::getenv("VSBES_DEBUG")) ? gu_conf_debug_on() : gu_conf_debug_off();
+
     try {
 	std::string srv_arg("async");
 	srv_arg += argv[1];
@@ -398,8 +402,8 @@ int main(int argc, char *argv[])
 	s.start();
 	s.run();
 	s.stop();
-    } catch (std::exception e) {
-	std::cerr << e.what() << "\n";
+    } catch (std::exception& e) {
+	log_error << e.what();
 	return 1;
     }
     return 0;
