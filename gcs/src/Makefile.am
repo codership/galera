@@ -62,7 +62,7 @@ gcs_test_LDADD   = $(lib_LTLIBRARIES) $(GCOMM_LIBS)
 gcs_test_LDFLAGS = -static
 # how to set it up automatically?
 CCLD=g++
-gcs_test_LINK    = $(LIBTOOL) --tag=CXX --mode=link $(CCLD) -o $@
+gcs_test_LINK    = $(LIBTOOL) --tag=CXX --mode=link $(CCLD) -static -o $@
 
 .PHONY: lib test tags
 

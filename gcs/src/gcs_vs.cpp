@@ -27,30 +27,25 @@ struct vs_ev {
           const VSView *v) :
 	rb(0), msg(0), view(0), msg_size(ms)
     {
-	if (r)
-	    rb = r->copy(m->get_data_offset()); // what if m is 0?
-	if (m)
-	    msg = new VSMessage(*m);
-	if (v)
-	    view = new VSView(*v);
+	if (r) rb   = r->copy(m->get_data_offset()); // what if m is 0?
+	if (m) msg  = new VSMessage(*m);
+	if (v) view = new VSView(*v);
     }
 
     vs_ev (const vs_ev& ev) :
-        rb       (0),
-        msg      (0),
-        view     (0),
+        rb       (ev.rb),
+        msg      (ev.msg),
+        view     (ev.view),
         msg_size (ev.msg_size)
     {
-	if (ev.rb)   rb   = ev.rb->copy(ev.msg->get_data_offset());
-
-	if (ev.msg)  msg  = new VSMessage(*msg);
-
+	if (ev.rb)   rb   = ev.rb->copy();
+	if (ev.msg)  msg  = new VSMessage(*ev.msg);
 	if (ev.view) view = new VSView(*ev.view);
     }
 
     ~vs_ev ()
     {
-        if (rb)   delete (rb);
+        if (rb)   rb->release();
         if (msg)  delete (msg);
         if (view) delete (view);
     }
@@ -67,30 +62,40 @@ class gcs_vs : public Toplay
 
 public:
 
-    VS *vs;
-    Poll *po;
+    VS*        vs;
+    Poll*      po;
     std::deque<vs_ev> eq;
-    void *waiter_buf;
-    size_t waiter_buf_len;
-    gu::Mutex mutex;
-    gu::Cond  cond;
-    Monitor   monitor;
+    void*      waiter_buf;
+    size_t     waiter_buf_len;
+    gu::Mutex  mutex;
+    gu::Cond   cond;
+    Monitor    monitor;
     enum State {JOINING, JOINED, LEFT} state;
 
-    gcs_vs() : vs(0), po(0), eq(), waiter_buf(0), waiter_buf_len(0), mutex(),
-               cond(), monitor(), state(JOINING)
+    gcs_vs() :
+        vs          (0),
+        po          (0),
+        eq          (),
+        waiter_buf  (0),
+        waiter_buf_len(0),
+        mutex       (),
+        cond        (),
+        monitor     (),
+        state       (JOINING)
     {}
 
     ~gcs_vs()
     {
+/*
 	for (std::deque<vs_ev>::iterator i = eq.begin(); i != eq.end(); ++i) {
-	    if (i->rb)
-		i->rb->release();
-	    if (i->msg)
-		delete i->msg;
-	    if (i->view)
-		delete i->view;
+
+	    if (i->rb)   { i->rb->release(); i->rb = 0; }
+	    if (i->msg)  { delete i->msg;  i->msg  = 0; }
+	    if (i->view) { delete i->view; i->view = 0; }
+
+//            delete &(*i);
 	}
+*/
     }
     
     void handle_up(const int cid, const ReadBuf *rb, const size_t roff, 
@@ -129,14 +134,17 @@ public:
 	}
 
         gu::Lock lock(mutex);
+
 	if (vum->msg && eq.empty() && rb->get_len(roff) <= waiter_buf_len) {
+
 	    memcpy(waiter_buf, rb->get_buf(roff), rb->get_len(roff));
 	    eq.push_back(vs_ev(0, rb->get_len(roff), vum->msg, vum->view));
 	    // Zero pointer/len here to avoid rewriting the buffer if 
 	    // waiter does not wake up before next message
 	    waiter_buf = 0;
 	    waiter_buf_len = 0;
-	} else {
+	}
+        else {
 	    eq.push_back(vs_ev(rb, 0, vum->msg, vum->view));
 	}
 	cond.signal();
@@ -162,12 +170,14 @@ public:
 	assert(eq.size());
         gu::Lock lock(mutex);
 
-	vs_ev ev = eq.front();
+//	vs_ev ev = eq.front();
 	eq.pop_front();
-
+/*
 	if (ev.rb) {
             ev.rb->release();
+            ev.rb = 0;
         }
+*/
     }
 };
 
@@ -248,7 +258,7 @@ static void fill_comp(gcs_comp_msg_t *msg,
 
 	if (comp_map)   comp_map->insert(std::pair<Address, long>(*i, n));
 
-	n++;	    
+	n++;
     }
 }
 
@@ -351,9 +361,9 @@ static void *conn_run(void *arg)
 		abort();
 	    }
 	}
-
     }
-    catch (std::exception e) {
+    catch (std::exception& e) {
+
 	log_error << "poll error: '" << e.what() << "', thread exiting";
 	conn->vs_ctx.handle_up(-1, 0, 0, 0);
     }
@@ -367,12 +377,14 @@ static GCS_BACKEND_OPEN_FN(gcs_vs_open)
     if (!conn) return -EBADFD;
 
     try {
+	conn->vs_ctx.vs->connect();
 	conn->vs_ctx.vs->join(0, &conn->vs_ctx);
 	int err = gu_thread_create(&conn->thr, 0, &conn_run, conn);
 	if (err != 0)
 	    return -err;
     }
-    catch (std::exception e) {
+    catch (std::exception& e) {
+        log_error << e.what();
 	return -EINVAL;
     }
     
@@ -437,8 +449,8 @@ GCS_BACKEND_CREATE_FN(gcs_vs_create)
 	conn->vs_ctx.vs = VS::create(sock, conn->vs_ctx.po, 
 				     &conn->vs_ctx.monitor);
 	conn->vs_ctx.set_down_context(conn->vs_ctx.vs);
-	conn->vs_ctx.vs->connect();
-    } catch (std::exception e) {
+    } catch (std::exception& e) {
+        log_error << e.what();
 	delete conn;
 	return -EINVAL;
     }
