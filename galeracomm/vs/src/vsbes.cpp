@@ -124,7 +124,7 @@ void ClientHandler::handle_vs(const ReadBuf *rb, const size_t roff,
 	    if (vmsg.get_type()   == VSMessage::DATA &&
                 vmsg.get_source() == vs->get_self()) {
 		read_len = vmsg.get_hdrlen();
-		log_debug << "Dropping own data, hdr len: " << read_len;
+//		log_debug << "Dropping own data, hdr len: " << read_len;
 	    }
 	}
 	
@@ -239,8 +239,8 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 	    }
 	    tp->handle_down(&wb, 0);
 	} else if (msg.get_type() == VSRMessage::VSPROTO) {
-	    log_debug << "VSPROTO: len = "
-	              << rb->get_len(roff + msg.get_raw_len());
+//	    log_debug << "VSPROTO: len = "
+//	              << rb->get_len(roff + msg.get_raw_len());
 	    // TODO: Validate
 	    VSMessage vmsg;
 	    if (vmsg.read(rb->get_buf(),

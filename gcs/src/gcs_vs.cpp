@@ -32,22 +32,21 @@ struct vs_ev {
 	if (v) view = new VSView(*v);
     }
 
+    // looks like we need a shallow copy here to go through queue
     vs_ev (const vs_ev& ev) :
         rb       (ev.rb),
         msg      (ev.msg),
         view     (ev.view),
         msg_size (ev.msg_size)
-    {
-	if (ev.rb)   rb   = ev.rb->copy();
-	if (ev.msg)  msg  = new VSMessage(*ev.msg);
-	if (ev.view) view = new VSView(*ev.view);
-    }
+    {}
 
-    ~vs_ev ()
+    ~vs_ev () {}
+
+    void release ()
     {
-        if (rb)   rb->release();
-        if (msg)  delete (msg);
-        if (view) delete (view);
+        if (rb)   { rb->release(); rb   = 0; }
+        if (msg)  { delete msg;    msg  = 0; }
+        if (view) { delete view;   view = 0; }
     }
 
 private:
@@ -84,18 +83,18 @@ public:
         state       (JOINING)
     {}
 
+    void release_event()
+    {
+	assert(eq.size());
+        gu::Lock lock(mutex);
+
+	eq.front().release();
+	eq.pop_front();
+    }
+
     ~gcs_vs()
     {
-/*
-	for (std::deque<vs_ev>::iterator i = eq.begin(); i != eq.end(); ++i) {
-
-	    if (i->rb)   { i->rb->release(); i->rb = 0; }
-	    if (i->msg)  { delete i->msg;  i->msg  = 0; }
-	    if (i->view) { delete i->view; i->view = 0; }
-
-//            delete &(*i);
-	}
-*/
+        while (eq.size()) { release_event(); }
     }
     
     void handle_up(const int cid, const ReadBuf *rb, const size_t roff, 
@@ -165,20 +164,6 @@ public:
 	return ret;
     }
 
-    void release_event()
-    {
-	assert(eq.size());
-        gu::Lock lock(mutex);
-
-//	vs_ev ev = eq.front();
-	eq.pop_front();
-/*
-	if (ev.rb) {
-            ev.rb->release();
-            ev.rb = 0;
-        }
-*/
-    }
 };
 
 struct gcs_backend_conn {
