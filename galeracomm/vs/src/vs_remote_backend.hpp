@@ -151,11 +151,11 @@ public:
 	return cmd;
     }
     
-    size_t write(void *buf, const size_t buflen, const size_t offset) const {
+    size_t write(void *buf, const size_t buflen, const size_t offset) const
+    {
 	size_t off;
-	uint32_t w;
-	w = type;
-	log_debug << "writing message of type: " << w << '(' << type << ')';
+	uint32_t w = type;
+
 	if ((off = write_uint32(w, buf, buflen, offset)) == 0)
 	    return 0;
 	switch (type) {

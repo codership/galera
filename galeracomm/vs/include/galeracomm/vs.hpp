@@ -287,6 +287,35 @@ class VSMessage {
     const Serializable *user_state;
     ReadBuf *user_state_buf;
     size_t hdrlen;
+
+    VSMessage& operator= (const VSMessage& m);
+/*
+    {
+        if (gu_likely(this != &m)) {
+            if (view)           delete view;
+            if (user_state_buf) user_state_buf->release();
+
+            version        = m.version; 
+            type           = m.type; 
+            user_type      = m.user_type;
+            flags          = m.flags;
+            view           = 0;
+            source         = m.source;
+            source_view    = m.source_view;
+            destination    = m.destination;
+            seq            = m.seq;
+            cksum          = m.cksum;
+            data_offset    = m.data_offset;
+            user_state     = m.user_state;
+            user_state_buf = 0;
+            hdrlen         = m.hdrlen;
+
+            if (m.view)           view = new VSView(*m.view);
+            if (m.user_state_buf) user_state_buf = m.user_state_buf->copy();
+        }
+        return *this;
+    }
+*/
 public:
     enum Type {NONE, CONF, STATE, DATA};
     enum {
@@ -312,19 +341,6 @@ public:
         user_state_buf(0),
         hdrlen(0)
     {}
-
-    VSMessage& operator= (const VSMessage& m)
-    {
-	if (view)           delete view;
-	if (user_state_buf) user_state_buf->release();
-
-        *this = m;
-
-	if (m.view)           view = new VSView(*m.view);
-	if (m.user_state_buf) user_state_buf = m.user_state_buf->copy();
-
-        return *this;
-    };
 
     // Ctor for conf message
     VSMessage(const ServiceId sid, const VSView *v) : 
@@ -445,7 +461,6 @@ public:
 	user_state_buf(0),
         hdrlen(m.hdrlen)
     {
-	*this = m;
 	if (m.view)
 	    this->view = new VSView(*m.view);
 	if (m.user_state_buf)

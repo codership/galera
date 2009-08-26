@@ -336,23 +336,32 @@ int TCPTransport::recv_nointr(int flags)
 {
     
     if (recv_buf_offset < TCPTransportHdr::get_raw_len()) {
-	ssize_t ret;    
+	ssize_t ret;
+
 	do {
-	    ret = ::recv(fd, recv_buf + recv_buf_offset, 
+	    ret = ::recv(fd,
+                         recv_buf + recv_buf_offset, 
 			 TCPTransportHdr::get_raw_len() - recv_buf_offset,
 			 flags);
 	} while (ret == -1 && errno == EINTR);
+
 	if (ret == -1 && errno == EAGAIN) {
-	    LOG_DEBUG("TCPTransport::recv_nointr(): Return EAGAIN in header recv"); 
+	    log_debug << "TCPTransport::recv_nointr(): "
+                      << "Return EAGAIN in header recv"; 
 	    return EAGAIN;
 	}
 	else if (ret == -1 || ret == 0) {
-	    LOG_DEBUG("TCPTransport::recv_nointr(): Return error in header recv"); 
-	    return ret == -1 ? errno : EPIPE;
-	}
+            ret = (ret == -1) ? errno : EPIPE;
+	    log_debug << "TCPTransport::recv_nointr(): Return "
+                      << ret << " (" << strerror(ret) << ") in header recv"; 
+	    return ret;
+        }
+
 	recv_buf_offset += ret;
+
 	if (recv_buf_offset < TCPTransportHdr::get_raw_len()) {
-	    LOG_DEBUG("TCPTransport::recv_nointr(): Return EAGAIN in header recv"); 
+	    log_debug << "TCPTransport::recv_nointr(): "
+                      <<"Return EAGAIN in header recv"; 
 	    return EAGAIN;
 	}
     }
