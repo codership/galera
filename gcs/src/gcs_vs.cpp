@@ -166,11 +166,8 @@ public:
 	eq.pop_front();
 
 	if (ev.rb) {
-	    ev.rb->release();
+            ev.rb->release();
         }
-
-	delete ev.msg;
-	delete ev.view;
     }
 };
 
