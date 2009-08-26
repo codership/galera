@@ -191,7 +191,7 @@ static void accumulate_block(struct version_file *vf) {
         vf->current_version = accumulate_file(vf);
     }
     vf->file->append_block(vf->file, vf->block_size, vf->block);
-    memset(vf->block, vf->block_size, 0);
+    memset(vf->block, 0, vf->block_size);
     vf->block_pos = 0;
     vf->block_id++;
 }
@@ -357,7 +357,7 @@ struct wsdb_file *version_file_open (const char *directory,
 
     vf->block_size = block_size;
     vf->block = gu_malloc(block_size);
-    memset(vf->block, vf->file->get_block_size(vf->file), 0);
+    memset(vf->block, 0, vf->file->get_block_size(vf->file));
     
     vf->block_pos = 0;
     vf->file_size = file_size;

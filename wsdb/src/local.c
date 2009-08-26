@@ -167,7 +167,7 @@ int local_open(
     int rcode;
     int cache_size;
 
-    memset(full_name, 256, '\0');
+    memset(full_name, 0, 256);
     sprintf(
         full_name, "%s%s%s", (dir)  ? dir  : DEFAULT_WORK_DIR, 
         PATH_SEPARATOR,
