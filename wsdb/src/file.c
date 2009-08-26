@@ -176,7 +176,7 @@ struct wsdb_file *file_create(char *file_name, uint16_t block_size) {
     file->state = FILE_OPEN;
 
     /* write file header */
-    memset(&file->hdr, sizeof(struct file_hdr), 0);
+    memset(&file->hdr, 0, sizeof(struct file_hdr));
     file->hdr.magic = WSDB_FILE_MAGIC;
     strncpy(file->hdr.name, file_name, 256);
     file->hdr.block_size = block_size;
