@@ -17,6 +17,8 @@ extern "C" {
 
 #include <limits>
 
+namespace vsbes {
+
 struct vs_ev {
     ReadBuf   *rb;
     VSMessage *msg;
@@ -61,15 +63,17 @@ class gcs_vs : public Toplay
 
 public:
 
-    VS*        vs;
-    Poll*      po;
+    enum State {JOINING, JOINED, LEFT};
+
+    VS*         vs;
+    Poll*       po;
     std::deque<vs_ev> eq;
-    void*      waiter_buf;
-    size_t     waiter_buf_len;
-    gu::Mutex  mutex;
-    gu::Cond   cond;
-    Monitor    monitor;
-    enum State {JOINING, JOINED, LEFT} state;
+    void*       waiter_buf;
+    size_t      waiter_buf_len;
+    gu::Mutex   mutex;
+    gu::Cond    cond;
+    gu::Monitor monitor;
+    enum State  state;
 
     gcs_vs() :
         vs          (0),
@@ -166,7 +170,7 @@ public:
 
 };
 
-struct gcs_backend_conn {
+struct gcs_vsbes_conn {
     size_t last_view_size;
     size_t max_msg_size;
     unsigned long long n_received;
@@ -176,7 +180,7 @@ struct gcs_backend_conn {
     gcs_comp_msg_t *comp_msg;
     std::map<Address, long> comp_map;
 
-    gcs_backend_conn() :
+    gcs_vsbes_conn() :
         last_view_size (0),
         max_msg_size   (1 << 20),
 	n_received     (0),
@@ -189,18 +193,18 @@ struct gcs_backend_conn {
 
 private:
 
-    gcs_backend_conn (const gcs_backend_conn&);
-    gcs_backend_conn operator= (const gcs_backend_conn&);
+    gcs_vsbes_conn (const gcs_vsbes_conn&);
+    gcs_vsbes_conn operator= (const gcs_vsbes_conn&);
 };
 
 static GCS_BACKEND_MSG_SIZE_FN(gcs_vs_msg_size)
 {
-    return backend->conn->max_msg_size;
+    return reinterpret_cast<gcs_vsbes_conn*>(backend->conn)->max_msg_size;
 }
 
 static GCS_BACKEND_SEND_FN(gcs_vs_send)
 {
-    gcs_backend_conn* conn = static_cast<gcs_backend_conn*>(backend->conn);
+    gcs_vsbes_conn* conn = reinterpret_cast<gcs_vsbes_conn*>(backend->conn);
 
     if (conn == 0)
 	return -EBADFD;
@@ -250,7 +254,7 @@ static void fill_comp(gcs_comp_msg_t *msg,
 
 static GCS_BACKEND_RECV_FN(gcs_vs_recv)
 {
-    gcs_backend_conn* conn = static_cast<gcs_backend_conn*>(backend->conn);
+    gcs_vsbes_conn* conn = reinterpret_cast<gcs_vsbes_conn*>(backend->conn);
     long ret = 0;
     long cpy = 0;
     if (conn == 0)
@@ -328,13 +332,13 @@ retry:
 
 static GCS_BACKEND_NAME_FN(gcs_vs_name)
 {
-    static const char *name = "vs";
+    static const char *name = "vsbes";
     return name;
 }
 
 static void *conn_run(void *arg)
 {
-    gcs_backend_conn* conn = static_cast<gcs_backend_conn*>(arg);
+    gcs_vsbes_conn* conn = reinterpret_cast<gcs_vsbes_conn*>(arg);
 
     try {
 
@@ -357,13 +361,13 @@ static void *conn_run(void *arg)
 
 static GCS_BACKEND_OPEN_FN(gcs_vs_open)
 {
-    gcs_backend_conn* conn = static_cast<gcs_backend_conn*>(backend->conn);
+    gcs_vsbes_conn* conn = reinterpret_cast<gcs_vsbes_conn*>(backend->conn);
 
     if (!conn) return -EBADFD;
 
     try {
 	conn->vs_ctx.vs->connect();
-	conn->vs_ctx.vs->join(0, &conn->vs_ctx);
+	conn->vs_ctx.vs->join(0, conn->vs_ctx);
 	int err = gu_thread_create(&conn->thr, 0, &conn_run, conn);
 	if (err != 0)
 	    return -err;
@@ -378,7 +382,7 @@ static GCS_BACKEND_OPEN_FN(gcs_vs_open)
 
 static GCS_BACKEND_CLOSE_FN(gcs_vs_close)
 {
-    gcs_backend_conn* conn = static_cast<gcs_backend_conn*>(backend->conn);
+    gcs_vsbes_conn* conn = reinterpret_cast<gcs_vsbes_conn*>(backend->conn);
 
     if (conn == 0)
 	return -EBADFD;
@@ -391,7 +395,7 @@ static GCS_BACKEND_CLOSE_FN(gcs_vs_close)
 
 static GCS_BACKEND_DESTROY_FN(gcs_vs_destroy)
 {
-    gcs_backend_conn* conn = static_cast<gcs_backend_conn*>(backend->conn);
+    gcs_vsbes_conn* conn = reinterpret_cast<gcs_vsbes_conn*>(backend->conn);
 
     if (conn == 0)
 	return -EBADFD;
@@ -413,7 +417,7 @@ static GCS_BACKEND_DESTROY_FN(gcs_vs_destroy)
 
 static const char* vs_default_socket = "tcp:127.0.0.1:4567";
 
-GCS_BACKEND_CREATE_FN(gcs_vs_create)
+static GCS_BACKEND_CREATE_FN(gcs_vs_create)
 {
     const char* sock = socket;
     
@@ -422,17 +426,17 @@ GCS_BACKEND_CREATE_FN(gcs_vs_create)
 
     log_debug << "Opening connection to '" << sock << '\'';
 
-    gcs_backend_conn* conn = 0;
+    gcs_vsbes_conn* conn = 0;
     try {
-	conn = new gcs_backend_conn;	
+	conn = new gcs_vsbes_conn;	
     } catch (std::bad_alloc e) {
 	return -ENOMEM;
     }
     
     try {
 	conn->vs_ctx.po = Poll::create("def");
-	conn->vs_ctx.vs = VS::create(sock, conn->vs_ctx.po, 
-				     &conn->vs_ctx.monitor);
+	conn->vs_ctx.vs = VS::create(sock, conn->vs_ctx.po,
+                                     conn->vs_ctx.monitor);
 	conn->vs_ctx.set_down_context(conn->vs_ctx.vs);
     } catch (std::exception& e) {
         log_error << e.what();
@@ -448,7 +452,14 @@ GCS_BACKEND_CREATE_FN(gcs_vs_create)
     backend->recv     = &gcs_vs_recv;
     backend->name     = &gcs_vs_name;
     backend->msg_size = &gcs_vs_msg_size;
-    backend->conn     = conn;
+    backend->conn     = reinterpret_cast<gcs_backend_conn*>(conn);
     
     return 0;
+}
+
+} // namespace vsbes
+
+GCS_BACKEND_CREATE_FN(gcs_vs_create)
+{
+    return vsbes::gcs_vs_create (backend, socket);
 }

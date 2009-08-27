@@ -25,7 +25,7 @@ using std::map;
 using std::pair;
 using std::make_pair;
 
-using namespace gcomm;
+namespace gcomm {
 
 struct vs_ev
 {
@@ -49,22 +49,20 @@ struct vs_ev
 	    view = new View(*v);
     }
 
+    // looks like we need a shallow copy here to go through queue
     vs_ev (const vs_ev& ev) :
-        rb       (0),
+        rb       (ev.rb),
         um       (ev.um),
-        view     (0),
+        view     (ev.view),
         msg_size (ev.msg_size)
-    {
-	if (ev.rb)
-	    rb = ev.rb->copy(0);
-	if (ev.view)
-	    view = new View(*ev.view);
-    }
+    {}
 
-    ~vs_ev ()
+    ~vs_ev () {}
+
+    void release ()
     {
-        if (rb)   delete (rb);
-        if (view) delete (view);
+        if (rb)   { rb->release(); rb   = 0; }
+        if (view) { delete view;   view = 0; }
     }
 
 private:
@@ -92,14 +90,18 @@ struct gcs_gcomm : public Toplay
         cond()
     {}
     
+    void release_event()
+    {
+	assert(eq.size());
+        gu::Lock lock(mutex);
+
+	eq.front().release();
+	eq.pop_front();
+    }
+
     ~gcs_gcomm() 
     {
-	for (deque<vs_ev>::iterator i = eq.begin(); i != eq.end(); ++i) 
-        {
-	    if (i->rb)
-		i->rb->release();
-            delete i->view;
-	}
+        while (eq.size()) { release_event(); }
     }
     
     void handle_up(const int cid, const ReadBuf *rb, const size_t roff, 
@@ -163,20 +165,6 @@ struct gcs_gcomm : public Toplay
 
 	return ret;
     }
-    
-    void release_event()
-    {
-	assert(eq.size());
-        gu::Lock lock(mutex);
-
-	vs_ev ev = eq.front();
-	eq.pop_front();
-
-	if (ev.rb)
-	    ev.rb->release();
-
-	delete ev.view;
-    }
 
 private:
 
@@ -186,7 +174,7 @@ private:
 
 typedef map<const UUID, long> CompMap;
 
-typedef struct gcs_backend_conn 
+struct gcomm_ctx
 {
     string sock;
     string channel;
@@ -199,7 +187,8 @@ typedef struct gcs_backend_conn
     gcs_comp_msg_t *comp_msg;
     CompMap comp_map;
     volatile bool terminate;
-    gcs_backend_conn() :
+
+    gcomm_ctx() :
         sock(),
         channel(),
         last_view_size(0), 
@@ -211,26 +200,22 @@ typedef struct gcs_backend_conn
         comp_msg(0),
         comp_map(),
         terminate(false)
-    {
-    }
+    {}
 
 private:
 
-    gcs_backend_conn (const gcs_backend_conn&);
-    gcs_backend_conn& operator= (const gcs_backend_conn&);
-}
-conn_t;
-
-
+    gcomm_ctx (const gcomm_ctx&);
+    gcomm_ctx& operator= (const gcomm_ctx&);
+};
 
 static GCS_BACKEND_MSG_SIZE_FN(gcs_gcomm_msg_size)
 {
-    return backend->conn->max_msg_size;
+    return reinterpret_cast<gcomm_ctx*>(backend->conn)->max_msg_size;
 }
 
 static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
 {
-    conn_t *conn = backend->conn;
+    gcomm_ctx* conn = reinterpret_cast<gcomm_ctx*>(backend->conn);
 
     if (conn == 0)
     {
@@ -304,7 +289,7 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
 {
     long ret = 0;
     long cpy = 0;
-    conn_t *conn = backend->conn;
+    gcomm_ctx* conn = reinterpret_cast<gcomm_ctx*>(backend->conn);
     if (conn == 0)
     {
         log_warn << "gcs_gcomm_recv: -EBADFD";
@@ -339,7 +324,7 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
 	*sender_idx = i->second;
 	if (ev.rb) {
 	    ret = ev.rb->get_len();
-	    if (static_cast<size_t>(ret) <= len) {
+	    if (ret <= static_cast<ssize_t>(len)) {
 		memcpy(buf, ev.rb->get_buf(), ret);
 		conn->n_copied++;
 	    }
@@ -381,7 +366,7 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
 	memcpy(buf, conn->comp_msg, cpy);
 	*msg_type = GCS_MSG_COMPONENT;
     }
-    if (static_cast<size_t>(ret) <= len) 
+    if (ret <= static_cast<ssize_t>(len)) 
     {
 	conn->vs_ctx.release_event();
 	conn->n_received++;
@@ -397,7 +382,7 @@ static GCS_BACKEND_NAME_FN(gcs_gcomm_name)
 
 static void *conn_run(void *arg)
 {
-    conn_t *conn = reinterpret_cast<conn_t*>(arg);
+    gcomm_ctx* conn = reinterpret_cast<gcomm_ctx*>(arg);
     while (conn->terminate == false) 
     {
         int err = conn->vs_ctx.el->poll(200);
@@ -424,7 +409,7 @@ static void *conn_run(void *arg)
 
 static GCS_BACKEND_OPEN_FN(gcs_gcomm_open)
 {
-    conn_t *conn = backend->conn;
+    gcomm_ctx* conn = reinterpret_cast<gcomm_ctx*>(backend->conn);
 
     if (!conn) return -EBADFD;
 
@@ -459,7 +444,7 @@ static GCS_BACKEND_OPEN_FN(gcs_gcomm_open)
 
 static GCS_BACKEND_CLOSE_FN(gcs_gcomm_close)
 {
-    conn_t *conn = backend->conn;
+    gcomm_ctx* conn = reinterpret_cast<gcomm_ctx*>(backend->conn);
     if (conn == 0)
 	return -EBADFD;
     log_debug << "closing gcomm backend";
@@ -473,7 +458,7 @@ static GCS_BACKEND_CLOSE_FN(gcs_gcomm_close)
 
 static GCS_BACKEND_DESTROY_FN(gcs_gcomm_destroy)
 {
-    conn_t *conn = backend->conn;
+    gcomm_ctx* conn = reinterpret_cast<gcomm_ctx*>(backend->conn);
     if (conn == 0)
 	return -EBADFD;
     backend->conn = 0;
@@ -493,13 +478,13 @@ static GCS_BACKEND_DESTROY_FN(gcs_gcomm_destroy)
 
 GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
 {
-    conn_t *conn = 0;
+    gcomm_ctx*  conn = 0;
     const char* sock = socket;
     
     log_debug << "Opening connection to '" << sock << '\'';
 
     try {
-	conn = new gcs_backend_conn;	
+	conn = new gcomm_ctx;	
     } catch (std::bad_alloc e) {
 	return -ENOMEM;
     }
@@ -520,8 +505,14 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
     backend->recv     = &gcs_gcomm_recv;
     backend->name     = &gcs_gcomm_name;
     backend->msg_size = &gcs_gcomm_msg_size;
-    backend->conn     = conn;
+    backend->conn     = reinterpret_cast<gcs_backend_conn_t*>(conn);
     
     return 0;
 }
 
+} // namespace gcomm
+
+GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
+{
+    return gcomm::gcs_gcomm_create (backend, socket);
+}

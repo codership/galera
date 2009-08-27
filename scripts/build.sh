@@ -96,7 +96,7 @@ if [ "$DEBUG" == "yes" ]; then CONFIGURE="yes"; fi
 if [ -n "$WITH_SPREAD" ]; then CONFIGURE="yes"; fi
 
 # Disable gcomm until fixed
-DISABLE_GCOMM=${DISABLE_GCOMM:-"yes"}
+#DISABLE_GCOMM=${DISABLE_GCOMM:-"yes"}
 
 # Be quite verbose
 set -x
