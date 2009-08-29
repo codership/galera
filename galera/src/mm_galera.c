@@ -43,20 +43,11 @@ static const char* galera_act_type_str[] =
     "GCS_ACT_UNKNOWN"
 };
 
-enum galera_repl_state {
+typedef enum galera_repl_state {
     GALERA_UNINITIALIZED,
     GALERA_INITIALIZED,
-    GALERA_ENABLED,
-    GALERA_DISABLED,
-};
-
-struct galera_info {
-    /* state of wsdb library */
-    struct wsdb_info wsdb;
-    /* state of gcs library */
-    //struct gcs_status gcs;
-    enum galera_repl_state repl_state;
-};
+    GALERA_CONNECTED,
+} galera_repl_state_t;
 
 /* application's handlers */
 static wsrep_conf_param_cb_t    app_configurator   = NULL;
@@ -73,6 +64,7 @@ static gu_to_t            *commit_queue = NULL;
 static gcs_conn_t         *gcs_conn     = NULL;
 
 /* state trackers */
+static galera_repl_state_t galera_state = GALERA_UNINITIALIZED;
 static gcs_seqno_t         sst_seqno;         // received in state transfer
 static gu_uuid_t           sst_uuid;          // received in state transfer
 static gcs_seqno_t         last_recved  = -1; // last received from group
@@ -84,9 +76,6 @@ static struct job_queue   *applier_queue = NULL;
 
 static const char* data_dir  = NULL;
 static const char* sst_donor = NULL;
-
-/* global status structure */
-struct galera_info Galera;
 
 static gu_mutex_t commit_mtx;
 static gu_mutex_t sst_mtx;
@@ -336,7 +325,7 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     /* initialize commit queue */
     commit_queue = gu_to_create(16384, GCS_SEQNO_FIRST);
 
-    Galera.repl_state = GALERA_INITIALIZED;
+    galera_state = GALERA_INITIALIZED;
 
     gu_mutex_init(&commit_mtx, NULL);
     gu_mutex_init(&sst_mtx,  NULL);
@@ -358,97 +347,6 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
 #endif
     GU_DBUG_RETURN(WSREP_OK);
 }
-
-static void mm_galera_dbug_push (wsrep_t *gh, const char* control)
-{
-    GU_DBUG_PUSH(control);
-}
-
-static void mm_galera_dbug_pop (wsrep_t *gh)
-{
-    GU_DBUG_POP();
-}
-
-static void mm_galera_tear_down(wsrep_t *gh)
-{
-    int rcode;
-    galera_state_t saved_state;
-
-    if (Galera.repl_state == GALERA_UNINITIALIZED)
-	return;
-
-    if (gcs_conn)     gcs_destroy (gcs_conn);
-    if (to_queue)     gu_to_destroy(&to_queue);
-    if (commit_queue) gu_to_destroy(&commit_queue);
-
-    wsdb_close();
-
-    /* store persistent state*/
-    memcpy(saved_state.uuid.data, group_uuid.data, GU_UUID_LEN);
-    saved_state.last_applied_seqno = last_applied;
-
-    rcode = galera_store_state(data_dir, &saved_state);
-    if (rcode) {
-        gu_error("GALERA state store failed: %d", rcode);
-        gu_info("      last applied: %lli", last_applied);
-        gu_info(GU_UUID_FORMAT, GU_UUID_ARGS(&group_uuid));
-    }
-
-    if (data_dir)  free ((char*)data_dir);
-    if (sst_donor) free ((char*)sst_donor);
-}
-
-#if UNUSED // looks like we cannot block in galera_connect()
-static long galera_handle_configuration (wsrep_t* gh,
-                                         const gcs_act_conf_t*, gcs_seqno_t);
-
-/*! Waits for and processes the first configuration action.
- *
- *  In case of PRIMARY configuration it means that state transfer is
- *  complete too (it is a part of galera_handle_configuration())
- *
- * @return WSREP_OK if PRIMARY configuration
- *         WSREP_CONN_FAIL if NON-PRIMARY or other failure (should be revised?)
- */
-static enum wsrep_status galera_wait_conf (wsrep_t *gh)
-{
-    int             rcode;
-    gcs_act_type_t  action_type = GCS_ACT_UNKNOWN;
-    size_t          action_size;
-    void*           action;
-    gcs_seqno_t     seqno_g, seqno_l;
-
-    GU_DBUG_ENTER ("galera_wait_conf");
-
-    do {
-        rcode = gcs_recv(
-            gcs_conn, &action, &action_size, &action_type, &seqno_g, &seqno_l
-            );
-
-	if (rcode <= 0) GU_DBUG_RETURN(WSREP_CONN_FAIL);
-
-        assert (GCS_SEQNO_ILL != seqno_l);
-
-        if (GCS_ACT_CONF == action_type) {
-            galera_handle_configuration (gh, action, seqno_l);
-        }
-        else {
-            gu_warn ("Unexpected action of type %s. Ignoring.",
-                     galera_act_type_str[action_type]);
-            assert(0);
-            GALERA_SELF_CANCEL_QUEUE (to_queue,     seqno_l);
-            GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
-        }
-
-    } while (GCS_ACT_CONF != action_type);
-
-    // prim/non-prim
-    rcode = ((const gcs_act_conf_t*)action)->conf_id > 0 ?
-        WSREP_OK : WSREP_CONN_FAIL;
-
-    GU_DBUG_RETURN(rcode);
-}
-#endif
 
 static enum wsrep_status mm_galera_connect (wsrep_t *gh,
                                             const char* cluster_name,
@@ -474,10 +372,7 @@ static enum wsrep_status mm_galera_connect (wsrep_t *gh,
 
     gu_info("Successfully opened GCS connection to %s", cluster_name);
 
-    Galera.repl_state = GALERA_ENABLED;
-
-    // Can't wait for configuration here for now
-    //rcode = galera_wait_conf (gh);
+    galera_state = GALERA_CONNECTED;
 
     GU_DBUG_RETURN(rcode);
 }
@@ -490,17 +385,72 @@ static enum wsrep_status mm_galera_disconnect(wsrep_t *gh) {
         GU_DBUG_RETURN(WSREP_NODE_FAIL);
     }
 
-    rcode = gcs_close(gcs_conn);
-    if (rcode) {
-        gu_error ("Failed to close GCS connection handle: %d (%s)",
-                  rcode, strerror(-rcode));
-        GU_DBUG_RETURN(WSREP_NODE_FAIL);
+    if (GALERA_CONNECTED == galera_state) {
+
+        rcode = gcs_close(gcs_conn);
+        if (rcode) {
+            gu_error ("Failed to close GCS connection handle: %d (%s)",
+                      rcode, strerror(-rcode));
+            GU_DBUG_RETURN(WSREP_NODE_FAIL);
+        }
+
+        gu_info("Closed GCS connection");
+
+        galera_state = GALERA_INITIALIZED;
+    }
+    GU_DBUG_RETURN(WSREP_OK);
+}
+
+static void mm_galera_tear_down(wsrep_t *gh)
+{
+    int rcode;
+    galera_state_t saved_state;
+
+    switch (galera_state) {
+    case GALERA_CONNECTED:
+        mm_galera_disconnect (gh);
+
+    case GALERA_INITIALIZED:
+        if (gcs_conn)     gcs_destroy (gcs_conn);
+        if (to_queue)     gu_to_destroy(&to_queue);
+        if (commit_queue) gu_to_destroy(&commit_queue);
+
+        wsdb_close();
+
+        /* store persistent state*/
+        memcpy(saved_state.uuid.data, group_uuid.data, GU_UUID_LEN);
+        saved_state.last_applied_seqno = last_applied;
+
+        rcode = galera_store_state(data_dir, &saved_state);
+        if (rcode) {
+            gu_error("GALERA state store failed: %d", rcode);
+            gu_info("      last applied: %lli", last_applied);
+            gu_info(GU_UUID_FORMAT, GU_UUID_ARGS(&group_uuid));
+        }
+
+        if (data_dir)  free ((char*)data_dir);
+        if (sst_donor) free ((char*)sst_donor);
+
+    case GALERA_UNINITIALIZED:
+        break;
+
+    default:
+        gu_fatal ("Unrecognized Galera state on teardown: %d", galera_state);
+        assert (0);
+        abort();
     }
 
-    gu_info("Closed GCS connection");
+    return;
+}
 
-    Galera.repl_state = GALERA_DISABLED;
-    GU_DBUG_RETURN(WSREP_OK);
+static void mm_galera_dbug_push (wsrep_t *gh, const char* control)
+{
+    GU_DBUG_PUSH(control);
+}
+
+static void mm_galera_dbug_pop (wsrep_t *gh)
+{
+    GU_DBUG_POP();
 }
 
 #ifdef EXTRA_DEBUG
@@ -1299,11 +1249,11 @@ static enum wsrep_status mm_galera_cancel_commit(wsrep_t *gh,
     int rcode;
     wsdb_trx_info_t victim;
 
-    if (Galera.repl_state != GALERA_ENABLED) return WSREP_OK;
+    if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_OK;
+
     /* take commit mutex to be sure, committing trx does not
      * conflict with us
-     */
-    
+     */    
     gu_mutex_lock(&commit_mtx);
 
     wsdb_get_local_trx_info(victim_trx, &victim);
@@ -1378,7 +1328,7 @@ static enum wsrep_status mm_galera_cancel_slave(
     enum wsrep_status ret_code = WSREP_OK;
     int rcode;
 
-    if (Galera.repl_state != GALERA_ENABLED) return WSREP_OK;
+    if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_OK;
     /* take commit mutex to be sure, committing trx does not
      * conflict with us
      */
@@ -1408,13 +1358,15 @@ static enum wsrep_status mm_galera_cancel_slave(
     return ret_code;
 }
 
-static enum wsrep_status mm_galera_committed(wsrep_t *gh, trx_id_t trx_id) {
-
+static enum wsrep_status mm_galera_committed(wsrep_t *gh, trx_id_t trx_id)
+{
     bool do_report = false;
     wsdb_trx_info_t trx;
 
     GU_DBUG_ENTER("galera_committed");
-    if (Galera.repl_state != GALERA_ENABLED) return WSREP_OK;
+
+    if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_OK;
+
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
 
     gu_mutex_lock(&commit_mtx);
@@ -1441,12 +1393,14 @@ static enum wsrep_status mm_galera_committed(wsrep_t *gh, trx_id_t trx_id) {
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static enum wsrep_status mm_galera_rolledback(wsrep_t *gh, trx_id_t trx_id) {
-
+static enum wsrep_status mm_galera_rolledback(wsrep_t *gh, trx_id_t trx_id)
+{
     wsdb_trx_info_t trx;
 
     GU_DBUG_ENTER("galera_rolledback");
-    if (Galera.repl_state != GALERA_ENABLED) return WSREP_OK;
+
+    if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_OK;
+
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
 
     gu_mutex_lock(&commit_mtx);
@@ -1538,7 +1492,8 @@ mm_galera_commit(
     wsdb_trx_info_t        trx;
 
     GU_DBUG_ENTER("galera_commit");
-    if (Galera.repl_state != GALERA_ENABLED) return WSREP_CONN_FAIL;
+
+    if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_CONN_FAIL;
 
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
 
@@ -1572,7 +1527,7 @@ mm_galera_commit(
     /* what is happening here:
      * - first,  (gcs_wait() > 0) is evaluated, if not true, loop exits
      * - second, (unlock(), usleep(), true) is evaluated always to true,
-     *   so we always keep on looping.
+     *   so we keep on looping.
      *   AFAIK usleep() is evaluated after unlock()
      */
      } while ((gcs_wait (gcs_conn) > 0) && 
@@ -1756,9 +1711,10 @@ static enum wsrep_status mm_galera_append_query(
     wsrep_t *gh,
     const trx_id_t trx_id, const char *query, const time_t timeval, const uint32_t randseed) {
 
-    if (Galera.repl_state != GALERA_ENABLED) return WSREP_OK;
+    if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_OK;
 
     errno = 0;
+
     switch (wsdb_append_query(trx_id, (char*)query, timeval, randseed)) {
     case WSDB_OK:              return WSREP_OK;
     case WSDB_ERR_TRX_UNKNOWN: return WSREP_TRX_FAIL;
@@ -1773,7 +1729,8 @@ static enum wsrep_status galera_append_row(
     uint16_t len,
     uint8_t *data
 ) {
-    if (Galera.repl_state != GALERA_ENABLED) return WSREP_OK;
+    if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_OK;
+
     errno = 0;
 
     switch(wsdb_append_row(trx_id, len, data)) {
@@ -1798,7 +1755,8 @@ static enum wsrep_status mm_galera_append_row_key(
     struct wsdb_key_part  key_part;
     char wsdb_action  = WSDB_ACTION_UPDATE;
 
-    if (Galera.repl_state != GALERA_ENABLED) return WSREP_OK;
+    if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_OK;
+
     errno = 0;
 
     /* TODO: make this setupping static, needs mutex protection */
@@ -1833,7 +1791,8 @@ static enum wsrep_status mm_galera_set_variable(
     const char *query, const size_t query_len
 ) {
     char var[256];
-    if (Galera.repl_state != GALERA_ENABLED) return WSREP_OK;
+
+    if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_OK;
 
     /*
      * an ugly way to provide dynamic way to change galera_debug parameter.
@@ -1884,7 +1843,8 @@ static enum wsrep_status mm_galera_set_database(
     wsrep_t *gh,
     const conn_id_t conn_id, const char *query, const size_t query_len
 ) {
-    if (Galera.repl_state != GALERA_ENABLED) return WSREP_OK;
+
+    if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_OK;
 
     errno = 0;
     switch(wsdb_store_set_database(conn_id, (char*)query, query_len)) {
@@ -1910,7 +1870,9 @@ static enum wsrep_status mm_galera_to_execute_start(
     bool                   do_apply;
 
     GU_DBUG_ENTER("galera_to_execute_start");
-    if (Galera.repl_state != GALERA_ENABLED) return WSREP_OK;
+
+    if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_CONN_FAIL;
+
     GU_DBUG_PRINT("galera", ("conn: %llu", conn_id));
 
     /* retrieve write set */
@@ -1997,7 +1959,8 @@ static enum wsrep_status mm_galera_to_execute_end(
     int rcode;
 
     GU_DBUG_ENTER("galera_to_execute_end");
-    if (Galera.repl_state != GALERA_ENABLED) return WSREP_OK;
+
+    if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_OK;
 
     if ((rcode = wsdb_conn_get_info(conn_id, &conn_info) != WSDB_OK)) {
         gu_warn("missing connection for: %lld, rcode: %d", conn_id, rcode);
