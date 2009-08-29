@@ -18,6 +18,7 @@
 #define WSREP_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -29,7 +30,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "10"
+#define WSREP_INTERFACE_VERSION "11"
 
 /* Empty backend spec */
 #define WSREP_NONE "none"
@@ -173,10 +174,10 @@ typedef enum wsrep_member_status {
 } wsrep_member_status_t;
 
 /*!
- * information about group member
+ * information about group member (some fields are tentative yet)
  */
 typedef struct wsrep_member_info {
-    wsrep_uuid_t  id;                         //!< group uuid
+    wsrep_uuid_t  id;                         //!< group-wide unique member ID
     char          name[WSREP_MEMBER_NAME_LEN];//!< human-readable name
     wsrep_seqno_t last_committed;             //!< last committed seqno
     wsrep_seqno_t slave_queue_len;            //!< length of the slave queue
@@ -190,9 +191,9 @@ typedef struct wsrep_member_info {
  * group status
  */
 typedef enum wsrep_view_status {
-    WSREP_VIEW_PRIMARY,      //!< Primary group configuration (quorum present)
-    WSREP_VIEW_NON_PRIMARY,  //!< Non-primary group configuration (quorum lost)
-    WSREP_VIEW_DISCONNECTED, //!< Not connected to group, retrying.
+    WSREP_VIEW_PRIMARY,      //!< primary group configuration (quorum present)
+    WSREP_VIEW_NON_PRIMARY,  //!< non-primary group configuration (quorum lost)
+    WSREP_VIEW_DISCONNECTED, //!< not connected to group, retrying.
     WSREP_VIEW_MAX
 } wsrep_view_status_t;
 
@@ -200,13 +201,14 @@ typedef enum wsrep_view_status {
  * view on the group
  */
 typedef struct wsrep_view_info {
-    wsrep_uuid_t        id;       //!< Group ID
-    wsrep_seqno_t       conf;     //!< This configuration number
-    wsrep_seqno_t       first;    //!< First seqno in this configuration
-    wsrep_view_status_t status;   //!< Configuration status
-    int                 my_idx;   //!< Index of this member in the configuration
-    int                 memb_num; //!< Number of members in the configuration
-    wsrep_member_info_t members[];//!< Array of member information
+    wsrep_uuid_t        id;        //!< group ID
+    wsrep_seqno_t       conf;      //!< group configuration number
+    wsrep_seqno_t       first;     //!< first seqno in this configuration
+    wsrep_view_status_t status;    //!< view status
+    bool                state_gap; //!< discontinuity between group and member states
+    int                 my_idx;    //!< index of this member in the view
+    int                 memb_num;  //!< number of members in the view
+    wsrep_member_info_t members[]; //!< array of member information
 } wsrep_view_info_t;
 
 /*!

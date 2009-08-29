@@ -3,28 +3,21 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include <stdarg.h>
 #include <errno.h>
 #include <stdbool.h>
-#include <time.h>
 #include <unistd.h>
-
-#include <galerautils.h>
-#include <gcs.h>
-#include <dirent.h>
-#include <sys/stat.h>
-
-#define __USE_BSD 1
+#include <time.h>
 #include <sys/time.h>
+
+#include "wsrep_api.h"
 
 #include <galerautils.h>
 #include <gcs.h>
 #include <wsdb_api.h>
+#include <job_queue.h>
 
-#include "wsrep_api.h"
 #include "galera_info.h"
 #include "galera_state.h"
-#include "job_queue.h"
 
 #define GALERA_USE_FLOW_CONTROL 1
 #define GALERA_USLEEP 10000 // 10 ms
@@ -300,12 +293,6 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
 
     app_stat_cb = args->stat_param_cb;
     last_applied = last_recved;
-
-// begin workaround for #411814
-    void* uuid = (void*)&args->state_uuid; // outsmart FORTIFY_SOURCE?
-    memcpy (uuid, &group_uuid, sizeof(wsrep_uuid_t));
-    *(wsrep_seqno_t*)&args->state_seqno = last_applied;
-// end   workaround for #411814
 
     my_idx = 0;
 

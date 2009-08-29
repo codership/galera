@@ -18,14 +18,15 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf)
         const char* str = conf->data;
         int m;
 
-        ret->id       = *(wsrep_uuid_t*)&conf->group_uuid;
-        ret->conf     = conf->conf_id;
-        ret->first    = conf->seqno != GCS_SEQNO_ILL ?
-                        (conf->seqno + 1) : WSREP_SEQNO_UNDEFINED;
-        ret->status   = conf->conf_id != -1 ?
-                        WSREP_VIEW_PRIMARY : WSREP_VIEW_NON_PRIMARY;
-        ret->my_idx   = conf->my_idx;
-        ret->memb_num = conf->memb_num;
+        ret->id        = *(wsrep_uuid_t*)&conf->group_uuid;
+        ret->conf      = conf->conf_id;
+        ret->first     = conf->seqno != GCS_SEQNO_ILL ?
+                         (conf->seqno + 1) : WSREP_SEQNO_UNDEFINED;
+        ret->status    = conf->conf_id != -1 ?
+                         WSREP_VIEW_PRIMARY : WSREP_VIEW_NON_PRIMARY;
+        ret->state_gap = conf->st_required;
+        ret->my_idx    = conf->my_idx;
+        ret->memb_num  = conf->memb_num;
 
         for (m = 0; m < ret->memb_num; m++) {
             wsrep_member_info_t* member = &ret->members[m];
