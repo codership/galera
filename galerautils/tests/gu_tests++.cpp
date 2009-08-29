@@ -86,21 +86,29 @@ void* listener_thd(void* arg)
     while (conns > 0)
     {
         NetworkEvent ev = net->wait_event(-1);
-        
+
+	mark_point();
+
         Socket* sock = ev.get_socket();
+
+	mark_point();
+
         const int em = ev.get_event_mask();
-        // log_info << sock << " " << em;
+	
+	mark_point();
+        
+	log_info << sock << " " << em;
 
         if (em & NetworkEvent::E_ACCEPTED)
         {
-            log_info << "socket accepted";
+            log_info << "Listener: socket accepted";
         }
         else if (em & NetworkEvent::E_ERROR)
         {
             fail_unless(sock != 0);
             if (sock->get_state() == Socket::S_CLOSED)
             {
-                log_info << "socket closed";
+                log_info << "Listener: socket closed";
                 delete sock;
                 conns--;
             }
@@ -108,7 +116,7 @@ void* listener_thd(void* arg)
             {
                 fail_unless(sock->get_state() == Socket::S_FAILED);
                 fail_unless(sock->get_errno() != 0);
-                log_info << "socket read failed: " << sock->get_errstr();
+                log_info << "Listener: socket read failed: " << sock->get_errstr();
                 sock->close();
                 delete sock;
                 conns--;
@@ -136,17 +144,18 @@ void* listener_thd(void* arg)
         }
         else if (sock == 0)
         {
-            log_error << "wut?: " << em;
+            log_error << "Listener: wut?: " << em;
             return reinterpret_cast<void*>(1);
         }
         else
         {
-            log_error <<  "socket " << sock->get_fd()
+            log_error <<  "Listener: socket " << sock->get_fd()
                       << " event mask: " << ev.get_event_mask();
             return reinterpret_cast<void*>(1);
         }
+	log_info << "Listener: connections: " << conns;
     }
-    log_info << "received " << bytes/(1 << 20) << "MB + "
+    log_info << "Listener: received " << bytes/(1 << 20) << "MB + "
              << bytes%(1 << 20) << "B";
     return 0;
 }

@@ -2,7 +2,8 @@
 
 AM_CPPFLAGS = @AM_CPPFLAGS@ @CHECK_CFLAGS@ -I$(top_srcdir)/src
 
-noinst_PROGRAMS   = gu_tests gu_to_test gu_testspp
+#noinst_PROGRAMS   = gu_tests gu_to_test gu_testspp
+noinst_PROGRAMS   = gu_tests gu_to_test
 
 gu_tests_SOURCES  = \
 	gu_tests.c                              \
