@@ -52,7 +52,7 @@ static wsrep_sst_prepare_cb_t   sst_prepare_cb     = NULL;
 static wsrep_sst_donate_cb_t    sst_donate_cb      = NULL;
 
 /* gcs parameters */
-static gu_to_t            *to_queue     = NULL; // rename to cert_queue?
+static gu_to_t            *cert_queue   = NULL;
 static gu_to_t            *commit_queue = NULL;
 static gcs_conn_t         *gcs_conn     = NULL;
 
@@ -102,7 +102,7 @@ static inline long galera_to_eagain (
 }
 
 #define GALERA_QUEUE_NAME(queue)                        \
-    ((queue) == to_queue ? "to_queue" : "commit_queue")
+    ((queue) == cert_queue ? "cert_queue" : "commit_queue")
 
 // the following are made as macros to allow for correct line number reporting
 #define GALERA_GRAB_QUEUE(queue, seqno)                                 \
@@ -307,7 +307,7 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     sst_donate_cb     = args->sst_donate_cb;
 
     /* initialize total order queue */
-    to_queue = gu_to_create(16384, GCS_SEQNO_FIRST);
+    cert_queue = gu_to_create(16384, GCS_SEQNO_FIRST);
 
     /* initialize commit queue */
     commit_queue = gu_to_create(16384, GCS_SEQNO_FIRST);
@@ -399,7 +399,7 @@ static void mm_galera_tear_down(wsrep_t *gh)
 
     case GALERA_INITIALIZED:
         if (gcs_conn)     gcs_destroy (gcs_conn);
-        if (to_queue)     gu_to_destroy(&to_queue);
+        if (cert_queue)     gu_to_destroy(&cert_queue);
         if (commit_queue) gu_to_destroy(&commit_queue);
 
         wsdb_close();
@@ -680,7 +680,7 @@ static inline void truncate_trx_history (gcs_seqno_t seqno)
 }
 
 // returns true if action to be applied and false if to be skipped
-// should always be called while holding to_queue
+// should always be called while holding cert_queue
 static inline bool
 galera_update_global_seqno (gcs_seqno_t seqno)
 {
@@ -704,7 +704,7 @@ static wsrep_status_t process_conn_write_set(
     wsrep_status_t rcode = WSREP_OK;
 
     /* wait for total order */
-    GALERA_GRAB_QUEUE (to_queue,     seqno_l);
+    GALERA_GRAB_QUEUE (cert_queue,     seqno_l);
     GALERA_GRAB_QUEUE (commit_queue, seqno_l);
 
     if (gu_likely(galera_update_global_seqno(seqno_g))) {
@@ -716,7 +716,7 @@ static wsrep_status_t process_conn_write_set(
     }
     
     /* release total order */
-    GALERA_RELEASE_QUEUE (to_queue, seqno_l);
+    GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
     GALERA_UPDATE_LAST_APPLIED (seqno_g);
     do_report = report_check_counter();
     GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
@@ -860,7 +860,7 @@ static enum wsrep_status process_query_write_set(
     int rcode;
 
     /* wait for total order */
-    GALERA_GRAB_QUEUE (to_queue, seqno_l);
+    GALERA_GRAB_QUEUE (cert_queue, seqno_l);
 
     if (gu_likely(galera_update_global_seqno(seqno_g))) {
         /* Global seqno OK, do certification test */
@@ -872,7 +872,7 @@ static enum wsrep_status process_query_write_set(
     }
 
     /* release total order */
-    GALERA_RELEASE_QUEUE (to_queue, seqno_l);
+    GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
 
     PRINT_WS(wslog_G, ws, seqno_l);
 
@@ -987,7 +987,7 @@ galera_handle_configuration (wsrep_t* gh,
 
     my_idx = conf->my_idx; // this is always true.
 
-    GALERA_GRAB_QUEUE (to_queue,     conf_seqno);
+    GALERA_GRAB_QUEUE (cert_queue,     conf_seqno);
     GALERA_GRAB_QUEUE (commit_queue, conf_seqno);
 
     view_handler_cb (galera_view_info_create (conf));
@@ -1038,7 +1038,7 @@ galera_handle_configuration (wsrep_t* gh,
                 }
 
                 if (seqno_l > GCS_SEQNO_NIL) {
-                    GALERA_SELF_CANCEL_QUEUE (to_queue,     seqno_l);
+                    GALERA_SELF_CANCEL_QUEUE (cert_queue,     seqno_l);
                     GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
                 }
 
@@ -1132,7 +1132,7 @@ galera_handle_configuration (wsrep_t* gh,
         ret = -1;
     }
 
-    GALERA_RELEASE_QUEUE (to_queue,     conf_seqno);
+    GALERA_RELEASE_QUEUE (cert_queue,     conf_seqno);
     GALERA_RELEASE_QUEUE (commit_queue, conf_seqno);
 
     GU_DBUG_RETURN(ret);
@@ -1192,9 +1192,9 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
         }
         case GCS_ACT_COMMIT_CUT:
             // synchronize
-            GALERA_GRAB_QUEUE (to_queue, seqno_l);
+            GALERA_GRAB_QUEUE (cert_queue, seqno_l);
             truncate_trx_history (*(gcs_seqno_t*)action);
-            GALERA_RELEASE_QUEUE (to_queue, seqno_l);
+            GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
 
             // Let other transaction continue to commit
             GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
@@ -1209,12 +1209,12 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
                 gu_info ("Got state transfer request.");
 
                 // synchronize with app.
-                GALERA_GRAB_QUEUE (to_queue,     seqno_l);
+                GALERA_GRAB_QUEUE (cert_queue,     seqno_l);
                 GALERA_GRAB_QUEUE (commit_queue, seqno_l);
 
                 sst_donate_cb (action, action_size);
 
-                GALERA_RELEASE_QUEUE (to_queue, seqno_l);
+                GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
                 GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
                 /* To snap out of donor state application must call
                  * wsrep->sst_sent() when it is really done */
@@ -1290,9 +1290,9 @@ static enum wsrep_status mm_galera_cancel_commit(wsrep_t *gh,
             gu_debug("interrupting trx commit: trx_id %lld seqno %lld", 
                      victim_trx, victim.seqno_l);
 
-            rcode = gu_to_interrupt(to_queue, victim.seqno_l);
+            rcode = gu_to_interrupt(cert_queue, victim.seqno_l);
             if (rcode) {
-                gu_debug("trx interupt fail in to_queue: %d", rcode);
+                gu_debug("trx interupt fail in cert_queue: %d", rcode);
                 ret_code = WSREP_OK;
                 rcode = gu_to_interrupt(commit_queue, victim.seqno_l);
                 if (rcode) {
@@ -1330,9 +1330,9 @@ static enum wsrep_status mm_galera_cancel_slave(
         gu_debug("interrupting trx commit: seqno %lld", 
                  victim_seqno);
 
-        rcode = gu_to_interrupt(to_queue, victim_seqno);
+        rcode = gu_to_interrupt(cert_queue, victim_seqno);
         if (rcode) {
-            gu_debug("BF trx interupt fail in to_queue: %d", rcode);
+            gu_debug("BF trx interupt fail in cert_queue: %d", rcode);
             rcode = gu_to_interrupt(commit_queue, victim_seqno);
             if (rcode) {
                 gu_warn("BF trx interrupt fail in commit_queue: %d", rcode);
@@ -1425,12 +1425,12 @@ static int check_certification_status_for_aborted(
      * us. However, this is not simple to guarantee. There is a limited number 
      * of slave threads and each slave will eventually end up waiting for 
      * commit_queue. Therefore, all preceding remote trxs might not have passed
-     * to_queue and we would hang here waiting for to_queue => deadlock.
+     * cert_queue and we would hang here waiting for cert_queue => deadlock.
      * 
      * for the time being, I just certificate here with all trxs which were
      * fast enough to certificate. This is wrong, and must be fixed.
      *
-     * Maybe 'light weight' to_queue would work here: We would just check that
+     * Maybe 'light weight' cert_queue would work here: We would just check that
      * seqno_l - 1 has certified and then do our certification.
      */
 
@@ -1591,8 +1591,8 @@ mm_galera_commit(
     wsdb_assign_trx_seqno(trx_id, seqno_l, seqno_g, WSDB_TRX_REPLICATED);
     gu_mutex_unlock(&commit_mtx);
 
-    // cant use it here - GALERA_GRAB_TO_QUEUE (seqno_l);
-    if ((rcode = galera_to_eagain (gu_to_grab, to_queue, seqno_l))) {
+    // cant use it here - GALERA_GRAB_CERT_QUEUE (seqno_l);
+    if ((rcode = galera_to_eagain (gu_to_grab, cert_queue, seqno_l))) {
         gu_debug("gu_to_grab aborted: %d seqno %llu", rcode, seqno_l);
         retcode = WSREP_TRX_FAIL;
 
@@ -1601,11 +1601,11 @@ mm_galera_commit(
         ) {
             retcode = WSREP_BF_ABORT;
             wsdb_assign_trx_ws(trx_id, ws);
-            wsdb_assign_trx_pos(trx_id, WSDB_TRX_POS_TO_QUEUE);
+            wsdb_assign_trx_pos(trx_id, WSDB_TRX_POS_CERT_QUEUE);
             wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTED);
             GU_DBUG_RETURN(retcode);
         } else {
-            GALERA_SELF_CANCEL_QUEUE (to_queue, seqno_l);
+            GALERA_SELF_CANCEL_QUEUE (cert_queue, seqno_l);
             GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
             retcode = WSREP_TRX_FAIL;
         }
@@ -1650,7 +1650,7 @@ mm_galera_commit(
     }
 
     // call release only if grab was successfull
-    GALERA_RELEASE_QUEUE (to_queue, seqno_l);
+    GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
 
     if (retcode == WSREP_OK) {
         assert (seqno_l >= 0);
@@ -1907,7 +1907,7 @@ static enum wsrep_status mm_galera_to_execute_start(
     assert (GCS_SEQNO_ILL != seqno_l);
 
     /* wait for total order */
-    GALERA_GRAB_QUEUE (to_queue, seqno_l);
+    GALERA_GRAB_QUEUE (cert_queue, seqno_l);
     
     /* update global seqno */
     if ((do_apply = galera_update_global_seqno (seqno_g))) {
@@ -1915,7 +1915,7 @@ static enum wsrep_status mm_galera_to_execute_start(
         wsdb_conn_set_seqno(conn_id, seqno_l, seqno_g);
     }
 
-    GALERA_RELEASE_QUEUE (to_queue, seqno_l);
+    GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
 
     if (do_apply) {
         /* Grab commit queue */
@@ -2000,7 +2000,7 @@ static enum wsrep_status mm_galera_replay_trx(
     gu_debug("applier %d", applier->id );
 
     /*
-     * grab to_queue already here, to make sure the conflicting BF applier
+     * grab cert_queue already here, to make sure the conflicting BF applier
      * has completed before we start.
      * commit_queue is released inside process_query or process_query_applying
      */
@@ -2017,7 +2017,7 @@ static enum wsrep_status mm_galera_replay_trx(
         break;
 
     default:
-        gu_fatal("replaying tcommit queue grab fail(%lld %lld)", 
+        gu_fatal("replaying commit queue grab fail(%lld %lld)", 
                  trx.seqno_g, trx.seqno_l);
         abort();
     }
@@ -2031,7 +2031,7 @@ static enum wsrep_status mm_galera_replay_trx(
     if (trx.ws->type == WSDB_WS_TYPE_TRX) {
 
         switch (trx.position) {
-        case WSDB_TRX_POS_TO_QUEUE:
+        case WSDB_TRX_POS_CERT_QUEUE:
             process_query_write_set(
                 applier, app_ctx, trx.ws, trx.seqno_g, trx.seqno_l
             );

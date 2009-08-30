@@ -103,7 +103,7 @@ enum wsdb_trx_state {
 
 enum wsdb_trx_position {
     WSDB_TRX_POS_VOID = 1  ,       /*!< position not defined        */
-    WSDB_TRX_POS_TO_QUEUE,         /*!< before to_queue monitor     */
+    WSDB_TRX_POS_CERT_QUEUE,       /*!< before cert_queue monitor   */
     WSDB_TRX_POS_COMMIT_QUEUE,     /*!< before commit_queue monitor */
 };
 
