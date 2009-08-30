@@ -1,4 +1,4 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2009 Codership Oy <info@codership.com>
 
 #include <stdlib.h>
 #include <assert.h>
@@ -14,8 +14,8 @@
 #include <galerautils.h>
 #include <gcs.h>
 #include <wsdb_api.h>
-#include <job_queue.h>
 
+#include "galera_job_queue.h"
 #include "galera_info.h"
 #include "galera_state.h"
 

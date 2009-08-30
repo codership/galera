@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "job_queue.h"
+#include "galera_job_queue.h"
 
 static void init_worker(
     struct job_worker *worker, unsigned short id, unsigned short workers
