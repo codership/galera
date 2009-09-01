@@ -631,7 +631,7 @@ enum wsdb_conf_param_id {
 enum wsdb_conf_param_type {
     WSDB_CONF_TYPE_INT,     //!< integer type
     WSDB_CONF_TYPE_DOUBLE,  //!< float
-    WSDB_CONFTYPE_STRING,  //!< null terminated string
+    WSDB_CONF_TYPE_STRING,  //!< null terminated string
 };
 
 typedef void * (*wsdb_conf_param_fun)(

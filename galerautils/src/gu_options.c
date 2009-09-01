@@ -90,7 +90,7 @@ gu_options_from_string (const char* opts, char pair_sep, char key_sep)
     const char*        val_end   = NULL;
     int                state = BEFORE_KEY;
 
-    if (ret) {
+    if (ret && scan_pos) {
 
         while ('\0' != *scan_pos) {
 

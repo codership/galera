@@ -18,6 +18,7 @@
 #include "galera_job_queue.h"
 #include "galera_info.h"
 #include "galera_state.h"
+#include "galera_options.h"
 
 #define GALERA_USE_FLOW_CONTROL 1
 #define GALERA_USLEEP 10000 // 10 ms
@@ -43,8 +44,7 @@ typedef enum galera_repl_state {
 } galera_repl_state_t;
 
 /* application's handlers */
-static wsrep_conf_param_cb_t    app_configurator   = NULL;
-static wsrep_stat_param_cb_t    app_stat_cb        = NULL;
+static wsrep_status_param_cb_t  app_status_cb      = NULL;
 static wsrep_bf_apply_cb_t      bf_apply_cb        = NULL;
 static wsrep_ws_start_cb_t      ws_start_cb        = NULL;
 static wsrep_view_cb_t          view_handler_cb    = NULL;
@@ -74,6 +74,8 @@ static gu_mutex_t commit_mtx;
 static gu_mutex_t sst_mtx;
 static gu_cond_t  sst_cond;
 
+static struct galera_options galera_opts;
+
 //#define EXTRA_DEBUG
 #ifdef EXTRA_DEBUG
 static FILE *wslog_L;
@@ -101,7 +103,7 @@ static inline long galera_to_eagain (
     return rcode;
 }
 
-#define GALERA_QUEUE_NAME(queue)                        \
+#define GALERA_QUEUE_NAME(queue)                                \
     ((queue) == cert_queue ? "cert_queue" : "commit_queue")
 
 // the following are made as macros to allow for correct line number reporting
@@ -182,15 +184,17 @@ static int ws_cmp_order(void *ctx1, void *ctx2) {
     return 0;
 }
 
-static void *galera_configurator (
+static void *galera_wsdb_configurator (
     enum wsdb_conf_param_id id, enum wsdb_conf_param_type type
 ) {
-    if (!app_configurator) {
-        return(NULL);
-    } else {
-        return(app_configurator(
-            (enum wsrep_conf_param_id)id, (enum wsrep_conf_param_type)type)
-        );
+    switch (id) {
+    case WSDB_CONF_LOCAL_CACHE_SIZE:
+        return &galera_opts.local_cache_size;
+    case WSDB_CONF_WS_PERSISTENCY:
+        return &galera_opts.persistent_writesets;
+    case WSDB_CONF_MARK_COMMIT_EARLY: // not supported any more?
+    default:
+        return NULL;
     }
 }
 
@@ -198,8 +202,8 @@ static void *galera_configurator (
     assert (last_applied <= seqno);                                     \
     last_applied = seqno;                                               \
     assert (last_applied <= last_recved);                               \
-    if (app_stat_cb) {                                                  \
-        app_stat_cb(WSREP_STAT_LAST_SEQNO, WSREP_TYPE_INT, &last_applied); \
+    if (app_status_cb) {                                                \
+        app_status_cb(WSREP_STAT_LAST_SEQNO, WSREP_TYPE_INT, &last_applied); \
     }
 
 static gcs_conn_t* galera_init_gcs (wsrep_t*      gh,
@@ -244,17 +248,12 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     /* Set up logging */
     gu_conf_set_log_callback((gu_log_cb_t)args->logger_cb);
 
-    /* setup configurator */
-    app_configurator = args->conf_param_cb;
-    wsdb_set_conf_param_cb(galera_configurator);
+    /* Set up options if any */
+    if (args->options) galera_options_from_string (&galera_opts, args->options);
 
-    /* set debug logging on, if requested by app */
-    if (*(my_bool*)app_configurator(WSREP_CONF_DEBUG, WSREP_TYPE_INT)) {
-        gu_info("setting debug level logging");
-        gu_conf_debug_on();
-    }
+    wsdb_set_conf_param_cb(galera_wsdb_configurator);
 
-    /* set up initial state: */
+    /* Set up initial state: */
 
     /* 1.  initialize state to undefined */
     group_uuid = GU_UUID_NIL;
@@ -291,7 +290,7 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
         GU_DBUG_RETURN(WSREP_NODE_FAIL);            
     }
 
-    app_stat_cb = args->stat_param_cb;
+    app_status_cb = args->status_param_cb;
     last_applied = last_recved;
 
     my_idx = 0;
@@ -333,6 +332,18 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     }
 #endif
     GU_DBUG_RETURN(WSREP_OK);
+}
+
+static enum wsrep_status
+mm_galera_options_set (wsrep_t* gh, const char* opts_str)
+{
+    return galera_options_from_string (&galera_opts, opts_str);
+}
+
+static char*
+mm_galera_options_get (wsrep_t* gh)
+{
+    return galera_options_to_string (&galera_opts);
 }
 
 static enum wsrep_status mm_galera_connect (wsrep_t *gh,
@@ -430,16 +441,6 @@ static void mm_galera_tear_down(wsrep_t *gh)
     return;
 }
 
-static void mm_galera_dbug_push (wsrep_t *gh, const char* control)
-{
-    GU_DBUG_PUSH(control);
-}
-
-static void mm_galera_dbug_pop (wsrep_t *gh)
-{
-    GU_DBUG_POP();
-}
-
 #ifdef EXTRA_DEBUG
 static void print_ws(FILE* fid, struct wsdb_write_set *ws, gcs_seqno_t seqno) {
     u_int16_t i;
@@ -460,7 +461,7 @@ static void print_ws(FILE* fid, struct wsdb_write_set *ws, gcs_seqno_t seqno) {
 #define PRINT_WS(fid, ws, seqno) { print_ws(fid, ws, seqno); }
 #else
 #define PRINT_WS(fid, ws, seqno)
-#endif
+#endif // EXTRA_DEBUG
 
 static wsrep_status_t apply_queries(void *app_ctx, struct wsdb_write_set *ws) {
     u_int16_t i;
@@ -783,7 +784,7 @@ static int process_query_write_set_applying(
     }
 
     /* Grab commit queue for commit time */
-    // can't use it here GALERA_GRAB_QUEUE (seqno_l);
+    // can't use it here: GALERA_GRAB_QUEUE (seqno_l);
     switch (applier->type) {
     case JOB_SLAVE:
         rcode = galera_to_eagain (gu_to_grab, commit_queue, seqno_l);
@@ -805,7 +806,7 @@ static int process_query_write_set_applying(
         /*
          * here we have logical problem. We cannot tell, if interrupt
          * was meant for us, or if we already aborted, and retried earlier
-         * in applying phase.We decide to abort once more, just for safety
+         * in applying phase. We decide to abort once more, just for safety
          * to avoid hanging.
          * This needs a better implementation, to identify if interrupt
          * is real or not.
@@ -1229,7 +1230,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
     return WSREP_OK;
 }
 
-static enum wsrep_status mm_galera_cancel_commit(wsrep_t *gh,
+static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
     const wsrep_seqno_t bf_seqno, const trx_id_t victim_trx
 ) {
     enum wsrep_status ret_code = WSREP_OK;
@@ -1309,7 +1310,7 @@ static enum wsrep_status mm_galera_cancel_commit(wsrep_t *gh,
     return ret_code;
 }
 
-static enum wsrep_status mm_galera_cancel_slave(
+static enum wsrep_status mm_galera_abort_slave_trx(
     wsrep_t *gh, wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno
 ) {
     enum wsrep_status ret_code = WSREP_OK;
@@ -1345,12 +1346,12 @@ static enum wsrep_status mm_galera_cancel_slave(
     return ret_code;
 }
 
-static enum wsrep_status mm_galera_committed(wsrep_t *gh, trx_id_t trx_id)
+static enum wsrep_status mm_galera_post_commit(wsrep_t *gh, trx_id_t trx_id)
 {
     bool do_report = false;
     wsdb_trx_info_t trx;
 
-    GU_DBUG_ENTER("galera_committed");
+    GU_DBUG_ENTER("galera_post_commit");
 
     if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_OK;
 
@@ -1380,11 +1381,11 @@ static enum wsrep_status mm_galera_committed(wsrep_t *gh, trx_id_t trx_id)
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static enum wsrep_status mm_galera_rolledback(wsrep_t *gh, trx_id_t trx_id)
+static enum wsrep_status mm_galera_post_rollback(wsrep_t *gh, trx_id_t trx_id)
 {
     wsdb_trx_info_t trx;
 
-    GU_DBUG_ENTER("galera_rolledback");
+    GU_DBUG_ENTER("galera_post_rollback");
 
     if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_OK;
 
@@ -1400,6 +1401,7 @@ static enum wsrep_status mm_galera_rolledback(wsrep_t *gh, trx_id_t trx_id)
 	}
         wsdb_delete_local_trx(trx_id);
         wsdb_delete_local_trx_info(trx_id);
+
     } else if (trx.state != WSDB_TRX_MISSING) {
         gu_debug("trx state: %d at galera_rolledback for: %lld", 
                  trx.state, trx.seqno_l
@@ -1461,10 +1463,9 @@ static int check_certification_status_for_aborted(
 }
 
 
-static enum wsrep_status
-mm_galera_commit(
+static enum wsrep_status mm_galera_pre_commit(
     wsrep_t *gh,
-    trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data, size_t rbr_data_len
+    trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data,size_t rbr_data_len
     )
 {
 
@@ -1478,7 +1479,7 @@ mm_galera_commit(
     enum wsrep_status      retcode;
     wsdb_trx_info_t        trx;
 
-    GU_DBUG_ENTER("galera_commit");
+    GU_DBUG_ENTER("galera_pre_commit");
 
     if (gu_unlikely(galera_state != GALERA_CONNECTED)) return WSREP_CONN_FAIL;
 
@@ -2115,17 +2116,17 @@ static wsrep_status_t mm_galera_sst_received (wsrep_t* gh,
 static wsrep_t mm_galera_str = {
     WSREP_INTERFACE_VERSION,
     &mm_galera_init,
+    &mm_galera_options_set,
+    &mm_galera_options_get,
     &mm_galera_connect,
     &mm_galera_disconnect,
-    &mm_galera_dbug_push,
-    &mm_galera_dbug_pop,
     &mm_galera_recv,
-    &mm_galera_commit,
+    &mm_galera_pre_commit,
+    &mm_galera_post_commit,
+    &mm_galera_post_rollback,
     &mm_galera_replay_trx,
-    &mm_galera_cancel_commit,
-    &mm_galera_cancel_slave,
-    &mm_galera_committed,
-    &mm_galera_rolledback,
+    &mm_galera_abort_pre_commit,
+    &mm_galera_abort_slave_trx,
     &mm_galera_append_query,
     &mm_galera_append_row_key,
     &mm_galera_set_variable,

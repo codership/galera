@@ -9,8 +9,6 @@ GCACHE_SRCS =               \
 	GCache_memops.cpp   \
 	GCache_seqno.cpp
 
-#GCACHE_INCS = $(wildcard *.hpp)
-
 # Describe libGCACHE library target
 #include_HEADERS   = GCache.hpp
 lib_LTLIBRARIES      = libgcache.la
