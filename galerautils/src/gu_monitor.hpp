@@ -40,7 +40,7 @@ public:
 #ifndef NDEBUG
     Monitor() : refcnt(0), mutex(), cond(), holder(0) {}
 #else
-    Monitor() : refcnt(0), mutex(), cond {}
+    Monitor() : refcnt(0), mutex(), cond() {}
 #endif
 
     ~Monitor() {}
