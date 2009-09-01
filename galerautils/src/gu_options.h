@@ -16,13 +16,13 @@ struct gu_options_token {
 };
 
 struct gu_options_pair {
-    gu_options_token key;
-    gu_options_token value;
+    struct gu_options_token key;
+    struct gu_options_token value;
 };
 
 struct gu_options {
-    long            opts_num;
-    gu_options_pair opts[];
+    long                   opts_num;
+    struct gu_options_pair opts[];
 };
 
 extern struct gu_options*

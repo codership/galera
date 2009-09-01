@@ -14,6 +14,7 @@
 #include "gu_time_test.h"
 #include "gu_fifo_test.h"
 #include "gu_uuid_test.h"
+#include "gu_options_test.h"
 #include "gu_lock_step_test.h"
 
 typedef Suite *(*suite_creator_t)(void);
@@ -26,6 +27,7 @@ static suite_creator_t suites[] =
         gu_time_suite,
         gu_fifo_suite,
 	gu_uuid_suite,
+	gu_options_suite,
 	gu_lock_step_suite,
 	NULL
     };
@@ -38,9 +40,11 @@ int main(int argc, char* argv[])
 
   FILE* log_file = NULL;
 
-  log_file = fopen ("gu_tests.log", "w");
-  if (!log_file) return EXIT_FAILURE;
-  gu_conf_set_log_file (log_file);
+  if (!no_fork) {
+      log_file = fopen ("gu_tests.log", "w");
+      if (!log_file) return EXIT_FAILURE;
+      gu_conf_set_log_file (log_file);
+  }
   gu_conf_debug_on();
 
   while (suites[i]) {
