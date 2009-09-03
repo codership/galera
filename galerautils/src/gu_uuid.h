@@ -23,6 +23,9 @@ typedef struct {
 
 extern const gu_uuid_t GU_UUID_NIL;
 
+/** length of string representation */
+#define GU_UUID_STR_LEN 36
+
 /** Macros for pretty printing */
 #define GU_UUID_FORMAT \
 "%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"

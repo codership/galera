@@ -69,7 +69,7 @@ struct gcs_conn
     int err;
     gu_mutex_t   lock;
 
-    gcs_seqno_t local_act_id; /* local seqno of the action  */
+    gcs_seqno_t  local_act_id; /* local seqno of the action  */
 
     /* A queue for threads waiting for replicated actions */
     gcs_fifo_lite_t*  repl_q;
@@ -81,9 +81,9 @@ struct gcs_conn
 
     /* Flow control */
 //    gu_mutex_t    fc_mutex;
-    uint32_t      conf_id;     // configuration ID
-    long          stop_sent;   // how many STOPs and CONTs were send
-    long          stop_count;  // counts stop requests received
+    uint32_t     conf_id;     // configuration ID
+    long         stop_sent;   // how many STOPs and CONTs were send
+    long         stop_count;  // counts stop requests received
     long queue_len;   // slave queue length
     long upper_limit; // upper slave queue limit
     long lower_limit; // lower slave queue limit
@@ -676,11 +676,11 @@ long gcs_close (gcs_conn_t *conn)
     }
     gu_mutex_unlock (&conn->lock);
 
-        /* wake all gcs_recv() threads () */
-        // FIXME: this can block waiting for applicaiton threads to fetch all
-        // items. In certain situations this can block forever. Ticket #113
-        gu_info ("Closing slave action queue.");
-        gu_fifo_close (conn->recv_q);
+    /* wake all gcs_recv() threads () */
+    // FIXME: this can block waiting for applicaiton threads to fetch all
+    // items. In certain situations this can block forever. Ticket #113
+    gu_info ("Closing slave action queue.");
+    gu_fifo_close (conn->recv_q);
 
     return ret;
 }

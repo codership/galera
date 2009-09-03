@@ -7,6 +7,7 @@ libmmgalera_la_SOURCES =   \
 	galera_info.c      \
 	galera_state.c     \
 	galera_options.c   \
+	galera_status.c    \
 	galera_job_queue.c \
 	mm_galera.c
 
