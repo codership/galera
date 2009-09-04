@@ -497,12 +497,12 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
         if (GCS_STATE_DONOR == sender->status) {
             peer_id = sender->joiner;
-            st_dir  = ">>>";
+            st_dir  = "to";
             sender->status = GCS_STATE_JOINED;
         }
         else {
             peer_id = sender->donor;
-            st_dir  = "<<<";
+            st_dir  = "from";
             if (seqno >= 0) sender->status = GCS_STATE_JOINED;
         }
 
@@ -518,12 +518,13 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         }
 
         if (seqno < 0) {
-            gu_warn ("State Transfer %ld (%s) %s %ld (%s) failed: %d (%s)",
+            gu_warn ("%ld(%s): State transfer %s %ld(%s) failed: "
+                     "%d (%s)",
                      sender_idx, sender->name, st_dir, peer_idx, peer_name,
                      (int)seqno, strerror((int)-seqno));
         }
         else {
-            gu_info ("State Transfer %ld (%s) %s %ld (%s) complete.",
+            gu_info ("%ld(%s): State transfer %s %ld(%s) complete.",
                      sender_idx, sender->name, st_dir, peer_idx, peer_name);
         }
 

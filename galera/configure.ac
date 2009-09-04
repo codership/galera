@@ -4,7 +4,7 @@
 #sinclude(config/ac-macros/galera.m4)
 
 AC_PREREQ(2.50)
-AC_INIT([libgalera], [0.4.0], [info@codership.com])
+AC_INIT([libgalera], [0.5.0], [info@codership.com])
 AC_CONFIG_SRCDIR([src/mm_galera.c])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE  # AC_INIT sets version and package name

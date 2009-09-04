@@ -7,6 +7,20 @@
 static gu_uuid_t state_uuid = { { 0, } };
 static char      state_uuid_str[GU_UUID_STR_LEN + 1] = { 0, };
 
+static const char* status_str[GALERA_STAGE_MAX] =
+{
+    "Initialized (0)",
+    "Joining (1)",
+    "Prepare for SST (2)",
+    "SST request sent (3)",
+    "Waiting for SST (4)",
+    "Joined (5)",
+    "Synced (6)",
+    "Donor (+)"
+    "SST request failed (-)",
+    "SST failed (-)",
+};
+
 enum status_vars
 {
     STATUS_STATE_UUID,
@@ -18,12 +32,13 @@ enum status_vars
     STATUS_LOCAL_COMMITS,
     STATUS_LOCAL_CERT_FAILURES,
     STATUS_LOCAL_BF_ABORTS,
+    STATUS_LOCAL_STATUS,
     STATUS_MAX
 };
 
-static struct wsrep_status_var wsrep_status[] =
+static struct wsrep_status_var wsrep_status[STATUS_MAX + 1] =
 {
-    {"state_uuid",          WSREP_STATUS_STRING, {._string = state_uuid_str}},
+    {"local_state_uuid",    WSREP_STATUS_STRING, {._string = state_uuid_str}},
     {"last_committed",      WSREP_STATUS_INT64,  { -1 }                     },
     {"replicated",          WSREP_STATUS_INT64,  { 0 }                      },
     {"replicated_bytes",    WSREP_STATUS_INT64,  { 0 }                      },
@@ -32,6 +47,7 @@ static struct wsrep_status_var wsrep_status[] =
     {"local_commits",       WSREP_STATUS_INT64,  { 0 }                      },
     {"local_cert_failures", WSREP_STATUS_INT64,  { 0 }                      },
     {"local_bf_aborts",     WSREP_STATUS_INT64,  { 0 }                      },
+    {"local_status",        WSREP_STATUS_STRING, { 0 }                      },
     {NULL, 0, { 0 }}
 };
 
@@ -54,6 +70,8 @@ galera_status_get (const struct galera_status* s)
     wsrep_status[STATUS_LOCAL_CERT_FAILURES].value._int64 =
         s->local_cert_failures;
     wsrep_status[STATUS_LOCAL_BF_ABORTS    ].value._int64 = s->local_bf_aborts;
+    wsrep_status[STATUS_LOCAL_STATUS       ].value._string = 
+        status_str[s->stage];
 
     return wsrep_status;
 }
