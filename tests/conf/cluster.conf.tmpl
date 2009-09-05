@@ -7,22 +7,38 @@
 # on each network node.
 export CLUSTER_NODES=${CLUSTER_NODES:-"gw vs1 vs2"}
 
+# DBMS that will be used for tests
+export DBMS=${DBMS:-"MYSQL"}
+
 # DBMS superuser username and password for administrative purposes
-export MYSQL_ROOT_USER=${MYSQL_ROOT_USER:-"root"}
-export MYSQL_ROOT_PSWD=${MYSQL_ROOT_PSWD:-"rootpass"}
+export DBMS_ROOT_USER=${DBMS_ROOT_USER:-"root"}
+export DBMS_ROOT_PSWD=${DBMS_ROOT_PSWD:-"rootpass"}
 
 # DBMS test use username and password
-export MYSQL_TEST_USER=${MYSQL_TEST_USER:-"test"}
-export MYSQL_TEST_PSWD=${MYSQL_TEST_PSWD:-"testpass"}
+export DBMS_TEST_USER=${DBMS_TEST_USER:-"test"}
+export DBMS_TEST_PSWD=${DBMS_TEST_PSWD:-"testpass"}
 
-# Base directory where MySQL is installed in. May also be 
-# symbolic link pointing to real directory
-export MYSQL_BASE=${MYSQL_BASE:-"~/galera/mysql"}
+# DBMS schema to use for tests
+export DBMS_TEST_SCHEMA=${DBMS_TEST_SCHEMA:-"test"}
+
+# is this needed?
+## Base directory where MySQL is installed in. May also be 
+## symbolic link pointing to real directory
+#export MYSQL_BASE=${MYSQL_BASE:-"~/galera/mysql"}
 
 # Host for clients to connect to
-export MYSQL_HOST=${MYSQL_HOST:-"127.0.0.1"}
+export DBMS_HOST=${DBMS_HOST:-"127.0.0.1"}
 
-# Port for clients to connect to
+# Port for MySQL specific tests
 export MYSQL_PORT=${MYSQL_PORT:-"3306"}
+
+# Port for PostgreSQL specific tests
+export PGSQL_PORT=${PGSQL_PORT:-"5432"}
+
+# Port for crossplatform tests
+case "$DBMS" in
+"MYSQL") export DBMS_PORT=$MYSQL_PORT ;;
+"PGSQL") export DBMS_PORT=$PGSQL_PORT ;;
+esac
 
 # end
