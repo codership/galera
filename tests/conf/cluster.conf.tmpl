@@ -41,4 +41,7 @@ case "$DBMS" in
 "PGSQL") export DBMS_PORT=$PGSQL_PORT ;;
 esac
 
+# How many concurrent clients to use
+export DBMS_CLIENTS=${DBMS_CLIENTS:-16}
+
 # end
