@@ -16,8 +16,9 @@ TRX_LEN=10
 #	  --auto-generate-sql-unique-write-number=10000 \
 #	  --auto-generate-sql-write-number=$TRX_LEN \
 #	  --auto-generate-sql-load-type=write \
-mysqlslap --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD --delimiter=';' \
-          --create-schema=$DBMS_TEST_SCHEMA \
+mysqlslap --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD \
+          --host=$DBMS_HOST --port=$DBMS_PORT \
+          --delimiter=';' --create-schema=$DBMS_TEST_SCHEMA \
 	  --create="create_auto.sql" --query="insert_auto.sql" \
           --commit=$TRX_LEN --detach=$(($TRX_LEN * 4)) \
 	  --concurrency=30 --number-of-queries=10000 \
