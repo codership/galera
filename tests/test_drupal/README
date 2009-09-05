@@ -84,7 +84,7 @@ RUNNING THE TEST:
    
 NOTE1:
 During the first few runs it will stop with error about unable to find
-requested JavaScript file. But after 2-3 runs this file will misteriously
+requested JavaScript file. But after 2-3 runs this file will mysteriously
 appear on all cluster nodes and it won't be a problem after that. One solution
 would be to keep Drupal files directory on a shared disk.
 

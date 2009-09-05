@@ -7,22 +7,22 @@
 # on each network node.
 export CLUSTER_NODES=${CLUSTER_NODES:-"gw vs1 vs2"}
 
-# MySQL superuser username and password for administrative purposes
+# DBMS superuser username and password for administrative purposes
 export MYSQL_ROOT_USER=${MYSQL_ROOT_USER:-"root"}
-export MYSQL_ROOT_PASSWD=${MYSQL_ROOT_PASSWD:-"rootpass"}
+export MYSQL_ROOT_PSWD=${MYSQL_ROOT_PSWD:-"rootpass"}
 
-# MySQL test use username and password
+# DBMS test use username and password
 export MYSQL_TEST_USER=${MYSQL_TEST_USER:-"test"}
-export MYSQL_TEST_PASSWD=${MYSQL_TEST_PASSWD:-"testpass"}
+export MYSQL_TEST_PSWD=${MYSQL_TEST_PSWD:-"testpass"}
 
 # Base directory where MySQL is installed in. May also be 
 # symbolic link pointing to real directory
-export MYSQLD_BASE=${MYSQLD_BASE:-"~/galera/mysql"}
+export MYSQL_BASE=${MYSQL_BASE:-"~/galera/mysql"}
 
-# Pid file name under MySQL base directory
-export MYSQLD_PID_FILE=${MYSQLD_PID_FILE:-"${MYSQLD_BASE}/mysql/var/mysqld.pid"}
+# Host for clients to connect to
+export MYSQL_HOST=${MYSQL_HOST:-"127.0.0.1"}
 
-# The port mysqld is listening
+# Port for clients to connect to
 export MYSQL_PORT=${MYSQL_PORT:-"3306"}
 
 # end
