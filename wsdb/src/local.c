@@ -47,7 +47,7 @@ static long        last_committed_refs   = 0;
 static trx_seqno_t next_to_discard_seqno = 0;
 static ulong       next_to_discard_refs  = 0;
 static trx_seqno_t safe_to_discard_seqno = 0;
-static const ulong discard_interval      = 100;
+static const long  discard_interval      = 100;
 
 static gu_mutex_t  last_committed_seqno_mtx; // mutex protecting last_commit...
 
@@ -1199,7 +1199,7 @@ struct wsdb_write_set *wsdb_get_conn_write_set(
 }
 
 int wsdb_set_exec_query(
-    struct wsdb_write_set *ws, char *query, uint32_t query_len
+    struct wsdb_write_set *ws, char *query, size_t query_len
 ) {
 
     GU_DBUG_ENTER("wsdb_set_exec_query");
