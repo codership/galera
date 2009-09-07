@@ -37,11 +37,11 @@ export PGSQL_PORT=${PGSQL_PORT:-"5432"}
 
 # Port for crossplatform tests
 case "$DBMS" in
-"MYSQL") export DBMS_PORT=$MYSQL_PORT ;;
-"PGSQL") export DBMS_PORT=$PGSQL_PORT ;;
+"MYSQL") export DBMS_PORT=${DBMS_PORT:-"$MYSQL_PORT"} ;;
+"PGSQL") export DBMS_PORT=${DBMS_PORT:-"$PGSQL_PORT"} ;;
 esac
 
 # How many concurrent clients to use
-export DBMS_CLIENTS=${DBMS_CLIENTS:-16}
+export DBMS_CLIENTS=${DBMS_CLIENTS:-"16"}
 
 # end
