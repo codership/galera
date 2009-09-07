@@ -3,7 +3,9 @@
 TEST_BASE=$(cd $(dirname $0)/..; pwd -P)
 . $TEST_BASE/conf/main.conf
 
-TRX_LEN=1
+# big - for IO bound workload, small - for CPU bound workload
+SIZE=${SIZE:-"small"}
+TRX_LEN=${TRX_LEN:-"1"}
 
 # Auto gernerate does not seem to work with mysqlslap 5.1.37
 #	  --number-int-cols=5 --number-char-cols=3 \
@@ -17,7 +19,7 @@ TRX_LEN=1
 mysqlslap --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD \
           --host=$DBMS_HOST --port=$DBMS_PORT \
           --delimiter=';' --create-schema=$DBMS_TEST_SCHEMA \
-	  --create="create_auto.sql" --query="insert_auto.sql" \
+	  --create="create_$SIZE.sql" --query="insert_$SIZE.sql" \
           --commit=$TRX_LEN \
 	  --concurrency=$DBMS_CLIENTS --number-of-queries=1000000 \
 	  --verbose --csv
