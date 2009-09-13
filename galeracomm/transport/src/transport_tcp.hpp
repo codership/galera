@@ -4,20 +4,19 @@
 #include "galeracomm/transport.hpp"
 #include "transport_common.hpp"
 
+#include <string>
 #include <cerrno>
 #include <cstdlib>
 #include <cassert>
-
 
 #include <deque>
 
 #include <sys/socket.h>
 
-
-
 class TCPTransport : public Transport, PollContext {
     int fd;
     int no_nagle;
+    std::string peer;
     sockaddr sa;
     size_t sa_size;
     Poll *poll;
@@ -39,28 +38,23 @@ class TCPTransport : public Transport, PollContext {
     void operator= (const TCPTransport&);
 
     TCPTransport(const int _fd, const sockaddr& _sa, 
-		 const size_t _sa_size, Poll *_poll) :
-	fd(_fd), no_nagle(1), sa(_sa), sa_size(_sa_size), poll(_poll),
-	max_pending(1024),
-        pending_bytes(0),
-	recv_buf_size(65536),
-	recv_buf (reinterpret_cast<unsigned char*>(::malloc(recv_buf_size))),
-        recv_buf_offset(0),
-        recv_rb(0),
-	up_rb(0),
-        pending()
-    {
-	set_max_pending_bytes(10*1024*1024);
-    }
-
+		 const size_t _sa_size, Poll *_poll);
 public:
 
     TCPTransport(Poll *p) : 
-	fd(-1), no_nagle(1), sa(), sa_size(0), poll(p), // FIXME!!!
-        max_pending(1024), pending_bytes(0), 
+	fd(-1),
+        no_nagle(1),
+        peer(""),
+        sa(),
+        sa_size(0),
+        poll(p),
+        max_pending(1024),
+        pending_bytes(0), 
 	recv_buf_size(65536),
 	recv_buf (reinterpret_cast<unsigned char*>(::malloc(recv_buf_size))),
-	recv_buf_offset(0), recv_rb(0), up_rb(0),
+	recv_buf_offset(0),
+        recv_rb(0),
+        up_rb(0),
         pending()
     {
 	set_max_pending_bytes(1024*1024);
@@ -101,6 +95,7 @@ public:
     int send(WriteBuf *wb, const ProtoDownMeta *dm);
     const ReadBuf *recv();
 
+    void set_timeout (int tout /* sec*/);
 };
 
 #endif // TRANSPORT_TCP_HPP

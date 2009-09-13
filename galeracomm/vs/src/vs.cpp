@@ -373,7 +373,13 @@ void VS::connect()
 {
     if (!be)
 	throw DException("Not initialized");
-    be->connect(be_addr);
+    try {
+        be->connect(be_addr);
+    }
+    catch (std::exception& e) {
+        log_fatal << "Connect failed: " << e.what();
+	throw (e);
+    }
 }
 
 

@@ -163,8 +163,8 @@ public:
 	    lock.wait(cond);
 	}
 
-	std::pair<vs_ev, bool> ret(eq.front(), eq.size() && state != LEFT 
-				   ? true : false);
+	std::pair<vs_ev, bool> ret(eq.front(), eq.size() && state != LEFT);
+
 	return ret;
     }
 
@@ -257,19 +257,20 @@ static GCS_BACKEND_RECV_FN(gcs_vs_recv)
     gcs_vsbes_conn* conn = reinterpret_cast<gcs_vsbes_conn*>(backend->conn);
     long ret = 0;
     long cpy = 0;
-    if (conn == 0)
-	return -EBADFD;
+
+    if (conn == 0) return -EBADFD;
     
 retry:
+
     std::pair<vs_ev, bool> wr(conn->vs_ctx.wait_event(buf, len));
-    if (wr.second == false)
-	return -ENOTCONN;
+
+    if (wr.second == false) return -ENOTCONN;
+
     vs_ev& ev(wr.first);
 
-    if (!(ev.msg || ev.view))
-	return -ENOTCONN;
+    if (!(ev.msg || ev.view)) return -ENOTCONN;
 
-    assert((ev.msg && (ev.rb || ev.msg_size))|| ev.view);
+    assert((ev.msg && (ev.rb || ev.msg_size)) || ev.view);
 
     if (ev.msg) {
 	*msg_type = static_cast<gcs_msg_type_t>(ev.msg->get_user_type());
@@ -294,7 +295,6 @@ retry:
 	// - Check number of members that left *ungracefully* 
 	//   (see fixme in CLOSE)
 	// 
-	//
 	gcs_comp_msg_t *new_comp = 0;
 	if (ev.view->is_trans() && conn->comp_msg && 
 	    ev.view->get_addr().size()*2 + ev.view->get_left().size() 
@@ -317,11 +317,14 @@ retry:
                   ev.view->get_addr(), conn->vs_ctx.vs->get_self());
 	if (conn->comp_msg) gcs_comp_msg_delete(conn->comp_msg);
 	conn->comp_msg = new_comp;
-	cpy = std::min(static_cast<size_t>(gcs_comp_msg_size(conn->comp_msg)), len);
-	ret = std::max(static_cast<size_t>(gcs_comp_msg_size(conn->comp_msg)), len);
+	cpy = std::min(static_cast<size_t>(gcs_comp_msg_size(conn->comp_msg)),
+                       len);
+	ret = std::max(static_cast<size_t>(gcs_comp_msg_size(conn->comp_msg)),
+                       len);
 	memcpy(buf, conn->comp_msg, cpy);
 	*msg_type = GCS_MSG_COMPONENT;
     }
+
     if (static_cast<size_t>(ret) <= len) {
 	conn->vs_ctx.release_event();
 	conn->n_received++;

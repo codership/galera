@@ -157,7 +157,7 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 	close();
 	return;
     } else if (rb == 0 && state == HANDSHAKE) {
-	// Should not happen because Transport::accept() results 
+	// Should not happen because Transport::accept() results in
 	// connected socket (at least should)
 	throw FatalException("");
 	try {
@@ -320,7 +320,15 @@ VSServer::~VSServer()
 void VSServer::handle_up(const int cid, const ReadBuf *rb, const size_t roff, 
 			 const ProtoUpMeta *um)
 {
-    Transport *tp = listener->accept(tp_poll);
+    Transport* tp = 0;
+    try {
+        tp = listener->accept(tp_poll);
+    }
+    catch (std::exception& e) {
+	log_fatal << "Accept failed: " << e.what();
+	throw (e);
+    }
+
     tp->set_contention_params(1, 500);
     tp->set_max_pending_bytes(50*1024*1024);
     VSBackend *vs = VSBackend::create("fifo", fifo_poll);

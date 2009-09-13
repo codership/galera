@@ -1,11 +1,12 @@
+#include <iostream>
 
 #include "galeracomm/logger.hpp"
 #include "transport_tcp.hpp"
 
-
 #include <fcntl.h>
 #include <unistd.h>
 
+#define TCP_CONN_TIMEOUT 3
 
 static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
 {
@@ -40,6 +41,38 @@ static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
      return true;
 }
 
+static void sa_to_string (const sockaddr* sa, std::string& str)
+{
+    char buf[256];
+    const sockaddr_in* sin = reinterpret_cast<const sockaddr_in*>(sa);
+    std::ostringstream os;
+
+    os << inet_ntop (sin->sin_family, &sin->sin_addr, buf, sizeof(buf))
+       << ":" << ntohs(sin->sin_port);
+
+    str = os.str();
+}
+
+TCPTransport::TCPTransport(const int _fd, const sockaddr& _sa, 
+                           const size_t _sa_size, Poll *_poll) :
+    fd(_fd),
+    no_nagle(1),
+    peer(""),
+    sa(_sa),
+    sa_size(_sa_size),
+    poll(_poll),
+    max_pending(1024),
+    pending_bytes(0),
+    recv_buf_size(65536),
+    recv_buf (reinterpret_cast<unsigned char*>(::malloc(recv_buf_size))),
+    recv_buf_offset(0),
+    recv_rb(0),
+    up_rb(0),
+    pending()
+{
+    sa_to_string (&sa, peer);
+    set_max_pending_bytes(10*1024*1024);
+}
 
 class TCPTransportHdr {
     unsigned char raw[sizeof(uint32_t)];
@@ -80,26 +113,32 @@ public:
 void TCPTransport::connect(const char *addr)
 {
     if (fd != -1)
-	throw FatalException("TCPTransport::connect(): Already connected or listening");
+	throw DFatalException("TCPTransport::connect(): Already connected or listening");
+
     if (!tcp_addr_to_sa(addr, &sa, &sa_size))
-	throw FatalException("TCPTransport::connect(): Invalid address");
+	throw DFatalException("TCPTransport::connect(): Invalid address");
+
     if (::strncmp(addr, "tcp:", strlen("tcp:")) == 0)
 	set_synchronous();
+
     if ((fd = ::socket(PF_INET, SOCK_STREAM, 0)) == -1)
-	throw FatalException(::strerror(errno));
-    linger lg = {1, 3};
+	throw DFatalException(::strerror(errno));
+
+    linger lg = {1, TCP_CONN_TIMEOUT};
+
     if (::setsockopt(fd, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg)) == -1) {
 	int err = errno;
         closefd(fd);
 	fd = -1;
-	throw FatalException(::strerror(err));
+	throw DFatalException(::strerror(err));
     }
 
-    if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) == -1) {
+    if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) 
+        == -1) {
 	int err = errno;
         closefd(fd);
 	fd = -1;
-	throw FatalException(::strerror(err));	
+	throw DFatalException(::strerror(err));	
     }
 
     if (is_synchronous() == false) {
@@ -107,22 +146,29 @@ void TCPTransport::connect(const char *addr)
 	    int err = errno;
             closefd(fd);
 	    fd = -1;
-	    throw FatalException(::strerror(err));
+	    throw DFatalException(::strerror(err));
 	}
-    } 
+    }
+
     if (poll) {
 	poll->insert(fd, this);
 	poll->set(fd, PollEvent::POLL_IN);
     }
+
     if (::connect(fd, &sa, sa_size) == -1) {
+
 	if (errno != EINPROGRESS) {
-	    throw FatalException(::strerror(errno));
-	} else {
+	    throw DFatalException(::strerror(errno));
+	}
+        else {
 	    if (poll)
 		poll->set(fd, PollEvent::POLL_OUT);
 	    state = TRANSPORT_S_CONNECTING;
 	}
-    } else {
+    }
+    else {
+        sa_to_string (&sa, peer);
+        set_timeout (TCP_CONN_TIMEOUT);
 	state = TRANSPORT_S_CONNECTED;
     }
 }
@@ -140,32 +186,43 @@ void TCPTransport::close()
 void TCPTransport::listen(const char *addr)
 {
     LOG_DEBUG(std::string("TCPTransport::listen(") + addr + ")");
+
     if (fd != -1)
-	throw FatalException("TCPTransport::listen(): Already connected or listening");
+	throw DFatalException("TCPTransport::listen(): Already connected or listening");
+
     if (!tcp_addr_to_sa(addr, &sa, &sa_size))
-	throw FatalException("TCPTransport::listen(): Invalid address");
+	throw DFatalException("TCPTransport::listen(): Invalid address");
+
     if ((fd = ::socket(PF_INET, SOCK_STREAM, 0)) == -1)
-	throw FatalException("TCPTransport::listen(): Could not open socket");
+	throw DFatalException("TCPTransport::listen(): Could not open socket");
+
     if (::strncmp(addr, "tcp:", strlen("tcp:")) == 0)
 	set_synchronous();
 
     if (is_synchronous() == false && ::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
-	throw FatalException("TCPTransport::listen(): Fcntl failed");
+	throw DFatalException("TCPTransport::listen(): Fcntl failed");
+
     int reuse = 1;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1)
-	throw FatalException("TCPTransport::listen(): Setsockopt faild");
+	throw DFatalException("TCPTransport::listen(): Setsockopt faild");
+
     if (::bind(fd, &sa, sa_size) == -1) {
 	int err = errno;
 	LOG_FATAL(std::string("TCPTransport::listen(): Bind failed to address ") + to_string(&sa) + " failed " +
 		     ::strerror(err));
-	throw FatalException("TCPTransport::listen(): Bind failed");
+	throw DFatalException("TCPTransport::listen(): Bind failed");
     }
+
     if (::listen(fd, 128) == -1)
-	throw FatalException("TCPTransport::listen(): Listen failed");
+	throw DFatalException("TCPTransport::listen(): Listen failed");
+
+    sa_to_string (&sa, peer);
+
     if (poll) {
 	poll->insert(fd, this);
 	poll->set(fd, PollEvent::POLL_IN);
     }
+
     state = TRANSPORT_S_LISTENING;
 }
 
@@ -178,25 +235,28 @@ Transport *TCPTransport::accept(Poll *poll, Protolay *up_ctx)
     
     int acc_fd;
     if ((acc_fd = ::accept(fd, &sa, &sa_size)) == -1)
-	throw FatalException("TCPTransport::accept(): Accept failed");
+	throw DFatalException("TCPTransport::accept(): Accept failed");
     
 
-    if (is_synchronous() == false && ::fcntl(acc_fd, F_SETFL, O_NONBLOCK) == -1) {
+    if (is_synchronous() == false && ::fcntl(acc_fd, F_SETFL, O_NONBLOCK)
+        == -1) {
         closefd(fd);
-	throw FatalException("TCPTransport::accept(): Fcntl failed");
+	throw DFatalException("TCPTransport::accept(): Fcntl failed");
     }
 
 
-    if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) == -1) {
+    if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) 
+        == -1) {
 	int err = errno;
         closefd(fd);
-	throw FatalException(::strerror(err));	
+	throw DFatalException(::strerror(err));	
     }
     
     TCPTransport *ret = new TCPTransport(acc_fd, sa, sa_size, poll);
     if (up_ctx) {
 	ret->set_up_context(up_ctx);
     }
+    ret->set_timeout (TCP_CONN_TIMEOUT);
     ret->state = TRANSPORT_S_CONNECTED;
     if (poll) {
 	poll->insert(ret->fd, ret);
@@ -454,7 +514,7 @@ void TCPTransport::handle(const int fd, const PollEnum pe)
 	    socklen_t errlen = sizeof(err);
 	    poll->unset(fd, PollEvent::POLL_OUT);
 	    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1)
-		throw FatalException("TCPTransport::handle(): Getsockopt failed");
+		throw DFatalException("TCPTransport::handle(): Getsockopt failed");
 	    if (err == 0) {
 		state = TRANSPORT_S_CONNECTED;
 	    } else {
@@ -472,6 +532,7 @@ void TCPTransport::handle(const int fd, const PollEnum pe)
 	    LOG_DEBUG("TCPTransport::handle(): Failed");
 	}
     }
+
     if (pe & PollEvent::POLL_IN) {
 	if (state == TRANSPORT_S_CONNECTED) {
 	    ssize_t ret = recv_nointr();
@@ -489,19 +550,34 @@ void TCPTransport::handle(const int fd, const PollEnum pe)
 	    pass_up(0, 0, 0);
 	}
     }
+
     if (pe & PollEvent::POLL_HUP) {
 	this->error_no = ENOTCONN;
 	state = TRANSPORT_S_FAILED;
 	pass_up(0, 0, 0);
     }
+
     if (pe & PollEvent::POLL_INVAL)
-	throw FatalException("TCPTransport::handle(): Invalid file descriptor");
+	throw
+            DFatalException("TCPTransport::handle(): Invalid file descriptor");
+
     if (pe & PollEvent::POLL_ERR) {
 	int err = 0;
 	socklen_t errlen = sizeof(err);
 	if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) {
-	    LOG_WARN("TCPTransport::handle(): Poll error");
-	}
+            if (EBADF == errno) {
+                log_warn << "TCPTransport::handle(): lost connectivity to "
+                         << peer;
+            }
+            else {
+                log_warn << "TCPTransport::handle(): socket error: " << errno
+                         << " " << strerror (errno);
+            }
+        }
+        else {
+	    log_warn << "TCPTransport::handle(): poll error: " << err << " "
+                     << strerror (err);
+        }
     }
 }
 
@@ -574,4 +650,41 @@ const ReadBuf *TCPTransport::recv()
 			  recv_buf_offset - TCPTransportHdr::get_raw_len());
     recv_buf_offset = 0;
     return recv_rb;
+}
+
+void TCPTransport::set_timeout (int tout /* sec*/)
+{
+    static const int interval  = 1;
+    static const int keepalive = 1;
+
+    if (::setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &keepalive,
+                     sizeof(keepalive)) != 0) {
+	int err = errno;
+        closefd(fd);
+	fd = -1;
+	throw DFatalException(::strerror(err));
+    }
+
+    if (::setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &interval,
+                     sizeof(interval)) != 0) {
+	int err = errno;
+        closefd(fd);
+	fd = -1;
+	throw DFatalException(::strerror(err));	
+    }
+
+    if (::setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &interval,
+                     sizeof(interval)) != 0) {
+	int err = errno;
+        closefd(fd);
+	fd = -1;
+	throw DFatalException(::strerror(err));	
+    }
+
+    if (::setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &tout, sizeof(tout)) != 0) {
+	int err = errno;
+        closefd(fd);
+	fd = -1;
+	throw DFatalException(::strerror(err));	
+    }
 }
