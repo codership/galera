@@ -1136,7 +1136,6 @@ galera_handle_configuration (wsrep_t* gh,
 
                 status.state_uuid   = *conf_uuid;
                 status.last_applied = conf->seqno;
-                status.stage        = GALERA_STAGE_JOINED;
             }
             else {
                 if (status.last_applied != conf->seqno ||
@@ -1157,6 +1156,7 @@ galera_handle_configuration (wsrep_t* gh,
 
             if (galera_invalidate_state (data_dir)) abort();
 
+            status.stage = GALERA_STAGE_JOINED;
             ret = my_idx;
         }
 
