@@ -6,8 +6,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <check.h>
-
-
+#include <string.h>
 
 // <using namespace gcomm;
 

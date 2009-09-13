@@ -1,4 +1,5 @@
 #include <iostream>
+#include <limits>
 
 #include "galeracomm/logger.hpp"
 #include "transport_tcp.hpp"

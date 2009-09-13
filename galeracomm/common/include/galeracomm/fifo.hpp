@@ -1,15 +1,16 @@
 #ifndef FIFO_HPP
 #define FIFO_HPP
 
-#include <galeracomm/readbuf.hpp>
-#include <galeracomm/writebuf.hpp>
-
+#include <limits>
 #include <set>
 #include <map>
 #include <deque>
 #include <list>
 #include <cerrno>
 #include <algorithm>
+
+#include <galeracomm/readbuf.hpp>
+#include <galeracomm/writebuf.hpp>
 
 class Fifo {
     size_t mque_max_size;
