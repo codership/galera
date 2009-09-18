@@ -33,6 +33,8 @@ else
 fi
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
 
+CXXFLAGS=${CXXFLAGS:-"$CFLAGS"}
+
 # Check if use of DBUG macros is desired
 AC_ARG_ENABLE(dbug,
               AC_HELP_STRING([--disable-dbug],

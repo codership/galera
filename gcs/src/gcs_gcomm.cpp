@@ -29,17 +29,18 @@ namespace gcomm {
 
 struct vs_ev
 {
-    ReadBuf* rb;
-    ProtoUpMeta um;
-    View *view;
-    size_t msg_size;
+    ReadBuf*     rb;
+    const ProtoUpMeta* um;
+    const View*        view;
+    size_t       msg_size;
 
     vs_ev(const ReadBuf *r, 
           const ProtoUpMeta* um_,
           const size_t roff, 
           const size_t ms, const View *v) :
 	rb(0), 
-        um(um_ ? *um_ : ProtoUpMeta()),
+//        um(um_ ? new *um_ : ProtoUpMeta()),
+        um(um_),
         view(0),
         msg_size(ms) 
     {
@@ -232,18 +233,24 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
         log_warn << "-EINVAL";
 	return -EINVAL;
     }
+
     int err = 0;
     WriteBuf wb(static_cast<const gcomm::byte_t*>(buf), len);
-    try {
+
+    try
+    {
 	ProtoDownMeta vdm(msg_type);
 	err = conn->vs_ctx.pass_down(&wb, &vdm);
-    } catch (Exception& e) {
-	return -ENOTCONN;
+    }
+    catch (Exception& e)
+    {
+        log_error << e.what();
+	return -e.get_errno();
     }
 
     if (err != 0)
     {
-        log_warn << "pass_down(): " << strerror(err);
+        log_error << "pass_down(): " << strerror(err);
     }
     return err == 0 ? len : -err;
 }
@@ -318,8 +325,8 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
     
     if (ev.rb || ev.msg_size) 
     {
-	*msg_type = static_cast<gcs_msg_type_t>(ev.um.get_user_type());
-	CompMap::const_iterator i = conn->comp_map.find(ev.um.get_source());
+	*msg_type = static_cast<gcs_msg_type_t>(ev.um->get_user_type());
+	CompMap::const_iterator i = conn->comp_map.find(ev.um->get_source());
 	assert(i != conn->comp_map.end());
 	*sender_idx = i->second;
 	if (ev.rb) {
@@ -413,30 +420,38 @@ static GCS_BACKEND_OPEN_FN(gcs_gcomm_open)
 
     if (!conn) return -EBADFD;
 
-    try {
-        conn->channel = channel;
-        string uri_str("gcomm+pc://");
-        uri_str += conn->sock;
-        if (conn->sock.find_first_of('?') == string::npos)
-        {
-            uri_str += "?";
-        }
-        else
-        {
-            uri_str += "&";
-        }
+    conn->channel = channel;
 
-        uri_str += "gmcast.group=" + conn->channel;
-        log_debug << "uri: " << uri_str;
+    string uri_str("gcomm+pc://");
+
+    uri_str += conn->sock;
+
+    if (conn->sock.find_first_of('?') == string::npos)
+    {
+        uri_str += "?";
+    }
+    else
+    {
+        uri_str += "&";
+    }
+
+    uri_str += "gmcast.group=" + conn->channel;
+    log_debug << "uri: " << uri_str;
+
+    try
+    {
 	conn->vs_ctx.vs = Transport::create(uri_str, conn->vs_ctx.el);
         gcomm::connect(conn->vs_ctx.vs, &conn->vs_ctx);
 	conn->vs_ctx.vs->connect();
 
 	int err = gu_thread_create(&conn->thr, 0, &conn_run, conn);
-	if (err != 0)
-	    return -err;
-    } catch (Exception& e) {
-	return -EINVAL;
+
+	if (err != 0) return -err;
+    }
+    catch (Exception& e)
+    {
+        log_error << e.what();
+	return -e.get_errno();
     }
     
     return 0;
@@ -445,14 +460,16 @@ static GCS_BACKEND_OPEN_FN(gcs_gcomm_open)
 static GCS_BACKEND_CLOSE_FN(gcs_gcomm_close)
 {
     gcomm_ctx* conn = reinterpret_cast<gcomm_ctx*>(backend->conn);
-    if (conn == 0)
-	return -EBADFD;
+
+    if (conn == 0) return -EBADFD;
+
     log_debug << "closing gcomm backend";
     conn->terminate = true;
     log_debug << "joining backend recv thread";
     gu_thread_join(conn->thr, 0);
     delete conn->vs_ctx.vs;
     log_debug << "close done";
+
     return 0;
 }
 
