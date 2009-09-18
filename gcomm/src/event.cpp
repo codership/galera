@@ -26,10 +26,10 @@ static inline int map_event_to_mask(const int e)
 static inline int map_mask_to_event(const int m)
 {
     int ret = Event::E_NONE;
-    ret |= (m & POLLIN) ? Event::E_IN : Event::E_NONE;
-    ret |= (m & POLLOUT) ? Event::E_OUT : Event::E_NONE;
-    ret |= (m & POLLERR) ? Event::E_ERR : Event::E_NONE;
-    ret |= (m & POLLHUP) ? Event::E_HUP : Event::E_NONE;
+    ret |= (m & POLLIN)   ? Event::E_IN    : Event::E_NONE;
+    ret |= (m & POLLOUT)  ? Event::E_OUT   : Event::E_NONE;
+    ret |= (m & POLLERR)  ? Event::E_ERR   : Event::E_NONE;
+    ret |= (m & POLLHUP)  ? Event::E_HUP   : Event::E_NONE;
     ret |= (m & POLLNVAL) ? Event::E_INVAL : Event::E_NONE;
     return ret;
 }
@@ -220,52 +220,65 @@ int EventLoop::compute_timeout(const int max_val)
 
 int EventLoop::poll(const int timeout)
 {
-    int p_ret;
-    int err = 0;
     int p_cnt = 0;
     interrupted = false;
 
     handle_queued_events();
-    if (interrupted)
-        goto out;
 
+    if (interrupted) return -1;
 
+    int p_ret = ::poll(pfds, n_pfds, compute_timeout(timeout));
+    int err   = errno;
 
-    p_ret = ::poll(pfds, n_pfds, compute_timeout(timeout));
-    err = errno;
-
-    if (p_ret == -1 && err == EINTR) {
+    if (p_ret == -1 && err == EINTR)
+    {
         p_ret = 0;
-    } else if (p_ret == -1 && err != EINTR) {
-        throw FatalException("");
-    } else {
-        for (size_t i = 0; i < n_pfds; ) {
+    }
+    else if (p_ret == -1 && err != EINTR)
+    {
+        gcomm_throw_fatal;
+    }
+    else
+    {
+        for (size_t i = 0; i < n_pfds; )
+        {
             size_t last_n_pfds = n_pfds;
             int e = map_mask_to_event(pfds[i].revents);
-            if (e != Event::E_NONE) {
 
+            if (e != Event::E_NONE)
+            {
                 CtxMap::iterator map_i;
-                if ((map_i = ctx_map.find(pfds[i].fd)) != ctx_map.end()) {
-                    if (map_i->second == 0)
-                        throw FatalException("");
+
+                if ((map_i = ctx_map.find(pfds[i].fd)) != ctx_map.end())
+                {
+                    if (map_i->second == 0) gcomm_throw_fatal;
+
                     LOG_TRACE("handling "
-                              + make_int(pfds[i].fd).to_string() + " "
+                              + gu::to_string (pfds[i].fd) + " "
                               + Pointer(map_i->second).to_string() + " "
-                              + make_int(pfds[i].revents).to_string());
+                              + gu::to_string (pfds[i].revents));
+
                     pfds[i].revents = 0;
-                    map_i->second->handle_event(pfds[i].fd, Event(e));
+
+                    gu_trace(map_i->second->handle_event(pfds[i].fd, Event(e)));
+
                     p_cnt++;
-                    if (interrupted)
-                        goto out;
-                } else {
-                    throw FatalException("No ctx for fd found");
+
+                    if (interrupted) goto out;
                 }
-            } else {
-                if (pfds[i].revents) {
-                    LOG_ERROR("Unhandled poll events");
-                    throw FatalException("");
+                else 
+                {
+                    gcomm_throw_fatal << "No ctx for fd found";
                 }
             }
+            else
+            {
+                if (pfds[i].revents)
+                {
+                    gcomm_throw_fatal << "Unhandled poll events";
+                }
+            }
+
             if (last_n_pfds != n_pfds)
             {
                 /* pfds has changed, lookup for first nonzero revents from 

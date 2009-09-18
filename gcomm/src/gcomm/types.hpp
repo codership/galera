@@ -1,10 +1,9 @@
 #ifndef _GCOMM_TYPES_HPP_
 #define _GCOMM_TYPES_HPP_
 
-#include <assert.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
+//#include <stdint.h>
+//#include <stdbool.h>
+//#include <string.h>
 #include <sys/socket.h>
 
 #include <sstream>
@@ -16,6 +15,7 @@ using std::ostringstream;
 BEGIN_GCOMM_NAMESPACE
 
 typedef unsigned char byte_t;
+typedef int64_t       seqno_t;
 
 template <class T> 
 inline size_t read(const byte_t* buf, const size_t buflen, 
@@ -215,8 +215,6 @@ public:
     }
 
 };
-
-
 
 END_GCOMM_NAMESPACE
 

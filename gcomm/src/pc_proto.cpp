@@ -1,10 +1,6 @@
 
-
-
 #include "pc_proto.hpp"
-
 #include "pc_message.hpp"
-
 #include "gcomm/logger.hpp"
 
 #include <set>
@@ -13,12 +9,13 @@ using std::multiset;
 
 BEGIN_GCOMM_NAMESPACE
 
-static const PCInst& get_state(PCProto::SMMap::const_iterator smap_i, const UUID& uuid)
+static const PCInst& get_state(PCProto::SMMap::const_iterator smap_i,
+                               const UUID& uuid)
 {
     PCInstMap::const_iterator i = PCProto::SMMap::get_instance(smap_i).get_inst_map().find(uuid);
     if (i == PCProto::SMMap::get_instance(smap_i).get_inst_map().end())
     {
-        throw FatalException("");
+        throw DFatalException("");
     }
     return PCInstMap::get_instance(i);
 }
@@ -38,12 +35,12 @@ void PCProto::send_state()
     Buffer buf(pcs.size());
     if (pcs.write(buf.get_buf(), buf.get_len(), 0) == 0)
     {
-        throw FatalException("");
+        throw DFatalException("");
     }
     WriteBuf wb(buf.get_buf(), buf.get_len());
     if (pass_down(&wb, 0))
     {
-        throw FatalException("todo");
+        throw DFatalException("todo");
     }
     
 }
@@ -63,18 +60,18 @@ void PCProto::send_install()
                              SMMap::get_uuid(i), 
                              gcomm::get_state(i, SMMap::get_uuid(i)))).second == false)
         {
-            throw FatalException("");
+            throw DFatalException("");
         }
     }
     Buffer buf(pci.size());
     if (pci.write(buf.get_buf(), buf.get_len(), 0) == 0)
     {
-        throw FatalException("");
+        throw DFatalException("");
     }
     WriteBuf wb(buf.get_buf(), buf.get_len());
     if (pass_down(&wb, 0))
     {
-        throw FatalException("");
+        throw DFatalException("");
     }
 }
 
@@ -125,7 +122,7 @@ void PCProto::shift_to(const State s)
     {
         LOG_FATAL("invalid state transtion: " + to_string(get_state()) + " -> " 
                   + to_string(s));
-        throw FatalException("invalid state transition");
+        throw DFatalException("invalid state transition");
     }
     switch (s)
     {
@@ -161,11 +158,11 @@ void PCProto::handle_first_trans(const View& view)
     {
         if (view.get_members().length() > 1 || view.is_empty())
         {
-            throw FatalException("");
+            throw DFatalException("");
         }
         if (get_uuid(view.get_members().begin()) != uuid)
         {
-            throw FatalException("");
+            throw DFatalException("");
         }
         set_last_prim(view.get_id());
         set_prim(true);
@@ -215,7 +212,7 @@ void PCProto::handle_first_reg(const View& view)
         if (view.get_members().length() > 1 || view.is_empty())
         {
             LOG_FATAL(self_string() + " starting primary but first reg view is not singleton");
-            throw FatalException("");
+            throw DFatalException("");
         }
     }
     if (view.get_id().get_seq() <= current_view.get_id().get_seq())
@@ -224,7 +221,7 @@ void PCProto::handle_first_reg(const View& view)
                   << current_view.get_id().to_string() 
                   << " new view "
                   << view.get_id().to_string();
-        throw std::logic_error("non-increasing view ids");
+        throw DFatalException ("non-increasing view ids");
     }
 
     current_view = view;
@@ -244,7 +241,7 @@ void PCProto::handle_reg(const View& view)
                   << current_view.get_id().to_string() 
                   << " new view "
                   << view.get_id().to_string();
-        throw std::logic_error("non-increasing view ids");
+        throw DFatalException ("non-increasing view ids");
     }
     
     current_view = view;
@@ -272,7 +269,7 @@ void PCProto::handle_view(const View& view)
     if (view.get_type() != View::V_TRANS && view.get_type() != View::V_REG)
     {
         LOG_FATAL("invalid view type");
-        throw FatalException("invalid view type");
+        throw DFatalException("invalid view type");
     }
     
     // Make sure that self exists in view
@@ -280,7 +277,7 @@ void PCProto::handle_view(const View& view)
         view.get_members().find(uuid) == view.get_members().end())
     {
         LOG_FATAL("self not found from non empty view: " + view.to_string());
-        throw FatalException("self not found from non empty view");
+        throw DFatalException("self not found from non empty view");
     }
     
     
@@ -317,7 +314,7 @@ bool PCProto::requires_rtr() const
         PCInstMap::const_iterator ii = SMMap::get_instance(i).get_inst_map().find(SMMap::get_uuid(i));
         if (ii == SMMap::get_instance(i).get_inst_map().end())
         {
-            throw FatalException("");
+            throw DFatalException("");
         }
         const PCInst& inst = PCInstMap::get_instance(ii);
         max_to_seq = std::max(max_to_seq, inst.get_to_seq());
@@ -328,7 +325,7 @@ bool PCProto::requires_rtr() const
         PCInstMap::const_iterator ii = SMMap::get_instance(i).get_inst_map().find(SMMap::get_uuid(i));
         if (ii == SMMap::get_instance(i).get_inst_map().end())
         {
-            throw FatalException("");
+            throw DFatalException("");
         }
         const PCInst& inst = PCInstMap::get_instance(ii);
         const int64_t to_seq = inst.get_to_seq();
@@ -383,12 +380,12 @@ bool PCProto::is_prim() const
             if (i_state.get_last_prim() != last_prim)
             {
                 LOG_FATAL("last prims not consistent");
-                throw FatalException("");
+                throw DFatalException("");
             }
             if (i_state.get_to_seq() != to_seq)
             {
                 LOG_FATAL("TO seqs not consistent");
-                throw FatalException("");
+                throw DFatalException("");
             }
         }
         else
@@ -415,9 +412,9 @@ bool PCProto::is_prim() const
                 vset.insert(i_state.get_last_prim());
             }
         }
-        uint32_t max_view_seq = 0;
-        size_t great_view_len = 0;
-        ViewId great_view;
+        seqno_t max_view_seq   = 0;
+        size_t  great_view_len = 0;
+        ViewId  great_view;
         
         for (multiset<ViewId>::const_iterator vi = vset.begin();
              vi != vset.end(); vi = vset.upper_bound(*vi))
@@ -443,7 +440,7 @@ bool PCProto::is_prim() const
             if (lvi == views.end())
             {
                 LOG_FATAL("view not found from list");
-                throw FatalException("view not found from list");
+                throw DFatalException("view not found from list");
             }
             if (lvi->get_members().length() == great_view_len)
             {
@@ -463,7 +460,7 @@ bool PCProto::is_prim() const
                         else if (j_state.get_to_seq() != to_seq)
                         {
                             LOG_FATAL("conflicting to_seq");
-                            throw FatalException("conflicting to_seq");
+                            throw DFatalException("conflicting to_seq");
                         }
                     }
                 }
@@ -475,7 +472,7 @@ bool PCProto::is_prim() const
                       + " not equal to seq of greatest views "
                       + make_int(great_view.get_seq()).to_string()
                       +  ", don't know how to recover");
-            throw FatalException("");
+            throw DFatalException("");
         }
     }
     
@@ -487,7 +484,7 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
     assert(msg.get_type() == PCMessage::T_STATE);
     assert(state_msgs.length() < current_view.get_members().length());
 
-    LOG_INFO(self_string() + " handle state: " + msg.to_string());
+    log_info << self_string() << " handle state: " << msg.to_string();
 
     if (get_prim() == true)
     {
@@ -498,6 +495,7 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
                      << get_last_prim().to_string() 
                      << " other prim: " 
                      << si.get_last_prim().to_string();
+
             if (get_last_prim() < si.get_last_prim())
             {
                 
@@ -506,16 +504,15 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
             }
             else
             {
-                log_fatal << "aborting";
-                throw std::runtime_error(self_string() 
-                                         + " aborting due to conflicting prims");
+                gcomm_throw_fatal << self_string()
+                                  << " aborting due to conflicting prims";
             }
         }
     }
     
     if (state_msgs.insert(std::make_pair(source, msg)).second == false)
     {
-        throw FatalException("");
+        throw DFatalException("");
     }
     
     if (state_msgs.length() == current_view.get_members().length())
@@ -529,10 +526,10 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
                 if (instances.insert(
                         std::make_pair(SMMap::get_uuid(i),
                                        gcomm::get_state(
-                                           i, 
-                                           SMMap::get_uuid(i)))).second == false)
+                                        i, 
+                                        SMMap::get_uuid(i)))).second == false)
                 {
-                    throw FatalException("");
+                    throw DFatalException("");
                 }
             }
         }
@@ -540,11 +537,14 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
         if (is_prim())
         {
             shift_to(S_RTR);
+
             if (requires_rtr())
             {
-                throw FatalException("retransmission not implemented");
+                throw DFatalException("retransmission not implemented");
             }
-            if (current_view.get_members().find(uuid) == current_view.get_members().begin())
+
+            if (current_view.get_members().find(uuid) ==
+                current_view.get_members().begin())
             {
                 send_install();
             }
@@ -560,28 +560,32 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 void PCProto::handle_install(const PCMessage& msg, const UUID& source)
 {
     assert(msg.get_type() == PCMessage::T_INSTALL);
-    assert(get_state() == S_RTR);
+    assert(get_state()    == S_RTR);
 
-    LOG_INFO(self_string() + " handle install: " + msg.to_string());
+    log_info << self_string() << " handle install: " << msg.to_string();
     
     // Validate own state
+
     PCInstMap::const_iterator mi = msg.get_inst_map().find(uuid);
+
     if (mi == msg.get_inst_map().end())
     {
-        throw FatalException("");
+        throw DFatalException("");
     }
+
     const PCInst& m_state = PCInstMap::get_instance(mi);
-    if (m_state.get_prim() != get_prim() ||
+
+    if (m_state.get_prim()      != get_prim()      ||
         m_state.get_last_prim() != get_last_prim() ||
-        m_state.get_to_seq() != get_to_seq() ||
-        m_state.get_last_seq() != get_last_seq())
+        m_state.get_to_seq()    != get_to_seq()    ||
+        m_state.get_last_seq()  != get_last_seq())
     {
-        LOG_FATAL(self_string()
-                  + "install message self state does not match, message state: "
-                  + m_state.to_string() 
-                  + " local state: " 
-                  + PCInstMap::get_instance(self_i).to_string());
-        throw FatalException("install message self state does not match");
+        log_fatal << self_string()
+                  << "install message self state does not match, message state: "
+                  << m_state.to_string()
+                  << ", local state: "
+                  << PCInstMap::get_instance(self_i).to_string();
+        throw DFatalException("install message self state does not match");
     }
     
     // Set TO seqno according to state message
@@ -590,20 +594,23 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
     for (mi = msg.get_inst_map().begin(); mi != msg.get_inst_map().end(); ++mi)
     {
         const PCInst& m_state = PCInstMap::get_instance(mi);
+
         if (m_state.get_prim() == true && to_seq != -1)
         {
             if (m_state.get_to_seq() != to_seq)
             {
-                throw FatalException("install message to seq inconsistent");
+                throw DFatalException("install message to seq inconsistent");
             }
         }
+
         if (m_state.get_prim() == true)
         {
             to_seq = std::max(to_seq, m_state.get_to_seq());
         }
     }
     
-    LOG_INFO(self_string() + " setting TO seq to " + make_int(to_seq).to_string());
+    log_info << self_string() << " setting TO seq to " << to_seq;
+
     set_to_seq(to_seq);
     
     shift_to(S_PRIM);
@@ -614,58 +621,67 @@ void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
                           const size_t roff, const ProtoUpMeta* um)
 {
     int64_t to_seq = -1;
+
     if (get_state() == S_PRIM)
     {
         set_to_seq(get_to_seq() + 1);
         to_seq = get_to_seq();
     }
+
     ProtoUpMeta pum(um->get_source(), um->get_user_type(), to_seq);
     pass_up(rb, roff + msg.size(), &pum);
 }
 
-void PCProto::handle_msg(const PCMessage& msg, 
-                         const ReadBuf* rb, 
-                         const size_t roff, 
+void PCProto::handle_msg(const PCMessage&   msg, 
+                         const ReadBuf*     rb, 
+                         const size_t       roff, 
                          const ProtoUpMeta* um)
 {
-    enum Verdict 
+    enum Verdict
     {
         ACCEPT,
         DROP,
         FAIL
     };
-    static const Verdict verdict[S_MAX][PCMessage::T_MAX] = {
+
+    static const Verdict verdicts[S_MAX][PCMessage::T_MAX] = {
         // Msg types
-        // NONE,  STATE,  INSTALL,  USER
-        // Closed
-        {FAIL,    FAIL,   FAIL,     FAIL    },
-        // Joining
-        {FAIL,    FAIL,   FAIL,     FAIL    },
-        // States exch
-        {FAIL,    ACCEPT, FAIL,     FAIL    },
-        // RTR
-        {FAIL,    FAIL,   ACCEPT,   FAIL    },
-        // PRIM
-        {FAIL,    FAIL,   FAIL,     ACCEPT  },
-        // TRANS
-        {FAIL,    DROP,   DROP,     ACCEPT    },
-        // NON-PRIM
-        {FAIL,    ACCEPT, FAIL,     ACCEPT  }
+        // NONE,  STATE,   INSTALL,  USER
+
+        {FAIL,    FAIL,    FAIL,     FAIL    },    // Closed
+
+        {FAIL,    FAIL,    FAIL,     FAIL    },    // Joining
+
+        {FAIL,    ACCEPT,  FAIL,     FAIL    },    // States exch
+
+        {FAIL,    FAIL,    ACCEPT,   FAIL    },    // RTR
+
+        {FAIL,    FAIL,    FAIL,     ACCEPT  },    // PRIM
+
+        {FAIL,    DROP,    DROP,     ACCEPT  },    // TRANS
+
+        {FAIL,    ACCEPT,  FAIL,     ACCEPT  }     // NON-PRIM
     };
-    if (verdict[get_state()][msg.get_type()] == FAIL)
+
+    PCMessage::Type msg_type = msg.get_type();
+    Verdict         verdict  = verdicts[get_state()][msg.get_type()];
+
+    if (verdict == FAIL)
     {
-        LOG_FATAL("invalid input, message " + msg.to_string() + " in state "
-                  + to_string(get_state()));
-        throw FatalException("");
+        string err("Invalid input, message " + msg.to_string() + " in state "
+                   + to_string(get_state()));
+
+        log_fatal << err;
+        throw DFatalException(err);
     }
-    else if (verdict[get_state()][msg.get_type()] == DROP)
+    else if (verdict == DROP)
     {
-        LOG_WARN("dropping input, message " + msg.to_string() + " in state "
-                 + to_string(get_state()));
+        log_warn << "Dropping input, message " << msg.to_string()
+                 << " in state " << to_string(get_state());
         return;
     }
     
-    switch (msg.get_type())
+    switch (msg_type)
     {
     case PCMessage::T_STATE:
         handle_state(msg, um->get_source());
@@ -677,7 +693,7 @@ void PCProto::handle_msg(const PCMessage& msg,
         handle_user(msg, rb, roff, um);
         break;
     default:
-        throw FatalException("invalid message");
+        throw DFatalException("Invalid message");
     }
 }
 
@@ -696,7 +712,7 @@ void PCProto::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
 
         if (msg.read(rb->get_buf(), rb->get_len(), roff) == 0)
         {
-            throw FatalException("could not read message");
+            throw DFatalException("could not read message");
         }
 
         handle_msg(msg, rb, roff, um);
@@ -710,26 +726,31 @@ int PCProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
         return EAGAIN;
     }
     
-    uint32_t seq = get_last_seq() + 1;
+    uint32_t      seq = get_last_seq() + 1;
     PCUserMessage um(seq);
-    byte_t buf[8];
+    byte_t        buf[8];
+
     if (um.write(buf, sizeof(buf), 0) == 0)
     {
-        throw FatalException("short buffer");
+        throw DFatalException("short buffer");
     }
+
     wb->prepend_hdr(buf, um.size());
+
     int ret = pass_down(wb, dm);
+
     wb->rollback_hdr(um.size());
+
     if (ret == 0)
     {
         set_last_seq(seq);
     }
     else if (ret != EAGAIN)
     {
-        LOG_WARN(string("PCProto::handle_down: ") + strerror(ret));
+        log_warn << "PCProto::handle_down: " << strerror(ret);
     }
+
     return ret;
 }
-
 
 END_GCOMM_NAMESPACE

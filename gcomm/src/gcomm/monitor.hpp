@@ -4,8 +4,6 @@
 #include <pthread.h>
 #include <deque>
 #include <list>
-#include <cassert>
-
 #include <gcomm/common.hpp>
 #include <gcomm/exception.hpp>
 #include <gcomm/mutex.hpp>

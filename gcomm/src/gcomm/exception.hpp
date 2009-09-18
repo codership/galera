@@ -1,73 +1,112 @@
 #ifndef _GCOMM_EXCEPTION_HPP_
 #define _GCOMM_EXCEPTION_HPP_
 
-#include <gcomm/common.hpp>
+#include <cerrno>
+#include <galerautils.hpp>
 
-#include <stdexcept>
-#include <exception>
+#include "gcomm/common.hpp"
 
-using std::exception;
+using gu::Exception;
 
 BEGIN_GCOMM_NAMESPACE
-
-class Exception : exception
-{
-    const char* msg;
-
-    void operator=(const Exception&);
-protected:
-    Exception(const Exception& e) :
-        exception(),
-        msg()
-    {
-        msg = e.msg;
-    }
-public:
-    Exception() throw() : msg("")
-    {
-    }
-    
-    Exception(const char *msg_) throw() : 
-        msg(msg_)
-    {
-    }
-    
-    const char* what() const throw()
-    {
-        return msg;
-    }
-};
 
 /*!
  * Type of exception which is recoverable.
  */
-struct RuntimeException : Exception
+class RuntimeException : public gu::Exception
 {
-    RuntimeException(const char *msg) : 
-        Exception(msg)
+public:
+
+    RuntimeException(const std::string& msg, int err) :
+        gu::Exception(msg, err)
+    {}
+};
+
+// deprecated
+#define DRuntimeException(_msg_)                \
+    gcomm::RuntimeException(_msg_, errno)
+
+/* final*/ class ThrowRuntime : public gu::ThrowBase
+{
+    int const err;
+
+public:
+
+    ThrowRuntime(const char* file, const char* func, int line, int err_) throw()
+        :
+        ThrowBase (file, func, line),
+        err       (err_)
+    {}
+
+    ~ThrowRuntime() throw(RuntimeException)
     {
+        os << ": " << err << " (" << ::strerror(err) << ')';
+
+        RuntimeException e(os.str(), err);
+
+        e.trace (file, func, line);
+
+        throw e;
     }
 };
 
 /*!
  * Type of exception which is unrecoverable.
  */
-struct FatalException : Exception
+class FatalException : public gu::Exception
 {
-    FatalException(const char *msg) : 
-        Exception(msg)
-    {
-    }
+public:
+
+    FatalException(const std::string& msg) :
+        gu::Exception(msg, ENOTRECOVERABLE)
+    {}
 }; 
 
-struct InterruptedException : Exception
+//deprecated
+#define DFatalException(_msg_)                  \
+    gcomm::FatalException(_msg_)
+
+/* final*/ class ThrowFatal : public gu::ThrowBase
 {
-    InterruptedException() :
-        Exception("interrupted")
+public:
+    ThrowFatal (const char* file, const char* func, int line) throw()
+        :
+        gu::ThrowBase (file, func, line)
+    {}
+
+    ~ThrowFatal () throw (FatalException)
     {
+        os << " (FATAL)";
+        //  assert(0);
+
+        FatalException e(os.str());
+
+        e.trace (file, func, line);
+
+        throw e;
     }
 };
-    
+
+/*!
+ * Exception caused by interrupt.
+ */
+class InterruptedException : public gu::Exception
+{
+public:
+
+    InterruptedException(const std::string& msg, int err = EINTR) :
+        gu::Exception(msg, EINTR)
+    {}
+}; 
+
 END_GCOMM_NAMESPACE
+
+#define gcomm_throw_runtime(err_)                                       \
+    gcomm::ThrowRuntime (__FILE__,__FUNCTION__,__LINE__,err_).msg()
+
+#define gcomm_throw_fatal                                       \
+    gcomm::ThrowFatal (__FILE__,__FUNCTION__,__LINE__).msg()
+
+
 
 #endif // _GCOMM_EXCEPTION_HPP_

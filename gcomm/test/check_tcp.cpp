@@ -21,13 +21,14 @@ class Sender : Toplay
     bool can_send;
     Sender(const Sender&);
     void operator=(const Sender&);
+
 public:
+
     Sender(EventLoop *el_) : 
         tp(0), 
         el(el_), 
         can_send(false) 
-    {
-    }
+    {}
 
     string get_remote_url() const
     {
@@ -37,7 +38,7 @@ public:
     void handle_up(const int cid, const ReadBuf *rb, const size_t offset,
                    const ProtoUpMeta *um)
     {
-        if (rb == 0 && tp->get_state() == S_CONNECTED)
+        if (rb == 0 && tp->get_state() == Transport::S_CONNECTED)
             can_send = true;
         else
             throw FatalException("");
@@ -137,7 +138,7 @@ public:
     {
         const unsigned char *ptr;
         if (rb == 0) {
-            if (tp->get_state() == S_FAILED)
+            if (tp->get_state() == Transport::S_FAILED)
                 throw FatalException(strerror(tp->get_errno()));
             return;
         }

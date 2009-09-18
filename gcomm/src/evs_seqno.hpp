@@ -1,9 +1,10 @@
 #ifndef EVS_SEQNO_HPP
 #define EVS_SEQNO_HPP
 
+#include <galerautils.hpp>
+
 #include "gcomm/common.hpp"
 #include "gcomm/types.hpp"
-#include <cassert>
 
 BEGIN_GCOMM_NAMESPACE
 

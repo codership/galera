@@ -3,8 +3,6 @@
 #include "gcomm/logger.hpp"
 #include "gcomm/pseudofd.hpp"
 
-#include <cassert>
-
 BEGIN_GCOMM_NAMESPACE
 
 Timer::Timer(EventLoop *p) : 

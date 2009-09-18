@@ -1,12 +1,12 @@
 #ifndef PC_PROTO_HPP
 #define PC_PROTO_HPP
 
-#include "pc_message.hpp"
+#include <list>
 
 #include "gcomm/uuid.hpp"
 #include "gcomm/event.hpp"
+#include "pc_message.hpp"
 
-#include <list>
 using std::list;
 
 BEGIN_GCOMM_NAMESPACE
@@ -30,40 +30,34 @@ public:
     {
         switch (s)
         {
-        case S_CLOSED:
-            return "CLOSED";
-        case S_JOINING:
-            return "JOINING";
-        case S_STATES_EXCH:
-            return "STATES_EXCH";
-        case S_RTR:
-            return "RTR";
-        case S_TRANS:
-            return "TRANS";
-        case S_PRIM:
-            return "PRIM";
-        case S_NON_PRIM:
-            return "NON_PRIM";
+        case S_CLOSED:      return "CLOSED";
+        case S_JOINING:     return "JOINING";
+        case S_STATES_EXCH: return "STATES_EXCH";
+        case S_RTR:         return "RTR";
+        case S_TRANS:       return "TRANS";
+        case S_PRIM:        return "PRIM";
+        case S_NON_PRIM:    return "NON_PRIM";
         default:
-            throw FatalException("invalid state");
+            throw DFatalException("invalid state");
         }
     }
 
 private:
-    UUID uuid;
+
+    UUID       uuid;
     EventLoop* el;
-    Monitor* mon;
-    bool start_prim;
-    State state;
-    
-    
-    PCInstMap instances;
+    Monitor*   mon;
+    bool       start_prim;
+    State      state;
+
+    PCInstMap           instances;
     PCInstMap::iterator self_i;
 
-    PCProto(const PCProto&);
-    void operator=(const PCProto&);
+    PCProto (const PCProto&);
+    PCProto& operator=(const PCProto&);
 
 public:
+
     bool get_prim() const
     {
         return PCInstMap::get_instance(self_i).get_prim();
@@ -104,14 +98,12 @@ public:
         PCInstMap::get_instance(self_i).set_to_seq(seq);
     }
 
-
-
     typedef InstMap<PCMessage> SMMap;
+
 private:
 
-    SMMap state_msgs;
-
-    View current_view;
+    SMMap      state_msgs;
+    View       current_view;
     list<View> views;
 
 public:
@@ -122,9 +114,9 @@ public:
     }
 
     PCProto(const UUID& uuid_, 
-            EventLoop* el_, 
-            Monitor* mon_, 
-            const bool start_prim_) :
+            EventLoop*  el_, 
+            Monitor*    mon_, 
+            const bool  start_prim_) :
         uuid(uuid_),
         el(el_),
         mon(mon_),
@@ -140,7 +132,7 @@ public:
         if ((iret = instances.insert(
                  std::make_pair(uuid, PCInst()))).second == false)
         {
-            throw FatalException("");
+            throw DFatalException("");
         }
         self_i = iret.first;
     }

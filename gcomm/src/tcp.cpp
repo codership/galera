@@ -22,7 +22,8 @@ static inline void closefd(int fd)
     while (::close(fd) == -1 && errno == EINTR) {}
 }
 
-static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
+static void tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
+    throw (gu::Exception)
 {
     string host = parse_host(addr);
     string port = parse_port(addr);
@@ -43,38 +44,39 @@ static bool tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
         0
     };
 
-    addrinfo* addri = 0;
-    
-    int err;
+    addrinfo* addri = 0;    
+    int       err;
+
     log_debug << "Calling getaddrinfo(" << host << ", " << port << ", "
               << addrhint.ai_addrlen << ", " << &addri << ')';
+
     if ((err = getaddrinfo(host.c_str(), port.c_str(), &addrhint, &addri)) != 0)
     {
-        log_error << "getaddrinfo failed: " << err
-                  << " (" << gai_strerror(err) << ')';
-        if (EAI_SYSTEM == err) {
-            log_error << "System error: " << errno
-                  << " (" << strerror(errno) << ')';
+        if (EAI_SYSTEM == err)
+        {
+            gcomm_throw_runtime(errno) << "System error: " << errno
+                                       << " (" << strerror(errno) << ')';
         }
-        return false;
+        else
+        {
+            gcomm_throw_runtime(err) << "getaddrinfo failed: " << err
+                                     << " (" << gai_strerror(err) << ')';
+        }
     }
     
     if (addri == 0)
     {
-        LOG_ERROR("no address found");
-        throw FatalException("");
+        gcomm_throw_fatal << "no address found";
     }
     
     if (addri->ai_socktype != SOCK_STREAM)
     {
-        LOG_FATAL("returned socket is not stream");
-        throw FatalException("");
+        gcomm_throw_fatal << "returned socket is not stream";
     }
     
     *s = *addri->ai_addr;
     *s_size = addri->ai_addrlen;
     freeaddrinfo(addri);
-    return true;
 }
 
 
@@ -82,12 +84,15 @@ class TCPHdr
 {
     unsigned char raw[sizeof(uint32_t)];
     uint32_t len;
+
 public:
+
     TCPHdr(const size_t l) : raw(), len(l) 
     {
 	if (gcomm::write(len, raw, sizeof(raw), 0) == 0)
 	    throw FatalException("");
     }
+
     TCPHdr(const unsigned char *buf, const size_t buflen, 
            const size_t offset) :
         raw(),
@@ -99,72 +104,80 @@ public:
 	if (gcomm::read(raw, sizeof(raw), 0, &len) == 0)
 	    throw FatalException("");
     }
-    const void* get_raw() const {
-	return raw;
-    }
-    const void* get_raw(const size_t off) const {
-	return raw + off;
-    }
-    static size_t get_raw_len() {
-	return 4;
-    }
-    size_t get_len() const {
-	return len;
+
+    const void*   get_raw()                 const { return raw; }
+
+    const void*   get_raw(const size_t off) const { return raw + off; }
+
+    size_t        get_len()                 const { return len; }
+
+    static size_t get_raw_len()
+    {
+        return sizeof((reinterpret_cast<TCPHdr*>(0))->raw);
     }
 };
 
-
-
 void TCP::connect()
 {
-    if (fd != -1)
-	throw FatalException("TCP::connect(): Already connected or listening");
-    if (!tcp_addr_to_sa(uri.get_authority().c_str(), &sa, &sa_size))
-	throw FatalException("TCP::connect(): Invalid address");
+    if (fd != -1) gcomm_throw_runtime(EISCONN);
+
+    tcp_addr_to_sa(uri.get_authority().c_str(), &sa, &sa_size);
 
     set_blocking_mode();
 
     if ((fd = ::socket(sa.sa_family, SOCK_STREAM, 0)) == -1)
-	throw FatalException(::strerror(errno));
-    LOG_DEBUG("socket " + make_int(fd).to_string());
+	gcomm_throw_runtime(errno);
+
+    log_debug << "socket: " << fd;
+
     linger lg = {1, 3};
-    if (::setsockopt(fd, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg)) == -1) {
-	int err = errno;
+
+    if (::setsockopt(fd, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg)) == -1)
+    {
         closefd(fd);
 	fd = -1;
-	throw FatalException(::strerror(err));
+	gcomm_throw_runtime(errno);
     }
 
-    if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) == -1) {
-	int err = errno;
+    if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle))
+        == -1)
+    {
         closefd(fd);
 	fd = -1;
-	throw FatalException(::strerror(err));	
+	gcomm_throw_runtime(errno);
     }
 
-    if (is_non_blocking()) {
-	if (::fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-	    int err = errno;
+    if (is_non_blocking())
+    {
+	if (::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
+        {
             closefd(fd);
 	    fd = -1;
-	    throw FatalException(::strerror(err));
+            gcomm_throw_runtime(errno);
 	}
-    } 
-    if (event_loop) {
+    }
+
+    if (event_loop)
+    {
 	event_loop->insert(fd, this);
 	event_loop->set(fd, Event::E_IN);
     }
+
     if (::connect(fd, &sa, sa_size) == -1) 
     {
-	if (errno != EINPROGRESS) {
-            LOG_ERROR(string("connect(): ") + ::strerror(errno));
-	    throw RuntimeException(::strerror(errno));
-	} else {
-	    if (event_loop)
-		event_loop->set(fd, Event::E_OUT);
+	if (errno != EINPROGRESS)
+        {
+	    gcomm_throw_runtime(errno);
+	}
+        else
+        {
+	    if (event_loop) event_loop->set(fd, Event::E_OUT);
+
 	    state = S_CONNECTING;
 	}
-    } else {
+    }
+    else
+    {
 	state = S_CONNECTED;
     }
 }
@@ -173,9 +186,10 @@ void TCP::close()
 {
     if (fd != -1) 
     {
-        LOG_DEBUG("closing " + make_int(fd).to_string());
-	if (event_loop)
-	    event_loop->erase(fd);
+        log_debug << "closing " << fd;
+
+	if (event_loop) event_loop->erase(fd);
+
         closefd(fd);
 	fd = -1;
     }
@@ -183,52 +197,56 @@ void TCP::close()
 
 void TCP::listen()
 {
-    LOG_DEBUG(std::string("TCP::listen(") + uri.to_string() + ")");
-    if (fd != -1)
-	throw FatalException("TCP::listen(): Already connected or listening");
-    if (!tcp_addr_to_sa(uri.get_authority().c_str(), &sa, &sa_size))
-	throw FatalException("TCP::listen(): Invalid address");
+    log_debug << "TCP::listen(" << uri.to_string() << ')';
+
+    if (fd != -1) gcomm_throw_runtime (EISCONN);
+
+    tcp_addr_to_sa(uri.get_authority().c_str(), &sa, &sa_size);
+
     if ((fd = ::socket(sa.sa_family, SOCK_STREAM, 0)) == -1)
-	throw FatalException("TCP::listen(): Could not open socket");
+	gcomm_throw_runtime(errno);
     
     set_blocking_mode();
 
     if (is_non_blocking() && ::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
-	throw FatalException("TCP::listen(): Fcntl failed");
+	gcomm_throw_runtime(errno);
+
     int reuse = 1;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1)
-	throw FatalException("TCP::listen(): Setsockopt faild");
-    if (::bind(fd, &sa, sa_size) == -1) {
-	int err = errno;
-	LOG_FATAL(std::string("TCP::listen(): Bind failed to address ") 
-                  + sockaddr_to_uri(Conf::TcpScheme, &sa) + " failed " +
-                  ::strerror(err));
-	throw FatalException("TCP::listen(): Bind failed");
+	gcomm_throw_runtime(errno);
+
+    if (::bind(fd, &sa, sa_size) == -1)
+    {
+	gcomm_throw_runtime(errno) << "Bind failed to address " 
+                                   << sockaddr_to_uri(Conf::TcpScheme, &sa);
     }
+
     if (::listen(fd, 128) == -1)
-	throw FatalException("TCP::listen(): Listen failed");
+        gcomm_throw_runtime(errno) << "Listen failed: ";
+
     if (event_loop) {
 	event_loop->insert(fd, this);
 	event_loop->set(fd, Event::E_IN);
     }
+
     state = S_LISTENING;
 }
 
 Transport *TCP::accept()
 {
-
-
-    sockaddr acc_sa;
+    sockaddr  acc_sa;
     socklen_t acc_sa_size = sizeof(sockaddr);
     
     int acc_fd;
+
     if ((acc_fd = ::accept(fd, &acc_sa, &acc_sa_size)) == -1)
-	throw FatalException("TCP::accept(): Accept failed");
-    LOG_DEBUG(std::string("accept()") + make_int(acc_fd).to_string());
+	gcomm_throw_runtime(errno) << "Accept failed";
+
+    log_debug << "accept(): " << acc_fd;
 
     if (is_non_blocking() && ::fcntl(acc_fd, F_SETFL, O_NONBLOCK) == -1) {
         closefd(acc_fd);
-	throw FatalException("TCP::accept(): Fcntl failed");
+	gcomm_throw_runtime(errno) << "Fcntl failed";
     }
 
     linger lg = {1, 3};
@@ -236,25 +254,28 @@ Transport *TCP::accept()
     {
         closefd(acc_fd);
 	acc_fd = -1;
-	throw FatalException("TCP::accept(): set linger failed");
+	gcomm_throw_runtime(errno) << "Setsockopt linger failed";
     }
     
-    if (::setsockopt(acc_fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) == -1) {
-	int err = errno;
+    if (::setsockopt(acc_fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle,
+                     sizeof(no_nagle)) == -1) {
         closefd(acc_fd);
-	throw FatalException(::strerror(err));	
+	gcomm_throw_runtime(errno);	
     }
     
     TCP *ret = new TCP(uri, event_loop, mon);
-    ret->fd = acc_fd;
-    ret->state = S_CONNECTED;
-    ret->sa = acc_sa;
+
+    ret->fd      = acc_fd;
+    ret->state   = S_CONNECTED;
+    ret->sa      = acc_sa;
     ret->sa_size = acc_sa_size;
+
     if (event_loop)
     {
 	event_loop->insert(ret->fd, ret);
 	event_loop->set(ret->fd, Event::E_IN);
     }
+
     return ret;
 }
 
@@ -273,22 +294,32 @@ ssize_t TCP::send_nointr(const void *buf, const size_t buflen,
     
     flags |= MSG_NOSIGNAL;
 
-    if (buflen == offset)
-	return 0;
+    if (buflen == offset) return 0;
+
     do {
-	do {
+	do
+        {
 	    ret = ::send(fd,
                          reinterpret_cast<const char*>(buf) + offset + sent, 
 			 buflen - offset - sent,
                          flags);
-	} while (ret == -1 && errno == EINTR);
-	if (ret == -1 && errno == EAGAIN) {
+	}
+        while (ret == -1 && errno == EINTR);
+
+	if (ret == -1 && errno == EAGAIN)
+        {
 	    return sent;
-	} else if (ret == -1 || ret == 0) {
+
+	}
+        else if (ret == -1 || ret == 0)
+        {
 	    return -1;
 	}
+
 	sent += ret;
-    } while (size_t(sent) + offset < buflen);
+    }
+    while (size_t(sent) + offset < buflen);
+
     return sent;
 }
 
@@ -516,12 +547,9 @@ int TCP::handle_pending()
     return 0;
 }
 
-void TCP::handle_event(const int fd, const Event& pe)
+void TCP::handle_event (const int fd, const Event& pe)
 {
-    if (fd != this->fd)
-    {
-        throw FatalException("");
-    }
+    if (fd != this->fd) gcomm_throw_fatal;
     
     if (pe.get_cause() & Event::E_HUP)
     {
@@ -530,76 +558,101 @@ void TCP::handle_event(const int fd, const Event& pe)
 	pass_up(0, 0, 0);
         return;
     }
-    else if (pe.get_cause() & Event::E_ERR)
+
+    if (pe.get_cause() & Event::E_ERR)
     {
-	int err = 0;
+	int err          = 0;
 	socklen_t errlen = sizeof(err);
+
 	if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) 
         {
-	    LOG_WARN("TCP::handle(): Poll error");
+	    log_warn << "TCP::handle(): Poll error";
 	}
+
 	this->error_no = ENOTCONN;
 	state = S_FAILED;
 	pass_up(0, 0, 0);
         return;
     }
-    else if (pe.get_cause() & Event::E_OUT)
+
+    if (pe.get_cause() & Event::E_OUT)
     {
-	LOG_DEBUG("TCP::handle(): Event::E_OUT");
+	log_debug << "TCP::handle(): Event::E_OUT";
+
 	int ret;
-	if (state == S_CONNECTING) {
+
+	if (state == S_CONNECTING)
+        {
 	    int err = 0;
 	    socklen_t errlen = sizeof(err);
-            if (event_loop)
-                event_loop->unset(fd, Event::E_OUT);
+
+            if (event_loop) event_loop->unset(fd, Event::E_OUT);
+
 	    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1)
-		throw FatalException("TCP::handle(): Getsockopt failed");
-	    if (err == 0) {
+		gcomm_throw_runtime(errno) << "Getsockopt failed";
+
+	    if (err == 0)
+            {
 		state = S_CONNECTED;
-	    } else {
+	    }
+            else
+            {
 		this->error_no = err;
 		state = S_FAILED;
 	    }
+
 	    pass_up(0, 0, 0);
             return;
-	} else if ((ret = handle_pending()) == 0) {
-            if (event_loop)
-                event_loop->unset(fd, Event::E_OUT);
-	} else if (ret != EAGAIN) {
+	}
+
+        if ((ret = handle_pending()) == 0)
+        {
+            if (event_loop) event_loop->unset(fd, Event::E_OUT);
+	}
+        else if (ret != EAGAIN)
+        {
 	    // Something bad has happened
 	    this->error_no = ret;
 	    state = S_FAILED;
-	    LOG_DEBUG("TCP::handle(): Failed");
+	    log_debug << "TCP::handle() failed: " << strerror(ret);
 	    pass_up(0, 0, 0);
             return;
 	}
     }
-    else if (pe.get_cause() & Event::E_IN) 
+//    else if (pe.get_cause() & Event::E_IN) - I think we should have OR here
+    if (pe.get_cause() & Event::E_IN) 
     {
-	if (state == S_CONNECTED) {
+	if (state == S_CONNECTED)
+        {
 	    ssize_t ret = recv_nointr();
-	    if (ret == 0) {
+
+	    if (ret == 0)
+            {
 		ReadBuf rb(recv_buf, recv_buf_offset, true);
-		pass_up(&rb, TCPHdr::get_raw_len(), 0);
+		gu_trace(pass_up(&rb, TCPHdr::get_raw_len(), 0));
 		recv_buf_offset = 0;
-	    } else if (ret != EAGAIN) {
+	    }
+            else if (ret != EAGAIN)
+            {
 		this->error_no = ret;
 		state = S_FAILED;
-		LOG_DEBUG("TCP::handle(): Failed");
+		log_warn << "TCP::handle(): Failed";
 		pass_up(0, 0, 0);
                 return;
 	    }
-	} else if (state == S_LISTENING) {
+	}
+        else if (state == S_LISTENING)
+        {
 	    pass_up(0, 0, 0);
 	}
     }
     else if (pe.get_cause() & Event::E_INVAL)
     {
-	throw FatalException("TCP::handle(): Invalid file descriptor");
+	gcomm_throw_fatal << "TCP::handle(): Invalid file descriptor";
     }
     else
     {
-        LOG_FATAL("unhnadled event");
+        log_fatal << "unhnadled event";
     }
 }
 

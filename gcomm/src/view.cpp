@@ -28,7 +28,7 @@ size_t ViewId::write(byte_t* buf, const size_t buflen, const size_t offset) cons
 
 string ViewId::to_string() const
 {
-    return "view_id(" + uuid.to_string() + ":" + make_int(seq).to_string() + ")";
+    return "view_id(" + uuid.to_string() + ":" + gu::to_string(seq) + ")";
 }
 
 size_t NodeList::length() const
@@ -38,7 +38,7 @@ size_t NodeList::length() const
 
 size_t NodeList::read(const byte_t* buf, const size_t buflen, const size_t offset)
 {
-    size_t off;
+    size_t   off;
     uint32_t len;
 
     /* Clear map */
@@ -366,6 +366,7 @@ string View::to_string() const
     
     ret += to_string(type) + " (" + repr_pid.to_string() + "," 
         + make_int(view_id.get_seq()).to_string() + ") members {";
+
     for (i = members.begin(); i != members.end(); ++i)
     {
         NodeList::const_iterator i_next = i;
@@ -376,8 +377,9 @@ string View::to_string() const
             ret += ",";
         }
     }
-    ret += "}";
-    ret += " joined {";
+
+    ret += "} joined {";
+
     for (i = joined.begin(); i != joined.end(); ++i)
     {
         NodeList::const_iterator i_next = i;
@@ -388,20 +390,24 @@ string View::to_string() const
             ret += ",";
         }
     }
-    ret += "}";
-    ret += " left {";
+
+    ret += "} left {";
+
     for (i = left.begin(); i != left.end(); ++i)
     {
         NodeList::const_iterator i_next = i;
+
         ++i_next;
         ret += "(" + get_uuid(i).to_string() + ":" + get_name(i) + ")";;
+
         if (i_next != left.end())
         {
             ret += ",";
         }
     }
-    ret += "}";
-    ret += " partitioned {";
+
+    ret += "} partitioned {";
+
     for (i = partitioned.begin(); i != partitioned.end(); ++i)
     {
         NodeList::const_iterator i_next = i;
@@ -412,7 +418,9 @@ string View::to_string() const
             ret += ",";
         }
     }
+
     ret += "}";
+
     return ret;
 }
 

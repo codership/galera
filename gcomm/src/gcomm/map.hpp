@@ -12,85 +12,59 @@ namespace gcomm
     template<typename K, typename V, typename C>
     class MapBase
     {
-        typedef C MType;
+        typedef C MapType;
+
     public:
-        typedef typename MType::iterator iterator;
-        typedef typename MType::const_iterator const_iterator;
+
+        typedef typename MapType::iterator       iterator;
+        typedef typename MapType::const_iterator const_iterator;
+
     protected:
-        MType map;
+
+        MapType map;
+
     public:
-        MapBase() : 
-            map() 
-        {
-        }
 
-        virtual ~MapBase() 
-        {
-        }
+        MapBase() : map() {}
 
-        iterator begin() 
-        {
-            return map.begin();
-        }
-        const_iterator begin() const 
-        {
-            return map.begin();
-        }
+        virtual ~MapBase() {}
 
-        iterator end()
-        {
-            return map.end();
-        }
+        iterator begin()          { return map.begin(); }
 
-        const_iterator end() const
-        {
-            return map.end();
-        }
+        iterator end()            { return map.end();   }
 
-        iterator find(const K& k)
-        {
-            return map.find(k);
-        }
+        iterator find(const K& k) { return map.find(k); }
 
-        const_iterator find(const K& k) const
-        {
-            return map.find(k);
-        }
+        const_iterator begin()          const { return map.begin(); }
+
+        const_iterator end()            const { return map.end();   }
+
+        const_iterator find(const K& k) const { return map.find(k); }
     
-        void erase(iterator i)
-        {
-            map.erase(i);
-        }
+        void erase(iterator i) { map.erase(i); }
 
-        void erase(const K& k)
-        {
-            map.erase(k);
-        }
+        void erase(const K& k) { map.erase(k); }
 
-        void clear()
-        {
-            map.clear();
-        }
+        void clear()           { map.clear(); }
     
-        size_t size() const
-        {
-            return map.size();
-        }
+        size_t size() const    { return map.size(); }
 
-        size_t serialize(byte_t* buf, const size_t buflen, 
+        size_t serialize(byte_t*      buf,
+                         const size_t buflen, 
                          const size_t offset) const
         {
-            size_t off = offset;
+            size_t   off = offset;
             uint32_t len = size();
-            if ((off = gcomm::write(len, buf, buflen, off)) == 0)
-                return 0;
-            typename MType::const_iterator i;
+
+            if ((off = gcomm::write(len, buf, buflen, off)) == 0) return 0;
+
+//            typename MapType::const_iterator i;
+            const_iterator i;
+
             for (i = map.begin(); i != map.end(); ++i)
             {
-                if ((off = i->first.write(buf, buflen, off)) == 0)
-                    return 0;
-                if ((off = i->second.write(buf, buflen, off)) == 0)
-                    return 0;
+                if ((off = i->first.write (buf, buflen, off)) == 0) return 0;
+                if ((off = i->second.write(buf, buflen, off)) == 0) return 0;
             }
             return off;
         }
@@ -98,23 +72,25 @@ namespace gcomm
         size_t unserialize(const byte_t* buf, const size_t buflen, 
                            const size_t offset)
         {
-            size_t off = offset;
+            size_t   off = offset;
             uint32_t len;
+
             // Clear map in case this object is reused
             map.clear();
-            if ((off = gcomm::read(buf, buflen, off, &len)) == 0)
-                return 0;
+
+            if ((off = gcomm::read(buf, buflen, off, &len)) == 0) return 0;
+
             for (uint32_t i = 0; i < len; ++i)
             {
                 K uuid;
                 V t;
-                if ((off = uuid.read(buf, buflen, off)) == 0)
-                    return 0;
-                if ((off = t.read(buf, buflen, off)) == 0)
-                    return 0;
+
+                if ((off = uuid.read(buf, buflen, off)) == 0) return 0;
+                if ((off = t.read   (buf, buflen, off)) == 0) return 0;
+
                 if (map.insert(std::make_pair(uuid, t)).second == false)
                 {
-                    throw std::runtime_error("failed to unserialize map");
+                    throw DRuntimeException("failed to unserialize map");
                 }
             }
             return off;
@@ -122,7 +98,7 @@ namespace gcomm
 
         size_t serial_size() const
         {
-            return 4 + size()*(K::size() + V::size());
+            return sizeof(uint32_t) + size()*(K::size() + V::size());
         }
 
         bool operator==(const MapBase& other) const

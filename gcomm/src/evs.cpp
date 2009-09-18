@@ -9,15 +9,18 @@
 //          Output: If from current view, aru changed and flow control
 //                  allows send GAP message
 //                  Else if source is not known, add to set of known nodes
+//
 //   GAP  - If INSTALL received update aru and expected
 //          Else if GAP message matches to INSTALL message, add source
 //               to install_acked
-//          Output: If all in install_acked = true, 
+//          Output: If all in install_acked = true,
+//
 //   JOIN - add to join messages, add source to install acked with false 
 //          status, compute consensus
 //          Output: 
 //          If consensus reached and representative send INSTALL
 //          If state was updated, send JOIN
+//
 //   INSTALL - Output:
 //          If message state matches to current send GAP message
 //          Else send JOIN message
@@ -103,7 +106,7 @@ void EVS::connect()
     proto = new EVSProto(event_loop, tp, uuid, name, mon);
     gcomm::connect(tp, proto);
     gcomm::connect(proto, this);
-    proto->shift_to(EVSProto::JOINING);
+    proto->shift_to(EVSProto::S_JOINING);
     Time stop(Time::now() + Time(5, 0));
     do 
     {
@@ -124,7 +127,7 @@ void EVS::connect()
             LOG_WARN("poll(): " + make_int(ret).to_string());
         }
     }
-    while (proto->get_state() != EVSProto::OPERATIONAL);
+    while (proto->get_state() != EVSProto::S_OPERATIONAL);
 }
 
 
@@ -133,7 +136,7 @@ void EVS::close()
     Critical crit(mon);
 
     LOG_INFO("EVS Proto leaving");
-    proto->shift_to(EVSProto::LEAVING);
+    proto->shift_to(EVSProto::S_LEAVING);
     LOG_INFO("EVS Proto sending leave notification");
     proto->send_leave();
     do
@@ -141,7 +144,7 @@ void EVS::close()
         int ret = event_loop->poll(500);
         LOG_DEBUG(string("poll returned ") + make_int(ret).to_string());
     } 
-    while (proto->get_state() != EVSProto::CLOSED);
+    while (proto->get_state() != EVSProto::S_CLOSED);
     
     int cnt = 0;
     do

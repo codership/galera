@@ -752,7 +752,7 @@ START_TEST(test_pc_conflicting_prims)
         pu2.pc->handle_msg(msg1, 0, 0, &pum1);
         fail("not aborted");
     }
-    catch (std::runtime_error& e)
+    catch (FatalException& e)
     {
         log_info << e.what();
     }
@@ -963,8 +963,7 @@ Suite* pc_suite()
     tcase_add_test(tc, test_pc_conflicting_prims);
     suite_add_tcase(s, tc);
 
-    if (skip == true)
-        return s;
+    if (skip == true) return s;
 
     tc = tcase_create("test_pc_transport");
     tcase_add_test(tc, test_pc_transport);

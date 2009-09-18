@@ -110,13 +110,14 @@ public:
     };
 
     enum State {
-        CLOSED,
-        JOINING,
-        LEAVING,
-        RECOVERY, 
-        OPERATIONAL,
-        STATE_MAX
+        S_CLOSED,
+        S_JOINING,
+        S_LEAVING,
+        S_RECOVERY, 
+        S_OPERATIONAL,
+        S_MAX
     };
+
 private:
     Monitor* mon;
     Transport* tp;
@@ -198,7 +199,7 @@ public:
         output(),
         max_output_size(1024),
         self_loopback(false),
-        state(CLOSED),
+        state(S_CLOSED),
         shift_to_rfcnt(0),
         ith(), cth(), consth(), resendth(), sjth()
     {
@@ -263,18 +264,14 @@ public:
     
     static std::string to_string(const State s) {
         switch (s) {
-        case CLOSED:
-            return "CLOSED";
-        case JOINING:
-            return "JOINING";
-        case LEAVING:
-            return "LEAVING";
-        case RECOVERY:
-            return "RECOVERY";
-        case OPERATIONAL:
-            return "OPERATIONAL";
+        case S_CLOSED:      return "CLOSED";
+        case S_JOINING:     return "JOINING";
+        case S_LEAVING:     return "LEAVING";
+        case S_RECOVERY:    return "RECOVERY";
+        case S_OPERATIONAL: return "OPERATIONAL";
         default:
-            throw FatalException("Invalid state");
+            gcomm_throw_fatal << "Invalid state";
+            throw;
         }
     }
     
@@ -419,10 +416,10 @@ public:
         {
             Critical crit(p.mon);
             
-            if (p.get_state() == RECOVERY)
+            if (p.get_state() == S_RECOVERY)
             {
                 LOG_WARN("CONSENSUS TIMER");
-                p.shift_to(RECOVERY, true);
+                p.shift_to(S_RECOVERY, true);
                 if (p.is_consensus() && p.is_representative(p.my_addr))
                 {
                     p.send_install();
@@ -452,7 +449,7 @@ public:
         void handle()
         {
             Critical crit(p.mon);
-            if (p.get_state() == OPERATIONAL)
+            if (p.get_state() == S_OPERATIONAL)
             {
                 LOG_DEBUG("resend timer handler at " + p.self_string());
                 if (p.output.empty())
@@ -489,7 +486,7 @@ public:
         void handle()
         {
             Critical crit(p.mon);
-            if (p.get_state() == RECOVERY)
+            if (p.get_state() == S_RECOVERY)
             {
                 LOG_DEBUG("send join timer handler at " + p.self_string());
                 p.send_join(true);

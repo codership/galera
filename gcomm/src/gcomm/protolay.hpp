@@ -1,3 +1,7 @@
+/*!
+ * @file Base class for all gcomm layers
+ */
+
 #ifndef _GCOMM_PROTOLAY_HPP_
 #define _GCOMM_PROTOLAY_HPP_
 
@@ -15,50 +19,44 @@ BEGIN_GCOMM_NAMESPACE
 
 class ProtoUpMeta
 {
-    const UUID source;
+    const UUID    source;
     const uint8_t user_type;
     const int64_t to_seq;
-    View* const view;
+    View* const   view; // this makes default constructor pointless
     
-    void operator=(const ProtoUpMeta&);
+    ProtoUpMeta& operator=(const ProtoUpMeta&);
 
 public:
+#if 0
     ProtoUpMeta() :
-        source(UUID()),
+        source   (),
         user_type(0xff),
-        to_seq(-1),
-        view(0)
-    {
-    }
-    
-    ProtoUpMeta(const ProtoUpMeta& um) :
-        source(um.source),
-        user_type(um.user_type),
-        to_seq(um.to_seq),
-        view(um.view ? new View(*um.view) : 0)
-    {
+        to_seq   (-1),
+        view     (0)
+    {}
+#endif
 
-    }
+    ProtoUpMeta(const ProtoUpMeta& um) :
+        source    (um.source),
+        user_type (um.user_type),
+        to_seq    (um.to_seq),
+        view      (um.view ? new View(*um.view) : 0)
+    {}
 
     ProtoUpMeta(const View* view_, const int64_t to_seq_ = -1) :
-        source(),
-        user_type(0xff),
-        to_seq(to_seq_),
-        view(new View(*view_))
-    {
-        
-    }
-    
+        source    (),
+        user_type (0xff),
+        to_seq    (to_seq_),
+        view      (new View(*view_))
+    {}
+
     ProtoUpMeta(const UUID& source_, const uint8_t user_type_ = 0xff,
                 const int64_t to_seq_ = -1) :
         source(source_),
         user_type(user_type_),
         to_seq(to_seq_),
         view(0)
-    {
-        
-    }
-
+    {}
 
     ~ProtoUpMeta()
     {

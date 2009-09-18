@@ -11,7 +11,7 @@ BEGIN_GCOMM_NAMESPACE
 
 // Private methods
 
-void Transport::set_state(const TransportState state)
+void Transport::set_state(const State state)
 {
     this->state = state;
 }
@@ -25,26 +25,29 @@ bool Transport::supports_uuid() const
 
 const UUID& Transport::get_uuid() const
 {
-    LOG_FATAL("UUID not supported by " + uri.get_scheme());
-    throw FatalException("UUID not supported");
+    gcomm_throw_fatal << "UUID not supported by " + uri.get_scheme();
+    throw;
 }
 
 std::string Transport::get_remote_url() const
 {
-    throw FatalException("get remote url not supported");
+    gcomm_throw_fatal << "get remote url not supported";
+    throw;
 }
 
 std::string Transport::get_remote_host() const
 {
-    throw FatalException("get remote host not supported");
+    gcomm_throw_fatal << "get remote host not supported";
+    throw;
 }
 
 std::string Transport::get_remote_port() const
 {
-    throw FatalException("get remote port not supported");
+    gcomm_throw_fatal << "get remote port not supported";
+    throw;
 }
 
-TransportState Transport::get_state() const
+Transport::State Transport::get_state() const
 {
     return state;
 }
@@ -61,22 +64,25 @@ int Transport::get_fd() const
 
 void Transport::listen()
 {
-    throw FatalException("not supported");
+    gcomm_throw_fatal << "not supported";
 }
 
 Transport* Transport::accept()
 {
-    throw FatalException("not supported");
+    gcomm_throw_fatal << "not supported";
+    throw;
 }
 
 int Transport::send(WriteBuf* wb, const ProtoDownMeta* dm)
 {
-    throw FatalException("Not implemented");
+    gcomm_throw_fatal << "Not implemented";
+    throw;
 }
 
 const ReadBuf* Transport::recv()
 {
-    throw FatalException("Not implemented");
+    gcomm_throw_fatal << "Not implemented";
+    throw;
 }
 
 // CTOR/DTOR
@@ -88,13 +94,9 @@ Transport::Transport(const URI& uri_, EventLoop* event_loop_, Monitor* mon_) :
     error_no(0),
     event_loop(event_loop_),
     fd(-1)
-{
-}
+{}
 
-Transport::~Transport()
-{
-
-}
+Transport::~Transport() {}
 
 // Factory method
 
@@ -102,24 +104,28 @@ static Monitor transport_mon;
 
 Transport* Transport::create(const URI& uri, EventLoop* event_loop)
 {
-    
-    if (uri.get_scheme() == Conf::TcpScheme)
+    const std::string& scheme = uri.get_scheme();
+
+    if      (scheme == Conf::TcpScheme)
     {
         return new TCP(uri, event_loop, &transport_mon);
     }
-    else if (uri.get_scheme() == Conf::GMCastScheme)
+    else if (scheme == Conf::GMCastScheme)
     {
         return new GMCast(uri, event_loop, &transport_mon);
     }
-    else if (uri.get_scheme() == Conf::EvsScheme)
+    else if (scheme == Conf::EvsScheme)
     {
         return new EVS(uri, event_loop, &transport_mon);
     }
-    else if (uri.get_scheme() == Conf::PcScheme)
+    else if (scheme == Conf::PcScheme)
     {
         return new PC(uri, event_loop, &transport_mon);
     }
-    throw FatalException("scheme not supported");
+
+    gcomm_throw_fatal << "scheme not supported";
+
+    throw; // to make compiler happy
 }
 
 Transport* Transport::create(const string& uri_str, EventLoop* el)

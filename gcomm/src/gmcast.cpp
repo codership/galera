@@ -13,13 +13,11 @@ using std::make_pair;
 
 class gcomm::GMCastProtoMap : 
     public Map<const int, GMCastProto*, std::map<const int, GMCastProto*> >
-{
-};
+{};
 
 class gcomm::UUIDToAddressMap :
     public MultiMap<const UUID, string, std::multimap<const UUID, string> >
-{
-};
+{};
 
 class gcomm::GMCastNode
 {
@@ -28,7 +26,9 @@ class gcomm::GMCastNode
     UUID uuid;
     static const size_t ADDR_SIZE = 64;
     char address[ADDR_SIZE];
+
 public:
+
     GMCastNode() : 
         operational(false), 
         weight(0xff), 
@@ -170,7 +170,7 @@ public:
     {
         if (type != P_HANDSHAKE && type != P_HANDSHAKE_OK && 
             type != P_HANDSHAKE_FAIL)
-            throw FatalException("invalid message type");
+            throw DFatalException("invalid message type");
         
     }
     
@@ -187,7 +187,7 @@ public:
         node_list(0)
     {
         if (type < P_USER_BASE)
-            throw FatalException("invalid message type");
+            throw DFatalException("invalid message type");
     }
     
     /* Ctor for handshake response */
@@ -205,7 +205,7 @@ public:
 
     {
         if (type != P_HANDSHAKE_RESPONSE)
-            throw FatalException("invalid message type");
+            throw DFatalException("invalid message type");
     }
 
     /* Ctor for topology change */
@@ -223,7 +223,7 @@ public:
         node_list(new NodeList(nodes))
     {
         if (type != P_TOPOLOGY_CHANGE)
-            throw FatalException("invalid message type");
+            throw DFatalException("invalid message type");
     }
     
     ~GMCastMessage() 
@@ -366,7 +366,7 @@ public:
     void dec_ttl()
     {
         if (ttl == 0)
-            throw FatalException("");
+            throw DFatalException("");
         ttl--;
     }
 
@@ -509,27 +509,27 @@ public:
         case S_INIT:
             if (new_state != S_HANDSHAKE_SENT &&
                 new_state != S_HANDSHAKE_WAIT)
-                throw FatalException("invalid state change");
+                throw DFatalException("invalid state change");
             break;
         case S_HANDSHAKE_WAIT:
             if (new_state != S_HANDSHAKE_RESPONSE_SENT)
-                throw FatalException("invalid state change");
+                throw DFatalException("invalid state change");
             break;
         case S_HANDSHAKE_SENT:
         case S_HANDSHAKE_RESPONSE_SENT:
             if (new_state != S_OK && new_state != S_FAILED)
-                throw FatalException("invalid state change");
+                throw DFatalException("invalid state change");
             break;
         case S_OK:
             if (new_state != S_CLOSED && new_state != S_FAILED)
-                throw FatalException("invalid state change");
+                throw DFatalException("invalid state change");
             break;
         case S_FAILED:
             if (new_state != S_CLOSED)
-                throw FatalException("invalid state change");
+                throw DFatalException("invalid state change");
             break;
         case S_CLOSED:
-            throw FatalException("invalid state change");
+            throw DFatalException("invalid state change");
         }
 
         state = new_state;
@@ -566,7 +566,7 @@ public:
         if (msg.write(buf, msg.size(), 0) == 0) 
         {
             delete[] buf;
-            throw FatalException("message serialization");
+            throw DFatalException("message serialization");
         }
         WriteBuf wb(buf, msg.size());
         int ret = tp->handle_down(&wb, 0);
@@ -589,14 +589,14 @@ public:
     void wait_handshake() 
     {
         if (get_state() != S_INIT)
-            throw FatalException("invalid state");
+            throw DFatalException("invalid state");
         set_state(S_HANDSHAKE_WAIT);
     }
     
     void handle_handshake(const GMCastMessage& hs) 
     {
         if (get_state() != S_HANDSHAKE_WAIT)
-            throw FatalException("invalid state");
+            throw DFatalException("invalid state");
         remote_uuid = hs.get_source_uuid();
         GMCastMessage hsr(GMCastMessage::P_HANDSHAKE_RESPONSE, 
                          local_uuid, 
@@ -609,7 +609,7 @@ public:
     void handle_handshake_response(const GMCastMessage& hs) 
     {
         if (get_state() != S_HANDSHAKE_SENT)
-            throw FatalException("handle_handshake_response(): invalid state");
+            throw DFatalException("handle_handshake_response(): invalid state");
             
         const char* grp = hs.get_group_name();
         LOG_DEBUG(string("hsr: ") + hs.get_source_uuid().to_string() + " " + 
@@ -684,24 +684,27 @@ public:
         for (UUIDToAddressMap::const_iterator i = um.begin(); i != um.end(); ++i)
         {
             if (i->first == UUID() || i->second == string(""))
-                throw FatalException("nil uuid or empty address");
+                gcomm_throw_fatal << "nil uuid or empty address";
+
             nl.push_back(GMCastNode(true, i->first, i->second));
         }
-        GMCastMessage msg(GMCastMessage::P_TOPOLOGY_CHANGE, local_uuid, group_name, nl);
+
+        GMCastMessage msg(GMCastMessage::P_TOPOLOGY_CHANGE, local_uuid,
+                          group_name, nl);
         
         send_msg(msg);
-
     }
 
 
-    void handle_user(const GMCastMessage& hs) 
+    void handle_user(const GMCastMessage& hs) //? strange function
     {
-
         if (get_state() != S_OK)
-            throw RuntimeException("handle_user(): invalid state");
+            gcomm_throw_fatal << "invalid state";
+
         if (hs.get_type() < GMCastMessage::P_USER_BASE)
-            throw RuntimeException("handle_user(): invalid user message");
-        throw FatalException("");
+            gcomm_throw_fatal << "invalid user message";
+
+        gcomm_throw_fatal;
     }
     
     void handle_message(const GMCastMessage& msg) 
@@ -789,8 +792,8 @@ static bool check_uri(const URI& uri)
 }
 
 
-GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon_) :
-    Transport(uri, event_loop, mon_),
+GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon) :
+    Transport(uri, event_loop, mon),
     my_uuid(0, 0),
     proto_map(new ProtoMap()),
     spanning_tree(new ProtoMap()),
@@ -804,11 +807,12 @@ GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon_) :
     
     if (uri.get_scheme() != Conf::GMCastScheme)
     {
-        LOG_FATAL("invalid uri scheme: " + uri.get_scheme());
-        throw FatalException("invalid uri scheme");
+        gcomm_throw_fatal << "invalid uri scheme: " << uri.get_scheme();
     }
     
-    URIQueryList::const_iterator i = uri.get_query_list().find(Conf::GMCastQueryListenAddr);
+    URIQueryList::const_iterator i =
+        uri.get_query_list().find(Conf::GMCastQueryListenAddr);
+
     if (i == uri.get_query_list().end())
     {
         listen_addr = Conf::TcpScheme + "://:4567";
@@ -818,10 +822,11 @@ GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon_) :
     {
         listen_addr = get_query_value(i);
     }
+
     if (check_uri(listen_addr) == false)
     {
-        log_fatal << "Listen addr uri '" << listen_addr << "' is not valid";
-        throw FatalException("invalid uri");
+        gcomm_throw_fatal << "Listen addr uri '" << listen_addr
+                          << "' is not valid";
     }
     
     if (uri.get_authority() != "")
@@ -830,12 +835,14 @@ GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon_) :
     }
     
     i = uri.get_query_list().find(Conf::GMCastQueryGroup);
+
     if (i == uri.get_query_list().end())
     {
-        LOG_FATAL("group not defined in uri: " + uri.to_string());
-        throw FatalException("group not defined");
+        gcomm_throw_fatal << "group not defined in uri: " << uri.to_string();
     }
+
     group_name = i->second;
+
     fd = PseudoFd::alloc_fd();
 }
 
@@ -907,7 +914,7 @@ void GMCast::gmcast_accept()
                       new GMCastProto(tp, listen_addr, string(""), 
                                       get_uuid(), group_name)));
     if (ret.second == false)
-        throw FatalException("");
+        throw DFatalException("");
     ret.first->second->send_handshake();
 }
 
@@ -937,7 +944,7 @@ void GMCast::gmcast_connect(const string& addr)
             make_pair(tp->get_fd(), new GMCastProto(tp, listen_addr, 
                                                     addr, get_uuid(), group_name)));
     if (ret.second == false)
-        throw FatalException("");
+        throw DFatalException("");
     ret.first->second->wait_handshake();
 }
 
@@ -1064,37 +1071,35 @@ bool GMCast::is_connected(const string& addr, const UUID& uuid) const
     return false;
 }
 
-void GMCast::insert_address(const string& addr, const UUID& uuid, 
+void GMCast::insert_address(const string& addr, const UUID& uuid,
                             AddrList& alist)
 {
     if (addr == listen_addr)
     {
-        throw std::logic_error("trying to add self to addr list");
+        throw DRuntimeException("trying to add self to addr list");
     }
     
     if (alist.insert(make_pair(addr, 
-                               Timing(Time::now(), Time::now(), uuid))).second == false)
+                               Timing(Time::now(),
+                                      Time::now(), uuid))).second == false)
     {
         log_warn << "duplicate entry " << addr;
     }
     else
     {
-        log_debug << self_string() << " new address entry "
-                  << uuid.to_string() << " "
-                  << addr;
+        log_debug << self_string() << " new address entry " << uuid.to_string()
+                  << ' ' << addr;
     }
 }
-
-
-
-
 
 using namespace boost;
 using std::vector;
 
-typedef adjacency_list<listS, vecS, undirectedS, property<vertex_index_t, UUID>, 
-                       property<edge_weight_t, int> > Graph;
-typedef graph_traits <Graph>::edge_descriptor Edge;
+typedef adjacency_list< listS, vecS, undirectedS,
+                        property<vertex_index_t, UUID>, 
+                        property<edge_weight_t,  int> > Graph;
+
+typedef graph_traits <Graph>::edge_descriptor   Edge;
 typedef graph_traits <Graph>::vertex_descriptor Vertex;
 typedef pair<int, int> E;
 
@@ -1105,7 +1110,7 @@ static inline int find_safe(const map<const UUID, int>& m, const UUID& val)
     if (i == m.end())
     {
         LOG_FATAL(string("missing UUID ") + val.to_string());
-        throw FatalException("");
+        throw DFatalException("");
     }
     return i->second;
 }
@@ -1114,7 +1119,7 @@ static inline const UUID& find_safe(const map<const int, UUID>& m, const int val
 {
     map<const int, UUID>::const_iterator i = m.find(val);
     if (i == m.end())
-        throw FatalException("");
+        throw DFatalException("");
     return i->second;
 }
 
@@ -1127,9 +1132,9 @@ void GMCast::compute_spanning_tree(const UUIDToAddressMap& uuid_map)
     map<const UUID, pair<const int, GMCastProto*> > uuid_to_proto;
     
     if (uuid_to_idx.insert(pair<const UUID, int>(get_uuid(), 0)).second == false)
-        throw FatalException("");
+        throw DFatalException("");
     if (idx_to_uuid.insert(pair<const int, UUID>(0, get_uuid())).second == false)
-        throw FatalException("");
+        throw DFatalException("");
     int n = 1;
     for (UUIDToAddressMap::const_iterator i = uuid_map.begin();
          i != uuid_map.end(); ++i)
@@ -1137,7 +1142,7 @@ void GMCast::compute_spanning_tree(const UUIDToAddressMap& uuid_map)
         if (uuid_to_idx.insert(make_pair(i->first, n)).second == true)
         {
             if (idx_to_uuid.insert(make_pair(n, i->first)).second == false)
-                throw FatalException("");
+                throw DFatalException("");
             ++n;
         }
     }
@@ -1208,7 +1213,7 @@ void GMCast::compute_spanning_tree(const UUIDToAddressMap& uuid_map)
                 if (spanning_tree->insert(
                         make_pair(up_target->second.first, 
                                   up_target->second.second)).second == false)
-                    throw FatalException("");
+                    throw DFatalException("");
             }
             st.erase(ei);
         }
@@ -1231,17 +1236,20 @@ void GMCast::compute_spanning_tree(const UUIDToAddressMap& uuid_map)
         }
         if (i == spanning_tree->end())
         {
-            LOG_WARN(string("no outgoing route found for ") + source_uuid.to_string());
+            log_warn << "no outgoing route found for "
+                     << source_uuid.to_string();
         }
     }
 
     if (st.begin() == st.end())
     {
-        log_debug << self_string() << " single hop spanning tree of size " << spanning_tree->size();
+        log_debug << self_string() << " single hop spanning tree of size "
+                  << spanning_tree->size();
     }
     else
     {
-        log_debug << self_string() << " multi hop spanning tree of size " << spanning_tree->size();
+        log_debug << self_string() << " multi hop spanning tree of size "
+                  << spanning_tree->size();
     }
 
 }
@@ -1269,7 +1277,7 @@ void GMCast::update_addresses()
                           + " remote: "
                           + i->second->get_remote_uuid().to_string() + " "
                           + i->second->get_remote_addr());
-                throw FatalException("protocol error");
+                throw DFatalException("protocol error");
             }
             
             if (exists(uuid_map, rp->get_remote_uuid(), 
@@ -1319,7 +1327,7 @@ void GMCast::update_addresses()
                               + i->second->get_remote_addr() + " "
                               + j->first.to_string() + " "
                               + j->second);
-                    throw FatalException("protocol error");
+                    throw DFatalException("protocol error");
                 }
                 if (exists(uuid_map, j->first, j->second) == false)
                 {
@@ -1353,6 +1361,7 @@ void GMCast::reconnect()
     for (i = pending_addrs.begin(); i != pending_addrs.end(); i = i_next)
     {
         i_next = i, ++i_next;
+
         if (is_connected(get_address(i), UUID()) == false)
         {
             if (get_next_reconnect(i) <= now)
@@ -1370,8 +1379,9 @@ void GMCast::reconnect()
     {
         if (get_uuid(i) == get_uuid())
         {
-            throw std::logic_error("own uuid in addr list");
+            gcomm_throw_fatal << "own uuid in addr list";
         }
+
         i_next = i, ++i_next;
         
         if (is_connected(get_address(i), get_uuid(i)) == false)
@@ -1430,7 +1440,7 @@ void GMCast::forward_message(const int cid, const ReadBuf* rb,
     byte_t buf[20];
     size_t hdrlen;
     if ((hdrlen = msg.write(buf, sizeof(buf), 0)) == 0)
-        throw FatalException("");
+        throw DFatalException("");
     wb.prepend_hdr(buf, hdrlen);
     for (ProtoMap::iterator i = spanning_tree->begin(); i != spanning_tree->end();
          ++i)
@@ -1444,15 +1454,17 @@ void GMCast::forward_message(const int cid, const ReadBuf* rb,
 
 }
 
-void GMCast::handle_up(const int cid, const ReadBuf* rb, 
-                      const size_t offset, const ProtoUpMeta* um) 
+void GMCast::handle_up(const int    cid,    const ReadBuf* rb, 
+                       const size_t offset, const ProtoUpMeta* um) 
 {
     Critical crit(mon);
+
     if (listener == 0)
     {
-        LOG_WARN("");
+        log_warn << "handle_up on non-listener";
         return;
     }
+
     if (cid == listener->get_fd()) 
     {
         gmcast_accept();
@@ -1460,35 +1472,40 @@ void GMCast::handle_up(const int cid, const ReadBuf* rb,
     else 
     {
         GMCastMessage msg;
-        size_t off;
+        size_t        off;
+
         if (rb != 0)
         {
             if ((off = msg.read(rb->get_buf(), rb->get_len(), offset)) == 0)
-                throw RuntimeException("message unserialization");
+                gcomm_throw_fatal << "message unserialization";
+
             if (msg.get_type() >= GMCastMessage::P_USER_BASE)
             {
                 ProtoUpMeta um(msg.get_source_uuid());
+
                 pass_up(rb, off, &um);
+
                 if (msg.get_ttl() > 1)
                 {
                     msg.dec_ttl();
                     forward_message(cid, rb, off, msg);
                 }
+
                 return;
             }
         }
-        
-        
-        bool changed = false;
+
+        bool changed         = false;
         ProtoMap::iterator i = proto_map->find(cid);
+
         if (i == proto_map->end()) 
-        {
-            
-            LOG_WARN(string("unknown fd ") + make_int(cid).to_string());
+        {            
+            log_warn << "unknown fd " << cid;
             return;
         }
         
         GMCastProto* rp = ProtoMap::get_value(i);
+
         if (rb == 0) 
         {
             
@@ -1508,8 +1525,10 @@ void GMCast::handle_up(const int cid, const ReadBuf* rb,
                  rp->get_state() != GMCastProto::S_CLOSED)
         {
             GMCastProto::State s = rp->get_state();
+
             rp->handle_message(msg);
             changed = changed || rp->get_changed();
+
             if (s != GMCastProto::S_OK && rp->get_state() == GMCastProto::S_OK)
             {
                 handle_established(rp);
@@ -1533,7 +1552,8 @@ void GMCast::handle_up(const int cid, const ReadBuf* rb,
         {
             update_addresses();
         }
-        reconnect();
+
+        gu_trace(reconnect());
     }
 }
 
@@ -1545,22 +1565,28 @@ int GMCast::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
          i != spanning_tree->end(); ++i)
     {
         GMCastProto* rp = ProtoMap::get_value(i);
-        GMCastMessage msg(GMCastMessage::P_USER_BASE, get_uuid(), rp->get_send_ttl());
+        GMCastMessage msg(GMCastMessage::P_USER_BASE, get_uuid(),
+                          rp->get_send_ttl());
         byte_t hdrbuf[20];
         size_t wlen;
+
         if ((wlen = msg.write(hdrbuf, sizeof(hdrbuf), 0)) == 0)
-            throw FatalException("short buffer");
+            throw DFatalException("short buffer");
+
         if (msg.get_ttl() > 1)
         {
-            LOG_DEBUG(string("msg ttl: ") + make_int(msg.get_ttl()).to_string());
+            log_debug << "msg ttl: " << msg.get_ttl();
         }
+
         wb->prepend_hdr(hdrbuf, wlen);
+
         int err;
         
         if ((err = rp->get_transport()->handle_down(wb, 0)) != 0)
         {
-            LOG_WARN(string("transport: ") + ::strerror(err));
+            log_warn << "transport: " << ::strerror(err);
         }
+
         wb->rollback_hdr(wlen);
     }
     

@@ -10,8 +10,8 @@ static const size_t WRITEBUF_MAX_HDRLEN = 128;
 
 class WriteBuf
 {
-    byte_t hdr[WRITEBUF_MAX_HDRLEN];
-    size_t hdrlen;
+    byte_t  hdr[WRITEBUF_MAX_HDRLEN];
+    size_t  hdrlen;
     ReadBuf *rb;
     
     WriteBuf(const WriteBuf&);
@@ -24,6 +24,7 @@ class WriteBuf
     {
 	memcpy(hdr + (WRITEBUF_MAX_HDRLEN - hdrlen), hdr_, hdrlen);
     }
+
 public:
     
     WriteBuf(const byte_t* buf, const size_t buflen) :
@@ -44,8 +45,7 @@ public:
     
     ~WriteBuf()
     {
-	if (rb)
-	    rb->release();
+	if (rb) rb->release();
     }
     
     WriteBuf *copy() const 
@@ -53,39 +53,50 @@ public:
 	return new WriteBuf(get_hdr(), get_hdrlen(), rb);
     }
     
-    void prepend_hdr(const void *h, const size_t hl) {
+    void prepend_hdr(const void *h, const size_t hl)
+    {
 	if (hl + hdrlen > WRITEBUF_MAX_HDRLEN)
-	    throw FatalException("out of buffer space");
+	    gcomm_throw_fatal << "out of buffer space";
 	
 	memcpy(hdr + (WRITEBUF_MAX_HDRLEN - hdrlen - hl), h, hl);
 	hdrlen += hl;
     }
     
-    void rollback_hdr(const size_t hl) {
+    void rollback_hdr(const size_t hl)
+    {
 	hdrlen -= hl;
     }
     
-    const byte_t *get_hdr() const {
+    const byte_t *get_hdr() const
+    {
 	return hdr + (WRITEBUF_MAX_HDRLEN - hdrlen);
     }
-    size_t get_hdrlen() const {
+
+    size_t get_hdrlen() const
+    {
 	return hdrlen;
     }
-    const byte_t *get_buf() const {
+
+    const byte_t *get_buf() const
+    {
 	return rb ? rb->get_buf() : 0;
     }
 
-    size_t get_len() const {
+    size_t get_len() const
+    {
 	return rb ? rb->get_len() : 0;
     }
 
-    size_t get_totlen() const {
+    size_t get_totlen() const
+    {
 	return get_hdrlen() + get_len();
     }
 
-    ReadBuf *to_readbuf() const {
-	const byte_t* bufs[2] = {get_hdr(), rb ? rb->get_buf() : 0};
-	size_t buflens[2] = {hdrlen, rb ? rb->get_len() : 0};
+    ReadBuf *to_readbuf() const
+    {
+	const byte_t* bufs[2]    = {get_hdr(), rb ? rb->get_buf() : 0};
+	size_t        buflens[2] = {hdrlen,    rb ? rb->get_len() : 0};
+
 	return new ReadBuf(bufs, buflens, rb ? 2 : 1, get_totlen());
     }
     

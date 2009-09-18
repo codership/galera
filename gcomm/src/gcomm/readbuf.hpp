@@ -16,33 +16,26 @@ BEGIN_GCOMM_NAMESPACE
 
 class Buffer
 {
+    size_t  buflen;
     byte_t* buf;
-    size_t buflen;
-    Buffer(const Buffer&);
-    void operator=(const Buffer&);
+
+    Buffer (const Buffer&);
+    Buffer& operator=(const Buffer&);
+
 public:
-    Buffer(const size_t buflen_) : 
-        buf(),
-        buflen(buflen_)
-    {
-        buf = new byte_t[buflen];
-    }
 
-    ~Buffer()
-    {
-        delete[] buf;
-    }
+    Buffer(size_t buflen_) : buflen(buflen_), buf(new byte_t[buflen]) {}
 
-    byte_t* get_buf() const
-    {
-        return buf;
-    }
+    ~Buffer() { delete[] buf; }
 
-    size_t get_len() const
-    {
-        return buflen;
-    }
+    byte_t*       get_buf()       { return buf; }
 
+    const byte_t* get_buf() const { return buf; }
+
+    size_t        get_len() const { return buflen; }
+
+    byte_t  operator[] (size_t i) const { return buf[i]; }
+    byte_t& operator[] (size_t i)       { return buf[i]; }
 };
 
 
@@ -59,18 +52,14 @@ class ReadBuf
 
     ReadBuf(const ReadBuf&);
     // Private copy operator to disallow assignment 
-    void operator=(ReadBuf& r);
-
-
+    ReadBuf& operator=(ReadBuf& r);
 
 public:
-
 
     ~ReadBuf() 
     {
 	if (instack == false) {
-	    LOG_FATAL("~ReadBuf(): Invalid call to dtor");
-	    throw FatalException("Must not call dtor explicitly, object not in stack");
+	    gcomm_throw_fatal << "Must not call dtor explicitly, object not in stack";
 	}
 	delete[] priv_buf;
     }
@@ -82,12 +71,7 @@ public:
         priv_buf(0),
         buflen(buflen_),
         mon()
-    {
-
-    }
-    
-    
-
+    {}
 
     ReadBuf(const byte_t* bufs[], const size_t buflens[], 
             const size_t nbufs, 

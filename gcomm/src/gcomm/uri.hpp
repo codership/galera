@@ -7,6 +7,7 @@ namespace gcomm
 {
     typedef gu::URL URI;
     typedef gu::URLQueryList URIQueryList;
+
     inline const std::string& get_query_key(URIQueryList::const_iterator& i)
     {
         return i->first;

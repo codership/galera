@@ -1,9 +1,6 @@
 
 #include "check_gcomm.hpp"
 
-
-
-
 #include "evs_proto.hpp"
 #include "evs.hpp"
 #include "gcomm/pseudofd.hpp"
@@ -632,11 +629,11 @@ static void single_boot(DummyInstance* di)
 {
     EVSMessage msg;
 
-    di->assert_shift_to(EVSProto::CLOSED, EVSProto::JOINING);
-    di->assert_send(EVSMessage::JOIN, EVSProto::JOINING, EVSProto::OPERATIONAL);
-    di->assert_output_msg(&msg, EVSMessage::JOIN, EVSProto::OPERATIONAL);
-    di->assert_output_msg(&msg, EVSMessage::INSTALL, EVSProto::OPERATIONAL);
-    di->assert_output_msg(&msg, EVSMessage::GAP, EVSProto::OPERATIONAL);
+    di->assert_shift_to(EVSProto::S_CLOSED, EVSProto::S_JOINING);
+    di->assert_send(EVSMessage::JOIN, EVSProto::S_JOINING, EVSProto::S_OPERATIONAL);
+    di->assert_output_msg(&msg, EVSMessage::JOIN, EVSProto::S_OPERATIONAL);
+    di->assert_output_msg(&msg, EVSMessage::INSTALL, EVSProto::S_OPERATIONAL);
+    di->assert_output_msg(&msg, EVSMessage::GAP, EVSProto::S_OPERATIONAL);
 }
 
 
@@ -695,7 +692,7 @@ static void reach_operational(DummyList& dlist, const bool send_join = false)
         }
     }
     log_info << "reach operational, checking states";
-    std::for_each(dlist.begin(), dlist.end(), assert_state(EVSProto::OPERATIONAL));
+    std::for_each(dlist.begin(), dlist.end(), assert_state(EVSProto::S_OPERATIONAL));
 }
 
 static void join_instance(DummyList& dlist, DummyInstance* di)
@@ -707,10 +704,10 @@ static void join_instance(DummyList& dlist, DummyInstance* di)
     }
     else
     {
-        std::for_each(dlist.begin(), dlist.end(), assert_state(EVSProto::OPERATIONAL));
-        di->assert_shift_to(EVSProto::CLOSED, EVSProto::JOINING);
-        di->assert_send(EVSMessage::JOIN, EVSProto::JOINING, 
-                        EVSProto::JOINING, false);
+        std::for_each(dlist.begin(), dlist.end(), assert_state(EVSProto::S_OPERATIONAL));
+        di->assert_shift_to(EVSProto::S_CLOSED, EVSProto::S_JOINING);
+        di->assert_send(EVSMessage::JOIN, EVSProto::S_JOINING, 
+                        EVSProto::S_JOINING, false);
         dlist.insert(di);
         reach_operational(dlist);
     }
@@ -742,7 +739,7 @@ struct init_recovery
 {
     void operator()(DummyInstance* di)
     {
-        di->shift_to(EVSProto::RECOVERY, true);
+        di->shift_to(EVSProto::S_RECOVERY, true);
     }
 };
 
@@ -754,8 +751,8 @@ struct send_msgs
     {
         for (int i = 0; i < n; ++i)
         {
-            di->assert_send(EVSMessage::USER, EVSProto::OPERATIONAL,
-                            EVSProto::OPERATIONAL);
+            di->assert_send(EVSMessage::USER, EVSProto::S_OPERATIONAL,
+                            EVSProto::S_OPERATIONAL);
         }
     }
 };
@@ -789,21 +786,21 @@ static void split_instances(DummyList& dlist, const size_t n, DummyList& ret)
     std::for_each(dlist.begin(), dlist.end(), check_inactive());
     std::for_each(ret.begin(), ret.end(), check_inactive());
     
-    std::for_each(dlist.begin(), dlist.end(), assert_state(EVSProto::RECOVERY));
-    std::for_each(ret.begin(), ret.end(), assert_state(EVSProto::RECOVERY));
+    std::for_each(dlist.begin(), dlist.end(), assert_state(EVSProto::S_RECOVERY));
+    std::for_each(ret.begin(), ret.end(), assert_state(EVSProto::S_RECOVERY));
 
     if (dlist.size() == 1)
     {
         (*dlist.begin())->assert_send(EVSMessage::JOIN, 
-                                      EVSProto::RECOVERY,
-                                      EVSProto::OPERATIONAL,
+                                      EVSProto::S_RECOVERY,
+                                      EVSProto::S_OPERATIONAL,
                                       true);
     }
     if (ret.size() == 1)
     {
         (*ret.begin())->assert_send(EVSMessage::JOIN, 
-                                    EVSProto::RECOVERY,
-                                    EVSProto::OPERATIONAL,
+                                    EVSProto::S_RECOVERY,
+                                    EVSProto::S_OPERATIONAL,
                                     true);
     }
     reach_operational(dlist);
@@ -825,7 +822,7 @@ static void merge_instances(DummyList& dlist1, DummyList& dlist2)
     }
     
     std::for_each(dlist1.begin(), dlist1.end(), 
-                  assert_state(EVSProto::OPERATIONAL));
+                  assert_state(EVSProto::S_OPERATIONAL));
     std::for_each(dlist1.begin(), dlist1.end(), init_recovery());
     
     reach_operational(dlist1);
@@ -918,7 +915,7 @@ static void single_boot(DummyTransport* tp, EVSProto* ep)
     EVSMessage gm;
 
     // Initial state is joining
-    ep->shift_to(EVSProto::JOINING);
+    ep->shift_to(EVSProto::S_JOINING);
 
     // Send join must produce emitted join message
     ep->send_join();
@@ -941,17 +938,17 @@ static void single_boot(DummyTransport* tp, EVSProto* ep)
     get_msg(rb, &gm);
     fail_unless(gm.get_type() == EVSMessage::GAP);
 
-    // State must have evolved JOIN -> RECOVERY -> OPERATIONAL
-    fail_unless(ep->get_state() == EVSProto::OPERATIONAL);
+    // State must have evolved JOIN -> S_RECOVERY -> S_OPERATIONAL
+    fail_unless(ep->get_state() == EVSProto::S_OPERATIONAL);
 
 
-    // Handle join message again, must stay in OPERATIONAL, must not
+    // Handle join message again, must stay in S_OPERATIONAL, must not
     // emit anything
     ep->handle_msg(jm);
     rb = tp->get_out();
     get_msg(rb, &gm);
     fail_unless(rb == 0);
-    fail_unless(ep->get_state() == EVSProto::OPERATIONAL);
+    fail_unless(ep->get_state() == EVSProto::S_OPERATIONAL);
 }
 
 
@@ -986,13 +983,13 @@ static void double_boot(DummyTransport* tp1, EVSProto* ep1,
 
     ReadBuf* rb;
 
-    ep2->shift_to(EVSProto::JOINING);
-    fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
-    fail_unless(ep2->get_state() == EVSProto::JOINING);
+    ep2->shift_to(EVSProto::S_JOINING);
+    fail_unless(ep1->get_state() == EVSProto::S_OPERATIONAL);
+    fail_unless(ep2->get_state() == EVSProto::S_JOINING);
 
     // Send join message, don't handle immediately
     ep2->send_join(false);
-    fail_unless(ep2->get_state() == EVSProto::JOINING);
+    fail_unless(ep2->get_state() == EVSProto::S_JOINING);
     rb = tp2->get_out();
     fail_unless(rb != 0);
     get_msg(rb, &jm);
@@ -1001,7 +998,7 @@ static void double_boot(DummyTransport* tp1, EVSProto* ep1,
     fail_unless(rb == 0);
 
     ep1->handle_msg(jm);
-    fail_unless(ep1->get_state() == EVSProto::RECOVERY);
+    fail_unless(ep1->get_state() == EVSProto::S_RECOVERY);
 
     rb = tp1->get_out();
     fail_unless(rb != 0);
@@ -1013,7 +1010,7 @@ static void double_boot(DummyTransport* tp1, EVSProto* ep1,
     fail_unless(rb == 0);
 
     ep2->handle_msg(jm);
-    fail_unless(ep2->get_state() == EVSProto::RECOVERY);
+    fail_unless(ep2->get_state() == EVSProto::S_RECOVERY);
     rb = tp2->get_out();
     fail_unless(rb != 0);
     get_msg(rb, &jm);
@@ -1023,7 +1020,7 @@ static void double_boot(DummyTransport* tp1, EVSProto* ep1,
     fail_unless(rb == 0);
 
     ep1->handle_msg(jm);
-    fail_unless(ep1->get_state() == EVSProto::RECOVERY);
+    fail_unless(ep1->get_state() == EVSProto::S_RECOVERY);
     rb = tp1->get_out();
     fail_unless(rb != 0);
     get_msg(rb, &im);
@@ -1037,7 +1034,7 @@ static void double_boot(DummyTransport* tp1, EVSProto* ep1,
     fail_unless(rb == 0);
 
     ep2->handle_msg(im);
-    fail_unless(ep2->get_state() == EVSProto::RECOVERY);
+    fail_unless(ep2->get_state() == EVSProto::S_RECOVERY);
     rb = tp2->get_out();
     fail_unless(rb != 0);
     get_msg(rb, &gm2);
@@ -1048,12 +1045,12 @@ static void double_boot(DummyTransport* tp1, EVSProto* ep1,
     fail_unless(rb == 0);
 
     ep1->handle_msg(gm2);
-    fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
+    fail_unless(ep1->get_state() == EVSProto::S_OPERATIONAL);
     rb = tp1->get_out();
     fail_unless(rb == 0);
 
     ep2->handle_msg(gm);
-    fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
+    fail_unless(ep2->get_state() == EVSProto::S_OPERATIONAL);
     rb = tp2->get_out();
     fail_unless(rb == 0);
 }
@@ -1199,9 +1196,9 @@ START_TEST(test_evs_proto_leave_basic)
     
     EVSMessage lm1;
     
-    ep1->shift_to(EVSProto::LEAVING);
+    ep1->shift_to(EVSProto::S_LEAVING);
     ep1->send_leave();
-    fail_unless(ep1->get_state() == EVSProto::CLOSED);
+    fail_unless(ep1->get_state() == EVSProto::S_CLOSED);
     rb = tp1->get_out();
     fail_unless(rb != 0);
     get_msg(rb, &lm1);
@@ -1221,7 +1218,7 @@ START_TEST(test_evs_proto_leave_basic)
     fail_unless(rb != 0);
     get_msg(rb, &im2);
     fail_unless(im2.get_type() == EVSMessage::INSTALL);
-    fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
+    fail_unless(ep2->get_state() == EVSProto::S_OPERATIONAL);
     rb = tp2->get_out();
     fail_unless(rb != 0);
     get_msg(rb, &gm2);
@@ -1267,13 +1264,13 @@ START_TEST(test_evs_proto_duplicates)
     
     ReadBuf* rb;
     
-    ep2->shift_to(EVSProto::JOINING);
-    fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
-    fail_unless(ep2->get_state() == EVSProto::JOINING);
+    ep2->shift_to(EVSProto::S_JOINING);
+    fail_unless(ep1->get_state() == EVSProto::S_OPERATIONAL);
+    fail_unless(ep2->get_state() == EVSProto::S_JOINING);
     
     // Send join message, don't handle immediately
     ep2->send_join(false);
-    fail_unless(ep2->get_state() == EVSProto::JOINING);
+    fail_unless(ep2->get_state() == EVSProto::S_JOINING);
     rb = tp2->get_out();
     fail_unless(rb != 0);
     get_msg(rb, &jm2);
@@ -1282,7 +1279,7 @@ START_TEST(test_evs_proto_duplicates)
     fail_unless(rb == 0);
 
     ep1->handle_msg(jm2);
-    fail_unless(ep1->get_state() == EVSProto::RECOVERY);
+    fail_unless(ep1->get_state() == EVSProto::S_RECOVERY);
 
     rb = tp1->get_out();
     fail_unless(rb != 0);
@@ -1294,7 +1291,7 @@ START_TEST(test_evs_proto_duplicates)
     fail_unless(rb == 0);
 
     ep2->handle_msg(jm1);
-    fail_unless(ep2->get_state() == EVSProto::RECOVERY);
+    fail_unless(ep2->get_state() == EVSProto::S_RECOVERY);
     rb = tp2->get_out();
     fail_unless(rb != 0);
     get_msg(rb, &jm2);
@@ -1306,7 +1303,7 @@ START_TEST(test_evs_proto_duplicates)
     ep1->handle_msg(jm2);
     ep1->handle_msg(jm1);
     ep1->handle_msg(jm2);
-    fail_unless(ep1->get_state() == EVSProto::RECOVERY);
+    fail_unless(ep1->get_state() == EVSProto::S_RECOVERY);
     rb = tp1->get_out();
     fail_unless(rb != 0);
     get_msg(rb, &im);
@@ -1323,10 +1320,10 @@ START_TEST(test_evs_proto_duplicates)
     ep1->handle_msg(jm1);
     ep1->handle_msg(jm2);
     ep1->handle_msg(im);
-    fail_unless(ep1->get_state() == EVSProto::RECOVERY);
+    fail_unless(ep1->get_state() == EVSProto::S_RECOVERY);
     
     ep2->handle_msg(im);
-    fail_unless(ep2->get_state() == EVSProto::RECOVERY);
+    fail_unless(ep2->get_state() == EVSProto::S_RECOVERY);
     rb = tp2->get_out();
     fail_unless(rb != 0);
     get_msg(rb, &gm2);
@@ -1337,12 +1334,12 @@ START_TEST(test_evs_proto_duplicates)
     fail_unless(rb == 0);
 
     ep1->handle_msg(gm2);
-    fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
+    fail_unless(ep1->get_state() == EVSProto::S_OPERATIONAL);
     rb = tp1->get_out();
     fail_unless(rb == 0);
 
     ep2->handle_msg(gm);
-    fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
+    fail_unless(ep2->get_state() == EVSProto::S_OPERATIONAL);
     rb = tp2->get_out();
     fail_unless(rb == 0);
 
@@ -1350,14 +1347,14 @@ START_TEST(test_evs_proto_duplicates)
     ep1->handle_msg(jm1);
     ep1->handle_msg(jm2);
     ep1->handle_msg(im);
-    fail_unless(ep1->get_state() == EVSProto::OPERATIONAL);
+    fail_unless(ep1->get_state() == EVSProto::S_OPERATIONAL);
 
     
     ep2->handle_msg(jm2);
     ep2->handle_msg(jm1);
     ep2->handle_msg(jm2);
     ep2->handle_msg(im);
-    fail_unless(ep2->get_state() == EVSProto::OPERATIONAL);
+    fail_unless(ep2->get_state() == EVSProto::S_OPERATIONAL);
 
     delete ep1;
     delete ep2;
@@ -1422,7 +1419,7 @@ public:
     
     void send(WriteBuf* wb)
     {
-        if (ep->get_state() != EVSProto::OPERATIONAL)
+        if (ep->get_state() != EVSProto::S_OPERATIONAL)
         {
             return;
         }
@@ -1445,8 +1442,8 @@ static bool all_operational(const vector<Inst*>* pvec)
 {
     for (vector<Inst*>::const_iterator i = pvec->begin();
          i != pvec->end(); ++i) {
-        if ((*i)->ep->get_state() != EVSProto::OPERATIONAL &&
-            (*i)->ep->get_state() != EVSProto::CLOSED)
+        if ((*i)->ep->get_state() != EVSProto::S_OPERATIONAL &&
+            (*i)->ep->get_state() != EVSProto::S_CLOSED)
             return false;
     }
     return true;
@@ -1524,7 +1521,7 @@ static void multicast(vector<Inst*>* pvec, const ReadBuf* rb, const int ploss)
     for (vector<Inst*>::iterator j = pvec->begin();
          j != pvec->end(); ++j) {
 
-        if ((*j)->ep->get_state() == EVSProto::CLOSED)
+        if ((*j)->ep->get_state() == EVSProto::S_CLOSED)
             continue;
 
         if (::rand() % 10000 < ploss) {
@@ -1647,7 +1644,7 @@ START_TEST(test_evs_proto_converge)
         DummyTransport* tp = new DummyTransport();
         vec[i] = new Inst(tp, new EVSProto(&el, tp, UUID(i + 1),
                                            "n" + make_int(i + 1).to_string(), 0));
-        vec[i]->ep->shift_to(EVSProto::JOINING);
+        vec[i]->ep->shift_to(EVSProto::S_JOINING);
         vec[i]->ep->send_join(false);
     }
     reach_operational(&vec);
@@ -1665,9 +1662,9 @@ START_TEST(test_evs_proto_converge_1by1)
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1),
                                            "n" + make_int(n + 1).to_string(), 0));
-        vec[n]->ep->shift_to(EVSProto::JOINING);
+        vec[n]->ep->shift_to(EVSProto::S_JOINING);
         vec[n]->ep->send_join(n == 0);
-        fail_unless(vec[n]->ep->get_state() == (n == 0 ? EVSProto::OPERATIONAL: EVSProto::JOINING));
+        fail_unless(vec[n]->ep->get_state() == (n == 0 ? EVSProto::S_OPERATIONAL: EVSProto::S_JOINING));
         reach_operational(&vec);
         flush(&vec);
     }
@@ -1759,7 +1756,7 @@ START_TEST(test_evs_proto_user_msg)
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1),
                                            "n" + make_int(n + 1).to_string(), 0));
-        vec[n]->ep->shift_to(EVSProto::JOINING);
+        vec[n]->ep->shift_to(EVSProto::S_JOINING);
         vec[n]->ep->send_join(n == 0);
         reach_operational(&vec);
         send_msgs(&vec);
@@ -1845,7 +1842,7 @@ START_TEST(test_evs_proto_consensus_with_user_msg)
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1), "n" 
                                            + make_int(n + 1).to_string(), 0));
-        vec[n]->ep->shift_to(EVSProto::JOINING);
+        vec[n]->ep->shift_to(EVSProto::S_JOINING);
         vec[n]->ep->send_join(n == 0);
         reach_operational(&vec);
         stats.print();
@@ -1866,7 +1863,7 @@ START_TEST(test_evs_proto_msg_loss)
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1), "n" + 
                                            make_int(n + 1).to_string(), 0));
-        vec[n]->ep->shift_to(EVSProto::JOINING);
+        vec[n]->ep->shift_to(EVSProto::S_JOINING);
         vec[n]->ep->send_join(false);
     }
     reach_operational(&vec);
@@ -1896,7 +1893,7 @@ START_TEST(test_evs_proto_leave)
         DummyTransport* tp = new DummyTransport();
         vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1), "n" 
                                            + make_int(n + 1).to_string(), 0));
-        vec[n]->ep->shift_to(EVSProto::JOINING);
+        vec[n]->ep->shift_to(EVSProto::S_JOINING);
         vec[n]->ep->send_join(n == 0);
         reach_operational(&vec);
         stats.print();
@@ -1905,7 +1902,7 @@ START_TEST(test_evs_proto_leave)
     
     for (size_t n = 8; n > 0; --n) {
         send_msgs_rnd(&vec, 8);
-        vec[n - 1]->ep->shift_to(EVSProto::LEAVING);
+        vec[n - 1]->ep->shift_to(EVSProto::S_LEAVING);
         vec[n - 1]->ep->send_leave();
         reach_operational(&vec);
     }
@@ -1925,7 +1922,7 @@ static void join_inst(EventLoop* el,
     DummyTransport* tp = new DummyTransport();
     vec[*n] = new Inst(tp, new EVSProto(el, tp, UUID(*n + 1), "n" 
                                         + make_int(*n + 1).to_string(), 0));
-    vec[*n]->ep->shift_to(EVSProto::JOINING);
+    vec[*n]->ep->shift_to(EVSProto::S_JOINING);
     vec[*n]->ep->send_join(false);
 
     std::list<vector<Inst* >* >::iterator li;
@@ -1941,9 +1938,9 @@ static void leave_inst(vector<Inst*>& vec)
 {
     for (vector<Inst*>::iterator i = vec.begin();
          i != vec.end(); ++i) {
-        if ((*i)->ep->get_state() == EVSProto::OPERATIONAL ||
-            (*i)->ep->get_state() == EVSProto::RECOVERY) {
-            (*i)->ep->shift_to(EVSProto::LEAVING);
+        if ((*i)->ep->get_state() == EVSProto::S_OPERATIONAL ||
+            (*i)->ep->get_state() == EVSProto::S_RECOVERY) {
+            (*i)->ep->shift_to(EVSProto::S_LEAVING);
             (*i)->ep->send_leave();
         }
     }
@@ -2002,7 +1999,7 @@ class EVSUser : public Toplay, EventContext
     {
         CLOSED,
         JOINING,
-        OPERATIONAL,
+        S_OPERATIONAL,
         LEAVING,
         LEAVING2
     };
@@ -2064,7 +2061,7 @@ public:
         fail_unless(um != 0);
         if (rb)
         {
-            fail_unless(state == OPERATIONAL || state == LEAVING ||
+            fail_unless(state == S_OPERATIONAL || state == LEAVING ||
                         state == LEAVING2);
             LOG_DEBUG("regular message from " + um->get_source().to_string());
             recvd++;
@@ -2093,7 +2090,7 @@ public:
                 fail_unless(um->get_view()->get_type() == View::V_TRANS);
                 fail_unless(um->get_view()->get_members().length() == 1);
                 fail_unless(um->get_view()->get_id() == ViewId(evs->get_uuid(), 0));
-                state = OPERATIONAL;
+                state = S_OPERATIONAL;
                 el->queue_event(fd, Event(Event::E_USER, Time(Time::now() + Time(0, 50))));
             }
             else if (state == LEAVING)
@@ -2114,7 +2111,7 @@ public:
             else if (um->get_view()->get_type() == View::V_REG)
             {
                 EVSProto* p = static_cast<EVS*>(evs)->get_proto();
-                fail_unless(p->get_state() == EVSProto::OPERATIONAL);
+                fail_unless(p->get_state() == EVSProto::S_OPERATIONAL);
             }
             LOG_INFO("received in prev view: " 
                      + make_int(recvd).to_string());
@@ -2126,7 +2123,7 @@ public:
     {
         LOG_TRACE("event, state = " + Int(state).to_string());
         fail_unless(ev.get_cause() == Event::E_USER);
-        if (state == OPERATIONAL)
+        if (state == S_OPERATIONAL)
         {
             byte_t databuf[8] = "1234567";
             byte_t buf[4];
