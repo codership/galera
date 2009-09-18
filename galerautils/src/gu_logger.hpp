@@ -3,13 +3,15 @@
  *
  * This code is based on an excellent article at Dr.Dobb's:
  * http://www.ddj.com/cpp/201804215?pgno=1
+ *
+ * It looks ugly because it has to integrate with C logger -
+ * in order to produce identical output
  */
 
 #ifndef __GU_LOGGER__
 #define __GU_LOGGER__
 
 #include <sstream>
-#include <iostream>
 
 extern "C" {
 #include "gu_log.h"
@@ -39,32 +41,14 @@ namespace gu
 
     class Logger
     {
-    public:
-        Logger() :
-            os(),
-            level(LOG_INFO) {}
-        virtual inline ~Logger();
-
-        // this function returns a stream for further logging.
-//        std::ostringstream& get(TLogLevel level = logINFO);
-        inline std::ostringstream& get(const LogLevel lvl,
-                                       const char*    file,
-                                       const char*    func,
-                                       const int      line);
-    public:
-#ifndef _gu_log_h_
-        static void        enable_tstamp (bool);
-        static void        enable_debug  (bool);
-        static void        set_logger    (LogCallback);
-#endif
-    protected:
-        std::ostringstream os;
     private:
+
         Logger(const Logger&);
         Logger& operator =(const Logger&);
-    private:
+
         void               prepare_default ();
-        LogLevel           level;
+        const LogLevel     level;
+
 #ifndef _gu_log_h_
         static LogLevel    max_level;
         static bool        do_timestamp;
@@ -75,41 +59,56 @@ namespace gu
 #define logger             gu_log_cb
 #define default_logger     gu_log_cb_default
 #endif
-    public:
-        static inline bool no_log          (LogLevel lvl)
-        { return (static_cast<int>(lvl) > static_cast<int>(max_level)); };
 
-        
+    protected:
+
+        std::ostringstream os;
+
+    public:
+
+        Logger(LogLevel _level = LOG_INFO) :
+            level  (_level),
+            os     ()
+        {}
+
+        virtual ~Logger() { logger (level, os.str().c_str()); }
+
+        std::ostringstream& get(const char* file,
+                                const char* func,
+                                int         line)
+        {
+            if (default_logger == logger)
+            {
+                prepare_default();       // prefix with timestamp and log level
+            }
+
+            os << file << ':' << func << "():" << line << ": ";
+
+            return os;
+        }
+
+        static bool no_log (LogLevel lvl)
+        {
+            return (static_cast<int>(lvl) > static_cast<int>(max_level));
+        }
+
         static void set_debug_filter(const std::string&);
+
         static bool no_debug(const std::string&, const std::string&, const int);
+
+#ifndef _gu_log_h_
+        static void enable_tstamp (bool);
+        static void enable_debug  (bool);
+        static void set_logger    (LogCallback);
+#endif
     };
 
-    Logger::~Logger()
-    {
-//        os << std::endl; becomes extra newline with most loggers
-        logger (level, os.str().c_str());
-    }
-
-    std::ostringstream&
-    Logger::get(const LogLevel lvl,
-                const char*    file,
-                const char*    func,
-                const int      line)
-    {
-        level = lvl; // save level for ~Logger
-        if (default_logger == logger) {
-            // prefix with timestamp and log level
-            prepare_default();
-        }
-        os << file << ':' /* << func << ':' */ << line << ": ";
-        return os;
-    }
 
 #define GU_LOG_CPP(level)                                               \
     if (gu::Logger::no_log(level) ||                                    \
         (level == gu::LOG_DEBUG &&                                      \
          gu::Logger::no_debug(__FILE__, __FUNCTION__, __LINE__))) {}    \
-    else gu::Logger().get(level, __FILE__, __PRETTY_FUNCTION__, __LINE__)
+    else gu::Logger(level).get(__FILE__, __FUNCTION__, __LINE__)
 
 // USAGE: LOG(level) << item_1 << item_2 << ... << item_n;
 

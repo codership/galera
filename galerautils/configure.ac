@@ -5,7 +5,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.50)
-AC_INIT(galerautils, 0.3.3, [info@codership.com])
+AC_INIT(galerautils, 0.3.4, [info@codership.com])
 AC_CONFIG_SRCDIR([src/gu_mutex.c])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE

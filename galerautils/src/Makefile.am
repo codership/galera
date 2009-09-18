@@ -60,7 +60,7 @@ libgalerautils___la_SOURCES = \
 	gu_prodcons.cpp
 
 
-INTERFACEPP = 1
+INTERFACEPP = 3
 REVISIONPP  = 0
 AGEPP       = 0
 libgalerautils___la_LDFLAGS = @AM_LDFLAGS@ \

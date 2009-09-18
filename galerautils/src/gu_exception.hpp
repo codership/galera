@@ -6,34 +6,47 @@
 #ifndef __GU_EXCEPTION__
 #define __GU_EXCEPTION__
 
+#include <string>
 #include <exception>
 
 namespace gu
 {
     class Exception: public std::exception
     {
-
     private:
 
-#define GU_EXCEPTION_MSG_SIZE 256
-        char msg[GU_EXCEPTION_MSG_SIZE];
-        const int _errno;
+        std::string msg;
+        const int   err;
 
     public:
 
-        Exception (const char* msg, int err = 0) throw();
+        enum { E_UNSPEC = 255 }; // unspecified error
 
-        Exception (const char* msg, int err,
-                   const char* file, const char* function, int line) throw();
+        Exception (const std::string& msg_, int err_ = E_UNSPEC) throw()
+            : msg (msg_),
+              err (err_)
+        {}
 
-        virtual ~Exception () throw() {};
+        virtual ~Exception () throw() {}
 
-        virtual const char* what () const throw() { return msg; };
-        int get_errno () const throw() { return _errno; };
+        const char* what      () const throw() { return msg.c_str(); }
+
+        int         get_errno () const throw() { return err; }
+
+        void        trace (const char* file, const char* func, int line);
     };
 }
 
-#define gu_Exception(_msg_,_err_)                               \
-    gu::Exception(_msg_, _err_, __FILE__, NULL, __LINE__)
+#ifndef NDEBUG /* enabled together with assert() */
+
+#define gu_trace(expr_)                                                 \
+    try { expr_; } catch (gu::Exception& e)                             \
+    { e.trace(__FILE__, __FUNCTION__, __LINE__); throw; }
+
+#else
+
+#define gu_trace(expr_) expr_
+
+#endif // NDEBUG
 
 #endif // __GU_EXCEPTION__

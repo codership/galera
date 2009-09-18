@@ -1,3 +1,11 @@
+2009-09-17 Alex 
+    Added gu_utils.hpp to hold general-purpose templates and functions
+    (now with to_string() template functions).
+    Logger class cleanups.
+    Exception class cleanups. Added stack tracing macro.
+    New Throw class for composing verbose exception messages.
+    Version 0.3.4
+    
 2009-09-01 Alex 
     Added a simple option line parser. Some optimizations and cleanups.
     Version 0.3.3

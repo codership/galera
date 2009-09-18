@@ -10,6 +10,7 @@
 #define _galerautils_hpp_
 
 #include "gu_exception.hpp"
+#include "gu_throw.hpp"
 #include "gu_logger.hpp"
 #include "gu_assert.hpp"
 #include "gu_mutex.hpp"
@@ -17,6 +18,7 @@
 #include "gu_lock.hpp"
 #include "gu_monitor.hpp"
 #include "gu_macros.hpp"
+#include "gu_utils.hpp"
 
 extern "C" {
 #include "gu_macros.h"
