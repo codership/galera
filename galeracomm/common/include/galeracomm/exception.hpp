@@ -10,7 +10,7 @@
  * Macro to throw exceptions with debug information
  */
 #define DException(_msg_)                                               \
-    gu::Exception(_msg_, errno, __FILE__, __FUNCTION__, __LINE__)
+    gu::Exception(_msg_, errno)
 
 /*!
  * Type of exception which is recoverable.
@@ -20,11 +20,11 @@ public:
     RuntimeException(const char *msg, int err = 0) :
         gu::Exception(msg, err) {}
     RuntimeException(const char *msg, int err, const char* file, int line) :
-        gu::Exception(msg, err, file, NULL, line) {}
+        gu::Exception(msg, err) {}
 };
 
 #define DRuntimeException(_msg_)                        \
-    RuntimeException(_msg_, errno, __FILE__, __LINE__)
+    RuntimeException(_msg_, errno)
 
 /*!
  * Type of exception which is unrecoverable.
@@ -34,10 +34,10 @@ public:
     FatalException(const char *msg, int err = 0) :
         gu::Exception(msg, err) {}
     FatalException(const char *msg, int err, const char* file, int line) :
-        gu::Exception(msg, err, file, NULL, line) {}
+        gu::Exception(msg, err) {}
 }; 
 
 #define DFatalException(_msg_)                          \
-    FatalException(_msg_, errno, __FILE__, __LINE__)
+    FatalException(_msg_, errno)
 
 #endif // EXCEPTION_HPP
