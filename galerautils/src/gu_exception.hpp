@@ -9,8 +9,12 @@
 #include <string>
 #include <exception>
 
-namespace gu
-{
+namespace gu {
+
+    /*! Some utility exceptions to indicate special conditions. */
+    class NotSet   {};
+    class NotFound {};
+
     class Exception: public std::exception
     {
     private:
@@ -39,13 +43,13 @@ namespace gu
 
 #ifndef NDEBUG /* enabled together with assert() */
 
-#define gu_trace(expr_)                                                 \
-    try { expr_; } catch (gu::Exception& e)                             \
+#define gu_trace(_expr_)                                                 \
+    try { _expr_; } catch (gu::Exception& e)                             \
     { e.trace(__FILE__, __FUNCTION__, __LINE__); throw; }
 
 #else
 
-#define gu_trace(expr_) expr_
+#define gu_trace(_expr_) _expr_
 
 #endif // NDEBUG
 

@@ -13,9 +13,9 @@ BEGIN_GCOMM_NAMESPACE
 namespace Conf
 {
     
-    static const string GCommPrefix = "gcomm";
-    static const string SchemeDelim = "+";
-    static const string QueryDelim = "&";
+    static const string GCommPrefix   = "gcomm";
+    static const string SchemeDelim   = "+";
+    static const string QueryDelim    = "&";
     static const string ParamKeyDelim = ".";
     
     static const string EvsPrefix = "evs";
@@ -42,8 +42,10 @@ namespace Conf
     /* Scheme */
     static const string TcpScheme = GCommPrefix + SchemeDelim + TcpPrefix;
     /* Parameter denoting asynchronous/non-blocking mode */
-    static const string TcpParamNonBlocking = TcpPrefix + ParamKeyDelim + "non_blocking";
-    static const string TcpParamMaxPending = TcpPrefix + ParamKeyDelim + "max_pending";
+    static const string TcpParamNonBlocking =
+        TcpPrefix + ParamKeyDelim + "non_blocking";
+    static const string TcpParamMaxPending =
+        TcpPrefix + ParamKeyDelim + "max_pending";
     
     /* */
     static const string TipcPrefix = "tipc";
@@ -52,23 +54,21 @@ namespace Conf
     static const string GMCastPrefix = "gmcast";
     static const string GMCastScheme = GCommPrefix + SchemeDelim + GMCastPrefix;
     
-    // static const string GMCastQueryNode = GMCastPrefix + ParamKeyDelim + "node";
-    static const string GMCastQueryGroup = GMCastPrefix + ParamKeyDelim + "group";
-    static const string GMCastQueryListenAddr = GMCastPrefix + ParamKeyDelim + "listen_addr";
+    // static const string GMCastQueryNode =
+    //    GMCastPrefix + ParamKeyDelim + "node";
+    static const string GMCastQueryGroup =
+        GMCastPrefix + ParamKeyDelim + "group";
+    static const string GMCastQueryListenAddr =
+        GMCastPrefix + ParamKeyDelim + "listen_addr";
     
-    static const string NodePrefix = "node";
+    static const string NodePrefix    = "node";
     static const string NodeQueryName = NodePrefix + ParamKeyDelim + "name";
 
     static const string DummyPrefix = "dummy";
     static const string DummyScheme = GCommPrefix + SchemeDelim + DummyPrefix;
     
-
-
-    
 }
 
-
 END_GCOMM_NAMESPACE
-
 
 #endif // _GCOMM_CONF_HPP_

@@ -1,0 +1,25 @@
+// Copyright (C) 2009 Codership Oy <info@codership.com>
+
+// $Id$
+
+/*!
+ * @file: package specific part of the main test file.
+ */
+#ifndef __gu_testspp_hpp__
+#define __gu_testspp_hpp__
+
+#define LOG_FILE "gu_tests++.log"
+
+#include "gu_uri_test.hpp"
+#include "gu_net_test.hpp"
+
+typedef Suite *(*suite_creator_t)(void);
+
+static suite_creator_t suites[] =
+{
+    gu_uri_suite,
+//    gu_net_suite,
+    0
+};
+
+#endif /* __gu_testspp_hpp__ */

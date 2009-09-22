@@ -58,6 +58,6 @@ int main(int argc, char* argv[])
   }
 
   fclose (log_file);
-  printf ("Total test failed: %d\n", failed);
+  printf ("Total tests failed: %d\n", failed);
   return (failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

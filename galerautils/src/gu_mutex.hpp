@@ -10,8 +10,9 @@
 #include <cerrno>
 #include <cstring>
 
+#include "gu_macros.h"
 #include "gu_exception.hpp"
-#include "gu_logger.hpp"
+#include "gu_throw.hpp"
 
 namespace gu
 {
@@ -36,9 +37,9 @@ namespace gu
         ~Mutex ()
         {
             int err = pthread_mutex_destroy (&value);
-            if (err != 0)
+            if (gu_unlikely(err != 0))
 	    {
-                throw Exception (strerror(err), err);
+                gu_throw_error (err) << "pthread_mutex_destroy()";
             }
         }
     };

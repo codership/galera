@@ -2,6 +2,7 @@
 lib_LTLIBRARIES = libgcomm.la
 
 libgcomm_la_SOURCES = 		\
+	defaults.cpp            \
 	test.cpp		\
 	util.cpp 		\
 	string.cpp 		\

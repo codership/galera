@@ -43,7 +43,7 @@ int PC::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 size_t PC::get_max_msg_size() const
 {
     // TODO: 
-    if (tp == 0) throw DFatalException("not open");
+    if (tp == 0) gcomm_throw_fatal << "not open";
 
     EVSUserMessage evsm(UUID(), 0xff, SAFE, 0, 0, 0, ViewId(), 0);
     PCUserMessage  pcm(0);
@@ -78,7 +78,8 @@ void PC::connect()
 
     URI tp_uri = uri;
 
-    tp_uri.set_scheme(Conf::GMCastScheme);
+    tp_uri._set_scheme(Conf::GMCastScheme); // why do we need this?
+
     tp = Transport::create(tp_uri, event_loop);
 
     if (tp->supports_uuid() == false)
@@ -97,23 +98,22 @@ void PC::connect()
     }
 
     string name;
-    URIQueryList::const_iterator i = 
-        uri.get_query_list().find(Conf::NodeQueryName);
 
-    if (i == uri.get_query_list().end())
+    try
+    {
+        name = uri.get_option (Conf::NodeQueryName);
+    }
+    catch (gu::NotFound&)
     {
         name = uuid.to_string();
-    }
-    else
-    {
-        name = get_query_value(i);
     }
 
     evs = new EVSProto(event_loop, tp, uuid, name, mon);
 
     gcomm::connect (tp, evs);
 
-    const bool start_prim = uri.get_authority() == "";
+    const bool start_prim = host_undefined (uri.get_host());
+
     evs->shift_to(EVSProto::S_JOINING);
 
     do
@@ -131,6 +131,7 @@ void PC::connect()
     log_info << "PC/EVS Proto initial state: " << evs->to_string();
     
     pc = new PCProto (uuid, event_loop, mon, start_prim);
+
     gcomm::connect (evs, pc);
     gcomm::connect (pc, this);
     

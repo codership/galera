@@ -9,7 +9,6 @@
 #include <map>
 #include <set>
 
-
 BEGIN_GCOMM_NAMESPACE
 
 class EVSProto;
@@ -17,7 +16,7 @@ class EVSProto;
 class EVS : public Transport
 {
     Transport *tp;
-    EVSProto *proto;
+    EVSProto  *proto;
     
     EVS(const EVS&);
     void operator=(const EVS&);
@@ -31,19 +30,17 @@ public:
     void close();
     
     void handle_up(const int, const ReadBuf*, const size_t, const ProtoUpMeta*);
-    int handle_down(WriteBuf*, const ProtoDownMeta*);
+    int  handle_down(WriteBuf*, const ProtoDownMeta*);
     
     bool supports_uuid() const;
     const UUID& get_uuid() const;
 
     size_t get_max_msg_size() const;
 
-
     EVSProto* get_proto() const
     {
         return proto;
     }
-
 };
 
 END_GCOMM_NAMESPACE

@@ -123,6 +123,12 @@ inline std::string parse_port(const std::string& str)
     return str.substr(sep + 1);
 }
 
+inline bool host_undefined (const string& addr)
+{   
+    return (addr.length() == 0 || addr == "0.0.0.0" ||
+            addr.find ("::/128") <= 1);
+}
+
 END_GCOMM_NAMESPACE
 
 #endif // _GCOMM_UTIL_HPP_

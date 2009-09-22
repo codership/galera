@@ -4,13 +4,13 @@
 #include <list>
 #include <limits>
 
-#include <check.h>
 #include <galerautils.hpp>
 
 #include "galeracomm/vs.hpp"
 #include "galeracomm/thread.hpp"
 #include "vsbes.hpp"
 
+#include <check.h>
 //static Logger& logger = Logger::instance();
 
 START_TEST(check_vsviewid)
@@ -103,9 +103,6 @@ START_TEST(check_vsview)
 	    
 	}
     }
-
-
-
 }
 END_TEST
 

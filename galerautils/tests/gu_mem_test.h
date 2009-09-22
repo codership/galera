@@ -5,6 +5,6 @@
 #ifndef __gu_mem_test__
 #define __gu_mem_test__
 
-Suite *gu_mem_suite(void);
+extern Suite *gu_mem_suite(void);
 
 #endif /* __gu_mem_test__ */

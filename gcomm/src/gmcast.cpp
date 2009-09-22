@@ -21,15 +21,16 @@ class gcomm::UUIDToAddressMap :
 
 class gcomm::GMCastNode
 {
-    bool operational;
+    bool    operational;
     uint8_t weight;
-    UUID uuid;
+    UUID    uuid;
     static const size_t ADDR_SIZE = 64;
-    char address[ADDR_SIZE];
+    char    address[ADDR_SIZE];
 
 public:
 
-    GMCastNode() : 
+    GMCastNode()
+        : 
         operational(false), 
         weight(0xff), 
         uuid() 
@@ -37,14 +38,20 @@ public:
         memset(address, 0, sizeof(address));
     }
     
-    GMCastNode(const bool operational_, 
-               const UUID& uuid_, 
-               const string& address_) :
-        operational(operational_), 
-        weight(0xff),
-        uuid(uuid_) {
+    GMCastNode(const bool    operational_, 
+               const UUID&   uuid_, 
+               const string& address_)
+        :
+        operational (operational_), 
+        weight      (0xff),
+        uuid        (uuid_)
+    {
         if (address_.size() > sizeof(address) - 1)
-            throw FatalException("");
+        {
+            gcomm_throw_fatal << "Address too big: " << address_.size()
+                              << " > " << (sizeof(address));
+        }
+
         memset(address, 0, sizeof(address));
         strcpy(address, address_.c_str());
     }
@@ -110,120 +117,136 @@ public:
 
 class gcomm::GMCastMessage
 {
-    uint8_t version;
-    uint8_t type;
-    uint8_t flags;
-    uint8_t ttl;
-    UUID source_uuid;
+    byte_t version;
+    byte_t type;
+    byte_t flags;
+    byte_t ttl;
+    UUID   source_uuid;
     string node_address;
     string group_name;
-public:
-    typedef std::list<GMCastNode> NodeList;
-private:
-    NodeList* node_list;
+
     GMCastMessage(const GMCastMessage&);
-    void operator=(const GMCastMessage&);
+    GMCastMessage& operator=(const GMCastMessage&);
+
+public:
+
+    typedef std::list<GMCastNode> NodeList;
+
+private:
+
+    NodeList* node_list;
+
 public:
     
     enum Flags {
-        F_GROUP_NAME = 1 << 0,
-        F_NODE_NAME = 1 << 1,
+        F_GROUP_NAME   = 1 << 0,
+        F_NODE_NAME    = 1 << 1,
         F_NODE_ADDRESS = 1 << 2,
-        F_NODE_LIST = 1 << 3
+        F_NODE_LIST    = 1 << 3
     };
     
     enum PacketType 
     {
-        P_INVALID = 0,
-        P_HANDSHAKE = 1,
+        P_INVALID            = 0,
+        P_HANDSHAKE          = 1,
         P_HANDSHAKE_RESPONSE = 2,
-        P_HANDSHAKE_OK = 3,
-        P_HANDSHAKE_FAIL = 4,
-        P_TOPOLOGY_CHANGE = 5,
+        P_HANDSHAKE_OK       = 3,
+        P_HANDSHAKE_FAIL     = 4,
+        P_TOPOLOGY_CHANGE    = 5,
         /* Leave room for future use */
-        P_USER_BASE = 8
+        P_USER_BASE          = 8
     };
     
     /* Default ctor */
-    GMCastMessage() :
-        version(0), 
-        type(0), 
-        flags(0), 
-        ttl(0), 
-        source_uuid(), 
-        node_address(),
-        group_name(),
-        node_list(0)
-    {
-    }
+    GMCastMessage ()
+        :
+        version      (0), 
+        type         (0), 
+        flags        (0), 
+        ttl          (0), 
+        source_uuid  (), 
+        node_address (),
+        group_name   (),
+        node_list    (0)
+    {}
     
     /* Ctor for handshake, handshake ok and handshake fail */
-    GMCastMessage(const uint8_t type_, const UUID& source_uuid_) :
-        version(0), 
-        type(type_), 
-        flags(0), 
-        ttl(1), 
-        source_uuid(source_uuid_), 
-        node_address(),
-        group_name(),
-        node_list(0)
+    GMCastMessage (const uint8_t type_,
+                   const UUID&   source_uuid_)
+        :
+        version      (0), 
+        type         (type_), 
+        flags        (0), 
+        ttl          (1), 
+        source_uuid  (source_uuid_), 
+        node_address (),
+        group_name   (),
+        node_list    (0)
     {
         if (type != P_HANDSHAKE && type != P_HANDSHAKE_OK && 
             type != P_HANDSHAKE_FAIL)
-            throw DFatalException("invalid message type");
-        
+            gcomm_throw_fatal << "Invalid message type " << type
+                              << " in handshake constructor";        
     }
     
     /* Ctor for user message */
-    GMCastMessage(const uint8_t type_, const UUID& source_uuid_, 
-                 const uint8_t ttl_) :
-        version(0), 
-        type(type_), 
-        flags(0), 
-        ttl(ttl_), 
-        source_uuid(source_uuid_), 
-        node_address(),
-        group_name(""),
-        node_list(0)
+    GMCastMessage (const uint8_t type_,
+                   const UUID&   source_uuid_, 
+                   const uint8_t ttl_)
+        :
+        version      (0), 
+        type         (type_), 
+        flags        (0), 
+        ttl          (ttl_), 
+        source_uuid  (source_uuid_), 
+        node_address (),
+        group_name   (""),
+        node_list    (0)
     {
         if (type < P_USER_BASE)
-            throw DFatalException("invalid message type");
+            gcomm_throw_fatal << "Invalid message type" << type
+                              << " in user message constructor";
     }
     
     /* Ctor for handshake response */
-    GMCastMessage(const uint8_t type_, const UUID& source_uuid_,
-                 const string& node_address_,
-                 const char* group_name_) : 
-        version(0), 
-        type(type_), 
-        flags(F_GROUP_NAME | F_NODE_ADDRESS), 
-        ttl(1),
-        source_uuid(source_uuid_),
-        node_address(node_address_),
-        group_name(group_name_),
-        node_list(0)
+    GMCastMessage (const uint8_t type_,
+                   const UUID&   source_uuid_,
+                   const string& node_address_,
+                   const string& group_name_)
+        : 
+        version      (0),
+        type         (type_), 
+        flags        (F_GROUP_NAME | F_NODE_ADDRESS), 
+        ttl          (1),
+        source_uuid  (source_uuid_),
+        node_address (node_address_),
+        group_name   (group_name_),
+        node_list    (0)
 
     {
         if (type != P_HANDSHAKE_RESPONSE)
-            throw DFatalException("invalid message type");
+            gcomm_throw_fatal << "Invalid message type " << type
+                              << " in handshake response constructor";
     }
 
     /* Ctor for topology change */
-    GMCastMessage(const uint8_t type_, 
-                 const UUID& source_uuid_,
-                 const string& group_name_,
-                 const NodeList& nodes) :
-        version(0),
-        type(type_),
-        flags(F_GROUP_NAME | F_NODE_LIST), 
-        ttl(1),
-        source_uuid(source_uuid_),
-        node_address(),
-        group_name(group_name_),
-        node_list(new NodeList(nodes))
+    GMCastMessage (const uint8_t   type_, 
+                   const UUID&     source_uuid_,
+                   const string&   group_name_,
+                   const NodeList& nodes)
+        :
+        version      (0),
+        type         (type_),
+        flags        (F_GROUP_NAME | F_NODE_LIST), 
+        ttl          (1),
+        source_uuid  (source_uuid_),
+        node_address (),
+        group_name   (group_name_),
+        node_list    (new NodeList(nodes))
     {
         if (type != P_TOPOLOGY_CHANGE)
-            throw DFatalException("invalid message type");
+            gcomm_throw_fatal << "Invalid message type " << type
+                              << " in topology change constructor";
     }
     
     ~GMCastMessage() 
@@ -232,7 +255,8 @@ public:
     }
 
     
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const {
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    {
         size_t off;
         /* Version */
         if ((off = gcomm::write(version, buf, buflen, offset)) == 0)
@@ -246,6 +270,7 @@ public:
         /* TTL */
         if ((off = gcomm::write(ttl, buf, buflen, off)) == 0)
             return 0;
+
         if ((off = source_uuid.write(buf, buflen, off)) == 0)
             return 0;
 
@@ -254,6 +279,7 @@ public:
             if ((off = write_string(node_address.c_str(), buf, buflen, off)) == 0)
                 return 0;
         }
+
         if (flags & F_GROUP_NAME) 
         {
             if ((off = write_string(group_name.c_str(), buf, buflen, off)) == 0)
@@ -275,7 +301,8 @@ public:
         return off;
     }
     
-    size_t read_v0(const byte_t* buf, const size_t buflen, const size_t offset) {
+    size_t read_v0(const byte_t* buf, const size_t buflen, const size_t offset)
+    {
         size_t off;
         if ((off = gcomm::read(buf, buflen, offset, &type)) == 0)
             return 0;
@@ -288,20 +315,28 @@ public:
         
         if (flags & F_NODE_ADDRESS)
         {
+#if 0
             char* addr = 0;
             if ((off = read_string(buf, buflen, off, &addr)) == 0)
                 return 0;
             node_address = addr;
             free(addr);
+#endif
+            node_address = reinterpret_cast<const char*>(buf + off);
+            off += node_address.length() + 1;
         }
         
         if (flags & F_GROUP_NAME) 
         {
+#if 0
             char* grp = 0;
             if ((off = read_string(buf, buflen, off, &grp)) == 0)
                 return 0;
             group_name = grp;
             free(grp);
+#endif
+            group_name = reinterpret_cast<const char*>(buf + off);
+            off += group_name.length() + 1;
         }
         
         if (flags & F_NODE_LIST)
@@ -320,8 +355,9 @@ public:
         }
 
         log_debug << "type: " << type << ", flags: " << flags
-                  << ", ttl: " << ttl << ", group_name: "
-                  << (F_GROUP_NAME ? group_name : "");
+                  << ", ttl: " << ttl
+                  << ", node_address: " << (F_NODE_ADDRESS ? node_address : "")
+                  << ", group_name: "   << (F_GROUP_NAME   ? group_name   : "");
 
         return off;
     }
@@ -365,8 +401,7 @@ public:
     
     void dec_ttl()
     {
-        if (ttl == 0)
-            throw DFatalException("");
+        if (ttl == 0) gcomm_throw_fatal << "decrementing 0 ttl";
         ttl--;
     }
 
@@ -378,12 +413,13 @@ public:
     const UUID& get_source_uuid() const {
         return source_uuid;
     }
+
     const string& get_node_address() const {
         return node_address;
     }
 
-    const char* get_group_name() const {
-        return group_name.c_str();
+    const string& get_group_name() const {
+        return group_name;
     }
 
     const NodeList* get_node_list() const {
@@ -437,27 +473,14 @@ static bool equals(const UUIDToAddressMap& a,
     return true;
 }
 
-static void set_tcp_params(URI* uri)
+static void set_tcp_defaults (URI* uri)
 {
-    uri->set_query_param(Conf::TcpParamNonBlocking, make_int(1).to_string());
+    // what happens if there is already this parameter?
+    uri->set_query_param(Conf::TcpParamNonBlocking, gu::to_string(1));
 }
-
-
 
 class GMCastProto 
 {
-    UUID local_uuid;
-    UUID remote_uuid;
-    Transport* tp;
-    string local_addr;
-    string remote_addr;
-    string group_name;
-    uint8_t send_ttl;
-    bool changed;
-private:
-    UUIDToAddressMap uuid_map;
-    GMCastProto(const GMCastProto&);
-    void operator=(const GMCastProto&);
 public:
     
     enum State 
@@ -470,88 +493,95 @@ public:
         S_FAILED,
         S_CLOSED
     };
-    
-    State state;
+
+private:
+
+    UUID    local_uuid;
+    UUID    remote_uuid;
+    string  local_addr;
+    string  remote_addr;
+    string  group_name;
+    uint8_t send_ttl;
+    bool    changed;
+    State   state;
+
+    Transport*       tp;
+    UUIDToAddressMap uuid_map;
+
+    GMCastProto(const GMCastProto&);
+    GMCastProto& operator=(const GMCastProto&);
+
+public:
     
     State get_state() const 
     {
         return state;
     }
 
-    string to_string(State s) 
+    static string to_string (State s) 
     {
         switch (s)
         {
-        case S_INIT:
-            return "INIT";
-        case S_HANDSHAKE_SENT:
-            return "HANDSHAKE_SENT";
-        case S_HANDSHAKE_WAIT:
-            return "HANDSHAKE_WAIT";
-        case S_HANDSHAKE_RESPONSE_SENT:
-            return "HANDSHAKE_RESPONSE_SENT";
-        case S_OK:
-            return "OK";
-        case S_FAILED:
-            return "FAILED";
-        case S_CLOSED:
-            return "CLOSED";
+        case S_INIT:                    return "INIT";
+        case S_HANDSHAKE_SENT:          return "HANDSHAKE_SENT";
+        case S_HANDSHAKE_WAIT:          return "HANDSHAKE_WAIT";
+        case S_HANDSHAKE_RESPONSE_SENT: return "HANDSHAKE_RESPONSE_SENT";
+        case S_OK:                      return "OK";
+        case S_FAILED:                  return "FAILED";
+        case S_CLOSED:                  return "CLOSED";
+        default: return "UNKNOWN";
         }
-        return "UNKNOWN";
     }
     
     void set_state(State new_state) 
     {
-        LOG_DEBUG(string("state change: ") 
-                  + to_string(state) + " -> " 
-                  + to_string(new_state));
-        switch (state) {
-        case S_INIT:
-            if (new_state != S_HANDSHAKE_SENT &&
-                new_state != S_HANDSHAKE_WAIT)
-                throw DFatalException("invalid state change");
-            break;
-        case S_HANDSHAKE_WAIT:
-            if (new_state != S_HANDSHAKE_RESPONSE_SENT)
-                throw DFatalException("invalid state change");
-            break;
-        case S_HANDSHAKE_SENT:
-        case S_HANDSHAKE_RESPONSE_SENT:
-            if (new_state != S_OK && new_state != S_FAILED)
-                throw DFatalException("invalid state change");
-            break;
-        case S_OK:
-            if (new_state != S_CLOSED && new_state != S_FAILED)
-                throw DFatalException("invalid state change");
-            break;
-        case S_FAILED:
-            if (new_state != S_CLOSED)
-                throw DFatalException("invalid state change");
-            break;
-        case S_CLOSED:
-            throw DFatalException("invalid state change");
+        log_debug << "State change: " << to_string(state) << " -> " 
+                  << to_string(new_state);
+
+        static const bool allowed[][7] =
+        {
+            // INIT  HS_SENT HS_WAIT HSR_SENT   OK    FAILED CLOSED
+            { false,  true,   true,   false,  false,  false, false },// INIT
+
+            { false,  false,  false,  false,  true,   true,  false },// HS_SENT
+
+            { false,  false,  false,  true,   false,  false, false },// HS_WAIT
+
+            { false,  false,  false,  false,  true,   true,  false },// HSR_SENT
+
+            { false,  false,  false,  false,  false,  true,  true  },// OK
+
+            { false,  false,  false,  false,  false,  false, true  },// FAILED
+
+            { false,  false,  false,  false,  false,  false, false } // CLOSED
+        };
+
+        if (!allowed[state][new_state])
+        {
+            gcomm_throw_fatal << "Invalid state change: " << to_string(state)
+                              << " -> " << to_string(new_state);
         }
 
         state = new_state;
     }
     
-    GMCastProto(Transport* tp_, 
-                const string& local_addr_, 
-                const string& remote_addr_, 
-                const UUID& local_uuid_, 
-                const string& group_name_) : 
-        local_uuid(local_uuid_),
-        remote_uuid(),
-        tp(tp_), 
-        local_addr(local_addr_),
-        remote_addr(remote_addr_),
-        group_name(group_name_),
-        send_ttl(1),
-        changed(false),
-        uuid_map(),
-        state(S_INIT)
-    {
-    }
+    GMCastProto (Transport*    tp_, 
+                 const string& local_addr_, 
+                 const string& remote_addr_, 
+                 const UUID&   local_uuid_, 
+                 const string& group_name_)
+        : 
+        local_uuid  (local_uuid_),
+        remote_uuid (),
+        local_addr  (local_addr_),
+        remote_addr (remote_addr_),
+        group_name  (group_name_),
+        send_ttl    (1),
+        changed     (false),
+        state       (S_INIT),
+        tp          (tp_),
+        uuid_map    ()
+    {}
 
     ~GMCastProto() 
     {
@@ -559,86 +589,121 @@ public:
         // delete tp;
     }
 
-
     void send_msg(const GMCastMessage& msg)
     {
         byte_t* buf = new byte_t[msg.size()];
+
         if (msg.write(buf, msg.size(), 0) == 0) 
         {
             delete[] buf;
-            throw DFatalException("message serialization");
+            gcomm_throw_fatal << "Message serialization";
         }
+
         WriteBuf wb(buf, msg.size());
+
         int ret = tp->handle_down(&wb, 0);
 
         if (ret)
         {
-            LOG_DEBUG(string("send failed: ") + strerror(ret));
+            log_debug << "Send failed: " << strerror(ret);
             set_state(S_FAILED);
         }
+
         delete[] buf;
     }
     
     void send_handshake() 
     {
-        GMCastMessage hs(GMCastMessage::P_HANDSHAKE, local_uuid);
+        GMCastMessage hs (GMCastMessage::P_HANDSHAKE, local_uuid);
+
         send_msg(hs);
+
         set_state(S_HANDSHAKE_SENT);
     }
     
     void wait_handshake() 
     {
         if (get_state() != S_INIT)
-            throw DFatalException("invalid state");
+            gcomm_throw_fatal << "Invalid state: " << to_string(get_state());
+
         set_state(S_HANDSHAKE_WAIT);
     }
     
     void handle_handshake(const GMCastMessage& hs) 
     {
         if (get_state() != S_HANDSHAKE_WAIT)
-            throw DFatalException("invalid state");
+            gcomm_throw_fatal << "Invalid state: " << to_string(get_state());
+
         remote_uuid = hs.get_source_uuid();
-        GMCastMessage hsr(GMCastMessage::P_HANDSHAKE_RESPONSE, 
-                         local_uuid, 
-                         local_addr,
-                         group_name.c_str());
+
+        GMCastMessage hsr (GMCastMessage::P_HANDSHAKE_RESPONSE, 
+                           local_uuid, 
+                           local_addr,
+                           group_name);
         send_msg(hsr);
+
         set_state(S_HANDSHAKE_RESPONSE_SENT);
     }
 
     void handle_handshake_response(const GMCastMessage& hs) 
     {
         if (get_state() != S_HANDSHAKE_SENT)
-            throw DFatalException("handle_handshake_response(): invalid state");
+            gcomm_throw_fatal << "Invalid state: " << to_string(get_state());
             
-        const char* grp = hs.get_group_name();
-        LOG_DEBUG(string("hsr: ") + hs.get_source_uuid().to_string() + " " + 
-                  hs.get_node_address() + " " + grp);
-        if (grp == 0 || group_name != string(grp))
+        const string& grp = hs.get_group_name();
+
+        log_debug << "hsr: " << hs.get_source_uuid().to_string() << " @ "
+                  << hs.get_node_address() << " / " << grp;
+
+        try
         {
-            LOG_DEBUG(string("handshake fail, invalid group: ") + grp);
-            GMCastMessage nok(GMCastMessage::P_HANDSHAKE_FAIL, local_uuid);
-            send_msg(nok);
-            set_state(S_FAILED);
-        } 
-        else 
-        {
+            if (grp != group_name)
+            {
+                log_debug << "Handshake failed, my group: '" << group_name
+                          << "', peer group: '" << grp << "'";
+                throw std::exception();
+            }
+
             remote_uuid = hs.get_source_uuid();
 
             URI uri(hs.get_node_address());
-            string host = parse_host(uri.get_authority());
-            string port = parse_port(uri.get_authority());
-            if (host == "")
+
+            remote_addr = uri.get_scheme() + "://";
+
+            try
             {
-                uri.set_authority(tp->get_remote_host() + ':' + port);
+                if (0 == uri.get_host().length()) throw gu::NotSet();
+
+                remote_addr += uri.get_host();
             }
-            remote_addr = uri.to_string();
+            catch (gu::NotSet&)
+            {
+                remote_addr += tp->get_remote_host();
+            }
+
+            try
+            {
+                remote_addr += (string(":") + uri.get_port());
+            }
+            catch (gu::NotSet&) {}
+
             GMCastMessage ok(GMCastMessage::P_HANDSHAKE_OK, local_uuid);
+
             send_msg(ok);
             set_state(S_OK);
         }
+        catch (...)
+        {
+            log_warn << "Parsing peer address '"
+                     << hs.get_node_address() << "' failed.";
+
+            GMCastMessage nok (GMCastMessage::P_HANDSHAKE_FAIL, local_uuid);
+
+            send_msg (nok);
+            set_state(S_FAILED);
+        }
     }
-    
+
     void handle_ok(const GMCastMessage& hs) 
     {
         set_state(S_OK);
@@ -780,105 +845,122 @@ public:
     }
 };
 
-
-
 static bool check_uri(const URI& uri)
 {
-    if (uri.get_scheme() != Conf::TcpScheme)
-    {
-        return false;
-    }
-    return true;
+    return (uri.get_scheme() == Conf::TcpScheme);
 }
 
+static const string tcp_addr_prefix = Conf::TcpScheme + "://";
 
-GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon) :
-    Transport(uri, event_loop, mon),
-    my_uuid(0, 0),
-    proto_map(new ProtoMap()),
-    spanning_tree(new ProtoMap()),
-    listener(0),
-    listen_addr(),
-    initial_addr(),
-    pending_addrs(),
-    remote_addrs(),
-    group_name()
+GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon)
+    :
+    Transport     (uri, event_loop, mon),
+    my_uuid       (0, 0),
+    proto_map     (new ProtoMap()),
+    spanning_tree (new ProtoMap()),
+    listener      (0),
+    listen_addr   (tcp_addr_prefix),
+    initial_addr  (""),
+    pending_addrs (),
+    remote_addrs  (),
+    group_name    ()
 {
-    
     if (uri.get_scheme() != Conf::GMCastScheme)
     {
-        gcomm_throw_fatal << "invalid uri scheme: " << uri.get_scheme();
+        gcomm_throw_runtime (EINVAL) << "Invalid uri scheme: "
+                                     << uri.get_scheme();
     }
-    
-    URIQueryList::const_iterator i =
-        uri.get_query_list().find(Conf::GMCastQueryListenAddr);
 
-    if (i == uri.get_query_list().end())
+    // @todo: technically group name should be in path component
+    try
     {
-        listen_addr = Conf::TcpScheme + "://:4567";
-        log_info << "set default listen addr to: " << listen_addr;
+        group_name = uri.get_option (Conf::GMCastQueryGroup);
     }
-    else
+    catch (gu::NotFound&)
     {
-        listen_addr = get_query_value(i);
+        gcomm_throw_runtime (EINVAL) << "Group not defined in URL: "
+                                     << uri.to_string();
     }
+
+    try
+    {
+        if (!host_undefined(uri.get_host()))
+        {
+            initial_addr = tcp_addr_prefix + uri.get_authority();
+            log_debug << "Setting initial_addr to '" << initial_addr << "'";
+        }
+    }
+    catch (gu::NotSet&)
+    {
+        //@note: this is different from empty host and indicates URL without ://
+        gcomm_throw_runtime (EINVAL) << "Host not defined in URL: "
+                                     << uri.to_string();
+    }
+
+    try
+    {
+        listen_addr = uri.get_option (Conf::GMCastQueryListenAddr);
+        log_debug << "Setting listen address to " << listen_addr;
+    }
+    catch (gu::NotFound&) {}
+
+    try
+    { 
+        gu::URI(listen_addr).get_port();
+    }
+    catch (gu::NotSet&)
+    {
+        // if no port is set for listen address in the options,
+        // try one from authority part
+        try
+        {
+            if (uri.get_port().length()) listen_addr += ':' + uri.get_port();
+        }
+        catch (gu::NotSet&) {}
+    }
+
+    log_info << "Listening at: " << listen_addr;
 
     if (check_uri(listen_addr) == false)
     {
-        gcomm_throw_fatal << "Listen addr uri '" << listen_addr
-                          << "' is not valid";
+        gcomm_throw_runtime (EINVAL) << "Listen addr '" << listen_addr
+                                     << "' is not valid";
     }
     
-    if (uri.get_authority() != "")
-    {
-        initial_addr = Conf::TcpScheme + "://" + uri.get_authority();
-    }
-    
-    i = uri.get_query_list().find(Conf::GMCastQueryGroup);
-
-    if (i == uri.get_query_list().end())
-    {
-        gcomm_throw_fatal << "group not defined in uri: " << uri.to_string();
-    }
-
-    group_name = i->second;
-
     fd = PseudoFd::alloc_fd();
 }
 
-
-
 GMCast::~GMCast()
 {
-    if (listener != 0)
-    {
-        stop();
-    }
+    if (listener != 0) stop();
+
     PseudoFd::release_fd(fd);
     delete proto_map;
     delete spanning_tree;
 }
 
-
-
-
 void GMCast::start() 
-{
-    
+{    
     URI listen_uri(listen_addr);
-    set_tcp_params(&listen_uri);
+
+    set_tcp_defaults (&listen_uri);
     
     listener = Transport::create(listen_uri, event_loop);
     listener->listen();
     listener->set_up_context(this, listener->get_fd());
-    LOG_DEBUG(string("Listener: ") + make_int(listener->get_fd()).to_string());
+
+    log_debug << "Listener: " << listener->get_fd();
+
     if (initial_addr != "")
     {
+        log_debug << "Connecting to: " << initial_addr;
         insert_address(initial_addr, UUID(), pending_addrs);
         gmcast_connect(initial_addr);
     }
+
     event_loop->insert(fd, this);
-    event_loop->queue_event(fd, Event(Event::E_USER, Time::now() + Time(0, 500000)));
+    event_loop->queue_event(fd, Event(Event::E_USER,
+                                      Time::now() + Time(0, 500000)));
 }
 
 
@@ -888,9 +970,9 @@ void GMCast::stop()
     
     listener->close();
     delete listener;
-    listener = 0;
-    
+    listener = 0;    
     spanning_tree->clear();
+
     for (ProtoMap::iterator i = proto_map->begin(); i != proto_map->end(); ++i)
     {
         Transport* tp = ProtoMap::get_value(i)->get_transport();
@@ -898,6 +980,7 @@ void GMCast::stop()
         delete tp;
         delete ProtoMap::get_value(i);
     }
+
     proto_map->clear();
     pending_addrs.clear();
     remote_addrs.clear();
@@ -907,44 +990,59 @@ void GMCast::stop()
 void GMCast::gmcast_accept() 
 {
     Transport* tp = listener->accept();
+
     tp->set_up_context(this, tp->get_fd());
-    pair<ProtoMap::iterator, bool> ret = 
-        proto_map->insert(
-            make_pair(tp->get_fd(), 
-                      new GMCastProto(tp, listen_addr, string(""), 
-                                      get_uuid(), group_name)));
+
+    GMCastProto* peer = new GMCastProto (tp, listen_addr, "",
+                                         get_uuid(), group_name);
+
+    pair<ProtoMap::iterator, bool> ret =
+        proto_map->insert(make_pair(tp->get_fd(), peer));
+
     if (ret.second == false)
-        throw DFatalException("");
-    ret.first->second->send_handshake();
+    {
+        delete peer;
+        gcomm_throw_fatal << "Failed to add peer to map";
+    }
+
+    peer->send_handshake();
 }
 
-void GMCast::gmcast_connect(const string& addr) 
+void GMCast::gmcast_connect(const string& remote_addr)
 {
-    if (addr == listen_addr)
-    {
-        return;
-    }
-    URI connect_uri(addr);
-    set_tcp_params(&connect_uri);
+    if (remote_addr == listen_addr) return;
+
+    URI connect_uri(remote_addr);
+
+    set_tcp_defaults (&connect_uri);
+
     Transport* tp = Transport::create(connect_uri, event_loop);
+
     try 
     {
         tp->connect();
     }
     catch (RuntimeException e)
     {
-        LOG_WARN(string("connect failed: ") + e.what());
+        log_warn << "Connect failed: " << e.what();
         delete tp;
         return;
     }
     
     tp->set_up_context(this, tp->get_fd());
-    std::pair<ProtoMap::iterator, bool> ret = 
-        proto_map->insert(
-            make_pair(tp->get_fd(), new GMCastProto(tp, listen_addr, 
-                                                    addr, get_uuid(), group_name)));
+
+    GMCastProto* peer = new GMCastProto (tp, listen_addr, remote_addr,
+                                         get_uuid(), group_name);
+
+    pair<ProtoMap::iterator, bool> ret = 
+        proto_map->insert(make_pair(tp->get_fd(), peer));
+
     if (ret.second == false)
-        throw DFatalException("");
+    {
+        delete peer;
+        gcomm_throw_fatal << "Failed to add peer to map";
+    }
+
     ret.first->second->wait_handshake();
 }
 
@@ -1071,23 +1169,24 @@ bool GMCast::is_connected(const string& addr, const UUID& uuid) const
     return false;
 }
 
-void GMCast::insert_address(const string& addr, const UUID& uuid,
-                            AddrList& alist)
+void GMCast::insert_address (const string& addr,
+                             const UUID&   uuid,
+                             AddrList&     alist)
 {
     if (addr == listen_addr)
     {
-        throw DRuntimeException("trying to add self to addr list");
+        gcomm_throw_fatal << "Trying to add self to addr list";
     }
-    
+
     if (alist.insert(make_pair(addr, 
                                Timing(Time::now(),
                                       Time::now(), uuid))).second == false)
     {
-        log_warn << "duplicate entry " << addr;
+        log_warn << "Duplicate entry: " << addr;
     }
     else
     {
-        log_debug << self_string() << " new address entry " << uuid.to_string()
+        log_debug << self_string() << ": new address entry " << uuid.to_string()
                   << ' ' << addr;
     }
 }

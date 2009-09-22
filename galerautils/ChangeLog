@@ -1,3 +1,10 @@
+2009-09-20 Alex 
+    Added RegEx class for matching strings with POSIX regular expressions.
+    Renamed URL class to URI to better reflect what it does.
+    Added get_host(), get_user() and get_port() methods and a unit test.
+    Modularized galerautils++ unit tests.
+    Version 0.3.5
+
 2009-09-17 Alex 
     Added gu_utils.hpp to hold general-purpose templates and functions
     (now with to_string() template functions).

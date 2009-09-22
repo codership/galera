@@ -24,7 +24,6 @@ class GMCastProto;
 
 class UUIDToAddressMap;
 
-
 class GMCastProtoMap;
 class GMCastNode;
 class GMCastMessage;
@@ -39,8 +38,9 @@ class GMCast : public Transport, EventContext
     ProtoMap* spanning_tree;
 
     /* */
-    Transport* listener;
-    string listen_addr;
+    Transport*  listener;
+    std::string listen_addr;
+    std::string initial_addr;
 
     static const long max_retry_cnt = 1 << 24;
 
@@ -49,19 +49,19 @@ class GMCast : public Transport, EventContext
         UUID uuid;
         Time last_seen;
         Time next_reconnect;
-        int retry_cnt;
-        Timing(const Time& last_seen_, const Time& next_reconnect_,
-            const UUID& uuid_) :
+        int  retry_cnt;
+
+        Timing(const Time& last_seen_,
+               const Time& next_reconnect_,
+               const UUID& uuid_)
+            :
             uuid(uuid_),
             last_seen(last_seen_),
             next_reconnect(next_reconnect_),
             retry_cnt(0)
-        {
-        }
+        {}
     };
     
-    std::string initial_addr;
-
     typedef map<const string, Timing > AddrList;
 
     AddrList pending_addrs;
@@ -189,7 +189,8 @@ public:
 
     size_t get_max_msg_size() const
     {
-        return 1024*1024;
+        return (65535 - 24 /* IPv4 */ - 60 /* TCP */);
+        // no point to have message bigger than TCP packet payload
     }
 
     void connect()

@@ -2,17 +2,18 @@
  * Default poll implementation 
  */
 
-#include "gcomm/event.hpp"
-#include "gcomm/logger.hpp"
-#include "gcomm/util.hpp"
-
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
 #include <cerrno>
 #include <poll.h>
+#include <string>
 #include <map>
 #include <iostream>
+
+#include "gcomm/event.hpp"
+#include "gcomm/logger.hpp"
+#include "gcomm/util.hpp"
 
 BEGIN_GCOMM_NAMESPACE
 
@@ -34,6 +35,34 @@ static inline int map_mask_to_event(const int m)
     return ret;
 }
 
+static std::string event_to_string (int e)
+{
+    if (Event::E_NONE == e) return "E_NONE";
+
+    std::string ret;
+
+    ret.reserve(32); // should be enough for most situations
+
+    if (e & Event::E_IN)
+    {                                                        ret += "E_IN";    }
+    if (e & Event::E_OUT)
+    {                        if (!ret.empty()) {ret += '|';} ret += "E_OUT";   }
+    if (e & Event::E_ERR)
+    {                        if (!ret.empty()) {ret += '|';} ret += "E_ERR";   }
+    if (e & Event::E_HUP)
+    {                        if (!ret.empty()) {ret += '|';} ret += "E_HUP";   }
+    if (e & Event::E_INVAL)
+    {                        if (!ret.empty()) {ret += '|';} ret += "E_INVAL"; }
+    if (e & Event::E_TIMED)
+    {                        if (!ret.empty()) {ret += '|';} ret += "E_TIMED"; }
+    if (e & Event::E_SIGNAL)
+    {                        if (!ret.empty()) {ret += '|';} ret += "E_SIGNAL";}
+    if (e & Event::E_USER)
+    {                        if (!ret.empty()) {ret += '|';} ret += "E_USER";  }
+
+    return ret;
+}
+
 static struct pollfd *pfd_find(struct pollfd *pfds, const size_t n_pfds, 
 			       const int fd)
 {
@@ -43,9 +72,6 @@ static struct pollfd *pfd_find(struct pollfd *pfds, const size_t n_pfds,
     }
     return 0;
 }
-
-
-
 
 void EventLoop::insert(const int fd, EventContext *pctx)
 {
@@ -83,43 +109,53 @@ void EventLoop::set(const int fd, const int e)
 {
     struct pollfd *pfd = 0;
 
-    if (fd < 0)
-    {
-        LOG_WARN("negative fd");
-    }
-    LOG_DEBUG("set " + make_int(fd).to_string());
+    if (fd < 0) gcomm_throw_fatal << "Negative fd: " << fd;
+    // was LOG_WARN("negative fd");
 
-    if ((pfd = pfd_find(pfds, n_pfds, fd)) == 0) {
-	++n_pfds;
-	struct pollfd* tmp = reinterpret_cast<struct pollfd *>(realloc(pfds, n_pfds*sizeof(struct pollfd)));
-        if (tmp == 0 && n_pfds > 0) {
-            throw FatalException("out of memory");
-        }
-        pfds = tmp;
-	pfd = &pfds[n_pfds - 1];
-	pfd->fd = fd;
-	pfd->events = 0;
+    log_debug << "Setting event(s) " << event_to_string(e) << " on fd " << fd;
+
+    if ((pfd = pfd_find(pfds, n_pfds, fd)) == 0)
+    {
+	void* tmp = realloc(pfds, (n_pfds + 1) * sizeof (struct pollfd));
+
+        if (tmp == 0 && n_pfds > 0) gcomm_throw_runtime (ENOMEM);
+
+        pfds = reinterpret_cast<struct pollfd *>(tmp);
+	pfd  = &pfds[n_pfds];
+
+	pfd->fd      = fd;
+	pfd->events  = 0;
 	pfd->revents = 0;
+
+	++n_pfds;
     }
+
     pfd->events |= map_event_to_mask(e);
 }
 
 void EventLoop::unset(const int fd, const int e)
 {
-    struct pollfd *pfd = 0;
-    LOG_DEBUG("unset " + make_int(fd).to_string() 
-              + " n_pfds " + make_int(n_pfds).to_string());
+    assert (e != Event::E_NONE);
 
-    if ((pfd = pfd_find(pfds, n_pfds, fd)) != 0) {
+    struct pollfd *pfd = 0;
+
+    log_debug << "Clearing event(s) " << event_to_string(e) << " from fd "<<fd; 
+
+    if ((pfd = pfd_find(pfds, n_pfds, fd)) != 0)
+    {
 	pfd->events &= ~map_event_to_mask(e);
-	if (pfd->events == 0) {
+
+	if (pfd->events == 0)
+        {
+	    memmove(&pfd[0], &pfd[1],
+                    (n_pfds - (pfd - pfds)) * sizeof(struct pollfd));
+
+	    void* tmp = realloc(pfds, n_pfds*sizeof(struct pollfd));
+
+            if (tmp == 0 && n_pfds > 0) gcomm_throw_runtime(ENOMEM);
+
+            pfds = reinterpret_cast<struct pollfd *>(tmp);
 	    --n_pfds;
-	    memmove(&pfd[0], &pfd[1], (n_pfds - (pfd - pfds))*sizeof(struct pollfd));
-	    struct pollfd* tmp = reinterpret_cast<struct pollfd *>(realloc(pfds, n_pfds*sizeof(struct pollfd)));
-            if (tmp == 0 && n_pfds > 0) {
-                throw FatalException("out of memory");
-            }
-            pfds = tmp;
 	}
     }
 

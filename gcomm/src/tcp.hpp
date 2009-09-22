@@ -16,11 +16,11 @@ class TCP : public Transport, EventContext
     int      no_nagle;
     sockaddr sa;
     size_t   sa_size;
+    size_t   recv_buf_size;
+    byte_t*  recv_buf;
+    size_t   recv_buf_offset;
     size_t   max_pending_bytes;
     size_t   pending_bytes;
-    byte_t*  recv_buf;
-    size_t   recv_buf_size;
-    size_t   recv_buf_offset;
     long     contention_tries;
     long     contention_tout;
     ReadBuf* recv_rb;
@@ -56,8 +56,11 @@ class TCP : public Transport, EventContext
 
     bool                        non_blocking;
 
-    void set_blocking_mode()
+#if 0 // there seems to be no point in this function, this must be done in
+      // constructor
+    void set_blocking_mode() throw (RuntimeException)
     {
+
         URIQueryList::const_iterator qli =
             uri.get_query_list().find(Conf::TcpParamNonBlocking);
 
@@ -70,7 +73,8 @@ class TCP : public Transport, EventContext
             }
         }
     }
-    
+#endif
+
     bool    is_non_blocking() const { return non_blocking; }
     
     int     recv_nointr();
@@ -87,37 +91,7 @@ public:
 
     TCP (const URI& uri_,
          EventLoop* event_loop_,
-         Monitor*   mon)
-        : 
-	Transport(uri_, event_loop_, mon), 
-        no_nagle(1),
-        sa(),
-        sa_size(),
-        max_pending_bytes(4*1024*1024), 
-        pending_bytes(0), 
-        recv_buf(),
-        recv_buf_size(),
-	recv_buf_offset(0), 
-        contention_tries(30),
-        contention_tout(10),
-        recv_rb(0),
-        up_rb(0),
-        pending(),
-        non_blocking(false) 
-    {
-        /* */
-	recv_buf_size = 65536;
-	recv_buf      = reinterpret_cast<byte_t*>(::malloc(recv_buf_size));
-        
-        const URIQueryList& ql(uri.get_query_list());
-        URIQueryList::const_iterator i = ql.find(Conf::TcpParamMaxPending);
-
-        if (i != ql.end())
-        {
-            max_pending_bytes = read_long(get_query_value(i));
-            log_debug << "max_pending_bytes: " << max_pending_bytes;
-        }
-    }
+         Monitor*   mon)         throw (RuntimeException);
 
     ~TCP ()
     {

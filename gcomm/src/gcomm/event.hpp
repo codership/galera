@@ -14,25 +14,22 @@
 /* Forward declarations */
 struct pollfd;
 
-
-
 BEGIN_GCOMM_NAMESPACE
 
-struct EventData
-{
-};
+struct EventData {};
 
 class Event
 {
-    int event_cause;
-    Time time;
+    int        event_cause;
+    Time       time;
     EventData* user_data;
-
 
     void operator=(const Event&);
 
 public:
-    enum {
+
+    enum
+    {
 	E_NONE   = 0,
 	E_IN     = 1 << 0,
 	E_OUT    = 1 << 1,
@@ -45,51 +42,43 @@ public:
 	E_ALL = E_IN | E_OUT | E_ERR | E_HUP | E_INVAL | E_TIMED | E_SIGNAL | E_USER
     };
 
-    Event(const Event& e) :
-        event_cause(e.event_cause),
-        time(e.time),
-        user_data(e.user_data)
+    Event(const Event& e)
+        :
+        event_cause (e.event_cause),
+        time        (e.time),
+        user_data   (e.user_data)
 
-    {
-    }
+    {}
     
-    Event(int cause) : 
-        event_cause(cause), 
-        time(),
-        user_data(0) 
-    {
-    }
+    Event(int cause) : event_cause(cause), time(), user_data(0) {}
     
-    Event(int cause, const Time& at, EventData* user_data_ = 0) :
-        event_cause(cause), 
-        time(at), 
-        user_data(user_data_) 
-    {
-    }
+    Event(int cause, const Time& at, EventData* user_data_ = 0)
+        :
+        event_cause (cause), 
+        time        (at), 
+        user_data   (user_data_) 
+    {}
 
-    int get_cause() const {
-        return event_cause;
-    }
+    int get_cause() const { return event_cause; }
 
-    Time get_time() const {
-        return time;
-    }
+    Time get_time() const { return time; }
 
-    EventData* get_user_data() const {
-        return user_data;
-    }
-
+    EventData* get_user_data() const { return user_data; }
 };
 
-class EventContext {
+
+class EventContext
+{
 protected:
+
     EventContext() {}
+
 public:
+
     virtual ~EventContext() {}
     virtual void handle_event(int, const Event&) = 0;
     virtual void handle_signal(int, int) {}
 };
-
 
 
 class EventLoop

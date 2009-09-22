@@ -21,11 +21,15 @@ include_HEADERS =      \
 	gu_options.h   \
 	galerautils.hpp  \
 	gu_exception.hpp \
+	gu_throw.hpp     \
 	gu_logger.hpp    \
 	gu_assert.hpp    \
+	gu_utils.hpp     \
+	gu_regex.hpp     \
 	gu_mutex.hpp     \
 	gu_cond.hpp      \
 	gu_lock.hpp      \
+	gu_uri.hpp       \
 	gu_network.hpp
 
 lib_LTLIBRARIES = libgalerautils.la
@@ -53,14 +57,15 @@ libgalerautils___la_SOURCES = \
 	gu_exception.cpp      \
 	gu_string.cpp         \
 	gu_logger.cpp         \
-	gu_url.cpp            \
+	gu_regex.cpp          \
+	gu_uri.cpp            \
 	gu_resolver.cpp	      \
 	gu_epoll.cpp	      \
 	gu_network.cpp        \
 	gu_prodcons.cpp
 
 
-INTERFACEPP = 3
+INTERFACEPP = 4
 REVISIONPP  = 0
 AGEPP       = 0
 libgalerautils___la_LDFLAGS = @AM_LDFLAGS@ \

@@ -1,12 +1,12 @@
 #ifndef _GCOMM_URI_HPP_
 #define _GCOMM_URI_HPP_
 
-#include <gu_url.hpp>
+#include <gu_uri.hpp>
 
 namespace gcomm
 {
-    typedef gu::URL URI;
-    typedef gu::URLQueryList URIQueryList;
+    typedef gu::URI URI;
+    typedef gu::URIQueryList URIQueryList;
 
     inline const std::string& get_query_key(URIQueryList::const_iterator& i)
     {

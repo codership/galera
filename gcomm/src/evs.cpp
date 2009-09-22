@@ -47,10 +47,13 @@ BEGIN_GCOMM_NAMESPACE
 // EVS interface
 /////////////////////////////////////////////////////////////////////////////
 
-void EVS::handle_up(const int cid, const ReadBuf* rb, const size_t roff, 
+void EVS::handle_up(const int          cid,
+                    const ReadBuf*     rb,
+                    const size_t       roff, 
                     const ProtoUpMeta* um)
 {
     Critical crit(mon);
+
     if (um->get_view() != 0 && um->get_view()->get_type() == View::V_REG)
     {
         /* Call close gmcast transport for all nodes that left 
@@ -61,6 +64,7 @@ void EVS::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
             tp->close(gcomm::get_uuid(i));
         }
     }
+
     pass_up(rb, roff, um);
 }
 
@@ -72,38 +76,42 @@ int EVS::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 
 
 void EVS::connect()
-{
-    
+{    
     Critical crit(mon);
 
     URI tp_uri = uri;
-    tp_uri.set_scheme(Conf::GMCastScheme);
+
+    tp_uri._set_scheme(Conf::GMCastScheme);
     tp = Transport::create(tp_uri, event_loop);
+
     if (tp->supports_uuid() == false)
     {
-        LOG_FATAL("Transport " + tp_uri.get_scheme() + " does not support UUID");
-        throw FatalException("UUID not supported by transport");
+        gcomm_throw_fatal << "Transport " << tp_uri.get_scheme()
+                          <<" does not support UUID";
     }
     
     tp->connect();
+
     UUID uuid = tp->get_uuid();
+
     if (uuid == UUID())
     {
-        LOG_FATAL("invalid UUID: " + uuid.to_string());
-        throw FatalException("invalid UUID");
+        gcomm_throw_fatal << "invalid UUID: " << uuid.to_string();
     }
+
     string name;
-    URIQueryList::const_iterator i = 
-        uri.get_query_list().find(Conf::NodeQueryName);
-    if (i == uri.get_query_list().end())
+
+    try
+    {
+        name = uri.get_option (Conf::NodeQueryName);
+    }
+    catch (gu::NotFound&)
     {
         name = uuid.to_string();
     }
-    else
-    {
-        name = get_query_value(i);
-    }
+
     proto = new EVSProto(event_loop, tp, uuid, name, mon);
+
     gcomm::connect(tp, proto);
     gcomm::connect(proto, this);
     proto->shift_to(EVSProto::S_JOINING);
@@ -178,31 +186,32 @@ size_t EVS::get_max_msg_size() const
     }
     else
     {
-        EVSUserMessage evsm(UUID(0, 0), 0xff, SAFE, 0, 0, 0, ViewId(UUID(), 0), 0);
+        EVSUserMessage evsm (UUID (0, 0), 0xff, SAFE, 0, 0, 0,
+                             ViewId(UUID(), 0), 0);
+
         if (tp->get_max_msg_size() < evsm.size())
         {
-            LOG_FATAL("transport max msg size too small: " +
-                      make_int(tp->get_max_msg_size()).to_string());
-            throw FatalException("");
+            gcomm_throw_fatal << "transport max msg size too small: "
+                              << tp->get_max_msg_size();
         }
+
         return tp->get_max_msg_size() - evsm.size();
     }
 }
 
 
-EVS::EVS(const URI& uri_, EventLoop* event_loop_, Monitor* mon_) :
-    Transport(uri_, event_loop_, mon_),
-    tp(0),
-    proto(0)
+EVS::EVS (const URI& uri_,
+          EventLoop* event_loop_,
+          Monitor*   mon_)
+    :
+    Transport (uri_, event_loop_, mon_),
+    tp        (0),
+    proto     (0)
 {
-    
     if (uri.get_scheme() != Conf::EvsScheme)
     {
-        LOG_FATAL("invalid uri: " + uri.to_string());
-        throw FatalException("invalid uri");
+        gcomm_throw_runtime (EINVAL) << "Invalid uri: " + uri.to_string();
     }
-
-
 }
 
 EVS::~EVS()

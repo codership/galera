@@ -7,7 +7,7 @@
 /* Galerautil C++ includes */
 #include "gu_network.hpp"
 #include "gu_resolver.hpp"
-#include "gu_url.hpp"
+#include "gu_uri.hpp"
 #include "gu_logger.hpp"
 #include "gu_epoll.hpp"
 
@@ -367,7 +367,7 @@ gu::net::Socket::~Socket()
  * Construct URL from string. If no scheme-authority separator is not 
  * found from string, string is prefixed with tcp scheme.
  */
-static gu::URL get_url(const string& str)
+static gu::URI get_url(const string& str)
 {
     string real_str;
     if (str.find("://") == string::npos)
@@ -378,13 +378,13 @@ static gu::URL get_url(const string& str)
     {
         real_str = str;
     }
-    return gu::URL(real_str);
+    return gu::URI(real_str);
 }
 
 /*
  * Fill in addrinfo according to addr URL
  */
-static void get_addrinfo(const gu::URL& url, struct addrinfo** ai)
+static void get_addrinfo(const gu::URI& url, struct addrinfo** ai)
 {
     string scheme = url.get_scheme();
     string addr = url.get_authority();
@@ -394,7 +394,7 @@ static void get_addrinfo(const gu::URL& url, struct addrinfo** ai)
 void gu::net::Socket::open_socket(const string& addr)
 {
     struct addrinfo* ai(0);    
-    URL url(get_url(addr));
+    URI url(get_url(addr));
     get_addrinfo(url, &ai);
     
     if (ai == 0 || ai->ai_addr == 0)
@@ -413,9 +413,9 @@ void gu::net::Socket::open_socket(const string& addr)
     
     freeaddrinfo(ai);
 
-
-    const URLQueryList& ql = url.get_query_list();
-    for (URLQueryList::const_iterator i = ql.begin(); i != ql.end(); ++i)
+#if 0 // with get_query_list()
+    const URIQueryList& ql = url._get_query_list();
+    for (URIQueryList::const_iterator i = ql.begin(); i != ql.end(); ++i)
     {
         Option<int> opt = get_option<int>(i->first, i->second);
         switch (opt.get_opt())
@@ -434,13 +434,27 @@ void gu::net::Socket::open_socket(const string& addr)
             throw std::logic_error("invalid option");
         }
     }
+#else // with get_option()
+    try
+    {
+        if (from_string<bool>(url.get_option("O_NON_BLOCKING")))
+        {
+            options |= O_NON_BLOCKING;
+        }
+        else
+        {
+            options &= ~O_NON_BLOCKING;
+        }
+    }
+    catch (NotFound&) {} // no option found, no modifications
+#endif
     
     if ((fd = ::socket(ai_family, ai_socktype, ai_protocol)) == -1)
     {
         throw std::runtime_error("could not create socket");
     }
     
-    if ((getopt() & O_NON_BLOCKING))
+    if (options & O_NON_BLOCKING)
     {
         if (::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
         {

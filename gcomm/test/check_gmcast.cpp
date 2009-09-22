@@ -18,8 +18,8 @@ static bool operator==(const GMCastNode& a, const GMCastNode& b)
 static bool operator==(const GMCastMessage& a, const GMCastMessage& b)
 {
     bool ret = a.get_version() == b.get_version() &&
-        a.get_type() == b.get_type() &&
-        a.get_ttl() == b.get_ttl() &&
+        a.get_type()  == b.get_type() &&
+        a.get_ttl()   == b.get_ttl() &&
         a.get_flags() == b.get_flags();
 
     if (ret == true && a.get_flags() & GMCastMessage::F_NODE_ADDRESS)
@@ -29,10 +29,10 @@ static bool operator==(const GMCastMessage& a, const GMCastMessage& b)
 
     if (ret == true && a.get_flags() & GMCastMessage::F_GROUP_NAME)
     {
-        const char* a_grp = a.get_group_name();
-        const char* b_grp = b.get_group_name();
-        fail_unless(!!a_grp && !!b_grp);
-        ret = ret && strcmp(a_grp, b_grp) == 0;
+        const string& a_grp = a.get_group_name();
+        const string& b_grp = b.get_group_name();
+//        fail_unless(!!a_grp && !!b_grp);
+        ret = ret && (a_grp == b_grp);
         // std::cerr << a_grp << "\n";
     }
 

@@ -17,6 +17,86 @@ using std::string;
 
 BEGIN_GCOMM_NAMESPACE
 
+TCP::TCP (const URI& uri_,
+          EventLoop* event_loop_,
+          Monitor*   mon)
+    throw (RuntimeException)
+    : 
+    Transport         (uri_, event_loop_, mon), 
+    no_nagle          (1),
+    sa                (),
+    sa_size           (),
+    recv_buf_size     (65536),
+    recv_buf          (reinterpret_cast<byte_t*>(::malloc(recv_buf_size))),
+    recv_buf_offset   (0),
+    max_pending_bytes (4*1024*1024), // do we really want it that big?
+    pending_bytes     (0),
+    contention_tries  (30),
+    contention_tout   (10),
+    recv_rb           (0),
+    up_rb             (0),
+    pending           (),
+    non_blocking      (false) 
+{
+    if (!recv_buf)
+    {
+        gcomm_throw_runtime (ENOMEM) << "Failed to allocate "
+                                     << recv_buf_size
+                                     << " bytes for recv_buf";
+    }
+
+#if 0 // with get_query_list       
+    const URIQueryList& ql(uri.get_query_list());
+    URIQueryList::const_iterator i = ql.find(Conf::TcpParamMaxPending);
+
+    if (i != ql.end())
+    {
+        max_pending_bytes = read_long(get_query_value(i));
+        log_debug << "max_pending_bytes: " << max_pending_bytes;
+    }
+#else // with get option
+    try
+    {
+        std::string val = uri.get_option (Conf::TcpParamMaxPending);
+
+        try
+        {
+            max_pending_bytes = gu::from_string<long>(val);
+            log_debug << "max_pending_bytes: " << max_pending_bytes;
+        }
+        catch (gu::NotFound&)
+        {
+            gcomm_throw_runtime (EINVAL) << "Invalid "
+                                         << Conf::TcpParamMaxPending
+                                         << " value '" << val << "'";
+        }
+    }
+    catch (gu::NotFound&) { /* no max_pending_bytes option spec'ed */ }
+#endif
+
+    try
+    {
+        std::string val = uri.get_option (Conf::TcpParamNonBlocking);
+
+        try
+        {
+            non_blocking = gu::from_string<bool>(val);
+
+            if (non_blocking)
+            {
+                log_debug << "Using non-blocking mode for " << uri.to_string();
+            }
+        }
+        catch (gu::NotFound&)
+        {
+            gcomm_throw_runtime (EINVAL) << "Invalid "
+                                         << Conf::TcpParamNonBlocking
+                                         << " value '" << val << "'";
+        }
+    }
+    catch (gu::NotFound&) { /* No non-blocking option slecified */ }
+}
+
 static inline void closefd(int fd)
 {
     while (::close(fd) == -1 && errno == EINTR) {}
@@ -123,7 +203,7 @@ void TCP::connect()
 
     tcp_addr_to_sa(uri.get_authority().c_str(), &sa, &sa_size);
 
-    set_blocking_mode();
+//    set_blocking_mode();
 
     if ((fd = ::socket(sa.sa_family, SOCK_STREAM, 0)) == -1)
 	gcomm_throw_runtime(errno);
@@ -205,8 +285,8 @@ void TCP::listen()
 
     if ((fd = ::socket(sa.sa_family, SOCK_STREAM, 0)) == -1)
 	gcomm_throw_runtime(errno);
-    
-    set_blocking_mode();
+
+//    set_blocking_mode();
 
     if (is_non_blocking() && ::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
 	gcomm_throw_runtime(errno);

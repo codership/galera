@@ -17,6 +17,7 @@
 
 BEGIN_GCOMM_NAMESPACE
 
+/* message context to pass up with the data buffer? */
 class ProtoUpMeta
 {
     const UUID    source;
@@ -58,96 +59,73 @@ public:
         view(0)
     {}
 
-    ~ProtoUpMeta()
-    {
-        delete view;
-    }
+    ~ProtoUpMeta() { delete view; }
 
-    const UUID& get_source() const
-    {
-        return source;
-    }
+    const UUID& get_source()    const { return source; }
 
-    uint8_t get_user_type() const
-    {
-        return user_type;
-    }
+    uint8_t     get_user_type() const { return user_type; }
 
-    int64_t get_to_seq() const
-    {
-        return to_seq;
-    }
+    int64_t     get_to_seq()    const { return to_seq; }
 
-    const View* get_view() const
-    {
-        return view;
-    }
+    const View* get_view()      const { return view; }
 };
 
+/* message context to pass down? */
 class ProtoDownMeta
 {
     const uint8_t user_type;
-public:
-    ProtoDownMeta(const uint8_t user_type_) :
-        user_type(user_type_)
-    {
-    }
 
-    uint8_t get_user_type() const
-    {
-        return user_type;
-    }
+public:
+
+    ProtoDownMeta(const uint8_t user_type_) : user_type(user_type_) {}
+
+    uint8_t get_user_type() const { return user_type; }
 };
 
-class Protolay {
-    int context_id;
+class Protolay
+{
+    int       context_id; // why there are two contexts but only one id?
     Protolay *up_context;
     Protolay *down_context;
-    bool released;
+    bool      released;
 
-    Protolay(const Protolay&);
-    void operator=(const Protolay&);
+    Protolay (const Protolay&);
+    Protolay& operator=(const Protolay&);
 
 protected:
-    Protolay() : 
-        context_id(-1),
-        up_context(0),
-        down_context(0),
-        released(false)
-    {
-    }
+
+    Protolay() : context_id(-1), up_context(0), down_context(0), released(false)
+    {}
 
 public:
+
     void release()
     {
-        up_context = 0;
+        up_context   = 0;
         down_context = 0;
-        released = true;
+        released     = true;
     }
     
-    virtual ~Protolay()
-    {
-    }
+    virtual ~Protolay() {}
 
-    virtual int handle_down(WriteBuf *, const ProtoDownMeta*) = 0;
-    virtual void handle_up(const int cid, const ReadBuf *, const size_t, const ProtoUpMeta*) = 0;
+    /* apparently handles data from upper layer. what is return value? */
+    virtual int  handle_down (WriteBuf *, const ProtoDownMeta*) = 0;
+
+    virtual void handle_up   (const int cid, const ReadBuf *,
+                              const size_t, const ProtoUpMeta*) = 0;
 
     
     void set_up_context(Protolay *up)
     {
-	if (up_context) {
-	    LOG_FATAL("Protolay::set_up_context(): Context already exists");
-	    throw FatalException("Up context already exists");
-	}
+	if (up_context) gcomm_throw_fatal << "Context already exists";
+
 	up_context = up;
     }
     
     void set_up_context(Protolay *up, const int id)
     {
-	if (up_context) {
-	    LOG_FATAL("Protolay::set_up_context(): Context already exists");
-	    throw FatalException("Up context already exists");	   
-	}
+	if (up_context) gcomm_throw_fatal << "Up context already exists";
+
 	context_id = id;
 	up_context = up;
     }
@@ -155,11 +133,10 @@ public:
     void change_up_context(Protolay* old_up, Protolay* new_up)
     {
         if (up_context != old_up) {
-            LOG_FATAL("Protolay::change_up_context(): old context does not match: " 
-                      + Pointer(old_up).to_string() 
-                      + " " 
-                      + Pointer(up_context).to_string());
-            throw FatalException("context mismatch");
+            gcomm_throw_fatal << "Context mismatch: " 
+                              << Pointer(old_up).to_string() 
+                              << " " 
+                              << Pointer(up_context).to_string();
         }
         
         up_context = new_up;
@@ -168,62 +145,74 @@ public:
     void change_down_context(Protolay* old_down, Protolay* new_down)
     {
         if (down_context != old_down) {
-            LOG_FATAL("Protolay::change_down_context(): old context does not match: " 
-                      + Pointer(old_down).to_string() 
-                      + " " 
-                      + Pointer(down_context).to_string());
-            throw FatalException("context mismatch");
+            gcomm_throw_fatal << "Context mismatch: " 
+                              << Pointer(old_down).to_string() 
+                              << " "
+                              << Pointer(down_context).to_string();
         }
+
         down_context = new_down;
     }
 
-    void set_down_context(Protolay *down, const int id) {
-	context_id = id;
+    void set_down_context(Protolay *down, const int id)
+    {
+	context_id   = id;
 	down_context = down;
     }
 
-    void set_down_context(Protolay *down) {
+    void set_down_context(Protolay *down)
+    {
 	down_context = down;
     }
-    
-    void pass_up(const ReadBuf *rb, const size_t roff, 
-		 const ProtoUpMeta *up_meta) {
+
+    /* apparently passed data buffer to the upper layer */
+    void pass_up(const ReadBuf *rb, const size_t roff,
+                 const ProtoUpMeta *up_meta)
+    {
 	if (!up_context) {
-	    LOG_FATAL("Protolay::pass_up(): "
-		      "Up context not defined, released = " 
-                      + make_int(released).to_string());
-	    throw FatalException("Up context not defined");
+	    gcomm_throw_fatal << "Up context not defined, released = " 
+                              << released;
 	}
         
 	up_context->handle_up(context_id, rb, roff, up_meta);
     }
 
-    int pass_down(WriteBuf *wb, const ProtoDownMeta *down_meta) {
+    /* apparently passes data buffer to lower layer, what is return value? */
+    int pass_down(WriteBuf *wb, const ProtoDownMeta *down_meta)
+    {
 	if (!down_context) {
-	    LOG_FATAL("Protolay::pass_down(): Down context not defined, "
-                      "released = " + make_int(released).to_string());
-	    throw FatalException("Down context not defined");
+	    gcomm_throw_fatal << "Down context not defined, released = "
+                              << released;
 	}
 
 	// Simple guard of wb consistency in form of testing 
 	// writebuffer header length. 
 	size_t down_hdrlen = wb->get_hdrlen();
-	int ret = down_context->handle_down(wb, down_meta);
+	int    ret         = down_context->handle_down(wb, down_meta);
+
 	if (down_hdrlen != wb->get_hdrlen())
-	    throw FatalException("hdr not rolled back");
+        {
+            gcomm_throw_fatal << "hdr not rolled back";
+        }
+
 	return ret;
     }    
 };
 
-class Toplay : public Protolay {
-    int handle_down(WriteBuf *wb, const ProtoDownMeta *) {
-	throw FatalException("Toplay handle_down() called");
-	return 0;
+class Toplay : public Protolay
+{
+    int handle_down(WriteBuf *wb, const ProtoDownMeta *)
+    {
+	gcomm_throw_fatal << "Toplay handle_down() called";
+	throw;
     }
 };
 
-class Bottomlay : public Protolay {
-    void handle_up(const int, const ReadBuf *, const size_t, const ProtoUpMeta *) {
+class Bottomlay : public Protolay
+{
+    void handle_up(const int, const ReadBuf *, const size_t,
+                   const ProtoUpMeta *)
+    {
 	throw FatalException("Bottomlay handle_up() called");
     }
 };

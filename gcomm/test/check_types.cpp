@@ -12,6 +12,8 @@
 #include <iostream>
 #include <stdexcept>
 
+#include <galerautils.hpp>
+
 using std::pair;
 using std::make_pair;
 
@@ -73,10 +75,7 @@ START_TEST(test_uri)
         URI too_simple("http");
         fail("too simple accepted");
     }
-    catch (std::invalid_argument& e)
-    {
-
-    }
+    catch (gu::Exception& e) {}
 
     URI empty_auth("http://");
     fail_unless(empty_auth.get_scheme() == "http");
@@ -86,20 +85,20 @@ START_TEST(test_uri)
     fail_unless(simple_valid1.get_scheme() == "http");
     fail_unless(simple_valid1.get_authority() == "example.com");
     fail_unless(simple_valid1.get_path() == "");
-    fail_unless(simple_valid1.get_query_list().size() == 0);
+    fail_unless(simple_valid1._get_query_list().size() == 0);
 
     URI with_path("http://example.com/path/to/file.html");
     fail_unless(with_path.get_scheme() == "http");
     fail_unless(with_path.get_authority() == "example.com");
     fail_unless(with_path.get_path() == "/path/to/file.html");
-    fail_unless(with_path.get_query_list().size() == 0);
+    fail_unless(with_path._get_query_list().size() == 0);
 
     URI with_query("http://example.com?key1=val1&key2=val2");
     fail_unless(with_query.get_scheme() == "http");
 
     fail_unless(with_query.get_authority() == "example.com");
     fail_unless(with_query.get_path() == "");
-    const URIQueryList& qlist = with_query.get_query_list();
+    const URIQueryList& qlist = with_query._get_query_list();
     fail_unless(qlist.size() == 2);
 
     URIQueryList::const_iterator i;
@@ -111,7 +110,7 @@ START_TEST(test_uri)
     URI with_uri_in_query("gcomm+gmcast://localhost:10001?gmcast.node=gcomm+tcp://localhost:10002&gmcast.node=gcomm+tcp://localhost:10003");
     fail_unless(with_uri_in_query.get_scheme() == "gcomm+gmcast");
     fail_unless(with_uri_in_query.get_authority() == "localhost:10001");
-    const URIQueryList& qlist2 = with_uri_in_query.get_query_list();
+    const URIQueryList& qlist2 = with_uri_in_query._get_query_list();
     fail_unless(qlist2.size() == 2);
 
     pair<URIQueryList::const_iterator,
@@ -138,7 +137,7 @@ START_TEST(test_uri)
     // Check rewriting
 
     URI rew("gcomm+gmcast://localhost:10001/foo/bar.txt?k1=v1&k2=v2");
-    rew.set_scheme("gcomm+tcp");
+    rew._set_scheme("gcomm+tcp");
     fail_unless(rew.to_string() == "gcomm+tcp://localhost:10001/foo/bar.txt?k1=v1&k2=v2");
 }
 END_TEST

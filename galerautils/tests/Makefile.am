@@ -3,7 +3,7 @@
 AM_CPPFLAGS = @AM_CPPFLAGS@ @CHECK_CFLAGS@ -I$(top_srcdir)/src
 
 #noinst_PROGRAMS   = gu_tests gu_to_test gu_testspp
-noinst_PROGRAMS   = gu_tests gu_to_test
+noinst_PROGRAMS   = gu_tests gu_to_test gu_testspp
 
 gu_tests_SOURCES  = \
 	gu_tests.c                              \
@@ -16,9 +16,14 @@ gu_tests_SOURCES  = \
 	gu_options_test.c   gu_options_test.h   \
 	gu_lock_step_test.c gu_lock_step_test.h
 
-gu_tests_LDADD    = ../src/libgalerautils.la @CHECK_LIBS@ -lm
+gu_tests_LDADD   = ../src/libgalerautils.la @CHECK_LIBS@ -lm
+gu_tests_LDFLAGS = @AM_LDFLAGS@ -static
 
-gu_testspp_SOURCES = gu_tests++.cpp
+gu_testspp_SOURCES = \
+	gu_tests++.cpp  gu_tests++.hpp  \
+	gu_uri_test.cpp gu_uri_test.hpp \
+	gu_net_test.cpp gu_net_test.hpp
+
 gu_testspp_LDADD = \
 	$(top_builddir)/src/libgalerautils.la \
 	$(top_builddir)/src/libgalerautils++.la @CHECK_LIBS@

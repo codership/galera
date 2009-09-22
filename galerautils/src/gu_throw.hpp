@@ -99,7 +99,7 @@ namespace gu
 // Usage: gu_throw_xxxxx << msg1 << msg2 << msg3;
 
 #define gu_throw_error(err_)                                    \
-    gu::ThrowError(__FILE__, __FUNCTION__, __LINE__, err).msg()
+    gu::ThrowError(__FILE__, __FUNCTION__, __LINE__, err_).msg()
 
 #define gu_throw_fatal                                          \
     gu::ThrowFatal(__FILE__, __FUNCTION__, __LINE__).msg()
