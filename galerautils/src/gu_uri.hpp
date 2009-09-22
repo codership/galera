@@ -167,6 +167,7 @@ namespace gu
 
         /*!
          * @brief Get URI query list
+         *        It seems that this is needed only in unit tests
          */
         const URIQueryList& _get_query_list() const { return query_list; }
 
