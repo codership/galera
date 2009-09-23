@@ -504,7 +504,7 @@ public:
 		      const EVSRange& range,
                       const uint32_t safe_seq) 
     {
-	std::pair<std::map<UUID, Instance>::iterator, bool> i = 
+	std::pair<InstMap::iterator, bool> i = 
 	    instances->insert(make_pair(
 				  pid, 
 				  Instance(pid, 
@@ -513,7 +513,7 @@ public:
 					   view_id, 
                                            range, safe_seq)));
 	if (i.second == false)
-	    throw FatalException("");
+	    gcomm_throw_fatal << "Failed to add instance " << pid.to_string();
     }
     
     
@@ -679,15 +679,19 @@ public:
 	return off;
     }
     
-    size_t size() const {
+    size_t size() const
+    {
         size_t source_size = flags & F_SOURCE ? source.size() : 0;
+
 	switch (type) {
         case NONE:
-            throw FatalException("");
+            gcomm_throw_fatal << "Invalid message type NONE";
 	case USER:
-	    return 4 + 4 + 4 + source_size + source_view.size(); // bits + seq + aru_seq + view
+            // bits + seq + aru_seq + view
+	    return 4 + 4 + 4 + source_size + source_view.size();
 	case GAP:
-	    return 4 + 4 + 4 + source_size + source_view.size() + gap.size(); // bits + seq + aru_seq + view + gap
+            // bits + seq + aru_seq + view + gap
+	    return 4 + 4 + 4 + source_size + source_view.size() + gap.size();
 	case DELEGATE:
 	    return 4 + source.size(); // 
 	case JOIN:
@@ -702,9 +706,12 @@ public:
     }
     
     mutable unsigned char hdrbuf[64];
-    const byte_t* get_hdr() const {
+
+    const byte_t* get_hdr() const
+    {
 	if (write(hdrbuf, sizeof(hdrbuf), 0) == 0)
-	    throw FatalException("Short buffer");
+	    gcomm_throw_fatal << "Short buffer";
+
 	return hdrbuf;
     }
 

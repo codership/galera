@@ -35,8 +35,9 @@ void Timer::set(TimerHandler* h, const Period& p)
     
     std::pair<TimerMap::iterator, bool> tret = 
 	timer_map.insert(TimerPair(h->get_name(), eret));
-    if (tret.second == false)
-	throw FatalException("Timer already set");
+
+    if (tret.second == false) gcomm_throw_fatal << "Timer already set";
+
     event_loop->queue_event(fd, Event(Event::E_USER, Time::now() + p));
 }
 

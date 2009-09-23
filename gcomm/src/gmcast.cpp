@@ -661,7 +661,7 @@ public:
             {
                 log_debug << "Handshake failed, my group: '" << group_name
                           << "', peer group: '" << grp << "'";
-                throw std::exception();
+                throw false;
             }
 
             remote_uuid = hs.get_source_uuid();
@@ -1206,19 +1206,22 @@ typedef pair<int, int> E;
 static inline int find_safe(const map<const UUID, int>& m, const UUID& val)
 {
     map<const UUID, int>::const_iterator i = m.find(val);
+
     if (i == m.end())
     {
-        LOG_FATAL(string("missing UUID ") + val.to_string());
-        throw DFatalException("");
+        gcomm_throw_fatal << "Missing UUID " << val.to_string();
     }
+
     return i->second;
 }
 
-static inline const UUID& find_safe(const map<const int, UUID>& m, const int val)
+static inline const UUID& find_safe(const map<const int, UUID>& m,
+                                    const int val)
 {
     map<const int, UUID>::const_iterator i = m.find(val);
-    if (i == m.end())
-        throw DFatalException("");
+
+    if (i == m.end()) gcomm_throw_fatal << "Not found: " << val;
+
     return i->second;
 }
 
@@ -1230,25 +1233,31 @@ void GMCast::compute_spanning_tree(const UUIDToAddressMap& uuid_map)
     map<const int, UUID> idx_to_uuid;
     map<const UUID, pair<const int, GMCastProto*> > uuid_to_proto;
     
-    if (uuid_to_idx.insert(pair<const UUID, int>(get_uuid(), 0)).second == false)
-        throw DFatalException("");
-    if (idx_to_uuid.insert(pair<const int, UUID>(0, get_uuid())).second == false)
-        throw DFatalException("");
+    if (uuid_to_idx.insert(pair<const UUID, int>(get_uuid(), 0)).second ==
+        false)
+        gcomm_throw_fatal << "Insert to uuid_to_idx failed";
+
+    if (idx_to_uuid.insert(pair<const int, UUID>(0, get_uuid())).second ==
+        false)
+        gcomm_throw_fatal << "Insert to idx_to_uuid failed";
+
     int n = 1;
+
     for (UUIDToAddressMap::const_iterator i = uuid_map.begin();
          i != uuid_map.end(); ++i)
     {
         if (uuid_to_idx.insert(make_pair(i->first, n)).second == true)
         {
             if (idx_to_uuid.insert(make_pair(n, i->first)).second == false)
-                throw DFatalException("");
+                gcomm_throw_fatal;
             ++n;
         }
     }
     
     /* Construct lists of edges and weights */
-    list<E> edges;
+    list<E>   edges;
     list<int> weights;
+
     for (ProtoMap::const_iterator i = proto_map->begin(); i != proto_map->end();
          ++i)
     {
@@ -1303,17 +1312,21 @@ void GMCast::compute_spanning_tree(const UUIDToAddressMap& uuid_map)
         {
             // Edge start vertex is self
             
-            map<const UUID, pair<const int, GMCastProto*> >::const_iterator up_target = 
+            map<const UUID, pair<const int, GMCastProto*> >::const_iterator
+                up_target = 
                 uuid_to_proto.find(find_safe(idx_to_uuid, target(*ei, graph)));
             
             if (up_target != uuid_to_proto.end())
             {
                 // std::cerr << up_target->second.first << " ";
                 if (spanning_tree->insert(
-                        make_pair(up_target->second.first, 
-                                  up_target->second.second)).second == false)
-                    throw DFatalException("");
+//                        make_pair(up_target->second.first, 
+//                                  up_target->second.second)).second == false)
+                        up_target->second).second == false)
+                    gcomm_throw_fatal << "Adding connection to spanning tree"
+                                      << " failed";
             }
+
             st.erase(ei);
         }
     }
@@ -1353,10 +1366,6 @@ void GMCast::compute_spanning_tree(const UUIDToAddressMap& uuid_map)
 
 }
 
-
-
-
-
 void GMCast::update_addresses()
 {
     UUIDToAddressMap uuid_map;
@@ -1366,17 +1375,16 @@ void GMCast::update_addresses()
     for (ProtoMap::iterator i = proto_map->begin(); i != proto_map->end(); ++i)
     {
         GMCastProto* rp = ProtoMap::get_value(i);
+
         if (rp->get_state() == GMCastProto::S_OK)
         {
             if (rp->get_remote_addr() == "" || rp->get_remote_uuid() == UUID())
             {
-                LOG_ERROR("this: " 
-                          + get_uuid().to_string() + " " 
-                          + listen_addr 
-                          + " remote: "
-                          + i->second->get_remote_uuid().to_string() + " "
-                          + i->second->get_remote_addr());
-                throw DFatalException("protocol error");
+                gcomm_throw_fatal << "Protocol error: local: " 
+                                  << get_uuid().to_string() << " "
+                                  << listen_addr << ", remote: "
+                                  << rp->get_remote_uuid().to_string()
+                                  << " '" << rp->get_remote_addr() << "'";
             }
             
             if (exists(uuid_map, rp->get_remote_uuid(), 
@@ -1389,7 +1397,7 @@ void GMCast::update_addresses()
             if (remote_addrs.find(rp->get_remote_addr()) == remote_addrs.end())
             {
                 log_warn << "proto exists but no addr on addr list for "
-                         << i->second->get_remote_addr();
+                         << rp->get_remote_addr();
                 insert_address(rp->get_remote_addr(), rp->get_remote_uuid(), 
                                remote_addrs);
             }
@@ -1410,28 +1418,29 @@ void GMCast::update_addresses()
     for (ProtoMap::iterator i = proto_map->begin(); i != proto_map->end(); ++i)
     {
         GMCastProto* rp = ProtoMap::get_value(i);
+
         if (rp->get_state() == GMCastProto::S_OK)
         {
-            for (UUIDToAddressMap::const_iterator 
-                     j = rp->get_uuid_map().begin(); 
+            for (UUIDToAddressMap::const_iterator j=rp->get_uuid_map().begin();
                  j != rp->get_uuid_map().end(); ++j)
             {
                 if (j->second == "" || j->first == UUID())
                 {
-                    LOG_ERROR("this: " 
-                              + get_uuid().to_string() + " " 
-                              + listen_addr 
-                              + " remote: "
-                              + i->second->get_remote_uuid().to_string() + " "
-                              + i->second->get_remote_addr() + " "
-                              + j->first.to_string() + " "
-                              + j->second);
-                    throw DFatalException("protocol error");
+                    gcomm_throw_fatal << "Protocol error: local: "
+                                      << get_uuid().to_string()
+                                      << " " << listen_addr
+                                      << ", remote: "
+                                      << rp->get_remote_uuid().to_string()
+                                      << " " << rp->get_remote_addr() << " "
+                                      << j->first.to_string() << " "
+                                      << j->second;
                 }
+
                 if (exists(uuid_map, j->first, j->second) == false)
                 {
                     uuid_map.insert(make_pair(j->first, j->second));
                 }
+
                 if (j->first != get_uuid() &&
                     remote_addrs.find(j->second) == remote_addrs.end() &&
                     pending_addrs.find(j->second) == pending_addrs.end())
@@ -1439,7 +1448,8 @@ void GMCast::update_addresses()
                     log_debug << "proto refers but no addr on addr list for "
                               << j->second;
                     insert_address(j->second, j->first, pending_addrs);
-                    set_retry_cnt(pending_addrs.find(j->second), max_retry_cnt - 60);
+                    set_retry_cnt(pending_addrs.find(j->second),
+                                  max_retry_cnt - 60);
                 }
             }
         }
@@ -1521,7 +1531,8 @@ void GMCast::reconnect()
 void GMCast::handle_event(const int fd, const Event& pe) 
 {
     Critical crit(mon);
-    LOG_DEBUG("handle event");
+
+    log_debug << "handle event";
 
     update_addresses();
     reconnect();
@@ -1534,19 +1545,25 @@ void GMCast::handle_event(const int fd, const Event& pe)
 void GMCast::forward_message(const int cid, const ReadBuf* rb, 
                              const size_t offset, const GMCastMessage& msg)
 {
-
+    // @todo: how about wb (rb, offset)?
     WriteBuf wb(rb->get_buf(offset), rb->get_len(offset));
     byte_t buf[20];
     size_t hdrlen;
+
     if ((hdrlen = msg.write(buf, sizeof(buf), 0)) == 0)
-        throw DFatalException("");
+        gcomm_throw_fatal << "Write header failed";
+
     wb.prepend_hdr(buf, hdrlen);
-    for (ProtoMap::iterator i = spanning_tree->begin(); i != spanning_tree->end();
-         ++i)
+
+    for (ProtoMap::iterator i = spanning_tree->begin();
+         i != spanning_tree->end(); ++i)
     {
         if (i->first != cid)
         {
-            LOG_DEBUG(string("forwarding message ") + msg.get_source_uuid().to_string() + " -> " + i->second->get_remote_uuid().to_string());
+            log_debug << "Forwarding message "
+                      << msg.get_source_uuid().to_string() << " -> "
+                      << i->second->get_remote_uuid().to_string();
+
             i->second->get_transport()->handle_down(&wb, 0);
         }
     }
@@ -1670,7 +1687,7 @@ int GMCast::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
         size_t wlen;
 
         if ((wlen = msg.write(hdrbuf, sizeof(hdrbuf), 0)) == 0)
-            throw DFatalException("short buffer");
+            gcomm_throw_fatal << "short buffer";
 
         if (msg.get_ttl() > 1)
         {

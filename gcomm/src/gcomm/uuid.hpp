@@ -84,15 +84,19 @@ public:
         if (*val != 0 &&
             memcmp(val + 1, buf, sizeof(uuid) - sizeof(int32_t)) == 0)
         {
-            return make_int(*val).to_string();
+            // if all of UUID is contained in the first 4 bytes
+            return gu::to_string(*val);
         }
         else
         {
-#define GU_CPP_UUID_FORMAT "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
-            if (36 != snprintf(buf, sizeof(buf), GU_CPP_UUID_FORMAT,
-                               GU_UUID_ARGS(&uuid)))
+#define GU_CPP_UUID_FORMAT \
+          "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
+            int const ret = snprintf(buf, sizeof(buf), GU_CPP_UUID_FORMAT,
+                                     GU_UUID_ARGS(&uuid));
+            // @todo: this is a rather unwarranted check
+            if (36 != ret)
             {
-                throw FatalException("");
+                gcomm_throw_fatal << "Failed to write UUID";
             }
 #undef GU_CPP_UUID_FORMAT
             return std::string(buf);

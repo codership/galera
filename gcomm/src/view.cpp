@@ -114,25 +114,20 @@ string View::to_string(const Type type) const
 {
     switch (type)
     {
-    case V_TRANS:
-        return "TRANS";
-    case V_REG:
-        return "REG";
-    case V_NON_PRIM:
-        return "NON_PRIM";
-    case V_PRIM:
-        return "PRIM";
+    case V_TRANS:    return "TRANS";
+    case V_REG:      return "REG";
+    case V_NON_PRIM: return "NON_PRIM";
+    case V_PRIM:     return "PRIM";
     default:
-        break;
-        /* Fall through to exception */
+        gcomm_throw_fatal << "Invalid type value"; throw;
     }
-    throw FatalException("invalid type value");
 }
 
 string View::pid_to_string(const UUID& pid) const
 {
     string ret;
     NodeList::const_iterator i = members.find(pid);
+
     if (i != members.end())
     {
         ret = get_name(i);
@@ -148,13 +143,16 @@ string View::pid_to_string(const UUID& pid) const
     else
     {
         string str = "view_id: " + view_id.to_string() + " ";
+
         for (i = members.begin(); i != members.end(); ++i)
         {
             str += "memb: " + get_uuid(i).to_string() + ":" + get_name(i) + " ";
         }
-        LOG_FATAL("pid '" + pid.to_string() + "' not in view: " + str);
-        throw FatalException("");
+
+        gcomm_throw_fatal << "pid '" << pid.to_string() << "' not in view: "
+                          << str;
     }
+
     return ret;
 }
 
@@ -162,19 +160,19 @@ void View::add_member(const UUID& pid, const string& name)
 {
     if (members.insert(make_pair(pid, name)).second == false)
     {
-        LOG_FATAL("member " + pid.to_string() + " already exists");
-        throw FatalException("member already exists");
+        gcomm_throw_fatal << "Member " << pid.to_string() << " already exists";
     }
 }
     
-void View::add_members(NodeList::const_iterator begin, NodeList::const_iterator end)
+void View::add_members(NodeList::const_iterator begin,
+                       NodeList::const_iterator end)
 {
     for (NodeList::const_iterator i = begin; i != end; ++i)
     {
         if (members.insert(make_pair(get_uuid(i), get_name(i))).second == false)
         {
-            LOG_FATAL("member " + get_uuid(i).to_string() + " already exists");
-            throw FatalException("member already exists");
+            gcomm_throw_fatal << "Member " << get_uuid(i).to_string()
+                              << " already exists";
         }
     }
 }
@@ -183,8 +181,7 @@ void View::add_joined(const UUID& pid, const string& name)
 {
     if (joined.insert(make_pair(pid, name)).second == false)
     {
-        LOG_FATAL("joiner " + pid.to_string() + " already exists");
-        throw FatalException("joiner already exists");
+        gcomm_throw_fatal << "Joiner " << pid.to_string() << " already exists";
     }
 }
     
@@ -192,8 +189,7 @@ void View::add_left(const UUID& pid, const string& name)
 {
     if (left.insert(make_pair(pid, name)).second == false)
     {
-        LOG_FATAL("leaver " + pid.to_string() + " already exists");
-        throw FatalException("leaver already exists");
+        gcomm_throw_fatal << "Leaving " << pid.to_string() << " already exists";
     }
 }
 
@@ -201,8 +197,8 @@ void View::add_partitioned(const UUID& pid, const string& name)
 {
     if (partitioned.insert(make_pair(pid, name)).second == false)
     {
-        LOG_FATAL("partitioned " + pid.to_string() + " already exists");
-        throw FatalException("partitioned already exists");
+        gcomm_throw_fatal << "Partitioned " << pid.to_string()
+                          << " already exists";
     }
 }
     
@@ -255,11 +251,11 @@ bool View::is_empty() const
 
 bool operator==(const View& a, const View& b)
 {
-    return a.get_id() == b.get_id() && 
-        a.get_type() == b.get_type() &&
+    return a.get_id()   == b.get_id() && 
+        a.get_type()    == b.get_type() &&
         a.get_members() == b.get_members() &&
-        a.get_joined() == b.get_joined() &&
-        a.get_left() == b.get_left() &&
+        a.get_joined()  == b.get_joined() &&
+        a.get_left()    == b.get_left() &&
         a.get_partitioned() == b.get_partitioned();
 }
 

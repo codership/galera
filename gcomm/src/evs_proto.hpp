@@ -49,8 +49,7 @@ struct EVSInstance
         tstamp(Time::now()),
         prev_range(SEQNO_MAX, SEQNO_MAX),
         fifo_seq(-1)
-    {
-    }
+    {}
 
     EVSInstance(const EVSInstance& i) :
         operational(i.operational),

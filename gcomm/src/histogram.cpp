@@ -12,29 +12,34 @@ using std::ostringstream;
 
 BEGIN_GCOMM_NAMESPACE
 
-Histogram::Histogram(const string& vals) :
+Histogram::Histogram(const string& vals)
+    :
     cnt()
 {
-
     vector<string> varr = strsplit(vals, ',');
 
     for (vector<string>::const_iterator i = varr.begin(); i != varr.end(); ++i)
     {
         double val;
+
         istringstream is(*i);
         is >> val;
+
         if (is.fail())
         {
-            throw FatalException("parse error");
+            gcomm_throw_fatal << "Parse error";
         }
+
         if (cnt.insert(make_pair(val, 0)).second == false)
         {
-            throw FatalException("");
+            gcomm_throw_fatal << "Failed to insert value: " << val;
         }
     }
-    if (cnt.insert(make_pair(std::numeric_limits<double>::max(), 0)).second == false)
+
+    if (cnt.insert(
+            make_pair(std::numeric_limits<double>::max(), 0)).second == false)
     {
-        throw FatalException("");
+        gcomm_throw_fatal << "Failed to insert numeric_limits<double>::max()";
     }
 }
 
@@ -42,15 +47,17 @@ void Histogram::insert(const double val)
 {
     if (val < 0.0)
     {
-        LOG_WARN("negative value (" 
-                 + Double(val).to_string() + "), discarding");
+        log_warn << "Negative value (" << val << "), discarding";
         return;
     }
+
     map<const double, uint64_t>::iterator i = cnt.lower_bound(val);
+
     if (i == cnt.end())
     {
-        throw FatalException("");
+        gcomm_throw_fatal;
     }
+
     i->second++;
 }
 

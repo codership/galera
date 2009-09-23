@@ -14,6 +14,7 @@ BEGIN_GCOMM_NAMESPACE
 class PCProto : public Protolay
 {
 public:
+
     enum State 
     {
         S_CLOSED, 
@@ -26,7 +27,7 @@ public:
         S_MAX
     };
     
-    const string to_string(const State s) const
+    static string to_string(const State s)
     {
         switch (s)
         {
@@ -38,7 +39,7 @@ public:
         case S_PRIM:        return "PRIM";
         case S_NON_PRIM:    return "NON_PRIM";
         default:
-            throw DFatalException("invalid state");
+            gcomm_throw_fatal << "Invalid state"; throw;
         }
     }
 
@@ -116,30 +117,31 @@ public:
     PCProto(const UUID& uuid_, 
             EventLoop*  el_, 
             Monitor*    mon_, 
-            const bool  start_prim_) :
-        uuid(uuid_),
-        el(el_),
-        mon(mon_),
-        start_prim(start_prim_),
-        state(S_CLOSED),
-        instances(),
-        self_i(),
-        state_msgs(),
-        current_view(),
-        views()
+            const bool  start_prim_)
+        :
+        uuid         (uuid_),
+        el           (el_),
+        mon          (mon_),
+        start_prim   (start_prim_),
+        state        (S_CLOSED),
+        instances    (),
+        self_i       (),
+        state_msgs   (),
+        current_view (),
+        views        ()
     {
         std::pair<PCInstMap::iterator, bool> iret;
+
         if ((iret = instances.insert(
                  std::make_pair(uuid, PCInst()))).second == false)
         {
-            throw DFatalException("");
+            gcomm_throw_fatal << "Failed to insert myself into instance map";
         }
+
         self_i = iret.first;
     }
     
-    ~PCProto() 
-    {
-    }
+    ~PCProto() {}
 
     string self_string() const
     {

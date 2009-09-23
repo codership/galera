@@ -14,9 +14,9 @@ void set_seqno_max(const uint32_t val)
 {
     if (val > MAX_SEQNO_MAX)
     {
-        LOG_FATAL("seqno max too large: " + make_int(val).to_string());
-        throw FatalException("seqno max too large");
+        gcomm_throw_fatal << "Seqno max too large: " << val;
     }
+
     if (val != 0)
     {
         _SEQNO_MAX = val;

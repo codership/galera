@@ -16,9 +16,9 @@ class PCInst
     enum Flags { F_PRIM = 0x1 };
 
     bool    prim;
-    int32_t last_seq;
+    int32_t last_seq;  // what is this seqno?
     ViewId  last_prim;
-    int64_t to_seq;
+    int64_t to_seq;    // what is this seqno?
 
 public:
 
@@ -27,7 +27,8 @@ public:
     PCInst(const bool     prim_,
            const uint32_t last_seq_,
            const ViewId&  last_prim_, 
-           const int64_t  to_seq_) :
+           const int64_t  to_seq_)
+        :
         prim      (prim_),
         last_seq  (last_seq_),
         last_prim (last_prim_),
@@ -99,13 +100,16 @@ public:
 
         b |= prim ? F_PRIM : 0;
 
-        if ((off = gcomm::write(b, buf, buflen, off)) == 0)        return 0;
+        if ((off = gcomm::write(b, buf, buflen, off)) == 0)
+            gcomm_throw_fatal;
 
-        if ((off = gcomm::write(last_seq, buf, buflen, off)) == 0) return 0;
+        if ((off = gcomm::write(last_seq, buf, buflen, off)) == 0)
+            gcomm_throw_fatal;
 
-        if ((off = last_prim.write(buf, buflen, off)) == 0)        return 0;
+        gu_trace (off = last_prim.write(buf, buflen, off));
 
-        if ((off = gcomm::write(to_seq, buf, buflen, off)) == 0)   return 0;
+        if ((off = gcomm::write(to_seq, buf, buflen, off)) == 0)
+            gcomm_throw_fatal;
 
         return off;
     }
@@ -145,14 +149,12 @@ public:
 
 private:
 
-    int      version;
-    Type     type;
-    uint32_t seq;
-    
-private:
-
+    int        version;
+    Type       type;
+    uint32_t   seq;
     PCInstMap* inst;
-    void operator=(const PCMessage&);
+
+    PCMessage& operator=(const PCMessage&);
 
 public:
 
@@ -160,7 +162,8 @@ public:
     
     PCMessage(const int      version_, 
               const Type     type_,
-              const uint32_t seq_) :
+              const uint32_t seq_)
+        :
         version(version_),
         type   (type_),
         seq    (seq_),
@@ -172,7 +175,8 @@ public:
         }
     }
     
-    PCMessage(const PCMessage& msg) :
+    PCMessage(const PCMessage& msg)
+        :
         version (msg.version),
         type    (msg.type),
         seq     (msg.seq),
@@ -183,7 +187,7 @@ public:
     
     size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
     {
-        size_t off;
+        size_t   off;
         uint32_t b;
 
         delete inst;
@@ -221,11 +225,13 @@ public:
         b <<= 8;
         b |= version & 0xff;
 
-        if ((off = gcomm::write(b, buf, buflen, offset)) == 0)       return 0;
+        if ((off = gcomm::write(b, buf, buflen, offset)) == 0)
+            gcomm_throw_fatal << buflen;
 
-        if ((off = gcomm::write(seq, buf, buflen, off)) == 0)        return 0;
+        if ((off = gcomm::write(seq, buf, buflen, off)) == 0)
+            gcomm_throw_fatal << buflen;
 
-        if (inst != 0 && (off = inst->write(buf, buflen, off)) == 0) return 0;
+        gu_trace (off = inst->write(buf, buflen, off));
 
         return off;        
     }
@@ -236,56 +242,45 @@ public:
         return sizeof(uint32_t) + sizeof(seq) + (inst != 0 ? inst->size() : 0);
     }
     
-    int get_version() const
-    {
-        return version;
-    }
+    int      get_version()  const { return version; }
     
-    Type get_type() const
-    {
-        return type;
-    }
+    Type     get_type()     const { return type; }
 
-    uint32_t get_seq() const
-    {
-        return seq;
-    }
+    uint32_t get_seq()      const { return seq; }
     
-    bool has_inst_map() const
-    {
-        return inst;
-    }
+    bool     has_inst_map() const { return inst; }
 
+    // we have a problem here - we should not be able to construct the message
+    // without the instance map in the first place. Or that should be another
+    // class of message.
     const PCInstMap& get_inst_map() const
     {
-        if (has_inst_map() == false)
-        {
-            throw DFatalException("PC message does not have instance map");
-        }
-        return *inst;
+        if (has_inst_map()) return *inst;
+
+        gcomm_throw_fatal << "PC message does not have instance map"; throw;
     }
 
     PCInstMap& get_inst_map()
     {
-        if (has_inst_map() == false)
-        {
-            throw DFatalException("PC message does not have instance map");
-        }
-        return *inst;
+        if (has_inst_map()) return *inst;
+
+        gcomm_throw_fatal << "PC message does not have instance map"; throw;
     }
 
     string to_string() const
     {
-        string ret("pcmsg(");
-        ret += make_int(get_type()).to_string() + ",";
-        ret += make_int(get_seq()).to_string();
+        std::ostringstream ret;
+
+        ret << "pcmsg(" << get_type() << ", " << get_seq();
+
         if (has_inst_map())
         {
-            ret += ",";
-            ret += get_inst_map().to_string();
+            ret << ", " << get_inst_map().to_string();
         }
-        ret += ")";
-        return ret;
+
+        ret << ')';
+
+        return ret.str();
     }
 };
 
@@ -302,7 +297,7 @@ struct PCInstallMessage : PCMessage
 
 struct PCUserMessage    : PCMessage
 {
-    /// ??? why seq is not initialized from seq?
+    // @todo: why seq is not initialized from seq?
 //    PCUserMessage(uint32_t seq) : PCMessage(0, PCMessage::T_USER, 0) {}
     PCUserMessage(uint32_t seq) : PCMessage(0, PCMessage::T_USER, seq) {}
 };
@@ -318,7 +313,8 @@ inline bool operator==(const PCMessage& a, const PCMessage& b)
     {
         if (a.has_inst_map() != b.has_inst_map())
         {
-            throw DFatalException("");
+            // @todo: what is this supposed to mean?
+            gcomm_throw_fatal;
         }
 
         if (a.has_inst_map())

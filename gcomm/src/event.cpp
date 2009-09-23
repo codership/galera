@@ -19,8 +19,8 @@ BEGIN_GCOMM_NAMESPACE
 
 static inline int map_event_to_mask(const int e)
 {
-    int ret = (e & Event::E_IN) ? POLLIN : 0;
-    ret |= ((e & Event::E_OUT) ? POLLOUT : 0);
+    int ret = ((e & Event::E_IN)  ? POLLIN  : 0);
+    ret    |= ((e & Event::E_OUT) ? POLLOUT : 0);
     return ret;
 }
 
@@ -75,10 +75,10 @@ static struct pollfd *pfd_find(struct pollfd *pfds, const size_t n_pfds,
 
 void EventLoop::insert(const int fd, EventContext *pctx)
 {
-    if (fd == -1)
-        throw FatalException("invalid fd -1");
+    if (fd == -1) gcomm_throw_fatal << "invalid fd -1";
+
     if (ctx_map.insert(std::make_pair(fd, pctx)).second == false)
-	throw FatalException("Insert");
+	gcomm_throw_fatal << "Insert";
 }
 
 void EventLoop::erase(const int fd)
@@ -97,11 +97,11 @@ void EventLoop::erase(const int fd)
     }
 
     CtxMap::iterator ci = ctx_map.find(fd);
-    if (ci == ctx_map.end())
-        throw FatalException("");
 
-    LOG_DEBUG("erase " + make_int(fd).to_string() + " " 
-              + Pointer(ci->second).to_string());    
+    if (ci == ctx_map.end()) gcomm_throw_fatal << "Unknown fd";
+
+    log_debug << "fd: " << fd << " " << ci->second;
+    
     ctx_map.erase(ci);
 }
 

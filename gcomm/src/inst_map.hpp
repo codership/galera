@@ -155,7 +155,8 @@ public:
                 return 0;
             if (map.insert(std::make_pair(uuid, t)).second == false)
             {
-                throw FatalException("");
+                gcomm_throw_fatal << "Failed to insert " << uuid.to_string()
+                                  << " in the map";
             }
         }
         return off;

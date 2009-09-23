@@ -84,16 +84,18 @@ public:
         mon()
     {
 	priv_buf = new byte_t[tot_len];
+
 	for (size_t i = 0; i < nbufs; ++i)
         {
 	    memcpy(priv_buf + buflen, bufs[i], buflens[i]);
 	    buflen += buflens[i];
 	}
-	if (buflen != tot_len)
-	    throw FatalException("");
+
+	if (buflen != tot_len) gcomm_throw_fatal;
     }
     
-    ReadBuf *copy() const {
+    ReadBuf *copy() const
+    {
 	if (instack) {
 	    ReadBuf* ret = new ReadBuf(get_buf(), get_len());
 	    ret->copy();
@@ -111,9 +113,10 @@ public:
     }
     
     
-    ReadBuf *copy(const size_t offset) const {
-	if (offset > buflen)
-	    throw FatalException("");
+    ReadBuf *copy(const size_t offset) const
+    {
+	if (offset > buflen) gcomm_throw_fatal;
+
 	if (offset > 0) {
 	    ReadBuf *ret = new ReadBuf(get_buf(offset), buflen - offset);
 	    ret->copy();
@@ -124,9 +127,11 @@ public:
 	}
     }
 
-    const byte_t *get_buf(const size_t offset) const {
+    const byte_t *get_buf(const size_t offset) const
+    {
 	if (offset > buflen)
-	    throw FatalException("Trying to read past buffer end");
+            gcomm_throw_fatal << "Trying to read past buffer end";
+
 	return (priv_buf ? priv_buf : buf) + offset;
     }
     
@@ -138,9 +143,11 @@ public:
 	return buflen;
     }
     
-    size_t get_len(size_t off) const {
+    size_t get_len(size_t off) const
+    {
 	if (off > buflen)
-	    throw FatalException("Offset greater than buffer length");
+            gcomm_throw_fatal << "Offset greater than buffer length";
+
 	return buflen - off;
     }
 
@@ -196,32 +203,36 @@ public:
 
     ReadBuf(const byte_t* bufs[], const size_t buflens[], 
             const size_t nbufs, 
-	    const size_t tot_len) {
+	    const size_t tot_len)
+    {
         buf = new byte_t[tot_len];
 	buflen = 0;
 	for (size_t i = 0; i < nbufs; ++i) {
 	    memcpy(buf + buflen, bufs[i], buflens[i]);
 	    buflen += buflens[i];
 	}
-	if (buflen != tot_len)
-	    throw FatalException("");
+
+	if (buflen != tot_len) gcomm_throw_fatal;
     }
     
-    ReadBuf *copy() const {
+    ReadBuf *copy() const
+    {
         return new ReadBuf(buf, buflen);
     }
     
     
-    ReadBuf *copy(const size_t offset) const {
-	if (offset > buflen)
-	    throw FatalException("");
+    ReadBuf *copy(const size_t offset) const
+    {
+	if (offset > buflen) gcomm_throw_fatal;
+
         return new ReadBuf(get_buf(offset), buflen - offset);
     }
 
     const byte_t *get_buf(const size_t offset) const 
     {
 	if (offset > buflen)
-	    throw FatalException("Trying to read past buffer end");
+	    gcomm_throw_fatal << "Trying to read past buffer end";
+
 	return buf + offset;
     }
     
@@ -235,9 +246,11 @@ public:
 	return buflen;
     }
     
-    size_t get_len(size_t off) const {
+    size_t get_len(size_t off) const
+    {
 	if (off > buflen)
-	    throw FatalException("Offset greater than buffer length");
+	    gcomm_throw_fatal << "Offset greater than buffer length";
+
 	return buflen - off;
     }
     
@@ -252,7 +265,6 @@ public:
         return 1;
     }
 };
-
 
 #endif
 

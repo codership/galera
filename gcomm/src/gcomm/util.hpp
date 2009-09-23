@@ -19,7 +19,7 @@ static inline size_t read_string(const void* from, const size_t fromlen,
 {
     if (to == 0)
     {
-        throw FatalException("invalid argument");
+        gcomm_throw_runtime (EINVAL) << "0 destination pointer";
     }
     /* Scan for termination character */
     size_t i;
@@ -102,31 +102,32 @@ std::string sockaddr_host_to_str(const sockaddr* sa);
 std::string sockaddr_port_to_str(const sockaddr* sa);
 bool is_anyaddr(const std::string& url);
 
-
-inline std::string parse_host(const std::string& str)
+// @todo: wrong function - port is not mandatory by RFC, will also fail for IPv6
+inline std::string _parse_host(const std::string& str)
 {
     size_t sep = str.find(':');
     if (sep == std::string::npos)
     {
-        throw FatalException("invalid auth str");
+        gcomm_throw_runtime (EINVAL) << "Invalid auth str";
     }
     return str.substr(0, sep);
 }
 
-inline std::string parse_port(const std::string& str)
+// @todo: wrong function - port is not mandatory by RFC, will also fail for IPv6
+inline std::string _parse_port(const std::string& str)
 {
     size_t sep = str.find(':');
     if (sep == std::string::npos)
     {
-        throw FatalException("invalid auth str");
+        gcomm_throw_runtime (EINVAL) << "Invalid auth str";
     }
     return str.substr(sep + 1);
 }
 
-inline bool host_undefined (const string& addr)
+inline bool host_undefined (const string& host)
 {   
-    return (addr.length() == 0 || addr == "0.0.0.0" ||
-            addr.find ("::/128") <= 1);
+    return (host.length() == 0 || host == "0.0.0.0" ||
+            host.find ("::/128") <= 1);
 }
 
 END_GCOMM_NAMESPACE

@@ -38,7 +38,7 @@ public:
     {
 	if (uint64_t(sec) > std::numeric_limits<uint64_t>::max()/Second) {
 	    std::cerr << sec << " " << std::numeric_limits<time_t>::max()/Second << "\n";
-	    throw FatalException("Time value overflow");
+	    gcomm_throw_fatal << "Time value overflow";
 	}
 	time = uint64_t(sec)*uint64_t(Second) + uint64_t(usec);
     }

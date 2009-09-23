@@ -14,20 +14,20 @@ class Mutex
     pthread_mutex_t mutex;
 
     Mutex(const Mutex&);
-    void operator=(const Mutex&);
+    Mutex& operator=(const Mutex&);
+
 public:
     
     Mutex() :
         mutex()
     {
-	if (pthread_mutex_init(&mutex, 0))
-	    throw FatalException("Mutex(): init failed");
+	if (pthread_mutex_init(&mutex, 0)) gcomm_throw_fatal << "init failed";
     }
     
     ~Mutex()
     {
-	if (pthread_mutex_destroy(&mutex))
-	    throw FatalException("~Mutex(): destroy failed");
+	if (pthread_mutex_destroy(&mutex)) 
+            gcomm_throw_fatal << "destroy failed";
     }
     
     void lock()
@@ -35,7 +35,7 @@ public:
 	int err;
 	if ((err = pthread_mutex_lock(&mutex)))
         {
-	    throw FatalException("Mutex::lock(): lock failed");
+	    gcomm_throw_runtime (err) << "lock failed";
 	}
     }
     
@@ -44,7 +44,7 @@ public:
 	int err;
 	if ((err = pthread_mutex_unlock(&mutex)))
         {
-	    throw FatalException("Mutex::unlock(): unlock failed");
+	    gcomm_throw_runtime (err) << "unlock failed";
 	}	
     }
 
@@ -77,7 +77,7 @@ public:
     {
         if (pthread_cond_wait(&cond, m->get()))
         {
-            throw FatalException("");
+            gcomm_throw_fatal;
         }
     }
     
@@ -85,7 +85,7 @@ public:
     {
         if (pthread_cond_signal(&cond))
         {
-            throw FatalException("");
+            gcomm_throw_fatal;
         }
     }
 

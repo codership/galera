@@ -1,5 +1,5 @@
 #include "tcp.hpp"
-
+#include "defaults.hpp"
 #include "gcomm/logger.hpp"
 #include "gcomm/types.hpp"
 #include "gcomm/util.hpp"
@@ -102,15 +102,28 @@ static inline void closefd(int fd)
     while (::close(fd) == -1 && errno == EINTR) {}
 }
 
-static void tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
+static void uri_to_sa(const URI& uri, struct sockaddr *s, size_t *s_size)
     throw (gu::Exception)
 {
-    string host = parse_host(addr);
-    string port = parse_port(addr);
-    
-    if (host == "")
+    const char* host = 0;
+    const char* port = 0;
+
+    try
+    { 
+        host = uri.get_host().c_str();
+
+        if ('\0' == host[0]) host = 0;
+
+        try { port = uri.get_port().c_str(); }
+        catch (gu::NotSet&)
+        {
+            port = Defaults::Port.c_str();
+        }
+    }
+    catch (gu::NotSet&)
     {
-        host = "0.0.0.0";
+        gcomm_throw_runtime (EINVAL) << "URL " << uri.to_string()
+                                     << " does not have host field";
     }
 
     addrinfo addrhint = {
@@ -127,10 +140,10 @@ static void tcp_addr_to_sa(const char *addr, struct sockaddr *s, size_t *s_size)
     addrinfo* addri = 0;    
     int       err;
 
-    log_debug << "Calling getaddrinfo(" << host << ", " << port << ", "
+    log_debug << "Calling getaddrinfo('" << host << "', '" << port << "', "
               << addrhint.ai_addrlen << ", " << &addri << ')';
 
-    if ((err = getaddrinfo(host.c_str(), port.c_str(), &addrhint, &addri)) != 0)
+    if ((err = getaddrinfo(host, port, &addrhint, &addri)) != 0)
     {
         if (EAI_SYSTEM == err)
         {
@@ -170,7 +183,7 @@ public:
     TCPHdr(const size_t l) : raw(), len(l) 
     {
 	if (gcomm::write(len, raw, sizeof(raw), 0) == 0)
-	    throw FatalException("");
+	    gcomm_throw_fatal;
     }
 
     TCPHdr(const unsigned char *buf, const size_t buflen, 
@@ -178,11 +191,11 @@ public:
         raw(),
         len()
     {
-	if (buflen < sizeof(raw) + offset)
-	    throw FatalException("");
+	if (buflen < sizeof(raw) + offset) gcomm_throw_fatal;
+
 	::memcpy(raw, buf + offset, sizeof(raw));
-	if (gcomm::read(raw, sizeof(raw), 0, &len) == 0)
-	    throw FatalException("");
+
+	if (gcomm::read(raw, sizeof(raw), 0, &len) == 0) gcomm_throw_fatal;
     }
 
     const void*   get_raw()                 const { return raw; }
@@ -201,7 +214,7 @@ void TCP::connect()
 {
     if (fd != -1) gcomm_throw_runtime(EISCONN);
 
-    tcp_addr_to_sa(uri.get_authority().c_str(), &sa, &sa_size);
+    uri_to_sa(uri, &sa, &sa_size);
 
 //    set_blocking_mode();
 
@@ -281,7 +294,7 @@ void TCP::listen()
 
     if (fd != -1) gcomm_throw_runtime (EISCONN);
 
-    tcp_addr_to_sa(uri.get_authority().c_str(), &sa, &sa_size);
+    uri_to_sa(uri, &sa, &sa_size);
 
     if ((fd = ::socket(sa.sa_family, SOCK_STREAM, 0)) == -1)
 	gcomm_throw_runtime(errno);
@@ -422,7 +435,7 @@ static int tmp_poll(int fd, const int pe, int tout, EventContext *ctx)
 
 void TCP::handle_up(int cid, const ReadBuf* rb, const size_t roff, const ProtoUpMeta* um)
 {
-    throw FatalException("not supported");
+    gcomm_throw_runtime (ENOSYS) << "not supported";
 }
 
 

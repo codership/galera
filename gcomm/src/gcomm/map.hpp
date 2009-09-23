@@ -90,7 +90,7 @@ namespace gcomm
 
                 if (map.insert(std::make_pair(uuid, t)).second == false)
                 {
-                    throw DRuntimeException("failed to unserialize map");
+                    gcomm_throw_fatal << "Failed to unserialize map";
                 }
             }
             return off;

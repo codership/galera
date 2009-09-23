@@ -20,10 +20,10 @@ BEGIN_GCOMM_NAMESPACE
 /* message context to pass up with the data buffer? */
 class ProtoUpMeta
 {
-    const UUID    source;
-    const uint8_t user_type;
-    const int64_t to_seq;
-    View* const   view; // this makes default constructor pointless
+    UUID    const source;
+    uint8_t const user_type;
+    int64_t const to_seq;
+    View*   const view; // @todo: this makes default constructor pointless
     
     ProtoUpMeta& operator=(const ProtoUpMeta&);
 
@@ -213,7 +213,7 @@ class Bottomlay : public Protolay
     void handle_up(const int, const ReadBuf *, const size_t,
                    const ProtoUpMeta *)
     {
-	throw FatalException("Bottomlay handle_up() called");
+	gcomm_throw_fatal << "Bottomlay handle_up() called";
     }
 };
 

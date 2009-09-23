@@ -67,81 +67,6 @@ START_TEST(test_serialization)
 }
 END_TEST
 
-
-START_TEST(test_uri)
-{
-    try
-    {
-        URI too_simple("http");
-        fail("too simple accepted");
-    }
-    catch (gu::Exception& e) {}
-
-    URI empty_auth("http://");
-    fail_unless(empty_auth.get_scheme() == "http");
-    fail_unless(empty_auth.get_authority() == "");
-
-    URI simple_valid1("http://example.com");
-    fail_unless(simple_valid1.get_scheme() == "http");
-    fail_unless(simple_valid1.get_authority() == "example.com");
-    fail_unless(simple_valid1.get_path() == "");
-    fail_unless(simple_valid1._get_query_list().size() == 0);
-
-    URI with_path("http://example.com/path/to/file.html");
-    fail_unless(with_path.get_scheme() == "http");
-    fail_unless(with_path.get_authority() == "example.com");
-    fail_unless(with_path.get_path() == "/path/to/file.html");
-    fail_unless(with_path._get_query_list().size() == 0);
-
-    URI with_query("http://example.com?key1=val1&key2=val2");
-    fail_unless(with_query.get_scheme() == "http");
-
-    fail_unless(with_query.get_authority() == "example.com");
-    fail_unless(with_query.get_path() == "");
-    const URIQueryList& qlist = with_query._get_query_list();
-    fail_unless(qlist.size() == 2);
-
-    URIQueryList::const_iterator i;
-    i = qlist.find("key1");
-    fail_unless(i != qlist.end() && i->second == "val1");
-    i = qlist.find("key2");
-    fail_unless(i != qlist.end() && i->second == "val2");
-
-    URI with_uri_in_query("gcomm+gmcast://localhost:10001?gmcast.node=gcomm+tcp://localhost:10002&gmcast.node=gcomm+tcp://localhost:10003");
-    fail_unless(with_uri_in_query.get_scheme() == "gcomm+gmcast");
-    fail_unless(with_uri_in_query.get_authority() == "localhost:10001");
-    const URIQueryList& qlist2 = with_uri_in_query._get_query_list();
-    fail_unless(qlist2.size() == 2);
-
-    pair<URIQueryList::const_iterator,
-        URIQueryList::const_iterator> ii;
-    ii = qlist2.equal_range("gmcast.node");
-    fail_unless(ii.first != qlist2.end());
-    for (i = ii.first; i != ii.second; ++i)
-    {
-        fail_unless(i->first == "gmcast.node");
-        URI quri(i->second);
-        fail_unless(quri.get_scheme() == "gcomm+tcp");
-        fail_unless(quri.get_authority().substr(0, string("localhost:1000").size()) == "localhost:1000");
-    }
-
-    try
-    {
-        URI invalid1("http://example.com/?key1");
-        fail("invalid query accepted");
-    }
-    catch (std::invalid_argument& e)
-    {
-
-    }
-    // Check rewriting
-
-    URI rew("gcomm+gmcast://localhost:10001/foo/bar.txt?k1=v1&k2=v2");
-    rew._set_scheme("gcomm+tcp");
-    fail_unless(rew.to_string() == "gcomm+tcp://localhost:10001/foo/bar.txt?k1=v1&k2=v2");
-}
-END_TEST
-
 START_TEST(test_uuid)
 {
     UUID uuid;
@@ -406,10 +331,6 @@ Suite* types_suite()
     
     tc = tcase_create("test_serialization");
     tcase_add_test(tc, test_serialization);
-    suite_add_tcase(s, tc);
-
-    tc = tcase_create("test_uri");
-    tcase_add_test(tc, test_uri);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_uuid");

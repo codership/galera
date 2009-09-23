@@ -59,8 +59,7 @@ void EVSProto::set_inactive(const UUID& uuid)
     EVSInstMap::iterator i = known.find(uuid);
     if (i == known.end())
     {
-        log_fatal << "could not find uuid from set ok nown nodes";
-        throw std::logic_error("");
+        gcomm_throw_fatal << "could not find UUID from the set of known nodes";
     }
     log_debug << self_string() << " setting " << uuid.to_string() << " inactive";
     EVSInstMap::get_instance(i).tstamp = Time(0, 0);
@@ -114,16 +113,15 @@ void EVSProto::deliver_reg_view()
 {
     if (install_message == 0)
     {
-        LOG_FATAL("protocol error: no install message in deliver reg view");
-        throw FatalException("protocol error");
+        gcomm_throw_fatal
+            << "Protocol error: no install message in deliver reg view";
     }
     
-    View view(View::V_REG, install_message->get_source_view());
-    if (previous_views.size() == 0)
-    {
-        throw FatalException("");
-    }
-    const View& prev_view(previous_view);
+    if (previous_views.size() == 0) gcomm_throw_fatal << "Zero-size view";
+
+    const View& prev_view (previous_view);
+    View view (View::V_REG, install_message->get_source_view());
+
     for (EVSInstMap::iterator i = known.begin(); i != known.end(); ++i)
     {
         if (EVSInstMap::get_instance(i).installed)
@@ -163,11 +161,12 @@ void EVSProto::deliver_trans_view(bool local)
 {
     if (local == false && install_message == 0)
     {
-        LOG_FATAL("protocol error: no install message in deliver trans view");
-        throw FatalException("protocol error");
+        gcomm_throw_fatal
+            << "Protocol error: no install message in deliver trans view";
     }
     
     View view(View::V_TRANS, current_view.get_id());
+
     for (EVSInstMap::const_iterator i = known.begin(); i != known.end(); ++i)
     {
         if (EVSInstMap::get_instance(i).get_installed() && 
@@ -299,12 +298,10 @@ bool EVSProto::is_representative(const UUID& pid) const
     {
         if (i->second.operational) 
         {
-            if (pid == i->first)
-                return true;
-            else
-                return false;
+            return (pid == i->first);
         }
     }
+
     return false;
 }
 
@@ -316,7 +313,8 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
     if (jm.get_type() != EVSMessage::JOIN &&
         jm.get_type() != EVSMessage::INSTALL)
     {
-        throw FatalException("");
+        gcomm_throw_fatal << "Wrong message type: "
+                          << EVSMessage::to_string(jm.get_type());
     }
 
     std::map<const UUID, EVSRange> local_insts;
@@ -398,7 +396,7 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
 #ifdef STRICT_JOIN_CHECK
             if (jm.get_source() == my_addr)
             {
-                throw FatalException("");
+                gcomm_throw_fatal << "My address in join message source";
             }
 #endif
             return false;
@@ -613,16 +611,19 @@ void EVSProto::send_gap(const UUID& pid, const ViewId& source_view,
     
     size_t bufsize = gm.size();
     unsigned char* buf = new unsigned char[bufsize];
+
     if (gm.write(buf, bufsize, 0) == 0)
-        throw FatalException("");
+        gcomm_throw_fatal << "Error writing buf";
     
     WriteBuf wb(buf, bufsize);
     int err;
+
     if ((err = pass_down(&wb, 0))) {
-        LOG_WARN(std::string("send failed ") 
-                 + strerror(err));
+        log_warn << "send failed " << strerror(err);
     }
+
     delete[] buf;
+
     handle_gap(gm, self_i);
 }
 
@@ -654,7 +655,7 @@ EVSJoinMessage EVSProto::create_join()
 #ifdef STRICT_JOIN_CHECK
     if (is_consistent(jm) == false)
     {
-        throw FatalException("");
+        gcomm_throw_fatal << "Inconsistent JOIN message";
     }
 #endif
     return jm;
@@ -664,14 +665,21 @@ void EVSProto::set_join(const EVSMessage& jm, const UUID& source)
 {
     if (jm.get_type() != EVSMessage::JOIN)
     {
-        throw FatalException("");
+        gcomm_throw_fatal << "Wrong message type: "
+                          << EVSMessage::to_string(jm.get_type());
     }
+
     EVSInstMap::iterator i = known.find(source);
+
     if (i == known.end())
     {
-        throw FatalException("");
+        // @todo: do we really need to freak out here? maybe ignore the message?
+        gcomm_throw_fatal << "JOIN message from unknown source: "
+                          << source.to_string();
     }
+
     delete i->second.join_message;
+
     i->second.join_message = new EVSMessage(jm);
 }
 
@@ -679,19 +687,24 @@ void EVSProto::set_leave(const EVSMessage& lm, const UUID& source)
 {
     if (lm.get_type() != EVSMessage::LEAVE)
     {
-        throw FatalException("");
+        gcomm_throw_fatal << "Wrong message type: "
+                          << EVSMessage::to_string(lm.get_type());
     }
+
     EVSInstMap::iterator i = known.find(source);
+
     if (i == known.end())
     {
-        throw FatalException("");
+        // @todo: do we really need to freak out here? maybe ignore the message?
+        gcomm_throw_fatal << "LEAVE message from unknown source: "
+                          << source.to_string();
     }
-    if (i->second.leave_message != 0)
+
+    if (i->second.leave_message)
     {
-        LOG_WARN("duplicate leave: previous: "
-                 + i->second.leave_message->to_string() 
-                 + " new: "
-                 + lm.to_string());
+        log_warn << "Duplicate leave:\n\told: "
+                 << i->second.leave_message->to_string() 
+                 << "\n\tnew: " << lm.to_string();
     }
     else
     {
@@ -702,9 +715,10 @@ void EVSProto::set_leave(const EVSMessage& lm, const UUID& source)
 bool EVSProto::has_leave(const UUID& uuid) const
 {
     EVSInstMap::const_iterator ii = known.find(uuid);
+
     if (ii == known.end())
     {
-        throw FatalException("");
+        gcomm_throw_fatal << "UUID " << uuid.to_string() << " not found";
     }
     
     if (ii->second.leave_message != 0)
@@ -718,17 +732,22 @@ bool EVSProto::has_leave(const UUID& uuid) const
         {
             const EVSMessage::InstMap* im = 
                 ii->second.join_message->get_instances();
+
             if (im == 0)
             {
-                throw FatalException("");
+                gcomm_throw_fatal << ii->first.to_string()
+                                  << " has no instance map";
             }
-            EVSMessage::InstMap::const_iterator ji = im->find(uuid); 
+
+            EVSMessage::InstMap::const_iterator ji = im->find(uuid);
+
             if (ji != im->end() && ji->second.get_left() == true)
             {
                 return true;
             }
         }
     }
+
     return false;
 }
 
@@ -771,24 +790,28 @@ void EVSProto::send_leave()
 {
     assert(get_state() == S_LEAVING);
     
-    LOG_DEBUG(self_string() + " send leave as " + make_int(last_sent).to_string());
-    EVSLeaveMessage lm(my_addr, 
-                       current_view.get_id(), 
-                       input_map.get_aru_seq(), 
-                       last_sent,
-                       ++fifo_seq);
+    log_debug << self_string() << " send leave as " << last_sent;
+
+    EVSLeaveMessage lm (my_addr, 
+                        current_view.get_id(), 
+                        input_map.get_aru_seq(), 
+                        last_sent,
+                        ++fifo_seq);
+
     size_t bufsize = lm.size();
     unsigned char* buf = new unsigned char[bufsize];
+
     if (lm.write(buf, bufsize, 0) == 0)
-        throw FatalException("failed to serialize leave message");
+        gcomm_throw_fatal << "failed to serialize leave message";
     
     WriteBuf wb(buf, bufsize);
     int err;
-    if ((err = pass_down(&wb, 0))) {
-        LOG_WARN(std::string("EVSProto::send_leave(): Send failed ") 
-                 + strerror(err));
-    }
+
+    if ((err = pass_down(&wb, 0)))
+        log_warn << "EVSProto::send_leave(): Send failed " << strerror(err);
+
     delete[] buf;
+
     handle_leave(lm, self_i);
 }
 
@@ -800,7 +823,7 @@ void EVSProto::send_install()
 
     if (is_consensus() != true || is_representative(my_addr) != true)
     {
-        gcomm_throw_fatal;
+        gcomm_throw_fatal << "Have no right to send install flag";
     }
 
     EVSInstMap::const_iterator self = known.find(my_addr);
@@ -891,10 +914,10 @@ void EVSProto::resend(const UUID& gap_source, const EVSGap& gap)
                                                                seq);
         if (i.second == false) 
         {
-            LOG_FATAL("could not recover message for " 
-                      + gap_source.to_string());
-            throw FatalException("");
-        } else {
+            gcomm_throw_fatal << "could not recover message for " 
+                              << gap_source.to_string();
+        }
+        else {
             const ReadBuf* rb = i.first.get_readbuf();
             const EVSMessage& msg = i.first.get_evs_message();
             assert(msg.get_type() == EVSMessage::USER);
@@ -978,19 +1001,25 @@ void EVSProto::handle_foreign(const EVSMessage& msg)
         return;
     }
 
-    log_debug << self_string() 
-              << " detected new source: " << msg.get_source().to_string();
-    pair <EVSInstMap::iterator, bool> iret; 
-    if ((iret = known.insert(
-             make_pair(msg.get_source(), 
-                       EVSInstance()))).second == false)
-    {
-        throw FatalException("");
-    }
+    const UUID& source = msg.get_source();
+
+    log_debug << self_string() << " detected new source: "
+              << source.to_string();
+
+    pair <EVSInstMap::iterator, bool> iret;
+
+    iret = known.insert(make_pair(source, EVSInstance()));
+
+    if (iret.second == false)
+        gcomm_throw_fatal << "Failed to insert " << source.to_string()
+                          << " into the known map";
+
     assert(EVSInstMap::get_instance(iret.first).get_operational() == true);
+
     if (state == S_JOINING || state == S_RECOVERY || state == S_OPERATIONAL)
     {
-        log_debug << self_string() <<  " shift to S_RECOVERY due to foreign message";
+        log_debug << self_string()
+                  << " shift to S_RECOVERY due to foreign message";
         shift_to(S_RECOVERY, true);
     }
     
@@ -1007,26 +1036,25 @@ void EVSProto::handle_msg(const EVSMessage& msg, const ReadBuf* rb,
 {
     if (get_state() == S_CLOSED)
     {
-        LOG_DEBUG("dropping message in closed state");
+        log_debug << "dropping message in closed state";
         return;
     }
 
     // Figure out if the message is from known source
-
     EVSInstMap::iterator ii = known.find(msg.get_source());
+
     if (ii == known.end())
     {
         handle_foreign(msg);
         return;
     }
 
-
     // Filter out unwanted/duplicate membership messages
     if (msg.is_membership())
     {
         if (EVSInstMap::get_instance(ii).fifo_seq >= msg.get_fifo_seq())
         {
-            LOG_WARN("dropping non-fifo membership message");
+            log_warn << "dropping non-fifo membership message";
             return;
         }
         else
@@ -1075,8 +1103,8 @@ void EVSProto::handle_msg(const EVSMessage& msg, const ReadBuf* rb,
             handle_install(msg, ii);
             break;
         default:
-            LOG_WARN(std::string("EVS::handle_msg(): Invalid message type: ") 
-                     + EVSMessage::to_string(msg.get_type()));
+            log_warn << "Invalid message type: "
+                     << EVSMessage::to_string(msg.get_type());
         }
     }
     else
@@ -1099,29 +1127,28 @@ void EVSProto::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
     EVSMessage msg;
     
     if (rb == 0 && um == 0)
-        throw FatalException("EVS::handle_up(): Invalid input rb == 0 && um == 0");
+        gcomm_throw_fatal << "Invalid input: rb == 0 && um == 0";
     
     if (get_state() == S_CLOSED)
     {
-        LOG_DEBUG("dropping message in closed state");
+        log_debug << "Dropping message in closed state";
         return;
     }
     
     if (msg.read(rb->get_buf(), rb->get_len(), roff) == 0)
     {
-        LOG_WARN("EVS::handle_up(): Invalid message");
+        log_warn << "Invalid message";
         return;
     }
-    if (um)
-    {
-        msg.set_source(um->get_source());
-    }
-    if (msg.get_source() == UUID::nil())
-    {
-        throw FatalException("");
-    }
+
+    if (um) msg.set_source(um->get_source());
+
+    // @todo: in view of the above, should not this be an assertion?
+    if (msg.get_source() == UUID::nil()) gcomm_throw_fatal;
     
-    LOG_TRACE(self_string() + " message " + EVSMessage::to_string(msg.get_type()) + " from " + msg.get_source().to_string());
+    LOG_TRACE(self_string() + " message " +
+              EVSMessage::to_string(msg.get_type()) + " from " +
+              msg.get_source().to_string());
     
     handle_msg(msg, rb, roff);
 }
@@ -1136,6 +1163,7 @@ int EVSProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
     {
         return EAGAIN;
     }
+
     else if (get_state() != S_OPERATIONAL)
     {
         LOG_WARN("user message in state " + to_string(get_state()));
@@ -1194,24 +1222,23 @@ void EVSProto::shift_to(const State s, const bool send_j)
     shift_to_rfcnt++;
 
     static const bool allowed[S_MAX][S_MAX] = {
-    // S_CLOSED
-        {false, true, false, false, false},
-    // S_JOINING
-        {false, false, true, true, false},
-    // S_LEAVING
-        {true, false, false, false, false},
-    // S_RECOVERY
-        {false, false, true, true, true},
-    // S_OPERATIONAL
-        {false, false, true, true, false}
+        // CLOSED JOINING LEAVING RECOV  OPERAT
+        {  false,  true,   false, false, false }, // CLOSED
+
+        {  false,  false,  true,  true,  false }, // JOINING
+
+        {  true,   false,  false, false, false }, // LEAVING
+
+        {  false,  false,  true,  true,  true  }, // RECOVERY
+
+        {  false,  false,  true,  true,  false }  // OPERATIONAL
     };
     
     assert(s < S_MAX);
 
     if (allowed[state][s] == false) {
-        LOG_FATAL(std::string("invalid state transition: ") 
-                  + to_string(state) + " -> " + to_string(s));
-        throw FatalException("invalid state transition");
+        gcomm_throw_fatal << "Forbidden state transition: " 
+                          << to_string(state) << " -> " << to_string(s);
     }
     
     if (get_state() != s)
@@ -1293,11 +1320,12 @@ void EVSProto::shift_to(const State s, const bool send_j)
 
         previous_view = current_view;
         previous_views.push_back(make_pair(current_view.get_id(), Time::now()));
+
         const EVSMessage::InstMap* imap = install_message->get_instances();
+
         if (imap == 0)
-        {
-            throw FatalException("");
-        }
+            gcomm_throw_fatal << "Install message has no instance map";
+
         for (EVSMessage::InstMap::const_iterator i = imap->begin();
              i != imap->end(); ++i)
         {
@@ -1333,7 +1361,7 @@ void EVSProto::shift_to(const State s, const bool send_j)
         break;
     }
     default:
-        throw FatalException("Invalid state");
+        gcomm_throw_fatal << "Invalid state";
     }
     shift_to_rfcnt--;
 }
@@ -1346,11 +1374,11 @@ void EVSProto::validate_reg_msg(const EVSMessage& msg)
 {
     if (msg.get_type() != EVSMessage::USER)
     {
-        throw FatalException("reg validate: not user message");
+        gcomm_throw_fatal << "Reg validate: not user message";
     }
     if (msg.get_source_view() != current_view.get_id())
     {
-        throw FatalException("reg validate: not current view");
+        gcomm_throw_fatal << "Reg validate: not current view";
     }
     if (collect_stats && msg.get_safety_prefix() == SAFE)
     {
@@ -1363,20 +1391,24 @@ void EVSProto::deliver()
 {
     if (delivering == true)
     {
-        throw FatalException("recursive enter to delivery");
+        gcomm_throw_fatal << "Recursive enter to delivery";
     }
+
     delivering = true;
+
     if (get_state() != S_OPERATIONAL && get_state() != S_RECOVERY && 
         get_state() != S_LEAVING)
-        throw FatalException("Invalid state");
-    LOG_DEBUG("aru_seq: " + make_int(input_map.get_aru_seq()).to_string() 
-              + " safe_seq: "
-              + make_int(input_map.get_safe_seq()).to_string());
+        gcomm_throw_fatal << "Invalid state";
+
+    log_debug << "aru_seq: "   << input_map.get_aru_seq() 
+              << " safe_seq: " << input_map.get_safe_seq();
     
     EVSInputMap::iterator i, i_next;
+
     // First deliver all messages that qualify at least as safe
     for (i = input_map.begin();
-         i != input_map.end() && input_map.is_safe(i); i = i_next) {
+         i != input_map.end() && input_map.is_safe(i); i = i_next)
+    {
         i_next = i;
         ++i_next;
         validate_reg_msg(i->get_evs_message());
@@ -1416,15 +1448,20 @@ void EVSProto::deliver()
 
 void EVSProto::validate_trans_msg(const EVSMessage& msg)
 {
-    LOG_DEBUG(msg.to_string());
+    log_debug << msg.to_string();
+
     if (msg.get_type() != EVSMessage::USER)
     {
-        throw FatalException("reg validate: not user message");
+        gcomm_throw_fatal << "Reg validate: not USER message ("
+                          << EVSMessage::to_string(msg.get_type()) << ")";
     }
+
     if (msg.get_source_view() != current_view.get_id())
     {
-        throw FatalException("reg validate: not current view");
+        // @todo: do we have to freak out here?
+        gcomm_throw_fatal << "Reg validate: not current view";
     }
+
     if (collect_stats && msg.get_safety_prefix() == SAFE)
     {
         Time now(Time::now());
@@ -1436,11 +1473,14 @@ void EVSProto::deliver_trans()
 {
     if (delivering == true)
     {
-        throw FatalException("recursive enter to delivery");
+        gcomm_throw_fatal << "Recursive enter to delivery";
     }
+
     delivering = true;
+
     if (get_state() != S_RECOVERY && get_state() != S_LEAVING)
-        throw FatalException("Invalid state");
+        gcomm_throw_fatal << "Invalid state";
+
     // In transitional configuration we must deliver all messages that 
     // are fifo. This is because:
     // - We know that it is possible to deliver all fifo messages originated
@@ -1489,20 +1529,18 @@ void EVSProto::deliver_trans()
         ++i_next;
         std::map<const UUID, EVSInstance>::iterator ii =
             known.find(i->get_sockaddr());
+
         if (ii->second.installed)
         {
-            LOG_FATAL("Protocol error in transitional delivery "
-                      "(self delivery constraint)");
-            throw FatalException("Protocol error in transitional delivery "
-                                 "(self delivery constraint)");
+            gcomm_throw_fatal << "Protocol error in transitional delivery "
+                              << "(self delivery constraint)";
         }
         else if (input_map.is_fifo(i))
         {
-            LOG_FATAL("Protocol error in transitional delivery "
-                                 "(fifo from partitioned component)");
-            throw FatalException("Protocol error in transitional delivery "
-                                 "(fifo from partitioned component)");
+            gcomm_throw_fatal << "Protocol error in transitional delivery "
+                              << "(fifo from partitioned component)";
         }
+
         input_map.erase(i);
     }
     delivering = false;
@@ -1567,18 +1605,23 @@ void EVSProto::handle_user(const EVSMessage& msg,
                 msg.get_source_view() == install_message->get_source_view()) 
             {
                 assert(state == S_RECOVERY);
-                LOG_DEBUG(self_string() + " recovery user message source");
+
+                log_debug << self_string() << " recovery user message source";
+
                 // Other instances installed view before this one, so it is 
                 // safe to shift to S_OPERATIONAL if consensus has been reached
-                for (EVSMessage::InstMap::const_iterator 
+                for (EVSMessage::InstMap::const_iterator
                          mi = install_message->get_instances()->begin(); 
                      mi != install_message->get_instances()->end(); ++mi)
                 {
                     EVSInstMap::iterator jj = known.find(mi->second.get_uuid());
+
                     if (jj == known.end())
                     {
-                        throw FatalException("");
+                        gcomm_throw_fatal << "Unknown instance map UUID"
+                                          << mi->second.get_uuid().to_string();
                     }
+
                     jj->second.installed = true;
                 }
                 
@@ -1599,7 +1642,8 @@ void EVSProto::handle_user(const EVSMessage& msg,
         } 
         else 
         {
-            LOG_INFO(self_string() + " unknown user message: " + msg.to_string());
+            log_info << self_string() << " unknown user message: "
+                     << msg.to_string();
             return;
         }
     }
@@ -1690,10 +1734,12 @@ void EVSProto::handle_user(const EVSMessage& msg,
          seqno_eq(prev_safe, input_map.get_safe_seq()) == false))
     {
         assert(output.empty() == true);
+
         EVSInstMap::const_iterator self_i = known.find(my_addr);
+
         if (self_i == known.end())
         {
-            throw FatalException("");
+            gcomm_throw_fatal << "Can't find myself in the known list";
         }
         
         if (self_i->second.join_message == 0 ||
@@ -1712,12 +1758,15 @@ void EVSProto::handle_delegate(const EVSMessage& msg, EVSInstMap::iterator ii,
                                const ReadBuf* rb, const size_t roff)
 {
     assert(ii != known.end());
+
     EVSMessage umsg;
+
     if (umsg.read(rb->get_buf(roff), 
                   rb->get_len(roff), msg.size()) == 0)
     {
-        throw FatalException("failed to read user msg from delegate");
+        gcomm_throw_fatal << "Failed to read user msg from delegate";
     }
+
     handle_msg(umsg, rb, roff + msg.size());
 }
 
@@ -1813,10 +1862,12 @@ void EVSProto::handle_gap(const EVSMessage& msg, EVSInstMap::iterator ii)
         seqno_eq(prev_safe, input_map.get_safe_seq()) == false)
     {
         assert(output.empty() == true);
+
         EVSInstMap::const_iterator self_i = known.find(my_addr);
+
         if (self_i == known.end())
         {
-            throw FatalException("");
+            gcomm_throw_fatal << "Can't find myself in the known list";
         }
         
         if (self_i->second.join_message == 0 ||
@@ -1845,11 +1896,12 @@ bool EVSProto::states_compare(const EVSMessage& msg)
         EVSInstMap::iterator local_ii = known.find(ii->second.get_uuid());
         if (local_ii == known.end())
         {
-            LOG_DEBUG(self_string() + " new instance from join message");
+            log_debug << self_string() << ": new instance from join message";
+
             if (known.insert(make_pair(ii->second.get_uuid(), 
                                        EVSInstance())).second == false)
             {
-                throw FatalException("");
+                gcomm_throw_fatal << "Failed to add to known list";
             }
         }
         else if (local_ii->second.operational != ii->second.get_operational()) 
@@ -1970,8 +2022,9 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
     
     if (msg.get_type() != EVSMessage::JOIN)
     {
-        throw FatalException("invalid input");
+        gcomm_throw_fatal << "Invalid input";
     }
+
     log_debug << "id" << self_string() << " view" << current_view.to_string()
               << " ================ enter handle_join ==================";
     log_debug << self_string() << " " << msg.to_string();
@@ -2112,10 +2165,12 @@ void EVSProto::handle_join(const EVSMessage& msg, EVSInstMap::iterator ii)
     }
 
     EVSInstMap::const_iterator self_i = known.find(my_addr);
+
     if (self_i == known.end())
     {
-        throw FatalException("");
+        gcomm_throw_fatal << "Can't find myself in the known list";
     }
+
     if (((self_i->second.join_message == 0 ||
           is_consistent(*self_i->second.join_message) == false) &&
          send_join_p == true) || pre_consistent == false)
@@ -2165,15 +2220,19 @@ void EVSProto::handle_leave(const EVSMessage& msg, EVSInstMap::iterator ii)
         while (output.empty() == false)
         {
             pair<WriteBuf*, ProtoDownMeta> wb = output.front();
+
             if (send_user(wb.first, 
                           wb.second.get_user_type(), 
                           SAFE, 0, SEQNO_MAX, true) != 0)
             {
-                throw FatalException("");
+                gcomm_throw_fatal << "send_user() failed";
             }
+
             output.pop_front();
+
             delete wb.first;
         }
+
         /* Deliver all possible messages in reg view */
         deliver();
         setall_installed(false);

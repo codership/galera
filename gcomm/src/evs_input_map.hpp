@@ -148,12 +148,14 @@ public:
 #ifdef VALIDATE_STATE
         if (seqno_eq(aru_seq, SEQNO_MAX) && !seqno_eq(safe_seq, SEQNO_MAX))
         {
-            throw FatalException("validate state: aru_seq == SEQNO_MAX, safe_seq != SEQNO_MAX");
+            gcomm_throw_fatal << "Validate state: aru_seq == SEQNO_MAX, "
+                              << "safe_seq != SEQNO_MAX";
         }
+
         if (!seqno_eq(aru_seq, SEQNO_MAX) && !seqno_eq(safe_seq, SEQNO_MAX)
             && seqno_gt(safe_seq, aru_seq))
         {
-            throw FatalException("validate state: safe_seq > aru_seq");
+            gcomm_throw_fatal << "Validate state: safe_seq > aru_seq";
         }
         
         uint32_t low = SEQNO_MAX;
@@ -174,23 +176,24 @@ public:
                 low = i->second.gap.low;
             }
         }
-        if ((seqno_eq(low, SEQNO_MAX) == true &&
-             seqno_eq(aru_seq, SEQNO_MAX) == false) ||
-            (seqno_eq(low, SEQNO_MAX) == false && 
-             (seqno_eq(aru_seq, SEQNO_MAX) == true ||
-              seqno_eq(seqno_next(aru_seq), low) == false)))
+        if (( seqno_eq(low, SEQNO_MAX) && !seqno_eq(aru_seq, SEQNO_MAX)) ||
+            (!seqno_eq(low, SEQNO_MAX) && (seqno_eq(aru_seq, SEQNO_MAX) ||
+                                           !seqno_eq(seqno_next(aru_seq), low))))
         {
-            throw FatalException("");
+            gcomm_throw_fatal;
         }
 #endif // VALIDATE_STATE
     }
 
-    void set_safe(const UUID& s, const uint32_t seq) {
+    void set_safe(const UUID& s, const uint32_t seq)
+    {
         //if (seqno_eq(aru_seq, SEQNO_MAX) || seqno_gt(seq, aru_seq))
-        //    throw FatalException("Safe seqno out of range");
+        //    gcomm_throw_fatal << "Safe seqno out of range";
+
         IMap::iterator ii = instances.find(s);
+
         if (ii == instances.end())
-            throw FatalException("Instance not found");
+            gcomm_throw_fatal << "Instance not found";
         
         if (seqno_eq(ii->second.safe_seq, SEQNO_MAX) || 
             seqno_lt(ii->second.safe_seq, seq))
@@ -234,8 +237,8 @@ public:
 private:
     void update_aru() 
     {
-        if (instances.empty())
-            throw FatalException("Instance not found");
+        if (instances.empty()) gcomm_throw_fatal << "Instance not found";
+
         uint32_t min_seq = SEQNO_MAX;
         LOG_DEBUG("aru_seq: " + make_int(aru_seq).to_string());
         for (IMap::const_iterator ii = instances.begin(); ii != instances.end();
@@ -299,27 +302,30 @@ public:
         return !(seqno_eq(aru_seq, SEQNO_MAX) || seqno_lt(aru_seq, i->get_evs_message().get_seq()));
     }
     
-    bool is_fifo(const iterator& i) const {
+    bool is_fifo(const iterator& i) const
+    {
         IMap::const_iterator ii = instances.find(i->get_sockaddr());
+
         if (ii == instances.end())
         {
-            LOG_FATAL("instance " + i->get_sockaddr().to_string() 
-                + " not found");
-            throw FatalException("Instance not found");
+            gcomm_throw_fatal << "Instance " << i->get_sockaddr().to_string() 
+                              << " not found";
         }
-        if (seqno_eq(ii->second.gap.low, SEQNO_MAX))
-        {
-            return false;
-        }
+
+        if (seqno_eq(ii->second.gap.low, SEQNO_MAX)) return false;
+
         log_debug << "is_fifo: " << ii->second.gap.low
                   << " " << i->get_evs_message().get_seq();
+
         return !seqno_lt(ii->second.gap.low, i->get_evs_message().get_seq());
     }
 
-    std::list<EVSRange> get_gap_list(const UUID& pid) const {
+    std::list<EVSRange> get_gap_list(const UUID& pid) const
+    {
         IMap::const_iterator ii = instances.find(pid);
-        if (ii == instances.end())
-            throw FatalException("Instance not found");
+
+        if (ii == instances.end()) gcomm_throw_fatal << "Instance not found";
+
         std::list<EVSRange> lst;
         assert(!seqno_eq(ii->second.gap.get_high(), SEQNO_MAX));
         uint32_t start_seq = seqno_eq(ii->second.gap.get_low(), SEQNO_MAX) ? 
@@ -378,66 +384,80 @@ public:
     }
     
     
-    bool contains_sa(const UUID& sa) const {
+    bool contains_sa(const UUID& sa) const
+    {
         IMap::const_iterator ii = instances.find(sa);
         return !(ii == instances.end());
     }
     
-    void insert_sa(const UUID& sa) {
+    void insert_sa(const UUID& sa)
+    {
         if (!seqno_eq(aru_seq, SEQNO_MAX))
-            throw FatalException("Can't add instance after aru has been updated");
+            gcomm_throw_fatal<< "Can't add instance after aru has been updated";
+
         std::pair<IMap::iterator, bool> iret = 
             instances.insert(IMapItem(sa, Instance()));
+
         if (iret.second == false)
-            throw FatalException("Instance already exists");
+            gcomm_throw_fatal << "Instance already exists";
     }
     
-    void erase_sa(const UUID& sa) {
+    void erase_sa(const UUID& sa)
+    {
         IMap::iterator ii = instances.find(sa);
+
         if (ii == instances.end())
-            throw FatalException("Instance does not exist");
+            gcomm_throw_fatal << "Instance does not exist";
+
         instances.erase(sa);
     }
     
     EVSRange get_sa_gap(const UUID& sa) const 
     {
         IMap::const_iterator ii = instances.find(sa);
+
         if (ii == instances.end())
-            throw FatalException("Instance does not exist");
+            gcomm_throw_fatal << "Instance does not exist";
+
         return ii->second.gap;
     }
 
     uint32_t get_sa_safe_seq(const UUID& sa) const
     {
         IMap::const_iterator ii = instances.find(sa);
+
         if (ii == instances.end())
-            throw FatalException("Instance does not exist");
+            gcomm_throw_fatal << "Instance does not exist";
+
         return ii->second.safe_seq;
     }
     
-    void clear() {
-        if (instances.empty() == false)
-            instances.clear();
+    void clear()
+    {
+        if (instances.empty() == false) instances.clear();
+
         if (msg_log.size())
         {
-            LOG_WARN("going to discard " 
-                     + make_int(msg_log.size()).to_string() 
-                     + " messages from msg log");
+            log_warn << "Going to discard " << msg_log.size() 
+                     << " messages from msg log";
+
             for (MLog::const_iterator i = msg_log.begin(); i != msg_log.end();
                  ++i)
             {
-                LOG_WARN("source " + i->get_sockaddr().to_string() + " seq " 
-                         + make_int(i->get_evs_message().get_seq()).to_string());
+                log_warn << "Source " << i->get_sockaddr().to_string()
+                         <<" seq " << i->get_evs_message().get_seq();
             }
         }
         
         msg_log.clear();
+
         if (recovery_log.size())
         {
-            log_debug << "going to discard " 
-                      << recovery_log.size()
+            log_debug << "going to discard " << recovery_log.size()
                       << " messages from recovery log";
-            for (MLog::const_iterator i = recovery_log.begin(); i != recovery_log.end();
+
+            for (MLog::const_iterator i = recovery_log.begin();
+                 i != recovery_log.end();
                  ++i)
             {
                 log_debug << "source " << i->get_sockaddr().to_string() 

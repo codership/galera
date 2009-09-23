@@ -5,7 +5,6 @@
 #ifndef TRANSPORT_GMCAST_HPP
 #define TRANSPORT_GMCAST_HPP
 
-
 #include "gcomm/common.hpp"
 #include "gcomm/uuid.hpp"
 #include "gcomm/uri.hpp"
@@ -16,14 +15,11 @@
 #include "gcomm/transport.hpp"
 #include "gcomm/types.hpp"
 
-
 BEGIN_GCOMM_NAMESPACE
-
-
-class GMCastProto;
 
 class UUIDToAddressMap;
 
+class GMCastProto;
 class GMCastProtoMap;
 class GMCastNode;
 class GMCastMessage;
@@ -55,10 +51,10 @@ class GMCast : public Transport, EventContext
                const Time& next_reconnect_,
                const UUID& uuid_)
             :
-            uuid(uuid_),
-            last_seen(last_seen_),
-            next_reconnect(next_reconnect_),
-            retry_cnt(0)
+            uuid           (uuid_),
+            last_seen      (last_seen_),
+            next_reconnect (next_reconnect_),
+            retry_cnt      (0)
         {}
     };
     
@@ -113,7 +109,6 @@ class GMCast : public Transport, EventContext
         i->second.retry_cnt = cnt;
     }
 
-
     string group_name;
 
     /* Accept a new connection */
@@ -136,11 +131,9 @@ class GMCast : public Transport, EventContext
     void update_addresses();
     void reconnect();
 
-
     void compute_spanning_tree(const UUIDToAddressMap&);
     void forward_message(const int cid, const ReadBuf* rb, 
                          const size_t offset, const GMCastMessage& msg);
-
     
     /* Start gmcast engine */
     void start();
@@ -152,22 +145,20 @@ class GMCast : public Transport, EventContext
         return "(" + get_uuid().to_string() + "," + listen_addr + ")";
     }
 
-
-    GMCast(const GMCast&);
-    void operator=(GMCast&);
+    GMCast (const GMCast&);
+    GMCast& operator=(const GMCast&);
 
 public:
     
     list<string> get_addresses();
     /* Constructor */
-    GMCast(const URI&, EventLoop*, Monitor*);
+    GMCast (const URI&, EventLoop*, Monitor*);
     // const string& listen_addr_, 
     //    const list<string>& remote_addrs_, 
     //     const list<string>& groups_);
     
     ~GMCast();
 
-    
     /* Handle poll event */
     void handle_event(const int, const Event&);
     /* Handle Protolay up event */
@@ -207,21 +198,17 @@ public:
     {
         gmcast_forget(uuid);
     }
-    
 
     void listen()
     {
-        throw FatalException("gmcast transport listen not implemented");
+        gcomm_throw_fatal << "gmcast transport listen not implemented";
     }
 
     Transport* accept()
     {
-        throw FatalException("gmcast transport accept not implemented");
+        gcomm_throw_fatal << "gmcast transport accept not implemented"; throw;
     }
-    
-
 };
-
 
 END_GCOMM_NAMESPACE
 

@@ -11,7 +11,7 @@ EVSRange EVSInputMap::insert(const EVSInputMapItem& item)
     // Find corresponding instance
     IMap::iterator ii = instances.find(item.get_sockaddr());
     if (ii == instances.end())
-        throw FatalException("Instance not found");
+        gcomm_throw_fatal << "Instance not found";
     
     // 
     EVSRange& gap(ii->second.gap);

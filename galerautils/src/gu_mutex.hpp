@@ -11,7 +11,6 @@
 #include <cstring>
 
 #include "gu_macros.h"
-#include "gu_exception.hpp"
 #include "gu_throw.hpp"
 
 namespace gu
@@ -31,7 +30,7 @@ namespace gu
 
         Mutex () : value()
         {
-            pthread_mutex_init (&value, NULL);
+            pthread_mutex_init (&value, NULL); // always succeeds
         }
 
         ~Mutex ()
