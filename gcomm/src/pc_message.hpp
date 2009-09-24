@@ -79,11 +79,11 @@ public:
         throw (gu::Exception)
     {
         size_t   off = offset;
-        uint32_t b;
+        uint32_t flags;
 
-        gu_trace (off = gcomm::read(buf, buflen, off, &b));
+        gu_trace (off = gcomm::read(buf, buflen, off, &flags));
 
-        prim = b & F_PRIM;
+        prim = flags & F_PRIM;
 
         gu_trace (off = gcomm::read(buf, buflen, off, &last_seq));
         gu_trace (off = last_prim.read(buf, buflen, off));
@@ -95,15 +95,17 @@ public:
     size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
         throw (gu::Exception)
     {
-        size_t off = offset;
-        uint32_t b = 0;
+        size_t   off   = offset;
+        uint32_t flags = 0;
 
-        b |= prim ? F_PRIM : 0;
+        flags |= prim ? F_PRIM : 0;
 
-        gu_trace (off = gcomm::write(b, buf, buflen, off));
+        gu_trace (off = gcomm::write(flags, buf, buflen, off));
         gu_trace (off = gcomm::write(last_seq, buf, buflen, off));
         gu_trace (off = last_prim.write(buf, buflen, off));
         gu_trace (off = gcomm::write(to_seq, buf, buflen, off));
+
+        assert (size() == (off - offset));
 
         return off;
     }
@@ -112,7 +114,8 @@ public:
     {
         PCInst* pcinst = reinterpret_cast<PCInst*>(0);
 
-        return (sizeof(pcinst->prim) + sizeof(pcinst->last_seq) + 
+        //             flags
+        return (sizeof(uint32_t) + sizeof(pcinst->last_seq) + 
                 ViewId::size() + sizeof(pcinst->to_seq));
     }
 
@@ -229,7 +232,19 @@ public:
 
         gu_trace (off = gcomm::write(b, buf, buflen, offset));
         gu_trace (off = gcomm::write(seq, buf, buflen, off));
-        gu_trace (off = inst->write(buf, buflen, off));
+
+
+        if (type == T_STATE || type == T_INSTALL)
+        {
+            assert (inst);
+            gu_trace (off = inst->write(buf, buflen, off));
+        }
+        else
+        {
+            assert (!inst);
+        }
+
+        assert (size() == (off - offset));
 
         return off;        
     }
