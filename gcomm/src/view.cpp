@@ -7,22 +7,24 @@
 BEGIN_GCOMM_NAMESPACE
 
 size_t ViewId::read(const byte_t* buf, const size_t buflen, const size_t offset)
+    throw (gu::Exception)
 {
     size_t off;
-    if ((off = uuid.read(buf, buflen, offset)) == 0)
-        return 0;
-    if ((off = gcomm::read(buf, buflen, off, &seq)) == 0)
-        return 0;
+
+    gu_trace (off = uuid.read(buf, buflen, offset));
+    gu_trace (off = gcomm::read(buf, buflen, off, &seq));
+
     return off;
 }
 
-size_t ViewId::write(byte_t* buf, const size_t buflen, const size_t offset) const
+size_t ViewId::write(byte_t* buf, const size_t buflen, const size_t offset)
+    const throw (gu::Exception)
 {
     size_t off;
-    if ((off = uuid.write(buf, buflen, offset)) == 0)
-        return 0;
-    if ((off = gcomm::write(seq, buf, buflen, off)) == 0)
-        return 0;
+
+    gu_trace (off = uuid.write(buf, buflen, offset));
+    gu_trace (off = gcomm::write(seq, buf, buflen, off));
+
     return off;
 }
 
@@ -31,12 +33,10 @@ string ViewId::to_string() const
     return "view_id(" + uuid.to_string() + ":" + gu::to_string(seq) + ")";
 }
 
-size_t NodeList::length() const
-{
-    return nodes.size();
-}
-
-size_t NodeList::read(const byte_t* buf, const size_t buflen, const size_t offset)
+size_t NodeList::read(const byte_t* buf,
+                      const size_t  buflen,
+                      const size_t  offset)
+    throw (gu::Exception)
 {
     size_t   off;
     uint32_t len;
@@ -44,71 +44,59 @@ size_t NodeList::read(const byte_t* buf, const size_t buflen, const size_t offse
     /* Clear map */
     nodes.clear();
     
-    if ((off = gcomm::read(buf, buflen, offset, &len)) == 0)
-    {
-        LOG_WARN("read node list: read len");
-        return 0;
-    }
+    gu_trace (off = gcomm::read(buf, buflen, offset, &len));
+
     for (uint32_t i = 0; i < len; ++i)
     {
         UUID uuid;
         byte_t name[node_name_size + 1];
-        if ((off = uuid.read(buf, buflen, off)) == 0)
-        {
-            LOG_WARN("read node list: read pid #" + make_int(i).to_string());
-            return 0;
-        }
-        if ((off = read_bytes(buf, buflen, off, name, node_name_size)) == 0)
-        {
-            LOG_WARN("read node list: read name #" + make_int(i).to_string());
-            return 0;
-        }
+
+        gu_trace (off = uuid.read(buf, buflen, off));
+        gu_trace (off = read_bytes(buf, buflen, off, name, node_name_size));
+
         name[node_name_size] = '\0';
-        if (nodes.insert(make_pair(uuid, string(reinterpret_cast<char*>(name)))).second == false)
+
+        if (nodes.insert(
+                make_pair(
+                    uuid,
+                    string(reinterpret_cast<char*>(name)))
+                ).second == false
+            )
         {
-            LOG_WARN("read node list: duplicate entry: " + uuid.to_string());
-            return 0;
+            gcomm_throw_runtime (EADDRINUSE)
+                << "Read node list: duplicate entry: " << uuid.to_string();
         }
     }
+
     return off;
 }
 
-size_t NodeList::write(byte_t* buf, const size_t buflen, const size_t offset) const
+size_t NodeList::write(byte_t* buf, const size_t buflen, const size_t offset)
+    const throw (gu::Exception)
 {
-    size_t off;
-        
+    size_t   off;
     uint32_t len(length());
-    if ((off = gcomm::write(len, buf, buflen, offset)) == 0)
-    {
-        LOG_WARN("write node list: write len");
-        return 0;
-    }
+
+    gu_trace (off = gcomm::write(len, buf, buflen, offset));
+
     size_t cnt = 0;
+
     for (NodeList::const_iterator i = begin(); i != end(); ++i)
     {
-        if ((off = get_uuid(i).write(buf, buflen, off)) == 0)
-        {
-            LOG_WARN("write node list: write pid #" + make_int(cnt).to_string());
-            return 0;
-        }
+        gu_trace (off = get_uuid(i).write(buf, buflen, off));
+
         byte_t name[node_name_size];
+
         strncpy(reinterpret_cast<char*>(name), 
                 get_name(i).c_str(), node_name_size);
-        if ((off = write_bytes(name, node_name_size, buf, buflen, off)) == 0)
-        {
-            LOG_WARN("write node list: write name #"
-                     + make_int(cnt).to_string());
-        }
+
+        // @todo: write_bytes() shoudl be rewritten to accept string&
+        gu_trace (off = write_bytes(name, node_name_size, buf, buflen, off));
         cnt++;
     }
+
     return off;
 }
-
-size_t NodeList::size() const
-{
-    return 4 + length()*(UUID::size() + node_name_size);
-}
-
 
 string View::to_string(const Type type) const
 {
@@ -262,82 +250,42 @@ bool operator==(const View& a, const View& b)
 
 
 size_t View::read(const byte_t* buf, const size_t buflen, const size_t offset)
+    throw (gu::Exception)
 {
     size_t off;
     uint32_t w;
 
-    if ((off = gcomm::read(buf, buflen, offset, &w)) == 0)
-    {
-        LOG_WARN("read type");
-        return 0;
-    }
+    gu_trace (off = gcomm::read(buf, buflen, offset, &w));
+
     type = static_cast<Type>(w);
+
     if (type != V_TRANS && type != V_REG)
     {
-        LOG_WARN("invalid type: " + make_int(w).to_string());
-        return 0;
+        gcomm_throw_runtime (EINVAL) << "Invalid type: " << w;
     }
-    if ((off = view_id.read(buf, buflen, off)) == 0)
-    {
-        LOG_WARN("read view id");
-        return 0;
-    }
-    if ((off = members.read(buf, buflen, off)) == 0)
-    {
-        LOG_WARN("read members");
-        return 0;
-    }
-    if ((off = joined.read(buf, buflen, off)) == 0)
-    {
-        LOG_WARN("read joined");
-        return 0;
-    }
-    if ((off = left.read(buf, buflen, off)) == 0)
-    {
-        LOG_WARN("read left");
-        return 0;
-    }
-    if ((off = partitioned.read(buf, buflen, off)) == 0)
-    {
-        LOG_WARN("read partitioned");
-    }
+
+    gu_trace (off = view_id.read (buf, buflen, off));
+    gu_trace (off = members.read (buf, buflen, off));
+    gu_trace (off = joined.read  (buf, buflen, off));
+    gu_trace (off = left.read    (buf, buflen, off));
+    gu_trace (off = partitioned.read(buf, buflen, off));
+
     return off;
 }
 
 size_t View::write(byte_t* buf, const size_t buflen, const size_t offset) const
+    throw (gu::Exception)
 {
-    size_t off;
+    size_t   off;
     uint32_t w(type);
-    if ((off = gcomm::write(w, buf, buflen, offset)) == 0)
-    {
-        LOG_WARN("write type");
-        return 0;
-    }
-    if ((off = view_id.write(buf, buflen, off)) == 0)
-    {
-        LOG_WARN("write view id");
-        return 0;
-    }
-    if ((off = members.write(buf, buflen, off)) == 0)
-    {
-        LOG_WARN("write members");
-        return 0;
-    }
-    if ((off = joined.write(buf, buflen, off)) == 0)
-    {
-        LOG_WARN("write joined");
-        return 0;
-    }
-    if ((off = left.write(buf, buflen, off)) == 0)
-    {
-        LOG_WARN("write left");
-        return 0;
-    }
-    if ((off = partitioned.write(buf, buflen, off)) == 0)
-    {
-        LOG_WARN("write partitioned");
-        return 0;
-    }
+
+    gu_trace (off = gcomm::write(w, buf, buflen, offset));
+    gu_trace (off = view_id.write  (buf, buflen, off));
+    gu_trace (off = members.write  (buf, buflen, off));
+    gu_trace (off = joined.write   (buf, buflen, off));
+    gu_trace (off = left.write     (buf, buflen, off));
+    gu_trace (off = partitioned.write(buf, buflen, off));
+
     return off;
 }
 

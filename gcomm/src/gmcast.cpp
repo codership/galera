@@ -56,53 +56,61 @@ public:
         strcpy(address, address_.c_str());
     }
     
-    void set_operational(bool op) {
-        operational = op;
-    }
+    void set_operational(bool op) { operational = op; }
     
-    bool is_operational() const {
-        return operational;
-    }
+    bool is_operational() const   { return operational; }
     
-    const UUID& get_uuid() const {
-        return uuid;
-    }
+    const UUID& get_uuid() const  { return uuid; }
     
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset) {
-        size_t off;
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+    {
+        size_t  off;
         uint8_t byte;
-        if ((off = gcomm::read(buf, buflen, offset, &byte)) == 0)
-            return 0;
+
+        gu_trace (off = gcomm::read(buf, buflen, offset, &byte));
+
         operational = byte & 0x1;
-        if ((off = uuid.read(buf, buflen, off)) == 0)
-            return 0;
+
+        gu_trace (off = uuid.read(buf, buflen, off));
+
         if (off + ADDR_SIZE > buflen)
-            return 0;
-        memcpy(address, buf + off, ADDR_SIZE);
+            gcomm_throw_runtime (EMSGSIZE) << ADDR_SIZE << " > "
+                                           << (buflen - off);
+
         size_t i;
+
         for (i = 0; i < ADDR_SIZE; ++i) {
-            if (address[i] == '\0')
+            if (buf[off + i] == '\0')
                 break;
         }
+
         if (i == ADDR_SIZE) {
-            LOG_WARN("address was not '\0' terminated");
-            return 0;
+            gcomm_throw_runtime (EINVAL) << "Address is not '\0' terminated";
         }
+
+        memcpy(address, buf + off, ADDR_SIZE);
+
         off += ADDR_SIZE;
+
         return off;
     }
 
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const {
-        size_t off;
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    {
+        size_t  off;
         uint8_t byte = operational ? 0x1 : 0;
-        if ((off = gcomm::write(byte, buf, buflen, offset)) == 0)
-            return 0;
-        if ((off = uuid.write(buf, buflen, off)) == 0)
-            return 0;
+
+        gu_trace (off = gcomm::write(byte, buf, buflen, offset));
+        gu_trace (off = uuid.write(buf, buflen, off));
+
         if (off + ADDR_SIZE > buflen)
-            return 0;
+            gcomm_throw_runtime (EMSGSIZE) << ADDR_SIZE << " > "
+                                           << (buflen - off);
+
         memcpy(buf + off, address, ADDR_SIZE);
+
         off += ADDR_SIZE;
+
         return off;
     }
     
@@ -134,7 +142,8 @@ public:
 
 private:
 
-    NodeList* node_list;
+    NodeList* node_list; // @todo: since we do a full node list copy in ctor
+                         //        below, do we really need a pointer here?
 
 public:
     
@@ -256,100 +265,84 @@ public:
 
     
     size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+        throw (gu::Exception)
     {
         size_t off;
-        /* Version */
-        if ((off = gcomm::write(version, buf, buflen, offset)) == 0)
-            return 0;
-        /* Type */
-        if ((off = gcomm::write(type, buf, buflen, off)) == 0)
-            return 0;
-        /* Flags  */
-        if ((off = gcomm::write(flags, buf, buflen, off)) == 0)
-            return 0;
-        /* TTL */
-        if ((off = gcomm::write(ttl, buf, buflen, off)) == 0)
-            return 0;
 
-        if ((off = source_uuid.write(buf, buflen, off)) == 0)
-            return 0;
+        gu_trace (off = gcomm::write(version, buf, buflen, offset));
+        gu_trace (off = gcomm::write(type, buf, buflen, off));
+        gu_trace (off = gcomm::write(flags, buf, buflen, off));
+        gu_trace (off = gcomm::write(ttl, buf, buflen, off));
+        gu_trace (off = source_uuid.write(buf, buflen, off));
 
         if (flags & F_NODE_ADDRESS)
         {
-            if ((off = write_string(node_address.c_str(), buf, buflen, off)) == 0)
-                return 0;
+            gu_trace (off = write_string(node_address.c_str(), buf,buflen,off));
         }
 
         if (flags & F_GROUP_NAME) 
         {
-            if ((off = write_string(group_name.c_str(), buf, buflen, off)) == 0)
-                return 0;
+            gu_trace (off = write_string(group_name.c_str(), buf, buflen, off));
         }
         
         if (flags & F_NODE_LIST) 
         {
-            if ((off = gcomm::write(static_cast<uint16_t>(node_list->size()), 
-                                    buf, buflen, off)) == 0)
-                return 0;
+            gu_trace (off = gcomm::write(
+                          static_cast<uint16_t>(node_list->size()),
+                          buf, buflen, off));
+
             for (NodeList::const_iterator i = node_list->begin();
                  i != node_list->end(); ++i) 
             {
-                if ((off = i->write(buf, buflen, off)) == 0)
-                    return 0;
+                gu_trace (off = i->write(buf, buflen, off));
             }
         }
         return off;
     }
     
     size_t read_v0(const byte_t* buf, const size_t buflen, const size_t offset)
+        throw (gu::Exception)
     {
         size_t off;
-        if ((off = gcomm::read(buf, buflen, offset, &type)) == 0)
-            return 0;
-        if ((off = gcomm::read(buf, buflen, off, &flags)) == 0)
-            return 0;
-        if ((off = gcomm::read(buf, buflen, off, &ttl)) == 0)
-            return 0;
-        if ((off = source_uuid.read(buf, buflen, off)) == 0)
-            return 0;
+
+        gu_trace (off = gcomm::read(buf, buflen, offset, &type));
+        gu_trace (off = gcomm::read(buf, buflen, off, &flags));
+        gu_trace (off = gcomm::read(buf, buflen, off, &ttl));
+        gu_trace (off = source_uuid.read(buf, buflen, off));
         
         if (flags & F_NODE_ADDRESS)
         {
-#if 0
             char* addr = 0;
-            if ((off = read_string(buf, buflen, off, &addr)) == 0)
-                return 0;
+
+            // @todo: this call should be totally redone and take std::string&
+            //        instead of char**
+            gu_trace (off = read_string(buf, buflen, off, &addr));
             node_address = addr;
             free(addr);
-#endif
-            node_address = reinterpret_cast<const char*>(buf + off);
-            off += node_address.length() + 1;
         }
         
         if (flags & F_GROUP_NAME) 
         {
-#if 0
             char* grp = 0;
-            if ((off = read_string(buf, buflen, off, &grp)) == 0)
-                return 0;
+
+            gu_trace (off = read_string(buf, buflen, off, &grp));
             group_name = grp;
             free(grp);
-#endif
-            group_name = reinterpret_cast<const char*>(buf + off);
-            off += group_name.length() + 1;
         }
         
         if (flags & F_NODE_LIST)
         {
-            node_list = new NodeList();
             uint16_t size;
-            if ((off = gcomm::read(buf, buflen, off, &size)) == 0)
-                return 0;
+
+            gu_trace (off = gcomm::read(buf, buflen, off, &size));
+
+            node_list = new NodeList(); // @todo: danger! Prev. list not deleted
+
             for (uint16_t i = 0; i < size; ++i) 
             {
                 GMCastNode node;
-                if ((off = node.read(buf, buflen, off)) == 0)
-                    return 0;
+
+                gu_trace (off = node.read(buf, buflen, off));
                 node_list->push_back(node);
             }
         }
@@ -362,20 +355,23 @@ public:
         return off;
     }
     
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset) {
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+        throw (gu::Exception)
+    {
         size_t off;
         
-        if ((off = gcomm::read(buf, buflen, offset, &version)) == 0)
-            return 0;
+        gu_trace (off = gcomm::read(buf, buflen, offset, &version));
+
         switch (version) {
         case 0:
-            return read_v0(buf, buflen, off);
+            gu_trace (return read_v0(buf, buflen, off));
         default:
             return 0;
         }
     }
     
-    size_t size() const {
+    size_t size() const
+    {
         return 4                 /* Common header */ 
             + source_uuid.size() /* Source uuid */
             /* GMCast address if set */
@@ -427,7 +423,6 @@ public:
     }
 
 };
-
 
 BEGIN_GCOMM_NAMESPACE
 

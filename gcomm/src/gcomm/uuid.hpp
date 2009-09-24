@@ -50,19 +50,27 @@ public:
         return uuid_nil;
     }
     
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset) 
+    size_t read (const byte_t* buf, const size_t buflen, const size_t offset)
+        throw (gu::Exception)
     {
         if (buflen < offset + sizeof(gu_uuid_t))
-            return 0;
+            gcomm_throw_runtime (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
+                                           << (buflen - offset);
+            
         memcpy(&uuid, buf + offset, sizeof(gu_uuid_t));
+
         return offset + sizeof(gu_uuid_t);
     }
     
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const 
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+        throw (gu::Exception)
     {
         if (buflen < offset + sizeof(gu_uuid_t))
-            return 0;
+            gcomm_throw_runtime (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
+                                           << (buflen - offset);
+
         memcpy(buf + offset, &uuid, sizeof(gu_uuid_t));
+
         return offset + sizeof(gu_uuid_t);
     }
     
@@ -96,7 +104,7 @@ public:
             // @todo: this is a rather unwarranted check
             if (36 != ret)
             {
-                gcomm_throw_fatal << "Failed to write UUID";
+                gcomm_throw_fatal << "Failed to print UUID";
             }
 #undef GU_CPP_UUID_FORMAT
             return std::string(buf);

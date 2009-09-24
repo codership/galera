@@ -11,6 +11,7 @@ using std::ostringstream;
 
 #include <gcomm/common.hpp>
 #include <gcomm/string.hpp>
+#include <gcomm/exception.hpp>
 
 BEGIN_GCOMM_NAMESPACE
 
@@ -20,11 +21,11 @@ typedef int64_t       seqno_t;
 template <class T> 
 inline size_t read(const byte_t* buf, const size_t buflen, 
                    const size_t offset, T* ret)
+    throw (gu::Exception)
 {
     if (buflen < sizeof(T) + offset)
-    {
-        return 0;
-    }
+        gcomm_throw_runtime (EMSGSIZE) << sizeof(T) << " > " << (buflen-offset);
+
 #if __BYTE_ORDER == __LITTLE_ENDIAN
     *ret = *reinterpret_cast<const T*>(buf + offset);
 #elif __BYTE_ORDER == __BIG_ENDIAN
@@ -40,9 +41,8 @@ inline size_t write(const T val, byte_t* buf, const size_t buflen,
                     const size_t offset)
 {
     if (buflen < sizeof(T) + offset)
-    {
-        return 0;
-    }
+        gcomm_throw_runtime (EMSGSIZE) << sizeof(T) << " > " << (buflen-offset);
+
 #if __BYTE_ORDER == __LITTLE_ENDIAN
     *reinterpret_cast<T*>(buf + offset) = val;
 #elif __BYTE_ORDER == __BIG_ENDIAN
@@ -60,12 +60,11 @@ template <class T> class IntType
 public:
     IntType() :
         t()
-    {
-    }
+    {}
+
     IntType(const T t_) : 
         t(t_)
-    {
-    }
+    {}
 
     T get() const
     {

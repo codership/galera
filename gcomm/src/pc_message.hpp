@@ -76,40 +76,34 @@ public:
     }
 
     size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+        throw (gu::Exception)
     {
-        size_t off = offset;
+        size_t   off = offset;
         uint32_t b;
 
-        if ((off = gcomm::read(buf, buflen, off, &b)) == 0)        return 0;
+        gu_trace (off = gcomm::read(buf, buflen, off, &b));
 
         prim = b & F_PRIM;
 
-        if ((off = gcomm::read(buf, buflen, off, &last_seq)) == 0) return 0;
-
-        if ((off = last_prim.read(buf, buflen, off)) == 0)         return 0;
-
-        if ((off = gcomm::read(buf, buflen, off, &to_seq)) == 0)   return 0;
+        gu_trace (off = gcomm::read(buf, buflen, off, &last_seq));
+        gu_trace (off = last_prim.read(buf, buflen, off));
+        gu_trace (off = gcomm::read(buf, buflen, off, &to_seq));
 
         return off;
     }
     
     size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+        throw (gu::Exception)
     {
         size_t off = offset;
         uint32_t b = 0;
 
         b |= prim ? F_PRIM : 0;
 
-        if ((off = gcomm::write(b, buf, buflen, off)) == 0)
-            gcomm_throw_fatal;
-
-        if ((off = gcomm::write(last_seq, buf, buflen, off)) == 0)
-            gcomm_throw_fatal;
-
+        gu_trace (off = gcomm::write(b, buf, buflen, off));
+        gu_trace (off = gcomm::write(last_seq, buf, buflen, off));
         gu_trace (off = last_prim.write(buf, buflen, off));
-
-        if ((off = gcomm::write(to_seq, buf, buflen, off)) == 0)
-            gcomm_throw_fatal;
+        gu_trace (off = gcomm::write(to_seq, buf, buflen, off));
 
         return off;
     }
@@ -124,10 +118,14 @@ public:
 
     string to_string() const
     {
-        return "prim = "       + make_int(prim).to_string()
-            + ", last_seq = "  + make_int(last_seq).to_string() 
-            + ", last_prim = " + last_prim.to_string()
-            + ", to_seq = "    + make_int(to_seq).to_string();
+        std::ostringstream ret;
+
+        ret << "prim = "        << prim
+            << ", last_seq = "  << last_seq 
+            << ", last_prim = " << last_prim.to_string()
+            << ", to_seq = "    << to_seq;
+
+        return ret.str();
     }    
 };
 
@@ -186,6 +184,7 @@ public:
     virtual ~PCMessage() { delete inst; }
     
     size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+        throw (gu::Exception)
     {
         size_t   off;
         uint32_t b;
@@ -193,44 +192,43 @@ public:
         delete inst;
         inst = 0;
 
-        if ((off = gcomm::read(buf, buflen, offset, &b)) == 0)
-            return 0;
+        gu_trace (off = gcomm::read(buf, buflen, offset, &b));
 
         version = b & 0xff;
 
-        if (version != 0) return 0;
+        if (version != 0)
+            gcomm_throw_runtime (EPROTONOSUPPORT)
+                << "Unsupported protocol varsion: " << version;
 
         type = static_cast<Type>((b >> 8) & 0xff);
 
-        if (type <= T_NONE || type >= T_MAX) return 0;
+        if (type <= T_NONE || type >= T_MAX)
+            gcomm_throw_runtime (EINVAL) << "Bad type value: " << type;
 
-        if ((off = gcomm::read(buf, buflen, off, &seq)) == 0) return 0;
+        gu_trace (off = gcomm::read(buf, buflen, off, &seq));
 
         if (type == T_STATE || type == T_INSTALL)
         {
             inst = new PCInstMap();
 
-            if ((off = inst->read(buf, buflen, off)) == 0) return 0;
+            gu_trace (off = inst->read(buf, buflen, off));
         }
 
         return off;
     }
     
     size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+        throw (gu::Exception)
     {
-        size_t off;
+        size_t   off;
         uint32_t b;
 
         b = type & 0xff;
         b <<= 8;
         b |= version & 0xff;
 
-        if ((off = gcomm::write(b, buf, buflen, offset)) == 0)
-            gcomm_throw_fatal << buflen;
-
-        if ((off = gcomm::write(seq, buf, buflen, off)) == 0)
-            gcomm_throw_fatal << buflen;
-
+        gu_trace (off = gcomm::write(b, buf, buflen, offset));
+        gu_trace (off = gcomm::write(seq, buf, buflen, off));
         gu_trace (off = inst->write(buf, buflen, off));
 
         return off;        

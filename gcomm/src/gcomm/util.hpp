@@ -28,8 +28,7 @@ static inline size_t read_string(const void* from, const size_t fromlen,
     for (i = from_offset; i < fromlen && *(from_str + i) != '\0'; ++i) {}
  
     /* Buffer didn't contain '\0' */
-    if (i == fromlen)
-        return 0;
+    if (i == fromlen) gcomm_throw_runtime (EMSGSIZE);
 
     /* Safe to strdup now */
     *to = strdup(from_str + from_offset);
@@ -40,9 +39,10 @@ static inline size_t read_bytes(const byte_t* from, const size_t fromlen,
                                 const size_t from_offset, 
                                 byte_t* to, const size_t tolen)
 {
-    if (fromlen < from_offset + tolen)
-        return 0;
+    if (fromlen < from_offset + tolen) gcomm_throw_runtime (EMSGSIZE);
+
     memcpy(to, from + from_offset, tolen);
+
     return from_offset + tolen;
 }
 
@@ -50,10 +50,12 @@ static inline size_t write_string(const char* from, byte_t* to,
                                   const size_t tolen, const size_t to_offset)
 {
     size_t strl = strlen(from);
-    if (tolen < strl + 1 + to_offset)
-        return 0;
+
+    if (tolen < strl + 1 + to_offset) gcomm_throw_runtime (EMSGSIZE);
+
     /* Copy string including '\0' */
     memcpy(to + to_offset, from, strl + 1);
+
     return to_offset + strl + 1;
 }
 
@@ -62,9 +64,10 @@ static inline size_t write_bytes(const byte_t* from,
                                  byte_t* to, 
                                  const size_t tolen, const size_t to_offset)
 {
-    if (tolen < fromlen + to_offset)
-        return 0;
+    if (tolen < fromlen + to_offset) gcomm_throw_runtime (EMSGSIZE);
+
     memcpy(to + to_offset, from, fromlen);
+
     return to_offset + fromlen;
 }
 

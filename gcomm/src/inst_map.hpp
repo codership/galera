@@ -31,76 +31,57 @@ namespace gcomm
 template<class T> class gcomm::InstMap
 {
     typedef std::map<const UUID, T> MType; /*!< Internal map representation */
+
 public:
 
-    typedef typename MType::iterator iterator; /*!< Iterator */
-    typedef typename MType::const_iterator const_iterator; /*!< Const iterator */
+    typedef typename MType::iterator       iterator;       /*!< Iterator */
+    typedef typename MType::const_iterator const_iterator; /*!< Const iterator*/
+
 private:
+
     MType map; /*!< Map */
+
 public:    
 
     /*!
      * @brief Default constructor
      */
-    InstMap() :
-        map()
-    {
-    }
+    InstMap() : map() {}
 
     /*!
      * @brief Destructor
      */
-    virtual ~InstMap()
-    {
-    }
+    virtual ~InstMap() {}
 
     /*!
      *
      */
-    iterator begin()
-    {
-        return map.begin();
-    }
+    iterator begin() { return map.begin(); }
     
     /*!
      *
      */
-    const_iterator begin() const
-    {
-        return map.begin();
-    }
+    const_iterator begin() const { return map.begin(); }
 
     /*!
      *
      */
-    iterator end()
-    {
-        return map.end();
-    }
+    iterator end() { return map.end(); }
 
     /*!
      *
      */
-    const_iterator end() const
-    {
-        return map.end();
-    }
+    const_iterator end() const { return map.end(); }
 
     /*!
      *
      */
-    iterator find(const UUID& uuid)
-    {
-        return map.find(uuid);
-    }
+    iterator find(const UUID& uuid) { return map.find(uuid); }
 
     /*!
      *
      */
-    const_iterator find(const UUID& uuid) const
-    {
-        return map.find(uuid);
-    }
+    const_iterator find(const UUID& uuid) const { return map.find(uuid); }
 
     /*!
      *
@@ -113,52 +94,46 @@ public:
     /*!
      *
      */
-    void erase(iterator i)
-    {
-        map.erase(i);
-    }
+    void erase(iterator i) { map.erase(i); }
 
     /*!
      *
      */
-    void clear()
-    {
-        map.clear();
-    }
+    void clear() { map.clear(); }
 
     /*!
      *
      */
-    size_t length() const
-    {
-        return map.size();
-    }
+    size_t length() const { return map.size(); }
     
     /*!
      *
      */
     size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+        throw (gu::Exception)
     {
         size_t off = offset;
         uint32_t len;
         // Clear map in case this object is reused
         map.clear();
-        if ((off = gcomm::read(buf, buflen, off, &len)) == 0)
-            return 0;
+
+        gu_trace (off = gcomm::read(buf, buflen, off, &len));
+
         for (uint32_t i = 0; i < len; ++i)
         {
             UUID uuid;
-            T t;
-            if ((off = uuid.read(buf, buflen, off)) == 0)
-                return 0;
-            if ((off = t.read(buf, buflen, off)) == 0)
-                return 0;
+            T    t;
+
+            gu_trace (off = uuid.read (buf, buflen, off));
+            gu_trace (off = t.read    (buf, buflen, off));
+
             if (map.insert(std::make_pair(uuid, t)).second == false)
             {
                 gcomm_throw_fatal << "Failed to insert " << uuid.to_string()
                                   << " in the map";
             }
         }
+
         return off;
     }
 
@@ -166,19 +141,21 @@ public:
      *
      */    
     size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+        throw (gu::Exception)
     {
-        size_t off = offset;
+        size_t   off = offset;
         uint32_t len = length();
-        if ((off = gcomm::write(len, buf, buflen, off)) == 0)
-            return 0;
+
+        gu_trace (off = gcomm::write(len, buf, buflen, off));
+
         typename MType::const_iterator i;
+
         for (i = map.begin(); i != map.end(); ++i)
         {
-            if ((off = i->first.write(buf, buflen, off)) == 0)
-                return 0;
-            if ((off = i->second.write(buf, buflen, off)) == 0)
-                return 0;
+            gu_trace (off = i->first.write (buf, buflen, off));
+            gu_trace (off = i->second.write(buf, buflen, off));
         }
+
         return off;
     }
     
@@ -187,7 +164,8 @@ public:
      */
     size_t size() const
     {
-        return 4 + length()*(UUID::size() + T::size());
+        //            length
+        return sizeof(uint32_t) + length() * (UUID::size() + T::size());
     }
     
     /*!

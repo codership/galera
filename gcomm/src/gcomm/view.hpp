@@ -32,9 +32,11 @@ public:
 
     seqno_t     get_seq() const { return seq; }
     
-    size_t read (const byte_t* buf, const size_t buflen, const size_t offset);
+    size_t read (const byte_t* buf, const size_t buflen, const size_t offset)
+        throw (gu::Exception);
 
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const;
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+        throw (gu::Exception);
 
     static size_t size() 
     {
@@ -108,13 +110,16 @@ public:
         return nodes == other.nodes;
     }
 
-    size_t length() const;
+    size_t length() const { return nodes.size(); }
     
     static const size_t node_name_size = 16;
-    size_t read(const byte_t*, size_t, size_t);
-    size_t write(byte_t*, size_t, size_t) const;
-    size_t size() const;
 
+    size_t read  (const byte_t*, size_t, size_t) throw (gu::Exception);
+    size_t write (byte_t*, size_t, size_t) const throw (gu::Exception);
+    size_t size  () const
+    {
+        return 4 + nodes.size()*(UUID::size() + node_name_size);
+    }
 };
 
 static inline const UUID& get_uuid(const NodeList::const_iterator i)
@@ -198,8 +203,12 @@ public:
 
     bool is_empty() const;
 
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset);
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const;
+    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+        throw (gu::Exception);
+
+    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+        throw (gu::Exception);
+
     size_t size() const;
     string to_string() const;
 };
