@@ -12,6 +12,7 @@
 #ifndef __GU_THROW__
 #define __GU_THROW__
 
+#include <cstring>
 #include <cerrno>
 #include <cstring>
 #include <sstream>
@@ -40,7 +41,7 @@ namespace gu
             line (line_),
             os   ()
         {}
-        
+
     public:
 
         virtual ~ThrowBase () {}

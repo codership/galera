@@ -49,19 +49,24 @@ static void parse_authority (const string&     auth,
     {
         host = gu::RegEx::Match (auth.substr (pos1, pos2 - pos1));
 
-        // according to RFC 3986 empty port (nothing after :) should be trated
+        // according to RFC 3986 empty port (nothing after :) should be treated
         // as unspecified, so make sure that it is not 0-length.
         if ((pos2 + 1) < auth.length())
         {
             port = gu::RegEx::Match (auth.substr (pos2 + 1));
 
-            if ((port.string().find_first_not_of ("0123456789") != string::npos)
+            if ((port.str().find_first_not_of ("0123456789") != string::npos)
                 ||
                 // @todo: possible port range is not determined in RFC 3986
-                (65535 < gu::from_string<long> (port.string())))
+                (65535 < gu::from_string<long> (port.str())))
             {
+                log_debug << "\n\tauth: '" << auth << "'"
+                          << "\n\thost: '" << host.str() << "'"
+                          << "\n\tport: '" << port.str() << "'"
+                          << "\n\tpos1: " << pos1 << ", pos2: " << pos2;
+
                 gu_throw_error (EINVAL) << "Can't parse port number from '"
-                                        << port.string() << "'";
+                                        << port.str() << "'";
             }
         }
     }
@@ -135,14 +140,14 @@ void gu::URI::parse (const string& uri_str) throw (gu::Exception)
 
     scheme = parts[SCHEME];
 
-    if (!scheme.is_set() || !scheme.string().length())
+    if (!scheme.is_set() || !scheme.str().length())
     {
         gu_throw_error (EINVAL) << "URI '" << uri_str << "' has empty scheme"; 
     }
 
     try
     {
-        parse_authority (parts[AUTHORITY].string(), user, host, port);
+        parse_authority (parts[AUTHORITY].str(), user, host, port);
     }
     catch (NotSet&) {}
 
@@ -156,7 +161,7 @@ void gu::URI::parse (const string& uri_str) throw (gu::Exception)
 
     try
     {
-        query_list = extract_query_list(str, parts[QUERY].string());
+        query_list = extract_query_list(str, parts[QUERY].str());
     }
     catch (NotSet&) {}
 
@@ -165,7 +170,7 @@ void gu::URI::parse (const string& uri_str) throw (gu::Exception)
 #if 0
     try
     {
-        log_debug << "Base URI: " << scheme.string() << "://"
+        log_debug << "Base URI: " << scheme.str() << "://"
                   << get_authority();
     }
     catch (NotSet&) {}
@@ -178,26 +183,26 @@ string gu::URI::get_authority() const throw (NotSet)
 
     size_t auth_len = 0;
 
-    if (user.is_set()) auth_len += user.string().length() + 1;
+    if (user.is_set()) auth_len += user.str().length() + 1;
 
     if (host.is_set())
     {
-        auth_len += host.string().length();
+        auth_len += host.str().length();
 
-        if (port.is_set()) auth_len += port.string().length() + 1;
+        if (port.is_set()) auth_len += port.str().length() + 1;
     }
 
     string auth;
 
     auth.reserve (auth_len);
 
-    if (user.is_set()) { auth += user.string(); auth += '@'; }
+    if (user.is_set()) { auth += user.str(); auth += '@'; }
 
     if (host.is_set())
     {
-        auth += host.string();
+        auth += host.str();
 
-        if (port.is_set()) { auth += ':'; auth += port.string(); }
+        if (port.is_set()) { auth += ':'; auth += port.str(); }
     }
 
     return auth;
@@ -211,7 +216,7 @@ void gu::URI::recompose() const
 
     if (scheme.is_set())
     {
-        str += scheme.string();
+        str += scheme.str();
         str += ':';
     }
 
@@ -223,7 +228,7 @@ void gu::URI::recompose() const
     }
     catch (NotSet&) {}
 
-    if (path.is_set()) str += path.string();
+    if (path.is_set()) str += path.str();
 
     if (query_list.size() > 0)
     {
@@ -251,7 +256,7 @@ void gu::URI::recompose() const
     if (fragment.is_set())
     {
         str += '#';
-        str += fragment.string();
+        str += fragment.str();
     }
 }
 

@@ -98,7 +98,7 @@ namespace gu
          */
         const std::string& get_scheme() const throw ()
         {
-            return scheme.string();
+            return scheme.str();
         }
 
         void _set_authority(const std::string& auth);
@@ -117,7 +117,7 @@ namespace gu
          */
         const std::string& get_user() const throw (NotSet)
         {
-            return user.string();
+            return user.str();
         }
         
         /*!
@@ -127,7 +127,7 @@ namespace gu
          */
         const std::string& get_host() const throw (NotSet)
         {
-            return host.string();
+            return host.str();
         }
         
         /*!
@@ -137,7 +137,7 @@ namespace gu
          */
         const std::string& get_port() const throw (NotSet)
         {
-            return port.string();
+            return port.str();
         }
         
         /*!
@@ -147,7 +147,7 @@ namespace gu
          */
         const std::string& get_path() const throw()
         {
-            return path.string();
+            return path.str();
         }
 
         /*!
@@ -157,7 +157,7 @@ namespace gu
          */
         const std::string& get_fragment() const throw(NotSet)
         {
-            return fragment.string();
+            return fragment.str();
         }
 
         /*!

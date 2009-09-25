@@ -122,26 +122,17 @@ static void uri_to_sa(const URI& uri, struct sockaddr *s, size_t *s_size)
     }
     catch (gu::NotSet&)
     {
-        gcomm_throw_runtime (EINVAL) << "URL " << uri.to_string()
+        gcomm_throw_runtime (EINVAL) << "URI " << uri.to_string()
                                      << " does not have host field";
     }
 
-    addrinfo addrhint = {
-        0,
-        AF_UNSPEC,
-        SOCK_STREAM,
-        0,
-        0,
-        0,
-        0,
-        0
-    };
-
-    addrinfo* addri = 0;    
+    addrinfo  addrhint = { 0, AF_UNSPEC, SOCK_STREAM, 0, 0, 0, 0, 0 };
+    addrinfo* addri    = 0;    
     int       err;
 
-    log_debug << "Calling getaddrinfo('" << host << "', '" << port << "', "
-              << addrhint.ai_addrlen << ", " << &addri << ')';
+    log_debug << "Calling getaddrinfo('" << (host ? host : "Null") << "', '" 
+              << (port ? port : "Null") << "', "
+              << &addrhint << ", " << &addri << ')';
 
     if ((err = getaddrinfo(host, port, &addrhint, &addri)) != 0)
     {
@@ -157,18 +148,15 @@ static void uri_to_sa(const URI& uri, struct sockaddr *s, size_t *s_size)
         }
     }
     
-    if (addri == 0)
-    {
-        gcomm_throw_fatal << "no address found";
-    }
+    if (addri == 0) gcomm_throw_fatal << "no address found";
     
     if (addri->ai_socktype != SOCK_STREAM)
     {
         gcomm_throw_fatal << "returned socket is not stream";
     }
     
-    *s = *addri->ai_addr;
-    *s_size = addri->ai_addrlen;
+    *s      = *addri->ai_addr;
+    *s_size =  addri->ai_addrlen;
     freeaddrinfo(addri);
 }
 
@@ -294,7 +282,7 @@ void TCP::listen()
 
     if (fd != -1) gcomm_throw_runtime (EISCONN);
 
-    uri_to_sa(uri, &sa, &sa_size);
+    gu_trace (uri_to_sa(uri, &sa, &sa_size));
 
     if ((fd = ::socket(sa.sa_family, SOCK_STREAM, 0)) == -1)
 	gcomm_throw_runtime(errno);
@@ -305,13 +293,14 @@ void TCP::listen()
 	gcomm_throw_runtime(errno);
 
     int reuse = 1;
+
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1)
 	gcomm_throw_runtime(errno);
 
     if (::bind(fd, &sa, sa_size) == -1)
     {
 	gcomm_throw_runtime(errno) << "Bind failed to address " 
-                                   << sockaddr_to_uri(Conf::TcpScheme, &sa);
+                                   << sockaddr_to_str (&sa);
     }
 
     if (::listen(fd, 128) == -1)
@@ -333,27 +322,30 @@ Transport *TCP::accept()
     int acc_fd;
 
     if ((acc_fd = ::accept(fd, &acc_sa, &acc_sa_size)) == -1)
-	gcomm_throw_runtime(errno) << "Accept failed";
+	gcomm_throw_runtime(errno) << "accept() failed";
 
     log_debug << "accept(): " << acc_fd;
 
-    if (is_non_blocking() && ::fcntl(acc_fd, F_SETFL, O_NONBLOCK) == -1) {
+    if (is_non_blocking() && ::fcntl(acc_fd, F_SETFL, O_NONBLOCK) == -1)
+    {
         closefd(acc_fd);
-	gcomm_throw_runtime(errno) << "Fcntl failed";
+	gcomm_throw_runtime(errno) << "fcntl O_NONBLOCK failed";
     }
 
     linger lg = {1, 3};
+
     if (::setsockopt(acc_fd, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg)) == -1) 
     {
         closefd(acc_fd);
 	acc_fd = -1;
-	gcomm_throw_runtime(errno) << "Setsockopt linger failed";
+	gcomm_throw_runtime(errno) << "setsockopt SO_LINGER failed";
     }
     
     if (::setsockopt(acc_fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle,
-                     sizeof(no_nagle)) == -1) {
+                     sizeof(no_nagle)) == -1)
+    {
         closefd(acc_fd);
-	gcomm_throw_runtime(errno);	
+	gcomm_throw_runtime(errno) << "setsockopt TCP_NODELAY failed";
     }
     
     TCP *ret = new TCP(uri, event_loop, mon);
@@ -801,40 +793,42 @@ const ReadBuf *TCP::recv()
 {
     int ret;
 
-    if (recv_rb)
-	recv_rb->release();
+    if (recv_rb) recv_rb->release();
+
     recv_rb = 0;
 
-    while ((ret = recv_nointr(0)) == EAGAIN) {
+    while ((ret = recv_nointr(0)) == EAGAIN)
+    {
 	while (tmp_poll(fd, Event::E_IN, 
 			std::numeric_limits<int>::max(), 0) == 0) {}
     }
+
     if (ret != 0) {
-	LOG_DEBUG(std::string("TCP::recv() ") + ::strerror(ret));
+        // @todo: throw exception?
+	log_debug << ::strerror(ret);
 	return 0;
     }
     
     recv_rb = new ReadBuf(recv_buf + TCPHdr::get_raw_len(),
 			  recv_buf_offset - TCPHdr::get_raw_len());
     recv_buf_offset = 0;
+
     return recv_rb;
 }
 
-
-
 string TCP::get_remote_url() const
 {
-    return sockaddr_to_uri(Conf::TcpScheme, &sa);
+    return Conf::TcpScheme + sockaddr_to_str(&sa);
 }
 
 string TCP::get_remote_host() const
 {
-    return sockaddr_host_to_str(&sa);
+    return sockaddr_to_host(&sa);
 }
 
 string TCP::get_remote_port() const
 {
-    return sockaddr_port_to_str(&sa);
+    return sockaddr_to_port(&sa);
 }
 
 END_GCOMM_NAMESPACE

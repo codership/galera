@@ -22,15 +22,12 @@ gu_timeval_diff (struct timeval* left, struct timeval* right)
 }
 
 static inline void
-gu_timeval_add (struct timeval* time, double s)
+gu_timeval_add (struct timeval* t, double s)
 {
-    long sec  = (long)s;
-    long usec = (long)(((long)s - sec) * 1000000);
-    long carry;
-    time->tv_usec += usec;
-    carry = (time->tv_usec >= 1000000);
-    time->tv_sec  += sec + carry;
-    time->tv_usec -= carry * 1000000;
+    double ret = (double)t->tv_sec + ((double)t->tv_usec) * 1.0e-06 + s;
+
+    t->tv_sec  = (long)ret;
+    t->tv_usec = (long)((ret - (double)t->tv_sec) * 1.0e+06);
 }
 
 static const double SEC_PER_CLOCK = ((double)1.0)/CLOCKS_PER_SEC;

@@ -47,16 +47,15 @@ long read_long(const string& s)
     return ret;
 }
 
-string sockaddr_to_uri(const string& scheme, const sockaddr* sa)
+string sockaddr_to_str (const sockaddr* sa) throw (RuntimeException)
 {
     if (sa->sa_family != AF_INET && sa->sa_family != AF_INET6)
     {
-        gcomm_throw_fatal << "Address family " << sa->sa_family
-                          << " not supported";
+        gcomm_throw_runtime (EINVAL) << "Address family " << sa->sa_family
+                                     << " not supported";
     }
 
-    char buf[24];
-    string ret = scheme + "://";
+    char   buf[40]; // IPv6 takes 39 digits + terminator
     
     const sockaddr_in *sin = reinterpret_cast<const sockaddr_in*>(sa);
     
@@ -64,43 +63,46 @@ string sockaddr_to_uri(const string& scheme, const sockaddr* sa)
                                sizeof(buf));
     if (rb == 0)
     {
-        gcomm_throw_fatal << "Address conversion failed: " << strerror(errno);
+        gcomm_throw_runtime (errno) << "Address conversion failed";
     }
-    ret += rb;
-    ret += ":";
-    ret += make_int<unsigned short>(ntohs(sin->sin_port)).to_string();
+
+    std::ostringstream ret;
+
+    ret << rb << ":" << (ntohs(sin->sin_port));
     
-    return ret;
+    return ret.str();
 }
 
-string sockaddr_host_to_str(const sockaddr* sa)
+string sockaddr_to_host (const sockaddr* sa) throw (RuntimeException)
 {
     if (sa->sa_family != AF_INET && sa->sa_family != AF_INET6)
     {
-        gcomm_throw_fatal << "Address family " << sa->sa_family
-                          << " not supported";
+        gcomm_throw_runtime (EINVAL) << "Address family " << sa->sa_family
+                                     << " not supported";
     }
-    char buf[24];
+
+    char buf[40];
     const sockaddr_in *sin = reinterpret_cast<const sockaddr_in*>(sa);
     const char* rb = inet_ntop(sin->sin_family, &sin->sin_addr, buf,
                                sizeof(buf));
     if (rb == 0)
     {
-        gcomm_throw_fatal << "Address conversion failed: " << strerror(errno);
+        gcomm_throw_runtime (errno) << "Address conversion failed";
     }
+
     return rb;
 }
 
-string sockaddr_port_to_str(const sockaddr* sa)
+string sockaddr_to_port (const sockaddr* sa) throw (RuntimeException)
 {
     if (sa->sa_family != AF_INET && sa->sa_family != AF_INET6)
     {
-        gcomm_throw_fatal << "Address family " << sa->sa_family
-                          << " not supported";
+        gcomm_throw_runtime (EINVAL) << "Address family " << sa->sa_family
+                                     << " not supported";
     }
 
     const sockaddr_in *sin = reinterpret_cast<const sockaddr_in*>(sa);
-    return make_int<unsigned short>(ntohs(sin->sin_port)).to_string();
+    return gu::to_string (ntohs(sin->sin_port));
 }
 
 END_GCOMM_NAMESPACE

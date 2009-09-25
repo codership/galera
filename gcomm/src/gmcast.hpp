@@ -29,7 +29,7 @@ class GMCast : public Transport, EventContext
     UUID my_uuid;
 
     /* */
-    typedef GMCastProtoMap ProtoMap;
+    typedef GMCastProtoMap ProtoMap; // @todo: purpose of this typedef?
     ProtoMap* proto_map;
     ProtoMap* spanning_tree;
 
@@ -142,7 +142,7 @@ class GMCast : public Transport, EventContext
 
     std::string self_string() const
     {
-        return "(" + get_uuid().to_string() + "," + listen_addr + ")";
+        return "(" + get_uuid().to_string() + ", " + listen_addr + ")";
     }
 
     GMCast (const GMCast&);

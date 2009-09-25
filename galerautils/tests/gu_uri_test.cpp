@@ -109,11 +109,11 @@ START_TEST (uri_test1) // checking normal URI
             fail ("Authority not set in '%s'", uri_str.c_str());
         }
 
-        gu::URIQueryList ql = uri._get_query_list();
+        URIQueryList ql = uri._get_query_list();
 
         fail_if (ql.size() != 2, "Query list size %zu, expected 2", ql.size());
 
-        gu::URIQueryList::const_iterator i = ql.begin();
+        URIQueryList::const_iterator i = ql.begin();
 
         fail_if (i->first != opt1, "got option '%s', expected '%s'",
                  i->first.c_str(), opt1.c_str());
@@ -132,6 +132,8 @@ START_TEST (uri_test1) // checking normal URI
 
         try { uri.get_option("xxx"); fail ("Expected NotFound exception"); }
         catch (NotFound&) {}
+
+        URI simple ("gcomm+pc://192.168.0.1");
     }
     catch (Exception& e)
     {

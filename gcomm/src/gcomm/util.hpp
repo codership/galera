@@ -97,16 +97,14 @@ int read_int(const string& s);
 long read_long(const string& s);
 
 /*! 
- * Convert sockaddr struct to uri
+ * sockaddr conversion functions
  */
-std::string sockaddr_to_uri(const std::string& scheme, const sockaddr* sa);
-
-std::string sockaddr_host_to_str(const sockaddr* sa);
-std::string sockaddr_port_to_str(const sockaddr* sa);
-bool is_anyaddr(const std::string& url);
+std::string sockaddr_to_str  (const sockaddr* sa) throw (RuntimeException);
+std::string sockaddr_to_host (const sockaddr* sa) throw (RuntimeException);
+std::string sockaddr_to_port (const sockaddr* sa) throw (RuntimeException);
 
 // @todo: wrong function - port is not mandatory by RFC, will also fail for IPv6
-inline std::string _parse_host(const std::string& str)
+inline std::string __parse_host(const std::string& str)
 {
     size_t sep = str.find(':');
     if (sep == std::string::npos)
@@ -117,7 +115,7 @@ inline std::string _parse_host(const std::string& str)
 }
 
 // @todo: wrong function - port is not mandatory by RFC, will also fail for IPv6
-inline std::string _parse_port(const std::string& str)
+inline std::string __parse_port(const std::string& str)
 {
     size_t sep = str.find(':');
     if (sep == std::string::npos)
@@ -127,7 +125,7 @@ inline std::string _parse_port(const std::string& str)
     return str.substr(sep + 1);
 }
 
-inline bool host_undefined (const string& host)
+inline bool host_is_any (const string& host)
 {   
     return (host.length() == 0 || host == "0.0.0.0" ||
             host.find ("::/128") <= 1);

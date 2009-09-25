@@ -44,12 +44,12 @@ public:
         uuid = GU_UUID_NIL;
         memcpy(&uuid, &idx, sizeof(idx));
     }
-    
+
     static const UUID& nil()
     {
         return uuid_nil;
     }
-    
+
     size_t read (const byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
     {

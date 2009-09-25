@@ -24,7 +24,8 @@ void PC::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
             tp->close(gcomm::get_uuid(i));
         }
 
-        for (NodeList::const_iterator i = um->get_view()->get_partitioned().begin();
+        for (NodeList::const_iterator i =
+                 um->get_view()->get_partitioned().begin();
              i != um->get_view()->get_partitioned().end(); ++i)
         {
             tp->close(gcomm::get_uuid(i));
@@ -37,6 +38,7 @@ void PC::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
 int PC::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
 {
     Critical crit(mon);
+
     return pass_down(wb, dm);
 }
 
@@ -88,11 +90,11 @@ void PC::connect()
                           << " does not support UUID";
     }
     
-    tp->connect();
+    gu_trace (tp->connect());
 
     UUID uuid = tp->get_uuid();
 
-    if (uuid == UUID())
+    if (uuid == UUID::nil())
     {
         gcomm_throw_fatal << "invalid UUID: " << uuid.to_string();
     }
@@ -112,7 +114,7 @@ void PC::connect()
 
     gcomm::connect (tp, evs);
 
-    const bool start_prim = host_undefined (uri.get_host());
+    const bool start_prim = host_is_any (uri.get_host());
 
     evs->shift_to(EVSProto::S_JOINING);
 
