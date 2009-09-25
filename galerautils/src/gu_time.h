@@ -25,7 +25,7 @@ static inline void
 gu_timeval_add (struct timeval* time, double s)
 {
     long sec  = (long)s;
-    long usec = (long)((s - sec) * 1000000);
+    long usec = (long)(((long)s - sec) * 1000000);
     long carry;
     time->tv_usec += usec;
     carry = (time->tv_usec >= 1000000);
