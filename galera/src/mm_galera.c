@@ -1301,7 +1301,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
 }
 
 static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
-    const wsrep_seqno_t bf_seqno, const trx_id_t victim_trx
+    const wsrep_seqno_t bf_seqno, const wsrep_trx_id_t victim_trx
 ) {
     enum wsrep_status ret_code = WSREP_OK;
     int rcode;
@@ -1416,8 +1416,9 @@ static enum wsrep_status mm_galera_abort_slave_trx(
     return ret_code;
 }
 
-static enum wsrep_status mm_galera_post_commit(wsrep_t *gh, trx_id_t trx_id)
-{
+static enum wsrep_status mm_galera_post_commit(
+    wsrep_t *gh, wsrep_trx_id_t trx_id
+) {
     bool do_report = false;
     wsdb_trx_info_t trx;
 
@@ -1453,8 +1454,9 @@ static enum wsrep_status mm_galera_post_commit(wsrep_t *gh, trx_id_t trx_id)
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static enum wsrep_status mm_galera_post_rollback(wsrep_t *gh, trx_id_t trx_id)
-{
+static enum wsrep_status mm_galera_post_rollback(
+    wsrep_t *gh, wsrep_trx_id_t trx_id
+) {
     wsdb_trx_info_t trx;
 
     GU_DBUG_ENTER("galera_post_rollback");
@@ -1536,10 +1538,9 @@ static int check_certification_status_for_aborted(
 
 
 static enum wsrep_status mm_galera_pre_commit(
-    wsrep_t *gh,
-    trx_id_t trx_id, conn_id_t conn_id, const char *rbr_data,size_t rbr_data_len
-    )
-{
+    wsrep_t *gh, wsrep_trx_id_t trx_id, wsrep_conn_id_t conn_id, 
+    const char *rbr_data,size_t rbr_data_len
+) {
 
     int                    rcode;
     struct wsdb_write_set *ws;
@@ -1773,8 +1774,9 @@ cleanup:
 }
 
 static enum wsrep_status mm_galera_append_query(
-    wsrep_t *gh,
-    const trx_id_t trx_id, const char *query, const time_t timeval, const uint32_t randseed) {
+    wsrep_t *gh, const wsrep_trx_id_t trx_id, 
+    const char *query, const time_t timeval, const uint32_t randseed
+) {
 
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
 
@@ -1790,7 +1792,7 @@ static enum wsrep_status mm_galera_append_query(
 
 #ifdef UNUSED
 static enum wsrep_status galera_append_row(
-    trx_id_t trx_id,
+    wsrep_trx_id_t trx_id,
     uint16_t len,
     uint8_t *data
 ) {
@@ -1808,7 +1810,7 @@ static enum wsrep_status galera_append_row(
 
 static enum wsrep_status mm_galera_append_row_key(
     wsrep_t *gh,
-    const trx_id_t trx_id,
+    const wsrep_trx_id_t trx_id,
     const char    *dbtable,
     const size_t dbtable_len,
     const char *key,
@@ -1851,7 +1853,7 @@ static enum wsrep_status mm_galera_append_row_key(
 
 static enum wsrep_status mm_galera_set_variable(
     wsrep_t *gh,
-    const conn_id_t  conn_id,
+    const wsrep_conn_id_t  conn_id,
     const char *key,  const  size_t key_len, 
     const char *query, const size_t query_len
 ) {
@@ -1906,7 +1908,7 @@ static enum wsrep_status mm_galera_set_variable(
 
 static enum wsrep_status mm_galera_set_database(
     wsrep_t *gh,
-    const conn_id_t conn_id, const char *query, const size_t query_len
+    const wsrep_conn_id_t conn_id, const char *query, const size_t query_len
 ) {
 
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
@@ -1922,7 +1924,7 @@ static enum wsrep_status mm_galera_set_database(
 
 static enum wsrep_status mm_galera_to_execute_start(
     wsrep_t *gh,
-    const conn_id_t conn_id, const char *query, const size_t query_len
+    const wsrep_conn_id_t conn_id, const char *query, const size_t query_len
 ) {
 
     int                    rcode;
@@ -2020,7 +2022,7 @@ cleanup:
 }
 
 static enum wsrep_status mm_galera_to_execute_end(
-    wsrep_t *gh, const conn_id_t conn_id
+    wsrep_t *gh, const wsrep_conn_id_t conn_id
 ) {
     bool do_report;
     struct wsdb_conn_info conn_info;
@@ -2051,7 +2053,7 @@ static enum wsrep_status mm_galera_to_execute_end(
 }
 
 static enum wsrep_status mm_galera_replay_trx(
-    wsrep_t *gh, const trx_id_t trx_id, void *app_ctx
+    wsrep_t *gh, const wsrep_trx_id_t trx_id, void *app_ctx
 ) {
     struct job_worker *applier;
     int                rcode;
