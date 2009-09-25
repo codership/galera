@@ -13,6 +13,7 @@
 #define __GU_THROW__
 
 #include <cerrno>
+#include <cstring>
 #include <sstream>
 
 #include "gu_exception.hpp"
