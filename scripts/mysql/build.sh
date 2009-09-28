@@ -155,6 +155,9 @@ install -m 644 README $DIST_DIR
 install -m 644 QUICK_START $DIST_DIR
 install -D -m 644 $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/mysql/english/errmsg.sys
 install -D -m 755 $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/libexec/mysqld
+install -D -m 755 $MYSQL_SRC/client/.libs/lt-mysql       $MYSQL_DIST_DIR/bin/mysql
+install -D -m 755 $MYSQL_SRC/client/.libs/lt-mysqldump   $MYSQL_DIST_DIR/bin/mysqldump
+install -D -m 755 $MYSQL_SRC/client/.libs/mysqladmin     $MYSQL_DIST_DIR/bin/mysqladmin
 install -D -m 755 $MYSQL_SRC/scripts/wsrep_sst_mysqldump $MYSQL_DIST_DIR/bin/wsrep_sst_mysqldump
 install -D -m 644 my.cnf $MYSQL_DIST_CNF
 cat $MYSQL_SRC/support-files/wsrep.cnf >> $MYSQL_DIST_CNF
@@ -187,6 +190,9 @@ GALERA_SBIN=""
     install -D -m 755 $GALERA_SRC/galeracomm/vs/src/.libs/vsbes $GALERA_SBIN/vsbes
 #fi
 
+strip $MYSQL_DIST_DIR/bin/mysql
+strip $MYSQL_DIST_DIR/bin/mysqladmin
+strip $MYSQL_DIST_DIR/bin/mysqldump
 # Strip binaries if not instructed otherwise
 if test "$NO_STRIP" != "yes"
 then
@@ -195,6 +201,7 @@ then
 #	then
 	strip $GALERA_SBIN/*
 #    fi
+    strip $MYSQL_DIST_DIR/libexec/mysqld
 fi
 
 # original MYSQL_VER=$(grep AM_INIT_AUTOMAKE\(mysql, configure.in | awk '{ print $2 }' | sed s/\)//)

@@ -1,6 +1,8 @@
 Galera for MySQL Quick Start Guide
 ==================================
 
+version 0.7pre
+
 This is an informal guide to quick setup of MySQL/Galera cluster for 
 experienced users. For more detailed information please see README.
 
@@ -21,10 +23,10 @@ same performance and Node1 has IP address 192.168.1.1
    choice (hereafter INSTALL_DIR). The location must have at least 1Gb of free
    space for database files.
 
-2. Start arbitrator on Node1. For that just run gcomm script from this 
+2. Start arbitrator on Node1. For that just run vsbes script from this 
    distribution:
 
-   $ <INSTALL_DIR>/gcomm start
+   $ <INSTALL_DIR>/vsbes start
 
 3. Configure and start MySQL server on each node 
    
@@ -33,7 +35,7 @@ same performance and Node1 has IP address 192.168.1.1
    need to modify only the wsrep_gcs_address option to contain your arbitrator
    node address:
 
-   wsrep_gcs_address=gcomm://tcp:192.168.1.1:4567
+   wsrep_gcs_address=vsbes://tcp:192.168.1.1:4567
 
    After this change, you can start the server with following command:
 
@@ -44,7 +46,12 @@ same performance and Node1 has IP address 192.168.1.1
 
    Alternatively you can provide arbitrator address as a command line option:
 
-   <INSTALL_DIR>/mysql-galera -g "gcomm://tcp:192.168.1.1:4567" start
+   <INSTALL_DIR>/mysql-galera -g "vsbes://tcp:192.168.1.1:4567" start
+
+NOTE: Beginning from the second node, each node you start will automatically
+copy the contents of the database from one of the working nodes. Allow some
+time for it to complete - it depends on the size of the database. See README
+for details.
 
 That's it. You've got a multi-master MySQL/Galera cluster. Node1, Node2 and 
 Node3 will now synchronize all writes to the whole cluster.
@@ -64,11 +71,7 @@ LIMITATIONS:
    different nodes. As a result SELECT...LIMIT... may return slightly different
    sets.
 
-3. Currently MySQL/Galera demo lacks automatic state transfer. Every time 
-   you add a new node to the cluster and/or restart a node you need to manually 
-   synchronize database contents on the nodes. See README for details.
-
-4. Unsupported in this demo:
+3. Unsupported in this release:
    commands: LOAD DATA.
    features: LOCKed sessions.
    Use at your own risk.
@@ -99,5 +102,5 @@ QUICK ANSWERS:
 
 7. The patch for MySQL can be obtained at: bzr branch lp:codership-mysql
 
-Please direct all your suggestions, opinions and inquiries to info@codership.com
 
+Please direct all your suggestions, opinions and inquiries to info@codership.com

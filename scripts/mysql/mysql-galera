@@ -184,9 +184,6 @@ galera_start()
 
     echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening at port $MYSQL_PORT and socket $MYSQL_SOCKET..."
 
-    export LD_LIBRARY_PATH
-    export PATH=$MYSQL_BASE_DIR/bin:$PATH
-
     if test -z $GDB
     then
 	nohup $VALGRIND $MYSQLD \
@@ -199,6 +196,7 @@ galera_start()
 	    --socket=$MYSQL_SOCKET \
 	    --skip-locking \
             --log_error=$err_log \
+	    $MYSQLD_OPTS \
             $INNODB_OPTS \
 	    $WSREP_OPTS \
 	    $DEBUG_OPTS \
@@ -216,6 +214,7 @@ galera_start()
 	    --socket=$MYSQL_SOCKET \
 	    --skip-locking \
             --log_error=$err_log \
+	    $MYSQLD_OPTS \
             $INNODB_OPTS \
 	    $WSREP_OPTS \
 	    $DEBUG_OPTS \
@@ -383,7 +382,7 @@ case $1 in
             COMMAND=$2
             ;;
     --mysql-opt)
-            OPT_MYSQLD="$OPT_MYSQLD $2"
+            MYSQLD_OPTS="$MYSQLD_OPTS $2"
 	    shift
             ;;
 'dump')
@@ -416,6 +415,9 @@ case $1 in
 esac
 shift
 done
+
+export LD_LIBRARY_PATH
+export PATH=$MYSQL_BASE_DIR/bin:$PATH
 
 $COMMAND
 

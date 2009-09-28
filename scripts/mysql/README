@@ -4,7 +4,7 @@ http://www.codership.com
 
 DISCLAIMER
 
-THIS DEMO SOFTWARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER
+THIS SOFTWARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER
 EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
 OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 IN NO EVENT SHALL CODERSHIP OY BE HELD LIABLE TO ANY PARTY FOR ANY DAMAGES
@@ -49,14 +49,13 @@ CONTENTS:
 5. LIMITATIONS
 
 
-0. WHAT IS MYSQL/GALERA CLUSTER
+0. WHAT IS MYSQL/GALERA CLUSTER v0.7pre
 
-MySQL/Galera demo cluster is a synchronous multi-master MySQL server cluster.
-It consists of a single group communication daemon gcomm and several MySQL 
-server instances which connect to it in a star-like fashion:
+MySQL/Galera cluster is a synchronous multi-master MySQL server cluster.
+In this release it consists of a single group communication daemon vsbes and several MySQL server instances which connect to it in a star-like fashion:
 
      ,--------.   ,---------.   ,--------.
-     | mysqld |---|  gcomm  |---| mysqld |
+     | mysqld |---|  vsbes  |---| mysqld |
      `--------'   `---------'   `--------'
                    /       \
             ,--------.   ,--------.
@@ -67,7 +66,7 @@ Server states are synchronized by replicating transaction changes at commit
 time. The cluster is virtually synchronous: this means that each node commits
 transactions in exactly the same order, although not necessarily at the same
 physical moment. (The latter is not that important as it may seem, since in most
-cases dbms gives no guarantee on when the transaction is actually executed.)
+cases DBMS gives no guarantee on when the transaction is actually executed.)
 Built-in flow control keeps nodes within fraction of a second from each other,
 this is more than enough for most practical purposes.
 
