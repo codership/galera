@@ -652,7 +652,7 @@ public:
 	    }
             else if (type == GAP)
             {
-                gu_trace (off = gap.write(buf, buflen, off))
+                gu_trace (off = gap.write(buf, buflen, off));
             }
 	} 
 	return off;
