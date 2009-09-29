@@ -416,6 +416,12 @@ esac
 shift
 done
 
+if [ -z "$COMMAND" ]
+then
+    usage
+    exit 1
+fi
+
 export LD_LIBRARY_PATH
 export PATH=$MYSQL_BASE_DIR/bin:$PATH
 
