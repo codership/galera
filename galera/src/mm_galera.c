@@ -1019,9 +1019,11 @@ galera_handle_configuration (wsrep_t* gh,
 
     assert (status.last_applied == last_recved);
 
-    if (conf->st_required) // see #163 - SST might have happened already
-        conf->st_required = (status.last_applied != conf->seqno ||
-                             gu_uuid_compare (&status.state_uuid, conf_uuid)));
+    if (conf->st_required) { // see #163 - SST might have happened already
+        ((gcs_act_conf_t*)conf)->st_required =
+            (status.last_applied != conf->seqno ||
+             gu_uuid_compare (&status.state_uuid, conf_uuid));
+    }
 
     view_handler_cb (galera_view_info_create (conf));
 
