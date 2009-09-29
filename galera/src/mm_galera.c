@@ -180,6 +180,7 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
     }
     return 0;
 }
+
 /*
  * @brief compare seqno order of two applying jobs
  */
@@ -206,10 +207,10 @@ static void *galera_wsdb_configurator (
     }
 }
 
-#define GALERA_UPDATE_LAST_APPLIED(seqno)                               \
+#define GALERA_UPDATE_LAST_APPLIED(seqno)                              \
     assert (status.last_applied <= seqno);                             \
     status.last_applied = seqno;                                       \
-    assert (status.last_applied <= last_recved);                       \
+    assert (status.last_applied <= last_recved);
 
 static gcs_conn_t* galera_init_gcs (wsrep_t*      gh,
                                     const char*   node_name,
@@ -1018,11 +1019,16 @@ galera_handle_configuration (wsrep_t* gh,
 
     assert (status.last_applied == last_recved);
 
+    if (conf->st_required) // see #163 - SST might have happened already
+        conf->st_required = (status.last_applied != conf->seqno ||
+                             gu_uuid_compare (&status.state_uuid, conf_uuid)));
+
     view_handler_cb (galera_view_info_create (conf));
 
     if (conf->conf_id >= 0) {                // PRIMARY configuration
 
-        if (conf->st_required) {
+        if (conf->st_required)
+        {
             void*   app_req = NULL;
             ssize_t app_req_len;
 
@@ -1044,7 +1050,7 @@ galera_handle_configuration (wsrep_t* gh,
                 status.stage = GALERA_STAGE_JOINING;
                 ret = app_req_len;
                 gu_error ("Application failed to prepare for receiving "
-                          "state transfer: %d (%s)", -ret, strerror(-ret));
+                          "state transfer: %d (%s)", ret, strerror(-ret));
             }
             else do {
                 // Actually this loop can be done even in this thread:
@@ -1061,15 +1067,21 @@ galera_handle_configuration (wsrep_t* gh,
                                                   app_req, app_req_len,
                                                   sst_donor, &seqno_l);
                 if (ret < 0) {
+                    if (ret != -EAGAIN) {
+                        galera_state_t st =
+                            { status.last_applied, status.state_uuid };
 
-                    galera_state_t st =
-                        { status.last_applied, status.state_uuid };
-
-                    status.stage = GALERA_STAGE_RST_FAILED;
-                    gu_error ("Requesting state transfer failed: %d (%s)",
-                              ret, strerror(-ret));
-                    // try not to lose state information if RST fails
-                    galera_store_state (data_dir, &st);
+                        status.stage = GALERA_STAGE_RST_FAILED;
+                        gu_error ("Requesting state snapshot transfer failed: "
+                                  "%d (%s)", ret, strerror(-ret));
+                        // try not to lose state information if RST fails
+                        galera_store_state (data_dir, &st);
+                    }
+                    else {
+                        gu_info ("Requesting state snapshot transfer failed: "
+                                 "%d (%s). Retrying in 1 second",
+                                 ret, strerror(-ret));
+                    }
                 }
 
                 if (seqno_l > GCS_SEQNO_NIL) {
