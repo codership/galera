@@ -809,8 +809,10 @@ static int process_query_write_set_applying(
         return WSREP_TRX_FAIL;
     }
 
-    /* Grab commit queue for commit time */
-    // can't use it here: GALERA_GRAB_QUEUE (seqno_l);
+    /* 
+     * Grab commit queue for commit time
+     * (can't use here GALERA_GRAB_QUEUE(seqno_l) macro)
+     */
     switch (applier->type) {
     case JOB_SLAVE:
         rcode = galera_to_eagain (gu_to_grab, commit_queue, seqno_l);
@@ -865,16 +867,22 @@ static int process_query_write_set_applying(
     }
     job_queue_end_job(applier_queue, applier);
 
-    GALERA_UPDATE_LAST_APPLIED (seqno_g);
+    /* 
+     * if trx is replaying, we will call post_commit later on,
+     * => slave applying "bookkeeping" must be avoided.
+     * post_commit will also release commit_queue
+     */
+    if (applier->type == JOB_SLAVE) {
+        GALERA_UPDATE_LAST_APPLIED (seqno_g);
 
-    do_report = report_check_counter ();
+        do_report = report_check_counter ();
 
-    GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
+        GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
 
-    wsdb_set_global_trx_committed(seqno_g);
+        wsdb_set_global_trx_committed(seqno_g);
 
-    if (do_report) report_last_committed(gcs_conn);
-
+        if (do_report) report_last_committed(gcs_conn);
+    }
     return WSREP_OK;
 }
 /*
@@ -2097,25 +2105,15 @@ static enum wsrep_status mm_galera_replay_trx(
     gu_debug("applier %d", applier->id );
 
     /*
-     * grab cert_queue already here, to make sure the conflicting BF applier
+     * grab commit_queue already here, to make sure the conflicting BF applier
      * has completed before we start.
-     * commit_queue is released inside process_query or process_query_applying
+     * commit_queue will be released at post_commit(), which the application
+     * has reponsibility to call.
      */
     rcode = galera_to_eagain (gu_to_grab, commit_queue, trx.seqno_l);
-
-    switch (rcode) {
-    case 0: break;
-    case -ECANCELED:
-        gu_warn("replaying canceled in commit queue for %lld %lld", 
-                 trx.seqno_g, trx.seqno_l);
-        break;
-    case -EINTR:
-        gu_warn("replaying interrupted when starting %llu", trx.seqno_l);
-        break;
-
-    default:
-        gu_fatal("replaying commit queue grab fail(%lld %lld)", 
-                 trx.seqno_g, trx.seqno_l);
+    if (rcode) {
+        gu_fatal("replaying commit queue grab failed for: %d seqno: %lld %lld", 
+                 rcode, trx.seqno_g, trx.seqno_l);
         abort();
     }
 
