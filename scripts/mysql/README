@@ -25,16 +25,16 @@ The WSREP patch for MySQL can be obtained at: bzr branch lp:codership-mysql
 
 ABOUT THIS DOCUMENT
 
-This document only covers issues specific to MySQL/Galera demo. It does not
-cover the use or administration of MySQL server per se. The reader is assumed
-to know how to install, configure, administer and use MySQL server.
+This document only covers issues specific to MySQL/Galera distribution. It does
+not cover the use or administration of MySQL server per se. The reader is
+assumed to know how to install, configure, administer and use MySQL server.
 
 
 CONTENTS:
 =========
 0. WHAT IS MYSQL/GALERA CLUSTER
-1. DEMO SETUP
-   1.1 DEMO INSTALLATION
+1. CLUSTER SETUP
+   1.1 INSTALLATION
    1.2 STARTING GROUP COMMUNICATION DAEMON
    1.3 STARTING MYSQL SERVERS
 2. USING THE CLUSTER
@@ -45,7 +45,7 @@ CONTENTS:
 3. CONFIGURATION
    3.1 MANDATORY OPTIONS
    3.2 WSREP OPTIONS
-4. Using MySQL/Galera demo in Amazon EC2
+4. Using MySQL/Galera in Amazon EC2
 5. LIMITATIONS
 
 
@@ -82,16 +82,16 @@ Main features of MySQL/Galera cluster:
 
 * Scalable even with WRITE-intensive applications.
 
-This demo package contains all software you'll need to setup MySQL/Galera
-cluster. It is essentially a self-contained MySQL server installation with its
-own configuration file, data directory and preconfigured empty database.
-You don't need administrative privileges or to uninstall/disable previously
-installed MySQL software to use this demo.
+This distribution package contains all software you'll need to setup
+MySQL/Galera cluster. It is essentially a self-contained MySQL server
+installation with its own configuration file, data directory and preconfigured
+empty database. You don't need administrative privileges or to uninstall/
+disable previously installed MySQL software to use this distribution.
 
 
-1. DEMO SETUP
+1. CLUSTER SETUP
                
-To setup MySQL/Galera demo cluster you will need several networked computers -
+To setup MySQL/Galera cluster you will need several networked computers -
 one for each mysqld instance you plan to use. For best performance those
 computers should be of approximately same configuration: Galera replication is
 synchronous and one slow machine will slow down the whole cluster.
@@ -101,13 +101,14 @@ You must also select one machine that would host group communication daemon
 but it also can be one of the MySQL nodes. The only requirement is that
 arbitrator is accessible to all other cluster nodes.
 
-For your convenience this demo 
-
 It takes 3 steps to set up the cluster:
-1) Copy demo distribution to all prospective nodes of the cluster and unpack it
+
+1) Copy this distribution to all prospective nodes of the cluster and unpack it
    to location of your choice.
-2) Start group communication daemon on arbitrator node by running gcomm script
+
+2) Start group communication daemon on arbitrator node by running vsbes script
    from the distribution.
+
 3) Start MySQL servers.
 
 (NOTE: You can easily set up the cluster on a single computer. However this
@@ -115,18 +116,19 @@ makes little sense, as you won't see the the benefits of high availability and
 scalability. Hence it is not covered by this document.)
 
 
-1.1 DEMO INSTALLATION
+1.1 INSTALLATION
 
-Just copy and unpack the demo on the prospective cluster nodes to wherever you
-have privileges. The demo was designed to be able to run on most systems without
-reconfiguration. It is a self-contained MySQL installation and comes with its
-own data directory and a preconfigured empty database with users 'root'
-(password 'rootpass') and 'test' (password 'testpass', privileges on schema
- 'test'). As a result default installation will require at least 1Gb of free
-space for InnoDB files (will be created on first start).
+Just copy and unpack the distribution on the prospective cluster nodes to
+wherever you have privileges. The distribution was designed to be able to run
+on most systems without reconfiguration. It is a self-contained MySQL 
+installation and comes with its own data directory and a preconfigured empty 
+database with users 'root' (password 'rootpass') and 'test' (password 
+'testpass', privileges on schema 'test'). As a result default installation will 
+require at least 1Gb of free space for InnoDB files (will be created on first 
+start).
 
 This requirement, as well as other MySQL and Galera options can be changed by
-editing configuration file which can be found at <DEMO_ROOT>/mysql/etc/my.cnf.
+editing configuration file which can be found at <INST_ROOT>/mysql/etc/my.cnf.
 
 Please see CONFIGURATION chapter for the details on editable parameters.
 
@@ -136,47 +138,47 @@ Please see CONFIGURATION chapter for the details on editable parameters.
 Select one of the nodes to act as an arbitrator. On that node issue the
 following command:
 
-   <DEMO_ROOT>/gcomm start
+   <INST_ROOT>/vsbes start
 
 This will start a Galera group communication daemon listening on all interfaces
 at port 4567. GCS_ADDRESS environment variable can be used to bind the daemon
 to particular interface or port, e.g.:
 
-   GCS_ADDRESS=tcp:192.168.0.1:3333 <DEMO_ROOT>/gcomm start
+   GCS_ADDRESS=tcp:192.168.0.1:3333 <INST_ROOT>/vsbes start
 
 
 1.3 STARTING MYSQL SERVERS
 
-<DEMO_ROOT>/mysql-galera is a special MySQL startup script that sets proper
+<INST_ROOT>/mysql-galera is a special MySQL startup script that sets proper
 options (including data directory path) for mysqld. If you're running it as a
 superuser, you have to make sure there is 'mysql' user in the system and it has
-sufficient privileges on the demo directory (see MySQL Manual about running
-mysqld as root). 
+sufficient privileges on the installation directory (see MySQL Manual about
+running mysqld as root). 
 
 You will need to tell mysqld the address of the group communication daemon. For
-the purpose of this demo the address follows this layout:
+this distribution the address follows this layout:
 
-   gcomm://tcp:<IP address>:<port>.
+   vsbes://tcp:<IP address>:<port>.
 
-Thus, if you have started gcomm on the node with IP address 192.168.1.1, then
-GCS address would be gcomm://tcp:192.168.1.1:4567
+Thus, if you have started vsbes on the node with IP address 192.168.1.1, then
+GCS address would be vsbes://tcp:192.168.1.1:4567
 
 1) Either supply the address as the option on the command line:
 
-   <DEMO_ROOT>/mysql-galera -g gcomm://tcp:192.168.1.1:4567 start
+   <INST_ROOT>/mysql-galera -g gcomm://tcp:192.168.1.1:4567 start
 
-2) Or you can hardcode it in <DEMO_ROOT>/my.cnf by setting
+2) Or you can hardcode it in <INST_ROOT>/my.cnf by setting
    wsrep_gcs_address="gcomm://tcp:192.168.1.1:4567" and then just launch
    mysql-galera script:
 
-   <DEMO_ROOT>/mysql-galera start
+   <INST_ROOT>/mysql-galera start
 
 It might take few minutes to start mysqld for the first time as it will have to
 create required InnoDB files.
 
 For full description of mysql-galera options and commands see:
 
-   <DEMO_ROOT>/mysql-galera --help
+   <INST_ROOT>/mysql-galera --help
 
 
 2. USING THE CLUSTER
@@ -190,13 +192,13 @@ be accessed independently and asynchronously. Just direct SQL load to any one or
 more of the cluster nodes. For most practical purposes you can treat
 MySQL/Galera cluster as a single MySQL server listening on multiple interfaces
 with the exception that you might see transaction deadlocks where you previously
-hadn't.
+didn't.
 
 2.1 LOADING DATA TO CLUSTER
 
-Initially demo database is empty. You can populate it by loading the dump of
-your data to any one of the nodes. It will be automatically replicated to
-others. Please note that this demo supports only InnoDB storage engine.
+Initially distribution database is empty. You can populate it by loading the
+dump of your data to any one of the nodes. It will be automatically replicated
+to others. Please note that this release supports only InnoDB storage engine.
 
 2.2 CONNECTING APPLICATION TO CLUSTER
 
@@ -290,27 +292,13 @@ require any SQL traffic filtering, it is highly transparent and plain TCP
 connection balancer would suffice.
 
 TCP connection balancers that were successfully used with MySQL/Galera:
-- GLB (http://www.codership.com/products/downloads) 
 - Pen (http://siag.nu/pen/)
+- GLB (http://www.codership.com/en/downloads/glb) 
 
 
 2.4 ADDING NEW NODE TO A CLUSTER
 
-This demo does not support automatic node provisioning (yet), so adding new node
-to a working cluster is a somewhat disruptive operation. You will need to take
-the following steps to do it:
 
-1) Install demo on a new node as usual - but don't start mysqld.
-2) Connect the node to a cluster network. Make sure it can connect to
-   arbitrator.
-3) Stop SQL load on cluster.
-4) Connect with mysql client to one of the nodes and issue
-   FLUSH TABLES WITH READ LOCK;
-   command. Don't close this session.
-5) Copy data directory from that server to the new node.
-6) Start mysqld on the new node.
-7) Close the locking session from step 4.
-8) Resume SQL load.
 
 
 3. CONFIGURATION
