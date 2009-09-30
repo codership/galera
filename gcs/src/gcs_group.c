@@ -86,6 +86,10 @@ group_nodes_init (const gcs_group_t* group, const gcs_comp_msg_t* comp)
             }
         }
     }
+    else {
+        gu_error ("Could not allocate %ld x %z bytes", nodes_num,
+                  sizeof(gcs_node_t));
+    }
     return ret;
 }
 
@@ -258,7 +262,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     group_check_comp_msg (prim_comp, new_my_idx, new_nodes_num);
 
     if (new_my_idx >= 0) {
-        gu_info ("New COMPONENT: primary = %s, my_idx = %d, memb_num = %d",
+        gu_info ("New COMPONENT: primary = %s, my_idx = %ld, memb_num = %ld",
                  prim_comp ? "yes" : "no", new_my_idx, new_nodes_num);
 
         new_nodes = group_nodes_init (group, comp);
@@ -405,7 +409,7 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 {
     if (GCS_GROUP_WAIT_STATE_MSG == group->state) {
 
-        gcs_state_t* state       = gcs_state_msg_read (msg->buf, msg->size);
+        gcs_state_t* state = gcs_state_msg_read (msg->buf, msg->size);
 
         if (state) {
 
@@ -416,11 +420,11 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
                 gu_info ("STATE EXCHANGE: got state msg: "GU_UUID_FORMAT
                          " from %ld (%s)", GU_UUID_ARGS(state_uuid),
                          msg->sender_idx, gcs_state_name(state));
+
                 if (gu_log_debug) group_print_state_debug(state);
 
                 gcs_node_record_state (&group->nodes[msg->sender_idx], state);
                 group_post_state_exchange (group);
-
             }
             else {
                 gu_warn ("STATE EXCHANGE: stray state msg: "GU_UUID_FORMAT
@@ -429,6 +433,7 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
                          GU_UUID_ARGS(state_uuid),
                          msg->sender_idx, gcs_state_name(state),
                          GU_UUID_ARGS(&group->state_uuid));
+
                 if (gu_log_debug) group_print_state_debug(state);
 
                 gcs_state_destroy (state);
@@ -474,6 +479,8 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
     return 0;
 }
 
+/*! return true if this node is the sender to notify the calling thread of
+ * success */
 long
 gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 {
@@ -493,11 +500,13 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         const char* peer_id   = NULL;
         const char* peer_name = "left the group";
         long        peer_idx  = -1;
+        bool        from_donor = false;
         const char* st_dir    = NULL; // state transfer direction symbol
 
         if (GCS_STATE_DONOR == sender->status) {
-            peer_id = sender->joiner;
-            st_dir  = "to";
+            peer_id    = sender->joiner;
+            from_donor = true;
+            st_dir     = "to";
             sender->status = GCS_STATE_JOINED;
         }
         else {
@@ -514,7 +523,12 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
                 peer_idx  = j;
                 peer      = &group->nodes[peer_idx];
                 peer_name = peer->name;
+                break;
             }
+        }
+
+        if (j == group->num) {
+            gu_warn ("Could not find peer: %s", peer_id);
         }
 
         if (seqno < 0) {
@@ -522,6 +536,14 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
                      "%d (%s)",
                      sender_idx, sender->name, st_dir, peer_idx, peer_name,
                      (int)seqno, strerror((int)-seqno));
+
+            if (from_donor && peer_idx == group->my_idx &&
+                GCS_STATE_JOINER == group->nodes[peer_idx].status) {
+                // this node will be waiting for SST forever. If it has only
+                // one recv thread there is no (generic) way to wake it up.
+                gu_fatal ("Will never receive state. Aborting.");
+                abort();
+            }
         }
         else {
             gu_info ("%ld(%s): State transfer %s %ld(%s) complete.",
@@ -583,14 +605,14 @@ group_find_node_by_name (gcs_group_t* group, long joiner_idx, const char* name)
     for (idx = 0; idx < group->num; idx++) {
         gcs_node_t* node = &group->nodes[idx];
         if (!strcmp(node->name, name)) {
-            if (node->status >= GCS_STATE_JOINED) {
+            if (joiner_idx == idx) {
+                return -EHOSTDOWN;
+            }
+            else if (node->status >= GCS_STATE_JOINED) {
                 return idx;
             }
             else {
-                if (joiner_idx == idx)
-                    return -EHOSTDOWN;
-                else
-                    return -EAGAIN;
+                return -EAGAIN;
             }
         }
     }
@@ -652,7 +674,7 @@ group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
 }
 
 /* NOTE: check gcs_request_state_transfer() for sender part. */
-extern long
+long
 gcs_group_handle_state_request (gcs_group_t*    group,
                                 long            joiner_idx,
                                 gcs_recv_act_t* act)
@@ -678,7 +700,7 @@ gcs_group_handle_state_request (gcs_group_t*    group,
         }
         else {
             gu_error ("Node %ld (%s) requested state transfer, "
-                      "but it is in %s. Ignoring.",
+                      "but its state is %s. Ignoring.",
                       joiner_idx, joiner_name, joiner_state_string);
             free ((void*)act->buf);
             return 0;
@@ -767,8 +789,9 @@ gcs_group_act_conf (gcs_group_t* group, gcs_recv_act_t* act)
 }
 
 /*! Returns state object for state message */
-extern gcs_state_t*
-gcs_group_get_state (gcs_group_t* group) {
+gcs_state_t*
+gcs_group_get_state (gcs_group_t* group)
+{
     const gcs_node_t* my_node = &group->nodes[group->my_idx];
 
     return gcs_state_create (
