@@ -1140,6 +1140,8 @@ galera_handle_configuration (wsrep_t* gh,
                         usleep (100000);
 
                     status.stage = GALERA_STAGE_JOINED;
+
+                    last_recved = status.last_applied;
                 }
             }
             else {
@@ -1158,9 +1160,12 @@ galera_handle_configuration (wsrep_t* gh,
 
                 status.state_uuid   = *conf_uuid;
                 status.last_applied = conf->seqno;
+
+                last_recved = status.last_applied;
             }
             else {
-                if (status.last_applied != conf->seqno ||
+                // last_applied has gaps, so must use last_recved here.
+                if (last_recved != conf->seqno ||
                     gu_uuid_compare (&status.state_uuid, conf_uuid)) {
 
                     gu_fatal ("Internal replication error: no state transfer "
@@ -1168,9 +1173,8 @@ galera_handle_configuration (wsrep_t* gh,
                               "the same as the group."
                               "\n\tGroup: "GU_UUID_FORMAT":%lld"
                               "\n\tNode:  "GU_UUID_FORMAT":%lld",
-                              GU_UUID_ARGS(conf_uuid),   conf->seqno,
-                              GU_UUID_ARGS(&status.state_uuid),
-                              status.last_applied);
+                              GU_UUID_ARGS(conf_uuid),          conf->seqno,
+                              GU_UUID_ARGS(&status.state_uuid), last_recved);
                     assert(0);
                     abort(); // just abort for now. Ideally reconnect to group.
                 }
@@ -1181,8 +1185,6 @@ galera_handle_configuration (wsrep_t* gh,
             status.stage = GALERA_STAGE_JOINED;
             ret = my_idx;
         }
-
-        last_recved = status.last_applied;
     }
     else {
         // NON PRIMARY configuraiton
