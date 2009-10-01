@@ -90,6 +90,7 @@ public:
     void release_event()
     {
 	assert(eq.size());
+
         gu::Lock lock(mutex);
 
 	eq.front().release();
@@ -106,7 +107,8 @@ public:
     {
 	const VSUpMeta *vum = static_cast<const VSUpMeta *>(um);
 	// null rb and um denotes eof (broken connection)
-	if (!(rb || vum)) {
+	if (!(rb || vum))
+        {
             gu::Lock lock(mutex);
 	    eq.push_back(vs_ev(0, 0, 0, 0));
 	    cond.signal();
@@ -115,21 +117,25 @@ public:
 
 	assert((rb && vum->msg) || vum->view);
 
-	if (state == JOINING) {
+	if (state == JOINING)
+        {
 	    assert(vum->view);
 	    assert(vum->view->is_trans());
 	    assert(vum->view->get_addr().size() == 0);
+            gu::Lock lock(mutex);
 	    state = JOINED;
 	    return;
-	} else if (vum->view && vum->view->is_trans()) {
+	}
+        else if (vum->view && vum->view->is_trans())
+        {
 	    log_debug << "trans view: size = "
                       << vum->view->get_addr().size();
 	    // Reached the end
 	    // Todo: add gu_thread_exit() to gu library
 	    if (vum->view->get_addr().size() == 0) {
-		state = LEFT;
                 {
                     gu::Lock lock(mutex);
+                    state = LEFT;
                     cond.signal();
                 }
 		pthread_exit(0);
@@ -138,18 +144,19 @@ public:
 
         gu::Lock lock(mutex);
 
-	if (vum->msg && eq.empty() && rb->get_len(roff) <= waiter_buf_len) {
-
+	if (vum->msg && eq.empty() && rb->get_len(roff) <= waiter_buf_len)
+        {
 	    memcpy(waiter_buf, rb->get_buf(roff), rb->get_len(roff));
 	    eq.push_back(vs_ev(0, rb->get_len(roff), vum->msg, vum->view));
-	    // Zero pointer/len here to avoid rewriting the buffer if 
-	    // waiter does not wake up before next message
-	    waiter_buf = 0;
-	    waiter_buf_len = 0;
 	}
-        else {
+        else
+        {
 	    eq.push_back(vs_ev(rb, 0, vum->msg, vum->view));
 	}
+        // Zero pointer/len here to avoid rewriting the buffer if 
+        // waiter does not wake up before next message
+        waiter_buf = 0;
+        waiter_buf_len = 0;
 	cond.signal();
     }
 
@@ -157,17 +164,18 @@ public:
     {
         gu::Lock lock(mutex);
 
-	while (eq.size() == 0 && state != LEFT) {
-	    waiter_buf = wb;
+	while (eq.empty() && state != LEFT) {
+	    waiter_buf     = wb;
 	    waiter_buf_len = wb_len;
 	    lock.wait(cond);
+            assert (waiter_buf == 0 || state == LEFT);
+            assert (waiter_buf_len == 0 || state == LEFT);
 	}
 
 	std::pair<vs_ev, bool> ret(eq.front(), eq.size() && state != LEFT);
 
 	return ret;
     }
-
 };
 
 struct gcs_vsbes_conn {
@@ -182,7 +190,7 @@ struct gcs_vsbes_conn {
 
     gcs_vsbes_conn() :
         last_view_size (0),
-        max_msg_size   (1 << 20),
+        max_msg_size   ((1 << 16) - 256 /* TCP/IP and other headers */),
 	n_received     (0),
         n_copied       (0),
         vs_ctx         (),
@@ -219,7 +227,10 @@ static GCS_BACKEND_SEND_FN(gcs_vs_send)
     try {
 	VSDownMeta vdm (0, msg_type);
 	err = conn->vs_ctx.pass_down(&wb, &vdm);
-    } catch (std::exception e) {
+    }
+    catch (std::exception& e)
+    {
+        log_error << e.what();
 	return -ENOTCONN;
     }
     
@@ -274,7 +285,8 @@ retry:
 
     if (ev.msg) {
 	*msg_type = static_cast<gcs_msg_type_t>(ev.msg->get_user_type());
-	std::map<Address, long>::iterator i = conn->comp_map.find(ev.msg->get_source());
+	std::map<Address, long>::iterator i =
+            conn->comp_map.find(ev.msg->get_source());
 	assert(i != conn->comp_map.end());
 	*sender_idx = i->second;
 
@@ -335,18 +347,19 @@ retry:
 
 static GCS_BACKEND_NAME_FN(gcs_vs_name)
 {
-    static const char *name = "vsbes";
-    return name;
+    return "vsbes";
 }
 
 static void *conn_run(void *arg)
 {
     gcs_vsbes_conn* conn = reinterpret_cast<gcs_vsbes_conn*>(arg);
 
-    try {
-
-	while (true) {
+    try
+    {
+	while (true)
+        {
 	    int err = conn->vs_ctx.po->poll(std::numeric_limits<int>::max());
+
 	    if (err < 0) {
 		log_fatal << "unrecoverable error: " << err
                           << " (" << strerror(err) << ')';
@@ -354,11 +367,12 @@ static void *conn_run(void *arg)
 	    }
 	}
     }
-    catch (std::exception& e) {
-
+    catch (std::exception& e)
+    {
 	log_error << "poll error: '" << e.what() << "', thread exiting";
 	conn->vs_ctx.handle_up(-1, 0, 0, 0);
     }
+
     return 0;
 }
 
@@ -430,9 +444,12 @@ static GCS_BACKEND_CREATE_FN(gcs_vs_create)
     log_debug << "Opening connection to '" << sock << '\'';
 
     gcs_vsbes_conn* conn = 0;
-    try {
+    try
+    {
 	conn = new gcs_vsbes_conn;	
-    } catch (std::bad_alloc e) {
+    }
+    catch (std::bad_alloc& e)
+    {
 	return -ENOMEM;
     }
     
