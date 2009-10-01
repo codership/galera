@@ -20,6 +20,7 @@ extern "C" {
 #include "gcs_comp_msg.h"
 }
 
+using std::string;
 using std::deque;
 using std::map;
 using std::pair;
