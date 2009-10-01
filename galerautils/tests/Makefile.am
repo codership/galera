@@ -21,6 +21,7 @@ gu_tests_LDFLAGS = @AM_LDFLAGS@ -static
 
 gu_testspp_SOURCES = \
 	gu_tests++.cpp  gu_tests++.hpp  \
+	gu_string_test.cpp gu_string_test.hpp \
 	gu_uri_test.cpp gu_uri_test.hpp \
 	gu_net_test.cpp gu_net_test.hpp
 
