@@ -220,6 +220,7 @@ void PCProto::handle_trans(const View& view)
             log_warn << "Trans view during " + to_string(get_state());
         }
     }
+
     if (get_state() != S_NON_PRIM)
     {
         shift_to(S_TRANS);
@@ -283,7 +284,6 @@ void PCProto::handle_reg(const View& view)
     }
     
 }
-
 
 void PCProto::handle_view(const View& view)
 {
@@ -669,6 +669,7 @@ void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
     }
 
     ProtoUpMeta pum(um->get_source(), um->get_user_type(), to_seq);
+
     pass_up(rb, roff + msg.size(), &pum);
 }
 
@@ -686,20 +687,20 @@ void PCProto::handle_msg(const PCMessage&   msg,
 
     static const Verdict verdicts[S_MAX][PCMessage::T_MAX] = {
         // Msg types
-        // NONE,  STATE,   INSTALL,  USER
-        {FAIL,    FAIL,    FAIL,     FAIL    },    // Closed
+        // NONE,   STATE,   INSTALL,  USER
+        {  FAIL,   FAIL,    FAIL,     FAIL    },  // Closed
 
-        {FAIL,    FAIL,    FAIL,     FAIL    },    // Joining
+        {  FAIL,   FAIL,    FAIL,     FAIL    },  // Joining
 
-        {FAIL,    ACCEPT,  FAIL,     FAIL    },    // States exch
+        {  FAIL,   ACCEPT,  FAIL,     FAIL    },  // States exch
 
-        {FAIL,    FAIL,    ACCEPT,   FAIL    },    // RTR
+        {  FAIL,   FAIL,    ACCEPT,   FAIL    },  // RTR
 
-        {FAIL,    FAIL,    FAIL,     ACCEPT  },    // PRIM
+        {  FAIL,   FAIL,    FAIL,     ACCEPT  },  // PRIM
 
-        {FAIL,    DROP,    DROP,     ACCEPT  },    // TRANS
+        {  FAIL,   DROP,    DROP,     ACCEPT  },  // TRANS
 
-        {FAIL,    ACCEPT,  FAIL,     ACCEPT  }     // NON-PRIM
+        {  FAIL,   ACCEPT,  FAIL,     ACCEPT  }   // NON-PRIM
     };
 
     PCMessage::Type msg_type = msg.get_type();

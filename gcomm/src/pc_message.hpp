@@ -148,6 +148,16 @@ public:
 
     enum Type {T_NONE, T_STATE, T_INSTALL, T_USER, T_MAX};
 
+    static const char* to_string(Type t)
+    {
+        static const char* str[T_MAX] =
+            { "NONE", "STATE", "INSTALL", "USER" };
+
+        if (t < T_MAX) return str[t];
+
+        return "unknown";
+    }
+
 private:
 
     int        version;
@@ -284,11 +294,11 @@ public:
     {
         std::ostringstream ret;
 
-        ret << "pcmsg(" << get_type() << ", " << get_seq();
+        ret << "pcmsg( type: " << to_string(type) << ", seq: " << seq;
 
         if (has_inst_map())
         {
-            ret << ", " << get_inst_map().to_string();
+            ret << "," << get_inst_map().to_string();
         }
 
         ret << ')';
@@ -318,15 +328,16 @@ struct PCUserMessage    : PCMessage
 
 inline bool operator==(const PCMessage& a, const PCMessage& b)
 {
-    bool ret = a.get_version() == b.get_version() &&
-        a.get_type() == b.get_type() &&
-        a.get_seq() == b.get_seq();
+    bool ret =
+        a.get_version() == b.get_version() &&
+        a.get_type()    == b.get_type() &&
+        a.get_seq()     == b.get_seq();
 
     if (ret == true)
     {
         if (a.has_inst_map() != b.has_inst_map())
         {
-            // @todo: what is this supposed to mean?
+            // @todo: what is this supposed to mean? shouldn't it be just false?
             gcomm_throw_fatal;
         }
 

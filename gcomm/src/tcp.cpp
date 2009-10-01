@@ -433,8 +433,8 @@ void TCP::handle_up(int cid, const ReadBuf* rb, const size_t roff, const ProtoUp
 
 int TCP::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 {
-    if (state != S_CONNECTED)
-	return ENOTCONN;
+    if (state != S_CONNECTED) return ENOTCONN;
+
     if (is_non_blocking() == false)
     {
         LOG_TRACE("");
@@ -444,8 +444,10 @@ int TCP::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
     if (pending_bytes + wb->get_totlen() > max_pending_bytes)
     {
 	/* was: pending.size() == max_pending */
-	LOG_DEBUG("TCP::handle_down(): Contention");
-	if (contention_tries > 0 ) {
+	log_debug << "Contention";
+
+	if (contention_tries > 0 )
+        {
 	    for (long i = 0; 
                  i < contention_tries && 
 		     pending_bytes + wb->get_totlen() > 
@@ -803,8 +805,9 @@ const ReadBuf *TCP::recv()
 			std::numeric_limits<int>::max(), 0) == 0) {}
     }
 
-    if (ret != 0) {
-        // @todo: throw exception?
+    if (ret != 0)
+    {
+        // @todo: throw an exception?
 	log_debug << ::strerror(ret);
 	return 0;
     }

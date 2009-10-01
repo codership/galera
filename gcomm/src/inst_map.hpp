@@ -164,7 +164,7 @@ public:
      */
     size_t size() const
     {
-        //            length
+        //             length
         return sizeof(uint32_t) + length() * (UUID::size() + T::size());
     }
     
@@ -173,20 +173,24 @@ public:
      */
     std::string to_string() const
     {
-        std::string ret;
-        
+        std::ostringstream ret;
+        int j = 0;
+
         for (const_iterator i = map.begin(); i != map.end(); ++i)
         {
             const_iterator i_next = i;
+
             ++i_next;
-            ret += get_uuid(i).to_string() + ": ";
-            ret += get_instance(i).to_string();
-            if (i_next != map.end())
-            {
-                ret += ",";
-            }
+            ++j;
+            ret << "\ninst_" << j << ": " << get_uuid(i).to_string() + ":\n"
+                << get_instance(i).to_string();
+
+            if (i_next != map.end()) ret << ",";
         }
-        return ret;
+
+        ret << "\n";
+
+        return ret.str();
     }
 
     /*!

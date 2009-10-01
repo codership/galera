@@ -94,7 +94,8 @@ public:
         return nodes.find(uuid);
     }
 
-    std::pair<iterator, bool> insert(const std::pair<const UUID, const std::string>& p)
+    std::pair<iterator, bool> insert(const std::pair<const UUID,
+                                     const std::string>& p)
     {
         return nodes.insert(p);
     }
@@ -115,10 +116,13 @@ public:
 
     size_t read  (const byte_t*, size_t, size_t) throw (gu::Exception);
     size_t write (byte_t*, size_t, size_t) const throw (gu::Exception);
+
     size_t size  () const
     {
         return 4 + nodes.size()*(UUID::size() + node_name_size);
     }
+
+    std::string to_string() const;
 };
 
 static inline const UUID& get_uuid(const NodeList::const_iterator i)

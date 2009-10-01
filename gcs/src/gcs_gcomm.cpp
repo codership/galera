@@ -114,12 +114,15 @@ struct gcs_gcomm : public Toplay
 	if (!(rb || um)) 
         {
             log_warn << "gcomm backed thread exit";
+
 	    {
                 gu::Lock lock(mutex);
                 eq.push_back(vs_ev(0, 0, 0, 0, 0));
                 cond.signal();
             }
+
             el->interrupt();
+
 	    return;
 	}
         
@@ -127,43 +130,57 @@ struct gcs_gcomm : public Toplay
                       (um->get_view()->get_type() == View::V_PRIM ||
                        um->get_view()->get_type() == View::V_NON_PRIM)));
         
-        if (um->get_view() && um->get_view()->is_empty()) {
+        if (um->get_view() && um->get_view()->is_empty())
+        {
 	    log_debug << "empty view, leaving";
-	    eq.push_back(vs_ev(0, 0, 0, 0, um->get_view()));            
+	    eq.push_back(vs_ev(0, 0, 0, 0, um->get_view()));
 	    // Reached the end
             {
                 gu::Lock lock(mutex);
                 cond.signal();
             }
+
             el->interrupt();
 	}
 
+        log_info << "[DEBUG] Got message: type: " << um->get_user_type()
+                 << ", sender: " << um->get_source().to_string();
+
         gu::Lock lock(mutex);
-	if (rb && eq.empty() && rb->get_len(roff) <= waiter_buf_len) {
+
+	if (rb && eq.empty() && rb->get_len(roff) <= waiter_buf_len)
+        {
+// @todo: it seems like the only thing to be done in this block is cond.signal()
+//        and eq.push_back() sould be done unconditionally.
 	    memcpy(waiter_buf, rb->get_buf(roff), rb->get_len(roff));
 	    eq.push_back(vs_ev(0, um, roff, rb->get_len(roff), 0));
 	    // Zero pointer/len here to avoid rewriting the buffer if 
 	    // waiter does not wake up before next message
-	    waiter_buf = 0;
+	    waiter_buf     = 0;
 	    waiter_buf_len = 0;
 	} 
-        else {
+        else
+        {
 	    eq.push_back(vs_ev(rb, um, roff, 0, um->get_view()));
 	}
+
 	cond.signal();
     }
 
-    std::pair<vs_ev, bool> wait_event(void* wb, size_t wb_len)
+    std::pair<vs_ev, bool> wait_event (void* wb, size_t wb_len)
     {
         gu::Lock lock(mutex);
 
-	while (eq.size() == 0) {
+	while (eq.size() == 0)
+        {
 	    waiter_buf     = wb;
 	    waiter_buf_len = wb_len;
 	    lock.wait(cond);
 	}
 
-	std::pair<vs_ev, bool> ret(eq.front(), eq.size() ? true : false);
+// @todo: it does not look like we can have eq.size() == 0 here.
+//        So there's no point to return a pair?
+	std::pair<vs_ev, bool> ret (eq.front(), eq.size() != 0);
 
 	return ret;
     }
@@ -190,7 +207,8 @@ struct gcomm_ctx
     CompMap comp_map;
     volatile bool terminate;
 
-    gcomm_ctx() :
+    gcomm_ctx()
+        :
         sock(),
         channel(),
         last_view_size(0), 
@@ -224,11 +242,13 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
         log_warn << "-EBADFD";
 	return -EBADFD;
     }
+
     if (conn->vs_ctx.vs == 0)
     {
         log_warn << "-ENOTCONN";
 	return -ENOTCONN;
     }
+
     if (msg_type < 0 || msg_type >= 0xff)
     {
         log_warn << "-EINVAL";
@@ -236,7 +256,7 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
     }
 
     int err = 0;
-    WriteBuf wb(static_cast<const gcomm::byte_t*>(buf), len);
+    WriteBuf wb (static_cast<const gcomm::byte_t*>(buf), len);
 
     try
     {
@@ -258,21 +278,24 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
 
 
 
-static void fill_comp(gcs_comp_msg_t *msg,
-		      CompMap *comp_map,
+static void fill_comp(gcs_comp_msg_t* msg,
+		      CompMap*        comp_map,
 		      const NodeList& members, 
-                      const UUID& self)
+                      const UUID&     self)
 {
-    size_t n = 0;
     // TODO: 
     assert(msg != 0 && 
            static_cast<size_t>(msg->memb_num) == members.length() &&
            comp_map != 0);
     
     comp_map->clear();
+
+    size_t n = 0;
+
     for (NodeList::const_iterator i = members.begin(); i != members.end(); ++i)
     {
         const UUID& pid = get_uuid(i);
+
 	if (snprintf(msg->memb[n].id, sizeof(msg->memb[n].id), "%s",
                      pid.to_string().c_str())
             >= static_cast<ssize_t>(sizeof(msg->memb[n].id)))
@@ -280,15 +303,21 @@ static void fill_comp(gcs_comp_msg_t *msg,
             log_fatal << "PID string does not fit into comp msg buffer";
             abort();
         }
-	if (pid == self)
-        {
-	    msg->my_idx = n;
-        }
+
+	if (pid == self) msg->my_idx = n;
+
 	if (comp_map)
         {
-	    comp_map->insert(make_pair(pid, n));
+            log_info << "[DEBUG] comp_map += (" << pid.to_string() << ", "
+                     << n<< ")";
+
+            if (!(comp_map->insert (make_pair (pid, n))).second)
+                gu_throw_fatal << "Could not insert into map: ("
+                               << pid.to_string() << ", " << n << ")\n"
+                               << "NodeList: " << members.to_string();
         }
-	n++;	    
+
+	n++;
     }
 }
 
@@ -297,28 +326,35 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
 {
     long ret = 0;
     long cpy = 0;
+
     gcomm_ctx* conn = reinterpret_cast<gcomm_ctx*>(backend->conn);
+
     if (conn == 0)
     {
         log_warn << "gcs_gcomm_recv: -EBADFD";
 	return -EBADFD;
     }
+
     if (conn->terminate == true)
     {
         return -ENOTCONN;
     }
 
-    std::pair<vs_ev, bool> wr(conn->vs_ctx.wait_event(buf, len));
+    std::pair<vs_ev, bool> wr (conn->vs_ctx.wait_event(buf, len));
+
     if (wr.second == false)
     {
-        log_warn << "gcs_gcomm_recv: -ENOTCONN";
+        // as pointed out above wait_event() does not seem to be able to return
+        // false in wr.second
+        log_warn << "-ENOTCONN";
 	return -ENOTCONN;
     }
+
     vs_ev& ev(wr.first);
 
     if (!(ev.rb || ev.msg_size || ev.view))
     {
-        log_warn << "gcs_gcomm_recv: -ENOTCONN";
+        log_warn << "-ENOTCONN";
 	return -ENOTCONN;
     }
     
@@ -327,16 +363,29 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
     if (ev.rb || ev.msg_size) 
     {
 	*msg_type = static_cast<gcs_msg_type_t>(ev.um->get_user_type());
+
 	CompMap::const_iterator i = conn->comp_map.find(ev.um->get_source());
+
 	assert(i != conn->comp_map.end());
+
 	*sender_idx = i->second;
-	if (ev.rb) {
+
+        log_info << "[DEBUG] Got user message: type: " << *msg_type
+                 << ", sender: (" << ev.um->get_source().to_string()
+                 << ", index: " << *sender_idx << ")";
+
+	if (ev.rb)
+        {
 	    ret = ev.rb->get_len();
-	    if (ret <= static_cast<ssize_t>(len)) {
+
+	    if (ret <= static_cast<ssize_t>(len))
+            {
 		memcpy(buf, ev.rb->get_buf(), ret);
 		conn->n_copied++;
 	    }
-	} else {
+	}
+        else
+        {
 	    assert(ev.msg_size > 0);
 	    ret = ev.msg_size;
 	}
@@ -364,21 +413,29 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
         
 	fill_comp(new_comp, &conn->comp_map, ev.view->get_members(), 
                   conn->vs_ctx.vs->get_uuid());
+
 	if (conn->comp_msg) 
         {
             gcs_comp_msg_delete(conn->comp_msg);
         }
+
 	conn->comp_msg = new_comp;
-	cpy = std::min(static_cast<size_t>(gcs_comp_msg_size(conn->comp_msg)), len);
-	ret = std::max(static_cast<size_t>(gcs_comp_msg_size(conn->comp_msg)), len);
+
+	cpy = std::min(static_cast<size_t>(gcs_comp_msg_size(conn->comp_msg)),
+                       len);
+	ret = std::max(static_cast<size_t>(gcs_comp_msg_size(conn->comp_msg)),
+                       len);
+
 	memcpy(buf, conn->comp_msg, cpy);
 	*msg_type = GCS_MSG_COMPONENT;
     }
+
     if (ret <= static_cast<ssize_t>(len)) 
     {
 	conn->vs_ctx.release_event();
 	conn->n_received++;
     }
+
     return ret;
 }
 
@@ -501,19 +558,26 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
     
     log_debug << "Opening connection to '" << sock << '\'';
 
-    try {
+    try
+    {
 	conn = new gcomm_ctx;	
-    } catch (std::bad_alloc e) {
+    }
+    catch (std::bad_alloc& e)
+    {
 	return -ENOMEM;
     }
     
-    try {
+    try
+    {
 	conn->vs_ctx.el = new EventLoop();
         conn->sock = sock;
-    } catch (Exception& e) {
+    }
+    catch (Exception& e)
+    {
 	delete conn;
 	return -EINVAL;
     }
+
     conn->comp_msg = 0;
     
     backend->open     = &gcs_gcomm_open;

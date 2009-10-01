@@ -142,41 +142,39 @@ public:
     
     ~PCProto() {}
 
-    std::string self_string() const
-    {
-        return uuid.to_string();
-    }
-    
-    void shift_to(State);
-    
-    State get_state() const
-    {
-        return state;
-    }
+    std::string self_string() const { return uuid.to_string(); }
 
-    void send_state();
+    State       get_state()   const { return state; }
+
+    void shift_to    (State);
+    void send_state  ();
     void send_install();
-    
-    void handle_first_trans(const View&);
-    void handle_first_reg(const View&);
-    void handle_trans(const View&);
-    void handle_reg(const View&);
+
+    void handle_first_trans (const View&);
+    void handle_first_reg   (const View&);
+    void handle_trans       (const View&);
+    void handle_reg         (const View&);
 
 private:
+
     bool requires_rtr() const;
     bool is_prim() const;
     void validate_state_msgs() const;
     void handle_state(const PCMessage&, const UUID&);
     void handle_install(const PCMessage&, const UUID&);
-    void handle_user(const PCMessage&, const ReadBuf*, const size_t, const ProtoUpMeta*);
+    void handle_user(const PCMessage&, const ReadBuf*, const size_t,
+                     const ProtoUpMeta*);
     void deliver_view();
-public:
-    void handle_msg(const PCMessage&, const ReadBuf*, const size_t, const ProtoUpMeta*);
 
-    void handle_up(const int, const ReadBuf*, const size_t, const ProtoUpMeta*);
-    int handle_down(WriteBuf*, const ProtoDownMeta*);
+public:
+
+    void handle_msg  (const PCMessage&, const ReadBuf*, const size_t,
+                      const ProtoUpMeta*);
+    void handle_up   (const int, const ReadBuf*, const size_t,
+                      const ProtoUpMeta*);
+    int  handle_down (WriteBuf*, const ProtoDownMeta*);
     
-    void handle_view(const View&);
+    void handle_view (const View&);
 };
 
 END_GCOMM_NAMESPACE

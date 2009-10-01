@@ -1,3 +1,4 @@
+#include <sstream>
 
 #include "gcomm/view.hpp"
 #include "gcomm/logger.hpp"
@@ -98,6 +99,18 @@ size_t NodeList::write(byte_t* buf, const size_t buflen, const size_t offset)
     }
 
     return off;
+}
+
+string NodeList::to_string () const
+{
+    std::ostringstream ret;
+
+    for (NodeList::const_iterator i = begin(); i != end(); ++i)
+    {
+        ret << "\n(" << i->first.to_string() << ", " << i->second << ")\n";
+    }
+
+    return ret.str();
 }
 
 string View::to_string(const Type type) const
