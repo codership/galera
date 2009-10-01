@@ -54,4 +54,12 @@
 #define htogl(x) gu_le32(x)
 #define gtohl(x) htogl(x)
  
+/* Analogues to htogs() and friends, named with type width */
+#define htog16(x) gu_le16(x)
+#define gtoh16(x) htog16(x)
+#define htog32(x) gu_le32(x)
+#define gtoh32(x) htog32(x)
+#define htog64(x) gu_le64(x)
+#define gtoh64(x) htog64(x)
+
 #endif /* _gu_byteswap_h_ */
