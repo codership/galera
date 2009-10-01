@@ -4,19 +4,25 @@
 #include "gcomm/exception.hpp"
 #include "gcomm/logger.hpp"
 #include "gcomm/types.hpp"
+
+#include <gu_string.hpp>
+
 #include <sstream>
 #include <limits>
+#include <vector>
 
 using std::istringstream;
 using std::ostringstream;
+using std::string;
+using std::map;
+using std::make_pair;
+using std::vector;
 
-BEGIN_GCOMM_NAMESPACE
-
-Histogram::Histogram(const string& vals)
+gcomm::Histogram::Histogram(const string& vals)
     :
     cnt()
 {
-    vector<string> varr = strsplit(vals, ',');
+    vector<string> varr = gu::strsplit(vals, ',');
 
     for (vector<string>::const_iterator i = varr.begin(); i != varr.end(); ++i)
     {
@@ -43,7 +49,7 @@ Histogram::Histogram(const string& vals)
     }
 }
 
-void Histogram::insert(const double val)
+void gcomm::Histogram::insert(const double val)
 {
     if (val < 0.0)
     {
@@ -61,7 +67,7 @@ void Histogram::insert(const double val)
     i->second++;
 }
 
-void Histogram::clear()
+void gcomm::Histogram::clear()
 {
     for (map<const double, uint64_t>::iterator i = cnt.begin();
          i != cnt.end(); ++i)
@@ -70,7 +76,7 @@ void Histogram::clear()
     }
 }
 
-string Histogram::to_string() const
+string gcomm::Histogram::to_string() const
 {
     ostringstream os;
     
@@ -88,7 +94,7 @@ string Histogram::to_string() const
         ++i_next;
         if (i_next == cnt.end())
             break;
-        os << i->first << "->" << i_next->first << ": " << 100.*double(i_next->second)/norm << "% ";
+        os << i->first << "->" << i_next->first << ": " << 100.*double(i_next->second)/double(norm) << "% ";
     }
     os << "total: " << norm;
 
@@ -96,4 +102,3 @@ string Histogram::to_string() const
 }
 
 
-END_GCOMM_NAMESPACE

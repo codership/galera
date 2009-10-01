@@ -130,7 +130,7 @@ void EventLoop::set(const int fd, const int e)
 	++n_pfds;
     }
 
-    pfd->events |= map_event_to_mask(e);
+    pfd->events = static_cast<short int>(pfd->events | static_cast<short int>(map_event_to_mask(e)));
 }
 
 void EventLoop::unset(const int fd, const int e)
@@ -143,7 +143,7 @@ void EventLoop::unset(const int fd, const int e)
 
     if ((pfd = pfd_find(pfds, n_pfds, fd)) != 0)
     {
-	pfd->events &= ~map_event_to_mask(e);
+	pfd->events = static_cast<short int>(pfd->events & static_cast<short int>(~map_event_to_mask(e)));
 
 	if (pfd->events == 0)
         {
@@ -245,7 +245,7 @@ int EventLoop::compute_timeout(const int max_val)
         LOG_DEBUG("return 0");
         return 0;
     }
-    int diff = next.get_milliseconds() - now.get_milliseconds();
+    int diff = static_cast<int>(next.get_milliseconds() - now.get_milliseconds());
     
     assert(diff >= 0);
     

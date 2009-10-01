@@ -526,7 +526,7 @@ int EVSProto::send_user(WriteBuf* wb,
                        user_type,
                        sp, 
                        seq, 
-                       seq_range & 0xffU, 
+                       static_cast<uint8_t>(seq_range & 0xffU), 
                        input_map.get_aru_seq(), 
                        current_view.get_id(), 
                        flags);
@@ -802,14 +802,17 @@ void EVSProto::send_leave()
     unsigned char* buf = new unsigned char[bufsize];
 
     if (lm.write(buf, bufsize, 0) == 0)
+    {
         gcomm_throw_fatal << "failed to serialize leave message";
-    
+    }
+
     WriteBuf wb(buf, bufsize);
     int err;
 
     if ((err = pass_down(&wb, 0)))
+    {
         log_warn << "EVSProto::send_leave(): Send failed " << strerror(err);
-
+    }
     delete[] buf;
 
     handle_leave(lm, self_i);
@@ -1179,7 +1182,8 @@ int EVSProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
     
     if (output.empty()) 
     {
-        int err = send_user(wb, dm ? dm->get_user_type() : 0xff,
+        int err = send_user(wb, 
+                            static_cast<uint8_t>(dm ? dm->get_user_type() : 0xff),
                             SAFE, send_window/2, SEQNO_MAX);
         switch (err) 
         {

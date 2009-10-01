@@ -15,14 +15,14 @@ class TCP : public Transport, EventContext
 {
     int      no_nagle;
     sockaddr sa;
-    size_t   sa_size;
+    socklen_t   sa_size;
     size_t   recv_buf_size;
     byte_t*  recv_buf;
     size_t   recv_buf_offset;
     size_t   max_pending_bytes;
     size_t   pending_bytes;
-    long     contention_tries;
-    long     contention_tout;
+    int     contention_tries;
+    int     contention_tout;
     ReadBuf* recv_rb;
 
     // Used to hold pointer to ReadBuf that has been passed upwards. 

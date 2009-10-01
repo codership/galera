@@ -1,16 +1,10 @@
 #ifndef _GCOMM_TYPES_HPP_
 #define _GCOMM_TYPES_HPP_
 
-//#include <stdint.h>
-//#include <stdbool.h>
-//#include <string.h>
 #include <sys/socket.h>
 
 #include <sstream>
-using std::ostringstream;
-
 #include <gcomm/common.hpp>
-#include <gcomm/string.hpp>
 #include <gcomm/exception.hpp>
 
 BEGIN_GCOMM_NAMESPACE
@@ -71,9 +65,9 @@ public:
         return t;
     }
     
-    string to_string() const
+    std::string to_string() const
     {
-        ostringstream os;
+        std::ostringstream os;
         os << t;
         return os.str();
     }
@@ -155,9 +149,9 @@ public:
     {
     }
 
-    string to_string() const
+    std::string to_string() const
     {
-        ostringstream os;
+        std::ostringstream os;
         
         os << d;
         return os.str();
@@ -177,13 +171,15 @@ public:
     {
     }
     
-    string to_string() const
+    std::string to_string() const
     {
-        ostringstream os;
+        std::ostringstream os;
         os << p;
         return os.str();
     }
 };
+
+#if 0
 
 class Sockaddr
 {
@@ -214,6 +210,8 @@ public:
     }
 
 };
+
+#endif // 0
 
 END_GCOMM_NAMESPACE
 

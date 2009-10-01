@@ -20,7 +20,6 @@ using std::map;
 using std::make_pair;
 using std::string;
 
-
 BEGIN_GCOMM_NAMESPACE
 
 struct EVSRange {
@@ -137,7 +136,7 @@ public:
     };
 
 
-    static string to_string(const Type t) 
+    static std::string to_string(const Type t) 
     {
         switch (t) {
         case NONE:
@@ -283,9 +282,9 @@ public:
 	    return 4 + UUID::size() + ViewId::size() + 4 + 4 + 4;
 	}
 
-        string to_string() const
+        std::string to_string() const
         {
-            ostringstream ret;
+            std::ostringstream ret;
 
             ret << "inst(" << pid.to_string() << ") "
                 << (operational ? "o=1" : "o=0") << ", "
@@ -598,7 +597,7 @@ public:
     size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
         throw (gu::Exception)
     {
-	uint8_t b;
+	int b;
 	size_t off;
 	
 	/* Common header for all messages */
@@ -609,7 +608,7 @@ public:
         b <<= 2;
 	b |= (version & 0x3);
 
-	gu_trace (off = gcomm::write(b, buf, buflen, offset));
+	gu_trace (off = gcomm::write(static_cast<uint8_t>(b), buf, buflen, offset));
 
         /* User type */
 	gu_trace (off = gcomm::write(user_type, buf, buflen, off));
@@ -640,7 +639,7 @@ public:
 
 	    if (type == JOIN || type == INSTALL)
             {
-                uint32_t len = instances->size();
+                uint32_t len(static_cast<uint32_t>(instances->size()));
 
 		gu_trace (off = gcomm::write(len, buf, buflen, off));
 
@@ -699,9 +698,9 @@ public:
     }
 
 
-    string to_string() const
+    std::string to_string() const
     {
-        ostringstream ret;
+        std::ostringstream ret;
 
         ret << "evsmsg("
             << "type: "     << to_string(get_type())   << ", "

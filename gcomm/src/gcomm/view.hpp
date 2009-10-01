@@ -9,7 +9,6 @@
 
 #include <gcomm/common.hpp>
 #include <gcomm/uuid.hpp>
-#include <gcomm/string.hpp>
 #include <gcomm/logger.hpp>
 
 BEGIN_GCOMM_NAMESPACE
@@ -23,13 +22,13 @@ public:
 
     ViewId () : uuid(), seq(0) {}
 
-    ViewId (const UUID& uuid_, const uint32_t seq_) :
+    ViewId (const UUID& uuid_, const seqno_t seq_) :
         uuid  (uuid_),
         seq (seq_)
     {}
 
     const UUID& get_uuid()  const { return uuid; }
-
+    
     seqno_t     get_seq() const { return seq; }
     
     size_t read (const byte_t* buf, const size_t buflen, const size_t offset)
@@ -58,7 +57,7 @@ public:
         return !(*this == cmp);
     }
 
-    string to_string() const;
+    std::string to_string() const;
 };
 
 // why don't we just inherit from std::map ?
@@ -95,7 +94,7 @@ public:
         return nodes.find(uuid);
     }
 
-    std::pair<iterator, bool> insert(const std::pair<const UUID, const string>& p)
+    std::pair<iterator, bool> insert(const std::pair<const UUID, const std::string>& p)
     {
         return nodes.insert(p);
     }
@@ -127,7 +126,7 @@ static inline const UUID& get_uuid(const NodeList::const_iterator i)
     return i->first;
 }
 
-static inline const string& get_name(const NodeList::const_iterator i)
+static inline const std::string& get_name(const NodeList::const_iterator i)
 {
     return i->second;
 }
@@ -146,7 +145,7 @@ public:
         V_PRIM
     } Type;
 
-    string to_string (const Type) const;
+    std::string to_string (const Type) const;
 
 private:
 
@@ -159,7 +158,7 @@ private:
     NodeList partitioned;
     
     /* Map pid to human readable string */
-    string pid_to_string(const UUID& pid) const;
+    std::string pid_to_string(const UUID& pid) const;
 
 public:
 
@@ -183,14 +182,14 @@ public:
     
     ~View() {}
     
-    void add_member  (const UUID& pid, const string& name = "");
+    void add_member  (const UUID& pid, const std::string& name = "");
 
     void add_members (NodeList::const_iterator begin,
                       NodeList::const_iterator end);
 
-    void add_joined      (const UUID& pid, const string& name);
-    void add_left        (const UUID& pid, const string& name);
-    void add_partitioned (const UUID& pid, const string& name);
+    void add_joined      (const UUID& pid, const std::string& name);
+    void add_left        (const UUID& pid, const std::string& name);
+    void add_partitioned (const UUID& pid, const std::string& name);
 
     const NodeList& get_members     () const;
     const NodeList& get_joined      () const;
@@ -210,7 +209,7 @@ public:
         throw (gu::Exception);
 
     size_t size() const;
-    string to_string() const;
+    std::string to_string() const;
 };
 
 bool operator==(const View&, const View&);

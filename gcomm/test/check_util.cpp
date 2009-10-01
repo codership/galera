@@ -6,6 +6,8 @@
 
 #include "check_gcomm.hpp"
 
+#include <gu_string.hpp>
+
 #include <vector>
 #include <limits>
 #include <cstdlib>
@@ -13,6 +15,7 @@
 
 using std::vector;
 using std::numeric_limits;
+using std::string;
 
 using namespace gcomm;
 
@@ -54,7 +57,16 @@ START_TEST(test_cstring_rw)
 
     memset(buf, 'f', 25);
 
-    fail_unless(read_string(buf, sizeof(buf), 0, &str) == 0);
+    try
+    {
+        (void)read_string(buf, sizeof(buf), 0, &str);
+        fail("read did not throw");
+    }
+    catch (RuntimeException& e)
+    {
+
+    }
+
 
 }
 END_TEST
@@ -62,7 +74,7 @@ END_TEST
 START_TEST(test_stringutil)
 {
     string splstr = "1&adfhg&cvc";
-    vector<string> strvec = strsplit(splstr, '&');
+    vector<string> strvec = gu::strsplit(splstr, '&');
     fail_unless(strvec.size() == 3);
     fail_unless(strvec[0] == "1");
     fail_unless(strvec[1] == "adfhg");

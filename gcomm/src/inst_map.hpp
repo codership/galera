@@ -144,7 +144,7 @@ public:
         throw (gu::Exception)
     {
         size_t   off = offset;
-        uint32_t len = length();
+        uint32_t len(static_cast<uint32_t>(length()));
 
         gu_trace (off = gcomm::write(len, buf, buflen, off));
 
@@ -171,9 +171,9 @@ public:
     /*!
      *
      */
-    string to_string() const
+    std::string to_string() const
     {
-        string ret;
+        std::string ret;
         
         for (const_iterator i = map.begin(); i != map.end(); ++i)
         {

@@ -119,7 +119,7 @@ public:
                 ViewId::size() + sizeof(pcinst->to_seq));
     }
 
-    string to_string() const
+    std::string to_string() const
     {
         std::ostringstream ret;
 
@@ -280,7 +280,7 @@ public:
         gcomm_throw_fatal << "PC message does not have instance map"; throw;
     }
 
-    string to_string() const
+    std::string to_string() const
     {
         std::ostringstream ret;
 

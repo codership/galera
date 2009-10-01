@@ -11,6 +11,7 @@
 // @todo: fatal throws in the read_xxx() functions below are really unnecessary,
 //        they don't represent unresolvable logic error in the applicaiton
 using std::istringstream;
+using std::string;
 
 BEGIN_GCOMM_NAMESPACE
 

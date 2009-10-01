@@ -5,7 +5,6 @@
 
 #include <gcomm/common.hpp>
 #include <gcomm/exception.hpp>
-#include <gcomm/string.hpp>
 #include <gcomm/types.hpp>
 
 extern "C" {
@@ -84,7 +83,7 @@ public:
         return &uuid;
     }
     
-    string to_string() const {
+    std::string to_string() const {
         char buf[37];
         memset(buf, 0, sizeof(buf));
 

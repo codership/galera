@@ -13,6 +13,7 @@
 #include <cstdlib>
 
 using std::list;
+using std::string;
 
 using namespace gcomm;
 
@@ -27,7 +28,7 @@ START_TEST(test_pc_messages)
     
     size_t expt_size = 4 // hdr
         + 4              // seq
-        + 4 + 3*(UUID::size() + 4 + 4 + 20 + 8); // PCInstMap
+        + 4 + 3*(UUID::size() + sizeof(seqno_t) + 4 + 20 + 8); // PCInstMap
     check_serialization(pcs, expt_size, PCStateMessage());
                        
     PCInstallMessage pci;
@@ -40,7 +41,7 @@ START_TEST(test_pc_messages)
 
     expt_size = 4 // hdr
         + 4              // seq
-        + 4 + 4*(UUID::size() + 4 + 4 + 20 + 8); // PCInstMap
+        + 4 + 4*(UUID::size() + sizeof(seqno_t) + 4 + 20 + 8); // PCInstMap
     LOG_INFO(make_int(expt_size).to_string() + " - " + make_int(pci.size()).to_string());
     check_serialization(pci, expt_size, PCInstallMessage());
 
@@ -794,7 +795,7 @@ public:
         event_loop(el),
         sending(false),
         fd(-1),
-        my_type(1 + ::rand()%4),
+        my_type(static_cast<uint8_t>(1 + ::rand()%4)),
         send(send_)
     {
         tp = Transport::create(uri, el);

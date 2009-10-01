@@ -7,7 +7,6 @@
 #include "gcomm/event.hpp"
 #include "pc_message.hpp"
 
-using std::list;
 
 BEGIN_GCOMM_NAMESPACE
 
@@ -27,7 +26,7 @@ public:
         S_MAX
     };
     
-    static string to_string(const State s)
+    static std::string to_string(const State s)
     {
         switch (s)
         {
@@ -105,7 +104,7 @@ private:
 
     SMMap      state_msgs;
     View       current_view;
-    list<View> views;
+    std::list<View> views;
 
 public:
 
@@ -143,7 +142,7 @@ public:
     
     ~PCProto() {}
 
-    string self_string() const
+    std::string self_string() const
     {
         return uuid.to_string();
     }

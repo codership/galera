@@ -4,6 +4,8 @@
 #include "gcomm/types.hpp"
 #include "gcomm/util.hpp"
 
+using std::string;
+
 BEGIN_GCOMM_NAMESPACE
 
 size_t ViewId::read(const byte_t* buf, const size_t buflen, const size_t offset)
@@ -75,7 +77,7 @@ size_t NodeList::write(byte_t* buf, const size_t buflen, const size_t offset)
     const throw (gu::Exception)
 {
     size_t   off;
-    uint32_t len(length());
+    uint32_t len(static_cast<uint32_t>(length()));
 
     gu_trace (off = gcomm::write(len, buf, buflen, offset));
 

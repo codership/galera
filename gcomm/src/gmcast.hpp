@@ -8,7 +8,6 @@
 #include "gcomm/common.hpp"
 #include "gcomm/uuid.hpp"
 #include "gcomm/uri.hpp"
-#include "gcomm/string.hpp"
 #include "gcomm/exception.hpp"
 #include "gcomm/logger.hpp"
 #include "gcomm/pseudofd.hpp"
@@ -58,7 +57,7 @@ class GMCast : public Transport, EventContext
         {}
     };
     
-    typedef map<const string, Timing > AddrList;
+    typedef map<const std::string, Timing > AddrList;
 
     AddrList pending_addrs;
     AddrList remote_addrs;
@@ -68,7 +67,7 @@ class GMCast : public Transport, EventContext
         return i->second.uuid;
     }
 
-    const string& get_address(const AddrList::const_iterator i) const
+    const std::string& get_address(const AddrList::const_iterator i) const
     {
         return i->first;
     }
@@ -109,12 +108,12 @@ class GMCast : public Transport, EventContext
         i->second.retry_cnt = cnt;
     }
 
-    string group_name;
+    std::string group_name;
 
     /* Accept a new connection */
     void gmcast_accept();
     /* Connect to remote host */
-    void gmcast_connect(const string&);
+    void gmcast_connect(const std::string&);
     /* Forget node */
     void gmcast_forget(const UUID&);
     /* Handle GMCastProto that has connected succesfully to remote host */
@@ -127,7 +126,7 @@ class GMCast : public Transport, EventContext
     void remove_proto(const int);
     
     bool is_connected(const std::string& addr, const UUID& uuid) const;
-    void insert_address(const string& addr, const UUID& uuid, AddrList&);
+    void insert_address(const std::string& addr, const UUID& uuid, AddrList&);
     void update_addresses();
     void reconnect();
 
@@ -150,7 +149,7 @@ class GMCast : public Transport, EventContext
 
 public:
     
-    list<string> get_addresses();
+    std::list<std::string> get_addresses();
     /* Constructor */
     GMCast (const URI&, EventLoop*, Monitor*);
     // const string& listen_addr_, 

@@ -19,8 +19,9 @@ START_TEST(test_readbuf)
 
     fail_unless(rb->get_refcnt() == 1);
     for (size_t i = 0; i < bufsize; i++)
-        buf[i] = i;
-
+    {
+        buf[i] = static_cast<byte_t>(i & 0xff);
+    }
     ReadBuf *rb_copy = rb->copy();
     fail_unless(rb->get_refcnt() == 2);
     rb->release();
@@ -58,8 +59,9 @@ START_TEST(test_writebuf)
     const byte_t *ptr;
 
     for (size_t i = 0; i < buflen; i++)
-        buf[i] = i;
-
+    {
+        buf[i] = static_cast<byte_t>(i & 0xff);
+    }
     WriteBuf *wb_copy;
     {
         WriteBuf wb(buf, buflen);
@@ -107,8 +109,9 @@ START_TEST(test_writebuf)
     delete wbp;
 
     for (size_t i = 0; i < buflen; i++)
-        buf[i] = i;
-
+    {
+        buf[i] = static_cast<byte_t>(i & 0xff);
+    }
     wbp = new WriteBuf(buf, buflen);
     wbp->prepend_hdr(hdr1, 3);
 
@@ -146,7 +149,7 @@ START_TEST(test_wb_to_rb)
     byte_t buf[64];
     for (size_t i = 0; i < sizeof(buf); ++i)
     {
-        buf[i] = i % 256;
+        buf[i] = static_cast<byte_t>(i & 0xff);
     }
 
     WriteBuf wb(buf, sizeof(buf));

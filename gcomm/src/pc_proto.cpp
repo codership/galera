@@ -6,6 +6,7 @@
 #include <set>
 
 using std::multiset;
+using std::string;
 
 BEGIN_GCOMM_NAMESPACE
 

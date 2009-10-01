@@ -8,6 +8,7 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/kruskal_min_spanning_tree.hpp>
 
+using std::string;
 using std::pair;
 using std::make_pair;
 
@@ -99,7 +100,7 @@ public:
     size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
     {
         size_t  off;
-        uint8_t byte = operational ? 0x1 : 0;
+        uint8_t byte = static_cast<uint8_t>(operational ? 0x1 : 0);
 
         gu_trace (off = gcomm::write(byte, buf, buflen, offset));
         gu_trace (off = uuid.write(buf, buflen, off));
@@ -1246,9 +1247,9 @@ static inline int find_safe(const map<const UUID, int>& m, const UUID& val)
 }
 
 static inline const UUID& find_safe(const map<const int, UUID>& m,
-                                    const int val)
+                                    const Vertex val)
 {
-    map<const int, UUID>::const_iterator i = m.find(val);
+    map<const int, UUID>::const_iterator i = m.find(static_cast<int>(val));
 
     if (i == m.end()) gcomm_throw_fatal << "Not found: " << val;
 

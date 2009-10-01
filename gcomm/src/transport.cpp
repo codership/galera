@@ -7,6 +7,8 @@
 #include "pc.hpp"
 #include "gcomm/conf.hpp"
 
+using std::string;
+
 BEGIN_GCOMM_NAMESPACE
 
 // Private methods

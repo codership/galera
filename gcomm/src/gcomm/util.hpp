@@ -5,11 +5,9 @@
 #include <cstring>
 
 #include <gcomm/common.hpp>
-#include <gcomm/string.hpp>
 #include <gcomm/exception.hpp>
 #include <gcomm/types.hpp>
 
-using std::ostringstream;
 
 BEGIN_GCOMM_NAMESPACE
 
@@ -78,7 +76,7 @@ static inline size_t write_bytes(const byte_t* from,
  * \param s Input string
  * \return Boolean value
  */
-bool read_bool(const string& s);
+bool read_bool(const std::string& s);
 
 /**
  * Read integer value from string. 
@@ -86,7 +84,7 @@ bool read_bool(const string& s);
  * \param s Input string
  * \return Integer value
  */
-int read_int(const string& s);
+int read_int(const std::string& s);
 
 /**
  * Read long value from string.
@@ -94,7 +92,7 @@ int read_int(const string& s);
  * \param s Input string
  * \return Long value
  */
-long read_long(const string& s);
+long read_long(const std::string& s);
 
 /*! 
  * sockaddr conversion functions
@@ -125,7 +123,7 @@ inline std::string __parse_port(const std::string& str)
     return str.substr(sep + 1);
 }
 
-inline bool host_is_any (const string& host)
+inline bool host_is_any (const std::string& host)
 {   
     return (host.length() == 0 || host == "0.0.0.0" ||
             host.find ("::/128") <= 1);

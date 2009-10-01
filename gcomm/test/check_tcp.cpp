@@ -7,6 +7,8 @@
 #include <check.h>
 
 
+using std::string;
+
 using namespace gcomm;
 
 
@@ -60,12 +62,14 @@ public:
     
     bool send(const size_t b)
     {
-        unsigned char *buf = new unsigned char[b];
+        byte_t *buf = new byte_t[b];
         if (can_send == false)
             throw FatalException("");
         
         for (size_t i = 0; i < b; i++)
-            buf[i] = i % 256;
+        {
+            buf[i] = static_cast<byte_t>(i & 0xff);
+        }
         WriteBuf wb(buf, b);
         int res;
         bool ret = (res = pass_down(&wb, 0)) == 0 ? true : false;
@@ -75,11 +79,13 @@ public:
 
     void send_block(const size_t b)
     {
-        unsigned char *buf = new unsigned char[b];
+        byte_t *buf = new byte_t[b];
         if (can_send == false)
             throw FatalException("");
         for (size_t i = 0; i < b; i++)
-            buf[i] = i % 256;
+        {
+            buf[i] = static_cast<byte_t>(i & 0xff);
+        }
         WriteBuf wb(buf, b);
         tp->send(&wb, 0);
         delete[] buf;
@@ -119,7 +125,7 @@ public:
     {
         cstop = clock();
         clock_t ct = (cstop - cstart);
-        double tput = CLOCKS_PER_SEC*double(recvd)/(cstop - cstart);
+        double tput = CLOCKS_PER_SEC*double(recvd)/double(cstop - cstart);
         LOG_INFO("Reciver: received " 
                  + make_int(recvd).to_string() 
                  + " bytes\n"
@@ -330,7 +336,9 @@ public:
     void send(size_t len) {
         buf = new unsigned char[len];
         for (size_t i = 0; i < len; i++)
-            buf[i] = i % 256;
+        {
+            buf[i] = static_cast<byte_t>(i & 0xff);
+        }
         WriteBuf wb(buf, len);
         tp->send(&wb, 0);
         delete[] buf;
@@ -472,7 +480,7 @@ START_TEST(test_get_url)
 
     const string url = sender.get_remote_url();
     log_info << url;
-    fail_unless(url == "gcomm+tcp://127.0.0.1:4567");
+    fail_unless(url == "gcomm+tcp://127.0.0.1:4567", url.c_str());
 
     std::list<string> lst = listener.get_receiver_urls();
     for (std::list<string>::const_iterator i = lst.begin();

@@ -16,6 +16,7 @@
 
 using std::pair;
 using std::make_pair;
+using std::string;
 
 #include "check_templ.hpp"
 
@@ -99,7 +100,7 @@ START_TEST(test_view)
     fail_unless(vid.get_uuid() == uuid);
     fail_unless(vid.get_seq() == 7);
     
-    check_serialization(vid, UUID::size() + 4, ViewId());
+    check_serialization(vid, UUID::size() + sizeof(seqno_t), ViewId());
     
     
     NodeList nl;

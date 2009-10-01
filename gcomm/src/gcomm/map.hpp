@@ -53,11 +53,11 @@ namespace gcomm
                          const size_t buflen, 
                          const size_t offset) const
         {
-            size_t   off = offset;
-            uint32_t len = size();
+            size_t   off(offset);
 
-            if ((off = gcomm::write(len, buf, buflen, off)) == 0) return 0;
-
+            if ((off = gcomm::write(static_cast<uint32_t>(size()), 
+                                    buf, buflen, off)) == 0) return 0;
+            
 //            typename MapType::const_iterator i;
             const_iterator i;
 

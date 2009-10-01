@@ -102,7 +102,7 @@ static inline void closefd(int fd)
     while (::close(fd) == -1 && errno == EINTR) {}
 }
 
-static void uri_to_sa(const URI& uri, struct sockaddr *s, size_t *s_size)
+static void uri_to_sa(const URI& uri, struct sockaddr *s, socklen_t *s_size)
     throw (gu::Exception)
 {
     const char* host = 0;
@@ -168,14 +168,14 @@ class TCPHdr
 
 public:
 
-    TCPHdr(const size_t l) : raw(), len(l) 
+    TCPHdr(const size_t l) : raw(), len(static_cast<uint32_t>(l)) 
     {
 	if (gcomm::write(len, raw, sizeof(raw), 0) == 0)
 	    gcomm_throw_fatal;
     }
 
     TCPHdr(const unsigned char *buf, const size_t buflen, 
-           const size_t offset) :
+           const uint32_t offset) :
         raw(),
         len()
     {
@@ -719,7 +719,7 @@ void TCP::handle_event (const int fd, const Event& pe)
 	    }
             else if (ret != EAGAIN)
             {
-		this->error_no = ret;
+		this->error_no = static_cast<int>(ret);
 		state = S_FAILED;
 		log_warn << "TCP::handle(): Failed";
 		pass_up(0, 0, 0);
@@ -818,7 +818,7 @@ const ReadBuf *TCP::recv()
 
 string TCP::get_remote_url() const
 {
-    return Conf::TcpScheme + sockaddr_to_str(&sa);
+    return Conf::TcpScheme + "://" + sockaddr_to_str(&sa);
 }
 
 string TCP::get_remote_host() const

@@ -5,7 +5,6 @@
 #include <gcomm/exception.hpp>
 #include <gcomm/time.hpp>
 #include <gcomm/protolay.hpp>
-#include <gcomm/string.hpp>
 
 #include <list>
 #include <set>

@@ -16,6 +16,9 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL
 
+# Check library
+AM_PATH_CHECK()
+
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stdint.h string.h])

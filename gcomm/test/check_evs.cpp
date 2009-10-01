@@ -246,7 +246,7 @@ START_TEST(test_input_map_overwrap)
     static const size_t qlen = 8;
     UUID pids[nodes];
     for (size_t i = 0; i < nodes; ++i) {
-        pids[i] = UUID(i + 1);
+        pids[i] = UUID(static_cast<int32_t>(i + 1));
         im.insert_sa(pids[i]);
     }
 
@@ -269,7 +269,9 @@ START_TEST(test_input_map_overwrap)
         }
 
         if (seqi > 0 && seqi % qlen == 0) {
-            uint32_t seqto = seqno_dec(seq, (::rand() % qlen + 1)*2);
+            uint32_t seqto = seqno_dec(
+                seq, 
+                (static_cast<uint32_t>(::rand() % qlen) + 1)*2);
             EVSInputMap::iterator mi_next;
             for (EVSInputMap::iterator mi = im.begin(); mi != im.end();
                  mi = mi_next) {
@@ -294,7 +296,7 @@ START_TEST(test_input_map_overwrap)
              im.erase(mi);
          }
     Time stop(Time::now());
-    std::cerr << "Msg rate " << n_msg/(stop.to_double() - start.to_double()) <<
+    std::cerr << "Msg rate " << double(n_msg)/(stop.to_double() - start.to_double()) <<
 "\n";
     set_seqno_max(0);
 
@@ -329,7 +331,7 @@ START_TEST(test_input_map_random)
     vector<UUID> pids(4);
     for (size_t i = 0; i < 4; ++i)
     {
-        pids[i] = UUID(i + 1);
+        pids[i] = UUID(static_cast<int32_t>(i + 1));
         im.insert_sa(pids[i]);
     }
     
@@ -345,7 +347,7 @@ START_TEST(test_input_map_random)
     for (EVSInputMap::iterator i = im.begin();
          i != im.end(); ++i) {
         fail_unless(i->get_sockaddr() == pids[cnt % 4]);
-        fail_unless(seqno_eq(i->get_evs_message().get_seq(), cnt/4));
+        fail_unless(seqno_eq(i->get_evs_message().get_seq(), static_cast<uint32_t>(cnt/4)));
         ++cnt;
     }
 
@@ -383,7 +385,7 @@ public:
         if (rb)
         {
             IntType<uint32_t> rseq(SEQNO_MAX);
-            fail_unless(rseq.read(rb->get_buf(), rb->get_len(), roff));
+            fail_unless(rseq.read(rb->get_buf(), rb->get_len(), roff) != 0);
             deliv_seq = rseq.get();
         }
     }
@@ -452,7 +454,7 @@ class DummyInstance : public Toplay
     DummyInstance(const DummyInstance&);
     void operator=(const DummyInstance&);
 public:
-    DummyInstance(EventLoop* el, const size_t idx, const string& name) :
+    DummyInstance(EventLoop* el, const int32_t idx, const string& name) :
         tp(),
         ep(el, &tp, UUID(idx), name, 0),
         send_seq(0),
@@ -1515,7 +1517,7 @@ static Stats stats;
 static void multicast(vector<Inst*>* pvec, const ReadBuf* rb, const int ploss)
 {
     EVSMessage msg;
-    fail_unless(msg.read(rb->get_buf(), rb->get_len(), 0));
+    fail_unless(msg.read(rb->get_buf(), rb->get_len(), 0) != 0);
     LOG_DEBUG("msg: " + make_int(msg.get_type()).to_string());
     stats.acc_mcast(msg.get_type());
     for (vector<Inst*>::iterator j = pvec->begin();
@@ -1642,7 +1644,7 @@ START_TEST(test_evs_proto_converge)
 
     for (size_t i = 0; i < n; ++i) {
         DummyTransport* tp = new DummyTransport();
-        vec[i] = new Inst(tp, new EVSProto(&el, tp, UUID(i + 1),
+        vec[i] = new Inst(tp, new EVSProto(&el, tp, UUID(static_cast<int32_t>(i + 1)),
                                            "n" + make_int(i + 1).to_string(), 0));
         vec[i]->ep->shift_to(EVSProto::S_JOINING);
         vec[i]->ep->send_join(false);
@@ -1660,7 +1662,7 @@ START_TEST(test_evs_proto_converge_1by1)
     for (size_t n = 0; n < 8; ++n) {
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
-        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1),
+        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(static_cast<int32_t>(n + 1)),
                                            "n" + make_int(n + 1).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::S_JOINING);
         vec[n]->ep->send_join(n == 0);
@@ -1754,7 +1756,7 @@ START_TEST(test_evs_proto_user_msg)
     for (size_t n = 0; n < 8; ++n) {
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
-        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1),
+        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(static_cast<int32_t>(n + 1)),
                                            "n" + make_int(n + 1).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::S_JOINING);
         vec[n]->ep->send_join(n == 0);
@@ -1840,7 +1842,7 @@ START_TEST(test_evs_proto_consensus_with_user_msg)
         send_msgs_rnd(&vec, 8);
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
-        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1), "n" 
+        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(static_cast<int32_t>(n + 1)), "n" 
                                            + make_int(n + 1).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::S_JOINING);
         vec[n]->ep->send_join(n == 0);
@@ -1861,7 +1863,7 @@ START_TEST(test_evs_proto_msg_loss)
     for (size_t n = 0; n < 8; ++n) {
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
-        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1), "n" + 
+        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(static_cast<int32_t>(n + 1)), "n" + 
                                            make_int(n + 1).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::S_JOINING);
         vec[n]->ep->send_join(false);
@@ -1891,7 +1893,7 @@ START_TEST(test_evs_proto_leave)
         send_msgs_rnd(&vec, 8);
         vec.resize(n + 1);
         DummyTransport* tp = new DummyTransport();
-        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(n + 1), "n" 
+        vec[n] = new Inst(tp, new EVSProto(&el, tp, UUID(static_cast<int32_t>(n + 1)), "n" 
                                            + make_int(n + 1).to_string(), 0));
         vec[n]->ep->shift_to(EVSProto::S_JOINING);
         vec[n]->ep->send_join(n == 0);
@@ -1920,7 +1922,7 @@ static void join_inst(EventLoop* el,
     // std::cout << *n << "\n";
     vec.resize(*n + 1);
     DummyTransport* tp = new DummyTransport();
-    vec[*n] = new Inst(tp, new EVSProto(el, tp, UUID(*n + 1), "n" 
+    vec[*n] = new Inst(tp, new EVSProto(el, tp, UUID(static_cast<int32_t>(*n + 1)), "n" 
                                         + make_int(*n + 1).to_string(), 0));
     vec[*n]->ep->shift_to(EVSProto::S_JOINING);
     vec[*n]->ep->send_join(false);

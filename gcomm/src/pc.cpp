@@ -149,7 +149,10 @@ void PC::connect()
 
         gu_trace(ret = event_loop->poll(50));
 
-        if (ret < 0) log_warn << "poll(): " << ret;
+        if (ret < 0)
+        {
+            log_warn << "poll(): " << ret;
+        }
     }
     while (pc->get_state() != PCProto::S_PRIM);
 }
