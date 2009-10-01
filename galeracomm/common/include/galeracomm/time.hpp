@@ -87,21 +87,21 @@ public:
     /*!
      *
      */
-    time_t get_seconds() const {
+    uint64_t get_seconds() const {
 	return time/Second;
     }
 
     /*!
      *
      */
-    time_t get_milliseconds() const {
+    uint64_t get_milliseconds() const {
 	return time/MilliSecond;
     };
 
     /*!
      *
      */
-    time_t get_microseconds() const {
+    uint64_t get_microseconds() const {
 	return time;
     }
 };

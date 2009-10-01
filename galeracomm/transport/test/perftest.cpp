@@ -318,14 +318,14 @@ int main(int argc, char *argv[])
 	if (strcmp(argv[1], "--client") == 0) {
 	    Client c(p);
 	    c.connect(argv[2]);
-	    unsigned long long msgs = 1000;
-	    unsigned long long nbytes = 1000;
+	    size_t msgs = 1000;
+	    size_t nbytes = 1000;
 	    if (argc > 3)
-		msgs = ::strtoull(argv[3], 0, 0);
+		msgs = static_cast<size_t>(::strtoull(argv[3], 0, 0));
 	    if (argc > 4)
-		nbytes = ::strtoull(argv[4], 0, 0);
+		nbytes = static_cast<size_t>(::strtoull(argv[4], 0, 0));
 	    while (c.is_connected() == false && p->poll(1000) >= 0) {}
-	    for (unsigned long long i = 0; i < msgs && terminated == false;) {
+	    for (size_t i = 0; i < msgs && terminated == false;) {
 		int ret;
 		if ((ret = c.send((rand()%nbytes)*2)) == 0)
 		    i++;
