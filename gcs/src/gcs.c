@@ -337,9 +337,15 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     conn->my_idx = conf->my_idx;
 
     if (conf->conf_id < 0) {
-        assert (conf->my_idx < 0);
-        gu_info ("Received self-leave message. Closing connection.");
-        conn->state = GCS_CONN_CLOSED;
+        if (0 == conf->memb_num) {
+            assert (conf->my_idx < 0);
+            gu_info ("Received SELF-LEAVE. Closing connection.");
+            conn->state = GCS_CONN_CLOSED;
+        }
+        else {
+            gu_info ("Received NON-PRIMARY.");
+            gcs_become_open (conn);
+        }
         return;
     }
 
