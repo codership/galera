@@ -122,7 +122,7 @@ public:
 	do {
 	    if (last_proc_id + 1 == std::numeric_limits<uint16_t>::max())
 		last_proc_id = 0;
-	    if (addresses.find(Address(last_proc_id + 1, 0, segment_id))
+	    if (addresses.find(Address(static_cast<uint16_t>(last_proc_id + 1), 0, segment_id))
 		== addresses.end()) {
 		found = true;
 	    }

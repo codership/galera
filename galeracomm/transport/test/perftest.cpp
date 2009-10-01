@@ -126,15 +126,15 @@ public:
 	for (std::vector<uint64_t>::iterator i = periods.begin();
 	     i != periods.end(); ++i) {
 	    // std::cout << *i << "\n";
-	    p += *i;
+	    p += double(*i);
 	}
 	std::cerr << "Running time: " << last_recvd.tstamp - first_sent.tstamp << " usec\n";
 	std::cerr << "Samples: " << periods.size() << "\n";
-	std::cerr << "Msg rate: " << (periods.size()*1.e6/(last_recvd.tstamp - first_sent.tstamp)) << " msg/sec\n";
+	std::cerr << "Msg rate: " << (double(periods.size())*1.e6/double(last_recvd.tstamp - first_sent.tstamp)) << " msg/sec\n";
 	std::cerr << "Min latency: " << min_period << " usec\n";
 	std::cerr << "Max latency: " << max_period << " usec\n";
-	std::cerr << "Average latency : " << (p/periods.size()) << " usec\n";
-	std::cerr << "Throughput: " << (1.e6*double(bytes)/(last_recvd.tstamp - first_sent.tstamp)) << " bytes/sec\n";
+	std::cerr << "Average latency : " << (p/double(periods.size())) << " usec\n";
+	std::cerr << "Throughput: " << (1.e6*double(bytes)/double(last_recvd.tstamp - first_sent.tstamp)) << " bytes/sec\n";
 	bytes = 0;
 	first_sent.tstamp = 0;
 	last_recvd.tstamp = 1;

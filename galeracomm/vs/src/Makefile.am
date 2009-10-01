@@ -1,5 +1,5 @@
 
-lib_LTLIBRARIES = libgcommvspp.la libgcommvsbes.la libgcommevs.la
+lib_LTLIBRARIES = libgcommvspp.la libgcommvsbes.la
 sbin_PROGRAMS = vsbes
 
 INCLUDES = \
@@ -22,6 +22,3 @@ vsbes_LDADD = libgcommvspp.la \
 	$(top_builddir)/common/src/libgcommcommonpp.la \
 	-lgalerautils++ -lgalerautils
 
-libgcommevs_la_SOURCES = evs.cpp evs.hpp \
-	evs_proto.cpp evs_proto.hpp \
-	evs_input_map.cpp evs_input_map.hpp evs_message.hpp

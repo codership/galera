@@ -50,13 +50,13 @@ static inline int map_event_to_mask(const PollEnum e)
 
 static inline PollEnum map_mask_to_event(const int m)
 {
-    PollEnum ret = PollEvent::POLL_NONE;
+    int ret = PollEvent::POLL_NONE;
     ret |= (m & POLLIN)   ? PollEvent::POLL_IN    : PollEvent::POLL_NONE;
     ret |= (m & POLLOUT)  ? PollEvent::POLL_OUT   : PollEvent::POLL_NONE;
     ret |= (m & POLLERR)  ? PollEvent::POLL_ERR   : PollEvent::POLL_NONE;
     ret |= (m & POLLHUP)  ? PollEvent::POLL_HUP   : PollEvent::POLL_NONE;
     ret |= (m & POLLNVAL) ? PollEvent::POLL_INVAL : PollEvent::POLL_NONE;
-    return ret;
+    return static_cast<PollEnum>(ret);
 }
 
 static struct pollfd *pfd_find(struct pollfd *pfds, const size_t n_pfds, 
@@ -105,7 +105,7 @@ void PollDef::set(const int fd, const PollEnum e)
 	pfd->events = 0;
 	pfd->revents = 0;
     }
-    pfd->events |= map_event_to_mask(e);
+    pfd->events = static_cast<unsigned short>(pfd->events | map_event_to_mask(e));
 }
 
 void PollDef::unset(const int fd, const PollEnum e)
@@ -115,7 +115,7 @@ void PollDef::unset(const int fd, const PollEnum e)
 //    if (e == PollEvent::POLL_OUT)
 //	std::cerr << "fd " << fd << " unset POLL_OUT\n";
     if ((pfd = pfd_find(pfds, n_pfds, fd)) != 0) {
-	pfd->events &= ~map_event_to_mask(e);
+	pfd->events = static_cast<unsigned short>(pfd->events & ~map_event_to_mask(e));
 	if (pfd->events == 0) {
 	    --n_pfds;
 	    memmove (&pfd[0], &pfd[1],
@@ -215,14 +215,14 @@ public:
 	    throw DException("Invalid fd");
 	if (Fifo::find(fd) == 0)
 	    throw DException("Invalid fd");
-	ctxi->second.second |= e;
+	ctxi->second.second = static_cast<unsigned short>(ctxi->second.second | e);
     }
     void unset(const int fd, const PollEnum e) {
 	std::map<const int, std::pair<PollContext *, PollEnum> >::iterator 
 	    ctxi = ctx_map.find(fd);
 	if (ctxi == ctx_map.end())
 	    throw DException("Invalid fd");
-	ctxi->second.second &= ~e;
+	ctxi->second.second = static_cast<unsigned short>(ctxi->second.second & ~e);
     }
     
     int poll(int tout) {

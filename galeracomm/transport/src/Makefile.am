@@ -8,3 +8,4 @@ libgcommtransportpp_la_SOURCES = \
 	transport.cpp \
 	transport_tcp.cpp \
 	transport_tipc.cpp
+libgcommtransportpp_la_CXXFLAGS = @AM_CXXFLAGS@ -Wno-conversion

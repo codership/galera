@@ -203,7 +203,7 @@ START_TEST(check_vsmessage)
 
     buf = new char[128];
     for (int i = 0; i < 128; i++)
-	buf[i] = (i % 128);
+	buf[i] = static_cast<char>(i % 128);
     WriteBuf *wb = new WriteBuf(buf, 128);
 
     wb->prepend_hdr(data_msg.get_hdr(), data_msg.get_hdrlen());
@@ -609,7 +609,7 @@ public:
     Random() {
         ::srand(12345678);
     }
-    Random(long s) {
+    Random(unsigned int s) {
         ::srand(s);
     }
 
@@ -724,7 +724,7 @@ public:
     void run() {
 	char msg[128];
 	for (unsigned int i = 0; i < 128; i++) 
-	    msg[i] = i % 256;
+	    msg[i] = static_cast<char>(i % 256);
 	while (true) {
 	    WriteBuf wb(msg, 128);
 	    if (vs->handle_down(&wb, 0))

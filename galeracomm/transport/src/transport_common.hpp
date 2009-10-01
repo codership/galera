@@ -39,7 +39,7 @@ static inline std::string to_string(const sockaddr* sa)
     if (sa->sa_family == AF_INET) {
 	ret << ::inet_ntoa(reinterpret_cast<const sockaddr_in*>(sa)->sin_addr)
 	    << ":"
-	    << gu_be16(reinterpret_cast<const sockaddr_in*>(sa)->sin_port);
+	    << ntohs(reinterpret_cast<const sockaddr_in*>(sa)->sin_port);
     }
     else
 	ret << "Unknown address family: " << (sa->sa_family);

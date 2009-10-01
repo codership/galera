@@ -90,8 +90,7 @@ static inline size_t write_aset(const std::set<Address>& addr, void *buf,
 				const size_t buflen, const size_t offset)
 {
     size_t off;
-    uint32_t s;
-    s = addr.size();
+    uint32_t s(static_cast<uint32_t>(addr.size()));
     if ((off = write_uint32(s, buf, buflen, offset)) == 0)
 	return 0;
     for (std::set<Address>::const_iterator i = addr.begin();
@@ -394,7 +393,7 @@ public:
 
 	view = new VSView(*v);
 
-	flags |= user_state ? F_USER_STATE : 0;
+	flags = static_cast<uint8_t>(flags | (user_state ? F_USER_STATE : 0));
     }
 
     // Ctor for broadcast data message
@@ -566,10 +565,10 @@ public:
 	    LOG_WARN("VSMessage::read() failed at hdr read");
 	    return 0;
 	}
-	version = w & 0xff;
-	type = (w >> 8) & 0xff;
-	flags = (w >> 16) & 0xff;
-	user_type = (w >> 24) & 0xff;
+	version = static_cast<uint8_t>(w & 0xff);
+	type = static_cast<uint8_t>((w >> 8) & 0xff);
+	flags = static_cast<uint8_t>((w >> 16) & 0xff);
+	user_type = static_cast<uint8_t>((w >> 24) & 0xff);
 
 	// LOG_TRACE(std::string("VSMessage::read(): reading "
 	//				     "source, offset ") 

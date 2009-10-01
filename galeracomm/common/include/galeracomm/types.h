@@ -48,7 +48,7 @@ static inline size_t read_uint16(const void *from, const size_t fromlen,
      if (fromlen - from_offset < 2)
 	  return 0;
      memcpy(to, (uint8_t*) from + from_offset, 2);
-     *to = gu_be16(*to);
+     *to = gtoh16(*to);
      return from_offset + 2;
 }
 
@@ -59,7 +59,7 @@ static inline size_t read_uint32(const void *from, const size_t fromlen,
      if (fromlen - from_offset < 4)
 	  return 0;
      memcpy(to, (uint8_t *) from + from_offset , 4);
-     *to = gu_be32(*to);
+     *to = gtoh32(*to);
      return from_offset + 4;
 }
 
@@ -69,7 +69,7 @@ static inline size_t read_uint64(const void *from, const size_t fromlen,
      if (fromlen - from_offset < 8)
 	  return 0;
      memcpy(to, (uint8_t *)from + from_offset, 8);
-     *to = gu_be64(*to);
+     *to = gtoh64(*to);
      return from_offset + 8;
 }
 
@@ -88,7 +88,7 @@ static inline size_t write_uint16(const uint16_t from, void *to,
      uint16_t w;
      if (tolen - to_offset < 2)
 	  return 0;
-     w = gu_be16(from);
+     w = htog16(from);
      memcpy((uint8_t *) to + to_offset, &w, 2);
      return to_offset + 2;
 }
@@ -99,7 +99,7 @@ static inline size_t write_uint32(const uint32_t from, void *to,
      uint32_t w;
      if (tolen - to_offset < 4)
 	  return 0;
-     w = gu_be32(from);
+     w = htog32(from);
      memcpy((uint8_t *) to + to_offset, &w, 4);
      return to_offset + 4;
 }
@@ -110,7 +110,7 @@ static inline size_t write_uint64(const uint64_t from, void *to,
      uint64_t w;
      if (tolen - to_offset < 8)
 	  return 0;
-     w = gu_be64(from);
+     w = htog64(from);
      memcpy((uint8_t *)to + to_offset, &w, 8);
      return to_offset + 8;
 }

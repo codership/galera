@@ -72,10 +72,10 @@ START_TEST(check_address)
     char buf[64];
 
     fail_unless(a.size() == 4);
-    fail_unless(a.write(buf, a.size(), 0));
+    fail_unless(a.write(buf, a.size(), 0) != 0);
     
     Address aread;
-    fail_unless(aread.read(buf, aread.size(), 0));
+    fail_unless(aread.read(buf, aread.size(), 0) != 0);
 
     fail_unless(aread == a);
 
@@ -84,7 +84,9 @@ START_TEST(check_address)
     for (size_t i = 0; i < 2; i++) {
 	for (size_t j = 0; j < 2; j++) {
 	    for (size_t k = 0; k < 2; k++) {
-		avec[i][j][k] = new Address(i + 1, j + 1, k + 1);
+		avec[i][j][k] = new Address(static_cast<uint16_t>(i + 1), 
+                                            static_cast<uint8_t>(j + 1),
+                                            static_cast<uint8_t>(k + 1));
 	    }
 	}
     }
@@ -145,8 +147,9 @@ START_TEST(check_readbuf)
  
     fail_unless(rb->get_refcnt() == 1);
     for (size_t i = 0; i < bufsize; i++)
-	buf[i] = i;
-    
+    {
+	buf[i] = static_cast<unsigned char>(i & 0xff);
+    }
     ReadBuf *rb_copy = rb->copy();
     fail_unless(rb->get_refcnt() == 2);
     rb->release();
@@ -183,8 +186,9 @@ START_TEST(check_writebuf)
     const unsigned char *ptr;
 
     for (size_t i = 0; i < buflen; i++)
-	buf[i] = i;
-
+    {
+	buf[i] = static_cast<unsigned char>(i & 0xff);
+    }
     WriteBuf *wb_copy;
     {
 	WriteBuf wb(buf, buflen);    
@@ -232,7 +236,9 @@ START_TEST(check_writebuf)
     delete wbp;
 
     for (size_t i = 0; i < buflen; i++)
-	buf[i] = i;
+    {
+	buf[i] = static_cast<unsigned char>(i & 0xff);
+    }
 
     wbp = new WriteBuf(buf, buflen);
     wbp->prepend_hdr(hdr1, 3);

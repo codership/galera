@@ -47,15 +47,15 @@ public:
 	    log_info << "Queued:    " << n_msgs_in << " msgs "
 	                              << bytes_in  << " bytes";
 	    log_info << "    "
-		     << (1.e6*double(n_msgs_in)/(tnow - tlast)) << " msg/sec";
+		     << (1.e6*double(n_msgs_in)/double(tnow - tlast)) << " msg/sec";
 	    log_info << "    "
-		     << (1.e6*double(bytes_in)/(tnow - tlast)) << " bytes/sec";
+		     << (1.e6*double(bytes_in)/double(tnow - tlast)) << " bytes/sec";
 	    log_info << "Forwarded: " << n_msgs_out << " msgs " 
 			              << bytes_out << " bytes ";
 	    log_info << "    "
-		     << (1.e6*double(n_msgs_out)/(tnow - tlast)) << " msg/sec";
+		     << (1.e6*double(n_msgs_out)/double(tnow - tlast)) << " msg/sec";
 	    log_info << "    " 
-		     << (1.e6*double(bytes_out)/(tnow - tlast)) <<" bytes/sec";
+		     << (1.e6*double(bytes_out)/double(tnow - tlast)) <<" bytes/sec";
 	    tlast = tnow;
 	    n_msgs_out = bytes_out = n_msgs_in = bytes_in = 0;
 	}
@@ -88,7 +88,9 @@ ClientHandler::ClientHandler(Transport *t, VSBackend *v) :
 ClientHandler::~ClientHandler()
 {
     if (vs)
+    {
 	log_info << "deleting " + vs->get_self().to_string();
+    }
     delete tp;
     delete vs;
 }

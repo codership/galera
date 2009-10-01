@@ -491,7 +491,7 @@ int VS::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
     if (dm)
 	vdm = static_cast<const VSDownMeta *>(dm);
     ServiceId sid = vdm ? vdm->sid : 0;
-    uint8_t user_type = vdm ? vdm->user_type : 0;
+    uint8_t user_type = static_cast<uint8_t>(vdm ? vdm->user_type : 0);
 
     gu::Critical crit(mon);
     if ((pi = proto.find(sid)) == proto.end())

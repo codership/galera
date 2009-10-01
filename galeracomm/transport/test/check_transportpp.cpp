@@ -47,7 +47,7 @@ public:
 	    throw DException("");
 	
 	for (size_t i = 0; i < b; i++)
-	    buf[i] = i % 256;
+	    buf[i] = static_cast<unsigned char>(i & 0xff);
 	WriteBuf *wb = new WriteBuf(buf, b);
 	int res;
 	bool ret = (res = pass_down(wb, 0)) == 0 ? true : false;
@@ -60,7 +60,7 @@ public:
 	if (can_send == false)
 	    throw DException("");
 	for (size_t i = 0; i < b; i++)
-	    buf[i] = i % 256;
+	    buf[i] = static_cast<unsigned char>(i & 0xff);
 	WriteBuf *wb = new WriteBuf(buf, b);
 	tp->send(wb, 0);
 	delete wb;
@@ -96,7 +96,7 @@ public:
     ~Receiver() {
 	cstop = clock();
 	clock_t ct = (cstop - cstart);
-	double tput = CLOCKS_PER_SEC*double(recvd)/(cstop - cstart);
+	double tput = CLOCKS_PER_SEC*double(recvd)/double(cstop - cstart);
 	std::cerr << "Reciver: received " << recvd << " bytes\n";
 	std::cerr << "         used " << (double(ct)/CLOCKS_PER_SEC) << " secs cputime\n";
 	std::cerr << "         throughput " << tput << "bytes/cpusec\n";
@@ -276,7 +276,7 @@ public:
     void send(size_t len) {
 	buf = new unsigned char[len];
 	for (size_t i = 0; i < len; i++)
-	    buf[i] = i % 256;
+	    buf[i] = static_cast<unsigned char>(i & 0xff);
 	WriteBuf wb(buf, len);
 	tp->send(&wb, 0);
 	delete[] buf;
@@ -415,7 +415,7 @@ public:
         seq_map ()
     {
 	for (size_t i = 0; i < 128; ++i) {
-	    buf[i] = i;
+	    buf[i] = static_cast<unsigned char>(i & 0xff);
 	}
 	set_down_context(tp);
     }
@@ -472,7 +472,7 @@ public:
 	    
 	    // LOG_TRACE << "seqno: " << rs;
 	    recvd++;
-	    recvd_b += rb->get_len();
+	    recvd_b += double(rb->get_len());
 	} else if (um) {
 	    if (tn->ntype == TRANSPORT_N_SUBSCRIBED) {
 		fprintf(stderr, "subs: ");
