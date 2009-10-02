@@ -517,6 +517,7 @@ void TCPTransport::handle(const int fd, const PollEnum pe)
 	    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1)
 		throw DFatalException("TCPTransport::handle(): Getsockopt failed");
 	    if (err == 0) {
+                set_timeout(TCP_CONN_TIMEOUT);
 		state = TRANSPORT_S_CONNECTED;
 	    } else {
 		this->error_no = err;
