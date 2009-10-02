@@ -30,8 +30,18 @@ const gu_uuid_t GU_UUID_NIL = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};
 static uint64_t
 uuid_get_time ()
 {
-    struct timeval t;
-    gettimeofday (&t, NULL);
+    static struct timeval check = { 0, 0 };
+    struct timeval t, t_prev;
+
+    t_prev = check;
+
+    do {
+        gettimeofday (&t, NULL);
+    }
+    while (t_prev.tv_usec == t.tv_usec && t_prev.tv_sec == t.tv_sec);
+
+    check = t;
+
     return ((t.tv_sec * 10000000) + (t.tv_usec * 10) +
 	    0x01B21DD213814000LL); // offset since the start of 15 October 1582
 }
