@@ -20,6 +20,7 @@
 #include "gu_byteswap.h"
 #include "gu_log.h"
 #include "gu_assert.h"
+#include "gu_mutex.h"
 #include "gu_uuid.h"
 
 const gu_uuid_t GU_UUID_NIL = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};
@@ -31,18 +32,21 @@ static uint64_t
 uuid_get_time ()
 {
     static struct timeval check = { 0, 0 };
-    struct timeval t, t_prev;
+    static gu_mutex_t mtx = GU_MUTEX_INITIALIZER;
+    struct timeval t;
 
-    t_prev = check;
+    gu_mutex_lock (&mtx);
 
     do {
         gettimeofday (&t, NULL);
     }
-    while (t_prev.tv_usec == t.tv_usec && t_prev.tv_sec == t.tv_sec);
+    while (check.tv_usec == t.tv_usec && check.tv_sec == t.tv_sec);
 
     check = t;
 
-    return ((t.tv_sec * 10000000) + (t.tv_usec * 10) +
+    gu_mutex_unlock (&mtx);
+
+    return ((t.tv_sec * 10000000LL) + (t.tv_usec * 10LL) +
 	    0x01B21DD213814000LL); // offset since the start of 15 October 1582
 }
 

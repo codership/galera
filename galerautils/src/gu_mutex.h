@@ -56,6 +56,10 @@ typedef struct gu_mutex gu_mutex_t;
 #define gu_mutex_destroy(M) gu_mutex_destroy_dbg((M), __FILE__, __LINE__)
 #define gu_cond_wait(S,M)   gu_cond_wait_dbg    ((S),(M), __FILE__, __LINE__)
 
+#define GU_MUTEX_INITIALIZER { PTHREAD_MUTEX_INITIALIZER,       \
+            PTHREAD_MUTEX_INITIALIZER,                          \
+            0,0,0,0,0,0 }
+
 #else /* DEBUG_MUTEX not defined - use regular pthread functions */
 
 typedef pthread_mutex_t gu_mutex_t;
@@ -65,6 +69,8 @@ typedef pthread_mutex_t gu_mutex_t;
 #define gu_mutex_unlock(M)  pthread_mutex_unlock ((M))
 #define gu_mutex_destroy(M) pthread_mutex_destroy((M))
 #define gu_cond_wait(S,M)   pthread_cond_wait    ((S),(M))
+
+#define GU_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 
 #endif /* DEBUG_MUTEX */
 /*@}*/
