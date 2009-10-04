@@ -58,6 +58,11 @@ struct gu_to
 static inline to_waiter_t*
 to_get_waiter (gu_to_t* to, gu_seqno_t seqno)
 {
+    // Check for queue overflow. Tell application that it should wait.
+    if (seqno >= to->seqno + to->qlen) {
+	return NULL;
+    }        
+
     return (to->queue + (seqno & to->qmask));
 }
 
@@ -164,13 +169,11 @@ long gu_to_grab (gu_to_t* to, gu_seqno_t seqno)
 	return -ECANCELED;
     }
 
-    // Check for queue overflow. Tell application that it should wait.
-    if (seqno >= to->seqno + to->qlen) {
+    if ((w = to_get_waiter (to, seqno)) == NULL) {
 	gu_mutex_unlock(&to->lock);
 	return -EAGAIN;
     }        
-
-    w = to_get_waiter (to, seqno);
+    /* we have a valid waiter now */
 
     switch (w->state) {
     case INTERRUPTED:
@@ -253,9 +256,13 @@ to_wake_waiter (to_waiter_t* w)
 static inline void
 to_release_and_wake_next (gu_to_t* to, to_waiter_t* w) {
     w->state = RELEASED;
-    /* Iterate over CANCELED waiters and set states as RELEASED */
+    /* 
+     * Iterate over CANCELED waiters and set states as RELEASED
+     * We look for waiter in the head of queue, which guarantees that
+     * to_get_waiter() will always return a valid waiter pointer
+     */
     for (to->seqno++;
-         (w = to_get_waiter(to, to->seqno)) && w->state == CANCELED;
+         (w = to_get_waiter(to, to->seqno)) && w && w->state == CANCELED;
          to->seqno++) {
         w->state = RELEASED;
     }
@@ -274,7 +281,11 @@ long gu_to_release (gu_to_t *to, gu_seqno_t seqno)
 	abort();
     }
 
-    w = to_get_waiter (to, seqno);
+    if ((w = to_get_waiter (to, seqno)) == NULL) {
+	gu_mutex_unlock(&to->lock);
+	return -EAGAIN;
+    }        
+    /* we have a valid waiter now */
     
     if (seqno == to->seqno) {
         to_release_and_wake_next (to, w);
@@ -315,12 +326,12 @@ long gu_to_cancel (gu_to_t *to, gu_seqno_t seqno)
     }
     
     // Check for queue overflow. This is totally unrecoverable. Abort.
-    if (seqno >= to->seqno + to->qlen) {
+    if ((w = to_get_waiter (to, seqno)) == NULL) {
 	gu_mutex_unlock(&to->lock);
 	abort();
     }        
+    /* we have a valid waiter now */
 
-    w = to_get_waiter (to, seqno);
     if ((seqno > to->seqno) || 
         (seqno == to->seqno && w->state != HOLDER)) {
         err = to_wake_waiter (w);
@@ -351,13 +362,11 @@ long gu_to_self_cancel(gu_to_t *to, gu_seqno_t seqno)
 	abort();
     }
 
-    // Check for queue overflow. Tell application that it should wait.
-    if (seqno >= to->seqno + to->qlen) {
+    if ((w = to_get_waiter (to, seqno)) == NULL) {
 	gu_mutex_unlock(&to->lock);
 	return -EAGAIN;
     }        
-
-    w = to_get_waiter(to, seqno);
+    /* we have a valid waiter now */
 
     if (seqno > to->seqno) { // most probable case
         w->state = CANCELED;
@@ -380,6 +389,7 @@ long gu_to_interrupt (gu_to_t *to, gu_seqno_t seqno)
 {
     long rcode = 0;
     long err;
+    to_waiter_t *w;
 
     assert (seqno >= 0);
 
@@ -387,30 +397,34 @@ long gu_to_interrupt (gu_to_t *to, gu_seqno_t seqno)
 	gu_fatal("Mutex lock failed (%d): %s", err, strerror(err));
 	abort();
     }
-    {
-        if (seqno >= to->seqno) {
-            to_waiter_t *w = to_get_waiter (to, seqno);
-            if (w->state == HOLDER) {
-                gu_debug ("trying to interrupt in use seqno: seqno = %llu, "
-                          "TO seqno = %llu", seqno, to->seqno);
-                /* gu_mutex_unlock (&to->lock); */
-                rcode = -ERANGE;
-            } else if (w->state == CANCELED) {
-                gu_debug ("trying to interrupt canceled seqno: seqno = %llu, "
-                          "TO seqno = %llu", seqno, to->seqno);
-                /* gu_mutex_unlock (&to->lock); */
-                rcode = -ERANGE;
-            } else {
-                rcode    = to_wake_waiter (w);
-                w->state = INTERRUPTED;
-            }
-        } else {
-            gu_debug ("trying to interrupt used seqno: cancel seqno = %llu, "
-                     "TO seqno = %llu", seqno, to->seqno);
+    if (seqno >= to->seqno) {
+        if ((w = to_get_waiter (to, seqno)) == NULL) {
+            gu_mutex_unlock(&to->lock);
+            return -EAGAIN;
+        }        
+        /* we have a valid waiter now */
+
+        if (w->state == HOLDER) {
+            gu_debug ("trying to interrupt in use seqno: seqno = %llu, "
+                      "TO seqno = %llu", seqno, to->seqno);
             /* gu_mutex_unlock (&to->lock); */
             rcode = -ERANGE;
+        } else if (w->state == CANCELED) {
+            gu_debug ("trying to interrupt canceled seqno: seqno = %llu, "
+                      "TO seqno = %llu", seqno, to->seqno);
+            /* gu_mutex_unlock (&to->lock); */
+            rcode = -ERANGE;
+        } else {
+            rcode    = to_wake_waiter (w);
+            w->state = INTERRUPTED;
         }
+    } else {
+        gu_debug ("trying to interrupt used seqno: cancel seqno = %llu, "
+                  "TO seqno = %llu", seqno, to->seqno);
+        /* gu_mutex_unlock (&to->lock); */
+        rcode = -ERANGE;
     }
+
     gu_mutex_unlock (&to->lock);
     return rcode;
 }
