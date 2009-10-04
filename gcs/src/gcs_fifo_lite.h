@@ -156,7 +156,7 @@ gcs_fifo_lite_remove (gcs_fifo_lite_t* const fifo)
     assert (fifo);
 
     if (gu_mutex_lock (&fifo->lock)) {
-	return -ECANCELED;
+	return false;
     }
     
     if (fifo->used) {    

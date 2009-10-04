@@ -315,8 +315,8 @@ statement-level. For performance and consistency considerations don't change
 that. As a side effect, binlog, if tuned on, can be ROW only. In future this
 option won't have special meaning.
 
-Mandatory options are hardcoded both in demo my.cnf file and in mysql-galera
-script.
+Mandatory options are hardcoded both in distribution's my.cnf file and in
+mysql-galera script.
 
 3.2 WSREP OPTIONS
 

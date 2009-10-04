@@ -22,7 +22,9 @@
 #include "galera_status.h"
 
 #define GALERA_USE_FLOW_CONTROL 1
-#define GALERA_USLEEP 10000 // 10 ms
+#define GALERA_USLEEP_FLOW_CONTROL    10000 //  0.01 sec
+#define GALERA_USLEEP_1_SECOND      1000000 //  1 sec
+#define GALERA_USLEEP_10_SECONDS   10000000 // 10 sec
 
 // for pretty printing in diagnostic messages
 static const char* galera_act_type_str[] =
@@ -60,7 +62,7 @@ struct galera_status status =
 {
     { { 0 } },
     WSREP_SEQNO_UNDEFINED,
-    0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
     GALERA_STAGE_INIT
 };
 
@@ -1025,8 +1027,6 @@ galera_handle_configuration (wsrep_t* gh,
     GALERA_GRAB_QUEUE (cert_queue,   conf_seqno);
     GALERA_GRAB_QUEUE (commit_queue, conf_seqno);
 
-    assert (status.last_applied == last_recved);
-
     if (conf->st_required) { // see #163 - SST might have happened already
         ((gcs_act_conf_t*)conf)->st_required =
             (status.last_applied != conf->seqno ||
@@ -1089,7 +1089,7 @@ galera_handle_configuration (wsrep_t* gh,
                     }
                     else {
                         gu_info ("Requesting state snapshot transfer failed: "
-                                 "%d (%s). Retrying in 1 second",
+                                 "%d (%s). Retrying in 10 seconds",
                                  ret, strerror(-ret));
                     }
                 }
@@ -1100,7 +1100,8 @@ galera_handle_configuration (wsrep_t* gh,
                     GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
                 }
 
-            } while ((ret == -EAGAIN) && (usleep(1000000), true));
+            } while ((ret == -EAGAIN) &&
+                     (usleep(GALERA_USLEEP_10_SECONDS), true));
 
             if (app_req) free (app_req);
 
@@ -1129,19 +1130,32 @@ galera_handle_configuration (wsrep_t* gh,
                 else {
                     status.state_uuid   = sst_uuid;
                     status.last_applied = sst_seqno;
+                    last_recved = status.last_applied;
 
                     gu_info ("Application state transfer complete: "
                              GU_UUID_FORMAT":%lld",
                              GU_UUID_ARGS(&status.state_uuid),
                              status.last_applied);
 
-                    while (-EAGAIN == (ret = gcs_join (gcs_conn,
-                                                       status.last_applied)))
-                        usleep (100000);
+                    do {
+                        ret = gcs_join (gcs_conn, status.last_applied);
+                    }
+                    while ((-EAGAIN == ret) &&
+                           (usleep(GALERA_USLEEP_1_SECOND), true));
 
-                    status.stage = GALERA_STAGE_JOINED;
+                    if (ret) {
+                        galera_state_t st =
+                            { status.last_applied, status.state_uuid };
 
-                    last_recved = status.last_applied;
+                        galera_store_state (data_dir, &st);
+
+                        gu_fatal ("Could not send join message: "
+                                  "%d (%s). Aborting.", ret, strerror(-ret));
+                        abort(); // TODO: see #170, gcs_join() must be reworked
+                    }
+                    else {
+                        status.stage = GALERA_STAGE_JOINED;
+                    }
                 }
             }
             else {
@@ -1164,8 +1178,9 @@ galera_handle_configuration (wsrep_t* gh,
                 last_recved = status.last_applied;
             }
             else {
-                // last_applied has gaps, so must use last_recved here.
-                if (last_recved != conf->seqno ||
+                /* Here we can't test for exact seqno equality,
+                 * there can be gaps */
+                if (last_recved > conf->seqno ||
                     gu_uuid_compare (&status.state_uuid, conf_uuid)) {
 
                     gu_fatal ("Internal replication error: no state transfer "
@@ -1367,10 +1382,11 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
     case WSDB_TRX_REPLICATING:
         gu_debug("victim trx is replicating: %lld", victim.seqno_l);
         while (victim.state == WSDB_TRX_REPLICATING ) {
-          gu_mutex_unlock(&commit_mtx);
-          usleep (GALERA_USLEEP);
-          gu_mutex_lock(&commit_mtx);
-          wsdb_get_local_trx_info(victim_trx, &victim);
+            gu_mutex_unlock(&commit_mtx);
+            // TODO: This must be driven by signal.
+            usleep (GALERA_USLEEP_FLOW_CONTROL);
+            gu_mutex_lock(&commit_mtx);
+            wsdb_get_local_trx_info(victim_trx, &victim);
         }
         gu_debug("victim trx has replicated: %lld", victim.seqno_l);
 
@@ -1585,7 +1601,7 @@ static enum wsrep_status mm_galera_pre_commit(
     errno = 0;
 
 #ifdef GALERA_USE_FLOW_CONTROL
-   do {
+    do {
 #endif
     /* hold commit time mutex */
     gu_mutex_lock(&commit_mtx);
@@ -1611,13 +1627,14 @@ static enum wsrep_status mm_galera_pre_commit(
 #ifdef GALERA_USE_FLOW_CONTROL
     /* what is happening here:
      * - first,  (gcs_wait() > 0) is evaluated, if not true, loop exits
-     * - second, (unlock(), usleep(), true) is evaluated always to true,
+     * - second, (++, unlock(), usleep(), true) is evaluated always to true,
      *   so we keep on looping.
      *   AFAIK usleep() is evaluated after unlock()
      */
-     } while ((gcs_wait (gcs_conn) > 0) && 
-              (gu_mutex_unlock(&commit_mtx), usleep (GALERA_USLEEP), true)
-     );
+    } while ((gcs_wait (gcs_conn) > 0) &&
+              (status.fc_waits++, gu_mutex_unlock (&commit_mtx),
+               usleep (GALERA_USLEEP_FLOW_CONTROL), true)
+        );
 #endif
 
     /* retrieve write set */
@@ -1669,10 +1686,8 @@ static enum wsrep_status mm_galera_pre_commit(
     do {
         rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_TORDERED,
                          &seqno_g, &seqno_l);
-    } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP), true));
+    } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
 
-    status.replicated++;
-    status.replicated_bytes += len;
 //    gu_info ("gcs_repl(): act_type: %s, act_size: %u, act_id: %llu, "
 //             "local: %llu, ret: %d",
 //             "GCS_ACT_TORDERED", len, seqno_g, seqno_l, rcode);
@@ -1682,6 +1697,9 @@ static enum wsrep_status mm_galera_pre_commit(
         retcode = WSREP_CONN_FAIL;
         goto cleanup;
     }
+
+    status.replicated++;
+    status.replicated_bytes += len;
 
     assert (GCS_SEQNO_ILL != seqno_g);
     assert (GCS_SEQNO_ILL != seqno_l);
@@ -1714,7 +1732,7 @@ static enum wsrep_status mm_galera_pre_commit(
     }
 
     if (gu_likely(galera_update_global_seqno (seqno_g))) {
-        /* Gloabl seqno OK, do certification test */
+        /* Global seqno OK, do certification test */
         rcode = wsdb_append_write_set(seqno_g, ws);
         switch (rcode) {
         case WSDB_OK:
@@ -1990,15 +2008,19 @@ static enum wsrep_status mm_galera_to_execute_start(
     len = xdr_getpos(&xdrs);
 
 #ifdef GALERA_USE_FLOW_CONTROL
-    while ((rcode = gcs_wait(gcs_conn)) && rcode > 0) usleep (GALERA_USLEEP);
-    if (rcode >= 0) // execute the following operation conditionally
+    while ((rcode = gcs_wait(gcs_conn)) && rcode > 0) {
+        status.fc_waits++;
+        usleep (GALERA_USLEEP_FLOW_CONTROL);
+    }
+
+    if (rcode < 0) goto cleanup;
 #endif
 
     /* replicate through gcs */
     do {
         rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_TORDERED, &seqno_g,
 	                 &seqno_l);
-    } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP), true));
+    } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
 
     status.replicated++;
     status.replicated_bytes += len;

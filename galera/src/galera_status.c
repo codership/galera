@@ -32,6 +32,7 @@ enum status_vars
     STATUS_LOCAL_COMMITS,
     STATUS_LOCAL_CERT_FAILURES,
     STATUS_LOCAL_BF_ABORTS,
+    STATUS_FC_WAITS,
     STATUS_LOCAL_STATUS,
     STATUS_MAX
 };
@@ -47,6 +48,7 @@ static struct wsrep_status_var wsrep_status[STATUS_MAX + 1] =
     {"local_commits",       WSREP_STATUS_INT64,  { 0 }                      },
     {"local_cert_failures", WSREP_STATUS_INT64,  { 0 }                      },
     {"local_bf_aborts",     WSREP_STATUS_INT64,  { 0 }                      },
+    {"flow_control_waits",  WSREP_STATUS_INT64,  { 0 }                      },
     {"local_status",        WSREP_STATUS_STRING, { 0 }                      },
     {NULL, 0, { 0 }}
 };
@@ -70,6 +72,7 @@ galera_status_get (const struct galera_status* s)
     wsrep_status[STATUS_LOCAL_CERT_FAILURES].value._int64 =
         s->local_cert_failures;
     wsrep_status[STATUS_LOCAL_BF_ABORTS    ].value._int64 = s->local_bf_aborts;
+    wsrep_status[STATUS_FC_WAITS           ].value._int64 = s->fc_waits;
     wsrep_status[STATUS_LOCAL_STATUS       ].value._string = 
         status_str[s->stage];
 

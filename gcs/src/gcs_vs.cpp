@@ -168,6 +168,9 @@ public:
 	    waiter_buf     = wb;
 	    waiter_buf_len = wb_len;
 	    lock.wait(cond);
+            // these asserts will misfire when connection to vsbes is lost
+            // but only in debug build and we anyways have to restart the
+            // node in that case
             assert (waiter_buf == 0 || state == LEFT);
             assert (waiter_buf_len == 0 || state == LEFT);
 	}

@@ -457,6 +457,10 @@ static void *gcs_recv_thread (void *arg)
     {
         gcs_seqno_t this_act_id = GCS_SEQNO_ILL;
 
+        action   = NULL;
+        act_type = GCS_ACT_ERROR;
+        act_id   = GCS_SEQNO_ILL;
+
         act_size = gcs_core_recv (conn->core, &action, &act_type, &act_id);
 
 	if (gu_unlikely(act_size <= 0)) {
@@ -821,8 +825,8 @@ long gcs_repl (gcs_conn_t          *conn,
                     /* sending failed - remove item from the queue */
                     gu_warn ("Send action returned %d (%s)",
                              ret, strerror(-ret));
-                    if (gcs_fifo_lite_remove (conn->repl_q)) {
-                        gu_fatal ("Failed to recover repl_q");
+                    if (!gcs_fifo_lite_remove (conn->repl_q)) {
+                        gu_fatal ("Failed to remove unsent item from repl_q");
                         ret = -ENOTRECOVERABLE;
                     }
                 }
@@ -892,9 +896,8 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
         if (ret > 0) {
             assert (ret == (ssize_t)rst_size);
             assert (global >= 0);
+            ret = global; // index of donor or error code is in the global seqno
         }
-
-        ret = global; // index of donor or error code is in the global seqno
 
         gu_free (rst);
     }
