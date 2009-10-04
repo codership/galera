@@ -1402,7 +1402,20 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
                      victim_trx, victim.seqno_l);
 
             rcode = gu_to_interrupt(cert_queue, victim.seqno_l);
-            if (rcode) {
+            switch (rcode) {
+            case 0:
+                ret_code = WSREP_OK;
+                break;
+            case -EAGAIN:
+                /* 
+                 * victim does not yet fit in TO queue, 
+                 * slave queue has grown too long, we treat this as error 
+                 */
+                gu_warn("victim trx does not fit cert TO queue");
+                ret_code = WSREP_FATAL;
+                break;
+            case -ERANGE:
+                /* victim was canceled or used already */
                 gu_debug("trx interupt fail in cert_queue: %d", rcode);
                 ret_code = WSREP_OK;
                 rcode = gu_to_interrupt(commit_queue, victim.seqno_l);
@@ -1410,8 +1423,6 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
                     gu_debug("trx interrupt fail in commit_queue: %d", rcode);
                     ret_code = WSREP_WARNING;
                 }
-            } else {
-              ret_code = WSREP_OK;
             }
         }
     }
