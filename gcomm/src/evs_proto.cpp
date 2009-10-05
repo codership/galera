@@ -830,7 +830,7 @@ void EVSProto::send_install()
     }
 
     EVSInstMap::const_iterator self = known.find(my_addr);
-    seqno_t max_view_id_seq = 0;
+    uint32_t max_view_id_seq = 0;
 
     for (EVSInstMap::const_iterator i = known.begin(); i != known.end(); ++i)
     {

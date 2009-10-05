@@ -16,20 +16,20 @@ BEGIN_GCOMM_NAMESPACE
 class ViewId
 {
     UUID    uuid; // uniquely identifies the sequence of group views (?)
-    seqno_t seq;  // position in the sequence                        (?)
+    uint32_t seq;  // position in the sequence                        (?)
 
 public:
 
     ViewId () : uuid(), seq(0) {}
 
-    ViewId (const UUID& uuid_, const seqno_t seq_) :
+    ViewId (const UUID& uuid_, const uint32_t seq_) :
         uuid  (uuid_),
         seq (seq_)
     {}
 
     const UUID& get_uuid()  const { return uuid; }
     
-    seqno_t     get_seq() const { return seq; }
+    uint32_t     get_seq() const { return seq; }
     
     size_t read (const byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception);

@@ -446,7 +446,7 @@ bool PCProto::is_prim() const
             }
         }
 
-        seqno_t max_view_seq   = 0;
+        uint32_t max_view_seq   = 0;
         size_t  great_view_len = 0;
         ViewId  great_view;
         

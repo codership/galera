@@ -100,7 +100,7 @@ START_TEST(test_view)
     fail_unless(vid.get_uuid() == uuid);
     fail_unless(vid.get_seq() == 7);
     
-    check_serialization(vid, UUID::size() + sizeof(seqno_t), ViewId());
+    check_serialization(vid, UUID::size() + sizeof(uint32_t), ViewId());
     
     
     NodeList nl;
