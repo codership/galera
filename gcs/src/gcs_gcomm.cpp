@@ -31,7 +31,7 @@ namespace gcomm {
 struct vs_ev
 {
     ReadBuf*     rb;
-    const ProtoUpMeta* um;
+    ProtoUpMeta um;
     const View*        view;
     size_t       msg_size;
 
@@ -40,8 +40,7 @@ struct vs_ev
           const size_t roff, 
           const size_t ms, const View *v) :
 	rb(0), 
-//        um(um_ ? new *um_ : ProtoUpMeta()),
-        um(um_),
+        um(*um_),
         view(0),
         msg_size(ms) 
     {
@@ -133,7 +132,7 @@ struct gcs_gcomm : public Toplay
         if (um->get_view() && um->get_view()->is_empty())
         {
 	    log_debug << "empty view, leaving";
-	    eq.push_back(vs_ev(0, 0, 0, 0, um->get_view()));
+	    eq.push_back(vs_ev(0, um, 0, 0, um->get_view()));
 	    // Reached the end
             {
                 gu::Lock lock(mutex);
@@ -143,8 +142,8 @@ struct gcs_gcomm : public Toplay
             el->interrupt();
 	}
 
-        log_info << "[DEBUG] Got message: type: " << um->get_user_type()
-                 << ", sender: " << um->get_source().to_string();
+        // log_info << "[DEBUG] Got message: type: " << um->get_user_type()
+        //      << ", sender: " << um->get_source().to_string();
 
         gu::Lock lock(mutex);
 
@@ -362,17 +361,17 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
     
     if (ev.rb || ev.msg_size) 
     {
-	*msg_type = static_cast<gcs_msg_type_t>(ev.um->get_user_type());
+	*msg_type = static_cast<gcs_msg_type_t>(ev.um.get_user_type());
 
-	CompMap::const_iterator i = conn->comp_map.find(ev.um->get_source());
+	CompMap::const_iterator i = conn->comp_map.find(ev.um.get_source());
 
 	assert(i != conn->comp_map.end());
 
 	*sender_idx = i->second;
 
-        log_info << "[DEBUG] Got user message: type: " << *msg_type
-                 << ", sender: (" << ev.um->get_source().to_string()
-                 << ", index: " << *sender_idx << ")";
+        // log_info << "[DEBUG] Got user message: type: " << *msg_type
+        //         << ", sender: (" << ev.um.get_source().to_string()
+        //         << ", index: " << *sender_idx << ")";
 
 	if (ev.rb)
         {
