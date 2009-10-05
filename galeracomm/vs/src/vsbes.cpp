@@ -404,7 +404,7 @@ int main(int argc, char *argv[])
     (::getenv("VSBES_DEBUG")) ? gu_conf_debug_on() : gu_conf_debug_off();
 
     try {
-	std::string srv_arg("async");
+	std::string srv_arg("asynctcp:");
 	srv_arg += argv[1];
 	VSServer s(srv_arg.c_str());
 	s.start();

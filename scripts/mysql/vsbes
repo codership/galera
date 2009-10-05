@@ -18,7 +18,7 @@ SELF=$(cd $(dirname $0); pwd -P)/$(basename $0)
 # ENVIRONMENT VARIABLES:
 #
 # GALERA_BASE_DIR - specifies the Galera installation root
-# GCS_ADDRESS     - overrides default listening address tcp:0.0.0.0:4567
+# GCS_ADDRESS     - overrides default listening address 0.0.0.0:4567
 #                   (currently only TCP transport is supported)
 
 # Where Galera installation is located
@@ -27,7 +27,7 @@ GALERA_BASE_DIR=${GALERA_BASE_DIR:-"$(dirname $SELF)/galera"}
 LD_LIBRARY_PATH="$GALERA_BASE_DIR/lib"
 
 # Group Communication Address
-GCS_ADDRESS=${GCS_ADDRESS:-"tcp:0.0.0.0:4567"}
+GCS_ADDRESS=${GCS_ADDRESS:-"0.0.0.0:4567"}
 # allow users to specify full gcs address (for cut'n'paste)
 GCS_ADDRESS_STRIPPED=$(echo $GCS_ADDRESS | sed s/vsbes:\\/\\///)
 
@@ -112,7 +112,7 @@ case $cmd in
             COMMAND=vsbes_restart
             ;;
     *)
-            echo "Usage: [GCS_ADDRESS=tcp:<ip>:<port>] $0 [start|stop|restart]"
+            echo "Usage: [GCS_ADDRESS=<ip>:<port>] $0 [start|stop|restart]"
 	    exit 1
             ;;
 esac

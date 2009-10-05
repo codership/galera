@@ -435,7 +435,7 @@ static GCS_BACKEND_DESTROY_FN(gcs_vs_destroy)
     return 0;
 }
 
-static const char* vs_default_socket = "tcp:127.0.0.1:4567";
+static const char* vs_default_socket = "127.0.0.1:4567";
 
 static GCS_BACKEND_CREATE_FN(gcs_vs_create)
 {
@@ -444,7 +444,9 @@ static GCS_BACKEND_CREATE_FN(gcs_vs_create)
     if (NULL == sock || strlen(sock) == 0)
         sock = vs_default_socket;
 
-    log_debug << "Opening connection to '" << sock << '\'';
+    std::string sock_str("tcp:");
+    sock_str += sock;
+    log_debug << "Opening connection to '" << sock_str << '\'';
 
     gcs_vsbes_conn* conn = 0;
     try
@@ -458,7 +460,7 @@ static GCS_BACKEND_CREATE_FN(gcs_vs_create)
     
     try {
 	conn->vs_ctx.po = Poll::create("def");
-	conn->vs_ctx.vs = VS::create(sock, conn->vs_ctx.po,
+	conn->vs_ctx.vs = VS::create(sock_str.c_str(), conn->vs_ctx.po,
                                      conn->vs_ctx.monitor);
 	conn->vs_ctx.set_down_context(conn->vs_ctx.vs);
     } catch (std::exception& e) {
