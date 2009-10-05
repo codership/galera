@@ -14,6 +14,7 @@
 #include <poll.h>
 #include <map>
 #include <iostream>
+#include <algorithm>
 
 class PollDef : public Poll {
 
@@ -22,8 +23,9 @@ class PollDef : public Poll {
     typedef std::map <const int, PollContext*>::iterator PollContextMapIterator;
 
     PollContextMap ctx_map;
-    size_t         n_pfds;
+    ssize_t        n_pfds;
     struct pollfd* pfds;
+    long long      last_check; // timestamp of the last timeout check
 
     PollDef (const PollDef&);
     void operator=(const PollDef&);
@@ -36,7 +38,7 @@ public:
     void erase(const int);
     void set(const int, const PollEnum);
     void unset(const int, const PollEnum);
-    int poll(const int);
+    int poll(const int t = Poll::DEFAULT_KA_TIMEOUT);
 };
 
 
@@ -128,57 +130,91 @@ void PollDef::unset(const int fd, const PollEnum e)
 
 int PollDef::poll(const int timeout)
 {
-    int p_cnt = 0;
-    int p_ret = ::poll(pfds, n_pfds, timeout);
-    int err   = errno;
+    int wait = timeout;
+    long long begin = PollContext::get_timestamp();
+    int p_ret;
 
-    if (p_ret == -1 && err == EINTR) {
-	p_ret = 0;
-    }
-    else if (p_ret == -1 && err != EINTR) {
-	throw DException("");
-    }
-    else {
-	for (size_t i = 0; i < n_pfds; i++) {
+    do
+    {
+        int p_cnt = 0;
 
-	    PollEnum e = map_mask_to_event(pfds[i].revents);
+        p_ret = ::poll(pfds, n_pfds, std::min(wait, Poll::DEFAULT_KA_INTERVAL));
 
-	    if (e != PollEvent::POLL_NONE) {
+        int err = errno;
 
-		PollContextMapIterator map_i;
+        long long tstamp = PollContext::get_timestamp();
+        bool check_timeout = (tstamp - last_check) >= Poll::DEFAULT_KA_INTERVAL;
 
-		if ((map_i = ctx_map.find(pfds[i].fd)) != ctx_map.end()) {
+        wait = timeout - (tstamp - begin);
 
-		    if (map_i->second == 0) throw DException("");
+        if (p_ret == -1 && err == EINTR) p_ret = 0;
 
-                    try {
-                        map_i->second->handle(pfds[i].fd, e);
+        if (p_ret == -1 && err != EINTR)
+        {
+            throw DException("");
+        }
+        else if (p_ret > 0 || check_timeout)
+        {
+            for (ssize_t i = 0; i < n_pfds; i++)
+            {
+                PollEnum e = map_mask_to_event(pfds[i].revents);
+
+                if (e != PollEvent::POLL_NONE || check_timeout)
+                {
+                    PollContextMapIterator map_i;
+
+                    if ((map_i = ctx_map.find(pfds[i].fd)) != ctx_map.end())
+                    {
+                        if (map_i->second == 0) throw DException("");
+
+                        try {
+                            map_i->second->handle(pfds[i].fd, e, tstamp);
+                        }
+                        catch (std::exception& e) {
+                            throw DException (e.what());
+                        }
+
+                        p_cnt++;
                     }
-                    catch (std::exception& e) {
-                        throw DException (e.what());
+                    else
+                    {
+                        throw FatalException("No ctx for fd found");
                     }
+                }
+                else
+                {
+                    if (pfds[i].revents) {
+                        log_error << "Unhandled poll events";
+                        throw FatalException("");
+                    }
+                }
+            }
 
-		    p_cnt++;
-		}
-                else {
-		    throw FatalException("No ctx for fd found");
-		}
-	    } else {
-		if (pfds[i].revents) {
-		    log_error << "Unhandled poll events";
-		    throw FatalException("");
-		}
-	    }
-	}
+            if (!check_timeout)
+            {
+                if (p_ret != p_cnt)
+                {
+                    log_warn << "p_ret (" << p_ret << ") != p_cnt ("
+                             << p_cnt << ")";
+                }
+            }
+            else
+            {
+                last_check = tstamp;
+                if (n_pfds > p_cnt)
+                {
+                    log_warn << "n_pfds (" << n_pfds << ") > p_cnt ("
+                             << p_cnt << ")";
+                }
+            }
+        }
     }
-    // assert(p_ret == p_cnt);
-    if (p_ret != p_cnt) {
-        log_warn << "p_ret (" << p_ret << ") != p_cnt (" << p_cnt << ")";
-    }
+    while (!p_ret && wait > 0); // timeout
+
     return p_ret;
 }
 
-PollDef::PollDef() : ctx_map(), n_pfds(0), pfds(0) {}
+PollDef::PollDef() : ctx_map(), n_pfds(0), pfds(0), last_check(0) {}
 
 PollDef::~PollDef()
 {
@@ -186,15 +222,14 @@ PollDef::~PollDef()
     free(pfds);
 }
 
-
-
 class FifoPoll : public Poll {
 
     std::map<const int, std::pair<PollContext *, PollEnum> > ctx_map;
+    long long last_check; // timestamp of last timeout check (ms)
 
 public:
 
-    FifoPoll() : Poll(), ctx_map() {}
+    FifoPoll() : Poll(), ctx_map(), last_check(0) {}
 
     void insert(const int fd, PollContext *ctx) {
 	if (ctx_map.insert(
@@ -204,10 +239,12 @@ public:
 			ctx, PollEvent::POLL_NONE))).second == false)
 	    throw DException("");
     }
+
     void erase(const int fd) {
 	unset(fd, PollEvent::POLL_ALL);
 	ctx_map.erase(fd);
     }
+
     void set(const int fd, const PollEnum e) {
 	std::map<const int, std::pair<PollContext *, PollEnum> >::iterator 
 	    ctxi = ctx_map.find(fd);
@@ -217,6 +254,7 @@ public:
 	    throw DException("Invalid fd");
 	ctxi->second.second = static_cast<unsigned short>(ctxi->second.second | e);
     }
+
     void unset(const int fd, const PollEnum e) {
 	std::map<const int, std::pair<PollContext *, PollEnum> >::iterator 
 	    ctxi = ctx_map.find(fd);
@@ -225,29 +263,51 @@ public:
 	ctxi->second.second = static_cast<unsigned short>(ctxi->second.second & ~e);
     }
     
-    int poll(int tout) {
+    int poll(int tout)
+    {
 	int n = 0;
+
 	std::map<const int, std::pair<PollContext *, PollEnum> >::iterator i;
-	for (i = ctx_map.begin(); i != ctx_map.end(); ++i) {
-	    if (i->second.second & PollEvent::POLL_IN){
-		Fifo *fifo = Fifo::find(i->first);
-		if (fifo == 0)
-		    throw DException("Invalid fd");
-		if (fifo->is_empty() == false) {
-		    i->second.first->handle(i->first, PollEvent::POLL_IN);
+
+        long long tstamp = PollContext::get_timestamp();
+        bool check_timeout = (tstamp - last_check) >= Poll::DEFAULT_KA_INTERVAL;
+
+	for (i = ctx_map.begin(); i != ctx_map.end(); ++i)
+        {
+	    if ((i->second.second & (PollEvent::POLL_IN | PollEvent::POLL_OUT))
+                || check_timeout)
+            {
+                Fifo *fifo = Fifo::find(i->first);
+
+                if (fifo == 0) throw DException("Invalid fd");
+
+		if ((i->second.second & PollEvent::POLL_IN) &&
+                    (fifo->is_empty() == false))
+                {
+		    i->second.first->handle(i->first, PollEvent::POLL_IN,
+                                            tstamp);
 		    n++;
 		}
-	    }
-	    if (i->second.second & PollEvent::POLL_OUT) {
-		Fifo *fifo = Fifo::find(i->first);
-		if (fifo == 0)
-		    throw DException("Invalid fd");
-		if (fifo->is_full() == false) {
-		    i->second.first->handle(i->first, PollEvent::POLL_OUT);
+
+		if ((i->second.second & PollEvent::POLL_OUT) &&
+                    (fifo->is_full() == false))
+                {
+		    i->second.first->handle(i->first, PollEvent::POLL_OUT,
+                                            tstamp);
+		    n++;
+		}
+
+		if (check_timeout)
+                {
+		    i->second.first->handle(i->first, PollEvent::POLL_NONE,
+                                            tstamp);
 		    n++;
 		}
 	    }
 	}
+
+        if (check_timeout) last_check = tstamp;
+
 	return n;
     }
 };

@@ -32,7 +32,7 @@ public:
 	throw FatalException("tipc: accept() not supported");
     }
     
-    void handle(int, PollEnum);
+    void handle(int, PollEnum, long long);
     int handle_down(WriteBuf*, const ProtoDownMeta*);
     
 };

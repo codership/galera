@@ -218,7 +218,7 @@ void TIPCTransport::close(const char* addr)
     }
 }
 
-void TIPCTransport::handle(int fd, PollEnum pe)
+void TIPCTransport::handle(int fd, PollEnum pe, long long tstamp)
 {
     if (pe & PollEvent::POLL_OUT) {
 	LOG_DEBUG("Poll out");

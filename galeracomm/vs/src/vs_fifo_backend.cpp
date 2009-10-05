@@ -4,8 +4,6 @@
 #include "vs_fifo_backend.hpp"
 #include "galeracomm/vs.hpp"
 
-
-
 struct Member {
     Protolay *pl;
     enum State {JOINING, JOINED, LEAVING, CLOSED} state;
@@ -399,7 +397,7 @@ public:
 	return msgs.push_back(wb);
     }
 
-    void handle(const int fd, const PollEnum e) {
+    void handle(const int fd, const PollEnum e, long long tstamp) {
 	// std::cerr << "VSFifoBackendProvider::handle()\n";
 	if (e & PollEvent::POLL_IN) {
 	    if (fd == msgs.get_read_fd()) {
@@ -417,7 +415,6 @@ public:
 	    }
 	}
     }
-
 };
 
 static VSFifoBackendProvider *provider = 0;

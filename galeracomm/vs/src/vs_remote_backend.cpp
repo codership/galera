@@ -29,9 +29,15 @@ void VSRBackend::handle_up(const int cid, const ReadBuf *rb, const size_t roff,
 	pass_up(0, 0, 0);
 	return;
     }
-    
-    if (msg.read(rb->get_buf(), rb->get_len(), roff) == 0)
+
+    if (msg.read(rb->get_buf(), rb->get_len(), roff) == 0) {
+        if (rb->get_len() == roff) {
+            // ping - technically it should not reach here, but that requires
+	    // too many changes
+	    return;
+        }
 	throw FatalException("VSRBackend::handle_up(): Invalid message");
+    }
     
     switch (msg.get_type()) {
     case VSRMessage::HANDSHAKE: {

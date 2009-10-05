@@ -182,6 +182,7 @@ void ClientHandler::handle_tp(const ReadBuf *rb, const size_t roff,
 	throw FatalException("What just happened?");
     } else {
 	if (msg.read(rb->get_buf(), rb->get_len(), roff) == 0) {
+            if (rb->get_len() == roff) return; // empty ping message
 	    LOG_WARN("Invalid message");
 	    close();
 	    return;

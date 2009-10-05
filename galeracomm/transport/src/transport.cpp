@@ -18,18 +18,27 @@ Transport *Transport::create(const char *type, Poll *poll,
 			     Protolay *up_ctx)
 {
     Transport *ret = 0;
+
     if (strncmp(type, "tcp:", strlen("tcp:")) == 0 ||
-	strncmp(type, "asynctcp:", strlen("asynctcp:")) == 0) {
+	strncmp(type, "asynctcp:", strlen("asynctcp:")) == 0)
+    {
 	ret = new TCPTransport(poll);
-    } else if (strncmp(type, "tipc:", strlen("tipc:")) == 0) {
+    }
+    else if (strncmp(type, "tipc:", strlen("tipc:")) == 0)
+    {
 	ret = new TIPCTransport(poll);
-    } else if (strncmp(type, "dummy:", strlen("dummy:")) == 0) {
+    }
+    else if (strncmp(type, "dummy:", strlen("dummy:")) == 0)
+    {
 	ret = new DummyTransport(0);
-    } else {
+    }
+    else
+    {
 	throw FatalException("Unknown transport type");
     }
-    if (up_ctx)
-	ret->set_up_context(up_ctx);    
+
+    if (up_ctx) ret->set_up_context(up_ctx);
+
     return ret;
 }
 

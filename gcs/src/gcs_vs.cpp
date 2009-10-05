@@ -63,7 +63,7 @@ class gcs_vs : public Toplay
 
 public:
 
-    enum State {JOINING, JOINED, LEFT};
+    enum State {JOINING, JOINED, LEFT, FAILED};
 
     VS*         vs;
     Poll*       po;
@@ -110,6 +110,7 @@ public:
 	if (!(rb || vum))
         {
             gu::Lock lock(mutex);
+            state = FAILED;
 	    eq.push_back(vs_ev(0, 0, 0, 0));
 	    cond.signal();
 	    return;
@@ -168,11 +169,8 @@ public:
 	    waiter_buf     = wb;
 	    waiter_buf_len = wb_len;
 	    lock.wait(cond);
-            // these asserts will misfire when connection to vsbes is lost
-            // but only in debug build and we anyways have to restart the
-            // node in that case
-            assert (waiter_buf == 0 || state == LEFT);
-            assert (waiter_buf_len == 0 || state == LEFT);
+            assert (waiter_buf == 0     || state >= LEFT);
+            assert (waiter_buf_len == 0 || state >= LEFT);
 	}
 
 	std::pair<vs_ev, bool> ret(eq.front(), eq.size() && state != LEFT);

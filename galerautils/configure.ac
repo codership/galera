@@ -5,7 +5,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.50)
-AC_INIT(galerautils, 0.3.5, [info@codership.com])
+AC_INIT(galerautils, 0.3.6, [info@codership.com])
 AC_CONFIG_SRCDIR([src/gu_mutex.c])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE
@@ -40,6 +40,8 @@ AM_PATH_CHECK()
 # Checks for libraries.
 AC_CHECK_LIB([pthread], [pthread_testcancel],,
              AC_MSG_ERROR([*** POSIX threads not found! ***]))
+
+AC_CHECK_LIB([rt], [clock_getres],,AC_MSG_NOTICE([librt not found]))
 
 # Checks for header files.
 AC_HEADER_STDC

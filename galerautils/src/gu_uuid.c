@@ -21,6 +21,7 @@
 #include "gu_log.h"
 #include "gu_assert.h"
 #include "gu_mutex.h"
+#include "gu_time.h"
 #include "gu_uuid.h"
 
 const gu_uuid_t GU_UUID_NIL = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};
@@ -31,23 +32,23 @@ const gu_uuid_t GU_UUID_NIL = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}};
 static uint64_t
 uuid_get_time ()
 {
-    static struct timeval check = { 0, 0 };
+    static long long check = 0;
     static gu_mutex_t mtx = GU_MUTEX_INITIALIZER;
-    struct timeval t;
+    long long t;
 
     gu_mutex_lock (&mtx);
 
     do {
-        gettimeofday (&t, NULL);
+        t = gu_time_calendar() / 100;
     }
-    while (check.tv_usec == t.tv_usec && check.tv_sec == t.tv_sec);
+    while (check == t);
 
     check = t;
 
     gu_mutex_unlock (&mtx);
 
-    return ((t.tv_sec * 10000000LL) + (t.tv_usec * 10LL) +
-	    0x01B21DD213814000LL); // offset since the start of 15 October 1582
+    return (t + 0x01B21DD213814000LL);
+    //          offset since the start of 15 October 1582
 }
 
 #ifndef UUID_URAND

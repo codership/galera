@@ -13,7 +13,8 @@
 
 #include <sys/socket.h>
 
-class TCPTransport : public Transport, PollContext {
+class TCPTransport : public Transport, PollContext
+{
     int fd;
     int no_nagle;
     std::string peer;
@@ -34,14 +35,22 @@ class TCPTransport : public Transport, PollContext {
     //boost::crc_32_type recv_crc;
     std::deque<PendingWriteBuf> pending;
 
+    long const ka_timeout;
+    long const ka_interval;
+    long long  last_in;
+    long long  last_out;
+
     TCPTransport (const TCPTransport&);
     void operator= (const TCPTransport&);
 
     TCPTransport(const int _fd, const sockaddr& _sa, 
-		 const size_t _sa_size, Poll *_poll);
+		 const size_t _sa_size, Poll *_poll,
+                 int tout = Poll::DEFAULT_KA_TIMEOUT);
 public:
 
-    TCPTransport(Poll *p) : 
+    TCPTransport(Poll *p,
+                 int tout = Poll::DEFAULT_KA_TIMEOUT)
+        : 
 	fd(-1),
         no_nagle(1),
         peer(""),
@@ -55,12 +64,17 @@ public:
 	recv_buf_offset(0),
         recv_rb(0),
         up_rb(0),
-        pending()
+        pending(),
+        ka_timeout (tout),
+        ka_interval (Poll::DEFAULT_KA_INTERVAL),
+        last_in (PollContext::get_timestamp()),
+        last_out (last_in)
     {
 	set_max_pending_bytes(1024*1024);
     }
 
-    ~TCPTransport() {
+    ~TCPTransport()
+    {
 	if (fd != -1) {
 	    if (poll)
 		poll->erase(fd);
@@ -71,8 +85,9 @@ public:
 	    up_rb->release();
     }
 
-    size_t get_max_msg_size() const {
-	return 1024*1024;
+    size_t get_max_msg_size() const
+    {
+	return ((1 << 16) - 512); // max IP packet minus some space for headers
     }
 
     void connect(const char *addr);
@@ -80,17 +95,17 @@ public:
     void listen(const char *addr);
     Transport *accept(Poll *, Protolay *);
 
-    int recv_nointr();
-    int recv_nointr(int);
+    int recv_nointr(long long);
+    int recv_nointr(int, long long);
     ssize_t send_nointr(const void *buf, const size_t buflen, 
 			const size_t offset, int flags);
 
     int handle_down(WriteBuf *, const ProtoDownMeta *);
 
     // PollContext handle()
-    void handle(const int, const PollEnum);
+    void handle(const int fd, const PollEnum e, long long tstamp);
 
-    int handle_pending();
+    int handle_pending(long long tstamp);
 
     int send(WriteBuf *wb, const ProtoDownMeta *dm);
     const ReadBuf *recv();

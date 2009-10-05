@@ -25,9 +25,9 @@ The WSREP patch for MySQL can be obtained at: bzr branch lp:codership-mysql
 
 ABOUT THIS DOCUMENT
 
-This document only covers issues specific to MySQL/Galera distribution. It does
-not cover the use or administration of MySQL server per se. The reader is
-assumed to know how to install, configure, administer and use MySQL server.
+This document only covers issues specific to MySQL/Galera demo distribution.
+It does not cover the use or administration of MySQL server per se. The reader
+is assumed to know how to install, configure, administer and use MySQL server.
 
 
 CONTENTS:
@@ -165,10 +165,10 @@ GCS address would be vsbes://192.168.1.1:4567
 
 1) Either supply the address as the option on the command line:
 
-   <INST_ROOT>/mysql-galera -g gcomm://192.168.1.1:4567 start
+   <INST_ROOT>/mysql-galera -g vsbes://192.168.1.1:4567 start
 
 2) Or you can hardcode it in <INST_ROOT>/my.cnf by setting
-   wsrep_gcs_address="gcomm://192.168.1.1:4567" and then just launch
+   wsrep_gcs_address="vsbes://192.168.1.1:4567" and then just launch
    mysql-galera script:
 
    <INST_ROOT>/mysql-galera start
@@ -328,8 +328,8 @@ wsrep_provider=none
    A full path to the library that implements WSREP interface. If none is
    specified, the server behaves almost like a normal mysqld, with slight
    overhead. mysql-galera script automatically substitutes it to point to
-   Galera implementation shipped with the demo. It can be overridden with
-   WSREP environment variable.
+   Galera implementation shipped with the distribution. It can be overridden
+   with WSREP environment variable.
 
 wsrep_gcs_address="dummy://"
    Group Communication System address. Depends on the WSREP provider. Galera

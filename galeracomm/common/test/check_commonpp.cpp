@@ -276,21 +276,26 @@ START_TEST(check_poll)
     Poll *p = 0;
     class MyContext : public PollContext {
 	int fd;
+        long long last_in;
+        long long last_out;
     public:
-	MyContext() : fd(-1){}
-	MyContext(const int fd_) : fd(fd_) {}
+	MyContext() : fd(-1), last_in(0), last_out(0) {}
+	MyContext(const int fd_) : fd(fd_), last_in(0), last_out(0) {}
 	~MyContext() {}
-	void handle(int efd, const PollEnum e) {
+	void handle(int efd, const PollEnum e, long long tstamp) {
 	    char buf[32];
 	    std::cout << "Received event: ";
-	    std::cout << (e & PollEvent::POLL_IN ? "POLL_IN " : "");
-	    std::cout << (e & PollEvent::POLL_OUT ? "POLL_OUT " : "");
-	    std::cout << (e & PollEvent::POLL_ERR ? "POLL_ERR " : "");
-	    std::cout << (e & PollEvent::POLL_HUP ? "POLL_HUP " : "");
+	    std::cout << (e & PollEvent::POLL_IN    ? "POLL_IN "    : "");
+	    std::cout << (e & PollEvent::POLL_OUT   ? "POLL_OUT "   : "");
+	    std::cout << (e & PollEvent::POLL_ERR   ? "POLL_ERR "   : "");
+	    std::cout << (e & PollEvent::POLL_HUP   ? "POLL_HUP "   : "");
 	    std::cout << (e & PollEvent::POLL_INVAL ? "POLL_INVAL " : "");
 	    std::cout << "\n";
 	    if ((e & PollEvent::POLL_IN) && read(efd, buf, 32) <= 0)
 		std::cerr << "Error reading fd: " << strerror(errno) << "\n";
+
+            if (e & PollEvent::POLL_IN)  last_in  = tstamp;
+            if (e & PollEvent::POLL_OUT) last_out = tstamp;
 	}
 	int get_fd() const {return fd;}
     };
@@ -534,29 +539,44 @@ START_TEST(check_protolay)
 	Fifo *qtrans;
 	bool writable;
 
+        long long last_in;
+        long long last_out;
+
         Proto3 (const Proto3&);
         void operator= (const Proto3&);
 
     public:
+
 	Proto3(Poll *p, Fifo *qt) : poll(p),
 				    qtrans(qt),
-				    writable(true) {
+				    writable(true),
+                                    last_in(0),
+                                    last_out(0)
+        {
 	    poll->insert(qtrans->get_read_fd(), this);
 	    poll->insert(qtrans->get_write_fd(), this);
 	    poll->set(qtrans->get_read_fd(), PollEvent::POLL_IN);
 	}
 	
-	void handle(const int fd, PollEnum e) {
-	    if (e & PollEvent::POLL_IN) {
-		if (fd != qtrans->get_read_fd())
-		    throw std::exception();
+	void handle(const int fd, PollEnum e, long long tstamp)
+        {
+	    if (e & PollEvent::POLL_IN)
+            {
+                last_in = tstamp;
+
+		if (fd != qtrans->get_read_fd()) throw std::exception();
+
 		ReadBuf *rb = qtrans->pop_front();
 		pass_up(rb, 0, 0);
 		rb->release();
 	    }
-	    if (e & PollEvent::POLL_OUT) {
-		if (fd != qtrans->get_write_fd())
-		    throw std::exception();
+
+	    if (e & PollEvent::POLL_OUT)
+            {
+                last_out = tstamp;
+
+		if (fd != qtrans->get_write_fd()) throw std::exception();
+
 		writable = true;
 		poll->unset(qtrans->get_write_fd(), PollEvent::POLL_OUT);
 	    }

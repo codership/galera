@@ -55,7 +55,8 @@ static void sa_to_string (const sockaddr* sa, std::string& str)
 }
 
 TCPTransport::TCPTransport(const int _fd, const sockaddr& _sa, 
-                           const size_t _sa_size, Poll *_poll) :
+                           const size_t _sa_size, Poll *_poll, int tout)
+    :
     fd(_fd),
     no_nagle(1),
     peer(""),
@@ -69,7 +70,11 @@ TCPTransport::TCPTransport(const int _fd, const sockaddr& _sa,
     recv_buf_offset(0),
     recv_rb(0),
     up_rb(0),
-    pending()
+    pending(),
+    ka_timeout (tout),
+    ka_interval (Poll::DEFAULT_KA_INTERVAL),
+    last_in (PollContext::get_timestamp()),
+    last_out (last_in)
 {
     sa_to_string (&sa, peer);
     set_max_pending_bytes(10*1024*1024);
@@ -229,8 +234,6 @@ void TCPTransport::listen(const char *addr)
 
 Transport *TCPTransport::accept(Poll *poll, Protolay *up_ctx)
 {
-
-
     sockaddr sa;
     socklen_t sa_size = sizeof(sockaddr);
     
@@ -241,15 +244,15 @@ Transport *TCPTransport::accept(Poll *poll, Protolay *up_ctx)
 
     if (is_synchronous() == false && ::fcntl(acc_fd, F_SETFL, O_NONBLOCK)
         == -1) {
-        closefd(fd);
+        closefd(acc_fd);
 	throw DFatalException("TCPTransport::accept(): Fcntl failed");
     }
 
 
-    if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) 
+    if (::setsockopt(acc_fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle, sizeof(no_nagle)) 
         == -1) {
 	int err = errno;
-        closefd(fd);
+        closefd(acc_fd);
 	throw DFatalException(::strerror(err));	
     }
     
@@ -257,6 +260,7 @@ Transport *TCPTransport::accept(Poll *poll, Protolay *up_ctx)
     if (up_ctx) {
 	ret->set_up_context(up_ctx);
     }
+
     ret->set_timeout (TCP_CONN_TIMEOUT);
     ret->state = TRANSPORT_S_CONNECTED;
     if (poll) {
@@ -297,7 +301,7 @@ ssize_t TCPTransport::send_nointr(const void *buf, const size_t buflen,
 }
 
 class DummyPollContext : public PollContext {
-    void handle(const int fd, const PollEnum pe) {
+    void handle(const int fd, const PollEnum pe, long long tstamp) {
 	// 
     }
 };
@@ -383,6 +387,7 @@ int TCPTransport::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
     }
     
 out_success:
+    last_out = PollContext::get_timestamp();
     wb->rollback_hdr(hdr.get_raw_len());
     return 0;
     
@@ -393,7 +398,7 @@ out_epipe:
 }
 
 
-int TCPTransport::recv_nointr(int flags)
+int TCPTransport::recv_nointr(int flags, long long tstamp)
 {
     
     if (recv_buf_offset < TCPTransportHdr::get_raw_len()) {
@@ -418,6 +423,7 @@ int TCPTransport::recv_nointr(int flags)
 	    return ret;
         }
 
+        last_in = tstamp;
 	recv_buf_offset += ret;
 
 	if (recv_buf_offset < TCPTransportHdr::get_raw_len()) {
@@ -426,7 +432,7 @@ int TCPTransport::recv_nointr(int flags)
 	    return EAGAIN;
 	}
     }
-    
+
     TCPTransportHdr hdr(recv_buf, recv_buf_offset, 0);
     
     if (recv_buf_size < hdr.get_len() + hdr.get_raw_len()) {
@@ -454,23 +460,26 @@ int TCPTransport::recv_nointr(int flags)
 	    LOG_DEBUG("TCPTransport::recv_nointr(): Return error in body recv"); 
 	    return ret == -1 ? errno : EPIPE;
 	}
+        last_in = tstamp;
 	recv_buf_offset += ret;
     } while (recv_buf_offset < hdr.get_len() + hdr.get_raw_len());
+
     return 0;
 }
 
-int TCPTransport::recv_nointr()
+int TCPTransport::recv_nointr(long long tstamp)
 {
-    return recv_nointr(MSG_DONTWAIT);
+    return recv_nointr(MSG_DONTWAIT, tstamp);
 }
 
-int TCPTransport::handle_pending()
+int TCPTransport::handle_pending(long long tstamp)
 {
     LOG_DEBUG("TCPTransport::handle_pending()");
     if (pending.size() == 0)
 	return 0;
     
     std::deque<PendingWriteBuf>::iterator i;
+
     while (pending.size()) {
 	i = pending.begin();
 	ssize_t ret = 0;
@@ -496,7 +505,9 @@ int TCPTransport::handle_pending()
 	    LOG_DEBUG("TCPTransport::handle_pending(): Return EAGAIN");
 	    return EAGAIN;
 	}
-	
+
+        last_out = tstamp;
+
 	pending_bytes -= i->offset;
 	delete i->wb;
 	pending.pop_front();
@@ -504,29 +515,44 @@ int TCPTransport::handle_pending()
     return 0;
 }
 
-void TCPTransport::handle(const int fd, const PollEnum pe)
+void TCPTransport::handle(const int fd, const PollEnum pe, long long tstamp)
 {
     assert(fd == this->fd);
-    if (pe & PollEvent::POLL_OUT) {
+
+    if (pe & PollEvent::POLL_OUT)
+    {
 	LOG_DEBUG("TCPTransport::handle(): PollEvent::POLL_OUT");
+
 	int ret;
-	if (state == TRANSPORT_S_CONNECTING) {
+
+	if (state == TRANSPORT_S_CONNECTING)
+        {
 	    int err = 0;
 	    socklen_t errlen = sizeof(err);
+
 	    poll->unset(fd, PollEvent::POLL_OUT);
+
 	    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1)
 		throw DFatalException("TCPTransport::handle(): Getsockopt failed");
-	    if (err == 0) {
+	    if (err == 0)
+            {
                 set_timeout(TCP_CONN_TIMEOUT);
 		state = TRANSPORT_S_CONNECTED;
-	    } else {
+	    }
+            else
+            {
 		this->error_no = err;
 		state = TRANSPORT_S_FAILED;
 	    }
+
 	    pass_up(0, 0, 0);
-	} else if ((ret = handle_pending()) == 0) {
+	}
+        else if ((ret = handle_pending(tstamp)) == 0)
+        {
 	    poll->unset(fd, PollEvent::POLL_OUT);
-	} else if (ret != EAGAIN) {
+	}
+        else if (ret != EAGAIN)
+        {
 	    // Something bad has happened
 	    this->error_no = ret;
 	    state = TRANSPORT_S_FAILED;
@@ -535,25 +561,37 @@ void TCPTransport::handle(const int fd, const PollEnum pe)
 	}
     }
 
-    if (pe & PollEvent::POLL_IN) {
-	if (state == TRANSPORT_S_CONNECTED) {
-	    ssize_t ret = recv_nointr();
-	    if (ret == 0) {
+    if (pe & PollEvent::POLL_IN)
+    {
+	if (state == TRANSPORT_S_CONNECTED)
+        {
+	    ssize_t ret = recv_nointr(tstamp);
+
+	    if (ret == 0)
+            {
 		ReadBuf rb(recv_buf, recv_buf_offset, true);
+
 		pass_up(&rb, TCPTransportHdr::get_raw_len(), 0);
 		recv_buf_offset = 0;
-	    } else if (ret != EAGAIN) {
+	    }
+            else if (ret != EAGAIN)
+            {
 		this->error_no = ret;
 		state = TRANSPORT_S_FAILED;
 		pass_up(0, 0, 0);
 		LOG_DEBUG("TCPTransport::handle(): Failed");
 	    }
-	} else if (state == TRANSPORT_S_LISTENING) {
+	}
+        else if (state == TRANSPORT_S_LISTENING)
+        {
 	    pass_up(0, 0, 0);
 	}
     }
 
-    if (pe & PollEvent::POLL_HUP) {
+    // also check for read timeout on connected socket
+    if ((pe & PollEvent::POLL_HUP) ||
+        (TRANSPORT_S_CONNECTED == state && (tstamp - last_in) >= ka_timeout))
+    {
 	this->error_no = ENOTCONN;
 	state = TRANSPORT_S_FAILED;
 	pass_up(0, 0, 0);
@@ -581,11 +619,21 @@ void TCPTransport::handle(const int fd, const PollEnum pe)
                      << strerror (err);
         }
     }
+
+    // send ping on connected socket if it was idle for too long
+    // this is equally triggered both by poll events and by poll timeouts
+    if (TRANSPORT_S_CONNECTED == state && (tstamp - last_out) >= ka_interval)
+    {
+//        log_info << "Ping " << fd;
+
+        WriteBuf wb(0, 0);
+        int ret = send (&wb, 0);
+        if (ret) {
+            log_warn << "Could not send ping packet: " << ret
+                     << " (" << ::strerror(ret) << ")";
+        }
+    }
 }
-
-
-
-
 
 int TCPTransport::send(WriteBuf *wb, const ProtoDownMeta *dm)
 {
@@ -595,26 +643,34 @@ int TCPTransport::send(WriteBuf *wb, const ProtoDownMeta *dm)
     ssize_t ret;
     size_t sent = 0;
     int err = 0;
+    long long tstamp = PollContext::get_timestamp();
 
-    while (pending.size() && (err = handle_pending()) == 0) {}
-    if (err)
-	return err;
+    while (pending.size() && (err = handle_pending(tstamp)) == 0) {}
+
+    if (err) return err;
     
-    while (sent != wb->get_hdrlen()) {
+    while (sent != wb->get_hdrlen())
+    {
 	ret = send_nointr(wb->get_hdr(), wb->get_hdrlen(), sent, 
 			  wb->get_totlen() > wb->get_hdrlen() ? MSG_MORE : 0);
-	if (ret == -1) {
+	if (ret == -1)
+        {
 	    err = EPIPE;
 	    goto out;
 	}
+
 	sent += ret;
-	if (sent != wb->get_hdrlen() && is_synchronous() == false) {
-	    while (tmp_poll(fd, PollEvent::POLL_OUT, 
-			    std::numeric_limits<int>::max(), 0) == 0) {}
+
+	if (sent != wb->get_hdrlen() && is_synchronous() == false)
+        {
+	    while (tmp_poll(fd, PollEvent::POLL_OUT, -1, 0) == 0) {}
 	}
     }
+
     sent = 0;
-    while (sent != wb->get_len()) {
+
+    while (sent != wb->get_len())
+    {
 	ret = send_nointr(wb->get_buf(), wb->get_len(), sent, 0);
 	if (ret == -1) {
 	    err = EPIPE;
@@ -627,6 +683,7 @@ int TCPTransport::send(WriteBuf *wb, const ProtoDownMeta *dm)
 	}
     }
 out:
+    last_out = tstamp;
     wb->rollback_hdr(hdr.get_raw_len());
     return err;
 }
@@ -639,10 +696,14 @@ const ReadBuf *TCPTransport::recv()
 	recv_rb->release();
     recv_rb = 0;
 
-    while ((ret = recv_nointr(0)) == EAGAIN) {
+    long long tstamp = PollContext::get_timestamp();
+
+    while ((ret = recv_nointr(0, tstamp)) == EAGAIN) {
 	while (tmp_poll(fd, PollEvent::POLL_IN, 
 			std::numeric_limits<int>::max(), 0) == 0) {}
+        tstamp = PollContext::get_timestamp();
     }
+
     if (ret != 0) {
 	LOG_INFO(std::string("TCPTransport::recv() ") + ::strerror(ret));
 	return 0;
