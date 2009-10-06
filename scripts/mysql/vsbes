@@ -36,6 +36,26 @@ VSBES=$GALERA_BASE_DIR/sbin/vsbes
 VSBES_PID=/tmp/vsbes.pid
 VSBES_ERR=/tmp/vsbes.err
 
+usage() { cat - << EOF
+
+usage: vsbes [options] command
+
+Options:
+    -g|--gcs_address  : vsbes listen address (0.0.0.0:4567)
+    -h|--help         : print help message
+
+Commands:
+start                 : start vsbes
+stop                  : stop vsbes
+restart               : stop and start vsbes
+status                : show if vsbes is running
+
+pid file:  $VSBES_PID
+error log: $VSBES_ERR
+
+EOF
+}
+
 # Checks if a process with a given PID is still running
 find_pid()
 {
@@ -58,7 +78,7 @@ vsbes_start()
         exit 1;
     fi
 
-    export LD_LIBRARY_PATH	
+    export LD_LIBRARY_PATH
     nohup $VSBES $GCS_ADDRESS_STRIPPED 1>/dev/null 2>$VSBES_ERR &
     pid=$!
     sleep 1
@@ -99,9 +119,37 @@ vsbes_restart()
     vsbes_start
 }
 
-cmd=${1:-start} # start by default
+vsbes_status()
+{
+    # check pid file
+    if test -r $VSBES_PID
+    then
+        if find_pid $(cat $VSBES_PID)
+        then
+            echo "vsbes is running: `cat $VSBES_PID`"
+        else
+            echo "vsbes is stopped, but stale pid file: `cat $VSBES_PID`"
+        fi
+    else
+            echo "vsbes is stoppped"
+    fi
+}
 
-case $cmd in
+#if [ $# -eq 0 ]; then usage; exit 1; fi
+
+# start by default
+COMMAND=vsbes_start
+
+while [ $# -gt 0 ]; do
+case $1 in
+    -h|--help)
+            usage
+            exit 0
+            ;;
+    -g|--gcs_address)
+            GCS_ADDRESS_STRIPPED=$2
+            shift
+            ;;
 'start')
             COMMAND=vsbes_start
             ;;
@@ -111,11 +159,23 @@ case $cmd in
 'restart')
             COMMAND=vsbes_restart
             ;;
+'status')
+            COMMAND=vsbes_status
+            ;;
     *)
-            echo "Usage: [GCS_ADDRESS=<ip>:<port>] $0 [start|stop|restart]"
-	    exit 1
+        # must be command
+            usage
+            exit 1
             ;;
 esac
+shift
+done
+
+if [ -z "$COMMAND" ]
+then
+    usage
+    exit 1
+fi
 
 $COMMAND
 

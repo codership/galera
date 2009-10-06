@@ -151,7 +151,11 @@ This will start a Galera group communication daemon listening on all interfaces
 at port 4567. GCS_ADDRESS environment variable can be used to bind the daemon
 to particular interface or port, e.g.:
 
-   GCS_ADDRESS=192.168.0.1:3333 <INST_ROOT>/vsbes start
+   <INST_ROOT>/vsbes -g 192.168.0.1:3333 start
+
+For full description of vsbes options and commands see:
+
+   <INST_ROOT>/vsbes --help
 
 
 1.3 STARTING MYSQL SERVERS
