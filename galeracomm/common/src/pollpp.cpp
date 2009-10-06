@@ -145,7 +145,7 @@ int PollDef::poll(const int timeout)
         long long tstamp = PollContext::get_timestamp();
         bool check_timeout = (tstamp - last_check) >= Poll::DEFAULT_KA_INTERVAL;
 
-        wait = timeout - (tstamp - begin);
+        wait = timeout - static_cast<int>(tstamp - begin);
 
         if (p_ret == -1 && err == EINTR) p_ret = 0;
 
