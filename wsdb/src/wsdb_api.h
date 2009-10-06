@@ -99,6 +99,7 @@ enum wsdb_trx_state {
   WSDB_TRX_REPLICATED,    //!< valid sequence numbers have been assigned
   WSDB_TRX_ABORTED,       //!< BF trx has marked this trx as victim
   WSDB_TRX_MISSING,       //!< trx is not in local hash
+  WSDB_TRX_MUST_ABORT,    //!< trx must abort, set by BF applier
 };
 
 enum wsdb_trx_position {

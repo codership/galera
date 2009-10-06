@@ -99,8 +99,8 @@ struct job_context {
     struct wsdb_write_set *ws;
 };
 
-// a wrapper for TO funcitons which can return -EAGAIN
-static inline long galera_to_eagain (
+// a wrapper to re-try functions which can return -EAGAIN
+static inline long while_eagain (
     long (*function) (gu_to_t*, gcs_seqno_t), gu_to_t* to, gcs_seqno_t seqno
 ) {
     static const struct timespec period = { 0, 10000000 }; // 10 msec
@@ -113,13 +113,32 @@ static inline long galera_to_eagain (
     return rcode;
 }
 
+static inline long while_eagain_or_trx_abort (
+    wsrep_trx_id_t trx_id, long (*function) (gu_to_t*, gcs_seqno_t), 
+    gu_to_t* to, gcs_seqno_t seqno
+) {
+    static const struct timespec period = { 0, 10000000 }; // 10 msec
+    long rcode;
+
+    while (-EAGAIN == (rcode = function (to, seqno))) {
+        wsdb_trx_info_t info;
+        nanosleep (&period, NULL);
+        wsdb_get_local_trx_info(trx_id, &info);
+        if (info.state == WSDB_TRX_MUST_ABORT) {
+            return -EINTR;
+        }
+    }
+
+    return rcode;
+}
+
 #define GALERA_QUEUE_NAME(queue)                                \
     ((queue) == cert_queue ? "cert_queue" : "commit_queue")
 
 // the following are made as macros to allow for correct line number reporting
 #define GALERA_GRAB_QUEUE(queue, seqno)                                 \
     {                                                                   \
-        long ret = galera_to_eagain (gu_to_grab, queue, seqno);         \
+        long ret = while_eagain (gu_to_grab, queue, seqno);             \
         if (gu_unlikely(ret)) {                                         \
             gu_fatal("Failed to grab %s at %lld: %ld (%s)",             \
                      GALERA_QUEUE_NAME(queue), seqno, ret, strerror(-ret)); \
@@ -141,7 +160,7 @@ static inline long galera_to_eagain (
 
 #define GALERA_SELF_CANCEL_QUEUE(queue, seqno)                          \
     {                                                                   \
-        long ret = galera_to_eagain (gu_to_self_cancel, queue, seqno);  \
+        long ret = while_eagain (gu_to_self_cancel, queue, seqno);      \
         if (gu_unlikely(ret)) {                                         \
             gu_fatal("Failed to self-cancel %s at %lld: %ld (%s)",      \
                      GALERA_QUEUE_NAME(queue), seqno, ret, strerror(-ret)); \
@@ -817,7 +836,7 @@ static int process_query_write_set_applying(
      */
     switch (applier->type) {
     case JOB_SLAVE:
-        rcode = galera_to_eagain (gu_to_grab, commit_queue, seqno_l);
+        rcode = while_eagain(gu_to_grab, commit_queue, seqno_l);
         break;
     case JOB_REPLAYING:
         /* replaying jobs have reserved commit_queue in the beginning */
@@ -1409,10 +1428,14 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
             case -EAGAIN:
                 /* 
                  * victim does not yet fit in TO queue, 
-                 * slave queue has grown too long, we treat this as error 
+                 * slave queue has grown too long, we flag trx with
+                 * must abort and assume he will abort himself
                  */
                 gu_warn("victim trx does not fit cert TO queue");
-                ret_code = WSREP_FATAL;
+
+                wsdb_assign_trx_state(victim_trx, WSDB_TRX_MUST_ABORT);
+                ret_code = WSREP_OK;
+
                 break;
             case -ERANGE:
                 /* victim was canceled or used already */
@@ -1420,6 +1443,7 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
                 ret_code = WSREP_OK;
                 rcode = gu_to_interrupt(commit_queue, victim.seqno_l);
                 if (rcode) {
+                    wsdb_assign_trx_state(victim_trx, WSDB_TRX_MUST_ABORT);
                     gu_debug("trx interrupt fail in commit_queue: %d", rcode);
                     ret_code = WSREP_WARNING;
                 }
@@ -1721,8 +1745,9 @@ static enum wsrep_status mm_galera_pre_commit(
     wsdb_assign_trx_seqno(trx_id, seqno_l, seqno_g, WSDB_TRX_REPLICATED);
     gu_mutex_unlock(&commit_mtx);
 
-    // cant use it here - GALERA_GRAB_CERT_QUEUE (seqno_l);
-    if ((rcode = galera_to_eagain (gu_to_grab, cert_queue, seqno_l))) {
+    if ((rcode = while_eagain_or_trx_abort(
+        trx_id, gu_to_grab, cert_queue, seqno_l))
+    ) {
         gu_debug("gu_to_grab aborted: %d seqno %llu", rcode, seqno_l);
         retcode = WSREP_TRX_FAIL;
 
@@ -1788,8 +1813,8 @@ static enum wsrep_status mm_galera_pre_commit(
         assert (seqno_l >= 0);
 	/* Grab commit queue for commit time */
         // can't use it here GALERA_GRAB_COMMIT_QUEUE (seqno_l);
-        rcode = galera_to_eagain (gu_to_grab, commit_queue, seqno_l);
-
+        rcode = while_eagain_or_trx_abort(
+            trx_id, gu_to_grab, commit_queue, seqno_l);
         switch (rcode) {
         case 0: break;
         case -ECANCELED:
@@ -2145,7 +2170,7 @@ static enum wsrep_status mm_galera_replay_trx(
      * commit_queue will be released at post_commit(), which the application
      * has reponsibility to call.
      */
-    rcode = galera_to_eagain (gu_to_grab, commit_queue, trx.seqno_l);
+    rcode = while_eagain (gu_to_grab, commit_queue, trx.seqno_l);
     if (rcode) {
         gu_fatal("replaying commit queue grab failed for: %d seqno: %lld %lld", 
                  rcode, trx.seqno_g, trx.seqno_l);
