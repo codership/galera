@@ -79,8 +79,8 @@ this is more than enough for most practical purposes.
 
 Main features of MySQL/Galera cluster:
 
-* Truly highly available: no transaction is ever lost in case of a node crash. 
-  All nodes always have consistent state.
+* Truly highly available: no committed transaction is ever lost in case of a
+  node crash. All nodes always have consistent state.
 
 * True multi-master: all cluster nodes can handle WRITE load concurrently.
 
@@ -514,39 +514,37 @@ NOTE: this distribution may be binary incompatible with some older Linux
    So, you can safely issue: CREATE USER..., 
    but issuing: INSERT INTO mysql.user..., will not be replicated.
 
-2) DDL statements are replicated (like CREATE.., DROP..., GRANT ...)
-   in statement level, and are safe to use. However, we have not tested
-   concurrent DDL/DDL operations and they may cause issues. Also concurrent 
-   DDL/DML operations have gone through minimal testing and should be avoided,
-   if possible. Best practise is to stop application load or stop cluster 
-   for performing database upgrades.
-   
-3) Rows in tables without primary keys may appear in different order on
+2) Rows in tables without primary keys may appear in different order on
    different nodes. As a result SELECT...LIMIT... may return slightly different
    sets.
 
-4)  Unsupported queries: 
+3)  Unsupported queries: 
     * LOAD DATA
     * lock functions (GET_LOCK(), RELEASE_LOCK()... )
    
-5) Locking sessions (LOCK TABLE...UNLOCK), are not supported. There is
+4) Locking sessions (LOCK TABLE...UNLOCK), are not supported. There is
    an option to convert locking sessions to transactions on the fly:
    wsrep_convert_LOCK_to_trx. Use at your own risk.
 
-6) Transaction isolation level should be REPEATABLE_READ (the default).
+5) Transaction isolation level should be REPEATABLE_READ (the default).
    Galera implements implicit snapshot isolation for cluster wide
    transactions.
 
-7) Due to cluster level optimistic concurrency control, transaction issuing
+6) Due to cluster level optimistic concurrency control, transaction issuing
    COMMIT may still be aborted at that stage. There can be two transactions 
    writing to same rows and committing in separate cluster nodes, and only one
    of the them can successfully commit. The failing one, will be aborted.
    For cluster level aborts, MySQL/galera cluster gives back deadlock error 
    code (Error: 1213 SQLSTATE: 40001  (ER_LOCK_DEADLOCK)).
    
-8) Query log cannot be directed to table. If you enable query logging,
+7) Query log cannot be directed to table. If you enable query logging,
    you must forward the log to a file: 
        log_output = FILE
    Use general_log and general_log_file to choose query logging and the 
    log file name
-   
+
+8) XA transactions can not be supported due to possible rollback on commit.
+
+9) MySQL replication cannot be used together with MySQL/Galera yet.
+
+
