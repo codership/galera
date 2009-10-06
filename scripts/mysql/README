@@ -20,7 +20,10 @@ Licensing Information.
 
 Please see ./mysql/LICENSE.mysql and ./galera/LICENSE.galera
 
-The WSREP patch for MySQL can be obtained at: bzr branch lp:codership-mysql
+The wsrep patch for MySQL project is hosted in launchpad site: 
+    http://launchpad.net/codership-mysql 
+The bzr command to get the patch for release 0.7 is: 
+    bzr branch lp:~codership/codership-mysql/release-0.7
 
 
 ABOUT THIS DOCUMENT
@@ -55,7 +58,8 @@ CONTENTS:
 0. WHAT IS MYSQL/GALERA CLUSTER
 
 MySQL/Galera cluster is a synchronous multi-master MySQL server cluster.
-In this release it consists of a single group communication daemon vsbes and several MySQL server instances which connect to it in a star-like fashion:
+In this release it consists of a single group communication daemon vsbes 
+and several MySQL server instances which connect to it in a star-like fashion:
 
      ,--------.   ,---------.   ,--------.
      | mysqld |---|  vsbes  |---| mysqld |
@@ -69,7 +73,7 @@ Server states are synchronized by replicating transaction changes at commit
 time. The cluster is virtually synchronous: this means that each node commits
 transactions in exactly the same order, although not necessarily at the same
 physical moment. (The latter is not that important as it may seem, since in most
-cases DBMS gives no guarantee on when the transaction is actually executed.)
+cases DBMS gives no guarantee on when the transaction is actually processed.)
 Built-in flow control keeps nodes within fraction of a second from each other,
 this is more than enough for most practical purposes.
 
@@ -294,9 +298,9 @@ hungry operation: usually SQL traffic consists of many small packets. For best
 results we recommend to carefully examine CPU consumption of the balancer and
 if needed dedicate a separate machine for it.
 
-Unlike traditional MySQL master-slave cluster MySQL/Galera cluster does not
+Unlike traditional MySQL master-slave cluster, MySQL/Galera cluster does not
 require any SQL traffic filtering, it is highly transparent and plain TCP
-connection balancer would suffice.
+connection balancer will suffice.
 
 TCP connection balancers that were successfully used with MySQL/Galera:
 - Pen (http://siag.nu/pen/)
@@ -361,7 +365,7 @@ extra silent node is negligible for most loads.
 3. CONFIGURATION
 
 Each MySQL/Galera node is configured just like the usual MySQL server, we just
-added few configuration variables to my.cnf. In addition some options can be
+added few configuration variables in my.cnf. In addition some options can be
 passed to mysql-galera startup script (see mysql-galera --help).
 
 3.1 MANDATORY CONFIGURATION OPTIONS
@@ -369,7 +373,7 @@ passed to mysql-galera startup script (see mysql-galera --help).
 binlog_format=ROW
 This option is required to use row-level replication as opposed to
 statement-level. For performance and consistency considerations don't change
-that. As a side effect, binlog, if tuned on, can be ROW only. In future this
+that. As a side effect, binlog, if turned on, can be ROW only. In future this
 option won't have special meaning.
 
 Mandatory options are hardcoded both in distribution's my.cnf file and in
@@ -436,6 +440,8 @@ New since demo2:
 innodb_autoinc_lock_mode=2
    This is a required parameter. Without it INSERTs into tables with
    AUTO_INCREMENT column may fail.
+   autoinc lock modes 0 and 1 can cause unresolved deadlock, and make
+   system unresponsive.
 
 wsrep_drupal_282555_workaround=1
    MySQL seems to have an obscure bug when INSERT into table with
@@ -499,14 +505,44 @@ NOTE: this distribution may be binary incompatible with some older Linux
 
 1) Currently replication works only with InnoDB storage engine. Any writes to 
    tables of other types, including system (mysql.*) tables are not replicated. 
-   (GRANT commands ARE replicated)
+   However, DDL statements are replicated in statement level, and changes
+   to mysql.* tables will get replicated that way. 
+   So, you can safely issue: CREATE USER..., 
+   but issuing: INSERT INTO mysql.user..., will not be replicated.
 
-2) Rows in tables without primary keys may appear in different order on
+2) DDL statements are replicated (like CREATE.., DROP..., GRANT ...)
+   in statement level, and are safe to use. However, we have not tested
+   concurrent DDL/DDL operations and they may cause issues. Also concurrent 
+   DDL/DML operations have gone through minimal testing and should be avoided,
+   if possible. Best practise is to stop application load or stop cluster 
+   for performing database upgrades.
+   
+3) Rows in tables without primary keys may appear in different order on
    different nodes. As a result SELECT...LIMIT... may return slightly different
    sets.
 
-   Unsupported:
-   commands: LOAD DATA.
-   features: LOCKing sessions.
-   Use at your own risk.
+4)  Unsupported queries: 
+    * LOAD DATA
+    * lock functions (GET_LOCK(), RELEASE_LOCK()... )
+   
+5) Locking sessions (LOCK TABLE...UNLOCK), are not supported. There is
+   an option to convert locking sessions to transactions on the fly:
+   wsrep_convert_LOCK_to_trx. Use at your own risk.
 
+6) Transaction isolation level should be REPEATABLE_READ (the default).
+   Galera implements implicit snapshot isolation for cluster wide
+   transactions.
+
+7) Due to cluster level optimistic concurrency control, transaction issuing
+   COMMIT may still be aborted at that stage. There can be two transactions 
+   writing to same rows and committing in separate cluster nodes, and only one
+   of the them can successfully commit. The failing one, will be aborted.
+   For cluster level aborts, MySQL/galera cluster gives back deadlock error 
+   code (Error: 1213 SQLSTATE: 40001  (ER_LOCK_DEADLOCK)).
+   
+8) Query log cannot be directed to table. If you enable query logging,
+   you must forward the log to a file: 
+       log_output = FILE
+   Use general_log and general_log_file to choose query logging and the 
+   log file name
+   
