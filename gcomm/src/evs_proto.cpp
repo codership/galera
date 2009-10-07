@@ -217,7 +217,7 @@ void EVSProto::deliver_trans_view(bool local)
         }
     }
     LOG_DEBUG(view.to_string());
-    assert(view.get_members().find(my_uuid) != view.get_members().end());
+    assert(view.get_members().find(get_uuid()) != view.get_members().end());
     ProtoUpMeta up_meta(&view);
     pass_up(0, 0, &up_meta);
 }
