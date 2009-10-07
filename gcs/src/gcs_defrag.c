@@ -33,7 +33,7 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                         gcs_recv_act_t*       act,
                         bool                  local)
 {
-    if (gu_likely(df->received)) {
+    if (df->received) {
         /* another fragment of existing action */
 
         df->frag_no++;
