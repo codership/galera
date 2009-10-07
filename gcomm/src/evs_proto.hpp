@@ -78,6 +78,20 @@ struct EVSInstance
         return installed;
     }
 
+    void set_join_message(EVSMessage* msg)
+    {
+        if (join_message)
+        {
+            delete join_message;
+        }
+        join_message = msg;
+    }
+
+    const EVSMessage* get_join_message() const
+    {
+        return join_message;
+    }
+
     string to_string() const 
     {
         std::string ret;

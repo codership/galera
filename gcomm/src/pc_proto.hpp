@@ -19,7 +19,7 @@ public:
         S_CLOSED, 
         S_JOINING, 
         S_STATES_EXCH, 
-        S_RTR, 
+        S_INSTALL, 
         S_PRIM,
         S_TRANS,
         S_NON_PRIM,
@@ -33,7 +33,7 @@ public:
         case S_CLOSED:      return "CLOSED";
         case S_JOINING:     return "JOINING";
         case S_STATES_EXCH: return "STATES_EXCH";
-        case S_RTR:         return "RTR";
+        case S_INSTALL:     return "INSTALL";
         case S_TRANS:       return "TRANS";
         case S_PRIM:        return "PRIM";
         case S_NON_PRIM:    return "NON_PRIM";

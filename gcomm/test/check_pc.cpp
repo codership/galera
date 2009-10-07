@@ -135,7 +135,7 @@ void single_boot(PCUser* pu1)
         fail_unless(pi1.get_last_prim() == ViewId(pu1->uuid, 0));
     }
     pu1->pc->handle_msg(sm1, 0, 0, &sum1);
-    fail_unless(pu1->pc->get_state() == PCProto::S_RTR);
+    fail_unless(pu1->pc->get_state() == PCProto::S_INSTALL);
     
     rb = pu1->tp->get_out();
     fail_unless(rb != 0);
@@ -213,14 +213,14 @@ static void double_boot(PCUser* pu1, PCUser* pu2)
     fail_unless(rb == 0);
     fail_unless(pu1->pc->get_state() == PCProto::S_STATES_EXCH);
     pu1->pc->handle_msg(sm2, 0, 0, &pum2);
-    fail_unless(pu1->pc->get_state() == PCProto::S_RTR);
+    fail_unless(pu1->pc->get_state() == PCProto::S_INSTALL);
 
     pu2->pc->handle_msg(sm1, 0, 0, &pum1);
     rb = pu2->tp->get_out();
     fail_unless(rb == 0);
     fail_unless(pu2->pc->get_state() == PCProto::S_STATES_EXCH);
     pu2->pc->handle_msg(sm2, 0, 0, &pum2);
-    fail_unless(pu2->pc->get_state() == PCProto::S_RTR);
+    fail_unless(pu2->pc->get_state() == PCProto::S_INSTALL);
 
     PCMessage im1;
     UUID imsrc;
@@ -294,7 +294,7 @@ START_TEST(test_pc_view_changes_double)
     fail_unless(sm2.get_type() == PCMessage::T_STATE);
     fail_unless(pu2.tp->get_out() == 0);
     pu2.pc->handle_msg(sm2, 0, 0, &pum2);
-    fail_unless(pu2.pc->get_state() == PCProto::S_RTR);
+    fail_unless(pu2.pc->get_state() == PCProto::S_INSTALL);
     rb = pu2.tp->get_out();
     fail_unless(rb != 0);
     PCMessage im2;
@@ -386,8 +386,8 @@ START_TEST(test_pc_state1)
     pu1.pc->handle_msg(msg, 0, 0, &pum2);
     pu2.pc->handle_msg(msg, 0, 0, &pum2);
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_RTR);
-    fail_unless(pu2.pc->get_state() == PCProto::S_RTR);    
+    fail_unless(pu1.pc->get_state() == PCProto::S_INSTALL);
+    fail_unless(pu2.pc->get_state() == PCProto::S_INSTALL);    
     
     View tr2(View::V_TRANS, pu1.pc->get_current_view().get_id()); 
     tr2.add_member(uuid1, "n1");
@@ -443,8 +443,8 @@ START_TEST(test_pc_state1)
     pu1.pc->handle_msg(msg, 0, 0, &pum2);
     pu2.pc->handle_msg(msg, 0, 0, &pum2);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_RTR);
-    fail_unless(pu2.pc->get_state() == PCProto::S_RTR);
+    fail_unless(pu1.pc->get_state() == PCProto::S_INSTALL);
+    fail_unless(pu2.pc->get_state() == PCProto::S_INSTALL);
     
     if (uuid1 < uuid2)
     {
@@ -562,8 +562,8 @@ START_TEST(test_pc_state2)
     pu1.pc->handle_msg(msg, 0, 0, &pum2);
     pu2.pc->handle_msg(msg, 0, 0, &pum2);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_RTR);
-    fail_unless(pu2.pc->get_state() == PCProto::S_RTR);
+    fail_unless(pu1.pc->get_state() == PCProto::S_INSTALL);
+    fail_unless(pu2.pc->get_state() == PCProto::S_INSTALL);
     
     PCMessage im;
     if (uuid1 < uuid2)
@@ -684,8 +684,8 @@ START_TEST(test_pc_state3)
     pu1.pc->handle_msg(msg, 0, 0, &pum2);
     pu2.pc->handle_msg(msg, 0, 0, &pum2);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_RTR);
-    fail_unless(pu2.pc->get_state() == PCProto::S_RTR);
+    fail_unless(pu1.pc->get_state() == PCProto::S_INSTALL);
+    fail_unless(pu2.pc->get_state() == PCProto::S_INSTALL);
 
     PCMessage im;
     if (uuid1 < uuid2)

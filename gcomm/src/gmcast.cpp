@@ -28,7 +28,7 @@ class gcomm::GMCastNode
     UUID    uuid;
     static const size_t ADDR_SIZE = 64;
     char    address[ADDR_SIZE];
-
+    
 public:
 
     GMCastNode()

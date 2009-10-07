@@ -127,7 +127,7 @@ void PCProto::shift_to(const State s)
         { true,  false, true,  false, false, false, false },
         // States exch
         { true,  false, false, true,  false, true,  true  },
-        // RTR
+        // Install
         { true,  false, false, false, true,  true,  true  },
         // Prim
         { true,  false, false, false, false, true,  true  },
@@ -155,7 +155,7 @@ void PCProto::shift_to(const State s)
     case S_STATES_EXCH:
         state_msgs.clear();
         break;
-    case S_RTR:
+    case S_INSTALL:
         break;
     case S_PRIM:
         set_last_prim(current_view.get_id());
@@ -519,6 +519,7 @@ bool PCProto::is_prim() const
 void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 {
     assert(msg.get_type() == PCMessage::T_STATE);
+    assert(get_state() == S_STATES_EXCH);
     assert(state_msgs.length() < current_view.get_members().length());
 
     log_info << self_string() << " handle state: " << msg.to_string();
@@ -577,12 +578,10 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 
         if (is_prim())
         {
-            shift_to(S_RTR);
-
-            if (requires_rtr())
-            {
-                gcomm_throw_fatal << "Retransmission not implemented";
-            }
+            // Requires RTR does not actually have effect, but let it 
+            // be for debugging purposes until a while
+            (void)requires_rtr();
+            shift_to(S_INSTALL);
 
             if (current_view.get_members().find(uuid) ==
                 current_view.get_members().begin())
@@ -601,7 +600,7 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 void PCProto::handle_install(const PCMessage& msg, const UUID& source)
 {
     assert(msg.get_type() == PCMessage::T_INSTALL);
-    assert(get_state()    == S_RTR);
+    assert(get_state()    == S_INSTALL);
 
     log_info << self_string() << " handle install: " << msg.to_string();
     
@@ -694,7 +693,7 @@ void PCProto::handle_msg(const PCMessage&   msg,
 
         {  FAIL,   ACCEPT,  FAIL,     FAIL    },  // States exch
 
-        {  FAIL,   FAIL,    ACCEPT,   FAIL    },  // RTR
+        {  FAIL,   FAIL,    ACCEPT,   FAIL    },  // INSTALL
 
         {  FAIL,   FAIL,    FAIL,     ACCEPT  },  // PRIM
 

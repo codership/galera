@@ -165,17 +165,26 @@ void EVSProto::deliver_trans_view(bool local)
             << "Protocol error: no install message in deliver trans view";
     }
     
+    log_debug << self_string();
+
     View view(View::V_TRANS, current_view.get_id());
 
     for (EVSInstMap::const_iterator i = known.begin(); i != known.end(); ++i)
     {
-        if (EVSInstMap::get_instance(i).get_installed() && 
-            current_view.get_members().find(EVSInstMap::get_uuid(i)) != 
-            current_view.get_members().end())
+        const UUID& uuid = EVSInstMap::get_uuid(i);
+        const EVSInstance& inst = EVSInstMap::get_instance(i);
+        
+        log_debug << uuid.to_string() << " " << inst.to_string();
+
+        if (inst.get_installed() == true && 
+            current_view.get_members().find(uuid) != 
+            current_view.get_members().end() &&
+            (local == true ||
+             inst.get_join_message()->get_source_view() == current_view.get_id()))
         {
             view.add_member(EVSInstMap::get_uuid(i), "");
         }
-        else if (EVSInstMap::get_instance(i).installed == false)
+        else if (inst.get_installed() == false)
         {
             if (local == false)
             {
@@ -202,8 +211,13 @@ void EVSProto::deliver_trans_view(bool local)
                 view.add_partitioned(EVSInstMap::get_uuid(i), "");
             }
         }
+        else
+        {
+            // merging nodes, these won't be visible in trans view
+        }
     }
     LOG_DEBUG(view.to_string());
+    assert(view.get_members().find(my_uuid) != view.get_members().end());
     ProtoUpMeta up_meta(&view);
     pass_up(0, 0, &up_meta);
 }
@@ -1357,6 +1371,11 @@ void EVSProto::shift_to(const State s, const bool send_j)
         hs_safe.clear();
         cleanup_unoperational();
         cleanup_views();
+        for (EVSInstMap::iterator i = known.begin(); i != known.end(); 
+             ++i)
+        {
+            EVSInstMap::get_instance(i).set_join_message(0);
+        }
         delete install_message;
         install_message = 0;
         LOG_DEBUG("new view: " + current_view.to_string());
