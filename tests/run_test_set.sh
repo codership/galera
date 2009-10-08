@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# This is a wrapper script for ./scripts/run_test_set.pl
+# This is a wrapper script for ./tap/run_test_set.pl
 # 
 
 
@@ -17,7 +17,7 @@ export TEST_BASE_DIR=$BASE_DIR
 
 . $BASE_DIR/conf/cluster.conf
 
-$BASE_DIR/scripts/run_test_set.pl $@
+$BASE_DIR/tap/run_test_set.pl $@
 
 res=$?
 

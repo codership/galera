@@ -4,7 +4,7 @@
 BASE_DIR=$(cd $(dirname $0); pwd -P)
 
 
-. $BASE_DIR/../scripts/tap-functions
+. $BASE_DIR/../tap/tap-functions
 
 REPORT_DIR="$TEST_REPORT_DIR/dummy"
 if ! test -d $REPORT_DIR

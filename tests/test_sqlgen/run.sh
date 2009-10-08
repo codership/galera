@@ -16,7 +16,7 @@ fi
 SQLGEN_LOG=$REPORT_DIR/sqlgen.log
 echo "Running sqlgen test, args: $@" >> $SQLGEN_LOG
 
-. $TEST_BASE_DIR/scripts/tap-functions
+. $TEST_BASE_DIR/tap/tap-functions
 
 plan_tests 1
 
