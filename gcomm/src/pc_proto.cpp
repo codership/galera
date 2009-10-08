@@ -86,6 +86,9 @@ void PCProto::send_install()
 
     WriteBuf wb(buf.get_buf(), buf.get_len());
 
+    // @fixme This can happen in normal circumstances if the last delivered 
+    // message in reg view was the last state message. Figure out the
+    // way to verify that and crash only if it was not the case.
     if (pass_down(&wb, 0))
     {
         gcomm_throw_fatal << "pass_down failed";
@@ -302,6 +305,8 @@ void PCProto::handle_view(const View& view)
                           << view.to_string();
     }
     
+    log_info << self_string() << " " << view.to_string();
+
     if (view.get_type() == View::V_TRANS)
     {
         if (get_state() == S_JOINING)
@@ -378,6 +383,26 @@ void PCProto::validate_state_msgs() const
 {
     // TODO:
 }
+
+void PCProto::cleanup_instances()
+{
+    assert(get_state() == S_PRIM);
+    assert(current_view.get_type() == View::V_REG);
+
+    PCInstMap::iterator i, i_next;
+    for (i = instances.begin(); i != instances.end(); i = i_next)
+    {
+        i_next = i, ++i_next;
+        if (current_view.get_members().find(PCInstMap::get_uuid(i)) 
+            == current_view.get_members().end())
+        {
+            log_info << "cleaning up instance " 
+                     << PCInstMap::get_uuid(i).to_string();
+            instances.erase(i);
+        }
+    }
+}
+
 
 bool PCProto::is_prim() const
 {
@@ -654,6 +679,7 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
     
     shift_to(S_PRIM);
     deliver_view();
+    cleanup_instances();
 }
 
 void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,

@@ -17,6 +17,14 @@ EVSRange EVSInputMap::insert(const EVSInputMapItem& item)
     EVSRange& gap(ii->second.gap);
     // MEssage seqno
     uint32_t seq = item.get_evs_message().get_seq();
+    if (seqno_eq(gap.get_low(), SEQNO_MAX) == false &&
+        seqno_gt(gap.get_low(), seq))
+    {
+        log_warn << item.get_evs_message().to_string() << " already inserted";
+        return gap;
+    }
+    
+
     // MEssage seqno range 
     uint8_t seq_range = item.get_evs_message().get_seq_range();        
     // Starting point of the allowed seqno window

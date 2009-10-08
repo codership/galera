@@ -918,12 +918,12 @@ void EVSProto::resend(const UUID& gap_source, const EVSGap& gap)
     }
     
     uint32_t start_seq = seqno_eq(gap.get_low(), SEQNO_MAX) ? 0 : gap.get_low();
-    LOG_DEBUG(self_string() + " resending, requested by " 
-              + gap_source.to_string() 
-              + " " 
-              + make_int(start_seq).to_string() + " -> " 
-              + make_int(gap.get_high()).to_string());
-
+    log_info << self_string() << " resending, requested by " 
+             << gap_source.to_string() 
+             << " " 
+             << make_int(start_seq).to_string() << " -> " 
+             << make_int(gap.get_high()).to_string();
+    
     for (uint32_t seq = start_seq; !seqno_gt(seq, gap.get_high()); ) {
 
 
@@ -947,7 +947,7 @@ void EVSProto::resend(const UUID& gap_source, const EVSGap& gap)
                                    input_map.get_aru_seq(),
                                    msg.get_source_view(), 
                                    EVSMessage::F_RESEND);
-            LOG_DEBUG("resend: " + new_msg.to_string());
+            log_info << "resend: " << new_msg.to_string();
             WriteBuf wb(rb ? rb->get_buf(i.first.get_payload_offset()) : 0, 
                         rb ? rb->get_len(i.first.get_payload_offset()) : 0);
             wb.prepend_hdr(new_msg.get_hdr(), new_msg.get_hdrlen());
@@ -974,6 +974,12 @@ void EVSProto::recover(const EVSGap& gap)
                   + make_int(gap.get_high()).to_string());
         return;
     }
+
+    log_info << self_string() << " recovering, requested by " 
+             << gap.get_source().to_string() 
+             << " " 
+             << make_int(gap.get_low()).to_string() << " -> " 
+             << make_int(gap.get_high()).to_string();
     
     // TODO: Find out a way to select only single instance that
     // is allowed to recover messages
@@ -996,7 +1002,7 @@ void EVSProto::recover(const EVSGap& gap)
             WriteBuf wb(rb ? rb->get_buf(i.first.get_payload_offset()) : 0,
                         rb ? rb->get_len(i.first.get_payload_offset()) : 0);
             wb.prepend_hdr(new_msg.get_hdr(), new_msg.get_hdrlen());
-            LOG_DEBUG("recovered " + new_msg.to_string());
+            log_info << "recovered " + new_msg.to_string();
             if (send_delegate(gap.source, &wb))
             {
                 break;
@@ -1584,7 +1590,7 @@ void EVSProto::handle_user(const EVSMessage& msg,
     
     if (msg.get_flags() & EVSMessage::F_RESEND)
     {
-        LOG_DEBUG(self_string() + " msg with resend flag " + msg.to_string());
+        log_info << self_string() << " msg with resend flag " << msg.to_string();
     }
     else 
     {
@@ -1629,8 +1635,9 @@ void EVSProto::handle_user(const EVSMessage& msg,
             {
                 assert(state == S_RECOVERY);
 
-                log_debug << self_string() << " recovery user message source";
-
+                log_info << self_string() << " recovery user message "
+                         << msg.to_string();
+                
                 // Other instances installed view before this one, so it is 
                 // safe to shift to S_OPERATIONAL if consensus has been reached
                 for (EVSMessage::InstMap::const_iterator
@@ -1638,13 +1645,13 @@ void EVSProto::handle_user(const EVSMessage& msg,
                      mi != install_message->get_instances()->end(); ++mi)
                 {
                     EVSInstMap::iterator jj = known.find(mi->second.get_uuid());
-
+                    
                     if (jj == known.end())
                     {
                         gcomm_throw_fatal << "Unknown instance map UUID"
                                           << mi->second.get_uuid().to_string();
                     }
-
+                    
                     jj->second.installed = true;
                 }
                 
@@ -1789,7 +1796,7 @@ void EVSProto::handle_delegate(const EVSMessage& msg, EVSInstMap::iterator ii,
     {
         gcomm_throw_fatal << "Failed to read user msg from delegate";
     }
-
+    log_info << umsg.to_string();
     handle_msg(umsg, rb, roff + msg.size());
 }
 
@@ -1804,9 +1811,11 @@ void EVSProto::handle_gap(const EVSMessage& msg, EVSInstMap::iterator ii)
         // Silent drop
         return;
     } 
-    else if (state == S_RECOVERY && install_message && 
+    else if (get_state() == S_RECOVERY && 
+             install_message != 0 && 
              install_message->get_source_view() == msg.get_source_view()) 
     {
+        log_info << self_string() << " install gap " << msg.to_string();
         inst.installed = true;
         if (is_all_installed())
             shift_to(S_OPERATIONAL);
@@ -1919,13 +1928,14 @@ bool EVSProto::states_compare(const EVSMessage& msg)
         EVSInstMap::iterator local_ii = known.find(ii->second.get_uuid());
         if (local_ii == known.end())
         {
-            log_debug << self_string() << ": new instance from join message";
-
-            if (known.insert(make_pair(ii->second.get_uuid(), 
-                                       EVSInstance())).second == false)
-            {
-                gcomm_throw_fatal << "Failed to add to known list";
-            }
+            log_debug << self_string() << ": unknown instance from join message";
+            // Don't do this here, wait until gmcast gets direct connection
+            // with unknown instances.
+            // if (known.insert(make_pair(ii->second.get_uuid(), 
+            // EVSInstance())).second == false)
+            // {
+            //  gcomm_throw_fatal << "Failed to add to known list";
+            // }
         }
         else if (local_ii->second.operational != ii->second.get_operational()) 
         {

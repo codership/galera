@@ -160,6 +160,7 @@ private:
     bool requires_rtr() const;
     bool is_prim() const;
     void validate_state_msgs() const;
+    void cleanup_instances();
     void handle_state(const PCMessage&, const UUID&);
     void handle_install(const PCMessage&, const UUID&);
     void handle_user(const PCMessage&, const ReadBuf*, const size_t,
