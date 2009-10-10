@@ -44,4 +44,20 @@ esac
 # How many concurrent clients to use
 export DBMS_CLIENTS=${DBMS_CLIENTS:-"16"}
 
+# Type of GCS backend
+export GCS_TYPE=${GCS_TYPE:-"gcomm"}
+
+case "$GCS_TYPE" in
+"gcomm")
+    ;;
+"vsbes")
+    if [ -z "$VSBES_ADDRESS" ]; then echo "VSBES_ADDRESS is not set"; exit 1; fi
+    ;;
+*) echo "Urecognized GCS_TYPE: '$GCS_TYPE'" ; exit 1 ;;
+esac
+
+export GCS_PORT=4567
+
+. $BASE_CONF/nodes.conf
+
 # end

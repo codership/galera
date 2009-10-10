@@ -6,12 +6,14 @@ action_cmd()
 {
     local cmd=$1
     local node=${@:$#}
+    local nargs=$(( $# - 2 ))  # minus cmd and node
+    local args="${@:2:$nargs}" # arguments range from 2 to n-1
     local dir="${NODE_TEST_DIR[$node]}"
-    local args="${@:3: --$#}" # arguments range from 3 to n-1
 
     case "$DBMS" in
     "MYSQL")
-        echo -n "\"$dir/mysql-galera\" $args $cmd"
+        echo -n "MYSQL_PORT=${NODE_INCOMING_PORT[$node]} "\
+                "\"$dir/mysql-galera\" $args $cmd"
 	;;
     "PGSQL"|*)
         return -1

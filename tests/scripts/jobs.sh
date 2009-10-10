@@ -9,13 +9,16 @@
 
 local_job()
 {
-    eval "$($@)"
+    local cmd="$1"
+#    eval "$($@)"
+    eval $cmd
 }
 
 ssh_job()
 {
     local node=${@:$#} # last argument
-    local cmd="$($@)"
+#    local cmd="$($@)"
+    local cmd="$1"
 
     ssh "${NODE_LOCATION[$node]}" "$cmd"
 }
@@ -23,13 +26,16 @@ ssh_job()
 virtual_job()
 {
     local node=${@:$#} # last argument
-    local output=$BASE_OUT/$1_${NODE_ID[$node]}.out
+    local out="$BASE_OUT/${1}_${NODE_ID[$node]}.out"
+    local cmd="$($@)"
 
     if [ "${NODE_LOCATION[$node]}" == "local" ]
     then
-        local_job "$@" 1>"$output"
+#        local_job "$cmd" 1>"$out"
+        eval "$cmd" 1>"$out"
     else
-        ssh_job "$@" 1>"$output"
+#        ssh_job "$cmd" 1>"$out"
+        ssh "${NODE_LOCATION[$node]}" "$cmd" 1>"$out"
     fi
 
 }
@@ -40,25 +46,26 @@ virtual_job()
 node_job()
 {
     local cmd=$1
+    shift
     local node=${@:$#} # last argument
     local node_id="${NODE_ID[$node]}"
+    local prefix="$BASE_RUN/${cmd}_${node_id}"
     local rcode=0
 
     local start=$SECONDS
 
     case $cmd in
     "untar_cmd")
-        shift
 	local dist="$1"
 	shift
-	cat "$dist" | virtual_job "$cmd" "$@" || rcode=$?
+	cat "$dist" | virtual_job "$cmd" "$@" 2>"$prefix.err" || rcode=$?
         ;;
     *)
-        virtual_job "$@" || rcode=$?
-	;;
+        virtual_job "$cmd" "$@" 2>"$prefix.err" || rcode=$?
+        ;;
     esac
 
-    echo $rcode > "$BASE_RUN/${cmd}_$node_id.ret"
+    echo $rcode > "$prefix.ret"
 
     echo -n "Job '$cmd' on '$node_id'"
     
@@ -67,8 +74,8 @@ node_job()
         echo " complete in $(($SECONDS - $start)) seconds"
     else
         echo " failed with code: $rcode"
-        echo -n "REASON: "
-        cat "$BASE_RUN/${cmd}_$node_id.err"
+        echo "FAILED COMMAND: $($cmd $@)"
+        echo "REASON: $(cat "$prefix.err")"
     fi
 
     return $rcode
@@ -85,7 +92,7 @@ start_jobs()
         local node_id="${NODE_ID[$node]}"
         local prefix="$BASE_RUN/${1}_$node_id"
 	
-	node_job "$@" $node 2>"$prefix.err" &
+	node_job "$@" $node &
 	echo $! > "$prefix.pid"
 	echo "Job '$1' on '$node_id' started"
     done
