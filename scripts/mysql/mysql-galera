@@ -243,6 +243,7 @@ galera_start()
         echo " Done (PID:$(cat $MYSQL_PID))"
     else
         echo " Failed (PID:$my_pid)"
+	return 1
     fi
 }
 
@@ -298,7 +299,7 @@ local DUMP_OPTIONS=" --skip-opt --compact --flush-logs --lock-all-tables \
            --quick --create-options --set-charset --skip-comments $ROUTINES "
 DB=${DB:-"--all-databases"}
 #set -x
-mysqldump $DUMP_OPTIONS $ROOT_USER $ROOT_PSWD -h127.0.0.1 -P$MYSQL_PORT  \
+mysqldump $DUMP_OPTIONS $ROOT_USER $ROOT_PSWD --socket $MYSQL_SOCKET  \
           $IGNORE_TABLES $DB
 #set +x
 }
@@ -419,7 +420,7 @@ done
 
 if [ -z "$COMMAND" ]
 then
-    usage
+    usage >&2
     exit 1
 fi
 
