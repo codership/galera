@@ -199,8 +199,19 @@ int local_open(
     return WSDB_OK;
 }
 
+static void trx_print(void *ctx, void *entry) {
+    wsdb_trx_info_t *info = (wsdb_trx_info_t *) entry;
+    fprintf(stdout, "TRX: seqno: %llu - %llu state: %d", 
+            info->seqno_l, info->seqno_g, info->state
+    );
+}
+
 void local_close() {
     uint32_t mem_usage;
+    uint32_t elems;
+
+    elems = wsdb_hash_scan(trx_hash, NULL, trx_print);
+    gu_info("trx hash elems: %u", elems);
 
     mem_usage = wsdb_hash_report(trx_hash);
     gu_info("mem usage for trx hash: %u", mem_usage);

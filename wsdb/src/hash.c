@@ -41,7 +41,7 @@ struct wsdb_hash {
 #define IDENT_wsdb_hash 'h'
 
 struct wsdb_hash *wsdb_hash_open(
-    size_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp, 
+    size_t max_size, hash_fun_t hash_fun, hash_cmp_t hash_cmp,
     bool unique, bool reuse_key
 ) {
     struct wsdb_hash *hash;
