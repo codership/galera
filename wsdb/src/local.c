@@ -199,9 +199,11 @@ int local_open(
     return WSDB_OK;
 }
 
+#include <inttypes.h>
+
 static void trx_print(void *ctx, void *entry) {
     wsdb_trx_info_t *info = (wsdb_trx_info_t *) entry;
-    fprintf(stdout, "TRX: seqno: %llu - %llu state: %d", 
+    fprintf(stdout, "TRX: seqno: %0" PRId64 " - %0" PRId64 " state: %d", 
             info->seqno_l, info->seqno_g, info->state
     );
 }
