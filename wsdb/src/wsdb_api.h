@@ -94,14 +94,15 @@ struct wsdb_conn_info {
 };
 
 enum wsdb_trx_state {
-  WSDB_TRX_VOID = 0,      //!< sequencing 
-  WSDB_TRX_REPLICATING,   //!< gcs_repl() has been called
-  WSDB_TRX_REPLICATED,    //!< valid sequence numbers have been assigned
-  WSDB_TRX_MUST_ABORT,    //!< trx must abort, set by BF applier
-  WSDB_TRX_MUST_REPLAY,   //!< trx must abort, and then replay
-  WSDB_TRX_REPLAYING,     //!< trx is replaying
-  WSDB_TRX_ABORTING,      //!< MUST_ABORT has been seen, aborting started
-  WSDB_TRX_MISSING,       //!< trx is not in local hash
+  WSDB_TRX_VOID = 0,        //!< sequencing 
+  WSDB_TRX_REPLICATING,     //!< gcs_repl() has been called
+  WSDB_TRX_REPLICATED,      //!< valid sequence numbers have been assigned
+  WSDB_TRX_MUST_ABORT,      //!< trx must abort, set by BF applier
+  WSDB_TRX_MUST_REPLAY,     //!< trx must abort, and then replay
+  WSDB_TRX_REPLAYING,       //!< trx is replaying
+  WSDB_TRX_ABORTING_REPL,   //!< MUST_ABORT acked, trx has replicated, aborting
+  WSDB_TRX_ABORTING_NONREPL,//!< MUST_ABORT acked, trx not replicated, aborting
+  WSDB_TRX_MISSING,         //!< trx is not in local hash
 };
 
 enum wsdb_trx_position {
