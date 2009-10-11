@@ -97,7 +97,29 @@ int mempool_close(struct mempool *pool) {
 
         block = next;
     }
+    gu_free(pool);
     return 0;
+}
+
+uint32_t mempool_report(struct mempool *pool, bool print) {
+    struct block *block;
+    uint32_t mem = 0;
+    CHECK_OBJ(pool, mempool);
+
+    if (print) fprintf(stdout, "pool blocks: %d", pool->block_count);
+
+    block = pool->blocks;
+    while(block) {
+        struct block *next = block->next;
+        mem += pool->block_size;
+        mem += sizeof (struct block);
+        if (print) fprintf(stdout, "block in use: %d", block->in_use);
+
+        block = next;
+    }
+    if (print) fprintf(stdout, "pool allocation: %ud", mem);
+
+    return mem;
 }
 
 /*
@@ -124,6 +146,8 @@ static struct block *add_block(struct mempool *pool, struct block *prev) {
     new_block->free_list = new_block->block;
     new_block->next      = NULL;
     new_block->end       = new_block->block + pool->block_size;
+    new_block->in_use    = 0;
+
     if (prev) {
         prev->next = new_block;
     } else {
@@ -138,6 +162,13 @@ static void *mempool_alloc_sticky(struct mempool *pool, int length) {
     struct block *block;
     struct block *prev = NULL;
     struct block *new_block;
+
+    if (length > pool->item_size) {
+        gu_error("Too large alloc from mempool, alloc: %d max item size: %d", 
+                 length, pool->item_size
+        );
+        return NULL;
+    }
 
     if (pool->use_mutex) gu_mutex_lock(&(pool->mutex));
     block = pool->blocks;
@@ -169,6 +200,13 @@ static void *mempool_alloc_dynamic(struct mempool *pool, int length) {
     struct block *block;
     struct block *prev = NULL;
     struct block *new_block;
+
+    if (length > pool->item_size) {
+        gu_error("Too large alloc from mempool, alloc: %d max item size: %d", 
+                 length, pool->item_size
+        );
+        return NULL;
+    }
 
     if (pool->use_mutex) gu_mutex_lock(&(pool->mutex));
     block = pool->blocks;
@@ -221,7 +259,8 @@ int mempool_free(struct mempool *pool, void *buf) {
     if (pool->use_mutex) gu_mutex_lock(&(pool->mutex));
     block = pool->blocks;
 
-    while(block) {
+    while(block && !found) {
+        /* locate block for this memory item */
         if ((buf >= (void*)block->block) && (buf < (void*)block->end)) {
             found = true;
             if (pool->pool_type == MEMPOOL_DYNAMIC) {
@@ -232,11 +271,9 @@ int mempool_free(struct mempool *pool, void *buf) {
 
             if (block->in_use == 0) {
                 if (pool->blocks != block) {
-                    if (prev) {
-                        prev->next = block->next;
-                    } else {
-                        pool->blocks = block->next;
-                    }
+                    assert(prev);
+                    prev->next = block->next;
+
                     gu_free(block->block);
                     gu_free(block);
                     pool->block_count--;

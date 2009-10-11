@@ -64,4 +64,14 @@ void *mempool_alloc(struct mempool *pool, int length);
  */
 int mempool_free(struct mempool *pool, void *buf);
 
+/*
+ * @brief prints allocation information from pool
+ *     Function returns total size allocated and can optionally
+ *     print detailed report to stdout
+ * @param pool the mempool to use
+ * @param print to print report in stdout or not
+ * @return total memory allocated in pool
+ */
+uint32_t mempool_report(struct mempool *pool, bool print);
+
 #endif

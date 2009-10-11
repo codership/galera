@@ -590,9 +590,9 @@ int wsdb_cert_close() {
 
     uint32_t mem_usage;
     mem_usage = wsdb_hash_report(table_index);
-    gu_info("mem usage for table_idex: %u", mem_usage);
+    gu_info("mem usage for table_index: %u", mem_usage);
     mem_usage = wsdb_hash_report(key_index);
-    gu_info("mem usage for key_idex: %u", mem_usage);
+    gu_info("mem usage for key_index: %u", mem_usage);
 
     gu_info("active seqno list len: %d, size: %d", 
             trx_info.list_len, trx_info.list_size
@@ -622,6 +622,8 @@ int wsdb_cert_close() {
     purge_seqno_list(LLONG_MAX);
 
 #ifdef USE_MEMPOOL
+    mem_usage = mempool_report(index_pool, true);
+    gu_info("mempool usage for index: %u", mem_usage);
     mempool_close(index_pool);
 #endif
     return WSDB_OK;

@@ -462,6 +462,11 @@ uint32_t wsdb_hash_report(
         }
     }
 
+#ifdef USE_MEMPOOL
+    mem_usage += mempool_report(hash->entry_pool, true);
+    mem_usage += mempool_report(hash->key_pool, true);
+#endif
+
     gu_mutex_unlock(&hash->mutex);
     GU_DBUG_RETURN(mem_usage);
 }
