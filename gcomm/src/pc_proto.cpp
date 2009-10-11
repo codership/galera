@@ -687,12 +687,12 @@ void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
 {
     int64_t to_seq = -1;
 
-    if (get_state() == S_PRIM)
+    if (get_prim() == true)
     {
         set_to_seq(get_to_seq() + 1);
         to_seq = get_to_seq();
     }
-
+    
     ProtoUpMeta pum(um->get_source(), um->get_user_type(), to_seq);
 
     pass_up(rb, roff + msg.size(), &pum);

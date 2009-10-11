@@ -453,6 +453,16 @@ bool EVSProto::is_consistent(const EVSMessage& jm) const
     {
         // Instances are originating from different view, need to check
         // only that new view is consistent
+
+        /*
+         * @fixme
+         *
+         * The above comment is not actually right. If the newly joining
+         * node happens to be representative, it must check carefully 
+         * that nodes moving from other view advance their safe and aru seqs
+         * to the same value.
+         */
+
         for (EVSInstMap::const_iterator i = known.begin();
              i != known.end(); ++i) 
         {
@@ -862,12 +872,12 @@ void EVSProto::send_install()
                          input_map.get_aru_seq(), 
                          input_map.get_safe_seq(),
                          ++fifo_seq);
-
+    
     for (EVSInstMap::const_iterator i = known.begin(); i != known.end(); ++i) 
     {
         const UUID&        pid = EVSInstMap::get_uuid(i);
         const EVSInstance& ei  = EVSInstMap::get_instance(i);
-
+        
         im.add_instance(pid,
                         ei.operational,
                         has_leave(pid),
@@ -880,9 +890,9 @@ void EVSProto::send_install()
                         (input_map.contains_sa(pid) ?
                          input_map.get_sa_safe_seq(pid) : SEQNO_MAX));
     }
-
+    
     log_debug << self_string() << " sending install: " << im.to_string();
-
+    
     size_t  bufsize = im.size();
     byte_t* buf     = new byte_t[bufsize];
 
