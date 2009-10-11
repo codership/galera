@@ -1379,11 +1379,12 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
 
     /* continue to kill the victim */
     switch (victim.state) {
-    case WSDB_TRX_ABORTING:
+    case WSDB_TRX_ABORTING_REPL:
+    case WSDB_TRX_ABORTING_NONREPL:
     case WSDB_TRX_MUST_REPLAY:
     case WSDB_TRX_MUST_ABORT:
     case WSDB_TRX_MISSING:
-        /* more or less good states */
+        /* MUST_ABORT has been acknowledged or trx does not exist */
         break;
 
     case WSDB_TRX_VOID:
@@ -1557,13 +1558,15 @@ static enum wsrep_status mm_galera_post_rollback(
         /* we need trx info for replaying */
         break;
     case WSDB_TRX_VOID:
-        /* voluntary rollback */
+    case WSDB_TRX_ABORTING_NONREPL:
+        /* voluntary rollback before replicating was attempted */
         wsdb_delete_local_trx(trx_id);
         wsdb_delete_local_trx_info(trx_id);
         break;
     case WSDB_TRX_MUST_ABORT:
     case WSDB_TRX_REPLICATED:
-    case WSDB_TRX_ABORTING:
+    case WSDB_TRX_ABORTING_REPL:
+        /* these have replicated */
         if (gu_to_release(commit_queue, trx.seqno_l)) {
             gu_fatal("Could not release commit resource for %lld", trx.seqno_l);
             abort();
@@ -1672,7 +1675,7 @@ static enum wsrep_status mm_galera_pre_commit(
 	if ((rcode = wsdb_delete_local_trx(trx_id))) {
 	    gu_debug("could not delete trx: %llu", trx_id);
 	}
-        wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTING);
+        wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTING_NONREPL);
 	gu_mutex_unlock(&commit_mtx);
 	GU_DBUG_RETURN(WSREP_TRX_FAIL);
         break;
@@ -1787,7 +1790,7 @@ static enum wsrep_status mm_galera_pre_commit(
         } else {
             GALERA_SELF_CANCEL_QUEUE (cert_queue, seqno_l);
             GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
-            wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTING);
+            wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTING_REPL);
        }
         goto cleanup;
     }
@@ -1844,7 +1847,7 @@ static enum wsrep_status mm_galera_pre_commit(
         case 0: break;
         case -ECANCELED:
 	    gu_debug("canceled in commit queue for %llu", seqno_l);
-            wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTING);
+            wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTING_REPL);
             GU_DBUG_RETURN(WSREP_TRX_FAIL);
             break;
         case -EINTR:
