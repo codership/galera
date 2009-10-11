@@ -106,18 +106,20 @@ uint32_t mempool_report(struct mempool *pool, bool print) {
     uint32_t mem = 0;
     CHECK_OBJ(pool, mempool);
 
-    if (print) fprintf(stdout, "pool blocks: %d", pool->block_count);
+    if (print && pool->block_count > 1) 
+        gu_info("mempool blocks: %d", pool->block_count);
 
     block = pool->blocks;
     while(block) {
         struct block *next = block->next;
         mem += pool->block_size;
         mem += sizeof (struct block);
-        if (print) fprintf(stdout, "block in use: %d", block->in_use);
+        if (print && block->in_use > 0) 
+            gu_info("mempool block in use: %d", block->in_use);
 
         block = next;
     }
-    if (print) fprintf(stdout, "pool allocation: %ud", mem);
+    if (print && pool->block_count > 1) gu_info("mempool allocation: %u", mem);
 
     return mem;
 }

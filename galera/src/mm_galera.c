@@ -1288,7 +1288,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
 #endif
 	if (rcode <= 0) {
 
-            gu_error ("gcs_recv() returned %d (%s)", rcode, strerror(-rcode));
+            gu_info ("gcs_recv() returned %d (%s)", rcode, strerror(-rcode));
             return WSREP_CONN_FAIL;
         }
 
