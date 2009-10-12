@@ -835,7 +835,7 @@ static void merge_instances(DummyList& dlist1, DummyList& dlist2)
 static void propagate_up_to(DummyList& dlist, const vector<int>& vec)
 {
     vector<int> cnt(vec);
-    if (cnt.size() == 0 || dlist.size() > cnt.size())
+    if (cnt.size() != dlist.size())
     {
         throw std::logic_error("");
     }
@@ -891,16 +891,27 @@ START_TEST(test_evs_proto_generic_boot)
         {
             for (int i = 1; i < n_nodes; ++i)
             {
-                std::cerr << "Permutation: ";
+                log_info << "Permutation: ";
                 std::copy(perm.begin(), perm.end(), 
                           std::ostream_iterator<int>(std::cerr, " "));
-                std::cerr << "msgs: " << n << " split: " << i;
+                log_info << "msgs: " << n << " split: " << i;
                 std::cerr << std::endl;
                 std::for_each(dlist.begin(), dlist.end(), send_msgs(n));
                 propagate_up_to(dlist, perm);
                 log_info << "splitting: " << i;
                 DummyList dlist2;
                 split_instances(dlist, i, dlist2);
+                log_info << "sending in split state";
+                for_each(dlist.begin(), dlist.end(), send_msgs(n));
+                for_each(dlist2.begin(), dlist2.end(), send_msgs(n));
+                log_info << "propagating in split state";
+                vector<int> perm1(dlist.size());
+                copy(&perm[0], &perm[perm1.size()], perm1.begin());
+                propagate_up_to(dlist, perm1);
+                vector<int> perm2(dlist2.size());
+                copy(&perm[perm1.size()], &perm[perm1.size()] + perm2.size(), 
+                     perm2.begin());
+                propagate_up_to(dlist2, perm2);
                 log_info << "merging: " << i;
                 merge_instances(dlist, dlist2);
             }

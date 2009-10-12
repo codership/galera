@@ -24,6 +24,7 @@ libgcomm_la_SOURCES = 		\
 	view.cpp		\
 	evs_seqno.cpp		\
 	evs_input_map.cpp	\
+	evs_input_map2.cpp 	\
 	evs_proto.cpp		\
 	evs.cpp			\
 	pc_proto.cpp		\

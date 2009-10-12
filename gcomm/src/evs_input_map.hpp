@@ -415,13 +415,13 @@ public:
     EVSRange get_sa_gap(const UUID& sa) const 
     {
         IMap::const_iterator ii = instances.find(sa);
-
+        
         if (ii == instances.end())
             gcomm_throw_fatal << "Instance does not exist";
 
         return ii->second.gap;
     }
-
+    
     uint32_t get_sa_safe_seq(const UUID& sa) const
     {
         IMap::const_iterator ii = instances.find(sa);

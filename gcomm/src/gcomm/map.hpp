@@ -3,6 +3,7 @@
 #define GCOMM_MAP_HPP
 
 #include <utility>
+#include <map>
 
 #include "gcomm/exception.hpp"
 #include "gcomm/types.hpp"
@@ -63,11 +64,15 @@ namespace gcomm
     
         void erase(iterator i) { map.erase(i); }
 
+        void erase(iterator i, iterator j) { map.erase(i, j); }
+
         void erase(const K& k) { map.erase(k); }
 
         void clear()           { map.clear(); }
     
         size_t size() const    { return map.size(); }
+
+        bool empty() const     { return map.empty(); }
 
         size_t serialize(byte_t*      buf,
                          const size_t buflen, 
@@ -154,7 +159,7 @@ namespace gcomm
     };
 
 
-    template<typename K, typename V, typename C>
+    template<typename K, typename V, typename C = std::map<K, V> >
     class Map : public MapBase<K, V, C>
     {
     public:
@@ -175,7 +180,7 @@ namespace gcomm
         }
     };
 
-    template<typename K, typename V, typename C>
+    template<typename K, typename V, typename C = std::multimap<K, V> >
     class MultiMap : public MapBase<K, V, C>
     {
     public:

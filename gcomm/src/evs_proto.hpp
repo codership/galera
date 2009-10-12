@@ -236,7 +236,7 @@ public:
             known.insert(make_pair(my_addr, EVSInstance()));
         assert(i.second == true);
         self_i = i.first;
-        assert(EVSInstMap::get_instance(self_i).get_operational() == true);
+        assert(EVSInstMap::get_value(self_i).get_operational() == true);
         
         input_map.insert_sa(my_addr);
         current_view.add_member(my_addr, "");

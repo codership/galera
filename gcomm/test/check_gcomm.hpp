@@ -22,6 +22,8 @@ Suite* tcp_suite();
 Suite* gmcast_suite();
 /* Tests for EVS transport */
 Suite* evs_suite();
+/* Better evs suite */
+Suite* evs2_suite();
 /* Tests for VS trasport */
 Suite* vs_suite();
 /* Tests for PC transport */

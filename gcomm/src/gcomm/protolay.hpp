@@ -15,6 +15,9 @@
 #include <gcomm/exception.hpp>
 #include <gcomm/logger.hpp>
 
+
+
+
 BEGIN_GCOMM_NAMESPACE
 
 /* message context to pass up with the data buffer? */
