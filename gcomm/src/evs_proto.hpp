@@ -9,9 +9,10 @@
 #include "gcomm/protolay.hpp"
 #include "gcomm/view.hpp"
 #include "gcomm/transport.hpp"
-#include "inst_map.hpp"
+#include "gcomm/map.hpp"
 #include "histogram.hpp"
 
+#include <map>
 #include <set>
 #include <list>
 
@@ -26,21 +27,7 @@ BEGIN_GCOMM_NAMESPACE
 
 struct EVSInstance 
 {
-    // True if instance is considered to be operational (has produced messages)
-    bool operational;
-    // True if it is known that the instance has installed current view
-    bool installed;
-    // Last received JOIN message
-    EVSMessage* join_message;
-    // Last activity timestamp
-    EVSMessage* leave_message;
-    // 
-    Time tstamp;
-    //
-    EVSRange prev_range;
-    // greatest seen FIFO seqno from this source 
-    int64_t fifo_seq;
-    // CTOR
+
     EVSInstance() : 
         operational(true), 
         installed(false), 
@@ -67,17 +54,13 @@ struct EVSInstance
         delete join_message;
         delete leave_message;
     }
+
+    void set_operational(const bool op) { operational = op; }
+    bool get_operational() const { return operational; }
     
-    bool get_operational() const
-    {
-        return operational;
-    }
-
-    bool get_installed() const
-    {
-        return installed;
-    }
-
+    void set_installed(const bool inst) { installed = inst; }
+    bool get_installed() const { return installed; }
+    
     void set_join_message(EVSMessage* msg)
     {
         if (join_message)
@@ -86,11 +69,19 @@ struct EVSInstance
         }
         join_message = msg;
     }
-
-    const EVSMessage* get_join_message() const
+    
+    const EVSMessage* get_join_message() const { return join_message; }
+    
+    void set_leave_message(EVSMessage* msg)
     {
-        return join_message;
+        if (leave_message != 0)
+        {
+            delete leave_message;
+        }
+        leave_message = msg;
     }
+
+    const EVSMessage* get_leave_message() const { return leave_message; }
 
     string to_string() const 
     {
@@ -103,13 +94,37 @@ struct EVSInstance
         ret += (leave_message ? "1" : "0");
         return ret;
     }
+    
+    void set_tstamp(const Time& t) { tstamp = t; }
+    const Time& get_tstamp() const { return tstamp; }
 
-    void update_tstamp() {
-        tstamp = Time::now();
-    }
+    void set_fifo_seq(const int64_t seq) { fifo_seq = seq; }
+    int64_t get_fifo_seq() const { return fifo_seq; }
+
+    void set_prev_range(const EVSRange& r) { prev_range = r; }
+    const EVSRange& get_prev_range() const { return prev_range; }
+
 private:
 
     void operator=(const EVSInstance&);
+
+
+    // True if instance is considered to be operational (has produced messages)
+    bool operational;
+    // True if it is known that the instance has installed current view
+    bool installed;
+    // Last received JOIN message
+    EVSMessage* join_message;
+    // Last activity timestamp
+    EVSMessage* leave_message;
+    // 
+    Time tstamp;
+    //
+    EVSRange prev_range;
+    // greatest seen FIFO seqno from this source 
+    int64_t fifo_seq;
+    // CTOR
+
 };
 
 
@@ -118,7 +133,7 @@ class EVSProto : public Protolay
 {
 public:
     // typedef InstMap<EVSInstance> EVSInstMap;
-    struct EVSInstMap : InstMap<EVSInstance>
+    class EVSInstMap : public Map<const UUID, EVSInstance, std::map<const UUID, EVSInstance> >
     {
     };
 
@@ -267,7 +282,7 @@ public:
 
     size_t get_known_size() const
     {
-        return known.length();
+        return known.size();
     }
     
     bool is_output_empty() const
@@ -331,8 +346,12 @@ public:
     
     // Compares join message against current state
     
-    bool is_consistent(const EVSMessage& jm) const;
-    
+    bool is_consistent(const EVSMessage&) const;
+    bool is_consistent_input_map(const EVSMessage&) const;
+    bool is_consistent_joining(const EVSMessage&) const;
+    bool is_consistent_partitioning(const EVSMessage&) const;
+    bool is_consistent_leaving(const EVSMessage&) const;
+    bool is_consistent_same_view(const EVSMessage&) const;
     bool is_consensus() const;
     
     bool is_representative(const UUID& pid) const;

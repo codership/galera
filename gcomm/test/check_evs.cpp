@@ -98,7 +98,7 @@ START_TEST(test_msg)
                         SAFE, 0x037b137bU, 0x17U,
                         0x0534555,
                         ViewId(UUID(5), 0x7373b173U), EVSMessage::F_MSG_MORE);
-
+    
     check_serialization(umsg, umsg.size(), 
                         EVSUserMessage(UUID(), 
                                        0, 
@@ -106,10 +106,12 @@ START_TEST(test_msg)
                                        0, 0, 0,
                                        ViewId(UUID(0,0), 0),
                                        0));
-
-
+    
+    
     EVSDelegateMessage dmsg(pid);
     check_serialization(dmsg, dmsg.size(), EVSDelegateMessage(UUID::nil()));
+
+
 }
 END_TEST
 
@@ -1062,7 +1064,7 @@ START_TEST(test_evs_proto_double_boot)
     EventLoop el;
     UUID p1(1);
     UUID p2(2);
-
+    // gu_log_max_level = GU_LOG_DEBUG;
 
     DummyTransport* tp1 = new DummyTransport();
     DummyUser du1;
@@ -1518,27 +1520,26 @@ static void multicast(vector<Inst*>* pvec, const ReadBuf* rb, const int ploss)
 {
     EVSMessage msg;
     fail_unless(msg.read(rb->get_buf(), rb->get_len(), 0) != 0);
-    LOG_DEBUG("msg: " + make_int(msg.get_type()).to_string());
     stats.acc_mcast(msg.get_type());
     for (vector<Inst*>::iterator j = pvec->begin();
          j != pvec->end(); ++j) {
-
+        
         if ((*j)->ep->get_state() == EVSProto::S_CLOSED)
             continue;
-
+        
         if (::rand() % 10000 < ploss) {
             if (::rand() % 3 == 0) {
                 LOG_DEBUG("dropping " + EVSMessage::to_string(msg.get_type()) +
-                         " from " + msg.get_source().to_string() + " to " +
+                          " from " + msg.get_source().to_string() + " to " +
                           (*j)->ep->get_uuid().to_string() 
-                         + " seq " + make_int(msg.get_seq()).to_string());
+                          + " seq " + make_int(msg.get_seq()).to_string());
                 continue;
             } else {
                 LOG_DEBUG("dropping " + EVSMessage::to_string(msg.get_type()) +" from " + msg.get_source().to_string() + " to all");
                 break;
             }
         }
-
+        // log_info << msg.to_string();
         (*j)->ep->handle_msg(msg, rb, 0);
     }
 }
@@ -2246,16 +2247,16 @@ Suite* evs_suite()
     tcase_add_test(tc, test_evs_proto_single_boot);
     suite_add_tcase(s, tc);
 
+    tc = tcase_create("test_evs_proto_double_boot");
+    tcase_add_test(tc, test_evs_proto_double_boot);
+    suite_add_tcase(s, tc);
+
     tc = tcase_create("test_evs_proto_generic_boot");
     tcase_add_test(tc, test_evs_proto_generic_boot);
     tcase_set_timeout(tc, 10);
     suite_add_tcase(s, tc);
 
 
-
-    tc = tcase_create("test_evs_proto_double_boot");
-    tcase_add_test(tc, test_evs_proto_double_boot);
-    suite_add_tcase(s, tc);
 
     tc = tcase_create("test_evs_proto_user_msg_basic");
     tcase_add_test(tc, test_evs_proto_user_msg_basic);

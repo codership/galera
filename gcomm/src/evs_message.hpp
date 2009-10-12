@@ -10,6 +10,7 @@
 #include "gcomm/util.hpp"
 #include "gcomm/uuid.hpp"
 #include "gcomm/view.hpp"
+#include "gcomm/map.hpp"
 #include "evs_seqno.hpp"
 
 #include <map>
@@ -296,11 +297,10 @@ public:
         }
     };
 
-    typedef std::map<UUID, Instance> InstMap;
-
+    class InstMap : public Map<UUID, Instance, std::map<const UUID, Instance> > { };
 private:
 
-    std::map<UUID, Instance>* instances;
+    InstMap* instances;
 
 protected:
 
@@ -316,7 +316,7 @@ protected:
                const UUID&           source_,
                const EVSGap&         gap_,
                const int64_t         fifo_seq_,
-               map<UUID, Instance>* instances_)
+               InstMap*              instances_)
         :
         version       (version_),
         type          (type_),
@@ -330,7 +330,7 @@ protected:
         source        (source_),
         gap           (gap_),
         fifo_seq      (fifo_seq_),
-        tstamp        (),
+        tstamp        (Time::now()),
         instances     (instances_)
     {
         if (source != UUID::nil()) flags |= F_SOURCE;
@@ -346,12 +346,12 @@ public:
         seq(SEQNO_MAX), 
         seq_range(),
         aru_seq(),
-        flags(),
+        flags(0),
         source_view(),
         source(),
         gap(),
         fifo_seq(-1),
-        tstamp(),
+        tstamp(Time::now()),
         instances(0) 
     {
     }
@@ -374,8 +374,7 @@ public:
     {
 	if (m.instances) 
         {
-	    instances = new std::map<UUID, Instance>();
-	    *instances = *m.instances;
+	    instances = new InstMap(*m.instances);
 	}
     }
     
@@ -400,7 +399,7 @@ public:
         gap = m.gap;
         fifo_seq = m.fifo_seq;
         tstamp = m.tstamp;
-        instances = m.instances != 0 ? new std::map<UUID, Instance>(*m.instances) : 0;
+        instances = m.instances != 0 ? new InstMap(*m.instances) : 0;
         return *this;
     }
     
@@ -477,9 +476,7 @@ public:
         return tstamp;
     }
     
-    const std::map<UUID, Instance>* get_instances() const {
-	return instances;
-    }
+    const InstMap* get_instances() const { return instances; }
     
     void add_instance(const UUID& pid, 
                       const bool operational, 
@@ -488,16 +485,13 @@ public:
 		      const EVSRange& range,
                       const uint32_t safe_seq) 
     {
-	std::pair<InstMap::iterator, bool> i = 
-	    instances->insert(make_pair(
-				  pid, 
-				  Instance(pid, 
-                                           operational, 
-                                           left,
-					   view_id, 
-                                           range, safe_seq)));
-	if (i.second == false)
-	    gcomm_throw_fatal << "Failed to add instance " << pid.to_string();
+        (void)instances->insert_checked(make_pair(
+                                            pid, 
+                                            Instance(pid, 
+                                                     operational, 
+                                                     left,
+                                                     view_id, 
+                                                     range, safe_seq)));
     }
     
     
@@ -560,30 +554,11 @@ public:
             {
                 fifo_seq = -1;
             }
-
+            
 	    if (type == JOIN || type == INSTALL)
             {
-		uint32_t n;
-
-		gu_trace (off = gcomm::read(buf, buflen, off, &n));
-
-		instances = new std::map<UUID, Instance>();
-
-		for (size_t i = 0; i < n; ++i)
-                {
-		    Instance inst;
-
-		    gu_trace (off = inst.read(buf, buflen, off));
-
-		    std::pair<std::map<UUID, Instance>::iterator, bool> ii =
-			instances->insert(
-                            std::pair<UUID, Instance>(inst.get_pid(), inst)
-                            );
-
-		    if (ii.second == false)
-			gcomm_throw_fatal
-                            << "Can't insert into UUID/Instance map";
-		}
+		instances = new InstMap();
+                gu_trace(off = instances->unserialize(buf, buflen, off));
 	    }
             else if (type == GAP)
             {
@@ -636,18 +611,10 @@ public:
             {
                 gu_trace (off = gcomm::write(fifo_seq, buf, buflen, off));
             }
-
+            
 	    if (type == JOIN || type == INSTALL)
             {
-                uint32_t len(static_cast<uint32_t>(instances->size()));
-
-		gu_trace (off = gcomm::write(len, buf, buflen, off));
-
-		for (std::map<UUID, Instance>::iterator i = instances->begin();
-                     i != instances->end(); ++i)
-                {
-		    gu_trace (off = i->second.write(buf, buflen, off));
-		}
+                gu_trace (off = instances->serialize(buf, buflen, off));
 	    }
             else if (type == GAP)
             {
@@ -660,7 +627,7 @@ public:
     size_t size() const
     {
         size_t source_size = flags & F_SOURCE ? source.size() : 0;
-
+        
 	switch (type) {
         case NONE:
             gcomm_throw_fatal << "Invalid message type NONE";
@@ -675,7 +642,7 @@ public:
 	case JOIN:
 	case INSTALL:
 	    return source_size + 4 + 4 + 4 + 8 + source_view.size()
-                + 4 + instances->size()*Instance::size();
+                + 4 + instances->serial_size();
 	case LEAVE:
 	    return source_size + 4 + 4 + 4 + 8 + source_view.size();
 	}
@@ -835,7 +802,7 @@ struct EVSJoinMessage : EVSMessage
                    pid,
                    EVSGap(UUID(), EVSRange()),
                    fifo_seq,
-                   new map<UUID, Instance>())
+                   new InstMap())
     {
     }
 };
@@ -884,7 +851,7 @@ struct EVSInstallMessage : EVSMessage
                    pid,
                    EVSGap(UUID(), EVSRange()),
                    fifo_seq,
-                   new map<UUID, Instance>())
+                   new InstMap())
     {
         
     }

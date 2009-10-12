@@ -133,15 +133,15 @@ public:
     {
         return (1U << 31);
     }
-
+    
     void connect() 
     {
     }
-
+    
     void close() 
     {
     }
-
+    
     void listen() 
     {
         throw FatalException("Not applicable");
@@ -157,7 +157,7 @@ public:
     {
         throw FatalException("not applicable");
     }
-
+    
     int handle_down(WriteBuf *wb, const ProtoDownMeta *dm) 
     {
         out.push_back(wb->to_readbuf());

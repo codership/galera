@@ -11,7 +11,7 @@ EVSRange EVSInputMap::insert(const EVSInputMapItem& item)
     // Find corresponding instance
     IMap::iterator ii = instances.find(item.get_sockaddr());
     if (ii == instances.end())
-        gcomm_throw_fatal << "Instance not found";
+        gcomm_throw_fatal << "Instance " << item.get_sockaddr().to_string() << " not found";
     
     // 
     EVSRange& gap(ii->second.gap);
@@ -20,7 +20,7 @@ EVSRange EVSInputMap::insert(const EVSInputMapItem& item)
     if (seqno_eq(gap.get_low(), SEQNO_MAX) == false &&
         seqno_gt(gap.get_low(), seq))
     {
-        log_warn << item.get_evs_message().to_string() << " already inserted";
+        // log_warn << item.get_evs_message().to_string() << " already inserted";
         return gap;
     }
     

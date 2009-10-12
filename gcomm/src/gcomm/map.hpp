@@ -34,12 +34,32 @@ namespace gcomm
         iterator end()            { return map.end();   }
 
         iterator find(const K& k) { return map.find(k); }
-
+        
+        iterator find_checked(const K& k)
+        {
+            iterator ret = map.find(k);
+            if (ret == map.end())
+            {
+                gcomm_throw_fatal << "element not found";
+            }
+            return ret;
+        }
+        
         const_iterator begin()          const { return map.begin(); }
 
         const_iterator end()            const { return map.end();   }
 
         const_iterator find(const K& k) const { return map.find(k); }
+
+        const_iterator find_checked(const K& k) const 
+        {
+            const_iterator ret = map.find(k);
+            if (ret == map.end())
+            {
+                gcomm_throw_fatal << "element not found";
+            }
+            return ret;
+        }
     
         void erase(iterator i) { map.erase(i); }
 
@@ -84,7 +104,7 @@ namespace gcomm
             {
                 K uuid;
                 V t;
-
+                
                 if ((off = uuid.read(buf, buflen, off)) == 0) return 0;
                 if ((off = t.read   (buf, buflen, off)) == 0) return 0;
 
@@ -103,7 +123,12 @@ namespace gcomm
 
         bool operator==(const MapBase& other) const
         {
-            return map == other.map;
+            return (map == other.map);
+        }
+
+        bool operator!=(const MapBase& other) const
+        {
+            return !(map == other.map);
         }
         
         static const K& get_key(const_iterator i)
@@ -137,6 +162,16 @@ namespace gcomm
         std::pair<iterator, bool> insert(const std::pair<K, V>& p)
         {
             return MapBase<K, V, C>::map.insert(p);
+        }
+
+        iterator insert_checked(const std::pair<K, V>& p)
+        {
+            std::pair<iterator, bool> ret = MapBase<K, V, C>::map.insert(p);
+            if (false == ret.second)
+            {
+                gcomm_throw_fatal << "duplicate entry";
+            }
+            return ret.first;
         }
     };
 
