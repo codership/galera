@@ -28,7 +28,7 @@ START_TEST(test_pc_messages)
     
     size_t expt_size = 4 // hdr
         + 4              // seq
-        + 4 + 3*(UUID::size() + sizeof(uint32_t) + 4 + 20 + 8); // PCInstMap
+        + 4 + 3*(UUID::serial_size() + sizeof(uint32_t) + 4 + 20 + 8); // PCInstMap
     check_serialization(pcs, expt_size, PCStateMessage());
                        
     PCInstallMessage pci;
@@ -41,8 +41,7 @@ START_TEST(test_pc_messages)
 
     expt_size = 4 // hdr
         + 4              // seq
-        + 4 + 4*(UUID::size() + sizeof(uint32_t) + 4 + 20 + 8); // PCInstMap
-    LOG_INFO(make_int(expt_size).to_string() + " - " + make_int(pci.size()).to_string());
+        + 4 + 4*(UUID::serial_size() + sizeof(uint32_t) + 4 + 20 + 8); // PCInstMap
     check_serialization(pci, expt_size, PCInstallMessage());
 
     PCUserMessage pcu(7);
@@ -78,7 +77,7 @@ public:
         const View* v = um->get_view();
         if (v)
         {
-            LOG_INFO(v->to_string());
+            log_info << *v;
             fail_unless(v->get_type() == View::V_PRIM ||
                         v->get_type() == View::V_NON_PRIM);
             views.push_back(View(*v));
@@ -92,12 +91,12 @@ void get_msg(ReadBuf* rb, PCMessage* msg, bool release = true)
     assert(msg != 0);
     if (rb == 0)
     {
-        LOG_INFO("get_msg: (null)");
+        log_info << "get_msg: (null)";
     }
     else
     {
-        fail_unless(msg->read(rb->get_buf(), rb->get_len(), 0) != 0);
-        LOG_INFO("get_msg: " + msg->to_string());
+        fail_unless(msg->unserialize(rb->get_buf(), rb->get_len(), 0) != 0);
+        log_info << "get_msg: " << msg->to_string();
         if (release)
             rb->release();
     }
@@ -128,9 +127,9 @@ void single_boot(PCUser* pu1)
     get_msg(rb, &sm1);
     fail_unless(sm1.get_type() == PCMessage::T_STATE);
     fail_unless(sm1.has_inst_map() == true);
-    fail_unless(sm1.get_inst_map().length() == 1);
+    fail_unless(sm1.get_inst_map().size() == 1);
     {
-        const PCInst& pi1 = PCInstMap::get_instance(sm1.get_inst_map().begin());
+        const PCInst& pi1 = PCInstMap::get_value(sm1.get_inst_map().begin());
         fail_unless(pi1.get_prim() == true);
         fail_unless(pi1.get_last_prim() == ViewId(pu1->uuid, 0));
     }
@@ -143,9 +142,9 @@ void single_boot(PCUser* pu1)
     get_msg(rb, &im1);
     fail_unless(im1.get_type() == PCMessage::T_INSTALL);
     fail_unless(im1.has_inst_map() == true);
-    fail_unless(im1.get_inst_map().length() == 1);
+    fail_unless(im1.get_inst_map().size() == 1);
     {
-        const PCInst& pi1 = PCInstMap::get_instance(im1.get_inst_map().begin());
+        const PCInst& pi1 = PCInstMap::get_value(im1.get_inst_map().begin());
         fail_unless(pi1.get_prim() == true);
         fail_unless(pi1.get_last_prim() == ViewId(pu1->uuid, 0));
     }
@@ -829,7 +828,7 @@ public:
         const View* view = um->get_view();
         if (view)
         {
-            LOG_INFO(view->to_string());
+            log_info << *view;
             if (view->get_type() == View::V_PRIM && send == true)
             {
                 sending = true;
@@ -839,7 +838,7 @@ public:
         }
         else
         {
-            LOG_DEBUG("received message: " + make_int(um->get_to_seq()).to_string());
+            log_debug << "received message: " << um->get_to_seq();
             if (um->get_source() == tp->get_uuid())
             {
                 fail_unless(um->get_user_type() == my_type);
@@ -857,7 +856,7 @@ public:
             int ret = pass_down(&wb, &dm);
             if (ret != 0 && ret != EAGAIN)
             {
-                LOG_WARN(string("pass_down(): ") + strerror(ret));
+                log_warn << "pass_down(): " << strerror(ret);
             }
             
             event_loop->queue_event(fd, Event(Event::E_USER,

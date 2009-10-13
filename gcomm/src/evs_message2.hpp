@@ -20,25 +20,9 @@ namespace gcomm
     namespace evs
     {
         class Range;
-        
-        size_t serialize(const Range&, byte_t*, size_t, size_t);
-        size_t unserialize(const byte_t*, size_t, size_t, Range*);
-        size_t serial_size(const Range&);
-        
         class MessageNode;
-        
-        size_t serialize(const MessageNode&, byte_t*, size_t, size_t);
-        size_t unserialize(const byte_t*, size_t, size_t, MessageNode*);
-        size_t serial_size(const MessageNode&);
-        
-        
         class MessageNodeList;
-        
         class Message;
-        
-        size_t serialize(const Message&, byte_t*, size_t, size_t);
-        size_t unserialize(const byte_t*, size_t, size_t, Message*);
-        size_t serial_size(const Message&);
         
         class UserMessage;
         class DelegateMessage;
@@ -65,6 +49,25 @@ public:
     void set_lu(const Seqno s) { lu = s; }
     void set_hs(const Seqno s) { hs = s; }
     
+    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+    {
+        gu_trace(offset = lu.serialize(buf, buflen, offset));
+        gu_trace(offset = hs.serialize(buf, buflen, offset));
+        return offset;
+    }
+    
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+    {
+        gu_trace(offset = lu.unserialize(buf, buflen, offset));
+        gu_trace(offset = hs.unserialize(buf, buflen, offset));
+        return offset;
+    }
+
+    static size_t serial_size()
+    {
+        return 2*Seqno::serial_size();
+    }
+
 private:
     Seqno lu; /*!< Lowest unseen seqno */
     Seqno hs; /*!< Highest seen seqno  */

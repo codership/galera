@@ -170,24 +170,23 @@ public:
 
     TCPHdr(const size_t l) : raw(), len(static_cast<uint32_t>(l)) 
     {
-	if (gcomm::write(len, raw, sizeof(raw), 0) == 0)
+	if (gcomm::serialize(len, raw, sizeof(raw), 0) == 0)
 	    gcomm_throw_fatal;
     }
-
+    
     TCPHdr(const unsigned char *buf, const size_t buflen, 
            const uint32_t offset) :
         raw(),
         len()
     {
 	if (buflen < sizeof(raw) + offset) gcomm_throw_fatal;
-
+        
 	::memcpy(raw, buf + offset, sizeof(raw));
-
-	if (gcomm::read(raw, sizeof(raw), 0, &len) == 0) gcomm_throw_fatal;
+	gu_trace(gcomm::unserialize(raw, sizeof(raw), 0, &len));
     }
-
+    
     const void*   get_raw()                 const { return raw; }
-
+    
     const void*   get_raw(const size_t off) const { return raw + off; }
 
     size_t        get_len()                 const { return len; }
@@ -418,7 +417,6 @@ static int tmp_poll(int fd, const int pe, int tout, EventContext *ctx)
 {
     DummyEventContext dummy;
     EventLoop el;
-    LOG_DEBUG("tmp_poll");
     el.insert(fd, ctx ? ctx : &dummy);
     el.set(fd, pe);
     int ret = el.poll(tout);
@@ -437,7 +435,6 @@ int TCP::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 
     if (is_non_blocking() == false)
     {
-        LOG_TRACE("");
 	return TCP::send(wb, dm);
     }
     
@@ -458,10 +455,8 @@ int TCP::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
         
 	if (pending_bytes + wb->get_totlen() > max_pending_bytes)
         {
-	    LOG_DEBUG("contention not cleared: pending " 
-                      + make_int(pending_bytes).to_string()
-                      + " max pending " 
-                      + make_int(max_pending_bytes).to_string());
+	    log_debug << "contention not cleared: pending " << pending_bytes
+                      << " max pending " << max_pending_bytes;
 	    return EAGAIN;
 	}
     }
@@ -473,7 +468,6 @@ int TCP::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 	WriteBuf *wb_copy = wb->copy();
 	pending.push_back(PendingWriteBuf(wb_copy, 0));
 	pending_bytes += wb->get_totlen();
-	LOG_DEBUG("TCP::handle_down(): Appended to pending");
 	goto out_success;
     } else {
 	ssize_t ret;
@@ -490,7 +484,6 @@ int TCP::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 	    pending_bytes += wb->get_totlen();
 	    if (event_loop)
 		event_loop->set(fd, Event::E_OUT);
-	    LOG_DEBUG("TCP::handle_down(): Appended to pending in header send");
 	    goto out_success;
 	}
 	
@@ -505,7 +498,6 @@ int TCP::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
 	    pending_bytes += wb->get_totlen();
 	    if (event_loop)
 		event_loop->set(fd, Event::E_OUT);
-	    LOG_DEBUG("TCP::handle_down(): Appended to pending in payload send");
 	}
     }
     
@@ -514,7 +506,7 @@ out_success:
     return 0;
     
 out_epipe:
-    LOG_WARN("TCP::handle_down(): Broken pipe");
+    log_warn << "TCP::handle_down(): Broken pipe";
     wb->rollback_hdr(hdr.get_raw_len());
     return EPIPE;
 }
@@ -531,16 +523,13 @@ int TCP::recv_nointr(int flags)
 			 flags);
 	} while (ret == -1 && errno == EINTR);
 	if (ret == -1 && errno == EAGAIN) {
-	    LOG_DEBUG("TCP::recv_nointr(): Return EAGAIN in header recv"); 
 	    return EAGAIN;
 	}
 	else if (ret == -1 || ret == 0) {
-	    LOG_DEBUG("TCP::recv_nointr(): Return error in header recv"); 
 	    return ret == -1 ? errno : EPIPE;
 	}
 	recv_buf_offset += ret;
 	if (recv_buf_offset < TCPHdr::get_raw_len()) {
-	    LOG_DEBUG("TCP::recv_nointr(): Return EAGAIN in header recv"); 
 	    return EAGAIN;
 	}
     }
@@ -553,7 +542,6 @@ int TCP::recv_nointr(int flags)
     }
     
     if (hdr.get_len() == 0) {
-	LOG_DEBUG("TCP::recv_nointr(): Zero len message"); 
 	return 0;
     }
     
@@ -565,11 +553,9 @@ int TCP::recv_nointr(int flags)
 			 flags);
 	} while (ret == -1 && errno == EINTR);
 	if (ret == -1 && errno == EAGAIN) {
-	    LOG_DEBUG("TCP::recv_nointr(): Return EAGAIN in body recv"); 
 	    return EAGAIN;
 	}
 	else if (ret == -1 || ret == 0) {
-	    LOG_DEBUG("TCP::recv_nointr(): Return error in body recv"); 
 	    return ret == -1 ? errno : EPIPE;
 	}
 	recv_buf_offset += ret;
@@ -584,10 +570,8 @@ int TCP::recv_nointr()
 
 int TCP::handle_pending()
 {
-    LOG_DEBUG("enter");
     if (pending.size() == 0)
     {
-        LOG_DEBUG("return 0");
 	return 0;
     }
     std::deque<PendingWriteBuf>::iterator i;
@@ -600,13 +584,11 @@ int TCP::handle_pending()
 				   i->wb->get_hdrlen(), i->offset, 
 				   i->wb->get_len() ? MSG_MORE : 0)) == -1)
             {
-                LOG_DEBUG("return EPIPE");
 		return EPIPE;
             }
 	    i->offset += ret;
 	    if (i->offset != i->wb->get_hdrlen())
             {
-		LOG_DEBUG("return EAGAIN");
 		return EAGAIN;
 	    }
 	}
@@ -615,13 +597,11 @@ int TCP::handle_pending()
 	    (ret = send_nointr(i->wb->get_buf(), i->wb->get_len(),
 			       i->offset - i->wb->get_hdrlen(), 0)) == -1)
         {
-            LOG_DEBUG("return EPIPE");
 	    return EPIPE;
 	}
 	i->offset += ret;
 	if (i->offset != i->wb->get_totlen())
         {
-	    LOG_DEBUG("return EAGAIN");
 	    return EAGAIN;
 	}
 	
@@ -629,7 +609,6 @@ int TCP::handle_pending()
 	delete i->wb;
 	pending.pop_front();
     }
-    LOG_DEBUG("return 0");
     
     return 0;
 }
@@ -739,7 +718,7 @@ void TCP::handle_event (const int fd, const Event& pe)
     }
     else
     {
-        log_fatal << "unhnadled event";
+        log_warn << "unhnadled event";
     }
 }
 

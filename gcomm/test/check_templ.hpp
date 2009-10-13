@@ -20,43 +20,43 @@ void check_serialization(const T& c, const size_t expected_size,
                          const T& default_c)
 {
 
-    fail_unless(c.size() == expected_size, 
+    fail_unless(c.serial_size() == expected_size, 
                 "size = %lu expected = %lu", 
-                c.size(), expected_size);
+                c.serial_size(), expected_size);
     byte_t* buf = new byte_t[expected_size + 7];
     size_t ret;
     // Check that what is written gets also read
     try
     {
-        (void)c.write(buf, expected_size, 1);
+        (void)c.serialize(buf, expected_size, 1);
         fail("exception not thrown");
     }
     catch (RuntimeException& e)
     {
     }
     
-    fail_unless(c.write(buf, expected_size, 0) == expected_size);
+    fail_unless(c.serialize(buf, expected_size, 0) == expected_size);
     
     T c2(default_c);
 
     try
     {
-        (void)c2.read(buf, expected_size, 1);
+        (void)c2.unserialize(buf, expected_size, 1);
         fail("exception not thrown");
     }
     catch (RuntimeException& e)
     {
     }
     
-    ret = c2.read(buf, expected_size, 0);
+    ret = c2.unserialize(buf, expected_size, 0);
     fail_unless(ret == expected_size, "expected %z ret %z", expected_size, ret);
     fail_unless(c == c2);
     
     // Check that read/write return offset properly
     
-    fail_unless(c.write(buf, expected_size + 7, 5) == expected_size + 5);
-    fail_unless(c2.read(buf, expected_size + 7, 5) == expected_size + 5);
-
+    fail_unless(c.serialize(buf, expected_size + 7, 5) == expected_size + 5);
+    fail_unless(c2.unserialize(buf, expected_size + 7, 5) == expected_size + 5);
+    
     fail_unless(c == c2);
     
     delete[] buf;

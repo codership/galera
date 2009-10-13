@@ -64,16 +64,16 @@ public:
     
     const UUID& get_uuid() const  { return uuid; }
     
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
     {
         size_t  off;
         uint8_t byte;
 
-        gu_trace (off = gcomm::read(buf, buflen, offset, &byte));
+        gu_trace (off = gcomm::unserialize(buf, buflen, offset, &byte));
 
         operational = byte & 0x1;
 
-        gu_trace (off = uuid.read(buf, buflen, off));
+        gu_trace (off = uuid.unserialize(buf, buflen, off));
 
         if (off + ADDR_SIZE > buflen)
             gcomm_throw_runtime (EMSGSIZE) << ADDR_SIZE << " > "
@@ -97,13 +97,13 @@ public:
         return off;
     }
 
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
     {
         size_t  off;
         uint8_t byte = static_cast<uint8_t>(operational ? 0x1 : 0);
 
-        gu_trace (off = gcomm::write(byte, buf, buflen, offset));
-        gu_trace (off = uuid.write(buf, buflen, off));
+        gu_trace (off = gcomm::serialize(byte, buf, buflen, offset));
+        gu_trace (off = uuid.serialize(buf, buflen, off));
 
         if (off + ADDR_SIZE > buflen)
             gcomm_throw_runtime (EMSGSIZE) << ADDR_SIZE << " > "
@@ -120,9 +120,7 @@ public:
         return string(address);
     }
     
-    static size_t size() {
-        return 1 + UUID::size() + ADDR_SIZE;
-    }
+    static size_t size() { return 1 + UUID::serial_size() + ADDR_SIZE; }
 };
 
 class gcomm::GMCastMessage
@@ -287,16 +285,16 @@ public:
     }
 
     
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
         throw (gu::Exception)
     {
         size_t off;
 
-        gu_trace (off = gcomm::write(version, buf, buflen, offset));
-        gu_trace (off = gcomm::write(static_cast<byte_t>(type),buf,buflen,off));
-        gu_trace (off = gcomm::write(flags, buf, buflen, off));
-        gu_trace (off = gcomm::write(ttl, buf, buflen, off));
-        gu_trace (off = source_uuid.write(buf, buflen, off));
+        gu_trace (off = gcomm::serialize(version, buf, buflen, offset));
+        gu_trace (off = gcomm::serialize(static_cast<byte_t>(type),buf,buflen,off));
+        gu_trace (off = gcomm::serialize(flags, buf, buflen, off));
+        gu_trace (off = gcomm::serialize(ttl, buf, buflen, off));
+        gu_trace (off = source_uuid.serialize(buf, buflen, off));
 
         if (flags & F_NODE_ADDRESS)
         {
@@ -310,14 +308,14 @@ public:
         
         if (flags & F_NODE_LIST) 
         {
-            gu_trace (off = gcomm::write(
+            gu_trace (off = gcomm::serialize(
                           static_cast<uint16_t>(node_list->size()),
                           buf, buflen, off));
 
             for (NodeList::const_iterator i = node_list->begin();
                  i != node_list->end(); ++i) 
             {
-                gu_trace (off = i->write(buf, buflen, off));
+                gu_trace (off = i->serialize(buf, buflen, off));
             }
         }
         return off;
@@ -329,11 +327,11 @@ public:
         size_t off;
         byte_t t;
 
-        gu_trace (off = gcomm::read(buf, buflen, offset, &t));
+        gu_trace (off = gcomm::unserialize(buf, buflen, offset, &t));
         type = static_cast<Type>(t);
-        gu_trace (off = gcomm::read(buf, buflen, off, &flags));
-        gu_trace (off = gcomm::read(buf, buflen, off, &ttl));
-        gu_trace (off = source_uuid.read(buf, buflen, off));
+        gu_trace (off = gcomm::unserialize(buf, buflen, off, &flags));
+        gu_trace (off = gcomm::unserialize(buf, buflen, off, &ttl));
+        gu_trace (off = source_uuid.unserialize(buf, buflen, off));
         
         if (flags & F_NODE_ADDRESS)
         {
@@ -359,7 +357,7 @@ public:
         {
             uint16_t size;
 
-            gu_trace (off = gcomm::read(buf, buflen, off, &size));
+            gu_trace (off = gcomm::unserialize(buf, buflen, off, &size));
 
             node_list = new NodeList(); // @todo: danger! Prev. list not deleted
 
@@ -367,7 +365,7 @@ public:
             {
                 GMCastNode node;
 
-                gu_trace (off = node.read(buf, buflen, off));
+                gu_trace (off = node.unserialize(buf, buflen, off));
                 node_list->push_back(node);
             }
         }
@@ -381,12 +379,12 @@ public:
         return off;
     }
     
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
     {
         size_t off;
         
-        gu_trace (off = gcomm::read(buf, buflen, offset, &version));
+        gu_trace (off = gcomm::unserialize(buf, buflen, offset, &version));
 
         switch (version) {
         case 0:
@@ -396,10 +394,10 @@ public:
         }
     }
     
-    size_t size() const
+    size_t serial_size() const
     {
         return 4 /* Common header: version, type, flags, ttl */ 
-            + source_uuid.size()
+            + source_uuid.serial_size()
             /* GMCast address if set */
             + (flags & F_NODE_ADDRESS ? node_address.size() + 1 : 0)
             /* Group name if set */
@@ -434,18 +432,6 @@ public:
 
 BEGIN_GCOMM_NAMESPACE
 
-#if 0
-const UUID& get_uuid(UUIDToAddressMap::const_iterator i)
-{
-    return i->first;
-}
-#endif // 0
-
-const string& get_address(UUIDToAddressMap::const_iterator i)
-{
-    return i->second;
-}
-
 
 static bool exists(const UUIDToAddressMap& uuid_map, 
                    const UUID& uuid,
@@ -457,7 +443,7 @@ static bool exists(const UUIDToAddressMap& uuid_map,
     for (UUIDToAddressMap::const_iterator i = ret.first; 
          i != ret.second; ++i)
     {
-        if (get_address(i) == addr)
+        if (UUIDToAddressMap::get_value(i) == addr)
             return true;
     }
     return false;
@@ -470,7 +456,8 @@ static bool equals(const UUIDToAddressMap& a,
         return false;
     for (UUIDToAddressMap::const_iterator i = a.begin(); i != a.end(); ++i)
     {
-        if (exists(b, get_uuid(i), get_address(i)) == false)
+        if (exists(b, UUIDToAddressMap::get_key(i), 
+                   UUIDToAddressMap::get_value(i)) == false)
             return false;
     }
     return true;
@@ -594,11 +581,11 @@ public:
 
     void send_msg(const GMCastMessage& msg)
     {
-        byte_t* buf = new byte_t[msg.size()];
+        byte_t* buf = new byte_t[msg.serial_size()];
 
-        gu_trace (msg.write(buf, msg.size(), 0));
+        gu_trace (msg.serialize(buf, msg.serial_size(), 0));
 
-        WriteBuf wb(buf, msg.size());
+        WriteBuf wb(buf, msg.serial_size());
 
         int ret = tp->handle_down(&wb, 0);
 
@@ -739,7 +726,7 @@ public:
         const GMCastMessage::NodeList* nl = msg.get_node_list();
         if (nl == 0)
         {
-            LOG_WARN("null node list");
+            log_warn << "null node list";
         }
 
         UUIDToAddressMap new_map;
@@ -748,7 +735,7 @@ public:
         {
             if (exists(new_map, i->get_uuid(), i->get_address()))
             {
-                LOG_WARN("Duplicate entry");
+                log_warn << "Duplicate entry";
                 continue;
             }
             new_map.insert(make_pair(i->get_uuid(), i->get_address()));
@@ -756,7 +743,7 @@ public:
         
         if (equals(uuid_map, new_map) == false)
         {
-            LOG_DEBUG("topology change");
+            log_debug << "topology change";
             changed = true;
         }
         uuid_map = new_map;
@@ -1105,7 +1092,7 @@ void GMCast::handle_connected(GMCastProto* rp)
 {
     const Transport* tp = rp->get_transport();
 
-    LOG_DEBUG("transport " + make_int(tp->get_fd()).to_string() + " connected");
+    log_debug << "transport " << tp->get_fd() << " connected";
 }
 
 void GMCast::handle_established(GMCastProto* rp)
@@ -1601,7 +1588,7 @@ void GMCast::forward_message(const int cid, const ReadBuf* rb,
     byte_t buf[20];
     size_t hdrlen;
 
-    if ((hdrlen = msg.write(buf, sizeof(buf), 0)) == 0)
+    if ((hdrlen = msg.serialize(buf, sizeof(buf), 0)) == 0)
         gcomm_throw_fatal << "Write header failed";
 
     wb.prepend_hdr(buf, hdrlen);
@@ -1643,7 +1630,7 @@ void GMCast::handle_up(const int    cid,    const ReadBuf* rb,
 
         if (rb != 0)
         {
-            if ((off = msg.read(rb->get_buf(), rb->get_len(), offset)) == 0)
+            if ((off = msg.unserialize(rb->get_buf(), rb->get_len(), offset)) == 0)
                 gcomm_throw_fatal << "message unserialization";
 
             if (msg.get_type() >= GMCastMessage::T_USER_BASE)
@@ -1737,7 +1724,7 @@ int GMCast::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
         byte_t hdrbuf[20];
         size_t wlen;
 
-        if ((wlen = msg.write(hdrbuf, sizeof(hdrbuf), 0)) == 0)
+        if ((wlen = msg.serialize(hdrbuf, sizeof(hdrbuf), 0)) == 0)
             gcomm_throw_fatal << "short buffer";
 
         if (msg.get_ttl() > 1)

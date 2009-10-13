@@ -4,8 +4,6 @@
 #include "gcomm/view.hpp"
 #include "gcomm/uri.hpp"
 #include "gcomm/types.hpp"
-
-#include "inst_map.hpp"
 #include "gcomm/map.hpp"
 
 #include <utility>
@@ -28,36 +26,21 @@ using namespace gcomm;
 START_TEST(test_sizes)
 {
     uint8_t u8(3);
-    fail_unless(make_int(u8).size() == 1);
+    fail_unless(make_int(u8).serial_size() == 1);
 
     uint16_t u16(3);
-    fail_unless(make_int(u16).size() == 2);
+    fail_unless(make_int(u16).serial_size() == 2);
 
     uint32_t u32(3);
-    fail_unless(make_int(u32).size() == 4);
+    fail_unless(make_int(u32).serial_size() == 4);
 
     uint64_t u64(3);
-    fail_unless(make_int(u64).size() == 8);
+    fail_unless(make_int(u64).serial_size() == 8);
     
 }
 END_TEST
 
 
-START_TEST(test_relops)
-{
-    IntType<int> a(3), b(-7);
-
-    fail_if(a == b);
-    fail_unless(a != b);
-    fail_unless(b < a);
-    fail_unless(b <= a);
-    fail_unless(a > b);
-    fail_unless(a >= b);
-    
-    fail_unless(a >= a);
-    fail_unless(a <= a);    
-}
-END_TEST
 
 START_TEST(test_serialization)
 {
@@ -75,7 +58,7 @@ START_TEST(test_uuid)
     for (size_t i = 0; i < 159; ++i)
     {
         UUID uuidrnd(0, 0);
-        LOG_DEBUG(uuidrnd.to_string());
+        log_debug << uuidrnd;
     }
 
     UUID uuid1(0, 0);
@@ -100,18 +83,19 @@ START_TEST(test_view)
     fail_unless(vid.get_uuid() == uuid);
     fail_unless(vid.get_seq() == 7);
     
-    check_serialization(vid, UUID::size() + sizeof(uint32_t), ViewId());
+    check_serialization(vid, UUID::serial_size() + sizeof(uint32_t), ViewId());
     
     
     NodeList nl;
 
     for (size_t i = 0; i < 7; ++i)
     {
-        nl.insert(make_pair(UUID(0, 0), "n" + make_int(i).to_string()));
+        nl.insert(make_pair(UUID(0, 0), Node()));
     }
     
-    fail_unless(nl.length() == 7);
-    check_serialization(nl, 4 + 7*(UUID::size() + NodeList::node_name_size), NodeList());
+    fail_unless(nl.size() == 7);
+    check_serialization(nl, 4 + 7*(UUID::serial_size() 
+                                   + Node::serial_size()), NodeList());
 
 
     View v(View::V_TRANS, vid);
@@ -119,7 +103,7 @@ START_TEST(test_view)
     for (size_t i = 0; i < 10; ++i)
     {
         UUID uuid(0, 0);
-        string name("n" + make_int(i).to_string());
+        string name("n" + gu::to_string(i));
         if (i < 3)
         {
             v.add_joined(uuid, name);
@@ -143,11 +127,12 @@ START_TEST(test_view)
                         /* Header (type etc) */
                         4 
                         /* view id */
-                        + ViewId::size() 
+                        + ViewId::serial_size() 
                         /* 4 times node list length */
                         + 4*4 
                         /* 10 nodes which of 3 twice */
-                        + (10 + 3)*(UUID::size() + NodeList::node_name_size),
+                        + (10 + 3)*(UUID::serial_size() 
+                                    + Node::serial_size()),
                         View());
 }
 END_TEST
@@ -160,24 +145,24 @@ public:
     
     T1(const int32_t foo_ = -1) : foo(foo_) {}
     
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
     {
-        return gcomm::read(buf, buflen, offset, &foo);
+        return gcomm::unserialize(buf, buflen, offset, &foo);
     }
     
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
     {
-        return gcomm::write(foo, buf, buflen, offset);
+        return gcomm::serialize(foo, buf, buflen, offset);
     }
     
-    static size_t size()
+    static size_t serial_size()
     {
         return 4;
     }
 
     string to_string() const
     {
-        return make_int(foo).to_string();
+        return gu::to_string(foo);
     }
     
     bool operator==(const T1& cmp) const
@@ -187,49 +172,6 @@ public:
 };
 
 
-class T2
-{
-    static const size_t foolen = 16;
-    string foo;
-public:
-    
-    T2(const string foo_ = "") : foo(foo_, 0, foolen) {}
-    
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
-    {
-        byte_t b[foolen + 1];
-        memset(b, 0, foolen + 1);
-        size_t ret = read_bytes(buf, buflen, offset, b, foolen);
-        if (ret != 0)
-        {
-            foo = string(reinterpret_cast<char*>(b));
-        }
-        return ret;
-    }
-    
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
-    {
-        byte_t b[foolen];
-        memset(b, 0, foolen);
-        strncpy(reinterpret_cast<char*>(b), foo.c_str(), foolen);
-        return write_bytes(b, foolen, buf, buflen, offset);
-    }
-    
-    static size_t size()
-    {
-        return foolen;
-    }
-    
-    string to_string() const
-    {
-        return foo;
-    }
-    
-    bool operator==(const T2& cmp) const
-    {
-        return foo == cmp.foo;
-    }
-};
 
 class T3
 {
@@ -238,56 +180,6 @@ public:
 };
 
 
-START_TEST(test_inst_map)
-{
-    
-    typedef InstMap<T1> T1Map;
-    T1Map im1;
-    
-    im1.insert(make_pair(UUID(0, 0), T1(4)));
-    fail_unless(im1.length() == 1);
-    fail_unless(im1.size() == 24);
-
-    check_serialization(im1, 24, T1Map());
-    
-    for (T1Map::const_iterator i = im1.begin(); i != im1.end(); ++i)
-    {
-        LOG_INFO(T1Map::get_uuid(i).to_string() +  " " 
-                 + T1Map::get_instance(i).to_string());
-    }
-
-
-    typedef InstMap<T2> T2Map;
-    T2Map im2;
-    im2.insert(make_pair(UUID(0, 0), T2("strstrs strstrs b")));
-    im2.insert(make_pair(UUID(0, 0), T2("strstrs strstrd ba")));
-    fail_unless(im2.length() == 2);
-    fail_unless(im2.size() == 68);
-
-    check_serialization(im2, 68, T2Map());
-     
-    for (T2Map::const_iterator i = im2.begin(); i != im2.end(); ++i)
-    {
-        LOG_INFO(T2Map::get_uuid(i).to_string() +  " " 
-                 + T2Map::get_instance(i).to_string());
-    }
-          
-    typedef InstMap<T3> T3Map;
-    T3Map im3;
-    im3.insert(make_pair(UUID(0, 0), T3()));
-    im3.insert(make_pair(UUID(0, 0), T3()));
-    im3.insert(make_pair(UUID(0, 0), T3()));
-    im3.insert(make_pair(UUID(0, 0), T3()));
-    fail_unless(im3.length() == 4);
-
-    for (T3Map::const_iterator i = im3.begin(); i != im3.end(); ++i)
-    {
-        LOG_INFO(T3Map::get_uuid(i).to_string());
-    }
-
-
-}
-END_TEST
 
 START_TEST(test_map)
 {
@@ -304,15 +196,6 @@ END_TEST
 START_TEST(test_exception)
 {
 
-    try
-    {
-        throw std::logic_error(string("logic error message: ") + make_int(1).to_string());
-    }
-    catch (std::logic_error e)
-    {
-        log_info << e.what();
-    }
-
 }
 END_TEST
 
@@ -326,10 +209,6 @@ Suite* types_suite()
     tcase_add_test(tc, test_sizes);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_relops");
-    tcase_add_test(tc, test_relops);
-    suite_add_tcase(s, tc);
-    
     tc = tcase_create("test_serialization");
     tcase_add_test(tc, test_serialization);
     suite_add_tcase(s, tc);
@@ -340,10 +219,6 @@ Suite* types_suite()
 
     tc = tcase_create("test_view");
     tcase_add_test(tc, test_view);
-    suite_add_tcase(s, tc);
-
-    tc = tcase_create("test_inst_map");
-    tcase_add_test(tc, test_inst_map);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_map");

@@ -66,10 +66,10 @@ START_TEST(test_gmcast_messages)
     /* */
     {
         GMCastMessage hdr(GMCastMessage::T_HANDSHAKE, UUID());
-        byte_t* buf = new byte_t[hdr.size()];
-        fail_unless(hdr.write(buf, hdr.size(), 0) == hdr.size());
+        byte_t* buf = new byte_t[hdr.serial_size()];
+        fail_unless(hdr.serialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
         GMCastMessage hdr2;
-        fail_unless(hdr2.read(buf, hdr.size(), 0) == hdr.size());
+        fail_unless(hdr2.unserialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
         fail_unless(hdr == hdr2);
         delete[] buf;
     }
@@ -77,10 +77,10 @@ START_TEST(test_gmcast_messages)
     /* */
     {
         GMCastMessage hdr(GMCastMessage::T_HANDSHAKE_OK, UUID());
-        byte_t* buf = new byte_t[hdr.size()];
-        fail_unless(hdr.write(buf, hdr.size(), 0) == hdr.size());
+        byte_t* buf = new byte_t[hdr.serial_size()];
+        fail_unless(hdr.serialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
         GMCastMessage hdr2;
-        fail_unless(hdr2.read(buf, hdr.size(), 0) == hdr.size());
+        fail_unless(hdr2.unserialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
         fail_unless(hdr == hdr2);
         delete[] buf;
 
@@ -89,10 +89,10 @@ START_TEST(test_gmcast_messages)
     /* */
     {
         GMCastMessage hdr(GMCastMessage::T_HANDSHAKE_FAIL, UUID());
-        byte_t* buf = new byte_t[hdr.size()];
-        fail_unless(hdr.write(buf, hdr.size(), 0) == hdr.size());
+        byte_t* buf = new byte_t[hdr.serial_size()];
+        fail_unless(hdr.serialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
         GMCastMessage hdr2;
-        fail_unless(hdr2.read(buf, hdr.size(), 0) == hdr.size());
+        fail_unless(hdr2.unserialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
         fail_unless(hdr == hdr2);
         delete[] buf;
     }
@@ -102,10 +102,10 @@ START_TEST(test_gmcast_messages)
                           UUID(),
                           "gcomm+tcp://127.0.0.1:2112",
                           "test_group");
-        byte_t* buf = new byte_t[hdr.size()];
-        fail_unless(hdr.write(buf, hdr.size(), 0) == hdr.size());
+        byte_t* buf = new byte_t[hdr.serial_size()];
+        fail_unless(hdr.serialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
         GMCastMessage hdr2;
-        fail_unless(hdr2.read(buf, hdr.size(), 0) == hdr.size());
+        fail_unless(hdr2.unserialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
         fail_unless(hdr == hdr2);
         delete[] buf;
     }
@@ -113,10 +113,10 @@ START_TEST(test_gmcast_messages)
     /* */
     {
         GMCastMessage hdr(GMCastMessage::T_USER_BASE, UUID(), 4);
-        byte_t* buf = new byte_t[hdr.size()];
-        fail_unless(hdr.write(buf, hdr.size(), 0) == hdr.size());
+        byte_t* buf = new byte_t[hdr.serial_size()];
+        fail_unless(hdr.serialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
         GMCastMessage hdr2;
-        fail_unless(hdr2.read(buf, hdr.size(), 0) == hdr.size());
+        fail_unless(hdr2.unserialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
         fail_unless(hdr == hdr2);
         delete[] buf;
     }
@@ -130,10 +130,10 @@ START_TEST(test_gmcast_messages)
 
         GMCastMessage hdr(GMCastMessage::T_TOPOLOGY_CHANGE, UUID(0, 0),
                          "foobar", node_list);
-        byte_t* buf = new byte_t[hdr.size()];
-        fail_unless(hdr.write(buf, hdr.size(), 0) == hdr.size());
+        byte_t* buf = new byte_t[hdr.serial_size()];
+        fail_unless(hdr.serialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
         GMCastMessage hdr2;
-        fail_unless(hdr2.read(buf, hdr.size(), 0) == hdr.size());
+        fail_unless(hdr2.unserialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
         fail_unless(hdr == hdr2);
         delete[] buf;
   }
@@ -257,7 +257,7 @@ START_TEST(test_gmcast_w_user_messages)
         void handle_up(const int cid, const ReadBuf* rb, const size_t roff,
                        const ProtoUpMeta* um)
         {
-            LOG_DEBUG("msg " + make_int(roff).to_string());
+            log_debug << "msg " << roff;
             if (rb->get_len() < roff + 16)
             {
                 throw FatalException("offset error");

@@ -183,9 +183,9 @@ START_TEST(test_wb_to_rb)
     fail_unless(wb2.get_totlen() == 16 + sizeof(buf));
 
     rb = wb2.to_readbuf();
-    LOG_INFO(make_int(rb->get_len()).to_string() + make_int(rb2->get_len()).to_string());
+    log_info << rb->get_len() << " " << rb2->get_len();
     fail_unless(rb->get_len() == 16 + sizeof(buf));
-
+    
     wb2.rollback_hdr(16);
     rb2->release();
 

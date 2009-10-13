@@ -41,7 +41,7 @@
 #include "gcomm/conf.hpp"
 #include "gcomm/transport.hpp"
 
-BEGIN_GCOMM_NAMESPACE
+using namespace gcomm;
 
 /////////////////////////////////////////////////////////////////////////////
 // EVS interface
@@ -61,7 +61,7 @@ void EVS::handle_up(const int          cid,
         for (NodeList::const_iterator i = um->get_view()->get_left().begin();
              i != um->get_view()->get_left().end(); ++i)
         {
-            tp->close(gcomm::get_uuid(i));
+            tp->close(NodeList::get_key(i));
         }
     }
 
@@ -121,18 +121,18 @@ void EVS::connect()
         /* Send join messages without handling them */
         proto->send_join(false);
         int ret = event_loop->poll(500);
-        LOG_DEBUG(string("poll returned ") + make_int(ret).to_string());
+        log_debug << "poll returned " << ret;
     } 
     while (stop >= Time::now() && proto->get_known_size() == 1);
-    LOG_INFO("EVS Proto initial state: " + proto->to_string());
-    LOG_INFO("EVS Proto sending join request");
+    log_info << "EVS Proto initial state: " << proto->to_string();
+    log_info << "EVS Proto sending join request";
     proto->send_join();
     do
     {
         int ret = event_loop->poll(50);
         if (ret < 0)
         {
-            LOG_WARN("poll(): " + make_int(ret).to_string());
+            log_warn << "poll(): " << ret;
         }
     }
     while (proto->get_state() != EVSProto::S_OPERATIONAL);
@@ -143,14 +143,14 @@ void EVS::close()
 {
     Critical crit(mon);
 
-    LOG_INFO("EVS Proto leaving");
+    log_info << "EVS Proto leaving";
     proto->shift_to(EVSProto::S_LEAVING);
-    LOG_INFO("EVS Proto sending leave notification");
+    log_info << "EVS Proto sending leave notification";
     proto->send_leave();
     do
     {
         int ret = event_loop->poll(500);
-        LOG_DEBUG(string("poll returned ") + make_int(ret).to_string());
+        log_debug << "poll returned " << ret;
     } 
     while (proto->get_state() != EVSProto::S_CLOSED);
     
@@ -188,14 +188,14 @@ size_t EVS::get_max_msg_size() const
     {
         EVSUserMessage evsm (UUID (0, 0), 0xff, SAFE, 0, 0, 0,
                              ViewId(UUID(), 0), 0);
-
-        if (tp->get_max_msg_size() < evsm.size())
+        
+        if (tp->get_max_msg_size() < evsm.serial_size())
         {
             gcomm_throw_fatal << "transport max msg size too small: "
                               << tp->get_max_msg_size();
         }
-
-        return tp->get_max_msg_size() - evsm.size();
+        
+        return tp->get_max_msg_size() - evsm.serial_size();
     }
 }
 
@@ -222,4 +222,4 @@ EVS::~EVS()
     }
 }
 
-END_GCOMM_NAMESPACE
+

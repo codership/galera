@@ -110,7 +110,6 @@ void EventLoop::set(const int fd, const int e)
     struct pollfd *pfd = 0;
 
     if (fd < 0) gcomm_throw_fatal << "Negative fd: " << fd;
-    // was LOG_WARN("negative fd");
 
     log_debug << "Setting event(s) " << event_to_string(e) << " on fd " << fd;
 
@@ -176,9 +175,8 @@ void EventLoop::set_signal(const int fd, const int signo)
     } else {
         std::pair<SigSet::iterator, bool> ret = i->second.insert(signo);
         if (ret.second == false) {
-            LOG_WARN("signal " + make_int(signo).to_string() 
-                     + " already exists in " 
-                     + make_int(fd).to_string() + " sig set");
+            log_warn << "signal " << signo << " already exists in " 
+                     << fd << " sig set";
         }
     }
 }
@@ -187,14 +185,13 @@ void EventLoop::unset_signal(const int fd, const int signo)
 {
     SigMap::iterator i = sig_map.find(fd);
     if (i == sig_map.end()) {
-        LOG_WARN("fd " + make_int(fd).to_string() + " not found from sig map");
+        log_warn << fd << " not found from sig map";
         
     } else {
         SigSet::iterator si = i->second.find(signo);
         if (si == i->second.end()) {
-            LOG_WARN("signal " + make_int(signo).to_string() 
-                     + " not found from fd " + make_int(fd).to_string() 
-                     + " sig set");
+            log_warn << "signal " << signo
+                     << " not found from fd " << fd << " sig set";
         }
         i->second.erase(signo);
     }
@@ -216,8 +213,8 @@ void EventLoop::handle_queued_events()
          i = event_map.begin()) {
         CtxMap::iterator map_i = ctx_map.find(i->second.first);
         if (map_i == ctx_map.end()) {
-            LOG_WARN("ctx " + make_int(i->second.first).to_string() + 
-                     " associated to event not found from context map");
+            log_warn << "ctx " << i->second.first
+                     << " associated to event not found from context map";
         } else {
             active_event = i;
             map_i->second->handle_event(i->second.first, i->second.second);
@@ -242,7 +239,7 @@ int EventLoop::compute_timeout(const int max_val)
     
     if (next < now)
     {
-        LOG_DEBUG("return 0");
+        log_debug << "return 0";
         return 0;
     }
     int diff = static_cast<int>(next.get_milliseconds() - now.get_milliseconds());
@@ -289,10 +286,10 @@ int EventLoop::poll(const int timeout)
                 {
                     if (map_i->second == 0) gcomm_throw_fatal;
 
-                    LOG_TRACE("handling "
-                              + gu::to_string (pfds[i].fd) + " "
-                              + Pointer(map_i->second).to_string() + " "
-                              + gu::to_string (pfds[i].revents));
+                    log_debug << "handling "
+                              << pfds[i].fd << " "
+                              << map_i->second << " "
+                              << pfds[i].revents;
 
                     pfds[i].revents = 0;
 
@@ -337,11 +334,7 @@ int EventLoop::poll(const int timeout)
     
     // assert(p_ret == p_cnt);
     if (p_ret != p_cnt) {
-        LOG_WARN("p_ret ("
-                 + make_int(p_ret).to_string() 
-                 + ") != p_cnt (" 
-                 + make_int(p_cnt).to_string() 
-                 + ")");
+        log_warn << "p_ret (" << p_ret << ") != p_cnt (" << p_cnt << ")";
     }
     
     handle_queued_events();

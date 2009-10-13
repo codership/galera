@@ -6,12 +6,21 @@
 #include "gcomm/common.hpp"
 #include "gcomm/readbuf.hpp"
 #include "gcomm/uuid.hpp"
+#include "gcomm/map.hpp"
 
-#include "inst_map.hpp"
+namespace gcomm
+{
+    class PCInst;
+    class PCInstMap;
+    class PCMessage;
+    class PCUserMessage;
+    class PCStateMessage;
+    class PCInstallMessage;
+    std::ostream& operator<<(std::ostream&, const PCInst&);
+    bool operator==(const PCMessage&, const PCMessage&);
+}
 
-BEGIN_GCOMM_NAMESPACE
-
-class PCInst
+class gcomm::PCInst
 {
     enum Flags { F_PRIM = 0x1 };
 
@@ -75,24 +84,24 @@ public:
         return to_seq;
     }
 
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
     {
         size_t   off = offset;
         uint32_t flags;
 
-        gu_trace (off = gcomm::read(buf, buflen, off, &flags));
+        gu_trace (off = gcomm::unserialize(buf, buflen, off, &flags));
 
         prim = flags & F_PRIM;
 
-        gu_trace (off = gcomm::read(buf, buflen, off, &last_seq));
-        gu_trace (off = last_prim.read(buf, buflen, off));
-        gu_trace (off = gcomm::read(buf, buflen, off, &to_seq));
+        gu_trace (off = gcomm::unserialize(buf, buflen, off, &last_seq));
+        gu_trace (off = last_prim.unserialize(buf, buflen, off));
+        gu_trace (off = gcomm::unserialize(buf, buflen, off, &to_seq));
 
         return off;
     }
     
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
         throw (gu::Exception)
     {
         size_t   off   = offset;
@@ -100,49 +109,56 @@ public:
 
         flags |= prim ? F_PRIM : 0;
 
-        gu_trace (off = gcomm::write(flags, buf, buflen, off));
-        gu_trace (off = gcomm::write(last_seq, buf, buflen, off));
-        gu_trace (off = last_prim.write(buf, buflen, off));
-        gu_trace (off = gcomm::write(to_seq, buf, buflen, off));
+        gu_trace (off = gcomm::serialize(flags, buf, buflen, off));
+        gu_trace (off = gcomm::serialize(last_seq, buf, buflen, off));
+        gu_trace (off = last_prim.serialize(buf, buflen, off));
+        gu_trace (off = gcomm::serialize(to_seq, buf, buflen, off));
 
-        assert (size() == (off - offset));
+        assert (serial_size() == (off - offset));
 
         return off;
     }
 
-    static size_t size()
+    static size_t serial_size()
     {
         PCInst* pcinst = reinterpret_cast<PCInst*>(0);
 
         //             flags
         return (sizeof(uint32_t) + sizeof(pcinst->last_seq) + 
-                ViewId::size() + sizeof(pcinst->to_seq));
+                ViewId::serial_size() + sizeof(pcinst->to_seq));
     }
 
+    bool operator==(const PCInst& cmp) const
+    { 
+        return get_prim()   == cmp.get_prim()      && 
+            get_last_seq()  == cmp.get_last_seq()  &&
+            get_last_prim() == cmp.get_last_prim() &&
+            get_to_seq()    == cmp.get_to_seq();
+    }
+
+
+    
     std::string to_string() const
     {
         std::ostringstream ret;
 
         ret << "prim = "        << prim
             << ", last_seq = "  << last_seq 
-            << ", last_prim = " << last_prim.to_string()
+            << ", last_prim = " << last_prim
             << ", to_seq = "    << to_seq;
 
         return ret.str();
     }    
 };
 
-inline bool operator==(const PCInst& a, const PCInst& b)
+inline std::ostream& gcomm::operator<<(std::ostream& os, const PCInst& inst)
 {
-    return a.get_prim()   == b.get_prim()      && 
-        a.get_last_seq()  == b.get_last_seq()  &&
-        a.get_last_prim() == b.get_last_prim() &&
-        a.get_to_seq()    == b.get_to_seq();
+    return (os << inst.to_string());
 }
 
-typedef InstMap<PCInst> PCInstMap;
+class gcomm::PCInstMap : public Map<UUID, PCInst> { };
 
-class PCMessage
+class gcomm::PCMessage
 {
 public:
 
@@ -196,7 +212,7 @@ public:
     
     virtual ~PCMessage() { delete inst; }
     
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
     {
         size_t   off;
@@ -205,7 +221,7 @@ public:
         delete inst;
         inst = 0;
 
-        gu_trace (off = gcomm::read(buf, buflen, offset, &b));
+        gu_trace (off = gcomm::unserialize(buf, buflen, offset, &b));
 
         version = b & 0xff;
 
@@ -218,19 +234,19 @@ public:
         if (type <= T_NONE || type >= T_MAX)
             gcomm_throw_runtime (EINVAL) << "Bad type value: " << type;
 
-        gu_trace (off = gcomm::read(buf, buflen, off, &seq));
+        gu_trace (off = gcomm::unserialize(buf, buflen, off, &seq));
 
         if (type == T_STATE || type == T_INSTALL)
         {
             inst = new PCInstMap();
 
-            gu_trace (off = inst->read(buf, buflen, off));
+            gu_trace (off = inst->unserialize(buf, buflen, off));
         }
 
         return off;
     }
     
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
         throw (gu::Exception)
     {
         size_t   off;
@@ -240,29 +256,30 @@ public:
         b <<= 8;
         b |= version & 0xff;
 
-        gu_trace (off = gcomm::write(b, buf, buflen, offset));
-        gu_trace (off = gcomm::write(seq, buf, buflen, off));
+        gu_trace (off = gcomm::serialize(b, buf, buflen, offset));
+        gu_trace (off = gcomm::serialize(seq, buf, buflen, off));
 
 
         if (type == T_STATE || type == T_INSTALL)
         {
             assert (inst);
-            gu_trace (off = inst->write(buf, buflen, off));
+            gu_trace (off = inst->serialize(buf, buflen, off));
         }
         else
         {
             assert (!inst);
         }
 
-        assert (size() == (off - offset));
+        assert (serial_size() == (off - offset));
 
         return off;        
     }
     
-    size_t size() const
+    size_t serial_size() const
     {
         //            header
-        return sizeof(uint32_t) + sizeof(seq) + (inst != 0 ? inst->size() : 0);
+        return sizeof(uint32_t) + sizeof(seq) 
+            + (inst != 0 ? inst->serial_size() : 0);
     }
     
     int      get_version()  const { return version; }
@@ -298,7 +315,7 @@ public:
 
         if (has_inst_map())
         {
-            ret << "," << get_inst_map().to_string();
+            ret << "," << get_inst_map();
         }
 
         ret << ')';
@@ -308,31 +325,34 @@ public:
 };
 
 
-struct PCStateMessage   : PCMessage
+class gcomm::PCStateMessage : public PCMessage
 {
+public:
     PCStateMessage() :  PCMessage(0, PCMessage::T_STATE, 0) {}
 };
 
-struct PCInstallMessage : PCMessage
+class gcomm::PCInstallMessage : public PCMessage
 {
+public:
     PCInstallMessage() : PCMessage(0, PCMessage::T_INSTALL, 0) {}
 };
 
-struct PCUserMessage    : PCMessage
+class gcomm::PCUserMessage : public PCMessage
 {
     // @todo: why seq is not initialized from seq?
 //    PCUserMessage(uint32_t seq) : PCMessage(0, PCMessage::T_USER, 0) {}
+public:
     PCUserMessage(uint32_t seq) : PCMessage(0, PCMessage::T_USER, seq) {}
 };
 
 
-inline bool operator==(const PCMessage& a, const PCMessage& b)
+inline bool gcomm::operator==(const PCMessage& a, const PCMessage& b)
 {
     bool ret =
         a.get_version() == b.get_version() &&
         a.get_type()    == b.get_type() &&
         a.get_seq()     == b.get_seq();
-
+    
     if (ret == true)
     {
         if (a.has_inst_map() != b.has_inst_map())
@@ -340,7 +360,7 @@ inline bool operator==(const PCMessage& a, const PCMessage& b)
             // @todo: what is this supposed to mean? shouldn't it be just false?
             gcomm_throw_fatal;
         }
-
+        
         if (a.has_inst_map())
         {
             ret = ret && a.get_inst_map() == b.get_inst_map();
@@ -350,6 +370,5 @@ inline bool operator==(const PCMessage& a, const PCMessage& b)
     return ret;
 }
 
-END_GCOMM_NAMESPACE
 
 #endif // PC_MESSAGE_HPP

@@ -69,6 +69,7 @@ namespace gcomm
     namespace evs
     {
         class Seqno;
+        std::ostream& operator<<(std::ostream&, const Seqno);
     }
 }
 
@@ -150,12 +151,31 @@ public:
 
     uint16_t get() const { return seq; }
     
+    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+    {
+        gu_trace(offset = gcomm::serialize(seq, buf, buflen, offset));
+        return offset;
+    }
+    
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+    {
+        gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &seq));
+        return offset;
+    }
+    
+    static size_t serial_size()
+    {
+        return sizeof(uint16_t);
+    }
+
+
+    
 private:
     uint16_t seq;
     static const uint16_t seq_max = 0x8000;
 };
 
-inline std::ostream& operator<<(std::ostream& os, const gcomm::evs::Seqno seq)
+inline std::ostream& gcomm::evs::operator<<(std::ostream& os, const Seqno seq)
 {
     return (os << seq.get());
 }

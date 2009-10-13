@@ -13,6 +13,7 @@ libgcomm_la_SOURCES = 		\
 	histogram.cpp		\
 	time.cpp		\
 	uuid.cpp		\
+	view.cpp		\
 	monitor.cpp		\
 	pseudofd.cpp		\
 	readbuf.cpp		\
@@ -21,7 +22,6 @@ libgcomm_la_SOURCES = 		\
 	transport.cpp		\
 	tcp.cpp			\
 	gmcast.cpp		\
-	view.cpp		\
 	evs_seqno.cpp		\
 	evs_input_map.cpp	\
 	evs_input_map2.cpp 	\

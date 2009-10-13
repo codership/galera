@@ -89,18 +89,18 @@ START_TEST(test_histogram)
     Histogram hs("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.");
     
     hs.insert(0.001);
-    LOG_INFO(hs.to_string());
+    log_info << hs.to_string();
 
     for (size_t i = 0; i < 1000; ++i)
     {
         hs.insert(double(::rand())/RAND_MAX);
     }
 
-    LOG_INFO(hs.to_string());
+    log_info << hs.to_string();
 
     hs.clear();
 
-    LOG_INFO(hs.to_string());
+    log_info << hs.to_string();
 }
 END_TEST
 

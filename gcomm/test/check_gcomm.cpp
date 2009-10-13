@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
         //gu::Logger::enable_debug(true);
     }
 
-    LOG_INFO("check_gcomm, start tests");
+    log_info << "check_gcomm, start tests";
     if (::getenv("CHECK_GCOMM_SUITES"))
     {
         suits = new vector<string>(gu::strsplit(::getenv("CHECK_GCOMM_SUITES"), ','));
@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
     suits = 0;
 
     srunner_run_all(sr, CK_NORMAL);
-    LOG_INFO("check_gcomm, run all tests");
+    log_info << "check_gcomm, run all tests";
     int n_fail = srunner_ntests_failed(sr);
     srunner_free(sr);
 

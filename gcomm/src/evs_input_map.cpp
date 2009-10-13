@@ -20,7 +20,6 @@ EVSRange EVSInputMap::insert(const EVSInputMapItem& item)
     if (seqno_eq(gap.get_low(), SEQNO_MAX) == false &&
         seqno_gt(gap.get_low(), seq))
     {
-        // log_warn << item.get_evs_message().to_string() << " already inserted";
         return gap;
     }
     
@@ -33,12 +32,12 @@ EVSRange EVSInputMap::insert(const EVSInputMapItem& item)
     // Check whether this message is inside allowed seqno windon
     if (seqno_gt(seq, seqno_add(wseq, SEQNO_MAX/4)) ||
         seqno_lt(seq, seqno_dec(wseq, SEQNO_MAX/4))) {
-        LOG_WARN(std::string("Seqno out of window: ") + 
-                 make_int(seq).to_string() 
-                 + " current aru " + make_int(aru_seq).to_string());
+        log_warn << "Seqno out of window: " 
+                 << seq
+                 << " current aru " << aru_seq;
         return EVSRange(gap);
     }
-        
+    
     // If gap.high is SEQNO_MAX, then also gap.low must be SEQNO_MAX
     assert(!seqno_eq(gap.high, SEQNO_MAX) || seqno_eq(gap.low, SEQNO_MAX));
 
@@ -56,7 +55,7 @@ EVSRange EVSInputMap::insert(const EVSInputMapItem& item)
             iret = msg_log.insert(item);
             if (iret.second == false)
             {
-                LOG_DEBUG("dropping duplicate");
+                log_debug << "dropping duplicate";
             }
         } 
         else 
@@ -98,8 +97,6 @@ EVSRange EVSInputMap::insert(const EVSInputMapItem& item)
                         // Yes, this is not optimal, but this should
                         // be quite rare routine under considerably 
                         // small message loss
-                        LOG_TRACE(std::string("\t") +
-                                  UInt32(mi->get_evs_message().get_seq()).to_string() + " " + UInt32(gap.low).to_string());
                         if (mi->get_sockaddr() == item.get_sockaddr()) {
                             if (seqno_eq(mi->get_evs_message().get_seq(), 
                                          gap.low)) {
@@ -111,7 +108,6 @@ EVSRange EVSInputMap::insert(const EVSInputMapItem& item)
                                 break;
                             }
                         }
-                        LOG_TRACE("\t" + UInt32(gap.low).to_string());
                     }
                 }
             } 
@@ -123,17 +119,6 @@ EVSRange EVSInputMap::insert(const EVSInputMapItem& item)
         }
     }
     
-#if 0
-    for (MLog::iterator i = msg_log.begin(); i != msg_log.end(); ++i) {
-        LOG_TRACE(std::string("MLog: ") + i->get_sockaddr().to_string() + " " + to_string(i->get_evs_message().get_seq()));
-    }
-#endif 
-    LOG_TRACE(std::string("EVSInputMap::insert(): ") 
-              + " aru_seq = " + UInt32(aru_seq).to_string()
-              + " safe_seq = " + UInt32(safe_seq).to_string()
-              + " low = " + UInt32(gap.low).to_string()
-              + " high = " + UInt32(gap.high).to_string());
-
     if (seqno_eq(aru_seq, SEQNO_MAX) || seqno_gt(gap.low, seqno_next(aru_seq)))
         update_aru();
     

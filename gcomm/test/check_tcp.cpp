@@ -54,7 +54,7 @@ public:
     void connect()
     {
         URI uri(nonblock_addr);
-        uri.set_query_param("tcp.max_pending", make_int(1 << 25).to_string());
+        uri.set_query_param("tcp.max_pending", gu::to_string(1 << 25));
         tp = Transport::create(uri, el);
         gcomm::connect(tp, this);
         tp->connect();
@@ -126,15 +126,15 @@ public:
         cstop = clock();
         clock_t ct = (cstop - cstart);
         double tput = CLOCKS_PER_SEC*double(recvd)/double(cstop - cstart);
-        LOG_INFO("Reciver: received " 
-                 + make_int(recvd).to_string() 
-                 + " bytes\n"
-                 + "         used " 
-                 + Double((double(ct)/CLOCKS_PER_SEC)).to_string() 
-                 + "secs cputime\n"
-                 + "         throughput " 
-                 + Double(tput).to_string() 
-                 + "bytes/cpusec");
+        log_info << "Reciver: received " 
+                 << recvd
+                 << " bytes\n"
+                 << "         used " 
+                 << (double(ct)/CLOCKS_PER_SEC)
+                 << "secs cputime\n"
+                 << "         throughput " 
+                 << tput 
+                 << "bytes/cpusec";
         tp->close();
         delete tp;
     }
@@ -222,7 +222,7 @@ public:
         if (tp)
             throw FatalException("");
         URI uri(nonblock_addr);
-        uri.set_query_param("tcp.max_pending", make_int(1 << 25).to_string());
+        uri.set_query_param("tcp.max_pending", gu::to_string(1 << 25));
         tp = Transport::create(uri, el);
         gcomm::connect(tp, this);
         tp->listen();
@@ -264,11 +264,11 @@ START_TEST(test_nonblock)
         el.poll(1);
     }
 
-    LOG_INFO("connected");
+    log_info << "connected";
     
     for (size_t i = 1; i <= (1 << 24);)
     {
-        LOG_INFO("sending " + make_int(i).to_string());
+        log_info << "sending " << i;
         if (s.send(i) == true)
             i *= 2;
         el.poll(1);
@@ -330,7 +330,7 @@ public:
 
     ~BlockSender() {
         delete[] buf;
-        LOG_INFO("BlockSender: sent " + make_int(sent).to_string() + " bytes");
+        log_info << "BlockSender: sent " << sent << " bytes";
     }
 
     void send(size_t len) {
@@ -383,7 +383,7 @@ public:
     
     ~BlockReceiver()
     {
-        LOG_INFO("BlockReceiver: received " + make_int(recvd).to_string() + " bytes");
+        log_info << "BlockReceiver: received " << recvd << " bytes";
         tp->close();
         delete tp;
     }

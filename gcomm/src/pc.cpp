@@ -7,7 +7,8 @@
 #include "gcomm/conf.hpp"
 #include "gcomm/time.hpp"
 
-BEGIN_GCOMM_NAMESPACE
+
+using namespace gcomm;
 
 void PC::handle_up(const int cid, const ReadBuf* rb, const size_t roff, 
                    const ProtoUpMeta* um)
@@ -21,14 +22,14 @@ void PC::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
         for (NodeList::const_iterator i = um->get_view()->get_left().begin();
              i != um->get_view()->get_left().end(); ++i)
         {
-            tp->close(gcomm::get_uuid(i));
+            tp->close(NodeList::get_key(i));
         }
 
         for (NodeList::const_iterator i =
                  um->get_view()->get_partitioned().begin();
              i != um->get_view()->get_partitioned().end(); ++i)
         {
-            tp->close(gcomm::get_uuid(i));
+            tp->close(NodeList::get_key(i));
         }
     }
 
@@ -50,13 +51,13 @@ size_t PC::get_max_msg_size() const
     EVSUserMessage evsm(UUID(), 0xff, SAFE, 0, 0, 0, ViewId(), 0);
     PCUserMessage  pcm(0);
 
-    if (tp->get_max_msg_size() < evsm.size() + pcm.size())
+    if (tp->get_max_msg_size() < evsm.serial_size() + pcm.serial_size())
     {
         gcomm_throw_fatal << "transport max msg size too small: "
                           << tp->get_max_msg_size();
     }
 
-    return tp->get_max_msg_size() - evsm.size() - pcm.size();
+    return tp->get_max_msg_size() - evsm.serial_size() - pcm.serial_size();
 }
 
 bool PC::supports_uuid() const
@@ -206,7 +207,7 @@ PC::PC(const URI& uri_, EventLoop* el_, Monitor* mon_) :
 {
     if (uri.get_scheme() != Conf::PcScheme)
     {
-        LOG_FATAL("invalid uri: " + uri.to_string());
+        log_fatal << "invalid uri: " << uri.to_string();
     }
 }
 
@@ -218,4 +219,4 @@ PC::~PC()
     }
 }
 
-END_GCOMM_NAMESPACE
+

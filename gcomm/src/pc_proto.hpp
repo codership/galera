@@ -60,45 +60,45 @@ public:
 
     bool get_prim() const
     {
-        return PCInstMap::get_instance(self_i).get_prim();
+        return PCInstMap::get_value(self_i).get_prim();
     }
 
     void set_prim(const bool val)
     {
-        PCInstMap::get_instance(self_i).set_prim(val);
+        PCInstMap::get_value(self_i).set_prim(val);
     }
 
     const ViewId& get_last_prim() const
     {
-        return PCInstMap::get_instance(self_i).get_last_prim();
+        return PCInstMap::get_value(self_i).get_last_prim();
     }
 
     void set_last_prim(const ViewId& vid)
     {
-        PCInstMap::get_instance(self_i).set_last_prim(vid);
+        PCInstMap::get_value(self_i).set_last_prim(vid);
     }
     
     uint32_t get_last_seq() const
     {
-        return PCInstMap::get_instance(self_i).get_last_seq();
+        return PCInstMap::get_value(self_i).get_last_seq();
     }
     
     void set_last_seq(const uint32_t seq)
     {
-        PCInstMap::get_instance(self_i).set_last_seq(seq);
+        PCInstMap::get_value(self_i).set_last_seq(seq);
     }
 
     int64_t get_to_seq() const
     {
-        return PCInstMap::get_instance(self_i).get_to_seq();
+        return PCInstMap::get_value(self_i).get_to_seq();
     }
     
     void set_to_seq(const int64_t seq)
     {
-        PCInstMap::get_instance(self_i).set_to_seq(seq);
+        PCInstMap::get_value(self_i).set_to_seq(seq);
     }
 
-    typedef InstMap<PCMessage> SMMap;
+    class SMMap : public Map<const UUID, PCMessage> { };
 
 private:
 

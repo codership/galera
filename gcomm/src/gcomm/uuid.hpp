@@ -49,31 +49,31 @@ public:
         return uuid_nil;
     }
 
-    size_t read (const byte_t* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
     {
         if (buflen < offset + sizeof(gu_uuid_t))
             gcomm_throw_runtime (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
                                            << (buflen - offset);
-            
+        
         memcpy(&uuid, buf + offset, sizeof(gu_uuid_t));
-
+        
         return offset + sizeof(gu_uuid_t);
     }
     
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
         throw (gu::Exception)
     {
         if (buflen < offset + sizeof(gu_uuid_t))
             gcomm_throw_runtime (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
                                            << (buflen - offset);
-
+        
         memcpy(buf + offset, &uuid, sizeof(gu_uuid_t));
-
+        
         return offset + sizeof(gu_uuid_t);
     }
     
-    static size_t size() 
+    static size_t serial_size() 
     {
         return sizeof(gu_uuid_t);
     }
@@ -82,6 +82,8 @@ public:
     {
         return &uuid;
     }
+
+
     
     std::string to_string() const {
         char buf[37];
@@ -112,20 +114,24 @@ public:
 };
 
 
-
-static inline bool operator==(const UUID& a, const UUID& b)
+inline bool operator==(const UUID& a, const UUID& b)
 {
     return gu_uuid_compare(a.get_uuid_ptr(), b.get_uuid_ptr()) == 0;
 }
 
-static inline bool operator!=(const UUID& a, const UUID& b)
+inline bool operator!=(const UUID& a, const UUID& b)
 {
     return !(a == b);
 }
 
-static inline bool operator<(const UUID& a, const UUID& b)
+inline bool operator<(const UUID& a, const UUID& b)
 {
     return gu_uuid_compare(a.get_uuid_ptr(), b.get_uuid_ptr()) < 0;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const UUID& uuid)
+{
+    return (os << uuid.to_string());
 }
 
 END_GCOMM_NAMESPACE

@@ -8,6 +8,7 @@
 #define GCOMM_MAP_HPP
 
 #include <utility>
+#include <iterator>
 #include <map>
 
 #include "gcomm/exception.hpp"
@@ -28,17 +29,16 @@ namespace gcomm
     protected:
 
         MapType map;
-
     public:
-
+        
         MapBase() : map() {}
-
+        
         virtual ~MapBase() {}
-
+        
         iterator begin()          { return map.begin(); }
-
+        
         iterator end()            { return map.end();   }
-
+        
         iterator find(const K& k) { return map.find(k); }
         
         iterator find_checked(const K& k)
@@ -50,15 +50,15 @@ namespace gcomm
             }
             return ret;
         }
-
+        
         iterator lower_bound(const K& k) { return map.lower_bound(k); }
         
         const_iterator begin()          const { return map.begin(); }
 
         const_iterator end()            const { return map.end();   }
-
+        
         const_iterator find(const K& k) const { return map.find(k); }
-
+        
         const_iterator find_checked(const K& k) const 
         {
             const_iterator ret = map.find(k);
@@ -68,7 +68,7 @@ namespace gcomm
             }
             return ret;
         }
-
+        
         
     
         void erase(iterator i) { map.erase(i); }
@@ -83,58 +83,51 @@ namespace gcomm
 
         bool empty() const     { return map.empty(); }
 
-        size_t serialize(byte_t*      buf,
-                         const size_t buflen, 
-                         const size_t offset) const
+        size_t serialize(byte_t* const buf,
+                         size_t  const buflen, 
+                         size_t        offset) const
+            throw (gu::Exception)
         {
-            size_t   off(offset);
-
-            if ((off = gcomm::write(static_cast<uint32_t>(size()), 
-                                    buf, buflen, off)) == 0) return 0;
-            
-//            typename MapType::const_iterator i;
-            const_iterator i;
-
-            for (i = map.begin(); i != map.end(); ++i)
+            gu_trace(offset = gcomm::serialize(
+                         static_cast<uint32_t>(size()), buf, buflen, offset));
+            for (const_iterator i = map.begin(); i != map.end(); ++i)
             {
-                if ((off = i->first.write (buf, buflen, off)) == 0) return 0;
-                if ((off = i->second.write(buf, buflen, off)) == 0) return 0;
+                gu_trace(offset = get_key(i).serialize(buf, buflen, offset));
+                gu_trace(offset = get_value(i).serialize(buf, buflen, offset));
             }
-            return off;
+            return offset;
         }
-    
-        size_t unserialize(const byte_t* buf, const size_t buflen, 
-                           const size_t offset)
+        
+        size_t unserialize(const byte_t* buf, 
+                           size_t const  buflen, 
+                           size_t        offset)
+            throw (gu::Exception)
         {
-            size_t   off = offset;
             uint32_t len;
-
             // Clear map in case this object is reused
             map.clear();
-
-            if ((off = gcomm::read(buf, buflen, off, &len)) == 0) return 0;
-
+            
+            gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &len));;
+            
             for (uint32_t i = 0; i < len; ++i)
             {
-                K uuid;
-                V t;
-                
-                if ((off = uuid.read(buf, buflen, off)) == 0) return 0;
-                if ((off = t.read   (buf, buflen, off)) == 0) return 0;
-
-                if (map.insert(std::make_pair(uuid, t)).second == false)
+                K k;
+                V v;
+                gu_trace(offset = k.unserialize(buf, buflen, offset));
+                gu_trace(offset = v.unserialize(buf, buflen, offset));
+                if (map.insert(std::make_pair(k, v)).second == false)
                 {
                     gcomm_throw_fatal << "Failed to unserialize map";
                 }
             }
-            return off;
+            return offset;
         }
-
+        
         size_t serial_size() const
         {
-            return sizeof(uint32_t) + size()*(K::size() + V::size());
+            return sizeof(uint32_t) + size()*(K::serial_size() + V::serial_size());
         }
-
+        
         bool operator==(const MapBase& other) const
         {
             return (map == other.map);
@@ -150,7 +143,7 @@ namespace gcomm
             return i->first;
         }
 
-        static K& get_key(iterator i)
+        static const K& get_key(iterator i)
         {
             return i->first;
         }
@@ -165,7 +158,22 @@ namespace gcomm
             return i->second;
         }
 
+
     };
+    
+    template <typename K, typename V>
+    std::ostream& operator<<(std::ostream& os, const std::pair<K, V>& p)
+    {
+        return (os << p.first << "," << p.second);
+    }
+    
+    template <typename K, typename V, typename C>
+    std::ostream& operator<<(std::ostream& os, const MapBase<K, V, C>& map)
+    {
+        std::copy(map.begin(), map.end(),
+                  std::ostream_iterator<const std::pair<K, V> >(os, " "));
+        return os;
+    }
 
 
     template<typename K, typename V, typename C = std::map<K, V> >
@@ -177,7 +185,7 @@ namespace gcomm
         {
             return MapBase<K, V, C>::map.insert(p);
         }
-
+        
         iterator insert_checked(const std::pair<K, V>& p)
         {
             std::pair<iterator, bool> ret = MapBase<K, V, C>::map.insert(p);
@@ -188,7 +196,7 @@ namespace gcomm
             return ret.first;
         }
     };
-
+    
     template<typename K, typename V, typename C = std::multimap<K, V> >
     class MultiMap : public MapBase<K, V, C>
     {
@@ -198,11 +206,13 @@ namespace gcomm
         {
             MapBase<K, V, C>::map.insert(p);
         }
-
+        
         std::pair<const_iterator, const_iterator> equal_range(const K& k) const
         {
             return MapBase<K, V, C>::map.equal_range(k);
         }
     };
+
+
 }
 #endif /* GCOMM_MAP_HPP */

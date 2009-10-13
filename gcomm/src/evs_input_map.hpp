@@ -68,12 +68,12 @@ public:
     }
     
     size_t get_payload_offset() const {
-        return roff + msg.size();
+        return roff + msg.serial_size();
     }
     
     string to_string() const
     {
-        return sa.to_string() + " " + make_int(msg.get_seq()).to_string();
+        return sa.to_string() + " " + gu::to_string(msg.get_seq());
     }
 };
 
@@ -89,7 +89,8 @@ class EVSInputMap {
         }
         std::string to_string() const
         {
-            return "gap=" + gap.to_string() + " safe_seq=" + make_int(safe_seq).to_string();
+            return "gap=" + gap.to_string() 
+                + " safe_seq=" + gu::to_string(safe_seq);
         }
     };
     
@@ -136,11 +137,9 @@ public:
     }
     
     ~EVSInputMap() {
-        LOG_INFO("~EVSInputMap(): "
-                 + Double(double(msg_log_size_cum)/double(n_messages + 1)).to_string() 
-                 + " "
-                 + Double(double(recovery_log_size_cum)/
-                          double(n_messages + 1)).to_string());
+        log_info << double(msg_log_size_cum)/double(n_messages + 1)
+                 << " "
+                 << double(recovery_log_size_cum)/double(n_messages + 1);
     }
     
     void validate_state() const
@@ -162,8 +161,6 @@ public:
         for (IMap::const_iterator i = instances.begin(); i != instances.end();
              ++i)
         {
-            LOG_TRACE("low " + make_int(low).to_string()
-                      + " imin " + make_int(i->second.gap.low).to_string());
             if (seqno_eq(i->second.gap.low, SEQNO_MAX))
             {
                 low = SEQNO_MAX;
@@ -240,7 +237,6 @@ private:
         if (instances.empty()) gcomm_throw_fatal << "Instance not found";
 
         uint32_t min_seq = SEQNO_MAX;
-        LOG_DEBUG("aru_seq: " + make_int(aru_seq).to_string());
         for (IMap::const_iterator ii = instances.begin(); ii != instances.end();
              ++ii) 
         {
@@ -248,8 +244,6 @@ private:
             assert(seqno_eq(aru_seq, SEQNO_MAX) ||
                    seqno_eq(ii->second.gap.low, SEQNO_MAX) ||
                    !seqno_lt(ii->second.gap.low, aru_seq));
-            LOG_TRACE("min_seq " + make_int(min_seq).to_string()
-                      + " imin " + make_int(ii->second.gap.low).to_string());
             if (seqno_eq(ii->second.gap.low, SEQNO_MAX)) 
             {
                 assert(seqno_eq(aru_seq, SEQNO_MAX));
@@ -271,9 +265,6 @@ private:
         }
         // Aru must not decrease during update
         assert(seqno_eq(aru_seq, SEQNO_MAX) || !seqno_lt(act_min, aru_seq));
-        LOG_DEBUG("aru_seq " + make_int(aru_seq).to_string()
-                  + " min_seq " + make_int(min_seq).to_string()
-                  + " act_min " + make_int(act_min).to_string());
         aru_seq = act_min;
         validate_state();
     }
@@ -471,8 +462,8 @@ public:
     std::string to_string() const
     {
         std::string ret = 
-            std::string("aru_seq=") + make_int(aru_seq).to_string() + " "
-            + "safe_seq=" + make_int(safe_seq).to_string() + " ";
+            std::string("aru_seq=") + gu::to_string(aru_seq) + " "
+            + "safe_seq=" + gu::to_string(safe_seq) + " ";
         for (IMap::const_iterator i = instances.begin(); 
              i != instances.end(); ++i)
         {

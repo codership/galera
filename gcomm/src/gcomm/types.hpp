@@ -3,215 +3,173 @@
 
 #include <sys/socket.h>
 
-#include <sstream>
+
 #include <gcomm/common.hpp>
 #include <gcomm/exception.hpp>
 
-BEGIN_GCOMM_NAMESPACE
+#include <sstream>
+#include <algorithm>
+#include <string>
 
-typedef unsigned char byte_t;
-
-template <class T> 
-inline size_t read(const byte_t* buf, const size_t buflen, 
-                   const size_t offset, T* ret)
-    throw (gu::Exception)
+namespace gcomm
 {
-    if (buflen < sizeof(T) + offset)
-        gcomm_throw_runtime (EMSGSIZE) << sizeof(T) << " > " << (buflen-offset);
 
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-    *ret = *reinterpret_cast<const T*>(buf + offset);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-#error "Big endian not supported yet"
-#else
-#error "Byte order unrecognized"
-#endif // __BYTE_ORDER
-    return offset + sizeof(T);
-}
-
-template <class T> 
-inline size_t write(const T val, byte_t* buf, const size_t buflen, 
-                    const size_t offset)
-{
-    if (buflen < sizeof(T) + offset)
-        gcomm_throw_runtime (EMSGSIZE) << sizeof(T) << " > " << (buflen-offset);
-
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-    *reinterpret_cast<T*>(buf + offset) = val;
-#elif __BYTE_ORDER == __BIG_ENDIAN
-#error "Big endian not supported yet"
-#else
-#error "Byte order unrecognized"
-#endif // __BYTE_ORDER
-    return offset + sizeof(T);
-}
-
-
-template <class T> class IntType
-{
-    T t;
-public:
-    IntType() :
-        t()
-    {}
-
-    IntType(const T t_) : 
-        t(t_)
-    {}
-
-    T get() const
-    {
-        return t;
-    }
+    typedef unsigned char byte_t;
     
-    std::string to_string() const
+    /*!
+     * Serialize template function
+     */
+    template <typename T> 
+    inline size_t serialize(const T      val, 
+                            byte_t*      buf, 
+                            size_t const buflen, 
+                            size_t const offset)
     {
-        std::ostringstream os;
-        os << t;
-        return os.str();
-    }
-    
-    size_t read(const byte_t* from, const size_t fromlen, 
-                const size_t from_offset)
-    {
-        return gcomm::read(from, fromlen, from_offset, &t);
-    }
-    
-    size_t write(byte_t* to, const size_t tolen, const size_t to_offset) const
-    {
-        return gcomm::write(t, to, tolen, to_offset);
-    }
-    
-    static size_t size()
-    {
-        return sizeof(T);
-    }
-};
-
-
-template<class T> 
-inline bool operator==(const IntType<T> a, const IntType<T> b)
-{
-    return a.get() == b.get();
-}
-
-template<class T> 
-inline bool operator!=(const IntType<T> a, const IntType<T> b)
-{
-    return a.get() != b.get();
-}
-
-
-template<class T> 
-inline bool operator<(const IntType<T> a, const IntType<T> b)
-{
-    return a.get() < b.get();
-}
-
-template<class T> 
-inline bool operator>(const IntType<T> a, const IntType<T> b)
-{
-    return a.get() > b.get();
-}
-
-template<class T> 
-inline bool operator<=(const IntType<T> a, const IntType<T> b)
-{
-    return a.get() <= b.get();
-}
-
-template<class T> 
-inline bool operator>=(const IntType<T> a, const IntType<T> b)
-{
-    return a.get() >= b.get();
-}
-
-template<class T>
-inline IntType<T> make_int(T t)
-{
-    return IntType<T>(t);
-}
-
-
-class Double
-{
-    double d;
-public:
-
-    Double() : 
-        d()
-    {
-    }
-
-    Double(const double d_) :
-        d(d_)
-    {
-    }
-
-    std::string to_string() const
-    {
-        std::ostringstream os;
+        if (buflen < sizeof(T) + offset)
+            gcomm_throw_runtime (EMSGSIZE) << sizeof(T) << " > " 
+                                           << (buflen-offset);
         
-        os << d;
-        return os.str();
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+        *reinterpret_cast<T*>(buf + offset) = val;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+#error "Big endian not supported yet"
+#else
+#error "Byte order unrecognized"
+#endif // __BYTE_ORDER
+        return offset + sizeof(T);
     }
-};
 
-class Pointer 
-{
-    void* p;
-public:
-    Pointer() :
-        p()
+    
+    /*!
+     * Unserialize template function
+     */
+    template <typename T> 
+    inline size_t unserialize(const byte_t* buf, 
+                              size_t const  buflen, 
+                              size_t const  offset, 
+                              T* ret)
+        throw (gu::Exception)
     {
-    }
-    Pointer(void* const p_) :
-        p(p_)
-    {
+        if (buflen < sizeof(T) + offset)
+            gcomm_throw_runtime (EMSGSIZE) << sizeof(T) << " > " 
+                                           << (buflen-offset);
+        
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+        *ret = *reinterpret_cast<const T*>(buf + offset);
+#elif __BYTE_ORDER == __BIG_ENDIAN
+#error "Big endian not supported yet"
+#else
+#error "Byte order unrecognized"
+#endif // __BYTE_ORDER
+        return offset + sizeof(T);
     }
     
-    std::string to_string() const
+    /*!
+     * Template function to return serializable size.
+     */
+    template <typename T> 
+    inline size_t serial_size(const T t)
     {
-        std::ostringstream os;
-        os << p;
-        return os.str();
+        return sizeof(t);
     }
-};
-
-#if 0
-
-class Sockaddr
-{
-    sockaddr sa;
-public:
-    Sockaddr() :
-        sa()
+    
+    template <typename I> class IntType
     {
-    }
-    Sockaddr(const sockaddr& sa_) :
-        sa(sa_)
-    {
-    }
+    public:
+        
+        IntType() : i() { }
 
-    string to_string() const
-    {
-        string ret("sockaddr(");
-        ret += IntType<unsigned short int>(sa.sa_family).to_string();
-        ret += ",";
-        ostringstream os;
-        os.setf(ostringstream::hex);
-        for (size_t i = 0; i < sizeof(sa.sa_data); ++i)
+        IntType(const I i_) : i(i_) { }
+        
+        size_t serialize(byte_t* buf, size_t const buflen, size_t const offset)
+            const throw(gu::Exception)
         {
-            os << IntType<unsigned int>(sa.sa_data[i]).to_string();
+            return gcomm::serialize(i, buf, buflen, offset);
         }
-        ret += ")";
-        return ret;
+        
+        size_t unserialize(const byte_t* buf, size_t const buflen,
+                           size_t const offset)
+            throw(gu::Exception)
+        {
+            return gcomm::unserialize(buf, buflen, offset, &i);
+        }
+        
+        static size_t serial_size()
+        {
+            return sizeof(I);
+        }
+
+        I get() const { return i; }
+
+        bool operator==(const IntType<I>& cmp) const
+        {
+            return i == cmp.i;
+        }
+
+        bool operator<(const IntType<I>& cmp) const
+        {
+            return i < cmp.i;
+        }
+
+    private:
+        I i;
+    };
+
+    template <typename I> inline IntType<I> make_int(I i)
+    {
+        return IntType<I>(i);
     }
+    
+    
+    template <size_t SZ> 
+    class String
+    {
+    public:
+        String(const std::string& str_) : str(str_) 
+        { 
+            if (str.size() != str_size)
+            {
+                str.resize(str_size);
+            }
+        }
+        
+        virtual ~String() { }
 
-};
-
-#endif // 0
-
-END_GCOMM_NAMESPACE
+        size_t serialize(byte_t* buf, size_t buflen, size_t offset) 
+            const throw(gu::Exception)
+        {
+            if (buflen < offset + str_size)
+            {
+                gcomm_throw_runtime (EMSGSIZE) << str_size
+                                               << " > " << (buflen-offset);
+            }
+            (void)std::copy(str.data(), str.data() + str_size, buf + offset);
+            return offset + str_size;
+        }
+        
+        size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+            throw(gu::Exception)
+        {
+            if (buflen < offset + str_size)
+            {
+                gcomm_throw_runtime (EMSGSIZE) << str_size
+                                               << " > " << (buflen-offset);
+        }
+            str.assign(reinterpret_cast<const char*>(buf) + offset, str_size);
+            return offset + str_size;
+        }
+        
+        static size_t serial_size()
+        {
+            return str_size;
+        }
+        
+    private:
+        static const size_t str_size = SZ ;
+        std::string str; /* Human readable name if any */
+    };
+        
+    
+} // namespace gcomm
 
 #endif /* _GCOMM_TYPES_HPP_ */

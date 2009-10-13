@@ -123,7 +123,7 @@ public:
     
     void handle_event(const int cid, const Event& pe)
     {
-        LOG_INFO("self destruct");
+        log_info << "self destruct";
         el->erase(fd);
         el->release_protolay(this);
     }
@@ -166,7 +166,7 @@ public:
     
     void handle_event(const int cid, const Event& pe)
     {
-        LOG_INFO("self interrupt");
+        log_info << "self interrupt";
         el->interrupt();
     }
 };

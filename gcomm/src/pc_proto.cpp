@@ -8,21 +8,20 @@
 using std::multiset;
 using std::string;
 
-BEGIN_GCOMM_NAMESPACE
+using namespace gcomm;
 
 static const PCInst& get_state(PCProto::SMMap::const_iterator smap_i,
                                const UUID& uuid)
 {
     PCInstMap::const_iterator i =
-        PCProto::SMMap::get_instance(smap_i).get_inst_map().find(uuid);
-
-    if (i == PCProto::SMMap::get_instance(smap_i).get_inst_map().end())
+        PCProto::SMMap::get_value(smap_i).get_inst_map().find(uuid);
+    
+    if (i == PCProto::SMMap::get_value(smap_i).get_inst_map().end())
     {
         gcomm_throw_fatal << "UUID: " << uuid.to_string()
                           << " not found in the instance map";
     }
-
-    return PCInstMap::get_instance(i);
+    return PCInstMap::get_value(i);
 }
 
 void PCProto::send_state()
@@ -36,13 +35,13 @@ void PCProto::send_state()
     for (PCInstMap::const_iterator i = instances.begin(); i != instances.end();
          ++i)
     {
-        im.insert(std::make_pair(PCInstMap::get_uuid(i), 
-                                 PCInstMap::get_instance(i)));
+        im.insert(std::make_pair(PCInstMap::get_key(i), 
+                                 PCInstMap::get_value(i)));
     }
 
-    Buffer buf(pcs.size());
+    Buffer buf(pcs.serial_size());
 
-    if (pcs.write(buf.get_buf(), buf.get_len(), 0) == 0)
+    if (pcs.serialize(buf.get_buf(), buf.get_len(), 0) == 0)
     {
         gcomm_throw_fatal << "Failed to serialize state";
     }
@@ -66,20 +65,20 @@ void PCProto::send_install()
     for (SMMap::const_iterator i = state_msgs.begin(); i != state_msgs.end();
          ++i)
     {
-        if (current_view.get_members().find(SMMap::get_uuid(i)) != 
+        if (current_view.get_members().find(SMMap::get_key(i)) != 
             current_view.get_members().end()
             && im.insert(std::make_pair(
-                             SMMap::get_uuid(i), 
-                             gcomm::get_state(i, SMMap::get_uuid(i)))).second
+                             SMMap::get_key(i), 
+                             ::get_state(i, SMMap::get_key(i)))).second
             == false)
         {
             gcomm_throw_fatal << "Insert into instance map failed";
         }
     }
 
-    Buffer buf(pci.size());
+    Buffer buf(pci.serial_size());
 
-    if (pci.write(buf.get_buf(), buf.get_len(), 0) == 0)
+    if (pci.serialize(buf.get_buf(), buf.get_len(), 0) == 0)
     {
         gcomm_throw_fatal << "PCInstallMessage serialization failed";
     }
@@ -107,10 +106,10 @@ void PCProto::deliver_view()
     for (PCInstMap::const_iterator i = instances.begin(); 
          i != instances.end(); ++i)
     {
-        if (current_view.get_members().find(PCInstMap::get_uuid(i)) ==
+        if (current_view.get_members().find(PCInstMap::get_key(i)) ==
             current_view.get_members().end())
         {
-            v.add_partitioned(PCInstMap::get_uuid(i), "");
+            v.add_partitioned(PCInstMap::get_key(i), "");
         }
     }
 
@@ -140,8 +139,8 @@ void PCProto::shift_to(const State s)
         { true,  false, true,  false, false, false, true  }
     };
     
-    LOG_INFO(self_string() + " shift_to: " + to_string(get_state()) + " -> " 
-             + to_string(s));
+    log_info << self_string() << " shift_to: " << to_string(get_state()) 
+             << " -> " <<  to_string(s);
     
     if (allowed[get_state()][s] == false)
     {
@@ -182,16 +181,16 @@ void PCProto::handle_first_trans(const View& view)
 
     if (start_prim == true)
     {
-        if (view.get_members().length() > 1 || view.is_empty())
+        if (view.get_members().size() > 1 || view.is_empty())
         {
             gcomm_throw_fatal << "Corrupted view";
         }
 
-        if (get_uuid(view.get_members().begin()) != uuid)
+        if (NodeList::get_key(view.get_members().begin()) != uuid)
         {
             gcomm_throw_fatal << "Bad first UUID: "
-                              <<get_uuid(view.get_members().begin()).to_string()
-                              << ", expected: " << uuid.to_string();
+                              << NodeList::get_key(view.get_members().begin())
+                              << ", expected: " << uuid;
         }
 
         set_last_prim(view.get_id());
@@ -204,13 +203,13 @@ void PCProto::handle_trans(const View& view)
     assert(view.get_type() == View::V_TRANS);
     assert(view.get_id()   == current_view.get_id());
 
-    log_info << "Handle trans, current: " << current_view.get_id().to_string()
-             << ", new: " << view.get_id().to_string();
+    log_info << "Handle trans, current: " << current_view.get_id()
+             << ", new: " << view.get_id();
 
     if (view.get_id() == get_last_prim())
     {
-        if (view.get_members().length()*2 + view.get_left().length() <=
-            current_view.get_members().length())
+        if (view.get_members().size()*2 + view.get_left().size() <=
+            current_view.get_members().size())
         {
             shift_to(S_NON_PRIM);
             return;
@@ -220,7 +219,7 @@ void PCProto::handle_trans(const View& view)
     {
         if (get_last_prim() != ViewId())
         {
-            log_warn << "Trans view during " + to_string(get_state());
+            log_warn << "Trans view during " << to_string(get_state());
         }
     }
 
@@ -237,7 +236,7 @@ void PCProto::handle_first_reg(const View& view)
     
     if (start_prim == true)
     {
-        if (view.get_members().length() > 1 || view.is_empty())
+        if (view.get_members().size() > 1 || view.is_empty())
         {
             gcomm_throw_fatal << self_string() << " starting primary "
                               <<"but first reg view is not singleton";
@@ -247,9 +246,9 @@ void PCProto::handle_first_reg(const View& view)
     if (view.get_id().get_seq() <= current_view.get_id().get_seq())
     {
         gcomm_throw_fatal << "Non-increasing view ids: current view " 
-                          << current_view.get_id().to_string() 
+                          << current_view.get_id() 
                           << " new view "
-                          << view.get_id().to_string();
+                          << view.get_id();
     }
 
     current_view = view;
@@ -266,9 +265,9 @@ void PCProto::handle_reg(const View& view)
         view.get_id().get_seq() <= current_view.get_id().get_seq())
     {
         gcomm_throw_fatal << "Non-increasing view ids: current view " 
-                          << current_view.get_id().to_string() 
+                          << current_view.get_id() 
                           << " new view "
-                          << view.get_id().to_string();
+                          << view.get_id();
     }
     
     current_view = view;
@@ -302,10 +301,10 @@ void PCProto::handle_view(const View& view)
         view.get_members().find(uuid) == view.get_members().end())
     {
         gcomm_throw_fatal << "Self not found from non empty view: "
-                          << view.to_string();
+                          << view;
     }
     
-    log_info << self_string() << " " << view.to_string();
+    log_info << self_string() << " " << view;
 
     if (view.get_type() == View::V_TRANS)
     {
@@ -340,14 +339,14 @@ bool PCProto::requires_rtr() const
          i != state_msgs.end(); ++i)
     {
         PCInstMap::const_iterator ii =
-            SMMap::get_instance(i).get_inst_map().find(SMMap::get_uuid(i));
+            SMMap::get_value(i).get_inst_map().find(SMMap::get_key(i));
 
-        if (ii == SMMap::get_instance(i).get_inst_map().end())
+        if (ii == SMMap::get_value(i).get_inst_map().end())
         {
             gcomm_throw_fatal << "Internal logic error";
         }
 
-        const PCInst& inst = PCInstMap::get_instance(ii);
+        const PCInst& inst = PCInstMap::get_value(ii);
 
         max_to_seq = std::max(max_to_seq, inst.get_to_seq());
     }
@@ -356,21 +355,21 @@ bool PCProto::requires_rtr() const
          i != state_msgs.end(); ++i)
     {
         PCInstMap::const_iterator ii =
-            SMMap::get_instance(i).get_inst_map().find(SMMap::get_uuid(i));
+            SMMap::get_value(i).get_inst_map().find(SMMap::get_key(i));
 
-        if (ii == SMMap::get_instance(i).get_inst_map().end())
+        if (ii == SMMap::get_value(i).get_inst_map().end())
         {
             gcomm_throw_fatal << "Internal logic error 2";
         }
 
-        const PCInst& inst      = PCInstMap::get_instance(ii);
+        const PCInst& inst      = PCInstMap::get_value(ii);
         const int64_t to_seq    = inst.get_to_seq();
         const ViewId  last_prim = inst.get_last_prim();
 
         if (to_seq != -1 && to_seq != max_to_seq && last_prim != ViewId())
         {
             log_info << self_string() << " RTR is needed: " << to_seq
-                     << " / " << last_prim.to_string();
+                     << " / " << last_prim;
 
             return true;
         }
@@ -393,11 +392,11 @@ void PCProto::cleanup_instances()
     for (i = instances.begin(); i != instances.end(); i = i_next)
     {
         i_next = i, ++i_next;
-        if (current_view.get_members().find(PCInstMap::get_uuid(i)) 
+        if (current_view.get_members().find(PCInstMap::get_key(i)) 
             == current_view.get_members().end())
         {
             log_info << "cleaning up instance " 
-                     << PCInstMap::get_uuid(i).to_string();
+                     << PCInstMap::get_key(i);
             instances.erase(i);
         }
     }
@@ -414,7 +413,7 @@ bool PCProto::is_prim() const
     for (SMMap::const_iterator i = state_msgs.begin(); i != state_msgs.end();
          ++i)
     {
-        const PCInst& i_state(gcomm::get_state(i, SMMap::get_uuid(i)));
+        const PCInst& i_state(::get_state(i, SMMap::get_key(i)));
 
         if (i_state.get_prim() == true)
         {
@@ -430,7 +429,7 @@ bool PCProto::is_prim() const
     for (SMMap::const_iterator i = state_msgs.begin(); i != state_msgs.end();
          ++i)
     {
-        const PCInst& i_state(gcomm::get_state(i, SMMap::get_uuid(i)));
+        const PCInst& i_state(::get_state(i, SMMap::get_key(i)));
 
         if (i_state.get_prim() == true)
         {
@@ -446,8 +445,8 @@ bool PCProto::is_prim() const
         }
         else
         {
-            log_info << "Non-prim " << SMMap::get_uuid(i).to_string() <<" from "
-                     << i_state.get_last_prim().to_string() << " joining prim";
+            log_info << "Non-prim " << SMMap::get_key(i) <<" from "
+                     << i_state.get_last_prim() << " joining prim";
         }
     }
     
@@ -463,7 +462,7 @@ bool PCProto::is_prim() const
              i != state_msgs.end();
              ++i)
         {
-            const PCInst& i_state(gcomm::get_state(i, SMMap::get_uuid(i)));
+            const PCInst& i_state(::get_state(i, SMMap::get_key(i)));
 
             if (i_state.get_last_prim() != ViewId())
             {
@@ -503,7 +502,7 @@ bool PCProto::is_prim() const
                 gcomm_throw_fatal << "View not found from list";
             }
 
-            if (lvi->get_members().length() == great_view_len)
+            if (lvi->get_members().size() == great_view_len)
             {
                 log_info << "Found common last prim view";
 
@@ -512,8 +511,8 @@ bool PCProto::is_prim() const
                 for (SMMap::const_iterator j = state_msgs.begin();
                      j != state_msgs.end(); ++j)
                 {
-                    const PCInst& j_state(gcomm::get_state(j,
-                                                           SMMap::get_uuid(j)));
+                    const PCInst& j_state(::get_state(j,
+                                                      SMMap::get_key(j)));
 
                     if (j_state.get_last_prim() == great_view)
                     {
@@ -545,19 +544,19 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 {
     assert(msg.get_type() == PCMessage::T_STATE);
     assert(get_state() == S_STATES_EXCH);
-    assert(state_msgs.length() < current_view.get_members().length());
+    assert(state_msgs.size() < current_view.get_members().size());
 
     log_info << self_string() << " handle state: " << msg.to_string();
 
     if (get_prim() == true)
     {
-        const PCInst& si = PCInstMap::get_instance(msg.get_inst_map().find(source));
+        const PCInst& si = PCInstMap::get_value(msg.get_inst_map().find(source));
         if (si.get_prim() == true && si.get_last_prim() != get_last_prim())
         {
             log_warn << self_string() << " conflicting prims: my prim " 
-                     << get_last_prim().to_string() 
+                     << get_last_prim() 
                      << " other prim: " 
-                     << si.get_last_prim().to_string();
+                     << si.get_last_prim();
 
             if (get_last_prim() < si.get_last_prim())
             {
@@ -578,19 +577,19 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
         gcomm_throw_fatal << "Failed to save state message";
     }
     
-    if (state_msgs.length() == current_view.get_members().length())
+    if (state_msgs.size() == current_view.get_members().size())
     {
         for (SMMap::const_iterator i = state_msgs.begin(); 
              i != state_msgs.end();
              ++i)
         {
-            const UUID& sm_uuid = SMMap::get_uuid(i);
+            const UUID& sm_uuid = SMMap::get_key(i);
 
             if (instances.find(sm_uuid) == instances.end())
             {
                 if (instances.insert(
                         std::make_pair(sm_uuid,
-                                       gcomm::get_state(i, sm_uuid))).second
+                                       ::get_state(i, sm_uuid))).second
                     == false)
                 {
                     gcomm_throw_fatal
@@ -638,7 +637,7 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
         gcomm_throw_fatal << "No self in the PCMessage instance map";
     }
 
-    const PCInst& m_state = PCInstMap::get_instance(mi);
+    const PCInst& m_state = PCInstMap::get_value(mi);
 
     if (m_state.get_prim()      != get_prim()      ||
         m_state.get_last_prim() != get_last_prim() ||
@@ -649,7 +648,7 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
                           << "Install message self state does not match, "
                           << "message state: " << m_state.to_string()
                           << ", local state: "
-                          << PCInstMap::get_instance(self_i).to_string();
+                          << PCInstMap::get_value(self_i).to_string();
     }
     
     // Set TO seqno according to state message
@@ -657,7 +656,7 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
     
     for (mi = msg.get_inst_map().begin(); mi != msg.get_inst_map().end(); ++mi)
     {
-        const PCInst& m_state = PCInstMap::get_instance(mi);
+        const PCInst& m_state = PCInstMap::get_value(mi);
 
         if (m_state.get_prim() == true && to_seq != -1)
         {
@@ -695,7 +694,7 @@ void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
     
     ProtoUpMeta pum(um->get_source(), um->get_user_type(), to_seq);
 
-    pass_up(rb, roff + msg.size(), &pum);
+    pass_up(rb, roff + msg.serial_size(), &pum);
 }
 
 void PCProto::handle_msg(const PCMessage&   msg, 
@@ -772,7 +771,7 @@ void PCProto::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
     {
         PCMessage msg;
 
-        if (msg.read(rb->get_buf(), rb->get_len(), roff) == 0)
+        if (msg.unserialize(rb->get_buf(), rb->get_len(), roff) == 0)
         {
             gcomm_throw_fatal << "Could not read message";
         }
@@ -792,16 +791,16 @@ int PCProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
     PCUserMessage um(seq);
     byte_t        buf[8];
 
-    if (um.write(buf, sizeof(buf), 0) == 0)
+    if (um.serialize(buf, sizeof(buf), 0) == 0)
     {
         gcomm_throw_fatal << "Short buffer";
     }
 
-    wb->prepend_hdr(buf, um.size());
+    wb->prepend_hdr(buf, um.serial_size());
 
     int ret = pass_down(wb, dm);
 
-    wb->rollback_hdr(um.size());
+    wb->rollback_hdr(um.serial_size());
 
     if (ret == 0)
     {
@@ -815,4 +814,4 @@ int PCProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
     return ret;
 }
 
-END_GCOMM_NAMESPACE
+

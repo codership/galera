@@ -94,7 +94,7 @@ struct EVSInstance
         ret += (leave_message ? "1" : "0");
         return ret;
     }
-    
+
     void set_tstamp(const Time& t) { tstamp = t; }
     const Time& get_tstamp() const { return tstamp; }
 
@@ -127,6 +127,10 @@ private:
 
 };
 
+inline std::ostream& operator<<(std::ostream& os, const EVSInstance& ei)
+{
+    return (os << ei.to_string());
+}
 
 
 class EVSProto : public Protolay
@@ -231,7 +235,6 @@ public:
         shift_to_rfcnt(0),
         ith(), cth(), consth(), resendth(), sjth()
     {
-        LOG_DEBUG("EVSProto(): (" + my_addr.to_string() + ")");
         pair<std::map<const UUID, EVSInstance>::iterator, bool> i =
             known.insert(make_pair(my_addr, EVSInstance()));
         assert(i.second == true);
@@ -450,7 +453,7 @@ public:
             
             if (p.get_state() == S_RECOVERY)
             {
-                LOG_WARN("CONSENSUS TIMER");
+                log_warn << "consensus timer";
                 p.shift_to(S_RECOVERY, true);
                 if (p.is_consensus() && p.is_representative(p.my_addr))
                 {
@@ -459,7 +462,8 @@ public:
             }
             else
             {
-                LOG_WARN("consensus timer handler in " + to_string(p.get_state()));
+                log_warn << "consensus timer handler in " 
+                         << to_string(p.get_state());
             }
         }
     };
@@ -483,7 +487,7 @@ public:
             Critical crit(p.mon);
             if (p.get_state() == S_OPERATIONAL)
             {
-                LOG_DEBUG("resend timer handler at " + p.self_string());
+                log_debug << p.self_string() << " resend timer handler";
                 if (p.output.empty())
                 {
                     WriteBuf wb(0, 0);
@@ -520,7 +524,7 @@ public:
             Critical crit(p.mon);
             if (p.get_state() == S_RECOVERY)
             {
-                LOG_DEBUG("send join timer handler at " + p.self_string());
+                log_debug << p.self_string() << " send join timer handler";
                 p.send_join(true);
                 if (p.timer.is_set(this) == false)
                 {
@@ -547,8 +551,8 @@ public:
     {
         if (timer.is_set(ith) == false)
         {
-            LOG_WARN("inactivity timer is not set, state: " 
-                     + to_string(get_state()));
+            log_warn << "inactivity timer is not set, state: " 
+                     << to_string(get_state());
         }
         else
         {
@@ -565,7 +569,7 @@ public:
     {
         if (timer.is_set(consth) == false)
         {
-            LOG_DEBUG("consensus timer is not set");
+            log_warn << "consensus timer is not set";
         }
         else
         {
@@ -607,15 +611,10 @@ public:
     string to_string() const
     {
         // TODO
-        std::string v;
-        for (std::map<const UUID, EVSInstance>::const_iterator 
-                 i = known.begin();
-             i != known.end(); ++i)
-        {
-            v += i->first.to_string() + ":" + i->second.to_string() + " ";
-        }
-        return "EVS Proto: " + self_string() + ": " + current_view.to_string() + " " + v;
-        
+        std::ostringstream os;
+        os << "EVSProto: " << self_string() << " " << current_view;
+        os << known;
+        return os.str();
     }
 
 };

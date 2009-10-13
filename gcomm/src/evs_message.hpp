@@ -39,8 +39,8 @@ struct EVSRange {
 	return cmp.get_low() == low && cmp.get_high() == high;
     }
     std::string to_string() const {
-        return std::string("[") + make_int(low).to_string() 
-            + "," + make_int(high).to_string() + "]";
+        return std::string("[") + gu::to_string(low) 
+            + "," + gu::to_string(high) + "]";
     }
 };
 
@@ -73,33 +73,33 @@ struct EVSGap {
 	return range.high;
     }
 
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
     {
         size_t off;
 
-        gu_trace (off = source.read(buf, buflen, offset));
-        gu_trace (off = gcomm::read(buf, buflen, off, &range.low));
-        gu_trace (off = gcomm::read(buf, buflen, off, &range.high));
+        gu_trace (off = source.unserialize(buf, buflen, offset));
+        gu_trace (off = gcomm::unserialize(buf, buflen, off, &range.low));
+        gu_trace (off = gcomm::unserialize(buf, buflen, off, &range.high));
 
         return off;
     }
 
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
         throw (gu::Exception)
     {
         size_t off;
 
-        gu_trace (off = source.write(buf, buflen, offset));
-        gu_trace (off = gcomm::write(range.low, buf, buflen, off));
-        gu_trace (off = gcomm::write(range.high, buf, buflen, off));
+        gu_trace (off = source.serialize(buf, buflen, offset));
+        gu_trace (off = gcomm::serialize(range.low, buf, buflen, off));
+        gu_trace (off = gcomm::serialize(range.high, buf, buflen, off));
 
         return off;
     }
 
-    size_t size() const 
+    size_t serial_size() const 
     {
-        return source.size() + 8;
+        return source.serial_size() + 8;
     }
 
     std::string to_string() const
@@ -237,60 +237,60 @@ public:
             return safe_seq;
         }
 
-	size_t write(byte_t* buf, const size_t buflen, const size_t offset)
+	size_t serialize(byte_t* buf, const size_t buflen, const size_t offset)
             const throw (gu::Exception)
         {
 	    size_t   off;
 	    uint32_t b = (operational ? 0x1 : 0x0) | (left ? 0x10 : 0x0);
 
-	    gu_trace (off = gcomm::write(b, buf, buflen, offset));
-	    gu_trace (off = pid.write(buf, buflen, off));
-	    gu_trace (off = view_id.write(buf, buflen, off));
-	    gu_trace (off = gcomm::write(range.get_low(), buf, buflen, off));
-	    gu_trace (off = gcomm::write(range.get_high(), buf, buflen, off));
-            gu_trace (off = gcomm::write(safe_seq, buf, buflen, off));
+	    gu_trace (off = gcomm::serialize(b, buf, buflen, offset));
+	    gu_trace (off = pid.serialize(buf, buflen, off));
+	    gu_trace (off = view_id.serialize(buf, buflen, off));
+	    gu_trace (off = gcomm::serialize(range.get_low(), buf, buflen, off));
+	    gu_trace (off = gcomm::serialize(range.get_high(), buf, buflen, off));
+            gu_trace (off = gcomm::serialize(safe_seq, buf, buflen, off));
 
 	    return off;
 	}
 	
-	size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+	size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
             throw (gu::Exception)
         {
 	    size_t   off;
 	    uint32_t b;
 
-	    gu_trace (off = gcomm::read(buf, buflen, offset, &b));
+	    gu_trace (off = gcomm::unserialize(buf, buflen, offset, &b));
 
 	    operational = b & 0x1;
             left        = b & 0x10;
 
-	    gu_trace (off = pid.read(buf, buflen, off));
-	    gu_trace (off = view_id.read(buf, buflen, off));
+	    gu_trace (off = pid.unserialize(buf, buflen, off));
+	    gu_trace (off = view_id.unserialize(buf, buflen, off));
 
 	    uint32_t low, high;
 
-	    gu_trace (off = gcomm::read(buf, buflen, off, &low));
-	    gu_trace (off = gcomm::read(buf, buflen, off, &high));
+	    gu_trace (off = gcomm::unserialize(buf, buflen, off, &low));
+	    gu_trace (off = gcomm::unserialize(buf, buflen, off, &high));
 
 	    range = EVSRange(low, high);
 
-            gu_trace (off = gcomm::read(buf, buflen, off, &safe_seq));
+            gu_trace (off = gcomm::unserialize(buf, buflen, off, &safe_seq));
 
 	    return off;
 	}
 
-	static size_t size() {
-	    return 4 + UUID::size() + ViewId::size() + 4 + 4 + 4;
+	static size_t serial_size() {
+	    return 4 + UUID::serial_size() + ViewId::serial_size() + 4 + 4 + 4;
 	}
 
         std::string to_string() const
         {
             std::ostringstream ret;
 
-            ret << "inst(" << pid.to_string() << ") "
+            ret << "inst(" << pid << ") "
                 << (operational ? "o=1" : "o=0") << ", "
                 << (left ? "l=1" : "l=0") << ", "
-                << view_id.to_string() << ", "
+                << view_id << ", "
                 << range.to_string() << " safe_seq: " << safe_seq;
 
             return ret.str();
@@ -497,7 +497,7 @@ public:
     
     // Message serialization:
 
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
     {
         delete instances;
@@ -507,7 +507,7 @@ public:
 	uint8_t b;
 	size_t  off;
 
-	gu_trace (off = gcomm::read(buf, buflen, offset, &b));
+	gu_trace (off = gcomm::unserialize(buf, buflen, offset, &b));
 
 	version       = b & 0x3;
 	type          = static_cast<Type>((b >> 2) & 0x7);
@@ -530,25 +530,25 @@ public:
                 << "Bad safety prefix: " << safety_prefix;
         }
         
-	gu_trace (off = gcomm::read(buf, buflen, off, &user_type));
-	gu_trace (off = gcomm::read(buf, buflen, off, &seq_range));
-	gu_trace (off = gcomm::read(buf, buflen, off, &flags));
+	gu_trace (off = gcomm::unserialize(buf, buflen, off, &user_type));
+	gu_trace (off = gcomm::unserialize(buf, buflen, off, &seq_range));
+	gu_trace (off = gcomm::unserialize(buf, buflen, off, &flags));
         
         if (flags & F_SOURCE)
         {
-            gu_trace (off = source.read(buf, buflen, off));
+            gu_trace (off = source.unserialize(buf, buflen, off));
         }
 
 	if (type == USER || type == JOIN || type == INSTALL || type == LEAVE ||
             type == GAP)
         {
-	    gu_trace (off = gcomm::read(buf, buflen, off, &seq));
-	    gu_trace (off = gcomm::read(buf, buflen, off, &aru_seq));
-	    gu_trace (off = source_view.read(buf, buflen, off));
+	    gu_trace (off = gcomm::unserialize(buf, buflen, off, &seq));
+	    gu_trace (off = gcomm::unserialize(buf, buflen, off, &aru_seq));
+	    gu_trace (off = source_view.unserialize(buf, buflen, off));
 
             if (type == JOIN || type == INSTALL || type == LEAVE)
             {
-                gu_trace (off = gcomm::read(buf, buflen, off, &fifo_seq));
+                gu_trace (off = gcomm::unserialize(buf, buflen, off, &fifo_seq));
             }
             else
             {
@@ -562,14 +562,14 @@ public:
 	    }
             else if (type == GAP)
             {
-                gu_trace (off = gap.read(buf, buflen, off));
+                gu_trace (off = gap.unserialize(buf, buflen, off));
             }
 	}
 
 	return off;
     }
     
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
         throw (gu::Exception)
     {
 	int b;
@@ -583,33 +583,33 @@ public:
         b <<= 2;
 	b |= (version & 0x3);
 
-	gu_trace (off = gcomm::write(static_cast<uint8_t>(b), buf, buflen, offset));
+	gu_trace (off = gcomm::serialize(static_cast<uint8_t>(b), buf, buflen, offset));
 
         /* User type */
-	gu_trace (off = gcomm::write(user_type, buf, buflen, off));
+	gu_trace (off = gcomm::serialize(user_type, buf, buflen, off));
 
 	/* Seq range */
-	gu_trace (off = gcomm::write(seq_range, buf, buflen, off));
+	gu_trace (off = gcomm::serialize(seq_range, buf, buflen, off));
 
 	/* Flags */
-	gu_trace (off = gcomm::write(flags, buf, buflen, off));
+	gu_trace (off = gcomm::serialize(flags, buf, buflen, off));
 
         if (flags & F_SOURCE)
         {
             /* Message source pid */
-            gu_trace (off = source.write(buf, buflen, off));
+            gu_trace (off = source.serialize(buf, buflen, off));
         }
 	
 	if (type == USER || type == JOIN || type == INSTALL || type == LEAVE ||
 	    type == GAP) 
         {
-	    gu_trace (off = gcomm::write(seq, buf, buflen, off));
-	    gu_trace (off = gcomm::write(aru_seq, buf, buflen, off));
-	    gu_trace (off = source_view.write(buf, buflen, off));
+	    gu_trace (off = gcomm::serialize(seq, buf, buflen, off));
+	    gu_trace (off = gcomm::serialize(aru_seq, buf, buflen, off));
+	    gu_trace (off = source_view.serialize(buf, buflen, off));
 
             if (type == JOIN || type == INSTALL || type == LEAVE)
             {
-                gu_trace (off = gcomm::write(fifo_seq, buf, buflen, off));
+                gu_trace (off = gcomm::serialize(fifo_seq, buf, buflen, off));
             }
             
 	    if (type == JOIN || type == INSTALL)
@@ -618,33 +618,33 @@ public:
 	    }
             else if (type == GAP)
             {
-                gu_trace (off = gap.write(buf, buflen, off));
+                gu_trace (off = gap.serialize(buf, buflen, off));
             }
 	} 
 	return off;
     }
     
-    size_t size() const
+    size_t serial_size() const
     {
-        size_t source_size = flags & F_SOURCE ? source.size() : 0;
+        size_t source_size = flags & F_SOURCE ? source.serial_size() : 0;
         
 	switch (type) {
         case NONE:
             gcomm_throw_fatal << "Invalid message type NONE";
 	case USER:
             //                 bits seq aru_seq        view
-	    return source_size + 4 + 4  +  4  +  source_view.size();
+	    return source_size + 4 + 4  +  4  +  source_view.serial_size();
 	case GAP:
             //                 bits seq aru_seq     view               gap
-	    return source_size + 4 + 4  +  4  + source_view.size() + gap.size();
+	    return source_size + 4 + 4  +  4  + source_view.serial_size() + gap.serial_size();
 	case DELEGATE:
-	    return source.size() + 4; // @todo:???
+	    return source.serial_size() + 4; // @todo:???
 	case JOIN:
 	case INSTALL:
-	    return source_size + 4 + 4 + 4 + 8 + source_view.size()
+	    return source_size + 4 + 4 + 4 + 8 + source_view.serial_size()
                 + 4 + instances->serial_size();
 	case LEAVE:
-	    return source_size + 4 + 4 + 4 + 8 + source_view.size();
+	    return source_size + 4 + 4 + 4 + 8 + source_view.serial_size();
 	}
 
 	return 0;
@@ -654,14 +654,14 @@ public:
 
     const byte_t* get_hdr() const
     {
-	if (write(hdrbuf, sizeof(hdrbuf), 0) == 0)
+	if (serialize(hdrbuf, sizeof(hdrbuf), 0) == 0)
 	    gcomm_throw_fatal << "Short buffer";
 
 	return hdrbuf;
     }
 
     size_t get_hdrlen() const {
-	return size();
+	return serial_size();
     }
 
 
@@ -672,8 +672,8 @@ public:
         ret << "evsmsg("
             << "type: "     << to_string(get_type())   << ", "
             << "safetyp: "  << safety_prefix           << ", "
-            << "src: ("     << source.to_string()      << "), "
-            << "srcview: "  << source_view.to_string() << ", "
+            << "src: ("     << source                  << "), "
+            << "srcview: "  << source_view             << ", "
             << "seq: "      << seq                     << ", "
             << "aru_seq: "  << aru_seq                 << ", "
             << "fifo_seq: " << fifo_seq                << ", "
@@ -685,7 +685,7 @@ public:
             for (InstMap::const_iterator i = instances->begin();
                  i != instances->end(); ++i)
             {
-                ret << i->first.to_string() << ":" << i->second.to_string()
+                ret << i->first << ":" << i->second.to_string()
                     << " ";
             }
         }

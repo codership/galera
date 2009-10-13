@@ -137,9 +137,9 @@ public:
     {
         if (up_context != old_up) {
             gcomm_throw_fatal << "Context mismatch: " 
-                              << Pointer(old_up).to_string() 
+                              << old_up 
                               << " " 
-                              << Pointer(up_context).to_string();
+                              << up_context;
         }
         
         up_context = new_up;
@@ -149,9 +149,9 @@ public:
     {
         if (down_context != old_down) {
             gcomm_throw_fatal << "Context mismatch: " 
-                              << Pointer(old_down).to_string() 
+                              << old_down 
                               << " "
-                              << Pointer(down_context).to_string();
+                              << down_context;
         }
 
         down_context = new_down;

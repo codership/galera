@@ -5,21 +5,30 @@
 #ifndef _GCOMM_VIEW_HPP_
 #define _GCOMM_VIEW_HPP_
 
-#include <map>
-
 #include <gcomm/common.hpp>
 #include <gcomm/uuid.hpp>
 #include <gcomm/logger.hpp>
+#include <gcomm/types.hpp>
+#include <gcomm/map.hpp>
 
-BEGIN_GCOMM_NAMESPACE
-
-class ViewId
+namespace gcomm
 {
-    UUID    uuid; // uniquely identifies the sequence of group views (?)
-    uint32_t seq;  // position in the sequence                        (?)
+    class ViewId;
+    std::ostream& operator<<(std::ostream&, const ViewId&);
+    class Node;
+    std::ostream& operator<<(std::ostream&, const Node&);
+    class NodeList;
+    class View;
+    bool operator==(const View&, const View&);
+    std::ostream& operator<<(std::ostream&, const View&);
+}
 
+class gcomm::ViewId
+{
+    UUID uuid; // uniquely identifies the sequence of group views (?)
+    uint32_t    seq;  // position in the sequence                        (?)
 public:
-
+    
     ViewId () : uuid(), seq(0) {}
 
     ViewId (const UUID& uuid_, const uint32_t seq_) :
@@ -31,17 +40,17 @@ public:
     
     uint32_t     get_seq() const { return seq; }
     
-    size_t read (const byte_t* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
         throw (gu::Exception);
-
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    
+    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
         throw (gu::Exception);
-
-    static size_t size() 
+    
+    static size_t serial_size() 
     {
-        return UUID::size() + sizeof(reinterpret_cast<ViewId*>(0)->seq);
+        return UUID::serial_size() + sizeof(reinterpret_cast<ViewId*>(0)->seq);
     }
-
+    
     bool operator<(const ViewId& cmp) const
     {
         return uuid < cmp.uuid || (uuid == cmp.uuid && seq < cmp.seq);
@@ -51,92 +60,35 @@ public:
     {
         return uuid == cmp.uuid && seq == cmp.seq;
     }
-
+    
     bool operator!=(const ViewId& cmp) const
     {
         return !(*this == cmp);
     }
-
-    std::string to_string() const;
 };
 
-// why don't we just inherit from std::map ?
-class NodeList 
-{
+
+
+class gcomm::Node : public String<16> 
+{ 
 public:
-
-    typedef std::map<const UUID, std::string> Map;
-    typedef Map::const_iterator               const_iterator;
-    typedef Map::iterator                     iterator;
-
-private:
-
-    Map nodes;
-
-public:
-
-    NodeList() : nodes() {}
-
-    ~NodeList() {}
-    
-    const_iterator begin() const
-    {
-        return nodes.begin();
-    }
-
-    const_iterator end() const
-    {
-        return nodes.end();
-    }
-    
-    const_iterator find(const UUID& uuid) const
-    {
-        return nodes.find(uuid);
-    }
-
-    std::pair<iterator, bool> insert(const std::pair<const UUID,
-                                     const std::string>& p)
-    {
-        return nodes.insert(p);
-    }
-
-    bool empty() const
-    {
-        return nodes.empty();
-    }
-
-    bool operator==(const NodeList& other) const
-    {
-        return nodes == other.nodes;
-    }
-
-    size_t length() const { return nodes.size(); }
-    
-    static const size_t node_name_size = 16;
-
-    size_t read  (const byte_t*, size_t, size_t) throw (gu::Exception);
-    size_t write (byte_t*, size_t, size_t) const throw (gu::Exception);
-
-    size_t size  () const
-    {
-        return 4 + nodes.size()*(UUID::size() + node_name_size);
-    }
-
-    std::string to_string() const;
+    Node() : String<16>("") { }
+    bool operator==(const Node& cmp) const { return true; }
 };
 
-static inline const UUID& get_uuid(const NodeList::const_iterator i)
+inline std::ostream& gcomm::operator<<(std::ostream& os, const gcomm::Node& n)
 {
-    return i->first;
+    return (os << "");
 }
 
-static inline const std::string& get_name(const NodeList::const_iterator i)
-{
-    return i->second;
-}
+class gcomm::NodeList : 
+    public gcomm::Map<gcomm::UUID, gcomm::Node>
+{ 
+};
 
 
-class View
+
+class gcomm::View
 {    
 public:
 
@@ -161,9 +113,6 @@ private:
     NodeList left;
     NodeList partitioned;
     
-    /* Map pid to human readable string */
-    std::string pid_to_string(const UUID& pid) const;
-
 public:
 
     View() :
@@ -206,18 +155,18 @@ public:
 
     bool is_empty() const;
 
-    size_t read(const byte_t* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception);
 
-    size_t write(byte_t* buf, const size_t buflen, const size_t offset) const
+    size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
         throw (gu::Exception);
 
-    size_t size() const;
-    std::string to_string() const;
+    size_t serial_size() const;
 };
 
-bool operator==(const View&, const View&);
 
-END_GCOMM_NAMESPACE
+
+bool gcomm::operator==(const gcomm::View&, const gcomm::View&);
+
 
 #endif // _GCOMM_VIEW_HPP_
