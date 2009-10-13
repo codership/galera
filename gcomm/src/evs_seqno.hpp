@@ -1,3 +1,9 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
+
 #ifndef EVS_SEQNO_HPP
 #define EVS_SEQNO_HPP
 
@@ -146,7 +152,7 @@ public:
     
 private:
     uint16_t seq;
-    static const uint16_t seq_max = 0xffff;
+    static const uint16_t seq_max = 0x8000;
 };
 
 inline std::ostream& operator<<(std::ostream& os, const gcomm::evs::Seqno seq)

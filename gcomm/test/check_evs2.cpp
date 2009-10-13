@@ -1,5 +1,11 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
+
 /*!
- * @file Unit tests for EVS, this time serious
+ * @file Unit tests for refactored EVS
  */
 
 
@@ -10,8 +16,12 @@
 
 #include "check_gcomm.hpp"
 
+#include <vector>
+
 #include "check.h"
 
+
+using namespace std;
 using namespace gcomm;
 using namespace gcomm::evs;
 
@@ -94,13 +104,13 @@ START_TEST(test_input_map_insert)
     {
         InputMap::iterator i = im.find(uuid1, s);
         fail_if(i == im.end());
-        fail_unless(InputMapMsgIndex::get_value(i).get_uuid() == uuid1);
-        fail_unless(InputMapMsgIndex::get_value(i).get_msg().get_seq() == s);
+        fail_unless(InputMap::MsgIndex::get_value(i).get_uuid() == uuid1);
+        fail_unless(InputMap::MsgIndex::get_value(i).get_msg().get_seq() == s);
 
         i = im.find(uuid2, s);
         fail_if(i == im.end());
-        fail_unless(InputMapMsgIndex::get_value(i).get_uuid() == uuid2);
-        fail_unless(InputMapMsgIndex::get_value(i).get_msg().get_seq() == s);
+        fail_unless(InputMap::MsgIndex::get_value(i).get_uuid() == uuid2);
+        fail_unless(InputMap::MsgIndex::get_value(i).get_msg().get_seq() == s);
     }
     
 }
@@ -181,13 +191,77 @@ END_TEST
 
 START_TEST(test_input_map_erase)
 {
+    InputMap im;
+    UUID uuid1(1);
+    ViewId view(uuid1, 1);
+    im.insert_uuid(uuid1);
+
+    for (Seqno s = 0; s < 10; ++s)
+    {
+        im.insert(uuid1, UserMessage(view, s));
+    }
     
+    for (Seqno s = 0; s < 10; ++s)
+    {
+        InputMap::iterator i = im.find(uuid1, s);
+        fail_unless(i != im.end());
+        im.erase(i);
+        i = im.find(uuid1, s);
+        fail_unless(i == im.end());
+        (void)im.recover(uuid1, s);
+    }
+    im.set_safe_seq(uuid1, 9);
+    try
+    {
+        im.recover(uuid1, 9);
+        fail("");
+    }
+    catch (...) { }
 }
 END_TEST
 
 START_TEST(test_input_map_overwrap)
 {
+    InputMap im;
     
+    ViewId view(UUID(1), 1);
+    vector<UUID> uuids;
+    for (uint32_t n = 1; n <= 5; ++n)
+    {
+        uuids.push_back(UUID(n));
+    }
+
+    for (vector<UUID>::const_iterator i = uuids.begin(); i != uuids.end(); ++i)
+    {
+        im.insert_uuid(*i);
+    }
+    
+    Time start(Time::now());
+    size_t cnt = 0;
+    for (size_t n = 0; n < 100000; ++n)
+    {
+        UserMessage um(view, static_cast<uint16_t>(n % Seqno::max().get()));
+        for (vector<UUID>::const_iterator i = uuids.begin(); i != uuids.end();
+             ++i)
+        {
+            (void)im.insert(*i, um);
+            if ((n + 5) % 10 == 0)
+            {
+                im.set_safe_seq(*i, um.get_seq() - 3);
+                for (InputMap::iterator ii = im.begin(); 
+                     ii != im.end() && im.is_safe(ii) == true;
+                     ii = im.begin())
+                {
+                    im.erase(ii);
+                }
+            }
+            cnt++;
+        }
+    }
+    Time stop(Time::now());
+
+    log_info << "input map msg rate " << double(cnt)/(stop - start).to_double();
+
 }
 END_TEST
 

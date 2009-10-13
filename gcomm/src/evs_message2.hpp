@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -70,6 +70,10 @@ private:
     Seqno hs; /*!< Highest seen seqno  */
 };
 
+inline std::ostream& operator<<(std::ostream& os, const gcomm::evs::Range &r)
+{
+    return (os << "[" << r.get_lu() << "," << r.get_hs() << "]");
+}
 
 class gcomm::evs::MessageNode
 {
@@ -213,12 +217,6 @@ public:
      */
     const MessageNodeList& get_node_list() const { return *node_list; }
     
-    
-    /*!
-     * Set message tstamp.
-     */
-    void set_tstamp(const Time& tstamp_) { tstamp = tstamp_; }
-    
     /*!
      * Get timestamp associated to the message.
      */
@@ -278,7 +276,7 @@ protected:
         source_view_id(source_view_id_),
         range_uuid(range_uuid_),
         range(range_),
-        tstamp(tstamp_),
+        tstamp(Time::now()),
         node_list(node_list_ != 0 ? new MessageNodeList(*node_list_) : 0)
     { }
     
@@ -297,7 +295,7 @@ private:
     gcomm::ViewId       const source_view_id;
     gcomm::UUID         const range_uuid;
     Range               const range;
-    Time                      tstamp;
+    Time                const tstamp;
     MessageNodeList*    const node_list;
     
     void operator=(const Message&);

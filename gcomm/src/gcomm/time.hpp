@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
 #ifndef _GCOMM_TIME_HPP_
 #define _GCOMM_TIME_HPP_
 
@@ -59,31 +64,24 @@ public:
     /*!
      *
      */
-    Time operator+(const Time& t) const {
-	return time + t.time;
-    }
+    Time operator+(const Time& t) const { return time + t.time; }
+    
+    Time operator-(const Time& t) const { return time - t.time; }
+    
     
     /*!
      *
      */
-    bool operator<(const Time& cmp) const {
-	return time < cmp.time;
-    }
+    bool operator<(const Time& cmp) const { return time < cmp.time; }
 
     /*!
      *
      */
-    bool operator<=(const Time& cmp) const {
-        return time <= cmp.time;
-    }
+    bool operator<=(const Time& cmp) const { return time <= cmp.time; }
 
-    bool operator>(const Time& cmp) const {
-        return time > cmp.time;
-    }
+    bool operator>(const Time& cmp) const { return time > cmp.time; }
 
-    bool operator>=(const Time& cmp) const {
-        return time >= cmp.time;
-    }
+    bool operator>=(const Time& cmp) const { return time >= cmp.time; }
 
     /*!
      *

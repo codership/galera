@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
 
 #ifndef GCOMM_MAP_HPP
 #define GCOMM_MAP_HPP
@@ -45,6 +50,8 @@ namespace gcomm
             }
             return ret;
         }
+
+        iterator lower_bound(const K& k) { return map.lower_bound(k); }
         
         const_iterator begin()          const { return map.begin(); }
 
@@ -61,6 +68,8 @@ namespace gcomm
             }
             return ret;
         }
+
+        
     
         void erase(iterator i) { map.erase(i); }
 
@@ -195,7 +204,5 @@ namespace gcomm
             return MapBase<K, V, C>::map.equal_range(k);
         }
     };
-
-
 }
 #endif /* GCOMM_MAP_HPP */
