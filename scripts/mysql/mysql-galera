@@ -292,6 +292,24 @@ galera_restart()
     galera_start
 }
 
+galera_status()
+{
+    if test -f $MYSQL_PID
+    then
+	local my_pid=$(cat $MYSQL_PID)
+        if find_pid $my_pid
+        then
+            echo "mysqld running with PID: $my_pid"
+	else
+	    echo "Found existing '$MYSQL_PID', but mysqld is not running"
+	fi
+
+        exit 0;
+    else
+	echo "no PID file: '$MYSQL_PID'"
+    fi
+}
+
 dump()
 {
 #local ROUTINES="--routines" # don't dump routines yet, will cause false err.
@@ -403,7 +421,7 @@ case $1 in
             COMMAND=galera_restart
             ;;
 'status')
-            COMMAND=status
+            COMMAND=galera_status
             ;;
 'create')
             COMMAND="create_data_dir $2"
