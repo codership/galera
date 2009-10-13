@@ -293,7 +293,7 @@ static void fill_comp(gcs_comp_msg_t* msg,
 
     for (NodeList::const_iterator i = members.begin(); i != members.end(); ++i)
     {
-        const UUID& pid = get_uuid(i);
+        const UUID& pid = NodeList::get_key(i);
 
 	if (snprintf(msg->memb[n].id, sizeof(msg->memb[n].id), "%s",
                      pid.to_string().c_str())
@@ -307,13 +307,13 @@ static void fill_comp(gcs_comp_msg_t* msg,
 
 	if (comp_map)
         {
-            log_info << "[DEBUG] comp_map += (" << pid.to_string() << ", "
+            log_info << "[DEBUG] comp_map += (" << pid << ", "
                      << n<< ")";
-
+            
             if (!(comp_map->insert (make_pair (pid, n))).second)
                 gu_throw_fatal << "Could not insert into map: ("
                                << pid.to_string() << ", " << n << ")\n"
-                               << "NodeList: " << members.to_string();
+                               << "NodeList: " << members;
         }
 
 	n++;
@@ -397,7 +397,7 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
         {
             new_comp =
                 gcs_comp_msg_new(ev.view->get_type() == View::V_PRIM, 0, 
-                                 ev.view->get_members().length());
+                                 ev.view->get_members().size());
         }        
         else
         {
