@@ -61,6 +61,15 @@ void conn_remove_conn(connid_t conn_id) {
     );
     if (conn) {
         CHECK_OBJ(conn, conn_info);
+
+	/* release set database statement */
+	if (conn->set_default_db) {
+	    gu_free(conn->set_default_db);
+	}
+
+	/* release connection variables */
+	key_array_close(&conn->variables);
+
         gu_free(conn);
     } else {
         gu_error("Trying delete non existing conn: %lu", conn_id);
@@ -141,12 +150,24 @@ int wsdb_store_set_database(
 ) {
     struct conn_info *conn = get_conn_info(conn_id);
     GU_DBUG_ENTER("wsdb_store_set_database");
+
+    /* 
+     * Connection remove is currently wired to happen
+     * as set database with NULL db name.
+     * @todo: refactor wsrep API to have connection_close() call
+     */
+    if (set_db == NULL) {
+        conn_remove_conn(conn_id);
+	GU_DBUG_RETURN(WSDB_OK);
+    }
+
     if (!conn) {
         conn = new_conn_info(conn_id);
     }
     GU_DBUG_PRINT("wsdb",("set db for conn: %lu : %s", conn_id, set_db));
 
     if (conn->set_default_db) {
+        /* replacing connection */
         gu_free(conn->set_default_db);
     }
     conn->set_default_db = (char *) gu_malloc (set_db_len + 1);
