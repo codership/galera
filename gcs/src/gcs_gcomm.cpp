@@ -284,7 +284,7 @@ static void fill_comp(gcs_comp_msg_t* msg,
 {
     // TODO: 
     assert(msg != 0 && 
-           static_cast<size_t>(msg->memb_num) == members.length() &&
+           static_cast<size_t>(msg->memb_num) == members.size() &&
            comp_map != 0);
     
     comp_map->clear();
