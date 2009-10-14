@@ -41,7 +41,9 @@
 #include "gcomm/conf.hpp"
 #include "gcomm/transport.hpp"
 
+using namespace std;
 using namespace gcomm;
+using namespace gcomm::evs;
 
 /////////////////////////////////////////////////////////////////////////////
 // EVS interface
@@ -110,11 +112,11 @@ void EVS::connect()
         name = uuid.to_string();
     }
 
-    proto = new EVSProto(event_loop, tp, uuid, name, mon);
+    proto = new Proto(event_loop, tp, uuid, mon);
 
     gcomm::connect(tp, proto);
     gcomm::connect(proto, this);
-    proto->shift_to(EVSProto::S_JOINING);
+    proto->shift_to(Proto::S_JOINING);
     Time stop(Time::now() + Time(5, 0));
     do 
     {
@@ -124,7 +126,7 @@ void EVS::connect()
         log_debug << "poll returned " << ret;
     } 
     while (stop >= Time::now() && proto->get_known_size() == 1);
-    log_info << "EVS Proto initial state: " << proto->to_string();
+    log_info << "EVS Proto initial state: " << *proto;
     log_info << "EVS Proto sending join request";
     proto->send_join();
     do
@@ -135,7 +137,7 @@ void EVS::connect()
             log_warn << "poll(): " << ret;
         }
     }
-    while (proto->get_state() != EVSProto::S_OPERATIONAL);
+    while (proto->get_state() != Proto::S_OPERATIONAL);
 }
 
 
@@ -144,7 +146,7 @@ void EVS::close()
     Critical crit(mon);
 
     log_info << "EVS Proto leaving";
-    proto->shift_to(EVSProto::S_LEAVING);
+    proto->shift_to(Proto::S_LEAVING);
     log_info << "EVS Proto sending leave notification";
     proto->send_leave();
     do
@@ -152,7 +154,7 @@ void EVS::close()
         int ret = event_loop->poll(500);
         log_debug << "poll returned " << ret;
     } 
-    while (proto->get_state() != EVSProto::S_CLOSED);
+    while (proto->get_state() != Proto::S_CLOSED);
     
     int cnt = 0;
     do
@@ -186,8 +188,7 @@ size_t EVS::get_max_msg_size() const
     }
     else
     {
-        EVSUserMessage evsm (UUID (0, 0), 0xff, SAFE, 0, 0, 0,
-                             ViewId(UUID(), 0), 0);
+        UserMessage evsm;
         
         if (tp->get_max_msg_size() < evsm.serial_size())
         {

@@ -85,23 +85,29 @@ private:
 class gcomm::evs::MessageNode
 {
 public:
-    MessageNode(const bool    operational_  = false,
-                const bool    leaving_      = false,
-                const ViewId& current_view_ = ViewId(),
-                const Seqno   safe_seq_     = Seqno::max(),
-                const Range   im_range_     = Range()) :
+    MessageNode(const bool    operational_     = false,
+                const bool    leaving_         = false,
+                const ViewId& view_id_ = ViewId(),
+                const Seqno   safe_seq_        = Seqno::max(),
+                const Range   im_range_        = Range()) :
         operational(operational_),
         leaving(leaving_),
-        current_view(current_view_),
+        view_id(view_id_),
         safe_seq(safe_seq_),
         im_range(im_range_)
     { }
+
+    bool get_operational() const { return operational; }
+    bool get_leaving() const { return leaving; }
+    const ViewId& get_view_id() const { return view_id; }
+    Seqno get_safe_seq() const { return safe_seq; }
+    Range get_im_range() const { return im_range; }
 
     bool operator==(const MessageNode& cmp) const
     {
         return operational == cmp.operational &&
             leaving == cmp.leaving &&
-            current_view == cmp.current_view && 
+            view_id == cmp.view_id && 
             safe_seq == cmp.safe_seq &&
             im_range == cmp.im_range;
     }
@@ -112,11 +118,11 @@ public:
         throw(gu::Exception);
     static size_t serial_size();
 private:
-    bool     operational;  // Is operational
-    bool     leaving;      // Is leaving
-    ViewId   current_view; // Current view as seen by source of this message
-    Seqno    safe_seq;     // Safe seq as seen...
-    Range    im_range;     // Input map range as seen...
+    bool     operational;     // Is operational
+    bool     leaving;         // Is leaving
+    ViewId   view_id;         // Current view as seen by source of this message
+    Seqno    safe_seq;        // Safe seq as seen...
+    Range    im_range;        // Input map range as seen...
 };
 
 class gcomm::evs::MessageNodeList : 
@@ -143,7 +149,7 @@ public:
     
     
     static const uint8_t F_MSG_MORE = 0x1; /*!< Sender has more messages to send  */
-    static const uint8_t F_RESEND   = 0x2; /*!< Message is resent upon request    */
+    static const uint8_t F_RETRANS   = 0x2; /*!< Message is resent upon request    */
     static const uint8_t F_SOURCE   = 0x4;  /*!< Message has source set explicitly */
 
     /*!
@@ -304,7 +310,7 @@ public:
 
     virtual ~Message() { delete node_list; }
 
-protected:
+
     /*! Default constructor */
     Message(const uint8_t version_   = 0,
             const Type    type_      = T_NONE,
@@ -335,6 +341,8 @@ protected:
         tstamp(Time::now()),
         node_list(node_list_ != 0 ? new MessageNodeList(*node_list_) : 0)
     { }
+
+protected:
 
     size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
@@ -387,10 +395,13 @@ public:
                 Range(),
                 0)
     { }
-
+    
+    void set_aru_seq(const Seqno as) { aru_seq = as; }
+    
     size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
+                       bool skip_header = false)
         throw(gu::Exception);
     size_t serial_size() const;
 
@@ -399,7 +410,7 @@ public:
 class gcomm::evs::DelegateMessage : public Message
 {
 public:
-    DelegateMessage(const ViewId& source_view_id) : 
+    DelegateMessage(const ViewId& source_view_id, const UUID& source) : 
         Message(0, 
                 T_DELEGATE,
                 0xff,
@@ -413,7 +424,8 @@ public:
     { }
     size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
+                       bool skip_header = false)
         throw(gu::Exception);
     size_t serial_size() const;
 };
@@ -442,7 +454,8 @@ public:
     { }
     size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
+                       bool skip_header = false)
         throw(gu::Exception);
     size_t serial_size() const;
 };
@@ -471,7 +484,8 @@ public:
     { }
     size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
+                       bool skip_header = false)
         throw(gu::Exception);
     size_t serial_size() const;
 };
@@ -500,7 +514,8 @@ public:
     { }
     size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
+                       bool skip_header = false)
         throw(gu::Exception);
     size_t serial_size() const;
 };
@@ -525,7 +540,8 @@ public:
     { }
     size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
+                       bool skip_header = false)
         throw(gu::Exception);
     size_t serial_size() const;
 };

@@ -12,7 +12,6 @@ check_gcomm_SOURCES = 		\
 	check_concurrent.cpp	\
 	check_tcp.cpp		\
 	check_gmcast.cpp	\
-	check_evs.cpp		\
 	check_evs2.cpp		\
 	check_pc.cpp		\
 	check_gcomm.cpp

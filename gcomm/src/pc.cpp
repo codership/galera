@@ -7,8 +7,9 @@
 #include "gcomm/conf.hpp"
 #include "gcomm/time.hpp"
 
-
+using namespace std;
 using namespace gcomm;
+
 
 void PC::handle_up(const int cid, const ReadBuf* rb, const size_t roff, 
                    const ProtoUpMeta* um)
@@ -48,7 +49,7 @@ size_t PC::get_max_msg_size() const
     // TODO: 
     if (tp == 0) gcomm_throw_fatal << "not open";
 
-    EVSUserMessage evsm(UUID(), 0xff, SAFE, 0, 0, 0, ViewId(), 0);
+    evs::UserMessage evsm;
     PCUserMessage  pcm(0);
 
     if (tp->get_max_msg_size() < evsm.serial_size() + pcm.serial_size())
@@ -111,13 +112,13 @@ void PC::connect()
         name = uuid.to_string();
     }
 
-    evs = new EVSProto(event_loop, tp, uuid, name, mon);
+    evs = new evs::Proto(event_loop, tp, uuid, mon);
 
     gcomm::connect (tp, evs);
 
     const bool start_prim = host_is_any (uri.get_host());
 
-    evs->shift_to(EVSProto::S_JOINING);
+    evs->shift_to(evs::Proto::S_JOINING);
 
     do
     {
@@ -131,7 +132,7 @@ void PC::connect()
     }
     while (start_prim == false && evs->get_known_size() == 1);
 
-    log_info << "PC/EVS Proto initial state: " << evs->to_string();
+    log_info << "PC/EVS Proto initial state: " << *evs;
     
     pc = new PCProto (uuid, event_loop, mon, start_prim);
 
@@ -163,7 +164,7 @@ void PC::close()
     Critical crit(mon);
 
     log_info << "PC/EVS Proto leaving";
-    evs->shift_to(EVSProto::S_LEAVING);
+    evs->shift_to(evs::Proto::S_LEAVING);
     evs->send_leave();
 
     do
@@ -172,7 +173,7 @@ void PC::close()
 
         log_debug << "poll returned " << ret;
     } 
-    while (evs->get_state() != EVSProto::S_CLOSED);
+    while (evs->get_state() != evs::Proto::S_CLOSED);
 
     if (pc->get_state() != PCProto::S_CLOSED)
     {

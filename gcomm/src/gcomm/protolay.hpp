@@ -14,7 +14,7 @@
 #include <gcomm/view.hpp>
 #include <gcomm/exception.hpp>
 #include <gcomm/logger.hpp>
-
+#include <gcomm/safety_prefix.hpp>
 
 
 
@@ -76,13 +76,19 @@ public:
 /* message context to pass down? */
 class ProtoDownMeta
 {
-    const uint8_t user_type;
-
+    const uint8_t      user_type;
+    const SafetyPrefix sp;
 public:
 
-    ProtoDownMeta(const uint8_t user_type_) : user_type(user_type_) {}
+    ProtoDownMeta(const uint8_t user_type_ = 0xff, 
+                  const SafetyPrefix sp_   = SP_SAFE) : 
+        user_type(user_type_), 
+        sp(sp_) 
+    { }
 
     uint8_t get_user_type() const { return user_type; }
+    
+    SafetyPrefix get_safety_prefix() const { return sp; }
 };
 
 class Protolay

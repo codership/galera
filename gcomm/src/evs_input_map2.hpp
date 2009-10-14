@@ -100,7 +100,7 @@ public:
     class Msg
     {
     public:
-        Msg(const gcomm::UUID& uuid_, const Message& msg_, 
+        Msg(const gcomm::UUID& uuid_, const UserMessage& msg_, 
             gcomm::ReadBuf* const rb_) :
             uuid(uuid_),
             msg(msg_),
@@ -114,7 +114,7 @@ public:
         { }
         
         const UUID& get_uuid() const { return uuid; }
-        const Message& get_msg() const { return msg; }
+        const UserMessage& get_msg() const { return msg; }
         
         const gcomm::ReadBuf* get_rb() const { return rb; }
         gcomm::ReadBuf* get_rb() { return rb; }
@@ -122,7 +122,7 @@ public:
         void operator=(const Msg&);
         
         gcomm::UUID const uuid;
-        Message  const msg;
+        UserMessage  const msg;
         gcomm::ReadBuf* const rb;
     };
 
@@ -241,7 +241,7 @@ public:
      * @throws FatalException if node not found or message sequence 
      *         number is out of allowed range
      */
-    Range insert(const UUID& uuid, const Message& msg, 
+    Range insert(const UUID& uuid, const UserMessage& msg, 
                  const ReadBuf* rb = 0, size_t offset = 0);
     
     /*!
@@ -273,11 +273,11 @@ public:
      * @param uuid Message source node uuid
      * @param seq  Message sequence number
      *
-     * @return Const iterator pointing to the message
+     * @return Iterator pointing to the message
      *
      * @throws FatalException if node or message was not found
      */
-    const_iterator recover(const UUID& uuid, const Seqno seq) const;
+    iterator recover(const UUID& uuid, const Seqno seq) const;
     
     /*!
      * Insert node uuid.

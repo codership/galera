@@ -31,7 +31,7 @@ static GCommSuite suites[] = {
     {"concurrent", concurrent_suite},
     {"tcp", tcp_suite},
     {"gmcast", gmcast_suite},
-    {"evs", evs_suite},
+    // {"evs", evs_suite},
     {"evs2", evs2_suite},
     {"pc", pc_suite},
     {"", 0}

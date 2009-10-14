@@ -25,6 +25,7 @@ namespace gcomm
 
         typedef typename MapType::iterator       iterator;
         typedef typename MapType::const_iterator const_iterator;
+        typedef typename MapType::value_type     value_type;
 
     protected:
 
@@ -158,7 +159,20 @@ namespace gcomm
             return i->second;
         }
 
+        static const K& get_key(const value_type& vt)
+        {
+            return vt.first;
+        }
+        
+        static V& get_value(value_type& vt)
+        {
+            return vt.second;
+        }
 
+        static const V& get_value(const value_type& vt)
+        {
+            return vt.second;
+        }
     };
     
     template <typename K, typename V>

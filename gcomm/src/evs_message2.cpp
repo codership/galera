@@ -57,7 +57,7 @@ size_t gcomm::evs::MessageNode::serialize(byte_t* const buf,
     gu_trace(offset = gcomm::serialize(b, buf, buflen, offset));
     uint16_t pad(0);
     gu_trace(offset = gcomm::serialize(pad, buf, buflen, offset));
-    gu_trace(offset = current_view.serialize(buf, buflen, offset));
+    gu_trace(offset = view_id.serialize(buf, buflen, offset));
     gu_trace(offset = safe_seq.serialize(buf, buflen, offset));
     gu_trace(offset = im_range.serialize(buf, buflen, offset));    
     return offset;
@@ -90,7 +90,7 @@ size_t gcomm::evs::MessageNode::unserialize(const byte_t* const buf,
     {
         gcomm_throw_runtime(EINVAL) << "invalid pad" << pad;
     }
-    gu_trace(offset = current_view.unserialize(buf, buflen, offset));
+    gu_trace(offset = view_id.unserialize(buf, buflen, offset));
     gu_trace(offset = safe_seq.unserialize(buf, buflen, offset));
     gu_trace(offset = im_range.unserialize(buf, buflen, offset));    
     return offset;
@@ -218,10 +218,14 @@ size_t gcomm::evs::UserMessage::serialize(byte_t* const buf,
 
 size_t gcomm::evs::UserMessage::unserialize(const byte_t* const buf,
                                             size_t        const buflen,
-                                            size_t              offset)
+                                            size_t              offset,
+                                            bool                skip_header)
     throw(gu::Exception)
 {
-    gu_trace(offset = Message::unserialize(buf, buflen, offset));
+    if (skip_header == false)
+    {
+        gu_trace(offset = Message::unserialize(buf, buflen, offset));
+    }
     gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &user_type));
     uint8_t b;
     gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &b));
@@ -242,6 +246,36 @@ size_t gcomm::evs::UserMessage::serial_size() const
         
 }
 
+
+size_t gcomm::evs::DelegateMessage::serialize(byte_t* const buf,
+                                              size_t  const buflen,
+                                              size_t        offset) const
+    throw(gu::Exception)
+{
+    gu_trace(offset = Message::serialize(buf, buflen, offset));
+    return offset;
+}
+
+size_t gcomm::evs::DelegateMessage::unserialize(const byte_t* const buf,
+                                                size_t        const buflen,
+                                                size_t              offset,
+                                                bool                skip_header)
+    throw(gu::Exception)
+{
+    if (skip_header == false)
+    {
+        gu_trace(offset = Message::unserialize(buf, buflen, offset));
+    }
+    return offset;
+}
+
+size_t gcomm::evs::DelegateMessage::serial_size() const
+{
+    return Message::serial_size();
+}
+
+
+
 size_t gcomm::evs::GapMessage::serialize(byte_t* const buf,
                                          size_t  const buflen,
                                          size_t        offset) const
@@ -257,10 +291,14 @@ size_t gcomm::evs::GapMessage::serialize(byte_t* const buf,
 
 size_t gcomm::evs::GapMessage::unserialize(const byte_t* const buf,
                                            size_t        const buflen,
-                                           size_t              offset)
+                                           size_t              offset,
+                                           bool                skip_header)
     throw(gu::Exception)
 {
-    gu_trace(offset = Message::unserialize(buf, buflen, offset));
+    if (skip_header == false)
+    {
+        gu_trace(offset = Message::unserialize(buf, buflen, offset));
+    }
     gu_trace(offset = seq.unserialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.unserialize(buf, buflen, offset));
     gu_trace(offset = range_uuid.unserialize(buf, buflen, offset));
@@ -289,11 +327,15 @@ size_t gcomm::evs::JoinMessage::serialize(byte_t* const buf,
 }
 
 size_t gcomm::evs::JoinMessage::unserialize(const byte_t* const buf,
-                                           size_t        const buflen,
-                                           size_t              offset)
+                                            size_t        const buflen,
+                                            size_t              offset,
+                                            bool                skip_header)
     throw(gu::Exception)
 {
-    gu_trace(offset = Message::unserialize(buf, buflen, offset));
+    if (skip_header == false)
+    {
+        gu_trace(offset = Message::unserialize(buf, buflen, offset));
+    }
     gu_trace(offset = seq.unserialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.unserialize(buf, buflen, offset));
     gu_trace(offset = node_list->unserialize(buf, buflen, offset));
@@ -321,10 +363,14 @@ size_t gcomm::evs::InstallMessage::serialize(byte_t* const buf,
 
 size_t gcomm::evs::InstallMessage::unserialize(const byte_t* const buf,
                                            size_t        const buflen,
-                                           size_t              offset)
+                                               size_t              offset,
+                                               bool skip_header)
     throw(gu::Exception)
 {
-    gu_trace(offset = Message::unserialize(buf, buflen, offset));
+    if (skip_header == false)
+    {
+        gu_trace(offset = Message::unserialize(buf, buflen, offset));
+    }
     gu_trace(offset = seq.unserialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.unserialize(buf, buflen, offset));
     gu_trace(offset = node_list->unserialize(buf, buflen, offset));
@@ -352,10 +398,14 @@ size_t gcomm::evs::LeaveMessage::serialize(byte_t* const buf,
 
 size_t gcomm::evs::LeaveMessage::unserialize(const byte_t* const buf,
                                              size_t        const buflen,
-                                             size_t              offset)
+                                             size_t              offset,
+                                             bool skip_header)
     throw(gu::Exception)
 {
-    gu_trace(offset = Message::unserialize(buf, buflen, offset));
+    if (skip_header == false)
+    {
+        gu_trace(offset = Message::unserialize(buf, buflen, offset));
+    }
     gu_trace(offset = seq.unserialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.unserialize(buf, buflen, offset));
     return offset;

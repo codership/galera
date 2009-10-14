@@ -9,40 +9,46 @@
 #include <map>
 #include <set>
 
-BEGIN_GCOMM_NAMESPACE
 
-class EVSProto;
 
-class EVS : public Transport
+namespace gcomm
 {
-    Transport *tp;
-    EVSProto  *proto;
-    
-    EVS(const EVS&);
-    void operator=(const EVS&);
-
-public:
-    
-    EVS(const URI& uri_, EventLoop* event_loop_, Monitor*);
-    ~EVS();
-
-    void connect();
-    void close();
-    
-    void handle_up(const int, const ReadBuf*, const size_t, const ProtoUpMeta*);
-    int  handle_down(WriteBuf*, const ProtoDownMeta*);
-    
-    bool supports_uuid() const;
-    const UUID& get_uuid() const;
-
-    size_t get_max_msg_size() const;
-
-    EVSProto* get_proto() const
+    namespace evs
     {
-        return proto;
-    }
-};
+        class Proto;
+    } // namespace evs
 
-END_GCOMM_NAMESPACE
+    class EVS : public Transport
+    {
+        Transport *tp;
+        gcomm::evs::Proto  *proto;
+        
+        EVS(const EVS&);
+        void operator=(const EVS&);
+        
+    public:
+        
+        EVS(const URI& uri_, EventLoop* event_loop_, Monitor*);
+        ~EVS();
+        
+        void connect();
+        void close();
+        
+        void handle_up(const int, const ReadBuf*, const size_t, 
+                       const ProtoUpMeta*);
+        int  handle_down(WriteBuf*, const ProtoDownMeta*);
+        
+        bool supports_uuid() const;
+        const UUID& get_uuid() const;
+        
+        size_t get_max_msg_size() const;
+        
+        gcomm::evs::Proto* get_proto() const
+        {
+            return proto;
+        }
+    };
+} // namespace gcomm
+
 
 #endif // EVS_HPP

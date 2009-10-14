@@ -88,7 +88,7 @@ gcomm::evs::InputMap::iterator gcomm::evs::InputMap::end() const
 
 gcomm::evs::Range gcomm::evs::InputMap::insert(
     const UUID& uuid, 
-    const Message& msg, 
+    const UserMessage& msg, 
     const ReadBuf* const rb, 
     const size_t offset)
 {
@@ -193,7 +193,7 @@ gcomm::evs::InputMap::iterator gcomm::evs::InputMap::find(
 }
 
 
-gcomm::evs::InputMap::const_iterator gcomm::evs::InputMap::recover(
+gcomm::evs::InputMap::iterator gcomm::evs::InputMap::recover(
     const UUID& uuid,
     const Seqno seq) const
 {
@@ -310,7 +310,16 @@ void gcomm::evs::InputMap::insert_uuid(const UUID& uuid)
     }
 }
 
+const gcomm::evs::Range& InputMap::get_range(const UUID& uuid) const
+{
+    return NodeIndex::get_value(node_index->find_checked(uuid)).get_range();
+}
 
+
+gcomm::evs::Seqno InputMap::get_safe_seq(const UUID& uuid) const
+{
+    return NodeIndex::get_value(node_index->find_checked(uuid)).get_safe_seq();
+}
 
 void gcomm::evs::InputMap::clear()
 {
