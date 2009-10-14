@@ -205,13 +205,13 @@ std::ostream& gcomm::operator<<(std::ostream& os, const gcomm::View& view)
     else
     {
         os << view.get_id();
-        os << " memb (";
+        os << "\n\tmemb (";
         os << view.get_members();
-        os << ") joined (";
+        os << ")\n\tjoined (";
         os << view.get_joined();
-        os << ") left (";
+        os << ")\n\tleft (";
         os << view.get_left();
-        os << ") partitioned (";
+        os << ")\n\tpartitioned (";
         os << view.get_partitioned();
         os << ")";
     }

@@ -20,10 +20,12 @@ namespace gcomm
     namespace evs
     {
         class Range;
+        std::ostream& operator<<(std::ostream&, const Range&);
         class MessageNode;
+        std::ostream& operator<<(std::ostream&, const MessageNode&);
         class MessageNodeList;
         class Message;
-        
+        std::ostream& operator<<(std::ostream&, const Message&);
         class UserMessage;
         class DelegateMessage;
         class GapMessage;
@@ -68,23 +70,57 @@ public:
         return 2*Seqno::serial_size();
     }
 
+    bool operator==(const Range& cmp) const
+    {
+        return (lu == cmp.lu && hs == cmp.hs);
+    }
+
 private:
     Seqno lu; /*!< Lowest unseen seqno */
     Seqno hs; /*!< Highest seen seqno  */
 };
 
-inline std::ostream& operator<<(std::ostream& os, const gcomm::evs::Range &r)
-{
-    return (os << "[" << r.get_lu() << "," << r.get_hs() << "]");
-}
+
 
 class gcomm::evs::MessageNode
 {
+public:
+    MessageNode(const bool    operational_  = false,
+                const bool    leaving_      = false,
+                const ViewId& current_view_ = ViewId(),
+                const Seqno   safe_seq_     = Seqno::max(),
+                const Range   im_range_     = Range()) :
+        operational(operational_),
+        leaving(leaving_),
+        current_view(current_view_),
+        safe_seq(safe_seq_),
+        im_range(im_range_)
+    { }
+
+    bool operator==(const MessageNode& cmp) const
+    {
+        return operational == cmp.operational &&
+            leaving == cmp.leaving &&
+            current_view == cmp.current_view && 
+            safe_seq == cmp.safe_seq &&
+            im_range == cmp.im_range;
+    }
     
+    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+        throw(gu::Exception);
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+        throw(gu::Exception);
+    static size_t serial_size();
+private:
+    bool     operational;  // Is operational
+    bool     leaving;      // Is leaving
+    ViewId   current_view; // Current view as seen by source of this message
+    Seqno    safe_seq;     // Safe seq as seen...
+    Range    im_range;     // Input map range as seen...
 };
 
 class gcomm::evs::MessageNodeList : 
-    public gcomm::Map<const gcomm::UUID, MessageNode>
+    public gcomm::Map<gcomm::UUID, MessageNode>
 {
 };
 
@@ -96,12 +132,13 @@ class gcomm::evs::Message
 public:
     enum Type
     {
-        T_USER,     /*!< User generated message */
-        T_DELEGATE, /*!< Delegate message       */
-        T_GAP,      /*!< Gap message            */
-        T_JOIN,     /*!< Join message           */
-        T_LEAVE,    /*!< Leave message          */
-        T_INSTALL   /*!< Install message        */
+        T_NONE     = 0,
+        T_USER     = 1, /*!< User generated message */
+        T_DELEGATE = 2, /*!< Delegate message       */
+        T_GAP      = 3, /*!< Gap message            */
+        T_JOIN     = 4, /*!< Join message           */
+        T_INSTALL  = 5, /*!< Install message        */
+        T_LEAVE    = 6  /*!< Leave message          */
     };
     
     
@@ -177,6 +214,17 @@ public:
     uint8_t get_flags() const { return flags; }
     
     /*!
+     * Set message source
+     *
+     * @param uuid Source node uuid
+     */
+    void set_source(const UUID& uuid) 
+    { 
+        source = uuid; 
+        flags |= F_SOURCE;
+    }
+
+    /*!
      * Get message source UUID.
      *
      * @return Message source UUID.
@@ -212,6 +260,8 @@ public:
      * @return Fifo sequence number associated to the message.
      */
     int64_t get_fifo_seq() const { return fifo_seq; }
+
+    bool has_node_list() const { return (node_list != 0); }
     
     /*!
      * Get message node list.
@@ -224,6 +274,11 @@ public:
      * Get timestamp associated to the message.
      */
     const gcomm::Time& get_tstamp() const { return tstamp; }
+
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+        throw(gu::Exception);
+
+    bool operator==(const Message& cmp) const;
 
     /*!
      * Copy constructor.
@@ -251,21 +306,19 @@ public:
 
 protected:
     /*! Default constructor */
-    Message(const uint8_t version_,
-            const Type    type_,
-            const uint8_t user_type_,
-            const gcomm::SafetyPrefix safety_prefix_,
-            const Seqno& seq_,
-            const Seqno& seq_range_,
-            const Seqno& aru_seq_,
-            const int64_t fifo_seq_,
-            const uint8_t flags_,
-            const gcomm::UUID& source_,
-            const gcomm::ViewId& source_view_id_,
-            const gcomm::UUID& range_uuid_,
-            const Range range_,
-            const Time& tstamp_,
-            const MessageNodeList* node_list_) :
+    Message(const uint8_t version_   = 0,
+            const Type    type_      = T_NONE,
+            const uint8_t user_type_ = 0xff,
+            const gcomm::SafetyPrefix safety_prefix_ = SP_DROP,
+            const Seqno  seq_ = Seqno::max(),
+            const Seqno  seq_range_ = Seqno::max(),
+            const Seqno  aru_seq_ = Seqno::max(),
+            const int64_t fifo_seq_ = -1,
+            const uint8_t flags_ = 0,
+            const gcomm::ViewId& source_view_id_ = ViewId(),
+            const gcomm::UUID& range_uuid_ = UUID(),
+            const Range range_ = Range(),
+            const MessageNodeList* node_list_ = 0) :
         version(version_),
         type(type_),
         user_type(user_type_),
@@ -274,32 +327,35 @@ protected:
         seq_range(seq_range_),
         aru_seq(aru_seq_),
         fifo_seq(fifo_seq_),
-        flags(flags_),
-        source(source_),
+        flags(static_cast<uint8_t>(flags_ & ~F_SOURCE)),
+        source(),
         source_view_id(source_view_id_),
         range_uuid(range_uuid_),
         range(range_),
         tstamp(Time::now()),
         node_list(node_list_ != 0 ? new MessageNodeList(*node_list_) : 0)
     { }
+
+    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+        throw(gu::Exception);
+
+    size_t serial_size() const;
     
-private:    
-    
-    uint8_t             const version;
-    Type                const type;
-    uint8_t             const user_type;
-    gcomm::SafetyPrefix const safety_prefix;
-    Seqno               const seq;
-    Seqno               const seq_range;
-    Seqno               const aru_seq;
-    int64_t             const fifo_seq;
-    uint8_t             const flags;
-    gcomm::UUID               source;
-    gcomm::ViewId       const source_view_id;
-    gcomm::UUID         const range_uuid;
-    Range               const range;
-    Time                const tstamp;
-    MessageNodeList*    const node_list;
+    uint8_t              version;
+    Type                 type;
+    uint8_t              user_type;
+    gcomm::SafetyPrefix  safety_prefix;
+    Seqno                seq;
+    Seqno                seq_range;
+    Seqno                aru_seq;
+    int64_t              fifo_seq;
+    uint8_t              flags;
+    gcomm::UUID          source;
+    gcomm::ViewId        source_view_id;
+    gcomm::UUID          range_uuid;
+    Range                range;
+    Time           const tstamp;
+    MessageNodeList*     node_list;
     
     void operator=(const Message&);
 };
@@ -310,13 +366,13 @@ private:
 class gcomm::evs::UserMessage : public Message
 {
 public:
-    UserMessage(const gcomm::ViewId       source_view_id,
-                const Seqno&              seq,
-                const Seqno&              aru_seq       = Seqno::max(),
-                const Seqno&              seq_range     = 0,
-                const gcomm::SafetyPrefix safety_prefix = gcomm::SP_SAFE,
-                const uint8_t             user_type     = 0xff,
-                const uint8_t             flags         = 0             ) :
+    UserMessage(const gcomm::ViewId&      source_view_id = ViewId(),
+                const Seqno               seq            = Seqno::max(),
+                const Seqno               aru_seq        = Seqno::max(),
+                const Seqno               seq_range      = 0,
+                const gcomm::SafetyPrefix safety_prefix  = gcomm::SP_SAFE,
+                const uint8_t             user_type      = 0xff,
+                const uint8_t             flags          = 0             ) :
         Message(0,
                 Message::T_USER,
                 user_type,
@@ -326,14 +382,152 @@ public:
                 aru_seq,
                 -1,
                 flags,
-                UUID(),
                 source_view_id,
                 UUID(),
                 Range(),
-                Time::now(),
                 0)
     { }
+
+    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+        throw(gu::Exception);
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+        throw(gu::Exception);
+    size_t serial_size() const;
+
 };
 
+class gcomm::evs::DelegateMessage : public Message
+{
+public:
+    DelegateMessage(const ViewId& source_view_id) : 
+        Message(0, 
+                T_DELEGATE,
+                0xff,
+                SP_UNRELIABLE,
+                Seqno::max(),
+                Seqno::max(),
+                Seqno::max(),
+                -1,
+                0,
+                source_view_id) 
+    { }
+    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+        throw(gu::Exception);
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+        throw(gu::Exception);
+    size_t serial_size() const;
+};
+
+class gcomm::evs::GapMessage : public Message
+{
+public:
+    GapMessage(const Seqno   seq,
+               const Seqno   aru_seq,
+               const ViewId& source_view_id,
+               const UUID&   range_uuid,
+               const Range   range) : 
+        Message(0, 
+                T_GAP,
+                0xff,
+                SP_UNRELIABLE,
+                seq,
+                Seqno::max(),
+                aru_seq,
+                -1,
+                0,
+                source_view_id,
+                range_uuid,
+                range,
+                0)
+    { }
+    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+        throw(gu::Exception);
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+        throw(gu::Exception);
+    size_t serial_size() const;
+};
+
+class gcomm::evs::JoinMessage : public Message
+{
+public:
+    JoinMessage(const Seqno   seq, 
+                const Seqno   aru_seq,
+                const int64_t fifo_seq,
+                const ViewId& source_view_id,
+                const MessageNodeList* node_list) :
+        Message(0,
+                Message::T_JOIN,
+                0xff,
+                SP_UNRELIABLE,
+                seq,
+                Seqno::max(),
+                aru_seq,
+                fifo_seq,
+                0,
+                source_view_id,
+                UUID(),
+                Range(),
+                node_list)
+    { }
+    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+        throw(gu::Exception);
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+        throw(gu::Exception);
+    size_t serial_size() const;
+};
+
+class gcomm::evs::InstallMessage : public Message
+{
+public:
+    InstallMessage(const Seqno   seq, 
+                   const Seqno   aru_seq,
+                   const int64_t fifo_seq,
+                   const ViewId& source_view_id,
+                   const MessageNodeList* node_list) :
+        Message(0,
+                Message::T_INSTALL,
+                0xff,
+                SP_UNRELIABLE,
+                seq,
+                Seqno::max(),
+                aru_seq,
+                fifo_seq,
+                0,
+                source_view_id,
+                UUID(),
+                Range(),
+                node_list)
+    { }
+    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+        throw(gu::Exception);
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+        throw(gu::Exception);
+    size_t serial_size() const;
+};
+
+class gcomm::evs::LeaveMessage : public Message
+{
+public:
+    LeaveMessage(const Seqno   seq,
+                 const Seqno   aru_seq,
+                 const int64_t fifo_seq,
+                 const ViewId& source_view_id) :
+        Message(0,
+                T_LEAVE,
+                0xff,
+                SP_UNRELIABLE,
+                seq,
+                Seqno::max(),
+                aru_seq,
+                fifo_seq,
+                0,
+                source_view_id)
+    { }
+    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+        throw(gu::Exception);
+    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+        throw(gu::Exception);
+    size_t serial_size() const;
+};
 
 #endif // EVS_MESSAGE2_HPP

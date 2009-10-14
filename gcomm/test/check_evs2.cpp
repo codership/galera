@@ -15,6 +15,7 @@
 #include "evs_input_map2.hpp"
 
 #include "check_gcomm.hpp"
+#include "check_templ.hpp"
 
 #include <vector>
 
@@ -53,6 +54,31 @@ START_TEST(test_seqno)
     fail_unless(sk > s0);
     fail_unless(sk < sn);
     
+    Seqno ss(0x7aba);
+    check_serialization(ss, 2, Seqno());
+    
+}
+END_TEST
+
+START_TEST(test_range)
+{
+    Range r(3, 6);
+
+    check_serialization(r, 2*Seqno::serial_size(), Range());
+
+}
+END_TEST
+
+START_TEST(test_message)
+{
+    UUID uuid1(0, 0);
+    ViewId view_id(uuid1, 4567);
+    Seqno seq(478), aru_seq(456), seq_range(7);
+
+    UserMessage um(view_id, seq, aru_seq, seq_range);
+
+    check_serialization(um, um.serial_size(), UserMessage());
+
 }
 END_TEST
 
@@ -178,13 +204,9 @@ START_TEST(test_input_map_safety)
     fail_unless(im.is_safe(i) == true);
     
     im.insert(uuid1, UserMessage(view, 7));
-    try
-    {
-        im.set_safe_seq(uuid1, 7);
-        fail("");
-    } 
-    catch (...) { }
-
+    im.set_safe_seq(uuid1, im.get_aru_seq());
+    i = im.find(uuid1, 7);
+    fail_if(im.is_safe(i) == true);
 
 }
 END_TEST
@@ -238,8 +260,10 @@ START_TEST(test_input_map_overwrap)
     
     Time start(Time::now());
     size_t cnt = 0;
+    Seqno last_safe(Seqno::max());
     for (size_t n = 0; n < 100000; ++n)
     {
+
         UserMessage um(view, static_cast<uint16_t>(n % Seqno::max().get()));
         for (vector<UUID>::const_iterator i = uuids.begin(); i != uuids.end();
              ++i)
@@ -247,7 +271,8 @@ START_TEST(test_input_map_overwrap)
             (void)im.insert(*i, um);
             if ((n + 5) % 10 == 0)
             {
-                im.set_safe_seq(*i, um.get_seq() - 3);
+                last_safe = um.get_seq() - 3;
+                im.set_safe_seq(*i, last_safe);
                 for (InputMap::iterator ii = im.begin(); 
                      ii != im.end() && im.is_safe(ii) == true;
                      ii = im.begin())
@@ -257,9 +282,11 @@ START_TEST(test_input_map_overwrap)
             }
             cnt++;
         }
+        fail_unless(im.get_aru_seq() == um.get_seq());
+        fail_unless(im.get_safe_seq() == last_safe);
     }
     Time stop(Time::now());
-
+    
     log_info << "input map msg rate " << double(cnt)/(stop - start).to_double();
 
 }
@@ -273,6 +300,14 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_seqno");
     tcase_add_test(tc, test_seqno);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_range");
+    tcase_add_test(tc, test_range);
+    suite_add_tcase(s, tc);
+    
+    tc = tcase_create("test_message");
+    tcase_add_test(tc, test_message);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_input_map_insert");

@@ -186,7 +186,7 @@ START_TEST(test_map)
     typedef Map<IntType<int>, IntType<int>, std::map<IntType<int>, IntType<int> > > IntMap;
 
     IntMap m;
-    check_new_serialization(m, 4, IntMap());
+    check_serialization(m, 4, IntMap());
 
     m.insert(make_pair(make_int<int>(1), make_int<int>(2)));
 

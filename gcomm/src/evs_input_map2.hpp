@@ -317,6 +317,10 @@ private:
     NodeIndex* node_index;     /*!< Index of nodes          */
     MsgIndex*  msg_index;      /*!< Index of messages       */
     MsgIndex*  recovery_index; /*!< Recovery index          */
+
+    uint64_t   inserted;
+    uint64_t   updated_aru;
+
 };
 
 #endif // EVS_INPUT_MAP2_HPP

@@ -32,7 +32,9 @@ gcomm::evs::InputMap::InputMap() :
     aru_seq(Seqno::max()),
     node_index(new NodeIndex()),
     msg_index(new MsgIndex()),
-    recovery_index(new MsgIndex())
+    recovery_index(new MsgIndex()),
+    inserted(0),
+    updated_aru(0)
 {
 }
 
@@ -43,7 +45,9 @@ gcomm::evs::InputMap::~InputMap()
     delete node_index;
     delete msg_index;
     delete recovery_index;
+    log_info << "inserted: " << inserted << " updated aru: " << updated_aru;
 }
+
 
 
 bool gcomm::evs::InputMap::is_safe(iterator i) const
@@ -137,6 +141,7 @@ gcomm::evs::Range gcomm::evs::InputMap::insert(
             (void)msg_index->insert_checked(
                 make_pair(MsgKey(node.get_index(), s), 
                           Msg(uuid, msg, ins_rb)));
+            ++inserted;
         }
         
         /* Update highest seen */
@@ -159,8 +164,15 @@ gcomm::evs::Range gcomm::evs::InputMap::insert(
         }
     }
     
+
+    bool do_update_aru = (aru_seq == Seqno::max() || 
+                          (aru_seq + 1) < range.get_lu());
     node.set_range(range);
-    update_aru();
+    if (do_update_aru == true)
+    {
+        update_aru();
+        ++updated_aru;
+    }
     return range;
 }
 
@@ -246,15 +258,20 @@ struct SetSafeSeqCmp
 void gcomm::evs::InputMap::set_safe_seq(const UUID& uuid, const Seqno seq)
 {
     gcomm_assert(seq != Seqno::max());
-    gcomm_assert(aru_seq != Seqno::max() && seq <= aru_seq);
+    // @note This assertion does not necessarily hold. Some other 
+    // instance may well have higher all received up to seqno 
+    // than this (due to packet loss). Commented out... and left
+    // for future reference.
+    // gcomm_assert(aru_seq != Seqno::max() && seq <= aru_seq);
     
-    // Update node safe seq
+    // Update node safe seq. Must (at least should) be updated
+    // in monotonically increasing order if node works ok.
     Node& node(NodeIndex::get_value(node_index->find_checked(uuid)));
     gcomm_assert(node.get_safe_seq() == Seqno::max() || 
                  seq >= node.get_safe_seq());
     node.set_safe_seq(seq);
-
-    // Update min safe seq
+    
+    // Update global safe seq which must be monotonically increasing.
     NodeIndex::const_iterator min = 
         min_element(node_index->begin(), node_index->end(), SetSafeSeqCmp());
     const Seqno minval = NodeIndex::get_value(min).get_safe_seq();
@@ -264,6 +281,7 @@ void gcomm::evs::InputMap::set_safe_seq(const UUID& uuid, const Seqno seq)
     // Cleanup recovery index
     cleanup_recovery_index();
 }
+
 
 void gcomm::evs::InputMap::cleanup_recovery_index()
 {
