@@ -36,11 +36,11 @@ struct vs_ev
     size_t       msg_size;
 
     vs_ev(const ReadBuf *r, 
-          const ProtoUpMeta* um_,
+          const ProtoUpMeta& um_,
           const size_t roff, 
           const size_t ms, const View *v) :
 	rb(0), 
-        um(*um_),
+        um(um_),
         view(0),
         msg_size(ms) 
     {
@@ -105,34 +105,34 @@ struct gcs_gcomm : public Toplay
         while (eq.size()) { release_event(); }
     }
     
-    void handle_up(const int cid, const ReadBuf *rb, const size_t roff, 
-		   const ProtoUpMeta *um) 
+    void handle_up(int cid, const ReadBuf *rb, size_t roff, 
+		   const ProtoUpMeta& um) 
     {
 
-	// null rb and um denotes eof (broken connection)
-	if (!(rb || um)) 
+	// null rb denotes eof (broken connection)
+	if (rb == 0) 
         {
             log_warn << "gcomm backed thread exit";
-
+            
 	    {
                 gu::Lock lock(mutex);
-                eq.push_back(vs_ev(0, 0, 0, 0, 0));
+                eq.push_back(vs_ev(0, ProtoUpMeta(), 0, 0, 0));
                 cond.signal();
             }
-
+            
             el->interrupt();
-
+            
 	    return;
 	}
         
-	assert(rb || (um->get_view() && 
-                      (um->get_view()->get_type() == View::V_PRIM ||
-                       um->get_view()->get_type() == View::V_NON_PRIM)));
+	assert(rb || (um.has_view() == true && 
+                      (um.get_view().get_type() == View::V_PRIM ||
+                       um.get_view().get_type() == View::V_NON_PRIM)));
         
-        if (um->get_view() && um->get_view()->is_empty())
+        if (um.has_view() == true && um.get_view().is_empty() == true)
         {
 	    log_debug << "empty view, leaving";
-	    eq.push_back(vs_ev(0, um, 0, 0, um->get_view()));
+	    eq.push_back(vs_ev(0, um, 0, 0, &um.get_view()));
 	    // Reached the end
             {
                 gu::Lock lock(mutex);
@@ -160,16 +160,17 @@ struct gcs_gcomm : public Toplay
 	} 
         else
         {
-	    eq.push_back(vs_ev(rb, um, roff, 0, um->get_view()));
+	    eq.push_back(vs_ev(rb, um, roff, 0, 
+                               um.has_view() ? &um.get_view() : 0));
 	}
-
+        
 	cond.signal();
     }
 
     std::pair<vs_ev, bool> wait_event (void* wb, size_t wb_len)
     {
         gu::Lock lock(mutex);
-
+        
 	while (eq.size() == 0)
         {
 	    waiter_buf     = wb;
@@ -259,8 +260,7 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
 
     try
     {
-	ProtoDownMeta vdm(msg_type);
-	err = conn->vs_ctx.pass_down(&wb, &vdm);
+	err = conn->vs_ctx.pass_down(&wb, ProtoDownMeta(msg_type));
     }
     catch (Exception& e)
     {
