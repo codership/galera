@@ -24,14 +24,7 @@ using namespace gcomm;
 
 static const uint32_t EVS_SEQNO_MAX = 0x800U;
 
-struct delete_object
-{
-    template <typename T>
-    void operator()(T* t)
-    {
-        delete t;
-    }
-};
+
 
 
 START_TEST(test_seqno)

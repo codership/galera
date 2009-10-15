@@ -707,6 +707,262 @@ START_TEST(test_proto_double_join)
 }
 END_TEST
 
+class DummyNode
+{
+public:
+    DummyNode(size_t idx, EventLoop* el) : 
+        index(idx),
+        uuid(UUID(static_cast<int32_t>(idx))),
+        u(), 
+        t(uuid),
+        p(el, &t, uuid, 0) 
+    { 
+        connect(&t, &p);
+        connect(&p, &u);
+    }
+    
+    ~DummyNode()
+    {
+        disconnect(&t, &p);
+        disconnect(&p, &u);
+    }
+    
+    DummyTransport* get_tp() { return &t; }
+
+    size_t get_index() const { return index; }
+
+    void join(bool first)
+    {
+        p.shift_to(Proto::S_JOINING);
+        p.send_join(first);
+    }
+    
+    void leave()
+    {
+        p.shift_to(Proto::S_LEAVING);
+        p.send_leave();
+    }
+    
+private:
+    size_t index;
+    UUID uuid;
+    DummyUser u;
+    DummyTransport t;
+    Proto p;
+};
+
+
+class Channel
+{
+public:
+    Channel(const size_t ttl_ = 1, 
+            const size_t latency_ = 1, 
+            const double loss_ = 1.) :
+        ttl(ttl_),
+        latency(latency_),
+        loss(loss_),
+        queue()
+    { }
+
+    void put(const ReadBuf* rb) 
+    { 
+        queue.push_back(make_pair(latency, rb->copy()));
+    }
+
+    ReadBuf* get()
+    {
+        while (queue.empty() == false)
+        {
+            pair<size_t, ReadBuf*> p(queue.front());
+            if (p.first == 0)
+            {
+                // todo: packet loss goes here
+                queue.pop_front();
+                return p.second;
+            }
+            else
+            {
+                --p.first;
+                return 0;
+            }
+        }
+        return 0;
+    }
+    
+    void set_ttl(const size_t t) { ttl = t; }
+    size_t get_ttl() const { return ttl; }
+    void set_latency(const size_t l) { latency = l; }
+    size_t get_latency() const { return latency; }
+    void set_loss(const double l) { loss = l; }
+    double get_loss() const { return loss; }
+private:
+    size_t ttl;
+    size_t latency;
+    double loss;
+    deque<pair<size_t, ReadBuf*> > queue;
+};
+
+ostream& operator<<(ostream& os, const Channel& ch)
+{
+    return os;
+}
+
+class MatrixElem
+{
+public:
+    MatrixElem(const size_t ii_, const size_t jj_) : ii(ii_), jj(jj_) { }
+    size_t get_ii() const { return ii; }
+    size_t get_jj() const { return jj; }
+    bool operator<(const MatrixElem& cmp) const
+    {
+        return (ii < cmp.ii || (ii == cmp.ii && jj < cmp.jj));
+    }
+private:
+    size_t ii;
+    size_t jj;
+};
+
+
+ostream& operator<<(ostream& os, const MatrixElem& me)
+{
+    return (os << "(" << me.get_ii() << "," << me.get_jj() << ")");
+}
+
+class LinkOp
+{
+public:
+    LinkOp(const size_t idx_, map<MatrixElem, Channel>& prop_) : 
+        idx(idx_), prop(prop_) { }
+    void operator()(const map<size_t, DummyTransport*>::value_type& l) const
+    {
+        if (l.first != idx)
+        {
+            gcomm_assert(
+                prop.insert(
+                    make_pair(MatrixElem(idx, l.first), Channel())).second == true);
+            gcomm_assert(
+                prop.insert(
+                    make_pair(MatrixElem(l.first, idx), Channel())).second == true);
+        }
+    }
+private:
+    size_t idx;
+    map<MatrixElem, Channel>& prop;
+};
+
+class ReadTpOp
+{
+public:
+    ReadTpOp(map<MatrixElem, Channel>& prop_) : prop(prop_) { }
+
+    void operator()(const map<size_t, DummyTransport*>::value_type& vt)
+    {
+        ReadBuf* rb = vt.second->get_out();
+        if (rb != 0)
+        {
+            for (map<MatrixElem, Channel>::iterator i = prop.begin();
+                 i != prop.end(); ++i)
+            {
+                if (i->first.get_ii() == vt.first)
+                {
+                    i->second.put(rb);
+                }
+            }
+        }
+        rb->release();
+    }
+private:
+    map<MatrixElem, Channel>& prop;
+};
+
+
+class PropagateOp
+{
+public:
+    PropagateOp(map<size_t, DummyTransport*>& tp_) : tp(tp_) { }
+
+    void operator()(map<MatrixElem, Channel>::value_type& vt)
+    {
+        ReadBuf* rb = vt.second.get();
+        if (rb != 0)
+        {
+            map<size_t, DummyTransport*>::iterator i = tp.find(vt.first.get_jj());
+            gcomm_assert(i != tp.end());
+            i->second->handle_up(-1, rb, 0, ProtoUpMeta());
+        }
+        rb->release();
+    }
+
+private:
+    map<size_t, DummyTransport*>& tp;
+};
+
+class PropagationMatrix
+{
+public:
+    PropagationMatrix() : tp(), prop() { }
+    
+
+    
+    void insert_tp(const size_t idx, DummyTransport* t)
+    {
+        gcomm_assert(tp.insert(make_pair(idx, t)).second == true);
+        for_each(tp.begin(), tp.end(), LinkOp(idx, prop));
+    }
+
+    void propagate_n(size_t n)
+    {
+        while (n-- > 0)
+        {
+            for_each(tp.begin(), tp.end(), ReadTpOp(prop));
+            for_each(prop.begin(), prop.end(), PropagateOp(tp));
+        }
+    }
+
+    friend ostream& operator<<(ostream&, const PropagationMatrix&);
+private:
+    map<size_t, DummyTransport*> tp;
+    map<MatrixElem, Channel> prop;
+};
+
+ostream& operator<<(ostream& os, const map<MatrixElem, Channel>::value_type& v)
+{
+    return (os << "(" << v.first.get_ii() << "," << v.first.get_jj() << ")");
+}
+
+ostream& operator<<(ostream& os, const PropagationMatrix& prop)
+{
+    os << "(";
+    copy(prop.prop.begin(), prop.prop.end(), 
+         ostream_iterator<const map<MatrixElem, Channel>::value_type>(os, ","));
+    os << ")";
+    return os;
+}
+
+static void join_node(PropagationMatrix* p, 
+                      DummyNode* n, bool first = false)
+{
+    p->insert_tp(n->get_index(), n->get_tp());
+    n->join(first);
+}
+
+START_TEST(test_proto_random_join)
+{
+    EventLoop el;
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+
+    dn.push_back(new DummyNode(1, &el));
+    dn.push_back(new DummyNode(2, &el));
+
+    join_node(&prop, dn[0], true);
+
+    for_each(dn.begin(), dn.end(), delete_object());
+
+
+}
+END_TEST
+
 Suite* evs2_suite()
 {
     Suite* s = suite_create("gcomm::evs");
@@ -755,6 +1011,10 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_proto_double_join");
     tcase_add_test(tc, test_proto_double_join);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_proto_random_join");
+    tcase_add_test(tc, test_proto_random_join);
     suite_add_tcase(s, tc);
     
     return s;

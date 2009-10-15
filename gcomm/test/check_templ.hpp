@@ -162,6 +162,15 @@ namespace gcomm
         }
     };
 
+    struct delete_object
+    {
+        template <typename T>
+        void operator()(T* t)
+        {
+            delete t;
+        }
+    };
+
 } // namespace gcomm
 
 #endif // CHECK_TEMPL_HPP
