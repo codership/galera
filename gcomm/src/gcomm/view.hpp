@@ -53,7 +53,7 @@ public:
     
     bool operator<(const ViewId& cmp) const
     {
-        return uuid < cmp.uuid || (uuid == cmp.uuid && seq < cmp.seq);
+        return (seq < cmp.seq || (seq == cmp.seq && uuid < cmp.uuid));
     }
 
     bool operator==(const ViewId& cmp) const

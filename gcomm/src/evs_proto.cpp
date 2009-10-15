@@ -858,7 +858,8 @@ int gcomm::evs::Proto::send_user(WriteBuf* wb,
     
     // Insert first to input map to determine correct aru seq
     ReadBuf* rb = wb->to_readbuf();
-    const Range range(input_map->insert(get_uuid(), msg, rb, 0));
+    Range range;
+    gu_trace(range = input_map->insert(get_uuid(), msg, rb, 0));
     rb->release();
     
     last_sent = last_msg_seq;
@@ -1180,15 +1181,16 @@ void gcomm::evs::Proto::send_install()
 
 void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
 {
-    assert(gap_source != get_uuid());
-    assert(range.get_lu() != Seqno::max() && range.get_hs() != Seqno::max());
+    gcomm_assert(gap_source != get_uuid());
+    gcomm_assert(range.get_lu() != Seqno::max() && 
+                 range.get_hs() != Seqno::max());
     gcomm_assert(range.get_lu() <= range.get_hs()) << 
         "lu (" << range.get_lu() << ") > hs(" << range.get_hs() << ")"; 
     
-    if (range.get_lu() <= input_map->get_safe_seq())
+    if (input_map->get_safe_seq() != Seqno::max() &&
+        range.get_lu() <= input_map->get_safe_seq())
     {
         log_warn << "lu <= safe_seq";
-        return;
     }
     
     log_debug << self_string() << " resending, requested by " 
@@ -1986,8 +1988,18 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     const Seqno prev_aru(input_map->get_aru_seq());
     const Seqno prev_safe(input_map->get_safe_seq());
     const Range prev_range(input_map->get_range(msg.get_source()));
-    const Range range(input_map->insert(msg.get_source(), msg, rb, roff));
+    Range range;
     
+    // Insert only if msg seq is greater or equal than current lowest unseen
+    if (msg.get_seq() >= prev_range.get_lu())
+    {
+        gu_trace(range = input_map->insert(msg.get_source(), msg, rb, roff));
+    }
+    else
+    {
+        range = prev_range;
+    }
+
     if (range.get_lu() > prev_range.get_lu())
     {
         inst.set_tstamp(Time::now());
