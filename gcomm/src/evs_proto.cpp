@@ -12,6 +12,44 @@ using namespace std;
 using namespace gcomm;
 using namespace gcomm::evs;
 
+gcomm::evs::Node::~Node()
+{
+    delete join_message;
+    delete leave_message;
+}
+
+void gcomm::evs::Node::set_join_message(const JoinMessage* jm)
+{
+    if (join_message != 0)
+    {
+        delete join_message;
+    }
+    if (jm != 0)
+    {
+        join_message = new JoinMessage(*jm);
+    }
+    else
+    {
+        join_message = 0;
+    }
+}
+
+void gcomm::evs::Node::set_leave_message(const LeaveMessage* lm)
+{
+    if (leave_message != 0)
+    {
+        delete leave_message;
+    }
+    if (lm != 0)
+    {
+        leave_message = new LeaveMessage(*lm);
+    }
+    else
+    {
+        leave_message = 0;
+    }
+}
+
 static bool msg_from_previous_view(const list<pair<ViewId, Time> >& views, 
                                    const Message& msg)
 {
@@ -51,7 +89,7 @@ gcomm::evs::Proto::Proto(EventLoop* el_,
     current_view(View::V_TRANS, ViewId(my_uuid, 0)),
     previous_view(),
     previous_views(),
-    im(),
+    input_map(new InputMap()),
     install_message(0),
     installing(false),
     fifo_seq(-1),
@@ -68,7 +106,7 @@ gcomm::evs::Proto::Proto(EventLoop* el_,
     self_i = known.begin();
     assert(NodeMap::get_value(self_i).get_operational() == true);
     
-    im.insert_uuid(my_uuid);
+    input_map->insert_uuid(my_uuid);
     current_view.add_member(my_uuid, "");
     
     ith = new InactivityTimerHandler(*this);
@@ -88,6 +126,7 @@ gcomm::evs::Proto::~Proto()
     }
     output.clear();
     delete install_message;
+    delete input_map;
     delete ith;
     delete cth;
     delete consth;
@@ -411,7 +450,7 @@ bool gcomm::evs::Proto::is_consistent_input_map(const Message& msg) const
             inst.get_join_message() != 0 &&
             inst.get_join_message()->get_source_view_id() == current_view.get_id())
         {
-            (void)local_insts.insert_checked(make_pair(uuid, im.get_range(uuid)));
+            (void)local_insts.insert_checked(make_pair(uuid, input_map->get_range(uuid)));
         }
     }
     
@@ -457,7 +496,7 @@ bool gcomm::evs::Proto::is_consistent_partitioning(const Message& msg) const
             current_view.get_members().find(uuid) != current_view.get_members().end())
         {
             (void)local_insts.insert_checked(make_pair(uuid, 
-                                                       im.get_range(uuid)));
+                                                       input_map->get_range(uuid)));
         }
     }
     
@@ -505,7 +544,7 @@ bool gcomm::evs::Proto::is_consistent_leaving(const Message& msg) const
             current_view.get_members().find(uuid) != current_view.get_members().end())
         {
             (void)local_insts.insert_checked(make_pair(uuid, 
-                                                       im.get_range(uuid)));
+                                                       input_map->get_range(uuid)));
         }
     }
     
@@ -538,17 +577,17 @@ bool gcomm::evs::Proto::is_consistent_same_view(const Message& msg) const
     gcomm_assert(msg.get_source_view_id() == current_view.get_id());
     
     // Compare aru seqs
-    if (im.get_aru_seq() != msg.get_aru_seq())
+    if (input_map->get_aru_seq() != msg.get_aru_seq())
     {
-        log_debug << "aru seq not consistent, local " << im.get_aru_seq()
+        log_debug << "aru seq not consistent, local " << input_map->get_aru_seq()
                   << " msg " << msg.get_aru_seq();
         return false;
     }
     
     // Compare safe seqs
-    if (im.get_safe_seq() != msg.get_seq())
+    if (input_map->get_safe_seq() != msg.get_seq())
     {
-        log_debug << "safe seq not consistent, local " << im.get_safe_seq()
+        log_debug << "safe seq not consistent, local " << input_map->get_safe_seq()
                   << " msg " << msg.get_seq();
         return false;
     }
@@ -670,7 +709,7 @@ bool gcomm::evs::Proto::is_flow_control(const Seqno seq, const Seqno win) const
 {
     assert(seq != Seqno::max() && win != Seqno::max());
     
-    const Seqno base(im.get_aru_seq() == Seqno::max() ? 0 : im.get_aru_seq());
+    const Seqno base(input_map->get_aru_seq() == Seqno::max() ? 0 : input_map->get_aru_seq());
     if (seq >= base + win)
     {
         return true;
@@ -721,7 +760,7 @@ int gcomm::evs::Proto::send_user(WriteBuf* wb,
     UserMessage msg(get_uuid(),
                     current_view.get_id(), 
                     seq,
-                    im.get_aru_seq(),
+                    input_map->get_aru_seq(),
                     seq_range,
                     sp, 
                     user_type,
@@ -730,18 +769,18 @@ int gcomm::evs::Proto::send_user(WriteBuf* wb,
     
     // Insert first to input map to determine correct aru seq
     ReadBuf* rb = wb->to_readbuf();
-    const Range range(im.insert(get_uuid(), msg, rb, 0));
+    const Range range(input_map->insert(get_uuid(), msg, rb, 0));
     rb->release();
     
     last_sent = last_msg_seq;
     assert(range.get_hs() == last_sent);
-    im.set_safe_seq(get_uuid(), im.get_aru_seq());
+    input_map->set_safe_seq(get_uuid(), input_map->get_aru_seq());
     pop_header(msg, wb);
     
     if (local == false)
     {
         // Rewrite message hdr to include correct aru
-        msg.set_aru_seq(im.get_aru_seq());
+        msg.set_aru_seq(input_map->get_aru_seq());
         push_header(msg, wb);
         if ((ret = pass_down(wb, 0)))
         {
@@ -811,7 +850,7 @@ void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
     GapMessage gm(get_uuid(),
                   source_view_id,
                   last_sent, 
-                  im.get_aru_seq(), 
+                  input_map->get_aru_seq(), 
                   range_uuid, 
                   range);
     
@@ -838,8 +877,8 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                             (in_current == true ? 
                              current_view.get_id() : 
                              ViewId()));
-        const Seqno safe_seq = (in_current == true ? im.get_safe_seq(uuid) : Seqno::max());
-        const Range range = (in_current == true ? im.get_range(uuid) : Range());
+        const Seqno safe_seq = (in_current == true ? input_map->get_safe_seq(uuid) : Seqno::max());
+        const Range range = (in_current == true ? input_map->get_range(uuid) : Range());
         const MessageNode mnode(node.get_operational(),
                                 has_leave(uuid),
                                 vid, 
@@ -857,8 +896,8 @@ JoinMessage gcomm::evs::Proto::create_join()
     populate_node_list(&node_list);
     JoinMessage jm(get_uuid(),
                    current_view.get_id(),
-                   im.get_safe_seq(),
-                   im.get_aru_seq(),
+                   input_map->get_safe_seq(),
+                   input_map->get_aru_seq(),
                    ++fifo_seq,
                    &node_list);
     
@@ -874,7 +913,7 @@ void gcomm::evs::Proto::set_join(const JoinMessage& jm, const UUID& source)
 {
     NodeMap::iterator i;
     gu_trace(i = known.find_checked(source));
-    NodeMap::get_value(i).set_join_message(new JoinMessage(jm));
+    NodeMap::get_value(i).set_join_message(&jm);;
 }
 
 
@@ -892,7 +931,7 @@ void gcomm::evs::Proto::set_leave(const LeaveMessage& lm, const UUID& source)
     }
     else
     {
-        inst.set_leave_message(new LeaveMessage(lm));
+        inst.set_leave_message(&lm);
     }
 }
 
@@ -967,7 +1006,7 @@ void gcomm::evs::Proto::send_leave()
     LeaveMessage lm(get_uuid(),
                     current_view.get_id(),
                     last_sent,
-                    im.get_aru_seq(), 
+                    input_map->get_aru_seq(), 
                     ++fifo_seq);
 
     WriteBuf wb(0, 0);
@@ -1030,8 +1069,8 @@ void gcomm::evs::Proto::send_install()
     
     InstallMessage imsg(get_uuid(),
                         ViewId(get_uuid(), max_view_id_seq + 1),
-                        im.get_safe_seq(),
-                        im.get_aru_seq(),
+                        input_map->get_safe_seq(),
+                        input_map->get_aru_seq(),
                         ++fifo_seq,
                         &node_list);
 
@@ -1058,7 +1097,7 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
     assert(range.get_lu() != Seqno::max() && range.get_hs() != Seqno::max());
     assert(range.get_lu() <= range.get_hs());
 
-    if (range.get_lu() <= im.get_safe_seq())
+    if (range.get_lu() <= input_map->get_safe_seq())
     {
         log_warn << "lu <= safe_seq";
         return;
@@ -1073,10 +1112,10 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
     Seqno seq = range.get_lu(); 
     while (seq <= range.get_hs())
     {
-        InputMap::iterator msg_i = im.find(get_uuid(), seq);
-        if (msg_i == im.end())
+        InputMap::iterator msg_i = input_map->find(get_uuid(), seq);
+        if (msg_i == input_map->end())
         {
-            msg_i = im.recover(get_uuid(), seq);
+            msg_i = input_map->recover(get_uuid(), seq);
         }
 
         const UserMessage& msg(InputMap::MsgIndex::get_value(msg_i).get_msg());
@@ -1085,7 +1124,7 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
         UserMessage um(msg.get_source(),
                        msg.get_source_view_id(),
                        msg.get_seq(),
-                       im.get_aru_seq(),
+                       input_map->get_aru_seq(),
                        msg.get_seq_range(),
                        msg.get_safety_prefix(),
                        msg.get_user_type(),
@@ -1113,7 +1152,7 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
     assert(range.get_lu() != Seqno::max() && range.get_hs() != Seqno::max());
     assert(range.get_lu() <= range.get_hs());
     
-    if (range.get_lu() <= im.get_safe_seq())
+    if (range.get_lu() <= input_map->get_safe_seq())
     {
         log_warn << "lu <= safe_seq";
         return;
@@ -1128,10 +1167,10 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
     Seqno seq = range.get_lu(); 
     while (seq <= range.get_hs())
     {
-        InputMap::iterator msg_i = im.find(range_uuid, seq);
-        if (msg_i == im.end())
+        InputMap::iterator msg_i = input_map->find(range_uuid, seq);
+        if (msg_i == input_map->end())
         {
-            msg_i = im.recover(range_uuid, seq);
+            msg_i = input_map->recover(range_uuid, seq);
         }
         
         const UserMessage& msg(InputMap::MsgIndex::get_value(msg_i).get_msg());
@@ -1503,7 +1542,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         deliver_trans_view(false);
         deliver_trans();
         // Reset input map
-        im.clear();
+        input_map->clear();
         
         previous_view = current_view;
         previous_views.push_back(make_pair(current_view.get_id(), Time::now()));
@@ -1524,7 +1563,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             if (NodeMap::get_value(i).get_installed() == true)
             {
                 current_view.add_member(NodeMap::get_key(i), "");
-                im.insert_uuid(NodeMap::get_key(i));
+                input_map->insert_uuid(NodeMap::get_key(i));
             }
         }
         
@@ -1585,11 +1624,11 @@ void gcomm::evs::Proto::deliver()
         get_state() != S_LEAVING)
         gcomm_throw_fatal << "Invalid state";
 
-    log_debug << "aru_seq: "   << im.get_aru_seq() 
-              << " safe_seq: " << im.get_safe_seq();
+    log_debug << "aru_seq: "   << input_map->get_aru_seq() 
+              << " safe_seq: " << input_map->get_safe_seq();
     
     InputMap::MsgIndex::iterator i, i_next;
-    for (i = im.begin(); i != im.end(); i = i_next)
+    for (i = input_map->begin(); i != input_map->end(); i = i_next)
     {
         i_next = i;
         ++i_next;
@@ -1603,19 +1642,19 @@ void gcomm::evs::Proto::deliver()
             break;
             
         case SP_SAFE:
-            if (im.is_safe(i) == true)
+            if (input_map->is_safe(i) == true)
             {
                 deliver = true;
             }
             break;
         case SP_AGREED:
-            if (im.is_agreed(i) == true)
+            if (input_map->is_agreed(i) == true)
             {
                 deliver = true;
             }
             break;
         case SP_FIFO:
-            if (im.is_fifo(i) == true)
+            if (input_map->is_fifo(i) == true)
             {
                 deliver = true;
             }
@@ -1632,7 +1671,7 @@ void gcomm::evs::Proto::deliver()
                                msg.get_msg().get_user_type());
                 pass_up(msg.get_rb(), 0, &um);
             }
-            im.erase(i);
+            input_map->erase(i);
         }
     }
     delivering = false;
@@ -1680,7 +1719,7 @@ void gcomm::evs::Proto::deliver_trans()
     //   in transitional configuration
 
     InputMap::iterator i, i_next;
-    for (i = im.begin(); i != im.end(); i = i_next)
+    for (i = input_map->begin(); i != input_map->end(); i = i_next)
     {
         i_next = i;
         ++i_next;    
@@ -1695,7 +1734,7 @@ void gcomm::evs::Proto::deliver_trans()
         case SP_SAFE:
         case SP_AGREED:
         case SP_FIFO:
-            if (im.is_fifo(i) == true)
+            if (input_map->is_fifo(i) == true)
             {
                 deliver = true;
             }
@@ -1712,7 +1751,7 @@ void gcomm::evs::Proto::deliver_trans()
                                msg.get_msg().get_user_type());
                 pass_up(msg.get_rb(), 0, &um);
             }
-            im.erase(i);
+            input_map->erase(i);
         }
     }
     
@@ -1720,7 +1759,7 @@ void gcomm::evs::Proto::deliver_trans()
     // There must not be any messages left that 
     // - Are originated from outside of trans conf and are FIFO
     // - Are originated from trans conf
-    for (i = im.begin(); i != im.end(); i = i_next)
+    for (i = input_map->begin(); i != input_map->end(); i = i_next)
     {
         i_next = i;
         ++i_next;
@@ -1733,12 +1772,12 @@ void gcomm::evs::Proto::deliver_trans()
             gcomm_throw_fatal << "Protocol error in transitional delivery "
                               << "(self delivery constraint)";
         }
-        else if (im.is_fifo(i) == true)
+        else if (input_map->is_fifo(i) == true)
         {
             gcomm_throw_fatal << "Protocol error in transitional delivery "
                               << "(fifo from partitioned component)";
         }
-        im.erase(i);
+        input_map->erase(i);
     }
     delivering = false;
 }
@@ -1846,10 +1885,10 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     
     assert(msg.get_source_view_id() == current_view.get_id());
     
-    const Seqno prev_aru(im.get_aru_seq());
-    const Seqno prev_safe(im.get_safe_seq());
-    const Range prev_range(im.get_range(msg.get_source()));
-    const Range range(im.insert(msg.get_source(), msg, rb, roff));
+    const Seqno prev_aru(input_map->get_aru_seq());
+    const Seqno prev_safe(input_map->get_safe_seq());
+    const Range prev_range(input_map->get_range(msg.get_source()));
+    const Range range(input_map->insert(msg.get_source(), msg, rb, roff));
     
     if (range.get_lu() > prev_range.get_lu())
     {
@@ -1874,7 +1913,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                   << msg.get_source() 
                   << " " << range 
                   << " due to input map gap, aru " 
-                  << im.get_aru_seq();
+                  << input_map->get_aru_seq();
         send_gap(msg.get_source(), current_view.get_id(), range);
     }
     
@@ -1886,7 +1925,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         // and last_sent seqno should be advanced
         complete_user(range.get_hs());
     }
-    else if ((output.empty() == true && im.get_aru_seq() != prev_aru) ||
+    else if ((output.empty() == true && input_map->get_aru_seq() != prev_aru) ||
              get_state() == S_LEAVING)
     {
         // Output queue empty and aru changed, send gap to inform others
@@ -1903,9 +1942,9 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     }
     
     
-    if (get_state() == S_RECOVERY && last_sent == im.get_aru_seq() && 
-        (prev_aru != im.get_aru_seq() ||
-         prev_safe != im.get_safe_seq()))
+    if (get_state() == S_RECOVERY && last_sent == input_map->get_aru_seq() && 
+        (prev_aru != input_map->get_aru_seq() ||
+         prev_safe != input_map->get_safe_seq()))
     {
         assert(output.empty() == true);
         const JoinMessage* jm = NodeMap::get_value(self_i).get_join_message();
@@ -1980,10 +2019,10 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     
     assert(msg.get_source_view_id() == current_view.get_id());
     
-    const Seqno prev_safe(im.get_safe_seq());
+    const Seqno prev_safe(input_map->get_safe_seq());
     if (msg.get_aru_seq() != Seqno::max())
     {
-        im.set_safe_seq(msg.get_source(), msg.get_aru_seq());
+        input_map->set_safe_seq(msg.get_source(), msg.get_aru_seq());
     }
 
     // Scan through gap list and resend or recover messages if appropriate.
@@ -2005,8 +2044,8 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
             break;
     }
     
-    if (get_state() == S_RECOVERY && last_sent == im.get_aru_seq() &&
-        prev_safe != im.get_safe_seq())
+    if (get_state() == S_RECOVERY && last_sent == input_map->get_aru_seq() &&
+        prev_safe != input_map->get_safe_seq())
     {
         assert(output.empty() == true);
         const JoinMessage* jm(NodeMap::get_value(self_i).get_join_message());
@@ -2129,14 +2168,14 @@ bool gcomm::evs::Proto::states_compare(const JoinMessage& msg)
         
         if (msg_node.get_view_id() == current_view.get_id())
         {
-            const Seqno imseq(im.get_safe_seq(msg_node_uuid));
+            const Seqno imseq(input_map->get_safe_seq(msg_node_uuid));
             if ((imseq == Seqno::max() &&
                  msg_node.get_safe_seq() != Seqno::max()) ||
                 (imseq != Seqno::max() && 
                  msg_node.get_safe_seq() != Seqno::max() && 
                  imseq < msg_node.get_safe_seq()))
             {
-                im.set_safe_seq(msg_node_uuid, msg.get_seq());
+                input_map->set_safe_seq(msg_node_uuid, msg.get_seq());
                 send_join_p = true;
             }
         }
@@ -2271,27 +2310,27 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     
     if (msg.get_source_view_id() == current_view.get_id()) 
     {
-        const Seqno prev_safe(im.get_safe_seq());
+        const Seqno prev_safe(input_map->get_safe_seq());
         if (msg.get_aru_seq() != Seqno::max())
         {
-            im.set_safe_seq(msg.get_source(), msg.get_aru_seq());
+            input_map->set_safe_seq(msg.get_source(), msg.get_aru_seq());
         }
 
-        if (prev_safe != im.get_safe_seq())
+        if (prev_safe != input_map->get_safe_seq())
         {
             log_debug << "safe seq " 
-                      << prev_safe << " -> " << im.get_safe_seq();
+                      << prev_safe << " -> " << input_map->get_safe_seq();
         }
 
         // Aru seqs are not the same
-        if (msg.get_aru_seq() != im.get_aru_seq())
+        if (msg.get_aru_seq() != input_map->get_aru_seq())
         {
             states_compare(msg);
             return;
         }
         
         // Safe seqs are not the same
-        if (msg.get_seq() != im.get_safe_seq())
+        if (msg.get_seq() != input_map->get_safe_seq())
         {
             states_compare(msg);
             return;

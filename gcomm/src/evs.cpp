@@ -37,6 +37,7 @@
 
 #include "evs.hpp"
 #include "evs_proto.hpp"
+#include "evs_message2.hpp"
 
 #include "gcomm/conf.hpp"
 #include "gcomm/transport.hpp"

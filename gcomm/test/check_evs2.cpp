@@ -282,7 +282,7 @@ START_TEST(test_input_map_overwrap)
     Time start(Time::now());
     size_t cnt = 0;
     Seqno last_safe(Seqno::max());
-    for (size_t n = 0; n < 100000; ++n)
+    for (size_t n = 0; n < Seqno::max().get()*3LU; ++n)
     {
 
         Seqno seq(static_cast<uint16_t>(n % Seqno::max().get()));

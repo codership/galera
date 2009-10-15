@@ -10,8 +10,7 @@
 #include "gcomm/map.hpp"
 #include "histogram.hpp"
 
-#include "evs_message2.hpp"
-#include "evs_input_map2.hpp"
+#include "evs_seqno.hpp"
 
 #include <list>
 #include <deque>
@@ -20,6 +19,17 @@ namespace gcomm
 {
     namespace evs
     {
+
+        class Message;
+        class MessageNodeList;
+        class UserMessage;
+        class DelegateMessage;
+        class GapMessage;
+        class JoinMessage;
+        class InstallMessage;
+        class LeaveMessage;
+        class InputMap;
+
         class Node;
         std::ostream& operator<<(std::ostream&, const Node&);
         class NodeMap;
@@ -51,11 +61,7 @@ public:
     {
     }
     
-    ~Node() 
-    {
-        delete join_message;
-        delete leave_message;
-    }
+    ~Node();
     
     void set_operational(const bool op) { operational = op; }
     bool get_operational() const { return operational; }
@@ -63,25 +69,11 @@ public:
     void set_installed(const bool inst) { installed = inst; }
     bool get_installed() const { return installed; }
     
-    void set_join_message(JoinMessage* msg)
-    {
-        if (join_message)
-        {
-            delete join_message;
-        }
-        join_message = msg;
-    }
+    void set_join_message(const JoinMessage* msg);
     
     const JoinMessage* get_join_message() const { return join_message; }
     
-    void set_leave_message(LeaveMessage* msg)
-    {
-        if (leave_message != 0)
-        {
-            delete leave_message;
-        }
-        leave_message = msg;
-    }
+    void set_leave_message(const LeaveMessage* msg);
     
     const LeaveMessage* get_leave_message() const { return leave_message; }
     
@@ -480,7 +472,7 @@ private:
     std::list<std::pair<ViewId, Time> > previous_views;
     
     // Map containing received messages and aru/safe seqnos
-    InputMap im;
+    InputMap* input_map;
     
     // Last received install message
     InstallMessage* install_message;

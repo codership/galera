@@ -10,10 +10,7 @@
 
 using namespace std;
 
-ostream& gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::Range &r)
-{
-    return (os << "[" << r.get_lu() << "," << r.get_hs() << "]");
-}
+
 
 ostream& gcomm::evs::operator<<(ostream& os, const gcomm::evs::MessageNode& node)
 {
@@ -342,7 +339,14 @@ size_t gcomm::evs::JoinMessage::unserialize(const byte_t* const buf,
     gu_trace(offset = seq.unserialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.unserialize(buf, buflen, offset));
     gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &fifo_seq));
-    node_list->clear();
+    if (node_list == 0)
+    {
+        node_list = new MessageNodeList();
+    }
+    else
+    {
+        node_list->clear();
+    }
     gu_trace(offset = node_list->unserialize(buf, buflen, offset));
     return offset;
 }
@@ -381,6 +385,14 @@ size_t gcomm::evs::InstallMessage::unserialize(const byte_t* const buf,
     gu_trace(offset = seq.unserialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.unserialize(buf, buflen, offset));
     gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &fifo_seq));
+    if (node_list == 0)
+    {
+        node_list = new MessageNodeList();
+    }
+    else
+    {
+        node_list->clear();
+    }
     gu_trace(offset = node_list->unserialize(buf, buflen, offset));
     return offset;
 }

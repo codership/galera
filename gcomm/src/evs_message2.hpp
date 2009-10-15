@@ -19,8 +19,6 @@ namespace gcomm
 {
     namespace evs
     {
-        class Range;
-        std::ostream& operator<<(std::ostream&, const Range&);
         class MessageNode;
         std::ostream& operator<<(std::ostream&, const MessageNode&);
         class MessageNodeList;
@@ -35,50 +33,6 @@ namespace gcomm
     }
 }
 
-/*!
- *
- */
-class gcomm::evs::Range
-{
-public:
-    Range(const Seqno lu_ = Seqno::max(), const Seqno hs_ = Seqno::max()) :
-        lu(lu_),
-        hs(hs_)
-    {}
-    Seqno get_lu() const { return lu; }
-    Seqno get_hs() const { return hs; }
-    
-    void set_lu(const Seqno s) { lu = s; }
-    void set_hs(const Seqno s) { hs = s; }
-    
-    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
-    {
-        gu_trace(offset = lu.serialize(buf, buflen, offset));
-        gu_trace(offset = hs.serialize(buf, buflen, offset));
-        return offset;
-    }
-    
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
-    {
-        gu_trace(offset = lu.unserialize(buf, buflen, offset));
-        gu_trace(offset = hs.unserialize(buf, buflen, offset));
-        return offset;
-    }
-
-    static size_t serial_size()
-    {
-        return 2*Seqno::serial_size();
-    }
-
-    bool operator==(const Range& cmp) const
-    {
-        return (lu == cmp.lu && hs == cmp.hs);
-    }
-
-private:
-    Seqno lu; /*!< Lowest unseen seqno */
-    Seqno hs; /*!< Highest seen seqno  */
-};
 
 
 
@@ -473,7 +427,7 @@ public:
                 const Seqno            seq            = Seqno::max(), 
                 const Seqno            aru_seq        = Seqno::max(),
                 const int64_t          fifo_seq       = -1,
-                const MessageNodeList* node_list      = new MessageNodeList()) :
+                const MessageNodeList* node_list      = 0) :
         Message(0,
                 Message::T_JOIN,
                 source,
@@ -505,7 +459,7 @@ public:
                    const Seqno            seq            = Seqno::max(), 
                    const Seqno            aru_seq        = Seqno::max(),
                    const int64_t          fifo_seq       = -1,
-                   const MessageNodeList* node_list      = new MessageNodeList()) :
+                   const MessageNodeList* node_list      = 0) :
         Message(0,
                 Message::T_INSTALL,
                 source,
