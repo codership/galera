@@ -40,22 +40,22 @@ public:
     
     Seqno& operator++()
     {
-        assert(seq != seq_max);
+        gcomm_assert(seq != seq_max);
         seq = static_cast<uint16_t>((seq + 1) % seq_max);
         return *this;
     }
     
     Seqno operator+(const Seqno inc) const
     {
-        assert(inc.seq < seq_max/2);
-        assert(seq != seq_max);
+        gcomm_assert(inc.seq < seq_max/2);
+        gcomm_assert(seq != seq_max);
         return static_cast<uint16_t>((seq + inc.seq) % seq_max);
     }
     
     Seqno operator-(const Seqno dec) const
     {
-        assert(dec.seq < seq_max/2);
-        assert(seq != seq_max);
+        gcomm_assert(dec.seq < seq_max/2);
+        gcomm_assert(seq != seq_max);
         return static_cast<uint16_t>((uint32_t(seq) + seq_max - dec.seq) % seq_max);
     }
 
@@ -71,7 +71,7 @@ public:
     
     bool operator<(const Seqno cmp) const
     {
-        assert(seq != seq_max && cmp.seq != seq_max);
+        gcomm_assert(seq != seq_max && cmp.seq != seq_max);
         if (cmp.seq < seq_max/2)
         {
             return seq < cmp.seq || seq > (cmp.seq + seq_max/2) % seq_max;
@@ -84,19 +84,19 @@ public:
     
     bool operator>(const Seqno cmp) const
     {
-        assert(seq != seq_max && cmp.seq != seq_max);
+        gcomm_assert(seq != seq_max && cmp.seq != seq_max);
         return not (*this < cmp || *this == cmp);
     }
 
     bool operator>=(const Seqno cmp) const
     {
-        assert(seq != seq_max && cmp.seq != seq_max);
+        gcomm_assert(seq != seq_max && cmp.seq != seq_max);
         return (*this > cmp|| *this == cmp);
     }
 
     bool operator<=(const Seqno cmp) const
     {
-        assert(seq != seq_max && cmp.seq != seq_max);
+        gcomm_assert(seq != seq_max && cmp.seq != seq_max);
         return (*this < cmp || *this == cmp);
     }
     

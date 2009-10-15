@@ -220,9 +220,12 @@ gcomm::evs::InputMap::iterator gcomm::evs::InputMap::recover(
     const UUID& uuid,
     const Seqno seq) const
 {
-    size_t idx = NodeIndex::get_value(
-        node_index->find_checked(uuid)).get_index();
-    return recovery_index->find_checked(MsgKey(idx, seq));
+    NodeIndex::const_iterator node_i;
+    gu_trace(node_i = node_index->find_checked(uuid));
+    size_t idx = NodeIndex::get_value(node_i).get_index();
+    iterator ret;
+    gu_trace(ret = recovery_index->find_checked(MsgKey(idx, seq)));
+    return ret;
 }
 
 

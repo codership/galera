@@ -12,6 +12,90 @@ using namespace std;
 using namespace gcomm;
 using namespace gcomm::evs;
 
+
+template <class C>
+class SameViewSelect
+{
+public:
+    SameViewSelect(C& c_, const ViewId& view_id_) : c(c_), view_id(view_id_) { }
+    
+    void operator()(const MessageNodeList::value_type& vt) const
+    {
+        if (MessageNodeList::get_value(vt).get_view_id() == view_id)
+        {
+            c.push_back(vt);
+        }
+    }
+private:
+    C& c;
+    const ViewId& view_id;
+};
+
+
+
+template <class C>
+class OperationalSelect
+{
+public:
+    OperationalSelect(C& c_) : c(c_) { }
+    
+    void operator()(const NodeMap::value_type& vt) const
+    {
+        if (NodeMap::get_value(vt).get_operational() == true)
+        {
+            c.push_back(&vt);
+        }
+    }
+private:
+    C& c;
+};
+
+
+class RangeHsCmp
+{
+public:
+    bool operator()(const MessageNodeList::value_type& a,
+                  const MessageNodeList::value_type& b) const
+    {
+        if (MessageNodeList::get_value(a).get_im_range().get_hs() == Seqno::max())
+        {
+            return true;
+        }
+        else if (MessageNodeList::get_value(b).get_im_range().get_hs() == Seqno::max())
+        {
+            return false;
+        }
+        else
+        {
+            return MessageNodeList::get_value(a).get_im_range().get_hs() < 
+                MessageNodeList::get_value(b).get_im_range().get_hs();
+        }
+    }
+};
+
+class RangeLuCmp
+{
+public:
+    bool operator()(const MessageNodeList::value_type& a,
+                    const MessageNodeList::value_type& b) const
+    {
+        if (MessageNodeList::get_value(a).get_im_range().get_lu() == Seqno::max())
+        {
+            return true;
+        }
+        else if (MessageNodeList::get_value(b).get_im_range().get_lu() == Seqno::max())
+        {
+            return false;
+        }
+        else
+        {
+            return MessageNodeList::get_value(a).get_im_range().get_lu() < 
+                MessageNodeList::get_value(b).get_im_range().get_lu();
+        }
+    }
+};
+
+
 gcomm::evs::Node::~Node()
 {
     delete join_message;
@@ -770,7 +854,7 @@ int gcomm::evs::Proto::send_user(WriteBuf* wb,
                     sp, 
                     user_type,
                     flags);
-    push_header(msg, wb);
+    // push_header(msg, wb);
     
     // Insert first to input map to determine correct aru seq
     ReadBuf* rb = wb->to_readbuf();
@@ -779,8 +863,11 @@ int gcomm::evs::Proto::send_user(WriteBuf* wb,
     
     last_sent = last_msg_seq;
     assert(range.get_hs() == last_sent);
-    input_map->set_safe_seq(get_uuid(), input_map->get_aru_seq());
-    pop_header(msg, wb);
+    if (input_map->get_aru_seq() != Seqno::max())
+    {
+        gu_trace(input_map->set_safe_seq(get_uuid(), input_map->get_aru_seq()));
+    }
+    // pop_header(msg, wb);
     
     if (local == false)
     {
@@ -1030,22 +1117,14 @@ void gcomm::evs::Proto::send_leave()
 
 struct ViewIdCmp
 {
-    bool operator()(const NodeMap::value_type& a,
-                    const NodeMap::value_type& b) const
+    bool operator()(const NodeMap::value_type* a,
+                    const NodeMap::value_type* b) const
     {
-        if (b.second.get_join_message() == 0)
-        {
-            return true;
-        }
-        else if (a.second.get_join_message() == 0)
-        {
-            return false;
-        }
-        else
-        {
-            return (a.second.get_join_message()->get_source_view_id() <
-                    b.second.get_join_message()->get_source_view_id());
-        }
+        gcomm_assert(NodeMap::get_value(*a).get_join_message() != 0&&
+                     NodeMap::get_value(*b).get_join_message() != 0);
+        return (NodeMap::get_value(*a).get_join_message()->get_source_view_id().get_seq() <
+                NodeMap::get_value(*b).get_join_message()->get_source_view_id().get_seq());
+        
     }
 };
 
@@ -1063,12 +1142,14 @@ void gcomm::evs::Proto::send_install()
     gcomm_assert(is_consensus() == true && 
                  is_representative(get_uuid()) == true);
     
-    NodeMap::const_iterator max_node = 
-        max_element(known.begin(), known.end(), ViewIdCmp());
-    gcomm_assert(max_node != known.end());
-
+    list<const NodeMap::value_type*> oper_list;
+    for_each(known.begin(), known.end(), 
+             OperationalSelect<list<const NodeMap::value_type*> >(oper_list));
+    list<const NodeMap::value_type*>::const_iterator max_node = 
+        max_element(oper_list.begin(), oper_list.end(), ViewIdCmp());
+    
     const uint32_t max_view_id_seq = 
-        NodeMap::get_value(max_node).get_join_message()->get_source_view_id().get_seq();
+        NodeMap::get_value(**max_node).get_join_message()->get_source_view_id().get_seq();
     
     MessageNodeList node_list;
     populate_node_list(&node_list);
@@ -1101,8 +1182,9 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
 {
     assert(gap_source != get_uuid());
     assert(range.get_lu() != Seqno::max() && range.get_hs() != Seqno::max());
-    assert(range.get_lu() <= range.get_hs());
-
+    gcomm_assert(range.get_lu() <= range.get_hs()) << 
+        "lu (" << range.get_lu() << ") > hs(" << range.get_hs() << ")"; 
+    
     if (range.get_lu() <= input_map->get_safe_seq())
     {
         log_warn << "lu <= safe_seq";
@@ -1121,7 +1203,7 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
         InputMap::iterator msg_i = input_map->find(get_uuid(), seq);
         if (msg_i == input_map->end())
         {
-            msg_i = input_map->recover(get_uuid(), seq);
+            gu_trace(msg_i = input_map->recover(get_uuid(), seq));
         }
 
         const UserMessage& msg(InputMap::MsgIndex::get_value(msg_i).get_msg());
@@ -1156,7 +1238,8 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
 {
     assert(gap_source != get_uuid());
     assert(range.get_lu() != Seqno::max() && range.get_hs() != Seqno::max());
-    assert(range.get_lu() <= range.get_hs());
+    gcomm_assert(range.get_lu() <= range.get_hs()) 
+        << "lu (" << range.get_lu() << ") > hs(" << range.get_hs() << ")"; 
     
     if (range.get_lu() <= input_map->get_safe_seq())
     {
@@ -1164,7 +1247,9 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
         return;
     }
     
-    log_debug << self_string() << " recovering message, requested by " 
+    log_debug << self_string() << " recovering message from "
+              << range_uuid
+              << " requested by " 
               << gap_source 
               << " " 
               << range.get_lu() << " -> " 
@@ -1176,7 +1261,7 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
         InputMap::iterator msg_i = input_map->find(range_uuid, seq);
         if (msg_i == input_map->end())
         {
-            msg_i = input_map->recover(range_uuid, seq);
+            gu_trace(msg_i = input_map->recover(range_uuid, seq));
         }
         
         const UserMessage& msg(InputMap::MsgIndex::get_value(msg_i).get_msg());
@@ -1291,22 +1376,22 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     
     switch (msg.get_type()) {
     case Message::T_USER:
-        handle_user(static_cast<const UserMessage&>(msg), ii, rb, roff);
+        gu_trace(handle_user(static_cast<const UserMessage&>(msg), ii, rb, roff));
         break;
     case Message::T_DELEGATE:
-        handle_delegate(static_cast<const DelegateMessage&>(msg), ii, rb, roff);
+        gu_trace(handle_delegate(static_cast<const DelegateMessage&>(msg), ii, rb, roff));
         break;
     case Message::T_GAP:
-        handle_gap(static_cast<const GapMessage&>(msg), ii);
+        gu_trace(handle_gap(static_cast<const GapMessage&>(msg), ii));
         break;
     case Message::T_JOIN:
-        handle_join(static_cast<const JoinMessage&>(msg), ii);
+        gu_trace(handle_join(static_cast<const JoinMessage&>(msg), ii));
         break;
     case Message::T_LEAVE:
-        handle_leave(static_cast<const LeaveMessage&>(msg), ii);
+        gu_trace(handle_leave(static_cast<const LeaveMessage&>(msg), ii));
         break;
     case Message::T_INSTALL:
-        handle_install(static_cast<const InstallMessage&>(msg), ii);
+        gu_trace(handle_install(static_cast<const InstallMessage&>(msg), ii));
         break;
     default:
         log_warn << "Invalid message type: " << msg.get_type();
@@ -2042,11 +2127,12 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     log_debug << "range uuid " << msg.get_range_uuid();
     if (msg.get_range_uuid() == get_uuid())
     {
-        resend(msg.get_source(), msg.get_range());
+        gu_trace(resend(msg.get_source(), msg.get_range()));
     }
     else if (get_state() == S_RECOVERY && msg.get_range_uuid() != UUID::nil())
     {
-        recover(msg.get_source(), msg.get_range_uuid(), msg.get_range());
+        gu_trace(recover(msg.get_source(), msg.get_range_uuid(), 
+                         msg.get_range()));
     }
     
     // Deliver messages 
@@ -2068,69 +2154,6 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         }
     }
 }
-
-template <class C>
-class SameViewSelect
-{
-public:
-    SameViewSelect(C& c_, const ViewId& view_id_) : c(c_), view_id(view_id_) { }
-    
-    void operator()(const MessageNodeList::value_type& vt) const
-    {
-        if (MessageNodeList::get_value(vt).get_view_id() == view_id)
-        {
-            c.push_back(vt);
-        }
-    }
-private:
-    C& c;
-    const ViewId& view_id;
-};
-
-
-class RangeHsCmp
-{
-public:
-    bool operator()(const MessageNodeList::value_type& a,
-                  const MessageNodeList::value_type& b) const
-    {
-        if (MessageNodeList::get_value(a).get_im_range().get_hs() == Seqno::max())
-        {
-            return true;
-        }
-        else if (MessageNodeList::get_value(b).get_im_range().get_hs() == Seqno::max())
-        {
-            return false;
-        }
-        else
-        {
-            return MessageNodeList::get_value(a).get_im_range().get_hs() < 
-                MessageNodeList::get_value(b).get_im_range().get_hs();
-        }
-    }
-};
-
-class RangeLuCmp
-{
-public:
-    bool operator()(const MessageNodeList::value_type& a,
-                    const MessageNodeList::value_type& b) const
-    {
-        if (MessageNodeList::get_value(a).get_im_range().get_lu() == Seqno::max())
-        {
-            return true;
-        }
-        else if (MessageNodeList::get_value(b).get_im_range().get_lu() == Seqno::max())
-        {
-            return false;
-        }
-        else
-        {
-            return MessageNodeList::get_value(a).get_im_range().get_lu() < 
-                MessageNodeList::get_value(b).get_im_range().get_lu();
-        }
-    }
-};
 
 
 bool gcomm::evs::Proto::states_compare(const JoinMessage& msg) 
@@ -2188,7 +2211,7 @@ bool gcomm::evs::Proto::states_compare(const JoinMessage& msg)
                  msg_node.get_safe_seq() != Seqno::max() && 
                  imseq < msg_node.get_safe_seq()))
             {
-                input_map->set_safe_seq(msg_node_uuid, msg.get_seq());
+                gu_trace(input_map->set_safe_seq(msg_node_uuid, msg_node.get_safe_seq()));
                 send_join_p = true;
             }
         }
@@ -2218,9 +2241,11 @@ bool gcomm::evs::Proto::states_compare(const JoinMessage& msg)
         {
             complete_user(high_seq);
         }
-        else if (msg.get_source() != get_uuid() && msg.get_source() == low_uuid)
+        else if (msg.get_source() != get_uuid() && 
+                 msg.get_source() == low_uuid   &&
+                 low_seq <= high_seq)
         {
-            resend(msg.get_source(), Range(low_seq, high_seq));
+            gu_trace(resend(msg.get_source(), Range(low_seq, high_seq)));
         }
         send_join_p = true;
         
@@ -2229,12 +2254,19 @@ bool gcomm::evs::Proto::states_compare(const JoinMessage& msg)
             for (NodeMap::const_iterator i = known.begin(); i != known.end(); 
                  ++i)
             {
+
                 if (NodeMap::get_value(i).get_operational() == false &&
                     current_view.get_members().find(NodeMap::get_key(i)) != 
                     current_view.get_members().end())
                 {
-                    recover(msg.get_source(), NodeMap::get_key(i), 
-                            Range(low_seq, high_seq));
+                    const Range im_range(input_map->get_range(
+                                             NodeMap::get_key(i)));
+                    if (im_range.get_hs() != Seqno::max() &&
+                        im_range.get_hs() >= high_seq)
+                    {
+                        gu_trace(recover(msg.get_source(), NodeMap::get_key(i), 
+                                         Range(low_seq, high_seq)));
+                    }
                 }
             }
         }
