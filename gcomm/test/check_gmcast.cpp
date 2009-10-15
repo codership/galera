@@ -254,8 +254,8 @@ START_TEST(test_gmcast_w_user_messages)
                                       Time::now() + Time(0, 5000)));
         }
         
-        void handle_up(const int cid, const ReadBuf* rb, const size_t roff,
-                       const ProtoUpMeta* um)
+        void handle_up(int cid, const ReadBuf* rb, size_t roff,
+                       const ProtoUpMeta& um)
         {
             log_debug << "msg " << roff;
             if (rb->get_len() < roff + 16)

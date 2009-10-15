@@ -163,17 +163,17 @@ private:
     void cleanup_instances();
     void handle_state(const PCMessage&, const UUID&);
     void handle_install(const PCMessage&, const UUID&);
-    void handle_user(const PCMessage&, const ReadBuf*, const size_t,
-                     const ProtoUpMeta*);
+    void handle_user(const PCMessage&, const ReadBuf*, size_t,
+                     const ProtoUpMeta&);
     void deliver_view();
 
 public:
 
-    void handle_msg  (const PCMessage&, const ReadBuf*, const size_t,
-                      const ProtoUpMeta*);
-    void handle_up   (const int, const ReadBuf*, const size_t,
-                      const ProtoUpMeta*);
-    int  handle_down (WriteBuf*, const ProtoDownMeta*);
+    void handle_msg  (const PCMessage&, const ReadBuf*, size_t,
+                      const ProtoUpMeta&);
+    void handle_up   (int, const ReadBuf*, size_t,
+                      const ProtoUpMeta&);
+    int  handle_down (WriteBuf*, const ProtoDownMeta&);
     
     void handle_view (const View&);
 };

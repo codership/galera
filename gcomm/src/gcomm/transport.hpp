@@ -64,11 +64,11 @@ public:
     virtual void       listen();
     virtual Transport* accept();
     
-    virtual int  handle_down(WriteBuf*, const ProtoDownMeta*) = 0;
-    virtual void handle_up  (int, const ReadBuf*, const size_t,
-                             const ProtoUpMeta*) = 0;
+    virtual int  handle_down(WriteBuf*, const ProtoDownMeta&) = 0;
+    virtual void handle_up  (int, const ReadBuf*, size_t,
+                             const ProtoUpMeta&) = 0;
     
-    virtual int send(WriteBuf*, const ProtoDownMeta*);
+    virtual int send(WriteBuf*, const ProtoDownMeta&);
     virtual const ReadBuf* recv();
 
     static Transport* create(const URI&, EventLoop*);

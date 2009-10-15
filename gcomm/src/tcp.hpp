@@ -118,12 +118,12 @@ public:
     void listen();
     Transport *accept();
     
-    int  handle_down   (WriteBuf *, const ProtoDownMeta *);
-    void handle_up     (int, const ReadBuf*, const size_t, const ProtoUpMeta*);
+    int  handle_down   (WriteBuf *, const ProtoDownMeta&);
+    void handle_up     (int, const ReadBuf*, size_t, const ProtoUpMeta&);
     void handle_event  (int, const Event&);
     int  handle_pending();
     
-    int            send(WriteBuf*, const ProtoDownMeta*);
+    int            send(WriteBuf*, const ProtoDownMeta&);
     const ReadBuf* recv();
 };
 

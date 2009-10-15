@@ -110,13 +110,13 @@ public:
     }
     
     
-    int handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
+    int handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
     {
         return EAGAIN;
     }
     
-    void handle_up(const int cid, const ReadBuf* rb, const size_t s,
-                   const ProtoUpMeta* um)
+    void handle_up(int cid, const ReadBuf* rb, size_t s,
+                   const ProtoUpMeta& um)
     {
         
     }
@@ -153,13 +153,13 @@ public:
     }
     
     
-    int handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
+    int handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
     {
         return EAGAIN;
     }
     
-    void handle_up(const int cid, const ReadBuf* rb, const size_t s,
-                   const ProtoUpMeta* um)
+    void handle_up(int cid, const ReadBuf* rb, size_t s,
+                   const ProtoUpMeta& um)
     {
         
     }

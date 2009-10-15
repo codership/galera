@@ -113,9 +113,9 @@ void PCProto::deliver_view()
         }
     }
 
-    ProtoUpMeta um(&v);
+    ProtoUpMeta um(UUID::nil(), &v);
 
-    pass_up(0, 0, &um);
+    pass_up(0, 0, um);
 }
 
 void PCProto::shift_to(const State s)
@@ -682,7 +682,7 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
 }
 
 void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
-                          const size_t roff, const ProtoUpMeta* um)
+                          size_t roff, const ProtoUpMeta& um)
 {
     int64_t to_seq = -1;
 
@@ -692,15 +692,15 @@ void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
         to_seq = get_to_seq();
     }
     
-    ProtoUpMeta pum(um->get_source(), um->get_user_type(), to_seq);
+    ProtoUpMeta pum(um.get_source(), 0, um.get_user_type(), to_seq);
 
-    pass_up(rb, roff + msg.serial_size(), &pum);
+    pass_up(rb, roff + msg.serial_size(), pum);
 }
 
 void PCProto::handle_msg(const PCMessage&   msg, 
                          const ReadBuf*     rb, 
-                         const size_t       roff, 
-                         const ProtoUpMeta* um)
+                               size_t       roff, 
+                         const ProtoUpMeta& um)
 {
     enum Verdict
     {
@@ -745,10 +745,10 @@ void PCProto::handle_msg(const PCMessage&   msg,
     switch (msg_type)
     {
     case PCMessage::T_STATE:
-        handle_state(msg, um->get_source());
+        handle_state(msg, um.get_source());
         break;
     case PCMessage::T_INSTALL:
-        handle_install(msg, um->get_source());
+        handle_install(msg, um.get_source());
         break;
     case PCMessage::T_USER:
         handle_user(msg, rb, roff, um);
@@ -758,29 +758,27 @@ void PCProto::handle_msg(const PCMessage&   msg,
     }
 }
 
-void PCProto::handle_up(const int cid, const ReadBuf* rb, const size_t roff,
-                        const ProtoUpMeta* um)
+void PCProto::handle_up(int cid, const ReadBuf* rb, size_t roff,
+                        const ProtoUpMeta& um)
 {
-    const View* v = um->get_view();
-
-    if (v)
+    if (um.has_view() == true)
     {
-        handle_view(*v);
+        handle_view(um.get_view());
     }
     else
     {
         PCMessage msg;
-
+        
         if (msg.unserialize(rb->get_buf(), rb->get_len(), roff) == 0)
         {
             gcomm_throw_fatal << "Could not read message";
         }
-
+        
         handle_msg(msg, rb, roff, um);
     }
 }
 
-int PCProto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
+int PCProto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
 {
     if (get_state() != S_PRIM)
     {

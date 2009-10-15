@@ -18,10 +18,20 @@
 
 
 
-BEGIN_GCOMM_NAMESPACE
+namespace gcomm
+{
+    class ProtoUpMeta;
+    class ProtoDownMeta;
+    class Protolay;
+    class Toplay;
+    class Bottomlay;
+
+    void connect(Protolay*, Protolay*);
+    void disconnect(Protolay*, Protolay*);
+}
 
 /* message context to pass up with the data buffer? */
-class ProtoUpMeta
+class gcomm::ProtoUpMeta
 {
     UUID    const source;
     uint8_t const user_type;
@@ -31,14 +41,18 @@ class ProtoUpMeta
     ProtoUpMeta& operator=(const ProtoUpMeta&);
 
 public:
-#if 0
-    ProtoUpMeta() :
-        source   (),
-        user_type(0xff),
-        to_seq   (-1),
-        view     (0)
-    {}
-#endif
+
+    ProtoUpMeta(const UUID source_ = UUID::nil(),
+                const View* view_  = 0,
+                const uint8_t user_type_ = 0xff,
+                const int64_t to_seq_ = -1) :
+        source(source_),
+        user_type(user_type_),
+        to_seq(to_seq_),
+        view(view_ != 0 ? new View(*view_) : 0)
+    {
+
+    }
 
     ProtoUpMeta(const ProtoUpMeta& um) :
         source    (um.source),
@@ -47,51 +61,38 @@ public:
         view      (um.view ? new View(*um.view) : 0)
     {}
 
-    ProtoUpMeta(const View* view_, const int64_t to_seq_ = -1) :
-        source    (),
-        user_type (0xff),
-        to_seq    (to_seq_),
-        view      (new View(*view_))
-    {}
-
-    ProtoUpMeta(const UUID& source_, const uint8_t user_type_ = 0xff,
-                const int64_t to_seq_ = -1) :
-        source(source_),
-        user_type(user_type_),
-        to_seq(to_seq_),
-        view(0)
-    {}
-
     ~ProtoUpMeta() { delete view; }
-
+    
     const UUID& get_source()    const { return source; }
-
+    
     uint8_t     get_user_type() const { return user_type; }
-
+    
     int64_t     get_to_seq()    const { return to_seq; }
-
-    const View* get_view()      const { return view; }
+    
+    bool        has_view()      const { return view != 0; }
+    
+    const View& get_view()      const { return *view; }
 };
 
 /* message context to pass down? */
-class ProtoDownMeta
+class gcomm::ProtoDownMeta
 {
     const uint8_t      user_type;
     const SafetyPrefix sp;
 public:
-
+    
     ProtoDownMeta(const uint8_t user_type_ = 0xff, 
                   const SafetyPrefix sp_   = SP_SAFE) : 
         user_type(user_type_), 
         sp(sp_) 
     { }
-
+    
     uint8_t get_user_type() const { return user_type; }
     
     SafetyPrefix get_safety_prefix() const { return sp; }
 };
 
-class Protolay
+class gcomm::Protolay
 {
     int       context_id; // why there are two contexts but only one id?
     Protolay *up_context;
@@ -118,10 +119,10 @@ public:
     virtual ~Protolay() {}
 
     /* apparently handles data from upper layer. what is return value? */
-    virtual int  handle_down (WriteBuf *, const ProtoDownMeta*) = 0;
+    virtual int  handle_down (WriteBuf *, const ProtoDownMeta&) = 0;
 
-    virtual void handle_up   (const int cid, const ReadBuf *,
-                              const size_t, const ProtoUpMeta*) = 0;
+    virtual void handle_up   (int cid, const ReadBuf *,
+                              size_t, const ProtoUpMeta&) = 0;
 
     
     void set_up_context(Protolay *up)
@@ -131,17 +132,18 @@ public:
 	up_context = up;
     }
     
-    void set_up_context(Protolay *up, const int id)
+    void set_up_context(Protolay *up, int id)
     {
 	if (up_context) gcomm_throw_fatal << "Up context already exists";
-
+        
 	context_id = id;
 	up_context = up;
     }
 
     void change_up_context(Protolay* old_up, Protolay* new_up)
     {
-        if (up_context != old_up) {
+        if (up_context != old_up) 
+        {
             gcomm_throw_fatal << "Context mismatch: " 
                               << old_up 
                               << " " 
@@ -153,47 +155,47 @@ public:
 
     void change_down_context(Protolay* old_down, Protolay* new_down)
     {
-        if (down_context != old_down) {
+        if (down_context != old_down) 
+        {
             gcomm_throw_fatal << "Context mismatch: " 
                               << old_down 
                               << " "
                               << down_context;
         }
-
+        
         down_context = new_down;
     }
 
-    void set_down_context(Protolay *down, const int id)
+    void set_down_context(Protolay *down, int id)
     {
 	context_id   = id;
 	down_context = down;
     }
-
+    
     void set_down_context(Protolay *down)
     {
 	down_context = down;
     }
-
+    
     /* apparently passed data buffer to the upper layer */
-    void pass_up(const ReadBuf *rb, const size_t roff,
-                 const ProtoUpMeta *up_meta)
+    void pass_up(const ReadBuf *rb, size_t offset, const ProtoUpMeta& up_meta)
     {
 	if (!up_context) {
 	    gcomm_throw_fatal << "Up context not defined, released = " 
                               << released;
 	}
         
-	up_context->handle_up(context_id, rb, roff, up_meta);
+	up_context->handle_up(context_id, rb, offset, up_meta);
     }
-
+    
     /* apparently passes data buffer to lower layer, what is return value? */
-    int pass_down(WriteBuf *wb, const ProtoDownMeta *down_meta)
+    int pass_down(WriteBuf *wb, const ProtoDownMeta& down_meta)
     {
 	if (!down_context) {
 	    gcomm_throw_fatal << "Down context not defined, released = "
                               << released;
 	}
-
+        
 	// Simple guard of wb consistency in form of testing 
 	// writebuffer header length. 
 	size_t down_hdrlen = wb->get_hdrlen();
@@ -203,41 +205,40 @@ public:
         {
             gcomm_throw_fatal << "hdr not rolled back";
         }
-
+        
 	return ret;
     }    
 };
 
-class Toplay : public Protolay
+class gcomm::Toplay : public Protolay
 {
-    int handle_down(WriteBuf *wb, const ProtoDownMeta *)
+    int handle_down(WriteBuf *wb, const ProtoDownMeta& dm)
     {
 	gcomm_throw_fatal << "Toplay handle_down() called";
 	throw;
     }
 };
 
-class Bottomlay : public Protolay
+class gcomm::Bottomlay : public Protolay
 {
-    void handle_up(const int, const ReadBuf *, const size_t,
-                   const ProtoUpMeta *)
+    void handle_up(int cid, const ReadBuf *rb, size_t offset, 
+                   const ProtoUpMeta& um)
     {
 	gcomm_throw_fatal << "Bottomlay handle_up() called";
     }
 };
 
-static inline void connect(Protolay* down, Protolay* up)
+inline void gcomm::connect(Protolay* down, Protolay* up)
 {
     down->set_up_context(up);
     up->set_down_context(down);
 }
 
-static inline void disconnect(Protolay* down, Protolay* up)
+inline void gcomm::disconnect(Protolay* down, Protolay* up)
 {
     down->change_up_context(up, 0);
     up->change_down_context(down, 0);
 }
 
-END_GCOMM_NAMESPACE
 
 #endif /* _GCOMM_PROTOLAY_HPP_ */

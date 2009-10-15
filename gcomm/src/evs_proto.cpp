@@ -266,8 +266,8 @@ void gcomm::evs::Proto::deliver_reg_view()
     }
     
     log_debug << view;
-    ProtoUpMeta up_meta(&view);
-    pass_up(0, 0, &up_meta);
+    ProtoUpMeta up_meta(UUID::nil(), &view);
+    pass_up(0, 0, up_meta);
 }
 
 void gcomm::evs::Proto::deliver_trans_view(bool local) 
@@ -329,8 +329,8 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
     }
     log_debug << view;
     gcomm_assert(view.get_members().find(get_uuid()) != view.get_members().end());
-    ProtoUpMeta up_meta(&view);
-    pass_up(0, 0, &up_meta);
+    ProtoUpMeta up_meta(UUID::nil(), &view);
+    pass_up(0, 0, up_meta);
 }
 
 
@@ -338,8 +338,8 @@ void gcomm::evs::Proto::deliver_empty_view()
 {
     View view(View::V_REG, ViewId());
     log_debug << view;
-    ProtoUpMeta up_meta(&view);
-    pass_up(0, 0, &up_meta);
+    ProtoUpMeta up_meta(UUID::nil(), &view);
+    pass_up(0, 0, up_meta);
 }
 
 
@@ -731,8 +731,9 @@ int gcomm::evs::Proto::send_user(WriteBuf* wb,
     assert(get_state() == S_LEAVING || 
            get_state() == S_RECOVERY || 
            get_state() == S_OPERATIONAL);
-    assert(up_to_seqno >= last_sent);
-
+    assert(up_to_seqno == Seqno::max() || last_sent == Seqno::max() ||
+           up_to_seqno >= last_sent);
+    
     int ret;
     Seqno seq = (last_sent == Seqno::max() ? 0 : last_sent + 1);
     
@@ -1366,14 +1367,14 @@ size_t gcomm::evs::Proto::unserialize_message(const UUID& source,
 void gcomm::evs::Proto::handle_up(int cid, 
                                   const ReadBuf* rb, 
                                   size_t offset,
-                                  const ProtoUpMeta* um)
+                                  const ProtoUpMeta& um)
 {
     Critical crit(mon);
     
     Message msg;
     
-    if (rb == 0 || um == 0)
-        gcomm_throw_fatal << "Invalid input: rb == 0 || um == 0";
+    if (rb == 0)
+        gcomm_throw_fatal << "Invalid input: rb == 0";
     
     if (get_state() == S_CLOSED)
     {
@@ -1381,17 +1382,18 @@ void gcomm::evs::Proto::handle_up(int cid,
         return;
     }
     
-    gcomm_assert(um->get_source() != UUID::nil());    
-    if (um->get_source() == get_uuid())
+    gcomm_assert(um.get_source() != UUID::nil());    
+    if (um.get_source() == get_uuid())
     {
         log_warn << "dropping self originated message";
+        return;
     }
     
-    gu_trace(offset = unserialize_message(um->get_source(), rb, offset, &msg));
+    gu_trace(offset = unserialize_message(um.get_source(), rb, offset, &msg));
     handle_msg(msg, rb, offset);
 }
 
-int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
+int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
 {
     Critical crit(mon);
     
@@ -1406,7 +1408,7 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
         return ENOTCONN;
     }
 
-    if (dm && dm->get_user_type() == 0xff)
+    if (dm.get_user_type() == 0xff)
     {
         return EINVAL;
     }
@@ -1416,15 +1418,15 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
     if (output.empty()) 
     {
         int err = send_user(wb, 
-                            static_cast<uint8_t>(dm ? dm->get_user_type() : 0xff),
-                            dm->get_safety_prefix(), send_window.get()/2, 
+                            dm.get_user_type(),
+                            dm.get_safety_prefix(), send_window.get()/2, 
                             Seqno::max());
         switch (err) 
         {
         case EAGAIN:
         {
             WriteBuf* priv_wb = wb->copy();
-            output.push_back(make_pair(priv_wb, dm ? ProtoDownMeta(*dm) : ProtoDownMeta(0xff)));
+            output.push_back(make_pair(priv_wb, dm));
             // Fall through
         }
         case 0:
@@ -1437,7 +1439,7 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
     else if (output.size() < max_output_size)
     {
         WriteBuf* priv_wb = wb->copy();
-        output.push_back(make_pair(priv_wb, dm ? ProtoDownMeta(*dm) : ProtoDownMeta(0xff)));
+        output.push_back(make_pair(priv_wb, dm));
     } 
     else 
     {
@@ -1677,8 +1679,9 @@ void gcomm::evs::Proto::deliver()
             if (msg.get_msg().get_safety_prefix() != SP_DROP)
             {
                 ProtoUpMeta um(msg.get_uuid(), 
+                               0,
                                msg.get_msg().get_user_type());
-                pass_up(msg.get_rb(), 0, &um);
+                pass_up(msg.get_rb(), 0, um);
             }
             input_map->erase(i);
         }
@@ -1757,8 +1760,9 @@ void gcomm::evs::Proto::deliver_trans()
             if (msg.get_msg().get_safety_prefix() != SP_DROP)
             {
                 ProtoUpMeta um(msg.get_uuid(), 
+                               0,
                                msg.get_msg().get_user_type());
-                pass_up(msg.get_rb(), 0, &um);
+                pass_up(msg.get_rb(), 0, um);
             }
             input_map->erase(i);
         }

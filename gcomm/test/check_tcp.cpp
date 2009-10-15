@@ -37,8 +37,8 @@ public:
         return tp->get_remote_url();
     }
 
-    void handle_up(const int cid, const ReadBuf *rb, const size_t offset,
-                   const ProtoUpMeta *um)
+    void handle_up(int cid, const ReadBuf *rb, size_t offset,
+                   const ProtoUpMeta& um)
     {
         if (rb == 0 && tp->get_state() == Transport::S_CONNECTED)
             can_send = true;
@@ -139,8 +139,8 @@ public:
         delete tp;
     }
 
-    void handle_up(const int cid, const ReadBuf *rb, const size_t offset,
-                   const ProtoUpMeta *um)
+    void handle_up(int cid, const ReadBuf *rb, size_t offset,
+                   const ProtoUpMeta& um)
     {
         const unsigned char *ptr;
         if (rb == 0) {
@@ -203,19 +203,14 @@ public:
         }
     }
 
-    void handle_up(const int cid, const ReadBuf *rb, const size_t offset,
-                   const ProtoUpMeta *um)
+    void handle_up(int cid, const ReadBuf *rb, size_t offset,
+                   const ProtoUpMeta& um)
     {
         Transport *t = tp->accept();
         Receiver *r = new Receiver(t);
         tports.push_back(std::pair<Receiver *, Transport *>(r, t));
     }
     
-    int handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
-    {
-        throw FatalException("");
-        return 0;
-    }
 
     void start()
     {

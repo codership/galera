@@ -50,19 +50,19 @@ using namespace gcomm::evs;
 // EVS interface
 /////////////////////////////////////////////////////////////////////////////
 
-void EVS::handle_up(const int          cid,
-                    const ReadBuf*     rb,
-                    const size_t       roff, 
-                    const ProtoUpMeta* um)
+void EVS::handle_up(int                 cid,
+                    const ReadBuf*      rb,
+                    size_t              roff, 
+                    const ProtoUpMeta&  um)
 {
     Critical crit(mon);
-
-    if (um->get_view() != 0 && um->get_view()->get_type() == View::V_REG)
+    
+    if (um.has_view() == true && um.get_view().get_type() == View::V_REG)
     {
         /* Call close gmcast transport for all nodes that left 
          * gracefully */
-        for (NodeList::const_iterator i = um->get_view()->get_left().begin();
-             i != um->get_view()->get_left().end(); ++i)
+        for (NodeList::const_iterator i = um.get_view().get_left().begin();
+             i != um.get_view().get_left().end(); ++i)
         {
             tp->close(NodeList::get_key(i));
         }
@@ -71,7 +71,7 @@ void EVS::handle_up(const int          cid,
     pass_up(rb, roff, um);
 }
 
-int EVS::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
+int EVS::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
 {
     Critical crit(mon);
     return proto->handle_down(wb, dm);

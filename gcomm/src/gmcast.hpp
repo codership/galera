@@ -161,9 +161,9 @@ public:
     /* Handle poll event */
     void handle_event(const int, const Event&);
     /* Handle Protolay up event */
-    void handle_up(const int, const ReadBuf*, const size_t, const ProtoUpMeta*);
+    void handle_up(int, const ReadBuf*, size_t, const ProtoUpMeta&);
     /* Handle Protolay down event */
-    int handle_down(WriteBuf* wb, const ProtoDownMeta*);
+    int handle_down(WriteBuf* wb, const ProtoDownMeta&);
 
     // Transport interface
     

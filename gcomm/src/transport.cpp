@@ -75,7 +75,7 @@ Transport* Transport::accept()
     throw;
 }
 
-int Transport::send(WriteBuf* wb, const ProtoDownMeta* dm)
+int Transport::send(WriteBuf* wb, const ProtoDownMeta& dm)
 {
     gcomm_throw_fatal << "Not implemented";
     throw;

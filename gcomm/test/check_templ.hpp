@@ -122,19 +122,19 @@ namespace gcomm
             return 0;
         }
         
-        void handle_up(const int cid, const ReadBuf* rb, const size_t roff, 
-                       const ProtoUpMeta* um)
+        void handle_up(int cid, const ReadBuf* rb, size_t roff, 
+                       const ProtoUpMeta& um)
         {
             gcomm_throw_fatal << "not implemented";
         }
         
-        int handle_down(WriteBuf *wb, const ProtoDownMeta *dm) 
+        int handle_down(WriteBuf *wb, const ProtoDownMeta& dm) 
         {
             out.push_back(wb->to_readbuf());
             return 0;
         }
     
-        void pass_up(WriteBuf *wb, const ProtoUpMeta *um) 
+        void pass_up(WriteBuf *wb, const ProtoUpMeta& um) 
         {
             gcomm_throw_fatal << "not implemented";
         }

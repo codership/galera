@@ -231,8 +231,8 @@ public:
     void handle_msg(const Message& msg, 
                     const ReadBuf* rb = 0, const size_t roff = 0);    
     // Protolay
-    void handle_up(const int, const ReadBuf*, const size_t, const ProtoUpMeta*);
-    int handle_down(WriteBuf* wb, const ProtoDownMeta* dm);
+    void handle_up(int, const ReadBuf*, size_t, const ProtoUpMeta&);
+    int handle_down(WriteBuf* wb, const ProtoDownMeta& dm);
     
     //
     void cleanup() {}

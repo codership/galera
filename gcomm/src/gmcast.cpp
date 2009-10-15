@@ -1608,8 +1608,8 @@ void GMCast::forward_message(const int cid, const ReadBuf* rb,
 
 }
 
-void GMCast::handle_up(const int    cid,    const ReadBuf* rb, 
-                       const size_t offset, const ProtoUpMeta* um) 
+void GMCast::handle_up(int    cid,    const ReadBuf* rb, 
+                       size_t offset, const ProtoUpMeta& um) 
 {
     Critical crit(mon);
 
@@ -1635,9 +1635,9 @@ void GMCast::handle_up(const int    cid,    const ReadBuf* rb,
 
             if (msg.get_type() >= GMCastMessage::T_USER_BASE)
             {
-                ProtoUpMeta um(msg.get_source_uuid());
 
-                pass_up(rb, off, &um);
+
+                pass_up(rb, off, ProtoUpMeta(msg.get_source_uuid()));
 
                 if (msg.get_ttl() > 1)
                 {
@@ -1711,7 +1711,7 @@ void GMCast::handle_up(const int    cid,    const ReadBuf* rb,
     }
 }
 
-int GMCast::handle_down(WriteBuf* wb, const ProtoDownMeta* dm) 
+int GMCast::handle_down(WriteBuf* wb, const ProtoDownMeta& dm) 
 {
     Critical crit(mon);
     

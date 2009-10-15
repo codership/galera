@@ -28,9 +28,8 @@ namespace gcomm
         void connect();
         void close();
         
-        void handle_up(const int, const ReadBuf*, const size_t, 
-                       const ProtoUpMeta*);
-        int  handle_down(WriteBuf*, const ProtoDownMeta*);
+        void handle_up(int, const ReadBuf*, size_t, const ProtoUpMeta&);
+        int  handle_down(WriteBuf*, const ProtoDownMeta&);
         
         bool supports_uuid() const;
         const UUID& get_uuid() const;

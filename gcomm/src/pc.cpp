@@ -12,33 +12,33 @@ using namespace std;
 using namespace gcomm;
 
 
-void PC::handle_up(const int cid, const ReadBuf* rb, const size_t roff, 
-                   const ProtoUpMeta* um)
+void PC::handle_up(int cid, const ReadBuf* rb, size_t roff, 
+                   const ProtoUpMeta& um)
 {
     Critical crit(mon);
-
-    if (um->get_view() != 0 && um->get_view()->get_type() == View::V_PRIM)
+    
+    if (um.has_view() == true && um.get_view().get_type() == View::V_PRIM)
     {
         /* Call close gmcast transport for all nodes that have left 
          * or partitioned */
-        for (NodeList::const_iterator i = um->get_view()->get_left().begin();
-             i != um->get_view()->get_left().end(); ++i)
+        for (NodeList::const_iterator i = um.get_view().get_left().begin();
+             i != um.get_view().get_left().end(); ++i)
         {
             tp->close(NodeList::get_key(i));
         }
-
+        
         for (NodeList::const_iterator i =
-                 um->get_view()->get_partitioned().begin();
-             i != um->get_view()->get_partitioned().end(); ++i)
+                 um.get_view().get_partitioned().begin();
+             i != um.get_view().get_partitioned().end(); ++i)
         {
             tp->close(NodeList::get_key(i));
         }
     }
-
+    
     pass_up(rb, roff, um);
 }
 
-int PC::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
+int PC::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
 {
     Critical crit(mon);
 

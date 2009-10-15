@@ -423,13 +423,13 @@ static int tmp_poll(int fd, const int pe, int tout, EventContext *ctx)
     return ret;
 }
 
-void TCP::handle_up(int cid, const ReadBuf* rb, const size_t roff, const ProtoUpMeta* um)
+void TCP::handle_up(int cid, const ReadBuf* rb, const size_t roff, const ProtoUpMeta& um)
 {
     gcomm_throw_runtime (ENOSYS) << "not supported";
 }
 
 
-int TCP::handle_down(WriteBuf *wb, const ProtoDownMeta *dm)
+int TCP::handle_down(WriteBuf *wb, const ProtoDownMeta& dm)
 {
     if (state != S_CONNECTED) return ENOTCONN;
 
@@ -621,7 +621,7 @@ void TCP::handle_event (const int fd, const Event& pe)
     {
 	this->error_no = ENOTCONN;
 	state = S_FAILED;
-	pass_up(0, 0, 0);
+	pass_up(0, 0, ProtoUpMeta());
         return;
     }
 
@@ -637,7 +637,7 @@ void TCP::handle_event (const int fd, const Event& pe)
 
 	this->error_no = ENOTCONN;
 	state = S_FAILED;
-	pass_up(0, 0, 0);
+	pass_up(0, 0, ProtoUpMeta());
         return;
     }
 
@@ -667,7 +667,7 @@ void TCP::handle_event (const int fd, const Event& pe)
 		state = S_FAILED;
 	    }
 
-	    pass_up(0, 0, 0);
+	    pass_up(0, 0, ProtoUpMeta());
             return;
 	}
 
@@ -681,7 +681,7 @@ void TCP::handle_event (const int fd, const Event& pe)
 	    this->error_no = ret;
 	    state = S_FAILED;
 	    log_debug << "TCP::handle() failed: " << strerror(ret);
-	    pass_up(0, 0, 0);
+	    pass_up(0, 0, ProtoUpMeta());
             return;
 	}
     }
@@ -695,7 +695,7 @@ void TCP::handle_event (const int fd, const Event& pe)
 	    if (ret == 0)
             {
 		ReadBuf rb(recv_buf, recv_buf_offset, true);
-		gu_trace(pass_up(&rb, TCPHdr::get_raw_len(), 0));
+		gu_trace(pass_up(&rb, TCPHdr::get_raw_len(), ProtoUpMeta()));
 		recv_buf_offset = 0;
 	    }
             else if (ret != EAGAIN)
@@ -703,13 +703,13 @@ void TCP::handle_event (const int fd, const Event& pe)
 		this->error_no = static_cast<int>(ret);
 		state = S_FAILED;
 		log_warn << "TCP::handle(): Failed";
-		pass_up(0, 0, 0);
+		pass_up(0, 0, ProtoUpMeta());
                 return;
 	    }
 	}
         else if (state == S_LISTENING)
         {
-	    pass_up(0, 0, 0);
+	    pass_up(0, 0, ProtoUpMeta());
 	}
     }
     else if (pe.get_cause() & Event::E_INVAL)
@@ -726,7 +726,7 @@ void TCP::handle_event (const int fd, const Event& pe)
 
 
 
-int TCP::send(WriteBuf *wb, const ProtoDownMeta *dm)
+int TCP::send(WriteBuf *wb, const ProtoDownMeta& dm)
 {
 
     TCPHdr hdr(wb->get_totlen());
