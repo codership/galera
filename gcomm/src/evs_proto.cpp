@@ -450,7 +450,8 @@ bool gcomm::evs::Proto::is_consistent_input_map(const Message& msg) const
             ((inst.get_join_message() != 0 &&
               inst.get_join_message()->get_source_view_id() == 
               current_view.get_id()) || 
-             current_view.get_members().find(uuid) != current_view.get_members().end()))
+             (inst.get_join_message() == 0 &&
+              current_view.get_members().find(uuid) != current_view.get_members().end())))
         {
             (void)local_insts.insert_checked(make_pair(uuid, input_map->get_range(uuid)));
         }

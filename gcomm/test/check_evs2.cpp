@@ -435,7 +435,7 @@ static void single_join(DummyTransport* t, Proto* p)
     rb = get_msg(t, &gm);
     fail_unless(rb != 0);
     fail_unless(gm.get_type() == Message::T_GAP);
-
+    
     // State must have evolved JOIN -> S_RECOVERY -> S_OPERATIONAL
     fail_unless(p->get_state() == Proto::S_OPERATIONAL);
     
@@ -458,6 +458,109 @@ START_TEST(test_proto_single_join)
     connect(&t, &p);
     connect(&p, &u);
     single_join(&t, &p);
+}
+END_TEST
+
+static void double_join(DummyTransport* t1, Proto* p1,
+                        DummyTransport* t2, Proto* p2)
+{
+
+    Message jm;
+    Message im;
+    Message gm;
+    Message gm2;
+    Message msg;
+
+    ReadBuf* rb;
+
+    // Initial states check
+    p2->shift_to(Proto::S_JOINING);
+    fail_unless(p1->get_state() == Proto::S_OPERATIONAL);
+    fail_unless(p2->get_state() == Proto::S_JOINING);
+
+    // Send join message, don't self handle immediately
+    // Expected output: one join message
+    p2->send_join(false);
+    fail_unless(p2->get_state() == Proto::S_JOINING);
+    rb = get_msg(t2, &jm);
+    fail_unless(rb != 0);
+    fail_unless(jm.get_type() == Message::T_JOIN);
+    rb = get_msg(t2, &msg);
+    fail_unless(rb == 0);
+    
+    // Handle node 2's join on node 1
+    // Expected output: shift to S_RECOVERY and one join message
+    p1->handle_msg(jm);
+    fail_unless(p1->get_state() == Proto::S_RECOVERY);
+    rb = get_msg(t1, &jm);
+    fail_unless(rb != 0);
+    fail_unless(jm.get_type() == Message::T_JOIN);
+    rb = get_msg(t1, &msg);
+    fail_unless(rb == 0);
+    
+    // Handle node 1's join on node 2
+    // Expected output: shift to S_RECOVERY and one join message
+    p2->handle_msg(jm);
+    fail_unless(p2->get_state() == Proto::S_RECOVERY);
+    rb = get_msg(t2, &jm);
+    fail_unless(rb != 0);
+    fail_unless(jm.get_type() == Message::T_JOIN);
+    rb = get_msg(t2, &msg);
+    fail_unless(rb == 0);
+    
+    // Handle node 2's join on node 1
+    // Expected output: Install and gap messages, state stays in S_RECOVERY
+    p1->handle_msg(jm);
+    fail_unless(p1->get_state() == Proto::S_RECOVERY);
+    rb = get_msg(t1, &im);
+    fail_unless(rb != 0);
+    fail_unless(im.get_type() == Message::T_INSTALL);
+    rb = get_msg(t1, &gm);
+    fail_unless(rb != 0);
+    fail_unless(gm.get_type() == Message::T_GAP);
+    rb = get_msg(t1, &msg);
+    fail_unless(rb == 0);
+    
+    // Handle install message on node 2
+    // Expected output: Gap message and state stays in S_RECOVERY
+    p2->handle_msg(im);
+    fail_unless(p2->get_state() == Proto::S_RECOVERY);
+    rb = get_msg(t2, &gm2);
+    fail_unless(rb != 0);
+    fail_unless(gm2.get_type() == Message::T_GAP);
+    rb = get_msg(t2, &msg);
+    fail_unless(rb == 0);
+    
+    // Handle gap messages
+    // Expected output: Both nodes shift to S_OPERATIONAL, no messages
+    // sent
+    p1->handle_msg(gm2);
+    fail_unless(p1->get_state() == Proto::S_OPERATIONAL);
+    rb = get_msg(t1, &msg);
+    fail_unless(rb == 0);
+    p2->handle_msg(gm);
+    fail_unless(p2->get_state() == Proto::S_OPERATIONAL);
+    rb = get_msg(t2, &msg);
+    fail_unless(rb == 0);
+}
+
+START_TEST(test_proto_double_join)
+{
+    EventLoop el;
+    UUID uuid1(1), uuid2(2);
+    DummyTransport t1(uuid1), t2(uuid2);
+    DummyUser u1, u2;
+    Proto p1(&el, &t1, uuid1, 0), p2(&el, &t2, uuid2, 0);
+
+    connect(&t1, &p1);
+    connect(&p1, &u1);
+
+    connect(&t2, &p2);
+    connect(&p2, &u2);
+
+    single_join(&t1, &p1);
+    double_join(&t1, &p1, &t2, &p2);
+
 }
 END_TEST
 
@@ -504,6 +607,10 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_proto_single_join");
     tcase_add_test(tc, test_proto_single_join);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_proto_double_join");
+    tcase_add_test(tc, test_proto_double_join);
     suite_add_tcase(s, tc);
     
     return s;
