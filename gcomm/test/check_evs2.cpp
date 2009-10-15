@@ -19,6 +19,7 @@
 #include "check_templ.hpp"
 
 #include <vector>
+#include <set>
 
 #include "check.h"
 
@@ -385,15 +386,156 @@ START_TEST(test_input_map_random_insert)
 }
 END_TEST
 
-class DummyUser : public Toplay
+class Msg
 {
 public:
-    DummyUser() { }
+    Msg(const UUID& source_, const int64_t seq_) : 
+        source(source_), seq(seq_) { }
+    
+    const UUID& get_source() const { return source; }
+
+    int64_t get_seq() const { return seq; }
+
+    bool operator==(const Msg& cmp) const
+    {
+        return (source   == cmp.source && 
+                seq      == cmp.seq      );  
+        
+    }
+private:
+    UUID const source;
+    int64_t const seq;
+};
+
+ostream& operator<<(ostream& os, const Msg& msg)
+{
+    return (os << "(" << msg.get_source() << "," << msg.get_seq() << ")");
+}
+
+class ViewTrace
+{
+public:
+    ViewTrace(const View& view_) : view(view_), msgs() { }
+
+    void insert_msg(const Msg& msg) const
+    {
+        gcomm_assert(contains(msg.get_source()) == true);
+    }
+    
+    const View& get_view() const { return view; }
+    
+    const deque<Msg>& get_msgs() const { return msgs; }
+    
+    bool operator==(const ViewTrace& cmp) const
+    {
+        return (view == cmp.view && msgs == cmp.msgs);
+    }
+private:
+
+    bool contains(const UUID& uuid) const
+    {
+        return (view.get_members().find(uuid) != view.get_members().end() ||
+                view.get_left().find(uuid)    != view.get_left().end() ||
+                view.get_partitioned().find(uuid) != view.get_partitioned().end());
+    }
+    
+    View const view;
+    deque<Msg> msgs;
+};
+
+ostream& operator<<(ostream& os, const ViewTrace& vtr)
+{
+    os << vtr.get_view() << ": ";
+    copy(vtr.get_msgs().begin(), vtr.get_msgs().end(),
+         ostream_iterator<const Msg>(os, " "));
+    return os;
+}
+
+
+struct ViewTraceCmpStr
+{
+    bool operator()(const set<ViewTrace>::value_type& a,
+                    const set<ViewTrace>::value_type& b) const
+    {
+        // Note, higher view type enum comes first
+        return a.get_view().get_id() < b.get_view().get_id() ||
+            (a.get_view().get_id() == b.get_view().get_id() && 
+             a.get_view().get_type() > b.get_view().get_type());
+    }
+};
+
+class Trace
+{
+public:
+    Trace() : views(), current_view(views.end()) { }
+    void insert_view(const View& view)
+    {
+        gcomm_assert(views.insert(view).second == true);
+    }
+    void insert_msg(const Msg& msg) const
+    {
+        gcomm_assert(current_view != views.end());
+        current_view->insert_msg(msg);
+    }
+    const set<ViewTrace, ViewTraceCmpStr>& get_views() const { return views; }
+private:
+    set<ViewTrace, ViewTraceCmpStr> views;
+    set<ViewTrace, ViewTraceCmpStr>::iterator current_view;
+};
+
+ostream& operator<<(ostream& os, const Trace& tr)
+{
+    os << "trace: \n";
+    copy(tr.get_views().begin(), tr.get_views().end(), 
+         ostream_iterator<const ViewTrace>(os, "\n"));
+    return os;
+}
+
+class DummyUser : public Toplay
+{
+    
+public:
+    DummyUser() : curr_seq(0), tr() { }
+    ~DummyUser()
+    {
+        log_info << tr;
+    }
     void handle_up(int cid, const ReadBuf* rb, size_t offset,
                    const ProtoUpMeta& um)
     {
         log_debug << "";
+        if (um.has_view() == true)
+        {
+            tr.insert_view(um.get_view());
+        }
+        else
+        {
+            int64_t seq;
+            gu_trace((void)unserialize(rb->get_buf(), rb->get_len(), 
+                                       offset, &seq));
+            tr.insert_msg(Msg(um.get_source(), seq));
+        }
     }
+
+    void send()
+    {
+        int64_t seq(curr_seq);
+        byte_t buf[sizeof(seq)];
+        size_t sz;
+        gu_trace(sz = serialize(seq, buf, sizeof(buf), 0));
+        WriteBuf wb(buf, sz);
+        int err = pass_down(&wb, ProtoDownMeta(0));
+        if (err != 0)
+        {
+            log_warn << "failed to send: " << strerror(err);
+        }
+    }
+
+    const Trace& get_trace() const { return tr; }
+
+private:
+    int64_t curr_seq;
+    Trace tr;
 };
 
 static ReadBuf* get_msg(DummyTransport* tp, Message* msg, bool release = true)
@@ -543,6 +685,7 @@ static void double_join(DummyTransport* t1, Proto* p1,
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
 }
+
 
 START_TEST(test_proto_double_join)
 {
