@@ -10,9 +10,10 @@
 
 
 
-
-#include "evs_message2.hpp"
+#include "evs_proto.hpp"
 #include "evs_input_map2.hpp"
+#include "evs_message2.hpp"
+#include "evs_seqno.hpp"
 
 #include "check_gcomm.hpp"
 #include "check_templ.hpp"
@@ -280,7 +281,7 @@ START_TEST(test_input_map_overwrap)
     }
     
     Time start(Time::now());
-    size_t cnt = 0;
+    size_t cnt(0);
     Seqno last_safe(Seqno::max());
     for (size_t n = 0; n < Seqno::max().get()*3LU; ++n)
     {
@@ -315,15 +316,160 @@ START_TEST(test_input_map_overwrap)
 END_TEST
 
 
+class InputMapInserter
+{
+public:
+    InputMapInserter(InputMap& im_) : im(im_) { }
+    
+    void operator()(const UserMessage& um) const
+    {
+        im.insert(um.get_source(), um);
+    }
+private:
+    InputMap& im;
+};
+
+START_TEST(test_input_map_random_insert)
+{
+    size_t n_seqnos(Seqno::max().get()/4);
+    size_t n_uuids(4);
+    vector<UUID> uuids(n_uuids);
+    vector<UserMessage> msgs(n_uuids*n_seqnos);
+    ViewId view_id(UUID(1), 1);
+    InputMap im;
+    
+    for (size_t i = 0; i < n_uuids; ++i)
+    {
+        uuids[i] = (static_cast<int32_t>(i + 1));
+        im.insert_uuid(uuids[i]);
+    }
+    
+    for (size_t j = 0; j < n_seqnos; ++j)
+    {
+        for (size_t i = 0; i < n_uuids; ++i)
+        {
+            msgs[j*n_uuids + i] = 
+                UserMessage(uuids[i],
+                            view_id,
+                            static_cast<uint16_t>(j % Seqno::max().get()));
+        }
+    }
+    
+    vector<UserMessage> random_msgs(msgs);
+    random_shuffle(random_msgs.begin(), random_msgs.end());
+    for_each(random_msgs.begin(), random_msgs.end(), InputMapInserter(im));
+    
+    size_t n = 0;
+    for (InputMap::iterator i = im.begin(); i != im.end(); ++i)
+    {
+        const InputMap::Msg& msg(InputMap::MsgIndex::get_value(i));
+        fail_unless(msg.get_uuid() == msg.get_msg().get_source());
+        fail_unless(msg.get_msg() == msgs[n]);
+        fail_if(im.is_safe(i) == true);
+        ++n;
+    }
+ 
+    fail_unless(im.get_aru_seq() == Seqno(static_cast<uint16_t>(n_seqnos - 1)));
+    fail_unless(im.get_safe_seq() == Seqno::max());
+
+    for (size_t i = 0; i < n_uuids; ++i)
+    {
+        fail_unless(im.get_range(uuids[i]) == 
+                    Range(static_cast<uint16_t>(n_seqnos),
+                          static_cast<uint16_t>(n_seqnos - 1)));
+                                                                  
+        im.set_safe_seq(uuids[i], static_cast<uint16_t>(n_seqnos - 1));
+    }
+    fail_unless(im.get_safe_seq() == static_cast<uint16_t>(n_seqnos - 1));
+   
+}
+END_TEST
+
+class DummyUser : public Toplay
+{
+public:
+    DummyUser() { }
+    void handle_up(int cid, const ReadBuf* rb, size_t offset,
+                   const ProtoUpMeta* um)
+    {
+        log_debug << "";
+    }
+};
+
+static ReadBuf* get_msg(DummyTransport* tp, Message* msg, bool release = true)
+{
+    ReadBuf* rb = tp->get_out();
+    if (rb != 0)
+    {
+        gu_trace(Proto::unserialize_message(tp->get_uuid(), rb, 0, msg));
+        if (release == true)
+        {
+            rb->release();
+        }
+    }
+    return rb;
+}
+
+static void single_join(DummyTransport* t, Proto* p)
+{
+    Message jm, im, gm;
+    
+    // Initial state is joining
+    p->shift_to(Proto::S_JOINING);
+    
+    // Send join must produce emitted join message
+    p->send_join();
+    
+    ReadBuf* rb = get_msg(t, &jm);
+    fail_unless(rb != 0);
+    fail_unless(jm.get_type() == Message::T_JOIN);
+    
+    // Install message is emitted at the end of JOIN handling
+    // 'cause this is the only instance and is always consistent
+    // with itself
+    rb = get_msg(t, &im);
+    fail_unless(rb != 0);
+    fail_unless(im.get_type() == Message::T_INSTALL);
+    
+    // Handling INSTALL message must emit gap message
+    rb = get_msg(t, &gm);
+    fail_unless(rb != 0);
+    fail_unless(gm.get_type() == Message::T_GAP);
+
+    // State must have evolved JOIN -> S_RECOVERY -> S_OPERATIONAL
+    fail_unless(p->get_state() == Proto::S_OPERATIONAL);
+    
+    // Handle join message again, must stay in S_OPERATIONAL, must not
+    // emit anything
+    p->handle_msg(jm);
+    rb = get_msg(t, &gm);
+    fail_unless(rb == 0);
+    fail_unless(p->get_state() == Proto::S_OPERATIONAL);
+    
+}
+
+START_TEST(test_proto_single_join)
+{
+    EventLoop el;
+    UUID uuid(1);
+    DummyTransport t(uuid);
+    DummyUser u;
+    Proto p(&el, &t, uuid, 0);
+    connect(&t, &p);
+    connect(&p, &u);
+    single_join(&t, &p);
+}
+END_TEST
+
 Suite* evs2_suite()
 {
-    Suite* s = suite_create("evs2");
+    Suite* s = suite_create("gcomm::evs");
     TCase* tc;
-
+    
     tc = tcase_create("test_seqno");
     tcase_add_test(tc, test_seqno);
     suite_add_tcase(s, tc);
-
+    
     tc = tcase_create("test_range");
     tcase_add_test(tc, test_range);
     suite_add_tcase(s, tc);
@@ -350,6 +496,14 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_input_map_overwrap");
     tcase_add_test(tc, test_input_map_overwrap);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_input_map_random_insert");
+    tcase_add_test(tc, test_input_map_random_insert);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_proto_single_join");
+    tcase_add_test(tc, test_proto_single_join);
     suite_add_tcase(s, tc);
     
     return s;

@@ -447,8 +447,10 @@ bool gcomm::evs::Proto::is_consistent_input_map(const Message& msg) const
         const UUID& uuid(NodeMap::get_key(i));
         const Node& inst(NodeMap::get_value(i));
         if (inst.get_operational() == true &&
-            inst.get_join_message() != 0 &&
-            inst.get_join_message()->get_source_view_id() == current_view.get_id())
+            ((inst.get_join_message() != 0 &&
+              inst.get_join_message()->get_source_view_id() == 
+              current_view.get_id()) || 
+             current_view.get_members().find(uuid) != current_view.get_members().end()))
         {
             (void)local_insts.insert_checked(make_pair(uuid, input_map->get_range(uuid)));
         }
@@ -594,7 +596,8 @@ bool gcomm::evs::Proto::is_consistent_same_view(const Message& msg) const
     
     if (is_consistent_input_map(msg) == false)
     {
-        log_debug << "input map not consistent";
+        log_debug << "input map not consistent " << *input_map 
+                  << " with message " << msg;
         return false;
     }
     
@@ -884,6 +887,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                                 vid, 
                                 safe_seq, 
                                 range);
+        log_debug << "inserting " << uuid;
         node_list->insert_checked(make_pair(uuid, mnode));
     }
 }
@@ -900,10 +904,10 @@ JoinMessage gcomm::evs::Proto::create_join()
                    input_map->get_aru_seq(),
                    ++fifo_seq,
                    &node_list);
-    
-    if (is_consistent(jm) == false)
+    log_debug << "created join message " << jm;
+    if (is_consistent_same_view(jm) == false)
     {
-        gcomm_throw_fatal << "Inconsistent JOIN message";
+        gcomm_throw_fatal << "inconsistent JOIN message";
     }
     return jm;
 }
@@ -1074,7 +1078,7 @@ void gcomm::evs::Proto::send_install()
                         ++fifo_seq,
                         &node_list);
 
-    log_info << self_string() << " sending install: " << imsg;
+    log_debug << self_string() << " sending install: " << imsg;
     
     vector<byte_t> buf(imsg.serial_size());
     gu_trace((void)imsg.serialize(&buf[0], buf.size(), 0));
@@ -1239,8 +1243,12 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         log_debug << "dropping message in closed state";
         return;
     }
-    gcomm_assert(msg.get_source() != UUID::nil() && 
-                 msg.get_source() != get_uuid());
+    if (msg.get_source() == get_uuid())
+    {
+        log_debug << "dropping self originated message";
+    }
+
+    gcomm_assert(msg.get_source() != UUID::nil());
     
     
     // Figure out if the message is from known source
@@ -1877,8 +1885,8 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         } 
         else 
         {
-            log_info << self_string() << " unknown user message: "
-                     << msg;
+            log_debug << self_string() << " unknown user message: "
+                      << msg;
             return;
         }
     }
@@ -1982,7 +1990,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
              install_message != 0 && 
              install_message->get_source_view_id() == msg.get_source_view_id()) 
     {
-        log_info << self_string() << " install gap " << msg;
+        log_debug << self_string() << " install gap " << msg;
         inst.set_installed(true);
         if (is_all_installed() == true)
             shift_to(S_OPERATIONAL);
@@ -2386,7 +2394,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     { 
         if (is_representative(get_uuid()))
         {
-            log_info << self_string() << " is consensus and representative";
+            log_debug << self_string() << " is consensus and representative";
             send_install();
         }
         else if (pre_consistent == false)
@@ -2409,7 +2417,7 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
 {
     assert(ii != known.end());
     Node& inst(NodeMap::get_value(ii));
-    log_info << self_string() << "leave message " << msg;
+    log_debug << self_string() << "leave message " << msg;
     
     set_leave(msg, msg.get_source());
     if (msg.get_source() == get_uuid()) 
@@ -2469,7 +2477,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         return;
     }
     
-    log_info << self_string() << " " << msg;
+    log_debug << self_string() << " " << msg;
     
     if (state == S_JOINING || state == S_CLOSED) 
     {

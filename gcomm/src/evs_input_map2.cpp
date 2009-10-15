@@ -26,6 +26,29 @@ static void release_rb(pair<const InputMap::MsgKey, InputMap::Msg>& p)
     }
 }
 
+ostream& gcomm::evs::operator<<(ostream& os, const InputMapNode& in)
+{
+    os << "node: {";
+    os << "idx=" << in.get_index() << ",";
+    os << "range=" << in.get_range() << ",";
+    os << "safe_seq=" << in.get_safe_seq();
+    os << "}";
+    return os;
+}
+
+ostream& gcomm::evs::operator<<(ostream& os, const InputMap& im)
+{
+    os << "evs::input_map: {";
+    os << "aru_seq=" << im.get_aru_seq() << ",";
+    os << "safe_seq=" << im.get_safe_seq() << ",";
+    os << "node_index=" << *im.node_index << ",";
+    // os << "msg_index=" << *msg_index << ",";
+    // os << "recovery_index=" << *recovery_index << ",";
+    // os << "inserted=" << inserted << ",";
+    // os << "updated_aru=" << updated_aru << "}";
+    return os;
+}
+
 
 gcomm::evs::InputMap::InputMap() :
     safe_seq(Seqno::max()),

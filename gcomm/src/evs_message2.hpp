@@ -265,6 +265,27 @@ public:
         node_list(msg.node_list != 0 ? new MessageNodeList(*msg.node_list) : 0)
     { }
 
+    Message& operator=(const Message& msg)
+    {
+        version = msg.version;
+        type = msg.type;
+        user_type = msg.user_type;
+        safety_prefix = msg.safety_prefix;
+        seq = msg.seq;
+        seq_range = msg.seq_range;
+        aru_seq = msg.aru_seq;
+        fifo_seq = msg.fifo_seq;
+        flags = msg.flags;
+        source = msg.source;
+        source_view_id = msg.source_view_id;
+        range_uuid = msg.range_uuid;
+        range = msg.range;
+        tstamp = msg.tstamp;
+        node_list = (msg.node_list != 0 ? 
+                     new MessageNodeList(*msg.node_list) : 0);
+        return *this;
+    }
+
     virtual ~Message() { delete node_list; }
 
 
@@ -320,10 +341,10 @@ protected:
     ViewId        source_view_id;
     UUID          range_uuid;
     Range                range;
-    Time           const tstamp;
+    Time                 tstamp;
     MessageNodeList*     node_list;
     
-    void operator=(const Message&);
+
 };
 
 /*!

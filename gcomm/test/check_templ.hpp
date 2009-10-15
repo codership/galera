@@ -81,11 +81,13 @@ namespace gcomm
 
     class DummyTransport : public Transport 
     {
+        UUID uuid;
         std::deque<ReadBuf*> in;
         std::deque<ReadBuf*> out;
     public:
-        DummyTransport() : 
-            Transport(URI("dummy:"), 0, 0),
+        DummyTransport(const UUID& uuid_ = UUID::nil()) :
+            Transport(URI("dummy:"), 0, 0),            
+            uuid(uuid_),
             in(), out()
         {}
         
@@ -97,35 +99,35 @@ namespace gcomm
             out.clear();
         }
     
-        size_t get_max_msg_size() const 
-        {
-            return (1U << 31);
-        }
+        bool supports_uuid() const { return true; }
         
-        void connect() 
-        {
-        }
+        const UUID& get_uuid() const { return uuid; }
+
+
+        size_t get_max_msg_size() const { return (1U << 31); }
         
-        void close() 
-        {
-        }
+        void connect() { }
+        
+        void close() { }
     
+
         void listen() 
         {
-            throw FatalException("Not applicable");
+            gcomm_throw_fatal << "not implemented";
         }
-
+        
         Transport *accept() 
         {
-            throw FatalException("Not applicable");
+            gcomm_throw_fatal << "not implemented";
+            return 0;
         }
-
+        
         void handle_up(const int cid, const ReadBuf* rb, const size_t roff, 
                        const ProtoUpMeta* um)
         {
-            throw FatalException("not applicable");
+            gcomm_throw_fatal << "not implemented";
         }
-    
+        
         int handle_down(WriteBuf *wb, const ProtoDownMeta *dm) 
         {
             out.push_back(wb->to_readbuf());
@@ -134,13 +136,26 @@ namespace gcomm
     
         void pass_up(WriteBuf *wb, const ProtoUpMeta *um) 
         {
-            in.push_back(wb->to_readbuf());
+            gcomm_throw_fatal << "not implemented";
         }
-    
+        
+        ReadBuf* get_in()
+        {
+            if (in.empty())
+            {
+                return 0;
+            }
+            ReadBuf* rb = in.front();
+            in.pop_front();
+            return rb;
+        }
+        
         ReadBuf* get_out() 
         {
             if (out.empty())
+            {
                 return 0;
+            }
             ReadBuf* rb = out.front();
             out.pop_front();
             return rb;

@@ -14,7 +14,13 @@ using namespace std;
 
 ostream& gcomm::evs::operator<<(ostream& os, const gcomm::evs::MessageNode& node)
 {
-    os << "node{}";
+    os << "node: {";
+    os << "operational=" << node.get_operational() << ",";
+    os << "leaving=" << node.get_leaving() << ",";
+    os << "view_id=" << node.get_view_id() << ",";
+    os << "safe_seq=" << node.get_safe_seq() << ",";
+    os << "im_range=" << node.get_im_range() << ",";
+    os << "}";
     return os;
 }
 

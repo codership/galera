@@ -31,12 +31,31 @@ namespace gcomm
     namespace evs
     {
         class InputMap;
+        class InputMapNode;
+        std::ostream& operator<<(std::ostream&, const InputMap&);
+        std::ostream& operator<<(std::ostream&, const InputMapNode&);
     } // namespace evs
 } // namespace gcomm
 
 
 
 
+/* Internal node representation */
+class gcomm::evs::InputMapNode
+{
+public:
+    InputMapNode() : idx(), range(0, Seqno::max()), safe_seq() { }
+    void set_range(const Range& r) { range = r; }
+    const Range& get_range() const { return range; }
+    void set_safe_seq(const Seqno s) { safe_seq = s; }
+    Seqno get_safe_seq() const { return safe_seq; }
+    void set_index(const size_t i) { idx = i; }
+    size_t get_index() const { return idx; }
+private:
+    size_t idx;
+    Range range;
+    Seqno safe_seq;
+};
 
 
 
@@ -47,22 +66,10 @@ namespace gcomm
 class gcomm::evs::InputMap
 {
 public:
-    /* Internal node representation */
-    class Node
-    {
-    public:
-        Node() : idx(), range(0, Seqno::max()), safe_seq() { }
-        void set_range(const Range& r) { range = r; }
-        const Range& get_range() const { return range; }
-        void set_safe_seq(const Seqno s) { safe_seq = s; }
-        Seqno get_safe_seq() const { return safe_seq; }
-        void set_index(const size_t i) { idx = i; }
-        size_t get_index() const { return idx; }
-    private:
-        size_t idx;
-        Range range;
-        Seqno safe_seq;
-    };
+
+    friend std::ostream& operator<<(std::ostream&, const InputMap&);
+
+    typedef InputMapNode Node;
 
     /* Internal node index representation */
     class NodeIndex : public gcomm::Map<const gcomm::UUID, Node> { };
