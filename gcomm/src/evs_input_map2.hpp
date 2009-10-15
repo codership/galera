@@ -105,7 +105,8 @@ public:
             uuid(uuid_),
             msg(msg_),
             rb(rb_)
-        { }
+        { 
+        }
         
         Msg(const Msg& m) :
             uuid(m.uuid),
@@ -122,7 +123,7 @@ public:
         void operator=(const Msg&);
         
         gcomm::UUID const uuid;
-        UserMessage  const msg;
+        UserMessage const msg;
         gcomm::ReadBuf* const rb;
     };
 

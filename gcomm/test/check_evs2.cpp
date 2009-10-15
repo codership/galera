@@ -75,9 +75,30 @@ START_TEST(test_message)
     ViewId view_id(uuid1, 4567);
     Seqno seq(478), aru_seq(456), seq_range(7);
 
-    UserMessage um(view_id, seq, aru_seq, seq_range);
-
+    UserMessage um(uuid1, view_id, seq, aru_seq, seq_range, SP_SAFE, 0xab,
+                   Message::F_SOURCE);
+    
     check_serialization(um, um.serial_size(), UserMessage());
+
+    DelegateMessage dm(uuid1, view_id);
+    dm.set_source(uuid1);
+    check_serialization(dm, dm.serial_size(), DelegateMessage());
+
+    MessageNodeList node_list;
+    node_list.insert(make_pair(uuid1, MessageNode()));
+    node_list.insert(make_pair(UUID(2), MessageNode(true, true, ViewId(), 5,
+                                                    Range(7, 8))));
+    JoinMessage jm(uuid1, view_id, 8, 5, 27, &node_list);
+    jm.set_source(uuid1);
+    check_serialization(jm, jm.serial_size(), JoinMessage());
+
+    InstallMessage im(uuid1, view_id, 8, 5, 27, &node_list);
+    im.set_source(uuid1);
+    check_serialization(im, im.serial_size(), InstallMessage());
+
+    LeaveMessage lm(uuid1, view_id, 45, 88, 3456);
+    lm.set_source(uuid1);
+    check_serialization(lm, lm.serial_size(), LeaveMessage());
 
 }
 END_TEST
@@ -90,19 +111,19 @@ START_TEST(test_input_map_insert)
 
     try 
     {
-        im.insert(uuid1, UserMessage(view, 0));
+        im.insert(uuid1, UserMessage(uuid1, view, 0));
         fail("");
     } 
     catch (...) { }
     
     im.insert_uuid(uuid1);
     
-    im.insert(uuid1, UserMessage(view, 0));
+    im.insert(uuid1, UserMessage(uuid1, view, 0));
     
     try 
     { 
         im.insert(uuid1, 
-                  UserMessage(view, 
+                  UserMessage(uuid1, view, 
                               static_cast<uint16_t>(Seqno::max().get() - 1))); 
         fail("");
     }
@@ -122,8 +143,8 @@ START_TEST(test_input_map_insert)
 
     for (Seqno s = 0; s < 10; ++s)
     {
-        im.insert(uuid1, UserMessage(view, s));
-        im.insert(uuid2, UserMessage(view, s));
+        im.insert(uuid1, UserMessage(uuid1, view, s));
+        im.insert(uuid2, UserMessage(uuid1, view, s));
     }
 
     for (Seqno s = 0; s < 10; ++s)
@@ -150,14 +171,14 @@ START_TEST(test_input_map_find)
     
     im.insert_uuid(uuid1);
     
-    im.insert(uuid1, UserMessage(view, 0));
+    im.insert(uuid1, UserMessage(uuid1, view, 0));
     
     fail_if(im.find(uuid1, 0) == im.end());
     
 
-    im.insert(uuid1, UserMessage(view, 2));
-    im.insert(uuid1, UserMessage(view, 4));
-    im.insert(uuid1, UserMessage(view, 7));
+    im.insert(uuid1, UserMessage(uuid1, view, 2));
+    im.insert(uuid1, UserMessage(uuid1, view, 4));
+    im.insert(uuid1, UserMessage(uuid1, view, 7));
 
     fail_if(im.find(uuid1, 2) == im.end());
     fail_if(im.find(uuid1, 4) == im.end());
@@ -178,18 +199,18 @@ START_TEST(test_input_map_safety)
     
     im.insert_uuid(uuid1);
     
-    im.insert(uuid1, UserMessage(view, 0));
+    im.insert(uuid1, UserMessage(uuid1, view, 0));
     fail_unless(im.get_aru_seq() == 0);
-    im.insert(uuid1, UserMessage(view, 1));
+    im.insert(uuid1, UserMessage(uuid1, view, 1));
     fail_unless(im.get_aru_seq() == 1);
-    im.insert(uuid1, UserMessage(view, 2));
+    im.insert(uuid1, UserMessage(uuid1, view, 2));
     fail_unless(im.get_aru_seq() == 2);
-    im.insert(uuid1, UserMessage(view, 3));
+    im.insert(uuid1, UserMessage(uuid1, view, 3));
     fail_unless(im.get_aru_seq() == 3);
-    im.insert(uuid1, UserMessage(view, 5));
+    im.insert(uuid1, UserMessage(uuid1, view, 5));
     fail_unless(im.get_aru_seq() == 3);    
     
-    im.insert(uuid1, UserMessage(view, 4));
+    im.insert(uuid1, UserMessage(uuid1, view, 4));
     fail_unless(im.get_aru_seq() == 5);
     
     InputMap::iterator i = im.find(uuid1, 0);
@@ -203,7 +224,7 @@ START_TEST(test_input_map_safety)
     i = im.find(uuid1, 5);
     fail_unless(im.is_safe(i) == true);
     
-    im.insert(uuid1, UserMessage(view, 7));
+    im.insert(uuid1, UserMessage(uuid1, view, 7));
     im.set_safe_seq(uuid1, im.get_aru_seq());
     i = im.find(uuid1, 7);
     fail_if(im.is_safe(i) == true);
@@ -220,7 +241,7 @@ START_TEST(test_input_map_erase)
 
     for (Seqno s = 0; s < 10; ++s)
     {
-        im.insert(uuid1, UserMessage(view, s));
+        im.insert(uuid1, UserMessage(uuid1, view, s));
     }
     
     for (Seqno s = 0; s < 10; ++s)
@@ -264,10 +285,11 @@ START_TEST(test_input_map_overwrap)
     for (size_t n = 0; n < 100000; ++n)
     {
 
-        UserMessage um(view, static_cast<uint16_t>(n % Seqno::max().get()));
+        Seqno seq(static_cast<uint16_t>(n % Seqno::max().get()));
         for (vector<UUID>::const_iterator i = uuids.begin(); i != uuids.end();
              ++i)
         {
+            UserMessage um(*i, view, seq);
             (void)im.insert(*i, um);
             if ((n + 5) % 10 == 0)
             {
@@ -282,7 +304,7 @@ START_TEST(test_input_map_overwrap)
             }
             cnt++;
         }
-        fail_unless(im.get_aru_seq() == um.get_seq());
+        fail_unless(im.get_aru_seq() == seq);
         fail_unless(im.get_safe_seq() == last_safe);
     }
     Time stop(Time::now());

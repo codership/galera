@@ -165,7 +165,7 @@ public:
                   const Seqno, bool local = false);
     int send_user();
     void complete_user(const Seqno);
-    int send_delegate(const UUID&, WriteBuf*);
+    int send_delegate(WriteBuf*);
     void send_gap(const UUID&, const ViewId&, const Range);
     JoinMessage create_join();
     void send_join(bool tval = true);
@@ -227,13 +227,15 @@ private:
     void handle_delegate(const DelegateMessage&, 
                          NodeMap::iterator,
                          const ReadBuf*, 
-                         const size_t);
+                         size_t);
     void handle_gap(const GapMessage&, NodeMap::iterator);
     void handle_join(const JoinMessage&, NodeMap::iterator);
     void handle_leave(const LeaveMessage&, NodeMap::iterator);
     void handle_install(const InstallMessage&, NodeMap::iterator);
     void populate_node_list(MessageNodeList*) const;
 public:
+    static size_t unserialize_message(const UUID&, const ReadBuf*, size_t,
+                                      Message*);
     void handle_msg(const Message& msg, 
                     const ReadBuf* rb = 0, const size_t roff = 0);    
     // Protolay

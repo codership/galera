@@ -17,6 +17,7 @@ namespace gcomm
     class PCStateMessage;
     class PCInstallMessage;
     std::ostream& operator<<(std::ostream&, const PCInst&);
+    std::ostream& operator<<(std::ostream&, const PCMessage&);
     bool operator==(const PCMessage&, const PCMessage&);
 }
 
@@ -324,6 +325,10 @@ public:
     }
 };
 
+inline std::ostream& gcomm::operator<<(std::ostream& os, const PCMessage& m)
+{
+    return (os << m.to_string());
+}
 
 class gcomm::PCStateMessage : public PCMessage
 {

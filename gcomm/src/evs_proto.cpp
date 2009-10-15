@@ -131,7 +131,8 @@ void gcomm::evs::Proto::check_inactive()
 
 void gcomm::evs::Proto::set_inactive(const UUID& uuid)
 {
-    NodeMap::iterator i = known.find_checked(uuid);
+    NodeMap::iterator i;
+    gu_trace(i = known.find_checked(uuid));
     log_debug << self_string() << " setting " << uuid << " inactive";
     NodeMap::get_value(i).set_tstamp(Time(0, 0));
 }
@@ -717,7 +718,8 @@ int gcomm::evs::Proto::send_user(WriteBuf* wb,
         flags = Message::F_MSG_MORE;
     }
     
-    UserMessage msg(current_view.get_id(), 
+    UserMessage msg(get_uuid(),
+                    current_view.get_id(), 
                     seq,
                     im.get_aru_seq(),
                     seq_range,
@@ -785,9 +787,9 @@ void gcomm::evs::Proto::complete_user(const Seqno high_seq)
 }
 
 
-int gcomm::evs::Proto::send_delegate(const UUID& uuid, WriteBuf* wb)
+int gcomm::evs::Proto::send_delegate(WriteBuf* wb)
 {
-    DelegateMessage dm(current_view.get_id(), uuid);
+    DelegateMessage dm(get_uuid(), current_view.get_id());
     push_header(dm, wb);
     int ret = pass_down(wb, 0);
     pop_header(dm, wb);
@@ -795,18 +797,23 @@ int gcomm::evs::Proto::send_delegate(const UUID& uuid, WriteBuf* wb)
 }
 
 
-void gcomm::evs::Proto::send_gap(const UUID&   uuid, 
+void gcomm::evs::Proto::send_gap(const UUID&   range_uuid, 
                                  const ViewId& source_view_id, 
                                  const Range   range)
 {
-    log_debug << self_string() << " to "  << uuid 
+    log_debug << self_string() << " to "  << range_uuid 
               << " requesting range " << range;
     // TODO: Investigate if gap sending can be somehow limited, 
     // message loss happen most probably during congestion and 
     // flooding network with gap messages won't probably make 
     // conditions better
     
-    GapMessage gm(last_sent, im.get_aru_seq(), source_view_id, uuid, range);
+    GapMessage gm(get_uuid(),
+                  source_view_id,
+                  last_sent, 
+                  im.get_aru_seq(), 
+                  range_uuid, 
+                  range);
     
     WriteBuf wb(0, 0);
     push_header(gm, &wb);
@@ -848,10 +855,11 @@ JoinMessage gcomm::evs::Proto::create_join()
     MessageNodeList node_list;
 
     populate_node_list(&node_list);
-    JoinMessage jm(im.get_safe_seq(),
+    JoinMessage jm(get_uuid(),
+                   current_view.get_id(),
+                   im.get_safe_seq(),
                    im.get_aru_seq(),
                    ++fifo_seq,
-                   current_view.get_id(),
                    &node_list);
     
     if (is_consistent(jm) == false)
@@ -864,14 +872,16 @@ JoinMessage gcomm::evs::Proto::create_join()
 
 void gcomm::evs::Proto::set_join(const JoinMessage& jm, const UUID& source)
 {
-    NodeMap::iterator i = known.find_checked(source);
+    NodeMap::iterator i;
+    gu_trace(i = known.find_checked(source));
     NodeMap::get_value(i).set_join_message(new JoinMessage(jm));
 }
 
 
 void gcomm::evs::Proto::set_leave(const LeaveMessage& lm, const UUID& source)
 {
-    NodeMap::iterator i = known.find_checked(source);
+    NodeMap::iterator i;
+    gu_trace(i = known.find_checked(source));
     Node& inst(NodeMap::get_value(i));
     
     if (inst.get_leave_message())
@@ -889,7 +899,8 @@ void gcomm::evs::Proto::set_leave(const LeaveMessage& lm, const UUID& source)
 
 bool gcomm::evs::Proto::has_leave(const UUID& uuid) const
 {
-    NodeMap::const_iterator ii = known.find_checked(uuid);
+    NodeMap::const_iterator ii;
+    gu_trace(ii = known.find_checked(uuid));
     const Node& inst(NodeMap::get_value(ii));
 
     if (inst.get_leave_message() != 0)
@@ -953,10 +964,11 @@ void gcomm::evs::Proto::send_leave()
     
     log_debug << self_string() << " send leave as " << last_sent;
     
-    LeaveMessage lm(last_sent,
-                       im.get_aru_seq(), 
-                       ++fifo_seq,
-                       current_view.get_id());
+    LeaveMessage lm(get_uuid(),
+                    current_view.get_id(),
+                    last_sent,
+                    im.get_aru_seq(), 
+                    ++fifo_seq);
 
     WriteBuf wb(0, 0);
     push_header(lm, &wb);
@@ -1016,10 +1028,11 @@ void gcomm::evs::Proto::send_install()
     MessageNodeList node_list;
     populate_node_list(&node_list);
     
-    InstallMessage imsg(im.get_safe_seq(),
+    InstallMessage imsg(get_uuid(),
+                        ViewId(get_uuid(), max_view_id_seq + 1),
+                        im.get_safe_seq(),
                         im.get_aru_seq(),
                         ++fifo_seq,
-                        ViewId(get_uuid(), max_view_id_seq + 1),
                         &node_list);
 
     log_info << self_string() << " sending install: " << imsg;
@@ -1069,7 +1082,8 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
         const UserMessage& msg(InputMap::MsgIndex::get_value(msg_i).get_msg());
         assert(msg.get_source() == get_uuid());
         const ReadBuf* rb(InputMap::MsgIndex::get_value(msg_i).get_rb());
-        UserMessage um(msg.get_source_view_id(),
+        UserMessage um(msg.get_source(),
+                       msg.get_source_view_id(),
                        msg.get_seq(),
                        im.get_aru_seq(),
                        msg.get_seq_range(),
@@ -1123,18 +1137,19 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
         const UserMessage& msg(InputMap::MsgIndex::get_value(msg_i).get_msg());
         assert(msg.get_source() == range_uuid);
         const ReadBuf* rb(InputMap::MsgIndex::get_value(msg_i).get_rb());
-        UserMessage um(msg.get_source_view_id(),
+        UserMessage um(msg.get_source(),
+                       msg.get_source_view_id(),
                        msg.get_seq(),
                        msg.get_aru_seq(),
                        msg.get_seq_range(),
                        msg.get_safety_prefix(),
                        msg.get_user_type(),
-                       Message::F_RETRANS);
+                       Message::F_SOURCE | Message::F_RETRANS);
         
         WriteBuf wb(rb != 0 ? rb->get_buf() : 0, rb != 0 ? rb->get_len() : 0);
         push_header(um, &wb);
         
-        int err = send_delegate(msg.get_source(), &wb);
+        int err = send_delegate(&wb);
         if (err != 0)
         {
             log_warn << "recovery failed " << strerror(err);
@@ -1253,78 +1268,79 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
 // Protolay interface
 ////////////////////////////////////////////////////////////////////////
 
-size_t read_rest(gcomm::evs::Message* msg, const ReadBuf* rb, size_t roff)
+size_t gcomm::evs::Proto::unserialize_message(const UUID& source, 
+                                              const ReadBuf* const rb, 
+                                              size_t offset,
+                                              Message* msg)
 {
+
+
+    gu_trace(offset = msg->unserialize(rb->get_buf(), rb->get_len(), offset));
+    if ((msg->get_flags() & Message::F_SOURCE) == false)
+    {
+        gcomm_assert(source != UUID::nil());
+        msg->set_source(source);
+    }
+    
     switch (msg->get_type())
     {
     case Message::T_NONE:
         gcomm_throw_fatal;
         break;
     case Message::T_USER:
-        roff = static_cast<UserMessage&>(*msg).unserialize(
-            rb->get_buf(), rb->get_len(), roff, true);
+        gu_trace(offset = static_cast<UserMessage&>(*msg).unserialize(
+                     rb->get_buf(), rb->get_len(), offset, true));
         break;
     case Message::T_DELEGATE:
-        roff = static_cast<DelegateMessage&>(*msg).unserialize(
-            rb->get_buf(), rb->get_len(), roff, true);
+        gu_trace(offset = static_cast<DelegateMessage&>(*msg).unserialize(
+                     rb->get_buf(), rb->get_len(), offset, true));
         break;
     case Message::T_GAP:
-        roff = static_cast<GapMessage&>(*msg).unserialize(
-            rb->get_buf(), rb->get_len(), roff, true);
+        gu_trace(offset = static_cast<GapMessage&>(*msg).unserialize(
+                     rb->get_buf(), rb->get_len(), offset, true));
         break;
     case Message::T_JOIN:
-        roff = static_cast<JoinMessage&>(*msg).unserialize(
-            rb->get_buf(), rb->get_len(), roff, true);
+        gu_trace(offset = static_cast<JoinMessage&>(*msg).unserialize(
+                     rb->get_buf(), rb->get_len(), offset, true));
         break;
     case Message::T_INSTALL:
-        roff = static_cast<InstallMessage&>(*msg).unserialize(
-            rb->get_buf(), rb->get_len(), roff, true);
+        gu_trace(offset = static_cast<InstallMessage&>(*msg).unserialize(
+                     rb->get_buf(), rb->get_len(), offset, true));
         break;
     case Message::T_LEAVE:
-        roff = static_cast<LeaveMessage&>(*msg).unserialize(
-            rb->get_buf(), rb->get_len(), roff, true);
+        gu_trace(offset = static_cast<LeaveMessage&>(*msg).unserialize(
+                     rb->get_buf(), rb->get_len(), offset, true));
         break;
     }
-    return roff;
+    return offset;
 }
 
-void gcomm::evs::Proto::handle_up(const int cid, 
+void gcomm::evs::Proto::handle_up(int cid, 
                                   const ReadBuf* rb, 
-                                  size_t roff,
+                                  size_t offset,
                                   const ProtoUpMeta* um)
 {
     Critical crit(mon);
     
     Message msg;
-
+    
     if (rb == 0 || um == 0)
         gcomm_throw_fatal << "Invalid input: rb == 0 || um == 0";
     
     if (get_state() == S_CLOSED)
     {
-        log_debug << "Dropping message in closed state";
+        log_debug << "dropping message in closed state";
         return;
     }
     
+    gcomm_assert(um->get_source() != UUID::nil());    
     if (um->get_source() == get_uuid())
     {
         log_warn << "dropping self originated message";
     }
-    gcomm_assert(um->get_source() != UUID::nil());
     
-    try
-    {
-        roff = msg.unserialize(rb->get_buf(), rb->get_len(), roff);
-    }
-    catch (gu::Exception& e)
-    {
-        log_warn << "invalid message";
-        return;
-    }
-    
-    msg.set_source(um->get_source());
-    roff = read_rest(&msg, rb, roff);
-    handle_msg(msg, rb, roff);
+    gu_trace(offset = unserialize_message(um->get_source(), rb, offset, &msg));
+    handle_msg(msg, rb, offset);
 }
 
 int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta* dm)
@@ -1709,7 +1725,8 @@ void gcomm::evs::Proto::deliver_trans()
         i_next = i;
         ++i_next;
         const InputMap::Msg& msg(InputMap::MsgIndex::get_value(i));
-        NodeMap::iterator ii = known.find_checked(msg.get_uuid());
+        NodeMap::iterator ii;
+        gu_trace(ii = known.find_checked(msg.get_uuid()));
 
         if (NodeMap::get_value(ii).get_installed() == true)
         {
@@ -1798,8 +1815,9 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                          mi = install_message->get_node_list().begin(); 
                      mi != install_message->get_node_list().end(); ++mi)
                 {
-                    NodeMap::iterator jj = known.find_checked(
-                        MessageNodeList::get_key(mi));
+                    NodeMap::iterator jj;
+                    gu_trace(jj = known.find_checked(
+                                 MessageNodeList::get_key(mi)));
                     NodeMap::get_value(jj).set_installed(true);
                 }
                 
@@ -1901,17 +1919,13 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
 void gcomm::evs::Proto::handle_delegate(const DelegateMessage& msg, 
                                         NodeMap::iterator ii,
                                         const ReadBuf* rb, 
-                                        const size_t roff)
+                                        size_t offset)
 {
     assert(ii != known.end());
 
     Message umsg;
-    gu_trace((void)umsg.unserialize(rb->get_buf(), rb->get_len(),
-                                    roff + msg.serial_size()));
-    umsg.set_source(msg.get_source());
-    read_rest(&umsg, rb, roff + msg.serial_size());
-    log_debug << umsg;
-    handle_msg(umsg, rb, roff + msg.serial_size());
+    gu_trace(offset = unserialize_message(UUID::nil(), rb, offset, &umsg));
+    handle_msg(umsg, rb, offset);
 }
 
 void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)

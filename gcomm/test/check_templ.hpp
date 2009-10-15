@@ -18,6 +18,13 @@ namespace gcomm
     {
         rb->release();
     }
+
+    template <typename I>
+    inline std::ostream& operator<<(std::ostream& os, const IntType<I>& i)
+    {
+        return (os << i.get());
+    }
+
     
     template<class T>
     void check_serialization(const T& c, const size_t expected_size, 
@@ -54,6 +61,10 @@ namespace gcomm
         }
         ret = c2.unserialize(buf, expected_size, 0);
         fail_unless(ret == expected_size, "expected %z ret %z", expected_size, ret);
+        if ((c == c2) == false)
+        {
+            log_warn << "\n\t" << c << " !=\n\t" << c2;
+        }
         fail_unless(c == c2);
     
         // Check that read/write return offset properly

@@ -22,8 +22,6 @@ libgcomm_la_SOURCES = 		\
 	transport.cpp		\
 	tcp.cpp			\
 	gmcast.cpp		\
-	evs_seqno.cpp		\
-	evs_input_map.cpp	\
 	evs_message2.cpp	\
 	evs_input_map2.cpp 	\
 	evs_proto.cpp		\
