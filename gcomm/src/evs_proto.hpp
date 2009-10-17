@@ -154,7 +154,6 @@ public:
     void send_join(bool tval = true);
     void set_join(const JoinMessage&, const UUID&);
     void set_leave(const LeaveMessage&, const UUID&);
-    bool has_leave(const UUID&) const;
     void send_leave();
     void send_install();
     

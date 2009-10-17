@@ -572,7 +572,7 @@ bool gcomm::evs::Proto::is_consistent_input_map(const Message& msg) const
     }
     
     assert(msg.has_node_list() == true);
-    const MessageNodeList m_insts = msg.get_node_list();
+    const MessageNodeList& m_insts(msg.get_node_list());
     
     for (MessageNodeList::const_iterator i = m_insts.begin();
          i != m_insts.end(); ++i)
@@ -588,6 +588,10 @@ bool gcomm::evs::Proto::is_consistent_input_map(const Message& msg) const
     }
     if (msg_insts != local_insts)
     {
+        if (msg.get_source() == get_uuid())
+        {
+            log_warn << "own join not consistent with input map";
+        }
         return false;
     }
     return true;
@@ -608,8 +612,8 @@ bool gcomm::evs::Proto::is_consistent_partitioning(const Message& msg) const
     {
         const UUID& uuid(NodeMap::get_key(i));
         const Node& inst(NodeMap::get_value(i));
-        if (inst.get_operational() == false &&
-            inst.get_leave_message() == 0   &&
+        if (inst.get_operational()                == false &&
+            inst.get_leave_message()              == 0     &&
             current_view.get_members().find(uuid) != current_view.get_members().end())
         {
             gu_trace((void)local_insts.insert_checked(
@@ -636,6 +640,10 @@ bool gcomm::evs::Proto::is_consistent_partitioning(const Message& msg) const
     }
     if (local_insts != msg_insts)
     {
+        if (msg.get_source() == get_uuid())
+        {
+            log_warn << "own join not consistent with partitioning";
+        }
         return false;
     }
     return true;
@@ -654,12 +662,10 @@ bool gcomm::evs::Proto::is_consistent_leaving(const Message& msg) const
     
     for (NodeMap::const_iterator i = known.begin(); i != known.end(); ++i)
     {
-        // @todo Using has_leave() is probably wrong, others should
-        // delegate leave message if missing on some instance
         const UUID& uuid(NodeMap::get_key(i));
         const Node& inst(NodeMap::get_value(i));
         if (inst.get_operational() == false &&
-            has_leave(uuid)        == true  &&
+            inst.get_leave_message() != 0  &&
             current_view.get_members().find(uuid) != current_view.get_members().end())
         {
             gu_trace((void)local_insts.insert_checked(
@@ -685,6 +691,10 @@ bool gcomm::evs::Proto::is_consistent_leaving(const Message& msg) const
     }
     if (local_insts != msg_insts)
     {
+        if (msg.get_source() == get_uuid())
+        {
+            log_warn << "own join not consistent with leaving";
+        }
         return false;
     }
     return true;
@@ -701,6 +711,10 @@ bool gcomm::evs::Proto::is_consistent_same_view(const Message& msg) const
     {
         log_debug << "aru seq not consistent, local " << input_map->get_aru_seq()
                   << " msg " << msg.get_aru_seq();
+        if (msg.get_source() == get_uuid())
+        {
+            log_warn << "own join not consistent with input map aru seq";
+        }
         return false;
     }
     
@@ -709,6 +723,10 @@ bool gcomm::evs::Proto::is_consistent_same_view(const Message& msg) const
     {
         log_debug << "safe seq not consistent, local " << input_map->get_safe_seq()
                   << " msg " << msg.get_seq();
+        if (msg.get_source() == get_uuid())
+        {
+            log_warn << "own join not consistent with input map safe seq";
+        }
         return false;
     }
     
@@ -753,6 +771,10 @@ bool gcomm::evs::Proto::is_consistent_joining(const Message& msg) const
         const JoinMessage* jm = inst.get_join_message();        
         if (jm == 0)
         {
+            if (msg.get_source() == get_uuid())
+            {
+                log_warn << "own join not consistent with joining";
+            }
             return false;
         }
         
@@ -760,10 +782,18 @@ bool gcomm::evs::Proto::is_consistent_joining(const Message& msg) const
         { 
             if (msg.get_aru_seq() != jm->get_aru_seq())
             {
+                if (msg.get_source() == get_uuid())
+                {
+                    log_warn << "own join not consistent with joining jm aru seq";
+                }
                 return false;
             }
             if (msg.get_seq() != jm->get_seq())
             {
+                if (msg.get_source() == get_uuid())
+                {
+                    log_warn << "own join not consistent with joining jm seq";
+                }
                 return false;
             }
         }
@@ -787,6 +817,10 @@ bool gcomm::evs::Proto::is_consistent_joining(const Message& msg) const
     
     if (local_insts != msg_insts)
     {
+        if (msg.get_source() == get_uuid())
+        {
+            log_warn << "own join not consistent with joining";
+        }
         return false;
     }
     
@@ -998,19 +1032,19 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
 {
     for (NodeMap::const_iterator i = known.begin(); i != known.end(); ++i)
     {
-        const UUID& uuid = NodeMap::get_key(i);
-        const Node& node = NodeMap::get_value(i);
-        const bool in_current = (current_view.get_members().find(uuid) != 
-                                 current_view.get_members().end());
-        const ViewId vid = (node.get_join_message() != 0 ?
-                            node.get_join_message()->get_source_view_id() :
-                            (in_current == true ? 
-                             current_view.get_id() : 
-                             ViewId()));
-        const Seqno safe_seq = (in_current == true ? input_map->get_safe_seq(uuid) : Seqno::max());
-        const Range range = (in_current == true ? input_map->get_range(uuid) : Range());
+        const UUID& uuid(NodeMap::get_key(i));
+        const Node& node(NodeMap::get_value(i));
+        const bool in_current(current_view.get_members().find(uuid) != 
+                              current_view.get_members().end());
+        const ViewId vid(node.get_join_message() != 0 ?
+                         node.get_join_message()->get_source_view_id() :
+                         (in_current == true ? 
+                          current_view.get_id() : 
+                          ViewId()));
+        const Seqno safe_seq(in_current == true ? input_map->get_safe_seq(uuid) : Seqno::max());
+        const Range range(in_current == true ? input_map->get_range(uuid) : Range());
         const MessageNode mnode(node.get_operational(),
-                                has_leave(uuid),
+                                node.get_leave_message() != 0,
                                 vid, 
                                 safe_seq, 
                                 range);
@@ -1068,39 +1102,6 @@ void gcomm::evs::Proto::set_leave(const LeaveMessage& lm, const UUID& source)
     }
 }
 
-
-bool gcomm::evs::Proto::has_leave(const UUID& uuid) const
-{
-    NodeMap::const_iterator ii;
-    gu_trace(ii = known.find_checked(uuid));
-    const Node& inst(NodeMap::get_value(ii));
-    
-    if (inst.get_leave_message() != 0)
-    {
-        return true;
-    }
-    
-    for (ii = known.begin(); ii != known.end(); ++ii)
-    {
-        const Node& ii_node(NodeMap::get_value(ii));
-        const JoinMessage* jm = ii_node.get_join_message();
-        if (ii_node.get_join_message() != 0)
-        {
-            assert(jm->has_node_list() == true);
-            const MessageNodeList& im = jm->get_node_list();
-            
-            MessageNodeList::const_iterator ji = im.find(uuid);
-            
-            if (ji != im.end() &&
-                MessageNodeList::get_value(ji).get_leaving() == true)
-            {
-                return true;
-            }
-        }
-    }
-    
-    return false;
-}
 
 void gcomm::evs::Proto::send_join(bool handle)
 {
@@ -1229,7 +1230,8 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
     if (input_map->get_safe_seq() != Seqno::max() &&
         range.get_lu() <= input_map->get_safe_seq())
     {
-        log_warn << "lu <= safe_seq";
+        log_warn << "lu <= safe_seq, can't recover message";
+        return;
     }
     
     log_debug << self_string() << " resending, requested by " 
@@ -1287,7 +1289,7 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
     
     if (range.get_lu() <= input_map->get_safe_seq())
     {
-        log_warn << "lu <= safe_seq";
+        log_warn << "lu <= safe_seq, can't recover message";
         return;
     }
     
@@ -1745,7 +1747,7 @@ void gcomm::evs::Proto::validate_reg_msg(const UserMessage& msg)
     if (collect_stats == true && msg.get_safety_prefix() == SP_SAFE)
     {
         Time now(Time::now());
-        hs_safe.insert(double(now.get_microseconds() - msg.get_tstamp().get_microseconds())/1000.);
+        hs_safe.insert(double(now.get_microseconds() - msg.get_tstamp().get_microseconds())/1.e6);
     }
 }
 
@@ -1831,7 +1833,7 @@ void gcomm::evs::Proto::validate_trans_msg(const UserMessage& msg)
     if (collect_stats && msg.get_safety_prefix() == SP_SAFE)
     {
         Time now(Time::now());
-        hs_safe.insert(double(now.get_microseconds() - msg.get_tstamp().get_microseconds())/1000.);
+        hs_safe.insert(double(now.get_microseconds() - msg.get_tstamp().get_microseconds())/1.e6);
     }
 }
 
@@ -2258,8 +2260,21 @@ bool gcomm::evs::Proto::states_compare(const JoinMessage& msg)
                     send_join_p = true;
                 }
             }
+
+            if (msg_node.get_leaving() == false && 
+                local_node.get_leave_message() != 0)
+            {
+                // Help friend a bit
+
+                const LeaveMessage& lm(*local_node.get_leave_message());
+                log_info << "sending leave " << lm << " as delegate to "
+                         << msg.get_source();
+                WriteBuf wb(0, 0);
+                push_header(lm, &wb);
+                send_delegate(&wb);
+            }
         }
-        
+
         if (msg_node.get_view_id() == current_view.get_id())
         {
             const Seqno imseq(input_map->get_safe_seq(msg_node_uuid));
