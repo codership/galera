@@ -34,27 +34,31 @@ namespace gcomm
 class gcomm::evs::Seqno
 {
 public:
-    Seqno(const uint16_t seq_ = seq_max) : seq(seq_) { }
+    Seqno(const uint16_t seq_ = seq_max) : 
+        seq(seq_) 
+    {
+        gcomm_assert(seq <= seq_max);
+    }
     
     static const Seqno max() { return Seqno(seq_max); }
     
     Seqno& operator++()
     {
-        gcomm_assert(seq != seq_max);
+        gcomm_assert(seq < seq_max);
         seq = static_cast<uint16_t>((seq + 1) % seq_max);
         return *this;
     }
     
     Seqno operator+(const Seqno inc) const
     {
-        gcomm_assert(inc.seq < seq_max/2);
+        gcomm_assert(inc.seq < seq_max);
         gcomm_assert(seq != seq_max);
         return static_cast<uint16_t>((seq + inc.seq) % seq_max);
     }
     
     Seqno operator-(const Seqno dec) const
     {
-        gcomm_assert(dec.seq < seq_max/2);
+        gcomm_assert(dec.seq < seq_max);
         gcomm_assert(seq != seq_max);
         return static_cast<uint16_t>((uint32_t(seq) + seq_max - dec.seq) % seq_max);
     }
