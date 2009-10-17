@@ -50,17 +50,8 @@ public:
         fifo_seq(-1)
     {}
 
-    
-    Node(const Node& n) :
-        operational(n.operational),
-        installed(n.installed),
-        join_message(n.join_message),
-        leave_message(n.leave_message),
-        tstamp(n.tstamp),
-        fifo_seq(n.fifo_seq)
-    {
-    }
-    
+    Node(const Node& n);
+
     ~Node();
     
     void set_operational(const bool op) { operational = op; }
@@ -105,7 +96,7 @@ private:
     int64_t fifo_seq;
 };
 
-class gcomm::evs::NodeMap : public Map<const UUID, Node> { };
+class gcomm::evs::NodeMap : public Map<UUID, Node> { };
 
 
 class gcomm::evs::Proto : public Protolay
@@ -119,7 +110,7 @@ public:
         S_OPERATIONAL,
         S_MAX
     };
-
+    friend std::ostream& operator<<(std::ostream&, const Proto&);
 public:
 
     Proto(EventLoop* el_, Transport* t, const UUID& my_uuid_, Monitor* mon_);

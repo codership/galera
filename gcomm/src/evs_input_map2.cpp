@@ -17,9 +17,9 @@ using namespace std;
 /*
  * Release ReadBuf associated to input map msg.
  */ 
-static void release_rb(pair<const InputMap::MsgKey, InputMap::Msg>& p)
+static void release_rb(InputMap::MsgIndex::value_type& vt)
 {
-    ReadBuf* rb = p.second.get_rb();
+    ReadBuf* rb = InputMap::MsgIndex::get_value(vt).get_rb();
     if (rb != 0)
     {
         rb->release();
@@ -34,6 +34,22 @@ ostream& gcomm::evs::operator<<(ostream& os, const InputMapNode& in)
     os << "safe_seq=" << in.get_safe_seq();
     os << "}";
     return os;
+}
+
+ostream& gcomm::evs::operator<<(ostream& os, const InputMapMsgKey& mk)
+{
+    return (os << "(" << mk.get_index() << "," << mk.get_seq() << ")");
+}
+
+ostream& gcomm::evs::operator<<(ostream& os, const InputMapMsg& m)
+{
+    return os;
+}
+
+ostream& gcomm::evs::operator<<(ostream& os, const InputMapMsgIndex::value_type& vt)
+{
+    return (os << "(" << InputMapMsgIndex::get_key(vt) << "," 
+            << InputMapMsgIndex::get_value(vt) << ")");
 }
 
 ostream& gcomm::evs::operator<<(ostream& os, const InputMap& im)
@@ -142,6 +158,14 @@ gcomm::evs::Range gcomm::evs::InputMap::insert(
         << "lu " << range.get_lu() << " > "
         << msg.get_seq();
     
+    if (recovery_index->find(MsgKey(node.get_index(), msg.get_seq())) !=
+        recovery_index->end())
+    {
+        log_warn << "message " << msg << " has already been delivered, state "
+                 << *this;
+        return node.get_range();
+    }
+    
     /* Loop over message seqno range and insert messages when not 
      * already found */
     for (Seqno s = msg.get_seq(); s <= msg.get_seq() + msg.get_seq_range(); ++s)
@@ -201,8 +225,28 @@ gcomm::evs::Range gcomm::evs::InputMap::insert(
 
 void gcomm::evs::InputMap::erase(iterator i)
 {
-    recovery_index->insert_checked(*i);
-    msg_index->erase(i);
+    const UserMessage& msg(MsgIndex::get_value(i).get_msg());
+    if (msg.get_seq_range() == 0)
+    {
+        try
+        {
+            gu_trace(recovery_index->insert_checked(*i));
+            gu_trace(msg_index->erase(i));
+        }
+        catch (...)
+        {
+            log_fatal << "msg: " << msg;
+            throw;
+        }
+    }
+    else
+    {
+        if (recovery_index->insert(*i).second == false)
+        {
+            log_debug << "duplicate";
+        }
+        gu_trace(msg_index->erase(i));
+    }
 }
 
 
@@ -210,9 +254,11 @@ gcomm::evs::InputMap::iterator gcomm::evs::InputMap::find(
     const UUID& uuid, 
     const Seqno seq) const
 {
-    return msg_index->find(
-        MsgKey(NodeIndex::get_value(
-                   node_index->find_checked(uuid)).get_index(), seq));
+    InputMap::iterator ret;
+    gu_trace(ret = msg_index->find(
+                 MsgKey(NodeIndex::get_value(
+                            node_index->find_checked(uuid)).get_index(), seq)));
+    return ret;
 }
 
 

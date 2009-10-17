@@ -188,9 +188,9 @@ namespace gcomm
                   std::ostream_iterator<const std::pair<K, V> >(os, " "));
         return os;
     }
+    
 
-
-    template<typename K, typename V, typename C = std::map<K, V> >
+    template <typename K, typename V, typename C = std::map<K, V> >
     class Map : public MapBase<K, V, C>
     {
     public:
@@ -205,13 +205,16 @@ namespace gcomm
             std::pair<iterator, bool> ret = MapBase<K, V, C>::map.insert(p);
             if (false == ret.second)
             {
-                gcomm_throw_fatal << "duplicate entry";
+                gcomm_throw_fatal << "duplicate entry " 
+                                  << "key=" << get_key(p) << " " 
+                                  << "value=" << get_value(p) << " "
+                                  << "map=" << *this;
             }
             return ret.first;
         }
     };
     
-    template<typename K, typename V, typename C = std::multimap<K, V> >
+    template <typename K, typename V, typename C = std::multimap<K, V> >
     class MultiMap : public MapBase<K, V, C>
     {
     public:
@@ -227,6 +230,17 @@ namespace gcomm
         }
     };
 
+    template <typename K, typename V>
+    const K& get_key(const typename Map<K, V>::value_type& vt)
+    {
+        return vt.first;
+    }
+
+    template <typename K, typename V>
+    const V& get_value(const typename Map<K, V>::value_type& vt)
+    {
+        return vt.second;
+    }
 
 }
 #endif /* GCOMM_MAP_HPP */

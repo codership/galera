@@ -51,6 +51,14 @@ public:
         im_range(im_range_)
     { }
 
+    MessageNode(const MessageNode& mn) :
+        operational(mn.operational),
+        leaving(mn.leaving),
+        view_id(mn.view_id),
+        safe_seq(mn.safe_seq),
+        im_range(mn.im_range)
+    { }
+
     bool get_operational() const { return operational; }
     bool get_leaving() const { return leaving; }
     const ViewId& get_view_id() const { return view_id; }
