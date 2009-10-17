@@ -340,7 +340,9 @@ void gcomm::evs::InputMap::set_safe_seq(const UUID& uuid, const Seqno seq)
     // in monotonically increasing order if node works ok.
     Node& node(NodeIndex::get_value(node_index->find_checked(uuid)));
     gcomm_assert(node.get_safe_seq() == Seqno::max() || 
-                 seq >= node.get_safe_seq());
+                 seq >= node.get_safe_seq()) 
+                     << "node.safe_seq=" << node.get_safe_seq() 
+                     << " seq=" << seq;
     node.set_safe_seq(seq);
     
     // Update global safe seq which must be monotonically increasing.

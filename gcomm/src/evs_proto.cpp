@@ -920,6 +920,7 @@ int gcomm::evs::Proto::send_user(WriteBuf* wb,
                     input_map->get_aru_seq(),
                     seq_range,
                     sp, 
+                    ++fifo_seq,
                     user_type,
                     flags);
     
@@ -992,7 +993,7 @@ void gcomm::evs::Proto::complete_user(const Seqno high_seq)
 
 int gcomm::evs::Proto::send_delegate(WriteBuf* wb)
 {
-    DelegateMessage dm(get_uuid(), current_view.get_id());
+    DelegateMessage dm(get_uuid(), current_view.get_id(), ++fifo_seq);
     push_header(dm, wb);
     int ret = pass_down(wb, 0);
     pop_header(dm, wb);
@@ -1015,6 +1016,7 @@ void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
                   source_view_id,
                   last_sent, 
                   input_map->get_aru_seq(), 
+                  ++fifo_seq,
                   range_uuid, 
                   range);
     
@@ -1258,6 +1260,7 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
                        input_map->get_aru_seq(),
                        msg.get_seq_range(),
                        msg.get_safety_prefix(),
+                       ++fifo_seq,
                        msg.get_user_type(),
                        Message::F_RETRANS);
         
@@ -1319,6 +1322,7 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
                        msg.get_aru_seq(),
                        msg.get_seq_range(),
                        msg.get_safety_prefix(),
+                       ++fifo_seq,
                        msg.get_user_type(),
                        Message::F_SOURCE | Message::F_RETRANS);
         
@@ -1393,24 +1397,26 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         gu_trace(handle_foreign(msg));
         return;
     }
-    
-    // Filter out unwanted/duplicate membership messages
-    if (msg.is_membership() == true)
+
+    // Filter out non-fifo messages
+    if (msg.get_fifo_seq() != -1)
     {
-        if (NodeMap::get_value(ii).get_fifo_seq() >= msg.get_fifo_seq())
+        Node& node(NodeMap::get_value(ii));
+        if (node.get_fifo_seq() >= msg.get_fifo_seq())
         {
-            log_warn << "dropping non-fifo membership message";
+            log_warn << "droppoing non-fifo message " << msg;
             return;
         }
         else
         {
-            NodeMap::get_value(ii).set_fifo_seq(msg.get_fifo_seq());
+            node.set_fifo_seq(msg.get_fifo_seq());
         }
     }
-    else
+
+    // Accept non-membership messages only from current view
+    // or from view to be installed
+    if (msg.is_membership() == false)
     {
-        // Accept non-membership messages only from current view
-        // or from view to be installed
         if (msg.get_source_view_id() != current_view.get_id())
         {
             if (install_message == 0 ||
@@ -1531,15 +1537,16 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
     
     if (get_state() == S_RECOVERY)
     {
+        log_warn << "state == S_RECOVERY";
         return EAGAIN;
     }
-
+    
     else if (get_state() != S_OPERATIONAL)
     {
         log_warn << "user message in state " << to_string(get_state());
         return ENOTCONN;
     }
-
+    
     if (dm.get_user_type() == 0xff)
     {
         return EINVAL;
@@ -1547,7 +1554,7 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
     
     int ret = 0;
     
-    if (output.empty()) 
+    if (output.empty() == true) 
     {
         int err = send_user(wb, 
                             dm.get_user_type(),
@@ -1562,6 +1569,7 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
             // Fall through
         }
         case 0:
+            ret = 0;
             break;
         default:
             log_error << "Send error: " << err;
@@ -1575,6 +1583,8 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
     } 
     else 
     {
+        log_warn << "output.size()=" << output.size() << " "
+            "max_output_size=" << max_output_size;
         ret = EAGAIN;
     }
     return ret;
@@ -1619,7 +1629,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
     case S_CLOSED:
         if (collect_stats)
         {
-            log_info << "delivery stats (safe): " << hs_safe.to_string();
+            log_info << "delivery stats (safe): " << hs_safe;
         }
         hs_safe.clear();
         stop_inactivity_timer();
@@ -1712,7 +1722,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         deliver_reg_view();
         if (collect_stats)
         {
-            log_info << "delivery stats (safe): " + hs_safe.to_string();
+            log_info << "delivery stats (safe): " << hs_safe;
         }
         hs_safe.clear();
         cleanup_unoperational();

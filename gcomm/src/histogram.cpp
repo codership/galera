@@ -11,12 +11,7 @@
 #include <limits>
 #include <vector>
 
-using std::istringstream;
-using std::ostringstream;
-using std::string;
-using std::map;
-using std::make_pair;
-using std::vector;
+using namespace std;
 
 gcomm::Histogram::Histogram(const string& vals)
     :
@@ -42,8 +37,7 @@ gcomm::Histogram::Histogram(const string& vals)
         }
     }
 
-    if (cnt.insert(
-            make_pair(std::numeric_limits<double>::max(), 0)).second == false)
+    if (cnt.insert(make_pair(numeric_limits<double>::max(), 0)).second == false)
     {
         gcomm_throw_fatal << "Failed to insert numeric_limits<double>::max()";
     }
@@ -56,14 +50,14 @@ void gcomm::Histogram::insert(const double val)
         log_warn << "Negative value (" << val << "), discarding";
         return;
     }
-
+    
     map<const double, uint64_t>::iterator i = cnt.lower_bound(val);
-
+    
     if (i == cnt.end())
     {
         gcomm_throw_fatal;
     }
-
+    
     i->second++;
 }
 
@@ -76,29 +70,27 @@ void gcomm::Histogram::clear()
     }
 }
 
-string gcomm::Histogram::to_string() const
+ostream& gcomm::operator<<(ostream& os, const Histogram& hs)
 {
-    ostringstream os;
-    
     map<const double, uint64_t>::const_iterator i, i_next;
 
     uint64_t norm = 0;
-    for (i = cnt.begin(); i != cnt.end(); ++i)
+    for (i = hs.cnt.begin(); i != hs.cnt.end(); ++i)
     {
         norm += i->second;
     }
-
-    for (i = cnt.begin(); i != cnt.end(); i = i_next)
+    
+    for (i = hs.cnt.begin(); i != hs.cnt.end(); i = i_next)
     {
         i_next = i;
         ++i_next;
-        if (i_next == cnt.end())
+        if (i_next == hs.cnt.end())
             break;
-        os << i->first << "->" << i_next->first << ": " << 100.*double(i_next->second)/double(norm) << "% ";
+        os << i->first << " -> " << i_next->first << ": " << 100.*double(i_next->second)/double(norm) << " ";
     }
     os << "total: " << norm;
-
-    return os.str();
+    
+    return os;
 }
 
 

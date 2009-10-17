@@ -304,10 +304,10 @@ public:
             const ViewId& source_view_id_ = ViewId(),
             const uint8_t user_type_ = 0xff,
             const SafetyPrefix safety_prefix_ = SP_DROP,
+            const int64_t fifo_seq_ = -1,
             const Seqno  seq_ = Seqno::max(),
             const Seqno  seq_range_ = Seqno::max(),
             const Seqno  aru_seq_ = Seqno::max(),
-            const int64_t fifo_seq_ = -1,
             const uint8_t flags_ = 0,
             const UUID& range_uuid_ = UUID(),
             const Range range_ = Range(),
@@ -367,18 +367,19 @@ public:
                 const Seqno        aru_seq        = Seqno::max(),
                 const Seqno        seq_range      = 0,
                 const SafetyPrefix safety_prefix  = gcomm::SP_SAFE,
+                const int64_t      fifo_seq       = -1,
                 const uint8_t      user_type      = 0xff,
-                const uint8_t      flags          = 0             ) :
+                const uint8_t      flags          = 0) :
         Message(0,
                 Message::T_USER,
                 source,
                 source_view_id,
                 user_type,
                 safety_prefix,
+                fifo_seq,
                 seq,
                 seq_range,
                 aru_seq,
-                -1,
                 flags,
                 UUID(),
                 Range(),
@@ -399,14 +400,16 @@ public:
 class gcomm::evs::DelegateMessage : public Message
 {
 public:
-    DelegateMessage(const UUID&   source = UUID::nil(), 
-                    const ViewId& source_view_id = ViewId()) : 
+    DelegateMessage(const UUID&   source         = UUID::nil(), 
+                    const ViewId& source_view_id = ViewId(),
+                    const int64_t fifo_seq       = -1) : 
         Message(0, 
                 T_DELEGATE,
                 source,
                 source_view_id,
                 0xff,
-                SP_UNRELIABLE)
+                SP_UNRELIABLE,
+                fifo_seq)
     { }
     size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
@@ -419,22 +422,23 @@ public:
 class gcomm::evs::GapMessage : public Message
 {
 public:
-    GapMessage(const UUID&   source = UUID::nil(),
+    GapMessage(const UUID&   source         = UUID::nil(),
                const ViewId& source_view_id = ViewId(),
-               const Seqno   seq = Seqno::max(),
-               const Seqno   aru_seq = Seqno::max(),
-               const UUID&   range_uuid = UUID::nil(),
-               const Range   range = Range()) : 
+               const Seqno   seq            = Seqno::max(),
+               const Seqno   aru_seq        = Seqno::max(),
+               const int64_t fifo_seq       = -1,
+               const UUID&   range_uuid     = UUID::nil(),
+               const Range   range          = Range()) : 
         Message(0, 
                 T_GAP,
                 source,
                 source_view_id,                
                 0xff,
                 SP_UNRELIABLE,
+                fifo_seq,
                 seq,
                 Seqno::max(),
                 aru_seq,
-                -1,
                 0,
                 range_uuid,
                 range,
@@ -463,10 +467,10 @@ public:
                 source_view_id,
                 0xff,
                 SP_UNRELIABLE,
+                fifo_seq,
                 seq,
                 Seqno::max(),
                 aru_seq,
-                fifo_seq,
                 0,
                 UUID(),
                 Range(),
@@ -495,10 +499,10 @@ public:
                 source_view_id,
                 0xff,
                 SP_UNRELIABLE,
+                fifo_seq,
                 seq,
                 Seqno::max(),
                 aru_seq,
-                fifo_seq,
                 0,
                 UUID(),
                 Range(),
@@ -526,10 +530,10 @@ public:
                 source_view_id,
                 0xff,
                 SP_UNRELIABLE,
+                fifo_seq,
                 seq,
                 Seqno::max(),
                 aru_seq,
-                fifo_seq,
                 0)
     { }
     size_t serialize(byte_t* buf, size_t buflen, size_t offset) const

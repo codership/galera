@@ -141,6 +141,7 @@ size_t gcomm::evs::Message::serialize(byte_t* const buf,
     gu_trace(offset = gcomm::serialize(flags, buf, buflen, offset));
     uint16_t pad(0);
     gu_trace(offset = gcomm::serialize(pad, buf, buflen, offset));
+    gu_trace(offset = gcomm::serialize(fifo_seq, buf, buflen, offset));
     if (flags & F_SOURCE)
     {
         gu_trace(offset = source.serialize(buf, buflen, offset));
@@ -184,7 +185,7 @@ size_t gcomm::evs::Message::unserialize(const byte_t* const buf,
     {
         gcomm_throw_runtime(EINVAL) << "invalid pad" << pad;
     }
-
+    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &fifo_seq));
     if (flags & F_SOURCE)
     {
         gu_trace(offset = source.unserialize(buf, buflen, offset));
@@ -199,6 +200,7 @@ size_t gcomm::evs::Message::serial_size() const
     return (1 +                // version | type | safety_prefix
             1 +              // flags
             2 +              // pad
+            sizeof(fifo_seq) +  // fifo_seq
             ((flags & F_SOURCE) ? UUID::serial_size() : 0) +
             ViewId::serial_size()); // source_view_id
 }
@@ -327,7 +329,6 @@ size_t gcomm::evs::JoinMessage::serialize(byte_t* const buf,
     gu_trace(offset = Message::serialize(buf, buflen, offset));
     gu_trace(offset = seq.serialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.serialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(fifo_seq, buf, buflen, offset));
     gu_trace(offset = node_list->serialize(buf, buflen, offset));
     return offset;
 }
@@ -344,7 +345,6 @@ size_t gcomm::evs::JoinMessage::unserialize(const byte_t* const buf,
     }
     gu_trace(offset = seq.unserialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.unserialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &fifo_seq));
     if (node_list == 0)
     {
         node_list = new MessageNodeList();
@@ -361,7 +361,6 @@ size_t gcomm::evs::JoinMessage::serial_size() const
 {
     return (Message::serial_size()
             + 2*Seqno::serial_size()
-            + sizeof(fifo_seq)
             + node_list->serial_size());
 }
 
@@ -373,7 +372,6 @@ size_t gcomm::evs::InstallMessage::serialize(byte_t* const buf,
     gu_trace(offset = Message::serialize(buf, buflen, offset));
     gu_trace(offset = seq.serialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.serialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(fifo_seq, buf, buflen, offset));
     gu_trace(offset = node_list->serialize(buf, buflen, offset));
     return offset;
 }
@@ -390,7 +388,6 @@ size_t gcomm::evs::InstallMessage::unserialize(const byte_t* const buf,
     }
     gu_trace(offset = seq.unserialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.unserialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &fifo_seq));
     if (node_list == 0)
     {
         node_list = new MessageNodeList();
@@ -407,7 +404,6 @@ size_t gcomm::evs::InstallMessage::serial_size() const
 {
     return (Message::serial_size()
             + 2*Seqno::serial_size()
-            + sizeof(fifo_seq)
             + node_list->serial_size());
 }
 
@@ -420,7 +416,6 @@ size_t gcomm::evs::LeaveMessage::serialize(byte_t* const buf,
     gu_trace(offset = Message::serialize(buf, buflen, offset));
     gu_trace(offset = seq.serialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.serialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(fifo_seq, buf, buflen, offset));
     return offset;
 }
 
@@ -436,11 +431,10 @@ size_t gcomm::evs::LeaveMessage::unserialize(const byte_t* const buf,
     }
     gu_trace(offset = seq.unserialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.unserialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &fifo_seq));
     return offset;
 }
 
 size_t gcomm::evs::LeaveMessage::serial_size() const
 {
-    return (Message::serial_size() + 2*Seqno::serial_size() + sizeof(fifo_seq));
+    return (Message::serial_size() + 2*Seqno::serial_size());
 }

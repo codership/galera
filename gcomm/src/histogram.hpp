@@ -4,20 +4,23 @@
 
 #include "gcomm/common.hpp"
 #include <map>
-#include <string>
+#include <ostream>
 
 
 namespace gcomm
 {
     class Histogram
     {
-        std::map<const double, uint64_t> cnt;
     public:
         Histogram(const std::string&);
         void insert(const double);
         void clear();
-        std::string to_string() const;
+        friend std::ostream& operator<<(std::ostream&, const Histogram&);
+    private:
+        std::map<const double, uint64_t> cnt;
     };
+    
+    std::ostream& operator<<(std::ostream&, const Histogram&);
 }
 
 
