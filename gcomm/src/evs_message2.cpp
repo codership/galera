@@ -43,7 +43,7 @@ ostream& gcomm::evs::operator<<(ostream& os, const gcomm::evs::Message& msg)
     if (msg.has_node_list())
     {
         os << ",";
-        os << "node_list=\n" << msg.get_node_list();
+        os << "node_list=(" << msg.get_node_list() << ") ";
     }
     os << "}";
     return os;
