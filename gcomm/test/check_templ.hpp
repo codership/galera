@@ -19,6 +19,7 @@ namespace gcomm
         rb->release();
     }
 
+
     template <typename I>
     inline std::ostream& operator<<(std::ostream& os, const IntType<I>& i)
     {
@@ -82,19 +83,16 @@ namespace gcomm
     class DummyTransport : public Transport 
     {
         UUID uuid;
-        std::deque<ReadBuf*> in;
         std::deque<ReadBuf*> out;
     public:
         DummyTransport(const UUID& uuid_ = UUID::nil()) :
             Transport(URI("dummy:"), 0, 0),            
             uuid(uuid_),
-            in(), out()
+            out()
         {}
         
         ~DummyTransport() 
         {
-            std::for_each(in.begin(), in.end(), release_rb);
-            in.clear();
             std::for_each(out.begin(), out.end(), release_rb);
             out.clear();
         }
@@ -125,7 +123,7 @@ namespace gcomm
         void handle_up(int cid, const ReadBuf* rb, size_t roff, 
                        const ProtoUpMeta& um)
         {
-            gcomm_throw_fatal << "not implemented";
+            pass_up(rb, roff, um);
         }
         
         int handle_down(WriteBuf *wb, const ProtoDownMeta& dm) 
@@ -134,21 +132,7 @@ namespace gcomm
             return 0;
         }
     
-        void pass_up(WriteBuf *wb, const ProtoUpMeta& um) 
-        {
-            gcomm_throw_fatal << "not implemented";
-        }
         
-        ReadBuf* get_in()
-        {
-            if (in.empty())
-            {
-                return 0;
-            }
-            ReadBuf* rb = in.front();
-            in.pop_front();
-            return rb;
-        }
         
         ReadBuf* get_out() 
         {

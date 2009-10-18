@@ -752,6 +752,20 @@ private:
 };
 
 
+class ChannelMsg
+{
+public:
+    ChannelMsg(const ReadBuf* rb_, const UUID& source_) :
+        rb(rb_ != 0 ? rb_->copy() : 0),
+        source(source_)
+    { }
+    ReadBuf* get_rb() { return rb; }
+    const UUID& get_source() { return source; }
+private:
+    ReadBuf* rb;
+    UUID source;
+};
+
 class Channel
 {
 public:
@@ -764,42 +778,61 @@ public:
         queue()
     { }
 
-    void put(const ReadBuf* rb) 
+    void put(const ReadBuf* rb, const UUID& source) 
     { 
-        queue.push_back(make_pair(latency, rb->copy()));
+        queue.push_back(make_pair(latency, ChannelMsg(rb, source)));
     }
 
-    ReadBuf* get()
+    ChannelMsg get()
     {
         while (queue.empty() == false)
         {
-            pair<size_t, ReadBuf*> p(queue.front());
+            pair<size_t, ChannelMsg>& p(queue.front());
             if (p.first == 0)
             {
                 // todo: packet loss goes here
+                if (get_loss() < 1.)
+                {
+                    double rnd(double(rand())/double(RAND_MAX));
+                    if (get_loss() < rnd)
+                    {
+                        p.second.get_rb()->release();
+                        queue.pop_front();
+                        return ChannelMsg(0, UUID::nil());
+                    }
+                }
+                ChannelMsg ret(p.second);
                 queue.pop_front();
-                return p.second;
+                return ret;
             }
             else
             {
                 --p.first;
-                return 0;
+                return ChannelMsg(0, UUID::nil());
             }
         }
-        return 0;
+        return ChannelMsg(0, UUID::nil());
     }
     
     void set_ttl(const size_t t) { ttl = t; }
     size_t get_ttl() const { return ttl; }
-    void set_latency(const size_t l) { latency = l; }
+    void set_latency(const size_t l) 
+    { 
+        gcomm_assert(l > 0);
+        latency = l; 
+    }
     size_t get_latency() const { return latency; }
     void set_loss(const double l) { loss = l; }
     double get_loss() const { return loss; }
+    size_t get_n_msgs() const
+    {
+        return queue.size();
+    }
 private:
     size_t ttl;
     size_t latency;
     double loss;
-    deque<pair<size_t, ReadBuf*> > queue;
+    deque<pair<size_t, ChannelMsg> > queue;
 };
 
 ostream& operator<<(ostream& os, const Channel& ch)
@@ -865,11 +898,11 @@ public:
             {
                 if (i->first.get_ii() == vt.first)
                 {
-                    i->second.put(rb);
+                    i->second.put(rb, vt.second->get_uuid());
                 }
             }
+            rb->release();
         }
-        rb->release();
     }
 private:
     map<MatrixElem, Channel>& prop;
@@ -883,16 +916,16 @@ public:
 
     void operator()(map<MatrixElem, Channel>::value_type& vt)
     {
-        ReadBuf* rb = vt.second.get();
-        if (rb != 0)
+        ChannelMsg cmsg(vt.second.get());
+        if (cmsg.get_rb() != 0)
         {
-            map<size_t, DummyTransport*>::iterator i = tp.find(vt.first.get_jj());
+            map<size_t, DummyTransport*>::iterator i(tp.find(vt.first.get_jj()));
             gcomm_assert(i != tp.end());
-            i->second->handle_up(-1, rb, 0, ProtoUpMeta());
+            i->second->handle_up(-1, cmsg.get_rb(), 0, ProtoUpMeta(cmsg.get_source()));
+            cmsg.get_rb()->release();
         }
-        rb->release();
     }
-
+    
 private:
     map<size_t, DummyTransport*>& tp;
 };
@@ -910,6 +943,20 @@ public:
         for_each(tp.begin(), tp.end(), LinkOp(idx, prop));
     }
 
+    void set_latency(const size_t ii, const size_t jj, const size_t lat)
+    {
+        map<MatrixElem, Channel>::iterator i = prop.find(MatrixElem(ii, jj));
+        gcomm_assert(i != prop.end());
+        i->second.set_latency(lat);
+    }
+
+    void set_loss(const size_t ii, const size_t jj, const double loss)
+    {
+        map<MatrixElem, Channel>::iterator i = prop.find(MatrixElem(ii, jj));
+        gcomm_assert(i != prop.end());
+        i->second.set_loss(loss);
+    }
+
     void propagate_n(size_t n)
     {
         while (n-- > 0)
@@ -919,8 +966,30 @@ public:
         }
     }
 
+    void propagate_until_empty()
+    {
+        do
+        {
+            for_each(prop.begin(), prop.end(), PropagateOp(tp));
+            for_each(tp.begin(), tp.end(), ReadTpOp(prop));
+        }
+        while (count_channel_msgs() > 0);
+    }
+
     friend ostream& operator<<(ostream&, const PropagationMatrix&);
+
 private:
+
+    size_t count_channel_msgs() const
+    {
+        size_t ret = 0;
+        for (map<MatrixElem, Channel>::const_iterator i = prop.begin(); 
+             i != prop.end(); ++i)
+        {
+            ret += i->second.get_n_msgs();
+        }
+        return ret;
+    }
     map<size_t, DummyTransport*> tp;
     map<MatrixElem, Channel> prop;
 };
@@ -946,20 +1015,55 @@ static void join_node(PropagationMatrix* p,
     n->join(first);
 }
 
-START_TEST(test_proto_random_join)
+START_TEST(test_proto_join_n)
 {
+    const size_t n_nodes(4);
     EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
 
-    dn.push_back(new DummyNode(1, &el));
-    dn.push_back(new DummyNode(2, &el));
-
-    join_node(&prop, dn[0], true);
-
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        dn.push_back(new DummyNode(i, &el));
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        join_node(&prop, dn[i], i == 0 ? true : false);
+        prop.propagate_until_empty();
+    }
+    
     for_each(dn.begin(), dn.end(), delete_object());
+}
+END_TEST
 
 
+START_TEST(test_proto_join_n_lossy)
+{
+    const size_t n_nodes(8);
+    EventLoop el;
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+    
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        dn.push_back(new DummyNode(i, &el));
+    }
+
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        join_node(&prop, dn[i], i == 0 ? true : false);
+        for (size_t j = 1; j < i + 1; ++j)
+        {
+            prop.set_loss(i + 1, j, 0.9);
+            prop.set_loss(j, i + 1, 0.9);
+
+        }
+        prop.propagate_until_empty();
+    }
+    
+    for_each(dn.begin(), dn.end(), delete_object());
 }
 END_TEST
 
@@ -1013,8 +1117,12 @@ Suite* evs2_suite()
     tcase_add_test(tc, test_proto_double_join);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_proto_random_join");
-    tcase_add_test(tc, test_proto_random_join);
+    tc = tcase_create("test_proto_join_n");
+    tcase_add_test(tc, test_proto_join_n);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_proto_join_n_lossy");
+    tcase_add_test(tc, test_proto_join_n_lossy);
     suite_add_tcase(s, tc);
     
     return s;
