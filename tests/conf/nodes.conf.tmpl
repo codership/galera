@@ -16,6 +16,9 @@ declare -a NODE_TEST_DIR
 declare -a NODE_INCOMING_HOST
 declare -a NODE_INCOMING_PORT
 
+# Address for group communicaiton
+declare -a NODE_GCS_HOST
+declare -a NODE_GCS_PORT
 
 # 1st node
 idx=0
@@ -50,19 +53,14 @@ NODE_GCS_PORT[$idx]=$GCS_PORT
 NODE_MAX=$idx
 NODE_LIST=$(seq 0 $NODE_MAX)
 
-declare -r NODE_ID
-declare -r NODE_LOCATION
-declare -r NODE_TEST_DIR
-declare -r NODE_INCOMING_HOST
-declare -r NODE_INCOMING_PORT
-declare -r NODE_MAX
-declare -r NODE_LIST
+declare -xr NODE_ID
+declare -xr NODE_LOCATION
+declare -xr NODE_TEST_DIR
+declare -xr NODE_INCOMING_HOST
+declare -xr NODE_INCOMING_PORT
+declare -xr NODE_GCS_HOST
+declare -xr NODE_GCS_PORT
+declare -xr NODE_MAX
+declare -xr NODE_LIST
 
-export NODE_ID
-export NODE_LOCATION
-export NODE_TEST_DIR
-export NODE_INCOMING_HOST
-export NODE_INCOMING_PORT
-export NODE_MAX
-export NODE_LIST
 #

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 SELF=$(cd $(dirname $0); pwd -P)/$(basename $0)
 # Copyright (C) 2007, 2008 Codership Oy <info@codership.com>
@@ -131,6 +131,41 @@ find_pid()
     ps axc | grep mysqld | grep -w ^\ *$1 > /dev/null
 }
 
+get_status()
+{
+    local stat_var=$1
+    set -o pipefail
+    mysql $ROOT_USER $ROOT_PSWD --socket $MYSQL_SOCKET  --skip-column-names \
+          -Be "SHOW STATUS LIKE '$stat_var'" | cut -f 2
+}
+
+# Loop until wsrep_ready == ON
+wait_for_wsrep_ready()
+{
+    echo -n "Waiting for wsrep_ready"
+
+    local ret=0
+    local ready
+
+    while [ $ret ]
+    do
+        echo -n "."
+        sleep 1
+	ready=$(get_status "wsrep_ready")
+	ret=$?
+	if [ "$ready" == "ON" ]; then break; fi
+    done
+
+    if [ $ret ]
+    then
+        echo " Done"
+    else
+        echo " Failed"
+    fi
+
+    return $ret
+}
+
 galera_start()
 {
     local failed
@@ -162,7 +197,7 @@ galera_start()
     WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera.so"}
     if test -f $WSREP || test $WSREP == "none"
     then
-	WSREP_OPTS="$WSREP_OPTS --wsrep_provider=$WSREP"
+	WSREP_OPTS="--wsrep_provider=$WSREP"
     else
 	echo "WSREP driver '$WSREP' not found"
 	exit -1
@@ -245,6 +280,8 @@ galera_start()
         echo " Failed (PID:$my_pid)"
 	return 1
     fi
+
+    wait_for_wsrep_ready
 }
 
 galera_stop()
@@ -313,7 +350,9 @@ galera_status()
 dump()
 {
 #local ROUTINES="--routines" # don't dump routines yet, will cause false err.
-local DUMP_OPTIONS=" --skip-opt --compact --flush-logs --lock-all-tables \
+# --flush-logs --lock-all-tables # this blocks waiting for all trx to complete
+                                 # thus impossible to use with -STOP/CONT
+local DUMP_OPTIONS=" --skip-opt --compact \
            --quick --create-options --set-charset --skip-comments $ROUTINES "
 DB=${DB:-"--all-databases"}
 #set -x
@@ -322,9 +361,28 @@ mysqldump $DUMP_OPTIONS $ROOT_USER $ROOT_PSWD --socket $MYSQL_SOCKET  \
 #set +x
 }
 
+wait_for_last_committed()
+{
+    local lc
+    local new_lc
+    
+    lc=$(get_status "wsrep_last_committed") 
+
+    while [ 1 ]
+    do
+        sleep 1
+	new_lc=$(get_status "wsrep_last_committed")
+	if [ "$lc" == "$new_lc" ]; then break; fi
+	lc="$new_lc"
+    done
+}
+
 checksum()
 {
-CS=`dump | md5sum`
+wait_for_last_committed
+
+set -o pipefail
+CS=$(dump | md5sum) || return $?
 
 echo $CS
 }

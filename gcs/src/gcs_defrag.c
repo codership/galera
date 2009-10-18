@@ -102,7 +102,7 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                 gu_error ("Unordered fragment received. Protocol error.");
                 gu_error ("Expected: any:0(first), received: %lld:%ld",
                           frg->act_id, frg->frag_no);
-                gu_error ("Contents: %s", (char*)frg->frag);
+                gu_error ("Contents: '%s'", (char*)frg->frag);
                 assert(0);
                 return -EPROTO;
             }

@@ -103,17 +103,18 @@ start_jobs()
 wait_jobs()
 {
     local err=0
-    
+    local node
+
     for node in $NODE_LIST
     do
         wait %% 2>$BASE_RUN/wait.err || err=$?;
-	if [ $err -ne 0 ]; then break; fi
+        
+        # 127 - no more jobs
+	if [ $err -eq 127 ]; then err=0; break; fi
+        if [ $err -gt 128 ]; then err=0; fi # ignore signals
     done
 
     echo "All jobs complete in $SECONDS seconds"
-
-    # 127 - no such job. Job has completed before we got around to wait for it
-    if [ $err -eq 127 ]; then err=0; fi
 
     return $err
 }

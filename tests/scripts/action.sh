@@ -65,9 +65,9 @@ restart()
 check()
 {
     cmd="check_cmd"
-    action "$cmd" "$@"
-    
-    local prefix="$BASE_OUT/$cmd"
+    ! action "$cmd" "$@" # ! - to ignore possible connection error
+
+    local -r prefix="$BASE_OUT/$cmd"
     local node
     local prev=""
     local fail=""
@@ -80,10 +80,10 @@ check()
         chk=$(cat "$out") # no need to check if file exists:
                           # should be created even if command fails
 #        echo "$node_id: ${chk%% -}"
-        echo "$chk" | sed s/-/${node_id}/
 
         if [ -n "$chk" ]  # skip 0-length checksum: the node was down
         then
+            echo "$chk" | sed s/-/${node_id}/
             if [ -z "$prev" ]
             then
                 prev="$chk"
@@ -91,7 +91,6 @@ check()
                 if [ "$prev" != "$chk" ]
                 then
                     fail="yes"
-                    break
                 fi
             fi
         fi

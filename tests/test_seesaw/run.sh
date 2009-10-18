@@ -1,12 +1,17 @@
 #!/bin/bash -eu
 
-declare -r TEST_BASE=$(cd $(dirname $0)/..; pwd -P)
+declare -r DIST_BASE=$(cd $(dirname $0)/..; pwd -P)
+declare -r SCRIPTS="$DIST_BASE/scripts"
+
+TEST_BASE=${TEST_BASE:-"$DIST_BASE"}
 
 . $TEST_BASE/conf/main.conf
 
 . $SCRIPTS/jobs.sh
 . $SCRIPTS/action.sh
 . $SCRIPTS/kill.sh
+
+TRIES=${1:-"-1"} # -1 stands for indefinite loop
 
 gcs_address()
 {
@@ -21,7 +26,7 @@ gcs_address()
         echo "gcomm://${NODE_GCS_HOST[$peer]}:${NODE_GCS_PORT[$peer]}"
 	;;
     "vsbes")
-        echo "vsbes://$VSBES_ADDR"
+        echo "vsbes://$VSBES_ADDRESS"
 	;;
     *)
         return 1
@@ -38,7 +43,10 @@ do
     if [ $node -eq 0 ]
     then
         # must make sure 1st node completely operational
-        restart_node "-g gcomm://" 0
+	case "$GCS_TYPE" in
+	"gcomm") restart_node "-g gcomm://" 0 ;;
+	"vsbes") restart_node "-g vsbes://$VSBES_ADDRESS" 0 ;;
+	esac
     else
 	restart_node "-g $(gcs_address $node)" $node &
     fi
@@ -46,43 +54,85 @@ done
 
 wait_jobs
 
+# Start load
+SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}
+$SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host $DBMS_HOST \
+        --port $DBMS_PORT --users $DBMS_CLIENTS --duration 999999999 \
+        --stat-interval 99999999 >/dev/null 2>$BASE_RUN/seesaw.err &
+declare -r sqlgen_pid=$!
+disown # forget about the job, disable waiting for it
+
+term=0
+terminate()
+{
+    echo "Terminating"
+    term=1
+}
+
+trap terminate SIGINT SIGTERM SIGHUP SIGPIPE
+
+trap "kill $sqlgen_pid" EXIT
+
 # Returns variable amount of seconds to sleep
 pause()
 {
-    local min_sleep=10
-    local var_sleep=16
+    local min_sleep=1
+    local var_sleep=10
     local p=$(( $RANDOM % var_sleep + min_sleep ))
     
     echo "Sleeping for $p sec."
     sleep $p
 }
 
+# Pauses load to perform consistency check
+consistency_check()
+{
+    local ret
+
+    kill -STOP $sqlgen_pid
+    sleep 1
+    check || check || ret=$?
+    kill -CONT $sqlgen_pid # will receive SIGHUP in the case of script exit
+    return $ret
+}
+
+pause
+consistency_check
 # kills a node and restarts it after a while
 cycle()
 {
-    local node=$1
-    local node_id=${NODE_ID[$node]}
+    local -r node=$1
+    local -r node_id=${NODE_ID[$node]}
 
     echo "Killing node $node_id..."
     kill_node $node
     
     pause
 
+    consistency_check
+
     echo "Restarting node $node_id..."
     restart_node "-g $(gcs_address $node)" $node
 }
 
-
 node=0
 node_num=$(( $NODE_MAX + 1 ))
+try=0
 
 echo "### Looping over $node_num nodes ###"
 
-while [ 1 ]
+while [ $try -ne $TRIES ]
 do
-    pause
-    
-    node=$(( ( node + 1 ) % node_num ))
-    
+    ! let try++ # ! - to protect from -e
+
+    echo -e "\nTry ${try}/${TRIES}\n"
+
     cycle $node
+
+    pause
+    consistency_check
+
+    node=$(( ( node + 1 ) % node_num ))
 done
+
+exit
