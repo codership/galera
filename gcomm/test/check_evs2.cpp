@@ -428,7 +428,12 @@ public:
     
     bool operator==(const ViewTrace& cmp) const
     {
-        return (view == cmp.view && msgs == cmp.msgs);
+        // Note: Cannot compare joining members since seen differently
+        // on different merging subsets
+        return (view.get_members()     == cmp.view.get_members()     && 
+                view.get_left()        == cmp.view.get_left()        &&
+                view.get_partitioned() == cmp.view.get_partitioned() &&
+                msgs                   == cmp.msgs                     );
     }
 private:
 
@@ -495,10 +500,10 @@ class DummyUser : public Toplay
 {
     
 public:
-    DummyUser() : curr_seq(0), tr() { }
+    DummyUser(const UUID& uuid_) : uuid(uuid_), curr_seq(0), tr() { }
     ~DummyUser()
     {
-        log_info << tr;
+        log_info << uuid << " " << tr;
     }
     void handle_up(int cid, const ReadBuf* rb, size_t offset,
                    const ProtoUpMeta& um)
@@ -534,9 +539,11 @@ public:
     const Trace& get_trace() const { return tr; }
 
 private:
+    UUID uuid;
     int64_t curr_seq;
     Trace tr;
 };
+
 
 static ReadBuf* get_msg(DummyTransport* tp, Message* msg, bool release = true)
 {
@@ -595,7 +602,7 @@ START_TEST(test_proto_single_join)
     EventLoop el;
     UUID uuid(1);
     DummyTransport t(uuid);
-    DummyUser u;
+    DummyUser u(uuid);
     Proto p(&el, &t, uuid, 0);
     connect(&t, &p);
     connect(&p, &u);
@@ -692,7 +699,7 @@ START_TEST(test_proto_double_join)
     EventLoop el;
     UUID uuid1(1), uuid2(2);
     DummyTransport t1(uuid1), t2(uuid2);
-    DummyUser u1, u2;
+    DummyUser u1(uuid1), u2(uuid2);
     Proto p1(&el, &t1, uuid1, 0), p2(&el, &t2, uuid2, 0);
 
     connect(&t1, &p1);
@@ -713,7 +720,7 @@ public:
     DummyNode(size_t idx, EventLoop* el) : 
         index(idx),
         uuid(UUID(static_cast<int32_t>(idx))),
-        u(), 
+        u(uuid), 
         t(uuid),
         p(el, &t, uuid, 0) 
     { 
@@ -741,6 +748,11 @@ public:
     {
         p.shift_to(Proto::S_LEAVING);
         p.send_leave();
+    }
+
+    const Trace& get_trace() const
+    {
+        return u.get_trace();
     }
     
 private:
@@ -1008,6 +1020,51 @@ ostream& operator<<(ostream& os, const PropagationMatrix& prop)
     return os;
 }
 
+void check_traces(const Trace& t1, const Trace& t2)
+{
+    for (set<ViewTrace, ViewTraceCmpStr>::const_iterator 
+             i = t1.get_views().begin(); i != t1.get_views().end();
+             ++i)
+    {
+        const set<ViewTrace, ViewTraceCmpStr>::const_iterator 
+            j = t2.get_views().find(*i);
+        if (j != t2.get_views().end())
+        {
+            gcomm_assert(*i == *j) << 
+                "traces differ: " << *i << " != " << *j;
+        }
+    }
+}
+
+class CheckTraceOp
+{
+public:
+    CheckTraceOp(const vector<DummyNode*>& nvec_) : nvec(nvec_) { }
+    
+    void operator()(const DummyNode* n) const
+    {
+        for (vector<DummyNode*>::const_iterator i = nvec.begin(); 
+             i != nvec.end();
+             ++i)
+        {
+            if ((*i)->get_index() != n->get_index())
+            {
+                check_traces((*i)->get_trace(), n->get_trace());
+            }
+        }
+    }
+
+private:
+    const vector<DummyNode*>& nvec;
+};
+
+void check_trace(const vector<DummyNode*>& nvec)
+{
+    for_each(nvec.begin(), nvec.end(), CheckTraceOp(nvec));
+}
+
+
+
 static void join_node(PropagationMatrix* p, 
                       DummyNode* n, bool first = false)
 {
@@ -1032,7 +1089,7 @@ START_TEST(test_proto_join_n)
         join_node(&prop, dn[i], i == 0 ? true : false);
         prop.propagate_until_empty();
     }
-    
+    check_trace(dn);
     for_each(dn.begin(), dn.end(), delete_object());
 }
 END_TEST
@@ -1062,7 +1119,7 @@ START_TEST(test_proto_join_n_lossy)
         }
         prop.propagate_until_empty();
     }
-    
+    check_trace(dn);
     for_each(dn.begin(), dn.end(), delete_object());
 }
 END_TEST
