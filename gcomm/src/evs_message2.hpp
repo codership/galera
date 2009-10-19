@@ -523,7 +523,8 @@ public:
                  const ViewId& source_view_id = ViewId(),
                  const Seqno   seq            = Seqno::max(),
                  const Seqno   aru_seq        = Seqno::max(),
-                 const int64_t fifo_seq       = -1) :
+                 const int64_t fifo_seq       = -1,
+                 const uint8_t flags          = 0) :
         Message(0,
                 T_LEAVE,
                 source,
@@ -534,7 +535,7 @@ public:
                 seq,
                 Seqno::max(),
                 aru_seq,
-                0)
+                flags)
     { }
     size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);

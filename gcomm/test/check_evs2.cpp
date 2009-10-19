@@ -31,6 +31,7 @@ using namespace gcomm::evs;
 
 START_TEST(test_seqno)
 {
+    log_info << "START";
     Seqno s0(0), s1(1), 
         sk(static_cast<uint16_t>(Seqno::max().get()/2)), 
         sn(static_cast<uint16_t>(Seqno::max().get() - 1));
@@ -64,6 +65,7 @@ END_TEST
 
 START_TEST(test_range)
 {
+    log_info << "START";
     Range r(3, 6);
 
     check_serialization(r, 2*Seqno::serial_size(), Range());
@@ -73,6 +75,7 @@ END_TEST
 
 START_TEST(test_message)
 {
+    log_info << "START";
     UUID uuid1(0, 0);
     ViewId view_id(V_TRANS, uuid1, 4567);
     Seqno seq(478), aru_seq(456), seq_range(7);
@@ -106,6 +109,7 @@ END_TEST
 
 START_TEST(test_input_map_insert)
 {
+    log_info << "START";
     InputMap im;
     UUID uuid1(1), uuid2(2);
     ViewId view(V_REG, uuid1, 0);
@@ -166,6 +170,7 @@ END_TEST
 
 START_TEST(test_input_map_find)
 {
+    log_info << "START";
     InputMap im;
     UUID uuid1(1);
     ViewId view(V_REG, uuid1, 0);
@@ -194,6 +199,7 @@ END_TEST
 
 START_TEST(test_input_map_safety)
 {
+    log_info << "START";
     InputMap im;
     UUID uuid1(1);
     ViewId view(V_REG, uuid1, 0);
@@ -235,6 +241,7 @@ END_TEST
 
 START_TEST(test_input_map_erase)
 {
+    log_info << "START";
     InputMap im;
     UUID uuid1(1);
     ViewId view(V_REG, uuid1, 1);
@@ -266,6 +273,7 @@ END_TEST
 
 START_TEST(test_input_map_overwrap)
 {
+    log_info << "START";
     InputMap im;
     
     ViewId view(V_REG, UUID(1), 1);
@@ -331,6 +339,7 @@ private:
 
 START_TEST(test_input_map_random_insert)
 {
+    log_info << "START";
     size_t n_seqnos(Seqno::max().get()/4);
     size_t n_uuids(4);
     vector<UUID> uuids(n_uuids);
@@ -532,7 +541,7 @@ public:
 
     void send()
     {
-        int64_t seq(curr_seq);
+        const int64_t seq(curr_seq);
         byte_t buf[sizeof(seq)];
         size_t sz;
         gu_trace(sz = serialize(seq, buf, sizeof(buf), 0));
@@ -541,6 +550,10 @@ public:
         if (err != 0)
         {
             log_warn << "failed to send: " << strerror(err);
+        }
+        else
+        {
+            ++curr_seq;
         }
     }
 
@@ -607,6 +620,7 @@ static void single_join(DummyTransport* t, Proto* p)
 
 START_TEST(test_proto_single_join)
 {
+    log_info << "START";
     EventLoop el;
     UUID uuid(1);
     DummyTransport t(uuid);
@@ -704,6 +718,7 @@ static void double_join(DummyTransport* t1, Proto* p1,
 
 START_TEST(test_proto_double_join)
 {
+    log_info << "START";
     EventLoop el;
     UUID uuid1(1), uuid2(2);
     DummyTransport t1(uuid1), t2(uuid2);
@@ -726,11 +741,12 @@ class DummyNode
 {
 public:
     DummyNode(size_t idx, EventLoop* el) : 
-        index(idx),
-        uuid(UUID(static_cast<int32_t>(idx))),
-        u(uuid), 
-        t(uuid),
-        p(el, &t, uuid, 0) 
+        index (idx),
+        uuid  (UUID(static_cast<int32_t>(idx))),
+        u     (uuid), 
+        t     (uuid),
+        p     (el, &t, uuid, 0),
+        cvi   ()
     { 
         connect(&t, &p);
         connect(&p, &u);
@@ -743,6 +759,8 @@ public:
     }
     
     DummyTransport* get_tp() { return &t; }
+
+    const UUID& get_uuid() const { return uuid; }
 
     size_t get_index() const { return index; }
 
@@ -763,9 +781,20 @@ public:
         gu_trace(u.send());
     }
 
-    const Trace& get_trace() const
+    const Trace& get_trace() const { return u.get_trace(); }
+    
+    void set_cvi(const ViewId& vi) { cvi = vi; }
+
+    bool in_cvi() const 
+    { 
+        return (u.get_trace().get_views().empty() == false &&
+                u.get_trace().get_views().find(cvi) != 
+                u.get_trace().get_views().end()); 
+    }
+
+    void expire_timers()
     {
-        return u.get_trace();
+        p.handle_send_join_timer();
     }
     
 private:
@@ -774,6 +803,7 @@ private:
     DummyUser u;
     DummyTransport t;
     Proto p;
+    ViewId cvi;
 };
 
 
@@ -891,7 +921,7 @@ class LinkOp
 public:
     LinkOp(const size_t idx_, map<MatrixElem, Channel>& prop_) : 
         idx(idx_), prop(prop_) { }
-    void operator()(const map<size_t, DummyTransport*>::value_type& l) const
+    void operator()(const map<size_t, DummyNode*>::value_type& l) const
     {
         if (l.first != idx)
         {
@@ -913,9 +943,9 @@ class ReadTpOp
 public:
     ReadTpOp(map<MatrixElem, Channel>& prop_) : prop(prop_) { }
 
-    void operator()(const map<size_t, DummyTransport*>::value_type& vt)
+    void operator()(const map<size_t, DummyNode*>::value_type& vt)
     {
-        ReadBuf* rb = vt.second->get_out();
+        ReadBuf* rb = vt.second->get_tp()->get_out();
         if (rb != 0)
         {
             for (map<MatrixElem, Channel>::iterator i = prop.begin();
@@ -937,24 +967,35 @@ private:
 class PropagateOp
 {
 public:
-    PropagateOp(map<size_t, DummyTransport*>& tp_) : tp(tp_) { }
-
+    PropagateOp(map<size_t, DummyNode*>& tp_) : tp(tp_) { }
+    
     void operator()(map<MatrixElem, Channel>::value_type& vt)
     {
         ChannelMsg cmsg(vt.second.get());
         if (cmsg.get_rb() != 0)
         {
-            map<size_t, DummyTransport*>::iterator i(tp.find(vt.first.get_jj()));
+            map<size_t, DummyNode*>::iterator i(tp.find(vt.first.get_jj()));
             gcomm_assert(i != tp.end());
-            gu_trace(i->second->handle_up(-1, cmsg.get_rb(), 0, 
-                                          ProtoUpMeta(cmsg.get_source())));
+            gu_trace(i->second->get_tp()->handle_up(-1, cmsg.get_rb(), 0, 
+                                                    ProtoUpMeta(cmsg.get_source())));
             cmsg.get_rb()->release();
         }
     }
     
 private:
-    map<size_t, DummyTransport*>& tp;
+    map<size_t, DummyNode*>& tp;
 };
+
+class ExpireTimersOp
+{
+public:
+    ExpireTimersOp() { }
+    void operator()(map<size_t, DummyNode*>::value_type& vt)
+    {
+        vt.second->expire_timers();
+    }
+};
+
 
 class PropagationMatrix
 {
@@ -963,7 +1004,7 @@ public:
     
 
     
-    void insert_tp(const size_t idx, DummyTransport* t)
+    void insert_tp(const size_t idx, DummyNode* t)
     {
         gcomm_assert(tp.insert(make_pair(idx, t)).second == true);
         for_each(tp.begin(), tp.end(), LinkOp(idx, prop));
@@ -1002,6 +1043,22 @@ public:
         while (count_channel_msgs() > 0);
     }
 
+    void propagate_until_cvi()
+    {
+        bool all_in = false;
+        do
+        {
+            propagate_until_empty();
+            all_in = all_in_cvi();
+            if (all_in == false)
+            {
+                for_each(tp.begin(), tp.end(), ExpireTimersOp());
+            }
+        }
+        while (all_in == false);
+        
+    }
+
     friend ostream& operator<<(ostream&, const PropagationMatrix&);
 
 private:
@@ -1016,7 +1073,21 @@ private:
         }
         return ret;
     }
-    map<size_t, DummyTransport*> tp;
+
+    bool all_in_cvi() const
+    {
+        for (map<size_t, DummyNode*>::const_iterator i = tp.begin(); 
+             i != tp.end(); ++i)
+        {
+            if (i->second->in_cvi() == false)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    map<size_t, DummyNode*> tp;
     map<MatrixElem, Channel> prop;
 };
 
@@ -1041,12 +1112,23 @@ void check_traces(const Trace& t1, const Trace& t2)
              i = t1.get_views().begin(); i != t1.get_views().end();
          ++i)
     {
-        const Trace::ViewTraceMap::const_iterator 
-            j = t2.get_views().find(Trace::ViewTraceMap::get_key(i));
-        if (j != t2.get_views().end())
+        Trace::ViewTraceMap::const_iterator i_next(i);
+        ++i_next;
+        if (i_next != t1.get_views().end())
         {
-            gcomm_assert(*i == *j) << 
-                "traces differ: " << *i << " != " << *j;
+            const Trace::ViewTraceMap::const_iterator 
+                j(t2.get_views().find(Trace::ViewTraceMap::get_key(i)));
+            Trace::ViewTraceMap::const_iterator j_next(j);
+            ++j_next;
+            // Note: Comparision is meaningful if also next view is the 
+            // same
+            if (j             != t2.get_views().end() && 
+                j_next        != t2.get_views().end() &&
+                i_next->first == j_next->first          )
+            {
+                gcomm_assert(*i == *j) << 
+                    "traces differ: " << *i << " != " << *j;
+            }
         }
     }
 }
@@ -1083,7 +1165,7 @@ static void check_trace(const vector<DummyNode*>& nvec)
 static void join_node(PropagationMatrix* p, 
                       DummyNode* n, bool first = false)
 {
-    gu_trace(p->insert_tp(n->get_index(), n->get_tp()));
+    gu_trace(p->insert_tp(n->get_index(), n));
     gu_trace(n->join(first));
 }
 
@@ -1097,6 +1179,7 @@ static void send_n(DummyNode* node, const size_t n)
 
 START_TEST(test_proto_join_n)
 {
+    log_info << "START";
     const size_t n_nodes(4);
     EventLoop el;
     PropagationMatrix prop;
@@ -1119,6 +1202,7 @@ END_TEST
 
 START_TEST(test_proto_join_n_w_user_msg)
 {
+    log_info << "START";
     const size_t n_nodes(4);
     EventLoop el;
     PropagationMatrix prop;
@@ -1146,6 +1230,7 @@ END_TEST
 
 START_TEST(test_proto_join_n_lossy)
 {
+    log_info << "START";
     const size_t n_nodes(8);
     EventLoop el;
     PropagationMatrix prop;
@@ -1156,9 +1241,14 @@ START_TEST(test_proto_join_n_lossy)
         dn.push_back(new DummyNode(i, &el));
     }
 
-
+    gu_log_max_level = GU_LOG_DEBUG;
     for (size_t i = 0; i < n_nodes; ++i)
     {
+        for (size_t j = 0; j <= i; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, dn[0]->get_uuid(), 
+                                  static_cast<uint32_t>(i + 1)));
+        }
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
         for (size_t j = 1; j < i + 1; ++j)
         {
@@ -1166,7 +1256,7 @@ START_TEST(test_proto_join_n_lossy)
             prop.set_loss(j, i + 1, 0.9);
 
         }
-        gu_trace(prop.propagate_until_empty());
+        gu_trace(prop.propagate_until_cvi());
     }
     gu_trace(check_trace(dn));
     for_each(dn.begin(), dn.end(), delete_object());
@@ -1176,6 +1266,7 @@ END_TEST
 
 START_TEST(test_proto_join_n_lossy_w_user_msg)
 {
+    log_info << "START";
     const size_t n_nodes(8);
     EventLoop el;
     PropagationMatrix prop;
@@ -1186,17 +1277,22 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
         dn.push_back(new DummyNode(i, &el));
     }
 
-
+    gu_log_max_level = GU_LOG_DEBUG;
     for (size_t i = 0; i < n_nodes; ++i)
     {
+        for (size_t j = 0; j <= i; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, dn[0]->get_uuid(), 
+                                  static_cast<uint32_t>(i + 1)));
+        }
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
         for (size_t j = 1; j < i + 1; ++j)
         {
             prop.set_loss(i + 1, j, 0.9);
             prop.set_loss(j, i + 1, 0.9);
-
+            
         }
-        gu_trace(prop.propagate_until_empty());
+        gu_trace(prop.propagate_until_cvi());
         for (size_t j = 0; j < i; ++j)
         {
             gu_trace(send_n(dn[j], 8));

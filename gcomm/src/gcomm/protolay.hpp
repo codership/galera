@@ -82,8 +82,14 @@ private:
 inline std::ostream& gcomm::operator<<(std::ostream& os, const ProtoUpMeta& um)
 {
     os << "proto_up_meta: { ";
-    os << "source=" << um.get_source() << ",";
-    os << "source_view_id=" << um.get_source_view_id() << ",";
+    if (um.get_source() != UUID::nil())
+    {
+        os << "source=" << um.get_source() << ",";
+    }
+    if (um.get_source_view_id().get_type() != V_NONE)
+    {
+        os << "source_view_id=" << um.get_source_view_id() << ",";
+    }
     os << "user_type=" << static_cast<int>(um.get_user_type()) << ",";
     os << "to_seq=" << um.get_to_seq() << ",";
     if (um.has_view() == true)

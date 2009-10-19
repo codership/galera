@@ -342,6 +342,9 @@ public:
         }
     };
 
+    void handle_send_join_timer();
+
+
     class SendJoinTimerHandler : public TimerHandler
     {
         Proto& p;
@@ -359,21 +362,13 @@ public:
         void handle()
         {
             Critical crit(p.mon);
-            if (p.get_state() == S_RECOVERY)
+            p.handle_send_join_timer();
+            if (p.timer.is_set(this) == false)
             {
-                log_debug << p.self_string() << " send join timer handler";
-                p.send_join(true);
-                if (p.timer.is_set(this) == false)
-                {
-                    p.timer.set(this, p.resend_period);
-                }
+                p.timer.set(this, p.resend_period);
             }
         }
     };
-
-
-
-
     
     void start_inactivity_timer() { timer.set(ith, inactive_check_period); }
 

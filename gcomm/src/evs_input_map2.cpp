@@ -173,7 +173,7 @@ gcomm::evs::Range gcomm::evs::InputMap::insert(
         MsgIndex::iterator msg_i = msg_index->find(
             MsgKey(node.get_index(), s));
         
-        if (range.get_hs() == Seqno::max() || range.get_hs() >= s)
+        if (range.get_hs() == Seqno::max() || range.get_hs() < s)
         {
             gcomm_assert(msg_i == msg_index->end());
         }
