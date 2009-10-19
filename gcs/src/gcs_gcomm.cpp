@@ -126,8 +126,8 @@ struct gcs_gcomm : public Toplay
 	}
         
 	assert(rb || (um.has_view() == true && 
-                      (um.get_view().get_type() == View::V_PRIM ||
-                       um.get_view().get_type() == View::V_NON_PRIM)));
+                      (um.get_view().get_type() == V_PRIM ||
+                       um.get_view().get_type() == V_NON_PRIM)));
         
         if (um.has_view() == true && um.get_view().is_empty() == true)
         {
@@ -396,7 +396,7 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
         if (ev.view->is_empty() == false)
         {
             new_comp =
-                gcs_comp_msg_new(ev.view->get_type() == View::V_PRIM, 0, 
+                gcs_comp_msg_new(ev.view->get_type() == V_PRIM, 0, 
                                  ev.view->get_members().size());
         }        
         else
