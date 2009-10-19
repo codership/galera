@@ -16,8 +16,10 @@ size_t gcomm::ViewId::unserialize(const byte_t* buf,
     size_t off;
     
     gu_trace (off = uuid.unserialize(buf, buflen, offset));
-    gu_trace (off = gcomm::unserialize(buf, buflen, off, &seq));
-    
+    uint32_t w;
+    gu_trace (off = gcomm::unserialize(buf, buflen, off, &w));
+    seq = w & 0x3fffffff;
+    type = static_cast<ViewType>(w >> 30);
     return off;
 }
 
@@ -27,20 +29,17 @@ size_t gcomm::ViewId::serialize(byte_t* buf,
     const throw (gu::Exception)
 {
     size_t off;
-    
+ 
+    gcomm_assert(type != V_NONE);
     gu_trace (off = uuid.serialize(buf, buflen, offset));
-    gu_trace (off = gcomm::serialize(seq, buf, buflen, off));
+    uint32_t w((seq & 0x3fffffff) | (type << 30));
+    gu_trace (off = gcomm::serialize(w, buf, buflen, off));
     
     return off;
 }
 
-ostream& gcomm::operator<<(ostream& os, const gcomm::ViewId& vid)
-{
-    return (os << "(" << vid.get_uuid() << "," << vid.get_seq()) << ")";
-}
 
-
-string gcomm::View::to_string(const Type type) const
+static string to_string(const ViewType type)
 {
     switch (type)
     {
@@ -51,6 +50,14 @@ string gcomm::View::to_string(const Type type) const
     default:
         gcomm_throw_fatal << "Invalid type value"; throw;
     }
+}
+
+ostream& gcomm::operator<<(ostream& os, const gcomm::ViewId& vi)
+{
+    return (os << "view_id(" 
+            << ::to_string(vi.get_type()) << "," 
+            << vi.get_uuid() << "," 
+            << vi.get_seq()) << ")";
 }
 
 
@@ -106,9 +113,9 @@ const NodeList& gcomm::View::get_partitioned() const
     return partitioned;
 }
     
-View::Type gcomm::View::get_type() const
+ViewType gcomm::View::get_type() const
 {
-    return type;
+    return view_id.get_type();
 }
 
 const gcomm::ViewId& View::get_id() const
@@ -130,13 +137,12 @@ const UUID& gcomm::View::get_representative() const
 
 bool gcomm::View::is_empty() const
 {
-    return view_id == ViewId() && members.size() == 0;
+    return view_id.get_uuid() == UUID::nil() && members.size() == 0;
 }
 
 bool gcomm::operator==(const gcomm::View& a, const gcomm::View& b)
 {
     return a.get_id()   == b.get_id() && 
-        a.get_type()    == b.get_type() &&
         a.get_members() == b.get_members() &&
         a.get_joined()  == b.get_joined() &&
         a.get_left()    == b.get_left() &&
@@ -145,49 +151,34 @@ bool gcomm::operator==(const gcomm::View& a, const gcomm::View& b)
 
 
 
-size_t gcomm::View::unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
+size_t gcomm::View::unserialize(const byte_t* buf, const size_t buflen, 
+                                size_t offset)
     throw (gu::Exception)
 {
-    size_t off;
-    uint32_t w;
-    
-    gu_trace (off = gcomm::unserialize(buf, buflen, offset, &w));
+    gu_trace (offset = view_id.unserialize    (buf, buflen, offset));
+    gu_trace (offset = members.unserialize    (buf, buflen, offset));
+    gu_trace (offset = joined.unserialize     (buf, buflen, offset));
+    gu_trace (offset = left.unserialize       (buf, buflen, offset));
+    gu_trace (offset = partitioned.unserialize(buf, buflen, offset));
 
-    type = static_cast<Type>(w);
-
-    if (type != V_TRANS && type != V_REG)
-    {
-        gcomm_throw_runtime (EINVAL) << "Invalid type: " << w;
-    }
-    
-    gu_trace (off = view_id.unserialize    (buf, buflen, off));
-    gu_trace (off = members.unserialize    (buf, buflen, off));
-    gu_trace (off = joined.unserialize     (buf, buflen, off));
-    gu_trace (off = left.unserialize       (buf, buflen, off));
-    gu_trace (off = partitioned.unserialize(buf, buflen, off));
-
-    return off;
+    return offset;
 }
 
-size_t gcomm::View::serialize(byte_t* buf, const size_t buflen, const size_t offset) const
+size_t gcomm::View::serialize(byte_t* buf, const size_t buflen, 
+                              size_t offset) const
     throw (gu::Exception)
 {
-    size_t   off;
-    uint32_t w(type);
-
-    gu_trace (off = gcomm::serialize  (w, buf, buflen, offset));
-    gu_trace (off = view_id.serialize    (buf, buflen, off));
-    gu_trace (off = members.serialize    (buf, buflen, off));
-    gu_trace (off = joined.serialize     (buf, buflen, off));
-    gu_trace (off = left.serialize       (buf, buflen, off));
-    gu_trace (off = partitioned.serialize(buf, buflen, off));
-
-    return off;
+    gu_trace (offset = view_id.serialize    (buf, buflen, offset));
+    gu_trace (offset = members.serialize    (buf, buflen, offset));
+    gu_trace (offset = joined.serialize     (buf, buflen, offset));
+    gu_trace (offset = left.serialize       (buf, buflen, offset));
+    gu_trace (offset = partitioned.serialize(buf, buflen, offset));
+    return offset;
 }
 
 size_t gcomm::View::serial_size() const
 {
-    return 4 + view_id.serial_size() 
+    return view_id.serial_size() 
         + members.serial_size() 
         + joined.serial_size() 
         + left.serial_size() 
@@ -197,7 +188,7 @@ size_t gcomm::View::serial_size() const
 
 std::ostream& gcomm::operator<<(std::ostream& os, const gcomm::View& view)
 {
-    os << "View (" << view.to_string(view.get_type()) << "):";
+    os << "view(";
     if (view.is_empty() == true)
     {
         os << "(empty)";
@@ -205,15 +196,16 @@ std::ostream& gcomm::operator<<(std::ostream& os, const gcomm::View& view)
     else
     {
         os << view.get_id();
-        os << " memb (";
+        os << " memb {";
         os << view.get_members();
-        os << ") joined (";
+        os << "} joined {";
         os << view.get_joined();
-        os << ") left (";
+        os << "} left {";
         os << view.get_left();
-        os << ") partitioned (";
+        os << "} partitioned {";
         os << view.get_partitioned();
-        os << ")";
+        os << "}";
     }
+    os << ")";
     return os;
 }

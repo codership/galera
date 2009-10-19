@@ -72,6 +72,21 @@ END_TEST
 
 START_TEST(test_view)
 {
+    ViewId v1(V_REG,   UUID(1), 1);
+    ViewId v2(V_TRANS, UUID(1), 1);
+    ViewId v3(V_REG,   UUID(2), 1);
+    ViewId v4(V_REG,   UUID(1), 2);
+    ViewId v5(V_TRANS, UUID(1), 2);
+    ViewId v6(V_REG,   UUID(2), 2);
+    ViewId v7(V_TRANS, UUID(3), 2);
+
+    fail_unless(v1 < v2);
+    fail_unless(v2 < v3);
+    fail_unless(v3 < v4);
+    fail_unless(v5 < v6);
+    fail_unless(v6 < v7);
+
+
 
     ViewId vid;
     fail_unless(vid.get_uuid() == UUID());
@@ -79,7 +94,7 @@ START_TEST(test_view)
     
     UUID uuid(0, 0);
     
-    vid = ViewId(uuid, 7);
+    vid = ViewId(V_REG, uuid, 7);
     fail_unless(vid.get_uuid() == uuid);
     fail_unless(vid.get_seq() == 7);
     
@@ -98,7 +113,7 @@ START_TEST(test_view)
                                    + Node::serial_size()), NodeList());
 
 
-    View v(View::V_TRANS, vid);
+    View v(ViewId(V_TRANS, vid));
 
     for (size_t i = 0; i < 10; ++i)
     {

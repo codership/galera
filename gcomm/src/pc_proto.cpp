@@ -97,8 +97,8 @@ void PCProto::send_install()
 
 void PCProto::deliver_view()
 {
-    View v(get_prim() == true ? View::V_PRIM : View::V_NON_PRIM,
-           current_view.get_id());
+    View v(ViewId(get_prim() == true ? V_PRIM : V_NON_PRIM,
+                  current_view.get_id()));
 
     v.add_members(current_view.get_members().begin(), 
                   current_view.get_members().end());
@@ -113,7 +113,7 @@ void PCProto::deliver_view()
         }
     }
 
-    ProtoUpMeta um(UUID::nil(), &v);
+    ProtoUpMeta um(UUID::nil(), ViewId(), &v);
 
     pass_up(0, 0, um);
 }
@@ -160,7 +160,7 @@ void PCProto::shift_to(const State s)
     case S_INSTALL:
         break;
     case S_PRIM:
-        set_last_prim(current_view.get_id());
+        set_last_prim(ViewId(V_PRIM, current_view.get_id()));
         set_prim(true);
         break;
     case S_TRANS:
@@ -177,7 +177,7 @@ void PCProto::shift_to(const State s)
 
 void PCProto::handle_first_trans(const View& view)
 {
-    assert(view.get_type() == View::V_TRANS);
+    gcomm_assert(view.get_type() == V_TRANS);
 
     if (start_prim == true)
     {
@@ -192,21 +192,22 @@ void PCProto::handle_first_trans(const View& view)
                               << NodeList::get_key(view.get_members().begin())
                               << ", expected: " << uuid;
         }
-
-        set_last_prim(view.get_id());
+        
+        set_last_prim(ViewId(V_PRIM, view.get_id()));
         set_prim(true);
     }
 }
 
 void PCProto::handle_trans(const View& view)
 {
-    assert(view.get_type() == View::V_TRANS);
-    assert(view.get_id()   == current_view.get_id());
-
+    gcomm_assert(view.get_id().get_type() == V_TRANS);
+    gcomm_assert(view.get_id().get_uuid() == current_view.get_id().get_uuid() &&
+                 view.get_id().get_seq()  == current_view.get_id().get_seq());
+    
     log_info << "Handle trans, current: " << current_view.get_id()
              << ", new: " << view.get_id();
 
-    if (view.get_id() == get_last_prim())
+    if (ViewId(V_PRIM, view.get_id()) == get_last_prim())
     {
         if (view.get_members().size()*2 + view.get_left().size() <=
             current_view.get_members().size())
@@ -217,7 +218,8 @@ void PCProto::handle_trans(const View& view)
     }
     else
     {
-        if (get_last_prim() != ViewId())
+        if (get_last_prim().get_uuid() != view.get_id().get_uuid() &&
+            get_last_prim().get_seq()  != view.get_id().get_seq() )
         {
             log_warn << "Trans view during " << to_string(get_state());
         }
@@ -231,8 +233,8 @@ void PCProto::handle_trans(const View& view)
 
 void PCProto::handle_first_reg(const View& view)
 {
-    assert(view.get_type() == View::V_REG);
-    assert(get_state() == S_JOINING);
+    gcomm_assert(view.get_type() == V_REG);
+    gcomm_assert(get_state() == S_JOINING);
     
     if (start_prim == true)
     {
@@ -242,7 +244,7 @@ void PCProto::handle_first_reg(const View& view)
                               <<"but first reg view is not singleton";
         }
     }
-
+    
     if (view.get_id().get_seq() <= current_view.get_id().get_seq())
     {
         gcomm_throw_fatal << "Non-increasing view ids: current view " 
@@ -259,7 +261,7 @@ void PCProto::handle_first_reg(const View& view)
 
 void PCProto::handle_reg(const View& view)
 {
-    assert(view.get_type() == View::V_REG);
+    gcomm_assert(view.get_type() == V_REG);
     
     if (view.is_empty() == false && 
         view.get_id().get_seq() <= current_view.get_id().get_seq())
@@ -291,7 +293,7 @@ void PCProto::handle_view(const View& view)
 {
     
     // We accept only EVS TRANS and REG views
-    if (view.get_type() != View::V_TRANS && view.get_type() != View::V_REG)
+    if (view.get_type() != V_TRANS && view.get_type() != V_REG)
     {
         gcomm_throw_fatal << "Invalid view type";
     }
@@ -305,8 +307,8 @@ void PCProto::handle_view(const View& view)
     }
     
     log_info << self_string() << " " << view;
-
-    if (view.get_type() == View::V_TRANS)
+    
+    if (view.get_type() == V_TRANS)
     {
         if (get_state() == S_JOINING)
         {
@@ -385,8 +387,8 @@ void PCProto::validate_state_msgs() const
 
 void PCProto::cleanup_instances()
 {
-    assert(get_state() == S_PRIM);
-    assert(current_view.get_type() == View::V_REG);
+    gcomm_assert(get_state() == S_PRIM);
+    gcomm_assert(current_view.get_type() == V_REG);
 
     PCInstMap::iterator i, i_next;
     for (i = instances.begin(); i != instances.end(); i = i_next)
@@ -406,7 +408,7 @@ void PCProto::cleanup_instances()
 bool PCProto::is_prim() const
 {
     bool prim = false;
-    ViewId last_prim;
+    ViewId last_prim(V_NON_PRIM);
     int64_t to_seq = -1;
 
     // Check if any of instances claims to come from prim view
@@ -454,7 +456,8 @@ bool PCProto::is_prim() const
     // view can be recovered (all members from last prim alive)
     if (prim == false)
     {
-        assert(last_prim == ViewId());
+        gcomm_assert(last_prim == ViewId(V_NON_PRIM)) 
+            << last_prim << " != " << ViewId(V_NON_PRIM);
 
         multiset<ViewId> vset;
 
@@ -469,7 +472,7 @@ bool PCProto::is_prim() const
                 vset.insert(i_state.get_last_prim());
             }
         }
-
+        
         uint32_t max_view_seq   = 0;
         size_t  great_view_len = 0;
         ViewId  great_view;
@@ -478,13 +481,13 @@ bool PCProto::is_prim() const
              vi != vset.end(); vi = vset.upper_bound(*vi))
         {
             max_view_seq = std::max(max_view_seq, vi->get_seq());
-
+            
             const size_t vsc = vset.count(*vi);
-
+            
             if (vsc >= great_view_len && vi->get_seq() >= great_view.get_seq())
             {
                 great_view_len = vsc;
-                great_view = *vi;
+                great_view = ViewId(V_REG, *vi);
             }
         }
 
@@ -542,9 +545,9 @@ bool PCProto::is_prim() const
 
 void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 {
-    assert(msg.get_type() == PCMessage::T_STATE);
-    assert(get_state() == S_STATES_EXCH);
-    assert(state_msgs.size() < current_view.get_members().size());
+    gcomm_assert(msg.get_type() == PCMessage::T_STATE);
+    gcomm_assert(get_state() == S_STATES_EXCH);
+    gcomm_assert(state_msgs.size() < current_view.get_members().size());
 
     log_info << self_string() << " handle state: " << msg.to_string();
 
@@ -623,8 +626,8 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 
 void PCProto::handle_install(const PCMessage& msg, const UUID& source)
 {
-    assert(msg.get_type() == PCMessage::T_INSTALL);
-    assert(get_state()    == S_INSTALL);
+    gcomm_assert(msg.get_type() == PCMessage::T_INSTALL);
+    gcomm_assert(get_state()    == S_INSTALL);
 
     log_info << self_string() << " handle install: " << msg.to_string();
     
@@ -692,8 +695,9 @@ void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
         to_seq = get_to_seq();
     }
     
-    ProtoUpMeta pum(um.get_source(), 0, um.get_user_type(), to_seq);
-
+    ProtoUpMeta pum(um.get_source(), current_view.get_id(), 0,
+                    um.get_user_type(), to_seq);
+    
     pass_up(rb, roff + msg.serial_size(), pum);
 }
 

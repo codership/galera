@@ -107,7 +107,7 @@ END_GCOMM_NAMESPACE
 #define gcomm_throw_fatal                                       \
     gcomm::ThrowFatal (__FILE__,__FUNCTION__,__LINE__).msg()
 
-#define gcomm_assert(cond_) \
-    if (not (cond_)) gcomm_throw_fatal
+#define gcomm_assert(cond_)                    \
+    if (not (cond_)) gcomm_throw_fatal << #cond_ << ": "
 
 #endif // _GCOMM_EXCEPTION_HPP_

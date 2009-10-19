@@ -75,6 +75,7 @@ public:
 
     void set_last_prim(const ViewId& vid)
     {
+        gcomm_assert(vid.get_type() == V_PRIM);
         PCInstMap::get_value(self_i).set_last_prim(vid);
     }
     
@@ -126,7 +127,7 @@ public:
         instances    (),
         self_i       (),
         state_msgs   (),
-        current_view (),
+        current_view (V_NON_PRIM),
         views        ()
     {
         std::pair<PCInstMap::iterator, bool> iret;

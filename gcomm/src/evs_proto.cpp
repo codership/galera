@@ -179,7 +179,7 @@ gcomm::evs::Proto::Proto(EventLoop* el_,
     resend_period(Time(1, 0)),
     send_join_period(Time(0, 300000)),
     timer(el_),
-    current_view(View::V_TRANS, ViewId(my_uuid, 0)),
+    current_view(ViewId(V_TRANS, my_uuid, 0)),
     previous_view(),
     previous_views(),
     input_map(new InputMap()),
@@ -249,13 +249,16 @@ ostream& gcomm::evs::operator<<(ostream& os, const Node& n)
 
 ostream& gcomm::evs::operator<<(ostream& os, const Proto& p)
 {
-    os << "evs::proto(" << p.to_string(p.get_state()) << ") ";
+    os << "evs::proto("
+       << p.self_string() << ", " 
+       << p.to_string(p.get_state()) << ") {";
     os << "current_view=" << p.current_view << ",";
     os << "installing=" << p.installing << ",";
     os << "input_map=" << *p.input_map << ",";
     os << "fifo_seq=" << p.fifo_seq << ",";
     os << "last_sent=" << p.last_sent << ",";
-    os << "known=" << p.known;
+    os << "known={ " << p.known << " } ";
+    os << " }";
     return os;
 }
 
@@ -346,7 +349,7 @@ void gcomm::evs::Proto::deliver_reg_view()
     if (previous_views.size() == 0) gcomm_throw_fatal << "Zero-size view";
     
     const View& prev_view (previous_view);
-    View view (View::V_REG, install_message->get_source_view_id());
+    View view (install_message->get_source_view_id());
     
     for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
     {
@@ -380,7 +383,7 @@ void gcomm::evs::Proto::deliver_reg_view()
     }
     
     log_debug << view;
-    ProtoUpMeta up_meta(UUID::nil(), &view);
+    ProtoUpMeta up_meta(UUID::nil(), ViewId(), &view);
     pass_up(0, 0, up_meta);
 }
 
@@ -394,7 +397,9 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
     
     log_debug << self_string();
     
-    View view(View::V_TRANS, current_view.get_id());
+    View view(ViewId(V_TRANS, 
+                     current_view.get_id().get_uuid(),
+                     current_view.get_id().get_seq()));
     
     for (NodeMap::const_iterator i = known.begin(); i != known.end(); ++i)
     {
@@ -443,16 +448,16 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
     }
     log_debug << view;
     gcomm_assert(view.get_members().find(get_uuid()) != view.get_members().end());
-    ProtoUpMeta up_meta(UUID::nil(), &view);
+    ProtoUpMeta up_meta(UUID::nil(), ViewId(), &view);
     pass_up(0, 0, up_meta);
 }
 
 
 void gcomm::evs::Proto::deliver_empty_view()
 {
-    View view(View::V_REG, ViewId());
+    View view(V_REG);
     log_debug << view;
-    ProtoUpMeta up_meta(UUID::nil(), &view);
+    ProtoUpMeta up_meta(UUID::nil(), ViewId(), &view);
     pass_up(0, 0, up_meta);
 }
 
@@ -1045,7 +1050,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                          node.get_join_message()->get_source_view_id() :
                          (in_current == true ? 
                           current_view.get_id() : 
-                          ViewId()));
+                          ViewId(V_REG)));
         const Seqno safe_seq(in_current == true ? input_map->get_safe_seq(uuid) : Seqno::max());
         const Range range(in_current == true ? input_map->get_range(uuid) : Range());
         const MessageNode mnode(node.get_operational(),
@@ -1060,9 +1065,9 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
 
 JoinMessage gcomm::evs::Proto::create_join()
 {
-
+    
     MessageNodeList node_list;
-
+    
     gu_trace(populate_node_list(&node_list));
     JoinMessage jm(get_uuid(),
                    current_view.get_id(),
@@ -1201,7 +1206,7 @@ void gcomm::evs::Proto::send_install()
     populate_node_list(&node_list);
     
     InstallMessage imsg(get_uuid(),
-                        ViewId(get_uuid(), max_view_id_seq + 1),
+                        ViewId(V_REG, get_uuid(), max_view_id_seq + 1),
                         input_map->get_safe_seq(),
                         input_map->get_aru_seq(),
                         ++fifo_seq,
@@ -1539,8 +1544,8 @@ void gcomm::evs::Proto::handle_up(int cid,
     }
     catch (...)
     {
-        log_fatal << "exception caused by message: " << msg;
-        log_fatal << " state after handling message: " << *this << std::endl;
+        // log_fatal << "exception caused by message: " << msg;
+        // log_fatal << " state after handling message: " << *this;
         throw;
     }
 }
@@ -1725,8 +1730,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             previous_views.push_back(make_pair(MessageNodeList::get_value(i).get_view_id(), 
                                                Time::now()));
         }
-        current_view = View(View::V_REG, 
-                            install_message->get_source_view_id());
+        current_view = View(install_message->get_source_view_id());
         for (NodeMap::const_iterator i = known.begin(); i != known.end(); ++i)
         {
             if (NodeMap::get_value(i).get_installed() == true)
@@ -1839,8 +1843,10 @@ void gcomm::evs::Proto::deliver()
             if (msg.get_msg().get_safety_prefix() != SP_DROP)
             {
                 ProtoUpMeta um(msg.get_uuid(), 
+                               msg.get_msg().get_source_view_id(),
                                0,
-                               msg.get_msg().get_user_type());
+                               msg.get_msg().get_user_type(),
+                               msg.get_msg().get_seq().get());
                 gu_trace(pass_up(msg.get_rb(), 0, um));
             }
             gu_trace(input_map->erase(i));
@@ -1920,8 +1926,10 @@ void gcomm::evs::Proto::deliver_trans()
             if (msg.get_msg().get_safety_prefix() != SP_DROP)
             {
                 ProtoUpMeta um(msg.get_uuid(), 
+                               msg.get_msg().get_source_view_id(),
                                0,
-                               msg.get_msg().get_user_type());
+                               msg.get_msg().get_user_type(),
+                               msg.get_msg().get_seq().get());
                 gu_trace(pass_up(msg.get_rb(), 0, um));
             }
             gu_trace(input_map->erase(i));

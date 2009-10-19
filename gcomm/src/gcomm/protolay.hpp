@@ -21,6 +21,7 @@
 namespace gcomm
 {
     class ProtoUpMeta;
+    std::ostream& operator<<(std::ostream&, const ProtoUpMeta&);
     class ProtoDownMeta;
     class Protolay;
     class Toplay;
@@ -33,46 +34,65 @@ namespace gcomm
 /* message context to pass up with the data buffer? */
 class gcomm::ProtoUpMeta
 {
-    UUID    const source;
-    uint8_t const user_type;
-    int64_t const to_seq;
-    View*   const view; // @todo: this makes default constructor pointless
-    
-    ProtoUpMeta& operator=(const ProtoUpMeta&);
-
 public:
-
-    ProtoUpMeta(const UUID source_ = UUID::nil(),
-                const View* view_  = 0,
-                const uint8_t user_type_ = 0xff,
-                const int64_t to_seq_ = -1) :
-        source(source_),
-        user_type(user_type_),
-        to_seq(to_seq_),
-        view(view_ != 0 ? new View(*view_) : 0)
-    {
-
-    }
+    ProtoUpMeta(const UUID    source_         = UUID::nil(),
+                const ViewId  source_view_id_ = ViewId(),
+                const View*   view_           = 0,
+                const uint8_t user_type_      = 0xff,
+                const int64_t to_seq_         = -1) :
+        source         (source_      ),
+        source_view_id (source_view_id_ ),
+        user_type      (user_type_   ),
+        to_seq         (to_seq_      ),
+        view           (view_ != 0 ? new View(*view_) : 0)
+    { }
 
     ProtoUpMeta(const ProtoUpMeta& um) :
-        source    (um.source),
-        user_type (um.user_type),
-        to_seq    (um.to_seq),
-        view      (um.view ? new View(*um.view) : 0)
-    {}
+        source         (um.source      ),
+        source_view_id (um.source_view_id ),
+        user_type      (um.user_type   ),
+        to_seq         (um.to_seq      ),
+        view           (um.view ? new View(*um.view) : 0)
+    { }
 
     ~ProtoUpMeta() { delete view; }
     
-    const UUID& get_source()    const { return source; }
+    const UUID&   get_source()         const { return source; }
     
-    uint8_t     get_user_type() const { return user_type; }
+    const ViewId& get_source_view_id() const { return source_view_id; }
+
+    uint8_t       get_user_type()      const { return user_type; }
     
-    int64_t     get_to_seq()    const { return to_seq; }
+    int64_t       get_to_seq()         const { return to_seq; }
     
-    bool        has_view()      const { return view != 0; }
+    bool          has_view()           const { return view != 0; }
     
-    const View& get_view()      const { return *view; }
+    const View&   get_view()           const { return *view; }
+
+private:
+    ProtoUpMeta& operator=(const ProtoUpMeta&);
+    
+    UUID    const source;
+    ViewId  const source_view_id;
+    uint8_t const user_type;
+    int64_t const to_seq;
+    View*   const view; // @todo: this makes default constructor pointless
 };
+
+inline std::ostream& gcomm::operator<<(std::ostream& os, const ProtoUpMeta& um)
+{
+    os << "proto_up_meta: { ";
+    os << "source=" << um.get_source() << ",";
+    os << "source_view_id=" << um.get_source_view_id() << ",";
+    os << "user_type=" << static_cast<int>(um.get_user_type()) << ",";
+    os << "to_seq=" << um.get_to_seq() << ",";
+    if (um.has_view() == true)
+    {
+        os << "view=" << um.get_view();
+    }
+    os << "}";
+    return os;
+}
 
 /* message context to pass down? */
 class gcomm::ProtoDownMeta

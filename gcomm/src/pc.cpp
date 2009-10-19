@@ -17,7 +17,7 @@ void PC::handle_up(int cid, const ReadBuf* rb, size_t roff,
 {
     Critical crit(mon);
     
-    if (um.has_view() == true && um.get_view().get_type() == View::V_PRIM)
+    if (um.has_view() == true && um.get_view().get_type() == V_PRIM)
     {
         /* Call close gmcast transport for all nodes that have left 
          * or partitioned */

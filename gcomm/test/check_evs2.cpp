@@ -74,34 +74,33 @@ END_TEST
 START_TEST(test_message)
 {
     UUID uuid1(0, 0);
-    ViewId view_id(uuid1, 4567);
+    ViewId view_id(V_TRANS, uuid1, 4567);
     Seqno seq(478), aru_seq(456), seq_range(7);
-
+    
     UserMessage um(uuid1, view_id, seq, aru_seq, seq_range, SP_SAFE, 75433, 0xab,
                    Message::F_SOURCE);
     
     check_serialization(um, um.serial_size(), UserMessage());
-
+    
     DelegateMessage dm(uuid1, view_id);
     dm.set_source(uuid1);
     check_serialization(dm, dm.serial_size(), DelegateMessage());
-
+    
     MessageNodeList node_list;
     node_list.insert(make_pair(uuid1, MessageNode()));
-    node_list.insert(make_pair(UUID(2), MessageNode(true, true, ViewId(), 5,
+    node_list.insert(make_pair(UUID(2), MessageNode(true, true, ViewId(V_REG), 5,
                                                     Range(7, 8))));
     JoinMessage jm(uuid1, view_id, 8, 5, 27, &node_list);
     jm.set_source(uuid1);
     check_serialization(jm, jm.serial_size(), JoinMessage());
-
+    
     InstallMessage im(uuid1, view_id, 8, 5, 27, &node_list);
     im.set_source(uuid1);
     check_serialization(im, im.serial_size(), InstallMessage());
-
+    
     LeaveMessage lm(uuid1, view_id, 45, 88, 3456);
     lm.set_source(uuid1);
     check_serialization(lm, lm.serial_size(), LeaveMessage());
-
 }
 END_TEST
 
@@ -109,7 +108,7 @@ START_TEST(test_input_map_insert)
 {
     InputMap im;
     UUID uuid1(1), uuid2(2);
-    ViewId view(uuid1, 0);
+    ViewId view(V_REG, uuid1, 0);
 
     try 
     {
@@ -169,7 +168,7 @@ START_TEST(test_input_map_find)
 {
     InputMap im;
     UUID uuid1(1);
-    ViewId view(uuid1, 0);
+    ViewId view(V_REG, uuid1, 0);
     
     im.insert_uuid(uuid1);
     
@@ -197,7 +196,7 @@ START_TEST(test_input_map_safety)
 {
     InputMap im;
     UUID uuid1(1);
-    ViewId view(uuid1, 0);
+    ViewId view(V_REG, uuid1, 0);
     
     im.insert_uuid(uuid1);
     
@@ -238,7 +237,7 @@ START_TEST(test_input_map_erase)
 {
     InputMap im;
     UUID uuid1(1);
-    ViewId view(uuid1, 1);
+    ViewId view(V_REG, uuid1, 1);
     im.insert_uuid(uuid1);
 
     for (Seqno s = 0; s < 10; ++s)
@@ -269,7 +268,7 @@ START_TEST(test_input_map_overwrap)
 {
     InputMap im;
     
-    ViewId view(UUID(1), 1);
+    ViewId view(V_REG, UUID(1), 1);
     vector<UUID> uuids;
     for (uint32_t n = 1; n <= 5; ++n)
     {
@@ -336,7 +335,7 @@ START_TEST(test_input_map_random_insert)
     size_t n_uuids(4);
     vector<UUID> uuids(n_uuids);
     vector<UserMessage> msgs(n_uuids*n_seqnos);
-    ViewId view_id(UUID(1), 1);
+    ViewId view_id(V_REG, UUID(1), 1);
     InputMap im;
     
     for (size_t i = 0; i < n_uuids; ++i)
@@ -389,37 +388,51 @@ END_TEST
 class Msg
 {
 public:
-    Msg(const UUID& source_, const int64_t seq_) : 
-        source(source_), seq(seq_) { }
+    Msg(const UUID& source_           = UUID::nil(), 
+        const ViewId& source_view_id_ = ViewId(),
+        const int64_t seq_            = -1) : 
+        source(source_), 
+        source_view_id(source_view_id_), 
+        seq(seq_) 
+    { }
     
     const UUID& get_source() const { return source; }
 
+    const ViewId& get_source_view_id() const { return source_view_id; }
+    
     int64_t get_seq() const { return seq; }
-
+    
     bool operator==(const Msg& cmp) const
     {
-        return (source   == cmp.source && 
-                seq      == cmp.seq      );  
+        return (source         == cmp.source         && 
+                source_view_id == cmp.source_view_id &&
+                seq            == cmp.seq              );  
         
     }
+
 private:
-    UUID const source;
-    int64_t const seq;
+    UUID    source;
+    ViewId  source_view_id;
+    int64_t seq;
 };
 
 ostream& operator<<(ostream& os, const Msg& msg)
 {
-    return (os << "(" << msg.get_source() << "," << msg.get_seq() << ")");
+    return (os << "(" << msg.get_source() << "," << msg.get_source_view_id() << "," << msg.get_seq() << ")");
 }
 
 class ViewTrace
 {
 public:
     ViewTrace(const View& view_) : view(view_), msgs() { }
-
-    void insert_msg(const Msg& msg) const
+    
+    void insert_msg(const Msg& msg)
+        throw (gu::Exception)
     {
-        gcomm_assert(contains(msg.get_source()) == true);
+        gcomm_assert(contains(msg.get_source()) == true) 
+            << "msg source " << msg.get_source() << " not int view " << view;
+        gcomm_assert(view.get_id() == msg.get_source_view_id());
+        msgs.push_back(msg);
     }
     
     const View& get_view() const { return view; }
@@ -436,7 +449,7 @@ public:
                 msgs                   == cmp.msgs                     );
     }
 private:
-
+    
     bool contains(const UUID& uuid) const
     {
         return (view.get_members().find(uuid) != view.get_members().end() ||
@@ -444,7 +457,7 @@ private:
                 view.get_partitioned().find(uuid) != view.get_partitioned().end());
     }
     
-    View const view;
+    View       view;
     deque<Msg> msgs;
 };
 
@@ -457,42 +470,36 @@ ostream& operator<<(ostream& os, const ViewTrace& vtr)
 }
 
 
-struct ViewTraceCmpStr
-{
-    bool operator()(const set<ViewTrace>::value_type& a,
-                    const set<ViewTrace>::value_type& b) const
-    {
-        // Note, higher view type enum comes first
-        return a.get_view().get_id() < b.get_view().get_id() ||
-            (a.get_view().get_id() == b.get_view().get_id() && 
-             a.get_view().get_type() > b.get_view().get_type());
-    }
-};
 
 class Trace
 {
 public:
+    class ViewTraceMap : public Map<ViewId, ViewTrace> { };
+
     Trace() : views(), current_view(views.end()) { }
+
     void insert_view(const View& view)
     {
-        gcomm_assert(views.insert(view).second == true);
+        gu_trace(current_view = views.insert_checked(
+                     make_pair(view.get_id(), ViewTrace(view))));
+        
     }
-    void insert_msg(const Msg& msg) const
+    void insert_msg(const Msg& msg)
     {
-        gcomm_assert(current_view != views.end());
-        current_view->insert_msg(msg);
+        gcomm_assert(current_view != views.end()) << "no view set before msg delivery";
+        gu_trace(ViewTraceMap::get_value(current_view).insert_msg(msg));
     }
-    const set<ViewTrace, ViewTraceCmpStr>& get_views() const { return views; }
+    const ViewTraceMap& get_views() const { return views; }
 private:
-    set<ViewTrace, ViewTraceCmpStr> views;
-    set<ViewTrace, ViewTraceCmpStr>::iterator current_view;
+    ViewTraceMap views;
+    ViewTraceMap::iterator current_view;
 };
+
 
 ostream& operator<<(ostream& os, const Trace& tr)
 {
     os << "trace: \n";
-    copy(tr.get_views().begin(), tr.get_views().end(), 
-         ostream_iterator<const ViewTrace>(os, "\n"));
+    os << tr.get_views();
     return os;
 }
 
@@ -508,17 +515,18 @@ public:
     void handle_up(int cid, const ReadBuf* rb, size_t offset,
                    const ProtoUpMeta& um)
     {
-        log_debug << "";
+        log_debug << uuid << ": " << um;
         if (um.has_view() == true)
         {
-            tr.insert_view(um.get_view());
+            gu_trace(tr.insert_view(um.get_view()));
         }
         else
         {
             int64_t seq;
             gu_trace((void)unserialize(rb->get_buf(), rb->get_len(), 
                                        offset, &seq));
-            tr.insert_msg(Msg(um.get_source(), seq));
+            gu_trace(tr.insert_msg(
+                         Msg(um.get_source(), um.get_source_view_id(), seq)));
         }
     }
 
@@ -740,14 +748,19 @@ public:
 
     void join(bool first)
     {
-        p.shift_to(Proto::S_JOINING);
-        p.send_join(first);
+        gu_trace(p.shift_to(Proto::S_JOINING));
+        gu_trace(p.send_join(first));
     }
     
     void leave()
     {
-        p.shift_to(Proto::S_LEAVING);
-        p.send_leave();
+        gu_trace(p.shift_to(Proto::S_LEAVING));
+        gu_trace(p.send_leave());
+    }
+
+    void send()
+    {
+        gu_trace(u.send());
     }
 
     const Trace& get_trace() const
@@ -933,7 +946,8 @@ public:
         {
             map<size_t, DummyTransport*>::iterator i(tp.find(vt.first.get_jj()));
             gcomm_assert(i != tp.end());
-            i->second->handle_up(-1, cmsg.get_rb(), 0, ProtoUpMeta(cmsg.get_source()));
+            gu_trace(i->second->handle_up(-1, cmsg.get_rb(), 0, 
+                                          ProtoUpMeta(cmsg.get_source())));
             cmsg.get_rb()->release();
         }
     }
@@ -1020,14 +1034,15 @@ ostream& operator<<(ostream& os, const PropagationMatrix& prop)
     return os;
 }
 
+
 void check_traces(const Trace& t1, const Trace& t2)
 {
-    for (set<ViewTrace, ViewTraceCmpStr>::const_iterator 
+    for (Trace::ViewTraceMap::const_iterator 
              i = t1.get_views().begin(); i != t1.get_views().end();
-             ++i)
+         ++i)
     {
-        const set<ViewTrace, ViewTraceCmpStr>::const_iterator 
-            j = t2.get_views().find(*i);
+        const Trace::ViewTraceMap::const_iterator 
+            j = t2.get_views().find(Trace::ViewTraceMap::get_key(i));
         if (j != t2.get_views().end())
         {
             gcomm_assert(*i == *j) << 
@@ -1049,7 +1064,7 @@ public:
         {
             if ((*i)->get_index() != n->get_index())
             {
-                check_traces((*i)->get_trace(), n->get_trace());
+                gu_trace(check_traces((*i)->get_trace(), n->get_trace()));
             }
         }
     }
@@ -1058,7 +1073,7 @@ private:
     const vector<DummyNode*>& nvec;
 };
 
-void check_trace(const vector<DummyNode*>& nvec)
+static void check_trace(const vector<DummyNode*>& nvec)
 {
     for_each(nvec.begin(), nvec.end(), CheckTraceOp(nvec));
 }
@@ -1068,8 +1083,16 @@ void check_trace(const vector<DummyNode*>& nvec)
 static void join_node(PropagationMatrix* p, 
                       DummyNode* n, bool first = false)
 {
-    p->insert_tp(n->get_index(), n->get_tp());
-    n->join(first);
+    gu_trace(p->insert_tp(n->get_index(), n->get_tp()));
+    gu_trace(n->join(first));
+}
+
+static void send_n(DummyNode* node, const size_t n)
+{
+    for (size_t i = 0; i < n; ++i)
+    {
+        gu_trace(node->send());
+    }
 }
 
 START_TEST(test_proto_join_n)
@@ -1086,10 +1109,36 @@ START_TEST(test_proto_join_n)
     
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        join_node(&prop, dn[i], i == 0 ? true : false);
-        prop.propagate_until_empty();
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        gu_trace(prop.propagate_until_empty());
     }
-    check_trace(dn);
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), delete_object());
+}
+END_TEST
+
+START_TEST(test_proto_join_n_w_user_msg)
+{
+    const size_t n_nodes(4);
+    EventLoop el;
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        dn.push_back(new DummyNode(i, &el));
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        gu_trace(prop.propagate_until_empty());
+        for (size_t j = 0; j < i; ++j)
+        {
+            gu_trace(send_n(dn[j], 8));
+        }
+    }
+    gu_trace(check_trace(dn));
     for_each(dn.begin(), dn.end(), delete_object());
 }
 END_TEST
@@ -1110,16 +1159,16 @@ START_TEST(test_proto_join_n_lossy)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        join_node(&prop, dn[i], i == 0 ? true : false);
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
         for (size_t j = 1; j < i + 1; ++j)
         {
             prop.set_loss(i + 1, j, 0.9);
             prop.set_loss(j, i + 1, 0.9);
 
         }
-        prop.propagate_until_empty();
+        gu_trace(prop.propagate_until_empty());
     }
-    check_trace(dn);
+    gu_trace(check_trace(dn));
     for_each(dn.begin(), dn.end(), delete_object());
 }
 END_TEST
@@ -1176,6 +1225,10 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_proto_join_n");
     tcase_add_test(tc, test_proto_join_n);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_proto_join_n_w_user_msg");
+    tcase_add_test(tc, test_proto_join_n_w_user_msg);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_proto_join_n_lossy");

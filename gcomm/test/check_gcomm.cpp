@@ -2,6 +2,7 @@
 #include "gcomm/logger.hpp"
 
 #include <gu_string.hpp>
+#include <gu_exception.hpp>
 
 #include <string>
 #include <vector>

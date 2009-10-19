@@ -41,7 +41,7 @@ class gcomm::evs::MessageNode
 public:
     MessageNode(const bool    operational_     = false,
                 const bool    leaving_         = false,
-                const ViewId& view_id_ = ViewId(),
+                const ViewId& view_id_         = ViewId(V_REG),
                 const Seqno   safe_seq_        = Seqno::max(),
                 const Range   im_range_        = Range()) :
         operational(operational_),

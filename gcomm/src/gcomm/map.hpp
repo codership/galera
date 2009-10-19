@@ -176,7 +176,7 @@ namespace gcomm
     };
     
     template <typename K, typename V>
-    std::ostream& operator<<(std::ostream& os, const std::pair<K, V>& p)
+    std::ostream& operator<<(std::ostream& os, const std::pair<const K, V>& p)
     {
         return (os << p.first << "," << p.second);
     }
@@ -185,7 +185,7 @@ namespace gcomm
     std::ostream& operator<<(std::ostream& os, const MapBase<K, V, C>& map)
     {
         std::copy(map.begin(), map.end(),
-                  std::ostream_iterator<const std::pair<K, V> >(os, " "));
+                  std::ostream_iterator<const std::pair<const K, V> >(os, " "));
         return os;
     }
     
@@ -229,6 +229,12 @@ namespace gcomm
             return MapBase<K, V, C>::map.equal_range(k);
         }
     };
+
+    template <typename K, typename V>
+    const K& get_key(const typename Map<K, V>::const_iterator i)
+    {
+        return i->first;
+    }
 
     template <typename K, typename V>
     const K& get_key(const typename Map<K, V>::value_type& vt)

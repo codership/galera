@@ -32,7 +32,11 @@ class gcomm::PCInst
 
 public:
 
-    PCInst() : prim(false), last_seq(-1), last_prim(), to_seq(-1) {}
+    PCInst() : prim(false), 
+               last_seq(-1), 
+               last_prim(V_NON_PRIM), 
+               to_seq(-1) 
+    {}
     
     PCInst(const bool     prim_,
            const uint32_t last_seq_,

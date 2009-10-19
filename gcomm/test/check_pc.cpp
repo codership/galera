@@ -22,9 +22,19 @@ START_TEST(test_pc_messages)
     PCStateMessage pcs;
     PCInstMap& sim = pcs.get_inst_map();
 
-    sim.insert(std::make_pair(UUID(0,0), PCInst(true, 6, ViewId(UUID(0, 0), 9), 42)));
-    sim.insert(std::make_pair(UUID(0,0), PCInst(false, 88, ViewId(UUID(0, 0), 3), 472)));
-    sim.insert(std::make_pair(UUID(0,0), PCInst(true, 78, ViewId(UUID(0, 0), 87), 52)));
+    sim.insert(std::make_pair(UUID(0,0), 
+                              PCInst(true, 6, 
+                                     ViewId(V_PRIM,
+                                            UUID(0, 0), 9), 
+                                     42)));
+    sim.insert(std::make_pair(UUID(0,0), 
+                              PCInst(false, 88, ViewId(V_PRIM, 
+                                                       UUID(0, 0), 3), 
+                                     472)));
+    sim.insert(std::make_pair(UUID(0,0), 
+                              PCInst(true, 78, ViewId(V_PRIM,
+                                                      UUID(0, 0), 87), 
+                                     52)));
     
     size_t expt_size = 4 // hdr
         + 4              // seq
@@ -34,16 +44,24 @@ START_TEST(test_pc_messages)
     PCInstallMessage pci;
     PCInstMap& iim = pci.get_inst_map();
 
-    iim.insert(std::make_pair(UUID(0,0), PCInst(true, 6, ViewId(UUID(0, 0), 9), 42)));
-    iim.insert(std::make_pair(UUID(0,0), PCInst(false, 88, ViewId(UUID(0, 0), 3), 472)));
-    iim.insert(std::make_pair(UUID(0,0), PCInst(true, 78, ViewId(UUID(0, 0), 87), 52)));
-    iim.insert(std::make_pair(UUID(0,0), PCInst(false, 457, ViewId(UUID(0, 0), 37), 56)));
-
+    iim.insert(std::make_pair(UUID(0,0), 
+                              PCInst(true, 6, ViewId(V_PRIM,
+                                                     UUID(0, 0), 9), 42)));
+    iim.insert(std::make_pair(UUID(0,0), 
+                              PCInst(false, 88, ViewId(V_NON_PRIM,
+                                                       UUID(0, 0), 3), 472)));
+    iim.insert(std::make_pair(UUID(0,0), 
+                              PCInst(true, 78, ViewId(V_PRIM,
+                                                      UUID(0, 0), 87), 52)));
+    iim.insert(std::make_pair(UUID(0,0), 
+                              PCInst(false, 457, ViewId(V_NON_PRIM,
+                                                        UUID(0, 0), 37), 56)));
+    
     expt_size = 4 // hdr
         + 4              // seq
         + 4 + 4*(UUID::serial_size() + sizeof(uint32_t) + 4 + 20 + 8); // PCInstMap
     check_serialization(pci, expt_size, PCInstallMessage());
-
+    
     PCUserMessage pcu(7);
     
     expt_size = 4 + 4;
@@ -78,8 +96,8 @@ public:
         {
             const View& view(um.get_view());
             log_info << view;
-            fail_unless(view.get_type() == View::V_PRIM ||
-                        view.get_type() == View::V_NON_PRIM);
+            fail_unless(view.get_type() == V_PRIM ||
+                        view.get_type() == V_NON_PRIM);
             views.push_back(View(view));
         }
     }
@@ -108,16 +126,16 @@ void single_boot(PCUser* pu1)
     
     ProtoUpMeta sum1(pu1->uuid);
 
-    View vt0(View::V_TRANS, ViewId(pu1->uuid, 0));
+    View vt0(ViewId(V_TRANS, pu1->uuid, 0));
     vt0.add_member(pu1->uuid, "n1");
-    ProtoUpMeta um1(UUID::nil(), &vt0);
+    ProtoUpMeta um1(UUID::nil(), ViewId(), &vt0);
     pu1->pc->shift_to(PCProto::S_JOINING);
     pu1->pc->handle_up(0, 0, 0, um1);
     fail_unless(pu1->pc->get_state() == PCProto::S_JOINING);
     
-    View vr1(View::V_REG, ViewId(pu1->uuid, 1));
+    View vr1(ViewId(V_REG, pu1->uuid, 1));
     vr1.add_member(pu1->uuid, "n1");
-    ProtoUpMeta um2(UUID::nil(), &vr1);
+    ProtoUpMeta um2(UUID::nil(), ViewId(), &vr1);
     pu1->pc->handle_up(0, 0, 0, um2);
     fail_unless(pu1->pc->get_state() == PCProto::S_STATES_EXCH);
     
@@ -131,7 +149,7 @@ void single_boot(PCUser* pu1)
     {
         const PCInst& pi1 = PCInstMap::get_value(sm1.get_inst_map().begin());
         fail_unless(pi1.get_prim() == true);
-        fail_unless(pi1.get_last_prim() == ViewId(pu1->uuid, 0));
+        fail_unless(pi1.get_last_prim() == ViewId(V_PRIM, pu1->uuid, 0));
     }
     pu1->pc->handle_msg(sm1, 0, 0, sum1);
     fail_unless(pu1->pc->get_state() == PCProto::S_INSTALL);
@@ -146,7 +164,7 @@ void single_boot(PCUser* pu1)
     {
         const PCInst& pi1 = PCInstMap::get_value(im1.get_inst_map().begin());
         fail_unless(pi1.get_prim() == true);
-        fail_unless(pi1.get_last_prim() == ViewId(pu1->uuid, 0));
+        fail_unless(pi1.get_last_prim() == ViewId(V_PRIM, pu1->uuid, 0));
     }
     pu1->pc->handle_msg(im1, 0, 0, sum1);
     fail_unless(pu1->pc->get_state() == PCProto::S_PRIM);
@@ -170,18 +188,20 @@ static void double_boot(PCUser* pu1, PCUser* pu2)
     ProtoUpMeta pum1(pu1->uuid);
     ProtoUpMeta pum2(pu2->uuid);
 
-    View t11(View::V_TRANS, pu1->pc->get_current_view().get_id());
+    View t11(ViewId(V_TRANS, pu1->pc->get_current_view().get_id()));
     t11.add_member(pu1->uuid, "n1");
     pu1->pc->handle_view(t11);
     fail_unless(pu1->pc->get_state() == PCProto::S_TRANS);
     
-    View t12(View::V_TRANS, ViewId(pu2->uuid, 0));
+    View t12(ViewId(V_TRANS, pu2->uuid, 0));
     t12.add_member(pu2->uuid, "n2");
     pu2->pc->shift_to(PCProto::S_JOINING);
     pu2->pc->handle_view(t12);
     fail_unless(pu2->pc->get_state() == PCProto::S_JOINING);
 
-    View r1(View::V_REG, ViewId(pu1->uuid, pu1->pc->get_current_view().get_id().get_seq() + 1));
+    View r1(ViewId(V_REG, 
+                   pu1->uuid, 
+                   pu1->pc->get_current_view().get_id().get_seq() + 1));
     r1.add_member(pu1->uuid, "n1");
     r1.add_member(pu2->uuid, "n2");
     pu1->pc->handle_view(r1);
@@ -265,22 +285,22 @@ START_TEST(test_pc_view_changes_double)
     PCUser pu2(uuid2, &tp2, &pc2);
     
     double_boot(&pu1, &pu2);
-
+    
     ReadBuf* rb;
-
-    View tnp(View::V_TRANS, pu1.pc->get_current_view().get_id());
+    
+    View tnp(ViewId(V_TRANS, pu1.pc->get_current_view().get_id()));
     tnp.add_member(uuid1, "n1");
     pu1.pc->handle_view(tnp);
     fail_unless(pu1.pc->get_state() == PCProto::S_NON_PRIM);
-
-    View tpv2(View::V_TRANS, pu2.pc->get_current_view().get_id());
+    
+    View tpv2(ViewId(V_TRANS, pu2.pc->get_current_view().get_id()));
     tpv2.add_member(uuid2, "n2");
     tpv2.add_left(uuid1, "n1");
     pu2.pc->handle_view(tpv2);
     fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);
     fail_unless(pu2.tp->get_out() == 0);
 
-    View rp2(View::V_REG, ViewId(uuid2, 
+    View rp2(ViewId(V_REG, uuid2, 
                                  pu1.pc->get_current_view().get_id().get_seq() + 1));
     rp2.add_member(uuid2, "n2");
     rp2.add_left(uuid1, "n1");
@@ -351,7 +371,7 @@ START_TEST(test_pc_state1)
     fail_unless(pu2.pc->get_state() == PCProto::S_PRIM);
     
     // PRIM -> TRANS -> STATES_EXCH -> RTR -> TRANS -> STATES_EXCH -> RTR -> PRIM
-    View tr1(View::V_TRANS, pu1.pc->get_current_view().get_id());
+    View tr1(ViewId(V_TRANS, pu1.pc->get_current_view().get_id()));
     tr1.add_member(uuid1, "n1");
     tr1.add_member(uuid2, "n2");
     pu1.pc->handle_view(tr1);
@@ -363,7 +383,7 @@ START_TEST(test_pc_state1)
     fail_unless(pu1.tp->get_out() == 0);
     fail_unless(pu2.tp->get_out() == 0);
 
-    View reg2(View::V_REG, ViewId(uuid1,
+    View reg2(ViewId(V_REG, uuid1,
                                   pu1.pc->get_current_view().get_id().get_seq() + 1));
     reg2.add_member(uuid1, "n1");
     reg2.add_member(uuid2, "n2");
@@ -388,7 +408,7 @@ START_TEST(test_pc_state1)
     fail_unless(pu1.pc->get_state() == PCProto::S_INSTALL);
     fail_unless(pu2.pc->get_state() == PCProto::S_INSTALL);    
     
-    View tr2(View::V_TRANS, pu1.pc->get_current_view().get_id()); 
+    View tr2(ViewId(V_TRANS, pu1.pc->get_current_view().get_id())); 
     tr2.add_member(uuid1, "n1");
     tr2.add_member(uuid2, "n2");
 
@@ -400,7 +420,7 @@ START_TEST(test_pc_state1)
     fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);    
 
     PCMessage im;
-
+    
     if (uuid1 < uuid2)
     {
         get_msg(pu1.tp->get_out(), &im);
@@ -419,8 +439,8 @@ START_TEST(test_pc_state1)
     fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);    
     
 
-    View reg3(View::V_REG, ViewId(uuid1,
-                                  pu1.pc->get_current_view().get_id().get_seq() + 1));
+    View reg3(ViewId(V_REG, uuid1,
+                     pu1.pc->get_current_view().get_id().get_seq() + 1));
     
     reg3.add_member(uuid1, "n1");
     reg3.add_member(uuid2, "n2");
@@ -487,7 +507,7 @@ START_TEST(test_pc_state2)
     fail_unless(pu2.pc->get_state() == PCProto::S_PRIM);
     
     // PRIM -> TRANS -> STATES_EXCH -> TRANS -> STATES_EXCH -> RTR -> PRIM
-    View tr1(View::V_TRANS, pu1.pc->get_current_view().get_id());
+    View tr1(ViewId(V_TRANS, pu1.pc->get_current_view().get_id()));
     tr1.add_member(uuid1, "n1");
     tr1.add_member(uuid2, "n2");
     pu1.pc->handle_view(tr1);
@@ -499,8 +519,8 @@ START_TEST(test_pc_state2)
     fail_unless(pu1.tp->get_out() == 0);
     fail_unless(pu2.tp->get_out() == 0);
 
-    View reg2(View::V_REG, ViewId(uuid1,
-                                  pu1.pc->get_current_view().get_id().get_seq() + 1));
+    View reg2(ViewId(V_REG, uuid1,
+                     pu1.pc->get_current_view().get_id().get_seq() + 1));
     reg2.add_member(uuid1, "n1");
     reg2.add_member(uuid2, "n2");
     pu1.pc->handle_view(reg2);
@@ -511,7 +531,7 @@ START_TEST(test_pc_state2)
 
 
     
-    View tr2(View::V_TRANS, pu1.pc->get_current_view().get_id()); 
+    View tr2(ViewId(V_TRANS, pu1.pc->get_current_view().get_id())); 
     tr2.add_member(uuid1, "n1");
     tr2.add_member(uuid2, "n2");
 
@@ -538,8 +558,8 @@ START_TEST(test_pc_state2)
     fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);    
     
 
-    View reg3(View::V_REG, ViewId(uuid1,
-                                  pu1.pc->get_current_view().get_id().get_seq() + 1));
+    View reg3(ViewId(V_REG, uuid1,
+                     pu1.pc->get_current_view().get_id().get_seq() + 1));
     
     reg3.add_member(uuid1, "n1");
     reg3.add_member(uuid2, "n2");
@@ -608,11 +628,11 @@ START_TEST(test_pc_state3)
     
     // PRIM -> NON_PRIM -> STATES_EXCH -> RTR -> NON_PRIM -> STATES_EXCH -> ...
     //      -> NON_PRIM -> STATES_EXCH -> RTR -> NON_PRIM
-    View tr11(View::V_TRANS, pu1.pc->get_current_view().get_id());
+    View tr11(ViewId(V_TRANS, pu1.pc->get_current_view().get_id()));
     tr11.add_member(uuid1, "n1");
     pu1.pc->handle_view(tr11);
 
-    View tr12(View::V_TRANS, pu1.pc->get_current_view().get_id());
+    View tr12(ViewId(V_TRANS, pu1.pc->get_current_view().get_id()));
     tr12.add_member(uuid2, "n2");
     pu2.pc->handle_view(tr12);
     
@@ -622,14 +642,14 @@ START_TEST(test_pc_state3)
     fail_unless(pu1.tp->get_out() == 0);
     fail_unless(pu2.tp->get_out() == 0);
 
-    View reg21(View::V_REG, ViewId(uuid1,
-                                   pu1.pc->get_current_view().get_id().get_seq() + 1));
+    View reg21(ViewId(V_REG, uuid1,
+                      pu1.pc->get_current_view().get_id().get_seq() + 1));
     reg21.add_member(uuid1, "n1");
     pu1.pc->handle_view(reg21);
     fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
 
-    View reg22(View::V_REG, ViewId(uuid2,
-                                   pu2.pc->get_current_view().get_id().get_seq() + 1));
+    View reg22(ViewId(V_REG, uuid2,
+                      pu2.pc->get_current_view().get_id().get_seq() + 1));
     reg22.add_member(uuid2, "n2");
     pu2.pc->handle_view(reg22);
     fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);    
@@ -647,11 +667,11 @@ START_TEST(test_pc_state3)
 
 
     
-    View tr21(View::V_TRANS, pu1.pc->get_current_view().get_id()); 
+    View tr21(ViewId(V_TRANS, pu1.pc->get_current_view().get_id())); 
     tr21.add_member(uuid1, "n1");
     pu1.pc->handle_view(tr21);
 
-    View tr22(View::V_TRANS, pu2.pc->get_current_view().get_id()); 
+    View tr22(ViewId(V_TRANS, pu2.pc->get_current_view().get_id())); 
     tr22.add_member(uuid2, "n2");
     pu2.pc->handle_view(tr22);
 
@@ -661,8 +681,8 @@ START_TEST(test_pc_state3)
     fail_unless(pu1.tp->get_out() == 0);
     fail_unless(pu2.tp->get_out() == 0);
 
-    View reg3(View::V_REG, ViewId(uuid1,
-                                  pu1.pc->get_current_view().get_id().get_seq() + 1));
+    View reg3(ViewId(V_REG, uuid1,
+                     pu1.pc->get_current_view().get_id().get_seq() + 1));
     reg3.add_member(uuid1, "n1");
     reg3.add_member(uuid2, "n2");
 
@@ -722,14 +742,14 @@ START_TEST(test_pc_conflicting_prims)
     PCUser pu2(uuid2, &tp2, &pc2);
     single_boot(&pu2);
 
-    View tr1(View::V_TRANS, pu1.pc->get_current_view().get_id());
+    View tr1(ViewId(V_TRANS, pu1.pc->get_current_view().get_id()));
     tr1.add_member(uuid1);
     pu1.pc->handle_view(tr1);
-    View tr2(View::V_TRANS, pu2.pc->get_current_view().get_id());
+    View tr2(ViewId(V_TRANS, pu2.pc->get_current_view().get_id()));
     tr2.add_member(uuid2);
     pu2.pc->handle_view(tr2);
     
-    View reg(View::V_REG, ViewId(uuid1, tr1.get_id().get_seq() + 1));
+    View reg(ViewId(V_REG, uuid1, tr1.get_id().get_seq() + 1));
     reg.add_member(uuid1);
     reg.add_member(uuid2);
     pu1.pc->handle_view(reg);
@@ -759,10 +779,10 @@ START_TEST(test_pc_conflicting_prims)
 
     fail_unless(pu1.tp->get_out() == 0);
     
-    View tr3(View::V_TRANS, reg.get_id());
+    View tr3(ViewId(V_TRANS, reg.get_id()));
     tr3.add_member(uuid1);
     pu1.pc->handle_view(tr3);
-    View reg3(View::V_REG, ViewId(uuid1, tr3.get_id().get_seq() + 1));
+    View reg3(ViewId(V_REG, uuid1, tr3.get_id().get_seq() + 1));
     reg3.add_member(uuid1);
     pu1.pc->handle_view(reg3);
 
@@ -830,7 +850,7 @@ public:
         {
             const View& view(um.get_view());
             log_info << view;
-            if (view.get_type() == View::V_PRIM && send == true)
+            if (view.get_type() == V_PRIM && send == true)
             {
                 sending = true;
                 event_loop->queue_event(fd, Event(Event::E_USER,
