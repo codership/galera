@@ -1544,8 +1544,8 @@ void gcomm::evs::Proto::handle_up(int cid,
     }
     catch (...)
     {
-        // log_fatal << "exception caused by message: " << msg;
-        // log_fatal << " state after handling message: " << *this;
+        log_fatal << "exception caused by message: " << msg;
+        log_fatal << " state after handling message: " << *this;
         throw;
     }
 }
@@ -2224,7 +2224,9 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     {
         gu_trace(resend(msg.get_source(), msg.get_range()));
     }
-    else if (get_state() == S_RECOVERY && msg.get_range_uuid() != UUID::nil())
+    else if (get_state()          == S_RECOVERY  && 
+             msg.get_range_uuid() != UUID::nil() &&
+             msg.get_source()     != get_uuid()    )
     {
         gu_trace(recover(msg.get_source(), msg.get_range_uuid(), 
                          msg.get_range()));

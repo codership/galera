@@ -1173,6 +1173,40 @@ START_TEST(test_proto_join_n_lossy)
 }
 END_TEST
 
+
+START_TEST(test_proto_join_n_lossy_w_user_msg)
+{
+    const size_t n_nodes(8);
+    EventLoop el;
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+    
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        dn.push_back(new DummyNode(i, &el));
+    }
+
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        for (size_t j = 1; j < i + 1; ++j)
+        {
+            prop.set_loss(i + 1, j, 0.9);
+            prop.set_loss(j, i + 1, 0.9);
+
+        }
+        gu_trace(prop.propagate_until_empty());
+        for (size_t j = 0; j < i; ++j)
+        {
+            gu_trace(send_n(dn[j], 8));
+        }
+    }
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), delete_object());
+}
+END_TEST
+
 Suite* evs2_suite()
 {
     Suite* s = suite_create("gcomm::evs");
@@ -1233,6 +1267,11 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_proto_join_n_lossy");
     tcase_add_test(tc, test_proto_join_n_lossy);
+    suite_add_tcase(s, tc);
+
+
+    tc = tcase_create("test_proto_join_n_lossy_w_user_msg");
+    tcase_add_test(tc, test_proto_join_n_lossy_w_user_msg);
     suite_add_tcase(s, tc);
     
     return s;
