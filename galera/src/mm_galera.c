@@ -933,8 +933,8 @@ static enum wsrep_status process_query_write_set(
     PRINT_WS(wslog_G, ws, seqno_l);
 
     gu_debug("remote trx seqno: %llu %llu last_seen_trx: %llu %llu, cert: %d", 
-             seqno_g, seqno_l, ws->last_seen_trx, last_recved, rcode
-    );
+             seqno_g, seqno_l, ws->last_seen_trx, last_recved, rcode);
+
     switch (rcode) {
     case WSDB_OK:   /* certification ok */
     {
@@ -1212,6 +1212,9 @@ galera_handle_configuration (wsrep_t* gh,
                     assert(0);
                     abort(); // just abort for now. Ideally reconnect to group.
                 }
+
+                // workaround for #182, should be safe since we're in isolation
+                last_recved = conf->seqno;
             }
 
             if (galera_invalidate_state (data_dir)) abort();
@@ -1341,7 +1344,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
                 sst_donate_cb (action,
                                action_size,
                                (wsrep_uuid_t*)&status.state_uuid,
-                               status.last_applied);
+                               /* status.last_applied, see #182 */ last_recved);
 
                 GALERA_RELEASE_QUEUE (cert_queue,   seqno_l);
                 GALERA_RELEASE_QUEUE (commit_queue, seqno_l);

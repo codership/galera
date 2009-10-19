@@ -53,6 +53,9 @@ do
 	-t|--tar)
             TAR=yes       # Create a TGZ package
             ;;
+	-i|--install)
+	    INSTALL=yes
+	    ;;
 	--no-strip)
 	    NO_STRIP=yes  # Don't strip the binaries
 	    ;;
@@ -72,13 +75,12 @@ do
     shift
 done
 
-set -x
-
 # export command options for Galera build
 export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD
 
-if [ "$OPT"   == "yes" ]; then CONFIGURE="yes"; fi
-if [ "$DEBUG" == "yes" ]; then CONFIGURE="yes"; fi
+if [ "$OPT"     == "yes" ]; then CONFIGURE="yes"; fi
+if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
+if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
 
 set -e
 
@@ -223,5 +225,12 @@ mv $DIST_DIR $RELEASE_NAME
 if [ "$TAR" == "yes" ]
 then
     tar -czf $RELEASE_NAME.tgz $RELEASE_NAME
+fi
+
+if [ "$INSTALL" == "yes" ]
+then
+    cmd="$GALERA_SRC/tests/scripts/command.sh"
+    $cmd stop
+    $cmd install $RELEASE_NAME.tgz
 fi
 #
