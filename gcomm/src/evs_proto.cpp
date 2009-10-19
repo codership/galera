@@ -23,7 +23,7 @@ public:
     {
         if (MessageNodeList::get_value(vt).get_view_id() == view_id)
         {
-            c.push_back(vt);
+            c.insert_checked(vt);
         }
     }
 private:
@@ -1150,8 +1150,9 @@ void gcomm::evs::Proto::send_join(bool handle)
 {
     assert(output.empty() == true);
 
+    
     JoinMessage jm(create_join());
-
+    
     log_debug << self_string() << " sending join " << jm;
     
     vector<byte_t> buf(jm.serial_size());
@@ -1164,7 +1165,7 @@ void gcomm::evs::Proto::send_join(bool handle)
         log_warn << "send failed: " << strerror(err);
     }
     
-    if (handle)
+    if (handle == true)
     {
         handle_join(jm, self_i);
     }
@@ -2034,7 +2035,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         log_debug << self_string() << " " << msg;
     }
     
-    if (state == S_JOINING || state == S_CLOSED) 
+    if (get_state() == S_JOINING || get_state() == S_CLOSED) 
     {
         // Drop message
         log_debug << self_string() << " dropping " << msg;
@@ -2068,7 +2069,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         } 
         else if (inst.get_installed() == false) 
         {
-            if (install_message && 
+            if (install_message != 0 && 
                 msg.get_source_view_id() == install_message->get_source_view_id()) 
             {
                 assert(state == S_RECOVERY);
@@ -2111,10 +2112,10 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         }
     }
     
-    assert(msg.get_source_view_id() == current_view.get_id());
+    gcomm_assert(msg.get_source_view_id() == current_view.get_id());
     
     const Seqno prev_aru(input_map->get_aru_seq());
-    const Seqno prev_safe(input_map->get_safe_seq());
+    const Seqno prev_safe(input_map->get_safe_seq(msg.get_source()));
     const Range prev_range(input_map->get_range(msg.get_source()));
     Range range;
     
@@ -2127,23 +2128,28 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     {
         range = prev_range;
     }
-
+    
+    
+    if (input_map->get_aru_seq() != Seqno::max() &&
+        (prev_aru == Seqno::max() || prev_aru < input_map->get_aru_seq()))
+    {
+        input_map->set_safe_seq(get_uuid(), input_map->get_aru_seq());
+    }
+    
+    if (msg.get_aru_seq() != Seqno::max() &&
+        (prev_safe == Seqno::max() || prev_safe < msg.get_aru_seq()))
+    {
+        gu_trace(input_map->set_safe_seq(msg.get_source(), msg.get_aru_seq()));
+    }
+    
     if (range.get_lu() > prev_range.get_lu())
     {
         inst.set_tstamp(Time::now());
     }
     
-    // Some messages are missing
-    // 
-    // TODO: 
-    // - Gap messages should take list of gaps to avoid sending gap 
-    //   message for each missing message
-    // - There should be guard (timer etc) to avoid sending gap message
-    //   for each incoming packet from the source of missing packet 
-    //   (maybe this is not too bad if gap message contains gap list
-    //   and message loss is infrequent)
-    if (range.get_hs() > range.get_lu() && 
-        (msg.get_flags() & Message::F_RETRANS) == false)
+    // Missing messages
+    if (range.get_hs()                         >  range.get_lu() && 
+        (msg.get_flags() & Message::F_RETRANS) == 0                 )
     {
         log_debug << self_string() 
                   << " requesting retrans from " 
@@ -2162,7 +2168,8 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         // and last_sent seqno should be advanced
         gu_trace(complete_user(range.get_hs()));
     }
-    else if ((output.empty() == true && input_map->get_aru_seq() != prev_aru) ||
+    else if ((output.empty() == true && 
+              input_map->get_aru_seq() != prev_aru) ||
              get_state() == S_LEAVING)
     {
         // Output queue empty and aru changed, send gap to inform others
@@ -2183,7 +2190,8 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     }
     
     
-    if (get_state() == S_RECOVERY && last_sent == input_map->get_aru_seq() && 
+    if (get_state() == S_RECOVERY && 
+        last_sent == input_map->get_aru_seq() && 
         (prev_aru != input_map->get_aru_seq() ||
          prev_safe != input_map->get_safe_seq()))
     {
@@ -2225,7 +2233,9 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         log_debug << self_string() << " install gap " << msg;
         inst.set_installed(true);
         if (is_all_installed() == true)
+        {
             shift_to(S_OPERATIONAL);
+        }
         return;
     } 
     else if (msg.get_source_view_id() != current_view.get_id()) 
@@ -2259,8 +2269,9 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     
     gcomm_assert(msg.get_source_view_id() == current_view.get_id());
     
-    const Seqno prev_safe(input_map->get_safe_seq());
-    if (msg.get_aru_seq() != Seqno::max())
+    const Seqno prev_safe(input_map->get_safe_seq(msg.get_source()));
+    if (msg.get_aru_seq() != Seqno::max() &&
+        (prev_safe == Seqno::max() || prev_safe < msg.get_aru_seq()))
     {
         gu_trace(input_map->set_safe_seq(msg.get_source(), msg.get_aru_seq()));
     }
@@ -2271,20 +2282,6 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     {
         gu_trace(resend(msg.get_source(), msg.get_range()));
     }
-#if 0
-    else if (get_state()          == S_RECOVERY  && 
-             msg.get_range_uuid() != UUID::nil() &&
-             msg.get_source()     != get_uuid()    )
-    {
-        const Range range(input_map->get_range(msg.get_range_uuid()));
-        if (range.get_hs() != Seqno::max() && 
-            range.get_hs() >= msg.get_range().get_lu())
-        {
-            gu_trace(recover(msg.get_source(), msg.get_range_uuid(), 
-                             msg.get_range()));
-        }
-    }
-#endif /* 0 */
     
     // Deliver messages 
     gu_trace(deliver());
@@ -2296,7 +2293,8 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
             break;
     }
     
-    if (get_state() == S_RECOVERY && last_sent == input_map->get_aru_seq() &&
+    if (get_state() == S_RECOVERY && 
+        last_sent == input_map->get_aru_seq() &&
         prev_safe != input_map->get_safe_seq())
     {
         gcomm_assert(output.empty() == true);
@@ -2308,7 +2306,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     }
 }
 
-
+#if 0
 bool gcomm::evs::Proto::states_compare(const JoinMessage& msg) 
 {
     assert(msg.has_node_list() == true);
@@ -2445,16 +2443,16 @@ bool gcomm::evs::Proto::states_compare(const JoinMessage& msg)
     
     return send_join_p;
 }
-
+#endif /* 0 */
 
 
 void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii)
 {
-    assert(ii != known.end());
+    gcomm_assert(ii != known.end());
     Node& inst(NodeMap::get_value(ii));
     
-    log_debug << self_string() << " view" << current_view.get_id()
-              << " ================ enter handle_join ==================";
+    log_debug << self_string() << " " << current_view.get_id();
+    log_debug << " ================ enter handle_join ==================";
     log_debug << self_string() << " " << msg;
     
     if (get_state() == S_LEAVING) 
@@ -2462,8 +2460,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         log_debug << "================ leave handle_join ==================";
         return;
     }
-    
-    if (msg_from_previous_view(previous_views, msg))
+    else if (msg_from_previous_view(previous_views, msg))
     {
         log_debug << self_string() 
                   << " join message from one of the previous views " 
@@ -2471,37 +2468,160 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         log_debug << "================ leave handle_join ==================";
         return;
     }
-    
-    if (install_message != 0)
+    else if (install_message != 0)
     {
-        log_debug << self_string() 
+        // Someone may be still missing either join or install message.
+        // Send join (without self handling), install (if representative)
+        // and install gap.
+        send_join(false);
+        if (is_representative(get_uuid()) == true)
+        {
+            gu_trace(send_install());
+        }
+        
+        log_debug << self_string()
                   << " install message and received join, discarding";
         log_debug << "================ leave handle_join ==================";
         send_gap(UUID::nil(), install_message->get_source_view_id(), 
                  Range());
         return;
     }
+    else if (get_state() != S_RECOVERY)
+    {
+        shift_to(S_RECOVERY, false);
+    }
+
+    // Instance previously declared unoperational seems to be operational now
+    if (inst.get_operational() == false) 
+    {
+        inst.set_operational(true);
+        log_debug << self_string() << " unop -> op";
+    } 
     
+    inst.set_join_message(&msg);
     
+    gcomm_assert(output.empty() == true);
+    
+    if (is_consensus() == true)
+    {
+        if (is_representative(get_uuid()) == true)
+        {
+            gu_trace(send_install());
+        }
+        else
+        {
+            // do nothing, wait for install message
+        }
+    }
+    else
+    {
+        bool do_send_join(false);
+        // Select nodes that are coming from the same view as seen by
+        // message source
+        MessageNodeList same_view;
+        for_each(msg.get_node_list().begin(), msg.get_node_list().end(),
+                 SameViewSelect<MessageNodeList>(same_view, current_view.get_id()));
+        // Coming from the same view
+        if (msg.get_source_view_id() == current_view.get_id())
+        {
+            // Update input map state
+            const Seqno im_safe_seq(input_map->get_safe_seq(msg.get_source()));
+            if (msg.get_aru_seq() != Seqno::max()         && 
+                (im_safe_seq      == Seqno::max()    || 
+                 im_safe_seq      < msg.get_aru_seq()  )     )
+            {
+                gu_trace(input_map->set_safe_seq(msg.get_source(),
+                                                 msg.get_aru_seq()));
+                do_send_join = true;
+            }
+            // See if we need to retrans some user messages
+            MessageNodeList::const_iterator nli(same_view.find(get_uuid()));
+            if (nli != same_view.end())
+            {
+                const MessageNode& msg_node(MessageNodeList::get_value(nli));
+                const Range mn_im_range(msg_node.get_im_range());
+                const Range im_range(input_map->get_range(get_uuid()));
+                if (mn_im_range.get_hs()   != Seqno::max() &&
+                    mn_im_range.get_lu()   < mn_im_range.get_hs())
+                {
+                    gu_trace(resend(msg.get_source(), mn_im_range));
+                    do_send_join = true;
+                }
+                if (im_range.get_hs() != Seqno::max() &&
+                    (mn_im_range.get_hs() == Seqno::max() ||
+                     mn_im_range.get_hs() < im_range.get_hs()))
+                {
+                    gu_trace(resend(msg.get_source(),
+                                    Range(
+                                        (mn_im_range.get_hs() == Seqno::max() ?
+                                         0 :
+                                         mn_im_range.get_hs() + 1), 
+                                        im_range.get_hs())));
+                }
+            }
+            
+            // Find out max hs and complete up to that if needed
+            MessageNodeList::const_iterator max_hs_i(
+                max_element(same_view.begin(), same_view.end(), RangeHsCmp()));
+            const Seqno max_hs(MessageNodeList::get_value(max_hs_i).get_im_range().get_hs());
+            log_debug << self_string() << " same view max hs " << max_hs;
+            if (max_hs != Seqno::max() &&
+                (last_sent == Seqno::max() || last_sent < max_hs))
+            {
+                gu_trace(complete_user(max_hs));
+                do_send_join = true;
+            }
+            
+            
+            if (max_hs != Seqno::max())
+            {
+                // Find out min hs and try to recover messages if 
+                // min hs uuid is non operational
+                MessageNodeList::const_iterator min_hs_i(
+                    min_element(same_view.begin(), same_view.end(), 
+                                RangeHsCmp()));
+                const UUID& min_hs_uuid(MessageNodeList::get_key(min_hs_i));
+                const Seqno min_hs(MessageNodeList::get_value(min_hs_i).get_im_range().get_hs());                
+                const NodeMap::const_iterator local_i(known.find_checked(min_hs_uuid));
+                const Node& local_node(NodeMap::get_value(local_i));
+                const Range im_range(input_map->get_range(min_hs_uuid));
+                log_debug << self_string() << " same view min hs " << min_hs;
+                if (local_node.get_operational() == false &&
+                    im_range.get_hs()            != Seqno::max() &&
+                    im_range.get_hs()            >  min_hs)
+                {
+                    gu_trace(recover(msg.get_source(), min_hs_uuid, 
+                                     Range(min_hs, max_hs)));
+                    do_send_join = true;
+                }
+            }
+        }
+        
+        if (do_send_join == true)
+        {
+            gu_trace(send_join(false));
+        }
+    }
+
+    
+    log_debug << "================ leave handle_join ==================";
+#if 0
     inst.set_tstamp(Time::now());
     
-    bool pre_consistent = is_consistent(msg);
+    bool pre_consistent(is_consistent(msg));
     
-    if (get_state()     == S_OPERATIONAL && 
-        pre_consistent  == true            )
+    if (get_state() == S_OPERATIONAL && pre_consistent == true)
     {
         log_debug << self_string() << " redundant join message in state "
                   << to_string(get_state()) << ": "
                   << msg;
-        if (install_message != 0)
-        {
-            log_debug << self_string() << " install message: " << *install_message;
-        }
         log_debug << "================ leave handle_join ==================";
+        send_gap(UUID::nil(), install_message->get_source_view_id(), 
+                 Range());
         return;
     }
     
-    bool send_join_p = false;
+    bool send_join_p(false);
     if (get_state() == S_JOINING || get_state() == S_OPERATIONAL)
     {
         send_join_p = true;
@@ -2510,13 +2630,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     
     assert(inst.get_installed() == false);
     
-    // Instance previously declared unoperational seems to be operational now
-    if (inst.get_operational() == false) 
-    {
-        inst.set_operational(true);
-        log_debug << self_string() << " unop -> op";
-        send_join_p = true;
-    } 
+
     
     // Store join message
     set_join(msg, msg.get_source());
@@ -2528,7 +2642,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         {
             input_map->set_safe_seq(msg.get_source(), msg.get_aru_seq());
         }
-
+        
         if (prev_safe != input_map->get_safe_seq())
         {
             log_debug << self_string() << " safe seq " 
@@ -2613,6 +2727,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     log_debug << self_string() << " send_join_p=" << send_join_p 
               << " output empty=" << output.empty();
     log_debug << "================ leave handle_join ==================";
+#endif /* 0 */
 }
 
 
@@ -2682,7 +2797,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     
     log_debug << self_string() << " " << msg;
     
-    if (state == S_JOINING || state == S_CLOSED) 
+    if (get_state() == S_JOINING || get_state() == S_CLOSED) 
     {
         log_debug << self_string() 
                   << " dropping install message from " << msg.get_source();
@@ -2691,6 +2806,8 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     else if (get_state() == S_OPERATIONAL &&
              current_view.get_id() == msg.get_source_view_id())
     {
+        log_debug << self_string()
+                  << " dropping install message in already installed view";
         return;
     }
     else if (inst.get_operational() == false) 
@@ -2702,7 +2819,8 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     } 
     else if (msg_from_previous_view(previous_views, msg))
     {
-        log_debug << self_string() << " install message from previous view";
+        log_debug << self_string() 
+                  << " dropping install message from previous view";
         return;
     }
     else if (install_message != 0)
@@ -2710,28 +2828,33 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         if (is_consistent(msg) && 
             msg.get_source_view_id() == install_message->get_source_view_id())
         {
+            log_debug << self_string()
+                      << " dropping already handled install message";
             return;
         }
-        log_debug << self_string();
+        log_warn << self_string() 
+                 << " shift to S_RECOVERY due to inconsistent install";
         shift_to(S_RECOVERY);
         return;
     }
     else if (inst.get_installed() == true) 
     {
-        log_debug << self_string();
+        log_debug << self_string()
+                  << " shift to S_RECOVERY due to inconsistent state";
         shift_to(S_RECOVERY);
         return;
     } 
     else if (is_representative(msg.get_source()) == false) 
     {
-        log_warn << "source is not supposed to be representative";
+        log_warn << self_string() 
+                 << " source is not supposed to be representative";
         shift_to(S_RECOVERY);
         return;
     } 
     
     
     assert(install_message == 0);
-
+    
     bool is_consistent_p(is_consistent(msg));
     
     if (is_consistent_p == false)
@@ -2752,7 +2875,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         handle_join(jm, ii);
         is_consistent_p = is_consistent(msg);
     }
-
+    
     if (is_consistent_p == true)
     {
         install_message = new InstallMessage(msg);

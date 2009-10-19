@@ -1241,7 +1241,6 @@ START_TEST(test_proto_join_n_lossy)
         dn.push_back(new DummyNode(i, &el));
     }
 
-    gu_log_max_level = GU_LOG_DEBUG;
     for (size_t i = 0; i < n_nodes; ++i)
     {
         for (size_t j = 0; j <= i; ++j)

@@ -206,7 +206,9 @@ gcomm::evs::Range gcomm::evs::InputMap::insert(
                 ++i;
             }
             while (msg_index->find(MsgKey(node.get_index(), i)) 
-                   != msg_index->end());
+                   != msg_index->end() ||
+                   recovery_index->find(MsgKey(node.get_index(), i)) != 
+                   recovery_index->end());
             range.set_lu(i);
         }
     }
@@ -351,7 +353,10 @@ void gcomm::evs::InputMap::set_safe_seq(const UUID& uuid, const Seqno seq)
     const Seqno minval = NodeIndex::get_value(min).get_safe_seq();
     gcomm_assert(safe_seq == Seqno::max() || minval >= safe_seq);
     safe_seq = minval;
-    
+
+    // Global safe seq must always be smaller than equal to aru seq
+    gcomm_assert(safe_seq == Seqno::max() ||
+                 (aru_seq != Seqno::max() && safe_seq <= aru_seq));
     // Cleanup recovery index
     cleanup_recovery_index();
 }

@@ -119,7 +119,11 @@ public:
     const UUID& get_uuid() const { return my_uuid; }
 
 
-    std::string self_string() const { return get_uuid().to_string(); }
+    std::string self_string() const 
+    { 
+        return "evs::proto(" + get_uuid().to_string() + ","
+            + to_string(get_state()) + ")"; 
+    }
     
     State get_state() const { return state; }
     
