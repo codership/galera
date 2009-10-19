@@ -47,7 +47,7 @@ namespace gcomm
             iterator ret = map.find(k);
             if (ret == map.end())
             {
-                gcomm_throw_fatal << "element not found";
+                gcomm_throw_fatal << "element " << k << " not found";
             }
             return ret;
         }
@@ -65,7 +65,7 @@ namespace gcomm
             const_iterator ret = map.find(k);
             if (ret == map.end())
             {
-                gcomm_throw_fatal << "element not found";
+                gcomm_throw_fatal << "element " << k << " not found";
             }
             return ret;
         }

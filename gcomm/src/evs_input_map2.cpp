@@ -58,10 +58,10 @@ ostream& gcomm::evs::operator<<(ostream& os, const InputMap& im)
     os << "aru_seq=" << im.get_aru_seq() << ",";
     os << "safe_seq=" << im.get_safe_seq() << ",";
     os << "node_index=" << *im.node_index << ",";
-    // os << "msg_index=" << *msg_index << ",";
-    // os << "recovery_index=" << *recovery_index << ",";
-    // os << "inserted=" << inserted << ",";
-    // os << "updated_aru=" << updated_aru << "}";
+    os << "msg_index=" << *im.msg_index << ",";
+    os << "recovery_index=" << *im.recovery_index << ",";
+    os << "inserted=" << im.inserted << ",";
+    os << "updated_aru=" << im.updated_aru << "}";
     return os;
 }
 

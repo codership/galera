@@ -1304,21 +1304,31 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
         return;
     }
     
+    const Range im_range(input_map->get_range(range_uuid));
+
     log_debug << self_string() << " recovering message from "
               << range_uuid
               << " requested by " 
               << gap_source 
-              << " " 
-              << range.get_lu() << " -> " 
-              << range.get_hs();
+              << " requested range " << range
+              << " available " << im_range;
     
-    Seqno seq = range.get_lu(); 
-    while (seq <= range.get_hs())
+    
+    Seqno seq(range.get_lu()); 
+    while (seq <= range.get_hs() && seq <= im_range.get_hs())
     {
         InputMap::iterator msg_i = input_map->find(range_uuid, seq);
         if (msg_i == input_map->end())
         {
-            gu_trace(msg_i = input_map->recover(range_uuid, seq));
+            try
+            {
+                gu_trace(msg_i = input_map->recover(range_uuid, seq));
+            }
+            catch (...)
+            {
+                seq = seq + 1;
+                continue;
+            }
         }
         
         const UserMessage& msg(InputMap::MsgIndex::get_value(msg_i).get_msg());
@@ -2228,8 +2238,13 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
              msg.get_range_uuid() != UUID::nil() &&
              msg.get_source()     != get_uuid()    )
     {
-        gu_trace(recover(msg.get_source(), msg.get_range_uuid(), 
-                         msg.get_range()));
+        const Range range(input_map->get_range(msg.get_range_uuid()));
+        if (range.get_hs() != Seqno::max() && 
+            range.get_hs() >= msg.get_range().get_lu())
+        {
+            gu_trace(recover(msg.get_source(), msg.get_range_uuid(), 
+                             msg.get_range()));
+        }
     }
     
     // Deliver messages 
