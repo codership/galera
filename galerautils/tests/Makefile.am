@@ -23,7 +23,8 @@ gu_testspp_SOURCES = \
 	gu_tests++.cpp  gu_tests++.hpp  \
 	gu_string_test.cpp gu_string_test.hpp \
 	gu_uri_test.cpp gu_uri_test.hpp \
-	gu_net_test.cpp gu_net_test.hpp
+	gu_net_test.cpp gu_net_test.hpp \
+	gu_datetime_test.cpp gu_datetime_test.hpp
 
 gu_testspp_LDADD = \
 	$(top_builddir)/src/libgalerautils.la \
@@ -35,6 +36,6 @@ gu_to_test_LDADD   = ../src/libgalerautils.la
 
 TESTS = $(noinst_PROGRAMS)
 
-all: check
+# all: check
 
 #

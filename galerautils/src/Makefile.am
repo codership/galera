@@ -30,7 +30,8 @@ include_HEADERS =      \
 	gu_cond.hpp      \
 	gu_lock.hpp      \
 	gu_uri.hpp       \
-	gu_network.hpp
+	gu_network.hpp   \
+	gu_datetime.hpp
 
 lib_LTLIBRARIES = libgalerautils.la
 
@@ -62,7 +63,8 @@ libgalerautils___la_SOURCES = \
 	gu_resolver.cpp	      \
 	gu_epoll.cpp	      \
 	gu_network.cpp        \
-	gu_prodcons.cpp
+	gu_prodcons.cpp	      \
+	gu_datetime.cpp
 
 
 INTERFACEPP = 4

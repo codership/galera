@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
         srunner_free(sr);
     }
 
-    fclose(log_file);
+    if (log_file != 0) fclose(log_file);
     printf ("Total tests failed: %d\n", failed);
 
     return failed == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
