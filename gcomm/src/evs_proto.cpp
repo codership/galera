@@ -257,12 +257,15 @@ ostream& gcomm::evs::operator<<(ostream& os, const Proto& p)
 
 void gcomm::evs::Proto::handle_inactivity_timer()
 {
-    log_debug << "not implemented";
+    log_debug << "inactivity timer";
+    gu_trace(check_inactive());
+    gu_trace(cleanup_views());
 }
 
 
 void gcomm::evs::Proto::handle_retrans_timer()
 {
+    log_debug << "retrans timer";
     if (get_state() == S_RECOVERY)
     {
         if (install_message != 0 && is_consistent(*install_message) == true)
@@ -288,8 +291,10 @@ void gcomm::evs::Proto::handle_retrans_timer()
     {
         if (output.empty() == true)
         {
-            if (input_map->get_aru_seq() == Seqno::max() ||
-                input_map->get_aru_seq() == last_sent)
+            if (input_map->get_aru_seq() == Seqno::max()  ||
+                input_map->get_aru_seq() == last_sent     ||
+                input_map->get_safe_seq() == Seqno::max() ||
+                input_map->get_safe_seq() == last_sent)
             {
                 WriteBuf wb(0, 0);
                 gu_trace((void)send_user(&wb, 0xff, SP_DROP, send_window, 
@@ -311,7 +316,12 @@ void gcomm::evs::Proto::handle_retrans_timer()
 
 void gcomm::evs::Proto::handle_consensus_timer()
 {
-    log_debug << "not implemented";
+    log_debug << "consensus timer";
+    if (get_state() != S_OPERATIONAL)
+    {
+        log_warn << "consensus timer expired";
+        shift_to(S_RECOVERY, true);
+    }
 }
 
 
@@ -359,6 +369,7 @@ Time gcomm::evs::Proto::get_next_expiration(const Timer t) const
     return Time::max();
 }
 
+
 void gcomm::evs::Proto::reset_timers()
 {
     timers.clear();
@@ -370,34 +381,52 @@ void gcomm::evs::Proto::reset_timers()
                  make_pair(get_next_expiration(T_CONSENSUS), T_CONSENSUS)));
 }
 
+#if 0
+namespace gcomm
+{
+    namespace evs {
+    static ostream& operator<<(ostream& os, 
+                               const pair<const gu::datetime::Date, 
+                               gcomm::evs::Proto::Timer>& p)
+    {
+        return (os << "timer " << p.second << " time " << p.first.get_utc());
+    }
+    }
+}
+#endif 
+
 Time gcomm::evs::Proto::handle_timers()
 {
-    if (timers.empty() == false)
+    Time now(Time::now());
+    
+    while (timers.empty() == false &&
+           TimerList::get_key(timers.begin()) <= now)
     {
-        Time now(Time::now());
-        
-        if (TimerList::get_key(timers.begin()) <= now)
+        Timer t(TimerList::get_value(timers.begin()));
+        timers.erase(timers.begin());
+        switch (t)
         {
-            Timer t(TimerList::get_value(timers.begin()));
-            timers.erase(timers.begin());
-            switch (t)
-            {
-            case T_INACTIVITY:
-                handle_inactivity_timer();
-                break;
-            case T_RETRANS:
-                handle_retrans_timer();
-                break;
-            case T_CONSENSUS:
-                handle_consensus_timer();
-                break;
-            }
-            // Make sure that timer was not inserted twice
-            gcomm_assert(find_if(timers.begin(), timers.end(), 
-                                 TimerSelectOp(t)) == timers.end());
-            gu_trace((void)timers.insert(make_pair(get_next_expiration(t), t)));
+        case T_INACTIVITY:
+            handle_inactivity_timer();
+            break;
+        case T_RETRANS:
+            handle_retrans_timer();
+            break;
+        case T_CONSENSUS:
+            handle_consensus_timer();
+            break;
         }
+        // Make sure that timer was not inserted twice
+        TimerList::iterator ii = find_if(timers.begin(), timers.end(), 
+                                         TimerSelectOp(t));
+        if (ii != timers.end())
+        {
+            log_warn << "resetting timer " << t;
+            timers.erase(ii);
+        }
+        gu_trace((void)timers.insert(make_pair(get_next_expiration(t), t)));
     }
+    
     if (timers.empty() == true)
     {
         log_debug << self_string() << "no timers set";
@@ -864,7 +893,7 @@ bool gcomm::evs::Proto::is_consistent_same_view(const Message& msg) const
                   << " msg " << msg.get_aru_seq();
         if (msg.get_source() == get_uuid())
         {
-            log_warn << "own join not consistent with input map aru seq";
+            log_warn << self_string() << " own join not consistent with input map aru seq " << input_map->get_aru_seq() << " " << msg;
         }
         return false;
     }
@@ -877,7 +906,7 @@ bool gcomm::evs::Proto::is_consistent_same_view(const Message& msg) const
                   << " msg " << msg.get_seq();
         if (msg.get_source() == get_uuid())
         {
-            log_warn << "own join not consistent with input map safe seq";
+            log_warn << self_string() << " own join not consistent with input map safe seq " << input_map->get_safe_seq() << " " << msg;
         }
         return false;
     }
