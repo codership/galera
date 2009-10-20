@@ -156,13 +156,13 @@ START_TEST(test_input_map_insert)
     {
         InputMap::iterator i = im.find(uuid1, s);
         fail_if(i == im.end());
-        fail_unless(InputMap::MsgIndex::get_value(i).get_uuid() == uuid1);
-        fail_unless(InputMap::MsgIndex::get_value(i).get_msg().get_seq() == s);
+        fail_unless(InputMapMsgIndex::get_value(i).get_uuid() == uuid1);
+        fail_unless(InputMapMsgIndex::get_value(i).get_msg().get_seq() == s);
 
         i = im.find(uuid2, s);
         fail_if(i == im.end());
-        fail_unless(InputMap::MsgIndex::get_value(i).get_uuid() == uuid2);
-        fail_unless(InputMap::MsgIndex::get_value(i).get_msg().get_seq() == s);
+        fail_unless(InputMapMsgIndex::get_value(i).get_uuid() == uuid2);
+        fail_unless(InputMapMsgIndex::get_value(i).get_msg().get_seq() == s);
     }
     
 }
@@ -371,7 +371,7 @@ START_TEST(test_input_map_random_insert)
     size_t n = 0;
     for (InputMap::iterator i = im.begin(); i != im.end(); ++i)
     {
-        const InputMap::Msg& msg(InputMap::MsgIndex::get_value(i));
+        const InputMapMsg& msg(InputMapMsgIndex::get_value(i));
         fail_unless(msg.get_uuid() == msg.get_msg().get_source());
         fail_unless(msg.get_msg() == msgs[n]);
         fail_if(im.is_safe(i) == true);
@@ -1276,7 +1276,6 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
         dn.push_back(new DummyNode(i, &el));
     }
 
-    gu_log_max_level = GU_LOG_DEBUG;
     for (size_t i = 0; i < n_nodes; ++i)
     {
         for (size_t j = 0; j <= i; ++j)

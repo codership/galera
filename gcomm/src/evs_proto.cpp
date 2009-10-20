@@ -1292,9 +1292,9 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
             gu_trace(msg_i = input_map->recover(get_uuid(), seq));
         }
 
-        const UserMessage& msg(InputMap::MsgIndex::get_value(msg_i).get_msg());
+        const UserMessage& msg(InputMapMsgIndex::get_value(msg_i).get_msg());
         gcomm_assert(msg.get_source() == get_uuid());
-        const ReadBuf* rb(InputMap::MsgIndex::get_value(msg_i).get_rb());
+        const ReadBuf* rb(InputMapMsgIndex::get_value(msg_i).get_rb());
         UserMessage um(msg.get_source(),
                        msg.get_source_view_id(),
                        msg.get_seq(),
@@ -1368,9 +1368,9 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
             }
         }
         
-        const UserMessage& msg(InputMap::MsgIndex::get_value(msg_i).get_msg());
+        const UserMessage& msg(InputMapMsgIndex::get_value(msg_i).get_msg());
         assert(msg.get_source() == range_uuid);
-        const ReadBuf* rb(InputMap::MsgIndex::get_value(msg_i).get_rb());
+        const ReadBuf* rb(InputMapMsgIndex::get_value(msg_i).get_rb());
         UserMessage um(msg.get_source(),
                        msg.get_source_view_id(),
                        msg.get_seq(),

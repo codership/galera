@@ -4,77 +4,142 @@
  * $Id$
  */
 
+/*! 
+ * @file evs_input_map2.cpp
+ *
+ * Input map implementation
+ *
+ * @author Teemu Ollakka <teemu.ollakka@codership.com>
+ */
+
 #include "evs_input_map2.hpp"
 #include "gcomm/readbuf.hpp"
 #include "gcomm/safety_prefix.hpp"
 
 #include <algorithm>
 
+using namespace std;
 using namespace gcomm;
 using namespace gcomm::evs;
-using namespace std;
 
-/*
- * Release ReadBuf associated to input map msg.
- */ 
-static void release_rb(InputMap::MsgIndex::value_type& vt)
+//////////////////////////////////////////////////////////////////////////
+//
+// Static operators and functions
+//
+//////////////////////////////////////////////////////////////////////////
+
+
+// Compare node index LUs
+class NodeIndexLUCmpOp
 {
-    ReadBuf* rb = InputMap::MsgIndex::get_value(vt).get_rb();
+public:
+    bool operator()(const InputMapNodeIndex::value_type& a,
+                    const InputMapNodeIndex::value_type& b) const
+    {
+        
+        const InputMapNode& aval(InputMapNodeIndex::get_value(a));
+        const InputMapNode& bval(InputMapNodeIndex::get_value(b));
+        return (aval.get_range().get_lu() < bval.get_range().get_lu());
+    }
+};
+
+
+// Compare node index safe seqs
+class NodeIndexSafeSeqCmpOp
+{
+public:
+    bool operator()(const InputMapNodeIndex::value_type& a,
+                    const InputMapNodeIndex::value_type& b) const
+    {
+        const InputMapNode& aval(InputMapNodeIndex::get_value(a));
+        const InputMapNode& bval(InputMapNodeIndex::get_value(b));
+        if (aval.get_safe_seq() == Seqno::max())
+        {
+            return true;
+        }
+        else if (bval.get_safe_seq() == Seqno::max())
+        {
+            return false;
+        }
+        else
+        {
+            return aval.get_safe_seq() < bval.get_safe_seq();
+        }
+    }
+};
+
+
+// Release ReadBuf object from message index element
+static void release_rb(InputMapMsgIndex::value_type& vt)
+{
+    ReadBuf* rb = InputMapMsgIndex::get_value(vt).get_rb();
     if (rb != 0)
     {
         rb->release();
     }
 }
 
+
+
+//////////////////////////////////////////////////////////////////////////
+//
+// Ostream operators
+//
+//////////////////////////////////////////////////////////////////////////
+
+
 ostream& gcomm::evs::operator<<(ostream& os, const InputMapNode& in)
 {
-    os << "node: {";
-    os << "idx=" << in.get_index() << ",";
-    os << "range=" << in.get_range() << ",";
-    os << "safe_seq=" << in.get_safe_seq();
-    os << "}";
-    return os;
+    return (os << "node: ("
+            << "idx="      << in.get_index()    << ","
+            << "range="    << in.get_range()    << ","
+            << "safe_seq=" << in.get_safe_seq() << ")");
 }
 
-ostream& gcomm::evs::operator<<(ostream& os, const InputMapMsgKey& mk)
+
+ostream& gcomm::operator<<(ostream& os, const InputMapMsgKey& mk)
 {
     return (os << "(" << mk.get_index() << "," << mk.get_seq() << ")");
 }
+
 
 ostream& gcomm::evs::operator<<(ostream& os, const InputMapMsg& m)
 {
     return os;
 }
 
-ostream& gcomm::evs::operator<<(ostream& os, const InputMapMsgIndex::value_type& vt)
-{
-    return (os << "(" << InputMapMsgIndex::get_key(vt) << "," 
-            << InputMapMsgIndex::get_value(vt) << ")");
-}
 
 ostream& gcomm::evs::operator<<(ostream& os, const InputMap& im)
 {
-    os << "evs::input_map: {";
-    os << "aru_seq=" << im.get_aru_seq() << ",";
-    os << "safe_seq=" << im.get_safe_seq() << ",";
-    os << "node_index=" << *im.node_index << ",";
-    os << "msg_index=" << *im.msg_index << ",";
-    os << "recovery_index=" << *im.recovery_index << ",";
-    os << "inserted=" << im.inserted << ",";
-    os << "updated_aru=" << im.updated_aru << "}";
-    return os;
+    return (os << "evs::input_map: {"
+            << "aru_seq="        << im.get_aru_seq()   << ","
+            << "safe_seq="       << im.get_safe_seq()  << ","
+            << "node_index="     << *im.node_index     << ","
+            << "msg_index="      << *im.msg_index      << ","
+            << "recovery_index=" << *im.recovery_index << ","
+            << "inserted="       << im.inserted        << ","
+            << "updated_aru="    << im.updated_aru     << "}");
 }
+
+
+
+//////////////////////////////////////////////////////////////////////////
+//
+// Constructors/destructors
+//
+//////////////////////////////////////////////////////////////////////////
 
 
 gcomm::evs::InputMap::InputMap() :
     safe_seq(Seqno::max()),
     aru_seq(Seqno::max()),
-    node_index(new NodeIndex()),
-    msg_index(new MsgIndex()),
-    recovery_index(new MsgIndex()),
+    node_index(new InputMapNodeIndex()),
+    msg_index(new InputMapMsgIndex()),
+    recovery_index(new InputMapMsgIndex()),
     inserted(0),
     updated_aru(0)
 {
+    // 
 }
 
 
@@ -89,26 +154,126 @@ gcomm::evs::InputMap::~InputMap()
 
 
 
-bool gcomm::evs::InputMap::is_safe(iterator i) const
+//////////////////////////////////////////////////////////////////////////
+//
+// Public member functions
+//
+//////////////////////////////////////////////////////////////////////////
+
+
+void gcomm::evs::InputMap::insert_uuid(const UUID& uuid)
+    throw (gu::Exception)
 {
-    const Seqno seq(MsgIndex::get_value(i).get_msg().get_seq());
+    gcomm_assert(msg_index->empty() == true &&
+                 recovery_index->empty() == true);
+    
+    gu_trace((void)node_index->insert_checked(make_pair(uuid, InputMapNode())));
+    size_t n = 0;
+    for (InputMapNodeIndex::iterator i = node_index->begin();
+         i != node_index->end(); ++i)
+    {
+        InputMapNodeIndex::get_value(i).set_index(n);
+        ++n;
+    }
+}
+
+
+gcomm::evs::Range InputMap::get_range(const UUID& uuid) const
+    throw (gu::Exception)
+{
+    return InputMapNodeIndex::get_value(
+        node_index->find_checked(uuid)).get_range();
+}
+
+
+gcomm::evs::Seqno InputMap::get_safe_seq(const UUID& uuid) const
+    throw (gu::Exception)
+{
+    return InputMapNodeIndex::get_value(
+        node_index->find_checked(uuid)).get_safe_seq();
+}
+
+
+void gcomm::evs::InputMap::set_safe_seq(const UUID& uuid, const Seqno seq)
+    throw (gu::Exception)
+{
+    gcomm_assert(seq != Seqno::max());
+    // @note This assertion does not necessarily hold. Some other 
+    // instance may well have higher all received up to seqno 
+    // than this (due to packet loss). Commented out... and left
+    // for future reference.
+    // gcomm_assert(aru_seq != Seqno::max() && seq <= aru_seq);
+    
+    // Update node safe seq. Must (at least should) be updated
+    // in monotonically increasing order if node works ok.
+    InputMapNode& node(InputMapNodeIndex::get_value(node_index->find_checked(uuid)));
+    gcomm_assert(node.get_safe_seq() == Seqno::max() || 
+                 seq >= node.get_safe_seq()) 
+        << "node.safe_seq=" << node.get_safe_seq() 
+        << " seq=" << seq;
+    node.set_safe_seq(seq);
+    
+    // Update global safe seq which must be monotonically increasing.
+    InputMapNodeIndex::const_iterator min = 
+        min_element(node_index->begin(), node_index->end(), 
+                    NodeIndexSafeSeqCmpOp());
+    const Seqno minval = InputMapNodeIndex::get_value(min).get_safe_seq();
+    gcomm_assert(safe_seq == Seqno::max() || minval >= safe_seq);
+    safe_seq = minval;
+
+    // Global safe seq must always be smaller than equal to aru seq
+    gcomm_assert(safe_seq == Seqno::max() ||
+                 (aru_seq != Seqno::max() && safe_seq <= aru_seq));
+    // Cleanup recovery index
+    cleanup_recovery_index();
+}
+
+
+void gcomm::evs::InputMap::clear()
+{
+    if (msg_index->empty() == false)
+    {
+        log_warn << "discarding " << msg_index->size() << 
+            " messages from message index";
+    }
+    for_each(msg_index->begin(), msg_index->end(), release_rb);
+    msg_index->clear();
+    if (recovery_index->empty() == false)
+    {
+        log_debug << "discarding " << recovery_index->size() 
+                  << " messages from recovery index";
+    }
+    for_each(recovery_index->begin(), recovery_index->end(), release_rb);
+    recovery_index->clear();
+    node_index->clear();
+    aru_seq = Seqno::max();
+    safe_seq = Seqno::max();
+}
+
+
+bool gcomm::evs::InputMap::is_safe(iterator i) const
+    throw (gu::Exception)
+{
+    const Seqno seq(InputMapMsgIndex::get_value(i).get_msg().get_seq());
     return (safe_seq != Seqno::max() && seq <= safe_seq);
 }
 
 
 bool gcomm::evs::InputMap::is_agreed(iterator i) const
+    throw (gu::Exception)
 {
-    const Seqno seq(MsgIndex::get_value(i).get_msg().get_seq());
+    const Seqno seq(InputMapMsgIndex::get_value(i).get_msg().get_seq());
     return (aru_seq != Seqno::max() && seq <= aru_seq);
 }
 
 
 bool gcomm::evs::InputMap::is_fifo(iterator i) const
+    throw (gu::Exception)
 {
-    const Seqno seq(MsgIndex::get_value(i).get_msg().get_seq());
-    const Node& node(NodeIndex::get_value(
+    const Seqno seq(InputMapMsgIndex::get_value(i).get_msg().get_seq());
+    const InputMapNode& node(InputMapNodeIndex::get_value(
                                  node_index->find_checked(
-                                     MsgIndex::get_value(i).get_uuid())));
+                                     InputMapMsgIndex::get_value(i).get_uuid())));
     return (node.get_range().get_lu() > seq);
 }
 
@@ -125,40 +290,41 @@ gcomm::evs::InputMap::iterator gcomm::evs::InputMap::end() const
 }
 
 
-gcomm::evs::Range gcomm::evs::InputMap::insert(
-    const UUID& uuid, 
-    const UserMessage& msg, 
-    const ReadBuf* const rb, 
-    const size_t offset)
+gcomm::evs::Range 
+gcomm::evs::InputMap::insert(const UUID& uuid, 
+                             const UserMessage& msg, 
+                             const ReadBuf* const rb, 
+                             const size_t offset)
+    throw (gu::Exception)
 {
-    /* Only insert messages with meaningful seqno */
+    // Only insert messages with meaningful seqno
     gcomm_assert(msg.get_seq() != Seqno::max());
     if (msg_index->empty() == false)
     {
         gcomm_assert(
             msg.get_seq() < 
-            MsgIndex::get_value(msg_index->begin()).get_msg().get_seq() 
+            InputMapMsgIndex::get_value(msg_index->begin()).get_msg().get_seq() 
             + Seqno::max().get()/4);
     }
     
-    Node& node(NodeIndex::get_value(node_index->find_checked(uuid)));
+    InputMapNode& node(InputMapNodeIndex::get_value(node_index->find_checked(uuid)));
     Range range(node.get_range());
     
-    /* User should check aru_seq before inserting. This check is left 
-     * also in optimized builds since violating it may cause duplicate 
-     * messages */
+    // User should check aru_seq before inserting. This check is left 
+    // also in optimized builds since violating it may cause duplicate 
+    // messages.
     gcomm_assert(aru_seq == Seqno::max() || aru_seq < msg.get_seq()) 
         << "aru seq " << aru_seq << " msg seq " << msg.get_seq() 
         << " index size " << msg_index->size();
     
-    /* User should check LU before inserting. This check is left 
-     * also in optimized builds since violating it may cause duplicate 
-     * messages */
+    // User should check LU before inserting. This check is left 
+    // also in optimized builds since violating it may cause duplicate 
+    // messages
     gcomm_assert(range.get_lu() <= msg.get_seq()) 
         << "lu " << range.get_lu() << " > "
         << msg.get_seq();
     
-    if (recovery_index->find(MsgKey(node.get_index(), msg.get_seq())) !=
+    if (recovery_index->find(InputMapMsgKey(node.get_index(), msg.get_seq())) !=
         recovery_index->end())
     {
         log_warn << "message " << msg << " has already been delivered, state "
@@ -166,12 +332,12 @@ gcomm::evs::Range gcomm::evs::InputMap::insert(
         return node.get_range();
     }
     
-    /* Loop over message seqno range and insert messages when not 
-     * already found */
+    // Loop over message seqno range and insert messages when not 
+    // already found
     for (Seqno s = msg.get_seq(); s <= msg.get_seq() + msg.get_seq_range(); ++s)
     {
-        MsgIndex::iterator msg_i = msg_index->find(
-            MsgKey(node.get_index(), s));
+        InputMapMsgIndex::iterator msg_i = msg_index->find(
+            InputMapMsgKey(node.get_index(), s));
         
         if (range.get_hs() == Seqno::max() || range.get_hs() < s)
         {
@@ -185,19 +351,19 @@ gcomm::evs::Range gcomm::evs::InputMap::insert(
             {
                 ins_rb = (rb != 0 ? rb->copy(offset) : 0);
             }
-            (void)msg_index->insert_checked(
-                make_pair(MsgKey(node.get_index(), s), 
-                          Msg(uuid, msg, ins_rb)));
+            gu_trace((void)msg_index->insert_checked(
+                         make_pair(InputMapMsgKey(node.get_index(), s), 
+                                   InputMapMsg(uuid, msg, ins_rb))));
             ++inserted;
         }
         
-        /* Update highest seen */
+        // Update highest seen
         if (range.get_hs() == Seqno::max() || range.get_hs() < s)
         {
             range.set_hs(s);
         }
         
-        /* Update lowest unseen */
+        // Update lowest unseen
         if (range.get_lu() == s)
         {
             Seqno i(s);
@@ -205,15 +371,17 @@ gcomm::evs::Range gcomm::evs::InputMap::insert(
             {
                 ++i;
             }
-            while (msg_index->find(MsgKey(node.get_index(), i)) 
-                   != msg_index->end() ||
-                   recovery_index->find(MsgKey(node.get_index(), i)) != 
-                   recovery_index->end());
+            while (
+                i <= range.get_hs() &&
+                (msg_index->find(InputMapMsgKey(node.get_index(), i)) 
+                 != msg_index->end() ||
+                 recovery_index->find(InputMapMsgKey(node.get_index(), i)) 
+                 != recovery_index->end()));
             range.set_lu(i);
         }
     }
     
-
+    // Call update aru only if aru_seq may change
     bool do_update_aru = (aru_seq == Seqno::max() || 
                           (aru_seq + 1) < range.get_lu());
     node.set_range(range);
@@ -222,12 +390,15 @@ gcomm::evs::Range gcomm::evs::InputMap::insert(
         update_aru();
         ++updated_aru;
     }
+
     return range;
 }
 
+
 void gcomm::evs::InputMap::erase(iterator i)
+    throw (gu::Exception)
 {
-    const UserMessage& msg(MsgIndex::get_value(i).get_msg());
+    const UserMessage& msg(InputMapMsgIndex::get_value(i).get_msg());
     if (msg.get_seq_range() == 0)
     {
         try
@@ -252,171 +423,72 @@ void gcomm::evs::InputMap::erase(iterator i)
 }
 
 
-gcomm::evs::InputMap::iterator gcomm::evs::InputMap::find(
-    const UUID& uuid, 
-    const Seqno seq) const
+gcomm::evs::InputMap::iterator 
+gcomm::evs::InputMap::find(const UUID& uuid, const Seqno seq) const
+    throw (gu::Exception)
 {
-    InputMap::iterator ret;
-    gu_trace(ret = msg_index->find(
-                 MsgKey(NodeIndex::get_value(
-                            node_index->find_checked(uuid)).get_index(), seq)));
-    return ret;
-}
-
-
-gcomm::evs::InputMap::iterator gcomm::evs::InputMap::recover(
-    const UUID& uuid,
-    const Seqno seq) const
-{
-    NodeIndex::const_iterator node_i;
-    gu_trace(node_i = node_index->find_checked(uuid));
-    size_t idx = NodeIndex::get_value(node_i).get_index();
     iterator ret;
-    gu_trace(ret = recovery_index->find_checked(MsgKey(idx, seq)));
+    InputMapNodeIndex::const_iterator node_i;
+    gu_trace(node_i = node_index->find_checked(uuid));
+    const InputMapNode& node(InputMapNodeIndex::get_value(node_i));
+    const InputMapMsgKey key(node.get_index(), seq);
+    gu_trace(ret = msg_index->find(key));
     return ret;
 }
 
 
-struct UpdateAruLUCmp
+gcomm::evs::InputMap::iterator 
+gcomm::evs::InputMap::recover(const UUID& uuid, const Seqno seq) const
+    throw (gu::Exception)
 {
-    bool operator()(const pair<const UUID, InputMap::Node>& a,
-                    const pair<const UUID, InputMap::Node>& b) const
-    {
+    iterator ret;
+    InputMapNodeIndex::const_iterator node_i;
+    gu_trace(node_i = node_index->find_checked(uuid));
+    const InputMapNode& node(InputMapNodeIndex::get_value(node_i));
+    const InputMapMsgKey key(node.get_index(), seq);
+    gu_trace(ret = recovery_index->find_checked(key));
+    return ret;
+}
 
-        return a.second.get_range().get_lu() < b.second.get_range().get_lu();
-    }
-};
+
+
+//////////////////////////////////////////////////////////////////////////
+//
+// Private member functions
+//
+//////////////////////////////////////////////////////////////////////////
+
 
 void gcomm::evs::InputMap::update_aru()
+    throw (gu::Exception)
 {
-    NodeIndex::const_iterator min = 
-        min_element(node_index->begin(),
-                    node_index->end(), UpdateAruLUCmp());
+    InputMapNodeIndex::const_iterator min = 
+        min_element(node_index->begin(), node_index->end(), NodeIndexLUCmpOp());
     
-    const Seqno minval = NodeIndex::get_value(min).get_range().get_lu();
-    // log_info << "aru seq " << aru_seq << " next " << minval;
-    if (aru_seq != Seqno::max())
+    const Seqno minval = InputMapNodeIndex::get_value(min).get_range().get_lu();
+    gcomm_assert(minval != Seqno::max());
+    // log_debug << "aru seq " << aru_seq << " next " << minval;
+    if (aru_seq != Seqno::max() ||
+        (aru_seq == Seqno::max() && minval > 0))
     {
         /* aru_seq must not decrease */
-        gcomm_assert(minval - 1 >= aru_seq);
+        gcomm_assert(aru_seq == Seqno::max() || minval - 1 >= aru_seq);
         aru_seq = minval - 1;
     }
-    else if (minval == 1)
-    {
-        aru_seq = 0;
-    }
-    
-}
-
-struct SetSafeSeqCmp
-{
-
-    bool operator()(const pair<const UUID, InputMap::Node>& a,
-                    const pair<const UUID, InputMap::Node>& b) const    
-    {
-        if (a.second.get_safe_seq() == Seqno::max())
-        {
-            return true;
-        }
-        else if (b.second.get_safe_seq() == Seqno::max())
-        {
-            return false;
-        }
-        else
-        {
-            return a.second.get_safe_seq() < b.second.get_safe_seq();
-        }
-    }
-};
-
-void gcomm::evs::InputMap::set_safe_seq(const UUID& uuid, const Seqno seq)
-{
-    gcomm_assert(seq != Seqno::max());
-    // @note This assertion does not necessarily hold. Some other 
-    // instance may well have higher all received up to seqno 
-    // than this (due to packet loss). Commented out... and left
-    // for future reference.
-    // gcomm_assert(aru_seq != Seqno::max() && seq <= aru_seq);
-    
-    // Update node safe seq. Must (at least should) be updated
-    // in monotonically increasing order if node works ok.
-    Node& node(NodeIndex::get_value(node_index->find_checked(uuid)));
-    gcomm_assert(node.get_safe_seq() == Seqno::max() || 
-                 seq >= node.get_safe_seq()) 
-                     << "node.safe_seq=" << node.get_safe_seq() 
-                     << " seq=" << seq;
-    node.set_safe_seq(seq);
-    
-    // Update global safe seq which must be monotonically increasing.
-    NodeIndex::const_iterator min = 
-        min_element(node_index->begin(), node_index->end(), SetSafeSeqCmp());
-    const Seqno minval = NodeIndex::get_value(min).get_safe_seq();
-    gcomm_assert(safe_seq == Seqno::max() || minval >= safe_seq);
-    safe_seq = minval;
-
-    // Global safe seq must always be smaller than equal to aru seq
-    gcomm_assert(safe_seq == Seqno::max() ||
-                 (aru_seq != Seqno::max() && safe_seq <= aru_seq));
-    // Cleanup recovery index
-    cleanup_recovery_index();
 }
 
 
 void gcomm::evs::InputMap::cleanup_recovery_index()
+    throw (gu::Exception)
 {
-    assert(node_index->size() > 0);
+    gcomm_assert(node_index->size() > 0);
     if (safe_seq != Seqno::max())
     {
-        MsgIndex::iterator i = recovery_index->lower_bound(
-            MsgKey(node_index->size() - 1, safe_seq + 1));
+        InputMapMsgIndex::iterator i = recovery_index->lower_bound(
+            InputMapMsgKey(node_index->size() - 1, safe_seq + 1));
         for_each(recovery_index->begin(), i, release_rb);
         recovery_index->erase(recovery_index->begin(), i);
     }
 }
 
-void gcomm::evs::InputMap::insert_uuid(const UUID& uuid)
-{
-    gcomm_assert(msg_index->empty() == true &&
-                 recovery_index->empty() == true);
 
-    (void)node_index->insert_checked(make_pair(uuid, Node()));
-    size_t n = 0;
-    for (NodeIndex::iterator i = node_index->begin();
-         i != node_index->end(); ++i)
-    {
-        NodeIndex::get_value(i).set_index(n);
-        ++n;
-    }
-}
-
-const gcomm::evs::Range& InputMap::get_range(const UUID& uuid) const
-{
-    return NodeIndex::get_value(node_index->find_checked(uuid)).get_range();
-}
-
-
-gcomm::evs::Seqno InputMap::get_safe_seq(const UUID& uuid) const
-{
-    return NodeIndex::get_value(node_index->find_checked(uuid)).get_safe_seq();
-}
-
-void gcomm::evs::InputMap::clear()
-{
-    if (msg_index->empty() == false)
-    {
-        log_warn << "discarding " << msg_index->size() << 
-            " messages from message index";
-    }
-    for_each(msg_index->begin(), msg_index->end(), release_rb);
-    msg_index->clear();
-    if (recovery_index->empty() == false)
-    {
-        log_debug << "discarding " << recovery_index->size() 
-                  << " messages from recovery index";
-    }
-    for_each(recovery_index->begin(), recovery_index->end(), release_rb);
-    recovery_index->clear();
-    node_index->clear();
-    aru_seq = Seqno::max();
-    safe_seq = Seqno::max();
-}

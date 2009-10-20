@@ -175,8 +175,10 @@ namespace gcomm
         }
     };
     
+    // @todo For some reason map key must be declared in gcomm namespace 
+    //       in order this to work. Find out the reason why and fix.
     template <typename K, typename V>
-    std::ostream& operator<<(std::ostream& os, const std::pair<const K, V>& p)
+    std::ostream& operator<<(std::ostream& os, const std::pair<K, V>& p)
     {
         return (os << p.first << "," << p.second);
     }
@@ -213,6 +215,9 @@ namespace gcomm
             return ret.first;
         }
     };
+
+
+
     
     template <typename K, typename V, typename C = std::multimap<K, V> >
     class MultiMap : public MapBase<K, V, C>
