@@ -5,8 +5,8 @@
 
 #include <set>
 
-using std::multiset;
-using std::string;
+using namespace std;
+using namespace std::rel_ops;
 
 using namespace gcomm;
 

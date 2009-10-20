@@ -25,6 +25,8 @@ namespace gcomm
         
         EVS(const EVS&);
         void operator=(const EVS&);
+
+        Period join_wait_period;
         
     public:
         

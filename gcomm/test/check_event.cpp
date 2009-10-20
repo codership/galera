@@ -4,13 +4,17 @@
 #include "gcomm/event.hpp"
 #include "gcomm/pseudofd.hpp"
 
+#include <vector>
+
 #include <cstdlib>
 #include <sys/types.h>
 #include <sys/socket.h>
 
 #include <check.h>
 
+using namespace std;
 using namespace gcomm;
+
 
 START_TEST(test_protolay)
 {
@@ -21,43 +25,43 @@ END_TEST
 
 START_TEST(test_pseudofd)
 {
-    std::set<int> fds;
-    
-    for (int i = 0; i < 100; ++i)
-        fail_unless(fds.insert(PseudoFd::alloc_fd()).second == true);
-    
-    while (fds.empty() == false) {
-        if (::rand() % 5 == 0)
-            fail_unless(fds.insert(PseudoFd::alloc_fd()).second == true);
-        int fd;
-        if (::rand() % 3 == 0)
-            fd = *fds.begin();
-        else
-            fd = *fds.rbegin();
-        PseudoFd::release_fd(fd);
-        fds.erase(fd);
+    {
+        PseudoFd pfd1;
+        PseudoFd pfd2;
+        fail_unless(pfd1.get() == numeric_limits<int>::min());
+        fail_unless(pfd2.get() == numeric_limits<int>::min() + 1);
     }
+    PseudoFd pfd3;
+    fail_unless(pfd3.get() == numeric_limits<int>::min());
 }
 END_TEST
 
+
 struct UserContext : EventContext
 {
-    int fd;
-    
-    UserContext(const int fd_) : 
-        fd(fd_)
+    PseudoFd pfd;
+    EventLoop& el;
+    UserContext(EventLoop& el_) : 
+        pfd(),
+        el(el_)
     {
+        el.insert(pfd.get(), this);
     }
     
+    ~UserContext()
+    {
+        el.erase(pfd.get());
+    }
+
     void handle_event(const int efd, const Event& e)
     {
-        fail_unless(efd == fd);
+        fail_unless(efd == pfd.get());
         
         if (e.get_cause() == Event::E_IN)
         {
             char buf[16];
-            fail_unless(::recv(fd, buf, sizeof(buf), 0) == sizeof(buf));
-            fail_unless(::recv(fd, buf, sizeof(buf), MSG_DONTWAIT) == -1);
+            fail_unless(::recv(pfd.get(), buf, sizeof(buf), 0) == sizeof(buf));
+            fail_unless(::recv(pfd.get(), buf, sizeof(buf), MSG_DONTWAIT) == -1);
         }
         if (e.get_cause() == Event::E_OUT)
         {
@@ -71,15 +75,7 @@ START_TEST(test_eventloop_basic)
 {
     // TODO
     EventLoop el;
-    
-    int fd = PseudoFd::alloc_fd();
-    UserContext uc(fd);
-    
-    el.insert(fd, &uc);
-    el.erase(fd);
-    
-    PseudoFd::release_fd(fd);
-    
+    UserContext uc(el);
 }
 END_TEST
 
@@ -97,18 +93,21 @@ END_TEST
 
 class SelfDestruct : public Protolay, EventContext
 {
-    int fd;
-    EventLoop* el;
+    PseudoFd fd;
+    EventLoop& el;
     SelfDestruct(const SelfDestruct&);
     void operator=(const SelfDestruct&);
 public:
-    SelfDestruct(EventLoop* el_) : 
-        fd(PseudoFd::alloc_fd()), 
+    SelfDestruct(EventLoop& el_) : 
+        fd(), 
         el(el_){
-        el->insert(fd, this);
-        el->queue_event(fd, Event(Event::E_USER, Time::now(), 0));
+        el.insert(fd.get(), this);
+        el.queue_event(fd.get(), Event(Event::E_USER, Time::now(), 0));
     }
     
+    ~SelfDestruct()
+    {
+    }
     
     int handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
     {
@@ -124,15 +123,15 @@ public:
     void handle_event(const int cid, const Event& pe)
     {
         log_info << "self destruct";
-        el->erase(fd);
-        el->release_protolay(this);
+        el.erase(fd.get());
+        el.release_protolay(this);
     }
 };
 
 START_TEST(test_eventloop_gc)
 {
     EventLoop el;
-    SelfDestruct* sd = new SelfDestruct(&el);
+    SelfDestruct* sd = new SelfDestruct(el);
     (void)sd;
     el.poll(100);
 }
@@ -140,16 +139,17 @@ END_TEST
 
 class SelfInterrupt : public Protolay, EventContext
 {
-    int fd;
-    EventLoop* el;
+    PseudoFd fd;
+    EventLoop& el;
     SelfInterrupt(const SelfInterrupt&);
     void operator=(const SelfInterrupt&);
 public:
-    SelfInterrupt(EventLoop* el_) : 
-        fd(PseudoFd::alloc_fd()), 
-        el(el_){
-        el->insert(fd, this);
-        el->queue_event(fd, Event(Event::E_USER, Time::now(), 0));
+    SelfInterrupt(EventLoop& el_) : 
+        fd(), 
+        el(el_)
+    {
+        el.insert(fd.get(), this);
+        el.queue_event(fd.get(), Event(Event::E_USER, Time::now(), 0));
     }
     
     
@@ -167,7 +167,7 @@ public:
     void handle_event(const int cid, const Event& pe)
     {
         log_info << "self interrupt";
-        el->interrupt();
+        el.interrupt();
     }
 };
 
@@ -175,15 +175,15 @@ START_TEST(test_eventloop_interrupt)
 {
     EventLoop el;
 
-    SelfInterrupt si(&el);
-
+    SelfInterrupt si(el);
+    
     while (el.poll(10) >= 0)
     {
-
+        
     }
 
     fail_unless(el.is_interrupted() == true);
-
+    
 }
 END_TEST
 

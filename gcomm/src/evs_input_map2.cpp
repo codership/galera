@@ -14,13 +14,10 @@
 
 #include "evs_input_map2.hpp"
 #include "gcomm/readbuf.hpp"
-#include "gcomm/safety_prefix.hpp"
-
-#include <algorithm>
+#include <gu_exception.hpp>
 
 using namespace std;
-using namespace gcomm;
-using namespace gcomm::evs;
+using namespace std::rel_ops;
 
 //////////////////////////////////////////////////////////////////////////
 //
@@ -33,12 +30,13 @@ using namespace gcomm::evs;
 class NodeIndexLUCmpOp
 {
 public:
-    bool operator()(const InputMapNodeIndex::value_type& a,
-                    const InputMapNodeIndex::value_type& b) const
+    bool operator()(const gcomm::evs::InputMapNodeIndex::value_type& a,
+                    const gcomm::evs::InputMapNodeIndex::value_type& b) const
     {
         
-        const InputMapNode& aval(InputMapNodeIndex::get_value(a));
-        const InputMapNode& bval(InputMapNodeIndex::get_value(b));
+        const gcomm::evs::InputMapNode& aval(
+            gcomm::evs::InputMapNodeIndex::get_value(a));
+        const gcomm::evs::InputMapNode& bval(gcomm::evs::InputMapNodeIndex::get_value(b));
         return (aval.get_range().get_lu() < bval.get_range().get_lu());
     }
 };
@@ -48,16 +46,16 @@ public:
 class NodeIndexSafeSeqCmpOp
 {
 public:
-    bool operator()(const InputMapNodeIndex::value_type& a,
-                    const InputMapNodeIndex::value_type& b) const
+    bool operator()(const gcomm::evs::InputMapNodeIndex::value_type& a,
+                    const gcomm::evs::InputMapNodeIndex::value_type& b) const
     {
-        const InputMapNode& aval(InputMapNodeIndex::get_value(a));
-        const InputMapNode& bval(InputMapNodeIndex::get_value(b));
-        if (aval.get_safe_seq() == Seqno::max())
+        const gcomm::evs::InputMapNode& aval(gcomm::evs::InputMapNodeIndex::get_value(a));
+        const gcomm::evs::InputMapNode& bval(gcomm::evs::InputMapNodeIndex::get_value(b));
+        if (aval.get_safe_seq() == gcomm::evs::Seqno::max())
         {
             return true;
         }
-        else if (bval.get_safe_seq() == Seqno::max())
+        else if (bval.get_safe_seq() == gcomm::evs::Seqno::max())
         {
             return false;
         }
@@ -70,9 +68,9 @@ public:
 
 
 // Release ReadBuf object from message index element
-static void release_rb(InputMapMsgIndex::value_type& vt)
+static void release_rb(gcomm::evs::InputMapMsgIndex::value_type& vt)
 {
-    ReadBuf* rb = InputMapMsgIndex::get_value(vt).get_rb();
+    gcomm::ReadBuf* rb = gcomm::evs::InputMapMsgIndex::get_value(vt).get_rb();
     if (rb != 0)
     {
         rb->release();
@@ -178,7 +176,7 @@ void gcomm::evs::InputMap::insert_uuid(const UUID& uuid)
 }
 
 
-gcomm::evs::Range InputMap::get_range(const UUID& uuid) const
+gcomm::evs::Range gcomm::evs::InputMap::get_range(const UUID& uuid) const
     throw (gu::Exception)
 {
     return InputMapNodeIndex::get_value(
@@ -186,7 +184,7 @@ gcomm::evs::Range InputMap::get_range(const UUID& uuid) const
 }
 
 
-gcomm::evs::Seqno InputMap::get_safe_seq(const UUID& uuid) const
+gcomm::evs::Seqno gcomm::evs::InputMap::get_safe_seq(const UUID& uuid) const
     throw (gu::Exception)
 {
     return InputMapNodeIndex::get_value(
@@ -197,7 +195,7 @@ gcomm::evs::Seqno InputMap::get_safe_seq(const UUID& uuid) const
 void gcomm::evs::InputMap::set_safe_seq(const UUID& uuid, const Seqno seq)
     throw (gu::Exception)
 {
-    gcomm_assert(seq != Seqno::max());
+    gcomm_assert(seq != static_cast<const Seqno>(Seqno::max()));
     // @note This assertion does not necessarily hold. Some other 
     // instance may well have higher all received up to seqno 
     // than this (due to packet loss). Commented out... and left
@@ -469,7 +467,7 @@ void gcomm::evs::InputMap::update_aru()
     gcomm_assert(minval != Seqno::max());
     // log_debug << "aru seq " << aru_seq << " next " << minval;
     if (aru_seq != Seqno::max() ||
-        (aru_seq == Seqno::max() && minval > 0))
+        (aru_seq == Seqno::max() && minval > Seqno(0)))
     {
         /* aru_seq must not decrease */
         gcomm_assert(aru_seq == Seqno::max() || minval - 1 >= aru_seq);

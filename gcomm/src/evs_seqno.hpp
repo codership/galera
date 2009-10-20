@@ -68,11 +68,6 @@ public:
         return cmp.seq == seq;
     }
 
-    bool operator!=(const Seqno cmp) const
-    {
-        return cmp.seq != seq;
-    }
-    
     bool operator<(const Seqno cmp) const
     {
         gcomm_assert(seq != seq_max && cmp.seq != seq_max);
@@ -86,26 +81,6 @@ public:
         }
     }
     
-    bool operator>(const Seqno cmp) const
-    {
-        gcomm_assert(seq != seq_max && cmp.seq != seq_max);
-        return not (*this < cmp || *this == cmp);
-    }
-
-    bool operator>=(const Seqno cmp) const
-    {
-        gcomm_assert(seq != seq_max && cmp.seq != seq_max);
-        return (*this > cmp|| *this == cmp);
-    }
-
-    bool operator<=(const Seqno cmp) const
-    {
-        gcomm_assert(seq != seq_max && cmp.seq != seq_max);
-        return (*this < cmp || *this == cmp);
-    }
-    
-
-
     uint16_t get() const { return seq; }
     
     size_t serialize(byte_t* buf, size_t buflen, size_t offset) const

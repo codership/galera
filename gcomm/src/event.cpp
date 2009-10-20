@@ -15,7 +15,9 @@
 #include "gcomm/logger.hpp"
 #include "gcomm/util.hpp"
 
-BEGIN_GCOMM_NAMESPACE
+using namespace std;
+using namespace std::rel_ops;
+using namespace gcomm;
 
 static inline int map_event_to_mask(const int e)
 {
@@ -242,7 +244,7 @@ int EventLoop::compute_timeout(const int max_val)
         log_debug << "return 0";
         return 0;
     }
-    int diff = static_cast<int>(next.get_milliseconds() - now.get_milliseconds());
+    int diff = static_cast<int>(next.get_utc() - now.get_utc())/gu::datetime::MSec;
     
     assert(diff >= 0);
     
@@ -257,7 +259,7 @@ int EventLoop::poll(const int timeout)
     interrupted = false;
 
     handle_queued_events();
-
+    
     if (interrupted) return -1;
 
     int p_ret = ::poll(pfds, n_pfds, compute_timeout(timeout));
@@ -377,4 +379,4 @@ EventLoop::~EventLoop()
     free(pfds);
 }
 
-END_GCOMM_NAMESPACE
+

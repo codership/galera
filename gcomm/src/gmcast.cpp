@@ -8,9 +8,9 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/kruskal_min_spanning_tree.hpp>
 
-using std::string;
-using std::pair;
-using std::make_pair;
+using namespace std;
+using namespace std::rel_ops;
+using namespace gcomm;
 
 // map file descriptor to connection context
 class gcomm::GMCastProtoMap : 
@@ -859,6 +859,7 @@ static const string tcp_addr_prefix = Conf::TcpScheme + "://";
 GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon)
     :
     Transport     (uri, event_loop, mon),
+    pfd           (),
     my_uuid       (0, 0),
     proto_map     (new ProtoMap()),
     spanning_tree (new ProtoMap()),
@@ -933,15 +934,12 @@ GMCast::GMCast(const URI& uri, EventLoop* event_loop, Monitor* mon)
         gcomm_throw_runtime (EINVAL) << "Listen addr '" << listen_addr
                                      << "' is not valid";
     }
-    
-    fd = PseudoFd::alloc_fd();
 }
 
 GMCast::~GMCast()
 {
     if (listener != 0) stop();
 
-    PseudoFd::release_fd(fd);
     delete proto_map;
     delete spanning_tree;
 }
@@ -965,21 +963,21 @@ void GMCast::start()
         gu_trace (gmcast_connect(initial_addr));
     }
 
-    event_loop->insert(fd, this);
-    event_loop->queue_event(fd, Event(Event::E_USER,
-                                      Time::now() + Time(0, 500000)));
+    event_loop->insert(pfd.get(), this);
+    event_loop->queue_event(pfd.get(), Event(Event::E_USER,
+                                             Time::now() + Period("PT0.5S")));
 }
 
 
 void GMCast::stop() 
 {
-    event_loop->erase(fd);
+    event_loop->erase(pfd.get());
     
     listener->close();
     delete listener;
     listener = 0;    
     spanning_tree->clear();
-
+    
     for (ProtoMap::iterator i = proto_map->begin(); i != proto_map->end(); ++i)
     {
         Transport* tp = ProtoMap::get_value(i)->get_transport();
@@ -1080,7 +1078,7 @@ void GMCast::gmcast_forget(const UUID& uuid)
         if (get_uuid(ai) == uuid)
         {
             set_retry_cnt(ai, max_retry_cnt + 1);
-            set_next_reconnect(ai, Time::now() + Time(5, 0));
+            set_next_reconnect(ai, Time::now() + Period("PT5S"));
         }
     }
     
@@ -1153,11 +1151,10 @@ void GMCast::handle_failed(GMCastProto* rp)
         {
             set_retry_cnt(i, get_retry_cnt(i) + 1);
 
-            int rsecs  = 1;
-            Time rtime = Time::now() + Time(rsecs, 0);
+            Time rtime = Time::now() + Period("PT1S");
 
             log_debug << "Setting next reconnect time to "
-                      << rtime.to_string() << " for " << remote_addr;
+                      << rtime << " for " << remote_addr;
 
             set_next_reconnect(i, rtime);
         }
@@ -1559,8 +1556,8 @@ void GMCast::reconnect()
                 log_debug << "Waiting to reconnect to "
                           << remote_uuid.to_string() << " "
                           << remote_addr << " "
-                          << get_next_reconnect(i).to_string() << " "
-                          << now.to_string();
+                          << get_next_reconnect(i) << " "
+                          << now;
             }
         }
     }
@@ -1576,7 +1573,7 @@ void GMCast::handle_event(const int fd, const Event& pe)
     reconnect();
     
     event_loop->queue_event(fd, Event(Event::E_USER, 
-                                      Time::now() + Time(0, 500000)));
+                                      Time::now() + Period("PT0.5S")));
 }
 
 
@@ -1599,8 +1596,8 @@ void GMCast::forward_message(const int cid, const ReadBuf* rb,
         if (i->first != cid)
         {
             log_debug << "Forwarding message "
-                      << msg.get_source_uuid().to_string() << " -> "
-                      << i->second->get_remote_uuid().to_string();
+                      << msg.get_source_uuid() << " -> "
+                      << i->second->get_remote_uuid();
 
             i->second->get_transport()->handle_down(&wb, 0);
         }

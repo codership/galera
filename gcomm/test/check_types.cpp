@@ -111,8 +111,8 @@ START_TEST(test_view)
     fail_unless(nl.size() == 7);
     check_serialization(nl, 4 + 7*(UUID::serial_size() 
                                    + Node::serial_size()), NodeList());
-
-
+    
+    
     View v(ViewId(V_TRANS, vid));
 
     for (size_t i = 0; i < 10; ++i)
@@ -139,8 +139,6 @@ START_TEST(test_view)
     }
         
     check_serialization(v, 
-                        /* Header (type etc) */
-                        4 
                         /* view id */
                         + ViewId::serial_size() 
                         /* 4 times node list length */

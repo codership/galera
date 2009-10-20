@@ -3,7 +3,6 @@
 
 #include "gcomm/common.hpp"
 #include "gcomm/time.hpp"
-#include "gcomm/timer.hpp"
 #include "gcomm/protolay.hpp"
 #include "gcomm/view.hpp"
 #include "gcomm/transport.hpp"
@@ -197,9 +196,6 @@ public:
     
     bool is_representative(const UUID& pid) const;
 
-    bool states_compare(const JoinMessage& );
-    
-
     void shift_to(const State, const bool send_j = true);
     
     
@@ -228,216 +224,31 @@ public:
     void handle_up(int, const ReadBuf*, size_t, const ProtoUpMeta&);
     int handle_down(WriteBuf* wb, const ProtoDownMeta& dm);
     
-    //
-    void cleanup() {}
-    
-    
-    
-    class CleanupTimerHandler : public TimerHandler
+
+    // Timer functions do appropriate actions for timer handling 
+    // and return next expiration time 
+private:
+public:
+    enum Timer
     {
-        Proto& p;
-    public:
-        CleanupTimerHandler(Proto& p_) : TimerHandler("cleanup"), p(p_) {}
-        void handle() 
-        {
-            Critical crit(p.mon);
-            p.cleanup_unoperational();
-            p.cleanup_views();
-            p.timer.set(this, Period(Time(30, 0)));
-        }
-        ~CleanupTimerHandler() {
-            if (p.timer.is_set(this))
-                p.timer.unset(this);
-        }
+        T_INACTIVITY,
+        T_RETRANS,
+        T_CONSENSUS
     };
-    
-    class InactivityTimerHandler : public TimerHandler
-    {
-        Proto& p;
-    public:
-        InactivityTimerHandler(Proto& p_) : TimerHandler("inact"), p(p_) {}
-        void handle() 
-        {
-            Critical crit(p.mon);
-            p.check_inactive();
-            if (p.timer.is_set(this) == false)
-            {
-                p.timer.set(this, Period(Time(1, 0)));
-            }
-        }
-        
-        ~InactivityTimerHandler() {
-            if (p.timer.is_set(this))
-                p.timer.unset(this);
-        }
-    };
-
-    class ConsensusTimerHandler : public TimerHandler
-    {
-        Proto& p;
-    public:
-        ConsensusTimerHandler(Proto& p_) : 
-            TimerHandler("consensus"), 
-            p(p_)
-        {
-            
-        }
-        ~ConsensusTimerHandler()
-        {
-            if (p.timer.is_set(this))
-                p.timer.unset(this);
-        }
-        
-        void handle()
-        {
-            Critical crit(p.mon);
-            
-            if (p.get_state() == S_RECOVERY)
-            {
-                log_warn << "consensus timer";
-                p.shift_to(S_RECOVERY, true);
-                if (p.is_consensus() && p.is_representative(p.my_uuid))
-                {
-                    p.send_install();
-                }
-            }
-            else
-            {
-                log_warn << "consensus timer handler in " 
-                         << to_string(p.get_state());
-            }
-        }
-    };
-
-    class ResendTimerHandler : public TimerHandler
-    {
-        Proto& p;
-    public:
-        ResendTimerHandler(Proto& p_) :
-            TimerHandler("resend"),
-            p(p_)
-        {
-        }
-        ~ResendTimerHandler()
-        {
-            if (p.timer.is_set(this))
-                p.timer.unset(this);
-        }
-        void handle()
-        {
-            Critical crit(p.mon);
-            if (p.get_state() == S_OPERATIONAL)
-            {
-                log_debug << p.self_string() << " resend timer handler";
-                if (p.output.empty())
-                {
-                    WriteBuf wb(0, 0);
-                    p.send_user(&wb, 0xff, SP_DROP, p.send_window, Seqno::max());
-                }
-                else
-                {
-                    p.send_user();
-                }
-                if (p.timer.is_set(this) == false)
-                {
-                    p.timer.set(this, p.resend_period);
-                }
-            }
-        }
-    };
-
-    void handle_send_join_timer();
-
-
-    class SendJoinTimerHandler : public TimerHandler
-    {
-        Proto& p;
-    public:
-        SendJoinTimerHandler(Proto& p_) :
-            TimerHandler("send_join"),
-            p(p_)
-        {
-        }
-        ~SendJoinTimerHandler()
-        {
-            if (p.timer.is_set(this))
-                p.timer.unset(this);
-        }
-        void handle()
-        {
-            Critical crit(p.mon);
-            p.handle_send_join_timer();
-            if (p.timer.is_set(this) == false)
-            {
-                p.timer.set(this, p.resend_period);
-            }
-        }
-    };
-    
-    void start_inactivity_timer() { timer.set(ith, inactive_check_period); }
-
-    void stop_inactivity_timer() 
-    {
-        if (timer.is_set(ith) == false)
-        {
-            log_warn << "inactivity timer is not set, state: " 
-                     << to_string(get_state());
-        }
-        else
-        {
-            timer.unset(ith);
-        }
-    }
-    
-    void set_consensus_timer() { timer.set(consth, Period(consensus_timeout)); }
-    
-    void unset_consensus_timer()
-    {
-        if (timer.is_set(consth) == false)
-        {
-            log_warn << "consensus timer is not set";
-        }
-        else
-        {
-            timer.unset(consth);
-        }
-    }
-    
-    bool is_set_consensus_timer()
-    {
-        return timer.is_set(consth);
-    }
-
-    void start_resend_timer()
-    {
-        timer.set(resendth, resend_period);
-    }
-
-    void stop_resend_timer()
-    {
-        if (timer.is_set(resendth))
-        {
-            timer.unset(resendth);
-        }
-    }
-
-    void start_send_join_timer()
-    {
-        timer.set(sjth, send_join_period);
-    }
-
-    void stop_send_join_timer()
-    {
-        if (timer.is_set(sjth))
-        {
-            timer.unset(sjth);
-        }
-    }
-
+    class TimerList : public  MultiMap<Time, Timer> { };
+private:
+    TimerList timers;
+public:
+    // These need currently to be public for unit tests
+    void handle_inactivity_timer();
+    void handle_retrans_timer();
+    void handle_consensus_timer();
+    Time get_next_expiration(Timer) const;
+    void reset_timers();
+    Time handle_timers();
 private:
     Monitor* mon;
     Transport* tp;
-    EventLoop* el;
     bool collect_stats;
     Histogram hs_safe;
     bool delivering;
@@ -447,12 +258,12 @@ private:
     NodeMap known;
     NodeMap::iterator self_i;
     // 
-    Time inactive_timeout;
+    Period view_forget_timeout;
+    Period inactive_timeout;
     Period inactive_check_period;
-    Time consensus_timeout;
-    Period resend_period;
-    Period send_join_period;
-    Timer timer;
+    Period consensus_timeout;
+    Period retrans_period;
+    Period join_retrans_period;
     
     // Current view id
     // ViewId current_view;
@@ -483,12 +294,7 @@ private:
     State state;
     int shift_to_rfcnt;
 
-    InactivityTimerHandler* ith;
-    CleanupTimerHandler* cth;
-    ConsensusTimerHandler* consth;
-    ResendTimerHandler* resendth;
-    SendJoinTimerHandler* sjth;
-    
+
     Proto(const Proto&);
     void operator=(const Proto&);
 };

@@ -49,7 +49,7 @@ public:
 
     {}
     
-    Event(int cause) : event_cause(cause), time(), user_data(0) {}
+    Event(int cause) : event_cause(cause), time(Time::now()), user_data(0) {}
     
     Event(int cause, const Time& at, EventData* user_data_ = 0)
         :

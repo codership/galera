@@ -25,6 +25,7 @@ class GMCastMessage;
 
 class GMCast : public Transport, EventContext
 {
+    PseudoFd pfd;
     UUID my_uuid;
 
     /* */

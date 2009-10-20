@@ -12,9 +12,13 @@ extern "C" {
 #include <gu_uuid.h>
 }
 
-BEGIN_GCOMM_NAMESPACE
+namespace gcomm
+{
+    class UUID;
+    std::ostream& operator<<(std::ostream&, const UUID&);
+}
 
-class UUID
+class gcomm::UUID
 {
     gu_uuid_t uuid;
     static const UUID uuid_nil;
@@ -83,8 +87,17 @@ public:
         return &uuid;
     }
 
+    bool operator<(const UUID& cmp) const 
+    { 
+        return gu_uuid_compare(&uuid, &cmp.uuid) < 0; 
+    }
 
+    bool operator==(const UUID& cmp) const
+    {
+        return gu_uuid_compare(&uuid, &cmp.uuid) == 0; 
+    }
     
+
     std::string to_string() const {
         char buf[37];
         memset(buf, 0, sizeof(buf));
@@ -114,26 +127,12 @@ public:
 };
 
 
-inline bool operator==(const UUID& a, const UUID& b)
-{
-    return gu_uuid_compare(a.get_uuid_ptr(), b.get_uuid_ptr()) == 0;
-}
 
-inline bool operator!=(const UUID& a, const UUID& b)
-{
-    return !(a == b);
-}
-
-inline bool operator<(const UUID& a, const UUID& b)
-{
-    return gu_uuid_compare(a.get_uuid_ptr(), b.get_uuid_ptr()) < 0;
-}
-
-inline std::ostream& operator<<(std::ostream& os, const UUID& uuid)
+inline std::ostream& gcomm::operator<<(std::ostream& os, const UUID& uuid)
 {
     return (os << uuid.to_string());
 }
 
-END_GCOMM_NAMESPACE
+
 
 #endif // _GCOMM_UUID_HPP_

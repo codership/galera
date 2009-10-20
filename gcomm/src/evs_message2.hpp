@@ -14,6 +14,7 @@
 #include "gcomm/map.hpp"
 
 #include "evs_seqno.hpp"
+#include "evs_message2.hpp"
 
 namespace gcomm
 {

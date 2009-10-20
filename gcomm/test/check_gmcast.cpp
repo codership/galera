@@ -7,21 +7,22 @@ using namespace gcomm;
 
 #include <check.h>
 
-BEGIN_GCOMM_NAMESPACE
-
-static bool operator==(const GMCastNode& a, const GMCastNode& b)
+namespace gcomm
+{
+    static bool operator==(const GMCastNode& a, const GMCastNode& b)
 {
     return a.is_operational() == b.is_operational() &&
         a.get_uuid() == b.get_uuid() && a.get_address() == b.get_address();
 }
 
-static bool operator==(const GMCastMessage& a, const GMCastMessage& b)
+
+static bool operator==(const gcomm::GMCastMessage& a, const gcomm::GMCastMessage& b)
 {
     bool ret = a.get_version() == b.get_version() &&
         a.get_type()  == b.get_type() &&
         a.get_ttl()   == b.get_ttl() &&
         a.get_flags() == b.get_flags();
-
+    
     if (ret == true && a.get_flags() & GMCastMessage::F_NODE_ADDRESS)
     {
         ret = a.get_node_address() == b.get_node_address();
@@ -35,23 +36,23 @@ static bool operator==(const GMCastMessage& a, const GMCastMessage& b)
         ret = ret && (a_grp == b_grp);
         // std::cerr << a_grp << "\n";
     }
-
+    
     if (ret == true && a.get_flags() & GMCastMessage::F_NODE_LIST)
     {
         const std::list<GMCastNode>* alist = a.get_node_list();
         const std::list<GMCastNode>* blist = b.get_node_list();
-
+        
         fail_unless(alist != 0 && blist != 0);
         ret = ret && *alist == *blist;
 
     }
     return ret;
 }
+}
 
-static void event_loop(EventLoop* el, time_t secs, time_t msecs = 0)
+static void event_loop(EventLoop* el, const string tstr = "PT1S")
 {
-    assert(msecs < 1000);
-    Time stop = Time::now() + Time(secs, msecs*1000);
+    Time stop = Time::now() + Period(tstr);
     do
     {
         el->poll(10);
@@ -59,7 +60,6 @@ static void event_loop(EventLoop* el, time_t secs, time_t msecs = 0)
     while (stop >= Time::now());
 }
 
-END_GCOMM_NAMESPACE
 
 START_TEST(test_gmcast_messages)
 {
@@ -150,7 +150,7 @@ START_TEST(test_gmcast)
     Transport* tp1 = Transport::create("gcomm+gmcast://?gmcast.listen_addr=gcomm+tcp://127.0.0.1:10001&gmcast.group=testgrp", &el);
     
     tp1->connect();
-    event_loop(&el, 0, 200);
+    event_loop(&el, "PT0.2S");
     tp1->close();
     
     Transport* tp2 = Transport::create("gcomm+gmcast://127.0.0.1:10001?gmcast.group=testgrp&gmcast.listen_addr=gcomm+tcp://127.0.0.1:10002", &el);
@@ -158,10 +158,10 @@ START_TEST(test_gmcast)
     tp1->connect();
     tp2->connect();
 
-    event_loop(&el, 0, 200);
+    event_loop(&el, "PT0.2S");
     tp1->close();
 
-    event_loop(&el, 0, 200);
+    event_loop(&el, "PT0.2S");
     tp2->close();
     
     
@@ -169,17 +169,17 @@ START_TEST(test_gmcast)
 
     tp1->connect();
     tp2->connect();
-    event_loop(&el, 0, 200);
+    event_loop(&el, "PT0.2S");
 
     tp3->connect();
-    event_loop(&el, 0, 200);
+    event_loop(&el, "PT0.2S");
     
     tp3->close();
     tp2->close();
     tp1->close();
-
-    event_loop(&el, 0, 200);
-
+    
+    event_loop(&el, "PT0.2S");
+    
     delete tp3;
     delete tp2;
     delete tp1;
@@ -192,7 +192,7 @@ START_TEST(test_gmcast_w_user_messages)
     
     class User : public Toplay, EventContext
     {
-        int fd;
+        PseudoFd fd;
         EventLoop* el;
         Transport* tp;
         size_t recvd;
@@ -201,7 +201,7 @@ START_TEST(test_gmcast_w_user_messages)
     public:
 
         User(EventLoop* el_, const char* listen_addr, const char* remote_addr) :
-            fd(PseudoFd::alloc_fd()),
+            fd(),
             el(el_),
             tp(0),
             recvd(0)
@@ -222,23 +222,22 @@ START_TEST(test_gmcast_w_user_messages)
 
         ~User()
         {
-            PseudoFd::release_fd(fd);
             delete tp;
         }
-
+        
         void start()
         {
             tp->connect();
-            el->insert(fd, this);
-            el->queue_event(fd, Event(Event::E_USER,
-                                      Time::now() + Time(0, 5000)));
+            el->insert(fd.get(), this);
+            el->queue_event(fd.get(), Event(Event::E_USER,
+                                            Time::now() + Period("PT0.005S")));
         }
 
         
         void stop()
         {
             tp->close();
-            el->erase(fd);
+            el->erase(fd.get());
         }
 
         void handle_event(const int cfd, const Event& e)
@@ -250,8 +249,8 @@ START_TEST(test_gmcast_w_user_messages)
 
             pass_down(&wb, 0);
 
-            el->queue_event(fd, Event(Event::E_USER,
-                                      Time::now() + Time(0, 5000)));
+            el->queue_event(fd.get(), Event(Event::E_USER,
+                                      Time::now() + Period("PT0.005S")));
         }
         
         void handle_up(int cid, const ReadBuf* rb, size_t roff,
@@ -291,7 +290,7 @@ START_TEST(test_gmcast_w_user_messages)
     log_info << "u1 start";
     u1.start();
 
-    event_loop(&el, 0, 100);
+    event_loop(&el, "PT0.1S");
 
     fail_unless(u1.get_recvd() == 0);
     
@@ -307,23 +306,23 @@ START_TEST(test_gmcast_w_user_messages)
     User u3(&el, addr3, addr2);
     u3.start();
 
-    event_loop(&el, 0, 200);
+    event_loop(&el, "PT0.2S");
     
     log_info << "u4 start";
     User u4(&el, addr4, addr2);
     u4.start();
 
-    event_loop(&el, 0, 200);
+    event_loop(&el, "PT0.2S");
 
     log_info << "u1 stop";
     u1.stop();
 
-    event_loop(&el, 3, 0);
+    event_loop(&el, "PT3S");
     
     log_info << "u1 start";
     u1.start();
     
-    event_loop(&el, 0, 200);
+    event_loop(&el, "PT0.3S");
 
     fail_unless(u1.get_recvd() != 0);
     fail_unless(u2.get_recvd() != 0);
@@ -373,17 +372,17 @@ START_TEST(test_gmcast_forget)
     tp1->connect();
     tp2->connect();
     tp3->connect();
-    event_loop(&el, 1, 0);
+    event_loop(&el, "PT1S");
     
     UUID uuid1 = tp1->get_uuid();
     
     tp1->close();
     tp2->close(uuid1);
     tp3->close(uuid1);
-    event_loop(&el, 10, 0);
+    event_loop(&el, "PT10S");
     tp1->connect();
     log_info << "####";
-    event_loop(&el, 1, 0);
+    event_loop(&el, "PT1S");
     
     tp1->close();
     tp2->close();

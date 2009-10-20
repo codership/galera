@@ -25,6 +25,7 @@
 
 
 using namespace std;
+using namespace std::rel_ops;
 using namespace gcomm;
 using namespace gcomm::evs;
 
@@ -54,7 +55,8 @@ START_TEST(test_seqno)
     fail_unless(s0 > sn);
     fail_unless(s0 >= sn);
     
-    fail_unless(sk > s0);
+    fail_unless(sk - 1 > s0 && sk + 1 < s0);
+    fail_unless(sk != s0);
     fail_unless(sk < sn);
     
     Seqno ss(0x7aba);
@@ -318,7 +320,8 @@ START_TEST(test_input_map_overwrap)
     }
     Time stop(Time::now());
     
-    log_info << "input map msg rate " << double(cnt)/(stop - start).to_double();
+    double div(double((stop - start).get_utc())/gu::datetime::Sec);
+    log_info << "input map msg rate " << double(cnt)/div;
 
 }
 END_TEST
@@ -794,7 +797,7 @@ public:
 
     void expire_timers()
     {
-        p.handle_send_join_timer();
+        p.handle_retrans_timer();
     }
     
 private:

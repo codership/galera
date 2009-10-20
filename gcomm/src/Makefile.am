@@ -11,14 +11,12 @@ libgcomm_la_SOURCES = 		\
 	defaults.cpp            \
 	test.cpp		\
 	histogram.cpp		\
-	time.cpp		\
 	uuid.cpp		\
 	view.cpp		\
 	monitor.cpp		\
 	pseudofd.cpp		\
 	readbuf.cpp		\
 	event.cpp		\
-	timer.cpp		\
 	transport.cpp		\
 	tcp.cpp			\
 	gmcast.cpp		\

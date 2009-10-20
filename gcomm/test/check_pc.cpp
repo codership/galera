@@ -803,7 +803,7 @@ class PCUser2 : public Toplay, EventContext
     Transport* tp;
     EventLoop* event_loop;
     bool sending;
-    int fd;
+    PseudoFd pfd;
     uint8_t my_type;
     bool send;
     PCUser2(const PCUser2&);
@@ -813,20 +813,18 @@ public:
         tp(0),
         event_loop(el),
         sending(false),
-        fd(-1),
+        pfd(),
         my_type(static_cast<uint8_t>(1 + ::rand()%4)),
         send(send_)
     {
         tp = Transport::create(uri, el);
         gcomm::connect(tp, this);
-        fd = PseudoFd::alloc_fd();
-        event_loop->insert(fd, this);
+        event_loop->insert(pfd.get(), this);
     }
     
     ~PCUser2()
     {
-        event_loop->erase(fd);
-        PseudoFd::release_fd(fd);
+        event_loop->erase(pfd.get());
         gcomm::disconnect(tp, this);
         delete tp;
     }
@@ -853,8 +851,8 @@ public:
             if (view.get_type() == V_PRIM && send == true)
             {
                 sending = true;
-                event_loop->queue_event(fd, Event(Event::E_USER,
-                                                  Time(Time::now() + Time(0, 5000))));
+                event_loop->queue_event(pfd.get(), Event(Event::E_USER,
+                                                         Time(Time::now() + Period("PT0.005S"))));
             }
         }
         else
@@ -880,11 +878,10 @@ public:
                 log_warn << "pass_down(): " << strerror(ret);
             }
             
-            event_loop->queue_event(fd, Event(Event::E_USER,
-                                              Time(Time::now() + Time(0, 10000))));
+            event_loop->queue_event(pfd.get(), Event(Event::E_USER,
+                                                     (Time::now() + Period("PT0.01"))));
         }
     }
-
 };
 
 START_TEST(test_pc_transport)
@@ -896,7 +893,7 @@ START_TEST(test_pc_transport)
 
     pu1.start();
 
-    Time stop = Time::now() + Time(10, 0);
+    Time stop = Time::now() + Period("PT10S");
     do
     {
         el.poll(50);
@@ -905,7 +902,7 @@ START_TEST(test_pc_transport)
     
     pu2.start();
 
-    stop = Time::now() + Time(5, 0);
+    stop = Time::now() + Period("PT5S");
     do
     {
         el.poll(50);
@@ -914,7 +911,7 @@ START_TEST(test_pc_transport)
 
     pu3.start();
 
-    stop = Time::now() + Time(5, 0);
+    stop = Time::now() + Period("PT5S");
     do
     {
         el.poll(50);
@@ -923,7 +920,7 @@ START_TEST(test_pc_transport)
 
     pu2.stop();
 
-    stop = Time::now() + Time(5, 0);
+    stop = Time::now() + Period("PT5S");
     do
     {
         el.poll(50);
@@ -931,7 +928,7 @@ START_TEST(test_pc_transport)
     while (Time::now() < stop);
 
     pu1.stop();
-    stop = Time::now() + Time(5, 0);
+    stop = Time::now() + Period("PT5S");
     do
     {
         el.poll(50);

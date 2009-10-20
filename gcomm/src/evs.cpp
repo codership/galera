@@ -43,6 +43,7 @@
 #include "gcomm/transport.hpp"
 
 using namespace std;
+using namespace std::rel_ops;
 using namespace gcomm;
 using namespace gcomm::evs;
 
@@ -118,7 +119,7 @@ void EVS::connect()
     gcomm::connect(tp, proto);
     gcomm::connect(proto, this);
     proto->shift_to(Proto::S_JOINING);
-    Time stop(Time::now() + Time(5, 0));
+    Time stop(Time::now() + join_wait_period);
     do 
     {
         /* Send join messages without handling them */
@@ -208,7 +209,8 @@ EVS::EVS (const URI& uri_,
     :
     Transport (uri_, event_loop_, mon_),
     tp        (0),
-    proto     (0)
+    proto     (0),
+    join_wait_period("PT5S")
 {
     if (uri.get_scheme() != Conf::EvsScheme)
     {

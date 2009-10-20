@@ -9,6 +9,7 @@
 #include <algorithm>
 
 using namespace std;
+using namespace std::rel_ops;
 using namespace gcomm;
 using namespace gcomm::evs;
 
@@ -164,21 +165,21 @@ gcomm::evs::Proto::Proto(EventLoop* el_,
                          Transport* t, 
                          const UUID& my_uuid_, 
                          Monitor* mon_) : 
+    timers(),
     mon(mon_),
     tp(t),
-    el(el_),
     collect_stats(true),
     hs_safe("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
     delivering(false),
     my_uuid(my_uuid_), 
     known(),
     self_i(),
-    inactive_timeout(Time(5, 0)),
-    inactive_check_period(Time(1, 0)),
-    consensus_timeout(Time(1, 0)),
-    resend_period(Time(1, 0)),
-    send_join_period(Time(0, 300000)),
-    timer(el_),
+    view_forget_timeout("PT5M"),
+    inactive_timeout("PT5S"),
+    inactive_check_period("PT1S"),
+    consensus_timeout("PT5S"),
+    retrans_period("PT1S"),
+    join_retrans_period("PT0.3S"),
     current_view(ViewId(V_TRANS, my_uuid, 0)),
     previous_view(),
     previous_views(),
@@ -192,8 +193,7 @@ gcomm::evs::Proto::Proto(EventLoop* el_,
     max_output_size(128),
     self_loopback(false),
     state(S_CLOSED),
-    shift_to_rfcnt(0),
-    ith(), cth(), consth(), resendth(), sjth()
+    shift_to_rfcnt(0)
 {
     known.insert_checked(make_pair(my_uuid, Node()));
     self_i = known.begin();
@@ -201,12 +201,6 @@ gcomm::evs::Proto::Proto(EventLoop* el_,
     
     input_map->insert_uuid(my_uuid);
     current_view.add_member(my_uuid, "");
-    
-    ith = new InactivityTimerHandler(*this);
-    cth = new CleanupTimerHandler(*this);
-    consth = new ConsensusTimerHandler(*this);
-    resendth = new ResendTimerHandler(*this);
-    sjth = new SendJoinTimerHandler(*this);
 }
 
 
@@ -220,11 +214,6 @@ gcomm::evs::Proto::~Proto()
     output.clear();
     delete install_message;
     delete input_map;
-    delete ith;
-    delete cth;
-    delete consth;
-    delete resendth;
-    delete sjth;
 }
 
 ostream& gcomm::evs::operator<<(ostream& os, const Node& n)
@@ -262,7 +251,17 @@ ostream& gcomm::evs::operator<<(ostream& os, const Proto& p)
     return os;
 }
 
-void gcomm::evs::Proto::handle_send_join_timer()
+
+
+
+
+void gcomm::evs::Proto::handle_inactivity_timer()
+{
+    log_debug << "not implemented";
+}
+
+
+void gcomm::evs::Proto::handle_retrans_timer()
 {
     if (get_state() == S_RECOVERY)
     {
@@ -287,11 +286,126 @@ void gcomm::evs::Proto::handle_send_join_timer()
     }
     else if (get_state() == S_OPERATIONAL)
     {
-        gu_trace(send_gap(UUID::nil(),
-                          current_view.get_id(),
-                          Range()));
+        if (output.empty() == true)
+        {
+            if (input_map->get_aru_seq() == Seqno::max() ||
+                input_map->get_aru_seq() == last_sent)
+            {
+                WriteBuf wb(0, 0);
+                gu_trace((void)send_user(&wb, 0xff, SP_DROP, send_window, 
+                                         Seqno::max()));
+            }
+            else
+            {
+                gcomm_assert(last_sent != Seqno::max());
+                gu_trace(resend(UUID::nil(), Range(last_sent, last_sent)));
+            }
+        }
+        else
+        {
+            gu_trace(send_user());
+        }
     }
 }
+
+
+void gcomm::evs::Proto::handle_consensus_timer()
+{
+    log_debug << "not implemented";
+}
+
+
+class TimerSelectOp
+{
+public:
+    TimerSelectOp(const Proto::Timer t_) : t(t_) { }
+    bool operator()(const Proto::TimerList::value_type& vt) const
+    {
+        return (Proto::TimerList::get_value(vt) == t);
+    }
+private:
+    Proto::Timer const t;
+};
+
+Time gcomm::evs::Proto::get_next_expiration(const Timer t) const
+{
+    gcomm_assert(get_state() != S_CLOSED);
+    Time now(Time::now());
+    switch (t)
+    {
+    case T_INACTIVITY:
+        return (now + inactive_check_period);
+    case T_RETRANS:
+        switch (get_state())
+        {
+        case S_OPERATIONAL:
+        case S_LEAVING:
+            return (now + retrans_period);
+        case S_RECOVERY:
+            return (now + join_retrans_period);
+        default:
+            gcomm_throw_fatal;
+        }
+    case T_CONSENSUS:
+        switch (get_state()) 
+        {
+        case S_RECOVERY:
+            return (now + consensus_timeout);
+        default:
+            return Time::max();
+        }
+    }
+    gcomm_throw_fatal;
+    return Time::max();
+}
+
+void gcomm::evs::Proto::reset_timers()
+{
+    timers.clear();
+    gu_trace((void)timers.insert(
+                 make_pair(get_next_expiration(T_INACTIVITY), T_INACTIVITY)));
+    gu_trace((void)timers.insert(
+                 make_pair(get_next_expiration(T_RETRANS), T_RETRANS)));
+    gu_trace((void)timers.insert(
+                 make_pair(get_next_expiration(T_CONSENSUS), T_CONSENSUS)));
+}
+
+Time gcomm::evs::Proto::handle_timers()
+{
+    if (timers.empty() == false)
+    {
+        Time now(Time::now());
+        
+        if (TimerList::get_key(timers.begin()) <= now)
+        {
+            Timer t(TimerList::get_value(timers.begin()));
+            timers.erase(timers.begin());
+            switch (t)
+            {
+            case T_INACTIVITY:
+                handle_inactivity_timer();
+                break;
+            case T_RETRANS:
+                handle_retrans_timer();
+                break;
+            case T_CONSENSUS:
+                handle_consensus_timer();
+                break;
+            }
+            // Make sure that timer was not inserted twice
+            gcomm_assert(find_if(timers.begin(), timers.end(), 
+                                 TimerSelectOp(t)) == timers.end());
+            gu_trace((void)timers.insert(make_pair(get_next_expiration(t), t)));
+        }
+    }
+    if (timers.empty() == true)
+    {
+        log_debug << self_string() << "no timers set";
+        return Time::max();
+    }
+    return TimerList::get_key(timers.begin());
+}
+
 
 
 void gcomm::evs::Proto::check_inactive()
@@ -321,7 +435,7 @@ void gcomm::evs::Proto::set_inactive(const UUID& uuid)
     NodeMap::iterator i;
     gu_trace(i = known.find_checked(uuid));
     log_debug << self_string() << " setting " << uuid << " inactive";
-    NodeMap::get_value(i).set_tstamp(Time(0, 0));
+    NodeMap::get_value(i).set_tstamp(Time::zero());
 }
 
 void gcomm::evs::Proto::cleanup_unoperational()
@@ -345,7 +459,7 @@ void gcomm::evs::Proto::cleanup_views()
     list<pair<ViewId, Time> >::iterator i = previous_views.begin();
     while (i != previous_views.end())
     {
-        if (i->second + Time(300, 0) < now)
+        if (i->second + view_forget_timeout <= now)
         {
             log_info << self_string() << " erasing view: " << i->first;
             previous_views.erase(i);
@@ -938,7 +1052,7 @@ int gcomm::evs::Proto::send_user(WriteBuf* wb,
     }
     
     const Seqno seq_range(up_to_seqno == Seqno::max() ? 0 : up_to_seqno - seq);
-    gcomm_assert(seq_range <= 0xff);
+    gcomm_assert(seq_range <= Seqno(0xff));
     const Seqno last_msg_seq(seq + seq_range);
     uint8_t flags;
     
@@ -1699,25 +1813,20 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             log_info << "delivery stats (safe): " << hs_safe;
         }
         hs_safe.clear();
-        stop_inactivity_timer();
         cleanup_unoperational();
         cleanup_views();
-        cleanup();
+        timers.clear();
         state = S_CLOSED;
         break;
     case S_JOINING:
         state = S_JOINING;
-        start_inactivity_timer();
         break;
     case S_LEAVING:
-        unset_consensus_timer();
         state = S_LEAVING;
+        reset_timers();
         break;
     case S_RECOVERY:
     {
-        stop_resend_timer();
-        stop_send_join_timer();
-        start_send_join_timer();
         if (get_state() != S_RECOVERY)
         {
             cleanup_joins();
@@ -1726,11 +1835,6 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         delete install_message;
         install_message = 0;
         installing = false;
-        if (is_set_consensus_timer())
-        {
-            unset_consensus_timer();
-        }
-        set_consensus_timer();
         state = S_RECOVERY;
         log_debug << self_string() << " shift to recovery, flushing "
                   << output.size() << " messages";
@@ -1748,22 +1852,19 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         {
             gu_trace(send_join(false));
         }
-        
+        gcomm_assert(get_state() == S_RECOVERY);
+        reset_timers();        
         break;
     }
     case S_OPERATIONAL:
     {
-        // tp->set_loopback(false);
-        assert(output.empty() == true);
-        assert(install_message && (is_representative(get_uuid()) == false 
-                                   || is_consistent(*install_message)));
-        assert(is_all_installed() == true);
-        unset_consensus_timer();
-        stop_send_join_timer();
+        gcomm_assert(output.empty() == true);
+        gcomm_assert(install_message != 0 && 
+                     is_consistent(*install_message) == true);
+        gcomm_assert(is_all_installed() == true);
         gu_trace(deliver());
         gu_trace(deliver_trans_view(false));
         gu_trace(deliver_trans());
-        // Reset input map
         input_map->clear();
         
         previous_view = current_view;
@@ -1805,8 +1906,9 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         delete install_message;
         install_message = 0;
         log_debug << self_string() << " new view: " << current_view;
-        start_resend_timer();
-        assert(get_state() == S_OPERATIONAL);
+        // start_resend_timer();
+        gcomm_assert(get_state() == S_OPERATIONAL);
+        reset_timers();
         break;
     }
     default:
@@ -1828,7 +1930,7 @@ void gcomm::evs::Proto::validate_reg_msg(const UserMessage& msg)
     if (collect_stats == true && msg.get_safety_prefix() == SP_SAFE)
     {
         Time now(Time::now());
-        hs_safe.insert(double(now.get_microseconds() - msg.get_tstamp().get_microseconds())/1.e6);
+        hs_safe.insert(double(now.get_utc() - msg.get_tstamp().get_utc())/gu::datetime::Sec);
     }
 }
 
@@ -1907,7 +2009,7 @@ void gcomm::evs::Proto::deliver()
 void gcomm::evs::Proto::validate_trans_msg(const UserMessage& msg)
 {
     log_debug << self_string() << " " << msg;
-
+    
     if (msg.get_source_view_id() != current_view.get_id())
     {
         // @todo: do we have to freak out here?
@@ -1917,7 +2019,7 @@ void gcomm::evs::Proto::validate_trans_msg(const UserMessage& msg)
     if (collect_stats && msg.get_safety_prefix() == SP_SAFE)
     {
         Time now(Time::now());
-        hs_safe.insert(double(now.get_microseconds() - msg.get_tstamp().get_microseconds())/1.e6);
+        hs_safe.insert(double(now.get_utc() - msg.get_tstamp().get_utc())/gu::datetime::Sec);
     }
 }
 
@@ -2306,145 +2408,6 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     }
 }
 
-#if 0
-bool gcomm::evs::Proto::states_compare(const JoinMessage& msg) 
-{
-    assert(msg.has_node_list() == true);
-    const MessageNodeList& node_list(msg.get_node_list());
-    bool send_join_p(false);
-    
-    // Compare view of operational instances
-    for (MessageNodeList::const_iterator ii = node_list.begin(); 
-         ii != node_list.end(); ++ii) 
-    {
-        const UUID& msg_node_uuid(MessageNodeList::get_key(ii));
-        const MessageNode& msg_node(MessageNodeList::get_value(ii));
-        NodeMap::iterator local_ii = known.find(msg_node_uuid);
-        if (local_ii == known.end())
-        {
-            // Don't insert here into known nodes, wait for 
-            // direct mutual communication.
-            log_debug << self_string() 
-                      << ": unknown instance " << msg_node_uuid 
-                      << " in join message";
-        }
-        else 
-        {
-            Node& local_node(NodeMap::get_value(local_ii));
-            if (local_node.get_operational() != msg_node.get_operational()) 
-            {
-                if (local_node.get_operational() == true && 
-                    NodeMap::get_key(local_ii) != get_uuid()) 
-                {
-                    if (local_node.get_tstamp() + inactive_timeout < Time::now() ||
-                        msg_node.get_leaving() == true) 
-                    {
-                        log_debug << self_string()
-                                  << "setting " << NodeMap::get_key(local_ii) 
-                                  << " as unoperational";
-                        local_node.set_operational(false);
-                        send_join_p = true;
-                    }
-                } 
-                else 
-                {
-                    send_join_p = true;
-                }
-            }
-            
-            if (msg_node.get_leaving() == false && 
-                local_node.get_leave_message() != 0)
-            {
-                // Help friend a bit
-                const LeaveMessage* lmp(local_node.get_leave_message());
-                LeaveMessage lm(lmp->get_source(),
-                                lmp->get_source_view_id(),
-                                lmp->get_seq(),
-                                lmp->get_aru_seq(),
-                                lmp->get_fifo_seq(),
-                                Message::F_RETRANS | Message::F_SOURCE);
-                log_info << "sending leave " << lm << " as delegate to "
-                         << msg.get_source();
-                WriteBuf wb(0, 0);
-                push_header(lm, &wb);
-                send_delegate(&wb);
-            }
-        }
-        
-        if (msg_node.get_view_id() == current_view.get_id())
-        {
-            const Seqno imseq(input_map->get_safe_seq(msg_node_uuid));
-            if ((imseq == Seqno::max() &&
-                 msg_node.get_safe_seq() != Seqno::max()) ||
-                (imseq != Seqno::max() && 
-                 msg_node.get_safe_seq() != Seqno::max() && 
-                 imseq < msg_node.get_safe_seq()))
-            {
-                gu_trace(input_map->set_safe_seq(msg_node_uuid, msg_node.get_safe_seq()));
-                send_join_p = true;
-            }
-        }
-    }
-    
-    list<MessageNodeList::value_type> same_view;
-    for_each(node_list.begin(), node_list.end(), 
-             SameViewSelect<list<MessageNodeList::value_type> >(
-                 same_view, current_view.get_id()));
-    
-    list<MessageNodeList::value_type>::const_iterator high_ii = 
-        max_element(same_view.begin(), same_view.end(), RangeHsCmp());
-    list<MessageNodeList::value_type>::const_iterator low_ii =
-        min_element(same_view.begin(), same_view.end(), RangeLuCmp());
-
-    const Seqno high_seq(high_ii->second.get_im_range().get_hs());
-    const Seqno low_seq(low_ii->second.get_im_range().get_lu());
-    const UUID& low_uuid(low_ii->first);
-    // If this fires, not enough input validation is made
-    gcomm_assert(low_seq != Seqno::max());
-    gcomm_assert(low_seq == 0 || (high_seq + 1 >= low_seq)); 
-    
-    gcomm_assert(output.empty() == true);
-    
-    if (high_seq != Seqno::max())
-    {
-        if (last_sent == Seqno::max() || last_sent < high_seq)
-        {
-            complete_user(high_seq);
-        }
-        else if (msg.get_source() != get_uuid() && 
-                 msg.get_source() == low_uuid   &&
-                 low_seq <= high_seq)
-        {
-            gu_trace(resend(msg.get_source(), Range(low_seq, high_seq)));
-        }
-        send_join_p = true;
-        
-        if (msg.get_source() != get_uuid() && low_seq <= high_seq)
-        {
-            for (NodeMap::const_iterator i = known.begin(); i != known.end(); 
-                 ++i)
-            {
-                if (NodeMap::get_value(i).get_operational() == false && 
-                    current_view.get_members().find(NodeMap::get_key(i)) != 
-                    current_view.get_members().end())
-                {
-                    const Range im_range(input_map->get_range(
-                                             NodeMap::get_key(i)));
-                    if (im_range.get_hs() != Seqno::max() &&
-                        im_range.get_hs() >= high_seq)
-                    {
-                        gu_trace(recover(msg.get_source(), NodeMap::get_key(i), 
-                                         Range(low_seq, high_seq)));
-                    }
-                }
-            }
-        }
-    }
-    
-    return send_join_p;
-}
-#endif /* 0 */
-
 
 void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii)
 {
@@ -2602,132 +2565,8 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
             gu_trace(send_join(false));
         }
     }
-
     
     log_debug << "================ leave handle_join ==================";
-#if 0
-    inst.set_tstamp(Time::now());
-    
-    bool pre_consistent(is_consistent(msg));
-    
-    if (get_state() == S_OPERATIONAL && pre_consistent == true)
-    {
-        log_debug << self_string() << " redundant join message in state "
-                  << to_string(get_state()) << ": "
-                  << msg;
-        log_debug << "================ leave handle_join ==================";
-        send_gap(UUID::nil(), install_message->get_source_view_id(), 
-                 Range());
-        return;
-    }
-    
-    bool send_join_p(false);
-    if (get_state() == S_JOINING || get_state() == S_OPERATIONAL)
-    {
-        send_join_p = true;
-        shift_to(S_RECOVERY, false);
-    }
-    
-    assert(inst.get_installed() == false);
-    
-
-    
-    // Store join message
-    set_join(msg, msg.get_source());
-    
-    if (msg.get_source_view_id() == current_view.get_id()) 
-    {
-        const Seqno prev_safe(input_map->get_safe_seq());
-        if (msg.get_aru_seq() != Seqno::max())
-        {
-            input_map->set_safe_seq(msg.get_source(), msg.get_aru_seq());
-        }
-        
-        if (prev_safe != input_map->get_safe_seq())
-        {
-            log_debug << self_string() << " safe seq " 
-                      << prev_safe << " -> " << input_map->get_safe_seq();
-        }
-        
-        // Aru seqs are not the same
-        if (msg.get_aru_seq() != input_map->get_aru_seq())
-        {
-            states_compare(msg);
-            return;
-        }
-        
-        // Safe seqs are not the same
-        if (msg.get_seq() != input_map->get_safe_seq())
-        {
-            states_compare(msg);
-            return;
-        }
-    }
-    
-    
-    // Converge towards consensus
-    const MessageNodeList& instances = msg.get_node_list();
-    MessageNodeList::const_iterator selfi = instances.find(get_uuid());
-    if (selfi == instances.end()) 
-    {
-        // Source instance does not know about this instance, so there 
-        // is no sense to compare states yet
-        log_debug << self_string() << " this instance not known by source instance";
-        send_join_p = true;
-    } 
-    else if (current_view.get_id() != msg.get_source_view_id()) 
-    {
-        // Not coming from same views, there's no point to compare 
-        // states further
-        log_debug << self_string() 
-                  << " join from different view " 
-                  << msg.get_source_view_id();
-        if (is_consistent(msg) == false)
-        {
-            send_join_p = true;
-        }
-    } 
-    else 
-    {
-        if (states_compare(msg) == true)
-        {
-            send_join_p = true;
-        }
-    }
-    
-    const JoinMessage* self_join = NodeMap::get_value(self_i).get_join_message();
-    if (((self_join == 0 || is_consistent(*self_join) == false) &&
-         send_join_p == true) || pre_consistent == false)
-    {
-        send_join_p = true;
-    }
-    else
-    {
-        send_join_p = false;
-    }
-    
-    gu_trace(set_join(create_join(), get_uuid()));
-    
-    if (is_consensus())
-    { 
-        if (is_representative(get_uuid()))
-        {
-            log_debug << self_string() << " is consensus and representative";
-            gu_trace(send_install());
-        }
-        else if (pre_consistent == false)
-        {
-            gu_trace(send_join(false));
-        }
-    }    
-    else if (send_join_p == true && output.empty() == true)
-    {
-        gu_trace(send_join(false));
-    }
-    log_debug << self_string() << " send_join_p=" << send_join_p 
-              << " output empty=" << output.empty();
-    log_debug << "================ leave handle_join ==================";
-#endif /* 0 */
 }
 
 

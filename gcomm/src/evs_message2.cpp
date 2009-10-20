@@ -9,6 +9,7 @@
 #include <gu_exception.hpp>
 
 using namespace std;
+using namespace std::rel_ops;
 
 
 
@@ -214,7 +215,7 @@ size_t gcomm::evs::UserMessage::serialize(byte_t* const buf,
     gu_trace(offset = Message::serialize(buf, buflen, offset));
     gu_trace(offset = gcomm::serialize(user_type, buf, buflen, offset));
     
-    gcomm_assert(seq_range <= 0xff);
+    gcomm_assert(seq_range <= Seqno(0xff));
     uint8_t b = static_cast<uint8_t>(seq_range.get());
     gu_trace(offset = gcomm::serialize(b, buf, buflen, offset));
     gu_trace(offset = seq.serialize(buf, buflen, offset));

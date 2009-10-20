@@ -82,7 +82,7 @@ private:
 inline std::ostream& gcomm::operator<<(std::ostream& os, const ProtoUpMeta& um)
 {
     os << "proto_up_meta: { ";
-    if (um.get_source() != UUID::nil())
+    if (not (um.get_source() == UUID::nil()))
     {
         os << "source=" << um.get_source() << ",";
     }
