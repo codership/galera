@@ -13,6 +13,7 @@
 #include <check.h>
 
 using namespace std;
+using namespace std::rel_ops;
 using namespace gcomm;
 
 
@@ -41,9 +42,11 @@ struct UserContext : EventContext
 {
     PseudoFd pfd;
     EventLoop& el;
+    Time tstamp;
     UserContext(EventLoop& el_) : 
         pfd(),
-        el(el_)
+        el(el_),
+        tstamp(Time::zero())
     {
         el.insert(pfd.get(), this);
     }
@@ -67,7 +70,19 @@ struct UserContext : EventContext
         {
             
         }
+        if (e.get_cause() == Event::E_USER)
+        {
+            tstamp = Time::now();
+        }
     }
+
+    void queue_event(const Period& p)
+    {
+        el.queue_event(pfd.get(), Event(Event::E_USER, 
+                                         Time::now() + p));
+    }
+
+
 };
 
 
@@ -81,7 +96,13 @@ END_TEST
 
 START_TEST(test_eventloop_user)
 {
-    // TODO
+    EventLoop el;
+    UserContext uc(el);
+    Time start(Time::now());
+    Period sleep_p("PT0.5S");
+    uc.queue_event(sleep_p);
+    el.poll(1000000);
+    fail_unless(Time::now() >= start + sleep_p);
 }
 END_TEST
 

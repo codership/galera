@@ -1718,7 +1718,7 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
     
     if (get_state() == S_RECOVERY)
     {
-        log_warn << "state == S_RECOVERY";
+        log_debug << "state == S_RECOVERY";
         return EAGAIN;
     }
     
@@ -1764,7 +1764,7 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
     } 
     else 
     {
-        log_warn << "output.size()=" << output.size() << " "
+        log_debug << "output.size()=" << output.size() << " "
             "max_output_size=" << max_output_size;
         ret = EAGAIN;
     }
