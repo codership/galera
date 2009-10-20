@@ -291,20 +291,9 @@ void gcomm::evs::Proto::handle_retrans_timer()
     {
         if (output.empty() == true)
         {
-            if (input_map->get_aru_seq() == Seqno::max()  ||
-                input_map->get_aru_seq() == last_sent     ||
-                input_map->get_safe_seq() == Seqno::max() ||
-                input_map->get_safe_seq() == last_sent)
-            {
-                WriteBuf wb(0, 0);
-                gu_trace((void)send_user(&wb, 0xff, SP_DROP, send_window, 
+            WriteBuf wb(0, 0);
+            gu_trace((void)send_user(&wb, 0xff, SP_DROP, send_window, 
                                          Seqno::max()));
-            }
-            else
-            {
-                gcomm_assert(last_sent != Seqno::max());
-                gu_trace(resend(UUID::nil(), Range(last_sent, last_sent)));
-            }
         }
         else
         {
