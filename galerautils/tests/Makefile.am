@@ -36,6 +36,6 @@ gu_to_test_LDADD   = ../src/libgalerautils.la
 
 TESTS = $(noinst_PROGRAMS)
 
-# all: check
+all: check
 
 #
