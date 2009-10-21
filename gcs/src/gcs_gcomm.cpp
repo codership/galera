@@ -109,22 +109,6 @@ struct gcs_gcomm : public Toplay
 		   const ProtoUpMeta& um) 
     {
 
-	// null rb denotes eof (broken connection)
-	if (rb == 0) 
-        {
-            log_warn << "gcomm backed thread exit";
-            
-	    {
-                gu::Lock lock(mutex);
-                eq.push_back(vs_ev(0, ProtoUpMeta(), 0, 0, 0));
-                cond.signal();
-            }
-            
-            el->interrupt();
-            
-	    return;
-	}
-        
 	assert(rb || (um.has_view() == true && 
                       (um.get_view().get_type() == V_PRIM ||
                        um.get_view().get_type() == V_NON_PRIM)));
