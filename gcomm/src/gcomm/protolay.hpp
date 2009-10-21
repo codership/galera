@@ -15,8 +15,10 @@
 #include <gcomm/exception.hpp>
 #include <gcomm/logger.hpp>
 #include <gcomm/safety_prefix.hpp>
+#include "gcomm/time.hpp"
 
-
+#include <list>
+#include <utility>
 
 namespace gcomm
 {
@@ -27,8 +29,8 @@ namespace gcomm
     class Toplay;
     class Bottomlay;
 
-    void connect(Protolay*, Protolay*);
-    void disconnect(Protolay*, Protolay*);
+    void connect(Protolay*, Protolay*, int);
+    void disconnect(Protolay*, Protolay*, int);
 }
 
 /* message context to pass up with the data buffer? */
@@ -105,128 +107,163 @@ class gcomm::ProtoDownMeta
 {
     const uint8_t      user_type;
     const SafetyPrefix sp;
+    const UUID         source;
 public:
     
     ProtoDownMeta(const uint8_t user_type_ = 0xff, 
-                  const SafetyPrefix sp_   = SP_SAFE) : 
+                  const SafetyPrefix sp_   = SP_SAFE,
+                  const UUID& uuid_        = UUID::nil()) : 
         user_type(user_type_), 
-        sp(sp_) 
+        sp(sp_),
+        source(uuid_)
     { }
     
     uint8_t get_user_type() const { return user_type; }
     
     SafetyPrefix get_safety_prefix() const { return sp; }
+
+    const UUID& get_source() const { return source; }
 };
 
 class gcomm::Protolay
 {
-    int       context_id; // why there are two contexts but only one id?
-    Protolay *up_context;
-    Protolay *down_context;
-    bool      released;
-
+    typedef std::list<std::pair<Protolay*, int> > CtxList;
+    CtxList up_context;
+    CtxList down_context;
+    
     Protolay (const Protolay&);
     Protolay& operator=(const Protolay&);
-
+    
 protected:
-
-    Protolay() : context_id(-1), up_context(0), down_context(0), released(false)
+    
+    Protolay() : 
+        up_context(0), 
+        down_context(0)
     {}
-
+    
 public:
-
-    void release()
-    {
-        up_context   = 0;
-        down_context = 0;
-        released     = true;
-    }
     
     virtual ~Protolay() {}
 
+    virtual void connect(bool) { }
+    virtual void close() { }
+    
     /* apparently handles data from upper layer. what is return value? */
     virtual int  handle_down (WriteBuf *, const ProtoDownMeta&) = 0;
-
+    
     virtual void handle_up   (int cid, const ReadBuf *,
                               size_t, const ProtoUpMeta&) = 0;
-
     
-    void set_up_context(Protolay *up)
-    {
-	if (up_context) gcomm_throw_fatal << "Context already exists";
-
-	up_context = up;
-    }
     
-    void set_up_context(Protolay *up, int id)
+    void set_up_context(Protolay *up, int id = -1)
     {
-	if (up_context) gcomm_throw_fatal << "Up context already exists";
-        
-	context_id = id;
-	up_context = up;
-    }
-
-    void change_up_context(Protolay* old_up, Protolay* new_up)
-    {
-        if (up_context != old_up) 
+	if (std::find(up_context.begin(), up_context.end(),
+                      std::make_pair(up, id)) != up_context.end())
         {
-            gcomm_throw_fatal << "Context mismatch: " 
-                              << old_up 
-                              << " " 
-                              << up_context;
+            gcomm_throw_fatal << "up context already exists";
         }
-        
-        up_context = new_up;
-    }
-
-    void change_down_context(Protolay* old_down, Protolay* new_down)
-    {
-        if (down_context != old_down) 
-        {
-            gcomm_throw_fatal << "Context mismatch: " 
-                              << old_down 
-                              << " "
-                              << down_context;
-        }
-        
-        down_context = new_down;
-    }
-
-    void set_down_context(Protolay *down, int id)
-    {
-	context_id   = id;
-	down_context = down;
+	up_context.push_back(std::make_pair(up, id));
     }
     
-    void set_down_context(Protolay *down)
+    void set_down_context(Protolay *down, int id = -1)
     {
-	down_context = down;
+	if (std::find(down_context.begin(), 
+                      down_context.end(),
+                      std::make_pair(down, id)) != down_context.end())
+        {
+            gcomm_throw_fatal << "down context already exists";
+        }
+	down_context.push_back(std::make_pair(down, id));
     }
+    
+    void unset_up_context(Protolay* up, int id = -1)
+    {
+        std::list<std::pair<Protolay*, int> >::iterator i;
+	if ((i = std::find(up_context.begin(), 
+                           up_context.end(),
+                           std::make_pair(up, id))) == up_context.end())
+        { 
+            gcomm_throw_fatal << "up context does not exist";
+        }
+        up_context.erase(i);
+    }
+    
+    
+    void unset_down_context(Protolay* down, int id = -1)
+    {
+        std::list<std::pair<Protolay*, int> >::iterator i;
+	if ((i = std::find(down_context.begin(), 
+                           down_context.end(),
+                           std::make_pair(down, id))) == down_context.end()) 
+        {
+            gcomm_throw_fatal << "down context does not exist";
+        }
+        down_context.erase(i);
+    }
+
+    void release()
+    {
+        for (CtxList::iterator i = up_context.begin(); i !=  up_context.end();
+             ++i)
+        {
+            i->first->unset_down_context(this, i->second);
+            this->unset_up_context(i->first, i->second);
+        }
+        for (CtxList::iterator i = down_context.begin();
+             i != down_context.end(); ++i)
+        {
+            i->first->unset_up_context(this, i->second);
+            this->unset_down_context(i->first, i->second);
+        }
+    }
+
+
     
     /* apparently passed data buffer to the upper layer */
-    void pass_up(const ReadBuf *rb, size_t offset, const ProtoUpMeta& up_meta)
+    void pass_up(const ReadBuf *rb, 
+                 const size_t offset, 
+                 const ProtoUpMeta& up_meta)
     {
-	if (!up_context) {
-	    gcomm_throw_fatal << "Up context not defined, released = " 
-                              << released;
+	if (up_context.empty() == true)
+        {
+	    gcomm_throw_fatal << this << " up context(s) not set";
 	}
         
-	up_context->handle_up(context_id, rb, offset, up_meta);
+        CtxList::iterator i, i_next;
+        for (i = up_context.begin(); i != up_context.end(); i = i_next)
+        {
+            i_next = i, ++i_next;
+            i->first->handle_up(i->second, rb, offset, up_meta);
+        }
+
     }
     
+        
     /* apparently passes data buffer to lower layer, what is return value? */
     int pass_down(WriteBuf *wb, const ProtoDownMeta& down_meta)
     {
-	if (!down_context) {
-	    gcomm_throw_fatal << "Down context not defined, released = "
-                              << released;
+	if (down_context.empty() == true)
+        {
+            log_warn << this << " down context(s) not set";
+            return 0;
 	}
         
 	// Simple guard of wb consistency in form of testing 
 	// writebuffer header length. 
 	size_t down_hdrlen = wb->get_hdrlen();
-	int    ret         = down_context->handle_down(wb, down_meta);
+	int    ret         = 0;
+        
 
+        for (CtxList::iterator i = down_context.begin(); 
+             i != down_context.end(); ++i)
+        {
+            int err = i->first->handle_down(wb, down_meta);
+            if (err != 0)
+            {
+                ret = err;
+            }
+        }
+        
 	if (down_hdrlen != wb->get_hdrlen())
         {
             gcomm_throw_fatal << "hdr not rolled back";
@@ -234,6 +271,9 @@ public:
         
 	return ret;
     }    
+
+
+    virtual Time handle_timers() { return Time::max(); }
 };
 
 class gcomm::Toplay : public Protolay
@@ -254,16 +294,16 @@ class gcomm::Bottomlay : public Protolay
     }
 };
 
-inline void gcomm::connect(Protolay* down, Protolay* up)
+inline void gcomm::connect(Protolay* down, Protolay* up, int cid = -1)
 {
-    down->set_up_context(up);
-    up->set_down_context(down);
+    down->set_up_context(up, cid);
+    up->set_down_context(down, cid);
 }
 
-inline void gcomm::disconnect(Protolay* down, Protolay* up)
+inline void gcomm::disconnect(Protolay* down, Protolay* up, int cid = -1)
 {
-    down->change_up_context(up, 0);
-    up->change_down_context(down, 0);
+    down->unset_up_context(up, cid);
+    up->unset_down_context(down, cid);
 }
 
 

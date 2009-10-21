@@ -682,8 +682,8 @@ void TCP::handle_event (const int fd, const Event& pe)
 	    state = S_FAILED;
 	    log_debug << "TCP::handle() failed: " << strerror(ret);
 	    pass_up(0, 0, ProtoUpMeta());
-            return;
 	}
+        return;
     }
 //    else if (pe.get_cause() & Event::E_IN) - I think we should have OR here
     if (pe.get_cause() & Event::E_IN) 
@@ -691,7 +691,7 @@ void TCP::handle_event (const int fd, const Event& pe)
 	if (state == S_CONNECTED)
         {
 	    ssize_t ret = recv_nointr();
-
+            
 	    if (ret == 0)
             {
 		ReadBuf rb(recv_buf, recv_buf_offset, true);
@@ -704,13 +704,13 @@ void TCP::handle_event (const int fd, const Event& pe)
 		state = S_FAILED;
 		log_warn << "TCP::handle(): Failed";
 		pass_up(0, 0, ProtoUpMeta());
-                return;
 	    }
 	}
         else if (state == S_LISTENING)
         {
 	    pass_up(0, 0, ProtoUpMeta());
 	}
+        return;
     }
     else if (pe.get_cause() & Event::E_INVAL)
     {
@@ -718,7 +718,7 @@ void TCP::handle_event (const int fd, const Event& pe)
     }
     else
     {
-        log_warn << "unhnadled event";
+        log_warn << "unhnadled event" << pe.get_cause();
     }
 }
 

@@ -4,12 +4,14 @@
 #include "evs_input_map2.hpp"
 
 #include "gcomm/transport.hpp"
+#include "gcomm/conf.hpp"
 
 #include <stdexcept>
 #include <algorithm>
 
 using namespace std;
 using namespace std::rel_ops;
+using namespace gu;
 using namespace gcomm;
 using namespace gcomm::evs;
 
@@ -178,13 +180,8 @@ static bool msg_from_previous_view(const list<pair<ViewId, Time> >& views,
 }
 
 
-gcomm::evs::Proto::Proto(EventLoop* el_, 
-                         Transport* t, 
-                         const UUID& my_uuid_, 
-                         Monitor* mon_) : 
+gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     timers(),
-    mon(mon_),
-    tp(t),
     collect_stats(true),
     hs_safe("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
     delivering(false),
@@ -217,6 +214,38 @@ gcomm::evs::Proto::Proto(EventLoop* el_,
     
     input_map->insert_uuid(my_uuid);
     current_view.add_member(my_uuid, "");
+
+    URI uri(conf);
+    try
+    {
+        view_forget_timeout = 
+            Period(uri.get_option(Conf::EvsParamViewForgetTimeout));
+    } catch (NotFound&) { }
+    try
+    {
+        inactive_timeout = 
+            Period(uri.get_option(Conf::EvsParamInactiveTimeout));
+    } catch (NotFound&) { }
+    try
+    {
+        inactive_check_period = 
+            Period(uri.get_option(Conf::EvsParamInactiveCheckPeriod));
+    } catch (NotFound&) { }
+    try
+    {
+        consensus_timeout = 
+            Period(uri.get_option(Conf::EvsParamConsensusTimeout));
+    } catch (NotFound&) { }
+    try
+    {
+        retrans_period = Period(uri.get_option(Conf::EvsParamRetransPeriod));
+    } catch (NotFound&) { }
+    try
+    {
+        join_retrans_period = 
+            Period(uri.get_option(Conf::EvsParamJoinRetransPeriod));
+    } catch (NotFound&) { }
+
 }
 
 
@@ -1706,7 +1735,6 @@ void gcomm::evs::Proto::handle_up(int cid,
                                   size_t offset,
                                   const ProtoUpMeta& um)
 {
-    Critical crit(mon);
     
     Message msg;
     
@@ -1743,7 +1771,6 @@ void gcomm::evs::Proto::handle_up(int cid,
 
 int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
 {
-    Critical crit(mon);
     
     if (get_state() == S_RECOVERY)
     {

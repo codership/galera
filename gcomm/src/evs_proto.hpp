@@ -112,7 +112,7 @@ public:
     friend std::ostream& operator<<(std::ostream&, const Proto&);
 public:
 
-    Proto(EventLoop* el_, Transport* t, const UUID& my_uuid_, Monitor* mon_);
+    Proto(const UUID& my_uuid_, const std::string& conf = "evs://");
     ~Proto();
     
     const UUID& get_uuid() const { return my_uuid; }
@@ -223,7 +223,17 @@ public:
     // Protolay
     void handle_up(int, const ReadBuf*, size_t, const ProtoUpMeta&);
     int handle_down(WriteBuf* wb, const ProtoDownMeta& dm);
-    
+    void connect(bool first)
+    {
+        gu_trace(shift_to(S_JOINING));
+        gu_trace(send_join(first));
+    }
+
+    void close()
+    {
+        gu_trace(shift_to(S_LEAVING));
+        gu_trace(send_leave());
+    }
 
     // Timer functions do appropriate actions for timer handling 
     // and return next expiration time 
@@ -247,8 +257,6 @@ public:
     void reset_timers();
     Time handle_timers();
 private:
-    Monitor* mon;
-    Transport* tp;
     bool collect_stats;
     Histogram hs_safe;
     bool delivering;

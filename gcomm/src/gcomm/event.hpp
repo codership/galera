@@ -9,9 +9,9 @@
 #include <list>
 #include <set>
 #include <map>
+#include <vector>
 
-/* Forward declarations */
-struct pollfd;
+#include <poll.h>
 
 BEGIN_GCOMM_NAMESPACE
 
@@ -82,6 +82,7 @@ public:
 
 class EventLoop
 {
+public:
     typedef std::map<const int, EventContext *> CtxMap;
     typedef std::set<int> SigSet;
     typedef std::map<const int, SigSet > SigMap;
@@ -91,17 +92,19 @@ class EventLoop
     SigMap sig_map;
     EventMap event_map;
     EventMap::iterator active_event;
-    size_t n_pfds;
-    pollfd *pfds;
+    bool pfds_changed;
+    std::vector<pollfd> pfds;
     int compute_timeout(const int);
     void handle_queued_events();
     std::list<Protolay*> released;
+    size_t unset_fds;
     bool interrupted;
 
+private:
     EventLoop(const EventLoop&);
     void operator=(const EventLoop&);
-
 public:
+
     EventLoop();
     ~EventLoop();
 

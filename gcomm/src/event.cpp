@@ -19,6 +19,7 @@ using namespace std;
 using namespace std::rel_ops;
 using namespace gcomm;
 
+
 static inline int map_event_to_mask(const int e)
 {
     int ret = ((e & Event::E_IN)  ? POLLIN  : 0);
@@ -65,15 +66,6 @@ static std::string event_to_string (int e)
     return ret;
 }
 
-static struct pollfd *pfd_find(struct pollfd *pfds, const size_t n_pfds, 
-			       const int fd)
-{
-    for (size_t i = 0; i < n_pfds; i++) {
-	if (pfds[i].fd == fd)
-	    return &pfds[i];
-    }
-    return 0;
-}
 
 void EventLoop::insert(const int fd, EventContext *pctx)
 {
@@ -85,9 +77,11 @@ void EventLoop::insert(const int fd, EventContext *pctx)
 
 void EventLoop::erase(const int fd)
 {
-    unset(fd, Event::E_ALL);
-
-
+    if (fd >= 0)
+    {
+        unset(fd, Event::E_ALL);
+    }
+    
     EventMap::iterator i, i_next;
     for (i = event_map.begin(); i != event_map.end(); i = i_next)
     {
@@ -99,70 +93,72 @@ void EventLoop::erase(const int fd)
     }
 
     CtxMap::iterator ci = ctx_map.find(fd);
-
+    
     if (ci == ctx_map.end()) gcomm_throw_fatal << "Unknown fd";
-
+    
     log_debug << "fd: " << fd << " " << ci->second;
     
     ctx_map.erase(ci);
 }
 
+class PollFdCmpOp
+{
+public:
+    PollFdCmpOp(const int fd_) : fd(fd_) { }
+    bool operator()(const pollfd& cmp)
+    {
+        return (fd == cmp.fd);
+    } 
+private:
+    int const fd;
+};
+
 void EventLoop::set(const int fd, const int e)
 {
-    struct pollfd *pfd = 0;
+    vector<pollfd>::iterator pfd;
 
     if (fd < 0) gcomm_throw_fatal << "Negative fd: " << fd;
-
+    
     log_debug << "Setting event(s) " << event_to_string(e) << " on fd " << fd;
 
-    if ((pfd = pfd_find(pfds, n_pfds, fd)) == 0)
+    if ((pfd = find_if(pfds.begin(), pfds.end(), PollFdCmpOp(fd))) == pfds.end())
     {
-	void* tmp = realloc(pfds, (n_pfds + 1) * sizeof (struct pollfd));
-
-        if (tmp == 0 && n_pfds > 0) gcomm_throw_runtime (ENOMEM);
-
-        pfds = reinterpret_cast<struct pollfd *>(tmp);
-	pfd  = &pfds[n_pfds];
-
-	pfd->fd      = fd;
-	pfd->events  = 0;
-	pfd->revents = 0;
-
-	++n_pfds;
+        pollfd ins;
+        ins.fd = fd;
+        ins.events = static_cast<short int>(e);
+        ins.revents = 0;
+        pfds.push_back(ins);
+        pfds_changed = true;
     }
-
-    pfd->events = static_cast<short int>(pfd->events | static_cast<short int>(map_event_to_mask(e)));
+    else
+    {
+        short int mask = static_cast<short int>(
+            pfd->events | static_cast<short int>(map_event_to_mask(e)));
+        pfd->events = mask;
+    }
 }
 
 void EventLoop::unset(const int fd, const int e)
 {
+    if (fd < 0) gcomm_throw_fatal << "negative fd";
     assert (e != Event::E_NONE);
-
-    struct pollfd *pfd = 0;
-
-    log_debug << "Clearing event(s) " << event_to_string(e) << " from fd "<<fd; 
-
-    if ((pfd = pfd_find(pfds, n_pfds, fd)) != 0)
+    
+    vector<pollfd>::iterator pfd = find_if(pfds.begin(), pfds.end(), PollFdCmpOp(fd));
+    if (pfd != pfds.end())
     {
-	pfd->events = static_cast<short int>(pfd->events & static_cast<short int>(~map_event_to_mask(e)));
-
-	if (pfd->events == 0)
+        short int mask = static_cast<short int>(
+            pfd->events & ~static_cast<short int>(map_event_to_mask(e)));
+        log_debug << "Clearing event(s) " << event_to_string(e) 
+                  << " from fd "<<fd; 
+        pfd->events = mask;
+        if (pfd->events == 0)
         {
-	    memmove(&pfd[0], &pfd[1],
-                    (n_pfds - (pfd - pfds)) * sizeof(struct pollfd));
-
-	    void* tmp = realloc(pfds, n_pfds*sizeof(struct pollfd));
-
-            if (tmp == 0 && n_pfds > 0) gcomm_throw_runtime(ENOMEM);
-
-            pfds = reinterpret_cast<struct pollfd *>(tmp);
-	    --n_pfds;
-	}
+            unset_fds++;
+        }
     }
-
-    for (size_t i = 0; i < n_pfds; ++i)
+    else
     {
-        assert(pfds[i].fd != fd || pfds[i].events != 0);
+        log_warn << "descriptor " << fd << " not found from poll set";
     }
 }
 
@@ -253,16 +249,26 @@ int EventLoop::compute_timeout(const int max_val)
 }
 
 
+
+class ZeroMaskCmpOp
+{
+public:
+    ZeroMaskCmpOp() { }
+    
+    bool operator()(const pollfd& pfd) const
+    {
+        return (pfd.events == 0);
+    }
+};
+
 int EventLoop::poll(const int timeout)
 {
-    int p_cnt = 0;
     interrupted = false;
-
     handle_queued_events();
     
     if (interrupted) return -1;
 
-    int p_ret = ::poll(pfds, n_pfds, compute_timeout(timeout));
+    int p_ret = ::poll(&pfds[0], pfds.size(), compute_timeout(timeout));
     int err   = errno;
 
     if (p_ret == -1 && err == EINTR)
@@ -275,79 +281,42 @@ int EventLoop::poll(const int timeout)
     }
     else
     {
-        for (size_t i = 0; i < n_pfds; )
+        p_ret = 0;
+        pfds_changed = false;
+        for (vector<pollfd>::iterator i = pfds.begin(); i != pfds.end(); ++i)
         {
-            size_t last_n_pfds = n_pfds;
-            int e = map_mask_to_event(pfds[i].revents);
-
-            if (e != Event::E_NONE)
+            if (i->revents != 0)
             {
-                CtxMap::iterator map_i;
-
-                if ((map_i = ctx_map.find(pfds[i].fd)) != ctx_map.end())
+                EventLoop::CtxMap::iterator ctx_i = ctx_map.find(i->fd);
+                if (ctx_i != ctx_map.end())
                 {
-                    if (map_i->second == 0) gcomm_throw_fatal;
-
-                    log_debug << "handling "
-                              << pfds[i].fd << " "
-                              << map_i->second << " "
-                              << pfds[i].revents;
-
-                    pfds[i].revents = 0;
-
-                    gu_trace(map_i->second->handle_event(pfds[i].fd, Event(e)));
-
-                    p_cnt++;
-
-                    if (interrupted) goto out;
+                    ctx_i->second->handle_event(i->fd, 
+                                                map_mask_to_event(i->revents));
+                    ++p_ret;
                 }
-                else 
+                if (pfds_changed == true)
                 {
-                    gcomm_throw_fatal << "No ctx for fd found";
+                    break;
                 }
-            }
-            else
-            {
-                if (pfds[i].revents)
-                {
-                    gcomm_throw_fatal << "Unhandled poll events";
-                }
-            }
-
-            if (last_n_pfds != n_pfds)
-            {
-                /* pfds has changed, lookup for first nonzero revents from 
-                 * beginning */
-                for (size_t j = 0; j < n_pfds; ++j)
-                {
-                    if (pfds[j].revents != 0)
-                    {
-                        i = j;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                ++i;
             }
         }
-    }
-    
-    // assert(p_ret == p_cnt);
-    if (p_ret != p_cnt) {
-        log_warn << "p_ret (" << p_ret << ") != p_cnt (" << p_cnt << ")";
+    }   
+    if (unset_fds > 0)
+    {
+        vector<pollfd>::iterator i;
+        while ((i = find_if(pfds.begin(), pfds.end(), ZeroMaskCmpOp())) 
+               != pfds.end())
+        {
+            pfds.erase(i);
+        }
+        unset_fds = 0;
     }
     
     handle_queued_events();
     
     // Garbage collection
-    for (std::list<Protolay*>::iterator i = released.begin(); i != released.end(); ++i)
-    {
-        delete *i;
-    }
+    for_each(released.begin(), released.end(), DeleteObjectOp());
     released.clear();
-out:
     if (interrupted)
         return -1;
     return p_ret;
@@ -364,10 +333,12 @@ EventLoop::EventLoop() :
     sig_map(),
     event_map(),
     active_event(event_map.end()),
-    n_pfds(0),
+    pfds_changed(false),
     pfds(0),
     released(),
+    unset_fds(0),
     interrupted(false)
+
 {
 }
 
@@ -376,7 +347,7 @@ EventLoop::~EventLoop()
 {
     event_map.clear();
     ctx_map.clear();
-    free(pfds);
+    pfds.clear();
 }
 
 

@@ -5,6 +5,7 @@
 #include "pc_proto.hpp"
 
 #include "check_templ.hpp"
+#include "check_trace.hpp"
 #include "gcomm/pseudofd.hpp"
 
 #include <check.h>

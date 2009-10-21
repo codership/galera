@@ -17,9 +17,14 @@
 
 #include "check_gcomm.hpp"
 #include "check_templ.hpp"
+#include "check_trace.hpp"
+
+#include "gcomm/conf.hpp"
 
 #include <vector>
 #include <set>
+
+
 
 #include "check.h"
 
@@ -397,203 +402,7 @@ START_TEST(test_input_map_random_insert)
 }
 END_TEST
 
-class Msg
-{
-public:
-    Msg(const UUID& source_           = UUID::nil(), 
-        const ViewId& source_view_id_ = ViewId(),
-        const int64_t seq_            = -1) : 
-        source(source_), 
-        source_view_id(source_view_id_), 
-        seq(seq_) 
-    { }
-    
-    const UUID& get_source() const { return source; }
 
-    const ViewId& get_source_view_id() const { return source_view_id; }
-    
-    int64_t get_seq() const { return seq; }
-    
-    bool operator==(const Msg& cmp) const
-    {
-        return (source         == cmp.source         && 
-                source_view_id == cmp.source_view_id &&
-                seq            == cmp.seq              );  
-        
-    }
-
-private:
-    UUID    source;
-    ViewId  source_view_id;
-    int64_t seq;
-};
-
-ostream& operator<<(ostream& os, const Msg& msg)
-{
-    return (os << "(" << msg.get_source() << "," << msg.get_source_view_id() << "," << msg.get_seq() << ")");
-}
-
-class ViewTrace
-{
-public:
-    ViewTrace(const View& view_) : view(view_), msgs() { }
-    
-    void insert_msg(const Msg& msg)
-        throw (gu::Exception)
-    {
-        switch (view.get_type())
-        {
-        case V_REG:
-            gcomm_assert(view.get_id() == msg.get_source_view_id());
-            gcomm_assert(contains(msg.get_source()) == true) 
-                << "msg source " << msg.get_source() << " not int view " 
-                << view;            
-            break;
-        case V_TRANS:
-            gcomm_assert(view.get_id().get_uuid() == 
-                         msg.get_source_view_id().get_uuid() &&
-                         view.get_id().get_seq() ==
-                         msg.get_source_view_id().get_seq());
-            break;
-        case V_NON_PRIM:
-        case V_PRIM:
-            gcomm_throw_fatal << "not implemented";
-            break;
-        case V_NONE:
-            gcomm_throw_fatal;
-            break;
-        }
-
-        msgs.push_back(msg);
-    }
-    
-    const View& get_view() const { return view; }
-    
-    const deque<Msg>& get_msgs() const { return msgs; }
-    
-    bool operator==(const ViewTrace& cmp) const
-    {
-        // Note: Cannot compare joining members since seen differently
-        // on different merging subsets
-        return (view.get_members()     == cmp.view.get_members()     && 
-                view.get_left()        == cmp.view.get_left()        &&
-                view.get_partitioned() == cmp.view.get_partitioned() &&
-                msgs                   == cmp.msgs                     );
-    }
-private:
-    
-    bool contains(const UUID& uuid) const
-    {
-        return (view.get_members().find(uuid) != view.get_members().end() ||
-                view.get_left().find(uuid)    != view.get_left().end() ||
-                view.get_partitioned().find(uuid) != view.get_partitioned().end());
-    }
-    
-    View       view;
-    deque<Msg> msgs;
-};
-
-ostream& operator<<(ostream& os, const ViewTrace& vtr)
-{
-    os << vtr.get_view() << ": ";
-    copy(vtr.get_msgs().begin(), vtr.get_msgs().end(),
-         ostream_iterator<const Msg>(os, " "));
-    return os;
-}
-
-
-
-class Trace
-{
-public:
-    class ViewTraceMap : public Map<ViewId, ViewTrace> { };
-
-    Trace() : views(), current_view(views.end()) { }
-
-    void insert_view(const View& view)
-    {
-        gu_trace(current_view = views.insert_checked(
-                     make_pair(view.get_id(), ViewTrace(view))));
-        
-    }
-    void insert_msg(const Msg& msg)
-    {
-        gcomm_assert(current_view != views.end()) << "no view set before msg delivery";
-        gu_trace(ViewTraceMap::get_value(current_view).insert_msg(msg));
-    }
-    const ViewTraceMap& get_view_traces() const { return views; }
-
-    const ViewTrace& get_current_view_trace() const
-    {
-        gcomm_assert(current_view != views.end());
-        return ViewTraceMap::get_value(current_view);
-    }
-
-private:
-    ViewTraceMap views;
-    ViewTraceMap::iterator current_view;
-};
-
-
-ostream& operator<<(ostream& os, const Trace& tr)
-{
-    os << "trace: \n";
-    os << tr.get_view_traces();
-    return os;
-}
-
-class DummyUser : public Toplay
-{
-    
-public:
-    DummyUser(const UUID& uuid_) : uuid(uuid_), curr_seq(0), tr() { }
-    ~DummyUser()
-    {
-        log_debug << uuid << " " << tr;
-    }
-    void handle_up(int cid, const ReadBuf* rb, size_t offset,
-                   const ProtoUpMeta& um)
-    {
-        log_debug << uuid << ": " << um;
-        if (um.has_view() == true)
-        {
-            gu_trace(tr.insert_view(um.get_view()));
-        }
-        else
-        {
-            int64_t seq;
-            gu_trace((void)unserialize(rb->get_buf(), rb->get_len(), 
-                                       offset, &seq));
-            gu_trace(tr.insert_msg(
-                         Msg(um.get_source(), um.get_source_view_id(), seq)));
-        }
-    }
-
-    void send()
-    {
-        const int64_t seq(curr_seq);
-        byte_t buf[sizeof(seq)];
-        size_t sz;
-        gu_trace(sz = serialize(seq, buf, sizeof(buf), 0));
-        WriteBuf wb(buf, sz);
-        int err = pass_down(&wb, ProtoDownMeta(0));
-        if (err != 0)
-        {
-            log_debug << "failed to send: " << strerror(err);
-        }
-        else
-        {
-            ++curr_seq;
-        }
-    }
-
-    const Trace& get_trace() const { return tr; }
-
-private:
-    UUID uuid;
-    int64_t curr_seq;
-    Trace tr;
-};
 
 
 static ReadBuf* get_msg(DummyTransport* tp, Message* msg, bool release = true)
@@ -648,16 +457,25 @@ static void single_join(DummyTransport* t, Proto* p)
     
 }
 
+class DummyUser : public Toplay
+{
+public:
+    void handle_up(int, const ReadBuf*, size_t, const ProtoUpMeta&)
+    {
+
+    }
+};
+
 START_TEST(test_proto_single_join)
 {
     log_info << "START";
     EventLoop el;
     UUID uuid(1);
     DummyTransport t(uuid);
-    DummyUser u(uuid);
-    Proto p(&el, &t, uuid, 0);
-    connect(&t, &p);
-    connect(&p, &u);
+    DummyUser u;
+    Proto p(uuid);
+    gcomm::connect(&t, &p);
+    gcomm::connect(&p, &u);
     single_join(&t, &p);
 }
 END_TEST
@@ -752,14 +570,14 @@ START_TEST(test_proto_double_join)
     EventLoop el;
     UUID uuid1(1), uuid2(2);
     DummyTransport t1(uuid1), t2(uuid2);
-    DummyUser u1(uuid1), u2(uuid2);
-    Proto p1(&el, &t1, uuid1, 0), p2(&el, &t2, uuid2, 0);
+    DummyUser u1, u2;
+    Proto p1(uuid1), p2(uuid2);
 
-    connect(&t1, &p1);
-    connect(&p1, &u1);
+    gcomm::connect(&t1, &p1);
+    gcomm::connect(&p1, &u1);
 
-    connect(&t2, &p2);
-    connect(&p2, &u2);
+    gcomm::connect(&t2, &p2);
+    gcomm::connect(&p2, &u2);
 
     single_join(&t1, &p1);
     double_join(&t1, &p1, &t2, &p2);
@@ -767,440 +585,35 @@ START_TEST(test_proto_double_join)
 }
 END_TEST
 
-class DummyNode
+
+static DummyNode* create_dummy_node(size_t idx)
 {
-public:
-    DummyNode(size_t idx, EventLoop* el) : 
-        index (idx),
-        uuid  (UUID(static_cast<int32_t>(idx))),
-        u     (uuid), 
-        t     (uuid),
-        p     (el, &t, uuid, 0),
-        cvi   ()
-    { 
-        connect(&t, &p);
-        connect(&p, &u);
-    }
-    
-    ~DummyNode()
+    const string conf = "evs://?" + Conf::EvsParamViewForgetTimeout + "=PT1H&"
+        + Conf::EvsParamInactiveTimeout + "=PT1H&"
+        + Conf::EvsParamInactiveCheckPeriod + "=PT1H&"
+        + Conf::EvsParamConsensusTimeout + "=PT1H&"
+        + Conf::EvsParamRetransPeriod + "=PT0.001S&"
+        + Conf::EvsParamJoinRetransPeriod + "=PT0S";
+    list<Protolay*> protos;
+    try
     {
-        disconnect(&t, &p);
-        disconnect(&p, &u);
+        UUID uuid(static_cast<int32_t>(idx));
+        protos.push_back(new DummyTransport(uuid, false));
+        protos.push_back(new Proto(uuid, conf));
+        return new DummyNode(idx, protos);
     }
-    
-    DummyTransport* get_tp() { return &t; }
-
-    const UUID& get_uuid() const { return uuid; }
-
-    size_t get_index() const { return index; }
-
-    void join(bool first)
+    catch (...)
     {
-        gu_trace(p.shift_to(Proto::S_JOINING));
-        gu_trace(p.send_join(first));
-    }
-    
-    void leave()
-    {
-        gu_trace(p.shift_to(Proto::S_LEAVING));
-        gu_trace(p.send_leave());
-    }
-    
-    void send()
-    {
-        gu_trace(u.send());
-    }
-    
-    const Trace& get_trace() const { return u.get_trace(); }
-    
-    void set_cvi(const ViewId& vi) 
-    { 
-        log_debug << "setting cvi to " << vi;
-        cvi = vi; 
-    }
-
-    bool in_cvi() const 
-    { 
-        return (u.get_trace().get_view_traces().empty() == false &&
-                u.get_trace().get_view_traces().find(cvi) != 
-                u.get_trace().get_view_traces().end()); 
-    }
-
-    void expire_timers()
-    {
-        p.handle_retrans_timer();
-    }
-    
-private:
-    size_t index;
-    UUID uuid;
-    DummyUser u;
-    DummyTransport t;
-    Proto p;
-    ViewId cvi;
-};
-
-
-class ChannelMsg
-{
-public:
-    ChannelMsg(const ReadBuf* rb_, const UUID& source_) :
-        rb(rb_ != 0 ? rb_->copy() : 0),
-        source(source_)
-    { }
-    ReadBuf* get_rb() { return rb; }
-    const UUID& get_source() { return source; }
-private:
-    ReadBuf* rb;
-    UUID source;
-};
-
-class Channel
-{
-public:
-    Channel(const size_t ttl_ = 1, 
-            const size_t latency_ = 1, 
-            const double loss_ = 1.) :
-        ttl(ttl_),
-        latency(latency_),
-        loss(loss_),
-        queue()
-    { }
-
-    void put(const ReadBuf* rb, const UUID& source) 
-    { 
-        queue.push_back(make_pair(latency, ChannelMsg(rb, source)));
-    }
-
-    ChannelMsg get()
-    {
-        while (queue.empty() == false)
-        {
-            pair<size_t, ChannelMsg>& p(queue.front());
-            if (p.first == 0)
-            {
-                // todo: packet loss goes here
-                if (get_loss() < 1.)
-                {
-                    double rnd(double(rand())/double(RAND_MAX));
-                    if (get_loss() < rnd)
-                    {
-                        p.second.get_rb()->release();
-                        queue.pop_front();
-                        return ChannelMsg(0, UUID::nil());
-                    }
-                }
-                ChannelMsg ret(p.second);
-                queue.pop_front();
-                return ret;
-            }
-            else
-            {
-                --p.first;
-                return ChannelMsg(0, UUID::nil());
-            }
-        }
-        return ChannelMsg(0, UUID::nil());
-    }
-    
-    void set_ttl(const size_t t) { ttl = t; }
-    size_t get_ttl() const { return ttl; }
-    void set_latency(const size_t l) 
-    { 
-        gcomm_assert(l > 0);
-        latency = l; 
-    }
-    size_t get_latency() const { return latency; }
-    void set_loss(const double l) { loss = l; }
-    double get_loss() const { return loss; }
-    size_t get_n_msgs() const
-    {
-        return queue.size();
-    }
-private:
-    size_t ttl;
-    size_t latency;
-    double loss;
-    deque<pair<size_t, ChannelMsg> > queue;
-};
-
-ostream& operator<<(ostream& os, const Channel& ch)
-{
-    return os;
-}
-
-class MatrixElem
-{
-public:
-    MatrixElem(const size_t ii_, const size_t jj_) : ii(ii_), jj(jj_) { }
-    size_t get_ii() const { return ii; }
-    size_t get_jj() const { return jj; }
-    bool operator<(const MatrixElem& cmp) const
-    {
-        return (ii < cmp.ii || (ii == cmp.ii && jj < cmp.jj));
-    }
-private:
-    size_t ii;
-    size_t jj;
-};
-
-
-ostream& operator<<(ostream& os, const MatrixElem& me)
-{
-    return (os << "(" << me.get_ii() << "," << me.get_jj() << ")");
-}
-
-class LinkOp
-{
-public:
-    LinkOp(const size_t idx_, map<MatrixElem, Channel>& prop_) : 
-        idx(idx_), prop(prop_) { }
-    void operator()(const map<size_t, DummyNode*>::value_type& l) const
-    {
-        if (l.first != idx)
-        {
-            gcomm_assert(
-                prop.insert(
-                    make_pair(MatrixElem(idx, l.first), Channel())).second == true);
-            gcomm_assert(
-                prop.insert(
-                    make_pair(MatrixElem(l.first, idx), Channel())).second == true);
-        }
-    }
-private:
-    size_t idx;
-    map<MatrixElem, Channel>& prop;
-};
-
-class ReadTpOp
-{
-public:
-    ReadTpOp(map<MatrixElem, Channel>& prop_) : prop(prop_) { }
-
-    void operator()(const map<size_t, DummyNode*>::value_type& vt)
-    {
-        ReadBuf* rb = vt.second->get_tp()->get_out();
-        if (rb != 0)
-        {
-            for (map<MatrixElem, Channel>::iterator i = prop.begin();
-                 i != prop.end(); ++i)
-            {
-                if (i->first.get_ii() == vt.first)
-                {
-                    i->second.put(rb, vt.second->get_uuid());
-                }
-            }
-            rb->release();
-        }
-    }
-private:
-    map<MatrixElem, Channel>& prop;
-};
-
-
-class PropagateOp
-{
-public:
-    PropagateOp(map<size_t, DummyNode*>& tp_) : tp(tp_) { }
-    
-    void operator()(map<MatrixElem, Channel>::value_type& vt)
-    {
-        ChannelMsg cmsg(vt.second.get());
-        if (cmsg.get_rb() != 0)
-        {
-            map<size_t, DummyNode*>::iterator i(tp.find(vt.first.get_jj()));
-            gcomm_assert(i != tp.end());
-            gu_trace(i->second->get_tp()->handle_up(-1, cmsg.get_rb(), 0, 
-                                                    ProtoUpMeta(cmsg.get_source())));
-            cmsg.get_rb()->release();
-        }
-    }
-    
-private:
-    map<size_t, DummyNode*>& tp;
-};
-
-class ExpireTimersOp
-{
-public:
-    ExpireTimersOp() { }
-    void operator()(map<size_t, DummyNode*>::value_type& vt)
-    {
-        vt.second->expire_timers();
-    }
-};
-
-
-class PropagationMatrix
-{
-public:
-    PropagationMatrix() : tp(), prop() { }
-    
-
-    
-    void insert_tp(const size_t idx, DummyNode* t)
-    {
-        gcomm_assert(tp.insert(make_pair(idx, t)).second == true);
-        for_each(tp.begin(), tp.end(), LinkOp(idx, prop));
-    }
-
-    void set_latency(const size_t ii, const size_t jj, const size_t lat)
-    {
-        map<MatrixElem, Channel>::iterator i = prop.find(MatrixElem(ii, jj));
-        gcomm_assert(i != prop.end());
-        i->second.set_latency(lat);
-    }
-
-    void set_loss(const size_t ii, const size_t jj, const double loss)
-    {
-        map<MatrixElem, Channel>::iterator i = prop.find(MatrixElem(ii, jj));
-        gcomm_assert(i != prop.end());
-        i->second.set_loss(loss);
-    }
-
-    void propagate_n(size_t n)
-    {
-        while (n-- > 0)
-        {
-            for_each(tp.begin(), tp.end(), ReadTpOp(prop));
-            for_each(prop.begin(), prop.end(), PropagateOp(tp));
-        }
-    }
-
-    void propagate_until_empty()
-    {
-        do
-        {
-            for_each(prop.begin(), prop.end(), PropagateOp(tp));
-            for_each(tp.begin(), tp.end(), ReadTpOp(prop));
-        }
-        while (count_channel_msgs() > 0);
-    }
-
-    void propagate_until_cvi()
-    {
-        bool all_in = false;
-        do
-        {
-            propagate_until_empty();
-            all_in = all_in_cvi();
-            if (all_in == false)
-            {
-                for_each(tp.begin(), tp.end(), ExpireTimersOp());
-            }
-        }
-        while (all_in == false);
-        
-    }
-
-    friend ostream& operator<<(ostream&, const PropagationMatrix&);
-
-private:
-
-    size_t count_channel_msgs() const
-    {
-        size_t ret = 0;
-        for (map<MatrixElem, Channel>::const_iterator i = prop.begin(); 
-             i != prop.end(); ++i)
-        {
-            ret += i->second.get_n_msgs();
-        }
-        return ret;
-    }
-
-    bool all_in_cvi() const
-    {
-        for (map<size_t, DummyNode*>::const_iterator i = tp.begin(); 
-             i != tp.end(); ++i)
-        {
-            if (i->second->in_cvi() == false)
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    map<size_t, DummyNode*> tp;
-    map<MatrixElem, Channel> prop;
-};
-
-ostream& operator<<(ostream& os, const map<MatrixElem, Channel>::value_type& v)
-{
-    return (os << "(" << v.first.get_ii() << "," << v.first.get_jj() << ")");
-}
-
-ostream& operator<<(ostream& os, const PropagationMatrix& prop)
-{
-    os << "(";
-    copy(prop.prop.begin(), prop.prop.end(), 
-         ostream_iterator<const map<MatrixElem, Channel>::value_type>(os, ","));
-    os << ")";
-    return os;
-}
-
-
-void check_traces(const Trace& t1, const Trace& t2)
-{
-    for (Trace::ViewTraceMap::const_iterator 
-             i = t1.get_view_traces().begin(); i != t1.get_view_traces().end();
-         ++i)
-    {
-        Trace::ViewTraceMap::const_iterator i_next(i);
-        ++i_next;
-        if (i_next != t1.get_view_traces().end())
-        {
-            const Trace::ViewTraceMap::const_iterator 
-                j(t2.get_view_traces().find(Trace::ViewTraceMap::get_key(i)));
-            Trace::ViewTraceMap::const_iterator j_next(j);
-            ++j_next;
-            // Note: Comparision is meaningful if also next view is the 
-            // same
-            if (j             != t2.get_view_traces().end() && 
-                j_next        != t2.get_view_traces().end() &&
-                i_next->first == j_next->first          )
-            {
-                gcomm_assert(*i == *j) << 
-                    "traces differ: " << *i << " != " << *j;
-            }
-        }
+        for_each(protos.begin(), protos.end(), DeleteObjectOp());
+        throw;
     }
 }
-
-class CheckTraceOp
-{
-public:
-    CheckTraceOp(const vector<DummyNode*>& nvec_) : nvec(nvec_) { }
-    
-    void operator()(const DummyNode* n) const
-    {
-        for (vector<DummyNode*>::const_iterator i = nvec.begin(); 
-             i != nvec.end();
-             ++i)
-        {
-            if ((*i)->get_index() != n->get_index())
-            {
-                gu_trace(check_traces((*i)->get_trace(), n->get_trace()));
-            }
-        }
-    }
-
-private:
-    const vector<DummyNode*>& nvec;
-};
-
-static void check_trace(const vector<DummyNode*>& nvec)
-{
-    for_each(nvec.begin(), nvec.end(), CheckTraceOp(nvec));
-}
-
-
 
 static void join_node(PropagationMatrix* p, 
                       DummyNode* n, bool first = false)
 {
-    gu_trace(p->insert_tp(n->get_index(), n));
-    gu_trace(n->join(first));
+    gu_trace(p->insert_tp(n));
+    gu_trace(n->connect(first));
 }
 
 
@@ -1222,7 +635,7 @@ START_TEST(test_proto_join_n)
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(new DummyNode(i, &el));
+        dn.push_back(create_dummy_node(i));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1231,7 +644,7 @@ START_TEST(test_proto_join_n)
         gu_trace(prop.propagate_until_empty());
     }
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), delete_object());
+    for_each(dn.begin(), dn.end(), DeleteObjectOp());
 }
 END_TEST
 
@@ -1245,7 +658,7 @@ START_TEST(test_proto_join_n_w_user_msg)
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(new DummyNode(i, &el));
+        dn.push_back(create_dummy_node(i));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1258,7 +671,7 @@ START_TEST(test_proto_join_n_w_user_msg)
         }
     }
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), delete_object());
+    for_each(dn.begin(), dn.end(), DeleteObjectOp());
 }
 END_TEST
 
@@ -1273,7 +686,7 @@ START_TEST(test_proto_join_n_lossy)
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(new DummyNode(i, &el));
+        dn.push_back(create_dummy_node(i));
     }
 
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1293,7 +706,7 @@ START_TEST(test_proto_join_n_lossy)
         gu_trace(prop.propagate_until_cvi());
     }
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), delete_object());
+    for_each(dn.begin(), dn.end(), DeleteObjectOp());
 }
 END_TEST
 
@@ -1308,7 +721,7 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(new DummyNode(i, &el));
+        dn.push_back(create_dummy_node(i));
     }
 
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1332,7 +745,7 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
         }
     }
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), delete_object());
+    for_each(dn.begin(), dn.end(), DeleteObjectOp());
 }
 END_TEST
 
@@ -1346,7 +759,7 @@ START_TEST(test_proto_leave_n)
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(new DummyNode(i, &el));
+        dn.push_back(create_dummy_node(i));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1357,12 +770,12 @@ START_TEST(test_proto_leave_n)
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        dn[i]->leave();
+        dn[i]->close();
         gu_trace(prop.propagate_until_empty());
     }
 
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), delete_object());
+    for_each(dn.begin(), dn.end(), DeleteObjectOp());
 }
 END_TEST
 
@@ -1376,7 +789,7 @@ START_TEST(test_proto_leave_n_w_user_msg)
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(new DummyNode(i, &el));
+        dn.push_back(create_dummy_node(i));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1391,12 +804,12 @@ START_TEST(test_proto_leave_n_w_user_msg)
         {
             gu_trace(send_n(dn[j], 8));
         }
-        dn[i]->leave();
+        dn[i]->close();
         gu_trace(prop.propagate_until_empty());
     }
 
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), delete_object());
+    for_each(dn.begin(), dn.end(), DeleteObjectOp());
 }
 END_TEST
 
@@ -1410,7 +823,7 @@ START_TEST(test_proto_leave_n_lossy)
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(new DummyNode(i, &el));
+        dn.push_back(create_dummy_node(i));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1438,14 +851,15 @@ START_TEST(test_proto_leave_n_lossy)
             dn[j]->set_cvi(ViewId(V_REG, dn[i + 1]->get_uuid(), 
                                   static_cast<uint32_t>(last_view_seq + i + 1)));
         }
-        dn[i]->leave();
+        dn[i]->close();
         gu_trace(prop.propagate_until_cvi());
     }
     
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), delete_object());
+    for_each(dn.begin(), dn.end(), DeleteObjectOp());
 }
 END_TEST
+
 
 Suite* evs2_suite()
 {

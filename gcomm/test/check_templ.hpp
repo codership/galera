@@ -80,80 +80,8 @@ namespace gcomm
 
 
 
-    class DummyTransport : public Transport 
-    {
-        UUID uuid;
-        std::deque<ReadBuf*> out;
-    public:
-        DummyTransport(const UUID& uuid_ = UUID::nil()) :
-            Transport(URI("dummy:"), 0, 0),            
-            uuid(uuid_),
-            out()
-        {}
-        
-        ~DummyTransport() 
-        {
-            std::for_each(out.begin(), out.end(), release_rb);
-            out.clear();
-        }
-    
-        bool supports_uuid() const { return true; }
-        
-        const UUID& get_uuid() const { return uuid; }
 
 
-        size_t get_max_msg_size() const { return (1U << 31); }
-        
-        void connect() { }
-        
-        void close() { }
-    
-
-        void listen() 
-        {
-            gcomm_throw_fatal << "not implemented";
-        }
-        
-        Transport *accept() 
-        {
-            gcomm_throw_fatal << "not implemented";
-            return 0;
-        }
-        
-        void handle_up(int cid, const ReadBuf* rb, size_t roff, 
-                       const ProtoUpMeta& um)
-        {
-            pass_up(rb, roff, um);
-        }
-        
-        int handle_down(WriteBuf *wb, const ProtoDownMeta& dm) 
-        {
-            out.push_back(wb->to_readbuf());
-            return 0;
-        }
-    
-        
-        
-        ReadBuf* get_out() 
-        {
-            if (out.empty())
-            {
-                return 0;
-            }
-            ReadBuf* rb = out.front();
-            out.pop_front();
-            return rb;
-        }
-    };
-
-    struct delete_object
-    {
-        template <typename T>
-        void operator()(T* t)
-        {
-            delete t;
-        }
-    };
 
 } // namespace gcomm
 

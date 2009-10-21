@@ -952,7 +952,7 @@ void GMCast::start()
     
     listener = Transport::create(listen_uri, event_loop);
     gu_trace (listener->listen());
-    listener->set_up_context(this, listener->get_fd());
+    gcomm::connect(listener, this, listener->get_fd());
 
     log_debug << "Listener: " << listener->get_fd();
 
@@ -996,7 +996,7 @@ void GMCast::gmcast_accept()
 {
     Transport* tp = listener->accept();
 
-    tp->set_up_context(this, tp->get_fd());
+    gcomm::connect(tp, this, tp->get_fd());
 
     GMCastProto* peer = new GMCastProto (tp, listen_addr, "",
                                          get_uuid(), group_name);
@@ -1034,7 +1034,7 @@ void GMCast::gmcast_connect(const string& remote_addr)
         return;
     }
     
-    tp->set_up_context(this, tp->get_fd());
+    gcomm::connect(tp, this, tp->get_fd());
 
     GMCastProto* peer = new GMCastProto (tp, listen_addr, remote_addr,
                                          get_uuid(), group_name);
@@ -1062,6 +1062,8 @@ void GMCast::gmcast_forget(const UUID& uuid)
         GMCastProto* rp = ProtoMap::get_value(pi);
         if (rp->get_remote_uuid() == uuid)
         {
+            gcomm::disconnect(rp->get_transport(), this,
+                              rp->get_transport()->get_fd());
             rp->get_transport()->close();
             event_loop->release_protolay(rp->get_transport());
             delete rp;
@@ -1136,12 +1138,13 @@ void GMCast::handle_failed(GMCastProto* rp)
         log_warn << "Transport " << tp->get_fd() 
                  << " in unexpected state " << tp->get_errno();
     }
-
+    
+    gcomm::disconnect(tp, this, tp->get_fd());
     tp->close();
     event_loop->release_protolay(tp);
     
     const string& remote_addr = rp->get_remote_addr();
-
+    
     if (remote_addr != "") // @todo: should this be an assertion?
     {
         AddrList::iterator i;

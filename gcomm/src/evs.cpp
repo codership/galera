@@ -114,7 +114,7 @@ void EVS::connect()
         name = uuid.to_string();
     }
 
-    proto = new Proto(event_loop, tp, uuid, mon);
+    proto = new Proto(uuid);
 
     gcomm::connect(tp, proto);
     gcomm::connect(proto, this);

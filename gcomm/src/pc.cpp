@@ -128,7 +128,7 @@ void PC::connect()
         name = uuid.to_string();
     }
     
-    evs = new evs::Proto(event_loop, tp, uuid, mon);
+    evs = new evs::Proto(uuid);
     
     gcomm::connect (tp, evs);
     

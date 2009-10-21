@@ -23,6 +23,19 @@ namespace gcomm
         /* Timeout in milliseconds to wait joining */
         static const std::string EvsQueryJoinWait = EvsPrefix + ParamKeyDelim + "join_wait";
 
+        static const std::string EvsParamViewForgetTimeout = 
+            EvsPrefix + ParamKeyDelim + "view_forget_timeout";
+        static const std::string EvsParamInactiveTimeout = 
+            EvsPrefix + ParamKeyDelim + "inactive_timeout";
+        static const std::string EvsParamInactiveCheckPeriod = 
+            EvsPrefix + ParamKeyDelim + "inactive_check_period";
+        static const std::string EvsParamConsensusTimeout = 
+            EvsPrefix + ParamKeyDelim + "consensus_timeout";
+        static const std::string EvsParamRetransPeriod = 
+            EvsPrefix + ParamKeyDelim + "retrans_period";
+        static const std::string EvsParamJoinRetransPeriod =
+            EvsPrefix + ParamKeyDelim + "join_retrans_period";
+        
         static const std::string VsPrefix = "vs";
         static const std::string VsScheme = GCommPrefix + SchemeDelim + VsPrefix;
 
