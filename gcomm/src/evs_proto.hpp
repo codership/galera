@@ -121,7 +121,7 @@ public:
     std::string self_string() const 
     { 
         return "evs::proto(" + get_uuid().to_string() + ","
-            + to_string(get_state()) + ")"; 
+            + to_string(get_state()) + "," + gu::to_string(current_view.get_id()) + ")"; 
     }
     
     State get_state() const { return state; }

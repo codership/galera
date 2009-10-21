@@ -483,7 +483,7 @@ void gcomm::evs::InputMap::cleanup_recovery_index()
     if (safe_seq != Seqno::max())
     {
         InputMapMsgIndex::iterator i = recovery_index->lower_bound(
-            InputMapMsgKey(node_index->size() - 1, safe_seq + 1));
+            InputMapMsgKey(0, safe_seq + 1));
         for_each(recovery_index->begin(), i, release_rb);
         recovery_index->erase(recovery_index->begin(), i);
     }

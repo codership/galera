@@ -422,7 +422,7 @@ Time gcomm::evs::Proto::handle_timers()
                                          TimerSelectOp(t));
         if (ii != timers.end())
         {
-            log_warn << "resetting timer " << t;
+            log_debug << "resetting timer " << t;
             timers.erase(ii);
         }
         gu_trace((void)timers.insert(make_pair(get_next_expiration(t), t)));
@@ -772,7 +772,7 @@ bool gcomm::evs::Proto::is_consistent_input_map(const Message& msg) const
     {
         if (msg.get_source() == get_uuid())
         {
-            log_warn << "own join not consistent with input map";
+            log_debug << "own join not consistent with input map";
         }
         return false;
     }
@@ -824,7 +824,7 @@ bool gcomm::evs::Proto::is_consistent_partitioning(const Message& msg) const
     {
         if (msg.get_source() == get_uuid())
         {
-            log_warn << "own join not consistent with partitioning";
+            log_debug << "own join not consistent with partitioning";
         }
         return false;
     }
@@ -875,7 +875,7 @@ bool gcomm::evs::Proto::is_consistent_leaving(const Message& msg) const
     {
         if (msg.get_source() == get_uuid())
         {
-            log_warn << "own join not consistent with leaving";
+            log_debug << "own join not consistent with leaving";
         }
         return false;
     }
@@ -896,7 +896,9 @@ bool gcomm::evs::Proto::is_consistent_same_view(const Message& msg) const
                   << " msg " << msg.get_aru_seq();
         if (msg.get_source() == get_uuid())
         {
-            log_warn << self_string() << " own join not consistent with input map aru seq " << input_map->get_aru_seq() << " " << msg;
+            log_debug << self_string() 
+                      << " own join not consistent with input map aru seq " 
+                      << input_map->get_aru_seq() << " " << msg;
         }
         return false;
     }
@@ -909,7 +911,9 @@ bool gcomm::evs::Proto::is_consistent_same_view(const Message& msg) const
                   << " msg " << msg.get_seq();
         if (msg.get_source() == get_uuid())
         {
-            log_warn << self_string() << " own join not consistent with input map safe seq " << input_map->get_safe_seq() << " " << msg;
+            log_debug << self_string() 
+                      << " own join not consistent with input map safe seq " 
+                      << input_map->get_safe_seq() << " " << msg;
         }
         return false;
     }
@@ -958,7 +962,7 @@ bool gcomm::evs::Proto::is_consistent_joining(const Message& msg) const
         {
             if (msg.get_source() == get_uuid())
             {
-                log_warn << "own join not consistent with joining";
+                log_debug << "own join not consistent with joining";
             }
             return false;
         }
@@ -969,7 +973,7 @@ bool gcomm::evs::Proto::is_consistent_joining(const Message& msg) const
             {
                 if (msg.get_source() == get_uuid())
                 {
-                    log_warn << "own join not consistent with joining jm aru seq";
+                    log_debug << "own join not consistent with joining jm aru seq";
                 }
                 return false;
             }
@@ -977,7 +981,7 @@ bool gcomm::evs::Proto::is_consistent_joining(const Message& msg) const
             {
                 if (msg.get_source() == get_uuid())
                 {
-                    log_warn << "own join not consistent with joining jm seq";
+                    log_debug << "own join not consistent with joining jm seq";
                 }
                 return false;
             }
@@ -1004,7 +1008,7 @@ bool gcomm::evs::Proto::is_consistent_joining(const Message& msg) const
     {
         if (msg.get_source() == get_uuid())
         {
-            log_warn << "own join not consistent with joining";
+            log_debug << "own join not consistent with joining";
         }
         return false;
     }
@@ -1213,7 +1217,7 @@ void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
     int err = pass_down(&wb, 0);
     if (err != 0)
     {
-        log_warn << "send failed " << strerror(err);
+        log_debug << "send failed " << strerror(err);
     }
     gu_trace(handle_gap(gm, self_i));
 }
@@ -1282,9 +1286,9 @@ void gcomm::evs::Proto::set_leave(const LeaveMessage& lm, const UUID& source)
     
     if (inst.get_leave_message())
     {
-        log_warn << "Duplicate leave:\told: "
-                 << *inst.get_leave_message() 
-                 << "\tnew: " << lm;
+        log_debug << "Duplicate leave:\told: "
+                  << *inst.get_leave_message() 
+                  << "\tnew: " << lm;
     }
     else
     {
@@ -1309,7 +1313,7 @@ void gcomm::evs::Proto::send_join(bool handle)
     int err = pass_down(&wb, 0);
     if (err != 0) 
     {
-        log_warn << "send failed: " << strerror(err);
+        log_debug << "send failed: " << strerror(err);
     }
     
     if (handle == true)
@@ -1340,7 +1344,7 @@ void gcomm::evs::Proto::send_leave()
     int err = pass_down(&wb, 0);
     if (err != 0)
     {
-        log_warn << "send failed " << strerror(err);
+        log_debug << "send failed " << strerror(err);
     }
     
     handle_leave(lm, self_i);
@@ -1394,7 +1398,7 @@ void gcomm::evs::Proto::send_install()
     int err = pass_down(&wb, 0);;
     if (err != 0) 
     {
-        log_warn << "send failed " << strerror(err);
+        log_debug << "send failed " << strerror(err);
     }
     
     handle_install(imsg, self_i);
@@ -1450,7 +1454,7 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
         int err = pass_down(&wb, 0);
         if (err != 0)
         {
-            log_warn << "retrans failed " << strerror(err);
+            log_debug << "retrans failed " << strerror(err);
             break;
         }
         else
@@ -1526,7 +1530,7 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
         int err = send_delegate(&wb);
         if (err != 0)
         {
-            log_warn << "recovery failed " << strerror(err);
+            log_debug << "recovery failed " << strerror(err);
             break;
         }
         seq = seq + msg.get_seq_range() + 1;
@@ -1598,8 +1602,8 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         Node& node(NodeMap::get_value(ii));
         if (node.get_fifo_seq() >= msg.get_fifo_seq())
         {
-            log_warn << "droppoing non-fifo message " << msg
-                     << " fifo seq " << node.get_fifo_seq();
+            log_debug << "droppoing non-fifo message " << msg
+                      << " fifo seq " << node.get_fifo_seq();
             return;
         }
         else
@@ -1720,7 +1724,7 @@ void gcomm::evs::Proto::handle_up(int cid,
     gcomm_assert(um.get_source() != UUID::nil());    
     if (um.get_source() == get_uuid())
     {
-        log_warn << "dropping self originated message";
+        log_debug << "dropping self originated message";
         return;
     }
     
@@ -2210,10 +2214,13 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                          mi = install_message->get_node_list().begin(); 
                      mi != install_message->get_node_list().end(); ++mi)
                 {
-                    NodeMap::iterator jj;
-                    gu_trace(jj = known.find_checked(
-                                 MessageNodeList::get_key(mi)));
-                    NodeMap::get_value(jj).set_installed(true);
+                    if (MessageNodeList::get_value(mi).get_operational() == true)
+                    {
+                        NodeMap::iterator jj;
+                        gu_trace(jj = known.find_checked(
+                                     MessageNodeList::get_key(mi)));
+                        NodeMap::get_value(jj).set_installed(true);
+                    }
                 }
                 
                 if (is_consensus() == true) 
@@ -2779,10 +2786,10 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     }
     else
     {
-        log_warn << self_string() 
-                 << " install message " 
-                 << msg 
-                 << " not consistent with state " << *this;
+        log_debug << self_string() 
+                  << " install message " 
+                  << msg 
+                  << " not consistent with state " << *this;
         shift_to(S_RECOVERY, true);
     }
 }

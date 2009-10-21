@@ -441,9 +441,29 @@ public:
     void insert_msg(const Msg& msg)
         throw (gu::Exception)
     {
-        gcomm_assert(contains(msg.get_source()) == true) 
-            << "msg source " << msg.get_source() << " not int view " << view;
-        gcomm_assert(view.get_id() == msg.get_source_view_id());
+        switch (view.get_type())
+        {
+        case V_REG:
+            gcomm_assert(view.get_id() == msg.get_source_view_id());
+            gcomm_assert(contains(msg.get_source()) == true) 
+                << "msg source " << msg.get_source() << " not int view " 
+                << view;            
+            break;
+        case V_TRANS:
+            gcomm_assert(view.get_id().get_uuid() == 
+                         msg.get_source_view_id().get_uuid() &&
+                         view.get_id().get_seq() ==
+                         msg.get_source_view_id().get_seq());
+            break;
+        case V_NON_PRIM:
+        case V_PRIM:
+            gcomm_throw_fatal << "not implemented";
+            break;
+        case V_NONE:
+            gcomm_throw_fatal;
+            break;
+        }
+
         msgs.push_back(msg);
     }
     
@@ -501,7 +521,14 @@ public:
         gcomm_assert(current_view != views.end()) << "no view set before msg delivery";
         gu_trace(ViewTraceMap::get_value(current_view).insert_msg(msg));
     }
-    const ViewTraceMap& get_views() const { return views; }
+    const ViewTraceMap& get_view_traces() const { return views; }
+
+    const ViewTrace& get_current_view_trace() const
+    {
+        gcomm_assert(current_view != views.end());
+        return ViewTraceMap::get_value(current_view);
+    }
+
 private:
     ViewTraceMap views;
     ViewTraceMap::iterator current_view;
@@ -511,7 +538,7 @@ private:
 ostream& operator<<(ostream& os, const Trace& tr)
 {
     os << "trace: \n";
-    os << tr.get_views();
+    os << tr.get_view_traces();
     return os;
 }
 
@@ -522,7 +549,7 @@ public:
     DummyUser(const UUID& uuid_) : uuid(uuid_), curr_seq(0), tr() { }
     ~DummyUser()
     {
-        log_info << uuid << " " << tr;
+        log_debug << uuid << " " << tr;
     }
     void handle_up(int cid, const ReadBuf* rb, size_t offset,
                    const ProtoUpMeta& um)
@@ -552,7 +579,7 @@ public:
         int err = pass_down(&wb, ProtoDownMeta(0));
         if (err != 0)
         {
-            log_warn << "failed to send: " << strerror(err);
+            log_debug << "failed to send: " << strerror(err);
         }
         else
         {
@@ -778,21 +805,25 @@ public:
         gu_trace(p.shift_to(Proto::S_LEAVING));
         gu_trace(p.send_leave());
     }
-
+    
     void send()
     {
         gu_trace(u.send());
     }
-
+    
     const Trace& get_trace() const { return u.get_trace(); }
     
-    void set_cvi(const ViewId& vi) { cvi = vi; }
+    void set_cvi(const ViewId& vi) 
+    { 
+        log_debug << "setting cvi to " << vi;
+        cvi = vi; 
+    }
 
     bool in_cvi() const 
     { 
-        return (u.get_trace().get_views().empty() == false &&
-                u.get_trace().get_views().find(cvi) != 
-                u.get_trace().get_views().end()); 
+        return (u.get_trace().get_view_traces().empty() == false &&
+                u.get_trace().get_view_traces().find(cvi) != 
+                u.get_trace().get_view_traces().end()); 
     }
 
     void expire_timers()
@@ -1112,21 +1143,21 @@ ostream& operator<<(ostream& os, const PropagationMatrix& prop)
 void check_traces(const Trace& t1, const Trace& t2)
 {
     for (Trace::ViewTraceMap::const_iterator 
-             i = t1.get_views().begin(); i != t1.get_views().end();
+             i = t1.get_view_traces().begin(); i != t1.get_view_traces().end();
          ++i)
     {
         Trace::ViewTraceMap::const_iterator i_next(i);
         ++i_next;
-        if (i_next != t1.get_views().end())
+        if (i_next != t1.get_view_traces().end())
         {
             const Trace::ViewTraceMap::const_iterator 
-                j(t2.get_views().find(Trace::ViewTraceMap::get_key(i)));
+                j(t2.get_view_traces().find(Trace::ViewTraceMap::get_key(i)));
             Trace::ViewTraceMap::const_iterator j_next(j);
             ++j_next;
             // Note: Comparision is meaningful if also next view is the 
             // same
-            if (j             != t2.get_views().end() && 
-                j_next        != t2.get_views().end() &&
+            if (j             != t2.get_view_traces().end() && 
+                j_next        != t2.get_view_traces().end() &&
                 i_next->first == j_next->first          )
             {
                 gcomm_assert(*i == *j) << 
@@ -1171,6 +1202,7 @@ static void join_node(PropagationMatrix* p,
     gu_trace(p->insert_tp(n->get_index(), n));
     gu_trace(n->join(first));
 }
+
 
 static void send_n(DummyNode* node, const size_t n)
 {
@@ -1304,6 +1336,117 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
 }
 END_TEST
 
+START_TEST(test_proto_leave_n)
+{
+    log_info << "START";
+    const size_t n_nodes(4);
+    EventLoop el;
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        dn.push_back(new DummyNode(i, &el));
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        gu_trace(prop.propagate_until_empty());
+    }
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        dn[i]->leave();
+        gu_trace(prop.propagate_until_empty());
+    }
+
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), delete_object());
+}
+END_TEST
+
+START_TEST(test_proto_leave_n_w_user_msg)
+{
+    log_info << "START";
+    const size_t n_nodes(4);
+    EventLoop el;
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        dn.push_back(new DummyNode(i, &el));
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        gu_trace(prop.propagate_until_empty());
+    }
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        for (size_t j = i; j < n_nodes; ++j)
+        {
+            gu_trace(send_n(dn[j], 8));
+        }
+        dn[i]->leave();
+        gu_trace(prop.propagate_until_empty());
+    }
+
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), delete_object());
+}
+END_TEST
+
+START_TEST(test_proto_leave_n_lossy)
+{
+    log_info << "START";
+    const size_t n_nodes(4);
+    EventLoop el;
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        dn.push_back(new DummyNode(i, &el));
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        gu_trace(prop.propagate_until_empty());
+    }
+    
+    uint32_t last_view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        for (size_t j = 1; j < i + 1; ++j)
+        {
+            prop.set_loss(i + 1, j, 0.9);
+            prop.set_loss(j, i + 1, 0.9);
+        }
+    }
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        dn[i]->set_cvi(V_REG);
+        for (size_t j = i + 1; j < n_nodes; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, dn[i + 1]->get_uuid(), 
+                                  static_cast<uint32_t>(last_view_seq + i + 1)));
+        }
+        dn[i]->leave();
+        gu_trace(prop.propagate_until_cvi());
+    }
+    
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), delete_object());
+}
+END_TEST
+
 Suite* evs2_suite()
 {
     Suite* s = suite_create("gcomm::evs");
@@ -1367,9 +1510,21 @@ Suite* evs2_suite()
     tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
     
-    
     tc = tcase_create("test_proto_join_n_lossy_w_user_msg");
     tcase_add_test(tc, test_proto_join_n_lossy_w_user_msg);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_proto_leave_n");
+    tcase_add_test(tc, test_proto_leave_n);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_proto_leave_n_w_user_msg");
+    tcase_add_test(tc, test_proto_leave_n_w_user_msg);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_proto_leave_n_lossy");
+    tcase_add_test(tc, test_proto_leave_n_lossy);
     tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
     
