@@ -1364,11 +1364,13 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_proto_join_n_lossy");
     tcase_add_test(tc, test_proto_join_n_lossy);
+    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
-
-
+    
+    
     tc = tcase_create("test_proto_join_n_lossy_w_user_msg");
     tcase_add_test(tc, test_proto_join_n_lossy_w_user_msg);
+    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
     
     return s;

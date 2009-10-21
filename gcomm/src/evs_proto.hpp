@@ -276,8 +276,6 @@ private:
     
     // Last received install message
     InstallMessage* install_message;
-    // 
-    bool installing;
     // Sequence number to maintain membership message FIFO order
     int64_t fifo_seq;
     // Last sent seq
