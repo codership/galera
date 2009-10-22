@@ -824,8 +824,11 @@ bool gcomm::evs::Proto::is_consistent_highest_seen(const Message& msg) const
         max_hs = max_leave_seq;
     }
     
-    log_debug << "max_hs " << max_hs << " input map safe_seq " 
-              << input_map->get_safe_seq();
+    log_info << self_string()
+             << " max leave seq " << max_leave_seq
+             << " min hs " << min_hs 
+             << " max_hs " << max_hs 
+             << " input map safe_seq " << input_map->get_safe_seq();
     return (min_hs == input_map->get_min_hs() &&
             max_hs == input_map->get_max_hs() &&
             input_map->get_safe_seq() == min_hs);
@@ -2671,15 +2674,22 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         if (msg.get_source_view_id() == current_view.get_id())
         {
             // Update input map state
-            const Seqno im_safe_seq(input_map->get_safe_seq(msg.get_source()));
-            if (msg.get_aru_seq() != Seqno::max()         && 
-                (im_safe_seq      == Seqno::max()    || 
-                 im_safe_seq      < msg.get_aru_seq()  )     )
+            for (MessageNodeList::const_iterator i = same_view.begin();
+                 i != same_view.end(); ++i)
             {
-                gu_trace(input_map->set_safe_seq(msg.get_source(),
-                                                 msg.get_aru_seq()));
-                do_send_join = true;
+                const UUID& mn_uuid(MessageNodeList::get_key(i));
+                const Seqno mn_safe_seq(MessageNodeList::get_value(i).get_safe_seq());
+                const Seqno im_safe_seq(input_map->get_safe_seq(mn_uuid));
+                
+                if (mn_safe_seq  != Seqno::max()    && 
+                    (im_safe_seq == Seqno::max() || 
+                     im_safe_seq < mn_safe_seq     )   )
+                {
+                    gu_trace(input_map->set_safe_seq(mn_uuid, mn_safe_seq));
+                    do_send_join = true;
+                }
             }
+
             // See if we need to retrans some user messages
             MessageNodeList::const_iterator nli(same_view.find(get_uuid()));
             if (nli != same_view.end())

@@ -72,7 +72,7 @@ public:
     {
         return PCInstMap::get_value(self_i).get_last_prim();
     }
-
+    
     void set_last_prim(const ViewId& vid)
     {
         gcomm_assert(vid.get_type() == V_PRIM);
@@ -88,7 +88,7 @@ public:
     {
         PCInstMap::get_value(self_i).set_last_seq(seq);
     }
-
+    
     int64_t get_to_seq() const
     {
         return PCInstMap::get_value(self_i).get_to_seq();
@@ -98,7 +98,7 @@ public:
     {
         PCInstMap::get_value(self_i).set_to_seq(seq);
     }
-
+    
     class SMMap : public Map<const UUID, PCMessage> { };
 
 private:

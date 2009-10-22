@@ -140,7 +140,10 @@ void PCProto::shift_to(const State s)
     };
     
     log_info << self_string() << " shift_to: " << to_string(get_state()) 
-             << " -> " <<  to_string(s);
+             << " -> " <<  to_string(s) 
+             << " prim " << get_prim()
+             << " last prim " << get_last_prim()
+             << " to_seq " << get_to_seq();
     
     if (allowed[get_state()][s] == false)
     {
