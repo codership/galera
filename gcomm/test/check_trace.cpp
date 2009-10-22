@@ -35,7 +35,12 @@ ostream& gcomm::operator<<(ostream& os, const Trace& tr)
 
 ostream& gcomm::operator<<(ostream& os, const Channel& ch)
 {
-    return os;
+    return (os << "(" << ch.get_latency() << "," << ch.get_loss() << ")");
+}
+
+ostream& gcomm::operator<<(ostream& os, const Channel* chp)
+{
+    return (os << *chp);
 }
 
 ostream& gcomm::operator<<(ostream& os, const MatrixElem& me)
@@ -183,6 +188,11 @@ void gcomm::PropagationMatrix::set_loss(const size_t ii, const size_t jj,
     ChannelMap::get_value(i)->set_loss(loss);
 }
 
+void gcomm::PropagationMatrix::expire_timers()
+{
+    for_each(tp.begin(), tp.end(), ExpireTimersOp());
+}
+
 
 void gcomm::PropagationMatrix::propagate_n(size_t n)
 {
@@ -212,7 +222,7 @@ void gcomm::PropagationMatrix::propagate_until_cvi()
         all_in = all_in_cvi();
         if (all_in == false)
         {
-            for_each(tp.begin(), tp.end(), ExpireTimersOp());
+            expire_timers();
         }
     }
     while (all_in == false);

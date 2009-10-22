@@ -586,13 +586,15 @@ START_TEST(test_proto_double_join)
 END_TEST
 
 
-static DummyNode* create_dummy_node(size_t idx)
+static DummyNode* create_dummy_node(size_t idx, 
+                                    const string& inactive_timeout = "PT1H",
+                                    const string& retrans_period = "PT0.001S")
 {
     const string conf = "evs://?" + Conf::EvsParamViewForgetTimeout + "=PT1H&"
-        + Conf::EvsParamInactiveTimeout + "=PT1H&"
-        + Conf::EvsParamInactiveCheckPeriod + "=PT1H&"
+        + Conf::EvsParamInactiveTimeout + "=" + inactive_timeout + "&"
+        + Conf::EvsParamInactiveCheckPeriod + "=PT0.001S&"
         + Conf::EvsParamConsensusTimeout + "=PT1H&"
-        + Conf::EvsParamRetransPeriod + "=PT0.001S&"
+        + Conf::EvsParamRetransPeriod + "=" + retrans_period + "&"
         + Conf::EvsParamJoinRetransPeriod + "=PT0S";
     list<Protolay*> protos;
     try
@@ -810,7 +812,7 @@ START_TEST(test_proto_leave_n_w_user_msg)
     {
         for (size_t j = i; j < n_nodes; ++j)
         {
-            gu_trace(send_n(dn[j], 8));
+            gu_trace(send_n(dn[j], 5 + ::rand()%4));
         }
         dn[i]->close();
         gu_trace(prop.propagate_until_empty());
@@ -820,6 +822,7 @@ START_TEST(test_proto_leave_n_w_user_msg)
     for_each(dn.begin(), dn.end(), DeleteObjectOp());
 }
 END_TEST
+
 
 START_TEST(test_proto_leave_n_lossy)
 {
@@ -869,85 +872,234 @@ START_TEST(test_proto_leave_n_lossy)
 END_TEST
 
 
+
+START_TEST(test_proto_leave_n_lossy_w_user_msg)
+{
+    log_info << "START";
+    const size_t n_nodes(4);
+    EventLoop el;
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+    
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        dn.push_back(create_dummy_node(i));
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        gu_trace(prop.propagate_until_empty());
+    }
+    
+    uint32_t last_view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        for (size_t j = 1; j < i + 1; ++j)
+        {
+            prop.set_loss(i + 1, j, 0.9);
+            prop.set_loss(j, i + 1, 0.9);
+        }
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(send_n(dn[i], 5 + ::rand()%4));
+        dn[i]->set_cvi(V_REG);
+        for (size_t j = i + 1; j < n_nodes; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, dn[i + 1]->get_uuid(), 
+                                  static_cast<uint32_t>(last_view_seq + i + 1)));
+        }
+        dn[i]->close();
+        gu_trace(prop.propagate_until_cvi());
+    }
+    
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), DeleteObjectOp());
+}
+END_TEST
+
+
+
+
+START_TEST(test_proto_split_merge)
+{
+    log_info << "START";
+    const size_t n_nodes(4);
+    EventLoop el;
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+    const string inactive_timeout("PT0.01S");
+    const string retrans_period("PT0.001S");
+    
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        dn.push_back(create_dummy_node(i, "PT0.01S"));
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        gu_trace(prop.propagate_until_empty());
+    }
+    
+    
+    vector<int32_t> split;
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        split.push_back(static_cast<int32_t>(i + 1));
+    }
+    
+    uint32_t view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
+    uint32_t view_seq_inc = 0;
+    
+    // do
+    // {
+    ostringstream os;
+    copy(split.begin(), split.end(), ostream_iterator<size_t>(os, " "));
+    log_info << "permutation: " << os.str();
+    for (size_t i = 1; i < n_nodes; ++i)
+    {
+        for (size_t j = 0; j < i; ++j)
+        {
+            for (size_t k = i; k < n_nodes; ++k)
+            {
+                gu_trace(prop.set_loss(split[j], split[k], 0.));
+                gu_trace(prop.set_loss(split[k], split[j], 0.));
+            }
+        }
+        ++view_seq_inc;
+        for (size_t j = 0; j < i; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, split[0], view_seq + view_seq_inc));
+        }
+
+        for (size_t j = i; j < n_nodes; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, split[i], view_seq + view_seq_inc));
+        }
+        
+        Sleep(inactive_timeout + inactive_timeout);
+        prop.propagate_until_cvi();
+        
+        for (size_t j = 0; j < i; ++j)
+        {
+            for (size_t k = i; k < n_nodes; ++k)
+            {
+                gu_trace(prop.set_loss(split[j], split[k], 1.));
+                gu_trace(prop.set_loss(split[k], split[j], 1.));
+            }
+        }
+        ++view_seq_inc;
+        for (size_t j = 0; j < n_nodes; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, split[0], view_seq + view_seq_inc));
+        }
+        
+        Sleep(retrans_period + retrans_period);
+        prop.propagate_until_cvi();
+    } 
+    // }
+    // while (next_permutation(split.begin(), split.end()));
+
+
+}
+END_TEST
+
+static bool skip = false;
+
 Suite* evs2_suite()
 {
     Suite* s = suite_create("gcomm::evs");
     TCase* tc;
     
-    tc = tcase_create("test_seqno");
-    tcase_add_test(tc, test_seqno);
-    suite_add_tcase(s, tc);
+    if (skip == false)
+    {
+        tc = tcase_create("test_seqno");
+        tcase_add_test(tc, test_seqno);
+        suite_add_tcase(s, tc);
     
-    tc = tcase_create("test_range");
-    tcase_add_test(tc, test_range);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_range");
+        tcase_add_test(tc, test_range);
+        suite_add_tcase(s, tc);
     
-    tc = tcase_create("test_message");
-    tcase_add_test(tc, test_message);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_message");
+        tcase_add_test(tc, test_message);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_input_map_insert");
-    tcase_add_test(tc, test_input_map_insert);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_input_map_insert");
+        tcase_add_test(tc, test_input_map_insert);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_input_map_find");
-    tcase_add_test(tc, test_input_map_find);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_input_map_find");
+        tcase_add_test(tc, test_input_map_find);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_input_map_safety");
-    tcase_add_test(tc, test_input_map_safety);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_input_map_safety");
+        tcase_add_test(tc, test_input_map_safety);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_input_map_erase");
-    tcase_add_test(tc, test_input_map_erase);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_input_map_erase");
+        tcase_add_test(tc, test_input_map_erase);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_input_map_overwrap");
-    tcase_add_test(tc, test_input_map_overwrap);
-    tcase_set_timeout(tc, 15);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_input_map_overwrap");
+        tcase_add_test(tc, test_input_map_overwrap);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_input_map_random_insert");
-    tcase_add_test(tc, test_input_map_random_insert);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_input_map_random_insert");
+        tcase_add_test(tc, test_input_map_random_insert);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_proto_single_join");
-    tcase_add_test(tc, test_proto_single_join);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_proto_single_join");
+        tcase_add_test(tc, test_proto_single_join);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_proto_double_join");
-    tcase_add_test(tc, test_proto_double_join);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_proto_double_join");
+        tcase_add_test(tc, test_proto_double_join);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_proto_join_n");
-    tcase_add_test(tc, test_proto_join_n);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_proto_join_n");
+        tcase_add_test(tc, test_proto_join_n);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_proto_join_n_w_user_msg");
-    tcase_add_test(tc, test_proto_join_n_w_user_msg);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_proto_join_n_w_user_msg");
+        tcase_add_test(tc, test_proto_join_n_w_user_msg);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_proto_join_n_lossy");
-    tcase_add_test(tc, test_proto_join_n_lossy);
-    tcase_set_timeout(tc, 15);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_proto_join_n_lossy");
+        tcase_add_test(tc, test_proto_join_n_lossy);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
     
-    tc = tcase_create("test_proto_join_n_lossy_w_user_msg");
-    tcase_add_test(tc, test_proto_join_n_lossy_w_user_msg);
-    tcase_set_timeout(tc, 15);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_proto_join_n_lossy_w_user_msg");
+        tcase_add_test(tc, test_proto_join_n_lossy_w_user_msg);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_proto_leave_n");
-    tcase_add_test(tc, test_proto_leave_n);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_proto_leave_n");
+        tcase_add_test(tc, test_proto_leave_n);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_proto_leave_n_w_user_msg");
-    tcase_add_test(tc, test_proto_leave_n_w_user_msg);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_proto_leave_n_w_user_msg");
+        tcase_add_test(tc, test_proto_leave_n_w_user_msg);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_proto_leave_n_lossy");
-    tcase_add_test(tc, test_proto_leave_n_lossy);
-    tcase_set_timeout(tc, 15);
+        tc = tcase_create("test_proto_leave_n_lossy");
+        tcase_add_test(tc, test_proto_leave_n_lossy);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_proto_leave_n_lossy_w_user_msg");
+        tcase_add_test(tc, test_proto_leave_n_lossy_w_user_msg);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
+    }
+    tc = tcase_create("test_proto_split_merge");
+    tcase_add_test(tc, test_proto_split_merge);
     suite_add_tcase(s, tc);
     
     return s;

@@ -12,6 +12,13 @@ namespace gcomm
 {
     typedef gu::datetime::Date Time;
     typedef gu::datetime::Period Period;
+
+
+    inline void Sleep(const Period& p)
+    {
+        usleep(static_cast<useconds_t>(p.get_utc()/gu::datetime::USec));
+    }
+
 } // namespace gcomm
 
 #endif // _GCOMM_TIME_HPP_

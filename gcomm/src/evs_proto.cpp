@@ -500,13 +500,14 @@ void gcomm::evs::Proto::check_inactive()
     bool has_inactive = false;
     for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
     {
-        if (NodeMap::get_key(i) != get_uuid() &&
-            NodeMap::get_value(i).get_operational() == true &&
-            NodeMap::get_value(i).get_tstamp() + inactive_timeout < Time::now())
+        const UUID& uuid(NodeMap::get_key(i));
+        Node& node(NodeMap::get_value(i));
+        if (uuid != get_uuid() &&
+            node.get_operational() == true &&
+            node.get_tstamp() + inactive_timeout < Time::now())
         {
             log_info << self_string() << " detected inactive node: " 
-                     << NodeMap::get_key(i);
-            
+                     << uuid;
             i->second.set_operational(false);
             has_inactive = true;
         }

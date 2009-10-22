@@ -430,6 +430,7 @@ namespace gcomm
     
     
     std::ostream& operator<<(std::ostream& os, const Channel& ch);
+    std::ostream& operator<<(std::ostream& os, const Channel* ch);
 
     
 
@@ -483,6 +484,7 @@ namespace gcomm
         void insert_tp(DummyNode* t);
         void set_latency(const size_t ii, const size_t jj, const size_t lat);
         void set_loss(const size_t ii, const size_t jj, const double loss);
+        void expire_timers();
         void propagate_n(size_t n);
         void propagate_until_empty();
         void propagate_until_cvi();
