@@ -201,7 +201,11 @@ public:
     Range get_range   (const UUID& uuid) const 
         throw (gu::Exception);
     
-    
+    Seqno get_min_hs() const
+        throw (gu::Exception);
+
+    Seqno get_max_hs() const
+        throw (gu::Exception);
     
     /*!
      * Get iterator to the beginning of the input map

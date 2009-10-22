@@ -36,8 +36,35 @@ public:
         
         const gcomm::evs::InputMapNode& aval(
             gcomm::evs::InputMapNodeIndex::get_value(a));
-        const gcomm::evs::InputMapNode& bval(gcomm::evs::InputMapNodeIndex::get_value(b));
+        const gcomm::evs::InputMapNode& bval(
+            gcomm::evs::InputMapNodeIndex::get_value(b));
         return (aval.get_range().get_lu() < bval.get_range().get_lu());
+    }
+};
+
+class NodeIndexHSCmpOp
+{
+public:
+    bool operator()(const gcomm::evs::InputMapNodeIndex::value_type& a,
+                    const gcomm::evs::InputMapNodeIndex::value_type& b) const
+    {
+        
+        const gcomm::evs::InputMapNode& aval(
+            gcomm::evs::InputMapNodeIndex::get_value(a));
+        const gcomm::evs::InputMapNode& bval(
+            gcomm::evs::InputMapNodeIndex::get_value(b));
+        if (aval.get_range().get_hs() == gcomm::evs::Seqno::max())
+        {
+            return true;
+        }
+        else if (bval.get_range().get_hs() == gcomm::evs::Seqno::max())
+        {
+            return false;
+        }
+        else
+        {
+            return (aval.get_range().get_hs() < bval.get_range().get_hs());
+        }
     }
 };
 
@@ -181,6 +208,28 @@ gcomm::evs::Range gcomm::evs::InputMap::get_range(const UUID& uuid) const
 {
     return InputMapNodeIndex::get_value(
         node_index->find_checked(uuid)).get_range();
+}
+
+
+gcomm::evs::Seqno gcomm::evs::InputMap::get_min_hs() const
+    throw (gu::Exception)
+{
+    gcomm_assert(node_index->empty() == false);
+    return InputMapNodeIndex::get_value(
+        min_element(node_index->begin(),
+                    node_index->end(), 
+                    NodeIndexHSCmpOp())).get_range().get_hs();
+}
+
+
+gcomm::evs::Seqno gcomm::evs::InputMap::get_max_hs() const
+    throw (gu::Exception)
+{
+    gcomm_assert(node_index->empty() == false);
+    return InputMapNodeIndex::get_value(
+        max_element(node_index->begin(),
+                    node_index->end(),
+                    NodeIndexHSCmpOp())).get_range().get_hs();
 }
 
 

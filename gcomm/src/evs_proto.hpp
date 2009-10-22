@@ -149,15 +149,15 @@ public:
                   SafetyPrefix sp, 
                   const Seqno, 
                   const Seqno, bool local = false);
-    int send_user();
+    int send_user(const Seqno);
     void complete_user(const Seqno);
     int send_delegate(WriteBuf*);
     void send_gap(const UUID&, const ViewId&, const Range);
-    JoinMessage create_join();
+    const JoinMessage& create_join();
     void send_join(bool tval = true);
     void set_join(const JoinMessage&, const UUID&);
     void set_leave(const LeaveMessage&, const UUID&);
-    void send_leave();
+    void send_leave(bool handle = true);
     void send_install();
     
     void resend(const UUID&, const Range);
@@ -187,6 +187,7 @@ public:
     // Compares join message against current state
     
     bool is_consistent(const Message&) const;
+    bool is_consistent_highest_seen(const Message&) const;
     bool is_consistent_input_map(const Message&) const;
     bool is_consistent_joining(const Message&) const;
     bool is_consistent_partitioning(const Message&) const;

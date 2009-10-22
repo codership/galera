@@ -187,31 +187,30 @@ void PC::close()
     Critical crit(mon);
 
     log_info << "PC/EVS Proto leaving";
-    evs->shift_to(evs::Proto::S_LEAVING);
-    evs->send_leave();
-
+    evs->close();
+    
+    Time wait_until(Time::now() + leave_grace_period);
     do
     {
         int ret = event_loop->poll(500);
-
+        
         log_debug << "poll returned " << ret;
     } 
-    while (evs->get_state() != evs::Proto::S_CLOSED);
+    while (evs->get_state() != evs::Proto::S_CLOSED &&
+           Time::now()      <  wait_until);
 
+    if (evs->get_state() != evs::Proto::S_CLOSED)
+    {
+        evs->shift_to(evs::Proto::S_CLOSED);
+    }
+    
     if (pc->get_state() != PCProto::S_CLOSED)
     {
         log_warn << "PCProto didn't reach closed state";
     }
-
-    int cnt = 0;
-    do
-    {
-        event_loop->poll(10);
-    }
-    while (++cnt < 15); // what is that number?
-
+    
     tp->close();
-
+    
     delete tp;
     tp = 0;
 
@@ -228,7 +227,8 @@ PC::PC(const URI& uri_, EventLoop* el_, Monitor* mon_) :
     pfd(),
     tp(0),
     evs(0),
-    pc(0)
+    pc(0),
+    leave_grace_period("PT5S")
 {
     if (uri.get_scheme() != Conf::PcScheme)
     {

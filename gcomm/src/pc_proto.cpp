@@ -275,7 +275,7 @@ void PCProto::handle_reg(const View& view)
     current_view = view;
     views.push_back(current_view);
 
-    if (current_view.is_empty())
+    if (current_view.is_empty() == true)
     {
         set_prim(false);
         deliver_view();

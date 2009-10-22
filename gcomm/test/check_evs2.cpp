@@ -767,13 +767,21 @@ START_TEST(test_proto_leave_n)
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
         gu_trace(prop.propagate_until_empty());
     }
-
+    
+    uint32_t last_view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
+    
     for (size_t i = 0; i < n_nodes; ++i)
     {
+        dn[i]->set_cvi(V_REG);
+        for (size_t j = i + 1; j < n_nodes; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, dn[i + 1]->get_uuid(), 
+                                  static_cast<uint32_t>(last_view_seq + i + 1)));
+        }
         dn[i]->close();
-        gu_trace(prop.propagate_until_empty());
+        gu_trace(prop.propagate_until_cvi());
     }
-
+    
     gu_trace(check_trace(dn));
     for_each(dn.begin(), dn.end(), DeleteObjectOp());
 }
@@ -807,7 +815,7 @@ START_TEST(test_proto_leave_n_w_user_msg)
         dn[i]->close();
         gu_trace(prop.propagate_until_empty());
     }
-
+    
     gu_trace(check_trace(dn));
     for_each(dn.begin(), dn.end(), DeleteObjectOp());
 }

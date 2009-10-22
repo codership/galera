@@ -12,10 +12,11 @@ namespace gcomm
 
     class PC : public Transport, public EventContext
     {
-        PseudoFd pfd;     // PseudoFd for timer handler
-        Transport* tp;    // GMCast transport
-        evs::Proto*  evs; // EVS protocol layer
-        PCProto*   pc;    // PC protocol layer
+        PseudoFd    pfd;                // PseudoFd for timer handler
+        Transport*  tp;                 // GMCast transport
+        evs::Proto* evs;                // EVS protocol layer
+        PCProto*    pc;                 // PC protocol layer
+        Period      leave_grace_period; // Period to wait graceful leave
         
         PC(const PC&);
         void operator=(const PC&);
