@@ -35,6 +35,7 @@ using namespace gcomm;
 using namespace gcomm::evs;
 
 
+
 START_TEST(test_seqno)
 {
     log_info << "START";
@@ -1008,6 +1009,193 @@ START_TEST(test_proto_split_merge)
 }
 END_TEST
 
+
+START_TEST(test_proto_split_merge_lossy)
+{
+    log_info << "START";
+    const size_t n_nodes(4);
+    EventLoop el;
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+    const string inactive_timeout("PT0.01S");
+    const string retrans_period("PT0.001S");
+    
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        dn.push_back(create_dummy_node(i, "PT0.01S"));
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        gu_trace(prop.propagate_until_empty());
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        for (size_t j = 1; j < i + 1; ++j)
+        {
+            prop.set_loss(i + 1, j, 0.9);
+            prop.set_loss(j, i + 1, 0.9);
+        }
+    }
+    
+    vector<int32_t> split;
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        split.push_back(static_cast<int32_t>(i + 1));
+    }
+    
+    uint32_t view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
+    uint32_t view_seq_inc = 0;
+    
+    // do
+    // {
+    ostringstream os;
+    copy(split.begin(), split.end(), ostream_iterator<size_t>(os, " "));
+    log_info << "permutation: " << os.str();
+    for (size_t i = 1; i < n_nodes; ++i)
+    {
+        for (size_t j = 0; j < i; ++j)
+        {
+            for (size_t k = i; k < n_nodes; ++k)
+            {
+                gu_trace(prop.set_loss(split[j], split[k], 0.));
+                gu_trace(prop.set_loss(split[k], split[j], 0.));
+            }
+        }
+        ++view_seq_inc;
+        for (size_t j = 0; j < i; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, split[0], view_seq + view_seq_inc));
+        }
+
+        for (size_t j = i; j < n_nodes; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, split[i], view_seq + view_seq_inc));
+        }
+        
+        Sleep(inactive_timeout + inactive_timeout);
+        prop.propagate_until_cvi();
+        
+        for (size_t j = 0; j < i; ++j)
+        {
+            for (size_t k = i; k < n_nodes; ++k)
+            {
+                gu_trace(prop.set_loss(split[j], split[k], 0.9));
+                gu_trace(prop.set_loss(split[k], split[j], 0.9));
+            }
+        }
+        ++view_seq_inc;
+        for (size_t j = 0; j < n_nodes; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, split[0], view_seq + view_seq_inc));
+        }
+        
+        Sleep(retrans_period + retrans_period);
+        prop.propagate_until_cvi();
+    } 
+    // }
+    // while (next_permutation(split.begin(), split.end()));
+
+
+}
+END_TEST
+
+
+START_TEST(test_proto_split_merge_lossy_w_user_msg)
+{
+    log_info << "START";
+    const size_t n_nodes(4);
+    EventLoop el;
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+    const string inactive_timeout("PT0.01S");
+    const string retrans_period("PT0.001S");
+    
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        dn.push_back(create_dummy_node(i, "PT0.01S"));
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        gu_trace(prop.propagate_until_empty());
+    }
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        for (size_t j = 1; j < i + 1; ++j)
+        {
+            prop.set_loss(i + 1, j, 0.9);
+            prop.set_loss(j, i + 1, 0.9);
+        }
+    }    
+    
+    vector<int32_t> split;
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        split.push_back(static_cast<int32_t>(i + 1));
+    }
+    
+    uint32_t view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
+    uint32_t view_seq_inc = 0;
+    
+    // do
+    // {
+    ostringstream os;
+    copy(split.begin(), split.end(), ostream_iterator<size_t>(os, " "));
+    log_info << "permutation: " << os.str();
+    for (size_t i = 1; i < n_nodes; ++i)
+    {
+        for (size_t j = 0; j < i; ++j)
+        {
+            for (size_t k = i; k < n_nodes; ++k)
+            {
+                gu_trace(prop.set_loss(split[j], split[k], 0.));
+                gu_trace(prop.set_loss(split[k], split[j], 0.));
+            }
+        }
+        ++view_seq_inc;
+        for (size_t j = 0; j < i; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, split[0], view_seq + view_seq_inc));
+        }
+
+        for (size_t j = i; j < n_nodes; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, split[i], view_seq + view_seq_inc));
+        }
+
+        gu_trace(send_n(dn[i], 5 + ::rand()%4));        
+        Sleep(inactive_timeout + inactive_timeout);
+        prop.propagate_until_cvi();
+        
+        for (size_t j = 0; j < i; ++j)
+        {
+            for (size_t k = i; k < n_nodes; ++k)
+            {
+                gu_trace(prop.set_loss(split[j], split[k], 0.9));
+                gu_trace(prop.set_loss(split[k], split[j], 0.9));
+            }
+        }
+        ++view_seq_inc;
+        for (size_t j = 0; j < n_nodes; ++j)
+        {
+            dn[j]->set_cvi(ViewId(V_REG, split[0], view_seq + view_seq_inc));
+        }
+        gu_trace(send_n(dn[i], 5 + ::rand()%4));        
+        prop.propagate_until_cvi();
+    } 
+    // }
+    // while (next_permutation(split.begin(), split.end()));
+
+
+}
+END_TEST
+
+
 static bool skip = false;
 
 Suite* evs2_suite()
@@ -1100,6 +1288,15 @@ Suite* evs2_suite()
     }
     tc = tcase_create("test_proto_split_merge");
     tcase_add_test(tc, test_proto_split_merge);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_proto_split_merge_lossy");
+    tcase_add_test(tc, test_proto_split_merge_lossy);
+    suite_add_tcase(s, tc);
+
+
+    tc = tcase_create("test_proto_split_merge_lossy_w_user_msg");
+    tcase_add_test(tc, test_proto_split_merge_lossy_w_user_msg);
     suite_add_tcase(s, tc);
     
     return s;
