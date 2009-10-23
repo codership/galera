@@ -218,7 +218,7 @@ void gcomm::PropagationMatrix::propagate_until_cvi()
     bool all_in = false;
     do
     {
-        propagate_until_empty();
+        propagate_n(10);
         all_in = all_in_cvi();
         if (all_in == false)
         {

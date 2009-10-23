@@ -810,7 +810,7 @@ bool gcomm::evs::Proto::is_consistent_highest_seen(const Message& msg) const
     gcomm_assert(msg.get_source_view_id() == current_view.get_id());
     
     const MessageNodeList& node_list(msg.get_node_list());
-
+    
     // Same view, all
     MessageNodeList same_view;
     for_each(node_list.begin(), node_list.end(),
@@ -818,11 +818,19 @@ bool gcomm::evs::Proto::is_consistent_highest_seen(const Message& msg) const
     MessageNodeList::const_iterator min_hs_i(min_element(same_view.begin(), 
                                                          same_view.end(), 
                                                          RangeHsCmp()));
-    const Seqno min_hs(MessageNodeList::get_value(min_hs_i).get_im_range().get_hs());
+
+    const Seqno min_hs(
+        min_hs_i == same_view.end() ? 
+        Seqno::max() : 
+        MessageNodeList::get_value(min_hs_i).get_im_range().get_hs());
+
     MessageNodeList::const_iterator max_hs_i(max_element(same_view.begin(), 
                                                          same_view.end(), 
                                                          RangeHsCmp()));
-    Seqno max_hs(MessageNodeList::get_value(max_hs_i).get_im_range().get_hs());
+    Seqno max_hs(
+        max_hs_i == same_view.end() ? 
+        Seqno::max() : 
+        MessageNodeList::get_value(max_hs_i).get_im_range().get_hs());
     
     NodeMap leaving;
     for_each(known.begin(), known.end(), 
@@ -1941,8 +1949,8 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
     
     if (get_state() != s)
     {
-        log_debug << self_string() << " state change: " 
-                  << to_string(state) << " -> " << to_string(s);
+        log_info << self_string() << " state change: " 
+                 << to_string(state) << " -> " << to_string(s);
     }
     switch (s) {
     case S_CLOSED:
