@@ -267,7 +267,7 @@ void gcomm::evs::InputMap::set_safe_seq(const UUID& uuid, const Seqno seq)
     const Seqno minval = InputMapNodeIndex::get_value(min).get_safe_seq();
     gcomm_assert(safe_seq == Seqno::max() || minval >= safe_seq);
     safe_seq = minval;
-
+    
     // Global safe seq must always be smaller than equal to aru seq
     gcomm_assert(safe_seq == Seqno::max() ||
                  (aru_seq != Seqno::max() && safe_seq <= aru_seq));
@@ -374,8 +374,9 @@ gcomm::evs::InputMap::insert(const UUID& uuid,
     if (recovery_index->find(InputMapMsgKey(node.get_index(), msg.get_seq())) !=
         recovery_index->end())
     {
-        log_warn << "message " << msg << " has already been delivered, state "
-                 << *this;
+        // log_warn << "message " 
+        // << msg << " has already been delivered, state "
+        // << *this;
         return node.get_range();
     }
     

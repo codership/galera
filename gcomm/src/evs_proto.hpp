@@ -162,8 +162,10 @@ public:
     
     void resend(const UUID&, const Range);
     void recover(const UUID&, const UUID&, const Range);
-    
+    void retrans_leaves(const MessageNodeList&);
+
     void set_inactive(const UUID&);
+    bool is_inactive(const Node&) const;
     void check_inactive();
     void cleanup_unoperational();
     void cleanup_views();
@@ -202,6 +204,14 @@ public:
     
     // Message handlers
 private:
+    /*!
+     * Update input map safe seq
+     * @param uuid Node uuid
+     * @param seq  Sequence number
+     * @return Input map seqno before updating
+     */
+    Seqno update_im_safe_seq(const UUID& uuid, const Seqno seq);
+    bool is_msg_from_previous_view(const Message&);
     void handle_foreign(const Message&);
     void handle_user(const UserMessage&, 
                      NodeMap::iterator, 

@@ -441,7 +441,13 @@ static void single_join(DummyTransport* t, Proto* p)
     fail_unless(rb != 0);
     fail_unless(im.get_type() == Message::T_INSTALL);
     
-    // Handling INSTALL message must emit gap message
+    // Handling INSTALL message must emit two gap messages,
+    // one for receiving install message and one for 
+    // shift to operational
+    rb = get_msg(t, &gm);
+    fail_unless(rb != 0);
+    fail_unless(gm.get_type() == Message::T_GAP);
+    
     rb = get_msg(t, &gm);
     fail_unless(rb != 0);
     fail_unless(gm.get_type() == Message::T_GAP);
@@ -552,14 +558,20 @@ static void double_join(DummyTransport* t1, Proto* p1,
     fail_unless(rb == 0);
     
     // Handle gap messages
-    // Expected output: Both nodes shift to S_OPERATIONAL, no messages
-    // sent
+    // Expected output: Both nodes shift to S_OPERATIONAL,
+    // both send gap messages
     p1->handle_msg(gm2);
     fail_unless(p1->get_state() == Proto::S_OPERATIONAL);
+    rb = get_msg(t1, &msg);
+    fail_unless(rb != 0);
+    fail_unless(msg.get_type() == Message::T_GAP);
     rb = get_msg(t1, &msg);
     fail_unless(rb == 0);
     p2->handle_msg(gm);
     fail_unless(p2->get_state() == Proto::S_OPERATIONAL);
+    rb = get_msg(t2, &msg);
+    fail_unless(rb != 0);
+    fail_unless(msg.get_type() == Message::T_GAP);
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
 }
@@ -670,7 +682,7 @@ START_TEST(test_proto_join_n_w_user_msg)
         gu_trace(prop.propagate_until_empty());
         for (size_t j = 0; j < i; ++j)
         {
-            gu_trace(send_n(dn[j], 8));
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
         }
     }
     gu_trace(check_trace(dn));
@@ -744,7 +756,7 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
         gu_trace(prop.propagate_until_cvi());
         for (size_t j = 0; j < i; ++j)
         {
-            gu_trace(send_n(dn[j], 8));
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
         }
     }
     gu_trace(check_trace(dn));
@@ -813,7 +825,7 @@ START_TEST(test_proto_leave_n_w_user_msg)
     {
         for (size_t j = i; j < n_nodes; ++j)
         {
-            gu_trace(send_n(dn[j], 5 + ::rand()%4));
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
         }
         dn[i]->close();
         gu_trace(prop.propagate_until_empty());
@@ -854,7 +866,7 @@ START_TEST(test_proto_leave_n_lossy)
             prop.set_loss(j, i + 1, 0.9);
         }
     }
-
+    
     for (size_t i = 0; i < n_nodes; ++i)
     {
         dn[i]->set_cvi(V_REG);
@@ -906,7 +918,10 @@ START_TEST(test_proto_leave_n_lossy_w_user_msg)
     
     for (size_t i = 0; i < n_nodes; ++i)
     {
-        gu_trace(send_n(dn[i], 5 + ::rand()%4));
+        for (size_t j = i; j < n_nodes; ++j)
+        {
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
+        }
         dn[i]->set_cvi(V_REG);
         for (size_t j = i + 1; j < n_nodes; ++j)
         {
@@ -1051,25 +1066,25 @@ START_TEST(test_proto_split_merge_lossy)
     
     // do
     // {
-    ostringstream os;
-    copy(split.begin(), split.end(), ostream_iterator<size_t>(os, " "));
-    log_info << "permutation: " << os.str();
-    for (size_t i = 1; i < n_nodes; ++i)
-    {
-        for (size_t j = 0; j < i; ++j)
+        ostringstream os;
+        copy(split.begin(), split.end(), ostream_iterator<size_t>(os, " "));
+        log_info << "permutation: " << os.str();
+        for (size_t i = 1; i < n_nodes; ++i)
         {
-            for (size_t k = i; k < n_nodes; ++k)
+            for (size_t j = 0; j < i; ++j)
             {
+                for (size_t k = i; k < n_nodes; ++k)
+                {
                 gu_trace(prop.set_loss(split[j], split[k], 0.));
                 gu_trace(prop.set_loss(split[k], split[j], 0.));
+                }
             }
-        }
-        ++view_seq_inc;
-        for (size_t j = 0; j < i; ++j)
-        {
-            dn[j]->set_cvi(ViewId(V_REG, split[0], view_seq + view_seq_inc));
-        }
-
+            ++view_seq_inc;
+            for (size_t j = 0; j < i; ++j)
+            {
+                dn[j]->set_cvi(ViewId(V_REG, split[0], view_seq + view_seq_inc));
+            }
+        
         for (size_t j = i; j < n_nodes; ++j)
         {
             dn[j]->set_cvi(ViewId(V_REG, split[i], view_seq + view_seq_inc));
@@ -1094,9 +1109,9 @@ START_TEST(test_proto_split_merge_lossy)
         
         Sleep(retrans_period + retrans_period);
         prop.propagate_until_cvi();
-    } 
-    // }
-    // while (next_permutation(split.begin(), split.end()));
+        } 
+//    }
+// while (next_permutation(split.begin(), split.end()));
 
 
 }
@@ -1168,8 +1183,11 @@ START_TEST(test_proto_split_merge_lossy_w_user_msg)
             dn[j]->set_cvi(ViewId(V_REG, split[i], view_seq + view_seq_inc));
         }
 
-        gu_trace(send_n(dn[i], 5 + ::rand()%4));        
-        Sleep(inactive_timeout + inactive_timeout);
+        for (size_t j = 0; j < n_nodes; ++j)
+        {
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));        
+        }
+        
         prop.propagate_until_cvi();
         
         for (size_t j = 0; j < i; ++j)
@@ -1184,8 +1202,10 @@ START_TEST(test_proto_split_merge_lossy_w_user_msg)
         for (size_t j = 0; j < n_nodes; ++j)
         {
             dn[j]->set_cvi(ViewId(V_REG, split[0], view_seq + view_seq_inc));
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
         }
-        gu_trace(send_n(dn[i], 5 + ::rand()%4));        
+        
+
         prop.propagate_until_cvi();
     } 
     // }
@@ -1267,34 +1287,35 @@ Suite* evs2_suite()
         tcase_add_test(tc, test_proto_join_n_lossy_w_user_msg);
         tcase_set_timeout(tc, 15);
         suite_add_tcase(s, tc);
-
-        tc = tcase_create("test_proto_leave_n");
-        tcase_add_test(tc, test_proto_leave_n);
-        suite_add_tcase(s, tc);
-
-        tc = tcase_create("test_proto_leave_n_w_user_msg");
-        tcase_add_test(tc, test_proto_leave_n_w_user_msg);
-        suite_add_tcase(s, tc);
-
-        tc = tcase_create("test_proto_leave_n_lossy");
-        tcase_add_test(tc, test_proto_leave_n_lossy);
-        tcase_set_timeout(tc, 15);
-        suite_add_tcase(s, tc);
-
-        tc = tcase_create("test_proto_leave_n_lossy_w_user_msg");
-        tcase_add_test(tc, test_proto_leave_n_lossy_w_user_msg);
-        tcase_set_timeout(tc, 15);
-        suite_add_tcase(s, tc);
     }
+
+    tc = tcase_create("test_proto_leave_n");
+    tcase_add_test(tc, test_proto_leave_n);
+    suite_add_tcase(s, tc);
+    
+    tc = tcase_create("test_proto_leave_n_w_user_msg");
+    tcase_add_test(tc, test_proto_leave_n_w_user_msg);
+    suite_add_tcase(s, tc);
+    
+    tc = tcase_create("test_proto_leave_n_lossy");
+    tcase_add_test(tc, test_proto_leave_n_lossy);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
+
+
+    tc = tcase_create("test_proto_leave_n_lossy_w_user_msg");
+    tcase_add_test(tc, test_proto_leave_n_lossy_w_user_msg);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
+    
     tc = tcase_create("test_proto_split_merge");
     tcase_add_test(tc, test_proto_split_merge);
     suite_add_tcase(s, tc);
-
+    
     tc = tcase_create("test_proto_split_merge_lossy");
     tcase_add_test(tc, test_proto_split_merge_lossy);
     suite_add_tcase(s, tc);
-
-
+    
     tc = tcase_create("test_proto_split_merge_lossy_w_user_msg");
     tcase_add_test(tc, test_proto_split_merge_lossy_w_user_msg);
     suite_add_tcase(s, tc);
