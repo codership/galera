@@ -484,14 +484,17 @@ namespace gcomm
         void insert_tp(DummyNode* t);
         void set_latency(const size_t ii, const size_t jj, const size_t lat);
         void set_loss(const size_t ii, const size_t jj, const double loss);
+
+
+        void propagate_until_cvi(bool handle_timers = true);
+        friend std::ostream& operator<<(std::ostream&, const PropagationMatrix&);
+    private:
         void expire_timers();
         void propagate_n(size_t n);
         void propagate_until_empty();
-        void propagate_until_cvi();
-        friend std::ostream& operator<<(std::ostream&, const PropagationMatrix&);
-    private:
         size_t count_channel_msgs() const;
         bool all_in_cvi() const;
+        
         NodeMap    tp;
         ChannelMap prop;
     };

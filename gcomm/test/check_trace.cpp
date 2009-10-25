@@ -213,14 +213,14 @@ void gcomm::PropagationMatrix::propagate_until_empty()
 }
 
 
-void gcomm::PropagationMatrix::propagate_until_cvi()
+void gcomm::PropagationMatrix::propagate_until_cvi(bool handle_timers)
 {
     bool all_in = false;
     do
     {
         propagate_n(10);
         all_in = all_in_cvi();
-        if (all_in == false)
+        if (all_in == false && handle_timers == true)
         {
             expire_timers();
         }

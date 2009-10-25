@@ -16,30 +16,38 @@ using namespace gcomm;
 using namespace gcomm::evs;
 
 
-class SameViewSelect
+
+class SelectNodesOp
 {
 public:
-    SameViewSelect(MessageNodeList& nl_, 
-                   const ViewId& view_id_, 
-                   const bool only_op_ = false) : 
-        nl(nl_), 
-        view_id(view_id_),
-        only_op(only_op_) 
+    SelectNodesOp(MessageNodeList& nl_, 
+                  const ViewId& view_id_, 
+                  const bool operational_,
+                  const bool leaving_ ) : 
+        nl          (nl_), 
+        view_id     (view_id_),
+        operational (operational_),
+        leaving     (leaving_)
     { }
     
     void operator()(const MessageNodeList::value_type& vt) const
     {
-        if (MessageNodeList::get_value(vt).get_view_id() == view_id &&
-            (only_op == false || 
-             MessageNodeList::get_value(vt).get_operational() == true))
+        const MessageNode& node(MessageNodeList::get_value(vt));
+        if (node.get_view_id()      == view_id           &&
+            ((operational           == true          && 
+              leaving               == true            ) ||
+             (node.get_operational()  == operational &&
+              node.get_leaving()      == leaving       ) ) )
+            
         {
             nl.insert_checked(vt);
         }
     }
 private:
-    MessageNodeList& nl;
-    const ViewId& view_id;
-    bool only_op;
+    MessageNodeList&       nl;
+    ViewId           const view_id;
+    bool             const operational;
+    bool             const leaving;
 };
 
 
@@ -60,37 +68,19 @@ private:
     NodeMap& nm;
 };
 
-class LeavingSelectOp
-{
-public:
-    LeavingSelectOp(NodeMap& nm_, const ViewId& vid_ = ViewId()) : 
-        nm(nm_), vid(vid_) { }
-    
-    void operator()(const NodeMap::value_type& vt)
-    {
-        if (NodeMap::get_value(vt).get_leave_message() != 0 &&
-            (vid == ViewId() || 
-             NodeMap::get_value(vt).get_leave_message()->get_source_view_id() == vid))
-        {
-            nm.insert_checked(vt);
-        }
-    }
-private:
-    NodeMap& nm;
-    const ViewId& vid;
-};
+
 
 class LeaveSeqCmpOp
 {
 public:
-    bool operator()(const NodeMap::value_type& a,
-                    const NodeMap::value_type& b) const
+    bool operator()(const MessageNodeList::value_type& a,
+                    const MessageNodeList::value_type& b) const
     {
-        const evs::Node& aval(NodeMap::get_value(a));
-        const evs::Node& bval(NodeMap::get_value(b));
-        gcomm_assert(aval.get_leave_message() != 0 &&
-                     bval.get_leave_message() != 0);
-        return aval.get_leave_message()->get_seq() < bval.get_leave_message()->get_seq();
+        const MessageNode& aval(MessageNodeList::get_value(a));
+        const MessageNode& bval(MessageNodeList::get_value(b));
+        gcomm_assert(aval.get_leaving() != false &&
+                     bval.get_leaving() != false);
+        return aval.get_safe_seq() < bval.get_safe_seq();
     }
 };
 
@@ -137,6 +127,31 @@ public:
         }
     }
 };
+
+class SafeSeqCmp
+{
+public:
+    bool operator()(const MessageNodeList::value_type& a,
+                    const MessageNodeList::value_type& b) const
+    {
+        if (MessageNodeList::get_value(a).get_safe_seq() == Seqno::max())
+        {
+            return true;
+        }
+        else if (MessageNodeList::get_value(b).get_safe_seq() == Seqno::max())
+        {
+            return false;
+        }
+        else
+        {
+            return MessageNodeList::get_value(a).get_safe_seq() < 
+                MessageNodeList::get_value(b).get_safe_seq();
+        }
+    }
+};
+
+
+
 
 gcomm::evs::Node::Node(const Node& n) :
     operational(n.operational),
@@ -779,14 +794,16 @@ bool gcomm::evs::Proto::is_consensus() const
         if (is_consistent(*jm) == false)
         {
             log_debug << self_string() 
-                      << " join message "
-                      << *inst.get_join_message() 
-                      << " not consistent with state "
-                      << *this;
+                      << " join message of " << NodeMap::get_key(i) 
+                      << " not consistent";
             return false;
         }
     }
     log_debug << self_string() << " consensus reached";
+    if (is_representative(get_uuid()) == true && install_message == 0)
+    {
+        log_debug << self_string() << " consensus state " << *this;
+    }
     return true;
 }
 
@@ -811,52 +828,70 @@ bool gcomm::evs::Proto::is_consistent_highest_seen(const Message& msg) const
     
     const MessageNodeList& node_list(msg.get_node_list());
     
-    // Same view, all
+    // Same view
     MessageNodeList same_view;
     for_each(node_list.begin(), node_list.end(),
-             SameViewSelect(same_view, current_view.get_id()));
-    MessageNodeList::const_iterator min_hs_i(min_element(same_view.begin(), 
-                                                         same_view.end(), 
-                                                         RangeHsCmp()));
-
-    const Seqno min_hs(
-        min_hs_i == same_view.end() ? 
-        Seqno::max() : 
-        MessageNodeList::get_value(min_hs_i).get_im_range().get_hs());
-
+             SelectNodesOp(same_view, current_view.get_id(), true, true));
     MessageNodeList::const_iterator max_hs_i(max_element(same_view.begin(), 
                                                          same_view.end(), 
                                                          RangeHsCmp()));
-    Seqno max_hs(
+    // Max highest seen
+    const Seqno max_hs(
         max_hs_i == same_view.end() ? 
         Seqno::max() : 
         MessageNodeList::get_value(max_hs_i).get_im_range().get_hs());
     
-    NodeMap leaving;
-    for_each(known.begin(), known.end(), 
-             LeavingSelectOp(leaving, current_view.get_id()));
+    Seqno max_reachable_safe_seq(max_hs);
     
-    const Seqno max_leave_seq(
+    MessageNodeList leaving;
+    for_each(node_list.begin(), node_list.end(), 
+             SelectNodesOp(leaving, current_view.get_id(), false, true));
+    
+    const Seqno min_leave_seq(
         leaving.empty() == true ? max_hs :
-        NodeMap::get_value(
-            max_element(leaving.begin(), leaving.end(),
-                        LeaveSeqCmpOp())).get_leave_message()->get_seq());
-
-    if (max_leave_seq != Seqno::max() && 
-        (max_hs       == Seqno::max() ||
-         max_leave_seq > max_hs))
+        MessageNodeList::get_value(
+            min_element(leaving.begin(), leaving.end(),
+                        LeaveSeqCmpOp())).get_safe_seq());
+    
+    if (min_leave_seq == Seqno::max())
     {
-        max_hs = max_leave_seq;
+        max_reachable_safe_seq = min_leave_seq;
+    }
+    else if (max_reachable_safe_seq != Seqno::max())
+    {
+        max_reachable_safe_seq = min(max_reachable_safe_seq, min_leave_seq);
+    }
+    
+    
+    MessageNodeList partitioning;
+    for_each(node_list.begin(), node_list.end(), 
+             SelectNodesOp(partitioning, current_view.get_id(), false, false));
+    MessageNodeList::const_iterator min_part_safe_seq_i(
+        min_element(partitioning.begin(), partitioning.end(),
+                    SafeSeqCmp()));
+    const Seqno min_part_safe_seq(
+        min_part_safe_seq_i == partitioning.end() ?
+        max_hs : 
+        MessageNodeList::get_value(min_part_safe_seq_i).get_safe_seq());
+    
+    if (min_part_safe_seq == Seqno::max())
+    {
+        max_reachable_safe_seq = min_part_safe_seq;
+    }
+    else if (max_reachable_safe_seq != Seqno::max())
+    {
+        max_reachable_safe_seq = min(max_reachable_safe_seq, min_part_safe_seq);
     }
     
     log_debug << self_string()
-              << " max leave seq " << max_leave_seq
-              << " min hs " << min_hs 
+              << " min leave seq " << min_leave_seq
+              << " min part seq " << min_part_safe_seq
+              << " max reachable safe seq " << max_reachable_safe_seq
               << " max_hs " << max_hs 
+              << " input map max hs " << input_map->get_max_hs()
               << " input map safe_seq " << input_map->get_safe_seq();
-    return (min_hs == input_map->get_min_hs() &&
-            max_hs == input_map->get_max_hs() &&
-            input_map->get_safe_seq() == min_hs);
+    return (input_map->get_max_hs() == max_hs &&
+            highest_reachable_safe_seq() == max_reachable_safe_seq);
 }
 
 bool gcomm::evs::Proto::is_consistent_input_map(const Message& msg) const
@@ -868,8 +903,8 @@ bool gcomm::evs::Proto::is_consistent_input_map(const Message& msg) const
     
     if (msg.get_aru_seq() != input_map->get_aru_seq())
     {
-        log_debug << self_string() << " message "
-                  << msg 
+        log_debug << self_string() << " message aru seq "
+                  << msg.get_aru_seq()
                   << " not consistent with input map aru seq "
                   << input_map->get_aru_seq();
         return false;
@@ -877,8 +912,8 @@ bool gcomm::evs::Proto::is_consistent_input_map(const Message& msg) const
     
     if (msg.get_seq() != input_map->get_safe_seq())
     {
-        log_debug << self_string() << " message "
-                  << msg
+        log_debug << self_string() << " message safe seq "
+                  << msg.get_seq()
                   << " not consistent with input map safe seq "
                   << input_map->get_safe_seq();
         return false;
@@ -913,7 +948,7 @@ bool gcomm::evs::Proto::is_consistent_input_map(const Message& msg) const
     log_debug << self_string() 
               << " msg_insts " << msg_insts
               << " local_insts " << local_insts;
-
+    
     return (msg_insts == local_insts);
 }
 
@@ -958,15 +993,12 @@ bool gcomm::evs::Proto::is_consistent_partitioning(const Message& msg) const
                          make_pair(m_uuid, m_inst.get_im_range())));
         }
     }
-    if (local_insts != msg_insts)
-    {
-        if (msg.get_source() == get_uuid())
-        {
-            log_debug << "own join not consistent with partitioning";
-        }
-        return false;
-    }
-    return true;
+
+    
+    log_debug << self_string()
+              << " msg insts " << msg_insts
+              << " local insts " << local_insts;
+    return (msg_insts == local_insts);
 }
 
 bool gcomm::evs::Proto::is_consistent_leaving(const Message& msg) const
@@ -1010,7 +1042,10 @@ bool gcomm::evs::Proto::is_consistent_leaving(const Message& msg) const
                          make_pair(m_uuid, m_inst.get_im_range())));
         }
     }
-    
+
+    log_debug << self_string()
+              << " msg insts " << msg_insts
+              << " local insts " << local_insts;    
     return (local_insts == msg_insts);
 }
 
@@ -1019,20 +1054,19 @@ bool gcomm::evs::Proto::is_consistent_same_view(const Message& msg) const
     gcomm_assert(msg.get_type() == Message::T_JOIN ||
                  msg.get_type() == Message::T_INSTALL);
     gcomm_assert(msg.get_source_view_id() == current_view.get_id());
-
+    
     if (is_consistent_highest_seen(msg) == false)
     {
         log_debug << self_string()
-                  << " highest seen not consistent for message "
-                  << msg;
+                  << " highest seen not consistent";
         return false;
     }
-
+    
     if (is_consistent_input_map(msg) == false)
     {
         log_debug << self_string() 
-                  << " input map not consistent " << *input_map 
-                  << " with message " << msg;
+                  << " input map not consistent ";
+        
         return false;
     }
     
@@ -1436,11 +1470,27 @@ void gcomm::evs::Proto::send_leave(bool handle)
     
     // If no messages have been sent, generate one dummy to 
     // trigger message acknowledgement mechanism
-    if (last_sent == Seqno::max())
+    if (last_sent == Seqno::max() && output.empty() == true)
     {
         WriteBuf wb(0, 0);
         gu_trace(send_user(&wb, 0xff, SP_DROP, Seqno::max(), Seqno::max()));
-    } 
+    }
+    
+    /* Move all pending messages from output to input map */
+    while (output.empty() == false)
+    {
+        pair<WriteBuf*, ProtoDownMeta> wb = output.front();
+        if (send_user(wb.first, 
+                      wb.second.get_user_type(), 
+                      wb.second.get_safety_prefix(), 
+                      Seqno::max(), Seqno::max()) != 0)
+        {
+            gcomm_throw_fatal << "send_user() failed";
+        }
+        
+        output.pop_front();
+        delete wb.first;
+    }
     
     log_debug << self_string() << " send leave as " << last_sent;
     
@@ -1849,7 +1899,7 @@ void gcomm::evs::Proto::handle_up(int cid,
     try
     {
         gu_trace(offset = unserialize_message(um.get_source(), rb, offset, &msg));
-        handle_msg(msg, rb, offset);
+        gu_trace(handle_msg(msg, rb, offset));
     }
     catch (...)
     {
@@ -2283,6 +2333,32 @@ void gcomm::evs::Proto::deliver_trans()
 // Message handlers
 /////////////////////////////////////////////////////////////////////////////
 
+gcomm::evs::Seqno gcomm::evs::Proto::highest_reachable_safe_seq() const
+{
+    list<Seqno> seq_list;
+    for (NodeMap::const_iterator i = known.begin(); i != known.end();
+         ++i)
+    {
+        if (current_view.get_members().find(NodeMap::get_key(i)) != 
+            current_view.get_members().end())
+        {
+            const Seqno im_hs(input_map->get_range(NodeMap::get_key(i)).get_hs());
+            if (im_hs != Seqno::max())
+            {
+                seq_list.push_back(im_hs);
+            }
+        }
+    }
+    if (seq_list.empty() == false)
+    {
+        return *min_element(seq_list.begin(), seq_list.end());
+    }
+    else
+    {
+        return Seqno::max();
+    }
+}
+
 
 gcomm::evs::Seqno gcomm::evs::Proto::update_im_safe_seq(const UUID& uuid, 
                                                         const Seqno seq)
@@ -2362,7 +2438,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                         NodeMap::get_value(jj).set_installed(true);
                     }
                 }
-                
+                inst.set_tstamp(Time::now());                
                 if (is_consensus() == true) 
                 {
                     shift_to(S_OPERATIONAL);
@@ -2467,10 +2543,10 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     
     // If in recovery state, send join each time input map aru seq reaches
     // last sent and either input map aru or safe seq has changed.
-    if (get_state() == S_RECOVERY && 
-        last_sent   == input_map->get_aru_seq() && 
-        (prev_aru   != input_map->get_aru_seq() ||
-         prev_safe  != input_map->get_safe_seq()))
+    if (get_state()                  == S_RECOVERY && 
+        highest_reachable_safe_seq() == input_map->get_aru_seq() && 
+        (prev_aru                    != input_map->get_aru_seq() ||
+         prev_safe                   != input_map->get_safe_seq()))
     {
         gcomm_assert(output.empty() == true);
         const JoinMessage* jm = NodeMap::get_value(self_i).get_join_message();
@@ -2479,17 +2555,6 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
             gu_trace(send_join());
         }
     }
-    
-#if 0
-    // If in leaving state, shift to closed once input map safe seq 
-    // reaches last sent
-    if (get_state()               == S_LEAVING    && 
-        input_map->get_safe_seq() != Seqno::max() &&
-        input_map->get_safe_seq() >= last_sent)
-    {
-        shift_to(S_CLOSED);
-    }
-#endif
 }
 
 
@@ -2522,6 +2587,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     {
         log_debug << self_string() << " install gap " << msg;
         inst.set_installed(true);
+        inst.set_tstamp(Time::now());
         if (is_all_installed() == true)
         {
             shift_to(S_OPERATIONAL);
@@ -2545,6 +2611,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         if (inst.get_operational() == false) 
         {
             // This is probably partition merge, see if it works out
+            inst.set_tstamp(Time::now());
             inst.set_operational(true);
             shift_to(S_RECOVERY);
         } 
@@ -2570,7 +2637,10 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     // 
     const Seqno prev_safe(update_im_safe_seq(msg.get_source(), 
                                              msg.get_aru_seq()));
-
+    if (prev_safe != input_map->get_safe_seq(msg.get_source()))
+    {
+        inst.set_tstamp(Time::now());
+    }
     //
     if (msg.get_range_uuid() == get_uuid())
     {
@@ -2592,10 +2662,15 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         }
     }
     
+    log_debug << self_string() 
+              << " last sent " << last_sent 
+              << " aru seq " << input_map->get_aru_seq()
+              << " safe seq " << input_map->get_safe_seq()
+              << " prev safe seq " << prev_safe;
     // 
     if (get_state() == S_RECOVERY && 
-        last_sent   == input_map->get_aru_seq() &&
-        prev_safe   != input_map->get_safe_seq())
+        highest_reachable_safe_seq()   == input_map->get_aru_seq() &&
+        prev_safe                      != input_map->get_safe_seq())
     {
         gcomm_assert(output.empty() == true);
         const JoinMessage* jm(NodeMap::get_value(self_i).get_join_message());
@@ -2603,31 +2678,38 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         {
             gu_trace(send_join());
         }
-    }
-    
-#if 0
-    //
-    if (get_state()               == S_LEAVING    && 
-        input_map->get_safe_seq() != Seqno::max() &&
-        input_map->get_safe_seq() >= last_sent)
+    }    
+}
+
+bool gcomm::evs::Proto::update_im_safe_seqs(const MessageNodeList& node_list)
+{
+    bool updated = false;
+    // Update input map state
+    for (MessageNodeList::const_iterator i = node_list.begin();
+         i != node_list.end(); ++i)
     {
-        shift_to(S_CLOSED);
+        const UUID& uuid(MessageNodeList::get_key(i));
+        const Seqno safe_seq(MessageNodeList::get_value(i).get_safe_seq());
+        if (update_im_safe_seq(uuid, safe_seq) != safe_seq &&
+            input_map->get_safe_seq(uuid) == safe_seq)
+        {
+            updated = true;
+        }
     }
-#endif
+    return updated;
 }
 
 
-void gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
+bool gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
 {
+    bool sent = false;
     // @todo Check for nodes that have leave messages locally
     // but not seen in all same view nodes
-    NodeMap leaving;
-    for_each(known.begin(), known.end(), LeavingSelectOp(leaving));
-    for (NodeMap::const_iterator li = leaving.begin(); 
-         li != leaving.end(); ++li)
+    for (NodeMap::const_iterator li = known.begin(); li != known.end(); ++li)
     {
         const Node& local_node(NodeMap::get_value(li));
-        if (is_inactive(local_node) == false)
+        if (local_node.get_leave_message() != 0 && 
+            is_inactive(local_node)        == false)
         {
             MessageNodeList::const_iterator msg_li = 
                 node_list.find(NodeMap::get_key(li));
@@ -2648,9 +2730,11 @@ void gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
                                      Message::F_RETRANS | Message::F_SOURCE);
                 push_header(send_lm, &wb);
                 gu_trace(send_delegate(&wb));
+                sent = true;
             }
         }
     }
+    return sent;
 }
 
 
@@ -2667,9 +2751,16 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     {
         if (msg.get_source_view_id() == current_view.get_id())
         {
-            // Update input map state
-            (void)update_im_safe_seq(msg.get_source(), msg.get_aru_seq());
+            inst.set_tstamp(Time::now());
+            MessageNodeList node_list;
+            for_each(msg.get_node_list().begin(), msg.get_node_list().end(),
+                     SelectNodesOp(node_list, current_view.get_id(), true, true));
+            (void)update_im_safe_seqs(node_list);
+            // (void)update_im_safe_seq(msg.get_source(), msg.get_aru_seq());
         }
+        log_debug << self_string() 
+                  << " im safe seq " << input_map->get_safe_seq()
+                  << " last sent "   << last_sent;
         if (input_map->get_safe_seq() != Seqno::max() &&
             input_map->get_safe_seq() >= last_sent)
         {
@@ -2693,17 +2784,23 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         // and install gap.
         if (is_consistent(*install_message) == true)
         {
-            send_join(false);
+            inst.set_tstamp(Time::now());
             if (is_representative(get_uuid()) == true)
             {
                 gu_trace(send_install());
             }
-            
+            else if (msg.get_source() != get_uuid())
+            {
+                send_join(false);
+            }
             log_debug << self_string()
                       << " install message and received join, discarding";
             log_debug << "================ leave handle_join ==================";
-            send_gap(UUID::nil(), install_message->get_source_view_id(), 
-                     Range());
+            if (install_message != 0)
+            {
+                send_gap(UUID::nil(), install_message->get_source_view_id(), 
+                         Range());
+            }
             return;
         }
         else
@@ -2724,7 +2821,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     } 
     
     inst.set_join_message(&msg);
-    
+    inst.set_tstamp(Time::now());    
     gcomm_assert(output.empty() == true);
     
     if (is_consensus() == true)
@@ -2733,34 +2830,30 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         {
             gu_trace(send_install());
         }
-        else
+        else if (msg.get_source() != get_uuid())
         {
-            // do nothing, wait for install message
+            if (install_message == 0)
+            {
+                gu_trace(send_join(false));
+            }
         }
     }
-    else
+    else if (msg.get_source() != get_uuid())
     {
         bool do_send_join(false);
         // Select nodes that are coming from the same view as seen by
         // message source
         MessageNodeList same_view;
         for_each(msg.get_node_list().begin(), msg.get_node_list().end(),
-                 SameViewSelect(same_view, current_view.get_id()));
+                 SelectNodesOp(same_view, current_view.get_id(), true, true));
         // Coming from the same view
         if (msg.get_source_view_id() == current_view.get_id())
         {
-            // Update input map state
-            for (MessageNodeList::const_iterator i = same_view.begin();
-                 i != same_view.end(); ++i)
+            if (update_im_safe_seqs(same_view) == true)
             {
-                const UUID& mn_uuid(MessageNodeList::get_key(i));
-                const Seqno mn_safe_seq(MessageNodeList::get_value(i).get_safe_seq());
-                if (update_im_safe_seq(mn_uuid, mn_safe_seq) != mn_safe_seq)
-                {
-                    do_send_join = true;
-                }
+                do_send_join = true;
             }
-
+            
             // See if we need to retrans some user messages
             MessageNodeList::const_iterator nli(same_view.find(get_uuid()));
             if (nli != same_view.end())
@@ -2774,7 +2867,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                     gu_trace(resend(msg.get_source(), mn_im_range));
                     do_send_join = true;
                 }
-                if (im_range.get_hs() != Seqno::max() &&
+                if (im_range.get_hs()     != Seqno::max() &&
                     (mn_im_range.get_hs() == Seqno::max() ||
                      mn_im_range.get_hs() < im_range.get_hs()))
                 {
@@ -2792,8 +2885,9 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                 max_element(same_view.begin(), same_view.end(), RangeHsCmp()));
             const Seqno max_hs(MessageNodeList::get_value(max_hs_i).get_im_range().get_hs());
             log_debug << self_string() << " same view max hs " << max_hs;
-            if (max_hs != Seqno::max() &&
-                (last_sent == Seqno::max() || last_sent < max_hs))
+            if (max_hs     != Seqno::max()    &&
+                (last_sent == Seqno::max() || 
+                 last_sent < max_hs          )  )
             {
                 gu_trace(complete_user(max_hs));
                 do_send_join = true;
@@ -2807,24 +2901,31 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                 MessageNodeList::const_iterator min_hs_i(
                     min_element(same_view.begin(), same_view.end(), 
                                 RangeHsCmp()));
-                const UUID& min_hs_uuid(MessageNodeList::get_key(min_hs_i));
-                const Seqno min_hs(MessageNodeList::get_value(min_hs_i).get_im_range().get_hs());                
-                const NodeMap::const_iterator local_i(known.find_checked(min_hs_uuid));
-                const Node& local_node(NodeMap::get_value(local_i));
-                const Range im_range(input_map->get_range(min_hs_uuid));
-                log_debug << self_string() << " same view min hs " << min_hs;
-                if (local_node.get_operational() == false &&
-                    im_range.get_hs()            != Seqno::max() &&
-                    im_range.get_hs()            >  min_hs)
+                if (min_hs_i != same_view.end())
                 {
-                    gu_trace(recover(msg.get_source(), min_hs_uuid, 
-                                     Range(min_hs, max_hs)));
-                    do_send_join = true;
+                    const UUID& min_hs_uuid(MessageNodeList::get_key(min_hs_i));
+                    const Seqno min_hs(MessageNodeList::get_value(min_hs_i).get_im_range().get_hs());                
+                    const NodeMap::const_iterator local_i(known.find_checked(min_hs_uuid));
+                    const Node& local_node(NodeMap::get_value(local_i));
+                    const Range im_range(input_map->get_range(min_hs_uuid));
+                    log_debug << self_string() << " same view min hs " << min_hs;
+                    if (local_node.get_operational() == false           &&
+                        im_range.get_hs()            != Seqno::max()    &&
+                        (min_hs                      == Seqno::max() ||
+                         im_range.get_hs()            >  min_hs        )   )
+                    {
+                        gu_trace(recover(msg.get_source(), min_hs_uuid, 
+                                         Range(min_hs == Seqno::max() ? 0 : min_hs,
+                                               max_hs)));
+                        // do_send_join = true;
+                    }
                 }
             }
             
-            retrans_leaves(same_view);
-
+            if (retrans_leaves(same_view) == true)
+            {
+                // do_send_join = true;
+            }
         }
         
         if (do_send_join == true)
@@ -2846,23 +2947,7 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
     
     node.set_leave_message(&msg);
     if (msg.get_source() == get_uuid()) 
-    {
-        /* Move all pending messages from output to input map */
-        while (output.empty() == false)
-        {
-            pair<WriteBuf*, ProtoDownMeta> wb = output.front();
-            if (send_user(wb.first, 
-                          wb.second.get_user_type(), 
-                          wb.second.get_safety_prefix(), 
-                          Seqno::max(), Seqno::max(), true) != 0)
-            {
-                gcomm_throw_fatal << "send_user() failed";
-            }
-            
-            output.pop_front();
-            delete wb.first;
-        }
-        
+    {        
         // The last one to live, instant close. Otherwise continue 
         // serving until it becomes apparent that others have
         // leave message.
@@ -2991,10 +3076,12 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         
         handle_join(jm, ii);
         is_consistent_p = is_consistent(msg);
+
     }
     
     if (is_consistent_p == true && is_consensus() == true)
     {
+        inst.set_tstamp(Time::now());
         install_message = new InstallMessage(msg);
         gu_trace(send_gap(UUID::nil(), install_message->get_source_view_id(), 
                           Range()));

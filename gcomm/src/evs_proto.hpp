@@ -162,7 +162,7 @@ public:
     
     void resend(const UUID&, const Range);
     void recover(const UUID&, const UUID&, const Range);
-    void retrans_leaves(const MessageNodeList&);
+    bool retrans_leaves(const MessageNodeList&);
 
     void set_inactive(const UUID&);
     bool is_inactive(const Node&) const;
@@ -210,7 +210,9 @@ private:
      * @param seq  Sequence number
      * @return Input map seqno before updating
      */
+    Seqno highest_reachable_safe_seq() const;
     Seqno update_im_safe_seq(const UUID& uuid, const Seqno seq);
+    bool update_im_safe_seqs(const MessageNodeList&);
     bool is_msg_from_previous_view(const Message&);
     void handle_foreign(const Message&);
     void handle_user(const UserMessage&, 
