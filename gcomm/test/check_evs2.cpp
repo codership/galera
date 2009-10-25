@@ -860,7 +860,7 @@ START_TEST(test_proto_leave_n_lossy)
     {
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
         set_cvi(dn, 0, i, i + 1);
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(false));
     }
     
     uint32_t last_view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
@@ -947,8 +947,8 @@ START_TEST(test_proto_split_merge)
     EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
-    const string inactive_timeout("PT0.01S");
-    const string retrans_period("PT0.01S");
+    const string inactive_timeout("PT0.3S");
+    const string retrans_period("PT0.1S");
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
@@ -972,13 +972,9 @@ START_TEST(test_proto_split_merge)
     uint32_t view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
     uint32_t view_seq_inc = 0;
     
-    // do
-    // {
-    ostringstream os;
-    copy(split.begin(), split.end(), ostream_iterator<size_t>(os, " "));
-    log_info << "permutation: " << os.str();
     for (size_t i = 1; i < n_nodes; ++i)
     {
+        log_info << "split " << i;
         for (size_t j = 0; j < i; ++j)
         {
             for (size_t k = i; k < n_nodes; ++k)
@@ -992,6 +988,7 @@ START_TEST(test_proto_split_merge)
         set_cvi(dn, i, n_nodes - 1, view_seq + view_seq_inc);
         gu_trace(prop.propagate_until_cvi());
         
+        log_info << "merge " << i;
         for (size_t j = 0; j < i; ++j)
         {
             for (size_t k = i; k < n_nodes; ++k)
@@ -1004,10 +1001,6 @@ START_TEST(test_proto_split_merge)
         set_cvi(dn, 0, n_nodes - 1, view_seq + view_seq_inc);
         gu_trace(prop.propagate_until_cvi(false));
     } 
-    // }
-    // while (next_permutation(split.begin(), split.end()));
-
-
 }
 END_TEST
 
@@ -1019,19 +1012,19 @@ START_TEST(test_proto_split_merge_lossy)
     EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
-    const string inactive_timeout("PT0.01S");
-    const string retrans_period("PT0.001S");
+    const string inactive_timeout("PT0.3S");
+    const string retrans_period("PT0.01S");
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, "PT0.01S", "PT0.001S"));
+        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
     {
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
         set_cvi(dn, 0, i, i + 1);
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(false));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1052,11 +1045,9 @@ START_TEST(test_proto_split_merge_lossy)
     uint32_t view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
     uint32_t view_seq_inc = 0;
     
-    ostringstream os;
-    copy(split.begin(), split.end(), ostream_iterator<size_t>(os, " "));
-    log_info << "permutation: " << os.str();
     for (size_t i = 1; i < n_nodes; ++i)
     {
+        log_info << "split " << i;
         for (size_t j = 0; j < i; ++j)
         {
             for (size_t k = i; k < n_nodes; ++k)
@@ -1071,6 +1062,7 @@ START_TEST(test_proto_split_merge_lossy)
         
         prop.propagate_until_cvi();
         
+        log_info << "merge " << i;
         for (size_t j = 0; j < i; ++j)
         {
             for (size_t k = i; k < n_nodes; ++k)
@@ -1094,19 +1086,19 @@ START_TEST(test_proto_split_merge_lossy_w_user_msg)
     EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
-    const string inactive_timeout("PT0.01S");
-    const string retrans_period("PT0.001S");
+    const string inactive_timeout("PT0.3S");
+    const string retrans_period("PT0.01S");
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, "PT0.01S", "PT0.001S"));
+        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
     {
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
         set_cvi(dn, 0, i, i + 1);
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(false));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1127,12 +1119,9 @@ START_TEST(test_proto_split_merge_lossy_w_user_msg)
     uint32_t view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
     uint32_t view_seq_inc = 0;
     
-    
-    ostringstream os;
-    copy(split.begin(), split.end(), ostream_iterator<size_t>(os, " "));
-    log_info << "permutation: " << os.str();
     for (size_t i = 1; i < n_nodes; ++i)
     {
+        log_info << "split " << i;
         for (size_t j = 0; j < i; ++j)
         {
             for (size_t k = i; k < n_nodes; ++k)
@@ -1152,6 +1141,7 @@ START_TEST(test_proto_split_merge_lossy_w_user_msg)
         
         prop.propagate_until_cvi();
         
+        log_info << "merge " << i;
         for (size_t j = 0; j < i; ++j)
         {
             for (size_t k = i; k < n_nodes; ++k)
@@ -1167,8 +1157,7 @@ START_TEST(test_proto_split_merge_lossy_w_user_msg)
             gu_trace(send_n(dn[j], 5 + ::rand() % 4));
         }
         prop.propagate_until_cvi();
-    } 
-
+    }
 }
 END_TEST
 
@@ -1269,16 +1258,16 @@ Suite* evs2_suite()
     tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
     
-    if (skip == false)
-    {
-        tc = tcase_create("test_proto_split_merge");
-        tcase_add_test(tc, test_proto_split_merge);
-        suite_add_tcase(s, tc);
-        
-        tc = tcase_create("test_proto_split_merge_lossy");
-        tcase_add_test(tc, test_proto_split_merge_lossy);
-        suite_add_tcase(s, tc);
-    }
+    tc = tcase_create("test_proto_split_merge");
+    tcase_add_test(tc, test_proto_split_merge);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
+    
+    tc = tcase_create("test_proto_split_merge_lossy");
+    tcase_add_test(tc, test_proto_split_merge_lossy);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
+
     tc = tcase_create("test_proto_split_merge_lossy_w_user_msg");
     tcase_add_test(tc, test_proto_split_merge_lossy_w_user_msg);
     tcase_set_timeout(tc, 15);
