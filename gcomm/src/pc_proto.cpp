@@ -702,6 +702,13 @@ void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
         set_to_seq(get_to_seq() + 1);
         to_seq = get_to_seq();
     }
+    else if (current_view.get_members().find(um.get_source()) ==
+             current_view.get_members().end())
+    {
+        gcomm_assert(current_view.get_type() == V_TRANS);
+        log_warn << "dropping message from out of view source in non-prim";
+        return;
+    }
     
     ProtoUpMeta pum(um.get_source(), pc_view.get_id(), 0,
                     um.get_user_type(), to_seq);
