@@ -104,9 +104,16 @@ cycle()
     local -r node=$1
     local -r node_id=${NODE_ID[$node]}
 
-    echo "Killing node $node_id..."
-    kill_node $node
-    
+    local var_kill=3
+    if test $(( $RANDOM % var_kill )) = 0
+    then
+        echo "Killing node $node_id..."
+        kill_node $node
+    else
+        echo "Stopping node $node_id..."
+        stop_node $node
+    fi
+
     pause
 
     consistency_check
