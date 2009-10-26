@@ -135,7 +135,7 @@ void single_boot(PCUser* pu1)
     pu1->pc->connect(true);
     // pu1->pc->shift_to(PCProto::S_JOINING);
     pu1->pc->handle_up(0, 0, 0, um1);
-    fail_unless(pu1->pc->get_state() == PCProto::S_JOINING);
+    fail_unless(pu1->pc->get_state() == PCProto::S_TRANS);
     
     View vr1(ViewId(V_REG, pu1->uuid, 1));
     vr1.add_member(pu1->uuid, "n1");
@@ -202,7 +202,7 @@ static void double_boot(PCUser* pu1, PCUser* pu2)
     // pu2->pc->shift_to(PCProto::S_JOINING);
     pu2->pc->connect(false);
     pu2->pc->handle_view(t12);
-    fail_unless(pu2->pc->get_state() == PCProto::S_JOINING);
+    fail_unless(pu2->pc->get_state() == PCProto::S_TRANS);
 
     View r1(ViewId(V_REG, 
                    pu1->uuid, 
@@ -681,8 +681,8 @@ START_TEST(test_pc_state3)
     tr22.add_member(uuid2, "n2");
     pu2.pc->handle_view(tr22);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_NON_PRIM);
-    fail_unless(pu2.pc->get_state() == PCProto::S_NON_PRIM);
+    fail_unless(pu1.pc->get_state() == PCProto::S_TRANS);
+    fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);
 
     fail_unless(pu1.tp->get_out() == 0);
     fail_unless(pu2.tp->get_out() == 0);

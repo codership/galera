@@ -125,7 +125,7 @@ void PCProto::shift_to(const State s)
         // Closed
         { false, true, false,  false, false, false, false },
         // Joining
-        { true,  false, true,  false, false, false, false },
+        { true,  false, false,  false, false, true, false },
         // States exch
         { true,  false, false, true,  false, true,  true  },
         // Install
@@ -133,9 +133,9 @@ void PCProto::shift_to(const State s)
         // Prim
         { true,  false, false, false, false, true,  true  },
         // Trans
-        { true,  false, true,  false, false, false, false },
+        { true,  false, true,  false, false, false, true },
         // Non-prim
-        { true,  false, true,  false, false, false, true  }
+        { true,  false, true,  false, false, true, false  }
     };
     
 
@@ -196,15 +196,16 @@ void PCProto::shift_to(const State s)
 
 void PCProto::handle_first_trans(const View& view)
 {
+    gcomm_assert(get_state() == S_JOINING);
     gcomm_assert(view.get_type() == V_TRANS);
-
+    
     if (start_prim == true)
     {
         if (view.get_members().size() > 1 || view.is_empty())
         {
             gcomm_throw_fatal << "Corrupted view";
         }
-
+        
         if (NodeList::get_key(view.get_members().begin()) != uuid)
         {
             gcomm_throw_fatal << "Bad first UUID: "
@@ -215,6 +216,8 @@ void PCProto::handle_first_trans(const View& view)
         set_last_prim(ViewId(V_PRIM, view.get_id()));
         set_prim(true);
     }
+    current_view = view;
+    shift_to(S_TRANS);
 }
 
 void PCProto::handle_trans(const View& view)
@@ -225,12 +228,13 @@ void PCProto::handle_trans(const View& view)
     
     log_info << "Handle trans, current: " << current_view.get_id()
              << ", new: " << view.get_id();
-
+    
     if (ViewId(V_PRIM, view.get_id()) == get_last_prim())
     {
         if (view.get_members().size()*2 + view.get_left().size() <=
             current_view.get_members().size())
         {
+            current_view = view;
             shift_to(S_NON_PRIM);
             deliver_view();
             return;
@@ -244,17 +248,14 @@ void PCProto::handle_trans(const View& view)
             log_warn << "Trans view during " << to_string(get_state());
         }
     }
-
-    if (get_state() != S_NON_PRIM)
-    {
-        shift_to(S_TRANS);
-    }
+    current_view = view;
+    shift_to(S_TRANS);
 }
 
 void PCProto::handle_first_reg(const View& view)
 {
     gcomm_assert(view.get_type() == V_REG);
-    gcomm_assert(get_state() == S_JOINING);
+    gcomm_assert(get_state() == S_TRANS);
     
     if (start_prim == true)
     {
@@ -294,7 +295,7 @@ void PCProto::handle_reg(const View& view)
     
     current_view = view;
     views.push_back(current_view);
-
+    
     if (current_view.is_empty() == true)
     {
         // set_prim(false);
