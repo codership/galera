@@ -814,12 +814,14 @@ bool gcomm::evs::Proto::is_representative(const UUID& uuid) const
 {
     for (NodeMap::const_iterator i = known.begin(); i != known.end(); ++i) 
     {
-        if (NodeMap::get_value(i).get_operational()) 
+        if (NodeMap::get_value(i).get_operational() == true && 
+            is_inactive(NodeMap::get_value(i))      == false) 
         {
+            gcomm_assert(NodeMap::get_value(i).get_leave_message() == 0);
             return (uuid == NodeMap::get_key(i));
         }
     }
-
+    
     return false;
 }
 
@@ -3031,7 +3033,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     assert(ii != known.end());
     Node& inst(NodeMap::get_value(ii));
     
-
+    
     
     log_debug << self_string() << " " << msg;
     
@@ -3125,7 +3127,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         
         handle_join(jm, ii);
         is_consistent_p = is_consistent(msg);
-
+        
     }
     
     if (is_consistent_p == true && is_consensus() == true)
