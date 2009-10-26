@@ -17,7 +17,7 @@ ostream& gcomm::evs::operator<<(ostream& os, const gcomm::evs::MessageNode& node
 {
     os << "node: {";
     os << "operational=" << node.get_operational() << ",";
-    os << "leaving=" << node.get_leaving() << ",";
+    os << "leave_seq=" << node.get_leave_seq() << ",";
     os << "view_id=" << node.get_view_id() << ",";
     os << "safe_seq=" << node.get_safe_seq() << ",";
     os << "im_range=" << node.get_im_range() << ",";
@@ -57,10 +57,9 @@ size_t gcomm::evs::MessageNode::serialize(byte_t* const buf,
 {
     uint8_t b = operational;
     gu_trace(offset = gcomm::serialize(b, buf, buflen, offset));
-    b = leaving;
-    gu_trace(offset = gcomm::serialize(b, buf, buflen, offset));
-    uint16_t pad(0);
+    uint8_t pad(0);
     gu_trace(offset = gcomm::serialize(pad, buf, buflen, offset));
+    gu_trace(offset = leave_seq.serialize(buf, buflen, offset));
     gu_trace(offset = view_id.serialize(buf, buflen, offset));
     gu_trace(offset = safe_seq.serialize(buf, buflen, offset));
     gu_trace(offset = im_range.serialize(buf, buflen, offset));    
@@ -81,19 +80,13 @@ size_t gcomm::evs::MessageNode::unserialize(const byte_t* const buf,
     }
     operational = b;
     
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &b));
-    if (not (b == 0 || b == 1))
-    {
-        gcomm_throw_runtime(EINVAL) << "invalid leaving flag " << b;
-    }
-    leaving = b;
-    
-    uint16_t pad(0);
+    uint8_t pad(0);
     gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &pad));
     if (pad != 0)
     {
         gcomm_throw_runtime(EINVAL) << "invalid pad" << pad;
     }
+    gu_trace(offset = leave_seq.unserialize(buf, buflen, offset));
     gu_trace(offset = view_id.unserialize(buf, buflen, offset));
     gu_trace(offset = safe_seq.unserialize(buf, buflen, offset));
     gu_trace(offset = im_range.unserialize(buf, buflen, offset));    
@@ -102,7 +95,8 @@ size_t gcomm::evs::MessageNode::unserialize(const byte_t* const buf,
 
 size_t gcomm::evs::MessageNode::serial_size()
 {
-    return 4 +                  // 4 bytes reserved for flags
+    return 2 +                  // 4 bytes reserved for flags
+        Seqno::serial_size() +
         ViewId::serial_size() + 
         Seqno::serial_size() + 
         Range::serial_size();

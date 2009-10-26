@@ -853,7 +853,7 @@ START_TEST(test_proto_leave_n_lossy)
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, "PT1H", "PT0.001S"));
+        dn.push_back(create_dummy_node(i, "PT1H", "PT0.1S"));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -899,7 +899,7 @@ START_TEST(test_proto_leave_n_lossy_w_user_msg)
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, "PT1H", "PT0.001S"));
+        dn.push_back(create_dummy_node(i, "PT1H", "PT0.1S"));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -947,7 +947,7 @@ START_TEST(test_proto_split_merge)
     EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
-    const string inactive_timeout("PT0.3S");
+    const string inactive_timeout("PT0.7S");
     const string retrans_period("PT0.1S");
     
     for (size_t i = 1; i <= n_nodes; ++i)
@@ -999,7 +999,7 @@ START_TEST(test_proto_split_merge)
         }
         ++view_seq_inc;
         set_cvi(dn, 0, n_nodes - 1, view_seq + view_seq_inc);
-        gu_trace(prop.propagate_until_cvi(false));
+        gu_trace(prop.propagate_until_cvi());
     } 
 }
 END_TEST
@@ -1012,8 +1012,8 @@ START_TEST(test_proto_split_merge_lossy)
     EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
-    const string inactive_timeout("PT0.3S");
-    const string retrans_period("PT0.01S");
+    const string inactive_timeout("PT0.7S");
+    const string retrans_period("PT0.1S");
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
@@ -1086,8 +1086,8 @@ START_TEST(test_proto_split_merge_lossy_w_user_msg)
     EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
-    const string inactive_timeout("PT0.3S");
-    const string retrans_period("PT0.01S");
+    const string inactive_timeout("PT0.7S");
+    const string retrans_period("PT0.1S");
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
@@ -1162,96 +1162,87 @@ START_TEST(test_proto_split_merge_lossy_w_user_msg)
 END_TEST
 
 
-static bool skip = false;
-
 Suite* evs2_suite()
 {
     Suite* s = suite_create("gcomm::evs");
     TCase* tc;
     
-    if (skip == false)
-    {
-        tc = tcase_create("test_seqno");
-        tcase_add_test(tc, test_seqno);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_seqno");
+    tcase_add_test(tc, test_seqno);
+    suite_add_tcase(s, tc);
     
-        tc = tcase_create("test_range");
-        tcase_add_test(tc, test_range);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_range");
+    tcase_add_test(tc, test_range);
+    suite_add_tcase(s, tc);
     
-        tc = tcase_create("test_message");
-        tcase_add_test(tc, test_message);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_message");
+    tcase_add_test(tc, test_message);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_input_map_insert");
-        tcase_add_test(tc, test_input_map_insert);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_input_map_insert");
+    tcase_add_test(tc, test_input_map_insert);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_input_map_find");
-        tcase_add_test(tc, test_input_map_find);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_input_map_find");
+    tcase_add_test(tc, test_input_map_find);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_input_map_safety");
-        tcase_add_test(tc, test_input_map_safety);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_input_map_safety");
+    tcase_add_test(tc, test_input_map_safety);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_input_map_erase");
-        tcase_add_test(tc, test_input_map_erase);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_input_map_erase");
+    tcase_add_test(tc, test_input_map_erase);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_input_map_overwrap");
-        tcase_add_test(tc, test_input_map_overwrap);
-        tcase_set_timeout(tc, 15);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_input_map_overwrap");
+    tcase_add_test(tc, test_input_map_overwrap);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_input_map_random_insert");
-        tcase_add_test(tc, test_input_map_random_insert);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_input_map_random_insert");
+    tcase_add_test(tc, test_input_map_random_insert);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_proto_single_join");
-        tcase_add_test(tc, test_proto_single_join);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_single_join");
+    tcase_add_test(tc, test_proto_single_join);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_proto_double_join");
-        tcase_add_test(tc, test_proto_double_join);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_double_join");
+    tcase_add_test(tc, test_proto_double_join);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_proto_join_n");
-        tcase_add_test(tc, test_proto_join_n);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_join_n");
+    tcase_add_test(tc, test_proto_join_n);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_proto_join_n_w_user_msg");
-        tcase_add_test(tc, test_proto_join_n_w_user_msg);
-        tcase_set_timeout(tc, 15);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_join_n_w_user_msg");
+    tcase_add_test(tc, test_proto_join_n_w_user_msg);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_proto_join_n_lossy");
-        tcase_add_test(tc, test_proto_join_n_lossy);
-        tcase_set_timeout(tc, 15);
-        suite_add_tcase(s, tc);
-    }
+    tc = tcase_create("test_proto_join_n_lossy");
+    tcase_add_test(tc, test_proto_join_n_lossy);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
     
     tc = tcase_create("test_proto_join_n_lossy_w_user_msg");
     tcase_add_test(tc, test_proto_join_n_lossy_w_user_msg);
     tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
-
     
-    if (skip == false)
-    {
-        tc = tcase_create("test_proto_leave_n");
-        tcase_add_test(tc, test_proto_leave_n);
-        suite_add_tcase(s, tc);
-        
-        tc = tcase_create("test_proto_leave_n_w_user_msg");
-        tcase_add_test(tc, test_proto_leave_n_w_user_msg);
-        suite_add_tcase(s, tc);
-        
-        tc = tcase_create("test_proto_leave_n_lossy");
-        tcase_add_test(tc, test_proto_leave_n_lossy);
-        tcase_set_timeout(tc, 15);
-        suite_add_tcase(s, tc);
-    }
+    tc = tcase_create("test_proto_leave_n");
+    tcase_add_test(tc, test_proto_leave_n);
+    suite_add_tcase(s, tc);
+    
+    tc = tcase_create("test_proto_leave_n_w_user_msg");
+    tcase_add_test(tc, test_proto_leave_n_w_user_msg);
+    suite_add_tcase(s, tc);
+    
+    tc = tcase_create("test_proto_leave_n_lossy");
+    tcase_add_test(tc, test_proto_leave_n_lossy);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
 
     tc = tcase_create("test_proto_leave_n_lossy_w_user_msg");
     tcase_add_test(tc, test_proto_leave_n_lossy_w_user_msg);

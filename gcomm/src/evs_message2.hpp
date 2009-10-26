@@ -41,35 +41,36 @@ class gcomm::evs::MessageNode
 {
 public:
     MessageNode(const bool    operational_     = false,
-                const bool    leaving_         = false,
+                const Seqno   leave_seq_       = Seqno::max(),
                 const ViewId& view_id_         = ViewId(V_REG),
                 const Seqno   safe_seq_        = Seqno::max(),
                 const Range   im_range_        = Range()) :
         operational(operational_),
-        leaving(leaving_),
+        leave_seq(leave_seq_),
         view_id(view_id_),
         safe_seq(safe_seq_),
         im_range(im_range_)
     { }
 
     MessageNode(const MessageNode& mn) :
-        operational(mn.operational),
-        leaving(mn.leaving),
-        view_id(mn.view_id),
-        safe_seq(mn.safe_seq),
-        im_range(mn.im_range)
+        operational (mn.operational),
+        leave_seq   (mn.leave_seq),
+        view_id     (mn.view_id),
+        safe_seq    (mn.safe_seq),
+        im_range    (mn.im_range)
     { }
-
+    
     bool get_operational() const { return operational; }
-    bool get_leaving() const { return leaving; }
+    bool get_leaving() const { return not (leave_seq == Seqno::max()); }
+    Seqno get_leave_seq() const { return leave_seq; }
     const ViewId& get_view_id() const { return view_id; }
     Seqno get_safe_seq() const { return safe_seq; }
     Range get_im_range() const { return im_range; }
-
+    
     bool operator==(const MessageNode& cmp) const
     {
         return operational == cmp.operational &&
-            leaving == cmp.leaving &&
+            leave_seq == cmp.leave_seq &&
             view_id == cmp.view_id && 
             safe_seq == cmp.safe_seq &&
             im_range == cmp.im_range;
@@ -82,7 +83,7 @@ public:
     static size_t serial_size();
 private:
     bool     operational;     // Is operational
-    bool     leaving;         // Is leaving
+    Seqno    leave_seq;
     ViewId   view_id;         // Current view as seen by source of this message
     Seqno    safe_seq;        // Safe seq as seen...
     Range    im_range;        // Input map range as seen...

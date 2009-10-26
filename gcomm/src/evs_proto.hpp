@@ -189,8 +189,19 @@ public:
     // Compares join message against current state
     
     bool is_consistent(const Message&) const;
-    bool is_consistent_highest_seen(const Message&) const;
+    /*!
+     * Check if highest reachable safe seq according to message
+     * consistent with local state.
+     */
+    bool is_consistent_highest_reachable_safe_seq(const Message&) const;
+    /*!
+     * Check if message aru seq, safe seq and node ranges matches to
+     * local state.
+     */
     bool is_consistent_input_map(const Message&) const;
+    /*!
+     * Check if message joining nodes match to local state.
+     */
     bool is_consistent_joining(const Message&) const;
     bool is_consistent_partitioning(const Message&) const;
     bool is_consistent_leaving(const Message&) const;
@@ -205,13 +216,24 @@ public:
     // Message handlers
 private:
     /*!
+     * Compute highest reachable safe seq from local state
+     *
+     * @return Highest reachable safe seq
+     */
+    Seqno highest_reachable_safe_seq() const;
+
+    /*!
      * Update input map safe seq
      * @param uuid Node uuid
      * @param seq  Sequence number
      * @return Input map seqno before updating
      */
-    Seqno highest_reachable_safe_seq() const;
     Seqno update_im_safe_seq(const UUID& uuid, const Seqno seq);
+
+    /*!
+     * Update input map safe seqs according to message node list. Only
+     * inactive nodes are allowed to be in 
+     */
     bool update_im_safe_seqs(const MessageNodeList&);
     bool is_msg_from_previous_view(const Message&);
     void handle_foreign(const Message&);
