@@ -188,6 +188,21 @@ void gcomm::PropagationMatrix::set_loss(const size_t ii, const size_t jj,
     ChannelMap::get_value(i)->set_loss(loss);
 }
 
+
+void gcomm::PropagationMatrix::split(const size_t ii, const size_t jj)
+{
+    set_loss(ii, jj, 0.);
+    set_loss(jj, ii, 0.);
+}
+
+
+void gcomm::PropagationMatrix::merge(const size_t ii, const size_t jj, const double loss)
+{
+    set_loss(ii, jj, loss);
+    set_loss(jj, ii, loss);
+}
+
+
 void gcomm::PropagationMatrix::expire_timers()
 {
     for_each(tp.begin(), tp.end(), ExpireTimersOp());

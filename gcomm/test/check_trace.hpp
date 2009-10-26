@@ -79,8 +79,13 @@ namespace gcomm
                              msg.get_source_view_id().get_seq());
                 break;
             case V_NON_PRIM:
+
+                break;
             case V_PRIM:
-                gcomm_throw_fatal << "not implemented";
+                gcomm_assert(view.get_id() == msg.get_source_view_id())
+                    << " view id " << view.get_id() 
+                    <<  " source view " << msg.get_source_view_id();
+                gcomm_assert(contains(msg.get_source()) == true);
                 break;
             case V_NONE:
                 gcomm_throw_fatal;
@@ -131,6 +136,7 @@ namespace gcomm
             gu_trace(current_view = views.insert_checked(
                          std::make_pair(view.get_id(), ViewTrace(view))));
         
+            log_debug << view;
         }
         void insert_msg(const TraceMsg& msg)
         {
@@ -180,11 +186,13 @@ namespace gcomm
         
         size_t get_max_msg_size() const { return (1U << 31); }
         
-        void connect() { }
+        void connect(bool first) { }
         
         void close() { }
         
         
+        void connect() { }
+
         void listen() 
         {
             gcomm_throw_fatal << "not implemented";
@@ -270,7 +278,7 @@ namespace gcomm
         
         void connect(bool first)
         {
-            gu_trace(std::for_each(protos.begin(), protos.end(), 
+            gu_trace(std::for_each(protos.rbegin(), protos.rend(), 
                                    std::bind2nd(
                                        std::mem_fun(&Protolay::connect), first)));
         }
@@ -303,7 +311,7 @@ namespace gcomm
         
         void set_cvi(const ViewId& vi) 
         { 
-            log_debug << "setting cvi to " << vi;
+            log_debug << get_uuid() << " setting cvi to " << vi;
             cvi = vi; 
         }
         
@@ -484,8 +492,8 @@ namespace gcomm
         void insert_tp(DummyNode* t);
         void set_latency(const size_t ii, const size_t jj, const size_t lat);
         void set_loss(const size_t ii, const size_t jj, const double loss);
-
-
+        void split(const size_t ii, const size_t jj);
+        void merge(const size_t ii, const size_t jj, const double loss = 1.0);
         void propagate_until_cvi(bool handle_timers = true);
         friend std::ostream& operator<<(std::ostream&, const PropagationMatrix&);
     private:

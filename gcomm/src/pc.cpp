@@ -150,13 +150,13 @@ void PC::connect()
     
     log_info << "PC/EVS Proto initial state: " << *evs;
     
-    pc = new PCProto (uuid, event_loop, mon, start_prim);
+    pc = new PCProto (uuid);
     
     gcomm::connect (evs, pc);
     gcomm::connect (pc, this);
     
-    pc->shift_to(PCProto::S_JOINING);
-    
+    // pc->shift_to(PCProto::S_JOINING);
+    pc->connect(start_prim);
     log_info << "PC/EVS Proto sending join request";
     
     evs->send_join();

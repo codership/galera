@@ -97,12 +97,11 @@ void PCProto::send_install()
 
 void PCProto::deliver_view()
 {
-    View v(ViewId(get_prim() == true ? V_PRIM : V_NON_PRIM,
-                  current_view.get_id()));
-
+    View v(pc_view.get_id()); 
+    
     v.add_members(current_view.get_members().begin(), 
                   current_view.get_members().end());
-
+    
     for (PCInstMap::const_iterator i = instances.begin(); 
          i != instances.end(); ++i)
     {
@@ -112,9 +111,9 @@ void PCProto::deliver_view()
             v.add_partitioned(PCInstMap::get_key(i), "");
         }
     }
-
+    
     ProtoUpMeta um(UUID::nil(), ViewId(), &v);
-
+    log_info << self_string() << " delivering view " << v;
     pass_up(0, 0, um);
 }
 
@@ -139,11 +138,7 @@ void PCProto::shift_to(const State s)
         { true,  false, true,  false, false, false, true  }
     };
     
-    log_info << self_string() << " shift_to: " << to_string(get_state()) 
-             << " -> " <<  to_string(s) 
-             << " prim " << get_prim()
-             << " last prim " << get_last_prim()
-             << " to_seq " << get_to_seq();
+
     
     if (allowed[get_state()][s] == false)
     {
@@ -176,16 +171,25 @@ void PCProto::shift_to(const State s)
             }
         }
         set_prim(true);
+        pc_view = ViewId(V_PRIM, current_view.get_id());
         break;
     }
     case S_TRANS:
         break;
     case S_NON_PRIM:
         set_prim(false);
+        pc_view = ViewId(V_NON_PRIM, current_view.get_id());
         break;
     default:
         ;
     }
+
+    log_info << self_string() << " shift_to: " << to_string(get_state()) 
+             << " -> " <<  to_string(s) 
+             << " prim " << get_prim()
+             << " last prim " << get_last_prim()
+             << " to_seq " << get_to_seq();
+
     state = s;
 }
 
@@ -228,6 +232,7 @@ void PCProto::handle_trans(const View& view)
             current_view.get_members().size())
         {
             shift_to(S_NON_PRIM);
+            deliver_view();
             return;
         }
     }
@@ -292,7 +297,8 @@ void PCProto::handle_reg(const View& view)
 
     if (current_view.is_empty() == true)
     {
-        set_prim(false);
+        // set_prim(false);
+        shift_to(S_NON_PRIM);
         deliver_view();
         shift_to(S_CLOSED);
     }
@@ -614,10 +620,14 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
                 send_install();
             }
         }
-        else
+        else 
         {
+            const bool was_prim(get_prim());
             shift_to(S_NON_PRIM);
-            deliver_view();
+            if (was_prim == true)
+            {
+                deliver_view();
+            }
         }
     }
 }
@@ -693,10 +703,10 @@ void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
         to_seq = get_to_seq();
     }
     
-    ProtoUpMeta pum(um.get_source(), current_view.get_id(), 0,
+    ProtoUpMeta pum(um.get_source(), pc_view.get_id(), 0,
                     um.get_user_type(), to_seq);
     
-    pass_up(rb, roff + msg.serial_size(), pum);
+    gu_trace(pass_up(rb, roff + msg.serial_size(), pum));
 }
 
 void PCProto::handle_msg(const PCMessage&   msg, 
@@ -747,13 +757,13 @@ void PCProto::handle_msg(const PCMessage&   msg,
     switch (msg_type)
     {
     case PCMessage::T_STATE:
-        handle_state(msg, um.get_source());
+        gu_trace(handle_state(msg, um.get_source()));
         break;
     case PCMessage::T_INSTALL:
-        handle_install(msg, um.get_source());
+        gu_trace(handle_install(msg, um.get_source()));
         break;
     case PCMessage::T_USER:
-        handle_user(msg, rb, roff, um);
+        gu_trace(handle_user(msg, rb, roff, um));
         break;
     default:
         gcomm_throw_fatal << "Invalid message";

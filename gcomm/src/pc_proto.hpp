@@ -8,7 +8,8 @@
 #include "pc_message.hpp"
 
 
-BEGIN_GCOMM_NAMESPACE
+namespace gcomm
+{
 
 class PCProto : public Protolay
 {
@@ -45,8 +46,6 @@ public:
 private:
 
     UUID       uuid;
-    EventLoop* el;
-    Monitor*   mon;
     bool       start_prim;
     State      state;
 
@@ -104,7 +103,8 @@ public:
 private:
 
     SMMap      state_msgs;
-    View       current_view;
+    View       current_view; /*! EVS view */
+    View       pc_view;      /*! PC view */
     std::list<View> views;
 
 public:
@@ -114,20 +114,16 @@ public:
         return current_view;
     }
 
-    PCProto(const UUID& uuid_, 
-            EventLoop*  el_, 
-            Monitor*    mon_, 
-            const bool  start_prim_)
+    PCProto(const UUID& uuid_)
         :
         uuid         (uuid_),
-        el           (el_),
-        mon          (mon_),
-        start_prim   (start_prim_),
+        start_prim   (),
         state        (S_CLOSED),
         instances    (),
         self_i       (),
         state_msgs   (),
-        current_view (V_NON_PRIM),
+        current_view (V_TRANS),
+        pc_view      (V_NON_PRIM),
         views        ()
     {
         std::pair<PCInstMap::iterator, bool> iret;
@@ -150,7 +146,7 @@ public:
     void shift_to    (State);
     void send_state  ();
     void send_install();
-
+    
     void handle_first_trans (const View&);
     void handle_first_reg   (const View&);
     void handle_trans       (const View&);
@@ -175,10 +171,19 @@ public:
     void handle_up   (int, const ReadBuf*, size_t,
                       const ProtoUpMeta&);
     int  handle_down (WriteBuf*, const ProtoDownMeta&);
+
+    void connect(bool first) 
+    { 
+        log_info << self_string() << " start_prim " << first;
+        start_prim = first; 
+        shift_to(S_JOINING);
+    }
+    
+    void close() { }
     
     void handle_view (const View&);
 };
 
-END_GCOMM_NAMESPACE
+} // namespace gcomm
 
 #endif // PC_PROTO_HPP
