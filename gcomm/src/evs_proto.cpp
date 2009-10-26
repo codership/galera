@@ -17,33 +17,6 @@ using namespace gcomm::evs;
 
 
 
-static Seqno get_max_reachable_safe_seq(const Range range, const Seqno safe_seq)
-{
-    if (range.get_hs() != Seqno::max())
-    {
-        if (range.get_hs() > range.get_lu())
-        {
-            if (range.get_lu() == 0 && safe_seq == Seqno::max())
-            {
-                return Seqno::max();
-            }
-            else
-            {
-                return range.get_lu() - 1;
-            }
-        }
-        else
-        {
-            // All messages up to hs have been seen
-            return range.get_hs();
-        }
-    }
-    else
-    {
-        return Seqno::max();
-    }
-}
-
 class SelectNodesOp
 {
 public:
@@ -907,29 +880,22 @@ bool gcomm::evs::Proto::is_consistent_highest_reachable_safe_seq(
     
     if (partitioning.empty() == false)
     {
-        MessageNodeList::const_iterator min_part_hs_i(
+        MessageNodeList::const_iterator min_part_safe_seq_i(
             min_element(partitioning.begin(), partitioning.end(),
-                        RangeHsCmp()));
-        const Range min_part_range(
-            min_part_hs_i == partitioning.end() ? 
-            Range(0, Seqno::max()) : 
-            MessageNodeList::get_value(min_part_hs_i).get_im_range());
+                        SafeSeqCmp()));
         const Seqno min_part_safe_seq(
-            min_part_hs_i == partitioning.end() ?
+            min_part_safe_seq_i == partitioning.end() ?
             Seqno::max() : 
-            MessageNodeList::get_value(min_part_hs_i).get_safe_seq());
+            MessageNodeList::get_value(min_part_safe_seq_i).get_safe_seq());
         
-        const Seqno max_reachable_part(
-            get_max_reachable_safe_seq(min_part_range,
-                                       min_part_safe_seq));
         log_debug << self_string() 
-                  << " min part seq " << min_part_safe_seq
-                  << " min part range " << min_part_range
-                  << " max reachable part " << max_reachable_part;
-        if (max_reachable_part != Seqno::max() &&
+                  << " min part seq " << min_part_safe_seq;
+        
+        if (min_part_safe_seq      != Seqno::max() &&
             max_reachable_safe_seq != Seqno::max())
         {
-            max_reachable_safe_seq = min(max_reachable_safe_seq, max_reachable_part);
+            max_reachable_safe_seq = min(max_reachable_safe_seq, 
+                                         min_part_safe_seq);
         }
         else
         {
@@ -2406,8 +2372,7 @@ gcomm::evs::Seqno gcomm::evs::Proto::highest_reachable_safe_seq() const
             if (is_inactive(node) == true)
             {
                 const Seqno max_reachable_safe_seq(
-                    get_max_reachable_safe_seq(input_map->get_range(uuid),
-                                               input_map->get_safe_seq(uuid)));
+                    input_map->get_safe_seq(uuid));
                 if (max_reachable_safe_seq != Seqno::max())
                 {
                     seq_list.push_back(max_reachable_safe_seq);
