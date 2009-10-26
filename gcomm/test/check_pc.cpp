@@ -607,14 +607,15 @@ END_TEST
 
 START_TEST(test_pc_state3)
 {
-    UUID uuid1(0, 0);
+    log_info << "START";
+    UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
     PCProto pc1(uuid1, 0, 0, true);
     DummyTransport tp1;
     PCUser pu1(uuid1, &tp1, &pc1);
     single_boot(&pu1);
     
-    UUID uuid2(0, 0);
+    UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
     PCProto pc2(uuid2, 0, 0, false);
     DummyTransport tp2;
@@ -729,6 +730,7 @@ END_TEST
 
 START_TEST(test_pc_conflicting_prims)
 {
+    log_info << "START";
     UUID uuid1(0, 0);
     ProtoUpMeta pum1(uuid1);
     PCProto pc1(uuid1, 0, 0, true);
@@ -853,7 +855,7 @@ public:
             {
                 sending = true;
                 event_loop->queue_event(pfd.get(), Event(Event::E_USER,
-                                                         Time(Time::now() + Period("PT0.005S"))));
+                                                         Time(Time::now() + Period("PT0.05S"))));
             }
         }
         else

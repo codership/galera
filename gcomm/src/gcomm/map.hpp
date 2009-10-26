@@ -25,7 +25,10 @@ namespace gcomm
 
         typedef typename MapType::iterator       iterator;
         typedef typename MapType::const_iterator const_iterator;
+        typedef typename MapType::reverse_iterator reverse_iterator;
+        typedef typename MapType::const_reverse_iterator const_reverse_iterator;
         typedef typename MapType::value_type     value_type;
+        typedef typename MapType::const_reference const_reference;
 
     protected:
 
@@ -39,7 +42,7 @@ namespace gcomm
         iterator begin()          { return map.begin(); }
         
         iterator end()            { return map.end();   }
-        
+
         iterator find(const K& k) { return map.find(k); }
         
         iterator find_checked(const K& k)
@@ -57,6 +60,10 @@ namespace gcomm
         const_iterator begin()          const { return map.begin(); }
 
         const_iterator end()            const { return map.end();   }
+
+        const_reverse_iterator rbegin()         const { return map.rbegin(); }
+        
+        const_reverse_iterator rend()           const { return map.rend(); }
         
         const_iterator find(const K& k) const { return map.find(k); }
         
@@ -223,10 +230,19 @@ namespace gcomm
     class MultiMap : public MapBase<K, V, C>
     {
     public:
+        typedef typename MapBase<K, V, C>::iterator iterator;
         typedef typename MapBase<K, V, C>::const_iterator const_iterator;
-        void insert(const std::pair<K, V>& p)
+        typedef typename MapBase<K, V, C>::value_type value_type;
+        typedef typename MapBase<K, V, C>::const_reference const_reference;
+
+        iterator insert(const std::pair<K, V>& p)
         {
-            MapBase<K, V, C>::map.insert(p);
+            return MapBase<K, V, C>::map.insert(p);
+        }
+        
+        iterator insert(iterator position, const value_type& vt)
+        {
+            return MapBase<K, V, C>::map.insert(position, vt);
         }
         
         std::pair<const_iterator, const_iterator> equal_range(const K& k) const

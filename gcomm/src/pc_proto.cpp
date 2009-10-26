@@ -35,12 +35,12 @@ void PCProto::send_state()
     for (PCInstMap::const_iterator i = instances.begin(); i != instances.end();
          ++i)
     {
-        im.insert(std::make_pair(PCInstMap::get_key(i), 
-                                 PCInstMap::get_value(i)));
+        im.insert(make_pair(PCInstMap::get_key(i), 
+                            PCInstMap::get_value(i)));
     }
-
+    
     Buffer buf(pcs.serial_size());
-
+    
     if (pcs.serialize(buf.get_buf(), buf.get_len(), 0) == 0)
     {
         gcomm_throw_fatal << "Failed to serialize state";
@@ -61,13 +61,13 @@ void PCProto::send_install()
     PCInstallMessage pci;
 
     PCInstMap& im(pci.get_inst_map());
-
+    
     for (SMMap::const_iterator i = state_msgs.begin(); i != state_msgs.end();
          ++i)
     {
         if (current_view.get_members().find(SMMap::get_key(i)) != 
             current_view.get_members().end()
-            && im.insert(std::make_pair(
+            && im.insert(make_pair(
                              SMMap::get_key(i), 
                              ::get_state(i, SMMap::get_key(i)))).second
             == false)
@@ -77,7 +77,7 @@ void PCProto::send_install()
     }
 
     Buffer buf(pci.serial_size());
-
+    
     if (pci.serialize(buf.get_buf(), buf.get_len(), 0) == 0)
     {
         gcomm_throw_fatal << "PCInstallMessage serialization failed";
@@ -163,9 +163,21 @@ void PCProto::shift_to(const State s)
     case S_INSTALL:
         break;
     case S_PRIM:
-        set_last_prim(ViewId(V_PRIM, current_view.get_id()));
+    {
+        for (PCInstMap::iterator i = instances.begin(); i != instances.end();
+             ++i)
+        {
+            const UUID& uuid(PCInstMap::get_key(i));
+            if (current_view.get_members().find(uuid) != 
+                current_view.get_members().end())
+            {
+                PCInst& inst(PCInstMap::get_value(i));
+                inst.set_last_prim(ViewId(V_PRIM, current_view.get_id()));
+            }
+        }
         set_prim(true);
         break;
+    }
     case S_TRANS:
         break;
     case S_NON_PRIM:
@@ -255,7 +267,7 @@ void PCProto::handle_first_reg(const View& view)
                           << " new view "
                           << view.get_id();
     }
-
+    
     current_view = view;
     views.push_back(current_view);
     shift_to(S_STATES_EXCH);
@@ -338,7 +350,7 @@ void PCProto::handle_view(const View& view)
 bool PCProto::requires_rtr() const
 {
     int64_t max_to_seq = -1;
-
+    
     // find max seqno. @todo: can't we have it as a property of instance map?
     for (SMMap::const_iterator i = state_msgs.begin();
          i != state_msgs.end(); ++i)
@@ -413,7 +425,7 @@ bool PCProto::is_prim() const
     bool prim = false;
     ViewId last_prim(V_NON_PRIM);
     int64_t to_seq = -1;
-
+    
     // Check if any of instances claims to come from prim view
     for (SMMap::const_iterator i = state_msgs.begin(); i != state_msgs.end();
          ++i)
@@ -435,14 +447,14 @@ bool PCProto::is_prim() const
          ++i)
     {
         const PCInst& i_state(::get_state(i, SMMap::get_key(i)));
-
+        
         if (i_state.get_prim() == true)
         {
             if (i_state.get_last_prim() != last_prim)
             {
                 gcomm_throw_fatal << "Last prims not consistent";
             }
-
+            
             if (i_state.get_to_seq() != to_seq)
             {
                 gcomm_throw_fatal << "TO seqs not consistent";
@@ -456,90 +468,73 @@ bool PCProto::is_prim() const
     }
     
     // No members coming from prim view, check if last known prim 
-    // view can be recovered (all members from last prim alive)
+    // view can be recovered (majority of members from last prim alive)
     if (prim == false)
     {
         gcomm_assert(last_prim == ViewId(V_NON_PRIM)) 
             << last_prim << " != " << ViewId(V_NON_PRIM);
-
-        multiset<ViewId> vset;
-
+        
+        MultiMap<ViewId, UUID> last_prim_uuids;
+        
         for (SMMap::const_iterator i = state_msgs.begin(); 
              i != state_msgs.end();
              ++i)
         {
-            const PCInst& i_state(::get_state(i, SMMap::get_key(i)));
-
-            if (i_state.get_last_prim() != ViewId())
+            for (PCInstMap::const_iterator 
+                     j = SMMap::get_value(i).get_inst_map().begin(); 
+                 j != SMMap::get_value(i).get_inst_map().end(); ++j)
             {
-                vset.insert(i_state.get_last_prim());
-            }
-        }
-        
-        uint32_t max_view_seq   = 0;
-        size_t  great_view_len = 0;
-        ViewId  great_view;
-        
-        for (multiset<ViewId>::const_iterator vi = vset.begin();
-             vi != vset.end(); vi = vset.upper_bound(*vi))
-        {
-            max_view_seq = std::max(max_view_seq, vi->get_seq());
-            
-            const size_t vsc = vset.count(*vi);
-            
-            if (vsc >= great_view_len && vi->get_seq() >= great_view.get_seq())
-            {
-                great_view_len = vsc;
-                great_view = ViewId(V_REG, *vi);
-            }
-        }
-
-        if (great_view.get_seq() == max_view_seq)
-        {
-            list<View>::const_iterator lvi;
-
-            for (lvi = views.begin(); lvi != views.end(); ++lvi)
-            {
-                if (lvi->get_id() == great_view) break;
-            }
-
-            if (lvi == views.end())
-            {
-                gcomm_throw_fatal << "View not found from list";
-            }
-
-            if (lvi->get_members().size() == great_view_len)
-            {
-                log_info << "Found common last prim view";
-
-                prim = true;
-
-                for (SMMap::const_iterator j = state_msgs.begin();
-                     j != state_msgs.end(); ++j)
+                const UUID& uuid(PCInstMap::get_key(j));
+                const PCInst& inst(PCInstMap::get_value(j));
+                
+                if (inst.get_last_prim() != ViewId(V_NON_PRIM) &&
+                    find<MultiMap<ViewId, UUID>::iterator,
+                    pair<const ViewId, UUID> >(last_prim_uuids.begin(), 
+                                               last_prim_uuids.end(),
+                                               make_pair(inst.get_last_prim(), uuid)) == 
+                    last_prim_uuids.end())
                 {
-                    const PCInst& j_state(::get_state(j,
-                                                      SMMap::get_key(j)));
-
-                    if (j_state.get_last_prim() == great_view)
-                    {
-                        if (to_seq == -1)
-                        {
-                            to_seq = j_state.get_to_seq();
-                        }
-                        else if (j_state.get_to_seq() != to_seq)
-                        {
-                            gcomm_throw_fatal << "Conflicting to_seq";
-                        }
-                    }
+                    last_prim_uuids.insert(make_pair(inst.get_last_prim(), uuid));
                 }
             }
         }
-        else
+        
+        if (last_prim_uuids.empty() == true)
         {
-            gcomm_throw_fatal << "Max view seq " << max_view_seq
-                              << " not equal to seq of greatest views "
-                              << great_view.get_seq()
-                              <<  ", don't know how to recover";
+            log_warn << "no nodes coming from prim view, prim not possible";
+            return false;
+        }
+        
+        const ViewId greatest_view_id(last_prim_uuids.rbegin()->first);
+        set<UUID> greatest_view;
+        pair<MultiMap<ViewId, UUID>::const_iterator, 
+            MultiMap<ViewId, UUID>::const_iterator> gvi =
+            last_prim_uuids.equal_range(greatest_view_id);
+        for (MultiMap<ViewId, UUID>::const_iterator i = gvi.first;
+             i != gvi.second; ++i)
+        {
+            pair<set<UUID>::iterator, bool> iret = greatest_view.insert(
+                MultiMap<ViewId, UUID>::get_value(i));
+            gcomm_assert(iret.second == true);
+        }
+        log_info << self_string()
+                 << " greatest view id " << greatest_view_id;
+        set<UUID> present;
+        for (NodeList::const_iterator i = current_view.get_members().begin();
+             i != current_view.get_members().end(); ++i)
+        {
+            present.insert(NodeList::get_key(i));
+        }
+        set<UUID> intersection;
+        set_intersection(greatest_view.begin(), greatest_view.end(),
+                         present.begin(), present.end(),
+                         inserter(intersection, intersection.begin()));
+        log_info << self_string()
+                 << " intersection size " << intersection.size()
+                 << " greatest view size " << greatest_view.size();
+        if (intersection.size()*2 > greatest_view.size())
+        {
+            prim = true;
         }
     }
     
@@ -606,13 +601,13 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 
         validate_state_msgs();
 
-        if (is_prim())
+        if (is_prim() == true)
         {
             // Requires RTR does not actually have effect, but let it 
             // be for debugging purposes until a while
             (void)requires_rtr();
             shift_to(S_INSTALL);
-
+            
             if (current_view.get_members().find(uuid) ==
                 current_view.get_members().begin())
             {
