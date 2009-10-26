@@ -135,7 +135,7 @@ void PCProto::shift_to(const State s)
         // Trans
         { true,  false, true,  false, false, false, true },
         // Non-prim
-        { true,  false, true,  false, false, true, false  }
+        { true,  false, true,  false, false, true, true  }
     };
     
 
@@ -298,7 +298,6 @@ void PCProto::handle_reg(const View& view)
     
     if (current_view.is_empty() == true)
     {
-        // set_prim(false);
         shift_to(S_NON_PRIM);
         deliver_view();
         shift_to(S_CLOSED);
