@@ -1108,10 +1108,10 @@ bool gcomm::evs::Proto::is_consistent_same_view(const Message& msg) const
                  msg.get_type() == Message::T_INSTALL);
     gcomm_assert(msg.get_source_view_id() == current_view.get_id());
     
-    if (is_consistent_highest_seen(msg) == false)
+    if (is_consistent_highest_reachable_safe_seq(msg) == false)
     {
         log_debug << self_string()
-                  << " highest seen not consistent";
+                  << " highest reachable safe seq not consistent";
         return false;
     }
     
