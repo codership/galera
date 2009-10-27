@@ -101,7 +101,7 @@ void PC::connect()
     tp_uri._set_scheme(Conf::GMCastScheme); // why do we need this?
 
     tp = Transport::create(tp_uri, event_loop);
-
+    
     if (tp->supports_uuid() == false)
     {
         gcomm_throw_fatal << "Transport " << tp_uri.get_scheme()
@@ -143,7 +143,9 @@ void PC::connect()
         
         int ret;
         gu_trace(ret = event_loop->poll(500));
-        gu_trace((void)evs->handle_timers());
+        // Don't do timers here, retrans timer may fire forming
+        // of singleton view.
+        // gu_trace((void)evs->handle_timers());
         // log_debug << "poll returned: " << ret;
     }
     while (start_prim == false && evs->get_known_size() == 1);

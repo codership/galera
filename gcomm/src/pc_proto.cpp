@@ -36,7 +36,7 @@ void PCProto::send_state()
     
     WriteBuf wb(buf.get_buf(), buf.get_len());
     
-    if (pass_down(&wb, 0))
+    if (pass_down(&wb, ProtoDownMeta()))
     {
         gcomm_throw_fatal << "pass down failed";
     }    
@@ -76,9 +76,11 @@ void PCProto::send_install()
     // @fixme This can happen in normal circumstances if the last delivered 
     // message in reg view was the last state message. Figure out the
     // way to verify that and crash only if it was not the case.
-    if (pass_down(&wb, 0))
+    int ret = pass_down(&wb, ProtoDownMeta());
+    if (ret != 0)
     {
-        gcomm_throw_fatal << "pass_down failed";
+        log_warn << self_string() << " sending install message failed: "
+                 << strerror(ret);
     }
 }
 

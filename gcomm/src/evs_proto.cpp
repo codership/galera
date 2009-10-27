@@ -1955,10 +1955,12 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
         return ENOTCONN;
     }
     
-    if (dm.get_user_type() == 0xff)
-    {
-        return EINVAL;
-    }
+    // This is rather useless restriction, user might not want to know
+    // anything about message types.
+    // if (dm.get_user_type() == 0xff)
+    // {
+    //    return EINVAL;
+    // }
     
     int ret = 0;
     
@@ -3077,10 +3079,11 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     else if (is_representative(msg.get_source()) == false) 
     {
         log_warn << self_string() 
-                 << " source is not supposed to be representative";
+                 << " source " << msg.get_source()
+                 << " is not supposed to be representative";
         shift_to(S_RECOVERY);
         return;
-    } 
+    }
     
     
     assert(install_message == 0);
