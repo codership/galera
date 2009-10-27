@@ -140,17 +140,17 @@ public:
             get_last_prim() == cmp.get_last_prim() &&
             get_to_seq()    == cmp.get_to_seq();
     }
-
+    
 
     
     std::string to_string() const
     {
         std::ostringstream ret;
 
-        ret << "prim = "        << prim
-            << ", last_seq = "  << last_seq 
-            << ", last_prim = " << last_prim
-            << ", to_seq = "    << to_seq;
+        ret << "prim="        << prim
+            << ",last_seq="  << last_seq 
+            << ",last_prim=" << last_prim
+            << ",to_seq="    << to_seq;
 
         return ret.str();
     }    
@@ -312,18 +312,27 @@ public:
         gcomm_throw_fatal << "PC message does not have instance map"; throw;
     }
 
+    
+    const PCInst& get_inst(const UUID& uuid) const
+    {
+        if (has_inst_map()) return PCInstMap::get_value(inst->find_checked(uuid));
+        
+        gcomm_throw_fatal << "PC message does not have instance map"; throw;
+    }
+
+
     std::string to_string() const
     {
         std::ostringstream ret;
 
-        ret << "pcmsg( type: " << to_string(type) << ", seq: " << seq;
+        ret << "pcmsg{ type=" << to_string(type) << ", seq=" << seq;
 
         if (has_inst_map())
         {
-            ret << "," << get_inst_map();
+            ret << ", inst {" << get_inst_map() << "}";
         }
 
-        ret << ')';
+        ret << '}';
 
         return ret.str();
     }

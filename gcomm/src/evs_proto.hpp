@@ -292,6 +292,32 @@ public:
     void reset_timers();
     Time handle_timers();
 private:
+
+    enum
+    {
+        D_STATE         = 1 << 0,
+        D_TIMERS        = 1 << 1,
+        D_CONSENSUS     = 1 << 2,
+        D_USER_MSGS     = 1 << 3,
+        D_DELEGATE_MSGS = 1 << 4,
+        D_GAP_MSGS      = 1 << 5,
+        D_JOIN_MSGS     = 1 << 6,
+        D_INSTALL_MSGS  = 1 << 7,
+        D_LEAVE_MSGS    = 1 << 8,
+        D_FOREIGN_MSGS  = 1 << 9,
+        D_RETRANS       = 1 << 10,
+        D_DELIVERY      = 1 << 11
+    };
+    
+    enum
+    {
+        I_VIEWS      = 1 << 0,
+        I_STATE      = 1 << 1,
+        I_STATISTICS = 1 << 2
+    };
+    
+    int debug_mask;
+    int info_mask;
     bool collect_stats;
     Histogram hs_safe;
     bool delivering;

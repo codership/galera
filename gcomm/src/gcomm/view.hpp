@@ -138,6 +138,20 @@ namespace gcomm
         const NodeList& get_left        () const;
         const NodeList& get_partitioned () const;
         
+
+        bool is_member(const UUID& uuid) const
+        { return members.find(uuid) != members.end(); }
+        
+        bool is_joining(const UUID& uuid) const
+        { return joined.find(uuid) != joined.end(); }
+        
+        bool is_leaving(const UUID& uuid) const
+        { return left.find(uuid) != left.end(); }
+
+        bool is_partitioning(const UUID& uuid) const
+        { return partitioned.find(uuid) != partitioned.end(); }
+        
+        
         ViewType      get_type           () const;
         const ViewId& get_id             () const;
         const UUID&   get_representative () const;

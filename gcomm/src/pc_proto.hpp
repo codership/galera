@@ -45,9 +45,9 @@ public:
 
 private:
 
-    UUID       uuid;
-    bool       start_prim;
-    State      state;
+    UUID   const my_uuid;
+    bool         start_prim;
+    State        state;
 
     PCInstMap           instances;
     PCInstMap::iterator self_i;
@@ -56,6 +56,8 @@ private:
     PCProto& operator=(const PCProto&);
 
 public:
+
+    const UUID& get_uuid() const { return my_uuid; }
 
     bool get_prim() const
     {
@@ -116,7 +118,7 @@ public:
 
     PCProto(const UUID& uuid_)
         :
-        uuid         (uuid_),
+        my_uuid      (uuid_),
         start_prim   (),
         state        (S_CLOSED),
         instances    (),
@@ -126,21 +128,13 @@ public:
         pc_view      (V_NON_PRIM),
         views        ()
     {
-        std::pair<PCInstMap::iterator, bool> iret;
-
-        if ((iret = instances.insert(
-                 std::make_pair(uuid, PCInst()))).second == false)
-        {
-            gcomm_throw_fatal << "Failed to insert myself into instance map";
-        }
-
-        self_i = iret.first;
+        self_i = instances.insert_checked(std::make_pair(get_uuid(), PCInst()));
     }
     
     ~PCProto() {}
 
-    std::string self_string() const { return uuid.to_string(); }
-
+    std::string self_string() const { return get_uuid().to_string(); }
+    
     State       get_state()   const { return state; }
 
     void shift_to    (State);
