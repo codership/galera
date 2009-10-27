@@ -8,6 +8,7 @@
 
 #include <stdexcept>
 #include <algorithm>
+#include <numeric>
 
 using namespace std;
 using namespace std::rel_ops;
@@ -214,8 +215,14 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     timers(),
     debug_mask(D_STATE),
     info_mask(I_VIEWS | I_STATE | I_STATISTICS),
+    last_stats_report(Time::now()),
     collect_stats(true),
     hs_safe("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
+    sent_msgs(7, 0),
+    retrans_msgs(0),
+    recovered_msgs(0),
+    recvd_msgs(7, 0),
+    delivered_msgs(0),
     delivering(false),
     my_uuid(my_uuid_), 
     known(),
@@ -226,6 +233,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     consensus_timeout     ("PT5S"),
     retrans_period        ("PT1S"),
     join_retrans_period   ("PT1S"),
+    stats_report_period   ("PT30S"),
     current_view(ViewId(V_TRANS, my_uuid, 0)),
     previous_view(),
     previous_views(),
@@ -252,44 +260,50 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     {
         view_forget_timeout = 
             Period(uri.get_option(Conf::EvsParamViewForgetTimeout));
+        gcomm_assert(view_forget_timeout >= Period("PT1S"));
     } catch (NotFound&) { }
     try
     {
         inactive_timeout = 
             Period(uri.get_option(Conf::EvsParamInactiveTimeout));
+        gcomm_assert(inactive_timeout >= Period("PT0.3S"));
     } catch (NotFound&) { }
     try
     {
         inactive_check_period = 
             Period(uri.get_option(Conf::EvsParamInactiveCheckPeriod));
+        gcomm_assert(inactive_check_period >= Period("PT0.1S"));
     } catch (NotFound&) { }
     try
     {
         consensus_timeout = 
             Period(uri.get_option(Conf::EvsParamConsensusTimeout));
+        gcomm_assert(consensus_timeout >= inactive_timeout);
     } catch (NotFound&) { }
     try
     {
         retrans_period = Period(uri.get_option(Conf::EvsParamRetransPeriod));
+        gcomm_assert(retrans_period >= Period("PT0.01S") &&
+                     retrans_period < inactive_timeout);
     } catch (NotFound&) { }
     try
     {
         join_retrans_period = 
             Period(uri.get_option(Conf::EvsParamJoinRetransPeriod));
+        gcomm_assert(join_retrans_period >= Period("PT0.01S"));
     } catch (NotFound&) { }
-    
+        
     try
     {
         const string& dlm_str(uri.get_option(Conf::EvsParamDebugLogMask));
         debug_mask = gu::from_string<int>(dlm_str, hex);
     } catch (NotFound&) { }
-
+    
     try
     {
         const string& ilm_str(uri.get_option(Conf::EvsParamInfoLogMask));
         info_mask = gu::from_string<int>(ilm_str, hex);
     } catch (NotFound&) { }
-
 }
 
 
@@ -339,6 +353,46 @@ ostream& gcomm::evs::operator<<(ostream& os, const Proto& p)
     return os;
 }
 
+string gcomm::evs::Proto::get_stats() const
+{
+    ostringstream os;
+    os << "\n\tnodes " << current_view.get_members().size();
+    os << "\n\tsafe deliv hist {" << hs_safe << "} ";
+    os << "\n\tsent {";
+    copy(sent_msgs.begin(), sent_msgs.end(), 
+         ostream_iterator<long long int>(os, ","));
+    os << "}\n\tsent per sec {";
+    const double norm(double(Time::now().get_utc() 
+                             - last_stats_report.get_utc())/gu::datetime::Sec);
+    vector<double> result(7, norm);
+    transform(sent_msgs.begin(), sent_msgs.end(), 
+              result.begin(), result.begin(), divides<double>());
+    copy(result.begin(), result.end(), ostream_iterator<double>(os, ","));
+    os << "}\n\trecvd { ";
+    copy(recvd_msgs.begin(), recvd_msgs.end(), ostream_iterator<long long int>(os, ","));
+    os << "}\n\trecvd per sec {";
+    fill(result.begin(), result.end(), norm);
+    transform(recvd_msgs.begin(), recvd_msgs.end(), 
+              result.begin(), result.begin(), divides<double>());
+    copy(result.begin(), result.end(), ostream_iterator<double>(os, ","));
+    os << "}\n\tretransmitted " << retrans_msgs << " ";
+    os << "\n\trecovered " << recovered_msgs;
+    os << "\n\tdelivered " << delivered_msgs;
+    os << "\n\teff(delivered/sent/nodes) " << 
+        double(delivered_msgs)/double(accumulate(sent_msgs.begin(), sent_msgs.end(), 0))/double(current_view.get_members().size());
+    return os.str();
+}
+
+void gcomm::evs::Proto::reset_stats()
+{
+    hs_safe.clear();
+    fill(sent_msgs.begin(), sent_msgs.end(), 0LL);
+    fill(recvd_msgs.begin(), recvd_msgs.end(), 0LL);
+    retrans_msgs = 0LL;
+    recovered_msgs = 0LL;
+    delivered_msgs = 0LL;
+    last_stats_report = Time::now();
+}
 
 
 bool gcomm::evs::Proto::is_msg_from_previous_view(const Message& msg)
@@ -432,6 +486,13 @@ void gcomm::evs::Proto::handle_consensus_timer()
     }
 }
 
+void gcomm::evs::Proto::handle_stats_timer()
+{
+    evs_log_info(I_STATISTICS) << get_stats();
+    reset_stats();
+}
+
+
 
 class TimerSelectOp
 {
@@ -472,9 +533,11 @@ Time gcomm::evs::Proto::get_next_expiration(const Timer t) const
         default:
             return Time::max();
         }
+    case T_STATS:
+        return (now + stats_report_period);
     }
     gcomm_throw_fatal;
-    return Time::max();
+    throw;
 }
 
 
@@ -487,6 +550,8 @@ void gcomm::evs::Proto::reset_timers()
                  make_pair(get_next_expiration(T_RETRANS), T_RETRANS)));
     gu_trace((void)timers.insert(
                  make_pair(get_next_expiration(T_CONSENSUS), T_CONSENSUS)));
+    gu_trace((void)timers.insert(
+                 make_pair(get_next_expiration(T_STATS), T_STATS)));
 }
 
 
@@ -509,6 +574,9 @@ Time gcomm::evs::Proto::handle_timers()
             break;
         case T_CONSENSUS:
             handle_consensus_timer();
+            break;
+        case T_STATS:
+            handle_stats_timer();
             break;
         }
         // Make sure that timer was not inserted twice
@@ -1304,6 +1372,7 @@ int gcomm::evs::Proto::send_user(WriteBuf* wb,
             log_warn << "send failed: "  << strerror(ret);
         }
         pop_header(msg, wb);
+        sent_msgs[Message::T_USER]++;
     }
     
     if (delivering == false)
@@ -1355,6 +1424,7 @@ int gcomm::evs::Proto::send_delegate(WriteBuf* wb)
     push_header(dm, wb);
     int ret = pass_down(wb, 0);
     pop_header(dm, wb);
+    sent_msgs[Message::T_DELEGATE]++;
     return ret;
 }
 
@@ -1388,6 +1458,7 @@ void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
     {
         log_warn << "send failed: " << strerror(err);
     }
+    sent_msgs[Message::T_GAP]++;
     gu_trace(handle_gap(gm, self_i));
 }
 
@@ -1485,7 +1556,7 @@ void gcomm::evs::Proto::send_join(bool handle)
     {
         log_warn << "send failed: " << strerror(err);
     }
-    
+    sent_msgs[Message::T_JOIN]++;
     if (handle == true)
     {
         handle_join(jm, self_i);
@@ -1540,6 +1611,8 @@ void gcomm::evs::Proto::send_leave(bool handle)
         log_warn << "send failed " << strerror(err);
     }
     
+    sent_msgs[Message::T_LEAVE]++;
+
     if (handle == true)
     {
         handle_leave(lm, self_i);
@@ -1595,7 +1668,8 @@ void gcomm::evs::Proto::send_install()
     {
         log_warn << "send failed: " << strerror(err);
     }
-    
+
+    sent_msgs[Message::T_INSTALL]++;
     handle_install(imsg, self_i);
 }
 
@@ -1659,6 +1733,7 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
             evs_log_debug(D_RETRANS) << "retransmitted " << um;
         }
         seq = seq + msg.get_seq_range() + 1;
+        retrans_msgs++;
     }
 }
 
@@ -1734,6 +1809,7 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
             break;
         }
         seq = seq + msg.get_seq_range() + 1;
+        recovered_msgs++;
     }
 }
 
@@ -1779,16 +1855,17 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
                                    const ReadBuf* rb,
                                    const size_t roff)
 {
+    assert(msg.get_type() <= Message::T_LEAVE);
     if (get_state() == S_CLOSED)
     {
         return;
     }
-
+    
     if (msg.get_source() == get_uuid())
     {
         return;
     }
-    
+
     gcomm_assert(msg.get_source() != UUID::nil());
     
     
@@ -1832,6 +1909,8 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         }
     }
     
+    recvd_msgs[msg.get_type()]++;
+
     switch (msg.get_type()) {
     case Message::T_USER:
         gu_trace(handle_user(static_cast<const UserMessage&>(msg), ii, rb, roff));
@@ -2041,12 +2120,11 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         NodeMap::get_value(self_i).set_installed(true);
         gu_trace(deliver_trans_view(true));
         gu_trace(deliver_trans());
-        gu_trace(deliver_empty_view());
         if (collect_stats == true)
         {
-            evs_log_info(I_STATISTICS) << "delivery stats (safe): " << hs_safe;
+            handle_stats_timer();
         }
-        hs_safe.clear();
+        gu_trace(deliver_empty_view());
         cleanup_unoperational();
         cleanup_views();
         timers.clear();
@@ -2108,6 +2186,10 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         gu_trace(deliver_trans_view(false));
         gu_trace(deliver_trans());
         input_map->clear();
+        if (collect_stats == true)
+        {
+            handle_stats_timer();
+        }
         
         previous_view = current_view;
         previous_views.push_back(make_pair(current_view.get_id(), Time::now()));
@@ -2134,11 +2216,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         last_sent = Seqno::max();
         state = S_OPERATIONAL;
         deliver_reg_view();
-        if (collect_stats == true)
-        {
-            evs_log_info(I_STATISTICS) << "delivery stats (safe): " << hs_safe;
-        }
-        hs_safe.clear();
+
         cleanup_unoperational();
         cleanup_views();
         for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
@@ -2242,6 +2320,7 @@ void gcomm::evs::Proto::deliver()
                                msg.get_msg().get_user_type(),
                                msg.get_msg().get_seq().get());
                 gu_trace(pass_up(msg.get_rb(), 0, um));
+                delivered_msgs++;
             }
             gu_trace(input_map->erase(i));
         }
@@ -2331,6 +2410,7 @@ void gcomm::evs::Proto::deliver_trans()
                                msg.get_msg().get_seq().get());
                 gu_trace(pass_up(msg.get_rb(), 0, um));
             }
+            delivered_msgs++;
             gu_trace(input_map->erase(i));
         }
     }
@@ -2811,8 +2891,13 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         // Someone may be still missing either join or install message.
         // Send join (without self handling), install (if representative)
         // and install gap.
+
+
         if (is_consistent(*install_message) == true)
         {
+#if 0
+            // Note: please don't do this here... it may easily result into
+            // join/gap/install explosion to the network.
             inst.set_tstamp(Time::now());
             if (is_representative(get_uuid()) == true)
             {
@@ -2831,6 +2916,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                                   install_message->get_source_view_id(), 
                                   Range()));
             }
+#endif // 0
             return;
         }
         else

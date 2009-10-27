@@ -840,7 +840,7 @@ static DummyNode* create_dummy_node(size_t idx,
 {
     const string conf = "evs://?" + Conf::EvsParamViewForgetTimeout + "=PT1H&"
         + Conf::EvsParamInactiveTimeout + "=" + inactive_timeout + "&"
-        + Conf::EvsParamInactiveCheckPeriod + "=PT0.01S&"
+        + Conf::EvsParamInactiveCheckPeriod + "=PT0.1S&"
         + Conf::EvsParamConsensusTimeout + "=PT1H&"
         + Conf::EvsParamRetransPeriod + "=" + retrans_period + "&"
         + Conf::EvsParamJoinRetransPeriod + "=" + retrans_period;

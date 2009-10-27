@@ -73,7 +73,7 @@ void gcomm::Histogram::clear()
 ostream& gcomm::operator<<(ostream& os, const Histogram& hs)
 {
     map<const double, uint64_t>::const_iterator i, i_next;
-
+    
     uint64_t norm = 0;
     for (i = hs.cnt.begin(); i != hs.cnt.end(); ++i)
     {

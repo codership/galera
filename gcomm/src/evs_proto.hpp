@@ -13,6 +13,7 @@
 
 #include <list>
 #include <deque>
+#include <vector>
 
 namespace gcomm
 {
@@ -123,7 +124,7 @@ public:
         return "evs::proto(" + get_uuid().to_string() + ","
             + to_string(get_state()) + "," + gu::to_string(current_view.get_id()) + ")"; 
     }
-    
+
     State get_state() const { return state; }
     
     size_t get_known_size() const { return known.size(); }
@@ -144,6 +145,9 @@ public:
         }
     }
     
+    std::string get_stats() const;
+    void reset_stats();
+
     bool is_flow_control(const Seqno, const Seqno win) const;
     int send_user(WriteBuf* wb, const uint8_t,
                   SafetyPrefix sp, 
@@ -278,7 +282,8 @@ public:
     {
         T_INACTIVITY,
         T_RETRANS,
-        T_CONSENSUS
+        T_CONSENSUS,
+        T_STATS
     };
     class TimerList : public  MultiMap<Time, Timer> { };
 private:
@@ -288,6 +293,7 @@ public:
     void handle_inactivity_timer();
     void handle_retrans_timer();
     void handle_consensus_timer();
+    void handle_stats_timer();
     Time get_next_expiration(Timer) const;
     void reset_timers();
     Time handle_timers();
@@ -318,8 +324,14 @@ private:
     
     int debug_mask;
     int info_mask;
+    Time last_stats_report;
     bool collect_stats;
     Histogram hs_safe;
+    std::vector<long long int> sent_msgs;
+    long long int retrans_msgs;
+    long long int recovered_msgs;
+    std::vector<long long int> recvd_msgs;
+    long long int delivered_msgs;
     bool delivering;
     UUID my_uuid;
     // 
@@ -333,6 +345,7 @@ private:
     Period consensus_timeout;
     Period retrans_period;
     Period join_retrans_period;
+    Period stats_report_period;
     
     // Current view id
     // ViewId current_view;
