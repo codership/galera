@@ -220,12 +220,12 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     my_uuid(my_uuid_), 
     known(),
     self_i(),
-    view_forget_timeout("PT5M"),
-    inactive_timeout("PT3S"),
-    inactive_check_period("PT1S"),
-    consensus_timeout("PT5S"),
-    retrans_period("PT1S"),
-    join_retrans_period("PT0.3S"),
+    view_forget_timeout   ("PT5M"),
+    inactive_timeout      ("PT3S"),
+    inactive_check_period ("PT1S"),
+    consensus_timeout     ("PT5S"),
+    retrans_period        ("PT1S"),
+    join_retrans_period   ("PT1S"),
     current_view(ViewId(V_TRANS, my_uuid, 0)),
     previous_view(),
     previous_views(),
@@ -276,6 +276,18 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     {
         join_retrans_period = 
             Period(uri.get_option(Conf::EvsParamJoinRetransPeriod));
+    } catch (NotFound&) { }
+    
+    try
+    {
+        const string& dlm_str(uri.get_option(Conf::EvsParamDebugLogMask));
+        debug_mask = gu::from_string<int>(dlm_str, hex);
+    } catch (NotFound&) { }
+
+    try
+    {
+        const string& ilm_str(uri.get_option(Conf::EvsParamInfoLogMask));
+        info_mask = gu::from_string<int>(ilm_str, hex);
     } catch (NotFound&) { }
 
 }
@@ -375,7 +387,7 @@ void gcomm::evs::Proto::handle_retrans_timer()
     }
     else if (get_state() == S_OPERATIONAL)
     {
-        evs_log_debug(D_TIMERS) << "send user timer";
+        evs_log_debug(D_TIMERS) << "send user timer, last_sent=" << last_sent;
         if (output.empty() == true)
         {
             WriteBuf wb(0, 0);
@@ -386,6 +398,7 @@ void gcomm::evs::Proto::handle_retrans_timer()
         {
             gu_trace(send_user(send_window));
         }
+        evs_log_debug(D_TIMERS) << "send user timer, last_sent=" << last_sent;
     }
     else if (get_state() == S_LEAVING)
     {
