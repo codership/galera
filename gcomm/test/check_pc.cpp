@@ -1041,7 +1041,7 @@ public:
         }
         else
         {
-            log_debug << "received message: " << um.get_to_seq();
+            // log_debug << "received message: " << um.get_to_seq();
             if (um.get_source() == tp->get_uuid())
             {
                 fail_unless(um.get_user_type() == my_type);

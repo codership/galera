@@ -755,8 +755,8 @@ void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
              current_view.get_members().end())
     {
         gcomm_assert(current_view.get_type() == V_TRANS);
-        log_debug << self_string()
-                  << " dropping message from out of view source in non-prim";
+        // log_debug << self_string()
+        //        << " dropping message from out of view source in non-prim";
         return;
     }
     

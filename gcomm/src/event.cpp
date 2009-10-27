@@ -96,7 +96,7 @@ void EventLoop::erase(const int fd)
     
     if (ci == ctx_map.end()) gcomm_throw_fatal << "Unknown fd";
     
-    log_debug << "fd: " << fd << " " << ci->second;
+    // log_debug << "fd: " << fd << " " << ci->second;
     
     ctx_map.erase(ci);
 }
@@ -148,8 +148,8 @@ void EventLoop::unset(const int fd, const int e)
     {
         short int mask = static_cast<short int>(
             pfd->events & ~static_cast<short int>(map_event_to_mask(e)));
-        log_debug << "Clearing event(s) " << event_to_string(e) 
-                  << " from fd "<<fd; 
+        //log_debug << "Clearing event(s) " << event_to_string(e) 
+        //          << " from fd "<<fd; 
         pfd->events = mask;
         if (pfd->events == 0)
         {
@@ -237,7 +237,7 @@ int EventLoop::compute_timeout(const int max_val)
     
     if (next < now)
     {
-        log_debug << "return 0";
+        // log_debug << "return 0";
         return 0;
     }
     int diff = static_cast<int>(next.get_utc() - now.get_utc())/gu::datetime::MSec;

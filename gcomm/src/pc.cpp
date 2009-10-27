@@ -144,7 +144,7 @@ void PC::connect()
         int ret;
         gu_trace(ret = event_loop->poll(500));
         gu_trace((void)evs->handle_timers());
-        log_debug << "poll returned: " << ret;
+        // log_debug << "poll returned: " << ret;
     }
     while (start_prim == false && evs->get_known_size() == 1);
     
@@ -192,9 +192,9 @@ void PC::close()
     Time wait_until(Time::now() + leave_grace_period);
     do
     {
-        int ret = event_loop->poll(500);
+        (void)event_loop->poll(500);
         
-        log_debug << "poll returned " << ret;
+        // log_debug << "poll returned " << ret;
     } 
     while (evs->get_state() != evs::Proto::S_CLOSED &&
            Time::now()      <  wait_until);
