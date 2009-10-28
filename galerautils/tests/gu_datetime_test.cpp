@@ -33,42 +33,42 @@ END_TEST
 START_TEST(test_period)
 {
     // Zero periods
-    fail_unless(Period("").get_utc() == 0);
-    fail_unless(Period("P").get_utc() == 0);
-    fail_unless(Period("PT").get_utc() == 0);
+    fail_unless(Period("").get_nsecs() == 0);
+    fail_unless(Period("P").get_nsecs() == 0);
+    fail_unless(Period("PT").get_nsecs() == 0);
 
     // Year-mon-day
-    fail_unless(Period("P3Y").get_utc() == 3*Year);
-    fail_unless(Period("P5M").get_utc() == 5*Month);
-    fail_unless(Period("P37D").get_utc() == 37*Day);
+    fail_unless(Period("P3Y").get_nsecs() == 3*Year);
+    fail_unless(Period("P5M").get_nsecs() == 5*Month);
+    fail_unless(Period("P37D").get_nsecs() == 37*Day);
 
-    fail_unless(Period("P3Y17M").get_utc() == 3*Year + 17*Month);
-    fail_unless(Period("P5Y66D").get_utc() == 5*Year + 66*Day);
-    fail_unless(Period("P37M44D").get_utc() == 37*Month + 44*Day);
+    fail_unless(Period("P3Y17M").get_nsecs() == 3*Year + 17*Month);
+    fail_unless(Period("P5Y66D").get_nsecs() == 5*Year + 66*Day);
+    fail_unless(Period("P37M44D").get_nsecs() == 37*Month + 44*Day);
     
-    fail_unless(Period("P3YT").get_utc() == 3*Year);
-    fail_unless(Period("P5MT").get_utc() == 5*Month);
-    fail_unless(Period("P37DT").get_utc() == 37*Day);
+    fail_unless(Period("P3YT").get_nsecs() == 3*Year);
+    fail_unless(Period("P5MT").get_nsecs() == 5*Month);
+    fail_unless(Period("P37DT").get_nsecs() == 37*Day);
 
-    fail_unless(Period("P3Y17MT").get_utc() == 3*Year + 17*Month);
-    fail_unless(Period("P5Y66DT").get_utc() == 5*Year + 66*Day);
-    fail_unless(Period("P37M44DT").get_utc() == 37*Month + 44*Day);
+    fail_unless(Period("P3Y17MT").get_nsecs() == 3*Year + 17*Month);
+    fail_unless(Period("P5Y66DT").get_nsecs() == 5*Year + 66*Day);
+    fail_unless(Period("P37M44DT").get_nsecs() == 37*Month + 44*Day);
 
 
     // Hour-min-sec
-    fail_unless(Period("PT3H").get_utc() == 3*Hour);
-    fail_unless(Period("PT5M").get_utc() == 5*Min);
-    fail_unless(Period("P37S").get_utc() == 37*Sec);
+    fail_unless(Period("PT3H").get_nsecs() == 3*Hour);
+    fail_unless(Period("PT5M").get_nsecs() == 5*Min);
+    fail_unless(Period("P37S").get_nsecs() == 37*Sec);
 
-    // fail_unless(Period("PT3.578777S").get_utc() == 3*Sec + 578*MSec + 777*USec);
-    fail_unless(Period("PT0.5S").get_utc() == 500*MSec);
+    // fail_unless(Period("PT3.578777S").get_nsecs() == 3*Sec + 578*MSec + 777*USec);
+    fail_unless(Period("PT0.5S").get_nsecs() == 500*MSec);
 
 
-    // fail_unless(Period("PT5H7M3.578777S").get_utc() == 5*Hour + 7*Min + 3*Sec + 578*MSec + 777*USec);    
+    // fail_unless(Period("PT5H7M3.578777S").get_nsecs() == 5*Hour + 7*Min + 3*Sec + 578*MSec + 777*USec);    
     
     // @todo these should fail
-    fail_unless(Period("PT.S").get_utc() == 0);
-    fail_unless(Period("PT.D").get_utc() == 0);
+    fail_unless(Period("PT.S").get_nsecs() == 0);
+    fail_unless(Period("PT.D").get_nsecs() == 0);
 
 }
 END_TEST

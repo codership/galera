@@ -25,14 +25,14 @@ ostream& gu::datetime::operator<<(ostream& os, const Date& d)
 ostream& gu::datetime::operator<<(ostream& os, const Period& p)
 {
     os << "P";
-    int64_t utc(p.get_utc());
-    if (utc/Year > 0) {  os << (utc/Year) << "Y"; utc %= Year; }
-    if (utc/Month > 0) { os << (utc/Month) << "M"; utc %= Month; }
-    if (utc/Day > 0)  { os << (utc/Day) << "D"; utc %= Day; }
-    if (utc > 0) { os << "T"; }
-    if (utc/Hour > 0) { os << (utc/Hour) << "H"; utc %= Hour; }
-    if (utc/Min > 0) { os << (utc/Min) << "M"; utc %= Min; }
-    if (utc/Sec > 0) os << (double(utc)/Sec) << "S";
+    int64_t nsecs(p.get_nsecs());
+    if (nsecs/Year > 0) {  os << (nsecs/Year) << "Y"; nsecs %= Year; }
+    if (nsecs/Month > 0) { os << (nsecs/Month) << "M"; nsecs %= Month; }
+    if (nsecs/Day > 0)  { os << (nsecs/Day) << "D"; nsecs %= Day; }
+    if (nsecs > 0) { os << "T"; }
+    if (nsecs/Hour > 0) { os << (nsecs/Hour) << "H"; nsecs %= Hour; }
+    if (nsecs/Min > 0) { os << (nsecs/Min) << "M"; nsecs %= Min; }
+    if (double(nsecs)/Sec >= 1.e-9) os << (double(nsecs)/Sec) << "S";
     return os;
 }
 
@@ -101,33 +101,33 @@ void gu::datetime::Period::parse(const string& str)
     }
     if (parts[YEAR].is_set())
     {
-        utc += from_string<int64_t>(parts[YEAR].str())*Year;
+        nsecs += from_string<int64_t>(parts[YEAR].str())*Year;
     }
     if (parts[MONTH].is_set())
     {
-        utc += from_string<int64_t>(parts[MONTH].str())*Month;
+        nsecs += from_string<int64_t>(parts[MONTH].str())*Month;
     }
     if (parts[DAY].is_set())
     {
-        utc += from_string<int64_t>(parts[DAY].str())*Day;
+        nsecs += from_string<int64_t>(parts[DAY].str())*Day;
     }
     if (parts[HOUR].is_set())
     {
-        utc += from_string<int64_t>(parts[HOUR].str())*Hour;
+        nsecs += from_string<int64_t>(parts[HOUR].str())*Hour;
     }
     if (parts[MIN].is_set())
     {
-        utc += from_string<int64_t>(parts[MIN].str())*Min;
+        nsecs += from_string<int64_t>(parts[MIN].str())*Min;
     }
     if (parts[SEC].is_set())
     {
         int64_t s(from_string<int64_t>(parts[SEC].str()));
-        utc += s*Sec;
+        nsecs += s*Sec;
     }
     if (parts[SEC_D].is_set())
     {
         double d(from_string<double>(parts[SEC_D].str()));
-        utc += static_cast<int64_t>(d*Sec);
+        nsecs += static_cast<int64_t>(d*Sec);
     }
 }
 
