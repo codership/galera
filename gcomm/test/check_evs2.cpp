@@ -601,11 +601,11 @@ END_TEST
 
 static DummyNode* create_dummy_node(size_t idx, 
                                     const string& inactive_timeout = "PT1H",
-                                    const string& retrans_period = "PT1H")
+                                    const string& retrans_period = "PT30M")
 {
     string conf = "evs://?" + Conf::EvsParamViewForgetTimeout + "=PT1H&"
         + Conf::EvsParamInactiveTimeout + "=" + inactive_timeout + "&"
-        + Conf::EvsParamInactiveCheckPeriod + "=PT0.01S&"
+        + Conf::EvsParamInactiveCheckPeriod + "=PT0.1S&"
         + Conf::EvsParamConsensusTimeout + "=PT1H&"
         + Conf::EvsParamRetransPeriod + "=" + retrans_period + "&"
         + Conf::EvsParamJoinRetransPeriod + "=" + retrans_period;
@@ -672,7 +672,7 @@ START_TEST(test_proto_join_n)
     {
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
         set_cvi(dn, 0, i, i + 1);
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(false));
     }
     gu_trace(check_trace(dn));
     for_each(dn.begin(), dn.end(), DeleteObjectOp());
@@ -697,7 +697,7 @@ START_TEST(test_proto_join_n_w_user_msg)
     {
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
         set_cvi(dn, 0, i, i + 1);
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(false));
         for (size_t j = 0; j < i; ++j)
         {
             gu_trace(send_n(dn[j], 5 + ::rand() % 4));
@@ -716,10 +716,12 @@ START_TEST(test_proto_join_n_lossy)
     EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    const string inactive_timeout("PT1H");
+    const string retrans_period("PT0.1S");
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, "PT1H", "PT0.001S"));
+        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -731,7 +733,7 @@ START_TEST(test_proto_join_n_lossy)
             prop.set_loss(i + 1, j, 0.9);
             prop.set_loss(j, i + 1, 0.9);
         }
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(true));
     }
     gu_trace(check_trace(dn));
     for_each(dn.begin(), dn.end(), DeleteObjectOp());
@@ -746,10 +748,12 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
     EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
-    
+    const string inactive_timeout("PT1H");
+    const string retrans_period("PT0.1S");    
+
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, "PT1H", "PT0.001S"));
+        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
     }
 
     for (size_t i = 0; i < n_nodes; ++i)
@@ -762,7 +766,7 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
             prop.set_loss(j, i + 1, 0.9);
             
         }
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(true));
         for (size_t j = 0; j < i; ++j)
         {
             gu_trace(send_n(dn[j], 5 + ::rand() % 4));
@@ -790,7 +794,7 @@ START_TEST(test_proto_leave_n)
     {
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
         set_cvi(dn, 0, i, i + 1);
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(false));
     }
     
     uint32_t last_view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
@@ -800,7 +804,7 @@ START_TEST(test_proto_leave_n)
         dn[i]->close();
         dn[i]->set_cvi(V_REG);
         set_cvi(dn, i + 1, n_nodes - 1, last_view_seq + i + 1);
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(true));
     }
     
     gu_trace(check_trace(dn));
@@ -815,17 +819,19 @@ START_TEST(test_proto_leave_n_w_user_msg)
     EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    const string inactive_timeout("PT1H");
+    const string retrans_period("PT0.1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i));
+        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
     {
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));        
         set_cvi(dn, 0, i, i + 1);
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(false));
     }
 
     uint32_t last_view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
@@ -839,7 +845,7 @@ START_TEST(test_proto_leave_n_w_user_msg)
         dn[i]->close();
         dn[i]->set_cvi(V_REG);
         set_cvi(dn, i + 1, n_nodes - 1, last_view_seq + i + 1);
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(true));
     }
     
     gu_trace(check_trace(dn));
@@ -855,10 +861,12 @@ START_TEST(test_proto_leave_n_lossy)
     EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    const string inactive_timeout("PT1S");
+    const string retrans_period("PT0.1S");
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, "PT1H", "PT0.1S"));
+        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -884,7 +892,7 @@ START_TEST(test_proto_leave_n_lossy)
         dn[i]->set_cvi(V_REG);
         set_cvi(dn, i + 1, n_nodes - 1, last_view_seq + i + 1);
         dn[i]->close();
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(true));
     }
     
     gu_trace(check_trace(dn));
@@ -901,17 +909,19 @@ START_TEST(test_proto_leave_n_lossy_w_user_msg)
     EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    const string inactive_timeout("PT1S");
+    const string retrans_period("PT0.1S");
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, "PT1H", "PT0.1S"));
+        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
     {
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
         set_cvi(dn, 0, i, i + 1);
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(false));
     }
     
     uint32_t last_view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
@@ -934,7 +944,7 @@ START_TEST(test_proto_leave_n_lossy_w_user_msg)
         dn[i]->set_cvi(V_REG);
         set_cvi(dn, i + 1, n_nodes - 1, last_view_seq + i + 1);
         dn[i]->close();
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(true));
     }
     
     gu_trace(check_trace(dn));
@@ -991,7 +1001,7 @@ START_TEST(test_proto_split_merge)
         ++view_seq_inc;
         set_cvi(dn, 0, i - 1, view_seq + view_seq_inc);
         set_cvi(dn, i, n_nodes - 1, view_seq + view_seq_inc);
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(true));
         
         log_info << "merge " << i;
         for (size_t j = 0; j < i; ++j)
@@ -1004,7 +1014,7 @@ START_TEST(test_proto_split_merge)
         }
         ++view_seq_inc;
         set_cvi(dn, 0, n_nodes - 1, view_seq + view_seq_inc);
-        gu_trace(prop.propagate_until_cvi());
+        gu_trace(prop.propagate_until_cvi(true));
     } 
 }
 END_TEST
@@ -1065,7 +1075,7 @@ START_TEST(test_proto_split_merge_lossy)
         set_cvi(dn, 0, i - 1, view_seq + view_seq_inc);
         set_cvi(dn, i, n_nodes - 1, view_seq + view_seq_inc);
         
-        prop.propagate_until_cvi();
+        gu_trace(prop.propagate_until_cvi(true));
         
         log_info << "merge " << i;
         for (size_t j = 0; j < i; ++j)
@@ -1078,7 +1088,7 @@ START_TEST(test_proto_split_merge_lossy)
         }
         ++view_seq_inc;
         set_cvi(dn, 0, n_nodes - 1, view_seq + view_seq_inc);
-        prop.propagate_until_cvi();
+        gu_trace(prop.propagate_until_cvi(true));
     } 
 }
 END_TEST
@@ -1144,7 +1154,7 @@ START_TEST(test_proto_split_merge_lossy_w_user_msg)
             gu_trace(send_n(dn[j], 5 + ::rand() % 4));        
         }
         
-        prop.propagate_until_cvi();
+        gu_trace(prop.propagate_until_cvi(true));
         
         log_info << "merge " << i;
         for (size_t j = 0; j < i; ++j)
@@ -1161,7 +1171,7 @@ START_TEST(test_proto_split_merge_lossy_w_user_msg)
         {
             gu_trace(send_n(dn[j], 5 + ::rand() % 4));
         }
-        prop.propagate_until_cvi();
+        gu_trace(prop.propagate_until_cvi(true));
     }
 }
 END_TEST

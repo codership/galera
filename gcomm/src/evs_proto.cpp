@@ -1,4 +1,8 @@
 
+// Define to get profiling instrumentation compiled in
+#define GCOMM_PROFILE 1
+#include "profile.hpp"
+
 #include "evs_proto.hpp"
 #include "evs_message2.hpp"
 #include "evs_input_map2.hpp"
@@ -223,6 +227,10 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     recovered_msgs(0),
     recvd_msgs(7, 0),
     delivered_msgs(0),
+    send_gap_prof("send_gap"),
+    send_join_prof("send_join"),
+    send_install_prof("send_install"),
+    shift_to_prof("shift_to"),
     delivering(false),
     my_uuid(my_uuid_), 
     known(),
@@ -380,6 +388,11 @@ string gcomm::evs::Proto::get_stats() const
     os << "\n\tdelivered " << delivered_msgs;
     os << "\n\teff(delivered/sent/nodes) " << 
         double(delivered_msgs)/double(accumulate(sent_msgs.begin(), sent_msgs.end(), 0))/double(current_view.get_members().size());
+    os << "\nprofiles:\n"
+       << send_gap_prof     << "\n"
+       << send_join_prof    << "\n"
+       << send_install_prof << "\n"
+       << shift_to_prof     << "\n";
     return os.str();
 }
 
@@ -424,7 +437,9 @@ void gcomm::evs::Proto::handle_retrans_timer()
     {
         evs_log_debug(D_TIMERS) << "send join/install/gap timer";
         
+        profile_enter(send_join_prof);
         send_join(true);
+        profile_leave(send_join_prof);
         if (install_message != 0 && is_consistent(*install_message) == true)
         {
             if (is_representative(get_uuid()) == true)
@@ -579,6 +594,10 @@ Time gcomm::evs::Proto::handle_timers()
             handle_stats_timer();
             break;
         }
+        if (get_state() == S_CLOSED)
+        {
+            return Time::max();
+        }
         // Make sure that timer was not inserted twice
         TimerList::iterator ii = find_if(timers.begin(), timers.end(), 
                                          TimerSelectOp(t));
@@ -620,10 +639,16 @@ void gcomm::evs::Proto::check_inactive()
             has_inactive = true;
         }
     }
-
+    
     if (has_inactive == true && get_state() == S_OPERATIONAL)
     {
         shift_to(S_RECOVERY, true);
+    }
+    else if (has_inactive    == true && 
+             get_state()     == S_LEAVING &&
+             n_operational() == 1)
+    {
+        shift_to(S_CLOSED);
     }
 }
 
@@ -676,7 +701,7 @@ size_t gcomm::evs::Proto::n_operational() const
     NodeMap::const_iterator i;
     size_t ret = 0;
     for (i = known.begin(); i != known.end(); ++i) {
-        if (i->second.get_operational())
+        if (i->second.get_operational() == true)
             ret++;
     }
     return ret;
@@ -2170,7 +2195,9 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         state = S_RECOVERY;
         if (send_j == true)
         {
+            profile_enter(send_join_prof);
             gu_trace(send_join(false));
+            profile_leave(send_join_prof);
         }
         gcomm_assert(get_state() == S_RECOVERY);
         reset_timers();        
@@ -2672,7 +2699,9 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         const JoinMessage* jm = NodeMap::get_value(self_i).get_join_message();
         if (jm == 0 || is_consistent(*jm) == false)
         {
+            profile_enter(send_join_prof);
             gu_trace(send_join());
+            profile_leave(send_join_prof);
         }
     }
 }
@@ -2790,7 +2819,9 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         const JoinMessage* jm(NodeMap::get_value(self_i).get_join_message());
         if (jm == 0 || is_consistent(*jm) == false)
         {
+            profile_enter(send_join_prof);
             gu_trace(send_join());
+            profile_leave(send_join_prof);
         }
     }    
 }
@@ -2905,7 +2936,9 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
             }
             else if (msg.get_source() != get_uuid())
             {
+                profile_enter(send_join_prof);
                 gu_trace(send_join(false));
+                profile_leave(send_join_prof);
             }
             evs_log_debug(D_JOIN_MSGS)
                 << "install message and received join, discarding";
@@ -2950,13 +2983,19 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         {
             gu_trace(send_install());
         }
-        else if (msg.get_source() != get_uuid())
+#if 0
+        // Note: this segment seems to cause excessive join flood
+        else if (msg.get_source() != get_uuid() && 
+                 is_representative(msg.get_source()) == true)
         {
             if (install_message == 0)
             {
+                profile_enter(send_join_prof);
                 gu_trace(send_join(false));
+                profile_leave(send_join_prof);
             }
         }
+#endif // 0
     }
     else if (msg.get_source() != get_uuid())
     {
@@ -2971,7 +3010,9 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         {
             if (update_im_safe_seqs(same_view) == true)
             {
+                profile_enter(send_join_prof);
                 do_send_join = true;
+                profile_leave(send_join_prof);
             }
 
             // See if we need to retrans some user messages
@@ -2985,7 +3026,9 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                     mn_im_range.get_lu()   < mn_im_range.get_hs())
                 {
                     gu_trace(resend(msg.get_source(), mn_im_range));
+                    profile_enter(send_join_prof);
                     do_send_join = true;
+                    profile_leave(send_join_prof);
                 }
                 if (im_range.get_hs()     != Seqno::max() &&
                     (mn_im_range.get_hs() == Seqno::max() ||
@@ -3010,7 +3053,9 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                  last_sent < max_hs          )  )
             {
                 gu_trace(complete_user(max_hs));
+                profile_enter(send_join_prof);
                 do_send_join = true;
+                profile_leave(send_join_prof);
             }
             
             
@@ -3046,7 +3091,9 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         
         if (do_send_join == true)
         {
+            profile_enter(send_join_prof);
             gu_trace(send_join(false));
+            profile_leave(send_join_prof);
         }
     }
 }
@@ -3089,7 +3136,9 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
         else if (get_state() == S_RECOVERY &&
                  prev_safe_seq != input_map->get_safe_seq(msg.get_source()))
         {
+            profile_enter(send_join_prof);
             gu_trace(send_join());
+            profile_leave(send_join_prof);
         }
     }
 }

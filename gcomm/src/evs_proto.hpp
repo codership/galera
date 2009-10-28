@@ -8,6 +8,7 @@
 #include "gcomm/transport.hpp"
 #include "gcomm/map.hpp"
 #include "histogram.hpp"
+#include "profile.hpp"
 
 #include "evs_seqno.hpp"
 
@@ -332,6 +333,10 @@ private:
     long long int recovered_msgs;
     std::vector<long long int> recvd_msgs;
     long long int delivered_msgs;
+    Profile send_gap_prof;
+    Profile send_join_prof;
+    Profile send_install_prof;
+    Profile shift_to_prof;
     bool delivering;
     UUID my_uuid;
     // 

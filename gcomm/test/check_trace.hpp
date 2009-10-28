@@ -494,7 +494,7 @@ namespace gcomm
         void set_loss(const size_t ii, const size_t jj, const double loss);
         void split(const size_t ii, const size_t jj);
         void merge(const size_t ii, const size_t jj, const double loss = 1.0);
-        void propagate_until_cvi(bool handle_timers = true);
+        void propagate_until_cvi(bool handle_timers);
         friend std::ostream& operator<<(std::ostream&, const PropagationMatrix&);
     private:
         void expire_timers();

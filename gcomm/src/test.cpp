@@ -20,6 +20,7 @@
 #include "gcomm/event.hpp"
 #include "gcomm/transport.hpp"
 
+#include "profile.hpp"
 #include "tcp.hpp"
 #include "gmcast.hpp"
 #include "evs.hpp"

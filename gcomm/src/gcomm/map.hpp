@@ -29,6 +29,8 @@ namespace gcomm
         typedef typename MapType::const_reverse_iterator const_reverse_iterator;
         typedef typename MapType::value_type     value_type;
         typedef typename MapType::const_reference const_reference;
+        typedef typename MapType::key_type key_type;
+        typedef typename MapType::mapped_type mapped_type;
 
     protected:
 
@@ -77,7 +79,7 @@ namespace gcomm
             return ret;
         }
         
-        
+        mapped_type& operator[](const key_type& k) { return map[k]; }
     
         void erase(iterator i) { map.erase(i); }
 
