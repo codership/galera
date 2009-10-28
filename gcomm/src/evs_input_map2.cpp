@@ -387,6 +387,7 @@ gcomm::evs::InputMap::insert(const UUID& uuid,
     throw (gu::Exception)
 {
     Range range;
+
     profile_enter(prof);
     // Only insert messages with meaningful seqno
     gcomm_assert(msg.get_seq() != Seqno::max());
@@ -398,38 +399,51 @@ gcomm::evs::InputMap::insert(const UUID& uuid,
             + Seqno::max().get()/4);
     }
     
-    InputMapNode& node(InputMapNodeIndex::get_value(node_index->find_checked(uuid)));
-    range = node.get_range();
-    
     // User should check aru_seq before inserting. This check is left 
     // also in optimized builds since violating it may cause duplicate 
     // messages.
-    gcomm_assert(aru_seq == Seqno::max() || aru_seq < msg.get_seq()) 
+    gcomm_assert(aru_seq == Seqno::max() || aru_seq < msg.get_seq())
         << "aru seq " << aru_seq << " msg seq " << msg.get_seq() 
         << " index size " << msg_index->size();
     
+
+    profile_leave(prof);
+
+    InputMapNode* node;
+    
+    profile_enter(prof);
+    node = &InputMapNodeIndex::get_value(node_index->find_checked(uuid));
+    range = node->get_range();
+
+    profile_leave(prof);
+    
+    
+    profile_enter(prof);
+
     // User should check LU before inserting. This check is left 
     // also in optimized builds since violating it may cause duplicate 
     // messages
-    gcomm_assert(range.get_lu() <= msg.get_seq()) 
+    gcomm_assert(range.get_lu() <= msg.get_seq())
         << "lu " << range.get_lu() << " > "
         << msg.get_seq();
-    
-    if (recovery_index->find(InputMapMsgKey(node.get_index(), msg.get_seq())) !=
+
+    if (recovery_index->find(InputMapMsgKey(node->get_index(), msg.get_seq())) !=
         recovery_index->end())
     {
         // log_warn << "message " 
         // << msg << " has already been delivered, state "
         // << *this;
-        return node.get_range();
+        return node->get_range();
     }
+    profile_leave(prof);
     
     // Loop over message seqno range and insert messages when not 
     // already found
+    profile_enter(prof);
     for (Seqno s = msg.get_seq(); s <= msg.get_seq() + msg.get_seq_range(); ++s)
     {
         InputMapMsgIndex::iterator msg_i = msg_index->find(
-            InputMapMsgKey(node.get_index(), s));
+            InputMapMsgKey(node->get_index(), s));
         
         if (range.get_hs() == Seqno::max() || range.get_hs() < s)
         {
@@ -444,7 +458,7 @@ gcomm::evs::InputMap::insert(const UUID& uuid,
                 ins_rb = (rb != 0 ? rb->copy(offset) : 0);
             }
             gu_trace((void)msg_index->insert_checked(
-                         make_pair(InputMapMsgKey(node.get_index(), s), 
+                         make_pair(InputMapMsgKey(node->get_index(), s), 
                                    InputMapMsg(uuid, msg, ins_rb))));
             ++inserted;
         }
@@ -465,24 +479,25 @@ gcomm::evs::InputMap::insert(const UUID& uuid,
             }
             while (
                 i <= range.get_hs() &&
-                (msg_index->find(InputMapMsgKey(node.get_index(), i)) 
+                (msg_index->find(InputMapMsgKey(node->get_index(), i)) 
                  != msg_index->end() ||
-                 recovery_index->find(InputMapMsgKey(node.get_index(), i)) 
+                 recovery_index->find(InputMapMsgKey(node->get_index(), i)) 
                  != recovery_index->end()));
             range.set_lu(i);
         }
     }
-    
+    profile_leave(prof);
     // Call update aru only if aru_seq may change
     bool do_update_aru = (aru_seq == Seqno::max() || 
                           (aru_seq + 1) < range.get_lu());
-    node.set_range(range);
+    node->set_range(range);
     if (do_update_aru == true)
     {
+        profile_enter(prof);
         update_aru();
+        profile_leave(prof);
         ++updated_aru;
     }
-    profile_leave(prof);
     return range;
 }
 
@@ -557,11 +572,9 @@ gcomm::evs::InputMap::recover(const UUID& uuid, const Seqno seq) const
 //////////////////////////////////////////////////////////////////////////
 
 
-void gcomm::evs::InputMap::update_aru()
+inline void gcomm::evs::InputMap::update_aru()
     throw (gu::Exception)
 {
-    profile_enter(prof);
-
     InputMapNodeIndex::const_iterator min = 
         min_element(node_index->begin(), node_index->end(), NodeIndexLUCmpOp());
     
@@ -575,16 +588,12 @@ void gcomm::evs::InputMap::update_aru()
         gcomm_assert(aru_seq == Seqno::max() || minval - 1 >= aru_seq);
         aru_seq = minval - 1;
     }
-
-    profile_leave(prof);
 }
 
 
 void gcomm::evs::InputMap::cleanup_recovery_index()
     throw (gu::Exception)
 {
-    profile_enter(prof);
-
     gcomm_assert(node_index->size() > 0);
     if (safe_seq != Seqno::max())
     {
@@ -593,7 +602,6 @@ void gcomm::evs::InputMap::cleanup_recovery_index()
         for_each(recovery_index->begin(), i, release_rb);
         recovery_index->erase(recovery_index->begin(), i);
     }
-    profile_leave(prof);
 }
 
 

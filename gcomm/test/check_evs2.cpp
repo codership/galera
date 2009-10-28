@@ -321,8 +321,8 @@ START_TEST(test_input_map_overwrap)
             }
             cnt++;
         }
-        fail_unless(im.get_aru_seq() == seq);
-        fail_unless(im.get_safe_seq() == last_safe);
+        gcomm_assert(im.get_aru_seq() == seq);
+        gcomm_assert(im.get_safe_seq() == last_safe);
     }
     Time stop(Time::now());
     
@@ -1232,17 +1232,14 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_proto_join_n_w_user_msg");
     tcase_add_test(tc, test_proto_join_n_w_user_msg);
-    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_proto_join_n_lossy");
     tcase_add_test(tc, test_proto_join_n_lossy);
-    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
     
     tc = tcase_create("test_proto_join_n_lossy_w_user_msg");
     tcase_add_test(tc, test_proto_join_n_lossy_w_user_msg);
-    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
     
     tc = tcase_create("test_proto_leave_n");
@@ -1255,27 +1252,22 @@ Suite* evs2_suite()
     
     tc = tcase_create("test_proto_leave_n_lossy");
     tcase_add_test(tc, test_proto_leave_n_lossy);
-    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_proto_leave_n_lossy_w_user_msg");
     tcase_add_test(tc, test_proto_leave_n_lossy_w_user_msg);
-    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
     
     tc = tcase_create("test_proto_split_merge");
     tcase_add_test(tc, test_proto_split_merge);
-    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
     
     tc = tcase_create("test_proto_split_merge_lossy");
     tcase_add_test(tc, test_proto_split_merge_lossy);
-    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_proto_split_merge_lossy_w_user_msg");
     tcase_add_test(tc, test_proto_split_merge_lossy_w_user_msg);
-    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
     
     return s;

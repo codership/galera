@@ -93,30 +93,18 @@ public:
         line(line_)
     { }
 
+    bool operator==(const Key& cmp) const
+    {
+        return (line == cmp.line && 
+                func == cmp.func &&
+                file == cmp.file);
+    }
+    
     bool operator<(const Key& cmp) const
     {
-        int val = strcmp(file, cmp.file);
-        switch (val)
-        {
-        case -1:
-            return true;
-        case 1:
-            return false;
-        default:
-            break;
-        }
-
-        val = strcmp(func, cmp.func);
-        switch (val)
-        {
-        case -1:
-            return true;
-        case 1:
-            return false;
-        default:
-            break;
-        }
-        return line < cmp.line;
+        return (line < cmp.line ||
+                (line == cmp.line && (func < cmp.func ||
+                                      (func == cmp.func && file < cmp.file))));
     }
 private:
     friend class Point;
@@ -144,8 +132,8 @@ public:
 private:
     friend class Profile;
     const Profile& prof;
-    Key key;
-    const gu::datetime::Date enter_time;
+    const Key key;
+    mutable gu::datetime::Date enter_time;
 };
 
 /*!
@@ -169,15 +157,16 @@ public:
     
     void enter(const Point& point) const
     { 
-        gu::Lock lock(mutex);
+        // gu::Lock lock(mutex);
         points[point.key].first++; 
+        point.enter_time = gu::datetime::Date::now();
     }
     
     void leave(const Point& point) const
     { 
         long long int t(gu::datetime::Date::now().get_utc() - 
                         point.enter_time.get_utc());
-        gu::Lock lock(mutex);
+        // gu::Lock lock(mutex);
         points[point.key].second += t; 
         c_time += t;
     }
@@ -200,7 +189,7 @@ inline prof::Point::Point(const Profile& prof_,
                           const int line_) :
     prof(prof_),
     key(file_, func_, line_),
-    enter_time(gu::datetime::Date::now())
+    enter_time()
 { 
     prof.enter(*this); 
 }
@@ -225,7 +214,8 @@ inline std::ostream& prof::operator<<(std::ostream& os, const Profile& prof)
     {
         os << "\n\t" << i->first << ": " 
            << i->second.first     << " "
-           << double(i->second.second)/gu::datetime::Sec ;
+           << double(i->second.second)/gu::datetime::Sec << " "
+           << double(i->second.second)/double(prof.c_time);
     }
     return os;
 }
