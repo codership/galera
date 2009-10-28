@@ -12,6 +12,10 @@
  * @author Teemu Ollakka <teemu.ollakka@codership.com>
  */
 
+#ifdef PROFILE_EVS_INPUT_MAP
+#define GCOMM_PROFILE 1
+#endif // PROFILE_EVS_INPUT_MAP
+
 #include "evs_input_map2.hpp"
 #include "gcomm/readbuf.hpp"
 #include <gu_exception.hpp>
@@ -162,7 +166,8 @@ gcomm::evs::InputMap::InputMap() :
     msg_index(new InputMapMsgIndex()),
     recovery_index(new InputMapMsgIndex()),
     inserted(0),
-    updated_aru(0)
+    updated_aru(0),
+    prof("input_map_intrnl")
 {
     // 
 }
@@ -174,7 +179,8 @@ gcomm::evs::InputMap::~InputMap()
     delete node_index;
     delete msg_index;
     delete recovery_index;
-    log_info << "inserted: " << inserted << " updated aru: " << updated_aru;
+    // log_info << "profile: " << prof;
+    // log_info << "inserted: " << inserted << " updated aru: " << updated_aru;
 }
 
 
@@ -189,6 +195,7 @@ gcomm::evs::InputMap::~InputMap()
 void gcomm::evs::InputMap::insert_uuid(const UUID& uuid)
     throw (gu::Exception)
 {
+    profile_enter(prof);
     gcomm_assert(msg_index->empty() == true &&
                  recovery_index->empty() == true);
     
@@ -200,50 +207,68 @@ void gcomm::evs::InputMap::insert_uuid(const UUID& uuid)
         InputMapNodeIndex::get_value(i).set_index(n);
         ++n;
     }
+    profile_leave(prof);
 }
 
 
 gcomm::evs::Range gcomm::evs::InputMap::get_range(const UUID& uuid) const
     throw (gu::Exception)
 {
-    return InputMapNodeIndex::get_value(
+    Range ret;
+    profile_enter(prof);
+    ret = InputMapNodeIndex::get_value(
         node_index->find_checked(uuid)).get_range();
+    profile_leave(prof);
+    return ret;
 }
 
 
 gcomm::evs::Seqno gcomm::evs::InputMap::get_min_hs() const
     throw (gu::Exception)
 {
+    Seqno ret;
+    profile_enter(prof);
     gcomm_assert(node_index->empty() == false);
-    return InputMapNodeIndex::get_value(
+    ret = InputMapNodeIndex::get_value(
         min_element(node_index->begin(),
                     node_index->end(), 
                     NodeIndexHSCmpOp())).get_range().get_hs();
+    profile_leave(prof);
+    return ret;
 }
 
 
 gcomm::evs::Seqno gcomm::evs::InputMap::get_max_hs() const
     throw (gu::Exception)
 {
+    Seqno ret;
+    profile_enter(prof);
     gcomm_assert(node_index->empty() == false);
-    return InputMapNodeIndex::get_value(
+    ret = InputMapNodeIndex::get_value(
         max_element(node_index->begin(),
                     node_index->end(),
                     NodeIndexHSCmpOp())).get_range().get_hs();
+    profile_leave(prof);
+    return ret;
 }
 
 
 gcomm::evs::Seqno gcomm::evs::InputMap::get_safe_seq(const UUID& uuid) const
     throw (gu::Exception)
 {
-    return InputMapNodeIndex::get_value(
+    Seqno ret;
+    profile_enter(prof);
+    ret =  InputMapNodeIndex::get_value(
         node_index->find_checked(uuid)).get_safe_seq();
+    profile_leave(prof);
+    return ret;
 }
 
 
 void gcomm::evs::InputMap::set_safe_seq(const UUID& uuid, const Seqno seq)
     throw (gu::Exception)
 {
+    profile_enter(prof);
     gcomm_assert(seq != static_cast<const Seqno>(Seqno::max()));
     // @note This assertion does not necessarily hold. Some other 
     // instance may well have higher all received up to seqno 
@@ -273,11 +298,13 @@ void gcomm::evs::InputMap::set_safe_seq(const UUID& uuid, const Seqno seq)
                  (aru_seq != Seqno::max() && safe_seq <= aru_seq));
     // Cleanup recovery index
     cleanup_recovery_index();
+    profile_leave(prof);
 }
 
 
 void gcomm::evs::InputMap::clear()
 {
+    profile_enter(prof);
     if (msg_index->empty() == false)
     {
         log_warn << "discarding " << msg_index->size() << 
@@ -295,33 +322,46 @@ void gcomm::evs::InputMap::clear()
     node_index->clear();
     aru_seq = Seqno::max();
     safe_seq = Seqno::max();
+    profile_leave(prof);
 }
 
 
 bool gcomm::evs::InputMap::is_safe(iterator i) const
     throw (gu::Exception)
 {
+    bool ret;
+    profile_enter(prof);
     const Seqno seq(InputMapMsgIndex::get_value(i).get_msg().get_seq());
-    return (safe_seq != Seqno::max() && seq <= safe_seq);
+    ret = (safe_seq != Seqno::max() && seq <= safe_seq);
+    profile_leave(prof);
+    return ret;
 }
 
 
 bool gcomm::evs::InputMap::is_agreed(iterator i) const
     throw (gu::Exception)
 {
+    bool ret;
+    profile_enter(prof);
     const Seqno seq(InputMapMsgIndex::get_value(i).get_msg().get_seq());
-    return (aru_seq != Seqno::max() && seq <= aru_seq);
+    ret = (aru_seq != Seqno::max() && seq <= aru_seq);
+    profile_leave(prof);
+    return ret;
 }
 
 
 bool gcomm::evs::InputMap::is_fifo(iterator i) const
     throw (gu::Exception)
 {
+    bool ret;
+    profile_enter(prof);
     const Seqno seq(InputMapMsgIndex::get_value(i).get_msg().get_seq());
     const InputMapNode& node(InputMapNodeIndex::get_value(
                                  node_index->find_checked(
                                      InputMapMsgIndex::get_value(i).get_uuid())));
-    return (node.get_range().get_lu() > seq);
+    ret = (node.get_range().get_lu() > seq);
+    profile_leave(prof);
+    return ret;
 }
 
 
@@ -344,6 +384,8 @@ gcomm::evs::InputMap::insert(const UUID& uuid,
                              const size_t offset)
     throw (gu::Exception)
 {
+    Range range;
+    profile_enter(prof);
     // Only insert messages with meaningful seqno
     gcomm_assert(msg.get_seq() != Seqno::max());
     if (msg_index->empty() == false)
@@ -355,7 +397,7 @@ gcomm::evs::InputMap::insert(const UUID& uuid,
     }
     
     InputMapNode& node(InputMapNodeIndex::get_value(node_index->find_checked(uuid)));
-    Range range(node.get_range());
+    range = node.get_range();
     
     // User should check aru_seq before inserting. This check is left 
     // also in optimized builds since violating it may cause duplicate 
@@ -438,7 +480,7 @@ gcomm::evs::InputMap::insert(const UUID& uuid,
         update_aru();
         ++updated_aru;
     }
-
+    profile_leave(prof);
     return range;
 }
 
@@ -446,6 +488,7 @@ gcomm::evs::InputMap::insert(const UUID& uuid,
 void gcomm::evs::InputMap::erase(iterator i)
     throw (gu::Exception)
 {
+    profile_enter(prof);
     const UserMessage& msg(InputMapMsgIndex::get_value(i).get_msg());
     if (msg.get_seq_range() == 0)
     {
@@ -468,6 +511,7 @@ void gcomm::evs::InputMap::erase(iterator i)
         }
         gu_trace(msg_index->erase(i));
     }
+    profile_leave(prof);
 }
 
 
@@ -476,11 +520,13 @@ gcomm::evs::InputMap::find(const UUID& uuid, const Seqno seq) const
     throw (gu::Exception)
 {
     iterator ret;
+    profile_enter(prof);
     InputMapNodeIndex::const_iterator node_i;
     gu_trace(node_i = node_index->find_checked(uuid));
     const InputMapNode& node(InputMapNodeIndex::get_value(node_i));
     const InputMapMsgKey key(node.get_index(), seq);
     gu_trace(ret = msg_index->find(key));
+    profile_leave(prof);
     return ret;
 }
 
@@ -490,11 +536,13 @@ gcomm::evs::InputMap::recover(const UUID& uuid, const Seqno seq) const
     throw (gu::Exception)
 {
     iterator ret;
+    profile_enter(prof);
     InputMapNodeIndex::const_iterator node_i;
     gu_trace(node_i = node_index->find_checked(uuid));
     const InputMapNode& node(InputMapNodeIndex::get_value(node_i));
     const InputMapMsgKey key(node.get_index(), seq);
     gu_trace(ret = recovery_index->find_checked(key));
+    profile_leave(prof);
     return ret;
 }
 
@@ -510,6 +558,8 @@ gcomm::evs::InputMap::recover(const UUID& uuid, const Seqno seq) const
 void gcomm::evs::InputMap::update_aru()
     throw (gu::Exception)
 {
+    profile_enter(prof);
+
     InputMapNodeIndex::const_iterator min = 
         min_element(node_index->begin(), node_index->end(), NodeIndexLUCmpOp());
     
@@ -523,12 +573,16 @@ void gcomm::evs::InputMap::update_aru()
         gcomm_assert(aru_seq == Seqno::max() || minval - 1 >= aru_seq);
         aru_seq = minval - 1;
     }
+
+    profile_leave(prof);
 }
 
 
 void gcomm::evs::InputMap::cleanup_recovery_index()
     throw (gu::Exception)
 {
+    profile_enter(prof);
+
     gcomm_assert(node_index->size() > 0);
     if (safe_seq != Seqno::max())
     {
@@ -537,6 +591,7 @@ void gcomm::evs::InputMap::cleanup_recovery_index()
         for_each(recovery_index->begin(), i, release_rb);
         recovery_index->erase(recovery_index->begin(), i);
     }
+    profile_leave(prof);
 }
 
 

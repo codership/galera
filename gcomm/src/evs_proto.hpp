@@ -334,10 +334,16 @@ private:
     long long int recovered_msgs;
     std::vector<long long int> recvd_msgs;
     long long int delivered_msgs;
-    Profile send_gap_prof;
-    Profile send_join_prof;
-    Profile send_install_prof;
-    Profile shift_to_prof;
+    prof::Profile send_user_prof;
+    prof::Profile send_gap_prof;
+    prof::Profile send_join_prof;
+    prof::Profile send_install_prof;
+    prof::Profile send_leave_prof;
+    prof::Profile consistent_prof;
+    prof::Profile consensus_prof;
+    prof::Profile shift_to_prof;
+    prof::Profile input_map_prof;
+    prof::Profile delivery_prof;
     bool delivering;
     UUID my_uuid;
     // 

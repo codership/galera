@@ -20,7 +20,7 @@
 #define EVS_INPUT_MAP2_HPP
 
 #include "evs_message2.hpp"
-
+#include "profile.hpp"
 #include "gcomm/map.hpp"
 
 
@@ -345,7 +345,8 @@ private:
             
     uint64_t   inserted;
     uint64_t   updated_aru;
-
+    
+    prof::Profile prof;
 };
 
 #endif // EVS_INPUT_MAP2_HPP

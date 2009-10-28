@@ -59,44 +59,99 @@
 #ifndef GCOMM_PROFILE_HPP
 #define GCOMM_PROFILE_HPP
 
-#ifdef GCOMM_PROFILE
-#include "gcomm/map.hpp"
-#include "gcomm/time.hpp"
-#include "gu_utils.hpp"
-#endif // GCOMM_PROFILE
+#include "gu_datetime.hpp"
+#include "gu_lock.hpp"
 
+#include <map>
 #include <ostream>
+#include <cstring>
 
-namespace gcomm
+namespace prof
 {
+    
     // Forward declarations
-    class ProfilePoint;
+    class Key;
+    class Point;
     class Profile;
-    std::ostream& operator<<(std::ostream&, const std::pair<long long int, long long int>&);
+    std::ostream& operator<<(std::ostream&, const Key&);
     std::ostream& operator<<(std::ostream&, const Profile&);
 }
 
 /*!
- * Profile point storing human readable point description <file>:<func>:<line>
+ * Profile key storing human readable point description <file>:<func>:<line>
  * and entry time.
  */
-class gcomm::ProfilePoint
+
+class prof::Key
 {
 public:
-    ProfilePoint(Profile& prof_, const char* file, const char* func, const int line);
-    ~ProfilePoint();
-    const std::string& get_point() const { return point; }
-    const gcomm::Time& get_enter_time() const { return enter_time; }
+    Key(const char* const file_, 
+        const char* const func_, 
+        const int line_) :
+        file(file_),
+        func(func_),
+        line(line_)
+    { }
+
+    bool operator<(const Key& cmp) const
+    {
+        int val = strcmp(file, cmp.file);
+        switch (val)
+        {
+        case -1:
+            return true;
+        case 1:
+            return false;
+        default:
+            break;
+        }
+
+        val = strcmp(func, cmp.func);
+        switch (val)
+        {
+        case -1:
+            return true;
+        case 1:
+            return false;
+        default:
+            break;
+        }
+        return line < cmp.line;
+    }
 private:
-    Profile& prof;
-    std::string point;
-    const gcomm::Time enter_time;
+    friend class Point;
+    friend class Profile;
+    friend std::ostream& operator<<(std::ostream& os, const Key&);
+    const char* const file;
+    const char* const func;
+    const int         line;
+};
+
+inline std::ostream& prof::operator<<(std::ostream& os, const prof::Key& key)
+{
+    return os << key.file << ":" << key.func << ":" << key.line;
+} 
+
+
+class prof::Point
+{
+public:
+    Point(const Profile& prof_, 
+          const char* file_, 
+          const char* func_, 
+          const int line_);
+    ~Point();
+private:
+    friend class Profile;
+    const Profile& prof;
+    Key key;
+    const gu::datetime::Date enter_time;
 };
 
 /*!
  * Profile class for collecting statistics about profile points.
  */
-class gcomm::Profile
+class prof::Profile
 {
 public:
     /*!
@@ -106,22 +161,24 @@ public:
      */
     Profile(const std::string& name_ = "profile") : 
         name(name_),
+        start_time(gu::datetime::Date::now()),
         points(), 
-        c_time(0LL) 
+        c_time(0LL),
+        mutex()
     { }
     
-private:
-    friend class ProfilePoint;
-    
-    void enter(const ProfilePoint& point) 
+    void enter(const Point& point) const
     { 
-        points[point.get_point()].first++; 
+        gu::Lock lock(mutex);
+        points[point.key].first++; 
     }
     
-    void leave(const ProfilePoint& point) 
+    void leave(const Point& point) const
     { 
-        long long int t(Time::now().get_utc() - point.get_enter_time().get_utc());
-        points[point.get_point()].second += t; 
+        long long int t(gu::datetime::Date::now().get_utc() - 
+                        point.enter_time.get_utc());
+        gu::Lock lock(mutex);
+        points[point.key].second += t; 
         c_time += t;
     }
     
@@ -129,48 +186,46 @@ private:
     
     friend std::ostream& operator<<(std::ostream&, const Profile&);
     
-    class Map : 
-        public gcomm::Map<std::string, std::pair<long long int, long long int> > { };
+    typedef std::map<Key, std::pair<long long int, long long int> > Map;
     std::string const name;
-    Map points;
-    long long int c_time;
-    
+    gu::datetime::Date const start_time;
+    mutable Map points;
+    mutable long long int c_time;
+    mutable gu::Mutex mutex;
 };
 
-
-inline gcomm::ProfilePoint::ProfilePoint(Profile& prof_, 
-                                         const char* file, 
-                                         const char* func, 
-                                         const int line) : 
+inline prof::Point::Point(const Profile& prof_, 
+                          const char* file_, 
+                          const char* func_, 
+                          const int line_) :
     prof(prof_),
-    point(), 
-    enter_time(Time::now())
-{
-    std::ostringstream os;
-    os << file << ":" << func << ":" << line;
-    point = os.str();
-    prof.enter(*this);
+    key(file_, func_, line_),
+    enter_time(gu::datetime::Date::now())
+{ 
+    prof.enter(*this); 
 }
 
-inline gcomm::ProfilePoint::~ProfilePoint()
+inline prof::Point::~Point() 
 { 
     prof.leave(*this); 
 }
 
-
 /*!
  * Ostream operator for Profile class.
  */
-inline std::ostream& gcomm::operator<<(std::ostream& os, const Profile& prof)
+inline std::ostream& prof::operator<<(std::ostream& os, const Profile& prof)
 {
     os << "\n\t" << prof.name << ":";
     os << "\n\tcumulative time: " << double(prof.c_time)/gu::datetime::Sec;
+    os << "\n\toverhead: " 
+       << double(prof.c_time)/double(gu::datetime::Date::now().get_utc() -
+                                     prof.start_time.get_utc());
     for (Profile::Map::const_iterator i = prof.points.begin(); 
          i != prof.points.end(); ++i)
     {
-        os << "\n\t" << Profile::Map::get_key(i) << ": " 
-           << Profile::Map::get_value(i).first << " "
-           << double(Profile::Map::get_value(i).second)/gu::datetime::Sec ;
+        os << "\n\t" << i->first << ": " 
+           << i->second.first     << " "
+           << double(i->second.second)/gu::datetime::Sec ;
     }
     return os;
 }
@@ -182,7 +237,7 @@ inline std::ostream& gcomm::operator<<(std::ostream& os, const Profile& prof)
  */
 #ifdef GCOMM_PROFILE
 #define profile_enter(__p) do { \
-    const gcomm::ProfilePoint __point((__p), __FILE__,  __FUNCTION__, __LINE__); \
+    const prof::Point __point((__p), __FILE__,  __FUNCTION__, __LINE__); \
 
 #define profile_leave(__p) \
       } while (0)

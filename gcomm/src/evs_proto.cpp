@@ -1,7 +1,7 @@
 
-// Define to get profiling instrumentation compiled in
+#ifdef PROFILE_EVS_PROTO
 #define GCOMM_PROFILE 1
-#include "profile.hpp"
+#endif // PROFILE_EVS_PROTO
 
 #include "evs_proto.hpp"
 #include "evs_message2.hpp"
@@ -227,10 +227,16 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     recovered_msgs(0),
     recvd_msgs(7, 0),
     delivered_msgs(0),
-    send_gap_prof("send_gap"),
-    send_join_prof("send_join"),
-    send_install_prof("send_install"),
-    shift_to_prof("shift_to"),
+    send_user_prof    ("send_user"),
+    send_gap_prof     ("send_gap"),
+    send_join_prof    ("send_join"),
+    send_install_prof ("send_install"),
+    send_leave_prof   ("send_leave"),
+    consistent_prof   ("consistent"),
+    consensus_prof    ("consensus"),
+    shift_to_prof     ("shift_to"),
+    input_map_prof    ("input_map"),
+    delivery_prof     ("delivery_prof"),
     delivering(false),
     my_uuid(my_uuid_), 
     known(),
@@ -402,14 +408,6 @@ string gcomm::evs::Proto::get_stats() const
     os << "\n\tdelivered " << delivered_msgs;
     os << "\n\teff(delivered/sent/nodes) " << 
         double(delivered_msgs)/double(accumulate(sent_msgs.begin(), sent_msgs.end(), 0))/double(current_view.get_members().size());
-    if ((I_PROFILING & info_mask) != 0)
-    {
-        os << "\nprofiles:\n"
-           << send_gap_prof     << "\n"
-           << send_join_prof    << "\n"
-           << send_install_prof << "\n"
-           << shift_to_prof     << "\n";
-    }
     return os.str();
 }
 
@@ -461,13 +459,17 @@ void gcomm::evs::Proto::handle_retrans_timer()
         {
             if (is_representative(get_uuid()) == true)
             {
+                profile_enter(send_install_prof);
                 gu_trace(send_install());
+                profile_leave(send_install_prof);
             }
             else
             {
+                profile_enter(send_gap_prof);
                 gu_trace(send_gap(UUID::nil(), 
                                   install_message->get_source_view_id(), 
                                   Range()));
+                profile_leave(send_gap_prof);
             }
         }
     }
@@ -477,20 +479,25 @@ void gcomm::evs::Proto::handle_retrans_timer()
         if (output.empty() == true)
         {
             WriteBuf wb(0, 0);
+            profile_enter(send_user_prof);
             gu_trace((void)send_user(&wb, 0xff, SP_DROP, send_window, 
                                      Seqno::max()));
+            profile_leave(send_user_prof);
         }
         else
         {
+            profile_enter(send_user_prof);
             gu_trace(send_user(send_window));
+            profile_leave(send_user_prof);
         }
         evs_log_debug(D_TIMERS) << "send user timer, last_sent=" << last_sent;
     }
     else if (get_state() == S_LEAVING)
     {
         evs_log_debug(D_TIMERS) << "send leave timer";
-
+        profile_enter(send_leave_prof);
         send_leave(false);
+        profile_leave(send_leave_prof);
     }
 }
 
@@ -500,7 +507,9 @@ void gcomm::evs::Proto::handle_consensus_timer()
     if (get_state() != S_OPERATIONAL)
     {
         log_warn << self_string() << " consensus timer expired";
+        profile_enter(shift_to_prof);
         shift_to(S_RECOVERY, true);
+        profile_leave(shift_to_prof);
     }
     if (get_state() != S_LEAVING)
     {
@@ -522,6 +531,17 @@ void gcomm::evs::Proto::handle_stats_timer()
 {
     evs_log_info(I_STATISTICS) << get_stats();
     reset_stats();
+    evs_log_info(I_PROFILING) << "\nprofiles:\n";
+    evs_log_info(I_PROFILING) << send_user_prof    << "\n";
+    evs_log_info(I_PROFILING) << send_gap_prof     << "\n";
+    evs_log_info(I_PROFILING) << send_join_prof    << "\n";
+    evs_log_info(I_PROFILING) << send_install_prof << "\n";
+    evs_log_info(I_PROFILING) << send_leave_prof   << "\n";
+    evs_log_info(I_PROFILING) << consistent_prof   << "\n";
+    evs_log_info(I_PROFILING) << consensus_prof    << "\n";
+    evs_log_info(I_PROFILING) << shift_to_prof     << "\n";
+    evs_log_info(I_PROFILING) << input_map_prof    << "\n";
+    evs_log_info(I_PROFILING) << delivery_prof     << "\n";
 }
 
 
@@ -659,13 +679,17 @@ void gcomm::evs::Proto::check_inactive()
     
     if (has_inactive == true && get_state() == S_OPERATIONAL)
     {
+        profile_enter(shift_to_prof);
         shift_to(S_RECOVERY, true);
+        profile_leave(shift_to_prof);
     }
     else if (has_inactive    == true && 
              get_state()     == S_LEAVING &&
              n_operational() == 1)
     {
+        profile_enter(shift_to_prof);
         shift_to(S_CLOSED);
+        profile_leave(shift_to_prof);
     }
 }
 
@@ -1450,13 +1474,17 @@ void gcomm::evs::Proto::complete_user(const Seqno high_seq)
     evs_log_debug(D_USER_MSGS) << "completing seqno to " << high_seq;;
 
     WriteBuf wb(0, 0);
-    int err = send_user(&wb, 0xff, SP_DROP, Seqno::max(), high_seq);
+    int err;
+    profile_enter(send_user_prof);
+    err = send_user(&wb, 0xff, SP_DROP, Seqno::max(), high_seq);
+    profile_leave(send_user_prof);
     if (err != 0)
     {
         log_warn << "failed to send completing msg " << strerror(err) 
                  << " seq=" << high_seq << " send_window=" << send_window
                  << " last_sent=" << last_sent;
     }
+
 }
 
 
@@ -1615,10 +1643,13 @@ void gcomm::evs::Proto::send_leave(bool handle)
     if (last_sent == Seqno::max() && output.empty() == true)
     {
         WriteBuf wb(0, 0);
+        profile_enter(send_user_prof);
         gu_trace(send_user(&wb, 0xff, SP_DROP, Seqno::max(), Seqno::max()));
+        profile_leave(send_user_prof);
     }
     
     /* Move all pending messages from output to input map */
+    profile_enter(send_user_prof);
     while (output.empty() == false)
     {
         pair<WriteBuf*, ProtoDownMeta> wb = output.front();
@@ -1633,7 +1664,7 @@ void gcomm::evs::Proto::send_leave(bool handle)
         output.pop_front();
         delete wb.first;
     }
-    
+    profile_leave(send_user_prof);
 
     
     LeaveMessage lm(get_uuid(),
@@ -1882,7 +1913,9 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
         get_state() == S_OPERATIONAL)
     {
         evs_log_debug(D_STATE) << " shift to RECOVERY due to foreign message";
+        profile_enter(shift_to_prof);
         gu_trace(shift_to(S_RECOVERY, true));
+        profile_leave(shift_to_prof);
     }
     
     // Set join message after shift to recovery, shift may clean up
@@ -2087,10 +2120,15 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
     
     if (output.empty() == true) 
     {
-        int err = send_user(wb, 
-                            dm.get_user_type(),
-                            dm.get_safety_prefix(), send_window.get()/2, 
-                            Seqno::max());
+        int err;
+
+        profile_enter(send_user_prof);
+        err = send_user(wb, 
+                        dm.get_user_type(),
+                        dm.get_safety_prefix(), send_window.get()/2, 
+                        Seqno::max());
+        profile_leave(send_user_prof);
+        
         switch (err) 
         {
         case EAGAIN:
@@ -2191,6 +2229,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         
         if (get_state() == S_OPERATIONAL)
         {
+            profile_enter(send_user_prof);
             while (output.empty() == false)
             {
                 int err;
@@ -2203,6 +2242,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
                                       << strerror(err);
                 }
             }
+            profile_leave(send_user_prof);
         }
         else
         {
@@ -2269,7 +2309,9 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         }
         delete install_message;
         install_message = 0;
+        profile_enter(send_gap_prof);
         gu_trace(send_gap(UUID::nil(), current_view.get_id(), Range()));;
+        profile_leave(send_gap_prof);
         gcomm_assert(get_state() == S_OPERATIONAL);
         reset_timers();
         break;
@@ -2581,7 +2623,9 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                                    << msg.get_source()
                                    << " got operational";
             inst.set_operational(true);
+            profile_enter(shift_to_prof);
             shift_to(S_RECOVERY);
+            profile_leave(shift_to_prof);
             return;
         } 
         else if (inst.get_installed() == false) 
@@ -2611,11 +2655,15 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                 inst.set_tstamp(Time::now());                
                 if (is_consensus() == true) 
                 {
+                    profile_enter(shift_to_prof);
                     shift_to(S_OPERATIONAL);
+                    profile_leave(shift_to_prof);
                 } 
                 else 
                 {
+                    profile_enter(shift_to_prof);
                     shift_to(S_RECOVERY);
+                    profile_leave(shift_to_prof);
                     return;
                 }
             } 
@@ -2632,7 +2680,9 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     }
     
     gcomm_assert(msg.get_source_view_id() == current_view.get_id());
-    
+
+    profile_enter(input_map_prof);
+
     const Seqno prev_aru(input_map->get_aru_seq());
     const Range prev_range(input_map->get_range(msg.get_source()));
     Range range;
@@ -2666,7 +2716,9 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                                  << range 
                                  << " due to input map gap, aru " 
                                  << input_map->get_aru_seq();
+        profile_enter(send_gap_prof);
         gu_trace(send_gap(msg.get_source(), current_view.get_id(), range));
+        profile_leave(send_gap_prof);
     }
     
     // Seqno range completion and acknowledgement
@@ -2685,15 +2737,20 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     {
         // Output queue empty and aru changed, send gap to inform others
         evs_log_debug(D_GAP_MSGS) << "sending empty gap";
+        profile_enter(send_gap_prof);
         gu_trace(send_gap(UUID::nil(), current_view.get_id(), Range()));
+        profile_leave(send_gap_prof);
     }
     
     // Deliver messages
+    profile_enter(delivery_prof);
     gu_trace(deliver());
-    
+    profile_leave(delivery_prof);
+
     // Send messages
     if (get_state() == S_OPERATIONAL)
     {
+        profile_enter(send_user_prof);
         while (output.empty() == false)
         {
             int err;
@@ -2703,6 +2760,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                 break;
             }
         }
+        profile_leave(send_user_prof);
     }
     
     // If in recovery state, send join each time input map aru seq reaches
@@ -2721,6 +2779,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
             profile_leave(send_join_prof);
         }
     }
+    profile_leave(input_map_prof);
 }
 
 
@@ -2754,7 +2813,9 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         inst.set_tstamp(Time::now());
         if (is_all_installed() == true)
         {
+            profile_enter(shift_to_prof);
             shift_to(S_OPERATIONAL);
+            profile_leave(shift_to_prof);
         }
         return;
     } 
@@ -2777,7 +2838,9 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
             // This is probably partition merge, see if it works out
             inst.set_tstamp(Time::now());
             inst.set_operational(true);
+            profile_enter(shift_to_prof);
             shift_to(S_RECOVERY);
+            profile_leave(shift_to_prof);
         } 
         else if (inst.get_installed() == false) 
         {
@@ -2798,14 +2861,18 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     
     gcomm_assert(msg.get_source_view_id() == current_view.get_id());
     
+
     // 
-    const Seqno prev_safe(update_im_safe_seq(msg.get_source(), 
-                                             msg.get_aru_seq()));
+    Seqno prev_safe;
+    profile_enter(input_map_prof);    
+    prev_safe = update_im_safe_seq(msg.get_source(), 
+                                   msg.get_aru_seq());
     if (prev_safe != input_map->get_safe_seq(msg.get_source()))
     {
         inst.set_tstamp(Time::now());
     }
-
+    profile_leave(input_map_prof);
+    
     //
     if (msg.get_range_uuid() == get_uuid())
     {
@@ -2813,11 +2880,14 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     }
     
     // 
+    profile_enter(delivery_prof);
     gu_trace(deliver());
+    profile_leave(delivery_prof);
 
     // 
     if (get_state() == S_OPERATIONAL)
     {
+        profile_enter(send_user_prof);
         while (output.empty() == false)
         {
             int err;
@@ -2825,6 +2895,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
             if (err != 0)
                 break;
         }
+        profile_leave(send_user_prof);
     }
     
     // 
@@ -2923,10 +2994,14 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
             for_each(msg.get_node_list().begin(), msg.get_node_list().end(),
                      SelectNodesOp(same_view, current_view.get_id(), 
                                    true, true));
+            profile_enter(input_map_prof);
             if (update_im_safe_seqs(same_view) == true)
             {
+                profile_enter(send_leave_prof);
                 gu_trace(send_leave(false));
+                profile_leave(send_leave_prof);
             }
+            profile_leave(input_map_prof);
         }
         return;
     }
@@ -2939,44 +3014,25 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         // Someone may be still missing either join or install message.
         // Send join (without self handling), install (if representative)
         // and install gap.
-
-
+        
+        profile_enter(consistent_prof);
         if (is_consistent(*install_message) == true)
         {
-#if 0
-            // Note: please don't do this here... it may easily result into
-            // join/gap/install explosion to the network.
-            inst.set_tstamp(Time::now());
-            if (is_representative(get_uuid()) == true)
-            {
-                gu_trace(send_install());
-            }
-            else if (msg.get_source() != get_uuid())
-            {
-                profile_enter(send_join_prof);
-                gu_trace(send_join(false));
-                profile_leave(send_join_prof);
-            }
-            evs_log_debug(D_JOIN_MSGS)
-                << "install message and received join, discarding";
-            
-            if (install_message != 0)
-            {
-                gu_trace(send_gap(UUID::nil(), 
-                                  install_message->get_source_view_id(), 
-                                  Range()));
-            }
-#endif // 0
             return;
         }
         else
         {
+            profile_enter(shift_to_prof);
             gu_trace(shift_to(S_RECOVERY, false));
+            profile_leave(shift_to_prof);
         }
+        profile_leave(consistent_prof);
     }
     else if (get_state() != S_RECOVERY)
     {
+        profile_enter(shift_to_prof);
         gu_trace(shift_to(S_RECOVERY, false));
+        profile_leave(shift_to_prof);
     }
     
     // Instance previously declared unoperational seems to be operational now
@@ -2989,30 +3045,21 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     inst.set_join_message(&msg);
     inst.set_tstamp(Time::now());    
     gcomm_assert(output.empty() == true);
-
+    
     bool is_consensus_b;
+    profile_enter(consensus_prof);
     gu_trace(is_consensus_b = is_consensus());
+    profile_leave(consensus_prof);
     if (is_consensus_b == true)
     {
         bool is_representative_b;
         gu_trace(is_representative_b = is_representative(get_uuid()));
         if (is_representative_b == true)
         {
+            profile_enter(send_install_prof);
             gu_trace(send_install());
+            profile_leave(send_install_prof);
         }
-#if 0
-        // Note: this segment seems to cause excessive join flood
-        else if (msg.get_source() != get_uuid() && 
-                 is_representative(msg.get_source()) == true)
-        {
-            if (install_message == 0)
-            {
-                profile_enter(send_join_prof);
-                gu_trace(send_join(false));
-                profile_leave(send_join_prof);
-            }
-        }
-#endif // 0
     }
     else if (msg.get_source() != get_uuid())
     {
@@ -3025,13 +3072,14 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         // Coming from the same view
         if (msg.get_source_view_id() == current_view.get_id())
         {
+            profile_enter(input_map_prof);
             if (update_im_safe_seqs(same_view) == true)
             {
                 profile_enter(send_join_prof);
                 do_send_join = true;
                 profile_leave(send_join_prof);
             }
-
+            profile_leave(input_map_prof);
             // See if we need to retrans some user messages
             MessageNodeList::const_iterator nli(same_view.find(get_uuid()));
             if (nli != same_view.end())
@@ -3133,7 +3181,9 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
         // leave message.
         if (current_view.get_members().size() == 1)
         {
+            profile_enter(shift_to_prof);
             gu_trace(shift_to(S_CLOSED));
+            profile_leave(shift_to_prof);
         }
     } 
     else 
@@ -3148,7 +3198,9 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
         const Seqno prev_safe_seq(update_im_safe_seq(msg.get_source(), msg.get_aru_seq()));
         if (get_state() == S_OPERATIONAL)
         {
+            profile_enter(shift_to_prof);
             gu_trace(shift_to(S_RECOVERY, true));
+            profile_leave(shift_to_prof);
         }
         else if (get_state() == S_RECOVERY &&
                  prev_safe_seq != input_map->get_safe_seq(msg.get_source()))
@@ -3179,7 +3231,9 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
             const MessageNode& mn(MessageNodeList::get_value(mn_i));
             if (mn.get_operational() == false || mn.get_leaving() == true)
             {
+                profile_enter(shift_to_prof);
                 shift_to(S_CLOSED);
+                profile_leave(shift_to_prof);
             }
         }
         return;
@@ -3206,26 +3260,34 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     }
     else if (install_message != 0)
     {
+        profile_enter(consistent_prof);
         if (is_consistent(msg) && 
             msg.get_source_view_id() == install_message->get_source_view_id())
         {
             evs_log_debug(D_INSTALL_MSGS)
                 << " dropping already handled install message";
+            profile_enter(send_gap_prof);
             gu_trace(send_gap(UUID::nil(), 
                               install_message->get_source_view_id(), 
                               Range()));
+            profile_leave(send_gap_prof);
             return;
         }
+        profile_leave(consistent_prof);
         log_warn << self_string() 
                  << " shift to RECOVERY due to inconsistent install";
+        profile_enter(shift_to_prof);
         shift_to(S_RECOVERY);
+        profile_leave(shift_to_prof);
         return;
     }
     else if (inst.get_installed() == true) 
     {
         log_warn << self_string()
                  << " shift to RECOVERY due to inconsistent state";
+        profile_enter(shift_to_prof);
         shift_to(S_RECOVERY);
+        profile_leave(shift_to_prof);
         return;
     } 
     else if (is_representative(msg.get_source()) == false) 
@@ -3233,14 +3295,19 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         log_warn << self_string() 
                  << " source " << msg.get_source()
                  << " is not supposed to be representative";
+        profile_enter(shift_to_prof);
         shift_to(S_RECOVERY);
+        profile_leave(shift_to_prof);
         return;
     }
     
     
     assert(install_message == 0);
     
-    bool is_consistent_p(is_consistent(msg));
+    bool is_consistent_p;
+    profile_enter(consistent_prof);
+    is_consistent_p = is_consistent(msg);
+    profile_leave(consistent_prof);
     
     if (is_consistent_p == false)
     {
@@ -3258,22 +3325,28 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
                        &msg.get_node_list());
         
         handle_join(jm, ii);
+        profile_enter(consistent_prof);
         is_consistent_p = is_consistent(msg);
+        profile_leave(consistent_prof);
     }
     
     if (is_consistent_p == true && is_consensus() == true)
     {
         inst.set_tstamp(Time::now());
         install_message = new InstallMessage(msg);
+        profile_enter(send_gap_prof);
         gu_trace(send_gap(UUID::nil(), install_message->get_source_view_id(), 
                           Range()));
+        profile_leave(send_gap_prof);
     }
     else
     {
         evs_log_debug(D_INSTALL_MSGS)
             << "install message " << msg 
             << " not consistent with state " << *this;
+        profile_enter(shift_to_prof);
         shift_to(S_RECOVERY, true);
+        profile_leave(shift_to_prof);
     }
 }
 
