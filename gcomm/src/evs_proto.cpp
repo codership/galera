@@ -241,7 +241,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     consensus_timeout     ("PT5S"),
     retrans_period        ("PT1S"),
     join_retrans_period   ("PT1S"),
-    stats_report_period   ("PT30S"),
+    stats_report_period   ("PT5M"),
     current_view(ViewId(V_TRANS, my_uuid, 0)),
     previous_view(),
     previous_views(),
@@ -388,11 +388,14 @@ string gcomm::evs::Proto::get_stats() const
     os << "\n\tdelivered " << delivered_msgs;
     os << "\n\teff(delivered/sent/nodes) " << 
         double(delivered_msgs)/double(accumulate(sent_msgs.begin(), sent_msgs.end(), 0))/double(current_view.get_members().size());
-    os << "\nprofiles:\n"
-       << send_gap_prof     << "\n"
-       << send_join_prof    << "\n"
-       << send_install_prof << "\n"
-       << shift_to_prof     << "\n";
+    if ((I_PROFILING & info_mask) != 0)
+    {
+        os << "\nprofiles:\n"
+           << send_gap_prof     << "\n"
+           << send_join_prof    << "\n"
+           << send_install_prof << "\n"
+           << shift_to_prof     << "\n";
+    }
     return os.str();
 }
 

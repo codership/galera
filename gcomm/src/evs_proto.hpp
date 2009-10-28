@@ -320,7 +320,8 @@ private:
     {
         I_VIEWS      = 1 << 0,
         I_STATE      = 1 << 1,
-        I_STATISTICS = 1 << 2
+        I_STATISTICS = 1 << 2,
+        I_PROFILING  = 1 << 3
     };
     
     int debug_mask;
