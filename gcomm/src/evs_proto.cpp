@@ -2681,11 +2681,15 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     
     gcomm_assert(msg.get_source_view_id() == current_view.get_id());
 
+    Range range;
+    Range prev_range;
+    Seqno prev_aru;
+    Seqno prev_safe;
+
     profile_enter(input_map_prof);
 
-    const Seqno prev_aru(input_map->get_aru_seq());
-    const Range prev_range(input_map->get_range(msg.get_source()));
-    Range range;
+    prev_aru = input_map->get_aru_seq();
+    prev_range = input_map->get_range(msg.get_source());
     
     // Insert only if msg seq is greater or equal than current lowest unseen
     if (msg.get_seq() >= prev_range.get_lu())
@@ -2704,8 +2708,10 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     update_im_safe_seq(get_uuid(), input_map->get_aru_seq());
     
     // Update safe seq for message source
-    const Seqno prev_safe(update_im_safe_seq(msg.get_source(), 
-                                             msg.get_aru_seq()));
+    prev_safe = update_im_safe_seq(msg.get_source(), 
+                                   msg.get_aru_seq());
+    
+    profile_leave(input_map_prof);
     
     // Check for missing messages
     if (range.get_hs()                         >  range.get_lu() && 
@@ -2779,7 +2785,6 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
             profile_leave(send_join_prof);
         }
     }
-    profile_leave(input_map_prof);
 }
 
 
@@ -2864,12 +2869,19 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
 
     // 
     Seqno prev_safe;
+
     profile_enter(input_map_prof);    
     prev_safe = update_im_safe_seq(msg.get_source(), 
                                    msg.get_aru_seq());
+
+    // Deliver messages and update tstamp only if safe_seq changed
+    // for the source.
     if (prev_safe != input_map->get_safe_seq(msg.get_source()))
     {
         inst.set_tstamp(Time::now());
+        profile_enter(delivery_prof);
+        gu_trace(deliver());
+        profile_leave(delivery_prof);
     }
     profile_leave(input_map_prof);
     
@@ -2879,11 +2891,6 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         gu_trace(resend(msg.get_source(), msg.get_range()));
     }
     
-    // 
-    profile_enter(delivery_prof);
-    gu_trace(deliver());
-    profile_leave(delivery_prof);
-
     // 
     if (get_state() == S_OPERATIONAL)
     {
@@ -2911,7 +2918,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
             gu_trace(send_join());
             profile_leave(send_join_prof);
         }
-    }    
+    }
 }
 
 

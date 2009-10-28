@@ -179,7 +179,9 @@ gcomm::evs::InputMap::~InputMap()
     delete node_index;
     delete msg_index;
     delete recovery_index;
-    // log_info << "profile: " << prof;
+#ifdef GCOMM_PROFILE
+    log_info << "profile: " << prof;
+#endif // GCOMM_PROFILE
     // log_info << "inserted: " << inserted << " updated aru: " << updated_aru;
 }
 
