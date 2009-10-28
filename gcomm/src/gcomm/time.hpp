@@ -16,7 +16,7 @@ namespace gcomm
 
     inline void Sleep(const Period& p)
     {
-        usleep(static_cast<useconds_t>(p.get_utc()/gu::datetime::USec));
+        usleep(static_cast<useconds_t>(p.get_nsecs()/gu::datetime::USec));
     }
 
 } // namespace gcomm

@@ -840,8 +840,6 @@ static DummyNode* create_dummy_node(size_t idx,
 {
     const string conf = "evs://?" + Conf::EvsParamViewForgetTimeout + "=PT1H&"
         + Conf::EvsParamInactiveTimeout + "=" + inactive_timeout + "&"
-        + Conf::EvsParamInactiveCheckPeriod + "=PT0.1S&"
-        + Conf::EvsParamConsensusTimeout + "=PT1H&"
         + Conf::EvsParamRetransPeriod + "=" + retrans_period + "&"
         + Conf::EvsParamJoinRetransPeriod + "=" + retrans_period;
     list<Protolay*> protos;
@@ -873,8 +871,8 @@ START_TEST(test_pc_split_merge)
     size_t n_nodes(5);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
-    const string inactive_timeout("PT0.3S");
-    const string retrans_period("PT0.01S");
+    const string inactive_timeout("PT0.7S");
+    const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -928,8 +926,8 @@ START_TEST(test_pc_split_merge_w_user_msg)
     size_t n_nodes(5);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
-    const string inactive_timeout("PT0.3S");
-    const string retrans_period("PT0.01S");
+    const string inactive_timeout("PT0.7S");
+    const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
     
     for (size_t i = 0; i < n_nodes; ++i)

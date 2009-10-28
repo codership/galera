@@ -235,13 +235,13 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     my_uuid(my_uuid_), 
     known(),
     self_i(),
-    view_forget_timeout   ("PT5M"),
-    inactive_timeout      ("PT3S"),
-    inactive_check_period ("PT1S"),
-    consensus_timeout     ("PT5S"),
-    retrans_period        ("PT1S"),
-    join_retrans_period   ("PT1S"),
-    stats_report_period   ("PT5M"),
+    view_forget_timeout   (),
+    inactive_timeout      (),
+    inactive_check_period (),
+    consensus_timeout     (),
+    retrans_period        (),
+    join_retrans_period   (),
+    stats_report_period   (),
     current_view(ViewId(V_TRANS, my_uuid, 0)),
     previous_view(),
     previous_views(),
@@ -264,43 +264,57 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     current_view.add_member(my_uuid, "");
 
     URI uri(conf);
-    try
-    {
-        view_forget_timeout = 
-            Period(uri.get_option(Conf::EvsParamViewForgetTimeout));
-        gcomm_assert(view_forget_timeout >= Period("PT1S"));
-    } catch (NotFound&) { }
-    try
-    {
-        inactive_timeout = 
-            Period(uri.get_option(Conf::EvsParamInactiveTimeout));
-        gcomm_assert(inactive_timeout >= Period("PT0.3S"));
-    } catch (NotFound&) { }
-    try
-    {
-        inactive_check_period = 
-            Period(uri.get_option(Conf::EvsParamInactiveCheckPeriod));
-        gcomm_assert(inactive_check_period >= Period("PT0.1S"));
-    } catch (NotFound&) { }
-    try
-    {
-        consensus_timeout = 
-            Period(uri.get_option(Conf::EvsParamConsensusTimeout));
-        gcomm_assert(consensus_timeout >= inactive_timeout);
-    } catch (NotFound&) { }
-    try
-    {
-        retrans_period = Period(uri.get_option(Conf::EvsParamRetransPeriod));
-        gcomm_assert(retrans_period >= Period("PT0.01S") &&
-                     retrans_period < inactive_timeout);
-    } catch (NotFound&) { }
-    try
-    {
-        join_retrans_period = 
-            Period(uri.get_option(Conf::EvsParamJoinRetransPeriod));
-        gcomm_assert(join_retrans_period >= Period("PT0.01S"));
-    } catch (NotFound&) { }
-        
+    
+    // We probably don't want to go under this.
+    const Period min_retrans_period("PT0.1S");
+
+    view_forget_timeout =
+        conf_param_def_min(uri, 
+                           Conf::EvsParamViewForgetTimeout,
+                           Period("PT5M"), 
+                           Period("PT10S"));
+    inactive_timeout =
+        conf_param_def_min(uri,
+                           Conf::EvsParamInactiveTimeout,
+                           Period("PT3S"),
+                           Period("PT0.1S"));
+    retrans_period =
+        conf_param_def_range(uri,
+                             Conf::EvsParamRetransPeriod,
+                             Period("PT0.7S"),
+                             min_retrans_period,
+                             inactive_timeout/3);
+    
+    inactive_check_period = 
+        conf_param_def_range(uri, 
+                             Conf::EvsParamInactiveCheckPeriod,
+                             inactive_timeout/3,
+                             inactive_timeout/10,
+                             inactive_timeout/2);
+    
+    
+    
+    consensus_timeout = 
+        conf_param_def_range(uri,
+                             Conf::EvsParamConsensusTimeout,
+                             inactive_timeout*2,
+                             inactive_timeout,
+                             inactive_timeout*5);
+    
+    
+    join_retrans_period = 
+        conf_param_def_range(uri,
+                             Conf::EvsParamJoinRetransPeriod,
+                             inactive_timeout/5,
+                             min_retrans_period,
+                             inactive_timeout/3);
+
+    stats_report_period =
+        conf_param_def_min(uri,
+                           Conf::EvsParamStatsReportPeriod,
+                           Period("PT5M"),
+                           Period("PT1S"));
+
     try
     {
         const string& dlm_str(uri.get_option(Conf::EvsParamDebugLogMask));

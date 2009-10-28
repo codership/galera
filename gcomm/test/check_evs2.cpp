@@ -326,7 +326,7 @@ START_TEST(test_input_map_overwrap)
     }
     Time stop(Time::now());
     
-    double div(double((stop - start).get_utc())/gu::datetime::Sec);
+    double div(double(stop.get_utc() - start.get_utc())/gu::datetime::Sec);
     log_info << "input map msg rate " << double(cnt)/div;
 
 }
@@ -601,14 +601,13 @@ END_TEST
 
 static DummyNode* create_dummy_node(size_t idx, 
                                     const string& inactive_timeout = "PT1H",
-                                    const string& retrans_period = "PT30M")
+                                    const string& retrans_period = "PT20M")
 {
     string conf = "evs://?" + Conf::EvsParamViewForgetTimeout + "=PT1H&"
         + Conf::EvsParamInactiveTimeout + "=" + inactive_timeout + "&"
-        + Conf::EvsParamInactiveCheckPeriod + "=PT0.1S&"
-        + Conf::EvsParamConsensusTimeout + "=PT1H&"
         + Conf::EvsParamRetransPeriod + "=" + retrans_period + "&"
-        + Conf::EvsParamJoinRetransPeriod + "=" + retrans_period;
+        + Conf::EvsParamJoinRetransPeriod + "=" + retrans_period + "&"
+        + Conf::EvsParamInfoLogMask + "=0xff";
     if (::getenv("EVS_DEBUG_MASK") != 0)
     {
         conf += "&" + Conf::EvsParamDebugLogMask + "=" 
@@ -665,7 +664,7 @@ START_TEST(test_proto_join_n)
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i));
+        gu_trace(dn.push_back(create_dummy_node(i)));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -690,7 +689,7 @@ START_TEST(test_proto_join_n_w_user_msg)
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i));
+        gu_trace(dn.push_back(create_dummy_node(i)));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -721,7 +720,7 @@ START_TEST(test_proto_join_n_lossy)
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
+        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -753,7 +752,7 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
+        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
     }
 
     for (size_t i = 0; i < n_nodes; ++i)
@@ -787,7 +786,7 @@ START_TEST(test_proto_leave_n)
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i));
+        gu_trace(dn.push_back(create_dummy_node(i)));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -824,7 +823,7 @@ START_TEST(test_proto_leave_n_w_user_msg)
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
+        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -866,7 +865,7 @@ START_TEST(test_proto_leave_n_lossy)
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
+        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -914,7 +913,7 @@ START_TEST(test_proto_leave_n_lossy_w_user_msg)
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
+        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -967,7 +966,7 @@ START_TEST(test_proto_split_merge)
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
+        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1032,7 +1031,7 @@ START_TEST(test_proto_split_merge_lossy)
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
+        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1106,7 +1105,7 @@ START_TEST(test_proto_split_merge_lossy_w_user_msg)
     
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period));
+        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
     }
     
     for (size_t i = 0; i < n_nodes; ++i)
