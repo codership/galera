@@ -148,10 +148,11 @@ namespace gu
             Period operator-(const Date& dec) const
             { return (utc - dec.utc); }
 
-        protected:
-            Date(const int64_t utc_) : utc(utc_) { }
-            int64_t utc; /*!< System time in nanosecond precision */
+
+            Date(const int64_t utc_ = 0) : utc(utc_) { }
         private:
+            int64_t utc; /*!< System time in nanosecond precision */
+
             /*!
              * @brief Parse date from string.
              * @todo Not implemented yet
