@@ -116,10 +116,10 @@ struct gcs_gcomm : public Toplay
         if (um.has_view() == true && um.get_view().is_empty() == true)
         {
 	    log_debug << "empty view, leaving";
-	    eq.push_back(vs_ev(0, um, 0, 0, &um.get_view()));
 	    // Reached the end
             {
                 gu::Lock lock(mutex);
+                eq.push_back(vs_ev(0, um, 0, 0, &um.get_view()));
                 cond.signal();
             }
 
