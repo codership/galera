@@ -41,6 +41,7 @@
 #include <sys/socket.h>
 
 #include <string>
+#include <vector>
 
 namespace gu
 {
@@ -51,7 +52,7 @@ namespace gu
          * @typedef @brief Byte buffer type
          */
         typedef unsigned char byte_t;
-        class ByteBuffer;
+        typedef std::vector<byte_t> Buffer;
         class Datagram;
         class Socket;
         class SocketList;
@@ -68,6 +69,10 @@ namespace gu
         int closefd(int fd);
     }
 }
+
+
+
+
 /*! 
  * @brief  Datagram container
  *
@@ -76,12 +81,12 @@ namespace gu
  */
 class gu::net::Datagram
 {
-    const byte_t* const_buf;
-    byte_t* buf; /*!< Private byte buffer */
-    size_t buflen; /*!< Length of byte buffer */
+    Buffer header;
+    Buffer payload;
+    size_t offset;
     /* Disallow assignment, for copying use copy constructor */
-
-    void operator=(const Datagram&);
+    
+    // void operator=(const Datagram&);
 public:
     /*! 
      * @brief Construct new datagram from byte buffer
@@ -91,8 +96,8 @@ public:
      *
      * @throws std::bad_alloc 
      */
-    Datagram(const byte_t* buf = 0, size_t buflen = 0);
-        
+    Datagram(const Buffer& buf_, size_t offset_ = 0);
+    
     /*!
      * @brief Copy constructor
      *
@@ -102,50 +107,22 @@ public:
      */
     Datagram(const Datagram& dgram);
 
+    
     /*! 
      * @brief Destruct datagram
      */
     ~Datagram();
-
-    /*!
-     * @brief Reset datagram buffer
-     *
-     * @param[in] buf New data buffer
-     * @param[in] bulen Length of new data buffer
-     */
-    void reset(const byte_t* buf, size_t buflen);
     
-    /*!
-     * @brief Get const pointer to data buffer
-     *
-     * @param[in] offset Optional offset from the beginning of buffer 
-     *            (default 0)
-     *
-     * @return Const pointer to byte buffer at given offset
-     *
-     * @throws std::out_of_range If offset is greater than buffer length
-     */
-    const byte_t* get_buf(size_t offset = 0) const;
-    
-    /*!
-     * @brief Get length of data buffer
-     *
-     * @param[in] offset Optional offset from the beginning of buffer 
-     *            (default 0)
-     *
-     * @return Length of data buffer (starting from offset)
-     *
-     * @throws std::out_of_range If offset is greater than buffer length
-     */
-    size_t get_buflen(size_t offset = 0) const;
-    inline size_t get_len(size_t offset = 0) const
-    {
-        return get_buflen(offset);
-    }
+    Buffer& get_header() { return header; }
+    const Buffer& get_header() const { return header; }
+    Buffer& get_payload() { return payload; }
+    const Buffer& get_payload() const { return payload; }
+    size_t get_len() const { return (header.size() + payload.size()); }
+    size_t get_offset() const { return offset; }
 };
 
 
-    
+
 
 /*!
  * @brief Socket interface
@@ -176,14 +153,20 @@ private:
     sockaddr remote_sa; /*!< Socket address for remote endpoint    */
     socklen_t sa_size;     /*!< Size of socket address                */
     
+    static const size_t hdrlen = sizeof(uint32_t);
+    size_t mtu;
+    size_t max_pending;
+
     size_t dgram_offset; /*!< Offset of the last read datagram  */
     bool complete;     /*!< Boolean denoting that compleme dgram
                         * is waiting to be read */
-    Datagram dgram;       /*!< Datagram container               */
-    ByteBuffer* recv_buf;  /*!< Buffer for received data        */
-    ByteBuffer* pending;  /*!< Buffer for pending outgoing data */
-    State state;        /*!< Socket state                       */
 
+    Buffer recv_buf;  /*!< Buffer for received data        */
+    size_t recv_buf_offset;
+    Datagram dgram;       /*!< Datagram container               */
+    Buffer pending;  /*!< Buffer for pending outgoing data */
+    State state;        /*!< Socket state                       */
+    
     /* Network integration */
     friend class Network;
     friend class EPoll;
@@ -196,16 +179,18 @@ private:
      */
     Socket(Network& net,
            const int fd = -1,
-           const int options = O_NO_INTERRUPT,
+           const int options = (O_NO_INTERRUPT),
            const sockaddr* local_sa = 0, 
            const sockaddr* remote_sa = 0,
-           const socklen_t sa_size = 0);
+           const socklen_t sa_size = 0,
+           const size_t mtu = (1 << 15),
+           const size_t max_pending = (1 << 20));
         
     /*!
      * @brief Change socket state
      */
     void set_state(State, int err = 0);
-
+    
     /*!
      * @brief Open new socket
      *
@@ -215,10 +200,10 @@ private:
      *         socket could not be created
      */
     void open_socket(const std::string& addr);
-
+    
     Socket(const Socket&);
     void operator=(const Socket&);
-
+    
 public:
     /*!
      * @brief Get file descriptor corresponding to socket.
@@ -452,7 +437,7 @@ class gu::net::Network
     Network operator=(const Network&);
     Network(const Network&);
 public:
-        
+    
     /*!
      * @brief Default constructor
      */
@@ -465,7 +450,7 @@ public:
 
     Socket* connect(const std::string& addr);
     Socket* listen(const std::string& addr);
-
+    
     /*!
      * @brief Wait network event
      *
@@ -480,12 +465,12 @@ public:
      * @throws std::runtime_error If error was encountered
      */
     NetworkEvent wait_event(int timeout = -1);
-
+    
     /**
      *
      */
     void interrupt();
-
+    
     /*!
      * @brief Set event mask for @p sock
      *
@@ -497,7 +482,7 @@ public:
      *         invalid state
      */
     void set_event_mask(Socket* sock, int mask);
-
+    
 };
 
 #endif /* __GU_NETWORK_HPP__ */

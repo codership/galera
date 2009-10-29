@@ -12,6 +12,7 @@
 #ifndef __GU_EPOLL_HPP__
 #define __GU_EPOLL_HPP__
 
+#include <vector>
 
 /* Forward declarations */
 namespace gu
@@ -82,20 +83,14 @@ public:
 class gu::net::EPoll
 {
     int e_fd; /*! epoll control file descriptor */
-    struct epoll_event* events; /*! array of epoll events */
-    int events_size; /*! events array size */
-    int n_events; /*! number of unhandled events  */
-    struct epoll_event* current; /*! pointer to current event */
-
-    /*!
-     * @brief Resize events array
-     */
-    void resize(const int to_size);
-
+    int n_events;
+    std::vector<epoll_event> events; /*! array of epoll events */
+    std::vector<epoll_event>::iterator current; /*! pointer to current event */
+    
     EPoll(const EPoll&);
     void operator=(const EPoll&);
 public:
-
+    
     /*!
      * @brief Constructor
      */
@@ -119,7 +114,7 @@ public:
      *         internal storage
      */
     void insert(const EPollEvent& ev);
-
+    
     /*!
      * @brief Erase file descriptor from set of polled fds
      * 
@@ -128,7 +123,7 @@ public:
      * @param ev EPollEvent containing valid file descriptor
      */
     void erase(const EPollEvent& ev);
-
+    
     /*!
      * @brief Modify event mask for polled events of existing file descriptor
      *
@@ -137,7 +132,7 @@ public:
      * @throws std::runtime_error if epoll control call fails
      */
     void modify(const EPollEvent& ev);
-
+    
     /*!
      * @brief Poll until activity is detected or timeout expires
      *
@@ -150,7 +145,7 @@ public:
      * @param timeout Timeout in milliseconds
      */
     void poll(int timeout);
-
+    
     /*!
      * @brief Check whether list of unhandled poll events is empty
      */

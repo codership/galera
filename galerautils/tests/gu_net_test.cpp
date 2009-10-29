@@ -59,6 +59,7 @@ END_TEST
 
 START_TEST(test_network_listen)
 {
+    log_info << "START";
     Network net;
     Socket* listener = net.listen("localhost:2112");
     listener->close();
@@ -97,11 +98,11 @@ void* listener_thd(void* arg)
 	
 	mark_point();
         
-	log_info << sock << " " << em;
+	// log_info << sock << " " << em;
 
         if (em & NetworkEvent::E_ACCEPTED)
         {
-            log_info << "Listener: socket accepted";
+            // log_info << "Listener: socket accepted";
         }
         else if (em & NetworkEvent::E_ERROR)
         {
@@ -126,11 +127,13 @@ void* listener_thd(void* arg)
         {
             const Datagram* dm = sock->recv();
             fail_unless(dm != 0);
+            // log_info << "dgram len " << dm->get_len();
             bytes += dm->get_len();
             if (buf != 0)
             {
                 fail_unless(dm->get_len() <= buflen);
-                fail_unless(memcmp(dm->get_buf(), buf, dm->get_len()) == 0);
+                fail_unless(memcmp(&dm->get_payload()[0], buf, 
+                                   dm->get_len()) == 0);
             }
         }
         else if (em & NetworkEvent::E_CLOSED)
@@ -153,7 +156,7 @@ void* listener_thd(void* arg)
                       << " event mask: " << ev.get_event_mask();
             return reinterpret_cast<void*>(1);
         }
-	log_info << "Listener: connections: " << conns;
+	// log_info << "Listener: connections: " << conns;
     }
     log_info << "Listener: received " << bytes/(1 << 20) << "MB + "
              << bytes%(1 << 20) << "B";
@@ -162,6 +165,7 @@ void* listener_thd(void* arg)
 
 START_TEST(test_network_connect)
 {
+    log_info << "START";
     Network* net = new Network;
     Socket* listener = net->listen("localhost:2112");
     listener_thd_args args = {net, 2, 0, 0};
@@ -204,13 +208,14 @@ END_TEST
 
 START_TEST(test_network_send)
 {
-    const size_t bufsize = 1 << 24;
+    log_info << "START";
+    const size_t bufsize(1 << 15);
     byte_t* buf = new byte_t[bufsize];
     for (size_t i = 0; i < bufsize; ++i)
     {
         buf[i] = static_cast<byte_t>(i);
     }
-
+    
     Network* net = new Network;
     Socket* listener = net->listen("localhost:2112");
     listener_thd_args args = {net, 2, buf, bufsize};
@@ -222,24 +227,27 @@ START_TEST(test_network_send)
     
     fail_unless(conn != 0);
     fail_unless(conn->get_state() == Socket::S_CONNECTED);
-
+    
     Socket* conn2 = net2->connect("localhost:2112");
     fail_unless(conn2 != 0);
     fail_unless(conn2->get_state() == Socket::S_CONNECTED);
-
-
-
-    for (int i = 0; i < 100; ++i)
+    
+    
+    
+    for (int i = 0; i < 1000; ++i)
     {
-        size_t dlen = std::min(bufsize, static_cast<size_t>(1 + i*1023*170));
-        Datagram dm(buf, dlen);
+        size_t dlen = std::min(bufsize, static_cast<size_t>(1 + i*11));
+        Datagram dm(Buffer(buf, buf + dlen));
+        // log_info << "sending " << dlen;
         if (i % 100 == 0)
         {
             log_debug << "sending " << dlen;
         }
-        conn->send(&dm);
-
-        dm.reset(buf, ::rand() % 1023 + 1);
+        int err = conn->send(&dm);
+        if (err != 0)
+        {
+            log_info << err;
+        }
     }
 
     
@@ -273,7 +281,7 @@ void* interrupt_thd(void* arg)
 
 START_TEST(test_network_interrupt)
 {
-    
+    log_info << "START";    
     Network net;
     pthread_t th;
     pthread_create(&th, 0, &interrupt_thd, &net);
@@ -306,12 +314,12 @@ static void make_connections(Network& net,
         const int em = ev.get_event_mask();
         if (em & NetworkEvent::E_ACCEPTED)
         {
-            log_debug << "accepted";
+            log_info << "accepted";
             sr[sr_cnt++] = ev.get_socket();
         }
         else if (em & NetworkEvent::E_CONNECTED)
         {
-            log_debug << "connected";
+            log_info << "connected";
             cl_cnt++;
         }
         else
@@ -360,13 +368,14 @@ struct delete_object
 
 START_TEST(test_network_nonblocking)
 {
+    log_info << "START";
     Network net;
     
     Socket* listener = net.listen("tcp://localhost:2112?socket.non_blocking=1");
     
     vector<Socket*> cl;
     vector<Socket*> sr;
-    
+    gu_log_max_level = GU_LOG_DEBUG;
     make_connections(net, cl, sr, 3);
     
     close_connections(net, cl, sr);
@@ -504,7 +513,7 @@ public:
         while (is_interrupted() == false)
         {
             const Message* msg = get_next_msg();
-
+            
             if (msg != 0)
             {
                 const Datagram* dg = reinterpret_cast<const Datagram*>(msg->get_data());
@@ -512,7 +521,7 @@ public:
                 int err = send_sock->send(dg);
                 if (err != 0)
                 {
-                    log_warn << "send: " << strerror(err);
+                    // log_warn << "send: " << strerror(err);
                 }
                 sent += dg->get_len();
                 Message ack(msg->get_producer(), 0, err);
@@ -554,6 +563,7 @@ public:
 
 START_TEST(test_net_consumer)
 {
+    log_info << "START";
     string url("tcp://localhost:2112?socket.non_blocking=1");
     NetConsumer cons(url);
     cons.connect(url);
@@ -569,7 +579,7 @@ START_TEST(test_net_consumer)
         {
             log_debug << "iter " << i;
         }
-        Datagram dg(buf, sizeof(buf));
+        Datagram dg(Buffer(buf, buf + sizeof(buf)));
         Message msg(&prod, &dg);
         Message ack;
         prod.send(msg, &ack);
@@ -612,7 +622,7 @@ void* producer_thd(void* arg)
     }
     for (size_t i = 0; i < pargs->n_events; ++i)
     {
-        Datagram dg(buf, sizeof(buf));
+        Datagram dg(Buffer(buf, buf + sizeof(buf)));
         Message msg(&prod, &dg);
         Message ack;
         prod.send(msg, &ack);
@@ -623,6 +633,7 @@ void* producer_thd(void* arg)
 
 START_TEST(test_net_consumer_nto1)
 {
+    log_info << "START";
     string url("tcp://localhost:2112?socket.non_blocking=1");
     NetConsumer cons(url);
     cons.connect(url);

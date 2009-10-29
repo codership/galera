@@ -25,17 +25,58 @@
 #include <sstream>
 #include <map>
 #include <vector>
+#include <algorithm>
 
 /* System includes */
 #include <netdb.h>
 #include <fcntl.h>
 
 /* Using stuff to improve readability */
-using std::string;
-using std::istringstream;
-using std::vector;
-using std::map;
-using std::make_pair;
+using namespace std;
+
+using namespace gu;
+using namespace gu::net;
+
+template <typename T>
+size_t sserial_size(const T& t)
+{
+    return sizeof(T);
+}
+
+template <typename T>
+size_t serialize(const T& t, byte_t* buf, size_t buflen, size_t offset)
+    throw (Exception)
+{
+    if (offset + sserial_size(t) > buflen)
+        gu_throw_fatal;
+    *reinterpret_cast<T*>(buf + offset) = t;
+    return (offset + sserial_size(t));
+}
+
+template <typename T>
+size_t unserialize(const byte_t* buf, size_t buflen, size_t offset, T* t)
+{
+    if (offset + sserial_size(*t) > buflen)
+        gu_throw_fatal;
+    *t = *reinterpret_cast<const T*>(buf + offset);
+    return (offset + sserial_size(*t));
+}
+
+template <typename T>
+size_t serialize(const T& t, Buffer& buf, size_t offset)
+{
+    buf.reserve(buf.size() + sserial_size(t));
+    buf.insert(buf.end(), &t, &t + sserial_size(t));
+    return (offset + sserial_size(t));
+}
+
+template <typename T>
+size_t unserialize(const Buffer& buf, size_t offset, T* t)
+{
+    copy(&buf[0] + offset, &buf[0] + offset + sserial_size(*t), t);
+    return offset + sserial_size(*t);
+}
+
 
 class OptionMap
 {
@@ -121,152 +162,25 @@ int gu::net::closefd(int fd)
 }
 
 
-
-
-/**
- *
- */
-
-class gu::net::ByteBuffer
-{
-    byte_t* buf;
-    size_t buf_len;
-    size_t buf_size;
-
-    ByteBuffer(const ByteBuffer&);
-    void operator=(const ByteBuffer&);
-public:
-    ByteBuffer(const size_t init_size = 0) :
-        buf(0),
-        buf_len(0),
-        buf_size(0)
-    {
-        resize(init_size);
-    }
-
-    ~ByteBuffer()
-    {
-        free(buf);
-    }
-    
-    void resize(const size_t to_size)
-    {
-        void* tmp = realloc(buf, to_size);
-        if (to_size > 0 && tmp == 0)
-        {
-            log_fatal << "failed to allocate " << to_size;
-            throw std::bad_alloc();
-        }
-        buf = reinterpret_cast<byte_t*>(tmp);
-        buf_size = to_size;
-    }
-    
-    void push(const byte_t* b, const size_t blen)
-    {
-        if (buf_len + blen > buf_size)
-        {
-            resize(buf_len + blen);
-        }
-        assert(buf_len + blen <= buf_size);
-        memcpy(buf + buf_len, b, blen);
-        buf_len += blen;
-    }
-
-    void pop(const size_t blen)
-    {
-        assert(blen <= buf_len);
-        memmove(buf, buf + blen, buf_len - blen);
-        buf_len -= blen;
-    }
-    
-    const byte_t* get_buf() const
-    {
-        return buf;
-    }
-    size_t get_len() const
-    {
-        return buf_len;
-    }
-    size_t get_size() const
-    {
-        return buf_size;
-    }
-    
-    
-    void reserve(const size_t blen)
-    {
-        assert(buf_len + blen <= buf_size);
-        buf_len += blen;
-    }
-
-    byte_t* get_buf(size_t offset = 0)
-    {
-        return buf + offset;
-    }
-
-    size_t get_available(size_t offset = 0)
-    {
-        return buf_size - offset;
-    }
-};
-
 /**************************************************************************
  * Datagram implementation
  **************************************************************************/
 
 
-gu::net::Datagram::Datagram(const byte_t* buf_, const size_t buflen_) :
-    const_buf(buf_),
-    buf(0),
-    buflen(buflen_)
-{
-}
+gu::net::Datagram::Datagram(const Buffer& buf_, size_t offset_) :
+    header  (),
+    payload (buf_),
+    offset  (offset_)
+{ }
 
 gu::net::Datagram::Datagram(const Datagram& dgram) :
-    const_buf(0),
-    buf(0),
-    buflen(dgram.get_buflen())
-{
-    if (buflen > 0)
-    {
-        buf = new byte_t[buflen];
-    }
-    memcpy(buf, dgram.get_buf(), buflen);
-}
+    header  (dgram.header),
+    payload (dgram.payload),
+    offset  (dgram.offset)
+{ }
 
 gu::net::Datagram::~Datagram()
-{
-    delete[] buf;
-}
-
-const gu::net::byte_t* gu::net::Datagram::get_buf(const size_t offset) const
-{
-    if (offset > buflen)
-    {
-        throw std::out_of_range("datagram offset out of range");
-    }
-    const byte_t* b = const_buf ? const_buf : buf;
-    return b + offset;
-}
-
-size_t gu::net::Datagram::get_buflen(const size_t offset) const
-{
-    if (offset > buflen)
-    {
-        throw std::out_of_range("datagram offset out of range");
-    }
-    return buflen - offset;
-}
-
-void gu::net::Datagram::reset(const byte_t* b, const size_t blen)
-{
-    if (buf != 0)
-    {
-        throw std::logic_error("invalid state");
-    }
-    const_buf = b;
-    buflen = blen;
-}
+{ }
 
 
 /**************************************************************************
@@ -321,7 +235,9 @@ gu::net::Socket::Socket(Network& net_,
                         const int options_,
                         const sockaddr* local_sa_,
                         const sockaddr* remote_sa_,
-                        const socklen_t sa_size_) :
+                        const socklen_t sa_size_,
+                        const size_t mtu_,
+                        const size_t max_pending_) :
     fd(fd_),
     err_no(0),
     options(options_),
@@ -329,11 +245,14 @@ gu::net::Socket::Socket(Network& net_,
     local_sa(),
     remote_sa(),
     sa_size(sa_size_),
+    mtu(mtu_),
+    max_pending(max_pending_),
     dgram_offset(0),
     complete(false),
-    dgram(),
-    recv_buf(new ByteBuffer(1 << 16)),
-    pending(new ByteBuffer(1 << 10)),
+    recv_buf(mtu + hdrlen),
+    recv_buf_offset(0),
+    dgram(recv_buf),
+    pending(),
     state(S_CLOSED),
     net(net_)
 {
@@ -347,6 +266,7 @@ gu::net::Socket::Socket(Network& net_,
     {
         remote_sa = *remote_sa_;
     }
+    pending.reserve(max_pending);
 }
 
 gu::net::Socket::~Socket()
@@ -359,8 +279,6 @@ gu::net::Socket::~Socket()
         }
         close();
     }
-    delete recv_buf;
-    delete pending;
 }
 
 /*
@@ -437,7 +355,7 @@ void gu::net::Socket::open_socket(const string& addr)
 #else // with get_option()
     try
     {
-        if (from_string<bool>(url.get_option("O_NON_BLOCKING")))
+        if (from_string<bool>(url.get_option("socket.non_blocking")))
         {
             options |= O_NON_BLOCKING;
         }
@@ -599,7 +517,7 @@ static size_t iov_send(const int fd,
                          iov_len, 
                          0, 0, 0};
     ssize_t sent = ::sendmsg(fd, &msg, send_flags);
-    
+
     if (sent < 0)
     {
         sent = 0;
@@ -612,12 +530,10 @@ static size_t iov_send(const int fd,
     else if (static_cast<size_t>(sent) < tot_len)
     {
         assert(*errval == 0);
-        // sent = slow_send(fd, iov, iov_len, sent, flags, errval);
         *errval = EAGAIN;
     }
     
     assert(*errval != 0 || tot_len == static_cast<size_t>(sent));
-    
     return sent;
 }
 
@@ -627,7 +543,7 @@ static size_t iov_send(const int fd,
 static void iov_push(struct iovec iov[], 
                      const size_t iov_len, 
                      const size_t offset, 
-                     gu::net::ByteBuffer* bb)
+                     gu::net::Buffer& bb)
 {
     size_t begin_off = 0;
     size_t end_off = 0;
@@ -646,9 +562,13 @@ static void iov_push(struct iovec iov[],
             {
                 iov_base_off = 0;
             }
-            bb->push(
-                static_cast<gu::net::byte_t*>(iov[i].iov_base) + iov_base_off, 
-                iov[i].iov_len - iov_base_off);
+            
+            bb.insert(bb.end(), 
+                      static_cast<const byte_t*>(iov[i].iov_base) 
+                      + iov_base_off, 
+                      static_cast<const byte_t*>(iov[i].iov_base) 
+                      + iov[i].iov_len);
+
         }
         begin_off = end_off;
     }
@@ -656,38 +576,23 @@ static void iov_push(struct iovec iov[],
 
 size_t gu::net::Socket::get_max_pending_len() const
 {
-    return 1 << 20;
+    return max_pending;
 }
 
-
-
-static void write_hdr(gu::net::byte_t* buf, const size_t buflen, uint32_t len)
-{
-    assert(buf != 0 && buflen == 4);
-    *reinterpret_cast<uint32_t*>(buf) = htogl(len);
-}
-
-static void read_hdr(const gu::net::byte_t* buf, 
-                     const size_t buflen, 
-                     uint32_t *len)
-{
-    assert(buf != 0 && buflen >=  4 && len != 0);
-    *len = gtohl(*reinterpret_cast<const uint32_t*>(buf));
-}
 
 int gu::net::Socket::send_pending(const int send_flags)
 {
     struct iovec iov[1] = {
-        { pending->get_buf(), pending->get_len() }
+        { &pending[0], pending.size() }
     };
     int ret = 0;
     size_t sent = iov_send(fd, 
                            iov, 
                            1,
-                           pending->get_len(),
+                           pending.size(),
                            send_flags, 
                            &ret);
-    pending->pop(sent);
+    pending.erase(pending.begin(), pending.begin() + sent);
     return ret;
 }
 
@@ -697,21 +602,19 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
     {
         return ENOTCONN;
     }
+
     bool no_block = (getopt() & O_NON_BLOCKING) ||
         (flags & MSG_DONTWAIT);
     const int send_flags = flags | (no_block ? MSG_DONTWAIT : 0);
     int ret = 0;
-
-    byte_t hdr[4];
-    const size_t hdrlen = sizeof(hdr);
     
     if (dgram == 0)
     {
-        if (pending->get_len() > 0)
+        if (pending.size() > 0)
         {
             ret = send_pending(send_flags);
         }
-        assert(ret != 0 || pending->get_len() == 0);
+        assert(ret != 0 || pending.size() == 0);
         switch (ret)
         {
         case 0:
@@ -722,51 +625,62 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
         }
     } 
     else if (no_block == true &&
-             pending->get_len() + dgram->get_buflen() + hdrlen > 
-             get_max_pending_len())
+             pending.size() + 
+             dgram->get_len() + sizeof(uint32_t) > get_max_pending_len())
     {
         ret = EAGAIN;
     }
-    else if (no_block == true && pending->get_len() > 0)
+    else if (no_block == true && pending.size() > 0)
     {
-        write_hdr(hdr, hdrlen, static_cast<const uint32_t>(dgram->get_buflen()));
-        pending->push(hdr, hdrlen);
-        pending->push(dgram->get_buf(), dgram->get_buflen());
+        serialize(static_cast<uint32_t>(dgram->get_len()), 
+                  pending,
+                  pending.size());
+        pending.insert(pending.end(), 
+                       dgram->get_header().begin(), 
+                       dgram->get_header().end());
+        pending.insert(pending.end(), 
+                       dgram->get_payload().begin(), 
+                       dgram->get_payload().end());
     }
     else
     {
         /* Send any pending bytes first */
-        if (pending->get_len() > 0)
+        if (pending.size() > 0)
         {
             assert(no_block == false);
             /* Note: mask out MSG_DONTWAIT from flags */
             ret = send_pending(send_flags & ~MSG_DONTWAIT);
         }
-        assert(pending->get_len() == 0);
+        assert(pending.size() == 0);
         assert(ret == 0);
-        write_hdr(hdr, hdrlen, static_cast<const uint32_t>(dgram->get_buflen()));
-        struct iovec iov[2] = {
-            {hdr, hdrlen},
-            {const_cast<byte_t*>(dgram->get_buf()), dgram->get_buflen()}
+        byte_t hdr[sizeof(uint32_t)];
+        serialize(static_cast<uint32_t>(dgram->get_len()), hdr, sizeof(hdr), 0);
+        struct iovec iov[3] = {
+            {hdr, sizeof(uint32_t)},
+            {const_cast<byte_t*>(&dgram->get_header()[0]), 
+             dgram->get_header().size()},
+            {const_cast<byte_t*>(&dgram->get_payload()[0]), 
+             dgram->get_payload().size()}
         };
-        size_t sent = iov_send(fd, iov, 2, hdrlen + dgram->get_buflen(), 
+        size_t sent = iov_send(fd, iov, 3, 
+                               sizeof(uint32_t) + dgram->get_len(), 
                                send_flags, &ret);
         switch (ret)
         {
         case EAGAIN:
             assert(no_block == true);
-            iov_push(iov, 2, sent, pending);
+            iov_push(iov, 3, sent, pending);
             break;
         case 0:
             /* Everything went fine */
-            assert(sent == dgram->get_buflen() + hdrlen);
+            assert(sent == dgram->get_len() + hdrlen);
             break;
         default:
             /* Error occurred */
             set_state(S_FAILED, ret);
         }
     }
-    // log_debug << "return: " << ret;
+
     if (ret == EAGAIN and not get_event_mask() & gu::net::NetworkEvent::E_OUT)
     {
         net.set_event_mask(this, get_event_mask() & gu::net::NetworkEvent::E_OUT);
@@ -777,7 +691,6 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
 
 const gu::net::Datagram* gu::net::Socket::recv(const int flags)
 {
-    const size_t hdrlen = sizeof(uint32_t);
     const int recv_flags = (flags & ~MSG_PEEK) |
         (getopt() & O_NON_BLOCKING ? MSG_DONTWAIT : 0);
     const bool peek = flags & MSG_PEEK;
@@ -800,15 +713,19 @@ const gu::net::Datagram* gu::net::Socket::recv(const int flags)
     
     if (dgram_offset > 0)
     {
-        recv_buf->pop(dgram_offset);
+        assert(recv_buf_offset >= dgram_offset);
+        if (recv_buf_offset > dgram_offset)
+        {
+            memmove(&recv_buf[0], &recv_buf[0] + dgram_offset, 
+                    recv_buf_offset - dgram_offset);
+        }
+        recv_buf_offset -= dgram_offset;
         dgram_offset = 0;
     }
     
-
-    
-    ssize_t recvd = ::recv(fd, 
-                           recv_buf->get_buf(recv_buf->get_len()), 
-                           recv_buf->get_available(recv_buf->get_len()), 
+    ssize_t recvd = ::recv(fd,
+                           &recv_buf[0] + recv_buf_offset, 
+                           recv_buf.capacity() - recv_buf_offset, 
                            recv_flags);
     if (recvd < 0)
     {
@@ -819,29 +736,30 @@ const gu::net::Datagram* gu::net::Socket::recv(const int flags)
         default:
             set_state(S_FAILED, errno);
             return 0;
-            //throw std::runtime_error("recv failed");
         }
     }
     else if (recvd == 0)
     {
         close();
         return 0;
-        // throw std::runtime_error("recv failed");
     }
     else
     {
-        recv_buf->reserve(recvd);
-        if (recv_buf->get_len() > hdrlen)
+        recv_buf_offset += recvd;
+        if (recv_buf_offset >= hdrlen)
         {
             uint32_t len = 0;
-            read_hdr(recv_buf->get_buf(), hdrlen, &len);
-            if (len + hdrlen > recv_buf->get_size())
+            unserialize(&recv_buf[0], recv_buf_offset, 0, &len);
+            // log_info << " msg len " << len;
+            if (len + hdrlen > recv_buf.capacity())
             {
-                recv_buf->resize(len + hdrlen);
+                // recv_buf.resize(len + hdrlen);
+                log_error << len + hdrlen << " " << recv_buf.size();
+                // throw std::runtime_error("EMSGSIZE");
+                set_state(S_FAILED, EMSGSIZE);
             }
-            else if (recv_buf->get_len() >= len + hdrlen)
+            else if (recv_buf_offset >= len + hdrlen)
             {
-                dgram.reset(recv_buf->get_buf(hdrlen), len);
                 if (peek == false)
                 {
                     dgram_offset = len + hdrlen;
@@ -851,6 +769,8 @@ const gu::net::Datagram* gu::net::Socket::recv(const int flags)
                 {
                     complete = true;
                 }
+                dgram = Datagram(Buffer(&recv_buf[0] + hdrlen, 
+                                        &recv_buf[0] + hdrlen + len));
                 return &dgram;
             }
         }

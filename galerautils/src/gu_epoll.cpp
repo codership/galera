@@ -36,7 +36,7 @@ static inline int to_network_event_mask(const int mask)
     {
         log_warn << "event mask " << mask << " has unrecognized bits set";
     }
-
+    
     ret |= (mask & EPOLLIN ? gu::net::NetworkEvent::E_IN : 0);
     ret |= (mask & EPOLLOUT ? gu::net::NetworkEvent::E_OUT : 0);
     ret |= (mask & EPOLLERR ? gu::net::NetworkEvent::E_ERROR : 0);
@@ -46,32 +46,19 @@ static inline int to_network_event_mask(const int mask)
 
 
 
-void gu::net::EPoll::resize(const int to_size)
-{
-    void* tmp = realloc(events, to_size*sizeof(struct epoll_event));
-    if (to_size > 0 && tmp == 0)
-    {
-        log_fatal << "failed to allocate: " << to_size*sizeof(struct epoll_event);
-        throw std::bad_alloc();
-    }
-    events = reinterpret_cast<struct epoll_event*>(tmp);
-    events_size = to_size;
-    n_events = 0;
-}
 
 gu::net::EPoll::EPoll() :
     e_fd(-1),
-    events(0),
-    events_size(0),
     n_events(0),
-    current(events)
+    events(16),
+    current(events.end())
 {
     if ((e_fd = epoll_create(16)) == -1)
     {
         throw std::runtime_error("could not create epoll");
     }
 }
-    
+
 gu::net::EPoll::~EPoll()
 {
     int err = closefd(e_fd);
@@ -79,7 +66,6 @@ gu::net::EPoll::~EPoll()
     {
         log_warn << "Error closing epoll socket: " << err;
     }
-    free(events);
 }
     
 
@@ -99,8 +85,7 @@ void gu::net::EPoll::insert(const EPollEvent& epe)
                   << strerror(err);
         throw std::runtime_error("");
     }
-    resize(events_size + 1);
-    
+    events.resize(events.size() + 1);
 }
 
 void gu::net::EPoll::erase(const EPollEvent& epe)
@@ -113,7 +98,7 @@ void gu::net::EPoll::erase(const EPollEvent& epe)
         err = errno;
         log_debug << "epoll erase: " << err << ": " << strerror(err);
     }
-    resize(events_size - 1);
+    events.resize(events.size() - 1);
 }
 
 void gu::net::EPoll::modify(const EPollEvent& epe)
@@ -136,7 +121,8 @@ void gu::net::EPoll::modify(const EPollEvent& epe)
 
 void gu::net::EPoll::poll(const int timeout)
 {
-    int ret = epoll_wait(e_fd, events, events_size, timeout);
+    int ret = epoll_wait(e_fd, &events[0], static_cast<int>(events.size()), 
+                         timeout);
     if (ret == -1)
     {
         ret = errno;
@@ -146,10 +132,10 @@ void gu::net::EPoll::poll(const int timeout)
     else
     {
         n_events = ret;
-        current = events;
+        current = events.begin();
     }
 }
-    
+
 void gu::net::EPoll::pop_front()
 {
     if (n_events == 0)
