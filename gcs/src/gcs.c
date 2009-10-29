@@ -457,10 +457,6 @@ static void *gcs_recv_thread (void *arg)
     {
         gcs_seqno_t this_act_id = GCS_SEQNO_ILL;
 
-        action   = NULL;
-        act_type = GCS_ACT_ERROR;
-        act_id   = GCS_SEQNO_ILL;
-
         act_size = gcs_core_recv (conn->core, &action, &act_type, &act_id);
 
 	if (gu_unlikely(act_size <= 0)) {

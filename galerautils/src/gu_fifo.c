@@ -135,8 +135,6 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
         abort();                                        \
     }
 
-#define fifo_lock2(q) (gu_mutex_lock (&q->lock)); // unused
-
 static inline long
 fifo_unlock (gu_fifo_t* q)
 {

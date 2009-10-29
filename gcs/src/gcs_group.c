@@ -673,7 +673,19 @@ group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
     return donor_idx;
 }
 
+/* Cleanup ignored state request */
+static void
+group_ignore_state_request (gcs_recv_act_t* act)
+{
+    free ((void*)act->buf);
+    act->buf     = NULL;
+    act->buf_len = 0;
+    act->type    = GCS_ACT_ERROR;
+    assert (GCS_SEQNO_ILL == act->id);
+}
+
 /* NOTE: check gcs_request_state_transfer() for sender part. */
+/*! Returns 0 if request is ignored, request size if it should be passed up */
 long
 gcs_group_handle_state_request (gcs_group_t*    group,
                                 long            joiner_idx,
@@ -702,7 +714,7 @@ gcs_group_handle_state_request (gcs_group_t*    group,
             gu_error ("Node %ld (%s) requested state transfer, "
                       "but its state is %s. Ignoring.",
                       joiner_idx, joiner_name, joiner_state_string);
-            free ((void*)act->buf);
+            group_ignore_state_request (act);
             return 0;
         }
     }
@@ -726,7 +738,7 @@ gcs_group_handle_state_request (gcs_group_t*    group,
 
     if (group->my_idx != joiner_idx && group->my_idx != donor_idx) {
         // if neither DONOR nor JOINER, ignore request
-        free ((void*)act->buf);
+        group_ignore_state_request (act);
         return 0;
     }
     else if (group->my_idx == donor_idx) {

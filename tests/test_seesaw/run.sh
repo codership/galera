@@ -1,12 +1,11 @@
 #!/bin/bash -eu
 
 declare -r DIST_BASE=$(cd $(dirname $0)/..; pwd -P)
-declare -r SCRIPTS="$DIST_BASE/scripts"
-
 TEST_BASE=${TEST_BASE:-"$DIST_BASE"}
 
 . $TEST_BASE/conf/main.conf
 
+declare -r SCRIPTS="$DIST_BASE/scripts"
 . $SCRIPTS/jobs.sh
 . $SCRIPTS/action.sh
 . $SCRIPTS/kill.sh

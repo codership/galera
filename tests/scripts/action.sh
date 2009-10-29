@@ -1,5 +1,5 @@
 #
-# Routines to remove test distribution from nodes
+# Routines to start|stop|check cluster nodes
 #
 
 action_cmd()

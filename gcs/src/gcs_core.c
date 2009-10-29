@@ -432,7 +432,7 @@ core_handle_act_msg (gcs_core_t*     core,
         if (gu_unlikely(ret)) {
             gu_fatal ("Error parsing action fragment header: %zd (%s).",
                       ret, strerror (-ret));
-            assert (ret == 0);
+            assert (0);
             return -ENOTRECOVERABLE;
         }
 
@@ -499,6 +499,14 @@ core_handle_act_msg (gcs_core_t*     core,
         gu_debug ("Action message in non-primary configuration from "
                  "member %d", msg->sender_idx);
     }
+
+#ifndef NDEBUG
+    if (ret <= 0) {
+        assert (GCS_SEQNO_ILL == act->id);
+        assert (GCS_ACT_ERROR == act->type);
+        assert (NULL == act->buf);
+    }
+#endif
 
     return ret;
 }
