@@ -23,6 +23,7 @@
 #include "profile.hpp"
 #include "gcomm/map.hpp"
 
+#include <vector>
 
 namespace gcomm
 {
@@ -37,7 +38,8 @@ namespace gcomm
         class InputMapMsgIndex;
         class InputMapNode;
         std::ostream& operator<<(std::ostream&, const InputMapNode&);
-        class InputMapNodeIndex;
+        typedef std::vector<InputMapNode> InputMapNodeIndex;
+        std::ostream& operator<<(std::ostream&, const InputMapNodeIndex&);
         class InputMap;
     }
 }
@@ -49,7 +51,7 @@ public:
     InputMapMsgKey(const size_t index_, const evs::Seqno seq_) : 
         index(index_), 
         seq(seq_) 
-    {}
+    { }
     
     size_t     get_index() const { return index; }
     evs::Seqno get_seq  () const { return seq;   }
@@ -70,21 +72,17 @@ private:
 class gcomm::evs::InputMapMsg
 {
 public:
-    InputMapMsg(const UUID&              uuid_, 
-                const UserMessage&       msg_, 
+    InputMapMsg(const UserMessage&       msg_, 
                 ReadBuf*           const rb_   ) :
-        uuid (uuid_),
         msg  (msg_ ),
         rb   (rb_  )
     { }
     
     InputMapMsg(const InputMapMsg& m) :
-        uuid (m.uuid),
         msg  (m.msg ),
         rb   (m.rb  )
     { }
             
-    const UUID&        get_uuid() const { return uuid; }
     const UserMessage& get_msg () const { return msg;  }
     const ReadBuf*     get_rb  () const { return rb;   }
     ReadBuf*           get_rb  ()       { return rb;   }
@@ -92,7 +90,6 @@ public:
 private:
     void operator=(const InputMapMsg&);
     
-    UUID        const uuid;
     UserMessage const msg;
     ReadBuf*    const rb;
 };
@@ -109,13 +106,13 @@ class gcomm::evs::InputMapNode
 public:
     InputMapNode() : idx(), range(0, Seqno::max()), safe_seq() { }
 
-    void   set_range    (const Range  r)       { range    = r; }
-    void   set_safe_seq (const Seqno  s)       { safe_seq = s; }
-    void   set_index    (const size_t i)       { idx      = i; }
+    void   set_range     (const Range  r)       { range     = r; }
+    void   set_safe_seq  (const Seqno  s)       { safe_seq  = s; }
+    void   set_index     (const size_t i)       { idx       = i; }
     
-    Range  get_range    ()               const { return range;    }
-    Seqno  get_safe_seq ()               const { return safe_seq; }
-    size_t get_index    ()               const { return idx;      }
+    Range  get_range     ()               const { return range;     }
+    Seqno  get_safe_seq  ()               const { return safe_seq;  }
+    size_t get_index     ()               const { return idx;       }
 
 private:
     size_t idx;
@@ -126,8 +123,6 @@ private:
         
 
 
-class gcomm::evs::InputMapNodeIndex : 
-    public gcomm::Map<UUID, InputMapNode> { };
 
 /*!
  * Input map for messages.
@@ -174,7 +169,7 @@ public:
      * @throws FatalException if node was not found or sequence number
      *         was not in the allowed range
      */
-    void  set_safe_seq(const UUID& uuid, const Seqno seq)
+    void  set_safe_seq(const size_t uuid, const Seqno seq)
         throw (gu::Exception);
     
     /*!
@@ -186,8 +181,11 @@ public:
      *
      * @throws FatalException if node was not found
      */
-    Seqno get_safe_seq(const UUID& uuid) const 
-        throw (gu::Exception);
+    Seqno get_safe_seq(const size_t uuid) const 
+        throw (gu::Exception)
+    {
+        return node_index->at(uuid).get_safe_seq();
+    }
     
     /*!
      * Get current range parameter for node
@@ -198,12 +196,15 @@ public:
      *
      * @throws FatalException if node was not found
      */
-    Range get_range   (const UUID& uuid) const 
-        throw (gu::Exception);
+    Range get_range   (const size_t uuid) const 
+        throw (gu::Exception)
+    {
+        return node_index->at(uuid).get_range();
+    }
     
     Seqno get_min_hs() const
         throw (gu::Exception);
-
+    
     Seqno get_max_hs() const
         throw (gu::Exception);
     
@@ -212,38 +213,72 @@ public:
      *
      * @return Iterator pointing to the first element
      */
-    iterator begin() const;
+    iterator begin() const { return msg_index->begin(); }
     
     /*!
      * Get iterator next to the last element of the input map
      *
      * @return Iterator pointing past the last element
      */
-    iterator end  () const;
-    
+    iterator end  () const { return msg_index->end(); }
+     
     /*!
      * Check if message pointed by iterator fulfills SP_SAFE condition.
      *
      * @return True or false
      */
-    bool is_safe  (iterator) const 
-        throw (gu::Exception);
+    bool is_safe  (iterator i) const 
+        throw (gu::Exception)
+    {
+        const Seqno seq(InputMapMsgIndex::get_key(i).get_seq());
+        return (safe_seq != Seqno::max() && seq <= safe_seq);
+    }
     
     /*!
      * Check if message pointed by iterator fulfills SP_AGREED condition.
      *
      * @return True or false
      */
-    bool is_agreed(iterator) const 
-        throw (gu::Exception);
+    bool is_agreed(iterator i) const 
+        throw (gu::Exception)
+    {
+        const Seqno seq(InputMapMsgIndex::get_key(i).get_seq());
+        return (aru_seq != Seqno::max() && seq <= aru_seq);
+    }
     
     /*!
      * Check if message pointed by iterator fulfills SP_FIFO condition.
      *
      * @return True or false
      */
-    bool is_fifo  (iterator) const
-        throw (gu::Exception);
+    bool is_fifo  (iterator i) const
+        throw (gu::Exception)
+    {
+        const Seqno seq(InputMapMsgIndex::get_key(i).get_seq());
+        const InputMapNode& node(node_index->at(
+                                     InputMapMsgIndex::get_key(i).get_index()));
+        return (node.get_range().get_lu() > seq);
+    }
+
+    bool has_deliverables() const
+    {
+        if (msg_index->empty() == false)
+        {
+            if (n_msgs[SP_FIFO] > 0 && is_fifo(msg_index->begin()))
+                return true;
+            else if (n_msgs[SP_AGREED] > 0 && is_agreed(msg_index->begin()))
+                return true;
+            else if (n_msgs[SP_SAFE] > 0 && is_safe(msg_index->begin()))
+                return true;
+            else if (n_msgs[SP_DROP] > max_droppable)
+                return true;
+            return false;
+        }
+        else
+        {
+            return false;
+        }
+    }
     
     /*!
      * Insert new message into input map.
@@ -258,10 +293,10 @@ public:
      * @throws FatalException if node not found or message sequence 
      *         number is out of allowed range
      */
-    Range insert(const UUID& uuid, const UserMessage& msg, 
+    Range insert(const size_t uuid, const UserMessage& msg, 
                  const ReadBuf* rb = 0, size_t offset = 0)
         throw (gu::Exception);
-            
+    
     /*!
      * Erase message pointed by iterator. Note that message may still
      * be recovered through recover() method as long as it does not 
@@ -284,7 +319,7 @@ public:
      *
      * @throws FatalException if node was not found
      */
-    iterator find(const UUID& uuid, const Seqno seq) const
+    iterator find(const size_t uuid, const Seqno seq) const
         throw (gu::Exception);
     
     /*!
@@ -297,26 +332,21 @@ public:
      *
      * @throws FatalException if node or message was not found
      */
-    iterator recover(const UUID& uuid, const Seqno seq) const
+    iterator recover(const size_t uuid, const Seqno seq) const
         throw (gu::Exception);
     
     /*!
-     * Insert node uuid.
      *
-     * @param uuid Node uuid
-     *
-     * @throws FatalException if uuid already exists or either message
-     *         or recovery index is non empty.
      */
-    void insert_uuid(const UUID& uuid)
+    void reset(const size_t, const size_t = 256)
         throw (gu::Exception);
     
     /*!
      * Clear input map state.
      */
     void clear();
-            
-            
+    
+    
 private:
     friend std::ostream& operator<<(std::ostream&, const InputMap&);    
     /* Non-copyable */
@@ -335,17 +365,15 @@ private:
     void cleanup_recovery_index()
         throw (gu::Exception);
     
-    
-    
     Seqno              safe_seq;       /*!< Safe seqno              */
     Seqno              aru_seq;        /*!< All received upto seqno */
     InputMapNodeIndex* node_index;     /*!< Index of nodes          */
     InputMapMsgIndex*  msg_index;      /*!< Index of messages       */
     InputMapMsgIndex*  recovery_index; /*!< Recovery index          */
-            
-    uint64_t   inserted;
-    uint64_t   updated_aru;
     
+    std::vector<size_t> n_msgs;
+    size_t max_droppable;
+
     prof::Profile prof;
 };
 

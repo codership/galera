@@ -41,7 +41,7 @@ ostream& gcomm::evs::operator<<(ostream& os, const gcomm::evs::Message& msg)
     os << "range_uuid=" << msg.get_range_uuid() << ",";
     os << "range=" << msg.get_range() << ",";
     os << "fifo_seq=" << msg.get_fifo_seq();
-    if (msg.has_node_list())
+    if (msg.has_node_list() == true)
     {
         os << ",";
         os << "node_list=(" << msg.get_node_list() << ") ";

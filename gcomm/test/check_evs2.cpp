@@ -118,58 +118,51 @@ END_TEST
 START_TEST(test_input_map_insert)
 {
     log_info << "START";
-    InputMap im;
     UUID uuid1(1), uuid2(2);
+    InputMap im;
     ViewId view(V_REG, uuid1, 0);
-
+    
     try 
     {
-        im.insert(uuid1, UserMessage(uuid1, view, 0));
+        im.insert(0, UserMessage(uuid1, view, 0));
         fail("");
     } 
-    catch (...) { }
+    catch (...) 
+    {  }
+
+    im.reset(1);
     
-    im.insert_uuid(uuid1);
-    
-    im.insert(uuid1, UserMessage(uuid1, view, 0));
+    im.insert(0, UserMessage(uuid1, view, 0));
     
     try 
     { 
-        im.insert(uuid1, 
+        im.insert(0, 
                   UserMessage(uuid1, view, 
                               static_cast<uint16_t>(Seqno::max().get() - 1))); 
         fail("");
     }
     catch (...) { }
     
-    try
-    {
-        im.insert_uuid(uuid2);
-        fail("");
-    }
-    catch (...) { }
 
     im.clear();
-
-    im.insert_uuid(uuid1);
-    im.insert_uuid(uuid2);
+    im.reset(2);
 
     for (Seqno s = 0; s < 10; ++s)
     {
-        im.insert(uuid1, UserMessage(uuid1, view, s));
-        im.insert(uuid2, UserMessage(uuid1, view, s));
+        im.insert(0, UserMessage(uuid1, view, s));
+        im.insert(1, UserMessage(uuid2, view, s));
     }
 
     for (Seqno s = 0; s < 10; ++s)
     {
-        InputMap::iterator i = im.find(uuid1, s);
+        InputMap::iterator i = im.find(0, s);
         fail_if(i == im.end());
-        fail_unless(InputMapMsgIndex::get_value(i).get_uuid() == uuid1);
+        fail_unless(InputMapMsgIndex::get_value(i).get_msg().get_source() == uuid1);
         fail_unless(InputMapMsgIndex::get_value(i).get_msg().get_seq() == s);
 
-        i = im.find(uuid2, s);
+        i = im.find(1, s);
         fail_if(i == im.end());
-        fail_unless(InputMapMsgIndex::get_value(i).get_uuid() == uuid2);
+        fail_unless(InputMapMsgIndex::get_value(i).get_msg().get_source() == uuid2);
         fail_unless(InputMapMsgIndex::get_value(i).get_msg().get_seq() == s);
     }
     
@@ -183,25 +176,25 @@ START_TEST(test_input_map_find)
     UUID uuid1(1);
     ViewId view(V_REG, uuid1, 0);
     
-    im.insert_uuid(uuid1);
+    im.reset(1);
     
-    im.insert(uuid1, UserMessage(uuid1, view, 0));
+    im.insert(0, UserMessage(uuid1, view, 0));
     
-    fail_if(im.find(uuid1, 0) == im.end());
+    fail_if(im.find(0, 0) == im.end());
     
 
-    im.insert(uuid1, UserMessage(uuid1, view, 2));
-    im.insert(uuid1, UserMessage(uuid1, view, 4));
-    im.insert(uuid1, UserMessage(uuid1, view, 7));
+    im.insert(0, UserMessage(uuid1, view, 2));
+    im.insert(0, UserMessage(uuid1, view, 4));
+    im.insert(0, UserMessage(uuid1, view, 7));
 
-    fail_if(im.find(uuid1, 2) == im.end());
-    fail_if(im.find(uuid1, 4) == im.end());
-    fail_if(im.find(uuid1, 7) == im.end());
+    fail_if(im.find(0, 2) == im.end());
+    fail_if(im.find(0, 4) == im.end());
+    fail_if(im.find(0, 7) == im.end());
 
-    fail_unless(im.find(uuid1, 3) == im.end());
-    fail_unless(im.find(uuid1, 5) == im.end());
-    fail_unless(im.find(uuid1, 6) == im.end());
-    fail_unless(im.find(uuid1, 8) == im.end());
+    fail_unless(im.find(0, 3) == im.end());
+    fail_unless(im.find(0, 5) == im.end());
+    fail_unless(im.find(0, 6) == im.end());
+    fail_unless(im.find(0, 8) == im.end());
 }
 END_TEST
 
@@ -210,38 +203,39 @@ START_TEST(test_input_map_safety)
     log_info << "START";
     InputMap im;
     UUID uuid1(1);
+    size_t index1(0);
     ViewId view(V_REG, uuid1, 0);
     
-    im.insert_uuid(uuid1);
+    im.reset(1);
     
-    im.insert(uuid1, UserMessage(uuid1, view, 0));
+    im.insert(index1, UserMessage(uuid1, view, 0));
     fail_unless(im.get_aru_seq() == 0);
-    im.insert(uuid1, UserMessage(uuid1, view, 1));
+    im.insert(index1, UserMessage(uuid1, view, 1));
     fail_unless(im.get_aru_seq() == 1);
-    im.insert(uuid1, UserMessage(uuid1, view, 2));
+    im.insert(index1, UserMessage(uuid1, view, 2));
     fail_unless(im.get_aru_seq() == 2);
-    im.insert(uuid1, UserMessage(uuid1, view, 3));
+    im.insert(index1, UserMessage(uuid1, view, 3));
     fail_unless(im.get_aru_seq() == 3);
-    im.insert(uuid1, UserMessage(uuid1, view, 5));
+    im.insert(index1, UserMessage(uuid1, view, 5));
     fail_unless(im.get_aru_seq() == 3);    
     
-    im.insert(uuid1, UserMessage(uuid1, view, 4));
+    im.insert(index1, UserMessage(uuid1, view, 4));
     fail_unless(im.get_aru_seq() == 5);
     
-    InputMap::iterator i = im.find(uuid1, 0);
+    InputMap::iterator i = im.find(index1, 0);
     fail_unless(im.is_fifo(i) == true);
     fail_unless(im.is_agreed(i) == true);
     fail_if(im.is_safe(i) == true);
-    im.set_safe_seq(uuid1, 0);
+    im.set_safe_seq(index1, 0);
     fail_unless(im.is_safe(i) == true);
     
-    im.set_safe_seq(uuid1, 5);
-    i = im.find(uuid1, 5);
+    im.set_safe_seq(index1, 5);
+    i = im.find(index1, 5);
     fail_unless(im.is_safe(i) == true);
     
-    im.insert(uuid1, UserMessage(uuid1, view, 7));
-    im.set_safe_seq(uuid1, im.get_aru_seq());
-    i = im.find(uuid1, 7);
+    im.insert(index1, UserMessage(uuid1, view, 7));
+    im.set_safe_seq(index1, im.get_aru_seq());
+    i = im.find(index1, 7);
     fail_if(im.is_safe(i) == true);
 
 }
@@ -251,28 +245,30 @@ START_TEST(test_input_map_erase)
 {
     log_info << "START";
     InputMap im;
+    size_t index1(0);
     UUID uuid1(1);
     ViewId view(V_REG, uuid1, 1);
-    im.insert_uuid(uuid1);
+
+    im.reset(1);
 
     for (Seqno s = 0; s < 10; ++s)
     {
-        im.insert(uuid1, UserMessage(uuid1, view, s));
+        im.insert(index1, UserMessage(uuid1, view, s));
     }
     
     for (Seqno s = 0; s < 10; ++s)
     {
-        InputMap::iterator i = im.find(uuid1, s);
+        InputMap::iterator i = im.find(index1, s);
         fail_unless(i != im.end());
         im.erase(i);
-        i = im.find(uuid1, s);
+        i = im.find(index1, s);
         fail_unless(i == im.end());
-        (void)im.recover(uuid1, s);
+        (void)im.recover(index1, s);
     }
-    im.set_safe_seq(uuid1, 9);
+    im.set_safe_seq(index1, 9);
     try
     {
-        im.recover(uuid1, 9);
+        im.recover(index1, 9);
         fail("");
     }
     catch (...) { }
@@ -283,35 +279,32 @@ START_TEST(test_input_map_overwrap)
 {
     log_info << "START";
     InputMap im;
-    
+    const size_t n_nodes(5);
     ViewId view(V_REG, UUID(1), 1);
     vector<UUID> uuids;
-    for (uint32_t n = 1; n <= 5; ++n)
+    for (size_t n = 0; n < n_nodes; ++n)
     {
-        uuids.push_back(UUID(n));
+        uuids.push_back(UUID(static_cast<int32_t>(n + 1)));
     }
-
-    for (vector<UUID>::const_iterator i = uuids.begin(); i != uuids.end(); ++i)
-    {
-        im.insert_uuid(*i);
-    }
+    
+    im.reset(n_nodes);
+    
     
     Time start(Time::now());
     size_t cnt(0);
     Seqno last_safe(Seqno::max());
     for (size_t n = 0; n < Seqno::max().get()*3LU; ++n)
     {
-
+        
         Seqno seq(static_cast<uint16_t>(n % Seqno::max().get()));
-        for (vector<UUID>::const_iterator i = uuids.begin(); i != uuids.end();
-             ++i)
+        for (size_t i = 0; i < n_nodes; ++i)
         {
-            UserMessage um(*i, view, seq);
-            (void)im.insert(*i, um);
+            UserMessage um(uuids[i], view, seq);
+            (void)im.insert(i, um);
             if ((n + 5) % 10 == 0)
             {
                 last_safe = um.get_seq() - 3;
-                im.set_safe_seq(*i, last_safe);
+                im.set_safe_seq(i, last_safe);
                 for (InputMap::iterator ii = im.begin(); 
                      ii != im.end() && im.is_safe(ii) == true;
                      ii = im.begin())
@@ -328,7 +321,6 @@ START_TEST(test_input_map_overwrap)
     
     double div(double(stop.get_utc() - start.get_utc())/gu::datetime::Sec);
     log_info << "input map msg rate " << double(cnt)/div;
-
 }
 END_TEST
 
@@ -338,9 +330,9 @@ class InputMapInserter
 public:
     InputMapInserter(InputMap& im_) : im(im_) { }
     
-    void operator()(const UserMessage& um) const
+    void operator()(const pair<size_t, UserMessage>& p) const
     {
-        im.insert(um.get_source(), um);
+        im.insert(p.first, p.second);
     }
 private:
     InputMap& im;
@@ -352,28 +344,29 @@ START_TEST(test_input_map_random_insert)
     size_t n_seqnos(Seqno::max().get()/4);
     size_t n_uuids(4);
     vector<UUID> uuids(n_uuids);
-    vector<UserMessage> msgs(n_uuids*n_seqnos);
+    vector<pair<size_t, UserMessage> > msgs(n_uuids*n_seqnos);
     ViewId view_id(V_REG, UUID(1), 1);
     InputMap im;
     
     for (size_t i = 0; i < n_uuids; ++i)
     {
         uuids[i] = (static_cast<int32_t>(i + 1));
-        im.insert_uuid(uuids[i]);
     }
+
+    im.reset(n_uuids, Seqno::max().get()/4);
     
     for (size_t j = 0; j < n_seqnos; ++j)
     {
         for (size_t i = 0; i < n_uuids; ++i)
         {
-            msgs[j*n_uuids + i] = 
-                UserMessage(uuids[i],
-                            view_id,
-                            static_cast<uint16_t>(j % Seqno::max().get()));
+            msgs[j*n_uuids + i] =
+                make_pair(i, UserMessage(uuids[i],
+                                         view_id,
+                                         static_cast<uint16_t>(j % Seqno::max().get())));
         }
     }
     
-    vector<UserMessage> random_msgs(msgs);
+    vector<pair<size_t, UserMessage> > random_msgs(msgs);
     random_shuffle(random_msgs.begin(), random_msgs.end());
     for_each(random_msgs.begin(), random_msgs.end(), InputMapInserter(im));
     
@@ -381,25 +374,24 @@ START_TEST(test_input_map_random_insert)
     for (InputMap::iterator i = im.begin(); i != im.end(); ++i)
     {
         const InputMapMsg& msg(InputMapMsgIndex::get_value(i));
-        fail_unless(msg.get_uuid() == msg.get_msg().get_source());
-        fail_unless(msg.get_msg() == msgs[n]);
+        fail_unless(msg.get_msg() == msgs[n].second);
         fail_if(im.is_safe(i) == true);
         ++n;
     }
  
     fail_unless(im.get_aru_seq() == Seqno(static_cast<uint16_t>(n_seqnos - 1)));
     fail_unless(im.get_safe_seq() == Seqno::max());
-
+    
     for (size_t i = 0; i < n_uuids; ++i)
     {
-        fail_unless(im.get_range(uuids[i]) == 
+        fail_unless(im.get_range(i) == 
                     Range(static_cast<uint16_t>(n_seqnos),
                           static_cast<uint16_t>(n_seqnos - 1)));
-                                                                  
-        im.set_safe_seq(uuids[i], static_cast<uint16_t>(n_seqnos - 1));
+        
+        im.set_safe_seq(i, static_cast<uint16_t>(n_seqnos - 1));
     }
     fail_unless(im.get_safe_seq() == static_cast<uint16_t>(n_seqnos - 1));
-   
+    
 }
 END_TEST
 
@@ -1217,6 +1209,7 @@ Suite* evs2_suite()
     tc = tcase_create("test_input_map_random_insert");
     tcase_add_test(tc, test_input_map_random_insert);
     suite_add_tcase(s, tc);
+
 
     tc = tcase_create("test_proto_single_join");
     tcase_add_test(tc, test_proto_single_join);

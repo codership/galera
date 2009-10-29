@@ -43,6 +43,7 @@ class gcomm::evs::Node
 {
 public:    
     Node() : 
+        index(std::numeric_limits<size_t>::max()),
         operational(true), 
         installed(false), 
         join_message(0), 
@@ -52,8 +53,11 @@ public:
     {}
 
     Node(const Node& n);
-
+    
     ~Node();
+    
+    void set_index(const size_t idx) { index = idx; }
+    size_t get_index() const { return index; }
     
     void set_operational(const bool op) { operational = op; }
     bool get_operational() const { return operational; }
@@ -82,7 +86,8 @@ private:
 
     void operator=(const Node&);
 
-
+    // Index for input map
+    size_t index;
     // True if instance is considered to be operational (has produced messages)
     bool operational;
     // True if it is known that the instance has installed current view
@@ -233,7 +238,7 @@ private:
      * @param seq  Sequence number
      * @return Input map seqno before updating
      */
-    Seqno update_im_safe_seq(const UUID& uuid, const Seqno seq);
+    Seqno update_im_safe_seq(const size_t uuid, const Seqno seq);
 
     /*!
      * Update input map safe seqs according to message node list. Only

@@ -211,7 +211,7 @@ namespace gcomm
             return MapBase<K, V, C>::map.insert(p);
         }
         
-        iterator insert_checked(const std::pair<K, V>& p)
+        iterator insert_checked(const typename MapBase<K, V, C>::value_type& p)
         {
             std::pair<iterator, bool> ret = MapBase<K, V, C>::map.insert(p);
             if (false == ret.second)
@@ -222,6 +222,11 @@ namespace gcomm
                                   << "map=" << *this;
             }
             return ret.first;
+        }
+
+        iterator insert_unique(const typename MapBase<K, V, C>::value_type& vt)
+        {
+            return insert_checked(vt);
         }
     };
 
