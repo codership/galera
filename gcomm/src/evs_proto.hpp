@@ -334,6 +334,8 @@ private:
     Time last_stats_report;
     bool collect_stats;
     Histogram hs_safe;
+    long long int send_queue_s;
+    long long int n_send_queue_s;
     std::vector<long long int> sent_msgs;
     long long int retrans_msgs;
     long long int recovered_msgs;

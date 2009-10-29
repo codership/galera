@@ -223,6 +223,8 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     last_stats_report(Time::now()),
     collect_stats(true),
     hs_safe("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
+    send_queue_s(0),
+    n_send_queue_s(0),
     sent_msgs(7, 0),
     retrans_msgs(0),
     recovered_msgs(0),
@@ -388,6 +390,7 @@ string gcomm::evs::Proto::get_stats() const
     ostringstream os;
     os << "\n\tnodes " << current_view.get_members().size();
     os << "\n\tsafe deliv hist {" << hs_safe << "} ";
+    os << "\n\toutq avg " << double(send_queue_s)/double(n_send_queue_s);
     os << "\n\tsent {";
     copy(sent_msgs.begin(), sent_msgs.end(), 
          ostream_iterator<long long int>(os, ","));
@@ -416,6 +419,8 @@ string gcomm::evs::Proto::get_stats() const
 void gcomm::evs::Proto::reset_stats()
 {
     hs_safe.clear();
+    send_queue_s = 0;
+    n_send_queue_s = 0;
     fill(sent_msgs.begin(), sent_msgs.end(), 0LL);
     fill(recvd_msgs.begin(), recvd_msgs.end(), 0LL);
     retrans_msgs = 0LL;
@@ -2122,8 +2127,11 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
     //    return EINVAL;
     // }
     
+    send_queue_s += output.size();
+    ++n_send_queue_s;
+
     int ret = 0;
-    
+
     if (output.empty() == true) 
     {
         int err;
@@ -2412,6 +2420,7 @@ void gcomm::evs::Proto::deliver()
         {
             if (msg.get_msg().get_safety_prefix() != SP_DROP)
             {
+                profile_enter(delivery_prof);
                 ProtoUpMeta um(msg.get_msg().get_source(), 
                                msg.get_msg().get_source_view_id(),
                                0,
@@ -2419,8 +2428,13 @@ void gcomm::evs::Proto::deliver()
                                msg.get_msg().get_seq().get());
                 gu_trace(pass_up(msg.get_rb(), 0, um));
                 delivered_msgs++;
+                profile_leave(delivery_prof);
             }
             gu_trace(input_map->erase(i));
+        }
+        else if (input_map->has_deliverables() == false)
+        {
+            break;
         }
     }
     delivering = false;
