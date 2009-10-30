@@ -87,4 +87,32 @@ gu_time_monotonic()
 #endif
 }
 
+
+static inline long long
+gu_time_process_cputime()
+{
+#if _POSIX_TIMERS > 0
+    struct timespec tmp;
+    clock_gettime (CLOCK_PROCESS_CPUTIME_ID, &tmp);
+    return ((tmp.tv_sec * 1000000000LL) + tmp.tv_nsec);
+#else
+    return -1;
+#endif
+}
+
+
+
+static inline long long
+gu_time_thread_cputime()
+{
+#if _POSIX_TIMERS > 0
+    struct timespec tmp;
+    clock_gettime (CLOCK_THREAD_CPUTIME_ID, &tmp);
+    return ((tmp.tv_sec * 1000000000LL) + tmp.tv_nsec);
+#else
+    return -1;
+#endif
+}
+
+
 #endif /* _gu_time_h_ */
