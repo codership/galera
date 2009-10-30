@@ -98,8 +98,6 @@ void* listener_thd(void* arg)
 	
 	mark_point();
         
-	// log_info << sock << " " << em;
-
         if (em & NetworkEvent::E_ACCEPTED)
         {
             // log_info << "Listener: socket accepted";
@@ -127,7 +125,6 @@ void* listener_thd(void* arg)
         {
             const Datagram* dm = sock->recv();
             fail_unless(dm != 0);
-            // log_info << "dgram len " << dm->get_len();
             bytes += dm->get_len();
             if (buf != 0)
             {
@@ -143,7 +140,7 @@ void* listener_thd(void* arg)
         }
         else if (em & NetworkEvent::E_EMPTY)
         {
-
+            
         }
         else if (sock == 0)
         {
@@ -156,7 +153,6 @@ void* listener_thd(void* arg)
                       << " event mask: " << ev.get_event_mask();
             return reinterpret_cast<void*>(1);
         }
-	// log_info << "Listener: connections: " << conns;
     }
     log_info << "Listener: received " << bytes/(1 << 20) << "MB + "
              << bytes%(1 << 20) << "B";
@@ -516,17 +512,18 @@ public:
             
             if (msg != 0)
             {
-                const Datagram* dg = reinterpret_cast<const Datagram*>(msg->get_data());
+                const Datagram dg(Buffer(msg->get_data(), 
+                                         msg->get_data() + msg->get_data_size()));
                 
-                int err = send_sock->send(dg);
+                int err = send_sock->send(&dg);
                 if (err != 0)
                 {
                     // log_warn << "send: " << strerror(err);
                 }
-                sent += dg->get_len();
-                Message ack(msg->get_producer(), 0, err);
+                sent += dg.get_len();
+                Message ack(&msg->get_producer(), 0, 0, err);
                 return_ack(ack);
-
+                
             }
             
             NetworkEvent ev = net.wait_event(-1);
@@ -579,9 +576,9 @@ START_TEST(test_net_consumer)
         {
             log_debug << "iter " << i;
         }
-        Datagram dg(Buffer(buf, buf + sizeof(buf)));
-        Message msg(&prod, &dg);
-        Message ack;
+        // Datagram dg(Buffer(buf, buf + sizeof(buf)));
+        Message msg(&prod, buf, sizeof(buf));
+        Message ack(&prod);
         prod.send(msg, &ack);
         fail_unless(ack.get_val() == 0 || ack.get_val() == EAGAIN);
     }
@@ -622,9 +619,9 @@ void* producer_thd(void* arg)
     }
     for (size_t i = 0; i < pargs->n_events; ++i)
     {
-        Datagram dg(Buffer(buf, buf + sizeof(buf)));
-        Message msg(&prod, &dg);
-        Message ack;
+        // Datagram dg(Buffer(buf, buf + sizeof(buf)));
+        Message msg(&prod, buf, sizeof(buf));
+        Message ack(&prod);
         prod.send(msg, &ack);
         fail_unless(ack.get_val() == 0 || ack.get_val() == EAGAIN);        
     }

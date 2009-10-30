@@ -2,39 +2,22 @@
 #include "gu_prodcons.hpp"
 
 #include <cassert>
-
 #include <deque>
+
+using namespace std;
 
 class gu::prodcons::MessageQueue
 {
     std::deque<Message> que;
 public:
-    MessageQueue() :
-        que()
-    {
-    }
-    bool empty() const
-    {
-        return que.empty();
-    }
-    size_t size() const
-    {
-        return que.size();
-    }
-    const Message& front() const
-    {
-        return que.front();
-    }
+    MessageQueue() : que() { }
+    bool empty() const { return que.empty(); }
+    size_t size() const { return que.size(); }
+    const Message& front() const { return que.front(); }
 
-    void pop_front() 
-    {
-        que.pop_front();
-    }
-
-    void push_back(const Message& msg)
-    {
-        que.push_back(msg);
-    }
+    void pop_front() { que.pop_front(); }
+    
+    void push_back(const Message& msg) { que.push_back(msg); }
 };
 
 void gu::prodcons::Producer::send(const Message& msg, Message* ack)
@@ -58,8 +41,8 @@ void gu::prodcons::Consumer::queue_and_wait(const Message& msg, Message* ack)
     Lock lock(mutex);
     mque->push_back(msg);
     notify();
-    lock.wait(msg.get_producer()->get_cond());
-    assert(rque->front().get_producer() == msg.get_producer());
+    lock.wait(msg.get_producer().get_cond());
+    assert(&rque->front().get_producer() == &msg.get_producer());
     if (ack)
     {
         *ack = rque->front();
@@ -67,20 +50,20 @@ void gu::prodcons::Consumer::queue_and_wait(const Message& msg, Message* ack)
     rque->pop_front();
     if (rque->empty() == false)
     {
-        rque->front().get_producer()->get_cond().signal();
+        rque->front().get_producer().get_cond().signal();
     }    
 }
 
 void gu::prodcons::Consumer::return_ack(const Message& ack)
 {
     Lock lock(mutex);
-    assert(ack.get_producer() == mque->front().get_producer());
+    assert(&ack.get_producer() == &mque->front().get_producer());
     rque->push_back(ack);
     mque->pop_front();
     if (rque->size() == 1)
     {
-        ack.get_producer()->get_cond().signal();
-    }    
+        ack.get_producer().get_cond().signal();
+    } 
 }
 
 gu::prodcons::Consumer::Consumer() :

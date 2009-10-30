@@ -8,7 +8,9 @@
  * @file gu_prodcons.hpp Synchronous producer/consumer interface
  */
 
-#include <gu_lock.hpp>
+#include "gu_lock.hpp"
+// For byte_t
+#include "gu_network.hpp"
 
 /* Forward declarations */
 namespace gu
@@ -29,7 +31,8 @@ class gu::prodcons::Message
 {
     Producer* producer; /*! Producer associated to this message */
     int val; /*! Integer value (command/errno) */
-    void* data; /*! Producer data */
+    const gu::net::byte_t* data; /*! Producer data */
+    size_t data_size;
 public:
     
     /*!
@@ -39,42 +42,38 @@ public:
      * @param data_ Message data
      * @param val_ Integer value associated to the message
      */
-    Message(Producer* prod_ = 0, void* data_ = 0, int val_ = -1) :
+    Message(Producer* prod_, 
+            const gu::net::byte_t*   data_      = 0, 
+            size_t          data_size_ = 0,
+            int             val_       = -1) :
         producer(prod_),
         val(val_),
-        data(data_)
-    {
-    }
+        data(data_),
+        data_size(data_size_)
+    { }
     
     /*!
      * @brief Get producer associated to the message
      *
      * @return Producer associated to the message
      */
-    Producer* get_producer() const
-    {
-        return producer;
-    }
-
+    Producer& get_producer() const { return *producer; }
+    
     /*!
      * @brief Get data associated to the message
      *
      * @return Data associated to the message
      */
-    void* get_data() const
-    {
-        return data;
-    }
+    const gu::net::byte_t* get_data() const { return data; }
+    
+    size_t get_data_size() const { return data_size; }
     
     /*!
      * @brief Get int value associated to the message
      *
      * @return Int value associated to the message
      */
-    int get_val() const
-    {
-        return val;
-    }
+    int get_val() const { return val; }
 };
 
 /*!
@@ -84,16 +83,13 @@ class gu::prodcons::Producer
 {
     gu::Cond cond;  /*! Condition variable */
     Consumer& cons; /*! Consumer associated to this producer */
-
+    
     /*!
      * @brief Return reference to condition variable
      *
      * @return Reference to condition variable
      */
-    Cond& get_cond()
-    {
-        return cond;
-    }
+    Cond& get_cond() { return cond; }
     friend class Consumer;
 public:
     /*!
@@ -104,9 +100,8 @@ public:
     Producer(Consumer& cons_) :
         cond(),
         cons(cons_)
-    {
-    }
-
+    { }
+    
     /*!
      * @brief Send message to the consumer and wait for response
      *
@@ -124,8 +119,8 @@ class gu::prodcons::Consumer
     Mutex mutex; /*! Mutex for internal locking */
     MessageQueue* mque; /*! Message queue for producer messages */
     MessageQueue* rque; /*! Message queue for ack messages */
-
-
+    
+    
     Consumer(const Consumer&);
     void operator=(const Consumer&);
 protected:
@@ -148,7 +143,7 @@ protected:
      * @param msg Ack message corresponding the current head of mque
      */
     void return_ack(const Message& msg);
-
+    
     /*!
      * @brief Virtual method to notify consumer about queued message
      */
@@ -158,12 +153,12 @@ public:
      * @brief Default constructor
      */
     Consumer();
-
+    
     /*!
      * @brief Default destructor
      */
     virtual ~Consumer();
-
+    
     /*!
      * @brief Queue message and wait for ack
      *
