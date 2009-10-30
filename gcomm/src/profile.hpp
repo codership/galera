@@ -59,12 +59,10 @@
 #ifndef GCOMM_PROFILE_HPP
 #define GCOMM_PROFILE_HPP
 
-#include "gu_datetime.hpp"
-#include "gu_lock.hpp"
+#include "gu_time.h"
 
 #include <map>
 #include <ostream>
-#include <cstring>
 
 namespace prof
 {
@@ -106,6 +104,12 @@ public:
                 (line == cmp.line && (func < cmp.func ||
                                       (func == cmp.func && file < cmp.file))));
     }
+    std::string to_string() const
+    {
+        std::ostringstream os;
+        os << *this;
+        return os.str();
+    }
 private:
     friend class Point;
     friend class Profile;
@@ -133,7 +137,8 @@ private:
     friend class Profile;
     const Profile& prof;
     const Key key;
-    mutable gu::datetime::Date enter_time;
+    mutable long long int enter_time_calendar;
+    mutable long long int enter_time_thread_cputime;
 };
 
 /*!
@@ -141,6 +146,27 @@ private:
  */
 class prof::Profile
 {
+    struct PointStats
+    {
+        PointStats(long long int count_               = 0,
+                   long long int time_calendar_       = 0,
+                   long long int time_thread_cputime_ = 0) : 
+            count               (count_              ), 
+            time_calendar       (time_calendar_      ), 
+            time_thread_cputime (time_thread_cputime_) 
+        { }
+
+        PointStats operator+(const PointStats& add) const
+        {
+            return PointStats(count               + add.count,
+                              time_calendar       + add.time_calendar,
+                              time_thread_cputime + add.time_thread_cputime);
+        }
+        
+        long long int count;
+        long long int time_calendar;
+        long long int time_thread_cputime;
+    };
 public:
     /*!
      * Default constructor.
@@ -149,38 +175,35 @@ public:
      */
     Profile(const std::string& name_ = "profile") : 
         name(name_),
-        start_time(gu::datetime::Date::now()),
-        points(), 
-        c_time(0LL),
-        mutex()
+        start_time_calendar(gu_time_calendar()),
+        start_time_thread_cputime(gu_time_thread_cputime()),
+        points()
     { }
     
     void enter(const Point& point) const
     { 
-        // gu::Lock lock(mutex);
-        points[point.key].first++; 
-        point.enter_time = gu::datetime::Date::now();
+        points[point.key].count++; 
+        point.enter_time_calendar = gu_time_calendar();
+        point.enter_time_thread_cputime = gu_time_thread_cputime();
     }
     
     void leave(const Point& point) const
     { 
-        long long int t(gu::datetime::Date::now().get_utc() - 
-                        point.enter_time.get_utc());
-        // gu::Lock lock(mutex);
-        points[point.key].second += t; 
-        c_time += t;
+        long long int t_cal(gu_time_calendar());
+        long long int t_thdcpu(gu_time_thread_cputime());
+        points[point.key].time_calendar += (t_cal - point.enter_time_calendar);
+        points[point.key].time_thread_cputime += (t_thdcpu - point.enter_time_thread_cputime);
     }
     
-    void clear() { c_time = 0; points.clear(); }
+    void clear() { points.clear(); }
     
     friend std::ostream& operator<<(std::ostream&, const Profile&);
     
-    typedef std::map<Key, std::pair<long long int, long long int> > Map;
+    typedef std::map<Key, PointStats> Map;
     std::string const name;
-    gu::datetime::Date const start_time;
+    long long int const start_time_calendar;
+    long long int const start_time_thread_cputime;
     mutable Map points;
-    mutable long long int c_time;
-    mutable gu::Mutex mutex;
 };
 
 inline prof::Point::Point(const Profile& prof_, 
@@ -189,7 +212,8 @@ inline prof::Point::Point(const Profile& prof_,
                           const int line_) :
     prof(prof_),
     key(file_, func_, line_),
-    enter_time()
+    enter_time_calendar(),
+    enter_time_thread_cputime()
 { 
     prof.enter(*this); 
 }
@@ -199,24 +223,42 @@ inline prof::Point::~Point()
     prof.leave(*this); 
 }
 
+
 /*!
  * Ostream operator for Profile class.
  */
 inline std::ostream& prof::operator<<(std::ostream& os, const Profile& prof)
 {
-    os << "\n\t" << prof.name << ":";
-    os << "\n\tcumulative time: " << double(prof.c_time)/gu::datetime::Sec;
-    os << "\n\toverhead: " 
-       << double(prof.c_time)/double(gu::datetime::Date::now().get_utc() -
-                                     prof.start_time.get_utc());
+
+    Profile::PointStats cumul;
+
+    os << "\nprofile name: " << prof.name;
+    
+
+    os << std::left << std::fixed << std::setprecision(7);
+    os << "\n\n";
+    os << std::setw(40) << "point";
+    os << std::setw(10) << "count";
+    os << std::setw(10) << "calendar";
+    os << std::setw(10) << "cpu";
+    os << "\n" 
+       << std::setfill('-') << std::setw(70) << "" 
+       << std::setfill(' ') << "\n";
     for (Profile::Map::const_iterator i = prof.points.begin(); 
          i != prof.points.end(); ++i)
     {
-        os << "\n\t" << i->first << ": " 
-           << i->second.first     << " "
-           << double(i->second.second)/gu::datetime::Sec << " "
-           << double(i->second.second)/double(prof.c_time);
+        os << std::setw(40) << i->first.to_string();
+        os << std::setw(10) << i->second.count;
+        os << std::setw(10) << double(i->second.time_calendar)*1.e-9;
+        os << std::setw(10) << double(i->second.time_thread_cputime)*1.e-9;
+        os << "\n";
+        cumul = cumul + i->second;
     }
+    
+    os << "\ntot count         : " << cumul.count;
+    os << "\ntot calendar time : " << double(cumul.time_calendar)*1.e-9;
+    os << "\ntot thread cputime: " << double(cumul.time_thread_cputime)*1.e-9;
+    
     return os;
 }
 
