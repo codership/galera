@@ -20,6 +20,10 @@ declare -a NODE_INCOMING_PORT
 declare -a NODE_GCS_HOST
 declare -a NODE_GCS_PORT
 
+# Optional server configuration file to be copied to node
+declare -a NODE_MY_CNF
+declare -a NODE_PG_CNF
+
 # 1st node
 idx=0
 NODE_ID[$idx]="home"
@@ -29,6 +33,7 @@ NODE_INCOMING_HOST[$idx]=127.0.0.1
 NODE_INCOMING_PORT[$idx]=$(( $DBMS_PORT - 1 ))
 NODE_GCS_HOST[$idx]=192.168.0.1
 NODE_GCS_PORT[$idx]=$GCS_PORT
+NODE_MY_CNF[$idx]="$TEST_BASE/conf/my.cnf"
 
 # 2nd node
 idx=$(( $idx + 1 ))
@@ -39,6 +44,7 @@ NODE_INCOMING_HOST[$idx]=192.168.0.3
 NODE_INCOMING_PORT[$idx]=$DBMS_PORT
 NODE_GCS_HOST[$idx]=${NODE_INCOMING_HOST[$idx]}
 NODE_GCS_PORT[$idx]=$GCS_PORT
+NODE_MY_CNF[$idx]="$TEST_BASE/conf/my.cnf"
 
 # 3rd node
 #idx=$(( $idx + 1 ))
@@ -49,9 +55,10 @@ NODE_GCS_PORT[$idx]=$GCS_PORT
 #NODE_INCOMING_PORT[$idx]=$DBMS_PORT
 #NODE_GCS_HOST[$idx]=${NODE_INCOMING_HOST[$idx]}
 #NODE_GCS_PORT[$idx]=$GCS_PORT
+#NODE_MY_CNF[$idx]="$TEST_BASE/conf/my.cnf"
 
-NODE_MAX=$idx
-NODE_LIST=$(seq 0 $NODE_MAX)
+declare -xr NODE_MAX=$idx
+declare -xr NODE_LIST=$(seq 0 $NODE_MAX)
 
 declare -xr NODE_ID
 declare -xr NODE_LOCATION
@@ -60,7 +67,7 @@ declare -xr NODE_INCOMING_HOST
 declare -xr NODE_INCOMING_PORT
 declare -xr NODE_GCS_HOST
 declare -xr NODE_GCS_PORT
-declare -xr NODE_MAX
-declare -xr NODE_LIST
+declare -xr NODE_MY_CNF
+declare -xr NODE_PG_CNF
 
 #
