@@ -21,6 +21,9 @@ action_cmd()
     esac
 }
 
+# By convention node index is the last in the arguments list.
+# So we prepend command to the argument list otherwise it'll go after node
+# index here.
 start_cmd()
 {
     action_cmd "start" "$@"
@@ -47,19 +50,9 @@ action()
     wait_jobs
 }
 
-start()
-{
-    action "start_cmd" "$@"
-}
-
 stop()
 {
     action "stop_cmd" "$@"
-}
-
-restart()
-{
-    action "restart_cmd" "$@"
 }
 
 check()
@@ -133,3 +126,60 @@ check_node()
     echo "$chk" | sed s/-/${node_id}/
     return $(cat $BASE_RUN/check_cmd_$node_id.ret)
 }
+
+# return GCS address at which node N should connect to group
+gcs_address()
+{   
+    local node=$1
+     
+    case "$GCS_TYPE" in
+    "gcomm")
+        local peer=$(( $node - 1 )) # select previous node as connection peer
+
+        if [ $peer -lt 0 ]; then peer=$NODE_MAX; fi # rollover 
+
+        echo "gcomm://${NODE_GCS_HOST[$peer]}:${NODE_GCS_PORT[$peer]}"
+        ;;
+    "vsbes")
+        echo "vsbes://$VSBES_ADDRESS"
+        ;;
+    *)
+        return 1
+        ;;
+    esac
+}
+
+# start/restart nodes in group mode.
+_cluster_up()
+{
+    local -r cmd=$1
+
+    SECONDS=0 # for wait_jobs
+
+    for node in $NODE_LIST
+    do
+        echo "Starting ${NODE_ID[$node]}"
+        if [ $node -eq 0 ]
+        then
+            # must make sure 1st node completely operational
+            case "$GCS_TYPE" in
+            "gcomm") $cmd "-g gcomm://" 0 ;;
+            "vsbes") $cmd "-g vsbes://$VSBES_ADDRESS" 0 ;;
+            esac
+        else
+            $cmd "-g $(gcs_address $node)" $node &
+        fi
+    done
+    wait_jobs
+}
+
+start()
+{
+    _cluster_up start_node
+}
+
+restart()
+{
+    _cluster_up restart_node
+}
+															    

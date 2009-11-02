@@ -58,7 +58,8 @@ node_job()
     "untar_cmd")
 	local dist="$1"
 	shift
-	cat "$dist" | virtual_job "$cmd" "$@" 2>"$prefix.err" || rcode=$?
+	cat "$dist" | virtual_job "$cmd" "$@" 2>"$prefix.err" && \
+	copy_config $node 2>"$prefix.err" || rcode=$?
         ;;
     *)
         virtual_job "$cmd" "$@" 2>"$prefix.err" || rcode=$?

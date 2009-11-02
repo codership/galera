@@ -12,46 +12,7 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 
 TRIES=${1:-"-1"} # -1 stands for indefinite loop
 
-gcs_address()
-{
-    local node=$1
-    
-    case "$GCS_TYPE" in
-    "gcomm")
-	local peer=$(( $node - 1 )) # select previous node as connection peer
-
-        if [ $peer -lt 0 ]; then peer=$NODE_MAX; fi # rollover
-	
-        echo "gcomm://${NODE_GCS_HOST[$peer]}:${NODE_GCS_PORT[$peer]}"
-	;;
-    "vsbes")
-        echo "vsbes://$VSBES_ADDRESS"
-	;;
-    *)
-        return 1
-	;;
-    esac
-}
-
-# restart nodes in group mode
-echo "### Initial restart ###"
-SECONDS=0
-for node in $NODE_LIST
-do
-    echo "Starting ${NODE_ID[$node]}"
-    if [ $node -eq 0 ]
-    then
-        # must make sure 1st node completely operational
-	case "$GCS_TYPE" in
-	"gcomm") restart_node "-g gcomm://" 0 ;;
-	"vsbes") restart_node "-g vsbes://$VSBES_ADDRESS" 0 ;;
-	esac
-    else
-	restart_node "-g $(gcs_address $node)" $node &
-    fi
-done
-
-wait_jobs
+#restart # cluster restart should be triggered by user
 
 # Start load
 SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}

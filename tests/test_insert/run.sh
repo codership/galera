@@ -1,11 +1,19 @@
-#!/bin/sh -eu
+#!/bin/bash -eu
 
-TEST_BASE=$(cd $(dirname $0)/..; pwd -P)
+declare -r DIST_BASE=$(cd $(dirname $0)/..; pwd -P)
+TEST_BASE=${TEST_BASE:-"$DIST_BASE"}
+
 . $TEST_BASE/conf/main.conf
+
+declare -r SCRIPTS="$DIST_BASE/scripts"
+. $SCRIPTS/jobs.sh
+. $SCRIPTS/action.sh
 
 # big - for IO bound workload, small - for CPU bound workload
 SIZE=${SIZE:-"small"}
 TRX_LEN=${TRX_LEN:-"1"}
+
+#restart # cluster restart should be triggered by user
 
 # Auto gernerate does not seem to work with mysqlslap 5.1.37
 #	  --number-int-cols=5 --number-char-cols=3 \
@@ -22,6 +30,9 @@ mysqlslap --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD \
 	  --create="create_$SIZE.sql" --query="insert_$SIZE.sql" \
           --commit=$TRX_LEN \
 	  --concurrency=$DBMS_CLIENTS --number-of-queries=1000000 \
-	  --verbose --csv
+	  --verbose $@
 
+check || check || exit $?
+
+exit 0
 #
