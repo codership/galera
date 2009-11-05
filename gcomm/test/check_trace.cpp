@@ -166,7 +166,7 @@ ChannelMsg gcomm::Channel::get()
 
 gcomm::PropagationMatrix::~PropagationMatrix()
 {
-    for_each(prop.begin(), prop.end(), ChannelMap::DeleteObjectOp());
+    for_each(prop.begin(), prop.end(), ChannelMap::DeleteObject());
 }
 
 void gcomm::PropagationMatrix::insert_tp(DummyNode* t)

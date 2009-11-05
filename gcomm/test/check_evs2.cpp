@@ -620,7 +620,7 @@ static DummyNode* create_dummy_node(size_t idx,
     }
     catch (...)
     {
-        for_each(protos.begin(), protos.end(), DeleteObjectOp());
+        for_each(protos.begin(), protos.end(), DeleteObject());
         throw;
     }
 }
@@ -670,7 +670,7 @@ START_TEST(test_proto_join_n)
         gu_trace(prop.propagate_until_cvi(false));
     }
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), DeleteObjectOp());
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 
@@ -704,7 +704,7 @@ START_TEST(test_proto_join_n_w_user_msg)
     }
     
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), DeleteObjectOp());
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 
@@ -735,7 +735,7 @@ START_TEST(test_proto_join_n_lossy)
         gu_trace(prop.propagate_until_cvi(true));
     }
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), DeleteObjectOp());
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 
@@ -771,7 +771,7 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
         }
     }
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), DeleteObjectOp());
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 
@@ -805,7 +805,7 @@ START_TEST(test_proto_leave_n)
     }
     
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), DeleteObjectOp());
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 
@@ -845,7 +845,7 @@ START_TEST(test_proto_leave_n_w_user_msg)
     }
     
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), DeleteObjectOp());
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 
@@ -891,7 +891,7 @@ START_TEST(test_proto_leave_n_lossy)
     }
     
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), DeleteObjectOp());
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 
@@ -942,7 +942,7 @@ START_TEST(test_proto_leave_n_lossy_w_user_msg)
     }
     
     gu_trace(check_trace(dn));
-    for_each(dn.begin(), dn.end(), DeleteObjectOp());
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 

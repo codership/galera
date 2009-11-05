@@ -10,10 +10,8 @@
 #include "gu_uri.hpp"
 #include "gu_logger.hpp"
 #include "gu_epoll.hpp"
+#include "gu_serialize.hpp"
 
-/* Galerautil C includes */
-
-#include "gu_byteswap.h"
 
 /* C-includes */
 #include <cstring>
@@ -41,51 +39,9 @@ using namespace std;
 using namespace gu;
 using namespace gu::net;
 
-class DeleteObject
-{
-public:
-    template <typename T> void operator()(T* t) { delete t; }
-};
 
-template <typename T>
-size_t sserial_size(const T& t)
-{
-    return sizeof(T);
-}
 
-template <typename T>
-size_t serialize(const T& t, byte_t* buf, size_t buflen, size_t offset)
-    throw (Exception)
-{
-    if (offset + sserial_size(t) > buflen)
-        gu_throw_fatal;
-    *reinterpret_cast<T*>(buf + offset) = t;
-    return (offset + sserial_size(t));
-}
 
-template <typename T>
-size_t unserialize(const byte_t* buf, size_t buflen, size_t offset, T* t)
-{
-    if (offset + sserial_size(*t) > buflen)
-        gu_throw_fatal;
-    *t = *reinterpret_cast<const T*>(buf + offset);
-    return (offset + sserial_size(*t));
-}
-
-template <typename T>
-size_t serialize(const T& t, Buffer& buf, size_t offset)
-{
-    buf.reserve(buf.size() + sserial_size(t));
-    buf.insert(buf.end(), &t, &t + sserial_size(t));
-    return (offset + sserial_size(t));
-}
-
-template <typename T>
-size_t unserialize(const Buffer& buf, size_t offset, T* t)
-{
-    copy(&buf[0] + offset, &buf[0] + offset + sserial_size(*t), t);
-    return offset + sserial_size(*t);
-}
 
 
 class OptionMap

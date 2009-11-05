@@ -116,6 +116,27 @@ public:
     T& operator[] (size_t i) { return array[i]; }
 };
 
+
+/*!
+ * Object deletion operator. Convenient with STL containers containing
+ * pointers. Example:
+ *
+ * @code
+ * void cleanup()
+ * {
+ *     for_each(container.begin(), container.end(), DeleteObject());
+ *     container.clear();
+ * }
+ *
+ * @endcode
+ */
+class DeleteObject
+{
+public:
+    template <class T> void operator()(T* t) { delete t; }
+};
+
+
 } // namespace gu
 
 #endif /* _gu_utils_hpp_ */

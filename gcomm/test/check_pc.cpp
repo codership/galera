@@ -865,7 +865,7 @@ static DummyNode* create_dummy_node(size_t idx,
     }
     catch (...)
     {
-        for_each(protos.begin(), protos.end(), DeleteObjectOp());
+        for_each(protos.begin(), protos.end(), DeleteObject());
         throw;
     }
 }
@@ -926,7 +926,7 @@ START_TEST(test_pc_split_merge)
         gu_trace(prop.propagate_until_cvi(true));
     }
     check_trace(dn);
-    for_each(dn.begin(), dn.end(), DeleteObjectOp());
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 
@@ -987,7 +987,7 @@ START_TEST(test_pc_split_merge_w_user_msg)
         gu_trace(prop.propagate_until_cvi(true));
     }
     check_trace(dn);    
-    for_each(dn.begin(), dn.end(), DeleteObjectOp());
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 

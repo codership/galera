@@ -42,13 +42,6 @@ namespace gcomm
     }
     
     
-    
-    class DeleteObjectOp
-    {
-    public:
-        template <typename T> void operator()(T* t) { delete t; }
-    };
-    
     template <class C> 
     size_t serialize(const C& c, gu::Buffer& buf)
     {
@@ -88,7 +81,7 @@ namespace gcomm
                 dg.get_header().size() - msg.serial_size());
         dg.get_header().resize(dg.get_header().size() - msg.serial_size());
     }
-
+    
     // Conveinence function to iterate over protostacks
     void event_loop(gu::net::Network& el, 
                     std::vector<gcomm::Protostack>& protos, 

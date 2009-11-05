@@ -272,7 +272,7 @@ namespace gcomm
                 gu_trace(gcomm::disconnect(*i, *i_next));
             }
             gu_trace(gcomm::disconnect(*i, this));
-            std::for_each(protos.begin(), protos.end(), DeleteObjectOp());
+            std::for_each(protos.begin(), protos.end(), gu::DeleteObject());
         }
 
         
@@ -459,7 +459,7 @@ namespace gcomm
     class ChannelMap : public  Map<MatrixElem, Channel*> 
     { 
     public:
-        struct DeleteObjectOp
+        struct DeleteObject
         {
             void operator()(ChannelMap::value_type& vt)
             {
@@ -469,7 +469,7 @@ namespace gcomm
     };
     class NodeMap : public Map<size_t, DummyNode*> { 
     public:
-        struct DeleteObjectOp
+        struct DeleteObject
         {
             void operator()(NodeMap::value_type& vt)
             {

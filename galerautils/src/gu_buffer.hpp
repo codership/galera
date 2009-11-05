@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 /*!
  * Byte buffer class. This is thin wrapper to std::vector
@@ -7,6 +10,8 @@
 #define GU_BUFFER_HPP
 
 #include <vector>
+
+#include "gu_throw.hpp"
 
 #define GU_BUFFER_MEMPOOL 1
 
@@ -50,7 +55,9 @@ namespace gu
         
         value_type& operator[](size_t i) { return buf[i]; }
         const value_type& operator[](size_t i) const { return buf[i]; }
-
+        value_type& at(size_t i) { return buf.at(i); }
+        const value_type& at(size_t i) const { return buf.at(i); }
+        
 #ifdef GU_BUFFER_MEMPOOL
         void* operator new(size_t);
         void operator delete(void* );
@@ -68,6 +75,9 @@ namespace gu
         static void set_thread_safe(bool);
     };
 #endif
+
+
+    
 }
 
 
