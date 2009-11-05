@@ -10,7 +10,6 @@
  *
  */
 
-#define USE_PRODCONS 1
 
 extern "C" 
 {
@@ -130,30 +129,27 @@ public:
 class GCommConn : public Consumer, public Toplay
 {
 public:
-
-
     GCommConn(const string& uri_base_) :
         thd(),
         uri_base("pc://" + uri_base_),
+        use_prod_cons(false),
         net(),
         tp(0),
         mutex(),
-        cond(),
         refcnt(0),
         terminated(false),
         recv_buf(),
         current_view(),
         prof("gcs_gcomm")
-    { }
+    { 
+        try
+        {
+            use_prod_cons = from_string<bool>(URI(uri_base).get_option("gcomm.use_prod_cons"));
+        } catch (NotFound&) { }
+    }
     
     ~GCommConn()
     {
-        // Lock lock(mutex);
-        //        while (refcnt > 1)
-        //       {
-        //          log_info << "waiting for " << refcnt - 1 << " unrefs";
-        //   lock.wait(cond);
-        // }
         delete tp;
     }
     
@@ -217,34 +213,14 @@ public:
     
     RecvBuf& get_recv_buf() { return recv_buf; }
     size_t get_mtu() const { return tp->get_mtu(); }
+    bool get_use_prod_cons() const { return use_prod_cons; }
     Protonet& get_pnet() { return net; }
-private:
-    GCommConn* ref() 
-    { 
-        if (terminated == true)
-        {
-            return 0;
-        }
-        // ++refcnt; 
-        return this;
-    }
     
-    void unref() 
-    {
-        // --refcnt; 
-        if (terminated == true)
-        {
-            // cond.signal();
-        }
-    }
-    
-public:
     class Ref
     {
     public:
         Ref(gcs_backend_t* ptr, bool unset = false) : conn(0) 
         { 
-            // Lock lock(mutex);
             if (ptr->conn != 0)
             {
                 conn = reinterpret_cast<GCommConn*>(ptr->conn)->ref();
@@ -258,7 +234,6 @@ public:
         { 
             if (conn != 0)
             {
-                // Lock lock(mutex);
                 conn->unref();
             }
         }
@@ -266,19 +241,31 @@ public:
     private:
         Ref(const Ref&);
         void operator=(const Ref&);
-        static Mutex mutex;
         GCommConn* conn;
     };
     
 private:
     GCommConn(const GCommConn&);
     void operator=(const GCommConn&);
+
+    GCommConn* ref() 
+    { 
+        if (terminated == true)
+        {
+            return 0;
+        }
+        return this;
+    }
+    
+    void unref() 
+    { }
+    
     pthread_t thd;
     string uri_base;
+    bool use_prod_cons;
     Protonet net;
     Transport* tp;
     Mutex mutex;
-    Cond cond;
     size_t refcnt;
     bool terminated;
     RecvBuf recv_buf;
@@ -286,8 +273,6 @@ private:
     Profile prof;
 };
 
-
-Mutex GCommConn::Ref::mutex;
 
 void GCommConn::handle_up(int id, const Datagram& dg, const ProtoUpMeta& um)
 {
@@ -316,6 +301,7 @@ void GCommConn::handle_up(int id, const Datagram& dg, const ProtoUpMeta& um)
     }
 }
 
+
 void GCommConn::queue_and_wait(const Message& msg, Message* ack)
 {
     {
@@ -331,6 +317,7 @@ void GCommConn::queue_and_wait(const Message& msg, Message* ack)
     profile_leave(prof);
 }
 
+
 void GCommConn::run()
 {
     while (true)
@@ -339,29 +326,32 @@ void GCommConn::run()
             Lock lock(mutex);
             if (terminated == true)
             {
-#ifdef USE_PRODCONS
-                const Message* msg;
-                while ((msg = get_next_msg()) != 0)
+                if (get_use_prod_cons() == true)
                 {
-                    return_ack(Message(&msg->get_producer(), 0, -ENOTCONN));
+                    const Message* msg;
+                    while ((msg = get_next_msg()) != 0)
+                    {
+                        return_ack(Message(&msg->get_producer(), 0, -ENOTCONN));
+                    }
                 }
-#endif
                 break;
             }
         }
         
-#ifdef USE_PRODCONS
-        const Message* msg;
-        if ((msg = get_next_msg()) != 0)
+        if (get_use_prod_cons() == true)
         {
-            const MsgData* md(static_cast<const MsgData*>(msg->get_data()));
-            Buffer buf(md->get_data(), md->get_data() + md->get_data_size());
-            Datagram dg(buf);
-            int err = send_down(dg, ProtoDownMeta(md->get_msg_type()));
-            return_ack(Message(&msg->get_producer(), 0, 
-                               err != 0 ? -err : static_cast<int>(dg.get_len())));
+            const Message* msg;
+            if ((msg = get_next_msg()) != 0)
+            {
+                const MsgData* md(static_cast<const MsgData*>(msg->get_data()));
+                Buffer buf(md->get_data(), md->get_data() + md->get_data_size());
+                Datagram dg(buf);
+                int err = send_down(dg, ProtoDownMeta(md->get_msg_type()));
+                return_ack(Message(&msg->get_producer(), 0, 
+                                   err != 0 ? -err : static_cast<int>(dg.get_len())));
+            }
         }
-#endif
+        
         net.event_loop(Sec);
     }
 }
@@ -393,26 +383,23 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
         return -ENOTCONN;
     }
     GCommConn& conn(*ref.get());
-#ifdef USE_PRODCONS
-    Producer prod(conn);
-    Message ack;
-    MsgData msg_data(reinterpret_cast<const byte_t*>(buf), len, msg_type);
-    conn.queue_and_wait(Message(&prod, &msg_data), &ack);
-    return ack.get_val();
-#else
-    Lock lock(conn.get_pnet().get_mutex());
-    int ret = conn.send_down(Datagram(Buffer(reinterpret_cast<const byte_t*>(buf), 
-                                             reinterpret_cast<const byte_t*>(buf) + len)), 
-                             ProtoDownMeta(msg_type));
-    if (ret == 0)
+    if (conn.get_use_prod_cons() == true)
     {
-        return len;
+        Producer prod(conn);
+        Message ack;
+        MsgData msg_data(reinterpret_cast<const byte_t*>(buf), len, msg_type);
+        conn.queue_and_wait(Message(&prod, &msg_data), &ack);
+        return ack.get_val();
     }
     else
     {
-        return -ret;
+        Lock lock(conn.get_pnet().get_mutex());
+        int err = conn.send_down(
+            Datagram(Buffer(reinterpret_cast<const byte_t*>(buf), 
+                            reinterpret_cast<const byte_t*>(buf) + len)), 
+            ProtoDownMeta(msg_type));
+        return (err == 0 ? len : -err);
     }
-#endif
 }
 
 
@@ -478,7 +465,6 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
     }
     else
     {
-        
         assert(dg.get_len() > dg.get_offset());
         size_t pload_len(dg.get_len() - dg.get_offset());
         
@@ -487,6 +473,7 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
             *msg_type = GCS_MSG_ERROR;
             return pload_len;
         }
+        
         memcpy(buf, &dg.get_payload()[0] + dg.get_offset(), pload_len);
         *msg_type = static_cast<gcs_msg_type_t>(um.get_user_type());
         recv_buf.pop_front();
@@ -572,9 +559,6 @@ static GCS_BACKEND_DESTROY_FN(gcs_gcomm_destroy)
 
 GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
 {
-#ifndef USE_PRODCONS
-    BufferMempool::set_thread_safe(true);
-#endif
 
     GCommConn* conn(0);
     gu_conf_self_tstamp_on();
@@ -590,6 +574,11 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
                   << e.get_errno() << ": "
                   << e.what();
         return -e.get_errno();
+    }
+
+    if (conn->get_use_prod_cons() == false)
+    {
+        BufferMempool::set_thread_safe(true);
     }
     
     backend->open     = &gcs_gcomm_open;
