@@ -36,7 +36,8 @@ namespace gu
              */
             static void resolve(const std::string& scheme, 
                                 const std::string& authority,
-                                struct addrinfo** ai);
+                                addrinfo** ai);
+            static std::string addrinfo_to_string(const addrinfo&);
         };
     }
 }

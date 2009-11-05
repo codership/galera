@@ -2,21 +2,25 @@
 #include "gu_resolver.hpp"
 #include "gu_logger.hpp"
 #include "gu_string.hpp"
+#include "gu_utils.hpp"
+#include "gu_throw.hpp"
 
-#include <stdexcept>
 #include <map>
 
 #include <cerrno>
 
 #include <netdb.h>
+#include <arpa/inet.h>
+
+using namespace std;
 
 class SchemeMap
 {
 public:
-    typedef std::map<const std::string, struct addrinfo> Map;
+    typedef map<string, struct addrinfo> Map;
     typedef Map::const_iterator const_iterator;
 private:
-    Map map;
+    Map ai_map;
     struct addrinfo get_addrinfo(int flags, int family, int socktype, int protocol)
     {
         struct addrinfo ret = {
@@ -33,50 +37,104 @@ private:
     }
 public:
     SchemeMap() :
-        map()
+        ai_map()
     {
-        map.insert(std::make_pair("tcp", get_addrinfo(0, AF_UNSPEC, SOCK_STREAM, 0)));
+        ai_map.insert(make_pair("tcp", get_addrinfo(0, AF_UNSPEC, SOCK_STREAM, 0)));
         // TODO:
     }
-
-    const_iterator find(const std::string& key) const
+    
+    const_iterator find(const string& key) const
     {
-        return map.find(key);
+        return ai_map.find(key);
     }
-
+    
     const_iterator end() const
     {
-        return map.end();
+        return ai_map.end();
     }
-
+    
 };
 
 static SchemeMap scheme_map;
 
-void gu::net::Resolver::resolve(const std::string& scheme,
-                                const std::string& authority,
-                                struct addrinfo** ai)
+void gu::net::Resolver::resolve(const string& scheme,
+                                const string& authority,
+                                addrinfo** ai)
 {
     SchemeMap::const_iterator i;
     if ((i = scheme_map.find(scheme)) == scheme_map.end())
     {
-        log_error << "invalid scheme: '" << scheme << "'";
-        throw std::invalid_argument("invalid scheme");
+        gu_throw_error(EINVAL) << "invalid scheme: " << scheme;
     }
-
-    std::vector<std::string> auth_split = strsplit(authority, ':');
+    
+    vector<string> auth_split = strsplit(authority, ':');
     if (auth_split.size() != 2)
     {
-        log_error << "invalid authority: '" << authority << "'";
-        throw std::invalid_argument("invalid authority");
+        gu_throw_error(EINVAL) << "invalid authority" << authority;
     }
     
     int err;
     if ((err = getaddrinfo(auth_split[0].c_str(), auth_split[1].c_str(), 
                            &i->second, ai)) != 0)
     {
-        log_error << "getaddrinfo failed: " << errno;
-        throw std::runtime_error("getaddrinfo failed");
+        gu_throw_error(errno) << "getaddrinfo failed";
     }
+}
 
+
+string gu::net::Resolver::addrinfo_to_string(const addrinfo& ai)
+{
+    if (ai.ai_addr == 0)
+    {
+        gu_throw_error(EINVAL) << "null address";
+    }
+    
+    string ret;
+    switch (ai.ai_socktype)
+    {
+    case SOCK_STREAM:
+        ret += "tcp://";
+        break;
+    case SOCK_DGRAM:
+        ret += "udp://";
+        break;
+    default:
+        gu_throw_error(EINVAL) << "invalid socket type: " << ai.ai_socktype;
+        throw;
+    }
+    
+    char dst[INET6_ADDRSTRLEN + 1];
+    int port;
+    const sockaddr& sa(*ai.ai_addr);
+    
+    if (sa.sa_family == AF_INET)
+    {
+        const sockaddr_in* sin(reinterpret_cast<const sockaddr_in*>(&sa));
+        in_addr_t addr = sin->sin_addr.s_addr;
+        if (inet_ntop(sin->sin_family, 
+                      &addr, dst, sizeof(dst)) == 0)
+        {
+            gu_throw_error(EINVAL);
+        }
+        port = sin->sin_port;
+    }
+    else if (sa.sa_family == AF_INET6)
+    {
+        const sockaddr_in6* sin(reinterpret_cast<const sockaddr_in6*>(&sa));
+        if (inet_ntop(sin->sin6_family, 
+                      &sin->sin6_addr, dst, sizeof(dst)) == 0)
+        {
+            gu_throw_error(EINVAL);
+        }
+        port = sin->sin6_port;
+    }
+    else
+    {
+        gu_throw_error(EINVAL) 
+            << "unsupported address family: " << sa.sa_family; 
+        throw;
+    }
+    ret += dst;
+    ret += ":" + to_string(ntohs(port));
+    return ret;
 }

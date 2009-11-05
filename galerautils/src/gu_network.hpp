@@ -165,13 +165,14 @@ public:
     };
 private:
     /* Private data */
-    int fd;             /*!< Socket file descriptor                */
-    int err_no;         /*!< Error number for last error           */
-    int options;        /*!< Bitfield for general socket options   */
-    int event_mask;     /*!< Bitfield for waited network events    */
-    sockaddr local_sa;  /*!< Socket address for local endpoint     */
-    sockaddr remote_sa; /*!< Socket address for remote endpoint    */
-    socklen_t sa_size;     /*!< Size of socket address                */
+    int fd;             /*!< Socket file descriptor                 */
+    int err_no;         /*!< Error number for last error            */
+    int options;        /*!< Bitfield for general socket options    */
+    int event_mask;     /*!< Bitfield for waited network events     */
+    int type;           /*!< Socket type, SOCK_STREAM or SOCK_DGRAM */
+    sockaddr local_sa;  /*!< Socket address for local endpoint      */
+    sockaddr remote_sa; /*!< Socket address for remote endpoint     */
+    socklen_t sa_size;  /*!< Size of socket address                 */
     
     static const size_t hdrlen = sizeof(uint32_t);
     size_t mtu;             // For outgoing data

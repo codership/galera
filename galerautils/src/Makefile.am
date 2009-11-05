@@ -54,6 +54,13 @@ libgalerautils_la_LDFLAGS = @AM_LDFLAGS@ \
 
 lib_LTLIBRARIES += libgalerautils++.la
 
+# Resolver is built separately due to -Wno-conversion needed for
+# ntohs()
+noinst_LTLIBRARIES = libgaleraresolver.la
+libgaleraresolver_la_SOURCES = \
+	gu_resolver.cpp
+libgaleraresolver_la_CXXFLAGS = @AM_CXXFLAGS@ -Wno-conversion
+
 libgalerautils___la_SOURCES = \
 	gu_exception.cpp      \
 	gu_string.cpp         \
@@ -61,12 +68,12 @@ libgalerautils___la_SOURCES = \
 	gu_logger.cpp         \
 	gu_regex.cpp          \
 	gu_uri.cpp            \
-	gu_resolver.cpp	      \
 	gu_epoll.cpp	      \
 	gu_network.cpp        \
 	gu_prodcons.cpp	      \
 	gu_datetime.cpp
 
+libgalerautils___la_LIBADD = libgaleraresolver.la
 
 INTERFACEPP = 4
 REVISIONPP  = 0

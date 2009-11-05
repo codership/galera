@@ -28,9 +28,11 @@
 #include <algorithm>
 
 /* System includes */
+// addrinfo
 #include <netdb.h>
+// fcntl() to set O_NONBLOCK
 #include <fcntl.h>
-#include <arpa/inet.h>
+// TCP_NODELAY
 #include <netinet/tcp.h>
 
 /* Using stuff to improve readability */
@@ -258,6 +260,7 @@ gu::net::Socket::Socket(Network& net_,
     err_no(0),
     options(options_),
     event_mask(0),
+    type(-1),
     local_sa(),
     remote_sa(),
     sa_size(sa_size_),
@@ -333,6 +336,9 @@ void gu::net::Socket::open_socket(const string& addr,
         throw std::runtime_error("could not resolve address");
     }
     
+    // Set socktype
+    this->type = ai->ai_socktype;
+    
     int ai_family = ai->ai_family;
     int ai_socktype = ai->ai_socktype;
     int ai_protocol = ai->ai_protocol;
@@ -401,11 +407,14 @@ void gu::net::Socket::connect(const string& addr)
     }
 
 
-    const int no_nagle(1);
-    if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle,
-                     sizeof(no_nagle)) == -1)
+    if (type == SOCK_STREAM)
     {
-        gu_throw_error(errno);
+        const int no_nagle(1);
+        if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle,
+                         sizeof(no_nagle)) == -1)
+        {
+            gu_throw_error(errno);
+        }
     }
     assert(get_state() == S_CONNECTING || get_state() == S_CONNECTED);
 }
@@ -486,11 +495,14 @@ gu::net::Socket* gu::net::Socket::accept()
     }
     
     /* TODO: Set options before returning */
-    const int no_nagle(1);
-    if (::setsockopt(acc_fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle,
-                     sizeof(no_nagle)) == -1)
+    if (type == SOCK_STREAM)
     {
-        gu_throw_error(errno);
+        const int no_nagle(1);
+        if (::setsockopt(acc_fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle,
+                         sizeof(no_nagle)) == -1)
+        {
+            gu_throw_error(errno);
+        }
     }
 
     sockaddr local_acc_sa;
@@ -501,6 +513,7 @@ gu::net::Socket* gu::net::Socket::accept()
     
     Socket* ret = new Socket(net, acc_fd, options, 
                              &local_acc_sa, &acc_sa, sasz);
+    ret->type = this->type;
     ret->set_state(S_CONNECTED);
     net.insert(ret);
     net.set_event_mask(ret, NetworkEvent::E_IN);
@@ -717,7 +730,6 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
         case 0:
             /* Everything went fine */
             assert(sent == dgram->get_len() + hdrlen);
-            
             break;
         default:
             /* Error occurred */
@@ -857,51 +869,37 @@ void gu::net::Socket::setopt(const int opts)
     options = opts;
 }
 
-static string sa_to_string(const sockaddr& sa)
-{
-    string ret("tcp://");
-    char dst[INET6_ADDRSTRLEN + 1];
-    int port;
-    if (sa.sa_family == AF_INET)
-    {
-        const sockaddr_in* sin(reinterpret_cast<const sockaddr_in*>(&sa));
-        in_addr_t addr = sin->sin_addr.s_addr;
-        if (inet_ntop(sin->sin_family, 
-                      &addr, dst, sizeof(dst)) == 0)
-        {
-            gu_throw_error(EINVAL);
-        }
-        port = sin->sin_port;
-    }
-    else if (sa.sa_family == AF_INET6)
-    {
-        const sockaddr_in6* sin(reinterpret_cast<const sockaddr_in6*>(&sa));
-        if (inet_ntop(sin->sin6_family, 
-                      &sin->sin6_addr, dst, sizeof(dst)) == 0)
-        {
-            gu_throw_error(EINVAL);
-        }
-        port = sin->sin6_port;
-    }
-    else
-    {
-        gu_throw_error(EINVAL); throw;
-    }
-    ret += dst;
-    // damn ntohs() refuses to compile... this dirty hack now
-    ret += ":" + gu::to_string(((port & 0xff00) >> 8) | ((port & 0x00ff) << 8));
-    return ret;
-}
 
 string gu::net::Socket::get_local_addr() const
 {
-    return sa_to_string(local_sa);
+    const addrinfo ai = {
+        0,                  // Flags
+        local_sa.sa_family, // Address family
+        type,               // Socket type
+        0,                  // Protocol
+        sa_size,            // Addrlen
+        const_cast<sockaddr*>(&local_sa),          // Addr
+        0,                  // Cannonname
+        0                   // Next
+    };
+    return Resolver::addrinfo_to_string(ai);
 }
 
 string gu::net::Socket::get_remote_addr() const
 {
-    return sa_to_string(remote_sa);
+    const addrinfo ai = {
+        0,                  // Flags
+        local_sa.sa_family, // Address family
+        type,               // Socket type
+        0,                  // Protocol
+        sa_size,            // Addrlen
+        const_cast<sockaddr*>(&remote_sa),         // Addr
+        0,                  // Cannonname
+        0                   // Next
+    };
+    return Resolver::addrinfo_to_string(ai);
 }
+
 
 void gu::net::Socket::release()
 {
