@@ -2105,14 +2105,6 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         gu_trace(send_gap(UUID::nil(), current_view.get_id(), Range()));
         profile_leave(send_gap_prof);
     }
-    
-    // Deliver messages
-    profile_enter(delivery_prof);
-    if (input_map->has_deliverables() == true)
-    {
-        gu_trace(deliver());
-    }
-    profile_leave(delivery_prof);
 
     // Send messages
     if (get_state() == S_OPERATIONAL)
@@ -2130,6 +2122,14 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         profile_leave(send_user_prof);
     }
     
+    // Deliver messages
+    profile_enter(delivery_prof);
+    if (input_map->has_deliverables() == true)
+    {
+        gu_trace(deliver());
+    }
+    profile_leave(delivery_prof);
+
     // If in recovery state, send join each time input map aru seq reaches
     // last sent and either input map aru or safe seq has changed.
     if (get_state()                  == S_RECOVERY && 
@@ -2240,12 +2240,6 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     {
         inst.set_tstamp(Date::now());
     }
-    if (input_map->has_deliverables() == true)
-    {
-        profile_enter(delivery_prof);
-        gu_trace(deliver());
-        profile_leave(delivery_prof);
-    }
     profile_leave(input_map_prof);
     
     //
@@ -2266,6 +2260,13 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
                 break;
         }
         profile_leave(send_user_prof);
+    }
+    
+    if (input_map->has_deliverables() == true)
+    {
+        profile_enter(delivery_prof);
+        gu_trace(deliver());
+        profile_leave(delivery_prof);
     }
     
     // 
