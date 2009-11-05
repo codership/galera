@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
     gu_conf_debug_on();
 
     int failed = 0;
-    
+
     for (int i = 0; suites[i] != 0; ++i)
     {
         SRunner* sr = srunner_create(suites[i]());

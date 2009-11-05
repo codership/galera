@@ -17,12 +17,19 @@ AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL
 
 # Check library
-AM_PATH_CHECK()
+# m4-1.4.13 can no longer handle obsolete AM_PATH_CHECK so we have to switch to
+# PKG_CHECK_MODULES. However CentOS-5.0 has an outdated check version, so 
+# by checking m4 version we're trying to deduce which check macro to use. 
+m4_define(m4_version, m4_esyscmd(m4 --version | head -n1 | cut -d \  -f 4))
+m4_if(m4_version_compare(m4_version,1.4.10),
+      1,
+      [PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])],
+      [AM_PATH_CHECK()]
+     )
 
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stdint.h string.h])
-
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
@@ -67,7 +74,7 @@ AC_CONFIG_FILES([Makefile
 # C/C++ flags for more strict compile time checking
 # TODO: Find out the most wide set of warning flags  
 #       which is still useful (eats system header files etc.)
-AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -pedantic -Wno-unused-parameter"
+AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -pedantic -Wno-unused-parameter -fno-strict-aliasing"
 
 # CXXFLAGS 
 #

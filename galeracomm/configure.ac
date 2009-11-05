@@ -35,6 +35,15 @@ AC_PROG_LIBTOOL
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stdint.h string.h])
+# m4-1.4.13 can no longer handle obsolete AM_PATH_CHECK so we have to switch to
+# PKG_CHECK_MODULES. However CentOS-5.0 has an outdated check version, so 
+# by checking m4 version we're trying to deduce which check macro to use. 
+m4_define(m4_version, m4_esyscmd(m4 --version | head -n1 | cut -d \  -f 4))
+m4_if(m4_version_compare(m4_version,1.4.10),
+      1,
+      [PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])],
+      [AM_PATH_CHECK()]
+     )
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
@@ -46,7 +55,6 @@ AC_TYPE_SIZE_T
 #AC_TYPE_UINT64_T
 #AC_TYPE_UINT8_T
 
-
 AC_CHECK_HEADER([gu_byteswap.h],,
                 AC_MSG_ERROR([*** Galerautils not found ***]))
 
@@ -55,10 +63,10 @@ AC_CONFIG_FILES([Makefile
                  common/include/Makefile
                  common/src/Makefile
                  common/test/Makefile
-		 transport/Makefile
-		 transport/include/Makefile
-		 transport/src/Makefile
-		 transport/test/Makefile
+                 transport/Makefile
+                 transport/include/Makefile
+                 transport/src/Makefile
+                 transport/test/Makefile
                  vs/Makefile
                  vs/include/Makefile
                  vs/src/Makefile
@@ -67,7 +75,7 @@ AC_CONFIG_FILES([Makefile
 # Additional CFLAGS for more strict compile time checking
 # TODO: Find out the most wide set of warning flags  
 #       which is still useful (eats system header files etc.)
-AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -pedantic -Wno-unused-parameter"
+AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -pedantic -Wno-unused-parameter -fno-strict-aliasing"
 AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -Wold-style-cast -Wconversion -Wno-long-long -fno-rtti"
 AM_CFLAGS="$AM_CFLAGS -std=c99"
 AM_LDFLAGS="$AM_LDFLAGS -Wl,--warn-common -Wl,--fatal-warnings" 

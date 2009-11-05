@@ -33,7 +33,7 @@ CXXFLAGS=${CXXFLAGS:-"$CFLAGS"}
 AC_ARG_ENABLE(dbug,
               AC_HELP_STRING([--disable-dbug],
               [disable Fred Fish[']s DBUG macros [[default=enabled]]]),,
-	      enable_dbug="yes")
+              enable_dbug="yes")
 # Check if dbug location is provided
 if test "$enable_dbug" != "no"
 then
@@ -55,14 +55,20 @@ dnl # Check if release version of Galera library is required
 dnl AC_ARG_ENABLE(release,
 dnl              AC_HELP_STRING([--enable-release],
 dnl              [enable release build of Galera library (all dependencies linked in) [[default=disabled]]]),
-dnl	      AM_CONDITIONAL(ENABLE_RELEASE, test 1),
-dnl	      AM_CONDITIONAL(ENABLE_RELEASE, test 0))
+dnl           AM_CONDITIONAL(ENABLE_RELEASE, test 1),
+dnl           AM_CONDITIONAL(ENABLE_RELEASE, test 0))
 
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_LIBTOOL
-AM_PATH_CHECK()
-#PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
+# m4-1.4.13 can no longer handle obsolete AM_PATH_CHECK so we have to switch to
+# PKG_CHECK_MODULES. However CentOS-5.0 has an outdated check version, so 
+# by checking m4 version we're trying to deduce which check macro to use. 
+m4_define(m4_version, m4_esyscmd(m4 --version | head -n1 | cut -d \  -f 4))
+m4_if(m4_version_compare(m4_version,1.4.10),
+      1,
+      [PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])],
+      [AM_PATH_CHECK()])
 
 # Checks for libraries.
 

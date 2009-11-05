@@ -32,8 +32,15 @@ CXXFLAGS=${CXXFLAGS:-"$CFLAGS"}
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_LIBTOOL
-AM_PATH_CHECK()
-#PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
+# m4-1.4.13 can no longer handle obsolete AM_PATH_CHECK so we have to switch to
+# PKG_CHECK_MODULES. However CentOS-5.0 has an outdated check version, so 
+# by checking m4 version we're trying to deduce which check macro to use. 
+m4_define(m4_version, m4_esyscmd(m4 --version | head -n1 | cut -d \  -f 4))
+m4_if(m4_version_compare(m4_version,1.4.10),
+      1,
+      [PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])],
+      [AM_PATH_CHECK()]
+     )
 
 # Checks for libraries.
 
@@ -72,7 +79,7 @@ AC_SUBST(WSREP_INTERFACE_VERSION)
 
 #CFLAGS="$CFLAGS -Wall -Werror -Wextra -Wno-unused-parameter -Wmissing-prototypes"
 
-AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -pedantic -Wno-unused-parameter"
+AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -pedantic -Wno-unused-parameter -fno-strict-aliasing"
 AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -Wold-style-cast -Wconversion"
 AM_CXXFLAGS="$AM_CXXFLAGS -fno-rtti -Wno-long-long"
 AM_CFLAGS="$AM_CFLAGS -std=c99"

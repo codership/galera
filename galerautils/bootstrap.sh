@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -xe
 
 # This script bootraps the build process for the freshly checked
 # working copy
@@ -11,7 +11,7 @@ run_prog()
     $* 1>$LOG 2>&1 && echo "Ok" && rm -f $LOG || \
     (echo "Failed. See $LOG"; return 1)
 }
-set -e
+
 # Make aclocal to search for m4 macros in /usr/local
 if test -d /usr/local/share/aclocal
 then

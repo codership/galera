@@ -36,12 +36,10 @@
 #define __GU_NETWORK_HPP__
 
 #include "gu_buffer.hpp"
-
-/* size_t */
-#include <cstdlib>
-#include <cassert>
-/* sockaddr */
-#include <sys/socket.h>
+#include "gu_assert.h"
+#include <cstdlib>      /* size_t */
+#include <stdint.h>     /* uint32_t */
+#include <sys/socket.h> /* sockaddr */
 
 #include <string>
 #include <vector>

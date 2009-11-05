@@ -66,13 +66,13 @@ uuid_urand_node (uint8_t* node, size_t node_len)
     urand = fopen (urand_name, "r");
 
     if (NULL == urand) {
-	gu_debug ("Failed to open %s for reading (%d).", urand_name, -errno);
-	return -errno;
+        gu_debug ("Failed to open %s for reading (%d).", urand_name, -errno);
+        return -errno;
     }
 
     while (i < node_len && (c = fgetc (urand)) != EOF) {
-	node[i] = (uint8_t) c;
-	i++;
+        node[i] = (uint8_t) c;
+        i++;
     }
     fclose (urand);
 
@@ -98,12 +98,12 @@ uuid_rand_node (uint8_t* node, size_t node_len)
     /* use both high and low part of struct timeval and seed64 to
      * construct the final rand_r() seed */
     seed = (((uint32_t)time.tv_sec) ^ ((uint32_t)time.tv_usec) ^
-	    ((uint32_t)seed64)      ^ ((uint32_t)(seed64 >> 32)));
+           ((uint32_t)seed64)      ^ ((uint32_t)(seed64 >> 32)));
 
     for (i = 0; i < node_len; i++) {
-	uint32_t r = (uint32_t) rand_r (&seed);
-	/* combine all bytes into the lowest byte */
-	node[i] = (uint8_t)((r) ^ (r >> 8) ^ (r >> 16) ^ (r >> 24));
+        uint32_t r = (uint32_t) rand_r (&seed);
+        /* combine all bytes into the lowest byte */
+        node[i] = (uint8_t)((r) ^ (r >> 8) ^ (r >> 16) ^ (r >> 24));
     }
 }
 
@@ -111,7 +111,7 @@ static void
 uuid_fill_node (uint8_t* node, size_t node_len)
 {
     if (uuid_urand_node (node, node_len)) {
-	uuid_rand_node (node, node_len);
+        uuid_rand_node (node, node_len);
     }
 }
 
@@ -139,10 +139,10 @@ gu_uuid_generate (gu_uuid_t* uuid, const void* node, size_t node_len)
     uuid16[4] = gu_be16 ((clock_seq & 0x3FFF) | 0x0800);
     /* node */
     if (NULL != node && 0 != node_len) {
-	memcpy (&uuid->data[10], node, node_len > UUID_NODE_LEN ?
-		UUID_NODE_LEN : node_len);
+        memcpy (&uuid->data[10], node, node_len > UUID_NODE_LEN ?
+                UUID_NODE_LEN : node_len);
     } else {
-	uuid_fill_node (&uuid->data[10], UUID_NODE_LEN);
+        uuid_fill_node (&uuid->data[10], UUID_NODE_LEN);
     }
     return;
 }

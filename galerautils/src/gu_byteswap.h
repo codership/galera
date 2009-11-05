@@ -24,14 +24,14 @@
 #define gu_le64(x) (x)
 
 /* convert to/from Big Endian representation */
-#define gu_be16(x) bswap_16(x) 
+#define gu_be16(x) bswap_16(x)
 #define gu_be32(x) bswap_32(x)
 #define gu_be64(x) bswap_64(x)
 
 #elif __BYTE_ORDER == __BIG_ENDIAN
 
 /* convert to/from Little Endian representation */
-#define gu_le16(x) bswap_16(x) 
+#define gu_le16(x) bswap_16(x)
 #define gu_le32(x) bswap_32(x)
 #define gu_le64(x) bswap_64(x)
 

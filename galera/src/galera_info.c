@@ -42,7 +42,7 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf)
                       "not supported yet");
             snprintf (member->incoming, sizeof(member->incoming),
                       "not supported yet");
-         }
+        }
     }
 
     return ret;

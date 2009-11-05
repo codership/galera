@@ -18,8 +18,8 @@ AC_SUBST(LDFLAGS)
 # Check for debug
 AC_ARG_ENABLE(debug,
               AC_HELP_STRING([--disable-debug],
-	      [disable debugging code [[default=enabled]]]),,
-	      enable_debug="yes")
+              [disable debugging code [[default=enabled]]]),,
+              enable_debug="yes")
 if test "$enable_debug" != "no"
 then
     CFLAGS=${CFLAGS:-"-O1"} # -O1 to detect unitialized variables
@@ -39,7 +39,7 @@ CXXFLAGS=${CXXFLAGS:-"$CFLAGS"}
 AC_ARG_ENABLE(dbug,
               AC_HELP_STRING([--disable-dbug],
               [disable Fred Fish[']s DBUG macros [[default=enabled]]]),,
-	      enable_dbug="yes")
+              enable_dbug="yes")
 # Check if dbug location is provided
 if test "$enable_dbug" != "no"
 then
@@ -52,7 +52,7 @@ fi
 AC_ARG_WITH(spread,
             AC_HELP_STRING([--with-spread],
             [enable Spread toolkit backend [[default=disabled]]]),,
-	    with_spread="no")
+            with_spread="no")
 # Check if Spread location is provided
 if test "$with_spread" != "no"
 then
@@ -60,23 +60,25 @@ then
     AC_ARG_WITH(spread-libs,
                 AC_HELP_STRING([--with-spread-libs=PATH],
                 [specify where libtspread is installed]),
-		[ LDFLAGS="-L$withval $LDFLAGS"])
+                [ LDFLAGS="-L$withval $LDFLAGS"])
     AC_ARG_WITH(spread-includes,
                 AC_HELP_STRING([--with-spread-includes=PATH],
                 [specify where Spread toolkit header is located]),
-		[ CFLAGS="$CFLAGS -I$withval"])
+                [ CFLAGS="$CFLAGS -I$withval"])
 fi
 
 AC_ARG_ENABLE([gcomm],
-	AC_HELP_STRING([--disable-gcomm],
-		[disable GComm backend [[default=enabled]]]),,)
+              AC_HELP_STRING([--disable-gcomm],
+                             [disable GComm backend [[default=enabled]]]
+                            ),,
+             )
 if test "$enable_gcomm" != "no"
 then
     enable_gcomm="yes"
 fi
 
 AC_ARG_ENABLE([vs],
-	      AC_HELP_STRING([--disable-vs],
+              AC_HELP_STRING([--disable-vs],
               [disable VS backend [[default=enabled]]]),,)
 if test "$enable_vs" != "no"
 then
@@ -91,22 +93,29 @@ AM_PROG_CC_C_O
 #AC_PROG_RANLIB
 #AC_CHECK_PROG(AR, ar, ar)
 AC_PROG_LIBTOOL
-AM_PATH_CHECK()
-#PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
+# m4-1.4.13 can no longer handle obsolete AM_PATH_CHECK so we have to switch to
+# PKG_CHECK_MODULES. However CentOS-5.0 has an outdated check version, so 
+# by checking m4 version we're trying to guess which check macro to use. 
+m4_define(m4_version, m4_esyscmd(m4 --version | head -n1 | cut -d \  -f 4))
+m4_if(m4_version_compare(m4_version,1.4.10),
+      1,
+      [PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])],
+      [AM_PATH_CHECK()]
+     )
 
 # Checks for libraries.
 AC_CHECK_LIB([m], [sqrt],,
-	     AC_MSG_ERROR([*** libm not found! ***]))
+             AC_MSG_ERROR([*** libm not found! ***]))
 
 AC_CHECK_LIB([pthread], [pthread_testcancel],,
-	     AC_MSG_ERROR([*** POSIX threads not found! ***]))
+             AC_MSG_ERROR([*** POSIX threads not found! ***]))
 
 AC_CHECK_LIB([galerautils], [gu_malloc_dbg],,
-	     AC_MSG_ERROR([*** galerautils not found! ***]))
+             AC_MSG_ERROR([*** galerautils not found! ***]))
 
 if test "$enable_gcomm" != "no" -o "$enable_vs" != "no"; then
    AC_CHECK_LIB([galerautils++], [main],,
-	        AC_MSG_ERROR([*** galerautils++ not found! ***]))
+                AC_MSG_ERROR([*** galerautils++ not found! ***]))
 fi
 
 if test "$enable_gcomm" != no; then
@@ -154,12 +163,12 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([gettimeofday localtime_r memset strdup strerror strrchr strtol])
 AC_CHECK_FUNCS([htonl htons ntohl ntohs],,
-		AC_MSG_ERROR([*** htonl() and friends not found! ***]))
+                AC_MSG_ERROR([*** htonl() and friends not found! ***]))
 
 AC_CONFIG_FILES([Makefile
                  doc/Makefile
                  src/Makefile
-		 src/unit_tests/Makefile])
+                 src/unit_tests/Makefile])
 
 # Compiler and linker flags
 AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -Wno-unused-parameter"
@@ -175,12 +184,6 @@ AC_SUBST(AM_CXXFLAGS)
 AC_SUBST(AM_CPPFLAGS)
 AC_SUBST(AM_LDFLAGS)
 
-
-AC_SUBST(AM_CFLAGS)
-AC_SUBST(AM_CXXFLAGS)
-AC_SUBST(AM_CPPFLAGS)
-AC_SUBST(AM_LDFLAGS)
-		 
 AC_OUTPUT
 
 AC_MSG_NOTICE([***])

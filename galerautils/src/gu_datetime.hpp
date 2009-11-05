@@ -22,15 +22,15 @@ namespace gu
     namespace datetime
     {
         /* Multiplier constants */
-        const int64_t NSec = 1;
-        const int64_t USec = 1000*NSec;
-        const int64_t MSec = 1000*USec;
-        const int64_t Sec  = 1000*MSec;
-        const int64_t Min  = 60*Sec;
-        const int64_t Hour = 60*Min;
-        const int64_t Day  = 24*Hour;
-        const int64_t Month = 30*Day;
-        const int64_t Year = 12*Month;
+        const long long NSec = 1;
+        const long long USec = 1000*NSec;
+        const long long MSec = 1000*USec;
+        const long long Sec  = 1000*MSec;
+        const long long Min  = 60*Sec;
+        const long long Hour = 60*Min;
+        const long long Day  = 24*Hour;
+        const long long Month = 30*Day;
+        const long long Year = 12*Month;
 
         /*!
          * @brief Class representing time periods instead of 
@@ -58,7 +58,7 @@ namespace gu
                     parse(str);
             }
 
-            Period(const int64_t nsecs_) :
+            Period(const long long nsecs_) :
                 nsecs(nsecs_) { }
             
             bool operator==(const Period& cmp) const
@@ -66,21 +66,21 @@ namespace gu
 
             bool operator<(const Period& cmp) const
             { return (nsecs < cmp.nsecs); }
-            
-            Period operator+(const int64_t add) const
+
+            Period operator+(const long long add) const
             { return (nsecs + add); }
-            
-            Period operator-(const int64_t dec) const
+
+            Period operator-(const long long dec) const
             { return (nsecs - dec); }
-            
-            Period operator*(const int64_t mul) const
+
+            Period operator*(const long long mul) const
             { return (nsecs*mul); }
-            
-            Period operator/(const int64_t div) const
+
+            Period operator/(const long long div) const
             { return (nsecs/div); }
 
-            int64_t get_nsecs() const { return nsecs; }
-            
+            long long get_nsecs() const { return nsecs; }
+
         private:
 
             friend class Date;
@@ -90,10 +90,10 @@ namespace gu
              */
             void parse(const std::string&)
                 throw (gu::Exception);
-            int64_t nsecs;
+            long long nsecs;
         };
-        
-        
+
+
         /*!
          * @brief Date/time representation. 
          *
@@ -104,41 +104,42 @@ namespace gu
         class Date
         {
         public:
+
             /*! 
              * @brief Get system time.
              */
             static Date now();
-            
+
             /*!
              * @brief Get maximum representable timestamp.
              */
             static Date max();
-            
+
             /*!
              * @brief Get zero time
              */
-            
+
             static Date zero();
 
             /*!
              * Return 64-bit timestamp representing system time in nanosecond
              * resolution.
              */
-            int64_t get_utc() const { return utc; }
-            
+            long long get_utc() const { return utc; }
+
             /* Standard comparision operators */
             bool operator==(const Date cmp) const 
             { return (utc == cmp.utc); }
-            
+
             bool operator<(const Date cmp) const 
             { return (utc < cmp.utc); }
-            
+
             /*!
              * @brief Add period to Date
              */
             Date operator+(const Period& add) const 
             { return (utc + add.get_nsecs()); }
-            
+
             /*!
              * @brief Decrement period from Date
              */
@@ -150,9 +151,11 @@ namespace gu
             { return (utc - dec.utc); }
 
 
-            Date(const int64_t utc_ = 0) : utc(utc_) { }
+            Date(const long long utc_ = 0) : utc(utc_) { }
+
         private:
-            int64_t utc; /*!< System time in nanosecond precision */
+
+            long long utc; /*!< System time in nanosecond precision */
 
             /*!
              * @brief Parse date from string.
@@ -167,16 +170,12 @@ namespace gu
          * @todo Not implemented yet
          */
         std::ostream& operator<<(std::ostream&, const Date&);
-        
 
-
-
-        
         /*!
          * @brief Output operator for Period type.
          */
         std::ostream& operator<<(std::ostream&, const Period&);
-        
+
         inline std::istream& operator>>(std::istream& is, Period& p)
         {
             std::string str;
@@ -184,7 +183,7 @@ namespace gu
             p.parse(str);
             return is;
         }
-        
+
     } // namespace datetime
 } // namespace gu
 

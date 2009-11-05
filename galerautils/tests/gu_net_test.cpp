@@ -141,24 +141,21 @@ void* listener_thd(void* arg)
     while (conns > 0)
     {
         NetworkEvent ev = net->wait_event(-1);
-        
-	mark_point();
-        
+
+        mark_point();
+
         Socket* sock = ev.get_socket();
-        
-	mark_point();
-        
+
+        mark_point();
+
         const int em = ev.get_event_mask();
-        
-        
-	mark_point();
-        
+
+        mark_point();
+
         if (em & NetworkEvent::E_ACCEPTED)
         {
-            
             log_info << "accepted local " << sock->get_local_addr();
             log_info << "accepted remote " << sock->get_remote_addr();
-            
         }
         else if (em & NetworkEvent::E_ERROR)
         {
@@ -207,7 +204,7 @@ void* listener_thd(void* arg)
         }
         else if (em & NetworkEvent::E_EMPTY)
         {
-            
+
         }
         else if (sock == 0)
         {

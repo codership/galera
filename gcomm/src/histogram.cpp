@@ -51,7 +51,7 @@ void gcomm::Histogram::insert(const double val)
         return;
     }
     
-    map<const double, uint64_t>::iterator i = cnt.lower_bound(val);
+    map<const double, long long>::iterator i = cnt.lower_bound(val);
     
     if (i == cnt.end())
     {
@@ -63,7 +63,7 @@ void gcomm::Histogram::insert(const double val)
 
 void gcomm::Histogram::clear()
 {
-    for (map<const double, uint64_t>::iterator i = cnt.begin();
+    for (map<const double, long long>::iterator i = cnt.begin();
          i != cnt.end(); ++i)
     {
         i->second = 0;
@@ -72,9 +72,9 @@ void gcomm::Histogram::clear()
 
 ostream& gcomm::operator<<(ostream& os, const Histogram& hs)
 {
-    map<const double, uint64_t>::const_iterator i, i_next;
+    map<const double, long long>::const_iterator i, i_next;
     
-    uint64_t norm = 0;
+    long long norm = 0;
     for (i = hs.cnt.begin(); i != hs.cnt.end(); ++i)
     {
         norm += i->second;

@@ -1,9 +1,6 @@
-#!/bin/bash
+#!/bin/bash -e
 
 # $Id$
-
-# Fail if any command fails
-set -e
 
 have_ccache="false"
 #if test -n "`which ccache`"
@@ -35,7 +32,7 @@ usage()
     "    -b|--bootstap   rebuild the build system (implies -c)\n"\
     "    -o|--opt        configure build with debug disabled (implies -c)\n" \
     "    -d|--debug      configure build with debug enabled (implies -c)\n" \
-    "    -p|--package    build binary pacakges at the end.\n" \
+    "    -p|--package    build RPM and DEB packages at the end.\n" \
     "    --with-spread   configure build with spread backend (implies -c to gcs)\n" \
     "\nSet DISABLE_GCOMM/DISABLE_VSBES to 'yes' to disable respective modules"
 }
@@ -95,6 +92,8 @@ if [ "$OPT"   == "yes" ]; then CONFIGURE="yes"; conf_flags="$conf_flags --disabl
 if [ "$DEBUG" == "yes" ]; then CONFIGURE="yes"; fi
 if [ -n "$WITH_SPREAD" ]; then CONFIGURE="yes"; fi
 
+if [ "$CONFIGURE" == "yes" ]; then SCRATCH="yes"; fi
+
 # Disable gcomm until fixed
 #DISABLE_GCOMM=${DISABLE_GCOMM:-"yes"}
 
@@ -127,7 +126,7 @@ build()
     if [ "$BOOTSTRAP" == "yes" ]; then ./bootstrap.sh; CONFIGURE=yes ; fi
     if [ "$CONFIGURE" == "yes" ]; then rm -rf config.status; ./configure $@; SCRATCH=yes ; fi
     if [ "$SCRATCH"   == "yes" ]; then make clean ; fi
-    make || return -1
+    make || return 1
 #    $gainroot make install
     popd
 }
@@ -148,16 +147,16 @@ build_packages()
     local ARCH_RPM
     if [ "$ARCH" == "i686" ]
     then
-	ARCH_DEB=i386
-	ARCH_RPM=i386
+        ARCH_DEB=i386
+        ARCH_RPM=i386
     else
-	ARCH_DEB=amd64
-	ARCH_RPM=x86_64
+        ARCH_DEB=amd64
+        ARCH_RPM=x86_64
     fi
 
     if [ "$DISABLE_GCOMM" != "yes" ]; then export GCOMM=yes; fi
     if [ "$DISABLE_VSBES" != "yes" ]; then export VSBES=yes; fi
-    
+
     export BUILD_BASE=$build_base
     echo GCOMM=$GCOMM VSBES=$VSBES ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
     pushd $build_base/scripts/packages                       && \
@@ -166,7 +165,7 @@ build_packages()
     epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" galera-dev && \
     epm -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" galera     && \
     epm -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" galera-dev || \
-    return -1    
+    return 1
 }
 
 # Most modules are standard, so we can use a single function
@@ -177,10 +176,10 @@ build_module()
     local build_dir="$build_base/$module"
     if test "$initial_stage" == "$module" || "$building" = "true"
     then
-	build $build_dir $conf_flags $@ && building="true" || return -1
+        build $build_dir $conf_flags $@ && building="true" || return 1
     fi
 
-    build_flags $build_dir || return -1
+    build_flags $build_dir || return 1
 }
 
 building="false"
@@ -192,7 +191,7 @@ then
 #    rm -rf
     if test $have_ccache = "true"
     then
-	ccache -C
+        ccache -C
     fi
     building="true"
 fi
@@ -217,7 +216,7 @@ then
         build $galeracomm_src $conf_flags
         building="true"
     fi
-    
+
     # Galera comm is not particularly easy to handle
     CPPFLAGS="$CPPFLAGS -I$galeracomm_src/vs/include" # non-standard location
     CPPFLAGS="$CPPFLAGS -I$galeracomm_src/common/include" # non-standard location
