@@ -10,6 +10,8 @@
  *
  */
 
+#define USE_PRODCONS 1
+
 extern "C" 
 {
 #include "gcs_gcomm.h"
@@ -215,7 +217,7 @@ public:
     
     RecvBuf& get_recv_buf() { return recv_buf; }
     size_t get_mtu() const { return tp->get_mtu(); }
-    
+    Protonet& get_pnet() { return net; }
 private:
     GCommConn* ref() 
     { 
@@ -337,15 +339,18 @@ void GCommConn::run()
             Lock lock(mutex);
             if (terminated == true)
             {
+#ifdef USE_PRODCONS
                 const Message* msg;
                 while ((msg = get_next_msg()) != 0)
                 {
                     return_ack(Message(&msg->get_producer(), 0, -ENOTCONN));
                 }
+#endif
                 break;
             }
         }
         
+#ifdef USE_PRODCONS
         const Message* msg;
         if ((msg = get_next_msg()) != 0)
         {
@@ -356,6 +361,7 @@ void GCommConn::run()
             return_ack(Message(&msg->get_producer(), 0, 
                                err != 0 ? -err : static_cast<int>(dg.get_len())));
         }
+#endif
         net.event_loop(Sec);
     }
 }
@@ -387,11 +393,26 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
         return -ENOTCONN;
     }
     GCommConn& conn(*ref.get());
+#ifdef USE_PRODCONS
     Producer prod(conn);
     Message ack;
     MsgData msg_data(reinterpret_cast<const byte_t*>(buf), len, msg_type);
     conn.queue_and_wait(Message(&prod, &msg_data), &ack);
     return ack.get_val();
+#else
+    Lock lock(conn.get_pnet().get_mutex());
+    int ret = conn.send_down(Datagram(Buffer(reinterpret_cast<const byte_t*>(buf), 
+                                             reinterpret_cast<const byte_t*>(buf) + len)), 
+                             ProtoDownMeta(msg_type));
+    if (ret == 0)
+    {
+        return len;
+    }
+    else
+    {
+        return -ret;
+    }
+#endif
 }
 
 
@@ -551,6 +572,10 @@ static GCS_BACKEND_DESTROY_FN(gcs_gcomm_destroy)
 
 GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
 {
+#ifndef USE_PRODCONS
+    BufferMempool::set_thread_safe(true);
+#endif
+
     GCommConn* conn(0);
     gu_conf_self_tstamp_on();
     try

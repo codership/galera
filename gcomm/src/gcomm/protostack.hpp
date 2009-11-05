@@ -50,6 +50,7 @@ public:
         interrupted = true;
         net.interrupt();
     }
+    gu::Mutex& get_mutex() { return mutex; }
 private:
     Protonet(const Protonet&);
     void operator=(const Protonet&);

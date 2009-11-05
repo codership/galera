@@ -411,7 +411,7 @@ gcomm::evs::InputMap::insert(const size_t uuid,
     }
     catch (...)
     {
-        gu_throw_fatal;
+        // gu_throw_fatal;
         throw;
     }
 }

@@ -84,10 +84,13 @@ void gcomm::Protonet::event_loop(const Period& p)
     {
         Date next_time(Date::max());
         
-        for (deque<Protostack*>::iterator i = protos.begin(); i != protos.end();
-             ++i)
         {
-            next_time = min(next_time, (*i)->handle_timers());
+            Lock lock(mutex);
+            for (deque<Protostack*>::iterator i = protos.begin(); i != protos.end();
+                 ++i)
+            {
+                next_time = min(next_time, (*i)->handle_timers());
+            }
         }
         
         Period sleep_p(stop - Date::now());
@@ -120,6 +123,7 @@ void gcomm::Protonet::event_loop(const Period& p)
                              || s.get_state() == Socket::S_FAILED);
             }
             
+            Lock lock(mutex);
             for (deque<Protostack*>::iterator i = protos.begin();
                  i != protos.end(); ++i)
             {
