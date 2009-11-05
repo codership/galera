@@ -11,7 +11,9 @@
 #include "check_trace.hpp"
 
 using namespace std;
+using namespace gu::net;
 using namespace gcomm;
+
 
 ostream& gcomm::operator<<(ostream& os, const TraceMsg& msg)
 {
@@ -98,14 +100,13 @@ public:
     void operator()(ChannelMap::value_type& vt)
     {
         ChannelMsg cmsg(vt.second->get());
-        if (cmsg.get_rb() != 0)
+        if (cmsg.get_rb().get_len() != 0)
         {
             NodeMap::iterator i(tp.find(vt.first.get_jj()));
             gcomm_assert(i != tp.end());
             gu_trace(NodeMap::get_value(i)->get_protos().front()->handle_up(
-                         -1, cmsg.get_rb(), 0, 
+                         -1, cmsg.get_rb(),
                          ProtoUpMeta(cmsg.get_source())));
-            cmsg.get_rb()->release();
         }
     }
 private:
@@ -123,9 +124,14 @@ public:
     }
 };
 
-void gcomm::Channel::put(const ReadBuf* rb, const UUID& source) 
+void gcomm::Channel::put(const Datagram& rb, const UUID& source) 
 { 
-    queue.push_back(make_pair(latency, ChannelMsg(rb, source)));
+    Datagram dg(rb);
+    if (dg.is_normalized() == false)
+    {
+        dg.normalize();
+    }
+    queue.push_back(make_pair(latency, ChannelMsg(dg, source)));
 }
 
 ChannelMsg gcomm::Channel::get()
@@ -141,9 +147,8 @@ ChannelMsg gcomm::Channel::get()
                 double rnd(double(rand())/double(RAND_MAX));
                 if (get_loss() < rnd)
                 {
-                    p.second.get_rb()->release();
                     queue.pop_front();
-                    return ChannelMsg(0, UUID::nil());
+                    return ChannelMsg(Datagram(), UUID::nil());
                 }
             }
             ChannelMsg ret(p.second);
@@ -153,10 +158,10 @@ ChannelMsg gcomm::Channel::get()
         else
         {
             --p.first;
-            return ChannelMsg(0, UUID::nil());
+            return ChannelMsg(Datagram(), UUID::nil());
         }
     }
-    return ChannelMsg(0, UUID::nil());
+    return ChannelMsg(Datagram(), UUID::nil());
 }
 
 gcomm::PropagationMatrix::~PropagationMatrix()

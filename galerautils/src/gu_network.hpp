@@ -35,13 +35,19 @@
 #ifndef __GU_NETWORK_HPP__
 #define __GU_NETWORK_HPP__
 
+#include "gu_buffer.hpp"
+
 /* size_t */
 #include <cstdlib>
+#include <cassert>
 /* sockaddr */
 #include <sys/socket.h>
 
 #include <string>
 #include <vector>
+#include <limits>
+
+#include <boost/shared_ptr.hpp>
 
 namespace gu
 {
@@ -51,20 +57,17 @@ namespace gu
         /*! 
          * @typedef @brief Byte buffer type
          */
-        typedef unsigned char byte_t;
-        typedef std::vector<byte_t> Buffer;
         class Datagram;
         class Socket;
         class SocketList;
         class EPoll;
         class NetworkEvent;
         class Network;
-        
+        static const size_t default_mtu = (1 << 16) - 1;
         namespace URLScheme
         {
             static const std::string tcp = "tcp";
         }
-        
         
         int closefd(int fd);
     }
@@ -82,12 +85,13 @@ namespace gu
 class gu::net::Datagram
 {
     Buffer header;
-    Buffer payload;
+    boost::shared_ptr<Buffer> payload;
     size_t offset;
     /* Disallow assignment, for copying use copy constructor */
     
     // void operator=(const Datagram&);
 public:
+    Datagram() : header(), payload(new Buffer()), offset(0) { }
     /*! 
      * @brief Construct new datagram from byte buffer
      *
@@ -99,25 +103,41 @@ public:
     Datagram(const Buffer& buf_, size_t offset_ = 0);
     
     /*!
-     * @brief Copy constructor
+     * @brief Copy constructor. 
+     *
+     * @note Only for normalized datagrams.
      *
      * @param[in] dgram Datagram to make copy from
-     *
+     * @param[in] off   
      * @throws std::bad_alloc
      */
-    Datagram(const Datagram& dgram);
-
+    Datagram(const Datagram& dgram, 
+             size_t off = std::numeric_limits<size_t>::max()) :
+        header(dgram.header),
+        payload(dgram.payload),
+        offset(off == std::numeric_limits<size_t>::max() ? dgram.offset : off)
+    { 
+        assert(offset <= dgram.get_len());
+    }
     
     /*! 
      * @brief Destruct datagram
      */
-    ~Datagram();
+    ~Datagram() { }
+    
+    void normalize();
+    
+    bool is_normalized() const
+    { return (offset == 0 && header.size() == 0); }
     
     Buffer& get_header() { return header; }
     const Buffer& get_header() const { return header; }
-    Buffer& get_payload() { return payload; }
-    const Buffer& get_payload() const { return payload; }
-    size_t get_len() const { return (header.size() + payload.size()); }
+    const Buffer& get_payload() const 
+    { 
+        assert(payload != 0);
+        return *payload; 
+    }
+    size_t get_len() const { return (header.size() + payload->size()); }
     size_t get_offset() const { return offset; }
 };
 
@@ -154,15 +174,12 @@ private:
     socklen_t sa_size;     /*!< Size of socket address                */
     
     static const size_t hdrlen = sizeof(uint32_t);
-    size_t mtu;
+    size_t mtu;             // For outgoing data
+    size_t max_packet_size; // For incoming date
     size_t max_pending;
-
-    size_t dgram_offset; /*!< Offset of the last read datagram  */
-    bool complete;     /*!< Boolean denoting that compleme dgram
-                        * is waiting to be read */
-
+    
     Buffer recv_buf;  /*!< Buffer for received data        */
-    size_t recv_buf_offset;
+    size_t recv_buf_offset; /*! Offset to the end of read data */
     Datagram dgram;       /*!< Datagram container               */
     Buffer pending;  /*!< Buffer for pending outgoing data */
     State state;        /*!< Socket state                       */
@@ -183,9 +200,10 @@ private:
            const sockaddr* local_sa = 0, 
            const sockaddr* remote_sa = 0,
            const socklen_t sa_size = 0,
-           const size_t mtu = (1 << 15),
-           const size_t max_pending = (1 << 20));
-        
+           const size_t mtu = default_mtu,
+           const size_t max_packet_size = default_mtu,
+           const size_t max_pending = default_mtu*3);
+    
     /*!
      * @brief Change socket state
      */
@@ -199,12 +217,13 @@ private:
      * @throws std::runtime_error If address could not be resolved or 
      *         socket could not be created
      */
-    void open_socket(const std::string& addr);
+    void open_socket(const std::string& addr, sockaddr*, socklen_t*);
     
     Socket(const Socket&);
     void operator=(const Socket&);
     
 public:
+
     /*!
      * @brief Get file descriptor corresponding to socket.
      *
@@ -231,12 +250,12 @@ private:
     {
         return event_mask;
     }
-
+    
     /*!
      * @brief Get max pending bytes
      */
     size_t get_max_pending_len() const;
-
+    
     /*!
      * @brief Send pending bytes
      */
@@ -374,6 +393,27 @@ public:
      * @return Error string
      */
     const std::string get_errstr() const;
+
+    std::string get_local_addr() const;
+    std::string get_remote_addr() const;
+    size_t get_mtu() const { return mtu; }
+
+    bool has_unread_data() const { return (recv_buf_offset > 0); }
+
+    size_t get_recv_buf_offset() const { return recv_buf_offset; }
+    size_t get_recv_buf_hdr_len() const
+    {
+        if (recv_buf_offset > hdrlen)
+        {
+            return *reinterpret_cast<const uint32_t*>(&recv_buf[0]);
+        }
+        else
+        {
+            return 0;
+        }
+    }
+
+    void release();
 };
 
 /*!
@@ -428,10 +468,12 @@ class gu::net::Network
 {
     friend class Socket;
     SocketList* sockets;
+    std::vector<Socket*> released;
     int wake_fd[2];
     EPoll* poll;
     void insert(Socket*);
     void erase(Socket*);
+    void release(Socket*);
     Socket* find(int);
     /* Don't allow assignment or copy construction */
     Network operator=(const Network&);
@@ -464,10 +506,10 @@ public:
      *         was interrupted by signal
      * @throws std::runtime_error If error was encountered
      */
-    NetworkEvent wait_event(int timeout = -1);
+    NetworkEvent wait_event(int timeout = -1, bool auto_accept = true);
     
-    /**
-     *
+    /*!
+     * Interrupt network wait_event()
      */
     void interrupt();
     
@@ -482,6 +524,11 @@ public:
      *         invalid state
      */
     void set_event_mask(Socket* sock, int mask);
+    
+    /*!
+     * 
+     */
+    static size_t get_mtu() { return (1 << 24); }
     
 };
 

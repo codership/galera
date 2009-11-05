@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2008 Codership Oy <info@codership.com>
  *
- * $Id$
+ * $Id:$
  */
 
 /*!
@@ -17,12 +17,19 @@ namespace gu
 {
     namespace prodcons
     {
+        class MessageData;
         class Message;
         class MessageQueue;
         class Producer;
         class Consumer;
     }    
 }
+
+class gu::prodcons::MessageData
+{
+public:
+    virtual ~MessageData() { }
+};
 
 /*!
  * @brief Message class for Producer/Consumer communication
@@ -31,8 +38,9 @@ class gu::prodcons::Message
 {
     Producer* producer; /*! Producer associated to this message */
     int val; /*! Integer value (command/errno) */
-    const gu::net::byte_t* data; /*! Producer data */
-    size_t data_size;
+    const MessageData* data;
+
+
 public:
     
     /*!
@@ -42,15 +50,27 @@ public:
      * @param data_ Message data
      * @param val_ Integer value associated to the message
      */
-    Message(Producer* prod_, 
-            const gu::net::byte_t*   data_      = 0, 
-            size_t          data_size_ = 0,
-            int             val_       = -1) :
+    Message(Producer*          prod_ = 0, 
+            const MessageData* data_ = 0,
+            int                val_  = -1) :
         producer(prod_),
         val(val_),
-        data(data_),
-        data_size(data_size_)
+        data(data_)
     { }
+
+    Message(const Message& msg) :
+        producer(msg.producer),
+        val(msg.val),
+        data(msg.data)
+    { }
+
+    Message& operator=(const Message& msg)
+    {
+        producer = msg.producer;
+        val = msg.val;
+        data = msg.data;
+        return *this;
+    }
     
     /*!
      * @brief Get producer associated to the message
@@ -64,9 +84,7 @@ public:
      *
      * @return Data associated to the message
      */
-    const gu::net::byte_t* get_data() const { return data; }
-    
-    size_t get_data_size() const { return data_size; }
+    const MessageData* get_data() const { return data; }
     
     /*!
      * @brief Get int value associated to the message

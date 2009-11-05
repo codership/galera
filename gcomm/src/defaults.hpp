@@ -4,15 +4,15 @@
 
 #include <string>
 
-#include "gcomm/common.hpp"
 
-BEGIN_GCOMM_NAMESPACE
-
-struct Defaults
+namespace gcomm
 {
-    static std::string const Port;
-};
+    struct Defaults
+    {
+        static std::string const Port;
+    };
+}
 
-END_GCOMM_NAMESPACE
+
 
 #endif // DEFAULTS_HPP

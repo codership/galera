@@ -40,7 +40,7 @@ static inline int to_network_event_mask(const int mask)
     ret |= (mask & EPOLLIN ? gu::net::NetworkEvent::E_IN : 0);
     ret |= (mask & EPOLLOUT ? gu::net::NetworkEvent::E_OUT : 0);
     ret |= (mask & EPOLLERR ? gu::net::NetworkEvent::E_ERROR : 0);
-    ret |= (mask & EPOLLHUP ? gu::net::NetworkEvent::E_ERROR : 0);
+    ret |= (mask & EPOLLHUP ? gu::net::NetworkEvent::E_CLOSED : 0);
     return ret;
 }
 
@@ -68,8 +68,6 @@ gu::net::EPoll::~EPoll()
     }
 }
     
-
-
 void gu::net::EPoll::insert(const EPollEvent& epe)
 {
     int op = EPOLL_CTL_ADD;
@@ -86,6 +84,8 @@ void gu::net::EPoll::insert(const EPollEvent& epe)
         throw std::runtime_error("");
     }
     events.resize(events.size() + 1);
+    current = events.end();
+    n_events = 0;
 }
 
 void gu::net::EPoll::erase(const EPollEvent& epe)
@@ -99,6 +99,8 @@ void gu::net::EPoll::erase(const EPollEvent& epe)
         log_debug << "epoll erase: " << err << ": " << strerror(err);
     }
     events.resize(events.size() - 1);
+    current = events.end();
+    n_events = 0;
 }
 
 void gu::net::EPoll::modify(const EPollEvent& epe)
@@ -125,9 +127,12 @@ void gu::net::EPoll::poll(const int timeout)
                          timeout);
     if (ret == -1)
     {
-        ret = errno;
-        log_error << "epoll_wait(): " << ret;
+        if (errno != EINTR)
+        {
+            log_warn << "epoll_wait(): " << strerror(errno);
+        }
         n_events = 0;
+        current = events.end();
     }
     else
     {

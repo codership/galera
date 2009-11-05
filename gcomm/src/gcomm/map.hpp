@@ -93,7 +93,7 @@ namespace gcomm
 
         bool empty() const     { return map.empty(); }
 
-        size_t serialize(byte_t* const buf,
+        size_t serialize(gu::byte_t* const buf,
                          size_t  const buflen, 
                          size_t        offset) const
             throw (gu::Exception)
@@ -108,7 +108,7 @@ namespace gcomm
             return offset;
         }
         
-        size_t unserialize(const byte_t* buf, 
+        size_t unserialize(const gu::byte_t* buf, 
                            size_t const  buflen, 
                            size_t        offset)
             throw (gu::Exception)

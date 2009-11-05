@@ -7,18 +7,16 @@ INCLUDES = -I../src
 check_gcomm_SOURCES = 		\
 	check_types.cpp 	\
 	check_util.cpp		\
-	check_buffer.cpp 	\
-	check_event.cpp		\
-	check_concurrent.cpp	\
-	check_tcp.cpp		\
 	check_gmcast.cpp	\
+	check_gcomm.cpp 	\
 	check_evs2.cpp		\
 	check_pc.cpp		\
-	check_trace.cpp		\
-	check_gcomm.cpp
+	check_trace.cpp		
+
 check_gcomm_LDADD = \
 	$(top_builddir)/src/libgcomm.la \
  	-lgalerautils 			\
 	-lgalerautils++ 		\
 	@CHECK_LIBS@
 check_gcomm_LDFLAGS = @AM_LDFLAGS@ -static
+check_gcomm_DEPENDNCIES = -lgalerautils++

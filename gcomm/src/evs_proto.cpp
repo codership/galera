@@ -1,7 +1,7 @@
 
-#ifdef PROFILE_EVS_PROTO
+//#ifdef PROFILE_EVS_PROTO
 #define GCOMM_PROFILE 1
-#endif // PROFILE_EVS_PROTO
+//#endif // PROFILE_EVS_PROTO
 
 #include "evs_proto.hpp"
 #include "evs_message2.hpp"
@@ -9,6 +9,7 @@
 
 #include "gcomm/transport.hpp"
 #include "gcomm/conf.hpp"
+#include "gcomm/util.hpp"
 
 #include <stdexcept>
 #include <algorithm>
@@ -17,6 +18,8 @@
 using namespace std;
 using namespace std::rel_ops;
 using namespace gu;
+using namespace gu::net;
+using namespace gu::datetime;
 using namespace gcomm;
 using namespace gcomm::evs;
 
@@ -219,8 +222,8 @@ void gcomm::evs::Node::set_leave_message(const LeaveMessage* lm)
 gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     timers(),
     debug_mask(D_STATE),
-    info_mask(I_VIEWS | I_STATE | I_STATISTICS),
-    last_stats_report(Time::now()),
+    info_mask(I_VIEWS | I_STATE | I_STATISTICS | I_PROFILING),
+    last_stats_report(Date::now()),
     collect_stats(true),
     hs_safe("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
     send_queue_s(0),
@@ -258,9 +261,9 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     install_message(0),
     fifo_seq(-1),
     last_sent(Seqno::max()),
-    send_window(8), 
+    send_window(16), 
     output(),
-    max_output_size(16),
+    max_output_size(32),
     self_loopback(false),
     state(S_CLOSED),
     shift_to_rfcnt(0)
@@ -341,11 +344,6 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
 
 gcomm::evs::Proto::~Proto() 
 {
-    for (deque<pair<WriteBuf*, ProtoDownMeta> >::iterator i = output.begin(); i != output.end();
-         ++i)
-    {
-        delete i->first;
-    }
     output.clear();
     delete install_message;
     delete input_map;
@@ -395,7 +393,7 @@ string gcomm::evs::Proto::get_stats() const
     copy(sent_msgs.begin(), sent_msgs.end(), 
          ostream_iterator<long long int>(os, ","));
     os << "}\n\tsent per sec {";
-    const double norm(double(Time::now().get_utc() 
+    const double norm(double(Date::now().get_utc() 
                              - last_stats_report.get_utc())/gu::datetime::Sec);
     vector<double> result(7, norm);
     transform(sent_msgs.begin(), sent_msgs.end(), 
@@ -426,13 +424,13 @@ void gcomm::evs::Proto::reset_stats()
     retrans_msgs = 0LL;
     recovered_msgs = 0LL;
     delivered_msgs = 0LL;
-    last_stats_report = Time::now();
+    last_stats_report = Date::now();
 }
 
 
 bool gcomm::evs::Proto::is_msg_from_previous_view(const Message& msg)
 {
-    for (list<pair<ViewId, Time> >::const_iterator i = previous_views.begin();
+    for (list<pair<ViewId, Date> >::const_iterator i = previous_views.begin();
          i != previous_views.end(); ++i)
     {
         if (msg.get_source_view_id() == i->first)
@@ -485,9 +483,9 @@ void gcomm::evs::Proto::handle_retrans_timer()
         evs_log_debug(D_TIMERS) << "send user timer, last_sent=" << last_sent;
         if (output.empty() == true)
         {
-            WriteBuf wb(0, 0);
+            Datagram dg;
             profile_enter(send_user_prof);
-            gu_trace((void)send_user(&wb, 0xff, SP_DROP, send_window, 
+            gu_trace((void)send_user(dg, 0xff, SP_DROP, send_window, 
                                      Seqno::max()));
             profile_leave(send_user_prof);
         }
@@ -565,10 +563,10 @@ private:
     Proto::Timer const t;
 };
 
-Time gcomm::evs::Proto::get_next_expiration(const Timer t) const
+Date gcomm::evs::Proto::get_next_expiration(const Timer t) const
 {
     gcomm_assert(get_state() != S_CLOSED);
-    Time now(Time::now());
+    Date now(Date::now());
     switch (t)
     {
     case T_INACTIVITY:
@@ -590,7 +588,7 @@ Time gcomm::evs::Proto::get_next_expiration(const Timer t) const
         case S_RECOVERY:
             return (now + consensus_timeout);
         default:
-            return Time::max();
+            return Date::max();
         }
     case T_STATS:
         return (now + stats_report_period);
@@ -614,9 +612,9 @@ void gcomm::evs::Proto::reset_timers()
 }
 
 
-Time gcomm::evs::Proto::handle_timers()
+Date gcomm::evs::Proto::handle_timers()
 {
-    Time now(Time::now());
+    Date now(Date::now());
     
     while (timers.empty() == false &&
            TimerList::get_key(timers.begin()) <= now)
@@ -640,7 +638,7 @@ Time gcomm::evs::Proto::handle_timers()
         }
         if (get_state() == S_CLOSED)
         {
-            return Time::max();
+            return Date::max();
         }
         // Make sure that timer was not inserted twice
         TimerList::iterator ii = find_if(timers.begin(), timers.end(), 
@@ -655,7 +653,7 @@ Time gcomm::evs::Proto::handle_timers()
     if (timers.empty() == true)
     {
         evs_log_debug(D_TIMERS) << "no timers set";
-        return Time::max();
+        return Date::max();
     }
     return TimerList::get_key(timers.begin());
 }
@@ -663,7 +661,7 @@ Time gcomm::evs::Proto::handle_timers()
 
 bool gcomm::evs::Proto::is_inactive(const Node& node) const
 {
-    return (node.get_tstamp() + inactive_timeout < Time::now());
+    return (node.get_tstamp() + inactive_timeout < Date::now());
 }
 
 void gcomm::evs::Proto::check_inactive()
@@ -706,7 +704,7 @@ void gcomm::evs::Proto::set_inactive(const UUID& uuid)
     NodeMap::iterator i;
     gu_trace(i = known.find_checked(uuid));
     evs_log_debug(D_STATE) << "setting " << uuid << " inactive";
-    NodeMap::get_value(i).set_tstamp(Time::zero());
+    NodeMap::get_value(i).set_tstamp(Date::zero());
 }
 
 
@@ -727,8 +725,8 @@ void gcomm::evs::Proto::cleanup_unoperational()
 
 void gcomm::evs::Proto::cleanup_views()
 {
-    Time now(Time::now());
-    list<pair<ViewId, Time> >::iterator i = previous_views.begin();
+    Date now(Date::now());
+    list<pair<ViewId, Date> >::iterator i = previous_views.begin();
     while (i != previous_views.end())
     {
         if (i->second + view_forget_timeout <= now)
@@ -802,7 +800,7 @@ void gcomm::evs::Proto::deliver_reg_view()
     evs_log_info(I_VIEWS) << "delivering view " << view;
     
     ProtoUpMeta up_meta(UUID::nil(), ViewId(), &view);
-    pass_up(0, 0, up_meta);
+    send_up(Datagram(), up_meta);
 }
 
 void gcomm::evs::Proto::deliver_trans_view(bool local) 
@@ -868,7 +866,7 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
     evs_log_info(I_VIEWS) << " delivering view " << view;
     
     ProtoUpMeta up_meta(UUID::nil(), ViewId(), &view);
-    gu_trace(pass_up(0, 0, up_meta));
+    gu_trace(send_up(Datagram(), up_meta));
 }
 
 
@@ -879,7 +877,7 @@ void gcomm::evs::Proto::deliver_empty_view()
     evs_log_info(I_VIEWS) << "delivering view " << view;
 
     ProtoUpMeta up_meta(UUID::nil(), ViewId(), &view);
-    pass_up(0, 0, up_meta);
+    send_up(Datagram(), up_meta);
 }
 
 
@@ -1343,19 +1341,7 @@ bool gcomm::evs::Proto::is_consistent(const Message& msg) const
 // Message sending
 /////////////////////////////////////////////////////////////////////////////
 
-template <class M>
-void push_header(const M& msg, WriteBuf* wb)
-{
-    vector<byte_t> buf(msg.serial_size());
-    msg.serialize(&buf[0], buf.size(), 0);
-    wb->prepend_hdr(&buf[0], buf.size());
-}
 
-template <class M>
-void pop_header(const M& msg, WriteBuf* wb)
-{
-    wb->rollback_hdr(msg.serial_size());
-}
 
 
 bool gcomm::evs::Proto::is_flow_control(const Seqno seq, const Seqno win) const
@@ -1371,16 +1357,17 @@ bool gcomm::evs::Proto::is_flow_control(const Seqno seq, const Seqno win) const
     return false;
 }
 
-int gcomm::evs::Proto::send_user(WriteBuf* wb, 
-                                 const uint8_t user_type,
-                                 const SafetyPrefix sp, 
-                                 const Seqno win,
-                                 const Seqno up_to_seqno,
-                                 bool local)
+int gcomm::evs::Proto::send_user(const Datagram& dg,
+                                 uint8_t const user_type,
+                                 SafetyPrefix const sp, 
+                                 Seqno const win,
+                                 Seqno const up_to_seqno)
 {
     assert(get_state() == S_LEAVING || 
            get_state() == S_RECOVERY || 
            get_state() == S_OPERATIONAL);
+    assert(dg.get_offset() == 0);
+    
     gcomm_assert(up_to_seqno == Seqno::max() || 
                  last_sent   == Seqno::max() ||
                  up_to_seqno >= last_sent);
@@ -1388,8 +1375,7 @@ int gcomm::evs::Proto::send_user(WriteBuf* wb,
     int ret;
     const Seqno seq(last_sent == Seqno::max() ? 0 : last_sent + 1);
     
-    if (local                     == false         && 
-        win                       != Seqno::max()  &&
+    if (win                       != Seqno::max()  &&
         is_flow_control(seq, win) == true)
     {
         return EAGAIN;
@@ -1423,11 +1409,13 @@ int gcomm::evs::Proto::send_user(WriteBuf* wb,
                     flags);
     
     // Insert first to input map to determine correct aru seq
-    ReadBuf* rb = wb->to_readbuf();
     Range range;
+    
+    Datagram send_dg(dg);
+    send_dg.normalize();
+    
     gu_trace(range = input_map->insert(NodeMap::get_value(self_i).get_index(), 
-                                       msg, rb, 0));
-    rb->release();
+                                       msg, send_dg));
     
     gcomm_assert(range.get_hs() == last_msg_seq) 
         << msg << " " << *input_map << " " << *this;
@@ -1438,20 +1426,17 @@ int gcomm::evs::Proto::send_user(WriteBuf* wb,
     update_im_safe_seq(NodeMap::get_value(self_i).get_index(), 
                        input_map->get_aru_seq());
     
-    if (local == false)
+    msg.set_aru_seq(input_map->get_aru_seq());
+    evs_log_debug(D_USER_MSGS) << " sending " << msg;
+    push_header(msg, send_dg);
+    if ((ret = send_down(send_dg, ProtoDownMeta())) != 0)
     {
-        // Rewrite message hdr to include correct aru
-        msg.set_aru_seq(input_map->get_aru_seq());
-        push_header(msg, wb);
-        if ((ret = pass_down(wb, 0)) != 0)
-        {
-            log_warn << "send failed: "  << strerror(ret);
-        }
-        pop_header(msg, wb);
-        sent_msgs[Message::T_USER]++;
+        log_warn << "send failed: "  << strerror(ret);
     }
+    pop_header(msg, send_dg);
+    sent_msgs[Message::T_USER]++;
     
-    if (delivering == false)
+    if (delivering == false && input_map->has_deliverables() == true)
     {
         gu_trace(deliver());
     }
@@ -1462,7 +1447,7 @@ int gcomm::evs::Proto::send_user(const Seqno win)
 {
     gcomm_assert(output.empty() == false);
     gcomm_assert(get_state() == S_OPERATIONAL);
-    pair<WriteBuf*, ProtoDownMeta> wb = output.front();
+    pair<Datagram, ProtoDownMeta> wb = output.front();
     int ret;
     if ((ret = send_user(wb.first, 
                          wb.second.get_user_type(), 
@@ -1471,7 +1456,6 @@ int gcomm::evs::Proto::send_user(const Seqno win)
                          Seqno::max())) == 0) 
     {
         output.pop_front();
-        delete wb.first;
     }
     return ret;
 }
@@ -1483,10 +1467,10 @@ void gcomm::evs::Proto::complete_user(const Seqno high_seq)
     
     evs_log_debug(D_USER_MSGS) << "completing seqno to " << high_seq;;
 
-    WriteBuf wb(0, 0);
+    Datagram wb;
     int err;
     profile_enter(send_user_prof);
-    err = send_user(&wb, 0xff, SP_DROP, Seqno::max(), high_seq);
+    err = send_user(wb, 0xff, SP_DROP, Seqno::max(), high_seq);
     profile_leave(send_user_prof);
     if (err != 0)
     {
@@ -1498,11 +1482,11 @@ void gcomm::evs::Proto::complete_user(const Seqno high_seq)
 }
 
 
-int gcomm::evs::Proto::send_delegate(WriteBuf* wb)
+int gcomm::evs::Proto::send_delegate(Datagram& wb)
 {
     DelegateMessage dm(get_uuid(), current_view.get_id(), ++fifo_seq);
     push_header(dm, wb);
-    int ret = pass_down(wb, 0);
+    int ret = send_down(wb, ProtoDownMeta());
     pop_header(dm, wb);
     sent_msgs[Message::T_DELEGATE]++;
     return ret;
@@ -1531,9 +1515,9 @@ void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
                   range_uuid, 
                   range);
     
-    WriteBuf wb(0, 0);
-    push_header(gm, &wb);
-    int err = pass_down(&wb, 0);
+    Buffer buf;
+    serialize(gm, buf);
+    int err = send_down(Datagram(buf), ProtoDownMeta());
     if (err != 0)
     {
         log_warn << "send failed: " << strerror(err);
@@ -1627,11 +1611,11 @@ void gcomm::evs::Proto::send_join(bool handle)
     
     
     JoinMessage jm(create_join());
-    vector<byte_t> buf(jm.serial_size());
-    gu_trace((void)jm.serialize(&buf[0], buf.size(), 0));
-    WriteBuf wb(&buf[0], buf.size());
+
+    Buffer buf;
+    serialize(jm, buf);
+    int err = send_down(buf, ProtoDownMeta());
     
-    int err = pass_down(&wb, 0);
     if (err != 0) 
     {
         log_warn << "send failed: " << strerror(err);
@@ -1652,9 +1636,9 @@ void gcomm::evs::Proto::send_leave(bool handle)
     // trigger message acknowledgement mechanism
     if (last_sent == Seqno::max() && output.empty() == true)
     {
-        WriteBuf wb(0, 0);
+        Datagram wb;
         profile_enter(send_user_prof);
-        gu_trace(send_user(&wb, 0xff, SP_DROP, Seqno::max(), Seqno::max()));
+        gu_trace(send_user(wb, 0xff, SP_DROP, Seqno::max(), Seqno::max()));
         profile_leave(send_user_prof);
     }
     
@@ -1662,7 +1646,7 @@ void gcomm::evs::Proto::send_leave(bool handle)
     profile_enter(send_user_prof);
     while (output.empty() == false)
     {
-        pair<WriteBuf*, ProtoDownMeta> wb = output.front();
+        pair<Datagram, ProtoDownMeta> wb = output.front();
         if (send_user(wb.first, 
                       wb.second.get_user_type(), 
                       wb.second.get_safety_prefix(), 
@@ -1672,7 +1656,6 @@ void gcomm::evs::Proto::send_leave(bool handle)
         }
         
         output.pop_front();
-        delete wb.first;
     }
     profile_leave(send_user_prof);
 
@@ -1685,10 +1668,10 @@ void gcomm::evs::Proto::send_leave(bool handle)
 
     evs_log_debug(D_LEAVE_MSGS) << "sending leave msg " << lm;
     
-    WriteBuf wb(0, 0);
-    push_header(lm, &wb);
+    Buffer buf;
+    serialize(lm, buf);
     
-    int err = pass_down(&wb, 0);
+    int err = send_down(Datagram(buf), ProtoDownMeta());
     if (err != 0)
     {
         log_warn << "send failed " << strerror(err);
@@ -1742,11 +1725,12 @@ void gcomm::evs::Proto::send_install()
     
     evs_log_debug(D_INSTALL_MSGS) << "sending install " << imsg;
     
-    vector<byte_t> buf(imsg.serial_size());
-    gu_trace((void)imsg.serialize(&buf[0], buf.size(), 0));
-    WriteBuf wb (&buf[0], buf.size());
+
+
+    Buffer buf;
+    serialize(imsg, buf);
     
-    int err = pass_down(&wb, 0);;
+    int err = send_down(Datagram(buf), ProtoDownMeta());
     if (err != 0) 
     {
         log_warn << "send failed: " << strerror(err);
@@ -1791,7 +1775,8 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
         
         const UserMessage& msg(InputMapMsgIndex::get_value(msg_i).get_msg());
         gcomm_assert(msg.get_source() == get_uuid());
-        const ReadBuf* rb(InputMapMsgIndex::get_value(msg_i).get_rb());
+        Datagram rb(InputMapMsgIndex::get_value(msg_i).get_rb());
+        assert(rb.get_offset() == 0 && rb.get_header().size() == 0);
         UserMessage um(msg.get_source(),
                        msg.get_source_view_id(),
                        msg.get_seq(),
@@ -1802,10 +1787,9 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
                        msg.get_user_type(),
                        Message::F_RETRANS);
         
-        WriteBuf wb(rb != 0 ? rb->get_buf() : 0, rb != 0 ? rb->get_len() : 0);
-        push_header(um, &wb);
+        push_header(um, rb);
         
-        int err = pass_down(&wb, 0);
+        int err = send_down(rb, ProtoDownMeta());
         if (err != 0)
         {
             log_warn << "send failed: " << strerror(err);
@@ -1872,7 +1856,8 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
         
         const UserMessage& msg(InputMapMsgIndex::get_value(msg_i).get_msg());
         assert(msg.get_source() == range_uuid);
-        const ReadBuf* rb(InputMapMsgIndex::get_value(msg_i).get_rb());
+        Datagram rb(InputMapMsgIndex::get_value(msg_i).get_rb());
+        assert(rb.get_offset() == 0 && rb.get_header().size() == 0);
         UserMessage um(msg.get_source(),
                        msg.get_source_view_id(),
                        msg.get_seq(),
@@ -1883,10 +1868,9 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
                        msg.get_user_type(),
                        Message::F_SOURCE | Message::F_RETRANS);
         
-        WriteBuf wb(rb != 0 ? rb->get_buf() : 0, rb != 0 ? rb->get_len() : 0);
-        push_header(um, &wb);
+        push_header(um, rb);
         
-        int err = send_delegate(&wb);
+        int err = send_delegate(rb);
         if (err != 0)
         {
             log_warn << "send failed: " << strerror(err);
@@ -1938,8 +1922,7 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
 }
 
 void gcomm::evs::Proto::handle_msg(const Message& msg, 
-                                   const ReadBuf* rb,
-                                   const size_t roff)
+                                   const Datagram& rb)
 {
     assert(msg.get_type() <= Message::T_LEAVE);
     if (get_state() == S_CLOSED)
@@ -1999,10 +1982,10 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
 
     switch (msg.get_type()) {
     case Message::T_USER:
-        gu_trace(handle_user(static_cast<const UserMessage&>(msg), ii, rb, roff));
+        gu_trace(handle_user(static_cast<const UserMessage&>(msg), ii, rb));
         break;
     case Message::T_DELEGATE:
-        gu_trace(handle_delegate(static_cast<const DelegateMessage&>(msg), ii, rb, roff));
+        gu_trace(handle_delegate(static_cast<const DelegateMessage&>(msg), ii, rb));
         break;
     case Message::T_GAP:
         gu_trace(handle_gap(static_cast<const GapMessage&>(msg), ii));
@@ -2026,13 +2009,14 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
 ////////////////////////////////////////////////////////////////////////
 
 size_t gcomm::evs::Proto::unserialize_message(const UUID& source, 
-                                              const ReadBuf* const rb, 
-                                              size_t offset,
+                                              const Datagram& rb, 
                                               Message* msg)
 {
-
-
-    gu_trace(offset = msg->unserialize(rb->get_buf(), rb->get_len(), offset));
+    
+    size_t offset;
+    gu_trace(offset = msg->unserialize(&rb.get_payload()[0], 
+                                       rb.get_payload().size(), 
+                                       rb.get_offset()));
     if ((msg->get_flags() & Message::F_SOURCE) == false)
     {
         gcomm_assert(source != UUID::nil());
@@ -2046,44 +2030,38 @@ size_t gcomm::evs::Proto::unserialize_message(const UUID& source,
         break;
     case Message::T_USER:
         gu_trace(offset = static_cast<UserMessage&>(*msg).unserialize(
-                     rb->get_buf(), rb->get_len(), offset, true));
+                     &rb.get_payload()[0], rb.get_payload().size(), offset, true));
         break;
     case Message::T_DELEGATE:
         gu_trace(offset = static_cast<DelegateMessage&>(*msg).unserialize(
-                     rb->get_buf(), rb->get_len(), offset, true));
+                     &rb.get_payload()[0], rb.get_payload().size(), offset, true));
         break;
     case Message::T_GAP:
         gu_trace(offset = static_cast<GapMessage&>(*msg).unserialize(
-                     rb->get_buf(), rb->get_len(), offset, true));
+                     &rb.get_payload()[0], rb.get_payload().size(), offset, true));
         break;
     case Message::T_JOIN:
         gu_trace(offset = static_cast<JoinMessage&>(*msg).unserialize(
-                     rb->get_buf(), rb->get_len(), offset, true));
+                     &rb.get_payload()[0], rb.get_payload().size(), offset, true));
         break;
     case Message::T_INSTALL:
         gu_trace(offset = static_cast<InstallMessage&>(*msg).unserialize(
-                     rb->get_buf(), rb->get_len(), offset, true));
+                     &rb.get_payload()[0], rb.get_payload().size(), offset, true));
         break;
     case Message::T_LEAVE:
         gu_trace(offset = static_cast<LeaveMessage&>(*msg).unserialize(
-                     rb->get_buf(), rb->get_len(), offset, true));
+                     &rb.get_payload()[0], rb.get_payload().size(), offset, true));
         break;
     }
     return offset;
 }
 
 void gcomm::evs::Proto::handle_up(int cid, 
-                                  const ReadBuf* rb, 
-                                  size_t offset,
+                                  const Datagram& rb,
                                   const ProtoUpMeta& um)
 {
     
     Message msg;
-    
-    if (rb == 0)
-    {
-        gcomm_throw_fatal << "Invalid input: rb == 0";
-    }
     
     if (get_state() == S_CLOSED || um.get_source() == get_uuid())
     {
@@ -2095,8 +2073,9 @@ void gcomm::evs::Proto::handle_up(int cid,
     
     try
     {
-        gu_trace(offset = unserialize_message(um.get_source(), rb, offset, &msg));
-        handle_msg(msg, rb, offset);
+        size_t offset;
+        gu_trace(offset = unserialize_message(um.get_source(), rb, &msg));
+        handle_msg(msg, Datagram(rb, offset));
     }
     catch (...)
     {
@@ -2106,7 +2085,7 @@ void gcomm::evs::Proto::handle_up(int cid,
     }
 }
 
-int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
+int gcomm::evs::Proto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
 {
     
     if (get_state() == S_RECOVERY)
@@ -2139,16 +2118,15 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
         profile_enter(send_user_prof);
         err = send_user(wb, 
                         dm.get_user_type(),
-                        dm.get_safety_prefix(), send_window.get()/2, 
+                        dm.get_safety_prefix(), Seqno(send_window.get()/2), 
                         Seqno::max());
         profile_leave(send_user_prof);
-        
+
         switch (err) 
         {
         case EAGAIN:
         {
-            WriteBuf* priv_wb = wb->copy();
-            output.push_back(make_pair(priv_wb, dm));
+            output.push_back(make_pair(wb, dm));
             // Fall through
         }
         case 0:
@@ -2161,8 +2139,7 @@ int gcomm::evs::Proto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
     } 
     else if (output.size() < max_output_size)
     {
-        WriteBuf* priv_wb = wb->copy();
-        output.push_back(make_pair(priv_wb, dm));
+        output.push_back(make_pair(wb, dm));
     } 
     else 
     {
@@ -2290,7 +2267,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         }
         
         previous_view = current_view;
-        previous_views.push_back(make_pair(current_view.get_id(), Time::now()));
+        previous_views.push_back(make_pair(current_view.get_id(), Date::now()));
         
         gcomm_assert(install_message->has_node_list() == true);
         const MessageNodeList& imap = install_message->get_node_list();
@@ -2299,7 +2276,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
              i != imap.end(); ++i)
         {
             previous_views.push_back(make_pair(MessageNodeList::get_value(i).get_view_id(), 
-                                               Time::now()));
+                                               Date::now()));
         }
         current_view = View(install_message->get_source_view_id());
         size_t idx = 0;
@@ -2355,7 +2332,7 @@ void gcomm::evs::Proto::validate_reg_msg(const UserMessage& msg)
 
     if (collect_stats == true && msg.get_safety_prefix() == SP_SAFE)
     {
-        Time now(Time::now());
+        Date now(Date::now());
         hs_safe.insert(double(now.get_utc() - msg.get_tstamp().get_utc())/gu::datetime::Sec);
     }
 }
@@ -2385,7 +2362,6 @@ void gcomm::evs::Proto::deliver()
         i_next = i;
         ++i_next;
         const InputMapMsg& msg(InputMapMsgIndex::get_value(i));
-        gu_trace(validate_reg_msg(msg.get_msg()));
         bool deliver = false;
         switch (msg.get_msg().get_safety_prefix())
         {
@@ -2420,13 +2396,14 @@ void gcomm::evs::Proto::deliver()
         {
             if (msg.get_msg().get_safety_prefix() != SP_DROP)
             {
+                gu_trace(validate_reg_msg(msg.get_msg()));
                 profile_enter(delivery_prof);
                 ProtoUpMeta um(msg.get_msg().get_source(), 
                                msg.get_msg().get_source_view_id(),
                                0,
                                msg.get_msg().get_user_type(),
                                msg.get_msg().get_seq().get());
-                gu_trace(pass_up(msg.get_rb(), 0, um));
+                gu_trace(send_up(msg.get_rb(), um));
                 delivered_msgs++;
                 profile_leave(delivery_prof);
             }
@@ -2441,6 +2418,7 @@ void gcomm::evs::Proto::deliver()
 
 }
 
+#if 0
 void gcomm::evs::Proto::validate_trans_msg(const UserMessage& msg)
 {
     if (msg.get_source_view_id() != current_view.get_id())
@@ -2453,11 +2431,11 @@ void gcomm::evs::Proto::validate_trans_msg(const UserMessage& msg)
     
     if (collect_stats && msg.get_safety_prefix() == SP_SAFE)
     {
-        Time now(Time::now());
+        Date now(Date::now());
         hs_safe.insert(double(now.get_utc() - msg.get_tstamp().get_utc())/gu::datetime::Sec);
     }
 }
-
+#endif
 
 void gcomm::evs::Proto::deliver_trans()
 {
@@ -2492,7 +2470,6 @@ void gcomm::evs::Proto::deliver_trans()
         i_next = i;
         ++i_next;    
         const InputMapMsg& msg(InputMapMsgIndex::get_value(i));
-        gu_trace(validate_reg_msg(msg.get_msg()));
         bool deliver = false;
         switch (msg.get_msg().get_safety_prefix())
         {
@@ -2515,14 +2492,15 @@ void gcomm::evs::Proto::deliver_trans()
         {
             if (msg.get_msg().get_safety_prefix() != SP_DROP)
             {
+                gu_trace(validate_reg_msg(msg.get_msg()));
                 ProtoUpMeta um(msg.get_msg().get_source(), 
                                msg.get_msg().get_source_view_id(),
                                0,
                                msg.get_msg().get_user_type(),
                                msg.get_msg().get_seq().get());
-                gu_trace(pass_up(msg.get_rb(), 0, um));
+                gu_trace(send_up(msg.get_rb(), um));
+                delivered_msgs++;
             }
-            delivered_msgs++;
             gu_trace(input_map->erase(i));
         }
     }
@@ -2616,13 +2594,14 @@ gcomm::evs::Seqno gcomm::evs::Proto::update_im_safe_seq(const size_t uuid,
 
 void gcomm::evs::Proto::handle_user(const UserMessage& msg, 
                                     NodeMap::iterator ii, 
-                                    const ReadBuf* rb, 
-                                    const size_t roff)
+                                    const Datagram& rb)
+
 {
     assert(ii != known.end());
     assert(get_state() != S_CLOSED && get_state() != S_JOINING);
     Node& inst(NodeMap::get_value(ii));
-    
+
+    evs_log_debug(D_USER_MSGS) << "received " << msg;
     
     if (msg.get_source_view_id() != current_view.get_id()) 
     {
@@ -2676,7 +2655,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                         NodeMap::get_value(jj).set_installed(true);
                     }
                 }
-                inst.set_tstamp(Time::now());                
+                inst.set_tstamp(Date::now());                
                 if (is_consensus() == true) 
                 {
                     profile_enter(shift_to_prof);
@@ -2718,10 +2697,12 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     // Insert only if msg seq is greater or equal than current lowest unseen
     if (msg.get_seq() >= prev_range.get_lu())
     {
-        gu_trace(range = input_map->insert(inst.get_index(), msg, rb, roff));
+        Datagram im_dgram(rb, rb.get_offset());
+        im_dgram.normalize();
+        gu_trace(range = input_map->insert(inst.get_index(), msg, im_dgram));
         if (range.get_lu() > prev_range.get_lu())
         {
-            inst.set_tstamp(Time::now());
+            inst.set_tstamp(Date::now());
         }
     }
     else
@@ -2818,14 +2799,14 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
 
 void gcomm::evs::Proto::handle_delegate(const DelegateMessage& msg, 
                                         NodeMap::iterator ii,
-                                        const ReadBuf* rb, 
-                                        size_t offset)
+                                        const Datagram& rb)
 {
     gcomm_assert(ii != known.end());
     evs_log_debug(D_DELEGATE_MSGS) << "delegate message " << msg;
     Message umsg;
-    gu_trace(offset = unserialize_message(UUID::nil(), rb, offset, &umsg));
-    gu_trace(handle_msg(umsg, rb, offset));
+    size_t offset;
+    gu_trace(offset = unserialize_message(UUID::nil(), rb, &umsg));
+    gu_trace(handle_msg(umsg, Datagram(rb, offset)));
 }
 
 
@@ -2843,7 +2824,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     {
         evs_log_debug(D_STATE) << "install gap " << msg;
         inst.set_installed(true);
-        inst.set_tstamp(Time::now());
+        inst.set_tstamp(Date::now());
         if (is_all_installed() == true)
         {
             profile_enter(shift_to_prof);
@@ -2869,7 +2850,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         if (inst.get_operational() == false) 
         {
             // This is probably partition merge, see if it works out
-            inst.set_tstamp(Time::now());
+            inst.set_tstamp(Date::now());
             inst.set_operational(true);
             profile_enter(shift_to_prof);
             shift_to(S_RECOVERY);
@@ -2905,7 +2886,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     // for the source.
     if (prev_safe != input_map->get_safe_seq(inst.get_index()))
     {
-        inst.set_tstamp(Time::now());
+        inst.set_tstamp(Date::now());
     }
     if (input_map->has_deliverables() == true)
     {
@@ -2996,7 +2977,6 @@ bool gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
             
             if (node.get_leaving() == false)
             {
-                WriteBuf wb(0, 0);
                 const LeaveMessage& lm(*NodeMap::get_value(li).get_leave_message());
                 LeaveMessage send_lm(lm.get_source(),
                                      lm.get_source_view_id(),
@@ -3004,8 +2984,11 @@ bool gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
                                      lm.get_aru_seq(),
                                      lm.get_fifo_seq(),
                                      Message::F_RETRANS | Message::F_SOURCE);
-                push_header(send_lm, &wb);
-                gu_trace(send_delegate(&wb));
+
+                Buffer buf;
+                serialize(send_lm, buf);
+                Datagram dg(buf);
+                gu_trace(send_delegate(dg));
                 sent = true;
             }
         }
@@ -3027,7 +3010,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     {
         if (msg.get_source_view_id() == current_view.get_id())
         {
-            inst.set_tstamp(Time::now());
+            inst.set_tstamp(Date::now());
             MessageNodeList same_view;
             for_each(msg.get_node_list().begin(), msg.get_node_list().end(),
                      SelectNodesOp(same_view, current_view.get_id(), 
@@ -3081,7 +3064,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     } 
     
     inst.set_join_message(&msg);
-    inst.set_tstamp(Time::now());    
+    inst.set_tstamp(Date::now());    
     gcomm_assert(output.empty() == true);
     
     bool is_consensus_b;
@@ -3372,7 +3355,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     
     if (is_consistent_p == true && is_consensus() == true)
     {
-        inst.set_tstamp(Time::now());
+        inst.set_tstamp(Date::now());
         install_message = new InstallMessage(msg);
         profile_enter(send_gap_prof);
         gu_trace(send_gap(UUID::nil(), install_message->get_source_view_id(), 

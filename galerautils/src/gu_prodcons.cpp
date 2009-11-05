@@ -40,7 +40,10 @@ void gu::prodcons::Consumer::queue_and_wait(const Message& msg, Message* ack)
 {
     Lock lock(mutex);
     mque->push_back(msg);
-    notify();
+    if (mque->size() == 1)
+    {
+        notify();
+    }
     lock.wait(msg.get_producer().get_cond());
     assert(&rque->front().get_producer() == &msg.get_producer());
     if (ack)

@@ -4,7 +4,7 @@
 #include <list>
 
 #include "gcomm/uuid.hpp"
-#include "gcomm/event.hpp"
+#include "gcomm/protolay.hpp"
 #include "pc_message.hpp"
 
 
@@ -154,18 +154,18 @@ private:
     void cleanup_instances();
     void handle_state(const PCMessage&, const UUID&);
     void handle_install(const PCMessage&, const UUID&);
-    void handle_user(const PCMessage&, const ReadBuf*, size_t,
+    void handle_user(const PCMessage&, const gu::net::Datagram&,
                      const ProtoUpMeta&);
     void deliver_view();
 
 public:
 
-    void handle_msg  (const PCMessage&, const ReadBuf*, size_t,
+    void handle_msg  (const PCMessage&, const gu::net::Datagram&,
                       const ProtoUpMeta&);
-    void handle_up   (int, const ReadBuf*, size_t,
+    void handle_up   (int, const gu::net::Datagram&,
                       const ProtoUpMeta&);
-    int  handle_down (WriteBuf*, const ProtoDownMeta&);
-
+    int  handle_down (const gu::net::Datagram&, const ProtoDownMeta&);
+    
     void connect(bool first) 
     { 
         log_info << self_string() << " start_prim " << first;

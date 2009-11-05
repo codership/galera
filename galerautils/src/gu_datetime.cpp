@@ -18,7 +18,7 @@ using namespace gu;
 
 ostream& gu::datetime::operator<<(ostream& os, const Date& d)
 {
-    os << "";
+    os << d.get_utc();
     return os;
 }
 

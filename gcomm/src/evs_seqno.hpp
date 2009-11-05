@@ -92,13 +92,13 @@ public:
     
     uint16_t get() const { return seq; }
     
-    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
     {
         gu_trace(offset = gcomm::serialize(seq, buf, buflen, offset));
         return offset;
     }
     
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
     {
         gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &seq));
         return offset;
@@ -139,14 +139,14 @@ public:
     void set_lu(const Seqno s) { lu = s; }
     void set_hs(const Seqno s) { hs = s; }
     
-    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
     {
         gu_trace(offset = lu.serialize(buf, buflen, offset));
         gu_trace(offset = hs.serialize(buf, buflen, offset));
         return offset;
     }
     
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
     {
         gu_trace(offset = lu.unserialize(buf, buflen, offset));
         gu_trace(offset = hs.unserialize(buf, buflen, offset));

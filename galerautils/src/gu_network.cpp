@@ -30,12 +30,20 @@
 /* System includes */
 #include <netdb.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
+#include <netinet/tcp.h>
 
 /* Using stuff to improve readability */
 using namespace std;
 
 using namespace gu;
 using namespace gu::net;
+
+class DeleteObject
+{
+public:
+    template <typename T> void operator()(T* t) { delete t; }
+};
 
 template <typename T>
 size_t sserial_size(const T& t)
@@ -169,19 +177,25 @@ int gu::net::closefd(int fd)
 
 gu::net::Datagram::Datagram(const Buffer& buf_, size_t offset_) :
     header  (),
-    payload (buf_),
+    payload (new Buffer(buf_)),
     offset  (offset_)
 { }
 
-gu::net::Datagram::Datagram(const Datagram& dgram) :
-    header  (dgram.header),
-    payload (dgram.payload),
-    offset  (dgram.offset)
-{ }
 
-gu::net::Datagram::~Datagram()
-{ }
-
+void gu::net::Datagram::normalize()
+{
+    payload = boost::shared_ptr<Buffer>(new Buffer(*payload));
+    if (header.size() > 0)
+    {
+        payload->insert(payload->begin(), header.begin(), header.end());
+        header.clear();
+    }
+    if (offset > 0)
+    {
+        payload->erase(payload->begin(), payload->begin() + offset);
+        offset = 0;
+    }
+}
 
 /**************************************************************************
  * Socket implementation
@@ -206,6 +220,7 @@ void gu::net::Socket::set_state(const State s, const int err)
         log_error << "invalid state change " << state << " -> " << s;
         throw std::logic_error("invalid state change");
     }
+    log_debug << "socket " << fd << " state " << state << " -> " << s; 
     state = s;
     err_no = err;
 }
@@ -230,13 +245,14 @@ const string gu::net::Socket::get_errstr() const
  * Ctor/dtor
  */
 
-gu::net::Socket::Socket(Network& net_, 
+gu::net::Socket::Socket(Network& net_,
                         const int fd_,
                         const int options_,
                         const sockaddr* local_sa_,
                         const sockaddr* remote_sa_,
                         const socklen_t sa_size_,
                         const size_t mtu_,
+                        const size_t max_packet_size_,
                         const size_t max_pending_) :
     fd(fd_),
     err_no(0),
@@ -246,12 +262,11 @@ gu::net::Socket::Socket(Network& net_,
     remote_sa(),
     sa_size(sa_size_),
     mtu(mtu_),
+    max_packet_size(max_packet_size_),
     max_pending(max_pending_),
-    dgram_offset(0),
-    complete(false),
     recv_buf(mtu + hdrlen),
     recv_buf_offset(0),
-    dgram(recv_buf),
+    dgram(),
     pending(),
     state(S_CLOSED),
     net(net_)
@@ -273,10 +288,6 @@ gu::net::Socket::~Socket()
 {
     if (fd != -1)
     {
-        if (get_state() == S_CLOSED)
-        {
-            throw std::logic_error("fd != -1 but state S_CLOSED");
-        }
         close();
     }
 }
@@ -309,7 +320,9 @@ static void get_addrinfo(const gu::URI& url, struct addrinfo** ai)
     gu::net::Resolver::resolve(scheme, addr, ai);
 }
 
-void gu::net::Socket::open_socket(const string& addr)
+void gu::net::Socket::open_socket(const string& addr, 
+                                  sockaddr* sa,
+                                  socklen_t* sa_size)
 {
     struct addrinfo* ai(0);    
     URI url(get_url(addr));
@@ -326,33 +339,11 @@ void gu::net::Socket::open_socket(const string& addr)
     /* TODO: For now on assume first entry is always the correct one 
      * until some heuristics to guess best possible canditate 
      * is implemented */
-    local_sa = *ai->ai_addr;
-    sa_size = ai->ai_addrlen;
-    
-    freeaddrinfo(ai);
+    *sa = *ai->ai_addr;
+    *sa_size = ai->ai_addrlen;
 
-#if 0 // with get_query_list()
-    const URIQueryList& ql = url._get_query_list();
-    for (URIQueryList::const_iterator i = ql.begin(); i != ql.end(); ++i)
-    {
-        Option<int> opt = get_option<int>(i->first, i->second);
-        switch (opt.get_opt())
-        {
-        case O_NON_BLOCKING:
-            if (opt.get_val())
-            {
-                options |= O_NON_BLOCKING;
-            }
-            else
-            {
-                options &= ~O_NON_BLOCKING;
-            }
-            break;
-        default:
-            throw std::logic_error("invalid option");
-        }
-    }
-#else // with get_option()
+    freeaddrinfo(ai);
+    
     try
     {
         if (from_string<bool>(url.get_option("socket.non_blocking")))
@@ -365,7 +356,6 @@ void gu::net::Socket::open_socket(const string& addr)
         }
     }
     catch (NotFound&) {} // no option found, no modifications
-#endif
     
     if ((fd = ::socket(ai_family, ai_socktype, ai_protocol)) == -1)
     {
@@ -380,14 +370,15 @@ void gu::net::Socket::open_socket(const string& addr)
             log_error << "could not set fd non blocking " << strerror(err);
         }
     }
-
+    
 }
+
 
 void gu::net::Socket::connect(const string& addr)
 {
-    open_socket(addr);
+    open_socket(addr, &remote_sa, &sa_size);
     
-    if (::connect(fd, &local_sa, sa_size) == -1)
+    if (::connect(fd, &remote_sa, sa_size) == -1)
     {
         if ((options & O_NON_BLOCKING) && errno == EINPROGRESS)
         {
@@ -402,38 +393,53 @@ void gu::net::Socket::connect(const string& addr)
     }
     else
     {
+        if (::getsockname(fd, &local_sa, &sa_size) == -1)
+        {
+            gu_throw_error(errno);
+        }
         set_state(S_CONNECTED);
+    }
+
+
+    const int no_nagle(1);
+    if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle,
+                     sizeof(no_nagle)) == -1)
+    {
+        gu_throw_error(errno);
     }
     assert(get_state() == S_CONNECTING || get_state() == S_CONNECTED);
 }
 
 void gu::net::Socket::close()
 {
-    if (fd == -1 || get_state() == S_CLOSED)
+    if (fd == -1)
     {
         log_error << "socket not open: " << fd << " " << get_state();
-        throw std::logic_error("socket not open");
+        gu_throw_fatal << "socket " << fd << " not open " << get_state();
     }
     
-    /* Close socket first to interrupt possible senders */
+    /* Close fd only after calling net.erase() */
+    net.erase(this);
+    
     log_debug << "closing socket " << fd;
     int err = closefd(fd);
     if (err != 0)
     {
         set_state(S_FAILED, err);
-        throw std::runtime_error("close failed");
+        gu_throw_error(err) << "close failed";
     }
-    
-    /* Reset fd only after calling net.erase() */
-    net.erase(this);
-    
+
+    // Recv may set state to closed when reading zero bytes from socket.
+    if (get_state() != S_CLOSED)
+    {
+        set_state(S_CLOSED);    
+    }
     fd = -1;
-    set_state(S_CLOSED);
 }
 
 void gu::net::Socket::listen(const std::string& addr, const int backlog)
 {
-    open_socket(addr);
+    open_socket(addr, &local_sa, &sa_size);
 
     const int reuse = 1;
     const socklen_t reuselen = sizeof(reuse);
@@ -462,14 +468,15 @@ gu::net::Socket* gu::net::Socket::accept()
 {
     
     int acc_fd;
-
+    
     sockaddr acc_sa;
     socklen_t sasz = sizeof(acc_sa);
     memset(&acc_sa, 0, sizeof(acc_sa));
     if ((acc_fd = ::accept(fd, &acc_sa, &sasz)) == -1)
     {
         set_state(S_FAILED, errno);
-        throw std::runtime_error("accept failed");
+        gu_throw_error(errno);
+        // throw std::runtime_error("accept failed");
     }
     
     if (sasz != sa_size)
@@ -479,9 +486,24 @@ gu::net::Socket* gu::net::Socket::accept()
     }
     
     /* TODO: Set options before returning */
+    const int no_nagle(1);
+    if (::setsockopt(acc_fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle,
+                     sizeof(no_nagle)) == -1)
+    {
+        gu_throw_error(errno);
+    }
+
+    sockaddr local_acc_sa;
+    if (::getsockname(acc_fd, &local_acc_sa, &sa_size) == -1)
+    {
+        gu_throw_error(errno);
+    }
     
-    Socket* ret = new Socket(net, acc_fd, options, &local_sa, &acc_sa, sasz);
+    Socket* ret = new Socket(net, acc_fd, options, 
+                             &local_acc_sa, &acc_sa, sasz);
     ret->set_state(S_CONNECTED);
+    net.insert(ret);
+    net.set_event_mask(ret, NetworkEvent::E_IN);
     return ret;
 }
 
@@ -508,16 +530,17 @@ static size_t iov_send(const int fd,
     assert(errval != 0);
     assert(tot_len > 0);
 
-    const int send_flags = flags | MSG_NOSIGNAL;
+    const int send_flags = flags | 
+        ((flags & MSG_DONTWAIT) != 0 ? MSG_NOSIGNAL : 0);
     *errval = 0;
-
+    
     /* Try sendmsg() first */
     struct msghdr msg = {0, 0, 
                          iov, 
                          iov_len, 
                          0, 0, 0};
     ssize_t sent = ::sendmsg(fd, &msg, send_flags);
-
+    
     if (sent < 0)
     {
         sent = 0;
@@ -529,7 +552,6 @@ static size_t iov_send(const int fd,
     }
     else if (static_cast<size_t>(sent) < tot_len)
     {
-        assert(*errval == 0);
         *errval = EAGAIN;
     }
     
@@ -543,7 +565,7 @@ static size_t iov_send(const int fd,
 static void iov_push(struct iovec iov[], 
                      const size_t iov_len, 
                      const size_t offset, 
-                     gu::net::Buffer& bb)
+                     gu::Buffer& bb)
 {
     size_t begin_off = 0;
     size_t end_off = 0;
@@ -568,7 +590,6 @@ static void iov_push(struct iovec iov[],
                       + iov_base_off, 
                       static_cast<const byte_t*>(iov[i].iov_base) 
                       + iov[i].iov_len);
-
         }
         begin_off = end_off;
     }
@@ -582,6 +603,7 @@ size_t gu::net::Socket::get_max_pending_len() const
 
 int gu::net::Socket::send_pending(const int send_flags)
 {
+    assert(pending.size() != 0);
     struct iovec iov[1] = {
         { &pending[0], pending.size() }
     };
@@ -592,6 +614,7 @@ int gu::net::Socket::send_pending(const int send_flags)
                            pending.size(),
                            send_flags, 
                            &ret);
+    
     pending.erase(pending.begin(), pending.begin() + sent);
     return ret;
 }
@@ -602,19 +625,28 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
     {
         return ENOTCONN;
     }
-
+    
     bool no_block = (getopt() & O_NON_BLOCKING) ||
         (flags & MSG_DONTWAIT);
-    const int send_flags = flags | (no_block ? MSG_DONTWAIT : 0);
+    const int send_flags = flags | (no_block == true ? MSG_DONTWAIT : 0);
     int ret = 0;
+    
+    // Dgram with offset can't be handled yet
+    assert(dgram == 0 || dgram->get_offset() == 0);
+    
+    if (dgram != 0 && dgram->get_len() == 0)
+    {
+        gu_throw_error(EINVAL) << "trying to send zero sized dgram to " << fd;
+    }
     
     if (dgram == 0)
     {
         if (pending.size() > 0)
         {
             ret = send_pending(send_flags);
-        }
+        }        
         assert(ret != 0 || pending.size() == 0);
+        
         switch (ret)
         {
         case 0:
@@ -626,21 +658,29 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
     } 
     else if (no_block == true &&
              pending.size() + 
-             dgram->get_len() + sizeof(uint32_t) > get_max_pending_len())
+             dgram->get_len() + hdrlen > get_max_pending_len())
     {
-        ret = EAGAIN;
+        // Return directly from here, this is the only case when 
+        // return value must not be altered at the end of this method.
+        return EAGAIN;
     }
     else if (no_block == true && pending.size() > 0)
     {
+        uint32_t len;
         serialize(static_cast<uint32_t>(dgram->get_len()), 
-                  pending,
-                  pending.size());
+                  reinterpret_cast<byte_t*>(&len), 
+                  sizeof(len), 0);
+        pending.reserve(pending.size() + hdrlen + dgram->get_len());
         pending.insert(pending.end(), 
-                       dgram->get_header().begin(), 
+                       reinterpret_cast<byte_t*>(&len), 
+                       reinterpret_cast<byte_t*>(&len) + sizeof(len));
+        pending.insert(pending.end(),
+                       dgram->get_header().begin(),
                        dgram->get_header().end());
-        pending.insert(pending.end(), 
-                       dgram->get_payload().begin(), 
+        pending.insert(pending.end(),
+                       dgram->get_payload().begin(),
                        dgram->get_payload().end());
+        ret = EAGAIN;
     }
     else
     {
@@ -651,19 +691,22 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
             /* Note: mask out MSG_DONTWAIT from flags */
             ret = send_pending(send_flags & ~MSG_DONTWAIT);
         }
-        assert(pending.size() == 0);
-        assert(ret == 0);
-        byte_t hdr[sizeof(uint32_t)];
-        serialize(static_cast<uint32_t>(dgram->get_len()), hdr, sizeof(hdr), 0);
+        assert(ret == 0 && pending.size() == 0);
+        
+        uint32_t hdr(0);
+        serialize(static_cast<uint32_t>(dgram->get_len()), 
+                  reinterpret_cast<byte_t*>(&hdr), sizeof(hdr), 0);
+        
         struct iovec iov[3] = {
-            {hdr, sizeof(uint32_t)},
+            {&hdr, sizeof(hdr)},
             {const_cast<byte_t*>(&dgram->get_header()[0]), 
              dgram->get_header().size()},
             {const_cast<byte_t*>(&dgram->get_payload()[0]), 
              dgram->get_payload().size()}
         };
+
         size_t sent = iov_send(fd, iov, 3, 
-                               sizeof(uint32_t) + dgram->get_len(), 
+                               sizeof(hdr) + dgram->get_len(), 
                                send_flags, &ret);
         switch (ret)
         {
@@ -674,17 +717,31 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
         case 0:
             /* Everything went fine */
             assert(sent == dgram->get_len() + hdrlen);
+            
             break;
         default:
             /* Error occurred */
             set_state(S_FAILED, ret);
         }
     }
-
-    if (ret == EAGAIN and not get_event_mask() & gu::net::NetworkEvent::E_OUT)
+    
+    if (ret == EAGAIN)
     {
-        net.set_event_mask(this, get_event_mask() & gu::net::NetworkEvent::E_OUT);
+        if ((get_event_mask() & gu::net::NetworkEvent::E_OUT) == 0)
+        {
+            net.set_event_mask(this, 
+                               get_event_mask() | 
+                               gu::net::NetworkEvent::E_OUT);
+        }
+        ret = 0;
     }
+    else if (pending.size() == 0 &&
+             (get_event_mask() & NetworkEvent::E_OUT) != 0)
+    {
+        net.set_event_mask(this,
+                           get_event_mask() & ~NetworkEvent::E_OUT);
+    }
+    
     return ret;
 }
 
@@ -692,7 +749,7 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
 const gu::net::Datagram* gu::net::Socket::recv(const int flags)
 {
     const int recv_flags = (flags & ~MSG_PEEK) |
-        (getopt() & O_NON_BLOCKING ? MSG_DONTWAIT : 0);
+        ((getopt() & O_NON_BLOCKING) != 0 ? (MSG_DONTWAIT | MSG_NOSIGNAL) : 0);
     const bool peek = flags & MSG_PEEK;
     
     if (get_state() != S_CONNECTED)
@@ -701,31 +758,37 @@ const gu::net::Datagram* gu::net::Socket::recv(const int flags)
         return 0;
     }
     
-    if (complete == true)
+    if (recv_buf_offset > hdrlen)
     {
-        if (peek == false)
+        uint32_t len = 0;
+        unserialize(&recv_buf[0], recv_buf_offset, 0, &len);
+        
+        if (len == 0 || len > max_packet_size)
         {
-            dgram_offset = hdrlen + dgram.get_len();
-            complete = false;
+            log_error << "invalid packet size " << len;
+            set_state(S_FAILED, EMSGSIZE);
+            return 0;
         }
-        return &dgram;
+        
+        if (recv_buf_offset >= len + hdrlen)
+        {
+            dgram = Datagram(Buffer(&recv_buf[0] + hdrlen,
+                                    &recv_buf[0] + hdrlen + len));
+            if (peek == false)
+            {
+                memmove(&recv_buf[0], &recv_buf[0] + hdrlen + len,
+                        recv_buf_offset - (hdrlen + len));
+                recv_buf_offset -= (hdrlen + len);
+            }
+            return &dgram;
+        }
     }
     
-    if (dgram_offset > 0)
-    {
-        assert(recv_buf_offset >= dgram_offset);
-        if (recv_buf_offset > dgram_offset)
-        {
-            memmove(&recv_buf[0], &recv_buf[0] + dgram_offset, 
-                    recv_buf_offset - dgram_offset);
-        }
-        recv_buf_offset -= dgram_offset;
-        dgram_offset = 0;
-    }
+    assert(recv_buf_offset < recv_buf.size());
     
     ssize_t recvd = ::recv(fd,
                            &recv_buf[0] + recv_buf_offset, 
-                           recv_buf.capacity() - recv_buf_offset, 
+                           recv_buf.size() - recv_buf_offset, 
                            recv_flags);
     if (recvd < 0)
     {
@@ -740,7 +803,7 @@ const gu::net::Datagram* gu::net::Socket::recv(const int flags)
     }
     else if (recvd == 0)
     {
-        close();
+        set_state(S_CLOSED);
         return 0;
     }
     else
@@ -750,31 +813,37 @@ const gu::net::Datagram* gu::net::Socket::recv(const int flags)
         {
             uint32_t len = 0;
             unserialize(&recv_buf[0], recv_buf_offset, 0, &len);
-            // log_info << " msg len " << len;
-            if (len + hdrlen > recv_buf.capacity())
+            
+            if (len == 0 || len > max_packet_size)
             {
-                // recv_buf.resize(len + hdrlen);
-                log_error << len + hdrlen << " " << recv_buf.size();
-                // throw std::runtime_error("EMSGSIZE");
+                log_error << "invalid packet size " << len;
                 set_state(S_FAILED, EMSGSIZE);
+                return 0;
             }
-            else if (recv_buf_offset >= len + hdrlen)
+            
+            if (len + hdrlen + recv_buf_offset > recv_buf.size())
             {
-                if (peek == false)
-                {
-                    dgram_offset = len + hdrlen;
-                    complete = false;
-                }
-                else
-                {
-                    complete = true;
-                }
+                recv_buf.resize(len + hdrlen + recv_buf_offset);
+            }
+            
+            if (recv_buf_offset >= len + hdrlen)
+            {
                 dgram = Datagram(Buffer(&recv_buf[0] + hdrlen, 
                                         &recv_buf[0] + hdrlen + len));
+                if (peek == false)
+                {
+                    memmove(&recv_buf[0], &recv_buf[0] + hdrlen + len,
+                            recv_buf_offset - (hdrlen + len));
+                    recv_buf_offset -= (hdrlen + len);
+                }
+                
                 return &dgram;
             }
         }
     }
+    
+    // We should not get here if peek is not set
+    assert(peek == true);
     return 0;
 }
 
@@ -788,12 +857,62 @@ void gu::net::Socket::setopt(const int opts)
     options = opts;
 }
 
+static string sa_to_string(const sockaddr& sa)
+{
+    string ret("tcp://");
+    char dst[INET6_ADDRSTRLEN + 1];
+    int port;
+    if (sa.sa_family == AF_INET)
+    {
+        const sockaddr_in* sin(reinterpret_cast<const sockaddr_in*>(&sa));
+        in_addr_t addr = sin->sin_addr.s_addr;
+        if (inet_ntop(sin->sin_family, 
+                      &addr, dst, sizeof(dst)) == 0)
+        {
+            gu_throw_error(EINVAL);
+        }
+        port = sin->sin_port;
+    }
+    else if (sa.sa_family == AF_INET6)
+    {
+        const sockaddr_in6* sin(reinterpret_cast<const sockaddr_in6*>(&sa));
+        if (inet_ntop(sin->sin6_family, 
+                      &sin->sin6_addr, dst, sizeof(dst)) == 0)
+        {
+            gu_throw_error(EINVAL);
+        }
+        port = sin->sin6_port;
+    }
+    else
+    {
+        gu_throw_error(EINVAL); throw;
+    }
+    ret += dst;
+    // damn ntohs() refuses to compile... this dirty hack now
+    ret += ":" + gu::to_string(((port & 0xff00) >> 8) | ((port & 0x00ff) << 8));
+    return ret;
+}
+
+string gu::net::Socket::get_local_addr() const
+{
+    return sa_to_string(local_sa);
+}
+
+string gu::net::Socket::get_remote_addr() const
+{
+    return sa_to_string(remote_sa);
+}
+
+void gu::net::Socket::release()
+{
+    net.release(this);
+}
 
 class gu::net::SocketList
 {
-    map<const int, Socket*> sockets;
+    map<int, Socket*> sockets;
 public:
-    typedef map<const int, Socket*>::iterator iterator;
+    typedef map<int, Socket*>::iterator iterator;
 
     SocketList() : 
         sockets()
@@ -860,6 +979,7 @@ gu::net::Socket* gu::net::NetworkEvent::get_socket() const
 
 gu::net::Network::Network() :
     sockets(new SocketList()),
+    released(),
     poll(new EPoll())
 {
     if (pipe(wake_fd) == -1)
@@ -881,7 +1001,6 @@ gu::net::Network::~Network()
     for (SocketList::iterator i = sockets->begin(); 
          i != sockets->end(); i = sockets->begin())
     {
-        log_warn << "open socket in network dtor: " << i->first;
         delete i->second;
     }
     delete sockets;
@@ -931,6 +1050,12 @@ void gu::net::Network::erase(Socket* sock)
     sockets->erase(sock->get_fd());
 }
 
+void gu::net::Network::release(Socket* sock)
+{
+    assert(sock->get_state() == Socket::S_CLOSED);
+    released.push_back(sock);
+}
+
 gu::net::Socket* gu::net::Network::find(int fd)
 {
     return sockets->find(fd);
@@ -947,12 +1072,33 @@ void gu::net::Network::set_event_mask(Socket* sock, const int mask)
     sock->set_event_mask(mask);
 }
 
-gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout)
+gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout,
+                                                   const bool auto_accept)
 {
     Socket* sock = 0;
     int revent = 0;
     
-    if (poll->empty())
+    for_each(released.begin(), released.end(), DeleteObject());
+    released.clear();
+    
+    // Return first sockets that have pending unread data
+    for (SocketList::iterator i = sockets->begin(); i != sockets->end();
+         ++i)
+    {
+        Socket* s = i->second;
+        if (s->get_state()       == Socket::S_CONNECTED     && 
+            (s->get_event_mask() & NetworkEvent::E_IN) != 0 &&
+            s->has_unread_data() == true                    &&
+            s->recv(MSG_PEEK)    != 0)
+        {
+            return NetworkEvent(NetworkEvent::E_IN, s);
+        }
+        // Some validation
+        assert(s->pending.size() == 0 || 
+               (s->get_event_mask() & NetworkEvent::E_OUT) != 0);
+    }
+    
+    if (poll->empty() == true)
     {
         poll->poll(timeout);
     }
@@ -967,6 +1113,7 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout)
         EPollEvent ev = poll->front();
         poll->pop_front();
         
+        // This is a wake-up socket
         if (ev.get_user_data() == 0)
         {
             byte_t buf[1];
@@ -974,19 +1121,19 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout)
             {
                 int err = errno;
                 log_error << "Could not read pipe: " << strerror(err);
-                throw std::runtime_error("");
+                gu_throw_error(err) << "could not read pipe";
             }
             return NetworkEvent(NetworkEvent::E_EMPTY, 0);
         }
         
-        sock = reinterpret_cast<Socket*>(ev.get_user_data());
+        sock = static_cast<Socket*>(ev.get_user_data());
         revent = ev.get_events();
         
         switch (sock->get_state())
         {
         case Socket::S_CLOSED:
             log_error << "closed socket " << sock->get_fd() << " in poll set";
-            throw std::logic_error("closed socket in poll set");
+            // throw std::logic_error("closed socket in poll set");
             break;
         case Socket::S_CONNECTING:
             if (revent & NetworkEvent::E_OUT)
@@ -998,18 +1145,16 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout)
             }
             break;
         case Socket::S_LISTENING:
-            if (revent & NetworkEvent::E_IN)
+            if ((revent & NetworkEvent::E_IN) && auto_accept == true)
             {
                 Socket* acc = sock->accept();
-                insert(acc);
-                set_event_mask(acc, NetworkEvent::E_IN);
                 revent = NetworkEvent::E_ACCEPTED;
                 sock = acc;
             }
             break;
         case Socket::S_FAILED:
-            log_error << "failed socket " << sock->get_fd() << " in poll set";
-            throw std::logic_error("failed socket in poll set");
+            log_warn << "failed socket " << sock->get_fd() << " in poll set";
+            // throw std::logic_error("failed socket in poll set");
             break;
         case Socket::S_CONNECTED:
             if (revent & NetworkEvent::E_IN)
@@ -1055,6 +1200,6 @@ void gu::net::Network::interrupt()
     {
         int err = errno;
         log_error << "unable to write to pipe: " << strerror(err);
-        throw std::runtime_error("unable to write to pipe");
+        gu_throw_error(err) << "unable to write to pipe";
     }
 }

@@ -16,8 +16,8 @@ namespace gcomm
     namespace Conf
     {
     
-        static const std::string GCommPrefix   = "gcomm";
-        static const std::string SchemeDelim   = "+";
+        static const std::string GCommPrefix   = "";
+        static const std::string SchemeDelim   = "";
         static const std::string QueryDelim    = "&";
         static const std::string ParamKeyDelim = ".";
         
@@ -66,9 +66,9 @@ namespace gcomm
         static const std::string TcpScheme = GCommPrefix + SchemeDelim + TcpPrefix;
         /* Parameter denoting asynchronous/non-blocking mode */
         static const std::string TcpParamNonBlocking =
-            TcpPrefix + ParamKeyDelim + "non_blocking";
+            "socket" + ParamKeyDelim + "non_blocking";
         static const std::string TcpParamMaxPending =
-            TcpPrefix + ParamKeyDelim + "max_pending";
+            "socket" + ParamKeyDelim + "max_pending";
         
         /* */
         static const std::string TipcPrefix = "tipc";

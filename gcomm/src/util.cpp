@@ -1,109 +1,52 @@
 
 #include "gcomm/util.hpp"
-#include "gcomm/exception.hpp"
-#include "gcomm/logger.hpp"
+#include "gu_datetime.hpp"
 
-#include <istream>
-#include <cerrno>
-#include <arpa/inet.h>
-#include <netinet/in.h>
+using namespace std;
+using namespace std::rel_ops;
+using namespace gcomm;
+using namespace gu;
+using namespace gu::datetime;
+using namespace gu::net;
 
-// @todo: fatal throws in the read_xxx() functions below are really unnecessary,
-//        they don't represent unresolvable logic error in the applicaiton
-using std::istringstream;
-using std::string;
 
-BEGIN_GCOMM_NAMESPACE
-
-bool read_bool(const string& s)
+void gcomm::event_loop(Network& el, vector<Protostack>& protos, 
+                       const string tstr)
 {
-    istringstream is(s);
-    bool ret;
-    if ((is >> ret).fail())
+    Period p(tstr);
+    Date stop = Date::now() + p;
+    do
     {
-        gcomm_throw_fatal << "String '" << s << "' does not contain bool";
+        Date next_time(Date::max());
+        for (vector<Protostack>::iterator i = protos.begin(); i != protos.end();
+             ++i)
+        {
+            next_time = min(next_time, i->handle_timers());
+        }
+        Period sleep_p(min(p, stop - next_time));
+        if (sleep_p < 0)
+            sleep_p = 0;
+        log_info << sleep_p;
+        NetworkEvent ev(el.wait_event(static_cast<int>(p.get_nsecs()/MSec), false));
+        log_info << ev.get_event_mask();
+        if ((ev.get_event_mask() & NetworkEvent::E_EMPTY) == 0)
+        {
+            const int mask(ev.get_event_mask());
+            Socket& s(*ev.get_socket());
+            const Datagram* dg(0);
+            if (s.get_state() == Socket::S_CONNECTED &&
+                mask & NetworkEvent::E_IN)
+            {
+                dg = s.recv();
+                gcomm_assert(dg != 0);
+            }
+            
+            for (vector<Protostack>::iterator i = protos.begin();
+                 i != protos.end(); ++i)
+            {
+                i->dispatch(ev, dg != 0 ? *dg : Datagram());
+            }
+        }
     }
-    return ret;
+    while (stop >= Date::now());
 }
-
-int read_int(const string& s)
-{
-    istringstream is(s);
-    int ret;
-    if ((is >> ret).fail())
-    {
-        gcomm_throw_fatal << "String '" << s << "' does not contain int";
-    }
-    return ret;
-}
-
-long read_long(const string& s)
-{
-    istringstream is(s);
-    long ret;
-    if ((is >> ret).fail())
-    {
-        gcomm_throw_fatal << "String '" << s << "' does not contain long";
-    }
-    return ret;
-}
-
-string sockaddr_to_str (const sockaddr* sa) throw (RuntimeException)
-{
-    if (sa->sa_family != AF_INET && sa->sa_family != AF_INET6)
-    {
-        gcomm_throw_runtime (EINVAL) << "Address family " << sa->sa_family
-                                     << " not supported";
-    }
-
-    char   buf[40]; // IPv6 takes 39 digits + terminator
-    
-    const sockaddr_in *sin = reinterpret_cast<const sockaddr_in*>(sa);
-    
-    const char* rb = inet_ntop(sin->sin_family, &sin->sin_addr, buf,
-                               sizeof(buf));
-    if (rb == 0)
-    {
-        gcomm_throw_runtime (errno) << "Address conversion failed";
-    }
-
-    std::ostringstream ret;
-
-    ret << rb << ":" << (ntohs(sin->sin_port));
-    
-    return ret.str();
-}
-
-string sockaddr_to_host (const sockaddr* sa) throw (RuntimeException)
-{
-    if (sa->sa_family != AF_INET && sa->sa_family != AF_INET6)
-    {
-        gcomm_throw_runtime (EINVAL) << "Address family " << sa->sa_family
-                                     << " not supported";
-    }
-
-    char buf[40];
-    const sockaddr_in *sin = reinterpret_cast<const sockaddr_in*>(sa);
-    const char* rb = inet_ntop(sin->sin_family, &sin->sin_addr, buf,
-                               sizeof(buf));
-    if (rb == 0)
-    {
-        gcomm_throw_runtime (errno) << "Address conversion failed";
-    }
-
-    return rb;
-}
-
-string sockaddr_to_port (const sockaddr* sa) throw (RuntimeException)
-{
-    if (sa->sa_family != AF_INET && sa->sa_family != AF_INET6)
-    {
-        gcomm_throw_runtime (EINVAL) << "Address family " << sa->sa_family
-                                     << " not supported";
-    }
-
-    const sockaddr_in *sin = reinterpret_cast<const sockaddr_in*>(sa);
-    return gu::to_string (ntohs(sin->sin_port));
-}
-
-END_GCOMM_NAMESPACE

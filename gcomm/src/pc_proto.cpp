@@ -2,11 +2,15 @@
 #include "pc_proto.hpp"
 #include "pc_message.hpp"
 #include "gcomm/logger.hpp"
+#include "gcomm/util.hpp"
 
 #include <set>
 
 using namespace std;
 using namespace std::rel_ops;
+
+using namespace gu;
+using namespace gu::net;
 
 using namespace gcomm;
 
@@ -27,16 +31,10 @@ void PCProto::send_state()
         im.insert(make_pair(PCInstMap::get_key(i), local_state));
     }
     
-    Buffer buf(pcs.serial_size());
+    Buffer buf;
+    serialize(pcs, buf);
     
-    if (pcs.serialize(buf.get_buf(), buf.get_len(), 0) == 0)
-    {
-        gcomm_throw_fatal << "Failed to serialize state";
-    }
-    
-    WriteBuf wb(buf.get_buf(), buf.get_len());
-    
-    if (pass_down(&wb, ProtoDownMeta()))
+    if (send_down(Datagram(buf), ProtoDownMeta()))
     {
         gcomm_throw_fatal << "pass down failed";
     }    
@@ -64,19 +62,10 @@ void PCProto::send_install()
         }
     }
     
-    Buffer buf(pci.serial_size());
+    Buffer buf;
+    serialize(pci, buf);
     
-    if (pci.serialize(buf.get_buf(), buf.get_len(), 0) == 0)
-    {
-        gcomm_throw_fatal << "PCInstallMessage serialization failed";
-    }
-    
-    WriteBuf wb(buf.get_buf(), buf.get_len());
-    
-    // @fixme This can happen in normal circumstances if the last delivered 
-    // message in reg view was the last state message. Figure out the
-    // way to verify that and crash only if it was not the case.
-    int ret = pass_down(&wb, ProtoDownMeta());
+    int ret = send_down(Datagram(buf), ProtoDownMeta());
     if (ret != 0)
     {
         log_warn << self_string() << " sending install message failed: "
@@ -104,7 +93,7 @@ void PCProto::deliver_view()
     
     ProtoUpMeta um(UUID::nil(), ViewId(), &v);
     log_info << self_string() << " delivering view " << v;
-    pass_up(0, 0, um);
+    send_up(Datagram(), um);
 }
 
 
@@ -743,8 +732,8 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
 }
 
 
-void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
-                          size_t roff, const ProtoUpMeta& um)
+void PCProto::handle_user(const PCMessage& msg, const Datagram& dg,
+                          const ProtoUpMeta& um)
 {
     int64_t to_seq(-1);
 
@@ -766,8 +755,8 @@ void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
     PCInst& state(PCInstMap::get_value(instances.find_checked(um.get_source())));
     state.set_last_seq(msg.get_seq());
     
-    gu_trace(pass_up(rb, 
-                     roff + msg.serial_size(),
+    Datagram up_dg(dg, dg.get_offset() + msg.serial_size());
+    gu_trace(send_up(up_dg, 
                      ProtoUpMeta(um.get_source(), 
                                  pc_view.get_id(), 
                                  0,
@@ -777,8 +766,7 @@ void PCProto::handle_user(const PCMessage& msg, const ReadBuf* rb,
 
 
 void PCProto::handle_msg(const PCMessage&   msg, 
-                         const ReadBuf*     rb, 
-                         size_t             roff, 
+                         const Datagram&    rb, 
                          const ProtoUpMeta& um)
 {
     enum Verdict
@@ -830,7 +818,7 @@ void PCProto::handle_msg(const PCMessage&   msg,
         gu_trace(handle_install(msg, um.get_source()));
         break;
     case PCMessage::T_USER:
-        gu_trace(handle_user(msg, rb, roff, um));
+        gu_trace(handle_user(msg, rb, um));
         break;
     default:
         gcomm_throw_fatal << "Invalid message";
@@ -838,7 +826,7 @@ void PCProto::handle_msg(const PCMessage&   msg,
 }
 
 
-void PCProto::handle_up(int cid, const ReadBuf* rb, size_t roff,
+void PCProto::handle_up(int cid, const Datagram& rb,
                         const ProtoUpMeta& um)
 {
     if (um.has_view() == true)
@@ -849,17 +837,18 @@ void PCProto::handle_up(int cid, const ReadBuf* rb, size_t roff,
     {
         PCMessage msg;
         
-        if (msg.unserialize(rb->get_buf(), rb->get_len(), roff) == 0)
+        if (msg.unserialize(&rb.get_payload()[0], rb.get_payload().size(), 
+                            rb.get_offset()) == 0)
         {
             gcomm_throw_fatal << "Could not read message";
         }
         
-        handle_msg(msg, rb, roff, um);
+        handle_msg(msg, rb, um);
     }
 }
 
 
-int PCProto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
+int PCProto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
 {
     if (get_state() != S_PRIM)
     {
@@ -868,19 +857,12 @@ int PCProto::handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
     
     uint32_t      seq = get_last_seq() + 1;
     PCUserMessage um(seq);
-    byte_t        buf[8];
+    Datagram down_dg(wb);
 
-    if (um.serialize(buf, sizeof(buf), 0) == 0)
-    {
-        gcomm_throw_fatal << "Short buffer";
-    }
-
-    wb->prepend_hdr(buf, um.serial_size());
-
-    int ret = pass_down(wb, dm);
-
-    wb->rollback_hdr(um.serial_size());
-
+    push_header(um, down_dg);
+    
+    int ret = send_down(down_dg, dm);
+    
     if (ret == 0)
     {
         set_last_seq(seq);

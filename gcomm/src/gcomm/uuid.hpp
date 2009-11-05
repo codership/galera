@@ -1,16 +1,18 @@
 #ifndef _GCOMM_UUID_HPP_
 #define _GCOMM_UUID_HPP_
 
-#include <cstring>
 
-#include <gcomm/common.hpp>
-#include <gcomm/exception.hpp>
-#include <gcomm/types.hpp>
+
+#include "gcomm/common.hpp"
+#include "gcomm/exception.hpp"
+#include "gcomm/types.hpp"
 
 extern "C" {
 #include <stddef.h>
-#include <gu_uuid.h>
+#include "gu_uuid.h"
 }
+
+#include <cstring>
 
 namespace gcomm
 {
@@ -53,7 +55,7 @@ public:
         return uuid_nil;
     }
 
-    size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
     {
         if (buflen < offset + sizeof(gu_uuid_t))
@@ -65,7 +67,7 @@ public:
         return offset + sizeof(gu_uuid_t);
     }
     
-    size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
+    size_t serialize(gu::byte_t* buf, const size_t buflen, const size_t offset) const
         throw (gu::Exception)
     {
         if (buflen < offset + sizeof(gu_uuid_t))

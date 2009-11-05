@@ -17,13 +17,14 @@
 #endif // PROFILE_EVS_INPUT_MAP
 
 #include "evs_input_map2.hpp"
-#include "gcomm/readbuf.hpp"
 #include "gu_exception.hpp"
 #include <stdexcept>
 #include <numeric>
 
 using namespace std;
 using namespace std::rel_ops;
+
+using namespace gu::net;
 
 //////////////////////////////////////////////////////////////////////////
 //
@@ -90,15 +91,6 @@ public:
 };
 
 
-// Release ReadBuf object from message index element
-static void release_rb(gcomm::evs::InputMapMsgIndex::value_type& vt)
-{
-    gcomm::ReadBuf* rb = gcomm::evs::InputMapMsgIndex::get_value(vt).get_rb();
-    if (rb != 0)
-    {
-        rb->release();
-    }
-}
 
 
 
@@ -278,14 +270,12 @@ void gcomm::evs::InputMap::clear()
         log_warn << "discarding " << msg_index->size() << 
             " messages from message index";
     }
-    for_each(msg_index->begin(), msg_index->end(), release_rb);
     msg_index->clear();
     if (recovery_index->empty() == false)
     {
         log_debug << "discarding " << recovery_index->size() 
                   << " messages from recovery index";
     }
-    for_each(recovery_index->begin(), recovery_index->end(), release_rb);
     recovery_index->clear();
     node_index->clear();
     aru_seq = Seqno::max();
@@ -298,14 +288,14 @@ void gcomm::evs::InputMap::clear()
 gcomm::evs::Range 
 gcomm::evs::InputMap::insert(const size_t uuid, 
                              const UserMessage& msg, 
-                             const ReadBuf* const rb, 
-                             const size_t offset)
+                             const Datagram& rb)
     throw (gu::Exception)
 {
     try
     {
+    assert(rb.is_normalized() == true);
     Range range;
-    
+        
     profile_enter(prof);
 
     // Only insert messages with meaningful seqno
@@ -373,14 +363,11 @@ gcomm::evs::InputMap::insert(const size_t uuid,
         
         if (msg_i == msg_index->end())
         {
-            ReadBuf* ins_rb(0);
-            if (s == msg.get_seq())
-            {
-                ins_rb = (rb != 0 ? rb->copy(offset) : 0);
-            }
             gu_trace((void)msg_index->insert_unique(
                          make_pair(InputMapMsgKey(node.get_index(), s), 
-                                   InputMapMsg(msg, ins_rb))));
+                                   InputMapMsg(msg, 
+                                               s == msg.get_seq() ? rb : 
+                                               Datagram()))));
             ++n_msgs[msg.get_safety_prefix()];
         }
         profile_leave(prof); 
@@ -422,9 +409,9 @@ gcomm::evs::InputMap::insert(const size_t uuid,
     }
     return range;
     }
-    catch (out_of_range& e)
+    catch (...)
     {
-        gcomm_throw_fatal << "out of range";
+        gu_throw_fatal;
         throw;
     }
 }
@@ -433,27 +420,12 @@ gcomm::evs::InputMap::insert(const size_t uuid,
 void gcomm::evs::InputMap::erase(iterator i)
     throw (gu::Exception)
 {
-
     const UserMessage& msg(InputMapMsgIndex::get_value(i).get_msg());
-//    if (msg.get_seq_range() == 0)
-//    {
     profile_enter(prof);
     --n_msgs[msg.get_safety_prefix()];
     gu_trace(recovery_index->insert_unique(*i));
     gu_trace(msg_index->erase(i));
     profile_leave(prof);
-//    }
-//    else
-//    {
-//         profile_enter(prof);
-//         if (recovery_index->insert(*i).second == false)
-//         {
-//             log_debug << "duplicate";
-//         }
-//         gu_trace(msg_index->erase(i));
-//         profile_leave(prof);
-//     }
-
 }
 
 
@@ -520,7 +492,6 @@ void gcomm::evs::InputMap::cleanup_recovery_index()
     {
         InputMapMsgIndex::iterator i = recovery_index->lower_bound(
             InputMapMsgKey(0, safe_seq + 1));
-        for_each(recovery_index->begin(), i, release_rb);
         recovery_index->erase(recovery_index->begin(), i);
     }
 }

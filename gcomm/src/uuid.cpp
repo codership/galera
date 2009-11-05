@@ -2,9 +2,8 @@
 #include "gcomm/uuid.hpp"
 
 
-BEGIN_GCOMM_NAMESPACE
 
-const UUID UUID::uuid_nil = UUID(GU_UUID_NIL);
+const gcomm::UUID gcomm::UUID::uuid_nil = gcomm::UUID(GU_UUID_NIL);
 
-END_GCOMM_NAMESPACE
+
 

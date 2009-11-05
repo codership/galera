@@ -2,13 +2,14 @@
 #define _GCOMM_EXCEPTION_HPP_
 
 #include <cerrno>
-#include <galerautils.hpp>
+#include "galerautils.hpp"
 
 #include "gcomm/common.hpp"
 
 using gu::Exception;
 
-BEGIN_GCOMM_NAMESPACE
+namespace gcomm
+{
 
 /*!
  * Type of exception which is recoverable.
@@ -99,7 +100,7 @@ public:
     {}
 }; 
 
-END_GCOMM_NAMESPACE
+} // namespace gcomm
 
 #define gcomm_throw_runtime(err_)                                       \
     gcomm::ThrowRuntime (__FILE__,__FUNCTION__,__LINE__,err_).msg()

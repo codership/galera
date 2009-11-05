@@ -10,11 +10,11 @@
 
 #include "gcomm/safety_prefix.hpp"
 #include "gcomm/view.hpp"
-#include "gcomm/time.hpp"
 #include "gcomm/map.hpp"
 
 #include "evs_seqno.hpp"
-#include "evs_message2.hpp"
+
+#include "gu_datetime.hpp"
 
 namespace gcomm
 {
@@ -76,9 +76,9 @@ public:
             im_range == cmp.im_range;
     }
     
-    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
         throw(gu::Exception);
     static size_t serial_size();
 private:
@@ -246,9 +246,9 @@ public:
     /*!
      * Get timestamp associated to the message.
      */
-    Time get_tstamp() const { return tstamp; }
+    gu::datetime::Date get_tstamp() const { return tstamp; }
     
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
         throw(gu::Exception);
     
     bool operator==(const Message& cmp) const;
@@ -327,13 +327,13 @@ public:
         source_view_id(source_view_id_),
         range_uuid(range_uuid_),
         range(range_),
-        tstamp(Time::now()),
+        tstamp(gu::datetime::Date::now()),
         node_list(node_list_ != 0 ? new MessageNodeList(*node_list_) : 0)
     { }
 
 protected:
 
-    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
 
     size_t serial_size() const;
@@ -351,7 +351,7 @@ protected:
     ViewId        source_view_id;
     UUID          range_uuid;
     Range                range;
-    Time                 tstamp;
+    gu::datetime::Date                 tstamp;
     MessageNodeList*     node_list;
     
 
@@ -390,9 +390,9 @@ public:
     
     void set_aru_seq(const Seqno as) { aru_seq = as; }
     
-    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
                        bool skip_header = false)
         throw(gu::Exception);
     size_t serial_size() const;
@@ -413,9 +413,9 @@ public:
                 SP_UNRELIABLE,
                 fifo_seq)
     { }
-    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
                        bool skip_header = false)
         throw(gu::Exception);
     size_t serial_size() const;
@@ -446,9 +446,9 @@ public:
                 range,
                 0)
     { }
-    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
                        bool skip_header = false)
         throw(gu::Exception);
     size_t serial_size() const;
@@ -478,9 +478,9 @@ public:
                 Range(),
                 node_list)
     { }
-    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
                        bool skip_header = false)
         throw(gu::Exception);
     size_t serial_size() const;
@@ -510,9 +510,9 @@ public:
                 Range(),
                 node_list)
     { }
-    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
                        bool skip_header = false)
         throw(gu::Exception);
     size_t serial_size() const;
@@ -539,9 +539,9 @@ public:
                 aru_seq,
                 flags)
     { }
-    size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
-    size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
                        bool skip_header = false)
         throw(gu::Exception);
     size_t serial_size() const;

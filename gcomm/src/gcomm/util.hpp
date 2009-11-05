@@ -4,131 +4,96 @@
 #include <sstream>
 #include <cstring>
 
-#include <gcomm/common.hpp>
-#include <gcomm/exception.hpp>
-#include <gcomm/types.hpp>
+#include "gcomm/exception.hpp"
+#include "gcomm/types.hpp"
+#include "gcomm/protostack.hpp"
 
 
-BEGIN_GCOMM_NAMESPACE
 
-
-static inline size_t read_string(const void* from, const size_t fromlen,
-                                 const size_t from_offset, char** to)
+namespace gcomm
 {
-    if (to == 0)
+
+    // @todo: wrong function - port is not mandatory by RFC, will also fail for IPv6
+    inline std::string __parse_host(const std::string& str)
     {
-        gcomm_throw_runtime (EINVAL) << "0 destination pointer";
+        size_t sep = str.find(':');
+        if (sep == std::string::npos)
+        {
+            gcomm_throw_runtime (EINVAL) << "Invalid auth str";
+        }
+        return str.substr(0, sep);
     }
-    /* Scan for termination character */
-    size_t i;
-    const char* from_str = reinterpret_cast<const char*>(from);
-
-    for (i = from_offset; i < fromlen && *(from_str + i) != '\0'; ++i) {}
- 
-    /* Buffer didn't contain '\0' */
-    if (i == fromlen) gcomm_throw_runtime (EMSGSIZE);
-
-    /* Safe to strdup now */
-    *to = strdup(from_str + from_offset);
-    return i + 1;
-}
-
-static inline size_t read_bytes(const byte_t* from, const size_t fromlen,
-                                const size_t from_offset, 
-                                byte_t* to, const size_t tolen)
-{
-    if (fromlen < from_offset + tolen) gcomm_throw_runtime (EMSGSIZE);
-
-    memcpy(to, from + from_offset, tolen);
-
-    return from_offset + tolen;
-}
-
-static inline size_t write_string(const char* from, byte_t* to, 
-                                  const size_t tolen, const size_t to_offset)
-{
-    size_t strl = strlen(from);
-
-    if (tolen < strl + 1 + to_offset) gcomm_throw_runtime (EMSGSIZE);
-
-    /* Copy string including '\0' */
-    memcpy(to + to_offset, from, strl + 1);
-
-    return to_offset + strl + 1;
-}
-
-static inline size_t write_bytes(const byte_t* from, 
-                                 const size_t fromlen,
-                                 byte_t* to, 
-                                 const size_t tolen, const size_t to_offset)
-{
-    if (tolen < fromlen + to_offset) gcomm_throw_runtime (EMSGSIZE);
-
-    memcpy(to + to_offset, from, fromlen);
-
-    return to_offset + fromlen;
-}
-
-/**
- * Read boolean value from string. String must contain one of
- * 0, false, 1, true
- *
- * \param s Input string
- * \return Boolean value
- */
-bool read_bool(const std::string& s);
-
-/**
- * Read integer value from string. 
- *
- * \param s Input string
- * \return Integer value
- */
-int read_int(const std::string& s);
-
-/**
- * Read long value from string.
- *
- * \param s Input string
- * \return Long value
- */
-long read_long(const std::string& s);
-
-/*! 
- * sockaddr conversion functions
- */
-std::string sockaddr_to_str  (const sockaddr* sa) throw (RuntimeException);
-std::string sockaddr_to_host (const sockaddr* sa) throw (RuntimeException);
-std::string sockaddr_to_port (const sockaddr* sa) throw (RuntimeException);
-
-// @todo: wrong function - port is not mandatory by RFC, will also fail for IPv6
-inline std::string __parse_host(const std::string& str)
-{
-    size_t sep = str.find(':');
-    if (sep == std::string::npos)
+    
+    // @todo: wrong function - port is not mandatory by RFC, will also fail for IPv6
+    inline std::string __parse_port(const std::string& str)
     {
-        gcomm_throw_runtime (EINVAL) << "Invalid auth str";
+        size_t sep = str.find(':');
+        if (sep == std::string::npos)
+        {
+            gcomm_throw_runtime (EINVAL) << "Invalid auth str";
+        }
+        return str.substr(sep + 1);
     }
-    return str.substr(0, sep);
-}
-
-// @todo: wrong function - port is not mandatory by RFC, will also fail for IPv6
-inline std::string __parse_port(const std::string& str)
-{
-    size_t sep = str.find(':');
-    if (sep == std::string::npos)
+    
+    inline bool host_is_any (const std::string& host)
+    {   
+        return (host.length() == 0 || host == "0.0.0.0" ||
+                host.find ("::/128") <= 1);
+    }
+    
+    
+    
+    class DeleteObjectOp
     {
-        gcomm_throw_runtime (EINVAL) << "Invalid auth str";
+    public:
+        template <typename T> void operator()(T* t) { delete t; }
+    };
+    
+    template <class C> 
+    size_t serialize(const C& c, gu::Buffer& buf)
+    {
+        const size_t prev_size(buf.size());
+        buf.resize(buf.size() + c.serial_size());
+        size_t ret;
+        gu_trace(ret = c.serialize(&buf[0] + prev_size, buf.size(), 
+                                   prev_size));
+        assert(ret == prev_size + c.serial_size());
+        return ret;
     }
-    return str.substr(sep + 1);
-}
+    
+    template <class C>
+    size_t unserialize(const gu::Buffer& buf, size_t offset, C& c)
+    {
+        size_t ret;
+        gu_trace(ret = c.unserialize(buf, buf.size(), offset));
+        return ret;
+    }
+    
+    template <class M>
+    void push_header(const M& msg, gu::net::Datagram& dg)
+    {
+        dg.get_header().resize(dg.get_header().size() + msg.serial_size());
+        memmove(&dg.get_header()[0] + msg.serial_size(),
+                &dg.get_header()[0], 
+                dg.get_header().size() - msg.serial_size());
+        msg.serialize(&dg.get_header()[0], 
+                      dg.get_header().size(), 0);
+    }
+    
+    template <class M>
+    void pop_header(const M& msg, gu::net::Datagram& dg)
+    {
+        memmove(&dg.get_header()[0],
+                &dg.get_header()[0] + msg.serial_size(),
+                dg.get_header().size() - msg.serial_size());
+        dg.get_header().resize(dg.get_header().size() - msg.serial_size());
+    }
 
-inline bool host_is_any (const std::string& host)
-{   
-    return (host.length() == 0 || host == "0.0.0.0" ||
-            host.find ("::/128") <= 1);
-}
-
-END_GCOMM_NAMESPACE
+    // Conveinence function to iterate over protostacks
+    void event_loop(gu::net::Network& el, 
+                    std::vector<gcomm::Protostack>& protos, 
+                    const std::string tstr = "PT1S");
+    
+} // namespace gcomm
 
 #endif // _GCOMM_UTIL_HPP_

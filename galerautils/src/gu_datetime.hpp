@@ -57,6 +57,9 @@ namespace gu
                 if (str != "")
                     parse(str);
             }
+
+            Period(const int64_t nsecs_) :
+                nsecs(nsecs_) { }
             
             bool operator==(const Period& cmp) const
             { return (nsecs == cmp.nsecs); }
@@ -79,9 +82,7 @@ namespace gu
             int64_t get_nsecs() const { return nsecs; }
             
         private:
-            
-            Period(const int64_t nsecs_) :
-                nsecs(nsecs_) { }
+
             friend class Date;
             friend std::istream& operator>>(std::istream&, Period&);
             /*!

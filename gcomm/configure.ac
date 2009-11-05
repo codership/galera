@@ -78,7 +78,7 @@ AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -pedantic -Wno-unused-parameter"
 # - some stl headers may contain deprecated features
 # - gu_log.h contains some variadic macros
 # Disable RTTI generation as we don't use it anywhere
-AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -Wold-style-cast -Wconversion -Wno-long-long -Wno-deprecated -fno-rtti"
+AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -Wold-style-cast -Wconversion -Wno-long-long -Wno-deprecated -pipe "
 AM_CFLAGS="$AM_CFLAGS -std=c99"
 AM_LDFLAGS="-Wl,--warn-common -Wl,--fatal-warnings"
 

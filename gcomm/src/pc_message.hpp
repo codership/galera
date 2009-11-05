@@ -4,7 +4,6 @@
 #include "gcomm/view.hpp"
 #include "gcomm/types.hpp"
 #include "gcomm/common.hpp"
-#include "gcomm/readbuf.hpp"
 #include "gcomm/uuid.hpp"
 #include "gcomm/map.hpp"
 
@@ -89,7 +88,7 @@ public:
         return to_seq;
     }
 
-    size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
     {
         size_t   off = offset;
@@ -106,7 +105,7 @@ public:
         return off;
     }
     
-    size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
+    size_t serialize(gu::byte_t* buf, const size_t buflen, const size_t offset) const
         throw (gu::Exception)
     {
         size_t   off   = offset;
@@ -217,7 +216,7 @@ public:
     
     virtual ~PCMessage() { delete inst; }
     
-    size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
+    size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
     {
         size_t   off;
@@ -251,7 +250,7 @@ public:
         return off;
     }
     
-    size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
+    size_t serialize(gu::byte_t* buf, const size_t buflen, const size_t offset) const
         throw (gu::Exception)
     {
         size_t   off;

@@ -232,10 +232,12 @@ inline std::ostream& prof::operator<<(std::ostream& os, const Profile& prof)
 
     Profile::PointStats cumul;
 
+    char prev_fill(os.fill());
+    os.fill(' ');
     os << "\nprofile name: " << prof.name;
     
 
-    os << std::left << std::fixed << std::setprecision(7);
+    os << std::left << std::fixed << std::setprecision(3);
     os << "\n\n";
     os << std::setw(40) << "point";
     os << std::setw(10) << "count";
@@ -247,10 +249,12 @@ inline std::ostream& prof::operator<<(std::ostream& os, const Profile& prof)
     for (Profile::Map::const_iterator i = prof.points.begin(); 
          i != prof.points.end(); ++i)
     {
-        os << std::setw(40) << i->first.to_string();
+        os << std::setw(40) << std::left << i->first.to_string();
+        os << std::right;
         os << std::setw(10) << i->second.count;
         os << std::setw(10) << double(i->second.time_calendar)*1.e-9;
         os << std::setw(10) << double(i->second.time_thread_cputime)*1.e-9;
+        os << std::left;
         os << "\n";
         cumul = cumul + i->second;
     }
@@ -258,7 +262,10 @@ inline std::ostream& prof::operator<<(std::ostream& os, const Profile& prof)
     os << "\ntot count         : " << cumul.count;
     os << "\ntot calendar time : " << double(cumul.time_calendar)*1.e-9;
     os << "\ntot thread cputime: " << double(cumul.time_thread_cputime)*1.e-9;
+    os << "\ntot ct since ctor : " 
+       << double(gu::datetime::Date::now().get_utc() - prof.start_time_calendar)*1.e-9;
     
+    os.fill(prev_fill);
     return os;
 }
 

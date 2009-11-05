@@ -2,7 +2,6 @@
 #include "check_gcomm.hpp"
 
 #include "gcomm/view.hpp"
-#include "gcomm/uri.hpp"
 #include "gcomm/types.hpp"
 #include "gcomm/map.hpp"
 
@@ -19,6 +18,9 @@ using std::string;
 #include "check_templ.hpp"
 
 #include <check.h>
+
+using namespace gu;
+using namespace gu::net;
 
 using namespace gcomm;
 
@@ -37,6 +39,15 @@ START_TEST(test_sizes)
     uint64_t u64(3);
     fail_unless(make_int(u64).serial_size() == 8);
     
+
+
+    String<16> str16("fubar");
+    fail_unless(str16.serial_size() == 16);
+
+
+    check_serialization(str16, 16, String<16>());
+
+
 }
 END_TEST
 
@@ -206,12 +217,6 @@ START_TEST(test_map)
 }
 END_TEST
 
-START_TEST(test_exception)
-{
-
-}
-END_TEST
-
 
 Suite* types_suite()
 {
@@ -236,10 +241,6 @@ Suite* types_suite()
 
     tc = tcase_create("test_map");
     tcase_add_test(tc, test_map);
-    suite_add_tcase(s, tc);
-
-    tc = tcase_create("test_exception");
-    tcase_add_test(tc, test_exception);
     suite_add_tcase(s, tc);
 
     return s;

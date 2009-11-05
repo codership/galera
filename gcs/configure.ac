@@ -165,7 +165,7 @@ AC_CONFIG_FILES([Makefile
 AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -Wno-unused-parameter"
 # we have to omit -pedantic here to allow zero-sized arrays in structs
 AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -Wold-style-cast -Wconversion \
--fno-rtti -Wno-long-long"
+ -Wno-long-long"
 AM_CFLAGS="$AM_CFLAGS -std=gnu99"
 AM_CPPFLAGS="$AM_CPPFLAGS -D_XOPEN_SOURCE=600"
 AM_LDFLAGS="-Wl,--warn-common -Wl,--fatal-warnings"

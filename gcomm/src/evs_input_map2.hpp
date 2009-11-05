@@ -19,16 +19,19 @@
 #ifndef EVS_INPUT_MAP2_HPP
 #define EVS_INPUT_MAP2_HPP
 
+#include "gu_network.hpp"
+
 #include "evs_message2.hpp"
 #include "profile.hpp"
 #include "gcomm/map.hpp"
 
 #include <vector>
 
+
+
 namespace gcomm
 {
     /* Forward declarations */
-    class ReadBuf;
     class InputMapMsgKey;
     std::ostream& operator<<(std::ostream&, const InputMapMsgKey&);
     namespace evs
@@ -73,7 +76,7 @@ class gcomm::evs::InputMapMsg
 {
 public:
     InputMapMsg(const UserMessage&       msg_, 
-                ReadBuf*           const rb_   ) :
+                const gu::net::Datagram& rb_   ) :
         msg  (msg_ ),
         rb   (rb_  )
     { }
@@ -84,14 +87,12 @@ public:
     { }
             
     const UserMessage& get_msg () const { return msg;  }
-    const ReadBuf*     get_rb  () const { return rb;   }
-    ReadBuf*           get_rb  ()       { return rb;   }
-
+    const gu::net::Datagram&    get_rb  () const { return rb;   }
 private:
     void operator=(const InputMapMsg&);
     
     UserMessage const msg;
-    ReadBuf*    const rb;
+    gu::net::Datagram rb;
 };
 
 
@@ -294,7 +295,7 @@ public:
      *         number is out of allowed range
      */
     Range insert(const size_t uuid, const UserMessage& msg, 
-                 const ReadBuf* rb = 0, size_t offset = 0)
+                 const gu::net::Datagram& dg = gu::net::Datagram())
         throw (gu::Exception);
     
     /*!

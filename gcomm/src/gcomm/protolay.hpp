@@ -5,20 +5,27 @@
 #ifndef _GCOMM_PROTOLAY_HPP_
 #define _GCOMM_PROTOLAY_HPP_
 
+
+
 #include <cerrno>
 
-#include <gcomm/common.hpp>
-#include <gcomm/util.hpp>
-#include <gcomm/readbuf.hpp>
-#include <gcomm/writebuf.hpp>
-#include <gcomm/view.hpp>
-#include <gcomm/exception.hpp>
-#include <gcomm/logger.hpp>
-#include <gcomm/safety_prefix.hpp>
-#include "gcomm/time.hpp"
+#include "gcomm/view.hpp"
+#include "gcomm/exception.hpp"
+#include "gcomm/logger.hpp"
+#include "gcomm/safety_prefix.hpp"
+
+#include "gu_datetime.hpp"
 
 #include <list>
 #include <utility>
+
+namespace gu
+{
+    namespace net
+    {
+        class Datagram;
+    }
+}
 
 namespace gcomm
 {
@@ -37,15 +44,26 @@ namespace gcomm
 class gcomm::ProtoUpMeta
 {
 public:
+    ProtoUpMeta(const int err_no_) :
+        source(),
+        source_view_id(),
+        user_type(),
+        to_seq(),
+        err_no(err_no_),
+        view(0)
+    { }
+    
     ProtoUpMeta(const UUID    source_         = UUID::nil(),
                 const ViewId  source_view_id_ = ViewId(),
                 const View*   view_           = 0,
                 const uint8_t user_type_      = 0xff,
-                const int64_t to_seq_         = -1) :
+                const int64_t to_seq_         = -1,
+                const int err_no_ = 0) :
         source         (source_      ),
         source_view_id (source_view_id_ ),
         user_type      (user_type_   ),
         to_seq         (to_seq_      ),
+        err_no         (err_no_),
         view           (view_ != 0 ? new View(*view_) : 0)
     { }
 
@@ -54,6 +72,7 @@ public:
         source_view_id (um.source_view_id ),
         user_type      (um.user_type   ),
         to_seq         (um.to_seq      ),
+        err_no         (um.err_no),
         view           (um.view ? new View(*um.view) : 0)
     { }
 
@@ -66,6 +85,8 @@ public:
     uint8_t       get_user_type()      const { return user_type; }
     
     int64_t       get_to_seq()         const { return to_seq; }
+
+    int           get_errno()          const { return err_no; }
     
     bool          has_view()           const { return view != 0; }
     
@@ -78,6 +99,7 @@ private:
     ViewId  const source_view_id;
     uint8_t const user_type;
     int64_t const to_seq;
+    int     const err_no;
     View*   const view; // @todo: this makes default constructor pointless
 };
 
@@ -135,26 +157,26 @@ class gcomm::Protolay
     Protolay& operator=(const Protolay&);
     
 protected:
-    
+    int id;
     Protolay() : 
         up_context(0), 
-        down_context(0)
+        down_context(0),
+        id(-1)
     {}
     
 public:
     
     virtual ~Protolay() {}
-
+    
     virtual void connect(bool) { }
     virtual void close() { }
     
     /* apparently handles data from upper layer. what is return value? */
-    virtual int  handle_down (WriteBuf *, const ProtoDownMeta&) = 0;
+    virtual int  handle_down (const gu::net::Datagram&, const ProtoDownMeta&) = 0;
+    virtual void handle_up   (int, const gu::net::Datagram&, const ProtoUpMeta&) = 0;
     
-    virtual void handle_up   (int cid, const ReadBuf *,
-                              size_t, const ProtoUpMeta&) = 0;
-    
-    
+    void set_id(const int id_) { id = id_; }
+
     void set_up_context(Protolay *up, int id = -1)
     {
 	if (std::find(up_context.begin(), up_context.end(),
@@ -200,29 +222,9 @@ public:
         }
         down_context.erase(i);
     }
-
-    void release()
-    {
-        for (CtxList::iterator i = up_context.begin(); i !=  up_context.end();
-             ++i)
-        {
-            i->first->unset_down_context(this, i->second);
-            this->unset_up_context(i->first, i->second);
-        }
-        for (CtxList::iterator i = down_context.begin();
-             i != down_context.end(); ++i)
-        {
-            i->first->unset_up_context(this, i->second);
-            this->unset_down_context(i->first, i->second);
-        }
-    }
-
-
     
     /* apparently passed data buffer to the upper layer */
-    void pass_up(const ReadBuf *rb, 
-                 const size_t offset, 
-                 const ProtoUpMeta& up_meta)
+    void send_up(const gu::net::Datagram& dg, const ProtoUpMeta& up_meta)
     {
 	if (up_context.empty() == true)
         {
@@ -233,14 +235,12 @@ public:
         for (i = up_context.begin(); i != up_context.end(); i = i_next)
         {
             i_next = i, ++i_next;
-            i->first->handle_up(i->second, rb, offset, up_meta);
+            i->first->handle_up(i->second, dg, up_meta);
         }
-
     }
     
-        
     /* apparently passes data buffer to lower layer, what is return value? */
-    int pass_down(WriteBuf *wb, const ProtoDownMeta& down_meta)
+    int send_down(const gu::net::Datagram& dg, const ProtoDownMeta& down_meta)
     {
 	if (down_context.empty() == true)
         {
@@ -248,37 +248,28 @@ public:
             return 0;
 	}
         
-	// Simple guard of wb consistency in form of testing 
-	// writebuffer header length. 
-	size_t down_hdrlen = wb->get_hdrlen();
 	int    ret         = 0;
-        
-
         for (CtxList::iterator i = down_context.begin(); 
              i != down_context.end(); ++i)
         {
-            int err = i->first->handle_down(wb, down_meta);
+            int err = i->first->handle_down(dg, down_meta);
             if (err != 0)
             {
                 ret = err;
             }
         }
-        
-	if (down_hdrlen != wb->get_hdrlen())
-        {
-            gcomm_throw_fatal << "hdr not rolled back";
-        }
-        
 	return ret;
     }    
+    
+    virtual gu::datetime::Date handle_timers() { return gu::datetime::Date::max(); }
 
+    int get_id() const { return id; }
 
-    virtual Time handle_timers() { return Time::max(); }
 };
 
 class gcomm::Toplay : public Protolay
 {
-    int handle_down(WriteBuf *wb, const ProtoDownMeta& dm)
+    int handle_down(const gu::net::Datagram& dg, const ProtoDownMeta& dm)
     {
 	gcomm_throw_fatal << "Toplay handle_down() called";
 	throw;
@@ -287,23 +278,22 @@ class gcomm::Toplay : public Protolay
 
 class gcomm::Bottomlay : public Protolay
 {
-    void handle_up(int cid, const ReadBuf *rb, size_t offset, 
-                   const ProtoUpMeta& um)
+    void handle_up(int id, const gu::net::Datagram&, const ProtoUpMeta& um)
     {
 	gcomm_throw_fatal << "Bottomlay handle_up() called";
     }
 };
 
-inline void gcomm::connect(Protolay* down, Protolay* up, int cid = -1)
+inline void gcomm::connect(Protolay* down, Protolay* up, int id = -1)
 {
-    down->set_up_context(up, cid);
-    up->set_down_context(down, cid);
+    down->set_up_context(up, id);
+    up->set_down_context(down, id);
 }
 
-inline void gcomm::disconnect(Protolay* down, Protolay* up, int cid = -1)
+inline void gcomm::disconnect(Protolay* down, Protolay* up, int id = -1)
 {
-    down->unset_up_context(up, cid);
-    up->unset_down_context(down, cid);
+    down->unset_up_context(up, id);
+    up->unset_down_context(down, id);
 }
 
 

@@ -9,21 +9,15 @@ libgcommutil_la_CXXFLAGS = $(AM_CXXFLAGS) -Wno-conversion
 
 libgcomm_la_SOURCES = 		\
 	defaults.cpp            \
-	test.cpp		\
 	histogram.cpp		\
 	uuid.cpp		\
 	view.cpp		\
-	monitor.cpp		\
-	pseudofd.cpp		\
-	readbuf.cpp		\
-	event.cpp		\
+	protostack.cpp		\
 	transport.cpp		\
-	tcp.cpp			\
 	gmcast.cpp		\
 	evs_message2.cpp	\
 	evs_input_map2.cpp 	\
 	evs_proto.cpp		\
-	evs.cpp			\
 	pc_proto.cpp		\
 	pc.cpp
 

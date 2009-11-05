@@ -4,7 +4,6 @@
 
 #include "gcomm/common.hpp"
 #include "gcomm/types.hpp"
-#include "gcomm/readbuf.hpp"
 #include "gcomm/transport.hpp"
 #include <check.h>
 
@@ -13,11 +12,6 @@
 
 namespace gcomm
 {
-
-    inline void release_rb(ReadBuf* rb)
-    {
-        rb->release();
-    }
 
 
     template <typename I>
@@ -35,7 +29,7 @@ namespace gcomm
         fail_unless(c.serial_size() == expected_size, 
                     "size = %lu expected = %lu", 
                     c.serial_size(), expected_size);
-        byte_t* buf = new byte_t[expected_size + 7];
+        gu::byte_t* buf = new gu::byte_t[expected_size + 7];
         size_t ret;
         // Check that what is written gets also read
         try

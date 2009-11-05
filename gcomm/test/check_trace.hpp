@@ -8,11 +8,16 @@
  * Classes for tracing views and messages
  */
 
+#include "gu_network.hpp"
+#include "gu_uri.hpp"
+#include "gu_datetime.hpp"
+
 #include "gcomm/uuid.hpp"
 #include "gcomm/protolay.hpp"
+#include "gcomm/protostack.hpp"
 #include "gcomm/transport.hpp"
 #include "gcomm/map.hpp"
-#include "gcomm/time.hpp"
+#include "gcomm/util.hpp"
 
 
 #include <vector>
@@ -162,11 +167,13 @@ namespace gcomm
     class DummyTransport : public Transport 
     {
         UUID uuid;
-        std::deque<ReadBuf*> out;
+        std::deque<gu::net::Datagram*> out;
         bool queue;
     public:
-        DummyTransport(const UUID& uuid_ = UUID::nil(), bool queue_ = true) :
-            Transport(URI("dummy:"), 0, 0),            
+        DummyTransport(Protonet& net,
+                       const UUID& uuid_ = UUID::nil(), bool queue_ = true,
+                       const gu::URI& uri = gu::URI("dummy:")) :
+            Transport(net, uri),
             uuid(uuid_),
             out(),
             queue(queue_)
@@ -174,8 +181,6 @@ namespace gcomm
         
         ~DummyTransport() 
         {
-            std::for_each(out.begin(), out.end(), 
-                          std::mem_fun(&ReadBuf::release));
             out.clear();
         }
         
@@ -184,7 +189,7 @@ namespace gcomm
         const UUID& get_uuid() const { return uuid; }
         
         
-        size_t get_max_msg_size() const { return (1U << 31); }
+        size_t get_mtu() const { return (1U << 31); }
         
         void connect(bool first) { }
         
@@ -204,32 +209,33 @@ namespace gcomm
             return 0;
         }
         
-        void handle_up(int cid, const ReadBuf* rb, size_t roff, 
+        void handle_up(int cid, const gu::net::Datagram& rb,
                        const ProtoUpMeta& um)
         {
-            pass_up(rb, roff, um);
+            send_up(rb, um);
         }
         
-        int handle_down(WriteBuf *wb, const ProtoDownMeta& dm) 
+        int handle_down(const gu::net::Datagram& wb, const ProtoDownMeta& dm) 
         {
             if (queue == true)
             {
-                out.push_back(wb->to_readbuf());
+                assert(wb.get_header().size() == 0);
+                out.push_back(new gu::net::Datagram(wb));
                 return 0;
             }
             else
             {
-                gu_trace(return pass_down(wb, ProtoDownMeta(0xff, SP_UNRELIABLE, uuid)));
+                gu_trace(return send_down(wb, ProtoDownMeta(0xff, SP_UNRELIABLE, uuid)));
             }
         }
         
-        ReadBuf* get_out() 
+        gu::net::Datagram* get_out() 
         {
             if (out.empty())
             {
                 return 0;
             }
-            ReadBuf* rb = out.front();
+            gu::net::Datagram* rb = out.front();
             out.pop_front();
             return rb;
         }
@@ -292,11 +298,11 @@ namespace gcomm
         void send()
         {
             const int64_t seq(curr_seq);
-            byte_t buf[sizeof(seq)];
+            gu::byte_t buf[sizeof(seq)];
             size_t sz;
             gu_trace(sz = serialize(seq, buf, sizeof(buf), 0));
-            WriteBuf wb(buf, sz);
-            int err = pass_down(&wb, ProtoDownMeta(0));
+            gu::net::Datagram dg(gu::Buffer(buf, buf + sz)); 
+            int err = send_down(dg, ProtoDownMeta(0));
             if (err != 0)
             {
                 log_debug << "failed to send: " << strerror(err);
@@ -322,16 +328,17 @@ namespace gcomm
                     tr.get_view_traces().end()); 
         }
 
-        void handle_up(int cid, const ReadBuf* rb, size_t offset, 
+        void handle_up(int cid, const gu::net::Datagram& rb,
                        const ProtoUpMeta& um)
         {
-            if (rb != 0)
+            if (rb.get_len() != 0)
             {
                 gcomm_assert((um.get_source() == UUID::nil()) == false);
+                assert(rb.get_header().size() == 0);
                 int64_t seq;
-                gu_trace(gcomm::unserialize(rb->get_buf(), 
-                                            rb->get_len(), 
-                                            offset,
+                gu_trace(gcomm::unserialize(&rb.get_payload()[0], 
+                                            rb.get_payload().size(), 
+                                            rb.get_offset(),
                                             &seq));
                 tr.insert_msg(TraceMsg(um.get_source(), um.get_source_view_id(),
                                        seq));
@@ -344,11 +351,11 @@ namespace gcomm
         }
         
         
-        Time handle_timers()
+        gu::datetime::Date handle_timers()
         {
             std::for_each(protos.begin(), protos.end(), 
                           std::mem_fun(&Protolay::handle_timers));
-            return Time::max();
+            return gu::datetime::Date::max();
         }
         
     private:
@@ -365,19 +372,19 @@ namespace gcomm
     class ChannelMsg
     {
     public:
-        ChannelMsg(const ReadBuf* rb_, const UUID& source_) :
-            rb(rb_ != 0 ? rb_->copy() : 0),
+        ChannelMsg(const gu::net::Datagram& rb_, const UUID& source_) :
+            rb(rb_),
             source(source_)
         { 
         }
-        ReadBuf* get_rb() { return rb; }
-        const UUID& get_source() { return source; }
+        const gu::net::Datagram& get_rb() const { return rb; }
+        const UUID& get_source() const { return source; }
     private:
-        ReadBuf* rb;
+        gu::net::Datagram rb;
         UUID source;
     };
-
-
+    
+    
     class Channel : public Bottomlay
     {
     public:
@@ -391,29 +398,18 @@ namespace gcomm
         { 
         }
 
-        struct DeleteObjectOp
-        {
-            void operator()(std::pair<size_t, ChannelMsg>& p)
-            {
-                p.second.get_rb()->release();
-            }
-        };
 
-        ~Channel()
-        {
-            std::for_each(queue.begin(), queue.end(), Channel::DeleteObjectOp());
-        }
+
+        ~Channel() { }
         
-        int handle_down(WriteBuf* wb, const ProtoDownMeta& dm)
+        int handle_down(const gu::net::Datagram& wb, const ProtoDownMeta& dm)
         {
             gcomm_assert((dm.get_source() == UUID::nil()) == false);
-            ReadBuf* rb(wb->to_readbuf());
-            gu_trace(put(rb, dm.get_source()));
-            rb->release();
+            gu_trace(put(wb, dm.get_source()));
             return 0;
         }
-
-        void put(const ReadBuf* rb, const UUID& source);
+        
+        void put(const gu::net::Datagram& rb, const UUID& source);
         ChannelMsg get();
         void set_ttl(const size_t t) { ttl = t; }
         size_t get_ttl() const { return ttl; }
@@ -494,12 +490,13 @@ namespace gcomm
         void set_loss(const size_t ii, const size_t jj, const double loss);
         void split(const size_t ii, const size_t jj);
         void merge(const size_t ii, const size_t jj, const double loss = 1.0);
+        void propagate_until_empty();
         void propagate_until_cvi(bool handle_timers);
         friend std::ostream& operator<<(std::ostream&, const PropagationMatrix&);
     private:
         void expire_timers();
         void propagate_n(size_t n);
-        void propagate_until_empty();
+
         size_t count_channel_msgs() const;
         bool all_in_cvi() const;
         

@@ -8,6 +8,8 @@
 using namespace std;
 using namespace gcomm;
 
+using namespace gu;
+
 size_t gcomm::ViewId::unserialize(const byte_t* buf, 
                                   const size_t buflen, 
                                   const size_t offset)
@@ -48,7 +50,8 @@ static string to_string(const ViewType type)
     case V_NON_PRIM: return "NON_PRIM";
     case V_PRIM:     return "PRIM";
     default:
-        gcomm_throw_fatal << "Invalid type value"; throw;
+        return "UNKNOWN";
+        // gcomm_throw_fatal << "Invalid type value"; throw;
     }
 }
 

@@ -21,6 +21,7 @@
 
 #include "gcomm/conf.hpp"
 
+#include <stdexcept>
 #include <vector>
 #include <set>
 
@@ -31,6 +32,9 @@
 
 using namespace std;
 using namespace std::rel_ops;
+using namespace gu;
+using namespace gu::datetime;
+using namespace gu::net;
 using namespace gcomm;
 using namespace gcomm::evs;
 
@@ -290,7 +294,7 @@ START_TEST(test_input_map_overwrap)
     im.reset(n_nodes);
     
     
-    Time start(Time::now());
+    Date start(Date::now());
     size_t cnt(0);
     Seqno last_safe(Seqno::max());
     for (size_t n = 0; n < Seqno::max().get()*3LU; ++n)
@@ -317,7 +321,7 @@ START_TEST(test_input_map_overwrap)
         gcomm_assert(im.get_aru_seq() == seq);
         gcomm_assert(im.get_safe_seq() == last_safe);
     }
-    Time stop(Time::now());
+    Date stop(Date::now());
     
     double div(double(stop.get_utc() - start.get_utc())/gu::datetime::Sec);
     log_info << "input map msg rate " << double(cnt)/div;
@@ -398,15 +402,15 @@ END_TEST
 
 
 
-static ReadBuf* get_msg(DummyTransport* tp, Message* msg, bool release = true)
+static Datagram* get_msg(DummyTransport* tp, Message* msg, bool release = true)
 {
-    ReadBuf* rb = tp->get_out();
+    Datagram* rb = tp->get_out();
     if (rb != 0)
     {
-        gu_trace(Proto::unserialize_message(tp->get_uuid(), rb, 0, msg));
+        gu_trace(Proto::unserialize_message(tp->get_uuid(), *rb, msg));
         if (release == true)
         {
-            rb->release();
+            delete rb;
         }
     }
     return rb;
@@ -422,7 +426,7 @@ static void single_join(DummyTransport* t, Proto* p)
     // Send join must produce emitted join message
     p->send_join();
     
-    ReadBuf* rb = get_msg(t, &jm);
+    Datagram* rb = get_msg(t, &jm);
     fail_unless(rb != 0);
     fail_unless(jm.get_type() == Message::T_JOIN);
     
@@ -459,7 +463,7 @@ static void single_join(DummyTransport* t, Proto* p)
 class DummyUser : public Toplay
 {
 public:
-    void handle_up(int, const ReadBuf*, size_t, const ProtoUpMeta&)
+    void handle_up(int, const Datagram&, const ProtoUpMeta&)
     {
 
     }
@@ -468,9 +472,9 @@ public:
 START_TEST(test_proto_single_join)
 {
     log_info << "START";
-    EventLoop el;
+    Protonet net;
     UUID uuid(1);
-    DummyTransport t(uuid);
+    DummyTransport t(net, uuid);
     DummyUser u;
     Proto p(uuid);
     gcomm::connect(&t, &p);
@@ -489,7 +493,7 @@ static void double_join(DummyTransport* t1, Proto* p1,
     Message gm2;
     Message msg;
 
-    ReadBuf* rb;
+    Datagram* rb;
 
     // Initial states check
     p2->shift_to(Proto::S_JOINING);
@@ -572,9 +576,9 @@ static void double_join(DummyTransport* t1, Proto* p1,
 START_TEST(test_proto_double_join)
 {
     log_info << "START";
-    EventLoop el;
+    Protonet net;
     UUID uuid1(1), uuid2(2);
-    DummyTransport t1(uuid1), t2(uuid2);
+    DummyTransport t1(net, uuid1), t2(net, uuid2);
     DummyUser u1, u2;
     Proto p1(uuid1), p2(uuid2);
 
@@ -606,10 +610,11 @@ static DummyNode* create_dummy_node(size_t idx,
             + ::getenv("EVS_DEBUG_MASK");
     }
     list<Protolay*> protos;
+    Protonet net;
     try
     {
         UUID uuid(static_cast<int32_t>(idx));
-        protos.push_back(new DummyTransport(uuid, false));
+        protos.push_back(new DummyTransport(net, uuid, false));
         protos.push_back(new Proto(uuid, conf));
         return new DummyNode(idx, protos);
     }
@@ -650,7 +655,6 @@ START_TEST(test_proto_join_n)
 {
     log_info << "START";
     const size_t n_nodes(4);
-    EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
 
@@ -675,10 +679,9 @@ START_TEST(test_proto_join_n_w_user_msg)
 {
     log_info << "START";
     const size_t n_nodes(4);
-    EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
-    
+    gu_conf_self_tstamp_on();
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(create_dummy_node(i)));
@@ -689,11 +692,17 @@ START_TEST(test_proto_join_n_w_user_msg)
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
         set_cvi(dn, 0, i, i + 1);
         gu_trace(prop.propagate_until_cvi(false));
-        for (size_t j = 0; j < i; ++j)
+        for (size_t j = 0; j <= i; ++j)
+        {
+            gu_trace(send_n(dn[j], 5 + ::rand() % 4));
+        }
+        gu_trace(prop.propagate_until_empty());
+        for (size_t j = 0; j <= i; ++j)
         {
             gu_trace(send_n(dn[j], 5 + ::rand() % 4));
         }
     }
+    
     gu_trace(check_trace(dn));
     for_each(dn.begin(), dn.end(), DeleteObjectOp());
 }
@@ -704,7 +713,6 @@ START_TEST(test_proto_join_n_lossy)
 {
     log_info << "START";
     const size_t n_nodes(4);
-    EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
     const string inactive_timeout("PT1H");
@@ -736,7 +744,6 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
 {
     log_info << "START";
     const size_t n_nodes(4);
-    EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
     const string inactive_timeout("PT1H");
@@ -772,7 +779,6 @@ START_TEST(test_proto_leave_n)
 {
     log_info << "START";
     const size_t n_nodes(4);
-    EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
 
@@ -807,7 +813,6 @@ START_TEST(test_proto_leave_n_w_user_msg)
 {
     log_info << "START";
     const size_t n_nodes(4);
-    EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
     const string inactive_timeout("PT1H");
@@ -849,7 +854,6 @@ START_TEST(test_proto_leave_n_lossy)
 {
     log_info << "START";
     const size_t n_nodes(4);
-    EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
     const string inactive_timeout("PT1S");
@@ -897,7 +901,6 @@ START_TEST(test_proto_leave_n_lossy_w_user_msg)
 {
     log_info << "START";
     const size_t n_nodes(4);
-    EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
     const string inactive_timeout("PT1S");
@@ -950,7 +953,6 @@ START_TEST(test_proto_split_merge)
 {
     log_info << "START";
     const size_t n_nodes(4);
-    EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
     const string inactive_timeout("PT0.7S");
@@ -1015,7 +1017,6 @@ START_TEST(test_proto_split_merge_lossy)
 {
     log_info << "START";
     const size_t n_nodes(4);
-    EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
     const string inactive_timeout("PT0.7S");
@@ -1089,7 +1090,6 @@ START_TEST(test_proto_split_merge_lossy_w_user_msg)
 {
     log_info << "START";
     const size_t n_nodes(4);
-    EventLoop el;
     PropagationMatrix prop;
     vector<DummyNode*> dn;
     const string inactive_timeout("PT0.7S");

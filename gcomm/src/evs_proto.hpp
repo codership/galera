@@ -2,7 +2,6 @@
 #define EVS_PROTO_HPP
 
 #include "gcomm/common.hpp"
-#include "gcomm/time.hpp"
 #include "gcomm/protolay.hpp"
 #include "gcomm/view.hpp"
 #include "gcomm/transport.hpp"
@@ -11,6 +10,8 @@
 #include "profile.hpp"
 
 #include "evs_seqno.hpp"
+
+#include "gu_datetime.hpp"
 
 #include <list>
 #include <deque>
@@ -48,7 +49,7 @@ public:
         installed(false), 
         join_message(0), 
         leave_message(0),
-        tstamp(Time::now()),
+        tstamp(gu::datetime::Date::now()),
         fifo_seq(-1)
     {}
 
@@ -73,8 +74,8 @@ public:
     
     const LeaveMessage* get_leave_message() const { return leave_message; }
     
-    void set_tstamp(const Time& t) { tstamp = t; }
-    const Time& get_tstamp() const { return tstamp; }
+    void set_tstamp(const gu::datetime::Date& t) { tstamp = t; }
+    const gu::datetime::Date& get_tstamp() const { return tstamp; }
     
     void set_fifo_seq(const int64_t seq) { fifo_seq = seq; }
     int64_t get_fifo_seq() const { return fifo_seq; }
@@ -97,7 +98,7 @@ private:
     // Last activity timestamp
     LeaveMessage* leave_message;
     // 
-    Time tstamp;
+    gu::datetime::Date tstamp;
     //
     int64_t fifo_seq;
 };
@@ -155,13 +156,14 @@ public:
     void reset_stats();
 
     bool is_flow_control(const Seqno, const Seqno win) const;
-    int send_user(WriteBuf* wb, const uint8_t,
+    int send_user(const gu::net::Datagram&, 
+                  uint8_t,
                   SafetyPrefix sp, 
-                  const Seqno, 
-                  const Seqno, bool local = false);
+                  Seqno, 
+                  Seqno);
     int send_user(const Seqno);
     void complete_user(const Seqno);
-    int send_delegate(WriteBuf*);
+    int send_delegate(gu::net::Datagram&);
     void send_gap(const UUID&, const ViewId&, const Range);
     const JoinMessage& create_join();
     void send_join(bool tval = true);
@@ -249,25 +251,24 @@ private:
     void handle_foreign(const Message&);
     void handle_user(const UserMessage&, 
                      NodeMap::iterator, 
-                     const ReadBuf*, 
-                     const size_t);
+                     const gu::net::Datagram&);
     void handle_delegate(const DelegateMessage&, 
                          NodeMap::iterator,
-                         const ReadBuf*, 
-                         size_t);
+                         const gu::net::Datagram&);
     void handle_gap(const GapMessage&, NodeMap::iterator);
     void handle_join(const JoinMessage&, NodeMap::iterator);
     void handle_leave(const LeaveMessage&, NodeMap::iterator);
     void handle_install(const InstallMessage&, NodeMap::iterator);
     void populate_node_list(MessageNodeList*) const;
 public:
-    static size_t unserialize_message(const UUID&, const ReadBuf*, size_t,
+    static size_t unserialize_message(const UUID&, 
+                                      const gu::net::Datagram&,
                                       Message*);
     void handle_msg(const Message& msg, 
-                    const ReadBuf* rb = 0, const size_t roff = 0);    
+                    const gu::net::Datagram& dg = gu::net::Datagram());    
     // Protolay
-    void handle_up(int, const ReadBuf*, size_t, const ProtoUpMeta&);
-    int handle_down(WriteBuf* wb, const ProtoDownMeta& dm);
+    void handle_up(int, const gu::net::Datagram&, const ProtoUpMeta&);
+    int handle_down(const gu::net::Datagram& wb, const ProtoDownMeta& dm);
     void connect(bool first)
     {
         gu_trace(shift_to(S_JOINING));
@@ -280,7 +281,7 @@ public:
         gu_trace(send_leave());
     }
 
-    // Timer functions do appropriate actions for timer handling 
+    // gu::datetime::Date functions do appropriate actions for timer handling 
     // and return next expiration time 
 private:
 public:
@@ -291,7 +292,8 @@ public:
         T_CONSENSUS,
         T_STATS
     };
-    class TimerList : public  MultiMap<Time, Timer> { };
+    class TimerList : 
+        public  MultiMap<gu::datetime::Date, Timer> { };
 private:
     TimerList timers;
 public:
@@ -300,9 +302,9 @@ public:
     void handle_retrans_timer();
     void handle_consensus_timer();
     void handle_stats_timer();
-    Time get_next_expiration(Timer) const;
+    gu::datetime::Date get_next_expiration(const Timer) const;
     void reset_timers();
-    Time handle_timers();
+    gu::datetime::Date handle_timers();
 private:
 
     enum
@@ -331,7 +333,7 @@ private:
     
     int debug_mask;
     int info_mask;
-    Time last_stats_report;
+    gu::datetime::Date last_stats_report;
     bool collect_stats;
     Histogram hs_safe;
     long long int send_queue_s;
@@ -358,19 +360,19 @@ private:
     NodeMap known;
     NodeMap::iterator self_i;
     // 
-    Period view_forget_timeout;
-    Period inactive_timeout;
-    Period inactive_check_period;
-    Period consensus_timeout;
-    Period retrans_period;
-    Period join_retrans_period;
-    Period stats_report_period;
+    gu::datetime::Period view_forget_timeout;
+    gu::datetime::Period inactive_timeout;
+    gu::datetime::Period inactive_check_period;
+    gu::datetime::Period consensus_timeout;
+    gu::datetime::Period retrans_period;
+    gu::datetime::Period join_retrans_period;
+    gu::datetime::Period stats_report_period;
     
     // Current view id
     // ViewId current_view;
     View current_view;
     View previous_view;
-    std::list<std::pair<ViewId, Time> > previous_views;
+    std::list<std::pair<ViewId, gu::datetime::Date> > previous_views;
     
     // Map containing received messages and aru/safe seqnos
     InputMap* input_map;
@@ -384,7 +386,7 @@ private:
     // Send window size
     Seqno send_window;
     // Output message queue
-    std::deque<std::pair<WriteBuf*, ProtoDownMeta> > output;
+    std::deque<std::pair<gu::net::Datagram, ProtoDownMeta> > output;
     
     uint32_t max_output_size;
     

@@ -11,7 +11,7 @@
 using namespace std;
 using namespace std::rel_ops;
 
-
+using namespace gu;
 
 ostream& gcomm::evs::operator<<(ostream& os, const gcomm::evs::MessageNode& node)
 {

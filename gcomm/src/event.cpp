@@ -328,7 +328,13 @@ void EventLoop::release_protolay(Protolay* p)
     released.push_back(p);
 }
 
+gu::net::Network& EventLoop::get_net()
+{
+    return net;
+}
+
 EventLoop::EventLoop() :
+    net(),
     ctx_map(),
     sig_map(),
     event_map(),

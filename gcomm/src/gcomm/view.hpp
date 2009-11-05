@@ -50,10 +50,10 @@ namespace gcomm
         
         uint32_t    get_seq()  const { return seq; }
         
-        size_t unserialize(const byte_t* buf, size_t buflen, size_t offset)
+        size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
             throw (gu::Exception);
         
-        size_t serialize(byte_t* buf, size_t buflen, size_t offset) const
+        size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
             throw (gu::Exception);
         
         static size_t serial_size() 
@@ -158,10 +158,10 @@ namespace gcomm
         
         bool is_empty() const;
         
-        size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
+        size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
             throw (gu::Exception);
         
-        size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
+        size_t serialize(gu::byte_t* buf, const size_t buflen, const size_t offset) const
             throw (gu::Exception);
         
         size_t serial_size() const;

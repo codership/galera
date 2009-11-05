@@ -1,138 +1,111 @@
 
 #include "gcomm/transport.hpp"
-
-#include "tcp.hpp"
+#include "socket.hpp"
 #include "gmcast.hpp"
-#include "evs.hpp"
 #include "pc.hpp"
 #include "gcomm/conf.hpp"
 
-using std::string;
+using namespace std;
 
-BEGIN_GCOMM_NAMESPACE
+using namespace gu;
 
 // Private methods
 
-void Transport::set_state(const State state)
+void gcomm::Transport::set_state(const State state)
 {
     this->state = state;
 }
 
 // Public methods
 
-bool Transport::supports_uuid() const
+bool gcomm::Transport::supports_uuid() const
 {
     return false;
 }
 
-const UUID& Transport::get_uuid() const
+const gcomm::UUID& gcomm::Transport::get_uuid() const
 {
     gcomm_throw_fatal << "UUID not supported by " + uri.get_scheme();
     throw;
 }
 
-std::string Transport::get_remote_url() const
+string gcomm::Transport::get_local_addr() const
+{
+    gcomm_throw_fatal << "get local url not supported";
+    throw;
+}
+
+string gcomm::Transport::get_remote_addr() const
 {
     gcomm_throw_fatal << "get remote url not supported";
     throw;
 }
 
-std::string Transport::get_remote_host() const
-{
-    gcomm_throw_fatal << "get remote host not supported";
-    throw;
-}
 
-std::string Transport::get_remote_port() const
-{
-    gcomm_throw_fatal << "get remote port not supported";
-    throw;
-}
 
-Transport::State Transport::get_state() const
+gcomm::Transport::State gcomm::Transport::get_state() const
 {
     return state;
 }
 
-int Transport::get_errno() const
+int gcomm::Transport::get_errno() const
 {
     return error_no;
 }
 
-int Transport::get_fd() const
+int gcomm::Transport::get_fd() const
 {
-    return fd;
+    return -1;
 }
 
-void Transport::listen()
+void gcomm::Transport::listen()
 {
     gcomm_throw_fatal << "not supported";
 }
 
-Transport* Transport::accept()
+gcomm::Transport* gcomm::Transport::accept()
 {
     gcomm_throw_fatal << "not supported";
     throw;
 }
 
-int Transport::send(WriteBuf* wb, const ProtoDownMeta& dm)
-{
-    gcomm_throw_fatal << "Not implemented";
-    throw;
-}
-
-const ReadBuf* Transport::recv()
-{
-    gcomm_throw_fatal << "Not implemented";
-    throw;
-}
 
 // CTOR/DTOR
 
-Transport::Transport(const URI& uri_, EventLoop* event_loop_, Monitor* mon_) :
-    mon(mon_),
+gcomm::Transport::Transport(Protonet& pnet_, const URI& uri_) :
+    pstack(),
+    pnet(pnet_),
     uri(uri_),
     state(S_CLOSED),
-    error_no(0),
-    event_loop(event_loop_),
-    fd(-1)
-{}
+    error_no(0)
+{ }
 
-Transport::~Transport() {}
+gcomm::Transport::~Transport() {}
 
-// Factory method
 
-static Monitor transport_mon;
-
-Transport* Transport::create(const URI& uri, EventLoop* event_loop)
+gcomm::Transport* 
+gcomm::Transport::create(Protonet& pnet, const string& uri_str)
 {
+    const URI uri(uri_str);
     const std::string& scheme = uri.get_scheme();
-
-    if      (scheme == Conf::TcpScheme)
+    
+    if (scheme == Conf::TcpScheme)
     {
-        return new TCP(uri, event_loop, &transport_mon);
+        return new Socket(pnet, uri_str);
     }
     else if (scheme == Conf::GMCastScheme)
     {
-        return new GMCast(uri, event_loop, &transport_mon);
-    }
-    else if (scheme == Conf::EvsScheme)
-    {
-        return new EVS(uri, event_loop, &transport_mon);
+        return new GMCast(pnet, uri_str);
     }
     else if (scheme == Conf::PcScheme)
     {
-        return new PC(uri, event_loop, &transport_mon);
+        return new PC(pnet, uri_str);
     }
-
+    
     gcomm_throw_fatal << "scheme not supported";
-
+    
     throw; // to make compiler happy
 }
 
-Transport* Transport::create(const string& uri_str, EventLoop* el)
-{
-    return create(URI(uri_str), el);
-}
 
-END_GCOMM_NAMESPACE
+
