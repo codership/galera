@@ -861,8 +861,17 @@ int PCProto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
 
     push_header(um, down_dg);
     
-    int ret = send_down(down_dg, dm);
-    
+    int ret;
+    // If number of nodes is less than 3 we can send messages in agreed order
+    // since in case of crash we enter NON_PRIM anyway
+    if (current_view.get_members().size() < 3)
+    {
+        ret = send_down(down_dg, ProtoDownMeta(dm.get_user_type(), SP_AGREED));
+    }
+    else
+    {
+        ret = send_down(down_dg, dm);
+    }
     if (ret == 0)
     {
         set_last_seq(seq);

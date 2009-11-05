@@ -45,7 +45,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     retrans_msgs(0),
     recovered_msgs(0),
     recvd_msgs(7, 0),
-    delivered_msgs(0),
+    delivered_msgs(SP_SAFE + 1),
     send_user_prof    ("send_user"),
     send_gap_prof     ("send_gap"),
     send_join_prof    ("send_join"),
@@ -208,9 +208,11 @@ string gcomm::evs::Proto::get_stats() const
     copy(result.begin(), result.end(), ostream_iterator<double>(os, ","));
     os << "}\n\tretransmitted " << retrans_msgs << " ";
     os << "\n\trecovered " << recovered_msgs;
-    os << "\n\tdelivered " << delivered_msgs;
-    os << "\n\teff(delivered/sent/nodes) " << 
-        double(delivered_msgs)/double(accumulate(sent_msgs.begin(), sent_msgs.end(), 0))/double(current_view.get_members().size());
+    os << "\n\tdelivered {";
+    copy(delivered_msgs.begin(), delivered_msgs.end(), 
+         ostream_iterator<long long int>(os, ", "));
+    os << "}\n\teff(delivered/sent/nodes) " << 
+        double(accumulate(delivered_msgs.begin() + 1, delivered_msgs.end(), 0))/double(accumulate(sent_msgs.begin(), sent_msgs.end(), 0))/double(current_view.get_members().size());
     return os.str();
 }
 
@@ -223,7 +225,7 @@ void gcomm::evs::Proto::reset_stats()
     fill(recvd_msgs.begin(), recvd_msgs.end(), 0LL);
     retrans_msgs = 0LL;
     recovered_msgs = 0LL;
-    delivered_msgs = 0LL;
+    fill(delivered_msgs.begin(), delivered_msgs.end(), 0LL);
     last_stats_report = Date::now();
 }
 
@@ -1512,7 +1514,7 @@ int gcomm::evs::Proto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
                         dm.get_safety_prefix(), Seqno(send_window.get()/2), 
                         Seqno::max());
         profile_leave(send_user_prof);
-
+        
         switch (err) 
         {
         case EAGAIN:
@@ -1785,6 +1787,7 @@ void gcomm::evs::Proto::deliver()
         
         if (deliver == true)
         {
+            ++delivered_msgs[msg.get_msg().get_safety_prefix()];
             if (msg.get_msg().get_safety_prefix() != SP_DROP)
             {
                 gu_trace(validate_reg_msg(msg.get_msg()));
@@ -1795,7 +1798,6 @@ void gcomm::evs::Proto::deliver()
                                msg.get_msg().get_user_type(),
                                msg.get_msg().get_seq().get());
                 gu_trace(send_up(msg.get_rb(), um));
-                delivered_msgs++;
                 profile_leave(delivery_prof);
             }
             gu_trace(input_map->erase(i));
@@ -1881,6 +1883,7 @@ void gcomm::evs::Proto::deliver_trans()
         
         if (deliver == true)
         {
+            ++delivered_msgs[msg.get_msg().get_safety_prefix()];
             if (msg.get_msg().get_safety_prefix() != SP_DROP)
             {
                 gu_trace(validate_reg_msg(msg.get_msg()));
@@ -1890,7 +1893,6 @@ void gcomm::evs::Proto::deliver_trans()
                                msg.get_msg().get_user_type(),
                                msg.get_msg().get_seq().get());
                 gu_trace(send_up(msg.get_rb(), um));
-                delivered_msgs++;
             }
             gu_trace(input_map->erase(i));
         }

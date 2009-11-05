@@ -253,7 +253,7 @@ private:
     long long int retrans_msgs;
     long long int recovered_msgs;
     std::vector<long long int> recvd_msgs;
-    long long int delivered_msgs;
+    std::vector<long long int> delivered_msgs;
     prof::Profile send_user_prof;
     prof::Profile send_gap_prof;
     prof::Profile send_join_prof;
