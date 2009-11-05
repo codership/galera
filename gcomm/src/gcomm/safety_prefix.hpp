@@ -3,8 +3,9 @@
  *
  * $Id$
  */
-#ifndef SAFETY_PREFIX
-#define SAFETY_PREFIX
+
+#ifndef GCOMM_SAFETY_PREFIX
+#define GCOMM_SAFETY_PREFIX
 
 namespace gcomm
 {
@@ -18,4 +19,4 @@ namespace gcomm
     };
 }
 
-#endif // SAFETY_PREFIX
+#endif // GCOMM_SAFETY_PREFIX

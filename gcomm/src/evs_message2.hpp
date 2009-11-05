@@ -31,6 +31,8 @@ namespace gcomm
         class JoinMessage;
         class LeaveMessage;
         class InstallMessage;
+        class SelectNodesOp;
+        class RangeHsCmp;
     }
 }
 
@@ -546,5 +548,63 @@ public:
         throw(gu::Exception);
     size_t serial_size() const;
 };
+
+
+class gcomm::evs::SelectNodesOp
+{
+public:
+    SelectNodesOp(MessageNodeList& nl_, 
+                  const gcomm::ViewId& view_id_, 
+                  const bool operational_,
+                  const bool leaving_ ) : 
+        nl          (nl_), 
+        view_id     (view_id_),
+        operational (operational_),
+        leaving     (leaving_)
+    { }
+    
+    void operator()(const MessageNodeList::value_type& vt) const
+    {
+        const MessageNode& node(MessageNodeList::get_value(vt));
+        if (node.get_view_id()      == view_id           &&
+            ((operational           == true          && 
+              leaving               == true            ) ||
+             (node.get_operational()  == operational &&
+              node.get_leaving()      == leaving       ) ) )
+            
+        {
+            nl.insert_checked(vt);
+        }
+    }
+private:
+    MessageNodeList&       nl;
+    ViewId           const view_id;
+    bool             const operational;
+    bool             const leaving;
+};
+
+
+class gcomm::evs::RangeHsCmp
+{
+public:
+    bool operator()(const MessageNodeList::value_type& a,
+                    const MessageNodeList::value_type& b) const
+    {
+        if (MessageNodeList::get_value(a).get_im_range().get_hs() == Seqno::max())
+        {
+            return true;
+        }
+        else if (MessageNodeList::get_value(b).get_im_range().get_hs() == Seqno::max())
+        {
+            return false;
+        }
+        else
+        {
+            return MessageNodeList::get_value(a).get_im_range().get_hs() < 
+                MessageNodeList::get_value(b).get_im_range().get_hs();
+        }
+    }
+};
+
 
 #endif // EVS_MESSAGE2_HPP

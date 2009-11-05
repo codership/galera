@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
+
 #ifndef EVS_PROTO_HPP
 #define EVS_PROTO_HPP
 
@@ -10,6 +14,8 @@
 #include "profile.hpp"
 
 #include "evs_seqno.hpp"
+#include "evs_node.hpp"
+#include "evs_consensus.hpp"
 
 #include "gu_datetime.hpp"
 
@@ -31,79 +37,11 @@ namespace gcomm
         class InstallMessage;
         class LeaveMessage;
         class InputMap;
-
-        class Node;
-        std::ostream& operator<<(std::ostream&, const Node&);
-        class NodeMap;
         class Proto;
         std::ostream& operator<<(std::ostream&, const Proto&);
     }
 }
 
-class gcomm::evs::Node
-{
-public:    
-    Node() : 
-        index(std::numeric_limits<size_t>::max()),
-        operational(true), 
-        installed(false), 
-        join_message(0), 
-        leave_message(0),
-        tstamp(gu::datetime::Date::now()),
-        fifo_seq(-1)
-    {}
-
-    Node(const Node& n);
-    
-    ~Node();
-    
-    void set_index(const size_t idx) { index = idx; }
-    size_t get_index() const { return index; }
-    
-    void set_operational(const bool op) { operational = op; }
-    bool get_operational() const { return operational; }
-    
-    void set_installed(const bool inst) { installed = inst; }
-    bool get_installed() const { return installed; }
-    
-    void set_join_message(const JoinMessage* msg);
-    
-    const JoinMessage* get_join_message() const { return join_message; }
-    
-    void set_leave_message(const LeaveMessage* msg);
-    
-    const LeaveMessage* get_leave_message() const { return leave_message; }
-    
-    void set_tstamp(const gu::datetime::Date& t) { tstamp = t; }
-    const gu::datetime::Date& get_tstamp() const { return tstamp; }
-    
-    void set_fifo_seq(const int64_t seq) { fifo_seq = seq; }
-    int64_t get_fifo_seq() const { return fifo_seq; }
-    
-
-private:
-
-
-
-    void operator=(const Node&);
-
-    // Index for input map
-    size_t index;
-    // True if instance is considered to be operational (has produced messages)
-    bool operational;
-    // True if it is known that the instance has installed current view
-    bool installed;
-    // Last received JOIN message
-    JoinMessage* join_message;
-    // Last activity timestamp
-    LeaveMessage* leave_message;
-    // 
-    gu::datetime::Date tstamp;
-    //
-    int64_t fifo_seq;
-};
-
-class gcomm::evs::NodeMap : public Map<UUID, Node> { };
 
 
 class gcomm::evs::Proto : public Protolay
@@ -177,7 +115,6 @@ public:
     bool retrans_leaves(const MessageNodeList&);
 
     void set_inactive(const UUID&);
-    bool is_inactive(const Node&) const;
     void check_inactive();
     void cleanup_unoperational();
     void cleanup_views();
@@ -197,28 +134,7 @@ public:
 
 
     bool is_all_installed() const;
-    
-    // Compares join message against current state
-    
-    bool is_consistent(const Message&) const;
-    /*!
-     * Check if highest reachable safe seq according to message
-     * consistent with local state.
-     */
-    bool is_consistent_highest_reachable_safe_seq(const Message&) const;
-    /*!
-     * Check if message aru seq, safe seq and node ranges matches to
-     * local state.
-     */
-    bool is_consistent_input_map(const Message&) const;
-    /*!
-     * Check if message joining nodes match to local state.
-     */
-    bool is_consistent_joining(const Message&) const;
-    bool is_consistent_partitioning(const Message&) const;
-    bool is_consistent_leaving(const Message&) const;
-    bool is_consistent_same_view(const Message&) const;
-    bool is_consensus() const;
+
     
     bool is_representative(const UUID& pid) const;
 
@@ -227,12 +143,7 @@ public:
     
     // Message handlers
 private:
-    /*!
-     * Compute highest reachable safe seq from local state
-     *
-     * @return Highest reachable safe seq
-     */
-    Seqno highest_reachable_safe_seq() const;
+
 
     /*!
      * Update input map safe seq
@@ -376,6 +287,9 @@ private:
     
     // Map containing received messages and aru/safe seqnos
     InputMap* input_map;
+
+    // Consensus module
+    Consensus consensus;
     
     // Last received install message
     InstallMessage* install_message;

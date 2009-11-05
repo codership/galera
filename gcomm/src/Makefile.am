@@ -17,6 +17,8 @@ libgcomm_la_SOURCES = 		\
 	gmcast.cpp		\
 	evs_message2.cpp	\
 	evs_input_map2.cpp 	\
+	evs_node.cpp		\
+	evs_consensus.cpp	\
 	evs_proto.cpp		\
 	pc_proto.cpp		\
 	pc.cpp
