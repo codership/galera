@@ -39,7 +39,7 @@ public:
     SchemeMap() :
         ai_map()
     {
-        ai_map.insert(make_pair("tcp", get_addrinfo(0, AF_UNSPEC, SOCK_STREAM, 0)));
+        ai_map.insert(make_pair("tcp", get_addrinfo(0, AF_INET, SOCK_STREAM, 0)));
         // TODO:
     }
     
