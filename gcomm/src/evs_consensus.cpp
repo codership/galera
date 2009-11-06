@@ -14,10 +14,8 @@ using namespace std;
 using namespace gcomm;
 using namespace gcomm::evs;
 
-#define evs_log_debug(int) log_debug
-
-
-
+// Disable debug logging until debug mask is available here
+#define evs_log_debug(int) if (true) {} else log_debug
 
 
 class LeaveSeqCmpOp

@@ -25,6 +25,8 @@
 #include "profile.hpp"
 #include "gcomm/map.hpp"
 
+#include <boost/pool/pool_alloc.hpp>
+
 #include <vector>
 
 
@@ -98,7 +100,13 @@ private:
 
 
 class gcomm::evs::InputMapMsgIndex : 
-    public Map<InputMapMsgKey, InputMapMsg> { };
+    public Map<InputMapMsgKey, InputMapMsg,
+               std::map<InputMapMsgKey, 
+                        InputMapMsg, 
+                        std::less<InputMapMsgKey>,
+                        boost::fast_pool_allocator<
+                            std::pair<const InputMapMsgKey, InputMapMsg> > > >
+{ };
 
 
 /* Internal node representation */
