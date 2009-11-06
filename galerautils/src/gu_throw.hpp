@@ -24,8 +24,11 @@ namespace gu
     /*! Abstract base class */
     class ThrowBase
     {
-        ThrowBase (const ThrowBase&);
-        ThrowBase& operator= (const ThrowBase&);
+    public:
+
+        virtual ~ThrowBase () {}
+
+        std::ostringstream& msg () throw() { return os; }
 
     protected:
 
@@ -42,17 +45,14 @@ namespace gu
             os   ()
         {}
 
-    public:
+    private:
 
-        virtual ~ThrowBase () {}
-
-        std::ostringstream& msg () throw() { return os; }
+        ThrowBase (const ThrowBase&);
+        ThrowBase& operator= (const ThrowBase&);
     };
 
     /* final*/ class ThrowError : public ThrowBase
     {
-        int const err;
-
     public:
 
         ThrowError (const char* file_,
@@ -74,6 +74,10 @@ namespace gu
 
             throw e;
         }
+
+    private:
+
+        int const err;
     };
 
     /* final*/ class ThrowFatal : public ThrowBase
@@ -84,7 +88,7 @@ namespace gu
             :
             ThrowBase (file, func, line)
         {}
-        
+
         ~ThrowFatal () throw (Exception)
         {
             os << " (FATAL)";

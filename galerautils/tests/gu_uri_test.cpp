@@ -22,7 +22,7 @@ START_TEST (uri_test1) // checking normal URI
 {
     const string scheme("scheme");
     const string user  ("user:pswd");
-    const string host  ("host");
+    const string host  ("[::ffff:192.168.0.1]"); // IPv4 over IPv6
     const string port  ("4567");
     const string path  ("/path1/path2");
     const string opt1  ("opt1");

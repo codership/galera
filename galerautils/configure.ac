@@ -17,17 +17,13 @@ AC_ARG_ENABLE(debug,
               enable_debug="yes")
 if test "$enable_debug" != "no"
 then
-    CFLAGS=${CFLAGS:-"-O1"} # -O1 to detect unitialized vars
-    AM_CFLAGS="-g -fno-inline"
+    AM_CFLAGS="-O1 -g -fno-inline"
     AM_CPPFLAGS="-DDEBUG_ASSERT -D_FORTIFY_SOURCE=1"
 else
-    CFLAGS=${CFLAGS:-"-O3"}
-    AM_CFLAGS="-g"
+    AM_CFLAGS="-O3 -g"
     AM_CPPFLAGS="-DNDEBUG"
 fi
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
-
-CXXFLAGS=${CXXFLAGS:-"$CFLAGS"}
 
 # Checks for programs.
 AC_PROG_CC
@@ -84,7 +80,6 @@ AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -Wold-style-cast -Wconversion"
 # - some stl headers may contain deprecated features
 # - gu_log.h contains some variadic macros
 AM_CXXFLAGS="$AM_CXXFLAGS -Wno-long-long -Wno-deprecated"
-AM_CXXFLAGS="$AM_CXXFLAGS "
 AM_CFLAGS="$AM_CFLAGS -std=c99 -fno-strict-aliasing"
 AM_CPPFLAGS="$AM_CPPFLAGS -D_XOPEN_SOURCE=600"
 AM_LDFLAGS="-Wl,--warn-common -Wl,--fatal-warnings"

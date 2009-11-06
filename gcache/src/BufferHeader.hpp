@@ -19,7 +19,7 @@ namespace gcache
 
     struct BufferHeader
     {
-        int64_t  size;
+        ssize_t  size;
         int64_t  seqno;
         uint64_t flags;
     }__attribute__((__packed__));

@@ -21,16 +21,12 @@ AC_ARG_ENABLE(debug,
               enable_debug="yes")
 if test "$enable_debug" != "no"
 then
-    CFLAGS=${CFLAGS:-"-O1"}
-    AM_CFLAGS="-g -fno-inline"
+    AM_CFLAGS="-O1 -g -fno-inline"
 else
-    CFLAGS=${CFLAGS:-"-O3"}
-    AM_CFLAGS="-g"
+    AM_CFLAGS="-O3 -g"
     AM_CPPFLAGS="-DNDEBUG"
 fi
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
-
-CXXFLAGS=${CXXFLAGS:-"$CFLAGS"}
 
 # Checks for programs.
 AC_PROG_AWK

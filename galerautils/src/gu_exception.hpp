@@ -17,11 +17,6 @@ namespace gu {
 
     class Exception: public std::exception
     {
-    private:
-
-        std::string msg;
-        const int   err;
-
     public:
 
         enum { E_UNSPEC = 255 }; // unspecified error
@@ -38,6 +33,11 @@ namespace gu {
         int         get_errno () const throw() { return err; }
 
         void        trace (const char* file, const char* func, int line);
+
+    private:
+
+        std::string msg;
+        const int   err;
     };
 }
 

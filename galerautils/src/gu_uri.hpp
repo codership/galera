@@ -34,7 +34,7 @@ namespace gu
      *       header.
      */
     typedef std::multimap<const std::string, std::string> URIQueryList;
-    
+
     /*!
      * @brief Utility class to parse URIs
      */
@@ -51,7 +51,7 @@ namespace gu
         RegEx::Match port;      /*! URI port part */
         RegEx::Match path;      /*! URI path part */
         RegEx::Match fragment;  /*! URI fragment part */
-        
+
         URIQueryList query_list; /*! URI query list */
 
         /*!
@@ -73,7 +73,7 @@ namespace gu
          * @throws std::logic_error in case of internal error
          */
         URI (const std::string&) throw (Exception);
-        
+
         /*!
          * @brief Get URI string
          * @return URI string
@@ -109,7 +109,7 @@ namespace gu
          * @return URI authority substring
          */
         std::string get_authority() const throw (NotSet);
-        
+
         /*!
          * @brief Get "user" part of authority
          *
@@ -119,7 +119,7 @@ namespace gu
         {
             return user.str();
         }
-        
+
         /*!
          * @brief Get "host" part of authority
          *
@@ -129,7 +129,7 @@ namespace gu
         {
             return host.str();
         }
-        
+
         /*!
          * @brief Get "port" part of authority
          *
@@ -139,7 +139,7 @@ namespace gu
         {
             return port.str();
         }
-        
+
         /*!
          * @brief Get URI path
          *

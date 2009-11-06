@@ -19,6 +19,7 @@
 #include "gu_monitor.hpp"
 #include "gu_macros.hpp"
 #include "gu_utils.hpp"
+#include "gu_convert.hpp"
 
 extern "C" {
 #include "gu_macros.h"

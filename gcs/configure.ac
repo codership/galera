@@ -22,18 +22,14 @@ AC_ARG_ENABLE(debug,
               enable_debug="yes")
 if test "$enable_debug" != "no"
 then
-    CFLAGS=${CFLAGS:-"-O1"} # -O1 to detect unitialized variables
-    AM_CFLAGS="-g -fno-inline"
+    AM_CFLAGS="-O1 -g -fno-inline"
 #    AM_CPPFLAGS="-DDEBUG_MALLOC -DDEBUG_MUTEX -DDEBUG_ASSERT -D_FORTIFY_SOURCE=1"
     AM_CPPFLAGS="-DDEBUG_MALLOC -DDEBUG_MUTEX -DDEBUG_ASSERT"
 else
-    CFLAGS=${CFLAGS:-"-O3"}
-    AM_CFLAGS="-g"
+    AM_CFLAGS="-O3 -g"
     AM_CPPFLAGS="-DNDEBUG"
 fi
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
-
-CXXFLAGS=${CXXFLAGS:-"$CFLAGS"}
 
 # Check if use of DBUG macros is desired
 AC_ARG_ENABLE(dbug,
@@ -45,7 +41,7 @@ if test "$enable_dbug" != "no"
 then
     enable_dbug="yes"
 else
-    CFLAGS="$CFLAGS -DGU_DBUG_OFF"
+    AM_CPPFLAGS="$AM_CPPFLAGS -DGU_DBUG_OFF"
 fi
 
 # Check if Spread backend is desired

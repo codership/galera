@@ -6,8 +6,6 @@ then
     exit -1
 fi
 
-GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
-
 usage()
 {
     echo -e "Usage: build.sh [OPTIONS] \n" \
@@ -18,6 +16,7 @@ usage()
 	"    -c|--configure  reconfigure the build system (implies -s)\n"\
 	"    -b|--bootstap   rebuild the build system (implies -c)\n"\
 	"    -o|--opt        configure build with debug disabled (implies -c)\n"\
+	"    -m32/-m64       build 32/64-bit binaries on x86\n"\
 	"    -d|--debug      configure build with debug enabled (implies -c)\n"\
 	"    --with-spread   configure build with Spread (implies -c)\n"\
 	"    --no-strip      prevent stripping of release binaries\n"\
@@ -25,64 +24,85 @@ usage()
         "\n -s and -b options affect only Galera build.\n"
 }
 
+# Initializing variables to defaults
+uname -m | grep -q i686 && CPU=pentium || CPU=amd64
+DEBUG=no
+NO_STRIP=no
+RELEASE=""
+TAR=no
+INSTALL=no
+
+GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
 
 # Parse command line
 while test $# -gt 0
 do
     case $1 in
-	-b|--bootstrap)
+        -b|--bootstrap)
             BOOTSTRAP=yes # Bootstrap the build system
             ;;
-	-c|--configure)
+        -c|--configure)
             CONFIGURE=yes # Reconfigure the build system
             ;;
-	-s|--scratch)
+        -s|--scratch)
             SCRATCH=yes   # Build from scratch (run make clean)
             ;;
         -o|--opt)
             OPT=yes       # Compile without debug
             ;;
-	-d|--debug)
+        -d|--debug)
             DEBUG=yes     # Compile with debug
-	    NO_STRIP=yes  # Don't strip the binaries
-	    ;;
+            NO_STRIP=yes  # Don't strip the binaries
+            ;;
         -r|--release)
             RELEASE="$2"  # Compile without debug
-	    shift
+            shift
             ;;
-	-t|--tar)
+        -t|--tar)
             TAR=yes       # Create a TGZ package
             ;;
-	-i|--install)
-	    INSTALL=yes
-	    ;;
-	--no-strip)
-	    NO_STRIP=yes  # Don't strip the binaries
-	    ;;
-	--with*-spread)
-	    WITH_SPREAD="$1"
-	    ;;
-	--help)
-	    usage
-	    exit 0
-	    ;;
-	*)
-	    echo "Unrecognized option: $1"
-	    usage
-	    exit 1
-	    ;;
+        -i|--install)
+            INSTALL=yes
+            ;;
+        --no-strip)
+            NO_STRIP=yes  # Don't strip the binaries
+            ;;
+        --with*-spread)
+            WITH_SPREAD="$1"
+            ;;
+        -m32)
+            CFLAGS="$CFLAGS -m32"
+            CXXFLAGS="$CXXFLAGS -m32"
+            CONFIGURE=yes
+            CPU="pentium"
+            ;;
+        -m64)
+            CFLAGS="$CFLAGS -m64"
+            CXXFLAGS="$CXXFLAGS -m64"
+            CONFIGURE=yes
+            CPU="amd64"
+            ;;
+        --help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unrecognized option: $1"
+            usage
+            exit 1
+            ;;
     esac
     shift
 done
 
 # export command options for Galera build
-export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD
+export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD CFLAGS CXXFLAGS
 
 if [ "$OPT"     == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
 
-set -e
+set -eu
 
 # Absolute path of this script folder
 BUILD_ROOT=$(cd $(dirname $0); pwd -P)
@@ -90,7 +110,6 @@ GALERA_SRC=${GALERA_SRC:-$BUILD_ROOT/../../}
 # Source paths are either absolute or relative to script, get absolute
 MYSQL_SRC=$(cd $MYSQL_SRC; pwd -P; cd $BUILD_ROOT)
 GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
-
 
 ######################################
 ##                                  ##
@@ -115,9 +134,6 @@ MYSQL_REV=$(bzr revno)
 export MYSQL_REV
 export GALERA_REV
 export GALERA_SRC
-
-# must be single line or set -e will abort the script on amd64
-uname -m | grep -q i686 && export CPU=pentium || export CPU=amd64
 
 # Build mysqld
 if [ "$CONFIGURE" == "yes" ]
@@ -204,7 +220,7 @@ then
     strip $GALERA_LIBS/lib*.so
 #    if test $GCOMM_IMPL = "galeracomm"
 #	then
-	strip $GALERA_SBIN/*
+        strip $GALERA_SBIN/*
 #    fi
     strip $MYSQL_DIST_DIR/libexec/mysqld
 fi

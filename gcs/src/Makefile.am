@@ -60,8 +60,8 @@ noinst_PROGRAMS  = gcs_test
 gcs_test_SOURCES = gcs_test.c
 gcs_test_LDADD   = $(lib_LTLIBRARIES) $(GCOMM_LIBS)
 gcs_test_LDFLAGS = -static
-# how to set it up automatically?
-CCLD=g++
+# how to set it up automatically? $(CXXFLAGS) - to use the right arch
+CCLD=g++ $(CXXFLAGS)
 gcs_test_LINK    = $(LIBTOOL) --tag=CXX --mode=link $(CCLD) -static -o $@
 
 .PHONY: lib test tags

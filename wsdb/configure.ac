@@ -17,17 +17,14 @@ AC_ARG_ENABLE(debug,
 if test "$enable_debug" != "no"
 then
     enable_debug="yes"
-    CFLAGS=${CFLAGS:-"-O1"}
-    AM_CFLAGS="-g -fno-inline"
+    AM_CFLAGS="-O1 -g -fno-inline"
     AM_CPPFLAGS="-DDEBUG_MALLOC -DDEBUG_MUTEX -D_FORTIFY_SOURCE=1"
 else
-    AM_CFLAGS="-g"
+    AM_CFLAGS="-O3 -g"
     AM_CPPFLAGS="-DNDEBUG"
 fi
 
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
-
-CXXFLAGS=${CXXFLAGS:-"$CFLAGS"}
 
 # Check if use of DBUG macros is desired
 AC_ARG_ENABLE(dbug,
@@ -81,16 +78,16 @@ m4_if(m4_version_compare(m4_version,1.4.10),
 
 AC_CHECK_LIB([galerautils], [gu_log],,
              AC_MSG_ERROR([*** libgalerautils not found! ***]);
-	    )
+            )
 
 #f FIXME: how to check for libgalerautils only if libgcs was linked with it?
 AC_CHECK_LIB([galerautils++], [main],,
              AC_MSG_ERROR([*** libgalerautils++ not found! ***]);
-	    )
+            )
 
 AC_CHECK_LIB([gcs], [gcs_open],,
              AC_MSG_ERROR([*** libgcs not found! ***]);
-	    )
+            )
 
 ##AM_CONDITIONAL(ENABLE_DBUG, test "$enable_dbug" != "no")
 

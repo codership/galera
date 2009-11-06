@@ -17,15 +17,6 @@ namespace gu
 {
     class Mutex
     {
-        Mutex (const Mutex&);
-	Mutex& operator= (const Mutex&);
-
-        friend class Lock;
-
-    protected:
-
-        pthread_mutex_t mutable value;
-
     public:
 
         Mutex () : value()
@@ -37,10 +28,21 @@ namespace gu
         {
             int err = pthread_mutex_destroy (&value);
             if (gu_unlikely(err != 0))
-	    {
+            {
                 gu_throw_error (err) << "pthread_mutex_destroy()";
             }
         }
+
+    protected:
+
+        pthread_mutex_t mutable value;
+
+    private:
+
+        Mutex (const Mutex&);
+        Mutex& operator= (const Mutex&);
+
+        friend class Lock;
     };
 }
 

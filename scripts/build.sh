@@ -2,7 +2,24 @@
 
 # $Id$
 
-have_ccache="false"
+usage()
+{
+    echo -e "Usage: build.sh [OPTIONS] \n" \
+    "Options:                      \n" \
+    "    --stage <initial stage>   \n" \
+    "    --last-stage <last stage> \n" \
+    "    -s|--scratch    build everything from scratch\n"\
+    "    -c|--configure  reconfigure the build system (implies -s)\n"\
+    "    -b|--bootstap   rebuild the build system (implies -c)\n"\
+    "    -o|--opt        configure build with debug disabled (implies -c)\n" \
+    "    -d|--debug      configure build with debug enabled (implies -c)\n" \
+    "    -m32/-m64       build 32/64-bit binaries for x86\n" \
+    "    -p|--package    build RPM and DEB packages at the end.\n" \
+    "    --with-spread   configure build with spread backend (implies -c to gcs)\n" \
+    "\nSet DISABLE_GCOMM/DISABLE_VSBES to 'yes' to disable respective modules"
+}
+
+#have_ccache="false"
 #if test -n "`which ccache`"
 #then
 #    have_ccache="true"
@@ -17,25 +34,18 @@ have_ccache="false"
 #
 #fi
 
+if ccache -V > /dev/null 2>&1
+then
+    CC=${CC:-"gcc"}
+    CXX=${CXX:-"g++"}
+    echo "$CC"  | grep "ccache" > /dev/null || CC="ccache $CC"
+    echo "$CXX" | grep "ccache" > /dev/null || CXX="ccache $CXX"
+    export CC CXX
+fi
+
 initial_stage="galerautils"
 last_stage="galera"
 gainroot=""
-
-usage()
-{
-    echo -e "Usage: build.sh [OPTIONS] \n" \
-    "Options:                      \n" \
-    "    --stage <initial stage>   \n" \
-    "    --last-stage <last stage> \n" \
-    "    -s|--scratch    build everything from scratch\n"\
-    "    -c|--configure  reconfigure the build system (implies -s)\n"\
-    "    -b|--bootstap   rebuild the build system (implies -c)\n"\
-    "    -o|--opt        configure build with debug disabled (implies -c)\n" \
-    "    -d|--debug      configure build with debug enabled (implies -c)\n" \
-    "    -p|--package    build RPM and DEB packages at the end.\n" \
-    "    --with-spread   configure build with spread backend (implies -c to gcs)\n" \
-    "\nSet DISABLE_GCOMM/DISABLE_VSBES to 'yes' to disable respective modules"
-}
 
 while test $# -gt 0 
 do
@@ -63,6 +73,16 @@ do
 	    ;;
 	-o|--opt)
 	    OPT=yes       # Compile without debug
+	    ;;
+	-m32)
+	    CFLAGS="$CFLAGS -m32"
+	    CXXFLAGS="$CXXFLAGS -m32"
+	    SCRATCH=yes
+	    ;;
+	-m64)
+	    CFLAGS="$CFLAGS -m64"
+	    CXXFLAGS="$CXXFLAGS -m64"
+	    SCRATCH=yes
 	    ;;
 	-d|--debug)
 	    DEBUG=yes     # Compile with debug
@@ -93,9 +113,6 @@ if [ "$DEBUG" == "yes" ]; then CONFIGURE="yes"; fi
 if [ -n "$WITH_SPREAD" ]; then CONFIGURE="yes"; fi
 
 if [ "$CONFIGURE" == "yes" ]; then SCRATCH="yes"; fi
-
-# Disable gcomm until fixed
-#DISABLE_GCOMM=${DISABLE_GCOMM:-"yes"}
 
 # Be quite verbose
 set -x
@@ -183,20 +200,20 @@ build_module()
 }
 
 building="false"
-# Build projects
 
-if test $initial_stage = "scratch"
-then
-# Commented out, not sure where this does its tricks (teemu)
-#    rm -rf
-    if test $have_ccache = "true"
-    then
-        ccache -C
-    fi
-    building="true"
-fi
+# The whole purpose of ccache is to be able to safely make clean and not rebuild
+#if test $initial_stage = "scratch"
+#then
+## Commented out, not sure where this does its tricks (teemu)
+##    rm -rf
+#    if test $have_ccache = "true"
+#    then
+#        ccache -C
+#    fi
+#    building="true"
+#fi
 
-
+echo "CC: $CC"
 echo "CPPFLAGS: $CPPFLAGS"
 
 build_module "galerautils"

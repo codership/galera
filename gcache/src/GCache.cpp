@@ -3,8 +3,8 @@
  */
 
 #include <cerrno>
-
 #include <unistd.h>
+#include <galerautils.hpp>
 
 #include "BufferHeader.hpp"
 #include "GCache.hpp"
@@ -15,7 +15,7 @@ namespace gcache
 
     static size_t check_size (size_t megs)
     {
-        // overflow check
+        // overflow check (2^20 == 1Mb)
         if (megs != ((megs << 20) >> 20)) {
             std::ostringstream msg;
             msg << "Requested cache size too high: " << megs << "Mb";
@@ -82,7 +82,7 @@ namespace gcache
           open      (true),
           preamble  (static_cast<char*>(mmap.ptr)),
           header    (reinterpret_cast<int64_t*>(preamble + PREAMBLE_LEN)),
-          header_len(header[0]),
+          header_len(gu::convert(header[0], header_len)),
           start     (reinterpret_cast<uint8_t*>(header + header_len)),
           end       (reinterpret_cast<uint8_t*>(preamble + mmap.size)),
           first     (0),
