@@ -27,8 +27,13 @@ extern "C"
 #include "gcomm/transport.hpp"
 #include "gu_prodcons.hpp"
 
+#ifdef PROFILE_GCS_GCOMM
 #define GCOMM_PROFILE 1
+#else
+#undef GCOMM_PROFILE
+#endif // PROFILE_GCS_GCOMM
 #include "profile.hpp"
+
 
 #include <deque>
 
@@ -191,7 +196,7 @@ public:
             return_ack(Message(&msg->get_producer(), 0, -ENOTCONN));
         }
         
-        log_info << prof;
+        log_debug << prof;
     }
     
     void run();
@@ -561,12 +566,10 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
 {
 
     GCommConn* conn(0);
-    gu_conf_self_tstamp_on();
+
     try
     {
-        string backend_uri(socket);
-
-        conn = new GCommConn(backend_uri);
+        conn = new GCommConn(socket);
     }
     catch (Exception& e)
     {
@@ -576,11 +579,6 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
         return -e.get_errno();
     }
 
-    if (conn->get_use_prod_cons() == false)
-    {
-        BufferMempool::set_thread_safe(true);
-    }
-    
     backend->open     = &gcs_gcomm_open;
     backend->close    = &gcs_gcomm_close;
     backend->destroy  = &gcs_gcomm_destroy;
