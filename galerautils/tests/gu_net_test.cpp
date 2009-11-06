@@ -113,7 +113,6 @@ END_TEST
 START_TEST(test_network_listen)
 {
     log_info << "START";
-    BufferMempool::set_thread_safe(true);
     Network net;
     Socket* listener = net.listen("localhost:2112");
     listener->close();
@@ -226,7 +225,6 @@ void* listener_thd(void* arg)
 START_TEST(test_network_connect)
 {
     gu_log_max_level = GU_LOG_DEBUG;
-    BufferMempool::set_thread_safe(true);
     log_info << "START";
     Network* net = new Network;
     Socket* listener = net->listen("localhost:2112");
@@ -279,7 +277,6 @@ END_TEST
 START_TEST(test_network_send)
 {
     log_info << "START";
-    BufferMempool::set_thread_safe(true);
     const size_t bufsize(1 << 15);
     byte_t* buf = new byte_t[bufsize];
     for (size_t i = 0; i < bufsize; ++i)
@@ -357,7 +354,6 @@ void* interrupt_thd(void* arg)
 START_TEST(test_network_interrupt)
 {
     log_info << "START";    
-    BufferMempool::set_thread_safe(true);
     Network net;
     pthread_t th;
     pthread_create(&th, 0, &interrupt_thd, &net);
@@ -445,7 +441,6 @@ struct delete_object
 START_TEST(test_network_nonblocking)
 {
     log_info << "START";
-    BufferMempool::set_thread_safe(true);
     Network net;
     
     Socket* listener = net.listen("tcp://localhost:2112?socket.non_blocking=1");
@@ -673,7 +668,6 @@ public:
 START_TEST(test_net_consumer)
 {
     log_info << "START";
-    BufferMempool::set_thread_safe(true);
     string url("tcp://localhost:2112?socket.non_blocking=1");
     NetConsumer cons(url);
     cons.connect(url);
@@ -747,7 +741,6 @@ void* producer_thd(void* arg)
 START_TEST(test_net_consumer_nto1)
 {
     log_info << "START";
-    BufferMempool::set_thread_safe(true);
     string url("tcp://localhost:2112?socket.non_blocking=1");
     NetConsumer cons(url);
     cons.connect(url);

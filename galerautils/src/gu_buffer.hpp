@@ -66,18 +66,7 @@ namespace gu
         { return (cmp.buf == buf); }
     private:
         BType buf;
-    };
-
-#ifdef GU_BUFFER_MEMPOOL
-    class BufferMempool
-    {
-    public:
-        static void set_thread_safe(bool);
-    };
-#endif
-
-
-    
+    };    
 }
 
 
