@@ -67,6 +67,8 @@ namespace gu
     private:
         BType buf;
     };    
+
+
 }
 
 

@@ -47,14 +47,21 @@
 
 #include <boost/shared_ptr.hpp>
 
+// Forward declarations
 namespace gu
 {
-
+    class URI;
     namespace net
     {
-        /*! 
-         * @typedef @brief Byte buffer type
-         */
+        class Addrinfo;
+    }
+}
+
+// Declarations in this header
+namespace gu
+{
+    namespace net
+    {
         class Datagram;
         class Socket;
         class SocketList;
@@ -66,8 +73,7 @@ namespace gu
         {
             static const std::string tcp = "tcp";
         }
-        
-        int closefd(int fd);
+        int closefd(int);
     }
 }
 
@@ -167,10 +173,9 @@ private:
     int err_no;         /*!< Error number for last error            */
     int options;        /*!< Bitfield for general socket options    */
     int event_mask;     /*!< Bitfield for waited network events     */
-    int type;           /*!< Socket type, SOCK_STREAM or SOCK_DGRAM */
-    sockaddr local_sa;  /*!< Socket address for local endpoint      */
-    sockaddr remote_sa; /*!< Socket address for remote endpoint     */
-    socklen_t sa_size;  /*!< Size of socket address                 */
+    Addrinfo* listener_ai;
+    std::string local_addr;
+    std::string remote_addr;
     
     static const size_t hdrlen = sizeof(uint32_t);
     size_t mtu;             // For outgoing data
@@ -195,10 +200,8 @@ private:
      */
     Socket(Network& net,
            const int fd = -1,
-           const int options = (O_NO_INTERRUPT),
-           const sockaddr* local_sa = 0, 
-           const sockaddr* remote_sa = 0,
-           const socklen_t sa_size = 0,
+           const std::string& local_addr = "",
+           const std::string& remote_addr = "",
            const size_t mtu = default_mtu,
            const size_t max_packet_size = default_mtu,
            const size_t max_pending = default_mtu*3);
@@ -207,16 +210,6 @@ private:
      * @brief Change socket state
      */
     void set_state(State, int err = 0);
-    
-    /*!
-     * @brief Open new socket
-     *
-     * @param[in] addr Address URL
-     *
-     * @throws std::runtime_error If address could not be resolved or 
-     *         socket could not be created
-     */
-    void open_socket(const std::string& addr, sockaddr*, socklen_t*);
     
     Socket(const Socket&);
     void operator=(const Socket&);
@@ -233,6 +226,11 @@ public:
         return fd;
     }
 private:
+    
+    // Set options before connect
+    static void set_opt(Socket*, const Addrinfo&, int opt);
+
+    int get_opt() const { return options; }
     
     /*!
      * @brief Get current event mask for socket.
@@ -359,20 +357,6 @@ public:
     int send(const Datagram* dgram = 0, int flags = 0);
 
     /*!
-     * @brief Set socket options
-     *
-     * @throws std::invalid_argument
-     */
-    void setopt(int opts);
-
-    /*!
-     * @brief Get socket options
-     *
-     * @return Socket options mask
-     */
-    int getopt() const;
-
-    /*!
      * @brief Get socket state
      *
      * @return Current state of the socket
@@ -392,13 +376,13 @@ public:
      * @return Error string
      */
     const std::string get_errstr() const;
-
-    std::string get_local_addr() const;
-    std::string get_remote_addr() const;
+    
+    std::string get_local_addr() const { return local_addr; }
+    std::string get_remote_addr() const { return remote_addr; }
     size_t get_mtu() const { return mtu; }
-
+    
     bool has_unread_data() const { return (recv_buf_offset > 0); }
-
+    
     size_t get_recv_buf_offset() const { return recv_buf_offset; }
     size_t get_recv_buf_hdr_len() const
     {
@@ -411,7 +395,7 @@ public:
             return 0;
         }
     }
-
+    
     void release();
 };
 

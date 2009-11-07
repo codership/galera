@@ -4,20 +4,24 @@
 #include "gu_string.hpp"
 #include "gu_utils.hpp"
 #include "gu_throw.hpp"
+#include "gu_uri.hpp"
 
-#include <map>
+
 
 #include <cerrno>
-
+#include <cstdlib>
 #include <netdb.h>
 #include <arpa/inet.h>
+
+#include <map>
+#include <stdexcept>
 
 using namespace std;
 
 class SchemeMap
 {
 public:
-    typedef map<string, struct addrinfo> Map;
+    typedef map<string, addrinfo> Map;
     typedef Map::const_iterator const_iterator;
 private:
     Map ai_map;
@@ -39,7 +43,9 @@ public:
     SchemeMap() :
         ai_map()
     {
-        ai_map.insert(make_pair("tcp", get_addrinfo(0, AF_INET, SOCK_STREAM, 0)));
+        
+        ai_map.insert(make_pair("tcp", get_addrinfo(0, AF_UNSPEC, SOCK_STREAM, 0)));
+        ai_map.insert(make_pair("udp", get_addrinfo(0, AF_UNSPEC, SOCK_DGRAM, 0)));
         // TODO:
     }
     
@@ -52,45 +58,105 @@ public:
     {
         return ai_map.end();
     }
-    
+    static const addrinfo* get_addrinfo(const_iterator i)
+    {
+        return &i->second;
+    }
 };
 
 static SchemeMap scheme_map;
 
-void gu::net::Resolver::resolve(const string& scheme,
-                                const string& authority,
-                                addrinfo** ai)
+
+
+
+
+void copy(const addrinfo& from, addrinfo& to)
 {
-    SchemeMap::const_iterator i;
-    if ((i = scheme_map.find(scheme)) == scheme_map.end())
+    to.ai_flags = from.ai_flags;
+    to.ai_family = from.ai_family;
+    to.ai_socktype = from.ai_socktype;
+    to.ai_protocol = from.ai_protocol;
+    to.ai_addrlen = from.ai_addrlen;
+    if (from.ai_addr != 0)
     {
-        gu_throw_error(EINVAL) << "invalid scheme: " << scheme;
+        if ((to.ai_addr = reinterpret_cast<sockaddr*>(malloc(to.ai_addrlen))) == 0)
+        {
+            gu_throw_fatal 
+                << "out of memory while trying to allocate " 
+                << to.ai_addrlen << " bytes";
+        }
+        memcpy(to.ai_addr, from.ai_addr, to.ai_addrlen);
     }
-    
-    vector<string> auth_split = strsplit(authority, ':');
-    if (auth_split.size() != 2)
-    {
-        gu_throw_error(EINVAL) << "invalid authority" << authority;
-    }
-    
-    int err;
-    if ((err = getaddrinfo(auth_split[0].c_str(), auth_split[1].c_str(), 
-                           &i->second, ai)) != 0)
-    {
-        gu_throw_error(errno) << "getaddrinfo failed";
-    }
+    to.ai_canonname = 0;
+    to.ai_next = 0;
 }
 
 
-string gu::net::Resolver::addrinfo_to_string(const addrinfo& ai)
+gu::net::Sockaddr::Sockaddr(const sockaddr* sa_, socklen_t sa_len_) :
+    sa(0),
+    sa_len(sa_len_)
 {
-    if (ai.ai_addr == 0)
+
+    if ((sa = reinterpret_cast<sockaddr*>(malloc(sa_len))) == 0)
     {
-        gu_throw_error(EINVAL) << "null address";
+        gu_throw_fatal;
     }
-    
+    memcpy(sa, sa_, sa_len);
+}
+
+gu::net::Sockaddr::Sockaddr(const Sockaddr& s) :
+    sa(0),
+    sa_len(s.sa_len)
+{
+    if ((sa = reinterpret_cast<sockaddr*>(malloc(sa_len))) == 0)
+    {
+        gu_throw_fatal;
+    }
+    memcpy(sa, s.sa, sa_len);
+}
+
+
+
+gu::net::Sockaddr::~Sockaddr()
+{
+    free(sa);
+}
+
+
+gu::net::Addrinfo::Addrinfo(const addrinfo& a) :
+    ai()
+{
+    copy(a, ai);
+}
+
+gu::net::Addrinfo::Addrinfo(const Addrinfo& a) :
+    ai()
+{ 
+    copy(a.ai, ai);
+}
+
+gu::net::Addrinfo::Addrinfo(const Addrinfo& a, const Sockaddr& s) :
+    ai()
+{
+    if (a.get_addrlen() != s.get_sockaddr_len())
+    {
+        gu_throw_fatal;
+    }
+    copy(a.ai, ai);
+    memcpy(ai.ai_addr, &s.get_sockaddr(), a.ai.ai_addrlen);
+}
+
+gu::net::Addrinfo::~Addrinfo()
+{
+    free(ai.ai_addr);
+}
+
+string gu::net::Addrinfo::to_string() const
+{
     string ret;
-    switch (ai.ai_socktype)
+    Sockaddr addr(ai.ai_addr, ai.ai_addrlen);
+    
+    switch (get_socktype())
     {
     case SOCK_STREAM:
         ret += "tcp://";
@@ -99,42 +165,77 @@ string gu::net::Resolver::addrinfo_to_string(const addrinfo& ai)
         ret += "udp://";
         break;
     default:
-        gu_throw_error(EINVAL) << "invalid socket type: " << ai.ai_socktype;
-        throw;
+        gu_throw_error(EINVAL) << "invalid socktype: " << get_socktype();
     }
-    
     char dst[INET6_ADDRSTRLEN + 1];
-    int port;
-    const sockaddr& sa(*ai.ai_addr);
     
-    if (sa.sa_family == AF_INET)
+    
+    
+    if (inet_ntop(get_family(), addr.get_addr(), 
+                  dst, sizeof(dst)) == 0)
     {
-        const sockaddr_in* sin(reinterpret_cast<const sockaddr_in*>(&sa));
-        in_addr_t addr = sin->sin_addr.s_addr;
-        if (inet_ntop(sin->sin_family, 
-                      &addr, dst, sizeof(dst)) == 0)
-        {
-            gu_throw_error(EINVAL);
-        }
-        port = sin->sin_port;
+        gu_throw_error(errno) << "inet ntop failed";
     }
-    else if (sa.sa_family == AF_INET6)
+    
+    switch (get_family())
     {
-        const sockaddr_in6* sin(reinterpret_cast<const sockaddr_in6*>(&sa));
-        if (inet_ntop(sin->sin6_family, 
-                      &sin->sin6_addr, dst, sizeof(dst)) == 0)
-        {
-            gu_throw_error(EINVAL);
-        }
-        port = sin->sin6_port;
+    case AF_INET:
+        ret += dst;
+        break;
+    case AF_INET6:
+        ret += "[";
+        ret += dst;
+        ret += "]";
+        break;
+    default:
+        gu_throw_error(EINVAL) << "invalid address family: " << get_family();
     }
-    else
+    
+    ret += ":" + gu::to_string(ntohs(addr.get_port()));
+    return ret;
+}
+
+
+gu::net::Addrinfo gu::net::resolve(const URI& uri)
+{
+    SchemeMap::const_iterator i(scheme_map.find(uri.get_scheme()));
+    if (i == scheme_map.end())
     {
-        gu_throw_error(EINVAL) 
-            << "unsupported address family: " << sa.sa_family; 
+        gu_throw_error(EINVAL) << "invalid scheme: " << uri.get_scheme();
+    }
+    
+    try
+    {
+        string host(uri.get_host());
+        // remove [] if this is IPV6 address
+        size_t pos(host.find_first_of('['));
+        if (pos != string::npos)
+        {
+            host.erase(pos, pos + 1);
+            pos = host.find_first_of(']');
+            if (pos == string::npos)
+            {
+                gu_throw_error(EINVAL) << "invalid host: " << uri.get_host(); 
+
+            } 
+            host.erase(pos, pos + 1);
+        }
+        
+        int err;
+        addrinfo* ai(0);
+        if ((err = getaddrinfo(host.c_str(), uri.get_port().c_str(),
+                               SchemeMap::get_addrinfo(i), &ai)) == -1)
+        {
+            gu_throw_error(errno) << "getaddrinfo failed for: " << uri.to_string();
+        }
+        // Assume that the first entry is ok
+        Addrinfo ret(*ai);
+        freeaddrinfo(ai);
+        return ret;
+    }
+    catch (NotFound& nf)
+    {
+        gu_throw_error(EINVAL) << "invalid URI: " << uri.to_string();
         throw;
     }
-    ret += dst;
-    ret += ":" + to_string(ntohs(port));
-    return ret;
 }

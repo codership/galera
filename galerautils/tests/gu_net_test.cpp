@@ -11,7 +11,9 @@
 #include <cassert>
 
 #include "gu_logger.hpp"
+#include "gu_uri.hpp"
 #include "gu_network.hpp"
+#include "gu_resolver.hpp"
 #include "gu_lock.hpp"
 #include "gu_prodcons.hpp"
 
@@ -110,11 +112,41 @@ START_TEST(test_datagram)
 }
 END_TEST
 
+START_TEST(test_resolver)
+{
+    std::string tcp_lh4("tcp://127.0.0.1:2002");
+    
+    Addrinfo tcp_lh4_ai(resolve(tcp_lh4));
+    fail_unless(tcp_lh4_ai.get_family() == AF_INET);
+    fail_unless(tcp_lh4_ai.get_socktype() == SOCK_STREAM);
+
+    fail_unless(tcp_lh4_ai.to_string() == tcp_lh4, "%s != %s",
+                tcp_lh4_ai.to_string().c_str(), tcp_lh4.c_str());
+
+    std::string tcp_lh6("tcp://[::1]:2002");
+    
+    Addrinfo tcp_lh6_ai(resolve(tcp_lh6));
+    fail_unless(tcp_lh6_ai.get_family() == AF_INET6);
+    fail_unless(tcp_lh6_ai.get_socktype() == SOCK_STREAM);
+
+    fail_unless(tcp_lh6_ai.to_string() == tcp_lh6, "%s != %s",
+                tcp_lh6_ai.to_string().c_str(), tcp_lh6.c_str());
+
+
+    std::string lh("tcp://localhost:2002");
+    Addrinfo lh_ai(resolve(lh));
+    fail_unless(lh_ai.to_string() == "tcp://127.0.0.1:2002" ||
+                lh_ai.to_string() == "tcp://[::1]:2002");
+
+}
+END_TEST
+
+
 START_TEST(test_network_listen)
 {
     log_info << "START";
     Network net;
-    Socket* listener = net.listen("localhost:2112");
+    Socket* listener = net.listen("tcp://localhost:2112");
     listener->close();
     delete listener;
 }
@@ -227,7 +259,7 @@ START_TEST(test_network_connect)
     gu_log_max_level = GU_LOG_DEBUG;
     log_info << "START";
     Network* net = new Network;
-    Socket* listener = net->listen("localhost:2112");
+    Socket* listener = net->listen("tcp://localhost:2112");
 
     log_info << "listener " << listener->get_local_addr();
     
@@ -236,15 +268,15 @@ START_TEST(test_network_connect)
     pthread_create(&th, 0, &listener_thd, &args);
     
     Network* net2 = new Network;
-    Socket* conn = net2->connect("localhost:2112");
+    Socket* conn = net2->connect("tcp://localhost:2112");
     
     fail_unless(conn != 0);
     fail_unless(conn->get_state() == Socket::S_CONNECTED);
 
-    log_info << "connected " << conn->get_remote_addr();
-    log_info << "local " << conn->get_local_addr();
+    log_info << "connected remote " << conn->get_remote_addr();
+    log_info << "connected local " << conn->get_local_addr();
 
-    Socket* conn2 = net2->connect("localhost:2112");
+    Socket* conn2 = net2->connect("tcp://localhost:2112");
     fail_unless(conn2 != 0);
     fail_unless(conn2->get_state() == Socket::S_CONNECTED);
 
@@ -285,18 +317,18 @@ START_TEST(test_network_send)
     }
     
     Network* net = new Network;
-    Socket* listener = net->listen("localhost:2112");
+    Socket* listener = net->listen("tcp://localhost:2112");
     listener_thd_args args = {net, 2, buf, bufsize};
     pthread_t th;
     pthread_create(&th, 0, &listener_thd, &args);
     
     Network* net2 = new Network;
-    Socket* conn = net2->connect("localhost:2112");
+    Socket* conn = net2->connect("tcp://localhost:2112");
     
     fail_unless(conn != 0);
     fail_unless(conn->get_state() == Socket::S_CONNECTED);
     
-    Socket* conn2 = net2->connect("localhost:2112");
+    Socket* conn2 = net2->connect("tcp://localhost:2112");
     fail_unless(conn2 != 0);
     fail_unless(conn2->get_state() == Socket::S_CONNECTED);
     
@@ -784,6 +816,11 @@ Suite* gu_net_suite()
 
     tc = tcase_create("test_datagram");
     tcase_add_test(tc, test_datagram);
+    suite_add_tcase(s, tc);
+
+
+    tc = tcase_create("test_resolver");
+    tcase_add_test(tc, test_resolver);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_network_listen");

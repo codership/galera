@@ -26,91 +26,29 @@
 #include <algorithm>
 
 /* System includes */
-// addrinfo
-#include <netdb.h>
 // fcntl() to set O_NONBLOCK
 #include <fcntl.h>
 // TCP_NODELAY
 #include <netinet/tcp.h>
 
-/* Using stuff to improve readability */
+
 using namespace std;
-
 using namespace gu;
-using namespace gu::net;
 
 
-
-
-
-
-class OptionMap
+static int get_opt(const URI& uri)
 {
-    map<const string, int> opt_map;
-public:
-    
-    void insert(const string& key, const int val)
+    int ret(0);
+    try
     {
-        if (opt_map.insert(make_pair(key, val)).second == false)
-        {
-            throw std::logic_error("duplicate key");
-        }
+        bool val(from_string<bool>(uri.get_option("socket.non_blocking")));
+        ret |= (val == true ? gu::net::Socket::O_NON_BLOCKING : 0);
     }
-    
-    OptionMap() :
-        opt_map()
-    {
-        insert("socket.non_blocking", gu::net::Socket::O_NON_BLOCKING);
-    }
-    
-    std::map<const string, int>::const_iterator find(const string& key)
-    {
-        std::map<const string, int>::const_iterator i;
-        if ((i = opt_map.find(key)) == opt_map.end())
-        {
-            log_error << "invalid key '" << key << "'";
-            throw std::logic_error("invalid key");
-        }
-        return i;
-    }
-};
-
-static OptionMap option_map;
-
-template <class T> class Option
-{
-    int opt;
-    T val;
-public:
-    Option(int opt_, T val_) :
-        opt(opt_),
-        val(val_)
-    {
-    }
-    int get_opt() const
-    {
-        return opt;
-    }
-
-    const T& get_val() const
-    {
-        return val;
-    }
-};
-
-template <class T> Option<T> get_option(const string& key, const string& val)
-{
-    
-    map<const string, int>::const_iterator i = option_map.find(key);
-    istringstream is(val);
-    T ret;
-    is >> ret;
-    if (is.fail())
-    {
-        throw std::invalid_argument("");
-    }
-    return Option<T>(i->second, ret);
+    catch (NotFound&) { }
+    return ret;
 }
+
+
 
 int gu::net::closefd(int fd)
 {
@@ -159,6 +97,47 @@ void gu::net::Datagram::normalize()
  * Socket implementation
  **************************************************************************/
 
+
+/*
+ * Ctor/dtor
+ */
+
+gu::net::Socket::Socket(Network& net_,
+                        const int fd_,
+                        const string& local_addr_,
+                        const string& remote_addr_,
+                        const size_t mtu_,
+                        const size_t max_packet_size_,
+                        const size_t max_pending_) :
+    fd              (fd_),
+    err_no          (0),
+    options         (O_NO_INTERRUPT),
+    event_mask      (0),
+    listener_ai     (0),
+    local_addr      (local_addr_),
+    remote_addr     (remote_addr_),
+    mtu             (mtu_),
+    max_packet_size (max_packet_size_),
+    max_pending     (max_pending_),
+    recv_buf        (mtu + hdrlen),
+    recv_buf_offset (0),
+    dgram           (),
+    pending         (),
+    state           (S_CLOSED),
+    net             (net_)
+{
+    pending.reserve(max_pending);
+}
+
+gu::net::Socket::~Socket()
+{
+    if (fd != -1)
+    {
+        close();
+    }
+}
+
+
 /* 
  * State handling
  */
@@ -199,150 +178,50 @@ const string gu::net::Socket::get_errstr() const
 }
 
 
-/*
- * Ctor/dtor
- */
-
-gu::net::Socket::Socket(Network& net_,
-                        const int fd_,
-                        const int options_,
-                        const sockaddr* local_sa_,
-                        const sockaddr* remote_sa_,
-                        const socklen_t sa_size_,
-                        const size_t mtu_,
-                        const size_t max_packet_size_,
-                        const size_t max_pending_) :
-    fd(fd_),
-    err_no(0),
-    options(options_),
-    event_mask(0),
-    type(-1),
-    local_sa(),
-    remote_sa(),
-    sa_size(sa_size_),
-    mtu(mtu_),
-    max_packet_size(max_packet_size_),
-    max_pending(max_pending_),
-    recv_buf(mtu + hdrlen),
-    recv_buf_offset(0),
-    dgram(),
-    pending(),
-    state(S_CLOSED),
-    net(net_)
+void gu::net::Socket::set_opt(Socket* s, 
+                              const Addrinfo& ai, 
+                              const int opt)
 {
-    memset(&local_sa, 0, sizeof(local_sa));
-    memset(&remote_sa, 0, sizeof(remote_sa));
-    if (local_sa_ != 0)
+    if (ai.get_socktype() == SOCK_STREAM)
     {
-        local_sa = *local_sa_;
-    }
-    if (remote_sa_ != 0)
-    {
-        remote_sa = *remote_sa_;
-    }
-    pending.reserve(max_pending);
-}
-
-gu::net::Socket::~Socket()
-{
-    if (fd != -1)
-    {
-        close();
-    }
-}
-
-/*
- * Construct URL from string. If no scheme-authority separator is not 
- * found from string, string is prefixed with tcp scheme.
- */
-static gu::URI get_url(const string& str)
-{
-    string real_str;
-    if (str.find("://") == string::npos)
-    {
-        real_str = "tcp://" + str;
-    }
-    else
-    {
-        real_str = str;
-    }
-    return gu::URI(real_str);
-}
-
-/*
- * Fill in addrinfo according to addr URL
- */
-static void get_addrinfo(const gu::URI& url, struct addrinfo** ai)
-{
-    string scheme = url.get_scheme();
-    string addr = url.get_authority();
-    gu::net::Resolver::resolve(scheme, addr, ai);
-}
-
-void gu::net::Socket::open_socket(const string& addr, 
-                                  sockaddr* sa,
-                                  socklen_t* sa_size)
-{
-    struct addrinfo* ai(0);    
-    URI url(get_url(addr));
-    get_addrinfo(url, &ai);
-    
-    if (ai == 0 || ai->ai_addr == 0)
-    {
-        throw std::runtime_error("could not resolve address");
-    }
-    
-    // Set socktype
-    this->type = ai->ai_socktype;
-    
-    int ai_family = ai->ai_family;
-    int ai_socktype = ai->ai_socktype;
-    int ai_protocol = ai->ai_protocol;
-    /* TODO: For now on assume first entry is always the correct one 
-     * until some heuristics to guess best possible canditate 
-     * is implemented */
-    *sa = *ai->ai_addr;
-    *sa_size = ai->ai_addrlen;
-
-    freeaddrinfo(ai);
-    
-    try
-    {
-        if (from_string<bool>(url.get_option("socket.non_blocking")))
+        const int no_nagle(1);
+        if (::setsockopt(s->get_fd(), IPPROTO_TCP, TCP_NODELAY, &no_nagle,
+                         sizeof(no_nagle)) == -1)
         {
-            options |= O_NON_BLOCKING;
-        }
-        else
-        {
-            options &= ~O_NON_BLOCKING;
-        }
-    }
-    catch (NotFound&) {} // no option found, no modifications
-    
-    if ((fd = ::socket(ai_family, ai_socktype, ai_protocol)) == -1)
-    {
-        throw std::runtime_error("could not create socket");
-    }
-    
-    if (options & O_NON_BLOCKING)
-    {
-        if (::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
-        {
-            int err = errno;
-            log_error << "could not set fd non blocking " << strerror(err);
+            gu_throw_error(errno) << "setting TCP_NODELAY failed";
         }
     }
     
+    if ((opt & O_NON_BLOCKING) != 0)
+    {
+        if (::fcntl(s->get_fd(), F_SETFL, O_NONBLOCK) == -1)
+        {
+            gu_throw_error(errno) << "setting fd non-blocking failed";
+        }
+        s->options |= O_NON_BLOCKING;
+    }
 }
 
 
 void gu::net::Socket::connect(const string& addr)
 {
-    open_socket(addr, &remote_sa, &sa_size);
+    URI uri(addr);
+    Addrinfo ai(resolve(uri));
     
-    if (::connect(fd, &remote_sa, sa_size) == -1)
+    remote_addr = ai.to_string();
+    
+    if ((fd = ::socket(ai.get_family(), ai.get_socktype(), 
+                       ai.get_protocol())) == -1)
     {
-        if ((options & O_NON_BLOCKING) && errno == EINPROGRESS)
+        gu_throw_error(errno) << "failed to open socket: " << addr;
+    }
+    
+    set_opt(this, ai, ::get_opt(uri));
+    
+    Sockaddr sa(ai.get_addr());
+    if (::connect(fd, &sa.get_sockaddr(), sa.get_sockaddr_len()) == -1)
+    {
+        if ((get_opt() & O_NON_BLOCKING) && errno == EINPROGRESS)
         {
             log_debug << "non blocking connecting";
             set_state(S_CONNECTING);
@@ -350,28 +229,27 @@ void gu::net::Socket::connect(const string& addr)
         else
         {
             set_state(S_FAILED, errno);
-            throw std::runtime_error("connect failed");
+            gu_throw_error(errno) << "connect failed: " << remote_addr;
         }
     }
     else
     {
-        if (::getsockname(fd, &local_sa, &sa_size) == -1)
+        socklen_t sa_len(sa.get_sockaddr_len());
+        if (::getsockname(fd, &sa.get_sockaddr(), &sa_len) == -1)
         {
+            set_state(S_FAILED, errno);
             gu_throw_error(errno);
         }
+        if (sa_len != sa.get_sockaddr_len())
+        {
+            set_state(S_FAILED, EINVAL);
+            gu_throw_fatal << "addr len mismatch";
+        }
+        local_addr = Addrinfo(ai, sa).to_string();
         set_state(S_CONNECTED);
     }
-
-
-    if (type == SOCK_STREAM)
-    {
-        const int no_nagle(1);
-        if (::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle,
-                         sizeof(no_nagle)) == -1)
-        {
-            gu_throw_error(errno);
-        }
-    }
+    
+    set_opt(this, ai, 0);
     assert(get_state() == S_CONNECTING || get_state() == S_CONNECTED);
 }
 
@@ -393,39 +271,51 @@ void gu::net::Socket::close()
         set_state(S_FAILED, err);
         gu_throw_error(err) << "close failed";
     }
-
+    
     // Recv may set state to closed when reading zero bytes from socket.
     if (get_state() != S_CLOSED)
     {
         set_state(S_CLOSED);    
     }
+    delete listener_ai;
     fd = -1;
 }
 
 void gu::net::Socket::listen(const std::string& addr, const int backlog)
 {
-    open_socket(addr, &local_sa, &sa_size);
+    Addrinfo ai(resolve(addr));
+
+    Sockaddr sa(ai.get_addr());
+    
+    local_addr = ai.to_string();
+    
+    if ((fd = ::socket(ai.get_family(), ai.get_socktype(), ai.get_protocol())) == -1)
+    {
+        set_state(S_FAILED, errno);
+        gu_throw_error(errno) << "failed to open socket";
+    }
 
     const int reuse = 1;
     const socklen_t reuselen = sizeof(reuse);
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, reuselen) == -1)
     {
         set_state(S_FAILED, errno);
-        throw std::runtime_error("setsockopt(SO_REUSEADDR) failed");
+        gu_throw_error(errno) << "setsockopt(SO_REUSEADDR) failed";
     }
     
-    if (::bind(fd, &local_sa, sa_size) == -1)
+    if (::bind(fd, &sa.get_sockaddr(), sa.get_sockaddr_len()) == -1)
     {
         set_state(S_FAILED, errno);
-        throw std::runtime_error("bind failed");
+        gu_throw_error(errno) << "bind failed: " << local_addr;
     }
     
     if (::listen(fd, backlog) == -1)
     {
         set_state(S_FAILED, errno);
-        throw std::runtime_error("listen failed");
+        gu_throw_error(errno) << "listen failed: " << local_addr;
     }
     
+    listener_ai = new Addrinfo(ai);    
     set_state(S_LISTENING);
 }
 
@@ -434,42 +324,39 @@ gu::net::Socket* gu::net::Socket::accept()
     
     int acc_fd;
     
-    sockaddr acc_sa;
-    socklen_t sasz = sizeof(acc_sa);
-    memset(&acc_sa, 0, sizeof(acc_sa));
-    if ((acc_fd = ::accept(fd, &acc_sa, &sasz)) == -1)
+    Addrinfo acc_ai(*listener_ai);
+    Sockaddr acc_sa(acc_ai.get_addr());
+    
+    socklen_t sa_len(acc_sa.get_sockaddr_len());
+    if ((acc_fd = ::accept(fd, &acc_sa.get_sockaddr(), &sa_len)) == -1)
     {
         set_state(S_FAILED, errno);
         gu_throw_error(errno);
-        // throw std::runtime_error("accept failed");
     }
     
-    if (sasz != sa_size)
+    if (acc_sa.get_sockaddr_len() != sa_len)
     {
-        set_state(S_FAILED, errno);
-        throw std::runtime_error("sockaddr size mismatch");
+        set_state(S_FAILED, EINVAL);
+        gu_throw_error(EINVAL) << "sockaddr size mismatch";
     }
     
-    /* TODO: Set options before returning */
-    if (type == SOCK_STREAM)
-    {
-        const int no_nagle(1);
-        if (::setsockopt(acc_fd, IPPROTO_TCP, TCP_NODELAY, &no_nagle,
-                         sizeof(no_nagle)) == -1)
-        {
-            gu_throw_error(errno);
-        }
-    }
-
-    sockaddr local_acc_sa;
-    if (::getsockname(acc_fd, &local_acc_sa, &sa_size) == -1)
+    Sockaddr local_sa(acc_sa);
+    sa_len = local_sa.get_sockaddr_len();
+    if (::getsockname(acc_fd, &local_sa.get_sockaddr(), &sa_len) == -1)
     {
         gu_throw_error(errno);
     }
+    if (sa_len != local_sa.get_sockaddr_len())
+    {
+        set_state(S_FAILED, EINVAL);
+        gu_throw_error(EINVAL) << "sockaddr size mismatch";
+    }
     
-    Socket* ret = new Socket(net, acc_fd, options, 
-                             &local_acc_sa, &acc_sa, sasz);
-    ret->type = this->type;
+    Socket* ret = new Socket(net, 
+                             acc_fd, 
+                             Addrinfo(acc_ai, local_sa).to_string(), 
+                             Addrinfo(acc_ai, acc_sa).to_string());
+    set_opt(ret, acc_ai, options);
     ret->set_state(S_CONNECTED);
     net.insert(ret);
     net.set_event_mask(ret, NetworkEvent::E_IN);
@@ -595,7 +482,7 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
         return ENOTCONN;
     }
     
-    bool no_block = (getopt() & O_NON_BLOCKING) ||
+    bool no_block = (get_opt() & O_NON_BLOCKING) ||
         (flags & MSG_DONTWAIT);
     const int send_flags = flags | (no_block == true ? MSG_DONTWAIT : 0);
     int ret = 0;
@@ -717,7 +604,7 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
 const gu::net::Datagram* gu::net::Socket::recv(const int flags)
 {
     const int recv_flags = (flags & ~MSG_PEEK) |
-        ((getopt() & O_NON_BLOCKING) != 0 ? (MSG_DONTWAIT | MSG_NOSIGNAL) : 0);
+        ((get_opt() & O_NON_BLOCKING) != 0 ? (MSG_DONTWAIT | MSG_NOSIGNAL) : 0);
     const bool peek = flags & MSG_PEEK;
     
     if (get_state() != S_CONNECTED)
@@ -815,46 +702,7 @@ const gu::net::Datagram* gu::net::Socket::recv(const int flags)
     return 0;
 }
 
-int gu::net::Socket::getopt() const
-{
-    return options;
-}
 
-void gu::net::Socket::setopt(const int opts)
-{
-    options = opts;
-}
-
-
-string gu::net::Socket::get_local_addr() const
-{
-    const addrinfo ai = {
-        0,                  // Flags
-        local_sa.sa_family, // Address family
-        type,               // Socket type
-        0,                  // Protocol
-        sa_size,            // Addrlen
-        const_cast<sockaddr*>(&local_sa),          // Addr
-        0,                  // Cannonname
-        0                   // Next
-    };
-    return Resolver::addrinfo_to_string(ai);
-}
-
-string gu::net::Socket::get_remote_addr() const
-{
-    const addrinfo ai = {
-        0,                  // Flags
-        local_sa.sa_family, // Address family
-        type,               // Socket type
-        0,                  // Protocol
-        sa_size,            // Addrlen
-        const_cast<sockaddr*>(&remote_sa),         // Addr
-        0,                  // Cannonname
-        0                   // Next
-    };
-    return Resolver::addrinfo_to_string(ai);
-}
 
 
 void gu::net::Socket::release()
@@ -1157,3 +1005,4 @@ void gu::net::Network::interrupt()
         gu_throw_error(err) << "unable to write to pipe";
     }
 }
+
