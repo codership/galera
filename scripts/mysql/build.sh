@@ -31,6 +31,7 @@ NO_STRIP=no
 RELEASE=""
 TAR=no
 INSTALL=no
+CONFIGURE=no
 
 GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
 
@@ -95,12 +96,12 @@ do
     shift
 done
 
-# export command options for Galera build
-export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD CFLAGS CXXFLAGS
-
 if [ "$OPT"     == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
+
+# export command options for Galera build
+export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD CFLAGS CXXFLAGS
 
 set -eu
 
