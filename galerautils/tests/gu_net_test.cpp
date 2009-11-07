@@ -183,12 +183,12 @@ void* listener_thd(void* arg)
 
         mark_point();
 
-        if (em & NetworkEvent::E_ACCEPTED)
+        if (em & E_ACCEPTED)
         {
             log_info << "accepted local " << sock->get_local_addr();
             log_info << "accepted remote " << sock->get_remote_addr();
         }
-        else if (em & NetworkEvent::E_ERROR)
+        else if (em & E_ERROR)
         {
             fail_unless(sock != 0);
             if (sock->get_state() == Socket::S_CLOSED)
@@ -207,7 +207,7 @@ void* listener_thd(void* arg)
                 conns--;
             }
         }
-        else if (em & NetworkEvent::E_IN)
+        else if (em & E_IN)
         {
             const Datagram* dm = sock->recv();
             if (dm == 0 && sock->get_state() == Socket::S_CLOSED)
@@ -228,12 +228,12 @@ void* listener_thd(void* arg)
                 }
             }
         }
-        else if (em & NetworkEvent::E_CLOSED)
+        else if (em & E_CLOSED)
         {
             delete sock;
             conns--;
         }
-        else if (em & NetworkEvent::E_EMPTY)
+        else if (em & E_EMPTY)
         {
 
         }
@@ -379,7 +379,7 @@ void* interrupt_thd(void* arg)
 {
     Network* net = reinterpret_cast<Network*>(arg);
     NetworkEvent ev = net->wait_event(-1);
-    fail_unless(ev.get_event_mask() & NetworkEvent::E_EMPTY);
+    fail_unless(ev.get_event_mask() & E_EMPTY);
     return 0;
 }
 
@@ -416,12 +416,12 @@ static void make_connections(Network& net,
     {
         NetworkEvent ev = net.wait_event(-1);
         const int em = ev.get_event_mask();
-        if (em & NetworkEvent::E_ACCEPTED)
+        if (em & E_ACCEPTED)
         {
             log_info << "accepted";
             sr[sr_cnt++] = ev.get_socket();
         }
-        else if (em & NetworkEvent::E_CONNECTED)
+        else if (em & E_CONNECTED)
         {
             log_info << "connected";
             cl_cnt++;
@@ -446,11 +446,11 @@ static void close_connections(Network& net,
         NetworkEvent ev = net.wait_event(-1);
         const int em = ev.get_event_mask();
         Socket* sock = ev.get_socket();
-        if (em & NetworkEvent::E_CLOSED)
+        if (em & E_CLOSED)
         {
             cnt++;
         }
-        else if (em & NetworkEvent::E_ERROR)
+        else if (em & E_ERROR)
         {
             log_warn << "error: " << sock->get_errstr();
             cnt++;
@@ -594,10 +594,10 @@ public:
             NetworkEvent ev = net.wait_event(-1);
             const int em = ev.get_event_mask();
             Socket* sock = ev.get_socket();
-            if (em & NetworkEvent::E_ACCEPTED)
+            if (em & E_ACCEPTED)
             {
             }
-            else if (em & NetworkEvent::E_CONNECTED)
+            else if (em & E_CONNECTED)
             {
                 fail_unless(sock == send_sock);
                 log_info << "connected";
@@ -661,7 +661,7 @@ public:
             NetworkEvent ev = net.wait_event(-1);
             const int em = ev.get_event_mask();
             Socket* sock = ev.get_socket();
-            if (em & NetworkEvent::E_IN)
+            if (em & E_IN)
             {
                 const Datagram* dg = sock->recv();
                 if (dg == 0 && sock->get_state() == Socket::S_CLOSED)
@@ -675,16 +675,16 @@ public:
                     fail_unless(recvd <= sent);
                 }
             }
-            else if (em & NetworkEvent::E_CLOSED)
+            else if (em & E_CLOSED)
             {
                 delete sock;
             }
-            else if (em & NetworkEvent::E_ERROR)
+            else if (em & E_ERROR)
             {
                 sock->close();
                 delete sock;
             }
-            else if (em & NetworkEvent::E_EMPTY)
+            else if (em & E_EMPTY)
             {
                 /* */
             }

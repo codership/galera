@@ -44,6 +44,7 @@ public:
     void connect() 
     { 
         socket = pnet.get_net().connect(uri.to_string()); 
+        gcomm_assert((socket->get_opt() & gu::net::Socket::O_NON_BLOCKING) != 0);
     }
 
     void close() 
@@ -61,6 +62,7 @@ public:
     Transport* accept() 
     { 
         gu::net::Socket* acc(socket->accept());
+        gcomm_assert((acc->get_opt() & gu::net::Socket::O_NON_BLOCKING) != 0);
         return new Socket(pnet, acc);
     } 
     

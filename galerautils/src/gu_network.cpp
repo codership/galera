@@ -34,7 +34,7 @@
 
 using namespace std;
 using namespace gu;
-
+using namespace gu::datetime;
 
 static int get_opt(const URI& uri)
 {
@@ -200,6 +200,7 @@ void gu::net::Socket::set_opt(Socket* s,
         }
         s->options |= O_NON_BLOCKING;
     }
+
 }
 
 
@@ -283,8 +284,9 @@ void gu::net::Socket::close()
 
 void gu::net::Socket::listen(const std::string& addr, const int backlog)
 {
-    Addrinfo ai(resolve(addr));
-
+    URI uri(addr);
+    Addrinfo ai(resolve(uri));
+    
     Sockaddr sa(ai.get_addr());
     
     local_addr = ai.to_string();
@@ -294,7 +296,7 @@ void gu::net::Socket::listen(const std::string& addr, const int backlog)
         set_state(S_FAILED, errno);
         gu_throw_error(errno) << "failed to open socket";
     }
-
+    
     const int reuse = 1;
     const socklen_t reuselen = sizeof(reuse);
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, reuselen) == -1)
@@ -314,7 +316,8 @@ void gu::net::Socket::listen(const std::string& addr, const int backlog)
         set_state(S_FAILED, errno);
         gu_throw_error(errno) << "listen failed: " << local_addr;
     }
-    
+
+    set_opt(this, ai, ::get_opt(uri));    
     listener_ai = new Addrinfo(ai);    
     set_state(S_LISTENING);
 }
@@ -359,7 +362,7 @@ gu::net::Socket* gu::net::Socket::accept()
     set_opt(ret, acc_ai, options);
     ret->set_state(S_CONNECTED);
     net.insert(ret);
-    net.set_event_mask(ret, NetworkEvent::E_IN);
+    net.set_event_mask(ret, E_IN);
     return ret;
 }
 
@@ -386,8 +389,7 @@ static size_t iov_send(const int fd,
     assert(errval != 0);
     assert(tot_len > 0);
 
-    const int send_flags = flags | 
-        ((flags & MSG_DONTWAIT) != 0 ? MSG_NOSIGNAL : 0);
+    const int send_flags = flags | MSG_NOSIGNAL;
     *errval = 0;
     
     /* Try sendmsg() first */
@@ -484,7 +486,8 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
     
     bool no_block = (get_opt() & O_NON_BLOCKING) ||
         (flags & MSG_DONTWAIT);
-    const int send_flags = flags | (no_block == true ? MSG_DONTWAIT : 0);
+    const int send_flags = flags | (no_block == true ? MSG_DONTWAIT : 0) |
+        MSG_NOSIGNAL;
     int ret = 0;
     
     // Dgram with offset can't be handled yet
@@ -582,19 +585,19 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
     
     if (ret == EAGAIN)
     {
-        if ((get_event_mask() & gu::net::NetworkEvent::E_OUT) == 0)
+        if ((get_event_mask() & E_OUT) == 0)
         {
             net.set_event_mask(this, 
                                get_event_mask() | 
-                               gu::net::NetworkEvent::E_OUT);
+                               E_OUT);
         }
         ret = 0;
     }
     else if (pending.size() == 0 &&
-             (get_event_mask() & NetworkEvent::E_OUT) != 0)
+             (get_event_mask() & E_OUT) != 0)
     {
         net.set_event_mask(this,
-                           get_event_mask() & ~NetworkEvent::E_OUT);
+                           get_event_mask() & ~E_OUT);
     }
     
     return ret;
@@ -604,7 +607,8 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
 const gu::net::Datagram* gu::net::Socket::recv(const int flags)
 {
     const int recv_flags = (flags & ~MSG_PEEK) |
-        ((get_opt() & O_NON_BLOCKING) != 0 ? (MSG_DONTWAIT | MSG_NOSIGNAL) : 0);
+        ((get_opt() & O_NON_BLOCKING) != 0 ? MSG_DONTWAIT : 0) |
+        MSG_NOSIGNAL;
     const bool peek = flags & MSG_PEEK;
     
     if (get_state() != S_CONNECTED)
@@ -782,18 +786,18 @@ gu::net::Socket* gu::net::NetworkEvent::get_socket() const
 gu::net::Network::Network() :
     sockets(new SocketList()),
     released(),
-    poll(new EPoll())
+    poll(Poll::create())
 {
     if (pipe(wake_fd) == -1)
     {
         throw std::runtime_error("could not create pipe");
     }
-    poll->insert(EPollEvent(wake_fd[0], NetworkEvent::E_IN, 0));
+    poll->insert(PollEvent(wake_fd[0], E_IN, 0));
 }
 
 gu::net::Network::~Network()
 {
-    poll->erase(EPollEvent(wake_fd[0], 0, 0));
+    poll->erase(PollEvent(wake_fd[0], 0, 0));
     closefd(wake_fd[1]);
     closefd(wake_fd[0]);
     
@@ -817,11 +821,11 @@ gu::net::Socket* gu::net::Network::connect(const string& addr)
 
     if (sock->get_state() == Socket::S_CONNECTED)
     {
-        set_event_mask(sock, NetworkEvent::E_IN);
+        set_event_mask(sock, E_IN);
     }
     else if (sock->get_state() == Socket::S_CONNECTING)
     {
-        set_event_mask(sock, NetworkEvent::E_OUT);
+        set_event_mask(sock, E_OUT);
     }
     return sock;
 }
@@ -831,7 +835,7 @@ gu::net::Socket* gu::net::Network::listen(const string& addr)
     Socket* sock = new Socket(*this);
     sock->listen(addr);
     insert(sock);
-    set_event_mask(sock, NetworkEvent::E_IN);
+    set_event_mask(sock, E_IN);
     return sock;
 }
 
@@ -842,13 +846,13 @@ void gu::net::Network::insert(Socket* sock)
         delete sock;
         throw std::logic_error("");
     }
-    poll->insert(EPollEvent(sock->get_fd(), sock->get_event_mask(), sock));
+    poll->insert(PollEvent(sock->get_fd(), sock->get_event_mask(), sock));
 }
 
 void gu::net::Network::erase(Socket* sock)
 {
     /* Erases socket from poll set */
-    poll->erase(EPollEvent(sock->get_fd(), 0, sock));
+    poll->erase(PollEvent(sock->get_fd(), 0, sock));
     sockets->erase(sock->get_fd());
 }
 
@@ -870,11 +874,11 @@ void gu::net::Network::set_event_mask(Socket* sock, const int mask)
         log_error << "socket " << sock->get_fd() << " not found from socket set";
         throw std::logic_error("invalid socket");
     }
-    poll->modify(EPollEvent(sock->get_fd(), mask, sock));
+    poll->modify(PollEvent(sock->get_fd(), mask, sock));
     sock->set_event_mask(mask);
 }
 
-gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout,
+gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
                                                    const bool auto_accept)
 {
     Socket* sock = 0;
@@ -889,15 +893,15 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout,
     {
         Socket* s = i->second;
         if (s->get_state()       == Socket::S_CONNECTED     && 
-            (s->get_event_mask() & NetworkEvent::E_IN) != 0 &&
+            (s->get_event_mask() & E_IN) != 0 &&
             s->has_unread_data() == true                    &&
             s->recv(MSG_PEEK)    != 0)
         {
-            return NetworkEvent(NetworkEvent::E_IN, s);
+            return NetworkEvent(E_IN, s);
         }
         // Some validation
         assert(s->pending.size() == 0 || 
-               (s->get_event_mask() & NetworkEvent::E_OUT) != 0);
+               (s->get_event_mask() & E_OUT) != 0);
     }
     
     if (poll->empty() == true)
@@ -909,10 +913,10 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout,
     {
         if (poll->empty())
         {
-            return NetworkEvent(NetworkEvent::E_EMPTY, 0);
+            return NetworkEvent(E_EMPTY, 0);
         }
         
-        EPollEvent ev = poll->front();
+        PollEvent ev = poll->front();
         poll->pop_front();
         
         // This is a wake-up socket
@@ -925,7 +929,7 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout,
                 log_error << "Could not read pipe: " << strerror(err);
                 gu_throw_error(err) << "could not read pipe";
             }
-            return NetworkEvent(NetworkEvent::E_EMPTY, 0);
+            return NetworkEvent(E_EMPTY, 0);
         }
         
         sock = static_cast<Socket*>(ev.get_user_data());
@@ -938,19 +942,19 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout,
             // throw std::logic_error("closed socket in poll set");
             break;
         case Socket::S_CONNECTING:
-            if (revent & NetworkEvent::E_OUT)
+            if (revent & E_OUT)
             {
                 // Should do more deep inspection here?
                 sock->set_state(Socket::S_CONNECTED);
-                set_event_mask(sock, NetworkEvent::E_IN);
-                revent = NetworkEvent::E_CONNECTED;
+                set_event_mask(sock, E_IN);
+                revent = E_CONNECTED;
             }
             break;
         case Socket::S_LISTENING:
-            if ((revent & NetworkEvent::E_IN) && auto_accept == true)
+            if ((revent & E_IN) && auto_accept == true)
             {
                 Socket* acc = sock->accept();
-                revent = NetworkEvent::E_ACCEPTED;
+                revent = E_ACCEPTED;
                 sock = acc;
             }
             break;
@@ -959,7 +963,7 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout,
             // throw std::logic_error("failed socket in poll set");
             break;
         case Socket::S_CONNECTED:
-            if (revent & NetworkEvent::E_IN)
+            if (revent & E_IN)
             {
                 const gu::net::Datagram* dm = sock->recv(MSG_PEEK);
                 if (dm == 0)
@@ -967,10 +971,10 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout,
                     switch (sock->get_state())
                     {
                     case gu::net::Socket::S_FAILED:
-                        revent = gu::net::NetworkEvent::E_ERROR;
+                        revent = E_ERROR;
                         break;
                     case gu::net::Socket::S_CLOSED:
-                        revent = gu::net::NetworkEvent::E_CLOSED;
+                        revent = E_CLOSED;
                         break;
                     case gu::net::Socket::S_CONNECTED:
                         sock = 0;
@@ -979,7 +983,7 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const int timeout,
                     }
                 }
             }
-            else if (revent & NetworkEvent::E_OUT)
+            else if (revent & E_OUT)
             {
                 sock->send();
                 sock = 0;

@@ -8,12 +8,17 @@
 #include "gu_epoll.hpp"
 #include "gu_network.hpp"
 #include "gu_logger.hpp"
+#include "gu_datetime.hpp"
+#include "gu_convert.hpp"
 
 #include <stdexcept>
 
 #include <sys/epoll.h>
 #include <cerrno>
 #include <cstring>
+
+using namespace gu;
+using namespace gu::datetime;
 
 /*
  * Mapping between NetworkEvent and EPoll events
@@ -24,8 +29,8 @@
 static inline int to_epoll_mask(const int mask)
 {
     int ret = 0;
-    ret |= (mask & gu::net::NetworkEvent::E_IN ? EPOLLIN : 0);
-    ret |= (mask & gu::net::NetworkEvent::E_OUT ? EPOLLOUT : 0);
+    ret |= (mask & gu::net::E_IN ? EPOLLIN : 0);
+    ret |= (mask & gu::net::E_OUT ? EPOLLOUT : 0);
     return ret;
 }
 
@@ -37,10 +42,10 @@ static inline int to_network_event_mask(const int mask)
         log_warn << "event mask " << mask << " has unrecognized bits set";
     }
     
-    ret |= (mask & EPOLLIN ? gu::net::NetworkEvent::E_IN : 0);
-    ret |= (mask & EPOLLOUT ? gu::net::NetworkEvent::E_OUT : 0);
-    ret |= (mask & EPOLLERR ? gu::net::NetworkEvent::E_ERROR : 0);
-    ret |= (mask & EPOLLHUP ? gu::net::NetworkEvent::E_CLOSED : 0);
+    ret |= (mask & EPOLLIN ? gu::net::E_IN : 0);
+    ret |= (mask & EPOLLOUT ? gu::net::E_OUT : 0);
+    ret |= (mask & EPOLLERR ? gu::net::E_ERROR : 0);
+    ret |= (mask & EPOLLHUP ? gu::net::E_CLOSED : 0);
     return ret;
 }
 
@@ -68,7 +73,7 @@ gu::net::EPoll::~EPoll()
     }
 }
     
-void gu::net::EPoll::insert(const EPollEvent& epe)
+void gu::net::EPoll::insert(const PollEvent& epe)
 {
     int op = EPOLL_CTL_ADD;
     struct epoll_event ev = {
@@ -88,7 +93,7 @@ void gu::net::EPoll::insert(const EPollEvent& epe)
     n_events = 0;
 }
 
-void gu::net::EPoll::erase(const EPollEvent& epe)
+void gu::net::EPoll::erase(const PollEvent& epe)
 {
     int op = EPOLL_CTL_DEL;
     struct epoll_event ev = {0, {0}};
@@ -103,7 +108,7 @@ void gu::net::EPoll::erase(const EPollEvent& epe)
     n_events = 0;
 }
 
-void gu::net::EPoll::modify(const EPollEvent& epe)
+void gu::net::EPoll::modify(const PollEvent& epe)
 {
     int op = EPOLL_CTL_MOD;
     struct epoll_event ev = {
@@ -121,8 +126,9 @@ void gu::net::EPoll::modify(const EPollEvent& epe)
     }
 }
 
-void gu::net::EPoll::poll(const int timeout)
+void gu::net::EPoll::poll(const Period& p)
 {
+    int timeout(p.get_nsecs() == -1 ? -1 : convert(p.get_nsecs()/MSec, int()));
     int ret = epoll_wait(e_fd, &events[0], static_cast<int>(events.size()), 
                          timeout);
     if (ret == -1)
@@ -156,11 +162,11 @@ bool gu::net::EPoll::empty() const
     return n_events == 0;
 }
 
-gu::net::EPollEvent gu::net::EPoll::front() const
+gu::net::PollEvent gu::net::EPoll::front() const
 {
     if (n_events == 0)
     {
         throw std::logic_error("no events available");
     }
-    return EPollEvent(-1, to_network_event_mask(current->events), current->data.ptr);
+    return PollEvent(-1, to_network_event_mask(current->events), current->data.ptr);
 }

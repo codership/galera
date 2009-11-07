@@ -69,6 +69,7 @@ libgalerautils___la_SOURCES = \
 	gu_regex.cpp          \
 	gu_uri.cpp            \
 	gu_epoll.cpp	      \
+	gu_poll.cpp           \
 	gu_network.cpp        \
 	gu_prodcons.cpp	      \
 	gu_datetime.cpp

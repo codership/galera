@@ -81,12 +81,6 @@ namespace gcomm
                 dg.get_header().size() - msg.serial_size());
         dg.get_header().resize(dg.get_header().size() - msg.serial_size());
     }
-    
-    // Conveinence function to iterate over protostacks
-    void event_loop(gu::net::Network& el, 
-                    std::vector<gcomm::Protostack>& protos, 
-                    const std::string tstr = "PT1S");
-    
 } // namespace gcomm
 
 #endif // _GCOMM_UTIL_HPP_

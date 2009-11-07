@@ -9,6 +9,7 @@
 #ifndef _gu_convert_hpp_
 #define _gu_convert_hpp_
 
+#include "gu_macros.h"
 #include "gu_throw.hpp"
 #include <limits>
 

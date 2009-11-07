@@ -13,20 +13,20 @@
 #define __GU_EPOLL_HPP__
 
 #include <vector>
+#include "gu_poll.hpp"
 
-/* Forward declarations */
+// Declarations
 namespace gu
 {
     namespace net
     {
-        class EPollEvent;
         class EPoll;
-        class Socket;
     }
 }
 
 struct epoll_event;
 
+#if 0
 /*!
  * @brief Poll event class
  *
@@ -76,11 +76,12 @@ public:
     }
 };
 
+#endif
 
 /*!
  * @brief EPoll interface
  */
-class gu::net::EPoll
+class gu::net::EPoll : public Poll
 {
     int e_fd; /*! epoll control file descriptor */
     int n_events;
@@ -113,7 +114,7 @@ public:
      * @throws std::bad_alloc if call fails to allocate memory for 
      *         internal storage
      */
-    void insert(const EPollEvent& ev);
+    void insert(const PollEvent& ev);
     
     /*!
      * @brief Erase file descriptor from set of polled fds
@@ -122,7 +123,7 @@ public:
      *
      * @param ev EPollEvent containing valid file descriptor
      */
-    void erase(const EPollEvent& ev);
+    void erase(const PollEvent& ev);
     
     /*!
      * @brief Modify event mask for polled events of existing file descriptor
@@ -131,7 +132,7 @@ public:
      *
      * @throws std::runtime_error if epoll control call fails
      */
-    void modify(const EPollEvent& ev);
+    void modify(const PollEvent& ev);
     
     /*!
      * @brief Poll until activity is detected or timeout expires
@@ -144,7 +145,7 @@ public:
      *
      * @param timeout Timeout in milliseconds
      */
-    void poll(int timeout);
+    void poll(const gu::datetime::Period& p);
     
     /*!
      * @brief Check whether list of unhandled poll events is empty
@@ -158,7 +159,7 @@ public:
      *
      * @throws std::logic_error if no events were available
      */
-    EPollEvent front() const;
+    PollEvent front() const;
     
     /*!
      * @brief Erase the first event from the list of unhandled poll events

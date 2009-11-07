@@ -99,13 +99,13 @@ void gcomm::Protonet::event_loop(const Period& p)
             sleep_p = 0;
         
         NetworkEvent ev(net.wait_event(static_cast<int>(sleep_p.get_nsecs()/MSec), false));
-        if ((ev.get_event_mask() & NetworkEvent::E_EMPTY) == 0)
+        if ((ev.get_event_mask() & E_EMPTY) == 0)
         {
             const int mask(ev.get_event_mask());
             Socket& s(*ev.get_socket());
             const Datagram* dg(0);
             if (s.get_state() == Socket::S_CONNECTED &&
-                (mask & NetworkEvent::E_IN))
+                (mask & E_IN))
             {
                 dg = s.recv();
                 gcomm_assert(dg != 0 

@@ -70,7 +70,17 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
     {
         if (!host_is_any(uri.get_host()))
         {
-            initial_addr = resolve(tcp_addr_prefix + uri.get_authority()).to_string();
+            string port;
+            try
+            {
+                port = uri.get_port();
+            } 
+            catch (gu::NotSet& )
+            {
+                port = Defaults::Port;
+            }
+            initial_addr = resolve(
+                tcp_addr_prefix + uri.get_host() + ":" + port).to_string();
             if (check_uri(initial_addr) == false)
             {
                 gcomm_throw_runtime (EINVAL) << "initial addr '" << initial_addr

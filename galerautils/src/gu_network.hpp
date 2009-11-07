@@ -1,8 +1,4 @@
-/*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
- *
- * $Id$
- */
+
 
 /*!
  * @file gu_network.hpp Network API
@@ -37,6 +33,8 @@
 
 #include "gu_buffer.hpp"
 #include "gu_assert.h"
+#include "gu_poll.hpp"
+#include "gu_datetime.hpp"
 #include <cstdlib>      /* size_t */
 #include <stdint.h>     /* uint32_t */
 #include <sys/socket.h> /* sockaddr */
@@ -190,7 +188,6 @@ private:
     
     /* Network integration */
     friend class Network;
-    friend class EPoll;
     Network& net;       /*!< Network object this socket belongs to */
     
     /* Private methods */
@@ -230,7 +227,7 @@ private:
     // Set options before connect
     static void set_opt(Socket*, const Addrinfo&, int opt);
 
-    int get_opt() const { return options; }
+
     
     /*!
      * @brief Get current event mask for socket.
@@ -268,6 +265,8 @@ public:
         O_NO_INTERRUPT = 1 << 1  /*!< Socket methods calls are not 
                                   * interruptible */
     };
+
+    int get_opt() const { return options; }
         
     /*!
      * @brief Destructor
@@ -405,6 +404,7 @@ public:
 class gu::net::NetworkEvent
 {
 public:
+#if 0
     /*!
      * @brief Network event type enumeration
      */
@@ -421,6 +421,7 @@ public:
         E_CLOSED = 1 << 5,
         E_EMPTY = 1 << 6
     };
+#endif
 private:    
     int event_mask;             /*!< Event mask              */
     Socket* socket;             /*!< Socket related to event */
@@ -453,7 +454,7 @@ class gu::net::Network
     SocketList* sockets;
     std::vector<Socket*> released;
     int wake_fd[2];
-    EPoll* poll;
+    Poll* poll;
     void insert(Socket*);
     void erase(Socket*);
     void release(Socket*);
@@ -489,7 +490,8 @@ public:
      *         was interrupted by signal
      * @throws std::runtime_error If error was encountered
      */
-    NetworkEvent wait_event(int timeout = -1, bool auto_accept = true);
+    NetworkEvent wait_event(const gu::datetime::Period& = gu::datetime::Period(-1), 
+                            bool auto_accept = true);
     
     /*!
      * Interrupt network wait_event()
