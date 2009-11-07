@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
+
 /**
  * Generic multicast transport. Uses tcp connections if real multicast 
  * is not available.
@@ -14,184 +18,127 @@
 
 namespace gcomm
 {
-
-    class UUIDToAddressMap;
     
-    class GMCastProto;
-    class GMCastProtoMap;
-    class GMCastNode;
-    class GMCastMessage;
+    
+    namespace gmcast
+    {
+        class Proto;
+        class ProtoMap;
+        class Node;
+        class Message;
+    }
     
     class GMCast : public Transport
     {
-        UUID my_uuid;
+    public:
+        GMCast (Protonet&, const std::string&);
+        ~GMCast();
         
-        /* */
-        typedef GMCastProtoMap ProtoMap; // @todo: purpose of this typedef?
-        ProtoMap* proto_map;
-        ProtoMap* spanning_tree;
+        // Protolay interface 
+        void handle_up(int, const gu::net::Datagram&, const ProtoUpMeta&);
+        int handle_down(const gu::net::Datagram&, const ProtoDownMeta&);
         
-        /* */
-        Transport*  listener;
-        std::string listen_addr;
-        std::string initial_addr;
-        
-        static const long max_retry_cnt = 1 << 24;
-        
-        struct Timing
+        // Transport interface
+        bool supports_uuid() const { return true; }
+        const UUID& get_uuid() const { return my_uuid; }
+        void connect();
+        void close();
+        void close(const UUID& uuid) { gmcast_forget(uuid); }
+        void listen()
         {
-            UUID uuid;
-            gu::datetime::Date last_seen;
-            gu::datetime::Date next_reconnect;
-            int  retry_cnt;
-            
-            Timing(const gu::datetime::Date& last_seen_,
-                   const gu::datetime::Date& next_reconnect_,
-                   const UUID& uuid_)
+            gcomm_throw_fatal << "gmcast transport listen not implemented";
+        }
+        Transport* accept()
+        {
+            gcomm_throw_fatal << "gmcast transport accept not implemented"; throw;
+        }
+        size_t get_mtu() const
+        {
+            return gu::net::Network::get_mtu() - UUID::serial_size();
+        }
+
+    private:
+        
+        GMCast (const GMCast&);
+        GMCast& operator=(const GMCast&);
+
+        static const long max_retry_cnt = 12*3600;        
+        class AddrEntry
+        {
+        public:
+            AddrEntry(const gu::datetime::Date& last_seen_,
+                      const gu::datetime::Date& next_reconnect_,
+                      const UUID& uuid_)
                 :
                 uuid           (uuid_),
                 last_seen      (last_seen_),
                 next_reconnect (next_reconnect_),
                 retry_cnt      (0)
-            {}
+            { }
+            
+            const UUID& get_uuid() const { return uuid; }
+            void set_last_seen(const gu::datetime::Date& d)
+            { last_seen = d; }
+            const gu::datetime::Date& get_last_seen() const 
+            { return last_seen; }
+            void set_next_reconnect(const gu::datetime::Date& d)
+            { next_reconnect = d; }
+            const gu::datetime::Date& get_next_reconnect() const
+            { return next_reconnect; }
+            void set_retry_cnt(const int r)
+            { retry_cnt = r; }
+            int get_retry_cnt() const { return retry_cnt; }
+        private:
+            void operator=(const AddrEntry&);
+            UUID uuid;
+            gu::datetime::Date last_seen;
+            gu::datetime::Date next_reconnect;
+            int  retry_cnt;
         };
         
-        typedef std::map<const std::string, Timing > AddrList;
+        class AddrList : public Map<std::string, AddrEntry> { };
         
-        AddrList pending_addrs;
-        AddrList remote_addrs;
+        UUID              my_uuid;
+        std::string       group_name;
+        std::string       listen_addr;
+        std::string       initial_addr;        
+        Transport*        listener;
+        AddrList          pending_addrs;
+        AddrList          remote_addrs;
+        
+        gmcast::ProtoMap* proto_map;
         
         gu::datetime::Period check_period;
         gu::datetime::Date next_check;
-        
         gu::datetime::Date handle_timers();
         
-        const UUID& get_uuid(const AddrList::const_iterator i) const
-        {
-            return i->second.uuid;
-        }
-        
-        const std::string& get_address(const AddrList::const_iterator i) const
-        {
-            return i->first;
-        }
-        
-        void set_last_seen(AddrList::iterator i, const gu::datetime::Date& t)
-        {
-            i->second.last_seen = t;
-        }
-        
-        const gu::datetime::Date& get_last_seen(AddrList::iterator i) const
-        {
-            return i->second.last_seen;
-        }
-    
-
-        void set_next_reconnect(AddrList::iterator i, const gu::datetime::Date& t)
-        {
-            i->second.next_reconnect = t;
-        }
-        
-        const gu::datetime::Date& get_next_reconnect(AddrList::iterator i) const
-        {
-            return i->second.next_reconnect;
-        }
-
-        int get_retry_cnt(AddrList::iterator i)
-        {
-            return i->second.retry_cnt;
-        }
-
-        int get_retry_cnt(AddrList::iterator i) const
-        {
-            return i->second.retry_cnt;
-        }
-
-        void set_retry_cnt(AddrList::iterator i, const int cnt)
-        {
-            i->second.retry_cnt = cnt;
-        }
-
-        std::string group_name;
-
-        /* Accept a new connection */
+        // Accept new connection
         void gmcast_accept();
-        /* Connect to remote host */
+        // Initialize connecting to remote host
         void gmcast_connect(const std::string&);
-        /* Forget node */
-        void gmcast_forget(const UUID&);
-        /* Handle GMCastProto that has connected succesfully to remote host */
-        void handle_connected(GMCastProto*);
-        /* Handle GMCastProto that has finished handshake sequence */
-        void handle_established(GMCastProto*);
-        /* Handle GMCastProto that has failed */
-        void handle_failed(GMCastProto*);
-        /* Remote proto entry */
-        void remove_proto(const int);
-    
+        // Forget node
+        void gmcast_forget(const gcomm::UUID&);
+        // Handle proto entry that has established connection to remote host
+        void handle_connected(gmcast::Proto*);
+        // Handle proto entry that has succesfully finished handshake 
+        // sequence
+        void handle_established(gmcast::Proto*);
+        // Handle proto entry that has failed
+        void handle_failed(gmcast::Proto*);
+        
+        // Check if there exists connection that matches to either
+        // remote addr or uuid
         bool is_connected(const std::string& addr, const UUID& uuid) const;
+        // Inset address to address list
         void insert_address(const std::string& addr, const UUID& uuid, AddrList&);
+        // Scan through proto entries and update address lists
         void update_addresses();
+        // Reconnecting
         void reconnect();
-
-        void compute_spanning_tree(const UUIDToAddressMap&);
-        void forward_message(const int cid, const gu::net::Datagram& rb, 
-                             const GMCastMessage& msg);
-    
-        /* Start gmcast engine */
-        void start();
-        /* Stop gmcast engine */
-        void stop();
-
+        
         std::string self_string() const
         {
             return "(" + get_uuid().to_string() + ", " + listen_addr + ")";
-        }
-
-        GMCast (const GMCast&);
-        GMCast& operator=(const GMCast&);
-
-    public:
-    
-        std::list<std::string> get_addresses();
-        /* Constructor */
-        GMCast (Protonet&, const std::string&);
-        // const string& listen_addr_, 
-        //    const list<string>& remote_addrs_, 
-        //     const list<string>& groups_);
-    
-        ~GMCast();
-
-        /* Handle Protolay up event */
-        void handle_up(int, const gu::net::Datagram&, const ProtoUpMeta&);
-        /* Handle Protolay down event */
-        int handle_down(const gu::net::Datagram&, const ProtoDownMeta&);
-        
-        // Transport interface
-        
-        bool supports_uuid() const { return true; }
-
-        const UUID& get_uuid() const { return my_uuid; }
-        
-        void connect() { start(); }
-
-        void close() { stop(); }
-        
-        void close(const UUID& uuid) { gmcast_forget(uuid); }
-        
-        void listen()
-        {
-            gcomm_throw_fatal << "gmcast transport listen not implemented";
-        }
-        
-        Transport* accept()
-        {
-            gcomm_throw_fatal << "gmcast transport accept not implemented"; throw;
-        }
-
-        size_t get_mtu() const
-        {
-            return gu::net::Network::get_mtu() - UUID::serial_size();
         }
     };
 }

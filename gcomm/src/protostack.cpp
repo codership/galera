@@ -93,20 +93,10 @@ void gcomm::Protonet::event_loop(const Period& p)
             }
         }
         
-        Period sleep_p(stop - Date::now());
-        
-        if (next_time != Date::max())
-        {
-            sleep_p = next_time - Date::now();
-        }
+        Period sleep_p(min(stop - Date::now(), next_time - Date::now()));
         
         if (sleep_p < 0)
             sleep_p = 0;
-
-        if (sleep_p > Period(3*Sec))
-        {
-            log_warn << "long sleep of " << sleep_p;
-        }
         
         NetworkEvent ev(net.wait_event(static_cast<int>(sleep_p.get_nsecs()/MSec), false));
         if ((ev.get_event_mask() & NetworkEvent::E_EMPTY) == 0)

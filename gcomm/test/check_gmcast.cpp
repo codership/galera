@@ -2,138 +2,20 @@
 #include "check_gcomm.hpp"
 #include "gcomm/protostack.hpp"
 
-#include "../src/gmcast.cpp"
+#include "gmcast.hpp"
+#include "gmcast_message.hpp"
 
+using namespace std;
 using namespace gcomm;
+using namespace gcomm::gmcast;
+using namespace gu;
+using namespace gu::net;
 using namespace gu::datetime;
 
 #include <check.h>
 
-namespace gcomm
-{
-    static bool operator==(const GMCastNode& a, const GMCastNode& b)
-{
-    return a.is_operational() == b.is_operational() &&
-        a.get_uuid() == b.get_uuid() && a.get_address() == b.get_address();
-}
-
-
-static bool operator==(const gcomm::GMCastMessage& a, const gcomm::GMCastMessage& b)
-{
-    bool ret = a.get_version() == b.get_version() &&
-        a.get_type()  == b.get_type() &&
-        a.get_ttl()   == b.get_ttl() &&
-        a.get_flags() == b.get_flags();
-    
-    if (ret == true && a.get_flags() & GMCastMessage::F_NODE_ADDRESS)
-    {
-        ret = a.get_node_address() == b.get_node_address();
-    }
-
-    if (ret == true && a.get_flags() & GMCastMessage::F_GROUP_NAME)
-    {
-        const string& a_grp = a.get_group_name();
-        const string& b_grp = b.get_group_name();
-//        fail_unless(!!a_grp && !!b_grp);
-        ret = ret && (a_grp == b_grp);
-        // std::cerr << a_grp << "\n";
-    }
-    
-    if (ret == true && a.get_flags() & GMCastMessage::F_NODE_LIST)
-    {
-        const std::list<GMCastNode>* alist = a.get_node_list();
-        const std::list<GMCastNode>* blist = b.get_node_list();
-        
-        fail_unless(alist != 0 && blist != 0);
-        ret = ret && *alist == *blist;
-
-    }
-    return ret;
-}
-}
-
-
-
 START_TEST(test_gmcast_messages)
 {
-    /* */
-    {
-        GMCastMessage hdr(GMCastMessage::T_HANDSHAKE, UUID());
-        byte_t* buf = new byte_t[hdr.serial_size()];
-        fail_unless(hdr.serialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
-        GMCastMessage hdr2;
-        fail_unless(hdr2.unserialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
-        fail_unless(hdr == hdr2);
-        delete[] buf;
-    }
-
-    /* */
-    {
-        GMCastMessage hdr(GMCastMessage::T_HANDSHAKE_OK, UUID());
-        byte_t* buf = new byte_t[hdr.serial_size()];
-        fail_unless(hdr.serialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
-        GMCastMessage hdr2;
-        fail_unless(hdr2.unserialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
-        fail_unless(hdr == hdr2);
-        delete[] buf;
-
-    }
-
-    /* */
-    {
-        GMCastMessage hdr(GMCastMessage::T_HANDSHAKE_FAIL, UUID());
-        byte_t* buf = new byte_t[hdr.serial_size()];
-        fail_unless(hdr.serialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
-        GMCastMessage hdr2;
-        fail_unless(hdr2.unserialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
-        fail_unless(hdr == hdr2);
-        delete[] buf;
-    }
-    /* */
-    {
-        GMCastMessage hdr(GMCastMessage::T_HANDSHAKE_RESPONSE,
-                          UUID(),
-                          "gcomm+tcp://127.0.0.1:2112",
-                          "test_group");
-        byte_t* buf = new byte_t[hdr.serial_size()];
-        log_info << hdr.serial_size();
-        size_t ret = hdr.serialize(buf, hdr.serial_size(), 0);
-        log_info << ret;
-        fail_unless(hdr.serialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
-        GMCastMessage hdr2;
-        fail_unless(hdr2.unserialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
-        fail_unless(hdr == hdr2);
-        delete[] buf;
-    }
-
-    /* */
-    {
-        GMCastMessage hdr(GMCastMessage::T_USER_BASE, UUID(), 4);
-        byte_t* buf = new byte_t[hdr.serial_size()];
-        fail_unless(hdr.serialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
-        GMCastMessage hdr2;
-        fail_unless(hdr2.unserialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
-        fail_unless(hdr == hdr2);
-        delete[] buf;
-    }
-
-    /* */
-    {
-        std::list<GMCastNode> node_list;
-        node_list.push_back(GMCastNode(true, UUID(0, 0), "gcomm+tcp://127.0.0.1:10001"));
-        node_list.push_back(GMCastNode(false, UUID(0, 0), "gcomm+tcp://127.0.0.1:10002"));
-        node_list.push_back(GMCastNode(true, UUID(0, 0), "gcomm+tcp://127.0.0.1:10003"));
-
-        GMCastMessage hdr(GMCastMessage::T_TOPOLOGY_CHANGE, UUID(0, 0),
-                         "foobar", node_list);
-        byte_t* buf = new byte_t[hdr.serial_size()];
-        fail_unless(hdr.serialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
-        GMCastMessage hdr2;
-        fail_unless(hdr2.unserialize(buf, hdr.serial_size(), 0) == hdr.serial_size());
-        fail_unless(hdr == hdr2);
-        delete[] buf;
-  }
-
 
 }
 END_TEST
@@ -400,12 +282,16 @@ END_TEST
 
 START_TEST(test_gmcast_forget)
 {
+    gu_conf_self_tstamp_on();
     log_info << "START";
+
+
     Protonet pnet;
     Transport* tp1 = Transport::create(pnet, "gmcast://?gmcast.group=test");
     Transport* tp2 = Transport::create(pnet, "gmcast://127.0.0.1:4567?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:10002");
     Transport* tp3 = Transport::create(pnet, "gmcast://127.0.0.1:4567?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:10003");
     
+
 
     pnet.insert(&tp1->get_pstack());
     pnet.insert(&tp2->get_pstack());
@@ -454,17 +340,15 @@ Suite* gmcast_suite()
 
     tc = tcase_create("test_gmcast_messages");
     tcase_add_test(tc, test_gmcast_messages);
-    tcase_set_timeout(tc, 30);
     suite_add_tcase(s, tc);
-
+    
     tc = tcase_create("test_gmcast");
     tcase_add_test(tc, test_gmcast);
-    tcase_set_timeout(tc, 30);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_gmcast_w_user_messages");
     tcase_add_test(tc, test_gmcast_w_user_messages);
-    tcase_set_timeout(tc, 30);
+    tcase_set_timeout(tc, 20);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_gmcast_auto_addr");

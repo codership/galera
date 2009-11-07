@@ -14,6 +14,7 @@ libgcomm_la_SOURCES = 		\
 	view.cpp		\
 	protostack.cpp		\
 	transport.cpp		\
+	gmcast_proto.cpp        \
 	gmcast.cpp		\
 	evs_message2.cpp	\
 	evs_input_map2.cpp 	\
