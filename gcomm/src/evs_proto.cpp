@@ -1977,14 +1977,9 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         
         if (inst.get_operational() == false) 
         {
-            // This is probably partition merge, see if it works out
-            evs_log_debug(D_STATE) << " unoperational message source " 
-                                   << msg.get_source()
-                                   << " got operational";
-            inst.set_operational(true);
-            profile_enter(shift_to_prof);
-            shift_to(S_RECOVERY);
-            profile_leave(shift_to_prof);
+            evs_log_debug(D_STATE) 
+                << "dropping message from unoperational source " 
+                << msg.get_source();
             return;
         } 
         else if (inst.get_installed() == false) 
@@ -2205,12 +2200,9 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         
         if (inst.get_operational() == false) 
         {
-            // This is probably partition merge, see if it works out
-            inst.set_tstamp(Date::now());
-            inst.set_operational(true);
-            profile_enter(shift_to_prof);
-            shift_to(S_RECOVERY);
-            profile_leave(shift_to_prof);
+            evs_log_debug(D_STATE) 
+                << "dropping message from unoperational source " 
+                << msg.get_source();
         } 
         else if (inst.get_installed() == false) 
         {
@@ -2412,13 +2404,6 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         gu_trace(shift_to(S_RECOVERY, false));
         profile_leave(shift_to_prof);
     }
-    
-    // Instance previously declared unoperational seems to be operational now
-    if (inst.get_operational() == false) 
-    {
-        inst.set_operational(true);
-        log_debug << self_string() << " unop -> op";
-    } 
     
     inst.set_join_message(&msg);
     inst.set_tstamp(Date::now());    
