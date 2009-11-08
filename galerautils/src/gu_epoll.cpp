@@ -128,7 +128,7 @@ void gu::net::EPoll::modify(const PollEvent& epe)
 
 void gu::net::EPoll::poll(const Period& p)
 {
-    int timeout(p.get_nsecs() == -1 ? -1 : convert(p.get_nsecs()/MSec, int()));
+    int timeout(p.get_nsecs() < 0 ? -1 : convert(p.get_nsecs()/MSec, int()));
     int ret = epoll_wait(e_fd, &events[0], static_cast<int>(events.size()), 
                          timeout);
     if (ret == -1)

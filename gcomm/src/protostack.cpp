@@ -97,8 +97,8 @@ void gcomm::Protonet::event_loop(const Period& p)
         
         if (sleep_p < 0)
             sleep_p = 0;
-        
-        NetworkEvent ev(net.wait_event(static_cast<int>(sleep_p.get_nsecs()/MSec), false));
+
+        NetworkEvent ev(net.wait_event(sleep_p, false));
         if ((ev.get_event_mask() & E_EMPTY) == 0)
         {
             const int mask(ev.get_event_mask());
