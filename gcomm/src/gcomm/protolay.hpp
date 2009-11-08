@@ -12,7 +12,7 @@
 #include "gcomm/view.hpp"
 #include "gcomm/exception.hpp"
 #include "gcomm/logger.hpp"
-#include "gcomm/safety_prefix.hpp"
+#include "gcomm/order.hpp"
 
 #include "gu_datetime.hpp"
 
@@ -127,24 +127,22 @@ inline std::ostream& gcomm::operator<<(std::ostream& os, const ProtoUpMeta& um)
 /* message context to pass down? */
 class gcomm::ProtoDownMeta
 {
-    const uint8_t      user_type;
-    const SafetyPrefix sp;
-    const UUID         source;
-public:
-    
-    ProtoDownMeta(const uint8_t user_type_ = 0xff, 
-                  const SafetyPrefix sp_   = SP_SAFE,
-                  const UUID& uuid_        = UUID::nil()) : 
-        user_type(user_type_), 
-        sp(sp_),
-        source(uuid_)
+public:    
+    ProtoDownMeta(const uint8_t user_type_ = 0xff,
+                  const Order   order_     = O_SAFE,
+                  const UUID&   uuid_      = UUID::nil()) : 
+        user_type (user_type_), 
+        order     (order_),
+        source    (uuid_)
     { }
     
-    uint8_t get_user_type() const { return user_type; }
-    
-    SafetyPrefix get_safety_prefix() const { return sp; }
-
-    const UUID& get_source() const { return source; }
+    uint8_t     get_user_type() const { return user_type; }
+    Order       get_order()     const { return order;     }
+    const UUID& get_source()    const { return source;    }
+private:
+    const uint8_t user_type;
+    const Order   order;
+    const UUID    source;
 };
 
 class gcomm::Protolay

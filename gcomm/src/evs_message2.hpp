@@ -8,7 +8,7 @@
 #define EVS_MESSAGE2_HPP
 
 
-#include "gcomm/safety_prefix.hpp"
+#include "gcomm/order.hpp"
 #include "gcomm/view.hpp"
 #include "gcomm/map.hpp"
 
@@ -154,11 +154,11 @@ public:
     uint8_t get_user_type() const { return user_type; }
     
     /*!
-     * Get message safety prefix.
+     * Get message order type.
      *
-     * @return Safety prefix of the message.
+     * @return Order type of the message.
      */
-    SafetyPrefix get_safety_prefix() const { return safety_prefix; }
+    Order get_order() const { return order; }
     
     /*!
      * Get sequence number associated to the message.
@@ -258,43 +258,44 @@ public:
     /*!
      * Copy constructor.
      */
-
+    
     Message(const Message& msg) :
-        version(msg.version),
-        type(msg.type),
-        user_type(msg.user_type),
-        safety_prefix(msg.safety_prefix),
-        seq(msg.seq),
-        seq_range(msg.seq_range),
-        aru_seq(msg.aru_seq),
-        fifo_seq(msg.fifo_seq),
-        flags(msg.flags),
-        source(msg.source),
-        source_view_id(msg.source_view_id),
-        range_uuid(msg.range_uuid),
-        range(msg.range),
-        tstamp(msg.tstamp),
-        node_list(msg.node_list != 0 ? new MessageNodeList(*msg.node_list) : 0)
+        version        (msg.version),
+        type           (msg.type),
+        user_type      (msg.user_type),
+        order          (msg.order),
+        seq            (msg.seq),
+        seq_range      (msg.seq_range),
+        aru_seq        (msg.aru_seq),
+        fifo_seq       (msg.fifo_seq),
+        flags          (msg.flags),
+        source         (msg.source),
+        source_view_id (msg.source_view_id),
+        range_uuid     (msg.range_uuid),
+        range          (msg.range),
+        tstamp         (msg.tstamp),
+        node_list      (msg.node_list != 0 ? 
+                        new MessageNodeList(*msg.node_list) : 0)
     { }
 
     Message& operator=(const Message& msg)
     {
-        version = msg.version;
-        type = msg.type;
-        user_type = msg.user_type;
-        safety_prefix = msg.safety_prefix;
-        seq = msg.seq;
-        seq_range = msg.seq_range;
-        aru_seq = msg.aru_seq;
-        fifo_seq = msg.fifo_seq;
-        flags = msg.flags;
-        source = msg.source;
+        version        = msg.version;
+        type           = msg.type;
+        user_type      = msg.user_type;
+        order          = msg.order;
+        seq            = msg.seq;
+        seq_range      = msg.seq_range;
+        aru_seq        = msg.aru_seq;
+        fifo_seq       = msg.fifo_seq;
+        flags          = msg.flags;
+        source         = msg.source;
         source_view_id = msg.source_view_id;
-        range_uuid = msg.range_uuid;
-        range = msg.range;
-        tstamp = msg.tstamp;
-        node_list = (msg.node_list != 0 ? 
-                     new MessageNodeList(*msg.node_list) : 0);
+        range_uuid     = msg.range_uuid;
+        range          = msg.range;
+        tstamp         = msg.tstamp;
+        node_list      = (msg.node_list != 0 ? 
+                          new MessageNodeList(*msg.node_list) : 0);
         return *this;
     }
 
@@ -302,35 +303,35 @@ public:
 
 
     /*! Default constructor */
-    Message(const uint8_t version_   = 0,
-            const Type    type_      = T_NONE,
-            const UUID&   source_ = UUID::nil(),
-            const ViewId& source_view_id_ = ViewId(),
-            const uint8_t user_type_ = 0xff,
-            const SafetyPrefix safety_prefix_ = SP_DROP,
-            const int64_t fifo_seq_ = -1,
-            const Seqno  seq_ = Seqno::max(),
-            const Seqno  seq_range_ = Seqno::max(),
-            const Seqno  aru_seq_ = Seqno::max(),
-            const uint8_t flags_ = 0,
-            const UUID& range_uuid_ = UUID(),
-            const Range range_ = Range(),
-            const MessageNodeList* node_list_ = 0) :
-        version(version_),
-        type(type_),
-        user_type(user_type_),
-        safety_prefix(safety_prefix_),
-        seq(seq_),
-        seq_range(seq_range_),
-        aru_seq(aru_seq_),
-        fifo_seq(fifo_seq_),
-        flags(flags_),
-        source(source_),
-        source_view_id(source_view_id_),
-        range_uuid(range_uuid_),
-        range(range_),
-        tstamp(gu::datetime::Date::now()),
-        node_list(node_list_ != 0 ? new MessageNodeList(*node_list_) : 0)
+    Message(const uint8_t          version_        = 0,
+            const Type             type_           = T_NONE,
+            const UUID&            source_         = UUID::nil(),
+            const ViewId&          source_view_id_ = ViewId(),
+            const uint8_t          user_type_      = 0xff,
+            const Order            order_          = O_DROP,
+            const int64_t          fifo_seq_       = -1,
+            const Seqno            seq_            = Seqno::max(),
+            const Seqno            seq_range_      = Seqno::max(),
+            const Seqno            aru_seq_        = Seqno::max(),
+            const uint8_t          flags_          = 0,
+            const UUID&            range_uuid_     = UUID(),
+            const Range            range_          = Range(),
+            const MessageNodeList* node_list_      = 0) :
+        version        (version_),
+        type           (type_),
+        user_type      (user_type_),
+        order          (order_),
+        seq            (seq_),
+        seq_range      (seq_range_),
+        aru_seq        (aru_seq_),
+        fifo_seq       (fifo_seq_),
+        flags          (flags_),
+        source         (source_),
+        source_view_id (source_view_id_),
+        range_uuid     (range_uuid_),
+        range          (range_),
+        tstamp         (gu::datetime::Date::now()),
+        node_list      (node_list_ != 0 ? new MessageNodeList(*node_list_) : 0)
     { }
 
 protected:
@@ -340,21 +341,21 @@ protected:
 
     size_t serial_size() const;
     
-    uint8_t              version;
-    Type                 type;
-    uint8_t              user_type;
-    SafetyPrefix  safety_prefix;
-    Seqno                seq;
-    Seqno                seq_range;
-    Seqno                aru_seq;
-    int64_t              fifo_seq;
-    uint8_t              flags;
-    UUID          source;
-    ViewId        source_view_id;
-    UUID          range_uuid;
-    Range                range;
-    gu::datetime::Date                 tstamp;
-    MessageNodeList*     node_list;
+    uint8_t            version;
+    Type               type;
+    uint8_t            user_type;
+    Order              order;
+    Seqno              seq;
+    Seqno              seq_range;
+    Seqno              aru_seq;
+    int64_t            fifo_seq;
+    uint8_t            flags;
+    UUID               source;
+    ViewId             source_view_id;
+    UUID               range_uuid;
+    Range              range;
+    gu::datetime::Date tstamp;
+    MessageNodeList*   node_list;
     
 
 };
@@ -370,7 +371,7 @@ public:
                 const Seqno        seq            = Seqno::max(),
                 const Seqno        aru_seq        = Seqno::max(),
                 const Seqno        seq_range      = 0,
-                const SafetyPrefix safety_prefix  = gcomm::SP_SAFE,
+                const Order        order          = O_SAFE,
                 const int64_t      fifo_seq       = -1,
                 const uint8_t      user_type      = 0xff,
                 const uint8_t      flags          = 0) :
@@ -379,7 +380,7 @@ public:
                 source,
                 source_view_id,
                 user_type,
-                safety_prefix,
+                order,
                 fifo_seq,
                 seq,
                 seq_range,
@@ -412,7 +413,7 @@ public:
                 source,
                 source_view_id,
                 0xff,
-                SP_UNRELIABLE,
+                O_UNRELIABLE,
                 fifo_seq)
     { }
     size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
@@ -438,7 +439,7 @@ public:
                 source,
                 source_view_id,                
                 0xff,
-                SP_UNRELIABLE,
+                O_UNRELIABLE,
                 fifo_seq,
                 seq,
                 Seqno::max(),
@@ -470,7 +471,7 @@ public:
                 source,
                 source_view_id,
                 0xff,
-                SP_UNRELIABLE,
+                O_UNRELIABLE,
                 fifo_seq,
                 seq,
                 Seqno::max(),
@@ -502,7 +503,7 @@ public:
                 source,
                 source_view_id,
                 0xff,
-                SP_UNRELIABLE,
+                O_UNRELIABLE,
                 fifo_seq,
                 seq,
                 Seqno::max(),
@@ -534,7 +535,7 @@ public:
                 source,
                 source_view_id,
                 0xff,
-                SP_UNRELIABLE,
+                O_UNRELIABLE,
                 fifo_seq,
                 seq,
                 Seqno::max(),

@@ -31,7 +31,7 @@ ostream& gcomm::evs::operator<<(ostream& os, const gcomm::evs::Message& msg)
     os << "version=" << static_cast<int>(msg.get_version()) << ",";
     os << "type=" << msg.get_type() << ",";
     os << "user_type=" << static_cast<int>(msg.get_user_type()) << ",";
-    os << "safety_prefix=" << msg.get_safety_prefix() << ",";
+    os << "order=" << msg.get_order() << ",";
     os << "seq=" << msg.get_seq() << ",";
     os << "seq_range=" << msg.get_seq_range() << ",";
     os << "aru_seq=" << msg.get_aru_seq() << ",";
@@ -105,23 +105,22 @@ size_t gcomm::evs::MessageNode::serial_size()
 
 bool gcomm::evs::Message::operator==(const Message& cmp) const
 {
-    return version == cmp.version &&
-        type == cmp.type &&
-        user_type == cmp.user_type &&
-        safety_prefix == cmp.safety_prefix &&
-        seq == cmp.seq &&
-        seq_range == cmp.seq_range &&
-        aru_seq == cmp.aru_seq &&
-        fifo_seq == cmp.fifo_seq &&
-        flags == cmp.flags &&
-        source == cmp.source &&
-        source_view_id == cmp.source_view_id &&
-        range_uuid == cmp.range_uuid &&
-        range == cmp.range &&
-        (node_list != 0 ? 
-         ( cmp.node_list != 0 && 
-           *node_list == *cmp.node_list ) : 
-         true);
+    return (version        == cmp.version        &&
+            type           == cmp.type           &&
+            user_type      == cmp.user_type      &&
+            order          == cmp.order          &&
+            seq            == cmp.seq            &&
+            seq_range      == cmp.seq_range      &&
+            aru_seq        == cmp.aru_seq        &&
+            fifo_seq       == cmp.fifo_seq       &&
+            flags          == cmp.flags          &&
+            source         == cmp.source         &&
+            source_view_id == cmp.source_view_id &&
+            range_uuid     == cmp.range_uuid     &&
+            range          == cmp.range          &&
+            (node_list     != 0 ? 
+             (cmp.node_list != 0 && *node_list == *cmp.node_list) : 
+             true));
 }
 
 
@@ -131,7 +130,7 @@ size_t gcomm::evs::Message::serialize(byte_t* const buf,
     throw(gu::Exception)
 {
     
-    uint8_t b = static_cast<uint8_t>(version | (type << 2) | (safety_prefix << 5));
+    uint8_t b = static_cast<uint8_t>(version | (type << 2) | (order << 5));
     gu_trace(offset = gcomm::serialize(b, buf, buflen, offset));
     gu_trace(offset = gcomm::serialize(flags, buf, buflen, offset));
     uint16_t pad(0);
@@ -166,11 +165,11 @@ size_t gcomm::evs::Message::unserialize(const byte_t* const buf,
         gcomm_throw_runtime(EINVAL) << "invalid type " << type;
     }
     
-    safety_prefix = static_cast<SafetyPrefix>((b >> 5) & 0x7);
-    if (safety_prefix < SP_DROP || safety_prefix > SP_SAFE)
+    order = static_cast<Order>((b >> 5) & 0x7);
+    if (order < O_DROP || order > O_SAFE)
     {
         gcomm_throw_runtime(EINVAL) << "invalid safety prefix " 
-                                    << safety_prefix;
+                                    << order;
     }
     gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &flags));
 
@@ -192,7 +191,7 @@ size_t gcomm::evs::Message::unserialize(const byte_t* const buf,
 
 size_t gcomm::evs::Message::serial_size() const
 {
-    return (1 +                // version | type | safety_prefix
+    return (1 +                // version | type | order
             1 +              // flags
             2 +              // pad
             sizeof(fifo_seq) +  // fifo_seq

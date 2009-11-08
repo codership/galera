@@ -232,7 +232,7 @@ public:
     iterator end  () const { return msg_index->end(); }
      
     /*!
-     * Check if message pointed by iterator fulfills SP_SAFE condition.
+     * Check if message pointed by iterator fulfills O_SAFE condition.
      *
      * @return True or false
      */
@@ -244,7 +244,7 @@ public:
     }
     
     /*!
-     * Check if message pointed by iterator fulfills SP_AGREED condition.
+     * Check if message pointed by iterator fulfills O_AGREED condition.
      *
      * @return True or false
      */
@@ -256,7 +256,7 @@ public:
     }
     
     /*!
-     * Check if message pointed by iterator fulfills SP_FIFO condition.
+     * Check if message pointed by iterator fulfills O_FIFO condition.
      *
      * @return True or false
      */
@@ -273,13 +273,13 @@ public:
     {
         if (msg_index->empty() == false)
         {
-            if (n_msgs[SP_FIFO] > 0 && is_fifo(msg_index->begin()))
+            if (n_msgs[O_FIFO] > 0 && is_fifo(msg_index->begin()))
                 return true;
-            else if (n_msgs[SP_AGREED] > 0 && is_agreed(msg_index->begin()))
+            else if (n_msgs[O_AGREED] > 0 && is_agreed(msg_index->begin()))
                 return true;
-            else if (n_msgs[SP_SAFE] > 0 && is_safe(msg_index->begin()))
+            else if (n_msgs[O_SAFE] > 0 && is_safe(msg_index->begin()))
                 return true;
-            else if (n_msgs[SP_DROP] > max_droppable)
+            else if (n_msgs[O_DROP] > max_droppable)
                 return true;
             return false;
         }
@@ -309,7 +309,7 @@ public:
     /*!
      * Erase message pointed by iterator. Note that message may still
      * be recovered through recover() method as long as it does not 
-     * fulfill SP_SAFE constraint.
+     * fulfill O_SAFE constraint.
      *
      * @param i Iterator
      *

@@ -47,7 +47,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     retrans_msgs(0),
     recovered_msgs(0),
     recvd_msgs(7, 0),
-    delivered_msgs(SP_SAFE + 1),
+    delivered_msgs(O_SAFE + 1),
     send_user_prof    ("send_user"),
     send_gap_prof     ("send_gap"),
     send_join_prof    ("send_join"),
@@ -289,7 +289,7 @@ void gcomm::evs::Proto::handle_retrans_timer()
         {
             Datagram dg;
             profile_enter(send_user_prof);
-            gu_trace((void)send_user(dg, 0xff, SP_DROP, send_window, 
+            gu_trace((void)send_user(dg, 0xff, O_DROP, send_window, 
                                      Seqno::max()));
             profile_leave(send_user_prof);
         }
@@ -754,7 +754,7 @@ bool gcomm::evs::Proto::is_flow_control(const Seqno seq, const Seqno win) const
 
 int gcomm::evs::Proto::send_user(const Datagram& dg,
                                  uint8_t const user_type,
-                                 SafetyPrefix const sp, 
+                                 Order  const order, 
                                  Seqno const win,
                                  Seqno const up_to_seqno)
 {
@@ -798,7 +798,7 @@ int gcomm::evs::Proto::send_user(const Datagram& dg,
                     seq,
                     input_map->get_aru_seq(),
                     seq_range,
-                    sp, 
+                    order, 
                     ++fifo_seq,
                     user_type,
                     flags);
@@ -846,7 +846,7 @@ int gcomm::evs::Proto::send_user(const Seqno win)
     int ret;
     if ((ret = send_user(wb.first, 
                          wb.second.get_user_type(), 
-                         wb.second.get_safety_prefix(), 
+                         wb.second.get_order(), 
                          win, 
                          Seqno::max())) == 0) 
     {
@@ -865,7 +865,7 @@ void gcomm::evs::Proto::complete_user(const Seqno high_seq)
     Datagram wb;
     int err;
     profile_enter(send_user_prof);
-    err = send_user(wb, 0xff, SP_DROP, Seqno::max(), high_seq);
+    err = send_user(wb, 0xff, O_DROP, Seqno::max(), high_seq);
     profile_leave(send_user_prof);
     if (err != 0)
     {
@@ -1033,7 +1033,7 @@ void gcomm::evs::Proto::send_leave(bool handle)
     {
         Datagram wb;
         profile_enter(send_user_prof);
-        gu_trace(send_user(wb, 0xff, SP_DROP, Seqno::max(), Seqno::max()));
+        gu_trace(send_user(wb, 0xff, O_DROP, Seqno::max(), Seqno::max()));
         profile_leave(send_user_prof);
     }
     
@@ -1044,7 +1044,7 @@ void gcomm::evs::Proto::send_leave(bool handle)
         pair<Datagram, ProtoDownMeta> wb = output.front();
         if (send_user(wb.first, 
                       wb.second.get_user_type(), 
-                      wb.second.get_safety_prefix(), 
+                      wb.second.get_order(), 
                       Seqno::max(), Seqno::max()) != 0)
         {
             gcomm_throw_fatal << "send_user() failed";
@@ -1177,7 +1177,7 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
                        msg.get_seq(),
                        input_map->get_aru_seq(),
                        msg.get_seq_range(),
-                       msg.get_safety_prefix(),
+                       msg.get_order(),
                        msg.get_fifo_seq(),
                        msg.get_user_type(),
                        Message::F_RETRANS);
@@ -1258,7 +1258,7 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
                        msg.get_seq(),
                        msg.get_aru_seq(),
                        msg.get_seq_range(),
-                       msg.get_safety_prefix(),
+                       msg.get_order(),
                        msg.get_fifo_seq(),
                        msg.get_user_type(),
                        Message::F_SOURCE | Message::F_RETRANS);
@@ -1513,7 +1513,7 @@ int gcomm::evs::Proto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
         profile_enter(send_user_prof);
         err = send_user(wb, 
                         dm.get_user_type(),
-                        dm.get_safety_prefix(), Seqno(send_window.get()/2), 
+                        dm.get_order(), Seqno(send_window.get()/2), 
                         Seqno::max());
         profile_leave(send_user_prof);
         
@@ -1725,7 +1725,7 @@ void gcomm::evs::Proto::validate_reg_msg(const UserMessage& msg)
         gcomm_throw_fatal << "reg validate: not current view";
     }
 
-    if (collect_stats == true && msg.get_safety_prefix() == SP_SAFE)
+    if (collect_stats == true && msg.get_order() == O_SAFE)
     {
         Date now(Date::now());
         hs_safe.insert(double(now.get_utc() - msg.get_tstamp().get_utc())/gu::datetime::Sec);
@@ -1758,25 +1758,25 @@ void gcomm::evs::Proto::deliver()
         ++i_next;
         const InputMapMsg& msg(InputMapMsgIndex::get_value(i));
         bool deliver = false;
-        switch (msg.get_msg().get_safety_prefix())
+        switch (msg.get_msg().get_order())
         {
-        case SP_DROP:
+        case O_DROP:
             deliver = true;
             break;
             
-        case SP_SAFE:
+        case O_SAFE:
             if (input_map->is_safe(i) == true)
             {
                 deliver = true;
             }
             break;
-        case SP_AGREED:
+        case O_AGREED:
             if (input_map->is_agreed(i) == true)
             {
                 deliver = true;
             }
             break;
-        case SP_FIFO:
+        case O_FIFO:
             if (input_map->is_fifo(i) == true)
             {
                 deliver = true;
@@ -1784,13 +1784,13 @@ void gcomm::evs::Proto::deliver()
             break;
         default:
             gcomm_throw_fatal << "invalid safety prefix " 
-                              << msg.get_msg().get_safety_prefix();
+                              << msg.get_msg().get_order();
         }
         
         if (deliver == true)
         {
-            ++delivered_msgs[msg.get_msg().get_safety_prefix()];
-            if (msg.get_msg().get_safety_prefix() != SP_DROP)
+            ++delivered_msgs[msg.get_msg().get_order()];
+            if (msg.get_msg().get_order() != O_DROP)
             {
                 gu_trace(validate_reg_msg(msg.get_msg()));
                 profile_enter(delivery_prof);
@@ -1824,7 +1824,7 @@ void gcomm::evs::Proto::validate_trans_msg(const UserMessage& msg)
         gcomm_throw_fatal << "reg validate: not current view";
     }
     
-    if (collect_stats && msg.get_safety_prefix() == SP_SAFE)
+    if (collect_stats && msg.get_order() == O_SAFE)
     {
         Date now(Date::now());
         hs_safe.insert(double(now.get_utc() - msg.get_tstamp().get_utc())/gu::datetime::Sec);
@@ -1866,14 +1866,14 @@ void gcomm::evs::Proto::deliver_trans()
         ++i_next;    
         const InputMapMsg& msg(InputMapMsgIndex::get_value(i));
         bool deliver = false;
-        switch (msg.get_msg().get_safety_prefix())
+        switch (msg.get_msg().get_order())
         {
-        case SP_DROP:
+        case O_DROP:
             deliver = true;
             break;
-        case SP_SAFE:
-        case SP_AGREED:
-        case SP_FIFO:
+        case O_SAFE:
+        case O_AGREED:
+        case O_FIFO:
             if (input_map->is_fifo(i) == true)
             {
                 deliver = true;
@@ -1885,8 +1885,8 @@ void gcomm::evs::Proto::deliver_trans()
         
         if (deliver == true)
         {
-            ++delivered_msgs[msg.get_msg().get_safety_prefix()];
-            if (msg.get_msg().get_safety_prefix() != SP_DROP)
+            ++delivered_msgs[msg.get_msg().get_order()];
+            if (msg.get_msg().get_order() != O_DROP)
             {
                 gu_trace(validate_reg_msg(msg.get_msg()));
                 ProtoUpMeta um(msg.get_msg().get_source(), 

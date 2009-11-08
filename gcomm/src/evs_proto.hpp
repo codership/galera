@@ -96,7 +96,7 @@ public:
     bool is_flow_control(const Seqno, const Seqno win) const;
     int send_user(const gu::net::Datagram&, 
                   uint8_t,
-                  SafetyPrefix sp, 
+                  Order, 
                   Seqno, 
                   Seqno);
     int send_user(const Seqno);

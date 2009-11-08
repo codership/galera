@@ -152,7 +152,7 @@ gcomm::evs::InputMap::InputMap() :
     node_index(new InputMapNodeIndex()),
     msg_index(new InputMapMsgIndex()),
     recovery_index(new InputMapMsgIndex()),
-    n_msgs(SP_SAFE + 1),
+    n_msgs(O_SAFE + 1),
     max_droppable(16),
     prof("input_map_intrnl")
 {
@@ -368,7 +368,7 @@ gcomm::evs::InputMap::insert(const size_t uuid,
                                    InputMapMsg(msg, 
                                                s == msg.get_seq() ? rb : 
                                                Datagram()))));
-            ++n_msgs[msg.get_safety_prefix()];
+            ++n_msgs[msg.get_order()];
         }
         profile_leave(prof); 
         profile_enter(prof);
@@ -422,7 +422,7 @@ void gcomm::evs::InputMap::erase(iterator i)
 {
     const UserMessage& msg(InputMapMsgIndex::get_value(i).get_msg());
     profile_enter(prof);
-    --n_msgs[msg.get_safety_prefix()];
+    --n_msgs[msg.get_order()];
     gu_trace(recovery_index->insert_unique(*i));
     gu_trace(msg_index->erase(i));
     profile_leave(prof);

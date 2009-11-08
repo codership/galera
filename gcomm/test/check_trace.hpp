@@ -225,7 +225,7 @@ namespace gcomm
             }
             else
             {
-                gu_trace(return send_down(wb, ProtoDownMeta(0xff, SP_UNRELIABLE, uuid)));
+                gu_trace(return send_down(wb, ProtoDownMeta(0xff, O_UNRELIABLE, uuid)));
             }
         }
         

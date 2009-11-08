@@ -92,7 +92,7 @@ START_TEST(test_message)
     ViewId view_id(V_TRANS, uuid1, 4567);
     Seqno seq(478), aru_seq(456), seq_range(7);
     
-    UserMessage um(uuid1, view_id, seq, aru_seq, seq_range, SP_SAFE, 75433, 0xab,
+    UserMessage um(uuid1, view_id, seq, aru_seq, seq_range, O_SAFE, 75433, 0xab,
                    Message::F_SOURCE);
     
     check_serialization(um, um.serial_size(), UserMessage());
