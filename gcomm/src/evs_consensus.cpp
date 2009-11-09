@@ -18,6 +18,10 @@ using namespace gcomm::evs;
 #define evs_log_debug(int) if (true) {} else log_debug
 
 
+//
+// Helpers
+// 
+
 class LeaveSeqCmpOp
 {
 public:
@@ -58,6 +62,7 @@ public:
     }
 };
 
+
 class SafeSeqCmp
 {
 public:
@@ -81,8 +86,9 @@ public:
 };
 
 
-
-
+//
+//
+//
 
 gcomm::evs::Seqno gcomm::evs::Consensus::highest_reachable_safe_seq() const
 {
@@ -120,7 +126,9 @@ gcomm::evs::Seqno gcomm::evs::Consensus::highest_reachable_safe_seq() const
             }
         }
     }
+    
     gcomm_assert(seq_list.empty() == false);
+    
     return *min_element(seq_list.begin(), seq_list.end());
 }
 

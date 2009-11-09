@@ -927,15 +927,20 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
     {
         const UUID& uuid(NodeMap::get_key(i));
         const Node& node(NodeMap::get_value(i));
-        const bool in_current(current_view.get_members().find(uuid) != 
-                              current_view.get_members().end());
+        // View id is 
+        // 1) What the node reports in it's join message
+        // 2) If no join message and is in current view, assume current
+        //    view id in lack of better knowledge
+        // 3) Default V_REG view id
         const ViewId vid(node.get_join_message() != 0 ?
                          node.get_join_message()->get_source_view_id() :
-                         (in_current == true ? 
+                         (current_view.is_member(uuid) == true ? 
                           current_view.get_id() : 
                           ViewId(V_REG)));
-        const Seqno safe_seq(in_current == true ? input_map->get_safe_seq(node.get_index()) : Seqno::max());
-        const Range range(in_current == true         ? 
+        const Seqno safe_seq(vid == current_view.get_id() ? 
+                             input_map->get_safe_seq(node.get_index()) : 
+                             Seqno::max());
+        const Range range(vid == current_view.get_id() ? 
                           input_map->get_range(node.get_index()) : 
                           Range());
         const MessageNode mnode(node.get_operational(),
@@ -945,7 +950,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                                 vid, 
                                 safe_seq, 
                                 range);
-        gu_trace((void)node_list->insert_checked(make_pair(uuid, mnode)));
+        gu_trace((void)node_list->insert_unique(make_pair(uuid, mnode)));
     }
 }
 
