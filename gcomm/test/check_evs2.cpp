@@ -1245,22 +1245,27 @@ Suite* evs2_suite()
     
     tc = tcase_create("test_proto_leave_n_lossy");
     tcase_add_test(tc, test_proto_leave_n_lossy);
+    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_proto_leave_n_lossy_w_user_msg");
     tcase_add_test(tc, test_proto_leave_n_lossy_w_user_msg);
+    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
     
     tc = tcase_create("test_proto_split_merge");
     tcase_add_test(tc, test_proto_split_merge);
+    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
     
     tc = tcase_create("test_proto_split_merge_lossy");
     tcase_add_test(tc, test_proto_split_merge_lossy);
+    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_proto_split_merge_lossy_w_user_msg");
     tcase_add_test(tc, test_proto_split_merge_lossy_w_user_msg);
+    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
     
     return s;

@@ -567,11 +567,11 @@ public:
     void operator()(const MessageNodeList::value_type& vt) const
     {
         const MessageNode& node(MessageNodeList::get_value(vt));
-        if (node.get_view_id()      == view_id           &&
-            ((operational           == true          && 
-              leaving               == true            ) ||
-             (node.get_operational()  == operational &&
-              node.get_leaving()      == leaving       ) ) )
+        if (node.get_view_id()       == view_id           &&
+            ((operational            == true          && 
+              leaving                == true            ) ||
+             (node.get_operational() == operational &&
+              node.get_leaving()     == leaving        ) ) )
             
         {
             nl.insert_checked(vt);

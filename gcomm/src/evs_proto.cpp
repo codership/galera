@@ -1011,7 +1011,7 @@ void gcomm::evs::Proto::send_join(bool handle)
     
     
     JoinMessage jm(create_join());
-
+    
     Buffer buf;
     serialize(jm, buf);
     int err = send_down(buf, ProtoDownMeta());
@@ -2524,7 +2524,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                          im_range.get_hs()            >  min_hs        )   )
                     {
                         gu_trace(recover(msg.get_source(), min_hs_uuid, 
-                                         Range(min_hs == Seqno::max() ? 0 : min_hs,
+                                         Range(min_hs == Seqno::max() ? 0 : min_hs + 1,
                                                max_hs)));
                     }
                 }

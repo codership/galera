@@ -96,16 +96,24 @@ gcomm::evs::Seqno gcomm::evs::Consensus::highest_reachable_safe_seq() const
     for (NodeMap::const_iterator i = known.begin(); i != known.end();
          ++i)
     {
-        if (current_view.is_member(NodeMap::get_key(i)) == true)
+        const Node& node(NodeMap::get_value(i));
+        const JoinMessage* jm(node.get_join_message());
+        const LeaveMessage* lm(node.get_leave_message());
+        if ((jm == 0 && current_view.is_member(NodeMap::get_key(i)) == true) ||
+            (jm != 0 && jm->get_source_view_id() == current_view.get_id()))
         {
-            const Node& node(NodeMap::get_value(i));
-            if (node.is_inactive() == true)
+            if (node.get_operational() == false || lm != 0)
             {
                 const Seqno max_reachable_safe_seq(
                     input_map.get_safe_seq(node.get_index()));
-                if (max_reachable_safe_seq != Seqno::max())
+                if (lm == 0 && max_reachable_safe_seq != Seqno::max())
                 {
                     seq_list.push_back(max_reachable_safe_seq);
+                }
+                else if (lm != 0)
+                {
+                    gcomm_assert(lm->get_seq() != Seqno::max());
+                    seq_list.push_back(lm->get_seq());
                 }
                 else
                 {
@@ -195,7 +203,6 @@ bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
             min_part_safe_seq_i == partitioning.end() ?
             Seqno::max() : 
             MessageNodeList::get_value(min_part_safe_seq_i).get_safe_seq());
-        
         if (min_part_safe_seq      != Seqno::max() &&
             max_reachable_safe_seq != Seqno::max())
         {
