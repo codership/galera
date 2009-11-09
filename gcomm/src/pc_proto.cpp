@@ -14,6 +14,40 @@ using namespace gu::net;
 
 using namespace gcomm;
 
+//
+// Helpers
+//
+
+class ToSeqCmpOp
+{
+public:
+    bool operator()(const PCProto::SMMap::value_type& a,
+                    const PCProto::SMMap::value_type& b) const
+    {
+        const PCInst& astate(
+            PCInstMap::get_value(
+                PCProto::SMMap::get_value(a).get_inst_map().find_checked(PCProto::SMMap::get_key(a))));
+        const PCInst& bstate(
+            PCInstMap::get_value(
+                PCProto::SMMap::get_value(b).get_inst_map().find_checked(PCProto::SMMap::get_key(b))));
+        return (astate.get_to_seq() < bstate.get_to_seq());
+    }
+};
+
+
+static int64_t get_max_to_seq(const PCProto::SMMap& states)
+{
+    gcomm_assert(states.empty() == false);
+    PCProto::SMMap::const_iterator max_i(
+        max_element(states.begin(), states.end(), ToSeqCmpOp()));
+    const PCInst& state(PCProto::SMMap::get_value(max_i).get_inst(PCProto::SMMap::get_key(max_i)));
+    return state.get_to_seq();
+}
+
+
+//
+//
+//
 
 void PCProto::send_state()
 {
@@ -338,32 +372,6 @@ void PCProto::handle_view(const View& view)
 }
 
 
-class ToSeqCmpOp
-{
-public:
-    bool operator()(const PCProto::SMMap::value_type& a,
-                    const PCProto::SMMap::value_type& b) const
-    {
-        const PCInst& astate(
-            PCInstMap::get_value(
-                PCProto::SMMap::get_value(a).get_inst_map().find_checked(PCProto::SMMap::get_key(a))));
-        const PCInst& bstate(
-            PCInstMap::get_value(
-                PCProto::SMMap::get_value(b).get_inst_map().find_checked(PCProto::SMMap::get_key(b))));
-        return (astate.get_to_seq() < bstate.get_to_seq());
-    }
-};
-
-
-// Convenience
-static int64_t get_max_to_seq(const PCProto::SMMap& states)
-{
-    gcomm_assert(states.empty() == false);
-    PCProto::SMMap::const_iterator max_i(
-        max_element(states.begin(), states.end(), ToSeqCmpOp()));
-    const PCInst& state(PCProto::SMMap::get_value(max_i).get_inst(PCProto::SMMap::get_key(max_i)));
-    return state.get_to_seq();
-}
 
 
 // Validate state message agains local state
@@ -600,6 +608,7 @@ bool PCProto::is_prim() const
     return prim;
 }
 
+
 void PCProto::handle_state(const PCMessage& msg, const UUID& source)
 {
     gcomm_assert(msg.get_type() == PCMessage::T_STATE);
@@ -646,7 +655,7 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
             if (instances.find(sm_uuid) == instances.end())
             {
                 const PCInst& sm_state(SMMap::get_value(i).get_inst(sm_uuid));
-                instances.insert_checked(make_pair(sm_uuid, sm_state));
+                instances.insert_unique(make_pair(sm_uuid, sm_state));
             }
         }
         

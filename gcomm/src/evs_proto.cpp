@@ -1477,13 +1477,22 @@ void gcomm::evs::Proto::handle_up(int cid,
         gu_trace(offset = unserialize_message(um.get_source(), rb, &msg));
         handle_msg(msg, Datagram(rb, offset));
     }
-    catch (...)
+    catch (Exception& e)
     {
-        log_fatal << "exception caused by message: " << msg;
-        log_fatal << " state after handling message: " << *this;
-        throw;
+        if (e.get_errno() == ENOTRECOVERABLE)
+        {
+            log_fatal << "exception caused by message: " << msg;
+            log_fatal << " state after handling message: " << *this;
+            throw;
+        }
+        else
+        {
+            log_warn << "exception: " << e.what();
+            log_warn << "caused by message: " << msg;
+        }
     }
 }
+
 
 int gcomm::evs::Proto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
 {
