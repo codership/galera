@@ -311,15 +311,33 @@ void GMCast::handle_established(Proto* est)
     {
         j_next = j, ++j_next;
         Proto* p(ProtoMap::get_value(j));
-        if (p->get_remote_uuid() == est->get_remote_uuid() && p != est)
+        if (p->get_remote_uuid() == est->get_remote_uuid())
         {
-            log_debug << self_string()
-                      << " cleaning up duplicate "
-                      << p->get_transport()->get_fd() 
-                      << " after established " 
-                      << est->get_transport()->get_fd();
-            proto_map->erase(j);
-            delete p;
+            if (p->get_handshake_uuid() < est->get_handshake_uuid())
+            {
+                log_debug << self_string()
+                          << " cleaning up duplicate "
+                          << p->get_transport()->get_fd() 
+                          << " after established " 
+                          << est->get_transport()->get_fd();
+                proto_map->erase(j);
+                delete p;
+            }
+            else if (p->get_handshake_uuid() > est->get_handshake_uuid())
+            {
+                log_debug << self_string()
+                          << " cleaning up established "
+                          << est->get_transport()->get_fd() 
+                          << " which is duplicate of " 
+                          << p->get_transport()->get_fd();
+                proto_map->erase(proto_map->find_checked(est->get_transport()->get_fd()));
+                delete est;
+                break;
+            }
+            else
+            {
+                assert(p == est);
+            }
         }
     }
     

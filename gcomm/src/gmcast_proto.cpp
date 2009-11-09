@@ -56,7 +56,8 @@ void gcomm::gmcast::Proto::send_msg(const Message& msg)
     
 void gcomm::gmcast::Proto::send_handshake() 
 {
-    Message hs (Message::T_HANDSHAKE, local_uuid);
+    handshake_uuid = UUID(0, 0);
+    Message hs (Message::T_HANDSHAKE, handshake_uuid, local_uuid);
     
     send_msg(hs);
         
@@ -70,18 +71,20 @@ void gcomm::gmcast::Proto::wait_handshake()
     
     set_state(S_HANDSHAKE_WAIT);
 }
-    
+
 void gcomm::gmcast::Proto::handle_handshake(const Message& hs) 
 {
     if (get_state() != S_HANDSHAKE_WAIT)
         gcomm_throw_fatal << "Invalid state: " << to_string(get_state());
     
+    handshake_uuid = hs.get_handshake_uuid();
     remote_uuid = hs.get_source_uuid();
     
     Message hsr (Message::T_HANDSHAKE_RESPONSE, 
+                 handshake_uuid,
                  local_uuid, 
                  local_addr,
-                     group_name);
+                 group_name);
     send_msg(hsr);
     
     set_state(S_HANDSHAKE_RESPONSE_SENT);
@@ -108,7 +111,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
                 + URI(hs.get_node_address()).get_port();
             
             propagate_remote = true;
-            Message ok(Message::T_HANDSHAKE_OK, local_uuid);
+            Message ok(Message::T_HANDSHAKE_OK, handshake_uuid, local_uuid);
             send_msg(ok);
             set_state(S_OK);
         }
@@ -117,7 +120,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
             log_warn << "Parsing peer address '"
                      << hs.get_node_address() << "' failed.";
             
-            Message nok (Message::T_HANDSHAKE_FAIL, local_uuid);
+            Message nok (Message::T_HANDSHAKE_FAIL, handshake_uuid, local_uuid);
             
             send_msg (nok);
             set_state(S_FAILED);

@@ -22,10 +22,11 @@ class gcomm::gmcast::Message
 public:
 
     enum Flags {
-        F_GROUP_NAME   = 1 << 0,
-        F_NODE_NAME    = 1 << 1,
-        F_NODE_ADDRESS = 1 << 2,
-        F_NODE_LIST    = 1 << 3
+        F_GROUP_NAME     = 1 << 0,
+        F_NODE_NAME      = 1 << 1,
+        F_NODE_ADDRESS   = 1 << 2,
+        F_NODE_LIST      = 1 << 3,
+        F_HANDSHAKE_UUID = 1 << 4
     };
     
     enum Type 
@@ -45,11 +46,11 @@ public:
     
 private:
     
-    gu::byte_t version;
-    Type   type;
-    gu::byte_t flags;
-    gu::byte_t ttl;
-    gcomm::UUID   source_uuid;
+    gu::byte_t        version;
+    Type              type;
+    gu::byte_t        flags;
+    gcomm::UUID       handshake_uuid;
+    gcomm::UUID       source_uuid;
     gcomm::String<64> node_address;
     gcomm::String<32> group_name;
     
@@ -82,41 +83,42 @@ public:
     }
 
     Message(const Message& msg) :
-        version      (msg.version),
-        type         (msg.type),
-        flags        (msg.flags),
-        ttl          (msg.ttl),
-        source_uuid  (msg.source_uuid),
-        node_address (msg.node_address),
-        group_name   (msg.group_name),
-        node_list    (msg.node_list != 0 ? new NodeList(*msg.node_list) : 0)
+        version        (msg.version),
+        type           (msg.type),
+        flags          (msg.flags),
+        handshake_uuid (msg.handshake_uuid),
+        source_uuid    (msg.source_uuid),
+        node_address   (msg.node_address),
+        group_name     (msg.group_name),
+        node_list      (msg.node_list != 0 ? new NodeList(*msg.node_list) : 0)
     { }
 
     /* Default ctor */
     Message ()
         :
-        version      (0),
-        type         (T_INVALID),
-        flags        (0),
-        ttl          (0),
-        source_uuid  (),
-        node_address (),
-        group_name   (),
-        node_list    (0)
+        version        (0),
+        type           (T_INVALID),
+        flags          (0),
+        handshake_uuid (),
+        source_uuid    (),
+        node_address   (),
+        group_name     (),
+        node_list      (0)
     {}
     
     /* Ctor for handshake, handshake ok and handshake fail */
     Message (const Type  type_,
+             const UUID& handshake_uuid_,
              const UUID& source_uuid_)
         :
-        version      (0), 
-        type         (type_), 
-        flags        (0), 
-        ttl          (1), 
-        source_uuid  (source_uuid_), 
-        node_address (),
-        group_name   (),
-        node_list    (0)
+        version        (0), 
+        type           (type_), 
+        flags          (F_HANDSHAKE_UUID), 
+        handshake_uuid (handshake_uuid_),
+        source_uuid    (source_uuid_), 
+        node_address   (),
+        group_name     (),
+        node_list      (0)
     {
         if (type != T_HANDSHAKE && type != T_HANDSHAKE_OK && 
             type != T_HANDSHAKE_FAIL)
@@ -129,14 +131,14 @@ public:
              const UUID&   source_uuid_, 
              const uint8_t ttl_)
         :
-        version      (0), 
-        type         (type_), 
-        flags        (0), 
-        ttl          (ttl_), 
-        source_uuid  (source_uuid_), 
-        node_address (),
-        group_name   (""),
-        node_list    (0)
+        version        (0), 
+        type           (type_), 
+        flags          (0), 
+        handshake_uuid (),
+        source_uuid    (source_uuid_), 
+        node_address   (),
+        group_name     (),
+        node_list      (0)
     {
         if (type < T_USER_BASE)
             gcomm_throw_fatal << "Invalid message type " << type_to_string(type)
@@ -144,19 +146,20 @@ public:
     }
     
     /* Ctor for handshake response */
-    Message (const Type    type_,
-             const gcomm::UUID&   source_uuid_,
+    Message (const Type         type_,
+             const gcomm::UUID& handshake_uuid_,
+             const gcomm::UUID& source_uuid_,
              const std::string& node_address_,
              const std::string& group_name_)
         : 
-        version      (0),
-        type         (type_), 
-        flags        (F_GROUP_NAME | F_NODE_ADDRESS), 
-        ttl          (1),
-        source_uuid  (source_uuid_),
-        node_address (node_address_),
-        group_name   (group_name_),
-        node_list    (0)
+        version        (0),
+        type           (type_), 
+        flags          (F_GROUP_NAME | F_NODE_ADDRESS | F_HANDSHAKE_UUID), 
+        handshake_uuid (handshake_uuid_),
+        source_uuid    (source_uuid_),
+        node_address   (node_address_),
+        group_name     (group_name_),
+        node_list      (0)
         
     {
         if (type != T_HANDSHAKE_RESPONSE)
@@ -165,19 +168,19 @@ public:
     }
 
     /* Ctor for topology change */
-    Message (const Type      type_, 
-             const gcomm::UUID&     source_uuid_,
-             const std::string&   group_name_,
-             const NodeList& nodes)
+    Message (const Type         type_, 
+             const gcomm::UUID& source_uuid_,
+             const std::string& group_name_,
+             const NodeList&    nodes)
         :
-        version      (0),
-        type         (type_),
-        flags        (F_GROUP_NAME | F_NODE_LIST), 
-        ttl          (1),
-        source_uuid  (source_uuid_),
-        node_address (),
-        group_name   (group_name_),
-        node_list    (new NodeList(nodes))
+        version        (0),
+        type           (type_),
+        flags          (F_GROUP_NAME | F_NODE_LIST), 
+        handshake_uuid (),
+        source_uuid    (source_uuid_),
+        node_address   (),
+        group_name     (group_name_),
+        node_list      (new NodeList(nodes))
     {
         if (type != T_TOPOLOGY_CHANGE)
             gcomm_throw_fatal << "Invalid message type " << type_to_string(type)
@@ -199,9 +202,14 @@ public:
         gu_trace (off = gcomm::serialize(version, buf, buflen, offset));
         gu_trace (off = gcomm::serialize(static_cast<gu::byte_t>(type),buf,buflen,off));
         gu_trace (off = gcomm::serialize(flags, buf, buflen, off));
-        gu_trace (off = gcomm::serialize(ttl, buf, buflen, off));
+        gu_trace (off = gcomm::serialize<gu::byte_t>(0, buf, buflen, off));
         gu_trace (off = source_uuid.serialize(buf, buflen, off));
         
+        if (flags & F_HANDSHAKE_UUID)
+        {
+            gu_trace(off = handshake_uuid.serialize(buf, buflen, off));
+        }
+
         if (flags & F_NODE_ADDRESS)
         {
             gu_trace (off = node_address.serialize(buf, buflen, off));
@@ -236,8 +244,17 @@ public:
         gu_trace (off = gcomm::unserialize(buf, buflen, offset, &t));
         type = static_cast<Type>(t);
         gu_trace (off = gcomm::unserialize(buf, buflen, off, &flags));
-        gu_trace (off = gcomm::unserialize(buf, buflen, off, &ttl));
+        gu_trace (off = gcomm::unserialize(buf, buflen, off, &t));
+        if (t != 0)
+        {
+            gu_throw_error(EINVAL);
+        }
         gu_trace (off = source_uuid.unserialize(buf, buflen, off));
+        
+        if (flags & F_HANDSHAKE_UUID)
+        {
+            gu_trace(off = handshake_uuid.unserialize(buf, buflen, off));
+        }
         
         if (flags & F_NODE_ADDRESS)
         {
@@ -256,11 +273,11 @@ public:
             gu_trace (off = gcomm::unserialize(buf, buflen, off, &size));
 
             node_list = new NodeList(); // @todo: danger! Prev. list not deleted
-
+            
             for (uint16_t i = 0; i < size; ++i) 
             {
                 Node node;
-
+                
                 gu_trace (off = node.unserialize(buf, buflen, off));
                 node_list->push_back(node);
             }
@@ -288,6 +305,7 @@ public:
     {
         return 4 /* Common header: version, type, flags, ttl */ 
             + source_uuid.serial_size()
+            + (flags & F_HANDSHAKE_UUID ? handshake_uuid.serial_size() : 0)
             /* GMCast address if set */
             + (flags & F_NODE_ADDRESS ? node_address.serial_size() : 0)
             /* Group name if set */
@@ -300,22 +318,16 @@ public:
     uint8_t get_version() const { return version; }
     
     Type    get_type()    const { return type;    }
-
-    uint8_t get_flags()   const { return flags;   }
-
-    uint8_t get_ttl()     const { return ttl;     }
     
-    void dec_ttl()
-    {
-        if (ttl == 0) gcomm_throw_fatal << "Decrementing 0 ttl";
-        ttl--;
-    }
+    uint8_t get_flags()   const { return flags;   }
+    
+    const UUID& get_handshake_uuid() const { return handshake_uuid; }
     
     const UUID&     get_source_uuid()  const { return source_uuid;  }
-
+    
     const std::string&   get_node_address() const { return node_address.to_string(); }
-
+    
     const std::string&   get_group_name()   const { return group_name.to_string();   }
-
+    
     const NodeList* get_node_list()    const { return node_list;    }
 };

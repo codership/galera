@@ -67,6 +67,7 @@ public:
            const gcomm::UUID& local_uuid_, 
            const std::string& group_name_)
         : 
+        handshake_uuid   (),
         local_uuid       (local_uuid_),
         remote_uuid      (),
         local_addr       (local_addr_),
@@ -95,6 +96,7 @@ public:
     void send_topology_change(LinkMap& um);
     void handle_message(const Message& msg);
     
+    const gcomm::UUID& get_handshake_uuid() const { return handshake_uuid; }
     const gcomm::UUID& get_local_uuid() const { return local_uuid; }
     const gcomm::UUID& get_remote_uuid() const { return remote_uuid; }
 
@@ -115,6 +117,7 @@ private:
     Proto(const Proto&);
     void operator=(const Proto&);
     
+    gcomm::UUID       handshake_uuid;
     gcomm::UUID       local_uuid;  // @todo: do we need it here?
     gcomm::UUID       remote_uuid;
     std::string       local_addr;
