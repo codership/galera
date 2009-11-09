@@ -2364,7 +2364,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
 {
     assert(ii != known.end());
     assert(get_state() != S_CLOSED);
-
+    
     Node& inst(NodeMap::get_value(ii));
     
     evs_log_debug(D_JOIN_MSGS) << " " << msg;
