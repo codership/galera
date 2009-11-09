@@ -1090,7 +1090,7 @@ START_TEST(test_pc_transport)
     gu_conf_self_tstamp_on();
     
     pu1.start();
-    net.event_loop(10*Sec);
+    net.event_loop(5*Sec);
     
     pu2.start();
     net.event_loop(5*Sec);
@@ -1100,21 +1100,21 @@ START_TEST(test_pc_transport)
     
     pu3.stop();
     net.event_loop(5*Sec);
-
+    
     pu2.stop();
     net.event_loop(5*Sec);
     
     pu1.stop();
-    net.event_loop(5*Sec);
-    
+    log_info << "cleanup";
     net.event_loop(0);
+    log_info << "finished";
 
 }
 END_TEST
 
 
 
-static bool skip = true;
+static bool skip = false;
 
 Suite* pc_suite()
 {
@@ -1156,11 +1156,13 @@ Suite* pc_suite()
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_pc_split_merge");
-    tcase_add_test(tc, test_pc_split_merge);
+    tcase_add_loop_test(tc, test_pc_split_merge, 0, 2);
+    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_pc_split_merge_w_user_msg");
-    tcase_add_test(tc, test_pc_split_merge_w_user_msg);
+    tcase_add_loop_test(tc, test_pc_split_merge_w_user_msg, 0, 2);
+    tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
     }
 
