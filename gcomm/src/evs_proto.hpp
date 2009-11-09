@@ -246,6 +246,7 @@ private:
     int info_mask;
     gu::datetime::Date last_stats_report;
     bool collect_stats;
+    Histogram hs_agreed;
     Histogram hs_safe;
     long long int send_queue_s;
     long long int n_send_queue_s;

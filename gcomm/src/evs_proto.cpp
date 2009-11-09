@@ -40,6 +40,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     info_mask(I_VIEWS | I_STATE | I_STATISTICS),
     last_stats_report(Date::now()),
     collect_stats(true),
+    hs_agreed("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
     hs_safe("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
     send_queue_s(0),
     n_send_queue_s(0),
@@ -189,6 +190,7 @@ string gcomm::evs::Proto::get_stats() const
 {
     ostringstream os;
     os << "\n\tnodes " << current_view.get_members().size();
+    os << "\n\tagreed deliv hist {" << hs_agreed << "} ";
     os << "\n\tsafe deliv hist {" << hs_safe << "} ";
     os << "\n\toutq avg " << double(send_queue_s)/double(n_send_queue_s);
     os << "\n\tsent {";
@@ -1739,10 +1741,18 @@ void gcomm::evs::Proto::validate_reg_msg(const UserMessage& msg)
         gcomm_throw_fatal << "reg validate: not current view";
     }
 
-    if (collect_stats == true && msg.get_order() == O_SAFE)
+    if (collect_stats == true)
     {
-        Date now(Date::now());
-        hs_safe.insert(double(now.get_utc() - msg.get_tstamp().get_utc())/gu::datetime::Sec);
+        if (msg.get_order() == O_SAFE)
+        {
+            Date now(Date::now());
+            hs_safe.insert(double(now.get_utc() - msg.get_tstamp().get_utc())/gu::datetime::Sec);
+        }
+        else if (msg.get_order() == O_AGREED)
+        {
+            Date now(Date::now());
+            hs_agreed.insert(double(now.get_utc() - msg.get_tstamp().get_utc())/gu::datetime::Sec);
+        }
     }
 }
 
