@@ -1223,15 +1223,15 @@ Suite* pc_suite()
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_pc_split_merge");
-    tcase_add_loop_test(tc, test_pc_split_merge, 0, 2);
+    tcase_add_test(tc, test_pc_split_merge);
     tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_pc_split_merge_w_user_msg");
-    tcase_add_loop_test(tc, test_pc_split_merge_w_user_msg, 0, 2);
+    tcase_add_test(tc, test_pc_split_merge_w_user_msg);
     tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
-
+    
     tc = tcase_create("test_pc_transport");
     tcase_add_test(tc, test_pc_transport);
     tcase_set_timeout(tc, 35);
