@@ -99,24 +99,25 @@ usage() { cat - << EOF
 usage: mysql-galera [options] command
 
 Options:
-    -d|--debug        : enable debug output
-    -l|--log          : enable mysql query log
-    -g|--gcs_address  : address of gcs server (spread://locahost:4803)
-    --donor           : desired state transfer donor
-    --slave_threads   : number of consurrent ws appliers (1)
-    --data_dir        : location for mysql data directories
-    -u|--user         : mysql root user
-    -p|--password     : mysql root user password
     -c|--command      : command to execute (status)
-    --mysql-opt       : an option to the server to follow
+    --data_dir        : location for mysql data directories
     --db              : name of database to check
-    -i|--ignore_table : table to ignore in checking
-    --valgrind        : run under valgrind
+    -d|--debug        : enable debug output
+    --donor           : desired state transfer donor
+    -g|--gcs_address  : address of gcs server (spread://locahost:4803)
     --gdb             : run under gdb
+    -i|--ignore_table : table to ignore in checking
+    -l|--log          : enable mysql query log
+    --mysql-opt       : an option to the server to follow
+    -p|--password     : mysql root user password
+    --plugin          : use innodb plugin
+    --slave_threads   : number of consurrent ws appliers (1)
+    -u|--user         : mysql root user
+    --valgrind        : run under valgrind
     --ws_level        : RBR (default) or SQL
 
 Commands:
-check                 : check cosistency either locally or through network
+check                 : check cosistency of database given with --db option
 start                 : start servers
 stop                  : stop servers
 restart               : stop and start servers
@@ -238,6 +239,7 @@ galera_start()
 	    $DEBUG_OPTS \
 	    $LOGGING_OPTS \
 	    $RBR_OPTS \
+	    $PLUGIN_OPTS \
 	    1>/dev/null 2>>$err_log &
     else
 	$GDB --args $MYSQLD \
@@ -255,7 +257,8 @@ galera_start()
 	    $WSREP_OPTS \
 	    $DEBUG_OPTS \
 	    $LOGGING_OPTS \
-	    $RBR_OPTS 
+	    $RBR_OPTS \
+	    $PLUGIN_OPTS
     fi
     my_pid=$!
 	
@@ -396,6 +399,9 @@ WS_LEVEL="RBR"
 #DB="test" # use 'test' database if none given
 IGNORE_TABLES=""
 
+# to use innodb plugin or not
+PLUGIN_OPTS=""
+
 if [ $# -eq 0 ]; then usage; exit 1; fi
 
 while [ $# -gt 0 ]; do
@@ -451,6 +457,9 @@ case $1 in
     -p|--password)
             ROOT_PSWD="-p$2"
             shift
+            ;;
+    --plugin)
+            PLUGIN_OPTS="--ignore_builtin_innodb --plugin-load=innodb=ha_innodb_plugin.so;innodb_trx=ha_innodb_plugin.so;innodb_locks=ha_innodb_plugin.so;innodb_lock_waits=ha_innodb_plugin.so;innodb_cmp=ha_innodb_plugin.so;innodb_cmp_reset=ha_innodb_plugin.so;innodb_cmpmem=ha_innodb_plugin.so;innodb_cmpmem_reset=ha_innodb_plugin.so "
             ;;
     --data_dir)
             MYSQL_DATA_DIR=$2

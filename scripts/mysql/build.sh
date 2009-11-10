@@ -142,10 +142,12 @@ then
     rm -f config.status
     if [ "$DEBUG" == "yes" ]
     then
-        BUILD/compile-$CPU-debug-wsrep
+        DEBUG_OPT="-debug"
     else
-        BUILD/compile-$CPU-wsrep
+        DEBUG_OPT=""
     fi
+
+    BUILD/compile-${CPU}${DEBUG_OPT}-wsrep
 else # just recompile and relink with old configuration
     make
 fi
@@ -167,6 +169,8 @@ rm -rf $DIST_DIR
 # Install required MySQL files in the DIST_DIR
 MYSQL_LIBS=$MYSQL_DIST_DIR/lib/mysql
 mkdir -p $MYSQL_LIBS
+MYSQL_PLUGINS=$MYSQL_DIST_DIR/lib/mysql/plugin
+mkdir -p $MYSQL_PLUGINS
 install -m 644 LICENSE $DIST_DIR
 install -m 755 mysql-galera $DIST_DIR
 install -m 755 vsbes $DIST_DIR
@@ -177,6 +181,7 @@ install -D -m 644 $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/
 install -D -m 755 $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/libexec/mysqld
 #install -D -m 755 $MYSQL_SRC/libmysql/libmysqlclient.la $MYSQL_LIBS
 install -D -m 755 $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS
+install -D -m 755 $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so $MYSQL_PLUGINS
 install -D -m 755 $MYSQL_SRC/client/.libs/mysql       $MYSQL_DIST_DIR/bin/mysql
 install -D -m 755 $MYSQL_SRC/client/.libs/mysqldump   $MYSQL_DIST_DIR/bin/mysqldump
 install -D -m 755 $MYSQL_SRC/client/.libs/mysqladmin     $MYSQL_DIST_DIR/bin/mysqladmin
