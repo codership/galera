@@ -2562,6 +2562,11 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
     Node& node(NodeMap::get_value(ii));
     evs_log_debug(D_LEAVE_MSGS) << "leave message " << msg;
     
+    if (msg.get_source() != get_uuid() && node.is_inactive() == true)
+    {
+        evs_log_debug(D_LEAVE_MSGS) << "dropping leave from already inactive";
+        return;
+    }
     node.set_leave_message(&msg);
     if (msg.get_source() == get_uuid()) 
     {        
@@ -2585,6 +2590,10 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
         }
         node.set_operational(false);
         const Seqno prev_safe_seq(update_im_safe_seq(node.get_index(), msg.get_aru_seq()));
+        if (prev_safe_seq != input_map->get_safe_seq(node.get_index()))
+        {
+            node.set_tstamp(Date::now());
+        }
         if (get_state() == S_OPERATIONAL)
         {
             profile_enter(shift_to_prof);
