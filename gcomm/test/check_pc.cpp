@@ -992,6 +992,73 @@ START_TEST(test_pc_split_merge_w_user_msg)
 END_TEST
 
 
+START_TEST(test_pc_complete_split_merge)
+{
+    log_info << "START";
+    size_t n_nodes(5);
+    vector<DummyNode*> dn;
+    PropagationMatrix prop;
+    const string inactive_timeout("PT0.3S");
+    const string retrans_period("PT0.1S");
+    uint32_t view_seq = 0;
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        dn.push_back(create_dummy_node(i + 1, inactive_timeout, retrans_period));
+        log_info << "i " << i;
+        gu_trace(join_node(&prop, dn[i], i == 0));
+        set_cvi(dn, 0, i, ++view_seq, V_PRIM);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+    
+    for (size_t i = 0; i < 5; ++i)
+    {
+        
+        for (size_t j = 0; j < n_nodes; ++j)
+        {
+            send_n(dn[j], ::rand() % 5);
+        }
+
+
+        prop.propagate_n(9 + ::rand() % 5);
+        
+        for (size_t j = 0; j < n_nodes; ++j)
+        {
+            for (size_t k = 0; k < n_nodes; ++k)
+            {
+                if (j != k)
+                {
+                    prop.split(j + 1, k + 1);
+                }
+            }
+        }
+        
+        ++view_seq;
+        log_info << "split " << i << " view seq " << view_seq;
+        set_cvi(dn, 0, n_nodes - 1, view_seq, V_NON_PRIM);
+        gu_trace(prop.propagate_until_cvi(true));
+
+        for (size_t j = 0; j < n_nodes; ++j)
+        {
+            for (size_t k = 0; k < n_nodes; ++k)
+            {
+                if (j != k)
+                {
+                    prop.merge(j + 1, k + 1);
+                }
+            }
+        }
+        ++view_seq;
+        log_info << "merge " << i << " view seq " << view_seq;
+        set_cvi(dn, 0, n_nodes - 1, view_seq, V_PRIM);
+        gu_trace(prop.propagate_until_cvi(true));
+    }
+    check_trace(dn);    
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
+
 class PCUser2 : public Toplay
 {
     Transport* tp;
@@ -1114,7 +1181,7 @@ END_TEST
 
 
 
-static bool skip = false;
+static bool skip(false);
 
 Suite* pc_suite()
 {
@@ -1164,12 +1231,16 @@ Suite* pc_suite()
     tcase_add_loop_test(tc, test_pc_split_merge_w_user_msg, 0, 2);
     tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
-    }
-
 
     tc = tcase_create("test_pc_transport");
     tcase_add_test(tc, test_pc_transport);
     tcase_set_timeout(tc, 35);
+    suite_add_tcase(s, tc);
+    }
+
+    tc = tcase_create("test_pc_complete_split_merge");
+    tcase_add_test(tc, test_pc_complete_split_merge);
+    tcase_set_timeout(tc, 25);
     suite_add_tcase(s, tc);
 
     return s;

@@ -291,13 +291,22 @@ static void check_traces(const Trace& t1, const Trace& t2)
             Trace::ViewTraceMap::const_iterator j_next(j);
             ++j_next;
             // Note: Comparision is meaningful if also next view is the 
-            // same
+            //       same.
+            // @todo Proper checks for PRIM and NON_PRIM
             if (j             != t2.get_view_traces().end() && 
                 j_next        != t2.get_view_traces().end() &&
                 i_next->first == j_next->first          )
             {
-                gcomm_assert(*i == *j) << 
-                    "traces differ: " << *i << " != " << *j;
+                if (i->first.get_type() != V_NON_PRIM &&
+                    i->first.get_type() != V_PRIM)
+                {
+                    gcomm_assert(*i == *j) << 
+                        "traces differ: " << *i << " != " << *j;
+                }
+                else
+                {
+                    // todo
+                }
             }
         }
     }

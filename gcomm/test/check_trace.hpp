@@ -84,7 +84,6 @@ namespace gcomm
                              msg.get_source_view_id().get_seq());
                 break;
             case V_NON_PRIM:
-
                 break;
             case V_PRIM:
                 gcomm_assert(view.get_id() == msg.get_source_view_id())
@@ -96,8 +95,11 @@ namespace gcomm
                 gcomm_throw_fatal;
                 break;
             }
-
-            msgs.push_back(msg);
+            
+            if (view.get_type() != V_NON_PRIM)
+            {
+                msgs.push_back(msg);
+            }
         }
     
         const View& get_view() const { return view; }
@@ -507,12 +509,13 @@ namespace gcomm
         void set_loss(const size_t ii, const size_t jj, const double loss);
         void split(const size_t ii, const size_t jj);
         void merge(const size_t ii, const size_t jj, const double loss = 1.0);
+        void propagate_n(size_t n);
         void propagate_until_empty();
         void propagate_until_cvi(bool handle_timers);
         friend std::ostream& operator<<(std::ostream&, const PropagationMatrix&);
     private:
         void expire_timers();
-        void propagate_n(size_t n);
+
 
         size_t count_channel_msgs() const;
         bool all_in_cvi() const;

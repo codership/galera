@@ -59,10 +59,13 @@ void PCProto::send_state()
     
     for (PCInstMap::iterator i = instances.begin(); i != instances.end(); ++i)
     {
-        // Assume all nodes in the view have reached current to_seq
+        // Assume all nodes in the current view have reached current to_seq
         PCInst& local_state(PCInstMap::get_value(i));
-        local_state.set_to_seq(get_to_seq());
-        im.insert(make_pair(PCInstMap::get_key(i), local_state));
+        if (current_view.is_member(PCInstMap::get_key(i)) == true)
+        {
+            local_state.set_to_seq(get_to_seq());
+        }
+        im.insert_unique(make_pair(PCInstMap::get_key(i), local_state));
     }
     
     Buffer buf;
@@ -177,14 +180,19 @@ void PCProto::shift_to(const State s)
              ++i)
         {
             const UUID& uuid(PCInstMap::get_key(i));
+            PCInst& inst(PCInstMap::get_value(i));
             if (current_view.get_members().find(uuid) != 
                 current_view.get_members().end())
             {
-                PCInst& inst(PCInstMap::get_value(i));
+
                 inst.set_prim(true);
                 inst.set_last_prim(ViewId(V_PRIM, current_view.get_id()));
                 inst.set_last_seq(0);
                 inst.set_to_seq(get_to_seq());
+            }
+            else
+            {
+                inst.set_prim(false);
             }
         }
         set_prim(true);
@@ -194,6 +202,18 @@ void PCProto::shift_to(const State s)
     case S_TRANS:
         break;
     case S_NON_PRIM:
+        for (PCInstMap::iterator i = instances.begin(); i != instances.end();
+             ++i)
+        {
+            const UUID& uuid(PCInstMap::get_key(i));
+            PCInst& inst(PCInstMap::get_value(i));
+            if (current_view.get_members().find(uuid) != 
+                current_view.get_members().end())
+            {
+                
+                inst.set_prim(false);
+            }
+        }
         set_prim(false);
         pc_view = ViewId(V_NON_PRIM, current_view.get_id());
         break;
@@ -392,24 +412,32 @@ void PCProto::validate_state_msgs() const
             const UUID& uuid(PCInstMap::get_key(si));
             const PCInst& msg_state(PCInstMap::get_value(si));
             const PCInst& local_state(PCInstMap::get_value(instances.find_checked(uuid)));
-            if (get_prim() == true && msg_source_state.get_prim() &&
-                msg_state.get_prim() == true)
+            if (get_prim()                  == true && 
+                msg_source_state.get_prim() == true &&
+                msg_state.get_prim()        == true)
             {
-                // Msg source claims to come from prim view and this node
-                // is in prim. All message prim view states must be equal
-                // to local ones.
-                gcomm_assert(msg_state == local_state)
-                    << self_string()
-                    << " node " << uuid
-                    << " prim state message and local states not consistent:"
-                    << " msg node "   << msg_state
-                    << " local state " << local_state;
-                gcomm_assert(msg_state.get_to_seq() == max_to_seq)
-                    << self_string()
-                    << " node " << uuid
-                    << " to seq not consistent with local state:"
-                    << " max to seq " << max_to_seq
-                    << " msg state to seq " << msg_state.get_to_seq();
+                if (current_view.is_member(uuid) == true)
+                {
+                    // Msg source claims to come from prim view and this node
+                    // is in prim. All message prim view states must be equal
+                    // to local ones.
+                    gcomm_assert(msg_state == local_state)
+                        << self_string()
+                        << " node " << uuid
+                        << " prim state message and local states not consistent:"
+                        << " msg node "   << msg_state
+                        << " local state " << local_state;
+                    gcomm_assert(msg_state.get_to_seq() == max_to_seq)
+                        << self_string()
+                        << " node " << uuid
+                        << " to seq not consistent with local state:"
+                        << " max to seq " << max_to_seq
+                        << " msg state to seq " << msg_state.get_to_seq();
+                }
+                else
+                {
+                    // @todo: Is it valid to assert here that the 
+                }
             }
             else if (get_prim() == true)
             {
