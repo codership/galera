@@ -1009,6 +1009,8 @@ START_TEST(test_proto_split_merge)
         set_cvi(dn, 0, n_nodes - 1, view_seq + view_seq_inc);
         gu_trace(prop.propagate_until_cvi(true));
     } 
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 
@@ -1082,6 +1084,8 @@ START_TEST(test_proto_split_merge_lossy)
         set_cvi(dn, 0, n_nodes - 1, view_seq + view_seq_inc);
         gu_trace(prop.propagate_until_cvi(true));
     } 
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 
@@ -1164,15 +1168,61 @@ START_TEST(test_proto_split_merge_lossy_w_user_msg)
         }
         gu_trace(prop.propagate_until_cvi(true));
     }
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
 
+START_TEST(test_proto_stop_cont)
+{
+    log_info << "START";
+    const size_t n_nodes(4);
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+    const string inactive_timeout("PT0.3S");
+    const string retrans_period("PT0.1S");
+    
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        set_cvi(dn, 0, i, i + 1);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+    uint32_t view_seq = n_nodes + 1;
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        for (size_t j = 0; j < n_nodes; ++j)
+        {
+            if (j != i)
+            {
+                dn[j]->close(dn[i]->get_uuid());
+            }
+        }
+        set_cvi(dn, 0, n_nodes - 1, view_seq + 1);
+        gu_trace(prop.propagate_until_cvi(true));
+        view_seq += 2;
+
+    }
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
+static bool skip(true);
 
 Suite* evs2_suite()
 {
     Suite* s = suite_create("gcomm::evs");
     TCase* tc;
     
+    if (skip == false)
+    {
     tc = tcase_create("test_seqno");
     tcase_add_test(tc, test_seqno);
     suite_add_tcase(s, tc);
@@ -1267,6 +1317,11 @@ Suite* evs2_suite()
     tcase_add_loop_test(tc, test_proto_split_merge_lossy_w_user_msg, 0, 2);
     tcase_set_timeout(tc, 15);
     suite_add_tcase(s, tc);
+    }
+    tc = tcase_create("test_proto_stop_cont");
+    tcase_add_test(tc, test_proto_stop_cont);
+    suite_add_tcase(s, tc);
+    
     
     return s;
 }

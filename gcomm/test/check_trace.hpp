@@ -194,7 +194,7 @@ namespace gcomm
         void connect(bool first) { }
         
         void close() { }
-        
+        void close(const UUID&) { }
         
         void connect() { }
 
@@ -291,8 +291,25 @@ namespace gcomm
         
         void close()
         {
-            gu_trace(std::for_each(protos.rbegin(), protos.rend(),
-                                   std::mem_fun(&Protolay::close)));
+            for (std::list<Protolay*>::iterator i = protos.begin(); 
+                 i != protos.end(); ++i)
+            {
+                (*i)->close();
+            }
+            // gu_trace(std::for_each(protos.rbegin(), protos.rend(),
+            //                       std::mem_fun(&Protolay::close)));
+        }
+
+
+        void close(const UUID& uuid)
+        {
+            for (std::list<Protolay*>::iterator i = protos.begin(); 
+                 i != protos.end(); ++i)
+            {
+                (*i)->close(uuid);
+            }
+            // gu_trace(std::for_each(protos.rbegin(), protos.rend(),
+            //                       std::mem_fun(&Protolay::close)));
         }
         
         void send()

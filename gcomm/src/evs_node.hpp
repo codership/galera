@@ -50,7 +50,11 @@ public:
     void set_index(const size_t idx) { index = idx; }
     size_t get_index() const { return index; }
     
-    void set_operational(const bool op) { operational = op; }
+    void set_operational(const bool op) 
+    { 
+        gcomm_assert(op == false);
+        operational = op; 
+    }
     bool get_operational() const { return operational; }
     
     void set_installed(const bool inst) { installed = inst; }

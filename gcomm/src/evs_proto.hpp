@@ -192,6 +192,11 @@ public:
         gu_trace(send_leave());
     }
 
+    void close(const UUID& uuid)
+    {
+        set_inactive(uuid);
+    }
+
     // gu::datetime::Date functions do appropriate actions for timer handling 
     // and return next expiration time 
 private:

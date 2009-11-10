@@ -168,6 +168,7 @@ public:
     
     virtual void connect(bool) { }
     virtual void close() { }
+    virtual void close(const UUID& uuid) { }
     
     /* apparently handles data from upper layer. what is return value? */
     virtual int  handle_down (const gu::net::Datagram&, const ProtoDownMeta&) = 0;

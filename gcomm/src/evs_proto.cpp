@@ -36,7 +36,7 @@ using namespace gcomm::evs;
 
 gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     timers(),
-    debug_mask(D_STATE),
+    debug_mask(D_STATE | D_TIMERS),
     info_mask(I_VIEWS | I_STATE | I_STATISTICS),
     last_stats_report(Date::now()),
     collect_stats(true),
@@ -369,6 +369,7 @@ private:
     Proto::Timer const t;
 };
 
+
 Date gcomm::evs::Proto::get_next_expiration(const Timer t) const
 {
     gcomm_assert(get_state() != S_CLOSED);
@@ -474,11 +475,10 @@ void gcomm::evs::Proto::check_inactive()
         const UUID& uuid(NodeMap::get_key(i));
         Node& node(NodeMap::get_value(i));
         if (uuid                   != get_uuid() &&
-            node.get_operational() == true       &&
+            /* node.get_operational() == true       && */
             node.is_inactive()     == true         )
         {
-            log_warn << self_string() << " detected inactive node: " 
-                     << uuid;
+            evs_log_debug(D_STATE) << " detected inactive node: " << uuid;
             node.set_operational(false);
             has_inactive = true;
         }
@@ -506,7 +506,9 @@ void gcomm::evs::Proto::set_inactive(const UUID& uuid)
     NodeMap::iterator i;
     gu_trace(i = known.find_checked(uuid));
     evs_log_debug(D_STATE) << "setting " << uuid << " inactive";
-    NodeMap::get_value(i).set_tstamp(Date::zero());
+    Node& node(NodeMap::get_value(i));
+    node.set_tstamp(Date::zero());
+    node.set_operational(false);
 }
 
 
@@ -1336,7 +1338,7 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     {
         return;
     }
-
+    
     gcomm_assert(msg.get_source() != UUID::nil());
     
     
@@ -1349,10 +1351,20 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         return;
     }
     
+    Node& node(NodeMap::get_value(ii));
+
+    if (node.get_operational() == false)
+    {
+        // We have set this node unoperational and there was 
+        // probably good reason to do so. Don't accept messages
+        // from him before new view has been formed.
+        return;
+    }
+
     // Filter out non-fifo messages
     if (msg.get_fifo_seq() != -1 && (msg.get_flags() & Message::F_RETRANS) == 0)
     {
-        Node& node(NodeMap::get_value(ii));
+
         if (node.get_fifo_seq() >= msg.get_fifo_seq())
         {
             evs_log_debug(D_FOREIGN_MSGS) 
@@ -1980,9 +1992,9 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     assert(ii != known.end());
     assert(get_state() != S_CLOSED && get_state() != S_JOINING);
     Node& inst(NodeMap::get_value(ii));
-
-    evs_log_debug(D_USER_MSGS) << "received " << msg;
     
+    evs_log_debug(D_USER_MSGS) << "received " << msg;    
+
     if (msg.get_source_view_id() != current_view.get_id()) 
     {
         if (get_state() == S_LEAVING) 
@@ -2193,6 +2205,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     Node& inst(NodeMap::get_value(ii));
     evs_log_debug(D_GAP_MSGS) << "gap message " << msg;
     
+
     if (get_state()                           == S_RECOVERY && 
         install_message                       != 0          && 
         install_message->get_source_view_id() == msg.get_source_view_id()) 
