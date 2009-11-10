@@ -21,6 +21,7 @@
 #include "galera_options.h"
 #include "galera_status.h"
 
+#define GALERA_WORKAROUND_197   1 //w/around for #197: lack of cert db on joiner
 #define GALERA_USE_FLOW_CONTROL 1
 #define GALERA_USLEEP_FLOW_CONTROL    10000 //  0.01 sec
 #define GALERA_USLEEP_1_SECOND      1000000 //  1 sec
@@ -918,6 +919,10 @@ static enum wsrep_status process_query_write_set(
     /* wait for total order */
     GALERA_GRAB_QUEUE (cert_queue, seqno_l);
 
+#ifdef GALERA_WORKAROUND_197
+    galera_update_global_seqno(seqno_g);
+    rcode = wsdb_append_write_set(seqno_g, ws);
+#else
     if (gu_likely(galera_update_global_seqno(seqno_g))) {
         /* Global seqno OK, do certification test */
         rcode = wsdb_append_write_set(seqno_g, ws);
@@ -926,6 +931,7 @@ static enum wsrep_status process_query_write_set(
         /* Outdated writeset, skip */
         rcode = WSDB_CERTIFICATION_SKIP;
     }
+#endif
 
     /* release total order */
     GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
@@ -1052,6 +1058,11 @@ galera_handle_configuration (wsrep_t* gh,
              gu_uuid_compare (&status.state_uuid, conf_uuid));
     }
 
+#ifdef GALERA_WORKAROUND_197
+    if (conf->seqno >= 0) wsdb_purge_trxs_upto(conf->seqno);
+    wsdb_set_global_trx_committed(conf->seqno);
+#endif
+
     view_handler_cb (galera_view_info_create (conf));
 
     if (conf->conf_id >= 0) {                // PRIMARY configuration
@@ -1060,6 +1071,7 @@ galera_handle_configuration (wsrep_t* gh,
         {
             void*   app_req = NULL;
             ssize_t app_req_len;
+            int const retry_sec = 1;
 
             // GCS determined that we need to request state transfer.
             gu_info ("State transfer required:"
@@ -1108,8 +1120,8 @@ galera_handle_configuration (wsrep_t* gh,
                     }
                     else {
                         gu_info ("Requesting state snapshot transfer failed: "
-                                 "%d (%s). Retrying in 10 seconds",
-                                 ret, strerror(-ret));
+                                 "%d (%s). Retrying in %d seconds",
+                                 ret, strerror(-ret), retry_sec);
                     }
                 }
 
@@ -1120,7 +1132,7 @@ galera_handle_configuration (wsrep_t* gh,
                 }
 
             } while ((ret == -EAGAIN) &&
-                     (usleep(GALERA_USLEEP_10_SECONDS), true));
+                     (usleep(retry_sec * GALERA_USLEEP_1_SECOND), true));
 
             if (app_req) free (app_req);
 
@@ -1798,9 +1810,14 @@ static enum wsrep_status mm_galera_pre_commit(
         goto cleanup;
     }
 
+#ifdef GALERA_WORKAROUND_197
+    rcode = wsdb_append_write_set(seqno_g, ws);
+    if (gu_likely(galera_update_global_seqno (seqno_g))) {
+#else
     if (gu_likely(galera_update_global_seqno (seqno_g))) {
         /* Global seqno OK, do certification test */
         rcode = wsdb_append_write_set(seqno_g, ws);
+#endif
         switch (rcode) {
         case WSDB_OK:
             gu_debug ("local trx certified, "
@@ -1828,8 +1845,7 @@ static enum wsrep_status mm_galera_pre_commit(
         }
     }
     else {
-        // theoretically it is possible with poorly written application
-        // (trying to replicate something before completing state transfer)
+        // This cannot really happen. Perhaps we should abort in this case
         gu_warn ("Local action replicated with outdated seqno: "
                  "current seqno %lld, action seqno %lld", last_recved, seqno_g);
         // this situation is as good as cancelled transaction. See above.

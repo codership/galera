@@ -11,6 +11,8 @@
 #include "version_file.h"
 #define USE_MEMPOOL
 
+#define WSDB_WORKAROUND_197
+
 /* index for table row level keys */
 static struct wsdb_hash *key_index;
 
@@ -32,8 +34,9 @@ struct index_rec {
 /* persistent storage for certified write sets */
 static struct wsdb_file *cert_trx_file;
 
-/* list of cert index records kept in memory before purging */
-trx_seqno_t purged_up_to;
+#ifdef WSDB_WORKAROUND_197
+static trx_seqno_t purged_up_to = 0;
+#endif
 
 struct seqno_list {
     trx_seqno_t        seqno;
@@ -255,8 +258,16 @@ int wsdb_certification_test(
 ) {
     uint32_t i;
     uint32_t all_keys_len;
-
     char *all_keys = ws->key_composition;
+
+#ifdef WSDB_WORKAROUND_197
+    if (gu_unlikely(ws->last_seen_trx < purged_up_to)) {
+        gu_warn ("WS last_seen: %lld is below certification bound: %lld",
+                 ws->last_seen_trx, purged_up_to);
+        return WSDB_CERTIFICATION_FAIL;
+    }
+#endif
+
     if (!ws->key_composition) {
         (void)serialize_all_keys(&all_keys, ws);
         ws->key_composition = all_keys;
@@ -558,6 +569,9 @@ int wsdb_purge_trxs_upto(trx_seqno_t trx_id) {
     gu_info("active seqno list len: %d, size: %d", 
             trx_info.list_len, trx_info.list_size
     );
+#endif
+#ifdef WSDB_WORKAROUND_197
+    if (trx_id > purged_up_to) purged_up_to = trx_id;
 #endif
     return 0;
 }
