@@ -1,40 +1,15 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
+
+
 #ifndef _GCOMM_UTIL_HPP_
 #define _GCOMM_UTIL_HPP_
 
-#include <sstream>
-#include <cstring>
-
-#include "gcomm/exception.hpp"
-#include "gcomm/types.hpp"
-#include "gcomm/protostack.hpp"
-
-
+#include "gu_network.hpp"
 
 namespace gcomm
 {
-
-    // @todo: wrong function - port is not mandatory by RFC, will also fail for IPv6
-    inline std::string __parse_host(const std::string& str)
-    {
-        size_t sep = str.find(':');
-        if (sep == std::string::npos)
-        {
-            gcomm_throw_runtime (EINVAL) << "Invalid auth str";
-        }
-        return str.substr(0, sep);
-    }
-    
-    // @todo: wrong function - port is not mandatory by RFC, will also fail for IPv6
-    inline std::string __parse_port(const std::string& str)
-    {
-        size_t sep = str.find(':');
-        if (sep == std::string::npos)
-        {
-            gcomm_throw_runtime (EINVAL) << "Invalid auth str";
-        }
-        return str.substr(sep + 1);
-    }
-    
     inline bool host_is_any (const std::string& host)
     {   
         return (host.length() == 0 || host == "0.0.0.0" ||

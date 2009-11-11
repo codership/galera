@@ -113,7 +113,7 @@ public:
     {
         if (NodeMap::get_value(vt).get_operational() == true)
         {
-            nm.insert_checked(vt);
+            nm.insert_unique(vt);
         }
     }
 private:

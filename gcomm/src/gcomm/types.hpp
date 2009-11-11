@@ -1,17 +1,19 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
+
 #ifndef _GCOMM_TYPES_HPP_
 #define _GCOMM_TYPES_HPP_
 
-#include <sys/socket.h>
 
+#include "gcomm/exception.hpp"
 
-#include <gcomm/common.hpp>
-#include <gcomm/exception.hpp>
+#include "gu_buffer.hpp"
 
 #include <sstream>
 #include <algorithm>
 #include <string>
 
-#include "gu_buffer.hpp"
 
 namespace gcomm
 {
@@ -26,7 +28,7 @@ namespace gcomm
                             size_t const offset)
     {
         if (buflen < sizeof(T) + offset)
-            gcomm_throw_runtime (EMSGSIZE) << sizeof(T) << " > " 
+            gu_throw_error (EMSGSIZE) << sizeof(T) << " > " 
                                            << (buflen-offset);
         
 #if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -51,7 +53,7 @@ namespace gcomm
         throw (gu::Exception)
     {
         if (buflen < sizeof(T) + offset)
-            gcomm_throw_runtime (EMSGSIZE) << sizeof(T) << " > " 
+            gu_throw_error (EMSGSIZE) << sizeof(T) << " > " 
                                            << (buflen-offset);
         
 #if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -141,7 +143,7 @@ namespace gcomm
         {
             if (buflen < offset + str_size)
             {
-                gcomm_throw_runtime (EMSGSIZE) << str_size
+                gu_throw_error (EMSGSIZE) << str_size
                                                << " > " << (buflen-offset);
             }
             std::string ser_str(str);
@@ -156,7 +158,7 @@ namespace gcomm
         {
             if (buflen < offset + str_size)
             {
-                gcomm_throw_runtime (EMSGSIZE) << str_size
+                gu_throw_error (EMSGSIZE) << str_size
                                                << " > " << (buflen-offset);
             }
             str.assign(reinterpret_cast<const char*>(buf) + offset, str_size);

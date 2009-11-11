@@ -1,12 +1,15 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
+
 #ifndef _GCOMM_TRANSPORT_HPP_
 #define _GCOMM_TRANSPORT_HPP_
 
-#include "gu_uri.hpp"
-
-#include "gcomm/common.hpp"
 #include "gcomm/uuid.hpp"
 #include "gcomm/protolay.hpp"
 #include "gcomm/protostack.hpp"
+
+#include "gu_uri.hpp"
 
 namespace gcomm
 {
@@ -58,8 +61,8 @@ public:
     virtual void close()   = 0;
     virtual void close(const UUID& uuid)
     {        
-        gcomm_throw_runtime(ENOTSUP) << "close(UUID) not supported by "
-                                     << uri.get_scheme().c_str();
+        gu_throw_error(ENOTSUP) << "close(UUID) not supported by "
+                                << uri.get_scheme();
     }
     
     virtual void       listen();

@@ -1,11 +1,16 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
+
 #ifndef _GCOMM_UUID_HPP_
 #define _GCOMM_UUID_HPP_
 
 
 
-#include "gcomm/common.hpp"
 #include "gcomm/exception.hpp"
 #include "gcomm/types.hpp"
+
+#include "gu_utils.hpp"
 
 extern "C" {
 #include <stddef.h>
@@ -13,6 +18,7 @@ extern "C" {
 }
 
 #include <cstring>
+#include <cassert>
 
 namespace gcomm
 {
@@ -59,7 +65,7 @@ public:
         throw (gu::Exception)
     {
         if (buflen < offset + sizeof(gu_uuid_t))
-            gcomm_throw_runtime (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
+            gu_throw_error (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
                                            << (buflen - offset);
         
         memcpy(&uuid, buf + offset, sizeof(gu_uuid_t));
@@ -71,7 +77,7 @@ public:
         throw (gu::Exception)
     {
         if (buflen < offset + sizeof(gu_uuid_t))
-            gcomm_throw_runtime (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
+            gu_throw_error (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
                                            << (buflen - offset);
         
         memcpy(buf + offset, &uuid, sizeof(gu_uuid_t));
@@ -120,7 +126,7 @@ public:
             // @todo: this is a rather unwarranted check
             if (36 != ret)
             {
-                gcomm_throw_fatal << "Failed to print UUID";
+                gu_throw_fatal << "Failed to print UUID";
             }
 #undef GU_CPP_UUID_FORMAT
             return std::string(buf);

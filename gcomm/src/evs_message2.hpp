@@ -236,14 +236,12 @@ public:
      */
     int64_t get_fifo_seq() const { return fifo_seq; }
 
-    bool has_node_list() const { return (node_list != 0); }
-    
     /*!
      * Get message node list.
      *
      * @return Const reference to message node list.
      */
-    const MessageNodeList& get_node_list() const { return *node_list; }
+    const MessageNodeList& get_node_list() const { return node_list; }
     
     /*!
      * Get timestamp associated to the message.
@@ -274,8 +272,7 @@ public:
         range_uuid     (msg.range_uuid),
         range          (msg.range),
         tstamp         (msg.tstamp),
-        node_list      (msg.node_list != 0 ? 
-                        new MessageNodeList(*msg.node_list) : 0)
+        node_list      (msg.node_list)
     { }
 
     Message& operator=(const Message& msg)
@@ -294,12 +291,11 @@ public:
         range_uuid     = msg.range_uuid;
         range          = msg.range;
         tstamp         = msg.tstamp;
-        node_list      = (msg.node_list != 0 ? 
-                          new MessageNodeList(*msg.node_list) : 0);
+        node_list      = msg.node_list;
         return *this;
     }
 
-    virtual ~Message() { delete node_list; }
+    virtual ~Message() {  }
 
 
     /*! Default constructor */
@@ -316,7 +312,7 @@ public:
             const uint8_t          flags_          = 0,
             const UUID&            range_uuid_     = UUID(),
             const Range            range_          = Range(),
-            const MessageNodeList* node_list_      = 0) :
+            const MessageNodeList& node_list_      = MessageNodeList()) :
         version        (version_),
         type           (type_),
         user_type      (user_type_),
@@ -331,7 +327,7 @@ public:
         range_uuid     (range_uuid_),
         range          (range_),
         tstamp         (gu::datetime::Date::now()),
-        node_list      (node_list_ != 0 ? new MessageNodeList(*node_list_) : 0)
+        node_list      (node_list_)
     { }
 
 protected:
@@ -355,7 +351,7 @@ protected:
     UUID               range_uuid;
     Range              range;
     gu::datetime::Date tstamp;
-    MessageNodeList*   node_list;
+    MessageNodeList    node_list;
     
 
 };
@@ -387,8 +383,7 @@ public:
                 aru_seq,
                 flags,
                 UUID(),
-                Range(),
-                0)
+                Range())
     { }
     
     void set_aru_seq(const Seqno as) { aru_seq = as; }
@@ -446,8 +441,7 @@ public:
                 aru_seq,
                 0,
                 range_uuid,
-                range,
-                0)
+                range)
     { }
     size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
@@ -465,7 +459,7 @@ public:
                 const Seqno            seq            = Seqno::max(), 
                 const Seqno            aru_seq        = Seqno::max(),
                 const int64_t          fifo_seq       = -1,
-                const MessageNodeList* node_list      = 0) :
+                const MessageNodeList& node_list      = MessageNodeList()) :
         Message(0,
                 Message::T_JOIN,
                 source,
@@ -497,7 +491,7 @@ public:
                    const Seqno            seq            = Seqno::max(), 
                    const Seqno            aru_seq        = Seqno::max(),
                    const int64_t          fifo_seq       = -1,
-                   const MessageNodeList* node_list      = 0) :
+                   const MessageNodeList& node_list      = MessageNodeList()) :
         Message(0,
                 Message::T_INSTALL,
                 source,
@@ -574,7 +568,7 @@ public:
               node.get_leaving()     == leaving        ) ) )
             
         {
-            nl.insert_checked(vt);
+            nl.insert_unique(vt);
         }
     }
 private:

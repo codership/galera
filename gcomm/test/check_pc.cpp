@@ -154,7 +154,6 @@ void single_boot(PCUser* pu1)
     PCMessage sm1;
     get_msg(rb, &sm1);
     fail_unless(sm1.get_type() == PCMessage::T_STATE);
-    fail_unless(sm1.has_inst_map() == true);
     fail_unless(sm1.get_inst_map().size() == 1);
     {
         const PCInst& pi1 = PCInstMap::get_value(sm1.get_inst_map().begin());
@@ -169,7 +168,6 @@ void single_boot(PCUser* pu1)
     PCMessage im1;
     get_msg(rb, &im1);
     fail_unless(im1.get_type() == PCMessage::T_INSTALL);
-    fail_unless(im1.has_inst_map() == true);
     fail_unless(im1.get_inst_map().size() == 1);
     {
         const PCInst& pi1 = PCInstMap::get_value(im1.get_inst_map().begin());
@@ -791,7 +789,7 @@ START_TEST(test_pc_conflicting_prims)
         pu2.pc->handle_msg(msg1, Datagram(), pum1);
         fail("not aborted");
     }
-    catch (FatalException& e)
+    catch (Exception& e)
     {
         log_info << e.what();
     }

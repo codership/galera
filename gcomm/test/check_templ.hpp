@@ -1,8 +1,10 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
-#ifndef CHECK_TEMPL_HPP
-#define CHECK_TEMPL_HPP
+#ifndef GCOMM_CHECK_TEMPL_HPP
+#define GCOMM_CHECK_TEMPL_HPP
 
-#include "gcomm/common.hpp"
 #include "gcomm/types.hpp"
 #include "gcomm/transport.hpp"
 #include <check.h>
@@ -37,7 +39,7 @@ namespace gcomm
             (void)c.serialize(buf, expected_size, 1);
             fail("exception not thrown");
         }
-        catch (RuntimeException& e)
+        catch (gu::Exception& e)
         {
             // OK
         }
@@ -50,7 +52,7 @@ namespace gcomm
             (void)c2.unserialize(buf, expected_size, 1);
             fail("exception not thrown");
         }
-        catch (RuntimeException& e)
+        catch (gu::Exception& e)
         {
             // OK
         }

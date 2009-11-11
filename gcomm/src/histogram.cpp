@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 #include "histogram.hpp"
 
@@ -28,18 +31,18 @@ gcomm::Histogram::Histogram(const string& vals)
 
         if (is.fail())
         {
-            gcomm_throw_fatal << "Parse error";
+            gu_throw_fatal << "Parse error";
         }
 
         if (cnt.insert(make_pair(val, 0)).second == false)
         {
-            gcomm_throw_fatal << "Failed to insert value: " << val;
+            gu_throw_fatal << "Failed to insert value: " << val;
         }
     }
 
     if (cnt.insert(make_pair(numeric_limits<double>::max(), 0)).second == false)
     {
-        gcomm_throw_fatal << "Failed to insert numeric_limits<double>::max()";
+        gu_throw_fatal << "Failed to insert numeric_limits<double>::max()";
     }
 }
 
@@ -55,7 +58,7 @@ void gcomm::Histogram::insert(const double val)
     
     if (i == cnt.end())
     {
-        gcomm_throw_fatal;
+        gu_throw_fatal;
     }
     
     i->second++;

@@ -260,7 +260,7 @@ bool gcomm::evs::Consensus::is_consistent_input_map(const Message& msg) const
         const Node& node(NodeMap::get_value(i));
         if (current_view.is_member(uuid) == true)
         {
-            gu_trace((void)local_insts.insert_checked(
+            gu_trace((void)local_insts.insert_unique(
                          make_pair(uuid, input_map.get_range(node.get_index()))));
         }
     }
@@ -274,7 +274,7 @@ bool gcomm::evs::Consensus::is_consistent_input_map(const Message& msg) const
         const MessageNode& msg_inst(MessageNodeList::get_value(i));
         if (msg_inst.get_view_id() == current_view.get_id())
         {
-            gu_trace((void)msg_insts.insert_checked(
+            gu_trace((void)msg_insts.insert_unique(
                          make_pair(msg_uuid, msg_inst.get_im_range())));
         }
     }
@@ -304,13 +304,12 @@ bool gcomm::evs::Consensus::is_consistent_partitioning(const Message& msg) const
             node.get_leave_message()     == 0     &&
             current_view.is_member(uuid) == true)
         {
-            gu_trace((void)local_insts.insert_checked(
+            gu_trace((void)local_insts.insert_unique(
                          make_pair(uuid, 
                                    input_map.get_range(node.get_index()))));
         }
     }
     
-    gcomm_assert(msg.has_node_list() == true);
     const MessageNodeList& m_insts = msg.get_node_list();
     
     for (MessageNodeList::const_iterator i = m_insts.begin(); 
@@ -322,7 +321,7 @@ bool gcomm::evs::Consensus::is_consistent_partitioning(const Message& msg) const
             m_inst.get_leaving()     == false &&
             m_inst.get_view_id()     == current_view.get_id())
         {
-            gu_trace((void)msg_insts.insert_checked(
+            gu_trace((void)msg_insts.insert_unique(
                          make_pair(m_uuid, m_inst.get_im_range())));
         }
     }
@@ -354,7 +353,7 @@ bool gcomm::evs::Consensus::is_consistent_leaving(const Message& msg) const
             lm                       != 0  &&
             lm->get_source_view_id() == current_view.get_id())
         {
-            gu_trace((void)local_insts.insert_checked(
+            gu_trace((void)local_insts.insert_unique(
                          make_pair(uuid, input_map.get_range(inst.get_index()))));
         }
     }
@@ -370,7 +369,7 @@ bool gcomm::evs::Consensus::is_consistent_leaving(const Message& msg) const
             m_inst.get_leaving()     == true &&
             m_inst.get_view_id()     == current_view.get_id())
         {
-            gu_trace((void)msg_insts.insert_checked(
+            gu_trace((void)msg_insts.insert_unique(
                          make_pair(m_uuid, m_inst.get_im_range())));
         }
     }
@@ -462,10 +461,9 @@ bool gcomm::evs::Consensus::is_consistent_joining(const Message& msg) const
                 return false;
             }
         }
-        gu_trace((void)local_insts.insert_checked(make_pair(uuid, Range())));
+        gu_trace((void)local_insts.insert_unique(make_pair(uuid, Range())));
     }
     
-    assert(msg.has_node_list() == true);
     const MessageNodeList m_insts = msg.get_node_list();
     
     for (MessageNodeList::const_iterator mi = m_insts.begin();
@@ -476,7 +474,7 @@ bool gcomm::evs::Consensus::is_consistent_joining(const Message& msg) const
         
         if (m_inst.get_operational() == true)
         {
-            gu_trace((void)msg_insts.insert_checked(make_pair(m_uuid, Range())));
+            gu_trace((void)msg_insts.insert_unique(make_pair(m_uuid, Range())));
         }
     }
     

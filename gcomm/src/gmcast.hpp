@@ -2,14 +2,13 @@
  * Copyright (C) 2009 Codership Oy <info@codership.com>
  */
 
-/**
+/*
  * Generic multicast transport. Uses tcp connections if real multicast 
  * is not available.
  */
 #ifndef TRANSPORT_GMCAST_HPP
 #define TRANSPORT_GMCAST_HPP
 
-#include "gcomm/common.hpp"
 #include "gcomm/uuid.hpp"
 #include "gcomm/exception.hpp"
 #include "gcomm/logger.hpp"
@@ -46,11 +45,11 @@ namespace gcomm
         void close(const UUID& uuid) { gmcast_forget(uuid); }
         void listen()
         {
-            gcomm_throw_fatal << "gmcast transport listen not implemented";
+            gu_throw_fatal << "gmcast transport listen not implemented";
         }
         Transport* accept()
         {
-            gcomm_throw_fatal << "gmcast transport accept not implemented"; throw;
+            gu_throw_fatal << "gmcast transport accept not implemented"; throw;
         }
         size_t get_mtu() const
         {

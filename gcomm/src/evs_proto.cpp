@@ -387,7 +387,7 @@ Date gcomm::evs::Proto::get_next_expiration(const Timer t) const
         case S_RECOVERY:
             return (now + join_retrans_period);
         default:
-            gcomm_throw_fatal;
+            gu_throw_fatal;
         }
     case T_CONSENSUS:
         switch (get_state()) 
@@ -400,7 +400,7 @@ Date gcomm::evs::Proto::get_next_expiration(const Timer t) const
     case T_STATS:
         return (now + stats_report_period);
     }
-    gcomm_throw_fatal;
+    gu_throw_fatal;
     throw;
 }
 
@@ -561,11 +561,11 @@ void gcomm::evs::Proto::deliver_reg_view()
 {
     if (install_message == 0)
     {
-        gcomm_throw_fatal
+        gu_throw_fatal
             << "Protocol error: no install message in deliver reg view";
     }
     
-    if (previous_views.size() == 0) gcomm_throw_fatal << "Zero-size view";
+    if (previous_views.size() == 0) gu_throw_fatal << "Zero-size view";
     
     const View& prev_view (previous_view);
     View view (install_message->get_source_view_id());
@@ -611,7 +611,7 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
 {
     if (local == false && install_message == 0)
     {
-        gcomm_throw_fatal
+        gu_throw_fatal
             << "Protocol error: no install message in deliver trans view";
     }
     
@@ -969,7 +969,7 @@ const JoinMessage& gcomm::evs::Proto::create_join()
                    input_map->get_safe_seq(),
                    input_map->get_aru_seq(),
                    ++fifo_seq,
-                   &node_list);
+                   node_list);
     NodeMap::get_value(self_i).set_join_message(&jm);
     
     evs_log_debug(D_JOIN_MSGS) << " created join message " << jm;
@@ -1056,7 +1056,7 @@ void gcomm::evs::Proto::send_leave(bool handle)
                       wb.second.get_order(), 
                       Seqno::max(), Seqno::max()) != 0)
         {
-            gcomm_throw_fatal << "send_user() failed";
+            gu_throw_fatal << "send_user() failed";
         }
         
         output.pop_front();
@@ -1125,7 +1125,7 @@ void gcomm::evs::Proto::send_install()
                         input_map->get_safe_seq(),
                         input_map->get_aru_seq(),
                         ++fifo_seq,
-                        &node_list);
+                        node_list);
     
     evs_log_debug(D_INSTALL_MSGS) << "sending install " << imsg;
     
@@ -1305,7 +1305,7 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
                                   << source;
     
     NodeMap::iterator i;
-    gu_trace(i = known.insert_checked(make_pair(source, Node(inactive_timeout))));
+    gu_trace(i = known.insert_unique(make_pair(source, Node(inactive_timeout))));
     assert(NodeMap::get_value(i).get_operational() == true);
     
     if (get_state() == S_JOINING || get_state() == S_RECOVERY || 
@@ -1440,7 +1440,7 @@ size_t gcomm::evs::Proto::unserialize_message(const UUID& source,
     switch (msg->get_type())
     {
     case Message::T_NONE:
-        gcomm_throw_fatal;
+        gu_throw_fatal;
         break;
     case Message::T_USER:
         gu_trace(offset = static_cast<UserMessage&>(*msg).unserialize(
@@ -1577,7 +1577,7 @@ int gcomm::evs::Proto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
 
 void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
 {
-    if (shift_to_rfcnt > 0) gcomm_throw_fatal;
+    if (shift_to_rfcnt > 0) gu_throw_fatal;
 
     shift_to_rfcnt++;
 
@@ -1597,7 +1597,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
     assert(s < S_MAX);
     
     if (allowed[state][s] == false) {
-        gcomm_throw_fatal << "Forbidden state transition: " 
+        gu_throw_fatal << "Forbidden state transition: " 
                           << to_string(state) << " -> " << to_string(s);
     }
     
@@ -1650,7 +1650,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
                 gu_trace(err = send_user(Seqno::max()));
                 if (err != 0)
                 {
-                    gcomm_throw_fatal << self_string() 
+                    gu_throw_fatal << self_string() 
                                       << "send_user() failed in shifto "
                                       << "to S_RECOVERY: "
                                       << strerror(err);
@@ -1692,8 +1692,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         previous_view = current_view;
         previous_views.push_back(make_pair(current_view.get_id(), Date::now()));
         
-        gcomm_assert(install_message->has_node_list() == true);
-        const MessageNodeList& imap = install_message->get_node_list();
+        const MessageNodeList& imap(install_message->get_node_list());
         
         for (MessageNodeList::const_iterator i = imap.begin();
              i != imap.end(); ++i)
@@ -1737,7 +1736,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         break;
     }
     default:
-        gcomm_throw_fatal << "invalid state";
+        gu_throw_fatal << "invalid state";
     }
     shift_to_rfcnt--;
 }
@@ -1750,7 +1749,9 @@ void gcomm::evs::Proto::validate_reg_msg(const UserMessage& msg)
 {
     if (msg.get_source_view_id() != current_view.get_id())
     {
-        gcomm_throw_fatal << "reg validate: not current view";
+        // Note: This implementation should guarantee same view delivery,
+        // this is sanity check for that.
+        gu_throw_fatal << "reg validate: not current view";
     }
 
     if (collect_stats == true)
@@ -1772,7 +1773,7 @@ void gcomm::evs::Proto::deliver()
 {
     if (delivering == true)
     {
-        gcomm_throw_fatal << "Recursive enter to delivery";
+        gu_throw_fatal << "Recursive enter to delivery";
     }
     
     delivering = true;
@@ -1780,7 +1781,7 @@ void gcomm::evs::Proto::deliver()
     if (get_state() != S_OPERATIONAL && get_state() != S_RECOVERY && 
         get_state() != S_LEAVING)
     {
-        gcomm_throw_fatal << "invalid state: " << to_string(get_state());
+        gu_throw_fatal << "invalid state: " << to_string(get_state());
     }
     
     evs_log_debug(D_DELIVERY)
@@ -1819,7 +1820,7 @@ void gcomm::evs::Proto::deliver()
             }
             break;
         default:
-            gcomm_throw_fatal << "invalid safety prefix " 
+            gu_throw_fatal << "invalid safety prefix " 
                               << msg.get_msg().get_order();
         }
         
@@ -1849,36 +1850,18 @@ void gcomm::evs::Proto::deliver()
 
 }
 
-#if 0
-void gcomm::evs::Proto::validate_trans_msg(const UserMessage& msg)
-{
-    if (msg.get_source_view_id() != current_view.get_id())
-    {
-        // @todo: do we have to freak out here?
-        // @note: yes, this evs implementation should guarantee 
-        //        same view delivery
-        gcomm_throw_fatal << "reg validate: not current view";
-    }
-    
-    if (collect_stats && msg.get_order() == O_SAFE)
-    {
-        Date now(Date::now());
-        hs_safe.insert(double(now.get_utc() - msg.get_tstamp().get_utc())/gu::datetime::Sec);
-    }
-}
-#endif
 
 void gcomm::evs::Proto::deliver_trans()
 {
     if (delivering == true)
     {
-        gcomm_throw_fatal << "Recursive enter to delivery";
+        gu_throw_fatal << "Recursive enter to delivery";
     }
     
     delivering = true;
     
     if (get_state() != S_RECOVERY && get_state() != S_LEAVING)
-        gcomm_throw_fatal << "invalid state";
+        gu_throw_fatal << "invalid state";
     
     evs_log_debug(D_DELIVERY)
         << " aru_seq="   << input_map->get_aru_seq() 
@@ -1916,7 +1899,7 @@ void gcomm::evs::Proto::deliver_trans()
             }
             break;
         default:
-            gcomm_throw_fatal;
+            gu_throw_fatal;
         }
         
         if (deliver == true)
@@ -1950,13 +1933,13 @@ void gcomm::evs::Proto::deliver_trans()
         
         if (NodeMap::get_value(ii).get_installed() == true)
         {
-            gcomm_throw_fatal << "Protocol error in transitional delivery "
-                              << "(self delivery constraint)";
+            gu_throw_fatal << "Protocol error in transitional delivery "
+                           << "(self delivery constraint)";
         }
         else if (input_map->is_fifo(i) == true)
         {
-            gcomm_throw_fatal << "Protocol error in transitional delivery "
-                              << "(fifo from partitioned component)";
+            gu_throw_fatal << "Protocol error in transitional delivery "
+                           << "(fifo from partitioned component)";
         }
         gu_trace(input_map->erase(i));
     }
@@ -2024,7 +2007,6 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                 msg.get_source_view_id() == install_message->get_source_view_id()) 
             {
                 assert(state == S_RECOVERY);
-                gcomm_assert(install_message->has_node_list() == true);
                 evs_log_debug(D_STATE) << " recovery user message "
                                        << msg;
                 
@@ -2346,18 +2328,16 @@ bool gcomm::evs::Proto::update_im_safe_seqs(const MessageNodeList& node_list)
 bool gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
 {
     bool sent = false;
-    // @todo Check for nodes that have leave messages locally
-    // but not seen in all same view nodes
+
     for (NodeMap::const_iterator li = known.begin(); li != known.end(); ++li)
     {
         const Node& local_node(NodeMap::get_value(li));
         if (local_node.get_leave_message() != 0 && 
             local_node.is_inactive()       == false)
         {
-            MessageNodeList::const_iterator msg_li = 
-                node_list.find(NodeMap::get_key(li));
-            // @todo What if this fires?
-            gcomm_assert(msg_li != node_list.end());
+            MessageNodeList::const_iterator msg_li(
+                node_list.find_checked(NodeMap::get_key(li)));
+            
             const MessageNode& node(MessageNodeList::get_value(msg_li));
             gcomm_assert(node.get_view_id() == current_view.get_id());
             
@@ -2370,7 +2350,7 @@ bool gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
                                      lm.get_aru_seq(),
                                      lm.get_fifo_seq(),
                                      Message::F_RETRANS | Message::F_SOURCE);
-
+                
                 Buffer buf;
                 serialize(send_lm, buf);
                 Datagram dg(buf);
@@ -2733,7 +2713,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
                        msg.get_seq(),
                        msg.get_aru_seq(),
                        msg.get_fifo_seq(),
-                       &msg.get_node_list());
+                       msg.get_node_list());
         
         handle_join(jm, ii);
         profile_enter(consistent_prof);

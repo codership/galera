@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
- *
- * $Id:$
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
  */
 
 #ifndef GCOMM_PROTOSTACK_HPP
@@ -10,6 +8,7 @@
 #include "gcomm/protolay.hpp"
 
 #include "gu_lock.hpp"
+#include "gu_network.hpp"
 
 #include <deque>
 

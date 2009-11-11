@@ -1,7 +1,5 @@
 /*
  * Copyright (C) 2009 Codership Oy <info@codership.com>
- *
- * $Id:$
  */
 
 /*!
@@ -41,25 +39,15 @@
  * log_info << prof;
  * @endcode
  *
- * Output will be something along the lines
- *
- * @code
- * prof:
- * cumulative_time: 0.0366198
- * file.cpp:func:227: 6 0.0328768
- * file.cpp:func:250: 5 0.00374298
- * @endcode
- *
- * From the output you can read that branch starting from line 227 was
- * entered 6 times and time spent in the branch was around 0.0329 seconds,
- * the other branch was entered 5 times and time spent there was around
- * 0.0037 seconds.
  */
 
 #ifndef GCOMM_PROFILE_HPP
 #define GCOMM_PROFILE_HPP
 
+extern "C"
+{
 #include "gu_time.h"
+}
 
 #include <map>
 #include <ostream>

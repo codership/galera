@@ -1,18 +1,14 @@
 /*
  * Copyright (C) 2009 Codership Oy <info@codership.com>
- *
- * $Id$
  */
 
 #ifndef EVS_SEQNO_HPP
 #define EVS_SEQNO_HPP
 
-#include <galerautils.hpp>
-
-#include "gcomm/common.hpp"
 #include "gcomm/types.hpp"
 
 #include <ostream>
+#include <cassert>
 
 namespace gcomm
 {

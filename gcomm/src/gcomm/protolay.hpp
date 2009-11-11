@@ -5,16 +5,14 @@
 #ifndef _GCOMM_PROTOLAY_HPP_
 #define _GCOMM_PROTOLAY_HPP_
 
-
-
-#include <cerrno>
-
 #include "gcomm/view.hpp"
 #include "gcomm/exception.hpp"
 #include "gcomm/logger.hpp"
 #include "gcomm/order.hpp"
 
 #include "gu_datetime.hpp"
+
+#include <cerrno>
 
 #include <list>
 #include <utility>
@@ -100,7 +98,7 @@ private:
     uint8_t const user_type;
     int64_t const to_seq;
     int     const err_no;
-    View*   const view; // @todo: this makes default constructor pointless
+    View*   const view;
 };
 
 inline std::ostream& gcomm::operator<<(std::ostream& os, const ProtoUpMeta& um)
@@ -181,7 +179,7 @@ public:
 	if (std::find(up_context.begin(), up_context.end(),
                       std::make_pair(up, id)) != up_context.end())
         {
-            gcomm_throw_fatal << "up context already exists";
+            gu_throw_fatal << "up context already exists";
         }
 	up_context.push_back(std::make_pair(up, id));
     }
@@ -192,7 +190,7 @@ public:
                       down_context.end(),
                       std::make_pair(down, id)) != down_context.end())
         {
-            gcomm_throw_fatal << "down context already exists";
+            gu_throw_fatal << "down context already exists";
         }
 	down_context.push_back(std::make_pair(down, id));
     }
@@ -204,7 +202,7 @@ public:
                            up_context.end(),
                            std::make_pair(up, id))) == up_context.end())
         { 
-            gcomm_throw_fatal << "up context does not exist";
+            gu_throw_fatal << "up context does not exist";
         }
         up_context.erase(i);
     }
@@ -217,7 +215,7 @@ public:
                            down_context.end(),
                            std::make_pair(down, id))) == down_context.end()) 
         {
-            gcomm_throw_fatal << "down context does not exist";
+            gu_throw_fatal << "down context does not exist";
         }
         down_context.erase(i);
     }
@@ -227,7 +225,7 @@ public:
     {
 	if (up_context.empty() == true)
         {
-	    gcomm_throw_fatal << this << " up context(s) not set";
+	    gu_throw_fatal << this << " up context(s) not set";
 	}
         
         CtxList::iterator i, i_next;
@@ -270,7 +268,7 @@ class gcomm::Toplay : public Protolay
 {
     int handle_down(const gu::net::Datagram& dg, const ProtoDownMeta& dm)
     {
-	gcomm_throw_fatal << "Toplay handle_down() called";
+	gu_throw_fatal << "Toplay handle_down() called";
 	throw;
     }
 };
@@ -279,7 +277,7 @@ class gcomm::Bottomlay : public Protolay
 {
     void handle_up(int id, const gu::net::Datagram&, const ProtoUpMeta& um)
     {
-	gcomm_throw_fatal << "Bottomlay handle_up() called";
+	gu_throw_fatal << "Bottomlay handle_up() called";
     }
 };
 

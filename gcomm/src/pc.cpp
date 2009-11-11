@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 #include "pc.hpp"
 
@@ -55,14 +58,14 @@ int PC::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
 size_t PC::get_mtu() const
 {
     // TODO: 
-    if (gmcast == 0) gcomm_throw_fatal << "not open";
+    if (gmcast == 0) gu_throw_fatal << "not open";
     
     evs::UserMessage evsm;
     PCUserMessage  pcm(0);
     
     if (gmcast->get_mtu() < evsm.serial_size() + pcm.serial_size())
     {
-        gcomm_throw_fatal << "transport max msg size too small: "
+        gu_throw_fatal << "transport max msg size too small: "
                           << gmcast->get_mtu();
     }
     
@@ -74,7 +77,7 @@ bool PC::supports_uuid() const
     if (gmcast->supports_uuid() == false)
     {
         // alex: what is the meaning of this ?
-        gcomm_throw_fatal << "transport does not support UUID";
+        gu_throw_fatal << "transport does not support UUID";
     }
     return true;
 }
@@ -95,7 +98,7 @@ void PC::connect()
     const UUID& uuid(gmcast->get_uuid());
     if (uuid == UUID::nil())
     {
-        gcomm_throw_fatal << "invalid UUID: " << uuid.to_string();
+        gu_throw_fatal << "invalid UUID: " << uuid.to_string();
     }
 
     const bool start_prim = host_is_any (uri.get_host());

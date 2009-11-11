@@ -57,9 +57,7 @@ private:
     
     Message& operator=(const Message&);
     
-    NodeList* node_list; // @todo: since we do a full node list copy in ctor
-                         //        below, do we really need a pointer here?
-    
+    NodeList node_list; 
 public:
     
     static const char* type_to_string (Type t)
@@ -90,7 +88,7 @@ public:
         source_uuid    (msg.source_uuid),
         node_address   (msg.node_address),
         group_name     (msg.group_name),
-        node_list      (msg.node_list != 0 ? new NodeList(*msg.node_list) : 0)
+        node_list      (msg.node_list)
     { }
 
     /* Default ctor */
@@ -103,7 +101,7 @@ public:
         source_uuid    (),
         node_address   (),
         group_name     (),
-        node_list      (0)
+        node_list      ()
     {}
     
     /* Ctor for handshake, handshake ok and handshake fail */
@@ -118,11 +116,11 @@ public:
         source_uuid    (source_uuid_), 
         node_address   (),
         group_name     (),
-        node_list      (0)
+        node_list      ()
     {
         if (type != T_HANDSHAKE && type != T_HANDSHAKE_OK && 
             type != T_HANDSHAKE_FAIL)
-            gcomm_throw_fatal << "Invalid message type " << type_to_string(type)
+            gu_throw_fatal << "Invalid message type " << type_to_string(type)
                               << " in handshake constructor";        
     }
     
@@ -138,10 +136,10 @@ public:
         source_uuid    (source_uuid_), 
         node_address   (),
         group_name     (),
-        node_list      (0)
+        node_list      ()
     {
         if (type < T_USER_BASE)
-            gcomm_throw_fatal << "Invalid message type " << type_to_string(type)
+            gu_throw_fatal << "Invalid message type " << type_to_string(type)
                               << " in user message constructor";
     }
     
@@ -159,11 +157,11 @@ public:
         source_uuid    (source_uuid_),
         node_address   (node_address_),
         group_name     (group_name_),
-        node_list      (0)
+        node_list      ()
         
     {
         if (type != T_HANDSHAKE_RESPONSE)
-            gcomm_throw_fatal << "Invalid message type " << type_to_string(type)
+            gu_throw_fatal << "Invalid message type " << type_to_string(type)
                               << " in handshake response constructor";
     }
 
@@ -180,17 +178,14 @@ public:
         source_uuid    (source_uuid_),
         node_address   (),
         group_name     (group_name_),
-        node_list      (new NodeList(nodes))
+        node_list      (nodes)
     {
         if (type != T_TOPOLOGY_CHANGE)
-            gcomm_throw_fatal << "Invalid message type " << type_to_string(type)
+            gu_throw_fatal << "Invalid message type " << type_to_string(type)
                               << " in topology change constructor";
     }
     
-    ~Message() 
-    {
-        delete node_list;
-    }
+    ~Message() { }
     
     
     size_t serialize(gu::byte_t* buf, const size_t buflen, 
@@ -209,7 +204,7 @@ public:
         {
             gu_trace(off = handshake_uuid.serialize(buf, buflen, off));
         }
-
+        
         if (flags & F_NODE_ADDRESS)
         {
             gu_trace (off = node_address.serialize(buf, buflen, off));
@@ -223,11 +218,11 @@ public:
         if (flags & F_NODE_LIST) 
         {
             gu_trace (off = gcomm::serialize(
-                          static_cast<uint16_t>(node_list->size()),
+                          static_cast<uint16_t>(node_list.size()),
                           buf, buflen, off));
             
-            for (NodeList::const_iterator i = node_list->begin();
-                 i != node_list->end(); ++i) 
+            for (NodeList::const_iterator i = node_list.begin();
+                 i != node_list.end(); ++i) 
             {
                 gu_trace (off = i->serialize(buf, buflen, off));
             }
@@ -272,17 +267,14 @@ public:
 
             gu_trace (off = gcomm::unserialize(buf, buflen, off, &size));
 
-            node_list = new NodeList(); // @todo: danger! Prev. list not deleted
-            
             for (uint16_t i = 0; i < size; ++i) 
             {
                 Node node;
-                
                 gu_trace (off = node.unserialize(buf, buflen, off));
-                node_list->push_back(node);
+                node_list.push_back(node);
             }
         }
-
+        
         return off;
     }
     
@@ -312,7 +304,7 @@ public:
             + (flags & F_GROUP_NAME ? group_name.serial_size() : 0)
             /* Node list if set */
             + (flags & F_NODE_LIST ? 
-               2 + node_list->size()*Node::serial_size() : 0);
+               2 + node_list.size()*Node::serial_size() : 0);
     }
     
     uint8_t get_version() const { return version; }
@@ -329,5 +321,5 @@ public:
     
     const std::string&   get_group_name()   const { return group_name.to_string();   }
     
-    const NodeList* get_node_list()    const { return node_list;    }
+    const NodeList& get_node_list()    const { return node_list;    }
 };

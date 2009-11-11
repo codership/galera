@@ -92,7 +92,7 @@ namespace gcomm
                 gcomm_assert(contains(msg.get_source()) == true);
                 break;
             case V_NONE:
-                gcomm_throw_fatal;
+                gu_throw_fatal;
                 break;
             }
             
@@ -140,7 +140,7 @@ namespace gcomm
 
         void insert_view(const View& view)
         {
-            gu_trace(current_view = views.insert_checked(
+            gu_trace(current_view = views.insert_unique(
                          std::make_pair(view.get_id(), ViewTrace(view))));
         
             log_debug << view;
@@ -202,12 +202,12 @@ namespace gcomm
 
         void listen() 
         {
-            gcomm_throw_fatal << "not implemented";
+            gu_throw_fatal << "not implemented";
         }
         
         Transport *accept() 
         {
-            gcomm_throw_fatal << "not implemented";
+            gu_throw_fatal << "not implemented";
             return 0;
         }
         

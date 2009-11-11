@@ -1,7 +1,5 @@
 /*
  * Copyright (C) 2009 Codership Oy <info@codership.com>
- *
- * $Id$
  */
 
 #ifndef GCOMM_MAP_HPP
@@ -52,7 +50,7 @@ namespace gcomm
             iterator ret = map.find(k);
             if (ret == map.end())
             {
-                gcomm_throw_fatal << "element " << k << " not found";
+                gu_throw_fatal << "element " << k << " not found";
             }
             return ret;
         }
@@ -74,7 +72,7 @@ namespace gcomm
             const_iterator ret = map.find(k);
             if (ret == map.end())
             {
-                gcomm_throw_fatal << "element " << k << " not found";
+                gu_throw_fatal << "element " << k << " not found";
             }
             return ret;
         }
@@ -127,7 +125,7 @@ namespace gcomm
                 gu_trace(offset = v.unserialize(buf, buflen, offset));
                 if (map.insert(std::make_pair(k, v)).second == false)
                 {
-                    gcomm_throw_fatal << "Failed to unserialize map";
+                    gu_throw_fatal << "Failed to unserialize map";
                 }
             }
             return offset;
@@ -211,23 +209,19 @@ namespace gcomm
             return MapBase<K, V, C>::map.insert(p);
         }
         
-        iterator insert_checked(const typename MapBase<K, V, C>::value_type& p)
+        iterator insert_unique(const typename MapBase<K, V, C>::value_type& p)
         {
             std::pair<iterator, bool> ret = MapBase<K, V, C>::map.insert(p);
             if (false == ret.second)
             {
-                gcomm_throw_fatal << "duplicate entry " 
-                                  << "key=" << get_key(p) << " "
-                                  << "value=" << get_value(p) << " "
-                                  << "map=" << *this;
+                gu_throw_fatal << "duplicate entry " 
+                               << "key=" << get_key(p) << " "
+                               << "value=" << get_value(p) << " "
+                               << "map=" << *this;
             }
             return ret.first;
         }
 
-        iterator insert_unique(const typename MapBase<K, V, C>::value_type& vt)
-        {
-            return insert_checked(vt);
-        }
     };
 
 

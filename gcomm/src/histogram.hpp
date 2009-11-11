@@ -1,8 +1,10 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
-#ifndef HISTOGRAM_HPP
-#define HISTOGRAM_HPP
+#ifndef GCOMM_HISTOGRAM_HPP
+#define GCOMM_HISTOGRAM_HPP
 
-#include "gcomm/common.hpp"
 #include <map>
 #include <ostream>
 
@@ -24,4 +26,4 @@ namespace gcomm
 }
 
 
-#endif // HISTOGRAM_HPP
+#endif // GCOMM_HISTOGRAM_HPP

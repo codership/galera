@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 #include "pc_proto.hpp"
 #include "pc_message.hpp"
@@ -73,7 +76,7 @@ void PCProto::send_state()
     
     if (send_down(Datagram(buf), ProtoDownMeta()))
     {
-        gcomm_throw_fatal << "pass down failed";
+        gu_throw_fatal << "pass down failed";
     }    
 }
 
@@ -92,7 +95,7 @@ void PCProto::send_install()
             current_view.get_members().end())
         {
             gu_trace(
-                im.insert_checked(
+                im.insert_unique(
                     make_pair(
                         SMMap::get_key(i), 
                         SMMap::get_value(i).get_inst((SMMap::get_key(i))))));
@@ -159,7 +162,7 @@ void PCProto::shift_to(const State s)
     
     if (allowed[get_state()][s] == false)
     {
-        gcomm_throw_fatal << "Forbidden state transtion: "
+        gu_throw_fatal << "Forbidden state transtion: "
                           << to_string(get_state()) << " -> " << to_string(s);
     }
     
@@ -240,12 +243,12 @@ void PCProto::handle_first_trans(const View& view)
     {
         if (view.get_members().size() > 1 || view.is_empty())
         {
-            gcomm_throw_fatal << "Corrupted view";
+            gu_throw_fatal << "Corrupted view";
         }
         
         if (NodeList::get_key(view.get_members().begin()) != get_uuid())
         {
-            gcomm_throw_fatal << "Bad first UUID: "
+            gu_throw_fatal << "Bad first UUID: "
                               << NodeList::get_key(view.get_members().begin())
                               << ", expected: " << get_uuid();
         }
@@ -298,14 +301,14 @@ void PCProto::handle_first_reg(const View& view)
     {
         if (view.get_members().size() > 1 || view.is_empty())
         {
-            gcomm_throw_fatal << self_string() << " starting primary "
+            gu_throw_fatal << self_string() << " starting primary "
                               <<"but first reg view is not singleton";
         }
     }
     
     if (view.get_id().get_seq() <= current_view.get_id().get_seq())
     {
-        gcomm_throw_fatal << "Non-increasing view ids: current view " 
+        gu_throw_fatal << "Non-increasing view ids: current view " 
                           << current_view.get_id() 
                           << " new view "
                           << view.get_id();
@@ -325,7 +328,7 @@ void PCProto::handle_reg(const View& view)
     if (view.is_empty() == false && 
         view.get_id().get_seq() <= current_view.get_id().get_seq())
     {
-        gcomm_throw_fatal << "Non-increasing view ids: current view " 
+        gu_throw_fatal << "Non-increasing view ids: current view " 
                           << current_view.get_id() 
                           << " new view "
                           << view.get_id();
@@ -354,14 +357,14 @@ void PCProto::handle_view(const View& view)
     // We accept only EVS TRANS and REG views
     if (view.get_type() != V_TRANS && view.get_type() != V_REG)
     {
-        gcomm_throw_fatal << "Invalid view type";
+        gu_throw_fatal << "Invalid view type";
     }
     
     // Make sure that self exists in view
     if (view.is_empty()            == false &&
         view.is_member(get_uuid()) == false)
     {
-        gcomm_throw_fatal << "Self not found from non empty view: "
+        gu_throw_fatal << "Self not found from non empty view: "
                           << view;
     }
     
@@ -433,10 +436,6 @@ void PCProto::validate_state_msgs() const
                         << " to seq not consistent with local state:"
                         << " max to seq " << max_to_seq
                         << " msg state to seq " << msg_state.get_to_seq();
-                }
-                else
-                {
-                    // @todo: Is it valid to assert here that the 
                 }
             }
             else if (get_prim() == true)
@@ -543,14 +542,14 @@ bool PCProto::is_prim() const
         {
             if (state.get_last_prim() != last_prim)
             {
-                gcomm_throw_fatal 
+                gu_throw_fatal 
                     << self_string()
                     << " last prims not consistent";
             }
             
             if (state.get_to_seq() != to_seq)
             {
-                gcomm_throw_fatal 
+                gu_throw_fatal 
                     << self_string()
                     << " TO seqs not consistent";
             }
@@ -665,13 +664,13 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
             }
             else
             {
-                gcomm_throw_fatal << self_string()
+                gu_throw_fatal << self_string()
                                   << " aborting due to conflicting prims";
             }
         }
     }
     
-    state_msgs.insert_checked(make_pair(source, msg));
+    state_msgs.insert_unique(make_pair(source, msg));
     
     if (state_msgs.size() == current_view.get_members().size())
     {
@@ -736,7 +735,7 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
     
     if (m_state != PCInstMap::get_value(self_i))
     {
-        gcomm_throw_fatal << self_string()
+        gu_throw_fatal << self_string()
                           << "Install message self state does not match, "
                           << "message state: " << m_state
                           << ", local state: "
@@ -754,7 +753,7 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
         {
             if (m_state.get_to_seq() != to_seq)
             {
-                gcomm_throw_fatal << "Install message TO seqno inconsistent";
+                gu_throw_fatal << "Install message TO seqno inconsistent";
             }
         }
         
@@ -841,7 +840,7 @@ void PCProto::handle_msg(const PCMessage&   msg,
     
     if (verdict == FAIL)
     {
-        gcomm_throw_fatal << "Invalid input, message " << msg.to_string()
+        gu_throw_fatal << "Invalid input, message " << msg.to_string()
                           << " in state " << to_string(get_state());
     }
     else if (verdict == DROP)
@@ -863,7 +862,7 @@ void PCProto::handle_msg(const PCMessage&   msg,
         gu_trace(handle_user(msg, rb, um));
         break;
     default:
-        gcomm_throw_fatal << "Invalid message";
+        gu_throw_fatal << "Invalid message";
     }
 }
 
@@ -882,7 +881,7 @@ void PCProto::handle_up(int cid, const Datagram& rb,
         if (msg.unserialize(&rb.get_payload()[0], rb.get_payload().size(), 
                             rb.get_offset()) == 0)
         {
-            gcomm_throw_fatal << "Could not read message";
+            gu_throw_fatal << "Could not read message";
         }
         
         handle_msg(msg, rb, um);

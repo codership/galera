@@ -66,7 +66,7 @@ ostream& gcomm::operator<<(ostream& os, const gcomm::ViewId& vi)
 
 void gcomm::View::add_member(const UUID& pid, const string& name)
 {
-    gu_trace((void)members.insert_checked(make_pair(pid, Node())));
+    gu_trace((void)members.insert_unique(make_pair(pid, Node())));
 }
     
 void gcomm::View::add_members(NodeList::const_iterator begin,
@@ -74,7 +74,7 @@ void gcomm::View::add_members(NodeList::const_iterator begin,
 {
     for (NodeList::const_iterator i = begin; i != end; ++i)
     {
-        gu_trace((void)members.insert_checked(
+        gu_trace((void)members.insert_unique(
                      make_pair(NodeList::get_key(i), 
                                NodeList::get_value(i))));
     }
@@ -82,18 +82,18 @@ void gcomm::View::add_members(NodeList::const_iterator begin,
 
 void gcomm::View::add_joined(const UUID& pid, const string& name)
 {
-    gu_trace((void)joined.insert_checked(make_pair(pid, Node())));
+    gu_trace((void)joined.insert_unique(make_pair(pid, Node())));
 
 }
 
 void gcomm::View::add_left(const UUID& pid, const string& name)
 {
-    gu_trace((void)left.insert_checked(make_pair(pid, Node())));
+    gu_trace((void)left.insert_unique(make_pair(pid, Node())));
 }
 
 void gcomm::View::add_partitioned(const UUID& pid, const string& name)
 {
-    gu_trace((void)partitioned.insert_checked(make_pair(pid, Node())));
+    gu_trace((void)partitioned.insert_unique(make_pair(pid, Node())));
 }
 
 const NodeList& gcomm::View::get_members() const

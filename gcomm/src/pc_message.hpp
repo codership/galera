@@ -1,9 +1,12 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
+
 #ifndef PC_MESSAGE_HPP
 #define PC_MESSAGE_HPP
 
 #include "gcomm/view.hpp"
 #include "gcomm/types.hpp"
-#include "gcomm/common.hpp"
 #include "gcomm/uuid.hpp"
 #include "gcomm/map.hpp"
 
@@ -183,13 +186,13 @@ private:
     int        version;
     Type       type;
     uint32_t   seq;
-    PCInstMap* inst;
+    PCInstMap  inst;
 
     PCMessage& operator=(const PCMessage&);
 
 public:
 
-    PCMessage() : version(-1), type(T_NONE), seq(0), inst(0) {}
+    PCMessage() : version(-1), type(T_NONE), seq(0), inst() {}
     
     PCMessage(const int      version_, 
               const Type     type_,
@@ -198,53 +201,45 @@ public:
         version(version_),
         type   (type_),
         seq    (seq_),
-        inst   (0)
-    {
-        if (type == T_STATE || type == T_INSTALL)
-        {
-            inst = new PCInstMap();
-        }
-    }
+        inst   ()
+    { }
     
     PCMessage(const PCMessage& msg)
         :
         version (msg.version),
         type    (msg.type),
         seq     (msg.seq),
-        inst    (msg.inst != 0 ? new PCInstMap(*msg.inst) : 0)
+        inst    (msg.inst)
     {}
     
-    virtual ~PCMessage() { delete inst; }
+    virtual ~PCMessage() { }
     
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
     {
         size_t   off;
         uint32_t b;
-
-        delete inst;
-        inst = 0;
+        
+        inst.clear();
 
         gu_trace (off = gcomm::unserialize(buf, buflen, offset, &b));
 
         version = b & 0xff;
 
         if (version != 0)
-            gcomm_throw_runtime (EPROTONOSUPPORT)
+            gu_throw_error (EPROTONOSUPPORT)
                 << "Unsupported protocol varsion: " << version;
 
         type = static_cast<Type>((b >> 8) & 0xff);
 
         if (type <= T_NONE || type >= T_MAX)
-            gcomm_throw_runtime (EINVAL) << "Bad type value: " << type;
+            gu_throw_error (EINVAL) << "Bad type value: " << type;
 
         gu_trace (off = gcomm::unserialize(buf, buflen, off, &seq));
 
         if (type == T_STATE || type == T_INSTALL)
         {
-            inst = new PCInstMap();
-
-            gu_trace (off = inst->unserialize(buf, buflen, off));
+            gu_trace (off = inst.unserialize(buf, buflen, off));
         }
 
         return off;
@@ -266,12 +261,7 @@ public:
 
         if (type == T_STATE || type == T_INSTALL)
         {
-            assert (inst);
-            gu_trace (off = inst->serialize(buf, buflen, off));
-        }
-        else
-        {
-            assert (!inst);
+            gu_trace (off = inst.serialize(buf, buflen, off));
         }
 
         assert (serial_size() == (off - offset));
@@ -283,7 +273,7 @@ public:
     {
         //            header
         return sizeof(uint32_t) + sizeof(seq) 
-            + (inst != 0 ? inst->serial_size() : 0);
+            + (type == T_STATE || type == T_INSTALL  ? inst.serial_size() : 0);
     }
     
     int      get_version()  const { return version; }
@@ -292,47 +282,35 @@ public:
 
     uint32_t get_seq()      const { return seq; }
     
-    bool     has_inst_map() const { return inst; }
 
     // we have a problem here - we should not be able to construct the message
     // without the instance map in the first place. Or that should be another
     // class of message.
     const PCInstMap& get_inst_map() const
     {
-        if (has_inst_map()) return *inst;
-
-        gcomm_throw_fatal << "PC message does not have instance map"; throw;
+        return inst;
     }
 
     PCInstMap& get_inst_map()
     {
-        if (has_inst_map()) return *inst;
-
-        gcomm_throw_fatal << "PC message does not have instance map"; throw;
+        return inst;
     }
-
+    
     
     const PCInst& get_inst(const UUID& uuid) const
     {
-        if (has_inst_map()) return PCInstMap::get_value(inst->find_checked(uuid));
-        
-        gcomm_throw_fatal << "PC message does not have instance map"; throw;
+        return PCInstMap::get_value(inst.find_checked(uuid));
     }
-
-
+    
+    
     std::string to_string() const
     {
         std::ostringstream ret;
-
+        
         ret << "pcmsg{ type=" << to_string(type) << ", seq=" << seq;
-
-        if (has_inst_map())
-        {
-            ret << ", inst {" << get_inst_map() << "}";
-        }
-
+        ret << ", inst {" << get_inst_map() << "}";
         ret << '}';
-
+        
         return ret.str();
     }
 };
@@ -356,8 +334,6 @@ public:
 
 class gcomm::PCUserMessage : public PCMessage
 {
-    // @todo: why seq is not initialized from seq?
-//    PCUserMessage(uint32_t seq) : PCMessage(0, PCMessage::T_USER, 0) {}
 public:
     PCUserMessage(uint32_t seq) : PCMessage(0, PCMessage::T_USER, seq) {}
 };
@@ -365,26 +341,10 @@ public:
 
 inline bool gcomm::operator==(const PCMessage& a, const PCMessage& b)
 {
-    bool ret =
-        a.get_version() == b.get_version() &&
-        a.get_type()    == b.get_type() &&
-        a.get_seq()     == b.get_seq();
-    
-    if (ret == true)
-    {
-        if (a.has_inst_map() != b.has_inst_map())
-        {
-            // @todo: what is this supposed to mean? shouldn't it be just false?
-            gcomm_throw_fatal;
-        }
-        
-        if (a.has_inst_map())
-        {
-            ret = ret && a.get_inst_map() == b.get_inst_map();
-        }
-    }
-
-    return ret;
+    return (a.get_version()  == b.get_version() &&
+            a.get_type()     == b.get_type()    &&
+            a.get_seq()      == b.get_seq()     &&
+            a.get_inst_map() == b.get_inst_map());
 }
 
 

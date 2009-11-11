@@ -2,10 +2,9 @@
  * Copyright (C) 2009 Codership Oy <info@codership.com>
  */
 
-#ifndef EVS_PROTO_HPP
-#define EVS_PROTO_HPP
+#ifndef GCOMM_EVS_PROTO_HPP
+#define GCOMM_EVS_PROTO_HPP
 
-#include "gcomm/common.hpp"
 #include "gcomm/protolay.hpp"
 #include "gcomm/view.hpp"
 #include "gcomm/transport.hpp"
@@ -85,7 +84,7 @@ public:
         case S_RECOVERY:    return "RECOVERY";
         case S_OPERATIONAL: return "OPERATIONAL";
         default:
-            gcomm_throw_fatal << "Invalid state";
+            gu_throw_fatal << "Invalid state";
             throw;
         }
     }

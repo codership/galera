@@ -1,11 +1,14 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
+
+
 /**
  * Strings containing config parameter hierarchy and utility 
  * functions to read param values
  */
 #ifndef _GCOMM_CONF_HPP_
 #define _GCOMM_CONF_HPP_
-
-#include "gcomm/common.hpp"
 
 #include "gu_uri.hpp"
 #include "gu_throw.hpp"

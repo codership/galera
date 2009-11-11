@@ -72,12 +72,12 @@ public:
         if (NodeMap::get_key(l) != node.get_index())
         {
             ChannelMap::iterator ii;
-            gu_trace(ii = prop.insert_checked(
+            gu_trace(ii = prop.insert_unique(
                          make_pair(MatrixElem(node.get_index(), 
                                               NodeMap::get_key(l)), 
                                    new Channel())));
             gcomm::connect(ChannelMap::get_value(ii), node.get_protos().front());
-            gu_trace(ii = prop.insert_checked(
+            gu_trace(ii = prop.insert_unique(
                          make_pair(MatrixElem(NodeMap::get_key(l),
                                               node.get_index()), 
                                    new Channel())));
@@ -171,7 +171,7 @@ gcomm::PropagationMatrix::~PropagationMatrix()
 
 void gcomm::PropagationMatrix::insert_tp(DummyNode* t)
 {
-    gu_trace(tp.insert_checked(make_pair(t->get_index(), t)));
+    gu_trace(tp.insert_unique(make_pair(t->get_index(), t)));
     for_each(tp.begin(), tp.end(), LinkOp(*t, prop));
 }
 

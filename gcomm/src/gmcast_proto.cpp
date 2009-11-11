@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 #include "gmcast_proto.hpp"
 
@@ -34,7 +37,7 @@ void gcomm::gmcast::Proto:: set_state(State new_state)
 
     if (!allowed[state][new_state])
     {
-        gcomm_throw_fatal << "Invalid state change: " << to_string(state)
+        gu_throw_fatal << "Invalid state change: " << to_string(state)
                           << " -> " << to_string(new_state);
     }
 
@@ -67,7 +70,7 @@ void gcomm::gmcast::Proto::send_handshake()
 void gcomm::gmcast::Proto::wait_handshake() 
 {
     if (get_state() != S_INIT)
-        gcomm_throw_fatal << "Invalid state: " << to_string(get_state());
+        gu_throw_fatal << "Invalid state: " << to_string(get_state());
     
     set_state(S_HANDSHAKE_WAIT);
 }
@@ -75,7 +78,7 @@ void gcomm::gmcast::Proto::wait_handshake()
 void gcomm::gmcast::Proto::handle_handshake(const Message& hs) 
 {
     if (get_state() != S_HANDSHAKE_WAIT)
-        gcomm_throw_fatal << "Invalid state: " << to_string(get_state());
+        gu_throw_fatal << "Invalid state: " << to_string(get_state());
     
     handshake_uuid = hs.get_handshake_uuid();
     remote_uuid = hs.get_source_uuid();
@@ -93,7 +96,7 @@ void gcomm::gmcast::Proto::handle_handshake(const Message& hs)
 void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs) 
 {
     if (get_state() != S_HANDSHAKE_SENT)
-        gcomm_throw_fatal << "Invalid state: " << to_string(get_state());
+        gu_throw_fatal << "Invalid state: " << to_string(get_state());
     
         const std::string& grp = hs.get_group_name();
         
@@ -141,15 +144,10 @@ void gcomm::gmcast::Proto::handle_failed(const Message& hs)
     
 void gcomm::gmcast::Proto::handle_topology_change(const Message& msg)
 {
-    const Message::NodeList* nl = msg.get_node_list();
-    if (nl == 0)
-    {
-        log_warn << "null node list";
-    }
+    const Message::NodeList& nl(msg.get_node_list());
     
     LinkMap new_map;
-    for (Message::NodeList::const_iterator i = nl->begin();
-         i != nl->end(); ++i)
+    for (Message::NodeList::const_iterator i = nl.begin(); i != nl.end(); ++i)
     {
         new_map.insert(Link(i->get_uuid(), i->get_addr()));
     }
@@ -160,7 +158,7 @@ void gcomm::gmcast::Proto::handle_topology_change(const Message& msg)
     }
     link_map = new_map;
 }
-    
+
 void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
 {
     Message::NodeList nl;
@@ -168,12 +166,12 @@ void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
     {
         if (LinkMap::get_key(i) == UUID::nil() || 
             LinkMap::get_value(i).get_addr() == "")
-            gcomm_throw_fatal << "nil uuid or empty address";
-
+            gu_throw_fatal << "nil uuid or empty address";
+        
         nl.push_back(Node(LinkMap::get_key(i), 
                           LinkMap::get_value(i).get_addr()));
     }
-        
+    
     Message msg(Message::T_TOPOLOGY_CHANGE, local_uuid,
                 group_name, nl);
         

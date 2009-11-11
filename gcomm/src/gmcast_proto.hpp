@@ -8,7 +8,6 @@
 #include "gmcast_message.hpp"
 #include "gmcast_link.hpp"
 
-
 namespace gcomm
 {
 

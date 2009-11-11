@@ -105,11 +105,11 @@ START_TEST(test_message)
     node_list.insert(make_pair(uuid1, MessageNode()));
     node_list.insert(make_pair(UUID(2), MessageNode(true, true, ViewId(V_REG), 5,
                                                     Range(7, 8))));
-    JoinMessage jm(uuid1, view_id, 8, 5, 27, &node_list);
+    JoinMessage jm(uuid1, view_id, 8, 5, 27, node_list);
     jm.set_source(uuid1);
     check_serialization(jm, jm.serial_size(), JoinMessage());
     
-    InstallMessage im(uuid1, view_id, 8, 5, 27, &node_list);
+    InstallMessage im(uuid1, view_id, 8, 5, 27, node_list);
     im.set_source(uuid1);
     check_serialization(im, im.serial_size(), InstallMessage());
     

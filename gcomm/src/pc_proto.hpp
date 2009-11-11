@@ -1,5 +1,9 @@
-#ifndef PC_PROTO_HPP
-#define PC_PROTO_HPP
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
+
+#ifndef GCOMM_PC_PROTO_HPP
+#define GCOMM_PC_PROTO_HPP
 
 #include <list>
 
@@ -39,7 +43,7 @@ public:
         case S_PRIM:        return "PRIM";
         case S_NON_PRIM:    return "NON_PRIM";
         default:
-            gcomm_throw_fatal << "Invalid state"; throw;
+            gu_throw_fatal << "Invalid state"; throw;
         }
     }
 
@@ -128,7 +132,7 @@ public:
         pc_view      (V_NON_PRIM),
         views        ()
     {
-        self_i = instances.insert_checked(std::make_pair(get_uuid(), PCInst()));
+        self_i = instances.insert_unique(std::make_pair(get_uuid(), PCInst()));
     }
     
     ~PCProto() {}

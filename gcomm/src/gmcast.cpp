@@ -1,8 +1,10 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 #include "gmcast.hpp"
 #include "gmcast_proto.hpp"
 
-#include "gcomm/common.hpp"
 #include "gcomm/conf.hpp"
 #include "gcomm/util.hpp"
 #include "gcomm/map.hpp"
@@ -51,8 +53,8 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
 {
     if (uri.get_scheme() != Conf::GMCastScheme)
     {
-        gcomm_throw_runtime (EINVAL) << "Invalid URL scheme: "
-                                     << uri.get_scheme();
+        gu_throw_error (EINVAL) << "Invalid URL scheme: "
+                                << uri.get_scheme();
     }
     
     // @todo: technically group name should be in path component
@@ -62,8 +64,8 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
     }
     catch (gu::NotFound&)
     {
-        gcomm_throw_runtime (EINVAL) << "Group not defined in URL: "
-                                     << uri.to_string();
+        gu_throw_error (EINVAL) << "Group not defined in URL: "
+                                << uri.to_string();
     }
     
     try
@@ -83,8 +85,8 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
                 tcp_addr_prefix + uri.get_host() + ":" + port).to_string();
             if (check_uri(initial_addr) == false)
             {
-                gcomm_throw_runtime (EINVAL) << "initial addr '" << initial_addr
-                                             << "' is not valid";
+                gu_throw_error (EINVAL) << "initial addr '" << initial_addr
+                                        << "' is not valid";
             }
             log_debug << self_string() << " initial addr " << initial_addr;
         }
@@ -92,8 +94,8 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
     catch (gu::NotSet&)
     {
         //@note: this is different from empty host and indicates URL without ://
-        gcomm_throw_runtime (EINVAL) << "Host not defined in URL: "
-                                     << uri.to_string();
+        gu_throw_error (EINVAL) << "Host not defined in URL: "
+                                << uri.to_string();
     }
     
 
@@ -125,8 +127,8 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
     listen_addr = resolve(listen_addr).to_string();
     if (check_uri(listen_addr) == false)
     {
-        gcomm_throw_runtime (EINVAL) << "listen addr '" << listen_addr
-                                     << "' is not valid";
+        gu_throw_error (EINVAL) << "listen addr '" << listen_addr
+                                << "' is not valid";
     }
 
     log_debug << self_string() << " listening " << listen_addr;
@@ -199,7 +201,7 @@ void GMCast::gmcast_accept()
     if (ret.second == false)
     {
         delete peer;
-        gcomm_throw_fatal << "Failed to add peer to map";
+        gu_throw_fatal << "Failed to add peer to map";
     }
     
     peer->send_handshake();
@@ -220,7 +222,7 @@ void GMCast::gmcast_connect(const string& remote_addr)
     {
         tp->connect();
     }
-    catch (RuntimeException e)
+    catch (Exception& e)
     {
         log_debug << "Connect failed: " << e.what();
         delete tp;
@@ -236,7 +238,7 @@ void GMCast::gmcast_connect(const string& remote_addr)
     if (ret.second == false)
     {
         delete peer;
-        gcomm_throw_fatal << "Failed to add peer to map";
+        gu_throw_fatal << "Failed to add peer to map";
     }
     
     ret.first->second->wait_handshake();
@@ -417,7 +419,7 @@ void GMCast::insert_address (const string& addr,
 {
     if (addr == listen_addr)
     {
-        gcomm_throw_fatal << "Trying to add self to addr list";
+        gu_throw_fatal << "Trying to add self to addr list";
     }
     
     if (alist.insert(make_pair(addr, 
@@ -452,11 +454,11 @@ void GMCast::update_addresses()
             if (rp->get_remote_addr() == "" || 
                 rp->get_remote_uuid() == UUID::nil())
             {
-                gcomm_throw_fatal << "Protocol error: local: " 
-                                  << get_uuid().to_string() << " "
-                                  << listen_addr << ", remote: "
-                                  << rp->get_remote_uuid().to_string()
-                                  << " '" << rp->get_remote_addr() << "'";
+                gu_throw_fatal << "Protocol error: local: " 
+                               << get_uuid().to_string() << " "
+                               << listen_addr << ", remote: "
+                               << rp->get_remote_uuid().to_string()
+                               << " '" << rp->get_remote_addr() << "'";
             }
             
             if (remote_addrs.find(rp->get_remote_addr()) == remote_addrs.end())

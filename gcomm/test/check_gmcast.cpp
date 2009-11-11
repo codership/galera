@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 #include "check_gcomm.hpp"
 #include "gcomm/protostack.hpp"
@@ -140,13 +143,13 @@ START_TEST(test_gmcast_w_user_messages)
         {
             if (rb.get_len() < rb.get_offset() + 16)
             {
-                throw FatalException("offset error");
+                gu_throw_fatal << "offset error";
             }
             char buf[16];
             memset(buf, 'a', sizeof(buf));
             if (memcmp(buf, &rb.get_payload()[0] + rb.get_offset(), 16) != 0)
             {
-                throw FatalException("content mismatch");
+                gu_throw_fatal << "content mismatch";
             }
             recvd++;
         }

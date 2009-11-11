@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
+
+
 /*!
  * @file Group view class (used in the ProtoUpMeta (protolay.hpp)
  */
@@ -5,11 +10,11 @@
 #ifndef _GCOMM_VIEW_HPP_
 #define _GCOMM_VIEW_HPP_
 
-#include <gcomm/common.hpp>
-#include <gcomm/uuid.hpp>
-#include <gcomm/logger.hpp>
-#include <gcomm/types.hpp>
-#include <gcomm/map.hpp>
+
+#include "gcomm/uuid.hpp"
+#include "gcomm/logger.hpp"
+#include "gcomm/types.hpp"
+#include "gcomm/map.hpp"
 
 namespace gcomm
 {
