@@ -1,12 +1,15 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 #include "gcomm/util.hpp"
 #include "histogram.hpp"
-#include "gcomm/logger.hpp"
 
 
 #include "check_gcomm.hpp"
 
-#include <gu_string.hpp>
+#include "gu_string.hpp"
+#include "gu_logger.hpp"
 
 #include <vector>
 #include <limits>

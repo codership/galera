@@ -1,23 +1,13 @@
 /*
  * Copyright (C) 2009 Codership Oy <info@codership.com>
- *
- * $Id$
  */
 
-/*! 
- * @file evs_input_map2.cpp
- *
- * Input map implementation
- *
- * @author Teemu Ollakka <teemu.ollakka@codership.com>
- */
-
-#ifdef PROFILE_EVS_INPUT_MAP
-// #define GCOMM_PROFILE 1
-#endif // PROFILE_EVS_INPUT_MAP
 
 #include "evs_input_map2.hpp"
+
 #include "gu_exception.hpp"
+#include "gu_logger.hpp"
+
 #include <stdexcept>
 #include <numeric>
 

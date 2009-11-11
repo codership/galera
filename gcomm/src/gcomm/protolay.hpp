@@ -1,5 +1,9 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
+
 /*!
- * @file Base class for all gcomm layers
+ * @file Base class for all gcomm protocol layers
  */
 
 #ifndef _GCOMM_PROTOLAY_HPP_
@@ -7,9 +11,9 @@
 
 #include "gcomm/view.hpp"
 #include "gcomm/exception.hpp"
-#include "gcomm/logger.hpp"
 #include "gcomm/order.hpp"
 
+#include "gu_logger.hpp"
 #include "gu_datetime.hpp"
 
 #include <cerrno>

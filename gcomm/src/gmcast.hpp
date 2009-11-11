@@ -11,14 +11,12 @@
 
 #include "gcomm/uuid.hpp"
 #include "gcomm/exception.hpp"
-#include "gcomm/logger.hpp"
 #include "gcomm/transport.hpp"
 #include "gcomm/types.hpp"
 
 namespace gcomm
 {
-    
-    
+        
     namespace gmcast
     {
         class Proto;

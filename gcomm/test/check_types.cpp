@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
+
 
 #include "check_gcomm.hpp"
 

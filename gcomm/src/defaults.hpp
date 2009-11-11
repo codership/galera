@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 #ifndef DEFAULTS_HPP
 #define DEFAULTS_HPP

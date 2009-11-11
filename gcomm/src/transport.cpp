@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 #include "gcomm/transport.hpp"
 #include "socket.hpp"

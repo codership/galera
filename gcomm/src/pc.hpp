@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 #include "gcomm/transport.hpp"
 
@@ -13,10 +16,10 @@ namespace gcomm
     
     class PC : public Transport
     {
-        GMCast*     gmcast;                 // GMCast transport
+        GMCast*     gmcast;                           // GMCast transport
         evs::Proto* evs;                // EVS protocol layer
         PCProto*    pc;                 // PC protocol layer
-        gu::datetime::Period      leave_grace_period; // Period to wait graceful leave
+        gu::datetime::Period leave_grace_period; // Period to wait graceful leave
         
         PC(const PC&);
         void operator=(const PC&);

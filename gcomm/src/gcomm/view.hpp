@@ -12,7 +12,6 @@
 
 
 #include "gcomm/uuid.hpp"
-#include "gcomm/logger.hpp"
 #include "gcomm/types.hpp"
 #include "gcomm/map.hpp"
 

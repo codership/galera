@@ -1,9 +1,14 @@
-#include <sstream>
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 #include "gcomm/view.hpp"
-#include "gcomm/logger.hpp"
 #include "gcomm/types.hpp"
 #include "gcomm/util.hpp"
+
+#include "gu_logger.hpp"
+
+#include <sstream>
 
 using namespace std;
 using namespace gcomm;

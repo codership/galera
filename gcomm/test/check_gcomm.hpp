@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 #ifndef CHECK_GCOMM_HPP
 #define CHECK_GCOMM_HPP

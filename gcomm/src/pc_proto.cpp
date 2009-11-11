@@ -4,8 +4,10 @@
 
 #include "pc_proto.hpp"
 #include "pc_message.hpp"
-#include "gcomm/logger.hpp"
+
 #include "gcomm/util.hpp"
+
+#include "gu_logger.hpp"
 
 #include <set>
 

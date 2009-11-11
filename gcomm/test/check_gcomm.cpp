@@ -1,8 +1,12 @@
-#include "check_gcomm.hpp"
-#include "gcomm/logger.hpp"
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
-#include <gu_string.hpp>
-#include <gu_exception.hpp>
+#include "check_gcomm.hpp"
+
+#include "gu_string.hpp"
+#include "gu_exception.hpp"
+#include "gu_logger.hpp"
 
 #include <string>
 #include <vector>

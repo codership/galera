@@ -8,6 +8,8 @@
 #include "evs_node.hpp"
 #include "gcomm/view.hpp"
 
+#include "gu_logger.hpp"
+
 #include <list>
 
 using namespace std;

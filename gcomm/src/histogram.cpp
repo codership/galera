@@ -5,10 +5,10 @@
 #include "histogram.hpp"
 
 #include "gcomm/exception.hpp"
-#include "gcomm/logger.hpp"
 #include "gcomm/types.hpp"
 
-#include <gu_string.hpp>
+#include "gu_logger.hpp"
+#include "gu_string.hpp"
 
 #include <sstream>
 #include <limits>

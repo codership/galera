@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 #ifdef PROFILE_EVS_PROTO
 #define GCOMM_PROFILE 1
