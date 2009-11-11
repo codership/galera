@@ -1,3 +1,4 @@
+// Copyright (C) 2009 Codership Oy <info@codership.com>
 
 #include "gu_resolver.hpp"
 #include "gu_logger.hpp"
@@ -5,8 +6,6 @@
 #include "gu_utils.hpp"
 #include "gu_throw.hpp"
 #include "gu_uri.hpp"
-
-
 
 #include <cerrno>
 #include <cstdlib>
@@ -21,11 +20,41 @@ using namespace std;
 class SchemeMap
 {
 public:
+
     typedef map<string, addrinfo> Map;
     typedef Map::const_iterator const_iterator;
+
+    SchemeMap() : ai_map()
+    {
+        
+        ai_map.insert(make_pair("tcp",
+                                get_addrinfo(0, AF_UNSPEC, SOCK_STREAM, 0)));
+        ai_map.insert(make_pair("udp",
+                                get_addrinfo(0, AF_UNSPEC, SOCK_DGRAM,  0)));
+        // TODO:
+    }
+
+    const_iterator find(const string& key) const
+    {
+        return ai_map.find(key);
+    }
+
+    const_iterator end() const
+    {
+        return ai_map.end();
+    }
+
+    static const addrinfo* get_addrinfo(const_iterator i)
+    {
+        return &i->second;
+    }
+
 private:
+
     Map ai_map;
-    struct addrinfo get_addrinfo(int flags, int family, int socktype, int protocol)
+
+    struct addrinfo get_addrinfo(int flags, int family, int socktype,
+                                 int protocol)
     {
         struct addrinfo ret = {
             flags,
@@ -39,36 +68,9 @@ private:
         };
         return ret;
     }
-public:
-    SchemeMap() :
-        ai_map()
-    {
-        
-        ai_map.insert(make_pair("tcp", get_addrinfo(0, AF_UNSPEC, SOCK_STREAM, 0)));
-        ai_map.insert(make_pair("udp", get_addrinfo(0, AF_UNSPEC, SOCK_DGRAM, 0)));
-        // TODO:
-    }
-    
-    const_iterator find(const string& key) const
-    {
-        return ai_map.find(key);
-    }
-    
-    const_iterator end() const
-    {
-        return ai_map.end();
-    }
-    static const addrinfo* get_addrinfo(const_iterator i)
-    {
-        return &i->second;
-    }
 };
 
 static SchemeMap scheme_map;
-
-
-
-
 
 void copy(const addrinfo& from, addrinfo& to)
 {
@@ -77,20 +79,23 @@ void copy(const addrinfo& from, addrinfo& to)
     to.ai_socktype = from.ai_socktype;
     to.ai_protocol = from.ai_protocol;
     to.ai_addrlen = from.ai_addrlen;
+
     if (from.ai_addr != 0)
     {
-        if ((to.ai_addr = reinterpret_cast<sockaddr*>(malloc(to.ai_addrlen))) == 0)
+        if ((to.ai_addr =
+             reinterpret_cast<sockaddr*>(malloc(to.ai_addrlen))) == 0)
         {
             gu_throw_fatal 
                 << "out of memory while trying to allocate " 
                 << to.ai_addrlen << " bytes";
         }
+
         memcpy(to.ai_addr, from.ai_addr, to.ai_addrlen);
     }
+
     to.ai_canonname = 0;
     to.ai_next = 0;
 }
-
 
 gu::net::Sockaddr::Sockaddr(const sockaddr* sa_, socklen_t sa_len_) :
     sa(0),
@@ -115,13 +120,10 @@ gu::net::Sockaddr::Sockaddr(const Sockaddr& s) :
     memcpy(sa, s.sa, sa_len);
 }
 
-
-
 gu::net::Sockaddr::~Sockaddr()
 {
     free(sa);
 }
-
 
 gu::net::Addrinfo::Addrinfo(const addrinfo& a) :
     ai()
@@ -167,10 +169,9 @@ string gu::net::Addrinfo::to_string() const
     default:
         gu_throw_error(EINVAL) << "invalid socktype: " << get_socktype();
     }
+
     char dst[INET6_ADDRSTRLEN + 1];
-    
-    
-    
+
     if (inet_ntop(get_family(), addr.get_addr(), 
                   dst, sizeof(dst)) == 0)
     {
@@ -194,7 +195,6 @@ string gu::net::Addrinfo::to_string() const
     ret += ":" + gu::to_string(ntohs(addr.get_port()));
     return ret;
 }
-
 
 gu::net::Addrinfo gu::net::resolve(const URI& uri)
 {

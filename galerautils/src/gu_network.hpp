@@ -1,4 +1,4 @@
-
+// Copyright (C) 2009 Codership Oy <info@codership.com>
 
 /*!
  * @file gu_network.hpp Network API

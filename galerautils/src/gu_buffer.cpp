@@ -1,3 +1,4 @@
+// Copyright (C) 2009 Codership Oy <info@codership.com>
 
 #include "gu_buffer.hpp"
 #include "gu_lock.hpp"

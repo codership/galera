@@ -1,9 +1,7 @@
+// Copyright (C) 2009 Codership Oy <info@codership.com>
 
 #include "gu_string.hpp"
-
 #include "gu_string_test.hpp"
-
-
 
 using std::string;
 using std::vector;

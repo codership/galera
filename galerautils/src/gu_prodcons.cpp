@@ -1,3 +1,4 @@
+// Copyright (C) 2009 Codership Oy <info@codership.com>
 
 #include "gu_prodcons.hpp"
 
@@ -8,8 +9,8 @@ using namespace std;
 
 class gu::prodcons::MessageQueue
 {
-    std::deque<Message> que;
 public:
+
     MessageQueue() : que() { }
     bool empty() const { return que.empty(); }
     size_t size() const { return que.size(); }
@@ -18,6 +19,10 @@ public:
     void pop_front() { que.pop_front(); }
     
     void push_back(const Message& msg) { que.push_back(msg); }
+
+private:
+
+    std::deque<Message> que;
 };
 
 void gu::prodcons::Producer::send(const Message& msg, Message* ack)

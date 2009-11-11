@@ -44,7 +44,7 @@ struct gu_fifo
     long  get_wait;
     long  put_wait;
     bool  closed;
-    
+
     gu_mutex_t   lock;
     gu_cond_t    get_cond;
     gu_cond_t    put_cond;
@@ -70,9 +70,9 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
 
     if (length > 0 && item_size > 0) {
         size_t max_size;
-	/* find the best ratio of width and height:
-	 * the size of a row array must be equal to that of the row */
-	while (array_len * row_len < length) {
+        /* find the best ratio of width and height:
+         * the size of a row array must be equal to that of the row */
+        while (array_len * row_len < length) {
             if (array_size < row_size) {
                 array_pwr++;
                 array_len = 1 << array_pwr;
@@ -268,7 +268,7 @@ void gu_fifo_pop_head (gu_fifo_t* q)
 {
     if (FIFO_COL(q, q->head) == q->col_mask) {
         /* removing last unit from the row */
-	register ulong row = FIFO_ROW (q, q->head);
+        register ulong row = FIFO_ROW (q, q->head);
         assert (q->rows[row] != NULL);
         gu_free (q->rows[row]);
         q->rows[row] = NULL;
@@ -294,12 +294,12 @@ void* gu_fifo_get_tail (gu_fifo_t* q)
     }
 
     if (gu_likely(!q->closed)) { // stop adding items when closed
-	ulong row = FIFO_ROW(q, q->tail);
-        
+        ulong row = FIFO_ROW(q, q->tail);
+
         assert (q->used < q->length);
 
         // check if row is allocated and allocate if not.
-	if (NULL == q->rows[row] &&
+        if (NULL == q->rows[row] &&
             NULL == (q->alloc += q->row_size,
                      q->rows[row] = gu_malloc(q->row_size))) {
             q->alloc -= q->row_size;
@@ -309,7 +309,7 @@ void* gu_fifo_get_tail (gu_fifo_t* q)
                     FIFO_COL(q, q->tail) * q->item_size);
         }
 #if 0 // for debugging
-	if (NULL == q->rows[row]) {
+        if (NULL == q->rows[row]) {
             gu_debug ("Allocating row %lu of queue %p, rows %p", row, q, q->rows);
             if (NULL == (q->rows[row] = gu_malloc(q->row_size))) {
                 gu_debug ("Allocating row %lu failed", row);
