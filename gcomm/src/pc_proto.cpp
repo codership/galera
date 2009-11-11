@@ -627,7 +627,7 @@ bool PCProto::is_prim() const
         log_info << self_string()
                  << " intersection size " << intersection.size()
                  << " greatest view size " << greatest_view.size();
-        if (intersection.size()*2 > greatest_view.size())
+        if (intersection.size() == greatest_view.size())
         {
             prim = true;
         }
@@ -679,16 +679,21 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
         for (SMMap::const_iterator i = state_msgs.begin(); 
              i != state_msgs.end(); ++i)
         {
-            const UUID& sm_uuid(SMMap::get_key(i));
-            if (instances.find(sm_uuid) == instances.end())
+            const PCInstMap& sm_im(SMMap::get_value(i).get_inst_map());
+            for (PCInstMap::const_iterator j = sm_im.begin(); j != sm_im.end();
+                 ++j)
             {
-                const PCInst& sm_state(SMMap::get_value(i).get_inst(sm_uuid));
-                instances.insert_unique(make_pair(sm_uuid, sm_state));
+                const UUID& sm_uuid(PCInstMap::get_key(j));
+                if (instances.find(sm_uuid) == instances.end())
+                {
+                    const PCInst& sm_state(PCInstMap::get_value(j));
+                    instances.insert_unique(make_pair(sm_uuid, sm_state));
+                }
             }
         }
         
         // Validate that all state messages are consistent before proceeding
-        validate_state_msgs();
+        gu_trace(validate_state_msgs());
         
         if (is_prim() == true)
         {
