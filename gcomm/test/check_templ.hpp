@@ -15,13 +15,6 @@
 namespace gcomm
 {
 
-
-    template <typename I>
-    inline std::ostream& operator<<(std::ostream& os, const IntType<I>& i)
-    {
-        return (os << i.get());
-    }
-
     
     template<class T>
     void check_serialization(const T& c, const size_t expected_size, 

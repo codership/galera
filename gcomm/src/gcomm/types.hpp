@@ -75,53 +75,6 @@ namespace gcomm
         return sizeof(t);
     }
     
-    template <typename I> class IntType
-    {
-    public:
-        
-        IntType() : i() { }
-
-        IntType(const I i_) : i(i_) { }
-        
-        size_t serialize(gu::byte_t* buf, size_t const buflen, size_t const offset)
-            const throw(gu::Exception)
-        {
-            return gcomm::serialize(i, buf, buflen, offset);
-        }
-        
-        size_t unserialize(const gu::byte_t* buf, size_t const buflen,
-                           size_t const offset)
-            throw(gu::Exception)
-        {
-            return gcomm::unserialize(buf, buflen, offset, &i);
-        }
-        
-        static size_t serial_size()
-        {
-            return sizeof(I);
-        }
-
-        I get() const { return i; }
-
-        bool operator==(const IntType<I>& cmp) const
-        {
-            return i == cmp.i;
-        }
-
-        bool operator<(const IntType<I>& cmp) const
-        {
-            return i < cmp.i;
-        }
-
-    private:
-        I i;
-    };
-
-    template <typename I> inline IntType<I> make_int(I i)
-    {
-        return IntType<I>(i);
-    }
-    
     
     template <size_t SZ> 
     class String

@@ -29,43 +29,6 @@ using namespace gu::net;
 using namespace gcomm;
 
 
-START_TEST(test_sizes)
-{
-    uint8_t u8(3);
-    fail_unless(make_int(u8).serial_size() == 1);
-
-    uint16_t u16(3);
-    fail_unless(make_int(u16).serial_size() == 2);
-
-    uint32_t u32(3);
-    fail_unless(make_int(u32).serial_size() == 4);
-
-    uint64_t u64(3);
-    fail_unless(make_int(u64).serial_size() == 8);
-    
-
-
-    String<16> str16("fubar");
-    fail_unless(str16.serial_size() == 16);
-
-
-    check_serialization(str16, 16, String<16>());
-
-
-}
-END_TEST
-
-
-
-START_TEST(test_serialization)
-{
-    check_serialization(make_int<uint8_t>(0xab), 1, make_int<uint8_t>(0));
-    check_serialization(make_int<uint16_t>(0xabab), 2, make_int<uint16_t>(0));
-    check_serialization(make_int<uint32_t>(0xabababab), 4, make_int<uint32_t>(0));
-    check_serialization(make_int<uint64_t>(0xababababababababLLU), 8, make_int<uint64_t>(0));
-}
-END_TEST
-
 START_TEST(test_uuid)
 {
     UUID uuid;
@@ -78,9 +41,9 @@ START_TEST(test_uuid)
 
     UUID uuid1(0, 0);
     UUID uuid2(0, 0);
-
+    
     fail_unless(uuid1 < uuid2);
-
+    
 }
 END_TEST
 
@@ -166,74 +129,10 @@ START_TEST(test_view)
 END_TEST
 
 
-class T1
-{
-    int32_t foo;
-public:
-    
-    T1(const int32_t foo_ = -1) : foo(foo_) {}
-    
-    size_t unserialize(const byte_t* buf, const size_t buflen, const size_t offset)
-    {
-        return gcomm::unserialize(buf, buflen, offset, &foo);
-    }
-    
-    size_t serialize(byte_t* buf, const size_t buflen, const size_t offset) const
-    {
-        return gcomm::serialize(foo, buf, buflen, offset);
-    }
-    
-    static size_t serial_size()
-    {
-        return 4;
-    }
-
-    string to_string() const
-    {
-        return gu::to_string(foo);
-    }
-    
-    bool operator==(const T1& cmp) const
-    {
-        return foo == cmp.foo;
-    }
-};
-
-
-
-class T3
-{
-public:
-    T3() {}
-};
-
-
-
-START_TEST(test_map)
-{
-    typedef Map<IntType<int>, IntType<int>, std::map<IntType<int>, IntType<int> > > IntMap;
-
-    IntMap m;
-    check_serialization(m, 4, IntMap());
-
-    m.insert(make_pair(make_int<int>(1), make_int<int>(2)));
-
-}
-END_TEST
-
-
 Suite* types_suite()
 {
     Suite* s = suite_create("types");
     TCase* tc;
-
-    tc = tcase_create("test_sizes");
-    tcase_add_test(tc, test_sizes);
-    suite_add_tcase(s, tc);
-
-    tc = tcase_create("test_serialization");
-    tcase_add_test(tc, test_serialization);
-    suite_add_tcase(s, tc);
 
     tc = tcase_create("test_uuid");
     tcase_add_test(tc, test_uuid);
@@ -241,10 +140,6 @@ Suite* types_suite()
 
     tc = tcase_create("test_view");
     tcase_add_test(tc, test_view);
-    suite_add_tcase(s, tc);
-
-    tc = tcase_create("test_map");
-    tcase_add_test(tc, test_map);
     suite_add_tcase(s, tc);
 
     return s;
