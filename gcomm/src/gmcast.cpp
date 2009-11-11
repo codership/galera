@@ -180,12 +180,20 @@ void GMCast::close()
 
 void GMCast::gmcast_accept() 
 {
-    Transport* tp = listener->accept();
+    Transport* tp(0);
     
-    Proto* peer = new Proto (tp, listen_addr, "",
-                             get_uuid(), group_name);
+    try
+    {
+        tp = listener->accept();
+    }
+    catch (Exception& e)
+    {
+        log_warn << e.what();
+        return;
+    }
     
-    pair<ProtoMap::iterator, bool> ret =
+    Proto* peer = new Proto (tp, listen_addr, "", get_uuid(), group_name);
+    pair<ProtoMap::iterator, bool> ret =     
         proto_map->insert(make_pair(tp->get_fd(), peer));
     
     if (ret.second == false)
@@ -205,9 +213,9 @@ void GMCast::gmcast_connect(const string& remote_addr)
     URI connect_uri(remote_addr);
     
     set_tcp_defaults (&connect_uri);
-
+    
     Transport* tp = Transport::create(get_pnet(), connect_uri.to_string());
-
+    
     try 
     {
         tp->connect();

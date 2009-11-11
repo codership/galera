@@ -145,17 +145,16 @@ void gu::net::Socket::set_state(const State s, const int err)
 {
     /* Allowed state transitions */
     static const bool allowed[S_MAX][S_MAX] = {
-        /* CL, CTING, CTED, LIS, FAIL */
-        {false, true, true, true, true},   /* CL     */
-        {true, false, true, false, true},  /* CTING  */
-        {true, false, false, false, true}, /* CTED   */
-        {true, false, false, false, true}, /* LIS    */
-        {true, false, false, false, false} /* FAIL   */
+        /* CL,   CTING, CTED,  LIS,   FAIL */
+        { false, true,  true,  true,  true }, /* CL     */
+        { true,  false, true,  false, true }, /* CTING  */
+        { true,  false, false, false, true }, /* CTED   */
+        { true,  false, false, false, true }, /* LIS    */
+        { true,  false, false, false, true }  /* FAIL   */
     };
     if (allowed[get_state()][s] == false)
     {
-        log_error << "invalid state change " << state << " -> " << s;
-        throw std::logic_error("invalid state change");
+        gu_throw_fatal << "invalid state change" << state << " -> " << s;
     }
     log_debug << "socket " << fd << " state " << state << " -> " << s; 
     state = s;

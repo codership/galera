@@ -217,7 +217,7 @@ namespace gcomm
             if (false == ret.second)
             {
                 gcomm_throw_fatal << "duplicate entry " 
-                                  << "key=" << get_key(p) << " " 
+                                  << "key=" << get_key(p) << " "
                                   << "value=" << get_value(p) << " "
                                   << "map=" << *this;
             }
