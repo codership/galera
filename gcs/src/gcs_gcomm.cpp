@@ -1,10 +1,10 @@
-// Copyright (C) 2009 Codership Oy <info@codership.com>
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 
 /*!
  * @file GComm GCS Backend implementation
  *
- * @todo Race condition with backend destruct and getting GCommConn pointer
- *       in other backed interface methods should be fixed.
  * @todo Figure out if there is lock-free way to handle RecvBuf 
  *       push/pop operations.
  *
