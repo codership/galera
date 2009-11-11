@@ -172,7 +172,7 @@ public:
     
     void connect(bool first) 
     { 
-        log_info << self_string() << " start_prim " << first;
+        log_debug << self_string() << " start_prim " << first;
         start_prim = first; 
         shift_to(S_JOINING);
     }

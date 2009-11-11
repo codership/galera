@@ -156,9 +156,6 @@ gcomm::evs::InputMap::~InputMap()
     delete node_index;
     delete msg_index;
     delete recovery_index;
-#ifdef GCOMM_PROFILE
-    log_info << "profile: " << prof;
-#endif // GCOMM_PROFILE
 }
 
 
@@ -178,13 +175,13 @@ void gcomm::evs::InputMap::reset(const size_t nodes, const size_t window)
                  accumulate(n_msgs.begin(), n_msgs.end(), 0) == 0);
     node_index->clear();
     
-    log_info << " size " << node_index->size();
+    log_debug << " size " << node_index->size();
     gu_trace(node_index->resize(nodes, InputMapNode()));
     for (size_t i = 0; i < nodes; ++i)
     {
         node_index->at(i).set_index(i);
     }
-    log_info << *node_index << " size " << node_index->size();
+    log_debug << *node_index << " size " << node_index->size();
 }
 
 

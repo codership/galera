@@ -122,8 +122,8 @@ void PC::connect()
     }
     
     
-    log_info << "PC/EVS Proto initial state: " << *evs;
-    log_info << "PC/EVS Proto sending join request";
+    log_debug << "PC/EVS Proto initial state: " << *evs;
+    log_debug << "PC/EVS Proto sending join request";
     
     evs->send_join();
     gcomm_assert(evs->get_state() == evs::Proto::S_RECOVERY ||
@@ -140,7 +140,7 @@ void PC::connect()
 void PC::close()
 {
     
-    log_info << "PC/EVS Proto leaving";
+    log_debug << "PC/EVS Proto leaving";
     evs->close();
     
     Date wait_until(Date::now() + leave_grace_period);

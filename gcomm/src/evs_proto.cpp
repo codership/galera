@@ -40,7 +40,7 @@ using namespace gcomm::evs;
 gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     timers(),
     debug_mask(D_STATE | D_TIMERS),
-    info_mask(I_VIEWS | I_STATE | I_STATISTICS),
+    info_mask(0),
     last_stats_report(Date::now()),
     collect_stats(true),
     hs_agreed("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),

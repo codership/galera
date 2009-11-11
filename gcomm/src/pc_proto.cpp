@@ -134,7 +134,7 @@ void PCProto::deliver_view()
     }
     
     ProtoUpMeta um(UUID::nil(), ViewId(), &v);
-    log_info << self_string() << " delivering view " << v;
+    log_debug << self_string() << " delivering view " << v;
     send_up(Datagram(), um);
 }
 
@@ -226,11 +226,11 @@ void PCProto::shift_to(const State s)
         ;
     }
 
-    log_info << self_string() << " shift_to: " << to_string(get_state()) 
-             << " -> " <<  to_string(s) 
-             << " prim " << get_prim()
-             << " last prim " << get_last_prim()
-             << " to_seq " << get_to_seq();
+    log_debug << self_string() << " shift_to: " << to_string(get_state()) 
+              << " -> " <<  to_string(s) 
+              << " prim " << get_prim()
+              << " last prim " << get_last_prim()
+              << " to_seq " << get_to_seq();
 
     state = s;
 }
@@ -504,8 +504,8 @@ void PCProto::cleanup_instances()
         const UUID& uuid(PCInstMap::get_key(i));
         if (current_view.is_member(uuid) == false) 
         {
-            log_info << self_string()
-                     << " cleaning up instance " << uuid;
+            log_debug << self_string()
+                      << " cleaning up instance " << uuid;
             instances.erase(i);
         }
     }
@@ -558,8 +558,8 @@ bool PCProto::is_prim() const
         }
         else
         {
-            log_info << "Non-prim " << SMMap::get_key(i) <<" from "
-                     << state.get_last_prim() << " joining prim";
+            log_debug << "Non-prim " << SMMap::get_key(i) <<" from "
+                      << state.get_last_prim() << " joining prim";
         }
     }
     
@@ -625,9 +625,9 @@ bool PCProto::is_prim() const
         set_intersection(greatest_view.begin(), greatest_view.end(),
                          present.begin(), present.end(),
                          inserter(intersection, intersection.begin()));
-        log_info << self_string()
-                 << " intersection size " << intersection.size()
-                 << " greatest view size " << greatest_view.size();
+        log_debug << self_string()
+                  << " intersection size " << intersection.size()
+                  << " greatest view size " << greatest_view.size();
         if (intersection.size() == greatest_view.size())
         {
             prim = true;
@@ -644,7 +644,7 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
     gcomm_assert(get_state() == S_STATES_EXCH);
     gcomm_assert(state_msgs.size() < current_view.get_members().size());
     
-    log_info << self_string() << " handle state from " << source << " " << msg;
+    log_debug << self_string() << " handle state from " << source << " " << msg;
     
     // Early check for possibly conflicting primary components. The one 
     // with greater view id may continue (as it probably has been around
@@ -726,8 +726,8 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
     gcomm_assert(msg.get_type() == PCMessage::T_INSTALL);
     gcomm_assert(get_state()    == S_INSTALL);
     
-    log_info << self_string() 
-             << " handle install from " << source << " " << msg;
+    log_debug << self_string() 
+              << " handle install from " << source << " " << msg;
     
     // Validate own state
     
@@ -765,7 +765,7 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
         }
     }
     
-    log_info << self_string() << " setting TO seq to " << to_seq;
+    log_debug << self_string() << " setting TO seq to " << to_seq;
     
     set_to_seq(to_seq);
     
