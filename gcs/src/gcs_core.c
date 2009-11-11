@@ -921,7 +921,6 @@ long gcs_core_close (gcs_core_t* core)
     else {
         ret = core->backend.close (&core->backend);
         core->state = CORE_CLOSED;
-        core->backend.destroy (&core->backend);
     }
 
     gu_mutex_unlock (&core->send_lock);
@@ -943,6 +942,8 @@ long gcs_core_destroy (gcs_core_t* core)
             gu_mutex_unlock (&core->send_lock);
             return -EBADFD;
         }
+        gu_info ("Calling backend.destroy()");
+        core->backend.destroy (&core->backend);
         core->state = CORE_DESTROYED;
     }
     gu_mutex_unlock (&core->send_lock);
