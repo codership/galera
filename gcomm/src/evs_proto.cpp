@@ -332,9 +332,9 @@ void gcomm::evs::Proto::handle_consensus_timer()
             Node& node(NodeMap::get_value(i));
             if (node.get_leave_message() != 0 && node.is_inactive() == true)
             {
-                log_warn << self_string() 
-                         << " removing leave message of previously leaving node "
-                         << NodeMap::get_key(i);
+                log_debug << self_string() 
+                          << " removing leave message of previously leaving node "
+                          << NodeMap::get_key(i);
                 node.set_leave_message(0);
             }
         }
@@ -833,7 +833,7 @@ int gcomm::evs::Proto::send_user(const Datagram& dg,
     push_header(msg, send_dg);
     if ((ret = send_down(send_dg, ProtoDownMeta())) != 0)
     {
-        log_warn << "send failed: "  << strerror(ret);
+        log_debug << "send failed: "  << strerror(ret);
     }
     pop_header(msg, send_dg);
     sent_msgs[Message::T_USER]++;
@@ -876,9 +876,9 @@ void gcomm::evs::Proto::complete_user(const Seqno high_seq)
     profile_leave(send_user_prof);
     if (err != 0)
     {
-        log_warn << "failed to send completing msg " << strerror(err) 
-                 << " seq=" << high_seq << " send_window=" << send_window
-                 << " last_sent=" << last_sent;
+        log_debug << "failed to send completing msg " << strerror(err) 
+                  << " seq=" << high_seq << " send_window=" << send_window
+                  << " last_sent=" << last_sent;
     }
 
 }
@@ -922,7 +922,7 @@ void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
     int err = send_down(Datagram(buf), ProtoDownMeta());
     if (err != 0)
     {
-        log_warn << "send failed: " << strerror(err);
+        log_debug << "send failed: " << strerror(err);
     }
     sent_msgs[Message::T_GAP]++;
     gu_trace(handle_gap(gm, self_i));
@@ -1025,7 +1025,7 @@ void gcomm::evs::Proto::send_join(bool handle)
     
     if (err != 0) 
     {
-        log_warn << "send failed: " << strerror(err);
+        log_debug << "send failed: " << strerror(err);
     }
     sent_msgs[Message::T_JOIN]++;
     if (handle == true)
@@ -1065,7 +1065,7 @@ void gcomm::evs::Proto::send_leave(bool handle)
         output.pop_front();
     }
     profile_leave(send_user_prof);
-
+    
     
     LeaveMessage lm(get_uuid(),
                     current_view.get_id(),
@@ -1081,7 +1081,7 @@ void gcomm::evs::Proto::send_leave(bool handle)
     int err = send_down(Datagram(buf), ProtoDownMeta());
     if (err != 0)
     {
-        log_warn << "send failed " << strerror(err);
+        log_debug << "send failed " << strerror(err);
     }
     
     sent_msgs[Message::T_LEAVE]++;
@@ -1140,7 +1140,7 @@ void gcomm::evs::Proto::send_install()
     int err = send_down(Datagram(buf), ProtoDownMeta());
     if (err != 0) 
     {
-        log_warn << "send failed: " << strerror(err);
+        log_debug << "send failed: " << strerror(err);
     }
 
     sent_msgs[Message::T_INSTALL]++;
@@ -1199,7 +1199,7 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
         int err = send_down(rb, ProtoDownMeta());
         if (err != 0)
         {
-            log_warn << "send failed: " << strerror(err);
+            log_debug << "send failed: " << strerror(err);
             break;
         }
         else
@@ -1280,7 +1280,7 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
         int err = send_delegate(rb);
         if (err != 0)
         {
-            log_warn << "send failed: " << strerror(err);
+            log_debug << "send failed: " << strerror(err);
             break;
         }
         seq = seq + msg.get_seq_range() + 1;
@@ -1355,12 +1355,13 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     }
     
     Node& node(NodeMap::get_value(ii));
-
-    if (node.get_operational() == false)
+    
+    if (node.get_operational() == false && node.get_leave_message() == 0)
     {
         // We have set this node unoperational and there was 
         // probably good reason to do so. Don't accept messages
-        // from him before new view has been formed.
+        // from it before new view has been formed. Exception is
+        // node that is leaving.
         return;
     }
 
@@ -2049,7 +2050,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         } 
         else 
         {
-            log_warn << self_string() << " unhandled user message " << msg;
+            log_debug << self_string() << " unhandled user message " << msg;
             return;
         }
     }
@@ -2228,16 +2229,13 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         } 
         else if (inst.get_installed() == false) 
         {
-            // Probably caused by network partitioning during recovery
-            // state, this will most probably lead to view 
-            // partition/remerge. In order to do it in organized fashion,
-            // don't trust the source instance during recovery phase.
-            // Note: setting other instance to non-trust here is too harsh
-            // LOG_WARN("Setting source status to no-trust");
+            evs_log_debug(D_STATE) 
+                << "dropping message from uninstalled source " 
+                << msg.get_source();            
         } 
         else 
         {
-            log_warn << "unhandled gap message " << msg;
+            log_debug << "unhandled gap message " << msg;
         }
         return;
     }
