@@ -26,11 +26,8 @@
 #include <algorithm>
 
 /* System includes */
-// fcntl() to set O_NONBLOCK
-#include <fcntl.h>
-// TCP_NODELAY
-#include <netinet/tcp.h>
-
+#include <fcntl.h>         // fcntl() to set O_NONBLOCK
+#include <netinet/tcp.h>   // TCP_NODELAY
 
 using namespace std;
 using namespace gu;
@@ -47,8 +44,6 @@ static int get_opt(const URI& uri)
     catch (NotFound&) { }
     return ret;
 }
-
-
 
 int gu::net::closefd(int fd)
 {
@@ -70,7 +65,6 @@ int gu::net::closefd(int fd)
  * Datagram implementation
  **************************************************************************/
 
-
 gu::net::Datagram::Datagram(const Buffer& buf_, size_t offset_) :
     header  (),
     payload (new Buffer(buf_)),
@@ -81,11 +75,13 @@ gu::net::Datagram::Datagram(const Buffer& buf_, size_t offset_) :
 void gu::net::Datagram::normalize()
 {
     payload = boost::shared_ptr<Buffer>(new Buffer(*payload));
+
     if (header.size() > 0)
     {
         payload->insert(payload->begin(), header.begin(), header.end());
         header.clear();
     }
+
     if (offset > 0)
     {
         payload->erase(payload->begin(), payload->begin() + offset);
@@ -96,11 +92,6 @@ void gu::net::Datagram::normalize()
 /**************************************************************************
  * Socket implementation
  **************************************************************************/
-
-
-/*
- * Ctor/dtor
- */
 
 gu::net::Socket::Socket(Network& net_,
                         const int fd_,
@@ -152,12 +143,14 @@ void gu::net::Socket::set_state(const State s, const int err)
         { true,  false, false, false, true }, /* LIS    */
         { true,  false, false, false, true }  /* FAIL   */
     };
+
     if (allowed[get_state()][s] == false)
     {
         gu_throw_fatal << "invalid state change" << state << " -> " << s;
     }
+
     log_debug << "socket " << fd << " state " << state << " -> " << s; 
-    state = s;
+    state  = s;
     err_no = err;
 }
 
@@ -176,7 +169,6 @@ const string gu::net::Socket::get_errstr() const
     return ::strerror(err_no);
 }
 
-
 void gu::net::Socket::set_opt(Socket* s, 
                               const Addrinfo& ai, 
                               const int opt)
@@ -184,6 +176,7 @@ void gu::net::Socket::set_opt(Socket* s,
     if (ai.get_socktype() == SOCK_STREAM)
     {
         const int no_nagle(1);
+
         if (::setsockopt(s->get_fd(), IPPROTO_TCP, TCP_NODELAY, &no_nagle,
                          sizeof(no_nagle)) == -1)
         {
@@ -197,9 +190,9 @@ void gu::net::Socket::set_opt(Socket* s,
         {
             gu_throw_error(errno) << "setting fd non-blocking failed";
         }
+
         s->options |= O_NON_BLOCKING;
     }
-
 }
 
 
@@ -219,6 +212,7 @@ void gu::net::Socket::connect(const string& addr)
     set_opt(this, ai, ::get_opt(uri));
     
     Sockaddr sa(ai.get_addr());
+
     if (::connect(fd, &sa.get_sockaddr(), sa.get_sockaddr_len()) == -1)
     {
         if ((get_opt() & O_NON_BLOCKING) && errno == EINPROGRESS)
@@ -266,6 +260,7 @@ void gu::net::Socket::close()
     
     log_debug << "closing socket " << fd;
     int err = closefd(fd);
+
     if (err != 0)
     {
         set_state(S_FAILED, err);
@@ -277,6 +272,7 @@ void gu::net::Socket::close()
     {
         set_state(S_CLOSED);    
     }
+
     delete listener_ai;
     fd = -1;
 }
@@ -298,6 +294,7 @@ void gu::net::Socket::listen(const std::string& addr, const int backlog)
     
     const int reuse = 1;
     const socklen_t reuselen = sizeof(reuse);
+
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, reuselen) == -1)
     {
         set_state(S_FAILED, errno);
@@ -322,14 +319,14 @@ void gu::net::Socket::listen(const std::string& addr, const int backlog)
 }
 
 gu::net::Socket* gu::net::Socket::accept()
-{
-    
+{    
     int acc_fd;
     
     Addrinfo acc_ai(*listener_ai);
     Sockaddr acc_sa(acc_ai.get_addr());
     
     socklen_t sa_len(acc_sa.get_sockaddr_len());
+
     if ((acc_fd = ::accept(fd, &acc_sa.get_sockaddr(), &sa_len)) == -1)
     {
         set_state(S_FAILED, errno);
@@ -343,11 +340,14 @@ gu::net::Socket* gu::net::Socket::accept()
     }
     
     Sockaddr local_sa(acc_sa);
+
     sa_len = local_sa.get_sockaddr_len();
+
     if (::getsockname(acc_fd, &local_sa.get_sockaddr(), &sa_len) == -1)
     {
         gu_throw_error(errno);
     }
+
     if (sa_len != local_sa.get_sockaddr_len())
     {
         set_state(S_FAILED, EINVAL);
@@ -719,11 +719,7 @@ class gu::net::SocketList
 public:
     typedef map<int, Socket*>::iterator iterator;
 
-    SocketList() : 
-        sockets()
-    {
-
-    }
+    SocketList() : sockets() {}
 
     bool insert(const std::pair<const int, Socket*>& p)
     {
@@ -738,10 +734,12 @@ public:
     Socket* find(const int fd)
     {
         std::map<const int, Socket*>::const_iterator i = sockets.find(fd);
+
         if (i == sockets.end())
         {
             return 0;
         }
+
         return i->second;
     }
 
@@ -762,11 +760,9 @@ public:
  **/
 
 gu::net::NetworkEvent::NetworkEvent(const int event_mask_, Socket* socket_) :
-    event_mask(event_mask_),
-    socket(socket_)
-{
-
-}
+    event_mask (event_mask_),
+    socket     (socket_)
+{}
 
 int gu::net::NetworkEvent::get_event_mask() const
 {
@@ -778,19 +774,13 @@ gu::net::Socket* gu::net::NetworkEvent::get_socket() const
     return socket;
 }
 
-/**
- *
- **/
-
 gu::net::Network::Network() :
-    sockets(new SocketList()),
-    released(),
-    poll(Poll::create())
+    sockets  (new SocketList()),
+    released (),
+    poll     (Poll::create())
 {
-    if (pipe(wake_fd) == -1)
-    {
-        throw std::runtime_error("could not create pipe");
-    }
+    if (pipe(wake_fd) == -1) gu_throw_error(errno) << "could not create pipe";
+
     poll->insert(PollEvent(wake_fd[0], E_IN, 0));
 }
 
@@ -808,6 +798,7 @@ gu::net::Network::~Network()
     {
         delete i->second;
     }
+
     delete sockets;
     delete poll;
 }
@@ -826,6 +817,7 @@ gu::net::Socket* gu::net::Network::connect(const string& addr)
     {
         set_event_mask(sock, E_OUT);
     }
+
     return sock;
 }
 
@@ -843,8 +835,9 @@ void gu::net::Network::insert(Socket* sock)
     if (sockets->insert(make_pair(sock->get_fd(), sock)) == false)
     {
         delete sock;
-        throw std::logic_error("");
+        gu_throw_fatal << "Failed to add socket to sockets map";
     }
+
     poll->insert(PollEvent(sock->get_fd(), sock->get_event_mask(), sock));
 }
 
@@ -870,9 +863,10 @@ void gu::net::Network::set_event_mask(Socket* sock, const int mask)
 {
     if (find(sock->get_fd()) == 0)
     {
-        log_error << "socket " << sock->get_fd() << " not found from socket set";
-        throw std::logic_error("invalid socket");
+        gu_throw_fatal << "Socket " << sock->get_fd()
+                       << " not found from socket set";
     }
+
     poll->modify(PollEvent(sock->get_fd(), mask, sock));
     sock->set_event_mask(mask);
 }
@@ -922,12 +916,12 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
         if (ev.get_user_data() == 0)
         {
             byte_t buf[1];
+
             if (read(wake_fd[0], buf, sizeof(buf)) != 1)
             {
-                int err = errno;
-                log_error << "Could not read pipe: " << strerror(err);
-                gu_throw_error(err) << "could not read pipe";
+                gu_throw_error(errno) << "Could not read pipe";
             }
+
             return NetworkEvent(E_EMPTY, 0);
         }
         
@@ -938,7 +932,7 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
         {
         case Socket::S_CLOSED:
             log_error << "closed socket " << sock->get_fd() << " in poll set";
-            // throw std::logic_error("closed socket in poll set");
+            // gu_throw_fatal << "closed socket in poll set");
             break;
         case Socket::S_CONNECTING:
             if (revent & E_OUT)
@@ -959,7 +953,7 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
             break;
         case Socket::S_FAILED:
             log_warn << "failed socket " << sock->get_fd() << " in poll set";
-            // throw std::logic_error("failed socket in poll set");
+            // gu_throw_fatal << "failed socket in poll set";
             break;
         case Socket::S_CONNECTED:
             if (revent & E_IN)
@@ -989,7 +983,7 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
             }
             break;
         case Socket::S_MAX:
-            throw std::logic_error("");
+            gu_throw_fatal << "Invalid socket state: " << Socket::S_MAX;
             break;
         }
     }

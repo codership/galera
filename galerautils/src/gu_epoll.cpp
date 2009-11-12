@@ -4,7 +4,6 @@
  * $Id$
  */
 
-
 #include "gu_epoll.hpp"
 #include "gu_network.hpp"
 #include "gu_logger.hpp"
@@ -42,15 +41,12 @@ static inline int to_network_event_mask(const int mask)
         log_warn << "event mask " << mask << " has unrecognized bits set";
     }
     
-    ret |= (mask & EPOLLIN ? gu::net::E_IN : 0);
-    ret |= (mask & EPOLLOUT ? gu::net::E_OUT : 0);
-    ret |= (mask & EPOLLERR ? gu::net::E_ERROR : 0);
+    ret |= (mask & EPOLLIN  ? gu::net::E_IN     : 0);
+    ret |= (mask & EPOLLOUT ? gu::net::E_OUT    : 0);
+    ret |= (mask & EPOLLERR ? gu::net::E_ERROR  : 0);
     ret |= (mask & EPOLLHUP ? gu::net::E_CLOSED : 0);
     return ret;
 }
-
-
-
 
 gu::net::EPoll::EPoll() :
     e_fd(-1),
@@ -60,13 +56,14 @@ gu::net::EPoll::EPoll() :
 {
     if ((e_fd = epoll_create(16)) == -1)
     {
-        throw std::runtime_error("could not create epoll");
+        gu_throw_error(errno) << "Could not create epoll";
     }
 }
 
 gu::net::EPoll::~EPoll()
 {
     int err = closefd(e_fd);
+
     if (err != 0)
     {
         log_warn << "Error closing epoll socket: " << err;
@@ -76,18 +73,19 @@ gu::net::EPoll::~EPoll()
 void gu::net::EPoll::insert(const PollEvent& epe)
 {
     int op = EPOLL_CTL_ADD;
+
     struct epoll_event ev = {
         to_epoll_mask(epe.get_events()), 
         {epe.get_user_data()}
     };
+
     int err = epoll_ctl(e_fd, op, epe.get_fd(), &ev);
+
     if (err != 0)
     {
-        err = errno;
-        log_error << "epoll_ctl(" << e_fd << "," << op << "): " 
-                  << strerror(err);
-        throw std::runtime_error("");
+        gu_throw_error(errno) << "epoll_ctl(" << e_fd << ","<< op <<") failed";
     }
+
     events.resize(events.size() + 1);
     current = events.end();
     n_events = 0;
@@ -96,13 +94,17 @@ void gu::net::EPoll::insert(const PollEvent& epe)
 void gu::net::EPoll::erase(const PollEvent& epe)
 {
     int op = EPOLL_CTL_DEL;
+
     struct epoll_event ev = {0, {0}};
+
     int err = epoll_ctl(e_fd, op, epe.get_fd(), &ev);
+
     if (err != 0)
     {
         err = errno;
-        log_debug << "epoll erase: " << err << ": " << strerror(err);
+        log_debug << "epoll erase: " << err << " (" << strerror(err) << ')';
     }
+
     events.resize(events.size() - 1);
     current = events.end();
     n_events = 0;
@@ -111,24 +113,25 @@ void gu::net::EPoll::erase(const PollEvent& epe)
 void gu::net::EPoll::modify(const PollEvent& epe)
 {
     int op = EPOLL_CTL_MOD;
+
     struct epoll_event ev = {
         to_epoll_mask(epe.get_events()), 
         {epe.get_user_data()}
     };
+
     int err = epoll_ctl(e_fd, op, epe.get_fd(), &ev);
     
     if (err != 0)
     {
-        err = errno;
-        log_error << "epoll_ctl(" << op << "," << epe.get_fd() << "): " << err 
-                  << " '" << strerror(err) << "'";
-        throw std::runtime_error("");
+        gu_throw_error(errno) << "epoll_ctl(" << op << "," << epe.get_fd()
+                              << ") failed";
     }
 }
 
 void gu::net::EPoll::poll(const Period& p)
 {
     int timeout(p.get_nsecs() < 0 ? -1 : convert(p.get_nsecs()/MSec, int()));
+
     int ret = epoll_wait(e_fd, &events[0], static_cast<int>(events.size()), 
                          timeout);
     if (ret == -1)
@@ -149,10 +152,8 @@ void gu::net::EPoll::poll(const Period& p)
 
 void gu::net::EPoll::pop_front()
 {
-    if (n_events == 0)
-    {
-        throw std::logic_error("no events available");
-    }
+    if (n_events == 0) gu_throw_fatal << "No events available";
+
     --n_events;
     ++current;
 }
@@ -164,9 +165,9 @@ bool gu::net::EPoll::empty() const
 
 gu::net::PollEvent gu::net::EPoll::front() const
 {
-    if (n_events == 0)
-    {
-        throw std::logic_error("no events available");
-    }
-    return PollEvent(-1, to_network_event_mask(current->events), current->data.ptr);
+    if (n_events == 0) gu_throw_fatal << "No events available";
+
+    return PollEvent(-1,
+                     to_network_event_mask(current->events),
+                     current->data.ptr);
 }

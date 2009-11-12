@@ -48,8 +48,6 @@ static void debug_logger_checked_teardown()
     // gu_log_max_level = GU_LOG_INFO;
 }
 
-
-
 START_TEST(test_debug_logger)
 {
     Logger::set_debug_filter("log_foo");
@@ -534,8 +532,7 @@ public:
                                  reinterpret_cast<void* (*)(void*)>(&Thread::start_fn), this);
         if (err != 0)
         {
-            log_error << "could not start thread: " << strerror(err);
-            throw std::runtime_error("could not start thread");
+            gu_throw_error(err) << "could not start thread";
         }
     }
     
@@ -543,10 +540,10 @@ public:
     {
         interrupt();
         int err = pthread_join(self, 0);
+
         if (err != 0)
         {
-            log_error << "could not join thread: " << strerror(err);
-            throw std::runtime_error("could not join thread");
+            gu_throw_error(err) << "could not join thread";
         }
     }
 };
@@ -589,11 +586,13 @@ public:
     void connect(const string& url)
     {
         send_sock = net.connect(url);
+
         while (true)
         {
             NetworkEvent ev = net.wait_event(-1);
             const int em = ev.get_event_mask();
             Socket* sock = ev.get_socket();
+
             if (em & E_ACCEPTED)
             {
             }
@@ -605,16 +604,16 @@ public:
             }
             else
             {
-                throw std::runtime_error("");
+                gu_throw_fatal << "Unexpected event mask: " << em;
             }
         }
     }
-    
+
     void close()
     {
         send_sock->close();
     }
-    
+
     NetConsumer(const string& url) :
         net(),
         listener(net.listen(url)),
@@ -627,7 +626,7 @@ public:
         delete listener;
         delete send_sock;
     }
-    
+
     void notify()
     {
         net.interrupt();
@@ -739,10 +738,9 @@ struct producer_thd_args
         n_events(n_events_),
         barrier()
     {
-        if (pthread_barrier_init(&barrier, 0, n_thds_))
-        {
-            throw std::runtime_error("could not initialize barrier");
-        }
+        int err = pthread_barrier_init(&barrier, 0, n_thds_);
+
+        if (err) gu_throw_error(err) << "Could not initialize barrier";
     }
 };
 
