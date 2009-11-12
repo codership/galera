@@ -342,7 +342,11 @@ gcs_become_donor (gcs_conn_t* conn)
         conn->state = GCS_CONN_DONOR;
         return 1;
     }
-    else if (conn->state < GCS_CONN_OPEN){
+
+    gu_warn ("Rejecting SST request in state '%s'. Joiner should be restarted.",
+             gcs_conn_state_string[conn->state]);
+
+    if (conn->state < GCS_CONN_OPEN){
         ssize_t err;
         gu_warn ("Received State Transfer Request in wrong state %s. "
                  "Rejecting.", gcs_conn_state_string[conn->state]);
@@ -356,6 +360,7 @@ gcs_become_donor (gcs_conn_t* conn)
             return -ENOTRECOVERABLE; // failed to clear donor status,
         }
     }
+
     return 0; // do not pass to application
 }
 

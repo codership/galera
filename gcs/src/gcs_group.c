@@ -663,11 +663,22 @@ group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
 
         assert(donor_idx != joiner_idx);
 
+        gu_info ("Node %ld (%s) requested State Transfer from '%s'. "
+                 "Selected %ld (%s)(%s) as donor.",
+                 joiner_idx, joiner->name, required_donor ? donor_name :"*any*",
+                 donor_idx, donor->name, gcs_state_node_string[joiner->status]);
+
         // reserve donor, confirm joiner
         donor->status  = GCS_STATE_DONOR;
         joiner->status = GCS_STATE_JOINER;
         memcpy (donor->joiner, joiner->id, GCS_COMP_MEMB_ID_MAX_LEN+1);
         memcpy (joiner->donor, donor->id,  GCS_COMP_MEMB_ID_MAX_LEN+1);
+    }
+    else {
+        gu_warn ("Node %ld (%s) requested State Transfer from '%s', "
+                 "but it is impossible to select State Transfer donor: %s",
+                 joiner_idx, group->nodes[joiner_idx].name,
+                 required_donor ? donor_name : "*any*", strerror (-donor_idx));
     }
 
     return donor_idx;
@@ -693,27 +704,26 @@ gcs_group_handle_state_request (gcs_group_t*    group,
 {
     // pass only to sender and to one potential donor
     size_t           donor_name_len = strlen(act->buf);
-    bool             required_donor = (donor_name_len > 0);
     long             donor_idx;
     const char*      joiner_name    = group->nodes[joiner_idx].name;
-    gcs_state_node_t joiner_state   = group->nodes[joiner_idx].status;
+    gcs_state_node_t joiner_status  = group->nodes[joiner_idx].status;
 
     assert (GCS_ACT_STATE_REQ == act->type);
 
-    if (joiner_state != GCS_STATE_PRIM) {
+    if (joiner_status != GCS_STATE_PRIM) {
 
-        const char* joiner_state_string = gcs_state_node_string[joiner_state];
+        const char* joiner_status_string = gcs_state_node_string[joiner_status];
 
         if (group->my_idx == joiner_idx) {
             gu_error ("Requesting state transfer while in %s. "
-                      "Ignoring.", joiner_state_string);
+                      "Ignoring.", joiner_status_string);
             act->id = -ECANCELED;
             return act->buf_len;
         }
         else {
             gu_error ("Node %ld (%s) requested state transfer, "
                       "but its state is %s. Ignoring.",
-                      joiner_idx, joiner_name, joiner_state_string);
+                      joiner_idx, joiner_name, joiner_status_string);
             group_ignore_state_request (act);
             return 0;
         }
@@ -721,7 +731,7 @@ gcs_group_handle_state_request (gcs_group_t*    group,
 
     donor_idx = group_select_donor(group, joiner_idx, act->buf);
     assert (donor_idx != joiner_idx);
-
+#if 0 // delete this segment
     if (donor_idx >= 0) {
         gu_info ("Node %ld (%s) requested State Transfer from '%s'. "
                  "Selected %ld (%s) as donor.",
@@ -735,7 +745,7 @@ gcs_group_handle_state_request (gcs_group_t*    group,
                  joiner_idx, joiner_name, required_donor ? act->buf : "",
                  donor_idx, strerror (-donor_idx));
     }
-
+#endif
     if (group->my_idx != joiner_idx && group->my_idx != donor_idx) {
         // if neither DONOR nor JOINER, ignore request
         group_ignore_state_request (act);
