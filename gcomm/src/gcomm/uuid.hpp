@@ -5,8 +5,6 @@
 #ifndef _GCOMM_UUID_HPP_
 #define _GCOMM_UUID_HPP_
 
-
-
 #include "gcomm/exception.hpp"
 #include "gcomm/types.hpp"
 
@@ -17,6 +15,7 @@ extern "C" {
 #include "gu_uuid.h"
 }
 
+#include <cstdio>
 #include <cstring>
 #include <cassert>
 
@@ -105,7 +104,6 @@ public:
         return gu_uuid_compare(&uuid, &cmp.uuid) == 0; 
     }
     
-
     std::string to_string() const {
         char buf[37];
         memset(buf, 0, sizeof(buf));
@@ -139,7 +137,5 @@ inline std::ostream& gcomm::operator<<(std::ostream& os, const UUID& uuid)
 {
     return (os << uuid.to_string());
 }
-
-
 
 #endif // _GCOMM_UUID_HPP_

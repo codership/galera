@@ -7,6 +7,7 @@
 
 #include "gcomm/types.hpp"
 
+#include <stdint.h> // for uint16_t
 #include <ostream>
 #include <cassert>
 

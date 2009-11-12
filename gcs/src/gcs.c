@@ -185,6 +185,34 @@ gcs_init (gcs_conn_t* conn, gcs_seqno_t seqno, const uint8_t uuid[GU_UUID_LEN])
     }
 }
 
+/*!
+ * Checks if we should freak out on send/recv errors.
+ * Sometimes errors are ok, e.g. when attempting to send FC_CONT message
+ * on a closing connection. This can happen because GCS connection state
+ * change propagation from lower layers to upper layers is not atomic.
+ *
+ * @param err     error code returned by send/recv function
+ * @param warning warning to log if necessary
+ * @return        0 if error can be ignored, original err value if not
+ */
+static long
+gcs_check_error (long err, const char* warning)
+{
+    switch (err)
+    {
+    case -ENOTCONN:
+    case -ECONNABORTED:
+        if (NULL != warning) {
+            gu_warn ("%s: %d (%s)", warning, err, strerror(-err));
+        }
+        err = 0;
+        break;
+    default:;
+    }
+
+    return err;
+}
+
 /* To be called under slave queue lock. Returns true if FC_STOP must be sent */
 static inline bool
 gcs_fc_stop_begin (gcs_conn_t* conn)
@@ -212,15 +240,18 @@ gcs_fc_stop_end (gcs_conn_t* conn)
     long ret;
     struct gcs_fc fc  = { htogl(conn->conf_id), 1 };
 
-    gu_debug ("SENDING STOP (%llu)", conn->local_act_id); //track freq
+    gu_debug ("SENDING FC_STOP (%llu)", conn->local_act_id); //track freq
 
     ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
+
     if (ret >= 0) {
         ret = 0;
         conn->stop_sent++;
     }
 
     gu_mutex_unlock (&conn->fc_lock);
+
+    ret = gcs_check_error (ret, "Failed to send FC_STOP signal");
 
     return ret;
 }
@@ -253,15 +284,18 @@ gcs_fc_cont_end (gcs_conn_t* conn)
 
     assert (GCS_CONN_SYNCED == conn->state);
 
-    gu_debug ("SENDING CONT (%llu)", conn->local_act_id);
+    gu_debug ("SENDING FC_CONT (%llu)", conn->local_act_id);
 
     ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
+
     if (ret >= 0) {
         ret = 0;
         conn->stop_sent--;
     }
 
     gu_mutex_unlock (&conn->fc_lock);
+
+    ret = gcs_check_error (ret, "Failed to send FC_CONT signal");
 
     return ret;
 }
@@ -272,8 +306,6 @@ gcs_send_sync (gcs_conn_t* conn) {
 
     assert (GCS_CONN_JOINED == conn->state);
 
-//    conn->queue_len = gu_fifo_length (conn->recv_q);
-
     if (conn->lower_limit >= conn->queue_len) {
         // tripped lower slave queue limit, send SYNC message
         gu_debug ("SENDING SYNC");
@@ -281,6 +313,7 @@ gcs_send_sync (gcs_conn_t* conn) {
         if (ret >= 0) {
             ret = 0;
         }
+        ret = gcs_check_error (ret, "Failed to send SYNC signal");
     }
 
     return ret;
@@ -396,11 +429,18 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     /* reset flow control as membership is most likely changed */
     gu_fifo_lock(conn->recv_q);
     {
+        if (gu_mutex_lock (&conn->fc_lock)) {
+            gu_fatal ("Failed to lock mutex.");
+            abort();
+        }
+
         conn->conf_id     = conf->conf_id;
         conn->stop_sent   = 0;
         conn->stop_count  = 0;
         conn->lower_limit = base_queue_limit * sqrt(conf->memb_num);
         conn->upper_limit = 2 * conn->lower_limit;
+
+        gu_mutex_unlock (&conn->fc_lock);
     }
     gu_fifo_release (conn->recv_q);
 
