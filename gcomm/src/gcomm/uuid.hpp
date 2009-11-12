@@ -123,7 +123,6 @@ public:
           "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
             int const ret = snprintf(buf, sizeof(buf), GU_CPP_UUID_FORMAT,
                                      GU_UUID_ARGS(&uuid));
-            // @todo: this is a rather unwarranted check
             if (36 != ret)
             {
                 gu_throw_fatal << "Failed to print UUID";

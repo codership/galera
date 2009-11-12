@@ -1867,7 +1867,7 @@ void gcomm::evs::Proto::deliver_trans()
         gu_throw_fatal << "invalid state";
     
     evs_log_debug(D_DELIVERY)
-        << " aru_seq="   << input_map->get_aru_seq() 
+        << " aru_seq="  << input_map->get_aru_seq() 
         << " safe_seq=" << input_map->get_safe_seq();
     
     // In transitional configuration we must deliver all messages that 

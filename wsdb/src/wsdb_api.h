@@ -242,7 +242,6 @@ struct wsdb_write_set {
     char                   *rbr_buf;     // !<transactional cache of mysql (rbr data)
 
     char *key_composition;               //!< temp representation of keys in ws
-                                         
     //free_wsdb_write_set_fun free;
 };
 
