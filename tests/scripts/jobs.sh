@@ -20,7 +20,7 @@ ssh_job()
 #    local cmd="$($@)"
     local cmd="$1"
 
-    ssh "${NODE_LOCATION[$node]}" "$cmd"
+    ssh -ax "${NODE_LOCATION[$node]}" "$cmd"
 }
 
 virtual_job()
@@ -56,10 +56,10 @@ node_job()
 
     case $cmd in
     "untar_cmd")
-	local dist="$1"
-	shift
-	cat "$dist" | virtual_job "$cmd" "$@" 2>"$prefix.err" && \
-	copy_config $node 2>"$prefix.err" || rcode=$?
+        local dist="$1"
+        shift
+        cat "$dist" | virtual_job "$cmd" "$@" 2>"$prefix.err" && \
+        copy_config $node 2>"$prefix.err" || rcode=$?
         ;;
     *)
         virtual_job "$cmd" "$@" 2>"$prefix.err" || rcode=$?
@@ -69,7 +69,7 @@ node_job()
     echo $rcode > "$prefix.ret"
 
     echo -n "Job '$cmd' on '$node_id'"
-    
+
     if [ $rcode -eq 0 ]
     then
         echo " complete in $(($SECONDS - $start)) seconds"
@@ -92,10 +92,10 @@ start_jobs()
     do
         local node_id="${NODE_ID[$node]}"
         local prefix="$BASE_RUN/${1}_$node_id"
-	
-	node_job "$@" $node &
-	echo $! > "$prefix.pid"
-	echo "Job '$1' on '$node_id' started"
+
+        node_job "$@" $node &
+        echo $! > "$prefix.pid"
+        echo "Job '$1' on '$node_id' started"
     done
 
     echo "All jobs started"
@@ -109,9 +109,9 @@ wait_jobs()
     for node in $NODE_LIST
     do
         wait %% 2>$BASE_RUN/wait.err || err=$?;
-        
+
         # 127 - no more jobs
-	if [ $err -eq 127 ]; then err=0; break; fi
+        if [ $err -eq 127 ]; then err=0; break; fi
         if [ $err -gt 128 ]; then err=0; fi # ignore signals
     done
 

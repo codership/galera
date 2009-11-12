@@ -39,7 +39,7 @@ pause()
     local min_sleep=1
     local var_sleep=10
     local p=$(( $RANDOM % var_sleep + min_sleep ))
-    
+
     echo "Sleeping for $p sec."
     sleep $p
 }
@@ -47,7 +47,7 @@ pause()
 # Pauses load to perform consistency check
 consistency_check()
 {
-    local ret
+    local ret=0
 
     kill -STOP $sqlgen_pid
     sleep 1

@@ -6,7 +6,7 @@ untar_cmd()
 {
     local node=${@:$#}
     local dir="${NODE_TEST_DIR[$node]}"
-    echo -n "mkdir -p \"$dir\" && tar --strip 1 -C \"$dir\" -xzf -"
+    echo -n "mkdir -p \"$dir\" && tar --strip 1 -C \"$dir\" -xzf - && exit 0"
 }
 
 copy_config()
@@ -31,11 +31,11 @@ copy_config()
         local -r location="${NODE_LOCATION[$node]}"
 
         if [ "$location" == "local" ]
-	then
-	    cp "$cnf" "$cnf_dir"
-	else
-	    scp -q "$cnf" "$location:$cnf_dir"
-	fi
+        then
+            cp "$cnf" "$cnf_dir"
+        else
+            scp -q "$cnf" "$location:$cnf_dir"
+        fi
     fi
 }
 
