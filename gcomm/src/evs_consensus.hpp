@@ -31,9 +31,11 @@ public:
         current_view(current_view_)
     { }
     
-    // Compares join message against current state
-    
+    /*!
+     * Compare join message against current state
+     */
     bool is_consistent(const Message&) const;
+
     /*!
      * Compute highest reachable safe seq from local state
      *
@@ -59,7 +61,7 @@ public:
     bool is_consistent_same_view(const Message&) const;
     bool is_consensus() const;    
 private:
-
+    
     const UUID& get_uuid() const { return uuid; }
     
     const UUID& uuid;

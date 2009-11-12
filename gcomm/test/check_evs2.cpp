@@ -109,7 +109,8 @@ START_TEST(test_message)
     jm.set_source(uuid1);
     check_serialization(jm, jm.serial_size(), JoinMessage());
     
-    InstallMessage im(uuid1, view_id, 8, 5, 27, node_list);
+    InstallMessage im(uuid1, view_id, ViewId(V_REG, view_id.get_uuid(),
+                                             view_id.get_seq()), 8, 5, 27, node_list);
     im.set_source(uuid1);
     check_serialization(im, im.serial_size(), InstallMessage());
     
@@ -1356,6 +1357,7 @@ START_TEST(test_trac_200)
     
     p2.handle_msg(InstallMessage(uuid1, 
                                  im1.get_source_view_id(),
+                                 im1.get_install_view_id(),
                                  Seqno::max(),
                                  Seqno::max(), 
                                  -1,

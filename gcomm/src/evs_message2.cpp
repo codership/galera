@@ -101,20 +101,21 @@ size_t gcomm::evs::MessageNode::serial_size()
 
 bool gcomm::evs::Message::operator==(const Message& cmp) const
 {
-    return (version        == cmp.version        &&
-            type           == cmp.type           &&
-            user_type      == cmp.user_type      &&
-            order          == cmp.order          &&
-            seq            == cmp.seq            &&
-            seq_range      == cmp.seq_range      &&
-            aru_seq        == cmp.aru_seq        &&
-            fifo_seq       == cmp.fifo_seq       &&
-            flags          == cmp.flags          &&
-            source         == cmp.source         &&
-            source_view_id == cmp.source_view_id &&
-            range_uuid     == cmp.range_uuid     &&
-            range          == cmp.range          &&
-            node_list      == cmp.node_list);
+    return (version         == cmp.version         &&
+            type            == cmp.type            &&
+            user_type       == cmp.user_type       &&
+            order           == cmp.order           &&
+            seq             == cmp.seq             &&
+            seq_range       == cmp.seq_range       &&
+            aru_seq         == cmp.aru_seq         &&
+            fifo_seq        == cmp.fifo_seq        &&
+            flags           == cmp.flags           &&
+            source          == cmp.source          &&
+            source_view_id  == cmp.source_view_id  &&
+            install_view_id == cmp.install_view_id &&
+            range_uuid      == cmp.range_uuid      &&
+            range           == cmp.range           &&
+            node_list       == cmp.node_list);
 }
 
 
@@ -353,6 +354,7 @@ size_t gcomm::evs::InstallMessage::serialize(byte_t* const buf,
     gu_trace(offset = Message::serialize(buf, buflen, offset));
     gu_trace(offset = seq.serialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.serialize(buf, buflen, offset));
+    gu_trace(offset = install_view_id.serialize(buf, buflen, offset));
     gu_trace(offset = node_list.serialize(buf, buflen, offset));
     return offset;
 }
@@ -369,6 +371,7 @@ size_t gcomm::evs::InstallMessage::unserialize(const byte_t* const buf,
     }
     gu_trace(offset = seq.unserialize(buf, buflen, offset));
     gu_trace(offset = aru_seq.unserialize(buf, buflen, offset));
+    gu_trace(offset = install_view_id.unserialize(buf, buflen, offset));
     node_list.clear();
     gu_trace(offset = node_list.unserialize(buf, buflen, offset));
     return offset;
@@ -378,6 +381,7 @@ size_t gcomm::evs::InstallMessage::serial_size() const
 {
     return (Message::serial_size()
             + 2*Seqno::serial_size()
+            + ViewId::serial_size()
             + node_list.serial_size());
 }
 

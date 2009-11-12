@@ -281,7 +281,7 @@ void gcomm::evs::Proto::handle_retrans_timer()
             {
                 profile_enter(send_gap_prof);
                 gu_trace(send_gap(UUID::nil(), 
-                                  install_message->get_source_view_id(), 
+                                  install_message->get_install_view_id(), 
                                   Range()));
                 profile_leave(send_gap_prof);
             }
@@ -571,7 +571,7 @@ void gcomm::evs::Proto::deliver_reg_view()
     if (previous_views.size() == 0) gu_throw_fatal << "Zero-size view";
     
     const View& prev_view (previous_view);
-    View view (install_message->get_source_view_id());
+    View view (install_message->get_install_view_id());
     
     for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
     {
@@ -1124,6 +1124,7 @@ void gcomm::evs::Proto::send_install()
     populate_node_list(&node_list);
     
     InstallMessage imsg(get_uuid(),
+                        current_view.get_id(),
                         ViewId(V_REG, get_uuid(), max_view_id_seq + 1),
                         input_map->get_safe_seq(),
                         input_map->get_aru_seq(),
@@ -1389,7 +1390,7 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         if (msg.get_source_view_id() != current_view.get_id())
         {
             if (install_message == 0 ||
-                install_message->get_source_view_id() != msg.get_source_view_id())
+                install_message->get_install_view_id() != msg.get_source_view_id())
             {
                 return;
             }
@@ -1704,7 +1705,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             previous_views.push_back(make_pair(MessageNodeList::get_value(i).get_view_id(), 
                                                Date::now()));
         }
-        current_view = View(install_message->get_source_view_id());
+        current_view = View(install_message->get_install_view_id());
         size_t idx = 0;
         for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
         {
@@ -2008,7 +2009,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         else if (inst.get_installed() == false) 
         {
             if (install_message != 0 && 
-                msg.get_source_view_id() == install_message->get_source_view_id()) 
+                msg.get_source_view_id() == install_message->get_install_view_id()) 
             {
                 assert(state == S_RECOVERY);
                 evs_log_debug(D_STATE) << " recovery user message "
@@ -2194,7 +2195,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
 
     if (get_state()                           == S_RECOVERY && 
         install_message                       != 0          && 
-        install_message->get_source_view_id() == msg.get_source_view_id()) 
+        install_message->get_install_view_id() == msg.get_source_view_id()) 
     {
         evs_log_debug(D_STATE) << "install gap " << msg;
         inst.set_installed(true);
@@ -2654,13 +2655,13 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     {
         profile_enter(consistent_prof);
         if (consensus.is_consistent(msg) == true && 
-            msg.get_source_view_id() == install_message->get_source_view_id())
+            msg.get_install_view_id() == install_message->get_install_view_id())
         {
             evs_log_debug(D_INSTALL_MSGS)
                 << " dropping already handled install message";
             profile_enter(send_gap_prof);
             gu_trace(send_gap(UUID::nil(), 
-                              install_message->get_source_view_id(), 
+                              install_message->get_install_view_id(), 
                               Range()));
             profile_leave(send_gap_prof);
             return;
@@ -2727,7 +2728,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         inst.set_tstamp(Date::now());
         install_message = new InstallMessage(msg);
         profile_enter(send_gap_prof);
-        gu_trace(send_gap(UUID::nil(), install_message->get_source_view_id(), 
+        gu_trace(send_gap(UUID::nil(), install_message->get_install_view_id(), 
                           Range()));
         profile_leave(send_gap_prof);
     }

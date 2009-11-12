@@ -214,6 +214,8 @@ public:
      */
     const gcomm::ViewId& get_source_view_id() const { return source_view_id; }
     
+    const gcomm::ViewId& get_install_view_id() const { return install_view_id; }
+
     /*!
      * Get range UUID associated to the message.
      *
@@ -258,40 +260,42 @@ public:
      */
     
     Message(const Message& msg) :
-        version        (msg.version),
-        type           (msg.type),
-        user_type      (msg.user_type),
-        order          (msg.order),
-        seq            (msg.seq),
-        seq_range      (msg.seq_range),
-        aru_seq        (msg.aru_seq),
-        fifo_seq       (msg.fifo_seq),
-        flags          (msg.flags),
-        source         (msg.source),
-        source_view_id (msg.source_view_id),
-        range_uuid     (msg.range_uuid),
-        range          (msg.range),
-        tstamp         (msg.tstamp),
-        node_list      (msg.node_list)
+        version         (msg.version),
+        type            (msg.type),
+        user_type       (msg.user_type),
+        order           (msg.order),
+        seq             (msg.seq),
+        seq_range       (msg.seq_range),
+        aru_seq         (msg.aru_seq),
+        fifo_seq        (msg.fifo_seq),
+        flags           (msg.flags),
+        source          (msg.source),
+        source_view_id  (msg.source_view_id),
+        install_view_id (msg.install_view_id),
+        range_uuid      (msg.range_uuid),
+        range           (msg.range),
+        tstamp          (msg.tstamp),
+        node_list       (msg.node_list)
     { }
 
     Message& operator=(const Message& msg)
     {
-        version        = msg.version;
-        type           = msg.type;
-        user_type      = msg.user_type;
-        order          = msg.order;
-        seq            = msg.seq;
-        seq_range      = msg.seq_range;
-        aru_seq        = msg.aru_seq;
-        fifo_seq       = msg.fifo_seq;
-        flags          = msg.flags;
-        source         = msg.source;
-        source_view_id = msg.source_view_id;
-        range_uuid     = msg.range_uuid;
-        range          = msg.range;
-        tstamp         = msg.tstamp;
-        node_list      = msg.node_list;
+        version         = msg.version;
+        type            = msg.type;
+        user_type       = msg.user_type;
+        order           = msg.order;
+        seq             = msg.seq;
+        seq_range       = msg.seq_range;
+        aru_seq         = msg.aru_seq;
+        fifo_seq        = msg.fifo_seq;
+        flags           = msg.flags;
+        source          = msg.source;
+        source_view_id  = msg.source_view_id;
+        install_view_id = msg.install_view_id;
+        range_uuid      = msg.range_uuid;
+        range           = msg.range;
+        tstamp          = msg.tstamp;
+        node_list       = msg.node_list;
         return *this;
     }
 
@@ -299,35 +303,37 @@ public:
 
 
     /*! Default constructor */
-    Message(const uint8_t          version_        = 0,
-            const Type             type_           = T_NONE,
-            const UUID&            source_         = UUID::nil(),
-            const ViewId&          source_view_id_ = ViewId(),
-            const uint8_t          user_type_      = 0xff,
-            const Order            order_          = O_DROP,
-            const int64_t          fifo_seq_       = -1,
-            const Seqno            seq_            = Seqno::max(),
-            const Seqno            seq_range_      = Seqno::max(),
-            const Seqno            aru_seq_        = Seqno::max(),
-            const uint8_t          flags_          = 0,
-            const UUID&            range_uuid_     = UUID(),
-            const Range            range_          = Range(),
-            const MessageNodeList& node_list_      = MessageNodeList()) :
-        version        (version_),
-        type           (type_),
-        user_type      (user_type_),
-        order          (order_),
-        seq            (seq_),
-        seq_range      (seq_range_),
-        aru_seq        (aru_seq_),
-        fifo_seq       (fifo_seq_),
-        flags          (flags_),
-        source         (source_),
-        source_view_id (source_view_id_),
-        range_uuid     (range_uuid_),
-        range          (range_),
-        tstamp         (gu::datetime::Date::now()),
-        node_list      (node_list_)
+    Message(const uint8_t          version_         = 0,
+            const Type             type_            = T_NONE,
+            const UUID&            source_          = UUID::nil(),
+            const ViewId&          source_view_id_  = ViewId(),
+            const ViewId&          install_view_id_ = ViewId(),
+            const uint8_t          user_type_       = 0xff,
+            const Order            order_           = O_DROP,
+            const int64_t          fifo_seq_        = -1,
+            const Seqno            seq_             = Seqno::max(),
+            const Seqno            seq_range_       = Seqno::max(),
+            const Seqno            aru_seq_         = Seqno::max(),
+            const uint8_t          flags_           = 0,
+            const UUID&            range_uuid_      = UUID(),
+            const Range            range_           = Range(),
+            const MessageNodeList& node_list_       = MessageNodeList()) :
+        version         (version_),
+        type            (type_),
+        user_type       (user_type_),
+        order           (order_),
+        seq             (seq_),
+        seq_range       (seq_range_),
+        aru_seq         (aru_seq_),
+        fifo_seq        (fifo_seq_),
+        flags           (flags_),
+        source          (source_),
+        source_view_id  (source_view_id_),
+        install_view_id (install_view_id_),
+        range_uuid      (range_uuid_),
+        range           (range_),
+        tstamp          (gu::datetime::Date::now()),
+        node_list       (node_list_)
     { }
 
 protected:
@@ -348,6 +354,7 @@ protected:
     uint8_t            flags;
     UUID               source;
     ViewId             source_view_id;
+    ViewId             install_view_id;
     UUID               range_uuid;
     Range              range;
     gu::datetime::Date tstamp;
@@ -375,6 +382,7 @@ public:
                 Message::T_USER,
                 source,
                 source_view_id,
+                ViewId(),
                 user_type,
                 order,
                 fifo_seq,
@@ -407,6 +415,7 @@ public:
                 T_DELEGATE,
                 source,
                 source_view_id,
+                ViewId(),
                 0xff,
                 O_UNRELIABLE,
                 fifo_seq)
@@ -433,6 +442,7 @@ public:
                 T_GAP,
                 source,
                 source_view_id,                
+                ViewId(),
                 0xff,
                 O_UNRELIABLE,
                 fifo_seq,
@@ -464,6 +474,7 @@ public:
                 Message::T_JOIN,
                 source,
                 source_view_id,
+                ViewId(),
                 0xff,
                 O_UNRELIABLE,
                 fifo_seq,
@@ -486,16 +497,18 @@ public:
 class gcomm::evs::InstallMessage : public Message
 {
 public:
-    InstallMessage(const UUID&            source         = UUID::nil(),
-                   const ViewId&          source_view_id = ViewId(),
-                   const Seqno            seq            = Seqno::max(), 
-                   const Seqno            aru_seq        = Seqno::max(),
-                   const int64_t          fifo_seq       = -1,
-                   const MessageNodeList& node_list      = MessageNodeList()) :
+    InstallMessage(const UUID&            source          = UUID::nil(),
+                   const ViewId&          source_view_id  = ViewId(),
+                   const ViewId&          install_view_id = ViewId(),
+                   const Seqno            seq             = Seqno::max(), 
+                   const Seqno            aru_seq         = Seqno::max(),
+                   const int64_t          fifo_seq        = -1,
+                   const MessageNodeList& node_list       = MessageNodeList()) :
         Message(0,
                 Message::T_INSTALL,
                 source,
                 source_view_id,
+                install_view_id,
                 0xff,
                 O_UNRELIABLE,
                 fifo_seq,
@@ -528,6 +541,7 @@ public:
                 T_LEAVE,
                 source,
                 source_view_id,
+                ViewId(),
                 0xff,
                 O_UNRELIABLE,
                 fifo_seq,
