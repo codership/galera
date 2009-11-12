@@ -604,7 +604,7 @@ static DummyNode* create_dummy_node(size_t idx,
         + Conf::EvsParamInactiveTimeout + "=" + inactive_timeout + "&"
         + Conf::EvsParamRetransPeriod + "=" + retrans_period + "&"
         + Conf::EvsParamJoinRetransPeriod + "=" + retrans_period + "&"
-        + Conf::EvsParamInfoLogMask + "=0xff";
+        + Conf::EvsParamInfoLogMask + "=0x3";
     if (::getenv("EVS_DEBUG_MASK") != 0)
     {
         conf += "&" + Conf::EvsParamDebugLogMask + "=" 
@@ -1216,6 +1216,41 @@ START_TEST(test_proto_stop_cont)
 END_TEST
 
 
+START_TEST(test_proto_triangle)
+{
+    log_info << "START";
+    const size_t n_nodes(3);
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+    const string inactive_timeout("PT0.3S");
+    const string retrans_period("PT0.1S");
+    
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        set_cvi(dn, 0, i, i + 1);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+    uint32_t view_seq = n_nodes + 1;
+    
+    dn[0]->close(dn[1]->get_uuid());
+    dn[1]->close(dn[0]->get_uuid());
+    dn[0]->set_cvi(ViewId(V_REG, dn[0]->get_uuid(), view_seq));
+    dn[2]->set_cvi(ViewId(V_REG, dn[0]->get_uuid(), view_seq));
+    dn[1]->set_cvi(ViewId(V_REG, dn[1]->get_uuid(), view_seq));
+    // Enable this when fixed
+    // gu_trace(prop.propagate_until_cvi(true));
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
+
 START_TEST(test_trac_200)
 {
     Protonet net;
@@ -1484,6 +1519,10 @@ Suite* evs2_suite()
         tcase_add_test(tc, test_proto_stop_cont);
         suite_add_tcase(s, tc);
     }
+
+    tc = tcase_create("test_proto_triangle");
+    tcase_add_test(tc, test_proto_triangle);
+    suite_add_tcase(s, tc);
 
     tc = tcase_create("test_trac_200");
     tcase_add_test(tc, test_trac_200);
