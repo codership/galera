@@ -15,109 +15,12 @@ namespace gcomm
 {
     namespace evs
     {
-        class Seqno;
-        std::ostream& operator<<(std::ostream&, const Seqno);
-
+        typedef int64_t seqno_t;
+        
         class Range;
-        std::ostream& operator<<(std::ostream&, const Range);
+        std::ostream& operator<<(std::ostream&, const Range&);
     }
 }
-
-/*!
- * Seqno class for overwrapping seqnos.
- */ 
-
-
-class gcomm::evs::Seqno
-{
-public:
-    Seqno(const uint16_t seq_ = seq_max) : 
-        seq(seq_) 
-    {
-        assert(seq <= seq_max);
-    }
-    
-    static const Seqno max() { return Seqno(seq_max); }
-    
-    Seqno& operator++()
-    {
-        assert(seq < seq_max);
-        seq = static_cast<uint16_t>((seq + 1) % seq_max);
-        return *this;
-    }
-    
-    Seqno operator+(const Seqno inc) const
-    {
-        assert(inc.seq < seq_max);
-        assert(seq != seq_max);
-        return static_cast<uint16_t>((seq + inc.seq) % seq_max);
-    }
-    
-    Seqno operator-(const Seqno dec) const
-    {
-        assert(dec.seq < seq_max);
-        assert(seq != seq_max);
-        return static_cast<uint16_t>((uint32_t(seq) + seq_max - dec.seq) % seq_max);
-    }
-
-    bool operator==(const Seqno cmp) const
-    { return (cmp.seq == seq); }
-    
-    bool operator!=(const Seqno cmp) const { return !(*this == cmp); }
-    
-    bool operator<(const Seqno cmp) const
-    {
-        assert(seq != seq_max && cmp.seq != seq_max);
-        if (cmp.seq < seq_max/2)
-        {
-            return seq < cmp.seq || seq > (cmp.seq + seq_max/2) % seq_max;
-        }
-        else
-        {
-            return seq < cmp.seq && seq > (cmp.seq + seq_max/2) % seq_max;
-        }
-    }
-
-    bool operator<=(const Seqno cmp) const 
-    { return (*this < cmp || *this == cmp); }
-    
-    bool operator>(const Seqno cmp) const 
-    { return (cmp < *this); }
-    
-    bool operator>=(const Seqno cmp) const
-    { return (*this > cmp || *this == cmp); }
-    
-    uint16_t get() const { return seq; }
-    
-    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
-    {
-        gu_trace(offset = gcomm::serialize(seq, buf, buflen, offset));
-        return offset;
-    }
-    
-    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
-    {
-        gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &seq));
-        return offset;
-    }
-    
-    static size_t serial_size()
-    {
-        return sizeof(uint16_t);
-    }
-
-
-    
-private:
-    uint16_t seq;
-    static const uint16_t seq_max = 0x8000;
-};
-
-inline std::ostream& gcomm::evs::operator<<(std::ostream& os, const Seqno seq)
-{
-    return (os << seq.get());
-}
-
 
 
 /*!
@@ -126,46 +29,46 @@ inline std::ostream& gcomm::evs::operator<<(std::ostream& os, const Seqno seq)
 class gcomm::evs::Range
 {
 public:
-    Range(const Seqno lu_ = Seqno::max(), const Seqno hs_ = Seqno::max()) :
-        lu(lu_),
-        hs(hs_)
+    Range(const seqno_t lu = -1, const seqno_t hs = -1) :
+        lu_(lu),
+        hs_(hs)
     {}
-    Seqno get_lu() const { return lu; }
-    Seqno get_hs() const { return hs; }
+    seqno_t get_lu() const { return lu_; }
+    seqno_t get_hs() const { return hs_; }
     
-    void set_lu(const Seqno s) { lu = s; }
-    void set_hs(const Seqno s) { hs = s; }
+    void set_lu(const seqno_t s) { lu_ = s; }
+    void set_hs(const seqno_t s) { hs_ = s; }
     
     size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
     {
-        gu_trace(offset = lu.serialize(buf, buflen, offset));
-        gu_trace(offset = hs.serialize(buf, buflen, offset));
+        gu_trace(offset = gcomm::serialize(lu_, buf, buflen, offset));
+        gu_trace(offset = gcomm::serialize(hs_, buf, buflen, offset));
         return offset;
     }
     
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
     {
-        gu_trace(offset = lu.unserialize(buf, buflen, offset));
-        gu_trace(offset = hs.unserialize(buf, buflen, offset));
+        gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &lu_));
+        gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &hs_));
         return offset;
     }
-
+    
     static size_t serial_size()
     {
-        return 2*Seqno::serial_size();
+        return 2 * gcomm::serial_size(seqno_t());
     }
 
     bool operator==(const Range& cmp) const
     {
-        return (lu == cmp.lu && hs == cmp.hs);
+        return (lu_ == cmp.lu_ && hs_ == cmp.hs_);
     }
 
 private:
-    Seqno lu; /*!< Lowest unseen seqno */
-    Seqno hs; /*!< Highest seen seqno  */
+    seqno_t lu_; /*!< Lowest unseen seqno */
+    seqno_t hs_; /*!< Highest seen seqno  */
 };
 
-inline std::ostream& gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::Range r)
+inline std::ostream& gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::Range& r)
 {
     return (os << "[" << r.get_lu() << "," << r.get_hs() << "]");
 }

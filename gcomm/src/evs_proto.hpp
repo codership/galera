@@ -93,14 +93,14 @@ public:
     std::string get_stats() const;
     void reset_stats();
 
-    bool is_flow_control(const Seqno, const Seqno win) const;
+    bool is_flow_control(const seqno_t, const seqno_t win) const;
     int send_user(const gu::net::Datagram&, 
                   uint8_t,
                   Order, 
-                  Seqno, 
-                  Seqno);
-    int send_user(const Seqno);
-    void complete_user(const Seqno);
+                  seqno_t, 
+                  seqno_t);
+    int send_user(const seqno_t);
+    void complete_user(const seqno_t);
     int send_delegate(gu::net::Datagram&);
     void send_gap(const UUID&, const ViewId&, const Range);
     const JoinMessage& create_join();
@@ -151,7 +151,7 @@ private:
      * @param seq  Sequence number
      * @return Input map seqno before updating
      */
-    Seqno update_im_safe_seq(const size_t uuid, const Seqno seq);
+    seqno_t update_im_safe_seq(const size_t uuid, const seqno_t seq);
 
     /*!
      * Update input map safe seqs according to message node list. Only
@@ -302,9 +302,9 @@ private:
     // Sequence number to maintain membership message FIFO order
     int64_t fifo_seq;
     // Last sent seq
-    Seqno last_sent;
+    seqno_t last_sent;
     // Send window size
-    Seqno send_window;
+    seqno_t send_window;
     // Output message queue
     std::deque<std::pair<gu::net::Datagram, ProtoDownMeta> > output;
     

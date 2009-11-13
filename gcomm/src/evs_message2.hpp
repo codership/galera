@@ -43,9 +43,9 @@ class gcomm::evs::MessageNode
 {
 public:
     MessageNode(const bool    operational_     = false,
-                const Seqno   leave_seq_       = Seqno::max(),
+                const seqno_t   leave_seq_       = -1,
                 const ViewId& view_id_         = ViewId(V_REG),
-                const Seqno   safe_seq_        = Seqno::max(),
+                const seqno_t   safe_seq_        = -1,
                 const Range   im_range_        = Range()) :
         operational(operational_),
         leave_seq(leave_seq_),
@@ -63,10 +63,10 @@ public:
     { }
     
     bool get_operational() const { return operational; }
-    bool get_leaving() const { return not (leave_seq == Seqno::max()); }
-    Seqno get_leave_seq() const { return leave_seq; }
+    bool get_leaving() const { return not (leave_seq == -1); }
+    seqno_t get_leave_seq() const { return leave_seq; }
     const ViewId& get_view_id() const { return view_id; }
-    Seqno get_safe_seq() const { return safe_seq; }
+    seqno_t get_safe_seq() const { return safe_seq; }
     Range get_im_range() const { return im_range; }
     
     bool operator==(const MessageNode& cmp) const
@@ -85,9 +85,9 @@ public:
     static size_t serial_size();
 private:
     bool     operational;     // Is operational
-    Seqno    leave_seq;
+    seqno_t    leave_seq;
     ViewId   view_id;         // Current view as seen by source of this message
-    Seqno    safe_seq;        // Safe seq as seen...
+    seqno_t    safe_seq;        // Safe seq as seen...
     Range    im_range;        // Input map range as seen...
 };
 
@@ -165,21 +165,21 @@ public:
      *
      * @return Const reference to sequence number associated to the message.
      */
-    Seqno get_seq() const { return seq; }
+    seqno_t get_seq() const { return seq; }
 
     /*!
      * Get sequence numer range associated to the message.
      * 
      * @return Sequence number range associated to the message.
      */
-    Seqno get_seq_range() const { return seq_range; }
+    seqno_t get_seq_range() const { return seq_range; }
 
     /*!
      * Get all-received-upto sequence number associated the the message.
      *
      * @return All-received-upto sequence number associated to the message.
      */
-    Seqno get_aru_seq() const { return aru_seq; }
+    seqno_t get_aru_seq() const { return aru_seq; }
     
     /*!
      * Get message flags.
@@ -311,9 +311,9 @@ public:
             const uint8_t          user_type_       = 0xff,
             const Order            order_           = O_DROP,
             const int64_t          fifo_seq_        = -1,
-            const Seqno            seq_             = Seqno::max(),
-            const Seqno            seq_range_       = Seqno::max(),
-            const Seqno            aru_seq_         = Seqno::max(),
+            const seqno_t            seq_             = -1,
+            const seqno_t            seq_range_       = -1,
+            const seqno_t            aru_seq_         = -1,
             const uint8_t          flags_           = 0,
             const UUID&            range_uuid_      = UUID(),
             const Range            range_           = Range(),
@@ -347,9 +347,9 @@ protected:
     Type               type;
     uint8_t            user_type;
     Order              order;
-    Seqno              seq;
-    Seqno              seq_range;
-    Seqno              aru_seq;
+    seqno_t              seq;
+    seqno_t              seq_range;
+    seqno_t              aru_seq;
     int64_t            fifo_seq;
     uint8_t            flags;
     UUID               source;
@@ -371,9 +371,9 @@ class gcomm::evs::UserMessage : public Message
 public:
     UserMessage(const UUID&        source         = UUID::nil(),
                 const ViewId&      source_view_id = ViewId(),
-                const Seqno        seq            = Seqno::max(),
-                const Seqno        aru_seq        = Seqno::max(),
-                const Seqno        seq_range      = 0,
+                const seqno_t        seq            = -1,
+                const seqno_t        aru_seq        = -1,
+                const seqno_t        seq_range      = 0,
                 const Order        order          = O_SAFE,
                 const int64_t      fifo_seq       = -1,
                 const uint8_t      user_type      = 0xff,
@@ -394,7 +394,7 @@ public:
                 Range())
     { }
     
-    void set_aru_seq(const Seqno as) { aru_seq = as; }
+    void set_aru_seq(const seqno_t as) { aru_seq = as; }
     
     size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
@@ -433,8 +433,8 @@ class gcomm::evs::GapMessage : public Message
 public:
     GapMessage(const UUID&   source         = UUID::nil(),
                const ViewId& source_view_id = ViewId(),
-               const Seqno   seq            = Seqno::max(),
-               const Seqno   aru_seq        = Seqno::max(),
+               const seqno_t   seq            = -1,
+               const seqno_t   aru_seq        = -1,
                const int64_t fifo_seq       = -1,
                const UUID&   range_uuid     = UUID::nil(),
                const Range   range          = Range()) : 
@@ -447,7 +447,7 @@ public:
                 O_UNRELIABLE,
                 fifo_seq,
                 seq,
-                Seqno::max(),
+                -1,
                 aru_seq,
                 0,
                 range_uuid,
@@ -466,8 +466,8 @@ class gcomm::evs::JoinMessage : public Message
 public:
     JoinMessage(const UUID&            source         = UUID::nil(),
                 const ViewId&          source_view_id = ViewId(),
-                const Seqno            seq            = Seqno::max(), 
-                const Seqno            aru_seq        = Seqno::max(),
+                const seqno_t            seq            = -1, 
+                const seqno_t            aru_seq        = -1,
                 const int64_t          fifo_seq       = -1,
                 const MessageNodeList& node_list      = MessageNodeList()) :
         Message(0,
@@ -479,7 +479,7 @@ public:
                 O_UNRELIABLE,
                 fifo_seq,
                 seq,
-                Seqno::max(),
+                -1,
                 aru_seq,
                 0,
                 UUID(),
@@ -500,8 +500,8 @@ public:
     InstallMessage(const UUID&            source          = UUID::nil(),
                    const ViewId&          source_view_id  = ViewId(),
                    const ViewId&          install_view_id = ViewId(),
-                   const Seqno            seq             = Seqno::max(), 
-                   const Seqno            aru_seq         = Seqno::max(),
+                   const seqno_t            seq             = -1, 
+                   const seqno_t            aru_seq         = -1,
                    const int64_t          fifo_seq        = -1,
                    const MessageNodeList& node_list       = MessageNodeList()) :
         Message(0,
@@ -513,7 +513,7 @@ public:
                 O_UNRELIABLE,
                 fifo_seq,
                 seq,
-                Seqno::max(),
+                -1,
                 aru_seq,
                 0,
                 UUID(),
@@ -533,8 +533,8 @@ class gcomm::evs::LeaveMessage : public Message
 public:
     LeaveMessage(const UUID&   source         = UUID::nil(),
                  const ViewId& source_view_id = ViewId(),
-                 const Seqno   seq            = Seqno::max(),
-                 const Seqno   aru_seq        = Seqno::max(),
+                 const seqno_t   seq            = -1,
+                 const seqno_t   aru_seq        = -1,
                  const int64_t fifo_seq       = -1,
                  const uint8_t flags          = 0) :
         Message(0,
@@ -546,7 +546,7 @@ public:
                 O_UNRELIABLE,
                 fifo_seq,
                 seq,
-                Seqno::max(),
+                -1,
                 aru_seq,
                 flags)
     { }
@@ -599,19 +599,8 @@ public:
     bool operator()(const MessageNodeList::value_type& a,
                     const MessageNodeList::value_type& b) const
     {
-        if (MessageNodeList::get_value(a).get_im_range().get_hs() == Seqno::max())
-        {
-            return true;
-        }
-        else if (MessageNodeList::get_value(b).get_im_range().get_hs() == Seqno::max())
-        {
-            return false;
-        }
-        else
-        {
-            return MessageNodeList::get_value(a).get_im_range().get_hs() < 
-                MessageNodeList::get_value(b).get_im_range().get_hs();
-        }
+        return MessageNodeList::get_value(a).get_im_range().get_hs() < 
+            MessageNodeList::get_value(b).get_im_range().get_hs();
     }
 };
 

@@ -17,7 +17,7 @@ using namespace gcomm;
 using namespace gcomm::evs;
 
 // Disable debug logging until debug mask is available here
-#define evs_log_debug(int) if (true) {} else log_debug
+#define evs_log_debug(int) if (false) {} else log_debug
 
 
 //
@@ -34,9 +34,9 @@ public:
         const MessageNode& bval(MessageNodeList::get_value(b));
         gcomm_assert(aval.get_leaving() != false &&
                      bval.get_leaving() != false);
-        const Seqno asec(aval.get_leave_seq());
-        const Seqno bsec(bval.get_leave_seq());
-        gcomm_assert(asec != Seqno::max() && bsec != Seqno::max());
+        const seqno_t asec(aval.get_leave_seq());
+        const seqno_t bsec(bval.get_leave_seq());
+        gcomm_assert(asec != -1 && bsec != -1);
         return (asec < bsec);
     }
 };
@@ -48,19 +48,8 @@ public:
     bool operator()(const MessageNodeList::value_type& a,
                     const MessageNodeList::value_type& b) const
     {
-        if (MessageNodeList::get_value(a).get_im_range().get_lu() == Seqno::max())
-        {
-            return true;
-        }
-        else if (MessageNodeList::get_value(b).get_im_range().get_lu() == Seqno::max())
-        {
-            return false;
-        }
-        else
-        {
-            return MessageNodeList::get_value(a).get_im_range().get_lu() < 
-                MessageNodeList::get_value(b).get_im_range().get_lu();
-        }
+        return MessageNodeList::get_value(a).get_im_range().get_lu() < 
+            MessageNodeList::get_value(b).get_im_range().get_lu();
     }
 };
 
@@ -71,19 +60,8 @@ public:
     bool operator()(const MessageNodeList::value_type& a,
                     const MessageNodeList::value_type& b) const
     {
-        if (MessageNodeList::get_value(a).get_safe_seq() == Seqno::max())
-        {
-            return true;
-        }
-        else if (MessageNodeList::get_value(b).get_safe_seq() == Seqno::max())
-        {
-            return false;
-        }
-        else
-        {
-            return MessageNodeList::get_value(a).get_safe_seq() < 
-                MessageNodeList::get_value(b).get_safe_seq();
-        }
+        return MessageNodeList::get_value(a).get_safe_seq() < 
+            MessageNodeList::get_value(b).get_safe_seq();
     }
 };
 
@@ -92,9 +70,9 @@ public:
 //
 //
 
-gcomm::evs::Seqno gcomm::evs::Consensus::highest_reachable_safe_seq() const
+gcomm::evs::seqno_t gcomm::evs::Consensus::highest_reachable_safe_seq() const
 {
-    list<Seqno> seq_list;
+    list<seqno_t> seq_list;
     for (NodeMap::const_iterator i = known.begin(); i != known.end();
          ++i)
     {
@@ -106,38 +84,24 @@ gcomm::evs::Seqno gcomm::evs::Consensus::highest_reachable_safe_seq() const
         {
             if (node.get_operational() == false || lm != 0)
             {
-                const Seqno max_reachable_safe_seq(
+                const seqno_t max_reachable_safe_seq(
                     input_map.get_safe_seq(node.get_index()));
-                if (lm == 0 && max_reachable_safe_seq != Seqno::max())
+                if (lm == 0)
                 {
                     seq_list.push_back(max_reachable_safe_seq);
                 }
-                else if (lm != 0)
-                {
-                    gcomm_assert(lm->get_seq() != Seqno::max());
-                    seq_list.push_back(lm->get_seq());
-                }
                 else
                 {
-                    return Seqno::max();
+                    seq_list.push_back(lm->get_seq());
                 }
             }
             else
             {
-                const Seqno im_hs(input_map.get_range(node.get_index()).get_hs());
-                if (im_hs != Seqno::max())
-                {
-                    seq_list.push_back(im_hs);
-                }
-                else
-                {
-                    return Seqno::max();
-                }
+                const seqno_t im_hs(input_map.get_range(node.get_index()).get_hs());
+                seq_list.push_back(im_hs);
             }
         }
     }
-    
-    gcomm_assert(seq_list.empty() == false);
     
     return *min_element(seq_list.begin(), seq_list.end());
 }
@@ -159,14 +123,15 @@ bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
     MessageNodeList::const_iterator max_hs_i(max_element(same_view.begin(), 
                                                          same_view.end(), 
                                                          RangeHsCmp()));
+    gcomm_assert(max_hs_i != same_view.end());
+
     // Max highest seen
-    const Seqno max_hs(
-        max_hs_i == same_view.end() ? 
-        Seqno::max() : 
+    const seqno_t max_hs(
         MessageNodeList::get_value(max_hs_i).get_im_range().get_hs());
     
-    Seqno max_reachable_safe_seq(max_hs);
+    seqno_t max_reachable_safe_seq(max_hs);
     
+    // Leaving nodes
     MessageNodeList leaving;
     for_each(node_list.begin(), node_list.end(), 
              SelectNodesOp(leaving, current_view.get_id(), false, true));
@@ -177,21 +142,12 @@ bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
             min_element(leaving.begin(), leaving.end(),
                         LeaveSeqCmpOp()));
         gcomm_assert(min_leave_seq_i != leaving.end());
-        const Seqno min_leave_seq(
+        const seqno_t min_leave_seq(
             MessageNodeList::get_value(min_leave_seq_i).get_leave_seq());
-        gcomm_assert(min_leave_seq != Seqno::max());
-        if (max_reachable_safe_seq == Seqno::max())
-        {
-            // We will always get at least this far
-            max_reachable_safe_seq = min_leave_seq;
-        }
-        else
-        {
-            max_reachable_safe_seq = min(max_reachable_safe_seq, 
-                                         min_leave_seq);
-        }
+        max_reachable_safe_seq = min(max_reachable_safe_seq, min_leave_seq);
     }
     
+    // Partitioning nodes
     MessageNodeList partitioning;
     for_each(node_list.begin(), node_list.end(), 
              SelectNodesOp(partitioning, current_view.get_id(), false, false));
@@ -201,20 +157,11 @@ bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
         MessageNodeList::const_iterator min_part_safe_seq_i(
             min_element(partitioning.begin(), partitioning.end(),
                         SafeSeqCmp()));
-        const Seqno min_part_safe_seq(
-            min_part_safe_seq_i == partitioning.end() ?
-            Seqno::max() : 
+        gcomm_assert(min_part_safe_seq_i != partitioning.end());
+        const seqno_t min_part_safe_seq(
             MessageNodeList::get_value(min_part_safe_seq_i).get_safe_seq());
-        if (min_part_safe_seq      != Seqno::max() &&
-            max_reachable_safe_seq != Seqno::max())
-        {
-            max_reachable_safe_seq = min(max_reachable_safe_seq, 
-                                         min_part_safe_seq);
-        }
-        else
-        {
-            max_reachable_safe_seq = Seqno::max();
-        }
+        max_reachable_safe_seq = min(max_reachable_safe_seq, 
+                                     min_part_safe_seq);
     }
     
     evs_log_debug(D_CONSENSUS)

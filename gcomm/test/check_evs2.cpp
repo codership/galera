@@ -40,47 +40,13 @@ using namespace gcomm::evs;
 
 
 
-START_TEST(test_seqno)
-{
-    log_info << "START";
-    Seqno s0(0), s1(1), 
-        sk(static_cast<uint16_t>(Seqno::max().get()/2)), 
-        sn(static_cast<uint16_t>(Seqno::max().get() - 1));
-    
-    fail_unless(s0 - 1 == sn);
-    
-    fail_unless(s1 == s1);
-    fail_unless(s0 != s1);
-    
-    fail_unless(s0 < s1);
-    fail_unless(s0 <= s1);
-    fail_unless(s1 > s0);
-    fail_unless(s1 >= s0);
-    
-    fail_unless(s1 >= s1);
-    fail_unless(s1 <= s1);
-    
-    fail_unless(sn < s0);
-    fail_unless(sn <= s0);
-    fail_unless(s0 > sn);
-    fail_unless(s0 >= sn);
-    
-    fail_unless(sk - 1 > s0 && sk + 1 < s0);
-    fail_unless(sk != s0);
-    fail_unless(sk < sn);
-    
-    Seqno ss(0x7aba);
-    check_serialization(ss, 2, Seqno());
-    
-}
-END_TEST
 
 START_TEST(test_range)
 {
     log_info << "START";
     Range r(3, 6);
 
-    check_serialization(r, 2*Seqno::serial_size(), Range());
+    check_serialization(r, 2 * gcomm::serial_size(seqno_t()), Range());
 
 }
 END_TEST
@@ -90,7 +56,7 @@ START_TEST(test_message)
     log_info << "START";
     UUID uuid1(0, 0);
     ViewId view_id(V_TRANS, uuid1, 4567);
-    Seqno seq(478), aru_seq(456), seq_range(7);
+    seqno_t seq(478), aru_seq(456), seq_range(7);
     
     UserMessage um(uuid1, view_id, seq, aru_seq, seq_range, O_SAFE, 75433, 0xab,
                    Message::F_SOURCE);
@@ -126,7 +92,8 @@ START_TEST(test_input_map_insert)
     UUID uuid1(1), uuid2(2);
     InputMap im;
     ViewId view(V_REG, uuid1, 0);
-    
+    const seqno_t window(256);
+
     try 
     {
         im.insert(0, UserMessage(uuid1, view, 0));
@@ -139,26 +106,25 @@ START_TEST(test_input_map_insert)
     
     im.insert(0, UserMessage(uuid1, view, 0));
     
+
     try 
     { 
         im.insert(0, 
-                  UserMessage(uuid1, view, 
-                              static_cast<uint16_t>(Seqno::max().get() - 1))); 
+                  UserMessage(uuid1, view, window + 1)); 
         fail("");
     }
     catch (...) { }
     
-
     im.clear();
     im.reset(2);
 
-    for (Seqno s = 0; s < 10; ++s)
+    for (seqno_t s = 0; s < 10; ++s)
     {
         im.insert(0, UserMessage(uuid1, view, s));
         im.insert(1, UserMessage(uuid2, view, s));
     }
 
-    for (Seqno s = 0; s < 10; ++s)
+    for (seqno_t s = 0; s < 10; ++s)
     {
         InputMap::iterator i = im.find(0, s);
         fail_if(i == im.end());
@@ -256,12 +222,12 @@ START_TEST(test_input_map_erase)
 
     im.reset(1);
 
-    for (Seqno s = 0; s < 10; ++s)
+    for (seqno_t s = 0; s < 10; ++s)
     {
         im.insert(index1, UserMessage(uuid1, view, s));
     }
     
-    for (Seqno s = 0; s < 10; ++s)
+    for (seqno_t s = 0; s < 10; ++s)
     {
         InputMap::iterator i = im.find(index1, s);
         fail_unless(i != im.end());
@@ -297,16 +263,14 @@ START_TEST(test_input_map_overwrap)
     
     Date start(Date::now());
     size_t cnt(0);
-    Seqno last_safe(Seqno::max());
-    for (size_t n = 0; n < Seqno::max().get()*3LU; ++n)
+    seqno_t last_safe(-1);
+    for (seqno_t seq = 0; seq < 100000; ++seq)
     {
-        
-        Seqno seq(static_cast<uint16_t>(n % Seqno::max().get()));
         for (size_t i = 0; i < n_nodes; ++i)
         {
             UserMessage um(uuids[i], view, seq);
             (void)im.insert(i, um);
-            if ((n + 5) % 10 == 0)
+            if ((seq + 5) % 10 == 0)
             {
                 last_safe = um.get_seq() - 3;
                 im.set_safe_seq(i, last_safe);
@@ -346,7 +310,8 @@ private:
 START_TEST(test_input_map_random_insert)
 {
     log_info << "START";
-    size_t n_seqnos(Seqno::max().get()/4);
+    seqno_t window(1024);
+    seqno_t n_seqnos(1024);
     size_t n_uuids(4);
     vector<UUID> uuids(n_uuids);
     vector<pair<size_t, UserMessage> > msgs(n_uuids*n_seqnos);
@@ -357,17 +322,15 @@ START_TEST(test_input_map_random_insert)
     {
         uuids[i] = (static_cast<int32_t>(i + 1));
     }
-
-    im.reset(n_uuids, Seqno::max().get()/4);
     
-    for (size_t j = 0; j < n_seqnos; ++j)
+    im.reset(n_uuids, window);
+    
+    for (seqno_t j = 0; j < n_seqnos; ++j)
     {
         for (size_t i = 0; i < n_uuids; ++i)
         {
             msgs[j*n_uuids + i] =
-                make_pair(i, UserMessage(uuids[i],
-                                         view_id,
-                                         static_cast<uint16_t>(j % Seqno::max().get())));
+                make_pair(i, UserMessage(uuids[i], view_id, j));
         }
     }
     
@@ -383,19 +346,19 @@ START_TEST(test_input_map_random_insert)
         fail_if(im.is_safe(i) == true);
         ++n;
     }
- 
-    fail_unless(im.get_aru_seq() == Seqno(static_cast<uint16_t>(n_seqnos - 1)));
-    fail_unless(im.get_safe_seq() == Seqno::max());
+    
+    fail_unless(im.get_aru_seq() == n_seqnos - 1);
+    fail_unless(im.get_safe_seq() == -1);
     
     for (size_t i = 0; i < n_uuids; ++i)
     {
         fail_unless(im.get_range(i) == 
-                    Range(static_cast<uint16_t>(n_seqnos),
-                          static_cast<uint16_t>(n_seqnos - 1)));
+                    Range(n_seqnos,
+                          n_seqnos - 1));
         
-        im.set_safe_seq(i, static_cast<uint16_t>(n_seqnos - 1));
+        im.set_safe_seq(i, n_seqnos - 1);
     }
-    fail_unless(im.get_safe_seq() == static_cast<uint16_t>(n_seqnos - 1));
+    fail_unless(im.get_safe_seq() == n_seqnos - 1);
     
 }
 END_TEST
@@ -818,7 +781,7 @@ START_TEST(test_proto_leave_n_w_user_msg)
     vector<DummyNode*> dn;
     const string inactive_timeout("PT1H");
     const string retrans_period("PT0.1S");
-
+    
     for (size_t i = 1; i <= n_nodes; ++i)
     {
         gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
@@ -830,7 +793,7 @@ START_TEST(test_proto_leave_n_w_user_msg)
         set_cvi(dn, 0, i, i + 1);
         gu_trace(prop.propagate_until_cvi(false));
     }
-
+    
     uint32_t last_view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
     
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1371,36 +1334,36 @@ START_TEST(test_trac_200)
     nl.insert_unique(
         make_pair(uuid1,
                   MessageNode(true,
-                              Seqno::max(),
+                              -1,
                               ViewId(V_REG, uuid1, 2),
-                              Seqno::max(),
+                              -1,
                               Range())));
     nl.insert_unique(
         make_pair(uuid2,
                   MessageNode(true,
-                              Seqno::max(),
+                              -1,
                               ViewId(V_REG, uuid1, 2),
-                              Seqno::max(),
+                              -1,
                               Range())));
     nl.insert_unique(
         make_pair(uuid3,
                   MessageNode(false,
-                              Seqno::max(),
+                              -1,
                               ViewId(V_TRANS, uuid3, 0),
-                              Seqno::max(),
+                              -1,
                               Range(1, 0))));
     
     p2.handle_msg(InstallMessage(uuid1, 
                                  im1.get_source_view_id(),
                                  im1.get_install_view_id(),
-                                 Seqno::max(),
-                                 Seqno::max(), 
+                                 -1,
+                                 -1,
                                  -1,
                                  nl));
     p2.handle_msg(JoinMessage(uuid1, 
                               jm1.get_source_view_id(),
-                              Seqno::max(),
-                              Seqno::max(),
+                              -1,
+                              -1,
                               -1,
                               jm1.get_node_list()));
     // Commented out until this is fixed
@@ -1418,10 +1381,6 @@ Suite* evs2_suite()
     
     if (skip == false)
     {
-        tc = tcase_create("test_seqno");
-        tcase_add_test(tc, test_seqno);
-        suite_add_tcase(s, tc);
-    
         tc = tcase_create("test_range");
         tcase_add_test(tc, test_range);
         suite_add_tcase(s, tc);

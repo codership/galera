@@ -41,7 +41,7 @@ public:
      *
      * @return Highest reachable safe seq
      */
-    Seqno highest_reachable_safe_seq() const;
+    seqno_t highest_reachable_safe_seq() const;
     /*!
      * Check if highest reachable safe seq according to message
      * consistent with local state.
