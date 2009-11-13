@@ -9,15 +9,16 @@
 #include "gcomm/types.hpp"
 
 #include "gu_utils.hpp"
+#include "gu_assert.hpp"
+#include "gu_byteswap.h"
 
 extern "C" {
 #include <stddef.h>
 #include "gu_uuid.h"
 }
 
-#include <cstdio>
-#include <cstring>
-#include <cassert>
+#include <ostream>
+#include <iomanip>
 
 namespace gcomm
 {
@@ -27,18 +28,9 @@ namespace gcomm
 
 class gcomm::UUID
 {
-    gu_uuid_t uuid;
-    static const UUID uuid_nil;
-    UUID(gu_uuid_t uuid_) :
-        uuid(uuid_)
-    {
-    }
 public:
-    UUID() :
-        uuid()
-    {
-        uuid = GU_UUID_NIL;
-    }
+
+    UUID() : uuid(GU_UUID_NIL) {}
     
     UUID(const void* node, const size_t node_len) :
         uuid()
@@ -48,7 +40,6 @@ public:
 
     UUID(const int32_t idx) :
         uuid()
-
     {
         assert(idx > 0);
         uuid = GU_UUID_NIL;
@@ -103,39 +94,60 @@ public:
     {
         return gu_uuid_compare(&uuid, &cmp.uuid) == 0; 
     }
-    
-    std::string to_string() const {
-        char buf[37];
-        memset(buf, 0, sizeof(buf));
 
-        const int32_t* val = reinterpret_cast<const int32_t*>(&uuid);
-        if (*val != 0 &&
-            memcmp(val + 1, buf, sizeof(uuid) - sizeof(int32_t)) == 0)
+    std::ostream& to_stream(std::ostream& os) const
+    {
+        static const char buf[37] = { 0, };
+        const uint32_t* i = reinterpret_cast<const uint32_t*>(uuid.data);
+
+        if (i[0] != 0 &&
+            memcmp(i + 1, buf, sizeof(uuid) - sizeof(*i)) == 0)
         {
             // if all of UUID is contained in the first 4 bytes
-            return gu::to_string(*val);
+            os << i[0]; // should this be converted to certain endianness?
         }
         else
         {
-#define GU_CPP_UUID_FORMAT \
-          "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
-            int const ret = snprintf(buf, sizeof(buf), GU_CPP_UUID_FORMAT,
-                                     GU_UUID_ARGS(&uuid));
-            if (36 != ret)
-            {
-                gu_throw_fatal << "Failed to print UUID";
-            }
-#undef GU_CPP_UUID_FORMAT
-            return std::string(buf);
+            const uint16_t* s = reinterpret_cast<const uint16_t*>(uuid.data);
+
+            using namespace std;
+
+            ios_base::fmtflags saved = os.flags();
+
+            os << hex
+               << setfill('0') << setw(8) << gu_be32(i[0]) << '-'
+               << setfill('0') << setw(4) << gu_be16(s[2]) << '-'
+               << setfill('0') << setw(4) << gu_be16(s[3]) << '-'
+               << setfill('0') << setw(4) << gu_be16(s[4]) << '-'
+               << setfill('0') << setw(4) << gu_be16(s[5])
+               << setfill('0') << setw(8) << gu_be32(i[3]);
+
+            os.flags(saved);
         }
+
+        return os;
     }
+
+    // Prefer the above function over this one
+    std::string _str() const
+    {
+        std::ostringstream os;
+        to_stream(os);
+        return os.str();
+    }
+
+private:
+
+    gu_uuid_t         uuid;
+    static const UUID uuid_nil;
+    UUID(gu_uuid_t uuid_) : uuid(uuid_) {}
 };
 
 
 
 inline std::ostream& gcomm::operator<<(std::ostream& os, const UUID& uuid)
 {
-    return (os << uuid.to_string());
+    return uuid.to_stream (os);
 }
 
 #endif // _GCOMM_UUID_HPP_

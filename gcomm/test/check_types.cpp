@@ -32,7 +32,8 @@ using namespace gcomm;
 START_TEST(test_uuid)
 {
     UUID uuid;
-    fail_unless(uuid.to_string() == "00000000-0000-0000-0000-000000000000");
+    fail_unless(uuid._str() == "00000000-0000-0000-0000-000000000000");
+
     for (size_t i = 0; i < 159; ++i)
     {
         UUID uuidrnd(0, 0);
@@ -41,9 +42,8 @@ START_TEST(test_uuid)
 
     UUID uuid1(0, 0);
     UUID uuid2(0, 0);
-    
+
     fail_unless(uuid1 < uuid2);
-    
 }
 END_TEST
 
@@ -69,28 +69,26 @@ START_TEST(test_view)
     ViewId vid;
     fail_unless(vid.get_uuid() == UUID());
     fail_unless(vid.get_seq() == 0);
-    
+
     UUID uuid(0, 0);
-    
+
     vid = ViewId(V_REG, uuid, 7);
     fail_unless(vid.get_uuid() == uuid);
     fail_unless(vid.get_seq() == 7);
-    
+
     check_serialization(vid, UUID::serial_size() + sizeof(uint32_t), ViewId());
-    
-    
+
     NodeList nl;
 
     for (size_t i = 0; i < 7; ++i)
     {
         nl.insert(make_pair(UUID(0, 0), Node()));
     }
-    
+
     fail_unless(nl.size() == 7);
     check_serialization(nl, 4 + 7*(UUID::serial_size() 
                                    + Node::serial_size()), NodeList());
-    
-    
+
     View v(ViewId(V_TRANS, vid));
 
     for (size_t i = 0; i < 10; ++i)
@@ -115,7 +113,7 @@ START_TEST(test_view)
         }
 
     }
-        
+
     check_serialization(v, 
                         /* view id */
                         + ViewId::serial_size() 

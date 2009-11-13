@@ -137,7 +137,8 @@ public:
     
     ~PCProto() {}
 
-    std::string self_string() const { return get_uuid().to_string(); }
+//    std::string self_string() const { return get_uuid()._to_string(); }
+    const UUID& self_id() const { return my_uuid; }
     
     State       get_state()   const { return state; }
 
@@ -172,7 +173,7 @@ public:
     
     void connect(bool first) 
     { 
-        log_debug << self_string() << " start_prim " << first;
+        log_debug << self_id() << " start_prim " << first;
         start_prim = first; 
         shift_to(S_JOINING);
     }

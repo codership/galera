@@ -15,8 +15,7 @@
 #include "gcomm/types.hpp"
 
 namespace gcomm
-{
-        
+{        
     namespace gmcast
     {
         class Proto;
@@ -59,10 +58,12 @@ namespace gcomm
         GMCast (const GMCast&);
         GMCast& operator=(const GMCast&);
 
-        static const long max_retry_cnt = 12*3600;        
+        static const long max_retry_cnt = 12*3600;
+
         class AddrEntry
         {
         public:
+
             AddrEntry(const gu::datetime::Date& last_seen_,
                       const gu::datetime::Date& next_reconnect_,
                       const UUID& uuid_)
@@ -85,7 +86,9 @@ namespace gcomm
             void set_retry_cnt(const int r)
             { retry_cnt = r; }
             int get_retry_cnt() const { return retry_cnt; }
+
         private:
+
             void operator=(const AddrEntry&);
             UUID uuid;
             gu::datetime::Date last_seen;
@@ -132,10 +135,12 @@ namespace gcomm
         void update_addresses();
         // Reconnecting
         void reconnect();
-        
+
         std::string self_string() const
         {
-            return "(" + get_uuid().to_string() + ", " + listen_addr + ")";
+            std::ostringstream os;
+            os << '(' << my_uuid << ", '" << listen_addr << "')";
+            return os.str();
         }
     };
 }

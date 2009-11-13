@@ -11,7 +11,7 @@
 #ifndef _gcs_h_
 #define _gcs_h_
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -252,7 +252,6 @@ extern long gcs_join (gcs_conn_t *conn, gcs_seqno_t status);
 
 ///////////////////////////////////////////////////////////////////////////////
 
-    
 /* Service functions */
 
 /*! Informs group about the last applied action on this node */

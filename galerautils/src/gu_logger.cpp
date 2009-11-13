@@ -145,7 +145,7 @@ namespace gu
             localtime_r  (&time.tv_sec, &date);
 
             os << date.tm_year + 1900 << '-'
-               << setw(2) << setfill('0') << date.tm_mon + 1 << '-'
+               << setw(2) << setfill('0') << (date.tm_mon + 1) << '-'
                << setw(2) << setfill('0') << date.tm_mday << ' '
                << setw(2) << setfill('0') << date.tm_hour << ':'
                << setw(2) << setfill('0') << date.tm_min  << ':'

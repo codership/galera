@@ -29,12 +29,13 @@ using namespace gcomm;
 using namespace gcomm::evs;
 
 // Convenience macros for debug and info logging
-#define evs_log_debug(__mask__)   if ((debug_mask & (__mask__)) == 0) { } else log_debug << self_string() << ": "
-#define evs_log_info(__mask__)    if ((info_mask & (__mask__)) == 0) { } else log_info << self_string() << ": "
+#define evs_log_debug(__mask__)             \
+    if ((debug_mask & (__mask__)) == 0) { } \
+    else log_debug << self_string() << ": "
 
-
-
-
+#define evs_log_info(__mask__)              \
+    if ((info_mask & (__mask__)) == 0) { }  \
+    else log_info << self_string() << ": "
 
 
 gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
@@ -87,9 +88,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     self_loopback(false),
     state(S_CLOSED),
     shift_to_rfcnt(0)
-{
-
-    
+{    
     URI uri(conf);
     
     // We probably don't want to go under this.
@@ -170,10 +169,6 @@ gcomm::evs::Proto::~Proto()
     delete install_message;
     delete input_map;
 }
-
-
-
-
 
 ostream& gcomm::evs::operator<<(ostream& os, const Proto& p)
 {

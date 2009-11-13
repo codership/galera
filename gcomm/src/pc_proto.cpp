@@ -32,9 +32,11 @@ public:
         const PCInst& astate(
             PCInstMap::get_value(
                 PCProto::SMMap::get_value(a).get_inst_map().find_checked(PCProto::SMMap::get_key(a))));
+
         const PCInst& bstate(
             PCInstMap::get_value(
                 PCProto::SMMap::get_value(b).get_inst_map().find_checked(PCProto::SMMap::get_key(b))));
+
         return (astate.get_to_seq() < bstate.get_to_seq());
     }
 };
@@ -56,7 +58,7 @@ static int64_t get_max_to_seq(const PCProto::SMMap& states)
 
 void PCProto::send_state()
 {
-    log_debug << self_string() << " sending state";
+    log_debug << self_id() << " sending state";
     
     PCStateMessage pcs;
     
@@ -84,7 +86,7 @@ void PCProto::send_state()
 
 void PCProto::send_install()
 {
-    log_debug << self_string() << " send install";
+    log_debug << self_id() << " send install";
     
     PCInstallMessage pci;
     
@@ -110,7 +112,7 @@ void PCProto::send_install()
     int ret = send_down(Datagram(buf), ProtoDownMeta());
     if (ret != 0)
     {
-        log_warn << self_string() << " sending install message failed: "
+        log_warn << self_id() << " sending install message failed: "
                  << strerror(ret);
     }
 }
@@ -134,7 +136,7 @@ void PCProto::deliver_view()
     }
     
     ProtoUpMeta um(UUID::nil(), ViewId(), &v);
-    log_debug << self_string() << " delivering view " << v;
+    log_debug << self_id() << " delivering view " << v;
     send_up(Datagram(), um);
 }
 
@@ -155,9 +157,9 @@ void PCProto::shift_to(const State s)
         // Prim
         { true,  false, false, false, false, true,  true  },
         // Trans
-        { true,  false, true,  false, false, false, true },
+        { true,  false, true,  false, false, false, true  },
         // Non-prim
-        { true,  false, true,  false, false, true, true  }
+        { true,  false, true,  false, false, true,  true  }
     };
     
 
@@ -165,7 +167,7 @@ void PCProto::shift_to(const State s)
     if (allowed[get_state()][s] == false)
     {
         gu_throw_fatal << "Forbidden state transtion: "
-                          << to_string(get_state()) << " -> " << to_string(s);
+                       << to_string(get_state()) << " -> " << to_string(s);
     }
     
     switch (s)
@@ -200,6 +202,7 @@ void PCProto::shift_to(const State s)
                 inst.set_prim(false);
             }
         }
+
         set_prim(true);
         pc_view = ViewId(V_PRIM, current_view.get_id());
         break;
@@ -219,6 +222,7 @@ void PCProto::shift_to(const State s)
                 inst.set_prim(false);
             }
         }
+
         set_prim(false);
         pc_view = ViewId(V_NON_PRIM, current_view.get_id());
         break;
@@ -226,7 +230,7 @@ void PCProto::shift_to(const State s)
         ;
     }
 
-    log_debug << self_string() << " shift_to: " << to_string(get_state()) 
+    log_debug << self_id() << " shift_to: " << to_string(get_state()) 
               << " -> " <<  to_string(s) 
               << " prim " << get_prim()
               << " last prim " << get_last_prim()
@@ -285,7 +289,7 @@ void PCProto::handle_trans(const View& view)
         if (get_last_prim().get_uuid() != view.get_id().get_uuid() &&
             get_last_prim().get_seq()  != view.get_id().get_seq() )
         {
-            log_debug << self_string() 
+            log_debug << self_id() 
                       << " trans view during " << to_string(get_state());
         }
     }
@@ -303,7 +307,7 @@ void PCProto::handle_first_reg(const View& view)
     {
         if (view.get_members().size() > 1 || view.is_empty())
         {
-            gu_throw_fatal << self_string() << " starting primary "
+            gu_throw_fatal << self_id() << " starting primary "
                               <<"but first reg view is not singleton";
         }
     }
@@ -370,7 +374,7 @@ void PCProto::handle_view(const View& view)
                           << view;
     }
     
-    log_debug << self_string() << " " << view;
+    log_debug << self_id() << " " << view;
     
     if (view.get_type() == V_TRANS)
     {
@@ -427,13 +431,13 @@ void PCProto::validate_state_msgs() const
                     // is in prim. All message prim view states must be equal
                     // to local ones.
                     gcomm_assert(msg_state == local_state)
-                        << self_string()
+                        << self_id()
                         << " node " << uuid
                         << " prim state message and local states not consistent:"
                         << " msg node "   << msg_state
                         << " local state " << local_state;
                     gcomm_assert(msg_state.get_to_seq() == max_to_seq)
-                        << self_string()
+                        << self_id()
                         << " node " << uuid
                         << " to seq not consistent with local state:"
                         << " max to seq " << max_to_seq
@@ -442,7 +446,7 @@ void PCProto::validate_state_msgs() const
             }
             else if (get_prim() == true)
             {
-                log_debug << self_string()
+                log_debug << self_id()
                           << " node " << uuid 
                           << " from " << msg_state.get_last_prim()
                           << " joining " << get_last_prim();
@@ -450,7 +454,7 @@ void PCProto::validate_state_msgs() const
             else if (msg_state.get_prim() == true)
             {
                 // @todo: Cross check with other state messages coming from prim
-                log_debug << self_string()
+                log_debug << self_id()
                           << " joining to " << msg_state.get_last_prim();
             }
         }
@@ -482,7 +486,7 @@ bool PCProto::requires_rtr() const
             to_seq                 != max_to_seq && 
             last_prim.get_type()   != V_NON_PRIM)
         {
-            log_warn << self_string() << " RTR is needed: " << to_seq
+            log_warn << self_id() << " RTR is needed: " << to_seq
                      << " / " << last_prim;
             ret = true;
         }
@@ -504,7 +508,7 @@ void PCProto::cleanup_instances()
         const UUID& uuid(PCInstMap::get_key(i));
         if (current_view.is_member(uuid) == false) 
         {
-            log_debug << self_string()
+            log_debug << self_id()
                       << " cleaning up instance " << uuid;
             instances.erase(i);
         }
@@ -545,14 +549,14 @@ bool PCProto::is_prim() const
             if (state.get_last_prim() != last_prim)
             {
                 gu_throw_fatal 
-                    << self_string()
+                    << self_id()
                     << " last prims not consistent";
             }
             
             if (state.get_to_seq() != to_seq)
             {
                 gu_throw_fatal 
-                    << self_string()
+                    << self_id()
                     << " TO seqs not consistent";
             }
         }
@@ -613,7 +617,7 @@ bool PCProto::is_prim() const
                 MultiMap<ViewId, UUID>::get_value(i));
             gcomm_assert(iret.second == true);
         }
-        log_debug << self_string()
+        log_debug << self_id()
                   << " greatest view id " << greatest_view_id;
         set<UUID> present;
         for (NodeList::const_iterator i = current_view.get_members().begin();
@@ -625,7 +629,7 @@ bool PCProto::is_prim() const
         set_intersection(greatest_view.begin(), greatest_view.end(),
                          present.begin(), present.end(),
                          inserter(intersection, intersection.begin()));
-        log_debug << self_string()
+        log_debug << self_id()
                   << " intersection size " << intersection.size()
                   << " greatest view size " << greatest_view.size();
         if (intersection.size() == greatest_view.size())
@@ -644,7 +648,7 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
     gcomm_assert(get_state() == S_STATES_EXCH);
     gcomm_assert(state_msgs.size() < current_view.get_members().size());
     
-    log_debug << self_string() << " handle state from " << source << " " << msg;
+    log_debug << self_id() << " handle state from " << source << " " << msg;
     
     // Early check for possibly conflicting primary components. The one 
     // with greater view id may continue (as it probably has been around
@@ -654,7 +658,7 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
         const PCInst& si(PCInstMap::get_value(msg.get_inst_map().find(source)));
         if (si.get_prim() == true && si.get_last_prim() != get_last_prim())
         {
-            log_warn << self_string() << " conflicting prims: my prim " 
+            log_warn << self_id() << " conflicting prims: my prim " 
                      << get_last_prim() 
                      << " other prim: " 
                      << si.get_last_prim();
@@ -666,7 +670,7 @@ void PCProto::handle_state(const PCMessage& msg, const UUID& source)
             }
             else
             {
-                gu_throw_fatal << self_string()
+                gu_throw_fatal << self_id()
                                   << " aborting due to conflicting prims";
             }
         }
@@ -726,7 +730,7 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
     gcomm_assert(msg.get_type() == PCMessage::T_INSTALL);
     gcomm_assert(get_state()    == S_INSTALL);
     
-    log_debug << self_string() 
+    log_debug << self_id() 
               << " handle install from " << source << " " << msg;
     
     // Validate own state
@@ -737,7 +741,7 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
     
     if (m_state != PCInstMap::get_value(self_i))
     {
-        gu_throw_fatal << self_string()
+        gu_throw_fatal << self_id()
                           << "Install message self state does not match, "
                           << "message state: " << m_state
                           << ", local state: "
@@ -765,7 +769,7 @@ void PCProto::handle_install(const PCMessage& msg, const UUID& source)
         }
     }
     
-    log_debug << self_string() << " setting TO seq to " << to_seq;
+    log_debug << self_id() << " setting TO seq to " << to_seq;
     
     set_to_seq(to_seq);
     
@@ -789,7 +793,7 @@ void PCProto::handle_user(const PCMessage& msg, const Datagram& dg,
              current_view.get_members().end())
     {
         gcomm_assert(current_view.get_type() == V_TRANS);
-        // log_debug << self_string()
+        // log_debug << self_id()
         //        << " dropping message from out of view source in non-prim";
         return;
     }

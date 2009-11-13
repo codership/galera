@@ -98,7 +98,7 @@ void PC::connect()
     const UUID& uuid(gmcast->get_uuid());
     if (uuid == UUID::nil())
     {
-        gu_throw_fatal << "invalid UUID: " << uuid.to_string();
+        gu_throw_fatal << "invalid UUID: " << uuid;
     }
 
     const bool start_prim = host_is_any (uri.get_host());

@@ -415,11 +415,13 @@ static void fill_cmp_msg(const View& view, const UUID& my_uuid,
     for (NodeList::const_iterator i = view.get_members().begin();
          i != view.get_members().end(); ++i)
     {
-        
         const UUID& uuid(NodeList::get_key(i));
-        log_debug << "member " << n << " uuid " << uuid;
+
+        log_debug << "member: " << n << " uuid: " << uuid;
+
         (void)snprintf(cm->memb[n].id, GCS_COMP_MEMB_ID_MAX_LEN, "%s", 
-                       uuid.to_string().c_str());
+                       uuid._str().c_str());
+
         if (uuid == my_uuid)
         {
             log_debug << "my index " << n;

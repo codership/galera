@@ -20,7 +20,6 @@ using namespace gu;
 using namespace gu::net;
 using namespace gu::datetime;
 
-
 static void set_tcp_defaults (URI* uri)
 {
     // what happens if there is already this parameter?
@@ -88,7 +87,7 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
                 gu_throw_error (EINVAL) << "initial addr '" << initial_addr
                                         << "' is not valid";
             }
-            log_debug << self_string() << " initial addr " << initial_addr;
+            log_debug << self_string() << " initial addr: " << initial_addr;
         }
     }
     catch (gu::NotSet&)
@@ -430,8 +429,8 @@ void GMCast::insert_address (const string& addr,
     }
     else
     {
-        log_debug << self_string() << ": new address entry " << uuid.to_string()
-                  << ' ' << addr;
+        log_debug << self_string() << ": new address entry " << uuid << ' '
+                  << addr;
     }
 }
 
@@ -454,11 +453,10 @@ void GMCast::update_addresses()
             if (rp->get_remote_addr() == "" || 
                 rp->get_remote_uuid() == UUID::nil())
             {
-                gu_throw_fatal << "Protocol error: local: " 
-                               << get_uuid().to_string() << " "
-                               << listen_addr << ", remote: "
-                               << rp->get_remote_uuid().to_string()
-                               << " '" << rp->get_remote_addr() << "'";
+                gu_throw_fatal << "Protocol error: local: (" << my_uuid
+                               << ", '" << listen_addr
+                               << "'), remote: (" << rp->get_remote_uuid()
+                               << ", '" << rp->get_remote_addr() << "')";
             }
             
             if (remote_addrs.find(rp->get_remote_addr()) == remote_addrs.end())
@@ -468,6 +466,7 @@ void GMCast::update_addresses()
                 insert_address(rp->get_remote_addr(), rp->get_remote_uuid(), 
                                remote_addrs);
             }
+
             if (uuids.insert(rp->get_remote_uuid()).second == false)
             {
                 // Duplicate entry, drop this one
@@ -582,7 +581,7 @@ void GMCast::reconnect()
         {
             if (ae.get_retry_cnt() > max_retry_cnt)
             {
-                log_debug << " Forgetting " << remote_uuid.to_string() << " ("
+                log_debug << " Forgetting " << remote_uuid << " ("
                           << remote_addr << ")";
                 remote_addrs.erase(i);
                 continue;//no reference to remote_addr or remote_uuid after this
@@ -591,9 +590,8 @@ void GMCast::reconnect()
             {
                 if (ae.get_retry_cnt() % 30 == 0)
                 {
-                    log_info << self_string() << " Reconnecting to " 
-                             << remote_uuid.to_string() 
-                             << " (" << remote_addr
+                    log_info << self_string() << " reconnecting to " 
+                             << remote_uuid << " (" << remote_addr
                              << "), attempt " << ae.get_retry_cnt();
                 }
                 

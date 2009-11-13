@@ -54,27 +54,7 @@ public:
         S_OPERATIONAL,
         S_MAX
     };
-    friend std::ostream& operator<<(std::ostream&, const Proto&);
-public:
 
-    Proto(const UUID& my_uuid_, const std::string& conf = "evs://");
-    ~Proto();
-    
-    const UUID& get_uuid() const { return my_uuid; }
-
-
-    std::string self_string() const 
-    { 
-        return "evs::proto(" + get_uuid().to_string() + ","
-            + to_string(get_state()) + "," + gu::to_string(current_view.get_id()) + ")"; 
-    }
-
-    State get_state() const { return state; }
-    
-    size_t get_known_size() const { return known.size(); }
-    
-    bool is_output_empty() const { return output.empty(); }
-    
     static std::string to_string(const State s) 
     {
         switch (s) {
@@ -88,6 +68,27 @@ public:
             throw;
         }
     }
+    
+    friend std::ostream& operator<<(std::ostream&, const Proto&);
+
+    Proto(const UUID& my_uuid_, const std::string& conf = "evs://");
+    ~Proto();
+    
+    const UUID& get_uuid() const { return my_uuid; }
+
+    std::string self_string() const 
+    {
+        std::ostringstream os;
+        os << "evs::proto(" << get_uuid() << ", " << to_string(get_state())
+           << ", " << current_view.get_id() << ")";
+        return os.str();
+    }
+
+    State get_state() const { return state; }
+    
+    size_t get_known_size() const { return known.size(); }
+    
+    bool is_output_empty() const { return output.empty(); }
     
     std::string get_stats() const;
     void reset_stats();

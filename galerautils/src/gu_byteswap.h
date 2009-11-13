@@ -14,7 +14,17 @@
 #include <byteswap.h> // for bswap_16(x), bswap_32(x), bswap_64(x) 
 
 /* @note: there are inline functions behind these macros,
- *        so typesafety is taken care of. */
+ *        so typesafety is taken care of... However C++ still has issues: */
+
+#ifdef __cplusplus
+// To pacify C++. Not loosing much optimization on 2 bytes anyways.
+#include <stdint.h>
+#undef bswap_16
+static inline uint16_t bswap_16(uint16_t x)
+// Even though x is declared as 'uint16_t', g++-4.4.1 still treats results
+// of operations with it as 'int' and freaks out on return with -Wconversion.
+{ return static_cast<uint16_t>((x >> 8) | (x << 8)); }
+#endif // __cplusplus
 
 #if   __BYTE_ORDER == __LITTLE_ENDIAN
 
