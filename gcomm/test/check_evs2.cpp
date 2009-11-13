@@ -314,7 +314,7 @@ START_TEST(test_input_map_random_insert)
     seqno_t n_seqnos(1024);
     size_t n_uuids(4);
     vector<UUID> uuids(n_uuids);
-    vector<pair<size_t, UserMessage> > msgs(n_uuids*n_seqnos);
+    vector<pair<size_t, UserMessage> > msgs(static_cast<size_t>(n_uuids*n_seqnos));
     ViewId view_id(V_REG, UUID(1), 1);
     InputMap im;
     
@@ -329,7 +329,7 @@ START_TEST(test_input_map_random_insert)
     {
         for (size_t i = 0; i < n_uuids; ++i)
         {
-            msgs[j*n_uuids + i] =
+            msgs[static_cast<size_t>(j*n_uuids) + i] =
                 make_pair(i, UserMessage(uuids[i], view_id, j));
         }
     }
