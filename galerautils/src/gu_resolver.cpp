@@ -155,9 +155,15 @@ gu::net::Addrinfo::~Addrinfo()
 
 string gu::net::Addrinfo::to_string() const
 {
+    static const size_t max_addr_str_len = (6 /* tcp|udp:// */ +
+                                            INET6_ADDRSTRLEN + 2 /* [] */ +
+                                            6 /* :portt */);
     string ret;
+
+    ret.reserve(max_addr_str_len);
+
     Sockaddr addr(ai.ai_addr, ai.ai_addrlen);
-    
+
     switch (get_socktype())
     {
     case SOCK_STREAM:
@@ -177,7 +183,7 @@ string gu::net::Addrinfo::to_string() const
     {
         gu_throw_error(errno) << "inet ntop failed";
     }
-    
+
     switch (get_family())
     {
     case AF_INET:
@@ -191,8 +197,9 @@ string gu::net::Addrinfo::to_string() const
     default:
         gu_throw_error(EINVAL) << "invalid address family: " << get_family();
     }
-    
+
     ret += ":" + gu::to_string(ntohs(addr.get_port()));
+    ret.reserve(0); // free unused space if possible
     return ret;
 }
 
