@@ -332,10 +332,9 @@ gcomm::evs::InputMap::insert(const size_t uuid,
         }
     }
 
-    // Call update aru only if aru_seq may change
-    bool do_update_aru = ((aru_seq_ + 1) < range.get_lu());
     node.set_range(range);
-    if (do_update_aru == true)
+    // Call update aru only if aru_seq may change
+    if (aru_seq_ + 1 < range.get_lu())
     {
         update_aru();
     }

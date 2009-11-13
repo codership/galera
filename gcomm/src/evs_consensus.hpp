@@ -32,33 +32,32 @@ public:
     { }
     
     /*!
-     * Compare join message against current state
+     * Compare two messages if they are equal in consensus context.
      */
-    bool is_consistent(const Message&) const;
+    bool equal(const Message&, const Message&) const;
 
     /*!
-     * Compute highest reachable safe seq from local state
+     * Compute highest reachable safe seq from local state.
      *
-     * @return Highest reachable safe seq
+     * @return Highest reachable safe seq.
      */
     seqno_t highest_reachable_safe_seq() const;
+
     /*!
      * Check if highest reachable safe seq according to message
      * consistent with local state.
      */
     bool is_consistent_highest_reachable_safe_seq(const Message&) const;
+
     /*!
      * Check if message aru seq, safe seq and node ranges matches to
      * local state.
      */
     bool is_consistent_input_map(const Message&) const;
-    /*!
-     * Check if message joining nodes match to local state.
-     */
-    bool is_consistent_joining(const Message&) const;
     bool is_consistent_partitioning(const Message&) const;
     bool is_consistent_leaving(const Message&) const;
     bool is_consistent_same_view(const Message&) const;
+    bool is_consistent(const Message&) const;
     bool is_consensus() const;    
 private:
     

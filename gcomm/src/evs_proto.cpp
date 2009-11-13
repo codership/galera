@@ -918,35 +918,64 @@ void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
     gu_trace(handle_gap(gm, self_i));
 }
 
+
 void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
 {
     for (NodeMap::const_iterator i = known.begin(); i != known.end(); ++i)
     {
         const UUID& uuid(NodeMap::get_key(i));
         const Node& node(NodeMap::get_value(i));
-        // View id is 
-        // 1) What the node reports in it's join message
-        // 2) If no join message and is in current view, assume current
-        //    view id in lack of better knowledge
-        // 3) Default V_REG view id
-        const ViewId vid(node.get_join_message() != 0 ?
-                         node.get_join_message()->get_source_view_id() :
-                         (current_view.is_member(uuid) == true ? 
-                          current_view.get_id() : 
-                          ViewId(V_REG)));
-        const seqno_t safe_seq(vid == current_view.get_id() ? 
-                               input_map->get_safe_seq(node.get_index()) : 
-                               -1);
-        const Range range(vid == current_view.get_id() ? 
-                          input_map->get_range(node.get_index()) : 
-                          Range());
-        const MessageNode mnode(node.get_operational(),
-                                (node.get_leave_message() != 0 ? 
-                                 node.get_leave_message()->get_seq() :
-                                 -1),
-                                vid, 
-                                safe_seq, 
-                                range);
+        MessageNode mnode(node.get_operational());
+        if (uuid != get_uuid())
+        {
+            const JoinMessage* jm(node.get_join_message());
+            const LeaveMessage* lm(node.get_leave_message());
+
+            // 
+            if (jm != 0)
+            {
+                const ViewId& nsv(jm->get_source_view_id());
+                const MessageNode& mn(MessageNodeList::get_value(jm->get_node_list().find_checked(uuid)));
+                mnode = MessageNode(node.get_operational(),
+                                    -1,
+                                    jm->get_source_view_id(), 
+                                    (nsv == current_view.get_id() ?
+                                     input_map->get_safe_seq(node.get_index()) :
+                                     mn.get_safe_seq()), 
+                                    (nsv == current_view.get_id() ?
+                                     input_map->get_range(node.get_index()) :
+                                     mn.get_im_range()));
+            }
+            else if (lm != 0)
+            {
+                const ViewId& nsv(lm->get_source_view_id());
+                mnode = MessageNode(node.get_operational(),
+                                    lm->get_seq(),
+                                    nsv,
+                                    (nsv == current_view.get_id() ? 
+                                     input_map->get_safe_seq(node.get_index()) :
+                                     -1),
+                                    (nsv == current_view.get_id() ?
+                                     input_map->get_range(node.get_index()) :
+                                     Range()));
+            }
+            else if (current_view.is_member(uuid) == true)
+            {
+                mnode = MessageNode(node.get_operational(),
+                                    -1,
+                                    current_view.get_id(),
+                                    input_map->get_safe_seq(node.get_index()),
+                                    input_map->get_range(node.get_index()));
+            }
+        }
+        else
+        {
+            mnode = MessageNode(true,
+                                -1,
+                                current_view.get_id(),
+                                input_map->get_safe_seq(node.get_index()),
+                                input_map->get_range(node.get_index()));
+        }
         gu_trace((void)node_list->insert_unique(make_pair(uuid, mnode)));
     }
 }
@@ -966,10 +995,12 @@ const JoinMessage& gcomm::evs::Proto::create_join()
     NodeMap::get_value(self_i).set_join_message(&jm);
     
     evs_log_debug(D_JOIN_MSGS) << " created join message " << jm;
-    gcomm_assert(consensus.is_consistent_input_map    (jm) == true &&
-                 consensus.is_consistent_partitioning (jm) == true &&
-                 consensus.is_consistent_leaving      (jm) == true)
-        << "inconsistent JOIN message " << jm << " local state " << *this;
+
+    // Note: This assertion does not hold anymore, join message is
+    //       not necessarily equal to local state.
+    // gcomm_assert(consensus.is_consistent_same_view(jm) == true)
+    //    << "created inconsistent JOIN message " << jm 
+    //    << " local state " << *this;
     
     return *NodeMap::get_value(self_i).get_join_message();
 }
@@ -1295,9 +1326,7 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
         get_state() == S_OPERATIONAL)
     {
         evs_log_debug(D_STATE) << " shift to RECOVERY due to foreign message";
-        profile_enter(shift_to_prof);
-        gu_trace(shift_to(S_RECOVERY, true));
-        profile_leave(shift_to_prof);
+        gu_trace(shift_to(S_RECOVERY, false));
     }
     
     // Set join message after shift to recovery, shift may clean up
@@ -1306,6 +1335,7 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
     {
         set_join(static_cast<const JoinMessage&>(msg), msg.get_source());
     }
+    send_join(true);
 }
 
 void gcomm::evs::Proto::handle_msg(const Message& msg, 
@@ -1632,9 +1662,9 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
                 if (err != 0)
                 {
                     gu_throw_fatal << self_string() 
-                                      << "send_user() failed in shifto "
-                                      << "to S_RECOVERY: "
-                                      << strerror(err);
+                                   << "send_user() failed in shifto "
+                                   << "to S_RECOVERY: "
+                                   << strerror(err);
                 }
             }
             profile_leave(send_user_prof);
@@ -2311,12 +2341,10 @@ bool gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
             local_node.is_inactive()       == false)
         {
             MessageNodeList::const_iterator msg_li(
-                node_list.find_checked(NodeMap::get_key(li)));
+                node_list.find(NodeMap::get_key(li)));
             
-            const MessageNode& node(MessageNodeList::get_value(msg_li));
-            gcomm_assert(node.get_view_id() == current_view.get_id());
-            
-            if (node.get_leaving() == false)
+            if (msg_li == node_list.end() ||
+                MessageNodeList::get_value(msg_li).get_leaving() == false)
             {
                 const LeaveMessage& lm(*NodeMap::get_value(li).get_leave_message());
                 LeaveMessage send_lm(lm.get_source(),
@@ -2373,52 +2401,27 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     }
     else if (install_message != 0)
     {
-        // Someone may be still missing either join or install message.
-        // Send join (without self handling), install (if representative)
-        // and install gap.
-        
-        profile_enter(consistent_prof);
         if (consensus.is_consistent(*install_message) == true)
         {
             return;
         }
         else
         {
-            profile_enter(shift_to_prof);
             gu_trace(shift_to(S_RECOVERY, false));
-            profile_leave(shift_to_prof);
         }
-        profile_leave(consistent_prof);
     }
     else if (get_state() != S_RECOVERY)
     {
-        profile_enter(shift_to_prof);
         gu_trace(shift_to(S_RECOVERY, false));
-        profile_leave(shift_to_prof);
     }
+
+    gcomm_assert(output.empty() == true);
     
     inst.set_join_message(&msg);
     inst.set_tstamp(Date::now());    
-    gcomm_assert(output.empty() == true);
     
-    bool is_consensus_b;
-    profile_enter(consensus_prof);
-    gu_trace(is_consensus_b = consensus.is_consensus());
-    profile_leave(consensus_prof);
-    if (is_consensus_b == true)
+    if (msg.get_source() != get_uuid())
     {
-        bool is_representative_b;
-        gu_trace(is_representative_b = is_representative(get_uuid()));
-        if (is_representative_b == true)
-        {
-            profile_enter(send_install_prof);
-            gu_trace(send_install());
-            profile_leave(send_install_prof);
-        }
-    }
-    else if (msg.get_source() != get_uuid())
-    {
-        bool do_send_join(false);
         // Select nodes that are coming from the same view as seen by
         // message source
         MessageNodeList same_view;
@@ -2427,14 +2430,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         // Coming from the same view
         if (msg.get_source_view_id() == current_view.get_id())
         {
-            profile_enter(input_map_prof);
-            if (update_im_safe_seqs(same_view) == true)
-            {
-                profile_enter(send_join_prof);
-                do_send_join = true;
-                profile_leave(send_join_prof);
-            }
-            profile_leave(input_map_prof);
+            (void)update_im_safe_seqs(same_view);
             // See if we need to retrans some user messages
             MessageNodeList::const_iterator nli(same_view.find(get_uuid()));
             if (nli != same_view.end())
@@ -2447,7 +2443,6 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                 if (mn_im_range.get_lu() < mn_im_range.get_hs())
                 {
                     gu_trace(resend(msg.get_source(), mn_im_range));
-                    do_send_join = true;
                 }
                 
                 if (mn_im_range.get_hs() < im_range.get_hs())
@@ -2461,12 +2456,11 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
             // Find out max hs and complete up to that if needed
             MessageNodeList::const_iterator max_hs_i(
                 max_element(same_view.begin(), same_view.end(), RangeHsCmp()));
-            const seqno_t max_hs(
-                MessageNodeList::get_value(max_hs_i).get_im_range().get_hs());
+            const seqno_t max_hs(max_hs_i == same_view.end() ? -1 :
+                                 MessageNodeList::get_value(max_hs_i).get_im_range().get_hs());
             if (last_sent < max_hs)
             {
                 gu_trace(complete_user(max_hs));
-                do_send_join = true;
             }
             
             if (max_hs != -1)
@@ -2476,31 +2470,48 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                 MessageNodeList::const_iterator min_hs_i(
                     min_element(same_view.begin(), same_view.end(), 
                                 RangeHsCmp()));
-                if (min_hs_i != same_view.end())
+                gcomm_assert(min_hs_i != same_view.end());
+                const UUID& min_hs_uuid(MessageNodeList::get_key(min_hs_i));
+                const seqno_t min_hs(MessageNodeList::get_value(min_hs_i).get_im_range().get_hs());                
+                const NodeMap::const_iterator local_i(known.find_checked(min_hs_uuid));
+                const Node& local_node(NodeMap::get_value(local_i));
+                const Range im_range(input_map->get_range(local_node.get_index()));
+                
+                if (local_node.get_operational() == false  &&
+                    im_range.get_hs()            >  min_hs)
                 {
-                    const UUID& min_hs_uuid(MessageNodeList::get_key(min_hs_i));
-                    const seqno_t min_hs(MessageNodeList::get_value(min_hs_i).get_im_range().get_hs());                
-                    const NodeMap::const_iterator local_i(known.find_checked(min_hs_uuid));
-                    const Node& local_node(NodeMap::get_value(local_i));
-                    const Range im_range(input_map->get_range(local_node.get_index()));
-                    
-                    if (local_node.get_operational() == false           &&
-                        im_range.get_hs()            >  min_hs        )
-                    {
-                        gu_trace(recover(msg.get_source(), min_hs_uuid, 
-                                         Range(min_hs + 1, max_hs)));
-                    }
+                    gcomm_assert(im_range.get_hs() <= max_hs);
+                    gu_trace(recover(msg.get_source(), min_hs_uuid, 
+                                     Range(min_hs + 1, max_hs)));
                 }
             }
             
             gu_trace((void)retrans_leaves(same_view));
         }
         
-        if (do_send_join == true)
+        // If current join message differs from current state, send new join
+        const JoinMessage* curr_join(NodeMap::get_value(self_i).get_join_message());
+        MessageNodeList new_nl;
+        populate_node_list(&new_nl);
+        
+        if (curr_join                 == 0 ||
+            (curr_join->get_aru_seq()   != input_map->get_aru_seq()  ||
+             curr_join->get_seq()       != input_map->get_safe_seq() ||
+             curr_join->get_node_list() != new_nl))
         {
-            profile_enter(send_join_prof);
-            gu_trace(send_join(false));
-            profile_leave(send_join_prof);
+            gu_trace(create_join());
+            if (consensus.is_consensus() == false)
+            {
+                send_join(false);
+            }
+        }
+    }
+    
+    if (consensus.is_consensus() == true)
+    {
+        if (is_representative(get_uuid()) == true)
+        {
+            gu_trace(send_install());
         }
     }
 }
@@ -2612,7 +2623,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     else if (install_message != 0)
     {
         profile_enter(consistent_prof);
-        if (consensus.is_consistent(msg) == true && 
+        if (consensus.equal(msg, *install_message) == true && 
             msg.get_install_view_id() == install_message->get_install_view_id())
         {
             evs_log_debug(D_INSTALL_MSGS)

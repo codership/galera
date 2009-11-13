@@ -575,7 +575,8 @@ public:
     void operator()(const MessageNodeList::value_type& vt) const
     {
         const MessageNode& node(MessageNodeList::get_value(vt));
-        if (node.get_view_id()       == view_id           &&
+        if ((view_id                  == ViewId() ||
+             node.get_view_id()       == view_id    ) &&
             ((operational            == true          && 
               leaving                == true            ) ||
              (node.get_operational() == operational &&
