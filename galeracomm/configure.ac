@@ -4,6 +4,10 @@ AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE
 
+# Prevent configure from guessing default CFLAGS
+CFLAGS="$CFLAGS"
+CXXFLAGS="$CXXFLAGS"
+
 # Check for debug and set CFLAGS if unset by user
 AC_ARG_ENABLE(debug,
               AC_HELP_STRING([--disable-debug],

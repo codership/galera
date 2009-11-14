@@ -4,9 +4,11 @@ AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE
 
-CPPFLAGS="$CPPFLAGS"
+# Prevent configure from guessing default CFLAGS
 CFLAGS="$CFLAGS"
 CXXFLAGS="$CXXFLAGS"
+CPPFLAGS="$CPPFLAGS"
+
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC

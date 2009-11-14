@@ -9,6 +9,10 @@ AC_CONFIG_SRCDIR([src/certification.c])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE  # AC_INIT sets version and package name
 
+# Prevent configure from guessing default CFLAGS
+CFLAGS="$CFLAGS"
+CXXFLAGS="$CXXFLAGS"
+
 # Check if debugging information is needed
 AC_ARG_ENABLE(debug,
               AC_HELP_STRING([--disable-debug],

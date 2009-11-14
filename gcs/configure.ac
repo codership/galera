@@ -12,8 +12,9 @@ AM_INIT_AUTOMAKE
 
 AC_PREFIX_DEFAULT(/usr/local)
 
-AC_SUBST(CFLAGS)
-AC_SUBST(LDFLAGS)
+# Prevent configure from guessing default CFLAGS
+CFLAGS="$CFLAGS"
+CXXFLAGS="$CXXFLAGS"
 
 # Check for debug
 AC_ARG_ENABLE(debug,

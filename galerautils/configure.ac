@@ -10,6 +10,10 @@ AC_CONFIG_SRCDIR([src/gu_mutex.c])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE
 
+# Prevent configure from substituting its own flags
+CFLAGS="$CFLAGS"
+CXXFLAGS="$CXXFLAGS"
+
 # Check for debug
 AC_ARG_ENABLE(debug,
               AC_HELP_STRING([--disable-debug],
