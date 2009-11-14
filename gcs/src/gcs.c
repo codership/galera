@@ -230,6 +230,8 @@ gcs_fc_stop_begin (gcs_conn_t* conn)
             abort();
     }
 
+    conn->stop_sent++;
+
     return ret;
 }
 
@@ -246,7 +248,10 @@ gcs_fc_stop_end (gcs_conn_t* conn)
 
     if (ret >= 0) {
         ret = 0;
-        conn->stop_sent++;
+    }
+    else {
+        conn->stop_sent--;
+        assert (conn->stop_sent >= 0);
     }
 
     gu_mutex_unlock (&conn->fc_lock);
