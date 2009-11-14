@@ -1,15 +1,19 @@
 Galera for MySQL Quick Start Guide
 ==================================
 
-version 0.7pre
+version 0.7.x
 
 This is an informal guide to quick setup of MySQL/Galera cluster for 
 experienced users. For more detailed information please see README.
 
-MySQL/Galera cluster is a multi-master MySQL server cluster. It provides both 
-true service high-availability (all nodes always have the same data) and 
-performance scalability. This distribution is all you need. You don't need to 
-be root or to uninstall/disable any software.
+MySQL/Galera cluster is a multi-master MySQL server cluster. It provides
+ - True service high-availability (no committed transaction is lost, no single
+   point of failure)
+ - Performance scalability even foe write-intensive loads.
+ - Semantics of a single MySQL server.
+
+This distribution is all you need to install and run MySQL/Galera cluster.
+You don't need to be root or to uninstall/disable any software.
 
 MYSQL CLUSTER IN 3 EASY STEPS:
 
@@ -23,38 +27,25 @@ same performance and Node1 has IP address 192.168.1.1
    choice (hereafter INSTALL_DIR). The location must have at least 1Gb of free
    space for database files.
 
-2. Start arbitrator on Node1. For that just run vsbes script from this 
-   distribution:
+2. Start first MySQL server on Node1:
 
-   $ <INSTALL_DIR>/vsbes start
+   <INSTALL_DIR>/mysql-galera -g gcomm:// start
 
-3. Configure and start MySQL server on each node 
+3. Start remaining nodes:
    
-   Galera distribution has a sample my.cfg option file, which contains
-   default options suitable for an average installation. You probably 
-   need to modify only the wsrep_gcs_address option to contain your arbitrator
-   node address:
+   <INSTALL_DIR>/mysql-galera -g gcomm://192.168.1.1 start
 
-   wsrep_gcs_address=vsbes://192.168.1.1:4567
-
-   After this change, you can start the server with following command:
-
-   <INSTALL_DIR>/mysql-galera start
-
-   This will start mysqld with data directory at <INSTALL_DIR>/mysql/var and 
-   listening at default mysqld port 3306.
-
-   Alternatively you can provide arbitrator address as a command line option:
-
-   <INSTALL_DIR>/mysql-galera -g "vsbes://192.168.1.1:4567" start
-
-NOTE: Beginning from the second node, each node you start will automatically
-copy the contents of the database from one of the working nodes. Allow some
-time for it to complete - it depends on the size of the database. See README
-for details.
+NOTE1: First node of the cluster is started by supplying an empty gcomm address.
+       When you want to add a node to a cluster, you must supply an address
+       of any working cluster node.
+NOTE2: Beginning from the second node, each node you start will automatically
+       copy the contents of the database from one of the working nodes. Allow
+       some time for it to complete - it depends on the size of the database.
+       mysql-galera script will return when copying is done and node is ready
+       to use. See README for details.
 
 That's it. You've got a multi-master MySQL/Galera cluster. Node1, Node2 and 
-Node3 will now synchronize all writes to the whole cluster.
+Node3 will now synchronize all writes with the rest of the cluster.
 Root password is 'rootpass' and there is also 'test' user with password 
 'testpass' and privileges on 'test.*'. You can now populate your database 
 with mysqldump by loading your database dump to (any) one of the nodes.
@@ -79,28 +70,25 @@ LIMITATIONS:
 
 QUICK ANSWERS:
 
-1. Yes, arbitrator can run on any node or even on a separate machine. 
-   Arbitrator consumes little CPU/RAM resources but will benefit from fast 
-   network connection.
+1. Arbitrator is gone an is no longer supported.
 
-2. Yes, currently arbitrator is a single point of failure. It will change soon.
+2. Yes, it works anywhere TCP works, including Amazon EC2(TM).
 
-3. Yes, it works anywhere TCP works, including Amazon EC2(TM).
-
-4. Yes, it'd be faster if there were a dedicated network for arbitrator 
+3. Yes, it'd be faster if there were a dedicated network for replication
    connections and a separate network for MySQL client connections.
 
-5. Yes, it is highly configurable and flexible. For more info see README, 
+4. Yes, it is highly configurable and flexible. For more info see README, 
    mysql-galera --help and my.cnf that comes with the distribution.
 
-6. If your application cannot utilize more than one server, you can use TCP 
+5. If your application cannot utilize more than one server, you can use TCP 
    connection balancer like GLB (http://www.codership.com/products/downloads) 
    or pen (http://siag.nu/pen/).
    Note however, that SQL traffic balancing is very CPU consuming (due to high
    number of small packets), so it is recommended to have a dedicated 
    machine for load balancer.
 
-7. The patch for MySQL can be obtained at: bzr branch lp:codership-mysql
+6. The patch for MySQL can be obtained at: bzr branch lp:codership-mysql
 
 
 Please direct all your suggestions, opinions and inquiries to info@codership.com
+

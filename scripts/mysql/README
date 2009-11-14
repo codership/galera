@@ -33,15 +33,16 @@ It does not cover the use or administration of MySQL server per se. The reader
 is assumed to know how to install, configure, administer and use MySQL server.
 
 
-                        MYSQL/GALERA v0.7pre
+                        MYSQL/GALERA v0.7.0
 
 CONTENTS:
 =========
 0. WHAT IS MYSQL/GALERA CLUSTER
 1. CLUSTER SETUP
    1.1 INSTALLATION
-   1.2 STARTING GROUP COMMUNICATION DAEMON
-   1.3 STARTING MYSQL SERVERS
+   1.2 CLUSTER URL
+   1.3 STARTING THE FIRST NODE OF A CLUSTER
+   1.4 STARTING REMAINING NODES
 2. USING THE CLUSTER
    2.1 LOADING DATA TO A CLUSTER
    2.2 CONNECTING APPLICATION TO A CLUSTER
@@ -49,7 +50,7 @@ CONTENTS:
    2.4 ADDING NEW NODE TO A CLUSTER
    2.5 A "REFERENCE NODE"
 3. CONFIGURATION
-   3.1 MANDATORY OPTIONS
+   3.1 MANDATORY MYSQL OPTIONS
    3.2 WSREP OPTIONS
 4. Using MySQL/Galera in Amazon EC2
 5. LIMITATIONS
@@ -57,20 +58,25 @@ CONTENTS:
 
 0. WHAT IS MYSQL/GALERA CLUSTER
 
-MySQL/Galera cluster is a synchronous multi-master MySQL server cluster.
-In this release it consists of a single group communication daemon vsbes 
-and several MySQL server instances which connect to it in a star-like fashion:
+MySQL/Galera cluster is a synchronous multi-master MySQL server cluster. Cluster
+nodes are connected to each other in a N-to-N fashion through a group
+communication backend which provides automatic reconfiguration in the event of
+a node failure or a new node added to cluster:
 
-     ,--------.   ,---------.   ,--------.
-     | mysqld |---|  vsbes  |---| mysqld |
-     `--------'   `---------'   `--------'
-                   /       \
-            ,--------.   ,--------.
-            | mysqld |   | mysqld |
-            `--------'   `--------'
+     ,--------.    ,--------.    ,--------.
+     | mysqld |----| mysqld |<---| client |
+     `--------'    `--------'    `--------'
+              \    /       
+            ,--------.    ,--------.
+            | mysqld |<---| client |
+            `--------'    `--------'
 
-Server states are synchronized by replicating transaction changes at commit
-time. The cluster is virtually synchronous: this means that each node commits
+With few exceptions each cluster node can be used like a standalone MySQL server
+and supports most of MySQL features including transactions, triggers and stored
+procedures.
+
+Node states are synchronized by replicating transaction changes at commit time.
+The cluster is virtually synchronous: this means that each node commits
 transactions in exactly the same order, although not necessarily at the same
 physical moment. (The latter is not that important as it may seem, since in most
 cases DBMS gives no guarantee on when the transaction is actually processed.)
@@ -89,11 +95,11 @@ Main features of MySQL/Galera cluster:
 
 * Scalable even with WRITE-intensive applications.
 
-This distribution package contains all software you'll need to setup
-MySQL/Galera cluster. It is essentially a self-contained MySQL server
-installation with its own configuration file, data directory and preconfigured
-empty database. You don't need administrative privileges or to uninstall/
-disable previously installed MySQL software to use this distribution.
+This demo distribution contains all software you'll need to setup MySQL/Galera
+cluster. It is essentially a self-contained MySQL server installation with its
+own configuration file, data directory and preconfigured empty database.
+You don't need administrative privileges or to uninstall/disable previously
+installed MySQL server to use this distribution.
 
 
 1. CLUSTER SETUP
@@ -101,22 +107,18 @@ disable previously installed MySQL software to use this distribution.
 To setup MySQL/Galera cluster you will need several networked computers -
 one for each mysqld instance you plan to use. For best performance those
 computers should be of approximately same configuration: Galera replication is
-synchronous and one slow machine will slow down the whole cluster.
-
-You must also select one machine that would host group communication daemon
-(hereafter arbitrator). For best performance it should be a separate computer,
-but it also can be one of the MySQL nodes. The only requirement is that
-arbitrator is accessible to all other cluster nodes.
+synchronous and one overloaded machine may slow down the whole cluster. This
+however depends on load distribution. The node that does not handle client
+connections can be considerably slower.
 
 It takes 3 steps to set up the cluster:
 
 1) Copy this distribution to all prospective nodes of the cluster and unpack it
    to location of your choice.
 
-2) Start group communication daemon on arbitrator node by running vsbes script
-   from the distribution.
+2) Start the first node to begin a new cluster.
 
-3) Start MySQL servers.
+3) Start remaining nodes pointing to the first one.
 
 (NOTE: You can easily set up the cluster on a single computer. However this
 makes little sense, as you won't see the the benefits of high availability and
@@ -140,25 +142,16 @@ editing configuration file which can be found at <INST_ROOT>/mysql/etc/my.cnf.
 Please see CONFIGURATION chapter for the details on editable parameters.
 
 
-1.2 STARTING GROUP COMMUNICATION DAEMON
+1.2 CLUSTER URL
 
-Select one of the nodes to act as an arbitrator. On that node issue the
-following command:
-
-   <INST_ROOT>/vsbes start
-
-This will start a Galera group communication daemon listening on all interfaces
-at port 4567. GCS_ADDRESS environment variable can be used to bind the daemon
-to particular interface or port, e.g.:
-
-   <INST_ROOT>/vsbes -g 192.168.0.1:3333 start
-
-For full description of vsbes options and commands see:
-
-   <INST_ROOT>/vsbes --help
+Cluster URL is a connection handle that will be used by a new node to connect
+to the rest of the cluster. Its form is backend-specific and backend is
+determined by URL schema. Default is 'dummy' which means no replication.
+This demo comes with a distributed group communication backend which schema is
+'gcomm'.
 
 
-1.3 STARTING MYSQL SERVERS
+1.3 STARTING THE FIRST NODE OF A CLUSTER
 
 <INST_ROOT>/mysql-galera is a special MySQL startup script that sets proper
 options (including data directory path) for mysqld. If you're running it as a
@@ -166,23 +159,23 @@ superuser, you have to make sure there is 'mysql' user in the system and it has
 sufficient privileges on the installation directory (see MySQL Manual about
 running mysqld as root). 
 
-You will need to tell mysqld the address of the group communication daemon. For
-this distribution the address follows this layout:
+The first node of a cluster has nowhere to connect to, therefore it has to start
+with an empty cluster address (note that it still initializes gcomm backend):
 
-   vsbes://<IP address>:<port>.
+   <INST_ROOT>/mysql-galera -g gcomm:// start
 
-Thus, if you have started vsbes on the node with IP address 192.168.1.1, then
-GCS address would be vsbes://192.168.1.1:4567
 
-1) Either supply the address as the option on the command line:
+1.4 STARTING REMAINING NODES
 
-   <INST_ROOT>/mysql-galera -g vsbes://192.168.1.1:4567 start
+To add another node to the cluster it must be given the address of one of the
+existing cluster nodes.
 
-2) Or you can hardcode it in <INST_ROOT>/my.cnf by setting
-   wsrep_gcs_address="vsbes://192.168.1.1:4567" and then just launch
-   mysql-galera script:
+Thus, if the first cluster node has IP address 192.168.1.1, then the second will
+be started like this:
 
-   <INST_ROOT>/mysql-galera start
+   <INST_ROOT>/mysql-galera -g gcomm://192.168.1.1 start
+
+The third node can use either the first or the second node address and so on.
 
 It might take few minutes to start mysqld for the first time as it will have to
 create required InnoDB files.
@@ -205,11 +198,13 @@ MySQL/Galera cluster as a single MySQL server listening on multiple interfaces
 with the exception that you might see transaction deadlocks where you previously
 didn't.
 
+
 2.1 LOADING DATA TO CLUSTER
 
 Initially distribution database is empty. You can populate it by loading the
 dump of your data to any one of the nodes. It will be automatically replicated
 to others. Please note that this release supports only InnoDB storage engine.
+
 
 2.2 CONNECTING APPLICATION TO CLUSTER
 
@@ -310,12 +305,13 @@ TCP connection balancers that were successfully used with MySQL/Galera:
 - Pen (http://siag.nu/pen/)
 - GLB (http://www.codership.com/en/downloads/glb) 
 
+
 2.4 ADDING NEW NODE TO A CLUSTER
 
 With 0.7 series of releases Codership removes the main obstacle towards using 
 MySQL/Galera in production: inability to add/replace nodes in the working 
 cluster. This distribution features automatic state snapshot transfer to newly 
-joined node. Until node receives state snapshot it cannot execute any queries. 
+joined node. Until node receives state snapshot it won't execute any queries. 
 Detailed state snapshot transfer sequence diagram can be found in
 http://www.codership.com/files/presentations/Galera_OSC_2009.pdf
 
@@ -341,6 +337,7 @@ At this point there is only one state transfer method supported and it is based
 on mysqldump. Although it is relatively slow, it provides complete cloning of 
 the donor state, including system tables and thus is most compliant.
 
+
 2.5 A "REFERENCE NODE"
 
 For practical purposes we recommend to reserve a "reference node" in the
@@ -354,9 +351,9 @@ such node in a cluster can serve several purposes:
    database.
 
 2) Data safety: since this node does not process any SQL load on its own, it
-   has the lowest probability of crashing with catastrophic consequences. In
-   the event of total cluster failure (e.g. arbitrator crash) this will be the
-   best node to restore cluster from.
+   has the lowest probability of failing with catastrophic consequences. In
+   the event of total cluster failure (e.g. blackout) this will be the best
+   node to restore cluster from.
 
 3) High availability: a reference node can serve as a dedicated state snapshot
    donor. Since it does not serve any clients, they won't experience service
@@ -369,19 +366,27 @@ extra silent node is negligible for most loads.
 3. CONFIGURATION
 
 Each MySQL/Galera node is configured just like the usual MySQL server, we just
-added few configuration variables in my.cnf. In addition some options can be
+added some configuration variables to my.cnf. In addition some options can be
 passed to mysql-galera startup script (see mysql-galera --help).
 
-3.1 MANDATORY CONFIGURATION OPTIONS
+
+3.1 MANDATORY MYSQL OPTIONS
 
 binlog_format=ROW
-This option is required to use row-level replication as opposed to
-statement-level. For performance and consistency considerations don't change
-that. As a side effect, binlog, if turned on, can be ROW only. In future this
-option won't have special meaning.
+   This option is required to use row-level replication as opposed to
+   statement-level. For performance and consistency considerations don't change
+   that. As a side effect, binlog, if turned on, can be ROW only. In future this
+   option won't have special meaning.
+
+innodb_autoinc_lock_mode=2
+   This is a required parameter. Without it INSERTs into tables with
+   AUTO_INCREMENT column may fail.
+   autoinc lock modes 0 and 1 can cause unresolved deadlock, and make
+   system unresponsive.
 
 Mandatory options are hardcoded both in distribution's my.cnf file and in
 mysql-galera script.
+
 
 3.2 WSREP OPTIONS
 
@@ -398,7 +403,7 @@ wsrep_provider=none
 
 wsrep_gcs_address="dummy://"
    Group Communication System address. Depends on the WSREP provider. This
-   distribution recognises "dummy://" and "vsbes://<IP address>:<IP port>"
+   distribution recognises "dummy://" and "gcomm://<IP address>:<IP port>"
 
 wsrep_gcs_group="my_cluster"
    Logical group name, must be the same for all nodes of the cluster.
@@ -421,8 +426,6 @@ wsrep_ws_persistency=0
 wsrep_debug=0
    Enable debug-level logging.  
 
-NEW since demo1:
-
 wsrep_convert_LOCK_to_trx=1
    Implicitly convert locking sessions into transactions inside mysqld. By
    itself it does not mean support for locking sessions, but it prevents the
@@ -439,31 +442,17 @@ wsrep_auto_increment_control=1
    variables based on the number of nodes in the cluster. Significantly reduces
    certification conflic rate for INSERTS.
 
-New since demo2:
-
-innodb_autoinc_lock_mode=2
-   This is a required parameter. Without it INSERTs into tables with
-   AUTO_INCREMENT column may fail.
-   autoinc lock modes 0 and 1 can cause unresolved deadlock, and make
-   system unresponsive.
-
 wsrep_drupal_282555_workaround=1
    MySQL seems to have an obscure bug when INSERT into table with
-   AUTO_INCREMENT column with NULL value for that column may fail due to
-   duplicate key. When this option is on, it retries such INSERTs. Required for
-   Drupal. Documented at:
+   AUTO_INCREMENT column with NULL value for that column can fail with a 
+   duplicate key error. When this option is on, it retries such INSERTs.
+   Required for stable Drupal operation. Documented at:
       http://bugs.mysql.com/bug.php?id=41984
       http://drupal.org/node/282555
-
-New since 0.6.x releases:
 
 wsrep_provider_options=
    Provider dependent string that contains provider-specific (as opposed to
    general wsrep) options. Does not need to be set.
-
-wsrep_gcs_group option is renamed to wsrep_cluster_name.
-
-wsrep_gcs_address option is renamed to wsrep_cluster_address.
 
 wsrep_node_name=
    Human assigned symbolic node name. It does not have to be unique, but then
@@ -489,21 +478,22 @@ wsrep_sst_auth=
 
 wsrep_sst_donor=
    A name of the node which should serve as state snapshot donor. This allows
-   to control which node will receive state snapshot request. By default the
+   to control which node will serve state snapshot request. By default the
    most suitable node is chosen by GCS.
+
 
 4. Using MySQL/Galera distribution in Amazon EC2
 
 MySQL/Galera works anywhere TCP/IP works. Therefore using MySQL/Galera
 distribution in Amazon EC2 environment is no different than in LAN. Just launch
-several instances of your favourite AMI, copy and unpack the distribution,
-start vsbes on one of them and then start servers telling them where to find the
-arbitrator. Don't forget to use external arbitrator address if your nodes are 
+several instances of your favorite AMI, copy and unpack the distribution,
+and start the servers. Don't forget to use external addresses if your nodes are 
 running in different accessibility zones (obviously running in different 
 accessibility zones degrades performance somewhat).
 
 NOTE: this distribution may be binary incompatible with some older Linux
       distributions. Please use CentOS 5.0 or newer.
+
 
 5. LIMITATIONS
 
@@ -545,6 +535,6 @@ NOTE: this distribution may be binary incompatible with some older Linux
 
 8) XA transactions can not be supported due to possible rollback on commit.
 
-9) MySQL replication cannot be used together with MySQL/Galera yet.
+9) MySQL replication cannot be used together with MySQL/Galera _yet_.
 
 
