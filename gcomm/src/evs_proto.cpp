@@ -284,21 +284,14 @@ void gcomm::evs::Proto::handle_retrans_timer()
     }
     else if (get_state() == S_OPERATIONAL)
     {
+        const seqno_t prev_last_sent(last_sent);
         evs_log_debug(D_TIMERS) << "send user timer, last_sent=" << last_sent;
-        if (output.empty() == true)
+        Datagram dg;
+        gu_trace((void)send_user(dg, 0xff, O_DROP, -1, -1));
+        if (prev_last_sent == last_sent)
         {
-            Datagram dg;
-            profile_enter(send_user_prof);
-            gu_trace((void)send_user(dg, 0xff, O_DROP, send_window, -1));
-            profile_leave(send_user_prof);
+            log_warn << "could not send keepalive";
         }
-        else
-        {
-            profile_enter(send_user_prof);
-            gu_trace(send_user(send_window));
-            profile_leave(send_user_prof);
-        }
-        evs_log_debug(D_TIMERS) << "send user timer, last_sent=" << last_sent;
     }
     else if (get_state() == S_LEAVING)
     {
@@ -840,6 +833,7 @@ int gcomm::evs::Proto::send_user(const seqno_t win)
 {
     gcomm_assert(output.empty() == false);
     gcomm_assert(get_state() == S_OPERATIONAL);
+    gcomm_assert(win <= send_window/2);
     pair<Datagram, ProtoDownMeta> wb = output.front();
     int ret;
     if ((ret = send_user(wb.first, 
@@ -2138,7 +2132,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         while (output.empty() == false)
         {
             int err;
-            gu_trace(err = send_user(send_window));
+            gu_trace(err = send_user(send_window/2));
             if (err != 0)
             {
                 break;
@@ -2274,7 +2268,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         while (output.empty() == false)
         {
             int err;
-            gu_trace(err = send_user(send_window));
+            gu_trace(err = send_user(send_window/2));
             if (err != 0)
                 break;
         }

@@ -254,7 +254,7 @@ gcomm::evs::InputMap::insert(const size_t uuid,
     Range range;
     
     // Only insert messages with meaningful seqno
-    gcomm_assert(msg.get_seq() > -1 && msg.get_seq() <= aru_seq_ + window_);
+    gcomm_assert(msg.get_seq() > -1);
     
     // User should check aru_seq before inserting. This check is left 
     // also in optimized builds since violating it may cause duplicate 
