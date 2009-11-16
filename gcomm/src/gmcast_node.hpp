@@ -20,23 +20,22 @@ namespace gcomm
 
 class gcomm::gmcast::Node
 {
-    static const size_t ADDR_SIZE = 64;
-    gcomm::String<ADDR_SIZE> addr;
+
 public:
-
-    Node(const std::string& addr_   = "") : addr   (addr_) { }
     
+    Node(const std::string& addr   = "") : addr_(addr), mcast_addr_("") { }
     
-    const std::string& get_addr() const { return addr.to_string(); }
-
+    const std::string& get_addr() const { return addr_.to_string(); }
+    const std::string& get_mcast_addr() const { return mcast_addr_.to_string(); } 
+    
     size_t unserialize(const gu::byte_t* buf, 
                        const size_t buflen, const size_t offset)
     {
         size_t  off;
         uint32_t bits;
         gu_trace (off = gcomm::unserialize(buf, buflen, offset, &bits));
-        gu_trace (off = addr.unserialize(buf, buflen, off));
-        
+        gu_trace (off = addr_.unserialize(buf, buflen, off));
+        gu_trace (off = mcast_addr_.unserialize(buf, buflen, off));
         return off;
     }
     
@@ -46,13 +45,17 @@ public:
         size_t  off;
         uint32_t bits(0);
         gu_trace (off = gcomm::serialize(bits, buf, buflen, offset));
-        gu_trace (off = addr.serialize(buf, buflen, off));
-        
+        gu_trace (off = addr_.serialize(buf, buflen, off));
+        gu_trace (off = mcast_addr_.serialize(buf, buflen, off));
         return off;
     }
     
-    static size_t serial_size() 
-    { return (4 + ADDR_SIZE); }
+    static size_t serial_size() { return (4 + 2 * ADDR_SIZE); }
+    
+private:
+    static const size_t ADDR_SIZE = 64;
+    gcomm::String<ADDR_SIZE> addr_;
+    gcomm::String<ADDR_SIZE> mcast_addr_;
 };
 
 
