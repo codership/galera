@@ -17,7 +17,7 @@ using namespace gcomm;
 using namespace gcomm::evs;
 
 // Disable debug logging until debug mask is available here
-#define evs_log_debug(int) if (true) {} else log_debug
+#define evs_log_debug(int) if (true) {} else log_debug << get_uuid() << " "
 
 
 //

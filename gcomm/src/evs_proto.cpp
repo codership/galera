@@ -40,7 +40,7 @@ using namespace gcomm::evs;
 
 gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     timers(),
-    debug_mask(D_STATE | D_TIMERS),
+    debug_mask(D_STATE),
     info_mask(0),
     last_stats_report(Date::now()),
     collect_stats(true),
@@ -2163,8 +2163,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
          prev_safe                   != input_map->get_safe_seq()))
     {
         gcomm_assert(output.empty() == true);
-        const JoinMessage* jm = NodeMap::get_value(self_i).get_join_message();
-        if (jm == 0 || consensus.is_consistent(*jm) == false)
+        if (consensus.is_consensus() == false)
         {
             profile_enter(send_join_prof);
             gu_trace(send_join());
@@ -2290,13 +2289,12 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     }
     
     // 
-    if (get_state()                    == S_RECOVERY                && 
-        consensus.highest_reachable_safe_seq()   == input_map->get_aru_seq()  &&
-        prev_safe                      != input_map->get_safe_seq()   )
+    if (get_state()                            == S_RECOVERY                && 
+        consensus.highest_reachable_safe_seq() == input_map->get_aru_seq()  &&
+        prev_safe                              != input_map->get_safe_seq()   )
     {
         gcomm_assert(output.empty() == true);
-        const JoinMessage* jm(NodeMap::get_value(self_i).get_join_message());
-        if (jm == 0 || consensus.is_consistent(*jm) == false)
+        if (consensus.is_consensus() == false)
         {
             profile_enter(send_join_prof);
             gu_trace(send_join());
@@ -2573,6 +2571,7 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
         }
     }
 }
+
 
 void gcomm::evs::Proto::handle_install(const InstallMessage& msg, 
                                        NodeMap::iterator ii)
