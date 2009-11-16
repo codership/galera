@@ -84,7 +84,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     last_sent(-1),
     send_window(16), 
     output(),
-    max_output_size(32),
+    max_output_size(128),
     self_loopback(false),
     state(S_CLOSED),
     shift_to_rfcnt(0)

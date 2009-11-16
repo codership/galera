@@ -513,7 +513,7 @@ public:
     /*!
      * 
      */
-    static size_t get_mtu() { return (1 << 24); }
+    static size_t get_mtu() { return (1 << 15); }
     
 };
 
