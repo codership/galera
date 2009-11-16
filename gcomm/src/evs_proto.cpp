@@ -308,6 +308,17 @@ void gcomm::evs::Proto::handle_consensus_timer()
     if (get_state() != S_OPERATIONAL)
     {
         log_warn << self_string() << " consensus timer expired";
+        // Consensus timer expiration indicates that for some reason
+        // nodes fail to form new group. Set all other nodes 
+        // unoperational to form singleton group and retry
+        // forming new group after a while.
+        for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
+        {
+            if (NodeMap::get_key(i) != get_uuid())
+            {
+                NodeMap::get_value(i).set_operational(false);
+            }
+        }
         profile_enter(shift_to_prof);
         shift_to(S_RECOVERY, true);
         profile_leave(shift_to_prof);
