@@ -149,7 +149,8 @@ void gcomm::gmcast::Proto::handle_topology_change(const Message& msg)
     LinkMap new_map;
     for (Message::NodeList::const_iterator i = nl.begin(); i != nl.end(); ++i)
     {
-        new_map.insert(Link(i->get_uuid(), i->get_addr()));
+        new_map.insert(Link(Message::NodeList::get_key(i), 
+                            Message::NodeList::get_value(i).get_addr()));
     }
     
     if (link_map != new_map)
@@ -158,6 +159,7 @@ void gcomm::gmcast::Proto::handle_topology_change(const Message& msg)
     }
     link_map = new_map;
 }
+
 
 void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
 {
@@ -168,8 +170,8 @@ void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
             LinkMap::get_value(i).get_addr() == "")
             gu_throw_fatal << "nil uuid or empty address";
         
-        nl.push_back(Node(LinkMap::get_key(i), 
-                          LinkMap::get_value(i).get_addr()));
+        nl.insert_unique(make_pair(LinkMap::get_key(i),
+                                   Node(LinkMap::get_value(i).get_addr())));
     }
     
     Message msg(Message::T_TOPOLOGY_CHANGE, local_uuid,

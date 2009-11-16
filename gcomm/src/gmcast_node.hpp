@@ -13,27 +13,20 @@ namespace gcomm
     namespace gmcast
     {
         class Node;
+        std::ostream& operator<<(std::ostream&, const Node&);
     }
 }
 
 
 class gcomm::gmcast::Node
 {
-    gcomm::UUID    uuid;
     static const size_t ADDR_SIZE = 64;
     gcomm::String<ADDR_SIZE> addr;
 public:
 
-    Node(const gcomm::UUID& uuid_   = UUID::nil(), 
-         const std::string& addr_   = "") :
-        uuid   (uuid_),
-        addr   (addr_)
-    {
-        
-    }
-
+    Node(const std::string& addr_   = "") : addr   (addr_) { }
     
-    const UUID& get_uuid() const  { return uuid; }
+    
     const std::string& get_addr() const { return addr.to_string(); }
 
     size_t unserialize(const gu::byte_t* buf, 
@@ -42,7 +35,6 @@ public:
         size_t  off;
         uint32_t bits;
         gu_trace (off = gcomm::unserialize(buf, buflen, offset, &bits));
-        gu_trace (off = uuid.unserialize(buf, buflen, off));
         gu_trace (off = addr.unserialize(buf, buflen, off));
         
         return off;
@@ -54,17 +46,20 @@ public:
         size_t  off;
         uint32_t bits(0);
         gu_trace (off = gcomm::serialize(bits, buf, buflen, offset));
-        gu_trace (off = uuid.serialize(buf, buflen, off));
         gu_trace (off = addr.serialize(buf, buflen, off));
         
         return off;
     }
     
-
-    
     static size_t serial_size() 
-    { return (4 + UUID::serial_size() + ADDR_SIZE); }
+    { return (4 + ADDR_SIZE); }
 };
+
+
+inline std::ostream& gcomm::gmcast::operator<<(std::ostream& os, const Node& n)
+{
+    return os;
+}
 
 
 #endif // GMCAST_NODE_HPP

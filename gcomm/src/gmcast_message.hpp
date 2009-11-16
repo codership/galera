@@ -6,7 +6,6 @@
 #include "gcomm/uuid.hpp"
 #include "gmcast_node.hpp"
 
-#include <list>
 
 namespace gcomm
 {
@@ -42,7 +41,7 @@ public:
         T_MAX
     };
 
-    typedef std::list<Node> NodeList;
+    class NodeList : public Map<UUID, Node> { };
     
 private:
     
@@ -217,15 +216,7 @@ public:
         
         if (flags & F_NODE_LIST) 
         {
-            gu_trace (off = gcomm::serialize(
-                          static_cast<uint16_t>(node_list.size()),
-                          buf, buflen, off));
-            
-            for (NodeList::const_iterator i = node_list.begin();
-                 i != node_list.end(); ++i) 
-            {
-                gu_trace (off = i->serialize(buf, buflen, off));
-            }
+            gu_trace(off = node_list.serialize(buf, buflen, off));
         }
         return off;
     }
@@ -263,16 +254,7 @@ public:
         
         if (flags & F_NODE_LIST)
         {
-            uint16_t size;
-
-            gu_trace (off = gcomm::unserialize(buf, buflen, off, &size));
-
-            for (uint16_t i = 0; i < size; ++i) 
-            {
-                Node node;
-                gu_trace (off = node.unserialize(buf, buflen, off));
-                node_list.push_back(node);
-            }
+            gu_trace(off = node_list.unserialize(buf, buflen, off));
         }
         
         return off;
@@ -303,8 +285,7 @@ public:
             /* Group name if set */
             + (flags & F_GROUP_NAME ? group_name.serial_size() : 0)
             /* Node list if set */
-            + (flags & F_NODE_LIST ? 
-               2 + node_list.size()*Node::serial_size() : 0);
+            + (flags & F_NODE_LIST ? node_list.serial_size() : 0);
     }
     
     uint8_t get_version() const { return version; }
