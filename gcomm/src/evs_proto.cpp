@@ -2364,6 +2364,32 @@ bool gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
 }
 
 
+void gcomm::evs::Proto::cross_check_inactives(const UUID& source,
+                                              const MessageNodeList& nl)
+{
+    MessageNodeList inactive;
+    for_each(nl.begin(), nl.end(), SelectNodesOp(inactive, ViewId(), false, false));
+    for (MessageNodeList::const_iterator i = inactive.begin(); 
+         i != inactive.end(); ++i)
+    {
+        const UUID& uuid(MessageNodeList::get_key(i));
+        const MessageNode& node(MessageNodeList::get_value(i));
+        gcomm_assert(node.get_operational() == false);
+        NodeMap::iterator local_i(known.find(uuid));
+        if (local_i != known.end() && uuid != get_uuid())
+        {
+            Node& local_node(NodeMap::get_value(local_i));
+            if (local_node.get_operational() == true &&
+                (source < uuid || 
+                 local_node.get_tstamp() + (inactive_timeout*2)/3 < Date::now()))
+            {
+                local_node.set_operational(false);
+            }
+        }
+    }
+}
+
+
 void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii)
 {
     assert(ii != known.end());
@@ -2428,7 +2454,9 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         // Coming from the same view
         if (msg.get_source_view_id() == current_view.get_id())
         {
+            // Update input map state
             (void)update_im_safe_seqs(same_view);
+            
             // See if we need to retrans some user messages
             MessageNodeList::const_iterator nli(same_view.find(get_uuid()));
             if (nli != same_view.end())
@@ -2484,7 +2512,22 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                 }
             }
             
+            // Retrans leave messages that others are missing
             gu_trace((void)retrans_leaves(same_view));
+            
+            // Check if this node is set inactive by the other,
+            // if yes, the other must be marked as inactive too
+            if (nli != same_view.end())
+            {
+                if (MessageNodeList::get_value(nli).get_operational() == false)
+                {
+                    inst.set_operational(false);
+                }
+            }
+            
+            // Make cross check to resolve lock if two nodes
+            // declare each other inactive.
+            gu_trace(cross_check_inactives(msg.get_source(), same_view));
         }
         
         // If current join message differs from current state, send new join

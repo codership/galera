@@ -159,6 +159,7 @@ private:
      */
     bool update_im_safe_seqs(const MessageNodeList&);
     bool is_msg_from_previous_view(const Message&);
+    void cross_check_inactives(const UUID&, const MessageNodeList&);
     void handle_foreign(const Message&);
     void handle_user(const UserMessage&, 
                      NodeMap::iterator, 
