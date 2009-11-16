@@ -1185,7 +1185,7 @@ START_TEST(test_proto_stop_cont)
 END_TEST
 
 
-START_TEST(test_proto_triangle)
+START_TEST(test_proto_arbitrate)
 {
     log_info << "START";
     const size_t n_nodes(3);
@@ -1226,164 +1226,6 @@ START_TEST(test_proto_triangle)
 }
 END_TEST
 
-
-START_TEST(test_trac_200)
-{
-    Protonet net;
-    UUID uuid1(1), uuid2(2), uuid3(3);
-    DummyUser du1, du2, du3;
-    Proto p1(uuid1), p2(uuid2), p3(uuid3);
-    DummyTransport t1(net, uuid1, true), t2(net, uuid2, true), 
-        t3(net, uuid3, true);
-    gcomm::connect(&p1, &du1);
-    gcomm::connect(&p2, &du2);
-    gcomm::connect(&p3, &du3);
-    gcomm::connect(&t1, &p1);
-    gcomm::connect(&t2, &p2);
-    gcomm::connect(&t3, &p3);
-
-    single_join(&t1, &p1);
-    double_join(&t1, &p1, &t2, &p2);
-    
-    p3.shift_to(Proto::S_JOINING);
-    p3.send_join(false);
-    
-    Message jm3;
-    
-    get_msg(&t3, &jm3);
-
-    p1.handle_msg(jm3);
-    p2.handle_msg(jm3);
-    // Now 1 and 2 know about 3
-    
-    Message jm1;
-    get_msg(&t1, &jm1);
-    Message jm2;
-    get_msg(&t2, &jm2);
-    
-    p2.handle_msg(jm1);
-    p3.handle_msg(jm1);
-    p1.handle_msg(jm2);
-    p3.handle_msg(jm2);
-
-    // Now 3 knows about 1 and 2 and emits two join messages for both 
-    // handled join messages. 1 and 2 should have more complete knowledge
-    // and remain silent.
-    Message dm;
-    fail_unless(get_msg(&t1, &dm) == 0);
-    fail_unless(get_msg(&t2, &dm) == 0);
-
-    fail_unless(get_msg(&t3, &jm3) != 0);
-    fail_unless(jm3.get_type() == Message::T_JOIN);
-    p1.handle_msg(jm3);
-    p2.handle_msg(jm3);
-    fail_unless(get_msg(&t3, &jm3) != 0);
-    fail_unless(jm3.get_type() == Message::T_JOIN);
-    p1.handle_msg(jm3);
-    p2.handle_msg(jm3);
-    
-    // Nodes 2 and 3 should remain silent, while 1 should emit install 
-    // and gap,then remain silent.
-    fail_unless(get_msg(&t2, &dm) == 0);
-    fail_unless(get_msg(&t3, &dm) == 0);
-    
-    Message im1;
-    fail_unless(get_msg(&t1, &im1) != 0);
-    fail_unless(im1.get_type() == Message::T_INSTALL);
-    
-    Message gm1;
-    fail_unless(get_msg(&t1, &gm1) != 0);
-    fail_unless(gm1.get_type() == Message::T_GAP);
-    
-    fail_unless(get_msg(&t1, &dm) == 0);
-    
-    // Nodes 2 and 3 handle install and gap messages and should emit 
-    // gap messages each, then remain silent.
-    p2.handle_msg(im1);
-    p2.handle_msg(gm1);
-    p3.handle_msg(im1);
-    p3.handle_msg(gm1);
-    
-    Message gm2;
-    fail_unless(get_msg(&t2, &gm2) != 0);
-    fail_unless(gm2.get_type() == Message::T_GAP);
-    fail_unless(get_msg(&t2, &dm) == 0);
-    
-    Message gm3;
-    fail_unless(get_msg(&t3, &gm3) != 0);
-    fail_unless(gm3.get_type() == Message::T_GAP);
-    fail_unless(get_msg(&t3, &dm) == 0);
-    
-    // Nodes 1 and 3 handle gaps and shift to operational state, for some 
-    // reason 2 does not see the messages and stays in recovery
-    p1.handle_msg(gm2);
-    p1.handle_msg(gm3);
-    p3.handle_msg(gm2);
-    
-    fail_unless(get_msg(&t1, &dm) != 0);
-    fail_unless(get_msg(&t3, &dm) != 0);
-    
-    fail_unless(get_msg(&t1, &dm) == 0);
-    fail_unless(get_msg(&t2, &dm) == 0);
-    fail_unless(get_msg(&t3, &dm) == 0);    
-    
-    fail_unless(p1.get_state() == Proto::S_OPERATIONAL);
-    fail_unless(p2.get_state() == Proto::S_RECOVERY);
-    fail_unless(p3.get_state() == Proto::S_OPERATIONAL);
-
-    // Following sequence leads to similar crash reported in #200
-    p1.shift_to(Proto::S_RECOVERY);
-    p3.shift_to(Proto::S_RECOVERY);
-    fail_unless(get_msg(&t1, &jm1) != 0);
-    fail_unless(jm1.get_type() == Message::T_JOIN);
-    fail_unless(get_msg(&t3, &jm3) != 0);
-    fail_unless(jm3.get_type() == Message::T_JOIN);
-    
-    p2.handle_msg(jm1);
-    p2.handle_msg(jm3);    
-    p2.send_join(true);
-    
-    MessageNodeList nl;
-    nl.insert_unique(
-        make_pair(uuid1,
-                  MessageNode(true,
-                              -1,
-                              ViewId(V_REG, uuid1, 2),
-                              -1,
-                              Range())));
-    nl.insert_unique(
-        make_pair(uuid2,
-                  MessageNode(true,
-                              -1,
-                              ViewId(V_REG, uuid1, 2),
-                              -1,
-                              Range())));
-    nl.insert_unique(
-        make_pair(uuid3,
-                  MessageNode(false,
-                              -1,
-                              ViewId(V_TRANS, uuid3, 0),
-                              -1,
-                              Range(1, 0))));
-    
-    p2.handle_msg(InstallMessage(uuid1, 
-                                 im1.get_source_view_id(),
-                                 im1.get_install_view_id(),
-                                 -1,
-                                 -1,
-                                 -1,
-                                 nl));
-    p2.handle_msg(JoinMessage(uuid1, 
-                              jm1.get_source_view_id(),
-                              -1,
-                              -1,
-                              -1,
-                              jm1.get_node_list()));
-    // Commented out until this is fixed
-    // p2.send_join(true);
-
-}
-END_TEST
 
 static bool skip(false);
 
@@ -1492,13 +1334,8 @@ Suite* evs2_suite()
     tcase_add_test(tc, test_proto_stop_cont);
     suite_add_tcase(s, tc);
         
-    tc = tcase_create("test_proto_triangle");
-    tcase_add_test(tc, test_proto_triangle);
-    suite_add_tcase(s, tc);
-
-
-    tc = tcase_create("test_trac_200");
-    tcase_add_test(tc, test_trac_200);
+    tc = tcase_create("test_proto_arbitrate");
+    tcase_add_test(tc, test_proto_arbitrate);
     suite_add_tcase(s, tc);
 
     return s;
