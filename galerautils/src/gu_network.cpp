@@ -491,10 +491,22 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
     
     // Dgram with offset can't be handled yet
     assert(dgram == 0 || dgram->get_offset() == 0);
+
     
-    if (dgram != 0 && dgram->get_len() == 0)
+    if (dgram != 0)
     {
-        gu_throw_error(EINVAL) << "trying to send zero sized dgram to " << fd;
+        if (dgram->get_len() == 0)
+        {
+            gu_throw_error(EINVAL) << "trying to send zero sized dgram to " 
+                                   << fd;
+        }
+        else if (dgram->get_len() > get_mtu())
+        {
+            gu_throw_error(EMSGSIZE) << "message too long: " 
+                                     << dgram->get_len()
+                                     << " max allowed: " 
+                                     << get_mtu();
+        }
     }
     
     if (dgram == 0)
@@ -586,17 +598,13 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
     {
         if ((get_event_mask() & E_OUT) == 0)
         {
-            net.set_event_mask(this, 
-                               get_event_mask() | 
-                               E_OUT);
+            net.set_event_mask(this, get_event_mask() | E_OUT);
         }
         ret = 0;
     }
-    else if (pending.size() == 0 &&
-             (get_event_mask() & E_OUT) != 0)
+    else if (pending.size() == 0 && (get_event_mask() & E_OUT) != 0)
     {
-        net.set_event_mask(this,
-                           get_event_mask() & ~E_OUT);
+        net.set_event_mask(this, get_event_mask() & ~E_OUT);
     }
     
     return ret;

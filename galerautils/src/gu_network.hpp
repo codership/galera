@@ -66,7 +66,7 @@ namespace gu
         class EPoll;
         class NetworkEvent;
         class Network;
-        static const size_t default_mtu = (1 << 16) - 1;
+        static const size_t default_mtu = (1 << 15);
         namespace URLScheme
         {
             static const std::string tcp = "tcp";
@@ -201,7 +201,7 @@ private:
            const std::string& remote_addr = "",
            const size_t mtu = default_mtu,
            const size_t max_packet_size = default_mtu,
-           const size_t max_pending = default_mtu*3);
+           const size_t max_pending = default_mtu*5);
     
     /*!
      * @brief Change socket state
@@ -403,30 +403,6 @@ public:
  */
 class gu::net::NetworkEvent
 {
-public:
-#if 0
-    /*!
-     * @brief Network event type enumeration
-     */
-    enum
-    {
-        E_IN        = 1 << 0, /*!< Input event, socket is readable */
-        E_OUT       = 1 << 1, /*!< Output event, socket is writable */
-        E_ACCEPTED  = 1 << 2, /*!< New connection has been accepted */
-        
-        E_CONNECTED = 1 << 3, /*!< Socket connect was completed 
-                                (non-blocking socket)*/
-        E_ERROR = 1 << 4,    /*!< Socket was closed or error leading to 
-                               socket close was encountered */
-        E_CLOSED = 1 << 5,
-        E_EMPTY = 1 << 6
-    };
-#endif
-private:    
-    int event_mask;             /*!< Event mask              */
-    Socket* socket;             /*!< Socket related to event */
-    friend class Network;        
-    NetworkEvent(int, Socket*); /*!< Private constructor */
 public:    
     /*!
      * @brief Get event type
@@ -441,6 +417,12 @@ public:
      * @return Pointer to socket object
      */
     Socket* get_socket() const;
+
+private:
+    int event_mask;             /*!< Event mask              */
+    Socket* socket;             /*!< Socket related to event */
+    friend class Network;        
+    NetworkEvent(int, Socket*); /*!< Private constructor */
 };
 
 
@@ -450,18 +432,6 @@ public:
  */
 class gu::net::Network
 {
-    friend class Socket;
-    SocketList* sockets;
-    std::vector<Socket*> released;
-    int wake_fd[2];
-    Poll* poll;
-    void insert(Socket*);
-    void erase(Socket*);
-    void release(Socket*);
-    Socket* find(int);
-    /* Don't allow assignment or copy construction */
-    Network operator=(const Network&);
-    Network(const Network&);
 public:
     
     /*!
@@ -513,8 +483,21 @@ public:
     /*!
      * 
      */
-    static size_t get_mtu() { return (1 << 15); }
-    
+    static size_t get_mtu() { return default_mtu; }
+
+private:
+    friend class Socket;
+    SocketList* sockets;
+    std::vector<Socket*> released;
+    int wake_fd[2];
+    Poll* poll;
+    void insert(Socket*);
+    void erase(Socket*);
+    void release(Socket*);
+    Socket* find(int);
+    /* Don't allow assignment or copy construction */
+    Network operator=(const Network&);
+    Network(const Network&);    
 };
 
 #endif /* __GU_NETWORK_HPP__ */

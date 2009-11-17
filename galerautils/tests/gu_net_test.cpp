@@ -330,6 +330,21 @@ START_TEST(test_network_send)
     fail_unless(conn2 != 0);
     fail_unless(conn2->get_state() == Socket::S_CONNECTED);
     
+
+    try
+    {
+        vector<byte_t> toobig(Network::get_mtu() + 1, 0);
+        Datagram dg(Buffer(toobig.begin(), toobig.end()));
+        conn->send(&dg);
+        fail("exception not thrown");
+    } 
+    catch (Exception& e)
+    {
+        log_info << e.what();
+        fail_unless(e.get_errno() == EMSGSIZE);
+    }
+    
+
     size_t sent(0);
     
     for (int i = 0; i < 1000; ++i)

@@ -21,8 +21,6 @@ using namespace gu::datetime;
 
 /*
  * Mapping between NetworkEvent and EPoll events
- *
- * TODO: This mapping should be done elsewhere...
  */
 
 static inline int to_epoll_mask(const int mask)
