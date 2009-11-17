@@ -52,6 +52,7 @@ private:
     UUID   const my_uuid;
     bool         start_prim;
     State        state;
+    uint32_t     last_sent_seq;
 
     PCInstMap           instances;
     PCInstMap::iterator self_i;
@@ -122,15 +123,16 @@ public:
 
     PCProto(const UUID& uuid_)
         :
-        my_uuid      (uuid_),
-        start_prim   (),
-        state        (S_CLOSED),
-        instances    (),
-        self_i       (),
-        state_msgs   (),
-        current_view (V_TRANS),
-        pc_view      (V_NON_PRIM),
-        views        ()
+        my_uuid       (uuid_),
+        start_prim    (),
+        state         (S_CLOSED),
+        last_sent_seq (0),
+        instances     (),
+        self_i        (),
+        state_msgs    (),
+        current_view  (V_TRANS),
+        pc_view       (V_NON_PRIM),
+        views         ()
     {
         self_i = instances.insert_unique(std::make_pair(get_uuid(), PCInst()));
     }

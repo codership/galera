@@ -202,7 +202,7 @@ void PCProto::shift_to(const State s)
                 inst.set_prim(false);
             }
         }
-
+        last_sent_seq = 0;
         set_prim(true);
         pc_view = ViewId(V_PRIM, current_view.get_id());
         break;
@@ -800,8 +800,17 @@ void PCProto::handle_user(const PCMessage& msg, const Datagram& dg,
     
     
     PCInst& state(PCInstMap::get_value(instances.find_checked(um.get_source())));
+    if (state.get_last_seq() + 1 != msg.get_seq())
+    {
+        gu_throw_fatal << "gap in message sequence: source="
+                       << um.get_source()
+                       << " expected_seq="
+                       << state.get_last_seq() + 1
+                       << " seq="
+                       << msg.get_seq();
+    }
     state.set_last_seq(msg.get_seq());
-    
+
     Datagram up_dg(dg, dg.get_offset() + msg.serial_size());
     gu_trace(send_up(up_dg, 
                      ProtoUpMeta(um.get_source(), 
@@ -902,26 +911,17 @@ int PCProto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
         return EAGAIN;
     }
     
-    uint32_t      seq = get_last_seq() + 1;
+    uint32_t      seq(last_sent_seq + 1);
     PCUserMessage um(seq);
     Datagram down_dg(wb);
 
     push_header(um, down_dg);
     
-    int ret;
-    // If number of nodes is less than 3 we can send messages in agreed order
-    // since in case of crash we enter NON_PRIM anyway
-    if (current_view.get_members().size() < 3)
-    {
-        ret = send_down(down_dg, ProtoDownMeta(dm.get_user_type(), O_AGREED));
-    }
-    else
-    {
-        ret = send_down(down_dg, dm);
-    }
+    int ret = send_down(down_dg, dm);
+
     if (ret == 0)
     {
-        set_last_seq(seq);
+        last_sent_seq = seq;
     }
     else if (ret != EAGAIN)
     {
