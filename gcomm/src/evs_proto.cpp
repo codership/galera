@@ -82,7 +82,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     install_message(0),
     fifo_seq(-1),
     last_sent(-1),
-    send_window(16), 
+    send_window(8), 
     output(),
     max_output_size(128),
     self_loopback(false),
@@ -845,7 +845,7 @@ int gcomm::evs::Proto::send_user(const seqno_t win)
 {
     gcomm_assert(output.empty() == false);
     gcomm_assert(get_state() == S_OPERATIONAL);
-    gcomm_assert(win <= send_window/2);
+    gcomm_assert(win <= send_window);
     pair<Datagram, ProtoDownMeta> wb = output.front();
     int ret;
     if ((ret = send_user(wb.first, 
@@ -1372,15 +1372,19 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     
     Node& node(NodeMap::get_value(ii));
     
-    if (node.get_operational() == false && node.get_leave_message() == 0)
+    if (node.get_operational()                 == false && 
+        node.get_leave_message()               == 0     &&
+        (msg.get_flags() & Message::F_RETRANS) == 0)
     {
         // We have set this node unoperational and there was 
         // probably good reason to do so. Don't accept messages
-        // from it before new view has been formed. Exception is
-        // node that is leaving.
+        // from it before new view has been formed. 
+        // Exceptions:
+        // - Node that is leaving
+        // - Retransmitted messages
         return;
     }
-
+    
     // Filter out non-fifo messages
     if (msg.get_fifo_seq() != -1 && (msg.get_flags() & Message::F_RETRANS) == 0)
     {
@@ -1451,7 +1455,7 @@ size_t gcomm::evs::Proto::unserialize_message(const UUID& source,
     gu_trace(offset = msg->unserialize(&rb.get_payload()[0], 
                                        rb.get_payload().size(), 
                                        rb.get_offset()));
-    if ((msg->get_flags() & Message::F_SOURCE) == false)
+    if ((msg->get_flags() & Message::F_SOURCE) == 0)
     {
         gcomm_assert(source != UUID::nil());
         msg->set_source(source);
@@ -1559,7 +1563,7 @@ int gcomm::evs::Proto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
         int err;
         err = send_user(wb, 
                         dm.get_user_type(),
-                        dm.get_order(), send_window/2, 
+                        dm.get_order(), send_window, 
                         -1);
         
         switch (err) 
@@ -2144,7 +2148,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
         while (output.empty() == false)
         {
             int err;
-            gu_trace(err = send_user(send_window/2));
+            gu_trace(err = send_user(send_window));
             if (err != 0)
             {
                 break;
@@ -2280,7 +2284,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         while (output.empty() == false)
         {
             int err;
-            gu_trace(err = send_user(send_window/2));
+            gu_trace(err = send_user(send_window));
             if (err != 0)
                 break;
         }

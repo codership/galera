@@ -333,11 +333,7 @@ gcomm::evs::InputMap::insert(const size_t uuid,
     }
 
     node.set_range(range);
-    // Call update aru only if aru_seq may change
-    if (aru_seq_ + 1 < range.get_lu())
-    {
-        update_aru();
-    }
+    update_aru();
     return range;
     }
     catch (...)
