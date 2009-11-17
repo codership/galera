@@ -101,33 +101,33 @@ void gu::datetime::Period::parse(const string& str)
     }
     if (parts[YEAR].is_set())
     {
-        nsecs += from_string<int64_t>(parts[YEAR].str())*Year;
+        nsecs += from_string<long long>(parts[YEAR].str())*Year;
     }
     if (parts[MONTH].is_set())
     {
-        nsecs += from_string<int64_t>(parts[MONTH].str())*Month;
+        nsecs += from_string<long long>(parts[MONTH].str())*Month;
     }
     if (parts[DAY].is_set())
     {
-        nsecs += from_string<int64_t>(parts[DAY].str())*Day;
+        nsecs += from_string<long long>(parts[DAY].str())*Day;
     }
     if (parts[HOUR].is_set())
     {
-        nsecs += from_string<int64_t>(parts[HOUR].str())*Hour;
+        nsecs += from_string<long long>(parts[HOUR].str())*Hour;
     }
     if (parts[MIN].is_set())
     {
-        nsecs += from_string<int64_t>(parts[MIN].str())*Min;
+        nsecs += from_string<long long>(parts[MIN].str())*Min;
     }
     if (parts[SEC].is_set())
     {
-        int64_t s(from_string<int64_t>(parts[SEC].str()));
+        long long s(from_string<long long>(parts[SEC].str()));
         nsecs += s*Sec;
     }
     if (parts[SEC_D].is_set())
     {
         double d(from_string<double>(parts[SEC_D].str()));
-        nsecs += static_cast<int64_t>(d*Sec);
+        nsecs += static_cast<long long>(d*Sec);
     }
 }
 
