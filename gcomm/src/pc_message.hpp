@@ -27,10 +27,10 @@ class gcomm::PCInst
 {
     enum Flags { F_PRIM = 0x1 };
 
-    bool    prim;
-    int32_t last_seq;  // what is this seqno?
-    ViewId  last_prim;
-    int64_t to_seq;    // what is this seqno?
+    bool     prim;
+    uint32_t last_seq;  // what is this seqno?
+    ViewId   last_prim;
+    int64_t  to_seq;    // what is this seqno?
 
 public:
 
