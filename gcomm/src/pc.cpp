@@ -63,7 +63,7 @@ size_t PC::get_mtu() const
     evs::UserMessage evsm;
     PCUserMessage  pcm(0);
     
-    if (gmcast->get_mtu() < evsm.serial_size() + pcm.serial_size())
+    if (gmcast->get_mtu() < 2*evsm.serial_size() + pcm.serial_size())
     {
         gu_throw_fatal << "transport max msg size too small: "
                           << gmcast->get_mtu();
