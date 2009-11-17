@@ -156,8 +156,8 @@ int wsdb_store_set_database(
      * as set database with NULL db name.
      * @todo: refactor wsrep API to have connection_close() call
      */
-    if (set_db == NULL && conn) {
-        conn_remove_conn(conn_id);
+    if (set_db == NULL) {
+        if (conn) conn_remove_conn(conn_id);
 	GU_DBUG_RETURN(WSDB_OK);
     }
 
