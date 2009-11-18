@@ -69,7 +69,7 @@ size_t PC::get_mtu() const
                           << gmcast->get_mtu();
     }
     
-    return gmcast->get_mtu() - evsm.serial_size() - pcm.serial_size();
+    return gmcast->get_mtu() - 2*evsm.serial_size() - pcm.serial_size();
 }
 
 bool PC::supports_uuid() const
