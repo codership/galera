@@ -230,7 +230,7 @@ gcs_fc_stop_begin (gcs_conn_t* conn)
             abort();
     }
 
-    conn->stop_sent++;
+    conn->stop_sent += ret;
 
     return ret;
 }
@@ -277,6 +277,8 @@ gcs_fc_cont_begin (gcs_conn_t* conn)
         abort();
     }
 
+    conn->stop_sent -= ret; // decrement optimistically to allow for parallel
+                            // recv threads
     return ret;
 }
 
@@ -293,10 +295,11 @@ gcs_fc_cont_end (gcs_conn_t* conn)
 
     ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
 
-    if (ret >= 0) {
+    if (gu_likely (ret >= 0)) {
         ret = 0;
-        conn->stop_sent--;
     }
+
+    conn->stop_sent += (ret != 0); // fix count in case of error
 
     gu_mutex_unlock (&conn->fc_lock);
 

@@ -278,7 +278,7 @@ gcs_core_send (gcs_core_t*      const conn,
 	goto out;
 
     if ((local_act = gcs_fifo_lite_get_tail (conn->fifo))) {
-        *local_act  = (typeof(*local_act)){ conn->send_act_no, action };
+        *local_act = (typeof(*local_act)){ conn->send_act_no, action };
         gcs_fifo_lite_push_tail (conn->fifo);
     }
     else {
@@ -998,7 +998,7 @@ gcs_core_set_pkt_size (gcs_core_t* core, ulong pkt_size)
         msg_size = hdr_size + 1;
     }
 
-    gu_debug ("Changing maximum message size %u -> %u",
+    gu_info ("Changing maximum message size %u -> %u",
               core->send_buf_len, msg_size);
 
     if (gu_mutex_lock (&core->send_lock)) abort();
