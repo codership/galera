@@ -138,7 +138,7 @@ public:
     GCommConn(const string& uri_base_) :
         thd(),
         uri_base("pc://" + uri_base_),
-        use_prod_cons(true),
+        use_prod_cons(false),
         net(),
         tp(0),
         mutex(),
