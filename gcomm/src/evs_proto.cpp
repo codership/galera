@@ -83,6 +83,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     fifo_seq(-1),
     last_sent(-1),
     send_window(8), 
+    user_send_window(3),
     output(),
     max_output_size(128),
     self_loopback(false),
@@ -140,6 +141,18 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
                            Conf::EvsParamStatsReportPeriod,
                            Period("PT5M"),
                            Period("PT1S"));
+
+    send_window =
+        conf_param_def_min(uri,
+                           Conf::EvsParamSendWindow,
+                           seqno_t(8),
+                           seqno_t(1));
+    user_send_window =
+        conf_param_def_range(uri,
+                             Conf::EvsParamUserSendWindow,
+                             seqno_t(8),
+                             seqno_t(1),
+                             send_window);
 
     try
     {
@@ -213,8 +226,8 @@ string gcomm::evs::Proto::get_stats() const
     os << "\n\tdelivered {";
     copy(delivered_msgs.begin(), delivered_msgs.end(), 
          ostream_iterator<long long int>(os, ", "));
-    os << "}\n\teff(delivered/sent/nodes) " << 
-        double(accumulate(delivered_msgs.begin() + 1, delivered_msgs.end(), 0))/double(accumulate(sent_msgs.begin(), sent_msgs.end(), 0))/double(current_view.get_members().size());
+    os << "}\n\teff(delivered/sent) " << 
+        double(accumulate(delivered_msgs.begin() + 1, delivered_msgs.end(), 0))/double(accumulate(sent_msgs.begin(), sent_msgs.end(), 0));
     return os.str();
 }
 
@@ -1554,7 +1567,8 @@ int gcomm::evs::Proto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
         int err;
         err = send_user(wb, 
                         dm.get_user_type(),
-                        dm.get_order(), send_window, 
+                        dm.get_order(), 
+                        user_send_window, 
                         -1);
         
         switch (err) 

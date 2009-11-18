@@ -47,6 +47,10 @@ namespace gcomm
             EvsPrefix + ParamKeyDelim + "debug_log_mask";
         static const std::string EvsParamInfoLogMask =
             EvsPrefix + ParamKeyDelim + "info_log_mask";
+        static const std::string EvsParamSendWindow =
+            EvsPrefix + ParamKeyDelim + "send_window";
+        static const std::string EvsParamUserSendWindow =
+            EvsPrefix + ParamKeyDelim + "user_send_window";
         
 
         static const std::string VsPrefix = "vs";

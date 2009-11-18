@@ -304,8 +304,10 @@ private:
     int64_t fifo_seq;
     // Last sent seq
     seqno_t last_sent;
-    // Send window size
+    // Protocol send window size
     seqno_t send_window;
+    // User send window size
+    seqno_t user_send_window;
     // Output message queue
     std::deque<std::pair<gu::net::Datagram, ProtoDownMeta> > output;
     
