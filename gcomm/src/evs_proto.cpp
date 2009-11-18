@@ -145,12 +145,12 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     send_window =
         conf_param_def_min(uri,
                            Conf::EvsParamSendWindow,
-                           seqno_t(8),
+                           seqno_t(32),
                            seqno_t(1));
     user_send_window =
         conf_param_def_range(uri,
                              Conf::EvsParamUserSendWindow,
-                             seqno_t(8),
+                             seqno_t(16),
                              seqno_t(1),
                              send_window);
 
