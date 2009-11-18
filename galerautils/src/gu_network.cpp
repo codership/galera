@@ -714,12 +714,11 @@ const gu::net::Datagram* gu::net::Socket::recv(const int flags)
 }
 
 
-
-
 void gu::net::Socket::release()
 {
     net.release(this);
 }
+
 
 class gu::net::SocketList
 {
@@ -782,6 +781,7 @@ gu::net::Socket* gu::net::NetworkEvent::get_socket() const
     return socket;
 }
 
+
 gu::net::Network::Network() :
     sockets  (new SocketList()),
     released (),
@@ -791,6 +791,7 @@ gu::net::Network::Network() :
 
     poll->insert(PollEvent(wake_fd[0], E_IN, 0));
 }
+
 
 gu::net::Network::~Network()
 {
@@ -811,6 +812,7 @@ gu::net::Network::~Network()
     delete poll;
 }
 
+
 gu::net::Socket* gu::net::Network::connect(const string& addr)
 {
     Socket* sock = new Socket(*this);
@@ -829,6 +831,7 @@ gu::net::Socket* gu::net::Network::connect(const string& addr)
     return sock;
 }
 
+
 gu::net::Socket* gu::net::Network::listen(const string& addr)
 {
     Socket* sock = new Socket(*this);
@@ -837,6 +840,7 @@ gu::net::Socket* gu::net::Network::listen(const string& addr)
     set_event_mask(sock, E_IN);
     return sock;
 }
+
 
 void gu::net::Network::insert(Socket* sock)
 {
@@ -849,6 +853,7 @@ void gu::net::Network::insert(Socket* sock)
     poll->insert(PollEvent(sock->get_fd(), sock->get_event_mask(), sock));
 }
 
+
 void gu::net::Network::erase(Socket* sock)
 {
     /* Erases socket from poll set */
@@ -856,16 +861,19 @@ void gu::net::Network::erase(Socket* sock)
     sockets->erase(sock->get_fd());
 }
 
+
 void gu::net::Network::release(Socket* sock)
 {
     assert(sock->get_state() == Socket::S_CLOSED);
     released.push_back(sock);
 }
 
+
 gu::net::Socket* gu::net::Network::find(int fd)
 {
     return sockets->find(fd);
 }
+
 
 void gu::net::Network::set_event_mask(Socket* sock, const int mask)
 {
@@ -874,13 +882,14 @@ void gu::net::Network::set_event_mask(Socket* sock, const int mask)
         gu_throw_fatal << "Socket " << sock->get_fd()
                        << " not found from socket set";
     }
-
+    
     poll->modify(PollEvent(sock->get_fd(), mask, sock));
     sock->set_event_mask(mask);
 }
 
+
 gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
-                                                   const bool auto_accept)
+                                                   const bool auto_handle)
 {
     Socket* sock = 0;
     int revent = 0;
@@ -888,7 +897,7 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
     for_each(released.begin(), released.end(), DeleteObject());
     released.clear();
     
-    // Return first sockets that have pending unread data
+    // First return sockets that have pending unread data
     for (SocketList::iterator i = sockets->begin(); i != sockets->end();
          ++i)
     {
@@ -924,12 +933,12 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
         if (ev.get_user_data() == 0)
         {
             byte_t buf[1];
-
+            
             if (read(wake_fd[0], buf, sizeof(buf)) != 1)
             {
                 gu_throw_error(errno) << "Could not read pipe";
             }
-
+            
             return NetworkEvent(E_EMPTY, 0);
         }
         
@@ -939,7 +948,7 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
         switch (sock->get_state())
         {
         case Socket::S_CLOSED:
-            log_error << "closed socket " << sock->get_fd() << " in poll set";
+            log_warn << "closed socket " << sock->get_fd() << " in poll set";
             // gu_throw_fatal << "closed socket in poll set");
             break;
         case Socket::S_CONNECTING:
@@ -952,7 +961,7 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
             }
             break;
         case Socket::S_LISTENING:
-            if ((revent & E_IN) && auto_accept == true)
+            if ((revent & E_IN) && auto_handle == true)
             {
                 Socket* acc = sock->accept();
                 revent = E_ACCEPTED;
@@ -986,8 +995,11 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
             }
             else if (revent & E_OUT)
             {
-                sock->send();
-                sock = 0;
+                if (auto_handle == true)
+                {
+                    sock->send();
+                    sock = 0;
+                }
             }
             break;
         case Socket::S_MAX:
@@ -999,6 +1011,7 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
     
     return NetworkEvent(revent, sock);
 }
+
 
 void gu::net::Network::interrupt()
 {

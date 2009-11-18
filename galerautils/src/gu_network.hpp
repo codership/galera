@@ -461,7 +461,7 @@ public:
      * @throws std::runtime_error If error was encountered
      */
     NetworkEvent wait_event(const gu::datetime::Period& = gu::datetime::Period(-1), 
-                            bool auto_accept = true);
+                            bool auto_handle = true);
     
     /*!
      * Interrupt network wait_event()

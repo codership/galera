@@ -475,13 +475,6 @@ static void close_connections(Network& net,
     }
 }
 
-struct delete_object
-{
-    template <class T> void operator ()(T* ptr)
-    {
-        delete ptr;
-    }
-};
 
 START_TEST(test_network_nonblocking)
 {
@@ -496,8 +489,8 @@ START_TEST(test_network_nonblocking)
     make_connections(net, cl, sr, 3);
     
     close_connections(net, cl, sr);
-    for_each(cl.begin(), cl.end(), delete_object());
-    for_each(sr.begin(), sr.end(), delete_object());
+    for_each(cl.begin(), cl.end(), DeleteObject());
+    for_each(sr.begin(), sr.end(), DeleteObject());
 
     listener->close();
     delete listener;
@@ -773,7 +766,6 @@ void* producer_thd(void* arg)
     }
     for (size_t i = 0; i < pargs->n_events; ++i)
     {
-        // Datagram dg(Buffer(buf, buf + sizeof(buf)));
         MsgData md(buf, sizeof(buf));
         Message msg(&prod, &md);
         Message ack(&prod);

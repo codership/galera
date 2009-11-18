@@ -131,6 +131,7 @@ public:
     gcs_msg_type_t msg_type;
 };
 
+
 class GCommConn : public Consumer, public Toplay
 {
 public:
@@ -151,6 +152,10 @@ public:
         {
             use_prod_cons = from_string<bool>(URI(uri_base).get_option("gcomm.use_prod_cons"));
         } catch (NotFound&) { }
+        if (use_prod_cons == false)
+        {
+            log_info << "disabling prod/cons";
+        }
     }
     
     ~GCommConn()
@@ -160,7 +165,6 @@ public:
     
     const UUID& get_uuid() const { return tp->get_uuid(); }
     
-
     static void* run_fn(void* arg)
     {
         static_cast<GCommConn*>(arg)->run();

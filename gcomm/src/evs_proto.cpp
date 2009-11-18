@@ -1517,17 +1517,8 @@ void gcomm::evs::Proto::handle_up(int cid,
     }
     catch (Exception& e)
     {
-        if (e.get_errno() == ENOTRECOVERABLE)
-        {
-            log_fatal << "exception caused by message: " << msg;
-            log_fatal << " state after handling message: " << *this;
-            throw;
-        }
-        else
-        {
-            log_warn << "exception: " << e.what();
-            log_warn << "caused by message: " << msg;
-        }
+        log_fatal << "exception caused by message: " << msg;
+        log_fatal << " state after handling message: " << *this;
     }
 }
 

@@ -11,7 +11,6 @@ using namespace gu::datetime;
 using namespace gu::net;
 using namespace gcomm;
 
-
     
 void gcomm::Protostack::push_proto(Protolay* p)
 { 
@@ -23,6 +22,7 @@ void gcomm::Protostack::push_proto(Protolay* p)
         gcomm::connect(*prev_begin, p);
     }
 }
+
     
 void gcomm::Protostack::pop_proto(Protolay* p)
 {
@@ -33,6 +33,7 @@ void gcomm::Protostack::pop_proto(Protolay* p)
         gcomm::disconnect(*protos.begin(), p);
     }
 }
+
     
 gu::datetime::Date gcomm::Protostack::handle_timers()
 {
@@ -46,6 +47,7 @@ gu::datetime::Date gcomm::Protostack::handle_timers()
     return ret;
 }
 
+
 void gcomm::Protostack::dispatch(gu::net::NetworkEvent& ev, 
                                  const gu::net::Datagram& dg)
 {
@@ -57,7 +59,6 @@ void gcomm::Protostack::dispatch(gu::net::NetworkEvent& ev,
                                  ProtoUpMeta(s.get_errno()));
     }
 }
-
 
 
 void gcomm::Protonet::insert(Protostack* pstack) 
@@ -75,10 +76,11 @@ void gcomm::Protonet::erase(Protostack* pstack)
     std::deque<Protostack*>::iterator i;
     if ((i = find(protos.begin(), protos.end(), pstack)) == protos.end())
     {
-            gu_throw_fatal;
+        gu_throw_fatal;
     }
     protos.erase(i);
 }
+
 
 void gcomm::Protonet::event_loop(const Period& p)
 {
@@ -100,9 +102,14 @@ void gcomm::Protonet::event_loop(const Period& p)
         
         if (sleep_p < 0)
             sleep_p = 0;
-
+        
         NetworkEvent ev(net.wait_event(sleep_p, false));
-        if ((ev.get_event_mask() & E_EMPTY) == 0)
+        if ((ev.get_event_mask() & E_OUT) != 0)
+        {
+            Lock lock(mutex);
+            ev.get_socket()->send();
+        }
+        else if ((ev.get_event_mask() & E_EMPTY) == 0)
         {
             const int mask(ev.get_event_mask());
             Socket& s(*ev.get_socket());
