@@ -61,7 +61,7 @@ size_t PC::get_mtu() const
     if (gmcast == 0) gu_throw_fatal << "not open";
     
     evs::UserMessage evsm;
-    PCUserMessage  pcm(0);
+    pc::UserMessage  pcm(0);
     
     if (gmcast->get_mtu() < 2*evsm.serial_size() + pcm.serial_size())
     {
@@ -104,7 +104,7 @@ void PC::connect()
     const bool start_prim = host_is_any (uri.get_host());
     
     evs = new evs::Proto(uuid, uri.to_string());
-    pc = new PCProto (uuid);
+    pc = new pc::Proto (uuid);
     pstack.push_proto(gmcast);
     pstack.push_proto(evs);
     pstack.push_proto(pc);
@@ -134,7 +134,7 @@ void PC::connect()
         
         get_pnet().event_loop(Sec/2);
     }
-    while (pc->get_state() != PCProto::S_PRIM);
+    while (pc->get_state() != pc::Proto::S_PRIM);
 }
 
 void PC::close()
@@ -156,7 +156,7 @@ void PC::close()
         evs->shift_to(evs::Proto::S_CLOSED);
     }
     
-    if (pc->get_state() != PCProto::S_CLOSED)
+    if (pc->get_state() != pc::Proto::S_CLOSED)
     {
         log_warn << "PCProto didn't reach closed state";
     }

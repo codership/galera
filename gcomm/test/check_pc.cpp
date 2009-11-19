@@ -25,57 +25,57 @@ using namespace gu;
 using namespace gu::net;
 using namespace gu::datetime;
 using namespace gcomm;
-
+using namespace gcomm::pc;
 
 START_TEST(test_pc_messages)
 {
-    PCStateMessage pcs;
-    PCInstMap& sim = pcs.get_inst_map();
-
+    StateMessage pcs;
+    pc::NodeMap& sim(pcs.get_node_map());
+    
     sim.insert(std::make_pair(UUID(0,0), 
-                              PCInst(true, 6, 
+                              pc::Node(true, 6, 
                                      ViewId(V_PRIM,
                                             UUID(0, 0), 9), 
                                      42)));
     sim.insert(std::make_pair(UUID(0,0), 
-                              PCInst(false, 88, ViewId(V_PRIM, 
+                              pc::Node(false, 88, ViewId(V_PRIM, 
                                                        UUID(0, 0), 3), 
                                      472)));
     sim.insert(std::make_pair(UUID(0,0), 
-                              PCInst(true, 78, ViewId(V_PRIM,
+                              pc::Node(true, 78, ViewId(V_PRIM,
                                                       UUID(0, 0), 87), 
                                      52)));
     
     size_t expt_size = 4 // hdr
         + 4              // seq
-        + 4 + 3*(UUID::serial_size() + sizeof(uint32_t) + 4 + 20 + 8); // PCInstMap
-    check_serialization(pcs, expt_size, PCStateMessage());
+        + 4 + 3*(UUID::serial_size() + sizeof(uint32_t) + 4 + 20 + 8); // NodeMap
+    check_serialization(pcs, expt_size, StateMessage());
                        
-    PCInstallMessage pci;
-    PCInstMap& iim = pci.get_inst_map();
+    InstallMessage pci;
+    pc::NodeMap& iim = pci.get_node_map();
 
     iim.insert(std::make_pair(UUID(0,0), 
-                              PCInst(true, 6, ViewId(V_PRIM,
+                              pc::Node(true, 6, ViewId(V_PRIM,
                                                      UUID(0, 0), 9), 42)));
     iim.insert(std::make_pair(UUID(0,0), 
-                              PCInst(false, 88, ViewId(V_NON_PRIM,
+                              pc::Node(false, 88, ViewId(V_NON_PRIM,
                                                        UUID(0, 0), 3), 472)));
     iim.insert(std::make_pair(UUID(0,0), 
-                              PCInst(true, 78, ViewId(V_PRIM,
+                              pc::Node(true, 78, ViewId(V_PRIM,
                                                       UUID(0, 0), 87), 52)));
     iim.insert(std::make_pair(UUID(0,0), 
-                              PCInst(false, 457, ViewId(V_NON_PRIM,
+                              pc::Node(false, 457, ViewId(V_NON_PRIM,
                                                         UUID(0, 0), 37), 56)));
     
     expt_size = 4 // hdr
         + 4              // seq
-        + 4 + 4*(UUID::serial_size() + sizeof(uint32_t) + 4 + 20 + 8); // PCInstMap
-    check_serialization(pci, expt_size, PCInstallMessage());
+        + 4 + 4*(UUID::serial_size() + sizeof(uint32_t) + 4 + 20 + 8); // NodeMap
+    check_serialization(pci, expt_size, InstallMessage());
     
-    PCUserMessage pcu(7);
+    UserMessage pcu(7);
     
     expt_size = 4 + 4;
-    check_serialization(pcu, expt_size, PCUserMessage(-1U));
+    check_serialization(pcu, expt_size, UserMessage(-1U));
 
 }
 END_TEST
@@ -88,8 +88,8 @@ class PCUser : public Toplay
 public:
     UUID uuid;
     DummyTransport* tp;
-    PCProto* pc;
-    PCUser(const UUID& uuid_, DummyTransport *tp_, PCProto* pc_) :
+    Proto* pc;
+    PCUser(const UUID& uuid_, DummyTransport *tp_, Proto* pc_) :
         views(),
         uuid(uuid_),
         tp(tp_),
@@ -114,7 +114,7 @@ public:
     
 };
 
-void get_msg(Datagram* rb, PCMessage* msg, bool release = true)
+void get_msg(Datagram* rb, Message* msg, bool release = true)
 {
     assert(msg != 0);
     if (rb == 0)
@@ -143,50 +143,50 @@ void single_boot(PCUser* pu1)
     vt0.add_member(pu1->uuid, "n1");
     ProtoUpMeta um1(UUID::nil(), ViewId(), &vt0);
     pu1->pc->connect(true);
-    // pu1->pc->shift_to(PCProto::S_JOINING);
+    // pu1->pc->shift_to(Proto::S_JOINING);
     pu1->pc->handle_up(0, Datagram(), um1);
-    fail_unless(pu1->pc->get_state() == PCProto::S_TRANS);
+    fail_unless(pu1->pc->get_state() == Proto::S_TRANS);
     
     View vr1(ViewId(V_REG, pu1->uuid, 1));
     vr1.add_member(pu1->uuid, "n1");
     ProtoUpMeta um2(UUID::nil(), ViewId(), &vr1);
     pu1->pc->handle_up(0, Datagram(), um2);
-    fail_unless(pu1->pc->get_state() == PCProto::S_STATES_EXCH);
+    fail_unless(pu1->pc->get_state() == Proto::S_STATES_EXCH);
     
     Datagram* rb = pu1->tp->get_out();
     fail_unless(rb != 0);
-    PCMessage sm1;
+    Message sm1;
     get_msg(rb, &sm1);
-    fail_unless(sm1.get_type() == PCMessage::T_STATE);
-    fail_unless(sm1.get_inst_map().size() == 1);
+    fail_unless(sm1.get_type() == Message::T_STATE);
+    fail_unless(sm1.get_node_map().size() == 1);
     {
-        const PCInst& pi1 = PCInstMap::get_value(sm1.get_inst_map().begin());
+        const pc::Node& pi1 = pc::NodeMap::get_value(sm1.get_node_map().begin());
         fail_unless(pi1.get_prim() == true);
         fail_unless(pi1.get_last_prim() == ViewId(V_PRIM, pu1->uuid, 0));
     }
     pu1->pc->handle_msg(sm1, Datagram(), sum1);
-    fail_unless(pu1->pc->get_state() == PCProto::S_INSTALL);
+    fail_unless(pu1->pc->get_state() == Proto::S_INSTALL);
     
     rb = pu1->tp->get_out();
     fail_unless(rb != 0);
-    PCMessage im1;
+    Message im1;
     get_msg(rb, &im1);
-    fail_unless(im1.get_type() == PCMessage::T_INSTALL);
-    fail_unless(im1.get_inst_map().size() == 1);
+    fail_unless(im1.get_type() == Message::T_INSTALL);
+    fail_unless(im1.get_node_map().size() == 1);
     {
-        const PCInst& pi1 = PCInstMap::get_value(im1.get_inst_map().begin());
+        const pc::Node& pi1 = pc::NodeMap::get_value(im1.get_node_map().begin());
         fail_unless(pi1.get_prim() == true);
         fail_unless(pi1.get_last_prim() == ViewId(V_PRIM, pu1->uuid, 0));
     }
     pu1->pc->handle_msg(im1, Datagram(), sum1);
-    fail_unless(pu1->pc->get_state() == PCProto::S_PRIM);
+    fail_unless(pu1->pc->get_state() == Proto::S_PRIM);
 }
 
 START_TEST(test_pc_view_changes_single)
 {
     UUID uuid1(0, 0);
     Protonet net;
-    PCProto pc1(uuid1);
+    Proto pc1(uuid1);
     DummyTransport tp1(net);
     PCUser pu1(uuid1, &tp1, &pc1);    
     single_boot(&pu1);
@@ -203,14 +203,14 @@ static void double_boot(PCUser* pu1, PCUser* pu2)
     View t11(ViewId(V_TRANS, pu1->pc->get_current_view().get_id()));
     t11.add_member(pu1->uuid, "n1");
     pu1->pc->handle_view(t11);
-    fail_unless(pu1->pc->get_state() == PCProto::S_TRANS);
+    fail_unless(pu1->pc->get_state() == Proto::S_TRANS);
     
     View t12(ViewId(V_TRANS, pu2->uuid, 0));
     t12.add_member(pu2->uuid, "n2");
-    // pu2->pc->shift_to(PCProto::S_JOINING);
+    // pu2->pc->shift_to(Proto::S_JOINING);
     pu2->pc->connect(false);
     pu2->pc->handle_view(t12);
-    fail_unless(pu2->pc->get_state() == PCProto::S_TRANS);
+    fail_unless(pu2->pc->get_state() == Proto::S_TRANS);
 
     View r1(ViewId(V_REG, 
                    pu1->uuid, 
@@ -218,22 +218,22 @@ static void double_boot(PCUser* pu1, PCUser* pu2)
     r1.add_member(pu1->uuid, "n1");
     r1.add_member(pu2->uuid, "n2");
     pu1->pc->handle_view(r1);
-    fail_unless(pu1->pc->get_state() == PCProto::S_STATES_EXCH);
+    fail_unless(pu1->pc->get_state() == Proto::S_STATES_EXCH);
 
     pu2->pc->handle_view(r1);
-    fail_unless(pu2->pc->get_state() == PCProto::S_STATES_EXCH);
+    fail_unless(pu2->pc->get_state() == Proto::S_STATES_EXCH);
 
     Datagram* rb = pu1->tp->get_out();
     fail_unless(rb != 0);
-    PCMessage sm1;
+    Message sm1;
     get_msg(rb, &sm1);
-    fail_unless(sm1.get_type() == PCMessage::T_STATE);
+    fail_unless(sm1.get_type() == Message::T_STATE);
 
     rb = pu2->tp->get_out();
     fail_unless(rb != 0);
-    PCMessage sm2;
+    Message sm2;
     get_msg(rb, &sm2);
-    fail_unless(sm2.get_type() == PCMessage::T_STATE);
+    fail_unless(sm2.get_type() == Message::T_STATE);
 
     rb = pu1->tp->get_out();
     fail_unless(rb == 0);
@@ -243,18 +243,18 @@ static void double_boot(PCUser* pu1, PCUser* pu2)
     pu1->pc->handle_msg(sm1, Datagram(), pum1);
     rb = pu1->tp->get_out();
     fail_unless(rb == 0);
-    fail_unless(pu1->pc->get_state() == PCProto::S_STATES_EXCH);
+    fail_unless(pu1->pc->get_state() == Proto::S_STATES_EXCH);
     pu1->pc->handle_msg(sm2, Datagram(), pum2);
-    fail_unless(pu1->pc->get_state() == PCProto::S_INSTALL);
+    fail_unless(pu1->pc->get_state() == Proto::S_INSTALL);
 
     pu2->pc->handle_msg(sm1, Datagram(), pum1);
     rb = pu2->tp->get_out();
     fail_unless(rb == 0);
-    fail_unless(pu2->pc->get_state() == PCProto::S_STATES_EXCH);
+    fail_unless(pu2->pc->get_state() == Proto::S_STATES_EXCH);
     pu2->pc->handle_msg(sm2, Datagram(), pum2);
-    fail_unless(pu2->pc->get_state() == PCProto::S_INSTALL);
+    fail_unless(pu2->pc->get_state() == Proto::S_INSTALL);
 
-    PCMessage im1;
+    Message im1;
     UUID imsrc;
     if (pu1->uuid < pu2->uuid)
     {
@@ -269,24 +269,24 @@ static void double_boot(PCUser* pu1, PCUser* pu2)
 
     fail_unless(rb != 0);
     get_msg(rb, &im1);
-    fail_unless(im1.get_type() == PCMessage::T_INSTALL);
+    fail_unless(im1.get_type() == Message::T_INSTALL);
     
     fail_unless(pu1->tp->get_out() == 0);
     fail_unless(pu2->tp->get_out() == 0);
 
     ProtoUpMeta ipum(imsrc);
     pu1->pc->handle_msg(im1, Datagram(), ipum);
-    fail_unless(pu1->pc->get_state() == PCProto::S_PRIM);
+    fail_unless(pu1->pc->get_state() == Proto::S_PRIM);
 
     pu2->pc->handle_msg(im1, Datagram(), ipum);
-    fail_unless(pu2->pc->get_state() == PCProto::S_PRIM);
+    fail_unless(pu2->pc->get_state() == Proto::S_PRIM);
 }
 
 START_TEST(test_pc_view_changes_double)
 {
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    PCProto pc1(uuid1);
+    Proto pc1(uuid1);
     Protonet net;
     DummyTransport tp1(net);
     PCUser pu1(uuid1, &tp1, &pc1);
@@ -294,7 +294,7 @@ START_TEST(test_pc_view_changes_double)
     
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    PCProto pc2(uuid2);
+    Proto pc2(uuid2);
     DummyTransport tp2(net);
     PCUser pu2(uuid2, &tp2, &pc2);
     
@@ -305,13 +305,13 @@ START_TEST(test_pc_view_changes_double)
     View tnp(ViewId(V_TRANS, pu1.pc->get_current_view().get_id()));
     tnp.add_member(uuid1, "n1");
     pu1.pc->handle_view(tnp);
-    fail_unless(pu1.pc->get_state() == PCProto::S_NON_PRIM);
+    fail_unless(pu1.pc->get_state() == Proto::S_NON_PRIM);
     
     View tpv2(ViewId(V_TRANS, pu2.pc->get_current_view().get_id()));
     tpv2.add_member(uuid2, "n2");
     tpv2.add_left(uuid1, "n1");
     pu2.pc->handle_view(tpv2);
-    fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);
+    fail_unless(pu2.pc->get_state() == Proto::S_TRANS);
     fail_unless(pu2.tp->get_out() == 0);
 
     View rp2(ViewId(V_REG, uuid2, 
@@ -319,22 +319,22 @@ START_TEST(test_pc_view_changes_double)
     rp2.add_member(uuid2, "n2");
     rp2.add_left(uuid1, "n1");
     pu2.pc->handle_view(rp2);
-    fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);
+    fail_unless(pu2.pc->get_state() == Proto::S_STATES_EXCH);
     rb = pu2.tp->get_out();
     fail_unless(rb != 0);
-    PCMessage sm2;
+    Message sm2;
     get_msg(rb, &sm2);
-    fail_unless(sm2.get_type() == PCMessage::T_STATE);
+    fail_unless(sm2.get_type() == Message::T_STATE);
     fail_unless(pu2.tp->get_out() == 0);
     pu2.pc->handle_msg(sm2, Datagram(), pum2);
-    fail_unless(pu2.pc->get_state() == PCProto::S_INSTALL);
+    fail_unless(pu2.pc->get_state() == Proto::S_INSTALL);
     rb = pu2.tp->get_out();
     fail_unless(rb != 0);
-    PCMessage im2;
+    Message im2;
     get_msg(rb, &im2);
-    fail_unless(im2.get_type() == PCMessage::T_INSTALL);
+    fail_unless(im2.get_type() == Message::T_INSTALL);
     pu2.pc->handle_msg(im2, Datagram(), pum2);
-    fail_unless(pu2.pc->get_state() == PCProto::S_PRIM);
+    fail_unless(pu2.pc->get_state() == Proto::S_PRIM);
 
 }
 END_TEST
@@ -344,7 +344,7 @@ START_TEST(test_pc_view_changes_reverse)
 {
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    PCProto pc1(uuid1);
+    Proto pc1(uuid1);
     Protonet net;
     DummyTransport tp1(net);
     PCUser pu1(uuid1, &tp1, &pc1);
@@ -352,7 +352,7 @@ START_TEST(test_pc_view_changes_reverse)
     
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    PCProto pc2(uuid2);
+    Proto pc2(uuid2);
     DummyTransport tp2(net);
     PCUser pu2(uuid2, &tp2, &pc2);
 
@@ -368,14 +368,14 @@ START_TEST(test_pc_state1)
     Protonet net;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    PCProto pc1(uuid1);
+    Proto pc1(uuid1);
     DummyTransport tp1(net);
     PCUser pu1(uuid1, &tp1, &pc1);
     single_boot(&pu1);
     
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    PCProto pc2(uuid2);
+    Proto pc2(uuid2);
     DummyTransport tp2(net);
     PCUser pu2(uuid2, &tp2, &pc2);
     
@@ -383,8 +383,8 @@ START_TEST(test_pc_state1)
     // n2: JOINING -> STATES_EXCH -> RTR -> PRIM
     double_boot(&pu1, &pu2);    
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_PRIM);
-    fail_unless(pu2.pc->get_state() == PCProto::S_PRIM);
+    fail_unless(pu1.pc->get_state() == Proto::S_PRIM);
+    fail_unless(pu2.pc->get_state() == Proto::S_PRIM);
     
     // PRIM -> TRANS -> STATES_EXCH -> RTR -> TRANS -> STATES_EXCH -> RTR -> PRIM
     View tr1(ViewId(V_TRANS, pu1.pc->get_current_view().get_id()));
@@ -393,8 +393,8 @@ START_TEST(test_pc_state1)
     pu1.pc->handle_view(tr1);
     pu2.pc->handle_view(tr1);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_TRANS);
-    fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);    
+    fail_unless(pu1.pc->get_state() == Proto::S_TRANS);
+    fail_unless(pu2.pc->get_state() == Proto::S_TRANS);    
 
     fail_unless(pu1.tp->get_out() == 0);
     fail_unless(pu2.tp->get_out() == 0);
@@ -406,23 +406,23 @@ START_TEST(test_pc_state1)
     pu1.pc->handle_view(reg2);
     pu2.pc->handle_view(reg2);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
-    fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);    
+    fail_unless(pu1.pc->get_state() == Proto::S_STATES_EXCH);
+    fail_unless(pu2.pc->get_state() == Proto::S_STATES_EXCH);    
     
-    PCMessage msg;
+    Message msg;
     get_msg(pu1.tp->get_out(), &msg);
     pu1.pc->handle_msg(msg, Datagram(), pum1);
     pu2.pc->handle_msg(msg, Datagram(), pum1);
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
-    fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);    
+    fail_unless(pu1.pc->get_state() == Proto::S_STATES_EXCH);
+    fail_unless(pu2.pc->get_state() == Proto::S_STATES_EXCH);    
 
     get_msg(pu2.tp->get_out(), &msg);
     pu1.pc->handle_msg(msg, Datagram(), pum2);
     pu2.pc->handle_msg(msg, Datagram(), pum2);
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_INSTALL);
-    fail_unless(pu2.pc->get_state() == PCProto::S_INSTALL);    
+    fail_unless(pu1.pc->get_state() == Proto::S_INSTALL);
+    fail_unless(pu2.pc->get_state() == Proto::S_INSTALL);    
     
     View tr2(ViewId(V_TRANS, pu1.pc->get_current_view().get_id())); 
     tr2.add_member(uuid1, "n1");
@@ -432,10 +432,10 @@ START_TEST(test_pc_state1)
     pu2.pc->handle_view(tr2);
 
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_TRANS);
-    fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);    
+    fail_unless(pu1.pc->get_state() == Proto::S_TRANS);
+    fail_unless(pu2.pc->get_state() == Proto::S_TRANS);    
 
-    PCMessage im;
+    Message im;
     
     if (uuid1 < uuid2)
     {
@@ -451,8 +451,8 @@ START_TEST(test_pc_state1)
     }
 
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_TRANS);
-    fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);    
+    fail_unless(pu1.pc->get_state() == Proto::S_TRANS);
+    fail_unless(pu2.pc->get_state() == Proto::S_TRANS);    
     
 
     View reg3(ViewId(V_REG, uuid1,
@@ -464,22 +464,22 @@ START_TEST(test_pc_state1)
     pu1.pc->handle_view(reg3);
     pu2.pc->handle_view(reg3);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
-    fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);    
+    fail_unless(pu1.pc->get_state() == Proto::S_STATES_EXCH);
+    fail_unless(pu2.pc->get_state() == Proto::S_STATES_EXCH);    
 
     get_msg(pu1.tp->get_out(), &msg);
     pu1.pc->handle_msg(msg, Datagram(), pum1);
     pu2.pc->handle_msg(msg, Datagram(), pum1);
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
-    fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);    
+    fail_unless(pu1.pc->get_state() == Proto::S_STATES_EXCH);
+    fail_unless(pu2.pc->get_state() == Proto::S_STATES_EXCH);    
 
     get_msg(pu2.tp->get_out(), &msg);
     pu1.pc->handle_msg(msg, Datagram(), pum2);
     pu2.pc->handle_msg(msg, Datagram(), pum2);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_INSTALL);
-    fail_unless(pu2.pc->get_state() == PCProto::S_INSTALL);
+    fail_unless(pu1.pc->get_state() == Proto::S_INSTALL);
+    fail_unless(pu2.pc->get_state() == Proto::S_INSTALL);
     
     if (uuid1 < uuid2)
     {
@@ -494,8 +494,8 @@ START_TEST(test_pc_state1)
         pu2.pc->handle_msg(im, Datagram(), pum2);
     }
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_PRIM);
-    fail_unless(pu2.pc->get_state() == PCProto::S_PRIM);
+    fail_unless(pu1.pc->get_state() == Proto::S_PRIM);
+    fail_unless(pu2.pc->get_state() == Proto::S_PRIM);
 
 }
 END_TEST
@@ -505,14 +505,14 @@ START_TEST(test_pc_state2)
     Protonet net;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    PCProto pc1(uuid1);
+    Proto pc1(uuid1);
     DummyTransport tp1(net);
     PCUser pu1(uuid1, &tp1, &pc1);
     single_boot(&pu1);
     
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    PCProto pc2(uuid2);
+    Proto pc2(uuid2);
     DummyTransport tp2(net);
     PCUser pu2(uuid2, &tp2, &pc2);
     
@@ -520,8 +520,8 @@ START_TEST(test_pc_state2)
     // n2: JOINING -> STATES_EXCH -> RTR -> PRIM
     double_boot(&pu1, &pu2);    
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_PRIM);
-    fail_unless(pu2.pc->get_state() == PCProto::S_PRIM);
+    fail_unless(pu1.pc->get_state() == Proto::S_PRIM);
+    fail_unless(pu2.pc->get_state() == Proto::S_PRIM);
     
     // PRIM -> TRANS -> STATES_EXCH -> TRANS -> STATES_EXCH -> RTR -> PRIM
     View tr1(ViewId(V_TRANS, pu1.pc->get_current_view().get_id()));
@@ -530,8 +530,8 @@ START_TEST(test_pc_state2)
     pu1.pc->handle_view(tr1);
     pu2.pc->handle_view(tr1);
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_TRANS);
-    fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);    
+    fail_unless(pu1.pc->get_state() == Proto::S_TRANS);
+    fail_unless(pu2.pc->get_state() == Proto::S_TRANS);    
 
     fail_unless(pu1.tp->get_out() == 0);
     fail_unless(pu2.tp->get_out() == 0);
@@ -543,8 +543,8 @@ START_TEST(test_pc_state2)
     pu1.pc->handle_view(reg2);
     pu2.pc->handle_view(reg2);
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
-    fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);    
+    fail_unless(pu1.pc->get_state() == Proto::S_STATES_EXCH);
+    fail_unless(pu2.pc->get_state() == Proto::S_STATES_EXCH);    
 
 
     
@@ -556,23 +556,23 @@ START_TEST(test_pc_state2)
     pu2.pc->handle_view(tr2);
 
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_TRANS);
-    fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);    
+    fail_unless(pu1.pc->get_state() == Proto::S_TRANS);
+    fail_unless(pu2.pc->get_state() == Proto::S_TRANS);    
 
-    PCMessage msg;
+    Message msg;
     get_msg(pu1.tp->get_out(), &msg);
     pu1.pc->handle_msg(msg, Datagram(), pum1);
     pu2.pc->handle_msg(msg, Datagram(), pum1);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_TRANS);
-    fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);    
+    fail_unless(pu1.pc->get_state() == Proto::S_TRANS);
+    fail_unless(pu2.pc->get_state() == Proto::S_TRANS);    
 
     get_msg(pu2.tp->get_out(), &msg);
     pu1.pc->handle_msg(msg, Datagram(), pum2);
     pu2.pc->handle_msg(msg, Datagram(), pum2);
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_TRANS);
-    fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);    
+    fail_unless(pu1.pc->get_state() == Proto::S_TRANS);
+    fail_unless(pu2.pc->get_state() == Proto::S_TRANS);    
     
 
     View reg3(ViewId(V_REG, uuid1,
@@ -584,24 +584,24 @@ START_TEST(test_pc_state2)
     pu1.pc->handle_view(reg3);
     pu2.pc->handle_view(reg3);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
-    fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);    
+    fail_unless(pu1.pc->get_state() == Proto::S_STATES_EXCH);
+    fail_unless(pu2.pc->get_state() == Proto::S_STATES_EXCH);    
 
     get_msg(pu1.tp->get_out(), &msg);
     pu1.pc->handle_msg(msg, Datagram(), pum1);
     pu2.pc->handle_msg(msg, Datagram(), pum1);
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
-    fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);    
+    fail_unless(pu1.pc->get_state() == Proto::S_STATES_EXCH);
+    fail_unless(pu2.pc->get_state() == Proto::S_STATES_EXCH);    
 
     get_msg(pu2.tp->get_out(), &msg);
     pu1.pc->handle_msg(msg, Datagram(), pum2);
     pu2.pc->handle_msg(msg, Datagram(), pum2);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_INSTALL);
-    fail_unless(pu2.pc->get_state() == PCProto::S_INSTALL);
+    fail_unless(pu1.pc->get_state() == Proto::S_INSTALL);
+    fail_unless(pu2.pc->get_state() == Proto::S_INSTALL);
     
-    PCMessage im;
+    Message im;
     if (uuid1 < uuid2)
     {
         get_msg(pu1.tp->get_out(), &im);
@@ -615,8 +615,8 @@ START_TEST(test_pc_state2)
         pu2.pc->handle_msg(im, Datagram(), pum2);
     }
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_PRIM);
-    fail_unless(pu2.pc->get_state() == PCProto::S_PRIM);
+    fail_unless(pu1.pc->get_state() == Proto::S_PRIM);
+    fail_unless(pu2.pc->get_state() == Proto::S_PRIM);
 
 }
 END_TEST
@@ -627,14 +627,14 @@ START_TEST(test_pc_state3)
     Protonet net;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    PCProto pc1(uuid1);
+    Proto pc1(uuid1);
     DummyTransport tp1(net);
     PCUser pu1(uuid1, &tp1, &pc1);
     single_boot(&pu1);
     
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    PCProto pc2(uuid2);
+    Proto pc2(uuid2);
     DummyTransport tp2(net);
     PCUser pu2(uuid2, &tp2, &pc2);
     
@@ -642,8 +642,8 @@ START_TEST(test_pc_state3)
     // n2: JOINING -> STATES_EXCH -> RTR -> PRIM
     double_boot(&pu1, &pu2);    
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_PRIM);
-    fail_unless(pu2.pc->get_state() == PCProto::S_PRIM);
+    fail_unless(pu1.pc->get_state() == Proto::S_PRIM);
+    fail_unless(pu2.pc->get_state() == Proto::S_PRIM);
     
     // PRIM -> NON_PRIM -> STATES_EXCH -> RTR -> NON_PRIM -> STATES_EXCH -> ...
     //      -> NON_PRIM -> STATES_EXCH -> RTR -> NON_PRIM
@@ -655,8 +655,8 @@ START_TEST(test_pc_state3)
     tr12.add_member(uuid2, "n2");
     pu2.pc->handle_view(tr12);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_NON_PRIM);
-    fail_unless(pu2.pc->get_state() == PCProto::S_NON_PRIM);    
+    fail_unless(pu1.pc->get_state() == Proto::S_NON_PRIM);
+    fail_unless(pu2.pc->get_state() == Proto::S_NON_PRIM);    
     
     fail_unless(pu1.tp->get_out() == 0);
     fail_unless(pu2.tp->get_out() == 0);
@@ -665,24 +665,24 @@ START_TEST(test_pc_state3)
                       pu1.pc->get_current_view().get_id().get_seq() + 1));
     reg21.add_member(uuid1, "n1");
     pu1.pc->handle_view(reg21);
-    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
+    fail_unless(pu1.pc->get_state() == Proto::S_STATES_EXCH);
     
     View reg22(ViewId(V_REG, uuid2,
                       pu2.pc->get_current_view().get_id().get_seq() + 1));
     reg22.add_member(uuid2, "n2");
     pu2.pc->handle_view(reg22);
-    fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);    
+    fail_unless(pu2.pc->get_state() == Proto::S_STATES_EXCH);    
     
 
-    PCMessage msg;
+    Message msg;
     get_msg(pu1.tp->get_out(), &msg);
     pu1.pc->handle_msg(msg, Datagram(), pum1);
 
     get_msg(pu2.tp->get_out(), &msg);
     pu2.pc->handle_msg(msg, Datagram(), pum2);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_NON_PRIM);
-    fail_unless(pu2.pc->get_state() == PCProto::S_NON_PRIM);
+    fail_unless(pu1.pc->get_state() == Proto::S_NON_PRIM);
+    fail_unless(pu2.pc->get_state() == Proto::S_NON_PRIM);
     
     
     
@@ -694,8 +694,8 @@ START_TEST(test_pc_state3)
     tr22.add_member(uuid2, "n2");
     pu2.pc->handle_view(tr22);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_TRANS);
-    fail_unless(pu2.pc->get_state() == PCProto::S_TRANS);
+    fail_unless(pu1.pc->get_state() == Proto::S_TRANS);
+    fail_unless(pu2.pc->get_state() == Proto::S_TRANS);
 
     fail_unless(pu1.tp->get_out() == 0);
     fail_unless(pu2.tp->get_out() == 0);
@@ -708,24 +708,24 @@ START_TEST(test_pc_state3)
     pu1.pc->handle_view(reg3);
     pu2.pc->handle_view(reg3);
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
-    fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);
+    fail_unless(pu1.pc->get_state() == Proto::S_STATES_EXCH);
+    fail_unless(pu2.pc->get_state() == Proto::S_STATES_EXCH);
 
     get_msg(pu1.tp->get_out(), &msg);
     pu1.pc->handle_msg(msg, Datagram(), pum1);
     pu2.pc->handle_msg(msg, Datagram(), pum1);
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
-    fail_unless(pu2.pc->get_state() == PCProto::S_STATES_EXCH);    
+    fail_unless(pu1.pc->get_state() == Proto::S_STATES_EXCH);
+    fail_unless(pu2.pc->get_state() == Proto::S_STATES_EXCH);    
 
     get_msg(pu2.tp->get_out(), &msg);
     pu1.pc->handle_msg(msg, Datagram(), pum2);
     pu2.pc->handle_msg(msg, Datagram(), pum2);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_INSTALL);
-    fail_unless(pu2.pc->get_state() == PCProto::S_INSTALL);
+    fail_unless(pu1.pc->get_state() == Proto::S_INSTALL);
+    fail_unless(pu2.pc->get_state() == Proto::S_INSTALL);
 
-    PCMessage im;
+    Message im;
     if (uuid1 < uuid2)
     {
         get_msg(pu1.tp->get_out(), &im);
@@ -739,8 +739,8 @@ START_TEST(test_pc_state3)
         pu2.pc->handle_msg(im, Datagram(), pum2);
     }
 
-    fail_unless(pu1.pc->get_state() == PCProto::S_PRIM);
-    fail_unless(pu2.pc->get_state() == PCProto::S_PRIM);    
+    fail_unless(pu1.pc->get_state() == Proto::S_PRIM);
+    fail_unless(pu2.pc->get_state() == Proto::S_PRIM);    
 
 }
 END_TEST
@@ -750,7 +750,7 @@ START_TEST(test_pc_conflicting_prims)
     log_info << "START";
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    PCProto pc1(uuid1);
+    Proto pc1(uuid1);
     Protonet net;
     DummyTransport tp1(net);
     PCUser pu1(uuid1, &tp1, &pc1);
@@ -758,7 +758,7 @@ START_TEST(test_pc_conflicting_prims)
     
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    PCProto pc2(uuid2);
+    Proto pc2(uuid2);
     DummyTransport tp2(net);
     PCUser pu2(uuid2, &tp2, &pc2);
     single_boot(&pu2);
@@ -776,13 +776,13 @@ START_TEST(test_pc_conflicting_prims)
     pu1.pc->handle_view(reg);
     pu2.pc->handle_view(reg);
     
-    PCMessage msg1, msg2;
+    Message msg1, msg2;
 
     /* First node must discard msg2 and stay in states exch waiting for
      * trans view */
     get_msg(pu1.tp->get_out(), &msg1);
     get_msg(pu2.tp->get_out(), &msg2);
-    fail_unless(pu1.pc->get_state() == PCProto::S_STATES_EXCH);
+    fail_unless(pu1.pc->get_state() == Proto::S_STATES_EXCH);
     
     pu1.pc->handle_msg(msg1, Datagram(), pum1);
     pu1.pc->handle_msg(msg2, Datagram(), pum2);
@@ -813,7 +813,7 @@ START_TEST(test_pc_conflicting_prims)
     get_msg(pu1.tp->get_out(), &msg1);
     pu1.pc->handle_msg(msg1, Datagram(), pum1);
     
-    fail_unless(pu1.pc->get_state() == PCProto::S_PRIM);
+    fail_unless(pu1.pc->get_state() == Proto::S_PRIM);
 
 }
 END_TEST
@@ -863,7 +863,7 @@ static DummyNode* create_dummy_node(size_t idx,
         Protonet net;
         protos.push_back(new DummyTransport(net, uuid, false));
         protos.push_back(new evs::Proto(uuid, conf));
-        protos.push_back(new PCProto(uuid));
+        protos.push_back(new Proto(uuid));
         return new DummyNode(idx, protos);
     }
     catch (...)
@@ -1187,11 +1187,11 @@ START_TEST(test_trac_191)
 {
     Protonet net;
     UUID uuid1(1), uuid2(2), uuid3(3), uuid4(4);
-    PCProto p(uuid4);
+    Proto p(uuid4);
     DummyTransport tp(net, uuid4, true);
     gcomm::connect(&tp, &p);
     
-    p.shift_to(PCProto::S_JOINING);
+    p.shift_to(Proto::S_JOINING);
     View t0(ViewId(V_TRANS, uuid4, 0));
     t0.add_member(uuid4);
     p.handle_view(t0);
@@ -1204,20 +1204,20 @@ START_TEST(test_trac_191)
     
     Datagram* dg = tp.get_out();
     fail_unless(dg != 0);
-    PCMessage sm4;
+    Message sm4;
     get_msg(dg, &sm4);
-    fail_unless(sm4.get_type() == PCMessage::T_STATE);
+    fail_unless(sm4.get_type() == Message::T_STATE);
     
     // Handle first sm from uuid3
     
-    PCStateMessage sm3;
-    PCInstMap& im3(sm3.get_inst_map());
+    StateMessage sm3;
+    pc::NodeMap& im3(sm3.get_node_map());
     im3.insert_unique(make_pair(uuid1, 
-                                PCInst(true, 254, ViewId(V_PRIM, uuid1, 3), 20)));
+                                pc::Node(true, 254, ViewId(V_PRIM, uuid1, 3), 20)));
     im3.insert_unique(make_pair(uuid2, 
-                                PCInst(true, 254, ViewId(V_PRIM, uuid1, 3), 20)));
+                                pc::Node(true, 254, ViewId(V_PRIM, uuid1, 3), 20)));
     im3.insert_unique(make_pair(uuid3, 
-                                PCInst(false, 254, ViewId(V_PRIM, uuid1, 3), 25)));
+                                pc::Node(false, 254, ViewId(V_PRIM, uuid1, 3), 25)));
     p.handle_msg(sm3, Datagram(), ProtoUpMeta(uuid3));
     p.handle_msg(sm4, Datagram(), ProtoUpMeta(uuid4));
 }
@@ -1227,7 +1227,7 @@ static bool skip(false);
 
 Suite* pc_suite()
 {
-    Suite* s = suite_create("pc");
+    Suite* s = suite_create("gcomm::pc");
     TCase* tc;
     
     if (skip == false)

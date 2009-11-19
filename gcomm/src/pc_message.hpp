@@ -10,101 +10,64 @@
 #include "gcomm/uuid.hpp"
 #include "gcomm/map.hpp"
 
+
 namespace gcomm
 {
-    class PCInst;
-    class PCInstMap;
-    class PCMessage;
-    class PCUserMessage;
-    class PCStateMessage;
-    class PCInstallMessage;
-    std::ostream& operator<<(std::ostream&, const PCInst&);
-    std::ostream& operator<<(std::ostream&, const PCMessage&);
-    bool operator==(const PCMessage&, const PCMessage&);
+    namespace pc
+    {
+        class Node;
+        class NodeMap;
+        class Message;
+        class UserMessage;
+        class StateMessage;
+        class InstallMessage;
+        std::ostream& operator<<(std::ostream&, const Node&);
+        std::ostream& operator<<(std::ostream&, const Message&);
+        bool operator==(const Message&, const Message&);
+    }
 }
 
-class gcomm::PCInst
+
+class gcomm::pc::Node
 {
-    enum Flags { F_PRIM = 0x1 };
-
-    bool     prim;
-    uint32_t last_seq;  // what is this seqno?
-    ViewId   last_prim;
-    int64_t  to_seq;    // what is this seqno?
-
 public:
-
-    PCInst() : prim(false), 
-               last_seq(-1), 
-               last_prim(V_NON_PRIM), 
-               to_seq(-1) 
-    {}
+    enum Flags { F_PRIM = 0x1 };
     
-    PCInst(const bool     prim_,
-           const uint32_t last_seq_,
-           const ViewId&  last_prim_, 
-           const int64_t  to_seq_)
+    Node(const bool     prim      = false,
+           const uint32_t last_seq  = -1,
+           const ViewId&  last_prim = ViewId(V_NON_PRIM), 
+           const int64_t  to_seq    = -1) 
         :
-        prim      (prim_),
-        last_seq  (last_seq_),
-        last_prim (last_prim_),
-        to_seq    (to_seq_)
-    {}
+        prim_      (prim     ),
+        last_seq_  (last_seq ),
+        last_prim_ (last_prim),
+        to_seq_    (to_seq   )
+    { }
     
-    void set_prim(const bool val)
-    {
-        prim = val;
-    }
+    void set_prim      (const bool val)          { prim_      = val      ; }
+    void set_last_seq  (const uint32_t seq)      { last_seq_  = seq      ; }
+    void set_last_prim (const ViewId& last_prim) { last_prim_ = last_prim; }
+    void set_to_seq    (const uint64_t seq)      { to_seq_    = seq      ; }
     
-    bool get_prim() const
-    {
-        return prim;
-    }
+    bool          get_prim()      const { return prim_     ; }
+    uint32_t      get_last_seq()  const { return last_seq_ ; }
+    const ViewId& get_last_prim() const { return last_prim_; }
+    int64_t       get_to_seq()    const { return to_seq_   ; }
     
-    void set_last_seq(const uint32_t seq)
-    {
-        last_seq = seq;
-    }
-    
-    uint32_t get_last_seq() const
-    {
-        return last_seq;
-    }
-    
-    void set_last_prim(const ViewId& last_prim_)
-    {
-        last_prim = last_prim_;
-    }
-    
-    const ViewId& get_last_prim() const
-    {
-        return last_prim;
-    }
-
-    void set_to_seq(const uint64_t seq)
-    {
-        to_seq = seq;
-    }
-
-    int64_t get_to_seq() const
-    {
-        return to_seq;
-    }
-
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
     {
         size_t   off = offset;
         uint32_t flags;
-
+        
         gu_trace (off = gcomm::unserialize(buf, buflen, off, &flags));
-
-        prim = flags & F_PRIM;
-
-        gu_trace (off = gcomm::unserialize(buf, buflen, off, &last_seq));
-        gu_trace (off = last_prim.unserialize(buf, buflen, off));
-        gu_trace (off = gcomm::unserialize(buf, buflen, off, &to_seq));
-
+        
+        prim_ = flags & F_PRIM;
+        
+        gu_trace (off = gcomm::unserialize(buf, buflen, off, &last_seq_));
+        gu_trace (off = last_prim_.unserialize(buf, buflen, off));
+        gu_trace (off = gcomm::unserialize(buf, buflen, off, &to_seq_));
+        
         return off;
     }
     
@@ -113,29 +76,29 @@ public:
     {
         size_t   off   = offset;
         uint32_t flags = 0;
-
-        flags |= prim ? F_PRIM : 0;
-
+        
+        flags |= prim_ ? F_PRIM : 0;
+        
         gu_trace (off = gcomm::serialize(flags, buf, buflen, off));
-        gu_trace (off = gcomm::serialize(last_seq, buf, buflen, off));
-        gu_trace (off = last_prim.serialize(buf, buflen, off));
-        gu_trace (off = gcomm::serialize(to_seq, buf, buflen, off));
-
+        gu_trace (off = gcomm::serialize(last_seq_, buf, buflen, off));
+        gu_trace (off = last_prim_.serialize(buf, buflen, off));
+        gu_trace (off = gcomm::serialize(to_seq_, buf, buflen, off));
+        
         assert (serial_size() == (off - offset));
-
+        
         return off;
     }
-
+    
     static size_t serial_size()
     {
-        PCInst* pcinst = reinterpret_cast<PCInst*>(0);
-
+        Node* node(reinterpret_cast<Node*>(0));
+        
         //             flags
-        return (sizeof(uint32_t) + sizeof(pcinst->last_seq) + 
-                ViewId::serial_size() + sizeof(pcinst->to_seq));
+        return (sizeof(uint32_t) + sizeof(node->last_seq_) + 
+                ViewId::serial_size() + sizeof(node->to_seq_));
     }
-
-    bool operator==(const PCInst& cmp) const
+    
+    bool operator==(const Node& cmp) const
     { 
         return get_prim()   == cmp.get_prim()      && 
             get_last_seq()  == cmp.get_last_seq()  &&
@@ -143,76 +106,85 @@ public:
             get_to_seq()    == cmp.get_to_seq();
     }
     
-
-    
     std::string to_string() const
     {
         std::ostringstream ret;
 
-        ret << "prim="        << prim
-            << ",last_seq="  << last_seq 
-            << ",last_prim=" << last_prim
-            << ",to_seq="    << to_seq;
-
+        ret << "prim="        << prim_
+            << ",last_seq="  << last_seq_ 
+            << ",last_prim=" << last_prim_
+            << ",to_seq="    << to_seq_;
+        
         return ret.str();
     }    
+    
+private:
+    
+    bool     prim_;      // Is node in prim comp
+    uint32_t last_seq_;  // Last seen message seq from the node
+    ViewId   last_prim_; // Last known prim comp view id for the node
+    int64_t  to_seq_;    // Last known TO seq for the node
 };
 
-inline std::ostream& gcomm::operator<<(std::ostream& os, const PCInst& inst)
+
+inline std::ostream& gcomm::pc::operator<<(std::ostream& os, const Node& n)
 {
-    return (os << inst.to_string());
+    return (os << n.to_string());
 }
 
-class gcomm::PCInstMap : public Map<UUID, PCInst> { };
 
-class gcomm::PCMessage
+class gcomm::pc::NodeMap : public Map<UUID, Node> { };
+
+
+class gcomm::pc::Message
 {
 public:
-
+    
     enum Type {T_NONE, T_STATE, T_INSTALL, T_USER, T_MAX};
-
+    
     static const char* to_string(Type t)
     {
         static const char* str[T_MAX] =
             { "NONE", "STATE", "INSTALL", "USER" };
 
         if (t < T_MAX) return str[t];
-
+        
         return "unknown";
     }
-
-private:
-
-    int        version;
-    Type       type;
-    uint32_t   seq;
-    PCInstMap  inst;
-
-    PCMessage& operator=(const PCMessage&);
-
-public:
-
-    PCMessage() : version(-1), type(T_NONE), seq(0), inst() {}
     
-    PCMessage(const int      version_, 
-              const Type     type_,
-              const uint32_t seq_)
+    
+    Message(const int      version  = -1, 
+            const Type     type     = T_NONE,
+            const uint32_t seq      = 0,
+            const NodeMap& node_map = NodeMap())
         :
-        version(version_),
-        type   (type_),
-        seq    (seq_),
-        inst   ()
+        version_ (version ),
+        type_    (type    ),
+        seq_     (seq     ),
+        node_map_(node_map)
     { }
     
-    PCMessage(const PCMessage& msg)
+    Message(const Message& msg) 
         :
-        version (msg.version),
-        type    (msg.type),
-        seq     (msg.seq),
-        inst    (msg.inst)
-    {}
+        version_ (msg.version_ ),
+        type_    (msg.type_    ),
+        seq_     (msg.seq_     ),
+        node_map_(msg.node_map_)
+    { }
     
-    virtual ~PCMessage() { }
+    virtual ~Message() { }
+    
+    
+    int      get_version()  const { return version_; }
+    Type     get_type()     const { return type_; }
+    uint32_t get_seq()      const { return seq_; }
+    
+    
+    const NodeMap& get_node_map() const { return node_map_; }
+    NodeMap&       get_node_map()       { return node_map_; }
+
+    const Node&    get_node(const UUID& uuid) const
+    { return NodeMap::get_value(node_map_.find_checked(uuid)); }
     
     size_t unserialize(const gu::byte_t* buf, const size_t buflen, const size_t offset)
         throw (gu::Exception)
@@ -220,26 +192,26 @@ public:
         size_t   off;
         uint32_t b;
         
-        inst.clear();
-
+        node_map_.clear();
+        
         gu_trace (off = gcomm::unserialize(buf, buflen, offset, &b));
-
-        version = b & 0xff;
-
-        if (version != 0)
+        
+        version_ = b & 0xff;
+        
+        if (version_ != 0)
             gu_throw_error (EPROTONOSUPPORT)
-                << "Unsupported protocol varsion: " << version;
+                << "Unsupported protocol varsion: " << version_;
+        
+        type_ = static_cast<Type>((b >> 8) & 0xff);
+        
+        if (type_ <= T_NONE || type_ >= T_MAX)
+            gu_throw_error (EINVAL) << "Bad type value: " << type_;
 
-        type = static_cast<Type>((b >> 8) & 0xff);
+        gu_trace (off = gcomm::unserialize(buf, buflen, off, &seq_));
 
-        if (type <= T_NONE || type >= T_MAX)
-            gu_throw_error (EINVAL) << "Bad type value: " << type;
-
-        gu_trace (off = gcomm::unserialize(buf, buflen, off, &seq));
-
-        if (type == T_STATE || type == T_INSTALL)
+        if (type_ == T_STATE || type_ == T_INSTALL)
         {
-            gu_trace (off = inst.unserialize(buf, buflen, off));
+            gu_trace (off = node_map_.unserialize(buf, buflen, off));
         }
 
         return off;
@@ -251,19 +223,19 @@ public:
         size_t   off;
         uint32_t b;
 
-        b = type & 0xff;
+        b = type_ & 0xff;
         b <<= 8;
-        b |= version & 0xff;
+        b |= version_ & 0xff;
 
         gu_trace (off = gcomm::serialize(b, buf, buflen, offset));
-        gu_trace (off = gcomm::serialize(seq, buf, buflen, off));
+        gu_trace (off = gcomm::serialize(seq_, buf, buflen, off));
 
-
-        if (type == T_STATE || type == T_INSTALL)
+        
+        if (type_ == T_STATE || type_ == T_INSTALL)
         {
-            gu_trace (off = inst.serialize(buf, buflen, off));
+            gu_trace (off = node_map_.serialize(buf, buflen, off));
         }
-
+        
         assert (serial_size() == (off - offset));
 
         return off;        
@@ -272,79 +244,68 @@ public:
     size_t serial_size() const
     {
         //            header
-        return sizeof(uint32_t) + sizeof(seq) 
-            + (type == T_STATE || type == T_INSTALL  ? inst.serial_size() : 0);
-    }
-    
-    int      get_version()  const { return version; }
-    
-    Type     get_type()     const { return type; }
-
-    uint32_t get_seq()      const { return seq; }
-    
-
-    // we have a problem here - we should not be able to construct the message
-    // without the instance map in the first place. Or that should be another
-    // class of message.
-    const PCInstMap& get_inst_map() const
-    {
-        return inst;
+        return (sizeof(uint32_t) 
+                + sizeof(seq_) 
+                + (type_ == T_STATE || type_ == T_INSTALL  ? 
+                   node_map_.serial_size()                 : 
+                   0));
     }
 
-    PCInstMap& get_inst_map()
-    {
-        return inst;
-    }
-    
-    
-    const PCInst& get_inst(const UUID& uuid) const
-    {
-        return PCInstMap::get_value(inst.find_checked(uuid));
-    }
-    
     
     std::string to_string() const
     {
         std::ostringstream ret;
         
-        ret << "pcmsg{ type=" << to_string(type) << ", seq=" << seq;
-        ret << ", inst {" << get_inst_map() << "}";
+        ret << "pcmsg{ type=" << to_string(type_) << ", seq=" << seq_;
+        ret << ", node_map {" << get_node_map() << "}";
         ret << '}';
         
         return ret.str();
     }
+
+private:
+    Message& operator=(const Message&);
+    
+    int      version_;  // Message version
+    Type     type_;     // Message type
+    uint32_t seq_;      // Message seqno
+    NodeMap  node_map_; // Message node map
 };
 
-inline std::ostream& gcomm::operator<<(std::ostream& os, const PCMessage& m)
+
+inline std::ostream& gcomm::pc::operator<<(std::ostream& os, const Message& m)
 {
     return (os << m.to_string());
 }
 
-class gcomm::PCStateMessage : public PCMessage
-{
-public:
-    PCStateMessage() :  PCMessage(0, PCMessage::T_STATE, 0) {}
-};
 
-class gcomm::PCInstallMessage : public PCMessage
+class gcomm::pc::StateMessage : public Message
 {
 public:
-    PCInstallMessage() : PCMessage(0, PCMessage::T_INSTALL, 0) {}
-};
-
-class gcomm::PCUserMessage : public PCMessage
-{
-public:
-    PCUserMessage(uint32_t seq) : PCMessage(0, PCMessage::T_USER, seq) {}
+    StateMessage() :  Message(0, Message::T_STATE, 0) {}
 };
 
 
-inline bool gcomm::operator==(const PCMessage& a, const PCMessage& b)
+class gcomm::pc::InstallMessage : public Message
+{
+public:
+    InstallMessage() : Message(0, Message::T_INSTALL, 0) {}
+};
+
+
+class gcomm::pc::UserMessage : public Message
+{
+public:
+    UserMessage(uint32_t seq) : Message(0, Message::T_USER, seq) {}
+};
+
+
+inline bool gcomm::pc::operator==(const Message& a, const Message& b)
 {
     return (a.get_version()  == b.get_version() &&
             a.get_type()     == b.get_type()    &&
             a.get_seq()      == b.get_seq()     &&
-            a.get_inst_map() == b.get_inst_map());
+            a.get_node_map() == b.get_node_map());
 }
 
 

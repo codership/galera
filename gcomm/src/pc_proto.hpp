@@ -14,11 +14,17 @@
 
 namespace gcomm
 {
+    namespace pc
+    {
+        class Proto;
+    }
+}
 
-class PCProto : public Protolay
+
+class gcomm::pc::Proto : public Protolay
 {
 public:
-
+    
     enum State 
     {
         S_CLOSED, 
@@ -46,104 +52,61 @@ public:
             gu_throw_fatal << "Invalid state"; throw;
         }
     }
-
-private:
-
-    UUID   const my_uuid;
-    bool         start_prim;
-    State        state;
-    uint32_t     last_sent_seq;
-
-    PCInstMap           instances;
-    PCInstMap::iterator self_i;
-
-    PCProto (const PCProto&);
-    PCProto& operator=(const PCProto&);
-
-public:
-
-    const UUID& get_uuid() const { return my_uuid; }
-
-    bool get_prim() const
+    
+    
+    Proto(const UUID& uuid)
+        :
+        my_uuid_       (uuid),
+        start_prim_    (),
+        state_         (S_CLOSED),
+        last_sent_seq_ (0),
+        instances_     (),
+        self_i_        (),
+        state_msgs_    (),
+        current_view_  (V_TRANS),
+        pc_view_       (V_NON_PRIM),
+        views_         ()
     {
-        return PCInstMap::get_value(self_i).get_prim();
+        self_i_ = instances_.insert_unique(std::make_pair(get_uuid(), Node()));
     }
-
-    void set_prim(const bool val)
-    {
-        PCInstMap::get_value(self_i).set_prim(val);
-    }
-
-    const ViewId& get_last_prim() const
-    {
-        return PCInstMap::get_value(self_i).get_last_prim();
-    }
+    
+    ~Proto() { }    
+    
+    const UUID& get_uuid() const { return my_uuid_; }
+    
+    bool get_prim() const { return NodeMap::get_value(self_i_).get_prim(); }
+    
+    void set_prim(const bool val) { NodeMap::get_value(self_i_).set_prim(val); }
+    
+    const ViewId& get_last_prim() const 
+    { return NodeMap::get_value(self_i_).get_last_prim(); }
     
     void set_last_prim(const ViewId& vid)
     {
         gcomm_assert(vid.get_type() == V_PRIM);
-        PCInstMap::get_value(self_i).set_last_prim(vid);
+        NodeMap::get_value(self_i_).set_last_prim(vid);
     }
     
-    uint32_t get_last_seq() const
-    {
-        return PCInstMap::get_value(self_i).get_last_seq();
-    }
+    uint32_t get_last_seq() const 
+    { return NodeMap::get_value(self_i_).get_last_seq(); }
     
     void set_last_seq(const uint32_t seq)
-    {
-        PCInstMap::get_value(self_i).set_last_seq(seq);
-    }
+    { NodeMap::get_value(self_i_).set_last_seq(seq); }
     
     int64_t get_to_seq() const
-    {
-        return PCInstMap::get_value(self_i).get_to_seq();
-    }
+    { return NodeMap::get_value(self_i_).get_to_seq(); }
     
     void set_to_seq(const int64_t seq)
-    {
-        PCInstMap::get_value(self_i).set_to_seq(seq);
-    }
+    { NodeMap::get_value(self_i_).set_to_seq(seq); }
     
-    class SMMap : public Map<const UUID, PCMessage> { };
-
-private:
-
-    SMMap      state_msgs;
-    View       current_view; /*! EVS view */
-    View       pc_view;      /*! PC view */
-    std::list<View> views;
-
-public:
-
-    const View& get_current_view() const
-    {
-        return current_view;
-    }
-
-    PCProto(const UUID& uuid_)
-        :
-        my_uuid       (uuid_),
-        start_prim    (),
-        state         (S_CLOSED),
-        last_sent_seq (0),
-        instances     (),
-        self_i        (),
-        state_msgs    (),
-        current_view  (V_TRANS),
-        pc_view       (V_NON_PRIM),
-        views         ()
-    {
-        self_i = instances.insert_unique(std::make_pair(get_uuid(), PCInst()));
-    }
+    class SMMap : public Map<const UUID, Message> { };
     
-    ~PCProto() {}
-
-//    std::string self_string() const { return get_uuid()._to_string(); }
-    const UUID& self_id() const { return my_uuid; }
+    const View& get_current_view() const { return current_view_; }
     
-    State       get_state()   const { return state; }
-
+    const UUID& self_id() const { return my_uuid_; }
+    
+    State       get_state()   const { return state_; }
+    
     void shift_to    (State);
     void send_state  ();
     void send_install();
@@ -152,22 +115,8 @@ public:
     void handle_first_reg   (const View&);
     void handle_trans       (const View&);
     void handle_reg         (const View&);
-
-private:
-
-    bool requires_rtr() const;
-    bool is_prim() const;
-    void validate_state_msgs() const;
-    void cleanup_instances();
-    void handle_state(const PCMessage&, const UUID&);
-    void handle_install(const PCMessage&, const UUID&);
-    void handle_user(const PCMessage&, const gu::net::Datagram&,
-                     const ProtoUpMeta&);
-    void deliver_view();
-
-public:
-
-    void handle_msg  (const PCMessage&, const gu::net::Datagram&,
+    
+    void handle_msg  (const Message&, const gu::net::Datagram&,
                       const ProtoUpMeta&);
     void handle_up   (int, const gu::net::Datagram&,
                       const ProtoUpMeta&);
@@ -176,15 +125,41 @@ public:
     void connect(bool first) 
     { 
         log_debug << self_id() << " start_prim " << first;
-        start_prim = first; 
+        start_prim_ = first; 
         shift_to(S_JOINING);
     }
     
     void close() { }
     
     void handle_view (const View&);
+private:
+    
+    Proto (const Proto&);
+    Proto& operator=(const Proto&);
+    
+    bool requires_rtr() const;
+    bool is_prim() const;
+    void validate_state_msgs() const;
+    void cleanup_instances();
+    void handle_state(const Message&, const UUID&);
+    void handle_install(const Message&, const UUID&);
+    void handle_user(const Message&, const gu::net::Datagram&,
+                     const ProtoUpMeta&);
+    void deliver_view();
+
+    UUID   const      my_uuid_;       // Node uuid
+    bool              start_prim_;    // Is allowed to start in prim comp
+    State             state_;         // State
+    uint32_t          last_sent_seq_; // Msg seqno of last sent message
+    
+    NodeMap           instances_;     // Map of known node instances
+    NodeMap::iterator self_i_;        // Iterator pointing to self node instance
+    
+    SMMap             state_msgs_;    // Map of received state messages
+    View              current_view_;  // EVS view
+    View              pc_view_;       // PC view
+    std::list<View>   views_;         // List of seen views
 };
 
-} // namespace gcomm
 
 #endif // PC_PROTO_HPP

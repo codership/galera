@@ -11,14 +11,16 @@ namespace gcomm
     {
         class Proto;
     } // namespace gcomm
-    class PCProto;
-    
+    namespace pc
+    {
+        class Proto;
+    }
     
     class PC : public Transport
     {
         GMCast*     gmcast;                           // GMCast transport
         evs::Proto* evs;                // EVS protocol layer
-        PCProto*    pc;                 // PC protocol layer
+        pc::Proto*  pc;                 // PC protocol layer
         gu::datetime::Period leave_grace_period; // Period to wait graceful leave
         
         PC(const PC&);
