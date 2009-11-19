@@ -6,7 +6,8 @@
 
 #include "evs_message2.hpp"
 
-#include <gu_exception.hpp>
+#include "gu_exception.hpp"
+#include "gu_logger.hpp"
 
 using namespace std;
 using namespace std::rel_ops;
