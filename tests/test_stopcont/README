@@ -1,0 +1,14 @@
+The test runs sqlgen load against the cluster and in round robin order makes
+nodes stop and continue. After each transition consistency check is done. This
+facilitates testing crawling nodes.
+
+Usage with gcomm backend:
+
+./run.sh [N]
+
+Usage with vsbes backend:
+
+GCS_TYPE=vsbes VSBES_ADDRESS=192.168.0.1:5678 ./run.sh [N]
+
+where N is the number of stop/cont transitions. I.e. N=1 means that 1 node will
+be killed and restarted. If N is omitted it goes forever.
