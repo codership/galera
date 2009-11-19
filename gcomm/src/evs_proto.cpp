@@ -493,7 +493,10 @@ void gcomm::evs::Proto::check_inactive()
             /* node.get_operational() == true       && */
             node.is_inactive()     == true         )
         {
-            evs_log_debug(D_STATE) << " detected inactive node: " << uuid;
+            if (node.get_operational() == true)
+            {
+                log_info << self_string() << " detected inactive node: " << uuid;
+            }
             node.set_operational(false);
             has_inactive = true;
         }

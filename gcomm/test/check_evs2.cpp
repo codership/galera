@@ -60,7 +60,7 @@ START_TEST(test_message)
     
     UserMessage um(uuid1, view_id, seq, aru_seq, seq_range, O_SAFE, 75433, 0xab,
                    Message::F_SOURCE);
-    
+    fail_unless(um.serial_size() % 4 == 0);
     check_serialization(um, um.serial_size(), UserMessage());
     
     DelegateMessage dm(uuid1, view_id);

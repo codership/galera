@@ -206,6 +206,7 @@ size_t gcomm::evs::UserMessage::serialize(byte_t* const buf,
     gcomm_assert(seq_range <= seqno_t(0xff));
     uint8_t b = static_cast<uint8_t>(seq_range);
     gu_trace(offset = gcomm::serialize(b, buf, buflen, offset));
+    gu_trace(offset = gcomm::serialize(uint16_t(0), buf, buflen, offset));
     gu_trace(offset = gcomm::serialize(seq, buf, buflen, offset));
     gu_trace(offset = gcomm::serialize(aru_seq, buf, buflen, offset));
     
@@ -226,6 +227,12 @@ size_t gcomm::evs::UserMessage::unserialize(const byte_t* const buf,
     uint8_t b;
     gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &b));
     seq_range = b;
+    uint16_t pad;
+    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &pad));
+    if (pad != 0)
+    {
+        log_warn << "invalid pad: " << pad;
+    }
     gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &seq));
     gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &aru_seq));
     
@@ -234,11 +241,12 @@ size_t gcomm::evs::UserMessage::unserialize(const byte_t* const buf,
 
 size_t gcomm::evs::UserMessage::serial_size() const
 {
-    return Message::serial_size() + // Header
-        1 +                         // User type
-        1 +                         // Seq range
-        gcomm::serial_size(seqno_t()) +        // Seq
-        gcomm::serial_size(seqno_t());         // Aru seq
+    return Message::serial_size() +     // Header
+        1 +                             // User type
+        1 +                             // Seq range
+        2 +                             // Pad/reserved
+        gcomm::serial_size(seqno_t()) + // Seq
+        gcomm::serial_size(seqno_t());  // Aru seq
         
 }
 

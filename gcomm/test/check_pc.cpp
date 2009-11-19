@@ -50,22 +50,22 @@ START_TEST(test_pc_messages)
         + 4              // seq
         + 4 + 3*(UUID::serial_size() + sizeof(uint32_t) + 4 + 20 + 8); // NodeMap
     check_serialization(pcs, expt_size, StateMessage());
-                       
+    
     InstallMessage pci;
     pc::NodeMap& iim = pci.get_node_map();
-
+    
     iim.insert(std::make_pair(UUID(0,0), 
                               pc::Node(true, 6, ViewId(V_PRIM,
-                                                     UUID(0, 0), 9), 42)));
+                                                       UUID(0, 0), 9), 42)));
     iim.insert(std::make_pair(UUID(0,0), 
                               pc::Node(false, 88, ViewId(V_NON_PRIM,
-                                                       UUID(0, 0), 3), 472)));
+                                                         UUID(0, 0), 3), 472)));
     iim.insert(std::make_pair(UUID(0,0), 
                               pc::Node(true, 78, ViewId(V_PRIM,
-                                                      UUID(0, 0), 87), 52)));
+                                                        UUID(0, 0), 87), 52)));
     iim.insert(std::make_pair(UUID(0,0), 
                               pc::Node(false, 457, ViewId(V_NON_PRIM,
-                                                        UUID(0, 0), 37), 56)));
+                                                          UUID(0, 0), 37), 56)));
     
     expt_size = 4 // hdr
         + 4              // seq
@@ -76,7 +76,7 @@ START_TEST(test_pc_messages)
     
     expt_size = 4 + 4;
     check_serialization(pcu, expt_size, UserMessage(-1U));
-
+    fail_unless(pcu.serial_size() % 4 == 0);
 }
 END_TEST
 
