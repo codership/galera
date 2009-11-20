@@ -50,13 +50,15 @@ void gcomm::gmcast::Proto::send_msg(const Message& msg)
     gu_trace(serialize(msg, buf));
     int ret = tp->handle_down(gu::net::Datagram(buf), 0);
     
-    if (ret)
+    // @todo: This can happen during congestion, figure out how to 
+    // avoid terminating connection with topology change messages.
+    if (ret != 0)
     {
-            log_debug << "Send failed: " << strerror(ret);
-            set_state(S_FAILED);
+        log_debug << "Send failed: " << strerror(ret);
+        set_state(S_FAILED);
     }
 }
-    
+
 void gcomm::gmcast::Proto::send_handshake() 
 {
     handshake_uuid = UUID(0, 0);
@@ -183,8 +185,9 @@ void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
     
 void gcomm::gmcast::Proto::handle_message(const Message& msg) 
 {
-
-    switch (msg.get_type()) {
+    
+    switch (msg.get_type()) 
+    {
     case Message::T_HANDSHAKE:
         handle_handshake(msg);
         break;

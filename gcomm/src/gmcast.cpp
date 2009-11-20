@@ -639,6 +639,12 @@ void GMCast::handle_up(int id, const Datagram& dg, const ProtoUpMeta& um)
         if (dg.get_len() > 0)
         {
             const Proto::State prev_state(p->get_state());
+            if (prev_state == Proto::S_FAILED)
+            {
+                log_warn << "unhandled failed proto";
+                handle_failed(p);
+                return;
+            }
             Message msg;
             msg.unserialize(&dg.get_payload()[0], dg.get_len(), dg.get_offset());
             if (msg.get_type() >= Message::T_USER_BASE)
