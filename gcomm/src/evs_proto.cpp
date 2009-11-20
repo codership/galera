@@ -16,6 +16,8 @@
 #include "gcomm/conf.hpp"
 #include "gcomm/util.hpp"
 
+#include "defaults.hpp"
+
 #include <stdexcept>
 #include <algorithm>
 #include <numeric>
@@ -36,6 +38,7 @@ using namespace gcomm::evs;
 #define evs_log_info(__mask__)              \
     if ((info_mask & (__mask__)) == 0) { }  \
     else log_info << self_string() << ": "
+
 
 
 gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
@@ -92,68 +95,58 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
 {    
     URI uri(conf);
     
-    // We probably don't want to go under this.
-    const Period min_retrans_period("PT0.1S");
-
     view_forget_timeout =
         conf_param_def_min(uri, 
                            Conf::EvsParamViewForgetTimeout,
-                           Period("PT5M"), 
-                           Period("PT10S"));
+                           Period(Defaults::EvsViewForgetTimeout),
+                           Period(Defaults::EvsViewForgetTimeoutMin));
     inactive_timeout =
         conf_param_def_min(uri,
                            Conf::EvsParamInactiveTimeout,
-                           Period("PT3S"),
-                           Period("PT0.1S"));
+                           Period(Defaults::EvsInactiveTimeout),
+                           Period(Defaults::EvsInactiveTimeoutMin));
     retrans_period =
         conf_param_def_range(uri,
                              Conf::EvsParamRetransPeriod,
-                             Period("PT0.7S"),
-                             min_retrans_period,
+                             Period(Defaults::EvsRetransPeriod),
+                             Period(Defaults::EvsRetransPeriodMin),
                              inactive_timeout/3);
-    
     inactive_check_period = 
         conf_param_def_range(uri, 
                              Conf::EvsParamInactiveCheckPeriod,
                              inactive_timeout/3,
                              inactive_timeout/10,
                              inactive_timeout/2);
-    
-    
-    
     consensus_timeout = 
         conf_param_def_range(uri,
                              Conf::EvsParamConsensusTimeout,
                              inactive_timeout*2,
                              inactive_timeout,
                              inactive_timeout*5);
-    
-    
     join_retrans_period = 
         conf_param_def_range(uri,
                              Conf::EvsParamJoinRetransPeriod,
                              inactive_timeout/5,
-                             min_retrans_period,
+                             Period(Defaults::EvsRetransPeriodMin),
                              inactive_timeout/3);
-
     stats_report_period =
         conf_param_def_min(uri,
                            Conf::EvsParamStatsReportPeriod,
-                           Period("PT5M"),
-                           Period("PT1S"));
-
+                           Period(Defaults::EvsStatsReportPeriod),
+                           Period(Defaults::EvsStatsReportPeriodMin));
+    
     send_window =
         conf_param_def_min(uri,
                            Conf::EvsParamSendWindow,
-                           seqno_t(32),
-                           seqno_t(1));
+                           from_string<seqno_t>(Defaults::EvsSendWindow),
+                           from_string<seqno_t>(Defaults::EvsSendWindowMin));
     user_send_window =
         conf_param_def_range(uri,
                              Conf::EvsParamUserSendWindow,
-                             seqno_t(16),
-                             seqno_t(1),
+                             from_string<seqno_t>(Defaults::EvsUserSendWindow),
+                             from_string<seqno_t>(Defaults::EvsUserSendWindowMin),
                              send_window);
-
+    
     try
     {
         const string& dlm_str(uri.get_option(Conf::EvsParamDebugLogMask));

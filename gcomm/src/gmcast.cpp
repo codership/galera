@@ -78,7 +78,7 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
             } 
             catch (gu::NotSet& )
             {
-                port = Defaults::Port;
+                port = Defaults::GMCastTcpPort;
             }
             initial_addr = resolve(
                 tcp_addr_prefix + uri.get_host() + ":" + port).to_string();
@@ -119,7 +119,7 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
         }
         catch (gu::NotSet&)
         {
-            listen_addr += ':' + Defaults::Port;
+            listen_addr += ':' + Defaults::GMCastTcpPort;
         }
     }
     
