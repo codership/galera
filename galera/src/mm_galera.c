@@ -920,8 +920,11 @@ static enum wsrep_status process_query_write_set(
     GALERA_GRAB_QUEUE (cert_queue, seqno_l);
 
 #ifdef GALERA_WORKAROUND_197
-    galera_update_global_seqno(seqno_g);
     rcode = wsdb_append_write_set(seqno_g, ws);
+    if (gu_unlikely(!galera_update_global_seqno(seqno_g))) {
+        /* Outdated writeset, skip */
+        rcode = WSDB_CERTIFICATION_SKIP;
+    }
 #else
     if (gu_likely(galera_update_global_seqno(seqno_g))) {
         /* Global seqno OK, do certification test */
@@ -1508,7 +1511,7 @@ static enum wsrep_status mm_galera_abort_slave_trx(
         }
     }
     gu_mutex_unlock(&commit_mtx);
-    
+
     return ret_code;
 }
 
@@ -1877,14 +1880,14 @@ static enum wsrep_status mm_galera_pre_commit(
             GU_DBUG_RETURN(WSREP_BF_ABORT);
             break;
         default:
-	    gu_fatal("Failed to grab commit queue for %llu", seqno_l);
-	    abort();
+            gu_fatal("Failed to grab commit queue for %llu", seqno_l);
+            abort();
         }
 
         // we can update last seen trx counter already here
         wsdb_set_local_trx_committed(trx_id);
     } else {
-	/* Cancel commit queue since we are going to rollback */
+        /* Cancel commit queue since we are going to rollback */
         GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
     }
 
