@@ -129,7 +129,7 @@ void gu::net::EPoll::modify(const PollEvent& epe)
 void gu::net::EPoll::poll(const Period& p)
 {
     int timeout(p.get_nsecs() < 0 ? -1 : convert(p.get_nsecs()/MSec, int()));
-
+    
     int ret = epoll_wait(e_fd, &events[0], static_cast<int>(events.size()), 
                          timeout);
     if (ret == -1)
@@ -148,24 +148,27 @@ void gu::net::EPoll::poll(const Period& p)
     }
 }
 
-void gu::net::EPoll::pop_front()
-{
-    if (n_events == 0) gu_throw_fatal << "No events available";
-
-    --n_events;
-    ++current;
-}
-
 bool gu::net::EPoll::empty() const
 {
     return n_events == 0;
 }
 
 gu::net::PollEvent gu::net::EPoll::front() const
+    throw (gu::Exception)
 {
     if (n_events == 0) gu_throw_fatal << "No events available";
 
     return PollEvent(-1,
                      to_network_event_mask(current->events),
                      current->data.ptr);
+}
+
+
+void gu::net::EPoll::pop_front()
+    throw (gu::Exception)
+{
+    if (n_events == 0) gu_throw_fatal << "No events available";
+    
+    --n_events;
+    ++current;
 }
