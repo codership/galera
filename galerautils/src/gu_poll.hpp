@@ -4,7 +4,7 @@
  * $Id$
  */
 
-/*!
+/*! 
  * @file gu_poll.hpp Poll interface definitions
  */
 
@@ -29,11 +29,13 @@ namespace gu
     namespace net
     {
         /*!
+         * @brief Poll event enumeration.
+         * 
          * Poll event enumeration. Note that only E_IN, E_OUT, E_ERROR 
          * and E_CLOSED are usually returned by poll implementation, 
          * other events are extensions that are used elsewhere.
          */
-        enum
+        enum PollEventEnum
         {
             E_IN        = 1 << 0, /*!< Socket is readable                */
             E_OUT       = 1 << 1, /*!< Socket is writable                */
@@ -127,7 +129,7 @@ namespace gu
             /*!
              * Modify existing entry described by event.
              *
-             * @param evs PollEvent
+             * @param ev PollEvent
              */
             virtual void modify(const PollEvent& ev) = 0;
 

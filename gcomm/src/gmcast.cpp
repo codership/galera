@@ -23,7 +23,7 @@ using namespace gu::datetime;
 static void set_tcp_defaults (URI* uri)
 {
     // what happens if there is already this parameter?
-    uri->set_query_param(Conf::TcpParamNonBlocking, gu::to_string(1));
+    uri->set_query_param(Conf::TcpNonBlocking, gu::to_string(1));
 }
 
 
@@ -33,15 +33,13 @@ static bool check_uri(const URI& uri)
 }
 
 
-static const string tcp_addr_prefix = Conf::TcpScheme + "://";
-
 
 GMCast::GMCast(Protonet& net_, const string& uri_)
     :
     Transport     (net_, uri_),
     my_uuid       (0, 0),
     group_name    (),
-    listen_addr   (tcp_addr_prefix + "0.0.0.0"), // how to make it IPv6 safe?
+    listen_addr   (Conf::TcpScheme + "://0.0.0.0"), // how to make it IPv6 safe?
     initial_addr  (""),
     listener      (0),
     pending_addrs (),
@@ -59,7 +57,7 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
     // @todo: technically group name should be in path component
     try
     {
-        group_name = uri.get_option (Conf::GMCastQueryGroup);
+        group_name = uri.get_option (Conf::GMCastGroup);
     }
     catch (gu::NotFound&)
     {
@@ -81,7 +79,7 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
                 port = Defaults::GMCastTcpPort;
             }
             initial_addr = resolve(
-                tcp_addr_prefix + uri.get_host() + ":" + port).to_string();
+                Conf::TcpScheme + "://" + uri.get_host() + ":" + port).to_string();
             if (check_uri(initial_addr) == false)
             {
                 gu_throw_error (EINVAL) << "initial addr '" << initial_addr
@@ -97,11 +95,9 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
                                 << uri.to_string();
     }
     
-
-
     try
     {
-        listen_addr = uri.get_option (Conf::GMCastQueryListenAddr);
+        listen_addr = uri.get_option (Conf::GMCastListenAddr);
     }
     catch (gu::NotFound&) {}
     

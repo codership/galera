@@ -68,7 +68,8 @@ AC_CHECK_LIB([galerautils], [gu_malloc_dbg],,
 
 AC_CONFIG_FILES([Makefile
                 src/Makefile
-                test/Makefile])
+                test/Makefile
+                doc/Makefile])
 
 # C/C++ flags for more strict compile time checking
 # TODO: Find out the most wide set of warning flags  

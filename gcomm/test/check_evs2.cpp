@@ -554,14 +554,14 @@ static DummyNode* create_dummy_node(size_t idx,
                                     const string& inactive_timeout = "PT1H",
                                     const string& retrans_period = "PT20M")
 {
-    string conf = "evs://?" + Conf::EvsParamViewForgetTimeout + "=PT1H&"
-        + Conf::EvsParamInactiveTimeout + "=" + inactive_timeout + "&"
-        + Conf::EvsParamRetransPeriod + "=" + retrans_period + "&"
-        + Conf::EvsParamJoinRetransPeriod + "=" + retrans_period + "&"
-        + Conf::EvsParamInfoLogMask + "=0x3";
+    string conf = "evs://?" + Conf::EvsViewForgetTimeout + "=PT1H&"
+        + Conf::EvsInactiveTimeout + "=" + inactive_timeout + "&"
+        + Conf::EvsKeepalivePeriod + "=" + retrans_period + "&"
+        + Conf::EvsJoinRetransPeriod + "=" + retrans_period + "&"
+        + Conf::EvsInfoLogMask + "=0x3";
     if (::getenv("EVS_DEBUG_MASK") != 0)
     {
-        conf += "&" + Conf::EvsParamDebugLogMask + "=" 
+        conf += "&" + Conf::EvsDebugLogMask + "=" 
             + ::getenv("EVS_DEBUG_MASK");
     }
     list<Protolay*> protos;

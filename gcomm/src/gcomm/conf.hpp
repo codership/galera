@@ -2,102 +2,125 @@
  * Copyright (C) 2009 Codership Oy <info@codership.com>
  */
 
-
-/**
+/*!
+ * @file conf.hpp
+ *
+ * @brief Configurable parameters. 
+ *
  * Strings containing config parameter hierarchy and utility 
  * functions to read param values
  */
-#ifndef _GCOMM_CONF_HPP_
-#define _GCOMM_CONF_HPP_
+
+#ifndef GCOMM_CONF_HPP
+#define GCOMM_CONF_HPP
 
 #include "gu_uri.hpp"
 #include "gu_throw.hpp"
 
 namespace gcomm
 {
-    
-    namespace Conf
+    /*!
+     * Configuration parameter key definitions.
+     */
+    struct Conf
     {
-    
-        static const std::string GCommPrefix   = "";
-        static const std::string SchemeDelim   = "";
-        static const std::string QueryDelim    = "&";
-        static const std::string ParamKeyDelim = ".";
+        /*!
+         * TCP scheme for Transport URI.
+         */
+        static std::string const TcpScheme;
         
-        static const std::string EvsPrefix = "evs";
-        static const std::string EvsScheme = GCommPrefix + SchemeDelim + EvsPrefix;
-        /* Timeout in milliseconds to wait joining */
-        static const std::string EvsQueryJoinWait = EvsPrefix + ParamKeyDelim + "join_wait";
+        /*!
+         *  TCP non-blocking parameter. Allowed values are 0 and 1.
+         */
+        static std::string const TcpNonBlocking;
         
-        static const std::string EvsParamViewForgetTimeout = 
-            EvsPrefix + ParamKeyDelim + "view_forget_timeout";
-        static const std::string EvsParamInactiveTimeout = 
-            EvsPrefix + ParamKeyDelim + "inactive_timeout";
-        static const std::string EvsParamInactiveCheckPeriod = 
-            EvsPrefix + ParamKeyDelim + "inactive_check_period";
-        static const std::string EvsParamConsensusTimeout = 
-            EvsPrefix + ParamKeyDelim + "consensus_timeout";
-        static const std::string EvsParamRetransPeriod = 
-            EvsPrefix + ParamKeyDelim + "retrans_period";
-        static const std::string EvsParamJoinRetransPeriod =
-            EvsPrefix + ParamKeyDelim + "join_retrans_period";
-        static const std::string EvsParamStatsReportPeriod =
-            EvsPrefix + ParamKeyDelim + "stats_report_period";
-        static const std::string EvsParamDebugLogMask = 
-            EvsPrefix + ParamKeyDelim + "debug_log_mask";
-        static const std::string EvsParamInfoLogMask =
-            EvsPrefix + ParamKeyDelim + "info_log_mask";
-        static const std::string EvsParamSendWindow =
-            EvsPrefix + ParamKeyDelim + "send_window";
-        static const std::string EvsParamUserSendWindow =
-            EvsPrefix + ParamKeyDelim + "user_send_window";
+        /*!
+         * GMCast scheme for Transport URI.
+         */
+        static std::string const GMCastScheme;
         
+        /*!
+         * GMCast group parameter. String up to 16 characters.
+         */
+        static std::string const GMCastGroup;
+        
+        /*!
+         * GMCast listening address in URI string format.
+         */
+        static std::string const GMCastListenAddr;
+        
+        /*!
+         * EVS scheme for Transport URI.
+         */
+        static std::string const EvsScheme;
+        
+        /*!
+         * Timeout that controls how long information about
+         * seen views is held. 
+         */
+        static std::string const EvsViewForgetTimeout;
+        
+        /*!
+         * Timeout that controls how long node is allowed to
+         * be silent without being declared as inactive.
+         */
+        static std::string const EvsInactiveTimeout;
 
-        static const std::string VsPrefix = "vs";
-        static const std::string VsScheme = GCommPrefix + SchemeDelim + VsPrefix;
-        
-        static const std::string PcPrefix = "pc";
-        static const std::string PcScheme = GCommPrefix + SchemeDelim + PcPrefix;
-        
-        /* 
-         * Transport parameters 
+        /*!
+         * Period that controls how often node inactivity is checked.
          */
+        static std::string const EvsInactiveCheckPeriod;
         
-        /* 
-         * TCP 
+        /*!
+         * Timeout after forming a new group is declared unsuccessful.
          */
+        static std::string const EvsConsensusTimeout;
+
+        /*!
+         * Timeout that controls how often keepalive messages are sent.
+         */
+        static std::string const EvsKeepalivePeriod;
+
+        /*!
+         * Parameter that controls how often join messages are sent.
+         */
+        static std::string const EvsJoinRetransPeriod;
+
+        /*!
+         * Parameter that controls how often statistics are reported.
+         */
+        static std::string const EvsStatsReportPeriod;
+
+        /*!
+         * Debug logging mask. Set to "0xff" to get all debug messages.
+         */
+        static std::string const EvsDebugLogMask;
+
+        /*!
+         * Info logging mask. Set to "0xff" to get all info messages.
+         */
+        static std::string const EvsInfoLogMask;
+
+        /*!
+         * This parameter controls how many messages protocol layer is 
+         * allowed to send without getting all acknowledgements for any of them.
+         */
+        static std::string const EvsSendWindow;
+
+        /*! 
+         * Like EvsSendWindow, but for messages for which sending is initiated
+         * by call from upper layer.
+         */
+        static std::string const EvsUserSendWindow;
         
-        /* Prefix */
-        static const std::string TcpPrefix = "tcp";
-        /* Scheme */
-        static const std::string TcpScheme = GCommPrefix + SchemeDelim + TcpPrefix;
-        /* Parameter denoting asynchronous/non-blocking mode */
-        static const std::string TcpParamNonBlocking =
-            "socket" + ParamKeyDelim + "non_blocking";
-        static const std::string TcpParamMaxPending =
-            "socket" + ParamKeyDelim + "max_pending";
-        
-        /* */
-        static const std::string TipcPrefix = "tipc";
-        static const std::string TipcScheme = GCommPrefix + SchemeDelim + TipcPrefix;
-        
-        static const std::string GMCastPrefix = "gmcast";
-        static const std::string GMCastScheme = GCommPrefix + SchemeDelim + GMCastPrefix;
-        
-        // static const std::string GMCastQueryNode =
-        //    GMCastPrefix + ParamKeyDelim + "node";
-        static const std::string GMCastQueryGroup =
-            GMCastPrefix + ParamKeyDelim + "group";
-        static const std::string GMCastQueryListenAddr =
-            GMCastPrefix + ParamKeyDelim + "listen_addr";
-        
-        static const std::string NodePrefix    = "node";
-        static const std::string NodeQueryName = NodePrefix + ParamKeyDelim + "name";
-        
-        static const std::string DummyPrefix = "dummy";
-        static const std::string DummyScheme = GCommPrefix + SchemeDelim + DummyPrefix;
-        
-    } // namespace Conf
+        /*!
+         * PC scheme for Transport URI.
+         */
+        static std::string const PcScheme;
+    };
+
+
+    // Helper templates to read configuration parameters.
     
     
     template <typename T> T _conf_param(const gu::URI& uri, 
@@ -138,7 +161,7 @@ namespace gcomm
         }
         return ret;
     }
-
+    
     template <typename T> T conf_param(const gu::URI& uri,
                                        const std::string& param)
     {
@@ -173,7 +196,7 @@ namespace gcomm
                                                const std::string& param,
                                                const T& default_value,
                                                const T& max_value)
-
+        
     {
         return _conf_param(uri, param, &default_value, 0, &max_value);
     }
@@ -189,4 +212,4 @@ namespace gcomm
     
 } // namespace gcomm
 
-#endif // _GCOMM_CONF_HPP_
+#endif // GCOMM_CONF_HPP

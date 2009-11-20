@@ -1,6 +1,6 @@
 // Copyright (C) 2009 Codership Oy <info@codership.com>
 
-/*!
+/*! 
  * @file gu_network.hpp Network API
  *
  * These classes provide simple API for datagram oriented network 

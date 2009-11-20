@@ -2,6 +2,7 @@
 lib_LTLIBRARIES = libgcomm.la 
 
 libgcomm_la_SOURCES = 		\
+	conf.cpp		\
 	defaults.cpp            \
 	histogram.cpp		\
 	uuid.cpp		\

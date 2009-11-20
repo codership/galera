@@ -3,11 +3,17 @@
  */
 
 /*!
- * @file Base class for all gcomm protocol layers
+ * @file protolay.hpp
+ *
+ * @brief Protocol layer interface definitions.
+ *
+ * Protocol layer interface allows construction of protocol stacks 
+ * with consistent interface to send messages upwards or downwards in
+ * stack.
  */
 
-#ifndef _GCOMM_PROTOLAY_HPP_
-#define _GCOMM_PROTOLAY_HPP_
+#ifndef GCOMM_PROTOLAY_HPP
+#define GCOMM_PROTOLAY_HPP
 
 #include "gcomm/view.hpp"
 #include "gcomm/exception.hpp"
@@ -21,6 +27,8 @@
 #include <list>
 #include <utility>
 
+
+// Forward declarations
 namespace gu
 {
     namespace net
@@ -29,15 +37,46 @@ namespace gu
     }
 }
 
+
+// Declarations
 namespace gcomm
 {
+    /*!
+     * @class ProtoUpMeta
+     *
+     * Container for metadata passed upwards in protocol stack.
+     */
     class ProtoUpMeta;
     std::ostream& operator<<(std::ostream&, const ProtoUpMeta&);
+    
+    /*!
+     * @class ProtoDownMeta
+     *
+     * Container for metadata passed downwards in protocol stack.
+     */
     class ProtoDownMeta;
-    class Protolay;
-    class Toplay;
-    class Bottomlay;
 
+    /*!
+     * @class Protolay
+     *
+     * Protocol layer interface.
+     */
+    class Protolay;
+
+    /*!
+     * @class Toplay
+     *
+     * Protolay that is on the top of the protocol stack.
+     */
+    class Toplay;
+
+    /*!
+     * @class Bottomlay
+     *
+     * Protolay that is on the bottom of the protocol stack.
+     */
+    class Bottomlay;
+    
     void connect(Protolay*, Protolay*, int);
     void disconnect(Protolay*, Protolay*, int);
 }
@@ -298,4 +337,4 @@ inline void gcomm::disconnect(Protolay* down, Protolay* up, int id = -1)
 }
 
 
-#endif /* _GCOMM_PROTOLAY_HPP_ */
+#endif /* GCOMM_PROTOLAY_HPP */

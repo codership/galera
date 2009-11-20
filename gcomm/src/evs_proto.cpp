@@ -97,65 +97,65 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     
     view_forget_timeout =
         conf_param_def_min(uri, 
-                           Conf::EvsParamViewForgetTimeout,
+                           Conf::EvsViewForgetTimeout,
                            Period(Defaults::EvsViewForgetTimeout),
                            Period(Defaults::EvsViewForgetTimeoutMin));
     inactive_timeout =
         conf_param_def_min(uri,
-                           Conf::EvsParamInactiveTimeout,
+                           Conf::EvsInactiveTimeout,
                            Period(Defaults::EvsInactiveTimeout),
                            Period(Defaults::EvsInactiveTimeoutMin));
     retrans_period =
         conf_param_def_range(uri,
-                             Conf::EvsParamRetransPeriod,
+                             Conf::EvsKeepalivePeriod,
                              Period(Defaults::EvsRetransPeriod),
                              Period(Defaults::EvsRetransPeriodMin),
                              inactive_timeout/3);
     inactive_check_period = 
         conf_param_def_range(uri, 
-                             Conf::EvsParamInactiveCheckPeriod,
+                             Conf::EvsInactiveCheckPeriod,
                              inactive_timeout/3,
                              inactive_timeout/10,
                              inactive_timeout/2);
     consensus_timeout = 
         conf_param_def_range(uri,
-                             Conf::EvsParamConsensusTimeout,
+                             Conf::EvsConsensusTimeout,
                              inactive_timeout*2,
                              inactive_timeout,
                              inactive_timeout*5);
     join_retrans_period = 
         conf_param_def_range(uri,
-                             Conf::EvsParamJoinRetransPeriod,
+                             Conf::EvsJoinRetransPeriod,
                              inactive_timeout/5,
                              Period(Defaults::EvsRetransPeriodMin),
                              inactive_timeout/3);
     stats_report_period =
         conf_param_def_min(uri,
-                           Conf::EvsParamStatsReportPeriod,
+                           Conf::EvsStatsReportPeriod,
                            Period(Defaults::EvsStatsReportPeriod),
                            Period(Defaults::EvsStatsReportPeriodMin));
     
     send_window =
         conf_param_def_min(uri,
-                           Conf::EvsParamSendWindow,
+                           Conf::EvsSendWindow,
                            from_string<seqno_t>(Defaults::EvsSendWindow),
                            from_string<seqno_t>(Defaults::EvsSendWindowMin));
     user_send_window =
         conf_param_def_range(uri,
-                             Conf::EvsParamUserSendWindow,
+                             Conf::EvsUserSendWindow,
                              from_string<seqno_t>(Defaults::EvsUserSendWindow),
                              from_string<seqno_t>(Defaults::EvsUserSendWindowMin),
                              send_window);
     
     try
     {
-        const string& dlm_str(uri.get_option(Conf::EvsParamDebugLogMask));
+        const string& dlm_str(uri.get_option(Conf::EvsDebugLogMask));
         debug_mask = gu::from_string<int>(dlm_str, hex);
     } catch (NotFound&) { }
     
     try
     {
-        const string& ilm_str(uri.get_option(Conf::EvsParamInfoLogMask));
+        const string& ilm_str(uri.get_option(Conf::EvsInfoLogMask));
         info_mask = gu::from_string<int>(ilm_str, hex);
     } catch (NotFound&) { }
 

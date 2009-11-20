@@ -2,6 +2,13 @@
  * Copyright (C) 2009 Codership Oy <info@codership.com>
  */
 
+/*!
+ * @file map.hpp
+ *
+ * This file contains templates that are thin wrappers for std::map 
+ * and std::multimap with some extra functionality. 
+ */
+
 #ifndef GCOMM_MAP_HPP
 #define GCOMM_MAP_HPP
 
