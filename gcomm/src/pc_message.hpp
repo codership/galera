@@ -10,6 +10,7 @@
 #include "gcomm/uuid.hpp"
 #include "gcomm/map.hpp"
 
+#include <limits>
 
 namespace gcomm
 {
@@ -34,9 +35,9 @@ public:
     enum Flags { F_PRIM = 0x1 };
     
     Node(const bool     prim      = false,
-           const uint32_t last_seq  = -1,
-           const ViewId&  last_prim = ViewId(V_NON_PRIM), 
-           const int64_t  to_seq    = -1) 
+         const uint32_t last_seq  = std::numeric_limits<uint32_t>::max(),
+         const ViewId&  last_prim = ViewId(V_NON_PRIM), 
+         const int64_t  to_seq    = -1) 
         :
         prim_      (prim     ),
         last_seq_  (last_seq ),
