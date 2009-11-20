@@ -17,13 +17,15 @@
 
 using namespace std;
 
+
+// Map from scheme string to addrinfo
 class SchemeMap
 {
 public:
 
     typedef map<string, addrinfo> Map;
     typedef Map::const_iterator const_iterator;
-
+    
     SchemeMap() : ai_map()
     {
         
@@ -33,26 +35,26 @@ public:
                                 get_addrinfo(0, AF_UNSPEC, SOCK_DGRAM,  0)));
         // TODO:
     }
-
+    
     const_iterator find(const string& key) const
     {
         return ai_map.find(key);
     }
-
+    
     const_iterator end() const
     {
         return ai_map.end();
     }
-
+    
     static const addrinfo* get_addrinfo(const_iterator i)
     {
         return &i->second;
     }
-
+    
 private:
-
+    
     Map ai_map;
-
+    
     struct addrinfo get_addrinfo(int flags, int family, int socktype,
                                  int protocol)
     {
@@ -72,14 +74,16 @@ private:
 
 static SchemeMap scheme_map;
 
-void copy(const addrinfo& from, addrinfo& to)
+
+// Helper to copy addrinfo structs.
+static void copy(const addrinfo& from, addrinfo& to)
 {
     to.ai_flags = from.ai_flags;
     to.ai_family = from.ai_family;
     to.ai_socktype = from.ai_socktype;
     to.ai_protocol = from.ai_protocol;
     to.ai_addrlen = from.ai_addrlen;
-
+    
     if (from.ai_addr != 0)
     {
         if ((to.ai_addr =
@@ -89,69 +93,89 @@ void copy(const addrinfo& from, addrinfo& to)
                 << "out of memory while trying to allocate " 
                 << to.ai_addrlen << " bytes";
         }
-
+        
         memcpy(to.ai_addr, from.ai_addr, to.ai_addrlen);
     }
-
+    
     to.ai_canonname = 0;
     to.ai_next = 0;
 }
 
-gu::net::Sockaddr::Sockaddr(const sockaddr* sa_, socklen_t sa_len_) :
-    sa(0),
-    sa_len(sa_len_)
-{
 
-    if ((sa = reinterpret_cast<sockaddr*>(malloc(sa_len))) == 0)
+
+/////////////////////////////////////////////////////////////////////////
+//                     Sockaddr implementation
+/////////////////////////////////////////////////////////////////////////
+
+
+gu::net::Sockaddr::Sockaddr(const sockaddr* sa, socklen_t sa_len) :
+    sa_    (0     ),
+    sa_len_(sa_len)
+{
+    
+    if ((sa_ = reinterpret_cast<sockaddr*>(malloc(sa_len_))) == 0)
     {
         gu_throw_fatal;
     }
-    memcpy(sa, sa_, sa_len);
+    memcpy(sa_, sa, sa_len_);
 }
+
 
 gu::net::Sockaddr::Sockaddr(const Sockaddr& s) :
-    sa(0),
-    sa_len(s.sa_len)
+    sa_    (0        ),
+    sa_len_(s.sa_len_)
 {
-    if ((sa = reinterpret_cast<sockaddr*>(malloc(sa_len))) == 0)
+    if ((sa_ = reinterpret_cast<sockaddr*>(malloc(sa_len_))) == 0)
     {
         gu_throw_fatal;
     }
-    memcpy(sa, s.sa, sa_len);
+    memcpy(sa_, s.sa_, sa_len_);
 }
+
 
 gu::net::Sockaddr::~Sockaddr()
 {
-    free(sa);
+    free(sa_);
 }
 
-gu::net::Addrinfo::Addrinfo(const addrinfo& a) :
-    ai()
+
+
+/////////////////////////////////////////////////////////////////////////
+//                     Addrinfo implementation
+/////////////////////////////////////////////////////////////////////////
+
+
+gu::net::Addrinfo::Addrinfo(const addrinfo& ai) :
+    ai_()
 {
-    copy(a, ai);
+    copy(ai, ai_);
 }
 
-gu::net::Addrinfo::Addrinfo(const Addrinfo& a) :
-    ai()
+
+gu::net::Addrinfo::Addrinfo(const Addrinfo& ai) :
+    ai_()
 { 
-    copy(a.ai, ai);
+    copy(ai.ai_, ai_);
 }
 
-gu::net::Addrinfo::Addrinfo(const Addrinfo& a, const Sockaddr& s) :
-    ai()
+
+gu::net::Addrinfo::Addrinfo(const Addrinfo& ai, const Sockaddr& sa) :
+    ai_()
 {
-    if (a.get_addrlen() != s.get_sockaddr_len())
+    if (ai.get_addrlen() != sa.get_sockaddr_len())
     {
         gu_throw_fatal;
     }
-    copy(a.ai, ai);
-    memcpy(ai.ai_addr, &s.get_sockaddr(), a.ai.ai_addrlen);
+    copy(ai.ai_, ai_);
+    memcpy(ai_.ai_addr, &sa.get_sockaddr(), ai_.ai_addrlen);
 }
+
 
 gu::net::Addrinfo::~Addrinfo()
 {
-    free(ai.ai_addr);
+    free(ai_.ai_addr);
 }
+
 
 string gu::net::Addrinfo::to_string() const
 {
@@ -159,10 +183,10 @@ string gu::net::Addrinfo::to_string() const
                                             INET6_ADDRSTRLEN + 2 /* [] */ +
                                             6 /* :portt */);
     string ret;
-
+    
     ret.reserve(max_addr_str_len);
-
-    Sockaddr addr(ai.ai_addr, ai.ai_addrlen);
+    
+    Sockaddr addr(ai_.ai_addr, ai_.ai_addrlen);
 
     switch (get_socktype())
     {
@@ -175,7 +199,7 @@ string gu::net::Addrinfo::to_string() const
     default:
         gu_throw_error(EINVAL) << "invalid socktype: " << get_socktype();
     }
-
+    
     char dst[INET6_ADDRSTRLEN + 1];
 
     if (inet_ntop(get_family(), addr.get_addr(), 
@@ -183,7 +207,7 @@ string gu::net::Addrinfo::to_string() const
     {
         gu_throw_error(errno) << "inet ntop failed";
     }
-
+    
     switch (get_family())
     {
     case AF_INET:
@@ -197,11 +221,19 @@ string gu::net::Addrinfo::to_string() const
     default:
         gu_throw_error(EINVAL) << "invalid address family: " << get_family();
     }
-
+    
     ret += ":" + gu::to_string(ntohs(addr.get_port()));
     ret.reserve(0); // free unused space if possible
     return ret;
 }
+
+
+
+
+/////////////////////////////////////////////////////////////////////////
+//                       Public methods
+/////////////////////////////////////////////////////////////////////////
+
 
 gu::net::Addrinfo gu::net::resolve(const URI& uri)
 {
