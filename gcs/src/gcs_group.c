@@ -217,8 +217,6 @@ group_post_state_exchange (gcs_group_t* group)
             }
 
             group->prim_uuid  = group->state_uuid;
-            group->prim_seqno = group->conf_id;
-            group->prim_num   = group->num;
             group->prim_state = group->nodes[group->my_idx].status;
 
             group->state_uuid = GU_UUID_NIL;
@@ -227,9 +225,10 @@ group_post_state_exchange (gcs_group_t* group)
             // no state exchange happend, processing old state messages
             assert (GCS_GROUP_PRIMARY == group->state);
             group->conf_id++;
-            group->prim_seqno = group->conf_id;
-            group->prim_num   = group->num;
         }
+
+        group->prim_seqno = group->conf_id;
+        group->prim_num   = group->num;
     }
     else {
         // non-primary configuration
@@ -244,7 +243,7 @@ group_post_state_exchange (gcs_group_t* group)
               "\n\tprotocol   = %hd,"
               "\n\tgroup UUID = "GU_UUID_FORMAT,
               quorum.primary ? "PRIMARY" : "NON-PRIMARY",
-              group->act_id, group->conf_id, group->last_applied, group->proto,
+              quorum.act_id, quorum.conf_id, group->last_applied, quorum.proto,
               GU_UUID_ARGS(&quorum.group_uuid));
 }
 
@@ -320,8 +319,11 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                 assert (1 == group->num);
                 assert (0 == group->my_idx);
 
-                group->conf_id = 0; // this bootstraps configuration ID
-                group->state   = GCS_GROUP_PRIMARY;
+                // This bootstraps initial primary component for state exchange
+                gu_uuid_generate (&group->prim_uuid, NULL, 0);
+                group->prim_seqno = 0;
+                group->prim_num   = 1;
+                group->state      = GCS_GROUP_PRIMARY;
 
                 if (group->act_id < 0) {
                     // no history provided: start a new one
