@@ -21,9 +21,11 @@
 #include "gcs_core.h"
 #include "gcs_fifo_lite.h"
 
-const long GCS_MAX_REPL_THREADS = 16384;
+static const long GCS_MAX_REPL_THREADS = 16384;
 
-const long base_queue_limit = 4;
+// Flow control parameters
+static const long   fc_base_queue_limit = 16;
+static const double fc_resume_factor    = 0.5;
 
 typedef enum
 {
@@ -399,7 +401,7 @@ gcs_become_synced (gcs_conn_t* conn)
     if (GCS_CONN_JOINED == conn->state) {
         conn->state = GCS_CONN_SYNCED;
     }
-    else if (conn->state < GCS_CONN_OPEN && conn->state > GCS_CONN_SYNCED) {
+    else if (conn->state <= GCS_CONN_OPEN && conn->state > GCS_CONN_SYNCED) {
         gu_warn ("Received SYNC action in wrong state %s",
                  gcs_conn_state_string[conn->state]);
         // assert (0); may happen 
@@ -430,6 +432,18 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         return;
     }
 
+    if (conf->memb_num < 1) {
+        gu_fatal ("Internal error: PRIM configuration with %d nodes",
+                  conf->memb_num);
+        abort();
+    }
+
+    if (conf->my_idx < 0 || conf->my_idx >= conf->memb_num) {
+        gu_fatal ("Internal error: index of this node (%d) is out of bounds: "
+                  "[%d, %d]", conf->my_idx, 0, conf->memb_num - 1);
+        abort();
+    }
+
     if (conf->st_required) {
         gcs_become_open (conn);
     }
@@ -450,12 +464,15 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         conn->conf_id     = conf->conf_id;
         conn->stop_sent   = 0;
         conn->stop_count  = 0;
-        conn->lower_limit = base_queue_limit * sqrt(conf->memb_num);
-        conn->upper_limit = 2 * conn->lower_limit;
+        conn->upper_limit = fc_base_queue_limit * sqrt(conf->memb_num - 1) + .5;
+        conn->lower_limit = conn->upper_limit * fc_resume_factor + .5;
 
         gu_mutex_unlock (&conn->fc_lock);
     }
     gu_fifo_release (conn->recv_q);
+
+    gu_info ("Flow-control interval: [%ld, %ld]",
+             conn->lower_limit, conn->upper_limit);
 
     /* One of the cases when the node can become SYNCED */
     if (GCS_CONN_JOINED == conn->state && (ret = gcs_send_sync (conn))) {
