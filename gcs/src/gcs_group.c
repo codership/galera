@@ -40,6 +40,12 @@ gcs_group_init (gcs_group_t* group, const char* node_name, const char* inc_addr)
     gcs_node_init (&group->nodes[group->my_idx], NODE_NO_ID,
                    group->my_name, group->my_address);
 
+    group->prim_uuid  = GU_UUID_NIL;
+    group->prim_seqno = GCS_SEQNO_ILL;
+    group->prim_num   = 0;
+    group->prim_state = GCS_STATE_NON_PRIM;
+    group->prim_rep   = false;
+
     return 0;
 }
 
@@ -156,11 +162,16 @@ group_redo_last_applied (gcs_group_t* group)
 static void
 group_go_non_primary (gcs_group_t* group)
 {
+    if (GCS_GROUP_PRIMARY == group->state) {
+        group->prim_rep   = (group->my_idx == 0);
+        group->prim_state = group->nodes[group->my_idx].status;
+        group->nodes[group->my_idx].status = GCS_STATE_NON_PRIM;
+        //@todo: Perhaps the same has to be applied to the rest of the nodes[]?
+    }
+
     group->state   = GCS_GROUP_NON_PRIMARY;
     group->conf_id = GCS_SEQNO_ILL;
     // what else? Do we want to change anything about the node here?
-    // Probably we should keep old node status until next configuration
-    // change.
 }
 
 /*! Processes state messages and sets group parameters accordingly */
@@ -178,7 +189,7 @@ group_post_state_exchange (gcs_group_t* group)
      * include messages from the disappeared nodes.
      * Let's put it this way: looping here is reliable and not that expensive.*/
     for (i = 0; i < group->num; i++) {
-        states[i] = group->nodes[i].state;
+        states[i] = group->nodes[i].state_msg;
         if (NULL == states[i] ||
             (new_exchange &&
              gu_uuid_compare (&group->state_uuid, gcs_state_uuid(states[i]))))
@@ -198,18 +209,26 @@ group_post_state_exchange (gcs_group_t* group)
             group->act_id     = quorum.act_id;
             group->conf_id    = quorum.conf_id + 1;
             group->group_uuid = quorum.group_uuid;
-            group->state_uuid = GU_UUID_NIL;
 
             // Update each node state based on quorum outcome:
             // is it up to date, does it need SST and stuff
             for (i = 0; i < group->num; i++) {
                 gcs_node_update_status (&group->nodes[i], &quorum);
             }
+
+            group->prim_uuid  = group->state_uuid;
+            group->prim_seqno = group->conf_id;
+            group->prim_num   = group->num;
+            group->prim_state = group->nodes[group->my_idx].status;
+
+            group->state_uuid = GU_UUID_NIL;
         }
         else {
             // no state exchange happend, processing old state messages
             assert (GCS_GROUP_PRIMARY == group->state);
             group->conf_id++;
+            group->prim_seqno = group->conf_id;
+            group->prim_num   = group->num;
         }
     }
     else {
@@ -816,16 +835,24 @@ gcs_group_get_state (gcs_group_t* group)
 {
     const gcs_node_t* my_node = &group->nodes[group->my_idx];
 
+    uint8_t flags = 0;
+
+    if (group->prim_rep) flags |= GCS_STATE_FREP;
+
     return gcs_state_create (
         &group->state_uuid,
         &group->group_uuid,
+        &group->prim_uuid,
+        group->prim_num,
+        group->prim_seqno,
         group->act_id,
-        group->conf_id,
+        group->prim_state,
         my_node->status,
         my_node->name,
         my_node->inc_addr,
         my_node->proto_min,
-        my_node->proto_max
+        my_node->proto_max,
+        flags
         );
 }
 

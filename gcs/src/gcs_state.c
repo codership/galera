@@ -17,13 +17,17 @@
 gcs_state_t*
 gcs_state_create (const gu_uuid_t* state_uuid,
                   const gu_uuid_t* group_uuid,
-                  gcs_seqno_t      act_id,
-                  gcs_seqno_t      conf_id,
-                  gcs_state_node_t status,
+                  const gu_uuid_t* prim_uuid,
+                  long             prim_joined,
+                  gcs_seqno_t      prim_seqno,
+                  gcs_seqno_t      act_seqno,
+                  gcs_state_node_t prim_state,
+                  gcs_state_node_t current_state,
                   const char*      name,
                   const char*      inc_addr,
                   gcs_proto_t      proto_min,
-                  gcs_proto_t      proto_max)
+                  gcs_proto_t      proto_max,
+                  uint8_t          flags)
 {
     size_t name_len  = strlen(name) + 1;
     size_t addr_len  = strlen(inc_addr) + 1;
@@ -31,15 +35,19 @@ gcs_state_create (const gu_uuid_t* state_uuid,
         gu_calloc (1, sizeof (gcs_state_t) + name_len + addr_len);
 
     if (ret) {
-        ret->state_uuid = *state_uuid;
-        ret->group_uuid = *group_uuid;
-        ret->act_id     = act_id;
-        ret->conf_id    = conf_id;
-        ret->status     = status;
-        ret->proto_min  = proto_min;
-        ret->proto_max  = proto_max;
-        ret->name       = (void*)(ret) + sizeof (gcs_state_t);
-        ret->inc_addr   = ret->name + name_len;
+        ret->state_uuid    = *state_uuid;
+        ret->group_uuid    = *group_uuid;
+        ret->prim_uuid     = *prim_uuid;
+        ret->prim_joined   = prim_joined;
+        ret->prim_seqno    = prim_seqno;
+        ret->act_seqno     = act_seqno;
+        ret->prim_state    = prim_state;
+        ret->current_state = current_state;
+        ret->proto_min     = proto_min;
+        ret->proto_max     = proto_max;
+        ret->name          = (void*)(ret) + sizeof (gcs_state_t);
+        ret->inc_addr      = ret->name + name_len;
+        ret->flags         = flags;
 
         // tmp is a workaround for some combination of GCC flags which don't
         // allow passing ret->name and ret->inc_addr directly even with casting
@@ -63,29 +71,37 @@ size_t
 gcs_state_msg_len (gcs_state_t* state)
 {
     return (
-        sizeof (uint8_t)     +   // version (reserved)
-        sizeof (uint8_t)     +   // proto_min
-        sizeof (uint8_t)     +   // proto_max
-        sizeof (uint8_t)     +   // node status
-        sizeof (gu_uuid_t)   +   // state exchange UUID
-        sizeof (gu_uuid_t)   +   // group UUID
-        sizeof (gcs_seqno_t) +   // act_id
-        sizeof (gcs_seqno_t) +   // conf_id
+        sizeof (int8_t)      +   // version (reserved)
+        sizeof (int8_t)      +   // flags
+        sizeof (int8_t)      +   // proto_min
+        sizeof (int8_t)      +   // proto_max
+        sizeof (int8_t)      +   // prim_state
+        sizeof (int8_t)      +   // curr_state
+        sizeof (int16_t)     +   // prim_joined
+        sizeof (gu_uuid_t)   +   // state_uuid
+        sizeof (gu_uuid_t)   +   // group_uuid
+        sizeof (gu_uuid_t)   +   // conf_uuid
+        sizeof (int64_t)     +   // act_seqno
+        sizeof (int64_t)     +   // prim_seqno
         strlen (state->name) + 1 +
         strlen (state->inc_addr) + 1
         );
 }
 
-#define STATE_MSG_FIELDS_V0(_const,buf)                         \
-    _const uint8_t*   version    = (buf);                       \
-    _const uint8_t*   proto_min  = version   + 1;               \
-    _const uint8_t*   proto_max  = proto_min + 1;               \
-    _const uint8_t*   status     = proto_max + 1;               \
-    _const gu_uuid_t* state_uuid = (gu_uuid_t*)(status + 1);    \
-    _const gu_uuid_t* group_uuid = state_uuid + 1;              \
-    _const uint64_t*  act_id     = (uint64_t*)(group_uuid + 1); \
-    _const uint64_t*  conf_id    = act_id + 1;                  \
-    _const char*      name       = (char*)(conf_id + 1);
+#define STATE_MSG_FIELDS_V0(_const,buf)                            \
+    _const int8_t*    version     = (buf);                         \
+    _const int8_t*    flags       = version    + 1;                \
+    _const int8_t*    proto_min   = flags      + 1;                \
+    _const int8_t*    proto_max   = proto_min  + 1;                \
+    _const int8_t*    prim_state  = proto_max  + 1;                \
+    _const int8_t*    curr_state  = prim_state + 1;                \
+    _const int16_t*   prim_joined = (int16_t*)(curr_state + 1);    \
+    _const gu_uuid_t* state_uuid  = (gu_uuid_t*)(prim_joined + 1); \
+    _const gu_uuid_t* group_uuid  = state_uuid + 1;                \
+    _const gu_uuid_t* prim_uuid   = group_uuid + 1;                \
+    _const int64_t*   act_seqno   = (int64_t*)(prim_uuid + 1);     \
+    _const int64_t*   prim_seqno  = act_seqno + 1;                 \
+    _const char*      name        = (char*)(prim_seqno + 1);
 
 /* Serialize gcs_state_msg_t into buf */
 ssize_t
@@ -94,14 +110,18 @@ gcs_state_msg_write (void* buf, const gcs_state_t* state)
     STATE_MSG_FIELDS_V0(,buf);
     char*     inc_addr  = name + strlen (state->name) + 1;
 
-    *version    = 0;
-    *proto_min  = state->proto_min;
-    *proto_max  = state->proto_max;
-    *status     = state->status;
-    *state_uuid = state->state_uuid;
-    *group_uuid = state->group_uuid;
-    *act_id     = gu_le64(state->act_id);
-    *conf_id    = gu_le64(state->conf_id);
+    *version     = 0;
+    *flags       = state->flags;
+    *proto_min   = state->proto_min;
+    *proto_max   = state->proto_max;
+    *prim_state  = state->prim_state;
+    *curr_state  = state->current_state;
+    *prim_joined = gu_le16(((int16_t)state->prim_joined));
+    *state_uuid  = state->state_uuid;
+    *group_uuid  = state->group_uuid;
+    *prim_uuid   = state->prim_uuid;
+    *act_seqno   = gu_le64(state->act_seqno);
+    *prim_seqno  = gu_le64(state->prim_seqno);
     strcpy (name,     state->name);
     strcpy (inc_addr, state->inc_addr);
 
@@ -122,13 +142,17 @@ gcs_state_msg_read (const void* buf, size_t buf_len)
         return gcs_state_create (
             state_uuid,
             group_uuid,
-            gu_le64(*act_id),
-            gu_le64(*conf_id),
-            *status,
+            prim_uuid,
+            gu_le16(*prim_joined),
+            gu_le64(*prim_seqno),
+            gu_le64(*act_seqno),
+            *prim_state,
+            *curr_state,
             name,
             inc_addr,
             *proto_min,
-            *proto_max
+            *proto_max,
+            *flags
             );
     }
     default:
@@ -153,17 +177,26 @@ gcs_state_snprintf (char* str, size_t size, const gcs_state_t* state)
 {
     str[size - 1] = '\0'; // preventive termination
     return snprintf (str, size - 1,
+                     "\n\tFlags        : %u"
                      "\n\tProtocols    : %u - %u"
-                     "\n\tStatus       : %s"
+                     "\n\tState        : %s"
+                     "\n\tPrim state   : %s"
+                     "\n\tPrim UUID    : "GU_UUID_FORMAT
+                     "\n\tPrim JOINED  : %ld"
+                     "\n\tPrim seqno   : %lld"
                      "\n\tGlobal seqno : %lld"
-                     "\n\tConfiguration: %lld"
                      "\n\tState UUID   : "GU_UUID_FORMAT
                      "\n\tGroup UUID   : "GU_UUID_FORMAT
                      "\n\tName         : '%s'"
                      "\n\tIncoming addr: '%s'\n",
+                     state->flags,
                      state->proto_min, state->proto_max,
-                     gcs_state_node_string[state->status],
-                     (long long)state->act_id, (long long)state->conf_id,
+                     gcs_state_node_string[state->current_state],
+                     gcs_state_node_string[state->prim_state],
+                     GU_UUID_ARGS(&state->prim_uuid),
+                     state->prim_joined,
+                     (long long)state->prim_seqno,
+                     (long long)state->act_seqno,
                      GU_UUID_ARGS(&state->state_uuid),
                      GU_UUID_ARGS(&state->group_uuid),
                      state->name,
@@ -189,14 +222,14 @@ gcs_state_group_uuid (const gcs_state_t* state)
 gcs_seqno_t
 gcs_state_act_id (const gcs_state_t* state)
 {
-    return state->act_id;
+    return state->act_seqno;
 }
 
-/* Get node status */
+/* Get node state */
 gcs_state_node_t
-gcs_state_status (const gcs_state_t* state)
+gcs_state_node_state (const gcs_state_t* state)
 {
-    return state->status;
+    return state->current_state;
 }
 
 /* Get node name */
@@ -226,7 +259,7 @@ gcs_state_proto_max (const gcs_state_t* state)
     return state->proto_max;
 }
 
-/* Returns the node which is more representative of a group */
+/* Returns the node which is most representative of a group */
 static const gcs_state_t*
 state_nodes_compare (const gcs_state_t* left, const gcs_state_t* right)
 {
@@ -234,15 +267,17 @@ state_nodes_compare (const gcs_state_t* left, const gcs_state_t* right)
     assert (left->conf_id  != GCS_SEQNO_ILL);
     assert (right->conf_id != GCS_SEQNO_ILL);
 
-    if (left->act_id < right->act_id) {
+    if (left->act_seqno < right->act_seqno) {
+        assert (left->prim_seqno <= right->prim_seqno);
         return right;
     }
-    else if (left->act_id > right->act_id) {
+    else if (left->act_seqno > right->act_seqno) {
+        assert (left->prim_seqno >= right->prim_seqno);
         return left;
     }
     else {
-        // act_id's are equal, choose the one with higher conf_id.
-        if ((int64_t)left->conf_id < (int64_t)right->conf_id) {
+        // act_id's are equal, choose the one with higher prim_seqno.
+        if (left->prim_seqno < right->prim_seqno) {
             return right;
         }
         else {
@@ -257,8 +292,7 @@ state_report_conflicting_uuids (const gcs_state_t* states[], long states_num)
 {
     long j;
     for (j = 0; j < states_num; j++) {
-        if (states[j]->conf_id != GCS_SEQNO_ILL &&
-            states[j]->status  >= GCS_STATE_DONOR) {
+        if (states[j]->current_state >= GCS_STATE_DONOR) {
             size_t st_len = 1024;
             char   st[st_len];
             gcs_state_snprintf (st, st_len, states[j]);
@@ -275,7 +309,7 @@ gcs_state_get_quorum (const gcs_state_t*  states[],
                       gcs_state_quorum_t* quorum)
 {
     /* We count only nodes which come from primary configuraton -
-     * conf_id != GCS_SEQNO_ILL
+     * prim_seqno != GCS_SEQNO_ILL
      * They all must have the same group_uuid or otherwise quorum is impossible.
      * Of those we need to find at least one that has complete state - 
      * status >= GCS_STATE_JOINED. If we find none - configuration is
@@ -299,8 +333,7 @@ gcs_state_get_quorum (const gcs_state_t*  states[],
 
     // find at least one JOINED/DONOR (donor was once joined)
     for (i = 0; i < states_num; i++) {
-        if (states[i]->conf_id >= 0 &&
-            states[i]->status  >= GCS_STATE_DONOR) {
+        if (states[i]->current_state >= GCS_STATE_DONOR) {
             rep = states[i];
             break;
         }
@@ -314,8 +347,7 @@ gcs_state_get_quorum (const gcs_state_t*  states[],
     // Check that all JOINED/DONOR have the same group UUID
     // and find most updated
     for (j = i+1; j < states_num; j++) {
-        if (states[j]->conf_id != GCS_SEQNO_ILL &&
-            states[j]->status  >= GCS_STATE_DONOR) {
+        if (states[j]->current_state >= GCS_STATE_DONOR) {
             if (gu_uuid_compare (&rep->group_uuid, &states[i]->group_uuid)) {
                 // for now just freak out and print all conflicting nodes
                 gu_fatal ("Quorum impossible: conflicting group UUIDs:");
@@ -326,17 +358,21 @@ gcs_state_get_quorum (const gcs_state_t*  states[],
         }
     }
 
-    // select the most suitable protocol
+    // 1. select the highest commonly supported protocol: min(proto_max)
     quorum->proto = rep->proto_max;
     for (i = 0; i < states_num; i++) {
         if (states[i]->proto_max <  quorum->proto &&
             states[i]->proto_max >= rep->proto_min) {
             quorum->proto = states[i]->proto_max;
         }
+
+//        if (states[i]->current_state < GCS_STATE_PRIM) {
+//            states[i]->current_state = GCS_STATE_PRIM;
+//        }
     }
 
-    quorum->act_id     = rep->act_id;
-    quorum->conf_id    = rep->conf_id;
+    quorum->act_id     = rep->act_seqno;
+    quorum->conf_id    = rep->prim_seqno;
     quorum->group_uuid = rep->group_uuid;
     quorum->primary    = true;
 

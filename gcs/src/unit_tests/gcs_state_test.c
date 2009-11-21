@@ -13,15 +13,29 @@ START_TEST (gcs_state_test_basic)
     ssize_t send_len, ret;
     gu_uuid_t    state_uuid;
     gu_uuid_t    group_uuid;
+    gu_uuid_t    prim_uuid;
     gcs_state_t* send_state;
     gcs_state_t* recv_state;
 
     gu_uuid_generate (&state_uuid, NULL, 0);
     gu_uuid_generate (&group_uuid, NULL, 0);
+    gu_uuid_generate (&prim_uuid,  NULL, 0);
 
-    send_state = gcs_state_create (&state_uuid, &group_uuid, 3465, 457,
-                                   GCS_STATE_JOINED,
-                                   "My Name", "192.168.0.1:2345", 0, 1);
+    send_state = gcs_state_create (&state_uuid,
+                                   &group_uuid,
+                                   &prim_uuid,
+                                   5,                  // prim_joined
+                                   457,                // prim_seqno
+                                   3465,               // act_seqno
+                                   GCS_STATE_JOINED,   // prim_state
+                                   GCS_STATE_NON_PRIM, // current_state
+                                   "My Name",          // name
+                                   "192.168.0.1:2345", // inc_addr
+                                   0,                  // proto_min
+                                   1,                  // proto_max
+                                   GCS_STATE_FREP      // flags
+        );
+
     fail_if (NULL == send_state);
 
     send_len = gcs_state_msg_len (send_state);
@@ -38,13 +52,19 @@ START_TEST (gcs_state_test_basic)
         fail_if (NULL == recv_state);
     }
 
-    fail_if (send_state->proto_min != recv_state->proto_min);
-    fail_if (send_state->proto_max != recv_state->proto_max);
-    fail_if (send_state->act_id    != recv_state->act_id);
-    fail_if (send_state->conf_id   != recv_state->conf_id);
-    fail_if (send_state->status    != recv_state->status);
+    fail_if (send_state->flags         != recv_state->flags);
+    fail_if (send_state->proto_min     != recv_state->proto_min);
+    fail_if (send_state->proto_max     != recv_state->proto_max);
+    fail_if (send_state->act_seqno     != recv_state->act_seqno,
+             "act_seqno: sent %lld, recv %lld",
+             send_state->act_seqno, recv_state->act_seqno);
+    fail_if (send_state->prim_seqno    != recv_state->prim_seqno);
+    fail_if (send_state->current_state != recv_state->current_state);
+    fail_if (send_state->prim_state    != recv_state->prim_state);
+    fail_if (send_state->prim_joined   != recv_state->prim_joined);
     fail_if (gu_uuid_compare (&recv_state->state_uuid, &state_uuid));
     fail_if (gu_uuid_compare (&recv_state->group_uuid, &group_uuid));
+    fail_if (gu_uuid_compare (&recv_state->prim_uuid,  &prim_uuid));
     fail_if (strcmp(send_state->name,     recv_state->name));
     fail_if (strcmp(send_state->inc_addr, recv_state->inc_addr));
 
@@ -71,9 +91,9 @@ START_TEST (gcs_state_test_quorum)
     gu_uuid_generate (&g1, NULL, 0);
     gu_uuid_generate (&g2, NULL, 0);
     gu_uuid_generate (&g3, NULL, 0);
-    
+
     st1 = st2 = st3 = NULL;
-    
+
     mark_point();
 }
 END_TEST

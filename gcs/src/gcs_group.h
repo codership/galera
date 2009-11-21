@@ -47,6 +47,12 @@ typedef struct gcs_group
     long          last_node;    // node that reported last_applied
     bool          frag_reset;   // indicate that fragmentation was reset
     gcs_node_t*   nodes;        // array of node contexts
+
+    gu_uuid_t       prim_uuid;
+    gu_seqno_t      prim_seqno;
+    long            prim_num;
+    gcs_state_node_t prim_state;
+    bool            prim_rep;
 }
 gcs_group_t;
 

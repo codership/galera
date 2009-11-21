@@ -16,8 +16,11 @@
 #include "gcs_seqno.h"
 #include "gcs_act_proto.h"
 
-/* Possible node status */
-/* NOTE! when changing this dont forget to change gcs_state_node_string[] in
+/* State flags */
+#define GCS_STATE_FREP 0x01  // group representative
+
+/* Possible node states */
+/* @note: when changing this don't forget to change gcs_state_node_string[] in
  * gcs_state.c */
 typedef enum gcs_state_node
 {
@@ -36,15 +39,19 @@ extern const char* gcs_state_node_string[GCS_STATE_MAX];
 #ifdef GCS_STATE_ACCESS
 typedef struct gcs_state
 {
-    gu_uuid_t   state_uuid;  // UUID of the current state exchange
-    gu_uuid_t   group_uuid;  // UUID of the group
-    gcs_seqno_t act_id;      // next action seqno (received up to)
-    gcs_seqno_t conf_id;     // last primary configuration seqno
-    const char* name;        // human assigned node name
-    const char* inc_addr;    // incoming address string
-    gcs_state_node_t status; // status of the node
-    gcs_proto_t proto_min;
-    gcs_proto_t proto_max;
+    gu_uuid_t        state_uuid;    // UUID of the current state exchange
+    gu_uuid_t        group_uuid;    // UUID of the group
+    gu_uuid_t        prim_uuid;     // UUID of the last PC
+    long             prim_joined;   // number of joined nodes in the last PC
+    gcs_seqno_t      prim_seqno;    // last primary configuration seqno
+    gcs_seqno_t      act_seqno;     // last action seqno (received up to)
+    gcs_state_node_t prim_state;    // state of the node in the last PC
+    gcs_state_node_t current_state; // current state of the node
+    const char*      name;          // human assigned node name
+    const char*      inc_addr;      // incoming address string
+    gcs_proto_t      proto_min;
+    gcs_proto_t      proto_max;
+    uint8_t          flags;
 }
 gcs_state_t;
 #else
@@ -65,13 +72,17 @@ gcs_state_quorum_t;
 extern gcs_state_t*
 gcs_state_create (const gu_uuid_t* state_uuid,
                   const gu_uuid_t* group_uuid,
-                  gcs_seqno_t      act_id,
-                  gcs_seqno_t      conf_id,
-                  gcs_state_node_t status,
+                  const gu_uuid_t* prim_uuid,
+                  long             prim_joined,
+                  gcs_seqno_t      prim_seqno,
+                  gcs_seqno_t      act_seqno,
+                  gcs_state_node_t prim_state,
+                  gcs_state_node_t current_state,
                   const char*      name,
                   const char*      inc_addr,
                   gcs_proto_t      proto_min,
-                  gcs_proto_t      proto_max);
+                  gcs_proto_t      proto_max,
+                  uint8_t          flags);
 
 extern void
 gcs_state_destroy (gcs_state_t* state);
@@ -100,9 +111,9 @@ gcs_state_group_uuid (const gcs_state_t* state);
 extern gcs_seqno_t
 gcs_state_act_id (const gcs_state_t* state);
 
-/* Get node status */
+/* Get node state */
 extern gcs_state_node_t
-gcs_state_status (const gcs_state_t* state);
+gcs_state_node_state (const gcs_state_t* state);
 
 /* Get node name */
 extern const char*
@@ -117,6 +128,10 @@ extern gcs_proto_t
 gcs_state_proto_min (const gcs_state_t* state);
 extern gcs_proto_t
 gcs_state_proto_max (const gcs_state_t* state);
+
+/* Get state message flags */
+extern uint8_t
+gcs_state_flags (const gcs_state_t* state);
 
 /* Get quorum decision from state messages */
 extern long

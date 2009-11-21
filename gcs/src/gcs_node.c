@@ -33,15 +33,15 @@ gcs_node_init (gcs_node_t* node,
 void
 gcs_node_move (gcs_node_t* dst, gcs_node_t* src)
 {
-    if (dst->name)     free ((char*)dst->name);
-    if (dst->inc_addr) free ((char*)dst->inc_addr);
-    if (dst->state)    gcs_state_destroy ((gcs_state_t*)dst->state);
+    if (dst->name)      free ((char*)dst->name);
+    if (dst->inc_addr)  free ((char*)dst->inc_addr);
+    if (dst->state_msg) gcs_state_destroy ((gcs_state_t*)dst->state_msg);
     memcpy (dst, src, sizeof (gcs_node_t));
     gcs_defrag_forget (&src->app);
     gcs_defrag_forget (&src->oob);
-    src->name     = NULL;
-    src->inc_addr = NULL;
-    src->state    = NULL;
+    src->name      = NULL;
+    src->inc_addr  = NULL;
+    src->state_msg = NULL;
 }
 
 /*! Mark node's buffers as reset (local node only) */
@@ -74,31 +74,31 @@ gcs_node_free (gcs_node_t* node)
         free ((char*)node->inc_addr); // was strdup'ed
         node->inc_addr = NULL;
     }
-    if (node->state) {
-        gcs_state_destroy ((gcs_state_t*)node->state);
-        node->state = NULL;
+    if (node->state_msg) {
+        gcs_state_destroy ((gcs_state_t*)node->state_msg);
+        node->state_msg = NULL;
     }
 }
 
 /*! Record state message from the node */
 void
-gcs_node_record_state (gcs_node_t* node, gcs_state_t* state)
+gcs_node_record_state (gcs_node_t* node, gcs_state_t* state_msg)
 {
-    if (node->state) {
-        gcs_state_destroy ((gcs_state_t*)node->state);
+    if (node->state_msg) {
+        gcs_state_destroy ((gcs_state_t*)node->state_msg);
     }
-    node->state = state;
+    node->state_msg = state_msg;
 
     // copy relevant stuff from state into node
-    node->status    = gcs_state_status (state);
-    node->proto_min = gcs_state_proto_min (state);
-    node->proto_max = gcs_state_proto_max (state);
+    node->status    = gcs_state_node_state (state_msg);
+    node->proto_min = gcs_state_proto_min  (state_msg);
+    node->proto_max = gcs_state_proto_max  (state_msg);
 
     if (node->name) free ((char*)node->name);
-    node->name = strdup (gcs_state_name (state));
+    node->name = strdup (gcs_state_name (state_msg));
 
     if (node->inc_addr) free ((char*)node->inc_addr);
-    node->inc_addr = strdup (gcs_state_inc_addr (state));
+    node->inc_addr = strdup (gcs_state_inc_addr (state_msg));
 }
 
 /*! Update node status according to quorum decisions */
@@ -106,7 +106,8 @@ void
 gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
 {
     if (quorum->primary) {
-        const gu_uuid_t* node_group_uuid   = gcs_state_group_uuid (node->state);
+        const gu_uuid_t* node_group_uuid   = gcs_state_group_uuid (
+            node->state_msg);
         const gu_uuid_t* quorum_group_uuid = &quorum->group_uuid;
 
         // TODO: what to do when quorum.proto is not supported by this node?
@@ -117,7 +118,7 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
         }
         else {
             // node was a part of this group
-            gcs_seqno_t node_act_id = gcs_state_act_id (node->state);
+            gcs_seqno_t node_act_id = gcs_state_act_id (node->state_msg);
             if (GCS_STATE_PRIM <  node->status &&
                 node_act_id    != quorum->act_id) {
                 // gap in sequence numbers, needs a snapshot, demote status
@@ -130,7 +131,7 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
             }
 
             if (GCS_STATE_PRIM > node->status) {
-                // node must be at least GCS_STATE_PRIM
+                // node must be at least GCS_STATE_PRIM (duplication?)
                 node->status = GCS_STATE_PRIM;
             }
         }
@@ -143,4 +144,3 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
          */
     }
 }
-

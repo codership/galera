@@ -42,7 +42,7 @@ struct gcs_node
 
     const char*        name;         // human-given name
     const char*        inc_addr;     // incoming address - for load balancer
-    const gcs_state_t* state;        // state message
+    const gcs_state_t* state_msg;    // state message
 };
 typedef struct gcs_node gcs_node_t;
 
