@@ -7,14 +7,14 @@
 # e.g. logging of stderr must happen on the same level as recording of return
 # code. While stdout log should record only the output of command.
 
-local_job()
+_local_job()
 {
     local cmd="$1"
 #    eval "$($@)"
     eval $cmd
 }
 
-ssh_job()
+_ssh_job()
 {
     local node=${@:$#} # last argument
 #    local cmd="$($@)"
@@ -35,7 +35,7 @@ virtual_job()
         eval "$cmd" 1>"$out"
     else
 #        ssh_job "$cmd" 1>"$out"
-        ssh "${NODE_LOCATION[$node]}" "$cmd" 1>"$out"
+        ssh -ax "${NODE_LOCATION[$node]}" "$cmd" 1>"$out"
     fi
 
 }
