@@ -264,8 +264,8 @@ static const gcs_state_t*
 state_nodes_compare (const gcs_state_t* left, const gcs_state_t* right)
 {
     assert (0 == gu_uuid_compare(&left->group_uuid, &right->group_uuid));
-    assert (left->conf_id  != GCS_SEQNO_ILL);
-    assert (right->conf_id != GCS_SEQNO_ILL);
+    assert (left->prim_seqno  != GCS_SEQNO_ILL);
+    assert (right->prim_seqno != GCS_SEQNO_ILL);
 
     if (left->act_seqno < right->act_seqno) {
         assert (left->prim_seqno <= right->prim_seqno);
@@ -315,7 +315,7 @@ gcs_state_get_quorum (const gcs_state_t*  states[],
      * status >= GCS_STATE_JOINED. If we find none - configuration is
      * non-primary.
      * Of those with the status >= GCS_STATE_JOINED we choose the most
-     * representative: with the highest act_id and conf_id.
+     * representative: with the highest act_seqno and prim_seqno.
      */
 
     long i, j;
