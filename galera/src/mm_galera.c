@@ -412,10 +412,14 @@ static enum wsrep_status mm_galera_disconnect(wsrep_t *gh,
     GU_DBUG_ENTER("galera_disconnect");
 
     if (!gcs_conn) {
+        conn_state   = GALERA_INITIALIZED;
         GU_DBUG_RETURN (WSREP_NODE_FAIL); //shouldn't we just ignore it?
     }
 
     if (GALERA_CONNECTED == conn_state) {
+
+        conn_state   = GALERA_INITIALIZED;
+        status.stage = GALERA_STAGE_INIT;
 
         rcode = gcs_close(gcs_conn);
         if (rcode) {
@@ -425,9 +429,6 @@ static enum wsrep_status mm_galera_disconnect(wsrep_t *gh,
         }
 
         gu_info("Closed GCS connection");
-
-        status.stage = GALERA_STAGE_INIT;
-        conn_state   = GALERA_INITIALIZED;
     }
 
     // synchronize with self-leave
@@ -1423,11 +1424,21 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
         gu_debug("victim trx is replicating: %lld", victim.seqno_l);
         while (victim.state == WSDB_TRX_REPLICATING ) {
             gu_mutex_unlock(&commit_mtx);
-            // TODO: This must be driven by signal.
+            // @todo: This must be driven by signal.
             usleep (GALERA_USLEEP_FLOW_CONTROL);
             gu_mutex_lock(&commit_mtx);
             wsdb_get_local_trx_info(victim_trx, &victim);
         }
+
+        if (victim.state != WSDB_TRX_REPLICATED)
+	{
+            assert(GCS_SEQNO_ILL == victim.seqno_l &&
+                   GCS_SEQNO_ILL == victim.seqno_g);
+            gu_debug("victim trx didn't finish replicating");
+            ret_code = WSREP_OK;
+            break;
+        }
+
         gu_debug("victim trx has replicated: %lld", victim.seqno_l);
 
         //falling through, we have valid seqno now
@@ -1769,12 +1780,18 @@ static enum wsrep_status mm_galera_pre_commit(
                          &seqno_g, &seqno_l);
     } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
 
-//    gu_info ("gcs_repl(): act_type: %s, act_size: %u, act_id: %llu, "
-//             "local: %llu, ret: %d",
-//             "GCS_ACT_TORDERED", len, seqno_g, seqno_l, rcode);
+#ifdef EXTRA_DEBUG
+    gu_debug ("gcs_repl(): size: %u, seqno_g: %llu, seqno_l: %llu, ret: %d",
+             "GCS_ACT_TORDERED", len, seqno_g, seqno_l, rcode);
+#endif
     if (rcode != len) {
         gu_error("gcs failed for: %llu, len: %d, rcode: %d", trx_id,len,rcode);
         assert (GCS_SEQNO_ILL == seqno_l);
+        gu_mutex_lock(&commit_mtx);
+        wsdb_assign_trx_seqno(
+            trx_id, seqno_l, seqno_g, WSDB_TRX_ABORTING_NONREPL
+        );
+        gu_mutex_unlock(&commit_mtx);
         retcode = WSREP_CONN_FAIL;
         goto cleanup;
     }
