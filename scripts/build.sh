@@ -13,26 +13,19 @@ usage()
     "    -b|--bootstap   rebuild the build system (implies -c)\n"\
     "    -o|--opt        configure build with debug disabled (implies -c)\n" \
     "    -d|--debug      configure build with debug enabled (implies -c)\n" \
+    "    -r|--release    release number\n"\
     "    -m32/-m64       build 32/64-bit binaries for x86\n" \
     "    -p|--package    build RPM and DEB packages at the end.\n" \
     "    --with-spread   configure build with spread backend (implies -c to gcs)\n" \
+    "    --source        build source packages\n"\
     "\nSet DISABLE_GCOMM/DISABLE_VSBES to 'yes' to disable respective modules"
 }
 
-#have_ccache="false"
-#if test -n "`which ccache`"
-#then
-#    have_ccache="true"
-#    if test -n "`which distcc`"
-#    then
-#	export CCACHE_PREFIX="distcc"
-#	export MAKE="make -j6"
-#	export DISTCC_HOSTS="192.168.2.1 192.168.2.2 192.168.2.3"
-#    fi
-#    export CC="ccache gcc"
-#    export CXX="ccache g++"
-#
-#fi
+# disable building vsbes by default
+#DISABLE_VSBES=${DISABLE_VSBES:-"yes"}
+PACKAGE=no
+SOURCE=no
+RELEASE=""
 
 if ccache -V > /dev/null 2>&1
 then
@@ -74,6 +67,10 @@ do
 	-o|--opt)
 	    OPT=yes       # Compile without debug
 	    ;;
+	-r|--release)
+	    RELEASE="$2"
+	    shift
+	    ;;
 	-m32)
 	    CFLAGS="$CFLAGS -m32"
 	    CXXFLAGS="$CXXFLAGS -m32"
@@ -96,6 +93,9 @@ do
 	--help)
 	    usage
 	    exit 0
+	    ;;
+	--source)
+	    SOURCE=yes
 	    ;;
 	*)
 	    if test ! -z "$1"; then
@@ -140,6 +140,11 @@ build()
     export LD_LIBRARY_PATH
     export CPPFLAGS
     export LDFLAGS
+
+    if   [ ! -x "configure" ]; then BOOTSTRAP=yes;
+    elif [ ! -s "Makefile"  ]; then CONFIGURE=yes;
+    fi
+
     if [ "$BOOTSTRAP" == "yes" ]; then ./bootstrap.sh; CONFIGURE=yes ; fi
     if [ "$CONFIGURE" == "yes" ]; then rm -rf config.status; ./configure $@; SCRATCH=yes ; fi
     if [ "$SCRATCH"   == "yes" ]; then make clean ; fi
@@ -199,6 +204,50 @@ build_module()
     build_flags $build_dir || return 1
 }
 
+build_source()
+{
+    local module="$1"
+    shift
+    local build_dir="$build_base/$module"
+    pushd $build_dir
+
+    if [ ! -x "configure" ]; then ./bootstrap.sh; fi
+    if [ ! -s "Makefile"  ]; then ./configure;    fi
+
+    local src_base_name="lib${module}-"
+    rm -rf "${src_base_name}"*.tar.gz
+    make dist || (echo $?; echo "make dist failed"; echo)
+    local ret=$(ls "${src_base_name}"*.tar.gz)
+    popd
+
+    echo $build_dir/$ret
+}
+
+build_sources()
+{
+    local module
+    local srcs=""
+
+    for module in "galerautils" "gcomm" "gcs" "wsdb" "galera"
+    do
+        src=$(build_source $module | tail -n 1)
+        srcs="$srcs $src"
+    done
+
+    if [ -z "$RELEASE" ]
+    then
+        pushd "$build_base"
+        RELEASE="r$(svnversion | sed s/\:/,/g)"
+        popd
+    fi
+
+    local ret="galera-$RELEASE.tar"
+    tar --transform 's/.*\///' -cf $ret $srcs "README_BUILD" "COPYING"
+
+    # return absolute path for scripts
+    echo $PWD/$ret
+}
+
 building="false"
 
 # The whole purpose of ccache is to be able to safely make clean and not rebuild
@@ -255,6 +304,11 @@ build_module "galera"
 if test "$PACKAGE" == "yes"
 then
     build_packages
+fi
+
+if test "$SOURCE" == "yes"
+then
+    build_sources
 fi
 
 if test $building != "true"

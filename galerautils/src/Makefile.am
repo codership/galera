@@ -9,6 +9,7 @@ include_HEADERS =      \
 	gu_log.h       \
 	gu_assert.h    \
 	gu_mem.h       \
+	gu_limits.h    \
 	gu_mutex.h     \
 	gu_conf.h      \
 	gu_dbug.h      \
@@ -24,13 +25,21 @@ include_HEADERS =      \
 	gu_throw.hpp     \
 	gu_logger.hpp    \
 	gu_assert.hpp    \
+	gu_string.hpp    \
 	gu_utils.hpp     \
 	gu_regex.hpp     \
 	gu_mutex.hpp     \
 	gu_cond.hpp      \
 	gu_lock.hpp      \
 	gu_uri.hpp       \
+	gu_buffer.hpp    \
+	gu_poll.hpp      \
+	gu_epoll.hpp     \
+	gu_convert.hpp   \
+	gu_resolver.hpp  \
+	gu_serialize.hpp \
 	gu_network.hpp   \
+	gu_prodcons.hpp  \
 	gu_datetime.hpp
 
 lib_LTLIBRARIES = libgalerautils.la

@@ -11,6 +11,13 @@ libmmgalera_la_SOURCES =   \
 	galera_job_queue.c \
 	mm_galera.c
 
+include_HEADERS =          \
+	galera_info.h      \
+	galera_state.h     \
+	galera_options.h   \
+	galera_status.h    \
+	galera_job_queue.h
+
 #GALERA_RELEASE =
 #if ENABLE_RELEASE
 #GALERA_RELEASE = -Wl,--whole-archive .libs/libwsdb.a -Wl,--no-whole-archive

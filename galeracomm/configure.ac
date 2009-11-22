@@ -1,5 +1,5 @@
 AC_PREREQ(2.57)
-AC_INIT([galeracomm], [0.0.1], [info@codership.com])
+AC_INIT([libgaleracomm], [0.0.1], [info@codership.com])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE
