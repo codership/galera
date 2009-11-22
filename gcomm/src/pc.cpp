@@ -21,6 +21,7 @@ using namespace gu;
 using namespace gu::net;
 using namespace gu::datetime;
 
+
 void PC::handle_up(int cid, const Datagram& rb,
                    const ProtoUpMeta& um)
 {
@@ -46,6 +47,7 @@ void PC::handle_up(int cid, const Datagram& rb,
     send_up(rb, um);
 }
 
+
 int PC::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
 {
     if (wb.get_len() == 0)
@@ -54,6 +56,7 @@ int PC::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
     }
     return send_down(wb, dm);
 }
+
 
 size_t PC::get_mtu() const
 {
@@ -72,6 +75,7 @@ size_t PC::get_mtu() const
     return gmcast->get_mtu() - 2*evsm.serial_size() - pcm.serial_size();
 }
 
+
 bool PC::supports_uuid() const
 {
     if (gmcast->supports_uuid() == false)
@@ -82,47 +86,33 @@ bool PC::supports_uuid() const
     return true;
 }
 
+
 const UUID& PC::get_uuid() const
 {
     return gmcast->get_uuid();
 }
 
+
 void PC::connect()
 {
-    
-    URI tp_uri(uri);
-    
-    tp_uri._set_scheme(Conf::GMCastScheme); // why do we need this?
-    
-    gmcast = new GMCast(get_pnet(), tp_uri.to_string());
-
-    const UUID& uuid(gmcast->get_uuid());
-
-    if (uuid == UUID::nil())
-    {
-        gu_throw_fatal << "invalid UUID: " << uuid;
-    }
-
     const bool start_prim = host_is_any (uri.get_host());
     
-    evs = new evs::Proto(uuid, uri.to_string());
-    pc  = new pc::Proto (uuid);
-
     pstack.push_proto(gmcast);
     pstack.push_proto(evs);
     pstack.push_proto(pc);
     pstack.push_proto(this);
     get_pnet().insert(&pstack);
+    
     gmcast->connect();
-
+    
     closed = false;
-
+    
     evs->shift_to(evs::Proto::S_JOINING);
     pc->connect(start_prim);
     
     while (start_prim == false && evs->get_known_size() <= 1)
     {
-        /* Send join messages without handling them */
+        // Send join messages without handling them
         evs->send_join(false);
         get_pnet().event_loop(Sec/2);
     }
@@ -140,6 +130,7 @@ void PC::connect()
     }
     while (pc->get_state() != pc::Proto::S_PRIM);
 }
+
 
 void PC::close()
 {
@@ -173,18 +164,10 @@ void PC::close()
     pstack.pop_proto(gmcast);
     
     gmcast->close();
-/*    
-    delete gmcast;
-    gmcast = 0;
 
-    delete evs;
-    evs = 0;
-    
-    delete pc;
-    pc = 0;
-*/
     closed = true;
 }
+
 
 PC::PC(Protonet& net_, const string& uri_) :
     Transport (net_, uri_),
@@ -198,7 +181,22 @@ PC::PC(Protonet& net_, const string& uri_) :
     {
         log_fatal << "invalid uri: " << uri.to_string();
     }
+    URI tp_uri(uri);
+    
+    tp_uri._set_scheme(Conf::GMCastScheme); // why do we need this?
+    
+    gmcast = new GMCast(get_pnet(), tp_uri.to_string());
+    
+    const UUID& uuid(gmcast->get_uuid());
+    
+    if (uuid == UUID::nil())
+    {
+        gu_throw_fatal << "invalid UUID: " << uuid;
+    }
+    evs = new evs::Proto(uuid, uri.to_string());
+    pc  = new pc::Proto (uuid);
 }
+
 
 PC::~PC()
 {

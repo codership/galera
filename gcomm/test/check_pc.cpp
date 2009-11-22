@@ -1278,12 +1278,12 @@ Suite* pc_suite()
         tcase_add_test(tc, test_pc_complete_split_merge);
         tcase_set_timeout(tc, 25);
         suite_add_tcase(s, tc);
-
-        tc = tcase_create("test_pc_transport");
-        tcase_add_test(tc, test_pc_transport);
-        tcase_set_timeout(tc, 35);
-        suite_add_tcase(s, tc);
     }
+    
+    tc = tcase_create("test_pc_transport");
+    tcase_add_test(tc, test_pc_transport);
+    tcase_set_timeout(tc, 35);
+    suite_add_tcase(s, tc);
     
     tc = tcase_create("test_trac_191");
     tcase_add_test(tc, test_trac_191);
