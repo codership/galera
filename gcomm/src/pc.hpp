@@ -18,14 +18,6 @@ namespace gcomm
     
     class PC : public Transport
     {
-        GMCast*     gmcast;                           // GMCast transport
-        evs::Proto* evs;                // EVS protocol layer
-        pc::Proto*  pc;                 // PC protocol layer
-        gu::datetime::Period leave_grace_period; // Period to wait graceful leave
-        
-        PC(const PC&);
-        void operator=(const PC&);
-        
     public:
         
         PC (Protonet&, const std::string&);
@@ -42,6 +34,19 @@ namespace gcomm
         const UUID& get_uuid() const;
         
         size_t get_mtu() const;
+
+    private:
+
+        GMCast*     gmcast;             // GMCast transport
+        evs::Proto* evs;                // EVS protocol layer
+        pc::Proto*  pc;                 // PC protocol layer
+        bool        closed;             // flag for destructor
+                                        // Period to wait graceful leave
+        gu::datetime::Period leave_grace_period;
+
+        PC(const PC&);
+        void operator=(const PC&);
+        
     };
     
 } // namespace gcomm
