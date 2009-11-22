@@ -1432,8 +1432,7 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
 
         if (victim.state != WSDB_TRX_REPLICATED)
 	{
-            assert(GCS_SEQNO_ILL == victim.seqno_l &&
-                   GCS_SEQNO_ILL == victim.seqno_g);
+            assert(GCS_SEQNO_ILL == victim.seqno_l);
             gu_debug("victim trx didn't finish replicating");
             ret_code = WSREP_OK;
             break;
