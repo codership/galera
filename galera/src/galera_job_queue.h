@@ -13,14 +13,13 @@
 /*!
  * Job queue abstraction
  * 
- * Job queue holds information of workers and jobs
- * assigned for the workers. Each worker can execute
- * one job at a time. 
+ * Job queue holds information of workers and jobs assigned for 
+ * the workers. Each worker can execute one job at a time. 
  * 
  * Job queue is created and removed with job_queue_create() 
  * and job_queue_destroy(). Reference to job queue must be
  * passed to all subsequent job queue calls.
- * The create function requires a conflict resolution function
+ * The create function requires a conflict detection function
  * handle. Application must implement this function to determine
  * if two given jobs can be executed parallelly.
  *
@@ -31,13 +30,13 @@
  * Worker starts a job with job_queue_start_job() call. Job queue
  * finds all jobs, which are running at the moment, and verifies
  * with each of them, if the new job can be started parallelly. 
- * The application call back is used for this conflict resolution.
+ * The application call back is used for this conflict detection.
  * If there is no conflict, function returns immediately. If there
  * is a conflict, the function call blocks until all conflicting
  * jobs have ended.
  *
  * Worker ends a job by job_queue_end_job() call. This will signal
- * all workers, which are conflicting with the ending job to continue.
+ * to release all workers, which are conflicting with the ending job.
  *
  * Job queue has a configuration for maximum concurrent job limit.
  * Queue will guarantee that at any given time this limit is not exceeded.
@@ -113,7 +112,7 @@ enum job_type {
 };
 
 /*!
- * @struct job queue
+ * @struct job worker
  */
 struct job_worker {
     char           ident;
@@ -127,6 +126,9 @@ struct job_worker {
 
 #define IDENT_job_worker 'j'
 
+/*!
+ * @struct job queue
+ */
 struct job_queue {
     char                   ident;
     unsigned short         max_concurrent_workers; //!< limit for active workers
@@ -151,8 +153,8 @@ struct job_queue *job_queue_create(
     unsigned short max_workers, job_queue_conflict_fun, job_queue_cmp_fun);
 
 /*
- * @brief @fixme: 
- * @param id @fixme:
+ * @brief destroys the job queue and releases all resources
+ * @param queue the job queue to be destroyed
  * @return success code
  */
 int job_queue_destroy(struct job_queue *queue);
@@ -175,7 +177,7 @@ void job_queue_remove_worker(
 
 /*
  * @brief starts a new job for a worker
- * @param job_queue queue fo rthe jobs
+ * @param job_queue queue for the jobs
  * @param worker worker doing the job
  * @param ctx context pointer for conflict resolution
  * @return id for the new object
@@ -196,7 +198,7 @@ int job_queue_end_job(
 {                                                    \
     obj = (struct def *) gu_malloc (size);           \
     if (!obj) {                                      \
-        gu_error ("internal error");                 \
+        gu_error ("job queue internal error");       \
         assert(0);                                   \
     }                                                \
     obj->ident = IDENT_##def;                        \
@@ -214,7 +216,7 @@ int job_queue_end_job(
 #define CHECK_OBJ(obj, def)                          \
 {                                                    \
     if (!obj || obj->ident != IDENT_##def) {         \
-        gu_error ("internal error");                 \
+        gu_error ("job queue internal error");       \
         assert(0);                                   \
     }                                                \
 }

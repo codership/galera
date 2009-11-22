@@ -65,6 +65,10 @@ struct job_worker *job_queue_new_worker(
 
     if (queue->registered_workers == MAX_WORKERS) {
         gu_mutex_unlock(&(queue->mutex));
+        gu_warn(
+             "job queue full, type: %d, workers: %d", 
+             type, queue->registered_workers
+        );
         return NULL;
     }
     
@@ -76,6 +80,11 @@ struct job_worker *job_queue_new_worker(
     }
     if (!worker) {
         gu_mutex_unlock(&(queue->mutex));
+        gu_warn(
+             "no free job queue worker found for type: %d, workers: %d", 
+             type, queue->registered_workers
+        );
+
         return NULL;
     }
 
@@ -83,6 +92,11 @@ struct job_worker *job_queue_new_worker(
     worker->state = JOB_IDLE;
     worker->type  = type;
     gu_mutex_unlock(&(queue->mutex));
+
+    gu_debug(
+         "new job queue worker, type: %d, id: %d, workers: %d", 
+         worker->type, worker->id, queue->registered_workers
+    );
 
     return (worker);
 }
@@ -95,10 +109,12 @@ void job_queue_remove_worker(
     gu_mutex_lock(&(queue->mutex));
 
     assert(worker->state==JOB_IDLE);
-    assert(worker->id <= queue->registered_workers);
 
     worker->state = JOB_VOID;
     queue->registered_workers--;
+
+    gu_debug("job queue released, workers now: %d", queue->registered_workers);
+
     gu_mutex_unlock(&(queue->mutex));
 }
 
