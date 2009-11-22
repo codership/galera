@@ -945,9 +945,6 @@ long gcs_repl (gcs_conn_t          *conn,
         if (ret >= 0) {
             gu_cond_wait (&act.wait_cond, &act.wait_mutex);
 
-            *act_id       = act.act_id;       /* set by recv_thread */
-            *local_act_id = act.local_act_id; /* set by recv_thread */
-
             if (act.act_id < 0) {
                 assert (GCS_SEQNO_ILL    == act.local_act_id ||
                         GCS_ACT_TORDERED != act_type);
@@ -956,10 +953,15 @@ long gcs_repl (gcs_conn_t          *conn,
                     ret = -EINTR;
                 }
                 else {
-                    /* core provided an error code */
+                    /* core provided an error code in act_id */
                     ret = act.act_id;
                 }
+
+                act.act_id = GCS_SEQNO_ILL;
             }
+
+            *act_id       = act.act_id;       /* set by recv_thread */
+            *local_act_id = act.local_act_id; /* set by recv_thread */
         }
         gu_mutex_unlock  (&act.wait_mutex);
     }
@@ -1077,6 +1079,8 @@ gcs_wait (gcs_conn_t* conn)
     }
     else {
         switch (conn->state) {
+        case GCS_CONN_JOINER:
+            return -ECONNABORTED;
         case GCS_CONN_OPEN:
             return -ENOTCONN;
         case GCS_CONN_CLOSED:

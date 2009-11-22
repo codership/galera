@@ -75,8 +75,8 @@ then
 fi
 
 AC_ARG_ENABLE([vs],
-              AC_HELP_STRING([--disable-vs],
-              [disable VS backend [[default=enabled]]]),,)
+              AC_HELP_STRING([--enable-vs],
+              [enable VS backend [[default=disabled]]]),,enable_vs="no")
 if test "$enable_vs" != "no"
 then
     enable_vs="yes"
