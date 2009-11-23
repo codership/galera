@@ -22,6 +22,7 @@ include_HEADERS =      \
 	gu_options.h   \
 	galerautils.hpp  \
 	gu_exception.hpp \
+	gu_macros.hpp    \
 	gu_throw.hpp     \
 	gu_logger.hpp    \
 	gu_assert.hpp    \
@@ -31,6 +32,7 @@ include_HEADERS =      \
 	gu_mutex.hpp     \
 	gu_cond.hpp      \
 	gu_lock.hpp      \
+	gu_monitor.hpp   \
 	gu_uri.hpp       \
 	gu_buffer.hpp    \
 	gu_poll.hpp      \

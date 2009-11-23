@@ -5,18 +5,17 @@ include_HEADERS =
 lib_LTLIBRARIES = libmmgalera.la
 libmmgalera_la_SOURCES =   \
 	galera_info.c      \
-	galera_state.c     \
-	galera_options.c   \
-	galera_status.c    \
-	galera_job_queue.c \
-	mm_galera.c
-
-include_HEADERS =          \
 	galera_info.h      \
+	galera_state.c     \
 	galera_state.h     \
+	galera_options.c   \
 	galera_options.h   \
+	galera_status.c    \
 	galera_status.h    \
-	galera_job_queue.h
+	galera_job_queue.c \
+	galera_job_queue.h \
+	mm_galera.c        \
+	wsrep_api.h
 
 #GALERA_RELEASE =
 #if ENABLE_RELEASE

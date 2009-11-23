@@ -22,7 +22,7 @@ usage()
 }
 
 # disable building vsbes by default
-#DISABLE_VSBES=${DISABLE_VSBES:-"yes"}
+DISABLE_VSBES=${DISABLE_VSBES:-"yes"}
 PACKAGE=no
 SOURCE=no
 RELEASE=""
@@ -241,8 +241,9 @@ build_sources()
         popd
     fi
 
-    local ret="galera-$RELEASE.tar"
-    tar --transform 's/.*\///' -cf $ret $srcs "README_BUILD" "COPYING"
+    local ret="galera-source-$RELEASE.tar"
+    tar --transform 's/.*\///' -cf $ret $srcs \
+    "source/README_BUILD" "source/COPYING" "source/build.sh"
 
     # return absolute path for scripts
     echo $PWD/$ret

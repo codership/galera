@@ -16,27 +16,28 @@ include_HEADERS += wsdb_api.h
 lib_LTLIBRARIES += libwsdb.la
 libwsdb_la_SOURCES =    \
 	certification.c \
+	certification.h \
 	file.c          \
-	file_cache.c    \
-	hash.c          \
-	local.c         \
-	version_file.c  \
-	wsdb.c          \
-	wsdb_xdr.c	\
 	file.h          \
+	file_cache.c    \
 	file_cache.h    \
+	hash.c          \
 	hash.h          \
+	local.c         \
+	local.h         \
+	version_file.c  \
+	version_file.h  \
+	wsdb_xdr.c      \
+	wsdb_xdr.h      \
 	conn.c          \
 	conn.h          \
 	key_array.c     \
 	key_array.h     \
-	version_file.h  \
-	wsdb_api.h      \
 	wsdb_priv.h     \
 	wsdb_file.h     \
-	wsdb_xdr.h      \
-	mempool.c 	\
-	mempool.h
+	mempool.c       \
+	mempool.h       \
+	wsdb.c
 
 
 WSDB_INTERFACE = 2

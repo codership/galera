@@ -26,21 +26,37 @@ GCS_SRCS = \
 	gcs_node.c      \
 	gcs_group.c     \
 	gcs_core.c      \
-	gcs.c
+	gcs.c           \
+\
+	gcs_act_proto.h \
+	gcs_backend.h   \
+	gcs_comp_msg.h  \
+	gcs_core.h      \
+	gcs_defrag.h    \
+	gcs_defs.h      \
+	gcs_dummy.h     \
+	gcs_fifo_lite.h \
+	gcs_group.h     \
+	gcs_msg_type.h  \
+	gcs_node.h      \
+	gcs_recv_act.h  \
+	gcs_recv_msg.h  \
+	gcs_seqno.h     \
+	gcs_state.h
 
 if WITH_SPREAD
     AM_CFLAGS += -DGCS_USE_SPREAD
-    GCS_SRCS  += gcs_spread.c
+    GCS_SRCS  += gcs_spread.c gcs_spread.h
 endif
 
 if ENABLE_GCOMM
     AM_CFLAGS += -DGCS_USE_GCOMM
-    GCS_SRCS  += gcs_gcomm.cpp
+    GCS_SRCS  += gcs_gcomm.cpp gcs_gcomm.h
 endif
 
 if ENABLE_VS
     AM_CFLAGS += -DGCS_USE_VS
-    GCS_SRCS  += gcs_vs.cpp
+    GCS_SRCS  += gcs_vs.cpp gcs_vs.h
 endif
 
 # Describe libgcs library target
@@ -57,7 +73,7 @@ libgcs_la_DEPENDENCIES = $(GCOMM_LIBS)
 
 # Desclibe gcs_test binary target
 noinst_PROGRAMS  = gcs_test
-gcs_test_SOURCES = gcs_test.c
+gcs_test_SOURCES = gcs_test.c gcs_test.h
 gcs_test_LDADD   = $(lib_LTLIBRARIES) $(GCOMM_LIBS)
 gcs_test_LDFLAGS = -static
 # how to set it up automatically? $(CXXFLAGS) - to use the right arch
