@@ -4,9 +4,10 @@
 
 usage()
 {
-    echo -e "Usage: build.sh [configure options] \n"
-    "Options:                      \n" \
-    "    --stage <initial stage>   \n"
+    echo -e "Usage: build.sh [script options] [configure options]\n"\
+    "Script options:\n"\
+    "    -h|--help       this help message\n"\
+    "    -i|--install    install libraries system-wide\n"
 }
 
 INSTALL="no"
@@ -24,12 +25,16 @@ then
     export CC CXX
 fi
 
-while test $# -gt 0 
+while test $# -gt 0
 do
-    case $1 in 
-	--install)
+    case $1 in
+	-i|--install)
 	    INSTALL="yes"
 	    shift
+	    ;;
+	-h|--help)
+	    usage
+	    exit 1
 	    ;;
 	*)
 	    # what's left is the arguments for configure

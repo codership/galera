@@ -4,9 +4,11 @@
 
 usage()
 {
-    echo -e "Usage: build.sh [script options] [configure options] \n"
-    "Script options:                  \n" \
-    "    -r|--release <RELEASE NUMBER>\n"
+    echo -e "Usage: build.sh [script options] [configure options] \n" \
+    "Script options:\n" \
+    "    -h|--help                       this help message\n"\
+    "    -r|--release <RELEASE NUMBER>   release number to put in the tarball\n"\
+    "                                    name: galera-source-XXX.tgz"
 }
 
 RELEASE=""
@@ -23,6 +25,10 @@ do
 	    RELEASE=$2
 	    shift
 	    shift
+	    ;;
+	-h|--help)
+	    usage
+	    exit 1
 	    ;;
 	*)
 	    # what's left is the arguments for configure
