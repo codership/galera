@@ -2375,6 +2375,10 @@ bool gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
 }
 
 
+// If some node declares some other node as unoperational but 
+// we find it operational, use 2/3 of inactive timeout to
+// declare one of them or both as unoperational. Shorter
+// timeout in order to avoid triggering consensus timer.
 void gcomm::evs::Proto::cross_check_inactives(const UUID& source,
                                               const MessageNodeList& nl)
 {
@@ -2391,8 +2395,7 @@ void gcomm::evs::Proto::cross_check_inactives(const UUID& source,
         {
             Node& local_node(NodeMap::get_value(local_i));
             if (local_node.get_operational() == true &&
-                (source < uuid || 
-                 local_node.get_tstamp() + (inactive_timeout*2)/3 < Date::now()))
+                local_node.get_tstamp() + (inactive_timeout*2)/3 < Date::now())
             {
                 local_node.set_operational(false);
             }
