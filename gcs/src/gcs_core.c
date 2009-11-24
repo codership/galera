@@ -450,6 +450,7 @@ core_handle_act_msg (gcs_core_t*          core,
                 /* foreign action, must be passed from gcs_group */
                 assert (NULL != act->act.buf);
                 assert (ret  == act->act.buf_len);
+                assert (act->id >= 0 || GCS_ACT_TORDERED != act->act.type);
             }
             else {
                 /* local action, get from FIFO, should be there already */

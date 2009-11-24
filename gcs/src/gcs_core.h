@@ -90,7 +90,7 @@ gcs_core_destroy (gcs_core_t* conn);
  *       The real status of action is determined only in gcs_core_recv() call.
  */
 extern ssize_t
-gcs_core_send (gcs_core_t*          core,
+gcs_core_send (gcs_core_t*    core,
                const void*    action,
                size_t         act_size,
                gcs_act_type_t act_type);

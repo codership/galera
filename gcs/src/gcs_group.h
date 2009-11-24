@@ -121,7 +121,7 @@ static inline ssize_t
 gcs_group_handle_act_msg (gcs_group_t*          group,
                           const gcs_act_frag_t* frg,
                           const gcs_recv_msg_t* msg,
-                          struct gcs_act_rcvd*  act)
+                          struct gcs_act_rcvd*  rcvd)
 {
     long    sender_idx = msg->sender_idx;
     bool    local      = (sender_idx == group->my_idx);
@@ -133,21 +133,22 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
     // clear reset flag if set by own first fragment after reset flag was set
     group->frag_reset = (group->frag_reset && (0 != frg->frag_no || !local));
 
-    ret = gcs_node_handle_act_frag (&group->nodes[sender_idx], frg, act, local);
+    ret = gcs_node_handle_act_frag (&group->nodes[sender_idx], frg, &rcvd->act,
+                                    local);
 
     if (ret > 0) {
 
-        assert (ret == act->act.buf_len);
+        assert (ret == rcvd->act.buf_len);
 
-        act->act.type   = frg->act_type;
+        rcvd->act.type   = frg->act_type;
 
-        if (gu_likely(GCS_ACT_TORDERED  == act->act.type &&
+        if (gu_likely(GCS_ACT_TORDERED  == rcvd->act.type &&
                       GCS_GROUP_PRIMARY == group->state  &&
                       !(group->frag_reset && local))) {
             /* Common situation -
              * increment and assign act_id only for totally ordered actions
              * and only in PRIM (skip messages while in state exchange) */
-            act->id = ++group->act_id;
+            rcvd->id = ++group->act_id;
         }
         else {
             /* Rare situations */
@@ -156,7 +157,7 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
                     /* Fragmentation was reset by configuration change.
                      * Should be true for ANY action type. */
                     if (GCS_GROUP_PRIMARY == group->state) {
-                        act->id =  -ERESTART;
+                        rcvd->id =  -ERESTART;
                     }
                     // else?
                 }

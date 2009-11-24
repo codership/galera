@@ -9,6 +9,7 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 . $SCRIPTS/jobs.sh
 . $SCRIPTS/action.sh
 . $SCRIPTS/kill.sh
+. $SCRIPTS/misc.sh
 
 TRIES=${1:-"-1"} # -1 stands for indefinite loop
 
@@ -33,31 +34,9 @@ trap terminate SIGINT SIGTERM SIGHUP SIGPIPE
 
 trap "kill $sqlgen_pid" EXIT
 
-# Returns variable amount of seconds to sleep
-pause()
-{
-    local min_sleep=1
-    local var_sleep=10
-    local p=$(( $RANDOM % var_sleep + min_sleep ))
-
-    echo "Sleeping for $p sec."
-    sleep $p
-}
-
-# Pauses load to perform consistency check
-consistency_check()
-{
-    local ret=0
-
-    kill -STOP $sqlgen_pid
-    sleep 1
-    check || check || ret=$?
-    kill -CONT $sqlgen_pid # will receive SIGHUP in the case of script exit
-    return $ret
-}
-
 pause
-consistency_check
+consistency_check $sqlgen_pid
+
 # kills a node and restarts it after a while
 cycle()
 {
@@ -75,8 +54,7 @@ cycle()
     fi
 
     pause
-
-    consistency_check
+    consistency_check $sqlgen_pid
 
     echo "Restarting node $node_id..."
     restart_node "-g $(gcs_address $node)" $node
@@ -97,7 +75,7 @@ do
     cycle $node
 
     pause
-    consistency_check
+    consistency_check $sqlgen_pid
 
     node=$(( ( node + 1 ) % node_num ))
 done

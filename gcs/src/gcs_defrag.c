@@ -30,7 +30,7 @@
 ssize_t
 gcs_defrag_handle_frag (gcs_defrag_t*         df,
                         const gcs_act_frag_t* frg,
-                        struct gcs_act_rcvd*  act,
+                        struct gcs_act*       act,
                         bool                  local)
 {
     if (df->received) {
@@ -123,9 +123,9 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
     }
     else {
         assert (df->received == df->size);
-        act->act.buf     = df->head;
-        act->act.buf_len = df->received;
+        act->buf     = df->head;
+        act->buf_len = df->received;
         gcs_defrag_init (df);
-        return act->act.buf_len;
+        return act->buf_len;
     }
 }

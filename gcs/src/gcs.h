@@ -146,6 +146,9 @@ typedef enum gcs_act_type
 }
 gcs_act_type_t;
 
+/*! String representations of action types */
+extern const char* gcs_act_type_to_str(gcs_act_type_t);
+
 /*! @brief Sends an action to group and returns.
  * Action is not duplicated, therefore action buffer
  * should not be accessed by application after the call returns.

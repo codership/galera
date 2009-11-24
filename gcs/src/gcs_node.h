@@ -77,7 +77,7 @@ gcs_node_reset_local (gcs_node_t* node);
 static inline ssize_t
 gcs_node_handle_act_frag (gcs_node_t*           node,
                           const gcs_act_frag_t* frg,
-                          struct gcs_act_rcvd*  act,
+                          struct gcs_act*       act,
                           bool                  local)
 {
     if (gu_likely(GCS_ACT_SERVICE != frg->act_type)) {

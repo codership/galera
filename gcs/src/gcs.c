@@ -21,6 +21,19 @@
 #include "gcs_core.h"
 #include "gcs_fifo_lite.h"
 
+const char* gcs_act_type_to_str (gcs_act_type_t type)
+{
+    static const char* str[GCS_ACT_UNKNOWN + 1] =
+    {
+        "TORDERED", "COMMIT_CUT", "STATE_REQUEST", "CONFIGURATION",
+        "JOIN", "SYNC", "FLOW", "SERVICE", "ERROR", "UNKNOWN"
+    };
+
+    if (((unsigned long)type) < GCS_ACT_UNKNOWN) return str[type];
+
+    return str[GCS_ACT_UNKNOWN];
+}
+
 static const long GCS_MAX_REPL_THREADS = 16384;
 
 // Flow control parameters
@@ -41,7 +54,7 @@ gcs_conn_state_t;
 
 #define GCS_CLOSED_ERROR -EBADFD; // file descriptor in bad state
 
-static const char* gcs_conn_state_string[GCS_CONN_DESTROYED + 1] =
+static const char* gcs_conn_state_str[GCS_CONN_DESTROYED + 1] =
 {
     "SYNCED",
     "JOINED",
@@ -350,12 +363,12 @@ gcs_become_donor (gcs_conn_t* conn)
     }
 
     gu_warn ("Rejecting SST request in state '%s'. Joiner should be restarted.",
-             gcs_conn_state_string[conn->state]);
+             gcs_conn_state_str[conn->state]);
 
     if (conn->state < GCS_CONN_OPEN){
         ssize_t err;
         gu_warn ("Received State Transfer Request in wrong state %s. "
-                 "Rejecting.", gcs_conn_state_string[conn->state]);
+                 "Rejecting.", gcs_conn_state_str[conn->state]);
         // reject the request.
         // error handling currently is way too simplistic
         err = gcs_join (conn, -EPROTO);
@@ -386,7 +399,7 @@ gcs_become_joined (gcs_conn_t* conn)
     }
     else if (conn->state < GCS_CONN_OPEN){
         gu_warn ("Received JOIN action in wrong state %s",
-                 gcs_conn_state_string[conn->state]);
+                 gcs_conn_state_str[conn->state]);
         assert (0);
     }
 }
@@ -399,7 +412,7 @@ gcs_become_synced (gcs_conn_t* conn)
     }
     else if (conn->state <= GCS_CONN_OPEN && conn->state > GCS_CONN_SYNCED) {
         gu_warn ("Received SYNC action in wrong state %s",
-                 gcs_conn_state_string[conn->state]);
+                 gcs_conn_state_str[conn->state]);
         // assert (0); may happen 
     }
 }
@@ -603,8 +616,7 @@ static void *gcs_recv_thread (void *arg)
               * return false to fall to the 'else' branch; unlikely case */ 
              (gcs_fifo_lite_release (conn->repl_q), false)))
         {
-            /* local action */
-//            gu_debug ("Local action");
+            /* local action from repl_q */
             struct gcs_repl_act* repl_act = *repl_act_ptr;
             gcs_fifo_lite_pop_head (conn->repl_q);
 
@@ -618,7 +630,7 @@ static void *gcs_recv_thread (void *arg)
             gu_cond_signal  (&repl_act->wait_cond);
             gu_mutex_unlock (&repl_act->wait_mutex);
         }
-        else
+        else if (gu_likely(this_act_id >= 0))
         {
             /* remote/non-replicated action */
             struct gcs_recv_act* recv_act = gu_fifo_get_tail (conn->recv_q);
@@ -644,10 +656,31 @@ static void *gcs_recv_thread (void *arg)
                 ret = -EBADFD;
                 break;
             }
-
 //            gu_info("Received foreign action of type %d, size %d, id=%llu, "
 //                    "action %p", rcvd.act.type, rcvd.act.buf_len,
 //                    this_act_id, rcvd.act.buf);
+        }
+        else if (conn->my_idx == rcvd.sender_idx)
+        {
+#ifndef NDEBUG
+            gu_warn ("Protocol violation: unordered local action not in repl_q:"
+                     " { {%p, %zd, %s}, %ld, %lld }, ignoring.",
+                     rcvd.act.buf, rcvd.act.buf_len,
+                     gcs_act_type_to_str(rcvd.act.type), rcvd.id,
+                     rcvd.sender_idx);
+#endif
+            assert(0);
+        }
+        else
+        {
+            gu_fatal ("Protocol violation: unordered remote action: "
+                      "{ {%p, %zd, %s}, %ld, %lld }",
+                      rcvd.act.buf, rcvd.act.buf_len,
+                      gcs_act_type_to_str(rcvd.act.type), rcvd.id,
+                      rcvd.sender_idx);
+            assert (0);
+            ret = -ENOTRECOVERABLE;
+            break;
         }
     }
 
@@ -895,11 +928,13 @@ long gcs_repl (gcs_conn_t          *conn,
                 while ((ret = gcs_core_send (conn->core, action,
                                              act_size, act_type)) == -ERESTART);
                 if (ret < 0) {
-                    /* sending failed - remove item from the queue */
-                    gu_warn ("Send action returned %d (%s)",
+                    /* remove item from the queue, it will never be delivered */
+                    gu_warn ("Send action {%p, %zd, %s} returned %d (%s)",
+                             action, act_size, gcs_act_type_to_str(act_type),
                              ret, strerror(-ret));
                     if (!gcs_fifo_lite_remove (conn->repl_q)) {
                         gu_fatal ("Failed to remove unsent item from repl_q");
+                        assert(0);
                         ret = -ENOTRECOVERABLE;
                     }
                 }

@@ -25,7 +25,7 @@ action.sh  - usual start/stop/restart/check commands, both cluster-wide and
 
 kill.sh    - a per-node kill -9 command
 
-Assumed convention: cluster wide commands are just commnads, per-node commands
+Assumed convention: cluster-wide commands are just commnads, per-node commands
 have _node suffix. E.g.
 
 ./command.sh start
