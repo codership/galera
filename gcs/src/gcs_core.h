@@ -27,6 +27,7 @@
 #include <galerautils.h>
 
 #include "gcs.h"
+#include "gcs_act.h"
 
 struct gcs_core;
 typedef struct gcs_core gcs_core_t; 
@@ -89,10 +90,10 @@ gcs_core_destroy (gcs_core_t* conn);
  *       The real status of action is determined only in gcs_core_recv() call.
  */
 extern ssize_t
-gcs_core_send (gcs_core_t*     conn,
-               const void*     action,
-               size_t          act_size,
-               gcs_act_type_t  act_type);
+gcs_core_send (gcs_core_t*          core,
+               const void*    action,
+               size_t         act_size,
+               gcs_act_type_t act_type);
 
 /*
  * gcs_core_recv() blocks until some action is received from group.
@@ -106,10 +107,8 @@ gcs_core_send (gcs_core_t*     conn,
  *       resent.
  */
 extern ssize_t
-gcs_core_recv (gcs_core_t*     conn,
-               const void**    action,
-               gcs_act_type_t* act_type,
-               gcs_seqno_t*    act_id);
+gcs_core_recv (gcs_core_t*          conn,
+               struct gcs_act_rcvd* recv_act);
 
 /* Configuration functions */
 /* Sets maximum message size to achieve requested network packet size. 

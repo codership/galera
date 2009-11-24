@@ -707,29 +707,31 @@ group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
 
 /* Cleanup ignored state request */
 static void
-group_ignore_state_request (gcs_recv_act_t* act)
+group_ignore_state_request (struct gcs_act_rcvd* act)
 {
-    free ((void*)act->buf);
-    act->buf     = NULL;
-    act->buf_len = 0;
-    act->type    = GCS_ACT_ERROR;
+    free ((void*)act->act.buf);
+    act->act.buf     = NULL;
+    act->act.buf_len = 0;
+    act->act.type    = GCS_ACT_ERROR;
+    act->sender_idx  = -1;
     assert (GCS_SEQNO_ILL == act->id);
 }
 
 /* NOTE: check gcs_request_state_transfer() for sender part. */
 /*! Returns 0 if request is ignored, request size if it should be passed up */
 long
-gcs_group_handle_state_request (gcs_group_t*    group,
-                                long            joiner_idx,
-                                gcs_recv_act_t* act)
+gcs_group_handle_state_request (gcs_group_t*         group,
+                                long                 joiner_idx,
+                                struct gcs_act_rcvd* act)
 {
     // pass only to sender and to one potential donor
-    size_t           donor_name_len = strlen(act->buf);
+    const char*      donor_name     = act->act.buf;
+    size_t           donor_name_len = strlen(donor_name);
     long             donor_idx;
     const char*      joiner_name    = group->nodes[joiner_idx].name;
     gcs_state_node_t joiner_status  = group->nodes[joiner_idx].status;
 
-    assert (GCS_ACT_STATE_REQ == act->type);
+    assert (GCS_ACT_STATE_REQ == act->act.type);
 
     if (joiner_status != GCS_STATE_PRIM) {
 
@@ -739,7 +741,7 @@ gcs_group_handle_state_request (gcs_group_t*    group,
             gu_error ("Requesting state transfer while in %s. "
                       "Ignoring.", joiner_status_string);
             act->id = -ECANCELED;
-            return act->buf_len;
+            return act->act.buf_len;
         }
         else {
             gu_error ("Node %ld (%s) requested state transfer, "
@@ -750,32 +752,22 @@ gcs_group_handle_state_request (gcs_group_t*    group,
         }
     }
 
-    donor_idx = group_select_donor(group, joiner_idx, act->buf);
+    donor_idx = group_select_donor(group, joiner_idx, donor_name);
+
     assert (donor_idx != joiner_idx);
-#if 0 // delete this segment
-    if (donor_idx >= 0) {
-        gu_info ("Node %ld (%s) requested State Transfer from '%s'. "
-                 "Selected %ld (%s) as donor.",
-                 joiner_idx, joiner_name, required_donor ? act->buf : "",
-                 donor_idx,  group->nodes[donor_idx].name);
-    }
-    else {
-        gu_warn ("Node %ld (%s) requested State Transfer from '%s', "
-                 "but it is impossible to select State Transfer donor: "
-                 "%d (%s)",
-                 joiner_idx, joiner_name, required_donor ? act->buf : "",
-                 donor_idx, strerror (-donor_idx));
-    }
-#endif
+
     if (group->my_idx != joiner_idx && group->my_idx != donor_idx) {
         // if neither DONOR nor JOINER, ignore request
         group_ignore_state_request (act);
         return 0;
     }
     else if (group->my_idx == donor_idx) {
-        act->buf_len -= donor_name_len + 1;
-        memmove (*(void**)&act->buf, act->buf + donor_name_len+1, act->buf_len);
-        // now action starts with request, see gcs_request_state_transfer()
+        act->act.buf_len -= donor_name_len + 1;
+        memmove (*(void**)&act->act.buf,
+                 act->act.buf + donor_name_len+1,
+                 act->act.buf_len);
+        // now action starts with request, like it was supplied by application,
+        // see gcs_request_state_transfer()
     }
 
     // Return index of donor (or error) in the seqno field to sender.
@@ -784,12 +776,12 @@ gcs_group_handle_state_request (gcs_group_t*    group,
     // This may be ugly, well, any ideas?
     act->id = donor_idx;
 
-    return act->buf_len;
+    return act->act.buf_len;
 }
 
 /* Creates new configuration action */
 ssize_t
-gcs_group_act_conf (gcs_group_t* group, gcs_recv_act_t* act)
+gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act)
 {
     ssize_t conf_size = sizeof(gcs_act_conf_t) + group->num*GCS_MEMBER_NAME_MAX;
     gcs_act_conf_t* conf = malloc (conf_size);
@@ -822,8 +814,10 @@ gcs_group_act_conf (gcs_group_t* group, gcs_recv_act_t* act)
             conf->st_required = false;
         }
 
-        act->buf  = conf;
-        act->type = GCS_ACT_CONF;
+        act->buf     = conf;
+        act->buf_len = conf_size;
+        act->type    = GCS_ACT_CONF;
+
         return conf_size;
     }
     else {

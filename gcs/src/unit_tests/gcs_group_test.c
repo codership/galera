@@ -91,8 +91,9 @@ START_TEST (gcs_group_configuration)
     gcs_recv_msg_t msg1, msg2, msg3, msg4, msg5;
     gcs_act_frag_t frg1, frg2, frg3, frg4, frg5, frg;
 
-    gcs_recv_act_t act;
-    
+    struct gcs_act_rcvd r_act;
+    struct gcs_act* act = &r_act.act;
+
     gcs_comp_msg_t* comp;
 
     mark_point();
@@ -148,29 +149,29 @@ START_TEST (gcs_group_configuration)
 
 #define TRY_MESSAGE(msg) \
     ret = gcs_act_proto_read (&frg, (msg).buf, (msg).size);     \
-    ret = gcs_group_handle_act_msg (&group, &frg, &(msg), &act);
+    ret = gcs_group_handle_act_msg (&group, &frg, &(msg), &r_act);
 
     // 1. Try fragment that is not the first
-    memset (&act, 0, sizeof(act));
-//    ret = gcs_group_handle_act_msg (&group, &frg, &msg3, &act);
+    memset (&r_act, 0, sizeof(r_act));
+//    ret = gcs_group_handle_act_msg (&group, &frg, &msg3, &r_act);
     TRY_MESSAGE(msg3);
     fail_if (ret != -EPROTO);
-    fail_if (act.buf != NULL);
-    fail_if (act.buf_len != 0);
+    fail_if (act->buf != NULL);
+    fail_if (act->buf_len != 0);
     mark_point();
 
     // 2. Try first fragment
-//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
     TRY_MESSAGE(msg1);
     fail_if (ret != 0);
-    fail_if (act.buf != NULL);
-    fail_if (act.buf_len != 0);
+    fail_if (act->buf != NULL);
+    fail_if (act->buf_len != 0);
 
 #define TRY_WRONG_2ND_FRAGMENT(frag)                      \
-    /*ret = gcs_group_handle_act_msg (&group, &frag, &act);*/    \
+    /*ret = gcs_group_handle_act_msg (&group, &frag, &r_act);*/    \
     TRY_MESSAGE(frag);                                    \
     fail_if (ret != -EPROTO);                             \
-    fail_if (act.buf_len != 0);
+    fail_if (act->buf_len != 0);
 
     // 3. Try first fragment again
     gu_debug ("");
@@ -187,23 +188,23 @@ START_TEST (gcs_group_configuration)
     TRY_WRONG_2ND_FRAGMENT(msg5);
 
     // 7. Try correct second fragment
-//    ret = gcs_group_handle_act_msg (&group, &msg2, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg2, &r_act);
     TRY_MESSAGE(msg2);
     fail_if (ret != 0);
-    fail_if (act.buf != NULL); act.buf = (void*)0x12354; // shall be NULLed
-    fail_if (act.buf_len != 0);
+    fail_if (act->buf != NULL); act->buf = (void*)0x12354; // shall be NULLed
+    fail_if (act->buf_len != 0);
 
     // 8. Try third fragment, last one
-//    ret = gcs_group_handle_act_msg (&group, &msg3, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg3, &r_act);
     TRY_MESSAGE(msg3);
     fail_if (ret != act_len);
-    fail_if (act.sender_idx != 0);
-    fail_if (act.buf != NULL); // local action, must be fetched from local fifo
-    fail_if (act.buf_len != act_len);
-    fail_if (act.id != seqno, "Expected seqno %llu, found %llu", seqno, act.id);
+    fail_if (r_act.sender_idx != 0);
+    fail_if (act->buf != NULL); // local action, must be fetched from local fifo
+    fail_if (act->buf_len != act_len);
+    fail_if (r_act.id != seqno, "Expected seqno %llu, found %llu", seqno, r_act.id);
     seqno++;
     // cleanup
-    memset (&act, 0, sizeof(act));
+    memset (&r_act, 0, sizeof(r_act));
 
     // 10. New component message
     gcs_comp_msg_delete (comp);
@@ -216,32 +217,32 @@ START_TEST (gcs_group_configuration)
     fail_if (ret < 0);
 //    fail_if (!gcs_group_is_primary(&group));
 //    fail_if (!gcs_group_new_members(&group)); RECEIVE_SYNC();
-    
+
     // 11. Try the same with foreign action (now my index is 1, sender is 0)
-//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
     TRY_MESSAGE(msg1);
     fail_if (ret != 0);
-    fail_if (act.buf_len != 0);
-    fail_if (act.buf != NULL);
-//    ret = gcs_group_handle_act_msg (&group, &msg2, &act);
+    fail_if (act->buf_len != 0);
+    fail_if (act->buf != NULL);
+//    ret = gcs_group_handle_act_msg (&group, &msg2, &r_act);
     TRY_MESSAGE(msg2);
     fail_if (ret != 0);
-    fail_if (act.buf_len != 0);
-    fail_if (act.buf != NULL);
-//    ret = gcs_group_handle_act_msg (&group, &msg3, &act);
+    fail_if (act->buf_len != 0);
+    fail_if (act->buf != NULL);
+//    ret = gcs_group_handle_act_msg (&group, &msg3, &r_act);
     TRY_MESSAGE(msg3);
     fail_if (ret != act_len);
-    fail_if (act.buf_len != act_len);
-    fail_if (act.buf == NULL);
-    fail_if (strncmp(act.buf, act_buf, act_len),
+    fail_if (act->buf_len != act_len);
+    fail_if (act->buf == NULL);
+    fail_if (strncmp(act->buf, act_buf, act_len),
              "Action received: '%s', expected '%s'", act_buf);
-    fail_if (act.sender_idx != 0);
-    fail_if (act.type != GCS_ACT_TORDERED);
-    fail_if (act.id != seqno, "Expected seqno %llu, found %llu", seqno, act.id);
+    fail_if (r_act.sender_idx != 0);
+    fail_if (act->type != GCS_ACT_TORDERED);
+    fail_if (r_act.id != seqno, "Expected seqno %llu, found %llu", seqno, r_act.id);
     seqno++;
     // cleanup
-    free ((void*)act.buf);
-    memset (&act, 0, sizeof(act));
+    free ((void*)act->buf);
+    memset (&r_act, 0, sizeof(r_act));
 
     // 12. Try foreign action with a new node joined in the middle.
     gcs_comp_msg_delete (comp);
@@ -251,66 +252,66 @@ START_TEST (gcs_group_configuration)
     fail_if (gcs_comp_msg_add (comp, LOCALHOST) < 0);
     fail_if (gcs_comp_msg_add (comp, DISTANTHOST) < 0);
 
-//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
     TRY_MESSAGE(msg1);
     fail_if (ret != 0);
-    fail_if (act.buf_len != 0);
-    fail_if (act.buf != NULL);
+    fail_if (act->buf_len != 0);
+    fail_if (act->buf != NULL);
 
     ret = new_component (&group, comp);
     fail_if (ret < 0);
 //    fail_if (!gcs_group_is_primary(&group));
 //    fail_if (!gcs_group_new_members(&group)); RECEIVE_SYNC();
-    
+
     // now I must be able to resend the action from scratch
-//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
     TRY_MESSAGE(msg1);
     fail_if (ret != 0);
-    fail_if (act.buf_len != 0);
-    fail_if (act.buf != NULL);
-//    ret = gcs_group_handle_act_msg (&group, &msg2, &act);
+    fail_if (act->buf_len != 0);
+    fail_if (act->buf != NULL);
+//    ret = gcs_group_handle_act_msg (&group, &msg2, &r_act);
     TRY_MESSAGE(msg2);
     fail_if (ret != 0);
-    fail_if (act.buf_len != 0);
-    fail_if (act.buf != NULL);
-//    ret = gcs_group_handle_act_msg (&group, &msg3, &act);
+    fail_if (act->buf_len != 0);
+    fail_if (act->buf != NULL);
+//    ret = gcs_group_handle_act_msg (&group, &msg3, &r_act);
     TRY_MESSAGE(msg3);
     fail_if (ret != act_len);
-    fail_if (act.buf_len != act_len);
-    fail_if (act.buf == NULL);
-    fail_if (strncmp(act.buf, act_buf, act_len),
+    fail_if (act->buf_len != act_len);
+    fail_if (act->buf == NULL);
+    fail_if (strncmp(act->buf, act_buf, act_len),
              "Action received: '%s', expected '%s'", act_buf);
-    fail_if (act.sender_idx != 0);
-    fail_if (act.type != GCS_ACT_TORDERED);
-    fail_if (act.id != seqno, "Expected seqno %llu, found %llu", seqno, act.id);
+    fail_if (r_act.sender_idx != 0);
+    fail_if (act->type != GCS_ACT_TORDERED);
+    fail_if (r_act.id != seqno, "Expected seqno %llu, found %llu", seqno, r_act.id);
     seqno++;
     // cleanup
-    free ((void*)act.buf);
-    memset (&act, 0, sizeof(act));
+    free ((void*)act->buf);
+    memset (&r_act, 0, sizeof(r_act));
 
     // 13. Try to send an action with one node disappearing in the middle
     //     and order of nodes changed
 
     // 13.1 Each node sends a message
-//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
     TRY_MESSAGE(msg1);
     fail_if (ret != 0);
-    fail_if (act.buf_len != 0);
-    fail_if (act.buf != NULL);
+    fail_if (act->buf_len != 0);
+    fail_if (act->buf != NULL);
 
     msg_write (&msg1, &frg1, buf1, buf_len, frag1, frag1_len, 1,GCS_MSG_ACTION);
-//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
     TRY_MESSAGE(msg1);
     fail_if (ret != 0);
-    fail_if (act.buf_len != 0);
-    fail_if (act.buf != NULL);
+    fail_if (act->buf_len != 0);
+    fail_if (act->buf != NULL);
 
     msg_write (&msg1, &frg1, buf1, buf_len, frag1, frag1_len, 2,GCS_MSG_ACTION);
-//    ret = gcs_group_handle_act_msg (&group, &msg1, &act);
+//    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
     TRY_MESSAGE(msg1);
     fail_if (ret != 0);
-    fail_if (act.buf_len != 0);
-    fail_if (act.buf != NULL);
+    fail_if (act->buf_len != 0);
+    fail_if (act->buf != NULL);
 
     // 13.2 configuration changes, one node disappears
     // (REMOTEHOST, LOCALHOST, DISTANTHOST) -> (LOCALHOST, REMOTEHOST)
@@ -329,43 +330,43 @@ START_TEST (gcs_group_configuration)
     gcs_comp_msg_delete (comp);
 return;
     // 13.3 now I just continue sending messages
-//    ret = gcs_group_handle_act_msg (&group, &msg2, &act); // local
+//    ret = gcs_group_handle_act_msg (&group, &msg2, &r_act); // local
     TRY_MESSAGE(msg2);
     fail_if (ret != 0, "%d (%s)", ret, strerror(-ret));
-    fail_if (act.buf_len != 0);
-    fail_if (act.buf != NULL);
+    fail_if (act->buf_len != 0);
+    fail_if (act->buf != NULL);
     msg_write (&msg2, &frg2, buf2, buf_len, frag2, frag2_len, 1,GCS_MSG_ACTION);
-//    ret = gcs_group_handle_act_msg (&group, &msg2, &act); // foreign
+//    ret = gcs_group_handle_act_msg (&group, &msg2, &r_act); // foreign
     TRY_MESSAGE(msg2);
     fail_if (ret != 0);
-    fail_if (act.buf_len != 0);
-    fail_if (act.buf != NULL);
-    act.buf = (void*)0x11111; // shall be NULLed below when local act is recvd
-//    ret = gcs_group_handle_act_msg (&group, &msg3, &act); // local
+    fail_if (act->buf_len != 0);
+    fail_if (act->buf != NULL);
+    act->buf = (void*)0x11111; // shall be NULLed below when local act is recvd
+//    ret = gcs_group_handle_act_msg (&group, &msg3, &r_act); // local
     TRY_MESSAGE(msg3);
     fail_if (ret != act_len);
-    fail_if (act.buf_len != act_len);
-    fail_if (act.buf != NULL);
-    fail_if (act.sender_idx != 0);
-    fail_if (act.type != GCS_ACT_TORDERED);
-    fail_if (act.id != seqno, "Expected seqno %llu, found %llu", seqno, act.id);
+    fail_if (act->buf_len != act_len);
+    fail_if (act->buf != NULL);
+    fail_if (r_act.sender_idx != 0);
+    fail_if (act->type != GCS_ACT_TORDERED);
+    fail_if (r_act.id != seqno, "Expected seqno %llu, found %llu", seqno, r_act.id);
     seqno++;
 
     msg_write (&msg3, &frg3, buf3, buf_len, frag3, frag3_len, 1,GCS_MSG_ACTION);
-//    ret = gcs_group_handle_act_msg (&group, &msg3, &act); // foreign
+//    ret = gcs_group_handle_act_msg (&group, &msg3, &r_act); // foreign
     TRY_MESSAGE(msg3);
     fail_if (ret != act_len);
-    fail_if (act.buf_len != act_len);
-    fail_if (act.buf == NULL);
-    fail_if (strncmp(act.buf, act_buf, act_len),
+    fail_if (act->buf_len != act_len);
+    fail_if (act->buf == NULL);
+    fail_if (strncmp(act->buf, act_buf, act_len),
              "Action received: '%s', expected '%s'", act_buf);
-    fail_if (act.sender_idx != 1);
-    fail_if (act.type != GCS_ACT_TORDERED); 
-    fail_if (act.id != seqno, "Expected seqno %llu, found %llu", seqno, act.id);
+    fail_if (r_act.sender_idx != 1);
+    fail_if (act->type != GCS_ACT_TORDERED); 
+    fail_if (r_act.id != seqno, "Expected seqno %llu, found %llu", seqno, r_act.id);
     seqno++;
     // cleanup
-    free ((void*)act.buf);
-    memset (&act, 0, sizeof(act));
+    free ((void*)act->buf);
+    memset (&r_act, 0, sizeof(r_act));
 
     // Leave group
     comp = gcs_comp_msg_new (FALSE, -1, 0);

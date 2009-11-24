@@ -17,7 +17,7 @@
 
 #include "gcs.h"     // for gcs_seqno_t et al.
 #include "gcs_act_proto.h"
-#include "gcs_recv_act.h"
+#include "gcs_act.h"
 
 typedef struct gcs_defrag
 {
@@ -48,7 +48,7 @@ gcs_defrag_init (gcs_defrag_t* df)
 extern ssize_t
 gcs_defrag_handle_frag (gcs_defrag_t*         df,
                         const gcs_act_frag_t* frg,
-                        gcs_recv_act_t*       act,
+                        struct gcs_act_rcvd*  act,
                         bool                  local);
 
 /*! Deassociate, but don't deallocate action resources */

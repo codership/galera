@@ -79,7 +79,13 @@ core_recv_thread (void* arg)
 {
     action_t* act = arg;
 
-    act->size = gcs_core_recv (Core, &act->data, &act->type, &act->seqno);
+    // @todo: refactor according to new gcs_act types
+    struct gcs_act_rcvd recv_act;
+
+    act->size = gcs_core_recv (Core, &recv_act);
+    act->data = recv_act.act.buf;
+    act->type = recv_act.act.type;
+    act->seqno = recv_act.id;
 
     return (NULL);
 }
@@ -116,7 +122,8 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
     // action is ordered only if it is of type GCS_ACT_TORDERED and not an error
     if (act->seqno >= GCS_SEQNO_NIL) {
         FAIL_IF (GCS_ACT_TORDERED != act->type,
-                 "GCS_ACT_TORDERED != act->type");
+                 "GCS_ACT_TORDERED != act->type (%d), while act->seqno: %lld",
+                 act->type, (long long)act->seqno);
         FAIL_IF ((*seqno + 1) != act->seqno,
                  "expected seqno %lld, got %lld",
                  (long long)(*seqno + 1), (long long)act->seqno);
@@ -136,6 +143,7 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
                      "Received buffer contents is not the same as sent");
         }
     }
+
     return false;
 }
 
@@ -163,7 +171,12 @@ static bool CORE_RECV_ACT (action_t*      act,
                            ssize_t        size,
                            gcs_act_type_t type)
 {
-    act->size = gcs_core_recv (Core, &act->data, &act->type, &act->seqno);
+    struct gcs_act_rcvd recv_act;
+
+    act->size  = gcs_core_recv (Core, &recv_act);
+    act->data  = recv_act.act.buf;
+    act->type  = recv_act.act.type;
+    act->seqno = recv_act.id;
 
     return COMMON_RECV_CHECKS (act, buf, size, type, &Seqno);
 }

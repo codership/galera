@@ -27,7 +27,7 @@
 
 typedef struct gcs_fifo_lite
 {
-    long       length;
+    long        length;
     ulong       item_size;
     ulong       mask;
     ulong       head;
@@ -64,25 +64,34 @@ _gcs_fifo_lite_head (gcs_fifo_lite_t* f)
     return ((char*)f->queue + f->head * f->item_size);
 }
 
+#define GCS_FIFO_LITE_LOCK                                              \
+    if (gu_unlikely (gu_mutex_lock (&fifo->lock))) {                    \
+        gu_fatal ("Mutex lock failed.");                                \
+        abort();                                                        \
+    }
+
 /*! If FIFO is not full, returns pointer to the tail item and locks FIFO,
  *  otherwise blocks. Or returns NULL if FIFO is closed. */
 static inline void*
 gcs_fifo_lite_get_tail (gcs_fifo_lite_t* fifo)
 {
     register void* ret = NULL;
-    if (gu_likely(!gu_mutex_lock (&fifo->lock))) {
-        while (!fifo->closed && fifo->used >= fifo->length) {
-            fifo->put_wait++;
-            gu_cond_wait (&fifo->put_cond, &fifo->lock);
-        }
-        if (gu_likely(!fifo->closed)) {
-            assert (fifo->used < fifo->length);
-            ret = _gcs_fifo_lite_tail (fifo);
-        }
-        else {
-            gu_mutex_unlock (&fifo->lock);
-        }
+
+    GCS_FIFO_LITE_LOCK;
+
+    while (!fifo->closed && fifo->used >= fifo->length) {
+        fifo->put_wait++;
+        gu_cond_wait (&fifo->put_cond, &fifo->lock);
     }
+
+    if (gu_likely(!fifo->closed)) {
+        assert (fifo->used < fifo->length);
+        ret = _gcs_fifo_lite_tail (fifo);
+    }
+    else {
+        gu_mutex_unlock (&fifo->lock);
+    }
+
     return ret;
 }
 
@@ -92,11 +101,14 @@ gcs_fifo_lite_push_tail (gcs_fifo_lite_t* fifo)
 {
     fifo->tail = (fifo->tail + 1) & fifo->mask;
     fifo->used++;
+
     assert (fifo->used <= fifo->length);
+
     if (fifo->get_wait > 0) {
         fifo->get_wait--;
         gu_cond_signal (&fifo->get_cond);
     }
+
     gu_mutex_unlock (&fifo->lock);
 }
 
@@ -107,23 +119,22 @@ static inline void*
 gcs_fifo_lite_get_head (gcs_fifo_lite_t* fifo)
 {
     register void* ret = NULL;
-    if (gu_likely(!gu_mutex_lock (&fifo->lock))) {
+
+    GCS_FIFO_LITE_LOCK;
+
 /* Uncomment this for blocking behaviour
-        while (!fifo->closed && 0 == fifo->used) {
-            fifo->get_wait++;
-            gu_cond_wait (&fifo->get_cond, &fifo->lock);
-        }
+   while (!fifo->closed && 0 == fifo->used) {
+   fifo->get_wait++;
+   gu_cond_wait (&fifo->get_cond, &fifo->lock);
+   }
 */
-        // FIXME: Assert below is triggered by gcs_recv_thread() when
-	// initializing local_action. That function must be reworked.
-        //assert ((fifo->closed) || (fifo->used > 0));
-        if (gu_likely(fifo->used > 0)) {
-            ret = _gcs_fifo_lite_head (fifo);
-        }
-        else {
-            gu_mutex_unlock (&fifo->lock);
-        }
+    if (gu_likely(fifo->used > 0)) {
+        ret = _gcs_fifo_lite_head (fifo);
     }
+    else {
+        gu_mutex_unlock (&fifo->lock);
+    }
+
     return ret;
 }
 
@@ -133,11 +144,14 @@ gcs_fifo_lite_pop_head (gcs_fifo_lite_t* fifo)
 {
     fifo->head = (fifo->head + 1) & fifo->mask;
     fifo->used--;
+
     assert (fifo->used != -1);
+
     if (fifo->put_wait > 0) {
         fifo->put_wait--;
         gu_cond_signal (&fifo->put_cond);
     }
+
     gu_mutex_unlock (&fifo->lock);
 }
 
@@ -155,19 +169,19 @@ gcs_fifo_lite_remove (gcs_fifo_lite_t* const fifo)
     register bool ret = false;
     assert (fifo);
 
-    if (gu_mutex_lock (&fifo->lock)) {
-	return false;
-    }
-    
-    if (fifo->used) {    
+    GCS_FIFO_LITE_LOCK;
+
+    if (fifo->used) {
         fifo->tail = (fifo->tail - 1) & fifo->mask;
         fifo->used--;
         ret = true;
+
         if (fifo->put_wait > 0) {
             fifo->put_wait--;
             gu_cond_signal (&fifo->put_cond);
         }
     }
+
     gu_mutex_unlock (&fifo->lock);
 
     return ret;

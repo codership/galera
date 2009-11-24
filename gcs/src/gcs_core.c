@@ -75,6 +75,7 @@ typedef struct core_act
 {
     gcs_seqno_t sent_act_id;
     const void* action;
+    size_t      action_size;
 }
 core_act_t;
 
@@ -278,7 +279,9 @@ gcs_core_send (gcs_core_t*      const conn,
 	goto out;
 
     if ((local_act = gcs_fifo_lite_get_tail (conn->fifo))) {
-        *local_act = (typeof(*local_act)){ conn->send_act_no, action };
+        *local_act = (typeof(*local_act)){ conn->send_act_no,
+                                           action,
+                                           act_size };
         gcs_fifo_lite_push_tail (conn->fifo);
     }
     else {
@@ -415,14 +418,14 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg)
  * @return action size, negative error code or 0 to continue.
  */
 static inline ssize_t
-core_handle_act_msg (gcs_core_t*     core,
-                     gcs_recv_msg_t* msg,
-                     gcs_recv_act_t* act)
+core_handle_act_msg (gcs_core_t*          core,
+                     struct gcs_recv_msg* msg,
+                     struct gcs_act_rcvd* act)
 {
     ssize_t        ret = 0;
     gcs_group_t*   group = &core->group;
     gcs_act_frag_t frg;
-    register bool  my_msg = (gcs_group_my_idx(group) == msg->sender_idx);
+    bool  my_msg = (gcs_group_my_idx(group) == msg->sender_idx);
 
     assert (GCS_MSG_ACTION == msg->type);
 
@@ -440,26 +443,36 @@ core_handle_act_msg (gcs_core_t*     core,
 
         if (ret > 0) { /* complete action received */
 
+            act->sender_idx = msg->sender_idx;
+
             if (gu_likely(!my_msg)) {
                 /* foreign action, must be passed from gcs_group */
-                assert (act->buf != NULL);
+                assert (NULL != act->act.buf);
+                assert (ret  == act->act.buf_len);
             }
             else {
                 /* local action, get from FIFO, should be there already */
                 core_act_t* local_act;
                 gcs_seqno_t sent_act_id;
-                assert (act->buf == NULL);
+                assert (NULL == act->act.buf);
+                assert (ret  == act->act.buf_len);
 
                 if ((local_act = gcs_fifo_lite_get_head (core->fifo))){
-                    act->buf    = local_act->action;
-                    sent_act_id = local_act->sent_act_id;
-                    assert (NULL != act->buf);
+                    act->act.buf     = local_act->action;
+                    act->act.buf_len = local_act->action_size;
+                    sent_act_id      = local_act->sent_act_id;
+                    assert (NULL != act->act.buf);
                     gcs_fifo_lite_pop_head (core->fifo);
                     /* NOTE! local_act cannot be used after this point */
                     /* sanity check */
                     if (gu_unlikely(sent_act_id != frg.act_id)) {
                         gu_fatal ("FIFO violation: expected sent_act_id %lld "
                                   "found %lld", sent_act_id, frg.act_id);
+                        ret = -ENOTRECOVERABLE;
+                    }
+                    if (gu_unlikely(act->act.buf_len != ret)) {
+                        gu_fatal ("Send/recv action size mismatch: %zd/%zd",
+                                  act->act.buf_len, ret);
                         ret = -ENOTRECOVERABLE;
                     }
                 }
@@ -479,9 +492,10 @@ core_handle_act_msg (gcs_core_t*     core,
                 }
             }
 
-            if (gu_unlikely(GCS_ACT_STATE_REQ == act->type && ret > 0)) {
+            if (gu_unlikely(GCS_ACT_STATE_REQ == act->act.type && ret > 0)) {
                 ret = gcs_group_handle_state_request (group, msg->sender_idx,
                                                       act);
+                assert (ret <= 0 || ret == act->act.buf_len);
             }
 //          gu_debug ("Received action: seqno: %lld, sender: %d, size: %d, "
 //                    "act: %p", act->id, msg->sender_idx, ret, act->buf);
@@ -503,8 +517,8 @@ core_handle_act_msg (gcs_core_t*     core,
 #ifndef NDEBUG
     if (ret <= 0) {
         assert (GCS_SEQNO_ILL == act->id);
-        assert (GCS_ACT_ERROR == act->type);
-        assert (NULL == act->buf);
+        assert (GCS_ACT_ERROR == act->act.type);
+        assert (NULL == act->act.buf);
     }
 #endif
 
@@ -517,9 +531,9 @@ core_handle_act_msg (gcs_core_t*     core,
  * @return action size, negative error code or 0 to continue.
  */
 static ssize_t
-core_handle_last_msg (gcs_core_t*     core,
-                      gcs_recv_msg_t* msg,
-                      gcs_recv_act_t* act)
+core_handle_last_msg (gcs_core_t*          core,
+                      struct gcs_recv_msg* msg,
+                      struct gcs_act*      act)
 {
     assert (GCS_MSG_LAST == msg->type);
 
@@ -531,7 +545,8 @@ core_handle_last_msg (gcs_core_t*     core,
             if ((act->buf = malloc (sizeof (commit_cut)))) {
                 act->type                 = GCS_ACT_COMMIT_CUT;
                 *((gcs_seqno_t*)act->buf) = commit_cut;
-                return sizeof(commit_cut);
+                act->buf_len              = sizeof(commit_cut);
+                return act->buf_len;
             }
             else {
                 gu_fatal ("Out of memory for GCS_ACT_COMMIT_CUT");
@@ -553,9 +568,9 @@ core_handle_last_msg (gcs_core_t*     core,
  * @return action size, negative error code or 0 to continue.
  */
 static ssize_t
-core_handle_comp_msg (gcs_core_t*     core,
-                      gcs_recv_msg_t* msg,
-                      gcs_recv_act_t* act)
+core_handle_comp_msg (gcs_core_t*          core,
+                      struct gcs_recv_msg* msg,
+                      struct gcs_act*      act)
 {
     ssize_t      ret = 0;
     gcs_group_t* group = &core->group;
@@ -591,6 +606,7 @@ core_handle_comp_msg (gcs_core_t*     core,
             assert (0);
             ret = -ENOTRECOVERABLE;
         }
+        assert (ret == act->buf_len);
         break;
     case GCS_GROUP_WAIT_STATE_UUID:
         /* New members, need state exchange. If representative, send UUID */
@@ -644,6 +660,7 @@ core_handle_comp_msg (gcs_core_t*     core,
             assert (0);
             ret = -ENOTRECOVERABLE;
         }
+        assert (ret == act->buf_len);
         break;
     case GCS_GROUP_WAIT_STATE_MSG:
         gu_fatal ("Internal error: gcs_group_handle_comp() returned "
@@ -727,9 +744,9 @@ core_handle_uuid_msg (gcs_core_t*     core,
  * @return action size, negative error code or 0 to continue.
  */
 static ssize_t
-core_handle_state_msg (gcs_core_t*     core,
-                       gcs_recv_msg_t* msg,
-                       gcs_recv_act_t* act)
+core_handle_state_msg (gcs_core_t*          core,
+                       struct gcs_recv_msg* msg,
+                       struct gcs_act*      act)
 {
     ssize_t      ret = 0;
     gcs_group_t* group = &core->group;
@@ -770,6 +787,7 @@ core_handle_state_msg (gcs_core_t*     core,
                 assert (0);
                 ret = -ENOTRECOVERABLE;
             }
+            assert (ret == act->buf_len);
             break;
         case GCS_GROUP_WAIT_STATE_MSG:
             // waiting for more state messages
@@ -792,9 +810,9 @@ core_handle_state_msg (gcs_core_t*     core,
  * to deliver message to the upper level.
  */
 static ssize_t
-core_msg_to_action (gcs_core_t*     core,
-                    gcs_recv_msg_t* msg,
-                    gcs_recv_act_t* act)
+core_msg_to_action (gcs_core_t*          core,
+                    struct gcs_recv_msg* msg,
+                    struct gcs_act*      act)
 {
     ssize_t      ret = 0;
     gcs_group_t* group = &core->group;
@@ -823,54 +841,66 @@ core_msg_to_action (gcs_core_t*     core,
         }
 
         if (ret > 0) {
-            act->type = act_type;
-            act->buf  = msg->buf;
-            ret       = msg->size;
+            act->type    = act_type;
+            act->buf     = msg->buf;
+            act->buf_len = msg->size;
+            ret          = msg->size;
         }
     }
     else {
         gu_warn ("%s message from member %ld in non-primary configuration. "
                  "Ignoring.", gcs_msg_type_string[msg->type], msg->sender_idx);
-//        assert(0);
     }
 
     return ret;
 }
 
 /*! Receives action */
-ssize_t gcs_core_recv (gcs_core_t*      conn,
-                       const void**     action,
-                       gcs_act_type_t*  act_type,
-                       gcs_seqno_t*     act_id) // global ID
+ssize_t gcs_core_recv (gcs_core_t*          conn,
+                       struct gcs_act_rcvd* recv_act)
 {
-    gcs_recv_act_t  recv_act;
-    gcs_recv_msg_t* recv_msg = &conn->recv_msg;
-    ssize_t         ret      = 0;
+//    struct gcs_act_rcvd  recv_act;
+    struct gcs_recv_msg* recv_msg = &conn->recv_msg;
+    ssize_t              ret      = 0;
 
-    recv_act.buf  = NULL;
-    recv_act.type = GCS_ACT_ERROR;
-    recv_act.id   = GCS_SEQNO_ILL; // by default action is unordered
+    static struct gcs_act_rcvd zero_act = { .act = { .buf     = NULL,
+                                                     .buf_len = 0,
+                                                     .type    = GCS_ACT_ERROR },
+                                            .id         = -1, // GCS_SEQNO_ILL
+                                            .sender_idx = -1 };
+
+    *recv_act = zero_act;
 
     /* receive messages from group and demultiplex them 
      * until finally some complete action is ready */
     do
     {
-	ret = core_msg_recv (&conn->backend, recv_msg);
-	if (gu_unlikely (ret <= 0)) {
+        assert (recv_act->act.buf     == NULL);
+        assert (recv_act->act.buf_len == 0);
+        assert (recv_act->act.type    == GCS_ACT_ERROR);
+        assert (recv_act->id          == GCS_SEQNO_ILL);
+        assert (recv_act->sender_idx  == -1);
+
+        ret = core_msg_recv (&conn->backend, recv_msg);
+        if (gu_unlikely (ret <= 0)) {
             goto out; /* backend error while receiving message */
         }
 
-	switch (recv_msg->type) {
-	case GCS_MSG_ACTION:
-            ret = core_handle_act_msg(conn, recv_msg, &recv_act);
-	    break;
-        case GCS_MSG_LAST:
-            ret = core_handle_last_msg(conn, recv_msg, &recv_act);
-            assert (ret >= 0); // hang on error in debug mode
+        switch (recv_msg->type) {
+        case GCS_MSG_ACTION:
+            ret = core_handle_act_msg(conn, recv_msg, recv_act);
+            assert (ret == recv_act->act.buf_len || ret <= 0);
+            assert (recv_act->sender_idx >= 0    || ret == 0);
             break;
-	case GCS_MSG_COMPONENT:
-            ret = core_handle_comp_msg (conn, recv_msg, &recv_act);
+        case GCS_MSG_LAST:
+            ret = core_handle_last_msg(conn, recv_msg, &recv_act->act);
             assert (ret >= 0); // hang on error in debug mode
+            assert (ret == recv_act->act.buf_len);
+            break;
+        case GCS_MSG_COMPONENT:
+            ret = core_handle_comp_msg (conn, recv_msg, &recv_act->act);
+            assert (ret >= 0); // hang on error in debug mode
+            assert (ret == recv_act->act.buf_len);
             break;
         case GCS_MSG_STATE_UUID:
             ret = core_handle_uuid_msg (conn, recv_msg);
@@ -878,30 +908,35 @@ ssize_t gcs_core_recv (gcs_core_t*      conn,
             ret = 0;           // continue waiting for state messages
             break;
         case GCS_MSG_STATE_MSG:
-            ret = core_handle_state_msg (conn, recv_msg, &recv_act);
+            ret = core_handle_state_msg (conn, recv_msg, &recv_act->act);
             assert (ret >= 0); // hang on error in debug mode
+            assert (ret == recv_act->act.buf_len);
             break;
         case GCS_MSG_JOIN:
         case GCS_MSG_SYNC:
         case GCS_MSG_FLOW:
-            ret = core_msg_to_action (conn, recv_msg, &recv_act);
+            ret = core_msg_to_action (conn, recv_msg, &recv_act->act);
+            assert (ret == recv_act->act.buf_len || ret <= 0);
             break;
-	default:
-	    // this normaly should not happen, shall we bother with
-	    // protection?
-	    gu_warn ("Received unsupported message type: %d, length: %d, "
+        default:
+            // this normaly should not happen, shall we bother with
+            // protection?
+            gu_warn ("Received unsupported message type: %d, length: %d, "
                      "sender: %d",
-		     recv_msg->type, recv_msg->size, recv_msg->sender_idx);
-	    // continue looping
+            recv_msg->type, recv_msg->size, recv_msg->sender_idx);
+            // continue looping
         }
     } while (0 == ret); /* end of recv loop */
 
 out:
-    assert (ret || (GCS_ACT_ERROR == recv_act.type));
 
-    *action   = recv_act.buf;
-    *act_type = recv_act.type;
-    *act_id   = recv_act.id;
+    assert (ret || GCS_ACT_ERROR == recv_act->act.type);
+    assert (ret == recv_act->act.buf_len || ret < 0);
+    assert (recv_act->id       <= GCS_SEQNO_ILL ||
+            recv_act->act.type == GCS_ACT_TORDERED ||
+            recv_act->act.type == GCS_ACT_STATE_REQ); // <- dirty hack
+    assert (recv_act->sender_idx >= 0 ||
+            recv_act->act.type   != GCS_ACT_TORDERED);
 
 //    gu_debug ("Returning %d", ret);
 
@@ -916,7 +951,7 @@ long gcs_core_close (gcs_core_t* core)
     if (gu_mutex_lock (&core->send_lock)) return -EBADFD;
 
     if (core->state >= CORE_CLOSED) {
-	ret = -EBADFD;
+        ret = -EBADFD;
     }
     else {
         ret = core->backend.close (&core->backend);

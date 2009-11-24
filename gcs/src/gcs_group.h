@@ -109,9 +109,9 @@ extern long
 gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
 
 extern long
-gcs_group_handle_state_request (gcs_group_t*    group,
-                                long            joiner_idx,
-                                gcs_recv_act_t* act);
+gcs_group_handle_state_request (gcs_group_t*         group,
+                                long                 joiner_idx,
+                                struct gcs_act_rcvd* act);
 /*!
  * Handles action message. Is called often - therefore, inlined
  *
@@ -121,7 +121,7 @@ static inline ssize_t
 gcs_group_handle_act_msg (gcs_group_t*          group,
                           const gcs_act_frag_t* frg,
                           const gcs_recv_msg_t* msg,
-                          gcs_recv_act_t*       act)
+                          struct gcs_act_rcvd*  act)
 {
     long    sender_idx = msg->sender_idx;
     bool    local      = (sender_idx == group->my_idx);
@@ -135,15 +135,14 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
 
     ret = gcs_node_handle_act_frag (&group->nodes[sender_idx], frg, act, local);
 
-    if (gu_unlikely(ret > 0)) {
+    if (ret > 0) {
 
-        assert (ret == act->buf_len);
+        assert (ret == act->act.buf_len);
 
-        act->type       = frg->act_type;
-        act->sender_idx = sender_idx;
+        act->act.type   = frg->act_type;
 
-        if (gu_likely(GCS_ACT_TORDERED  == act->type    &&
-                      GCS_GROUP_PRIMARY == group->state &&
+        if (gu_likely(GCS_ACT_TORDERED  == act->act.type &&
+                      GCS_GROUP_PRIMARY == group->state  &&
                       !(group->frag_reset && local))) {
             /* Common situation -
              * increment and assign act_id only for totally ordered actions
@@ -188,7 +187,7 @@ gcs_group_my_idx (gcs_group_t* group)
 
 /*! Creates new configuration action */
 extern ssize_t
-gcs_group_act_conf (gcs_group_t* group, gcs_recv_act_t* act);
+gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act);
 
 /*! Returns state object for state message */
 extern gcs_state_t*

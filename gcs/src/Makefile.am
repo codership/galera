@@ -39,7 +39,7 @@ GCS_SRCS = \
 	gcs_group.h     \
 	gcs_msg_type.h  \
 	gcs_node.h      \
-	gcs_recv_act.h  \
+	gcs_act.h       \
 	gcs_recv_msg.h  \
 	gcs_seqno.h     \
 	gcs_state.h

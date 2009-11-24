@@ -34,8 +34,8 @@ static const gcs_seqno_t GCS_SEQNO_FIRST =  1;
 /*! Connection handle type */
 typedef struct gcs_conn gcs_conn_t;
 
-/*! @brief Creates GCS connection handle. 
- * 
+/*! @brief Creates GCS connection handle.
+ *
  * @param conn connection handle
  * @param node_name human readable name of the node, can be null.
  * @param inc_addr  address at which application accepts incoming requests.
@@ -67,8 +67,8 @@ extern long gcs_init (gcs_conn_t   *conn,
                       gcs_seqno_t   seqno,
                       const uint8_t uuid[GCS_UUID_LEN]);
 
-/*! @brief Opens connection to group (joins channel). 
- * 
+/*! @brief Opens connection to group (joins channel).
+ *
  * @param conn connection object
  * @param channel a name of the channel to join. It must uniquely identify
  *                the channel. If the channel with such name does not exist,
@@ -84,7 +84,7 @@ extern long gcs_init (gcs_conn_t   *conn,
  */
 extern long gcs_open  (gcs_conn_t *conn,
                        const char *channel,
-		       const char *url);
+                       const char *url);
 
 /*! @brief Closes connection to group.
  *

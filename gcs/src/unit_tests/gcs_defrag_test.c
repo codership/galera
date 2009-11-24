@@ -48,7 +48,7 @@ START_TEST (gcs_defrag_test)
     gcs_act_frag_t frg1, frg2, frg3, frg4;
 
     gcs_defrag_t defrag;
-    gcs_recv_act_t recv_act;
+    struct gcs_act_rcvd recv_act;
 
     void* tail;
 
@@ -132,9 +132,9 @@ START_TEST (gcs_defrag_test)
     fail_if (ret != (long)act_len);
 
     // 8. Check the action
-    fail_if (recv_act.buf_len != (long)act_len);
-    fail_if (strncmp(recv_act.buf, act_buf, act_len),
-             "Action received: '%s', expected '%s'", recv_act.buf, act_buf);
+    fail_if (recv_act.act.buf_len != (long)act_len);
+    fail_if (strncmp(recv_act.act.buf, act_buf, act_len),
+             "Action received: '%s', expected '%s'",recv_act.act.buf,act_buf);
     defrag_check_init (&defrag); // should be empty
 
     // 9. Try the same with local action
@@ -149,8 +149,8 @@ START_TEST (gcs_defrag_test)
     fail_if (defrag.head != NULL);
 
     // 10. Check the action
-    fail_if (recv_act.buf_len != (long)act_len);
-    fail_if (recv_act.buf != NULL);
+    fail_if (recv_act.act.buf_len != (long)act_len);
+    fail_if (recv_act.act.buf != NULL);
     defrag_check_init (&defrag); // should be empty
 }
 END_TEST
