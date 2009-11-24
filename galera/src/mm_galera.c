@@ -1384,7 +1384,11 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
     int rcode;
     wsdb_trx_info_t victim;
 
-    if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
+    /* 
+     * this call must be allowed even if conn_state != GALERA_CONNECTED,
+     * slave applier must be able to kill remaining conflicting trxs 
+     */
+
 
     /* take commit mutex to be sure, committing trx does not
      * conflict with us
@@ -1495,7 +1499,6 @@ static enum wsrep_status mm_galera_abort_slave_trx(
     enum wsrep_status ret_code = WSREP_OK;
     int rcode;
 
-    if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
     /* take commit mutex to be sure, committing trx does not
      * conflict with us
      */
@@ -1533,8 +1536,6 @@ static enum wsrep_status mm_galera_post_commit(
 
     GU_DBUG_ENTER("galera_post_commit");
 
-    if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
-
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
 
     gu_mutex_lock(&commit_mtx);
@@ -1569,8 +1570,6 @@ static enum wsrep_status mm_galera_post_rollback(
     wsdb_trx_info_t trx;
 
     GU_DBUG_ENTER("galera_post_rollback");
-
-    if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
 
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
 
