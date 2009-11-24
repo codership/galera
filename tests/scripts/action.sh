@@ -69,7 +69,7 @@ check()
     do
         local node_id="${NODE_ID[$node]}"
         local out="${prefix}_${node_id}.out"
-        
+
         chk=$(cat "$out") # no need to check if file exists:
                           # should be created even if command fails
 #        echo "$node_id: ${chk%% -}"
@@ -88,8 +88,8 @@ check()
             fi
         fi
     done
-    
-    if [ -z "$fail" ]; then return 0; fi
+
+    if [ -z "$fail" ] && [ -n "$prev" ]; then return 0; fi
 
     echo "Checksum failed."
 #    for node in $NODE_LIST
@@ -121,7 +121,7 @@ restart_node()
 check_node()
 {
     node_job "check_cmd" "$@"
-    
+
     local node_id="${NODE_ID[$node]}"
     echo "$chk" | sed s/-/${node_id}/
     return $(cat $BASE_RUN/check_cmd_$node_id.ret)
@@ -129,9 +129,9 @@ check_node()
 
 # return GCS address at which node N should connect to group
 gcs_address()
-{   
+{
     local node=$1
-     
+
     case "$GCS_TYPE" in
     "gcomm")
         local peer=$(( $node - 1 )) # select previous node as connection peer
@@ -182,4 +182,3 @@ restart()
 {
     _cluster_up restart_node
 }
-															    

@@ -7,20 +7,25 @@
 # e.g. logging of stderr must happen on the same level as recording of return
 # code. While stdout log should record only the output of command.
 
-_local_job()
-{
-    local cmd="$1"
+#_local_job()
+#{
+#    local cmd="$1"
 #    eval "$($@)"
-    eval $cmd
-}
+#    eval $cmd
+#}
 
-_ssh_job()
-{
-    local node=${@:$#} # last argument
+#_ssh_job()
+#{
+#    local node=${@:$#} # last argument
 #    local cmd="$($@)"
-    local cmd="$1"
+#    local cmd="$1"
+#
+#    ssh -ax "${NODE_LOCATION[$node]}" "$cmd"
+#}
 
-    ssh -ax "${NODE_LOCATION[$node]}" "$cmd"
+_date()
+{
+    echo -n $(date +'%y%m%d %T.%N' | cut -c 1-19)
 }
 
 virtual_job()
@@ -68,13 +73,13 @@ node_job()
 
     echo $rcode > "$prefix.ret"
 
-    echo -n "Job '$cmd' on '$node_id'"
+    echo -n "$(_date) Job '$cmd' on '$node_id'"
 
     if [ $rcode -eq 0 ]
     then
-        echo " complete in $(($SECONDS - $start)) seconds"
+        echo " complete in $(($SECONDS - $start)) seconds, "
     else
-        echo " failed with code: $rcode"
+        echo " failed with code: $rcode, "
         echo "FAILED COMMAND: $($cmd $@)"
         echo "REASON: $(cat "$prefix.err")"
     fi
@@ -95,7 +100,7 @@ start_jobs()
 
         node_job "$@" $node &
         echo $! > "$prefix.pid"
-        echo "Job '$1' on '$node_id' started"
+        echo "$(_date) Job '$1' on '$node_id' started"
     done
 
     echo "All jobs started"
@@ -115,7 +120,7 @@ wait_jobs()
         if [ $err -gt 128 ]; then err=0; fi # ignore signals
     done
 
-    echo "All jobs complete in $SECONDS seconds"
+    echo "$(_date) All jobs complete in $SECONDS seconds"
 
     return $err
 }
