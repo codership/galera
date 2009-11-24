@@ -162,7 +162,7 @@ bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
     // Same view
     MessageNodeList same_view;
     for_each(node_list.begin(), node_list.end(),
-             SelectNodesOp(same_view, current_view.get_id(), true, true));
+             SelectNodesOp(same_view, current_view.get_id(), true, false));
     MessageNodeList::const_iterator max_hs_i(max_element(same_view.begin(), 
                                                          same_view.end(), 
                                                          RangeHsCmp()));
