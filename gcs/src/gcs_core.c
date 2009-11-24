@@ -859,7 +859,8 @@ core_msg_to_action (gcs_core_t*          core,
 
 /*! Receives action */
 ssize_t gcs_core_recv (gcs_core_t*          conn,
-                       struct gcs_act_rcvd* recv_act)
+                       struct gcs_act_rcvd* recv_act,
+                       bool*                is_local)
 {
 //    struct gcs_act_rcvd  recv_act;
     struct gcs_recv_msg* recv_msg = &conn->recv_msg;
@@ -872,6 +873,7 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
                                             .sender_idx = -1 };
 
     *recv_act = zero_act;
+    *is_local = false;
 
     /* receive messages from group and demultiplex them 
      * until finally some complete action is ready */
@@ -891,6 +893,7 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
         switch (recv_msg->type) {
         case GCS_MSG_ACTION:
             ret = core_handle_act_msg(conn, recv_msg, recv_act);
+            *is_local= (recv_act->sender_idx == gcs_group_my_idx(&conn->group));
             assert (ret == recv_act->act.buf_len || ret <= 0);
             assert (recv_act->sender_idx >= 0    || ret == 0);
             break;

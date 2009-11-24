@@ -564,8 +564,9 @@ static void *gcs_recv_thread (void *arg)
         gcs_seqno_t this_act_id = GCS_SEQNO_ILL;
         struct gcs_repl_act** repl_act_ptr;
         struct gcs_act_rcvd   rcvd;
+        bool                  act_is_local;
 
-        ret = gcs_core_recv (conn->core, &rcvd);
+        ret = gcs_core_recv (conn->core, &rcvd, &act_is_local);
 
         if (gu_unlikely(ret <= 0)) {
             struct gcs_recv_act *err_act = gu_fifo_get_tail(conn->recv_q);
@@ -574,6 +575,7 @@ static void *gcs_recv_thread (void *arg)
             assert (0             == rcvd.act.buf_len);
             assert (GCS_ACT_ERROR == rcvd.act.type);
             assert (GCS_SEQNO_ILL == rcvd.id);
+            assert (!act_is_local);
 
             err_act->rcvd     = rcvd;
             err_act->local_id = GCS_SEQNO_ILL;
@@ -609,7 +611,7 @@ static void *gcs_recv_thread (void *arg)
             this_act_id = conn->local_act_id++;
         }
 
-        if (conn->my_idx == rcvd.sender_idx                        &&
+        if (act_is_local                                           &&
             (repl_act_ptr = gcs_fifo_lite_get_head (conn->repl_q)) &&
             (gu_likely ((*repl_act_ptr)->action == rcvd.act.buf)   ||
              /* at this point repl_q is locked and we need to unlock it and
@@ -666,8 +668,8 @@ static void *gcs_recv_thread (void *arg)
             gu_warn ("Protocol violation: unordered local action not in repl_q:"
                      " { {%p, %zd, %s}, %ld, %lld }, ignoring.",
                      rcvd.act.buf, rcvd.act.buf_len,
-                     gcs_act_type_to_str(rcvd.act.type), rcvd.id,
-                     rcvd.sender_idx);
+                     gcs_act_type_to_str(rcvd.act.type), rcvd.sender_idx,
+                     rcvd.id);
 #endif
             assert(0);
         }
@@ -676,8 +678,8 @@ static void *gcs_recv_thread (void *arg)
             gu_fatal ("Protocol violation: unordered remote action: "
                       "{ {%p, %zd, %s}, %ld, %lld }",
                       rcvd.act.buf, rcvd.act.buf_len,
-                      gcs_act_type_to_str(rcvd.act.type), rcvd.id,
-                      rcvd.sender_idx);
+                      gcs_act_type_to_str(rcvd.act.type), rcvd.sender_idx,
+                      rcvd.id);
             assert (0);
             ret = -ENOTRECOVERABLE;
             break;

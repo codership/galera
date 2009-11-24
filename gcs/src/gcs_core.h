@@ -108,7 +108,8 @@ gcs_core_send (gcs_core_t*    core,
  */
 extern ssize_t
 gcs_core_recv (gcs_core_t*          conn,
-               struct gcs_act_rcvd* recv_act);
+               struct gcs_act_rcvd* recv_act,
+               bool*                is_local);
 
 /* Configuration functions */
 /* Sets maximum message size to achieve requested network packet size. 
