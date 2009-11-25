@@ -314,7 +314,7 @@ void gcomm::evs::Proto::handle_consensus_timer()
     if (get_state() != S_OPERATIONAL)
     {
         log_warn << self_string() << " consensus timer expired, state dump follows:";
-        log_warn << *this;
+        std::cerr << *this;
         // Consensus timer expiration indicates that for some reason
         // nodes fail to form new group. Set all other nodes 
         // unoperational to form singleton group and retry
@@ -456,8 +456,8 @@ Date gcomm::evs::Proto::handle_timers()
             return Date::max();
         }
         // Make sure that timer was not inserted twice
-        TimerList::iterator ii = find_if(timers.begin(), timers.end(), 
-                                         TimerSelectOp(t));
+        TimerList::iterator ii(find_if(timers.begin(), timers.end(), 
+                                       TimerSelectOp(t)));
         if (ii != timers.end())
         {
             timers.erase(ii);
@@ -2375,13 +2375,31 @@ bool gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
 }
 
 
-// If some node declares some other node as unoperational but 
-// we find it operational, use 2/3 of inactive timeout to
-// declare one of them or both as unoperational. Shorter
-// timeout in order to avoid triggering consensus timer.
+// If one node has set some other as unoperational but we see it still
+// operational, do some arbitration. We wait until 2/3 of inactive timeout
+// from setting of consensus timer has passed. If both nodes express liveness,
+// select the one with greater uuid as a victim of exclusion.
 void gcomm::evs::Proto::cross_check_inactives(const UUID& source,
                                               const MessageNodeList& nl)
 {
+    assert(source != get_uuid());
+    
+    const Date now(Date::now());
+    const Period wait_c_to((inactive_timeout*2)/3); // Wait for consensus
+    
+    TimerList::const_iterator ti(
+        find_if(timers.begin(), timers.end(), TimerSelectOp(T_CONSENSUS)));
+    assert(ti != timers.end());
+    if (now + wait_c_to < TimerList::get_key(ti))
+    {
+        // No check yet
+        return;
+    }
+    
+    NodeMap::const_iterator source_i(known.find_checked(source));
+    const Node& local_source_node(NodeMap::get_value(source_i));
+    const Period ito((inactive_timeout*1)/3);       // Tighter inactive timeout
+    
     MessageNodeList inactive;
     for_each(nl.begin(), nl.end(), SelectNodesOp(inactive, ViewId(), false, false));
     for (MessageNodeList::const_iterator i = inactive.begin(); 
@@ -2391,12 +2409,16 @@ void gcomm::evs::Proto::cross_check_inactives(const UUID& source,
         const MessageNode& node(MessageNodeList::get_value(i));
         gcomm_assert(node.get_operational() == false);
         NodeMap::iterator local_i(known.find(uuid));
+        
         if (local_i != known.end() && uuid != get_uuid())
         {
             Node& local_node(NodeMap::get_value(local_i));
-            if (local_node.get_operational() == true &&
-                local_node.get_tstamp() + (inactive_timeout*2)/3 < Date::now())
+            if (local_node.get_operational()         == true &&
+                local_source_node.get_tstamp() + ito >= now  &&
+                local_node.get_tstamp() + ito        >= now  &&
+                uuid > source)
             {
+                log_info << get_uuid() << " arbitrating, select " << uuid;
                 local_node.set_operational(false);
             }
         }
@@ -2540,8 +2562,12 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
             }
             
             // Make cross check to resolve lock if two nodes
-            // declare each other inactive.
-            gu_trace(cross_check_inactives(msg.get_source(), same_view));
+            // declare each other inactive. There is no need to make
+            // this for own messages.
+            if (msg.get_source() != get_uuid())
+            {
+                gu_trace(cross_check_inactives(msg.get_source(), same_view));
+            }
         }
         
         // If current join message differs from current state, send new join
