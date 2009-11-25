@@ -829,6 +829,7 @@ core_msg_to_action (gcs_core_t*          core,
             break;
         case GCS_MSG_JOIN:
             ret = gcs_group_handle_join_msg (group, msg);
+            assert (gcs_group_my_idx(group) == msg->sender_idx || 0 == ret);
             act_type = GCS_ACT_JOIN;
             break;
         case GCS_MSG_SYNC:

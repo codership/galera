@@ -516,7 +516,7 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     if (GCS_STATE_DONOR  == sender->status ||
         GCS_STATE_JOINER == sender->status) {
         long j;
-        gcs_seqno_t seqno     = gu_le64(*(gcs_seqno_t*)msg->buf);
+        gcs_seqno_t seqno     = gcs_seqno_le(*(gcs_seqno_t*)msg->buf);
         gcs_node_t* peer      = NULL;
         const char* peer_id   = NULL;
         const char* peer_name = "left the group";

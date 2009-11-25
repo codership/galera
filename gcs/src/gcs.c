@@ -18,6 +18,7 @@
 #include <galerautils.h>
 
 #include "gcs.h"
+#include "gcs_seqno.h"
 #include "gcs_core.h"
 #include "gcs_fifo_lite.h"
 
@@ -323,9 +324,8 @@ static inline long
 gcs_send_sync (gcs_conn_t* conn) {
     long ret = 0;
 
-    assert (GCS_CONN_JOINED == conn->state);
-
-    if (conn->lower_limit >= conn->queue_len) {
+    if (conn->lower_limit >= conn->queue_len &&
+        GCS_CONN_JOINED   == conn->state) {
         // tripped lower slave queue limit, send SYNC message
         gu_debug ("SENDING SYNC");
         ret = gcs_core_send_sync (conn->core, 0);
@@ -384,11 +384,14 @@ gcs_become_donor (gcs_conn_t* conn)
 }
 
 static void
-gcs_become_joined (gcs_conn_t* conn)
+gcs_become_joined (gcs_conn_t* conn, gcs_seqno_t seqno)
 {
     if (GCS_CONN_JOINER == conn->state ||
         GCS_CONN_DONOR  == conn->state) {
         long ret;
+
+        gu_info ("Switching %s -> %s at %lld", gcs_conn_state_str[conn->state],
+                 gcs_conn_state_str[GCS_CONN_JOINED], seqno);
 
         conn->state = GCS_CONN_JOINED;
 
@@ -413,7 +416,6 @@ gcs_become_synced (gcs_conn_t* conn)
     else if (conn->state <= GCS_CONN_OPEN && conn->state > GCS_CONN_SYNCED) {
         gu_warn ("Received SYNC action in wrong state %s",
                  gcs_conn_state_str[conn->state]);
-        // assert (0); may happen 
     }
 }
 
@@ -533,7 +535,7 @@ gcs_handle_actions (gcs_conn_t* conn,
         break; 
     case GCS_ACT_JOIN:
         gu_debug ("Got GCS_ACT_JOIN");
-        gcs_become_joined (conn);
+        gcs_become_joined (conn, gcs_seqno_le(*(gcs_seqno_t*)rcvd->act.buf));
         break;
     case GCS_ACT_SYNC:
         gu_debug ("Got GCS_ACT_SYNC");
