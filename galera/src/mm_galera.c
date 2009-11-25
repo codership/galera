@@ -1030,6 +1030,32 @@ static wsrep_status_t process_write_set(
     return rcode;
 }
 
+/* To be called only in isolation in galera_handle_configuration() */
+static void
+galera_join()
+{
+    long ret;
+
+    do {
+        ret = gcs_join (gcs_conn, status.last_applied);
+    }
+    while ((-EAGAIN == ret) &&
+           (usleep(GALERA_USLEEP_1_SECOND), true));
+
+    if (ret) {
+        galera_state_t st = { status.last_applied, status.state_uuid };
+
+        galera_store_state (data_dir, &st);
+
+        gu_fatal ("Could not send join message: "
+                  "%d (%s). Aborting.", ret, strerror(-ret));
+        abort(); // TODO: see #170, gcs_join() must be reworked
+    }
+    else {
+        status.stage = GALERA_STAGE_JOINED;
+    }
+}
+
 /*!
  * @return
  *        donor index (own index in case when no state transfer needed)
@@ -1172,25 +1198,7 @@ galera_handle_configuration (wsrep_t* gh,
                              GU_UUID_ARGS(&status.state_uuid),
                              status.last_applied);
 
-                    do {
-                        ret = gcs_join (gcs_conn, status.last_applied);
-                    }
-                    while ((-EAGAIN == ret) &&
-                           (usleep(GALERA_USLEEP_1_SECOND), true));
-
-                    if (ret) {
-                        galera_state_t st =
-                            { status.last_applied, status.state_uuid };
-
-                        galera_store_state (data_dir, &st);
-
-                        gu_fatal ("Could not send join message: "
-                                  "%d (%s). Aborting.", ret, strerror(-ret));
-                        abort(); // TODO: see #170, gcs_join() must be reworked
-                    }
-                    else {
-                        status.stage = GALERA_STAGE_JOINED;
-                    }
+                    galera_join();
                 }
             }
             else {
