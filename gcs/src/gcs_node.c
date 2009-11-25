@@ -90,7 +90,7 @@ gcs_node_record_state (gcs_node_t* node, gcs_state_t* state_msg)
     node->state_msg = state_msg;
 
     // copy relevant stuff from state into node
-    node->status    = gcs_state_node_state (state_msg);
+    node->status    = gcs_state_current_state (state_msg);
     node->proto_min = gcs_state_proto_min  (state_msg);
     node->proto_max = gcs_state_proto_max  (state_msg);
 
@@ -118,12 +118,21 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
         }
         else {
             // node was a part of this group
-            gcs_seqno_t node_act_id = gcs_state_act_id (node->state_msg);
+            gcs_seqno_t node_act_id  = gcs_state_act_id (node->state_msg);
+ 
             if (GCS_STATE_PRIM <  node->status &&
                 node_act_id    != quorum->act_id) {
                 // gap in sequence numbers, needs a snapshot, demote status
                 node->status = GCS_STATE_PRIM;
             }
+            else if (node_act_id    == quorum->act_id) {
+                if (GCS_STATE_NON_PRIM == gcs_state_prim_state(node->state_msg))
+                {
+                    // First PC for the node and it already has all the state
+                    node->status = GCS_STATE_JOINED;
+                }
+            }
+
 
             if (GCS_STATE_PRIM > node->status) {
                 // node must be at least GCS_STATE_PRIM (duplication?)

@@ -107,13 +107,21 @@ gcs_state_uuid (const gcs_state_t* state);
 extern const gu_uuid_t*
 gcs_state_group_uuid (const gcs_state_t* state);
 
+/* Get last PC uuid */
+//extern const gu_uuid_t*
+//gcs_state_prim_uuid (const gcs_state_t* state);
+
 /* Get action seqno */
 extern gcs_seqno_t
 gcs_state_act_id (const gcs_state_t* state);
 
-/* Get node state */
+/* Get current node state */
 extern gcs_state_node_t
-gcs_state_node_state (const gcs_state_t* state);
+gcs_state_current_state (const gcs_state_t* state);
+
+/* Get last prim node state */
+extern gcs_state_node_t
+gcs_state_prim_state (const gcs_state_t* state);
 
 /* Get node name */
 extern const char*

@@ -225,11 +225,18 @@ gcs_state_act_id (const gcs_state_t* state)
     return state->act_seqno;
 }
 
-/* Get node state */
+/* Get current node state */
 gcs_state_node_t
-gcs_state_node_state (const gcs_state_t* state)
+gcs_state_current_state (const gcs_state_t* state)
 {
     return state->current_state;
+}
+
+/* Get node state */
+gcs_state_node_t
+gcs_state_prim_state (const gcs_state_t* state)
+{
+    return state->prim_state;
 }
 
 /* Get node name */
@@ -365,10 +372,6 @@ gcs_state_get_quorum (const gcs_state_t*  states[],
             states[i]->proto_max >= rep->proto_min) {
             quorum->proto = states[i]->proto_max;
         }
-
-//        if (states[i]->current_state < GCS_STATE_PRIM) {
-//            states[i]->current_state = GCS_STATE_PRIM;
-//        }
     }
 
     quorum->act_id     = rep->act_seqno;

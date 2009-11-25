@@ -571,12 +571,11 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             gu_info ("%ld(%s): State transfer %s %ld(%s) complete.",
                      sender_idx, sender->name, st_dir, peer_idx, peer_name);
         }
-
-        return (sender_idx == group->my_idx);
     }
     else {
         if (GCS_STATE_PRIM == sender->status) {
-            gu_warn ("Rejecting JOIN message: new State Transfer required.");
+            gu_warn ("Rejecting JOIN message from %ld (%s): new State Transfer"
+                     " required.", sender_idx, sender->name);
         }
         else {
             // should we freak out and throw an error?
@@ -586,6 +585,8 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         }
         return 0;
     }
+
+    return (sender_idx == group->my_idx);
 }
 
 long
@@ -799,7 +800,7 @@ gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act)
         if (group->num) {
             assert (conf->my_idx >= 0);
             conf->st_required =
-                (group->nodes[group->my_idx].status < GCS_STATE_DONOR);
+                (group->nodes[group->my_idx].status < GCS_STATE_JOINER);
 
             for (idx = 0; idx < group->num; idx++)
             {
