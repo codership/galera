@@ -297,7 +297,8 @@ private:
 
     // Consensus module
     Consensus consensus;
-    
+    // Consensus attempt count
+    size_t cac;
     // Last received install message
     InstallMessage* install_message;
     // Sequence number to maintain membership message FIFO order

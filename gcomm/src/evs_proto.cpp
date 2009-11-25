@@ -82,6 +82,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     previous_views(),
     input_map(new InputMap()),
     consensus(my_uuid, known, *input_map, current_view), 
+    cac(0),
     install_message(0),
     fifo_seq(-1),
     last_sent(-1),
@@ -315,6 +316,14 @@ void gcomm::evs::Proto::handle_consensus_timer()
     {
         log_warn << self_string() << " consensus timer expired, state dump follows:";
         std::cerr << *this << "\n";
+
+        ++cac;
+        if (cac == 2)
+        {
+            gu_throw_fatal << self_string() << "unable to reach consensus on "
+                           << cac << " attempts, giving up";
+        }
+        
         // Consensus timer expiration indicates that for some reason
         // nodes fail to form new group. Set all other nodes 
         // unoperational to form singleton group and retry
@@ -323,7 +332,6 @@ void gcomm::evs::Proto::handle_consensus_timer()
         {
             if (NodeMap::get_key(i) != get_uuid())
             {
-                // NodeMap::get_value(i).set_operational(false);
                 set_inactive(NodeMap::get_key(i));
             }
         }
@@ -491,7 +499,6 @@ void gcomm::evs::Proto::check_inactive()
             {
                 log_info << self_string() << " detected inactive node: " << uuid;
             }
-            // node.set_operational(false);
             set_inactive(uuid);
             has_inactive = true;
         }
@@ -1743,6 +1750,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         
         input_map->reset(current_view.get_members().size());
         last_sent = -1;
+        cac = 0;
         state = S_OPERATIONAL;
         deliver_reg_view();
 
@@ -2423,7 +2431,6 @@ void gcomm::evs::Proto::cross_check_inactives(const UUID& source,
                 uuid > source)
             {
                 log_info << get_uuid() << " arbitrating, select " << uuid;
-                // local_node.set_operational(false);
                 set_inactive(uuid);
             }
         }
@@ -2562,7 +2569,6 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
             {
                 if (MessageNodeList::get_value(nli).get_operational() == false)
                 {
-                    // inst.set_operational(false);
                     set_inactive(msg.get_source());
                 }
             }
