@@ -124,11 +124,6 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
                 // gap in sequence numbers, needs a snapshot, demote status
                 node->status = GCS_STATE_PRIM;
             }
-            else if (GCS_STATE_PRIM >= node->status &&
-                     node_act_id    == quorum->act_id) {
-                // node state matches quorum's, promote status
-                node->status = GCS_STATE_JOINED;
-            }
 
             if (GCS_STATE_PRIM > node->status) {
                 // node must be at least GCS_STATE_PRIM (duplication?)

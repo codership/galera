@@ -335,7 +335,8 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
 
                 group->nodes[0].status = GCS_STATE_JOINED;
                 /* initialize node ID to the one given by the backend - this way
-                 * we'll be recognized as coming from prev. conf. below */
+                 * we'll be recognized as coming from prev. conf. in node array
+                 * remap below */
                 strncpy ((char*)group->nodes[0].id, new_nodes[0].id,
                          sizeof (new_nodes[0].id) - 1);
             }
@@ -345,7 +346,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
         group_go_non_primary (group);
     }
 
-    /* remap old node array to new one to preserve action continuity */
+    /* Remap old node array to new one to preserve action continuity */
     assert (group->nodes);
     for (new_idx = 0; new_idx < new_nodes_num; new_idx++) {
         /* find member index in old component by unique member id */
