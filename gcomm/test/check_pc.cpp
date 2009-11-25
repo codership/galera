@@ -1001,7 +1001,7 @@ START_TEST(test_pc_complete_split_merge)
     size_t n_nodes(5);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
-    const string inactive_timeout("PT0.3S");
+    const string inactive_timeout("PT0.31S");
     const string retrans_period("PT0.1S");
     uint32_t view_seq = 0;
     

@@ -323,7 +323,8 @@ void gcomm::evs::Proto::handle_consensus_timer()
         {
             if (NodeMap::get_key(i) != get_uuid())
             {
-                NodeMap::get_value(i).set_operational(false);
+                // NodeMap::get_value(i).set_operational(false);
+                set_inactive(NodeMap::get_key(i));
             }
         }
         profile_enter(shift_to_prof);
@@ -490,7 +491,8 @@ void gcomm::evs::Proto::check_inactive()
             {
                 log_info << self_string() << " detected inactive node: " << uuid;
             }
-            node.set_operational(false);
+            // node.set_operational(false);
+            set_inactive(uuid);
             has_inactive = true;
         }
     }
@@ -519,6 +521,8 @@ void gcomm::evs::Proto::set_inactive(const UUID& uuid)
     evs_log_debug(D_STATE) << "setting " << uuid << " inactive";
     Node& node(NodeMap::get_value(i));
     node.set_tstamp(Date::zero());
+    node.set_join_message(0);
+    // node.set_leave_message(0);
     node.set_operational(false);
 }
 
@@ -2419,7 +2423,8 @@ void gcomm::evs::Proto::cross_check_inactives(const UUID& source,
                 uuid > source)
             {
                 log_info << get_uuid() << " arbitrating, select " << uuid;
-                local_node.set_operational(false);
+                // local_node.set_operational(false);
+                set_inactive(uuid);
             }
         }
     }
@@ -2557,7 +2562,8 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
             {
                 if (MessageNodeList::get_value(nli).get_operational() == false)
                 {
-                    inst.set_operational(false);
+                    // inst.set_operational(false);
+                    set_inactive(msg.get_source());
                 }
             }
             

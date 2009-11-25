@@ -1140,7 +1140,7 @@ START_TEST(test_proto_stop_cont)
     const size_t n_nodes(4);
     PropagationMatrix prop;
     vector<DummyNode*> dn;
-    const string inactive_timeout("PT0.3S");
+    const string inactive_timeout("PT0.31S");
     const string retrans_period("PT0.1S");
     
     for (size_t i = 1; i <= n_nodes; ++i)
