@@ -314,7 +314,7 @@ void gcomm::evs::Proto::handle_consensus_timer()
     if (get_state() != S_OPERATIONAL)
     {
         log_warn << self_string() << " consensus timer expired, state dump follows:";
-        std::cerr << *this;
+        std::cerr << *this << "\n";
         // Consensus timer expiration indicates that for some reason
         // nodes fail to form new group. Set all other nodes 
         // unoperational to form singleton group and retry
