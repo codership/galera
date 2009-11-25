@@ -47,7 +47,8 @@ typedef enum
     GCS_CONN_JOINED,   // state transfer complete
     GCS_CONN_DONOR,    // in state transfer, donor
     GCS_CONN_JOINER,   // in state transfer, joiner
-    GCS_CONN_OPEN,     // just connected to group, require state transfer
+    GCS_CONN_PRIMARY,  // in primary conf, needs state transfer   
+    GCS_CONN_OPEN,     // just connected to group, non-primary
     GCS_CONN_CLOSED,
     GCS_CONN_DESTROYED
 }
@@ -340,17 +341,24 @@ gcs_send_sync (gcs_conn_t* conn) {
 
 /*!
  * State transition functions - just in case we want to add something there.
+ * @todo: need to be reworked, see #231
  */
 static void
 gcs_become_open (gcs_conn_t* conn)
 {
-    if (conn->state < GCS_CONN_OPEN) conn->state = GCS_CONN_OPEN;
+    conn->state = GCS_CONN_OPEN;
+}
+
+static void
+gcs_become_primary (gcs_conn_t* conn)
+{
+    if (conn->state == GCS_CONN_OPEN) conn->state = GCS_CONN_PRIMARY;
 }
 
 static void
 gcs_become_joiner (gcs_conn_t* conn)
 {
-    if (conn->state == GCS_CONN_OPEN) conn->state = GCS_CONN_JOINER;
+    if (conn->state == GCS_CONN_PRIMARY) conn->state = GCS_CONN_JOINER;
 }
 
 // returns 1 if accepts, 0 if rejects, negative error code if fails.
@@ -401,7 +409,6 @@ gcs_become_joined (gcs_conn_t* conn, gcs_seqno_t seqno)
             gu_warn ("Sending SYNC failed: %ld (%s)", ret, strerror (-ret));
         }
     }
-//    else if (conn->state < GCS_CONN_OPEN){
     else {
         gu_warn ("Received JOIN action in wrong state %s",
                  gcs_conn_state_str[conn->state]);
@@ -479,12 +486,10 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     }
 
     if (conf->st_required) {
-        gcs_become_open (conn);
+        gcs_become_primary (conn);
     }
-    else if (1             == conf->conf_id  &&
-             1             == conf->memb_num &&
-             GCS_CONN_OPEN == conn->state) {
-        gu_info ("Initializing JOINED state as the first member of the group.");
+    else if (GCS_CONN_OPEN == conn->state) {
+        gu_info ("No state transfer required. Initializing JOINED state.");
         conn->state = GCS_CONN_JOINED;
     }
 
