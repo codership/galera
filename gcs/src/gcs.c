@@ -386,11 +386,12 @@ gcs_become_donor (gcs_conn_t* conn)
 static void
 gcs_become_joined (gcs_conn_t* conn, gcs_seqno_t seqno)
 {
+    /* See also gcs_handle_act_conf () for a case of cluster bootstrapping */
     if (GCS_CONN_JOINER == conn->state ||
         GCS_CONN_DONOR  == conn->state) {
         long ret;
 
-        gu_info ("Switching %s -> %s at %lld", gcs_conn_state_str[conn->state],
+        gu_info ("Shifting %s -> %s at %lld", gcs_conn_state_str[conn->state],
                  gcs_conn_state_str[GCS_CONN_JOINED], seqno);
 
         conn->state = GCS_CONN_JOINED;
@@ -400,7 +401,8 @@ gcs_become_joined (gcs_conn_t* conn, gcs_seqno_t seqno)
             gu_warn ("Sending SYNC failed: %ld (%s)", ret, strerror (-ret));
         }
     }
-    else if (conn->state < GCS_CONN_OPEN){
+//    else if (conn->state < GCS_CONN_OPEN){
+    else {
         gu_warn ("Received JOIN action in wrong state %s",
                  gcs_conn_state_str[conn->state]);
         assert (0);
@@ -479,9 +481,10 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     if (conf->st_required) {
         gcs_become_open (conn);
     }
-    else if (GCS_CONN_OPEN == conn->state) {
-        /* if quorum decided that state transfer is not needed, we're as good
-         * as joined. */
+    else if (1             == conf->conf_id  &&
+             1             == conf->memb_num &&
+             GCS_CONN_OPEN == conn->state) {
+        gu_info ("Initializing JOINED state as the first member of the group.");
         conn->state = GCS_CONN_JOINED;
     }
 
