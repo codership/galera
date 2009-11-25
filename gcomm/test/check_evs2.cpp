@@ -1300,6 +1300,7 @@ Suite* evs2_suite()
         tcase_add_test(tc, test_input_map_random_insert);
         suite_add_tcase(s, tc);
 
+
         tc = tcase_create("test_proto_single_join");
         tcase_add_test(tc, test_proto_single_join);
         suite_add_tcase(s, tc);
@@ -1323,7 +1324,6 @@ Suite* evs2_suite()
         tc = tcase_create("test_proto_join_n_lossy_w_user_msg");
         tcase_add_test(tc, test_proto_join_n_lossy_w_user_msg);
         suite_add_tcase(s, tc);
-
 
         tc = tcase_create("test_proto_leave_n");
         tcase_add_test(tc, test_proto_leave_n);
@@ -1360,11 +1360,11 @@ Suite* evs2_suite()
         tcase_add_test(tc, test_proto_split_merge_lossy_w_user_msg);
         tcase_set_timeout(tc, 15);
         suite_add_tcase(s, tc);
-
-        tcase_create("test_proto_stop_cont");
-        tcase_add_test(tc, test_proto_stop_cont);
-        suite_add_tcase(s, tc);
     }
+    tc = tcase_create("test_proto_stop_cont");
+    tcase_add_test(tc, test_proto_stop_cont);
+    suite_add_tcase(s, tc);
+    
         
     tc = tcase_create("test_proto_arbitrate");
     tcase_add_test(tc, test_proto_arbitrate);
