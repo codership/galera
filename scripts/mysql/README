@@ -49,6 +49,7 @@ CONTENTS:
    2.3 LOAD BALANCER
    2.4 ADDING NEW NODE TO A CLUSTER
    2.5 A "REFERENCE NODE"
+   2.6 "SPLIT-BRAIN" CONDITION
 3. CONFIGURATION
    3.1 MANDATORY MYSQL OPTIONS
    3.2 WSREP OPTIONS
@@ -361,6 +362,21 @@ such node in a cluster can serve several purposes:
 
 Even with the current TCP-based group communication the overhead of having one
 extra silent node is negligible for most loads.
+
+
+2.6 "SPLIT-BRAIN" CONDITION
+
+Galera cluster is fully distributed and does not use any sort of centralized
+arbitrator, thus having no single point of failure. However, like any cluster
+of that kind it may fall to a dreaded "split-brain" condition where half or
+more nodes of the cluster suddenly disappear (e.g. due to network failure).
+In general case, having no information about the fate of disappeared nodes,
+remaining nodes cannot continue to process requests and modify their states.
+
+While such situation is generally considered negligibly probable in a multi-node
+cluster (normally nodes fail one by one), in 2-node cluster a single node
+failure can lead to this, thus making 3 nodes a minimum requirement for
+a highly-available cluster.
 
 
 3. CONFIGURATION
