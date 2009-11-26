@@ -133,11 +133,16 @@ gcomm::evs::seqno_t gcomm::evs::Consensus::highest_reachable_safe_seq() const
         if ((jm == 0 && current_view.is_member(NodeMap::get_key(i)) == true) ||
             (jm != 0 && jm->get_source_view_id() == current_view.get_id()))
         {
-            if (node.get_operational() == false || lm != 0)
+            if (lm != 0)
             {
-                seq_list.push_back(lm != 0 ? 
-                                   lm->get_seq() :
-                                   input_map.get_safe_seq(node.get_index()));
+                seq_list.push_back(lm->get_seq());
+            }
+            else if (node.get_operational() == false)
+            {
+                seq_list.push_back(
+                    min(
+                        input_map.get_safe_seq(node.get_index()), 
+                        input_map.get_range(node.get_index()).get_lu() - 1));
             }
             else
             {
@@ -205,6 +210,14 @@ bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
             MessageNodeList::get_value(min_part_safe_seq_i).get_safe_seq());
         max_reachable_safe_seq = min(max_reachable_safe_seq, 
                                      min_part_safe_seq);
+        
+        MessageNodeList::const_iterator min_part_lu_i(
+            min_element(partitioning.begin(), partitioning.end(),
+                        RangeLuCmp()));
+        gcomm_assert(min_part_lu_i != partitioning.end());
+        const seqno_t min_part_lu(MessageNodeList::get_value(min_part_lu_i).get_im_range().get_lu() - 1);
+        max_reachable_safe_seq = min(max_reachable_safe_seq,
+                                     min_part_lu);
     }
     
     evs_log_debug(D_CONSENSUS)
