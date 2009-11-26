@@ -80,9 +80,9 @@ log_tstamp (char* tstamp, size_t const len)
 
     /* 23 symbols */
     ret = snprintf (tstamp, len, "%04d-%02d-%02d %02d:%02d:%02d.%03d ",
-		    date.tm_year + 1900, date.tm_mon + 1, date.tm_mday,
-		    date.tm_hour, date.tm_min, date.tm_sec,
-		    (int)time.tv_usec / 1000);
+                    date.tm_year + 1900, date.tm_mon + 1, date.tm_mday,
+                    date.tm_hour, date.tm_min, date.tm_sec,
+                    (int)time.tv_usec / 1000);
     return ret;
 }
 
@@ -119,10 +119,10 @@ int
 gu_conf_set_log_callback (gu_log_cb_t callback)
 {
     if (callback) {
-	gu_debug ("Logging function changed by application");
+        gu_debug ("Logging function changed by application");
         gu_log_cb = callback;
     } else {
-	gu_debug ("Logging function restored to default");
+        gu_debug ("Logging function restored to default");
         gu_log_cb = gu_log_cb_default;
     }
     return 0;
@@ -130,11 +130,11 @@ gu_conf_set_log_callback (gu_log_cb_t callback)
 
 int
 gu_log (gu_log_severity_t severity,
-	const char*       file,
-	const char*       function,
-	const int         line,
-	...)
-//	const char*       format, ...)
+        const char*       file,
+        const char*       function,
+        const int         line,
+        ...)
+//     const char*       format, ...)
 {
     va_list ap;
     int   max_string = 2048;
@@ -144,24 +144,31 @@ gu_log (gu_log_severity_t severity,
     int   len;
 
     if (gu_log_self_tstamp) {
-	len = log_tstamp (str, max_string);
-	str += len;
-	max_string -= len;
+        len = log_tstamp (str, max_string);
+        str += len;
+        max_string -= len;
     }
 
     if (gu_likely(max_string > 0)) {
         const char* log_level_str =
             gu_log_cb_default == gu_log_cb ? gu_log_level_str[severity] : "";
 
-	len = snprintf (str, max_string, "%s%s:%s():%d: ",
-			log_level_str, file, function, line);
-	str += len;
-	max_string -= len;
+        if (gu_log_debug) {
+            len = snprintf (str, max_string, "%s%s:%s():%d: ",
+                            log_level_str, file, function, line);
+        } else if (strlen(log_level_str) > 0) {
+            len = snprintf (str, max_string, "%s: ", log_level_str);
+        } else {
+            len = 0;
+        }
+          
+        str += len;
+        max_string -= len;
         va_start (ap, line);
         const char* format = va_arg (ap, const char*);
-	if (gu_likely(max_string > 0 && NULL != format)) {
-	    vsnprintf (str, max_string, format, ap);
-	}
+        if (gu_likely(max_string > 0 && NULL != format)) {
+            vsnprintf (str, max_string, format, ap);
+        }
         va_end (ap);
     }
 
@@ -170,6 +177,3 @@ gu_log (gu_log_severity_t severity,
 
     return 0;
 }
-
-
-
