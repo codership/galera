@@ -14,10 +14,10 @@ action_cmd()
     "MYSQL")
         echo -n "MYSQL_PORT=${NODE_INCOMING_PORT[$node]} "\
                 "\"$dir/mysql-galera\" $args $cmd"
-	;;
+        ;;
     "PGSQL"|*)
         return -1
-	;;
+        ;;
     esac
 }
 
@@ -153,6 +153,7 @@ gcs_address()
 _cluster_up()
 {
     local -r cmd=$1
+    shift
 
     SECONDS=0 # for wait_jobs
 
@@ -163,11 +164,11 @@ _cluster_up()
         then
             # must make sure 1st node completely operational
             case "$GCS_TYPE" in
-            "gcomm") $cmd "-g gcomm://" 0 ;;
-            "vsbes") $cmd "-g vsbes://$VSBES_ADDRESS" 0 ;;
+            "gcomm") $cmd "-g gcomm://" "$@" 0 ;;
+            "vsbes") $cmd "-g vsbes://$VSBES_ADDRESS" "$@" 0 ;;
             esac
         else
-            $cmd "-g $(gcs_address $node)" $node &
+            $cmd "-g $(gcs_address $node)" "$@" $node &
         fi
     done
     wait_jobs
@@ -175,10 +176,10 @@ _cluster_up()
 
 start()
 {
-    _cluster_up start_node
+    _cluster_up start_node "$@"
 }
 
 restart()
 {
-    _cluster_up restart_node
+    _cluster_up restart_node "$@"
 }
