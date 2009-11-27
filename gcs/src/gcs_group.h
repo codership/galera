@@ -156,12 +156,10 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
                 if (group->frag_reset && local) {
                     /* Fragmentation was reset by configuration change.
                      * Should be true for ANY action type. */
-                    if (GCS_GROUP_PRIMARY == group->state) {
-                        rcvd->id =  -ERESTART;
-                    }
-                    // else?
+                    rcvd->id =  -ERESTART;
                 }
             }
+            // else?
         }
     }
 
