@@ -78,6 +78,10 @@ gcs_group_init_history (gcs_group_t*     group,
 extern void
 gcs_group_free (gcs_group_t* group);
 
+/*! Forget the action if it is not to be delivered */
+extern void
+gcs_group_ignore_action (struct gcs_act_rcvd* rcvd);
+
 /*!
  * Handles component message - installs new membership,
  * cleans old one.
@@ -140,26 +144,28 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
 
         assert (ret == rcvd->act.buf_len);
 
-        rcvd->act.type   = frg->act_type;
+        rcvd->act.type = frg->act_type;
 
         if (gu_likely(GCS_ACT_TORDERED  == rcvd->act.type &&
-                      GCS_GROUP_PRIMARY == group->state  &&
+                      GCS_GROUP_PRIMARY == group->state   &&
+                      group->nodes[sender_idx].status >= GCS_STATE_DONOR &&
                       !(group->frag_reset && local))) {
             /* Common situation -
              * increment and assign act_id only for totally ordered actions
              * and only in PRIM (skip messages while in state exchange) */
             rcvd->id = ++group->act_id;
         }
-        else {
+        else if (GCS_ACT_TORDERED  == rcvd->act.type) {
             /* Rare situations */
-            if (GCS_GROUP_PRIMARY == group->state) {
-                if (group->frag_reset && local) {
-                    /* Fragmentation was reset by configuration change.
-                     * Should be true for ANY action type. */
-                    rcvd->id =  -ERESTART;
-                }
+            if (local) {
+                /* Let the sender know that it failed */
+                rcvd->id = -ERESTART;
             }
-            // else?
+            else {
+                /* Just ignore it */
+                ret = 0;
+                gcs_group_ignore_action (rcvd);
+            }
         }
     }
 
