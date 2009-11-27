@@ -134,7 +134,6 @@ gu_log (gu_log_severity_t severity,
         const char*       function,
         const int         line,
         ...)
-//     const char*       format, ...)
 {
     va_list ap;
     int   max_string = 2048;
@@ -153,21 +152,24 @@ gu_log (gu_log_severity_t severity,
         const char* log_level_str =
             gu_log_cb_default == gu_log_cb ? gu_log_level_str[severity] : "";
 
-        if (gu_log_debug) {
+        /* provide file:func():line info only if debug logging is on */
+        if (!gu_log_debug) {
+            len = snprintf (str, max_string, "%s", log_level_str);
+        }
+        else {
             len = snprintf (str, max_string, "%s%s:%s():%d: ",
                             log_level_str, file, function, line);
-        } else if (strlen(log_level_str) > 0) {
-            len = snprintf (str, max_string, "%s: ", log_level_str);
-        } else {
-            len = 0;
         }
-          
+
         str += len;
         max_string -= len;
         va_start (ap, line);
-        const char* format = va_arg (ap, const char*);
-        if (gu_likely(max_string > 0 && NULL != format)) {
-            vsnprintf (str, max_string, format, ap);
+        {
+            const char* format = va_arg (ap, const char*);
+
+            if (gu_likely(max_string > 0 && NULL != format)) {
+                vsnprintf (str, max_string, format, ap);
+            }
         }
         va_end (ap);
     }

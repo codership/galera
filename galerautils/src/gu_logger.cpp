@@ -40,9 +40,7 @@ namespace gu
             }
         }
         
-        ~DebugFilter()
-        {
-        }
+        ~DebugFilter() {}
         
         void set_filter(const string& str)
         {
@@ -54,10 +52,7 @@ namespace gu
             }
         }
 
-        size_t size() const
-        {
-            return filter.size();
-        }
+        size_t size() const { return filter.size(); }
 
         bool is_set(const string& str) const
         {

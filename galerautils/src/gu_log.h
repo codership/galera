@@ -47,7 +47,6 @@ gu_log (gu_log_severity_t severity,
         const char*       function,
         const int         line,
         ...);
-//        const char*       format, ...);
 
 /** This variable is made global only for the purpose of using it in
  *  gu_debug() macro and avoid calling gu_log() when debug is off.

@@ -82,7 +82,11 @@ namespace gu
                 prepare_default();       // prefix with timestamp and log level
             }
 
-            os << file << ':' << func << "():" << line << ": ";
+            /* provide file:func():line info only when debug logging is on */
+            if (static_cast<int>(LOG_DEBUG) == static_cast<int>(max_level))
+            {
+                os << file << ':' << func << "():" << line << ": ";
+            }
 
             return os;
         }

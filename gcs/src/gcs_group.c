@@ -449,12 +449,12 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
                 group_post_state_exchange (group);
             }
             else {
-                gu_warn ("STATE EXCHANGE: stray state msg: "GU_UUID_FORMAT
-                         "from node %ld (%s), current state UUID: "
-                         GU_UUID_FORMAT,
-                         GU_UUID_ARGS(state_uuid),
-                         msg->sender_idx, gcs_state_name(state),
-                         GU_UUID_ARGS(&group->state_uuid));
+                gu_debug ("STATE EXCHANGE: stray state msg: "GU_UUID_FORMAT
+                          " from node %ld (%s), current state UUID: "
+                          GU_UUID_FORMAT,
+                          GU_UUID_ARGS(state_uuid),
+                          msg->sender_idx, gcs_state_name(state),
+                          GU_UUID_ARGS(&group->state_uuid));
 
                 if (gu_log_debug) group_print_state_debug(state);
 
