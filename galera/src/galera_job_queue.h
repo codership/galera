@@ -187,12 +187,12 @@ int job_queue_start_job(
     struct job_queue *queue, struct job_worker *worker, void *ctx);
 
 /*
- * @brief marks a job complete
+ * @brief marks a job completed
  * @param job_queue queue fo rthe jobs
  * @param worker worker doing the job
- * @return id for the new object
+ * @return context pointer
  */
-int job_queue_end_job(
+void* job_queue_end_job(
     struct job_queue *queue, struct job_worker *worker);
 
 #define _MAKE_OBJ(obj, def, size)                    \

@@ -164,10 +164,12 @@ int job_queue_start_job(
     return WSDB_OK;
 }
 
-int job_queue_end_job(struct job_queue *queue, struct job_worker *worker
+void * job_queue_end_job(struct job_queue *queue, struct job_worker *worker
 ) {
     unsigned short i;
-    int min_job = -1;
+    int            min_job = -1;
+    void*          ctx;
+
     CHECK_OBJ(queue, job_queue);
     CHECK_OBJ(worker, job_worker);
 
@@ -181,6 +183,7 @@ int job_queue_end_job(struct job_queue *queue, struct job_worker *worker
             gu_cond_signal(&queue->jobs[i].cond);
         }
     }
+    ctx                           = queue->jobs[worker->id].ctx;
     queue->jobs[worker->id].state = JOB_IDLE;
     queue->jobs[worker->id].ctx   = NULL;
    
@@ -205,6 +208,6 @@ int job_queue_end_job(struct job_queue *queue, struct job_worker *worker
     gu_debug("job: %d complete", worker->id);
     gu_mutex_unlock(&(queue->mutex));
 
-    return WSDB_OK;
+    return ctx;
 }
 

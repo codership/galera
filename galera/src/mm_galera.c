@@ -175,6 +175,10 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
     struct job_context *job1 = (struct job_context *)ctx1;
     struct job_context *job2 = (struct job_context *)ctx2;
 
+    gu_debug("conflict check for: job1: %lld type: %d job2: %lld type %d",
+             job1->seqno, job1->type, job2->seqno, job2->type
+    );
+
     if (job1->seqno < job2->seqno) return 0;
 
     /* job1 is sequenced after job2, must check if they conflict */
@@ -184,7 +188,10 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
       trx_seqno_t last_seen_saved = job1->ws->last_seen_trx;
       int rcode;
 
-      if (job2->type == JOB_TO_ISOLATION) return 1;
+      if (job2->type == JOB_TO_ISOLATION) {
+          gu_debug("job2 has TO isolation");
+          return 1;
+      }
 
       /* serious mis-use of certification test
        * we mangle ws seqno's so that certification_test certifies
@@ -200,9 +207,11 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
 
       job1->ws->last_seen_trx = last_seen_saved;
       if (rcode) {
-        return 1;
+          return 1;
       }
     }
+    gu_debug("job1 qualified");
+
     return 0;
 }
 
@@ -2099,7 +2108,7 @@ static enum wsrep_status mm_galera_to_execute_start(
     gcs_seqno_t            seqno_g, seqno_l;
     bool                   do_apply;
     struct job_worker*     applier;
-    struct job_context     ctx;
+    struct job_context*    ctx;
 
     GU_DBUG_ENTER("galera_to_execute_start");
 
@@ -2168,15 +2177,16 @@ static enum wsrep_status mm_galera_to_execute_start(
     }
     wsdb_conn_set_worker(conn_id, applier);
 
-    gu_debug("TO applier id: %d seqnos: %lld - %lld", 
-             applier->id, seqno_l, seqno_g
+    gu_debug("TO isolation applier starting, id: %d seqnos: %lld - %lld", 
+             applier->id, seqno_g, seqno_l
     );
 
-    ctx.seqno = seqno_l;
-    ctx.ws    = ws;
-    ctx.type  = JOB_TO_ISOLATION;
+    ctx = (struct job_context *)gu_malloc(sizeof(struct job_context));
+    ctx->seqno = seqno_l;
+    ctx->ws    = ws;
+    ctx->type  = JOB_TO_ISOLATION;
 
-    job_queue_start_job(applier_queue, applier, (void *)&ctx);
+    job_queue_start_job(applier_queue, applier, (void *)ctx);
 
     /* wait for total order */
     GALERA_GRAB_QUEUE (cert_queue, seqno_l);
@@ -2186,8 +2196,6 @@ static enum wsrep_status mm_galera_to_execute_start(
         /* record local sequence number in connection info */
         wsdb_conn_set_seqno(conn_id, seqno_l, seqno_g);
     }
-
-    //GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
 
     if (do_apply) {
         /* Grab commit queue */
@@ -2200,9 +2208,7 @@ static enum wsrep_status mm_galera_to_execute_start(
         gu_warn ("Local action replicated with outdated seqno: "
                  "current seqno %lld, action seqno %lld", last_recved, seqno_g);
         
-        //THIS LINE ADDED:
         GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
-        
         GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
         // this situation is as good as failed gcs_repl() call.
         job_queue_end_job(applier_queue, applier);
@@ -2214,6 +2220,9 @@ static enum wsrep_status mm_galera_to_execute_start(
 cleanup:
 
     wsdb_write_set_free(ws); // cache for incremental state transfer if applied
+    gu_debug("TO isolation applied for: seqnos: %lld - %lld", 
+             seqno_g, seqno_l
+    );
     GU_DBUG_RETURN(rcode);
 }
 
@@ -2223,6 +2232,7 @@ static enum wsrep_status mm_galera_to_execute_end(
     bool do_report;
     struct wsdb_conn_info conn_info;
     int rcode;
+    struct job_context *ctx;
 
     GU_DBUG_ENTER("galera_to_execute_end");
 
@@ -2241,10 +2251,8 @@ static enum wsrep_status mm_galera_to_execute_end(
 
     do_report = report_check_counter ();
 
-    // THIS LINE ADDED:
+    /* release queues */
     GALERA_RELEASE_QUEUE (cert_queue, conn_info.seqno_l);
-
-    /* release commit queue */
     GALERA_RELEASE_QUEUE (commit_queue, conn_info.seqno_l);
     
     /* cleanup seqno reference */
@@ -2252,7 +2260,12 @@ static enum wsrep_status mm_galera_to_execute_end(
     
     if (do_report) report_last_committed (gcs_conn);
 
-    job_queue_end_job(applier_queue, conn_info.worker);
+    ctx = (struct job_context *)job_queue_end_job(
+        applier_queue, conn_info.worker
+    );
+    assert(ctx);
+    gu_free(ctx);
+
     job_queue_remove_worker(applier_queue, conn_info.worker);
     wsdb_conn_set_worker(conn_id, NULL);
 
@@ -2286,7 +2299,9 @@ static enum wsrep_status mm_galera_replay_trx(
         );
         return WSREP_NODE_FAIL;
     }
-    gu_debug("applier %d", applier->id );
+    gu_debug("replaying applier in to grab: %d, seqno: %lld %lld", 
+             applier->id, trx.seqno_g, trx.seqno_l
+    );
 
     /*
      * grab commit_queue already here, to make sure the conflicting BF applier
@@ -2300,6 +2315,7 @@ static enum wsrep_status mm_galera_replay_trx(
                  rcode, trx.seqno_g, trx.seqno_l);
         abort();
     }
+    gu_debug("replaying applier starting");
 
     /*
      * tell app, that replaying will start with allocated seqno
@@ -2351,6 +2367,9 @@ static enum wsrep_status mm_galera_replay_trx(
     wsdb_deref_seqno (trx.ws->last_seen_trx);
     wsdb_write_set_free(trx.ws);
 
+    gu_debug("replaying over for applier in to grab: %d, seqno: %lld %lld", 
+             applier->id, trx.seqno_g, trx.seqno_l
+    );
     return WSREP_OK;
 }
 
