@@ -8,13 +8,10 @@
 #include "key_array.h"
 
 struct conn_info {
-    char             ident;
-    struct wsdb_conn_info info;
-
-    struct key_array variables;
-
-    /* SQL statement to set the default database */
-    char   *set_default_db;
+    char                  ident;
+    struct wsdb_conn_info info;           //!< public connection info
+    struct key_array      variables;      //!< array of session variables
+    char*                 set_default_db; //!< SQL to set the default database
 };
 #define IDENT_conn_info 'C'
 
@@ -118,6 +115,7 @@ static struct conn_info *new_conn_info(
     conn->info.seqno_l   = LLONG_MAX;
     conn->info.seqno_g   = -1;
     conn->set_default_db = NULL;
+    conn->info.worker    = NULL;
     key_array_open(&conn->variables);
 
     GU_DBUG_PRINT("wsdb", ("created new connection: %lu", conn_id));
@@ -261,6 +259,22 @@ int wsdb_conn_set_seqno(
     conn->info.seqno_l = seqno_l;
     conn->info.seqno_g = seqno_g;
     conn->info.state   = WSDB_CONN_TRX;
+
+    GU_DBUG_RETURN(WSDB_OK);
+}
+
+int wsdb_conn_set_worker(
+    connid_t conn_id, struct job_worker *worker
+) {
+    struct conn_info *conn = get_conn_info(conn_id);
+    GU_DBUG_ENTER("conn_set_seqno");
+    if (!conn) {
+        gu_error("no connection in conn_set_worker",conn_id);
+        GU_DBUG_RETURN(WSDB_ERR_CONN_UNKNOWN);
+    }
+    GU_DBUG_PRINT("wsdb",("set worker for conn: %lu", conn_id));
+
+    conn->info.worker = worker;
 
     GU_DBUG_RETURN(WSDB_OK);
 }

@@ -84,13 +84,12 @@ enum wsdb_conn_state {
 
 
 struct wsdb_conn_info {
-    connid_t         id;
+    connid_t             id;
 
-    enum wsdb_conn_state state;
-
-    /* TO sequence number for direct executed query */
-    trx_seqno_t seqno_l;
-    trx_seqno_t seqno_g;
+    enum wsdb_conn_state state;   //!<
+    trx_seqno_t          seqno_l; //!< TO seqno for direct executed query
+    trx_seqno_t          seqno_g; //!<    global seqno 
+    struct job_worker*   worker;  //!< worker running for this connection
 };
 
 enum wsdb_trx_state {
@@ -616,6 +615,8 @@ int wsdb_conn_set_seqno (connid_t conn_id,
  * @param conn_id ID for the connection
  */
 int wsdb_conn_reset_seqno (connid_t conn_id);
+
+int wsdb_conn_set_worker(connid_t conn_id, struct job_worker *worker);
 
 /*!
  * @brief queries connection info

@@ -101,14 +101,15 @@ enum job_state {
     JOB_WAITING,
 };
 
-/*
+/*! @enum
  * JOB_SLAVE     = usual remote slave applying job
  * JOB_REPLAYING = replicated and certified local trx, which is replaying 
  *                 to earlier BF abort
  */
 enum job_type {
-    JOB_SLAVE,
-    JOB_REPLAYING,
+    JOB_SLAVE,        //!< usual trx applied
+    JOB_REPLAYING,    //!< BF aborted trx replaying
+    JOB_TO_ISOLATION, //!< TO isolation
 };
 
 /*!

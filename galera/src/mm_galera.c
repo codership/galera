@@ -96,8 +96,9 @@ static FILE *wslog_G;
 /* @struct contains one write set and its TO sequence number
  */
 struct job_context {
-    trx_seqno_t seqno;
-    struct wsdb_write_set *ws;
+    enum job_type          type;  //!< job's nature
+    trx_seqno_t            seqno; //!< seqno for the job
+    struct wsdb_write_set *ws;    //!< write set to be applied
 };
 
 // a wrapper to re-try functions which can return -EAGAIN
@@ -182,6 +183,8 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
     {
       trx_seqno_t last_seen_saved = job1->ws->last_seen_trx;
       int rcode;
+
+      if (job2->type == JOB_TO_ISOLATION) return 1;
 
       /* serious mis-use of certification test
        * we mangle ws seqno's so that certification_test certifies
@@ -793,6 +796,14 @@ static int process_query_write_set_applying(
     /* synchronize with other appliers */
     ctx.seqno = seqno_l;
     ctx.ws    = ws;
+    /* why this? slave applier can process either ws transactions or TO
+     * isolation queries. local connections, which are promoted as appliers
+     * are either of type: TO_ISOLATION or REPLAYING
+     */
+    ctx.type  = (applier->type == JOB_SLAVE) ?
+        ((ws->type == WSDB_WS_TYPE_CONN) ? JOB_TO_ISOLATION : JOB_SLAVE) :
+      applier->type;
+
     job_queue_start_job(applier_queue, applier, (void *)&ctx);
 
  retry:
@@ -829,6 +840,7 @@ static int process_query_write_set_applying(
     }
     if (attempts == MAX_APPLY_ATTEMPTS) {
         gu_warn("ws applying is not possible, %lld - %lld", seqno_g, seqno_l);
+        job_queue_end_job(applier_queue, applier);
         return WSREP_TRX_FAIL;
     }
 
@@ -841,6 +853,7 @@ static int process_query_write_set_applying(
         rcode = while_eagain(gu_to_grab, commit_queue, seqno_l);
         break;
     case JOB_REPLAYING:
+    case JOB_TO_ISOLATION:
         /* replaying jobs have reserved commit_queue in the beginning */
         rcode = 0;
         break;
@@ -2073,18 +2086,20 @@ static enum wsrep_status mm_galera_set_database(
 }
 
 static enum wsrep_status mm_galera_to_execute_start(
-    wsrep_t *gh,
-    const wsrep_conn_id_t conn_id, const char *query, const size_t query_len
+    wsrep_t *gh, const wsrep_conn_id_t conn_id, 
+    const char *query, const size_t query_len
 ) {
 
     int                    rcode;
-    struct wsdb_write_set *ws;
+    struct wsdb_write_set* ws;
     XDR                    xdrs;
     int                    data_max = 34000; /* only fixed xdr buf supported */
     uint8_t                data[data_max];
     int                    len;
     gcs_seqno_t            seqno_g, seqno_l;
     bool                   do_apply;
+    struct job_worker*     applier;
+    struct job_context     ctx;
 
     GU_DBUG_ENTER("galera_to_execute_start");
 
@@ -2143,6 +2158,26 @@ static enum wsrep_status mm_galera_to_execute_start(
     assert (GCS_SEQNO_ILL != seqno_g);
     assert (GCS_SEQNO_ILL != seqno_l);
 
+    applier = job_queue_new_worker(applier_queue, JOB_TO_ISOLATION);
+    if (!applier) {
+        gu_error("galera, could not create TO isolation applier");
+        gu_info("active_workers: %d, max_workers: %d",
+            applier_queue->active_workers, applier_queue->max_concurrent_workers
+        );
+        return WSREP_NODE_FAIL;
+    }
+    wsdb_conn_set_worker(conn_id, applier);
+
+    gu_debug("TO applier id: %d seqnos: %lld - %lld", 
+             applier->id, seqno_l, seqno_g
+    );
+
+    ctx.seqno = seqno_l;
+    ctx.ws    = ws;
+    ctx.type  = JOB_TO_ISOLATION;
+
+    job_queue_start_job(applier_queue, applier, (void *)&ctx);
+
     /* wait for total order */
     GALERA_GRAB_QUEUE (cert_queue, seqno_l);
     
@@ -2152,7 +2187,7 @@ static enum wsrep_status mm_galera_to_execute_start(
         wsdb_conn_set_seqno(conn_id, seqno_l, seqno_g);
     }
 
-    GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
+    //GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
 
     if (do_apply) {
         /* Grab commit queue */
@@ -2164,8 +2199,15 @@ static enum wsrep_status mm_galera_to_execute_start(
         // (trying to replicate something before completing state transfer)
         gu_warn ("Local action replicated with outdated seqno: "
                  "current seqno %lld, action seqno %lld", last_recved, seqno_g);
+        
+        //THIS LINE ADDED:
+        GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
+        
         GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
         // this situation is as good as failed gcs_repl() call.
+        job_queue_end_job(applier_queue, applier);
+        job_queue_remove_worker(applier_queue, applier);
+        wsdb_conn_set_worker(conn_id, NULL);
         rcode = WSREP_CONN_FAIL;
     }
 
@@ -2191,9 +2233,16 @@ static enum wsrep_status mm_galera_to_execute_end(
         GU_DBUG_RETURN(WSREP_CONN_FAIL);
     }
 
+    gu_debug("TO applier ending  seqnos: %lld - %lld", 
+             conn_info.seqno_l, conn_info.seqno_g
+    );
+
     GALERA_UPDATE_LAST_APPLIED (conn_info.seqno_g)
 
     do_report = report_check_counter ();
+
+    // THIS LINE ADDED:
+    GALERA_RELEASE_QUEUE (cert_queue, conn_info.seqno_l);
 
     /* release commit queue */
     GALERA_RELEASE_QUEUE (commit_queue, conn_info.seqno_l);
@@ -2202,6 +2251,10 @@ static enum wsrep_status mm_galera_to_execute_end(
     wsdb_conn_reset_seqno(conn_id);
     
     if (do_report) report_last_committed (gcs_conn);
+
+    job_queue_end_job(applier_queue, conn_info.worker);
+    job_queue_remove_worker(applier_queue, conn_info.worker);
+    wsdb_conn_set_worker(conn_id, NULL);
 
     GU_DBUG_RETURN(WSDB_OK);
 }
