@@ -44,7 +44,6 @@ gcs_group_init (gcs_group_t* group, const char* node_name, const char* inc_addr)
     group->prim_seqno = GCS_SEQNO_ILL;
     group->prim_num   = 0;
     group->prim_state = GCS_STATE_NON_PRIM;
-    group->prim_rep   = false;
 
     return 0;
 }
@@ -163,7 +162,6 @@ static void
 group_go_non_primary (gcs_group_t* group)
 {
     if (GCS_GROUP_PRIMARY == group->state) {
-        group->prim_rep   = (group->my_idx == 0);
         group->prim_state = group->nodes[group->my_idx].status;
         group->nodes[group->my_idx].status = GCS_STATE_NON_PRIM;
         //@todo: Perhaps the same has to be applied to the rest of the nodes[]?
@@ -376,7 +374,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
          * state exchange because old states can carry outdated node status.
          * However this means aborting ongoing actions. Find a way to avoid
          * this extra state exchange. Generate new state messages on behalf
-         * of other nodes? */
+         * of other nodes? see #238 */
         new_memb = true;
         /* if new nodes joined, reset ongoing actions and state messages */
         if (new_memb) {
@@ -828,15 +826,15 @@ gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act)
     }
 }
 
-/*! Returns state object for state message */
-gcs_state_t*
-gcs_group_get_state (gcs_group_t* group)
+// for future use in fake state exchange (in unit tests et.al. See #237, #238)
+static gcs_state_t*
+group_get_node_state (gcs_group_t* group, long node_idx)
 {
-    const gcs_node_t* my_node = &group->nodes[group->my_idx];
+    const gcs_node_t* node = &group->nodes[node_idx];
 
     uint8_t flags = 0;
 
-    if (group->prim_rep) flags |= GCS_STATE_FREP;
+    if (0 == node_idx) flags |= GCS_STATE_FREP;
 
     return gcs_state_create (
         &group->state_uuid,
@@ -846,12 +844,19 @@ gcs_group_get_state (gcs_group_t* group)
         group->prim_seqno,
         group->act_id,
         group->prim_state,
-        my_node->status,
-        my_node->name,
-        my_node->inc_addr,
-        my_node->proto_min,
-        my_node->proto_max,
+        node->status,
+        node->name,
+        node->inc_addr,
+        node->proto_min,
+        node->proto_max,
         flags
         );
+}
+
+/*! Returns state message object for this node */
+gcs_state_t*
+gcs_group_get_state (gcs_group_t* group)
+{
+    return group_get_node_state (group, group->my_idx);
 }
 

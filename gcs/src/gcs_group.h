@@ -52,7 +52,6 @@ typedef struct gcs_group
     gu_seqno_t      prim_seqno;
     long            prim_num;
     gcs_state_node_t prim_state;
-    bool            prim_rep;
 }
 gcs_group_t;
 

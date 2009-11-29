@@ -30,7 +30,7 @@ static suite_creator_t suites[] =
 	gcs_proto_suite,
 	gcs_defrag_suite,
 	gcs_node_suite,
-	gcs_group_suite,
+//	gcs_group_suite,
 	gcs_backend_suite,
 	gcs_core_suite,
 	NULL

@@ -50,7 +50,7 @@ new_component (gcs_group_t* group, const gcs_comp_msg_t* comp)
 {
     long ret = gcs_group_handle_comp_msg (group, comp);
     // modelling real state exchange is really tedious here, just fake it
-    group->state = GCS_GROUP_PRIMARY;
+//    group->state = GCS_GROUP_PRIMARY;
     return ret;
 }
 
@@ -70,7 +70,7 @@ START_TEST (gcs_group_configuration)
 
     // The Action
     const char   act_buf[]   = "Test action smuction";
-    long         act_len     = sizeof (act_buf);
+    ssize_t      act_len     = sizeof (act_buf);
 
     // lengths of three fragments of the action
     long         frag1_len    = act_len / 3;
@@ -231,7 +231,7 @@ START_TEST (gcs_group_configuration)
     fail_if (act->buf != NULL);
 //    ret = gcs_group_handle_act_msg (&group, &msg3, &r_act);
     TRY_MESSAGE(msg3);
-    fail_if (ret != act_len);
+    fail_if (ret != act_len, "Expected ret = %zd, got %zd", act_len, ret);
     fail_if (act->buf_len != act_len);
     fail_if (act->buf == NULL);
     fail_if (strncmp(act->buf, act_buf, act_len),
