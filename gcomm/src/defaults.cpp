@@ -10,7 +10,7 @@ using std::string;
 std::string const gcomm::Defaults::GMCastTcpPort            = "4567";
 std::string const gcomm::Defaults::EvsViewForgetTimeout     = "PT5M";
 std::string const gcomm::Defaults::EvsViewForgetTimeoutMin  = "PT1S";
-std::string const gcomm::Defaults::EvsInactiveTimeout       = "PT5S";
+std::string const gcomm::Defaults::EvsInactiveTimeout       = "PT15S";
 std::string const gcomm::Defaults::EvsInactiveTimeoutMin    = "PT0.1S";
 std::string const gcomm::Defaults::EvsRetransPeriod         = "PT0.7S";
 std::string const gcomm::Defaults::EvsRetransPeriodMin      = "PT0.1S";
