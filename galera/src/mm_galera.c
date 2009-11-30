@@ -184,17 +184,21 @@ static int ws_conflict_check(void *ctx1, void *ctx2) {
 
     if (job1->seqno < job2->seqno) return 0;
 
+    assert(job1->seqno > job2->seqno);
+
+    if ((job2->type == JOB_TO_ISOLATION) ||
+       (job2->type == JOB_REPLAYING)
+    ) {
+        gu_debug("job2 is brute force");
+        return 1;
+    }
+
     /* job1 is sequenced after job2, must check if they conflict */
 
     if (job1->ws->last_seen_trx >= job2->seqno)
     {
       trx_seqno_t last_seen_saved = job1->ws->last_seen_trx;
       int rcode;
-
-      if (job2->type == JOB_TO_ISOLATION) {
-          gu_debug("job2 has TO isolation");
-          return 1;
-      }
 
       /* serious mis-use of certification test
        * we mangle ws seqno's so that certification_test certifies
