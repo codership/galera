@@ -127,8 +127,11 @@ static inline long while_eagain_or_trx_abort (
         nanosleep (&period, NULL);
         wsdb_get_local_trx_info(trx_id, &info);
         if (info.state == WSDB_TRX_MUST_ABORT) {
+            gu_debug("WSDB_TRX_MUST_ABORT for trx: %lld %lld", info.seqno_g, info.seqno_l);
             return -EINTR;
         }
+        gu_debug("INTRERRUPT for trx: %lld %lld in state: %d", info.seqno_g, info.seqno_l, info.state);
+        return -EINTR;
     }
 
     return rcode;
