@@ -994,7 +994,7 @@ static enum wsrep_status process_query_write_set(
                 seqno_g, seqno_l, ws->last_seen_trx);
 
         PRINT_WS(wslog_G, ws, seqno_g);
-
+        /* fall through */
     case WSDB_CERTIFICATION_SKIP:
         /* Cancel commit queue */
         if (applier->type == JOB_SLAVE) {
@@ -2283,7 +2283,7 @@ static enum wsrep_status mm_galera_replay_trx(
     wsrep_t *gh, const wsrep_trx_id_t trx_id, void *app_ctx
 ) {
     struct job_worker *applier;
-    int                rcode;
+    int                rcode = WSREP_OK;
     wsdb_trx_info_t    trx;
 
     wsdb_get_local_trx_info(trx_id, &trx);
@@ -2334,7 +2334,7 @@ static enum wsrep_status mm_galera_replay_trx(
 
         switch (trx.position) {
         case WSDB_TRX_POS_CERT_QUEUE:
-            process_query_write_set(
+            rcode = process_query_write_set(
                 applier, app_ctx, trx.ws, trx.seqno_g, trx.seqno_l
             );
             break;
@@ -2374,10 +2374,10 @@ static enum wsrep_status mm_galera_replay_trx(
     wsdb_deref_seqno (trx.ws->last_seen_trx);
     wsdb_write_set_free(trx.ws);
 
-    gu_debug("replaying over for applier in to grab: %d, seqno: %lld %lld", 
+    gu_debug("replaying over for applier: %d, seqno: %lld %lld", 
              applier->id, trx.seqno_g, trx.seqno_l
     );
-    return WSREP_OK;
+    return (rcode == WSREP_OK) ? WSREP_OK : WSREP_TRX_FAIL;
 }
 
 static wsrep_status_t mm_galera_sst_sent (wsrep_t* gh,
