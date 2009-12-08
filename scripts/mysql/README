@@ -20,11 +20,10 @@ Licensing Information.
 
 Please see ./mysql/LICENSE.mysql and ./galera/LICENSE.galera
 
-The wsrep patch for MySQL project is hosted in launchpad site: 
-    http://launchpad.net/codership-mysql 
-The bzr command to get the patch for release 0.7 is: 
-    bzr branch lp:~codership/codership-mysql/release-0.7
-
+Project source code can be found at
+wsrep API:    https://launchpad.net/wsrep/
+MySQL patch:  https://launchpad.net/codership-mysql
+Galera libs:  http://www.codership.com/en/downloads/galera
 
 ABOUT THIS DOCUMENT
 
@@ -410,6 +409,8 @@ Here WSREP stands for Write-Set REPlication - a synchronous replication API
 that Codership is developing for transactional databases. Galera is a library
 that implements WSREP services. Default values are shown.
 
+All options are optional except for wsrep_provider and wsrep_cluster_address.
+
 wsrep_provider=none
    A full path to the library that implements WSREP interface. If none is
    specified, the server behaves almost like a normal mysqld, with slight
@@ -417,12 +418,18 @@ wsrep_provider=none
    Galera implementation shipped with the distribution. It can be overridden
    with WSREP environment variable.
 
-wsrep_gcs_address="dummy://"
-   Group Communication System address. Depends on the WSREP provider. This
-   distribution recognises "dummy://" and "gcomm://<IP address>:<IP port>"
+wsrep_provider_options=
+   Provider-specific option string.
 
-wsrep_gcs_group="my_cluster"
-   Logical group name, must be the same for all nodes of the cluster.
+wsrep_cluster_address="dummy://"
+   Group Communication System address. Depends on the WSREP provider. This
+   distribution recognizes "dummy://" and "gcomm://<IP address>:<IP port>"
+
+wsrep_cluster_name="my_wsrep_cluster"
+   Logical cluster name, must be the same for all nodes of the cluster.
+
+wsrep_node_name=
+   Human readable node name. Defaults to hostname.
 
 wsrep_slave_threads=1
    Number of threads dedicated to processing of writesets from other nodes.
@@ -440,19 +447,19 @@ wsrep_ws_persistency=0
    Save writesets in binary files. For debugging purposes only.
 
 wsrep_debug=0
-   Enable debug-level logging.  
+   Enable debug-level logging.
 
 wsrep_convert_LOCK_to_trx=1
    Implicitly convert locking sessions into transactions inside mysqld. By
    itself it does not mean support for locking sessions, but it prevents the
    database from going into logically inconsistent state.
-   
+
 wsrep_retry_autocommit=1
    Retry autocommit queries and single statement transactions should they fail
    certification test. This is analogous to rescheduling an autocommit query
    should it go into deadlock with other transactions in the database lock
    manager.
-   
+
 wsrep_auto_increment_control=1
    Automatically adjust auto_increment_increment and auto_increment_offset
    variables based on the number of nodes in the cluster. Significantly reduces
@@ -465,15 +472,6 @@ wsrep_drupal_282555_workaround=1
    Required for stable Drupal operation. Documented at:
       http://bugs.mysql.com/bug.php?id=41984
       http://drupal.org/node/282555
-
-wsrep_provider_options=
-   Provider dependent string that contains provider-specific (as opposed to
-   general wsrep) options. Does not need to be set.
-
-wsrep_node_name=
-   Human assigned symbolic node name. It does not have to be unique, but then
-   what's the point? It can be used to select desired donor for state snapshot
-   transfer and it makes logs easier to read. If not set defaults to hostname.
 
 wsrep_sst_method=mysqldump
    What method to use to copy database state to a newly joined node. Currently
@@ -524,10 +522,10 @@ NOTE: this distribution may be binary incompatible with some older Linux
    different nodes. As a result SELECT...LIMIT... may return slightly different
    sets.
 
-3)  Unsupported queries: 
+3)  Unsupported queries:
     * LOAD DATA
     * lock functions (GET_LOCK(), RELEASE_LOCK()... )
-   
+
 4) Locking sessions (LOCK TABLE...UNLOCK), are not supported. There is
    an option to convert locking sessions to transactions on the fly:
    wsrep_convert_LOCK_to_trx. Use at your own risk.
@@ -542,9 +540,9 @@ NOTE: this distribution may be binary incompatible with some older Linux
    of the them can successfully commit. The failing one, will be aborted.
    For cluster level aborts, MySQL/galera cluster gives back deadlock error 
    code (Error: 1213 SQLSTATE: 40001  (ER_LOCK_DEADLOCK)).
-   
+
 7) Query log cannot be directed to table. If you enable query logging,
-   you must forward the log to a file: 
+   you must forward the log to a file:
        log_output = FILE
    Use general_log and general_log_file to choose query logging and the 
    log file name
