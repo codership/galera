@@ -308,9 +308,7 @@ gcs_fc_cont_end (gcs_conn_t* conn)
 
     ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
 
-    if (gu_likely (ret >= 0)) {
-        ret = 0;
-    }
+    if (gu_likely (ret >= 0)) { ret = 0; }
 
     conn->stop_sent += (ret != 0); // fix count in case of error
 
@@ -452,6 +450,9 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         conn->stop_count  = 0;
         conn->upper_limit = fc_base_queue_limit * sqrt(conf->memb_num - 1) + .5;
         conn->lower_limit = conn->upper_limit * fc_resume_factor + .5;
+
+        if (0 == conn->upper_limit) conn->upper_limit = 1;
+        // otherwise any non-repl'd message may cause waits.
 
         gu_mutex_unlock (&conn->fc_lock);
     }
