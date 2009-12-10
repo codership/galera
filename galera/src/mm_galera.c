@@ -945,6 +945,7 @@ static enum wsrep_status process_query_write_set(
     gcs_seqno_t seqno_g, gcs_seqno_t seqno_l
 ) {
     int rcode;
+    enum wsrep_status ret_code;
 
     /* wait for total order */
     GALERA_GRAB_QUEUE (cert_queue, seqno_l);
@@ -954,6 +955,7 @@ static enum wsrep_status process_query_write_set(
     if (gu_unlikely(!galera_update_global_seqno(seqno_g))) {
         /* Outdated writeset, skip */
         rcode = WSDB_CERTIFICATION_SKIP;
+        ret_code = WSREP_OK;
     }
 #else
     if (gu_likely(galera_update_global_seqno(seqno_g))) {
@@ -963,6 +965,7 @@ static enum wsrep_status process_query_write_set(
     else {
         /* Outdated writeset, skip */
         rcode = WSDB_CERTIFICATION_SKIP;
+        ret_code = WSREP_OK;
     }
 #endif
 
@@ -986,6 +989,7 @@ static enum wsrep_status process_query_write_set(
             gu_fatal("could not apply trx: %lld %lld", seqno_g, seqno_l);
             return WSREP_FATAL;
         }
+        ret_code = WSREP_OK;
         break;
     }
     case WSDB_CERTIFICATION_FAIL:
@@ -994,13 +998,14 @@ static enum wsrep_status process_query_write_set(
                 seqno_g, seqno_l, ws->last_seen_trx);
 
         PRINT_WS(wslog_G, ws, seqno_g);
+        ret_code = WSREP_TRX_FAIL;
         /* fall through */
     case WSDB_CERTIFICATION_SKIP:
         /* Cancel commit queue */
         if (applier->type == JOB_SLAVE) {
             GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
         } else {
-            /* replaying job has garbbed commit queue in the beginning */
+            /* replaying job has grabbed commit queue in the beginning */
             GALERA_UPDATE_LAST_APPLIED (seqno_g);
             GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
         }
@@ -1013,7 +1018,7 @@ static enum wsrep_status process_query_write_set(
         break;
     }
 
-    return WSREP_OK;
+    return ret_code;
 }
 
 static wsrep_status_t process_write_set( 
@@ -2374,8 +2379,8 @@ static enum wsrep_status mm_galera_replay_trx(
     wsdb_deref_seqno (trx.ws->last_seen_trx);
     wsdb_write_set_free(trx.ws);
 
-    gu_debug("replaying over for applier: %d, seqno: %lld %lld", 
-             applier->id, trx.seqno_g, trx.seqno_l
+    gu_debug("replaying over for applier: %d rcode: %d, seqno: %lld %lld", 
+             applier->id, rcode, trx.seqno_g, trx.seqno_l
     );
     return (rcode == WSREP_OK) ? WSREP_OK : WSREP_TRX_FAIL;
 }
