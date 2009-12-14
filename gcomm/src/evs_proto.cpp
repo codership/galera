@@ -1408,7 +1408,7 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     // Filter out non-fifo messages
     if (msg.get_fifo_seq() != -1 && (msg.get_flags() & Message::F_RETRANS) == 0)
     {
-
+        
         if (node.get_fifo_seq() >= msg.get_fifo_seq())
         {
             evs_log_debug(D_FOREIGN_MSGS) 
@@ -1424,21 +1424,26 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     
     // Accept non-membership messages only from current view
     // or from view to be installed
-    if (msg.is_membership() == false)
+    if (msg.is_membership()                     == false                    &&
+        msg.get_source_view_id()                != current_view.get_id()    &&
+        (install_message                        == 0                     ||
+         install_message->get_install_view_id() != msg.get_source_view_id()))
     {
-        if (msg.get_source_view_id() != current_view.get_id())
+        // If state is operational and known node emits message that
+        // has view id of unknown view, shift to recovery.
+        if (get_state()                    == S_OPERATIONAL && 
+            is_msg_from_previous_view(msg) == false)
         {
-            if (install_message == 0 ||
-                install_message->get_install_view_id() != msg.get_source_view_id())
-            {
-                return;
-            }
+            assert(node.get_operational() == true);
+            shift_to(S_RECOVERY, true);
         }
+        return;
     }
     
     recvd_msgs[msg.get_type()]++;
 
-    switch (msg.get_type()) {
+    switch (msg.get_type())
+    {
     case Message::T_USER:
         gu_trace(handle_user(static_cast<const UserMessage&>(msg), ii, rb));
         break;
