@@ -1759,8 +1759,8 @@ static enum wsrep_status mm_galera_pre_commit(
      *   AFAIK usleep() is evaluated after unlock()
      */
     } while ((gcs_wait (gcs_conn) > 0) &&
-              (status.fc_waits++, gu_mutex_unlock (&commit_mtx),
-               usleep (GALERA_USLEEP_FLOW_CONTROL), true)
+             (status.fc_waits++, gu_mutex_unlock (&commit_mtx),
+              usleep (GALERA_USLEEP_FLOW_CONTROL), true)
         );
 #endif
 
@@ -2152,7 +2152,10 @@ static enum wsrep_status mm_galera_to_execute_start(
         usleep (GALERA_USLEEP_FLOW_CONTROL);
     }
 
-    if (rcode < 0) goto cleanup;
+    if (rcode < 0) {
+        rcode = WSREP_CONN_FAIL; // in this case we better reconnect
+        goto cleanup;
+    }
 #endif
 
     /* replicate through gcs */
