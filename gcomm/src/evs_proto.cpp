@@ -336,7 +336,7 @@ void gcomm::evs::Proto::handle_consensus_timer()
             }
         }
         profile_enter(shift_to_prof);
-        shift_to(S_RECOVERY, true);
+        gu_trace(shift_to(S_RECOVERY, true));
         profile_leave(shift_to_prof);
     }
     if (get_state() != S_LEAVING)
@@ -507,7 +507,7 @@ void gcomm::evs::Proto::check_inactive()
     if (has_inactive == true && get_state() == S_OPERATIONAL)
     {
         profile_enter(shift_to_prof);
-        shift_to(S_RECOVERY, true);
+        gu_trace(shift_to(S_RECOVERY, true));
         profile_leave(shift_to_prof);
     }
     else if (has_inactive    == true && 
@@ -515,7 +515,7 @@ void gcomm::evs::Proto::check_inactive()
              n_operational() == 1)
     {
         profile_enter(shift_to_prof);
-        shift_to(S_CLOSED);
+        gu_trace(shift_to(S_CLOSED));
         profile_leave(shift_to_prof);
     }
 }
@@ -524,6 +524,7 @@ void gcomm::evs::Proto::check_inactive()
 void gcomm::evs::Proto::set_inactive(const UUID& uuid)
 {
     NodeMap::iterator i;
+    gcomm_assert(uuid != get_uuid());
     gu_trace(i = known.find_checked(uuid));
     evs_log_debug(D_STATE) << "setting " << uuid << " inactive";
     Node& node(NodeMap::get_value(i));
@@ -1429,13 +1430,19 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
         (install_message                        == 0                     ||
          install_message->get_install_view_id() != msg.get_source_view_id()))
     {
-        // If state is operational and known node emits message that
-        // has view id of unknown view, shift to recovery.
-        if (get_state()                    == S_OPERATIONAL && 
-            is_msg_from_previous_view(msg) == false)
+        // If source node seems to be operational but it has proceeded
+        // into new view, mark it as unoperational in order to create
+        // intermediate views before re-merge.
+        if (node.get_installed()           == true      &&
+            node.get_operational()         == true      &&
+            is_msg_from_previous_view(msg) == false     &&
+            get_state()                    != S_LEAVING)
         {
-            assert(node.get_operational() == true);
-            shift_to(S_RECOVERY, true);
+            log_info << self_string() 
+                     << "detected new view from operational source: " 
+                     << msg.get_source_view_id();
+            set_inactive(msg.get_source());
+            gu_trace(shift_to(S_RECOVERY, true));
         }
         return;
     }
@@ -1615,7 +1622,7 @@ int gcomm::evs::Proto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
 
 void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
 {
-    if (shift_to_rfcnt > 0) gu_throw_fatal;
+    if (shift_to_rfcnt > 0) gu_throw_fatal << *this;
 
     shift_to_rfcnt++;
 
@@ -2065,13 +2072,13 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                 if (consensus.is_consensus() == true) 
                 {
                     profile_enter(shift_to_prof);
-                    shift_to(S_OPERATIONAL);
+                    gu_trace(shift_to(S_OPERATIONAL));
                     profile_leave(shift_to_prof);
                 } 
                 else 
                 {
                     profile_enter(shift_to_prof);
-                    shift_to(S_RECOVERY);
+                    gu_trace(shift_to(S_RECOVERY));
                     profile_leave(shift_to_prof);
                     return;
                 }
@@ -2233,7 +2240,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         if (is_all_installed() == true)
         {
             profile_enter(shift_to_prof);
-            shift_to(S_OPERATIONAL);
+            gu_trace(shift_to(S_OPERATIONAL));
             profile_leave(shift_to_prof);
         }
         return;
@@ -2693,7 +2700,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
             if (mn.get_operational() == false || mn.get_leaving() == true)
             {
                 profile_enter(shift_to_prof);
-                shift_to(S_CLOSED);
+                gu_trace(shift_to(S_CLOSED));
                 profile_leave(shift_to_prof);
             }
         }
@@ -2738,7 +2745,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         log_warn << self_string() 
                  << " shift to RECOVERY due to inconsistent install";
         profile_enter(shift_to_prof);
-        shift_to(S_RECOVERY);
+        gu_trace(shift_to(S_RECOVERY));
         profile_leave(shift_to_prof);
         return;
     }
@@ -2747,7 +2754,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         log_warn << self_string()
                  << " shift to RECOVERY due to inconsistent state";
         profile_enter(shift_to_prof);
-        shift_to(S_RECOVERY);
+        gu_trace(shift_to(S_RECOVERY));
         profile_leave(shift_to_prof);
         return;
     } 
@@ -2757,7 +2764,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
                  << " source " << msg.get_source()
                  << " is not supposed to be representative";
         profile_enter(shift_to_prof);
-        shift_to(S_RECOVERY);
+        gu_trace(shift_to(S_RECOVERY));
         profile_leave(shift_to_prof);
         return;
     }
@@ -2806,7 +2813,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
             << "install message " << msg 
             << " not consistent with state " << *this;
         profile_enter(shift_to_prof);
-        shift_to(S_RECOVERY, true);
+        gu_trace(shift_to(S_RECOVERY, true));
         profile_leave(shift_to_prof);
     }
 }
