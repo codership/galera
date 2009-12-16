@@ -1132,15 +1132,13 @@ gcs_wait (gcs_conn_t* conn)
     }
     else {
         switch (conn->state) {
-        case GCS_CONN_JOINER:
-            return -ECONNABORTED;
         case GCS_CONN_OPEN:
             return -ENOTCONN;
         case GCS_CONN_CLOSED:
         case GCS_CONN_DESTROYED:
             return GCS_CLOSED_ERROR;
         default:
-            return 1; // wait until get sync
+            return -EAGAIN; // wait until get sync
         }
     }
 }

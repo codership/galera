@@ -102,8 +102,7 @@ extern long gcs_destroy (gcs_conn_t *conn);
 
 /*! @brief Waits until the group catches up.
  * This call checks if any member of the group (including this one) has a
- * long slave queue. Should be called before gcs_repl(), gcs_send() or
- * gcs_join().
+ * long slave queue. Should be called before gcs_repl(), gcs_send().
  *
  * @return negative error code, 1 if wait is required, 0 otherwise
  */
