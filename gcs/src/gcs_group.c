@@ -233,16 +233,16 @@ group_post_state_exchange (gcs_group_t* group)
         group_go_non_primary (group);
     }
 
-    gu_debug ("Quorum results:"
-              "\n\t%s,"
-              "\n\tact_id     = %lld,"
-              "\n\tconf_id    = %lld,"
-              "\n\tlast_appl. = %lld,"
-              "\n\tprotocol   = %hd,"
-              "\n\tgroup UUID = "GU_UUID_FORMAT,
-              quorum.primary ? "PRIMARY" : "NON-PRIMARY",
-              quorum.act_id, quorum.conf_id, group->last_applied, quorum.proto,
-              GU_UUID_ARGS(&quorum.group_uuid));
+    gu_info ("Quorum results:"
+             "\n\t%s,"
+             "\n\tact_id     = %lld,"
+             "\n\tconf_id    = %lld,"
+             "\n\tlast_appl. = %lld,"
+             "\n\tprotocol   = %hd,"
+             "\n\tgroup UUID = "GU_UUID_FORMAT,
+             quorum.primary ? "PRIMARY" : "NON-PRIMARY",
+             quorum.act_id, quorum.conf_id, group->last_applied, quorum.proto,
+             GU_UUID_ARGS(&quorum.group_uuid));
 }
 
 // does basic sanity check of the component message (in response to #145)
@@ -606,10 +606,8 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     }
     else {
         if (GCS_STATE_SYNCED != sender->status) {
-            gu_warn ("Protocol violation. SYNC message sender %ld (%s) "
-                     "is not joined. Message ignored.",
+            gu_warn ("SYNC message sender from non-joined %ld (%s). Ignored.",
                      msg->sender_idx, sender->name);
-            assert (0);
         }
         else {
             gu_debug ("Redundant SYNC message from %ld (%s).",

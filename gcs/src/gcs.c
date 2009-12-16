@@ -105,8 +105,11 @@ struct gcs_conn
     long         upper_limit; // upper slave queue limit
     long         lower_limit; // lower slave queue limit
 
+    /* sync control */
+    bool         sync_sent;
+
     /* gcs_core object */
-    gcs_core_t  *core; // the context that is returned by
+    gcs_core_t*  core; // the context that is returned by
                        // the core group communication system
 };
 
@@ -319,22 +322,50 @@ gcs_fc_cont_end (gcs_conn_t* conn)
     return ret;
 }
 
-static inline long
-gcs_send_sync (gcs_conn_t* conn) {
-    long ret = 0;
-
-    if (conn->lower_limit >= conn->queue_len &&
-        GCS_CONN_JOINED   == conn->state) {
+/* To be called under slave queue lock. Returns true if SYNC must be sent */
+static inline bool
+gcs_send_sync_begin (gcs_conn_t* conn)
+{
+    if (gu_unlikely(GCS_CONN_JOINED   == conn->state     &&
+                    conn->lower_limit >= conn->queue_len && !conn->sync_sent)) {
         // tripped lower slave queue limit, send SYNC message
-        gu_debug ("SENDING SYNC");
-        ret = gcs_core_send_sync (conn->core, 0);
-        if (ret >= 0) {
-            ret = 0;
-        }
-        ret = gcs_check_error (ret, "Failed to send SYNC signal");
+        conn->sync_sent = true;
+        return true;
     }
 
+    return false;
+}
+
+static inline long
+gcs_send_sync_end (gcs_conn_t* conn)
+{
+    long ret = 0;
+
+    gu_debug ("SENDING SYNC");
+
+    ret = gcs_core_send_sync (conn->core, 0);
+
+    if (gu_likely (ret >= 0)) {
+        ret = 0;
+    }
+    else {
+        conn->sync_sent = false;
+    }
+
+    ret = gcs_check_error (ret, "Failed to send SYNC signal");
+
     return ret;
+}
+
+static inline long
+gcs_send_sync (gcs_conn_t* conn)
+{
+    if (gcs_send_sync_begin (conn)) {
+        return gcs_send_sync_end (conn);
+    }
+    else {
+        return 0;
+    }
 }
 
 /*!
@@ -437,9 +468,9 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
 
     conn->my_idx = conf->my_idx;
 
-    /* reset flow control as membership is most likely changed */
     gu_fifo_lock(conn->recv_q);
     {
+        /* reset flow control as membership is most likely changed */
         if (gu_mutex_lock (&conn->fc_lock)) {
             gu_fatal ("Failed to lock mutex.");
             abort();
@@ -452,9 +483,11 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         conn->lower_limit = conn->upper_limit * fc_resume_factor + .5;
 
         if (0 == conn->upper_limit) conn->upper_limit = 1;
-        // otherwise any non-repl'd message may cause waits.
+        // otherwise any non-repl'ed message may cause waits.
 
         gu_mutex_unlock (&conn->fc_lock);
+
+        conn->sync_sent = false;
     }
     gu_fifo_release (conn->recv_q);
 
@@ -495,7 +528,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     }
 
     /* One of the cases when the node can become SYNCED */
-    if (GCS_CONN_JOINED == conn->state && (ret = gcs_send_sync (conn))) {
+    if (GCS_CONN_JOINED == conn->state && (ret = gcs_send_sync_end (conn))) {
         gu_warn ("Sending SYNC failed: %ld (%s)", ret, strerror (-ret));
     }
 }
@@ -645,7 +678,7 @@ static void *gcs_recv_thread (void *arg)
         }
         else if (gu_likely(this_act_id >= 0))
         {
-            /* remote/non-replicated action */
+            /* remote/non-repl'ed action */
             struct gcs_recv_act* recv_act = gu_fifo_get_tail (conn->recv_q);
 
             if (gu_likely (NULL != recv_act)) {
@@ -1048,14 +1081,15 @@ long gcs_recv (gcs_conn_t*     conn,
 
     if ((act = gu_fifo_get_head (conn->recv_q)))
     {
+        conn->queue_len = gu_fifo_length (conn->recv_q) - 1;
+        bool send_cont  = gcs_fc_cont_begin   (conn);
+        bool send_sync  = gcs_send_sync_begin (conn);
+
         *action       = (void*)act->rcvd.act.buf;
         *act_size     = act->rcvd.act.buf_len;
         *act_type     = act->rcvd.act.type;
         *act_id       = act->rcvd.id;
         *local_act_id = act->local_id;
-
-        conn->queue_len = gu_fifo_length (conn->recv_q) - 1;
-        bool send_cont  = gcs_fc_cont_begin(conn);
 
         gu_fifo_pop_head (conn->recv_q); // release the queue
 
@@ -1077,7 +1111,7 @@ long gcs_recv (gcs_conn_t*     conn,
                 abort();
             }
         }
-        else if (GCS_CONN_JOINED == conn->state && (err=gcs_send_sync(conn))) {
+        else if (gu_unlikely(send_sync) && (err = gcs_send_sync_end (conn))) {
             gu_warn ("Failed to send SYNC message: %d (%s). Will try later.",
                      err, strerror(-err));
         }

@@ -295,19 +295,22 @@ state_nodes_compare (const gcs_state_t* left, const gcs_state_t* right)
 
 /* Helper - just prints out all significant (JOINED) nodes */
 static void
-state_report_conflicting_uuids (const gcs_state_t* states[], long states_num)
+state_report_uuids (char* buf, size_t buf_len,
+                    const gcs_state_t* states[], long states_num,
+                    gcs_state_node_t min_state)
 {
     long j;
+
     for (j = 0; j < states_num; j++) {
-        if (states[j]->current_state >= GCS_STATE_DONOR) {
-            size_t st_len = 1024;
-            char   st[st_len];
-            gcs_state_snprintf (st, st_len, states[j]);
-            st[st_len - 1] = '\0';
-            gu_fatal ("%s", st);
+        if (states[j]->current_state >= min_state) {
+            int written = gcs_state_snprintf (buf, buf_len, states[j]);
+            buf     += written;
+            buf_len -= written;
         }        
     }
 }
+
+#define GCS_STATE_MAX_LEN 720
 
 /* Get quorum decision from state messages */
 long 
@@ -347,7 +350,15 @@ gcs_state_get_quorum (const gcs_state_t*  states[],
     }
 
     if (!rep) {
-        gu_debug ("No node with complete state");
+        size_t buf_len = states_num * GCS_STATE_MAX_LEN;
+        char*  buf = gu_malloc (buf_len);
+        if (buf) {
+            state_report_uuids (buf, buf_len, states, states_num,
+                                GCS_STATE_NON_PRIM);
+            gu_warn ("Quorum impossible: No node with complete state:\n%s",
+                     buf);
+            gu_free (buf);
+        }
         return 0;
     }
 
@@ -357,8 +368,14 @@ gcs_state_get_quorum (const gcs_state_t*  states[],
         if (states[j]->current_state >= GCS_STATE_DONOR) {
             if (gu_uuid_compare (&rep->group_uuid, &states[i]->group_uuid)) {
                 // for now just freak out and print all conflicting nodes
-                gu_fatal ("Quorum impossible: conflicting group UUIDs:");
-                state_report_conflicting_uuids (states, states_num);
+                size_t buf_len = states_num * GCS_STATE_MAX_LEN;
+                char*  buf = gu_malloc (buf_len);
+                if (buf) {
+                    state_report_uuids (buf, buf_len, states, states_num,
+                                        GCS_STATE_DONOR);
+                    gu_fatal("Quorum impossible: conflicting group UUIDs:\n%s");
+                    gu_free (buf);
+                }
                 return 0;
             }
             rep = state_nodes_compare (rep, states[i]);

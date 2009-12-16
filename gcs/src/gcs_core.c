@@ -852,7 +852,7 @@ core_msg_to_action (gcs_core_t*          core,
     }
     else {
         gu_warn ("%s message from member %ld in non-primary configuration. "
-                 "Ignoring.", gcs_msg_type_string[msg->type], msg->sender_idx);
+                 "Ignored.", gcs_msg_type_string[msg->type], msg->sender_idx);
     }
 
     return ret;
