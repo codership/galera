@@ -149,9 +149,9 @@ int job_queue_start_job(
         ) {
             if (queue->conflict_test(ctx, queue->jobs[i].ctx)) {
                 queue->jobs[i].waiters[worker->id] = 1;
-                gu_warn ("job %d  waiting for: %d", worker->id, i);
+                gu_debug ("job %d  waiting for: %d", worker->id, i);
                 gu_cond_wait(&queue->jobs[worker->id].cond, &queue->mutex);
-                gu_warn ("job queue released: %d", worker->id);
+                gu_debug ("job queue released: %d", worker->id);
                 queue->jobs[i].waiters[worker->id] = 0;
             }
         }
@@ -179,7 +179,12 @@ void * job_queue_end_job(struct job_queue *queue, struct job_worker *worker
     /* if some job is depending on me, release it to continue */
     for (i=0; i<queue->registered_workers; i++) {
         if (queue->jobs[worker->id].waiters[i]) {
-	    gu_warn ("job queue signal for: %d", i);
+	    gu_debug ("job queue signal for: %d", i);
+
+            /* change state to running early, so that he will be taken
+             * in consideration with following job queue conflict tests
+             */
+            queue->jobs[i].state = JOB_RUNNING;
             gu_cond_signal(&queue->jobs[i].cond);
         }
     }
@@ -200,7 +205,7 @@ void * job_queue_end_job(struct job_queue *queue, struct job_worker *worker
     }
 
     if (min_job > -1) {
-        gu_warn ("job full queue signal for: %d", min_job);
+        gu_info ("job full queue signal for: %d", min_job);
         gu_cond_signal(&queue->jobs[min_job].cond);
     }
 
