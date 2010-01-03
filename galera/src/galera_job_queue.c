@@ -126,7 +126,7 @@ int job_queue_start_job(
     CHECK_OBJ(worker, job_worker);
 
     if (worker->state == JOB_RUNNING) {
-        gu_warn ("job %d  already running", worker->id);
+        gu_debug ("job %d  already running", worker->id);
         return WSDB_OK;
     }
 

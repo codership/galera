@@ -2327,6 +2327,17 @@ static enum wsrep_status mm_galera_replay_trx(
         );
         return WSREP_NODE_FAIL;
     }
+
+    if (trx.position == WSDB_TRX_POS_COMMIT_QUEUE) {
+        struct job_context ctx;
+    
+        /* start job already here, to prevent later slave transactions from
+         *   applying before us
+         */
+        ctx.seqno = trx.seqno_l;
+        ctx.ws    = trx.ws;
+        job_queue_start_job(applier_queue, applier, (void *)&ctx);
+    }
     gu_debug("replaying applier in to grab: %d, seqno: %lld %lld", 
              applier->id, trx.seqno_g, trx.seqno_l
     );
