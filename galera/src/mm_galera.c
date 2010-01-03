@@ -1694,7 +1694,7 @@ static int check_certification_status_for_aborted(
     rcode = wsdb_certification_test(ws, seqno_g, false);
     switch (rcode) {
     case WSDB_OK:
-        gu_warn ("BF conflicting local trx has certified, "
+        gu_debug ("BF conflicting local trx has certified, "
                  "seqno: %llu %llu last_seen_trx: %llu", 
                  seqno_l, seqno_g, ws->last_seen_trx);
         /* certification ok */
