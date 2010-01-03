@@ -2336,6 +2336,7 @@ static enum wsrep_status mm_galera_replay_trx(
          */
         ctx.seqno = trx.seqno_l;
         ctx.ws    = trx.ws;
+        ctx.type  = JOB_REPLAYING;
         job_queue_start_job(applier_queue, applier, (void *)&ctx);
     }
     gu_debug("replaying applier in to grab: %d, seqno: %lld %lld", 
