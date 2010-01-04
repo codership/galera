@@ -141,6 +141,7 @@ int job_queue_start_job(
     }
 
     queue->active_workers++;
+    worker->ctx   = ctx;
 
     /* check against all active jobs */
     for (i=0; i<queue->registered_workers; i++) {
@@ -156,7 +157,6 @@ int job_queue_start_job(
             }
         }
     }
-    worker->ctx   = ctx;
     worker->state = JOB_RUNNING;
 
     gu_debug("job: %d starting", worker->id);
@@ -200,7 +200,9 @@ void * job_queue_end_job(struct job_queue *queue, struct job_worker *worker
                      &queue->jobs[i].ctx, &queue->jobs[min_job].ctx) == -1) {
                       min_job = i;
                 }
-          }
+            } else {
+                min_job = i;
+            }
         }
     }
 

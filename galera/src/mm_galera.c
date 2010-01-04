@@ -2303,6 +2303,8 @@ static enum wsrep_status mm_galera_replay_trx(
     wsrep_t *gh, const wsrep_trx_id_t trx_id, void *app_ctx
 ) {
     struct job_worker *applier;
+    struct job_context ctx;
+    
     int                rcode;
     enum wsrep_status  ret_code = WSREP_OK;
     wsdb_trx_info_t    trx;
@@ -2329,8 +2331,6 @@ static enum wsrep_status mm_galera_replay_trx(
     }
 
     if (trx.position == WSDB_TRX_POS_COMMIT_QUEUE) {
-        struct job_context ctx;
-    
         /* start job already here, to prevent later slave transactions from
          *   applying before us
          */
