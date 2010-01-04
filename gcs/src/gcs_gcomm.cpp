@@ -242,7 +242,7 @@ public:
         { 
             if (ptr->conn != 0)
             {
-                conn = reinterpret_cast<GCommConn*>(ptr->conn)->ref();
+                conn = reinterpret_cast<GCommConn*>(ptr->conn)->ref(unset);
 
                 if (unset == true)
                 {
@@ -274,9 +274,9 @@ private:
     GCommConn(const GCommConn&);
     void operator=(const GCommConn&);
 
-    GCommConn* ref() 
+    GCommConn* ref(const bool unsetting) 
     { 
-        if (terminated == true)
+        if (terminated == true && unsetting == false)
         {
             return 0;
         }
@@ -595,11 +595,11 @@ static GCS_BACKEND_DESTROY_FN(gcs_gcomm_destroy)
 
     if (ref.get() == 0)
     {
+        log_warn << "could not get reference to backend conn";
         return -EBADFD;
     }
-
-    GCommConn* conn(ref.get());
     
+    GCommConn* conn(ref.get());
     try
     {
         conn->destroy();
@@ -607,7 +607,8 @@ static GCS_BACKEND_DESTROY_FN(gcs_gcomm_destroy)
     }
     catch (Exception& e)
     {
-        return e.get_errno();
+        log_warn << "conn destroy failed: " << e.get_errno();
+        return -e.get_errno();
     }
 
     return 0;
