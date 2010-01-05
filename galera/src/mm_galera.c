@@ -1988,8 +1988,8 @@ static enum wsrep_status mm_galera_pre_commit(
             /* start job already here, to prevent later slave transactions from
              *   applying before us
              */
-            ctx->seqno = trx.seqno_l;
-            ctx->ws    = trx.ws;
+            ctx->seqno = seqno_l;
+            ctx->ws    = ws;
             ctx->type  = JOB_REPLAYING;
             job_queue_start_job(applier_queue, applier, (void *)ctx);
 
