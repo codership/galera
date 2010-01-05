@@ -2387,6 +2387,7 @@ static enum wsrep_status mm_galera_replay_trx(
         }
     } else {
         gu_debug("Using registered applier");
+        assert (trx.position == WSDB_TRX_POS_COMMIT_QUEUE);
         applier = trx.applier;
     }
     gu_debug("replaying applier in to grab: %d, seqno: %lld %lld", 

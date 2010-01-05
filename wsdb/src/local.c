@@ -1440,12 +1440,13 @@ void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info) {
         info->state = WSDB_TRX_MISSING;
         GU_DBUG_VOID_RETURN;
     }
-    info->seqno_l  = trx->info.seqno_l;
-    info->seqno_g  = trx->info.seqno_g;
-    info->ws       = trx->info.ws;
-    info->position = trx->info.position;
-    info->state    = trx->info.state;
-
+    info->seqno_l     = trx->info.seqno_l;
+    info->seqno_g     = trx->info.seqno_g;
+    info->ws          = trx->info.ws;
+    info->position    = trx->info.position;
+    info->state       = trx->info.state;
+    info->applier     = trx->info.applier;
+    info->applier_ctx = trx->info.applier_ctx;
 
     GU_DBUG_VOID_RETURN;
 }
