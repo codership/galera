@@ -1128,7 +1128,7 @@ galera_handle_configuration (wsrep_t* gh,
     if (conf->st_required) { // see #163 - SST might have happened already
         ((gcs_act_conf_t*)conf)->st_required =
             (gu_uuid_compare (&status.state_uuid, conf_uuid) ||
-             status.last_applied < conf->seqno);
+             status.last_applied != conf->seqno);
     }
 
 #ifdef GALERA_WORKAROUND_197
