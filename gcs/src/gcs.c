@@ -50,18 +50,20 @@ typedef enum
     GCS_CONN_PRIMARY,  // in primary conf, needs state transfer   
     GCS_CONN_OPEN,     // just connected to group, non-primary
     GCS_CONN_CLOSED,
-    GCS_CONN_DESTROYED
+    GCS_CONN_DESTROYED,
+    GCS_CONN_STATE_MAX
 }
 gcs_conn_state_t;
 
 #define GCS_CLOSED_ERROR -EBADFD; // file descriptor in bad state
 
-static const char* gcs_conn_state_str[GCS_CONN_DESTROYED + 1] =
+static const char* gcs_conn_state_str[GCS_CONN_STATE_MAX] =
 {
     "SYNCED",
     "JOINED",
     "DONOR",
     "JOINER",
+    "PRIMARY",
     "OPEN",
     "CLOSED",
     "DESTROYED"
@@ -86,7 +88,8 @@ struct gcs_conn
     int err;
     gu_mutex_t   lock;
 
-    gcs_seqno_t  local_act_id; /* local seqno of the action  */
+    gcs_seqno_t  local_act_id; /* local seqno of the action */
+    gcs_seqno_t  global_seqno;
 
     /* A queue for threads waiting for replicated actions */
     gcs_fifo_lite_t*  repl_q;
@@ -156,6 +159,7 @@ gcs_create (const char* node_name, const char* inc_addr)
                     conn->state        = GCS_CONN_CLOSED;
                     conn->my_idx       = -1;
                     conn->local_act_id = GCS_SEQNO_FIRST;
+                    conn->global_seqno = 0;
                     gu_mutex_init (&conn->lock, NULL);
                     gu_mutex_init (&conn->fc_lock, NULL);
                     return conn; // success
@@ -189,7 +193,7 @@ gcs_create (const char* node_name, const char* inc_addr)
 long
 gcs_init (gcs_conn_t* conn, gcs_seqno_t seqno, const uint8_t uuid[GU_UUID_LEN])
 {
-    if (conn->state == GCS_CONN_CLOSED) {
+    if (GCS_CONN_CLOSED == conn->state) {
         return gcs_core_init (conn->core, seqno, (const gu_uuid_t*)uuid);
     }
     else {
@@ -372,32 +376,68 @@ gcs_send_sync (gcs_conn_t* conn)
  * State transition functions - just in case we want to add something there.
  * @todo: need to be reworked, see #231
  */
+
+static bool
+gcs_shift_state (gcs_conn_t*      conn,
+                 gcs_conn_state_t new_state)
+{
+    static const bool allowed [GCS_CONN_STATE_MAX][GCS_CONN_STATE_MAX] = {
+       // SYNCED JOINED DONOR  JOINER PRIM   OPEN   CLOSED DESTR
+        { false, true,  false, false, false, false, false, false }, // SYNCED
+        { false, false, true,  true,  true,  false, false, false }, // JOINED
+        { true,  true,  false, false, false, false, false, false }, // DONOR
+        { false, false, false, false, true,  false, false, false }, // JOINER
+        { true,  true,  true,  true,  false, true,  false, false }, // PRIMARY
+        { true,  true,  true,  true,  true,  false, true,  false }, // OPEN
+        { true,  true,  true,  true,  true,  true,  false, false }, // CLOSED
+        { false, false, false, false, false, false, true,  false }  // DESTROYED
+    };
+
+    if (allowed[new_state][conn->state]) {
+        gu_info ("Shifting %s -> %s (TO: %lld)",
+                 gcs_conn_state_str[conn->state],
+                 gcs_conn_state_str[new_state], conn->global_seqno);
+        conn->state = new_state;
+        return true;
+    }
+    else {
+        if (conn->state != new_state) {
+            gu_warn ("Shifting %s -> %s is not allowed (TO: %lld)",
+                     gcs_conn_state_str[conn->state],
+                     gcs_conn_state_str[new_state], conn->global_seqno);
+        }
+        return false;
+    }
+}
+
 static void
 gcs_become_open (gcs_conn_t* conn)
 {
-    conn->state = GCS_CONN_OPEN;
+    gcs_shift_state (conn, GCS_CONN_OPEN);
 }
 
 static void
 gcs_become_primary (gcs_conn_t* conn)
 {
-    if (conn->state == GCS_CONN_OPEN) conn->state = GCS_CONN_PRIMARY;
+    gcs_shift_state (conn, GCS_CONN_PRIMARY);
 }
 
 static void
 gcs_become_joiner (gcs_conn_t* conn)
 {
-    if (conn->state == GCS_CONN_PRIMARY) conn->state = GCS_CONN_JOINER;
+    if (!gcs_shift_state (conn, GCS_CONN_JOINER))
+    {
+        gu_fatal ("Protocol violation, can't continue");
+        assert (0);
+        abort();
+    }
 }
 
 // returns 1 if accepts, 0 if rejects, negative error code if fails.
 static long
 gcs_become_donor (gcs_conn_t* conn)
 {
-    if (conn->state <= GCS_CONN_JOINED) {
-        conn->state = GCS_CONN_DONOR;
-        return 1;
-    }
+    if (gcs_shift_state (conn, GCS_CONN_DONOR)) { return 1; }
 
     gu_warn ("Rejecting SST request in state '%s'. Joiner should be restarted.",
              gcs_conn_state_str[conn->state]);
@@ -421,26 +461,17 @@ gcs_become_donor (gcs_conn_t* conn)
 }
 
 static void
-gcs_become_joined (gcs_conn_t* conn, gcs_seqno_t seqno)
+gcs_become_joined (gcs_conn_t* conn)
 {
     /* See also gcs_handle_act_conf () for a case of cluster bootstrapping */
-    if (GCS_CONN_JOINER == conn->state ||
-        GCS_CONN_DONOR  == conn->state) {
-        long ret;
-
-        gu_info ("Shifting %s -> %s at %lld", gcs_conn_state_str[conn->state],
-                 gcs_conn_state_str[GCS_CONN_JOINED], seqno);
-
-        conn->state = GCS_CONN_JOINED;
-
+    if (gcs_shift_state (conn, GCS_CONN_JOINED)) {
         /* One of the cases when the node can become SYNCED */
+        long ret;
         if ((ret = gcs_send_sync (conn))) {
             gu_warn ("Sending SYNC failed: %ld (%s)", ret, strerror (-ret));
         }
     }
     else {
-        gu_warn ("Received JOIN action in wrong state %s",
-                 gcs_conn_state_str[conn->state]);
         assert (0);
     }
 }
@@ -448,13 +479,7 @@ gcs_become_joined (gcs_conn_t* conn, gcs_seqno_t seqno)
 static void
 gcs_become_synced (gcs_conn_t* conn)
 {
-    if (GCS_CONN_JOINED == conn->state) {
-        conn->state = GCS_CONN_SYNCED;
-    }
-    else if (conn->state <= GCS_CONN_OPEN && conn->state > GCS_CONN_SYNCED) {
-        gu_warn ("Received SYNC action in wrong state %s",
-                 gcs_conn_state_str[conn->state]);
-    }
+    gcs_shift_state (conn, GCS_CONN_SYNCED);
 }
 
 /*! Handles configuration action */
@@ -498,13 +523,21 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         if (0 == conf->memb_num) {
             assert (conf->my_idx < 0);
             gu_info ("Received SELF-LEAVE. Closing connection.");
-            conn->state = GCS_CONN_CLOSED;
+            gcs_shift_state (conn, GCS_CONN_CLOSED);
         }
         else {
             gu_info ("Received NON-PRIMARY.");
             gcs_become_open (conn);
+            conn->global_seqno = conf->seqno;
         }
+
         return;
+    }
+    else {
+        conn->global_seqno = conf->seqno;
+        if (GCS_CONN_OPEN == conn->state) {
+            gcs_shift_state (conn, GCS_CONN_PRIMARY);
+        }
     }
 
     if (conf->memb_num < 1) {
@@ -522,9 +555,9 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     if (conf->st_required) {
         gcs_become_primary (conn);
     }
-    else if (GCS_CONN_OPEN == conn->state) {
+    else if (GCS_CONN_PRIMARY == conn->state) {
         gu_info ("No state transfer required. Initializing JOINED state.");
-        conn->state = GCS_CONN_JOINED;
+        gcs_shift_state (conn, GCS_CONN_JOINED);
     }
 
     /* One of the cases when the node can become SYNCED */
@@ -539,7 +572,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
  *         passed to application.
  */
 static long
-gcs_handle_actions (gcs_conn_t* conn,
+gcs_handle_actions (gcs_conn_t*                conn,
                     const struct gcs_act_rcvd* rcvd)
 {
     long ret = 0;
@@ -565,22 +598,27 @@ gcs_handle_actions (gcs_conn_t* conn,
         break;
     case GCS_ACT_STATE_REQ:
         if ((gcs_seqno_t)conn->my_idx == rcvd->id) {
-            gu_info ("Got GCS_ACT_STATE_REQ to %lld, my idx: %ld",
-                     rcvd->id, conn->my_idx);
+            int donor_idx = (int)rcvd->id; // to pacify valgrind
+            gu_info ("Got GCS_ACT_STATE_REQ to %i, my idx: %ld",
+                     donor_idx, conn->my_idx);
             ret = gcs_become_donor (conn);
-            gu_info ("Becoming donor: %s", 1 == ret ? "yes" : "no");
+            // gu_info ("Becoming donor: %s", 1 == ret ? "yes" : "no");
         }
         else {
-            if (rcvd->id >= 0) gcs_become_joiner (conn);
+            if (rcvd->id >= 0) {
+                gcs_become_joiner (conn);
+            }
             ret = 1; // pass to gcs_request_state_transfer() caller.
         }
         break; 
     case GCS_ACT_JOIN:
-        gu_debug ("Got GCS_ACT_JOIN");
-        gcs_become_joined (conn, gcs_seqno_le(*(gcs_seqno_t*)rcvd->act.buf));
+        gu_debug ("Got GCS_ACT_JOIN dated %lld",
+                  gcs_seqno_le(*(gcs_seqno_t*)rcvd->act.buf));
+        gcs_become_joined (conn);
         break;
     case GCS_ACT_SYNC:
-        gu_debug ("Got GCS_ACT_SYNC");
+        gu_debug ("Got GCS_ACT_SYNC dated %lld",
+                  gcs_seqno_le(*(gcs_seqno_t*)rcvd->act.buf));
         gcs_become_synced (conn);
         break;
     default:
@@ -596,8 +634,8 @@ gcs_handle_actions (gcs_conn_t* conn,
  */
 static void *gcs_recv_thread (void *arg)
 {
-    ssize_t          ret  = -ECONNABORTED;
-    gcs_conn_t*      conn = arg;
+    gcs_conn_t* conn = arg;
+    ssize_t     ret  = -ECONNABORTED;
 
     // To avoid race between gcs_open() and the following state check in while()
     gu_mutex_lock   (&conn->lock);
@@ -650,7 +688,8 @@ static void *gcs_recv_thread (void *arg)
 
         /* deliver to application (note matching assert in the bottom-half of
          * gcs_repl()) */
-        if (gu_likely (rcvd.id >= 0 || rcvd.act.type != GCS_ACT_TORDERED)) {
+        if (gu_likely (rcvd.act.type != GCS_ACT_TORDERED ||
+                       (rcvd.id > 0 && (conn->global_seqno = rcvd.id)))) {
             /* successful delivery - increment local order */
             this_act_id = conn->local_act_id++;
         }
@@ -716,6 +755,8 @@ static void *gcs_recv_thread (void *arg)
                      rcvd.id);
 #endif
             assert(0);
+            ret = -ENOTRECOVERABLE;
+            break;
         }
         else
         {
@@ -755,7 +796,8 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
                                                   NULL,
                                                   gcs_recv_thread,
                                                   conn))) {
-                        conn->state = GCS_CONN_OPEN; // by default
+                        // conn->state = GCS_CONN_OPEN; // by default
+                        gcs_shift_state (conn, GCS_CONN_OPEN);
                         gu_info ("Opened channel '%s'", channel);
                         goto out;
                     }
@@ -815,7 +857,7 @@ long gcs_close (gcs_conn_t *conn)
         gu_thread_join (conn->recv_thread, NULL);
         gu_info ("recv_thread() joined.");
 
-        conn->state = GCS_CONN_CLOSED;
+        gcs_shift_state (conn, GCS_CONN_CLOSED);
         conn->err   = -ECONNABORTED;
 
         /* At this point (state == CLOSED) no new threads should be able to
@@ -861,7 +903,8 @@ long gcs_destroy (gcs_conn_t *conn)
             gu_mutex_unlock (&conn->lock);
             return -EBADFD;
         }
-        conn->state = GCS_CONN_DESTROYED;
+
+        gcs_shift_state (conn, GCS_CONN_DESTROYED);
         conn->err   = -EBADFD;
         /* we must unlock the mutex here to allow unfortunate threads
          * to acquire the lock and give up gracefully */

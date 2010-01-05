@@ -450,7 +450,7 @@ core_handle_act_msg (gcs_core_t*          core,
                 /* foreign action, must be passed from gcs_group */
                 assert (NULL != act->act.buf);
                 assert (ret  == act->act.buf_len);
-                assert (act->id >= 0 || GCS_ACT_TORDERED != act->act.type);
+                assert (GCS_ACT_TORDERED != act->act.type || act->id > 0);
             }
             else {
                 /* local action, get from FIFO, should be there already */
@@ -596,8 +596,6 @@ core_handle_comp_msg (gcs_core_t*          core,
         {
             assert (CORE_EXCHANGE != core->state);
             if (CORE_NON_PRIMARY == core->state) core->state = CORE_PRIMARY;
-// remove. send thread must clean this flag
-//            core->act_restart = false;
         }
         gu_mutex_unlock (&core->send_lock);
 

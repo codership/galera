@@ -161,7 +161,7 @@ gcs_state_msg_read (const void* buf, size_t buf_len)
     }
 }
 
-const char* gcs_state_node_string[GCS_STATE_MAX] =
+const char* gcs_state_node_str[GCS_STATE_MAX] =
 {
     "Non-primary",
     "Primary",
@@ -191,8 +191,8 @@ gcs_state_snprintf (char* str, size_t size, const gcs_state_t* state)
                      "\n\tIncoming addr: '%s'\n",
                      state->flags,
                      state->proto_min, state->proto_max,
-                     gcs_state_node_string[state->current_state],
-                     gcs_state_node_string[state->prim_state],
+                     gcs_state_node_str[state->current_state],
+                     gcs_state_node_str[state->prim_state],
                      GU_UUID_ARGS(&state->prim_uuid),
                      state->prim_joined,
                      (long long)state->prim_seqno,
