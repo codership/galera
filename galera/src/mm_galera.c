@@ -1127,8 +1127,8 @@ galera_handle_configuration (wsrep_t* gh,
 
     if (conf->st_required) { // see #163 - SST might have happened already
         ((gcs_act_conf_t*)conf)->st_required =
-            (status.last_applied != conf->seqno ||
-             gu_uuid_compare (&status.state_uuid, conf_uuid));
+            (gu_uuid_compare (&status.state_uuid, conf_uuid) ||
+             status.last_applied < conf->seqno);
     }
 
 #ifdef GALERA_WORKAROUND_197
@@ -1837,7 +1837,8 @@ static enum wsrep_status mm_galera_pre_commit(
              "GCS_ACT_TORDERED", len, seqno_g, seqno_l, rcode);
 #endif
     if (rcode != len) {
-        gu_error("gcs failed for: %llu, len: %d, rcode: %d", trx_id,len,rcode);
+        gu_error("gcs_repl() failed for: %llu, len: %d, rcode: %d (%s)",
+                 trx_id, len, rcode, strerror (-rcode));
         assert (GCS_SEQNO_ILL == seqno_l);
         gu_mutex_lock(&commit_mtx);
         wsdb_assign_trx_seqno(
@@ -2185,7 +2186,8 @@ static enum wsrep_status mm_galera_to_execute_start(
     status.replicated_bytes += len;
 
     if (rcode < 0) {
-        gu_error("gcs failed for: %llu, %d", conn_id, rcode);
+        gu_error("gcs_repl() failed for: %llu, %d (%s)",
+                 conn_id, rcode, strerror (-rcode));
         assert (GCS_SEQNO_ILL == seqno_l);
         rcode = WSREP_CONN_FAIL;
         goto cleanup;
