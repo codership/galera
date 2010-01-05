@@ -111,11 +111,13 @@ enum wsdb_trx_position {
 };
 
 typedef struct {
-    trx_seqno_t            seqno_l;  //!< local solid sequence
-    trx_seqno_t            seqno_g;  //!< cluster wide sequence number
-    enum wsdb_trx_state    state;    //!< state of sequencing
-    struct wsdb_write_set *ws;       //!<
-    enum wsdb_trx_position position; //!>
+    trx_seqno_t            seqno_l;     //!< local solid sequence
+    trx_seqno_t            seqno_g;     //!< cluster wide sequence number
+    enum wsdb_trx_state    state;       //!< state of sequencing
+    struct wsdb_write_set *ws;          //!< write set
+    enum wsdb_trx_position position;    //!<
+    struct job_worker     *applier;     //!< applier, if replaying trx
+    void                  *applier_ctx; //!< context for applying job
 } wsdb_trx_info_t;
 
 /* MySQL type for boolean */
@@ -453,6 +455,9 @@ int wsdb_assign_trx_ws(
 );
 int wsdb_assign_trx_pos(
     local_trxid_t trx_id, enum wsdb_trx_position
+);
+int wsdb_assign_trx_applier(
+    local_trxid_t trx_id, struct job_worker *applier, void *ctx
 );
 
  /*!

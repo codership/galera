@@ -1968,12 +1968,39 @@ static enum wsrep_status mm_galera_pre_commit(
             GU_DBUG_RETURN(WSREP_TRX_FAIL);
             break;
         case -EINTR:
+        {
+            struct job_worker  *applier;
+            struct job_context *ctx = (struct job_context *) 
+                gu_malloc(sizeof(struct job_context));
+
 	    gu_debug("interrupted in commit queue for %llu", seqno_l);
+
+            applier = job_queue_new_worker(applier_queue, JOB_REPLAYING);
+            if (!applier) {
+                gu_error("galera, could not create applier");
+                gu_info("active_workers: %d, max_workers: %d",
+                        applier_queue->active_workers, 
+                        applier_queue->max_concurrent_workers
+                );
+                return WSREP_NODE_FAIL;
+            }
+
+            /* start job already here, to prevent later slave transactions from
+             *   applying before us
+             */
+            ctx->seqno = trx.seqno_l;
+            ctx->ws    = trx.ws;
+            ctx->type  = JOB_REPLAYING;
+            job_queue_start_job(applier_queue, applier, (void *)ctx);
+
             wsdb_assign_trx_ws(trx_id, ws);
             wsdb_assign_trx_pos(trx_id, WSDB_TRX_POS_COMMIT_QUEUE);
             wsdb_assign_trx_state(trx_id, WSDB_TRX_MUST_REPLAY);
+            wsdb_assign_trx_applier(trx_id, applier, (void *)ctx);
+
             GU_DBUG_RETURN(WSREP_BF_ABORT);
             break;
+        }
         default:
             gu_fatal("Failed to grab commit queue for %llu", seqno_l);
             abort();
@@ -2329,8 +2356,7 @@ static enum wsrep_status mm_galera_to_execute_end(
 static enum wsrep_status mm_galera_replay_trx(
     wsrep_t *gh, const wsrep_trx_id_t trx_id, void *app_ctx
 ) {
-    struct job_worker *applier;
-    struct job_context ctx;
+    struct job_worker  *applier;
     
     int                rcode;
     enum wsrep_status  ret_code = WSREP_OK;
@@ -2348,23 +2374,18 @@ static enum wsrep_status mm_galera_replay_trx(
 
     wsdb_assign_trx_state(trx_id, WSDB_TRX_REPLAYING);
 
-    applier = job_queue_new_worker(applier_queue, JOB_REPLAYING);
-    if (!applier) {
-        gu_error("galera, could not create applier");
-        gu_info("active_workers: %d, max_workers: %d",
-            applier_queue->active_workers, applier_queue->max_concurrent_workers
-        );
-        return WSREP_NODE_FAIL;
-    }
-
-    if (trx.position == WSDB_TRX_POS_COMMIT_QUEUE) {
-        /* start job already here, to prevent later slave transactions from
-         *   applying before us
-         */
-        ctx.seqno = trx.seqno_l;
-        ctx.ws    = trx.ws;
-        ctx.type  = JOB_REPLAYING;
-        job_queue_start_job(applier_queue, applier, (void *)&ctx);
+    if (!trx.applier) {
+        applier = job_queue_new_worker(applier_queue, JOB_REPLAYING);
+        if (!applier) {
+            gu_error("galera, could not create applier");
+            gu_info("active_workers: %d, max_workers: %d",
+                    applier_queue->active_workers, 
+                    applier_queue->max_concurrent_workers
+            );
+            return WSREP_NODE_FAIL;
+        }
+    } else {
+        applier = trx.applier;
     }
     gu_debug("replaying applier in to grab: %d, seqno: %lld %lld", 
              applier->id, trx.seqno_g, trx.seqno_l
@@ -2420,12 +2441,18 @@ static enum wsrep_status mm_galera_replay_trx(
             abort();
         }
         job_queue_remove_worker(applier_queue, applier);
+        if (trx.applier_ctx) {
+            gu_free(trx.applier_ctx);
+        }
     }
     else {
         gu_error("replayed trx ws has bad type: %d", trx.ws->type);
         ws_start_cb(app_ctx, 0);
-        return WSREP_NODE_FAIL;
         job_queue_remove_worker(applier_queue, applier);
+        if (trx.applier_ctx) {
+            gu_free(trx.applier_ctx);
+        }
+        return WSREP_NODE_FAIL;
     }
     wsdb_assign_trx_state(trx_id, WSDB_TRX_REPLICATED);
 
