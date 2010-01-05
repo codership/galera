@@ -1100,6 +1100,35 @@ galera_join()
 }
 
 /*!
+ * This is needed because ST is (and needs to be) _asynchronous_ with
+ * replication. As a result, only application thread knows when and how ST
+ * completed and if we need another one. See #163
+ */
+static void
+galera_check_st_required (gcs_act_conf_t* conf)
+{
+    if (conf->st_required) {
+        gu_uuid_t* conf_uuid = (gu_uuid_t*)conf->group_uuid;
+
+        if (!gu_uuid_compare (&status.state_uuid, conf_uuid)) {
+            // same history
+            if (GALERA_STAGE_JOINED == status.stage) {
+                // if we took ST already, it may exceed conf->seqno
+                // (ST is asynchronous!)
+                conf->st_required = (status.last_applied < conf->seqno);
+            }
+            else {
+                conf->st_required = (status.last_applied != conf->seqno);
+            }
+        }
+
+        if (conf->st_required) {
+            status.stage = GALERA_STAGE_JOINING;
+        }
+    }
+}
+
+/*!
  * @return
  *        donor index (own index in case when no state transfer needed)
  *        or negative error code (-1 if configuration in non-primary)
@@ -1125,11 +1154,7 @@ galera_handle_configuration (wsrep_t* gh,
     GALERA_GRAB_QUEUE (cert_queue,   conf_seqno);
     GALERA_GRAB_QUEUE (commit_queue, conf_seqno);
 
-    if (conf->st_required) { // see #163 - SST might have happened already
-        ((gcs_act_conf_t*)conf)->st_required =
-            (gu_uuid_compare (&status.state_uuid, conf_uuid) ||
-             status.last_applied != conf->seqno);
-    }
+    galera_check_st_required ((gcs_act_conf_t*)conf);
 
 #ifdef GALERA_WORKAROUND_197
     if (conf->seqno >= 0) wsdb_purge_trxs_upto(conf->seqno);
@@ -1264,9 +1289,9 @@ galera_handle_configuration (wsrep_t* gh,
                 last_recved = status.last_applied;
             }
             else {
-                /* Here we can't test for exact seqno equality,
-                 * there can be gaps */
-                if (last_recved > conf->seqno ||
+                /* Here we can't test for seqno equality,
+                 * there can be gaps because of BFs and stuff */
+                if (/*last_recved < conf->seqno || */
                     gu_uuid_compare (&status.state_uuid, conf_uuid)) {
 
                     gu_fatal ("Internal replication error: no state transfer "
