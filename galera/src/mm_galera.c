@@ -1985,13 +1985,14 @@ static enum wsrep_status mm_galera_pre_commit(
                 return WSREP_NODE_FAIL;
             }
 
-            /* start job already here, to prevent later slave transactions from
-             *   applying before us
+            /* register job already here, to prevent later slave transactions 
+             * from applying before us
              */
             ctx->seqno = seqno_l;
             ctx->ws    = ws;
             ctx->type  = JOB_REPLAYING;
-            job_queue_start_job(applier_queue, applier, (void *)ctx);
+            /* just register the job, call does not block */
+            job_queue_register_job(applier_queue, applier, (void *)ctx);
 
             wsdb_assign_trx_ws(trx_id, ws);
             wsdb_assign_trx_pos(trx_id, WSDB_TRX_POS_COMMIT_QUEUE);
@@ -2385,6 +2386,7 @@ static enum wsrep_status mm_galera_replay_trx(
             return WSREP_NODE_FAIL;
         }
     } else {
+        gu_debug("Using registered applier");
         applier = trx.applier;
     }
     gu_debug("replaying applier in to grab: %d, seqno: %lld %lld", 

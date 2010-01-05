@@ -145,8 +145,9 @@ int job_queue_start_job(
 
     /* check against all active jobs */
     for (i=0; i<queue->registered_workers; i++) {
-        if (queue->jobs[i].state == JOB_RUNNING && 
-            queue->jobs[i].id != worker->id
+        if (((queue->jobs[i].state == JOB_RUNNING)     || 
+             (queue->jobs[i].state == JOB_REGISTERED)) && 
+            (queue->jobs[i].id != worker->id)
         ) {
             if (queue->conflict_test(ctx, queue->jobs[i].ctx)) {
                 queue->jobs[i].waiters[worker->id] = 1;
@@ -161,6 +162,24 @@ int job_queue_start_job(
 
     gu_debug("job: %d starting", worker->id);
     gu_mutex_unlock(&(queue->mutex));
+    return WSDB_OK;
+}
+
+int job_queue_register_job(
+    struct job_queue *queue, struct job_worker *worker, void *ctx
+) {
+    CHECK_OBJ(queue, job_queue);
+    CHECK_OBJ(worker, job_worker);
+
+    if (worker->state == JOB_RUNNING) {
+        gu_debug ("job %d  already running", worker->id);
+        return WSDB_OK;
+    }
+
+    worker->ctx   = ctx;
+    worker->state = JOB_REGISTERED;
+
+    gu_debug("job: %d registered", worker->id);
     return WSDB_OK;
 }
 
