@@ -106,6 +106,14 @@ void job_queue_remove_worker(
     CHECK_OBJ(queue, job_queue);
     CHECK_OBJ(worker, job_worker);
 
+    /* job can be registered, but never started */
+    if (JOB_REGISTERED == worker->state) {
+        gu_debug("registered job removed , workers now: %d", 
+                 queue->registered_workers);
+        worker->state = JOB_VOID;
+        return;
+    }
+
     gu_mutex_lock(&(queue->mutex));
 
     assert(worker->state==JOB_IDLE);
