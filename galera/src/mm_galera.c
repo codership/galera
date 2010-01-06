@@ -2357,7 +2357,8 @@ static enum wsrep_status mm_galera_to_execute_end(
 static enum wsrep_status mm_galera_replay_trx(
     wsrep_t *gh, const wsrep_trx_id_t trx_id, void *app_ctx
 ) {
-    struct job_worker  *applier;
+    struct job_worker   *applier;
+    struct job_context  ctx;
     
     int                rcode;
     enum wsrep_status  ret_code = WSREP_OK;
@@ -2376,6 +2377,8 @@ static enum wsrep_status mm_galera_replay_trx(
     wsdb_assign_trx_state(trx_id, WSDB_TRX_REPLAYING);
 
     if (!trx.applier) {
+        assert (trx.position == WSDB_TRX_POS_CERT_QUEUE);
+
         applier = job_queue_new_worker(applier_queue, JOB_REPLAYING);
         if (!applier) {
             gu_error("galera, could not create applier");
@@ -2385,6 +2388,17 @@ static enum wsrep_status mm_galera_replay_trx(
             );
             return WSREP_NODE_FAIL;
         }
+        /* register job already here, to prevent later slave transactions 
+         * from applying before us. 
+         * There will be a race condition between release of cert TO and 
+         * job_queue_start_job() call.
+         */
+        ctx.seqno = trx.seqno_l;
+        ctx.ws    = trx.ws;
+        ctx.type  = JOB_REPLAYING;
+        /* just register the job, call does not block */
+        job_queue_register_job(applier_queue, applier, (void *)&ctx);
+
     } else {
         gu_debug("Using registered applier");
         assert (trx.position == WSDB_TRX_POS_COMMIT_QUEUE);
