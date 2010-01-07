@@ -1969,20 +1969,28 @@ static enum wsrep_status mm_galera_pre_commit(
             break;
         case -EINTR:
         {
+            int retries = 0;
             struct job_worker  *applier;
             struct job_context *ctx = (struct job_context *) 
                 gu_malloc(sizeof(struct job_context));
 
-	    gu_debug("interrupted in commit queue for %llu", seqno_l);
+#define MAX_RETRIES 10
 
-            applier = job_queue_new_worker(applier_queue, JOB_REPLAYING);
-            if (!applier) {
-                gu_error("galera, could not create applier");
-                gu_info("active_workers: %d, max_workers: %d",
-                        applier_queue->active_workers, 
+	    gu_debug("interrupted in commit queue for %llu", seqno_l);
+            while ((applier = job_queue_new_worker(applier_queue, JOB_REPLAYING)
+                   ) == NULL
+            ) {
+                if (retries++ == MAX_RETRIES) {
+                    gu_warn("replaying is not possible, aborting node");
+                    return WSREP_NODE_FAIL;
+                }
+                gu_warn("replaying job queue full, retrying");
+                gu_info("workers, registered: %d, active: %d, max: %d",
+                        applier_queue->registered_workers,
+                        applier_queue->active_workers,
                         applier_queue->max_concurrent_workers
                 );
-                return WSREP_NODE_FAIL;
+                sleep(1);
             }
 
             /* register job already here, to prevent later slave transactions 
@@ -2377,17 +2385,26 @@ static enum wsrep_status mm_galera_replay_trx(
     wsdb_assign_trx_state(trx_id, WSDB_TRX_REPLAYING);
 
     if (!trx.applier) {
+        int retries = 0;
         assert (trx.position == WSDB_TRX_POS_CERT_QUEUE);
 
-        applier = job_queue_new_worker(applier_queue, JOB_REPLAYING);
-        if (!applier) {
-            gu_error("galera, could not create applier");
-            gu_info("active_workers: %d, max_workers: %d",
-                    applier_queue->active_workers, 
+#define MAX_RETRIES 10
+        while ((applier = job_queue_new_worker(applier_queue, JOB_REPLAYING)
+                ) == NULL
+        ) {
+            if (retries++ == MAX_RETRIES) {
+                gu_warn("replaying (cert) is not possible, aborting node");
+                return WSREP_NODE_FAIL;
+            }
+            gu_warn("replaying job queue full, retrying");
+            gu_info("workers, registered: %d, active: %d, max: %d",
+                    applier_queue->registered_workers,
+                    applier_queue->active_workers,
                     applier_queue->max_concurrent_workers
             );
-            return WSREP_NODE_FAIL;
+            sleep(1);
         }
+
         /* register job already here, to prevent later slave transactions 
          * from applying before us. 
          * There will be a race condition between release of cert TO and 
