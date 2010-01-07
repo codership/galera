@@ -364,7 +364,7 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     conn_state = GALERA_INITIALIZED;
 
     /* create worker queue */
-    applier_queue = job_queue_create(8, ws_conflict_check, ws_cmp_order);
+    applier_queue = job_queue_create(16, ws_conflict_check, ws_cmp_order);
 
 #ifdef EXTRA_DEBUG
     /* debug level printing to /tmp directory */

@@ -7,7 +7,7 @@
 #include "wsdb_api.h"
 
 /* absolute maximum for workers */
-#define MAX_WORKERS 8
+#define MAX_WORKERS 64
 
 
 /*!

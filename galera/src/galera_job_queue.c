@@ -129,24 +129,19 @@ void job_queue_remove_worker(
     CHECK_OBJ(queue, job_queue);
     CHECK_OBJ(worker, job_worker);
 
+    gu_mutex_lock(&(queue->mutex));
+
     /* job can be registered, but never started */
     if (JOB_REGISTERED == worker->state) {
-        gu_debug("registered job removed , workers now: %d", 
-                 queue->registered_workers);
-        worker->state = JOB_VOID;
+        gu_debug("registered job removed, id: %d", worker->id); 
+        worker->state = JOB_IDLE;
         worker->ctx   = NULL;
 
         /* registered job may have waiters piled up, release them now */
-        gu_mutex_lock(&(queue->mutex));
         release_my_waiters(queue, worker);
-        gu_mutex_unlock(&(queue->mutex));
-
-        return;
     }
 
-    gu_mutex_lock(&(queue->mutex));
-
-    assert(worker->state==JOB_IDLE);
+    assert(JOB_IDLE == worker->state);
 
     worker->state = JOB_VOID;
     queue->registered_workers--;
