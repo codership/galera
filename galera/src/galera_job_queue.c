@@ -238,7 +238,7 @@ void * job_queue_end_job(struct job_queue *queue, struct job_worker *worker
 
     //assert(worker == queue->jobs[worker->id]);
 
-    if (worker->state != JOB_RUNNING    ||
+    if (worker->state != JOB_RUNNING    &&
         worker->state != JOB_REGISTERED
     ) {
         gu_warn("job queue end, with bad state, id: %d, state: %d", 
