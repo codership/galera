@@ -96,11 +96,12 @@ struct job_id {
 
 enum job_state {
     JOB_VOID,
-    JOB_RUNNING,    // active job
-    JOB_REGISTERED, // in queue, but not running yet, 
-                    // can block further jobs to start
-    JOB_IDLE,
-    JOB_WAITING,    // waiting for some conflicting job to exit
+    JOB_RUNNING,          //!< active job
+    JOB_REGISTERED,       //!< in queue, but not running yet, 
+                          //!< can block further jobs to start
+    JOB_WAIT_QUEUE_ENTER, //!< queue is full, waiting to enter
+    JOB_WAIT_FOR_JOB    , //!< waiting for some conflicting job to exit
+    JOB_IDLE,             //!< job ended
 };
 
 /*! @enum
