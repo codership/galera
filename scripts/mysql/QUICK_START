@@ -4,10 +4,10 @@ Galera for MySQL Quick Start Guide
 version 0.7.x
 
 This is an informal guide to quick setup of MySQL/Galera cluster for 
-experienced users. For more detailed information please see README.
+experienced MySQL users. For more detailed information please see README.
 
 MySQL/Galera cluster is a multi-master MySQL server cluster. It provides
- - True service high-availability (no committed transaction is lost, no single
+ - True high-availability (no committed transaction is lost, no single
    point of failure)
  - Performance scalability even foe write-intensive loads.
  - Semantics of a single MySQL server.

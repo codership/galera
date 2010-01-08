@@ -217,8 +217,8 @@ if test "$NO_STRIP" != "yes"
 then
     strip $GALERA_LIBS/lib*.so
 #    if test $GCOMM_IMPL = "galeracomm"
-#	then
-        strip $GALERA_SBIN/*
+#    then
+        strip $GALERA_SBIN/* || echo "skipped"
 #    fi
     strip $MYSQL_DIST_DIR/libexec/mysqld
 fi
