@@ -330,11 +330,20 @@ gcs_fc_cont_end (gcs_conn_t* conn)
 static inline bool
 gcs_send_sync_begin (gcs_conn_t* conn)
 {
-    if (gu_unlikely(GCS_CONN_JOINED   == conn->state     &&
-                    conn->lower_limit >= conn->queue_len && !conn->sync_sent)) {
-        // tripped lower slave queue limit, send SYNC message
-        conn->sync_sent = true;
-        return true;
+    if (gu_unlikely(GCS_CONN_JOINED == conn->state)) {
+        if (conn->lower_limit >= conn->queue_len && !conn->sync_sent) {
+            // tripped lower slave queue limit, send SYNC message
+            conn->sync_sent = true;
+            return true;
+        }
+#if 0
+        else {
+            gu_info ("Not sending SYNC: state = %s, queue_len = %ld, "
+                     "lower_limit = %ld, sync_sent = %s",
+                     gcs_conn_state_str[conn->state], conn->queue_len,
+                     conn->lower_limit, conn->sync_sent ? "true" : "false");
+        }
+#endif
     }
 
     return false;
@@ -393,21 +402,23 @@ gcs_shift_state (gcs_conn_t*      conn,
         { false, false, false, false, false, false, true,  false }  // DESTROYED
     };
 
-    if (allowed[new_state][conn->state]) {
-        gu_info ("Shifting %s -> %s (TO: %lld)",
-                 gcs_conn_state_str[conn->state],
-                 gcs_conn_state_str[new_state], conn->global_seqno);
-        conn->state = new_state;
-        return true;
-    }
-    else {
-        if (conn->state != new_state) {
+    gcs_conn_state_t old_state = conn->state;
+
+    if (!allowed[new_state][old_state]) {
+        if (old_state != new_state) {
             gu_warn ("Shifting %s -> %s is not allowed (TO: %lld)",
-                     gcs_conn_state_str[conn->state],
+                     gcs_conn_state_str[old_state],
                      gcs_conn_state_str[new_state], conn->global_seqno);
         }
         return false;
     }
+
+    gu_info ("Shifting %s -> %s (TO: %lld)", gcs_conn_state_str[old_state],
+             gcs_conn_state_str[new_state], conn->global_seqno);
+
+    conn->state = new_state;
+
+    return true;
 }
 
 static void
@@ -480,6 +491,7 @@ static void
 gcs_become_synced (gcs_conn_t* conn)
 {
     gcs_shift_state (conn, GCS_CONN_SYNCED);
+    conn->sync_sent = false;
 }
 
 /*! Handles configuration action */
