@@ -8,12 +8,12 @@
 
 #include "gcs_group.h"
 
-static const char* group_state_str[GCS_GROUP_STATE_MAX] =
+const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
 {
-    "GCS_GROUP_NON_PRIMARY",
-    "GCS_GROUP_WAIT_STATE_UUID",
-    "GCS_GROUP_WAIT_STATE_MSG",
-    "GCS_GROUP_PRIMARY"
+    "NON_PRIMARY",
+    "WAIT_STATE_UUID",
+    "WAIT_STATE_MSG",
+    "PRIMARY"
 };
 
 long
@@ -233,16 +233,16 @@ group_post_state_exchange (gcs_group_t* group)
         group_go_non_primary (group);
     }
 
-    gu_debug ("Quorum results:"
-              "\n\t%s,"
-              "\n\tact_id     = %lld,"
-              "\n\tconf_id    = %lld,"
-              "\n\tlast_appl. = %lld,"
-              "\n\tprotocol   = %hd,"
-              "\n\tgroup UUID = "GU_UUID_FORMAT,
-              quorum.primary ? "PRIMARY" : "NON-PRIMARY",
-              quorum.act_id, quorum.conf_id, group->last_applied, quorum.proto,
-              GU_UUID_ARGS(&quorum.group_uuid));
+    gu_info ("Quorum results:"
+             "\n\t%s,"
+             "\n\tact_id     = %lld,"
+             "\n\tconf_id    = %lld,"
+             "\n\tlast_appl. = %lld,"
+             "\n\tprotocol   = %hd,"
+             "\n\tgroup UUID = "GU_UUID_FORMAT,
+             quorum.primary ? "PRIMARY" : "NON-PRIMARY",
+             quorum.act_id, quorum.conf_id, group->last_applied, quorum.proto,
+             GU_UUID_ARGS(&quorum.group_uuid));
 }
 
 // does basic sanity check of the component message (in response to #145)
@@ -410,7 +410,7 @@ gcs_group_handle_uuid_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
                  " from node %ld (%s), current group state %s",
                  GU_UUID_ARGS(&group->state_uuid),
                  msg->sender_idx, group->nodes[msg->sender_idx].name,
-                 group_state_str[group->state]);
+                 gcs_group_state_str[group->state]);
     }
 
     return group->state;
@@ -579,7 +579,7 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             // should we freak out and throw an error?
             gu_warn ("Protocol violation. JOIN message sender %ld (%s) is not "
                      "in state transfer (%s). Message ignored.", sender_idx,
-                     sender->name, gcs_state_node_string[sender->status]);
+                     sender->name, gcs_state_node_str[sender->status]);
         }
         return 0;
     }
@@ -606,10 +606,8 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     }
     else {
         if (GCS_STATE_SYNCED != sender->status) {
-            gu_warn ("Protocol violation. SYNC message sender %ld (%s) "
-                     "is not joined. Message ignored.",
+            gu_warn ("SYNC message sender from non-joined %ld (%s). Ignored.",
                      msg->sender_idx, sender->name);
-            assert (0);
         }
         else {
             gu_debug ("Redundant SYNC message from %ld (%s).",
@@ -687,7 +685,7 @@ group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
         gu_info ("Node %ld (%s) requested State Transfer from '%s'. "
                  "Selected %ld (%s)(%s) as donor.",
                  joiner_idx, joiner->name, required_donor ? donor_name :"*any*",
-                 donor_idx, donor->name, gcs_state_node_string[joiner->status]);
+                 donor_idx, donor->name, gcs_state_node_str[donor->status]);
 
         // reserve donor, confirm joiner
         donor->status  = GCS_STATE_DONOR;
@@ -728,7 +726,7 @@ gcs_group_handle_state_request (gcs_group_t*         group,
     // pass only to sender and to one potential donor
     const char*      donor_name     = act->act.buf;
     size_t           donor_name_len = strlen(donor_name);
-    long             donor_idx;
+    long             donor_idx      = -1;
     const char*      joiner_name    = group->nodes[joiner_idx].name;
     gcs_state_node_t joiner_status  = group->nodes[joiner_idx].status;
 
@@ -736,7 +734,7 @@ gcs_group_handle_state_request (gcs_group_t*         group,
 
     if (joiner_status != GCS_STATE_PRIM) {
 
-        const char* joiner_status_string = gcs_state_node_string[joiner_status];
+        const char* joiner_status_string = gcs_state_node_str[joiner_status];
 
         if (group->my_idx == joiner_idx) {
             gu_error ("Requesting state transfer while in %s. "

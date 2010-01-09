@@ -7,7 +7,7 @@
 #include "wsdb_api.h"
 
 /* absolute maximum for workers */
-#define MAX_WORKERS 8
+#define MAX_WORKERS 64
 
 
 /*!
@@ -96,9 +96,12 @@ struct job_id {
 
 enum job_state {
     JOB_VOID,
-    JOB_RUNNING,
-    JOB_IDLE,
-    JOB_WAITING,
+    JOB_RUNNING,          //!< active job
+    JOB_REGISTERED,       //!< in queue, but not running yet, 
+                          //!< can block further jobs to start
+    JOB_WAIT_QUEUE_ENTER, //!< queue is full, waiting to enter
+    JOB_WAIT_FOR_JOB    , //!< waiting for some conflicting job to exit
+    JOB_IDLE,             //!< job ended
 };
 
 /*! @enum
@@ -184,6 +187,17 @@ void job_queue_remove_worker(
  * @return id for the new object
  */
 int job_queue_start_job(
+    struct job_queue *queue, struct job_worker *worker, void *ctx);
+
+/*
+ * @brief registers a new job for a worker, but does not start it
+ *        Future conflict tests will take registered job in consideration
+ * @param job_queue queue for the jobs
+ * @param worker worker doing the job
+ * @param ctx context pointer for conflict resolution
+ * @return WSDB_OK
+ */
+int job_queue_register_job(
     struct job_queue *queue, struct job_worker *worker, void *ctx);
 
 /*

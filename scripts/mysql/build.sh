@@ -200,7 +200,7 @@ cp -P $GALERA_SRC/wsdb/src/.libs/libwsdb.so* $GALERA_LIBS
 cp -P $GALERA_SRC/galera/src/.libs/libmmgalera.so* $GALERA_LIBS
 
 # Install vsbes stuff if it is available
-GALERA_SBIN=""
+GALERA_SBIN="$GALERA_DIST_DIR/galera/sbin"
     cp -P $GALERA_SRC/galeracomm/common/src/.libs/libgcommcommonpp.so* $GALERA_LIBS && \
     cp -P $GALERA_SRC/galeracomm/transport/src/.libs/libgcommtransportpp.so* $GALERA_LIBS && \
     cp -P $GALERA_SRC/galeracomm/vs/src/.libs/libgcommvspp.so* $GALERA_LIBS && \
@@ -217,8 +217,8 @@ if test "$NO_STRIP" != "yes"
 then
     strip $GALERA_LIBS/lib*.so
 #    if test $GCOMM_IMPL = "galeracomm"
-#	then
-        strip $GALERA_SBIN/*
+#    then
+        strip $GALERA_SBIN/* || echo "skipped"
 #    fi
     strip $MYSQL_DIST_DIR/libexec/mysqld
 fi

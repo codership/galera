@@ -6,6 +6,29 @@
 
 #include "galera_job_queue.h"
 
+/*
+ * @brief release all jobs, which waited for this worker
+ *        Will send signal for waiting workers
+ *        Must hold queue mutex, when calling this
+ *
+ * @param: queue the job queue
+ * @param: worker worker ending
+ */
+static void release_my_waiters (
+    struct job_queue *queue, struct job_worker *worker
+) {
+    unsigned short i;
+    /* if some job is depending on me, release it to continue */
+    for (i=0; i<queue->registered_workers; i++) {
+        if (queue->jobs[worker->id].waiters[i]) {
+	    gu_debug ("job queue signal for: %d", i);
+            assert(JOB_WAIT_FOR_JOB == queue->jobs[i].state);
+
+            gu_cond_signal(&queue->jobs[i].cond);
+        }
+    }
+}
+
 static void init_worker(
     struct job_worker *worker, unsigned short id, unsigned short workers
 ) {
@@ -108,7 +131,17 @@ void job_queue_remove_worker(
 
     gu_mutex_lock(&(queue->mutex));
 
-    assert(worker->state==JOB_IDLE);
+    /* job can be registered, but never started */
+    if (JOB_REGISTERED == worker->state) {
+        gu_debug("registered job removed, id: %d", worker->id); 
+        worker->state = JOB_IDLE;
+        worker->ctx   = NULL;
+
+        /* registered job may have waiters piled up, release them now */
+        release_my_waiters(queue, worker);
+    }
+
+    assert(JOB_IDLE == worker->state);
 
     worker->state = JOB_VOID;
     queue->registered_workers--;
@@ -126,7 +159,7 @@ int job_queue_start_job(
     CHECK_OBJ(worker, job_worker);
 
     if (worker->state == JOB_RUNNING) {
-        gu_warn ("job %d  already running", worker->id);
+        gu_debug ("job %d  already running", worker->id);
         return WSDB_OK;
     }
 
@@ -135,32 +168,57 @@ int job_queue_start_job(
     /* cannot start, if max concurrent worker count is reached */
     if (queue->active_workers == queue->max_concurrent_workers) {
         gu_warn ("job queue full for: %d", worker->id);
-        worker->state = JOB_WAITING;
+        worker->state = JOB_WAIT_QUEUE_ENTER;
         gu_cond_wait(&worker->cond, &queue->mutex);
         gu_warn ("job queue released for: %d", worker->id);
     }
 
     queue->active_workers++;
+    worker->ctx   = ctx;
 
-    /* check against all active jobs */
+    /* Check against all jobs which have registered or are running.
+     * Also waiting jobs are checked against.
+     */
+
     for (i=0; i<queue->registered_workers; i++) {
-        if (queue->jobs[i].state == JOB_RUNNING && 
-            queue->jobs[i].id != worker->id
+        if (((queue->jobs[i].state == JOB_RUNNING)           || 
+             (queue->jobs[i].state == JOB_WAIT_QUEUE_ENTER)  || 
+             (queue->jobs[i].state == JOB_WAIT_FOR_JOB)      || 
+             (queue->jobs[i].state == JOB_REGISTERED))       && 
+            (queue->jobs[i].id != worker->id)
         ) {
             if (queue->conflict_test(ctx, queue->jobs[i].ctx)) {
                 queue->jobs[i].waiters[worker->id] = 1;
-                gu_warn ("job %d  waiting for: %d", worker->id, i);
+                gu_debug ("job %d  waiting for: %d", worker->id, i);
+                worker->state = JOB_WAIT_FOR_JOB;
                 gu_cond_wait(&queue->jobs[worker->id].cond, &queue->mutex);
-                gu_warn ("job queue released: %d", worker->id);
+                gu_debug ("job queue released: %d", worker->id);
                 queue->jobs[i].waiters[worker->id] = 0;
             }
         }
     }
-    worker->ctx   = ctx;
     worker->state = JOB_RUNNING;
 
     gu_debug("job: %d starting", worker->id);
     gu_mutex_unlock(&(queue->mutex));
+    return WSDB_OK;
+}
+
+int job_queue_register_job(
+    struct job_queue *queue, struct job_worker *worker, void *ctx
+) {
+    CHECK_OBJ(queue, job_queue);
+    CHECK_OBJ(worker, job_worker);
+
+    if (worker->state == JOB_RUNNING) {
+        gu_debug ("job %d  already running", worker->id);
+        return WSDB_OK;
+    }
+
+    worker->ctx   = ctx;
+    worker->state = JOB_REGISTERED;
+
+    gu_debug("job: %d registered", worker->id);
     return WSDB_OK;
 }
 
@@ -175,36 +233,46 @@ void * job_queue_end_job(struct job_queue *queue, struct job_worker *worker
 
     //assert(worker == queue->jobs[worker->id]);
 
-    gu_mutex_lock(&queue->mutex);
-    /* if some job is depending on me, release it to continue */
-    for (i=0; i<queue->registered_workers; i++) {
-        if (queue->jobs[worker->id].waiters[i]) {
-	    gu_warn ("job queue signal for: %d", i);
-            gu_cond_signal(&queue->jobs[i].cond);
-        }
+    if (worker->state != JOB_RUNNING    &&
+        worker->state != JOB_REGISTERED
+    ) {
+        gu_warn("job queue end, with bad state, id: %d, state: %d", 
+                worker->id, worker->state);
+        return NULL;
     }
+
+    gu_mutex_lock(&queue->mutex);
+
+    /* release jobs, which waited for me */
+    release_my_waiters(queue, worker);
+
+    if (JOB_RUNNING == worker->state) {
+        queue->active_workers--;
+    }
+
     ctx                           = queue->jobs[worker->id].ctx;
     queue->jobs[worker->id].state = JOB_IDLE;
     queue->jobs[worker->id].ctx   = NULL;
    
     /* if queue was full, find next in order to get in */
     for (i=0; i<queue->registered_workers; i++) {
-        if (queue->jobs[i].state == JOB_WAITING) {
+        if (queue->jobs[i].state == JOB_WAIT_QUEUE_ENTER) {
             if (min_job > -1) {
                 if (queue->job_cmp_order(
                      &queue->jobs[i].ctx, &queue->jobs[min_job].ctx) == -1) {
                       min_job = i;
                 }
-          }
+            } else {
+                min_job = i;
+            }
         }
     }
 
     if (min_job > -1) {
-        gu_warn ("job full queue signal for: %d", min_job);
+        gu_info ("job full queue signal for: %d", min_job);
         gu_cond_signal(&queue->jobs[min_job].cond);
     }
 
-    queue->active_workers--;
     gu_debug("job: %d complete", worker->id);
     gu_mutex_unlock(&(queue->mutex));
 

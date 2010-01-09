@@ -30,6 +30,8 @@ typedef enum gcs_group_state
 }
 gcs_group_state_t;
 
+extern const char* gcs_group_state_str[];
+
 typedef struct gcs_group
 {
     gcs_seqno_t   act_id;       // current(last) action seqno
@@ -134,7 +136,7 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
     assert (sender_idx < group->num);
 
     // clear reset flag if set by own first fragment after reset flag was set
-    group->frag_reset = (group->frag_reset && (0 != frg->frag_no || !local));
+    group->frag_reset = (group->frag_reset && (!local || (0 != frg->frag_no)));
 
     ret = gcs_node_handle_act_frag (&group->nodes[sender_idx], frg, &rcvd->act,
                                     local);
@@ -159,6 +161,13 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
             if (local) {
                 /* Let the sender know that it failed */
                 rcvd->id = -ERESTART;
+#ifndef NDEBUG
+                gu_info ("Returning -ERESTART for TORDERED action: group->state"
+                         " = %s, sender->status = %s, frag_reset = %s",
+                         gcs_group_state_str[group->state],
+                         gcs_state_node_str[group->nodes[sender_idx].status],
+                         group->frag_reset ? "true" : "false");
+#endif
             }
             else {
                 /* Just ignore it */

@@ -20,7 +20,7 @@
 #define GCS_STATE_FREP 0x01  // group representative
 
 /* Possible node states */
-/* @note: when changing this don't forget to change gcs_state_node_string[] in
+/* @note: when changing this don't forget to change gcs_state_node_str[] in
  * gcs_state.c */
 typedef enum gcs_state_node
 {
@@ -34,7 +34,7 @@ typedef enum gcs_state_node
 }
 gcs_state_node_t;
 
-extern const char* gcs_state_node_string[GCS_STATE_MAX];
+extern const char* gcs_state_node_str[GCS_STATE_MAX];
 
 #ifdef GCS_STATE_ACCESS
 typedef struct gcs_state

@@ -6,7 +6,7 @@
 pause() #min_sleep #var_sleep
 {
     local min_sleep=${1:-"1"}
-    local var_sleep=${10:-"10"}
+    local var_sleep=${2:-"10"}
     local p=$(( $RANDOM % var_sleep + min_sleep ))
 
     echo "Sleeping for $p sec."

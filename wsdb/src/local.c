@@ -308,14 +308,16 @@ static struct trx_info *new_trx_info(local_trxid_t trx_id) {
     }
 
     MAKE_OBJ(trx, trx_info);
-    trx->id            = trx_id;
-    trx->info.seqno_g  = TRX_SEQNO_MAX;
-    trx->info.seqno_l  = TRX_SEQNO_MAX;
-    trx->first_block   = 0;
-    trx->last_block    = 0;
-    trx->info.ws       = 0;
-    trx->info.position = WSDB_TRX_POS_VOID;
-    trx->info.state    = WSDB_TRX_VOID;
+    trx->id               = trx_id;
+    trx->info.seqno_g     = TRX_SEQNO_MAX;
+    trx->info.seqno_l     = TRX_SEQNO_MAX;
+    trx->first_block      = 0;
+    trx->last_block       = 0;
+    trx->info.ws          = 0;
+    trx->info.applier     = 0;
+    trx->info.applier_ctx = 0;
+    trx->info.position    = WSDB_TRX_POS_VOID;
+    trx->info.state       = WSDB_TRX_VOID;
 
     GU_DBUG_PRINT("wsdb", ("created new trx: %llu", trx_id));
 
@@ -1411,6 +1413,24 @@ int wsdb_assign_trx_pos(
     GU_DBUG_RETURN(WSDB_OK);
 }
 
+int wsdb_assign_trx_applier(
+    local_trxid_t trx_id, struct job_worker *applier, void* ctx
+) {
+    struct trx_info       *trx = get_trx_info(trx_id);
+ 
+    GU_DBUG_ENTER("wsdb_assign_trx_applier");
+
+    if (!trx) {
+        gu_error("trx does not exist in assign_trx_applier, trx: %llu", trx_id);
+        GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
+    }
+
+    trx->info.applier     = applier;
+    trx->info.applier_ctx = ctx;
+
+    GU_DBUG_RETURN(WSDB_OK);
+}
+
 void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info) {
     struct trx_info       *trx = get_trx_info(trx_id);
 
@@ -1420,12 +1440,13 @@ void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info) {
         info->state = WSDB_TRX_MISSING;
         GU_DBUG_VOID_RETURN;
     }
-    info->seqno_l  = trx->info.seqno_l;
-    info->seqno_g  = trx->info.seqno_g;
-    info->ws       = trx->info.ws;
-    info->position = trx->info.position;
-    info->state    = trx->info.state;
-
+    info->seqno_l     = trx->info.seqno_l;
+    info->seqno_g     = trx->info.seqno_g;
+    info->ws          = trx->info.ws;
+    info->position    = trx->info.position;
+    info->state       = trx->info.state;
+    info->applier     = trx->info.applier;
+    info->applier_ctx = trx->info.applier_ctx;
 
     GU_DBUG_VOID_RETURN;
 }

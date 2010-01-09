@@ -490,8 +490,8 @@ bool gcomm::pc::Proto::requires_rtr() const
             to_seq                 != max_to_seq && 
             last_prim.get_type()   != V_NON_PRIM)
         {
-            log_warn << self_id() << " RTR is needed: " << to_seq
-                     << " / " << last_prim;
+            log_debug << self_id() << " RTR is needed: " << to_seq
+                      << " / " << last_prim;
             ret = true;
         }
     }
