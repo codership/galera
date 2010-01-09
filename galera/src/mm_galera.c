@@ -2460,7 +2460,7 @@ static enum wsrep_status mm_galera_replay_trx(
             );
 
             /* register committed transaction */
-            if (rcode != WSREP_OK) {
+            if (ret_code != WSREP_OK) {
                 gu_fatal(
                      "could not re-apply trx: %lld %lld", 
                      trx.seqno_g, trx.seqno_l
