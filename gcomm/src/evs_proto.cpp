@@ -964,6 +964,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                 const ViewId& nsv(jm->get_source_view_id());
                 const MessageNode& mn(MessageNodeList::get_value(jm->get_node_list().find_checked(uuid)));
                 mnode = MessageNode(node.get_operational(),
+                                    false,
                                     -1,
                                     jm->get_source_view_id(), 
                                     (nsv == current_view.get_id() ?
@@ -977,6 +978,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
             {
                 const ViewId& nsv(lm->get_source_view_id());
                 mnode = MessageNode(node.get_operational(),
+                                    false,
                                     lm->get_seq(),
                                     nsv,
                                     (nsv == current_view.get_id() ? 
@@ -989,6 +991,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
             else if (current_view.is_member(uuid) == true)
             {
                 mnode = MessageNode(node.get_operational(),
+                                    false,
                                     -1,
                                     current_view.get_id(),
                                     input_map->get_safe_seq(node.get_index()),
@@ -998,6 +1001,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
         else
         {
             mnode = MessageNode(true,
+                                false,
                                 -1,
                                 current_view.get_id(),
                                 input_map->get_safe_seq(node.get_index()),
@@ -1549,8 +1553,16 @@ void gcomm::evs::Proto::handle_up(int cid,
     }
     catch (Exception& e)
     {
-        log_fatal << "exception caused by message: " << msg;
-        log_fatal << " state after handling message: " << *this;
+        if (e.get_errno() == EINVAL)
+        {
+            log_warn << "invalid message: " << msg;
+        }
+        else
+        {
+            log_fatal << "exception caused by message: " << msg;
+            log_fatal << " state after handling message: " << *this;
+            throw;
+        }
     }
 }
 
@@ -2280,7 +2292,6 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     
     
     gcomm_assert(msg.get_source_view_id() == current_view.get_id());
-    
 
     // 
     seqno_t prev_safe;
@@ -2566,7 +2577,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                 if (local_node.get_operational() == false  &&
                     im_range.get_hs()            >  min_hs)
                 {
-                    gcomm_assert(im_range.get_hs() <= max_hs);
+                    // gcomm_assert(im_range.get_hs() <= max_hs);
                     gu_trace(recover(msg.get_source(), min_hs_uuid, 
                                      Range(min_hs + 1, max_hs)));
                 }

@@ -42,40 +42,46 @@ namespace gcomm
 class gcomm::evs::MessageNode
 {
 public:
-    MessageNode(const bool    operational_     = false,
-                const seqno_t   leave_seq_       = -1,
-                const ViewId& view_id_         = ViewId(V_REG),
-                const seqno_t   safe_seq_        = -1,
-                const Range   im_range_        = Range()) :
-        operational(operational_),
-        leave_seq(leave_seq_),
-        view_id(view_id_),
-        safe_seq(safe_seq_),
-        im_range(im_range_)
-    { }
-
-    MessageNode(const MessageNode& mn) :
-        operational (mn.operational),
-        leave_seq   (mn.leave_seq),
-        view_id     (mn.view_id),
-        safe_seq    (mn.safe_seq),
-        im_range    (mn.im_range)
+    MessageNode(const bool    operational  = false,
+                const bool    suspected    = false,
+                const seqno_t leave_seq    = -1,
+                const ViewId& view_id      = ViewId(V_REG),
+                const seqno_t safe_seq     = -1,
+                const Range   im_range     = Range()) :
+        operational_(operational),
+        suspected_  (suspected  ),
+        leave_seq_  (leave_seq  ),
+        view_id_    (view_id    ),
+        safe_seq_   (safe_seq   ),
+        im_range_   (im_range   )
     { }
     
-    bool get_operational() const { return operational; }
-    bool get_leaving() const { return not (leave_seq == -1); }
-    seqno_t get_leave_seq() const { return leave_seq; }
-    const ViewId& get_view_id() const { return view_id; }
-    seqno_t get_safe_seq() const { return safe_seq; }
-    Range get_im_range() const { return im_range; }
+    MessageNode(const MessageNode& mn) 
+        :
+        operational_ (mn.operational_),
+        suspected_   (mn.suspected_  ),
+        leave_seq_   (mn.leave_seq_  ),
+        view_id_     (mn.view_id_    ),
+        safe_seq_    (mn.safe_seq_   ),
+        im_range_    (mn.im_range_   )
+    { }
+    
+    bool          get_operational() const { return operational_       ; }
+    bool          get_suspected()   const { return suspected_         ; }
+    bool          get_leaving()     const { return (leave_seq_ != -1) ; }
+    seqno_t       get_leave_seq()   const { return leave_seq_         ; }
+    const ViewId& get_view_id()     const { return view_id_           ; }
+    seqno_t       get_safe_seq()    const { return safe_seq_          ; }
+    Range         get_im_range()    const { return im_range_          ; }
     
     bool operator==(const MessageNode& cmp) const
     {
-        return operational == cmp.operational &&
-            leave_seq == cmp.leave_seq &&
-            view_id == cmp.view_id && 
-            safe_seq == cmp.safe_seq &&
-            im_range == cmp.im_range;
+        return (operational_ == cmp.operational_ &&
+                suspected_   == cmp.suspected_   &&
+                leave_seq_   == cmp.leave_seq_   &&
+                view_id_     == cmp.view_id_     && 
+                safe_seq_    == cmp.safe_seq_    &&
+                im_range_    == cmp.im_range_);
     }
     
     size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
@@ -84,11 +90,17 @@ public:
         throw(gu::Exception);
     static size_t serial_size();
 private:
-    bool     operational;     // Is operational
-    seqno_t    leave_seq;
-    ViewId   view_id;         // Current view as seen by source of this message
-    seqno_t    safe_seq;        // Safe seq as seen...
-    Range    im_range;        // Input map range as seen...
+    enum 
+    {
+        F_OPERATIONAL = 1 << 0,
+        F_SUSPECTED   = 1 << 1
+    };
+    bool     operational_;     // Is operational
+    bool     suspected_;
+    seqno_t  leave_seq_;
+    ViewId   view_id_;         // Current view as seen by source of this message
+    seqno_t  safe_seq_;        // Safe seq as seen...
+    Range    im_range_;        // Input map range as seen...
 };
 
 class gcomm::evs::MessageNodeList : 

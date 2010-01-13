@@ -69,7 +69,8 @@ START_TEST(test_message)
     
     MessageNodeList node_list;
     node_list.insert(make_pair(uuid1, MessageNode()));
-    node_list.insert(make_pair(UUID(2), MessageNode(true, true, ViewId(V_REG), 5,
+    node_list.insert(make_pair(UUID(2), MessageNode(true, false, 1, 
+                                                    ViewId(V_REG), 5,
                                                     Range(7, 8))));
     JoinMessage jm(uuid1, view_id, 8, 5, 27, node_list);
     jm.set_source(uuid1);
