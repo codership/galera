@@ -72,6 +72,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     self_i(),
     view_forget_timeout   (),
     inactive_timeout      (),
+    suspect_timeout       (),
     inactive_check_period (),
     consensus_timeout     (),
     retrans_period        (),
@@ -101,6 +102,12 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
                            Conf::EvsViewForgetTimeout,
                            Period(Defaults::EvsViewForgetTimeout),
                            Period(Defaults::EvsViewForgetTimeoutMin));
+    suspect_timeout = 
+        conf_param_def_min(uri,
+                           Conf::EvsSuspectTimeout,
+                           Period(Defaults::EvsSuspectTimeout),
+                           Period(Defaults::EvsSuspectTimeoutMin));
+    
     inactive_timeout =
         conf_param_def_min(uri,
                            Conf::EvsInactiveTimeout,
@@ -113,11 +120,10 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
                              Period(Defaults::EvsRetransPeriodMin),
                              inactive_timeout/3);
     inactive_check_period = 
-        conf_param_def_range(uri, 
-                             Conf::EvsInactiveCheckPeriod,
-                             inactive_timeout/3,
-                             inactive_timeout/10,
-                             inactive_timeout/2);
+        conf_param_def_max(uri,
+                           Conf::EvsInactiveCheckPeriod,
+                           Period(Defaults::EvsInactiveCheckPeriod),
+                           inactive_timeout/2);
     consensus_timeout = 
         conf_param_def_range(uri,
                              Conf::EvsConsensusTimeout,
@@ -160,7 +166,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
         info_mask = gu::from_string<int>(ilm_str, hex);
     } catch (NotFound&) { }
 
-    known.insert_unique(make_pair(my_uuid, Node(inactive_timeout)));
+    known.insert_unique(make_pair(my_uuid, Node(inactive_timeout, suspect_timeout)));
     self_i = known.begin();
     assert(NodeMap::get_value(self_i).get_operational() == true);
     
@@ -486,20 +492,27 @@ Date gcomm::evs::Proto::handle_timers()
 
 void gcomm::evs::Proto::check_inactive()
 {
-    bool has_inactive = false;
+    bool has_inactive(false);
     for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
     {
         const UUID& uuid(NodeMap::get_key(i));
         Node& node(NodeMap::get_value(i));
-        if (uuid                   != get_uuid() &&
-            /* node.get_operational() == true       && */
-            node.is_inactive()     == true         )
+        if (uuid                   != get_uuid()    &&
+            (node.is_inactive()     == true      ||
+             node.is_suspected()    == true           ))
         {
-            if (node.get_operational() == true)
+            if (node.get_operational() == true && node.is_inactive() == true)
             {
                 log_info << self_string() << " detected inactive node: " << uuid;
             }
-            set_inactive(uuid);
+            else if (node.is_suspected() == true && node.is_inactive() == false)
+            {
+                log_info << self_string() << " suspecting node: " << uuid;
+            }
+            if (node.is_inactive() == true)
+            {
+                set_inactive(uuid);
+            }
             has_inactive = true;
         }
     }
@@ -964,7 +977,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
                 const ViewId& nsv(jm->get_source_view_id());
                 const MessageNode& mn(MessageNodeList::get_value(jm->get_node_list().find_checked(uuid)));
                 mnode = MessageNode(node.get_operational(),
-                                    false,
+                                    node.is_suspected(),
                                     -1,
                                     jm->get_source_view_id(), 
                                     (nsv == current_view.get_id() ?
@@ -978,7 +991,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
             {
                 const ViewId& nsv(lm->get_source_view_id());
                 mnode = MessageNode(node.get_operational(),
-                                    false,
+                                    node.is_suspected(),
                                     lm->get_seq(),
                                     nsv,
                                     (nsv == current_view.get_id() ? 
@@ -991,7 +1004,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
             else if (current_view.is_member(uuid) == true)
             {
                 mnode = MessageNode(node.get_operational(),
-                                    false,
+                                    node.is_suspected(),
                                     -1,
                                     current_view.get_id(),
                                     input_map->get_safe_seq(node.get_index()),
@@ -1350,7 +1363,7 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
                                   << source;
     
     NodeMap::iterator i;
-    gu_trace(i = known.insert_unique(make_pair(source, Node(inactive_timeout))));
+    gu_trace(i = known.insert_unique(make_pair(source, Node(inactive_timeout, suspect_timeout))));
     assert(NodeMap::get_value(i).get_operational() == true);
     
     if (get_state() == S_JOINING || get_state() == S_RECOVERY || 
@@ -2410,6 +2423,72 @@ bool gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
 }
 
 
+class SelectSuspectsOp
+{
+public:
+    SelectSuspectsOp(MessageNodeList& nl) : nl_(nl) { }
+
+    void operator()(const MessageNodeList::value_type& vt) const
+    {
+        if (MessageNodeList::get_value(vt).get_suspected() == true)
+        {
+            nl_.insert_unique(vt);
+        }
+    }
+private:
+    MessageNodeList& nl_;
+};
+
+void gcomm::evs::Proto::check_suspects(const UUID& source,
+                                       const MessageNodeList& nl)
+{
+    assert(source != get_uuid());
+    MessageNodeList suspected;
+    for_each(nl.begin(), nl.end(), SelectSuspectsOp(suspected));
+    
+    for (MessageNodeList::const_iterator i(suspected.begin());
+         i != suspected.end(); ++i)
+    {
+        const UUID& uuid(MessageNodeList::get_key(i));
+        const MessageNode& node(MessageNodeList::get_value(i));
+        if (node.get_suspected() == true)
+        {
+            if (uuid != get_uuid())
+            {
+                size_t s_cnt(0);
+                // Iterate over join messages to see if majority agrees
+                // with the suspicion
+                for (NodeMap::const_iterator j(known.begin());
+                     j != known.end(); ++j)
+                {
+                    const JoinMessage* jm(NodeMap::get_value(j).get_join_message());
+                    if (jm != 0 && jm->get_source() != uuid)
+                    {
+                        MessageNodeList::const_iterator mni(jm->get_node_list().find(uuid));
+                        if (mni != jm->get_node_list().end())
+                        {
+                            const MessageNode& mn(MessageNodeList::get_value(mni));
+                            if (mn.get_suspected() == true)
+                            {
+                                ++s_cnt;
+                            }
+                        }
+                    }
+                }
+                const Node& kn(NodeMap::get_value(known.find_checked(uuid)));
+                if (kn.get_operational() == true && 
+                    s_cnt > current_view.get_members().size()/2)
+                {
+                    log_info << self_string() << "declaring suspected " 
+                             << uuid << " as inactive";
+                    set_inactive(uuid);
+                }
+            }
+        }
+    }
+}
+
+
 // If one node has set some other as unoperational but we see it still
 // operational, do some arbitration. We wait until 2/3 of inactive timeout
 // from setting of consensus timer has passed. If both nodes express liveness,
@@ -2601,6 +2680,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
             // this for own messages.
             if (msg.get_source() != get_uuid())
             {
+                gu_trace(check_suspects(msg.get_source(), same_view));
                 gu_trace(cross_check_inactives(msg.get_source(), same_view));
             }
         }

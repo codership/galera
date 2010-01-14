@@ -574,35 +574,36 @@ public:
 class gcomm::evs::SelectNodesOp
 {
 public:
-    SelectNodesOp(MessageNodeList& nl_, 
-                  const gcomm::ViewId& view_id_, 
-                  const bool operational_,
-                  const bool leaving_ ) : 
-        nl          (nl_), 
-        view_id     (view_id_),
-        operational (operational_),
-        leaving     (leaving_)
+    SelectNodesOp(MessageNodeList& nl, 
+                  const gcomm::ViewId& view_id, 
+                  const bool operational,
+                  const bool leaving)
+        : 
+        nl_          (nl), 
+        view_id_     (view_id),
+        operational_ (operational),
+        leaving_     (leaving)
     { }
     
     void operator()(const MessageNodeList::value_type& vt) const
     {
         const MessageNode& node(MessageNodeList::get_value(vt));
-        if ((view_id                  == ViewId() ||
-             node.get_view_id()       == view_id    ) &&
-            ((operational            == true          && 
-              leaving                == true            ) ||
-             (node.get_operational() == operational &&
-              node.get_leaving()     == leaving        ) ) )
+        if ((view_id_                  == ViewId() ||
+             node.get_view_id()        == view_id_    ) &&
+            ((operational_             == true          && 
+              leaving_                 == true   ) ||
+             (node.get_operational() == operational_ &&
+              node.get_leaving()     == leaving_ ) ) )
             
         {
-            nl.insert_unique(vt);
+            nl_.insert_unique(vt);
         }
     }
 private:
-    MessageNodeList&       nl;
-    ViewId           const view_id;
-    bool             const operational;
-    bool             const leaving;
+    MessageNodeList&       nl_;
+    ViewId           const view_id_;
+    bool             const operational_;
+    bool             const leaving_;
 };
 
 

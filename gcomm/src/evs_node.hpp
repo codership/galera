@@ -32,73 +32,74 @@ namespace gcomm
 class gcomm::evs::Node
 {
 public:    
-    Node(const gu::datetime::Period& inactive_timeout_) : 
-        index(std::numeric_limits<size_t>::max()),
-        operational(true), 
-        installed(false), 
-        join_message(0), 
-        leave_message(0),
-        inactive_timeout(inactive_timeout_),
-        tstamp(gu::datetime::Date::now()),
-        fifo_seq(-1)
+    Node(const gu::datetime::Period& inactive_timeout,
+         const gu::datetime::Period& suspect_timeout) 
+        : 
+        index_           (std::numeric_limits<size_t>::max()),
+        operational_     (true), 
+        installed_       (false), 
+        join_message_    (0), 
+        leave_message_   (0),
+        suspect_timeout_ (suspect_timeout),
+        inactive_timeout_(inactive_timeout),
+        tstamp_          (gu::datetime::Date::now()),
+        fifo_seq_        (-1)
     {}
-
+    
     Node(const Node& n);
     
     ~Node();
     
-    void set_index(const size_t idx) { index = idx; }
-    size_t get_index() const { return index; }
+    void set_index(const size_t idx) { index_ = idx; }
+    size_t get_index() const { return index_; }
     
     void set_operational(const bool op) 
     { 
         gcomm_assert(op == false);
-        operational = op; 
+        operational_ = op; 
     }
-    bool get_operational() const { return operational; }
+    bool get_operational() const { return operational_; }
     
-    void set_installed(const bool inst) { installed = inst; }
-    bool get_installed() const { return installed; }
+    void set_installed(const bool inst) { installed_ = inst; }
+    bool get_installed() const { return installed_; }
     
     void set_join_message(const JoinMessage* msg);
     
-    const JoinMessage* get_join_message() const { return join_message; }
+    const JoinMessage* get_join_message() const { return join_message_; }
     
     void set_leave_message(const LeaveMessage* msg);
     
-    const LeaveMessage* get_leave_message() const { return leave_message; }
+    const LeaveMessage* get_leave_message() const { return leave_message_; }
     
-    void set_tstamp(const gu::datetime::Date& t) { tstamp = t; }
-    const gu::datetime::Date& get_tstamp() const { return tstamp; }
+    void set_tstamp(const gu::datetime::Date& t) { tstamp_ = t; }
+    const gu::datetime::Date& get_tstamp() const { return tstamp_; }
     
-    void set_fifo_seq(const int64_t seq) { fifo_seq = seq; }
-    int64_t get_fifo_seq() const { return fifo_seq; }
+    void set_fifo_seq(const int64_t seq) { fifo_seq_ = seq; }
+    int64_t get_fifo_seq() const { return fifo_seq_; }
     
     bool is_inactive() const;
-
+    bool is_suspected() const;
 private:
-    
-    
     
     void operator=(const Node&);
     
     // Index for input map
-    size_t index;
+    size_t index_;
     // True if instance is considered to be operational (has produced messages)
-    bool operational;
+    bool operational_;
     // True if it is known that the instance has installed current view
-    bool installed;
+    bool installed_;
     // Last received JOIN message
-    JoinMessage* join_message;
+    JoinMessage* join_message_;
     // Last activity timestamp
-    LeaveMessage* leave_message;
+    LeaveMessage* leave_message_;
+    gu::datetime::Period suspect_timeout_;
     // 
-    gu::datetime::Period inactive_timeout;
+    gu::datetime::Period inactive_timeout_;
     // 
-    gu::datetime::Date tstamp;
+    gu::datetime::Date tstamp_;
     //
-    int64_t fifo_seq;
-    
+    int64_t fifo_seq_;
 };
 
 class gcomm::evs::NodeMap : public Map<UUID, Node> { };

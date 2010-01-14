@@ -24,6 +24,8 @@ std::string const gcomm::Conf::EvsViewForgetTimeout =
     EvsScheme + Delim + "view_forget_timeout";
 std::string const gcomm::Conf::EvsInactiveTimeout = 
     EvsScheme + Delim + "inactive_timeout";
+std::string const gcomm::Conf::EvsSuspectTimeout =
+    EvsScheme + Delim + "suspect_timeout";
 std::string const gcomm::Conf::EvsInactiveCheckPeriod = 
     EvsScheme + Delim + "inactive_check_period";
 std::string const gcomm::Conf::EvsConsensusTimeout = 

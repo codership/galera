@@ -14,6 +14,9 @@ namespace gcomm
         static std::string const GMCastTcpPort            ;
         static std::string const EvsViewForgetTimeout     ;
         static std::string const EvsViewForgetTimeoutMin  ;
+        static std::string const EvsInactiveCheckPeriod   ;
+        static std::string const EvsSuspectTimeout        ;
+        static std::string const EvsSuspectTimeoutMin     ;
         static std::string const EvsInactiveTimeout       ;
         static std::string const EvsInactiveTimeoutMin    ;
         static std::string const EvsRetransPeriod         ;
