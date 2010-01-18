@@ -107,7 +107,6 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
                            Conf::EvsSuspectTimeout,
                            Period(Defaults::EvsSuspectTimeout),
                            Period(Defaults::EvsSuspectTimeoutMin));
-    
     inactive_timeout =
         conf_param_def_min(uri,
                            Conf::EvsInactiveTimeout,
@@ -118,24 +117,24 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
                              Conf::EvsKeepalivePeriod,
                              Period(Defaults::EvsRetransPeriod),
                              Period(Defaults::EvsRetransPeriodMin),
-                             inactive_timeout/3);
+                             suspect_timeout/3);
     inactive_check_period = 
         conf_param_def_max(uri,
                            Conf::EvsInactiveCheckPeriod,
                            Period(Defaults::EvsInactiveCheckPeriod),
-                           inactive_timeout/2);
+                           suspect_timeout/2);
     consensus_timeout = 
         conf_param_def_range(uri,
                              Conf::EvsConsensusTimeout,
-                             inactive_timeout*2,
+                             Period(Defaults::EvsConsensusTimeout),
                              inactive_timeout,
                              inactive_timeout*5);
     join_retrans_period = 
         conf_param_def_range(uri,
                              Conf::EvsJoinRetransPeriod,
-                             inactive_timeout/5,
+                             Period(Defaults::EvsJoinRetransPeriod),
                              Period(Defaults::EvsRetransPeriodMin),
-                             inactive_timeout/3);
+                             suspect_timeout/3);
     stats_report_period =
         conf_param_def_min(uri,
                            Conf::EvsStatsReportPeriod,
@@ -165,7 +164,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
         const string& ilm_str(uri.get_option(Conf::EvsInfoLogMask));
         info_mask = gu::from_string<int>(ilm_str, hex);
     } catch (NotFound&) { }
-
+    
     known.insert_unique(make_pair(my_uuid, Node(inactive_timeout, suspect_timeout)));
     self_i = known.begin();
     assert(NodeMap::get_value(self_i).get_operational() == true);
@@ -1456,7 +1455,7 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
             get_state()                    != S_LEAVING)
         {
             log_info << self_string() 
-                     << "detected new view from operational source: " 
+                     << " detected new view from operational source: " 
                      << msg.get_source_view_id();
             set_inactive(msg.get_source());
             gu_trace(shift_to(S_RECOVERY, true));
