@@ -156,7 +156,7 @@ public:
 
         if (use_prod_cons == false)
         {
-            log_info << "disabling prod/cons";
+            log_debug << "disabling prod/cons";
         }
     }
     
@@ -177,18 +177,28 @@ public:
     { 
         char delim(uri_base.find_first_of('?') == string::npos ? '?' : '&');
 
-        tp = Transport::create(net,
-                               uri_base + delim + "gmcast.group=" + channel);
 
+        tp = Transport::create(net, uri_base + delim + "gmcast.group=" + channel);
         gcomm::connect(tp, this);
-        tp->connect();
 
+        URI uri(uri_base);
+        string host("");
+        string port("");
+        try { host = uri.get_host(); } catch (NotSet&) { }
+        try { port = uri.get_port(); } catch (NotSet&) { }
+        string peer(host != "" ? host + ":" + port : "");
+
+        log_info << "connecting to group '" << channel 
+                 << "', peer '" << peer << "'";
+        tp->connect();
+        
         int err;
 
         if ((err = pthread_create(&thd, 0, &run_fn, this)) != 0)
         {
             gu_throw_error(err);
         }
+        log_info << "connected";
     }
     
     void close() 
@@ -199,14 +209,14 @@ public:
         pthread_join(thd, 0);
         log_info << "closing backend";
         tp->close();
-
+        
         const Message* msg;
-
+        
         while ((msg = get_next_msg()) != 0)
         {
             return_ack(Message(&msg->get_producer(), 0, -ECONNABORTED));
         }
-        
+        log_info << "closed";
         log_debug << prof;
     }
 
