@@ -156,7 +156,7 @@ public:
 
         if (use_prod_cons == false)
         {
-            log_debug << "disabling prod/cons";
+            log_debug << "gcomm: disabling prod/cons";
         }
     }
     
@@ -188,7 +188,7 @@ public:
         try { port = uri.get_port(); } catch (NotSet&) { }
         string peer(host != "" ? host + ":" + port : "");
 
-        log_info << "connecting to group '" << channel 
+        log_info << "gcomm: connecting to group '" << channel 
                  << "', peer '" << peer << "'";
         tp->connect();
         
@@ -198,16 +198,16 @@ public:
         {
             gu_throw_error(err);
         }
-        log_info << "connected";
+        log_info << "gcomm: connected";
     }
     
     void close() 
     { 
-        log_info << "terminating thread";
+        log_info << "gcomm: terminating thread";
         terminate();
-        log_info << "joining thread";
+        log_info << "gcomm: joining thread";
         pthread_join(thd, 0);
-        log_info << "closing backend";
+        log_info << "gcomm: closing backend";
         tp->close();
         
         const Message* msg;
@@ -216,7 +216,7 @@ public:
         {
             return_ack(Message(&msg->get_producer(), 0, -ECONNABORTED));
         }
-        log_info << "closed";
+        log_info << "gcomm: closed";
         log_debug << prof;
     }
 
