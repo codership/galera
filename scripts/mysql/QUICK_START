@@ -15,12 +15,10 @@ MySQL/Galera cluster is a multi-master MySQL server cluster. It provides
 This distribution is all you need to install and run MySQL/Galera cluster.
 You don't need to be root or to uninstall/disable any software.
 
+
 MYSQL CLUSTER IN 3 EASY STEPS:
 
-To setup MySQL/Galera cluster all you need is to start an arbitrator and 
-connect mysqld instances to it. Here's an example of how to do it:
-
-Suppose you have three networked computers Node1, Node2, Node3 of roughly the 
+Suppose you have three networked computers Node1, Node2, Node3 of roughly the
 same performance and Node1 has IP address 192.168.1.1
 
 1. Copy and unpack this distribution on each node to the directory of your
@@ -32,7 +30,7 @@ same performance and Node1 has IP address 192.168.1.1
    <INSTALL_DIR>/mysql-galera -g gcomm:// start
 
 3. Start remaining nodes:
-   
+
    <INSTALL_DIR>/mysql-galera -g gcomm://192.168.1.1 start
 
 NOTE1: First node of the cluster is started by supplying an empty gcomm address.
@@ -55,8 +53,7 @@ LIMITATIONS:
 
 1. Currently replication works only with InnoDB storage engine. Any writes to 
    tables of other types, including system (mysql.*) tables are not replicated. 
-   E.g. if you want to add another user, you have to do it manually on every
-   node where you want that user to connect to.
+   (GRANT command is an exception and is replicated)
 
 2. Rows in tables without primary keys may appear in different order on
    different nodes. As a result SELECT...LIMIT... may return slightly different

@@ -55,6 +55,7 @@ MYSQL_DATA_DIR=${MYSQL_DATA_DIR:-"$my_cnf_datadir"}
 # If it was not found in my.cnf, use distribution default
 MYSQL_DATA_DIR=${MYSQL_DATA_DIR:-"$MYSQL_BASE_DIR/var"}
 
+MYSQLD_USER=$(whoami)
 
 #=======================================================================
 ##
@@ -72,11 +73,10 @@ MYSQL_SHUTDOWN_WAIT=60
 #============= Nothing servicable below ================================
 
 # User to run as if started under superuser
-MYSQLD_USER=$(whoami)
-if test "$MYSQLD_USER" = "root"
-then
-    MYSQLD_USER=mysql
-fi
+#if test "$MYSQLD_USER" = "root"
+#then
+#    MYSQLD_USER=mysql
+#fi
 ROOT_USER=${ROOT_USER:-"-uroot"}
 ROOT_PSWD=${ROOT_PSWD:-"-prootpass"}
 
@@ -152,9 +152,9 @@ wait_for_wsrep_ready()
     do
         echo -n "."
         sleep 1
-	ready=$(get_status "wsrep_ready")
-	ret=$?
-	if [ "$ready" == "ON" ]; then break; fi
+        ready=$(get_status "wsrep_ready")
+        ret=$?
+        if [ "$ready" == "ON" ]; then break; fi
     done
 
     if [ $ret ]
@@ -170,13 +170,13 @@ wait_for_wsrep_ready()
 galera_start()
 {
     local failed
-    
+
     if ! test -x $MYSQLD
     then
-	echo "$MYSQLD executable not found"
-	exit -1
+        echo "$MYSQLD executable not found"
+        exit -1
     fi
-    
+
     if test -f $MYSQL_PID
     then
         echo "Found existing '$MYSQL_PID'. Please run '$0 stop'"
@@ -198,10 +198,10 @@ galera_start()
     WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera.so"}
     if test -f $WSREP || test $WSREP == "none"
     then
-	WSREP_OPTS="--wsrep_provider=$WSREP"
+        WSREP_OPTS="--wsrep_provider=$WSREP"
     else
-	echo "WSREP driver '$WSREP' not found"
-	exit -1
+        echo "WSREP driver '$WSREP' not found"
+        exit -1
     fi
 
     if test -n "$GCS_ADDRESS"
@@ -223,45 +223,45 @@ galera_start()
 
     if test -z $GDB
     then
-	nohup $VALGRIND $MYSQLD \
-	    $DEFAULTS_OPTION \
-	    --user="$MYSQLD_USER" \
-	    --basedir="$MYSQL_BASE_DIR" \
-	    --datadir="$MYSQL_DATA_DIR" \
-	    --pid-file="$MYSQL_PID" \
-	    --port=$MYSQL_PORT \
-	    --socket=$MYSQL_SOCKET \
-	    --skip-locking \
+        nohup $VALGRIND $MYSQLD \
+            $DEFAULTS_OPTION \
+            --user="$MYSQLD_USER" \
+            --basedir="$MYSQL_BASE_DIR" \
+            --datadir="$MYSQL_DATA_DIR" \
+            --pid-file="$MYSQL_PID" \
+            --port=$MYSQL_PORT \
+            --socket=$MYSQL_SOCKET \
+            --skip-locking \
             --log_error=$err_log \
-	    $MYSQLD_OPTS \
+            $MYSQLD_OPTS \
             $INNODB_OPTS \
-	    $WSREP_OPTS \
-	    $DEBUG_OPTS \
-	    $LOGGING_OPTS \
-	    $RBR_OPTS \
-	    $PLUGIN_OPTS \
-	    1>/dev/null 2>>$err_log &
+            $WSREP_OPTS \
+            $DEBUG_OPTS \
+            $LOGGING_OPTS \
+            $RBR_OPTS \
+            $PLUGIN_OPTS \
+            1>/dev/null 2>>$err_log &
     else
-	$GDB --args $MYSQLD \
-	    $DEFAULTS_OPTION \
-	    --user="$MYSQLD_USER" \
-	    --basedir="$MYSQL_BASE_DIR" \
-	    --datadir="$MYSQL_DATA_DIR" \
-	    --pid-file="$MYSQL_PID" \
-	    --port=$MYSQL_PORT \
-	    --socket=$MYSQL_SOCKET \
-	    --skip-locking \
+        $GDB --args $MYSQLD \
+            $DEFAULTS_OPTION \
+            --user="$MYSQLD_USER" \
+            --basedir="$MYSQL_BASE_DIR" \
+            --datadir="$MYSQL_DATA_DIR" \
+            --pid-file="$MYSQL_PID" \
+            --port=$MYSQL_PORT \
+            --socket=$MYSQL_SOCKET \
+            --skip-locking \
             --log_error=$err_log \
-	    $MYSQLD_OPTS \
+            $MYSQLD_OPTS \
             $INNODB_OPTS \
-	    $WSREP_OPTS \
-	    $DEBUG_OPTS \
-	    $LOGGING_OPTS \
-	    $RBR_OPTS \
-	    $PLUGIN_OPTS
+            $WSREP_OPTS \
+            $DEBUG_OPTS \
+            $LOGGING_OPTS \
+            $RBR_OPTS \
+            $PLUGIN_OPTS
     fi
     my_pid=$!
-	
+
 #    echo "Waiting for pid file" 
     while ! test -r $MYSQL_PID
     do
@@ -269,11 +269,11 @@ galera_start()
         if find_pid $my_pid
         then
             # process is alive, wait for pid file
-	    echo -n "."
-	else
+            echo -n "."
+        else
             failed="yes"
-	    break
-	fi		
+            break
+        fi
     done
 
     if test "$failed" != "yes"
@@ -281,7 +281,7 @@ galera_start()
         echo " Done (PID:$(cat $MYSQL_PID))"
     else
         echo " Failed (PID:$my_pid)"
-	return 1
+        return 1
     fi
 
     wait_for_wsrep_ready
@@ -294,35 +294,35 @@ galera_stop()
     then
         # check if corresponding mysqld is running
 #        if ps axc | grep mysqld | grep $(cat $MYSQL_PID) >/dev/null 2>&1
-	local my_pid=$(cat $MYSQL_PID)
+        local my_pid=$(cat $MYSQL_PID)
         if find_pid $my_pid
         then
             echo -n "Killing PID $my_pid"
-	    kill $my_pid
+            kill $my_pid
             # wait for pid file to disappear
-	    for second in $(seq 1 $MYSQL_SHUTDOWN_WAIT)
-	    do
-	        echo -n "."
-	        sleep 1
-	        if test ! -r $MYSQL_PID
-	        then
-	            break
-		fi
-	    done
-	    echo ""
-	    if test "$second" = "$MYSQL_SHUTDOWN_WAIT"
-	    then
-	        echo -n "Failed to stop mysqld safely. Killing with -9... "
-	        kill -9 $my_pid
-	    fi
-	else
-	    echo -n "Removing stale PID file $MYSQL_PID... "
-	fi
-	
-	rm -rf $MYSQL_PID
-	echo "Done"
+            for second in $(seq 1 $MYSQL_SHUTDOWN_WAIT)
+            do
+                echo -n "."
+                sleep 1
+                if test ! -r $MYSQL_PID
+                then
+                    break
+                fi
+            done
+            echo ""
+            if test "$second" = "$MYSQL_SHUTDOWN_WAIT"
+            then
+                echo -n "Failed to stop mysqld safely. Killing with -9... "
+                kill -9 $my_pid
+            fi
+        else
+            echo -n "Removing stale PID file $MYSQL_PID... "
+        fi
+
+        rm -rf $MYSQL_PID
+        echo "Done"
     else
-	echo "PID file not found: $MYSQL_PID"
+        echo "PID file not found: $MYSQL_PID"
     fi
 }
 
@@ -336,17 +336,17 @@ galera_status()
 {
     if test -f $MYSQL_PID
     then
-	local my_pid=$(cat $MYSQL_PID)
+        local my_pid=$(cat $MYSQL_PID)
         if find_pid $my_pid
         then
             echo "mysqld running with PID: $my_pid"
-	else
-	    echo "Found existing '$MYSQL_PID', but mysqld is not running"
-	fi
+        else
+            echo "Found existing '$MYSQL_PID', but mysqld is not running"
+        fi
 
         exit 0;
     else
-	echo "no PID file: '$MYSQL_PID'"
+        echo "no PID file: '$MYSQL_PID'"
     fi
 }
 
@@ -368,15 +368,15 @@ wait_for_last_committed()
 {
     local lc
     local new_lc
-    
+
     lc=$(get_status "wsrep_last_committed") 
 
     while [ 1 ]
     do
         sleep 1
-	new_lc=$(get_status "wsrep_last_committed")
-	if [ "$lc" == "$new_lc" ]; then break; fi
-	lc="$new_lc"
+        new_lc=$(get_status "wsrep_last_committed")
+        if [ "$lc" == "$new_lc" ]; then break; fi
+        lc="$new_lc"
     done
 }
 
@@ -412,7 +412,7 @@ case $1 in
             ;;
     -d|--debug)
             DEBUG_OPTS=" --wsrep_debug=1 "
-	    ;;
+            ;;
     --dbug)
             DBUG_OPTS=" --debug=d,galera,wsdb:t:i:o"
             ;;
@@ -424,8 +424,8 @@ case $1 in
             VALGRIND="valgrind --log-file=/tmp/mysql_vg --leak-check=full"
             ;;
     --gdb)
-	    GDB="gdb"
-	    ;;
+            GDB="gdb"
+            ;;
     -g|--gcs_address)
             GCS_ADDRESS=$2
             shift
@@ -470,7 +470,7 @@ case $1 in
             ;;
     --mysql-opt)
             MYSQLD_OPTS="$MYSQLD_OPTS $2"
-	    shift
+            shift
             ;;
 'dump')
             COMMAND="dump"

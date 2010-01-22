@@ -342,7 +342,7 @@ the donor state, including system tables and thus is most compliant.
 
 For practical purposes we recommend to reserve a "reference node" in the
 cluster. A "reference node" is a node that does not receive SQL load. Having 
-such node in a cluster can serve several purposes:
+such node in a cluster serves several purposes:
 
 1) Data consistency: since this node does not process any SQL load on its own,
    it has the lowest probability of transaction conflicts and therefore -
