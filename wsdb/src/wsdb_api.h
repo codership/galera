@@ -112,7 +112,7 @@ enum wsdb_trx_position {
 
 typedef struct {
     trx_seqno_t            seqno_l;     //!< local solid sequence
-    trx_seqno_t            seqno_g;     //!< cluster wide sequence number
+//DELETE    trx_seqno_t            seqno_g;     //!< cluster wide sequence number
     enum wsdb_trx_state    state;       //!< state of sequencing
     struct wsdb_write_set *ws;          //!< write set
     enum wsdb_trx_position position;    //!<
@@ -229,6 +229,7 @@ struct wsdb_write_set {
     time_t                stmt_time;     //!< stmt start time
     local_trxid_t         local_trx_id;  //!< id of transaction in local state
     trx_seqno_t           last_seen_trx; //!< id of last committed trx
+    trx_seqno_t           trx_seqno;     //!< this trx id
     enum wsdb_ws_type     type;
     enum wsdb_ws_level    level;
   //    enum wsdb_trx_state2  state;
@@ -239,8 +240,8 @@ struct wsdb_write_set {
     struct wsdb_query    *conn_queries;      //!< query buffer
     uint32_t              item_count;    //!< number of items in write set
     struct wsdb_item_rec *items;         //!< write set items
-    u_int                  rbr_buf_len;    //!<  length of the following rbr placeholder
-    char                   *rbr_buf;     // !<transactional cache of mysql (rbr data)
+    u_int                 rbr_buf_len;   //!<  length of the following rbr placeholder
+    char                 *rbr_buf;       // !<transactional cache of mysql (rbr data)
 
     char *key_composition;               //!< temp representation of keys in ws
     //free_wsdb_write_set_fun free;
@@ -248,13 +249,13 @@ struct wsdb_write_set {
 
 /*!
  * @brief callback for handling log messages
- * 
+ *
  * @param code  severity code
  * @param msg   log message
  */
 typedef void (*wsdb_log_cb_t) (int code, const char* msg);
 
-/*! 
+/*!
  * @brief database initialization. This must be called at system
  *        initialization time once before any other wsdb_* function
  *
@@ -344,8 +345,8 @@ int wsdb_append_row_col(
  * @param action the action performed on the row (INSERT, DELETE, UPDATE)
  *
  * @return success or error code 
- *  
- */ 
+ *
+ */
 int wsdb_append_row_key(
     local_trxid_t trx_id,
     struct wsdb_key_rec *key, 
@@ -355,17 +356,17 @@ int wsdb_append_row_key(
 /*!
  * Appends the table modification reference. The modified data is not stored
  * with this call, only the reference to the modified data is recorded.
- * 
- * Transaction calling this function operates in local state and the cluster
- * level transaction sequence number is not known yet. 
  *
- * @param trx_id locally unique trx identifier or 0. 
+ * Transaction calling this function operates in local state and the cluster
+ * level transaction sequence number is not known yet.
+ *
+ * @param trx_id locally unique trx identifier or 0.
  * @param dbtable name of the table modified in format: db.table
  * @param len length of the dbtable
  *
- * @return success or error code 
- *  
- */ 
+ * @return success or error code
+ *
+ */
 int wsdb_append_table_lock(
     local_trxid_t  trx_id,
     char          *dbtable,
@@ -374,48 +375,47 @@ int wsdb_append_table_lock(
 
 /*!
  * @brief performs certification test for a write set
- * 
+ *
  * This method can be called after replication has received the write set.
  * Caller must provide the write set received from replication intact and the 
  * sequence number determined for the replication event.
- * 
+ *
  * @return certification verdict
- * 
+ *
  * @param write_set  The write set to be appended
  * @param trx_seqno  the cluster wide agreed commit order for the transaction.
  * @param save_keys save key composition after testing
- * 
+ *
  * @return success code, certification fail code or error code
  * @retval WSDB_OK
  * @retval WSDB_CERTIFICATION_FAIL certification failed
  */
 int wsdb_certification_test(
-    struct wsdb_write_set *ws, trx_seqno_t trx_seqno, bool_t save_keys
+    struct wsdb_write_set *ws, bool_t save_keys
 );
 
 /*!
  * @brief appends whole write_set
- * 
+ *
  * This method can be called after replication has received the write set.
  * Caller must provide the write set received from replication intact and the 
  * sequence number determined for the replication event.
- * 
+ *
  * Note that the write set may contain local state transaction identifiers, 
  * these will be replaced by the sequence number passed as parameter.
- * 
+ *
  * @return Success code. The write set appennd may fail for certification test.
- * 
- * @param trx_seqno  the cluster wide agreed commit order for the transaction.
+ *
  * @param write_set  The write set to be appended
- * 
+ *
  * @return success code, certification fail code or error code
  * @retval WSDB_OK
  * @retval WSDB_CERTIFICATION_FAIL certification failed, trx must abort
  */
 int wsdb_append_write_set(
-     trx_seqno_t trx_seqno, struct wsdb_write_set *write_set
+     struct wsdb_write_set *write_set
 );
- 
+
  /*!
   * @brief changes TRX state to committing state
   * 
@@ -444,15 +444,18 @@ int wsdb_assign_trx_seqno(
     local_trxid_t       trx_id, 
     trx_seqno_t         seqno_l, 
     trx_seqno_t         seqno_g, 
-    enum wsdb_trx_state state
+    enum wsdb_trx_state state,
+    struct wsdb_write_set* ws
 );
 int wsdb_assign_trx_state(
     local_trxid_t        trx_id, 
     enum wsdb_trx_state  state
 );
+#if 0 //DELETE
 int wsdb_assign_trx_ws(
     local_trxid_t trx_id, struct wsdb_write_set *ws
 );
+#endif
 int wsdb_assign_trx_pos(
     local_trxid_t trx_id, enum wsdb_trx_position
 );
@@ -498,7 +501,7 @@ int wsdb_delete_global_trx(trx_seqno_t trx_id );
 
 /*!
  * @brief removes transactions' write sets from global trx index
- * 
+ *
  * The write set data remains store in disk, just the search 
  * index will be removed. Therefore, you cannot certify anymore
  * against trx's with lower seqnos.
@@ -512,11 +515,11 @@ int wsdb_purge_trxs_upto(trx_seqno_t trx_id);
 
 /*!
  * @brief returns the whole write set for a transaction.
- * 
- * 
+ *
+ *
  * @param trx_id the id of the transaction
  * @param conn_id the id of the connection
- * 
+ *
  * @return the write set of the transaction. This is ready to be
  *         replicated to the cluster
  */
@@ -529,7 +532,7 @@ struct wsdb_write_set *wsdb_get_write_set(
  * Write set will be of type WSDB_WS_TYPE_CONN
  *
  * @param conn_id the id of the connection
- * 
+ *
  * @return the write set of the connection
  */
 struct wsdb_write_set *wsdb_get_conn_write_set(
@@ -537,27 +540,27 @@ struct wsdb_write_set *wsdb_get_conn_write_set(
 );
 
 /*!
- * @brief 
+ * @brief
  *
  * @param
- * 
- * @return 
+ *
+ * @return
  */
 int wsdb_set_exec_query(
-    struct wsdb_write_set *ws, char *query, size_t query_len
+    struct wsdb_write_set *ws, const char *query, size_t query_len
 );
 
 /*!
  * @brief XDR encoding/decoding for the write set.
- * 
+ *
  * Replicator should do the encoding before replicating the 
  * write set.
  * Replication receiver decodes the write set received from
  * group communication.
- * 
+ *
  * @param xdrs XDR stream 
  * @param ws the write set to be encoded/decoded
- * 
+ *
  * @return true/false
  */
 //typedef int bool;

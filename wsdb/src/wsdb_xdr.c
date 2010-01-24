@@ -173,6 +173,7 @@ bool_t xdr_wsdb_write_set(XDR *xdrs, struct wsdb_write_set *ws) {
     uint32_t i;
     if (!xdr_longlong_t(xdrs, &ws->local_trx_id))          return FALSE;
     if (!xdr_longlong_t(xdrs, &ws->last_seen_trx))         return FALSE;
+    ws->trx_seqno = -1; // trx_seqno is not replicated as it is trivial
     if (!xdr_enum(xdrs, (enum_t *)&ws->type))              return FALSE;
     if (!xdr_enum(xdrs, (enum_t *)&ws->level))             return FALSE;
 

@@ -264,7 +264,7 @@ static int dump_trx(struct block_info *bi) {
     rcode = get_data_from_block(bi, sizeof(struct trx_hdr), (void *)&trx); 
     if (rcode != WSDB_OK) return rcode;
 
-    fprintf(stdout, "TRX: %llu\n", (unsigned long long)trx.trx_seqno);
+    fprintf(stdout, "TRX: %lld\n", trx.trx_seqno);
 
     return (WSDB_OK);
 }

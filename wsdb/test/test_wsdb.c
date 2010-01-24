@@ -103,7 +103,7 @@ START_TEST (test_wsdb_api)
         //int table_id= RAND_ID(tables, 3);
 
         mark_point();
-        
+
         switch (trx->state) {
         case init:
         case commit_sent:
@@ -130,7 +130,8 @@ START_TEST (test_wsdb_api)
                     trx->state = commit_sent;
                     rcode = wsdb_delete_local_trx(trx->trx_id);
                     fail_if(rcode, "wsdb_delete_local_trx failed: %d", rcode);
-                    rcode = wsdb_append_write_set(trx_seqno++, ws);
+                    ws->trx_seqno = trx_seqno++;
+                    rcode = wsdb_append_write_set(ws);
                     if(rcode != WSDB_OK && rcode != WSDB_CERTIFICATION_FAIL) {
                         fail("wsdb_append_write_set failed: %d", rcode);
                     }
@@ -145,7 +146,7 @@ START_TEST (test_wsdb_api)
                     trx->trx_id += 10;
                 } else {
                     rcode = wsdb_append_query(trx->trx_id, query, time(NULL),
-					      rand());
+                                              rand());
                     fail_if(rcode, "wsdb_append_query failed: %d", rcode);
                     trx->state = query_sent;
                     trx->queries_sent++;
@@ -158,7 +159,7 @@ START_TEST (test_wsdb_api)
                     sizeof(struct wsdb_table_key)
                 );
                 table_key->key_parts = RAND_ID(key_parts, 100);
-                
+
                 key.dbtable = table;
                 key.dbtable_len = strlen(table);
                 key.key = table_key;

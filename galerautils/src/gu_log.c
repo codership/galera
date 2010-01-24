@@ -153,7 +153,7 @@ gu_log (gu_log_severity_t severity,
             gu_log_cb_default == gu_log_cb ? gu_log_level_str[severity] : "";
 
         /* provide file:func():line info only if debug logging is on */
-        if (!gu_log_debug) {
+        if (gu_likely(!gu_log_debug && severity > GU_LOG_ERROR)) {
             len = snprintf (str, max_string, "%s", log_level_str);
         }
         else {

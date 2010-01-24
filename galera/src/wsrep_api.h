@@ -30,7 +30,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "14"
+#define WSREP_INTERFACE_VERSION "15"
 
 /* Empty backend spec */
 #define WSREP_NONE "none"
@@ -181,12 +181,12 @@ typedef void (*wsrep_view_cb_t) (wsrep_view_info_t* view);
  * @brief transaction initialization function
  *
  * This handler is called from wsrep library to initialize
- * the context for following write set applying
+ * the context for following write set applying.
  *
  * @param context pointer provided by the application
  * @param sequence number
  */
-typedef int (*wsrep_ws_start_cb_t)(void *ctx, wsrep_seqno_t seqno);
+//DELETE typedef int (*wsrep_ws_start_cb_t)(void *ctx, wsrep_seqno_t seqno);
 
 /*!
  * data buffer for applying callback. Data is prepared in the master
@@ -212,18 +212,18 @@ typedef struct wsrep_apply_data {
     enum wsrep_apply_data_type type; //!< defines data representation
     union {
         struct {
-            char    *stm;      //!< SQL statement string
-            size_t   len;      //!< length of SQL string
-            time_t   timeval;  //!< time to use for time functions
-            uint32_t randseed; //!< seed for rand operations
+            const char* stm;      //!< SQL statement string
+            size_t      len;      //!< length of SQL string
+            time_t      timeval;  //!< time to use for time functions
+            uint32_t    randseed; //!< seed for rand operations
         } sql;
         struct {
-            uint8_t  *buffer;  //!< application specific data buffer
-            size_t len;
+            uint8_t* buffer;  //!< application specific data buffer
+            size_t   len;
         } app;
         struct {
-            uint8_t  *buffer;  //!< row data buffers
-            size_t len;
+            uint8_t* buffer;  //!< row data buffers
+            size_t   len;
         } row;
     } u;
 } wsrep_apply_data_t;
@@ -234,8 +234,9 @@ typedef struct wsrep_apply_data {
  * This handler is called from wsrep library to execute
  * the passed SQL statement in brute force.
  *
- * @param ctx context pointer provided by the application
- * @param data the apply data buffer to be applied
+ * @param ctx   context pointer provided by the application
+ * @param data  the apply data buffer to be applied
+ * @param seqno global seqno part of the action to be applied
  *
  * @return success code:
  * @retval WSREP_OK
@@ -244,9 +245,9 @@ typedef struct wsrep_apply_data {
  * @retval WSREP_ERRROR dbms failed to apply the write set
  *
  */
-typedef enum wsrep_status (*wsrep_bf_apply_cb_t)(
-    void *ctx, wsrep_apply_data_t *data
-);
+typedef enum wsrep_status (*wsrep_bf_apply_cb_t)(void*               ctx,
+                                                 wsrep_apply_data_t* data,
+                                                 wsrep_seqno_t       seqno);
 
 /*!
  * @brief a callback to prepare the application to receive state snapshot
@@ -299,7 +300,7 @@ struct wsrep_init_args
 
     /* applier callbacks */
     wsrep_bf_apply_cb_t       bf_apply_cb;     //!< applying callback
-    wsrep_ws_start_cb_t       ws_start_cb;     //!< ws applying start handler
+//DELETE    wsrep_ws_start_cb_t       ws_start_cb;     //!< ws applying start handler
 
     /* state snapshot transfer callbacks */
     wsrep_sst_prepare_cb_t    sst_prepare_cb;  //!< donor side prepare handler
@@ -402,7 +403,7 @@ struct wsrep_ {
    * @param ctx   application context to be passed to callbacks
    */
     wsrep_status_t (*recv)(wsrep_t*, void* ctx);
-    
+
   /*!
    * @brief Replicates/logs result of transaction to other nodes and allocates
    * required resources.
@@ -417,7 +418,8 @@ struct wsrep_ {
    * @param conn_id
    * @param app_data application specific applying data
    * @param data_len the size of the applying data
-
+   * @param seqno    seqno part of the global transaction ID
+   *
    * @retval WSREP_OK         cluster-wide commit succeeded
    * @retval WSREP_TRX_FAIL   must rollback transaction
    * @retval WSREP_CONN_FAIL  must close client connection
@@ -426,9 +428,10 @@ struct wsrep_ {
     wsrep_status_t (*pre_commit)(wsrep_t*,
                                  wsrep_trx_id_t  trx_id,
                                  wsrep_conn_id_t conn_id, 
-                                 const char*     app_data,
-                                 size_t          data_len);
-    
+                                 const void*     app_data,
+                                 size_t          data_len,
+                                 wsrep_seqno_t*  seqno);
+
   /*!
    * @brief Releases resources after transaction commit.
    *
@@ -507,7 +510,7 @@ struct wsrep_ {
     wsrep_status_t (*abort_slave_trx)(wsrep_t*,
                                       wsrep_seqno_t bf_seqno,
                                       wsrep_seqno_t victim_seqno);
-    
+
   /*!
    * @brief Appends a query in transaction's write set
    *
@@ -522,7 +525,7 @@ struct wsrep_ {
                                    const char*     query, 
                                    time_t          timeval,
                                    uint32_t        randseed);
-    
+
   /*!
    * @brief Appends a row reference in transaction's write set
    *
@@ -541,7 +544,6 @@ struct wsrep_ {
                                      const char*    key, 
                                      size_t         key_len, 
                                      wsrep_action_t action);
-    
 
   /*!
    * @brief Appends a set variable command connection's write set
@@ -572,7 +574,6 @@ struct wsrep_ {
                                    wsrep_conn_id_t   conn_id,
                                    const char*       query,
                                    size_t            query_len);
-    
 
   /*!
    * @brief Replicates a query and starts "total order isolation" section.
@@ -585,6 +586,7 @@ struct wsrep_ {
    * @param conn_id     connection ID
    * @param query       query to be executed
    * @param query_len   length of the query string
+   * @param seqno       seqno part of the action ID
    *
    * @retval WSREP_OK         cluster commit succeeded
    * @retval WSREP_CONN_FAIL  must close client connection
@@ -592,8 +594,9 @@ struct wsrep_ {
    */
     wsrep_status_t (*to_execute_start)(wsrep_t*, 
                                        wsrep_conn_id_t   conn_id, 
-                                       const char*       query, 
-                                       size_t            query_len);
+                                       const void*       query, 
+                                       size_t            query_len,
+                                       wsrep_seqno_t*    seqno);
 
   /*!
    * @brief Ends the total order isolation section.
@@ -674,7 +677,6 @@ struct wsrep_ {
     void *ctx;    //!< reserved for implemetation private context
 };
 
-    
 typedef int (*wsrep_loader_fun)(wsrep_t*);
 
 /*!
@@ -696,7 +698,7 @@ int wsrep_load(const char* spec, wsrep_t** hptr, wsrep_log_cb_t log_cb);
  * @param hptr wsrep handler pointer
  */
 void wsrep_unload(wsrep_t* hptr);
-    
+
 #ifdef __cplusplus
 }
 #endif

@@ -74,15 +74,15 @@ static inline void set_last_committed_seqno(trx_seqno_t seqno) {
                 assert (safe_to_discard_seqno < seqno);
                 safe_to_discard_seqno = seqno - 1;
             }
-            gu_debug("DISCARD begin: safe = %llu, next = %llu, next refs = %lu",
+            gu_debug("DISCARD begin: safe = %lld, next = %lld, next refs = %lu",
                      safe_to_discard_seqno, next_to_discard_seqno,
                      next_to_discard_refs);
         }
     }
     else {
-	GU_DBUG_PRINT(
+        GU_DBUG_PRINT(
             "wsdb",("trying to set last_committed_trx to lower value: "
-                    "%llu %llu", last_committed_seqno, seqno)
+                    "%lld %lld", last_committed_seqno, seqno)
             );
     }
     gu_mutex_unlock(&last_committed_seqno_mtx);
@@ -120,7 +120,7 @@ void wsdb_deref_seqno (trx_seqno_t last_seen)
         else {
             gu_debug ("DISCARD cont: safe = %llu, next = %llu, next refs = %lu",
                      safe_to_discard_seqno, next_to_discard_seqno,
-                     next_to_discard_refs);        
+                     next_to_discard_refs);
         }
     }
     gu_mutex_unlock(&last_committed_seqno_mtx);
@@ -204,7 +204,7 @@ int local_open(
 static void trx_print(void *ctx, void *entry) {
     wsdb_trx_info_t *info = (wsdb_trx_info_t *) entry;
     fprintf(stdout, "TRX: seqno: %0" PRId64 " - %0" PRId64 " state: %d", 
-            info->seqno_l, info->seqno_g, info->state
+            info->seqno_l, info->ws->trx_seqno, info->state
     );
 }
 
@@ -309,7 +309,7 @@ static struct trx_info *new_trx_info(local_trxid_t trx_id) {
 
     MAKE_OBJ(trx, trx_info);
     trx->id               = trx_id;
-    trx->info.seqno_g     = TRX_SEQNO_MAX;
+//DELETE    trx->info.seqno_g     = TRX_SEQNO_MAX;
     trx->info.seqno_l     = TRX_SEQNO_MAX;
     trx->first_block      = 0;
     trx->last_block       = 0;
@@ -344,7 +344,7 @@ static struct trx_info *new_trx_info(local_trxid_t trx_id) {
 
     /* create first block for the trx */
     new_trx_block(trx);
-    
+
     return trx;
 }
 
@@ -485,11 +485,11 @@ int wsdb_append_row_key(
 
     rec_type = REC_TYPE_ROW_KEY;
     append_in_trx_block(trx, &bi, (uint16_t)1, &rec_type);
-    
+
     /* db and table len & data */
     append_in_trx_block(trx, &bi, (uint16_t)2, (char *)&key->dbtable_len);
     append_in_trx_block(trx, &bi, key->dbtable_len, key->dbtable);
-    
+
     /* number of key parts */
     tkey = key->key;
     append_in_trx_block(trx, &bi, (uint16_t)2, (char *)&tkey->key_part_count);
@@ -512,7 +512,7 @@ int wsdb_append_row_key(
     rec_len = row_key->key_len + sizeof(struct file_row_key);
     append_in_trx_block(trx, &bi, (uint16_t)2, (char *)&rec_len);
     append_in_trx_block(trx, &bi, rec_len, (char *)row_key);
-    
+
     GU_DBUG_PRINT("wsdb",
                ("append key: %p, len: %d", row_key->key, row_key->key_len)
     );
@@ -553,7 +553,7 @@ int wsdb_append_row(
     append_in_trx_block(trx, &bi, len, (char *)&data);
 
     close_trx_block_access(trx, &bi);
-    
+
     return WSDB_OK;
 }
 
@@ -573,7 +573,7 @@ int wsdb_append_row_col(
     row_data.column    = col;
     row_data.data_type = data_type;
     row_data.length    = len;
-          
+
     open_trx_block_access(trx, &bi);
 
     rec_type = REC_TYPE_ROW_DATA;
@@ -585,9 +585,9 @@ int wsdb_append_row_col(
         trx, &bi, sizeof(struct wsdb_col_data_rec), (char *)&row_data
     );
     append_in_trx_block(trx, &bi, len, (char *)&data);
-    
+
     close_trx_block_access(trx, &bi);
-    
+
     return WSDB_OK;
 }
 static int read_next_block(struct block_info *bi, cache_id_t last_block) {
@@ -692,13 +692,13 @@ static int copy_from_block(
     return len;
 }
 
-static void free_wsdb_key_part(struct wsdb_key_part *part) {
+static inline void free_wsdb_key_part(struct wsdb_key_part *part) {
     if (!part) return;
     gu_free(part->data);
 }
 
-static void free_wsdb_table_key(struct wsdb_table_key *tkey) {
-    uint16_t i;
+static inline void free_wsdb_table_key(struct wsdb_table_key *tkey) {
+    int i;
     if(!tkey) return;
     for (i=0; i<tkey->key_part_count; i++) {
         free_wsdb_key_part(&tkey->key_parts[i]);
@@ -707,27 +707,27 @@ static void free_wsdb_table_key(struct wsdb_table_key *tkey) {
     gu_free(tkey);
 }
 
-static void free_wsdb_key_rec(struct wsdb_key_rec *key) {
+static inline void free_wsdb_key_rec(struct wsdb_key_rec *key) {
     if (!key) return;
     gu_free(key->dbtable);
     free_wsdb_table_key(key->key);
     gu_free(key);
 }
 
-static void free_wsdb_col_data_rec(struct wsdb_col_data_rec *rec) {
+static inline void free_wsdb_col_data_rec(struct wsdb_col_data_rec *rec) {
     if (!rec) return;
     gu_free(rec->data);
     gu_free(rec);
 }
 
-static void free_wsdb_row_data_rec(struct wsdb_row_data_rec *rec) {
+static inline void free_wsdb_row_data_rec(struct wsdb_row_data_rec *rec) {
     if (!rec) return;
     gu_free(rec->data);
     gu_free(rec);
 }
 
-static void free_wsdb_item_rec(struct wsdb_item_rec *item) {
-    uint16_t i;
+static inline void free_wsdb_item_rec(struct wsdb_item_rec *item) {
+    int i;
     if (!item) return;
 
     free_wsdb_key_rec(item->key);
@@ -746,14 +746,14 @@ static void free_wsdb_item_rec(struct wsdb_item_rec *item) {
     }
 }
 
-static void free_wsdb_query(struct wsdb_query *query) {
+static inline void free_wsdb_query(struct wsdb_query *query) {
     if (!query) return;
 
     gu_free(query->query);
 }
 
 void wsdb_write_set_free(struct wsdb_write_set *ws) {
-    uint32_t i;
+    unsigned long i;
     if (!ws) return;
 
     for (i=0; i<ws->query_count; i++) {
@@ -798,7 +798,7 @@ static int get_write_set_do(
     if (!bi.block) return WSDB_ERR_WS_FAIL;
 
     pos = (char *)bi.block + sizeof(struct block_hdr);
-    
+
     while (bi.block) {
         char rec_type;
 
@@ -814,7 +814,7 @@ static int get_write_set_do(
         switch(rec_type) {
         case REC_TYPE_QUERY: {
             uint32_t query_len;
-            
+
             /* get the length of the SQL query */
             if (copy_from_block(
                 (char *)(&query_len), 4, &bi, &pos, trx->last_block)
@@ -823,12 +823,15 @@ static int get_write_set_do(
                 return WSDB_ERR_WS_FAIL;
             }
             if (mode == WS_OPER_CREATE) {
-                ws->queries[query_count].query_len = query_len;
                 ws->queries[query_count].query =
                     (char*) gu_malloc (query_len + 1);
-                memset(
-                    ws->queries[query_count].query, '\0', query_len + 1
-                );
+                if (!ws->queries[query_count].query) {
+                    gu_error("could not allocate %lu bytes for query",
+                             query_len+1);
+                    return WSDB_ERR_WS_FAIL;
+                }
+                memset(ws->queries[query_count].query, '\0', query_len + 1);
+                ws->queries[query_count].query_len = query_len;
             }
 
             if (copy_from_block(
@@ -937,7 +940,7 @@ static int get_write_set_do(
                 )) {
                     gu_error("could not retrive write set trx: %lu", trx->id);
                     return WSDB_ERR_WS_FAIL;
-                }            
+                }
                 tkey->key_parts = (struct wsdb_key_part *) gu_malloc (
                     tkey->key_part_count * sizeof(struct wsdb_key_part)
                 );
@@ -1010,7 +1013,7 @@ static int get_write_set_do(
                           "could not retrive write set for trx: %llu", trx->id
                         );
                         return WSDB_ERR_WS_FAIL;
-                    }                
+                    }
                 }
             }
             break;
@@ -1077,7 +1080,7 @@ static int get_write_set_do(
     } else {
         gu_info("cache block id 0, in end of get_write_set_do");
     }
-    
+
     ws->query_count = query_count;
     ws->item_count  = item_count;
 
@@ -1106,13 +1109,14 @@ struct wsdb_write_set *wsdb_get_write_set(
     GU_DBUG_ENTER("wsdb_get_write_set");
 
     if (!trx || !trx->first_block) {
-	GU_DBUG_PRINT("wsdb",
-		   ("trx does not exist in wsdb_get_write_set: %llu", trx_id)
+        GU_DBUG_PRINT("wsdb",
+                    ("trx does not exist in wsdb_get_write_set: %llu", trx_id)
         );
         GU_DBUG_RETURN(NULL);
     }
 
-    ws = (struct wsdb_write_set *) gu_malloc (sizeof(struct wsdb_write_set));
+//    ws = (struct wsdb_write_set *) gu_malloc (sizeof(struct wsdb_write_set));
+    ws = GU_CALLOC(1, struct wsdb_write_set);
     if (!ws) {
         gu_error("failed to allocate write set buffer for %llu", trx_id);
         GU_DBUG_RETURN(NULL);
@@ -1128,29 +1132,26 @@ struct wsdb_write_set *wsdb_get_write_set(
         GU_DBUG_RETURN(NULL);
     }
 
-    ws->items = (struct wsdb_item_rec *) gu_malloc (
-        ws->item_count * sizeof(struct wsdb_item_rec)
-    );
-    if (!ws->items) {
-        gu_error("failed to allocate write set items %d-%d for %llu", 
-                 ws->item_count, ws->query_count, trx_id
-        );
-        GU_DBUG_RETURN(NULL);
+    if (ws->item_count > 0) {
+        ws->items = GU_CALLOC(ws->item_count, struct wsdb_item_rec);
+        if (!ws->items) {
+            gu_error("failed to allocate write set items %d-%d for %llu", 
+                     ws->item_count, ws->query_count, trx_id);
+            GU_DBUG_RETURN(NULL);
+        }
     }
-    memset(ws->items, '\0', ws->item_count * sizeof(struct wsdb_item_rec));
 
     GU_DBUG_PRINT("wsdb",("query count: %d", ws->query_count));
-    ws->queries = (struct wsdb_query *) gu_malloc (
-        ws->query_count * sizeof(struct wsdb_query)
-    );
-    if (!ws->queries) {
-      //gu_error("failed to allocate write set queries %d-%d for %llu", 
-      //           ws->item_count, ws->query_count, trx_id
-      //  );
-      //GU_DBUG_RETURN(NULL);
-    } else {
-        memset(ws->queries, '\0', ws->query_count * sizeof(struct wsdb_query));
+
+    if (ws->query_count > 0) {
+        ws->queries = GU_CALLOC(ws->query_count, struct wsdb_query);
+        if (!ws->queries) {
+            gu_error("failed to allocate write set queries %d-%d for %llu", 
+                     ws->item_count, ws->query_count, trx_id);
+            GU_DBUG_RETURN(NULL);
+        }
     }
+
     /* allocate queries and items */
     if (get_write_set_do(ws, trx, WS_OPER_CREATE)) {
         gu_error("write set extracting failed at allocate phase");
@@ -1159,23 +1160,27 @@ struct wsdb_write_set *wsdb_get_write_set(
 
     ws->local_trx_id  = trx_id;
     ws->last_seen_trx = wsdb_get_last_committed_seqno();
-    ws->level         = buf_len? WSDB_WS_DATA_RBR /* actually rbr; there might be other raw data representations */ : WSDB_WS_QUERY;
+    ws->trx_seqno     = -1;
+    ws->level         = buf_len > 0 ? WSDB_WS_DATA_RBR /* actually rbr; there might be other raw data representations */ : WSDB_WS_QUERY;
     if (ws->level == WSDB_WS_DATA_RBR) {
-            ws->rbr_buf_len = buf_len;
-            ws->rbr_buf = (char *) gu_malloc(ws->rbr_buf_len);
-            if (!ws->rbr_buf) {
-                gu_error("failed to allocate write set rbr %lu for %llu", 
-                         buf_len, trx_id
+        assert (NULL != row_buf);
+
+        ws->rbr_buf_len = buf_len;
+        ws->rbr_buf = (char *) gu_malloc(ws->rbr_buf_len);
+        if (!ws->rbr_buf) {
+            gu_error("failed to allocate write set rbr %lu for %llu", 
+                     buf_len, trx_id
                 );
-                GU_DBUG_RETURN(NULL);
-            }
-            memcpy(ws->rbr_buf, row_buf, ws->rbr_buf_len);
+            GU_DBUG_RETURN(NULL);
+        }
+        memcpy(ws->rbr_buf, row_buf, ws->rbr_buf_len);
     }
-    else
-    {
+#if 0 //DELETE
+    else {
             ws->rbr_buf_len = 0;
             ws->rbr_buf = NULL;
     }
+#endif
     if (ws->last_seen_trx == 0) {
         gu_warn("Setting ws.last_seen_trx to 0");
     }
@@ -1214,7 +1219,7 @@ struct wsdb_write_set *wsdb_get_conn_write_set(
 }
 
 int wsdb_set_exec_query(
-    struct wsdb_write_set *ws, char *query, size_t query_len
+    struct wsdb_write_set *ws, const char *query, size_t query_len
 ) {
 
     GU_DBUG_ENTER("wsdb_set_exec_query");
@@ -1258,12 +1263,13 @@ int wsdb_set_local_trx_committed(local_trxid_t trx_id) {
 
     GU_DBUG_ENTER("wsdb_set_local_trx_committed");
     if (!trx) {
-	GU_DBUG_PRINT("wsdb",("trx not found, set_local_trx_commit: %llu",trx_id));
+        GU_DBUG_PRINT("wsdb",("trx not found, set_local_trx_commit: %llu",trx_id));
         GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
     }
-    GU_DBUG_PRINT("wsdb",("last committed: %llu->%llu", trx_id, trx->info.seqno_g));
+    GU_DBUG_PRINT("wsdb",("last committed: %llu->%llu",
+                           trx_id, trx->info.ws->trx_seqno));
 
-    set_last_committed_seqno(trx->info.seqno_g);
+    set_last_committed_seqno(trx->info.ws->trx_seqno);
 
     GU_DBUG_RETURN( WSDB_OK);
 }
@@ -1276,7 +1282,7 @@ int wsdb_delete_local_trx(local_trxid_t trx_id) {
     GU_DBUG_ENTER("wsdb_delete_local_trx");
     GU_DBUG_PRINT("wsdb",("trx: %llu", trx_id));
     if (!trx) {
-	GU_DBUG_PRINT("wsdb",("trx not found in del_local_trx: %llu", trx_id));
+        GU_DBUG_PRINT("wsdb",("trx not found in del_local_trx: %llu", trx_id));
         GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
     }
 
@@ -1294,7 +1300,7 @@ int wsdb_delete_local_trx(local_trxid_t trx_id) {
     while (block) {
         cache_id_t next_cb = block->next_block;
         file_cache_delete(local_cache, cache_id);
-        
+
         if (next_cb) {
             cache_id = next_cb;
             block = (struct block_hdr *)file_cache_get(local_cache, cache_id);
@@ -1310,11 +1316,10 @@ int wsdb_delete_local_trx(local_trxid_t trx_id) {
 }
 
 int wsdb_delete_local_trx_info(local_trxid_t trx_id) {
-    struct trx_info       *trx = get_trx_info(trx_id);
+    struct trx_info       *trx = get_trx_info(trx_id); // TODO: is this check needed?
 
     GU_DBUG_ENTER("wsdb_delete_local_trx_info");
     GU_DBUG_PRINT("wsdb",("trx: %llu", trx_id));
-
     if (!trx) {
         gu_warn("trx info did not exist: %llu", trx_id);
         GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
@@ -1328,16 +1333,16 @@ static void print_trx_hash(void *ctx, void *data) {
     struct trx_info *trx = (struct trx_info *)data;
     gu_info(
         "trx, id: %llu seqno-g: %llu, seqno-l: %llu", 
-        trx->id, trx->info.seqno_g, trx->info.seqno_l
+        trx->id, trx->info.ws->trx_seqno, trx->info.seqno_l
     );
 }
 
 int wsdb_assign_trx_seqno(
     local_trxid_t trx_id, trx_seqno_t seqno_l, trx_seqno_t seqno_g, 
-    enum wsdb_trx_state state
+    enum wsdb_trx_state state, struct wsdb_write_set* ws
 ) {
     struct trx_info       *trx = get_trx_info(trx_id);
- 
+
     GU_DBUG_ENTER("wsdb_assign_trx");
     GU_DBUG_PRINT("wsdb",("trx: %llu -> %llu(%llu)",
                           trx_id, seqno_l, seqno_g));
@@ -1357,16 +1362,18 @@ int wsdb_assign_trx_seqno(
         GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
     }
 
-    trx->info.seqno_l = seqno_l;
-    trx->info.seqno_g = seqno_g;
     trx->info.state   = state;
+    trx->info.seqno_l = seqno_l;
+//DELETE    trx->info.seqno_g = seqno_g;
+    trx->info.ws = ws;
+    trx->info.ws->trx_seqno = seqno_g;
 
     GU_DBUG_RETURN(WSDB_OK);
 }
 
 int wsdb_assign_trx_state(local_trxid_t trx_id, enum wsdb_trx_state state) {
     struct trx_info       *trx = get_trx_info(trx_id);
- 
+
     GU_DBUG_ENTER("wsdb_assign_trx_state");
     if (!trx) {
         gu_error("trx does not exist in assign_trx_state, trx: %lld", trx_id);
@@ -1379,6 +1386,7 @@ int wsdb_assign_trx_state(local_trxid_t trx_id, enum wsdb_trx_state state) {
     GU_DBUG_RETURN(WSDB_OK);
 }
 
+#if 0 //DELETE
 int wsdb_assign_trx_ws(
     local_trxid_t trx_id, struct wsdb_write_set *ws
 ) {
@@ -1395,7 +1403,7 @@ int wsdb_assign_trx_ws(
 
     GU_DBUG_RETURN(WSDB_OK);
 }
-
+#endif
 int wsdb_assign_trx_pos(
     local_trxid_t trx_id, enum wsdb_trx_position pos
 ) {
@@ -1417,7 +1425,7 @@ int wsdb_assign_trx_applier(
     local_trxid_t trx_id, struct job_worker *applier, void* ctx
 ) {
     struct trx_info       *trx = get_trx_info(trx_id);
- 
+
     GU_DBUG_ENTER("wsdb_assign_trx_applier");
 
     if (!trx) {
@@ -1431,22 +1439,30 @@ int wsdb_assign_trx_applier(
     GU_DBUG_RETURN(WSDB_OK);
 }
 
-void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info) {
+void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info)
+{
     struct trx_info       *trx = get_trx_info(trx_id);
 
     GU_DBUG_ENTER("wsdb_get_local_trx_info");
-    if (!trx) {
-	GU_DBUG_PRINT("wsdb",("trx not found, : %llu",trx_id));
-        info->state = WSDB_TRX_MISSING;
-        GU_DBUG_VOID_RETURN;
+    if (gu_likely(NULL != trx)) {
+        *info = trx->info;
     }
+    else {
+        GU_DBUG_PRINT("wsdb",("trx not found, : %llu",trx_id));
+        memset (info, 0, sizeof(*info));
+        info->state = WSDB_TRX_MISSING;
+//DELETE        GU_DBUG_VOID_RETURN;
+    }
+
+#if 0 //DELETE
     info->seqno_l     = trx->info.seqno_l;
-    info->seqno_g     = trx->info.seqno_g;
+//DELETE    info->seqno_g     = trx->info.seqno_g;
     info->ws          = trx->info.ws;
     info->position    = trx->info.position;
     info->state       = trx->info.state;
     info->applier     = trx->info.applier;
     info->applier_ctx = trx->info.applier_ctx;
+#endif
 
     GU_DBUG_VOID_RETURN;
 }

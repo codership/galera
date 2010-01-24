@@ -35,6 +35,7 @@ struct galera_status
     gcs_seqno_t  local_commits;      //!< number of local commits
     gcs_seqno_t  local_cert_failures;//!< number of local certification failures
     gcs_seqno_t  local_bf_aborts;    //!< number of brute-forced transactions
+    gcs_seqno_t  local_replays;      //!< number of local trx replays
     gcs_seqno_t  fc_waits;           //!< how many times had to wait for FC
     galera_stage_t stage;            //!< operational stage (see above)
 };

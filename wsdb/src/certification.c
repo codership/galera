@@ -254,7 +254,7 @@ int wsdb_cert_init(const char* work_dir, const char* base_name) {
 }
 
 int wsdb_certification_test(
-    struct wsdb_write_set *ws, trx_seqno_t trx_seqno, bool_t save_keys
+    struct wsdb_write_set *ws, bool_t save_keys
 ) {
     uint32_t i;
     uint32_t all_keys_len;
@@ -292,11 +292,11 @@ int wsdb_certification_test(
             table_index, item->key->dbtable_len, item->key->dbtable
         );
         if (match && match->seqno > ws->last_seen_trx && 
-                match->seqno < trx_seqno
+            match->seqno < ws->trx_seqno
         ) {
             GU_DBUG_PRINT("wsdb",
-                ("trx: %llu conflicting table lock: %llu",
-		    (unsigned long long)trx_seqno, match->seqno)
+                ("trx: %lld conflicting table lock: %llu",
+                 ws->trx_seqno, match->seqno)
             );
 
             if (!save_keys) {
@@ -315,10 +315,10 @@ int wsdb_certification_test(
         all_keys += full_key_len;
 
         if (match && match->seqno > ws->last_seen_trx && 
-                match->seqno < trx_seqno
+                match->seqno < ws->trx_seqno
         ) {
             GU_DBUG_PRINT("wsdb",
-                   ("trx: %llu conflicting: %llu", trx_seqno, match->seqno)
+                   ("trx: %lld conflicting: %llu", ws->trx_seqno, match->seqno)
             );
             /* key composition is not needed anymore */
             gu_free(ws->key_composition);
@@ -365,13 +365,13 @@ static int update_index(
  * @param: trx_seqno seqno for the transaction
  * @returns: success code for the write operation
  */
-static int write_to_file(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
+static int write_to_file(struct wsdb_write_set *ws) {
     uint32_t i;
     struct trx_hdr trx;
     char rec_type = REC_TYPE_TRX;
     uint16_t len = sizeof(struct trx_hdr);
-    
-    trx.trx_seqno = trx_seqno;
+
+    trx.trx_seqno = ws->trx_seqno;
     /* store trx header */
     cert_trx_file->append_block(cert_trx_file, 1,   (char *)&rec_type);
     cert_trx_file->append_block(cert_trx_file, 2,   (char *)&len);
@@ -386,20 +386,20 @@ static int write_to_file(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
         cert_trx_file->append_block(cert_trx_file, 2,   (char *)&len);
         cert_trx_file->append_block(cert_trx_file, len, ws->queries[i].query);
     }
-    
+
     /* store ws items */
     for (i = 0; i < ws->item_count; i++) {
         struct wsdb_item_rec *item = &ws->items[i];
         struct file_row_key *row_key;
         uint16_t j; 
-               
+
         /* first action identifier */
         rec_type = REC_TYPE_ACTION;
         len = 1;
         cert_trx_file->append_block(cert_trx_file, 1,   (char *)&rec_type);
         cert_trx_file->append_block(cert_trx_file, 2,   (char *)&len);
         cert_trx_file->append_block(cert_trx_file, len, (char *)&item->action);
-    
+
         /* then the key specification */
         row_key = wsdb_key_2_file_row_key(item->key);
         rec_type = REC_TYPE_ROW_KEY;
@@ -415,7 +415,6 @@ static int write_to_file(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
         case NO_DATA: /* row data has not been stored */
             break;
         case COLUMN:
-          
             for (j=0; j<item->u.cols.col_count; j++) {
               struct wsdb_col_data_rec *data = &item->u.cols.data[j];
               len = sizeof(struct wsdb_col_data_rec) + item->u.cols.data->length;
@@ -437,7 +436,7 @@ static int write_to_file(struct wsdb_write_set *ws, trx_seqno_t trx_seqno) {
     return WSDB_OK;
 }
 
-int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
+int wsdb_append_write_set(struct wsdb_write_set *ws) {
     int rcode;
     my_bool *persistency = (my_bool *)wsdb_conf_get_param(
         WSDB_CONF_WS_PERSISTENCY, WSDB_TYPE_INT
@@ -446,7 +445,7 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     struct seqno_list *seqno_elem = NULL;
 
     /* certification test */
-    rcode = wsdb_certification_test(ws, trx_seqno, false); 
+    rcode = wsdb_certification_test(ws, false); 
     if (rcode) {
         return rcode;
     }
@@ -454,18 +453,18 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     if (persistency && *persistency) {
         gu_debug("writing trx WS in file");
         /* append write set */
-        write_to_file(ws, trx_seqno);
+        write_to_file(ws);
     }
 
     /* add trx in the active trx list */
     seqno_elem = 
-      add_active_seqno(trx_seqno, ws->item_count, ws->key_composition);
+      add_active_seqno(ws->trx_seqno, ws->item_count, ws->key_composition);
 
     /* update index */
     rcode = update_index(ws, seqno_elem); 
     if (rcode) {
-        gu_warn("certified WS failed to update cert index, rcode: %d trx: %lld",
-                rcode, trx_seqno);
+        gu_warn("certified WS failed to update cert index, "
+                "rcode: %d trx: %lld", rcode, ws->trx_seqno);
         gu_free(ws->key_composition);
         ws->key_composition = NULL;
         return rcode;
@@ -477,7 +476,7 @@ int wsdb_append_write_set(trx_seqno_t trx_seqno, struct wsdb_write_set *ws) {
     //if (key_size > 50000) {
     if (key_size >= 100000) {
         gu_debug("key length: %lu for trx: %lld, not stored in RAM", 
-                key_size, trx_seqno
+                key_size, ws->trx_seqno
         );
         gu_free(ws->key_composition);
         ws->key_composition = NULL;
