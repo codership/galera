@@ -154,6 +154,7 @@ public:
      */
     socklen_t get_sockaddr_len() const { return sa_len_; }
             
+    bool is_multicast() const;
 public:
     void operator=(const Sockaddr&);
 

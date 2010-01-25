@@ -152,7 +152,14 @@ void gcomm::gmcast::Proto::handle_topology_change(const Message& msg)
     for (Message::NodeList::const_iterator i = nl.begin(); i != nl.end(); ++i)
     {
         new_map.insert(Link(Message::NodeList::get_key(i), 
-                            Message::NodeList::get_value(i).get_addr()));
+                            Message::NodeList::get_value(i).get_addr(),
+                            Message::NodeList::get_value(i).get_mcast_addr()));
+        if (Message::NodeList::get_key(i) == get_remote_uuid()     &&
+            mcast_addr == "" &&
+            Message::NodeList::get_value(i).get_mcast_addr() != "")
+        {
+            mcast_addr = Message::NodeList::get_value(i).get_mcast_addr();
+        }
     }
     
     if (link_map != new_map)

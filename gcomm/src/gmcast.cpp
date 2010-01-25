@@ -41,10 +41,13 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
     group_name    (),
     listen_addr   (Conf::TcpScheme + "://0.0.0.0"), // how to make it IPv6 safe?
     initial_addr  (""),
+    mcast_addr    (""),
     listener      (0),
+    mcast         (0),
     pending_addrs (),
     remote_addrs  (),
     proto_map     (new ProtoMap()),
+    mcast_tree    (),
     check_period  ("PT1S"),
     next_check    (Date::now())
 {
@@ -101,9 +104,10 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
     }
     catch (gu::NotFound&) {}
     
+    string port(Defaults::GMCastTcpPort);
     try
     { 
-        gu::URI(listen_addr).get_port();
+        port = gu::URI(listen_addr).get_port();
     }
     catch (gu::NotSet&)
     {
@@ -111,13 +115,13 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
         // try one from authority part
         try
         {
-            listen_addr += ':' + uri.get_port();
+            port = uri.get_port();
         }
-        catch (gu::NotSet&)
-        {
-            listen_addr += ':' + Defaults::GMCastTcpPort;
-        }
+        catch (gu::NotSet&) { }
+        listen_addr += ":" + port;
     }
+    
+
     
     listen_addr = resolve(listen_addr).to_string();
     if (check_uri(listen_addr) == false)
@@ -126,7 +130,23 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
                                 << "' is not valid";
     }
 
-    log_debug << self_string() << " listening " << listen_addr;
+    
+    try 
+    {
+        mcast_addr = uri.get_option(Conf::GMCastMCastAddr);
+        try
+        {
+            port = uri.get_option(Conf::GMCastMCastPort);
+        }
+        catch (NotFound&) { }
+        mcast_addr = resolve("udp://" + mcast_addr + ":" + port).to_string();
+    } 
+    catch (NotFound&) 
+    { }
+    
+    
+    log_info << self_string() << " listening " << listen_addr;
+    log_info << self_string() << " multicast " << mcast_addr;
 }
 
 GMCast::~GMCast()
@@ -145,12 +165,23 @@ void GMCast::connect()
     
     listener = Transport::create(get_pnet(), listen_uri.to_string());
     gu_trace (listener->listen());
+
+    if (mcast_addr != "")
+    {
+        mcast = Transport::create(get_pnet(), 
+                                  mcast_addr 
+                                  + "?socket.if_addr=" 
+                                  + URI(listen_addr).get_host() 
+                                  + "&socket.non_blocking=1&socket.mcast_ttl=2");
+        gu_trace(mcast->connect());
+    }
     
     if (initial_addr != "")
     {
         insert_address(initial_addr, UUID(), pending_addrs);
         gu_trace (gmcast_connect(initial_addr));
     }
+
     pstack.push_proto(this);
 }
 
@@ -159,6 +190,13 @@ void GMCast::close()
 {
     log_debug << "gmcast " << get_uuid() << " close";
     pstack.pop_proto(this);
+    if (mcast != 0)
+    {
+        mcast->close();
+        delete mcast;
+        mcast = 0;
+    }
+    
     gcomm_assert(listener != 0);
     listener->close();
     delete listener;
@@ -168,7 +206,7 @@ void GMCast::close()
     {
         delete ProtoMap::get_value(i);
     }
-
+    
     proto_map->clear();
     pending_addrs.clear();
     remote_addrs.clear();
@@ -189,7 +227,8 @@ void GMCast::gmcast_accept()
         return;
     }
     
-    Proto* peer = new Proto (tp, listen_addr, "", get_uuid(), group_name);
+    Proto* peer = new Proto (tp, listen_addr, "", mcast_addr, 
+                             get_uuid(), group_name);
     pair<ProtoMap::iterator, bool> ret =     
         proto_map->insert(make_pair(tp->get_fd(), peer));
     
@@ -224,8 +263,12 @@ void GMCast::gmcast_connect(const string& remote_addr)
         return;
     }
     
-    Proto* peer = new Proto (tp, listen_addr, remote_addr,
-                             get_uuid(), group_name);
+    Proto* peer = new Proto (tp, 
+                             listen_addr, 
+                             remote_addr,
+                             mcast_addr,
+                             get_uuid(), 
+                             group_name);
     
     pair<ProtoMap::iterator, bool> ret = 
         proto_map->insert(make_pair(tp->get_fd(), peer));
@@ -474,7 +517,8 @@ void GMCast::update_addresses()
             else
             {
                 link_map.insert(Link(rp->get_remote_uuid(),
-                                     rp->get_remote_addr()));
+                                     rp->get_remote_addr(),
+                                     rp->get_mcast_addr()));
             }
         }
     }
@@ -530,6 +574,29 @@ void GMCast::update_addresses()
             }
         }
     }
+
+    // Build multicast tree
+    log_debug << self_string() << " --- mcast tree begin ---";
+    mcast_tree.clear();
+    if (mcast != 0)
+    {
+        log_debug << mcast_addr;
+        mcast_tree.push_back(mcast);
+    }
+    for (ProtoMap::const_iterator i(proto_map->begin()); i != proto_map->end();
+         ++i)
+    {
+        const Proto& p(*ProtoMap::get_value(i));
+        log_debug << "Proto: " << p.get_state() << " " << p.get_remote_addr() << " " << p.get_mcast_addr();
+        if (p.get_state() == Proto::S_OK &&
+            (p.get_mcast_addr() == "" ||
+             p.get_mcast_addr() != mcast_addr))
+        {
+            log_debug << p.get_remote_addr();
+            mcast_tree.push_back(p.get_transport());
+        }
+    }
+    log_debug << self_string() << " --- mcast tree end ---";
 }
 
 
@@ -629,6 +696,20 @@ void GMCast::handle_up(int id, const Datagram& dg, const ProtoUpMeta& um)
     {
         gmcast_accept();
     }
+    else if (mcast != 0 && id == mcast->get_fd())
+    {
+        Message msg;
+        msg.unserialize(&dg.get_payload()[0], dg.get_len(), dg.get_offset());
+        if (msg.get_type() >= Message::T_USER_BASE)
+        {
+            send_up(Datagram(dg, dg.get_offset() + msg.serial_size()),
+                        ProtoUpMeta(msg.get_source_uuid()));
+        }
+        else
+        {
+            log_warn << "non-user message " << msg.get_type() << " from multicast socket";
+        }
+    }
     else if ((i = proto_map->find(id)) != proto_map->end())
     {
         Proto* p(ProtoMap::get_value(i));
@@ -691,12 +772,24 @@ int GMCast::handle_down(const Datagram& dg, const ProtoDownMeta& dm)
     Datagram my_dg(dg);
     gu_trace(push_header(msg, my_dg));
     
+#if 0
     for (ProtoMap::iterator i = proto_map->begin(); i != proto_map->end(); ++i)
     {
         Proto* rp = ProtoMap::get_value(i);
         int err;
         if ((err = rp->get_transport()->handle_down(my_dg, 
                                                     ProtoDownMeta())) != 0)
+        {
+            log_debug << "transport: " << ::strerror(err);
+        }
+    }
+#endif // 0
+    for (list<Transport*>::iterator i(mcast_tree.begin()); 
+         i != mcast_tree.end(); ++i)
+    {
+        // log_info << self_string() << " mcast: " << (*i)->get_remote_addr();
+        int err;
+        if ((err = (*i)->handle_down(my_dg, ProtoDownMeta())) != 0)
         {
             log_debug << "transport: " << ::strerror(err);
         }

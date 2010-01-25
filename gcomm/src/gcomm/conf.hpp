@@ -28,6 +28,7 @@ namespace gcomm
          * TCP scheme for Transport URI.
          */
         static std::string const TcpScheme;
+        static std::string const UdpScheme;
         
         /*!
          *  TCP non-blocking parameter. Allowed values are 0 and 1.
@@ -48,6 +49,16 @@ namespace gcomm
          * GMCast listening address in URI string format.
          */
         static std::string const GMCastListenAddr;
+
+        /*!
+         * GMCast multicast address.
+         */
+        static std::string const GMCastMCastAddr;
+
+        /*!
+         * GMCast multicast port.
+         */
+        static std::string const GMCastMCastPort;
         
         /*!
          * EVS scheme for Transport URI.

@@ -92,7 +92,7 @@ gcomm::Transport::create(Protonet& pnet, const string& uri_str)
     const URI uri(uri_str);
     const std::string& scheme = uri.get_scheme();
     
-    if (scheme == Conf::TcpScheme)
+    if (scheme == Conf::TcpScheme || scheme == Conf::UdpScheme)
     {
         return new Socket(pnet, uri_str);
     }

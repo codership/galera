@@ -51,6 +51,7 @@ namespace gu
     class URI;
     namespace net
     {
+        class Sockaddr;
         class Addrinfo;
     }
 }
@@ -172,6 +173,8 @@ private:
     int options;        /*!< Bitfield for general socket options    */
     int event_mask;     /*!< Bitfield for waited network events     */
     Addrinfo* listener_ai;
+    Sockaddr* sendto_addr; // Needed for dgram sockets
+    
     std::string local_addr;
     std::string remote_addr;
     
@@ -207,7 +210,10 @@ private:
      * @brief Change socket state
      */
     void set_state(State, int err = 0);
-    
+
+    void* get_sendto_addr() const;
+    socklen_t get_sendto_addr_len() const;
+
     Socket(const Socket&);
     void operator=(const Socket&);
     

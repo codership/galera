@@ -102,12 +102,15 @@ namespace gcomm
         std::string       group_name;
         std::string       listen_addr;
         std::string       initial_addr;        
+        std::string       mcast_addr;
         Transport*        listener;
+        Transport*        mcast;
         AddrList          pending_addrs;
         AddrList          remote_addrs;
         
         gmcast::ProtoMap* proto_map;
-        
+        std::list<Transport*> mcast_tree;
+
         gu::datetime::Period check_period;
         gu::datetime::Date next_check;
         gu::datetime::Date handle_timers();

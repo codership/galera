@@ -17,11 +17,31 @@ using namespace gu::datetime;
 
 #include <check.h>
 
+
+static bool test_multicast(false);
+string mcast_param("gmcast.mcast_addr=239.192.0.11&gmcast.mcast_port=4567");
+
 START_TEST(test_gmcast_messages)
 {
 
 }
 END_TEST
+
+
+START_TEST(test_gmcast_multicast)
+{
+    
+    string uri1("gmcast://?gmcast.group=test&gmcast.mcast_addr=239.192.0.11");
+    Protonet pnet;
+    Transport* gm1(Transport::create(pnet, uri1));
+    
+    gm1->connect();
+    gm1->close();
+
+    delete gm1;
+}
+END_TEST
+
 
 START_TEST(test_gmcast)
 {
@@ -103,8 +123,13 @@ START_TEST(test_gmcast_w_user_messages)
             uri += "tcp.non_blocking=1";
             uri += "&";
             uri += "gmcast.group=testgrp";
+            if (test_multicast == true)
+            {
+                uri += "&" + mcast_param;
+            }
             uri += "&gmcast.listen_addr=tcp://";
             uri += listen_addr;
+
             tp = Transport::create(pnet, uri);
         }
         
@@ -165,7 +190,7 @@ START_TEST(test_gmcast_w_user_messages)
     
     log_info << "START";
     Protonet pnet;
-
+    
     const char* addr1 = "127.0.0.1:20001";
     const char* addr2 = "127.0.0.1:20002";
     const char* addr3 = "127.0.0.1:20003";
@@ -223,7 +248,7 @@ START_TEST(test_gmcast_w_user_messages)
     log_info << "u1 stop";
     u1.stop();
     pnet.erase(&u1.get_pstack());
-
+    
     pnet.event_loop(3*Sec);
     
     log_info << "u1 start";
@@ -335,25 +360,34 @@ START_TEST(test_gmcast_forget)
 }
 END_TEST
 
+
+
 Suite* gmcast_suite()
 {
     
     Suite* s = suite_create("gmcast");
     TCase* tc;
 
+    if (test_multicast == true)
+    {
+        tc = tcase_create("test_gmcast_multicast");
+        tcase_add_test(tc, test_gmcast_multicast);
+        suite_add_tcase(s, tc);
+    }
+    
     tc = tcase_create("test_gmcast_messages");
     tcase_add_test(tc, test_gmcast_messages);
     suite_add_tcase(s, tc);
-    
+        
     tc = tcase_create("test_gmcast");
     tcase_add_test(tc, test_gmcast);
     suite_add_tcase(s, tc);
-
+        
     tc = tcase_create("test_gmcast_w_user_messages");
     tcase_add_test(tc, test_gmcast_w_user_messages);
     tcase_set_timeout(tc, 20);
     suite_add_tcase(s, tc);
-
+        
     tc = tcase_create("test_gmcast_auto_addr");
     tcase_add_test(tc, test_gmcast_auto_addr);
     suite_add_tcase(s, tc);
@@ -362,8 +396,6 @@ Suite* gmcast_suite()
     tcase_add_test(tc, test_gmcast_forget);
     tcase_set_timeout(tc, 20);
     suite_add_tcase(s, tc);
-
-
 
     return s;
 

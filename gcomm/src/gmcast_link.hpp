@@ -24,27 +24,31 @@ namespace gcomm
 class gcomm::gmcast::Link
 {
 public:
-    Link(const gcomm::UUID& uuid_,
-         const std::string& addr_) :
-        uuid(uuid_),
-        addr(addr_)
+    Link(const gcomm::UUID& uuid,
+         const std::string& addr,
+         const std::string& mcast_addr) :
+        uuid_      (uuid),
+        addr_      (addr),
+        mcast_addr_(mcast_addr)
     { }
-
+    
     bool operator==(const Link& cmp) const
-    { return (uuid == cmp.uuid && addr == cmp.addr); }
-
+    { return (uuid_ == cmp.uuid_ && addr_ == cmp.addr_); }
+    
     bool operator<(const Link& cmp) const
     { 
-        return (uuid < cmp.uuid ||
-                (uuid == cmp.uuid && addr < cmp.addr));
+        return (uuid_ < cmp.uuid_ ||
+                (uuid_ == cmp.uuid_ && addr_ < cmp.addr_));
         
     }
-
-    const gcomm::UUID& get_uuid() const { return uuid; }
-    const std::string& get_addr() const { return addr; }
+    
+    const gcomm::UUID& get_uuid() const { return uuid_; }
+    const std::string& get_addr() const { return addr_; }
+    const std::string& get_mcast_addr() const { return mcast_addr_; }
 private:
-    UUID uuid;
-    std::string addr;
+    UUID uuid_;
+    std::string addr_;
+    std::string mcast_addr_;
 };
 
 

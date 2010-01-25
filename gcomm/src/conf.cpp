@@ -8,6 +8,7 @@ static std::string const Delim = ".";
 
 // TCP
 std::string const gcomm::Conf::TcpScheme = "tcp";
+std::string const gcomm::Conf::UdpScheme = "udp";
 std::string const gcomm::Conf::TcpNonBlocking =
     "socket" + Delim + "non_blocking";
 
@@ -17,7 +18,10 @@ std::string const gcomm::Conf::GMCastGroup =
     GMCastScheme + Delim + "group";
 std::string const gcomm::Conf::GMCastListenAddr =
     GMCastScheme + Delim + "listen_addr";
-
+std::string const gcomm::Conf::GMCastMCastAddr =
+    GMCastScheme + Delim + "mcast_addr";
+std::string const gcomm::Conf::GMCastMCastPort =
+    GMCastScheme + Delim + "mcast_port";
 // EVS
 std::string const gcomm::Conf::EvsScheme = "evs";
 std::string const gcomm::Conf::EvsViewForgetTimeout = 

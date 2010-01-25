@@ -70,7 +70,7 @@ lib_LTLIBRARIES += libgalerautils++.la
 noinst_LTLIBRARIES = libgaleraresolver.la
 libgaleraresolver_la_SOURCES = \
 	gu_resolver.cpp
-libgaleraresolver_la_CXXFLAGS = @AM_CXXFLAGS@ -Wno-conversion
+libgaleraresolver_la_CXXFLAGS = @AM_CXXFLAGS@ -Wno-conversion -Wno-old-style-cast
 
 libgalerautils___la_SOURCES = \
 	gu_exception.cpp      \

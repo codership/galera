@@ -31,6 +31,7 @@
 
 using namespace std;
 using namespace gu;
+using namespace gu::net;
 using namespace gu::datetime;
 
 static int get_opt(const URI& uri)
@@ -105,6 +106,7 @@ gu::net::Socket::Socket(Network& net_,
     options         (O_NO_INTERRUPT),
     event_mask      (0),
     listener_ai     (0),
+    sendto_addr     (0),
     local_addr      (local_addr_),
     remote_addr     (remote_addr_),
     mtu             (mtu_),
@@ -196,6 +198,17 @@ void gu::net::Socket::set_opt(Socket* s,
 }
 
 
+void* gu::net::Socket::get_sendto_addr() const
+{
+    return (sendto_addr != 0 ? &sendto_addr->get_sockaddr() : 0);
+}
+
+
+socklen_t gu::net::Socket::get_sendto_addr_len() const
+{
+    return (sendto_addr != 0 ? sendto_addr->get_sockaddr_len() : 0 );
+}
+
 void gu::net::Socket::connect(const string& addr)
 {
     URI uri(addr);
@@ -212,37 +225,116 @@ void gu::net::Socket::connect(const string& addr)
     set_opt(this, ai, ::get_opt(uri));
     
     Sockaddr sa(ai.get_addr());
-
-    if (::connect(fd, &sa.get_sockaddr(), sa.get_sockaddr_len()) == -1)
+    
+    if (ai.get_socktype() == SOCK_STREAM)
     {
-        if ((get_opt() & O_NON_BLOCKING) && errno == EINPROGRESS)
+        if (::connect(fd, &sa.get_sockaddr(), sa.get_sockaddr_len()) == -1)
         {
-            log_debug << "non blocking connecting";
-            set_state(S_CONNECTING);
+            if ((get_opt() & O_NON_BLOCKING) && errno == EINPROGRESS)
+            {
+                log_debug << "non blocking connecting";
+                set_state(S_CONNECTING);
+            }
+            else
+            {
+                set_state(S_FAILED, errno);
+                gu_throw_error(errno) << "connect failed: " << remote_addr;
+            }
         }
         else
         {
-            set_state(S_FAILED, errno);
-            gu_throw_error(errno) << "connect failed: " << remote_addr;
+            socklen_t sa_len(sa.get_sockaddr_len());
+            if (::getsockname(fd, &sa.get_sockaddr(), &sa_len) == -1)
+            {
+                set_state(S_FAILED, errno);
+                gu_throw_error(errno);
+            }
+            if (sa_len != sa.get_sockaddr_len())
+            {
+                set_state(S_FAILED, EINVAL);
+                gu_throw_fatal << "addr len mismatch";
+            }
+            local_addr = Addrinfo(ai, sa).to_string();
+            set_state(S_CONNECTED);
         }
     }
-    else
+    else if (ai.get_socktype() == SOCK_DGRAM)
     {
-        socklen_t sa_len(sa.get_sockaddr_len());
-        if (::getsockname(fd, &sa.get_sockaddr(), &sa_len) == -1)
+        if (sa.is_multicast() == false || sa.get_family() != AF_INET)
         {
-            set_state(S_FAILED, errno);
-            gu_throw_error(errno);
+            gu_throw_fatal << "unicast or family not supported for: "
+                           << addr;
         }
-        if (sa_len != sa.get_sockaddr_len())
+        
+        struct ip_mreq mreq;
+        memset(&mreq, 0, sizeof(mreq));
+        memcpy(&mreq.imr_multiaddr.s_addr, sa.get_addr(), sizeof(mreq.imr_multiaddr.s_addr));
+        mreq.imr_interface.s_addr = 0;
+        string if_addr("");
+        try
         {
-            set_state(S_FAILED, EINVAL);
-            gu_throw_fatal << "addr len mismatch";
+            if_addr = uri.get_option("socket.if_addr");
+        } catch (NotFound&) { }
+        
+        if (if_addr != "")
+        {
+            Addrinfo if_ai(resolve("udp://" + if_addr + ":0"));
+            mreq.imr_interface.s_addr = *reinterpret_cast<const uint32_t*>(if_ai.get_addr().get_addr());
         }
-        local_addr = Addrinfo(ai, sa).to_string();
+        
+        if (::setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, 
+                         &mreq, sizeof(mreq)) == -1)
+        {
+            const int err(errno);
+            set_state(S_FAILED, err);
+            gu_throw_error(err) << "setsockopt(IP_ADD_MEMBERSHIP): ";
+        }
+        
+        string if_loop("0");
+        try { if_loop = uri.get_option("socket.if_loop"); } 
+        catch (NotFound&) { }
+
+        const int loop(from_string<int>(if_loop));
+        if (::setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, 
+                         &loop, sizeof(loop)) == -1)
+        {
+            const int err(errno);
+            set_state(S_FAILED, err);
+            gu_throw_error(err) << "setsockopt(IP_MULTICAST_LOOP): ";
+        }
+
+        string mcast_ttl("1");
+        try { mcast_ttl = uri.get_option("socket.mcast_ttl"); }
+        catch (NotFound&) { }
+        
+        const int ttl(from_string<int>(mcast_ttl));
+        if (::setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL,
+                         &ttl, sizeof(ttl)) == -1)
+        {
+            const int err(errno);
+            set_state(S_FAILED, err);
+            gu_throw_error(err) << "setsockopt(IP_MULTICAST_TTL): ";
+        }
+        
+        const int reuseaddr(1);
+        if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, 
+                         &reuseaddr, sizeof(reuseaddr)) == -1)
+        {
+            const int err(errno);
+            set_state(S_FAILED, err);
+            gu_throw_error(err) << "setsockopt(SO_REUSEADDR): ";            
+        }
+        
+        if (::bind(fd, &sa.get_sockaddr(), sa.get_sockaddr_len()) == -1)
+        {
+            const int err(errno);
+            set_state(S_FAILED, err);
+            gu_throw_error(err) << "bind(): ";
+        }
+        
+        sendto_addr = new Sockaddr(sa);
         set_state(S_CONNECTED);
     }
-    
     set_opt(this, ai, 0);
     assert(get_state() == S_CONNECTING || get_state() == S_CONNECTED);
 }
@@ -274,6 +366,9 @@ void gu::net::Socket::close()
     }
 
     delete listener_ai;
+    listener_ai = 0;
+    delete sendto_addr;
+    sendto_addr = 0;
     fd = -1;
 }
 
@@ -281,6 +376,11 @@ void gu::net::Socket::listen(const std::string& addr, const int backlog)
 {
     URI uri(addr);
     Addrinfo ai(resolve(uri));
+    
+    if (ai.get_socktype() != SOCK_STREAM)
+    {
+        gu_throw_fatal << "invalid sock type for listen(): " << addr;
+    }
     
     Sockaddr sa(ai.get_addr());
     
@@ -326,7 +426,7 @@ gu::net::Socket* gu::net::Socket::accept()
     Sockaddr acc_sa(acc_ai.get_addr());
     
     socklen_t sa_len(acc_sa.get_sockaddr_len());
-
+    
     if ((acc_fd = ::accept(fd, &acc_sa.get_sockaddr(), &sa_len)) == -1)
     {
         set_state(S_FAILED, errno);
@@ -382,17 +482,19 @@ static size_t iov_send(const int fd,
                        struct iovec iov[],
                        const size_t iov_len,
                        const size_t tot_len,
+                       void* addr,
+                       const socklen_t addrlen,
                        const int flags,
                        int* errval)
 {
     assert(errval != 0);
     assert(tot_len > 0);
-
+    
     const int send_flags = flags | MSG_NOSIGNAL;
     *errval = 0;
     
     /* Try sendmsg() first */
-    struct msghdr msg = {0, 0, 
+    struct msghdr msg = {addr, addrlen, 
                          iov, 
                          iov_len, 
                          0, 0, 0};
@@ -461,6 +563,10 @@ size_t gu::net::Socket::get_max_pending_len() const
 int gu::net::Socket::send_pending(const int send_flags)
 {
     assert(pending.size() != 0);
+    if (get_sendto_addr() != 0)
+    {
+        gu_throw_fatal << "sendto not supported";
+    }
     struct iovec iov[1] = {
         { &pending[0], pending.size() }
     };
@@ -469,6 +575,7 @@ int gu::net::Socket::send_pending(const int send_flags)
                            iov, 
                            1,
                            pending.size(),
+                           0, 0,
                            send_flags, 
                            &ret);
     
@@ -511,6 +618,7 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
     
     if (dgram == 0)
     {
+        assert(sendto_addr == 0);
         if (pending.size() > 0)
         {
             ret = send_pending(send_flags);
@@ -530,12 +638,14 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
              pending.size() + 
              dgram->get_len() + hdrlen > get_max_pending_len())
     {
+        assert(sendto_addr == 0);
         // Return directly from here, this is the only case when 
         // return value must not be altered at the end of this method.
         return EAGAIN;
     }
     else if (no_block == true && pending.size() > 0)
     {
+        assert(sendto_addr == 0);
         uint32_t len;
         serialize(static_cast<uint32_t>(dgram->get_len()), 
                   reinterpret_cast<byte_t*>(&len), 
@@ -557,7 +667,7 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
         /* Send any pending bytes first */
         if (pending.size() > 0)
         {
-            assert(no_block == false);
+            assert(no_block == false && sendto_addr == 0);
             /* Note: mask out MSG_DONTWAIT from flags */
             ret = send_pending(send_flags & ~MSG_DONTWAIT);
         }
@@ -574,15 +684,21 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
             {const_cast<byte_t*>(&dgram->get_payload()[0]), 
              dgram->get_payload().size()}
         };
-
-        size_t sent = iov_send(fd, iov, 3, 
+        
+        size_t sent = iov_send(fd, 
+                               iov, 3, 
                                sizeof(hdr) + dgram->get_len(), 
-                               send_flags, &ret);
+                               get_sendto_addr(), get_sendto_addr_len(),
+                               send_flags, 
+                               &ret);
         switch (ret)
         {
         case EAGAIN:
             assert(no_block == true);
-            iov_push(iov, 3, sent, pending);
+            if (sendto_addr == 0)
+            {
+                iov_push(iov, 3, sent, pending);
+            }
             break;
         case 0:
             /* Everything went fine */
@@ -594,7 +710,7 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
         }
     }
     
-    if (ret == EAGAIN)
+    if (ret == EAGAIN && sendto_addr == 0)
     {
         if ((get_event_mask() & E_OUT) == 0)
         {

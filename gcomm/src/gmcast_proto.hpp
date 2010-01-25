@@ -63,6 +63,7 @@ public:
     Proto (Transport*    tp_, 
            const std::string& local_addr_, 
            const std::string& remote_addr_, 
+           const std::string& mcast_addr_,
            const gcomm::UUID& local_uuid_, 
            const std::string& group_name_)
         : 
@@ -71,6 +72,7 @@ public:
         remote_uuid      (),
         local_addr       (local_addr_),
         remote_addr      (remote_addr_),
+        mcast_addr       (mcast_addr_),
         group_name       (group_name_),
         changed          (false),
         state            (S_INIT),
@@ -102,6 +104,7 @@ public:
     gcomm::Transport* get_transport() const { return tp; }
     
     const std::string& get_remote_addr() const { return remote_addr; }
+    const std::string& get_mcast_addr() const { return mcast_addr; }
     const LinkMap& get_link_map() const { return link_map; }
     
     bool get_changed()
@@ -121,6 +124,7 @@ private:
     gcomm::UUID       remote_uuid;
     std::string       local_addr;
     std::string       remote_addr;
+    std::string       mcast_addr;
     std::string       group_name;
     bool              changed;
     State             state;

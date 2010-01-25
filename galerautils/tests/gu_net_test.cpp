@@ -802,63 +802,99 @@ START_TEST(test_net_consumer_nto1)
 }
 END_TEST
 
+START_TEST(test_multicast)
+{
+    string mc1("udp://239.192.0.1:4567?socket.if_addr=vs1&socket.if_loop=1");
+    string mc2("udp://239.192.0.1:4567?socket.if_addr=vs1&socket.if_loop=1");
+    
+    Network net;
+    Socket* s1(net.connect(mc1));
+    Socket* s2(net.connect(mc2));
+    
+    byte_t msg[2] = {0, 1};
+    Datagram dg(Buffer(msg, msg + 2));
+    s1->send(&dg);
+    
+    net.wait_event(-1);
+    net.wait_event(1 * gu::datetime::Sec);
+    const Datagram* rdg1(s1->recv());
+    const Datagram* rdg2(s2->recv());
+    fail_if(rdg1 == 0 || rdg2 == 0);
+    fail_if(rdg1->get_len() != 2 || rdg2->get_len() != 2);
+    delete s1;
+    delete s2;
+}
+
+END_TEST
+
+static bool enable_test_multicast(false);
+
 Suite* gu_net_suite()
 {
     Suite* s = suite_create("galerautils++ Networking");
     TCase* tc;
 
-    tc = tcase_create("test_debug_logger");
-    tcase_add_checked_fixture(tc, 
-                              &debug_logger_checked_setup,
-                              &debug_logger_checked_teardown);
-    tcase_add_test(tc, test_debug_logger);
-    suite_add_tcase(s, tc);
+    if (enable_test_multicast == false)
+    {
+        tc = tcase_create("test_debug_logger");
+        tcase_add_checked_fixture(tc, 
+                                  &debug_logger_checked_setup,
+                                  &debug_logger_checked_teardown);
+        tcase_add_test(tc, test_debug_logger);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_buffer");
-    tcase_add_test(tc, test_buffer);
-    suite_add_tcase(s, tc);
-
-
-    tc = tcase_create("test_datagram");
-    tcase_add_test(tc, test_datagram);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_buffer");
+        tcase_add_test(tc, test_buffer);
+        suite_add_tcase(s, tc);
 
 
-    tc = tcase_create("test_resolver");
-    tcase_add_test(tc, test_resolver);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_datagram");
+        tcase_add_test(tc, test_datagram);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_network_listen");
-    tcase_add_test(tc, test_network_listen);
-    suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_network_connect");
-    tcase_add_test(tc, test_network_connect);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_resolver");
+        tcase_add_test(tc, test_resolver);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_network_send");
-    tcase_add_test(tc, test_network_send);
-    tcase_set_timeout(tc, 10);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_network_listen");
+        tcase_add_test(tc, test_network_listen);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_network_interrupt");
-    tcase_add_test(tc, test_network_interrupt);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_network_connect");
+        tcase_add_test(tc, test_network_connect);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_network_nonblocking");
-    tcase_add_test(tc, test_network_nonblocking);
-    tcase_set_timeout(tc, 10);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_network_send");
+        tcase_add_test(tc, test_network_send);
+        tcase_set_timeout(tc, 10);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_net_consumer");
-    tcase_add_test(tc, test_net_consumer);
-    tcase_set_timeout(tc, 10);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_network_interrupt");
+        tcase_add_test(tc, test_network_interrupt);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_net_consumer_nto1");
-    tcase_add_test(tc, test_net_consumer_nto1);
-    tcase_set_timeout(tc, 10);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_network_nonblocking");
+        tcase_add_test(tc, test_network_nonblocking);
+        tcase_set_timeout(tc, 10);
+        suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_net_consumer");
+        tcase_add_test(tc, test_net_consumer);
+        tcase_set_timeout(tc, 10);
+        suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_net_consumer_nto1");
+        tcase_add_test(tc, test_net_consumer_nto1);
+        tcase_set_timeout(tc, 10);
+        suite_add_tcase(s, tc);
+    }
+    if (enable_test_multicast == true)
+    {
+        tc = tcase_create("test_multicast");
+        tcase_add_test(tc, test_multicast);
+        suite_add_tcase(s, tc);
+    }
 
     return s;
 }
