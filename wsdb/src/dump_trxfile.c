@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
-
+#include <inttypes.h>
 #include <unistd.h> // for getopt
 #include <getopt.h> // for getopt_long
 
@@ -264,7 +264,7 @@ static int dump_trx(struct block_info *bi) {
     rcode = get_data_from_block(bi, sizeof(struct trx_hdr), (void *)&trx); 
     if (rcode != WSDB_OK) return rcode;
 
-    fprintf(stdout, "TRX: %lld\n", trx.trx_seqno);
+    fprintf(stdout, "TRX: %" PRId64 "\n", trx.trx_seqno);
 
     return (WSDB_OK);
 }
