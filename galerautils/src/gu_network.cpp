@@ -226,7 +226,7 @@ void gu::net::Socket::connect(const string& addr)
     
     Sockaddr sa(ai.get_addr());
     
-    if (ai.get_socktype() == SOCK_STREAM)
+    if (sa.is_multicast() == false)
     {
         if (::connect(fd, &sa.get_sockaddr(), sa.get_sockaddr_len()) == -1)
         {
@@ -258,32 +258,32 @@ void gu::net::Socket::connect(const string& addr)
             set_state(S_CONNECTED);
         }
     }
-    else if (ai.get_socktype() == SOCK_DGRAM)
+    else 
     {
-        if (sa.is_multicast() == false || sa.get_family() != AF_INET)
-        {
-            gu_throw_fatal << "unicast or family not supported for: "
-                           << addr;
-        }
-        
-        struct ip_mreq mreq;
-        memset(&mreq, 0, sizeof(mreq));
-        memcpy(&mreq.imr_multiaddr.s_addr, sa.get_addr(), sizeof(mreq.imr_multiaddr.s_addr));
-        mreq.imr_interface.s_addr = 0;
         string if_addr("");
         try
         {
             if_addr = uri.get_option("socket.if_addr");
         } catch (NotFound&) { }
         
+        Sockaddr anyaddr(Sockaddr::get_anyaddr(sa));
+        Sockaddr if_sa(anyaddr);
         if (if_addr != "")
         {
+            log_debug << if_addr;
             Addrinfo if_ai(resolve("udp://" + if_addr + ":0"));
-            mreq.imr_interface.s_addr = *reinterpret_cast<const uint32_t*>(if_ai.get_addr().get_addr());
+            log_debug << if_ai.to_string();
+            if_sa = if_ai.get_addr();
         }
         
-        if (::setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, 
-                         &mreq, sizeof(mreq)) == -1)
+        
+
+        MReq mr(sa, if_sa);
+        if (::setsockopt(fd, 
+                         mr.get_ipproto(), 
+                         mr.get_add_membership_opt(),
+                         mr.get_mreq(), 
+                         mr.get_mreq_len()) == -1)
         {
             const int err(errno);
             set_state(S_FAILED, err);
@@ -295,8 +295,11 @@ void gu::net::Socket::connect(const string& addr)
         catch (NotFound&) { }
 
         const int loop(from_string<int>(if_loop));
-        if (::setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, 
-                         &loop, sizeof(loop)) == -1)
+        if (::setsockopt(fd, 
+                         mr.get_ipproto(), 
+                         mr.get_multicast_loop_opt(),
+                         &loop, 
+                         sizeof(loop)) == -1)
         {
             const int err(errno);
             set_state(S_FAILED, err);
@@ -308,8 +311,11 @@ void gu::net::Socket::connect(const string& addr)
         catch (NotFound&) { }
         
         const int ttl(from_string<int>(mcast_ttl));
-        if (::setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL,
-                         &ttl, sizeof(ttl)) == -1)
+        if (::setsockopt(fd, 
+                         mr.get_ipproto(), 
+                         mr.get_multicast_ttl_opt(),
+                         &ttl, 
+                         sizeof(ttl)) == -1)
         {
             const int err(errno);
             set_state(S_FAILED, err);

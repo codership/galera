@@ -11,7 +11,8 @@
 #include <cstdlib>
 #include <netdb.h>
 #include <arpa/inet.h>
-
+#include <net/if.h>
+#include <sys/ioctl.h>
 #include <map>
 #include <stdexcept>
 
@@ -151,6 +152,142 @@ gu::net::Sockaddr::~Sockaddr()
     free(sa_);
 }
 
+
+/////////////////////////////////////////////////////////////////////////
+//                     MReq implementation
+/////////////////////////////////////////////////////////////////////////
+
+static unsigned int get_ifindex_by_addr(const gu::net::Sockaddr& addr)
+{
+    unsigned int idx(-1);
+    struct ifconf ifc;
+    memset(&ifc, 0, sizeof(struct ifconf));
+    ifc.ifc_len = 16*sizeof(struct ifreq);
+    vector<struct ifreq> ifr(16);
+    ifc.ifc_req = &ifr[0];
+    
+    int fd(socket(AF_INET, SOCK_DGRAM, 0));
+    int err;
+    if (fd == -1)
+    {
+        err = errno;
+        gu_throw_error(err) << "could not create socket";
+    }
+    if ((err = ioctl(fd, SIOCGIFCONF, &ifc)) == -1)
+    {
+        err = errno;
+        goto out;
+    }
+    
+    log_debug << "read: " << ifc.ifc_len;
+    
+    for (size_t i(0); i < ifc.ifc_len/sizeof(struct ifreq); ++i)
+    {
+        struct ifreq* ifrp(&ifr[i]);
+        try
+        {
+            log_debug << "read: " << ifrp->ifr_name;
+            gu::net::Sockaddr sa(&ifrp->ifr_addr, sizeof(struct sockaddr));
+            if (sa.get_family() == addr.get_family() &&
+                memcmp(sa.get_addr(), addr.get_addr(), addr.get_addr_len()) == 0)
+            {
+                if ((err = ioctl(fd, SIOCGIFINDEX, ifrp, sizeof(struct ifreq))) == -1)
+                {
+                    err = errno;
+                }
+                idx = ifrp->ifr_ifindex;
+                goto out;
+            }
+        }
+        catch (gu::Exception& e)
+        {
+        }
+    }
+    
+out:
+    close(fd);
+    if (err != 0)
+    {
+        gu_throw_error(err) << "failed to get interface index";
+    }
+    else
+    {
+        log_debug << "returning ifindex: " << idx;
+    }
+    return idx;
+}
+
+
+gu::net::MReq::MReq(const Sockaddr& mcast_addr, const Sockaddr& if_addr)
+    :
+    mreq_               ( 0),
+    mreq_len_           ( 0),
+    ipproto_            ( 0),
+    add_membership_opt_ (-1),
+    drop_membership_opt_(-1),
+    multicast_loop_opt_ (-1),
+    multicast_ttl_opt_  (-1)
+{
+    log_debug << mcast_addr.get_family() << " " << if_addr.get_family();
+    if (mcast_addr.get_family() != if_addr.get_family())
+    {
+        gu_throw_fatal << "address families do not match: " 
+                       << mcast_addr.get_family() << ", "
+                       << if_addr.get_family();
+    }
+    
+    if (mcast_addr.get_family() != AF_INET &&
+        mcast_addr.get_family() != AF_INET6)
+    {
+        gu_throw_fatal << "Mreq: address family " << mcast_addr.get_family()
+                       << " not supported";
+    }
+    
+    get_ifindex_by_addr(if_addr);
+    
+    mreq_len_ = (mcast_addr.get_family() == AF_INET ? 
+                 sizeof(struct ip_mreq)             : 
+                 sizeof(struct ipv6_mreq));
+    if ((mreq_ = malloc(mreq_len_)) == 0)
+    {
+        gu_throw_fatal << "could not allocate memory";
+    }
+    memset(mreq_, 0, mreq_len_);
+    
+    switch (mcast_addr.get_family())
+    {
+    case AF_INET:
+    {
+        struct ip_mreq* mr(reinterpret_cast<struct ip_mreq*>(mreq_));
+        mr->imr_multiaddr.s_addr = *reinterpret_cast<const in_addr_t*>(mcast_addr.get_addr());
+        
+        mr->imr_interface.s_addr = *reinterpret_cast<const in_addr_t*>(if_addr.get_addr());
+        ipproto_             = IPPROTO_IP;
+        add_membership_opt_  = IP_ADD_MEMBERSHIP;
+        drop_membership_opt_ = IP_DROP_MEMBERSHIP;
+        multicast_loop_opt_  = IP_MULTICAST_LOOP;
+        multicast_ttl_opt_   = IP_MULTICAST_TTL;
+        break;
+    }
+    case AF_INET6:
+    {
+        struct ipv6_mreq* mr(reinterpret_cast<struct ipv6_mreq*>(mreq_));
+        mr->ipv6mr_multiaddr = *reinterpret_cast<const struct in6_addr*>(mcast_addr.get_addr());
+        mr->ipv6mr_interface = get_ifindex_by_addr(if_addr);
+        ipproto_             = IPPROTO_IPV6;
+        add_membership_opt_  = IPV6_ADD_MEMBERSHIP;
+        drop_membership_opt_ = IPV6_DROP_MEMBERSHIP;
+        multicast_loop_opt_  = IPV6_MULTICAST_LOOP;
+        multicast_ttl_opt_   = IPV6_MULTICAST_HOPS;
+        break;
+    }
+    }
+}
+
+gu::net::MReq::~MReq()
+{
+    free(mreq_);
+}
 
 
 /////////////////////////////////////////////////////////////////////////

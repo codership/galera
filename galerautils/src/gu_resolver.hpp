@@ -42,6 +42,13 @@ namespace gu
         class Sockaddr;
         
         /*!
+         * @class IMReq
+         *
+         * @brief Class encapsulating imreq structs.
+         */
+        class MReq;
+
+        /*!
          * @class Addrinfo 
          *
          * @brief Class encapsulating struct addrinfo.
@@ -129,6 +136,19 @@ public:
         case AF_INET6:
             return &reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_addr;
         default:
+            gu_throw_fatal  << "invalid address family: " << sa_->sa_family; throw;
+        }                
+    }
+
+    socklen_t get_addr_len() const
+    {
+        switch(sa_->sa_family)
+        {
+        case AF_INET:
+            return sizeof(reinterpret_cast<const sockaddr_in*>(sa_)->sin_addr);
+        case AF_INET6:
+            return sizeof(reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_addr);
+        default:
             gu_throw_fatal; throw;
         }                
     }
@@ -155,11 +175,62 @@ public:
     socklen_t get_sockaddr_len() const { return sa_len_; }
             
     bool is_multicast() const;
+    bool is_broadcast() const;
+    bool is_anyaddr()   const;
+    
+    static Sockaddr get_anyaddr(const Sockaddr& sa)
+    {
+        Sockaddr ret(sa);
+        switch(ret.sa_->sa_family)
+        {
+        case AF_INET:
+            reinterpret_cast<sockaddr_in*>(ret.sa_)->sin_addr.s_addr = 0;
+            break;
+        case AF_INET6:
+            memset(&reinterpret_cast<sockaddr_in6*>(ret.sa_)->sin6_addr, 0, sizeof(sockaddr_in6));
+            break;
+        default:
+            gu_throw_fatal << "invalid address family: " << ret.sa_->sa_family; throw;
+        }
+        return ret;
+    }
+
+    Sockaddr& operator=(const Sockaddr& sa)
+    {
+        memcpy(sa_, sa.sa_, sa_len_);
+        return *this;
+    }
+
 public:
-    void operator=(const Sockaddr&);
+
 
     sockaddr* sa_;
     socklen_t sa_len_;
+};
+
+
+class gu::net::MReq
+{
+public:
+    MReq(const Sockaddr& mcast_addr, const Sockaddr& if_addr);
+    ~MReq();
+    const void* get_mreq() const { return mreq_; }
+    socklen_t get_mreq_len() const { return mreq_len_; }
+    int get_ipproto() const { return ipproto_; }
+    int get_add_membership_opt() const { return add_membership_opt_; }
+    int get_drop_membership_opt() const { return drop_membership_opt_; }
+    int get_multicast_loop_opt() const { return multicast_loop_opt_; }
+    int get_multicast_ttl_opt() const { return multicast_ttl_opt_; }
+private:
+    MReq(const MReq&);
+    void operator=(const MReq&);
+    void* mreq_;
+    socklen_t mreq_len_;
+    int ipproto_;
+    int add_membership_opt_;
+    int drop_membership_opt_;
+    int multicast_loop_opt_;
+    int multicast_ttl_opt_;
 };
 
         

@@ -804,8 +804,14 @@ END_TEST
 
 START_TEST(test_multicast)
 {
+
     string mc1("udp://239.192.0.1:4567?socket.if_addr=vs1&socket.if_loop=1");
     string mc2("udp://239.192.0.1:4567?socket.if_addr=vs1&socket.if_loop=1");
+    
+    // Check that MReq works
+    
+    Sockaddr sa1(resolve(URI("udp://localhost:0")).get_addr());
+    MReq mreq(resolve(URI("udp://239.192.0.1:4567")).get_addr(), sa1);
     
     Network net;
     Socket* s1(net.connect(mc1));
