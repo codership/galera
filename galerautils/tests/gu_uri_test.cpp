@@ -7,6 +7,7 @@
 
 #include "../src/gu_uri.hpp"
 #include "../src/gu_exception.hpp"
+#include "../src/gu_logger.hpp"
 #include "gu_uri_test.hpp"
 
 using std::string;
@@ -355,6 +356,7 @@ START_TEST (uri_test3) // Test from gcomm
     URI rew("gcomm+gmcast://localhost:10001/foo/bar.txt?k1=v1&k2=v2");
     rew._set_scheme("gcomm+tcp");
     fail_unless(rew.to_string() == "gcomm+tcp://localhost:10001/foo/bar.txt?k1=v1&k2=v2");
+
 }
 END_TEST
 

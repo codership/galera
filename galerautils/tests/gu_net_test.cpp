@@ -170,17 +170,9 @@ void* listener_thd(void* arg)
     while (conns > 0)
     {
         NetworkEvent ev = net->wait_event(-1);
-
-        mark_point();
-
         Socket* sock = ev.get_socket();
-
-        mark_point();
-
         const int em = ev.get_event_mask();
-
-        mark_point();
-
+        
         if (em & E_ACCEPTED)
         {
             log_info << "accepted local " << sock->get_local_addr();
@@ -188,7 +180,7 @@ void* listener_thd(void* arg)
         }
         else if (em & E_ERROR)
         {
-            fail_unless(sock != 0);
+            assert(sock != 0);
             if (sock->get_state() == Socket::S_CLOSED)
             {
                 log_info << "Listener: socket closed";
@@ -197,8 +189,8 @@ void* listener_thd(void* arg)
             }
             else
             {
-                fail_unless(sock->get_state() == Socket::S_FAILED);
-                fail_unless(sock->get_errno() != 0);
+                assert(sock->get_state() == Socket::S_FAILED);
+                assert(sock->get_errno() != 0);
                 log_info << "Listener: socket read failed: " << sock->get_errstr();
                 sock->close();
                 delete sock;
@@ -219,10 +211,9 @@ void* listener_thd(void* arg)
                 bytes += dm->get_len();
                 if (buf != 0)
                 {
-                    fail_unless(dm->get_len() <= buflen, "%ul %ul",
-                                dm->get_len(), buflen);
-                    fail_unless(memcmp(&dm->get_payload()[0], buf, 
-                                       dm->get_len()) == 0);
+                    assert(dm->get_len() <= buflen);
+                    assert(memcmp(&dm->get_payload()[0], buf, 
+                                  dm->get_len()) == 0);
                 }
             }
         }
@@ -233,7 +224,7 @@ void* listener_thd(void* arg)
         }
         else if (em & E_EMPTY)
         {
-
+            
         }
         else if (sock == 0)
         {
@@ -392,7 +383,7 @@ void* interrupt_thd(void* arg)
 {
     Network* net = reinterpret_cast<Network*>(arg);
     NetworkEvent ev = net->wait_event(-1);
-    fail_unless(ev.get_event_mask() & E_EMPTY);
+    assert(ev.get_event_mask() & E_EMPTY);
     return 0;
 }
 
@@ -606,7 +597,7 @@ public:
             }
             else if (em & E_CONNECTED)
             {
-                fail_unless(sock == send_sock);
+                assert(sock == send_sock);
                 log_info << "connected";
                 break;
             }
@@ -679,7 +670,7 @@ public:
                 {
                     fail_unless(dg != 0);
                     recvd += dg->get_len();
-                    fail_unless(recvd <= sent);
+                    assert(recvd <= sent);
                 }
             }
             else if (em & E_CLOSED)
@@ -770,7 +761,7 @@ void* producer_thd(void* arg)
         Message msg(&prod, &md);
         Message ack(&prod);
         prod.send(msg, &ack);
-        fail_unless(ack.get_val() == 0 || ack.get_val() == EAGAIN);        
+        assert(ack.get_val() == 0 || ack.get_val() == EAGAIN);        
     }
     return 0;
 }
@@ -804,14 +795,18 @@ END_TEST
 
 START_TEST(test_multicast)
 {
-
-    string mc1("udp://239.192.0.1:4567?socket.if_addr=vs1&socket.if_loop=1");
-    string mc2("udp://239.192.0.1:4567?socket.if_addr=vs1&socket.if_loop=1");
+    string maddr("[ff30::8000:1]");
+    string ifaddr("[::]");
     
     // Check that MReq works
     
-    Sockaddr sa1(resolve(URI("udp://localhost:0")).get_addr());
-    MReq mreq(resolve(URI("udp://239.192.0.1:4567")).get_addr(), sa1);
+    Sockaddr sa1(resolve(URI("udp://" + ifaddr + ":0")).get_addr());
+    MReq mreq(resolve(URI("udp://" + maddr + ":4567")).get_addr(), sa1);
+    
+    string mc1("udp://" + maddr + ":4567?socket.if_addr=" + ifaddr 
+               + "&socket.if_loop=1");
+    string mc2("udp://" + maddr + ":4567?socket.if_addr=" + ifaddr
+               + "&socket.if_loop=1");
     
     Network net;
     Socket* s1(net.connect(mc1));

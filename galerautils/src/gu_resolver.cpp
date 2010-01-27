@@ -122,6 +122,20 @@ bool gu::net::Sockaddr::is_multicast() const
 }
 
 
+bool gu::net::Sockaddr::is_anyaddr() const
+{
+    switch (sa_->sa_family)
+    {
+    case AF_INET:
+        return (ntohl(reinterpret_cast<const sockaddr_in*>(sa_)->sin_addr.s_addr) == INADDR_ANY);
+    case AF_INET6:
+        return IN6_IS_ADDR_UNSPECIFIED(&reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_addr);
+    default:
+        gu_throw_fatal; throw;
+    }
+}
+
+
 gu::net::Sockaddr::Sockaddr(const sockaddr* sa, socklen_t sa_len) :
     sa_    (0     ),
     sa_len_(sa_len)
@@ -159,6 +173,12 @@ gu::net::Sockaddr::~Sockaddr()
 
 static unsigned int get_ifindex_by_addr(const gu::net::Sockaddr& addr)
 {
+
+    if (addr.is_anyaddr() == true)
+    {
+        return 0;
+    }
+
     unsigned int idx(-1);
     struct ifconf ifc;
     memset(&ifc, 0, sizeof(struct ifconf));

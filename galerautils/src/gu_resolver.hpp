@@ -187,7 +187,7 @@ public:
             reinterpret_cast<sockaddr_in*>(ret.sa_)->sin_addr.s_addr = 0;
             break;
         case AF_INET6:
-            memset(&reinterpret_cast<sockaddr_in6*>(ret.sa_)->sin6_addr, 0, sizeof(sockaddr_in6));
+            memset(&reinterpret_cast<sockaddr_in6*>(ret.sa_)->sin6_addr, 0, sizeof(struct in6_addr));
             break;
         default:
             gu_throw_fatal << "invalid address family: " << ret.sa_->sa_family; throw;

@@ -261,10 +261,8 @@ void gu::net::Socket::connect(const string& addr)
     else 
     {
         string if_addr("");
-        try
-        {
-            if_addr = uri.get_option("socket.if_addr");
-        } catch (NotFound&) { }
+        try { if_addr = uri.get_option("socket.if_addr"); } 
+        catch (NotFound&) { }
         
         Sockaddr anyaddr(Sockaddr::get_anyaddr(sa));
         Sockaddr if_sa(anyaddr);
@@ -276,8 +274,6 @@ void gu::net::Socket::connect(const string& addr)
             if_sa = if_ai.get_addr();
         }
         
-        
-
         MReq mr(sa, if_sa);
         if (::setsockopt(fd, 
                          mr.get_ipproto(), 
@@ -293,7 +289,7 @@ void gu::net::Socket::connect(const string& addr)
         string if_loop("0");
         try { if_loop = uri.get_option("socket.if_loop"); } 
         catch (NotFound&) { }
-
+        
         const int loop(from_string<int>(if_loop));
         if (::setsockopt(fd, 
                          mr.get_ipproto(), 
@@ -305,7 +301,7 @@ void gu::net::Socket::connect(const string& addr)
             set_state(S_FAILED, err);
             gu_throw_error(err) << "setsockopt(IP_MULTICAST_LOOP): ";
         }
-
+        
         string mcast_ttl("1");
         try { mcast_ttl = uri.get_option("socket.mcast_ttl"); }
         catch (NotFound&) { }
