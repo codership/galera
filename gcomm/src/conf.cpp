@@ -22,6 +22,8 @@ std::string const gcomm::Conf::GMCastMCastAddr =
     GMCastScheme + Delim + "mcast_addr";
 std::string const gcomm::Conf::GMCastMCastPort =
     GMCastScheme + Delim + "mcast_port";
+std::string const gcomm::Conf::GMCastMCastTTL =
+    GMCastScheme + Delim + "mcast_ttl";
 // EVS
 std::string const gcomm::Conf::EvsScheme = "evs";
 std::string const gcomm::Conf::EvsViewForgetTimeout = 

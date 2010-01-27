@@ -42,6 +42,7 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
     listen_addr   (Conf::TcpScheme + "://0.0.0.0"), // how to make it IPv6 safe?
     initial_addr  (""),
     mcast_addr    (""),
+    mcast_ttl     (1),
     listener      (0),
     mcast         (0),
     pending_addrs (),
@@ -140,13 +141,20 @@ GMCast::GMCast(Protonet& net_, const string& uri_)
         }
         catch (NotFound&) { }
         mcast_addr = resolve("udp://" + mcast_addr + ":" + port).to_string();
+        try 
+        { 
+            mcast_ttl = from_string<int>(uri.get_option(Conf::GMCastMCastTTL));
+        }
+        catch (NotFound&) { }
+        
     } 
-    catch (NotFound&) 
-    { }
+    catch (NotFound&) { }
     
     
     log_info << self_string() << " listening " << listen_addr;
-    log_info << self_string() << " multicast " << mcast_addr;
+    log_info << self_string() 
+             << " multicast " << mcast_addr 
+             << " ttl " << mcast_ttl;
 }
 
 GMCast::~GMCast()
@@ -165,14 +173,15 @@ void GMCast::connect()
     
     listener = Transport::create(get_pnet(), listen_uri.to_string());
     gu_trace (listener->listen());
-
+    
     if (mcast_addr != "")
     {
         mcast = Transport::create(get_pnet(), 
                                   mcast_addr 
                                   + "?socket.if_addr=" 
                                   + URI(listen_addr).get_host() 
-                                  + "&socket.non_blocking=1&socket.mcast_ttl=2");
+                                  + "&socket.non_blocking=1&socket.mcast_ttl="
+                                  + to_string(mcast_ttl));
         gu_trace(mcast->connect());
     }
     
@@ -181,7 +190,7 @@ void GMCast::connect()
         insert_address(initial_addr, UUID(), pending_addrs);
         gu_trace (gmcast_connect(initial_addr));
     }
-
+    
     pstack.push_proto(this);
 }
 

@@ -61,6 +61,12 @@ namespace gcomm
         static std::string const GMCastMCastPort;
         
         /*!
+         * GMCast multicast TTL.
+         */
+        static std::string const GMCastMCastTTL;
+        
+
+        /*!
          * EVS scheme for Transport URI.
          */
         static std::string const EvsScheme;

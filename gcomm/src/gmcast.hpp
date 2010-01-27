@@ -103,6 +103,7 @@ namespace gcomm
         std::string       listen_addr;
         std::string       initial_addr;        
         std::string       mcast_addr;
+        int               mcast_ttl;
         Transport*        listener;
         Transport*        mcast;
         AddrList          pending_addrs;
