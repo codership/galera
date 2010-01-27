@@ -138,7 +138,7 @@ gcs_address()
 
         if [ $peer -lt 0 ]; then peer=$NODE_MAX; fi # rollover 
 
-        echo "gcomm://${NODE_GCS_HOST[$peer]}:${NODE_GCS_PORT[$peer]}"
+        echo "gcomm://${NODE_GCS_HOST[$peer]}:${NODE_GCS_PORT[$peer]}${GCOMM_EXTRA_PARAMS}"
         ;;
     "vsbes")
         echo "vsbes://$VSBES_ADDRESS"
@@ -164,7 +164,7 @@ _cluster_up()
         then
             # must make sure 1st node completely operational
             case "$GCS_TYPE" in
-            "gcomm") $cmd "-g gcomm://" "$@" 0 ;;
+            "gcomm") $cmd "-g gcomm://${GCOMM_EXTRA_PARAMS}" "$@" 0 ;;
             "vsbes") $cmd "-g vsbes://$VSBES_ADDRESS" "$@" 0 ;;
             esac
         else
