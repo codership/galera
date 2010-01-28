@@ -159,6 +159,7 @@ private:
      */
     bool update_im_safe_seqs(const MessageNodeList&);
     bool is_msg_from_previous_view(const Message&);
+    void check_suspects(const UUID&, const MessageNodeList&);
     void cross_check_inactives(const UUID&, const MessageNodeList&);
     void handle_foreign(const Message&);
     void handle_user(const UserMessage&, 
@@ -280,6 +281,7 @@ private:
     // 
     gu::datetime::Period view_forget_timeout;
     gu::datetime::Period inactive_timeout;
+    gu::datetime::Period suspect_timeout;
     gu::datetime::Period inactive_check_period;
     gu::datetime::Period consensus_timeout;
     gu::datetime::Period retrans_period;

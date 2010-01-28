@@ -69,7 +69,8 @@ START_TEST(test_message)
     
     MessageNodeList node_list;
     node_list.insert(make_pair(uuid1, MessageNode()));
-    node_list.insert(make_pair(UUID(2), MessageNode(true, true, ViewId(V_REG), 5,
+    node_list.insert(make_pair(UUID(2), MessageNode(true, false, 1, 
+                                                    ViewId(V_REG), 5,
                                                     Range(7, 8))));
     JoinMessage jm(uuid1, view_id, 8, 5, 27, node_list);
     jm.set_source(uuid1);
@@ -555,7 +556,10 @@ static DummyNode* create_dummy_node(size_t idx,
                                     const string& retrans_period = "PT20M")
 {
     string conf = "evs://?" + Conf::EvsViewForgetTimeout + "=PT1H&"
+        + Conf::EvsInactiveCheckPeriod + "=" + to_string(Period(inactive_timeout)/3) + "&"
+        + Conf::EvsSuspectTimeout + "=" + inactive_timeout + "&"
         + Conf::EvsInactiveTimeout + "=" + inactive_timeout + "&"
+        + Conf::EvsConsensusTimeout + "=" + to_string(Period(inactive_timeout)*2) + "&"
         + Conf::EvsKeepalivePeriod + "=" + retrans_period + "&"
         + Conf::EvsJoinRetransPeriod + "=" + retrans_period + "&"
         + Conf::EvsInfoLogMask + "=0x3";

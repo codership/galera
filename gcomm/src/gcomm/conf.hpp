@@ -76,6 +76,12 @@ namespace gcomm
          * seen views is held. 
          */
         static std::string const EvsViewForgetTimeout;
+
+        /*!
+         * Timeout which controls how long node is allowed to
+         * be silent witout being set under suspicion.
+         */
+        static std::string const EvsSuspectTimeout;
         
         /*!
          * Timeout that controls how long node is allowed to
@@ -215,7 +221,7 @@ namespace gcomm
                                                const T& max_value)
         
     {
-        return _conf_param(uri, param, &default_value, 0, &max_value);
+        return _conf_param(uri, param, &default_value, reinterpret_cast<const T*>(0), &max_value);
     }
     
     template <typename T> T conf_param_def_range(const gu::URI& uri,

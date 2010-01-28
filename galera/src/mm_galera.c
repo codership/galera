@@ -127,7 +127,7 @@ static inline long while_eagain_or_trx_abort (
         nanosleep (&period, NULL);
         wsdb_get_local_trx_info(trx_id, &info);
 
-        assert (info.seqno_l == seqno)
+        assert (info.seqno_l == seqno);
 
         if (info.state == WSDB_TRX_MUST_ABORT) {
             gu_debug("WSDB_TRX_MUST_ABORT for trx: %lld %lld",

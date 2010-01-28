@@ -28,6 +28,9 @@ using namespace gu;
 using namespace gu::net;
 using namespace gu::prodcons;
 
+// Assertion to replace fail_unless() with threaded tests.
+#define test_assert(_a) do { if ((_a)) { } else { gu_throw_fatal << #_a ; } } while (0)
+
 static void log_foo()
 {
     log_debug << "foo func";
@@ -180,7 +183,7 @@ void* listener_thd(void* arg)
         }
         else if (em & E_ERROR)
         {
-            assert(sock != 0);
+            test_assert(sock != 0);
             if (sock->get_state() == Socket::S_CLOSED)
             {
                 log_info << "Listener: socket closed";
@@ -189,8 +192,8 @@ void* listener_thd(void* arg)
             }
             else
             {
-                assert(sock->get_state() == Socket::S_FAILED);
-                assert(sock->get_errno() != 0);
+                test_assert(sock->get_state() == Socket::S_FAILED);
+                test_assert(sock->get_errno() != 0);
                 log_info << "Listener: socket read failed: " << sock->get_errstr();
                 sock->close();
                 delete sock;
@@ -211,8 +214,8 @@ void* listener_thd(void* arg)
                 bytes += dm->get_len();
                 if (buf != 0)
                 {
-                    assert(dm->get_len() <= buflen);
-                    assert(memcmp(&dm->get_payload()[0], buf, 
+                    test_assert(dm->get_len() <= buflen);
+                    test_assert(memcmp(&dm->get_payload()[0], buf, 
                                   dm->get_len()) == 0);
                 }
             }
@@ -383,7 +386,7 @@ void* interrupt_thd(void* arg)
 {
     Network* net = reinterpret_cast<Network*>(arg);
     NetworkEvent ev = net->wait_event(-1);
-    assert(ev.get_event_mask() & E_EMPTY);
+    test_assert(ev.get_event_mask() & E_EMPTY);
     return 0;
 }
 
@@ -597,7 +600,7 @@ public:
             }
             else if (em & E_CONNECTED)
             {
-                assert(sock == send_sock);
+                test_assert(sock == send_sock);
                 log_info << "connected";
                 break;
             }
@@ -670,7 +673,7 @@ public:
                 {
                     fail_unless(dg != 0);
                     recvd += dg->get_len();
-                    assert(recvd <= sent);
+                    test_assert(recvd <= sent);
                 }
             }
             else if (em & E_CLOSED)
@@ -761,7 +764,7 @@ void* producer_thd(void* arg)
         Message msg(&prod, &md);
         Message ack(&prod);
         prod.send(msg, &ack);
-        assert(ack.get_val() == 0 || ack.get_val() == EAGAIN);        
+        test_assert(ack.get_val() == 0 || ack.get_val() == EAGAIN);        
     }
     return 0;
 }

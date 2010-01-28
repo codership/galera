@@ -853,7 +853,9 @@ static DummyNode* create_dummy_node(size_t idx,
                                     const string& retrans_period = "PT1H")
 {
     const string conf = "evs://?" + Conf::EvsViewForgetTimeout + "=PT1H&"
+        + Conf::EvsInactiveCheckPeriod + "=" + to_string(Period(inactive_timeout)/3) + "&"
         + Conf::EvsInactiveTimeout + "=" + inactive_timeout + "&"
+        + Conf::EvsConsensusTimeout + "=" + to_string(Period(inactive_timeout)*2) + "&"
         + Conf::EvsKeepalivePeriod + "=" + retrans_period + "&"
         + Conf::EvsJoinRetransPeriod + "=" + retrans_period;
     list<Protolay*> protos;

@@ -18,6 +18,7 @@ ostream& gcomm::evs::operator<<(ostream& os, const gcomm::evs::MessageNode& node
 {
     os << "node: {";
     os << "operational=" << node.get_operational() << ",";
+    os << "suspected=" << node.get_suspected() << ",";
     os << "leave_seq=" << node.get_leave_seq() << ",";
     os << "view_id=" << node.get_view_id() << ",";
     os << "safe_seq=" << node.get_safe_seq() << ",";
@@ -52,14 +53,16 @@ size_t gcomm::evs::MessageNode::serialize(byte_t* const buf,
                                           size_t        offset) const
     throw(gu::Exception)
 {
-    uint8_t b = operational;
+    uint8_t b = 
+        static_cast<uint8_t>((operational_ == true ? F_OPERATIONAL : 0) | 
+                             (suspected_   == true ? F_SUSPECTED   : 0));
     gu_trace(offset = gcomm::serialize(b, buf, buflen, offset));
     uint8_t pad(0);
     gu_trace(offset = gcomm::serialize(pad, buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(leave_seq, buf, buflen, offset));
-    gu_trace(offset = view_id.serialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::serialize(safe_seq, buf, buflen, offset));
-    gu_trace(offset = im_range.serialize(buf, buflen, offset));    
+    gu_trace(offset = gcomm::serialize(leave_seq_, buf, buflen, offset));
+    gu_trace(offset = view_id_.serialize(buf, buflen, offset));
+    gu_trace(offset = gcomm::serialize(safe_seq_, buf, buflen, offset));
+    gu_trace(offset = im_range_.serialize(buf, buflen, offset));    
     return offset;
 }
 
@@ -71,11 +74,12 @@ size_t gcomm::evs::MessageNode::unserialize(const byte_t* const buf,
 {
     uint8_t b;
     gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &b));
-    if (not (b == 0 || b == 1))
+    if ((b & ~(F_OPERATIONAL | F_SUSPECTED)) != 0)
     {
-        gu_throw_error(EINVAL) << "invalid operational flag " << b;
+        log_warn << "unknown flags: " << static_cast<int>(b);
     }
-    operational = b;
+    operational_ = b & F_OPERATIONAL;
+    suspected_   = b & F_SUSPECTED;
     
     uint8_t pad(0);
     gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &pad));
@@ -83,10 +87,10 @@ size_t gcomm::evs::MessageNode::unserialize(const byte_t* const buf,
     {
         gu_throw_error(EINVAL) << "invalid pad" << pad;
     }
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &leave_seq));
-    gu_trace(offset = view_id.unserialize(buf, buflen, offset));
-    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &safe_seq));
-    gu_trace(offset = im_range.unserialize(buf, buflen, offset));    
+    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &leave_seq_));
+    gu_trace(offset = view_id_.unserialize(buf, buflen, offset));
+    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &safe_seq_));
+    gu_trace(offset = im_range_.unserialize(buf, buflen, offset));    
     return offset;
 }
 
