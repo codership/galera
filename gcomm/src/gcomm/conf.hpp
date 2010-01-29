@@ -135,6 +135,8 @@ namespace gcomm
          * by call from upper layer.
          */
         static std::string const EvsUserSendWindow;
+
+        static std::string const EvsUseAggregate;
         
         /*!
          * PC scheme for Transport URI.

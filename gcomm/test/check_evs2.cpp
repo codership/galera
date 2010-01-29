@@ -62,6 +62,9 @@ START_TEST(test_message)
                    Message::F_SOURCE);
     fail_unless(um.serial_size() % 4 == 0);
     check_serialization(um, um.serial_size(), UserMessage());
+
+    AggregateMessage am(0xab, 17457, 0x79);
+    check_serialization(am, 4, AggregateMessage());
     
     DelegateMessage dm(uuid1, view_id);
     dm.set_source(uuid1);
@@ -1260,6 +1263,39 @@ START_TEST(test_proto_split_two)
 }
 END_TEST
 
+START_TEST(test_aggreg)
+{
+    log_info << "START";
+    const size_t n_nodes(2);
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+    const string inactive_timeout("PT0.31S");
+    const string retrans_period("PT0.1S");
+    
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+    }
+    
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        set_cvi(dn, 0, i, i + 1);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+    
+
+    for (size_t i = 0; i < n_nodes; ++i)
+    {
+        gu_trace(send_n(dn[i], 8));
+    }
+    
+    gu_trace(prop.propagate_until_empty());
+    gu_trace(check_trace(dn));
+    
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
 
 static bool skip(false);
 
@@ -1364,18 +1400,23 @@ Suite* evs2_suite()
         tcase_add_test(tc, test_proto_split_merge_lossy_w_user_msg);
         tcase_set_timeout(tc, 15);
         suite_add_tcase(s, tc);
-    }
-    tc = tcase_create("test_proto_stop_cont");
-    tcase_add_test(tc, test_proto_stop_cont);
-    suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_proto_stop_cont");
+        tcase_add_test(tc, test_proto_stop_cont);
+        suite_add_tcase(s, tc);
     
         
-    tc = tcase_create("test_proto_arbitrate");
-    tcase_add_test(tc, test_proto_arbitrate);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_proto_arbitrate");
+        tcase_add_test(tc, test_proto_arbitrate);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_proto_split_two");
-    tcase_add_test(tc, test_proto_split_two);
+        tc = tcase_create("test_proto_split_two");
+        tcase_add_test(tc, test_proto_split_two);
+        suite_add_tcase(s, tc);
+    }
+    
+    tc = tcase_create("test_aggreg");
+    tcase_add_test(tc, test_aggreg);
     suite_add_tcase(s, tc);
 
 

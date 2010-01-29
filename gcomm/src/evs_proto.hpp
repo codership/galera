@@ -21,6 +21,7 @@
 #include <list>
 #include <deque>
 #include <vector>
+#include <limits>
 
 namespace gcomm
 {
@@ -36,6 +37,7 @@ namespace gcomm
         class InstallMessage;
         class LeaveMessage;
         class InputMap;
+        class InputMapMsg;
         class Proto;
         std::ostream& operator<<(std::ostream&, const Proto&);
     }
@@ -71,7 +73,8 @@ public:
     
     friend std::ostream& operator<<(std::ostream&, const Proto&);
 
-    Proto(const UUID& my_uuid_, const std::string& conf = "evs://");
+    Proto(const UUID& my_uuid_, const std::string& conf = "evs://", 
+          const size_t mtu_ = std::numeric_limits<size_t>::max());
     ~Proto();
     
     const UUID& get_uuid() const { return my_uuid; }
@@ -98,7 +101,10 @@ public:
                   uint8_t,
                   Order, 
                   seqno_t, 
-                  seqno_t);
+                  seqno_t,
+                  bool = false);
+    size_t get_mtu() const { return mtu; }
+    size_t aggregate_len() const;
     int send_user(const seqno_t);
     void complete_user(const seqno_t);
     int send_delegate(gu::net::Datagram&);
@@ -123,6 +129,7 @@ public:
     size_t n_operational() const;
     
     void validate_reg_msg(const UserMessage&);
+    void deliver_finish(const InputMapMsg&);
     void deliver();
     void validate_trans_msg(const UserMessage&);
     void deliver_trans();
@@ -315,8 +322,9 @@ private:
     std::deque<std::pair<gu::net::Datagram, ProtoDownMeta> > output;
     
     uint32_t max_output_size;
-    
-    
+    size_t mtu;
+    bool use_aggregate;
+
     bool self_loopback;
     State state;
     int shift_to_rfcnt;

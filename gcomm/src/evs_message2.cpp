@@ -256,6 +256,36 @@ size_t gcomm::evs::UserMessage::serial_size() const
 }
 
 
+size_t gcomm::evs::AggregateMessage::serialize(byte_t* const buf,
+                                               size_t  const buflen,
+                                               size_t        offset) const
+    throw (gu::Exception)
+{
+    gu_trace(offset = gcomm::serialize(flags_, buf, buflen, offset));
+    gu_trace(offset = gcomm::serialize(user_type_, buf, buflen, offset));
+    gu_trace(offset = gcomm::serialize(len_, buf, buflen, offset));
+    return offset;
+}
+
+
+size_t gcomm::evs::AggregateMessage::unserialize(const byte_t* const buf,
+                                                 size_t const buflen,
+                                                 size_t       offset)
+    throw (gu::Exception)
+{
+    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &flags_));
+    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &user_type_));
+    gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &len_));
+    return offset;
+}
+
+size_t gcomm::evs::AggregateMessage::serial_size() const
+{
+    return gcomm::serial_size(flags_) 
+        + gcomm::serial_size(len_) 
+        + gcomm::serial_size(user_type_);
+}
+
 size_t gcomm::evs::DelegateMessage::serialize(byte_t* const buf,
                                               size_t  const buflen,
                                               size_t        offset) const

@@ -41,7 +41,8 @@ using namespace gcomm::evs;
 
 
 
-gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
+gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf, 
+                         const size_t mtu_) :
     timers(),
     debug_mask(D_STATE),
     info_mask(0),
@@ -91,6 +92,8 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     user_send_window(3),
     output(),
     max_output_size(128),
+    mtu(mtu_),
+    use_aggregate(false),
     self_loopback(false),
     state(S_CLOSED),
     shift_to_rfcnt(0)
@@ -152,6 +155,10 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
                              from_string<seqno_t>(Defaults::EvsUserSendWindow),
                              from_string<seqno_t>(Defaults::EvsUserSendWindowMin),
                              send_window);
+    use_aggregate =
+        conf_param_def(uri,
+                       Conf::EvsUseAggregate,
+                       false);
     
     try
     {
@@ -794,7 +801,8 @@ int gcomm::evs::Proto::send_user(const Datagram& dg,
                                  uint8_t const user_type,
                                  Order  const order, 
                                  seqno_t const win,
-                                 seqno_t const up_to_seqno)
+                                 seqno_t const up_to_seqno,
+                                 bool const aggregated)
 {
     assert(get_state() == S_LEAVING || 
            get_state() == S_RECOVERY || 
@@ -827,6 +835,10 @@ int gcomm::evs::Proto::send_user(const Datagram& dg,
     else 
     {
         flags = Message::F_MSG_MORE;
+    }
+    if (aggregated == true)
+    {
+        flags |= Message::F_AGGREGATE;
     }
     
     UserMessage msg(get_uuid(),
@@ -874,20 +886,84 @@ int gcomm::evs::Proto::send_user(const Datagram& dg,
     return 0;
 }
 
+size_t gcomm::evs::Proto::aggregate_len() const
+{
+    bool is_aggregate(false);
+    size_t ret(0);
+    AggregateMessage am;
+    deque<pair<Datagram, ProtoDownMeta> >::const_iterator i(output.begin());
+    const Order ord(i->second.get_order());
+    ret += i->first.get_len() + am.serial_size();
+    for (++i; i != output.end() && i->second.get_order() == ord; ++i)
+    {
+        if (ret + i->first.get_len() + am.serial_size() <= get_mtu())
+        {
+            ret += i->first.get_len() + am.serial_size();
+            is_aggregate = true;
+        }
+        else
+        {
+            break;
+        }
+    }
+    evs_log_debug(D_USER_MSGS) << "is aggregate " << is_aggregate << " ret " << ret;
+    return (is_aggregate == true ? ret : 0);
+}
+
 int gcomm::evs::Proto::send_user(const seqno_t win)
 {
     gcomm_assert(output.empty() == false);
     gcomm_assert(get_state() == S_OPERATIONAL);
     gcomm_assert(win <= send_window);
-    pair<Datagram, ProtoDownMeta> wb = output.front();
     int ret;
-    if ((ret = send_user(wb.first, 
-                         wb.second.get_user_type(), 
-                         wb.second.get_order(), 
-                         win, 
-                         -1)) == 0) 
+    size_t alen;
+    if (use_aggregate == true && (alen = aggregate_len()) > 0)
     {
-        output.pop_front();
+        // Messages can be aggregated into single message
+        vector<byte_t> bvec(alen);
+        size_t offset(0);
+        size_t n(0);
+
+        deque<pair<Datagram, ProtoDownMeta> >::iterator i(output.begin());
+        Order ord(i->second.get_order());
+        while ((alen > 0 && i != output.end()))
+        {
+            const Datagram& dg(i->first);
+            const ProtoDownMeta dm(i->second);
+            AggregateMessage am(0, dg.get_len(), dm.get_user_type());
+            gcomm_assert(alen >= dg.get_len() + am.serial_size());
+            
+            gu_trace(offset = am.serialize(&bvec[0], bvec.size(), offset));
+            copy(dg.get_header().begin(), dg.get_header().end(), 
+                 &bvec[0] + offset);
+            offset += dg.get_header().size();
+            copy(dg.get_payload().begin(), dg.get_payload().end(),
+                 &bvec[0] + offset);
+            offset += dg.get_payload().size();
+            alen -= dg.get_len() + am.serial_size();
+            ++n;
+            ++i;
+        }
+        Datagram dg(Buffer(bvec.begin(), bvec.end()));
+        if ((ret = send_user(dg, 0xff, ord, win, -1, true)) == 0)
+        {
+            while (n-- > 0)
+            {
+                output.pop_front();
+            }
+        }
+    }
+    else
+    {
+        pair<Datagram, ProtoDownMeta> wb(output.front());
+        if ((ret = send_user(wb.first, 
+                             wb.second.get_user_type(), 
+                             wb.second.get_order(), 
+                             win, 
+                             -1)) == 0) 
+        {
+            output.pop_front();
+        }
     }
     return ret;
 }
@@ -1249,7 +1325,9 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
                        msg.get_order(),
                        msg.get_fifo_seq(),
                        msg.get_user_type(),
-                       Message::F_RETRANS);
+                       static_cast<uint8_t>(
+                           Message::F_RETRANS | 
+                           (msg.get_flags() & Message::F_AGGREGATE)));
         
         push_header(um, rb);
         
@@ -1327,7 +1405,10 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
                        msg.get_order(),
                        msg.get_fifo_seq(),
                        msg.get_user_type(),
-                       Message::F_SOURCE | Message::F_RETRANS);
+                       static_cast<uint8_t>(
+                           Message::F_SOURCE | 
+                           Message::F_RETRANS |
+                           (msg.get_flags() & Message::F_AGGREGATE)));
         
         push_header(um, rb);
         
@@ -1581,7 +1662,6 @@ void gcomm::evs::Proto::handle_up(int cid,
 
 int gcomm::evs::Proto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
 {
-    
     if (get_state() == S_RECOVERY)
     {
         return EAGAIN;
@@ -1839,6 +1919,55 @@ void gcomm::evs::Proto::validate_reg_msg(const UserMessage& msg)
     }
 }
 
+
+void gcomm::evs::Proto::deliver_finish(const InputMapMsg& msg)
+{
+    if ((msg.get_msg().get_flags() & Message::F_AGGREGATE) == 0)
+    {
+        ++delivered_msgs[msg.get_msg().get_order()];
+        if (msg.get_msg().get_order() != O_DROP)
+        {
+            gu_trace(validate_reg_msg(msg.get_msg()));
+            profile_enter(delivery_prof);
+            ProtoUpMeta um(msg.get_msg().get_source(), 
+                           msg.get_msg().get_source_view_id(),
+                           0,
+                           msg.get_msg().get_user_type(),
+                           msg.get_msg().get_seq());
+            gu_trace(send_up(msg.get_rb(), um));
+            profile_leave(delivery_prof);
+        }
+    }
+    else
+    {
+        size_t offset(0);
+        while (offset < msg.get_rb().get_len())
+        {
+            ++delivered_msgs[msg.get_msg().get_order()];
+            AggregateMessage am;
+            gu_trace(am.unserialize(&msg.get_rb().get_payload()[0],
+                                    msg.get_rb().get_payload().size(),
+                                    offset));
+            Datagram dg(Buffer(
+                            &msg.get_rb().get_payload()[0] 
+                            + offset 
+                            + am.serial_size(), 
+                            &msg.get_rb().get_payload()[0] 
+                            + offset 
+                            + am.serial_size()
+                            + am.get_len()));
+            ProtoUpMeta um(msg.get_msg().get_source(), 
+                           msg.get_msg().get_source_view_id(),
+                           0,
+                           am.get_user_type(),
+                           msg.get_msg().get_seq());
+            gu_trace(send_up(dg, um));
+            offset += am.serial_size() + am.get_len();
+        }
+        gcomm_assert(offset == msg.get_rb().get_len());
+    }
+}
+
 void gcomm::evs::Proto::deliver()
 {
     if (delivering == true)
@@ -1896,19 +2025,7 @@ void gcomm::evs::Proto::deliver()
         
         if (deliver == true)
         {
-            ++delivered_msgs[msg.get_msg().get_order()];
-            if (msg.get_msg().get_order() != O_DROP)
-            {
-                gu_trace(validate_reg_msg(msg.get_msg()));
-                profile_enter(delivery_prof);
-                ProtoUpMeta um(msg.get_msg().get_source(), 
-                               msg.get_msg().get_source_view_id(),
-                               0,
-                               msg.get_msg().get_user_type(),
-                               msg.get_msg().get_seq());
-                gu_trace(send_up(msg.get_rb(), um));
-                profile_leave(delivery_prof);
-            }
+            deliver_finish(msg);
             gu_trace(input_map->erase(i));
         }
         else if (input_map->has_deliverables() == false)
@@ -1974,17 +2091,7 @@ void gcomm::evs::Proto::deliver_trans()
         
         if (deliver == true)
         {
-            ++delivered_msgs[msg.get_msg().get_order()];
-            if (msg.get_msg().get_order() != O_DROP)
-            {
-                gu_trace(validate_reg_msg(msg.get_msg()));
-                ProtoUpMeta um(msg.get_msg().get_source(), 
-                               msg.get_msg().get_source_view_id(),
-                               0,
-                               msg.get_msg().get_user_type(),
-                               msg.get_msg().get_seq());
-                gu_trace(send_up(msg.get_rb(), um));
-            }
+            deliver_finish(msg);
             gu_trace(input_map->erase(i));
         }
     }

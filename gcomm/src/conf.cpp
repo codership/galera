@@ -50,6 +50,7 @@ std::string const gcomm::Conf::EvsSendWindow =
     EvsScheme + Delim + "send_window";
 std::string const gcomm::Conf::EvsUserSendWindow =
     EvsScheme + Delim + "user_send_window";
-
+std::string const gcomm::Conf::EvsUseAggregate =
+    EvsScheme + Delim + "use_aggregate";
 // PC
 std::string const gcomm::Conf::PcScheme = "pc";

@@ -23,5 +23,5 @@ std::string const gcomm::Defaults::EvsStatsReportPeriod     = "PT1M";
 std::string const gcomm::Defaults::EvsStatsReportPeriodMin  = "PT1S";
 std::string const gcomm::Defaults::EvsSendWindow            = "32";
 std::string const gcomm::Defaults::EvsSendWindowMin         = "1";
-std::string const gcomm::Defaults::EvsUserSendWindow        = "16";
+std::string const gcomm::Defaults::EvsUserSendWindow        = "3";
 std::string const gcomm::Defaults::EvsUserSendWindowMin     = "1";

@@ -15,6 +15,7 @@
 #include "evs_seqno.hpp"
 
 #include "gu_datetime.hpp"
+#include "gu_convert.hpp"
 
 namespace gcomm
 {
@@ -26,6 +27,8 @@ namespace gcomm
         class Message;
         std::ostream& operator<<(std::ostream&, const Message&);
         class UserMessage;
+        class AggregateMessage;
+        std::ostream& operator<<(std::ostream&, const AggregateMessage&);
         class DelegateMessage;
         class GapMessage;
         class JoinMessage;
@@ -128,11 +131,13 @@ public:
     
     static const uint8_t F_MSG_MORE = 0x1; /*!< Sender has more messages to send  */
     static const uint8_t F_RETRANS   = 0x2; /*!< Message is resent upon request    */
+    
     /*! 
      * @brief Message source has been set explicitly via set_source()
      */
     static const uint8_t F_SOURCE   = 0x4;  
 
+    static const uint8_t F_AGGREGATE = 0x8; /*!< Message contains aggregated payload */
     /*!
      * Get version of the message
      *
@@ -416,6 +421,43 @@ public:
     size_t serial_size() const;
 
 };
+
+
+class gcomm::evs::AggregateMessage
+{
+public:
+    AggregateMessage(const int flags = 0, const size_t len = 0, const uint8_t user_type = 0xff)
+        :
+        flags_    (gu::convert(flags, uint8_t(0))),
+        user_type_(user_type),
+        len_      (gu::convert(len, uint16_t(0)))
+    { }
+    
+    int    get_flags() const { return flags_; }
+    size_t get_len()   const { return len_;   }
+    uint8_t get_user_type() const { return user_type_; }
+    
+    size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
+        throw(gu::Exception);
+    size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
+        throw(gu::Exception);
+    size_t serial_size() const;
+    bool operator==(const AggregateMessage& cmp) const
+    {
+        return (flags_ == cmp.flags_ && len_ == cmp.len_ && user_type_ == cmp.user_type_);
+    }
+
+private:
+    uint8_t  flags_;
+    uint8_t  user_type_;
+    uint16_t len_;
+};
+
+inline std::ostream& gcomm::evs::operator<<(std::ostream& os, const AggregateMessage& am)
+{
+    return (os << "{flags=" << am.get_flags() << ",len=" << am.get_len() << "}");
+}
+
 
 class gcomm::evs::DelegateMessage : public Message
 {

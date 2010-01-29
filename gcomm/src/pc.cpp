@@ -193,7 +193,8 @@ PC::PC(Protonet& net_, const string& uri_) :
     {
         gu_throw_fatal << "invalid UUID: " << uuid;
     }
-    evs = new evs::Proto(uuid, uri.to_string());
+    evs::UserMessage evsum;
+    evs = new evs::Proto(uuid, uri.to_string(), gmcast->get_mtu() - 2*evsum.serial_size());
     pc  = new pc::Proto (uuid);
 }
 
