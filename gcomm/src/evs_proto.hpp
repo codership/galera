@@ -102,7 +102,7 @@ public:
                   Order, 
                   seqno_t, 
                   seqno_t,
-                  bool = false);
+                  size_t n_aggregated = 1);
     size_t get_mtu() const { return mtu; }
     size_t aggregate_len() const;
     int send_user(const seqno_t);

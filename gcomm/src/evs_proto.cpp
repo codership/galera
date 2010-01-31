@@ -802,13 +802,14 @@ int gcomm::evs::Proto::send_user(const Datagram& dg,
                                  Order  const order, 
                                  seqno_t const win,
                                  seqno_t const up_to_seqno,
-                                 bool const aggregated)
+                                 size_t const n_aggregated)
 {
     assert(get_state() == S_LEAVING || 
            get_state() == S_RECOVERY || 
            get_state() == S_OPERATIONAL);
     assert(dg.get_offset() == 0);
-    
+    assert(n_aggregated >= 1 && output.size() >= n_aggregated);
+
     gcomm_assert(up_to_seqno == -1 || up_to_seqno >= last_sent);
     gcomm_assert(up_to_seqno == -1 || win == -1);
 
@@ -826,7 +827,7 @@ int gcomm::evs::Proto::send_user(const Datagram& dg,
     const seqno_t last_msg_seq(seq + seq_range);
     uint8_t flags;
     
-    if (output.size() < 2 || 
+    if (output.size() <= n_aggregated || 
         up_to_seqno != -1 ||
         (win != -1 && is_flow_control(last_msg_seq + 1, win) == true))
     {
@@ -836,7 +837,7 @@ int gcomm::evs::Proto::send_user(const Datagram& dg,
     {
         flags = Message::F_MSG_MORE;
     }
-    if (aggregated == true)
+    if (n_aggregated > 1)
     {
         flags |= Message::F_AGGREGATE;
     }
@@ -923,7 +924,7 @@ int gcomm::evs::Proto::send_user(const seqno_t win)
         vector<byte_t> bvec(alen);
         size_t offset(0);
         size_t n(0);
-
+        
         deque<pair<Datagram, ProtoDownMeta> >::iterator i(output.begin());
         Order ord(i->second.get_order());
         while ((alen > 0 && i != output.end()))
@@ -945,7 +946,7 @@ int gcomm::evs::Proto::send_user(const seqno_t win)
             ++i;
         }
         Datagram dg(Buffer(bvec.begin(), bvec.end()));
-        if ((ret = send_user(dg, 0xff, ord, win, -1, true)) == 0)
+        if ((ret = send_user(dg, 0xff, ord, win, -1, n)) == 0)
         {
             while (n-- > 0)
             {
