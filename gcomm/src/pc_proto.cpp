@@ -81,8 +81,8 @@ void gcomm::pc::Proto::send_state()
     
     Buffer buf;
     serialize(pcs, buf);
-    
-    if (send_down(Datagram(buf), ProtoDownMeta()))
+    Datagram dg(buf);
+    if (send_down(dg, ProtoDownMeta()))
     {
         gu_throw_fatal << "pass down failed";
     }    
@@ -112,8 +112,8 @@ void gcomm::pc::Proto::send_install()
     
     Buffer buf;
     serialize(pci, buf);
-    
-    int ret = send_down(Datagram(buf), ProtoDownMeta());
+    Datagram dg(buf);
+    int ret = send_down(dg, ProtoDownMeta());
     if (ret != 0)
     {
         log_warn << self_id() << " sending install message failed: "
@@ -909,7 +909,7 @@ void gcomm::pc::Proto::handle_up(int cid, const Datagram& rb,
 }
 
 
-int gcomm::pc::Proto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
+int gcomm::pc::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
 {
     if (get_state() != S_PRIM)
     {

@@ -87,14 +87,14 @@ namespace gu
  */
 class gu::net::Datagram
 {
-    Buffer header;
-    boost::shared_ptr<Buffer> payload;
-    size_t offset;
-    /* Disallow assignment, for copying use copy constructor */
-    
-    // void operator=(const Datagram&);
 public:
-    Datagram() : header(), payload(new Buffer()), offset(0) { }
+    Datagram() 
+        : 
+        header_       (), 
+        header_offset_(0), 
+        payload_      (new Buffer()), 
+        offset_       (0) 
+    { }
     /*! 
      * @brief Construct new datagram from byte buffer
      *
@@ -103,7 +103,7 @@ public:
      *
      * @throws std::bad_alloc 
      */
-    Datagram(const Buffer& buf_, size_t offset_ = 0);
+    Datagram(const Buffer& buf, size_t offset = 0);
     
     /*!
      * @brief Copy constructor. 
@@ -116,11 +116,12 @@ public:
      */
     Datagram(const Datagram& dgram, 
              size_t off = std::numeric_limits<size_t>::max()) :
-        header(dgram.header),
-        payload(dgram.payload),
-        offset(off == std::numeric_limits<size_t>::max() ? dgram.offset : off)
+        header_(dgram.header_),
+        header_offset_(dgram.header_offset_),
+        payload_(dgram.payload_),
+        offset_(off == std::numeric_limits<size_t>::max() ? dgram.offset_ : off)
     { 
-        assert(offset <= dgram.get_len());
+        assert(offset_ <= dgram.get_len());
     }
     
     /*! 
@@ -131,17 +132,29 @@ public:
     void normalize();
     
     bool is_normalized() const
-    { return (offset == 0 && header.size() == 0); }
+    { return (offset_ == 0 && header_.size() == 0); }
     
-    Buffer& get_header() { return header; }
-    const Buffer& get_header() const { return header; }
+    Buffer& get_header() { return header_; }
+    const Buffer& get_header() const { return header_; }
+    size_t get_header_offset() const { return header_offset_; }
+    void set_header_offset(const size_t off) 
+    { 
+        assert(off <= header_.size());
+        header_offset_ = off; 
+    }
+    
     const Buffer& get_payload() const 
     { 
-        assert(payload != 0);
-        return *payload; 
+        assert(payload_ != 0);
+        return *payload_; 
     }
-    size_t get_len() const { return (header.size() + payload->size()); }
-    size_t get_offset() const { return offset; }
+    size_t get_len() const { return (header_.size() - header_offset_ + payload_->size()); }
+    size_t get_offset() const { return offset_; }
+private:
+    Buffer header_;
+    size_t header_offset_;
+    boost::shared_ptr<Buffer> payload_;
+    size_t offset_;
 };
 
 

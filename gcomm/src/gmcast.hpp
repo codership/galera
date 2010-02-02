@@ -32,7 +32,7 @@ namespace gcomm
         
         // Protolay interface 
         void handle_up(int, const gu::net::Datagram&, const ProtoUpMeta&);
-        int handle_down(const gu::net::Datagram&, const ProtoDownMeta&);
+        int handle_down(gu::net::Datagram&, const ProtoDownMeta&);
         
         // Transport interface
         bool supports_uuid() const { return true; }

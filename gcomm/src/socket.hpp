@@ -66,7 +66,7 @@ public:
         return new Socket(pnet, acc);
     } 
     
-    int handle_down(const gu::net::Datagram& dg, const ProtoDownMeta& dm)
+    int handle_down(gu::net::Datagram& dg, const ProtoDownMeta& dm)
     {
         return socket->send(&dg);
     }

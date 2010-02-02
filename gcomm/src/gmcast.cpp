@@ -775,24 +775,12 @@ void GMCast::handle_up(int id, const Datagram& dg, const ProtoUpMeta& um)
     }
 }
 
-int GMCast::handle_down(const Datagram& dg, const ProtoDownMeta& dm) 
+int GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm) 
 {
     Message msg(Message::T_USER_BASE, get_uuid(), 1);
     Datagram my_dg(dg);
     gu_trace(push_header(msg, my_dg));
-    
-#if 0
-    for (ProtoMap::iterator i = proto_map->begin(); i != proto_map->end(); ++i)
-    {
-        Proto* rp = ProtoMap::get_value(i);
-        int err;
-        if ((err = rp->get_transport()->handle_down(my_dg, 
-                                                    ProtoDownMeta())) != 0)
-        {
-            log_debug << "transport: " << ::strerror(err);
-        }
-    }
-#endif // 0
+
     for (list<Transport*>::iterator i(mcast_tree.begin()); 
          i != mcast_tree.end(); ++i)
     {

@@ -217,7 +217,7 @@ namespace gcomm
             send_up(rb, um);
         }
         
-        int handle_down(const gu::net::Datagram& wb, const ProtoDownMeta& dm) 
+        int handle_down(gu::net::Datagram& wb, const ProtoDownMeta& dm) 
         {
             if (queue == true)
             {
@@ -421,7 +421,7 @@ namespace gcomm
 
         ~Channel() { }
         
-        int handle_down(const gu::net::Datagram& wb, const ProtoDownMeta& dm)
+        int handle_down(gu::net::Datagram& wb, const ProtoDownMeta& dm)
         {
             gcomm_assert((dm.get_source() == UUID::nil()) == false);
             gu_trace(put(wb, dm.get_source()));

@@ -110,6 +110,23 @@ START_TEST(test_datagram)
         fail_unless(dg.get_payload()[i] == i);
     }
 
+    Datagram dgoff(buf, 16);
+    dgoff.get_header().resize(8);
+    dgoff.set_header_offset(4);
+    fail_unless(dgoff.get_len() == buf.size() + 4);
+    fail_unless(dgoff.get_header_offset() == 4);
+    fail_unless(dgoff.get_header().size() == 8);
+    for (byte_t i = 0; i < 4; ++i)
+    {
+        *(&dgoff.get_header()[0] + i) = i;
+    }
+    
+    dgoff.normalize();
+    
+    fail_unless(dgoff.get_len() == sizeof(b) - 16 + 4);
+    fail_unless(dgoff.get_header_offset() == 0);
+    fail_unless(dgoff.get_header().size() == 0);
+    
 }
 END_TEST
 
@@ -360,6 +377,39 @@ START_TEST(test_network_send)
             sent += dlen;
         }
     }
+
+    for (int i = 0; i < 1000; ++i)
+    {
+        size_t dlen(std::min(bufsize, static_cast<size_t>(1 + i*11)));
+        size_t hdrsize(8);
+        size_t hdroff(dlen > hdrsize ? (rand() % 9) : 8);
+
+//        log_info << hdrsize << " " << hdroff << " " << dlen;
+//        log_info << reinterpret_cast<void*>(buf + (hdrsize - hdroff)) << " " 
+//                 << reinterpret_cast<void*>(buf + dlen - (hdrsize - hdroff));
+        Datagram dm(Buffer(buf + (hdrsize - hdroff), buf + dlen));
+        if (hdroff < hdrsize)
+        {
+            dm.get_header().resize(hdrsize);
+            dm.set_header_offset(hdroff);
+            copy(buf, buf + (hdrsize - hdroff), dm.get_header().begin() + hdroff);
+        }
+        // log_info << "sending " << dlen;
+        if (i % 100 == 0)
+        {
+            log_debug << "sending " << dlen;
+        }
+        int err = conn->send(&dm);
+        if (err != 0)
+        {
+            log_info << err;
+        }
+        else
+        {
+            sent += dlen;
+        }
+    }
+
 
     log_info << "sent " << sent;
     conn->close();
@@ -671,7 +721,7 @@ public:
                 }
                 else
                 {
-                    fail_unless(dg != 0);
+                    test_assert(dg != 0);
                     recvd += dg->get_len();
                     test_assert(recvd <= sent);
                 }

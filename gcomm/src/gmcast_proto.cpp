@@ -48,7 +48,8 @@ void gcomm::gmcast::Proto::send_msg(const Message& msg)
 {
     gu::Buffer buf;
     gu_trace(serialize(msg, buf));
-    int ret = tp->handle_down(gu::net::Datagram(buf), 0);
+    Datagram dg(buf);
+    int ret = tp->handle_down(dg, 0);
     
     // @todo: This can happen during congestion, figure out how to 
     // avoid terminating connection with topology change messages.

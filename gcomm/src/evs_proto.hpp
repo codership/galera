@@ -188,7 +188,7 @@ public:
                     const gu::net::Datagram& dg = gu::net::Datagram());    
     // Protolay
     void handle_up(int, const gu::net::Datagram&, const ProtoUpMeta&);
-    int handle_down(const gu::net::Datagram& wb, const ProtoDownMeta& dm);
+    int handle_down(gu::net::Datagram& wb, const ProtoDownMeta& dm);
     void connect(bool first)
     {
         gu_trace(shift_to(S_JOINING));

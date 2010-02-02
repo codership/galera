@@ -120,7 +120,7 @@ public:
                       const ProtoUpMeta&);
     void handle_up   (int, const gu::net::Datagram&,
                       const ProtoUpMeta&);
-    int  handle_down (const gu::net::Datagram&, const ProtoDownMeta&);
+    int  handle_down (gu::net::Datagram&, const ProtoDownMeta&);
     
     void connect(bool first) 
     { 

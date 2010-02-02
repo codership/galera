@@ -212,7 +212,7 @@ public:
     virtual void close(const UUID& uuid) { }
     
     /* apparently handles data from upper layer. what is return value? */
-    virtual int  handle_down (const gu::net::Datagram&, const ProtoDownMeta&) = 0;
+    virtual int  handle_down (gu::net::Datagram&, const ProtoDownMeta&) = 0;
     virtual void handle_up   (int, const gu::net::Datagram&, const ProtoUpMeta&) = 0;
     
     void set_id(const int id_) { id = id_; }
@@ -280,7 +280,7 @@ public:
     }
     
     /* apparently passes data buffer to lower layer, what is return value? */
-    int send_down(const gu::net::Datagram& dg, const ProtoDownMeta& down_meta)
+    int send_down(gu::net::Datagram& dg, const ProtoDownMeta& down_meta)
     {
 	if (down_context.empty() == true)
         {
@@ -309,7 +309,7 @@ public:
 
 class gcomm::Toplay : public Protolay
 {
-    int handle_down(const gu::net::Datagram& dg, const ProtoDownMeta& dm)
+    int handle_down(gu::net::Datagram& dg, const ProtoDownMeta& dm)
     {
 	gu_throw_fatal << "Toplay handle_down() called";
 	throw;

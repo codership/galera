@@ -18,7 +18,7 @@
 namespace gu
 {
     typedef unsigned char byte_t;
-    
+
     class Buffer
     {
     private:
@@ -50,9 +50,10 @@ namespace gu
         iterator begin() { return buf.begin(); }
         
         iterator end() { return buf.end(); }
+
         const_iterator begin() const { return buf.begin(); }
         const_iterator end()   const { return buf.end(); }
-        
+
         value_type& operator[](size_t i) { return buf[i]; }
         const value_type& operator[](size_t i) const { return buf[i]; }
         value_type& at(size_t i) { return buf.at(i); }

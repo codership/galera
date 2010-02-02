@@ -66,28 +66,38 @@ int gu::net::closefd(int fd)
  * Datagram implementation
  **************************************************************************/
 
-gu::net::Datagram::Datagram(const Buffer& buf_, size_t offset_) :
-    header  (),
-    payload (new Buffer(buf_)),
-    offset  (offset_)
-{ }
+gu::net::Datagram::Datagram(const Buffer& buf, size_t offset) :
+    header_  (),
+    header_offset_(0),
+    payload_ (new Buffer(buf)),
+    offset_  (offset)
+{ 
+    assert(offset_ <= payload_->size());
+}
 
 
 void gu::net::Datagram::normalize()
 {
-    payload = boost::shared_ptr<Buffer>(new Buffer(*payload));
-
-    if (header.size() > 0)
+    assert(header_.size() + payload_->size() >= header_offset_ + offset_);
+    
+    const boost::shared_ptr<Buffer> old_payload(payload_);
+    payload_ = boost::shared_ptr<Buffer>(new Buffer);
+    payload_->reserve(header_.size() + old_payload->size() - (header_offset_ + offset_));
+    
+    if (header_.size() > header_offset_ + offset_)
     {
-        payload->insert(payload->begin(), header.begin(), header.end());
-        header.clear();
+        payload_->insert(payload_->end(), header_.begin() + header_offset_ + offset_, header_.end());
+        offset_ = 0;
     }
-
-    if (offset > 0)
+    else
     {
-        payload->erase(payload->begin(), payload->begin() + offset);
-        offset = 0;
+        offset_ -= (header_.size() - header_offset_);
     }
+    header_offset_ = 0;
+    header_.clear();
+    payload_->insert(payload_->end(), old_payload->begin() + offset_,
+                     old_payload->end());
+    offset_ = 0;
 }
 
 /**************************************************************************
@@ -657,7 +667,7 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
                        reinterpret_cast<byte_t*>(&len), 
                        reinterpret_cast<byte_t*>(&len) + sizeof(len));
         pending.insert(pending.end(),
-                       dgram->get_header().begin(),
+                       dgram->get_header().begin() + dgram->get_header_offset(),
                        dgram->get_header().end());
         pending.insert(pending.end(),
                        dgram->get_payload().begin(),
@@ -681,8 +691,8 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
         
         struct iovec iov[3] = {
             {&hdr, sizeof(hdr)},
-            {const_cast<byte_t*>(&dgram->get_header()[0]), 
-             dgram->get_header().size()},
+            {const_cast<byte_t*>(&dgram->get_header()[0] + dgram->get_header_offset()), 
+             dgram->get_header().size() - dgram->get_header_offset()},
             {const_cast<byte_t*>(&dgram->get_payload()[0]), 
              dgram->get_payload().size()}
         };

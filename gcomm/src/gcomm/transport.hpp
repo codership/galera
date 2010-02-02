@@ -68,7 +68,7 @@ public:
     virtual void       listen();
     virtual Transport* accept();
     
-    virtual int  handle_down(const gu::net::Datagram&, const ProtoDownMeta&) = 0;
+    virtual int  handle_down(gu::net::Datagram&, const ProtoDownMeta&) = 0;
     virtual void handle_up  (int, const gu::net::Datagram&, const ProtoUpMeta&) = 0;
 
     Protostack& get_pstack() { return pstack; }

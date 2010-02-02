@@ -808,7 +808,7 @@ int gcomm::evs::Proto::send_user(const Datagram& dg,
            get_state() == S_RECOVERY || 
            get_state() == S_OPERATIONAL);
     assert(dg.get_offset() == 0);
-    assert(n_aggregated >= 1 && output.size() >= n_aggregated);
+    assert(n_aggregated == 1 || output.size() >= n_aggregated);
 
     gcomm_assert(up_to_seqno == -1 || up_to_seqno >= last_sent);
     gcomm_assert(up_to_seqno == -1 || win == -1);
@@ -1025,7 +1025,8 @@ void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
     
     Buffer buf;
     serialize(gm, buf);
-    int err = send_down(Datagram(buf), ProtoDownMeta());
+    Datagram dg(buf);
+    int err = send_down(dg, ProtoDownMeta());
     if (err != 0)
     {
         log_debug << "send failed: " << strerror(err);
@@ -1162,7 +1163,8 @@ void gcomm::evs::Proto::send_join(bool handle)
     
     Buffer buf;
     serialize(jm, buf);
-    int err = send_down(buf, ProtoDownMeta());
+    Datagram dg(buf);
+    int err = send_down(dg, ProtoDownMeta());
     
     if (err != 0) 
     {
@@ -1213,8 +1215,8 @@ void gcomm::evs::Proto::send_leave(bool handle)
     
     Buffer buf;
     serialize(lm, buf);
-    
-    int err = send_down(Datagram(buf), ProtoDownMeta());
+    Datagram dg(buf);
+    int err = send_down(dg, ProtoDownMeta());
     if (err != 0)
     {
         log_debug << "send failed " << strerror(err);
@@ -1273,8 +1275,8 @@ void gcomm::evs::Proto::send_install()
 
     Buffer buf;
     serialize(imsg, buf);
-    
-    int err = send_down(Datagram(buf), ProtoDownMeta());
+    Datagram dg(buf);
+    int err = send_down(dg, ProtoDownMeta());
     if (err != 0) 
     {
         log_debug << "send failed: " << strerror(err);
@@ -1661,7 +1663,7 @@ void gcomm::evs::Proto::handle_up(int cid,
 }
 
 
-int gcomm::evs::Proto::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
+int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
 {
     if (get_state() == S_RECOVERY)
     {

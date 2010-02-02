@@ -48,7 +48,7 @@ void PC::handle_up(int cid, const Datagram& rb,
 }
 
 
-int PC::handle_down(const Datagram& wb, const ProtoDownMeta& dm)
+int PC::handle_down(Datagram& wb, const ProtoDownMeta& dm)
 {
     if (wb.get_len() == 0)
     {
