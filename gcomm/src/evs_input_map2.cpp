@@ -250,7 +250,6 @@ gcomm::evs::InputMap::insert(const size_t uuid,
 {
     try
     {
-    assert(rb.is_normalized() == true);
     Range range;
     
     // Only insert messages with meaningful seqno
@@ -300,11 +299,11 @@ gcomm::evs::InputMap::insert(const size_t uuid,
         
         if (msg_i == msg_index_->end())
         {
+            Datagram ins_dg(s == msg.get_seq() ? Datagram(rb) : Datagram());
+            ins_dg.normalize();
             gu_trace((void)msg_index_->insert_unique(
                          make_pair(InputMapMsgKey(node.get_index(), s), 
-                                   InputMapMsg(msg, 
-                                               s == msg.get_seq() ? rb : 
-                                               Datagram()))));
+                                   InputMapMsg(msg, ins_dg))));
             ++n_msgs_[msg.get_order()];
         }
 

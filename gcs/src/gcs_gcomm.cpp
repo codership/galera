@@ -437,10 +437,13 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
     }
     else
     {
+        Datagram dg(Buffer(reinterpret_cast<const byte_t*>(buf), 
+                           reinterpret_cast<const byte_t*>(buf) + len));
+        dg.get_header().resize(128);
+        dg.set_header_offset(128);
         Lock lock(conn.get_pnet().get_mutex());
         int err = conn.send_down(
-            Datagram(Buffer(reinterpret_cast<const byte_t*>(buf), 
-                            reinterpret_cast<const byte_t*>(buf) + len)), 
+            dg,
             ProtoDownMeta(msg_type));
         return (err == 0 ? len : -err);
     }

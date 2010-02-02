@@ -1140,6 +1140,8 @@ public:
             byte_t buf[16];
             memset(buf, 0xa, sizeof(buf));
             Datagram dg(Buffer(buf, buf + sizeof(buf)));
+            dg.get_header().resize(128);
+            dg.set_header_offset(128);
             int ret = send_down(dg, ProtoDownMeta(my_type));
             if (ret != 0)
             {

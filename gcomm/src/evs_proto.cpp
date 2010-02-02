@@ -91,6 +91,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf,
     send_window(8), 
     user_send_window(3),
     output(),
+    send_buf_(),
     max_output_size(128),
     mtu(mtu_),
     use_aggregate(false),
@@ -179,6 +180,10 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf,
     NodeMap::get_value(self_i).set_index(0);
     input_map->reset(1);
     current_view.add_member(my_uuid, "");
+    if (mtu_ != numeric_limits<size_t>::max())
+    {
+        send_buf_.reserve(mtu_);
+    }
 }
 
 
@@ -797,7 +802,7 @@ bool gcomm::evs::Proto::is_flow_control(const seqno_t seq, const seqno_t win) co
     return false;
 }
 
-int gcomm::evs::Proto::send_user(const Datagram& dg,
+int gcomm::evs::Proto::send_user(Datagram& dg,
                                  uint8_t const user_type,
                                  Order  const order, 
                                  seqno_t const win,
@@ -809,10 +814,10 @@ int gcomm::evs::Proto::send_user(const Datagram& dg,
            get_state() == S_OPERATIONAL);
     assert(dg.get_offset() == 0);
     assert(n_aggregated == 1 || output.size() >= n_aggregated);
-
+    
     gcomm_assert(up_to_seqno == -1 || up_to_seqno >= last_sent);
     gcomm_assert(up_to_seqno == -1 || win == -1);
-
+    
     int ret;
     const seqno_t seq(last_sent + 1);
     
@@ -854,12 +859,8 @@ int gcomm::evs::Proto::send_user(const Datagram& dg,
     
     // Insert first to input map to determine correct aru seq
     Range range;
-    
-    Datagram send_dg(dg);
-    send_dg.normalize();
-    
     gu_trace(range = input_map->insert(NodeMap::get_value(self_i).get_index(), 
-                                       msg, send_dg));
+                                       msg, dg));
     
     gcomm_assert(range.get_hs() == last_msg_seq) 
         << msg << " " << *input_map << " " << *this;
@@ -872,12 +873,12 @@ int gcomm::evs::Proto::send_user(const Datagram& dg,
     
     msg.set_aru_seq(input_map->get_aru_seq());
     evs_log_debug(D_USER_MSGS) << " sending " << msg;
-    push_header(msg, send_dg);
-    if ((ret = send_down(send_dg, ProtoDownMeta())) != 0)
+    gu_trace(push_header(msg, dg));
+    if ((ret = send_down(dg, ProtoDownMeta())) != 0)
     {
         log_debug << "send failed: "  << strerror(ret);
     }
-    pop_header(msg, send_dg);
+    gu_trace(pop_header(msg, dg));
     sent_msgs[Message::T_USER]++;
     
     if (delivering == false && input_map->has_deliverables() == true)
@@ -921,7 +922,7 @@ int gcomm::evs::Proto::send_user(const seqno_t win)
     if (use_aggregate == true && (alen = aggregate_len()) > 0)
     {
         // Messages can be aggregated into single message
-        vector<byte_t> bvec(alen);
+        send_buf_.resize(alen);
         size_t offset(0);
         size_t n(0);
         
@@ -934,18 +935,20 @@ int gcomm::evs::Proto::send_user(const seqno_t win)
             AggregateMessage am(0, dg.get_len(), dm.get_user_type());
             gcomm_assert(alen >= dg.get_len() + am.serial_size());
             
-            gu_trace(offset = am.serialize(&bvec[0], bvec.size(), offset));
-            copy(dg.get_header().begin(), dg.get_header().end(), 
-                 &bvec[0] + offset);
-            offset += dg.get_header().size();
+            gu_trace(offset = am.serialize(&send_buf_[0], 
+                                           send_buf_.size(), offset));
+            copy(dg.get_header().begin() + dg.get_header_offset(), 
+                 dg.get_header().end(), 
+                 &send_buf_[0] + offset);
+            offset += (dg.get_header().size() - dg.get_header_offset());
             copy(dg.get_payload().begin(), dg.get_payload().end(),
-                 &bvec[0] + offset);
+                 &send_buf_[0] + offset);
             offset += dg.get_payload().size();
             alen -= dg.get_len() + am.serial_size();
             ++n;
             ++i;
         }
-        Datagram dg(Buffer(bvec.begin(), bvec.end()));
+        Datagram dg(Buffer(send_buf_.begin(), send_buf_.end()));
         if ((ret = send_user(dg, 0xff, ord, win, -1, n)) == 0)
         {
             while (n-- > 0)
@@ -2245,7 +2248,6 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     if (msg.get_seq() >= prev_range.get_lu())
     {
         Datagram im_dgram(rb, rb.get_offset());
-        im_dgram.normalize();
         gu_trace(range = input_map->insert(inst.get_index(), msg, im_dgram));
         if (range.get_lu() > prev_range.get_lu())
         {

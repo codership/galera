@@ -97,7 +97,7 @@ public:
     void reset_stats();
 
     bool is_flow_control(const seqno_t, const seqno_t win) const;
-    int send_user(const gu::net::Datagram&, 
+    int send_user(gu::net::Datagram&, 
                   uint8_t,
                   Order, 
                   seqno_t, 
@@ -320,7 +320,7 @@ private:
     seqno_t user_send_window;
     // Output message queue
     std::deque<std::pair<gu::net::Datagram, ProtoDownMeta> > output;
-    
+    std::vector<gu::byte_t> send_buf_;
     uint32_t max_output_size;
     size_t mtu;
     bool use_aggregate;

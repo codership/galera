@@ -909,7 +909,7 @@ void gcomm::pc::Proto::handle_up(int cid, const Datagram& rb,
 }
 
 
-int gcomm::pc::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
+int gcomm::pc::Proto::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 {
     if (get_state() != S_PRIM)
     {
@@ -918,11 +918,10 @@ int gcomm::pc::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
     
     uint32_t    seq(last_sent_seq_ + 1);
     UserMessage um(seq);
-    Datagram    down_dg(wb);
     
-    push_header(um, down_dg);
+    push_header(um, dg);
     
-    int ret = send_down(down_dg, dm);
+    int ret = send_down(dg, dm);
     
     if (ret == 0)
     {
@@ -932,6 +931,8 @@ int gcomm::pc::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
     {
         log_warn << "Proto::handle_down: " << strerror(ret);
     }
+
+    pop_header(um, dg);
 
     return ret;
 }

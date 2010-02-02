@@ -321,6 +321,8 @@ namespace gcomm
             size_t sz;
             gu_trace(sz = serialize(seq, buf, sizeof(buf), 0));
             gu::net::Datagram dg(gu::Buffer(buf, buf + sz)); 
+            dg.get_header().resize(128);
+            dg.set_header_offset(128);
             int err = send_down(dg, ProtoDownMeta(0));
             if (err != 0)
             {

@@ -21,6 +21,7 @@
 
 #include "gu_logger.hpp"
 #include "gu_datetime.hpp"
+#include "gu_network.hpp"
 
 #include <cerrno>
 
@@ -292,7 +293,15 @@ public:
         for (CtxList::iterator i = down_context.begin(); 
              i != down_context.end(); ++i)
         {
+            const size_t hdr_size(dg.get_header().size());
+            const size_t hdr_offset(dg.get_header_offset());
             int err = i->first->handle_down(dg, down_meta);
+            // Verify that lower layer rolls back any modifications to 
+            // header
+            if (hdr_size - hdr_offset != dg.get_header().size() - dg.get_header_offset())
+            {
+                gu_throw_fatal;
+            }
             if (err != 0)
             {
                 ret = err;

@@ -778,20 +778,19 @@ void GMCast::handle_up(int id, const Datagram& dg, const ProtoUpMeta& um)
 int GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm) 
 {
     Message msg(Message::T_USER_BASE, get_uuid(), 1);
-    Datagram my_dg(dg);
-    gu_trace(push_header(msg, my_dg));
-
+    gu_trace(push_header(msg, dg));
+    
     for (list<Transport*>::iterator i(mcast_tree.begin()); 
          i != mcast_tree.end(); ++i)
     {
         // log_info << self_string() << " mcast: " << (*i)->get_remote_addr();
         int err;
-        if ((err = (*i)->handle_down(my_dg, ProtoDownMeta())) != 0)
+        if ((err = (*i)->handle_down(dg, ProtoDownMeta())) != 0)
         {
             log_debug << "transport: " << ::strerror(err);
         }
     }
-    
+    gu_trace(pop_header(msg, dg));
     return 0;
 }
 
