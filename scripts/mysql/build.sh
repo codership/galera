@@ -9,19 +9,20 @@ fi
 usage()
 {
     echo -e "Usage: build.sh [OPTIONS] \n" \
-	"Options:                      \n" \
-        "    --stage <initial stage>   \n" \
-	"    --last-stage <last stage> \n" \
-	"    -s|--scratch    build everything from scratch\n"\
-	"    -c|--configure  reconfigure the build system (implies -s)\n"\
-	"    -b|--bootstap   rebuild the build system (implies -c)\n"\
-	"    -o|--opt        configure build with debug disabled (implies -c)\n"\
-	"    -m32/-m64       build 32/64-bit binaries on x86\n"\
-	"    -d|--debug      configure build with debug enabled (implies -c)\n"\
-	"    --with-spread   configure build with Spread (implies -c)\n"\
-	"    --no-strip      prevent stripping of release binaries\n"\
-	"    -r|--release <galera release>, otherwise revisions will be used"\
-        "\n -s and -b options affect only Galera build.\n"
+"Options:                      \n" \
+"    --stage <initial stage>   \n" \
+"    --last-stage <last stage> \n" \
+"    -s|--scratch    build everything from scratch\n"\
+"    -c|--configure  reconfigure the build system (implies -s)\n"\
+"    -b|--bootstap   rebuild the build system (implies -c)\n"\
+"    -o|--opt        configure build with debug disabled (implies -c)\n"\
+"    -m32/-m64       build 32/64-bit binaries on x86\n"\
+"    -d|--debug      configure build with debug enabled (implies -c)\n"\
+"    --with-spread   configure build with Spread (implies -c)\n"\
+"    --no-strip      prevent stripping of release binaries\n"\
+"    -r|--release <galera release>, otherwise revisions will be used"\
+"    -p|--package    create Debian packages"
+"\n -s and -b options affect only Galera build.\n"
 }
 
 # Initializing variables to defaults
@@ -30,6 +31,7 @@ DEBUG=no
 NO_STRIP=no
 RELEASE=""
 TAR=no
+PACKAGE=no
 INSTALL=no
 CONFIGURE=no
 
@@ -61,6 +63,9 @@ do
             ;;
         -t|--tar)
             TAR=yes       # Create a TGZ package
+            ;;
+        -p|--package)
+            PACKAGE=yes       # Create a DEB package
             ;;
         -i|--install)
             INSTALL=yes
@@ -101,7 +106,7 @@ if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
 
 # export command options for Galera build
-export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD CFLAGS CXXFLAGS
+export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD CFLAGS CXXFLAGS PACKAGE CPU
 
 set -eu
 
@@ -147,9 +152,10 @@ then
         DEBUG_OPT=""
     fi
 
-    BUILD/compile-${CPU}${DEBUG_OPT}-wsrep
+    export MYSQL_BUILD_PREFIX="/usr"
+    BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
 else # just recompile and relink with old configuration
-    make
+    make > /dev/null
 fi
 
 ######################################
@@ -235,8 +241,6 @@ RELEASE_NAME=$(echo mysql-$MYSQL_VER-$GALERA_RELEASE | sed s/\:/_/g)
 rm -rf $RELEASE_NAME
 mv $DIST_DIR $RELEASE_NAME
 
-sleep 2
-
 # Pack the release
 if [ "$TAR" == "yes" ]
 then
@@ -249,4 +253,37 @@ then
     $cmd stop
     $cmd install $RELEASE_NAME.tgz
 fi
+
+build_packages()
+{
+    local ARCH_DEB
+    local ARCH_RPM
+    if [ "$CPU" == "pentium" ]
+    then
+        ARCH_DEB=i386
+        ARCH_RPM=i386
+    else
+        ARCH_DEB=amd64
+        ARCH_RPM=x86_64
+    fi
+
+    export MYSQL_SRC MYSQL_VER GALERA_SRC RELEASE_NAME
+
+    echo $MYSQL_SRC $MYSQL_VER ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
+
+    WHOAMI=$(whoami)
+    EPM=/usr/bin/epm
+
+#   sudo -E $EPM -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" mysql-wsrep  && \
+    pushd $GALERA_SRC/scripts/packages                   && \
+    sudo -E $EPM -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" mysql-wsrep && \
+    sudo /bin/chown $WHOAMI.users -R * || \
+    return 1
+}
+
+if [ "$PACKAGE" == "yes" ]
+then
+    build_packages
+fi
 #
+

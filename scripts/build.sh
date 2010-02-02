@@ -23,7 +23,7 @@ usage()
 
 # disable building vsbes by default
 DISABLE_VSBES=${DISABLE_VSBES:-"yes"}
-PACKAGE=no
+PACKAGE=${PACKAGE:-"no"}
 SOURCE=no
 RELEASE=""
 
@@ -164,10 +164,9 @@ build_flags()
 
 build_packages()
 {
-    local ARCH=$(uname -m)
     local ARCH_DEB
     local ARCH_RPM
-    if [ "$ARCH" == "i686" ]
+    if [ "$CPU" == "pentium" ]
     then
         ARCH_DEB=i386
         ARCH_RPM=i386
@@ -179,14 +178,17 @@ build_packages()
     if [ "$DISABLE_GCOMM" != "yes" ]; then export GCOMM=yes; fi
     if [ "$DISABLE_VSBES" != "yes" ]; then export VSBES=yes; fi
 
+    local WHOAMI=$(whoami)
+
     export BUILD_BASE=$build_base
     echo GCOMM=$GCOMM VSBES=$VSBES ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
     pushd $build_base/scripts/packages                       && \
     rm -rf $ARCH_DEB $ARCH_RPM                               && \
-    epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" galera     && \
-    epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" galera-dev && \
-    epm -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" galera     && \
-    epm -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" galera-dev || \
+#    /usr/bin/epm -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" galera     && \
+#    /usr/bin/epm -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" galera-dev && \
+    sudo -E /usr/bin/epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" galera && \
+#    sudo -E /usr/bin/epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" galera-dev && \
+    sudo /bin/chown -R $WHOAMI.users * || \
     return 1
 }
 

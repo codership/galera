@@ -1,0 +1,217 @@
+# This is a MySQL-wsrep package description for ESP package manager
+
+%product     wsrep-enabled MySQL server, clients and libraries.
+%copyright   MySQL AB, Codership Oy, All Rights Reserved
+%vendor      Codership Oy
+%license     COPYING
+%readme      README
+%description MySQL server patched to make use of wsrep replication interface (https://launchpad.net/wsrep).
+$mysql_version=5.1.42
+$wsrep_version=0.7.3pre
+%version     ${mysql_version}-${wsrep_version}
+
+%provides    mysql-server-core-5.1
+%provides    mysql-server-core
+%provides    mysql-server-5.1
+%provides    mysql-server
+%provides    mysql-client-5.1
+%provides    mysql-client
+%provides    mysql-common-5.1
+%provides    mysql-common
+%provides    libmysqlclient16
+#%provides    mysql
+
+#%incompat    mysql-server-core
+%incompat    mysql-server-core-4.1
+%incompat    mysql-server-core-5.0
+%incompat    mysql-server-core-5.1
+#%incompat    mysql-server
+%incompat    mysql-server-4.1
+%incompat    mysql-server-5.0
+%incompat    mysql-server-5.1
+#%incompat    mysql-client
+%incompat    mysql-client-4.1
+%incompat    mysql-client-5.0
+%incompat    mysql-client-5.1
+%incompat    mysql-common
+%incompat    mysql-common-4.1
+%incompat    mysql-common-5.0
+%incompat    mysql-common-5.1
+%incompat    libmysqlclient16
+
+%replaces    mysql-server-core     0.0.0 ${mysql_version}
+#%replaces    mysql-server-core-4.1
+#%replaces    mysql-server-core-5.0
+%replaces    mysql-server-core-5.1 0.0.0 ${mysql_version}
+%replaces    mysql-server          0.0.0 ${mysql_version}
+%replaces    mysql-server-4.1
+%replaces    mysql-server-5.0
+%replaces    mysql-server-5.1      0.0.0 ${mysql_version}
+%replaces    mysql-client          0.0.0 ${mysql_version}
+%replaces    mysql-client-4.1
+%replaces    mysql-client-5.0
+%replaces    mysql-client-5.1      0.0.0 ${mysql_version}
+%replaces    mysql-common          0.0.0 ${mysql_version}
+%replaces    mysql-common-4.1
+%replaces    mysql-common-5.0
+%replaces    mysql-common-5.1      0.0.0 ${mysql_version}
+%replaces    libmysqlclient16      0.0.0 ${mysql_version}
+
+%requires    debianutils       1.6
+%requires    libc6             2.4
+%requires    libdbi-perl
+%requires    libdbd-mysql-perl 1.2202
+%requires    libgcc1           4.1.1
+%requires    libncurses5       5.6
+%requires    libstdc++6        4.1.1
+%requires    libwrap0          7.6
+%requires    perl
+%requires    zlib1g            1.1.4
+
+$prefix=/usr
+
+$CONF_DST=/etc/mysql
+$LIBS_DST=${prefix}/lib
+$SHAR_DST=${prefix}/share/mysql
+$SBIN_DST=${prefix}/sbin
+$BINS_DST=${prefix}/bin
+$DOCS_DST=${prefix}/share/doc/mysql
+$LIBEXEC_DST=${prefix}/libexec
+
+# Documentation
+d 755 root root $DOCS_DST -
+f 644 root root $DOCS_DST/COPYING           $MYSQL_SRC/COPYING
+f 644 root root $DOCS_DST/EXCEPTIONS-CLIENT $MYSQL_SRC/EXCEPTIONS-CLIENT
+f 644 root root $DOCS_DST/README            $MYSQL_SRC/README
+f 644 root root $DOCS_DST/README-wsrep      ${GALERA_SRC}/scripts/mysql/README-wsrep
+
+# libmysqlclient
+d 755 root root $LIBS_DST -
+f 755 root root $LIBS_DST/libmysqlclient.so.16.0.0   $MYSQL_SRC/libmysql/.libs/libmysqlclient.so.16.0.0
+f 755 root root $LIBS_DST/libmysqlclient_r.so.16.0.0 $MYSQL_SRC/libmysql_r/.libs/libmysqlclient_r.so.16.0.0
+
+# mysql-client
+d 755 root root $BINS_DST -
+f 755 root root $BINS_DST/mysql                $MYSQL_SRC/client/.libs/mysql
+f 755 root root $BINS_DST/mysqladmin           $MYSQL_SRC/client/.libs/mysqladmin
+f 755 root root $BINS_DST/mysqlcheck           $MYSQL_SRC/client/.libs/mysqlcheck
+f 755 root root $BINS_DST/mysqldump            $MYSQL_SRC/client/.libs/mysqldump
+f 755 root root $BINS_DST/mysqlimport          $MYSQL_SRC/client/.libs/mysqlimport
+f 755 root root $BINS_DST/mysqlshow            $MYSQL_SRC/client/.libs/mysqlshow
+f 755 root root $BINS_DST/mysqlslap            $MYSQL_SRC/client/.libs/mysqlslap
+f 755 root root $BINS_DST/innochecksum         $MYSQL_SRC/extra/innochecksum
+f 755 root root $BINS_DST/mysql_waitpid        $MYSQL_SRC/extra/mysql_waitpid
+f 755 root root $BINS_DST/mysql_find_rows      $MYSQL_SRC/scripts/mysql_find_rows
+f 755 root root $BINS_DST/mysql_fix_extensions $MYSQL_SRC/scripts/mysql_fix_extensions
+f 755 root root $BINS_DST/mysqlaccess          $MYSQL_SRC/scripts/mysqlaccess
+f 755 root root $BINS_DST/mysqlbug             $MYSQL_SRC/scripts/mysqlbug
+f 755 root root $BINS_DST/mysqldumpslow        $MYSQL_SRC/scripts/mysqldumpslow
+f 755 root root $BINS_DST/mysql_client_test    $MYSQL_SRC/tests/mysql_client_test
+# man files are absent from LP mysql branch
+d 755 root root $SBIN_DST -
+f 755 root root $SBIN_DST/mysqlmanager         $MYSQL_SRC/server-tools/instance-manager/mysqlmanager
+
+# mysql-common - sort of
+d 755 root root $CONF_DST -
+f 644 root root $CONF_DST/my.cnf               $GALERA_SRC/scripts/mysql/debian/my.cnf
+d 755 root root $CONF_DST/conf.d -
+
+# mysql-server-5.1
+f 644 root root $CONF_DST/conf.d/mysqld_safe_syslog.cnf $GALERA_SRC/scripts/mysql/debian/mysqld_safe_syslog.cnf
+f 644 root root $CONF_DST/conf.d/wsrep.cnf     $MYSQL_SRC/support-files/wsrep.cnf
+f 755 root root $BINS_DST/mysql_upgrade        $MYSQL_SRC/client/.libs/mysql_upgrade
+f 755 root root $BINS_DST/mysqlbinlog          $MYSQL_SRC/client/.libs/mysqlbinlog
+f 755 root root $BINS_DST/mysqltest            $MYSQL_SRC/client/.libs/mysqltest
+f 755 root root $BINS_DST/my_print_defaults    $MYSQL_SRC/extra/my_print_defaults
+f 755 root root $BINS_DST/perror               $MYSQL_SRC/extra/perror
+f 755 root root $BINS_DST/replace              $MYSQL_SRC/extra/replace
+f 755 root root $BINS_DST/resolve_stack_dump   $MYSQL_SRC/extra/resolve_stack_dump
+f 755 root root $BINS_DST/resolveip            $MYSQL_SRC/extra/resolveip
+f 755 root root $BINS_DST/msql2mysql           $MYSQL_SRC/scripts/msql2mysql
+f 755 root root $BINS_DST/mysql_convert_table_format $MYSQL_SRC/scripts/mysql_convert_table_format
+f 755 root root $BINS_DST/mysql_fix_privilege_tables $MYSQL_SRC/scripts/mysql_fix_privilege_tables
+f 755 root root $BINS_DST/mysql_install_db     $MYSQL_SRC/scripts/mysql_install_db
+f 755 root root $BINS_DST/mysql_secure_installation $MYSQL_SRC/scripts/mysql_secure_installation
+f 755 root root $BINS_DST/mysql_setpermission  $MYSQL_SRC/scripts/mysql_setpermission
+f 755 root root $BINS_DST/mysql_zap            $MYSQL_SRC/scripts/mysql_zap
+f 755 root root $BINS_DST/mysqld_multi         $MYSQL_SRC/scripts/mysqld_multi
+f 755 root root $BINS_DST/mysqld_safe          $MYSQL_SRC/scripts/mysqld_safe
+f 755 root root $BINS_DST/mysqlhotcopy         $MYSQL_SRC/scripts/mysqlhotcopy
+f 755 root root $BINS_DST/wsrep_sst_mysqldump  $MYSQL_SRC/scripts/wsrep_sst_mysqldump
+f 755 root root $BINS_DST/mysql_tzinfo_to_sql  $MYSQL_SRC/sql/mysql_tzinfo_to_sql
+f 755 root root $BINS_DST/myisamchk            $MYSQL_SRC/storage/myisam/myisamchk
+f 755 root root $BINS_DST/myisamlog            $MYSQL_SRC/storage/myisam/myisamlog
+f 755 root root $BINS_DST/myisampack           $MYSQL_SRC/storage/myisam/myisampack
+
+f 644 root root $SHAR_DST/errmsg.txt           $MYSQL_SRC/sql/share/errmsg.txt
+f 644 root root $SHAR_DST                      $MYSQL_SRC/scripts/*.sql
+
+d 755 root root $DOCS_DST/examples -
+f 644 root root $DOCS_DST/examples             $MYSQL_SRC/support-files/*.cnf
+
+d 755 mysql root /var/run/mysqld -
+d 755 mysql adm  /var/log/mysql  -
+
+d 755 root root /etc/init.d -
+f 755 root root /etc/init.d/mysql              $GALERA_SRC/scripts/mysql/debian/mysql
+
+# mysql-server-core-5.1
+d 755 root root $LIBEXEC_DST -
+f 755 root root $LIBEXEC_DST/mysqld            $MYSQL_SRC/sql/mysqld
+d 755 root root $SHAR_DST/english -
+f 644 root root $SHAR_DST/english/errmsg.sys   $MYSQL_SRC/sql/share/english/errmsg.sys
+d 755 root root $SHAR_DST/charsets -
+f 644 root root $SHAR_DST/charsets             $MYSQL_SRC/sql/share/charsets/*
+# dirty hack for the time being that mysqld segfaults
+#d 755 mysql mysql /var/lib/mysql       -
+#d 750 mysql mysql /var/lib/mysql/mysql -
+#d 750 mysql mysql /var/lib/mysql/test  -
+#f 640 mysql mysql /var/lib/mysql/mysql $GALERA_SRC/scripts/mysql/$RELEASE_NAME/mysql/var/mysql/*
+#f 640 mysql mysql /var/lib/mysql/test  $GALERA_SRC/scripts/mysql/$RELEASE_NAME/mysql/var/test/*
+
+%preinstall <<EOF_PRE
+id mysql >/dev/null 2>&1 || (adduser --system --group --disabled-password --disabled-login --home=/var/lib/mysql --shell=/bin/false mysql)
+EOF_PRE
+
+$mysql_data=/var/lib/mysql
+%postinstall <<EOF_POST
+update-rc.d -f mysql remove >/dev/null || exit $
+ldconfig -n $LIBS_DST
+test -d ${mysql_data} || (mysql_install_db --user=mysql --datadir=${mysql_data})
+EOF_POST
+
+%postremove <<EOF_POSTREMOVE
+if [ -x /usr/sbin/invoke-rc.d ]; then
+    invoke-rc.d mysql stop
+else
+    /etc/init.d/mysql stop
+fi
+update-rc.d -f mysql remove >/dev/null || exit $
+EOF_POSTREMOVE
+
+#%ifdef GCOMM
+#f 755 root root $LIBS_DST $BUILD_BASE/gcomm/src/.libs/libgcomm.so.*.*.*
+#%endif
+#%ifdef VSBES
+#f 755 root root $LIBS_DST $BUILD_BASE/galeracomm/common/src/.libs/libgcommcommonpp.so.*.*.*
+#f 755 root root $LIBS_DST $BUILD_BASE/galeracomm/transport/src/.libs/libgcommtransportpp.so.*.*.*
+#f 755 root root $LIBS_DST $BUILD_BASE/galeracomm/vs/src/.libs/libgcommvspp.so.*.*.*
+#%endif
+
+#%format deb # Debian packages come with bad file ownership
+#%postinstall <<EOF_DEB
+#chown -R root.root $SBIN_DST $LIBS_DST
+#ldconfig -n $LIBS_DST
+#EOF_DEB
+
+#%format rpm
+#%postinstall <<EOF_RPM
+#ldconfig -n $LIBS_DST
+#EOF_RPM
+
+#%format all
+#%preremove <<EOF2
+#rm -f $$(find $LIBS_DST -type l)
+#EOF2
+
+#
