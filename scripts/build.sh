@@ -166,7 +166,8 @@ build_packages()
 {
     local ARCH_DEB
     local ARCH_RPM
-    if [ "$CPU" == "pentium" ]
+
+    if file $build_base/gcs/src/gcs.o | grep "80386" >/dev/null 2>&1
     then
         ARCH_DEB=i386
         ARCH_RPM=i386
@@ -181,6 +182,7 @@ build_packages()
     local WHOAMI=$(whoami)
 
     export BUILD_BASE=$build_base
+    export GALERA_VER=$RELEASE
     echo GCOMM=$GCOMM VSBES=$VSBES ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
     pushd $build_base/scripts/packages                       && \
     rm -rf $ARCH_DEB $ARCH_RPM                               && \
@@ -236,14 +238,7 @@ build_sources()
         srcs="$srcs $src"
     done
 
-    if [ -z "$RELEASE" ]
-    then
-        pushd "$build_base"
-        RELEASE="r$(svnversion | sed s/\:/,/g)"
-        popd
-    fi
-
-    local ret="galera-source-$RELEASE.tar"
+    local ret="galera-source-r$RELEASE.tar"
     tar --transform 's/.*\///' -cf $ret $srcs \
     "source/README_BUILD" "source/COPYING" "source/build.sh"
 
@@ -267,6 +262,13 @@ building="false"
 
 echo "CC: $CC"
 echo "CPPFLAGS: $CPPFLAGS"
+
+if [ -z "$RELEASE" ]
+then
+    pushd "$build_base"
+    RELEASE="$(svnversion | sed s/\:/,/g)"
+    popd
+fi
 
 build_module "galerautils"
 build_module "gcache"

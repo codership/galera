@@ -5,9 +5,9 @@
 %vendor      Codership Oy
 %license     COPYING
 %readme      README
-%description MySQL server patched to make use of wsrep replication interface (https://launchpad.net/wsrep).
-$mysql_version=5.1.42
-$wsrep_version=0.7.3pre
+%description MySQL + wsrep patch (https://launchpad.net/codership-mysql). All-in-one: contains libraries, client and server.
+$mysql_version=${MYSQL_VER}
+$wsrep_version=${WSREP_VER}
 %version     ${mysql_version}-${wsrep_version}
 
 %provides    mysql-server-core-5.1
