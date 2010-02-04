@@ -123,7 +123,7 @@ gu::net::Socket::Socket(Network& net_,
     max_pending     (max_pending_),
     recv_buf        (mtu + hdrlen),
     recv_buf_offset (0),
-    dgram           (),
+    dgram           (Buffer()),
     pending         (),
     state           (S_CLOSED),
     net             (net_)
@@ -750,7 +750,110 @@ const gu::net::Datagram* gu::net::Socket::recv(const int flags)
         err_no = ENOTCONN;
         return 0;
     }
+
+    if (recv_buf_offset == 0 && dgram.get_payload().size() > 0)
+    {
+        dgram.set_header_offset(dgram.get_header_size());
+        dgram.get_payload().clear();
+    }
     
+    if (recv_buf_offset != 0 && has_unread_data() == true)
+    {
+        if (peek == false)
+        {
+            recv_buf_offset = 0;
+        }
+        return &dgram;
+    }
+    
+    if (dgram.get_header_len() < hdrlen)
+    {
+        ssize_t r(::recv(fd, 
+                         dgram.get_header() 
+                         + dgram.get_header_offset() 
+                         - (hdrlen - dgram.get_header_len()), 
+                         hdrlen - dgram.get_header_len(),
+                         recv_flags));
+        if (r < 0)
+        {
+            switch (errno)
+            {
+            case EAGAIN:
+                return 0;
+            default:
+                set_state(S_FAILED, errno);
+                return 0;
+            }
+        }
+        else if (r == 0)
+        {
+            set_state(S_CLOSED);
+            return 0;
+        }
+        else
+        {
+            dgram.set_header_offset(dgram.get_header_offset() - r);
+        }
+        if (dgram.get_header_len() < hdrlen)
+        {
+            return 0;
+        }
+    }
+    
+    assert(dgram.get_len() >= hdrlen);
+    uint32_t len(0);
+    unserialize(dgram.get_header() + dgram.get_header_offset(),
+                hdrlen, 0, &len);
+    
+    if (dgram.get_payload().size() != len)
+    {
+        dgram.get_payload().resize(static_cast<size_t>(len));
+    }
+    assert(len - recv_buf_offset > 0);
+    struct iovec iov[1] = { 
+        //{dgram.get_header() 
+        // + dgram.get_header_offset()
+        // - (hdrlen - dgram.get_header_len()),
+        // hdrlen - dgram.get_header_len()},
+        {&dgram.get_payload()[0] + recv_buf_offset,
+         len - recv_buf_offset}
+    };
+    struct msghdr mhdr = {0, 0, iov, 1, 0, 0, 0};
+    ssize_t r(recvmsg(fd, &mhdr, recv_flags)); 
+    
+    if (r < 0)
+    {
+        switch (errno)
+        {
+        case EAGAIN:
+            return 0;
+        default:
+            set_state(S_FAILED, errno);
+            return 0;
+        }
+    }
+    else if (r == 0)
+    {
+        set_state(S_CLOSED);
+        return 0;
+    }
+    else
+    {
+        recv_buf_offset += r;
+        if (recv_buf_offset == len)
+        {
+            // dgram = Datagram(dgram, hdrlen);
+            dgram.set_header_offset(dgram.get_header_size());
+            if (peek == false)
+            {
+                recv_buf_offset = 0;
+            }
+            return &dgram;
+        }
+    }
+    return 0;
+    
+#if 0
     if (recv_buf_offset > hdrlen)
     {
         uint32_t len = 0;
@@ -838,6 +941,7 @@ const gu::net::Datagram* gu::net::Socket::recv(const int flags)
     // We should not get here if peek is not set
     assert(peek == true);
     return 0;
+#endif // 0
 }
 
 

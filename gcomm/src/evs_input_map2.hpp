@@ -99,6 +99,14 @@ private:
 };
 
 
+#if 1
+
+class DummyMutex
+{
+public:
+    void lock() { }
+    void unlock() {}
+};
 
 class gcomm::evs::InputMapMsgIndex : 
     public Map<InputMapMsgKey, InputMapMsg,
@@ -106,9 +114,20 @@ class gcomm::evs::InputMapMsgIndex :
                         InputMapMsg, 
                         std::less<InputMapMsgKey>,
                         boost::fast_pool_allocator<
-                            std::pair<const InputMapMsgKey, InputMapMsg> > > >
+                            std::pair<const InputMapMsgKey, InputMapMsg>,
+                            boost::default_user_allocator_new_delete,
+                            DummyMutex> > >
 { };
+#else
 
+class gcomm::evs::InputMapMsgIndex : 
+    public Map<InputMapMsgKey, InputMapMsg> { };
+//               std::map<InputMapMsgKey, 
+//                        InputMapMsg, 
+//                        std::less<InputMapMsgKey>,
+//                        boost::fast_pool_allocator<
+//                            std::pair<const InputMapMsgKey, InputMapMsg> > > >
+#endif // 0
 
 /* Internal node representation */
 class gcomm::evs::InputMapNode

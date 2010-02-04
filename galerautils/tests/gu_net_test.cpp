@@ -230,13 +230,13 @@ void* listener_thd(void* arg)
             }
             else
             {
-                fail_unless(dm != 0);
+                test_assert(dm != 0);
                 bytes += dm->get_len();
                 if (buf != 0)
                 {
                     test_assert(dm->get_len() <= buflen);
                     test_assert(memcmp(&dm->get_payload()[0], buf, 
-                                  dm->get_len()) == 0);
+                                       dm->get_len() - dm->get_offset()) == 0);
                 }
             }
         }
@@ -537,6 +537,7 @@ START_TEST(test_network_nonblocking)
     make_connections(net, cl, sr, 3);
     
     close_connections(net, cl, sr);
+
     for_each(cl.begin(), cl.end(), DeleteObject());
     for_each(sr.begin(), sr.end(), DeleteObject());
 
@@ -726,7 +727,7 @@ public:
                 else
                 {
                     test_assert(dg != 0);
-                    recvd += dg->get_len();
+                    recvd += dg->get_len() - dg->get_offset();
                     test_assert(recvd <= sent);
                 }
             }

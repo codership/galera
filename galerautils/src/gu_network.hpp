@@ -155,6 +155,11 @@ public:
         assert(payload_ != 0);
         return *payload_; 
     }
+    Buffer& get_payload()
+    {
+        assert(payload_ != 0);
+        return *payload_;
+    }
     size_t get_len() const { return (header_size_ - header_offset_ + payload_->size()); }
     size_t get_offset() const { return offset_; }
 private:
@@ -408,7 +413,8 @@ public:
     std::string get_remote_addr() const { return remote_addr; }
     size_t get_mtu() const { return mtu; }
     
-    bool has_unread_data() const { return (recv_buf_offset > 0); }
+    bool has_unread_data() const { return (recv_buf_offset > 0 && 
+                                           recv_buf_offset == dgram.get_payload().size()); }
     
     size_t get_recv_buf_offset() const { return recv_buf_offset; }
     size_t get_recv_buf_hdr_len() const

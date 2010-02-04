@@ -827,9 +827,9 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
         return EAGAIN;
     }
     
-    const seqno_t seq_range(up_to_seqno == -1 ? 0 : up_to_seqno - seq);
+    seqno_t seq_range(up_to_seqno == -1 ? 0 : up_to_seqno - seq);
     gcomm_assert(seq_range <= 0xff);
-    const seqno_t last_msg_seq(seq + seq_range);
+    seqno_t last_msg_seq(seq + seq_range);
     uint8_t flags;
     
     if (output.size() <= n_aggregated || 
@@ -845,6 +845,18 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
     if (n_aggregated > 1)
     {
         flags |= Message::F_AGGREGATE;
+    }
+    
+    if ((flags & Message::F_MSG_MORE) == 0 && up_to_seqno == -1)
+    {
+        seq_range = input_map->get_max_hs() - seq;
+        seq_range = max(static_cast<seqno_t>(0), seq_range);
+        seq_range = min(static_cast<seqno_t>(0xff), seq_range);
+        if (seq_range != 0)
+        {
+            log_info << "adjusted seq range to: " << seq_range;
+            last_msg_seq = seq + seq_range;
+        }
     }
     
     UserMessage msg(get_uuid(),
@@ -2301,14 +2313,15 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     }
     
     // Seqno range completion and acknowledgement
+    const seqno_t max_hs(input_map->get_max_hs());
     if (output.empty()                          == true            && 
         get_state()                             != S_LEAVING       && 
         (msg.get_flags() & Message::F_MSG_MORE) == 0               &&
-        (last_sent                              <  range.get_hs()))
+        (last_sent                              <  max_hs))
     {
         // Message not originated from this instance, output queue is empty
         // and last_sent seqno should be advanced
-        gu_trace(complete_user(range.get_hs()));
+        gu_trace(complete_user(max_hs));
     }
     else if (output.empty()           == true  && 
              input_map->get_aru_seq() != prev_aru)
@@ -2459,15 +2472,26 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     // 
     if (get_state() == S_OPERATIONAL)
     {
-        profile_enter(send_user_prof);
-        while (output.empty() == false)
+        if (output.empty() == false)
         {
-            int err;
-            gu_trace(err = send_user(send_window));
-            if (err != 0)
-                break;
+            profile_enter(send_user_prof);
+            while (output.empty() == false)
+            {
+                int err;
+                gu_trace(err = send_user(send_window));
+                if (err != 0)
+                    break;
+            }
+            profile_leave(send_user_prof);
         }
-        profile_leave(send_user_prof);
+        else
+        {
+            const seqno_t max_hs(input_map->get_max_hs());
+            if (last_sent <  max_hs)
+            {
+                gu_trace(complete_user(max_hs));
+            }
+        }
     }
     
     if (input_map->has_deliverables() == true)
