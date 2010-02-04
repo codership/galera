@@ -4,13 +4,14 @@
 
 
 #include "evs_input_map2.hpp"
-
+#include "gcomm/util.hpp"
 #include "gu_exception.hpp"
 #include "gu_logger.hpp"
-
+#include "gu_buffer.hpp"
 #include <stdexcept>
 #include <numeric>
 
+using namespace gu;
 using namespace std;
 using namespace std::rel_ops;
 
@@ -299,14 +300,15 @@ gcomm::evs::InputMap::insert(const size_t uuid,
         
         if (msg_i == msg_index_->end())
         {
-            Datagram ins_dg(s == msg.get_seq() ? Datagram(rb) : Datagram());
-            ins_dg.normalize();
+            Datagram ins_dg(s == msg.get_seq() ? 
+                            Datagram(rb)       :
+                            Datagram());
             gu_trace((void)msg_index_->insert_unique(
                          make_pair(InputMapMsgKey(node.get_index(), s), 
                                    InputMapMsg(msg, ins_dg))));
             ++n_msgs_[msg.get_order()];
         }
-
+        
         // Update highest seen
         if (range.get_hs() < s)
         {

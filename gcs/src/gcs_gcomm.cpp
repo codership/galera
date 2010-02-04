@@ -25,6 +25,7 @@ extern "C"
 
 
 #include "gcomm/transport.hpp"
+#include "gcomm/util.hpp"
 #include "gu_prodcons.hpp"
 
 #ifdef PROFILE_GCS_GCOMM
@@ -439,8 +440,6 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
     {
         Datagram dg(Buffer(reinterpret_cast<const byte_t*>(buf), 
                            reinterpret_cast<const byte_t*>(buf) + len));
-        dg.get_header().resize(128);
-        dg.set_header_offset(128);
         Lock lock(conn.get_pnet().get_mutex());
         int err = conn.send_down(
             dg,
@@ -527,7 +526,8 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
     {
         assert(dg.get_len() > dg.get_offset());
 
-        size_t pload_len(dg.get_len() - dg.get_offset());
+        const byte_t* b(get_begin(dg));
+        const size_t pload_len(get_available(dg));
         
         if (pload_len > len)
         {
@@ -535,7 +535,7 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
             return pload_len;
         }
         
-        memcpy(buf, &dg.get_payload()[0] + dg.get_offset(), pload_len);
+        memcpy(buf, b, pload_len);
         *msg_type = static_cast<gcs_msg_type_t>(um.get_user_type());
         recv_buf.pop_front();
         return pload_len;

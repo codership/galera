@@ -86,7 +86,9 @@ public:
         msg  (m.msg ),
         rb   (m.rb  )
     { }
-            
+
+    ~InputMapMsg() { }
+    
     const UserMessage& get_msg () const { return msg;  }
     const gu::net::Datagram&    get_rb  () const { return rb;   }
 private:

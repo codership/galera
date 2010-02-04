@@ -53,18 +53,10 @@ namespace gcomm
 #else
         if (dg.get_header_offset() < msg.serial_size())
         {
-            const size_t prev_size(dg.get_header().size());
-            dg.get_header().resize((dg.get_header().size() - dg.get_header_offset()) + msg.serial_size());
-            std::copy_backward(
-                dg.get_header().begin() + dg.get_header_offset(),
-                dg.get_header().begin() + prev_size,
-                dg.get_header().end());
-            dg.set_header_offset(dg.get_header_offset() 
-                                 + (dg.get_header().size() - prev_size));
+            gu_throw_fatal;
         }
-        assert(dg.get_header_offset() >= msg.serial_size());
-        msg.serialize(&dg.get_header()[0], 
-                      dg.get_header().size(),
+        msg.serialize(dg.get_header(), 
+                      dg.get_header_size(),
                       dg.get_header_offset() - msg.serial_size());
         dg.set_header_offset(dg.get_header_offset() - msg.serial_size());
 #endif
@@ -79,10 +71,24 @@ namespace gcomm
                 dg.get_header().size() - msg.serial_size());
         dg.get_header().resize(dg.get_header().size() - msg.serial_size());
 #else
-        assert(dg.get_header().size() >= dg.get_header_offset() + msg.serial_size());
+        assert(dg.get_header_size() >= dg.get_header_offset() + msg.serial_size());
         dg.set_header_offset(dg.get_header_offset() + msg.serial_size());
 #endif
     }
+
+    inline const gu::byte_t* get_begin(const gu::net::Datagram& dg)
+    {
+        return (dg.get_offset() < dg.get_header_len() ?
+                dg.get_header() + dg.get_header_offset() + dg.get_offset() :
+                &dg.get_payload()[0] + (dg.get_offset() - dg.get_header_len()));
+    }
+    inline size_t get_available(const gu::net::Datagram& dg)
+    {
+        return (dg.get_offset() < dg.get_header_len() ?
+                dg.get_header_len() - dg.get_offset() :
+                dg.get_payload().size() - (dg.get_offset() - dg.get_header_len()));
+    }
+
 } // namespace gcomm
 
 #endif // _GCOMM_UTIL_HPP_

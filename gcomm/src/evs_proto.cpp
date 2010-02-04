@@ -937,10 +937,10 @@ int gcomm::evs::Proto::send_user(const seqno_t win)
             
             gu_trace(offset = am.serialize(&send_buf_[0], 
                                            send_buf_.size(), offset));
-            copy(dg.get_header().begin() + dg.get_header_offset(), 
-                 dg.get_header().end(), 
+            copy(dg.get_header() + dg.get_header_offset(), 
+                 dg.get_header() + dg.get_header_size(), 
                  &send_buf_[0] + offset);
-            offset += (dg.get_header().size() - dg.get_header_offset());
+            offset += (dg.get_header_len());
             copy(dg.get_payload().begin(), dg.get_payload().end(),
                  &send_buf_[0] + offset);
             offset += dg.get_payload().size();
@@ -1322,7 +1322,8 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
         const UserMessage& msg(InputMapMsgIndex::get_value(msg_i).get_msg());
         gcomm_assert(msg.get_source() == get_uuid());
         Datagram rb(InputMapMsgIndex::get_value(msg_i).get_rb());
-        assert(rb.get_offset() == 0 && rb.get_header().size() == 0);
+        assert(rb.get_offset() == 0);
+
         UserMessage um(msg.get_source(),
                        msg.get_source_view_id(),
                        msg.get_seq(),
@@ -1346,6 +1347,7 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
         else
         {
             evs_log_debug(D_RETRANS) << "retransmitted " << um;
+            log_info << "retrans " << um;
         }
         seq = seq + msg.get_seq_range() + 1;
         retrans_msgs++;
@@ -1401,8 +1403,9 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
         
         const UserMessage& msg(InputMapMsgIndex::get_value(msg_i).get_msg());
         assert(msg.get_source() == range_uuid);
+
         Datagram rb(InputMapMsgIndex::get_value(msg_i).get_rb());
-        assert(rb.get_offset() == 0 && rb.get_header().size() == 0);
+        assert(rb.get_offset() == 0);
         UserMessage um(msg.get_source(),
                        msg.get_source_view_id(),
                        msg.get_seq(),
@@ -1423,6 +1426,10 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
         {
             log_debug << "send failed: " << strerror(err);
             break;
+        }
+        else
+        {
+            log_info << "recover " << um;
         }
         seq = seq + msg.get_seq_range() + 1;
         recovered_msgs++;
@@ -1587,9 +1594,11 @@ size_t gcomm::evs::Proto::unserialize_message(const UUID& source,
 {
     
     size_t offset;
-    gu_trace(offset = msg->unserialize(&rb.get_payload()[0], 
-                                       rb.get_payload().size(), 
-                                       rb.get_offset()));
+    const byte_t* begin(get_begin(rb));
+    const size_t available(get_available(rb));
+    gu_trace(offset = msg->unserialize(begin,
+                                       available,
+                                       0));
     if ((msg->get_flags() & Message::F_SOURCE) == 0)
     {
         gcomm_assert(source != UUID::nil());
@@ -1603,30 +1612,30 @@ size_t gcomm::evs::Proto::unserialize_message(const UUID& source,
         break;
     case Message::T_USER:
         gu_trace(offset = static_cast<UserMessage&>(*msg).unserialize(
-                     &rb.get_payload()[0], rb.get_payload().size(), offset, true));
+                     begin, available, offset, true));
         break;
     case Message::T_DELEGATE:
         gu_trace(offset = static_cast<DelegateMessage&>(*msg).unserialize(
-                     &rb.get_payload()[0], rb.get_payload().size(), offset, true));
+                     begin, available, offset, true));
         break;
     case Message::T_GAP:
         gu_trace(offset = static_cast<GapMessage&>(*msg).unserialize(
-                     &rb.get_payload()[0], rb.get_payload().size(), offset, true));
+                     begin, available, offset, true));
         break;
     case Message::T_JOIN:
         gu_trace(offset = static_cast<JoinMessage&>(*msg).unserialize(
-                     &rb.get_payload()[0], rb.get_payload().size(), offset, true));
+                     begin, available, offset, true));
         break;
     case Message::T_INSTALL:
         gu_trace(offset = static_cast<InstallMessage&>(*msg).unserialize(
-                     &rb.get_payload()[0], rb.get_payload().size(), offset, true));
+                     begin, available, offset, true));
         break;
     case Message::T_LEAVE:
         gu_trace(offset = static_cast<LeaveMessage&>(*msg).unserialize(
-                     &rb.get_payload()[0], rb.get_payload().size(), offset, true));
+                     begin, available, offset, true));
         break;
     }
-    return offset;
+    return (offset + rb.get_offset());
 }
 
 void gcomm::evs::Proto::handle_up(int cid, 
@@ -1940,7 +1949,15 @@ void gcomm::evs::Proto::deliver_finish(const InputMapMsg& msg)
                            0,
                            msg.get_msg().get_user_type(),
                            msg.get_msg().get_seq());
-            gu_trace(send_up(msg.get_rb(), um));
+            try
+            {
+                send_up(msg.get_rb(), um);
+            }
+            catch (...)
+            {
+                log_info << msg.get_msg() << " " << msg.get_rb().get_len();
+                throw;
+            }
             profile_leave(delivery_prof);
         }
     }
@@ -2248,6 +2265,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     if (msg.get_seq() >= prev_range.get_lu())
     {
         Datagram im_dgram(rb, rb.get_offset());
+        im_dgram.normalize();
         gu_trace(range = input_map->insert(inst.get_index(), msg, im_dgram));
         if (range.get_lu() > prev_range.get_lu())
         {
@@ -2349,7 +2367,8 @@ void gcomm::evs::Proto::handle_delegate(const DelegateMessage& msg,
                                         const Datagram& rb)
 {
     gcomm_assert(ii != known.end());
-    evs_log_debug(D_DELEGATE_MSGS) << "delegate message " << msg;
+    // evs_log_debug(D_DELEGATE_MSGS) << "delegate message " << msg;
+    log_info << "delegate";
     Message umsg;
     size_t offset;
     gu_trace(offset = unserialize_message(UUID::nil(), rb, &umsg));

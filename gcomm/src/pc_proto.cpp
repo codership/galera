@@ -897,9 +897,9 @@ void gcomm::pc::Proto::handle_up(int cid, const Datagram& rb,
     else
     {
         Message msg;
-        
-        if (msg.unserialize(&rb.get_payload()[0], rb.get_payload().size(), 
-                            rb.get_offset()) == 0)
+        const byte_t* b(get_begin(rb));
+        const size_t available(get_available(rb));
+        if (msg.unserialize(b, available, 0) == 0)
         {
             gu_throw_fatal << "Could not read message";
         }

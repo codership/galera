@@ -708,11 +708,19 @@ void GMCast::handle_up(int id, const Datagram& dg, const ProtoUpMeta& um)
     else if (mcast != 0 && id == mcast->get_fd())
     {
         Message msg;
-        msg.unserialize(&dg.get_payload()[0], dg.get_len(), dg.get_offset());
+        if (dg.get_offset() < dg.get_header_len())
+        {
+            msg.unserialize(dg.get_header(), dg.get_header_size(), 
+                            dg.get_header_offset() + dg.get_offset());
+        }
+        else
+        {
+            msg.unserialize(&dg.get_payload()[0], dg.get_len(), dg.get_offset());
+        }
         if (msg.get_type() >= Message::T_USER_BASE)
         {
             send_up(Datagram(dg, dg.get_offset() + msg.serial_size()),
-                        ProtoUpMeta(msg.get_source_uuid()));
+                    ProtoUpMeta(msg.get_source_uuid()));
         }
         else
         {

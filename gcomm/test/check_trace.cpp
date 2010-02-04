@@ -127,10 +127,10 @@ public:
 void gcomm::Channel::put(const Datagram& rb, const UUID& source) 
 { 
     Datagram dg(rb);
-    if (dg.is_normalized() == false)
-    {
-        dg.normalize();
-    }
+//    if (dg.is_normalized() == false)
+    //  {
+    //   dg.normalize();
+    // }
     queue.push_back(make_pair(latency, ChannelMsg(dg, source)));
 }
 

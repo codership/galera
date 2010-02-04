@@ -123,10 +123,11 @@ void get_msg(Datagram* rb, Message* msg, bool release = true)
     }
     else
     {
-        assert(rb->get_header().size() == 0 && rb->get_offset() == 0);
-
-        fail_unless(msg->unserialize(&rb->get_payload()[0], 
-                                     rb->get_payload().size(), 0) != 0);
+        // assert(rb->get_header().size() == 0 && rb->get_offset() == 0);
+        const byte_t* begin(get_begin(*rb));
+        const size_t available(get_available(*rb));
+        fail_unless(msg->unserialize(begin,
+                                     available, 0) != 0);
         log_info << "get_msg: " << msg->to_string();
         if (release)
             delete rb;
@@ -1140,8 +1141,8 @@ public:
             byte_t buf[16];
             memset(buf, 0xa, sizeof(buf));
             Datagram dg(Buffer(buf, buf + sizeof(buf)));
-            dg.get_header().resize(128);
-            dg.set_header_offset(128);
+            // dg.get_header().resize(128);
+            // dg.set_header_offset(128);
             int ret = send_down(dg, ProtoDownMeta(my_type));
             if (ret != 0)
             {

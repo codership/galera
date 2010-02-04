@@ -221,7 +221,7 @@ namespace gcomm
         {
             if (queue == true)
             {
-                assert(wb.get_header().size() == 0);
+                // assert(wb.get_header().size() == 0);
                 out.push_back(new gu::net::Datagram(wb));
                 return 0;
             }
@@ -321,8 +321,6 @@ namespace gcomm
             size_t sz;
             gu_trace(sz = serialize(seq, buf, sizeof(buf), 0));
             gu::net::Datagram dg(gu::Buffer(buf, buf + sz)); 
-            dg.get_header().resize(128);
-            dg.set_header_offset(128);
             int err = send_down(dg, ProtoDownMeta(0));
             if (err != 0)
             {
@@ -355,11 +353,24 @@ namespace gcomm
             if (rb.get_len() != 0)
             {
                 gcomm_assert((um.get_source() == UUID::nil()) == false);
-                assert(rb.get_header().size() == 0);
+                // assert(rb.get_header().size() == 0);
+                const gu::byte_t* begin(get_begin(rb));
+                const size_t available(get_available(rb));
+
+                
+                log_info << um.get_source() << " " << get_uuid() 
+                         << " " << available ;
+                log_info << rb.get_len() << " " << rb.get_offset() << " "
+                         << rb.get_header_len();
+                if (available != 8)
+                {
+                    log_info << "check_trace fail";
+                }
+                gcomm_assert(available == 8);
                 int64_t seq;
-                gu_trace(gcomm::unserialize(&rb.get_payload()[0], 
-                                            rb.get_payload().size(), 
-                                            rb.get_offset(),
+                gu_trace(gcomm::unserialize(begin,
+                                            available,
+                                            0,
                                             &seq));
                 tr.insert_msg(TraceMsg(um.get_source(), um.get_source_view_id(),
                                        seq));

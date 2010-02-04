@@ -81,7 +81,9 @@ START_TEST(test_datagram)
     // Normal copy construction
     Datagram dgcopy(buf);
     fail_unless(dgcopy.get_len() == sizeof(b));
-    fail_unless(dgcopy.get_header() == dg.get_header());
+    fail_unless(memcmp(dgcopy.get_header() + dgcopy.get_header_offset(),
+                       dg.get_header() + dg.get_header_offset(),
+                       dg.get_header_len()) == 0);
     fail_unless(dgcopy.get_payload() == dg.get_payload());
     
     // Copy construction from offset of 16
@@ -93,6 +95,7 @@ START_TEST(test_datagram)
         fail_unless(dg16.get_payload()[i + dg16.get_offset()] == i + 16);
     }
     
+#if 0
     // Normalize datagram, all data is moved into payload, data from
     // beginning to offset is discarded. Normalization must not change
     // dg
@@ -126,7 +129,7 @@ START_TEST(test_datagram)
     fail_unless(dgoff.get_len() == sizeof(b) - 16 + 4);
     fail_unless(dgoff.get_header_offset() == 0);
     fail_unless(dgoff.get_header().size() == 0);
-    
+#endif // 0    
 }
 END_TEST
 
@@ -378,6 +381,7 @@ START_TEST(test_network_send)
         }
     }
 
+#if 0
     for (int i = 0; i < 1000; ++i)
     {
         size_t dlen(std::min(bufsize, static_cast<size_t>(1 + i*11)));
@@ -392,7 +396,7 @@ START_TEST(test_network_send)
         {
             dm.get_header().resize(hdrsize);
             dm.set_header_offset(hdroff);
-            copy(buf, buf + (hdrsize - hdroff), dm.get_header().begin() + hdroff);
+            std::copy(buf, buf + (hdrsize - hdroff), dm.get_header().begin() + hdroff);
         }
         // log_info << "sending " << dlen;
         if (i % 100 == 0)
@@ -409,7 +413,7 @@ START_TEST(test_network_send)
             sent += dlen;
         }
     }
-
+#endif // 0
 
     log_info << "sent " << sent;
     conn->close();
