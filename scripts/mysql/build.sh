@@ -42,37 +42,36 @@ while test $# -gt 0
 do
     case $1 in
         -b|--bootstrap)
-            BOOTSTRAP=yes # Bootstrap the build system
+            BOOTSTRAP="yes" # Bootstrap the build system
             ;;
         -c|--configure)
-            CONFIGURE=yes # Reconfigure the build system
+            CONFIGURE="yes" # Reconfigure the build system
             ;;
         -s|--scratch)
-            SCRATCH=yes   # Build from scratch (run make clean)
+            SCRATCH="yes"   # Build from scratch (run make clean)
             ;;
         -o|--opt)
-            OPT=yes       # Compile without debug
+            OPT="yes"       # Compile without debug
             ;;
         -d|--debug)
-            DEBUG=yes     # Compile with debug
-            NO_STRIP=yes  # Don't strip the binaries
+            DEBUG="yes"     # Compile with debug
+            NO_STRIP="yes"  # Don't strip the binaries
             ;;
         -r|--release)
-            RELEASE="$2"  # Compile without debug
+            RELEASE="$2"    # Compile without debug
             shift
             ;;
         -t|--tar)
-            TAR=yes       # Create a TGZ package
+            TAR="yes"       # Create a TGZ package
             ;;
         -i|--install)
-            TAR=yes
-            INSTALL=yes
+            INSTALL="yes"
             ;;
         -p|--package)
-            PACKAGE=yes   # Create a DEB package
+            PACKAGE="yes"   # Create a DEB package
             ;;
         --no-strip)
-            NO_STRIP=yes  # Don't strip the binaries
+            NO_STRIP="yes"  # Don't strip the binaries
             ;;
         --with*-spread)
             WITH_SPREAD="$1"
@@ -80,13 +79,13 @@ do
         -m32)
             CFLAGS="$CFLAGS -m32"
             CXXFLAGS="$CXXFLAGS -m32"
-            CONFIGURE=yes
+            CONFIGURE="yes"
             CPU="pentium"
             ;;
         -m64)
             CFLAGS="$CFLAGS -m64"
             CXXFLAGS="$CXXFLAGS -m64"
-            CONFIGURE=yes
+            CONFIGURE="yes"
             CPU="amd64"
             ;;
         --help)
@@ -124,7 +123,7 @@ GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
 ##                                  ##
 ######################################
 # Also obtain SVN revision information
-if [ $TAR == "yes" ]
+if [ "$TAR" == "yes" ]
 then
     cd $GALERA_SRC
     GALERA_REV=$(svnversion | sed s/\:/,/g)
@@ -173,7 +172,8 @@ then
     fi
 fi
 
-# Build mysqld
+echo  "Building mysqld"
+
 export MYSQL_REV
 export GALERA_REV
 if [ "$CONFIGURE" == "yes" ]
@@ -189,12 +189,17 @@ then
     export MYSQL_BUILD_PREFIX="/usr"
     BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
 else # just recompile and relink with old configuration
+    set -x
     make > /dev/null
+    set +x
 fi
 
 # gzip manpages
 # this should be rather fast, so we can repeat it every time
-cd $MYSQL_SRC/man && for i in *.1 *.8; do gzip -c $i > $i.gz; done || :
+if [ "$PACKAGE" == "yes" ]
+then
+    cd $MYSQL_SRC/man && for i in *.1 *.8; do gzip -c $i > $i.gz; done || :
+fi
 
 ######################################
 ##                                  ##
@@ -202,7 +207,8 @@ cd $MYSQL_SRC/man && for i in *.1 *.8; do gzip -c $i > $i.gz; done || :
 ##                                  ##
 ######################################
 
-if [ $TAR == "yes " ]; then
+if [ $TAR == "yes" ]; then
+echo "Creating test package"
 # Create build directory structure
 DIST_DIR=$BUILD_ROOT/dist
 MYSQL_DIST_DIR=$DIST_DIR/mysql
