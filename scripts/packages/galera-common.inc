@@ -6,8 +6,7 @@
 %license     COPYING
 %readme      README
 %description Replication framework for transactional applications. Implements wsrep interface.
-$galera_ver=0.7.3pre
-%version     ${galera_ver}
+%version     ${GALERA_VER}
 %provides    wsrep
 %provides    galera
 

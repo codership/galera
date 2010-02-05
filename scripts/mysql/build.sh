@@ -64,11 +64,12 @@ do
         -t|--tar)
             TAR=yes       # Create a TGZ package
             ;;
-        -p|--package)
-            PACKAGE=yes       # Create a DEB package
-            ;;
         -i|--install)
+            TAR=yes
             INSTALL=yes
+            ;;
+        -p|--package)
+            PACKAGE=yes   # Create a DEB package
             ;;
         --no-strip)
             NO_STRIP=yes  # Don't strip the binaries
@@ -123,10 +124,14 @@ GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
 ##                                  ##
 ######################################
 # Also obtain SVN revision information
-cd $GALERA_SRC
-GALERA_REV=$(svnversion | sed s/\:/,/g)
+if [ $TAR == "yes" ]
+then
+    cd $GALERA_SRC
+    GALERA_REV=$(svnversion | sed s/\:/,/g)
+    export GALERA_VER=${RELEASE:-$GALERA_REV}
 
-scripts/build.sh # options are passed via environment variables
+    scripts/build.sh # options are passed via environment variables
+fi
 
 ######################################
 ##                                  ##
@@ -136,12 +141,41 @@ scripts/build.sh # options are passed via environment variables
 # Obtain MySQL version and revision of Galera patch
 cd $MYSQL_SRC
 MYSQL_REV=$(bzr revno)
+# this does not work on an unconfigured source MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
+MYSQL_VER=$(grep AM_INIT_AUTOMAKE\(mysql, configure.in | awk '{ print $2 }' | sed s/\)//)
 
-export MYSQL_REV
-export GALERA_REV
-export GALERA_SRC
+if [ "$PACKAGE" == "yes" ] # fetch and patch pristine sources
+then
+    cd /tmp
+    mysql_tag=mysql-$MYSQL_VER
+    if [ ! -d $mysql_tag ]
+    then
+        mysql_orig_tar_gz=$mysql_tag.tar.gz
+        url=http://ftp.sunet.se/pub/unix/databases/relational/mysql/Downloads/MySQL-5.1/
+        echo "Downloading $mysql_orig_tar_gz... currently works only for 5.1.x"
+        wget -N $url/$mysql_orig_tar_gz
+        echo "Getting wsrep patch..."
+        patch_file=$(${BUILD_ROOT}/get_patch.sh $mysql_tag)
+        echo "Patching source..."
+        tar -xzf $mysql_orig_tar_gz
+        cd $mysql_tag/
+        patch -p1 -f < $patch_file >/dev/null || :
+        chmod a+x ./BUILD/*wsrep
+        CONFIGURE="yes"
+    else
+        cd $mysql_tag/
+    fi
+    MYSQL_SRC=$(pwd -P)
+    if [ "$CONFIGURE" == "yes" ]
+    then
+        echo "Regenerating config files"
+        time ./BUILD/autorun.sh
+    fi
+fi
 
 # Build mysqld
+export MYSQL_REV
+export GALERA_REV
 if [ "$CONFIGURE" == "yes" ]
 then
     rm -f config.status
@@ -158,12 +192,17 @@ else # just recompile and relink with old configuration
     make > /dev/null
 fi
 
+# gzip manpages
+# this should be rather fast, so we can repeat it every time
+cd $MYSQL_SRC/man && for i in *.1 *.8; do gzip -c $i > $i.gz; done || :
+
 ######################################
 ##                                  ##
-##      Making of distribution      ##
+##      Making of demo tarball      ##
 ##                                  ##
 ######################################
 
+if [ $TAR == "yes " ]; then
 # Create build directory structure
 DIST_DIR=$BUILD_ROOT/dist
 MYSQL_DIST_DIR=$DIST_DIR/mysql
@@ -229,8 +268,6 @@ then
     strip $MYSQL_DIST_DIR/libexec/mysqld
 fi
 
-# original MYSQL_VER=$(grep AM_INIT_AUTOMAKE\(mysql, configure.in | awk '{ print $2 }' | sed s/\)//)
-MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
 if [ "$RELEASE" != "" ]
 then
     GALERA_RELEASE="galera-$RELEASE-$(uname -m)"
@@ -242,10 +279,10 @@ rm -rf $RELEASE_NAME
 mv $DIST_DIR $RELEASE_NAME
 
 # Pack the release
-if [ "$TAR" == "yes" ]
-then
+#if [ "$TAR" == "yes" ]
+#then
     tar -czf $RELEASE_NAME.tgz $RELEASE_NAME
-fi
+#fi
 
 if [ "$INSTALL" == "yes" ]
 then
@@ -254,11 +291,16 @@ then
     $cmd install $RELEASE_NAME.tgz
 fi
 
+fi # if [ $TAR == "yes " ]
+
 build_packages()
 {
+    cd $BUILD_ROOT
+
     local ARCH_DEB
     local ARCH_RPM
-    if [ "$CPU" == "pentium" ]
+
+    if file $MYSQL_SRC/sql/mysqld.o | grep "80386" >/dev/null 2>&1
     then
         ARCH_DEB=i386
         ARCH_RPM=i386
@@ -267,7 +309,8 @@ build_packages()
         ARCH_RPM=x86_64
     fi
 
-    export MYSQL_SRC MYSQL_VER GALERA_SRC RELEASE_NAME
+    export MYSQL_VER MYSQL_SRC GALERA_SRC RELEASE_NAME
+    export WSREP_VER=${RELEASE:-"$MYSQL_REV"}
 
     echo $MYSQL_SRC $MYSQL_VER ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
 
@@ -275,7 +318,7 @@ build_packages()
     EPM=/usr/bin/epm
 
 #   sudo -E $EPM -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" mysql-wsrep  && \
-    pushd $GALERA_SRC/scripts/packages                   && \
+#    pushd $GALERA_SRC/scripts/packages                   && \
     sudo -E $EPM -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" mysql-wsrep && \
     sudo /bin/chown $WHOAMI.users -R * || \
     return 1
