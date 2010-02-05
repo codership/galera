@@ -765,6 +765,44 @@ const gu::net::Datagram* gu::net::Socket::recv(const int flags)
         }
         return &dgram;
     }
+
+    if (sendto_addr != 0)
+    {
+        // Datagram socket
+        byte_t buf[4];
+        ssize_t r(::recv(fd, 
+                         buf,
+                         sizeof(buf),
+                         recv_flags | MSG_PEEK));        
+        if (r != 4)
+        {
+            gu_throw_error(EINVAL);
+        }
+        uint32_t len(0);
+        unserialize(buf, sizeof(buf), 0, &len);
+        dgram.get_payload().resize(len);
+        struct iovec iov[2] = { 
+            {buf, sizeof(buf)},
+            {&dgram.get_payload()[0], mtu}
+        };
+        struct msghdr mhdr = {0, 0, iov, 2, 0, 0, 0};
+        r = ::recvmsg(fd, &mhdr, recv_flags); 
+        
+        if (static_cast<size_t>(r) != len + hdrlen)
+        {
+            gu_throw_error(EINVAL);
+        }
+        if (peek == false)
+        {
+            recv_buf_offset = 0;
+        }
+        else
+        {
+            recv_buf_offset = dgram.get_payload().size();
+        }
+        return &dgram;
+    }
+    
     
     if (dgram.get_header_len() < hdrlen)
     {

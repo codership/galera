@@ -828,7 +828,6 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
     }
     
     seqno_t seq_range(up_to_seqno == -1 ? 0 : up_to_seqno - seq);
-    gcomm_assert(seq_range <= 0xff);
     seqno_t last_msg_seq(seq + seq_range);
     uint8_t flags;
     
@@ -859,6 +858,13 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
         }
     }
     
+    if (seq_range > 0xff)
+    {
+        log_warn << "readjusting seq range " << seq_range << " to 255";
+        seq_range = 0xff;
+    }
+    gcomm_assert(seq_range >= 0 && seq_range <= 0xff);
+
     UserMessage msg(get_uuid(),
                     current_view.get_id(), 
                     seq,

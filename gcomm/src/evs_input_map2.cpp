@@ -305,7 +305,15 @@ gcomm::evs::InputMap::insert(const size_t uuid,
                             Datagram());
             gu_trace((void)msg_index_->insert_unique(
                          make_pair(InputMapMsgKey(node.get_index(), s), 
-                                   InputMapMsg(msg, ins_dg))));
+                                   InputMapMsg(
+                                       (s == msg.get_seq() ? 
+                                        msg :
+                                        UserMessage(msg.get_source(),
+                                                    msg.get_source_view_id(),
+                                                    s,
+                                                    msg.get_aru_seq(),
+                                                    0,
+                                                    O_DROP)), ins_dg))));
             ++n_msgs_[msg.get_order()];
         }
         
