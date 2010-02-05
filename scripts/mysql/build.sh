@@ -144,30 +144,38 @@ MYSQL_REV=$(bzr revno)
 # this does not work on an unconfigured source MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
 MYSQL_VER=$(grep AM_INIT_AUTOMAKE\(mysql, configure.in | awk '{ print $2 }' | sed s/\)//)
 
-export MYSQL_REV
-export GALERA_REV
-#export GALERA_SRC
 if [ "$PACKAGE" == "yes" ] # fetch and patch pristine sources
 then
-    mysql_tag=mysql-$MYSQL_VER
-    mysql_orig_tar_gz=$mysql_tag.tar.gz
-    url=http://ftp.sunet.se/pub/unix/databases/relational/mysql/Downloads/MySQL-5.1/
     cd /tmp
-    echo "Downloading $mysql_orig_tar_gz... currently works only for 5.1.x"
-    wget -N $url/$mysql_orig_tar_gz
-    echo "Getting wsrep patch..."
-    patch_file=$(${BUILD_ROOT}/get_patch.sh $mysql_tag)
-    echo "Patching source..."
-    tar -xzf $mysql_orig_tar_gz
-    cd $mysql_tag/
-    patch -p1 -f < $patch_file >/dev/null || :
-    chmod a+x ./BUILD/*wsrep
+    mysql_tag=mysql-$MYSQL_VER
+    if [ ! -d $mysql_tag ]
+    then
+        mysql_orig_tar_gz=$mysql_tag.tar.gz
+        url=http://ftp.sunet.se/pub/unix/databases/relational/mysql/Downloads/MySQL-5.1/
+        echo "Downloading $mysql_orig_tar_gz... currently works only for 5.1.x"
+        wget -N $url/$mysql_orig_tar_gz
+        echo "Getting wsrep patch..."
+        patch_file=$(${BUILD_ROOT}/get_patch.sh $mysql_tag)
+        echo "Patching source..."
+        tar -xzf $mysql_orig_tar_gz
+        cd $mysql_tag/
+        patch -p1 -f < $patch_file >/dev/null || :
+        chmod a+x ./BUILD/*wsrep
+        CONFIGURE="yes"
+    else
+        cd $mysql_tag/
+    fi
     MYSQL_SRC=$(pwd -P)
-    echo "Regenerating config files"
-    time ./BUILD/autorun.sh
+    if [ "$CONFIGURE" == "yes" ]
+    then
+        echo "Regenerating config files"
+        time ./BUILD/autorun.sh
+    fi
 fi
 
 # Build mysqld
+export MYSQL_REV
+export GALERA_REV
 if [ "$CONFIGURE" == "yes" ]
 then
     rm -f config.status
@@ -183,6 +191,10 @@ then
 else # just recompile and relink with old configuration
     make > /dev/null
 fi
+
+# gzip manpages
+# this should be rather fast, so we can repeat it every time
+cd $MYSQL_SRC/man && for i in *.1 *.8; do gzip -c $i > $i.gz; done || :
 
 ######################################
 ##                                  ##

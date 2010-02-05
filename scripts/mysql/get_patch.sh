@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 # This script produces WSREP patch against given official mysql version
 
@@ -32,17 +32,17 @@ WSREP_PATCH_SPEC=$1-$WSREP_REV
 # Check existing file
 # This is done to not to depend on LP operation, however it looks like
 # any changes uncommitted locally might go unnoticed as revno stays the same
-#WSREP_PATCH_FILE=$(ls $THIS_DIR/${WSREP_PATCH_SPEC}_*_.diff 2>/dev/null || : )
-#if [ -r "$WSREP_PATCH_FILE" ]
-#then
-#    WSREP_PATCH_MD5SAVE=$(basename $WSREP_PATCH_FILE | awk -F _ '{ print $2 }' )
-#    WSREP_PATCH_MD5TEST=$(md5sum $WSREP_PATCH_FILE | awk '{ print $1 }')
-#    if [ $WSREP_PATCH_MD5SAVE == $WSREP_PATCH_MD5TEST ]
-#    then
-#        echo $WSREP_PATCH_FILE
-#        exit 0
-#    fi
-#fi
+WSREP_PATCH_FILE=$(ls $THIS_DIR/${WSREP_PATCH_SPEC}_*_.diff 2>/dev/null || : )
+if [ -r "$WSREP_PATCH_FILE" ]
+then
+    WSREP_PATCH_MD5SAVE=$(basename $WSREP_PATCH_FILE | awk -F _ '{ print $2 }' )
+    WSREP_PATCH_MD5TEST=$(md5sum $WSREP_PATCH_FILE | awk '{ print $1 }')
+    if [ $WSREP_PATCH_MD5SAVE == $WSREP_PATCH_MD5TEST ]
+    then
+        echo $WSREP_PATCH_FILE
+        exit 0
+    fi
+fi
 
 # Existing file either not found or corrupted, try to create a new one
 

@@ -30,6 +30,7 @@ CONF=/etc/mysql/my.cnf
 SELF=$(cd $(dirname $0); pwd -P)/$(basename $0)
 #MYADMIN="/usr/bin/mysqladmin --defaults-file=/etc/mysql/debian.cnf"
 MYADMIN="/usr/bin/mysqladmin"
+VERBOSE=${VERBOSE:-"no"}
 
 # priority can be overriden and "-s" adds output to stderr
 ERR_LOGGER="logger -p daemon.err -t /etc/init.d/mysql -i"
@@ -105,8 +106,8 @@ case "${1:-''}" in
 	# Start daemon
 	log_daemon_msg "Starting MySQL database server" "mysqld"
 	if mysqld_status check_alive nowarn; then
-	   log_progress_msg "already running"
-	   log_end_msg 0
+	   log_failure_msg "already running"
+	   log_end_msg 1
 	else
 	    # Could be removed during boot
 	    test -e /var/run/mysqld || install -m 755 -o mysql -g root -d /var/run/mysqld
@@ -115,9 +116,9 @@ case "${1:-''}" in
 	    WSREP_OPTS=${WSREP_OPTS:-""}
 	    WSREP_PROVIDER=${WSREP_PROVIDER:-""}
 	    WSREP_CLUSTER_ADDRESS=${WSREP_CLUSTER_ADDRESS:-""}
-	    test -n $WSREP_PROVIDER && \
+	    test -n "$WSREP_PROVIDER" && \
 	    WSREP_OPTS="$WSREP_OPTS --wsrep_provider=$WSREP_PROVIDER"
-	    test -n $WSREP_CLUSTER_ADDRESS && \
+	    test -n "$WSREP_CLUSTER_ADDRESS" && \
 	    WSREP_OPTS="$WSREP_OPTS --wsrep_cluster_address=$WSREP_CLUSTER_ADDRESS"
 
 	    # Start MySQL! 
@@ -152,12 +153,12 @@ case "${1:-''}" in
 	  shutdown_out=`$MYADMIN shutdown 2>&1`; r=$?
 	  set -e
 	  if [ "$r" -ne 0 ]; then
-	    log_end_msg 1
+#	    log_end_msg 1
 	    [ "$VERBOSE" != "no" ] && log_failure_msg "Error: $shutdown_out"
 	    log_daemon_msg "Killing MySQL database server by signal" "mysqld"
 	    killall -15 mysqld
             server_down=
-	    for i in 1 2 3 4 5 6 7 8 9 10; do
+	    for i in $(seq 1 30); do # cleanups might take some time
               sleep 1
               if mysqld_status check_dead nowarn; then server_down=1; break; fi
             done
