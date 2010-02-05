@@ -245,6 +245,7 @@ gu::net::MReq::MReq(const Sockaddr& mcast_addr, const Sockaddr& if_addr)
     ipproto_            ( 0),
     add_membership_opt_ (-1),
     drop_membership_opt_(-1),
+    multicast_if_opt_   (-1),
     multicast_loop_opt_ (-1),
     multicast_ttl_opt_  (-1)
 {
@@ -285,6 +286,7 @@ gu::net::MReq::MReq(const Sockaddr& mcast_addr, const Sockaddr& if_addr)
         ipproto_             = IPPROTO_IP;
         add_membership_opt_  = IP_ADD_MEMBERSHIP;
         drop_membership_opt_ = IP_DROP_MEMBERSHIP;
+        multicast_if_opt_    = IP_MULTICAST_IF;
         multicast_loop_opt_  = IP_MULTICAST_LOOP;
         multicast_ttl_opt_   = IP_MULTICAST_TTL;
         break;
@@ -309,6 +311,35 @@ gu::net::MReq::~MReq()
     free(mreq_);
 }
 
+const void* gu::net::MReq::get_multicast_if_value() const
+{
+    switch (ipproto_)
+    {
+    case IPPROTO_IP:
+        return &reinterpret_cast<const struct ip_mreq*>(mreq_)->imr_interface;
+    case IPPROTO_IPV6:
+        return &reinterpret_cast<const struct ipv6_mreq*>(mreq_)->ipv6mr_interface;
+    default:
+        gu_throw_fatal << "get_multicast_if_value() not implemented for: "
+                       << ipproto_;
+        throw;
+    }
+}
+
+int gu::net::MReq::get_multicast_if_value_size() const
+{
+    switch (ipproto_)
+    {
+    case IPPROTO_IP:
+        return sizeof(reinterpret_cast<const struct ip_mreq*>(mreq_)->imr_interface);
+    case IPPROTO_IPV6:
+        return sizeof(reinterpret_cast<const struct ipv6_mreq*>(mreq_)->ipv6mr_interface);
+    default:
+        gu_throw_fatal << "get_multicast_if_value_size() not implemented for: "
+                       << ipproto_;
+        throw;
+    }
+}
 
 /////////////////////////////////////////////////////////////////////////
 //                     Addrinfo implementation

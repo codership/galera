@@ -219,6 +219,9 @@ public:
     int get_ipproto() const { return ipproto_; }
     int get_add_membership_opt() const { return add_membership_opt_; }
     int get_drop_membership_opt() const { return drop_membership_opt_; }
+    int get_multicast_if_opt() const { return multicast_if_opt_; }
+    const void* get_multicast_if_value() const;
+    int get_multicast_if_value_size() const;
     int get_multicast_loop_opt() const { return multicast_loop_opt_; }
     int get_multicast_ttl_opt() const { return multicast_ttl_opt_; }
 private:
@@ -229,6 +232,7 @@ private:
     int ipproto_;
     int add_membership_opt_;
     int drop_membership_opt_;
+    int multicast_if_opt_;
     int multicast_loop_opt_;
     int multicast_ttl_opt_;
 };

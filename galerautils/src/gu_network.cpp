@@ -282,7 +282,7 @@ void gu::net::Socket::connect(const string& addr)
             log_debug << if_ai.to_string();
             if_sa = if_ai.get_addr();
         }
-        
+
         MReq mr(sa, if_sa);
         if (::setsockopt(fd, 
                          mr.get_ipproto(), 
@@ -294,6 +294,18 @@ void gu::net::Socket::connect(const string& addr)
             set_state(S_FAILED, err);
             gu_throw_error(err) << "setsockopt(IP_ADD_MEMBERSHIP): ";
         }
+
+        if (::setsockopt(fd, 
+                         mr.get_ipproto(), 
+                         mr.get_multicast_if_opt(),
+                         mr.get_multicast_if_value(), 
+                         mr.get_multicast_if_value_size()) == -1)
+        {
+            const int err(errno);
+            set_state(S_FAILED, err);
+            gu_throw_error(err) << "setsockopt(IP_MULTICAST_IF_OPT): ";
+        }
+
         
         string if_loop("0");
         try { if_loop = uri.get_option("socket.if_loop"); } 
@@ -342,7 +354,7 @@ void gu::net::Socket::connect(const string& addr)
             set_state(S_FAILED, err);
             gu_throw_error(err) << "bind(): ";
         }
-        
+
         sendto_addr = new Sockaddr(sa);
         set_state(S_CONNECTED);
     }
