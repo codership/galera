@@ -2,6 +2,12 @@
  * Copyright (C) 2009 Codership Oy <info@codership.com>
  */
 
+/*!
+ * @file transport.hpp
+ *
+ * @brief Transport interface.
+ */
+
 #ifndef _GCOMM_TRANSPORT_HPP_
 #define _GCOMM_TRANSPORT_HPP_
 
@@ -13,10 +19,17 @@
 
 namespace gcomm
 {
+    /*!
+     * @class Transport
+     *
+     * @brief Transport interface
+     */
     class Transport;
 }
 
-
+/*!
+ * 
+ */
 class gcomm::Transport : public Protolay
 {
     Transport (const Transport&);
@@ -73,7 +86,10 @@ public:
 
     Protostack& get_pstack() { return pstack; }
     Protonet& get_pnet() { return pnet; }
-    
+
+    /*!
+     * @brief Factory method
+     */
     static Transport* create(Protonet&, const std::string&);
 };
 
