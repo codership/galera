@@ -2,6 +2,12 @@
  * Copyright (C) 2009 Codership Oy <info@codership.com>
  */
 
+/*!
+ * @file evs_proto.hpp
+ *
+ * @brief EVS protocol implementation header.
+ */
+
 #ifndef GCOMM_EVS_PROTO_HPP
 #define GCOMM_EVS_PROTO_HPP
 
@@ -44,7 +50,9 @@ namespace gcomm
 }
 
 
-
+/*!
+ * @brief Class implementing EVS protocol
+ */
 class gcomm::evs::Proto : public Protolay
 {
 public:
@@ -73,6 +81,9 @@ public:
     
     friend std::ostream& operator<<(std::ostream&, const Proto&);
 
+    /*!
+     * Default constructor.
+     */
     Proto(const UUID& my_uuid_, const std::string& conf = "evs://", 
           const size_t mtu_ = std::numeric_limits<size_t>::max());
     ~Proto();
@@ -217,6 +228,9 @@ public:
         T_CONSENSUS,
         T_STATS
     };
+    /*!
+     * Internal timer list 
+     */
     class TimerList : 
         public  MultiMap<gu::datetime::Date, Timer> { };
 private:
@@ -230,31 +244,40 @@ public:
     gu::datetime::Date get_next_expiration(const Timer) const;
     void reset_timers();
     gu::datetime::Date handle_timers();
+
+
+    /*!
+     * @brief Flags controlling what debug information is logged if 
+     *        debug logging is turned on.
+     */
+    enum DebugFlags
+    {
+        D_STATE         = 1 << 0,  /*!< State changes */
+        D_TIMERS        = 1 << 1,  /*!< Timer handling */
+        D_CONSENSUS     = 1 << 2,  /*!< Consensus protocol */
+        D_USER_MSGS     = 1 << 3,  /*!< User messages */
+        D_DELEGATE_MSGS = 1 << 4,  /*!< Delegate messages */
+        D_GAP_MSGS      = 1 << 5,  /*!< Gap messages */
+        D_JOIN_MSGS     = 1 << 6,  /*!< Join messages */
+        D_INSTALL_MSGS  = 1 << 7,  /*!< Install messages */
+        D_LEAVE_MSGS    = 1 << 8,  /*!< Leave messages */
+        D_FOREIGN_MSGS  = 1 << 9,  /*!< Foreing messages */
+        D_RETRANS       = 1 << 10, /*!< Retransmitted/recovered messages */
+        D_DELIVERY      = 1 << 11  /*!< Message delivery */
+    };
+
+    /*!
+     * @brief Flags controlling what info log is printed in logs.
+     */
+    enum InfoFlags
+    {
+        I_VIEWS      = 1 << 0, /*!< View changes */
+        I_STATE      = 1 << 1, /*!< State change information */
+        I_STATISTICS = 1 << 2, /*!< Statistics */
+        I_PROFILING  = 1 << 3  /*!< Profiling information */
+    };
 private:
 
-    enum
-    {
-        D_STATE         = 1 << 0,
-        D_TIMERS        = 1 << 1,
-        D_CONSENSUS     = 1 << 2,
-        D_USER_MSGS     = 1 << 3,
-        D_DELEGATE_MSGS = 1 << 4,
-        D_GAP_MSGS      = 1 << 5,
-        D_JOIN_MSGS     = 1 << 6,
-        D_INSTALL_MSGS  = 1 << 7,
-        D_LEAVE_MSGS    = 1 << 8,
-        D_FOREIGN_MSGS  = 1 << 9,
-        D_RETRANS       = 1 << 10,
-        D_DELIVERY      = 1 << 11
-    };
-    
-    enum
-    {
-        I_VIEWS      = 1 << 0,
-        I_STATE      = 1 << 1,
-        I_STATISTICS = 1 << 2,
-        I_PROFILING  = 1 << 3
-    };
     
     int debug_mask;
     int info_mask;

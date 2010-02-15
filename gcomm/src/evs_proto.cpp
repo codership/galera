@@ -94,7 +94,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf,
     send_buf_(),
     max_output_size(128),
     mtu(mtu_),
-    use_aggregate(false),
+    use_aggregate(true),
     self_loopback(false),
     state(S_CLOSED),
     shift_to_rfcnt(0)
@@ -159,7 +159,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf,
     use_aggregate =
         conf_param_def(uri,
                        Conf::EvsUseAggregate,
-                       false);
+                       true);
     
     try
     {
@@ -345,6 +345,9 @@ void gcomm::evs::Proto::handle_consensus_timer()
         // nodes fail to form new group. Set all other nodes 
         // unoperational to form singleton group and retry
         // forming new group after a while.
+        //
+        // @todo This should be improved so that only the nodes that
+        //       are not in agreement with current node are discarded.
         for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
         {
             if (NodeMap::get_key(i) != get_uuid())
