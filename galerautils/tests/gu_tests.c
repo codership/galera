@@ -16,6 +16,7 @@
 #include "gu_uuid_test.h"
 #include "gu_options_test.h"
 #include "gu_lock_step_test.h"
+#include "gu_str_test.h"
 
 typedef Suite *(*suite_creator_t)(void);
 
@@ -29,6 +30,7 @@ static suite_creator_t suites[] =
 	gu_uuid_suite,
 	gu_options_suite,
 	gu_lock_step_suite,
+        gu_str_suite,
 	NULL
     };
 
@@ -39,7 +41,7 @@ int main(int argc, char* argv[])
   int failed  = 0;
 
   FILE* log_file = NULL;
-
+  
   if (!no_fork) {
       log_file = fopen ("gu_tests.log", "w");
       if (!log_file) return EXIT_FAILURE;
@@ -56,8 +58,10 @@ int main(int argc, char* argv[])
       srunner_free (sr);
       i++;
   }
-
-  fclose (log_file);
+  if (log_file)
+  {
+      fclose (log_file);
+  }
   printf ("Total tests failed: %d\n", failed);
   return (failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
