@@ -1349,9 +1349,11 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
     int rcode;
     struct job_worker *applier;
     bool shutdown = false;
+    enum wsrep_status ret_code;
 
     /* we must have gcs connection */
     if (!gcs_conn) {
+        gu_info("recv method cannot start, no gcs connection");
         return WSREP_NODE_FAIL;
     }
 
@@ -1382,7 +1384,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
                  strerror(-rcode));
 #endif
 	if (rcode <= 0) {
-
+            /* must return immediately, seqnos are not usable */
             gu_info ("gcs_recv() returned %d (%s)", rcode, strerror(-rcode));
             return WSREP_CONN_FAIL;
         }
@@ -1396,7 +1398,6 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
         switch (action_type) {
         case GCS_ACT_TORDERED:
         {
-            enum wsrep_status ret_code;
             assert (GCS_SEQNO_ILL != seqno_g);
 
             status.received++;
@@ -1448,12 +1449,15 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
             }
             break;
         default:
+            gu_error("bad gcs action value: %d, must abort", action_type);
             return WSREP_FATAL;
         }
         free (action); /* TODO: cache DATA actions at the end of commit queue
                         * processing. Therefore do not free them here. */
     }
-    return WSREP_OK;
+
+    /* returning WSREP_NODE_FAIL or WSREP_FATAL */
+    return ret_code;
 }
 
 static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
