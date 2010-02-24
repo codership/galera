@@ -21,6 +21,13 @@ MYSQLD=/usr/libexec/mysqld
 #test -x /usr/lib/mysqld || exit 0
 test -x $MYSQLD
 
+MYSQLINIT=mysql
+if [ -f "/etc/default/${MYSQLINIT=mysql}" ]; then
+    . /etc/default/${MYSQLINIT=mysql}
+else
+    ${WSREP_CLUSTER_ADDRESS:=gcomm://}
+fi
+
 . /lib/lsb/init-functions
 
 # NOTE: Copying this script and changing the CONF variable here isn't
@@ -113,9 +120,9 @@ case "${1:-''}" in
 	    test -e /var/run/mysqld || install -m 755 -o mysql -g root -d /var/run/mysqld
 
 	    # Check for additional wsrep options
-	    WSREP_OPTS=${WSREP_OPTS:-""}
-	    WSREP_PROVIDER=${WSREP_PROVIDER:-""}
-	    WSREP_CLUSTER_ADDRESS=${WSREP_CLUSTER_ADDRESS:-""}
+	    ${WSREP_OPTS:=""}
+	    ${WSREP_PROVIDER:=""}
+	    ${WSREP_CLUSTER_ADDRESS:=""}
 	    test -n "$WSREP_PROVIDER" && \
 	    WSREP_OPTS="$WSREP_OPTS --wsrep_provider=$WSREP_PROVIDER"
 	    test -n "$WSREP_CLUSTER_ADDRESS" && \

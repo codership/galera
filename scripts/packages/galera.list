@@ -2,6 +2,8 @@
 
 %include galera-common.inc
 
+# this line is required by rpmbuild
+d 755 root root /usr
 d 755 root root $LIBS_DEST -
 f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils.so.*.*.*
 f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils++.so.*.*.*
@@ -23,12 +25,14 @@ f 755 root root $SBIN_DEST/vsbes $BUILD_BASE/galeracomm/vs/src/.libs/vsbes
 %endif
 
 $LD_SO_CONF_D=/etc/ld.so.conf.d
+# this line is required by rpmbuild
+#d 755 root root /etc
 d 755 root root $LD_SO_CONF_D -
 f 644 root root $LD_SO_CONF_D/galera.conf empty
 
 %format deb # Debian packages come with bad file ownership
 %postinstall <<EOF_DEB
-chown -R root.root $SBIN_DEST $LIBS_DEST
+#chown -R root.root $SBIN_DEST $LIBS_DEST
 echo $LIBS_DEST > $LD_SO_CONF_D/galera.conf
 ldconfig $LIBS_DEST
 EOF_DEB

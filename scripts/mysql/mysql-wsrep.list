@@ -10,74 +10,12 @@ $mysql_version=${MYSQL_VER}
 $wsrep_version=${WSREP_VER}
 %version     ${mysql_version}-${wsrep_version}
 
-%requires    debianutils       1.6
-%requires    libc6             2.4
-%requires    libdbi-perl
-%requires    libdbd-mysql-perl 1.2202
-%requires    libgcc1           4.1.1
-%requires    libncurses5       5.6
-%requires    libstdc++6        4.1.1
-%requires    libwrap0          7.6
-%requires    perl
-%requires    zlib1g            1.1.4
-
-%provides    mysql-server-core-5.1
-%provides    mysql-server-core
-%provides    mysql-server-5.1
-%provides    mysql-server
-%provides    mysql-client-5.1
-%provides    mysql-client
-%provides    mysql-common-5.1
-%provides    mysql-common
-%provides    libmysqlclient16
-#%provides    mysql
-
-%replaces    mysql-server-core     0.0.0 ${mysql_version}
-#%replaces    mysql-server-core-4.1
-#%replaces    mysql-server-core-5.0
-%replaces    mysql-server-core-5.1 0.0.0 ${mysql_version}
-%replaces    mysql-server          0.0.0 ${mysql_version}
-%replaces    mysql-server-4.1
-%replaces    mysql-server-5.0
-%replaces    mysql-server-5.1      0.0.0 ${mysql_version}
-%replaces    mysql-client          0.0.0 ${mysql_version}
-%replaces    mysql-client-4.1
-%replaces    mysql-client-5.0
-%replaces    mysql-client-5.1      0.0.0 ${mysql_version}
-%replaces    mysql-common          0.0.0 ${mysql_version}
-%replaces    mysql-common-4.1
-%replaces    mysql-common-5.0
-%replaces    mysql-common-5.1      0.0.0 ${mysql_version}
-%replaces    libmysqlclient16      0.0.0 ${mysql_version}
-
-#%incompat    mysql-server-core
-%incompat    mysql-server-core-4.1
-%incompat    mysql-server-core-5.0
-%incompat    mysql-server-core-5.1
-%incompat    mysql-server
-%incompat    mysql-server-4.1
-%incompat    mysql-server-5.0
-%incompat    mysql-server-5.1
-%incompat    mysql-client
-%incompat    mysql-client-4.1
-%incompat    mysql-client-5.0
-%incompat    mysql-client-5.1
-#%incompat    mysql-common
-%incompat    mysql-common-4.1
-%incompat    mysql-common-5.0
-#%incompat    mysql-common-5.1
-#%incompat    libmysqlclient16
-
-$prefix=/usr
-
-$CONF_DST=/etc/mysql
-$LIBS_DST=${prefix}/lib
-$SHAR_DST=${prefix}/share/mysql
-$SBIN_DST=${prefix}/sbin
-$BINS_DST=${prefix}/bin
-$DOCS_DST=${prefix}/share/doc/mysql
-$LIBEXEC_DST=${prefix}/libexec
-$MAN_DST=${prefix}/share/man
+# This includes dependencies and directory structore information
+%format deb
+%include mysql-wsrep.debian
+%format rpm
+%include mysql-wsrep.centos
+%format all
 
 # Documentation
 d 755 root root $DOCS_DST -
@@ -90,6 +28,11 @@ f 644 root root $DOCS_DST/README-wsrep      ${GALERA_SRC}/scripts/mysql/README-w
 d 755 root root $LIBS_DST -
 f 755 root root $LIBS_DST/libmysqlclient.so.16.0.0   $MYSQL_SRC/libmysql/.libs/libmysqlclient.so.16.0.0
 f 755 root root $LIBS_DST/libmysqlclient_r.so.16.0.0 $MYSQL_SRC/libmysql_r/.libs/libmysqlclient_r.so.16.0.0
+
+# mysql-common part
+d 755 root root $CONF_DST -
+d 755 root root $CONF_DST/conf.d -
+f 644 root root $MY_DST/my.cnf                 $GALERA_SRC/scripts/mysql/debian/my.cnf
 
 # mysql-client part
 d 755 root root $BINS_DST -
@@ -111,11 +54,6 @@ f 755 root root $BINS_DST/mysql_fix_extensions $MYSQL_SRC/scripts/mysql_fix_exte
 f 755 root root $BINS_DST/mysql_waitpid        $MYSQL_SRC/extra/mysql_waitpid
 d 755 root root $SBIN_DST -
 f 755 root root $SBIN_DST/mysqlmanager         $MYSQL_SRC/server-tools/instance-manager/mysqlmanager
-
-# mysql-common part
-d 755 root root $CONF_DST -
-f 644 root root $CONF_DST/my.cnf               $GALERA_SRC/scripts/mysql/debian/my.cnf
-d 755 root root $CONF_DST/conf.d -
 
 # mysql-server-5.1 part
 f 644 root root $CONF_DST/conf.d/mysqld_safe_syslog.cnf $GALERA_SRC/scripts/mysql/debian/mysqld_safe_syslog.cnf
@@ -154,12 +92,20 @@ f 644 root root $DOCS_DST/examples             $MYSQL_SRC/support-files/*.cnf
 d 755 mysql root /var/run/mysqld -
 d 755 mysql adm  /var/log/mysql  -
 
+%format deb
 d 755 root root /etc/init.d -
 f 755 root root /etc/init.d/mysql              $GALERA_SRC/scripts/mysql/debian/mysql
+%format rpm
+d 755 root root /etc/rc.d/init.d -
+f 755 root root /etc/rc.d/init.d/mysqld        $GALERA_SRC/scripts/mysql/centos/mysqld
+%format all
 
 # mysql-server-core-5.1
 d 755 root root $LIBEXEC_DST -
 f 755 root root $LIBEXEC_DST/mysqld            $MYSQL_SRC/sql/mysqld
+%format deb
+l 000 root root $SBIN_DST/mysqld               ../libexec/mysqld
+%format all
 d 755 root root $SHAR_DST/english -
 f 644 root root $SHAR_DST/english/errmsg.sys   $MYSQL_SRC/sql/share/english/errmsg.sys
 d 755 root root $SHAR_DST/charsets -
@@ -209,56 +155,8 @@ d 755 root root $MAN_DST/man8 -
 f 644 root root $MAN_DST/man8/mysqld.8.gz           $MYSQL_SRC/man/mysqld.8.gz
 f 644 root root $MAN_DST/man8/mysqlmanager.8.gz     $MYSQL_SRC/man/mysqlmanager.8.gz
 
-# dirty hack for the time being that mysqld segfaults
-#d 755 mysql mysql /var/lib/mysql       -
-#d 750 mysql mysql /var/lib/mysql/mysql -
-#d 750 mysql mysql /var/lib/mysql/test  -
-#f 640 mysql mysql /var/lib/mysql/mysql $GALERA_SRC/scripts/mysql/$RELEASE_NAME/mysql/var/mysql/*
-#f 640 mysql mysql /var/lib/mysql/test  $GALERA_SRC/scripts/mysql/$RELEASE_NAME/mysql/var/test/*
-
 %preinstall <<EOF_PRE
 id mysql >/dev/null 2>&1 || (adduser --system --group --disabled-password --disabled-login --home=/var/lib/mysql --shell=/bin/false mysql)
 EOF_PRE
-
-$mysql_data=/var/lib/mysql
-%postinstall <<EOF_POST
-update-rc.d -f mysql remove >/dev/null || exit $
-ldconfig -n $LIBS_DST
-test -d ${mysql_data} || (mysql_install_db --user=mysql --datadir=${mysql_data})
-EOF_POST
-
-%postremove <<EOF_POSTREMOVE
-if [ -x /usr/sbin/invoke-rc.d ]; then
-    invoke-rc.d mysql stop
-else
-    /etc/init.d/mysql stop
-fi
-update-rc.d -f mysql remove >/dev/null || exit $
-EOF_POSTREMOVE
-
-#%ifdef GCOMM
-#f 755 root root $LIBS_DST $BUILD_BASE/gcomm/src/.libs/libgcomm.so.*.*.*
-#%endif
-#%ifdef VSBES
-#f 755 root root $LIBS_DST $BUILD_BASE/galeracomm/common/src/.libs/libgcommcommonpp.so.*.*.*
-#f 755 root root $LIBS_DST $BUILD_BASE/galeracomm/transport/src/.libs/libgcommtransportpp.so.*.*.*
-#f 755 root root $LIBS_DST $BUILD_BASE/galeracomm/vs/src/.libs/libgcommvspp.so.*.*.*
-#%endif
-
-#%format deb # Debian packages come with bad file ownership
-#%postinstall <<EOF_DEB
-#chown -R root.root $SBIN_DST $LIBS_DST
-#ldconfig -n $LIBS_DST
-#EOF_DEB
-
-#%format rpm
-#%postinstall <<EOF_RPM
-#ldconfig -n $LIBS_DST
-#EOF_RPM
-
-#%format all
-#%preremove <<EOF2
-#rm -f $$(find $LIBS_DST -type l)
-#EOF2
 
 #

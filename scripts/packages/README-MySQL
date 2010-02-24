@@ -12,49 +12,42 @@ RESULTING DIRECTLY OR INDIRECTLY FROM THE USE OF THIS SOFTWARE.
 
 Trademark Information.
 
-MySQL is a trademark or registered trademark of Sun Microsystems, Inc. or
-its subsidiaries in the US and other countries. Other marks are the property
-of their respective owners.
+MySQL and other trademarks are the property of their respective owners.
 
 Licensing Information.
 
-Please see ./mysql/LICENSE.mysql and ./galera/LICENSE.galera
+Please see COPYING file that came with this distribution.
 
-Project source code can be found at
-wsrep API:    https://launchpad.net/wsrep/
-MySQL patch:  https://launchpad.net/codership-mysql
-Galera libs:  http://www.codership.com/en/downloads/galera
+Source code can be found at http://www.codership.com/en/downloads/galera
 
 ABOUT THIS DOCUMENT
 
-This document covers issues specific to this MySQL/Galera demo distribution.
-It does not cover the use or administration of MySQL server per se. The reader
-is assumed to know how to install, configure, administer and use MySQL server.
+This document explains how to use Galera wsrep provider with MySQL RDBMS.
 
 
-                        MYSQL/GALERA v0.7.2
+                     Using MySQL with GALERA v0.7.x
 
 CONTENTS:
 =========
-0. WHAT IS MYSQL/GALERA CLUSTER
-1. CLUSTER SETUP
+1. WHAT GALERA WSREP PROVIDER
+2. WHAT IS MYSQL/GALERA CLUSTER
+3. CLUSTER SETUP
    1.1 INSTALLATION
    1.2 CLUSTER URL
    1.3 STARTING THE FIRST NODE OF A CLUSTER
    1.4 STARTING REMAINING NODES
-2. USING THE CLUSTER
+4. USING THE CLUSTER
    2.1 LOADING DATA TO A CLUSTER
    2.2 CONNECTING APPLICATION TO A CLUSTER
    2.3 LOAD BALANCER
    2.4 ADDING NEW NODE TO A CLUSTER
    2.5 A "REFERENCE NODE"
    2.6 "SPLIT-BRAIN" CONDITION
-3. CONFIGURATION
+5. CONFIGURATION
    3.1 MANDATORY MYSQL OPTIONS
    3.2 WSREP OPTIONS
-   3.3 CONFIGURING LOCAL MYSQL CLIENTS
-4. Using MySQL/Galera in Amazon EC2
-5. LIMITATIONS
+6. Using MySQL/Galera in Amazon EC2
+7. LIMITATIONS
 
 
 0. WHAT IS MYSQL/GALERA CLUSTER
@@ -214,22 +207,20 @@ MySQL server and can be used independently. This creates considerable
 flexibility in the way the cluster can be utilized. The approaches can be
 categorized in three groups:
 
-1) Seeking High Availability only. It is similar to traditional MySQL
-   master-slave replication. In this case client application connects to only
-   one node, the rest serving as hot backups / read-only slaves:
+1) Seeking High Availability only. In this case client application connects to
+   only one node, the rest serving as hot backups:
 
    ,-------------.
    | application |
    `-------------'
-        | | |       DB backups/read-only slaves
+        | | |        DB backups
       ,-------. ,-------. ,-------.
       | node1 | | node2 | | node3 |
       `-------' `-------' `-------'
        <===== cluster nodes =====>
 
    In the case of primary node failure application can instantly switch to
-   another node without any preparations. This is also a most transparent mode:
-   COMMITs will never return deadlocks and table locks can be used too.
+   another node.
 
 2) Seeking High Availability and improved performance through uniform load
    distribution. If there are several client connections to the database, they
@@ -452,11 +443,10 @@ wsrep_ws_persistency=0
 wsrep_debug=0
    Enable debug-level logging.
 
-wsrep_convert_LOCK_to_trx=0
+wsrep_convert_LOCK_to_trx=1
    Implicitly convert locking sessions into transactions inside mysqld. By
    itself it does not mean support for locking sessions, but it prevents the
-   database from going into logically inconsistent state. Disabled by default
-   because of possible memory issues with DB dumps that contain LOCK statements.
+   database from going into logically inconsistent state.
 
 wsrep_retry_autocommit=1
    Retry autocommit queries and single statement transactions should they fail
@@ -500,24 +490,6 @@ wsrep_sst_donor=
    most suitable node is chosen by GCS.
 
 
-3.3 CONFIGURING LOCAL MYSQL CLIENTS
-
-This MySQL/Galera distribution runs mysqld in the "sandbox". Thus mysql clients
-won't find mysqld socket at default system location. Running mysql client
-without explicitly specifying socket or port (via --socket or --host/--port
-options) may, therefore, result in the following:
-
-$ mysql -uroot -prootpass
-ERROR 2002 (HY000): Can't connect to local MySQL server through socket '/var/run/mysqld/mysqld.sock' (2)
-
-Most applications that use libmysqlclient to connect to MySQL server can be
-instructed to look in the correct place by adding a following section to
-system-wide my.cnf file:
-
-[client]
-socket = <INST_ROOT>/mysql/var/mysqld.sock
-
-
 4. Using MySQL/Galera distribution in Amazon EC2
 
 MySQL/Galera works anywhere TCP/IP works. Therefore using MySQL/Galera
@@ -548,9 +520,9 @@ NOTE: this distribution may be binary incompatible with some older Linux
     * LOAD DATA
     * lock functions (GET_LOCK(), RELEASE_LOCK()... )
 
-4) Locking sessions (LOCK TABLE...UNLOCK) are not supported in multi-master
-   mode. However if there's only one node that executes locking sessions, then
-   it'll work.
+4) Locking sessions (LOCK TABLE...UNLOCK), are not supported. There is
+   an option to convert locking sessions to transactions on the fly:
+   wsrep_convert_LOCK_to_trx. Use at your own risk.
 
 5) Transaction isolation level should be REPEATABLE_READ (the default).
    Galera implements implicit snapshot isolation for cluster wide
