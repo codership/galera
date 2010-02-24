@@ -1,0 +1,94 @@
+# This is a MySQL-wsrep package description for ESP package manager
+# Debian specific part
+
+%requires    debianutils       1.6
+%requires    libc6             2.4
+%requires    libdbi-perl
+%requires    libdbd-mysql-perl 1.2202
+%requires    libgcc1           4.1.1
+%requires    libncurses5       5.6
+%requires    libstdc++6        4.1.1
+%requires    libwrap0          7.6
+%requires    perl
+%requires    zlib1g            1.1.4
+
+%provides    mysql-server-core-5.1
+%provides    mysql-server-core
+%provides    mysql-server-5.1
+%provides    mysql-server
+%provides    mysql-client-5.1
+%provides    mysql-client
+%provides    mysql-common-5.1
+%provides    mysql-common
+%provides    libmysqlclient16
+#%provides    mysql
+
+%replaces    mysql-server-core     0.0.0 ${mysql_version}
+#%replaces    mysql-server-core-4.1
+#%replaces    mysql-server-core-5.0
+%replaces    mysql-server-core-5.1 0.0.0 ${mysql_version}
+%replaces    mysql-server          0.0.0 ${mysql_version}
+%replaces    mysql-server-4.1
+%replaces    mysql-server-5.0
+%replaces    mysql-server-5.1      0.0.0 ${mysql_version}
+%replaces    mysql-client          0.0.0 ${mysql_version}
+%replaces    mysql-client-4.1
+%replaces    mysql-client-5.0
+%replaces    mysql-client-5.1      0.0.0 ${mysql_version}
+%replaces    mysql-common          0.0.0 ${mysql_version}
+%replaces    mysql-common-4.1
+%replaces    mysql-common-5.0
+%replaces    mysql-common-5.1      0.0.0 ${mysql_version}
+%replaces    libmysqlclient16      0.0.0 ${mysql_version}
+
+#%incompat    mysql-server-core
+%incompat    mysql-server-core-4.1
+%incompat    mysql-server-core-5.0
+%incompat    mysql-server-core-5.1
+%incompat    mysql-server
+%incompat    mysql-server-4.1
+%incompat    mysql-server-5.0
+%incompat    mysql-server-5.1
+%incompat    mysql-client
+%incompat    mysql-client-4.1
+%incompat    mysql-client-5.0
+%incompat    mysql-client-5.1
+#%incompat    mysql-common
+%incompat    mysql-common-4.1
+%incompat    mysql-common-5.0
+#%incompat    mysql-common-5.1
+#%incompat    libmysqlclient16
+
+$prefix=/usr
+
+$CONF_DST=/etc/mysql
+$MY_DST=$CONF_DST
+$LIBS_DST=${prefix}/lib
+$SHAR_DST=${prefix}/share/mysql
+$SBIN_DST=${prefix}/sbin
+$BINS_DST=${prefix}/bin
+$DOCS_DST=${prefix}/share/doc/mysql
+$LIBEXEC_DST=${prefix}/libexec
+$MAN_DST=${prefix}/share/man
+
+# Distribution dependent scripts
+
+$mysql_data=/var/lib/mysql
+%postinstall <<EOF_POSTINSTALL
+update-rc.d -f mysql remove >/dev/null || exit $
+ldconfig -n $LIBS_DST
+#test -d ${mysql_data} || (mysql_install_db --user=mysql --datadir=${mysql_data})
+# it seems that we can run mysql_install_db regardless of existing tables.
+mysql_install_db --user=mysql --datadir=${mysql_data}
+EOF_POSTINSTALL
+
+%postremove <<EOF_POSTREMOVE
+if [ -x /usr/sbin/invoke-rc.d ]; then
+    invoke-rc.d mysql stop
+else
+    /etc/init.d/mysql stop
+fi
+update-rc.d -f mysql remove >/dev/null || exit $
+EOF_POSTREMOVE
+
+#

@@ -13,13 +13,244 @@ RESULTING DIRECTLY OR INDIRECTLY FROM THE USE OF THIS SOFTWARE.
 Trademark Information.
 
 MySQL is a trademark or registered trademark of Sun Microsystems, Inc. or
-its subsidiaries in the US and other countries. Other marks are the property
-of their respective owners.
+its subsidiaries in the US and other countries or whoever owns it. Other
+trademarks are the property of their respective owners.
 
 Licensing Information.
 
-Please see file COPYING that came wiht this distribution
+Please see file COPYING that came with this distribution
 
-Project source code can be found at
+Source code can be found at
 wsrep API:    https://launchpad.net/wsrep
 MySQL patch:  https://launchpad.net/codership-mysql
+
+
+ABOUT THIS DOCUMENT
+
+This document covers installation and configuraton issues specific to this
+wsrep-patched MySQL distribution by Codership. It does not cover the use or
+administration of MySQL server per se. The reader is assumed to know how to
+install, configure, administer and use standard MySQL server version 5.1.xx.
+
+
+                        MYSQL-5.1.x/wsrep-0.7.x
+
+CONTENTS:
+=========
+1. WHAT IS WSREP PATCH FOR MYSQL
+2. INSTALLATION
+   2.1 CLEAN INSTALL.
+   2.2 UPGRADE OF EXISTING MYSQL INSTALLATION.
+3. CONFIGURATION
+   3.1 MANDATORY MYSQL OPTIONS
+   3.2 WSREP OPTIONS
+5. LIMITATIONS
+
+
+1. WHAT IS WSREP PATCH FOR MYSQL/INNODB
+
+Wsrep API developed by Codership Oy is a modern generic (database-agnostic) replication API for transactional databases with a goal to make database replication/logging subsystem completely modular and pluggable. It is developed with flexibility and completeness in mind to satisfy broad range of modern replication scenarios. It is equally suitable for synchronous and asynchronous, master-slave and multi-master replication.
+
+wsrep stands for Write Set REPlication.
+
+Wsrep patch for MySQL/InnoDB allows MySQL server to load and use various wsrep API implementations ("wsrep providers") with different qualities of service. Without wsrep provider MySQL-wsrep server will function like a regular standalone server.
+
+
+2. INSTALLATION
+
+In the examples below mysql authentication options are omitted for brevity.
+
+2.1 Download and install mysql-wsrep DEB package.
+
+If you're installing over an existing mysql installation, mysql-wsrep may
+conflict with  mysql-server and mysql-client meta-packages, so remove them first:
+
+$ sudo dpkg -r mysql-server mysql-client
+$ sudo dpkg -i <mysql-wsrep DEB>
+
+2.2 Check and edit configuration files.
+
+* Make sure system-wide my.cnf does not bind mysqld to 127.0.0.1. That is, if
+  you have the following line in [mysqld] section, comment it out:
+
+#bind-address = 127.0.0.1
+
+* Make sure system-wide my.cnf contains "!includedir /etc/mysql/conf.d/" line.
+
+* When a new node joins the cluster it'll have to receive a state snapshot from
+  one of the peers. This requires a privileged MySQL account with access from
+  the rest of the cluster. Edit /etc/mysql/conf.d/wsrep.cnf and set mysql
+  login/password pair for SST, for example:
+
+wsrep_sst_auth=wsrep_sst:wspass
+
+* See CONFIGURATION section below about wsrep-specific configuration parameters.
+  See wsrep provider-specific instructions on how to configure wsrep provider.
+
+2.3 Restart MySQL server to grant privileges to SST account.
+
+If upgrading from an older mysql version you might also want to upgrade system
+tables first:
+
+$ sudo /etc/init.d/mysql restart
+$ mysql_upgrade
+$ mysql -e "GRANT ALL ON *.* TO wsrep_sst@'localhost' IDENTIFIED BY 'wspass'"
+$ mysql -e "GRANT ALL ON *.* TO wsrep_sst@'%' IDENTIFIED BY 'wspass'"
+
+2.4 Check and correct firewall settings.
+MySQL-wsrep server needs to be accessible from other cluster members through
+its client listening socket and through wsrep provider socket. See wsrep
+provider documentation for details.
+
+2.5 Restart mysql once again (it needs correct privileges at startup, this will
+be fixed soon):
+
+$ sudo WSREP_CLUSTER_ADDRESS=<address URL> /etc/init.d/mysql restart
+
+See wsrep provider instructions on the format of cluster URL.
+
+2.6 Check status with
+
+$ mysql -e "show status like 'wsrep%'"
+
+
+3. CONFIGURATION
+
+3.1 MANDATORY MYSQL OPTIONS
+
+binlog_format=ROW
+   This option is required to use row-level replication as opposed to
+   statement-level. For performance and consistency considerations don't change
+   that. As a side effect, binlog, if turned on, can be ROW only. In future this
+   option won't have special meaning.
+
+innodb_autoinc_lock_mode=2
+   This is a required parameter. Without it INSERTs into tables with
+   AUTO_INCREMENT column may fail.
+   autoinc lock modes 0 and 1 can cause unresolved deadlock, and make
+   system unresponsive.
+
+3.2 WSREP OPTIONS
+
+All options are optional except for wsrep_provider, wsrep_cluster_address, and
+wsrep_sst_auth.
+
+wsrep_provider=none
+   A full path to the library that implements WSREP interface. If none is
+   specified, the server behaves like a regular mysqld.
+
+wsrep_provider_options=
+   Provider-specific option string. Check wsrep provider documentation.
+
+wsrep_cluster_address=
+   Provider-specific cluster address string. This is used to connect a node to
+   the desired cluster.
+
+wsrep_cluster_name="my_wsrep_cluster"
+   Logical cluster name, must be the same for all nodes of the cluster.
+
+wsrep_node_name=
+   Human readable node name (for easier log reading only). Defaults to hostname.
+
+wsrep_slave_threads=1
+   Number of threads dedicated to processing of writesets from other nodes.
+   Values greater than 1 not tested.
+
+wsrep_dbug_option
+   Options for the built-in DBUG library (independent from what MySQL uses).
+   Empty by default.
+
+wsrep_local_cache_size=20M
+   Amount of RAM reserved for writeset cache in bytes. Excess writesets are
+   stored on the hard drive in MySQL data directory. Should be somewhat bigger
+   than the maximum packet size.
+
+wsrep_ws_persistency=0
+   Save writesets in binary files. For debugging purposes only.
+
+wsrep_debug=0
+   Enable debug-level logging.
+
+wsrep_convert_LOCK_to_trx=0
+   Implicitly convert locking sessions into transactions inside mysqld. By
+   itself it does not mean support for locking sessions, but it prevents the
+   database from going into logically inconsistent state. Note however, that
+   loading large database dump with LOCK statements might result in abnormally
+   large transactions and cause an out-of-memory condition
+
+wsrep_retry_autocommit=1
+   Retry autocommit queries and single statement transactions should they fail
+   certification test. This is analogous to rescheduling an autocommit query
+   should it go into deadlock with other transactions in the database lock
+   manager.
+
+wsrep_auto_increment_control=1
+   Automatically adjust auto_increment_increment and auto_increment_offset
+   variables based on the number of nodes in the cluster. Significantly reduces
+   certification conflict rate for INSERTS.
+
+wsrep_drupal_282555_workaround=1
+   MySQL seems to have an obscure bug when INSERT into table with
+   AUTO_INCREMENT column with NULL value for that column can fail with a 
+   duplicate key error. When this option is on, it retries such INSERTs.
+   Required for stable Drupal operation. Documented at:
+      http://bugs.mysql.com/bug.php?id=41984
+      http://drupal.org/node/282555
+
+State snapshot transfer options.
+
+When a new node joins the cluster it has to synchronize its initial state with the other cluster members by transferring state snapshot from one of them. The options below govern how this happens.
+
+wsrep_sst_method=mysqldump
+   What method to use to copy database state to a newly joined node. Currently
+   only mysqldump is supported. Slow but sure.
+
+wsrep_sst_receive_address=
+   Address (hostname:port) at which this node wants to receive state snapshot.
+   Defaults to mysqld bind address, and if that is not specified (0.0.0.0) - to
+   the first IP of eth0 + mysqld bind port.
+   NOTE: check that your firewall allows connections to this address from other
+         cluster nodes.
+
+wsrep_sst_auth=
+   Authentication information needed for state transfer. Depends on the state
+   transfer method. For mysqldump-based SST it is
+   <mysql_root_user>:<mysql_root_password>
+   and should be the same on all nodes - it is used to authenticate with both
+   state snapshot receiver and state snapshot donor.
+
+wsrep_sst_donor=
+   A name of the node which should serve as state snapshot donor. This allows
+   to control which node will serve state snapshot request. By default the
+   most suitable node is chosen by wsrep provider. This is the same as given in
+   wsrep_node_name.
+
+
+5. LIMITATIONS
+
+1) Currently replication works only with InnoDB storage engine. Any writes to 
+   tables of other types, including system (mysql.*) tables are not replicated. 
+   However, DDL statements are replicated in statement level, and changes
+   to mysql.* tables will get replicated that way. 
+   So, you can safely issue: CREATE USER..., 
+   but issuing: INSERT INTO mysql.user..., will not be replicated.
+
+2) Rows in tables without primary keys may appear in different order on
+   different nodes. As a result SELECT...LIMIT... may return slightly different
+   sets.
+
+3)  Unsupported queries:
+    * LOAD DATA
+    * lock functions (GET_LOCK(), RELEASE_LOCK()... )
+
+4) Query log cannot be directed to table. If you enable query logging,
+   you must forward the log to a file:
+       log_output = FILE
+   Use general_log and general_log_file to choose query logging and the 
+   log file name
+
+5) XA transactions can not be supported due to possible rollback on commit.
+
+6) Traditional MySQL replication cannot be used with MySQL-wsrep _yet_.
+
+

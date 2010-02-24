@@ -10,9 +10,15 @@
 %provides    wsrep
 %provides    galera
 
+%format deb
 %requires    libc6      2.4
 %requires    libstdc++6 4.1.1
 %requires    libgcc1    4.1.1
+%format rpm
+%requires    glibc      2.4
+%requires    libstdc++  4.1.1
+%requires    libgcc     4.1.1
+%format all
 
 $prefix=/usr
 

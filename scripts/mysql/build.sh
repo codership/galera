@@ -20,8 +20,9 @@ usage()
 "    -d|--debug      configure build with debug enabled (implies -c)\n"\
 "    --with-spread   configure build with Spread (implies -c)\n"\
 "    --no-strip      prevent stripping of release binaries\n"\
-"    -r|--release <galera release>, otherwise revisions will be used"\
-"    -p|--package    create Debian packages"
+"    -r|--release <galera release>, otherwise revisions will be used\n"\
+"    -p|--package    create Debian packages\n"
+"    --sb|--skip-build skip the actual build, use the existing binaries"
 "\n -s and -b options affect only Galera build.\n"
 }
 
@@ -34,6 +35,7 @@ TAR=no
 PACKAGE=no
 INSTALL=no
 CONFIGURE=no
+SKIP_BUILD=no
 
 GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
 
@@ -88,6 +90,9 @@ do
             CONFIGURE="yes"
             CPU="amd64"
             ;;
+        --sb|--skip-build)
+            SKIP_BUILD="yes"
+            ;;
         --help)
             usage
             exit 0
@@ -104,9 +109,11 @@ done
 if [ "$OPT"     == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
+if [ "$SKIP_BUILD" == "yes" ]; then CONFIGURE="no"; fi
 
 # export command options for Galera build
-export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD CFLAGS CXXFLAGS PACKAGE CPU
+export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD CFLAGS CXXFLAGS \
+       PACKAGE CPU SKIP_BUILD RELEASE
 
 set -eu
 
@@ -150,7 +157,9 @@ then
     if [ ! -d $mysql_tag ]
     then
         mysql_orig_tar_gz=$mysql_tag.tar.gz
-        url=http://ftp.sunet.se/pub/unix/databases/relational/mysql/Downloads/MySQL-5.1/
+#        url=http://ftp.sunet.se/pub/unix/databases/relational/mysql/Downloads/MySQL-5.1
+        url=http://mysql.dataphone.se/Downloads/MySQL-5.1
+#        url=http://anduin.linuxfromscratch.org/sources/BLFS/svn/m
         echo "Downloading $mysql_orig_tar_gz... currently works only for 5.1.x"
         wget -N $url/$mysql_orig_tar_gz
         echo "Getting wsrep patch..."
@@ -176,23 +185,26 @@ echo  "Building mysqld"
 
 export MYSQL_REV
 export GALERA_REV
-if [ "$CONFIGURE" == "yes" ]
+if [ "$SKIP_BUILD" == "no" ]
 then
-    rm -f config.status
-    if [ "$DEBUG" == "yes" ]
+    if [ "$CONFIGURE" == "yes" ]
     then
-        DEBUG_OPT="-debug"
-    else
-        DEBUG_OPT=""
-    fi
+        rm -f config.status
+        if [ "$DEBUG" == "yes" ]
+        then
+            DEBUG_OPT="-debug"
+        else
+            DEBUG_OPT=""
+        fi
 
-    export MYSQL_BUILD_PREFIX="/usr"
-    BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
-else # just recompile and relink with old configuration
-    set -x
-    make > /dev/null
-    set +x
-fi
+        export MYSQL_BUILD_PREFIX="/usr"
+        BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
+    else  # just recompile and relink with old configuration
+        #set -x
+        make > /dev/null
+        #set +x
+    fi
+fi # SKIP_BUILD
 
 # gzip manpages
 # this should be rather fast, so we can repeat it every time
@@ -208,7 +220,7 @@ fi
 ######################################
 
 if [ $TAR == "yes" ]; then
-echo "Creating test package"
+echo "Creating demo distribution"
 # Create build directory structure
 DIST_DIR=$BUILD_ROOT/dist
 MYSQL_DIST_DIR=$DIST_DIR/mysql
@@ -299,6 +311,25 @@ fi
 
 fi # if [ $TAR == "yes " ]
 
+fix_rpmbuild()
+{
+    local buildroot=~/rpmbuild/BUILDROOT/mysql-wsrep-$1-$2.$3
+    rm    -rf $buildroot
+    mkdir -p  $buildroot
+    local real="$(pwd)/$4/buildroot/"
+    pushd $buildroot
+    ln -s "$real"/etc ./
+    ln -s "$real"/usr ./
+    ln -s "$real"/var ./
+    popd
+}
+
+cleanup() # OUTPUT ARCH 
+{
+    mv $1/RPMS/$2/*.rpm $1/
+    rm -rf $1/RPMS $1/buildroot $1/rpms # $1/mysql-wsrep.spec 
+}
+
 build_packages()
 {
     cd $BUILD_ROOT
@@ -320,14 +351,20 @@ build_packages()
 
     echo $MYSQL_SRC $MYSQL_VER ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
 
-    WHOAMI=$(whoami)
-    EPM=/usr/bin/epm
+    pushd $GALERA_SRC/scripts/mysql && \
+    local OUTPUT=$(pwd)/$ARCH_DEB
+    rm -rf $OUTPUT
+    local WHOAMI=$(whoami)
+    local EPM=/usr/bin/epm
 
-#   sudo -E $EPM -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" mysql-wsrep  && \
-#    pushd $GALERA_SRC/scripts/packages                   && \
-    sudo -E $EPM -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" mysql-wsrep && \
-    sudo /bin/chown $WHOAMI.users -R * || \
-    return 1
+    (sudo -E $EPM -vv -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" \
+         --output-dir "$OUTPUT" mysql-wsrep || \
+     /usr/bin/rpmbuild -bb --target "$ARCH_RPM" "$OUTPUT/mysql-wsrep.spec" \
+             --buildroot="$OUTPUT/buildroot" ) && \
+    sudo -E $EPM -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" \
+         --output-dir "$OUTPUT" mysql-wsrep && \
+    sudo /bin/chown $WHOAMI.users -R "$OUTPUT" && cleanup $OUTPUT $ARCH_RPM || \
+    (sudo /bin/chown $WHOAMI.users -R "$OUTPUT"; return 1)
 }
 
 if [ "$PACKAGE" == "yes" ]

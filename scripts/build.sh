@@ -18,14 +18,16 @@ usage()
     "    -p|--package    build RPM and DEB packages at the end.\n" \
     "    --with-spread   configure build with spread backend (implies -c to gcs)\n" \
     "    --source        build source packages\n"\
+    "    --sb            skip actual build, use the existing binaries"
     "\nSet DISABLE_GCOMM/DISABLE_VSBES to 'yes' to disable respective modules"
 }
 
 # disable building vsbes by default
 DISABLE_VSBES=${DISABLE_VSBES:-"yes"}
 PACKAGE=${PACKAGE:-"no"}
-SOURCE=no
-RELEASE=""
+SKIP_BUILD=${SKIP_BUILD:-"no"}
+RELEASE=${RELEASE:-""}
+SOURCE=${SOURCE:-"no"}
 
 if ccache -V > /dev/null 2>&1
 then
@@ -56,16 +58,16 @@ do
 	    shift
 	    ;;
 	-b|--bootstrap)
-	    BOOTSTRAP=yes # Bootstrap the build system
+	    BOOTSTRAP="yes" # Bootstrap the build system
 	    ;;
 	-c|--configure)
-	    CONFIGURE=yes # Reconfigure the build system
+	    CONFIGURE="yes" # Reconfigure the build system
 	    ;;
 	-s|--scratch)
-	    SCRATCH=yes   # Build from scratch (run make clean)
+	    SCRATCH="yes"   # Build from scratch (run make clean)
 	    ;;
 	-o|--opt)
-	    OPT=yes       # Compile without debug
+	    OPT="yes"       # Compile without debug
 	    ;;
 	-r|--release)
 	    RELEASE="$2"
@@ -74,18 +76,18 @@ do
 	-m32)
 	    CFLAGS="$CFLAGS -m32"
 	    CXXFLAGS="$CXXFLAGS -m32"
-	    SCRATCH=yes
+	    SCRATCH="yes"
 	    ;;
 	-m64)
 	    CFLAGS="$CFLAGS -m64"
 	    CXXFLAGS="$CXXFLAGS -m64"
-	    SCRATCH=yes
+	    SCRATCH="yes"
 	    ;;
 	-d|--debug)
-	    DEBUG=yes     # Compile with debug
+	    DEBUG="yes"     # Compile with debug
 	    ;;
 	-p|--package)
-	    PACKAGE=yes   # build binary packages
+	    PACKAGE="yes"   # build binary packages
 	    ;;
 	--with*-spread)
 	    WITH_SPREAD="$1"
@@ -95,11 +97,14 @@ do
 	    exit 0
 	    ;;
 	--source)
-	    SOURCE=yes
+	    SOURCE="yes"
+	    ;;
+	--sb)
+	    SKIP_BUILD="yes"
 	    ;;
 	*)
 	    if test ! -z "$1"; then
-		echo "Unrecognized option: $1"
+	       echo "Unrecognized option: $1"
 	    fi
 	    usage
 	    exit 1
@@ -162,6 +167,24 @@ build_flags()
     LDFLAGS="$LDFLAGS -L$build_dir/src/.libs"
 }
 
+fix_rpmbuild() # RELEASE ARCH OUTPUT - deprecated
+{
+    local buildroot=~/rpmbuild/BUILDROOT/galera-$1-0.$2
+    rm    -rf $buildroot
+    mkdir -p  $buildroot
+    local real="$(pwd)/$3/buildroot"
+    pushd $buildroot
+    cp -ar "$real"/etc ./
+    cp -ar "$real"/usr ./
+    popd
+}
+
+cleanup() # OUTPUT ARCH
+{
+    mv $1/RPMS/$2/*.rpm $1/
+    rm -rf $1/RPMS $1/buildroot $1/rpms # $1/galera.spec
+}
+
 build_packages()
 {
     local ARCH_DEB
@@ -179,19 +202,27 @@ build_packages()
     if [ "$DISABLE_GCOMM" != "yes" ]; then export GCOMM=yes; fi
     if [ "$DISABLE_VSBES" != "yes" ]; then export VSBES=yes; fi
 
+    pushd $build_base/scripts/packages
+    local OUTPUT=$(pwd)/$ARCH_DEB
     local WHOAMI=$(whoami)
 
     export BUILD_BASE=$build_base
     export GALERA_VER=$RELEASE
     echo GCOMM=$GCOMM VSBES=$VSBES ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
-    pushd $build_base/scripts/packages                       && \
-    rm -rf $ARCH_DEB $ARCH_RPM                               && \
-#    /usr/bin/epm -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" galera     && \
-#    /usr/bin/epm -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" galera-dev && \
-    sudo -E /usr/bin/epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" galera && \
-#    sudo -E /usr/bin/epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" galera-dev && \
-    sudo /bin/chown -R $WHOAMI.users * || \
-    return 1
+
+    rm -rf $OUTPUT && \
+    (sudo -E /usr/bin/epm -vv -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" \
+         --output-dir $OUTPUT --keep-files -k galera || \
+     /usr/bin/rpmbuild -bb --target "$ARCH_RPM" "$OUTPUT/galera.spec" \
+         --buildroot="$OUTPUT/buildroot" ) && \
+#    /usr/bin/epm -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" \
+#         --output-dir $OUTPUT galera-dev && \
+    sudo -E /usr/bin/epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" \
+         --output-dir $OUTPUT galera && \
+#    sudo -E /usr/bin/epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" \
+#         --output-dir $OUTPUT galera-dev && \
+    sudo /bin/chown -R $WHOAMI.users $OUTPUT && cleanup $OUTPUT $ARCH_RPM || \
+    (sudo /bin/chown -R $WHOAMI.users $OUTPUT ; return 1)
 }
 
 # Most modules are standard, so we can use a single function
@@ -206,6 +237,13 @@ build_module()
     fi
 
     build_flags $build_dir || return 1
+}
+
+fix_buildroot()
+{
+    rm -rf ~/rpmbuild/BUILDROOT
+    mkdir -p ~/rpmbuild
+    ln -s $(pwd)/$1/buildroot ~/rpmbuild/BUILDROOT
 }
 
 build_source()
@@ -270,6 +308,8 @@ then
     popd
 fi
 
+if test "$SKIP_BUILD" == "no"; then
+
 build_module "galerautils"
 build_module "gcache"
 
@@ -305,6 +345,8 @@ build_module "gcs" $gcs_conf_flags
 build_module "gemini"
 build_module "wsdb"
 build_module "galera"
+
+fi # SKIP_BUILD
 
 if test "$PACKAGE" == "yes"
 then
