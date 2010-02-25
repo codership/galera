@@ -202,9 +202,11 @@ int local_open(
 #include <inttypes.h>
 
 static void trx_print(void *ctx, void *entry) {
-    wsdb_trx_info_t *info = (wsdb_trx_info_t *) entry;
+    struct trx_info *info = (struct trx_info *) entry;
     fprintf(stdout, "TRX: seqno: %0" PRId64 " - %0" PRId64 " state: %d", 
-            info->seqno_l, info->seqno_g, info->state
+            info->info.seqno_l, 
+            info->info.seqno_g, 
+            info->info.state
     );
 }
 
@@ -1131,14 +1133,14 @@ struct wsdb_write_set *wsdb_get_write_set(
     ws->items = (struct wsdb_item_rec *) gu_malloc (
         ws->item_count * sizeof(struct wsdb_item_rec)
     );
-    if (!ws->items) {
+    if (!ws->items && ws->item_count != 0) {
         gu_error("failed to allocate write set items %d-%d for %llu", 
                  ws->item_count, ws->query_count, trx_id
         );
         GU_DBUG_RETURN(NULL);
+    } else if (ws->item_count > 0) {
+        memset(ws->items, '\0', ws->item_count * sizeof(struct wsdb_item_rec));
     }
-    memset(ws->items, '\0', ws->item_count * sizeof(struct wsdb_item_rec));
-
     GU_DBUG_PRINT("wsdb",("query count: %d", ws->query_count));
     ws->queries = (struct wsdb_query *) gu_malloc (
         ws->query_count * sizeof(struct wsdb_query)
