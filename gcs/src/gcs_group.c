@@ -561,8 +561,9 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
                 GCS_STATE_JOINER == group->nodes[peer_idx].status) {
                 // this node will be waiting for SST forever. If it has only
                 // one recv thread there is no (generic) way to wake it up.
-                gu_fatal ("Will never receive state. Aborting.");
-                abort();
+                gu_fatal ("Will never receive state. Need to abort.");
+                return -ENOTRECOVERABLE;
+                // abort();
             }
         }
         else {

@@ -58,7 +58,7 @@ extern gu_log_severity_t gu_log_max_level;
 // NOTE: don't add "\n" here even if you really want to do it
 #define GU_LOG_C(level, ...)\
         gu_log(level, __FILE__, __PRETTY_FUNCTION__, __LINE__,\
-	       ## __VA_ARGS__, NULL)
+               ## __VA_ARGS__, NULL)
 
 /**
  * @name Logging macros.
