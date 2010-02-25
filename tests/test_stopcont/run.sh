@@ -45,7 +45,7 @@ cycle()
     echo "Signaling node $node_id with STOP... "
     signal_node STOP $node
 
-    pause 10 10
+    pause 10 20
 
     echo "Signaling node $node_id with CONT..."
     signal_node CONT $node
@@ -66,6 +66,7 @@ do
     cycle $node
 
     pause 30 10
+
     consistency_check $sqlgen_pid
 
     node=$(( ( node + 1 ) % node_num ))

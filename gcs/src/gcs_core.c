@@ -827,7 +827,14 @@ core_msg_to_action (gcs_core_t*          core,
             break;
         case GCS_MSG_JOIN:
             ret = gcs_group_handle_join_msg (group, msg);
-            assert (gcs_group_my_idx(group) == msg->sender_idx || 0 == ret);
+            assert (gcs_group_my_idx(group) == msg->sender_idx || 0 >= ret);
+            if (-ENOTRECOVERABLE == ret) {
+                core->backend.close(&core->backend);
+                // See #165.
+                // There is nobody to pass this error to for graceful shutdown:
+                // application thread is blocked waiting for SST.
+                abort();
+            }
             act_type = GCS_ACT_JOIN;
             break;
         case GCS_MSG_SYNC:
