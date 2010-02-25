@@ -75,7 +75,7 @@ typedef int64_t connid_t;
 typedef int64_t local_trxid_t;
 typedef int64_t trx_seqno_t;
 
-#define TRX_SEQNO_MAX LLONG_MAX
+#define TRX_SEQNO_MAX INT64_MAX
 
 enum wsdb_conn_state {
   WSDB_CONN_IDLE = 0,     //!< 

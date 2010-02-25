@@ -160,7 +160,13 @@ static void purge_active_seqnos(trx_seqno_t up_to) {
         trx_info.list_size -= sizeof(struct seqno_list);
         trx_info.list_size -= all_keys_len;
     }
+
+    if (trx == NULL) {
+        /* Reached the end of list */
+        trx_info.last_active_seqno = NULL;
+    }
 }
+
 enum purge_method {
   PURGE_METHOD_FULL_SCAN=0,
   PURGE_METHOD_BY_KEYS,
@@ -194,6 +200,11 @@ static void purge_seqno_list(trx_seqno_t up_to) {
         trx = trx_info.active_seqnos = next_trx;
         trx_info.list_len--;
         trx_info.list_size -= sizeof(struct seqno_list);
+    }
+
+    if (trx == NULL) {
+        /* Reached the end of list */
+        trx_info.last_active_seqno = NULL;
     }
 }
 

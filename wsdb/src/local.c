@@ -202,9 +202,11 @@ int local_open(
 #include <inttypes.h>
 
 static void trx_print(void *ctx, void *entry) {
-    wsdb_trx_info_t *info = (wsdb_trx_info_t *) entry;
+    struct trx_info *info = (struct trx_info *) entry;
     fprintf(stdout, "TRX: seqno: %0" PRId64 " - %0" PRId64 " state: %d", 
-            info->seqno_l, info->ws->trx_seqno, info->state
+            info->info.seqno_l, 
+            (info->info.ws != NULL ? info->info.ws->trx_seqno : TRX_SEQNO_MAX), 
+            info->info.state
     );
 }
 
