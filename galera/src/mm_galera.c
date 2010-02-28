@@ -1110,6 +1110,8 @@ galera_check_st_required (gcs_act_conf_t* conf)
     if (conf->st_required) {
         gu_uuid_t* conf_uuid = (gu_uuid_t*)conf->group_uuid;
 
+        assert (conf->conf_id >= 0);
+
         if (!gu_uuid_compare (&status.state_uuid, conf_uuid)) {
             // same history
             if (GALERA_STAGE_JOINED == status.stage) {
