@@ -1125,6 +1125,10 @@ galera_check_st_required (gcs_act_conf_t* conf)
         if (conf->st_required) {
             status.stage = GALERA_STAGE_JOINING;
         }
+        else {
+            // rewrote conf->st_required, tell GCS about it
+            galera_join();
+        }
     }
 }
 
