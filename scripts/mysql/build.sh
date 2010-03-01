@@ -154,8 +154,8 @@ if [ "$PACKAGE" == "yes" ] # fetch and patch pristine sources
 then
     cd /tmp
     mysql_tag=mysql-$MYSQL_VER
-    if [ ! -d $mysql_tag ]
-    then
+#    if [ ! -d $mysql_tag ]
+#    then
         mysql_orig_tar_gz=$mysql_tag.tar.gz
 #        url=http://ftp.sunet.se/pub/unix/databases/relational/mysql/Downloads/MySQL-5.1
         url=http://mysql.dataphone.se/Downloads/MySQL-5.1
@@ -163,16 +163,16 @@ then
         echo "Downloading $mysql_orig_tar_gz... currently works only for 5.1.x"
         wget -N $url/$mysql_orig_tar_gz
         echo "Getting wsrep patch..."
-        patch_file=$(${BUILD_ROOT}/get_patch.sh $mysql_tag)
+        patch_file=$(${BUILD_ROOT}/get_patch.sh $mysql_tag $MYSQL_SRC)
         echo "Patching source..."
         tar -xzf $mysql_orig_tar_gz
         cd $mysql_tag/
         patch -p1 -f < $patch_file >/dev/null || :
         chmod a+x ./BUILD/*wsrep
         CONFIGURE="yes"
-    else
-        cd $mysql_tag/
-    fi
+#    else
+#        cd $mysql_tag/
+#    fi
     MYSQL_SRC=$(pwd -P)
     if [ "$CONFIGURE" == "yes" ]
     then

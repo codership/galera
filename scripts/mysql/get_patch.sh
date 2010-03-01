@@ -1,19 +1,11 @@
-#!/bin/bash
-
-# This script produces WSREP patch against given official mysql version
-
-if test -z "$MYSQL_SRC"
-then
-    echo "No MYSQL_SRC variable pointing at MySQL/wsrep sources. Can't continue."
-    exit -1
-fi
+#!/bin/bash -u
 
 usage()
 {
-    echo -e "Usage: $0 <mysql version tag (e.g. mysql-5.1.42)" 
+    echo -e "Usage: $0 <mysql version tag (e.g. mysql-5.1.42)> <local branch dir>" 
 }
 
-if [ $# -lt 1 ]
+if [ $# -lt 2 ]
 then
     usage
     exit -1
@@ -25,7 +17,7 @@ set -e
 # Source paths are either absolute or relative to script, get absolute
 THIS_DIR=$(pwd -P)
 
-cd $MYSQL_SRC
+cd $2
 WSREP_REV=$(bzr revno)
 WSREP_PATCH_SPEC=$1-$WSREP_REV
 
@@ -59,7 +51,7 @@ MYSQL_BRANCH="lp:mysql-server/5.1"
 WSREP_PATCH_TMP="$THIS_DIR/$WSREP_PATCH_SPEC.diff"
 # normally we expect bzr diff return 1 (changes available)
 bzr diff -p1 -v --diff-options " --exclude=.bzrignore " \
-    -r tag:$1..branch:$MYSQL_SRC \
+    -r tag:$1..branch:$2 \
     > "$WSREP_PATCH_TMP" || if [ $? -gt 1 ]; then exit -1; fi
 WSREP_PATCH_MD5SUM=$(md5sum $WSREP_PATCH_TMP | awk '{ print $1 }')
 WSREP_PATCH_FILE=$THIS_DIR/${WSREP_PATCH_SPEC}_${WSREP_PATCH_MD5SUM}_.diff

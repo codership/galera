@@ -82,13 +82,13 @@ ldconfig -n $LIBS_DST
 mysql_install_db --user=mysql --datadir=${mysql_data}
 EOF_POSTINSTALL
 
-%postremove <<EOF_POSTREMOVE
+%preremove <<EOF_PREREMOVE
 if [ -x /usr/sbin/invoke-rc.d ]; then
     invoke-rc.d mysql stop
 else
     /etc/init.d/mysql stop
 fi
 update-rc.d -f mysql remove >/dev/null || exit $
-EOF_POSTREMOVE
+EOF_PREREMOVE
 
 #
