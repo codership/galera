@@ -1362,6 +1362,12 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
         gu_info("recv method cannot start, no gcs connection");
         return WSREP_NODE_FAIL;
     }
+    if (GALERA_CONNECTED != conn_state) {
+        gu_info("recv method cannot start, gcs not connected");
+
+        /* return with success code to avoid node shutdown */
+        return WSREP_OK;
+    }
 
     applier = job_queue_new_worker(applier_queue, JOB_SLAVE);
 
