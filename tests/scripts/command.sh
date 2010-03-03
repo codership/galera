@@ -9,7 +9,7 @@ help()
     echo "Command help: $0 <command> help"
 }
 
-if [ $# -eq 0 ]; then usage >&2; exit 1; fi
+if [ $# -eq 0 ]; then help >&2; exit 1; fi
 
 declare -r DIST_BASE=$(cd $(dirname $0)/..; pwd -P)
 declare -r DIST_SCRIPTS="$DIST_BASE/scripts"

@@ -988,8 +988,13 @@ long gcs_core_destroy (gcs_core_t* core)
             gu_mutex_unlock (&core->send_lock);
             return -EBADFD;
         }
-        gu_info ("Calling backend.destroy()");
-        core->backend.destroy (&core->backend);
+
+        if (core->backend.conn) {
+            assert (core->backend.destroy);
+            gu_debug ("Calling backend.destroy()");
+            core->backend.destroy (&core->backend);
+        }
+
         core->state = CORE_DESTROYED;
     }
     gu_mutex_unlock (&core->send_lock);
