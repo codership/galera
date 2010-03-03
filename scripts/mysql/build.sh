@@ -154,8 +154,8 @@ if [ "$PACKAGE" == "yes" ] # fetch and patch pristine sources
 then
     cd /tmp
     mysql_tag=mysql-$MYSQL_VER
-#    if [ ! -d $mysql_tag ]
-#    then
+    if [ "$SKIP_BUILD" == "no" ] || [ ! -d $mysql_tag ]
+    then
         mysql_orig_tar_gz=$mysql_tag.tar.gz
 #        url=http://ftp.sunet.se/pub/unix/databases/relational/mysql/Downloads/MySQL-5.1
         url=http://mysql.dataphone.se/Downloads/MySQL-5.1
@@ -170,9 +170,9 @@ then
         patch -p1 -f < $patch_file >/dev/null || :
         chmod a+x ./BUILD/*wsrep
         CONFIGURE="yes"
-#    else
-#        cd $mysql_tag/
-#    fi
+    else
+        cd $mysql_tag/
+    fi
     MYSQL_SRC=$(pwd -P)
     if [ "$CONFIGURE" == "yes" ]
     then
