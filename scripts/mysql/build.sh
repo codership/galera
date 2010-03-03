@@ -311,59 +311,68 @@ fi
 
 fi # if [ $TAR == "yes " ]
 
-fix_rpmbuild()
-{
-    local buildroot=~/rpmbuild/BUILDROOT/mysql-wsrep-$1-$2.$3
-    rm    -rf $buildroot
-    mkdir -p  $buildroot
-    local real="$(pwd)/$4/buildroot/"
-    pushd $buildroot
-    ln -s "$real"/etc ./
-    ln -s "$real"/usr ./
-    ln -s "$real"/var ./
-    popd
-}
-
 cleanup() # OUTPUT ARCH 
 {
     mv $1/RPMS/$2/*.rpm $1/
     rm -rf $1/RPMS $1/buildroot $1/rpms # $1/mysql-wsrep.spec 
 }
 
+get_arch()
+{
+    if file $MYSQL_SRC/sql/mysqld.o | grep "80386" >/dev/null 2>&1
+    then
+        echo "i386"
+    else
+        echo "amd64"
+    fi
+}
+
+_build_packages()
+{
+    local ARCH=$1
+    local WHOAMI=$2
+
+    echo "ARCH=$ARCH"
+
+    local EPM=/usr/bin/epm
+
+    if test -x "$(which dpkg)" # distribution test
+    then
+        #build DEB
+        rm -rf $ARCH
+        sudo -E $EPM -n -m "$ARCH" -a "$ARCH" -f "deb" \
+             --output-dir $ARCH mysql-wsrep && \
+        sudo /bin/chown -R $WHOAMI.users $ARCH
+    else
+        # build RPM
+        if [ "$ARCH" == "amd64" ]; then ARCH="x86_64"; fi
+
+        rm -rf $ARCH
+        (sudo -E $EPM -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
+              --output-dir $ARCH --keep-files -k galera || \
+        /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/mysql-wsrep.spec" \
+              --buildroot="$ARCH/buildroot" ) && \
+        sudo /bin/chown -R $WHOAMI.users $ARCH && \
+        mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ && \
+        rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms
+    fi
+}
+
 build_packages()
 {
     cd $BUILD_ROOT
 
-    local ARCH_DEB
-    local ARCH_RPM
-
-    if file $MYSQL_SRC/sql/mysqld.o | grep "80386" >/dev/null 2>&1
-    then
-        ARCH_DEB=i386
-        ARCH_RPM=i386
-    else
-        ARCH_DEB=amd64
-        ARCH_RPM=x86_64
-    fi
+    local ARCH=$(get_arch)
 
     export MYSQL_VER MYSQL_SRC GALERA_SRC RELEASE_NAME
     export WSREP_VER=${RELEASE:-"$MYSQL_REV"}
 
-    echo $MYSQL_SRC $MYSQL_VER ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
+    echo $MYSQL_SRC $MYSQL_VER $ARCH
 
-    pushd $GALERA_SRC/scripts/mysql && \
-    local OUTPUT=$(pwd)/$ARCH_DEB
-    rm -rf $OUTPUT
+    pushd $GALERA_SRC/scripts/mysql
     local WHOAMI=$(whoami)
-    local EPM=/usr/bin/epm
 
-    (sudo -E $EPM -vv -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" \
-         --output-dir "$OUTPUT" mysql-wsrep || \
-     /usr/bin/rpmbuild -bb --target "$ARCH_RPM" "$OUTPUT/mysql-wsrep.spec" \
-             --buildroot="$OUTPUT/buildroot" ) && \
-    sudo -E $EPM -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" \
-         --output-dir "$OUTPUT" mysql-wsrep && \
-    sudo /bin/chown $WHOAMI.users -R "$OUTPUT" && cleanup $OUTPUT $ARCH_RPM || \
+    _build_packages $ARCH $WHOAMI || \
     (sudo /bin/chown $WHOAMI.users -R "$OUTPUT"; return 1)
 }
 

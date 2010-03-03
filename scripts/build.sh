@@ -167,62 +167,62 @@ build_flags()
     LDFLAGS="$LDFLAGS -L$build_dir/src/.libs"
 }
 
-fix_rpmbuild() # RELEASE ARCH OUTPUT - deprecated
+get_arch()
 {
-    local buildroot=~/rpmbuild/BUILDROOT/galera-$1-0.$2
-    rm    -rf $buildroot
-    mkdir -p  $buildroot
-    local real="$(pwd)/$3/buildroot"
-    pushd $buildroot
-    cp -ar "$real"/etc ./
-    cp -ar "$real"/usr ./
-    popd
-}
-
-cleanup() # OUTPUT ARCH
-{
-    mv $1/RPMS/$2/*.rpm $1/
-    rm -rf $1/RPMS $1/buildroot $1/rpms # $1/galera.spec
-}
-
-build_packages()
-{
-    local ARCH_DEB
-    local ARCH_RPM
-
     if file $build_base/gcs/src/gcs.o | grep "80386" >/dev/null 2>&1
     then
-        ARCH_DEB=i386
-        ARCH_RPM=i386
+        echo "i386"
     else
-        ARCH_DEB=amd64
-        ARCH_RPM=x86_64
+        echo "amd64"
     fi
+}
+
+_build_packages()
+{
+    local ARCH=$1
+    local WHOAMI=$2
 
     if [ "$DISABLE_GCOMM" != "yes" ]; then export GCOMM=yes; fi
     if [ "$DISABLE_VSBES" != "yes" ]; then export VSBES=yes; fi
 
-    pushd $build_base/scripts/packages
-    local OUTPUT=$(pwd)/$ARCH_DEB
-    local WHOAMI=$(whoami)
-
     export BUILD_BASE=$build_base
     export GALERA_VER=$RELEASE
-    echo GCOMM=$GCOMM VSBES=$VSBES ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
+    echo "GCOMM=$GCOMM VSBES=$VSBES ARCH=$ARCH"
 
-    rm -rf $OUTPUT && \
-    (sudo -E /usr/bin/epm -vv -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" \
-         --output-dir $OUTPUT --keep-files -k galera || \
-     /usr/bin/rpmbuild -bb --target "$ARCH_RPM" "$OUTPUT/galera.spec" \
-         --buildroot="$OUTPUT/buildroot" ) && \
-#    /usr/bin/epm -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" \
-#         --output-dir $OUTPUT galera-dev && \
-    sudo -E /usr/bin/epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" \
-         --output-dir $OUTPUT galera && \
-#    sudo -E /usr/bin/epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" \
-#         --output-dir $OUTPUT galera-dev && \
-    sudo /bin/chown -R $WHOAMI.users $OUTPUT && cleanup $OUTPUT $ARCH_RPM || \
-    (sudo /bin/chown -R $WHOAMI.users $OUTPUT ; return 1)
+    rm -rf $ARCH
+    if test -x "$(which dpkg)" # distribution test
+    then
+        # build DEB
+        sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
+             --output-dir $ARCH galera && \
+#       sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
+#            --output-dir $ARCH galera-dev && \
+        sudo /bin/chown -R $WHOAMI.users $ARCH
+    else
+        # build RPM
+        if [ "$ARCH" == "amd64" ]; then ARCH="x86_64"; fi
+
+        (sudo -E /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
+              --output-dir $ARCH --keep-files -k galera || \
+         /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/galera.spec" \
+              --buildroot="$ARCH/buildroot" ) && \
+#        /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "rpm" \
+#             --output-dir $ARCH galera-dev && \
+        sudo /bin/chown -R $WHOAMI.users $ARCH && \
+        mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ && \
+        rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms # $ARCH/galera.spec
+    fi
+}
+
+build_packages()
+{
+    local ARCH=$(get_arch)
+
+    pushd $build_base/scripts/packages
+    local WHOAMI=$(whoami)
+
+    _build_packages $ARCH $WHOAMI || \
+    (sudo /bin/chown -R $WHOAMI.users $ARCH ; return 1)
 }
 
 # Most modules are standard, so we can use a single function
