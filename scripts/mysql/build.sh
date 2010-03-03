@@ -349,7 +349,7 @@ _build_packages()
 
         rm -rf $ARCH
         (sudo -E $EPM -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
-              --output-dir $ARCH --keep-files -k galera || \
+              --output-dir $ARCH --keep-files -k mysql-wsrep || \
         /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/mysql-wsrep.spec" \
               --buildroot="$ARCH/buildroot" ) && \
         sudo /bin/chown -R $WHOAMI.users $ARCH && \
@@ -373,7 +373,7 @@ build_packages()
     local WHOAMI=$(whoami)
 
     _build_packages $ARCH $WHOAMI || \
-    (sudo /bin/chown $WHOAMI.users -R "$OUTPUT"; return 1)
+    (sudo /bin/chown $WHOAMI.users -R "$ARCH"; return 1)
 }
 
 if [ "$PACKAGE" == "yes" ]
