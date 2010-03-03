@@ -328,53 +328,49 @@ get_arch()
     fi
 }
 
-_build_packages()
-{
-    local ARCH=$1
-    local WHOAMI=$2
-
-    echo "ARCH=$ARCH"
-
-    local EPM=/usr/bin/epm
-
-    if test -x "$(which dpkg)" # distribution test
-    then
-        #build DEB
-        rm -rf $ARCH
-        sudo -E $EPM -n -m "$ARCH" -a "$ARCH" -f "deb" \
-             --output-dir $ARCH mysql-wsrep && \
-        sudo /bin/chown -R $WHOAMI.users $ARCH
-    else
-        # build RPM
-        if [ "$ARCH" == "amd64" ]; then ARCH="x86_64"; fi
-
-        rm -rf $ARCH
-        (sudo -E $EPM -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
-              --output-dir $ARCH --keep-files -k mysql-wsrep || \
-        /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/mysql-wsrep.spec" \
-              --buildroot="$ARCH/buildroot" ) && \
-        sudo /bin/chown -R $WHOAMI.users $ARCH && \
-        mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ && \
-        rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms
-    fi
-}
-
 build_packages()
 {
-    cd $BUILD_ROOT
+    pushd $GALERA_SRC/scripts/mysql
 
     local ARCH=$(get_arch)
+    local WHOAMI=$(whoami)
+    local DEB=1
+
+    if test ! -x "$(which dpkg)" # distribution test
+    then
+        DEB=0
+        if [ "$ARCH" == "amd64" ]; then ARCH="x86_64"; fi
+    fi
 
     export MYSQL_VER MYSQL_SRC GALERA_SRC RELEASE_NAME
     export WSREP_VER=${RELEASE:-"$MYSQL_REV"}
 
     echo $MYSQL_SRC $MYSQL_VER $ARCH
+    rm -rf $ARCH
 
-    pushd $GALERA_SRC/scripts/mysql
-    local WHOAMI=$(whoami)
+    set +e
+    if [ $DEB -eq 1 ]
+    then #build DEB
+        sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
+             --output-dir $ARCH mysql-wsrep
+    else # build RPM
+        (sudo -E /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
+              --output-dir $ARCH --keep-files -k mysql-wsrep || \
+        /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/mysql-wsrep.spec" \
+              --buildroot="$ARCH/buildroot" )
+    fi
+    local RET=$?
 
-    _build_packages $ARCH $WHOAMI || \
-    (sudo /bin/chown $WHOAMI.users -R "$ARCH"; return 1)
+    sudo /bin/chown -R $WHOAMI.users $ARCH
+    set -e
+
+    if [ $RET -eq 0 ] && [ $DEB -eq 0 ]
+    then # RPM cleanup
+        mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ && \
+        rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms
+    fi
+
+    return $RET
 }
 
 if [ "$PACKAGE" == "yes" ]

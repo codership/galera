@@ -177,10 +177,12 @@ get_arch()
     fi
 }
 
-_build_packages()
+build_packages()
 {
-    local ARCH=$1
-    local WHOAMI=$2
+    pushd $build_base/scripts/packages
+
+    local ARCH=$(get_arch)
+    local WHOAMI=$(whoami)
 
     if [ "$DISABLE_GCOMM" != "yes" ]; then export GCOMM=yes; fi
     if [ "$DISABLE_VSBES" != "yes" ]; then export VSBES=yes; fi
@@ -189,40 +191,42 @@ _build_packages()
     export GALERA_VER=$RELEASE
     echo "GCOMM=$GCOMM VSBES=$VSBES ARCH=$ARCH"
 
-    rm -rf $ARCH
-    if test -x "$(which dpkg)" # distribution test
-    then
-        # build DEB
-        sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
-             --output-dir $ARCH galera && \
-#       sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
-#            --output-dir $ARCH galera-dev && \
-        sudo /bin/chown -R $WHOAMI.users $ARCH
-    else
-        # build RPM
+    local DEB=1
+    if ! test -x "$(which dpkg)"  # distribution test
+    then # RPM system
+        local DEB=0
         if [ "$ARCH" == "amd64" ]; then ARCH="x86_64"; fi
+    fi
 
+    rm -rf $ARCH
+
+    set +e
+    if [ $DEB -eq 1 ]
+    then # build DEB
+        sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
+             --output-dir $ARCH galera # && \
+#       sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
+#            --output-dir $ARCH galera-dev
+    else # build RPM
         (sudo -E /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
               --output-dir $ARCH --keep-files -k galera || \
          /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/galera.spec" \
-              --buildroot="$ARCH/buildroot" ) && \
+              --buildroot="$ARCH/buildroot" ) # && \
 #        /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "rpm" \
-#             --output-dir $ARCH galera-dev && \
-        sudo /bin/chown -R $WHOAMI.users $ARCH && \
+#             --output-dir $ARCH galera-dev
+    fi
+    local RET=$?
+
+    sudo /bin/chown -R $WHOAMI.users $ARCH
+    set -e
+
+    if [ $RET -eq 0 ] && [ $DEB -ne 1 ]
+    then
         mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ && \
         rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms # $ARCH/galera.spec
     fi
-}
 
-build_packages()
-{
-    local ARCH=$(get_arch)
-
-    pushd $build_base/scripts/packages
-    local WHOAMI=$(whoami)
-
-    _build_packages $ARCH $WHOAMI || \
-    (sudo /bin/chown -R $WHOAMI.users $ARCH ; return 1)
+    return $RET
 }
 
 # Most modules are standard, so we can use a single function
