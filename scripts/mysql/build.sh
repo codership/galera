@@ -165,6 +165,7 @@ then
         echo "Getting wsrep patch..."
         patch_file=$(${BUILD_ROOT}/get_patch.sh $mysql_tag $MYSQL_SRC)
         echo "Patching source..."
+        rm -rf $mysql_tag # need clean sources for a patch
         tar -xzf $mysql_orig_tar_gz
         cd $mysql_tag/
         patch -p1 -f < $patch_file >/dev/null || :
