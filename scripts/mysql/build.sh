@@ -365,8 +365,8 @@ build_packages()
     set -e
 
     if [ $RET -eq 0 ] && [ $DEB -eq 0 ]
-    then # RPM cleanup
-        mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ && \
+    then # RPM cleanup (some rpm versions put the package in RPMS)
+        test -d $ARCH/RPMS/$ARCH && mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ || :
         rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms
     fi
 
