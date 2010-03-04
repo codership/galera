@@ -71,7 +71,8 @@ ldconfig -n $LIBS_DST
 #if [ $1 = 1 ]; then
     /sbin/chkconfig --add mysqld
 #fi
-/bin/chmod 0755 /var/lib/mysql
+mkdir -p ${mysql_data}
+/bin/chmod 0755 ${mysql_data}
 /bin/touch /var/log/mysqld.log
 mysql_install_db --user=mysql --datadir=${mysql_data}
 #if [ $1 -ge 1 ]; then

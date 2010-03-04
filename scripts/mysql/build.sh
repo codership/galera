@@ -312,12 +312,6 @@ fi
 
 fi # if [ $TAR == "yes " ]
 
-cleanup() # OUTPUT ARCH 
-{
-    mv $1/RPMS/$2/*.rpm $1/
-    rm -rf $1/RPMS $1/buildroot $1/rpms # $1/mysql-wsrep.spec 
-}
-
 get_arch()
 {
     if file $MYSQL_SRC/sql/mysqld.o | grep "80386" >/dev/null 2>&1
@@ -336,7 +330,7 @@ build_packages()
     local WHOAMI=$(whoami)
     local DEB=1
 
-    if test ! -x "$(which dpkg)" # distribution test
+    if test ! -x "$(which dpkg >/dev/null 2>&1)" # distribution test
     then
         DEB=0
         if [ "$ARCH" == "amd64" ]; then ARCH="x86_64"; fi
@@ -366,8 +360,10 @@ build_packages()
 
     if [ $RET -eq 0 ] && [ $DEB -eq 0 ]
     then # RPM cleanup (some rpm versions put the package in RPMS)
-        test -d $ARCH/RPMS/$ARCH && mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ || :
-        rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms
+        test -d $ARCH/RPMS/$ARCH && \
+        mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ 1>/dev/null 2>&1 || :
+
+        rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms # $ARCH/mysql-wsrep.spec
     fi
 
     return $RET
