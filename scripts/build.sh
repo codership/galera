@@ -68,6 +68,11 @@ do
 	    ;;
 	-o|--opt)
 	    OPT="yes"       # Compile without debug
+	    NO_STRIP="no"
+	    ;;
+	-d|--debug)
+	    DEBUG="yes"     # Compile with debug
+	    NO_STRIP="yes"
 	    ;;
 	-r|--release)
 	    RELEASE="$2"
@@ -82,9 +87,6 @@ do
 	    CFLAGS="$CFLAGS -m64"
 	    CXXFLAGS="$CXXFLAGS -m64"
 	    SCRATCH="yes"
-	    ;;
-	-d|--debug)
-	    DEBUG="yes"     # Compile with debug
 	    ;;
 	-p|--package)
 	    PACKAGE="yes"   # build binary packages
@@ -184,8 +186,8 @@ build_packages()
     local ARCH=$(get_arch)
     local WHOAMI=$(whoami)
 
-    if [ "$DISABLE_GCOMM" != "yes" ]; then export GCOMM=yes; fi
-    if [ "$DISABLE_VSBES" != "yes" ]; then export VSBES=yes; fi
+    [ "$DISABLE_GCOMM" != "yes" ] && export GCOMM="yes"
+    [ "$DISABLE_VSBES" != "yes" ] && export VSBES="yes"
 
     export BUILD_BASE=$build_base
     export GALERA_VER=$RELEASE
@@ -195,8 +197,11 @@ build_packages()
     if ! test -x "$(which dpkg)"  # distribution test
     then # RPM system
         local DEB=0
-        if [ "$ARCH" == "amd64" ]; then ARCH="x86_64"; fi
+        [ "$ARCH" == "amd64" ] && ARCH="x86_64"
     fi
+
+    local STRIP_OPT=""
+    [ "$NO_STRIP" == "yes" ] && STRIP_OPT="-g"
 
     rm -rf $ARCH
 
@@ -204,16 +209,16 @@ build_packages()
     if [ $DEB -eq 1 ]
     then # build DEB
         sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
-             --output-dir $ARCH galera # && \
+             --output-dir $ARCH $STRIP_OPT galera # && \
 #       sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
-#            --output-dir $ARCH galera-dev
+#            --output-dir $ARCH $STRIP_OPT galera-dev
     else # build RPM
         (sudo -E /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
-              --output-dir $ARCH --keep-files -k galera || \
+              --output-dir $ARCH --keep-files -k $STRIP_OPT galera || \
          /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/galera.spec" \
               --buildroot="$ARCH/buildroot" ) # && \
 #        /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "rpm" \
-#             --output-dir $ARCH galera-dev
+#             --output-dir $ARCH $STRIP_OPT galera-dev
     fi
     local RET=$?
 

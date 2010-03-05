@@ -330,11 +330,14 @@ build_packages()
     local WHOAMI=$(whoami)
     local DEB=1
 
-    if test ! -x "$(which dpkg >/dev/null 2>&1)" # distribution test
+    if test ! -x "$(which dpkg 2>/dev/null)" # distribution test
     then
         DEB=0
-        if [ "$ARCH" == "amd64" ]; then ARCH="x86_64"; fi
+        [ "$ARCH" == "amd64" ] && ARCH="x86_64"
     fi
+
+    local STRIP_OPT=""
+    [ "$NO_STRIP" == "yes" ] && STRIP_OPT="-g"
 
     export MYSQL_VER MYSQL_SRC GALERA_SRC RELEASE_NAME
     export WSREP_VER=${RELEASE:-"$MYSQL_REV"}
@@ -346,10 +349,10 @@ build_packages()
     if [ $DEB -eq 1 ]
     then #build DEB
         sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
-             --output-dir $ARCH mysql-wsrep
+             --output-dir $ARCH $STRIP_OPT mysql-wsrep
     else # build RPM
         (sudo -E /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
-              --output-dir $ARCH --keep-files -k mysql-wsrep || \
+              --output-dir $ARCH --keep-files -k $STRIP_OPT mysql-wsrep || \
         /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/mysql-wsrep.spec" \
               --buildroot="$ARCH/buildroot" )
     fi

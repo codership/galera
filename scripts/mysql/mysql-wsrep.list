@@ -12,10 +12,15 @@ $wsrep_version=${WSREP_VER}
 
 # This includes dependencies and directory structore information
 %format deb
-%include mysql-wsrep.debian
+%include debian/mysql-wsrep.list
 %format rpm
-%include mysql-wsrep.centos
+%include centos/mysql-wsrep.list
 %format all
+
+##############################################
+# Below files sorted into paragraphs         #
+# according to Debian division into packages #
+##############################################
 
 # Documentation
 d 755 root root $DOCS_DST -
@@ -97,7 +102,7 @@ d 755 root root /etc/init.d -
 f 755 root root /etc/init.d/mysql              $GALERA_SRC/scripts/mysql/debian/mysql
 %format rpm
 d 755 root root /etc/rc.d/init.d -
-f 755 root root /etc/rc.d/init.d/mysqld        $GALERA_SRC/scripts/mysql/centos/mysqld
+f 755 root root /etc/rc.d/init.d/mysqld        $GALERA_SRC/scripts/mysql/centos/init.oracle
 %format all
 
 # mysql-server-core-5.1
