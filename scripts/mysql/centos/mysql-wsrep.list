@@ -70,6 +70,12 @@ $MAN_DST=${prefix}/share/man
 # Commented out CentOS pieces of code which don't seem to make sense here
 
 $mysql_data=/var/lib/mysql
+
+%preinstall <<EOF_PREINSTALL
+/usr/sbin/useradd -M -o -r -d /var/lib/mysql -s /bin/bash \
+        -c "MySQL Server" -u 27 mysql > /dev/null 2>&1 || :
+EOF_PREINSTALL
+
 %postinstall <<EOF_POSTINSTALL
 ldconfig -n $LIBS_DST
 #if [ $1 = 1 ]; then

@@ -160,8 +160,4 @@ d 755 root root $MAN_DST/man8 -
 f 644 root root $MAN_DST/man8/mysqld.8.gz           $MYSQL_SRC/man/mysqld.8.gz
 f 644 root root $MAN_DST/man8/mysqlmanager.8.gz     $MYSQL_SRC/man/mysqlmanager.8.gz
 
-%preinstall <<EOF_PRE
-id mysql >/dev/null 2>&1 || (adduser --system --group --disabled-password --disabled-login --home=/var/lib/mysql --shell=/bin/false mysql)
-EOF_PRE
-
 #

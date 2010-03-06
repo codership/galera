@@ -74,6 +74,13 @@ $MAN_DST=${prefix}/share/man
 # Distribution dependent scripts
 
 $mysql_data=/var/lib/mysql
+
+%preinstall <<EOF_PREINSTALL
+id mysql >/dev/null 2>&1 || \
+adduser --system --disabled-login --ingroup mysql --home ${mysql_data} \
+         --gecos "MySQL Server" --shell /bin/false mysql >/dev/null
+EOF_PREINSTALL
+
 %postinstall <<EOF_POSTINSTALL
 update-rc.d -f mysql remove >/dev/null || exit $
 ldconfig -n $LIBS_DST
