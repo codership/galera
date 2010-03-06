@@ -22,7 +22,15 @@
 
 $prefix=/usr
 
+%format !rpm
 $LIBS_DEST=${prefix}/lib/galera
+%format rpm
+%if x86_64
+$LIBS_DEST=${prefix}/lib64/galera
+%else
+$LIBS_DEST=${prefix}/lib/galera
+%endif
+%format all
 $INCS_DEST=${prefix}/include/galera
 $SBIN_DEST=${prefix}/sbin
 $BINS_DEST=${prefix}/bin

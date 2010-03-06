@@ -197,7 +197,11 @@ build_packages()
     if ! test -x "$(which dpkg)"  # distribution test
     then # RPM system
         local DEB=0
-        [ "$ARCH" == "amd64" ] && ARCH="x86_64"
+        if [ "$ARCH" == "amd64" ]
+        then
+            ARCH="x86_64"
+            export x86_64=$ARCH # for epm
+        fi
     fi
 
     local STRIP_OPT=""

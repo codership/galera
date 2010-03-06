@@ -333,7 +333,11 @@ build_packages()
     if test ! -x "$(which dpkg 2>/dev/null)" # distribution test
     then
         DEB=0
-        [ "$ARCH" == "amd64" ] && ARCH="x86_64"
+        if [ "$ARCH" == "amd64" ]
+        then
+            ARCH="x86_64"
+            export x86_64=$ARCH # for epm
+        fi
     fi
 
     local STRIP_OPT=""

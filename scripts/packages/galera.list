@@ -25,9 +25,9 @@ f 755 root root $SBIN_DEST/vsbes $BUILD_BASE/galeracomm/vs/src/.libs/vsbes
 %endif
 
 $LD_SO_CONF_D=/etc/ld.so.conf.d
-# this line is required by rpmbuild
-#d 755 root root /etc
 d 755 root root $LD_SO_CONF_D -
+# the reason we don't create this file in postinstall script is to have it
+# in the package database
 f 644 root root $LD_SO_CONF_D/galera.conf empty
 
 %format deb # Debian packages come with bad file ownership

@@ -55,7 +55,11 @@ $prefix=/usr
 
 $CONF_DST=/etc/mysql
 $MY_DST=/etc
+%if x86_64 # CentOS (Red Hat) never fails to screw up things
+$LIBS_DST=${prefix}/lib64
+%else
 $LIBS_DST=${prefix}/lib
+%endif
 $SHAR_DST=${prefix}/share/mysql
 $SBIN_DST=${prefix}/sbin
 $BINS_DST=${prefix}/bin
