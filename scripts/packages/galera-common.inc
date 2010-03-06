@@ -11,6 +11,8 @@
 %provides    galera
 
 %format deb
+%replaces    galera
+
 %requires    libc6      2.4
 %requires    libstdc++6 4.1.1
 %requires    libgcc1    4.1.1
