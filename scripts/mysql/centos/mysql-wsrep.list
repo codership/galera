@@ -43,19 +43,21 @@
 %provides MySQL-shared
 
 
-#%incompat    libmysqlclient16      0.0.0 ${mysql_version}
-#%incompat    mysql
-#%incompat    mysql-server
-#%incompat    MySQL
-#%incompat    MySQL-server
-#%incompat    MySQL-client
-#%incompat    MySQL-shared
+#%incompat libmysqlclient16      0.0.0 ${mysql_version}
+#%incompat mysql
+#%incompat mysql-server
+#%incompat MySQL
+#%incompat MySQL-server
+#%incompat MySQL-client
+#%incompat MySQL-shared
 
 $prefix=/usr
 
 $CONF_DST=/etc/mysql
-$MY_DST=/etc
-%if x86_64 # CentOS (Red Hat) never fails to screw up things
+d 755 root root $CONF_DST    -
+c 644 root root /etc/my.cnf  $GALERA_SRC/scripts/mysql/centos/my.cnf
+
+%if x86_64 # CentOS (read Red Hat) never fails to screw up things
 $LIBS_DST=${prefix}/lib64
 %else
 $LIBS_DST=${prefix}/lib

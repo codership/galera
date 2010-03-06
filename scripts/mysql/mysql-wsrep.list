@@ -34,10 +34,9 @@ d 755 root root $LIBS_DST -
 f 755 root root $LIBS_DST/libmysqlclient.so.16.0.0   $MYSQL_SRC/libmysql/.libs/libmysqlclient.so.16.0.0
 f 755 root root $LIBS_DST/libmysqlclient_r.so.16.0.0 $MYSQL_SRC/libmysql_r/.libs/libmysqlclient_r.so.16.0.0
 
-# mysql-common part
-d 755 root root $CONF_DST -
-d 755 root root $CONF_DST/conf.d -
-f 644 root root $MY_DST/my.cnf                 $GALERA_SRC/scripts/mysql/debian/my.cnf
+# mysql-common part (see distribution-specific includes too)
+d 755 root  root  $CONF_DST/conf.d             -
+c 640 mysql mysql $CONF_DST/conf.d/wsrep.cnf   $MYSQL_SRC/support-files/wsrep.cnf
 
 # mysql-client part
 d 755 root root $BINS_DST -
@@ -62,7 +61,6 @@ f 755 root root $SBIN_DST/mysqlmanager         $MYSQL_SRC/server-tools/instance-
 
 # mysql-server-5.1 part
 f 644 root root $CONF_DST/conf.d/mysqld_safe_syslog.cnf $GALERA_SRC/scripts/mysql/debian/mysqld_safe_syslog.cnf
-f 644 root root $CONF_DST/conf.d/wsrep.cnf     $MYSQL_SRC/support-files/wsrep.cnf
 f 755 root root $BINS_DST/msql2mysql           $MYSQL_SRC/scripts/msql2mysql
 f 755 root root $BINS_DST/my_print_defaults    $MYSQL_SRC/extra/my_print_defaults
 f 755 root root $BINS_DST/myisamchk            $MYSQL_SRC/storage/myisam/myisamchk

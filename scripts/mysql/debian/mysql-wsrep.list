@@ -62,7 +62,9 @@
 $prefix=/usr
 
 $CONF_DST=/etc/mysql
-$MY_DST=$CONF_DST
+d 755 root root $CONF_DST         -
+c 644 root root $CONF_DST/my.cnf  $GALERA_SRC/scripts/mysql/debian/my.cnf
+
 $LIBS_DST=${prefix}/lib
 $SHAR_DST=${prefix}/share/mysql
 $SBIN_DST=${prefix}/sbin
