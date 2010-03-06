@@ -95,14 +95,6 @@ f 644 root root $DOCS_DST/examples             $MYSQL_SRC/support-files/*.cnf
 d 755 mysql root /var/run/mysqld -
 d 755 mysql adm  /var/log/mysql  -
 
-%format deb
-d 755 root root /etc/init.d -
-f 755 root root /etc/init.d/mysql              $GALERA_SRC/scripts/mysql/debian/mysql
-%format rpm
-d 755 root root /etc/rc.d/init.d -
-f 755 root root /etc/rc.d/init.d/mysqld        $GALERA_SRC/scripts/mysql/centos/init.oracle
-%format all
-
 # mysql-server-core-5.1
 d 755 root root $LIBEXEC_DST -
 f 755 root root $LIBEXEC_DST/mysqld            $MYSQL_SRC/sql/mysqld

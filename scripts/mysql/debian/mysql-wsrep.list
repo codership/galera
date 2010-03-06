@@ -65,6 +65,9 @@ $CONF_DST=/etc/mysql
 d 755 root root $CONF_DST         -
 c 644 root root $CONF_DST/my.cnf  $GALERA_SRC/scripts/mysql/debian/my.cnf
 
+d 755 root root /etc/init.d       -                                                  
+f 755 root root /etc/init.d/mysql $GALERA_SRC/scripts/mysql/debian/mysql
+
 $LIBS_DST=${prefix}/lib
 $SHAR_DST=${prefix}/share/mysql
 $SBIN_DST=${prefix}/sbin
