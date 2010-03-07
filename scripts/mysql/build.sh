@@ -111,9 +111,11 @@ if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
 if [ "$SKIP_BUILD" == "yes" ]; then CONFIGURE="no"; fi
 
+which dpkg >/dev/null 2>&1 && DEBIAN=1 || DEBIAN=0
+
 # export command options for Galera build
 export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD CFLAGS CXXFLAGS \
-       PACKAGE CPU SKIP_BUILD RELEASE
+       PACKAGE CPU SKIP_BUILD RELEASE DEBIAN
 
 set -eu
 
@@ -199,6 +201,11 @@ then
         fi
 
         export MYSQL_BUILD_PREFIX="/usr"
+
+        [ $DEBIAN ] && \
+        export MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
+        export MYSQL_SOCKET_PATH="/var/lib/mysql/mysql.sock"
+
         BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
     else  # just recompile and relink with old configuration
         #set -x
@@ -328,16 +335,11 @@ build_packages()
 
     local ARCH=$(get_arch)
     local WHOAMI=$(whoami)
-    local DEB=1
 
-    if test ! -x "$(which dpkg 2>/dev/null)" # distribution test
+    if [ ! $DEBIAN ] && [ "$ARCH" == "amd64" ]
     then
-        DEB=0
-        if [ "$ARCH" == "amd64" ]
-        then
-            ARCH="x86_64"
-            export x86_64=$ARCH # for epm
-        fi
+        ARCH="x86_64"
+        export x86_64=$ARCH # for epm
     fi
 
     local STRIP_OPT=""
@@ -350,7 +352,7 @@ build_packages()
     rm -rf $ARCH
 
     set +e
-    if [ $DEB -eq 1 ]
+    if [ $DEBIAN ]
     then #build DEB
         sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
              --output-dir $ARCH $STRIP_OPT mysql-wsrep
@@ -365,7 +367,7 @@ build_packages()
     sudo /bin/chown -R $WHOAMI.users $ARCH
     set -e
 
-    if [ $RET -eq 0 ] && [ $DEB -eq 0 ]
+    if [ $RET -eq 0 ] && [ ! $DEBIAN ]
     then # RPM cleanup (some rpm versions put the package in RPMS)
         test -d $ARCH/RPMS/$ARCH && \
         mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ 1>/dev/null 2>&1 || :
@@ -381,4 +383,3 @@ then
     build_packages
 fi
 #
-

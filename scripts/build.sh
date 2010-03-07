@@ -29,6 +29,8 @@ SKIP_BUILD=${SKIP_BUILD:-"no"}
 RELEASE=${RELEASE:-""}
 SOURCE=${SOURCE:-"no"}
 
+which dpkg >/dev/null 2>&1 && DEBIAN=${DEBIAN:-1} || DEBIAN=${DEBIAN:-0}
+
 if ccache -V > /dev/null 2>&1
 then
     CC=${CC:-"gcc"}
@@ -193,15 +195,10 @@ build_packages()
     export GALERA_VER=$RELEASE
     echo "GCOMM=$GCOMM VSBES=$VSBES ARCH=$ARCH"
 
-    local DEB=1
-    if ! test -x "$(which dpkg)"  # distribution test
-    then # RPM system
-        local DEB=0
-        if [ "$ARCH" == "amd64" ]
-        then
-            ARCH="x86_64"
-            export x86_64=$ARCH # for epm
-        fi
+    if [ ! $DEBIAN ] && [ "$ARCH" == "amd64" ]
+    then
+        ARCH="x86_64"
+        export x86_64=$ARCH # for epm
     fi
 
     local STRIP_OPT=""
@@ -210,7 +207,7 @@ build_packages()
     rm -rf $ARCH
 
     set +e
-    if [ $DEB -eq 1 ]
+    if [ $DEBIAN ]
     then # build DEB
         sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
              --output-dir $ARCH $STRIP_OPT galera # && \
@@ -229,7 +226,7 @@ build_packages()
     sudo /bin/chown -R $WHOAMI.users $ARCH
     set -e
 
-    if [ $RET -eq 0 ] && [ $DEB -ne 1 ]
+    if [ $RET -eq 0 ] && [ ! $DEBIAN ]
     then
         mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ && \
         rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms # $ARCH/galera.spec
