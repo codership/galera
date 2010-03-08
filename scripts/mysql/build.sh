@@ -21,7 +21,7 @@ usage()
 "    --with-spread   configure build with Spread (implies -c)\n"\
 "    --no-strip      prevent stripping of release binaries\n"\
 "    -r|--release <galera release>, otherwise revisions will be used\n"\
-"    -p|--package    create Debian packages\n"
+"    -p|--package    create DEB/RPM packages (depending on the distribution)\n"
 "    --sb|--skip-build skip the actual build, use the existing binaries"
 "\n -s and -b options affect only Galera build.\n"
 }
