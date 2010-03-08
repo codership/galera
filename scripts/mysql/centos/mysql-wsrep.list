@@ -57,7 +57,7 @@ $CONF_DST=/etc/mysql
 d 755 root root $CONF_DST               -
 c 644 root root /etc/my.cnf             $GALERA_SRC/scripts/mysql/centos/my.cnf
 
-d 755 root root /etc/rc.d/init.d        -                                             
+d 755 root root /etc/rc.d/init.d        -
 f 755 root root /etc/rc.d/init.d/mysqld $GALERA_SRC/scripts/mysql/centos/init.centos
 
 %if x86_64 # CentOS (read Red Hat) never fails to screw up things
@@ -75,6 +75,7 @@ $MAN_DST=${prefix}/share/man
 # Commented out CentOS pieces of code which don't seem to make sense here
 
 $mysql_data=/var/lib/mysql
+d 755 root root ${mysql_data} -
 
 %preinstall <<EOF_PREINSTALL
 /usr/sbin/useradd -M -o -r -d /var/lib/mysql -s /bin/bash \
@@ -87,13 +88,12 @@ ldconfig -n $LIBS_DST
 if [ $$1 = 1 ]; then
     /sbin/chkconfig --add mysqld
 fi
-mkdir -p ${mysql_data}
-/bin/chown -R mysql:mysql ${mysql_data}
 /bin/chmod 0755 ${mysql_data}
 /bin/touch /var/log/mysqld.log
-mysql_install_db --user=mysql --datadir=${mysql_data}
-/bin/chown -R mysql:mysql ${mysql_data}
-/bin/chmod -R og-rw ${mysql_data}/mysql
+#/bin/chown -R mysql:mysql ${mysql_data}
+#mysql_install_db --user=mysql --datadir=${mysql_data}
+#/bin/chown -R mysql:mysql ${mysql_data}
+#/bin/chmod -R og-rw ${mysql_data}/mysql
 EOF_POSTINSTALL
 
 %preremove  <<EOF_PREREMOVE

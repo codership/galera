@@ -195,7 +195,7 @@ build_packages()
     export GALERA_VER=$RELEASE
     echo "GCOMM=$GCOMM VSBES=$VSBES ARCH=$ARCH"
 
-    if [ ! $DEBIAN ] && [ "$ARCH" == "amd64" ]
+    if [ $DEBIAN -eq 0 ] && [ "$ARCH" == "amd64" ]
     then
         ARCH="x86_64"
         export x86_64=$ARCH # for epm
@@ -207,7 +207,7 @@ build_packages()
     rm -rf $ARCH
 
     set +e
-    if [ $DEBIAN ]
+    if [ $DEBIAN -ne 0 ]
     then # build DEB
         sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
              --output-dir $ARCH $STRIP_OPT galera # && \
@@ -226,7 +226,7 @@ build_packages()
     sudo /bin/chown -R $WHOAMI.users $ARCH
     set -e
 
-    if [ $RET -eq 0 ] && [ ! $DEBIAN ]
+    if [ $RET -eq 0 ] && [ $DEBIAN -eq 0 ]
     then
         mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ && \
         rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms # $ARCH/galera.spec

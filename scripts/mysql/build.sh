@@ -202,7 +202,7 @@ then
 
         export MYSQL_BUILD_PREFIX="/usr"
 
-        [ $DEBIAN ] && \
+        [ $DEBIAN -ne 0 ] && \
         export MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
         export MYSQL_SOCKET_PATH="/var/lib/mysql/mysql.sock"
 
@@ -336,7 +336,7 @@ build_packages()
     local ARCH=$(get_arch)
     local WHOAMI=$(whoami)
 
-    if [ ! $DEBIAN ] && [ "$ARCH" == "amd64" ]
+    if [ $DEBIAN -eq 0 ] && [ "$ARCH" == "amd64" ]
     then
         ARCH="x86_64"
         export x86_64=$ARCH # for epm
@@ -352,7 +352,7 @@ build_packages()
     rm -rf $ARCH
 
     set +e
-    if [ $DEBIAN ]
+    if [ $DEBIAN -ne 0 ]
     then #build DEB
         sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
              --output-dir $ARCH $STRIP_OPT mysql-wsrep
@@ -367,7 +367,7 @@ build_packages()
     sudo /bin/chown -R $WHOAMI.users $ARCH
     set -e
 
-    if [ $RET -eq 0 ] && [ ! $DEBIAN ]
+    if [ $RET -eq 0 ] && [ $DEBIAN -eq 0 ]
     then # RPM cleanup (some rpm versions put the package in RPMS)
         test -d $ARCH/RPMS/$ARCH && \
         mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ 1>/dev/null 2>&1 || :
