@@ -286,11 +286,6 @@ private:
 
     GCommConn* ref(const bool unsetting) 
     { 
-        if (terminated == true && unsetting == false)
-        {
-            return 0;
-        }
-
         return this;
     }
     
@@ -317,6 +312,10 @@ void GCommConn::handle_up(int id, const Datagram& dg, const ProtoUpMeta& um)
         current_view = um.get_view();
         recv_buf.push_back(RecvBufData(numeric_limits<size_t>::max(),
                                        dg, um));
+        if (current_view.is_empty())
+        {
+            log_debug << "handle_up: self leave";
+        }
     }
     else
     {
@@ -505,6 +504,11 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
                                             view.get_members().size()));
 
         const size_t cm_size(gcs_comp_msg_size(cm));
+
+        if (cm->my_idx == -1)
+        {
+            log_debug << "gcomm recv: self leave";
+        }
 
         if (cm_size > len)
         {
