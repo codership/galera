@@ -1,6 +1,7 @@
 # This is a MySQL-wsrep package description for ESP package manager
 # Debian specific part
 
+%requires    psmisc
 %requires    debianutils       1.6
 %requires    libc6             2.4
 %requires    libdbi-perl
