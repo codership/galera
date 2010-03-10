@@ -18,7 +18,7 @@ usage()
     "    -p|--package    build RPM and DEB packages at the end.\n" \
     "    --with-spread   configure build with spread backend (implies -c to gcs)\n" \
     "    --source        build source packages\n"\
-    "    --sb            skip actual build, use the existing binaries"
+    "    --sb            skip actual build, use the existing binaries\n"\
     "\nSet DISABLE_GCOMM/DISABLE_VSBES to 'yes' to disable respective modules"
 }
 

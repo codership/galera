@@ -30,22 +30,20 @@ d 755 root root $LD_SO_CONF_D -
 # in the package database
 f 644 root root $LD_SO_CONF_D/galera.conf empty
 
-%format deb # Debian packages come with bad file ownership
-%postinstall <<EOF_DEB
+%postinstall <<EOF_POSTINSTALL
+# Debian packages come with bad file ownership
 #chown -R root.root $SBIN_DEST $LIBS_DEST
 echo $LIBS_DEST > $LD_SO_CONF_D/galera.conf
 ldconfig $LIBS_DEST
-EOF_DEB
-
-%format rpm
-%postinstall <<EOF_RPM
-echo $LIBS_DEST > $LD_SO_CONF_D/galera.conf
-ldconfig $LIBS_DEST
-EOF_RPM
+# The following is to provide constant libmmgalera location across upgrades
+cd $LIBS_DEST
+rm -rf libmmgalera.so
+ln -s $(ls libmmgalera.so.* | tail -n1) libmmgalera.so
+EOF_POSTINISTALL
 
 %format all
-%preremove <<EOF2
+%preremove <<EOF_PREREMOVE
 rm -f $$(find $LIBS_DEST -type l)
-EOF2
+EOF_PREREMOVE
 
 #
