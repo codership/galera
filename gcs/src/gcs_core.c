@@ -144,7 +144,11 @@ gcs_core_open (gcs_core_t* core,
         return -EBADFD;
     }
 
-    assert (NULL == core->backend.conn);
+    if (core->backend.conn) {
+        assert (core->backend.destroy);
+        core->backend.destroy (&core->backend);
+        memset (&core->backend, 0, sizeof(core->backend));
+    }
 
     gu_debug ("Initializing backend IO layer");
     if (!(ret = gcs_backend_init (&core->backend, url))) {
@@ -975,7 +979,6 @@ long gcs_core_close (gcs_core_t* core)
         ret = core->backend.close (&core->backend);
         gu_cond_wait(&core->leave_cond, &core->send_lock);
         core->state = CORE_CLOSED;
-        core->backend.destroy (&core->backend);
     }
 
     gu_mutex_unlock (&core->send_lock);
@@ -999,7 +1002,6 @@ long gcs_core_destroy (gcs_core_t* core)
         }
 
         if (core->backend.conn) {
-            assert (core->backend.destroy);
             gu_debug ("Calling backend.destroy()");
             core->backend.destroy (&core->backend);
         }
