@@ -1236,11 +1236,10 @@ int wsdb_set_exec_query(
     memset(ws->queries, '\0', ws->query_count * sizeof(struct wsdb_query));
 
     /* allocate queries and items */
-    ws->queries[0].query = (char *) gu_malloc (query_len+1);
+    ws->queries[0].query = (char *) gu_malloc (query_len);
 
-    strncpy(ws->queries[0].query, query, query_len);
-    ws->queries[0].query[query_len] = '\0';
-    ws->queries[0].query_len = query_len+1;
+    memcpy(ws->queries[0].query, query, query_len);
+    ws->queries[0].query_len = query_len;
     ws->rbr_buf_len = 0;
 
     GU_DBUG_RETURN(WSDB_OK);
