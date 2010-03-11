@@ -46,7 +46,7 @@ start(){
 	chmod 0640 "$errlogfile"
 	[ -x /sbin/restorecon ] && /sbin/restorecon "$errlogfile"
 	if [ ! -d "$datadir/mysql" ] ; then
-	    action $"Initializing MySQL database: " /usr/bin/mysql_install_db --datadir="$datadir" --user=mysql
+	    action $"Initializing MySQL database: " /usr/bin/mysql_install_db --wsrep-on=0 --datadir="$datadir" --user=mysql
 	    ret=$?
 	    chown -R mysql:mysql "$datadir"
 	    if [ $ret -ne 0 ] ; then
@@ -81,7 +81,7 @@ start(){
                     action $"Starting $prog: " /bin/true
             fi
 	else
-    	    action $"Starting $prog: " /bin/false
+	    action $"Starting $prog: " /bin/false
 	fi
 	[ $ret -eq 0 ] && touch /var/lock/subsys/mysqld
 	return $ret

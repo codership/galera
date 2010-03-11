@@ -66,7 +66,7 @@ $CONF_DST=/etc/mysql
 d 755 root root $CONF_DST         -
 c 644 root root $CONF_DST/my.cnf  $GALERA_SRC/scripts/mysql/debian/my.cnf
 
-d 755 root root /etc/init.d       -                                                  
+d 755 root root /etc/init.d       -
 f 755 root root /etc/init.d/mysql $GALERA_SRC/scripts/mysql/debian/mysql
 
 $LIBS_DST=${prefix}/lib
@@ -81,10 +81,12 @@ $MAN_DST=${prefix}/share/man
 
 $mysql_data=/var/lib/mysql
 
+# Add mysql group and user if there are none
 %preinstall <<EOF_PREINSTALL
-id mysql >/dev/null 2>&1 || \
+getent group  mysql >/dev/null || addgroup --system mysql >/dev/null
+getent passwd mysql >/dev/null || \
 adduser --system --disabled-login --ingroup mysql --home ${mysql_data} \
-         --gecos "MySQL Server" --shell /bin/false mysql >/dev/null
+        --gecos "MySQL Server" --shell /bin/false mysql >/dev/null
 EOF_PREINSTALL
 
 %postinstall <<EOF_POSTINSTALL
