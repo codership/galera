@@ -38,8 +38,8 @@ ldconfig $LIBS_DEST
 # The following is to provide constant libmmgalera location across upgrades
 cd $LIBS_DEST
 rm -rf libmmgalera.so
-ln -s $(ls libmmgalera.so.* | tail -n1) libmmgalera.so
-EOF_POSTINISTALL
+ln -s $$(/bin/ls libmmgalera.so.* | /usr/bin/tail -n1) libmmgalera.so
+EOF_POSTINSTALL
 
 %format all
 %preremove <<EOF_PREREMOVE
