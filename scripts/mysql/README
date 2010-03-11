@@ -32,7 +32,7 @@ It does not cover the use or administration of MySQL server per se. The reader
 is assumed to know how to install, configure, administer and use MySQL server.
 
 
-                        MYSQL/GALERA v0.7.2
+                        MYSQL/GALERA v0.7.3
 
 CONTENTS:
 =========
@@ -428,6 +428,11 @@ wsrep_cluster_address="dummy://"
    Group Communication System address. Depends on the WSREP provider. This
    distribution recognizes "dummy://" and "gcomm://<IP address>:<IP port>"
 
+   mysql> set global wsrep_cluster_address=<ADDRESS>;
+
+   will (re)establish connection to ADDRESS. This can be used to change cluster
+   connection in runtime.
+
 wsrep_cluster_name="my_wsrep_cluster"
    Logical cluster name, must be the same for all nodes of the cluster.
 
@@ -508,7 +513,8 @@ without explicitly specifying socket or port (via --socket or --host/--port
 options) may, therefore, result in the following:
 
 $ mysql -uroot -prootpass
-ERROR 2002 (HY000): Can't connect to local MySQL server through socket '/var/run/mysqld/mysqld.sock' (2)
+ERROR 2002 (HY000): Can't connect to local MySQL server through socket
+'/var/run/mysqld/mysqld.sock' (2)
 
 Most applications that use libmysqlclient to connect to MySQL server can be
 instructed to look in the correct place by adding a following section to
@@ -545,7 +551,7 @@ NOTE: this distribution may be binary incompatible with some older Linux
    sets.
 
 3)  Unsupported queries:
-    * LOAD DATA
+    * LOAD DATA size is limited to ~1Gb
     * lock functions (GET_LOCK(), RELEASE_LOCK()... )
 
 4) Locking sessions (LOCK TABLE...UNLOCK) are not supported in multi-master

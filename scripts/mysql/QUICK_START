@@ -1,9 +1,9 @@
-Galera for MySQL Quick Start Guide
-==================================
+MySQL/Galera Demo Quick Start Guide
+===================================
 
 version 0.7.x
 
-This is an informal guide to quick setup of MySQL/Galera cluster for 
+This is an informal guide to quick setup of MySQL/Galera demo cluster for 
 experienced MySQL users. For more detailed information please see README.
 
 MySQL/Galera cluster is a multi-master MySQL server cluster. It provides
@@ -60,8 +60,9 @@ LIMITATIONS:
    sets.
 
 3. Unsupported in this release:
-   commands: LOAD DATA.
-   features: LOCKed sessions.
+   commands: LOAD DATA may result in a transaction that is too big and will be
+             rejected.
+   features: LOCKed sessions and locking functions.
    Use at your own risk.
 
 
