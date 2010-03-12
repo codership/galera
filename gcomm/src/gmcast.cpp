@@ -138,11 +138,12 @@ GMCast::~GMCast()
 
 void GMCast::connect() 
 {    
+    pstack.push_proto(this);
     log_debug << "gmcast " << get_uuid() << " connect";
     URI listen_uri(listen_addr);
     
     set_tcp_defaults (&listen_uri);
-    
+
     listener = Transport::create(get_pnet(), listen_uri.to_string());
     gu_trace (listener->listen());
     
@@ -151,7 +152,6 @@ void GMCast::connect()
         insert_address(initial_addr, UUID(), pending_addrs);
         gu_trace (gmcast_connect(initial_addr));
     }
-    pstack.push_proto(this);
 }
 
 

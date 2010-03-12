@@ -27,6 +27,11 @@ void gcomm::Protostack::push_proto(Protolay* p)
 void gcomm::Protostack::pop_proto(Protolay* p)
 {
     assert(protos.front() == p);
+    if (protos.front() != p)
+    {
+        log_warn << "Protolay " << p << " is not protostack front";
+        return;
+    }
     protos.pop_front();
     if (protos.begin() != protos.end())
     {
