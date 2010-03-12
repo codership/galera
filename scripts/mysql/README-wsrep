@@ -27,7 +27,7 @@ MySQL patch:  https://launchpad.net/codership-mysql
 
 ABOUT THIS DOCUMENT
 
-This document covers installation and configuraton issues specific to this
+This document covers installation and configuration issues specific to this
 wsrep-patched MySQL distribution by Codership. It does not cover the use or
 administration of MySQL server per se. The reader is assumed to know how to
 install, configure, administer and use standard MySQL server version 5.1.xx.
@@ -39,84 +39,149 @@ CONTENTS:
 =========
 1. WHAT IS WSREP PATCH FOR MYSQL
 2. INSTALLATION
-   2.1 CLEAN INSTALL.
-   2.2 UPGRADE OF EXISTING MYSQL INSTALLATION.
-3. CONFIGURATION
-   3.1 MANDATORY MYSQL OPTIONS
-   3.2 WSREP OPTIONS
+3. FIRST TIME SETUP
+   3.1 CONFIGURATION FILES
+   3.2 DATABASE PRIVILEGES
+   3.3 CHECK AND CORRECT FIREWALL SETTINGS
+   3.4 CONNECT TO CLUSTER
+4. CONFIGURATION OPTIONS
+   4.1 MANDATORY MYSQL OPTIONS
+   4.2 WSREP OPTIONS
 5. LIMITATIONS
 
 
 1. WHAT IS WSREP PATCH FOR MYSQL/INNODB
 
-Wsrep API developed by Codership Oy is a modern generic (database-agnostic) replication API for transactional databases with a goal to make database replication/logging subsystem completely modular and pluggable. It is developed with flexibility and completeness in mind to satisfy broad range of modern replication scenarios. It is equally suitable for synchronous and asynchronous, master-slave and multi-master replication.
+Wsrep API developed by Codership Oy is a modern generic (database-agnostic)
+replication API for transactional databases with a goal to make database
+replication/logging subsystem completely modular and pluggable. It is developed
+with flexibility and completeness in mind to satisfy broad range of modern
+replication scenarios. It is equally suitable for synchronous and asynchronous,
+master-slave and multi-master replication.
 
 wsrep stands for Write Set REPlication.
 
-Wsrep patch for MySQL/InnoDB allows MySQL server to load and use various wsrep API implementations ("wsrep providers") with different qualities of service. Without wsrep provider MySQL-wsrep server will function like a regular standalone server.
+Wsrep patch for MySQL/InnoDB allows MySQL server to load and use various wsrep
+API implementations ("wsrep providers") with different qualities of service.
+Without wsrep provider MySQL-wsrep server will function like a regular
+standalone server.
 
 
 2. INSTALLATION
 
 In the examples below mysql authentication options are omitted for brevity.
 
-2.1 Download and install mysql-wsrep DEB package.
+2.1 Download and install mysql-wsrep package.
+
+Download binary package for your Linux distribution from
+https://launchpad.net/codership-mysql/0.7
+
+mysql-wsrep binary package contains client, server and client libraries in one
+package because all of them are required for correct cluster operation. You
+might need to manually install additional packages from your distribution
+repository to satisfy package dependencies.
+
+2.1.1 On Debian and Debian-derived distributions.
 
 If you're installing over an existing mysql installation, mysql-wsrep may
-conflict with  mysql-server and mysql-client meta-packages, so remove them first:
+conflict with mysql-server and mysql-client meta-packages, so remove them first:
 
 $ sudo dpkg -r mysql-server mysql-client
 $ sudo dpkg -i <mysql-wsrep DEB>
 
-2.2 Check and edit configuration files.
+2.1.2 On CentOS and similar distributions.
+
+CentOS is tricky as it resorts to putting both MySQL client libraries and client
+program in the same package. This makes it impossible to cleanly upgrade or
+install a different major MySQL version without breaking library dependencies
+of other packages. To install mysql-wsrep RPM on CentOS:
+
+  1) Make sure that the following packages are not installed:
+  # rpm -e --allmatches --nodeps mysql-server mysql-test mysql-devel mysql-bench
+
+  2) Make sure that mysql package is installed (client library contained in it
+     will be needed by other packages):
+  # yum install mysql
+
+  3) Try to install mysql-wsrep and satisfy all package requirements except for
+     conflict with native mysql package:
+  # rpm -U <mysql-wsrep RPM>
+
+  4) When all packages required by mysql-wsrep are installed, overwrite the
+     native mysql package:
+  # rpm -U --nodeps --replacefiles <mysql-wsrep RPM>
+
+2.2 Upgrade system tables.
+
+If you're upgrading a previous MySQL installation, it might be advisable to
+upgrade system tables. To do that start mysqld and run mysql_upgrade command.
+Consult MySQL documentation in case of errors. Normally they are not critical
+and can be ignored unless specific functionality is needed.
+
+
+3. FIRST TIME SETUP
+
+Unless you're upgrading an already installed mysql-wsrep package, you will need
+to set up a few things to prepare server for operation.
+
+3.1 CONFIGURATION FILES
 
 * Make sure system-wide my.cnf does not bind mysqld to 127.0.0.1. That is, if
   you have the following line in [mysqld] section, comment it out:
 
-#bind-address = 127.0.0.1
+  #bind-address = 127.0.0.1
 
 * Make sure system-wide my.cnf contains "!includedir /etc/mysql/conf.d/" line.
+
+* Edit /etc/mysql/conf.d/wsrep.cnf and set wsrep_provider option by specifying
+  a path to provider library. If you don't have a provider, leave it as it is.
 
 * When a new node joins the cluster it'll have to receive a state snapshot from
   one of the peers. This requires a privileged MySQL account with access from
   the rest of the cluster. Edit /etc/mysql/conf.d/wsrep.cnf and set mysql
   login/password pair for SST, for example:
 
-wsrep_sst_auth=wsrep_sst:wspass
+  wsrep_sst_auth=wsrep_sst:wspass
 
-* See CONFIGURATION section below about wsrep-specific configuration parameters.
-  See wsrep provider-specific instructions on how to configure wsrep provider.
+* See CONFIGURATION section below about other configuration parameters that you
+  might want to change at this point.
 
-2.3 Restart MySQL server to grant privileges to SST account.
+3.2 DATABASE PRIVILEGES
 
-If upgrading from an older mysql version you might also want to upgrade system
-tables first:
+Restart MySQL server and connect to it as root to grant privileges to SST
+account (empty users may confuse MySQL authentication matching rules):
 
-$ sudo /etc/init.d/mysql restart
-$ mysql_upgrade
-$ mysql -e "GRANT ALL ON *.* TO wsrep_sst@'localhost' IDENTIFIED BY 'wspass'"
-$ mysql -e "GRANT ALL ON *.* TO wsrep_sst@'%' IDENTIFIED BY 'wspass'"
+mysql> SET wsrep_on=OFF;
+mysql> DELETE FROM mysql.user WHERE user='';
+mysql> GRANT ALL ON *.* TO wsrep_sst@'%' IDENTIFIED BY 'wspass'";
+mysql> FLUSH PRIVILEGES;
+mysql> SET wsrep_on=ON;
 
-2.4 Check and correct firewall settings.
+3.3 CHECK AND CORRECT FIREWALL SETTINGS.
+
 MySQL-wsrep server needs to be accessible from other cluster members through
-its client listening socket and through wsrep provider socket. See wsrep
-provider documentation for details.
+its client listening socket and through wsrep provider socket. See your
+distribution and wsrep provider documentation for details. For example on
+CentOS you might need to do something along these lines:
 
-2.5 Restart mysql once again (it needs correct privileges at startup, this will
-be fixed soon):
+# iptables --insert RH-Firewall-1-INPUT 1 --proto tcp --source <my IP>/24 --destination <my IP>/32 --dport 3306 -j ACCEPT
+# iptables --insert RH-Firewall-1-INPUT 1 --proto tcp --source <my IP>/24 --destination <my IP>/32 --dport 4567 -j ACCEPT
 
-$ sudo WSREP_CLUSTER_ADDRESS=<address URL> /etc/init.d/mysql restart
+If there is a NAT firewall between the nodes, it must be configured to allow
+direct connections between the nodes (e.g. via port forwarding).
 
-See wsrep provider instructions on the format of cluster URL.
+3.4 CONNECT TO CLUSTER
 
-2.6 Check status with
+Now you're ready to connect to cluster by setting wsrep_cluster_address variable
+and monitor status of wsrep provider:
 
-$ mysql -e "show status like 'wsrep%'"
+mysql> SET GLOBAL wsrep_cluster_address='<cluster address string>';
+mysql> SHOW STATUS LIKE 'wsrep%';
 
 
-3. CONFIGURATION
+4. CONFIGURATION OPTIONS
 
-3.1 MANDATORY MYSQL OPTIONS
+4.1 MANDATORY MYSQL OPTIONS
 
 binlog_format=ROW
    This option is required to use row-level replication as opposed to
@@ -130,7 +195,7 @@ innodb_autoinc_lock_mode=2
    autoinc lock modes 0 and 1 can cause unresolved deadlock, and make
    system unresponsive.
 
-3.2 WSREP OPTIONS
+4.2 WSREP OPTIONS
 
 All options are optional except for wsrep_provider, wsrep_cluster_address, and
 wsrep_sst_auth.
@@ -144,7 +209,8 @@ wsrep_provider_options=
 
 wsrep_cluster_address=
    Provider-specific cluster address string. This is used to connect a node to
-   the desired cluster.
+   the desired cluster. This option can be given either on mysqld startup or set
+   during runtime. See wsrep provider documentation for possible values.
 
 wsrep_cluster_name="my_wsrep_cluster"
    Logical cluster name, must be the same for all nodes of the cluster.
@@ -199,7 +265,10 @@ wsrep_drupal_282555_workaround=1
 
 State snapshot transfer options.
 
-When a new node joins the cluster it has to synchronize its initial state with the other cluster members by transferring state snapshot from one of them. The options below govern how this happens.
+When a new node joins the cluster it has to synchronize its initial state with
+the other cluster members by transferring state snapshot from one of them.
+The options below govern how this happens and should be set up before attempting
+to join or start a cluster.
 
 wsrep_sst_method=mysqldump
    What method to use to copy database state to a newly joined node. Currently
@@ -240,7 +309,7 @@ wsrep_sst_donor=
    sets.
 
 3)  Unsupported queries:
-    * LOAD DATA
+    * LOAD DATA (limited to ~1Gb, use mysqldump instead)
     * lock functions (GET_LOCK(), RELEASE_LOCK()... )
 
 4) Query log cannot be directed to table. If you enable query logging,
