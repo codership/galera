@@ -25,7 +25,7 @@ f 755 root root $SBIN_DEST/vsbes $BUILD_BASE/galeracomm/vs/src/.libs/vsbes
 %endif
 
 d 755 root root $DOCS_DEST -
-f 644 root root $DOCS_DEST/COPYING      $BUILD_BASE/scripts/mysql/COPYING
+f 644 root root $DOCS_DEST/COPYING      $BUILD_BASE/scripts/mysql/LICENSE.galera
 f 644 root root $DOCS_DEST/README       README
 f 644 root root $DOCS_DEST/README-MySQL README-MySQL
 
