@@ -17,6 +17,7 @@
 %requires    libstdc++6 4.1.1
 %requires    libgcc1    4.1.1
 %format rpm
+#%replaces    galera
 %requires    glibc      2.4
 %requires    libstdc++  4.1.1
 %requires    libgcc     4.1.1
@@ -36,5 +37,5 @@ $LIBS_DEST=${prefix}/lib/galera
 $INCS_DEST=${prefix}/include/galera
 $SBIN_DEST=${prefix}/sbin
 $BINS_DEST=${prefix}/bin
-
+$DOCS_DEST=${prefix}/share/doc/galera
 #

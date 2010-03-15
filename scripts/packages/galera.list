@@ -3,7 +3,7 @@
 %include galera-common.inc
 
 # this line is required by rpmbuild
-d 755 root root /usr
+#d 755 root root /usr
 d 755 root root $LIBS_DEST -
 f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils.so.*.*.*
 f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils++.so.*.*.*
@@ -23,6 +23,11 @@ f 755 root root $LIBS_DEST $BUILD_BASE/galera/src/.libs/libmmgalera.so.*.*.*
 d 755 root root $SBIN_DEST -
 f 755 root root $SBIN_DEST/vsbes $BUILD_BASE/galeracomm/vs/src/.libs/vsbes
 %endif
+
+d 755 root root $DOCS_DEST -
+f 644 root root $DOCS_DEST/COPYING      $BUILD_BASE/scripts/mysql/COPYING
+f 644 root root $DOCS_DEST/README       README
+f 644 root root $DOCS_DEST/README-MySQL README-MySQL
 
 $LD_SO_CONF_D=/etc/ld.so.conf.d
 d 755 root root $LD_SO_CONF_D -

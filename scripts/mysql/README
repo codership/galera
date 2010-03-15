@@ -89,7 +89,7 @@ Main features of MySQL/Galera cluster:
 * Truly highly available: no committed transaction is ever lost in case of a
   node crash. All nodes always have consistent state.
 
-* True multi-master: all cluster nodes can handle WRITE load concurrently.
+* True multi-master: all cluster nodes can modify the same table concurrently.
 
 * Highly transparent: the cluster is intended as a drop-in replacement for a 
   single MySQL server. (See LIMITATIONS below)

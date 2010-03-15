@@ -43,7 +43,8 @@ CONTENTS:
    3.1 CONFIGURATION FILES
    3.2 DATABASE PRIVILEGES
    3.3 CHECK AND CORRECT FIREWALL SETTINGS
-   3.4 CONNECT TO CLUSTER
+   3.4 SELINUX
+   3.5 CONNECT TO CLUSTER
 4. CONFIGURATION OPTIONS
    4.1 MANDATORY MYSQL OPTIONS
    4.2 WSREP OPTIONS
@@ -149,13 +150,11 @@ to set up a few things to prepare server for operation.
 3.2 DATABASE PRIVILEGES
 
 Restart MySQL server and connect to it as root to grant privileges to SST
-account (empty users may confuse MySQL authentication matching rules):
+account (empty users confuse MySQL authentication matching rules, we need to
+delete them too):
 
-mysql> SET wsrep_on=OFF;
-mysql> DELETE FROM mysql.user WHERE user='';
-mysql> GRANT ALL ON *.* TO wsrep_sst@'%' IDENTIFIED BY 'wspass'";
-mysql> FLUSH PRIVILEGES;
-mysql> SET wsrep_on=ON;
+$ mysql -e "SET wsrep_on=OFF; DELETE FROM mysql.user WHERE user='';"
+$ mysql -e "SET wsrep_on=OFF; GRANT ALL ON *.* TO wsrep_sst@'%' IDENTIFIED BY 'wspass'";
 
 3.3 CHECK AND CORRECT FIREWALL SETTINGS.
 
@@ -170,7 +169,14 @@ CentOS you might need to do something along these lines:
 If there is a NAT firewall between the nodes, it must be configured to allow
 direct connections between the nodes (e.g. via port forwarding).
 
-3.4 CONNECT TO CLUSTER
+3.4 SELINUX
+
+If you have SELinux enabled, it may block mysqld from doing required operations.
+You'll need to either disable it or configure to allow mysqld to run external
+programs and open listen sockets at unprivileged ports (i.e. things that
+an unprivileged user can do). See SELinux documentation about it.
+
+3.5 CONNECT TO CLUSTER
 
 Now you're ready to connect to cluster by setting wsrep_cluster_address variable
 and monitor status of wsrep provider:
@@ -308,7 +314,7 @@ wsrep_sst_donor=
    different nodes. As a result SELECT...LIMIT... may return slightly different
    sets.
 
-3)  Unsupported queries:
+3) Unsupported queries:
     * LOAD DATA (limited to ~1Gb, use mysqldump instead)
     * lock functions (GET_LOCK(), RELEASE_LOCK()... )
 
