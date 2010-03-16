@@ -48,6 +48,7 @@ struct gcs_core
                                // 2) synchronizes with configuration changes
                                // 3) synchronizes with close() call
 
+    gu_cond_t      leave_cond;
     void*           send_buf;
     size_t          send_buf_len;
     gcs_seqno_t     send_act_no;
@@ -97,6 +98,7 @@ gcs_core_create (const char* node_name,
                                                sizeof (core_act_t));
             if (core->fifo) {
                 gu_mutex_init  (&core->send_lock, NULL);
+                gu_cond_init   (&core->leave_cond, NULL);
                 gcs_group_init (&core->group, node_name, inc_addr);
                 core->proto_ver = 0;
                 core->state = CORE_CLOSED;
@@ -142,7 +144,11 @@ gcs_core_open (gcs_core_t* core,
         return -EBADFD;
     }
 
-    assert (NULL == core->backend.conn);
+    if (core->backend.conn) {
+        assert (core->backend.destroy);
+        core->backend.destroy (&core->backend);
+        memset (&core->backend, 0, sizeof(core->backend));
+    }
 
     gu_debug ("Initializing backend IO layer");
     if (!(ret = gcs_backend_init (&core->backend, url))) {
@@ -651,7 +657,7 @@ core_handle_comp_msg (gcs_core_t*          core,
                 core->state = CORE_NON_PRIMARY;
             }
         }
-        gu_mutex_unlock (&core->send_lock);
+
 
         ret = gcs_group_act_conf (group, act);
         if (ret < 0) {
@@ -660,6 +666,11 @@ core_handle_comp_msg (gcs_core_t*          core,
             assert (0);
             ret = -ENOTRECOVERABLE;
         }
+        if (gcs_group_my_idx(group) == -1)
+        {
+            gu_cond_signal(&core->leave_cond);
+        }
+        gu_mutex_unlock (&core->send_lock);
         assert (ret == act->buf_len);
         break;
     case GCS_GROUP_WAIT_STATE_MSG:
@@ -966,6 +977,7 @@ long gcs_core_close (gcs_core_t* core)
     }
     else {
         ret = core->backend.close (&core->backend);
+        gu_cond_wait(&core->leave_cond, &core->send_lock);
         core->state = CORE_CLOSED;
     }
 
@@ -988,8 +1000,12 @@ long gcs_core_destroy (gcs_core_t* core)
             gu_mutex_unlock (&core->send_lock);
             return -EBADFD;
         }
-        gu_info ("Calling backend.destroy()");
-        core->backend.destroy (&core->backend);
+
+        if (core->backend.conn) {
+            gu_debug ("Calling backend.destroy()");
+            core->backend.destroy (&core->backend);
+        }
+
         core->state = CORE_DESTROYED;
     }
     gu_mutex_unlock (&core->send_lock);
@@ -997,7 +1013,7 @@ long gcs_core_destroy (gcs_core_t* core)
 
     /* after that we must be able to destroy mutexes */
     while (gu_mutex_destroy (&core->send_lock));
-
+    gu_cond_destroy(&core->leave_cond);
     /* now noone will interfere */
     gcs_fifo_lite_close (core->fifo);
     while ((tmp = gcs_fifo_lite_get_head (core->fifo))) {

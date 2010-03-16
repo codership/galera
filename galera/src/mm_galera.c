@@ -1363,9 +1363,10 @@ galera_handle_configuration (wsrep_t* gh,
 }
 
 static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
-    int rcode;
-    struct job_worker *applier;
-    bool shutdown = false;
+    int                rcode;
+    struct job_worker* applier;
+    bool               shutdown = false;
+    enum wsrep_status  ret_code = WSREP_NODE_FAIL;
     enum wsrep_status ret_code;
 
 

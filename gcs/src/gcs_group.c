@@ -797,7 +797,7 @@ gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act)
 
         if (group->num) {
             assert (conf->my_idx >= 0);
-            conf->st_required =
+            conf->st_required = (group->conf_id >= 0) &&
                 (group->nodes[group->my_idx].status < GCS_STATE_JOINER);
 
             for (idx = 0; idx < group->num; idx++)
