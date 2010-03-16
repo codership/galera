@@ -1367,8 +1367,6 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
     struct job_worker* applier;
     bool               shutdown = false;
     enum wsrep_status  ret_code = WSREP_NODE_FAIL;
-    enum wsrep_status ret_code;
-
 
     if (GALERA_CONNECTED != conn_state) {
         gu_info("recv method cannot start, gcs not connected");
