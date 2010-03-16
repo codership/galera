@@ -353,7 +353,11 @@ int mysql_drv_connect(db_conn_t *sb_conn)
   char           *ssl_key;
   char           *ssl_cert;
   char           *ssl_ca;
-  
+
+  char           *colon;
+  char           host_name[256] = {'\0'};
+  int            host_port = args.port;
+
   con = (MYSQL *)malloc(sizeof(MYSQL));
   if (con == NULL)
     return 1;
@@ -367,7 +371,16 @@ int mysql_drv_connect(db_conn_t *sb_conn)
     hosts_pos = SB_LIST_ITEM_NEXT(hosts_pos);
   host = SB_LIST_ENTRY(hosts_pos, value_t, listitem)->data;
   pthread_mutex_unlock(&hosts_mutex);
-  
+
+  colon = strchr(host,':');
+  fprintf(stdout, "host list now; %s\n", host);
+  if (colon) 
+  {
+    strncpy(host_name, host, (colon-host));
+    host_port = atoi(colon+1);
+    host = host_name;
+    fprintf(stdout, "host now; %s, port: %d\n", host, host_port);
+  }
   DEBUG("mysql_init(%p)", con);
   mysql_options(con, MYSQL_READ_DEFAULT_GROUP, "sysbench");
   DEBUG("mysql_options(%p, MYSQL_READ_DEFAULT_GROUP, \"sysbench\")", con);
@@ -389,7 +402,7 @@ int mysql_drv_connect(db_conn_t *sb_conn)
         args.user,
         args.password,
         args.db,
-        args.port,
+        host_port,
         args.socket,
         (MYSQL_VERSION_ID >= 50000) ? "CLIENT_MULTI_STATEMENTS" : "0"
         );
@@ -651,6 +664,7 @@ int mysql_drv_execute(db_stmt_t *stmt, db_result_set_t *rs)
 	             mysql_errno(con->ptr),
 	             mysql_error(con->ptr));
 	     return SB_DB_ERROR_NONE;
+             //return SB_DB_ERROR_DEADLOCK;
 	  }
       log_text(LOG_ALERT, "failed to execute mysql_stmt_execute(): Err%d %s",
                mysql_errno(con->ptr),
