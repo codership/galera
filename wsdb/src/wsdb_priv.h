@@ -48,6 +48,7 @@
 
 #define LOCAL_CACHE_LIMIT 1000000
 #define TRX_LIMIT         USHRT_MAX
+#define QUERY_LIMIT       USHRT_MAX
 #define CONN_LIMIT        10000
 
 /* make sure 64bit integer limits are defined */

@@ -117,7 +117,6 @@ static struct conn_info *new_conn_info(
     conn->set_default_db = NULL;
     conn->info.worker    = NULL;
     key_array_open(&conn->variables);
-
     GU_DBUG_PRINT("wsdb", ("created new connection: %lu", conn_id));
 
     wsdb_hash_push(
@@ -139,6 +138,12 @@ int wsdb_store_set_variable(
     GU_DBUG_PRINT("wsdb",("set var for conn: %lu : %s", conn_id, data));
 
     key_array_replace(&conn->variables, key, key_len, data, data_len);
+
+    if (key_array_get_size(&conn->variables) == QUERY_LIMIT - 1)
+    {
+        gu_warn("wsdb: conn %lld exceeded max variable count", conn_id);
+        GU_DBUG_RETURN(WSDB_ERR_TOO_MANY_QUERIES);
+    }
 
     GU_DBUG_RETURN(WSDB_OK);
 }
@@ -171,6 +176,7 @@ int wsdb_store_set_database(
     conn->set_default_db = (char *) gu_malloc (set_db_len + 1);
     memcpy(conn->set_default_db, set_db, set_db_len);
     conn->set_default_db[set_db_len] = '\0';
+
 
     GU_DBUG_RETURN(WSDB_OK);
 }
