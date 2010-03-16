@@ -1134,13 +1134,16 @@ struct wsdb_write_set *wsdb_get_write_set(
         GU_DBUG_RETURN(NULL);
     }
 
-    if (ws->item_count > 0) {
-        ws->items = GU_CALLOC(ws->item_count, struct wsdb_item_rec);
-        if (!ws->items) {
-            gu_error("failed to allocate write set items %d-%d for %llu", 
-                     ws->item_count, ws->query_count, trx_id);
-            GU_DBUG_RETURN(NULL);
-        }
+    ws->items = (struct wsdb_item_rec *) gu_malloc (
+        ws->item_count * sizeof(struct wsdb_item_rec)
+    );
+    if (!ws->items && ws->item_count != 0) {
+        gu_error("failed to allocate write set items %d-%d for %llu", 
+                 ws->item_count, ws->query_count, trx_id
+        );
+        GU_DBUG_RETURN(NULL);
+    } else if (ws->item_count > 0) {
+        memset(ws->items, '\0', ws->item_count * sizeof(struct wsdb_item_rec));
     }
 
     GU_DBUG_PRINT("wsdb",("query count: %d", ws->query_count));
@@ -1241,11 +1244,10 @@ int wsdb_set_exec_query(
     memset(ws->queries, '\0', ws->query_count * sizeof(struct wsdb_query));
 
     /* allocate queries and items */
-    ws->queries[0].query = (char *) gu_malloc (query_len+1);
+    ws->queries[0].query = (char *) gu_malloc (query_len);
 
-    strncpy(ws->queries[0].query, query, query_len);
-    ws->queries[0].query[query_len] = '\0';
-    ws->queries[0].query_len = query_len+1;
+    memcpy(ws->queries[0].query, query, query_len);
+    ws->queries[0].query_len = query_len;
     ws->rbr_buf_len = 0;
 
     GU_DBUG_RETURN(WSDB_OK);
