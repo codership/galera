@@ -82,8 +82,6 @@ static const char* sst_donor = NULL;
 static gu_mutex_t commit_mtx;
 static gu_mutex_t sst_mtx;
 static gu_cond_t  sst_cond;
-static gu_mutex_t close_mtx;
-static gu_cond_t  close_cond;
 
 static struct galera_options galera_opts;
 
@@ -294,20 +292,20 @@ static gcs_conn_t* galera_init_gcs (wsrep_t*      gh,
 static enum wsrep_status mm_galera_init(wsrep_t* gh,
                                         const struct wsrep_init_args* args)
 {
+    int rcode;
     galera_state_t saved_state;
-    int rcode = WSREP_OK;
 
     GU_DBUG_ENTER("galera_init");
 
     data_dir = strdup (args->data_dir);
     if (!data_dir) return WSREP_FATAL;
-
+    
     /* Set up logging */
     gu_conf_set_log_callback((gu_log_cb_t)args->logger_cb);
-
+    
     /* Set up options if any */
     if (args->options) galera_options_from_string (&galera_opts, args->options);
-
+    
     wsdb_set_conf_param_cb(galera_wsdb_configurator);
 
     /* Set up initial state: */
@@ -316,23 +314,27 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     status.state_uuid   = *(gu_uuid_t*)args->state_uuid;
     status.last_applied = args->state_seqno;
 
-    /* 2. if nothing passed, try to read saved state from file */
+    
+    /* 2. initialize wsdb */
+    wsdb_init(data_dir, (gu_log_cb_t)args->logger_cb);    
+
+    /* 3. try to read saved state from file */
     if (status.last_applied == WSREP_SEQNO_UNDEFINED &&
         !memcmp (&WSREP_UUID_UNDEFINED, &status.state_uuid, sizeof(gu_uuid_t))){
-
+        
         rcode = galera_restore_state(data_dir, &saved_state);
-
+        
         if (rcode) {
             gu_warn("GALERA state restore failed");
         } else {
             status.state_uuid   = saved_state.uuid;
             status.last_applied = saved_state.last_applied_seqno;
         }
-
+        
         gu_info("Found stored state: " GU_UUID_FORMAT ":%lli",
                 GU_UUID_ARGS(&status.state_uuid), status.last_applied);
     }
-
+    
     gu_info("Configured state:   " GU_UUID_FORMAT ":%lli",
             GU_UUID_ARGS(&status.state_uuid), status.last_applied);
 
@@ -340,42 +342,36 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     gcs_conn = galera_init_gcs (gh, args->node_name, args->node_incoming,
                                 status.last_applied, status.state_uuid.data);
     if (!gcs_conn) {
-        gu_error ("Failed to initialize GCS state: %d (%s)",
-                  rcode, strerror (-rcode));
+        gu_error ("Failed to initialize GCS state");
         GU_DBUG_RETURN(WSREP_NODE_FAIL);            
     }
-
+    
     last_recved = status.last_applied;
-
+    
     my_idx = 0;
-
-    /* initialize wsdb */
-    wsdb_init(data_dir, (gu_log_cb_t)args->logger_cb);
-
+    
     /* set the rest of callbacks */
     bf_apply_cb       = args->bf_apply_cb;
 //DELETE    ws_start_cb       = args->ws_start_cb;
     view_handler_cb   = args->view_handler_cb;
     sst_prepare_cb    = args->sst_prepare_cb;
     sst_donate_cb     = args->sst_donate_cb;
-
-    /* initialize total order queue */
-    cert_queue = gu_to_create(16384, GCS_SEQNO_FIRST);
-
-    /* initialize commit queue */
-    commit_queue = gu_to_create(16384, GCS_SEQNO_FIRST);
-
+    
     gu_mutex_init(&commit_mtx, NULL);
     gu_mutex_init(&sst_mtx,    NULL);
     gu_cond_init (&sst_cond,   NULL);
-    gu_mutex_init(&close_mtx,  NULL);
-    gu_cond_init (&close_cond, NULL);
-
-    conn_state = GALERA_INITIALIZED;
-
+    
     /* create worker queue */
     applier_queue = job_queue_create(16, ws_conflict_check, ws_cmp_order);
-
+    
+    /* initialize total order queue */
+    cert_queue = gu_to_create(16384, GCS_SEQNO_FIRST);
+    
+    /* initialize commit queue */
+    commit_queue = gu_to_create(16384, GCS_SEQNO_FIRST);
+    
+    conn_state = GALERA_INITIALIZED;
+    
 #ifdef EXTRA_DEBUG
     /* debug level printing to /tmp directory */
     {
@@ -410,12 +406,11 @@ static enum wsrep_status mm_galera_connect (wsrep_t *gh,
     int rcode;
 
     GU_DBUG_ENTER("galera_connect");
-
     // save donor name for using in configuration handler
     if (sst_donor) free ((char*)sst_donor);
     sst_donor = strdup (state_donor);
     if (!sst_donor) GU_DBUG_RETURN(WSREP_FATAL);
-
+    
     rcode = gcs_open(gcs_conn, cluster_name, cluster_url);
     if (rcode) {
 	gu_error("gcs_open(%p, %s, %s) failed: %d (%s)",
@@ -423,12 +418,12 @@ static enum wsrep_status mm_galera_connect (wsrep_t *gh,
                  rcode, strerror(-rcode));
 	GU_DBUG_RETURN(WSREP_NODE_FAIL);
     }
-
+    
     gu_info("Successfully opened GCS connection to %s", cluster_name);
-
+    
     status.stage = GALERA_STAGE_JOINING;
     conn_state   = GALERA_CONNECTED;
-
+    
     GU_DBUG_RETURN(rcode);
 }
 
@@ -444,34 +439,26 @@ static enum wsrep_status mm_galera_disconnect(wsrep_t *gh,
         conn_state   = GALERA_INITIALIZED;
         GU_DBUG_RETURN (WSREP_NODE_FAIL); //shouldn't we just ignore it?
     }
-
+    
+    // synchronize with self-leave
     if (GALERA_CONNECTED == conn_state) {
-
+        
         conn_state   = GALERA_INITIALIZED;
         status.stage = GALERA_STAGE_INIT;
-
+        
         rcode = gcs_close(gcs_conn);
         if (rcode) {
             gu_error ("Failed to close GCS connection handle: %d (%s)",
                       rcode, strerror(-rcode));
             GU_DBUG_RETURN(WSREP_NODE_FAIL);
         }
-
+        
         gu_info("Closed GCS connection");
     }
-
-    // synchronize with self-leave
-    gu_mutex_lock (&close_mtx);
-#if SELF_LEAVE // currently vsbes does not deliver self-leave message
-    while (-1 != my_idx /* self-leave */) gu_cond_wait (&close_cond,&close_mtx);
-#else
-    sleep (5);
-#endif
-    gu_mutex_unlock (&close_mtx);
-
+    
     if (app_uuid)  *app_uuid  = *(wsrep_uuid_t*)&status.state_uuid;
     if (app_seqno) *app_seqno = status.last_applied;
-
+    
     GU_DBUG_RETURN(WSREP_OK);
 }
 
@@ -482,33 +469,34 @@ static void mm_galera_tear_down(wsrep_t *gh)
 
     switch (conn_state) {
 
-    case GALERA_CONNECTED:
-        mm_galera_disconnect (gh, NULL, NULL);
-
     case GALERA_INITIALIZED:
-        if (gcs_conn)     gcs_destroy (gcs_conn);
-        if (cert_queue)   gu_to_destroy(&cert_queue);
-        if (commit_queue) gu_to_destroy(&commit_queue);
-
-        wsdb_close();
-
         /* store persistent state*/
         memcpy(saved_state.uuid.data, status.state_uuid.data, GU_UUID_LEN);
         saved_state.last_applied_seqno = status.last_applied;
-
+        
         rcode = galera_store_state(data_dir, &saved_state);
         if (rcode) {
             gu_error("GALERA state store failed: %d", rcode);
             gu_info(" State: "GU_UUID_FORMAT":%lli",
                     GU_UUID_ARGS(&status.state_uuid), status.last_applied);
         }
-
+        
         if (data_dir)  free ((char*)data_dir);
+        data_dir = NULL;
         if (sst_donor) free ((char*)sst_donor);
-
+        sst_donor = NULL;
+        if (gcs_conn)     gcs_destroy (gcs_conn);
+        gcs_conn = NULL;
+        wsdb_close();
+        
+        if (cert_queue)   gu_to_destroy(&cert_queue);
+        cert_queue = NULL;
+        if (commit_queue) gu_to_destroy(&commit_queue);
+        commit_queue = NULL;
+        conn_state = GALERA_UNINITIALIZED;
     case GALERA_UNINITIALIZED:
         break;
-
+        
     default:
         gu_fatal ("Unrecognized Galera state on teardown: %d", conn_state);
         assert (0);
@@ -1139,6 +1127,8 @@ galera_check_st_required (gcs_act_conf_t* conf)
     if (conf->st_required) {
         gu_uuid_t* conf_uuid = (gu_uuid_t*)conf->group_uuid;
 
+        assert (conf->conf_id >= 0);
+
         if (!gu_uuid_compare (&status.state_uuid, conf_uuid)) {
             // same history
             if (GALERA_STAGE_JOINED == status.stage) {
@@ -1153,6 +1143,10 @@ galera_check_st_required (gcs_act_conf_t* conf)
 
         if (conf->st_required) {
             status.stage = GALERA_STAGE_JOINING;
+        }
+        else {
+            // rewrote conf->st_required, tell GCS about it
+            galera_join();
         }
     }
 }
@@ -1360,12 +1354,6 @@ galera_handle_configuration (wsrep_t* gh,
         status.stage = GALERA_STAGE_JOINING;
 
         ret = -1;
-
-#if SELF_LEAVE
-        gu_mutex_lock (&close_mtx);
-        if (-1 == my_idx /* self-leave */) gu_cond_signal (&close_cond);
-        gu_mutex_unlock (&close_mtx);
-#endif
     }
 
     GALERA_RELEASE_QUEUE (cert_queue,   conf_seqno);
@@ -1378,9 +1366,19 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
     int rcode;
     struct job_worker *applier;
     bool shutdown = false;
+    enum wsrep_status ret_code;
+
+
+    if (GALERA_CONNECTED != conn_state) {
+        gu_info("recv method cannot start, gcs not connected");
+
+        /* return with success code to avoid node shutdown */
+        return WSREP_OK;
+    }
 
     /* we must have gcs connection */
     if (!gcs_conn) {
+        gu_info("recv method cannot start, no gcs connection");
         return WSREP_NODE_FAIL;
     }
 
@@ -1411,7 +1409,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
                  strerror(-rcode));
 #endif
 	if (rcode <= 0) {
-
+            /* must return immediately, seqnos are not usable */
             gu_info ("gcs_recv() returned %d (%s)", rcode, strerror(-rcode));
             return WSREP_CONN_FAIL;
         }
@@ -1425,7 +1423,6 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
         switch (action_type) {
         case GCS_ACT_TORDERED:
         {
-            enum wsrep_status ret_code;
             assert (GCS_SEQNO_ILL != seqno_g);
 
             status.received++;
@@ -1453,6 +1450,11 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
         case GCS_ACT_CONF:
         {
             galera_handle_configuration (gh, action, seqno_l);
+            if (-1 == my_idx /* self-leave */)
+            {
+                shutdown = true;
+                ret_code = WSREP_OK;
+            }
             break;
         }
         case GCS_ACT_STATE_REQ:
@@ -1477,12 +1479,16 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
             }
             break;
         default:
+            gu_error("bad gcs action value: %d, must abort", action_type);
             return WSREP_FATAL;
         }
         free (action); /* TODO: cache DATA actions at the end of commit queue
                         * processing. Therefore do not free them here. */
     }
-    return WSREP_OK;
+
+    gu_info("mm_galera_recv(): return %d", ret_code);
+    /* returning WSREP_NODE_FAIL or WSREP_FATAL */
+    return ret_code;
 }
 
 static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
