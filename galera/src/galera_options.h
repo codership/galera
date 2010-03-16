@@ -12,6 +12,7 @@ struct galera_options
     bool   persistent_writesets;
     size_t local_cache_size;
     char*  dbug_spec;
+    bool   append_queries;
 };
 
 extern const struct galera_options galera_defaults;
