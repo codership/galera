@@ -11,10 +11,13 @@
 %provides    galera
 
 %format deb
+%replaces    galera
+
 %requires    libc6      2.4
 %requires    libstdc++6 4.1.1
 %requires    libgcc1    4.1.1
 %format rpm
+#%replaces    galera
 %requires    glibc      2.4
 %requires    libstdc++  4.1.1
 %requires    libgcc     4.1.1
@@ -22,9 +25,17 @@
 
 $prefix=/usr
 
+%format !rpm
 $LIBS_DEST=${prefix}/lib/galera
+%format rpm
+%if x86_64
+$LIBS_DEST=${prefix}/lib64/galera
+%else
+$LIBS_DEST=${prefix}/lib/galera
+%endif
+%format all
 $INCS_DEST=${prefix}/include/galera
 $SBIN_DEST=${prefix}/sbin
 $BINS_DEST=${prefix}/bin
-
+$DOCS_DEST=${prefix}/share/doc/galera
 #

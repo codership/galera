@@ -12,10 +12,15 @@ $wsrep_version=${WSREP_VER}
 
 # This includes dependencies and directory structore information
 %format deb
-%include mysql-wsrep.debian
+%include debian/mysql-wsrep.list
 %format rpm
-%include mysql-wsrep.centos
+%include centos/mysql-wsrep.list
 %format all
+
+##############################################
+# Below files sorted into paragraphs         #
+# according to Debian division into packages #
+##############################################
 
 # Documentation
 d 755 root root $DOCS_DST -
@@ -29,10 +34,9 @@ d 755 root root $LIBS_DST -
 f 755 root root $LIBS_DST/libmysqlclient.so.16.0.0   $MYSQL_SRC/libmysql/.libs/libmysqlclient.so.16.0.0
 f 755 root root $LIBS_DST/libmysqlclient_r.so.16.0.0 $MYSQL_SRC/libmysql_r/.libs/libmysqlclient_r.so.16.0.0
 
-# mysql-common part
-d 755 root root $CONF_DST -
-d 755 root root $CONF_DST/conf.d -
-f 644 root root $MY_DST/my.cnf                 $GALERA_SRC/scripts/mysql/debian/my.cnf
+# mysql-common part (see distribution-specific includes too)
+d 755 root  root  $CONF_DST/conf.d             -
+c 640 mysql mysql $CONF_DST/conf.d/wsrep.cnf   $MYSQL_SRC/support-files/wsrep.cnf
 
 # mysql-client part
 d 755 root root $BINS_DST -
@@ -57,7 +61,6 @@ f 755 root root $SBIN_DST/mysqlmanager         $MYSQL_SRC/server-tools/instance-
 
 # mysql-server-5.1 part
 f 644 root root $CONF_DST/conf.d/mysqld_safe_syslog.cnf $GALERA_SRC/scripts/mysql/debian/mysqld_safe_syslog.cnf
-f 644 root root $CONF_DST/conf.d/wsrep.cnf     $MYSQL_SRC/support-files/wsrep.cnf
 f 755 root root $BINS_DST/msql2mysql           $MYSQL_SRC/scripts/msql2mysql
 f 755 root root $BINS_DST/my_print_defaults    $MYSQL_SRC/extra/my_print_defaults
 f 755 root root $BINS_DST/myisamchk            $MYSQL_SRC/storage/myisam/myisamchk
@@ -91,14 +94,6 @@ f 644 root root $DOCS_DST/examples             $MYSQL_SRC/support-files/*.cnf
 
 d 755 mysql root /var/run/mysqld -
 d 755 mysql adm  /var/log/mysql  -
-
-%format deb
-d 755 root root /etc/init.d -
-f 755 root root /etc/init.d/mysql              $GALERA_SRC/scripts/mysql/debian/mysql
-%format rpm
-d 755 root root /etc/rc.d/init.d -
-f 755 root root /etc/rc.d/init.d/mysqld        $GALERA_SRC/scripts/mysql/centos/mysqld
-%format all
 
 # mysql-server-core-5.1
 d 755 root root $LIBEXEC_DST -
@@ -154,9 +149,5 @@ f 644 root root $MAN_DST/man1/resolve_stack_dump.1.gz $MYSQL_SRC/man/resolve_sta
 d 755 root root $MAN_DST/man8 -
 f 644 root root $MAN_DST/man8/mysqld.8.gz           $MYSQL_SRC/man/mysqld.8.gz
 f 644 root root $MAN_DST/man8/mysqlmanager.8.gz     $MYSQL_SRC/man/mysqlmanager.8.gz
-
-%preinstall <<EOF_PRE
-id mysql >/dev/null 2>&1 || (adduser --system --group --disabled-password --disabled-login --home=/var/lib/mysql --shell=/bin/false mysql)
-EOF_PRE
 
 #

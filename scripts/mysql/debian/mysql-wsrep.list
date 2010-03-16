@@ -1,6 +1,7 @@
 # This is a MySQL-wsrep package description for ESP package manager
 # Debian specific part
 
+%requires    psmisc
 %requires    debianutils       1.6
 %requires    libc6             2.4
 %requires    libdbi-perl
@@ -62,7 +63,12 @@
 $prefix=/usr
 
 $CONF_DST=/etc/mysql
-$MY_DST=$CONF_DST
+d 755 root root $CONF_DST         -
+c 644 root root $CONF_DST/my.cnf  $GALERA_SRC/scripts/mysql/debian/my.cnf
+
+d 755 root root /etc/init.d       -
+f 755 root root /etc/init.d/mysql $GALERA_SRC/scripts/mysql/debian/mysql
+
 $LIBS_DST=${prefix}/lib
 $SHAR_DST=${prefix}/share/mysql
 $SBIN_DST=${prefix}/sbin
@@ -74,21 +80,30 @@ $MAN_DST=${prefix}/share/man
 # Distribution dependent scripts
 
 $mysql_data=/var/lib/mysql
+
+# Add mysql group and user if there are none
+%preinstall <<EOF_PREINSTALL
+getent group  mysql >/dev/null || addgroup --system mysql >/dev/null
+getent passwd mysql >/dev/null || \
+adduser --system --disabled-login --ingroup mysql --home ${mysql_data} \
+        --gecos "MySQL Server" --shell /bin/false mysql >/dev/null
+EOF_PREINSTALL
+
 %postinstall <<EOF_POSTINSTALL
 update-rc.d -f mysql remove >/dev/null || exit $
 ldconfig -n $LIBS_DST
 #test -d ${mysql_data} || (mysql_install_db --user=mysql --datadir=${mysql_data})
 # it seems that we can run mysql_install_db regardless of existing tables.
-mysql_install_db --user=mysql --datadir=${mysql_data}
+mysql_install_db --wsrep-on=0 --user=mysql --datadir=${mysql_data}
 EOF_POSTINSTALL
 
-%postremove <<EOF_POSTREMOVE
+%preremove <<EOF_PREREMOVE
 if [ -x /usr/sbin/invoke-rc.d ]; then
     invoke-rc.d mysql stop
 else
     /etc/init.d/mysql stop
 fi
 update-rc.d -f mysql remove >/dev/null || exit $
-EOF_POSTREMOVE
+EOF_PREREMOVE
 
 #

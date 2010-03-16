@@ -21,7 +21,7 @@ usage()
 "    --with-spread   configure build with Spread (implies -c)\n"\
 "    --no-strip      prevent stripping of release binaries\n"\
 "    -r|--release <galera release>, otherwise revisions will be used\n"\
-"    -p|--package    create Debian packages\n"
+"    -p|--package    create DEB/RPM packages (depending on the distribution)\n"
 "    --sb|--skip-build skip the actual build, use the existing binaries"
 "\n -s and -b options affect only Galera build.\n"
 }
@@ -111,9 +111,11 @@ if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
 if [ "$SKIP_BUILD" == "yes" ]; then CONFIGURE="no"; fi
 
+which dpkg >/dev/null 2>&1 && DEBIAN=1 || DEBIAN=0
+
 # export command options for Galera build
 export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD CFLAGS CXXFLAGS \
-       PACKAGE CPU SKIP_BUILD RELEASE
+       PACKAGE CPU SKIP_BUILD RELEASE DEBIAN
 
 set -eu
 
@@ -154,7 +156,7 @@ if [ "$PACKAGE" == "yes" ] # fetch and patch pristine sources
 then
     cd /tmp
     mysql_tag=mysql-$MYSQL_VER
-    if [ ! -d $mysql_tag ]
+    if [ "$SKIP_BUILD" == "no" ] || [ ! -d $mysql_tag ]
     then
         mysql_orig_tar_gz=$mysql_tag.tar.gz
 #        url=http://ftp.sunet.se/pub/unix/databases/relational/mysql/Downloads/MySQL-5.1
@@ -163,8 +165,9 @@ then
         echo "Downloading $mysql_orig_tar_gz... currently works only for 5.1.x"
         wget -N $url/$mysql_orig_tar_gz
         echo "Getting wsrep patch..."
-        patch_file=$(${BUILD_ROOT}/get_patch.sh $mysql_tag)
+        patch_file=$(${BUILD_ROOT}/get_patch.sh $mysql_tag $MYSQL_SRC)
         echo "Patching source..."
+        rm -rf $mysql_tag # need clean sources for a patch
         tar -xzf $mysql_orig_tar_gz
         cd $mysql_tag/
         patch -p1 -f < $patch_file >/dev/null || :
@@ -198,6 +201,11 @@ then
         fi
 
         export MYSQL_BUILD_PREFIX="/usr"
+
+        [ $DEBIAN -ne 0 ] && \
+        export MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
+        export MYSQL_SOCKET_PATH="/var/lib/mysql/mysql.sock"
+
         BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
     else  # just recompile and relink with old configuration
         #set -x
@@ -311,60 +319,63 @@ fi
 
 fi # if [ $TAR == "yes " ]
 
-fix_rpmbuild()
+get_arch()
 {
-    local buildroot=~/rpmbuild/BUILDROOT/mysql-wsrep-$1-$2.$3
-    rm    -rf $buildroot
-    mkdir -p  $buildroot
-    local real="$(pwd)/$4/buildroot/"
-    pushd $buildroot
-    ln -s "$real"/etc ./
-    ln -s "$real"/usr ./
-    ln -s "$real"/var ./
-    popd
-}
-
-cleanup() # OUTPUT ARCH 
-{
-    mv $1/RPMS/$2/*.rpm $1/
-    rm -rf $1/RPMS $1/buildroot $1/rpms # $1/mysql-wsrep.spec 
+    if file $MYSQL_SRC/sql/mysqld.o | grep "80386" >/dev/null 2>&1
+    then
+        echo "i386"
+    else
+        echo "amd64"
+    fi
 }
 
 build_packages()
 {
-    cd $BUILD_ROOT
+    pushd $GALERA_SRC/scripts/mysql
 
-    local ARCH_DEB
-    local ARCH_RPM
+    local ARCH=$(get_arch)
+    local WHOAMI=$(whoami)
 
-    if file $MYSQL_SRC/sql/mysqld.o | grep "80386" >/dev/null 2>&1
+    if [ $DEBIAN -eq 0 ] && [ "$ARCH" == "amd64" ]
     then
-        ARCH_DEB=i386
-        ARCH_RPM=i386
-    else
-        ARCH_DEB=amd64
-        ARCH_RPM=x86_64
+        ARCH="x86_64"
+        export x86_64=$ARCH # for epm
     fi
+
+    local STRIP_OPT=""
+    [ "$NO_STRIP" == "yes" ] && STRIP_OPT="-g"
 
     export MYSQL_VER MYSQL_SRC GALERA_SRC RELEASE_NAME
     export WSREP_VER=${RELEASE:-"$MYSQL_REV"}
 
-    echo $MYSQL_SRC $MYSQL_VER ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
+    echo $MYSQL_SRC $MYSQL_VER $ARCH
+    rm -rf $ARCH
 
-    pushd $GALERA_SRC/scripts/mysql && \
-    local OUTPUT=$(pwd)/$ARCH_DEB
-    rm -rf $OUTPUT
-    local WHOAMI=$(whoami)
-    local EPM=/usr/bin/epm
+    set +e
+    if [ $DEBIAN -ne 0 ]
+    then #build DEB
+        sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
+             --output-dir $ARCH $STRIP_OPT mysql-wsrep
+    else # build RPM
+        (sudo -E /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
+              --output-dir $ARCH --keep-files -k $STRIP_OPT mysql-wsrep || \
+        /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/mysql-wsrep.spec" \
+              --buildroot="$ARCH/buildroot" )
+    fi
+    local RET=$?
 
-    (sudo -E $EPM -vv -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" \
-         --output-dir "$OUTPUT" mysql-wsrep || \
-     /usr/bin/rpmbuild -bb --target "$ARCH_RPM" "$OUTPUT/mysql-wsrep.spec" \
-             --buildroot="$OUTPUT/buildroot" ) && \
-    sudo -E $EPM -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" \
-         --output-dir "$OUTPUT" mysql-wsrep && \
-    sudo /bin/chown $WHOAMI.users -R "$OUTPUT" && cleanup $OUTPUT $ARCH_RPM || \
-    (sudo /bin/chown $WHOAMI.users -R "$OUTPUT"; return 1)
+    sudo /bin/chown -R $WHOAMI.users $ARCH
+    set -e
+
+    if [ $RET -eq 0 ] && [ $DEBIAN -eq 0 ]
+    then # RPM cleanup (some rpm versions put the package in RPMS)
+        test -d $ARCH/RPMS/$ARCH && \
+        mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ 1>/dev/null 2>&1 || :
+
+        rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms # $ARCH/mysql-wsrep.spec
+    fi
+
+    return $RET
 }
 
 if [ "$PACKAGE" == "yes" ]
@@ -372,4 +383,3 @@ then
     build_packages
 fi
 #
-

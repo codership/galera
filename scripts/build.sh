@@ -18,7 +18,7 @@ usage()
     "    -p|--package    build RPM and DEB packages at the end.\n" \
     "    --with-spread   configure build with spread backend (implies -c to gcs)\n" \
     "    --source        build source packages\n"\
-    "    --sb            skip actual build, use the existing binaries"
+    "    --sb            skip actual build, use the existing binaries\n"\
     "\nSet DISABLE_GCOMM/DISABLE_VSBES to 'yes' to disable respective modules"
 }
 
@@ -28,6 +28,8 @@ PACKAGE=${PACKAGE:-"no"}
 SKIP_BUILD=${SKIP_BUILD:-"no"}
 RELEASE=${RELEASE:-""}
 SOURCE=${SOURCE:-"no"}
+
+which dpkg >/dev/null 2>&1 && DEBIAN=${DEBIAN:-1} || DEBIAN=${DEBIAN:-0}
 
 if ccache -V > /dev/null 2>&1
 then
@@ -68,6 +70,11 @@ do
 	    ;;
 	-o|--opt)
 	    OPT="yes"       # Compile without debug
+	    NO_STRIP="no"
+	    ;;
+	-d|--debug)
+	    DEBUG="yes"     # Compile with debug
+	    NO_STRIP="yes"
 	    ;;
 	-r|--release)
 	    RELEASE="$2"
@@ -82,9 +89,6 @@ do
 	    CFLAGS="$CFLAGS -m64"
 	    CXXFLAGS="$CXXFLAGS -m64"
 	    SCRATCH="yes"
-	    ;;
-	-d|--debug)
-	    DEBUG="yes"     # Compile with debug
 	    ;;
 	-p|--package)
 	    PACKAGE="yes"   # build binary packages
@@ -167,62 +171,68 @@ build_flags()
     LDFLAGS="$LDFLAGS -L$build_dir/src/.libs"
 }
 
-fix_rpmbuild() # RELEASE ARCH OUTPUT - deprecated
+get_arch()
 {
-    local buildroot=~/rpmbuild/BUILDROOT/galera-$1-0.$2
-    rm    -rf $buildroot
-    mkdir -p  $buildroot
-    local real="$(pwd)/$3/buildroot"
-    pushd $buildroot
-    cp -ar "$real"/etc ./
-    cp -ar "$real"/usr ./
-    popd
-}
-
-cleanup() # OUTPUT ARCH
-{
-    mv $1/RPMS/$2/*.rpm $1/
-    rm -rf $1/RPMS $1/buildroot $1/rpms # $1/galera.spec
+    if file $build_base/gcs/src/gcs.o | grep "80386" >/dev/null 2>&1
+    then
+        echo "i386"
+    else
+        echo "amd64"
+    fi
 }
 
 build_packages()
 {
-    local ARCH_DEB
-    local ARCH_RPM
-
-    if file $build_base/gcs/src/gcs.o | grep "80386" >/dev/null 2>&1
-    then
-        ARCH_DEB=i386
-        ARCH_RPM=i386
-    else
-        ARCH_DEB=amd64
-        ARCH_RPM=x86_64
-    fi
-
-    if [ "$DISABLE_GCOMM" != "yes" ]; then export GCOMM=yes; fi
-    if [ "$DISABLE_VSBES" != "yes" ]; then export VSBES=yes; fi
-
     pushd $build_base/scripts/packages
-    local OUTPUT=$(pwd)/$ARCH_DEB
+
+    local ARCH=$(get_arch)
     local WHOAMI=$(whoami)
+
+    [ "$DISABLE_GCOMM" != "yes" ] && export GCOMM="yes"
+    [ "$DISABLE_VSBES" != "yes" ] && export VSBES="yes"
 
     export BUILD_BASE=$build_base
     export GALERA_VER=$RELEASE
-    echo GCOMM=$GCOMM VSBES=$VSBES ARCH_DEB=$ARCH_DEB ARCH_RPM=$ARCH_RPM
+    echo "GCOMM=$GCOMM VSBES=$VSBES ARCH=$ARCH"
 
-    rm -rf $OUTPUT && \
-    (sudo -E /usr/bin/epm -vv -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" \
-         --output-dir $OUTPUT --keep-files -k galera || \
-     /usr/bin/rpmbuild -bb --target "$ARCH_RPM" "$OUTPUT/galera.spec" \
-         --buildroot="$OUTPUT/buildroot" ) && \
-#    /usr/bin/epm -n -m "$ARCH_RPM" -a "$ARCH_RPM" -f "rpm" \
-#         --output-dir $OUTPUT galera-dev && \
-    sudo -E /usr/bin/epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" \
-         --output-dir $OUTPUT galera && \
-#    sudo -E /usr/bin/epm -n -m "$ARCH_DEB" -a "$ARCH_DEB" -f "deb" \
-#         --output-dir $OUTPUT galera-dev && \
-    sudo /bin/chown -R $WHOAMI.users $OUTPUT && cleanup $OUTPUT $ARCH_RPM || \
-    (sudo /bin/chown -R $WHOAMI.users $OUTPUT ; return 1)
+    if [ $DEBIAN -eq 0 ] && [ "$ARCH" == "amd64" ]
+    then
+        ARCH="x86_64"
+        export x86_64=$ARCH # for epm
+    fi
+
+    local STRIP_OPT=""
+    [ "$NO_STRIP" == "yes" ] && STRIP_OPT="-g"
+
+    rm -rf $ARCH
+
+    set +e
+    if [ $DEBIAN -ne 0 ]
+    then # build DEB
+        sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
+             --output-dir $ARCH $STRIP_OPT galera # && \
+#       sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
+#            --output-dir $ARCH $STRIP_OPT galera-dev
+    else # build RPM
+        (sudo -E /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
+              --output-dir $ARCH --keep-files -k $STRIP_OPT galera || \
+         /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/galera.spec" \
+              --buildroot="$ARCH/buildroot" ) # && \
+#        /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "rpm" \
+#             --output-dir $ARCH $STRIP_OPT galera-dev
+    fi
+    local RET=$?
+
+    sudo /bin/chown -R $WHOAMI.users $ARCH
+    set -e
+
+    if [ $RET -eq 0 ] && [ $DEBIAN -eq 0 ]
+    then
+        mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ && \
+        rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms # $ARCH/galera.spec
+    fi
+
+    return $RET
 }
 
 # Most modules are standard, so we can use a single function

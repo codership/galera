@@ -24,8 +24,6 @@ test -x $MYSQLD
 MYSQLINIT=mysql
 if [ -f "/etc/default/${MYSQLINIT=mysql}" ]; then
     . /etc/default/${MYSQLINIT=mysql}
-else
-    ${WSREP_CLUSTER_ADDRESS:=gcomm://}
 fi
 
 . /lib/lsb/init-functions
@@ -120,16 +118,16 @@ case "${1:-''}" in
 	    test -e /var/run/mysqld || install -m 755 -o mysql -g root -d /var/run/mysqld
 
 	    # Check for additional wsrep options
-	    ${WSREP_OPTS:=""}
-	    ${WSREP_PROVIDER:=""}
-	    ${WSREP_CLUSTER_ADDRESS:=""}
+	    WSREP_OPTS=${WSREP_OPTS:-""}
+	    WSREP_PROVIDER=${WSREP_PROVIDER:-""}
+	    WSREP_CLUSTER_ADDRESS=${WSREP_CLUSTER_ADDRESS:-""}
 	    test -n "$WSREP_PROVIDER" && \
 	    WSREP_OPTS="$WSREP_OPTS --wsrep_provider=$WSREP_PROVIDER"
 	    test -n "$WSREP_CLUSTER_ADDRESS" && \
 	    WSREP_OPTS="$WSREP_OPTS --wsrep_cluster_address=$WSREP_CLUSTER_ADDRESS"
 
 	    # Start MySQL! 
-  	    /usr/bin/mysqld_safe $WSREP_OPTS > /dev/null 2>&1 &
+	    /usr/bin/mysqld_safe $WSREP_OPTS > /dev/null 2>&1 &
 
 	    # 6s was reported in #352070 to be too few when using ndbcluster
 	    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14; do
