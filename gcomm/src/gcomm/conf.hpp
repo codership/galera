@@ -115,8 +115,6 @@ namespace gcomm
         
         
         /*!
-         * EVS scheme for Transport URI.
-         *
          * @brief EVS scheme for transport URI ("evs")
          */
         static std::string const EvsScheme;

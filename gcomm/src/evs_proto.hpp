@@ -245,7 +245,6 @@ public:
     void reset_timers();
     gu::datetime::Date handle_timers();
 
-
     /*!
      * @brief Flags controlling what debug information is logged if 
      *        debug logging is turned on.

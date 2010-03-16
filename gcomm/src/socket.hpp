@@ -49,7 +49,14 @@ public:
 
     void close() 
     { 
-        socket->close(); 
+        if (socket != 0)
+        {
+            socket->close(); 
+        }
+        else
+        {
+            log_debug << "closing unopened socket";
+        }
         delete socket;
         socket = 0;
     }
