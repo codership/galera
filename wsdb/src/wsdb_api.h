@@ -471,6 +471,8 @@ int wsdb_assign_trx_applier(
   */
 void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info);
 
+void wsdb_get_trx_info(trx_seqno_t trx_seqno, wsdb_trx_info_t* info);
+
  /*!
   * @brief returns the seqno of latest trx, which has committed,
   * Also increments use count of last_committed

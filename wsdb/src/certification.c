@@ -653,6 +653,11 @@ int wsdb_cert_close() {
     return WSDB_OK;
 }
 
+void wsdb_get_trx_info(trx_seqno_t trx_seqno, wsdb_trx_info_t* info)
+{
+    abort();
+}
+
 /* @todo: this function seems to be obsolete */
 int wsdb_delete_global_trx(trx_seqno_t trx_seqno) 
 {

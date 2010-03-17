@@ -1560,7 +1560,7 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
         //falling through, we have valid seqno now
 
     default:
-        if (victim.seqno_l < bf_seqno) {
+        if (victim.ws->trx_seqno < bf_seqno) {
             gu_debug("trying to interrupt earlier trx:  %lld - %lld", 
                      victim.seqno_l, bf_seqno);
             ret_code = WSREP_WARNING;
@@ -1625,13 +1625,15 @@ static enum wsrep_status mm_galera_abort_slave_trx(
                  victim_seqno, bf_seqno);
         ret_code = WSREP_WARNING;
     } else {
-        gu_debug("interrupting trx commit: seqno %lld", 
-                 victim_seqno);
-
-        rcode = gu_to_interrupt(cert_queue, victim_seqno);
+        wsdb_trx_info_t victim;
+        wsdb_get_trx_info(victim_seqno, &victim);
+        gu_debug("interrupting trx commit: seqno_g %lld seqno_l %lld", 
+                 victim_seqno, victim.seqno_l);
+        
+        rcode = gu_to_interrupt(cert_queue, victim.seqno_l);
         if (rcode) {
             gu_debug("BF trx interupt fail in cert_queue: %d", rcode);
-            rcode = gu_to_interrupt(commit_queue, victim_seqno);
+            rcode = gu_to_interrupt(commit_queue, victim.seqno_l);
             if (rcode) {
                 gu_warn("BF trx interrupt fail in commit_queue: %d", rcode);
                 ret_code = WSREP_WARNING;
