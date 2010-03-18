@@ -802,6 +802,21 @@ START_TEST(test_net_consumer_nto1)
 }
 END_TEST
 
+
+START_TEST(trac_288)
+{
+    try
+    {
+        string url("tcp://do-not-resolve:0");
+        (void)resolve(url);
+    }
+    catch (Exception& e)
+    {
+        log_debug << "exception was " << e.what();
+    }
+}
+END_TEST
+
 Suite* gu_net_suite()
 {
     Suite* s = suite_create("galerautils++ Networking");
@@ -858,6 +873,10 @@ Suite* gu_net_suite()
     tc = tcase_create("test_net_consumer_nto1");
     tcase_add_test(tc, test_net_consumer_nto1);
     tcase_set_timeout(tc, 10);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("trac_288");
+    tcase_add_test(tc, trac_288);
     suite_add_tcase(s, tc);
 
     return s;
