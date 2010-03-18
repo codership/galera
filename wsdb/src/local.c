@@ -36,6 +36,7 @@ struct trx_info {
     wsdb_trx_info_t info;
     cache_id_t      first_block;
     cache_id_t      last_block;
+    size_t          query_count;
 };
 #define IDENT_trx_info 'X'
 
@@ -320,6 +321,7 @@ static struct trx_info *new_trx_info(local_trxid_t trx_id) {
     trx->info.applier_ctx = 0;
     trx->info.position    = WSDB_TRX_POS_VOID;
     trx->info.state       = WSDB_TRX_VOID;
+    trx->query_count      = 0;
 
     GU_DBUG_PRINT("wsdb", ("created new trx: %llu", trx_id));
 
@@ -430,6 +432,11 @@ int wsdb_append_query(
     if (!trx) {
         trx = new_trx_info(trx_id);
     }
+    else if (trx->query_count == QUERY_LIMIT)
+    {
+        gu_warn("wsdb: trx %lld exceeded max query count", trx_id);
+        GU_DBUG_RETURN(WSDB_ERR_TOO_MANY_QUERIES);
+    }
     GU_DBUG_PRINT("wsdb",("query for trx: %llu : %s", trx_id, query));
 
     if (!query) {
@@ -445,6 +452,7 @@ int wsdb_append_query(
     append_in_trx_block(trx, &bi, (uint16_t)4, (char *)&timeval);
     append_in_trx_block(trx, &bi, (uint16_t)4, (char *)&randseed);
     close_trx_block_access(trx, &bi);
+    trx->query_count++;
     GU_DBUG_RETURN(WSDB_OK);
 }
 

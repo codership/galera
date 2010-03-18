@@ -1870,7 +1870,8 @@ static enum wsrep_status mm_galera_pre_commit(
     }
 
     /* avoid sending empty write sets */
-    if (ws->query_count == 0) {
+    if (ws->query_count == 0 && ws->item_count == 0 && ws->rbr_buf_len == 0) {
+        gu_mutex_unlock(&commit_mtx);
         gu_warn("empty write set for: %llu", trx_id);
         GU_DBUG_RETURN(WSREP_OK);
     }
@@ -2087,7 +2088,8 @@ static enum wsrep_status mm_galera_append_query(
 ) {
 
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
-
+    if (gu_likely(galera_opts.append_queries == false)) return WSREP_OK; 
+    
     errno = 0;
 
     switch (wsdb_append_query(trx_id, (char*)query, timeval, randseed)) {
