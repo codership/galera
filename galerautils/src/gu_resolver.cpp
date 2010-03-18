@@ -464,9 +464,11 @@ gu::net::Addrinfo gu::net::resolve(const URI& uri)
         int err;
         addrinfo* ai(0);
         if ((err = getaddrinfo(host.c_str(), uri.get_port().c_str(),
-                               SchemeMap::get_addrinfo(i), &ai)) == -1)
+                               SchemeMap::get_addrinfo(i), &ai)) != 0)
         {
-            gu_throw_error(errno) << "getaddrinfo failed for: " << uri.to_string();
+            gu_throw_error(errno) 
+                << "getaddrinfo failed with error code " 
+                << err << " for " << uri.to_string();
         }
         // Assume that the first entry is ok
         Addrinfo ret(*ai);

@@ -851,6 +851,7 @@ START_TEST(test_net_consumer_nto1)
 }
 END_TEST
 
+
 START_TEST(test_multicast)
 {
     string maddr("[ff30::8000:1]");
@@ -885,6 +886,22 @@ START_TEST(test_multicast)
 }
 
 END_TEST
+
+
+START_TEST(trac_288)
+{
+    try
+    {
+        string url("tcp://do-not-resolve:0");
+        (void)resolve(url);
+    }
+    catch (Exception& e)
+    {
+        log_debug << "exception was " << e.what();
+    }
+}
+END_TEST
+
 
 static bool enable_test_multicast(false);
 
@@ -954,6 +971,10 @@ Suite* gu_net_suite()
         tcase_add_test(tc, test_multicast);
         suite_add_tcase(s, tc);
     }
+
+    tc = tcase_create("trac_288");
+    tcase_add_test(tc, trac_288);
+    suite_add_tcase(s, tc);
 
     return s;
 }
