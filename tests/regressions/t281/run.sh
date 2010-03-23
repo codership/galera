@@ -26,7 +26,7 @@ pause 20 1
 
 signal_node CONT 1
 
-pause 5
+pause 5 1
 
 status=$(get_status 1 "wsrep_cluster_status");
 ready=$(get_status 1 "wsrep_ready");
