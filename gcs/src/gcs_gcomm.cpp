@@ -163,7 +163,7 @@ public:
     
     ~GCommConn()
     {
-        delete tp;
+
     }
     
     const UUID& get_uuid() const { return tp->get_uuid(); }
@@ -177,24 +177,23 @@ public:
     void connect(const string& channel) 
     { 
         char delim(uri_base.find_first_of('?') == string::npos ? '?' : '&');
-
-
+        
         tp = Transport::create(net, uri_base + delim + "gmcast.group=" + channel);
         gcomm::connect(tp, this);
-
+        
         URI uri(uri_base);
         string host("");
         string port("");
         try { host = uri.get_host(); } catch (NotSet&) { }
         try { port = uri.get_port(); } catch (NotSet&) { }
         string peer(host != "" ? host + ":" + port : "");
-
+        
         log_info << "gcomm: connecting to group '" << channel 
                  << "', peer '" << peer << "'";
         tp->connect();
         
         int err;
-
+        
         if ((err = pthread_create(&thd, 0, &run_fn, this)) != 0)
         {
             gu_throw_error(err);
@@ -210,6 +209,10 @@ public:
         pthread_join(thd, 0);
         log_info << "gcomm: closing backend";
         tp->close();
+
+        gcomm::disconnect(tp, this);
+        delete tp;
+        tp = 0;
         
         const Message* msg;
         
@@ -219,11 +222,6 @@ public:
         }
         log_info << "gcomm: closed";
         log_debug << prof;
-    }
-
-    void destroy()
-    {
-        gcomm::disconnect(tp, this);
     }
 
     void run();
@@ -619,7 +617,6 @@ static GCS_BACKEND_DESTROY_FN(gcs_gcomm_destroy)
     GCommConn* conn(ref.get());
     try
     {
-        conn->destroy();
         delete conn;
     }
     catch (Exception& e)
