@@ -1571,10 +1571,16 @@ void gcomm::evs::Proto::handle_up(int cid,
         }
         else
         {
-            log_fatal << "exception caused by message: " << msg;
+            log_fatal << " exception caused by message: " << msg;
             log_fatal << " state after handling message: " << *this;
             throw;
         }
+    }
+    catch (...)
+    {
+        log_fatal << "unexpected exception caused by message: " << msg;
+        log_fatal << " state after handling message: " << *this;
+        throw;
     }
 }
 
