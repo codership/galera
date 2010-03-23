@@ -78,20 +78,30 @@ START_TEST(test_str_table)
     size_t i;
     
     str = gu_str_table_set_name(str, &off, name);
+    fail_unless(strcmp(gu_str_table_get_name(str), name) == 0);
+
     str = gu_str_table_set_n_cols(str, &off, n_cols);
+    fail_unless(gu_str_table_get_n_cols(str) == n_cols);
+
     str = gu_str_table_set_n_rows(str, &off, n_rows);
+    fail_unless(gu_str_table_get_n_rows(str) == n_rows);
+    
     str = gu_str_table_set_cols(str, &off, n_cols, col_names);
     
     for (i = 0; i < n_rows; ++i)
     {
         str = gu_str_table_append_row(str, &off, n_cols, row);
     }
-    
-    fail_unless(strcmp(gu_str_table_get_name(str), name) == 0);
-    fail_unless(gu_str_table_get_n_cols(str) == n_cols);
-    fail_unless(gu_str_table_get_n_rows(str) == n_rows);
-    
-    gu_str_table_print(stderr, str);
+
+    mark_point();
+
+    FILE* tmp = fopen("/dev/null", "w");
+    fail_if (NULL == tmp);
+
+    gu_str_table_print(tmp, str);
+
+    fclose(tmp);
+
     free(str);
 }
 END_TEST

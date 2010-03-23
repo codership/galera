@@ -18,7 +18,7 @@ static inline char* gu_str_append(char* str, size_t* off,
     tmp = realloc(str, *off + app_len + 1);
     if (tmp != NULL)
     {
-        strcpy(tmp + *off, app);
+        memcpy(tmp + *off, app, app_len + 1);
         *off += app_len + 1;
     }
     return tmp;
