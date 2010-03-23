@@ -137,6 +137,7 @@ class GCommConn : public Consumer, public Toplay
 public:
 
     GCommConn(const string& uri_base_) :
+        uuid(),
         thd(),
         uri_base("pc://" + uri_base_),
         use_prod_cons(false),
@@ -165,7 +166,7 @@ public:
 
     }
     
-    const UUID& get_uuid() const { return tp->get_uuid(); }
+    const UUID& get_uuid() const { return uuid; }
     
     static void* run_fn(void* arg)
     {
@@ -175,6 +176,11 @@ public:
     
     void connect(const string& channel) 
     { 
+        if (tp != 0)
+        {
+            gu_throw_fatal << "backend connection already open";
+        }
+        
         char delim(uri_base.find_first_of('?') == string::npos ? '?' : '&');
         
         tp = Transport::create(net, uri_base + delim + "gmcast.group=" + channel);
@@ -190,6 +196,7 @@ public:
         log_info << "gcomm: connecting to group '" << channel 
                  << "', peer '" << peer << "'";
         tp->connect();
+        uuid = tp->get_uuid();
         
         int err;
         
@@ -202,6 +209,11 @@ public:
     
     void close() 
     { 
+        if (tp == 0)
+        {
+            log_warn << "gcomm: backend already closed";
+            return;
+        }
         log_info << "gcomm: terminating thread";
         terminate();
         log_info << "gcomm: joining thread";
@@ -289,6 +301,7 @@ private:
     
     void unref() { }
     
+    UUID uuid;
     pthread_t thd;
     string uri_base;
     bool use_prod_cons;
