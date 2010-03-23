@@ -162,7 +162,6 @@ static void
 group_go_non_primary (gcs_group_t* group)
 {
     if (GCS_GROUP_PRIMARY == group->state) {
-        group->prim_state = group->nodes[group->my_idx].status;
         group->nodes[group->my_idx].status = GCS_STATE_NON_PRIM;
         //@todo: Perhaps the same has to be applied to the rest of the nodes[]?
     }
@@ -215,8 +214,6 @@ group_post_state_exchange (gcs_group_t* group)
             }
 
             group->prim_uuid  = group->state_uuid;
-            group->prim_state = group->nodes[group->my_idx].status;
-
             group->state_uuid = GU_UUID_NIL;
         }
         else {
@@ -288,6 +285,13 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                       gcs_comp_msg_num (comp));
             assert(0);
             return -ENOMEM;
+        }
+
+        if (GCS_GROUP_PRIMARY == group->state) {
+            gu_debug ("#281: Saving %s over %s",
+                      gcs_state_node_str[group->nodes[group->my_idx].status],
+                      gcs_state_node_str[group->prim_state]);
+            group->prim_state = group->nodes[group->my_idx].status;
         }
     }
     else {

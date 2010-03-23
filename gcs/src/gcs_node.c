@@ -112,32 +112,31 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
 
         // TODO: what to do when quorum.proto is not supported by this node?
 
-        if (gu_uuid_compare (node_group_uuid, quorum_group_uuid)) {
-            // node joins completely different group, clear all status
-            node->status = GCS_STATE_PRIM;
-        }
-        else {
+        if (!gu_uuid_compare (node_group_uuid, quorum_group_uuid)) {
             // node was a part of this group
-            gcs_seqno_t node_act_id  = gcs_state_act_id (node->state_msg);
+            gcs_seqno_t node_act_id = gcs_state_act_id (node->state_msg);
  
-            if (GCS_STATE_PRIM <  node->status &&
-                node_act_id    != quorum->act_id) {
+            if (node_act_id == quorum->act_id) {
+                if (GCS_STATE_PRIM >= node->status) {
+                    // the node already has all the state, so it is at least:
+                    node->status = GCS_STATE_JOINED;
+                    gu_debug ("#281 Setting %s status to %s",
+                             node->name, gcs_state_node_str[node->status]);
+                }
+                else  {
+                    // Keep old node status
+                    gu_debug ("#281 Keeping old status for %s: %s",
+                             node->name, gcs_state_node_str[node->status]);
+                }
+            }
+            else {
                 // gap in sequence numbers, needs a snapshot, demote status
                 node->status = GCS_STATE_PRIM;
             }
-            else if (node_act_id    == quorum->act_id) {
-                if (GCS_STATE_NON_PRIM == gcs_state_prim_state(node->state_msg))
-                {
-                    // First PC for the node and it already has all the state
-                    node->status = GCS_STATE_JOINED;
-                }
-            }
-
-
-            if (GCS_STATE_PRIM > node->status) {
-                // node must be at least GCS_STATE_PRIM (duplication?)
-                node->status = GCS_STATE_PRIM;
-            }
+        }
+        else {
+            // node joins completely different group, clear all status
+            node->status = GCS_STATE_PRIM;
         }
     }
     else {
