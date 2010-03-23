@@ -1460,9 +1460,10 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
 
 void gcomm::evs::Proto::handle_foreign(const Message& msg)
 {
-    if (msg.get_type() == Message::T_LEAVE)
+    // - no need to handle foreign LEAVE message
+    // - don't handle foreing messages while installing new view
+    if (msg.get_type() == Message::T_LEAVE || install_message != 0)
     {
-        // No need to handle foreign LEAVE message
         return;
     }
     
