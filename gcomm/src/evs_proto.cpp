@@ -507,6 +507,7 @@ Date gcomm::evs::Proto::handle_timers()
 void gcomm::evs::Proto::check_inactive()
 {
     bool has_inactive(false);
+    size_t n_suspected(0);
     for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
     {
         const UUID& uuid(NodeMap::get_key(i));
@@ -527,7 +528,25 @@ void gcomm::evs::Proto::check_inactive()
             {
                 set_inactive(uuid);
             }
+            if (node.is_suspected() == true)
+            {
+                ++n_suspected;
+            }
             has_inactive = true;
+        }
+    }
+    
+    // All other nodes are under suspicion, set all others as inactive.
+    // This will speed up recovery when this node has been isolated from
+    // other group.
+    if (n_suspected + 1 == known.size())
+    {
+        for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
+        {
+            if (NodeMap::get_key(i) != get_uuid())
+            {
+                set_inactive(NodeMap::get_key(i));
+            }
         }
     }
     
@@ -2894,6 +2913,8 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         log_warn << self_string() 
                  << " source " << msg.get_source()
                  << " is not supposed to be representative";
+        // Isolate node from my group
+        set_inactive(msg.get_source());
         profile_enter(shift_to_prof);
         gu_trace(shift_to(S_RECOVERY));
         profile_leave(shift_to_prof);
