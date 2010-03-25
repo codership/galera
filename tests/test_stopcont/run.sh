@@ -45,7 +45,7 @@ cycle()
     echo "Signaling node $node_id with STOP... "
     signal_node STOP $node
 
-    pause 10 20
+    pause 3 20
 
     echo "Signaling node $node_id with CONT..."
     signal_node CONT $node
