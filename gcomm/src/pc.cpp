@@ -118,9 +118,11 @@ void PC::connect()
     }
     
     log_debug << "PC/EVS Proto initial state: " << *evs;
-    log_debug << "PC/EVS Proto sending join request";
-    
-    evs->send_join();
+    if (evs->get_state() != evs::Proto::S_OPERATIONAL)
+    {
+        log_debug << "PC/EVS Proto sending join request";
+        evs->send_join();
+    }
     gcomm_assert(evs->get_state() == evs::Proto::S_RECOVERY ||
                  evs->get_state() == evs::Proto::S_OPERATIONAL);
     

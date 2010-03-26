@@ -268,6 +268,21 @@ bool gcomm::evs::Proto::is_msg_from_previous_view(const Message& msg)
             return true;
         }
     }
+
+    // If node is in current view, check message source view seq, if it is 
+    // smaller than current view seq then the message is also from some
+    // previous (but unknown to us) view
+    NodeList::const_iterator ni(current_view.get_members().find(msg.get_source()));
+    if (ni != current_view.get_members().end())
+    {
+        if (msg.get_source_view_id().get_seq() < 
+            current_view.get_id().get_seq())
+        {
+            log_warn << "stale message from unknown origin " << msg;
+            return true;
+        }
+    }
+
     return false;
 }
 
@@ -507,6 +522,7 @@ Date gcomm::evs::Proto::handle_timers()
 void gcomm::evs::Proto::check_inactive()
 {
     bool has_inactive(false);
+    size_t n_suspected(0);
     for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
     {
         const UUID& uuid(NodeMap::get_key(i));
@@ -527,7 +543,25 @@ void gcomm::evs::Proto::check_inactive()
             {
                 set_inactive(uuid);
             }
+            if (node.is_suspected() == true)
+            {
+                ++n_suspected;
+            }
             has_inactive = true;
+        }
+    }
+    
+    // All other nodes are under suspicion, set all others as inactive.
+    // This will speed up recovery when this node has been isolated from
+    // other group.
+    if (n_suspected + 1 == known.size())
+    {
+        for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
+        {
+            if (NodeMap::get_key(i) != get_uuid())
+            {
+                set_inactive(NodeMap::get_key(i));
+            }
         }
     }
     
@@ -651,8 +685,8 @@ void gcomm::evs::Proto::deliver_reg_view()
         }
     }
     
-    evs_log_info(I_VIEWS) << "delivering view " << view;
-    
+    evs_log_info(I_VIEWS) << "delivering view " << view;    
+
     ProtoUpMeta up_meta(UUID::nil(), ViewId(), &view);
     send_up(Datagram(), up_meta);
 }
@@ -1182,7 +1216,6 @@ void gcomm::evs::Proto::send_join(bool handle)
 {
     assert(output.empty() == true);
     
-    
     JoinMessage jm(create_join());
     
     Buffer buf;
@@ -1484,7 +1517,7 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
     if (get_state() == S_JOINING || get_state() == S_RECOVERY || 
         get_state() == S_OPERATIONAL)
     {
-        evs_log_debug(D_STATE) << " shift to RECOVERY due to foreign message";
+        evs_log_info(I_STATE) << " shift to RECOVERY due to foreign message";
         gu_trace(shift_to(S_RECOVERY, false));
     }
     
@@ -1570,9 +1603,9 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
             is_msg_from_previous_view(msg) == false     &&
             get_state()                    != S_LEAVING)
         {
-            log_info << self_string() 
-                     << " detected new view from operational source: " 
-                     << msg.get_source_view_id();
+            evs_log_info(I_STATE) 
+                << " detected new view from operational source: " 
+                << msg.get_source_view_id();
             set_inactive(msg.get_source());
             gu_trace(shift_to(S_RECOVERY, true));
         }
@@ -1899,6 +1932,13 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             {
                 NodeMap::get_value(i).set_index(numeric_limits<size_t>::max());
             }
+        }
+        
+        if (previous_view.get_id().get_type() == V_REG && 
+            previous_view.get_members() == current_view.get_members())
+        {
+            log_warn << "subsequencent views have same members, prev view "
+                     << previous_view << " current view " << current_view;
         }
         
         input_map->reset(current_view.get_members().size());
@@ -2254,6 +2294,9 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                 else 
                 {
                     profile_enter(shift_to_prof);
+                    evs_log_info(I_STATE) 
+                        << " shift to RECOVERY, no consensus after "
+                        << "handling user message from new view";
                     gu_trace(shift_to(S_RECOVERY));
                     profile_leave(shift_to_prof);
                     return;
@@ -2745,11 +2788,18 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         }
         else
         {
+            evs_log_info(I_STATE) 
+                << "shift to RECOVERY, install message is "
+                << "inconsistent when handling join from "
+                << msg.get_source() << " " << msg.get_source_view_id();
             gu_trace(shift_to(S_RECOVERY, false));
         }
     }
     else if (get_state() != S_RECOVERY)
     {
+        evs_log_info(I_STATE) 
+            << " shift to RECOVERY while handling join message from " 
+            << msg.get_source() << " " << msg.get_source_view_id();
         gu_trace(shift_to(S_RECOVERY, false));
     }
 
@@ -2921,6 +2971,9 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
         if (get_state() == S_OPERATIONAL)
         {
             profile_enter(shift_to_prof);
+            evs_log_info(I_STATE) 
+                << " shift to RECOVERY when handling leave from "
+                << msg.get_source() << " " << msg.get_source_view_id();
             gu_trace(shift_to(S_RECOVERY, true));
             profile_leave(shift_to_prof);
         }
@@ -3018,6 +3071,8 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         log_warn << self_string() 
                  << " source " << msg.get_source()
                  << " is not supposed to be representative";
+        // Isolate node from my group
+        set_inactive(msg.get_source());
         profile_enter(shift_to_prof);
         gu_trace(shift_to(S_RECOVERY));
         profile_leave(shift_to_prof);
@@ -3064,7 +3119,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     }
     else
     {
-        evs_log_debug(D_INSTALL_MSGS)
+        evs_log_debug(D_INSTALL_MSGS) 
             << "install message " << msg 
             << " not consistent with state " << *this;
         profile_enter(shift_to_prof);

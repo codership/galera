@@ -75,7 +75,7 @@ namespace gcomm
         
         bool operator==(const ViewId& cmp) const
         {
-            return (uuid == cmp.uuid && seq == cmp.seq && type == cmp.type);
+            return (seq == cmp.seq && type == cmp.type && uuid == cmp.uuid);
         }
         
         bool operator!=(const ViewId& cmp) const
