@@ -65,8 +65,9 @@ do
 
     cycle $node
 
-    pause 20 20
+    pause 20 5
     consistency_check $sqlgen_pid
+    pause 5
 
     node=$(( ( node + 1 ) % node_num ))
 done
