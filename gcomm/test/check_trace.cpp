@@ -295,13 +295,16 @@ static void check_traces(const Trace& t1, const Trace& t2)
             // @todo Proper checks for PRIM and NON_PRIM
             if (j             != t2.get_view_traces().end() && 
                 j_next        != t2.get_view_traces().end() &&
-                i_next->first == j_next->first          )
+                i_next->first == j_next->first              &&
+                i_next->second.get_view().get_members() ==
+                j_next->second.get_view().get_members())
             {
                 if (i->first.get_type() != V_NON_PRIM &&
                     i->first.get_type() != V_PRIM)
                 {
-                    gcomm_assert(*i == *j) << 
-                        "traces differ: " << *i << " != " << *j;
+                    gcomm_assert(*i == *j) 
+                        << "traces differ: \n\n" << *i << "\n\n" << *j << "\n\n"
+                        << "next views: \n\n" << *i_next << "\n\n" << *j_next;
                 }
                 else
                 {
