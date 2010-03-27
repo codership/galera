@@ -709,11 +709,11 @@ core_handle_uuid_msg (gcs_core_t*     core,
         case GCS_GROUP_WAIT_STATE_MSG:
             // Need to send state message for state exchange
             {
-                gcs_state_t* state = gcs_group_get_state (group);
+                gcs_state_msg_t* state = gcs_group_get_state (group);
                 if (state) {
                     size_t           state_len = gcs_state_msg_len (state);
                     uint8_t          state_buf[state_len];
-                    const gu_uuid_t* state_uuid = gcs_state_uuid (state);
+                    const gu_uuid_t* state_uuid = gcs_state_msg_uuid (state);
 
                     gcs_state_msg_write (state_buf, state);
                     ret = core_msg_send_retry (core,
@@ -731,7 +731,7 @@ core_handle_uuid_msg (gcs_core_t*     core,
                                  ": %d (%s)",
                                  GU_UUID_ARGS(state_uuid), ret, strerror(-ret));
                     }
-                    gcs_state_destroy (state);
+                    gcs_state_msg_destroy (state);
                 }
                 else {
                     gu_fatal ("Failed to allocate state object.");

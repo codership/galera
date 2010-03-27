@@ -34,7 +34,8 @@ gcs_tests_SOURCES =           \
 	gcs_core_test.h       \
 	../gcs_core.c         \
 	../gcs_dummy.c        \
-	../gcs_msg_type.c
+	../gcs_msg_type.c     \
+	../gcs.c
 
 # For gcs_core_test
 gcs_tests_CPPFLAGS = @AM_CPPFLAGS@ -I.. -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING

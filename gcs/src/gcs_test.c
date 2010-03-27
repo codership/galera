@@ -448,7 +448,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     //       so for simplicity, just check conf_id.
     while (-EAGAIN == (ret = gu_to_grab (to, thread->local_act_id)));
     if (0 == ret) {
-        if (conf->st_required) {
+        if (conf->my_state == GCS_NODE_STATE_PRIM) {
             gcs_seqno_t seqno, s;
             fprintf (stdout, "Gap in configurations: ours: %lld, group: %lld.\n",
                      (long long)conf_id, (long long)conf->conf_id);

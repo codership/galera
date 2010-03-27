@@ -22,6 +22,24 @@
 #include "gcs_core.h"
 #include "gcs_fifo_lite.h"
 
+const char* gcs_node_state_to_str (gcs_node_state_t state)
+{
+    static const char* str[GCS_NODE_STATE_MAX + 1] =
+    {
+        "NON-PRIMARY",
+        "PRIMARY",
+        "JOINER",
+        "DONOR",
+        "JOINED",
+        "SYNCED",
+        "UNKNOWN"
+    };
+
+    if (state < GCS_NODE_STATE_MAX) return str[state];
+
+    return str[GCS_NODE_STATE_MAX];
+}
+
 const char* gcs_act_type_to_str (gcs_act_type_t type)
 {
     static const char* str[GCS_ACT_UNKNOWN + 1] =
@@ -30,7 +48,7 @@ const char* gcs_act_type_to_str (gcs_act_type_t type)
         "JOIN", "SYNC", "FLOW", "SERVICE", "ERROR", "UNKNOWN"
     };
 
-    if (((unsigned long)type) < GCS_ACT_UNKNOWN) return str[type];
+    if (type < GCS_ACT_UNKNOWN) return str[type];
 
     return str[GCS_ACT_UNKNOWN];
 }
@@ -393,7 +411,7 @@ gcs_shift_state (gcs_conn_t*      conn,
     static const bool allowed [GCS_CONN_STATE_MAX][GCS_CONN_STATE_MAX] = {
        // SYNCED JOINED DONOR  JOINER PRIM   OPEN   CLOSED DESTR
         { false, true,  false, false, false, false, false, false }, // SYNCED
-        { false, false, true,  true,  true,  false, false, false }, // JOINED
+        { false, false, true,  true,  false, false, false, false }, // JOINED
         { true,  true,  false, false, false, false, false, false }, // DONOR
         { false, false, false, false, true,  false, false, false }, // JOINER
         { true,  true,  true,  true,  false, true,  false, false }, // PRIMARY
@@ -539,21 +557,19 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         }
         else {
             gu_info ("Received NON-PRIMARY.");
+            assert (GCS_NODE_STATE_NON_PRIM == conf->my_state);
             gcs_become_open (conn);
             conn->global_seqno = conf->seqno;
         }
 
         return;
     }
-    else {
-        conn->global_seqno = conf->seqno;
-        if (GCS_CONN_OPEN == conn->state) {
-            gcs_shift_state (conn, GCS_CONN_PRIMARY);
-        }
-    }
 
+    assert (conf->conf_id  >= 0);
+
+    /* <sanity_checks> */
     if (conf->memb_num < 1) {
-        gu_fatal ("Internal error: PRIM configuration with %d nodes",
+        gu_fatal ("Internal error: PRIMARY configuration with %d nodes",
                   conf->memb_num);
         abort();
     }
@@ -564,12 +580,33 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         abort();
     }
 
-    if (conf->st_required) {
-        gcs_become_primary (conn);
+    if (conf->my_state < GCS_NODE_STATE_PRIM) {
+        gu_fatal ("Internal error: NON-PRIM node state in PRIM configuraiton");
+        abort();
     }
-    else if (GCS_CONN_PRIMARY == conn->state) {
-        gu_info ("No state transfer required. Initializing JOINED state.");
-        gcs_shift_state (conn, GCS_CONN_JOINED);
+    /* </sanity_checks> */
+
+    conn->global_seqno = conf->seqno;
+
+    const gcs_conn_state_t old_state = conn->state;
+    switch (conf->my_state) {
+    case GCS_NODE_STATE_PRIM:   gcs_become_primary(conn);      return;
+        /* Below are not real state transitions, rather state recovery, 
+         * so bypassing state transition matrix */
+    case GCS_NODE_STATE_JOINER: conn->state = GCS_CONN_JOINER; break;
+    case GCS_NODE_STATE_DONOR:  conn->state = GCS_CONN_DONOR;  break;
+    case GCS_NODE_STATE_JOINED: conn->state = GCS_CONN_JOINED; break;
+    case GCS_NODE_STATE_SYNCED: conn->state = GCS_CONN_SYNCED; break;
+    default:
+        gu_fatal ("Internal error: unrecognized node state: %d",
+                  conf->my_state);
+        abort();
+    }
+
+    if (old_state != conn->state) {
+        gu_info ("Restored state %s -> %s (%lld)",
+                 gcs_conn_state_str[old_state], gcs_conn_state_str[conn->state],
+                 conn->global_seqno);
     }
 
     /* One of the cases when the node can become SYNCED */

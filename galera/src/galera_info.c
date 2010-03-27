@@ -10,7 +10,8 @@ view_info_size (int members)
 }
 
 /* create view info out of configuration message */
-wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf)
+wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf,
+                                            bool                  st_required)
 {
     wsrep_view_info_t* ret = malloc(view_info_size(conf->memb_num));
 
@@ -24,7 +25,7 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf)
                          (conf->seqno + 1) : WSREP_SEQNO_UNDEFINED;
         ret->status    = conf->conf_id != -1 ?
                          WSREP_VIEW_PRIMARY : WSREP_VIEW_NON_PRIMARY;
-        ret->state_gap = conf->st_required;
+        ret->state_gap = st_required;
         ret->my_idx    = conf->my_idx;
         ret->memb_num  = conf->memb_num;
 
