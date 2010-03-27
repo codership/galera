@@ -20,7 +20,7 @@ gcs_node_init (gcs_node_t* node,
 
     memset (node, 0, sizeof (gcs_node_t));
     strncpy ((char*)node->id, id, sizeof(node->id) - 1);
-    node->status    = GCS_STATE_NON_PRIM;
+    node->status    = GCS_NODE_STATE_NON_PRIM;
     node->name      = strdup (name     ? name     : NODE_NO_NAME);
     node->inc_addr  = strdup (inc_addr ? inc_addr : NODE_NO_ADDR);
     node->proto_min = GCS_ACT_PROTO_MIN;
@@ -35,7 +35,10 @@ gcs_node_move (gcs_node_t* dst, gcs_node_t* src)
 {
     if (dst->name)      free ((char*)dst->name);
     if (dst->inc_addr)  free ((char*)dst->inc_addr);
-    if (dst->state_msg) gcs_state_destroy ((gcs_state_t*)dst->state_msg);
+
+    if (dst->state_msg)
+        gcs_state_msg_destroy ((gcs_state_msg_t*)dst->state_msg);
+
     memcpy (dst, src, sizeof (gcs_node_t));
     gcs_defrag_forget (&src->app);
     gcs_defrag_forget (&src->oob);
@@ -75,17 +78,17 @@ gcs_node_free (gcs_node_t* node)
         node->inc_addr = NULL;
     }
     if (node->state_msg) {
-        gcs_state_destroy ((gcs_state_t*)node->state_msg);
+        gcs_state_msg_destroy ((gcs_state_msg_t*)node->state_msg);
         node->state_msg = NULL;
     }
 }
 
 /*! Record state message from the node */
 void
-gcs_node_record_state (gcs_node_t* node, gcs_state_t* state_msg)
+gcs_node_record_state (gcs_node_t* node, gcs_state_msg_t* state_msg)
 {
     if (node->state_msg) {
-        gcs_state_destroy ((gcs_state_t*)node->state_msg);
+        gcs_state_msg_destroy ((gcs_state_msg_t*)node->state_msg);
     }
     node->state_msg = state_msg;
 
@@ -117,26 +120,30 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
             gcs_seqno_t node_act_id = gcs_state_act_id (node->state_msg);
  
             if (node_act_id == quorum->act_id) {
-                if (GCS_STATE_PRIM >= node->status) {
-                    // the node already has all the state, so it is at least:
-                    node->status = GCS_STATE_JOINED;
-                    gu_debug ("#281 Setting %s status to %s",
-                             node->name, gcs_state_node_str[node->status]);
+                const gcs_node_state_t last_prim_state =
+                    gcs_state_prim_state (node->state_msg);
+                    
+                if (GCS_NODE_STATE_NON_PRIM == last_prim_state) {
+                    // the node just joined, but already is up to date:
+                    node->status = GCS_NODE_STATE_JOINED;
+                    gu_debug ("#281 Setting %s state to %s",
+                              node->name, gcs_node_state_to_str(node->status));
                 }
                 else  {
-                    // Keep old node status
-                    gu_debug ("#281 Keeping old status for %s: %s",
-                             node->name, gcs_state_node_str[node->status]);
+                    // Keep node state from the previous primary comp.
+                    node->status = last_prim_state;
+                    gu_debug ("#281,#298 Carry over last prim state for %s: %s",
+                              node->name, gcs_node_state_to_str(node->status));
                 }
             }
             else {
                 // gap in sequence numbers, needs a snapshot, demote status
-                node->status = GCS_STATE_PRIM;
+                node->status = GCS_NODE_STATE_PRIM;
             }
         }
         else {
             // node joins completely different group, clear all status
-            node->status = GCS_STATE_PRIM;
+            node->status = GCS_NODE_STATE_PRIM;
         }
     }
     else {

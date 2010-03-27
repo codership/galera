@@ -53,7 +53,7 @@ typedef struct gcs_group
     gu_uuid_t       prim_uuid;
     gu_seqno_t      prim_seqno;
     long            prim_num;
-    gcs_state_node_t prim_state;
+    gcs_node_state_t prim_state;
 }
 gcs_group_t;
 
@@ -149,7 +149,7 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
 
         if (gu_likely(GCS_ACT_TORDERED  == rcvd->act.type &&
                       GCS_GROUP_PRIMARY == group->state   &&
-                      group->nodes[sender_idx].status >= GCS_STATE_DONOR &&
+                      group->nodes[sender_idx].status >= GCS_NODE_STATE_DONOR &&
                       !(group->frag_reset && local))) {
             /* Common situation -
              * increment and assign act_id only for totally ordered actions
@@ -165,7 +165,7 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
                 gu_info ("Returning -ERESTART for TORDERED action: group->state"
                          " = %s, sender->status = %s, frag_reset = %s",
                          gcs_group_state_str[group->state],
-                         gcs_state_node_str[group->nodes[sender_idx].status],
+                         gcs_node_state_to_str(group->nodes[sender_idx].status),
                          group->frag_reset ? "true" : "false");
 #endif
             }
@@ -203,7 +203,7 @@ extern ssize_t
 gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act);
 
 /*! Returns state object for state message */
-extern gcs_state_t*
+extern gcs_state_msg_t*
 gcs_group_get_state (gcs_group_t* group);
 
 #endif /* _gcs_group_h_ */

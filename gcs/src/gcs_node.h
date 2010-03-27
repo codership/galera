@@ -27,7 +27,7 @@ struct gcs_node
     gcs_seqno_t        last_applied; // last applied action on that node
 //    long             protocol;     // highest supported protocol
 //    long             queue_len;    // action queue length on that node
-    gcs_state_node_t   status;       // node status
+    gcs_node_state_t   status;       // node status
     gcs_proto_t        proto_min;    // supported protocol versions
     gcs_proto_t        proto_max;    // 
     gcs_defrag_t       app;          // defragmenter for application actions
@@ -42,7 +42,7 @@ struct gcs_node
 
     const char*        name;         // human-given name
     const char*        inc_addr;     // incoming address - for load balancer
-    const gcs_state_t* state_msg;    // state message
+    const gcs_state_msg_t* state_msg;// state message
 };
 typedef struct gcs_node gcs_node_t;
 
@@ -113,7 +113,7 @@ gcs_node_get_last_applied (gcs_node_t* node)
 
 /*! Record state message from the node */
 extern void
-gcs_node_record_state (gcs_node_t* node, gcs_state_t* state);
+gcs_node_record_state (gcs_node_t* node, gcs_state_msg_t* state);
 
 /*! Update node status according to quorum decisions */
 extern void

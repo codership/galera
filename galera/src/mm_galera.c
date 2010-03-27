@@ -1121,34 +1121,42 @@ galera_join()
  * replication. As a result, only application thread knows when and how ST
  * completed and if we need another one. See #163
  */
-static void
-galera_check_st_required (gcs_act_conf_t* conf)
+static bool
+galera_st_required (const gcs_act_conf_t* conf)
 {
-    if (conf->st_required) {
-        gu_uuid_t* conf_uuid = (gu_uuid_t*)conf->group_uuid;
+    bool st_required           = (conf->my_state == GCS_NODE_STATE_PRIM);
+    const gu_uuid_t* conf_uuid = (const gu_uuid_t*)(conf->group_uuid);
+
+    if (st_required) {
 
         assert (conf->conf_id >= 0);
 
         if (!gu_uuid_compare (&status.state_uuid, conf_uuid)) {
             // same history
-            if (GALERA_STAGE_JOINED == status.stage) {
+            if (GALERA_STAGE_JOINED <= status.stage) {
                 // if we took ST already, it may exceed conf->seqno
                 // (ST is asynchronous!)
-                conf->st_required = (status.last_applied < conf->seqno);
+                st_required = (status.last_applied < conf->seqno);
             }
             else {
-                conf->st_required = (status.last_applied != conf->seqno);
+                st_required = (status.last_applied != conf->seqno);
             }
         }
-
-        if (conf->st_required) {
+#if 0 // probably not needed anymore?
+        if (st_required) {
             status.stage = GALERA_STAGE_JOINING;
         }
         else {
             // rewrote conf->st_required, tell GCS about it
             galera_join();
         }
+#endif
     }
+    else {
+        /* some sanity checks */
+    }
+
+    return st_required;
 }
 
 /*!
@@ -1160,8 +1168,9 @@ static long
 galera_handle_configuration (wsrep_t* gh,
                              const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
 {
-    long ret = 0;
+    long ret             = 0;
     gu_uuid_t* conf_uuid = (gu_uuid_t*)conf->group_uuid;
+    bool st_required;
 
     GU_DBUG_ENTER("galera_handle_configuration");
 
@@ -1177,18 +1186,18 @@ galera_handle_configuration (wsrep_t* gh,
     GALERA_GRAB_QUEUE (cert_queue,   conf_seqno);
     GALERA_GRAB_QUEUE (commit_queue, conf_seqno);
 
-    galera_check_st_required ((gcs_act_conf_t*)conf);
+    st_required = galera_st_required (conf);
 
 #ifdef GALERA_WORKAROUND_197
     if (conf->seqno >= 0) wsdb_purge_trxs_upto(conf->seqno);
     wsdb_set_global_trx_committed(conf->seqno);
 #endif
 
-    view_handler_cb (galera_view_info_create (conf));
+    view_handler_cb (galera_view_info_create (conf, st_required));
 
     if (conf->conf_id >= 0) {                // PRIMARY configuration
 
-        if (conf->st_required)
+        if (st_required)
         {
             void*   app_req = NULL;
             ssize_t app_req_len;

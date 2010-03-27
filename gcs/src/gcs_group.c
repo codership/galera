@@ -43,7 +43,7 @@ gcs_group_init (gcs_group_t* group, const char* node_name, const char* inc_addr)
     group->prim_uuid  = GU_UUID_NIL;
     group->prim_seqno = GCS_SEQNO_ILL;
     group->prim_num   = 0;
-    group->prim_state = GCS_STATE_NON_PRIM;
+    group->prim_state = GCS_NODE_STATE_NON_PRIM;
 
     return 0;
 }
@@ -162,7 +162,7 @@ static void
 group_go_non_primary (gcs_group_t* group)
 {
     if (GCS_GROUP_PRIMARY == group->state) {
-        group->nodes[group->my_idx].status = GCS_STATE_NON_PRIM;
+        group->nodes[group->my_idx].status = GCS_NODE_STATE_NON_PRIM;
         //@todo: Perhaps the same has to be applied to the rest of the nodes[]?
     }
 
@@ -175,7 +175,7 @@ group_go_non_primary (gcs_group_t* group)
 static void
 group_post_state_exchange (gcs_group_t* group)
 {
-    const gcs_state_t* states[group->num];
+    const gcs_state_msg_t* states[group->num];
     gcs_state_quorum_t quorum;
     bool new_exchange = gu_uuid_compare (&group->state_uuid, &GU_UUID_NIL);
     long i;
@@ -189,7 +189,8 @@ group_post_state_exchange (gcs_group_t* group)
         states[i] = group->nodes[i].state_msg;
         if (NULL == states[i] ||
             (new_exchange &&
-             gu_uuid_compare (&group->state_uuid, gcs_state_uuid(states[i]))))
+             gu_uuid_compare (&group->state_uuid,
+                              gcs_state_msg_uuid(states[i]))))
             return; // not all states from THIS state exch. received, wait
     }
     gu_debug ("STATE EXCHANGE: "GU_UUID_FORMAT" complete.",
@@ -289,8 +290,8 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
 
         if (GCS_GROUP_PRIMARY == group->state) {
             gu_debug ("#281: Saving %s over %s",
-                      gcs_state_node_str[group->nodes[group->my_idx].status],
-                      gcs_state_node_str[group->prim_state]);
+                      gcs_node_state_to_str(group->nodes[group->my_idx].status),
+                      gcs_node_state_to_str(group->prim_state));
             group->prim_state = group->nodes[group->my_idx].status;
         }
     }
@@ -335,7 +336,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                              GU_UUID_ARGS(&group->group_uuid));
                 }
 
-                group->nodes[0].status = GCS_STATE_JOINED;
+                group->nodes[0].status = GCS_NODE_STATE_JOINED;
                 /* initialize node ID to the one given by the backend - this way
                  * we'll be recognized as coming from prev. conf. in node array
                  * remap below */
@@ -420,7 +421,7 @@ gcs_group_handle_uuid_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     return group->state;
 }
 
-static void group_print_state_debug(gcs_state_t* state)
+static void group_print_state_debug(gcs_state_msg_t* state)
 {
     size_t str_len = 1024;
     char state_str[str_len];
@@ -433,11 +434,11 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 {
     if (GCS_GROUP_WAIT_STATE_MSG == group->state) {
 
-        gcs_state_t* state = gcs_state_msg_read (msg->buf, msg->size);
+        gcs_state_msg_t* state = gcs_state_msg_read (msg->buf, msg->size);
 
         if (state) {
 
-            const gu_uuid_t* state_uuid = gcs_state_uuid (state);
+            const gu_uuid_t* state_uuid = gcs_state_msg_uuid (state);
 
             if (!gu_uuid_compare(&group->state_uuid, state_uuid)) {
 
@@ -460,7 +461,7 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
                 if (gu_log_debug) group_print_state_debug(state);
 
-                gcs_state_destroy (state);
+                gcs_state_msg_destroy (state);
             }
         }
         else {
@@ -516,8 +517,8 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     // TODO: define an explicit type for the join message, like gcs_join_msg_t
     assert (msg->size == sizeof(gcs_seqno_t));
 
-    if (GCS_STATE_DONOR  == sender->status ||
-        GCS_STATE_JOINER == sender->status) {
+    if (GCS_NODE_STATE_DONOR  == sender->status ||
+        GCS_NODE_STATE_JOINER == sender->status) {
         long j;
         gcs_seqno_t seqno     = gcs_seqno_le(*(gcs_seqno_t*)msg->buf);
         gcs_node_t* peer      = NULL;
@@ -527,16 +528,16 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         bool        from_donor = false;
         const char* st_dir    = NULL; // state transfer direction symbol
 
-        if (GCS_STATE_DONOR == sender->status) {
+        if (GCS_NODE_STATE_DONOR == sender->status) {
             peer_id    = sender->joiner;
             from_donor = true;
             st_dir     = "to";
-            sender->status = GCS_STATE_JOINED;
+            sender->status = GCS_NODE_STATE_JOINED;
         }
         else {
             peer_id = sender->donor;
             st_dir  = "from";
-            if (seqno >= 0) sender->status = GCS_STATE_JOINED;
+            if (seqno >= 0) sender->status = GCS_NODE_STATE_JOINED;
         }
 
         // Try to find peer.
@@ -562,7 +563,7 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
                      (int)seqno, strerror((int)-seqno));
 
             if (from_donor && peer_idx == group->my_idx &&
-                GCS_STATE_JOINER == group->nodes[peer_idx].status) {
+                GCS_NODE_STATE_JOINER == group->nodes[peer_idx].status) {
                 // this node will be waiting for SST forever. If it has only
                 // one recv thread there is no (generic) way to wake it up.
                 gu_fatal ("Will never receive state. Need to abort.");
@@ -576,7 +577,7 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         }
     }
     else {
-        if (GCS_STATE_PRIM == sender->status) {
+        if (GCS_NODE_STATE_PRIM == sender->status) {
             gu_warn ("Rejecting JOIN message from %ld (%s): new State Transfer"
                      " required.", sender_idx, sender->name);
         }
@@ -584,7 +585,7 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             // should we freak out and throw an error?
             gu_warn ("Protocol violation. JOIN message sender %ld (%s) is not "
                      "in state transfer (%s). Message ignored.", sender_idx,
-                     sender->name, gcs_state_node_str[sender->status]);
+                     sender->name, gcs_node_state_to_str(sender->status));
         }
         return 0;
     }
@@ -600,9 +601,9 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
     assert (GCS_MSG_SYNC == msg->type);
 
-    if (GCS_STATE_JOINED == sender->status) {
+    if (GCS_NODE_STATE_JOINED == sender->status) {
 
-        sender->status = GCS_STATE_SYNCED;
+        sender->status = GCS_NODE_STATE_SYNCED;
 
         gu_info ("Member %ld (%s) synced with group.",
                  sender_idx, sender->name);
@@ -610,7 +611,7 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         return (sender_idx == group->my_idx);
     }
     else {
-        if (GCS_STATE_SYNCED != sender->status) {
+        if (GCS_NODE_STATE_SYNCED != sender->status) {
             gu_warn ("SYNC message sender from non-joined %ld (%s). Ignored.",
                      msg->sender_idx, sender->name);
         }
@@ -632,7 +633,7 @@ group_find_node_by_name (gcs_group_t* group, long joiner_idx, const char* name)
             if (joiner_idx == idx) {
                 return -EHOSTDOWN;
             }
-            else if (node->status >= GCS_STATE_JOINED) {
+            else if (node->status >= GCS_NODE_STATE_JOINED) {
                 return idx;
             }
             else {
@@ -644,7 +645,7 @@ group_find_node_by_name (gcs_group_t* group, long joiner_idx, const char* name)
 }
 
 static long
-group_find_node_by_status (gcs_group_t* group, gcs_state_node_t status)
+group_find_node_by_status (gcs_group_t* group, gcs_node_state_t status)
 {
     long idx;
     for (idx = 0; idx < group->num; idx++) {
@@ -674,10 +675,10 @@ group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
     }
     else {
         // first, check SYNCED, they can process state request immediately
-        donor_idx = group_find_node_by_status (group, GCS_STATE_SYNCED);
+        donor_idx = group_find_node_by_status (group, GCS_NODE_STATE_SYNCED);
         if (donor_idx < 0) {
             // then check simply JOINED, they have full state
-            donor_idx = group_find_node_by_status (group, GCS_STATE_JOINED);
+            donor_idx = group_find_node_by_status (group,GCS_NODE_STATE_JOINED);
         }
     }
 
@@ -690,11 +691,11 @@ group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
         gu_info ("Node %ld (%s) requested State Transfer from '%s'. "
                  "Selected %ld (%s)(%s) as donor.",
                  joiner_idx, joiner->name, required_donor ? donor_name :"*any*",
-                 donor_idx, donor->name, gcs_state_node_str[donor->status]);
+                 donor_idx, donor->name, gcs_node_state_to_str(donor->status));
 
         // reserve donor, confirm joiner
-        donor->status  = GCS_STATE_DONOR;
-        joiner->status = GCS_STATE_JOINER;
+        donor->status  = GCS_NODE_STATE_DONOR;
+        joiner->status = GCS_NODE_STATE_JOINER;
         memcpy (donor->joiner, joiner->id, GCS_COMP_MEMB_ID_MAX_LEN+1);
         memcpy (joiner->donor, donor->id,  GCS_COMP_MEMB_ID_MAX_LEN+1);
     }
@@ -733,13 +734,13 @@ gcs_group_handle_state_request (gcs_group_t*         group,
     size_t           donor_name_len = strlen(donor_name);
     long             donor_idx      = -1;
     const char*      joiner_name    = group->nodes[joiner_idx].name;
-    gcs_state_node_t joiner_status  = group->nodes[joiner_idx].status;
+    gcs_node_state_t joiner_status  = group->nodes[joiner_idx].status;
 
     assert (GCS_ACT_STATE_REQ == act->act.type);
 
-    if (joiner_status != GCS_STATE_PRIM) {
+    if (joiner_status != GCS_NODE_STATE_PRIM) {
 
-        const char* joiner_status_string = gcs_state_node_str[joiner_status];
+        const char* joiner_status_string = gcs_node_state_to_str(joiner_status);
 
         if (group->my_idx == joiner_idx) {
             gu_error ("Requesting state transfer while in %s. "
@@ -801,8 +802,9 @@ gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act)
 
         if (group->num) {
             assert (conf->my_idx >= 0);
-            conf->st_required = (group->conf_id >= 0) &&
-                (group->nodes[group->my_idx].status < GCS_STATE_JOINER);
+//            conf->st_required = (group->conf_id >= 0) &&
+//                (group->nodes[group->my_idx].status < GCS_NODE_STATE_JOINER);
+            conf->my_state = group->nodes[group->my_idx].status;
 
             for (idx = 0; idx < group->num; idx++)
             {
@@ -814,8 +816,8 @@ gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act)
         else {
             // self leave message
             assert (conf->conf_id < 0);
-            assert (conf->my_idx < 0);
-            conf->st_required = false;
+            assert (conf->my_idx  < 0);
+            conf->my_state = GCS_NODE_STATE_NON_PRIM;
         }
 
         act->buf     = conf;
@@ -830,7 +832,7 @@ gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act)
 }
 
 // for future use in fake state exchange (in unit tests et.al. See #237, #238)
-static gcs_state_t*
+static gcs_state_msg_t*
 group_get_node_state (gcs_group_t* group, long node_idx)
 {
     const gcs_node_t* node = &group->nodes[node_idx];
@@ -839,7 +841,7 @@ group_get_node_state (gcs_group_t* group, long node_idx)
 
     if (0 == node_idx) flags |= GCS_STATE_FREP;
 
-    return gcs_state_create (
+    return gcs_state_msg_create (
         &group->state_uuid,
         &group->group_uuid,
         &group->prim_uuid,
@@ -857,7 +859,7 @@ group_get_node_state (gcs_group_t* group, long node_idx)
 }
 
 /*! Returns state message object for this node */
-gcs_state_t*
+gcs_state_msg_t*
 gcs_group_get_state (gcs_group_t* group)
 {
     return group_get_node_state (group, group->my_idx);

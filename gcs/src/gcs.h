@@ -277,18 +277,40 @@ gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size);
 //#define GCS_DEFAULT_PKT_SIZE 1500 /* Standard Ethernet frame */
 #define GCS_DEFAULT_PKT_SIZE 64500 /* 43 Eth. frames to carry max IP packet */
 
-/* Configuration action */
+/*
+ * Configuration action
+ */
+
+/*! Possible node states */
+typedef enum gcs_node_state
+{
+    GCS_NODE_STATE_NON_PRIM, /// in non-primary configuration, outdated state
+    GCS_NODE_STATE_PRIM,     /// in primary conf, needs state transfer
+    GCS_NODE_STATE_JOINER,   /// in primary conf, receiving state transfer
+    GCS_NODE_STATE_DONOR,    /// joined, donating state transfer
+    GCS_NODE_STATE_JOINED,   /// contains full state
+    GCS_NODE_STATE_SYNCED,   /// syncronized with group
+    GCS_NODE_STATE_MAX
+}
+gcs_node_state_t;
+
+/*! Convert state code to null-terminates string */
+extern const char*
+gcs_node_state_to_str (gcs_node_state_t state);
+
 /*! Member name max length (including terminating null) */
 #define GCS_MEMBER_NAME_MAX 40
 
-typedef struct {
-    gcs_seqno_t  seqno;         /// last global seqno applied by this group
-    gcs_seqno_t  conf_id;       /// configuration ID (-1 if non-primary)
-    uint8_t      group_uuid[GCS_UUID_LEN];/// group UUID
-    bool         st_required;   /// state transfer is required (gap in seqnos)
-    long         memb_num;      /// number of members in configuration
-    long         my_idx;        /// index of this node in the configuration
-    char         data[];        /// member array (null-terminated IDs)
+/*! New configuration action */
+typedef struct gcs_act_conf {
+    gcs_seqno_t      seqno;    /// last global seqno applied by this group
+    gcs_seqno_t      conf_id;  /// configuration ID (-1 if non-primary)
+    uint8_t          group_uuid[GCS_UUID_LEN];/// group UUID
+//    bool         st_required;   /// state transfer is required (gap in seqnos)
+    long             memb_num; /// number of members in configuration
+    long             my_idx;   /// index of this node in the configuration
+    gcs_node_state_t my_state; /// current node state
+    char             data[];   /// member array (null-terminated IDs)
 } gcs_act_conf_t;
 
 #ifdef	__cplusplus

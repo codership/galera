@@ -8,32 +8,32 @@
 #define GCS_STATE_ACCESS
 #include "../gcs_state.h"
 
-START_TEST (gcs_state_test_basic)
+START_TEST (gcs_state_msg_test_basic)
 {
     ssize_t send_len, ret;
     gu_uuid_t    state_uuid;
     gu_uuid_t    group_uuid;
     gu_uuid_t    prim_uuid;
-    gcs_state_t* send_state;
-    gcs_state_t* recv_state;
+    gcs_state_msg_t* send_state;
+    gcs_state_msg_t* recv_state;
 
     gu_uuid_generate (&state_uuid, NULL, 0);
     gu_uuid_generate (&group_uuid, NULL, 0);
     gu_uuid_generate (&prim_uuid,  NULL, 0);
 
-    send_state = gcs_state_create (&state_uuid,
-                                   &group_uuid,
-                                   &prim_uuid,
-                                   5,                  // prim_joined
-                                   457,                // prim_seqno
-                                   3465,               // act_seqno
-                                   GCS_STATE_JOINED,   // prim_state
-                                   GCS_STATE_NON_PRIM, // current_state
-                                   "My Name",          // name
-                                   "192.168.0.1:2345", // inc_addr
-                                   0,                  // proto_min
-                                   1,                  // proto_max
-                                   GCS_STATE_FREP      // flags
+    send_state = gcs_state_msg_create (&state_uuid,
+                                       &group_uuid,
+                                       &prim_uuid,
+                                       5,                  // prim_joined
+                                       457,                // prim_seqno
+                                       3465,               // act_seqno
+                                       GCS_NODE_STATE_JOINED,   // prim_state
+                                       GCS_NODE_STATE_NON_PRIM, // current_state
+                                       "My Name",          // name
+                                       "192.168.0.1:2345", // inc_addr
+                                       0,                  // proto_min
+                                       1,                  // proto_max
+                                       GCS_STATE_FREP      // flags
         );
 
     fail_if (NULL == send_state);
@@ -78,15 +78,15 @@ START_TEST (gcs_state_test_basic)
         fail_if (strncmp (send_str, recv_str, str_len));
     }
 
-    gcs_state_destroy (send_state);
-    gcs_state_destroy (recv_state);
+    gcs_state_msg_destroy (send_state);
+    gcs_state_msg_destroy (recv_state);
 }
 END_TEST
 
-START_TEST (gcs_state_test_quorum)
+START_TEST (gcs_state_msg_test_quorum)
 {
-    gcs_state_t* st1, *st2, *st3;
-    gu_uuid_t    g1, g2, g3;
+    gcs_state_msg_t* st1, *st2, *st3;
+    gu_uuid_t        g1, g2, g3;
 
     gu_uuid_generate (&g1, NULL, 0);
     gu_uuid_generate (&g2, NULL, 0);
@@ -104,8 +104,8 @@ Suite *gcs_state_suite(void)
   TCase *tc = tcase_create("gcs_state");
 
   suite_add_tcase (s, tc);
-  tcase_add_test  (tc, gcs_state_test_basic);
-  tcase_add_test  (tc, gcs_state_test_quorum);
+  tcase_add_test  (tc, gcs_state_msg_test_basic);
+  tcase_add_test  (tc, gcs_state_msg_test_quorum);
   return s;
 }
 
