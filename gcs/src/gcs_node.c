@@ -93,15 +93,15 @@ gcs_node_record_state (gcs_node_t* node, gcs_state_msg_t* state_msg)
     node->state_msg = state_msg;
 
     // copy relevant stuff from state into node
-    node->status    = gcs_state_current_state (state_msg);
-    node->proto_min = gcs_state_proto_min  (state_msg);
-    node->proto_max = gcs_state_proto_max  (state_msg);
+    node->status    = gcs_state_msg_current_state (state_msg);
+    node->proto_min = gcs_state_msg_proto_min  (state_msg);
+    node->proto_max = gcs_state_msg_proto_max  (state_msg);
 
     if (node->name) free ((char*)node->name);
-    node->name = strdup (gcs_state_name (state_msg));
+    node->name = strdup (gcs_state_msg_name (state_msg));
 
     if (node->inc_addr) free ((char*)node->inc_addr);
-    node->inc_addr = strdup (gcs_state_inc_addr (state_msg));
+    node->inc_addr = strdup (gcs_state_msg_inc_addr (state_msg));
 }
 
 /*! Update node status according to quorum decisions */
@@ -109,7 +109,7 @@ void
 gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
 {
     if (quorum->primary) {
-        const gu_uuid_t* node_group_uuid   = gcs_state_group_uuid (
+        const gu_uuid_t* node_group_uuid   = gcs_state_msg_group_uuid (
             node->state_msg);
         const gu_uuid_t* quorum_group_uuid = &quorum->group_uuid;
 
@@ -117,11 +117,11 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
 
         if (!gu_uuid_compare (node_group_uuid, quorum_group_uuid)) {
             // node was a part of this group
-            gcs_seqno_t node_act_id = gcs_state_act_id (node->state_msg);
+            gcs_seqno_t node_act_id = gcs_state_msg_act_id (node->state_msg);
  
             if (node_act_id == quorum->act_id) {
                 const gcs_node_state_t last_prim_state =
-                    gcs_state_prim_state (node->state_msg);
+                    gcs_state_msg_prim_state (node->state_msg);
                     
                 if (GCS_NODE_STATE_NON_PRIM == last_prim_state) {
                     // the node just joined, but already is up to date:

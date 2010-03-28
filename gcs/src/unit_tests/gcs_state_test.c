@@ -73,8 +73,8 @@ START_TEST (gcs_state_msg_test_basic)
         char   send_str[str_len];
         char   recv_str[str_len];
 
-        fail_if (gcs_state_snprintf (send_str, str_len, send_state) <= 0);
-        fail_if (gcs_state_snprintf (recv_str, str_len, recv_state) <= 0);
+        fail_if (gcs_state_msg_snprintf (send_str, str_len, send_state) <= 0);
+        fail_if (gcs_state_msg_snprintf (recv_str, str_len, recv_state) <= 0);
         fail_if (strncmp (send_str, recv_str, str_len));
     }
 
