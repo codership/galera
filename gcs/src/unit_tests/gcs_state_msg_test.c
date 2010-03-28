@@ -4,7 +4,7 @@
 
 #include <check.h>
 #include <string.h>
-#include "gcs_state_test.h"
+#include "gcs_state_msg_test.h"
 #define GCS_STATE_ACCESS
 #include "../gcs_state_msg.h"
 
@@ -98,10 +98,10 @@ START_TEST (gcs_state_msg_test_quorum)
 }
 END_TEST
 
-Suite *gcs_state_suite(void)
+Suite *gcs_state_msg_suite(void)
 {
   Suite *s  = suite_create("GCS state message");
-  TCase *tc = tcase_create("gcs_state");
+  TCase *tc = tcase_create("gcs_state_msg");
 
   suite_add_tcase (s, tc);
   tcase_add_test  (tc, gcs_state_msg_test_basic);
