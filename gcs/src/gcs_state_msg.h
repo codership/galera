@@ -8,8 +8,8 @@
  *
  */
 
-#ifndef _gcs_state_h_
-#define _gcs_state_h_
+#ifndef _gcs_state_msg_h_
+#define _gcs_state_msg_h_
 
 #include "gcs.h"
 #include "gcs_seqno.h"
@@ -21,7 +21,7 @@
 /* State flags */
 #define GCS_STATE_FREP 0x01  // group representative
 
-#ifdef GCS_STATE_ACCESS
+#ifdef GCS_STATE_MSG_ACCESS
 typedef struct gcs_state_msg
 {
     gu_uuid_t        state_uuid;    // UUID of the current state exchange
@@ -136,4 +136,4 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t*  states[],
 extern int
 gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* msg);
 
-#endif /* _gcs_state_h_ */
+#endif /* _gcs_state_msg_h_ */

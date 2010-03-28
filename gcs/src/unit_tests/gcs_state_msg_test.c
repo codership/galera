@@ -5,7 +5,7 @@
 #include <check.h>
 #include <string.h>
 #include "gcs_state_msg_test.h"
-#define GCS_STATE_ACCESS
+#define GCS_STATE_MSG_ACCESS
 #include "../gcs_state_msg.h"
 
 START_TEST (gcs_state_msg_test_basic)
