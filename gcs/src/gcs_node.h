@@ -16,7 +16,7 @@
 #include "gcs.h"
 #include "gcs_defrag.h"
 #include "gcs_comp_msg.h"
-#include "gcs_state.h"
+#include "gcs_state_msg.h"
 
 #define NODE_NO_ID   "undefined"
 #define NODE_NO_NAME "unknown"

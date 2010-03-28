@@ -12,7 +12,7 @@
 #include <galerautils.h>
 
 #define GCS_STATE_ACCESS
-#include "gcs_state.h"
+#include "gcs_state_msg.h"
 
 gcs_state_msg_t*
 gcs_state_msg_create (const gu_uuid_t* state_uuid,

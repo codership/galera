@@ -42,7 +42,7 @@ GCS_SRCS = \
 	gcs_act.h       \
 	gcs_recv_msg.h  \
 	gcs_seqno.h     \
-	gcs_state.h
+	gcs_state_msg.h
 
 if WITH_SPREAD
     AM_CFLAGS += -DGCS_USE_SPREAD
