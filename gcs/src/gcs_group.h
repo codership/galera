@@ -18,7 +18,7 @@
 #include "gcs_node.h"
 #include "gcs_recv_msg.h"
 #include "gcs_seqno.h"
-#include "gcs_state.h"
+#include "gcs_state_msg.h"
 
 typedef enum gcs_group_state
 {

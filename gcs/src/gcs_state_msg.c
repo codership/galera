@@ -11,8 +11,8 @@
 #include <string.h>
 #include <galerautils.h>
 
-#define GCS_STATE_ACCESS
-#include "gcs_state.h"
+#define GCS_STATE_MSG_ACCESS
+#include "gcs_state_msg.h"
 
 gcs_state_msg_t*
 gcs_state_msg_create (const gu_uuid_t* state_uuid,
@@ -163,7 +163,7 @@ gcs_state_msg_read (const void* buf, size_t buf_len)
 
 /* Print state message contents to buffer */
 int
-gcs_state_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
+gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
 {
     str[size - 1] = '\0'; // preventive termination
     return snprintf (str, size - 1,
@@ -203,55 +203,55 @@ gcs_state_msg_uuid (const gcs_state_msg_t* state)
 
 /* Get group uuid */
 const gu_uuid_t*
-gcs_state_group_uuid (const gcs_state_msg_t* state)
+gcs_state_msg_group_uuid (const gcs_state_msg_t* state)
 {
     return &state->group_uuid;
 }
 
 /* Get action seqno */
 gcs_seqno_t
-gcs_state_act_id (const gcs_state_msg_t* state)
+gcs_state_msg_act_id (const gcs_state_msg_t* state)
 {
     return state->act_seqno;
 }
 
 /* Get current node state */
 gcs_node_state_t
-gcs_state_current_state (const gcs_state_msg_t* state)
+gcs_state_msg_current_state (const gcs_state_msg_t* state)
 {
     return state->current_state;
 }
 
 /* Get node state */
 gcs_node_state_t
-gcs_state_prim_state (const gcs_state_msg_t* state)
+gcs_state_msg_prim_state (const gcs_state_msg_t* state)
 {
     return state->prim_state;
 }
 
 /* Get node name */
 const char*
-gcs_state_name (const gcs_state_msg_t* state)
+gcs_state_msg_name (const gcs_state_msg_t* state)
 {
     return state->name;
 }
 
 /* Get node incoming address */
 const char*
-gcs_state_inc_addr (const gcs_state_msg_t* state)
+gcs_state_msg_inc_addr (const gcs_state_msg_t* state)
 {
     return state->inc_addr;
 }
 
 /* Get supported protocols */
 gcs_proto_t
-gcs_state_proto_min (const gcs_state_msg_t* state)
+gcs_state_msg_proto_min (const gcs_state_msg_t* state)
 {
     return state->proto_min;
 }
 
 gcs_proto_t
-gcs_state_proto_max (const gcs_state_msg_t* state)
+gcs_state_msg_proto_max (const gcs_state_msg_t* state)
 {
     return state->proto_max;
 }
@@ -293,7 +293,7 @@ state_report_uuids (char* buf, size_t buf_len,
 
     for (j = 0; j < states_num; j++) {
         if (states[j]->current_state >= min_state) {
-            int written = gcs_state_snprintf (buf, buf_len, states[j]);
+            int written = gcs_state_msg_snprintf (buf, buf_len, states[j]);
             buf     += written;
             buf_len -= written;
         }        
@@ -304,9 +304,9 @@ state_report_uuids (char* buf, size_t buf_len,
 
 /* Get quorum decision from state messages */
 long 
-gcs_state_get_quorum (const gcs_state_msg_t* states[],
-                      long                   states_num,
-                      gcs_state_quorum_t*    quorum)
+gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
+                          long                   states_num,
+                          gcs_state_quorum_t*    quorum)
 {
     /* We count only nodes which come from primary configuraton -
      * prim_seqno != GCS_SEQNO_ILL

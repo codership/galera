@@ -12,9 +12,9 @@ gcs_tests_SOURCES =           \
 	gcs_comp_test.c       \
 	gcs_comp_test.h       \
 	../gcs_comp_msg.c     \
-	gcs_state_test.c      \
-	gcs_state_test.h      \
-	../gcs_state.c        \
+	gcs_state_msg_test.c  \
+	gcs_state_msg_test.h  \
+	../gcs_state_msg.c    \
 	gcs_backend_test.c    \
 	gcs_backend_test.h    \
 	../gcs_backend.c      \

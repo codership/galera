@@ -22,7 +22,7 @@ GCS_SRCS = \
 	gcs_dummy.c     \
 	gcs_act_proto.c \
 	gcs_defrag.c    \
-	gcs_state.c     \
+	gcs_state_msg.c \
 	gcs_node.c      \
 	gcs_group.c     \
 	gcs_core.c      \
@@ -42,7 +42,7 @@ GCS_SRCS = \
 	gcs_act.h       \
 	gcs_recv_msg.h  \
 	gcs_seqno.h     \
-	gcs_state.h
+	gcs_state_msg.h
 
 if WITH_SPREAD
     AM_CFLAGS += -DGCS_USE_SPREAD

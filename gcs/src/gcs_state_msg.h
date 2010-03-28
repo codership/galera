@@ -8,8 +8,8 @@
  *
  */
 
-#ifndef _gcs_state_h_
-#define _gcs_state_h_
+#ifndef _gcs_state_msg_h_
+#define _gcs_state_msg_h_
 
 #include "gcs.h"
 #include "gcs_seqno.h"
@@ -21,7 +21,7 @@
 /* State flags */
 #define GCS_STATE_FREP 0x01  // group representative
 
-#ifdef GCS_STATE_ACCESS
+#ifdef GCS_STATE_MSG_ACCESS
 typedef struct gcs_state_msg
 {
     gu_uuid_t        state_uuid;    // UUID of the current state exchange
@@ -90,7 +90,7 @@ gcs_state_msg_uuid (const gcs_state_msg_t* state);
 
 /* Get group uuid */
 extern const gu_uuid_t*
-gcs_state_group_uuid (const gcs_state_msg_t* state);
+gcs_state_msg_group_uuid (const gcs_state_msg_t* state);
 
 /* Get last PC uuid */
 //extern const gu_uuid_t*
@@ -98,42 +98,42 @@ gcs_state_group_uuid (const gcs_state_msg_t* state);
 
 /* Get action seqno */
 extern gcs_seqno_t
-gcs_state_act_id (const gcs_state_msg_t* state);
+gcs_state_msg_act_id (const gcs_state_msg_t* state);
 
 /* Get current node state */
 extern gcs_node_state_t
-gcs_state_current_state (const gcs_state_msg_t* state);
+gcs_state_msg_current_state (const gcs_state_msg_t* state);
 
 /* Get last prim node state */
 extern gcs_node_state_t
-gcs_state_prim_state (const gcs_state_msg_t* state);
+gcs_state_msg_prim_state (const gcs_state_msg_t* state);
 
 /* Get node name */
 extern const char*
-gcs_state_name (const gcs_state_msg_t* state);
+gcs_state_msg_name (const gcs_state_msg_t* state);
 
 /* Get node incoming address */
 extern const char*
-gcs_state_inc_addr (const gcs_state_msg_t* state);
+gcs_state_msg_inc_addr (const gcs_state_msg_t* state);
 
 /* Get supported protocols */
 extern gcs_proto_t
-gcs_state_proto_min (const gcs_state_msg_t* state);
+gcs_state_msg_proto_min (const gcs_state_msg_t* state);
 extern gcs_proto_t
-gcs_state_proto_max (const gcs_state_msg_t* state);
+gcs_state_msg_proto_max (const gcs_state_msg_t* state);
 
 /* Get state message flags */
 extern uint8_t
-gcs_state_flags (const gcs_state_msg_t* state);
+gcs_state_msg_flags (const gcs_state_msg_t* state);
 
 /* Get quorum decision from state messages */
 extern long
-gcs_state_get_quorum (const gcs_state_msg_t*  states[],
+gcs_state_msg_get_quorum (const gcs_state_msg_t*  states[],
                       long                states_num,
                       gcs_state_quorum_t* quorum);
 
 /* Print state message contents to buffer */
 extern int
-gcs_state_snprintf (char* str, size_t size, const gcs_state_msg_t* msg);
+gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* msg);
 
-#endif /* _gcs_state_h_ */
+#endif /* _gcs_state_msg_h_ */

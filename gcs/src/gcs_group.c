@@ -196,7 +196,7 @@ group_post_state_exchange (gcs_group_t* group)
     gu_debug ("STATE EXCHANGE: "GU_UUID_FORMAT" complete.",
               GU_UUID_ARGS(&group->state_uuid));
 
-    gcs_state_get_quorum (states, group->num, &quorum);
+    gcs_state_msg_get_quorum (states, group->num, &quorum);
 
     if (quorum.primary) {
         // primary configuration
@@ -425,7 +425,7 @@ static void group_print_state_debug(gcs_state_msg_t* state)
 {
     size_t str_len = 1024;
     char state_str[str_len];
-    gcs_state_snprintf (state_str, str_len, state);
+    gcs_state_msg_snprintf (state_str, str_len, state);
     gu_debug ("%s", state_str);
 }
 
@@ -444,7 +444,7 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
                 gu_info ("STATE EXCHANGE: got state msg: "GU_UUID_FORMAT
                          " from %ld (%s)", GU_UUID_ARGS(state_uuid),
-                         msg->sender_idx, gcs_state_name(state));
+                         msg->sender_idx, gcs_state_msg_name(state));
 
                 if (gu_log_debug) group_print_state_debug(state);
 
@@ -456,7 +456,7 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
                           " from node %ld (%s), current state UUID: "
                           GU_UUID_FORMAT,
                           GU_UUID_ARGS(state_uuid),
-                          msg->sender_idx, gcs_state_name(state),
+                          msg->sender_idx, gcs_state_msg_name(state),
                           GU_UUID_ARGS(&group->state_uuid));
 
                 if (gu_log_debug) group_print_state_debug(state);

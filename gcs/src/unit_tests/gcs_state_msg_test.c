@@ -4,9 +4,9 @@
 
 #include <check.h>
 #include <string.h>
-#include "gcs_state_test.h"
-#define GCS_STATE_ACCESS
-#include "../gcs_state.h"
+#include "gcs_state_msg_test.h"
+#define GCS_STATE_MSG_ACCESS
+#include "../gcs_state_msg.h"
 
 START_TEST (gcs_state_msg_test_basic)
 {
@@ -73,8 +73,8 @@ START_TEST (gcs_state_msg_test_basic)
         char   send_str[str_len];
         char   recv_str[str_len];
 
-        fail_if (gcs_state_snprintf (send_str, str_len, send_state) <= 0);
-        fail_if (gcs_state_snprintf (recv_str, str_len, recv_state) <= 0);
+        fail_if (gcs_state_msg_snprintf (send_str, str_len, send_state) <= 0);
+        fail_if (gcs_state_msg_snprintf (recv_str, str_len, recv_state) <= 0);
         fail_if (strncmp (send_str, recv_str, str_len));
     }
 
@@ -98,10 +98,10 @@ START_TEST (gcs_state_msg_test_quorum)
 }
 END_TEST
 
-Suite *gcs_state_suite(void)
+Suite *gcs_state_msg_suite(void)
 {
   Suite *s  = suite_create("GCS state message");
-  TCase *tc = tcase_create("gcs_state");
+  TCase *tc = tcase_create("gcs_state_msg");
 
   suite_add_tcase (s, tc);
   tcase_add_test  (tc, gcs_state_msg_test_basic);
