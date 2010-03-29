@@ -1305,7 +1305,7 @@ struct ViewIdCmp
 void gcomm::evs::Proto::send_install()
 {
     gcomm_assert(consensus.is_consensus() == true && 
-                 is_representative(get_uuid()) == true);
+                 is_representative(get_uuid()) == true) << *this;
     
     NodeMap oper_list;
     for_each(known.begin(), known.end(), OperationalSelect(oper_list));
@@ -2808,112 +2808,112 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     inst.set_join_message(&msg);
     inst.set_tstamp(Date::now());    
     
-    if (msg.get_source() != get_uuid())
+    // Select nodes that are coming from the same view as seen by
+    // message source
+    MessageNodeList same_view;
+    for_each(msg.get_node_list().begin(), msg.get_node_list().end(),
+             SelectNodesOp(same_view, current_view.get_id(), true, true));
+    // Find out self from node list
+    MessageNodeList::const_iterator nlself_i(same_view.find(get_uuid()));
+
+    // Other node coming from the same view
+    if (msg.get_source()         != get_uuid() &&
+        msg.get_source_view_id() == current_view.get_id())
     {
-        // Select nodes that are coming from the same view as seen by
-        // message source
-        MessageNodeList same_view;
-        for_each(msg.get_node_list().begin(), msg.get_node_list().end(),
-                 SelectNodesOp(same_view, current_view.get_id(), true, true));
-        // Coming from the same view
-        if (msg.get_source_view_id() == current_view.get_id())
+        // Update input map state
+        (void)update_im_safe_seqs(same_view);
+        
+        // See if we need to retrans some user messages
+        if (nlself_i != same_view.end())
         {
-            // Update input map state
-            (void)update_im_safe_seqs(same_view);
-            
-            // See if we need to retrans some user messages
-            MessageNodeList::const_iterator nli(same_view.find(get_uuid()));
-            if (nli != same_view.end())
+            const MessageNode& msg_node(MessageNodeList::get_value(nlself_i));
+            const Range mn_im_range(msg_node.get_im_range());
+            const Range im_range(
+                input_map->get_range(
+                    NodeMap::get_value(self_i).get_index()));
+            if (mn_im_range.get_lu() < mn_im_range.get_hs())
             {
-                const MessageNode& msg_node(MessageNodeList::get_value(nli));
-                const Range mn_im_range(msg_node.get_im_range());
-                const Range im_range(
-                    input_map->get_range(
-                        NodeMap::get_value(self_i).get_index()));
-                if (mn_im_range.get_lu() < mn_im_range.get_hs())
-                {
-                    gu_trace(resend(msg.get_source(), mn_im_range));
-                }
-                
-                if (mn_im_range.get_hs() < im_range.get_hs())
-                {
-                    gu_trace(resend(msg.get_source(),
-                                    Range(mn_im_range.get_hs() + 1, 
-                                          im_range.get_hs())));
-                }
+                gu_trace(resend(msg.get_source(), mn_im_range));
             }
             
-            // Find out max hs and complete up to that if needed
-            MessageNodeList::const_iterator max_hs_i(
-                max_element(same_view.begin(), same_view.end(), RangeHsCmp()));
-            const seqno_t max_hs(max_hs_i == same_view.end() ? -1 :
-                                 MessageNodeList::get_value(max_hs_i).get_im_range().get_hs());
-            if (last_sent < max_hs)
+            if (mn_im_range.get_hs() < im_range.get_hs())
             {
-                gu_trace(complete_user(max_hs));
-            }
-            
-            if (max_hs != -1)
-            {
-                // Find out min hs and try to recover messages if 
-                // min hs uuid is not operational
-                MessageNodeList::const_iterator min_hs_i(
-                    min_element(same_view.begin(), same_view.end(), 
-                                RangeHsCmp()));
-                gcomm_assert(min_hs_i != same_view.end());
-                const UUID& min_hs_uuid(MessageNodeList::get_key(min_hs_i));
-                const seqno_t min_hs(MessageNodeList::get_value(min_hs_i).get_im_range().get_hs());                
-                const NodeMap::const_iterator local_i(known.find_checked(min_hs_uuid));
-                const Node& local_node(NodeMap::get_value(local_i));
-                const Range im_range(input_map->get_range(local_node.get_index()));
-                
-                if (local_node.get_operational() == false  &&
-                    im_range.get_hs()            >  min_hs)
-                {
-                    // gcomm_assert(im_range.get_hs() <= max_hs);
-                    gu_trace(recover(msg.get_source(), min_hs_uuid, 
-                                     Range(min_hs + 1, max_hs)));
-                }
-            }
-            
-            // Retrans leave messages that others are missing
-            gu_trace((void)retrans_leaves(same_view));
-            
-            // Check if this node is set inactive by the other,
-            // if yes, the other must be marked as inactive too
-            if (nli != same_view.end())
-            {
-                if (MessageNodeList::get_value(nli).get_operational() == false)
-                {
-                    set_inactive(msg.get_source());
-                }
-            }
-            
-            // Make cross check to resolve lock if two nodes
-            // declare each other inactive. There is no need to make
-            // this for own messages.
-            if (msg.get_source() != get_uuid())
-            {
-                gu_trace(check_suspects(msg.get_source(), same_view));
-                gu_trace(cross_check_inactives(msg.get_source(), same_view));
+                gu_trace(resend(msg.get_source(),
+                                Range(mn_im_range.get_hs() + 1, 
+                                      im_range.get_hs())));
             }
         }
+    }
+    
+    // Find out max hs and complete up to that if needed
+    MessageNodeList::const_iterator max_hs_i(
+        max_element(same_view.begin(), same_view.end(), RangeHsCmp()));
+    const seqno_t max_hs(max_hs_i == same_view.end() ? -1 :
+                         MessageNodeList::get_value(max_hs_i).get_im_range().get_hs());
+    if (last_sent < max_hs)
+    {
+        gu_trace(complete_user(max_hs));
+    }
         
-        // If current join message differs from current state, send new join
-        const JoinMessage* curr_join(NodeMap::get_value(self_i).get_join_message());
-        MessageNodeList new_nl;
-        populate_node_list(&new_nl);
+    if (max_hs != -1)
+    {
+        // Find out min hs and try to recover messages if 
+        // min hs uuid is not operational
+        MessageNodeList::const_iterator min_hs_i(
+            min_element(same_view.begin(), same_view.end(), 
+                        RangeHsCmp()));
+        gcomm_assert(min_hs_i != same_view.end());
+        const UUID& min_hs_uuid(MessageNodeList::get_key(min_hs_i));
+        const seqno_t min_hs(MessageNodeList::get_value(min_hs_i).get_im_range().get_hs());                
+        const NodeMap::const_iterator local_i(known.find_checked(min_hs_uuid));
+        const Node& local_node(NodeMap::get_value(local_i));
+        const Range im_range(input_map->get_range(local_node.get_index()));
         
-        if (curr_join                 == 0 ||
-            (curr_join->get_aru_seq()   != input_map->get_aru_seq()  ||
-             curr_join->get_seq()       != input_map->get_safe_seq() ||
-             curr_join->get_node_list() != new_nl))
+        if (local_node.get_operational() == false  &&
+            im_range.get_hs()            >  min_hs)
         {
-            gu_trace(create_join());
-            if (consensus.is_consensus() == false)
-            {
-                send_join(false);
-            }
+            // gcomm_assert(im_range.get_hs() <= max_hs);
+            gu_trace(recover(msg.get_source(), min_hs_uuid, 
+                             Range(min_hs + 1, max_hs)));
+        }
+    }
+        
+    // Retrans leave messages that others are missing
+    gu_trace((void)retrans_leaves(same_view));
+        
+    // Check if this node is set inactive by the other,
+    // if yes, the other must be marked as inactive too
+    if (msg.get_source() != get_uuid() && nlself_i != same_view.end())
+    {
+        if (MessageNodeList::get_value(nlself_i).get_operational() == false)
+        {
+            set_inactive(msg.get_source());
+        }
+    }
+    
+    // Make cross check to resolve conflict if two nodes
+    // declare each other inactive. There is no need to make
+    // this for own messages.
+    if (msg.get_source() != get_uuid())
+    {
+        gu_trace(check_suspects(msg.get_source(), same_view));
+        gu_trace(cross_check_inactives(msg.get_source(), same_view));
+    }
+    
+    // If current join message differs from current state, send new join
+    const JoinMessage* curr_join(NodeMap::get_value(self_i).get_join_message());
+    MessageNodeList new_nl;
+    populate_node_list(&new_nl);
+    
+    if (curr_join == 0 ||
+        (curr_join->get_aru_seq()   != input_map->get_aru_seq()  ||
+         curr_join->get_seq()       != input_map->get_safe_seq() ||
+         curr_join->get_node_list() != new_nl))
+    {
+        gu_trace(create_join());
+        if (consensus.is_consensus() == false)
+        {
+            send_join(false);
         }
     }
     
