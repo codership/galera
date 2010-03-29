@@ -27,20 +27,6 @@
 #define GALERA_USLEEP_1_SECOND      1000000 //  1 sec
 #define GALERA_USLEEP_10_SECONDS   10000000 // 10 sec
 
-// for pretty printing in diagnostic messages
-static const char* galera_act_type_str[] =
-{   "GCS_ACT_TORDERED",
-    "GCS_ACT_COMMIT_CUT",
-    "GCS_ACT_STATE_REQ",
-    "GCS_ACT_CONF",
-    "GCS_ACT_JOIN",
-    "GCS_ACT_SYNC",
-    "GCS_ACT_FLOW",
-    "GCS_ACT_SERVICE",
-    "GCS_ACT_ERROR",
-    "GCS_ACT_UNKNOWN"
-};
-
 typedef enum galera_repl_state {
     GALERA_UNINITIALIZED,
     GALERA_INITIALIZED,
@@ -59,7 +45,7 @@ static gu_to_t            *cert_queue   = NULL;
 static gu_to_t            *commit_queue = NULL;
 static gcs_conn_t         *gcs_conn     = NULL;
 
-struct galera_status status =
+static struct galera_status status =
 {
     { { 0 } },
     WSREP_SEQNO_UNDEFINED,
@@ -73,6 +59,7 @@ static gcs_seqno_t         sst_seqno;         // received in state transfer
 static gu_uuid_t           sst_uuid;          // received in state transfer
 static gcs_seqno_t         last_recved  = -1; // last received from group
 static long                my_idx = 0;
+static galera_stage_t      donor_stage;       // stage to return to from DONOR
 
 static struct job_queue   *applier_queue = NULL;
 
@@ -1145,17 +1132,32 @@ galera_handle_configuration (wsrep_t* gh,
 
     GU_DBUG_ENTER("galera_handle_configuration");
 
-    gu_info ("New %s configuration: %lld, "
-             "seqno: %lld, group UUID: "GU_UUID_FORMAT
-             ", members: %zu, my idx: %zd",
-             conf->conf_id > 0 ? "PRIMARY" : "NON-PRIMARY",
-             (long long)conf->conf_id, (long long)conf->seqno,
-             GU_UUID_ARGS(conf_uuid), conf->memb_num, conf->my_idx);
+    gu_debug ("New %s configuration: %lld, "
+              "seqno: %lld, group UUID: "GU_UUID_FORMAT
+              ", members: %zu, my idx: %zd",
+              conf->conf_id > 0 ? "PRIMARY" : "NON-PRIMARY",
+              (long long)conf->conf_id, (long long)conf->seqno,
+              GU_UUID_ARGS(conf_uuid), conf->memb_num, conf->my_idx);
 
     my_idx = conf->my_idx; // this is always true.
 
     GALERA_GRAB_QUEUE (cert_queue,   conf_seqno);
     GALERA_GRAB_QUEUE (commit_queue, conf_seqno);
+
+    /* sanity check */
+    switch (status.stage) {
+    case GALERA_STAGE_INIT:
+    case GALERA_STAGE_JOINING:
+    case GALERA_STAGE_JOINED:
+    case GALERA_STAGE_SYNCED:
+    case GALERA_STAGE_DONOR:
+        break;
+    default:
+        gu_fatal ("Internal replication error: unexpected stage %u",
+                  status.stage);
+        assert(0);
+        abort();
+    }
 
     st_required = galera_st_required (conf);
 
@@ -1284,7 +1286,31 @@ galera_handle_configuration (wsrep_t* gh,
             gu_mutex_unlock (&sst_mtx);
         }
         else {                              /* no state transfer required */
+            /* sanity check */
+            if (GALERA_STAGE_JOINING < status.stage) {
+                if ((GCS_NODE_STATE_JOINED == conf->my_state &&
+                     GALERA_STAGE_JOINED   != status.stage) ||
+                    (GCS_NODE_STATE_SYNCED == conf->my_state &&
+                     GALERA_STAGE_SYNCED   != status.stage)) {
+                    gu_fatal ("Internal replication error: unexpected stage %u "
+                              "when conf_id == 1 and my_state: %s",status.stage,
+                              gcs_node_state_to_str(conf->my_state));
+                    assert(0);
+                    abort();
+                }
+            }
+
+            ret = my_idx;
+
             if (1 == conf->conf_id) {
+                /* sanity check */
+                if (GALERA_STAGE_JOINING < status.stage) {
+                    gu_fatal ("Internal replication error: unexpected stage %u "
+                              "when conf_id == 1 and my_state: %s",status.stage,
+                              gcs_node_state_to_str(conf->my_state));
+                    assert(0);
+                    abort();
+                }
 
                 status.state_uuid   = *conf_uuid;
                 status.last_applied = conf->seqno;
@@ -1298,7 +1324,7 @@ galera_handle_configuration (wsrep_t* gh,
                     gu_uuid_compare (&status.state_uuid, conf_uuid)) {
 
                     gu_fatal ("Internal replication error: no state transfer "
-                              "requested while this node state is not "
+                              "required while this node state is not "
                               "the same as the group."
                               "\n\tGroup: "GU_UUID_FORMAT":%lld"
                               "\n\tNode:  "GU_UUID_FORMAT":%lld",
@@ -1310,12 +1336,29 @@ galera_handle_configuration (wsrep_t* gh,
 
                 // workaround for #182, should be safe since we're in isolation
                 last_recved = conf->seqno;
+
+            }
+
+            if (GALERA_STAGE_JOINING >= status.stage) {
+                switch (conf->my_state) {
+                case GCS_NODE_STATE_JOINED:
+                    status.stage = GALERA_STAGE_JOINED; break;
+                case GCS_NODE_STATE_SYNCED:
+                    status.stage = GALERA_STAGE_SYNCED; break;
+                default: break;
+                }
+            }
+            else if (GALERA_STAGE_DONOR == status.stage) {
+                switch (conf->my_state) {
+                case GCS_NODE_STATE_JOINED:
+                    donor_stage = GALERA_STAGE_JOINED; break;
+                case GCS_NODE_STATE_SYNCED:
+                    donor_stage = GALERA_STAGE_SYNCED; break;
+                default: break;
+                }
             }
 
             if (galera_invalidate_state (data_dir)) abort();
-
-            status.stage = GALERA_STAGE_JOINED;
-            ret = my_idx;
         }
     }
     else {
@@ -1331,13 +1374,18 @@ galera_handle_configuration (wsrep_t* gh,
                     !gu_uuid_compare (&status.state_uuid, &GU_UUID_NIL));
         }
 
-        status.stage = GALERA_STAGE_JOINING;
+        if (status.stage != GALERA_STAGE_DONOR) {
+            status.stage = GALERA_STAGE_JOINING;
+        }
+        else {
+            donor_stage = GALERA_STAGE_JOINING;
+        }
 
         ret = -1;
     }
 
-    GALERA_RELEASE_QUEUE (cert_queue,   conf_seqno);
     GALERA_RELEASE_QUEUE (commit_queue, conf_seqno);
+    GALERA_RELEASE_QUEUE (cert_queue,   conf_seqno);
 
     GU_DBUG_RETURN(ret);
 }
@@ -1397,7 +1445,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
         assert (GCS_SEQNO_ILL != seqno_l);
 
         gu_debug("worker: %d with seqno: (%lld - %lld) type: %s recvd", 
-                 applier->id, seqno_g, seqno_l, galera_act_type_str[action_type]
+                 applier->id, seqno_g, seqno_l, gcs_act_type_to_str(action_type)
         );
 
         switch (action_type) {
@@ -1452,15 +1500,30 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
                                (wsrep_uuid_t*)&status.state_uuid,
                                /* status.last_applied, see #182 */ last_recved);
 
-                GALERA_RELEASE_QUEUE (cert_queue,   seqno_l);
                 GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
+                GALERA_RELEASE_QUEUE (cert_queue,   seqno_l);
                 /* To snap out of donor state application must call
                  * wsrep->sst_sent() when it is really done */
             }
             break;
+        case GCS_ACT_JOIN:
+            gu_info ("#303 Galera joined group");
+            status.stage = GALERA_STAGE_JOINED;
+            GALERA_SELF_CANCEL_QUEUE (cert_queue,   seqno_l);
+            GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
+            break;
+        case GCS_ACT_SYNC:
+            gu_info ("#301 Galera synchronized with group");
+            status.stage = GALERA_STAGE_SYNCED;
+            GALERA_SELF_CANCEL_QUEUE (cert_queue,   seqno_l);
+            GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
+            break;
         default:
-            gu_error("bad gcs action value: %d, must abort", action_type);
-            return WSREP_FATAL;
+            gu_error("Unexpected gcs action value: %s, must abort.",
+                     gcs_act_type_to_str(action_type));
+            ret_code = WSREP_FATAL;
+            shutdown = true;
+            assert(0);
         }
         free (action); /* TODO: cache DATA actions at the end of commit queue
                         * processing. Therefore do not free them here. */
@@ -2526,6 +2589,12 @@ static wsrep_status_t mm_galera_sst_sent (wsrep_t* gh,
 {
     long err;
 
+    if (GALERA_STAGE_DONOR != status.stage) {
+        gu_error ("wsrep_sst_sent() called when not SST donor. Stage: %u",
+                  status.stage);
+        return WSREP_CONN_FAIL;
+    }
+
     if (memcmp (uuid, &status.state_uuid, sizeof(wsrep_uuid_t))) {
         // state we have sent no longer corresponds to the current group state
         // mark an error.
@@ -2537,10 +2606,11 @@ static wsrep_status_t mm_galera_sst_sent (wsrep_t* gh,
     //          (Not that we expect that application can resolve it.)
     while (-EAGAIN == (err = gcs_join (gcs_conn, seqno))) usleep (100000);
 
-    status.stage = GALERA_STAGE_JOINED;
+    if (!err) {
+        return WSREP_OK;
+    }
 
-    if (!err) return WSREP_OK;
-
+    gu_error ("Failed to recover from DONOR state");
     return WSREP_CONN_FAIL;
 }
 

@@ -615,6 +615,45 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     }
 }
 
+static long
+gcs_handle_act_state_req (gcs_conn_t*                conn,
+                          const struct gcs_act_rcvd* rcvd)
+{
+    if ((gcs_seqno_t)conn->my_idx == rcvd->id) {
+        int donor_idx = (int)rcvd->id; // to pacify valgrind
+        gu_info ("Got GCS_ACT_STATE_REQ to %i, my idx: %ld",
+                 donor_idx, conn->my_idx);
+        return gcs_become_donor (conn);
+        // gu_info ("Becoming donor: %s", 1 == ret ? "yes" : "no");
+    }
+    else {
+        if (rcvd->id >= 0) {
+            gcs_become_joiner (conn);
+        }
+        return 1; // pass to gcs_request_state_transfer() caller.
+    }
+}
+
+/*! Allocates buffer with malloc to pass to the upper layer. */
+static long
+gcs_handle_state_change (gcs_conn_t*           conn,
+                         const struct gcs_act* act)
+{
+    gu_debug ("Got '%s' dated %lld", gcs_act_type_to_str (act->type),
+              gcs_seqno_le(*(gcs_seqno_t*)act->buf));
+
+    void* buf = malloc (act->buf_len);
+
+    if (buf) {
+        memcpy (buf, act->buf, act->buf_len);
+        ((struct gcs_act*)act)->buf = buf;
+        return 1;
+    }
+    else {
+        return -ENOMEM;
+    }
+}
+
 /*!
  * Performs work requred by action in current context.
  * @return negative error code, 0 if action should be discarded, 1 if should be
@@ -646,28 +685,14 @@ gcs_handle_actions (gcs_conn_t*                conn,
         ret = 1;
         break;
     case GCS_ACT_STATE_REQ:
-        if ((gcs_seqno_t)conn->my_idx == rcvd->id) {
-            int donor_idx = (int)rcvd->id; // to pacify valgrind
-            gu_info ("Got GCS_ACT_STATE_REQ to %i, my idx: %ld",
-                     donor_idx, conn->my_idx);
-            ret = gcs_become_donor (conn);
-            // gu_info ("Becoming donor: %s", 1 == ret ? "yes" : "no");
-        }
-        else {
-            if (rcvd->id >= 0) {
-                gcs_become_joiner (conn);
-            }
-            ret = 1; // pass to gcs_request_state_transfer() caller.
-        }
+        ret = gcs_handle_act_state_req (conn, rcvd);
         break; 
     case GCS_ACT_JOIN:
-        gu_debug ("Got GCS_ACT_JOIN dated %lld",
-                  gcs_seqno_le(*(gcs_seqno_t*)rcvd->act.buf));
+        ret = gcs_handle_state_change (conn, &rcvd->act);
         gcs_become_joined (conn);
         break;
     case GCS_ACT_SYNC:
-        gu_debug ("Got GCS_ACT_SYNC dated %lld",
-                  gcs_seqno_le(*(gcs_seqno_t*)rcvd->act.buf));
+        ret = gcs_handle_state_change (conn, &rcvd->act);
         gcs_become_synced (conn);
         break;
     default:
