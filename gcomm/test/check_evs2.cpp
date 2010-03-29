@@ -919,7 +919,7 @@ static void test_proto_split_merge_gen(const size_t n_nodes,
 {
     PropagationMatrix prop;
     vector<DummyNode*> dn;
-    const string inactive_timeout("PT0.7S");
+    const string inactive_timeout("PT1.2S");
     const string retrans_period("PT0.1S");
     
     for (size_t i = 1; i <= n_nodes; ++i)
@@ -960,7 +960,7 @@ static void test_proto_split_merge_gen(const size_t n_nodes,
             {
                 for (size_t j = 0; j < n_nodes; ++j)
                 {
-                    gu_trace(send_n(dn[j], 1));        
+                    gu_trace(send_n(dn[j], 1 + j));        
                 }
                 gu_trace(prop.propagate_n(7));
             }
@@ -1180,7 +1180,7 @@ END_TEST
 
 
 
-static bool skip(true);
+static bool skip(false);
 
 Suite* evs2_suite()
 {

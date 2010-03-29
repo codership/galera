@@ -12,6 +12,8 @@ declare -r SCRIPTS="$DIST_BASE/scripts"
 . $SCRIPTS/misc.sh
 
 TRIES=${1:-"-1"} # -1 stands for indefinite loop
+MIN_PAUSE=${2:-"3"}
+PAUSE_RND=${3:-"20"}
 
 #restart # cluster restart should be triggered by user
 
@@ -45,7 +47,7 @@ cycle()
     echo "Signaling node $node_id with STOP... "
     signal_node STOP $node
 
-    pause 3 20
+    pause $MIN_PAUSE $PAUSE_RND
 
     echo "Signaling node $node_id with CONT..."
     signal_node CONT $node
