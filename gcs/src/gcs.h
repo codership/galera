@@ -136,7 +136,7 @@ typedef enum gcs_act_type
     GCS_ACT_COMMIT_CUT, //! group-wide action commit cut
     GCS_ACT_STATE_REQ,  //! request for state transfer
     GCS_ACT_CONF,       //! new configuration
-    GCS_ACT_JOIN,       //! state transfer status
+    GCS_ACT_JOIN,       //! joined group (received all state data)
     GCS_ACT_SYNC,       //! synchronized with group
     GCS_ACT_FLOW,       //! flow control
     GCS_ACT_SERVICE,    //! service action, sent by GCS
