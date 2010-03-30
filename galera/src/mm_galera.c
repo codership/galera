@@ -1141,9 +1141,6 @@ galera_handle_configuration (wsrep_t* gh,
 
     my_idx = conf->my_idx; // this is always true.
 
-    GALERA_GRAB_QUEUE (cert_queue,   conf_seqno);
-    GALERA_GRAB_QUEUE (commit_queue, conf_seqno);
-
     /* sanity check */
     switch (status.stage) {
     case GALERA_STAGE_INIT:
@@ -1384,9 +1381,6 @@ galera_handle_configuration (wsrep_t* gh,
         ret = -1;
     }
 
-    GALERA_RELEASE_QUEUE (commit_queue, conf_seqno);
-    GALERA_RELEASE_QUEUE (cert_queue,   conf_seqno);
-
     GU_DBUG_RETURN(ret);
 }
 
@@ -1448,9 +1442,8 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
                  applier->id, seqno_g, seqno_l, gcs_act_type_to_str(action_type)
         );
 
-        switch (action_type) {
-        case GCS_ACT_TORDERED:
-        {
+        if (gu_likely(GCS_ACT_TORDERED == action_type)) {
+
             assert (GCS_SEQNO_ILL != seqno_g);
 
             status.received++;
@@ -1464,67 +1457,75 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
             if (ret_code == WSREP_FATAL || ret_code == WSREP_NODE_FAIL) {
               shutdown = true;
             } 
-            break;
         }
-        case GCS_ACT_COMMIT_CUT:
-            // synchronize
-            GALERA_GRAB_QUEUE (cert_queue, seqno_l);
-            truncate_trx_history (*(gcs_seqno_t*)action);
-            GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
-
-            // Let other transaction continue to commit
+        else if (GCS_ACT_COMMIT_CUT == action_type) {
+            /* This one can be quite frequent, so we optimize it a little */
+            assert (0 <= seqno_l);
             GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
-            break;
-        case GCS_ACT_CONF:
-        {
-            galera_handle_configuration (gh, action, seqno_l);
-            if (-1 == my_idx /* self-leave */)
-            {
-                shutdown = true;
-                ret_code = WSREP_OK;
-            }
-            break;
+            GALERA_GRAB_QUEUE    (cert_queue,   seqno_l);
+            truncate_trx_history (*(gcs_seqno_t*)action);
+            GALERA_RELEASE_QUEUE (cert_queue,   seqno_l);
         }
-        case GCS_ACT_STATE_REQ:
-            if (0 <= seqno_l) { // should it be an assert?
+        else if (0 <= seqno_l) {
+            /* Actions processed below are special and very rare, so they are
+             * processed in isolation */
+            GALERA_GRAB_QUEUE (cert_queue,   seqno_l);
+            GALERA_GRAB_QUEUE (commit_queue, seqno_l);
+
+            switch (action_type) {
+            case GCS_ACT_CONF:
+            {
+                galera_handle_configuration (gh, action, seqno_l);
+                if (-1 == my_idx /* self-leave */)
+                {
+                    status.stage = GALERA_STAGE_INIT;
+                    shutdown = true;
+                    ret_code = WSREP_OK;
+                }
+                ret_code = WSREP_OK;
+                break;
+            }
+            case GCS_ACT_STATE_REQ:
                 gu_info ("Got state transfer request.");
 
-                // synchronize with app.
-                GALERA_GRAB_QUEUE (cert_queue,   seqno_l);
-                GALERA_GRAB_QUEUE (commit_queue, seqno_l);
-
                 status.stage = GALERA_STAGE_DONOR;
+                /* To snap out of donor state application must call
+                 * wsrep->sst_sent() when it is really done */
 
                 sst_donate_cb (action,
                                action_size,
                                (wsrep_uuid_t*)&status.state_uuid,
                                /* status.last_applied, see #182 */ last_recved);
-
-                GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
-                GALERA_RELEASE_QUEUE (cert_queue,   seqno_l);
-                /* To snap out of donor state application must call
-                 * wsrep->sst_sent() when it is really done */
+                ret_code = WSREP_OK;
+                break;
+            case GCS_ACT_JOIN:
+                gu_debug ("#303 Galera joined group");
+                status.stage = GALERA_STAGE_JOINED;
+                ret_code = WSREP_OK;
+                break;
+            case GCS_ACT_SYNC:
+                gu_debug ("#301 Galera synchronized with group");
+                status.stage = GALERA_STAGE_SYNCED;
+                ret_code = WSREP_OK;
+                break;
+            default:
+                gu_error("Unexpected gcs action value: %s, must abort.",
+                         gcs_act_type_to_str(action_type));
+                assert(0);
+                return WSREP_FATAL; /* returning without releasing TO queues
+                                     * on purpose. */
             }
-            break;
-        case GCS_ACT_JOIN:
-            gu_info ("#303 Galera joined group");
-            status.stage = GALERA_STAGE_JOINED;
-            GALERA_SELF_CANCEL_QUEUE (cert_queue,   seqno_l);
-            GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
-            break;
-        case GCS_ACT_SYNC:
-            gu_info ("#301 Galera synchronized with group");
-            status.stage = GALERA_STAGE_SYNCED;
-            GALERA_SELF_CANCEL_QUEUE (cert_queue,   seqno_l);
-            GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
-            break;
-        default:
-            gu_error("Unexpected gcs action value: %s, must abort.",
-                     gcs_act_type_to_str(action_type));
-            ret_code = WSREP_FATAL;
-            shutdown = true;
-            assert(0);
+
+            GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
+            GALERA_RELEASE_QUEUE (cert_queue,   seqno_l);
         }
+        else {
+            /* Negative seqno_t means error code */
+            gu_error ("Got %s with code: %lld (%s)",
+                      gcs_act_type_to_str(action_type),
+                      seqno_l, strerror (-seqno_l));
+        }
+
         free (action); /* TODO: cache DATA actions at the end of commit queue
                         * processing. Therefore do not free them here. */
     }
