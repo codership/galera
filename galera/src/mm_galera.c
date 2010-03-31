@@ -21,11 +21,12 @@
 #include "galera_options.h"
 #include "galera_status.h"
 
+#define GALERA_USLEEP_1_SECOND      1000000 //  1 sec
+#define GALERA_USLEEP_10_SECONDS   10000000 // 10 sec
 #define GALERA_WORKAROUND_197   1 //w/around for #197: lack of cert db on joiner
 #define GALERA_USE_FLOW_CONTROL 1
 #define GALERA_USLEEP_FLOW_CONTROL    10000 //  0.01 sec
-#define GALERA_USLEEP_1_SECOND      1000000 //  1 sec
-#define GALERA_USLEEP_10_SECONDS   10000000 // 10 sec
+#define GALERA_USLEEP_FLOW_CONTROL_MAX (GALERA_USLEEP_1_SECOND*3)
 
 typedef enum galera_repl_state {
     GALERA_UNINITIALIZED,
@@ -413,7 +414,10 @@ static enum wsrep_status mm_galera_disconnect(wsrep_t *gh,
     GU_DBUG_ENTER("galera_disconnect");
 
     if (!gcs_conn) {
-        conn_state   = GALERA_INITIALIZED;
+        /* Commented out, this changes conn state from UNINITIALIZED to
+         * initialized when disconnect is called twice... this is probably
+         * not what we want */
+        /* conn_state   = GALERA_INITIALIZED; */
         GU_DBUG_RETURN (WSREP_NODE_FAIL); //shouldn't we just ignore it?
     }
     
@@ -1240,8 +1244,10 @@ galera_handle_configuration (wsrep_t* gh,
 
                 status.stage = GALERA_STAGE_SST_WAIT;
                 gu_info ("Requesting state transfer: success, donor %ld", ret);
-                assert (ret != my_idx);
-
+                /* Commented out, assertion is not correct in case
+                 * of rapid successive conf changes */
+                /* assert (ret != my_idx); */
+                
                 /* Here wait for application to call galera_state_received(),
                  * which will set my_uuid and my_seqno */
                 gu_cond_wait (&sst_cond, &sst_mtx);
@@ -1836,6 +1842,9 @@ static enum wsrep_status mm_galera_pre_commit(
     gcs_seqno_t            seqno_g, seqno_l;
     enum wsrep_status      retcode;
     wsdb_trx_info_t        trx;
+#ifdef GALERA_USE_FLOW_CONTROL
+    int flow_control_waits = GALERA_USLEEP_FLOW_CONTROL_MAX/GALERA_USLEEP_FLOW_CONTROL;
+#endif /* GALERA_USER_FLOW_CONTROL */
 
     GU_DBUG_ENTER("galera_pre_commit");
 
@@ -1881,8 +1890,14 @@ static enum wsrep_status mm_galera_pre_commit(
      */
     } while ((gcs_wait (gcs_conn) > 0) &&
              (status.fc_waits++, gu_mutex_unlock (&commit_mtx),
-              usleep (GALERA_USLEEP_FLOW_CONTROL), true)
+              usleep (GALERA_USLEEP_FLOW_CONTROL), (--flow_control_waits > 0))
         );
+    if (flow_control_waits == 0)
+    {
+        gu_warn("max flow control waits %d exceeded",
+                GALERA_USLEEP_FLOW_CONTROL_MAX/GALERA_USLEEP_FLOW_CONTROL);
+        GU_DBUG_RETURN(WSREP_TRX_FAIL);
+    }
 #endif
 
     /* retrieve write set */
