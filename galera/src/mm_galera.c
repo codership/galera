@@ -1794,12 +1794,13 @@ static enum wsrep_status mm_galera_post_rollback(
         break;
     case WSDB_TRX_MUST_ABORT:
     case WSDB_TRX_REPLICATED:
-    case WSDB_TRX_ABORTING_REPL:
         /* these have replicated */
+        assert (trx.seqno_l > 0 && trx.seqno_l < TRX_SEQNO_MAX);
         if (gu_to_release(commit_queue, trx.seqno_l)) {
             gu_fatal("Could not release commit resource for %lld", trx.seqno_l);
             abort();
         }
+    case WSDB_TRX_ABORTING_REPL:
         /* local trx was removed in pre_commit phase already */
         wsdb_delete_local_trx_info(trx_id);
 
