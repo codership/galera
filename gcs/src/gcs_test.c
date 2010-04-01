@@ -485,22 +485,22 @@ void *gcs_test_recv (void *arg)
 
     while (thread->n_tries)
     {
-	/* 
-	 * gcs_recv() allocates memory for new messages, thread_create() 
-	 * pre-allocates thread->msg, so free() and set to NULL before 
-	 * passing to gcs_recv()
-	 */
-	free(thread->msg);
-	thread->msg = NULL;
-	/* receive message from group */
-	ret = gcs_recv (gcs,
+        /*
+         * gcs_recv() allocates memory for new messages, thread_create() 
+         * pre-allocates thread->msg, so free() and set to NULL before 
+         * passing to gcs_recv()
+         */
+        free(thread->msg);
+        thread->msg = NULL;
+        /* receive message from group */
+        ret = gcs_recv (gcs,
                         (void**)&thread->msg,
                         &thread->msg_len,
                         &thread->act_type,
                         &thread->act_id,
                         &thread->local_act_id);
-	
-	if (ret <= 0) {
+
+        if (ret <= 0) {
             fprintf (stderr, "gcs_recv() %s: %ld (%s). Thread exits.\n",
                      ret < 0 ? "failed" : "connection closed",
                      ret, strerror(-ret));
@@ -510,11 +510,11 @@ void *gcs_test_recv (void *arg)
             assert (thread->local_act_id == GCS_SEQNO_ILL);
             assert (thread->act_type     == GCS_ACT_ERROR);
             break;
-	}
+        }
 
         assert (thread->act_type < GCS_ACT_ERROR);
 
-	msg_recvd++;
+        msg_recvd++;
         size_recvd += thread->msg_len;
 
         switch (thread->act_type) {
@@ -526,9 +526,9 @@ void *gcs_test_recv (void *arg)
             group_seqno = *(gcs_seqno_t*)thread->msg;
             gu_to_self_cancel (to, thread->local_act_id);
             break;
-	case GCS_ACT_CONF:
+        case GCS_ACT_CONF:
             gcs_test_handle_configuration (gcs, thread);
-	    break;
+            break;
         case GCS_ACT_STATE_REQ:
             fprintf (stdout, "Got STATE_REQ\n");
             gu_to_grab (to, thread->local_act_id);
@@ -536,10 +536,18 @@ void *gcs_test_recv (void *arg)
             fflush (stdout);
             gu_to_release (to, thread->local_act_id);
             break;
+        case GCS_ACT_JOIN:
+            fprintf (stdout, "Joined\n");
+            gu_to_self_cancel (to, thread->local_act_id);
+            break;
+        case GCS_ACT_SYNC:
+            fprintf (stdout, "Synced\n");
+            gu_to_self_cancel (to, thread->local_act_id);
+            break;
         default:
             fprintf (stderr, "Unexpected action type: %d\n", thread->act_type);
 
-	}
+        }
     }
 //    fprintf (stderr, "RECV thread %ld exiting: %s\n",
 //             thread->id, strerror(-ret));
