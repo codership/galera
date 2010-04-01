@@ -913,27 +913,29 @@ long gcs_close (gcs_conn_t *conn)
 
     if ((ret = gu_mutex_lock (&conn->lock))) return ret;
     {
-        struct gcs_repl_act** act_ptr;
-
         if (GCS_CONN_CLOSED <= conn->state)
         {
-            gu_mutex_unlock (&conn->lock);
-            return -EBADFD;
+            ret = -EBADFD;
         }
+        else if (!(ret = gcs_core_close (conn->core))) {
 
-        /** @note: We have to close connection before joining RECV thread
-         *         since it may be blocked in gcs_backend_recv().
-         *         That also means, that RECV thread should surely exit here. */
-        if ((ret = gcs_core_close (conn->core))) {
-            return ret;
+            /* here we synchronize with SELF_LEAVE event */
+            gu_thread_join (conn->recv_thread, NULL);
+            gu_info ("recv_thread() joined.");
+
+            if (GCS_CONN_CLOSED != conn->state) {
+                gu_warn ("Broken shutdown sequence: GCS connection state is %s,"
+                         " expected %s", gcs_conn_state_str[conn->state],
+                         gcs_conn_state_str[GCS_CONN_CLOSED]);
+                gcs_shift_state (conn, GCS_CONN_CLOSED);
+            }
+            conn->err = -ECONNABORTED;
         }
+    }
+    gu_mutex_unlock (&conn->lock);
 
-        gu_thread_join (conn->recv_thread, NULL);
-        gu_info ("recv_thread() joined.");
-
-        gcs_shift_state (conn, GCS_CONN_CLOSED);
-        conn->err   = -ECONNABORTED;
-
+    if (!ret) {
+        struct gcs_repl_act** act_ptr;
         /* At this point (state == CLOSED) no new threads should be able to
          * queue for repl (check gcs_repl()), and recv thread is joined, so no
          * new actions will be received. Abort threads that are still waiting
@@ -950,14 +952,13 @@ long gcs_close (gcs_conn_t *conn)
             gu_mutex_unlock (&act->wait_mutex);
         }
         gcs_fifo_lite_close (conn->repl_q);
-    }
-    gu_mutex_unlock (&conn->lock);
 
-    /* wake all gcs_recv() threads () */
-    // FIXME: this can block waiting for applicaiton threads to fetch all
-    // items. In certain situations this can block forever. Ticket #113
-    gu_info ("Closing slave action queue.");
-    gu_fifo_close (conn->recv_q);
+        /* wake all gcs_recv() threads () */
+        // FIXME: this can block waiting for applicaiton threads to fetch all
+        // items. In certain situations this can block forever. Ticket #113
+        gu_info ("Closing slave action queue.");
+        gu_fifo_close (conn->recv_q);
+    }
 
     return ret;
 }

@@ -48,7 +48,6 @@ struct gcs_core
                                // 2) synchronizes with configuration changes
                                // 3) synchronizes with close() call
 
-    gu_cond_t      leave_cond;
     void*           send_buf;
     size_t          send_buf_len;
     gcs_seqno_t     send_act_no;
@@ -98,7 +97,6 @@ gcs_core_create (const char* node_name,
                                                sizeof (core_act_t));
             if (core->fifo) {
                 gu_mutex_init  (&core->send_lock, NULL);
-                gu_cond_init   (&core->leave_cond, NULL);
                 gcs_group_init (&core->group, node_name, inc_addr);
                 core->proto_ver = 0;
                 core->state = CORE_CLOSED;
@@ -495,7 +493,7 @@ core_handle_act_msg (gcs_core_t*          core,
                 if (gu_unlikely(CORE_PRIMARY != core->state)) {
                     // there can be a tiny race with gcs_core_close(),
                     // so CORE_CLOSED allows TO delivery.
-                    assert (act->id < 0 || CORE_CLOSED == core->state);
+                    assert (act->id < 0 /*#275|| CORE_CLOSED == core->state*/);
                     if (act->id < 0) act->id = core_error (core->state);
                 }
             }
@@ -651,24 +649,25 @@ core_handle_comp_msg (gcs_core_t*          core,
         /* Lost primary component */
         if (gu_mutex_lock (&core->send_lock)) abort();
         {
-            // if state is CLOSING or CLOSED we don't change that
-            if (CORE_PRIMARY  == core->state ||
-                CORE_EXCHANGE == core->state) {
-                core->state = CORE_NON_PRIMARY;
+            if (core->state < CORE_CLOSED) {
+                ret = gcs_group_act_conf (group, act);
+                if (ret < 0) {
+                    gu_fatal ("Failed create NON-PRIM CONF action: %d (%s)",
+                              ret, strerror (-ret));
+                    assert (0);
+                    ret = -ENOTRECOVERABLE;
+                }
+
+                if (gcs_group_my_idx(group) == -1) { // self-leave
+                    core->state = CORE_CLOSED;
+                }
+                else {                               // regular non-prim
+                    core->state = CORE_NON_PRIMARY;
+                }
             }
-        }
-
-
-        ret = gcs_group_act_conf (group, act);
-        if (ret < 0) {
-            gu_fatal ("Failed create NON-PRIM CONF action: %d (%s)",
-                      ret, strerror (-ret));
-            assert (0);
-            ret = -ENOTRECOVERABLE;
-        }
-        if (gcs_group_my_idx(group) == -1)
-        {
-            gu_cond_signal(&core->leave_cond);
+            else { // ignore in production?
+                assert(0);
+            }
         }
         gu_mutex_unlock (&core->send_lock);
         assert (ret == act->buf_len);
@@ -977,8 +976,6 @@ long gcs_core_close (gcs_core_t* core)
     }
     else {
         ret = core->backend.close (&core->backend);
-        gu_cond_wait(&core->leave_cond, &core->send_lock);
-        core->state = CORE_CLOSED;
     }
 
     gu_mutex_unlock (&core->send_lock);
@@ -1013,12 +1010,10 @@ long gcs_core_destroy (gcs_core_t* core)
 
     /* after that we must be able to destroy mutexes */
     while (gu_mutex_destroy (&core->send_lock));
-    gu_cond_destroy(&core->leave_cond);
     /* now noone will interfere */
     gcs_fifo_lite_close (core->fifo);
     while ((tmp = gcs_fifo_lite_get_head (core->fifo))) {
-        // whatever is in tmp.action is allocated by application,
-        // just forget it.
+        // whatever is in tmp.action is allocated by app., just forget it.
         gcs_fifo_lite_pop_head (core->fifo);
     }
     gcs_fifo_lite_destroy (core->fifo);
