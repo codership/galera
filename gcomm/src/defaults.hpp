@@ -20,6 +20,7 @@ namespace gcomm
         static std::string const EvsInactiveTimeout       ;
         static std::string const EvsInactiveTimeoutMin    ;
         static std::string const EvsConsensusTimeout      ;
+        static std::string const EvsInstallTimeout        ;
         static std::string const EvsRetransPeriod         ;
         static std::string const EvsRetransPeriodMin      ;
         static std::string const EvsJoinRetransPeriod     ;

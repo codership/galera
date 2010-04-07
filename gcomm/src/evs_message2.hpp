@@ -138,6 +138,7 @@ public:
     static const uint8_t F_SOURCE   = 0x4;  
 
     static const uint8_t F_AGGREGATE = 0x8; /*!< Message contains aggregated payload */
+    static const uint8_t F_COMMIT    = 0x10;
     /*!
      * Get version of the message
      *
@@ -491,7 +492,8 @@ public:
                const seqno_t   aru_seq        = -1,
                const int64_t fifo_seq       = -1,
                const UUID&   range_uuid     = UUID::nil(),
-               const Range   range          = Range()) : 
+               const Range   range          = Range(),
+               const uint8_t flags          = 0) : 
         Message(0, 
                 T_GAP,
                 source,
@@ -503,7 +505,7 @@ public:
                 seq,
                 -1,
                 aru_seq,
-                0,
+                flags,
                 range_uuid,
                 range)
     { }

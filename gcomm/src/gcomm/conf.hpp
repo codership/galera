@@ -178,6 +178,8 @@ namespace gcomm
          */
         static std::string const EvsConsensusTimeout;
 
+        static std::string const EvsInstallTimeout;
+
         /*!
          * @brief EVS keepalive period ("evs.keepalive_period")
          *

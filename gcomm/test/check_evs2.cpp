@@ -396,20 +396,27 @@ static void single_join(DummyTransport* t, Proto* p)
     fail_unless(rb != 0);
     fail_unless(im.get_type() == Message::T_INSTALL);
     
-    // Handling INSTALL message must emit two gap messages,
-    // one for receiving install message and one for 
-    // shift to operational
+    // Handling INSTALL message emits three gap messages,
+    // one for receiving install message (commit gap), one for 
+    // shift to install and one for shift to operational
     rb = get_msg(t, &gm);
     fail_unless(rb != 0);
     fail_unless(gm.get_type() == Message::T_GAP);
+    fail_unless((gm.get_flags() & Message::F_COMMIT) != 0); 
     
     rb = get_msg(t, &gm);
     fail_unless(rb != 0);
     fail_unless(gm.get_type() == Message::T_GAP);
+    fail_unless((gm.get_flags() & Message::F_COMMIT) == 0);     
     
-    // State must have evolved JOIN -> S_RECOVERY -> S_OPERATIONAL
+    rb = get_msg(t, &gm);
+    fail_unless(rb != 0);
+    fail_unless(gm.get_type() == Message::T_GAP);
+    fail_unless((gm.get_flags() & Message::F_COMMIT) == 0);
+    
+    // State must have evolved JOIN -> S_GATHER -> S_INSTALL -> S_OPERATIONAL
     fail_unless(p->get_state() == Proto::S_OPERATIONAL);
-    
+
     // Handle join message again, must stay in S_OPERATIONAL, must not
     // emit anything
     p->handle_msg(jm);
@@ -470,9 +477,9 @@ static void double_join(DummyTransport* t1, Proto* p1,
     fail_unless(rb == 0);
     
     // Handle node 2's join on node 1
-    // Expected output: shift to S_RECOVERY and one join message
+    // Expected output: shift to S_GATHER and one join message
     p1->handle_msg(jm);
-    fail_unless(p1->get_state() == Proto::S_RECOVERY);
+    fail_unless(p1->get_state() == Proto::S_GATHER);
     rb = get_msg(t1, &jm);
     fail_unless(rb != 0);
     fail_unless(jm.get_type() == Message::T_JOIN);
@@ -480,9 +487,9 @@ static void double_join(DummyTransport* t1, Proto* p1,
     fail_unless(rb == 0);
     
     // Handle node 1's join on node 2
-    // Expected output: shift to S_RECOVERY and one join message
+    // Expected output: shift to S_GATHER and one join message
     p2->handle_msg(jm);
-    fail_unless(p2->get_state() == Proto::S_RECOVERY);
+    fail_unless(p2->get_state() == Proto::S_GATHER);
     rb = get_msg(t2, &jm);
     fail_unless(rb != 0);
     fail_unless(jm.get_type() == Message::T_JOIN);
@@ -490,45 +497,74 @@ static void double_join(DummyTransport* t1, Proto* p1,
     fail_unless(rb == 0);
     
     // Handle node 2's join on node 1
-    // Expected output: Install and gap messages, state stays in S_RECOVERY
+    // Expected output: Install and commit gap messages, state stays in S_GATHER
     p1->handle_msg(jm);
-    fail_unless(p1->get_state() == Proto::S_RECOVERY);
+    fail_unless(p1->get_state() == Proto::S_GATHER);
     rb = get_msg(t1, &im);
     fail_unless(rb != 0);
     fail_unless(im.get_type() == Message::T_INSTALL);
     rb = get_msg(t1, &gm);
     fail_unless(rb != 0);
     fail_unless(gm.get_type() == Message::T_GAP);
+    fail_unless((gm.get_flags() & Message::F_COMMIT) != 0);
     rb = get_msg(t1, &msg);
     fail_unless(rb == 0);
     
     // Handle install message on node 2
-    // Expected output: Gap message and state stays in S_RECOVERY
+    // Expected output: commit gap message and state stays in S_RECOVERY
     p2->handle_msg(im);
-    fail_unless(p2->get_state() == Proto::S_RECOVERY);
+    fail_unless(p2->get_state() == Proto::S_GATHER);
     rb = get_msg(t2, &gm2);
     fail_unless(rb != 0);
     fail_unless(gm2.get_type() == Message::T_GAP);
+    fail_unless((gm2.get_flags() & Message::F_COMMIT) != 0);
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
     
     // Handle gap messages
-    // Expected output: Both nodes shift to S_OPERATIONAL,
+    // Expected output: Both nodes shift to S_INSTALL,
     // both send gap messages
     p1->handle_msg(gm2);
+    fail_unless(p1->get_state() == Proto::S_INSTALL);
+    Message gm12;
+    rb = get_msg(t1, &gm12);
+    fail_unless(rb != 0);
+    fail_unless(gm12.get_type() == Message::T_GAP);
+    fail_unless((gm12.get_flags() & Message::F_COMMIT) == 0);
+    rb = get_msg(t1, &msg);
+    fail_unless(rb == 0);
+
+    p2->handle_msg(gm);
+    fail_unless(p2->get_state() == Proto::S_INSTALL);
+    Message gm22;
+    rb = get_msg(t2, &gm22);
+    fail_unless(rb != 0);
+    fail_unless(gm22.get_type() == Message::T_GAP);
+    fail_unless((gm22.get_flags() & Message::F_COMMIT) == 0);
+    rb = get_msg(t2, &msg);
+    fail_unless(rb == 0);
+
+    // Handle final gap messages, expected output shift to operational
+    // and gap message
+
+    p1->handle_msg(gm22);
     fail_unless(p1->get_state() == Proto::S_OPERATIONAL);
     rb = get_msg(t1, &msg);
     fail_unless(rb != 0);
     fail_unless(msg.get_type() == Message::T_GAP);
+    fail_unless((msg.get_flags() & Message::F_COMMIT) == 0);
     rb = get_msg(t1, &msg);
     fail_unless(rb == 0);
-    p2->handle_msg(gm);
+
+    p2->handle_msg(gm12);
     fail_unless(p2->get_state() == Proto::S_OPERATIONAL);
     rb = get_msg(t2, &msg);
     fail_unless(rb != 0);
     fail_unless(msg.get_type() == Message::T_GAP);
+    fail_unless((msg.get_flags() & Message::F_COMMIT) == 0);
     rb = get_msg(t2, &msg);
     fail_unless(rb == 0);
+
 }
 
 
@@ -1257,30 +1293,32 @@ Suite* evs2_suite()
         tc = tcase_create("test_input_map_random_insert");
         tcase_add_test(tc, test_input_map_random_insert);
         suite_add_tcase(s, tc);
+    }
         
-        tc = tcase_create("test_proto_single_join");
-        tcase_add_test(tc, test_proto_single_join);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_single_join");
+    tcase_add_test(tc, test_proto_single_join);
+    suite_add_tcase(s, tc);
+    
+    tc = tcase_create("test_proto_double_join");
+    tcase_add_test(tc, test_proto_double_join);
+    suite_add_tcase(s, tc);
+    
+    tc = tcase_create("test_proto_join_n");
+    tcase_add_test(tc, test_proto_join_n);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_proto_double_join");
-        tcase_add_test(tc, test_proto_double_join);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_join_n_w_user_msg");
+    tcase_add_test(tc, test_proto_join_n_w_user_msg);
+    suite_add_tcase(s, tc);
+    
+    tc = tcase_create("test_proto_join_n_lossy");
+    tcase_add_test(tc, test_proto_join_n_lossy);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_proto_join_n");
-        tcase_add_test(tc, test_proto_join_n);
-        suite_add_tcase(s, tc);
-
-        tc = tcase_create("test_proto_join_n_w_user_msg");
-        tcase_add_test(tc, test_proto_join_n_w_user_msg);
-        suite_add_tcase(s, tc);
-
-        tc = tcase_create("test_proto_join_n_lossy");
-        tcase_add_test(tc, test_proto_join_n_lossy);
-        suite_add_tcase(s, tc);
-        
-        tc = tcase_create("test_proto_join_n_lossy_w_user_msg");
-        tcase_add_test(tc, test_proto_join_n_lossy_w_user_msg);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_proto_join_n_lossy_w_user_msg");
+    tcase_add_test(tc, test_proto_join_n_lossy_w_user_msg);
+    suite_add_tcase(s, tc);
+    
 
         tc = tcase_create("test_proto_leave_n");
         tcase_add_test(tc, test_proto_leave_n);
@@ -1301,44 +1339,46 @@ Suite* evs2_suite()
         tcase_add_test(tc, test_proto_leave_n_lossy_w_user_msg);
         tcase_set_timeout(tc, 20);
         suite_add_tcase(s, tc);
-    }
-    
-    tc = tcase_create("test_proto_split_merge");
-    tcase_add_test(tc, test_proto_split_merge);
-    tcase_set_timeout(tc, 15);
-    suite_add_tcase(s, tc);
-    
-    tc = tcase_create("test_proto_split_merge_lossy");
-    tcase_add_test(tc, test_proto_split_merge_lossy);
-    tcase_set_timeout(tc, 15);
-    suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_proto_split_merge_w_user_msg");
-    tcase_add_test(tc, test_proto_split_merge_w_user_msg);
-    tcase_set_timeout(tc, 150);
-    suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_proto_split_merge_lossy_w_user_msg");
-    tcase_add_test(tc, test_proto_split_merge_lossy_w_user_msg);
-    tcase_set_timeout(tc, 15);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_proto_split_merge");
+        tcase_add_test(tc, test_proto_split_merge);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
     
-    tc = tcase_create("test_proto_stop_cont");
-    tcase_add_test(tc, test_proto_stop_cont);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_proto_split_merge_lossy");
+        tcase_add_test(tc, test_proto_split_merge_lossy);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_proto_arbitrate");
-    tcase_add_test(tc, test_proto_arbitrate);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_proto_split_merge_w_user_msg");
+        tcase_add_test(tc, test_proto_split_merge_w_user_msg);
+        tcase_set_timeout(tc, 150);
+        suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_proto_split_merge_lossy_w_user_msg");
+        tcase_add_test(tc, test_proto_split_merge_lossy_w_user_msg);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
+
+    if (skip == false)
+    {            
+        tc = tcase_create("test_proto_stop_cont");
+        tcase_add_test(tc, test_proto_stop_cont);
+        suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_proto_arbitrate");
+        tcase_add_test(tc, test_proto_arbitrate);
+        suite_add_tcase(s, tc);
     
-    tc = tcase_create("test_proto_split_two");
-    tcase_add_test(tc, test_proto_split_two);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_proto_split_two");
+        tcase_add_test(tc, test_proto_split_two);
+        suite_add_tcase(s, tc);
     
-    tc = tcase_create("test_aggreg");
-    tcase_add_test(tc, test_aggreg);
-    suite_add_tcase(s, tc);
-        
+        tc = tcase_create("test_aggreg");
+        tcase_add_test(tc, test_aggreg);
+        suite_add_tcase(s, tc);
+    }        
 
     return s;
 }

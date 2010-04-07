@@ -37,6 +37,7 @@ public:
         : 
         index_           (std::numeric_limits<size_t>::max()),
         operational_     (true), 
+        committed_       (false),
         installed_       (false), 
         join_message_    (0), 
         leave_message_   (0),
@@ -60,9 +61,11 @@ public:
     }
     bool get_operational() const { return operational_; }
     
+    void set_committed(const bool comm) { committed_ = comm; }
+    bool get_committed() const { return committed_; }
     void set_installed(const bool inst) { installed_ = inst; }
     bool get_installed() const { return installed_; }
-    
+
     void set_join_message(const JoinMessage* msg);
     
     const JoinMessage* get_join_message() const { return join_message_; }
@@ -87,6 +90,8 @@ private:
     size_t index_;
     // True if instance is considered to be operational (has produced messages)
     bool operational_;
+    // True if it is known that the instance has committed to install message
+    bool committed_;
     // True if it is known that the instance has installed current view
     bool installed_;
     // Last received JOIN message

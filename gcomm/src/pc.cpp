@@ -123,7 +123,8 @@ void PC::connect()
         log_debug << "PC/EVS Proto sending join request";
         evs->send_join();
     }
-    gcomm_assert(evs->get_state() == evs::Proto::S_RECOVERY ||
+    gcomm_assert(evs->get_state() == evs::Proto::S_GATHER ||
+                 evs->get_state() == evs::Proto::S_INSTALL ||
                  evs->get_state() == evs::Proto::S_OPERATIONAL);
     
     do

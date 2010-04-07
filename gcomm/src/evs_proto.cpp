@@ -44,7 +44,7 @@ using namespace gcomm::evs;
 gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf, 
                          const size_t mtu_) :
     timers(),
-    debug_mask(D_STATE),
+    debug_mask(D_STATE | D_INSTALL_MSGS),
     info_mask(0),
     last_stats_report(Date::now()),
     collect_stats(true),
@@ -76,6 +76,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf,
     suspect_timeout       (),
     inactive_check_period (),
     consensus_timeout     (),
+    install_timeout       (),
     retrans_period        (),
     join_retrans_period   (),
     stats_report_period   (),
@@ -133,6 +134,12 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf,
                              Period(Defaults::EvsConsensusTimeout),
                              inactive_timeout,
                              inactive_timeout*5);
+    install_timeout =
+        conf_param_def_range(uri,
+                             Conf::EvsInstallTimeout,
+                             retrans_period*3,
+                             retrans_period*2,
+                             suspect_timeout);
     join_retrans_period = 
         conf_param_def_range(uri,
                              Conf::EvsJoinRetransPeriod,
@@ -296,30 +303,27 @@ void gcomm::evs::Proto::handle_inactivity_timer()
 
 void gcomm::evs::Proto::handle_retrans_timer()
 {
-    if (get_state() == S_RECOVERY)
+    if (get_state() == S_GATHER)
     {
-        evs_log_debug(D_TIMERS) << "send join/install/gap timer";
-        
         profile_enter(send_join_prof);
         send_join(true);
         profile_leave(send_join_prof);
-        if (install_message != 0 && consensus.is_consistent(*install_message) == true)
+        if (install_message != 0)
         {
-            if (is_representative(get_uuid()) == true)
-            {
-                profile_enter(send_install_prof);
-                gu_trace(send_install());
-                profile_leave(send_install_prof);
-            }
-            else
-            {
-                profile_enter(send_gap_prof);
-                gu_trace(send_gap(UUID::nil(), 
-                                  install_message->get_install_view_id(), 
-                                  Range()));
-                profile_leave(send_gap_prof);
-            }
+            gu_trace(send_gap(UUID::nil(), 
+                              install_message->get_install_view_id(), 
+                              Range(), true));
         }
+    }
+    else if (get_state() == S_INSTALL)
+    {
+        gcomm_assert(install_message != 0);
+        gu_trace(send_gap(UUID::nil(), 
+                          install_message->get_install_view_id(), 
+                          Range(), true));
+        gu_trace(send_gap(UUID::nil(), 
+                          install_message->get_install_view_id(), 
+                          Range()));
     }
     else if (get_state() == S_OPERATIONAL)
     {
@@ -367,13 +371,17 @@ void gcomm::evs::Proto::handle_consensus_timer()
         {
             if (NodeMap::get_key(i) != get_uuid())
             {
+                evs_log_info(I_STATE) 
+                    << " setting source " << NodeMap::get_key(i)
+                    << " as inactive due to expired consensus timer";
                 set_inactive(NodeMap::get_key(i));
             }
         }
         profile_enter(shift_to_prof);
-        gu_trace(shift_to(S_RECOVERY, true));
+        gu_trace(shift_to(S_GATHER, true));
         profile_leave(shift_to_prof);
     }
+
     if (get_state() != S_LEAVING)
     {
         for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
@@ -388,6 +396,23 @@ void gcomm::evs::Proto::handle_consensus_timer()
             }
         }
     }
+}
+
+
+void gcomm::evs::Proto::handle_install_timer()
+{
+    gcomm_assert(get_state() == S_INSTALL);
+    log_warn << self_string() << " install timer expired";
+    for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
+    {
+        if (NodeMap::get_value(i).get_committed() == false)
+        {
+            log_info << self_string() << " node " << NodeMap::get_key(i)
+                     << " failed to commit for install message, setting "
+                     << " as inactive";
+        }
+    }
+    shift_to(S_GATHER, true);
 }
 
 void gcomm::evs::Proto::handle_stats_timer()
@@ -436,15 +461,24 @@ Date gcomm::evs::Proto::get_next_expiration(const Timer t) const
         case S_OPERATIONAL:
         case S_LEAVING:
             return (now + retrans_period);
-        case S_RECOVERY:
+        case S_GATHER:
+        case S_INSTALL:
             return (now + join_retrans_period);
         default:
             gu_throw_fatal;
         }
+    case T_INSTALL:
+        switch (get_state())
+        {
+        case S_INSTALL:
+            return (now + install_timeout);
+        default:
+            return Date::max();
+        }
     case T_CONSENSUS:
         switch (get_state()) 
         {
-        case S_RECOVERY:
+        case S_GATHER:
             return (now + consensus_timeout);
         default:
             return Date::max();
@@ -466,6 +500,8 @@ void gcomm::evs::Proto::reset_timers()
                  make_pair(get_next_expiration(T_RETRANS), T_RETRANS)));
     gu_trace((void)timers.insert(
                  make_pair(get_next_expiration(T_CONSENSUS), T_CONSENSUS)));
+    gu_trace((void)timers.insert(
+                 make_pair(get_next_expiration(T_INSTALL), T_INSTALL)));
     gu_trace((void)timers.insert(
                  make_pair(get_next_expiration(T_STATS), T_STATS)));
 }
@@ -490,6 +526,9 @@ Date gcomm::evs::Proto::handle_timers()
             break;
         case T_CONSENSUS:
             handle_consensus_timer();
+            break;
+        case T_INSTALL:
+            handle_install_timer();
             break;
         case T_STATS:
             handle_stats_timer();
@@ -560,6 +599,9 @@ void gcomm::evs::Proto::check_inactive()
         {
             if (NodeMap::get_key(i) != get_uuid())
             {
+                evs_log_info(I_STATE) 
+                    << " setting source " << NodeMap::get_key(i)
+                    << " inactive (other nodes under suspicion)";
                 set_inactive(NodeMap::get_key(i));
             }
         }
@@ -568,7 +610,7 @@ void gcomm::evs::Proto::check_inactive()
     if (has_inactive == true && get_state() == S_OPERATIONAL)
     {
         profile_enter(shift_to_prof);
-        gu_trace(shift_to(S_RECOVERY, true));
+        gu_trace(shift_to(S_GATHER, true));
         profile_leave(shift_to_prof);
     }
     else if (has_inactive    == true && 
@@ -686,7 +728,7 @@ void gcomm::evs::Proto::deliver_reg_view()
     }
     
     evs_log_info(I_VIEWS) << "delivering view " << view;    
-
+    
     ProtoUpMeta up_meta(UUID::nil(), ViewId(), &view);
     send_up(Datagram(), up_meta);
 }
@@ -712,7 +754,7 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
             current_view.get_members().find(uuid) != 
             current_view.get_members().end() &&
             (local == true ||
-             inst.get_join_message()->get_source_view_id() == current_view.get_id()))
+             MessageNodeList::get_value(install_message->get_node_list().find_checked(uuid)).get_view_id() == current_view.get_id()))
         {
             view.add_member(NodeMap::get_key(i), "");
         }
@@ -748,9 +790,9 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
             // merging nodes, these won't be visible in trans view
         }
     }
-
+    
     gcomm_assert(view.is_member(get_uuid()) == true);
-
+    
     evs_log_info(I_VIEWS) << " delivering view " << view;
     
     ProtoUpMeta up_meta(UUID::nil(), ViewId(), &view);
@@ -768,6 +810,27 @@ void gcomm::evs::Proto::deliver_empty_view()
     send_up(Datagram(), up_meta);
 }
 
+
+void gcomm::evs::Proto::setall_committed(bool val)
+{
+    for (NodeMap::iterator i = known.begin(); i != known.end(); ++i) 
+    {
+        NodeMap::get_value(i).set_committed(val);
+    }
+}
+
+bool gcomm::evs::Proto::is_all_committed() const
+{
+    for (NodeMap::const_iterator i = known.begin(); i != known.end(); ++i) 
+    {
+        const Node& inst(NodeMap::get_value(i));
+        if (inst.get_operational() == true && inst.get_committed() == false)
+        {
+            return false;
+        }
+    }
+    return true;
+}
 
 void gcomm::evs::Proto::setall_installed(bool val)
 {
@@ -847,7 +910,7 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
                                  size_t const n_aggregated)
 {
     assert(get_state() == S_LEAVING || 
-           get_state() == S_RECOVERY || 
+           get_state() == S_GATHER || 
            get_state() == S_OPERATIONAL);
     assert(dg.get_offset() == 0);
     assert(n_aggregated == 1 || output.size() >= n_aggregated);
@@ -1030,7 +1093,7 @@ int gcomm::evs::Proto::send_user(const seqno_t win)
 
 void gcomm::evs::Proto::complete_user(const seqno_t high_seq)
 {
-    gcomm_assert(get_state() == S_OPERATIONAL || get_state() == S_RECOVERY);
+    gcomm_assert(get_state() == S_OPERATIONAL || get_state() == S_GATHER);
     
     evs_log_debug(D_USER_MSGS) << "completing seqno to " << high_seq;;
 
@@ -1062,11 +1125,14 @@ int gcomm::evs::Proto::send_delegate(Datagram& wb)
 
 void gcomm::evs::Proto::send_gap(const UUID&   range_uuid, 
                                  const ViewId& source_view_id, 
-                                 const Range   range)
+                                 const Range   range,
+                                 const bool    commit)
 {
     evs_log_debug(D_GAP_MSGS) << "sending gap  to "  
                               << range_uuid 
                               << " requesting range " << range;
+    gcomm_assert((commit == false && source_view_id == current_view.get_id())
+                 || install_message != 0);
     // TODO: Investigate if gap sending can be somehow limited, 
     // message loss happen most probably during congestion and 
     // flooding network with gap messages won't probably make 
@@ -1074,12 +1140,14 @@ void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
     
     GapMessage gm(get_uuid(),
                   source_view_id,
-                  (source_view_id == current_view.get_id() ? last_sent : -1), 
+                  (source_view_id == current_view.get_id() ? last_sent : 
+                   (commit == true ? install_message->get_fifo_seq() : -1)), 
                   (source_view_id == current_view.get_id() ? 
                    input_map->get_aru_seq() : -1), 
                   ++fifo_seq,
                   range_uuid, 
-                  range);
+                  range,
+                  (commit == true ? Message::F_COMMIT : static_cast<uint8_t>(0)));
     
     Buffer buf;
     serialize(gm, buf);
@@ -1493,10 +1561,19 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
 
 void gcomm::evs::Proto::handle_foreign(const Message& msg)
 {
-    // - no need to handle foreign LEAVE message
-    // - don't handle foreing messages while installing new view
-    if (msg.get_type() == Message::T_LEAVE || install_message != 0)
+    // no need to handle foreign LEAVE message
+    if (msg.get_type() == Message::T_LEAVE)
     {
+        return;
+    }
+    
+    // don't handle foreing messages in install phase
+    if (get_state()              == S_INSTALL)
+    {
+        //evs_log_debug(D_FOREIGN_MSGS)
+        log_warn << self_string() 
+                 << " dropping foreign message from "
+                 << msg.get_source() << " in install state";
         return;
     }
     
@@ -1514,11 +1591,13 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
     gu_trace(i = known.insert_unique(make_pair(source, Node(inactive_timeout, suspect_timeout))));
     assert(NodeMap::get_value(i).get_operational() == true);
     
-    if (get_state() == S_JOINING || get_state() == S_RECOVERY || 
+    if (get_state() == S_JOINING || get_state() == S_GATHER || 
         get_state() == S_OPERATIONAL)
     {
-        evs_log_info(I_STATE) << " shift to RECOVERY due to foreign message";
-        gu_trace(shift_to(S_RECOVERY, false));
+        evs_log_info(I_STATE) 
+            << " shift to GATHER due to foreign message from " 
+            << msg.get_source();
+        gu_trace(shift_to(S_GATHER, false));
     }
     
     // Set join message after shift to recovery, shift may clean up
@@ -1607,7 +1686,7 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
                 << " detected new view from operational source: " 
                 << msg.get_source_view_id();
             set_inactive(msg.get_source());
-            gu_trace(shift_to(S_RECOVERY, true));
+            gu_trace(shift_to(S_GATHER, true));
         }
         return;
     }
@@ -1732,7 +1811,7 @@ void gcomm::evs::Proto::handle_up(int cid,
 
 int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
 {
-    if (get_state() == S_RECOVERY)
+    if (get_state() == S_GATHER || get_state() == S_INSTALL)
     {
         return EAGAIN;
     }
@@ -1801,16 +1880,18 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
     shift_to_rfcnt++;
 
     static const bool allowed[S_MAX][S_MAX] = {
-        // CLOSED JOINING LEAVING RECOV  OPERAT
-        {  false,  true,   false, false, false }, // CLOSED
+        // CLOSED JOINING LEAVING GATHER INSTALL OPERAT
+        {  false,  true,   false, false, false,  false }, // CLOSED
         
-        {  false,  false,  true,  true,  false }, // JOINING
+        {  false,  false,  true,  true,  false,  false }, // JOINING
 
-        {  true,   false,  false, false, false }, // LEAVING
-
-        {  false,  false,  true,  true,  true  }, // RECOVERY
-
-        {  false,  false,  true,  true,  false }  // OPERATIONAL
+        {  true,   false,  false, false, false,  false }, // LEAVING
+        
+        {  false,  false,  true,  true,  true,   false }, // GATHER
+        
+        {  false,  false,  false, true,  false,  true  },  // INSTALL
+        
+        {  false,  false,  true,  true,  false,  false }  // OPERATIONAL
     };
     
     assert(s < S_MAX);
@@ -1850,12 +1931,13 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         state = S_LEAVING;
         reset_timers();
         break;
-    case S_RECOVERY:
+    case S_GATHER:
     {
-        if (get_state() != S_RECOVERY)
+        if (get_state() != S_GATHER)
         {
             cleanup_joins();
         }
+        setall_committed(false);
         setall_installed(false);
         delete install_message;
         install_message = 0;
@@ -1871,7 +1953,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
                 {
                     gu_throw_fatal << self_string() 
                                    << "send_user() failed in shifto "
-                                   << "to S_RECOVERY: "
+                                   << "to S_GATHER: "
                                    << strerror(err);
                 }
             }
@@ -1882,15 +1964,23 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             gcomm_assert(output.empty() == true);
         }
         
-        state = S_RECOVERY;
+        state = S_GATHER;
         if (send_j == true)
         {
             profile_enter(send_join_prof);
             gu_trace(send_join(false));
             profile_leave(send_join_prof);
         }
-        gcomm_assert(get_state() == S_RECOVERY);
+        gcomm_assert(get_state() == S_GATHER);
         reset_timers();        
+        break;
+    }
+    case S_INSTALL:
+    {
+        gcomm_assert(install_message != 0);
+        gcomm_assert(is_all_committed() == true);
+        state = S_INSTALL;
+        reset_timers();
         break;
     }
     case S_OPERATIONAL:
@@ -1955,6 +2045,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         }
         delete install_message;
         install_message = 0;
+
         profile_enter(send_gap_prof);
         gu_trace(send_gap(UUID::nil(), current_view.get_id(), Range()));;
         profile_leave(send_gap_prof);
@@ -2062,7 +2153,9 @@ void gcomm::evs::Proto::deliver()
     
     delivering = true;
     
-    if (get_state() != S_OPERATIONAL && get_state() != S_RECOVERY && 
+    if (get_state() != S_OPERATIONAL && 
+        get_state() != S_GATHER      && 
+        get_state() != S_INSTALL     &&
         get_state() != S_LEAVING)
     {
         gu_throw_fatal << "invalid state: " << to_string(get_state());
@@ -2132,7 +2225,8 @@ void gcomm::evs::Proto::deliver_trans()
     
     delivering = true;
     
-    if (get_state() != S_RECOVERY && get_state() != S_LEAVING)
+    if (get_state() != S_INSTALL && 
+        get_state() != S_LEAVING)
         gu_throw_fatal << "invalid state";
     
     evs_log_debug(D_DELIVERY)
@@ -2266,7 +2360,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
             if (install_message != 0 && 
                 msg.get_source_view_id() == install_message->get_install_view_id()) 
             {
-                assert(state == S_RECOVERY);
+                assert(state == S_INSTALL);
                 evs_log_debug(D_STATE) << " recovery user message "
                                        << msg;
                 
@@ -2297,7 +2391,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                     evs_log_info(I_STATE) 
                         << " shift to RECOVERY, no consensus after "
                         << "handling user message from new view";
-                    gu_trace(shift_to(S_RECOVERY));
+                    gu_trace(shift_to(S_GATHER));
                     profile_leave(shift_to_prof);
                     return;
                 }
@@ -2412,7 +2506,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
 
     // If in recovery state, send join each time input map aru seq reaches
     // last sent and either input map aru or safe seq has changed.
-    if (get_state()                  == S_RECOVERY && 
+    if (get_state()                  == S_GATHER && 
         consensus.highest_reachable_safe_seq() == input_map->get_aru_seq() && 
         (prev_aru                    != input_map->get_aru_seq() ||
          prev_safe                   != input_map->get_safe_seq()))
@@ -2451,9 +2545,31 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     evs_log_debug(D_GAP_MSGS) << "gap message " << msg;
     
 
-    if (get_state()                           == S_RECOVERY && 
-        install_message                       != 0          && 
-        install_message->get_install_view_id() == msg.get_source_view_id()) 
+    if ((msg.get_flags() & Message::F_COMMIT) != 0)
+    {
+        log_info << self_string() << " commit gap from " << msg.get_source();
+        if (get_state()                           == S_GATHER &&
+            install_message                       != 0 &&
+            install_message->get_fifo_seq()       == msg.get_seq())
+        {
+            inst.set_committed(true);
+            if (is_all_committed() == true)
+            {
+                shift_to(S_INSTALL);
+                gu_trace(send_gap(UUID::nil(), 
+                                  install_message->get_install_view_id(), 
+                                  Range()));;
+            }
+        }
+        else
+        {
+            log_warn << self_string() << " unhandled commit gap " << msg;
+        }
+        return;
+    }
+    else if (get_state()                           == S_INSTALL  && 
+             install_message                       != 0          && 
+             install_message->get_install_view_id() == msg.get_source_view_id()) 
     {
         evs_log_debug(D_STATE) << "install gap " << msg;
         inst.set_installed(true);
@@ -2501,13 +2617,13 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     
     
     gcomm_assert(msg.get_source_view_id() == current_view.get_id());
-
+    
     // 
     seqno_t prev_safe;
-
+    
     profile_enter(input_map_prof);    
     prev_safe = update_im_safe_seq(inst.get_index(), msg.get_aru_seq());
-
+    
     // Deliver messages and update tstamp only if safe_seq changed
     // for the source.
     if (prev_safe != input_map->get_safe_seq(inst.get_index()))
@@ -2555,7 +2671,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     }
     
     // 
-    if (get_state()                            == S_RECOVERY                && 
+    if (get_state()                            == S_GATHER                  && 
         consensus.highest_reachable_safe_seq() == input_map->get_aru_seq()  &&
         prev_safe                              != input_map->get_safe_seq()   )
     {
@@ -2686,8 +2802,8 @@ void gcomm::evs::Proto::check_suspects(const UUID& source,
                 if (kn.get_operational() == true && 
                     s_cnt > current_view.get_members().size()/2)
                 {
-                    log_info << self_string() << "declaring suspected " 
-                             << uuid << " as inactive";
+                    evs_log_info(I_STATE) << " declaring suspected " 
+                                          << uuid << " as inactive";
                     set_inactive(uuid);
                 }
             }
@@ -2739,7 +2855,7 @@ void gcomm::evs::Proto::cross_check_inactives(const UUID& source,
                 local_node.get_tstamp() + ito        >= now  &&
                 uuid > source)
             {
-                log_info << get_uuid() << " arbitrating, select " << uuid;
+                evs_log_info(I_STATE) << " arbitrating, select " << uuid;
                 set_inactive(uuid);
             }
         }
@@ -2782,25 +2898,32 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     }
     else if (install_message != 0)
     {
-        if (consensus.is_consistent(*install_message) == true)
+        if (install_message->get_source() == msg.get_source())
+        {
+            evs_log_info(I_STATE) 
+                << "shift to gather due to representative join";
+            gu_trace(shift_to(S_GATHER, false));
+        }
+        else if (consensus.is_consistent(*install_message) == true &&
+                 consensus.is_consistent(msg)              == true)
         {
             return;
         }
         else
         {
             evs_log_info(I_STATE) 
-                << "shift to RECOVERY, install message is "
+                << "shift to GATHER, install message is "
                 << "inconsistent when handling join from "
                 << msg.get_source() << " " << msg.get_source_view_id();
-            gu_trace(shift_to(S_RECOVERY, false));
+            gu_trace(shift_to(S_GATHER, false));
         }
     }
-    else if (get_state() != S_RECOVERY)
+    else if (get_state() != S_GATHER)
     {
         evs_log_info(I_STATE) 
-            << " shift to RECOVERY while handling join message from " 
+            << " shift to GATHER while handling join message from " 
             << msg.get_source() << " " << msg.get_source_view_id();
-        gu_trace(shift_to(S_RECOVERY, false));
+        gu_trace(shift_to(S_GATHER, false));
     }
 
     gcomm_assert(output.empty() == true);
@@ -2887,6 +3010,10 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     {
         if (MessageNodeList::get_value(nlself_i).get_operational() == false)
         {
+            
+            evs_log_info(I_STATE) 
+                << " declaring source " << msg.get_source()
+                << " as inactive (mutual exclusion)";
             set_inactive(msg.get_source());
         }
     }
@@ -2972,12 +3099,12 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
         {
             profile_enter(shift_to_prof);
             evs_log_info(I_STATE) 
-                << " shift to RECOVERY when handling leave from "
+                << " shift to GATHER when handling leave from "
                 << msg.get_source() << " " << msg.get_source_view_id();
-            gu_trace(shift_to(S_RECOVERY, true));
+            gu_trace(shift_to(S_GATHER, true));
             profile_leave(shift_to_prof);
         }
-        else if (get_state() == S_RECOVERY &&
+        else if (get_state() == S_GATHER &&
                  prev_safe_seq != input_map->get_safe_seq(node.get_index()))
         {
             profile_enter(send_join_prof);
@@ -3036,33 +3163,17 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
     }
     else if (install_message != 0)
     {
-        profile_enter(consistent_prof);
-        if (consensus.equal(msg, *install_message) == true && 
-            msg.get_install_view_id() == install_message->get_install_view_id())
-        {
-            evs_log_debug(D_INSTALL_MSGS)
-                << " dropping already handled install message";
-            profile_enter(send_gap_prof);
-            gu_trace(send_gap(UUID::nil(), 
-                              install_message->get_install_view_id(), 
-                              Range()));
-            profile_leave(send_gap_prof);
-            return;
-        }
-        profile_leave(consistent_prof);
         log_warn << self_string() 
-                 << " shift to RECOVERY due to inconsistent install";
-        profile_enter(shift_to_prof);
-        gu_trace(shift_to(S_RECOVERY));
-        profile_leave(shift_to_prof);
+                 << " shift to GATHER due to duplicate install";
+        gu_trace(shift_to(S_GATHER));
         return;
     }
     else if (inst.get_installed() == true) 
     {
         log_warn << self_string()
-                 << " shift to RECOVERY due to inconsistent state";
+                 << " shift to GATHER due to inconsistent state";
         profile_enter(shift_to_prof);
-        gu_trace(shift_to(S_RECOVERY));
+        gu_trace(shift_to(S_GATHER));
         profile_leave(shift_to_prof);
         return;
     } 
@@ -3072,9 +3183,9 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
                  << " source " << msg.get_source()
                  << " is not supposed to be representative";
         // Isolate node from my group
-        set_inactive(msg.get_source());
+        // set_inactive(msg.get_source());
         profile_enter(shift_to_prof);
-        gu_trace(shift_to(S_RECOVERY));
+        gu_trace(shift_to(S_GATHER));
         profile_leave(shift_to_prof);
         return;
     }
@@ -3108,13 +3219,13 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         profile_leave(consistent_prof);
     }
     
-    if (is_consistent_p == true && consensus.is_consensus() == true)
+    if (is_consistent_p == true)
     {
         inst.set_tstamp(Date::now());
         install_message = new InstallMessage(msg);
         profile_enter(send_gap_prof);
         gu_trace(send_gap(UUID::nil(), install_message->get_install_view_id(), 
-                          Range()));
+                          Range(), true));
         profile_leave(send_gap_prof);
     }
     else
@@ -3123,7 +3234,7 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
             << "install message " << msg 
             << " not consistent with state " << *this;
         profile_enter(shift_to_prof);
-        gu_trace(shift_to(S_RECOVERY, true));
+        gu_trace(shift_to(S_GATHER, true));
         profile_leave(shift_to_prof);
     }
 }

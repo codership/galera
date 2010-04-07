@@ -34,6 +34,7 @@ gcomm::evs::Node::Node(const Node& n)
     :
     index_           (n.index_),
     operational_     (n.operational_),
+    committed_       (n.committed_),
     installed_       (n.installed_),
     join_message_    (n.join_message_ != 0 ? 
                       new JoinMessage(*n.join_message_) : 0),

@@ -36,6 +36,8 @@ std::string const gcomm::Conf::EvsInactiveCheckPeriod =
     EvsScheme + Delim + "inactive_check_period";
 std::string const gcomm::Conf::EvsConsensusTimeout = 
     EvsScheme + Delim + "consensus_timeout";
+std::string const gcomm::Conf::EvsInstallTimeout =
+    EvsScheme + Delim + "install_timeout";
 std::string const gcomm::Conf::EvsKeepalivePeriod = 
     EvsScheme + Delim + "keepalive_period";
 std::string const gcomm::Conf::EvsJoinRetransPeriod =

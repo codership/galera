@@ -60,7 +60,8 @@ public:
         S_CLOSED,
         S_JOINING,
         S_LEAVING,
-        S_RECOVERY, 
+        S_GATHER,
+        S_INSTALL,
         S_OPERATIONAL,
         S_MAX
     };
@@ -71,7 +72,8 @@ public:
         case S_CLOSED:      return "CLOSED";
         case S_JOINING:     return "JOINING";
         case S_LEAVING:     return "LEAVING";
-        case S_RECOVERY:    return "RECOVERY";
+        case S_GATHER:      return "GATHER";
+        case S_INSTALL:     return "INSTALL";
         case S_OPERATIONAL: return "OPERATIONAL";
         default:
             gu_throw_fatal << "Invalid state";
@@ -119,7 +121,7 @@ public:
     int send_user(const seqno_t);
     void complete_user(const seqno_t);
     int send_delegate(gu::net::Datagram&);
-    void send_gap(const UUID&, const ViewId&, const Range);
+    void send_gap(const UUID&, const ViewId&, const Range, bool commit = false);
     const JoinMessage& create_join();
     void send_join(bool tval = true);
     void set_join(const JoinMessage&, const UUID&);
@@ -148,9 +150,9 @@ public:
     void deliver_trans_view(bool local);
     void deliver_empty_view();
 
+    void setall_committed(bool val);
+    bool is_all_committed() const;
     void setall_installed(bool val);
-
-
     bool is_all_installed() const;
 
     
@@ -226,6 +228,7 @@ public:
         T_INACTIVITY,
         T_RETRANS,
         T_CONSENSUS,
+        T_INSTALL,
         T_STATS
     };
     /*!
@@ -240,6 +243,7 @@ public:
     void handle_inactivity_timer();
     void handle_retrans_timer();
     void handle_consensus_timer();
+    void handle_install_timer();
     void handle_stats_timer();
     gu::datetime::Date get_next_expiration(const Timer) const;
     void reset_timers();
@@ -313,6 +317,7 @@ private:
     gu::datetime::Period suspect_timeout;
     gu::datetime::Period inactive_check_period;
     gu::datetime::Period consensus_timeout;
+    gu::datetime::Period install_timeout;
     gu::datetime::Period retrans_period;
     gu::datetime::Period join_retrans_period;
     gu::datetime::Period stats_report_period;
