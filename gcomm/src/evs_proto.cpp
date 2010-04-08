@@ -137,7 +137,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf,
     install_timeout =
         conf_param_def_range(uri,
                              Conf::EvsInstallTimeout,
-                             retrans_period*3,
+                             retrans_period*4,
                              retrans_period*2,
                              suspect_timeout);
     join_retrans_period = 
@@ -401,7 +401,7 @@ void gcomm::evs::Proto::handle_consensus_timer()
 
 void gcomm::evs::Proto::handle_install_timer()
 {
-    gcomm_assert(get_state() == S_INSTALL);
+    gcomm_assert(get_state() == S_GATHER || get_state() == S_INSTALL);
     log_warn << self_string() << " install timer expired";
     for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
     {
@@ -470,6 +470,7 @@ Date gcomm::evs::Proto::get_next_expiration(const Timer t) const
     case T_INSTALL:
         switch (get_state())
         {
+        case S_GATHER:
         case S_INSTALL:
             return (now + install_timeout);
         default:
