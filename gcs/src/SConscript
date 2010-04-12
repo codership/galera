@@ -1,0 +1,32 @@
+#
+Import('env')
+
+# Clone environment as we need to tune compilation flags
+gcs_env = env.Clone()
+
+# Backends (TODO: Get from global options)
+gcs_env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM')
+
+# Need to live without -pedantic and use gnu99 std
+gcs_env.Replace(CFLAGS = '-std=gnu99 -fno-strict-aliasing')
+
+# Need to live without -pedantic
+gcs_env.Replace(CXXFLAGS = '-Wno-long-long -Wno-deprecated -Weffc++ -ansi')
+
+gcs_env.SharedLibrary('gcs', 
+                  Split('''
+                           gcs_conf.c
+                           gcs_fifo_lite.c
+                           gcs_msg_type.c
+                           gcs_comp_msg.c
+                           gcs_backend.c
+                           gcs_dummy.c
+                           gcs_act_proto.c
+                           gcs_defrag.c
+                           gcs_state_msg.c
+                           gcs_node.c
+                           gcs_group.c
+                           gcs_core.c
+                           gcs.c
+                           gcs_gcomm.cpp
+                   '''))

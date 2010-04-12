@@ -1,0 +1,3 @@
+# SConscript for building galerautils
+
+SConscript('src/SConscript')

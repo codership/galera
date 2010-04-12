@@ -1,0 +1,6 @@
+
+Import('env')
+
+env.SharedLibrary('galerautils', Glob('*.c'))
+env.SharedLibrary('galerautils++', Glob('*.cpp'))
+

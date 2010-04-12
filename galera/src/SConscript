@@ -1,0 +1,4 @@
+
+Import('env')
+
+env.SharedLibrary('mmgalera', Glob('*.c'))

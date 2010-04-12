@@ -1,0 +1,17 @@
+
+Import('env')
+
+env.SharedLibrary('wsdb',
+                  Split('''
+                           certification.c
+                           file.c
+                           file_cache.c
+                           hash.c
+                           local.c
+                           version_file.c
+                           wsdb_xdr.c
+                           conn.c
+                           key_array.c
+                           mempool.c
+                           wsdb.c  
+                        '''))

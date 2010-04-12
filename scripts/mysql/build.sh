@@ -304,6 +304,10 @@ RELEASE_NAME=$(echo mysql-$MYSQL_VER-$GALERA_RELEASE | sed s/\:/_/g)
 rm -rf $RELEASE_NAME
 mv $DIST_DIR $RELEASE_NAME
 
+# Hack to avoid 'file changed as we read it'-error 
+sync
+sleep 2
+
 # Pack the release
 #if [ "$TAR" == "yes" ]
 #then

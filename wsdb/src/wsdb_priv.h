@@ -4,7 +4,9 @@
 #define WSDB_PRIV_INCLUDED
 
 #include <stdlib.h>
+#ifdef HAVE_CONFIG_H
 #include <config.h>
+#endif /* HAVE_CONFIG_H */
 #include <stdio.h>
 #include <assert.h>
 #include <stdbool.h>

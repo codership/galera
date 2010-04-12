@@ -48,7 +48,7 @@ struct gu_to
 {
     volatile gu_seqno_t seqno;
     size_t               used; /* number of active waiters */
-    size_t               qlen;
+    ssize_t              qlen;
     size_t               qmask;
     to_waiter_t*         queue;
     gu_mutex_t           lock;
@@ -93,7 +93,7 @@ gu_to_t *gu_to_create (int len, gu_seqno_t seqno)
         ret->queue = GU_CALLOC (ret->qlen, to_waiter_t);
 
         if (ret->queue) {
-            size_t i;
+            ssize_t i;
             for (i = 0; i < ret->qlen; i++) {
                 to_waiter_t *w = ret->queue + i;
 #ifdef TO_USE_SIGNAL
@@ -117,7 +117,7 @@ long gu_to_destroy (gu_to_t** to)
 {
     gu_to_t *t = *to;
     long      ret;
-    size_t    i;
+    ssize_t    i;
 
     gu_mutex_lock (&t->lock);
     if (t->used) {
