@@ -1,24 +1,21 @@
 
-env = DefaultEnvironment()
+Import('check_env')
 
-check_gcomm_sources = Split('''
-                               check_gcomm.cpp
-                               check_trace.cpp
-                               check_types.cpp
-                               check_util.cpp
-                               check_gmcast.cpp
-                               check_evs2.cpp
-                               check_pc.cpp
-                            ''')
+env = check_env.Clone()
 
-env.Program(target = 'check_gcomm',
-            source = check_gcomm_sources,
-            LIBS = Split('''
+env.Prepend(LIBS = Split('''
                             gcomm
                             galerautils++
                             galerautils
-                            check
-                            rt
-                            pthread
-                         '''),
-            LINKFLAGS = '-static')
+                         '''))
+
+env.Program(target = 'check_gcomm',
+            source = Split('''
+                              check_gcomm.cpp
+                              check_trace.cpp
+                              check_types.cpp
+                              check_util.cpp
+                              check_gmcast.cpp
+                              check_evs2.cpp
+                              check_pc.cpp
+                           '''))

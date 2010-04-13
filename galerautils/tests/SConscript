@@ -1,7 +1,11 @@
 
-env = DefaultEnvironment()
+Import('check_env')
 
-gu_tests_sources = Split('''
+env = check_env.Clone()
+
+env.Prepend(LIBS = 'galerautils')
+env.Program(target = 'gu_tests',
+            source = Split('''
                             gu_tests.c
                             gu_mem_test.c
                             gu_bswap_test.c
@@ -12,32 +16,15 @@ gu_tests_sources = Split('''
                             gu_options_test.c
                             gu_lock_step_test.c
                             gu_str_test.c
-                         ''')
-
-env.Program(target = 'gu_tests',
-            source = gu_tests_sources,
-            LIBS = Split('''
-                             galerautils
-                             check
-                             rt
-                             pthread
-                         '''),
-            LINKFLAGS = '-static')
+                         '''))
 
 
-gu_testspp_sources = Split('''gu_tests++.cpp
+
+env.Prepend(LIBS = 'libgalerautils++')
+env.Program(target = 'gu_tests++',
+            source = Split('''gu_tests++.cpp
                               gu_string_test.cpp
                               gu_uri_test.cpp
                               gu_net_test.cpp
                               gu_datetime_test.cpp
-                           ''')
-env.Program(target = 'gu_tests++',
-            source = gu_testspp_sources,
-            LIBS = Split('''
-                            galerautils++
-                            galerautils
-                            check
-                            rt
-                            pthread
-                         '''),
-            LINKFLAGS = '-static')
+                           '''))

@@ -34,17 +34,16 @@ libgcs_env.StaticLibrary('gcs', libgcs_sources)
 
 # TODO: How to tell scons portably that C++ linker should be used
 # and program should be linked statically
-libgcs_env.Program(target = 'gcs_test',
-                   source = 'gcs_test.c',
-                   LIBS = Split('''
-                                   gcs
-                                   gcomm
-                                   galerautils++
-                                   galerautils
-                                   rt
-                                   pthread
-                                '''),
-                   LINK = libgcs_env['CXX'],
-                   LINKFLAGS = '-static')
+gcs_test_env = libgcs_env.Clone()
+gcs_test_env.Prepend(LIBS = Split('''
+                                     gcs
+                                     gcomm
+                                     galerautils++
+                                     galerautils
+                                  '''))
+gcs_test_env.Program(target = 'gcs_test',
+                     source = 'gcs_test.c',
+                     LINK = libgcs_env['CXX'],
+                     LINKFLAGS = '-static')
 
 SConscript('unit_tests/SConscript')

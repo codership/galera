@@ -1,7 +1,15 @@
 
-env = DefaultEnvironment()
+Import('check_env')
 
-check_wsdb_sources = Split('''
+env = check_env.Clone()
+
+env.Prepend(LIBS = Split('''
+                            wsdb
+                            galerautils
+                         '''))
+
+env.Program(target = 'check_wsdb', 
+            source = Split('''
                               test_file.c
                               test_hash.c
                               test_cache.c
@@ -11,15 +19,6 @@ check_wsdb_sources = Split('''
                               test_log.c
                               test_mempool.c
                               wsdb_test.c
-                           ''')
+                           '''))
 
-env.Program(target = 'check_wsdb', 
-            source = check_wsdb_sources,
-            LIBS = Split('''
-                            wsdb
-                            galerautils
-                            check
-                            rt
-                            pthread
-                         '''),
-            LINKFLAGS = '-static')
+

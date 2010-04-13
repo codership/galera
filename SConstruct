@@ -1,16 +1,41 @@
+###################################################################
+#
+# Copyright (C) 2010 Codership Oy <info@codership.com>
 #
 # SCons build script to build galera libraries
 #
-# Commandline args:
+# Script structure:
+# - Help message
+# - Default parameters 
+# - Read commandline options
+# - Set up and configure default build environment
+# - Set up and configure check unit test build environment
+# - Run root SConscript with variant_dir
 #
-# debug=n, debug build with optimization level n
-# arch=str, target architecture [i386|x86-64]
-# build_dir=dir, build directory, defaults to ./
+####################################################################
+
+
 #
+# Print Help 
+#
+
+Help('''
+Build targets:  build tests check install all
+Default target: all
+        
+Commandline Options:
+    debug=n       debug build with optimization level n
+    arch=str      target architecture [i386|x86-64]
+    build_dir=dir build directory, default .
+
+''')
+
 
 #
 # Default params
 #
+
+build_target = 'all'
 
 # Optimization level
 opt_flags    = '-g -O3 -DNDEBUG' 
@@ -45,38 +70,42 @@ elif arch == 'x86-64':
         
 
 #
-# Set up and export build environment
+# Set up and export default build environment
 #
 # TODO: import env required for ccache and distcc 
+#
+
 env = DefaultEnvironment()
 
 #
-# Check required headers and libraries
+# Check required headers and libraries (autoconf functionality)
 #
 
 conf = Configure(env)
+
+# System headers and libraries
+
+if not conf.CheckLib('pthread'):
+    print 'Error: pthread library not found'
+    Exit(1)
     
-if not conf.CheckHeader('check.h'):
-    print 'check.h not found'
+if not conf.CheckLib('rt'):
+    print 'Error: rt library not found'
     Exit(1)
 
-# Check
-# This seems to append libcheck into linker flags unconditionally, 
-# perhaps the check should be done for each target separately?
-# if not conf.CheckLib('check'):
-#     print 'Did not find libcheck'
-#    Exit(1)
-
+# Additional C headers and libraries
 
 # Required boost headers/libraries
+# 
 if not conf.CheckCXXHeader('boost/pool/pool_alloc.hpp'):
-    print 'boost/pool/pool_alloc.hpp not found'
+    print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
     Exit(1)
 
 env = conf.Finish()
 
+
 #
-# Set up build flags
+# Set up build and link paths
 # 
 
 # Include paths
@@ -88,6 +117,7 @@ env.Replace(CPPPATH = Split('''#/galerautils/src
                                #/galera/src
                                '''))
 
+# Library paths
 env.Replace(LIBPATH = Split('''#/galerautils/src
                                #/gcomm/src
                                #/gcs/src
@@ -97,9 +127,15 @@ env.Replace(LIBPATH = Split('''#/galerautils/src
 
 # Common C/CXX flags
 # These should be kept minimal as they are appended after C/CXX specific flags
-env.Replace(CCFLAGS = opt_flags + ' -Wall -Wextra -Werror -Wno-unused-parameter ' + compile_arch)
+env.Replace(CCFLAGS = 
+            opt_flags 
+            + ' -Wall -Wextra -Werror -Wno-unused-parameter ' 
+            + compile_arch)
 
-# Linker flags
+# Linker flags  
+# TODO: enable '-Wl,--warn-common -Wl,--fatal-warnings' after warnings from
+# static linking have beed addressed
+# 
 env.Append(LINKFLAGS = ' ' + link_arch)
 
 # CPPFLAGS
@@ -109,7 +145,38 @@ env.Append(CPPFLAGS = ' -D_XOPEN_SOURCE=600')
 env.Replace(CFLAGS = '-std=c99 -fno-strict-aliasing -pedantic')
 
 # CXXFLAGS
-env.Replace(CXXFLAGS = '-Wno-long-long -Wno-deprecated -Weffc++ -pedantic -ansi')
+env.Replace(CXXFLAGS = 
+            '-Wno-long-long -Wno-deprecated -Weffc++ -pedantic -ansi')
 
 
+#
+# Set up and export environment for check unit tests
+#
+
+# Clone base from default environment
+check_env = env.Clone()
+
+conf = Configure(check_env)
+
+# Check header and library
+
+if not conf.CheckHeader('check.h'):
+    print 'Error: check header file not found or not usable'
+    Exit(1)
+
+if not conf.CheckLib('check'):
+    print 'Error: check library not found or not usable'
+    Exit(1)
+
+conf.Finish()
+
+# Link unit tests statically
+check_env.Append(LINKFLAGS = ' -static')
+
+Export('check_env')
+
+
+#
+# Run root SConscript with variant_dir
+#
 SConscript('SConscript', variant_dir=build_dir)
