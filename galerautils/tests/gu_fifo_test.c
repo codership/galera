@@ -11,8 +11,8 @@
 START_TEST (gu_fifo_test)
 {
     gu_fifo_t* fifo;
-    long i;
-    long* item;
+    size_t i;
+    size_t* item;
     size_t used;
 
     fifo = gu_fifo_create (0, 1);

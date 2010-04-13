@@ -1,0 +1,25 @@
+
+env = DefaultEnvironment()
+
+check_wsdb_sources = Split('''
+                              test_file.c
+                              test_hash.c
+                              test_cache.c
+                              test_wsdb.c
+                              test_version_file.c
+                              test_xdr.c
+                              test_log.c
+                              test_mempool.c
+                              wsdb_test.c
+                           ''')
+
+env.Program(target = 'check_wsdb', 
+            source = check_wsdb_sources,
+            LIBS = Split('''
+                            wsdb
+                            galerautils
+                            check
+                            rt
+                            pthread
+                         '''),
+            LINKFLAGS = '-static')

@@ -49,7 +49,7 @@ START_TEST(test_scan)
         fail_unless(strcmp(ptr, strs[i]) == 0);
         ptr = gu_str_next(ptr);
     }
-    fail_unless(ptr - str == len);
+    fail_unless(ptr == len + str);
 
     for (i = 0; i < 5; ++i)
     {

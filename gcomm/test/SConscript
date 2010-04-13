@@ -1,0 +1,23 @@
+
+env = DefaultEnvironment()
+
+check_gcomm_sources = Split('''
+                               check_gcomm.cpp
+                               check_trace.cpp
+                               check_types.cpp
+                               check_util.cpp
+                               check_gmcast.cpp
+                               check_evs2.cpp
+                               check_pc.cpp
+                            ''')
+
+env.Program(check_gcomm_sources, 
+            LIBS = Split('''
+                            gcomm
+                            galerautils++
+                            galerautils
+                            check
+                            rt
+                            pthread
+                         '''),
+            LINKFLAGS = '-static')

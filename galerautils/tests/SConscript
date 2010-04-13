@@ -1,0 +1,41 @@
+
+env = DefaultEnvironment()
+
+gu_tests_sources = Split('''
+                            gu_tests.c
+                            gu_mem_test.c
+                            gu_bswap_test.c
+                            gu_time_test.c
+                            gu_fifo_test.c
+                            gu_uuid_test.c
+                            gu_dbug_test.c
+                            gu_options_test.c
+                            gu_lock_step_test.c
+                            gu_str_test.c
+                         ''')
+
+env.Program(gu_tests_sources,
+            LIBS = Split('''
+                             galerautils
+                             check
+                             rt
+                             pthread
+                         '''),
+            LINKFLAGS = '-static')
+
+
+gu_testspp_sources = Split('''gu_tests++.cpp
+                              gu_string_test.cpp
+                              gu_uri_test.cpp
+                              gu_net_test.cpp
+                              gu_datetime_test.cpp
+                           ''')
+env.Program(gu_testspp_sources,
+            LIBS = Split('''
+                            galerautils++
+                            galerautils
+                            check
+                            rt
+                            pthread
+                         '''),
+            LINKFLAGS = '-static')

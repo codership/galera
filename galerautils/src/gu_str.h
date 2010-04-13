@@ -82,7 +82,7 @@ static inline char* gu_str_table_set_n_cols(char* str, size_t* off, size_t n)
     return gu_str_table_append_size(str, off, n);
 }
 
-static inline const size_t gu_str_table_get_n_cols(const char* str)
+static inline size_t gu_str_table_get_n_cols(const char* str)
 {
     str = gu_str_advance(str, 1);
     return strtoul(str, NULL, 0);
