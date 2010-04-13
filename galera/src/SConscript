@@ -1,4 +1,4 @@
 
-Import('env')
+env = DefaultEnvironment()
 
 env.SharedLibrary('mmgalera', Glob('*.c'))

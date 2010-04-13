@@ -1,7 +1,8 @@
 # 
 
-Import('env')
+env = DefaultEnvironment()
 
 libgcomm_env = env.Clone()
-libgcomm_env.SharedLibrary('gcomm', Glob('*.cpp'))
 libgcomm_env.Append(CXXFLAGS = ' -fno-strict-aliasing')
+libgcomm_env.SharedLibrary('gcomm', Glob('*.cpp'))
+libgcomm_env.StaticLibrary('gcomm', Glob('*.cpp'))

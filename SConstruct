@@ -48,7 +48,7 @@ elif arch == 'x86-64':
 # Set up and export build environment
 #
 # TODO: import env required for ccache and distcc 
-env = Environment()
+env = DefaultEnvironment()
 
 #
 # Check required headers and libraries
@@ -88,6 +88,13 @@ env.Replace(CPPPATH = Split('''#/galerautils/src
                                #/galera/src
                                '''))
 
+env.Replace(LIBPATH = Split('''#/galerautils/src
+                               #/gcomm/src
+                               #/gcs/src
+                               #/wsdb/src
+                               #/galera/src
+                               '''))
+
 # Common C/CXX flags
 # These should be kept minimal as they are appended after C/CXX specific flags
 env.Replace(CCFLAGS = opt_flags + ' -Wall -Wextra -Werror -Wno-unused-parameter ' + compile_arch)
@@ -103,8 +110,6 @@ env.Replace(CFLAGS = '-std=c99 -fno-strict-aliasing -pedantic')
 
 # CXXFLAGS
 env.Replace(CXXFLAGS = '-Wno-long-long -Wno-deprecated -Weffc++ -pedantic -ansi')
-
-Export('env')
 
 
 SConscript('SConscript', variant_dir=build_dir)
