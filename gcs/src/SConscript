@@ -34,7 +34,8 @@ libgcs_env.StaticLibrary('gcs', libgcs_sources)
 
 # TODO: How to tell scons portably that C++ linker should be used
 # and program should be linked statically
-libgcs_env.Program('gcs_test.c',
+libgcs_env.Program(target = 'gcs_test',
+                   source = 'gcs_test.c',
                    LIBS = Split('''
                                    gcs
                                    gcomm

@@ -31,7 +31,8 @@ gcs_tests_sources = Split('''
 gcs_tests_env.Append(CPPFLAGS = ' -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING')
 gcs_tests_env.Replace(CFLAGS = ' -std=gnu99 -fno-strict-aliasing')
 
-gcs_tests_env.Program(gcs_tests_sources, 
+gcs_tests_env.Program(target = 'gcs_tests',
+                      source = gcs_tests_sources, 
                       OBJPREFIX = 'gcs-tests-',
                       LIBS = Split('''
                                       galerautils

@@ -11,7 +11,8 @@ check_gcomm_sources = Split('''
                                check_pc.cpp
                             ''')
 
-env.Program(check_gcomm_sources, 
+env.Program(target = 'check_gcomm',
+            source = check_gcomm_sources,
             LIBS = Split('''
                             gcomm
                             galerautils++

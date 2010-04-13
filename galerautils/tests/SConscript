@@ -14,7 +14,8 @@ gu_tests_sources = Split('''
                             gu_str_test.c
                          ''')
 
-env.Program(gu_tests_sources,
+env.Program(target = 'gu_tests',
+            source = gu_tests_sources,
             LIBS = Split('''
                              galerautils
                              check
@@ -30,7 +31,8 @@ gu_testspp_sources = Split('''gu_tests++.cpp
                               gu_net_test.cpp
                               gu_datetime_test.cpp
                            ''')
-env.Program(gu_testspp_sources,
+env.Program(target = 'gu_tests++',
+            source = gu_testspp_sources,
             LIBS = Split('''
                             galerautils++
                             galerautils
