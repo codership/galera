@@ -131,11 +131,9 @@ build_base=$(cd $(dirname $0); cd ..; pwd -P)
 
 # Define branches to be used
 galerautils_src=$build_base/galerautils
-gcache_src=$build_base/gcache
 galeracomm_src=$build_base/galeracomm
 gcomm_src=$build_base/gcomm
 gcs_src=$build_base/gcs
-gemini_src=$build_base/gemini
 wsdb_src=$build_base/wsdb
 galera_src=$build_base/galera
 
@@ -321,7 +319,6 @@ fi
 if test "$SKIP_BUILD" == "no"; then
 
 build_module "galerautils"
-build_module "gcache"
 
 if test "$DISABLE_GCOMM" != "yes"
 then 
@@ -352,7 +349,6 @@ else
 fi
 
 build_module "gcs" $gcs_conf_flags
-build_module "gemini"
 build_module "wsdb"
 build_module "galera"
 
