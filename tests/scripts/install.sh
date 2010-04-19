@@ -34,7 +34,7 @@ copy_config()
         then
             cp "$cnf" "$cnf_dir"
         else
-            scp -q "$cnf" "$location:$cnf_dir"
+            scp -q "$cnf" $location":$cnf_dir"
         fi
     fi
 }

@@ -20,7 +20,7 @@
 #    local cmd="$($@)"
 #    local cmd="$1"
 #
-#    ssh -ax "${NODE_LOCATION[$node]}" "$cmd"
+#    ssh -ax ${NODE_LOCATION[$node]} "$cmd"
 #}
 
 _date()
@@ -40,7 +40,7 @@ virtual_job()
         eval "$cmd" 1>"$out"
     else
 #        ssh_job "$cmd" 1>"$out"
-        ssh -ax "${NODE_LOCATION[$node]}" "$cmd" 1>"$out"
+        ssh -ax ${NODE_LOCATION[$node]} "$cmd" 1>"$out"
     fi
 
 }

@@ -120,10 +120,11 @@ restart_node()
 # unlike bulk check this one returns error when the node could not be checked
 check_node()
 {
-    node_job "check_cmd" "$@"
+    local cmd="check_cmd"
+    node_job "$cmd" "$@"
 
-    local node_id="${NODE_ID[$node]}"
-    echo "$chk" | sed s/-/${node_id}/
+    local node_id="${NODE_ID[$1]}"
+    cat "${BASE_OUT}/${cmd}_${node_id}.out" | sed s/-/${node_id}/
     return $(cat $BASE_RUN/check_cmd_$node_id.ret)
 }
 
