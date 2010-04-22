@@ -10,6 +10,7 @@
 #define _gu_mem_h_
 
 #include <stdlib.h>
+#include <unistd.h>
 
 /** @name Functions to help with dynamic allocation debugging.
  *  Take additional __FILE__ and __LINE__ arguments. Should be

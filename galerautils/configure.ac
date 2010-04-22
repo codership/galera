@@ -53,7 +53,7 @@ AC_CHECK_LIB([rt], [clock_getres],,AC_MSG_NOTICE([librt not found]))
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([limits.h stdint.h stdlib.h string.h sys/time.h])
+AC_CHECK_HEADERS([limits.h stdint.h stdlib.h string.h sys/time.h endian.h byteswap.h sys/endian.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <time.h>
 
 #ifdef __cplusplus

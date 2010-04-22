@@ -14,6 +14,11 @@
 #
 ####################################################################
 
+import os
+
+sysname = os.uname()[0].lower()
+print sysname
+
 
 #
 # Print Help 
@@ -77,16 +82,21 @@ boost = int(ARGUMENTS.get('boost', 1))
 # TODO: import env required for ccache and distcc 
 #
 
+
+
 env = DefaultEnvironment()
 
-
+# Ports are installed under /usr/local 
+if sysname == 'freebsd':
+    env.Append(LIBPATH = '-L/usr/local/lib')
+    env.Append(CPPFLAGS = '-I/usr/local/include')
 
 #
 # Set up build and link paths
 # 
 
 # Include paths
-env.Replace(CPPPATH = Split('''#/galerautils/src
+env.Append(CPPPATH = Split('''#/galerautils/src
                                #/gcomm/src
                                #/gcomm/src/gcomm
                                #/gcs/src
@@ -95,7 +105,7 @@ env.Replace(CPPPATH = Split('''#/galerautils/src
                                '''))
 
 # Library paths
-env.Replace(LIBPATH = Split('''#/galerautils/src
+env.Append(LIBPATH = Split('''#/galerautils/src
                                #/gcomm/src
                                #/gcs/src
                                #/wsdb/src
@@ -144,7 +154,26 @@ if not conf.CheckLib('rt'):
     print 'Error: rt library not found'
     Exit(1)
 
+if conf.CheckHeader('epoll.h'):
+    conf.env.Append(CPPFLAGS = ' -DGALERA_USE_GU_NETWORK')
+
+if conf.CheckHeader('byteswap.h'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_BYTESWAP_H')
+
+if conf.CheckHeader('endian.h'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_ENDIAN_H')
+
+if conf.CheckHeader('sys/endian.h'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_SYS_ENDIAN_H')
+
 # Additional C headers and libraries
+
+if not conf.CheckCXXHeader('boost/shared_ptr.hpp'):
+    print 'boost/shared_ptr.hpp not found or not usable, trying without -Weffc++'
+    conf.env.Replace(CXXFLAGS = conf.env['CXXFLAGS'].replace('-Weffc++', ''))
+    if not conf.CheckCXXHeader('boost/shared_ptr.hpp'):
+        print 'boost/shared_ptr.hpp not found or not usable'
+        Exit(1)
 
 if boost == 1:
     # Use nanosecond time precision

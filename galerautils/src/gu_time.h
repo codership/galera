@@ -87,7 +87,7 @@ gu_time_monotonic()
 #endif
 }
 
-
+#ifdef CLOCK_PROCESS_CPUTIME_ID
 static inline long long
 gu_time_process_cputime()
 {
@@ -99,7 +99,7 @@ gu_time_process_cputime()
     return -1;
 #endif
 }
-
+#endif /* CLOCK_PROCESS_CPUTIME_ID */
 
 
 static inline long long

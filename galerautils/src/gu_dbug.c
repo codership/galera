@@ -406,7 +406,7 @@ static struct state_map *_gu_db_state_map[_GU_DB_STATE_MAP_BUCKETS];
  */
 static inline unsigned long pt_hash(const pthread_t th)
 {
-    unsigned long k = th;
+    unsigned long k = (unsigned long)th;
     uint64_t ret = 2654435761U * k;
     // since we're returning a masked hash key, all considerations
     // for "reversibility" can be dropped. Instead we can help
@@ -1481,7 +1481,7 @@ DoPrefix(uint _line_)
     state->lineno++;
     if (_gu_db_stack->flags & PID_ON) {
 #ifdef THREAD
-	(void) fprintf(_gu_db_fp_, "%5d:(thread %lu):", (int)getpid(), pthread_self());
+        (void) fprintf(_gu_db_fp_, "%5d:(thread %lu):", (int)getpid(), (unsigned long)pthread_self());
 #else
 	(void) fprintf(_gu_db_fp_, "%5d: ", (int) getpid());
 #endif /* THREAD */

@@ -93,7 +93,7 @@ namespace gu
         {
             os << " (FATAL)";
 
-            Exception e(os.str(), ENOTRECOVERABLE);
+            Exception e(os.str(), Exception::E_NOTRECOVERABLE);
 
             e.trace (file, func, line);
 
