@@ -41,9 +41,9 @@ gcs_test_env.Prepend(LIBS = Split('''
                                      galerautils++
                                      galerautils
                                   '''))
+gcs_test_env.Append(LINKFLAGS = ' -static')
 gcs_test_env.Program(target = 'gcs_test',
                      source = 'gcs_test.c',
-                     LINK = libgcs_env['CXX'],
-                     LINKFLAGS = '-static')
+                     LINK = libgcs_env['CXX'])
 
 SConscript('unit_tests/SConscript')

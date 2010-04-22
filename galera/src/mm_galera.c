@@ -38,7 +38,6 @@ typedef enum galera_repl_state {
 static wsrep_bf_apply_cb_t      bf_apply_cb        = NULL;
 //DELETE static wsrep_ws_start_cb_t      ws_start_cb        = NULL;
 static wsrep_view_cb_t          view_handler_cb    = NULL;
-static wsrep_sst_prepare_cb_t   sst_prepare_cb     = NULL;
 static wsrep_sst_donate_cb_t    sst_donate_cb      = NULL;
 
 /* gcs parameters */
@@ -340,9 +339,7 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     
     /* set the rest of callbacks */
     bf_apply_cb       = args->bf_apply_cb;
-//DELETE    ws_start_cb       = args->ws_start_cb;
     view_handler_cb   = args->view_handler_cb;
-    sst_prepare_cb    = args->sst_prepare_cb;
     sst_donate_cb     = args->sst_donate_cb;
     
     gu_mutex_init(&commit_mtx, NULL);
@@ -415,9 +412,7 @@ static enum wsrep_status mm_galera_connect (wsrep_t *gh,
     GU_DBUG_RETURN(rcode);
 }
 
-static enum wsrep_status mm_galera_disconnect(wsrep_t *gh,
-                                              wsrep_uuid_t*  app_uuid,
-                                              wsrep_seqno_t* app_seqno)
+static enum wsrep_status mm_galera_disconnect(wsrep_t *gh)
 {
     int rcode;
 
@@ -446,9 +441,6 @@ static enum wsrep_status mm_galera_disconnect(wsrep_t *gh,
         
         gu_info("Closed GCS connection");
     }
-    
-    if (app_uuid)  *app_uuid  = *(wsrep_uuid_t*)&status.state_uuid;
-    if (app_seqno) *app_seqno = status.last_applied;
     
     GU_DBUG_RETURN(WSREP_OK);
 }
@@ -519,7 +511,7 @@ static void print_ws(FILE* fid, struct wsdb_write_set *ws, gcs_seqno_t seqno) {
 #define PRINT_WS(fid, ws, seqno)
 #endif // EXTRA_DEBUG
 
-static wsrep_status_t apply_queries(void *app_ctx, struct wsdb_write_set *ws)
+static wsrep_status_t apply_queries(void *recv_ctx, struct wsdb_write_set *ws)
 {
     u_int16_t i;
 
@@ -541,7 +533,7 @@ static wsrep_status_t apply_queries(void *app_ctx, struct wsdb_write_set *ws)
         data.u.sql.randseed = ws->queries[i].randseed;
 
         assert (ws->trx_seqno > 0);
-        switch (bf_apply_cb(app_ctx, &data, ws->trx_seqno)) {
+        switch (bf_apply_cb(recv_ctx, &data, ws->trx_seqno)) {
         case WSREP_OK: break;
         case WSREP_NOT_IMPLEMENTED: break;
         case WSREP_FATAL:
@@ -560,7 +552,7 @@ static wsrep_status_t apply_queries(void *app_ctx, struct wsdb_write_set *ws)
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static wsrep_status_t apply_rows(void *app_ctx, struct wsdb_write_set *ws)
+static wsrep_status_t apply_rows(void *recv_ctx, struct wsdb_write_set *ws)
 {
     u_int16_t i;
     wsrep_apply_data_t data;
@@ -580,7 +572,7 @@ static wsrep_status_t apply_rows(void *app_ctx, struct wsdb_write_set *ws)
         data.u.row.len = ws->items[i].u.row.length;
 
         assert (ws->trx_seqno > 0);
-        switch ((rcode = bf_apply_cb(app_ctx, &data, ws->trx_seqno))) {
+        switch ((rcode = bf_apply_cb(recv_ctx, &data, ws->trx_seqno))) {
         case WSREP_OK: break;
         case WSREP_NOT_IMPLEMENTED: break;
         case WSREP_FATAL:
@@ -595,7 +587,7 @@ static wsrep_status_t apply_rows(void *app_ctx, struct wsdb_write_set *ws)
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static wsrep_status_t apply_write_set(void *app_ctx, struct wsdb_write_set *ws)
+static wsrep_status_t apply_write_set(void *recv_ctx, struct wsdb_write_set *ws)
 {
     u_int16_t i;
     wsrep_status_t rcode = WSREP_OK;
@@ -618,7 +610,7 @@ static wsrep_status_t apply_write_set(void *app_ctx, struct wsdb_write_set *ws)
             data.u.sql.len      = ws->conn_queries[i].query_len;
 
             assert (ws->trx_seqno > 0);
-            switch (bf_apply_cb(app_ctx, &data, ws->trx_seqno)) {
+            switch (bf_apply_cb(recv_ctx, &data, ws->trx_seqno)) {
             case WSREP_OK: break;
             case WSREP_NOT_IMPLEMENTED: break;
             case WSREP_FATAL: 
@@ -638,11 +630,11 @@ static wsrep_status_t apply_write_set(void *app_ctx, struct wsdb_write_set *ws)
     }
     switch (ws->level) {
     case WSDB_WS_QUERY:     
-        rcode = apply_queries(app_ctx, ws);
+        rcode = apply_queries(recv_ctx, ws);
         break;
     case WSDB_WS_DATA_ROW:
         // TODO: implement
-        rcode = apply_rows(app_ctx, ws);
+        rcode = apply_rows(recv_ctx, ws);
         break;
     case WSDB_WS_DATA_RBR: 
         {
@@ -652,7 +644,7 @@ static wsrep_status_t apply_write_set(void *app_ctx, struct wsdb_write_set *ws)
             data.u.app.len = ws->rbr_buf_len;
 
             assert (ws->trx_seqno > 0);
-            rcode = bf_apply_cb(app_ctx, &data, ws->trx_seqno);
+            rcode = bf_apply_cb(recv_ctx, &data, ws->trx_seqno);
             break;
         }
     case WSDB_WS_DATA_COLS: 
@@ -674,7 +666,7 @@ static wsrep_status_t apply_write_set(void *app_ctx, struct wsdb_write_set *ws)
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static wsrep_status_t apply_query(void *app_ctx, const char *query, int len,
+static wsrep_status_t apply_query(void *recv_ctx, const char *query, int len,
                                   wsrep_seqno_t seqno_g
 ) {
     int rcode;
@@ -694,7 +686,7 @@ static wsrep_status_t apply_query(void *app_ctx, const char *query, int len,
     data.u.sql.randseed = 0;
 
     assert (seqno_g > 0);
-    rcode = bf_apply_cb(app_ctx, &data, seqno_g);
+    rcode = bf_apply_cb(recv_ctx, &data, seqno_g);
     if (rcode != WSREP_OK) {
         gu_error("query commit failed: %d query '%s'", rcode, query);
         GU_DBUG_RETURN(WSREP_TRX_FAIL);
@@ -762,7 +754,7 @@ galera_update_last_received (gcs_seqno_t seqno)
 }
 
 static wsrep_status_t process_conn_write_set( 
-    struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
+    struct job_worker *applier, void *recv_ctx, struct wsdb_write_set *ws, 
     gcs_seqno_t seqno_l
 ) {
     bool do_report;
@@ -776,7 +768,7 @@ static wsrep_status_t process_conn_write_set(
 
     if (gu_likely(galera_update_last_received(ws->trx_seqno))) {
         /* Global seqno ok, certification ok (not needed?) */
-        rcode = apply_write_set(app_ctx, ws);
+        rcode = apply_write_set(recv_ctx, ws);
         if (rcode) {
             gu_error ("unknown galera fail: %d trx: %llu", rcode, seqno_l);
         }
@@ -796,7 +788,7 @@ static wsrep_status_t process_conn_write_set(
 }
 
 enum wsrep_status process_query_write_set_applying(
-    struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
+    struct job_worker *applier, void *recv_ctx, struct wsdb_write_set *ws, 
     gcs_seqno_t seqno_l
 ) {
     struct job_context ctx;
@@ -821,13 +813,13 @@ enum wsrep_status process_query_write_set_applying(
     job_queue_start_job(applier_queue, applier, (void *)&ctx);
 
  retry:
-    while((rcode = apply_write_set(app_ctx, ws))) {
+    while((rcode = apply_write_set(recv_ctx, ws))) {
         if (attempts == 0) 
             gu_warn("ws apply failed, rcode: %d, seqno: %lld, last_seen: %lld", 
                     rcode, ws->trx_seqno, ws->last_seen_trx
         );
 
-        if (apply_query(app_ctx, "rollback\0", 9, ws->trx_seqno)) {
+        if (apply_query(recv_ctx, "rollback\0", 9, ws->trx_seqno)) {
             gu_warn("ws apply rollback failed, seqno: %lld, last_seen: %lld", 
                     ws->trx_seqno, ws->last_seen_trx);
         }
@@ -898,7 +890,7 @@ enum wsrep_status process_query_write_set_applying(
                     seqno_l);
         }
 
-        if (apply_query(app_ctx, "rollback\0", 9, ws->trx_seqno)) {
+        if (apply_query(recv_ctx, "rollback\0", 9, ws->trx_seqno)) {
             gu_warn("ws apply rollback failed for: %lld %lld, last_seen: %lld", 
                     ws->trx_seqno, seqno_l, ws->last_seen_trx
             );
@@ -914,7 +906,7 @@ enum wsrep_status process_query_write_set_applying(
 
     gu_debug("GALERA ws commit for: %lld %lld", ws->trx_seqno, seqno_l);
 
-    if (apply_query(app_ctx, "commit\0", 7, ws->trx_seqno)) {
+    if (apply_query(recv_ctx, "commit\0", 7, ws->trx_seqno)) {
         gu_warn("ws apply commit failed, seqno: %lld %lld, last_seen: %lld", 
                 ws->trx_seqno, seqno_l, ws->last_seen_trx);
         goto retry;
@@ -945,7 +937,7 @@ enum wsrep_status process_query_write_set_applying(
   similar to post gcs_repl part of `galera_commit' to apply remote WS
 */
 static wsrep_status_t process_query_write_set( 
-    struct job_worker *applier, void *app_ctx, struct wsdb_write_set *ws, 
+    struct job_worker *applier, void *recv_ctx, struct wsdb_write_set *ws, 
     gcs_seqno_t seqno_l
 ) {
     int rcode;
@@ -986,7 +978,7 @@ static wsrep_status_t process_query_write_set(
     switch (rcode) {
     case WSDB_OK:   /* certification ok */
     {
-        rcode = process_query_write_set_applying(applier, app_ctx, ws, seqno_l);
+        rcode = process_query_write_set_applying(applier, recv_ctx, ws, seqno_l);
 
         /* stop for any dbms error */
         if (rcode != WSDB_OK) {
@@ -1038,7 +1030,7 @@ static wsrep_status_t process_query_write_set(
 }
 
 static wsrep_status_t process_write_set( 
-    struct job_worker *applier, void *app_ctx, uint8_t *data, size_t data_len, 
+    struct job_worker *applier, void *recv_ctx, uint8_t *data, size_t data_len, 
     gcs_seqno_t seqno_g, gcs_seqno_t seqno_l
 ) {
     struct wsdb_write_set ws;
@@ -1065,10 +1057,10 @@ static wsrep_status_t process_write_set(
 
     switch (ws.type) {
     case WSDB_WS_TYPE_TRX:
-        rcode = process_query_write_set(applier, app_ctx, &ws, seqno_l);
+        rcode = process_query_write_set(applier, recv_ctx, &ws, seqno_l);
         break;
     case WSDB_WS_TYPE_CONN:
-        rcode = process_conn_write_set(applier, app_ctx, &ws, seqno_l);
+        rcode = process_conn_write_set(applier, recv_ctx, &ws, seqno_l);
         break;
     }
 
@@ -1157,11 +1149,15 @@ galera_st_required (const gcs_act_conf_t* conf)
  */
 static long
 galera_handle_configuration (wsrep_t* gh,
-                             const gcs_act_conf_t* conf, gcs_seqno_t conf_seqno)
+                             void* recv_ctx,
+                             const gcs_act_conf_t* conf, 
+                             gcs_seqno_t conf_seqno)
 {
     long ret             = 0;
     gu_uuid_t* conf_uuid = (gu_uuid_t*)conf->group_uuid;
     bool st_required;
+    void*   app_req = NULL;
+    ssize_t app_req_len;
 
     GU_DBUG_ENTER("galera_handle_configuration");
 
@@ -1196,16 +1192,19 @@ galera_handle_configuration (wsrep_t* gh,
     wsdb_set_global_trx_committed(conf->seqno);
 #endif
 
-    view_handler_cb (galera_view_info_create (conf, st_required));
+    view_handler_cb (NULL, recv_ctx,
+                     galera_view_info_create (conf, st_required),
+                     NULL, 0,
+                     &app_req,
+                     &app_req_len
+        );
 
     if (conf->conf_id >= 0) {                // PRIMARY configuration
 
         if (st_required)
         {
-            void*   app_req = NULL;
-            ssize_t app_req_len;
             int const retry_sec = 1;
-
+            
             // GCS determined that we need to request state transfer.
             gu_info ("State transfer required:"
                      "\n\tGroup state: "GU_UUID_FORMAT":%lld"
@@ -1217,7 +1216,7 @@ galera_handle_configuration (wsrep_t* gh,
             gu_mutex_lock (&sst_mtx);
 
             status.stage = GALERA_STAGE_SST_PREPARE;
-            app_req_len = sst_prepare_cb (&app_req);
+            // app_req_len = sst_prepare_cb (&app_req);
 
             if (app_req_len < 0) {
 
@@ -1419,7 +1418,8 @@ galera_handle_configuration (wsrep_t* gh,
     GU_DBUG_RETURN(ret);
 }
 
-static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
+static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx) 
+{
     int                rcode;
     struct job_worker* applier;
     bool               shutdown = false;
@@ -1484,7 +1484,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
             status.received_bytes += action_size;
 
             ret_code = process_write_set(
-                applier, app_ctx, action, action_size, seqno_g, seqno_l
+                applier, recv_ctx, action, action_size, seqno_g, seqno_l
             );
 
             /* catch node failure */
@@ -1509,7 +1509,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
             switch (action_type) {
             case GCS_ACT_CONF:
             {
-                galera_handle_configuration (gh, action, seqno_l);
+                galera_handle_configuration (gh, recv_ctx, action, seqno_l);
                 if (-1 == my_idx /* self-leave */)
                 {
                     status.stage = GALERA_STAGE_INIT;
@@ -1526,10 +1526,13 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *app_ctx) {
                 /* To snap out of donor state application must call
                  * wsrep->sst_sent() when it is really done */
 
-                sst_donate_cb (action,
+                sst_donate_cb (NULL,
+                               recv_ctx,
+                               action,
                                action_size,
                                (wsrep_uuid_t*)&status.state_uuid,
-                               /* status.last_applied, see #182 */ last_recved);
+                               /* status.last_applied, see #182 */ last_recved,
+                               NULL, 0);
                 ret_code = WSREP_OK;
                 break;
             case GCS_ACT_JOIN:
@@ -2057,6 +2060,7 @@ static enum wsrep_status mm_galera_pre_commit(
         /* Global seqno OK, do certification test */
         rcode = wsdb_append_write_set(seqno_g, ws);
 #endif
+
         switch (rcode) {
         case WSDB_OK:
             gu_debug ("local trx %lld certified, cert. interval: %lld - %lld", 
@@ -2249,6 +2253,14 @@ static enum wsrep_status mm_galera_append_row_key(
     default:                    return WSREP_CONN_FAIL;
     }
 }
+
+static wsrep_status_t mm_galera_causal_read(
+    wsrep_t* wsrep, 
+    wsrep_seqno_t* seqno)
+{
+    return WSREP_NOT_IMPLEMENTED;
+}
+
 
 static enum wsrep_status mm_galera_set_variable(
     wsrep_t *gh,
@@ -2514,7 +2526,7 @@ static enum wsrep_status mm_galera_to_execute_end(
 }
 
 static enum wsrep_status mm_galera_replay_trx(
-    wsrep_t *gh, const wsrep_trx_id_t trx_id, void *app_ctx
+    wsrep_t *gh, const wsrep_trx_id_t trx_id, void *recv_ctx
 ) {
     struct job_worker   *applier;
     struct job_context  ctx;
@@ -2602,13 +2614,13 @@ static enum wsrep_status mm_galera_replay_trx(
         switch (trx.position) {
         case WSDB_TRX_POS_CERT_QUEUE:
             ret_code = process_query_write_set(
-                applier, app_ctx, trx.ws, trx.seqno_l
+                applier, recv_ctx, trx.ws, trx.seqno_l
             );
             break;
 
         case WSDB_TRX_POS_COMMIT_QUEUE:
             ret_code = process_query_write_set_applying( 
-                applier, app_ctx, trx.ws, trx.seqno_l
+                applier, recv_ctx, trx.ws, trx.seqno_l
             );
 
             /* register committed transaction */
@@ -2688,7 +2700,9 @@ static wsrep_status_t mm_galera_sst_sent (wsrep_t* gh,
 
 static wsrep_status_t mm_galera_sst_received (wsrep_t* gh,
                                               const wsrep_uuid_t* uuid,
-                                              wsrep_seqno_t seqno)
+                                              wsrep_seqno_t seqno,
+                                              const char* state,
+                                              size_t state_len)
 {
     gu_mutex_lock (&sst_mtx);
     {
@@ -2701,6 +2715,15 @@ static wsrep_status_t mm_galera_sst_received (wsrep_t* gh,
     return WSREP_OK;
 }
 
+static wsrep_status_t mm_galera_snapshot(
+    wsrep_t*     wsrep,
+    const void*  msg,
+    const size_t msg_len,
+    const char*  donor_spec)
+{
+    return WSREP_NOT_IMPLEMENTED;
+}
+
 static struct wsrep_status_var* mm_galera_status_get (wsrep_t* gh)
 {
     return galera_status_get (&status);
@@ -2711,6 +2734,8 @@ static void mm_galera_status_free (wsrep_t* gh,
 {
     galera_status_free (s);
 }
+
+
 
 static wsrep_t mm_galera_str = {
     WSREP_INTERFACE_VERSION,
@@ -2728,12 +2753,14 @@ static wsrep_t mm_galera_str = {
     &mm_galera_abort_slave_trx,
     &mm_galera_append_query,
     &mm_galera_append_row_key,
+    &mm_galera_causal_read,
     &mm_galera_set_variable,
     &mm_galera_set_database,
     &mm_galera_to_execute_start,
     &mm_galera_to_execute_end,
     &mm_galera_sst_sent,
     &mm_galera_sst_received,
+    &mm_galera_snapshot,
     &mm_galera_status_get,
     &mm_galera_status_free,
     "Galera",
