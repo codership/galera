@@ -35,7 +35,7 @@ extern "C"
 #endif // PROFILE_GCS_GCOMM
 #include "profile.hpp"
 
-
+#include <boost/pool/pool_alloc.hpp>
 #include <deque>
 
 using namespace std;

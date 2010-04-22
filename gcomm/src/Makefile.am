@@ -18,7 +18,8 @@ libgcomm_la_SOURCES =      \
 	evs_proto.cpp      \
 	pc_proto.cpp       \
 	pc.cpp             \
-\
+	protonet.cpp \
+	gu.cpp \
 	defaults.hpp         \
 	evs_consensus.hpp    \
 	evs_input_map2.hpp   \

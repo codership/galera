@@ -21,8 +21,9 @@ usage()
 "    --with-spread   configure build with Spread (implies -c)\n"\
 "    --no-strip      prevent stripping of release binaries\n"\
 "    -r|--release <galera release>, otherwise revisions will be used\n"\
-"    -p|--package    create DEB/RPM packages (depending on the distribution)\n"
-"    --sb|--skip-build skip the actual build, use the existing binaries"
+"    -p|--package    create DEB/RPM packages (depending on the distribution)\n"\
+"    --sb|--skip-build skip the actual build, use the existing binaries"\
+"    --scons         use scons to build galera libraries"\
 "\n -s and -b options affect only Galera build.\n"
 }
 
@@ -36,6 +37,8 @@ PACKAGE=no
 INSTALL=no
 CONFIGURE=no
 SKIP_BUILD=no
+SCRATCH=no
+SCONS=no
 
 GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
 
@@ -93,6 +96,9 @@ do
         --sb|--skip-build)
             SKIP_BUILD="yes"
             ;;
+        --scons)
+            SCONS="yes"
+            ;;
         --help)
             usage
             exit 0
@@ -125,6 +131,8 @@ GALERA_SRC=${GALERA_SRC:-$BUILD_ROOT/../../}
 # Source paths are either absolute or relative to script, get absolute
 MYSQL_SRC=$(cd $MYSQL_SRC; pwd -P; cd $BUILD_ROOT)
 GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
+# Scons variant dir, defaults to GALERA_SRC
+SCONS_VD=$GALERA_SRC
 
 ######################################
 ##                                  ##
@@ -137,8 +145,20 @@ then
     cd $GALERA_SRC
     GALERA_REV=$(svnversion | sed s/\:/,/g)
     export GALERA_VER=${RELEASE:-$GALERA_REV}
-
-    scripts/build.sh # options are passed via environment variables
+    if [ "$SCONS" == "yes" ]
+    then
+        scons_args=""
+        if [ "$SCRATCH" == "yes" ]
+        then
+            scons -Q -c
+        fi
+        if [ "$SKIP_BUILD" != "yes" ]
+        then
+            scons -Q $scons_args
+        fi
+    else
+        scripts/build.sh # options are passed via environment variables
+    fi
 fi
 
 ######################################
@@ -150,7 +170,7 @@ fi
 cd $MYSQL_SRC
 MYSQL_REV=$(bzr revno)
 # this does not work on an unconfigured source MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
-MYSQL_VER=$(grep AM_INIT_AUTOMAKE\(mysql, configure.in | awk '{ print $2 }' | sed s/\)//)
+MYSQL_VER=$(grep PACKAGE_VERSION include/my_config.h | awk '{gsub(/\"/,""); print $3; }')
 
 if [ "$PACKAGE" == "yes" ] # fetch and patch pristine sources
 then
@@ -262,12 +282,21 @@ tar -xzf mysql_var.tgz -C $MYSQL_DIST_DIR
 GALERA_LIBS=$GALERA_DIST_DIR/lib
 mkdir -p $GALERA_LIBS
 install -m 644 LICENSE.galera $GALERA_DIST_DIR
-cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils.so*   $GALERA_LIBS
-cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils++.so* $GALERA_LIBS
-cp -P $GALERA_SRC/gcomm/src/.libs/libgcomm.so* $GALERA_LIBS
-cp -P $GALERA_SRC/gcs/src/.libs/libgcs.so* $GALERA_LIBS
-cp -P $GALERA_SRC/wsdb/src/.libs/libwsdb.so* $GALERA_LIBS
-cp -P $GALERA_SRC/galera/src/.libs/libmmgalera.so* $GALERA_LIBS
+if [ "$SCONS" == "yes" ]
+    cp -P $SCONS_VD/galerautils/src/libgalerautils.so*   $GALERA_LIBS
+    cp -P $SCONS_VD/galerautils/src/libgalerautils++.so* $GALERA_LIBS
+    cp -P $SCONS_VD/gcomm/src/libgcomm.so* $GALERA_LIBS
+    cp -P $SCONS_VD/gcs/src/libgcs.so* $GALERA_LIBS
+    cp -P $SCONS_VD/wsdb/src/libwsdb.so* $GALERA_LIBS
+    cp -P $SCONS_VD/galera/src/libmmgalera.so* $GALERA_LIBS
+then
+    cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils.so*   $GALERA_LIBS
+    cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils++.so* $GALERA_LIBS
+    cp -P $GALERA_SRC/gcomm/src/.libs/libgcomm.so* $GALERA_LIBS
+    cp -P $GALERA_SRC/gcs/src/.libs/libgcs.so* $GALERA_LIBS
+    cp -P $GALERA_SRC/wsdb/src/.libs/libwsdb.so* $GALERA_LIBS
+    cp -P $GALERA_SRC/galera/src/.libs/libmmgalera.so* $GALERA_LIBS
+fi
 
 # Install vsbes stuff if it is available
 GALERA_SBIN="$GALERA_DIST_DIR/galera/sbin"
