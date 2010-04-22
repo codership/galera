@@ -429,7 +429,7 @@ static void single_join(DummyTransport* t, Proto* p)
 class DummyUser : public Toplay
 {
 public:
-    void handle_up(int, const Datagram&, const ProtoUpMeta&)
+    void handle_up(const void*, const Datagram&, const ProtoUpMeta&)
     {
 
     }
@@ -438,9 +438,8 @@ public:
 START_TEST(test_proto_single_join)
 {
     log_info << "START";
-    Protonet net;
     UUID uuid(1);
-    DummyTransport t(net, uuid);
+    DummyTransport t(uuid);
     DummyUser u;
     Proto p(uuid);
     gcomm::connect(&t, &p);
@@ -571,9 +570,8 @@ static void double_join(DummyTransport* t1, Proto* p1,
 START_TEST(test_proto_double_join)
 {
     log_info << "START";
-    Protonet net;
     UUID uuid1(1), uuid2(2);
-    DummyTransport t1(net, uuid1), t2(net, uuid2);
+    DummyTransport t1(uuid1), t2(uuid2);
     DummyUser u1, u2;
     Proto p1(uuid1), p2(uuid2);
 
@@ -608,11 +606,10 @@ static DummyNode* create_dummy_node(size_t idx,
             + ::getenv("EVS_DEBUG_MASK");
     }
     list<Protolay*> protos;
-    Protonet net;
     try
     {
         UUID uuid(static_cast<int32_t>(idx));
-        protos.push_back(new DummyTransport(net, uuid, false));
+        protos.push_back(new DummyTransport(uuid, false));
         protos.push_back(new Proto(uuid, conf));
         return new DummyNode(idx, protos);
     }

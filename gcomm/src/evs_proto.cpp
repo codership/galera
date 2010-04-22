@@ -419,6 +419,7 @@ void gcomm::evs::Proto::handle_stats_timer()
 {
     evs_log_info(I_STATISTICS) << get_stats();
     reset_stats();
+#ifdef GCOMM_PROFILE
     evs_log_info(I_PROFILING) << "\nprofiles:\n";
     evs_log_info(I_PROFILING) << send_user_prof    << "\n";
     evs_log_info(I_PROFILING) << send_gap_prof     << "\n";
@@ -430,6 +431,7 @@ void gcomm::evs::Proto::handle_stats_timer()
     evs_log_info(I_PROFILING) << shift_to_prof     << "\n";
     evs_log_info(I_PROFILING) << input_map_prof    << "\n";
     evs_log_info(I_PROFILING) << delivery_prof     << "\n";
+#endif // GCOMM_PROFILE
 }
 
 
@@ -1067,7 +1069,10 @@ int gcomm::evs::Proto::send_user(const seqno_t win)
             ++n;
             ++i;
         }
-        Datagram dg(Buffer(send_buf_.begin(), send_buf_.end()));
+        Datagram dg(SharedBuffer(new Buffer(send_buf_.begin(), 
+                                            send_buf_.end()),
+                                 BufferDeleter(),
+                                 shared_buffer_allocator));
         if ((ret = send_user(dg, 0xff, ord, win, -1, n)) == 0)
         {
             while (n-- > 0)
@@ -1773,7 +1778,7 @@ size_t gcomm::evs::Proto::unserialize_message(const UUID& source,
     return (offset + rb.get_offset());
 }
 
-void gcomm::evs::Proto::handle_up(int cid, 
+void gcomm::evs::Proto::handle_up(const void* cid, 
                                   const Datagram& rb,
                                   const ProtoUpMeta& um)
 {
@@ -1788,11 +1793,14 @@ void gcomm::evs::Proto::handle_up(int cid,
     
     gcomm_assert(um.get_source() != UUID::nil());    
     
+#ifdef NDEBUG
     try
     {
+#endif
         size_t offset;
         gu_trace(offset = unserialize_message(um.get_source(), rb, &msg));
         handle_msg(msg, Datagram(rb, offset));
+#ifdef NDEBUG
     }
     catch (Exception& e)
     {
@@ -1807,6 +1815,7 @@ void gcomm::evs::Proto::handle_up(int cid,
             throw;
         }
     }
+#endif
 }
 
 
@@ -2125,14 +2134,18 @@ void gcomm::evs::Proto::deliver_finish(const InputMapMsg& msg)
             gu_trace(am.unserialize(&msg.get_rb().get_payload()[0],
                                     msg.get_rb().get_payload().size(),
                                     offset));
-            Datagram dg(Buffer(
-                            &msg.get_rb().get_payload()[0] 
-                            + offset 
-                            + am.serial_size(), 
-                            &msg.get_rb().get_payload()[0] 
-                            + offset 
-                            + am.serial_size()
-                            + am.get_len()));
+            Datagram dg(
+                SharedBuffer(
+                    new Buffer(
+                        &msg.get_rb().get_payload()[0] 
+                        + offset 
+                        + am.serial_size(), 
+                        &msg.get_rb().get_payload()[0] 
+                        + offset 
+                        + am.serial_size()
+                        + am.get_len()),
+                    BufferDeleter(),
+                    shared_buffer_allocator));
             ProtoUpMeta um(msg.get_msg().get_source(), 
                            msg.get_msg().get_source_view_id(),
                            0,

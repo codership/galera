@@ -49,7 +49,7 @@ void gcomm::gmcast::Proto::send_msg(const Message& msg)
     gu::Buffer buf;
     gu_trace(serialize(msg, buf));
     Datagram dg(buf);
-    int ret = tp->handle_down(dg, 0);
+    int ret = tp->send(dg);
     
     // @todo: This can happen during congestion, figure out how to 
     // avoid terminating connection with topology change messages.
@@ -121,10 +121,10 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
             send_msg(ok);
             set_state(S_OK);
         }
-        catch (...)
+        catch (exception& e)
         {
             log_warn << "Parsing peer address '"
-                     << hs.get_node_address() << "' failed.";
+                     << hs.get_node_address() << "' failed: " << e.what();
             
             Message nok (Message::T_HANDSHAKE_FAIL, handshake_uuid, local_uuid);
             
@@ -212,7 +212,7 @@ void gcomm::gmcast::Proto::handle_message(const Message& msg)
         handle_topology_change(msg);
         break;
     default:
-        gu_throw_fatal;
+        gu_throw_fatal << "invalid message type: " << msg.get_type();
         throw;
     }
 }

@@ -69,16 +69,29 @@ int gu::net::closefd(int fd)
 gu::net::Datagram::Datagram(const Buffer& buf, size_t offset) :
     header_  (),
     header_offset_(header_size_),
-    payload_ (new Buffer(buf)),
+    payload_ (new Buffer(buf), BufferDeleter(), shared_buffer_allocator),
     offset_  (offset)
 { 
     assert(offset_ <= payload_->size());
 }
 
+gu::net::Datagram::Datagram(const SharedBuffer& buf, size_t offset)
+    :
+    header_(),
+    header_offset_(header_size_),
+    payload_(buf),
+    offset_(offset)
+{
+    assert(offset_ <= payload_->size());
+}
+
+
 void gu::net::Datagram::normalize()
 {
-    const boost::shared_ptr<Buffer> old_payload(payload_);
-    payload_ = boost::shared_ptr<Buffer>(new Buffer);
+    const SharedBuffer old_payload(payload_);
+    payload_ = SharedBuffer(new Buffer,
+                            BufferDeleter(),
+                            shared_buffer_allocator);
     payload_->reserve(get_header_len() + old_payload->size() - offset_);
     
     if (get_header_len() > offset_)
@@ -902,96 +915,6 @@ const gu::net::Datagram* gu::net::Socket::recv(const int flags)
         }
     }
     return 0;
-    
-#if 0
-    if (recv_buf_offset > hdrlen)
-    {
-        uint32_t len = 0;
-        unserialize(&recv_buf[0], recv_buf_offset, 0, &len);
-        
-        if (len == 0 || len > max_packet_size)
-        {
-            log_error << "invalid packet size " << len;
-            set_state(S_FAILED, EMSGSIZE);
-            return 0;
-        }
-        
-        if (recv_buf_offset >= len + hdrlen)
-        {
-            dgram = Datagram(Buffer(&recv_buf[0] + hdrlen,
-                                    &recv_buf[0] + hdrlen + len));
-            if (peek == false)
-            {
-                memmove(&recv_buf[0], &recv_buf[0] + hdrlen + len,
-                        recv_buf_offset - (hdrlen + len));
-                recv_buf_offset -= (hdrlen + len);
-            }
-            return &dgram;
-        }
-    }
-    
-    assert(recv_buf_offset < recv_buf.size());
-    
-    ssize_t recvd = ::recv(fd,
-                           &recv_buf[0] + recv_buf_offset, 
-                           recv_buf.size() - recv_buf_offset, 
-                           recv_flags);
-    if (recvd < 0)
-    {
-        switch (errno)
-        {
-        case EAGAIN:
-            return 0;
-        default:
-            set_state(S_FAILED, errno);
-            return 0;
-        }
-    }
-    else if (recvd == 0)
-    {
-        set_state(S_CLOSED);
-        return 0;
-    }
-    else
-    {
-        recv_buf_offset += recvd;
-        if (recv_buf_offset >= hdrlen)
-        {
-            uint32_t len = 0;
-            unserialize(&recv_buf[0], recv_buf_offset, 0, &len);
-            
-            if (len == 0 || len > max_packet_size)
-            {
-                log_error << "invalid packet size " << len;
-                set_state(S_FAILED, EMSGSIZE);
-                return 0;
-            }
-            
-            if (len + hdrlen + recv_buf_offset > recv_buf.size())
-            {
-                recv_buf.resize(len + hdrlen + recv_buf_offset);
-            }
-            
-            if (recv_buf_offset >= len + hdrlen)
-            {
-                dgram = Datagram(Buffer(&recv_buf[0] + hdrlen, 
-                                        &recv_buf[0] + hdrlen + len));
-                if (peek == false)
-                {
-                    memmove(&recv_buf[0], &recv_buf[0] + hdrlen + len,
-                            recv_buf_offset - (hdrlen + len));
-                    recv_buf_offset -= (hdrlen + len);
-                }
-                
-                return &dgram;
-            }
-        }
-    }
-    
-    // We should not get here if peek is not set
-    assert(peek == true);
-    return 0;
-#endif // 0
 }
 
 

@@ -16,7 +16,7 @@ using namespace gu;
 
 void gcomm::Transport::set_state(const State state)
 {
-    this->state = state;
+    state_ = state;
 }
 
 // Public methods
@@ -28,7 +28,7 @@ bool gcomm::Transport::supports_uuid() const
 
 const gcomm::UUID& gcomm::Transport::get_uuid() const
 {
-    gu_throw_fatal << "UUID not supported by " + uri.get_scheme();
+    gu_throw_fatal << "UUID not supported by " + uri_.get_scheme();
     throw;
 }
 
@@ -48,17 +48,12 @@ string gcomm::Transport::get_remote_addr() const
 
 gcomm::Transport::State gcomm::Transport::get_state() const
 {
-    return state;
+    return state_;
 }
 
 int gcomm::Transport::get_errno() const
 {
-    return error_no;
-}
-
-int gcomm::Transport::get_fd() const
-{
-    return -1;
+    return error_no_;
 }
 
 void gcomm::Transport::listen()
@@ -75,12 +70,12 @@ gcomm::Transport* gcomm::Transport::accept()
 
 // CTOR/DTOR
 
-gcomm::Transport::Transport(Protonet& pnet_, const URI& uri_) :
-    pstack(),
-    pnet(pnet_),
-    uri(uri_),
-    state(S_CLOSED),
-    error_no(0)
+gcomm::Transport::Transport(Protonet& pnet, const URI& uri) :
+    pstack_(),
+    pnet_(pnet),
+    uri_(uri),
+    state_(S_CLOSED),
+    error_no_(0)
 { }
 
 gcomm::Transport::~Transport() {}
@@ -92,11 +87,7 @@ gcomm::Transport::create(Protonet& pnet, const string& uri_str)
     const URI uri(uri_str);
     const std::string& scheme = uri.get_scheme();
     
-    if (scheme == Conf::TcpScheme || scheme == Conf::UdpScheme)
-    {
-        return new Socket(pnet, uri_str);
-    }
-    else if (scheme == Conf::GMCastScheme)
+    if (scheme == Conf::GMCastScheme)
     {
         return new GMCast(pnet, uri_str);
     }

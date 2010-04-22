@@ -74,7 +74,7 @@ libgcs_la_DEPENDENCIES = $(GCOMM_LIBS)
 # Desclibe gcs_test binary target
 noinst_PROGRAMS  = gcs_test
 gcs_test_SOURCES = gcs_test.c gcs_test.h
-gcs_test_LDADD   = $(lib_LTLIBRARIES) $(GCOMM_LIBS)
+gcs_test_LDADD   = $(lib_LTLIBRARIES) $(GCOMM_LIBS) 
 gcs_test_LDFLAGS = -static
 # how to set it up automatically? $(CXXFLAGS) - to use the right arch
 CCLD=g++ $(CXXFLAGS)

@@ -33,6 +33,16 @@ namespace gu
             }
         }
 
+        void lock()
+        {
+            pthread_mutex_lock(&value);
+        }
+
+        void unlock()
+        {
+            pthread_mutex_unlock(&value);
+        }
+
     protected:
 
         pthread_mutex_t mutable value;
@@ -44,6 +54,42 @@ namespace gu
 
         friend class Lock;
     };
+
+    class RecursiveMutex
+    {
+    public:
+        RecursiveMutex() : mutex_()
+        {
+            pthread_mutexattr_t mattr;
+            pthread_mutexattr_init(&mattr);
+            pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
+            pthread_mutex_init(&mutex_, &mattr);
+            pthread_mutexattr_destroy(&mattr);
+        }
+        
+        ~RecursiveMutex()
+        {
+            pthread_mutex_destroy(&mutex_);
+        }
+        
+        void lock()
+        {
+            if (pthread_mutex_lock(&mutex_)) gu_throw_fatal;
+        }
+        
+        void unlock()
+        {
+            if (pthread_mutex_unlock(&mutex_)) gu_throw_fatal;
+        }
+        
+    private:
+        RecursiveMutex(const Mutex&);
+        void operator=(const Mutex&);
+        
+        pthread_mutex_t mutex_;
+    };
+
+
 }
 
 #endif /* __GU_MUTEX__ */

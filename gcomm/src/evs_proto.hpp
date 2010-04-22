@@ -200,7 +200,7 @@ public:
     void handle_msg(const Message& msg, 
                     const gu::net::Datagram& dg = gu::net::Datagram());    
     // Protolay
-    void handle_up(int, const gu::net::Datagram&, const ProtoUpMeta&);
+    void handle_up(const void*, const gu::net::Datagram&, const ProtoUpMeta&);
     int handle_down(gu::net::Datagram& wb, const ProtoDownMeta& dm);
     void connect(bool first)
     {

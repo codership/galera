@@ -171,11 +171,11 @@ namespace gcomm
         UUID uuid;
         std::deque<gu::net::Datagram*> out;
         bool queue;
+        static std::auto_ptr<Protonet> dummy_net;
     public:
-        DummyTransport(Protonet& net,
-                       const UUID& uuid_ = UUID::nil(), bool queue_ = true,
+        DummyTransport(const UUID& uuid_ = UUID::nil(), bool queue_ = true,
                        const gu::URI& uri = gu::URI("dummy:")) :
-            Transport(net, uri),
+            Transport(*dummy_net, uri),
             uuid(uuid_),
             out(),
             queue(queue_)
@@ -211,7 +211,7 @@ namespace gcomm
             return 0;
         }
         
-        void handle_up(int cid, const gu::net::Datagram& rb,
+        void handle_up(const void* cid, const gu::net::Datagram& rb,
                        const ProtoUpMeta& um)
         {
             send_up(rb, um);
@@ -347,7 +347,7 @@ namespace gcomm
                     tr.get_view_traces().end()); 
         }
 
-        void handle_up(int cid, const gu::net::Datagram& rb,
+        void handle_up(const void* cid, const gu::net::Datagram& rb,
                        const ProtoUpMeta& um)
         {
             if (rb.get_len() != 0)

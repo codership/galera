@@ -67,6 +67,7 @@ private:
     ProtoUpMeta um;
 };
 
+
 class RecvBuf
 {
 public:
@@ -103,9 +104,18 @@ public:
     }
     
 public:
+    class DummyMutex
+    {
+    public:
+        void lock() { }
+        void unlock() {}
+    };
     Mutex mutex;
     Cond cond;
-    deque<RecvBufData> queue;
+    deque<RecvBufData, 
+          boost::fast_pool_allocator<
+              RecvBufData,
+              boost::default_user_allocator_new_delete, DummyMutex> > queue;
     bool waiting;
 };
 
@@ -142,7 +152,7 @@ public:
         thd(),
         uri_base("pc://" + uri_base_),
         use_prod_cons(false),
-        net(),
+        net(Protonet::create(URI(uri_base).get_option("gcomm.protonet_backend", "gu"))),
         tp(0),
         mutex(),
         refcnt(0),
@@ -160,11 +170,14 @@ public:
         {
             log_debug << "gcomm: disabling prod/cons";
         }
+
+        log_info << "backend: " << net->get_type();
+
     }
     
     ~GCommConn()
     {
-
+        delete net;
     }
     
     const UUID& get_uuid() const { return uuid; }
@@ -184,7 +197,7 @@ public:
         
         char delim(uri_base.find_first_of('?') == string::npos ? '?' : '&');
         
-        tp = Transport::create(net, uri_base + delim + "gmcast.group=" + channel);
+        tp = Transport::create(*net, uri_base + delim + "gmcast.group=" + channel);
         gcomm::connect(tp, this);
         
         URI uri(uri_base);
@@ -238,22 +251,22 @@ public:
 
     void run();
     
-    void notify() { net.interrupt(); }
+    void notify() { net->interrupt(); }
     
     void terminate() 
     { 
         Lock lock(mutex);
         terminated = true;
-        net.interrupt(); 
+        net->interrupt(); 
     }
     
-    void handle_up     (int id, const Datagram& dg, const ProtoUpMeta& um);
+    void handle_up     (const void* id, const Datagram& dg, const ProtoUpMeta& um);
     void queue_and_wait(const Message& msg, Message* ack);
     
     RecvBuf&  get_recv_buf()            { return recv_buf; }
     size_t    get_mtu()           const { return tp->get_mtu(); }
     bool      get_use_prod_cons() const { return use_prod_cons; }
-    Protonet& get_pnet()                { return net; }
+    Protonet& get_pnet()                { return *net; }
     
     class Ref
     {
@@ -306,7 +319,7 @@ private:
     pthread_t thd;
     string uri_base;
     bool use_prod_cons;
-    Protonet net;
+    Protonet* net;
     Transport* tp;
     Mutex mutex;
     size_t refcnt;
@@ -317,7 +330,7 @@ private:
 };
 
 
-void GCommConn::handle_up(int id, const Datagram& dg, const ProtoUpMeta& um)
+void GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta& um)
 {
     if (um.has_view() == true)
     {
@@ -404,7 +417,7 @@ void GCommConn::run()
             }
         }
         
-        net.event_loop(Sec);
+        net->event_loop(Sec);
     }
 }
 
@@ -448,9 +461,12 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
     }
     else
     {
-        Datagram dg(Buffer(reinterpret_cast<const byte_t*>(buf), 
-                           reinterpret_cast<const byte_t*>(buf) + len));
-        Lock lock(conn.get_pnet().get_mutex());
+        Datagram dg(SharedBuffer(
+                        new Buffer(reinterpret_cast<const byte_t*>(buf), 
+                                   reinterpret_cast<const byte_t*>(buf) + len),
+                        BufferDeleter(),
+                        shared_buffer_allocator));
+        Critical<Protonet> crit(conn.get_pnet());
         int err = conn.send_down(
             dg,
             ProtoDownMeta(msg_type));

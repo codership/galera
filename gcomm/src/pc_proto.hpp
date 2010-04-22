@@ -118,7 +118,7 @@ public:
     
     void handle_msg  (const Message&, const gu::net::Datagram&,
                       const ProtoUpMeta&);
-    void handle_up   (int, const gu::net::Datagram&,
+    void handle_up   (const void*, const gu::net::Datagram&,
                       const ProtoUpMeta&);
     int  handle_down (gu::net::Datagram&, const ProtoDownMeta&);
     

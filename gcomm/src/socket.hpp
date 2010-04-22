@@ -1,132 +1,86 @@
-/*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
- *
- * $Id:$
- */
+//
+// Copyright (C) 2009 Codership Oy <info@codership.com>
+//
 
-/*!
- * @file Transport based on gu::network::Socket
- */
+//!
+// @file socket.hpp Socket interface.
+//
+// This file defines socket interface used by gcomm. Currently socket interface
+// provides synchronous send() but only async_recv().
+//
 
 #ifndef GCOMM_SOCKET_HPP
 #define GCOMM_SOCKET_HPP
 
-#include "gcomm/transport.hpp"
-
+#include "gu_uri.hpp"
 #include "gu_network.hpp"
 
 namespace gcomm
 {
-    class Socket;
+    typedef const void* SocketId; //!< Socket Identifier
+    class Socket;                 //!< Socket interface
+    typedef boost::shared_ptr<Socket> SocketPtr;
+    class Acceptor;               //!< Acceptor interfacemat
 }
 
-class gcomm::Socket : public Transport
+
+class gcomm::Socket
 {
 public:
-    Socket(Protonet& net_, const gu::URI& uri_) : 
-        Transport(net_, uri_),
-        socket(0) 
+    typedef enum
+    {
+        S_CLOSED,
+        S_CONNECTING,
+        S_CONNECTED,
+        S_FAILED
+    } State;
+    
+    Socket(const gu::URI& uri) 
+        : 
+        scheme_(uri.get_scheme())
     { }
     
-    ~Socket()
-    {
-        if (socket != 0)
-        {
-            if (socket->get_state() != gu::net::Socket::S_CLOSED)
-            {
-                socket->close();
-            }
-            socket->release();
-        }
-        socket = 0;
-    }
+    virtual ~Socket() { }
+    virtual void connect(const gu::URI& uri) = 0;
+    virtual void close() = 0;
     
-    void connect() 
-    { 
-        socket = pnet.get_net().connect(uri.to_string()); 
-        gcomm_assert((socket->get_opt() & gu::net::Socket::O_NON_BLOCKING) != 0);
-    }
-
-    void close() 
-    { 
-        if (socket != 0)
-        {
-            socket->close(); 
-        }
-        else
-        {
-            log_debug << "closing unopened socket";
-        }
-        delete socket;
-        socket = 0;
-    }
+    virtual int send(const gu::net::Datagram& dg) = 0;
+    virtual void async_receive() = 0;
     
-    void listen() 
-    { 
-        socket = pnet.get_net().listen(uri.to_string()); 
-    }
-
-    Transport* accept() 
-    { 
-        gu::net::Socket* acc(socket->accept());
-        gcomm_assert((acc->get_opt() & gu::net::Socket::O_NON_BLOCKING) != 0);
-        return new Socket(pnet, acc);
-    } 
-    
-    int handle_down(gu::net::Datagram& dg, const ProtoDownMeta& dm)
-    {
-        return socket->send(&dg);
-    }
-    
-    void handle_up(int fd, const gu::net::Datagram& dg, const ProtoUpMeta& um)
-    {
-        send_up(dg, um);
-    }
-
-    size_t get_mtu() const { return socket->get_mtu(); }
-
-    std::string get_local_addr() const { return socket->get_local_addr(); }
-    
-    std::string get_remote_addr() const { return socket->get_remote_addr(); }
-    
-    int get_fd() const { return socket->get_fd(); }
-
-    State get_state() const
-    {
-        if (socket == 0)
-        {
-            return S_CLOSED;
-        }
-        switch (socket->get_state())
-        {
-        case gu::net::Socket::S_CLOSED:
-            return S_CLOSED;
-        case gu::net::Socket::S_CONNECTING:
-            return S_CONNECTING;
-        case gu::net::Socket::S_CONNECTED:
-            return S_CONNECTED;
-        case gu::net::Socket::S_LISTENING:
-            return S_LISTENING;
-        case gu::net::Socket::S_FAILED:
-            return S_FAILED;
-        case gu::net::Socket::S_MAX:
-            gu_throw_fatal;
-        }
-        gu_throw_fatal;
-        throw;
-    }
-
-private:
-    Socket(const Socket&);
-    void operator=(const Socket&);
-    
-    Socket(Protonet& net_, gu::net::Socket* socket_) :
-        Transport(net_, socket_->get_remote_addr()),
-        socket(socket_)
-    { }
-
-    gu::net::Socket* socket;
+    virtual size_t get_mtu() const = 0;
+    virtual std::string get_local_addr() const = 0;
+    virtual std::string get_remote_addr() const = 0;
+    virtual State get_state() const = 0;
+    virtual SocketId get_id() const = 0;
+protected:
+    std::string scheme_;
 };
 
+
+class gcomm::Acceptor
+{
+public:
+    typedef enum
+    {
+        S_CLOSED,
+        S_LISTENING,
+        S_FAILED
+    } State;
+    
+    Acceptor(const gu::URI& uri) 
+        :
+        scheme_(uri.get_scheme())
+    { }
+    
+    virtual ~Acceptor() { }
+
+    virtual void listen(const gu::URI& uri) = 0;
+    virtual void close() = 0;
+    virtual State get_state() const = 0;
+    virtual SocketPtr accept() = 0;
+    virtual SocketId get_id() const = 0;
+protected:
+    std::string scheme_;
+};
 
 #endif // GCOMM_SOCKET_HPP

@@ -22,7 +22,7 @@ using namespace gu::net;
 using namespace gu::datetime;
 
 
-void PC::handle_up(int cid, const Datagram& rb,
+void PC::handle_up(const void* cid, const Datagram& rb,
                    const ProtoUpMeta& um)
 {
     
@@ -95,13 +95,13 @@ const UUID& PC::get_uuid() const
 
 void PC::connect()
 {
-    const bool start_prim = host_is_any (uri.get_host());
+    const bool start_prim = host_is_any (uri_.get_host());
     
-    pstack.push_proto(gmcast);
-    pstack.push_proto(evs);
-    pstack.push_proto(pc);
-    pstack.push_proto(this);
-    get_pnet().insert(&pstack);
+    pstack_.push_proto(gmcast);
+    pstack_.push_proto(evs);
+    pstack_.push_proto(pc);
+    pstack_.push_proto(this);
+    get_pnet().insert(&pstack_);
     
     gmcast->connect();
     
@@ -160,11 +160,11 @@ void PC::close()
         log_warn << "PCProto didn't reach closed state";
     }
     
-    get_pnet().erase(&pstack);
-    pstack.pop_proto(this);
-    pstack.pop_proto(pc);
-    pstack.pop_proto(evs);
-    pstack.pop_proto(gmcast);
+    get_pnet().erase(&pstack_);
+    pstack_.pop_proto(this);
+    pstack_.pop_proto(pc);
+    pstack_.pop_proto(evs);
+    pstack_.pop_proto(gmcast);
     
     gmcast->close();
 
@@ -172,19 +172,19 @@ void PC::close()
 }
 
 
-PC::PC(Protonet& net_, const string& uri_) :
-    Transport (net_, uri_),
+PC::PC(Protonet& net, const string& uri) :
+    Transport (net, uri),
     gmcast    (0),
     evs       (0),
     pc        (0),
     closed    (true),
     leave_grace_period("PT5S")
 {
-    if (uri.get_scheme() != Conf::PcScheme)
+    if (uri_.get_scheme() != Conf::PcScheme)
     {
-        log_fatal << "invalid uri: " << uri.to_string();
+        log_fatal << "invalid uri: " << uri_.to_string();
     }
-    URI tp_uri(uri);
+    URI tp_uri(uri_);
     
     tp_uri._set_scheme(Conf::GMCastScheme); // why do we need this?
     
@@ -197,7 +197,7 @@ PC::PC(Protonet& net_, const string& uri_) :
         gu_throw_fatal << "invalid UUID: " << uuid;
     }
     evs::UserMessage evsum;
-    evs = new evs::Proto(uuid, uri.to_string(), gmcast->get_mtu() - 2*evsum.serial_size());
+    evs = new evs::Proto(uuid, uri_.to_string(), gmcast->get_mtu() - 2*evsum.serial_size());
     pc  = new pc::Proto (uuid);
 }
 

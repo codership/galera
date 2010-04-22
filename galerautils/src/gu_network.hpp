@@ -32,9 +32,9 @@
 #define __GU_NETWORK_HPP__
 
 #include "gu_buffer.hpp"
-#include "gu_assert.h"
 #include "gu_poll.hpp"
 #include "gu_datetime.hpp"
+#include "gu_exception.hpp"
 #include <cstdlib>      /* size_t */
 #include <stdint.h>     /* uint32_t */
 #include <sys/socket.h> /* sockaddr */
@@ -42,6 +42,7 @@
 #include <string>
 #include <vector>
 #include <limits>
+#include <cassert>
 
 #include <boost/shared_ptr.hpp>
 
@@ -92,7 +93,7 @@ public:
         : 
         header_       (), 
         header_offset_(header_size_), 
-        payload_      (new Buffer()), 
+        payload_      (new Buffer(), BufferDeleter(), shared_buffer_allocator), 
         offset_       (0) 
     { }
     /*! 
@@ -104,6 +105,9 @@ public:
      * @throws std::bad_alloc 
      */
     Datagram(const Buffer& buf, size_t offset = 0);
+
+    Datagram(const SharedBuffer& buf, size_t offset = 0);
+
     
     /*!
      * @brief Copy constructor. 
@@ -167,7 +171,7 @@ private:
     static const size_t header_size_ = 128;
     gu::byte_t header_[header_size_];
     size_t header_offset_;
-    boost::shared_ptr<Buffer> payload_;
+    SharedBuffer payload_;
     size_t offset_;
 };
 

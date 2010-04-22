@@ -85,6 +85,7 @@ libgalerautils___la_SOURCES = \
 	gu_prodcons.cpp	      \
 	gu_datetime.cpp
 
+
 libgalerautils___la_LIBADD = libgaleraresolver.la
 
 INTERFACEPP = 4

@@ -31,7 +31,7 @@ namespace gcomm
         ~GMCast();
         
         // Protolay interface 
-        void handle_up(int, const gu::net::Datagram&, const ProtoUpMeta&);
+        void handle_up(const void*, const gu::net::Datagram&, const ProtoUpMeta&);
         int handle_down(gu::net::Datagram&, const ProtoDownMeta&);
         
         // Transport interface
@@ -104,13 +104,13 @@ namespace gcomm
         std::string       initial_addr;        
         std::string       mcast_addr;
         int               mcast_ttl;
-        Transport*        listener;
-        Transport*        mcast;
+        Acceptor*         listener;
+        SocketPtr         mcast;
         AddrList          pending_addrs;
         AddrList          remote_addrs;
         
         gmcast::ProtoMap* proto_map;
-        std::list<Transport*> mcast_tree;
+        std::list<Socket*> mcast_tree;
 
         gu::datetime::Period check_period;
         gu::datetime::Date next_check;

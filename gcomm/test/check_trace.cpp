@@ -105,7 +105,7 @@ public:
             NodeMap::iterator i(tp.find(vt.first.get_jj()));
             gcomm_assert(i != tp.end());
             gu_trace(NodeMap::get_value(i)->get_protos().front()->handle_up(
-                         -1, cmsg.get_rb(),
+                         &tp, cmsg.get_rb(),
                          ProtoUpMeta(cmsg.get_source())));
         }
     }
@@ -341,3 +341,6 @@ void gcomm::check_trace(const vector<DummyNode*>& nvec)
 {
     for_each(nvec.begin(), nvec.end(), CheckTraceOp(nvec));
 }
+
+
+auto_ptr<Protonet> DummyTransport::dummy_net(Protonet::create("gu"));

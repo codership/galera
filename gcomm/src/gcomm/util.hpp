@@ -89,6 +89,19 @@ namespace gcomm
                 dg.get_payload().size() - (dg.get_offset() - dg.get_header_len()));
     }
 
+    
+    template <class M> 
+    class Critical
+    {
+    public:
+        Critical(M& monitor) : monitor_(monitor)
+        { monitor_.enter(); }
+        
+        ~Critical() { monitor_.leave(); }
+    private:
+        M& monitor_;
+    };
+
 } // namespace gcomm
 
 #endif // _GCOMM_UTIL_HPP_

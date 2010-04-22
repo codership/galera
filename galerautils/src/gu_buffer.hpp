@@ -13,7 +13,14 @@
 
 #include "gu_throw.hpp"
 
-#define GU_BUFFER_MEMPOOL 1
+
+#include <boost/shared_ptr.hpp>
+#ifdef GALERA_USE_BOOST_POOL_ALLOC
+#include <boost/pool/pool_alloc.hpp>
+#endif // GALERA_USE_BOOST_POOL_ALLOC
+
+
+
 
 namespace gu
 {
@@ -59,16 +66,36 @@ namespace gu
         value_type& at(size_t i) { return buf.at(i); }
         const value_type& at(size_t i) const { return buf.at(i); }
         
-#ifdef GU_BUFFER_MEMPOOL
+#ifdef GALERA_USE_BOOST_POOL_ALLOC
         void* operator new(size_t);
         void operator delete(void* );
-#endif
+#endif // GALERA_USE_BOOST_POOL_ALLOC
         bool operator==(const Buffer& cmp) const
         { return (cmp.buf == buf); }
     private:
         BType buf;
     };    
 
+    class BufferDeleter
+    {
+    public:
+        BufferDeleter() { }
+        BufferDeleter(const BufferDeleter& bt) { }
+        ~BufferDeleter() { }
+        void operator()(Buffer* b) { delete b; }
+    private:
+        void operator=(const BufferDeleter&);
+    };
+
+
+    typedef boost::shared_ptr<Buffer> SharedBuffer;
+#ifdef GALERA_USE_BOOST_POOL_ALLOC
+    typedef boost::fast_pool_allocator<SharedBuffer> SharedBufferAllocator;
+    extern SharedBufferAllocator shared_buffer_allocator;
+#else
+#include <memory>
+    extern std::allocator<SharedBuffer> shared_buffer_allocator;
+#endif // GALERA_USE_BOOST_POOL_ALLOC
 
 }
 

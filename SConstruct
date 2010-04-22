@@ -27,7 +27,7 @@ Commandline Options:
     debug=n       debug build with optimization level n
     arch=str      target architecture [i386|x86-64]
     build_dir=dir build directory, default .
-
+    boost=[0|1]   disable or enable boost libraries
 ''')
 
 
@@ -68,6 +68,8 @@ elif arch == 'x86-64':
     compile_arch = '-m64'
     link_arch    = compile_arch + ' -m elf_x86_64'
         
+boost = int(ARGUMENTS.get('boost', 1))
+
 
 #
 # Set up and export default build environment
@@ -77,31 +79,6 @@ elif arch == 'x86-64':
 
 env = DefaultEnvironment()
 
-#
-# Check required headers and libraries (autoconf functionality)
-#
-
-conf = Configure(env)
-
-# System headers and libraries
-
-if not conf.CheckLib('pthread'):
-    print 'Error: pthread library not found'
-    Exit(1)
-    
-if not conf.CheckLib('rt'):
-    print 'Error: rt library not found'
-    Exit(1)
-
-# Additional C headers and libraries
-
-# Required boost headers/libraries
-# 
-if not conf.CheckCXXHeader('boost/pool/pool_alloc.hpp'):
-    print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
-    Exit(1)
-
-env = conf.Finish()
 
 
 #
@@ -147,6 +124,50 @@ env.Replace(CFLAGS = '-std=c99 -fno-strict-aliasing -pedantic')
 # CXXFLAGS
 env.Replace(CXXFLAGS = 
             '-Wno-long-long -Wno-deprecated -Weffc++ -pedantic -ansi')
+
+
+
+
+#
+# Check required headers and libraries (autoconf functionality)
+#
+
+conf = Configure(env)
+
+# System headers and libraries
+
+if not conf.CheckLib('pthread'):
+    print 'Error: pthread library not found'
+    Exit(1)
+    
+if not conf.CheckLib('rt'):
+    print 'Error: rt library not found'
+    Exit(1)
+
+# Additional C headers and libraries
+
+if boost == 1:
+    # Use nanosecond time precision
+    conf.env.Append(CPPFLAGS = ' -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG=1')
+    # Required boost headers/libraries
+    # 
+    if conf.CheckCXXHeader('boost/pool/pool_alloc.hpp'):
+        print 'Using boost pool alloc'
+        conf.env.Append(CPPFLAGS = ' -DGALERA_USE_BOOST_POOL_ALLOC=1')
+    else:
+        print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
+
+    
+    if conf.CheckCXXHeader('boost/asio.hpp'):
+        if conf.CheckLib('boost_system-mt'):
+            print 'Using boost asio'
+            conf.env.Append(CPPFLAGS = ' -DGALERA_USE_BOOST_ASIO=1')
+        else:
+            print 'Library boost_system-mt not usable'
+else:
+    print 'Not using boost'
+
+env = conf.Finish()
 
 
 #

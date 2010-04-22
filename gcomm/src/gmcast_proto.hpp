@@ -4,7 +4,7 @@
 
 #include "gcomm/uuid.hpp"
 #include "gcomm/util.hpp"
-#include "gcomm/transport.hpp"
+#include "socket.hpp"
 #include "gmcast_message.hpp"
 #include "gmcast_link.hpp"
 
@@ -60,7 +60,7 @@ public:
     
     
     
-    Proto (Transport*    tp_, 
+    Proto (SocketPtr          tp_, 
            const std::string& local_addr_, 
            const std::string& remote_addr_, 
            const std::string& mcast_addr_,
@@ -81,10 +81,7 @@ public:
         link_map         ()
     { }
     
-    ~Proto() 
-    {
-        delete tp;
-    }
+    ~Proto() { }
     
     void send_msg(const Message& msg);
     void send_handshake();    
@@ -101,7 +98,7 @@ public:
     const gcomm::UUID& get_local_uuid() const { return local_uuid; }
     const gcomm::UUID& get_remote_uuid() const { return remote_uuid; }
 
-    gcomm::Transport* get_transport() const { return tp; }
+    SocketPtr get_socket() const { return tp; }
     
     const std::string& get_remote_addr() const { return remote_addr; }
     const std::string& get_mcast_addr() const { return mcast_addr; }
@@ -129,9 +126,9 @@ private:
     bool              changed;
     State             state;
     bool              propagate_remote;
-    gcomm::Transport* tp;
+    SocketPtr         tp;
     LinkMap           link_map;
 };
 
 
-class gcomm::gmcast::ProtoMap : public Map<int, Proto*> { };
+class gcomm::gmcast::ProtoMap : public Map<const SocketId, Proto*> { };

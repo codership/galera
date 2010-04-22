@@ -5,7 +5,7 @@
 #include "gcomm/types.hpp"
 #include "gcomm/uuid.hpp"
 #include "gmcast_node.hpp"
-
+#include "gcomm/map.hpp"
 
 namespace gcomm
 {

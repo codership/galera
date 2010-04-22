@@ -4,12 +4,17 @@
 
 #include "gcomm/util.hpp"
 #include "histogram.hpp"
+#include "gcomm/protonet.hpp"
 
+#ifdef GALERA_USE_BOOST_ASIO
+#include "asio.hpp"
+#endif // GALERA_USE_BOOST_ASIO
 
 #include "check_gcomm.hpp"
 
 #include "gu_string.hpp"
 #include "gu_logger.hpp"
+
 
 #include <vector>
 #include <limits>
@@ -22,9 +27,7 @@ using std::string;
 
 using namespace gcomm;
 
-using namespace gu::net;
-
-
+using namespace gu;
 
 
 
@@ -50,6 +53,48 @@ START_TEST(test_histogram)
 END_TEST
 
 
+#ifdef GALERA_USE_BOOST_ASIO
+START_TEST(test_asio)
+{
+    asio::Protonet pn;
+    const string uri_str("tcp://localhost:10001");
+    
+    Acceptor* acc = pn.acceptor(uri_str);
+    acc->listen(uri_str);
+
+    SocketPtr cl = pn.socket(uri_str);
+    cl->connect(uri_str);
+    pn.event_loop(datetime::Sec);
+
+    SocketPtr sr = acc->accept();
+    fail_unless(sr->get_state() == Socket::S_CONNECTED);
+    
+    vector<byte_t> buf(cl->get_mtu());
+    for (size_t i = 0; i < buf.size(); ++i)
+    {
+        buf[i] = static_cast<byte_t>(i & 0xff);
+    }
+
+    for (size_t i = 0; i < 13; ++i)
+    {
+        net::Datagram dg(Buffer(&buf[0], &buf[0] + buf.size()));
+        cl->send(dg);
+    }
+    pn.event_loop(datetime::Sec);
+
+    delete acc;
+    
+}
+END_TEST
+#endif // GALERA_USE_BOOST_ASIO
+
+START_TEST(test_protonet)
+{
+    Protonet* pn(Protonet::create("asio"));
+    pn->event_loop(1);
+}
+END_TEST
+
 
 Suite* util_suite()
 {
@@ -60,7 +105,15 @@ Suite* util_suite()
     tcase_add_test(tc, test_histogram);
     suite_add_tcase(s, tc);
 
-
+#ifdef GALERA_USE_BOOST_ASIO
+    tc = tcase_create("test_asio");
+    tcase_add_test(tc, test_asio);
+    suite_add_tcase(s, tc);
+#endif // GALERA_USE_BOOST_ASIO
+    
+    tc = tcase_create("test_protonet");
+    tcase_add_test(tc, test_protonet);
+    suite_add_tcase(s, tc);
 
     return s;
 }

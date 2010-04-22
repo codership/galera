@@ -2,7 +2,51 @@
 
 env = DefaultEnvironment()
 
+
+
 libgcomm_env = env.Clone()
-libgcomm_env.Append(CXXFLAGS = ' -fno-strict-aliasing')
-libgcomm_env.SharedLibrary('gcomm', Glob('*.cpp'))
-libgcomm_env.StaticLibrary('gcomm', Glob('*.cpp'))
+
+libgcomm_sources = [
+    'conf.cpp',
+    'defaults.cpp',
+    'evs_consensus.cpp',
+    'evs_input_map2.cpp',
+    'evs_message2.cpp',
+    'evs_node.cpp',
+    'evs_proto.cpp',
+    'gmcast.cpp',
+    'gmcast_proto.cpp',
+    'gu.cpp',
+    'histogram.cpp',
+    'pc.cpp',
+    'pc_proto.cpp',
+    'protonet.cpp',
+    'protostack.cpp',
+    'transport.cpp',
+    'uuid.cpp',
+    'view.cpp']
+
+
+libgcomm_env.Append(CPPFLAGS = ' ')
+libgcomm_env.Append(CXXFLAGS = ' -fno-strict-aliasing ')
+
+if libgcomm_env['CPPFLAGS'].find('-DGALERA_USE_BOOST_ASIO') != -1:
+    # ASIO sources need to be built with relaxed C++ flags
+    libgcomm_asio_sources = [
+        'asio_tcp.cpp',
+        'asio_udp.cpp',
+        'asio.cpp']
+    libgcomm_asio_env = libgcomm_env.Clone()
+    libgcomm_asio_env.Replace(CXXFLAGS = ' -Wctor-dtor-privacy -Wreorder -Wold-style-cast -Woverloaded-virtual -pedantic -ansi -Wno-long-long')
+    libgcomm_asio_shared_objs = libgcomm_asio_env.SharedObject(libgcomm_asio_sources)
+    libgcomm_asio_static_objs = libgcomm_asio_env.Object(libgcomm_asio_sources)
+else:
+    libgcomm_asio_shared_objs = []
+    libgcomm_asio_static_objs = []
+
+libgcomm_env.SharedLibrary('gcomm', 
+                           [libgcomm_sources, 
+                            libgcomm_asio_shared_objs])
+libgcomm_env.StaticLibrary('gcomm', 
+                           [libgcomm_sources, 
+                            libgcomm_asio_static_objs])

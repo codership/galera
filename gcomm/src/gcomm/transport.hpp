@@ -14,6 +14,7 @@
 #include "gcomm/uuid.hpp"
 #include "gcomm/protolay.hpp"
 #include "gcomm/protostack.hpp"
+#include "gcomm/protonet.hpp"
 
 #include "gu_uri.hpp"
 
@@ -32,11 +33,7 @@ namespace gcomm
  */
 class gcomm::Transport : public Protolay
 {
-    Transport (const Transport&);
-    Transport& operator=(const Transport&);
-    
 public:
-    
     typedef enum {
         S_CLOSED,
         S_CONNECTING,
@@ -45,18 +42,6 @@ public:
         S_LISTENING,
         S_FAILED
     } State;
-    
-    Protostack        pstack;
-    Protonet&         pnet;
-    gu::URI           uri;
-    State             state;
-    int               error_no;
-    void              set_state(State);
-    
-protected:    
-    Transport (Protonet&, const gu::URI& uri_);
-    
-public:
     
     virtual ~Transport();
     
@@ -67,30 +52,50 @@ public:
     virtual std::string get_remote_addr()  const;
     
     virtual State        get_state() const;
-    int          get_errno() const;
-    virtual int          get_fd()    const;
+    int                  get_errno() const;
     
     virtual void connect() = 0;
-    virtual void close()   = 0;
+    virtual void close()                     = 0;
     virtual void close(const UUID& uuid)
     {        
         gu_throw_error(ENOTSUP) << "close(UUID) not supported by "
-                                << uri.get_scheme();
+                                << uri_.get_scheme();
     }
     
     virtual void       listen();
     virtual Transport* accept();
+    virtual void handle_accept(Transport*)
+    {
+        gu_throw_error(ENOTSUP) << "handle_accept() not supported by" 
+                                << uri_.get_scheme();
+    }
+    virtual void handle_connect()
+    {
+        gu_throw_error(ENOTSUP) << "handle_connect() not supported by"
+                                << uri_.get_scheme();
+    }
     
     virtual int  handle_down(gu::net::Datagram&, const ProtoDownMeta&) = 0;
-    virtual void handle_up  (int, const gu::net::Datagram&, const ProtoUpMeta&) = 0;
-
-    Protostack& get_pstack() { return pstack; }
-    Protonet& get_pnet() { return pnet; }
-
-    /*!
-     * @brief Factory method
-     */
+    virtual void handle_up  (const void*, const gu::net::Datagram&, const ProtoUpMeta&) = 0;
+    
+    Protostack& get_pstack() { return pstack_; }
+    Protonet&   get_pnet()   { return pnet_; }
+    
     static Transport* create(Protonet&, const std::string&);
+    
+protected:
+    Transport (Protonet&, const gu::URI&);
+    void              set_state(State);
+    Protostack        pstack_;
+    Protonet&         pnet_;
+    gu::URI           uri_;
+
+    State             state_;
+    int               error_no_;
+    
+private:
+    Transport (const Transport&);
+    Transport& operator=(const Transport&);
 };
 
 

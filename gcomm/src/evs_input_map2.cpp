@@ -249,8 +249,6 @@ gcomm::evs::InputMap::insert(const size_t uuid,
                              const Datagram& rb)
     throw (gu::Exception)
 {
-    try
-    {
     Range range;
     
     // Only insert messages with meaningful seqno
@@ -344,12 +342,6 @@ gcomm::evs::InputMap::insert(const size_t uuid,
     node.set_range(range);
     update_aru();
     return range;
-    }
-    catch (...)
-    {
-        gu_throw_fatal;
-        throw;
-    }
 }
 
 

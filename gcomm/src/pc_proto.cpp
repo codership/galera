@@ -887,7 +887,8 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
 }
 
 
-void gcomm::pc::Proto::handle_up(int cid, const Datagram& rb,
+void gcomm::pc::Proto::handle_up(const void* cid, 
+                                 const Datagram& rb,
                                  const ProtoUpMeta& um)
 {
     if (um.has_view() == true)

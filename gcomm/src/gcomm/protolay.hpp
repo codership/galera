@@ -78,8 +78,8 @@ namespace gcomm
      */
     class Bottomlay;
     
-    void connect(Protolay*, Protolay*, int);
-    void disconnect(Protolay*, Protolay*, int);
+    void connect(Protolay*, Protolay*);
+    void disconnect(Protolay*, Protolay*);
 }
 
 /* message context to pass up with the data buffer? */
@@ -189,7 +189,7 @@ private:
 
 class gcomm::Protolay
 {
-    typedef std::list<std::pair<Protolay*, int> > CtxList;
+    typedef std::list<Protolay*> CtxList;
     CtxList up_context;
     CtxList down_context;
     
@@ -197,15 +197,12 @@ class gcomm::Protolay
     Protolay& operator=(const Protolay&);
     
 protected:
-    int id;
     Protolay() : 
         up_context(0), 
-        down_context(0),
-        id(-1)
+        down_context(0)
     {}
     
 public:
-    
     virtual ~Protolay() {}
     
     virtual void connect(bool) { }
@@ -214,37 +211,36 @@ public:
     
     /* apparently handles data from upper layer. what is return value? */
     virtual int  handle_down (gu::net::Datagram&, const ProtoDownMeta&) = 0;
-    virtual void handle_up   (int, const gu::net::Datagram&, const ProtoUpMeta&) = 0;
+    virtual void handle_up   (const void*, const gu::net::Datagram&, const ProtoUpMeta&) = 0;
     
-    void set_id(const int id_) { id = id_; }
-
-    void set_up_context(Protolay *up, int id = -1)
+    void set_up_context(Protolay *up)
     {
-	if (std::find(up_context.begin(), up_context.end(),
-                      std::make_pair(up, id)) != up_context.end())
+	if (std::find(up_context.begin(), 
+                      up_context.end(), 
+                      up) != up_context.end())
         {
             gu_throw_fatal << "up context already exists";
         }
-	up_context.push_back(std::make_pair(up, id));
+	up_context.push_back(up);
     }
     
-    void set_down_context(Protolay *down, int id = -1)
+    void set_down_context(Protolay *down)
     {
 	if (std::find(down_context.begin(), 
                       down_context.end(),
-                      std::make_pair(down, id)) != down_context.end())
+                      down) != down_context.end())
         {
             gu_throw_fatal << "down context already exists";
         }
-	down_context.push_back(std::make_pair(down, id));
+	down_context.push_back(down);
     }
     
-    void unset_up_context(Protolay* up, int id = -1)
+    void unset_up_context(Protolay* up)
     {
-        std::list<std::pair<Protolay*, int> >::iterator i;
+        CtxList::iterator i;
 	if ((i = std::find(up_context.begin(), 
                            up_context.end(),
-                           std::make_pair(up, id))) == up_context.end())
+                           up)) == up_context.end())
         { 
             gu_throw_fatal << "up context does not exist";
         }
@@ -252,12 +248,12 @@ public:
     }
     
     
-    void unset_down_context(Protolay* down, int id = -1)
+    void unset_down_context(Protolay* down)
     {
-        std::list<std::pair<Protolay*, int> >::iterator i;
+        CtxList::iterator i;
 	if ((i = std::find(down_context.begin(), 
                            down_context.end(),
-                           std::make_pair(down, id))) == down_context.end()) 
+                           down)) == down_context.end()) 
         {
             gu_throw_fatal << "down context does not exist";
         }
@@ -276,7 +272,7 @@ public:
         for (i = up_context.begin(); i != up_context.end(); i = i_next)
         {
             i_next = i, ++i_next;
-            i->first->handle_up(i->second, dg, up_meta);
+            (*i)->handle_up(this, dg, up_meta);
         }
     }
     
@@ -294,7 +290,7 @@ public:
              i != down_context.end(); ++i)
         {
             const size_t hdr_offset(dg.get_header_offset());
-            int err = i->first->handle_down(dg, down_meta);
+            int err = (*i)->handle_down(dg, down_meta);
             // Verify that lower layer rolls back any modifications to 
             // header
             if (hdr_offset != dg.get_header_offset())
@@ -310,9 +306,9 @@ public:
     }    
     
     virtual gu::datetime::Date handle_timers() { return gu::datetime::Date::max(); }
-
-    int get_id() const { return id; }
-
+    
+    const Protolay* get_id() const { return this; }
+    
 };
 
 class gcomm::Toplay : public Protolay
@@ -326,22 +322,22 @@ class gcomm::Toplay : public Protolay
 
 class gcomm::Bottomlay : public Protolay
 {
-    void handle_up(int id, const gu::net::Datagram&, const ProtoUpMeta& um)
+    void handle_up(const void* id, const gu::net::Datagram&, const ProtoUpMeta& um)
     {
 	gu_throw_fatal << "Bottomlay handle_up() called";
     }
 };
 
-inline void gcomm::connect(Protolay* down, Protolay* up, int id = -1)
+inline void gcomm::connect(Protolay* down, Protolay* up)
 {
-    down->set_up_context(up, id);
-    up->set_down_context(down, id);
+    down->set_up_context(up);
+    up->set_down_context(down);
 }
 
-inline void gcomm::disconnect(Protolay* down, Protolay* up, int id = -1)
+inline void gcomm::disconnect(Protolay* down, Protolay* up)
 {
-    down->unset_up_context(up, id);
-    up->unset_down_context(down, id);
+    down->unset_up_context(up);
+    up->unset_down_context(down);
 }
 
 

@@ -52,7 +52,7 @@ AC_ARG_ENABLE(debug,
               enable_debug="yes")
 if test "$enable_debug" != "no"
 then
-    AM_CFLAGS="-O1 -g -fno-inline"
+    AM_CFLAGS="-O0 -g -fno-inline"
     AM_CPPFLAGS="-DDEBUG_ASSERT -D_FORTIFY_SOURCE=1"
 else
     AM_CFLAGS="-O3 -g"
@@ -85,7 +85,7 @@ AM_CFLAGS="$AM_CFLAGS -Wall -Werror -Wextra -pedantic -Wno-unused-parameter -fno
 # - some stl headers may contain deprecated features
 # - gu_log.h contains some variadic macros
 # Disable RTTI generation as we don't use it anywhere
-AM_CXXFLAGS="$AM_CFLAGS -ansi -Weffc++ -Wold-style-cast -Wconversion -Wno-long-long -Wno-deprecated -pipe "
+AM_CXXFLAGS="$AM_CFLAGS -ansi -Wold-style-cast -Wconversion -Wno-long-long -Wno-deprecated -pipe "
 AM_CFLAGS="$AM_CFLAGS -std=c99"
 AM_LDFLAGS="-Wl,--warn-common -Wl,--fatal-warnings"
 

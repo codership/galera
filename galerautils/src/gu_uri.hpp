@@ -176,6 +176,14 @@ namespace gu
          */
         const std::string& get_option(const std::string&) const
             throw (NotFound);
+
+        const std::string& get_option(const std::string& opt,
+                                      const std::string& def) const
+        {
+            try                { return get_option(opt); }
+            catch (NotFound& ) { return def            ; }
+        }
+        
     };
 }
 

@@ -14,49 +14,29 @@
 
 namespace gcomm
 {
+    class Socket;
+    class Acceptor;
     class Protostack;
     class Protonet;
+    class BoostProtonet;
 }
 
 
 class gcomm::Protostack
 {
 public:
-    Protostack() : protos() { }
-    
+    Protostack() : protos_(), mutex_() { }
     void push_proto(Protolay* p);
     void pop_proto(Protolay* p);
     gu::datetime::Date handle_timers();
-    void dispatch(gu::net::NetworkEvent& ev, const gu::net::Datagram& dg);
-    
+    void dispatch(const void* id, const gu::net::Datagram& dg,
+                  const ProtoUpMeta& um);
+    void enter() { mutex_.lock(); }
+    void leave() { mutex_.unlock(); }
 private:
     friend class Protonet;
-    std::deque<Protolay*> protos;
-};
-
-
-class gcomm::Protonet
-{
-public:
-    Protonet() : protos(), net(), mutex(), interrupted(false) { }
-    gu::net::Network& get_net() { return net; }
-    void insert(Protostack* pstack);
-    void erase(Protostack* pstack);
-    void event_loop(const gu::datetime::Period&);
-    void interrupt()
-    {
-        gu::Lock lock(mutex);
-        interrupted = true;
-        net.interrupt();
-    }
-    gu::Mutex& get_mutex() { return mutex; }
-private:
-    Protonet(const Protonet&);
-    void operator=(const Protonet&);
-    std::deque<Protostack*> protos;
-    gu::net::Network net;
-    gu::Mutex mutex;
-    bool interrupted;
+    std::deque<Protolay*> protos_;
+    gu::Mutex mutex_;
 };
 
 
