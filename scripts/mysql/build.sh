@@ -152,6 +152,13 @@ then
         then
             scons -Q -c
         fi
+        if [ "$CPU" == "pentium" ]
+        then
+            scons_args="$scons_args arch=i386"
+        elif [ "$CPU" == "amd64" ]
+        then
+            scons_args="$scons_args arch=x86_64"
+        fi
         if [ "$SKIP_BUILD" != "yes" ]
         then
             scons -Q $scons_args

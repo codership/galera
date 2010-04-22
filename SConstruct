@@ -68,13 +68,15 @@ if int(debug) >= 0:
 arch = ARGUMENTS.get('arch', '')
 if arch == 'i386':
     compile_arch = '-m32'
-    link_arch    = compile_arch + ' -m elf_i386'
+    link_arch    = compile_arch + ' -Wl,-melf_i386'
 elif arch == 'x86-64':
     compile_arch = '-m64'
-    link_arch    = compile_arch + ' -m elf_x86_64'
+    link_arch    = compile_arch + ' -Wl,-melf_x86_64'
         
 boost = int(ARGUMENTS.get('boost', 1))
 
+cc = os.getenv('CC', 'default')
+cxx = os.getenv('CXX', 'default')
 
 #
 # Set up and export default build environment
@@ -82,9 +84,12 @@ boost = int(ARGUMENTS.get('boost', 1))
 # TODO: import env required for ccache and distcc 
 #
 
-
-
 env = DefaultEnvironment()
+
+if cc != 'default':
+    env.Replace(CC = cc)
+if cxx != 'default':
+    env.Replace(CXX = cxx)
 
 # Ports are installed under /usr/local 
 if sysname == 'freebsd':
@@ -129,7 +134,10 @@ env.Append(LINKFLAGS = ' ' + link_arch)
 env.Append(CPPFLAGS = ' -D_XOPEN_SOURCE=600')
 
 # CFLAGS
-env.Replace(CFLAGS = '-std=c99 -fno-strict-aliasing -pedantic')
+# Notes:
+# - Append -pedantic after header checks due to
+#   'error: ISO C forbids an empty translation unit'
+env.Replace(CFLAGS = '-std=c99 -fno-strict-aliasing')
 
 # CXXFLAGS
 env.Replace(CXXFLAGS = 
@@ -154,7 +162,7 @@ if not conf.CheckLib('rt'):
     print 'Error: rt library not found'
     Exit(1)
 
-if conf.CheckHeader('epoll.h'):
+if conf.CheckHeader('sys/epoll.h'):
     conf.env.Append(CPPFLAGS = ' -DGALERA_USE_GU_NETWORK')
 
 if conf.CheckHeader('byteswap.h'):
@@ -192,11 +200,13 @@ if boost == 1:
             print 'Using boost asio'
             conf.env.Append(CPPFLAGS = ' -DGALERA_USE_BOOST_ASIO=1')
         else:
-            print 'Library boost_system-mt not usable'
+            print 'Library boost_system-mt not usable, disabling asio'
 else:
     print 'Not using boost'
 
 env = conf.Finish()
+
+env.Append(CFLAGS = ' -pedantic');
 
 
 #
