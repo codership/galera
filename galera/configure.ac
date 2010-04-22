@@ -59,7 +59,7 @@ AC_HEADER_STDC
 #AC_SUBST(CPPFLAGS, " ${dbug_includes} ")
 #AC_SUBST(LDFLAGS, " ${dbug_libs} ")
 #AC_CHECK_HEADERS([limits.h stdint.h stdlib.h string.h my_dbug.h])
-AC_CHECK_HEADERS([limits.h stdint.h stdlib.h string.h])
+AC_CHECK_HEADERS([limits.h stdint.h stdlib.h string.h endian.h byteswap.h])
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
 AC_C_INLINE

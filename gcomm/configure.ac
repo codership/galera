@@ -31,7 +31,7 @@ m4_if(m4_version_compare(m4_version,1.4.10),
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([stdint.h string.h])
+AC_CHECK_HEADERS([stdint.h string.h endian.h byteswap.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
