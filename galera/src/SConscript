@@ -9,5 +9,8 @@ env.SharedLibrary('mmgalera', [
         'galera_options.c',
         'galera_state.c',
         'galera_status.c',
-        'mm_galera.cpp'
+        'mm_galera_refact.cpp',
+        'wsdb.cpp',
+        'trx_handle.cpp',
+        'certification.cpp'
 ])
