@@ -41,7 +41,7 @@ namespace gcomm
     }
     
     template <class M>
-    void push_header(const M& msg, gu::net::Datagram& dg)
+    void push_header(const M& msg, gu::Datagram& dg)
     {
 #if 0
         dg.get_header().resize(dg.get_header().size() + msg.serial_size());
@@ -63,7 +63,7 @@ namespace gcomm
     }
     
     template <class M>
-    void pop_header(const M& msg, gu::net::Datagram& dg)
+    void pop_header(const M& msg, gu::Datagram& dg)
     {
 #if 0
         memmove(&dg.get_header()[0],
@@ -76,13 +76,13 @@ namespace gcomm
 #endif
     }
 
-    inline const gu::byte_t* get_begin(const gu::net::Datagram& dg)
+    inline const gu::byte_t* get_begin(const gu::Datagram& dg)
     {
         return (dg.get_offset() < dg.get_header_len() ?
                 dg.get_header() + dg.get_header_offset() + dg.get_offset() :
                 &dg.get_payload()[0] + (dg.get_offset() - dg.get_header_len()));
     }
-    inline size_t get_available(const gu::net::Datagram& dg)
+    inline size_t get_available(const gu::Datagram& dg)
     {
         return (dg.get_offset() < dg.get_header_len() ?
                 dg.get_header_len() - dg.get_offset() :

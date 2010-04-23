@@ -34,7 +34,7 @@ public:
     ~Protonet();
     void event_loop(const gu::datetime::Period& p);  
     void dispatch(const SocketId&,
-                  const gu::net::Datagram&, 
+                  const gu::Datagram&, 
                   const ProtoUpMeta&);
     void interrupt();
     SocketPtr socket(const gu::URI&);

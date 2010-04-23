@@ -29,7 +29,7 @@ public:
     void push_proto(Protolay* p);
     void pop_proto(Protolay* p);
     gu::datetime::Date handle_timers();
-    void dispatch(const void* id, const gu::net::Datagram& dg,
+    void dispatch(const void* id, const gu::Datagram& dg,
                   const ProtoUpMeta& um);
     void enter() { mutex_.lock(); }
     void leave() { mutex_.unlock(); }

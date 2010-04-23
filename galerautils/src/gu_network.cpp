@@ -66,50 +66,7 @@ int gu::net::closefd(int fd)
  * Datagram implementation
  **************************************************************************/
 
-gu::net::Datagram::Datagram(const Buffer& buf, size_t offset) :
-    header_  (),
-    header_offset_(header_size_),
-    payload_ (new Buffer(buf), BufferDeleter(), shared_buffer_allocator),
-    offset_  (offset)
-{ 
-    assert(offset_ <= payload_->size());
-}
 
-gu::net::Datagram::Datagram(const SharedBuffer& buf, size_t offset)
-    :
-    header_(),
-    header_offset_(header_size_),
-    payload_(buf),
-    offset_(offset)
-{
-    assert(offset_ <= payload_->size());
-}
-
-
-void gu::net::Datagram::normalize()
-{
-    const SharedBuffer old_payload(payload_);
-    payload_ = SharedBuffer(new Buffer,
-                            BufferDeleter(),
-                            shared_buffer_allocator);
-    payload_->reserve(get_header_len() + old_payload->size() - offset_);
-    
-    if (get_header_len() > offset_)
-    {
-        payload_->insert(payload_->end(), 
-                         header_ + header_offset_ + offset_, 
-                         header_ + header_size_);
-        offset_ = 0;
-    }
-    else
-    {
-        offset_ -= get_header_len();
-    }
-    header_offset_ = header_size_;
-    payload_->insert(payload_->end(), old_payload->begin() + offset_,
-                     old_payload->end());
-    offset_ = 0;
-}
 
 
 /**************************************************************************
@@ -763,7 +720,7 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
 }
 
 
-const gu::net::Datagram* gu::net::Socket::recv(const int flags)
+const gu::Datagram* gu::net::Socket::recv(const int flags)
 {
     const int recv_flags = (flags & ~MSG_PEEK) |
         ((get_opt() & O_NON_BLOCKING) != 0 ? MSG_DONTWAIT : 0) |
@@ -1179,7 +1136,7 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
         case Socket::S_CONNECTED:
             if (revent & E_IN)
             {
-                const gu::net::Datagram* dm = sock->recv(MSG_PEEK);
+                const Datagram* dm = sock->recv(MSG_PEEK);
                 if (dm == 0)
                 {
                     switch (sock->get_state())

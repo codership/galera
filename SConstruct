@@ -66,12 +66,15 @@ if int(debug) >= 0:
 
 # Target arch
 arch = ARGUMENTS.get('arch', '')
+
 if arch == 'i386':
     compile_arch = '-m32'
     link_arch    = compile_arch + ' -Wl,-melf_i386'
 elif arch == 'x86-64':
     compile_arch = '-m64'
     link_arch    = compile_arch + ' -Wl,-melf_x86_64'
+
+
         
 boost = int(ARGUMENTS.get('boost', 1))
 
@@ -204,9 +207,10 @@ if boost == 1:
 else:
     print 'Not using boost'
 
+conf.env.Append(CFLAGS = ' -pedantic');
+
 env = conf.Finish()
 
-env.Append(CFLAGS = ' -pedantic');
 
 
 #

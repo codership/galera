@@ -97,7 +97,7 @@ public:
         socket_ = 0;
     }
     
-    int send(const gu::net::Datagram& dg)
+    int send(const gu::Datagram& dg)
     {
         return socket_->send(&dg);
     }

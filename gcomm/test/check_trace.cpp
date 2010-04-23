@@ -11,7 +11,7 @@
 #include "check_trace.hpp"
 
 using namespace std;
-using namespace gu::net;
+using namespace gu;
 using namespace gcomm;
 
 

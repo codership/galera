@@ -169,7 +169,7 @@ namespace gcomm
     class DummyTransport : public Transport 
     {
         UUID uuid;
-        std::deque<gu::net::Datagram*> out;
+        std::deque<gu::Datagram*> out;
         bool queue;
         static std::auto_ptr<Protonet> dummy_net;
     public:
@@ -211,18 +211,18 @@ namespace gcomm
             return 0;
         }
         
-        void handle_up(const void* cid, const gu::net::Datagram& rb,
+        void handle_up(const void* cid, const gu::Datagram& rb,
                        const ProtoUpMeta& um)
         {
             send_up(rb, um);
         }
         
-        int handle_down(gu::net::Datagram& wb, const ProtoDownMeta& dm) 
+        int handle_down(gu::Datagram& wb, const ProtoDownMeta& dm) 
         {
             if (queue == true)
             {
                 // assert(wb.get_header().size() == 0);
-                out.push_back(new gu::net::Datagram(wb));
+                out.push_back(new gu::Datagram(wb));
                 return 0;
             }
             else
@@ -231,13 +231,13 @@ namespace gcomm
             }
         }
         
-        gu::net::Datagram* get_out() 
+        gu::Datagram* get_out() 
         {
             if (out.empty())
             {
                 return 0;
             }
-            gu::net::Datagram* rb = out.front();
+            gu::Datagram* rb = out.front();
             out.pop_front();
             return rb;
         }
@@ -320,7 +320,7 @@ namespace gcomm
             gu::byte_t buf[sizeof(seq)];
             size_t sz;
             gu_trace(sz = serialize(seq, buf, sizeof(buf), 0));
-            gu::net::Datagram dg(gu::Buffer(buf, buf + sz)); 
+            gu::Datagram dg(gu::Buffer(buf, buf + sz)); 
             int err = send_down(dg, ProtoDownMeta(0));
             if (err != 0)
             {
@@ -347,7 +347,7 @@ namespace gcomm
                     tr.get_view_traces().end()); 
         }
 
-        void handle_up(const void* cid, const gu::net::Datagram& rb,
+        void handle_up(const void* cid, const gu::Datagram& rb,
                        const ProtoUpMeta& um)
         {
             if (rb.get_len() != 0)
@@ -404,15 +404,15 @@ namespace gcomm
     class ChannelMsg
     {
     public:
-        ChannelMsg(const gu::net::Datagram& rb_, const UUID& source_) :
+        ChannelMsg(const gu::Datagram& rb_, const UUID& source_) :
             rb(rb_),
             source(source_)
         { 
         }
-        const gu::net::Datagram& get_rb() const { return rb; }
+        const gu::Datagram& get_rb() const { return rb; }
         const UUID& get_source() const { return source; }
     private:
-        gu::net::Datagram rb;
+        gu::Datagram rb;
         UUID source;
     };
     
@@ -434,14 +434,14 @@ namespace gcomm
 
         ~Channel() { }
         
-        int handle_down(gu::net::Datagram& wb, const ProtoDownMeta& dm)
+        int handle_down(gu::Datagram& wb, const ProtoDownMeta& dm)
         {
             gcomm_assert((dm.get_source() == UUID::nil()) == false);
             gu_trace(put(wb, dm.get_source()));
             return 0;
         }
         
-        void put(const gu::net::Datagram& rb, const UUID& source);
+        void put(const gu::Datagram& rb, const UUID& source);
         ChannelMsg get();
         void set_ttl(const size_t t) { ttl = t; }
         size_t get_ttl() const { return ttl; }

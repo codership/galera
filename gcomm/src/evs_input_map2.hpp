@@ -77,7 +77,7 @@ class gcomm::evs::InputMapMsg
 {
 public:
     InputMapMsg(const UserMessage&       msg_, 
-                const gu::net::Datagram& rb_   ) :
+                const gu::Datagram& rb_   ) :
         msg  (msg_ ),
         rb   (rb_  )
     { }
@@ -90,12 +90,12 @@ public:
     ~InputMapMsg() { }
     
     const UserMessage& get_msg () const { return msg;  }
-    const gu::net::Datagram&    get_rb  () const { return rb;   }
+    const gu::Datagram&    get_rb  () const { return rb;   }
 private:
     void operator=(const InputMapMsg&);
     
     UserMessage const msg;
-    gu::net::Datagram rb;
+    gu::Datagram rb;
 };
 
 
@@ -323,7 +323,7 @@ public:
      *         number is out of allowed range
      */
     Range insert(const size_t uuid, const UserMessage& msg, 
-                 const gu::net::Datagram& dg = gu::net::Datagram())
+                 const gu::Datagram& dg = gu::Datagram())
         throw (gu::Exception);
     
     /*!

@@ -28,7 +28,7 @@ public:
     ~UdpSocket();
     void connect(const gu::URI& uri);
     void close();
-    int send(const gu::net::Datagram& dg);
+    int send(const gu::Datagram& dg);
     void read_handler(const boost::system::error_code&, size_t);
     void async_receive();
     size_t get_mtu() const;

@@ -116,11 +116,11 @@ public:
     void handle_trans       (const View&);
     void handle_reg         (const View&);
     
-    void handle_msg  (const Message&, const gu::net::Datagram&,
+    void handle_msg  (const Message&, const gu::Datagram&,
                       const ProtoUpMeta&);
-    void handle_up   (const void*, const gu::net::Datagram&,
+    void handle_up   (const void*, const gu::Datagram&,
                       const ProtoUpMeta&);
-    int  handle_down (gu::net::Datagram&, const ProtoDownMeta&);
+    int  handle_down (gu::Datagram&, const ProtoDownMeta&);
     
     void connect(bool first) 
     { 
@@ -143,7 +143,7 @@ private:
     void cleanup_instances();
     void handle_state(const Message&, const UUID&);
     void handle_install(const Message&, const UUID&);
-    void handle_user(const Message&, const gu::net::Datagram&,
+    void handle_user(const Message&, const gu::Datagram&,
                      const ProtoUpMeta&);
     void deliver_view();
 

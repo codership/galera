@@ -21,22 +21,12 @@
 
 #include "gu_logger.hpp"
 #include "gu_datetime.hpp"
-#include "gu_network.hpp"
+#include "gu_datagram.hpp"
 
 #include <cerrno>
 
 #include <list>
 #include <utility>
-
-
-// Forward declarations
-namespace gu
-{
-    namespace net
-    {
-        class Datagram;
-    }
-}
 
 
 // Declarations
@@ -210,8 +200,8 @@ public:
     virtual void close(const UUID& uuid) { }
     
     /* apparently handles data from upper layer. what is return value? */
-    virtual int  handle_down (gu::net::Datagram&, const ProtoDownMeta&) = 0;
-    virtual void handle_up   (const void*, const gu::net::Datagram&, const ProtoUpMeta&) = 0;
+    virtual int  handle_down (gu::Datagram&, const ProtoDownMeta&) = 0;
+    virtual void handle_up   (const void*, const gu::Datagram&, const ProtoUpMeta&) = 0;
     
     void set_up_context(Protolay *up)
     {
@@ -261,7 +251,7 @@ public:
     }
     
     /* apparently passed data buffer to the upper layer */
-    void send_up(const gu::net::Datagram& dg, const ProtoUpMeta& up_meta)
+    void send_up(const gu::Datagram& dg, const ProtoUpMeta& up_meta)
     {
 	if (up_context.empty() == true)
         {
@@ -277,7 +267,7 @@ public:
     }
     
     /* apparently passes data buffer to lower layer, what is return value? */
-    int send_down(gu::net::Datagram& dg, const ProtoDownMeta& down_meta)
+    int send_down(gu::Datagram& dg, const ProtoDownMeta& down_meta)
     {
 	if (down_context.empty() == true)
         {
@@ -313,7 +303,7 @@ public:
 
 class gcomm::Toplay : public Protolay
 {
-    int handle_down(gu::net::Datagram& dg, const ProtoDownMeta& dm)
+    int handle_down(gu::Datagram& dg, const ProtoDownMeta& dm)
     {
 	gu_throw_fatal << "Toplay handle_down() called";
 	throw;
@@ -322,7 +312,7 @@ class gcomm::Toplay : public Protolay
 
 class gcomm::Bottomlay : public Protolay
 {
-    void handle_up(const void* id, const gu::net::Datagram&, const ProtoUpMeta& um)
+    void handle_up(const void* id, const gu::Datagram&, const ProtoUpMeta& um)
     {
 	gu_throw_fatal << "Bottomlay handle_up() called";
     }

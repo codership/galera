@@ -31,8 +31,8 @@ namespace gcomm
         ~GMCast();
         
         // Protolay interface 
-        void handle_up(const void*, const gu::net::Datagram&, const ProtoUpMeta&);
-        int handle_down(gu::net::Datagram&, const ProtoDownMeta&);
+        void handle_up(const void*, const gu::Datagram&, const ProtoUpMeta&);
+        int handle_down(gu::Datagram&, const ProtoDownMeta&);
         
         // Transport interface
         bool supports_uuid() const { return true; }

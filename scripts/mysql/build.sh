@@ -161,7 +161,7 @@ then
         fi
         if [ "$SKIP_BUILD" != "yes" ]
         then
-            scons -Q $scons_args
+            scons $scons_args
         fi
     else
         scripts/build.sh # options are passed via environment variables

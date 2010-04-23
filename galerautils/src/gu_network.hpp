@@ -32,6 +32,7 @@
 #define __GU_NETWORK_HPP__
 
 #include "gu_buffer.hpp"
+#include "gu_datagram.hpp"
 #include "gu_poll.hpp"
 #include "gu_datetime.hpp"
 #include "gu_exception.hpp"
@@ -43,8 +44,6 @@
 #include <vector>
 #include <limits>
 #include <cassert>
-
-#include <boost/shared_ptr.hpp>
 
 // Forward declarations
 namespace gu
@@ -62,7 +61,6 @@ namespace gu
 {
     namespace net
     {
-        class Datagram;
         class Socket;
         class SocketList;
         class EPoll;
@@ -80,100 +78,6 @@ namespace gu
 
 
 
-/*! 
- * @brief  Datagram container
- *
- * Datagram class provides consistent interface for managing 
- * datagrams/byte buffers. 
- */
-class gu::net::Datagram
-{
-public:
-    Datagram() 
-        : 
-        header_       (), 
-        header_offset_(header_size_), 
-        payload_      (new Buffer(), BufferDeleter(), shared_buffer_allocator), 
-        offset_       (0) 
-    { }
-    /*! 
-     * @brief Construct new datagram from byte buffer
-     *
-     * @param[in] buf Const pointer to data buffer
-     * @param[in] buflen Length of data buffer
-     *
-     * @throws std::bad_alloc 
-     */
-    Datagram(const Buffer& buf, size_t offset = 0);
-
-    Datagram(const SharedBuffer& buf, size_t offset = 0);
-
-    
-    /*!
-     * @brief Copy constructor. 
-     *
-     * @note Only for normalized datagrams.
-     *
-     * @param[in] dgram Datagram to make copy from
-     * @param[in] off   
-     * @throws std::bad_alloc
-     */
-    Datagram(const Datagram& dgram, 
-             size_t off = std::numeric_limits<size_t>::max()) :
-        // header_(dgram.header_),
-        header_offset_(dgram.header_offset_),
-        payload_(dgram.payload_),
-        offset_(off == std::numeric_limits<size_t>::max() ? dgram.offset_ : off)
-    { 
-        assert(offset_ <= dgram.get_len());
-        memcpy(header_ + header_offset_, 
-               dgram.header_ + dgram.get_header_offset(), 
-               dgram.get_header_len());
-    }
-    
-    /*! 
-     * @brief Destruct datagram
-     */
-    ~Datagram() { }
-    
-    void normalize();
-    
-    // bool is_normalized() const
-    // { return (offset_ == 0 && header_.size() == 0); }
-    
-    // Buffer& get_header() { return header_; }
-    // const Buffer& get_header() const { return header_; }
-    gu::byte_t* get_header() { return header_; }
-    const gu::byte_t* get_header() const { return header_; }
-    size_t get_header_size() const { return header_size_; }
-    size_t get_header_len() const { return (header_size_ - header_offset_); }
-    size_t get_header_offset() const { return header_offset_; }
-    void set_header_offset(const size_t off) 
-    { 
-        assert(off <= header_size_);
-        header_offset_ = off; 
-    }
-    
-    const Buffer& get_payload() const 
-    { 
-        assert(payload_ != 0);
-        return *payload_; 
-    }
-    Buffer& get_payload()
-    {
-        assert(payload_ != 0);
-        return *payload_;
-    }
-    size_t get_len() const { return (header_size_ - header_offset_ + payload_->size()); }
-    size_t get_offset() const { return offset_; }
-private:
-    // Buffer header_;
-    static const size_t header_size_ = 128;
-    gu::byte_t header_[header_size_];
-    size_t header_offset_;
-    SharedBuffer payload_;
-    size_t offset_;
-};
 
 
 
@@ -214,10 +118,10 @@ private:
     size_t max_packet_size; // For incoming date
     size_t max_pending;
     
-    Buffer recv_buf;  /*!< Buffer for received data        */
+    gu::Buffer recv_buf;  /*!< Buffer for received data        */
     size_t recv_buf_offset; /*! Offset to the end of read data */
-    Datagram dgram;       /*!< Datagram container               */
-    Buffer pending;  /*!< Buffer for pending outgoing data */
+    gu::Datagram dgram;       /*!< Datagram container               */
+    gu::Buffer pending;  /*!< Buffer for pending outgoing data */
     State state;        /*!< Socket state                       */
     
     /* Network integration */

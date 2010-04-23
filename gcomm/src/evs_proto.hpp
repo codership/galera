@@ -110,7 +110,7 @@ public:
     void reset_stats();
 
     bool is_flow_control(const seqno_t, const seqno_t win) const;
-    int send_user(gu::net::Datagram&, 
+    int send_user(gu::Datagram&, 
                   uint8_t,
                   Order, 
                   seqno_t, 
@@ -120,7 +120,7 @@ public:
     size_t aggregate_len() const;
     int send_user(const seqno_t);
     void complete_user(const seqno_t);
-    int send_delegate(gu::net::Datagram&);
+    int send_delegate(gu::Datagram&);
     void send_gap(const UUID&, const ViewId&, const Range, bool commit = false);
     const JoinMessage& create_join();
     void send_join(bool tval = true);
@@ -184,10 +184,10 @@ private:
     void handle_foreign(const Message&);
     void handle_user(const UserMessage&, 
                      NodeMap::iterator, 
-                     const gu::net::Datagram&);
+                     const gu::Datagram&);
     void handle_delegate(const DelegateMessage&, 
                          NodeMap::iterator,
-                         const gu::net::Datagram&);
+                         const gu::Datagram&);
     void handle_gap(const GapMessage&, NodeMap::iterator);
     void handle_join(const JoinMessage&, NodeMap::iterator);
     void handle_leave(const LeaveMessage&, NodeMap::iterator);
@@ -195,13 +195,13 @@ private:
     void populate_node_list(MessageNodeList*) const;
 public:
     static size_t unserialize_message(const UUID&, 
-                                      const gu::net::Datagram&,
+                                      const gu::Datagram&,
                                       Message*);
     void handle_msg(const Message& msg, 
-                    const gu::net::Datagram& dg = gu::net::Datagram());    
+                    const gu::Datagram& dg = gu::Datagram());    
     // Protolay
-    void handle_up(const void*, const gu::net::Datagram&, const ProtoUpMeta&);
-    int handle_down(gu::net::Datagram& wb, const ProtoDownMeta& dm);
+    void handle_up(const void*, const gu::Datagram&, const ProtoUpMeta&);
+    int handle_down(gu::Datagram& wb, const ProtoDownMeta& dm);
     void connect(bool first)
     {
         gu_trace(shift_to(S_JOINING));
@@ -346,7 +346,7 @@ private:
     // User send window size
     seqno_t user_send_window;
     // Output message queue
-    std::deque<std::pair<gu::net::Datagram, ProtoDownMeta> > output;
+    std::deque<std::pair<gu::Datagram, ProtoDownMeta> > output;
     std::vector<gu::byte_t> send_buf_;
     uint32_t max_output_size;
     size_t mtu;

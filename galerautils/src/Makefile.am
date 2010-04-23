@@ -75,7 +75,6 @@ libgaleraresolver_la_CXXFLAGS = @AM_CXXFLAGS@ -Wno-conversion -Wno-old-style-cas
 libgalerautils___la_SOURCES = \
 	gu_exception.cpp      \
 	gu_string.cpp         \
-	gu_buffer.cpp         \
 	gu_logger.cpp         \
 	gu_regex.cpp          \
 	gu_uri.cpp            \

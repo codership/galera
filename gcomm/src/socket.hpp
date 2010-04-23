@@ -13,7 +13,7 @@
 #define GCOMM_SOCKET_HPP
 
 #include "gu_uri.hpp"
-#include "gu_network.hpp"
+#include "gu_datagram.hpp"
 
 namespace gcomm
 {
@@ -44,7 +44,7 @@ public:
     virtual void connect(const gu::URI& uri) = 0;
     virtual void close() = 0;
     
-    virtual int send(const gu::net::Datagram& dg) = 0;
+    virtual int send(const gu::Datagram& dg) = 0;
     virtual void async_receive() = 0;
     
     virtual size_t get_mtu() const = 0;

@@ -5,7 +5,6 @@ env.SharedLibrary('galerautils', Glob('*.c'))
 env.StaticLibrary('galerautils', Glob('*.c'))
 
 utilsxx_sources = [
-        'gu_buffer.cpp',
         'gu_datetime.cpp',
         'gu_exception.cpp',
         'gu_logger.cpp',

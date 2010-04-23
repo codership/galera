@@ -60,7 +60,7 @@ gu::datetime::Date gcomm::Protostack::handle_timers()
 
 
 void gcomm::Protostack::dispatch(const void* id, 
-                                 const gu::net::Datagram& dg,
+                                 const Datagram& dg,
                                  const ProtoUpMeta& um)
 {
     Critical<Protostack> crit(*this);

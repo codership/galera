@@ -20,62 +20,10 @@
 #endif // GALERA_USE_BOOST_POOL_ALLOC
 
 
-
-
 namespace gu
 {
     typedef unsigned char byte_t;
-
-    class Buffer
-    {
-    private:
-        
-        typedef std::vector<byte_t> BType;
-    public:
-        typedef byte_t value_type;
-        typedef BType::iterator iterator;
-        typedef BType::const_iterator const_iterator;
-
-        explicit Buffer(size_t sz = 0) : 
-            buf(sz)
-        { }
-        
-        template <class InputIterator>
-        Buffer(InputIterator first, InputIterator last) :
-            buf(first, last)
-        { }
-        
-        size_t size() const { return buf.size(); }
-        void resize(size_t sz) { buf.resize(sz); }
-        size_t capacity() const { return buf.capacity(); }
-        void reserve(size_t sz) { buf.reserve(sz); }
-        template <class InputIterator>
-        void insert(iterator position, InputIterator first, InputIterator last)
-        { buf.insert(position, first, last); }
-        void clear() { buf.clear(); }
-        void erase(iterator first, iterator last) { buf.erase(first, last); }
-        iterator begin() { return buf.begin(); }
-        
-        iterator end() { return buf.end(); }
-
-        const_iterator begin() const { return buf.begin(); }
-        const_iterator end()   const { return buf.end(); }
-
-        value_type& operator[](size_t i) { return buf[i]; }
-        const value_type& operator[](size_t i) const { return buf[i]; }
-        value_type& at(size_t i) { return buf.at(i); }
-        const value_type& at(size_t i) const { return buf.at(i); }
-        
-#ifdef GALERA_USE_BOOST_POOL_ALLOC
-        void* operator new(size_t);
-        void operator delete(void* );
-#endif // GALERA_USE_BOOST_POOL_ALLOC
-        bool operator==(const Buffer& cmp) const
-        { return (cmp.buf == buf); }
-    private:
-        BType buf;
-    };    
-
+    typedef std::vector<byte_t> Buffer;
     class BufferDeleter
     {
     public:
@@ -86,8 +34,7 @@ namespace gu
     private:
         void operator=(const BufferDeleter&);
     };
-
-
+    
     typedef boost::shared_ptr<Buffer> SharedBuffer;
 #ifdef GALERA_USE_BOOST_POOL_ALLOC
     typedef boost::fast_pool_allocator<SharedBuffer> SharedBufferAllocator;

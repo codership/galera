@@ -37,7 +37,7 @@ public:
     void close();
     void write_handler(const boost::system::error_code& ec,
                        size_t bytes_transferred);    
-    int send(const gu::net::Datagram& dg);
+    int send(const gu::Datagram& dg);
     size_t read_completion_condition(
         const boost::system::error_code& ec,
         const size_t bytes_transferred);
@@ -57,7 +57,7 @@ private:
 
     Protonet&                     net_;
     boost::asio::ip::tcp::socket  socket_;
-    std::deque<gu::net::Datagram> send_q_;
+    std::deque<gu::Datagram> send_q_;
     std::vector<gu::byte_t>       recv_buf_;
     size_t                        recv_offset_;
     State                         state_;

@@ -75,8 +75,8 @@ public:
                                 << uri_.get_scheme();
     }
     
-    virtual int  handle_down(gu::net::Datagram&, const ProtoDownMeta&) = 0;
-    virtual void handle_up  (const void*, const gu::net::Datagram&, const ProtoUpMeta&) = 0;
+    virtual int  handle_down(gu::Datagram&, const ProtoDownMeta&) = 0;
+    virtual void handle_up  (const void*, const gu::Datagram&, const ProtoUpMeta&) = 0;
     
     Protostack& get_pstack() { return pstack_; }
     Protonet&   get_pnet()   { return pnet_; }
