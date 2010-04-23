@@ -68,6 +68,17 @@ namespace galera
     
     
     typedef boost::shared_ptr<TrxHandle> TrxHandlePtr;
+
+    
+    class TrxHandleLock
+    {
+    public:
+        TrxHandleLock(TrxHandlePtr& trx) : trx_(trx) { trx_->lock(); }
+        ~TrxHandleLock() { trx_->unlock(); }
+    private:
+        TrxHandlePtr& trx_;
+    };
+
 }
 
 #endif // GALERA_TRX_HANDLE_HPP

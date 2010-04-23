@@ -66,12 +66,12 @@ int galera::TrxHandle::append_row_key(const void* dbtable,
 {   struct wsdb_key_rec   wsdb_key;
     struct wsdb_table_key table_key;
     struct wsdb_key_part  key_part;
-
+    
     wsdb_key.key             = &table_key;
     table_key.key_part_count = 1;
     table_key.key_parts      = &key_part;
     key_part.type            = WSDB_TYPE_VOID;
-
+    
     /* assign key info */
     wsdb_key.dbtable     = (char*)dbtable;
     wsdb_key.dbtable_len = dbtable_len;

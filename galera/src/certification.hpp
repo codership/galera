@@ -18,7 +18,7 @@ namespace galera
         virtual void set_trx_committed(wsrep_seqno_t seqno);
         virtual TrxHandlePtr get_trx(wsrep_seqno_t seqno);
         virtual void deref_seqno(wsrep_seqno_t seqno);
-
+        
         virtual ~Certification() { }
         
         // Factory method

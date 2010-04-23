@@ -122,7 +122,7 @@ static inline long while_eagain_or_trx_abort (
     while (-EAGAIN == (rcode = function (to, seqno))) {
         nanosleep (&period, NULL);
         TrxHandlePtr trx(wsdb->get_trx(trx_id));
-        GLock<TrxHandle> trx_lock(*trx);
+        TrxHandleLock trx_lock(trx);
         assert(trx->get_local_seqno() == seqno);
         if (trx->get_state() == WSDB_TRX_MUST_ABORT) {
             gu_debug("WSDB_TRX_MUST_ABORT for trx: %lld %lld",
@@ -1714,7 +1714,7 @@ static enum wsrep_status mm_galera_abort_slave_trx(
         ret_code = WSREP_WARNING;
     } else {
         TrxHandlePtr victim(cert->get_trx(victim_seqno));
-        GLock<TrxHandle> lock(*victim);
+        TrxHandleLock lock(victim);
         gu_debug("interrupting trx commit: seqno_g %lld seqno_l %lld", 
                  victim_seqno, victim->get_local_seqno());
         
@@ -1737,7 +1737,7 @@ static enum wsrep_status mm_galera_post_commit(
 ) {
     bool do_report = false;
     TrxHandlePtr trx(wsdb->get_trx(trx_id));
-    GLock<TrxHandle> lock(*trx);
+    TrxHandleLock lock(trx);
 
     GU_DBUG_ENTER("galera_post_commit");
 
@@ -1773,7 +1773,7 @@ static enum wsrep_status mm_galera_post_rollback(
     wsrep_t *gh, wsrep_trx_id_t trx_id
 ) {
     TrxHandlePtr trx(wsdb->get_trx(trx_id));
-    GLock<TrxHandle> lock(*trx);
+    TrxHandleLock lock(trx);
 
     GU_DBUG_ENTER("galera_post_rollback");
 
@@ -1904,7 +1904,7 @@ static enum wsrep_status mm_galera_pre_commit(
 #endif
     do {
         TrxHandlePtr trx(wsdb->get_trx(trx_id));
-        GLock<TrxHandle> lock(*trx);
+        TrxHandleLock lock(trx);
         switch (trx->get_state()) {
         case WSDB_TRX_MUST_ABORT:
             gu_debug("trx has been cancelled already: %llu", trx_id);
@@ -1938,7 +1938,7 @@ static enum wsrep_status mm_galera_pre_commit(
     }
 
     TrxHandlePtr trx(wsdb->get_trx(trx_id));
-    GLock<TrxHandle> lock(*trx);
+    TrxHandleLock lock(trx);
 
     /* retrieve write set */
     ws = trx->get_write_set(rbr_data, rbr_data_len);
@@ -2214,7 +2214,7 @@ static enum wsrep_status mm_galera_append_row_key(
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
 
     TrxHandlePtr trx(wsdb->get_trx(trx_id, true));
-    GLock<TrxHandle> lock(*trx);
+    TrxHandleLock lock(trx);
 
     errno = 0;
 
@@ -2511,7 +2511,7 @@ static enum wsrep_status mm_galera_replay_trx(
     int                rcode = WSREP_OK;
     enum wsrep_status  ret_code = WSREP_OK;
     TrxHandlePtr trx(wsdb->get_trx(trx_id));
-    GLock<TrxHandle> lock(*trx);
+    TrxHandleLock lock(trx);
 
     gu_debug("trx_replay for: %lld %lld state: %d, rbr len: %d", 
              trx->get_local_seqno(), 
