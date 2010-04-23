@@ -101,7 +101,7 @@ enum job_state {
                           //!< can block further jobs to start
     JOB_WAIT_QUEUE_ENTER, //!< queue is full, waiting to enter
     JOB_WAIT_FOR_JOB    , //!< waiting for some conflicting job to exit
-    JOB_IDLE,             //!< job ended
+    JOB_IDLE              //!< job ended
 };
 
 /*! @enum
@@ -112,7 +112,7 @@ enum job_state {
 enum job_type {
     JOB_SLAVE,        //!< usual trx applied
     JOB_REPLAYING,    //!< BF aborted trx replaying
-    JOB_TO_ISOLATION, //!< TO isolation
+    JOB_TO_ISOLATION  //!< TO isolation
 };
 
 /*!

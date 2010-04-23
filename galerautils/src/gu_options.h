@@ -22,7 +22,7 @@ struct gu_options_pair {
 
 struct gu_options {
     long                   opts_num;
-    struct gu_options_pair opts[];
+    struct gu_options_pair opts[1];
 };
 
 extern struct gu_options*

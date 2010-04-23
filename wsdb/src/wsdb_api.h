@@ -80,7 +80,7 @@ typedef int64_t trx_seqno_t;
 
 enum wsdb_conn_state {
   WSDB_CONN_IDLE = 0,     //!< 
-  WSDB_CONN_TRX,          //!< processing transaction
+  WSDB_CONN_TRX           //!< processing transaction
 };
 
 
@@ -102,13 +102,13 @@ enum wsdb_trx_state {
   WSDB_TRX_REPLAYING,       //!< trx is replaying
   WSDB_TRX_ABORTING_REPL,   //!< MUST_ABORT acked, trx has replicated, aborting
   WSDB_TRX_ABORTING_NONREPL,//!< MUST_ABORT acked, trx not replicated, aborting
-  WSDB_TRX_MISSING,         //!< trx is not in local hash
+  WSDB_TRX_MISSING          //!< trx is not in local hash
 };
 
 enum wsdb_trx_position {
     WSDB_TRX_POS_VOID = 1  ,       /*!< position not defined        */
     WSDB_TRX_POS_CERT_QUEUE,       /*!< before cert_queue monitor   */
-    WSDB_TRX_POS_COMMIT_QUEUE,     /*!< before commit_queue monitor */
+    WSDB_TRX_POS_COMMIT_QUEUE      /*!< before commit_queue monitor */
 };
 
 typedef struct {
@@ -136,7 +136,7 @@ typedef char		my_bool; /* Small bool */
 
 enum wsdb_ws_type {
     WSDB_WS_TYPE_TRX = 1, /*!< ws contains one transaction */
-    WSDB_WS_TYPE_CONN,    /*!< ws contains one query for direct execution */
+    WSDB_WS_TYPE_CONN     /*!< ws contains one query for direct execution */
 };
 
 enum wsdb_ws_level {
@@ -150,7 +150,7 @@ enum wsdb_ws_level {
 enum wsdb_trx_state2 {
     LOCAL,      /*!< TRX is executing in local state */
     COMMITTING, /*!< TRX has replicated and is in committing state */
-    COMMITTED,  /*!< TRX has certified successfully */
+    COMMITTED   /*!< TRX has certified successfully */
 };
 struct wsdb_table_name_rec {
     char *db_name;
@@ -640,13 +640,13 @@ int wsdb_conn_get_info (connid_t conn_id, struct wsdb_conn_info *info);
 enum wsdb_conf_param_id {
     WSDB_CONF_LOCAL_CACHE_SIZE,  //!< max size for local cache
     WSDB_CONF_WS_PERSISTENCY,    //!< WS persistency policy
-    WSDB_CONF_MARK_COMMIT_EARLY, //!< update last seen trx asap
+    WSDB_CONF_MARK_COMMIT_EARLY  //!< update last seen trx asap
 };
 
 enum wsdb_conf_param_type {
     WSDB_CONF_TYPE_INT,     //!< integer type
     WSDB_CONF_TYPE_DOUBLE,  //!< float
-    WSDB_CONF_TYPE_STRING,  //!< null terminated string
+    WSDB_CONF_TYPE_STRING   //!< null terminated string
 };
 
 typedef void * (*wsdb_conf_param_fun)(

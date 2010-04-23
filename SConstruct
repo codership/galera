@@ -124,7 +124,7 @@ env.Append(LIBPATH = Split('''#/galerautils/src
 # These should be kept minimal as they are appended after C/CXX specific flags
 env.Replace(CCFLAGS = 
             opt_flags 
-            + ' -Wall -Wextra -Werror -Wno-unused-parameter ' 
+            + ' -pipe -Wall -Wextra -Werror -Wno-unused-parameter ' 
             + compile_arch)
 
 # Linker flags  
@@ -144,7 +144,7 @@ env.Replace(CFLAGS = '-std=c99 -fno-strict-aliasing')
 
 # CXXFLAGS
 env.Replace(CXXFLAGS = 
-            '-Wno-long-long -Wno-deprecated -Weffc++ -pedantic -ansi')
+            '-Wno-long-long -Wno-deprecated -Wold-style-cast -Weffc++ -pedantic -ansi')
 
 
 
@@ -154,6 +154,7 @@ env.Replace(CXXFLAGS =
 #
 
 conf = Configure(env)
+
 
 # System headers and libraries
 

@@ -310,7 +310,7 @@ typedef struct gcs_act_conf {
     long             memb_num; /// number of members in configuration
     long             my_idx;   /// index of this node in the configuration
     gcs_node_state_t my_state; /// current node state
-    char             data[];   /// member array (null-terminated IDs)
+    char             data[1];   /// member array (null-terminated IDs)
 } gcs_act_conf_t;
 
 #ifdef	__cplusplus

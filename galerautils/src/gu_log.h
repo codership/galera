@@ -54,7 +54,7 @@ gu_log (gu_log_severity_t severity,
 extern gu_log_severity_t gu_log_max_level;
 #define gu_log_debug (GU_LOG_DEBUG == gu_log_max_level)
 
-#ifndef __cplusplus
+#if !defined(__cplusplus) || defined(GALERA_LOG_H_ENABLE_CXX)
 // NOTE: don't add "\n" here even if you really want to do it
 #define GU_LOG_C(level, ...)\
         gu_log(level, __FILE__, __PRETTY_FUNCTION__, __LINE__,\

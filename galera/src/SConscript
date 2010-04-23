@@ -1,4 +1,13 @@
 
 env = DefaultEnvironment()
 
-env.SharedLibrary('mmgalera', Glob('*.c'))
+env.Replace(CXXFLAGS = '-DGALERA_LOG_H_ENABLE_CXX -Wno-long-long -Wno-deprecated -Weffc++ -ansi')
+
+env.SharedLibrary('mmgalera', [
+        'galera_info.c',
+        'galera_job_queue.c',
+        'galera_options.c',
+        'galera_state.c',
+        'galera_status.c',
+        'mm_galera.cpp'
+])

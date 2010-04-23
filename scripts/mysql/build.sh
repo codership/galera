@@ -39,7 +39,7 @@ CONFIGURE=no
 SKIP_BUILD=no
 SCRATCH=no
 SCONS=no
-
+JOBS=1
 GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
 
 # Parse command line
@@ -74,6 +74,10 @@ do
             ;;
         -p|--package)
             PACKAGE="yes"   # Create a DEB package
+            ;;
+        -j)
+            shift;
+            JOBS=$1
             ;;
         --no-strip)
             NO_STRIP="yes"  # Don't strip the binaries
@@ -148,10 +152,6 @@ then
     if [ "$SCONS" == "yes" ]
     then
         scons_args=""
-        if [ "$SCRATCH" == "yes" ]
-        then
-            scons -Q -c
-        fi
         if [ "$CPU" == "pentium" ]
         then
             scons_args="$scons_args arch=i386"
@@ -159,9 +159,13 @@ then
         then
             scons_args="$scons_args arch=x86_64"
         fi
+        if [ "$SCRATCH" == "yes" ]
+        then
+            scons -Q -c $scons_args
+        fi
         if [ "$SKIP_BUILD" != "yes" ]
         then
-            scons $scons_args
+            scons $scons_args -j $JOBS
         fi
     else
         scripts/build.sh # options are passed via environment variables
