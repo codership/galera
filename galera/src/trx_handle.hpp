@@ -15,8 +15,9 @@ namespace galera
     class TrxHandle
     {
     public:
-        TrxHandle(wsrep_trx_id_t id) : 
-            id_(id), 
+        TrxHandle(wsrep_trx_id_t id = -1, bool local = false) : 
+            id_(id),
+            local_(local),
             mutex_(),
             seqno_l_(WSREP_SEQNO_UNDEFINED),
             seqno_g_(WSREP_SEQNO_UNDEFINED),
@@ -29,6 +30,10 @@ namespace galera
         virtual ~TrxHandle() { }
         void lock() { mutex_.lock(); }
         void unlock() { mutex_.unlock(); }
+
+        virtual wsrep_trx_id_t get_id() const { return id_; }
+        virtual bool is_local() const { return local_; }
+        
         virtual void assign_local_seqno(wsrep_seqno_t seqno_l);
         virtual wsrep_seqno_t get_local_seqno() const;
         virtual void assign_global_seqno(wsrep_seqno_t seqno_g);
@@ -40,7 +45,6 @@ namespace galera
         virtual void assign_applier(void*, void*);
         virtual void* get_applier();
         virtual void* get_applier_ctx();
-        virtual void set_committed();
         
         virtual int append_row_key(const void* dbtable, 
                                    size_t dbtable_len,
@@ -56,6 +60,7 @@ namespace galera
         TrxHandle(const TrxHandle&);
         void operator=(const TrxHandle& other);
         wsrep_trx_id_t      id_;
+        bool                local_;
         gu::Mutex           mutex_;
         wsrep_seqno_t       seqno_l_;
         wsrep_seqno_t       seqno_g_;

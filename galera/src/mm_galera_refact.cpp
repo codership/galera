@@ -795,7 +795,11 @@ static wsrep_status_t process_conn_write_set(
     do_report = report_check_counter();
     GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
 
-    cert->set_trx_committed(ws->trx_seqno);
+    {
+        TrxHandlePtr trx(cert->get_trx(ws->trx_seqno));
+        TrxHandleLock lock(trx);
+        cert->set_trx_committed(trx);
+    }
 
     if (do_report) report_last_committed(gcs_conn);
     
@@ -941,8 +945,11 @@ enum wsrep_status process_query_write_set_applying(
 
         GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
 
-        cert->set_trx_committed(ws->trx_seqno);
-
+        {
+            TrxHandlePtr trx(cert->get_trx(ws->trx_seqno));
+            TrxHandleLock lock(trx);
+            cert->set_trx_committed(trx);
+        }
         if (do_report) report_last_committed(gcs_conn);
     }
     return WSREP_OK;
@@ -968,7 +975,7 @@ static wsrep_status_t process_query_write_set(
     trx->assign_write_set(ws);
     trx->assign_local_seqno(seqno_l);
     trx->assign_global_seqno(seqno_g);
-    rcode = cert->append_write_set(trx);
+    rcode = cert->append_trx(trx);
     if (gu_unlikely(!galera_update_last_received(seqno_g))) {
         /* Outdated writeset, skip */
         rcode = WSDB_CERTIFICATION_SKIP;
@@ -977,7 +984,7 @@ static wsrep_status_t process_query_write_set(
 #else
     if (gu_likely(galera_update_last_received(seqno_g))) {
         /* Global seqno OK, do certification test */
-        rcode = cert->append_write_set(ws);
+        rcode = cert->append_trx(trx);
     }
     else {
         /* Outdated writeset, skip */
@@ -1207,8 +1214,13 @@ galera_handle_configuration (wsrep_t* gh,
     st_required = galera_st_required (conf);
 
 #ifdef GALERA_WORKAROUND_197
+    TrxHandlePtr trx(cert->get_trx(conf->seqno));
+    if (trx != 0)
+    {
+        TrxHandleLock lock(trx);
+        cert->set_trx_committed(trx);
+    }
     if (conf->seqno >= 0) cert->purge_trxs_upto(conf->seqno);
-    cert->set_trx_committed(conf->seqno);
 #endif
 
     view_handler_cb (NULL, recv_ctx,
@@ -2040,12 +2052,12 @@ static enum wsrep_status mm_galera_pre_commit(
     }
 
 #ifdef GALERA_WORKAROUND_197
-    rcode = cert->append_write_set(trx);
+    rcode = cert->append_trx(trx);
     if (gu_likely(galera_update_last_received (seqno_g))) {
 #else
     if (gu_likely(galera_update_last_received (seqno_g))) {
         /* Global seqno OK, do certification test */
-        rcode = wsdb_append_write_set(seqno_g, ws);
+        rcode = cert->append_trx(trx);
 #endif
 
         switch (rcode) {
@@ -2149,7 +2161,7 @@ static enum wsrep_status mm_galera_pre_commit(
         }
 
         // we can update last seen trx counter already here
-        trx->set_committed();
+        cert->set_trx_committed(trx);
     } else {
         /* Cancel commit queue since we are going to rollback */
         GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
@@ -2159,7 +2171,7 @@ cleanup:
 
     gu_free(data); // TODO: cache writeset for 
     // was referenced by wsdb_get_write_set() above
-    wsdb_deref_seqno (ws->last_seen_trx);
+    cert->deref_seqno (ws->last_seen_trx);
 //DELETE    wsdb_write_set_free(ws);
     GU_DBUG_RETURN(retcode);
 }

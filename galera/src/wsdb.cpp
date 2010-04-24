@@ -17,7 +17,7 @@ galera::TrxHandlePtr galera::Wsdb::create_trx(wsrep_trx_id_t id)
 {
     Lock lock(mutex);
     pair<TrxMap::iterator, bool> i = trx_map.insert(
-        make_pair(id, TrxHandlePtr(new TrxHandle(id))));
+        make_pair(id, TrxHandlePtr(new TrxHandle(id, true))));
     if (i.second == false)
         gu_throw_fatal;
     return i.first->second;

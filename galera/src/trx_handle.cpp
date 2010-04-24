@@ -53,10 +53,6 @@ void galera::TrxHandle::assign_applier(void* applier, void* applier_ctx)
     wsdb_assign_trx_applier(id_, reinterpret_cast<job_worker*>(applier_), applier_ctx_);
 }
 
-void galera::TrxHandle::set_committed()
-{
-    wsdb_set_local_trx_committed(id_);
-}
 
 int galera::TrxHandle::append_row_key(const void* dbtable,
                                       size_t dbtable_len,
