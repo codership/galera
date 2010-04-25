@@ -294,13 +294,14 @@ GALERA_LIBS=$GALERA_DIST_DIR/lib
 mkdir -p $GALERA_LIBS
 install -m 644 LICENSE.galera $GALERA_DIST_DIR
 if [ "$SCONS" == "yes" ]
+then
     cp -P $SCONS_VD/galerautils/src/libgalerautils.so*   $GALERA_LIBS
     cp -P $SCONS_VD/galerautils/src/libgalerautils++.so* $GALERA_LIBS
     cp -P $SCONS_VD/gcomm/src/libgcomm.so* $GALERA_LIBS
     cp -P $SCONS_VD/gcs/src/libgcs.so* $GALERA_LIBS
     cp -P $SCONS_VD/wsdb/src/libwsdb.so* $GALERA_LIBS
     cp -P $SCONS_VD/galera/src/libmmgalera.so* $GALERA_LIBS
-then
+else
     cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils.so*   $GALERA_LIBS
     cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils++.so* $GALERA_LIBS
     cp -P $GALERA_SRC/gcomm/src/.libs/libgcomm.so* $GALERA_LIBS
