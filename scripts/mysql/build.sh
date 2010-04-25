@@ -23,6 +23,7 @@ usage()
 "    -r|--release <galera release>, otherwise revisions will be used\n"\
 "    -p|--package    create DEB/RPM packages (depending on the distribution)\n"\
 "    --sb|--skip-build skip the actual build, use the existing binaries"\
+"    --sc|--skip-configure skip configure"\
 "    --scons         use scons to build galera libraries"\
 "\n -s and -b options affect only Galera build.\n"
 }
@@ -37,6 +38,7 @@ PACKAGE=no
 INSTALL=no
 CONFIGURE=no
 SKIP_BUILD=no
+SKIP_CONFIGURE=no
 SCRATCH=no
 SCONS=no
 JOBS=1
@@ -99,6 +101,9 @@ do
             ;;
         --sb|--skip-build)
             SKIP_BUILD="yes"
+            ;;
+        --sc|--skip-configure)
+            SKIP_CONFIGURE="yes"
             ;;
         --scons)
             SCONS="yes"
@@ -220,7 +225,7 @@ export MYSQL_REV
 export GALERA_REV
 if [ "$SKIP_BUILD" == "no" ]
 then
-    if [ "$CONFIGURE" == "yes" ]
+    if [ "$CONFIGURE" == "yes" ] && [ "$SKIP_CONFIGURE" == "no" ]
     then
         rm -f config.status
         if [ "$DEBUG" == "yes" ]

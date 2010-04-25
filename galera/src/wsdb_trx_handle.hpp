@@ -59,6 +59,22 @@ namespace galera
             return static_cast<WsdbWriteSet*>(write_set_)->write_set_->trx_seqno;
         }
         
+        void assign_state(enum wsdb_trx_state state)
+        {
+            wsdb_assign_trx_state(get_id(), state);
+        }
+
+        void assign_position(enum wsdb_trx_position position)
+        {
+            wsdb_assign_trx_pos(get_id(), position);
+        }
+
+        enum wsdb_trx_position get_position() const 
+        {
+            wsdb_trx_info_t info;
+            wsdb_get_trx_info(get_id(), &info);
+            return info.position;
+        }
         void clear()
         {
             WsdbWriteSet* ws(static_cast<WsdbWriteSet*>(write_set_));

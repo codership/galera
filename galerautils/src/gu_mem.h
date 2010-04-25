@@ -12,6 +12,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /** @name Functions to help with dynamic allocation debugging.
  *  Take additional __FILE__ and __LINE__ arguments. Should be
  *  used as part of macros defined below */
@@ -56,5 +60,9 @@ void gu_mem_stats (ssize_t* total, ssize_t* allocs, ssize_t* reallocs,
 #define GU_REALLOC(P,N,type) (type*) gu_realloc((P), (N) * sizeof(type))
 
 /*@}*/
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _gu_mem_h_ */

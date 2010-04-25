@@ -8,10 +8,8 @@
 #include "gu_lock.hpp"
 #include "gu_throw.hpp"
 
-extern "C"
-{
 #include "wsdb_api.h"
-}
+
 #include <map>
 
 

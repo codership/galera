@@ -14,6 +14,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** UUID internally is represented as a BE integer which allows using
  *  memcmp() as comparison function and straightforward printing */
 #define GU_UUID_LEN 16
@@ -76,5 +80,8 @@ extern long
 gu_uuid_older (const gu_uuid_t* left,
                const gu_uuid_t* right);
 
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _gu_uuid_h_ */

@@ -12,13 +12,14 @@
 #include <time.h>
 #include <sys/time.h>
 
-#include "wsrep_api.h"
+
 
 extern "C"
 {
+#include "wsrep_api.h"
 #include "gu_log.h"
 #include "gcs.h"
-
+    
 #include "galera_info.h"
 #include "galera_state.h"
 #include "galera_options.h"
@@ -213,7 +214,8 @@ static gcs_conn_t* galera_init_gcs (wsrep_t*      gh,
     GU_DBUG_RETURN(ret);
 }
 
-static enum wsrep_status mm_galera_init(wsrep_t* gh,
+extern "C"
+enum wsrep_status mm_galera_init(wsrep_t* gh,
                                         const struct wsrep_init_args* args)
 {
     int rcode;
@@ -295,22 +297,23 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static enum wsrep_status
-mm_galera_options_set (wsrep_t* gh, const char* opts_str)
+extern "C"
+enum wsrep_status mm_galera_options_set (wsrep_t* gh, const char* opts_str)
 {
     return galera_options_from_string (&galera_opts, opts_str);
 }
 
-static char*
-mm_galera_options_get (wsrep_t* gh)
+extern "C"
+char* mm_galera_options_get (wsrep_t* gh)
 {
     return galera_options_to_string (&galera_opts);
 }
 
-static enum wsrep_status mm_galera_connect (wsrep_t *gh,
-                                            const char* cluster_name,
-                                            const char* cluster_url,
-                                            const char* state_donor)
+extern "C"
+enum wsrep_status mm_galera_connect (wsrep_t *gh,
+                                     const char* cluster_name,
+                                     const char* cluster_url,
+                                     const char* state_donor)
 {
     int rcode;
 
@@ -336,7 +339,8 @@ static enum wsrep_status mm_galera_connect (wsrep_t *gh,
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static enum wsrep_status mm_galera_disconnect(wsrep_t *gh)
+extern "C"
+enum wsrep_status mm_galera_disconnect(wsrep_t *gh)
 {
     int rcode;
 
@@ -369,7 +373,8 @@ static enum wsrep_status mm_galera_disconnect(wsrep_t *gh)
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static void mm_galera_tear_down(wsrep_t *gh)
+extern "C"
+void mm_galera_tear_down(wsrep_t *gh)
 {
     int rcode;
     galera_state_t saved_state;
@@ -454,6 +459,7 @@ static wsrep_status_t apply_write_set(void *recv_ctx, const WriteSet& ws,
     }
     GU_DBUG_RETURN(WSREP_OK);
 }
+
 
 static wsrep_status_t apply_query(void *recv_ctx, const char *query, int len,
                                   wsrep_seqno_t seqno_g
@@ -1125,7 +1131,8 @@ galera_handle_configuration (wsrep_t* gh,
     GU_DBUG_RETURN(ret);
 }
 
-static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx) 
+extern "C"
+enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx) 
 {
     int                rcode;
     bool               shutdown = false;
@@ -1267,7 +1274,8 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx)
     return ret_code;
 }
 
-static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
+extern "C"
+enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
     const wsrep_seqno_t bf_seqno, const wsrep_trx_id_t victim_trx
 ) {
     enum wsrep_status ret_code = WSREP_OK;
@@ -1374,7 +1382,8 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
     return ret_code;
 }
 
-static enum wsrep_status mm_galera_abort_slave_trx(
+extern "C"
+enum wsrep_status mm_galera_abort_slave_trx(
     wsrep_t *gh, wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno
 ) {
     enum wsrep_status ret_code = WSREP_OK;
@@ -1408,7 +1417,8 @@ static enum wsrep_status mm_galera_abort_slave_trx(
     return ret_code;
 }
 
-static enum wsrep_status mm_galera_post_commit(
+extern "C"
+enum wsrep_status mm_galera_post_commit(
     wsrep_t *gh, wsrep_trx_id_t trx_id
 ) {
     bool do_report(false);
@@ -1445,7 +1455,8 @@ static enum wsrep_status mm_galera_post_commit(
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static enum wsrep_status mm_galera_post_rollback(
+extern "C"
+enum wsrep_status mm_galera_post_rollback(
     wsrep_t *gh, wsrep_trx_id_t trx_id
 ) {
     TrxHandlePtr trx(wsdb->get_trx(trx_id));
@@ -1548,7 +1559,8 @@ static int check_certification_status_for_aborted(
 }
 
 
-static enum wsrep_status mm_galera_pre_commit(
+extern "C"
+enum wsrep_status mm_galera_pre_commit(
     wsrep_t *gh, wsrep_trx_id_t trx_id, wsrep_conn_id_t conn_id, 
     const void *rbr_data, size_t rbr_data_len, wsrep_seqno_t* global_seqno
 ) {
@@ -1776,7 +1788,8 @@ cleanup:
 }
 
 
-static enum wsrep_status mm_galera_append_query(
+extern "C"
+enum wsrep_status mm_galera_append_query(
     wsrep_t *gh, const wsrep_trx_id_t trx_id, 
     const char *query, const time_t timeval, const uint32_t randseed
 ) {
@@ -1789,7 +1802,7 @@ static enum wsrep_status mm_galera_append_query(
     
     try
     {
-        wsdb->append_query(trx, query, strlen(query));
+        wsdb->append_query(trx, query, strlen(query), timeval, randseed);
     }
     catch (...)
     {
@@ -1800,7 +1813,8 @@ static enum wsrep_status mm_galera_append_query(
 }
 
 
-static enum wsrep_status mm_galera_append_row_key(
+extern "C"
+enum wsrep_status mm_galera_append_row_key(
     wsrep_t *gh,
     const wsrep_trx_id_t trx_id,
     const char    *dbtable,
@@ -1833,7 +1847,8 @@ static enum wsrep_status mm_galera_append_row_key(
     return WSREP_OK;
 }
 
-static wsrep_status_t mm_galera_causal_read(
+extern "C"
+wsrep_status_t mm_galera_causal_read(
     wsrep_t* wsrep, 
     wsrep_seqno_t* seqno)
 {
@@ -1841,7 +1856,8 @@ static wsrep_status_t mm_galera_causal_read(
 }
 
 
-static enum wsrep_status mm_galera_set_variable(
+extern "C"
+enum wsrep_status mm_galera_set_variable(
     wsrep_t *gh,
     const wsrep_conn_id_t  conn_id,
     const char *key,   const size_t key_len, // why is it not 0-terminated?
@@ -1896,7 +1912,8 @@ static enum wsrep_status mm_galera_set_variable(
     return WSREP_OK;
 }
 
-static enum wsrep_status mm_galera_set_database(
+extern "C"
+enum wsrep_status mm_galera_set_database(
     wsrep_t *gh,
     const wsrep_conn_id_t conn_id, const char *query, const size_t query_len
     ) {
@@ -1912,7 +1929,8 @@ static enum wsrep_status mm_galera_set_database(
     return WSREP_OK;
 }
 
-static enum wsrep_status mm_galera_to_execute_start(
+extern "C"
+enum wsrep_status mm_galera_to_execute_start(
     wsrep_t *gh, 
     const wsrep_conn_id_t conn_id, 
     const void *query, 
@@ -1945,7 +1963,7 @@ static enum wsrep_status mm_galera_to_execute_start(
     
     TrxHandlePtr trx(wsdb->get_conn_query(conn_id, true));
     TrxHandleLock lock(trx);
-    wsdb->append_query(trx, query, query_len);
+    wsdb->append_conn_query(trx, query, query_len);
     wsdb->create_write_set(trx);
     
     Buffer query_buf;
@@ -2014,7 +2032,8 @@ static enum wsrep_status mm_galera_to_execute_start(
 }
 
 
-static enum wsrep_status mm_galera_to_execute_end(
+extern "C"
+enum wsrep_status mm_galera_to_execute_end(
     wsrep_t *gh, const wsrep_conn_id_t conn_id) 
 {
     bool do_report;
@@ -2044,7 +2063,8 @@ static enum wsrep_status mm_galera_to_execute_end(
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static enum wsrep_status mm_galera_replay_trx(
+extern "C"
+enum wsrep_status mm_galera_replay_trx(
     wsrep_t *gh, const wsrep_trx_id_t trx_id, void *recv_ctx
 ) {
     
@@ -2137,7 +2157,8 @@ static enum wsrep_status mm_galera_replay_trx(
     return (ret_code == WSREP_OK) ? WSREP_OK : WSREP_TRX_FAIL;
 }
 
-static wsrep_status_t mm_galera_sst_sent (wsrep_t* gh,
+extern "C"
+wsrep_status_t mm_galera_sst_sent (wsrep_t* gh,
                                           const wsrep_uuid_t* uuid,
                                           wsrep_seqno_t seqno)
 {
@@ -2168,7 +2189,8 @@ static wsrep_status_t mm_galera_sst_sent (wsrep_t* gh,
     return WSREP_CONN_FAIL;
 }
 
-static wsrep_status_t mm_galera_sst_received (wsrep_t* gh,
+extern "C"
+wsrep_status_t mm_galera_sst_received (wsrep_t* gh,
                                               const wsrep_uuid_t* uuid,
                                               wsrep_seqno_t seqno,
                                               const char* state,
@@ -2185,7 +2207,8 @@ static wsrep_status_t mm_galera_sst_received (wsrep_t* gh,
     return WSREP_OK;
 }
 
-static wsrep_status_t mm_galera_snapshot(
+extern "C"
+wsrep_status_t mm_galera_snapshot(
     wsrep_t*     wsrep,
     const void*  msg,
     const size_t msg_len,
@@ -2194,17 +2217,18 @@ static wsrep_status_t mm_galera_snapshot(
     return WSREP_NOT_IMPLEMENTED;
 }
 
-static struct wsrep_status_var* mm_galera_status_get (wsrep_t* gh)
+extern "C"
+struct wsrep_status_var* mm_galera_status_get (wsrep_t* gh)
 {
     return galera_status_get (&status);
 }
 
-static void mm_galera_status_free (wsrep_t* gh,
+extern "C"
+void mm_galera_status_free (wsrep_t* gh,
                                    struct wsrep_status_var* s)
 {
     galera_status_free (s);
 }
-
 
 
 static wsrep_t mm_galera_str = {
@@ -2242,8 +2266,10 @@ static wsrep_t mm_galera_str = {
 };
 
 /* Prototype to make compiler happy */
+extern "C"
 int wsrep_loader(wsrep_t *hptr);
 
+extern "C"
 int wsrep_loader(wsrep_t *hptr)
 {
     if (!hptr)

@@ -12,10 +12,7 @@
 #include "gu_assert.hpp"
 #include "gu_byteswap.h"
 
-extern "C" {
-#include <stddef.h>
 #include "gu_uuid.h"
-}
 
 #include <ostream>
 #include <iomanip>

@@ -16,6 +16,10 @@
 #include <time.h>
 #include <rpc/xdr.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* WSDB severity codes */
 #define WSDB_OK      0 //!< success
 #define WSDB_INFO    1 //!< success
@@ -663,5 +667,9 @@ void *wsdb_conf_get_param (enum wsdb_conf_param_id,
 void wsdb_set_conf_param_cb(
     wsdb_conf_param_fun configurator
 );
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif

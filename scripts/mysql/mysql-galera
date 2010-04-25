@@ -81,7 +81,12 @@ ROOT_USER=${ROOT_USER:-"-uroot"}
 ROOT_PSWD=${ROOT_PSWD:-"-prootpass"}
 
 LD_LIBRARY_PATH="$GALERA_BASE_DIR/lib"
-LD_PRELOAD="$MYSQL_BASE_DIR/lib/mysql/libmysqlclient.so"
+LD_PRELOAD=$(echo "$MYSQL_BASE_DIR/lib/mysql/libmysqlclient.so "\
+"$GALERA_BASE_DIR/lib/libgalerautils.so "\
+"$GALERA_BASE_DIR/lib/libgalerautils++.so "\
+"$GALERA_BASE_DIR/lib/libgcomm.so "\
+"$GALERA_BASE_DIR/lib/libgcs.so "\
+"$GALERA_BASE_DIR/lib/libwsdb.so ")
 
 # Mandatory stuff
 INNODB_OPTS=" --default-storage-engine=InnoDB "

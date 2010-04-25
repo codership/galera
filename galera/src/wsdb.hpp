@@ -28,8 +28,13 @@ namespace galera
         // Append query
         virtual void append_query(TrxHandlePtr&,
                                   const void* query,
-                                  size_t query_len) = 0;
+                                  size_t query_len,
+                                  time_t time,
+                                  uint32_t rnd) = 0;
         
+        virtual void append_conn_query(TrxHandlePtr&, const void* query,
+                                       size_t query_len) = 0;
+
         // Append row key
         virtual void append_row_key(TrxHandlePtr&,
                                     const void* dbtable, 
