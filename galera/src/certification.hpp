@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2007-2009 Codership Oy <info@codership.com>
+// Copyright (C) 2010 Codership Oy <info@codership.com>
 //
 
 //!
@@ -25,6 +25,10 @@ namespace galera
     class Certification
     {
     public:
+        virtual TrxHandlePtr create_trx(const void* data, size_t data_len,
+                                        wsrep_seqno_t seqno_l,
+                                        wsrep_seqno_t seqno_g) = 0;
+        
         //!
         // @brief Append new transaction into certification
         //
@@ -43,7 +47,7 @@ namespace galera
         //
         // @return WSDB_OK if certification test passed, otherwise error code
         //
-        virtual int test(wsdb_write_set*, bool) = 0;
+        virtual int test(const TrxHandlePtr&, bool) = 0;
 
         //!
         // @brief Get sequence number that is guaranteed to be 

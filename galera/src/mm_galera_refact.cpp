@@ -1,4 +1,7 @@
-// Copyright (C) 2007-2009 Codership Oy <info@codership.com>
+//
+// Copyright (C) 2010 Codership Oy <info@codership.com>
+//
+
 
 #include <stdlib.h>
 #include <assert.h>
@@ -9,15 +12,13 @@
 #include <time.h>
 #include <sys/time.h>
 
-extern "C"
-{
 #include "wsrep_api.h"
 
-#include <galerautils.h>
-#include <gcs.h>
-#include <wsdb_api.h>
+extern "C"
+{
+#include "gu_log.h"
+#include "gcs.h"
 
-#include "galera_job_queue.h"
 #include "galera_info.h"
 #include "galera_state.h"
 #include "galera_options.h"
@@ -74,8 +75,6 @@ static gcs_seqno_t         last_recved  = -1; // last received from group
 static long                my_idx = 0;
 static galera_stage_t      donor_stage;       // stage to return to from DONOR
 
-static struct job_queue   *applier_queue = NULL;
-
 static const char* data_dir  = NULL;
 static const char* sst_donor = NULL;
 
@@ -84,19 +83,6 @@ static gu_cond_t  sst_cond;
 
 static struct galera_options galera_opts;
 
-//#define EXTRA_DEBUG
-#ifdef EXTRA_DEBUG
-static FILE *wslog_L;
-static FILE *wslog_G;
-#endif
-
-/* @struct contains one write set and its TO sequence number
- */
-struct job_context {
-    enum job_type          type;  //!< job's nature
-//DELETE    trx_seqno_t            seqno; //!< seqno for the job
-    struct wsdb_write_set *ws;    //!< write set to be applied
-};
 
 // a wrapper to re-try functions which can return -EAGAIN
 static inline long while_eagain (
@@ -178,67 +164,6 @@ static inline long while_eagain_or_trx_abort (
         }                                                               \
     }
 
-static int ws_conflict_check(void *ctx1, void *ctx2) {
-    struct job_context *job1 = (struct job_context *)ctx1;
-    struct job_context *job2 = (struct job_context *)ctx2;
-
-    gu_debug("conflict check for: job1: %lld type: %d job2: %lld type %d",
-             job1->ws->trx_seqno, job1->type, job2->ws->trx_seqno, job2->type
-    );
-
-    if (job1->ws->trx_seqno < job2->ws->trx_seqno) return 0;
-
-    assert(job1->ws->trx_seqno > job2->ws->trx_seqno);
-
-    if ((job2->type == JOB_TO_ISOLATION) || (job2->type == JOB_REPLAYING)) {
-        gu_debug("job2 is brute force");
-        return 1;
-    }
-
-    /* job1 is sequenced after job2, must check if they conflict */
-
-    if (job1->ws->last_seen_trx >= job2->ws->trx_seqno)
-    {
-      trx_seqno_t last_seen_saved = job1->ws->last_seen_trx;
-      trx_seqno_t trx_seqno_saved = job1->ws->trx_seqno;
-      int rcode;
-
-      /* serious mis-use of certification test
-       * we mangle ws seqno's so that certification_test certifies
-       * against just only the job2 ws.
-       * If somebody cares to modify wsdb_certification_test, it might
-       * break this logic => take care
-       */
-
-      job1->ws->last_seen_trx = job2->ws->trx_seqno - 1;
-      job1->ws->trx_seqno = job2->ws->trx_seqno + 1;
-      /* @todo: this will conflict with purging, need to use certification_mtx
-       */
-      rcode = cert->test(job1->ws, true); 
-
-      job1->ws->last_seen_trx = last_seen_saved;
-      job1->ws->trx_seqno     = trx_seqno_saved;
-
-      if (rcode) {
-          return 1;
-      }
-    }
-    gu_debug("job1 qualified");
-
-    return 0;
-}
-
-/*
- * @brief compare seqno order of two applying jobs
- */
-static int ws_cmp_order(void *ctx1, void *ctx2) {
-    struct job_context *job1 = (struct job_context *)ctx1;
-    struct job_context *job2 = (struct job_context *)ctx2;
-
-    if (job1->ws->trx_seqno < job2->ws->trx_seqno) return -1;
-    if (job1->ws->trx_seqno > job2->ws->trx_seqno) return 1;
-    return 0;
-}
 
 static void *galera_wsdb_configurator (
     enum wsdb_conf_param_id id, enum wsdb_conf_param_type type
@@ -359,9 +284,6 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     gu_mutex_init(&sst_mtx,    NULL);
     gu_cond_init (&sst_cond,   NULL);
     
-    /* create worker queue */
-    applier_queue = job_queue_create(16, ws_conflict_check, ws_cmp_order);
-    
     /* initialize total order queue */
     cert_queue = gu_to_create(16384, GCS_SEQNO_FIRST);
     
@@ -370,17 +292,6 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     
     conn_state = GALERA_INITIALIZED;
     
-#ifdef EXTRA_DEBUG
-    /* debug level printing to /tmp directory */
-    {
-        DIR *dir = opendir("/tmp/galera");
-        if (!dir) {
-            mkdir("/tmp/galera", S_IRWXU | S_IRWXG);
-        }
-        wslog_L = fopen("/tmp/galera/ws_local.log", "w");
-        wslog_G = fopen("/tmp/galera/ws_global.log", "w");
-    }
-#endif
     GU_DBUG_RETURN(WSREP_OK);
 }
 
@@ -504,178 +415,41 @@ static void mm_galera_tear_down(wsrep_t *gh)
     return;
 }
 
-#ifdef EXTRA_DEBUG
-static void print_ws(FILE* fid, struct wsdb_write_set *ws, gcs_seqno_t seqno) {
-    u_int16_t i;
 
-    if (!fid) return;
-
-    fprintf(fid, "WS: %llu\n", (long long unsigned int)seqno);
-    for (i=0; i < ws->query_count; i++) {
-      char *query = gu_malloc (ws->queries[i].query_len + 1);
-      memset(query, '\0', ws->queries[i].query_len + 1);
-      memcpy(query, ws->queries[i].query, ws->queries[i].query_len);
-      fprintf(fid, "QUERY (%llu): %s\n", (long long unsigned int)seqno, query);
-      gu_free (query);
-    }
-    fflush(fid);
-}
-
-#define PRINT_WS(fid, ws, seqno) { print_ws(fid, ws, seqno); }
-#else
-#define PRINT_WS(fid, ws, seqno)
-#endif // EXTRA_DEBUG
-
-static wsrep_status_t apply_queries(void *recv_ctx, struct wsdb_write_set *ws)
+static wsrep_status_t apply_write_set(void *recv_ctx, const WriteSet& ws,
+                                      wsrep_seqno_t global_seqno)
 {
-    u_int16_t i;
-
-    GU_DBUG_ENTER(__PRETTY_FUNCTION__);
-
-    wsrep_apply_data_t data;
-    data.type = WSREP_APPLY_SQL;
-
-    if (bf_apply_cb == NULL) {
-        gu_error("data applier has not been defined"); 
-        GU_DBUG_RETURN(WSREP_FATAL);
-    }
-
-    /* SQL statement apply method */
-    for (i=0; i < ws->query_count; i++) {
-        data.u.sql.stm      = ws->queries[i].query;
-        data.u.sql.len      = ws->queries[i].query_len;
-        data.u.sql.timeval  = ws->queries[i].timeval;
-        data.u.sql.randseed = ws->queries[i].randseed;
-
-        assert (ws->trx_seqno > 0);
-        switch (bf_apply_cb(recv_ctx, &data, ws->trx_seqno)) {
-        case WSREP_OK: break;
-        case WSREP_NOT_IMPLEMENTED: break;
-        case WSREP_FATAL:
-        default: 
-            {
-                char *query = (char*)gu_malloc (ws->queries[i].query_len + 1);
-                memset(query, '\0',(ws->queries[i].query_len + 1));
-                memcpy(query, ws->queries[i].query, ws->queries[i].query_len);
-                gu_error("query apply failed: %s", query);
-                gu_free (query);
-                GU_DBUG_RETURN(WSREP_TRX_FAIL);
-                break;
-            }
-        }
-    }
-    GU_DBUG_RETURN(WSREP_OK);
-}
-
-static wsrep_status_t apply_rows(void *recv_ctx, struct wsdb_write_set *ws)
-{
-    u_int16_t i;
-    wsrep_apply_data_t data;
-    GU_DBUG_ENTER("apply_rows");
-    data.type = WSREP_APPLY_ROW;
-
-    /* row data apply method */
-    for (i=0; i < ws->item_count; i++) {
-        wsrep_status_t rcode;
-        if (ws->items[i].data_mode != ROW) {
-            gu_error("bad row mode: %d for item: %d", 
-		     ws->items[i].data_mode, i);
-            continue;
-        }
-
-        data.u.row.buffer = (uint8_t*)ws->items[i].u.row.data;
-        data.u.row.len = ws->items[i].u.row.length;
-
-        assert (ws->trx_seqno > 0);
-        switch ((rcode = bf_apply_cb(recv_ctx, &data, ws->trx_seqno))) {
-        case WSREP_OK: break;
-        case WSREP_NOT_IMPLEMENTED: break;
-        case WSREP_FATAL:
-        default:
-            {
-                gu_warn("row apply failed: %d", rcode);
-                GU_DBUG_RETURN(rcode);
-                break;
-            }
-        }
-    }
-    GU_DBUG_RETURN(WSREP_OK);
-}
-
-static wsrep_status_t apply_write_set(void *recv_ctx, struct wsdb_write_set *ws)
-{
-    u_int16_t i;
     wsrep_status_t rcode = WSREP_OK;
-
+    
     GU_DBUG_ENTER("apply_write_set");
     if (bf_apply_cb == NULL) {
         gu_error("data applier has not been defined"); 
         GU_DBUG_RETURN(WSREP_FATAL);
     }
-
-    /* first, applying connection context statements */
-    if (ws->level == WSDB_WS_QUERY) {
-        wsrep_apply_data_t data;
-        data.type = WSREP_APPLY_SQL;
-        data.u.sql.timeval  = (time_t)0;
-        data.u.sql.randseed = 0;
-
-        for (i=0; i < ws->conn_query_count; i++) {
-            data.u.sql.stm      = ws->conn_queries[i].query;
-            data.u.sql.len      = ws->conn_queries[i].query_len;
-
-            assert (ws->trx_seqno > 0);
-            switch (bf_apply_cb(recv_ctx, &data, ws->trx_seqno)) {
-            case WSREP_OK: break;
-            case WSREP_NOT_IMPLEMENTED: break;
-            case WSREP_FATAL: 
-            default:
-                {
-                    char *query = (char*)gu_malloc (ws->conn_queries[i].query_len + 1);
-                    memset(query, '\0', ws->conn_queries[i].query_len + 1);
-                    memcpy(query, ws->conn_queries[i].query, 
-                           ws->conn_queries[i].query_len);
-                    gu_error("connection query apply failed: %s", query);
-                    gu_free (query);
-                    GU_DBUG_RETURN(WSREP_TRX_FAIL);
-                    break;
-                }
-            }
-        }
-    }
-    switch (ws->level) {
-    case WSDB_WS_QUERY:     
-        rcode = apply_queries(recv_ctx, ws);
-        break;
-    case WSDB_WS_DATA_ROW:
-        // TODO: implement
-        rcode = apply_rows(recv_ctx, ws);
-        break;
+    switch (ws.get_level()) {
     case WSDB_WS_DATA_RBR: 
-        {
-            wsrep_apply_data_t data;
-            data.type = WSREP_APPLY_APP;
-            data.u.app.buffer = (uint8_t *)ws->rbr_buf;
-            data.u.app.len = ws->rbr_buf_len;
-
-            assert (ws->trx_seqno > 0);
-            rcode = bf_apply_cb(recv_ctx, &data, ws->trx_seqno);
-            break;
-        }
-    case WSDB_WS_DATA_COLS: 
-        gu_error("column data replication is not supported yet");
-        GU_DBUG_RETURN(WSREP_TRX_FAIL);
-    default:
-        assert(0);
+    {
+        wsrep_apply_data_t data;
+        data.type = WSREP_APPLY_APP;
+        data.u.app.buffer = (uint8_t *)&ws.get_rbr()[0];
+        data.u.app.len = ws.get_rbr().size();
+        
+        assert (global_seqno > 0);
+        rcode = bf_apply_cb(recv_ctx, &data, global_seqno);
         break;
     }
-
+    default:
+        gu_error("data replication level %d is not supported yet",
+                 ws.get_level());
+        GU_DBUG_RETURN(WSREP_FATAL);
+    }
+    
     switch (rcode) {
     case WSREP_OK: break;
     case WSREP_NOT_IMPLEMENTED: break;
     case WSREP_FATAL:
     default:
-        gu_error("apply failed for: %d, in level: %d", rcode, ws->level);
+        gu_error("apply failed for: %d, in level: %d", rcode, ws.get_level());
         GU_DBUG_RETURN(WSREP_FATAL);
     }
     GU_DBUG_RETURN(WSREP_OK);
@@ -688,12 +462,12 @@ static wsrep_status_t apply_query(void *recv_ctx, const char *query, int len,
     wsrep_apply_data_t data;
 
     GU_DBUG_ENTER("apply_commit");
-
+    
     if (bf_apply_cb == NULL) {
         gu_error("data applier has not been defined"); 
         GU_DBUG_RETURN(WSREP_FATAL);
     }
-
+    
     data.type           = WSREP_APPLY_SQL;
     data.u.sql.stm      = query;
     data.u.sql.len      = strlen (data.u.sql.stm) + 1 /* terminating 0 */;
@@ -769,21 +543,22 @@ galera_update_last_received (gcs_seqno_t seqno)
 }
 
 static wsrep_status_t process_conn_write_set( 
-    struct job_worker *applier, void *recv_ctx, struct wsdb_write_set *ws, 
+    void *recv_ctx, const TrxHandlePtr& trx, 
     gcs_seqno_t seqno_l
 ) {
     bool do_report;
     wsrep_status_t rcode = WSREP_OK;
 
-    assert (ws->trx_seqno > 0);
-
+    assert (trx->get_global_seqno() > 0);
+    
     /* wait for total order */
     GALERA_GRAB_QUEUE (cert_queue,   seqno_l);
     GALERA_GRAB_QUEUE (commit_queue, seqno_l);
 
-    if (gu_likely(galera_update_last_received(ws->trx_seqno))) {
+    if (gu_likely(galera_update_last_received(trx->get_global_seqno()))) {
         /* Global seqno ok, certification ok (not needed?) */
-        rcode = apply_write_set(recv_ctx, ws);
+        rcode = apply_write_set(recv_ctx, trx->get_write_set(), 
+                                trx->get_global_seqno());
         if (rcode) {
             gu_error ("unknown galera fail: %d trx: %llu", rcode, seqno_l);
         }
@@ -791,15 +566,11 @@ static wsrep_status_t process_conn_write_set(
     
     /* release total order */
     GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
-    GALERA_UPDATE_LAST_APPLIED (ws->trx_seqno);
+    GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
     do_report = report_check_counter();
     GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
 
-    {
-        TrxHandlePtr trx(cert->get_trx(ws->trx_seqno));
-        TrxHandleLock lock(trx);
-        cert->set_trx_committed(trx);
-    }
+    cert->set_trx_committed(trx);
 
     if (do_report) report_last_committed(gcs_conn);
     
@@ -807,151 +578,84 @@ static wsrep_status_t process_conn_write_set(
 }
 
 enum wsrep_status process_query_write_set_applying(
-    struct job_worker *applier, void *recv_ctx, struct wsdb_write_set *ws, 
-    gcs_seqno_t seqno_l
-) {
-    struct job_context ctx;
-
-    int rcode;
-    bool do_report          = false;
-    int  attempts           = 0;
-
-#define MAX_APPLY_ATTEMPTS 10 // try applying 10 times
-
-    /* synchronize with other appliers */
-//DELETE    ctx.seqno = seqno_l;
-    ctx.ws    = ws;
-    /* why this? slave applier can process either ws transactions or TO
-     * isolation queries. local connections, which are promoted as appliers
-     * are either of type: TO_ISOLATION or REPLAYING
-     */
-    ctx.type  = (applier->type == JOB_SLAVE) ?
-        ((ws->type == WSDB_WS_TYPE_CONN) ? JOB_TO_ISOLATION : JOB_SLAVE) :
-      applier->type;
-
-    job_queue_start_job(applier_queue, applier, (void *)&ctx);
-
- retry:
-    while((rcode = apply_write_set(recv_ctx, ws))) {
-        if (attempts == 0) 
-            gu_warn("ws apply failed, rcode: %d, seqno: %lld, last_seen: %lld", 
-                    rcode, ws->trx_seqno, ws->last_seen_trx
-        );
-
-        if (apply_query(recv_ctx, "rollback\0", 9, ws->trx_seqno)) {
-            gu_warn("ws apply rollback failed, seqno: %lld, last_seen: %lld", 
-                    ws->trx_seqno, ws->last_seen_trx);
-        }
-
-#ifdef EXTRA_DEBUG
-        /* print conflicting rbr buffer for later analysis */
-        if (attempts == 1) {
-            char file[256];
-            memset(file, '\0', 256);
-            sprintf(file, "/tmp/galera/ws_%llu.bin", seqno_l);
-            FILE *fd= fopen(file, "w");
-            fwrite(ws->rbr_buf, 1, ws->rbr_buf_len, fd);
-            fclose(fd); 
-        }
-#endif
-        ++attempts;
-
-        /* avoid retrying if fatal error happened */
-        if (rcode == WSREP_FATAL) attempts = MAX_APPLY_ATTEMPTS;
-
-        /* break if retry limit has been reached */
-        if (attempts == MAX_APPLY_ATTEMPTS) break;
-
+    void *recv_ctx, 
+    const TrxHandlePtr& trx,
+    gcs_seqno_t seqno_l) 
+{
+    // Locals grab commit queue already in pre commit so
+    // replaying trxs have it already
+    if (trx->is_local() == false)
+    {
+        GALERA_GRAB_QUEUE(commit_queue, seqno_l);
     }
-    if (attempts == MAX_APPLY_ATTEMPTS) {
+    
+    static const size_t max_apply_attempts(10);
+    size_t attempts(0);
+    int rcode;
+    
+    do
+    {
+        while ((rcode = apply_write_set(recv_ctx, 
+                                        trx->get_write_set(),
+                                        trx->get_global_seqno()))) 
+        {
+            gu_warn("ws apply failed, rcode: %d, seqno: %lld, "
+                    "last_seen: %lld", 
+                    rcode, trx->get_global_seqno(), 
+                    trx->get_write_set().get_last_seen_trx());
+            
+            if (apply_query(recv_ctx, "rollback\0", 9, 
+                            trx->get_global_seqno())) {
+                gu_warn("ws apply rollback failed, seqno: %lld, "
+                        "last_seen: %lld", 
+                        trx->get_global_seqno(), 
+                        trx->get_write_set().get_last_seen_trx());
+                rcode = WSREP_FATAL;
+            }
+            ++attempts;
+            
+            /* avoid retrying if fatal error happened */
+            if (rcode == WSREP_FATAL)
+            {
+                attempts = max_apply_attempts;
+            }
+        }
+        
+        if (rcode == WSREP_OK &&
+            (rcode = apply_query(recv_ctx, "commit\0", 7, 
+                                 trx->get_global_seqno())) != WSREP_OK)
+        {
+            
+            gu_warn("ws apply commit failed, seqno: %lld %lld, "
+                    "last_seen: %lld", 
+                    trx->get_global_seqno(), 
+                    seqno_l, 
+                    trx->get_write_set().get_last_seen_trx());
+        }
+    }
+    while (attempts < max_apply_attempts && rcode != WSREP_OK);
+    
+    if (attempts == max_apply_attempts) {
         gu_warn("ws applying is not possible, %lld - %lld",
-                ws->trx_seqno, seqno_l);
-        job_queue_end_job(applier_queue, applier);
+                trx->get_global_seqno(), seqno_l);
+        // We don't release commit queue here to disallow following
+        // transactions to commit
         return WSREP_TRX_FAIL;
     }
-
-    /* 
-     * Grab commit queue for commit time
-     * (can't use here GALERA_GRAB_QUEUE(seqno_l) macro)
-     */
-    switch (applier->type) {
-    case JOB_SLAVE:
-        rcode = while_eagain(gu_to_grab, commit_queue, seqno_l);
-        break;
-    case JOB_REPLAYING:
-    case JOB_TO_ISOLATION:
-        /* replaying jobs have reserved commit_queue in the beginning */
-        rcode = 0;
-        break;
-    }
-    switch (rcode) {
-    case 0: break;
-    case -ECANCELED:
-        gu_debug("BF canceled in commit queue for %lld %lld",
-                 ws->trx_seqno, seqno_l);
-        // falling through
-
-    case -EINTR:
-        gu_debug("BF interrupted in commit queue for %lld", seqno_l);
-
-        /*
-         * here we have logical problem. We cannot tell, if interrupt
-         * was meant for us, or if we already aborted, and retried earlier
-         * in applying phase. We decide to abort once more, just for safety
-         * to avoid hanging.
-         * This needs a better implementation, to identify if interrupt
-         * is real or not.
-         */
-        if (attempts > 0) {
-            attempts = 0;
-            //goto retry_commit;
-            gu_info("BF interrupted (retries>0) in commit queue for %lld", 
-                    seqno_l);
-        }
-
-        if (apply_query(recv_ctx, "rollback\0", 9, ws->trx_seqno)) {
-            gu_warn("ws apply rollback failed for: %lld %lld, last_seen: %lld", 
-                    ws->trx_seqno, seqno_l, ws->last_seen_trx
-            );
-        }
-        goto retry;
-        break;
-
-    default:
-        gu_fatal("BF commit queue grab failed (%lld %lld)",
-                 ws->trx_seqno, seqno_l);
-        abort();
-    }
-
-    gu_debug("GALERA ws commit for: %lld %lld", ws->trx_seqno, seqno_l);
-
-    if (apply_query(recv_ctx, "commit\0", 7, ws->trx_seqno)) {
-        gu_warn("ws apply commit failed, seqno: %lld %lld, last_seen: %lld", 
-                ws->trx_seqno, seqno_l, ws->last_seen_trx);
-        goto retry;
-    }
-
-    job_queue_end_job(applier_queue, applier);
-
-    /* 
-     * if trx is replaying, we will call post_commit later on,
-     * => slave applying "bookkeeping" must be avoided.
-     * post_commit will also release commit_queue
-     */
-    if (applier->type == JOB_SLAVE) {
-        GALERA_UPDATE_LAST_APPLIED (ws->trx_seqno);
-
-        do_report = report_check_counter ();
-
+    
+    gu_debug("GALERA ws commit for: %lld %lld", trx->get_global_seqno(), 
+             seqno_l);
+    
+    // Bookkeeping for local trxs is done in post commit
+    if (trx->is_local() == false)
+    {
+        GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
+        bool do_report(report_check_counter());
         GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
-
-        {
-            TrxHandlePtr trx(cert->get_trx(ws->trx_seqno));
-            TrxHandleLock lock(trx);
-            cert->set_trx_committed(trx);
-        }
+        cert->set_trx_committed(trx);
         if (do_report) report_last_committed(gcs_conn);
     }
+    
     return WSREP_OK;
 }
 
@@ -959,22 +663,18 @@ enum wsrep_status process_query_write_set_applying(
   similar to post gcs_repl part of `galera_commit' to apply remote WS
 */
 static wsrep_status_t process_query_write_set( 
-    struct job_worker *applier, void *recv_ctx, struct wsdb_write_set *ws, 
+    void *recv_ctx, const TrxHandlePtr& trx, 
     gcs_seqno_t seqno_l
 ) {
     int rcode;
     enum wsrep_status ret_code;
-    gcs_seqno_t seqno_g = ws->trx_seqno;
+    gcs_seqno_t seqno_g = trx->get_global_seqno();
 
     assert (seqno_g > 0);
     /* wait for total order */
     GALERA_GRAB_QUEUE (cert_queue, seqno_l);
 
 #ifdef GALERA_WORKAROUND_197
-    TrxHandlePtr trx(new TrxHandle(0));
-    trx->assign_write_set(ws);
-    trx->assign_local_seqno(seqno_l);
-    trx->assign_global_seqno(seqno_g);
     rcode = cert->append_trx(trx);
     if (gu_unlikely(!galera_update_last_received(seqno_g))) {
         /* Outdated writeset, skip */
@@ -996,15 +696,14 @@ static wsrep_status_t process_query_write_set(
     /* release total order */
     GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
 
-    PRINT_WS(wslog_G, ws, seqno_l);
-
     gu_debug("remote trx seqno: %lld %lld last_seen_trx: %lld %lld, cert: %d", 
-             seqno_g, seqno_l, ws->last_seen_trx, last_recved, rcode);
+             seqno_g, seqno_l, trx->get_write_set().get_last_seen_trx(), 
+             last_recved, rcode);
 
     switch (rcode) {
     case WSDB_OK:   /* certification ok */
     {
-        rcode = process_query_write_set_applying(applier, recv_ctx, ws, seqno_l);
+        rcode = process_query_write_set_applying(recv_ctx, trx, seqno_l);
 
         /* stop for any dbms error */
         if (rcode != WSDB_OK) {
@@ -1017,13 +716,12 @@ static wsrep_status_t process_query_write_set(
     case WSDB_CERTIFICATION_FAIL:
         /* certification failed, release */
         gu_debug("trx certification failed: (%lld %lld) last_seen: %lld",
-                seqno_g, seqno_l, ws->last_seen_trx);
+                 seqno_g, seqno_l, trx->get_write_set().get_last_seen_trx());
 
-        PRINT_WS(wslog_G, ws, seqno_g);
         ret_code = WSREP_TRX_FAIL;
         /* fall through */
         /* Cancel commit queue */
-        if (applier->type == JOB_SLAVE) {
+        if (trx->is_local() == false) {
             GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
         } else {
             /* replaying job has grabbed commit queue in the beginning */
@@ -1035,7 +733,7 @@ static wsrep_status_t process_query_write_set(
         break;
     case WSDB_CERTIFICATION_SKIP:
         /* Cancel commit queue */
-        if (applier->type == JOB_SLAVE) {
+        if (trx->is_local() == false) {
             GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
         } else {
             /* replaying job has grabbed commit queue in the beginning */
@@ -1055,46 +753,24 @@ static wsrep_status_t process_query_write_set(
     return ret_code;
 }
 
-static wsrep_status_t process_write_set( 
-    struct job_worker *applier, void *recv_ctx, uint8_t *data, size_t data_len, 
+static wsrep_status_t process_write_set(
+    void *recv_ctx, uint8_t *data, size_t data_len, 
     gcs_seqno_t seqno_g, gcs_seqno_t seqno_l
-) {
-    struct wsdb_write_set ws;
-    XDR xdrs;
+    ) {
+    
     wsrep_status_t rcode = WSREP_OK;
+    
+    TrxHandlePtr trx(cert->create_trx(data, data_len, seqno_l, seqno_g));
+    TrxHandleLock lock(trx);
 
-    xdrmem_create(&xdrs, (char *)data, data_len, XDR_DECODE);
-    if (!xdr_wsdb_write_set(&xdrs, &ws)) {
-        gu_fatal("GALERA XDR allocation failed, len: %d seqno: (%lld %lld)", 
-                 data_len, seqno_g, seqno_l
-        );
-        abort();
-    }
-
-    /* key composition is not sent through xdr */
-    if (ws.key_composition) {
-        gu_warn("GALERA XDR encoding returned key comp, seqno: (%lld %lld)",
-                seqno_g, seqno_l
-        );
-    }
-
-//DELETE    ws_start_cb(app_ctx, seqno_l);
-    ws.trx_seqno = seqno_g;
-
-    switch (ws.type) {
+    switch (trx->get_write_set().get_type()) {
     case WSDB_WS_TYPE_TRX:
-        rcode = process_query_write_set(applier, recv_ctx, &ws, seqno_l);
+        rcode = process_query_write_set(recv_ctx, trx, seqno_l);
         break;
     case WSDB_WS_TYPE_CONN:
-        rcode = process_conn_write_set(applier, recv_ctx, &ws, seqno_l);
+        rcode = process_conn_write_set(recv_ctx, trx, seqno_l);
         break;
     }
-
-//DELETE    ws_start_cb(app_ctx, 0);
-
-    /* free xdr objects */
-    xdrs.x_op = XDR_FREE;
-    xdr_wsdb_write_set(&xdrs, &ws);
 
     return rcode;
 }
@@ -1452,7 +1128,6 @@ galera_handle_configuration (wsrep_t* gh,
 static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx) 
 {
     int                rcode;
-    struct job_worker* applier;
     bool               shutdown = false;
     enum wsrep_status  ret_code = WSREP_NODE_FAIL;
 
@@ -1469,16 +1144,6 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx)
         return WSREP_NODE_FAIL;
     }
 
-    applier = job_queue_new_worker(applier_queue, JOB_SLAVE);
-
-    if (!applier) {
-        gu_error("galera, could not create applier");
-        gu_info("active_workers: %d, max_workers: %d",
-            applier_queue->active_workers, applier_queue->max_concurrent_workers
-        );
-        return WSREP_NODE_FAIL;
-    }
-
     while (!shutdown) {
         gcs_act_type_t  action_type;
         size_t          action_size;
@@ -1491,7 +1156,7 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx)
 
 #ifdef EXTRA_DEBUG
         gu_info ("gcs_recv(): act_type: %u, act_size: %u, act_id: %lld, "
-                "local: %lld, rcode: %d (%s)",
+                 "local: %lld, rcode: %d (%s)",
                  action_type, action_size, seqno_g, seqno_l, rcode,
                  strerror(-rcode));
 #endif
@@ -1503,19 +1168,18 @@ static enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx)
 
         assert (GCS_SEQNO_ILL != seqno_l);
 
-        gu_debug("worker: %d with seqno: (%lld - %lld) type: %s recvd", 
-                 applier->id, seqno_g, seqno_l, gcs_act_type_to_str(action_type)
-        );
-
+        gu_debug("worker with seqno: (%lld - %lld) type: %s recvd", 
+                 seqno_g, seqno_l, gcs_act_type_to_str(action_type));
+        
         if (gu_likely(GCS_ACT_TORDERED == action_type)) {
 
             assert (GCS_SEQNO_ILL != seqno_g);
-
+            
             status.received++;
             status.received_bytes += action_size;
 
             ret_code = process_write_set(
-                applier, recv_ctx, (uint8_t*)action, action_size, seqno_g, seqno_l
+                recv_ctx, (uint8_t*)action, action_size, seqno_g, seqno_l
             );
 
             /* catch node failure */
@@ -1619,7 +1283,7 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
      * conflict with us
      */    
     TrxHandlePtr victim(wsdb->get_trx(victim_trx));
-    victim->lock();
+    TrxHandleLock lock(victim);
     
     gu_debug("abort_pre_commit trx state: %d seqno: %lld", 
              victim->get_state(), victim->get_local_seqno());
@@ -1648,7 +1312,7 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
             usleep (GALERA_USLEEP_FLOW_CONTROL);
             victim->lock();
         }
-
+        
         if (victim->get_state() != WSDB_TRX_REPLICATED)
 	{
             assert(GCS_SEQNO_ILL == victim->get_local_seqno());
@@ -1656,9 +1320,9 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
             ret_code = WSREP_OK;
             break;
         }
-
+        
         gu_debug("victim trx has replicated: %lld", victim->get_local_seqno());
-
+        
         //falling through, we have valid seqno now
 
     default:
@@ -1747,37 +1411,37 @@ static enum wsrep_status mm_galera_abort_slave_trx(
 static enum wsrep_status mm_galera_post_commit(
     wsrep_t *gh, wsrep_trx_id_t trx_id
 ) {
-    bool do_report = false;
+    bool do_report(false);
     TrxHandlePtr trx(wsdb->get_trx(trx_id));
     TrxHandleLock lock(trx);
-
+    
     GU_DBUG_ENTER("galera_post_commit");
 
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
-
-//DELETE    assert (trx.state != WSDB_TRX_MISSING);
-
-    if (trx->get_state() == WSDB_TRX_REPLICATED) {
-        assert (trx->get_write_set() != NULL);
+    
+    if (trx->get_state() == WSDB_TRX_REPLICATED) 
+    {
+        assert (trx->get_write_set().size() > 0);
         assert (trx->get_global_seqno() != WSREP_SEQNO_UNDEFINED);
-
+        
         GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
-
         do_report = report_check_counter ();
-
         GALERA_RELEASE_QUEUE(commit_queue, trx->get_local_seqno());
-
         wsdb->discard_trx(trx_id);
-    } else if (trx->get_state() != WSDB_TRX_MISSING) {
+    } 
+    else if (trx->get_state() != WSDB_TRX_MISSING) 
+    {
         gu_warn("trx state: %d at galera_committed for: %lld", 
-                trx->get_state(), trx->get_local_seqno()
-        );
+                trx->get_state(), trx->get_local_seqno());
     }
-
+    
     status.local_commits++;
 
-    if (do_report) report_last_committed (gcs_conn);
-
+    if (do_report)
+    {
+        report_last_committed (gcs_conn);
+    }
+    
     GU_DBUG_RETURN(WSREP_OK);
 }
 
@@ -1795,7 +1459,8 @@ static enum wsrep_status mm_galera_post_rollback(
              trx->get_state(),
              trx->get_local_seqno());
 
-    switch (trx->get_state()) {
+    switch (trx->get_state()) 
+    {
     case WSDB_TRX_MISSING: 
         break;
     case WSDB_TRX_MUST_REPLAY:
@@ -1834,7 +1499,7 @@ static enum wsrep_status mm_galera_post_rollback(
 }
 
 static int check_certification_status_for_aborted(
-    trx_seqno_t seqno_l, struct wsdb_write_set *ws
+    trx_seqno_t seqno_l, const TrxHandlePtr& trx
 ) {
     int rcode;
     /*
@@ -1855,27 +1520,28 @@ static int check_certification_status_for_aborted(
      * seqno_l - 1 has certified and then do our certification.
      */
 
-    rcode = cert->test(ws, false);
+    rcode = cert->test(trx, false);
     switch (rcode) {
     case WSDB_OK:
         gu_debug ("BF conflicting local trx %lld has certified, "
                   "cert. interval: %lld - %lld", 
-                  seqno_l, ws->last_seen_trx, ws->trx_seqno);
+                  seqno_l, 
+                  trx->get_write_set().get_last_seen_trx(), 
+                  trx->get_global_seqno());
         /* certification ok */
         return WSREP_OK;
 
     case WSDB_CERTIFICATION_FAIL:
         /* certification failed, release */
         gu_debug("BF conflicting local trx %lld certification failed: "
-                 "%lld - %lld", seqno_l, ws->last_seen_trx, ws->trx_seqno);
-
-        PRINT_WS(wslog_L, ws, seqno_l);
-
+                 "%lld - %lld", seqno_l, 
+                 trx->get_write_set().get_last_seen_trx(), 
+                 trx->get_global_seqno());
         return WSREP_TRX_FAIL;
-
+        
     default:  
         gu_fatal("wsdb append failed: seqno_g %lld seqno_l %lld",
-                 ws->trx_seqno, seqno_l);
+                 trx->get_global_seqno(), seqno_l);
         abort();
         break;
     }
@@ -1888,17 +1554,12 @@ static enum wsrep_status mm_galera_pre_commit(
 ) {
 
     int                    rcode;
-    struct wsdb_write_set *ws;
-    XDR                    xdrs;
-    int                    data_max;
-    uint8_t                *data;
-    int                    len;
     gcs_seqno_t            seqno_g, seqno_l;
     enum wsrep_status      retcode;
 #ifdef GALERA_USE_FLOW_CONTROL
     int flow_control_waits = GALERA_USLEEP_FLOW_CONTROL_MAX/GALERA_USLEEP_FLOW_CONTROL;
 #endif /* GALERA_USER_FLOW_CONTROL */
-
+    
     GU_DBUG_ENTER("galera_pre_commit");
 
     *global_seqno = WSREP_SEQNO_UNDEFINED;
@@ -1952,68 +1613,47 @@ static enum wsrep_status mm_galera_pre_commit(
     TrxHandlePtr trx(wsdb->get_trx(trx_id));
     TrxHandleLock lock(trx);
 
-    /* retrieve write set */
-    ws = trx->get_write_set(rbr_data, rbr_data_len);
+    // generate write set
+    wsdb->create_write_set(trx, rbr_data, rbr_data_len);
+    const WriteSet& ws(trx->get_write_set());
 
-    if (!ws) {
-        /* this is possibly autocommit query, need to let it continue */
-        gu_debug("empty local trx ws %llu", trx_id);
-        GU_DBUG_RETURN(WSREP_OK);
-    }
-    assert (WSREP_SEQNO_UNDEFINED == ws->trx_seqno);
-
+    assert (WSREP_SEQNO_UNDEFINED == trx->get_global_seqno());
+    
     /* ws can be removed from local cache already now */
     wsdb->discard_trx(trx_id);
     
+    /* this is possibly autocommit query, need to let it continue */
     /* avoid sending empty write sets */
-    if (ws->query_count == 0 && ws->item_count == 0 && ws->rbr_buf_len == 0) {
+    if (ws.get_rbr().size() == 0) {
         gu_warn("empty write set for: %llu", trx_id);
         GU_DBUG_RETURN(WSREP_OK);
     }
-
-    /* encode with xdr */
-    /* TODO: is not optimal to allocate data buffer for xdr encoding
-     *       intermediate result.
-     *       Should use xdrrec stream instead and encode directly on
-     *       gcs channel as we go.
-     */
-    /* using xdr_sizeof to determine length of buffer. 
-       For some reason this requires one additional byte at the end
-    */
-    data_max = xdr_sizeof((xdrproc_t)xdr_wsdb_write_set, (void *)ws) + 1;
-
-    data = (uint8_t *)gu_malloc(data_max);
-    memset(data, 0, data_max);
-    xdrmem_create(&xdrs, (char *)data, data_max, XDR_ENCODE);
-    if (!xdr_wsdb_write_set(&xdrs, ws)) {
-        gu_error("xdr failed for: %llu", trx_id);
-        GU_DBUG_RETURN(WSREP_TRX_FAIL);
-    }
-    len = xdr_getpos(&xdrs);
-
+    
+    Buffer ws_buf;
+    ws.serialize(ws_buf);
+    
     trx->assign_state(WSDB_TRX_REPLICATING);
     trx->unlock();
     
     /* replicate through gcs */
     do {
-
-        rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_TORDERED,
+        
+        rcode = gcs_repl(gcs_conn, &ws_buf[0], ws_buf.size(), GCS_ACT_TORDERED,
                          &seqno_g, &seqno_l);
-
+        
     } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
-
+    
     trx->lock();
     *global_seqno = seqno_g;
-
+    
 #ifdef EXTRA_DEBUG
     gu_debug ("gcs_repl(): size: %u, seqno_g: %llu, seqno_l: %llu, ret: %d",
-             "GCS_ACT_TORDERED", len, seqno_g, seqno_l, rcode);
+              "GCS_ACT_TORDERED", len, seqno_g, seqno_l, rcode);
 #endif
-    trx->assign_local_seqno(seqno_l);
-    trx->assign_global_seqno(seqno_g);
-    if (rcode != len) {
+    trx->assign_seqnos(seqno_l, seqno_g);
+    if (rcode != static_cast<int>(ws_buf.size())) {
         gu_error("gcs_repl() failed for: %llu, len: %d, rcode: %d (%s)",
-                 trx_id, len, rcode, strerror (-rcode));
+                 trx_id, ws_buf.size(), rcode, strerror (-rcode));
         assert (GCS_SEQNO_ILL == seqno_l);
         assert (GCS_SEQNO_ILL == seqno_g);
         trx->assign_state(WSDB_TRX_ABORTING_NONREPL);
@@ -2022,14 +1662,14 @@ static enum wsrep_status mm_galera_pre_commit(
     }
 
     status.replicated++;
-    status.replicated_bytes += len;
-
+    status.replicated_bytes += ws_buf.size();
+    
     assert (GCS_SEQNO_ILL != seqno_g);
     assert (GCS_SEQNO_ILL != seqno_l);
 
     /* record seqnos for local transaction */
     trx->assign_state(WSDB_TRX_REPLICATED);
-
+    
     rcode = while_eagain_or_trx_abort(trx_id, gu_to_grab, cert_queue, seqno_l);
     if (rcode) 
     {
@@ -2038,8 +1678,7 @@ static enum wsrep_status mm_galera_pre_commit(
 
         retcode = WSREP_TRX_FAIL;
 
-        if (check_certification_status_for_aborted(seqno_l, ws) == WSREP_OK) {
-//DELETE            wsdb_assign_trx_ws(trx_id, ws);
+        if (check_certification_status_for_aborted(seqno_l, trx) == WSREP_OK) {
             trx->assign_position(WSDB_TRX_POS_CERT_QUEUE);
             trx->assign_state(WSDB_TRX_MUST_REPLAY);
             GU_DBUG_RETURN(WSREP_BF_ABORT);
@@ -2063,18 +1702,17 @@ static enum wsrep_status mm_galera_pre_commit(
         switch (rcode) {
         case WSDB_OK:
             gu_debug ("local trx %lld certified, cert. interval: %lld - %lld", 
-                      seqno_l, ws->last_seen_trx, ws->trx_seqno);
+                      seqno_l, 
+                      ws.get_last_seen_trx(), 
+                      seqno_g);
             /* certification ok */
             retcode = WSREP_OK;
             break;
         case WSDB_CERTIFICATION_FAIL:
             /* certification failed, release */
             retcode = WSREP_TRX_FAIL;
-
             gu_debug("local trx %lld certification failed: %lld - %lld",
-                     seqno_l, ws->last_seen_trx, ws->trx_seqno);
-            PRINT_WS(wslog_L, ws, seqno_l);
-
+                     seqno_l, ws.get_last_seen_trx(), seqno_g);
             status.local_cert_failures++;
             break;
         default:  
@@ -2099,9 +1737,9 @@ static enum wsrep_status mm_galera_pre_commit(
 
     if (retcode == WSREP_OK) {
         assert (seqno_l >= 0);
-        /* Grab commit queue for commit time */
-        // can't use it here GALERA_GRAB_COMMIT_QUEUE (seqno_l);
         trx->unlock();
+
+        // Grab commit queue
         rcode = while_eagain_or_trx_abort(
             trx_id, gu_to_grab, commit_queue, seqno_l);
         trx->lock();
@@ -2114,44 +1752,8 @@ static enum wsrep_status mm_galera_pre_commit(
             break;
         case -EINTR:
         {
-            int retries = 0;
-            struct job_worker  *applier;
-            struct job_context *ctx = (struct job_context *) 
-                gu_malloc(sizeof(struct job_context));
-
-#define MAX_RETRIES 10
-
-            gu_debug("interrupted in commit queue for %llu", seqno_l);
-            while ((applier = job_queue_new_worker(applier_queue, JOB_REPLAYING)
-                   ) == NULL
-            ) {
-                if (retries++ == MAX_RETRIES) {
-                    gu_warn("replaying is not possible, aborting node");
-                    return WSREP_NODE_FAIL;
-                }
-                gu_warn("replaying job queue full, retrying");
-                gu_info("workers, registered: %d, active: %d, max: %d",
-                        applier_queue->registered_workers,
-                        applier_queue->active_workers,
-                        applier_queue->max_concurrent_workers
-                );
-                sleep(1);
-            }
-
-            /* register job already here, to prevent later slave transactions 
-             * from applying before us
-             */
-//DELETE            ctx->seqno = seqno_l;
-            ctx->ws    = ws;
-            ctx->type  = JOB_REPLAYING;
-            /* just register the job, call does not block */
-            job_queue_register_job(applier_queue, applier, (void *)ctx);
-
-//DELETE            wsdb_assign_trx_ws(trx_id, ws);
             trx->assign_position(WSDB_TRX_POS_COMMIT_QUEUE);
             trx->assign_state(WSDB_TRX_MUST_REPLAY);
-            trx->assign_applier(applier, (void *)ctx);
-
             GU_DBUG_RETURN(WSREP_BF_ABORT);
             break;
         }
@@ -2159,22 +1761,20 @@ static enum wsrep_status mm_galera_pre_commit(
             gu_fatal("Failed to grab commit queue for %llu", seqno_l);
             abort();
         }
-
+        
         // we can update last seen trx counter already here
         cert->set_trx_committed(trx);
     } else {
         /* Cancel commit queue since we are going to rollback */
         GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
     }
-
+    
 cleanup:
-
-    gu_free(data); // TODO: cache writeset for 
     // was referenced by wsdb_get_write_set() above
-    cert->deref_seqno (ws->last_seen_trx);
-//DELETE    wsdb_write_set_free(ws);
+    cert->deref_seqno (ws.get_last_seen_trx());
     GU_DBUG_RETURN(retcode);
 }
+
 
 static enum wsrep_status mm_galera_append_query(
     wsrep_t *gh, const wsrep_trx_id_t trx_id, 
@@ -2184,33 +1784,21 @@ static enum wsrep_status mm_galera_append_query(
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
     if (gu_likely(galera_opts.append_queries == false)) return WSREP_OK; 
     
-    errno = 0;
-
-    switch (wsdb_append_query(trx_id, (char*)query, timeval, randseed)) {
-    case WSDB_OK:              return WSREP_OK;
-    case WSDB_ERR_TRX_UNKNOWN: return WSREP_TRX_FAIL;
-    default:                   return WSREP_CONN_FAIL;
+    TrxHandlePtr trx(wsdb->get_trx(trx_id, true));
+    TrxHandleLock lock(trx);
+    
+    try
+    {
+        wsdb->append_query(trx, query, strlen(query));
     }
+    catch (...)
+    {
+        return WSREP_CONN_FAIL;
+    }
+    
     return WSREP_OK;
 }
 
-#ifdef UNUSED
-static enum wsrep_status galera_append_row(
-    wsrep_trx_id_t trx_id,
-    uint16_t len,
-    uint8_t *data
-) {
-    if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
-
-    errno = 0;
-
-    switch(wsdb_append_row(trx_id, len, data)) {
-    case WSDB_OK:               return WSREP_OK;
-    case WSDB_ERR_TRX_UNKNOWN:  return WSREP_TRX_FAIL;
-    default:                    return WSREP_CONN_FAIL;
-    }
-}
-#endif
 
 static enum wsrep_status mm_galera_append_row_key(
     wsrep_t *gh,
@@ -2228,19 +1816,21 @@ static enum wsrep_status mm_galera_append_row_key(
     TrxHandlePtr trx(wsdb->get_trx(trx_id, true));
     TrxHandleLock lock(trx);
 
-    errno = 0;
-
     switch (action) {
     case WSREP_UPDATE: wsdb_action=WSDB_ACTION_UPDATE; break;
     case WSREP_DELETE: wsdb_action=WSDB_ACTION_DELETE; break;
     case WSREP_INSERT: wsdb_action=WSDB_ACTION_INSERT; break;
     }
-
-    switch(trx->append_row_key(dbtable, dbtable_len, key, key_len, action)) {
-    case WSDB_OK:               return WSREP_OK;
-    case WSDB_ERR_TRX_UNKNOWN:  return WSREP_TRX_FAIL;
-    default:                    return WSREP_CONN_FAIL;
+    
+    try
+    {
+        wsdb->append_row_key(trx, dbtable, dbtable_len, key, key_len, action);
     }
+    catch (...)
+    {
+        return WSREP_CONN_FAIL;
+    }
+    return WSREP_OK;
 }
 
 static wsrep_status_t mm_galera_causal_read(
@@ -2309,10 +1899,10 @@ static enum wsrep_status mm_galera_set_variable(
 static enum wsrep_status mm_galera_set_database(
     wsrep_t *gh,
     const wsrep_conn_id_t conn_id, const char *query, const size_t query_len
-) {
-
+    ) {
+    
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
-
+    
     errno = 0;
     switch(wsdb_store_set_database(conn_id, (char*)query, query_len)) {
     case WSDB_OK:              return WSREP_OK;
@@ -2323,122 +1913,83 @@ static enum wsrep_status mm_galera_set_database(
 }
 
 static enum wsrep_status mm_galera_to_execute_start(
-    wsrep_t *gh, const wsrep_conn_id_t conn_id, 
-    const void *query, const size_t query_len, wsrep_seqno_t* global_seqno
-) {
-
+    wsrep_t *gh, 
+    const wsrep_conn_id_t conn_id, 
+    const void *query, 
+    const size_t query_len, 
+    wsrep_seqno_t* global_seqno) 
+{
+    
     int                    rcode;
-    struct wsdb_write_set* ws;
-    XDR                    xdrs;
-    int                    data_max = 34000; /* only fixed xdr buf supported */
-    char                   data[data_max];
-    int                    len;
     gcs_seqno_t            seqno_g, seqno_l;
     bool                   do_apply;
-    struct job_worker*     applier;
-    struct job_context*    ctx;
 
     GU_DBUG_ENTER("galera_to_execute_start");
-
+    
     *global_seqno = WSREP_SEQNO_UNDEFINED;
-
+    
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_CONN_FAIL;
-
+    
     GU_DBUG_PRINT("galera", ("conn: %llu", conn_id));
-
-    /* retrieve write set */
-    ws = wsdb_get_conn_write_set(conn_id);
-    if (!ws) {
-        GU_DBUG_RETURN(WSREP_CONN_FAIL);
-    }
-
-    /* append the query to be executed */
-    wsdb_set_exec_query(ws, (const char*)query, query_len);
-
-    /* encode with xdr */
-    /* TODO: is not optimal to allocate data buffer for xdr encoding
-     *       intermediate result.
-     *       Should use xdrrec stream instead and encode directly on
-     *       gcs channel as we go.
-     */
-    memset(data, 0, data_max);
-    xdrmem_create(&xdrs, data, data_max, XDR_ENCODE);
-    if (!xdr_wsdb_write_set(&xdrs, ws)) {
-        gu_error("xdr failed for: %llu", conn_id);
-        GU_DBUG_RETURN(WSREP_CONN_FAIL);
-    }
-    len = xdr_getpos(&xdrs);
-
+    
 #ifdef GALERA_USE_FLOW_CONTROL
     while ((rcode = gcs_wait(gcs_conn)) && rcode > 0) {
         status.fc_waits++;
         usleep (GALERA_USLEEP_FLOW_CONTROL);
     }
-
+    
     if (rcode < 0) {
-        rcode = WSREP_CONN_FAIL; // in this case we better reconnect
-        goto cleanup;
+        return WSREP_CONN_FAIL; // in this case we better reconnect
     }
 #endif
+    
+    TrxHandlePtr trx(wsdb->get_conn_query(conn_id, true));
+    TrxHandleLock lock(trx);
+    wsdb->append_query(trx, query, query_len);
+    wsdb->create_write_set(trx);
+    
+    Buffer query_buf;
+    trx->get_write_set().serialize(query_buf);
 
     /* replicate through gcs */
     do {
-        rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_TORDERED, &seqno_g,
+        rcode = gcs_repl(gcs_conn, &query_buf[0], 
+                         query_buf.size(), GCS_ACT_TORDERED, &seqno_g,
 	                 &seqno_l);
     } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
-
-    *global_seqno = seqno_g;
-
+    
+    *global_seqno = seqno_g;   
+    
     if (rcode < 0) {
         gu_error("gcs_repl() failed for: %llu, %d (%s)",
                  conn_id, rcode, strerror (-rcode));
         assert (GCS_SEQNO_ILL == seqno_l);
-        rcode = WSREP_CONN_FAIL;
-        goto cleanup;
+        return WSREP_CONN_FAIL;
     }
-
+    
     status.replicated++;
-    status.replicated_bytes += len;
-
+    status.replicated_bytes += query_buf.size();
+    
+    // Don't need it anymore
+    query_buf.clear();
+    
     assert (GCS_SEQNO_ILL != seqno_g);
     assert (GCS_SEQNO_ILL != seqno_l);
-
-    applier = job_queue_new_worker(applier_queue, JOB_TO_ISOLATION);
-    if (!applier) {
-        gu_error("galera, could not create TO isolation applier");
-        gu_info("active_workers: %d, max_workers: %d",
-            applier_queue->active_workers, applier_queue->max_concurrent_workers
-        );
-        return WSREP_NODE_FAIL;
-    }
-    wsdb_conn_set_worker(conn_id, applier);
-
-    gu_debug("TO isolation applier starting, id: %d seqnos: %lld - %lld", 
-             applier->id, seqno_g, seqno_l
-    );
-
-    ctx = GU_MALLOC(struct job_context);
-    if (gu_likely(ctx != NULL)) {
-//DELETE    ctx->seqno = seqno_l;
-        ctx->ws    = ws;
-        ctx->type  = JOB_TO_ISOLATION;
-    }
-    else {
-        gu_error ("Failed to allocate job context (%zu bytes)", sizeof(ctx));
-        return WSREP_NODE_FAIL;
-    }
-
-    job_queue_start_job(applier_queue, applier, (void *)ctx);
-
+    
+    gu_debug("TO isolation applier starting, seqnos: %lld - %lld", 
+             seqno_g, seqno_l);
+    
+    trx->assign_seqnos(seqno_l, seqno_g);
+    trx->assign_state(WSDB_TRX_REPLICATED);
+    
     /* wait for total order */
     GALERA_GRAB_QUEUE (cert_queue, seqno_l);
     
+    rcode = cert->append_trx(trx);
+    
     /* update global seqno */
-    if ((do_apply = galera_update_last_received (seqno_g))) {
-        /* record local sequence number in connection info */
-        wsdb_conn_set_seqno(conn_id, seqno_l, seqno_g);
-    }
-
+    do_apply = galera_update_last_received (seqno_g);
+    
     if (do_apply) {
         /* Grab commit queue */
         GALERA_GRAB_QUEUE (commit_queue, seqno_l);
@@ -2453,132 +2004,68 @@ static enum wsrep_status mm_galera_to_execute_start(
         GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
         GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
         // this situation is as good as failed gcs_repl() call.
-        job_queue_end_job(applier_queue, applier);
-        job_queue_remove_worker(applier_queue, applier);
-        wsdb_conn_set_worker(conn_id, NULL);
         rcode = WSREP_CONN_FAIL;
     }
-
-cleanup:
-
-    wsdb_write_set_free(ws); // cache for incremental state transfer if applied
+    
     gu_debug("TO isolation applied for: seqnos: %lld - %lld", 
              seqno_g, seqno_l
-    );
+        );
     GU_DBUG_RETURN(static_cast<wsrep_status_t>(rcode));
 }
 
+
 static enum wsrep_status mm_galera_to_execute_end(
-    wsrep_t *gh, const wsrep_conn_id_t conn_id
-) {
+    wsrep_t *gh, const wsrep_conn_id_t conn_id) 
+{
     bool do_report;
-    struct wsdb_conn_info conn_info;
-    int rcode;
-    struct job_context *ctx;
-
+    
     GU_DBUG_ENTER("galera_to_execute_end");
-
+    
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
 
-    if ((rcode = wsdb_conn_get_info(conn_id, &conn_info) != WSDB_OK)) {
-        gu_warn("missing connection for: %lld, rcode: %d", conn_id, rcode);
-        GU_DBUG_RETURN(WSREP_CONN_FAIL);
-    }
 
+    TrxHandlePtr trx(wsdb->get_trx(-conn_id));
+    TrxHandleLock lock(trx);
+    wsdb->discard_conn_query(trx->get_id());
+    
     gu_debug("TO applier ending  seqnos: %lld - %lld", 
-             conn_info.seqno_l, conn_info.seqno_g
-    );
-
-    GALERA_UPDATE_LAST_APPLIED (conn_info.seqno_g)
+             trx->get_local_seqno(), trx->get_global_seqno());
+    
+    GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
 
     do_report = report_check_counter ();
-
-    /* release queues */
-    GALERA_RELEASE_QUEUE (cert_queue, conn_info.seqno_l);
-    GALERA_RELEASE_QUEUE (commit_queue, conn_info.seqno_l);
     
-    /* cleanup seqno reference */
-    wsdb_conn_reset_seqno(conn_id);
+    /* release queues */
+    GALERA_RELEASE_QUEUE (cert_queue, trx->get_local_seqno());
+    GALERA_RELEASE_QUEUE (commit_queue, trx->get_local_seqno());
     
     if (do_report) report_last_committed (gcs_conn);
-
-    ctx = (struct job_context *)job_queue_end_job(
-        applier_queue, conn_info.worker
-    );
-    assert(ctx);
-    gu_free(ctx);
-
-    job_queue_remove_worker(applier_queue, conn_info.worker);
-    wsdb_conn_set_worker(conn_id, NULL);
-
+    
     GU_DBUG_RETURN(WSREP_OK);
 }
 
 static enum wsrep_status mm_galera_replay_trx(
     wsrep_t *gh, const wsrep_trx_id_t trx_id, void *recv_ctx
 ) {
-    struct job_worker   *applier;
-    struct job_context  ctx;
     
     int                rcode = WSREP_OK;
     enum wsrep_status  ret_code = WSREP_OK;
     TrxHandlePtr trx(wsdb->get_trx(trx_id));
     TrxHandleLock lock(trx);
-
+    
     gu_debug("trx_replay for: %lld %lld state: %d, rbr len: %d", 
              trx->get_local_seqno(), 
-             trx->get_write_set()->trx_seqno, 
+             trx->get_global_seqno(), 
              trx->get_state(), 
-             trx->get_write_set()->rbr_buf_len);
-
+             trx->get_write_set().get_rbr().size());
+    
     if (trx->get_state() != WSDB_TRX_MUST_REPLAY) {
         gu_error("replayed trx in bad state: %d", trx->get_state());
         return WSREP_NODE_FAIL;
     }
-
+    
     trx->assign_state(WSDB_TRX_REPLAYING);
-
-    if (!trx->get_applier()) {
-        int retries = 0;
-        assert (trx->get_position() == WSDB_TRX_POS_CERT_QUEUE);
-
-#define MAX_RETRIES 10
-        while ((applier = job_queue_new_worker(applier_queue, JOB_REPLAYING)
-                ) == NULL
-        ) {
-            if (retries++ == MAX_RETRIES) {
-                gu_warn("replaying (cert) is not possible, aborting node");
-                return WSREP_NODE_FAIL;
-            }
-            gu_warn("replaying job queue full, retrying");
-            gu_info("workers, registered: %d, active: %d, max: %d",
-                    applier_queue->registered_workers,
-                    applier_queue->active_workers,
-                    applier_queue->max_concurrent_workers
-            );
-            sleep(1);
-        }
-
-        /* register job already here, to prevent later slave transactions 
-         * from applying before us. 
-         * There will be a race condition between release of cert TO and 
-         * job_queue_start_job() call.
-         */
-//DELETE        ctx.seqno = trx.seqno_l;
-        ctx.ws    = trx->get_write_set();
-        ctx.type  = JOB_REPLAYING;
-        /* just register the job, call does not block */
-        job_queue_register_job(applier_queue, applier, (void *)&ctx);
-
-    } else {
-        gu_debug("Using registered applier");
-        assert (trx->get_position() == WSDB_TRX_POS_COMMIT_QUEUE);
-        applier = (struct job_worker*)trx->get_applier();
-    }
-    gu_debug("replaying applier in to grab: %d, seqno: %lld %lld", 
-             applier->id, trx->get_write_set()->trx_seqno, trx->get_local_seqno()
-    );
-
+    
     /*
      * grab commit_queue already here, to make sure the conflicting BF applier
      * has completed before we start.
@@ -2588,7 +2075,7 @@ static enum wsrep_status mm_galera_replay_trx(
     rcode = while_eagain (gu_to_grab, commit_queue, trx->get_local_seqno());
     if (rcode) {
         gu_fatal("replaying commit queue grab failed for: %d seqno: %lld %lld", 
-                 rcode, trx->get_write_set()->trx_seqno, trx->get_local_seqno());
+                 rcode, trx->get_global_seqno(), trx->get_local_seqno());
         abort();
     }
     gu_debug("replaying applier starting");
@@ -2600,64 +2087,52 @@ static enum wsrep_status mm_galera_replay_trx(
      */
 //DELETE    ws_start_cb(app_ctx, trx.seqno_l);
 
-    if (trx->get_write_set()->type == WSDB_WS_TYPE_TRX) {
-
+    if (trx->get_write_set().get_type() == WSDB_WS_TYPE_TRX) 
+    {
         switch (trx->get_position()) {
         case WSDB_TRX_POS_CERT_QUEUE:
             ret_code = process_query_write_set(
-                applier, recv_ctx, trx->get_write_set(), 
-                trx->get_local_seqno()
-            );
+                recv_ctx, trx, 
+                trx->get_local_seqno());
             break;
-
+            
         case WSDB_TRX_POS_COMMIT_QUEUE:
             ret_code = process_query_write_set_applying( 
-                applier, recv_ctx, trx->get_write_set(), trx->get_local_seqno()
-            );
-
+                recv_ctx, trx, trx->get_local_seqno()
+                );
+            
             /* register committed transaction */
             if (ret_code != WSREP_OK) {
                 gu_fatal(
-                     "could not re-apply trx: %lld %lld", 
-                     trx->get_write_set()->trx_seqno, trx->get_local_seqno()
-                );
+                    "could not re-apply trx: %lld %lld", 
+                    trx->get_global_seqno(), trx->get_local_seqno()
+                    );
                 abort();
             }
             break;
         default:
             gu_fatal("bad trx pos in reapplying: %d %lld", 
                      trx->get_position(), 
-                     trx->get_write_set()->trx_seqno, 
+                     trx->get_global_seqno(),
                      trx->get_local_seqno()
-            );
+                );
             abort();
-        }
-        job_queue_remove_worker(applier_queue, applier);
-        if (trx->get_applier_ctx()) {
-            gu_free(trx->get_applier_ctx());
         }
     }
     else {
-        gu_error("replayed trx ws has bad type: %d", trx->get_write_set()->type);
-//DELETE        ws_start_cb(app_ctx, 0);
-        job_queue_remove_worker(applier_queue, applier);
-        if (trx->get_applier_ctx()) {
-            gu_free(trx->get_applier_ctx());
-        }
+        gu_error("replayed trx ws has bad type: %d", trx->get_write_set().get_type());
         return WSREP_NODE_FAIL;
     }
     trx->assign_state(WSDB_TRX_REPLICATED);
-
-//DELETE    ws_start_cb(app_ctx, 0);
-
-    cert->deref_seqno (trx->get_write_set()->last_seen_trx);
-//DELETE    wsdb_write_set_free(trx.ws);
-
+    
+    cert->deref_seqno (trx->get_write_set().get_last_seen_trx());
+    
     gu_debug("replaying over for applier: %d rcode: %d, seqno: %lld %lld", 
-             applier->id, rcode, trx->get_write_set()->trx_seqno, 
+             -1, rcode, 
+             trx->get_global_seqno(),
              trx->get_local_seqno()
-    );
-
+        );
+    
     // return only OK or TRX_FAIL
     return (ret_code == WSREP_OK) ? WSREP_OK : WSREP_TRX_FAIL;
 }
