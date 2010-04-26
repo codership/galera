@@ -75,10 +75,10 @@ int galera::WsdbCertification::append_trx(const TrxHandlePtr& trx)
     {
     case WSDB_WS_TYPE_TRX:
     {
-        const struct wsdb_write_set* ws(
-            static_cast<const WsdbWriteSet*>(
-                &trx->get_write_set())->write_set_);
-        assert(ws != 0 && ws->trx_seqno >= 0);
+        assert(static_cast<const WsdbWriteSet*>(
+                   &trx->get_write_set())->write_set_ != 0 && 
+               static_cast<const WsdbWriteSet*>(
+                   &trx->get_write_set())->write_set_->trx_seqno >= 0);
         return wsdb_append_write_set(
             static_cast<const WsdbWriteSet*>(
                 &trx->get_write_set())->write_set_);
