@@ -14,12 +14,13 @@
 
 
 
-extern "C"
-{
+
 #include "wsrep_api.h"
 #include "gu_log.h"
 #include "gcs.h"
-    
+
+extern "C"
+{    
 #include "galera_info.h"
 #include "galera_state.h"
 #include "galera_options.h"
@@ -1318,6 +1319,8 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
     if (victim == 0)
     {
         // Victim has probably already aborted
+        log_debug << "missing victim " << victim_trx 
+                  << " bf seqno " << bf_seqno;
         return WSREP_OK;
     }
 
@@ -1325,7 +1328,7 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
     
     gu_debug("abort_pre_commit trx state: %d seqno: %lld", 
              victim->get_state(), victim->get_local_seqno());
-
+    
     /* continue to kill the victim */
     switch (victim->get_state()) {
     case WSDB_TRX_ABORTING_REPL:
@@ -1471,11 +1474,11 @@ enum wsrep_status mm_galera_post_commit(
         assert (trx->get_write_set().empty() == false);
         assert (trx->get_global_seqno() != WSREP_SEQNO_UNDEFINED);
         cert->set_trx_committed(trx);
-        cert->deref_seqno (trx->get_write_set().get_last_seen_trx());
         GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
         do_report = report_check_counter ();
         GALERA_RELEASE_QUEUE(commit_queue, trx->get_local_seqno());
         wsdb->discard_trx(trx_id);
+
     } 
     else if (trx->get_state() != WSDB_TRX_MISSING) 
     {
@@ -1829,7 +1832,6 @@ post_repl_out:
         // We want to do this already here to allow early release of 
         // commit queue in case of rollback
         cert->set_trx_committed(trx);
-        cert->deref_seqno (trx->get_write_set().get_last_seen_trx());
         // GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
         bool do_report(report_check_counter ());
         GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);        
@@ -2152,11 +2154,11 @@ enum wsrep_status mm_galera_replay_trx(
     TrxHandlePtr trx(wsdb->get_trx(trx_id));
     TrxHandleLock lock(trx);
     
-    gu_info("trx_replay for: %lld %lld state: %d, rbr len: %d", 
-            trx->get_local_seqno(), 
-            trx->get_global_seqno(), 
-            trx->get_state(), 
-            trx->get_write_set().get_rbr().size());
+    gu_debug("trx_replay for: %lld %lld state: %d, rbr len: %d", 
+             trx->get_local_seqno(), 
+             trx->get_global_seqno(), 
+             trx->get_state(), 
+             trx->get_write_set().get_rbr().size());
     
     if (trx->get_state() != WSDB_TRX_MUST_REPLAY) {
         gu_error("replayed trx in bad state: %d", trx->get_state());
@@ -2184,7 +2186,6 @@ enum wsrep_status mm_galera_replay_trx(
      * tell app, that replaying will start with allocated seqno
      * when job is done, we will reset the seqno back to 0
      */
-//DELETE    ws_start_cb(app_ctx, trx.seqno_l);
 
     if (trx->get_write_set().get_type() == WSDB_WS_TYPE_TRX) 
     {
@@ -2223,9 +2224,6 @@ enum wsrep_status mm_galera_replay_trx(
         return WSREP_NODE_FAIL;
     }
     trx->assign_state(WSDB_TRX_REPLICATED);
-    
-    // updates will be done in post_commit
-    // cert->deref_seqno (trx->get_write_set().get_last_seen_trx());
     
     gu_debug("replaying over for applier: %d rcode: %d, seqno: %lld %lld", 
              -1, rcode, 

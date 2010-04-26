@@ -119,7 +119,9 @@ void galera::WsdbCertification::set_trx_committed(const TrxHandlePtr& trx)
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
     if (trx->is_local() == true)
     {
+        Lock lock(mutex_); 
         wsdb_set_local_trx_committed(trx->get_trx_id());
+        wsdb_deref_seqno(trx->get_write_set().get_last_seen_trx());
     }
     else
     {
@@ -137,11 +139,4 @@ galera::TrxHandlePtr galera::WsdbCertification::get_trx(wsrep_seqno_t seqno)
     }
     return i->second;
 }
-
-void galera::WsdbCertification::deref_seqno(wsrep_seqno_t seqno)
-{
-    assert(seqno >= 0);
-    wsdb_deref_seqno(seqno);
-}
-
 

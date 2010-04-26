@@ -31,7 +31,6 @@ namespace galera
         void purge_trxs_upto(wsrep_seqno_t);
         void set_trx_committed(const TrxHandlePtr&);
         TrxHandlePtr get_trx(wsrep_seqno_t);
-        void deref_seqno(wsrep_seqno_t);
     private:
         TrxMap trx_map_;
         gu::Mutex  mutex_;

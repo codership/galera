@@ -107,13 +107,6 @@ namespace galera
         virtual TrxHandlePtr get_trx(wsrep_seqno_t seqno) = 0;
         
         //!
-        // @brief Dereference seqno
-        //
-        // @todo This should probably be part of TrxHandle
-        //
-        virtual void deref_seqno(wsrep_seqno_t seqno) = 0;
-        
-        //!
         // @brief Virtual destructor to allow inheritance
         //
         virtual ~Certification() { }
