@@ -218,3 +218,29 @@ void galera::WsdbWsdb::append_row_key(TrxHandlePtr& trx,
         gu_throw_fatal; throw;
     }
 }
+
+void galera::WsdbWsdb::set_conn_variable(TrxHandlePtr& trx,
+                                         const void* key, size_t key_len,
+                                         const void* query, size_t query_len)
+{
+    int err;
+    if ((err = wsdb_store_set_variable(trx->get_conn_id(), (char*)key, key_len, 
+                                       (char*)query, query_len)) != WSDB_OK)
+    {
+        gu_throw_fatal << "set conn variable failed for " 
+                       << trx->get_conn_id() << " " << err;
+    }
+}
+
+void galera::WsdbWsdb::set_conn_database(TrxHandlePtr& trx,
+                                         const void* query,
+                                         size_t query_len)
+{
+    int err;
+    if ((err = wsdb_store_set_database(trx->get_conn_id(), 
+                                       (char*)query, query_len)) != WSDB_OK)
+    {
+        gu_throw_fatal << "set conn database failed for " 
+                       << trx->get_conn_id() << " " << err;
+    }
+}

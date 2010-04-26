@@ -32,8 +32,7 @@ namespace galera
                                   time_t time,
                                   uint32_t rnd) = 0;
         
-        virtual void append_conn_query(TrxHandlePtr&, const void* query,
-                                       size_t query_len) = 0;
+
 
         // Append row key
         virtual void append_row_key(TrxHandlePtr&,
@@ -42,6 +41,13 @@ namespace galera
                                     const void* key, 
                                     size_t key_len,
                                     int action) = 0;
+
+        virtual void append_conn_query(TrxHandlePtr&, const void* query,
+                                       size_t query_len) = 0;
+
+        virtual void set_conn_variable(TrxHandlePtr&, const void*, size_t,
+                                       const void*, size_t) = 0;
+        virtual void set_conn_database(TrxHandlePtr&, const void*, size_t) = 0;
         
         // Create write set 
         virtual void create_write_set(TrxHandlePtr&, 

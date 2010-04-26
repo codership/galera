@@ -25,7 +25,7 @@ namespace galera
         TrxHandlePtr create_trx(const void* data, size_t data_len,
                                 wsrep_seqno_t seqno_l,
                                 wsrep_seqno_t seqno_g);
-        int append_trx(TrxHandlePtr);
+        int append_trx(const TrxHandlePtr&);
         int test(const TrxHandlePtr&, bool);
         wsrep_seqno_t get_safe_to_discard_seqno() const;
         void purge_trxs_upto(wsrep_seqno_t);

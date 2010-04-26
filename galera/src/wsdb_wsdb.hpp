@@ -23,19 +23,26 @@ namespace galera
                                     bool create = false);
         // Discard trx handle
         void discard_trx(wsrep_trx_id_t trx_id);
-        void discard_conn_query(wsrep_conn_id_t conn_id);
+
         
         void append_query(TrxHandlePtr&, const void* query, size_t query_len,
                           time_t, uint32_t);
-        void append_conn_query(TrxHandlePtr&, const void* query,
-                               size_t query_len);
+
         void append_row_key(TrxHandlePtr&,
                             const void* dbtable, 
                             size_t dbtable_len,
                             const void* key, 
                             size_t key_len,
                             int action);
-        
+
+        void append_conn_query(TrxHandlePtr&, const void* query,
+                               size_t query_len);
+        void discard_conn_query(wsrep_conn_id_t conn_id);
+
+        void set_conn_variable(TrxHandlePtr&, 
+                               const void*, size_t,
+                               const void*, size_t);
+        void set_conn_database(TrxHandlePtr&, const void*, size_t);
         void create_write_set(TrxHandlePtr&, 
                               const void* rbr_data,
                               size_t rbr_data_len);

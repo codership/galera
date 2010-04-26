@@ -22,6 +22,7 @@ namespace galera
             : 
             trx_id_(trx_id),
             write_set_(0),
+            queries_(),
             rbr_()
         { }
 
@@ -52,16 +53,36 @@ namespace galera
             return write_set_->last_seen_trx;
         }
         
+        const QuerySequence& get_queries() const
+        {
+            assert(write_set_ != 0);
+            queries_.clear();
+            for (uint16_t i = 0; i < write_set_->conn_query_count; ++i)
+            {
+                queries_.push_back(
+                    Query(write_set_->conn_queries[i].query,
+                          write_set_->conn_queries[i].query_len));
+            }
+            for (uint16_t i = 0; i < write_set_->query_count; ++i)
+            {
+                queries_.push_back(
+                    Query(write_set_->queries[i].query,
+                          write_set_->queries[i].query_len,
+                          write_set_->queries[i].timeval,
+                          write_set_->queries[i].randseed));
+            }
+            return queries_;
+        }
+        
         const gu::Buffer& get_rbr() const
         {
             assert(write_set_ != 0);
-            if (rbr_.empty() == true)
-            {
-                rbr_.resize(write_set_->rbr_buf_len);
-                copy(write_set_->rbr_buf,
-                     write_set_->rbr_buf + write_set_->rbr_buf_len, 
-                     rbr_.begin());
-            }
+
+            rbr_.resize(write_set_->rbr_buf_len);
+            copy(write_set_->rbr_buf,
+                 write_set_->rbr_buf + write_set_->rbr_buf_len, 
+                 rbr_.begin());
+            
             return rbr_;
         }
         
@@ -91,6 +112,7 @@ namespace galera
         
         wsrep_trx_id_t trx_id_;
         struct wsdb_write_set* write_set_;
+        mutable QuerySequence queries_;
         mutable gu::Buffer rbr_;
     };
 }

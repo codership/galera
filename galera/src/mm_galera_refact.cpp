@@ -421,25 +421,54 @@ void mm_galera_tear_down(wsrep_t *gh)
 }
 
 
-static wsrep_status_t apply_write_set(void *recv_ctx, const WriteSet& ws,
+static wsrep_status_t apply_write_set(void *recv_ctx, 
+                                      const WriteSet& ws,
                                       wsrep_seqno_t global_seqno)
 {
     wsrep_status_t rcode = WSREP_OK;
+    assert (global_seqno > 0);
     
     GU_DBUG_ENTER("apply_write_set");
     if (bf_apply_cb == NULL) {
         gu_error("data applier has not been defined"); 
         GU_DBUG_RETURN(WSREP_FATAL);
     }
-    switch (ws.get_level()) {
+    switch (ws.get_level()) 
+    {
+    case WSDB_WS_QUERY:
+    {
+        const QuerySequence& qs(ws.get_queries());
+        for (QuerySequence::const_iterator i = qs.begin(); i != qs.end(); ++i)
+        {
+            wsrep_apply_data_t data;
+            data.type           = WSREP_APPLY_SQL;
+            data.u.sql.stm      = reinterpret_cast<const char*>(&i->get_query()[0]);
+            data.u.sql.len      = i->get_query().size();
+            data.u.sql.timeval  = i->get_tstamp();
+            data.u.sql.randseed = i->get_rnd_seed();
+            switch (bf_apply_cb(recv_ctx, &data, global_seqno))
+            {
+            case WSREP_OK: break;
+            case WSREP_NOT_IMPLEMENTED: 
+            {
+                log_warn << "bf applier returned not implemented for " << *i;
+                break;
+            }
+            case WSREP_FATAL:
+            default:
+                gu_error("apply failed for: %d, in level: %d", 
+                         rcode, ws.get_level());
+                GU_DBUG_RETURN(WSREP_FATAL);
+            }
+        }
+        break;
+    }
     case WSDB_WS_DATA_RBR: 
     {
         wsrep_apply_data_t data;
         data.type = WSREP_APPLY_APP;
         data.u.app.buffer = (uint8_t *)&ws.get_rbr()[0];
         data.u.app.len = ws.get_rbr().size();
-        
-        assert (global_seqno > 0);
         rcode = bf_apply_cb(recv_ctx, &data, global_seqno);
         break;
     }
@@ -1285,6 +1314,13 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
      * conflict with us
      */    
     TrxHandlePtr victim(wsdb->get_trx(victim_trx));
+
+    if (victim == 0)
+    {
+        // Victim has probably already aborted
+        return WSREP_OK;
+    }
+
     TrxHandleLock lock(victim);
     
     gu_debug("abort_pre_commit trx state: %d seqno: %lld", 
@@ -1485,19 +1521,16 @@ enum wsrep_status mm_galera_post_rollback(
     case WSDB_TRX_MUST_REPLAY:
         /* we need trx info for replaying */
         break;
-    case WSDB_TRX_VOID:
-    case WSDB_TRX_ABORTING_NONREPL:
-        /* voluntary rollback before replicating was attempted */
-        wsdb->discard_trx(trx_id);
-        break;
     case WSDB_TRX_MUST_ABORT:
     case WSDB_TRX_REPLICATED:
+    case WSDB_TRX_ABORTING_REPL:
         /* these have replicated */
         assert (trx->get_local_seqno() > 0);
         // Note: commit queue should have been released already in 
         // pre_commit()
         // GALERA_RELEASE_QUEUE(commit_queue, trx->get_local_seqno());
-    case WSDB_TRX_ABORTING_REPL:
+    case WSDB_TRX_VOID:
+    case WSDB_TRX_ABORTING_NONREPL:
         /* local trx was removed in pre_commit phase already */
         wsdb->discard_trx(trx_id);
         break;
@@ -1687,8 +1720,10 @@ enum wsrep_status mm_galera_pre_commit(
     
     trx->assign_seqnos(seqno_l, seqno_g);
     trx->assign_state(WSDB_TRX_REPLICATED);
-    
+
+    trx->unlock();
     rcode = while_eagain_or_trx_abort(trx_id, gu_to_grab, cert_queue, seqno_l);
+    trx->lock();
     if (rcode) 
     {
         gu_debug("gu_to_grab aborted for seqno %lld: %d (%s)",
@@ -1758,7 +1793,6 @@ enum wsrep_status mm_galera_pre_commit(
     {
         assert (seqno_l >= 0);
         trx->unlock();
-        
         // Grab commit queue
         rcode = while_eagain_or_trx_abort(
             trx_id, gu_to_grab, commit_queue, seqno_l);
@@ -1888,10 +1922,10 @@ enum wsrep_status mm_galera_set_variable(
     wsrep_t *gh,
     const wsrep_conn_id_t  conn_id,
     const char *key,   const size_t key_len, // why is it not 0-terminated?
-    const char *query, const size_t query_len
-    ) {
+    const char *query, const size_t query_len) 
+{
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
-
+    
     /*
      * an ugly way to provide dynamic way to change galera_debug parameter.
      *
@@ -1911,7 +1945,7 @@ enum wsrep_status mm_galera_set_variable(
         gu_debug("GALERA set value: %s" , value);
         strncpy(value, query, query_len);
         const char *set_query= "wsrep_debug=ON";
-
+        
         if (strstr(value, set_query)) {
             gu_info("GALERA enabling debug logging: %s" , value);
             gu_conf_debug_on();
@@ -1919,42 +1953,54 @@ enum wsrep_status mm_galera_set_variable(
             gu_info("GALERA disabling debug logging: %s %s" , value, set_query);
             gu_conf_debug_off();
         }
+        return WSREP_OK;
     }
-
+    
     {
         char var[256] = {0,};
         strncpy(var, key, sizeof(var) - 1);
         gu_debug("GALERA set var: %s" , var);
     }
+    
 
-//    errno = 0;
-    switch(wsdb_store_set_variable(conn_id, (char*)key, key_len, 
-                                   (char*)query, query_len)) {
-    case WSDB_OK:              return WSREP_OK;
-    case WSDB_ERR_TRX_UNKNOWN: return WSREP_TRX_FAIL;
-    default:                   return WSREP_CONN_FAIL;
+    try
+    {
+        TrxHandlePtr trx(wsdb->get_conn_query(conn_id, true));
+        TrxHandleLock lock(trx);
+        wsdb->set_conn_variable(trx, key, key_len, query, query_len);
     }
-
+    catch (...)
+    {
+        return WSREP_CONN_FAIL;
+    }
+    
+    
 
     return WSREP_OK;
 }
 
 extern "C"
-enum wsrep_status mm_galera_set_database(
-    wsrep_t *gh,
-    const wsrep_conn_id_t conn_id, const char *query, const size_t query_len
-    ) {
-    
+enum wsrep_status mm_galera_set_database(wsrep_t *gh,
+                                         const wsrep_conn_id_t conn_id, 
+                                         const char *query, 
+                                         const size_t query_len) 
+{
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
     
-    errno = 0;
-    switch(wsdb_store_set_database(conn_id, (char*)query, query_len)) {
-    case WSDB_OK:              return WSREP_OK;
-    case WSDB_ERR_TRX_UNKNOWN: return WSREP_TRX_FAIL;
-    default:                   return WSREP_CONN_FAIL;
+    try
+    {
+        TrxHandlePtr trx(wsdb->get_conn_query(conn_id, true));
+        TrxHandleLock lock(trx);
+        wsdb->set_conn_database(trx, query, query_len);
     }
+    catch (...)
+    {
+        return WSREP_CONN_FAIL;
+    }
+
     return WSREP_OK;
 }
+
 
 extern "C"
 enum wsrep_status mm_galera_to_execute_start(
@@ -2106,11 +2152,11 @@ enum wsrep_status mm_galera_replay_trx(
     TrxHandlePtr trx(wsdb->get_trx(trx_id));
     TrxHandleLock lock(trx);
     
-    gu_debug("trx_replay for: %lld %lld state: %d, rbr len: %d", 
-             trx->get_local_seqno(), 
-             trx->get_global_seqno(), 
-             trx->get_state(), 
-             trx->get_write_set().get_rbr().size());
+    gu_info("trx_replay for: %lld %lld state: %d, rbr len: %d", 
+            trx->get_local_seqno(), 
+            trx->get_global_seqno(), 
+            trx->get_state(), 
+            trx->get_write_set().get_rbr().size());
     
     if (trx->get_state() != WSDB_TRX_MUST_REPLAY) {
         gu_error("replayed trx in bad state: %d", trx->get_state());
@@ -2178,7 +2224,8 @@ enum wsrep_status mm_galera_replay_trx(
     }
     trx->assign_state(WSDB_TRX_REPLICATED);
     
-    cert->deref_seqno (trx->get_write_set().get_last_seen_trx());
+    // updates will be done in post_commit
+    // cert->deref_seqno (trx->get_write_set().get_last_seen_trx());
     
     gu_debug("replaying over for applier: %d rcode: %d, seqno: %lld %lld", 
              -1, rcode, 

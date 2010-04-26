@@ -58,7 +58,7 @@ namespace galera
         // @todo Should certification part be refactored out of this call
         //       and require that test() method is called for certification
         //       verdict?
-        virtual int append_trx(TrxHandlePtr trx) = 0;
+        virtual int append_trx(const TrxHandlePtr& trx) = 0;
         
         //!
         // @brief Perform certification test for write set

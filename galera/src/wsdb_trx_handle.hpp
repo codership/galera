@@ -16,7 +16,8 @@ namespace galera
     class WsdbTrxHandle : public TrxHandle
     {
     public:
-        WsdbTrxHandle(wsrep_conn_id_t conn_id, wsrep_trx_id_t trx_id, 
+        WsdbTrxHandle(wsrep_conn_id_t conn_id, 
+                      wsrep_trx_id_t trx_id, 
                       bool local) 
             :
             TrxHandle(conn_id, trx_id, local),
@@ -25,6 +26,7 @@ namespace galera
             local_seqno_(WSREP_SEQNO_UNDEFINED),
             global_seqno_(WSREP_SEQNO_UNDEFINED)
         { }
+
         ~WsdbTrxHandle()
         {
             delete write_set_; write_set_ = 0;
@@ -52,6 +54,7 @@ namespace galera
         void assign_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g)
         {
             assert(write_set_ != 0);
+            assert(seqno_l >= 0 && seqno_g >= 0);
             if (is_local() == true)
             {
                 switch (write_set_->get_type())
@@ -65,6 +68,10 @@ namespace galera
                     wsdb_conn_set_seqno(get_conn_id(), seqno_l, seqno_g);
                     break;
                 }
+            }
+            else
+            {
+                static_cast<WsdbWriteSet*>(write_set_)->write_set_->trx_seqno = seqno_g;
             }
             // Cache values
             local_seqno_ = seqno_l;

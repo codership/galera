@@ -271,6 +271,8 @@ int wsdb_certification_test(
     uint32_t all_keys_len;
     char *all_keys = ws->key_composition;
 
+    assert(ws->last_seen_trx >= 0 && ws->trx_seqno >= 0);
+
 #ifdef WSDB_WORKAROUND_197
     if (gu_unlikely(ws->last_seen_trx < purged_up_to)) {
         gu_warn ("WS last_seen: %lld is below certification bound: %lld",
