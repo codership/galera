@@ -17,6 +17,11 @@
 using namespace std;
 using namespace gu;
 
+galera::WsdbCertification::~WsdbCertification()
+{
+    log_info << "cert trx map usage at exit " << trx_map_.size();
+}
+
 
 void galera::WsdbCertification::assign_initial_position(wsrep_seqno_t seqno)
 {

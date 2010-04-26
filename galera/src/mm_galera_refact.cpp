@@ -636,9 +636,9 @@ enum wsrep_status process_query_write_set_applying(
                                         trx->get_global_seqno()))) 
         {
             gu_warn("ws apply failed, rcode: %d, seqno: %lld, "
-                    "last_seen: %lld", 
+                    "last_seen: %lld attempt: %uz", 
                     rcode, trx->get_global_seqno(), 
-                    trx->get_write_set().get_last_seen_trx());
+                    trx->get_write_set().get_last_seen_trx(), attempts);
             
             if (apply_query(recv_ctx, "rollback\0", 9, 
                             trx->get_global_seqno())) {
@@ -1993,7 +1993,16 @@ enum wsrep_status mm_galera_set_database(wsrep_t *gh,
     {
         TrxHandlePtr trx(wsdb->get_conn_query(conn_id, true));
         TrxHandleLock lock(trx);
-        wsdb->set_conn_database(trx, query, query_len);
+
+        if (query == 0)
+        {
+            // 0 query means the end of connection
+            wsdb->discard_conn(conn_id);
+        }
+        else
+        {
+            wsdb->set_conn_database(trx, query, query_len);
+        }
     }
     catch (...)
     {

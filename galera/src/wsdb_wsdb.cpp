@@ -16,6 +16,12 @@
 using namespace std;
 using namespace gu;
 
+galera::WsdbWsdb::~WsdbWsdb()
+{
+
+    log_info << "wsdb trx map usage " << trx_map_.size() 
+             << " conn query map usage " << conn_query_map_.size();
+}
 
 ostream& galera::WsdbWsdb::operator<<(ostream& os) const
 {
@@ -123,7 +129,16 @@ void galera::WsdbWsdb::discard_conn_query(wsrep_conn_id_t conn_id)
     wsdb_conn_reset_seqno(conn_id);
 }
 
-
+void galera::WsdbWsdb::discard_conn(wsrep_conn_id_t conn_id)
+{
+    Lock lock(mutex_);
+    wsdb_store_set_database(conn_id, 0, 0);
+    ConnQueryMap::iterator i;
+    if ((i = conn_query_map_.find(conn_id)) != conn_query_map_.end())
+    {
+        conn_query_map_.erase(i);
+    }
+}
 
 void galera::WsdbWsdb::create_write_set(TrxHandlePtr& trx,
                                         const void* rbr_data,

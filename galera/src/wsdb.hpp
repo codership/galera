@@ -22,6 +22,7 @@ namespace galera
         
         // Discard trx handle
         virtual void discard_trx(wsrep_trx_id_t trx_id) = 0;
+        virtual void discard_conn(wsrep_conn_id_t conn_id) = 0;
         
         virtual void discard_conn_query(wsrep_conn_id_t conn_id) = 0;
         

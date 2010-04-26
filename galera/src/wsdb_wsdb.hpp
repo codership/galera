@@ -23,7 +23,7 @@ namespace galera
                                     bool create = false);
         // Discard trx handle
         void discard_trx(wsrep_trx_id_t trx_id);
-
+        void discard_conn(wsrep_conn_id_t conn_id);
         
         void append_query(TrxHandlePtr&, const void* query, size_t query_len,
                           time_t, uint32_t);
@@ -50,7 +50,7 @@ namespace galera
         std::ostream& operator<<(std::ostream& os) const;
 
         WsdbWsdb() : trx_map_(), conn_query_map_(), mutex_() { }
-        ~WsdbWsdb() { }
+        ~WsdbWsdb();
     private:
         // Create new trx handle
         TrxHandlePtr create_trx(wsrep_trx_id_t trx_id);
