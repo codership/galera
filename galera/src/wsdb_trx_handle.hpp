@@ -19,76 +19,111 @@ namespace galera
         WsdbTrxHandle(wsrep_conn_id_t conn_id, wsrep_trx_id_t trx_id, 
                       bool local) 
             :
-            TrxHandle(conn_id, trx_id, local)
+            TrxHandle(conn_id, trx_id, local),
+            state_(WSDB_TRX_VOID),
+            position_(WSDB_TRX_POS_VOID),
+            local_seqno_(WSREP_SEQNO_UNDEFINED),
+            global_seqno_(WSREP_SEQNO_UNDEFINED)
         { }
+        ~WsdbTrxHandle()
+        {
+            delete write_set_; write_set_ = 0;
+        }
 
         void assign_write_set(struct wsdb_write_set* ws)
         {
-            write_set_ = new WsdbWriteSet(get_id());
+            write_set_ = new WsdbWriteSet(get_trx_id());
             static_cast<WsdbWriteSet*>(write_set_)->write_set_ = ws;
         }
 
         enum wsdb_trx_state get_state() const
         {
-            wsdb_trx_info_t info;
-            wsdb_get_trx_info(get_id(), &info);
-            return info.state;
+            if (is_local() == true)
+            {
+                return state_;
+            }
+            else
+            {
+                gu_throw_fatal << "not implemented";
+                throw;
+            }
         }
  
         void assign_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g)
         {
             assert(write_set_ != 0);
-            wsdb_assign_trx_seqno(get_id(), seqno_l, seqno_g, 
-                                  get_state(), 
-                                  static_cast<WsdbWriteSet*>(write_set_)->write_set_);
+            if (is_local() == true)
+            {
+                switch (write_set_->get_type())
+                {
+                case WSDB_WS_TYPE_TRX:
+                    wsdb_assign_trx_seqno(get_trx_id(), seqno_l, seqno_g, 
+                                          get_state(), 
+                                          static_cast<WsdbWriteSet*>(write_set_)->write_set_);
+                    break;
+                case WSDB_WS_TYPE_CONN:
+                    wsdb_conn_set_seqno(get_conn_id(), seqno_l, seqno_g);
+                    break;
+                }
+            }
+            // Cache values
+            local_seqno_ = seqno_l;
+            global_seqno_ = seqno_g;
         }
 
         wsrep_seqno_t get_local_seqno() const
         {
-            wsdb_trx_info_t info;
-            wsdb_get_trx_info(get_id(), &info);
-            return info.seqno_l;
+            return local_seqno_;
         }
         
         wsrep_seqno_t get_global_seqno() const
         {
-            if (write_set_ == 0)
-            {
-                return WSREP_SEQNO_UNDEFINED;
-            }
-            return static_cast<WsdbWriteSet*>(write_set_)->write_set_->trx_seqno;
+            return global_seqno_;
         }
         
         void assign_state(enum wsdb_trx_state state)
         {
-            wsdb_assign_trx_state(get_id(), state);
+            if (is_local() == true)
+            {
+                wsdb_assign_trx_state(get_trx_id(), state);
+                state_ = state;
+            }
+            else
+            {
+                gu_throw_fatal << "not implemented";
+                throw;
+            }
         }
 
         void assign_position(enum wsdb_trx_position position)
         {
-            wsdb_assign_trx_pos(get_id(), position);
+            if (is_local() == true)
+            {
+                wsdb_assign_trx_pos(get_trx_id(), position);
+                position_ = position;
+            }
+            else
+            {
+                gu_throw_fatal << "not implemented";
+                throw;
+            }
         }
 
         enum wsdb_trx_position get_position() const 
         {
-            wsdb_trx_info_t info;
-            wsdb_get_trx_info(get_id(), &info);
-            return info.position;
-        }
-        void clear()
-        {
-            WsdbWriteSet* ws(static_cast<WsdbWriteSet*>(write_set_));
-            if (ws != 0 && ws->write_set_ != 0)
-            {
-                XDR xdrs;
-                /* free xdr objects */
-                xdrs.x_op = XDR_FREE;
-                xdr_wsdb_write_set(&xdrs, ws->write_set_);
-                gu_free(ws->write_set_);
-                ws->write_set_ = 0;
-            }
+            return position_;
         }
 
+        void clear()
+        {
+            delete write_set_; write_set_ = 0;
+        }
+    private:
+        friend class WsdbWsdb;
+        enum wsdb_trx_state state_;
+        enum wsdb_trx_position position_;
+        wsrep_seqno_t local_seqno_;
+        wsrep_seqno_t global_seqno_;
    };
 }
 

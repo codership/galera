@@ -6,10 +6,10 @@
 #ifndef GALERA_WSDB_WRITE_SET_HPP
 #define GALERA_WSDB_WRITE_SET_HPP
 
-extern "C"
-{
+#include "gu_logger.hpp"
+
 #include "wsdb_api.h"
-}
+#include "gu_mem.h"
 
 #include <time.h>
 
@@ -24,6 +24,15 @@ namespace galera
             write_set_(0),
             rbr_()
         { }
+
+        ~WsdbWriteSet()
+        {
+            if (write_set_ != 0)
+            {
+                wsdb_write_set_free(write_set_);
+                write_set_ = 0;
+            }
+        }
         
         enum wsdb_ws_type get_type() const
         {
@@ -45,6 +54,14 @@ namespace galera
         
         const gu::Buffer& get_rbr() const
         {
+            assert(write_set_ != 0);
+            if (rbr_.empty() == true)
+            {
+                rbr_.resize(write_set_->rbr_buf_len);
+                copy(write_set_->rbr_buf,
+                     write_set_->rbr_buf + write_set_->rbr_buf_len, 
+                     rbr_.begin());
+            }
             return rbr_;
         }
         
@@ -68,12 +85,13 @@ namespace galera
 
     private:
         friend class WsdbTrxHandle;
+        friend class WsdbCertification;
         WsdbWriteSet(const WsdbWriteSet&);
         void operator=(const WsdbWriteSet&);
         
         wsrep_trx_id_t trx_id_;
         struct wsdb_write_set* write_set_;
-        gu::Buffer rbr_;
+        mutable gu::Buffer rbr_;
     };
 }
 

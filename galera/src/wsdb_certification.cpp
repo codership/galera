@@ -18,6 +18,12 @@ using namespace std;
 using namespace gu;
 
 
+void galera::WsdbCertification::assign_initial_position(wsrep_seqno_t seqno)
+{
+    wsdb_set_global_trx_committed(seqno);
+    wsdb_purge_trxs_upto(seqno);
+}
+
 galera::TrxHandlePtr galera::WsdbCertification::create_trx(
     const void* data,
     size_t data_len,
@@ -28,10 +34,11 @@ galera::TrxHandlePtr galera::WsdbCertification::create_trx(
     TrxHandlePtr lock(ret);
     WsdbTrxHandle* trx(static_cast<WsdbTrxHandle*>(ret.get()));
     struct wsdb_write_set* ws(reinterpret_cast<struct wsdb_write_set*>(gu_malloc(sizeof(struct wsdb_write_set))));
-
+    
     trx->assign_write_set(ws);
+    trx->assign_seqnos(seqno_l, seqno_g);
     XDR xdrs;
-
+    
     xdrmem_create(&xdrs, (char *)data, data_len, XDR_DECODE);
     if (!xdr_wsdb_write_set(&xdrs, ws)) {
         gu_fatal("GALERA XDR allocation failed, len: %d seqno: (%lld %lld)", 
@@ -58,7 +65,20 @@ int galera::WsdbCertification::append_trx(TrxHandlePtr trx)
     {
         gu_throw_fatal;
     }
-    return wsdb_append_write_set(0);
+    switch (trx->get_write_set().get_type())
+    {
+    case WSDB_WS_TYPE_TRX:
+        assert(static_cast<const WsdbWriteSet*>(
+                   &trx->get_write_set())->write_set_ != 0);
+        return wsdb_append_write_set(
+            static_cast<const WsdbWriteSet*>(
+                &trx->get_write_set())->write_set_);
+    case WSDB_WS_TYPE_CONN:
+        return WSDB_OK;
+    default:
+        gu_throw_fatal << "unknown ws type " << trx->get_write_set().get_type();
+        throw;
+    }
 }
 
 int galera::WsdbCertification::test(const TrxHandlePtr& trx, bool bval)
@@ -76,16 +96,16 @@ wsrep_seqno_t galera::WsdbCertification::get_safe_to_discard_seqno() const
 void galera::WsdbCertification::purge_trxs_upto(wsrep_seqno_t seqno)
 {
     Lock lock(mutex_); 
-    wsdb_purge_trxs_upto(seqno);
     TrxMap::iterator lower_bound(trx_map_.lower_bound(seqno));
     trx_map_.erase(trx_map_.begin(), lower_bound);
+    wsdb_purge_trxs_upto(seqno);
 }
 
-void galera::WsdbCertification::set_trx_committed(TrxHandlePtr trx)
+void galera::WsdbCertification::set_trx_committed(const TrxHandlePtr& trx)
 {
     if (trx->is_local() == true)
     {
-        wsdb_set_local_trx_committed(trx->get_global_seqno());
+        wsdb_set_local_trx_committed(trx->get_trx_id());
     }
     else
     {

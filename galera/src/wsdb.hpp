@@ -14,7 +14,7 @@ namespace galera
     {
     public:
         // Get trx handle from wsdb
-        virtual TrxHandlePtr get_trx(wsrep_trx_id_t id, 
+        virtual TrxHandlePtr get_trx(wsrep_trx_id_t trx_id, 
                                      bool create = false) = 0;
         
         virtual TrxHandlePtr get_conn_query(wsrep_conn_id_t conn_id, 
@@ -22,7 +22,7 @@ namespace galera
         
         // Discard trx handle
         virtual void discard_trx(wsrep_trx_id_t trx_id) = 0;
-
+        
         virtual void discard_conn_query(wsrep_conn_id_t conn_id) = 0;
         
         // Append query
@@ -48,6 +48,9 @@ namespace galera
                                       const void* rbr_data = 0,
                                       size_t rbr_data_len = 0) = 0;
         
+
+        virtual std::ostream& operator<<(std::ostream&) const = 0;
+
         // Create wsdb instance
         static Wsdb* create(const std::string& conf);
         
@@ -55,6 +58,13 @@ namespace galera
     protected:
         Wsdb() { }
     };
+
+    inline std::ostream& operator<<(std::ostream& os, const Wsdb& wsdb)
+    {
+        return wsdb.operator<<(os);
+    }
+    
+
 }
 
 

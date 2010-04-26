@@ -18,6 +18,7 @@ usage()
 "    -o|--opt        configure build with debug disabled (implies -c)\n"\
 "    -m32/-m64       build 32/64-bit binaries on x86\n"\
 "    -d|--debug      configure build with debug enabled (implies -c)\n"\
+"    --dl|--debug-level debug level for scons build \n"\
 "    --with-spread   configure build with Spread (implies -c)\n"\
 "    --no-strip      prevent stripping of release binaries\n"\
 "    -r|--release <galera release>, otherwise revisions will be used\n"\
@@ -31,6 +32,7 @@ usage()
 # Initializing variables to defaults
 uname -m | grep -q i686 && CPU=pentium || CPU=amd64
 DEBUG=no
+DEBUG_LEVEL=1
 NO_STRIP=no
 RELEASE=""
 TAR=no
@@ -63,6 +65,10 @@ do
         -d|--debug)
             DEBUG="yes"     # Compile with debug
             NO_STRIP="yes"  # Don't strip the binaries
+            ;;
+        --dl|--debug-level)
+            shift;
+            DEBUG_LEVEL=$1
             ;;
         -r|--release)
             RELEASE="$2"    # Compile without debug
@@ -163,6 +169,10 @@ then
         elif [ "$CPU" == "amd64" ]
         then
             scons_args="$scons_args arch=x86_64"
+        fi
+        if [ "$DEBUG" == "yes" ]
+        then
+            scons_args="$scons_args debug=$DEBUG_LEVEL"
         fi
         if [ "$SCRATCH" == "yes" ]
         then

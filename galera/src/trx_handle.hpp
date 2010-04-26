@@ -28,12 +28,13 @@ namespace galera
             mutex_(),
             write_set_(0)
         { }
-        virtual ~TrxHandle() { delete write_set_; }
+        virtual ~TrxHandle() { delete write_set_; write_set_ = 0; }
 
         void lock() { mutex_.lock(); }
         void unlock() { mutex_.unlock(); }
         
-        virtual wsrep_trx_id_t get_id() const { return trx_id_; }
+        virtual wsrep_trx_id_t get_trx_id() const { return trx_id_; }
+        void assign_conn_id(wsrep_conn_id_t conn_id) { conn_id_ = conn_id; }
         virtual wsrep_conn_id_t get_conn_id() const { return conn_id_; }
         virtual bool is_local() const { return local_; }
         
@@ -50,7 +51,7 @@ namespace galera
         {
             assert(write_set_ != 0);
             return *write_set_; 
-        };
+        }
         virtual void clear() = 0;
         
     private:

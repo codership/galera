@@ -25,6 +25,24 @@ namespace galera
     class Certification
     {
     public:
+
+        //!
+        // @brief Assign initial position
+        //
+        // @param seqno TO Seqno to start from
+        //
+        virtual void assign_initial_position(wsrep_seqno_t seqno) = 0;
+
+        //!
+        // @brief Create transaction for certification.
+        //
+        // @param data Serialized form of transaction
+        // @param data_len Length of serialized transaction
+        // @param seqno_l Local seqno
+        // @param seqno_g Global seqno
+        //
+        // @return TrxHandlePtr
+        //
         virtual TrxHandlePtr create_trx(const void* data, size_t data_len,
                                         wsrep_seqno_t seqno_l,
                                         wsrep_seqno_t seqno_g) = 0;
@@ -75,7 +93,7 @@ namespace galera
         // @param trx
         //
         //
-        virtual void set_trx_committed(TrxHandlePtr trx) = 0;
+        virtual void set_trx_committed(const TrxHandlePtr& trx) = 0;
 
         //!
         // @brief Get transaction matching for seqno from certification
