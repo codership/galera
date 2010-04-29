@@ -51,9 +51,11 @@ typedef enum galera_repl_state {
 } galera_repl_state_t;
 
 /* application's handlers */
+static void*                    app_ctx            = NULL;
 static wsrep_bf_apply_cb_t      bf_apply_cb        = NULL;
 //DELETE static wsrep_ws_start_cb_t      ws_start_cb        = NULL;
 static wsrep_view_cb_t          view_handler_cb    = NULL;
+static wsrep_synced_cb_t        synced_cb          = NULL;
 static wsrep_sst_donate_cb_t    sst_donate_cb      = NULL;
 
 /* gcs parameters */
@@ -280,8 +282,10 @@ enum wsrep_status mm_galera_init(wsrep_t* gh,
     my_idx = 0;
     
     /* set the rest of callbacks */
+    app_ctx           = args->app_ctx;
     bf_apply_cb       = args->bf_apply_cb;
     view_handler_cb   = args->view_handler_cb;
+    synced_cb         = args->synced_cb;
     sst_donate_cb     = args->sst_donate_cb;
     
     gu_mutex_init(&sst_mtx,    NULL);
@@ -1270,6 +1274,7 @@ enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx)
                 gu_debug ("#301 Galera synchronized with group");
                 status.stage = GALERA_STAGE_SYNCED;
                 ret_code = WSREP_OK;
+                synced_cb(app_ctx);
                 break;
             default:
                 gu_error("Unexpected gcs action value: %s, must abort.",
