@@ -88,7 +88,7 @@ namespace galera
         
         bool empty() const
         {
-            return rbr_.empty();
+            return (write_set_->rbr_buf_len == 0);
         }
         
         void serialize(gu::Buffer& buf) const

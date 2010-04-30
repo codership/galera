@@ -114,14 +114,14 @@ void wsdb_deref_seqno (trx_seqno_t last_seen)
             // next is now safe to discard
             safe_to_discard_seqno = next_to_discard_seqno;
             gu_debug ("DISCARD end: safe = %llu, next = %llu, next refs = %lu",
-                     safe_to_discard_seqno, next_to_discard_seqno,
-                     next_to_discard_refs);
+                      safe_to_discard_seqno, next_to_discard_seqno,
+                      next_to_discard_refs);
             next_to_discard_seqno = 0;
         }
         else {
             gu_debug ("DISCARD cont: safe = %llu, next = %llu, next refs = %lu",
-                     safe_to_discard_seqno, next_to_discard_seqno,
-                     next_to_discard_refs);
+                      safe_to_discard_seqno, next_to_discard_seqno,
+                      next_to_discard_refs);
         }
     }
     gu_mutex_unlock(&last_committed_seqno_mtx);
@@ -1276,6 +1276,7 @@ int wsdb_set_local_trx_committed(local_trxid_t trx_id) {
     GU_DBUG_ENTER("wsdb_set_local_trx_committed");
     if (!trx) {
         GU_DBUG_PRINT("wsdb",("trx not found, set_local_trx_commit: %llu",trx_id));
+        gu_warn("trx not found, set local trx committed: %llu", trx_id);
         GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
     }
     GU_DBUG_PRINT("wsdb",("last committed: %llu->%llu",

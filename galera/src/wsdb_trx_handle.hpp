@@ -92,6 +92,12 @@ namespace galera
         {
             if (is_local() == true)
             {
+                if (state == WSDB_TRX_ABORTING_NONREPL && write_set_ != 0)
+                {
+                    
+                    assert(static_cast<WsdbWriteSet*>(write_set_)->write_set_ != 0);
+                    wsdb_deref_seqno(static_cast<WsdbWriteSet*>(write_set_)->write_set_->last_seen_trx);
+                }
                 wsdb_assign_trx_state(get_trx_id(), state);
                 state_ = state;
             }

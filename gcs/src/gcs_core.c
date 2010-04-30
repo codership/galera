@@ -738,8 +738,11 @@ core_handle_uuid_msg (gcs_core_t*     core,
                 }
             }
             break;
+        case GCS_GROUP_WAIT_STATE_UUID:
+            // In case of stray state uuid message
+            break;
         default:
-            assert (ret < 0);
+            assert(ret < 0);
             gu_error ("Failed to handle state UUID: %d (%s)",
                       ret, strerror (-ret));
         }

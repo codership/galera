@@ -413,7 +413,7 @@ gcs_group_handle_uuid_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     else {
         gu_warn ("Stray state UUID msg: "GU_UUID_FORMAT
                  " from node %ld (%s), current group state %s",
-                 GU_UUID_ARGS(&group->state_uuid),
+                 GU_UUID_ARGS((gu_uuid_t*)msg->buf),
                  msg->sender_idx, group->nodes[msg->sender_idx].name,
                  gcs_group_state_str[group->state]);
     }

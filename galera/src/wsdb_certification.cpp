@@ -66,6 +66,11 @@ galera::TrxHandlePtr galera::WsdbCertification::create_trx(
     {
         gu_throw_fatal;
     }
+
+    if (trx_map_.size() > 10000 && (trx_size_warn_count_++ % 1000 == 0))
+    {
+        log_warn << "trx map size " << trx_map_.size();
+    }
     
     return ret;
 }
@@ -116,21 +121,40 @@ void galera::WsdbCertification::purge_trxs_upto(wsrep_seqno_t seqno)
     Lock lock(mutex_); 
     TrxMap::iterator lower_bound(trx_map_.lower_bound(seqno));
     trx_map_.erase(trx_map_.begin(), lower_bound);
+    if (trx_map_.size() > 10000)
+    {
+        log_warn << "trx map after purge: " 
+                 << trx_map_.size() << " " 
+                 << trx_map_.begin()->second->get_global_seqno() 
+                 << " purge seqno " << seqno;
+        log_warn << "last committed seqno updating is probably broken";
+    }
     wsdb_purge_trxs_upto(seqno);
 }
 
 void galera::WsdbCertification::set_trx_committed(const TrxHandlePtr& trx)
 {
+    int err;
+
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
     if (trx->is_local() == true)
     {
-        Lock lock(mutex_); 
-        wsdb_set_local_trx_committed(trx->get_trx_id());
+        Lock lock(mutex_);
+        assert (trx->get_write_set().get_type() == WSDB_WS_TYPE_TRX);
         wsdb_deref_seqno(trx->get_write_set().get_last_seen_trx());
+        if ((err = wsdb_set_local_trx_committed(trx->get_trx_id())))
+        {
+            gu_throw_fatal << "wsdb_set_local_trx_committed() failed with: "
+                           << err;
+        }
     }
     else
     {
-        wsdb_set_global_trx_committed(trx->get_global_seqno());
+        if ((err = wsdb_set_global_trx_committed(trx->get_global_seqno())))
+        {
+            gu_throw_fatal << "wsdb_set_global_trx_committed() failed with: "
+                           << err;
+        }
     }
 }
 

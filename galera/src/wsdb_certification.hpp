@@ -19,7 +19,7 @@ namespace galera
     private:
         typedef std::map<wsrep_seqno_t, TrxHandlePtr> TrxMap;
     public:
-        WsdbCertification() : trx_map_(), mutex_() { }
+        WsdbCertification() : trx_map_(), mutex_(), trx_size_warn_count_(0) { }
         ~WsdbCertification();
         void assign_initial_position(wsrep_seqno_t seqno);
         TrxHandlePtr create_trx(const void* data, size_t data_len,
@@ -34,6 +34,7 @@ namespace galera
     private:
         TrxMap trx_map_;
         gu::Mutex  mutex_;
+        size_t trx_size_warn_count_;
     };
 }
 
