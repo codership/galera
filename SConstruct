@@ -78,23 +78,28 @@ elif arch == 'x86-64':
         
 boost = int(ARGUMENTS.get('boost', 1))
 
-cc = os.getenv('CC', 'default')
-cxx = os.getenv('CXX', 'default')
+
 
 #
 # Set up and export default build environment
 #
-# TODO: import env required for ccache and distcc 
-#
 
 env = DefaultEnvironment()
 
+# Set up environment for ccache and distcc
+env['ENV']['HOME']          = os.environ['HOME']
+env['ENV']['DISTCC_HOSTS']  = os.environ['DISTCC_HOSTS']
+env['ENV']['CCACHE_PREFIX'] = os.environ['CCACHE_PREFIX']
+
+# Set CC and CXX compilers
+cc = os.getenv('CC', 'default')
 if cc != 'default':
     env.Replace(CC = cc)
+cxx = os.getenv('CXX', 'default')
 if cxx != 'default':
     env.Replace(CXX = cxx)
 
-# Ports are installed under /usr/local 
+# Freebsd ports are installed under /usr/local 
 if sysname == 'freebsd':
     env.Append(LIBPATH = '-L/usr/local/lib')
     env.Append(CPPFLAGS = '-I/usr/local/include')
