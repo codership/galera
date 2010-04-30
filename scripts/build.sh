@@ -117,7 +117,9 @@ do
     shift
 done
 
-if [ "$OPT"   == "yes" ]; then CONFIGURE="yes"; conf_flags="$conf_flags --disable-debug"; fi
+if [ "$OPT"   == "yes" ]; then CONFIGURE="yes";
+   conf_flags="$conf_flags --disable-debug --disable-dbug";
+fi
 if [ "$DEBUG" == "yes" ]; then CONFIGURE="yes"; fi
 if [ -n "$WITH_SPREAD" ]; then CONFIGURE="yes"; fi
 

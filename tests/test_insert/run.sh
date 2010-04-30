@@ -32,7 +32,7 @@ mysqlslap --user=$DBMS_TEST_USER --password=$DBMS_TEST_PSWD \
 	  --concurrency=$DBMS_CLIENTS --number-of-queries=1000000 \
 	  --verbose $@
 
-check || check || exit $?
-
-exit 0
+#check || check || exit $? there is no point to check consistency after mysqlslap -
+# it deletes the table
+#exit 0
 #

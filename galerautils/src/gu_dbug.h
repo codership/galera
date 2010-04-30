@@ -78,19 +78,19 @@
 #include <stdio.h>
 #include <sys/types.h>
 
-typedef unsigned int uint;
+typedef unsigned int  uint;
 typedef unsigned long ulong;
 
 #define THREAD 1
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C"
 {
 #endif
 
     extern char _gu_dig_vec[];
 
-#if !defined(GU_DBUG_OFF) && !defined(_lint)
+#if defined(GU_DBUG_ON) && !defined(_lint)
     extern int   _gu_db_on_;
     extern int   _gu_no_db_;
     extern FILE* _gu_db_fp_;
@@ -126,22 +126,22 @@ extern "C"
 #define GU_DBUG_ENTER(a) \
         const char *_gu_db_func_, *_gu_db_file_; \
         uint _gu_db_level_; \
-	char **_gu_db_framep_; \
-	_gu_db_enter_ (a, __FILE__, __LINE__, &_gu_db_func_, &_gu_db_file_, \
+        char **_gu_db_framep_; \
+        _gu_db_enter_ (a, __FILE__, __LINE__, &_gu_db_func_, &_gu_db_file_, \
                        &_gu_db_level_, &_gu_db_framep_)
 
 #define GU_DBUG_LEAVE \
-	(_gu_db_return_ (__LINE__, &_gu_db_func_, &_gu_db_file_, \
+        (_gu_db_return_ (__LINE__, &_gu_db_func_, &_gu_db_file_, \
                          &_gu_db_level_))
 
 #define GU_DBUG_RETURN(a1)  {GU_DBUG_LEAVE; return(a1);}
 #define GU_DBUG_VOID_RETURN {GU_DBUG_LEAVE; return;    }
 
 #define GU_DBUG_EXECUTE(keyword,a1) \
-	{if (_gu_db_on_) {if (_gu_db_keyword_ (keyword)) { a1 }}}
+        {if (_gu_db_on_) {if (_gu_db_keyword_ (keyword)) { a1 }}}
 
 #define GU_DBUG_PRINT(keyword,arglist) \
-	{if (_gu_db_on_) {_gu_db_pargs_(__LINE__,keyword); \
+        {if (_gu_db_on_) {_gu_db_pargs_(__LINE__,keyword); \
          _gu_db_doprnt_ arglist;}}
 
 #define GU_DBUG_PUSH(a1)        _gu_db_push_ (a1)
@@ -152,7 +152,7 @@ extern "C"
 #define GU_DBUG_LONGJMP(a1,a2) (_gu_db_longjmp_ (), longjmp (a1, a2))
 
 #define GU_DBUG_DUMP(keyword,a1,a2)\
-	{if (_gu_db_on_) {_gu_db_dump_(__LINE__,keyword,a1,a2);}}
+        {if (_gu_db_on_) {_gu_db_dump_(__LINE__,keyword,a1,a2);}}
 
 #define GU_DBUG_IN_USE (_gu_db_fp_ && _gu_db_fp_ != stderr)
 #define GU_DEBUGGER_OFF _no_gu_db_=1;_gu_db_on_=0;
@@ -182,7 +182,7 @@ extern "C"
 #define GU_DBUG_my_pthread_mutex_unlock_FILE
 #define GU_DBUG_ASSERT(A) {}
 #endif
-#ifdef	__cplusplus
+#ifdef __cplusplus
 }
 #endif
 #endif
