@@ -709,6 +709,7 @@ core_handle_uuid_msg (gcs_core_t*     core,
             // Need to send state message for state exchange
             {
                 gcs_state_msg_t* state = gcs_group_get_state (group);
+
                 if (state) {
                     size_t           state_len = gcs_state_msg_len (state);
                     uint8_t          state_buf[state_len];

@@ -27,7 +27,19 @@ else
     AM_CFLAGS="-O3 -g"
     AM_CPPFLAGS="-DNDEBUG"
 fi
+
 AM_CONDITIONAL(ENABLE_DEBUG, test "$enable_debug" != "no")
+
+# Check if use of DBUG macros is desired
+AC_ARG_ENABLE(dbug,
+              AC_HELP_STRING([--disable-dbug],
+              [disable Fred Fish[']s DBUG macros [[default=enabled]]]),,
+              enable_dbug="yes")
+if test "$enable_dbug" != "no"
+then
+    enable_dbug="yes"
+    AM_CPPFLAGS="$AM_CPPFLAGS -DGU_DBUG_ON"
+fi
 
 # Checks for programs.
 AC_PROG_CC

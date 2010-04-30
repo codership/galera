@@ -41,8 +41,7 @@ AC_ARG_ENABLE(dbug,
 if test "$enable_dbug" != "no"
 then
     enable_dbug="yes"
-else
-    AM_CPPFLAGS="$AM_CPPFLAGS -DGU_DBUG_OFF"
+    AM_CPPFLAGS="$AM_CPPFLAGS -DGU_DBUG_ON"
 fi
 
 # Check if Spread backend is desired

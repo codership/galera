@@ -6,7 +6,7 @@
 #
 # Script structure:
 # - Help message
-# - Default parameters 
+# - Default parameters
 # - Read commandline options
 # - Set up and configure default build environment
 # - Set up and configure check unit test build environment
@@ -21,13 +21,13 @@ print sysname
 
 
 #
-# Print Help 
+# Print Help
 #
 
 Help('''
 Build targets:  build tests check install all
 Default target: all
-        
+
 Commandline Options:
     debug=n       debug build with optimization level n
     arch=str      target architecture [i386|x86-64]
@@ -43,7 +43,7 @@ Commandline Options:
 build_target = 'all'
 
 # Optimization level
-opt_flags    = '-g -O3 -DNDEBUG' 
+opt_flags    = '-g -O3 -DNDEBUG'
 
 # Architecture (defaults to build host type)
 compile_arch = ''
@@ -59,10 +59,16 @@ build_dir    = ''
 
 build_dir = ARGUMENTS.get('build_dir', '')
 
-# Debug flags
+# Debug/dbug flags
 debug = ARGUMENTS.get('debug', -1)
+dbug  = ARGUMENTS.get('dbug', False)
+
 if int(debug) >= 0:
     opt_flags = '-g -O{0}'.format(int(debug))
+    dbug = True
+
+if dbug:
+    opt_flags = opt_flags + ' -DGU_DBUG_ON'
 
 # Target arch
 arch = ARGUMENTS.get('arch', '')
@@ -75,7 +81,6 @@ elif arch == 'x86-64':
     link_arch    = compile_arch + ' -Wl,-melf_x86_64'
 
 
-        
 boost = int(ARGUMENTS.get('boost', 1))
 
 
@@ -127,15 +132,15 @@ env.Append(LIBPATH = Split('''#/galerautils/src
 
 # Common C/CXX flags
 # These should be kept minimal as they are appended after C/CXX specific flags
-env.Replace(CCFLAGS = 
-            opt_flags 
-            + ' -pipe -Wall -Wextra -Werror -Wno-unused-parameter ' 
+env.Replace(CCFLAGS =
+            opt_flags
+            + ' -pipe -Wall -Wextra -Werror -Wno-unused-parameter '
             + compile_arch)
 
-# Linker flags  
+# Linker flags
 # TODO: enable '-Wl,--warn-common -Wl,--fatal-warnings' after warnings from
 # static linking have beed addressed
-# 
+#
 env.Append(LINKFLAGS = ' ' + link_arch)
 
 # CPPFLAGS
@@ -148,9 +153,8 @@ env.Append(CPPFLAGS = ' -D_XOPEN_SOURCE=600')
 env.Replace(CFLAGS = '-std=c99 -fno-strict-aliasing')
 
 # CXXFLAGS
-env.Replace(CXXFLAGS = 
+env.Replace(CXXFLAGS =
             '-Wno-long-long -Wno-deprecated -Wold-style-cast -Weffc++ -pedantic -ansi')
-
 
 
 
@@ -166,7 +170,7 @@ conf = Configure(env)
 if not conf.CheckLib('pthread'):
     print 'Error: pthread library not found'
     Exit(1)
-    
+
 if not conf.CheckLib('rt'):
     print 'Error: rt library not found'
     Exit(1)
@@ -196,14 +200,14 @@ if boost == 1:
     # Use nanosecond time precision
     conf.env.Append(CPPFLAGS = ' -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG=1')
     # Required boost headers/libraries
-    # 
+    #
     if conf.CheckCXXHeader('boost/pool/pool_alloc.hpp'):
         print 'Using boost pool alloc'
         conf.env.Append(CPPFLAGS = ' -DGALERA_USE_BOOST_POOL_ALLOC=1')
     else:
         print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
 
-    
+
     if conf.CheckCXXHeader('boost/asio.hpp'):
         if conf.CheckLib('boost_system-mt'):
             print 'Using boost asio'
@@ -216,7 +220,6 @@ else:
 conf.env.Append(CFLAGS = ' -pedantic');
 
 env = conf.Finish()
-
 
 
 #

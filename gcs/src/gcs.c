@@ -56,7 +56,7 @@ const char* gcs_act_type_to_str (gcs_act_type_t type)
 static const long GCS_MAX_REPL_THREADS = 16384;
 
 // Flow control parameters
-static const long   fc_base_queue_limit = 16;
+static const long   fc_base_queue_limit = 32;
 static const double fc_resume_factor    = 0.5;
 
 typedef enum

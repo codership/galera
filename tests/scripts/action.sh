@@ -135,9 +135,10 @@ gcs_address()
 
     case "$GCS_TYPE" in
     "gcomm")
-        local peer=$(( $node - 1 )) # select previous node as connection peer
+#        local peer=$(( $node - 1 )) # select previous node as connection peer
+        local peer=0 # use the first node as a connection handle
 
-        if [ $peer -lt 0 ]; then peer=$NODE_MAX; fi # rollover 
+        if [ $peer -lt 0 ]; then peer=$NODE_MAX; fi # rollover
 
         echo "gcomm://${NODE_GCS_HOST[$peer]}:${NODE_GCS_PORT[$peer]}${GCOMM_EXTRA_PARAMS}"
         ;;

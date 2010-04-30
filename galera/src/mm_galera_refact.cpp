@@ -12,15 +12,12 @@
 #include <time.h>
 #include <sys/time.h>
 
-
-
-
 #include "wsrep_api.h"
 #include "gu_log.h"
 #include "gcs.h"
 
 extern "C"
-{    
+{
 #include "galera_info.h"
 #include "galera_state.h"
 #include "galera_options.h"
@@ -124,7 +121,7 @@ static inline long while_eagain_or_trx_abort (
                 trx->get_global_seqno(), 
                 trx->get_local_seqno(), 
                 trx->get_state());
-        
+
         return -EINTR;
     }
 
@@ -211,7 +208,7 @@ static gcs_conn_t* galera_init_gcs (wsrep_t*      gh,
         gu_error ("Failed to initialize GCS state: %d (%s)",
                   rcode, strerror (-rcode));
         gcs_destroy (ret);
-        GU_DBUG_RETURN(NULL);            
+        GU_DBUG_RETURN(NULL);
     }
 
     GU_DBUG_RETURN(ret);
@@ -228,13 +225,13 @@ enum wsrep_status mm_galera_init(wsrep_t* gh,
 
     data_dir = strdup (args->data_dir);
     if (!data_dir) return WSREP_FATAL;
-    
+
     /* Set up logging */
     gu_conf_set_log_callback((gu_log_cb_t)args->logger_cb);
-    
+
     /* Set up options if any */
     if (args->options) galera_options_from_string (&galera_opts, args->options);
-    
+
     wsdb_set_conf_param_cb(galera_wsdb_configurator);
 
     /* Set up initial state: */
@@ -243,7 +240,6 @@ enum wsrep_status mm_galera_init(wsrep_t* gh,
     status.state_uuid   = *(gu_uuid_t*)args->state_uuid;
     status.last_applied = args->state_seqno;
 
-    
     /* 2. initialize wsdb */
     wsdb_init(data_dir, (gu_log_cb_t)args->logger_cb);    
     wsdb = Wsdb::create("");
@@ -274,7 +270,7 @@ enum wsrep_status mm_galera_init(wsrep_t* gh,
                                 status.last_applied, status.state_uuid.data);
     if (!gcs_conn) {
         gu_error ("Failed to initialize GCS state");
-        GU_DBUG_RETURN(WSREP_NODE_FAIL);            
+        GU_DBUG_RETURN(WSREP_NODE_FAIL);
     }
     
     last_recved = status.last_applied;
@@ -524,10 +520,10 @@ static wsrep_status_t apply_query(void *recv_ctx, const char *query, int len,
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static ulong const    report_interval = 200;
-static volatile ulong report_counter  = 0;
+static ulong const report_interval = 200;
+static ulong       report_counter  = 0;
 
-// fast funciton to be run inside commit_queue critical section
+// fast function to be run inside commit_queue critical section
 static inline bool report_check_counter ()
 {
     return (++report_counter > report_interval && !(report_counter = 0));

@@ -65,7 +65,7 @@
  *			  of creating a new one.
  *	Check of malloc on entry/exit (option "S")
  *
- *	Alexey Yurchenko:
+ *      Alexey Yurchenko:
  *      - Renamed global symbols for use with galera project to avoid
  *        collisions with other software (notably MySQL)
  *
@@ -75,13 +75,9 @@
  *      - Thread -> state mapping for multithreaded programs.
  *      - Changed initialization so that it is done on the first
  *        call to _gu_db_push().
- *      
- * $Id$     
+ *
+ * $Id$
  */
-
-#ifdef GU_DBUG_OFF
-#undef GU_DBUG_OFF
-#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -89,6 +85,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>
+
+#ifndef GU_DBUG_ON
+#define GU_DBUG_ON
+#endif
+
 #include "gu_dbug.h"
 
 /* Make a new type: bool_t */
@@ -109,7 +110,7 @@ bool_t;
 #include <process.h>
 #endif
 
-#ifdef	_GU_DBUG_CONDITION_
+#ifdef  _GU_DBUG_CONDITION_
 #define _GU_DBUG_START_CONDITION_ "d:t"
 #else
 #define _GU_DBUG_START_CONDITION_ ""
@@ -125,14 +126,14 @@ bool_t;
  *   Manifest constants which may be "tuned" if desired.
  */
 
-#define PRINTBUF	  1024    /* Print buffer size           */
+#define PRINTBUF          1024    /* Print buffer size           */
 #define INDENT               2    /* Indentation per trace level */
 #define MAXDEPTH           200    /* Maximum trace depth default */
 
 /*
- *	The following flags are used to determine which
- *	capabilities the user has enabled with the state
- *	push macro.
+ *   The following flags are used to determine which
+ *   capabilities the user has enabled with the state
+ *   push macro.
  */
 
 #define TRACE_ON	000001	  /* Trace enabled                      */
