@@ -1,6 +1,6 @@
 
-#ifndef GALERA_WRITE_SET_HPP
-#define GALERA_WRITE_SET_HPP
+#ifndef GALERA_GALERA_WRITE_SET_HPP
+#define GALERA_GALERA_WRITE_SET_HPP
 
 #include "write_set.hpp"
 
@@ -41,8 +41,6 @@ namespace galera
     size_t serial_size(const RowKey&);
     
 
-    typedef gu::Buffer Query;
-
     class GaleraWriteSet : public WriteSet
     {
     public:
@@ -58,8 +56,18 @@ namespace galera
             keys_(),
             rbr_()
         { }
-        
 
+        GaleraWriteSet(enum wsdb_ws_type type) 
+            : 
+            type_(type),
+            level_(),
+            last_seen_trx_(),
+            queries_(),
+            keys_(),
+            rbr_()
+        { }
+        
+        
         enum wsdb_ws_type get_type() const { return type_; }
         enum wsdb_ws_level get_level() const { return level_; }
         wsrep_seqno_t get_last_seen_trx() const { return last_seen_trx_; }
@@ -67,9 +75,8 @@ namespace galera
         
         void append_query(const void* query, size_t query_len)
         {
-            queries_.push_back(Query(reinterpret_cast<const gu::byte_t*>(query),
-                                     reinterpret_cast<const gu::byte_t*>(query)
-                                     + query_len));
+            queries_.push_back(Query(query,
+                                     query_len));
         }
         
         void append_row_key(const void* dbtable, size_t dbtable_len,
@@ -83,6 +90,7 @@ namespace galera
         void assign_rbr(const void* rbr_data, size_t rbr_data_len)
         {
             assert(rbr_.empty() == true);
+            rbr_.resize(rbr_data_len);
             rbr_.insert(rbr_.begin(),
                         reinterpret_cast<const gu::byte_t*>(rbr_data),
                         reinterpret_cast<const gu::byte_t*>(rbr_data) + rbr_data_len);
@@ -90,7 +98,9 @@ namespace galera
         
         const RowKeySequence& get_keys() const { return keys_; }
         const QuerySequence& get_queries() const { return queries_; }
-        
+        bool empty() const { return (rbr_.size() == 0); }
+        void serialize(gu::Buffer& buf) const;
+
     private:
         friend size_t serialize(const GaleraWriteSet&, gu::byte_t*, size_t, size_t);
         friend size_t unserialize(const gu::byte_t*, size_t, size_t, GaleraWriteSet&);
@@ -114,4 +124,4 @@ namespace galera
 }
 
 
-#endif // GALERA_WRITE_SET_HPP
+#endif // GALERA_GALERA_WRITE_SET_HPP

@@ -16,7 +16,7 @@ using namespace gu;
 
 galera::WsdbWsdb::WsdbWsdb()
     : 
-    trx_map_(), 
+    trx_map_(1 << 10), 
     conn_query_map_(), 
     mutex_() 
 {

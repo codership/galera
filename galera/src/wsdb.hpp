@@ -10,6 +10,9 @@
 
 namespace galera
 {
+
+    
+
     class Wsdb
     {
     public:

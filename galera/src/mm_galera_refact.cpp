@@ -242,8 +242,8 @@ enum wsrep_status mm_galera_init(wsrep_t* gh,
 
     /* 2. initialize wsdb */
     wsdb_init(data_dir, (gu_log_cb_t)args->logger_cb);    
-    wsdb = Wsdb::create("");
-    cert = Certification::create("");
+    wsdb = Wsdb::create("wsdb");
+    cert = Certification::create("wsdb");
 
     /* 3. try to read saved state from file */
     if (status.last_applied == WSREP_SEQNO_UNDEFINED &&

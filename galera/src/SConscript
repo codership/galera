@@ -13,5 +13,8 @@ env.SharedLibrary('mmgalera', [
         'wsdb.cpp',
         'wsdb_wsdb.cpp',
         'certification.cpp',
-        'wsdb_certification.cpp'
+        'wsdb_certification.cpp',
+        'galera_write_set.cpp',
+        'galera_wsdb.cpp',
+        'galera_certification.cpp'
 ])

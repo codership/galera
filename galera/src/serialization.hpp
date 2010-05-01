@@ -37,7 +37,7 @@ namespace galera
                      size_t buf_len,
                      size_t offset)
     {
-        assert(b.size() <= numeric_limits<ST>::max());
+        assert(b.size() <= std::numeric_limits<ST>::max());
         if (offset + b.size() > buf_len) gu_throw_fatal;
         offset = serialize(static_cast<ST>(b.size()), buf, buf_len, offset);
         copy(b.begin(), b.end(), buf + offset);

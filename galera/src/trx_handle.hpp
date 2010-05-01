@@ -43,9 +43,21 @@ namespace galera
         bool is_local() const { return local_; }
         
         virtual void assign_seqnos(wsrep_seqno_t seqno_l, 
-                                   wsrep_seqno_t seqno_g) = 0;
-        virtual void assign_state(enum wsdb_trx_state state) = 0;
-        virtual void assign_position(enum wsdb_trx_position pos) = 0;
+                                   wsrep_seqno_t seqno_g)
+        { 
+            local_seqno_ = seqno_l; 
+            global_seqno_ = seqno_g; 
+        }
+
+        virtual void assign_state(enum wsdb_trx_state state) 
+        { 
+            state_ = state; 
+        }
+
+        virtual void assign_position(enum wsdb_trx_position pos)
+        { 
+            position_ = pos; 
+        }
         
         
         enum wsdb_trx_state get_state() const
@@ -65,12 +77,24 @@ namespace galera
         wsrep_seqno_t get_global_seqno() const { return global_seqno_; }
         enum wsdb_trx_position get_position() const { return position_; }
         
+        virtual void assign_write_set(WriteSet* ws) 
+        {
+            assert(write_set_ == 0);
+            write_set_ = ws;
+        }
+
+        WriteSet& get_write_set()
+        {
+            assert(write_set_ != 0);
+            return* write_set_;
+        }
+
         const WriteSet& get_write_set() const 
         {
             assert(write_set_ != 0);
             return *write_set_; 
         }
-        virtual void clear() = 0;
+        virtual void clear() { }
         
     private:
         

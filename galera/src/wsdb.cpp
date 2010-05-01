@@ -4,12 +4,18 @@
 
 #include "wsdb.hpp"
 #include "wsdb_wsdb.hpp"
+#include "galera_wsdb.hpp"
 
 using namespace std;
 
 galera::Wsdb* galera::Wsdb::create(const string& conf)
 {
-    return new WsdbWsdb();
+    if (conf == "wsdb")
+        return new WsdbWsdb();
+    else if (conf == "galera")
+        return new GaleraWsdb();
+    gu_throw_fatal << "not implemented: " << conf;
+    throw;
 }
 
 

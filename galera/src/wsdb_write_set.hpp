@@ -104,6 +104,7 @@ namespace galera
             }
         }
 
+
     private:
         friend class WsdbTrxHandle;
         friend class WsdbCertification;

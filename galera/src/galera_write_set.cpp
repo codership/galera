@@ -76,3 +76,12 @@ size_t galera::serial_size(const GaleraWriteSet& ws)
             + serial_size<GaleraWriteSet::RowKeySequence, uint32_t>(ws.keys_)
             + serial_size<uint32_t>(ws.rbr_));
 }
+
+void galera::GaleraWriteSet::serialize(Buffer& buf) const
+{
+    buf.resize(serial_size(*this));
+    if (galera::serialize(*this, &buf[0], buf.size(), 0) == 0)
+    {
+        gu_throw_fatal << "failed to serialize write set";
+    }
+}
