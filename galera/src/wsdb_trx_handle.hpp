@@ -20,7 +20,7 @@ namespace galera
                       wsrep_trx_id_t trx_id, 
                       bool local) 
             :
-            TrxHandle(conn_id, trx_id, local)
+            TrxHandle(conn_id, trx_id, local), trx_info_(0)
 
         { }
 
@@ -34,9 +34,7 @@ namespace galera
             write_set_ = new WsdbWriteSet(get_trx_id());
             static_cast<WsdbWriteSet*>(write_set_)->write_set_ = ws;
         }
-
-
- 
+        
         void assign_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g)
         {
             assert(write_set_ != 0);
@@ -48,7 +46,7 @@ namespace galera
                 case WSDB_WS_TYPE_TRX:
                     wsdb_assign_trx_seqno(get_trx_id(), seqno_l, seqno_g, 
                                           get_state(), 
-                                          static_cast<WsdbWriteSet*>(write_set_)->write_set_);
+                                          static_cast<WsdbWriteSet*>(write_set_)->write_set_, &trx_info_);
                     break;
                 case WSDB_WS_TYPE_CONN:
                     wsdb_conn_set_seqno(get_conn_id(), seqno_l, seqno_g);
@@ -76,7 +74,7 @@ namespace galera
                     assert(static_cast<WsdbWriteSet*>(write_set_)->write_set_ != 0);
                     wsdb_deref_seqno(static_cast<WsdbWriteSet*>(write_set_)->write_set_->last_seen_trx);
                 }
-                wsdb_assign_trx_state(get_trx_id(), state);
+                wsdb_assign_trx_state(get_trx_id(), state, &trx_info_);
                 state_ = state;
             }
             else
@@ -90,7 +88,7 @@ namespace galera
         {
             if (is_local() == true)
             {
-                wsdb_assign_trx_pos(get_trx_id(), position);
+                wsdb_assign_trx_pos(get_trx_id(), position, &trx_info_);
                 position_ = position;
             }
             else
@@ -105,15 +103,21 @@ namespace galera
         void clear()
         {
             int err;
-            if ((err = wsdb_delete_local_trx(get_trx_id())) != WSDB_OK)
+            if ((err = wsdb_delete_local_trx(get_trx_id(), &trx_info_)) != WSDB_OK)
             {
                 log_warn << "delete local trx: " << err;
             }
-            // delete write_set_; write_set_ = 0;
         }
     private:
+        WsdbTrxHandle(const WsdbTrxHandle&);
+        void operator=(const WsdbTrxHandle&);
         friend class WsdbWsdb;
+        friend class WsdbCertification;
+        wsdb_trx_handle_t* trx_info_;
    };
 }
+
+#define WSDB_TRX_HANDLE(ptr_) static_cast<WsdbTrxHandle*>((ptr_).get())
+
 
 #endif // GALERA_WSDB_TRX_HANDLE_HPP

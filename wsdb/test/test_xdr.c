@@ -89,7 +89,7 @@ START_TEST (test_xdr)
 
             mark_point();
         
-            rcode = wsdb_append_query(trx, query, time(NULL), rand());
+            rcode = wsdb_append_query(trx, query, time(NULL), rand(), NULL);
             fail_if(rcode, "wsdb_append_query failed: %d", rcode);
         
             for (k=0; k < max_keys; k++) {
@@ -108,7 +108,7 @@ START_TEST (test_xdr)
                 key.dbtable_len = strlen(table);
                 key.key         = table_key;
                 table_key->key_part_count = 1;
-                rcode = wsdb_append_row_key(i, &key, action);
+                rcode = wsdb_append_row_key(i, &key, action, NULL);
                 fail_if(rcode, "wsdb_append_row_key failed: %d", rcode);
 
                 memset(data, 'd', len);
@@ -117,7 +117,7 @@ START_TEST (test_xdr)
             }
         }
         /* TODO: rbr level is not tested here */
-        ws_send = wsdb_get_write_set(trx, 1, NULL, 0);
+        ws_send = wsdb_get_write_set(trx, 1, NULL, 0, NULL);
         fail_if(!ws_send, "write set read failed");
 
         if (!xdr_wsdb_write_set(&xdrs, ws_send)) {

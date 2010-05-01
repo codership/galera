@@ -46,8 +46,8 @@ namespace galera
                                    wsrep_seqno_t seqno_g) = 0;
         virtual void assign_state(enum wsdb_trx_state state) = 0;
         virtual void assign_position(enum wsdb_trx_position pos) = 0;
-
-
+        
+        
         enum wsdb_trx_state get_state() const
         {
             if (is_local() == true)
@@ -56,25 +56,14 @@ namespace galera
             }
             else
             {
-                gu_throw_fatal << "not implemented";
+                gu_throw_fatal << "only local trx has state";
                 throw;
             }
         }
-
-        wsrep_seqno_t get_local_seqno() const
-        {
-            return local_seqno_;
-        }
         
-        wsrep_seqno_t get_global_seqno() const
-        {
-            return global_seqno_;
-        }
-
-        enum wsdb_trx_position get_position() const 
-        {
-            return position_;
-        }
+        wsrep_seqno_t get_local_seqno() const { return local_seqno_; }
+        wsrep_seqno_t get_global_seqno() const { return global_seqno_; }
+        enum wsdb_trx_position get_position() const { return position_; }
         
         const WriteSet& get_write_set() const 
         {

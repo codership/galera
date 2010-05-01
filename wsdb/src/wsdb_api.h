@@ -117,13 +117,14 @@ enum wsdb_trx_position {
 
 typedef struct {
     trx_seqno_t            seqno_l;     //!< local solid sequence
-//DELETE    trx_seqno_t            seqno_g;     //!< cluster wide sequence number
     enum wsdb_trx_state    state;       //!< state of sequencing
     struct wsdb_write_set *ws;          //!< write set
     enum wsdb_trx_position position;    //!<
     struct job_worker     *applier;     //!< applier, if replaying trx
     void                  *applier_ctx; //!< context for applying job
 } wsdb_trx_info_t;
+
+typedef struct trx_info wsdb_trx_handle_t;
 
 /* MySQL type for boolean */
 typedef char		my_bool; /* Small bool */
@@ -302,8 +303,10 @@ int wsdb_create_write_set(local_trxid_t trx_id);
  * @retval WSDB_OK 
  */
 int wsdb_append_query(
-    local_trxid_t trx_id, char *query, time_t timeval, uint32_t randseed
+    local_trxid_t trx_id, char *query, time_t timeval, uint32_t randseed,
+    wsdb_trx_handle_t** info
 );
+
 int wsdb_append_command(local_trxid_t trx_id, char *command);
 
 /*
@@ -355,7 +358,7 @@ int wsdb_append_row_col(
 int wsdb_append_row_key(
     local_trxid_t trx_id,
     struct wsdb_key_rec *key, 
-    char action
+    char action, wsdb_trx_handle_t** info
 );
 
 /*!
@@ -444,17 +447,19 @@ int wsdb_set_trx_committing(local_trxid_t trx_id);
   *
   */
 int wsdb_set_global_trx_committed(trx_seqno_t trx_seqno);
-int wsdb_set_local_trx_committed(local_trxid_t trx_id);
+int wsdb_set_local_trx_committed(local_trxid_t trx_id, wsdb_trx_handle_t** info);
 int wsdb_assign_trx_seqno(
     local_trxid_t       trx_id, 
     trx_seqno_t         seqno_l, 
     trx_seqno_t         seqno_g, 
     enum wsdb_trx_state state,
-    struct wsdb_write_set* ws
+    struct wsdb_write_set* ws,
+    wsdb_trx_handle_t** info
 );
 int wsdb_assign_trx_state(
     local_trxid_t        trx_id, 
-    enum wsdb_trx_state  state
+    enum wsdb_trx_state  state,
+    wsdb_trx_handle_t** info
 );
 #if 0 //DELETE
 int wsdb_assign_trx_ws(
@@ -462,10 +467,10 @@ int wsdb_assign_trx_ws(
 );
 #endif
 int wsdb_assign_trx_pos(
-    local_trxid_t trx_id, enum wsdb_trx_position
+    local_trxid_t trx_id, enum wsdb_trx_position, wsdb_trx_handle_t**
 );
 int wsdb_assign_trx_applier(
-    local_trxid_t trx_id, struct job_worker *applier, void *ctx
+    local_trxid_t trx_id, struct job_worker *applier, void *ctx, wsdb_trx_handle_t**
 );
 
  /*!
@@ -474,7 +479,7 @@ int wsdb_assign_trx_applier(
   * @param trx_id trasnaction identifier in the application context
   * @param info pointer to wsdb_trx_info struct, will be filled by the call
   */
-void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info);
+void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info, wsdb_trx_handle_t** handle);
 
 void wsdb_get_trx_info(trx_seqno_t trx_seqno, wsdb_trx_info_t* info);
 
@@ -502,8 +507,8 @@ trx_seqno_t wsdb_get_safe_to_discard_seqno ();
  * Both local and global versions are needed...
  *
  */
-int wsdb_delete_local_trx(local_trxid_t trx_id );
-int wsdb_delete_local_trx_info(local_trxid_t trx_id );
+int wsdb_delete_local_trx(local_trxid_t trx_id, wsdb_trx_handle_t**);
+int wsdb_delete_local_trx_info(local_trxid_t trx_id, wsdb_trx_handle_t**);
 int wsdb_delete_global_trx(trx_seqno_t trx_id );
 
 /*!
@@ -531,7 +536,8 @@ int wsdb_purge_trxs_upto(trx_seqno_t trx_id);
  *         replicated to the cluster
  */
 struct wsdb_write_set *wsdb_get_write_set(
-    local_trxid_t trx_id, connid_t conn_id, const char * row_buf, size_t buf_len
+    local_trxid_t trx_id, connid_t conn_id, const char * row_buf, 
+    size_t buf_len, wsdb_trx_handle_t** info
 );
 
 /*!

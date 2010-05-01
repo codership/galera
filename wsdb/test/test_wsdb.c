@@ -125,10 +125,10 @@ START_TEST (test_wsdb_api)
                 if (trx->queries_sent == 5) {
                      /* TODO: rbr level is not tested here */
                     struct wsdb_write_set *ws = 
-                         wsdb_get_write_set(trx->trx_id, trx->conn_id, NULL, 0);
+                        wsdb_get_write_set(trx->trx_id, trx->conn_id, NULL, 0, NULL);
                     fail_if(!ws, "write set read failed");
                     trx->state = commit_sent;
-                    rcode = wsdb_delete_local_trx(trx->trx_id);
+                    rcode = wsdb_delete_local_trx(trx->trx_id, NULL);
                     fail_if(rcode, "wsdb_delete_local_trx failed: %d", rcode);
                     ws->trx_seqno = trx_seqno++;
                     rcode = wsdb_append_write_set(ws);
@@ -136,7 +136,7 @@ START_TEST (test_wsdb_api)
                         fail("wsdb_append_write_set failed: %d", rcode);
                     }
 
-                    rcode = wsdb_delete_local_trx_info(trx->trx_id);
+                    rcode = wsdb_delete_local_trx_info(trx->trx_id, NULL);
                     fail_if(rcode, "wsdb_delete_local_trx_info failed: %d", 
                             rcode
                     );
@@ -146,7 +146,7 @@ START_TEST (test_wsdb_api)
                     trx->trx_id += 10;
                 } else {
                     rcode = wsdb_append_query(trx->trx_id, query, time(NULL),
-                                              rand());
+                                              rand(), NULL);
                     fail_if(rcode, "wsdb_append_query failed: %d", rcode);
                     trx->state = query_sent;
                     trx->queries_sent++;
@@ -167,7 +167,7 @@ START_TEST (test_wsdb_api)
                 //key_part->length = 10;
                 //key_part->data = RAND_ID(keys, 100);
                 //key_part->type = WSDB_DATA_TYPE_CHAR;
-                rcode = wsdb_append_row_key(trx->trx_id, &key, action);
+                rcode = wsdb_append_row_key(trx->trx_id, &key, action, NULL);
                 fail_if(rcode, "wsdb_append_row_key failed: %d", rcode);
                 trx->rows_sent++;
                 trx->state = row_sent;

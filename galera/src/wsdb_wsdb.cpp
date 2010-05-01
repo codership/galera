@@ -118,8 +118,9 @@ void galera::WsdbWsdb::discard_trx(wsrep_trx_id_t trx_id)
     TrxMap::iterator i;
     if ((i = trx_map_.find(trx_id)) != trx_map_.end())
     {
+        wsdb_delete_local_trx_info(trx_id, &WSDB_TRX_HANDLE(i->second)->trx_info_);
         trx_map_.erase(i);
-        wsdb_delete_local_trx_info(trx_id);
+
     }
 }
 
@@ -160,7 +161,8 @@ void galera::WsdbWsdb::create_write_set(TrxHandlePtr& trx,
         struct wsdb_write_set* ws(wsdb_get_write_set(trx->get_trx_id(),
                                                      trx->get_conn_id(),
                                                      (char*)rbr_data,
-                                                     rbr_data_len));
+                                                     rbr_data_len,
+                                                     &wsdb_trx->trx_info_));
         if (ws != 0)
         {
             assert(rbr_data == 0 || ws->rbr_buf != 0);
@@ -182,7 +184,7 @@ void galera::WsdbWsdb::append_query(TrxHandlePtr& trx,
 {
     if (wsdb_append_query(trx->get_trx_id(), 
                           const_cast<char*>(reinterpret_cast<const char*>(query)),
-                          t, rnd) != WSDB_OK)
+                          t, rnd, &WSDB_TRX_HANDLE(trx)->trx_info_) != WSDB_OK)
     {
         gu_throw_fatal;
     }
@@ -232,7 +234,8 @@ void galera::WsdbWsdb::append_row_key(TrxHandlePtr& trx,
         gu_throw_fatal; throw;
     }
     
-    switch(wsdb_append_row_key(trx->get_trx_id(), &wsdb_key, wsdb_action)) {
+    switch(wsdb_append_row_key(trx->get_trx_id(), &wsdb_key, wsdb_action,
+                               &WSDB_TRX_HANDLE(trx)->trx_info_)) {
     case WSDB_OK:  
         return;
     default: 

@@ -246,21 +246,31 @@ static void remove_trx_info(local_trxid_t trx_id) {
     return;
 }
 
-static struct trx_info *get_trx_info(local_trxid_t trx_id) {
+static struct trx_info *get_trx_info(local_trxid_t trx_id,
+                                     wsdb_trx_handle_t** trx_handle) 
+{
     struct trx_info *trx;
-
-    /* get the transaction info from local hash */
-    trx = (struct trx_info *)wsdb_hash_search(
-        trx_hash, sizeof(local_trxid_t), (char *)&trx_id
-    );
-    if (trx) {
-        GU_DBUG_PRINT("wsdb", 
-           ("found trx: %llu == %llu blocks: %d -> %d", 
-            trx_id, trx->id, trx->first_block, trx->last_block)
-        );
+    if (trx_handle != 0 && *trx_handle != 0)
+    {
+        trx = *trx_handle;
+        assert(trx->id == trx_id);
         CHECK_OBJ(trx, trx_info);
-    } else {
-        GU_DBUG_PRINT("wsdb", ("trx does not exist: %llu", trx_id));
+    }
+    else
+    {
+        /* get the transaction info from local hash */
+        trx = (struct trx_info *)wsdb_hash_search(
+            trx_hash, sizeof(local_trxid_t), (char *)&trx_id
+            );
+        if (trx) {
+            GU_DBUG_PRINT("wsdb", 
+                          ("found trx: %llu == %llu blocks: %d -> %d", 
+                           trx_id, trx->id, trx->first_block, trx->last_block)
+                );
+            CHECK_OBJ(trx, trx_info);
+        } else {
+            GU_DBUG_PRINT("wsdb", ("trx does not exist: %llu", trx_id));
+        }
     }
 
     return trx;
@@ -421,9 +431,10 @@ static void append_in_trx_block(
 }
 
 int wsdb_append_query(
-    local_trxid_t trx_id, char *query, time_t timeval, uint32_t randseed
+    local_trxid_t trx_id, char *query, time_t timeval, uint32_t randseed,
+    wsdb_trx_handle_t** handle
 ) {
-    struct trx_info  *trx = get_trx_info(trx_id);
+    struct trx_info  *trx = get_trx_info(trx_id, handle);
     char              rec_type;
     uint32_t          query_len = strlen(query) + 1;
     struct block_info bi;
@@ -431,12 +442,14 @@ int wsdb_append_query(
     GU_DBUG_ENTER("wsdb_append_query");
     if (!trx) {
         trx = new_trx_info(trx_id);
+        if (handle != 0) *handle = trx;
     }
     else if (trx->query_count == QUERY_LIMIT)
     {
         gu_warn("wsdb: trx %lld exceeded max query count", trx_id);
         GU_DBUG_RETURN(WSDB_ERR_TOO_MANY_QUERIES);
     }
+
     GU_DBUG_PRINT("wsdb",("query for trx: %llu : %s", trx_id, query));
 
     if (!query) {
@@ -457,9 +470,10 @@ int wsdb_append_query(
 }
 
 int wsdb_append_row_key(
-    local_trxid_t trx_id, struct wsdb_key_rec *key, char action
+    local_trxid_t trx_id, struct wsdb_key_rec *key, char action, wsdb_trx_handle_t** handle
 ) {
-    struct trx_info       *trx = get_trx_info(trx_id);
+    struct trx_info       *trx = get_trx_info(trx_id, handle);
+
 // @unused:   struct file_row_key   *row_key;
     char                   rec_type;
     uint16_t               rec_len;
@@ -535,7 +549,7 @@ int wsdb_append_row_key(
 int wsdb_append_row(
     local_trxid_t trx_id, uint16_t len, void *data
 ) {
-    struct trx_info      *trx = get_trx_info(trx_id);
+    struct trx_info      *trx = get_trx_info(trx_id, NULL);
     struct wsdb_row_data_rec  row_data;
     char                  rec_type;
     struct block_info     bi;
@@ -571,7 +585,7 @@ int wsdb_append_row_col(
     local_trxid_t trx_id, char *dbtable, uint16_t dbtable_len,
     uint16_t col, char data_type, uint16_t len, void *data
 ) {
-    struct trx_info      *trx = get_trx_info(trx_id);
+    struct trx_info      *trx = get_trx_info(trx_id, NULL);
     struct wsdb_col_data_rec  row_data;
     char                  rec_type;
     struct block_info     bi;
@@ -1111,9 +1125,9 @@ static int get_write_set_do(
 
 struct wsdb_write_set *wsdb_get_write_set(
         local_trxid_t trx_id, connid_t conn_id,
-        const char * row_buf, size_t buf_len
+        const char * row_buf, size_t buf_len, wsdb_trx_handle_t** handle
 ) {
-    struct trx_info       *trx = get_trx_info(trx_id);
+    struct trx_info       *trx = get_trx_info(trx_id, handle);
     struct wsdb_write_set *ws;
 
     GU_DBUG_ENTER("wsdb_get_write_set");
@@ -1270,8 +1284,8 @@ int wsdb_set_global_trx_committed(trx_seqno_t trx_seqno) {
     GU_DBUG_RETURN( WSDB_OK);
 }
 
-int wsdb_set_local_trx_committed(local_trxid_t trx_id) {
-    struct trx_info       *trx = get_trx_info(trx_id);
+int wsdb_set_local_trx_committed(local_trxid_t trx_id, wsdb_trx_handle_t **handle) {
+    struct trx_info       *trx = get_trx_info(trx_id, handle);
 
     GU_DBUG_ENTER("wsdb_set_local_trx_committed");
     if (!trx) {
@@ -1287,8 +1301,8 @@ int wsdb_set_local_trx_committed(local_trxid_t trx_id) {
     GU_DBUG_RETURN( WSDB_OK);
 }
 
-int wsdb_delete_local_trx(local_trxid_t trx_id) {
-    struct trx_info       *trx = get_trx_info(trx_id);
+int wsdb_delete_local_trx(local_trxid_t trx_id, wsdb_trx_handle_t** handle) {
+    struct trx_info       *trx = get_trx_info(trx_id, handle);
     cache_id_t             cache_id;
     struct block_hdr      *block;
 
@@ -1328,8 +1342,8 @@ int wsdb_delete_local_trx(local_trxid_t trx_id) {
     GU_DBUG_RETURN(WSDB_OK);
 }
 
-int wsdb_delete_local_trx_info(local_trxid_t trx_id) {
-    struct trx_info       *trx = get_trx_info(trx_id); // TODO: is this check needed?
+int wsdb_delete_local_trx_info(local_trxid_t trx_id, wsdb_trx_handle_t** handle) {
+    struct trx_info *trx = get_trx_info(trx_id, handle); // TODO: is this check needed?
 
     GU_DBUG_ENTER("wsdb_delete_local_trx_info");
     GU_DBUG_PRINT("wsdb",("trx: %llu", trx_id));
@@ -1338,7 +1352,7 @@ int wsdb_delete_local_trx_info(local_trxid_t trx_id) {
         GU_DBUG_RETURN(WSDB_ERR_TRX_UNKNOWN);
     }
     remove_trx_info(trx_id);
-
+    if (handle != 0) *handle = NULL;
     GU_DBUG_RETURN(WSDB_OK);
 }
 
@@ -1352,9 +1366,10 @@ static void print_trx_hash(void *ctx, void *data) {
 
 int wsdb_assign_trx_seqno(
     local_trxid_t trx_id, trx_seqno_t seqno_l, trx_seqno_t seqno_g, 
-    enum wsdb_trx_state state, struct wsdb_write_set* ws
+    enum wsdb_trx_state state, struct wsdb_write_set* ws,
+    wsdb_trx_handle_t** handle
 ) {
-    struct trx_info       *trx = get_trx_info(trx_id);
+    struct trx_info       *trx = get_trx_info(trx_id, handle);
 
     GU_DBUG_ENTER("wsdb_assign_trx");
     GU_DBUG_PRINT("wsdb",("trx: %llu -> %llu(%llu)",
@@ -1384,8 +1399,9 @@ int wsdb_assign_trx_seqno(
     GU_DBUG_RETURN(WSDB_OK);
 }
 
-int wsdb_assign_trx_state(local_trxid_t trx_id, enum wsdb_trx_state state) {
-    struct trx_info       *trx = get_trx_info(trx_id);
+int wsdb_assign_trx_state(local_trxid_t trx_id, enum wsdb_trx_state state,
+                          wsdb_trx_handle_t** handle) {
+    struct trx_info       *trx = get_trx_info(trx_id, handle);
 
     GU_DBUG_ENTER("wsdb_assign_trx_state");
     if (!trx) {
@@ -1418,9 +1434,9 @@ int wsdb_assign_trx_ws(
 }
 #endif
 int wsdb_assign_trx_pos(
-    local_trxid_t trx_id, enum wsdb_trx_position pos
+    local_trxid_t trx_id, enum wsdb_trx_position pos, wsdb_trx_handle_t** handle
 ) {
-    struct trx_info       *trx = get_trx_info(trx_id);
+    struct trx_info       *trx = get_trx_info(trx_id, handle);
  
     GU_DBUG_ENTER("wsdb_assign_trx_pos");
 
@@ -1435,9 +1451,10 @@ int wsdb_assign_trx_pos(
 }
 
 int wsdb_assign_trx_applier(
-    local_trxid_t trx_id, struct job_worker *applier, void* ctx
+    local_trxid_t trx_id, struct job_worker *applier, void* ctx,
+    wsdb_trx_handle_t** handle
 ) {
-    struct trx_info       *trx = get_trx_info(trx_id);
+    struct trx_info       *trx = get_trx_info(trx_id, handle);
 
     GU_DBUG_ENTER("wsdb_assign_trx_applier");
 
@@ -1452,9 +1469,10 @@ int wsdb_assign_trx_applier(
     GU_DBUG_RETURN(WSDB_OK);
 }
 
-void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info)
+void wsdb_get_local_trx_info(local_trxid_t trx_id, wsdb_trx_info_t *info,
+                             wsdb_trx_handle_t** handle)
 {
-    struct trx_info       *trx = get_trx_info(trx_id);
+    struct trx_info       *trx = get_trx_info(trx_id, handle);
 
     GU_DBUG_ENTER("wsdb_get_local_trx_info");
     if (gu_likely(NULL != trx)) {

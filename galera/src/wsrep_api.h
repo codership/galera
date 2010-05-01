@@ -343,6 +343,13 @@ struct wsrep_status_var
     } value;                   //!< variable value
 };
 
+
+typedef struct wsrep_trx_handle_
+{
+    wsrep_trx_id_t trx_id;
+    void*          opaque;
+} wsrep_trx_handle_t;
+
 typedef struct wsrep_ wsrep_t;
 /*!
  * wsrep interface for dynamically loadable libraries

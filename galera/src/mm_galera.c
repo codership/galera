@@ -111,7 +111,7 @@ static inline long while_eagain_or_trx_abort (
     while (-EAGAIN == (rcode = function (to, seqno))) {
         wsdb_trx_info_t info;
         nanosleep (&period, NULL);
-        wsdb_get_local_trx_info(trx_id, &info);
+        wsdb_get_local_trx_info(trx_id, &info, NULL);
 
         assert (info.seqno_l == seqno);
 
@@ -1593,7 +1593,7 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
      */    
     gu_mutex_lock(&commit_mtx);
 
-    wsdb_get_local_trx_info(victim_trx, &victim);
+    wsdb_get_local_trx_info(victim_trx, &victim, NULL);
     
     gu_debug("abort_pre_commit trx state: %d seqno: %lld", 
              victim.state, victim.seqno_l);
@@ -1610,7 +1610,7 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
 
     case WSDB_TRX_VOID:
         ret_code = WSREP_WARNING;
-        rcode = wsdb_assign_trx_state(victim_trx, WSDB_TRX_MUST_ABORT);
+        rcode = wsdb_assign_trx_state(victim_trx, WSDB_TRX_MUST_ABORT, NULL);
         if (rcode) {
             /* this is going to hang */
             gu_error("could not mark trx, aborting: trx %lld seqno: %lld", 
@@ -1629,7 +1629,7 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
             // @todo: This must be driven by signal.
             usleep (GALERA_USLEEP_FLOW_CONTROL);
             gu_mutex_lock(&commit_mtx);
-            wsdb_get_local_trx_info(victim_trx, &victim);
+            wsdb_get_local_trx_info(victim_trx, &victim, NULL);
         }
 
         if (victim.state != WSDB_TRX_REPLICATED)
@@ -1669,7 +1669,7 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
                  */
                 gu_warn("victim trx does not fit cert TO queue");
 
-                wsdb_assign_trx_state(victim_trx, WSDB_TRX_MUST_ABORT);
+                wsdb_assign_trx_state(victim_trx, WSDB_TRX_MUST_ABORT, NULL);
                 ret_code = WSREP_OK;
 
                 break;
@@ -1680,7 +1680,7 @@ static enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
                 ret_code = WSREP_OK;
                 rcode = gu_to_interrupt(commit_queue, victim.seqno_l);
                 if (rcode) {
-                    wsdb_assign_trx_state(victim_trx, WSDB_TRX_MUST_ABORT);
+                    wsdb_assign_trx_state(victim_trx, WSDB_TRX_MUST_ABORT, NULL);
                     gu_debug("trx interrupt fail in commit_queue for %lld: "
                              "%d (%s)",victim.seqno_l, rcode, strerror(-rcode));
                     ret_code = WSREP_WARNING;
@@ -1741,7 +1741,7 @@ static enum wsrep_status mm_galera_post_commit(
     GU_DBUG_PRINT("galera", ("trx: %llu", trx_id));
 
     gu_mutex_lock(&commit_mtx);
-    wsdb_get_local_trx_info(trx_id, &trx);
+    wsdb_get_local_trx_info(trx_id, &trx, NULL);
 
 //DELETE    assert (trx.state != WSDB_TRX_MISSING);
 
@@ -1755,7 +1755,7 @@ static enum wsrep_status mm_galera_post_commit(
 
         GALERA_RELEASE_QUEUE(commit_queue, trx.seqno_l);
 
-        wsdb_delete_local_trx_info(trx_id);
+        wsdb_delete_local_trx_info(trx_id, NULL);
     } else if (trx.state != WSDB_TRX_MISSING) {
         gu_warn("trx state: %d at galera_committed for: %lld", 
                 trx.state, trx.seqno_l
@@ -1783,7 +1783,7 @@ static enum wsrep_status mm_galera_post_rollback(
 
     gu_mutex_lock(&commit_mtx);
 
-    wsdb_get_local_trx_info(trx_id, &trx);
+    wsdb_get_local_trx_info(trx_id, &trx, NULL);
     gu_debug("trx state: %d at post_rollback for: %lld", trx.state,trx.seqno_l);
 
     switch (trx.state) {
@@ -1795,8 +1795,8 @@ static enum wsrep_status mm_galera_post_rollback(
     case WSDB_TRX_VOID:
     case WSDB_TRX_ABORTING_NONREPL:
         /* voluntary rollback before replicating was attempted */
-        wsdb_delete_local_trx(trx_id);
-        wsdb_delete_local_trx_info(trx_id);
+        wsdb_delete_local_trx(trx_id, NULL);
+        wsdb_delete_local_trx_info(trx_id, NULL);
         break;
     case WSDB_TRX_MUST_ABORT:
     case WSDB_TRX_REPLICATED:
@@ -1808,7 +1808,7 @@ static enum wsrep_status mm_galera_post_rollback(
         }
     case WSDB_TRX_ABORTING_REPL:
         /* local trx was removed in pre_commit phase already */
-        wsdb_delete_local_trx_info(trx_id);
+        wsdb_delete_local_trx_info(trx_id, NULL);
 
         break;
     default:
@@ -1909,16 +1909,16 @@ static enum wsrep_status mm_galera_pre_commit(
     /* hold commit time mutex */
     gu_mutex_lock(&commit_mtx);
     /* check if trx was cancelled before we got here */
-    wsdb_get_local_trx_info(trx_id, &trx);
+    wsdb_get_local_trx_info(trx_id, &trx, NULL);
     switch (trx.state) {
     case WSDB_TRX_MUST_ABORT:
 	gu_debug("trx has been cancelled already: %llu", trx_id);
 
         /* trx can be removed from local cache, but trx info is still needed */
-	if ((rcode = wsdb_delete_local_trx(trx_id))) {
+	if ((rcode = wsdb_delete_local_trx(trx_id, NULL))) {
 	    gu_debug("could not delete trx: %llu", trx_id);
 	}
-        wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTING_NONREPL);
+        wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTING_NONREPL, NULL);
 	gu_mutex_unlock(&commit_mtx);
 	GU_DBUG_RETURN(WSREP_TRX_FAIL);
         break;
@@ -1950,7 +1950,7 @@ static enum wsrep_status mm_galera_pre_commit(
 #endif
 
     /* retrieve write set */
-    ws = wsdb_get_write_set(trx_id, conn_id, rbr_data, rbr_data_len);
+    ws = wsdb_get_write_set(trx_id, conn_id, rbr_data, rbr_data_len, NULL);
     if (!ws) {
         /* this is possibly autocommit query, need to let it continue */
         gu_mutex_unlock(&commit_mtx);
@@ -1960,7 +1960,7 @@ static enum wsrep_status mm_galera_pre_commit(
     assert (WSREP_SEQNO_UNDEFINED == ws->trx_seqno);
 
     /* ws can be removed from local cache already now */
-    if ((rcode = wsdb_delete_local_trx(trx_id))) {
+    if ((rcode = wsdb_delete_local_trx(trx_id, NULL))) {
         gu_warn("could not delete trx: %llu", trx_id);
     }
 
@@ -1992,7 +1992,7 @@ static enum wsrep_status mm_galera_pre_commit(
     }
     len = xdr_getpos(&xdrs);
 
-    wsdb_assign_trx_state(trx_id, WSDB_TRX_REPLICATING);
+    wsdb_assign_trx_state(trx_id, WSDB_TRX_REPLICATING, NULL);
     /* */
     gu_mutex_unlock(&commit_mtx);
 
@@ -2015,7 +2015,7 @@ static enum wsrep_status mm_galera_pre_commit(
         assert (GCS_SEQNO_ILL == seqno_g);
         gu_mutex_lock(&commit_mtx);
         wsdb_assign_trx_seqno(
-            trx_id, seqno_l, seqno_g, WSDB_TRX_ABORTING_NONREPL, ws
+            trx_id, seqno_l, seqno_g, WSDB_TRX_ABORTING_NONREPL, ws, NULL
         );
         gu_mutex_unlock(&commit_mtx);
         retcode = WSREP_CONN_FAIL;
@@ -2031,7 +2031,7 @@ static enum wsrep_status mm_galera_pre_commit(
     gu_mutex_lock(&commit_mtx);
 
     /* record seqnos for local transaction */
-    wsdb_assign_trx_seqno(trx_id, seqno_l, seqno_g, WSDB_TRX_REPLICATED, ws);
+    wsdb_assign_trx_seqno(trx_id, seqno_l, seqno_g, WSDB_TRX_REPLICATED, ws, NULL);
     gu_mutex_unlock(&commit_mtx);
 
     rcode = while_eagain_or_trx_abort(trx_id, gu_to_grab, cert_queue, seqno_l);
@@ -2044,13 +2044,13 @@ static enum wsrep_status mm_galera_pre_commit(
 
         if (check_certification_status_for_aborted(seqno_l, ws) == WSREP_OK) {
 //DELETE            wsdb_assign_trx_ws(trx_id, ws);
-            wsdb_assign_trx_pos(trx_id, WSDB_TRX_POS_CERT_QUEUE);
-            wsdb_assign_trx_state(trx_id, WSDB_TRX_MUST_REPLAY);
+            wsdb_assign_trx_pos(trx_id, WSDB_TRX_POS_CERT_QUEUE, NULL);
+            wsdb_assign_trx_state(trx_id, WSDB_TRX_MUST_REPLAY, NULL);
             GU_DBUG_RETURN(WSREP_BF_ABORT);
         } else {
             GALERA_SELF_CANCEL_QUEUE (cert_queue, seqno_l);
             GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
-            wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTING_REPL);
+            wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTING_REPL, NULL);
         }
         goto cleanup;
     }
@@ -2111,7 +2111,7 @@ static enum wsrep_status mm_galera_pre_commit(
         case 0: break;
         case -ECANCELED:
             gu_debug("canceled in commit queue for %llu", seqno_l);
-            wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTING_REPL);
+            wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTING_REPL, NULL);
             GU_DBUG_RETURN(WSREP_TRX_FAIL);
             break;
         case -EINTR:
@@ -2150,9 +2150,9 @@ static enum wsrep_status mm_galera_pre_commit(
             job_queue_register_job(applier_queue, applier, (void *)ctx);
 
 //DELETE            wsdb_assign_trx_ws(trx_id, ws);
-            wsdb_assign_trx_pos(trx_id, WSDB_TRX_POS_COMMIT_QUEUE);
-            wsdb_assign_trx_state(trx_id, WSDB_TRX_MUST_REPLAY);
-            wsdb_assign_trx_applier(trx_id, applier, (void *)ctx);
+            wsdb_assign_trx_pos(trx_id, WSDB_TRX_POS_COMMIT_QUEUE, NULL);
+            wsdb_assign_trx_state(trx_id, WSDB_TRX_MUST_REPLAY, NULL);
+            wsdb_assign_trx_applier(trx_id, applier, (void *)ctx, NULL);
 
             GU_DBUG_RETURN(WSREP_BF_ABORT);
             break;
@@ -2163,7 +2163,7 @@ static enum wsrep_status mm_galera_pre_commit(
         }
 
         // we can update last seen trx counter already here
-        wsdb_set_local_trx_committed(trx_id);
+        wsdb_set_local_trx_committed(trx_id, NULL);
     } else {
         /* Cancel commit queue since we are going to rollback */
         GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
@@ -2188,7 +2188,7 @@ static enum wsrep_status mm_galera_append_query(
     
     errno = 0;
 
-    switch (wsdb_append_query(trx_id, (char*)query, timeval, randseed)) {
+    switch (wsdb_append_query(trx_id, (char*)query, timeval, randseed, NULL)) {
     case WSDB_OK:              return WSREP_OK;
     case WSDB_ERR_TRX_UNKNOWN: return WSREP_TRX_FAIL;
     default:                   return WSREP_CONN_FAIL;
@@ -2250,7 +2250,7 @@ static enum wsrep_status mm_galera_append_row_key(
     case WSREP_INSERT: wsdb_action=WSDB_ACTION_INSERT; break;
     }
 
-    switch(wsdb_append_row_key(trx_id, &wsdb_key, wsdb_action)) {
+    switch(wsdb_append_row_key(trx_id, &wsdb_key, wsdb_action, NULL)) {
     case WSDB_OK:               return WSREP_OK;
     case WSDB_ERR_TRX_UNKNOWN:  return WSREP_TRX_FAIL;
     default:                    return WSREP_CONN_FAIL;
@@ -2538,7 +2538,7 @@ static enum wsrep_status mm_galera_replay_trx(
     enum wsrep_status  ret_code = WSREP_OK;
     wsdb_trx_info_t    trx;
 
-    wsdb_get_local_trx_info(trx_id, &trx);
+    wsdb_get_local_trx_info(trx_id, &trx, NULL);
 
     gu_debug("trx_replay for: %lld %lld state: %d, rbr len: %d", 
              trx.seqno_l, trx.ws->trx_seqno, trx.state, trx.ws->rbr_buf_len);
@@ -2548,7 +2548,7 @@ static enum wsrep_status mm_galera_replay_trx(
         return WSREP_NODE_FAIL;
     }
 
-    wsdb_assign_trx_state(trx_id, WSDB_TRX_REPLAYING);
+    wsdb_assign_trx_state(trx_id, WSDB_TRX_REPLAYING, NULL);
 
     if (!trx.applier) {
         int retries = 0;
@@ -2655,7 +2655,7 @@ static enum wsrep_status mm_galera_replay_trx(
         }
         return WSREP_NODE_FAIL;
     }
-    wsdb_assign_trx_state(trx_id, WSDB_TRX_REPLICATED);
+    wsdb_assign_trx_state(trx_id, WSDB_TRX_REPLICATED, NULL);
 
 //DELETE    ws_start_cb(app_ctx, 0);
 

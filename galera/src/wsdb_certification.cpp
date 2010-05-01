@@ -142,7 +142,8 @@ void galera::WsdbCertification::set_trx_committed(const TrxHandlePtr& trx)
         Lock lock(mutex_);
         assert (trx->get_write_set().get_type() == WSDB_WS_TYPE_TRX);
         wsdb_deref_seqno(trx->get_write_set().get_last_seen_trx());
-        if ((err = wsdb_set_local_trx_committed(trx->get_trx_id())))
+        if ((err = wsdb_set_local_trx_committed(trx->get_trx_id(),
+                                                &WSDB_TRX_HANDLE(trx)->trx_info_)))
         {
             gu_throw_fatal << "wsdb_set_local_trx_committed() failed with: "
                            << err;
