@@ -8,13 +8,24 @@
 #include "wsdb.hpp"
 #include "gu_mutex.hpp"
 #include <boost/unordered_map.hpp>
+#include <map>
 
 namespace galera
 {
     class WsdbWsdb : public Wsdb
     {
-        typedef boost::unordered_map<wsrep_trx_id_t, TrxHandlePtr> TrxMap;
+        class TrxHash
+        {
+        public:
+            size_t operator()(const wsrep_trx_id_t& key) const
+            {
+                return (key & 0xffff);
+            }
+        };
+        typedef boost::unordered_map<wsrep_trx_id_t, TrxHandlePtr, TrxHash> TrxMap;
         typedef boost::unordered_map<wsrep_conn_id_t, TrxHandlePtr> ConnQueryMap;
+        // typedef std::map<wsrep_trx_id_t, TrxHandlePtr> TrxMap;
+        // typedef std::map<wsrep_trx_id_t, TrxHandlePtr> ConnQueryMap;
     public:
         
         // Get trx handle from wsdb
@@ -49,13 +60,14 @@ namespace galera
         
         std::ostream& operator<<(std::ostream& os) const;
 
-        WsdbWsdb() : trx_map_(), conn_query_map_(), mutex_() { }
+        WsdbWsdb();
         ~WsdbWsdb();
     private:
         // Create new trx handle
         TrxHandlePtr create_trx(wsrep_trx_id_t trx_id);
         TrxHandlePtr create_conn_query(wsrep_conn_id_t conn_id);
     private:
+
         TrxMap       trx_map_;
         ConnQueryMap conn_query_map_;
         gu::Mutex        mutex_;

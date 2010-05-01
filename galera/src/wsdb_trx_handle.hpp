@@ -20,11 +20,8 @@ namespace galera
                       wsrep_trx_id_t trx_id, 
                       bool local) 
             :
-            TrxHandle(conn_id, trx_id, local),
-            state_(WSDB_TRX_VOID),
-            position_(WSDB_TRX_POS_VOID),
-            local_seqno_(WSREP_SEQNO_UNDEFINED),
-            global_seqno_(WSREP_SEQNO_UNDEFINED)
+            TrxHandle(conn_id, trx_id, local)
+
         { }
 
         ~WsdbTrxHandle()
@@ -38,18 +35,7 @@ namespace galera
             static_cast<WsdbWriteSet*>(write_set_)->write_set_ = ws;
         }
 
-        enum wsdb_trx_state get_state() const
-        {
-            if (is_local() == true)
-            {
-                return state_;
-            }
-            else
-            {
-                gu_throw_fatal << "not implemented";
-                throw;
-            }
-        }
+
  
         void assign_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g)
         {
@@ -78,15 +64,7 @@ namespace galera
             global_seqno_ = seqno_g;
         }
 
-        wsrep_seqno_t get_local_seqno() const
-        {
-            return local_seqno_;
-        }
-        
-        wsrep_seqno_t get_global_seqno() const
-        {
-            return global_seqno_;
-        }
+
         
         void assign_state(enum wsdb_trx_state state)
         {
@@ -122,21 +100,19 @@ namespace galera
             }
         }
 
-        enum wsdb_trx_position get_position() const 
-        {
-            return position_;
-        }
+
 
         void clear()
         {
-            delete write_set_; write_set_ = 0;
+            int err;
+            if ((err = wsdb_delete_local_trx(get_trx_id())) != WSDB_OK)
+            {
+                log_warn << "delete local trx: " << err;
+            }
+            // delete write_set_; write_set_ = 0;
         }
     private:
         friend class WsdbWsdb;
-        enum wsdb_trx_state state_;
-        enum wsdb_trx_position position_;
-        wsrep_seqno_t local_seqno_;
-        wsrep_seqno_t global_seqno_;
    };
 }
 

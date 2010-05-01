@@ -1659,6 +1659,7 @@ enum wsrep_status mm_galera_pre_commit(
     {
         gu_warn("max flow control waits %d exceeded",
                 GALERA_USLEEP_FLOW_CONTROL_MAX/GALERA_USLEEP_FLOW_CONTROL);
+        trx->clear();
         GU_DBUG_RETURN(WSREP_TRX_FAIL);
     }
     
@@ -1675,6 +1676,7 @@ enum wsrep_status mm_galera_pre_commit(
     if (ws.empty() == true) 
     {
         gu_warn("empty write set for: %llu", trx_id);
+        trx->clear();
         GU_DBUG_RETURN(WSREP_OK);
     }
     
@@ -1705,6 +1707,7 @@ enum wsrep_status mm_galera_pre_commit(
                  trx_id, ws_buf.size(), rcode, strerror (-rcode));
         assert (GCS_SEQNO_ILL == seqno_l);
         assert (GCS_SEQNO_ILL == seqno_g);
+        trx->clear();
         trx->assign_state(WSDB_TRX_ABORTING_NONREPL);
         GU_DBUG_RETURN(WSREP_CONN_FAIL);
     }
@@ -1819,7 +1822,10 @@ post_repl_out:
     switch (retcode)
     {
     case WSREP_OK:
+        trx->clear();
+        // fall through
     case WSREP_BF_ABORT:
+        // must keep trx data for replay
         break;
     case WSREP_TRX_FAIL:
     {
@@ -1827,8 +1833,8 @@ post_repl_out:
         // commit queue in case of rollback
         bool do_report(report_check_counter ());
         GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
-
         cert->set_trx_committed(trx);
+        trx->clear();
         if (do_report) report_last_committed (gcs_conn);
         break;
     }
@@ -1836,7 +1842,7 @@ post_repl_out:
         gu_throw_fatal << "unhandled retcode " << retcode;
         throw;
     }
-
+    
     log_debug << "pre_commit " << trx_id << " " << retcode;
     GU_DBUG_RETURN(retcode);
 }

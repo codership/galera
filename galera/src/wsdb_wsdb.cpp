@@ -11,10 +11,16 @@
 #include "gu_lock.hpp"
 #include "gu_throw.hpp"
 
-#include <boost/unordered_map.hpp>
-
 using namespace std;
 using namespace gu;
+
+galera::WsdbWsdb::WsdbWsdb()
+    : 
+    trx_map_(), 
+    conn_query_map_(), 
+    mutex_() 
+{
+}
 
 galera::WsdbWsdb::~WsdbWsdb()
 {

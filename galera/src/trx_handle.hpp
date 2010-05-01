@@ -26,28 +26,57 @@ namespace galera
             trx_id_(trx_id),
             local_(local),
             mutex_(),
-            write_set_(0)
+            write_set_(0),
+            state_(WSDB_TRX_VOID),
+            position_(WSDB_TRX_POS_VOID),
+            local_seqno_(WSREP_SEQNO_UNDEFINED),
+            global_seqno_(WSREP_SEQNO_UNDEFINED)
         { }
         virtual ~TrxHandle() { delete write_set_; write_set_ = 0; }
-
+        
         void lock() { mutex_.lock(); }
         void unlock() { mutex_.unlock(); }
         
-        virtual wsrep_trx_id_t get_trx_id() const { return trx_id_; }
+        wsrep_trx_id_t get_trx_id() const { return trx_id_; }
         void assign_conn_id(wsrep_conn_id_t conn_id) { conn_id_ = conn_id; }
-        virtual wsrep_conn_id_t get_conn_id() const { return conn_id_; }
-        virtual bool is_local() const { return local_; }
+        wsrep_conn_id_t get_conn_id() const { return conn_id_; }
+        bool is_local() const { return local_; }
         
         virtual void assign_seqnos(wsrep_seqno_t seqno_l, 
                                    wsrep_seqno_t seqno_g) = 0;
-        virtual wsrep_seqno_t get_local_seqno() const = 0;
-        virtual wsrep_seqno_t get_global_seqno() const = 0;
         virtual void assign_state(enum wsdb_trx_state state) = 0;
-        virtual enum wsdb_trx_state get_state() const = 0;
         virtual void assign_position(enum wsdb_trx_position pos) = 0;
-        virtual enum wsdb_trx_position get_position() const = 0;
+
+
+        enum wsdb_trx_state get_state() const
+        {
+            if (is_local() == true)
+            {
+                return state_;
+            }
+            else
+            {
+                gu_throw_fatal << "not implemented";
+                throw;
+            }
+        }
+
+        wsrep_seqno_t get_local_seqno() const
+        {
+            return local_seqno_;
+        }
         
-        virtual const WriteSet& get_write_set() const 
+        wsrep_seqno_t get_global_seqno() const
+        {
+            return global_seqno_;
+        }
+
+        enum wsdb_trx_position get_position() const 
+        {
+            return position_;
+        }
+        
+        const WriteSet& get_write_set() const 
         {
             assert(write_set_ != 0);
             return *write_set_; 
@@ -64,6 +93,10 @@ namespace galera
         gu::Mutex           mutex_;
     protected:
         WriteSet* write_set_;
+        enum wsdb_trx_state state_;
+        enum wsdb_trx_position position_;
+        wsrep_seqno_t local_seqno_;
+        wsrep_seqno_t global_seqno_;
     };
     
     
