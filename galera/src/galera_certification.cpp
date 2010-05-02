@@ -19,6 +19,17 @@ using namespace std;
 using namespace gu;
 
 
+galera::GaleraCertification::GaleraCertification(const string& conf) 
+    : 
+    trx_map_(), 
+    mutex_(), 
+    trx_size_warn_count_(0), 
+    last_committed_(-1), 
+    role_(R_BYPASS) 
+{ 
+    // TODO: Adjust role by configuration
+}
+
 galera::GaleraCertification::~GaleraCertification()
 {
     log_info << "cert trx map usage at exit " << trx_map_.size();
@@ -73,7 +84,14 @@ int galera::GaleraCertification::append_trx(const TrxHandlePtr& trx)
 int galera::GaleraCertification::test(const TrxHandlePtr& trx, bool bval)
 {
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
-    return WSDB_OK;
+    switch (role_)
+    {
+    case R_BYPASS:
+        return WSDB_OK;
+    default:
+        gu_throw_fatal << "role " << role_ << " not implemented";
+        throw;
+    }
 }
 
 

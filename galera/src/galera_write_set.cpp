@@ -9,6 +9,7 @@
 using namespace std;
 using namespace gu;
 
+
 size_t galera::serialize(const RowKey& row_key, 
                          gu::byte_t*   buf,
                          size_t        buf_len,
@@ -19,6 +20,7 @@ size_t galera::serialize(const RowKey& row_key,
     offset = serialize(static_cast<gu::byte_t>(row_key.action_), buf, buf_len, offset);
     return offset;
 }
+
 
 size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len, size_t offset,
                            RowKey& row_key)
@@ -31,6 +33,7 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len, size_t offset,
     row_key.action_ = static_cast<int>(act_b);
     return offset;
 }
+
 
 size_t galera::serial_size(const RowKey& row_key)
 {
@@ -52,6 +55,7 @@ size_t galera::serialize(const GaleraWriteSet& ws, gu::byte_t* buf,
     offset = serialize<uint32_t>(ws.rbr_, buf, buf_len, offset);
     return offset;
 }
+
 
 size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len,
                            size_t offset, GaleraWriteSet& ws)

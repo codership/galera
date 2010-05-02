@@ -38,7 +38,7 @@ namespace galera
     {
         return (os << q);
     }
-
+    
     typedef std::vector<Query> QuerySequence;
     
     class WriteSet

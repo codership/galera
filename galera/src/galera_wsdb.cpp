@@ -159,6 +159,7 @@ void galera::GaleraWsdb::append_query(TrxHandlePtr& trx,
     trx->get_write_set().append_query(query, query_len);
 }
 
+
 void galera::GaleraWsdb::append_conn_query(TrxHandlePtr& trx,
                                            const void* query,
                                            size_t query_len)
@@ -177,13 +178,14 @@ void galera::GaleraWsdb::append_row_key(TrxHandlePtr& trx,
     trx->get_write_set().append_row_key(dbtable, dbtable_len, key, key_len, action);
 }
 
+
 void galera::GaleraWsdb::set_conn_variable(TrxHandlePtr& trx,
                                            const void* key, size_t key_len,
                                            const void* query, size_t query_len)
 {
     // TODO
-    // trx->
 }
+
 
 void galera::GaleraWsdb::set_conn_database(TrxHandlePtr& trx,
                                            const void* query,
