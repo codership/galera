@@ -13,13 +13,7 @@ namespace galera
     private:
         typedef std::map<wsrep_seqno_t, TrxHandle*> TrxMap;
     public:
-        typedef enum 
-        {
-            R_BYPASS,
-            R_SLAVE,
-            R_MASTER,
-            R_MULTIMASTER
-        } Role;
+
         GaleraCertification(const std::string& conf);
         ~GaleraCertification();
         void assign_initial_position(wsrep_seqno_t seqno);
@@ -38,7 +32,6 @@ namespace galera
         size_t        trx_size_warn_count_;
         wsrep_seqno_t position_;
         wsrep_seqno_t last_committed_;
-        Role          role_;
     };
 }
 

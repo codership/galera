@@ -40,37 +40,34 @@ namespace galera
     size_t serialize(const RowKey&, gu::byte_t*, size_t, size_t);
     size_t unserialize(const gu::byte_t*, size_t, size_t, RowKey&);
     size_t serial_size(const RowKey&);
+
+    typedef std::deque<RowKey> RowKeySequence;        
     
 
     class GaleraWriteSet : public WriteSet
     {
     public:
-        typedef std::vector<Query> QuerySequence;
-        typedef std::deque<RowKey> RowKeySequence;        
 
         GaleraWriteSet() 
             : 
             type_(),
-            level_(),
-            last_seen_trx_(),
-            queries_(),
-            keys_(),
-            rbr_()
-        { 
-            // keys_.reserve(8);
-        }
-
-        GaleraWriteSet(enum wsdb_ws_type type) 
-            : 
-            type_(type),
-            level_(),
+            level_(WSDB_WS_QUERY),
             last_seen_trx_(),
             queries_(),
             keys_(),
             rbr_()
         { }
-        
-        
+
+        GaleraWriteSet(enum wsdb_ws_type type) 
+            : 
+            type_(type),
+            level_(WSDB_WS_QUERY),
+            last_seen_trx_(),
+            queries_(),
+            keys_(),
+            rbr_()
+        { }
+
         enum wsdb_ws_type get_type() const { return type_; }
         enum wsdb_ws_level get_level() const { return level_; }
         wsrep_seqno_t get_last_seen_trx() const { return last_seen_trx_; }
@@ -93,10 +90,11 @@ namespace galera
         void assign_rbr(const void* rbr_data, size_t rbr_data_len)
         {
             assert(rbr_.empty() == true);
-            rbr_.resize(rbr_data_len);
+            rbr_.reserve(rbr_data_len);
             rbr_.insert(rbr_.begin(),
                         reinterpret_cast<const gu::byte_t*>(rbr_data),
                         reinterpret_cast<const gu::byte_t*>(rbr_data) + rbr_data_len);
+            level_ = WSDB_WS_DATA_RBR;
         }
         
         const RowKeySequence& get_keys() const { return keys_; }

@@ -25,11 +25,13 @@ extern "C"
 }
 
 #include "gu_lock.hpp"
+#include "gu_uri.hpp"
 
 #include "certification.hpp"
 #include "wsdb.hpp"
 
 using namespace gu;
+using namespace std;
 using namespace galera;
 static Wsdb* wsdb;
 static Certification* cert;
@@ -266,8 +268,8 @@ enum wsrep_status mm_galera_init(wsrep_t* gh,
 
     /* 2. initialize wsdb */
     wsdb_init(data_dir, (gu_log_cb_t)args->logger_cb);    
-    wsdb = Wsdb::create("wsdb");
-    cert = Certification::create("wsdb");
+    wsdb = Wsdb::create("galera");
+    cert = Certification::create("galera");
 
     /* 3. try to read saved state from file */
     if (status.last_applied == WSREP_SEQNO_UNDEFINED &&
@@ -360,6 +362,18 @@ enum wsrep_status mm_galera_connect (wsrep_t *gh,
     
     status.stage = GALERA_STAGE_JOINING;
     conn_state   = GALERA_CONNECTED;
+
+    URI uri(cluster_url);
+    if (uri.get_host() == "")
+    {
+        log_info << "WSREP: certification role master";
+        cert->set_role(Certification::R_MASTER);
+    }
+    else
+    {
+        log_info << "WSREP: certification role slave";
+        cert->set_role(Certification::R_SLAVE);
+    }
     
     GU_DBUG_RETURN(WSREP_OK);
 }
@@ -453,6 +467,7 @@ static wsrep_status_t apply_write_set(void *recv_ctx,
     wsrep_status_t rcode = WSREP_OK;
     assert (global_seqno > 0);
     
+    // log_info << "applying ws " << ws.get_type() << " " << ws.get_level();
     GU_DBUG_ENTER("apply_write_set");
     if (bf_apply_cb == NULL) {
         gu_error("data applier has not been defined"); 
@@ -471,6 +486,8 @@ static wsrep_status_t apply_write_set(void *recv_ctx,
             data.u.sql.len      = i->get_query().size();
             data.u.sql.timeval  = i->get_tstamp();
             data.u.sql.randseed = i->get_rnd_seed();
+            // log_info << "applying " << string(data.u.sql.stm,
+            // data.u.sql.stm + data.u.sql.len);
             switch (bf_apply_cb(recv_ctx, &data, global_seqno))
             {
             case WSREP_OK: break;
@@ -613,14 +630,19 @@ static wsrep_status_t process_conn_write_set(
     
     /* wait for total order */
     GALERA_GRAB_QUEUE (cert_queue,   seqno_l);
+    int cert_ret(cert->append_trx(trx));
     GALERA_GRAB_QUEUE (commit_queue, seqno_l);
-
-    if (gu_likely(galera_update_last_received(trx->get_global_seqno()))) {
-        /* Global seqno ok, certification ok (not needed?) */
-        rcode = apply_write_set(recv_ctx, trx->get_write_set(), 
-                                trx->get_global_seqno());
-        if (rcode) {
-            gu_error ("unknown galera fail: %d trx: %llu", rcode, seqno_l);
+    
+    if (cert_ret == WSDB_OK)
+    {
+        if (gu_likely(galera_update_last_received(trx->get_global_seqno()))) 
+        {
+            /* Global seqno ok, certification ok (not needed?) */
+            rcode = apply_write_set(recv_ctx, trx->get_write_set(), 
+                                    trx->get_global_seqno());
+            if (rcode) {
+                gu_error ("unknown galera fail: %d trx: %llu", rcode, seqno_l);
+            }
         }
     }
     
@@ -629,10 +651,10 @@ static wsrep_status_t process_conn_write_set(
     GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
     do_report = report_check_counter();
     GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
-
+    
     cert->set_trx_committed(trx);
     if (do_report) report_last_committed(gcs_conn);
-
+    
     return rcode;
 }
 
@@ -654,12 +676,12 @@ enum wsrep_status process_query_write_set_applying(
     
     do
     {
-        while ((rcode = apply_write_set(recv_ctx, 
-                                        trx->get_write_set(),
-                                        trx->get_global_seqno()))) 
+        if ((rcode = apply_write_set(recv_ctx, 
+                                     trx->get_write_set(),
+                                     trx->get_global_seqno()))) 
         {
             gu_warn("ws apply failed, rcode: %d, seqno: %lld, "
-                    "last_seen: %lld attempt: %uz", 
+                    "last_seen: %lld attempt: %zd", 
                     rcode, trx->get_global_seqno(), 
                     trx->get_write_set().get_last_seen_trx(), attempts);
             
@@ -680,11 +702,11 @@ enum wsrep_status process_query_write_set_applying(
             }
         }
         
-        if (rcode == WSREP_OK &&
+        if (rcode == WSREP_OK && 
+            trx->get_write_set().get_level() == WSDB_WS_QUERY &&
             (rcode = apply_query(recv_ctx, "commit\0", 7, 
                                  trx->get_global_seqno())) != WSREP_OK)
         {
-            
             gu_warn("ws apply commit failed, seqno: %lld %lld, "
                     "last_seen: %lld", 
                     trx->get_global_seqno(), 
@@ -829,7 +851,8 @@ static wsrep_status_t process_write_set(
     TrxHandle* trx(cert->create_trx(data, data_len, seqno_l, seqno_g));
     TrxHandleLock lock(*trx);
 
-    switch (trx->get_write_set().get_type()) {
+    switch (trx->get_write_set().get_type()) 
+    {
     case WSDB_WS_TYPE_TRX:
         rcode = process_query_write_set(recv_ctx, trx, seqno_l);
         break;
@@ -1879,7 +1902,7 @@ post_repl_out:
         throw;
     }
     
-    log_debug << "pre_commit " << trx->get_trx_id() << " " << retcode;
+    log_info << "pre_commit " << trx->get_trx_id() << " " << retcode;
     GU_DBUG_RETURN(retcode);
 }
 
@@ -2123,8 +2146,8 @@ enum wsrep_status mm_galera_to_execute_start(
     
     /* update global seqno */
     do_apply = galera_update_last_received (seqno_g);
-    
-    if (do_apply) {
+
+    if (rcode == WSDB_OK) {
         /* Grab commit queue */
         GALERA_GRAB_QUEUE (commit_queue, seqno_l);
         rcode = WSREP_OK;
@@ -2144,6 +2167,7 @@ enum wsrep_status mm_galera_to_execute_start(
     gu_debug("TO isolation applied for: seqnos: %lld - %lld", 
              seqno_g, seqno_l
         );
+    
     GU_DBUG_RETURN(static_cast<wsrep_status_t>(rcode));
 }
 

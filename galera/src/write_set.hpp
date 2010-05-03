@@ -9,6 +9,7 @@
 #include "wsdb_api.h"
 #include "wsrep_api.h"
 #include "gu_buffer.hpp"
+#include "serialization.hpp"
 
 namespace galera
 {
@@ -29,12 +30,45 @@ namespace galera
         time_t get_tstamp() const { return tstamp_; }
         uint32_t get_rnd_seed() const { return rnd_seed_; }
     private:
+        friend size_t serialize(const Query&, gu::byte_t*, size_t, size_t);
+        friend size_t unserialize(const gu::byte_t*, size_t, size_t, Query&);
+        friend size_t serial_size(const Query&);
         gu::Buffer query_;
         time_t tstamp_;
         uint32_t rnd_seed_;
     };
 
-    inline std::ostream& operator<<(std::ostream& os, const Query& q)
+    inline size_t serialize(const Query& q, gu::byte_t* buf, 
+                            size_t buf_len, 
+                            size_t offset)
+    {
+        offset = serialize<uint32_t>(q.query_, buf, buf_len, offset);
+        offset = serialize(static_cast<int64_t>(q.tstamp_), buf, 
+                           buf_len, offset);
+        offset = serialize(q.rnd_seed_, buf, buf_len, offset);
+        return offset;
+    }
+
+    inline size_t unserialize(const gu::byte_t* buf, size_t buf_len,
+                       size_t offset, Query& q)
+    {
+        q.query_.clear();
+        offset = unserialize<uint32_t>(buf, buf_len, offset, q.query_);
+        int64_t tstamp;
+        offset = unserialize(buf, buf_len, offset, tstamp);
+        q.tstamp_ = static_cast<time_t>(tstamp);
+        offset = unserialize(buf, buf_len, offset, q.rnd_seed_);
+        return offset;
+    }
+
+    inline size_t serial_size(const Query& q)
+    {
+        return (serial_size<uint32_t>(q.query_) 
+                + serial_size(int64_t())
+                + serial_size(uint32_t()));
+    }
+
+    static inline std::ostream& operator<<(std::ostream& os, const Query& q)
     {
         return (os << q);
     }
@@ -65,7 +99,7 @@ namespace galera
         
     private:
     };
-
+    
 
 }
 

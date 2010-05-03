@@ -16,6 +16,7 @@ size_t galera::serialize(const RowKey& row_key,
                          size_t        offset)
 {
     offset = serialize<uint16_t>(row_key.dbtable_, buf, buf_len, offset);
+
     offset = serialize<uint16_t>(row_key.key_, buf, buf_len, offset);
     offset = serialize(static_cast<gu::byte_t>(row_key.action_), buf, buf_len, offset);
     return offset;
@@ -48,10 +49,10 @@ size_t galera::serialize(const GaleraWriteSet& ws, gu::byte_t* buf,
 {
     uint32_t hdr(ws.type_ | (ws.level_ << 8));
     offset = serialize(hdr, buf, buf_len, offset);
-    offset = serialize<GaleraWriteSet::QuerySequence, uint32_t>(
-        ws.queries_, buf, buf_len, offset);
-    offset = serialize<GaleraWriteSet::RowKeySequence, uint32_t>(
-        ws.keys_, buf, buf_len, offset);
+    offset = serialize<QuerySequence::const_iterator, uint32_t>(
+        ws.queries_.begin(), ws.queries_.end(), buf, buf_len, offset);
+    offset = serialize<RowKeySequence::const_iterator, uint32_t>(
+        ws.keys_.begin(), ws.keys_.end(), buf, buf_len, offset);
     offset = serialize<uint32_t>(ws.rbr_, buf, buf_len, offset);
     return offset;
 }
@@ -64,11 +65,11 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len,
     offset = unserialize(buf, buf_len, offset, hdr);
     ws.type_ = static_cast<enum wsdb_ws_type>(hdr & 0xff);
     ws.level_ = static_cast<enum wsdb_ws_level>((hdr >> 8) & 0xff);
-    
-    offset = unserialize<GaleraWriteSet::QuerySequence, uint32_t>(
-        buf, buf_len, offset, ws.queries_);
-    offset = unserialize<GaleraWriteSet::RowKeySequence, uint32_t>(
-        buf, buf_len, offset, ws.keys_);
+    ws.queries_.clear();
+    offset = unserialize<Query, uint32_t>(
+        buf, buf_len, offset, back_inserter(ws.queries_));
+    offset = unserialize<RowKey, uint32_t>(
+        buf, buf_len, offset, back_inserter(ws.keys_));
     offset = unserialize<uint32_t>(buf, buf_len, offset, ws.rbr_);
     return offset;
 }
@@ -76,10 +77,14 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len,
 size_t galera::serial_size(const GaleraWriteSet& ws)
 {
     return (serial_size(uint32_t()) 
-            + serial_size<GaleraWriteSet::QuerySequence, uint32_t>(ws.queries_)
-            + serial_size<GaleraWriteSet::RowKeySequence, uint32_t>(ws.keys_)
+            + serial_size<QuerySequence::const_iterator, uint32_t>(
+                ws.queries_.begin(), ws.queries_.end())
+            + serial_size<RowKeySequence::const_iterator, uint32_t>(
+                ws.keys_.begin(), ws.keys_.end())
             + serial_size<uint32_t>(ws.rbr_));
 }
+
+#include "gu_logger.hpp"
 
 void galera::GaleraWriteSet::serialize(Buffer& buf) const
 {

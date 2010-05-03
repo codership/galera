@@ -1,0 +1,12 @@
+
+Import('check_env')
+
+env = check_env.Clone()
+env.Append(LIBS = ['mmgalera',
+                   'wsdb',
+                   'gcs',
+                   'gcomm',
+                   'galerautils++',
+                   'galerautils'])
+
+env.Program(target='test_write_set', source='test_write_set.cpp')

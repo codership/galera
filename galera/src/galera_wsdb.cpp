@@ -151,7 +151,10 @@ void galera::GaleraWsdb::create_write_set(TrxHandle* trx,
                                           const void* rbr_data,
                                           size_t rbr_data_len)
 {
-    trx->get_write_set().assign_rbr(rbr_data, rbr_data_len);
+    if (rbr_data != 0 && rbr_data_len > 0)
+    {
+        trx->get_write_set().assign_rbr(rbr_data, rbr_data_len);
+    }
 }
 
 

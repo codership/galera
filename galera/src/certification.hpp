@@ -25,6 +25,13 @@ namespace galera
     class Certification
     {
     public:
+        typedef enum 
+        {
+            R_BYPASS,
+            R_SLAVE,
+            R_MASTER,
+            R_MULTIMASTER
+        } Role;
 
         //!
         // @brief Assign initial position
@@ -110,16 +117,20 @@ namespace galera
         // @brief Virtual destructor to allow inheritance
         //
         virtual ~Certification() { }
+
+        void set_role(Role role) { role_ = role; }
         
         //!
         // @brief Factory method
         //
         static Certification* create(const std::string& conf);
     protected:
-        Certification() { }
+        Certification() : role_(R_BYPASS) { }
+        Role role_;
     private:
         Certification(const Certification&);
         void operator=(const Certification&);
+
     };
 }
 

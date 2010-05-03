@@ -23,9 +23,10 @@ usage()
 "    --no-strip      prevent stripping of release binaries\n"\
 "    -r|--release <galera release>, otherwise revisions will be used\n"\
 "    -p|--package    create DEB/RPM packages (depending on the distribution)\n"\
-"    --sb|--skip-build skip the actual build, use the existing binaries"\
-"    --sc|--skip-configure skip configure"\
-"    --scons         use scons to build galera libraries"\
+"    --sb|--skip-build skip the actual build, use the existing binaries\n"\
+"    --sc|--skip-configure skip configure\n"\
+"    --skip-clients  don't include client binaries in test package\n"\
+"    --scons         use scons to build galera libraries\n"\
 "\n -s and -b options affect only Galera build.\n"
 }
 
@@ -41,6 +42,7 @@ INSTALL=no
 CONFIGURE=no
 SKIP_BUILD=no
 SKIP_CONFIGURE=no
+SKIP_CLIENTS=no
 SCRATCH=no
 SCONS=no
 JOBS=1
@@ -110,6 +112,9 @@ do
             ;;
         --sc|--skip-configure)
             SKIP_CONFIGURE="yes"
+            ;;
+        --skip-clients)
+            SKIP_CLIENTS="yes"
             ;;
         --scons)
             SCONS="yes"
@@ -296,9 +301,12 @@ install -D -m 644 $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/
 install -D -m 755 $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/libexec/mysqld
 install -D -m 755 $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS
 install -D -m 755 $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so $MYSQL_PLUGINS
-install -D -m 755 $MYSQL_SRC/client/.libs/mysql       $MYSQL_DIST_DIR/bin/mysql
-install -D -m 755 $MYSQL_SRC/client/.libs/mysqldump   $MYSQL_DIST_DIR/bin/mysqldump
-install -D -m 755 $MYSQL_SRC/client/.libs/mysqladmin     $MYSQL_DIST_DIR/bin/mysqladmin
+if [ "$SKIP_CLIENTS" == "no" ]
+then
+    install -D -m 755 $MYSQL_SRC/client/.libs/mysql       $MYSQL_DIST_DIR/bin/mysql
+    install -D -m 755 $MYSQL_SRC/client/.libs/mysqldump   $MYSQL_DIST_DIR/bin/mysqldump
+    install -D -m 755 $MYSQL_SRC/client/.libs/mysqladmin     $MYSQL_DIST_DIR/bin/mysqladmin
+fi
 install -D -m 755 $MYSQL_SRC/scripts/wsrep_sst_mysqldump $MYSQL_DIST_DIR/bin/wsrep_sst_mysqldump
 install -D -m 644 my.cnf $MYSQL_DIST_CNF
 cat $MYSQL_SRC/support-files/wsrep.cnf >> $MYSQL_DIST_CNF
@@ -335,9 +343,12 @@ GALERA_SBIN="$GALERA_DIST_DIR/galera/sbin"
     install -D -m 755 $GALERA_SRC/galeracomm/vs/src/.libs/vsbes $GALERA_SBIN/vsbes && \
     install -m 755 vsbes $DIST_DIR || echo "Skipping vsbes"
 
-strip $MYSQL_DIST_DIR/bin/mysql
-strip $MYSQL_DIST_DIR/bin/mysqladmin
-strip $MYSQL_DIST_DIR/bin/mysqldump
+if [ "$SKIP_CLIENTS" == "no" ]
+then
+    strip $MYSQL_DIST_DIR/bin/mysql
+    strip $MYSQL_DIST_DIR/bin/mysqladmin
+    strip $MYSQL_DIST_DIR/bin/mysqldump
+fi
 # Strip binaries if not instructed otherwise
 if test "$NO_STRIP" != "yes"
 then

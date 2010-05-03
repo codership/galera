@@ -25,8 +25,7 @@ galera::GaleraCertification::GaleraCertification(const string& conf)
     mutex_(), 
     trx_size_warn_count_(0), 
     position_(-1),
-    last_committed_(-1), 
-    role_(R_BYPASS)
+    last_committed_(-1)
 { 
     // TODO: Adjust role by configuration
 }
@@ -103,10 +102,15 @@ int galera::GaleraCertification::append_trx(TrxHandle* trx)
 int galera::GaleraCertification::test(const TrxHandle* trx, bool bval)
 {
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
+    log_info << "test: " << role_ << " " << trx->is_local();
     switch (role_)
     {
     case R_BYPASS:
         return WSDB_OK;
+    case R_SLAVE:
+        return (trx->is_local() == true ? WSDB_CERTIFICATION_FAIL : WSDB_OK);
+    case R_MASTER:
+        return (trx->is_local() == true ? WSDB_OK : WSDB_CERTIFICATION_FAIL);
     default:
         gu_throw_fatal << "role " << role_ << " not implemented";
         throw;

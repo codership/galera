@@ -9,6 +9,22 @@ env.SharedLibrary('mmgalera', [
         'galera_options.c',
         'galera_state.c',
         'galera_status.c',
+        'mm_galera_refact.cpp',
+        'wsdb.cpp',
+        'wsdb_wsdb.cpp',
+        'certification.cpp',
+        'wsdb_certification.cpp',
+        'galera_write_set.cpp',
+        'galera_wsdb.cpp',
+        'galera_certification.cpp'
+])
+
+env.StaticLibrary('mmgalera', [
+        'galera_info.c',
+        'galera_job_queue.c',
+        'galera_options.c',
+        'galera_state.c',
+        'galera_status.c',
         'mm_galera.c',
         'wsdb.cpp',
         'wsdb_wsdb.cpp',

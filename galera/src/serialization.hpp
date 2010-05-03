@@ -51,13 +51,13 @@ namespace galera
                        size_t offset,
                        gu::Buffer& b)
     {
-        b.clear();
         ST len(0);
         if (offset + serial_size(len) > buf_len) gu_throw_fatal;
         
         offset = unserialize(buf, buf_len, offset, len);
         if (offset + len > buf_len) gu_throw_fatal;
         if (len > std::numeric_limits<ST>::max()) gu_throw_fatal;
+        b.resize(len);
         copy(buf + offset, buf + offset + len, b.begin());
         offset += len;
         return offset;
@@ -71,40 +71,42 @@ namespace galera
     }    
 
 
-    template<class S, typename ST>
-    size_t serialize(const S& s, gu::byte_t* buf, size_t buf_len, size_t offset)
+    template<typename I, typename ST>
+    size_t serialize(I begin, I end,
+                     gu::byte_t* buf, size_t buf_len, size_t offset)
     {
-        if (s.size() > std::numeric_limits<ST>::max()) gu_throw_fatal;
-        offset = serialize(static_cast<ST>(s.size()), buf, buf_len, offset);
-        for (typename S::const_iterator i = s.begin(); i != s.end(); ++i)
+        if (static_cast<size_t>(std::distance(begin, end)) > 
+            std::numeric_limits<ST>::max()) gu_throw_fatal;
+        offset = serialize(static_cast<ST>(std::distance(begin, end)), 
+                           buf, buf_len, offset);
+        for (I i = begin; i != end; ++i)
         {
             offset = serialize(*i, buf, buf_len, offset);
         }
         return offset;
     }
-
-    template<class S, typename ST>
+    
+    template<class C, typename ST, typename BI>
     size_t unserialize(const gu::byte_t* buf, size_t buf_len, size_t offset,
-                       S& s)
+                       BI bi)
     {
-        s.clear();
         ST len;
         offset = unserialize(buf, buf_len, offset, len);
         // s.reserve(len);
         for (ST i = 0; i < len; ++i)
         {
-            typename S::value_type st;
-            offset = unserialize(buf, buf_len, offset, st);
-            s.push_back(st);
+            C c;
+            offset = unserialize(buf, buf_len, offset, c);
+            *bi++ = c;
         }
         return offset;
     }
 
-    template<class S, typename ST>
-    size_t serial_size(const S& s)
+    template<typename I, typename ST>
+    size_t serial_size(I begin, I end)
     {
         size_t ret(serial_size(ST()));
-        for (typename S::const_iterator i = s.begin(); i != s.end(); ++i)
+        for (I i = begin; i != end; ++i)
         {
             ret += serial_size(*i);
         }
