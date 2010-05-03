@@ -43,9 +43,9 @@ namespace galera
         //
         // @return TrxHandlePtr
         //
-        virtual TrxHandlePtr create_trx(const void* data, size_t data_len,
-                                        wsrep_seqno_t seqno_l,
-                                        wsrep_seqno_t seqno_g) = 0;
+        virtual TrxHandle* create_trx(const void* data, size_t data_len,
+                                      wsrep_seqno_t seqno_l,
+                                      wsrep_seqno_t seqno_g) = 0;
         
         //!
         // @brief Append new transaction into certification
@@ -58,14 +58,14 @@ namespace galera
         // @todo Should certification part be refactored out of this call
         //       and require that test() method is called for certification
         //       verdict?
-        virtual int append_trx(const TrxHandlePtr& trx) = 0;
+        virtual int append_trx(TrxHandle* trx) = 0;
         
         //!
         // @brief Perform certification test for write set
         //
         // @return WSDB_OK if certification test passed, otherwise error code
         //
-        virtual int test(const TrxHandlePtr&, bool) = 0;
+        virtual int test(const TrxHandle*, bool) = 0;
 
         //!
         // @brief Get sequence number that is guaranteed to be 
@@ -93,7 +93,7 @@ namespace galera
         // @param trx
         //
         //
-        virtual void set_trx_committed(const TrxHandlePtr& trx) = 0;
+        virtual void set_trx_committed(TrxHandle* trx) = 0;
 
         //!
         // @brief Get transaction matching for seqno from certification
@@ -104,7 +104,7 @@ namespace galera
         // @return TrxHandlePtr pointing to transaction or object comparable
         //         to zero if not found.
         //
-        virtual TrxHandlePtr get_trx(wsrep_seqno_t seqno) = 0;
+        virtual TrxHandle* get_trx(wsrep_seqno_t seqno) = 0;
         
         //!
         // @brief Virtual destructor to allow inheritance

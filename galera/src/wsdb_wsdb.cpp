@@ -27,6 +27,9 @@ galera::WsdbWsdb::~WsdbWsdb()
 
     log_info << "wsdb trx map usage " << trx_map_.size() 
              << " conn query map usage " << conn_query_map_.size();
+    for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
+    for_each(conn_query_map_.begin(), 
+             conn_query_map_.end(), Unref2nd<TrxMap::value_type>());
 }
 
 ostream& galera::WsdbWsdb::operator<<(ostream& os) const
@@ -49,30 +52,30 @@ ostream& galera::WsdbWsdb::operator<<(ostream& os) const
 }
 
 
-galera::TrxHandlePtr 
+galera::TrxHandle*
 galera::WsdbWsdb::create_trx(wsrep_trx_id_t trx_id)
 {
     pair<TrxMap::iterator, bool> i = trx_map_.insert(
         make_pair(trx_id, 
-                  TrxHandlePtr(new WsdbTrxHandle(-1, trx_id, true))));
+                  new WsdbTrxHandle(-1, trx_id, true)));
     if (i.second == false)
         gu_throw_fatal;
     return i.first->second;
 }
 
 
-galera::TrxHandlePtr 
+galera::TrxHandle* 
 galera::WsdbWsdb::create_conn_query(wsrep_conn_id_t conn_id)
 {
     pair<TrxMap::iterator, bool> i = conn_query_map_.insert(
-        make_pair(conn_id, TrxHandlePtr(new WsdbTrxHandle(conn_id, -1, true))));
+        make_pair(conn_id, new WsdbTrxHandle(conn_id, -1, true)));
     if (i.second == false)
         gu_throw_fatal;
     return i.first->second;
 }
 
 
-galera::TrxHandlePtr 
+galera::TrxHandle*
 galera::WsdbWsdb::get_trx(wsrep_trx_id_t trx_id, 
                           bool create)
 {
@@ -86,14 +89,14 @@ galera::WsdbWsdb::get_trx(wsrep_trx_id_t trx_id,
         }
         else
         {
-            return TrxHandlePtr();
+            return 0;
         }
     }
     return i->second;
 }
 
-galera::TrxHandlePtr galera::WsdbWsdb::get_conn_query(wsrep_trx_id_t id, 
-                                                      bool create)
+galera::TrxHandle* galera::WsdbWsdb::get_conn_query(wsrep_trx_id_t id, 
+                                                    bool create)
 {
     Lock lock(mutex_);
     TrxMap::iterator i;
@@ -105,7 +108,7 @@ galera::TrxHandlePtr galera::WsdbWsdb::get_conn_query(wsrep_trx_id_t id,
         }
         else
         {
-            return TrxHandlePtr();
+            return 0;
         }
     }
     return i->second;
@@ -118,7 +121,8 @@ void galera::WsdbWsdb::discard_trx(wsrep_trx_id_t trx_id)
     TrxMap::iterator i;
     if ((i = trx_map_.find(trx_id)) != trx_map_.end())
     {
-        wsdb_delete_local_trx_info(trx_id, &WSDB_TRX_HANDLE(i->second)->trx_info_);
+        wsdb_delete_local_trx_info(trx_id, &static_cast<WsdbTrxHandle*>(i->second)->trx_info_);
+        i->second->unref();
         trx_map_.erase(i);
 
     }
@@ -131,6 +135,7 @@ void galera::WsdbWsdb::discard_conn_query(wsrep_conn_id_t conn_id)
     ConnQueryMap::iterator i;
     if ((i = conn_query_map_.find(conn_id)) != conn_query_map_.end())
     {
+        i->second->unref();
         conn_query_map_.erase(i);
     }
     wsdb_conn_reset_seqno(conn_id);
@@ -143,15 +148,16 @@ void galera::WsdbWsdb::discard_conn(wsrep_conn_id_t conn_id)
     ConnQueryMap::iterator i;
     if ((i = conn_query_map_.find(conn_id)) != conn_query_map_.end())
     {
+        i->second->unref();
         conn_query_map_.erase(i);
     }
 }
 
-void galera::WsdbWsdb::create_write_set(TrxHandlePtr& trx,
+void galera::WsdbWsdb::create_write_set(TrxHandle* trx,
                                         const void* rbr_data,
                                         size_t rbr_data_len)
 {
-    WsdbTrxHandle* wsdb_trx(static_cast<WsdbTrxHandle*>(trx.get()));
+    WsdbTrxHandle* wsdb_trx(static_cast<WsdbTrxHandle*>(trx));
     if (wsdb_trx->write_set_ != 0)
     {
         assert(wsdb_trx->write_set_->get_type() == WSDB_WS_TYPE_CONN);
@@ -176,7 +182,7 @@ void galera::WsdbWsdb::create_write_set(TrxHandlePtr& trx,
 }
 
 
-void galera::WsdbWsdb::append_query(TrxHandlePtr& trx,
+void galera::WsdbWsdb::append_query(TrxHandle* trx,
                                     const void* query,
                                     size_t query_len, 
                                     time_t t,
@@ -184,13 +190,13 @@ void galera::WsdbWsdb::append_query(TrxHandlePtr& trx,
 {
     if (wsdb_append_query(trx->get_trx_id(), 
                           const_cast<char*>(reinterpret_cast<const char*>(query)),
-                          t, rnd, &WSDB_TRX_HANDLE(trx)->trx_info_) != WSDB_OK)
+                          t, rnd, &static_cast<WsdbTrxHandle*>(trx)->trx_info_) != WSDB_OK)
     {
         gu_throw_fatal;
     }
 }
 
-void galera::WsdbWsdb::append_conn_query(TrxHandlePtr& trx,
+void galera::WsdbWsdb::append_conn_query(TrxHandle* trx,
                                          const void* query,
                                          size_t query_len)
 {
@@ -200,11 +206,11 @@ void galera::WsdbWsdb::append_conn_query(TrxHandlePtr& trx,
         gu_throw_fatal;
     }
     wsdb_set_exec_query(ws, (const char*)query, query_len);
-    static_cast<WsdbTrxHandle*>(trx.get())->assign_write_set(ws);
+    static_cast<WsdbTrxHandle*>(trx)->assign_write_set(ws);
 }
 
         
-void galera::WsdbWsdb::append_row_key(TrxHandlePtr& trx,
+void galera::WsdbWsdb::append_row_key(TrxHandle* trx,
                                       const void* dbtable, 
                                       size_t dbtable_len,
                                       const void* key, 
@@ -235,7 +241,7 @@ void galera::WsdbWsdb::append_row_key(TrxHandlePtr& trx,
     }
     
     switch(wsdb_append_row_key(trx->get_trx_id(), &wsdb_key, wsdb_action,
-                               &WSDB_TRX_HANDLE(trx)->trx_info_)) {
+                               &static_cast<WsdbTrxHandle*>(trx)->trx_info_)) {
     case WSDB_OK:  
         return;
     default: 
@@ -243,7 +249,7 @@ void galera::WsdbWsdb::append_row_key(TrxHandlePtr& trx,
     }
 }
 
-void galera::WsdbWsdb::set_conn_variable(TrxHandlePtr& trx,
+void galera::WsdbWsdb::set_conn_variable(TrxHandle* trx,
                                          const void* key, size_t key_len,
                                          const void* query, size_t query_len)
 {
@@ -256,7 +262,7 @@ void galera::WsdbWsdb::set_conn_variable(TrxHandlePtr& trx,
     }
 }
 
-void galera::WsdbWsdb::set_conn_database(TrxHandlePtr& trx,
+void galera::WsdbWsdb::set_conn_database(TrxHandle* trx,
                                          const void* query,
                                          size_t query_len)
 {

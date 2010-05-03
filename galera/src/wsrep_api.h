@@ -344,11 +344,28 @@ struct wsrep_status_var
 };
 
 
-typedef struct wsrep_trx_handle_
+struct wsrep_trx_handle_
 {
     wsrep_trx_id_t trx_id;
     void*          opaque;
-} wsrep_trx_handle_t;
+}; 
+
+typedef struct wsrep_trx_handle_ wsrep_trx_handle_t;
+
+/*! 
+ * @brief Helper method to reset trx handle state when trx id changes 
+ */
+static inline wsrep_trx_handle_t* wsrep_trx_handle_for_id(
+    wsrep_trx_handle_t* trx_handle, wsrep_trx_id_t trx_id)
+{
+    if (trx_handle->trx_id != trx_id)
+    {
+        trx_handle->trx_id = trx_id;
+        trx_handle->opaque = NULL;
+    }
+    return trx_handle;
+}
+
 
 typedef struct wsrep_ wsrep_t;
 /*!
@@ -444,12 +461,12 @@ struct wsrep_ {
    * @retval WSREP_CONN_FAIL  must close client connection
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
-    wsrep_status_t (*pre_commit)(wsrep_t*        wsrep,
-                                 wsrep_trx_id_t  trx_id,
-                                 wsrep_conn_id_t conn_id, 
-                                 const void*     app_data,
-                                 size_t          data_len,
-                                 wsrep_seqno_t*  seqno);
+    wsrep_status_t (*pre_commit)(wsrep_t*            wsrep,
+                                 wsrep_conn_id_t     conn_id, 
+                                 wsrep_trx_handle_t* trx_handle,
+                                 const void*         app_data,
+                                 size_t              data_len,
+                                 wsrep_seqno_t*      seqno);
 
   /*!
    * @brief Releases resources after transaction commit.
@@ -460,7 +477,7 @@ struct wsrep_ {
    * @param trx_id     transaction which is committing
    * @retval WSREP_OK  post_commit succeeded
    */
-    wsrep_status_t (*post_commit) (wsrep_t* wsrep, wsrep_trx_id_t trx_id);
+    wsrep_status_t (*post_commit) (wsrep_t* wsrep, wsrep_trx_handle_t* trx_handle);
 
   /*!
    * @brief Releases resources after transaction rollback.
@@ -469,7 +486,7 @@ struct wsrep_ {
    * @param trx_id     transaction which is committing
    * @retval WSREP_OK  post_rollback succeeded
    */
-    wsrep_status_t (*post_rollback)(wsrep_t* wsrep, wsrep_trx_id_t trx_id);    
+    wsrep_status_t (*post_rollback)(wsrep_t* wsrep, wsrep_trx_handle_t* trx_handle);    
 
   /*!
    * @brief Replay trx as a slave write set
@@ -490,9 +507,9 @@ struct wsrep_ {
    * @retval WSREP_CONN_FAIL  must close client connection
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
-    wsrep_status_t (*replay_trx)(wsrep_t*       wsrep,
-                                 wsrep_trx_id_t trx_id,
-                                 void*          trx_ctx);
+    wsrep_status_t (*replay_trx)(wsrep_t*            wsrep,
+                                 wsrep_trx_handle_t* trx_handle,
+                                 void*               trx_ctx);
 
   /*!
    * @brief Abort pre_commit() call of another thread.
@@ -539,11 +556,11 @@ struct wsrep_ {
    * @param timeval time to use for time functions
    * @param randseed seed for rand
    */
-    wsrep_status_t (*append_query)(wsrep_t*       wsrep,
-                                   wsrep_trx_id_t trx_id,
-                                   const char*    query, 
-                                   time_t         timeval,
-                                   uint32_t       randseed);
+    wsrep_status_t (*append_query)(wsrep_t*            wsrep,
+                                   wsrep_trx_handle_t* trx_handle,
+                                   const char*         query, 
+                                   time_t              timeval,
+                                   uint32_t            randseed);
 
   /*!
    * @brief Appends a row reference in transaction's write set
@@ -556,13 +573,13 @@ struct wsrep_ {
    * @param key_len     length of the key data
    * @param action      action code according to enum wsrep_action
    */
-    wsrep_status_t (*append_row_key)(wsrep_t*       wsrep, 
-                                     wsrep_trx_id_t trx_id, 
-                                     const char*    dbtable,
-                                     size_t         dbtable_len,
-                                     const char*    key, 
-                                     size_t         key_len, 
-                                     wsrep_action_t action);
+    wsrep_status_t (*append_row_key)(wsrep_t*            wsrep, 
+                                     wsrep_trx_handle_t* trx_handle,
+                                     const char*         dbtable,
+                                     size_t              dbtable_len,
+                                     const char*         key, 
+                                     size_t              key_len, 
+                                     wsrep_action_t      action);
 
   /*!
    * This call will block until causal ordering with all possible

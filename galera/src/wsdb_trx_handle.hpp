@@ -117,7 +117,5 @@ namespace galera
    };
 }
 
-#define WSDB_TRX_HANDLE(ptr_) static_cast<WsdbTrxHandle*>((ptr_).get())
-
 
 #endif // GALERA_WSDB_TRX_HANDLE_HPP

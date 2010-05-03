@@ -17,12 +17,12 @@ namespace galera
     {
     public:
         // Get trx handle from wsdb
-        virtual TrxHandlePtr get_trx(wsrep_trx_id_t trx_id, 
+        virtual TrxHandle* get_trx(wsrep_trx_id_t trx_id, 
                                      bool create = false) = 0;
 
-        virtual TrxHandlePtr get_conn_query(wsrep_conn_id_t conn_id, 
-                                            bool create = false) = 0;
-
+        virtual TrxHandle* get_conn_query(wsrep_conn_id_t conn_id, 
+                                          bool create = false) = 0;
+        
         // Discard trx handle
         virtual void discard_trx(wsrep_trx_id_t trx_id) = 0;
         virtual void discard_conn(wsrep_conn_id_t conn_id) = 0;
@@ -30,7 +30,7 @@ namespace galera
         virtual void discard_conn_query(wsrep_conn_id_t conn_id) = 0;
 
         // Append query
-        virtual void append_query(TrxHandlePtr&,
+        virtual void append_query(TrxHandle*,
                                   const void* query,
                                   size_t query_len,
                                   time_t time,
@@ -39,22 +39,22 @@ namespace galera
 
 
         // Append row key
-        virtual void append_row_key(TrxHandlePtr&,
+        virtual void append_row_key(TrxHandle*,
                                     const void* dbtable, 
                                     size_t dbtable_len,
                                     const void* key, 
                                     size_t key_len,
                                     int action) = 0;
 
-        virtual void append_conn_query(TrxHandlePtr&, const void* query,
+        virtual void append_conn_query(TrxHandle*, const void* query,
                                        size_t query_len) = 0;
-
-        virtual void set_conn_variable(TrxHandlePtr&, const void*, size_t,
+        
+        virtual void set_conn_variable(TrxHandle*, const void*, size_t,
                                        const void*, size_t) = 0;
-        virtual void set_conn_database(TrxHandlePtr&, const void*, size_t) = 0;
-
+        virtual void set_conn_database(TrxHandle*, const void*, size_t) = 0;
+        
         // Create write set 
-        virtual void create_write_set(TrxHandlePtr&, 
+        virtual void create_write_set(TrxHandle*, 
                                       const void* rbr_data = 0,
                                       size_t rbr_data_len = 0) = 0;
 

@@ -5,6 +5,7 @@
 #include "write_set.hpp"
 
 #include <vector>
+#include <deque>
 #include <limits>
 
 namespace galera
@@ -45,7 +46,7 @@ namespace galera
     {
     public:
         typedef std::vector<Query> QuerySequence;
-        typedef std::vector<RowKey> RowKeySequence;        
+        typedef std::deque<RowKey> RowKeySequence;        
 
         GaleraWriteSet() 
             : 
@@ -55,7 +56,9 @@ namespace galera
             queries_(),
             keys_(),
             rbr_()
-        { }
+        { 
+            // keys_.reserve(8);
+        }
 
         GaleraWriteSet(enum wsdb_ws_type type) 
             : 

@@ -12,7 +12,6 @@
 #include "wsdb_api.h"
 
 #include "gu_mutex.hpp"
-#include <boost/shared_ptr.hpp>
 
 namespace galera
 {
@@ -30,7 +29,8 @@ namespace galera
             state_(WSDB_TRX_VOID),
             position_(WSDB_TRX_POS_VOID),
             local_seqno_(WSREP_SEQNO_UNDEFINED),
-            global_seqno_(WSREP_SEQNO_UNDEFINED)
+            global_seqno_(WSREP_SEQNO_UNDEFINED),
+            refcnt_(1)
         { }
         virtual ~TrxHandle() { delete write_set_; write_set_ = 0; }
         
@@ -95,6 +95,9 @@ namespace galera
             return *write_set_; 
         }
         virtual void clear() { }
+
+        void ref() { ++refcnt_; }
+        void unref() { --refcnt_; if (refcnt_ == 0) delete this; }
         
     private:
         
@@ -110,19 +113,24 @@ namespace galera
         enum wsdb_trx_position position_;
         wsrep_seqno_t local_seqno_;
         wsrep_seqno_t global_seqno_;
+        size_t refcnt_;
     };
     
-    
-    typedef boost::shared_ptr<TrxHandle> TrxHandlePtr;
-
     
     class TrxHandleLock
     {
     public:
-        TrxHandleLock(TrxHandlePtr& trx) : trx_(trx) { trx_->lock(); }
-        ~TrxHandleLock() { trx_->unlock(); }
+        TrxHandleLock(TrxHandle& trx) : trx_(trx) { trx_.lock(); }
+        ~TrxHandleLock() { trx_.unlock(); }
     private:
-        TrxHandlePtr& trx_;
+        TrxHandle& trx_;
+    };
+
+    template <typename T>
+    class Unref2nd
+    {
+    public:
+        void operator()(T& t) const { t.second->unref(); }
     };
     
 }

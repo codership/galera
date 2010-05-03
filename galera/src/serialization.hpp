@@ -90,7 +90,7 @@ namespace galera
         s.clear();
         ST len;
         offset = unserialize(buf, buf_len, offset, len);
-        s.reserve(len);
+        // s.reserve(len);
         for (ST i = 0; i < len; ++i)
         {
             typename S::value_type st;
