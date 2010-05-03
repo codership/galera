@@ -703,7 +703,6 @@ enum wsrep_status process_query_write_set_applying(
         }
         
         if (rcode == WSREP_OK && 
-            trx->get_write_set().get_level() == WSDB_WS_QUERY &&
             (rcode = apply_query(recv_ctx, "commit\0", 7, 
                                  trx->get_global_seqno())) != WSREP_OK)
         {
@@ -1902,7 +1901,7 @@ post_repl_out:
         throw;
     }
     
-    log_info << "pre_commit " << trx->get_trx_id() << " " << retcode;
+    // log_info << "pre_commit " << trx->get_trx_id() << " " << retcode;
     GU_DBUG_RETURN(retcode);
 }
 

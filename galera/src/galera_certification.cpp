@@ -102,7 +102,7 @@ int galera::GaleraCertification::append_trx(TrxHandle* trx)
 int galera::GaleraCertification::test(const TrxHandle* trx, bool bval)
 {
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
-    log_info << "test: " << role_ << " " << trx->is_local();
+    // log_info << "test: " << role_ << " " << trx->is_local();
     switch (role_)
     {
     case R_BYPASS:
