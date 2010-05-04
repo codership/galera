@@ -19,9 +19,151 @@ using namespace std;
 using namespace gu;
 
 
+inline galera::RowKeyEntry::RowKeyEntry(
+    const RowKey& row_key)
+    :
+    row_key_(),
+    row_key_buf_(),
+    refs_()
+{
+    // @todo optimize this by passing original row key
+    // buffer as argument
+    row_key_buf_.resize(serial_size(row_key));
+    (void)serialize(row_key, &row_key_buf_[0], 
+                    row_key_buf_.size(), 0);
+    (void)unserialize(&row_key_buf_[0],
+                      row_key_buf_.size(), 0, row_key_);
+}
+
+inline const galera::RowKey& 
+galera::RowKeyEntry::get_row_key() const 
+{ 
+    return row_key_; 
+}
+
+
+inline const deque<const galera::TrxHandle*>& 
+galera::RowKeyEntry::get_refs() const 
+{ 
+    return refs_; 
+}
+
+
+inline void 
+galera::RowKeyEntry::ref(const TrxHandle* trx)
+{
+    refs_.push_back(trx);
+}
+
+
+inline void 
+galera::RowKeyEntry::unref(const TrxHandle* trx)
+{
+    std::deque<const TrxHandle*>::iterator 
+        i(std::find(refs_.begin(), refs_.end(), trx));
+    if (i == refs_.end()) gu_throw_fatal;
+    refs_.erase(i);
+}
+
+
+bool 
+galera::GaleraCertification::same_source(const TrxHandle* a, const TrxHandle* b)
+{
+    switch (role_)
+    {
+    case R_SLAVE:
+        return (a->is_local() == b->is_local());
+        // @todo Assing source uuid for trx
+        // case R_MULTIMASTER:
+        // return (a->get_source() == b->get_source());
+    default:
+        gu_throw_fatal << "not implemented";
+        throw;
+    }
+}
+
+void
+galera::GaleraCertification::purge_for_trx(TrxHandle* trx)
+{
+    TrxHandleLock lock(*trx);
+    deque<RowKeyEntry*>& refs(trx->cert_keys_);
+    for (deque<RowKeyEntry*>::iterator i = refs.begin(); i != refs.end();
+         ++i)
+    {
+        // Unref all referenced and remove if referenced only by us
+        (*i)->unref(trx);
+        if ((*i)->get_refs().empty() == true)
+        {
+            CertIndex::iterator ci(cert_index_.find((*i)->get_row_key()));
+            assert(ci != cert_index_.end());
+            delete ci->second;
+            cert_index_.erase(ci);
+        }
+    }
+    refs.clear();
+}
+
+
+int galera::GaleraCertification::do_test(TrxHandle* trx)
+{
+    RowKeySequence rk;
+    trx->get_write_set().get_keys(rk);
+    deque<RowKeyEntry*>& match(trx->cert_keys_);
+    wsrep_seqno_t last_depends_seqno(-1);
+    assert(match.empty() == true);
+    
+    // Scan over all row keys
+    for (RowKeySequence::const_iterator i = rk.begin(); i != rk.end(); ++i)
+    {
+        CertIndex::iterator ci;
+        if ((ci = cert_index_.find(*i)) != cert_index_.end())
+        {
+            // Found matching entry, scan over dependent transactions
+            const deque<const TrxHandle*>& refs(ci->second->get_refs());
+            assert(refs.empty() == false);
+            for (deque<const TrxHandle*>::const_iterator ti =
+                     refs.begin(); ti != refs.end(); ++ti)
+            {
+                // We assume that certification is done only once per trx
+                // and in total order
+                assert((*ti)->get_global_seqno() < trx->get_global_seqno() ||
+                       same_source(*ti, trx));
+                if (same_source(*ti, trx) == false &&
+                    (*ti)->get_global_seqno() > 
+                    trx->get_write_set().get_last_seen_trx())
+                {
+                    // Cert conflict if trx write set didn't see ti committed
+                    log_info << "trx conflict";
+                    goto cert_fail;
+                }
+            }
+            last_depends_seqno = max(last_depends_seqno, 
+                                     refs.back()->get_global_seqno());
+        }
+        else
+        {
+            RowKeyEntry* cie(new RowKeyEntry(*i));
+            ci = cert_index_.insert(make_pair(cie->get_row_key(), cie)).first;
+        }
+        match.push_back(ci->second);
+        ci->second->ref(trx);
+    }
+    
+    trx->assign_last_depends_seqno(last_depends_seqno);
+
+    return WSDB_OK;
+    
+cert_fail:
+    purge_for_trx(trx);
+    return WSDB_CERTIFICATION_FAIL;
+}
+
+
+
 galera::GaleraCertification::GaleraCertification(const string& conf) 
     : 
     trx_map_(), 
+    cert_index_(),
     mutex_(), 
     trx_size_warn_count_(0), 
     position_(-1),
@@ -29,6 +171,7 @@ galera::GaleraCertification::GaleraCertification(const string& conf)
 { 
     // TODO: Adjust role by configuration
 }
+
 
 galera::GaleraCertification::~GaleraCertification()
 {
@@ -99,7 +242,10 @@ int galera::GaleraCertification::append_trx(TrxHandle* trx)
 }
 
 
-int galera::GaleraCertification::test(const TrxHandle* trx, bool bval)
+
+
+
+int galera::GaleraCertification::test(TrxHandle* trx, bool bval)
 {
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
     // log_info << "test: " << role_ << " " << trx->is_local();
@@ -108,7 +254,14 @@ int galera::GaleraCertification::test(const TrxHandle* trx, bool bval)
     case R_BYPASS:
         return WSDB_OK;
     case R_SLAVE:
-        return (trx->is_local() == true ? WSDB_CERTIFICATION_FAIL : WSDB_OK);
+        if (trx->is_local() == false)
+        {
+            return do_test(trx);
+        }
+        else
+        {
+            return WSDB_CERTIFICATION_FAIL;
+        }
     case R_MASTER:
         return (trx->is_local() == true ? WSDB_OK : WSDB_CERTIFICATION_FAIL);
     default:
@@ -123,12 +276,13 @@ wsrep_seqno_t galera::GaleraCertification::get_safe_to_discard_seqno() const
     return last_committed_;
 }
 
+
 void galera::GaleraCertification::purge_trxs_upto(wsrep_seqno_t seqno)
 {
     assert(seqno >= 0);
     Lock lock(mutex_); 
     TrxMap::iterator lower_bound(trx_map_.lower_bound(seqno));
-    for_each(trx_map_.begin(), lower_bound, Unref2nd<TrxMap::value_type>());
+    for_each(trx_map_.begin(), lower_bound, PurgeAndDiscard(this));
     trx_map_.erase(trx_map_.begin(), lower_bound);
     if (trx_map_.size() > 10000)
     {

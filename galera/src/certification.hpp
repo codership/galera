@@ -72,7 +72,7 @@ namespace galera
         //
         // @return WSDB_OK if certification test passed, otherwise error code
         //
-        virtual int test(const TrxHandle*, bool) = 0;
+        virtual int test(TrxHandle*, bool) = 0;
 
         //!
         // @brief Get sequence number that is guaranteed to be 

@@ -76,12 +76,13 @@ namespace galera
     {
         if (a.dbtable_len_ != b.dbtable_len_) return false;
         if (a.key_len_ != b.key_len_) return false;
-        if (a.action_ != b.action_) return false;
         if (memcmp(a.dbtable_, b.dbtable_, a.dbtable_len_) != 0) return false;
         return (memcmp(a.key_, b.key_, a.key_len_) == 0);
     }
-
+    
     typedef std::deque<RowKey> RowKeySequence;
+    
+
     
     class WriteSet 
     {

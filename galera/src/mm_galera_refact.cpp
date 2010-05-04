@@ -1601,7 +1601,7 @@ enum wsrep_status mm_galera_post_rollback(
 }
 
 static int check_certification_status_for_aborted(
-    trx_seqno_t seqno_l, const TrxHandle* trx
+    trx_seqno_t seqno_l, TrxHandle* trx
 ) {
     int rcode;
     /*

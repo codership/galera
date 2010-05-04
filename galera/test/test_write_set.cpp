@@ -135,6 +135,16 @@ START_TEST(test_write_set)
 }
 END_TEST
 
+#if 0
+START_TEST(test_cert)
+{
+    Certification* cert(Certification::create("galera"));
+
+    delete cert;
+
+}
+END_TEST
+#endif
 
 
 Suite* suite()

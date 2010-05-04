@@ -47,7 +47,7 @@ inline size_t galera::serial_size(const Query& q)
             + serial_size(uint32_t()));
 }
 
-inline size_t galera::serialize(const RowKey& row_key, 
+size_t galera::serialize(const RowKey& row_key, 
                                 gu::byte_t*   buf,
                                 size_t        buf_len,
                                 size_t        offset)
@@ -61,7 +61,7 @@ inline size_t galera::serialize(const RowKey& row_key,
 }
 
 
-inline size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len, 
+size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len, 
                                   size_t offset,
                                   RowKey& row_key)
 {
@@ -74,7 +74,7 @@ inline size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len,
 }
 
 
-inline size_t galera::serial_size(const RowKey& row_key)
+size_t galera::serial_size(const RowKey& row_key)
 {
     return (serial_size<uint16_t>(row_key.dbtable_, row_key.dbtable_len_) 
             + serial_size<uint16_t>(row_key.key_, row_key.key_len_) 

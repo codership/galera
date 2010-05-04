@@ -15,6 +15,7 @@
 
 namespace galera
 {
+    class RowKeyEntry;
     class TrxHandle
     {
     public:
@@ -30,8 +31,11 @@ namespace galera
             position_(WSDB_TRX_POS_VOID),
             local_seqno_(WSREP_SEQNO_UNDEFINED),
             global_seqno_(WSREP_SEQNO_UNDEFINED),
-            refcnt_(1)
+            last_depends_seqno_(WSREP_SEQNO_UNDEFINED),
+            refcnt_(1),
+            cert_keys_()
         { }
+        
         virtual ~TrxHandle() { delete write_set_; write_set_ = 0; }
         
         void lock() { mutex_.lock(); }
@@ -44,11 +48,16 @@ namespace galera
         
         virtual void assign_seqnos(wsrep_seqno_t seqno_l, 
                                    wsrep_seqno_t seqno_g)
-        { 
+        {
             local_seqno_ = seqno_l; 
             global_seqno_ = seqno_g; 
         }
 
+        void assign_last_depends_seqno(wsrep_seqno_t seqno_lt)
+        {
+            last_depends_seqno_ = seqno_lt;
+        }
+        
         virtual void assign_state(enum wsdb_trx_state state) 
         { 
             state_ = state; 
@@ -75,6 +84,7 @@ namespace galera
         
         wsrep_seqno_t get_local_seqno() const { return local_seqno_; }
         wsrep_seqno_t get_global_seqno() const { return global_seqno_; }
+        wsrep_seqno_t get_last_depends_seqno() const { return last_depends_seqno_; }
         enum wsdb_trx_position get_position() const { return position_; }
         
         virtual void assign_write_set(WriteSet* ws) 
@@ -113,7 +123,10 @@ namespace galera
         enum wsdb_trx_position position_;
         wsrep_seqno_t local_seqno_;
         wsrep_seqno_t global_seqno_;
+        wsrep_seqno_t last_depends_seqno_;
         size_t refcnt_;
+        friend class GaleraCertification;
+        std::deque<RowKeyEntry*> cert_keys_;
     };
     
     
@@ -131,6 +144,22 @@ namespace galera
     {
     public:
         void operator()(T& t) const { t.second->unref(); }
+    };
+    
+
+    class RowKeyEntry
+    {
+    public:
+        RowKeyEntry(const RowKey& row_key);
+        
+        const RowKey& get_row_key() const;
+        const std::deque<const TrxHandle*>& get_refs() const;
+        void ref(const TrxHandle* trx);
+        void unref(const TrxHandle* trx);
+    private:
+        RowKey row_key_;
+        gu::Buffer row_key_buf_;
+        std::deque<const TrxHandle*> refs_;
     };
     
 }
