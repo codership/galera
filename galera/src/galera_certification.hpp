@@ -52,7 +52,7 @@ namespace galera
             void operator()(TrxMap::value_type& vt) const
             {
                 cert_->purge_for_trx(vt.second);
-                delete vt.second;
+                vt.second->unref();
             }
             PurgeAndDiscard(const PurgeAndDiscard& other) : cert_(other.cert_) { }
         private:

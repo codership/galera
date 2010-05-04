@@ -1585,6 +1585,8 @@ enum wsrep_status mm_galera_post_rollback(
     case WSDB_TRX_VOID:
     case WSDB_TRX_ABORTING_NONREPL:
         /* local trx was removed in pre_commit phase already */
+        cert->set_trx_committed(trx);
+        trx->clear();
         trx->unlock();
         wsdb->discard_trx(trx->get_trx_id());
         break;
@@ -1891,8 +1893,6 @@ post_repl_out:
         // commit queue in case of rollback
         bool do_report(report_check_counter ());
         GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
-        cert->set_trx_committed(trx);
-        trx->clear();
         if (do_report) report_last_committed (gcs_conn);
         break;
     }

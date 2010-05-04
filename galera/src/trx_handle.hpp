@@ -36,7 +36,7 @@ namespace galera
             cert_keys_()
         { }
         
-        virtual ~TrxHandle() { delete write_set_; write_set_ = 0; }
+
         
         void lock() { mutex_.lock(); }
         void unlock() { mutex_.unlock(); }
@@ -110,7 +110,7 @@ namespace galera
         void unref() { --refcnt_; if (refcnt_ == 0) delete this; }
         
     private:
-        
+        virtual ~TrxHandle() { delete write_set_; write_set_ = 0; }        
         TrxHandle(const TrxHandle&);
         void operator=(const TrxHandle& other);
         wsrep_conn_id_t     conn_id_;
