@@ -2,7 +2,7 @@
 
 #include "galera_wsdb.hpp"
 #include "trx_handle.hpp"
-#include "galera_write_set.hpp"
+#include "write_set.hpp"
 
 
 #include "gu_lock.hpp"
@@ -21,7 +21,7 @@ galera::GaleraWsdb::GaleraWsdb()
 
 galera::GaleraWsdb::~GaleraWsdb()
 {
-
+    
     log_info << "wsdb trx map usage " << trx_map_.size() 
              << " conn query map usage " << conn_query_map_.size();
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
@@ -57,7 +57,7 @@ galera::GaleraWsdb::create_trx(wsrep_trx_id_t trx_id)
                   new TrxHandle(-1, trx_id, true)));
     if (i.second == false)
         gu_throw_fatal;
-    i.first->second->assign_write_set(new GaleraWriteSet(WSDB_WS_TYPE_TRX));
+    i.first->second->assign_write_set(new WriteSet(WSDB_WS_TYPE_TRX));
     return i.first->second;
 }
 
@@ -69,7 +69,7 @@ galera::GaleraWsdb::create_conn_query(wsrep_conn_id_t conn_id)
         make_pair(conn_id, new TrxHandle(conn_id, -1, true)));
     if (i.second == false)
         gu_throw_fatal;
-    i.first->second->assign_write_set(new GaleraWriteSet(WSDB_WS_TYPE_CONN));
+    i.first->second->assign_write_set(new WriteSet(WSDB_WS_TYPE_CONN));
     return i.first->second;
 }
 

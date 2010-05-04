@@ -1,6 +1,5 @@
 
-#include "galera_write_set.hpp"
-#include "serialization.hpp"
+#include "write_set.cpp"
 #include "gu_logger.hpp"
 
 #include <cstdlib>
@@ -51,7 +50,7 @@ END_TEST
 
 START_TEST(test_write_set)
 {
-    GaleraWriteSet ws(WSDB_WS_TYPE_TRX);
+    WriteSet ws(WSDB_WS_TYPE_TRX);
 
     const char* query1 = "select 0";
     size_t query1_len = strlen(query1);
@@ -107,8 +106,8 @@ START_TEST(test_write_set)
     fail_unless(buf.size() == expected_size, "%zd <-> %zd <-> %zd", 
                 buf.size(), expected_size, serial_size(ws));
     
-
-    GaleraWriteSet ws2;
+    
+    WriteSet ws2;
     
     size_t ret = unserialize(&buf[0], buf.size(), 0, ws2);
     fail_unless(ret == expected_size);
@@ -122,8 +121,16 @@ START_TEST(test_write_set)
         const gu::Buffer& q(ws.get_queries()[i].get_query());
         log_info << string(&q[0], &q[0] + q.size());
     }
-    fail_unless(ws2.get_rbr().size() == rbr_len, "%zd <-> %zd", ws2.get_rbr().size(), rbr_len);
 
+    RowKeySequence rks;
+    ws.get_keys(rks);
+
+    RowKeySequence rks2;
+    ws.get_keys(rks2);
+
+    fail_unless(rks2 == rks);
+
+    fail_unless(ws2.get_rbr() == ws.get_rbr());
 
 }
 END_TEST

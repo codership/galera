@@ -4,7 +4,7 @@
 
 #include "galera_certification.hpp"
 #include "trx_handle.hpp"
-#include "galera_write_set.hpp"
+#include "write_set.hpp"
 
 #include "gu_lock.hpp"
 #include "gu_throw.hpp"
@@ -52,7 +52,7 @@ galera::TrxHandle* galera::GaleraCertification::create_trx(
     assert(seqno_l >= 0 && seqno_g >= 0);
     TrxHandle* trx(new TrxHandle(-1, -1, false));
     
-    GaleraWriteSet* ws(new GaleraWriteSet());
+    WriteSet* ws(new WriteSet());
     if (unserialize(reinterpret_cast<const byte_t*>(data), 
                     data_len, 0, *ws) == 0)
     {

@@ -25,12 +25,39 @@ namespace galera
         return (offset + sizeof(i));
     }
     
-    
     template<typename I> size_t serial_size(const I& i)
     {
         return sizeof(i);
     }
 
+    template<typename ST>
+    size_t serialize(const void* data, ST data_len, gu::byte_t* buf, 
+                     size_t buf_len,
+                     size_t offset)
+    {
+        offset = serialize(data_len, buf, buf_len, offset);
+        if (offset + data_len > buf_len) gu_throw_fatal;
+        memcpy(buf + offset, data, data_len);
+        return (offset + data_len);
+    }
+
+    template <typename ST>
+    size_t unserialize(const gu::byte_t* buf, size_t buf_len, size_t offset,
+                       const void*& data, ST& data_len)
+    {
+        offset = unserialize(buf, buf_len, offset, data_len);
+        if (offset + data_len > buf_len) gu_throw_fatal;
+        data = buf + offset;
+        return (offset + data_len);
+    }
+    
+    template <typename ST>
+    size_t serial_size(const void* data, ST data_len)
+    {
+        return (serial_size(data_len) + data_len);
+    }
+    
+    
     template<typename ST>
     size_t serialize(const gu::Buffer& b,
                      gu::byte_t* buf,
