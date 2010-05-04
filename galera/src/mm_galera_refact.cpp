@@ -372,6 +372,7 @@ enum wsrep_status mm_galera_connect (wsrep_t *gh,
     else
     {
         log_info << "WSREP: certification role slave";
+        // Bypass would be enough if no parallel applying
         cert->set_role(Certification::R_SLAVE);
     }
     
@@ -1524,7 +1525,6 @@ enum wsrep_status mm_galera_post_commit(
     GU_DBUG_PRINT("galera", ("trx: %llu", trx->get_trx_id()));
     
     assert (trx->get_state() == WSDB_TRX_REPLICATED);
-    assert (trx->get_write_set().empty() == false);
     assert (trx->get_global_seqno() != WSREP_SEQNO_UNDEFINED);
     
     GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
@@ -1579,14 +1579,14 @@ enum wsrep_status mm_galera_post_rollback(
     case WSDB_TRX_ABORTING_REPL:
         /* these have replicated */
         assert (trx->get_local_seqno() > 0);
+        cert->set_trx_committed(trx);
+        // trx->clear();
         // Note: commit queue should have been released already in 
         // pre_commit()
         // GALERA_RELEASE_QUEUE(commit_queue, trx->get_local_seqno());
     case WSDB_TRX_VOID:
     case WSDB_TRX_ABORTING_NONREPL:
         /* local trx was removed in pre_commit phase already */
-        cert->set_trx_committed(trx);
-        trx->clear();
         trx->unlock();
         wsdb->discard_trx(trx->get_trx_id());
         break;

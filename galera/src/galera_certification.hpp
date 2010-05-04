@@ -10,21 +10,34 @@
 
 namespace galera
 {
+    
+    class RowKeyEntry
+    {
+    public:
+        RowKeyEntry(const RowKey& row_key);
+        
+        const RowKey& get_row_key() const;
+        void ref(TrxHandle* trx);
+        void unref(TrxHandle* trx);
+        TrxHandle* get_ref_trx() const;
+        RowKeyEntry(const RowKeyEntry& other) 
+            : 
+            row_key_(other.row_key_),
+            row_key_buf_(other.row_key_buf_),
+            ref_trx_(other.ref_trx_)
+        { }
+        
+    private:
+        void operator=(const RowKeyEntry&);
+        RowKey row_key_;
+        gu::Buffer row_key_buf_;
+        TrxHandle* ref_trx_;
+    };
+
     class GaleraCertification : public Certification
     {
     private:
-        class RowKeyHash
-        {
-        public:
-            size_t operator()(const RowKey& rk) const
-            {
-                const gu::byte_t* b(reinterpret_cast<const gu::byte_t*>(
-                                        rk.get_key()));
-                const gu::byte_t* e(reinterpret_cast<const gu::byte_t*>(
-                                        rk.get_key()) + rk.get_key_len());
-                return boost::hash_range(b, e);
-            }
-        };
+
         typedef boost::unordered_map<RowKey, RowKeyEntry*, RowKeyHash> CertIndex;
         typedef std::map<wsrep_seqno_t, TrxHandle*> TrxMap;
     public:

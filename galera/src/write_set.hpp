@@ -13,6 +13,8 @@
 #include <vector>
 #include <deque>
 
+#include <boost/unordered_map.hpp>
+
 namespace galera
 {
     class Query
@@ -82,6 +84,18 @@ namespace galera
     
     typedef std::deque<RowKey> RowKeySequence;
     
+        class RowKeyHash
+        {
+        public:
+            size_t operator()(const RowKey& rk) const
+            {
+                const gu::byte_t* b(reinterpret_cast<const gu::byte_t*>(
+                                        rk.get_key()));
+                const gu::byte_t* e(reinterpret_cast<const gu::byte_t*>(
+                                        rk.get_key()) + rk.get_key_len());
+                return boost::hash_range(b, e);
+            }
+        };
 
     
     class WriteSet 
@@ -94,6 +108,7 @@ namespace galera
             last_seen_trx_(),
             queries_(),
             keys_(),
+            key_refs_(),
             rbr_()
         { }
         
@@ -104,6 +119,7 @@ namespace galera
             last_seen_trx_(),
             queries_(),
             keys_(),
+            key_refs_(),
             rbr_()
         { }
         
@@ -137,7 +153,8 @@ namespace galera
         const QuerySequence& get_queries() const { return queries_; }
         bool empty() const { return (rbr_.size() == 0); }
         void serialize(gu::Buffer& buf) const;
-        void clear() { keys_.clear(), rbr_.clear(), queries_.clear(); }
+        void clear() { keys_.clear(), key_refs_.clear(),
+                rbr_.clear(), queries_.clear(); }
     private:
         friend size_t serialize(const WriteSet&, gu::byte_t*, size_t, size_t);
         friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&);
@@ -148,6 +165,8 @@ namespace galera
         wsrep_seqno_t last_seen_trx_;
         QuerySequence queries_;
         gu::Buffer keys_;
+        typedef boost::unordered_multimap<size_t, size_t> KeyRefMap;
+        KeyRefMap key_refs_;
         gu::Buffer rbr_;
     };
 }

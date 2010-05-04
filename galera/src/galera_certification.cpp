@@ -24,7 +24,7 @@ inline galera::RowKeyEntry::RowKeyEntry(
     :
     row_key_(),
     row_key_buf_(),
-    refs_()
+    ref_trx_(0)
 {
     // @todo optimize this by passing original row key
     // buffer as argument
@@ -42,27 +42,29 @@ galera::RowKeyEntry::get_row_key() const
 }
 
 
-inline const deque<const galera::TrxHandle*>& 
-galera::RowKeyEntry::get_refs() const 
+inline galera::TrxHandle*
+galera::RowKeyEntry::get_ref_trx() const 
 { 
-    return refs_; 
+    return ref_trx_;
 }
 
 
 inline void 
-galera::RowKeyEntry::ref(const TrxHandle* trx)
+galera::RowKeyEntry::ref(TrxHandle* trx)
 {
-    refs_.push_back(trx);
+    assert(ref_trx_ == 0 || 
+           ref_trx_->get_global_seqno() < trx->get_global_seqno());
+    ref_trx_ = trx;
 }
 
 
 inline void 
-galera::RowKeyEntry::unref(const TrxHandle* trx)
+galera::RowKeyEntry::unref(TrxHandle* trx)
 {
-    std::deque<const TrxHandle*>::iterator 
-        i(std::find(refs_.begin(), refs_.end(), trx));
-    if (i == refs_.end()) gu_throw_fatal;
-    refs_.erase(i);
+    if (ref_trx_ == trx)
+    {
+        ref_trx_ = 0;
+    }
 }
 
 
@@ -90,9 +92,9 @@ galera::GaleraCertification::purge_for_trx(TrxHandle* trx)
     for (deque<RowKeyEntry*>::iterator i = refs.begin(); i != refs.end();
          ++i)
     {
-        // Unref all referenced and remove if referenced only by us
+        // Unref all referenced and remove if was referenced by us
         (*i)->unref(trx);
-        if ((*i)->get_refs().empty() == true)
+        if ((*i)->get_ref_trx() == 0)
         {
             CertIndex::iterator ci(cert_index_.find((*i)->get_row_key()));
             assert(ci != cert_index_.end());
@@ -111,6 +113,9 @@ int galera::GaleraCertification::do_test(TrxHandle* trx)
     deque<RowKeyEntry*>& match(trx->cert_keys_);
     wsrep_seqno_t last_depends_seqno(-1);
     assert(match.empty() == true);
+
+    //log_info << "test for " << trx->get_global_seqno() << " keys "
+    //        << rk.size() << " index size " << cert_index_.size();
     
     // Scan over all row keys
     for (RowKeySequence::const_iterator i = rk.begin(); i != rk.end(); ++i)
@@ -119,38 +124,39 @@ int galera::GaleraCertification::do_test(TrxHandle* trx)
         if ((ci = cert_index_.find(*i)) != cert_index_.end())
         {
             // Found matching entry, scan over dependent transactions
-            const deque<const TrxHandle*>& refs(ci->second->get_refs());
-            assert(refs.empty() == false);
-            for (deque<const TrxHandle*>::const_iterator ti =
-                     refs.begin(); ti != refs.end(); ++ti)
+            const TrxHandle* ref_trx(ci->second->get_ref_trx());
+            assert(ref_trx != 0);
+            // We assume that certification is done only once per trx
+            // and in total order
+            assert(ref_trx->get_global_seqno() < trx->get_global_seqno() ||
+                   same_source(ref_trx, trx));
+            if (same_source(ref_trx, trx) == false &&
+                ref_trx->get_global_seqno() > 
+                trx->get_write_set().get_last_seen_trx())
             {
-                // We assume that certification is done only once per trx
-                // and in total order
-                assert((*ti)->get_global_seqno() < trx->get_global_seqno() ||
-                       same_source(*ti, trx));
-                if (same_source(*ti, trx) == false &&
-                    (*ti)->get_global_seqno() > 
-                    trx->get_write_set().get_last_seen_trx())
-                {
-                    // Cert conflict if trx write set didn't see ti committed
-                    log_info << "trx conflict";
-                    goto cert_fail;
-                }
+                // Cert conflict if trx write set didn't see ti committed
+                log_info << "trx conflict";
+                goto cert_fail;
             }
             last_depends_seqno = max(last_depends_seqno, 
-                                     refs.back()->get_global_seqno());
+                                     ref_trx->get_global_seqno());
         }
         else
         {
             RowKeyEntry* cie(new RowKeyEntry(*i));
             ci = cert_index_.insert(make_pair(cie->get_row_key(), cie)).first;
         }
-        match.push_back(ci->second);
-        ci->second->ref(trx);
+        
+        if (ci->second->get_ref_trx() != trx)
+        {
+            match.push_back(ci->second);
+            ci->second->ref(trx);
+        }
     }
     
+    // log_info << "refs after scan " << match.size();
     trx->assign_last_depends_seqno(last_depends_seqno);
-
+    
     return WSDB_OK;
     
 cert_fail:
@@ -175,6 +181,7 @@ galera::GaleraCertification::GaleraCertification(const string& conf)
 
 galera::GaleraCertification::~GaleraCertification()
 {
+    log_info << "cert index usage at exit " << cert_index_.size();
     log_info << "cert trx map usage at exit " << trx_map_.size();
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
 }
@@ -299,6 +306,7 @@ void galera::GaleraCertification::set_trx_committed(TrxHandle* trx)
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
     if (last_committed_ < trx->get_global_seqno())
         last_committed_ = trx->get_global_seqno();
+    trx->clear();
 }
 
 galera::TrxHandle* galera::GaleraCertification::get_trx(wsrep_seqno_t seqno)

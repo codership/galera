@@ -131,13 +131,26 @@ void galera::WriteSet::append_row_key(const void* dbtable,
                                       int action)
 {
     RowKey rk(dbtable, dbtable_len, key, key_len, action);
+    size_t hash(RowKeyHash()(rk));
+    
+    pair<KeyRefMap::const_iterator, KeyRefMap::const_iterator> 
+        range(key_refs_.equal_range(hash));
+    for (KeyRefMap::const_iterator i = range.first; i != range.second; ++i)
+    {
+        RowKey cmp;
+        (void)galera::unserialize(&keys_[0], keys_.size(), i->second, cmp);
+        if (rk == cmp)
+        {
+            return;
+        }
+    }
+    
     size_t rk_size(serial_size(rk));
     size_t offset(keys_.size());
     keys_.resize(offset + rk_size);
-    if (galera::serialize(rk, &keys_[0], offset + rk_size, offset) == 0)
-    {
-        gu_throw_fatal << "failed to serialize row key";
-    }
+    (void)galera::serialize(rk, &keys_[0], keys_.size(), offset);
+    (void)galera::unserialize(&keys_[0], keys_.size(), offset, rk); 
+    (void)key_refs_.insert(make_pair(hash, offset));
 }
 
 

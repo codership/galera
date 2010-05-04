@@ -104,7 +104,7 @@ namespace galera
             assert(write_set_ != 0);
             return *write_set_; 
         }
-        virtual void clear() { }
+        virtual void clear() { if (write_set_ != 0) write_set_->clear(); }
 
         void ref() { ++refcnt_; }
         void unref() { --refcnt_; if (refcnt_ == 0) delete this; }
@@ -147,20 +147,7 @@ namespace galera
     };
     
 
-    class RowKeyEntry
-    {
-    public:
-        RowKeyEntry(const RowKey& row_key);
-        
-        const RowKey& get_row_key() const;
-        const std::deque<const TrxHandle*>& get_refs() const;
-        void ref(const TrxHandle* trx);
-        void unref(const TrxHandle* trx);
-    private:
-        RowKey row_key_;
-        gu::Buffer row_key_buf_;
-        std::deque<const TrxHandle*> refs_;
-    };
+
     
 }
 
