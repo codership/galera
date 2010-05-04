@@ -2,7 +2,7 @@
 Import('check_env')
 
 env = check_env.Clone()
-env.Append(LIBS = ['mmgalera',
+env.Append(LIBS = ['galera++',
                    'wsdb',
                    'gcs',
                    'gcomm',

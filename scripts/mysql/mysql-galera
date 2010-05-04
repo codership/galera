@@ -80,13 +80,15 @@ MYSQL_SHUTDOWN_WAIT=60
 ROOT_USER=${ROOT_USER:-"-uroot"}
 ROOT_PSWD=${ROOT_PSWD:-"-prootpass"}
 
+MASTER_SLAVE=no
 LD_LIBRARY_PATH="$GALERA_BASE_DIR/lib"
 LD_PRELOAD=$(echo "$MYSQL_BASE_DIR/lib/mysql/libmysqlclient.so "\
 "$GALERA_BASE_DIR/lib/libgalerautils.so "\
 "$GALERA_BASE_DIR/lib/libgalerautils++.so "\
 "$GALERA_BASE_DIR/lib/libgcomm.so "\
 "$GALERA_BASE_DIR/lib/libgcs.so "\
-"$GALERA_BASE_DIR/lib/libwsdb.so ")
+"$GALERA_BASE_DIR/lib/libwsdb.so "\
+"$GALERA_BASE_DIR/lib/libgalera++.so ")
 
 # Mandatory stuff
 INNODB_OPTS=" --default-storage-engine=InnoDB "
@@ -200,7 +202,13 @@ galera_start()
         RBR_OPTS=" --binlog_format=STATEMENT "
     fi
 
-    WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera.so"}
+    if [ "$MASTER_SLAVE" == "yes" ]
+    then
+        WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmsgalera.so"}
+    else
+        WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera.so"}
+    fi
+
     if test -f $WSREP || test $WSREP == "none"
     then
         WSREP_OPTS="--wsrep_provider=$WSREP"
@@ -454,6 +462,9 @@ case $1 in
     --ws_level)
             WS_LEVEL=$2
             shift
+            ;;
+    --master-slave)
+            MASTER_SLAVE="yes"
             ;;
     -u|--user)
             ROOT_USER="-u$2"

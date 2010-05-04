@@ -410,7 +410,9 @@ static enum wsrep_status mm_galera_connect (wsrep_t *gh,
     
     status.stage = GALERA_STAGE_JOINING;
     conn_state   = GALERA_CONNECTED;
-    
+ 
+    gu_info("WSREP: certification role multimaster");
+   
     GU_DBUG_RETURN(rcode);
 }
 
