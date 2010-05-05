@@ -78,12 +78,14 @@ namespace galera
                 last_entered_ = seqno;
             }
             
+            // @
             while (appliers_[indexof(last_entered_ + 1)].state_ >= Applier::S_WAITING)
             {
-                
                 ++last_entered_;
                 Applier& a(appliers_[indexof(last_entered_)]);
-                if (a.state_ == Applier::S_WAITING && may_enter(a.trx_) == true)
+                if (a.state_ == Applier::S_WAITING && 
+                    may_enter(a.trx_) == true &&
+                    a.trx_->get_global_seqno() != seqno)
                 {
                     a.cond_.signal();
                 }
@@ -111,6 +113,7 @@ namespace galera
             }
             appliers_[idx].state_ = Applier::S_WAITING;
             appliers_[idx].trx_   = trx;
+            update_last_entered(trx->get_global_seqno());
             // We must wait until all preceding trxs have entered
             // the monitor and the last dependent has left
             while (may_enter(trx) == false)
