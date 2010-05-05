@@ -1681,7 +1681,7 @@ static int check_certification_status_for_aborted(
     }
 }
 
-
+#include <iostream>
 extern "C"
 enum wsrep_status mm_galera_pre_commit(
     wsrep_t *gh, wsrep_conn_id_t conn_id, 
@@ -1761,6 +1761,14 @@ enum wsrep_status mm_galera_pre_commit(
     // generate write set
     wsdb->create_write_set(trx, rbr_data, rbr_data_len);
     const WriteSet& ws(trx->get_write_set());
+
+    if (ws.empty() == false && ws.get_key_buf().empty() == true)
+    {
+        log_warn << "non empty ws without keys";
+        copy(ws.get_queries().begin(), ws.get_queries().end(),
+             ostream_iterator<const Query>(cerr));
+        return WSREP_TRX_FAIL;
+    }
     
     assert (WSREP_SEQNO_UNDEFINED == trx->get_global_seqno());
     

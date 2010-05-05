@@ -157,6 +157,7 @@ namespace galera
         }
         
         void get_keys(RowKeySequence&) const;
+        const gu::Buffer& get_key_buf() const { return keys_; }
         const QuerySequence& get_queries() const { return queries_; }
         bool empty() const { return (rbr_.size() == 0 && queries_.size() == 0); }
         void serialize(gu::Buffer& buf) const;
