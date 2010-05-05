@@ -44,7 +44,7 @@ namespace galera
     
     std::ostream& operator<<(std::ostream&, const Query& q);
     
-    typedef std::vector<Query> QuerySequence;
+    typedef std::deque<Query> QuerySequence;
     
     class RowKey
     {
@@ -128,10 +128,17 @@ namespace galera
         wsrep_seqno_t get_last_seen_trx() const { return last_seen_trx_; }
         const gu::Buffer& get_rbr() const { return rbr_; }
         
-        void append_query(const void* query, size_t query_len)
+        void append_query(const void* query, size_t query_len, 
+                          time_t tstamp = -1,
+                          uint32_t rndseed = -1)
         {
             queries_.push_back(Query(query,
-                                     query_len));
+                                     query_len, tstamp, rndseed));
+        }
+
+        void prepend_query(const Query& query)
+        {
+            queries_.push_front(query);
         }
         
         void append_row_key(const void* dbtable, size_t dbtable_len,
@@ -151,7 +158,7 @@ namespace galera
         
         void get_keys(RowKeySequence&) const;
         const QuerySequence& get_queries() const { return queries_; }
-        bool empty() const { return (rbr_.size() == 0); }
+        bool empty() const { return (rbr_.size() == 0 && queries_.size() == 0); }
         void serialize(gu::Buffer& buf) const;
         void clear() { keys_.clear(), key_refs_.clear(),
                 rbr_.clear(), queries_.clear(); }

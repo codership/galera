@@ -14,7 +14,7 @@ using namespace gu;
 galera::GaleraWsdb::GaleraWsdb()
     : 
     trx_map_(), 
-    conn_query_map_(), 
+    conn_map_(), 
     mutex_() 
 {
 }
@@ -23,10 +23,8 @@ galera::GaleraWsdb::~GaleraWsdb()
 {
     
     log_info << "wsdb trx map usage " << trx_map_.size() 
-             << " conn query map usage " << conn_query_map_.size();
+             << " conn query map usage " << conn_map_.size();
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
-    for_each(conn_query_map_.begin(), conn_query_map_.end(), 
-             Unref2nd<TrxMap::value_type>());
 }
 
 ostream& galera::GaleraWsdb::operator<<(ostream& os) const
@@ -38,8 +36,8 @@ ostream& galera::GaleraWsdb::operator<<(ostream& os) const
         os << i->first << " ";
     }
     os << "\n conn query map: ";
-    for (ConnQueryMap::const_iterator i = conn_query_map_.begin(); 
-         i != conn_query_map_.end();
+    for (ConnMap::const_iterator i = conn_map_.begin(); 
+         i != conn_map_.end();
          ++i)
     {
         os << i->first << " ";
@@ -62,14 +60,13 @@ galera::GaleraWsdb::create_trx(wsrep_trx_id_t trx_id)
 }
 
 
-galera::TrxHandle*
-galera::GaleraWsdb::create_conn_query(wsrep_conn_id_t conn_id)
+galera::GaleraWsdb::Conn&
+galera::GaleraWsdb::create_conn(wsrep_conn_id_t conn_id)
 {
-    pair<TrxMap::iterator, bool> i = conn_query_map_.insert(
-        make_pair(conn_id, new TrxHandle(conn_id, -1, true)));
+    pair<ConnMap::iterator, bool> i = conn_map_.insert(
+        make_pair(conn_id, Conn(conn_id)));
     if (i.second == false)
         gu_throw_fatal;
-    i.first->second->assign_write_set(new WriteSet(WSDB_WS_TYPE_CONN));
     return i.first->second;
 }
 
@@ -94,23 +91,34 @@ galera::GaleraWsdb::get_trx(wsrep_trx_id_t trx_id,
     return i->second;
 }
 
-galera::TrxHandle* galera::GaleraWsdb::get_conn_query(wsrep_trx_id_t id, 
+galera::TrxHandle* galera::GaleraWsdb::get_conn_query(wsrep_trx_id_t conn_id, 
                                                       bool create)
 {
     Lock lock(mutex_);
-    TrxMap::iterator i;
-    if ((i = conn_query_map_.find(id)) == conn_query_map_.end())
+    ConnMap::iterator i;
+
+    if ((i = conn_map_.find(conn_id)) == conn_map_.end())
     {
         if (create == true)
         {
-            return create_conn_query(id);
+            Conn& conn(create_conn(conn_id));
+            TrxHandle* trx(new TrxHandle(conn_id, -1, true));
+            trx->assign_write_set(new WriteSet(WSDB_WS_TYPE_CONN));
+            conn.assign_trx(trx);
+            return trx;
         }
         else
         {
             return 0;
         }
     }
-    return i->second;
+    if (i->second.get_trx() == 0)
+    {
+        TrxHandle* trx(new TrxHandle(conn_id, -1, true));
+        trx->assign_write_set(new WriteSet(WSDB_WS_TYPE_CONN));
+        i->second.assign_trx(trx);
+    }
+    return i->second.get_trx();
 }
 
 
@@ -128,22 +136,22 @@ void galera::GaleraWsdb::discard_trx(wsrep_trx_id_t trx_id)
 
 void galera::GaleraWsdb::discard_conn_query(wsrep_conn_id_t conn_id)
 {
+
     Lock lock(mutex_);
-    ConnQueryMap::iterator i;
-    if ((i = conn_query_map_.find(conn_id)) != conn_query_map_.end())
+    ConnMap::iterator i;
+    if ((i = conn_map_.find(conn_id)) != conn_map_.end())
     {
-        i->second->unref();
-        conn_query_map_.erase(i);
+        i->second.assign_trx(0);
     }
 }
 
 void galera::GaleraWsdb::discard_conn(wsrep_conn_id_t conn_id)
 {
     Lock lock(mutex_);
-    ConnQueryMap::iterator i;
-    if ((i = conn_query_map_.find(conn_id)) != conn_query_map_.end())
+    ConnMap::iterator i;
+    if ((i = conn_map_.find(conn_id)) != conn_map_.end())
     {
-        conn_query_map_.erase(i);
+        conn_map_.erase(i);
     }
 }
 
@@ -151,9 +159,23 @@ void galera::GaleraWsdb::create_write_set(TrxHandle* trx,
                                           const void* rbr_data,
                                           size_t rbr_data_len)
 {
+
     if (rbr_data != 0 && rbr_data_len > 0)
     {
         trx->get_write_set().assign_rbr(rbr_data, rbr_data_len);
+    }
+    
+    if (trx->get_write_set().get_queries().empty() == false)
+    {
+        ConnMap::const_iterator i(conn_map_.find(trx->get_conn_id()));
+        if (i != conn_map_.end())
+        {
+            const Conn& conn(i->second);
+            if (conn.get_default_db().get_query().size() > 0)
+            {
+                trx->get_write_set().prepend_query(conn.get_default_db());
+            }
+        }
     }
 }
 
@@ -164,7 +186,7 @@ void galera::GaleraWsdb::append_query(TrxHandle* trx,
                                       time_t t,
                                       uint32_t rnd)
 {
-    trx->get_write_set().append_query(query, query_len);
+    trx->get_write_set().append_query(query, query_len, t, rnd);
 }
 
 
@@ -183,7 +205,8 @@ void galera::GaleraWsdb::append_row_key(TrxHandle* trx,
                                         size_t key_len,
                                         int action)
 {
-    trx->get_write_set().append_row_key(dbtable, dbtable_len, key, key_len, action);
+    trx->get_write_set().append_row_key(dbtable, dbtable_len, 
+                                        key, key_len, action);
 }
 
 
@@ -199,5 +222,9 @@ void galera::GaleraWsdb::set_conn_database(TrxHandle* trx,
                                            const void* query,
                                            size_t query_len)
 {
-    trx->get_write_set().append_query(query, query_len);
+    if (trx->get_conn_id() != static_cast<wsrep_conn_id_t>(-1))
+    {
+        Conn& conn(conn_map_.find(trx->get_conn_id())->second);
+        conn.assing_default_db(Query(query, query_len));
+    }
 }

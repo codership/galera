@@ -20,13 +20,61 @@ namespace galera
                 return (key & 0xffff);
             }
         };
+
+        class Conn
+        {
+        public:
+            Conn(wsrep_conn_id_t conn_id) 
+                : 
+                conn_id_(conn_id), 
+                default_db_(),
+                trx_(0)
+            { }
+            
+            Conn(const Conn& other)
+                :
+                conn_id_(other.conn_id_),
+                default_db_(other.default_db_),
+                trx_(other.trx_)
+            { }
+            
+            ~Conn() { if (trx_ != 0) trx_->unref(); }
+            
+            void assign_trx(TrxHandle* trx)
+            {
+                if (trx_ != 0) trx_->unref();
+                trx_ = trx;
+            }
+
+            TrxHandle* get_trx() 
+            { 
+                return trx_; 
+            }
+
+            void assing_default_db(const Query& query)
+            {
+                default_db_ = query;
+            }
+            
+            const Query& get_default_db() const
+            {
+                return default_db_;
+            }
+
+        private:
+            void operator=(const Conn&);
+            wsrep_conn_id_t conn_id_;
+            Query default_db_;
+            TrxHandle* trx_;
+        };
+
         typedef boost::unordered_map<wsrep_trx_id_t, TrxHandle*, TrxHash> TrxMap;
-        typedef boost::unordered_map<wsrep_conn_id_t, TrxHandle*> ConnQueryMap;
+        typedef boost::unordered_map<wsrep_conn_id_t, Conn> ConnMap;
 
     public:
         TrxHandle* get_trx(wsrep_trx_id_t trx_id, bool create = false);
         TrxHandle* get_conn_query(wsrep_conn_id_t conn_id, 
-                                    bool create = false);
+                                  bool create = false);
         // Discard trx handle
         void discard_trx(wsrep_trx_id_t trx_id);
         void discard_conn(wsrep_conn_id_t conn_id);
@@ -44,7 +92,7 @@ namespace galera
         void append_conn_query(TrxHandle*, const void* query,
                                size_t query_len);
         void discard_conn_query(wsrep_conn_id_t conn_id);
-
+        
         void set_conn_variable(TrxHandle*, 
                                const void*, size_t,
                                const void*, size_t);
@@ -59,10 +107,10 @@ namespace galera
     private:
         // Create new trx handle
         TrxHandle* create_trx(wsrep_trx_id_t trx_id);
-        TrxHandle* create_conn_query(wsrep_conn_id_t conn_id);
-
+        Conn& create_conn(wsrep_conn_id_t conn_id);
+        
         TrxMap       trx_map_;
-        ConnQueryMap conn_query_map_;
+        ConnMap      conn_map_;
         gu::Mutex    mutex_;
     };
 

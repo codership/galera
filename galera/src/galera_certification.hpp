@@ -69,7 +69,7 @@ namespace galera
             }
             PurgeAndDiscard(const PurgeAndDiscard& other) : cert_(other.cert_) { }
         private:
-
+            
             void operator=(const PurgeAndDiscard&);
             GaleraCertification* cert_;
         };
