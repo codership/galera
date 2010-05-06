@@ -53,6 +53,7 @@ CONTENTS:
    3.1 MANDATORY MYSQL OPTIONS
    3.2 WSREP OPTIONS
    3.3 CONFIGURING LOCAL MYSQL CLIENTS
+   3.4 FIREWALLS
 4. Using MySQL/Galera in Amazon EC2
 5. LIMITATIONS
 
@@ -104,7 +105,7 @@ installed MySQL server to use this distribution.
 
 
 1. CLUSTER SETUP
-               
+
 To setup MySQL/Galera cluster you will need several networked computers -
 one for each mysqld instance you plan to use. For best performance those
 computers should be of approximately same configuration: Galera replication is
@@ -426,7 +427,8 @@ wsrep_provider_options=
 
 wsrep_cluster_address="dummy://"
    Group Communication System address. Depends on the WSREP provider. This
-   distribution recognizes "dummy://" and "gcomm://<IP address>:<IP port>"
+   distribution recognizes "dummy://" and "gcomm://<address>[:port]"
+   Default port is 4567.
 
    mysql> set global wsrep_cluster_address=<ADDRESS>;
 
@@ -523,6 +525,22 @@ system-wide my.cnf file:
 [client]
 socket = <INST_ROOT>/mysql/var/mysqld.sock
 
+3.4 FIREWALLS
+
+If there are any firewalls used, they should be configured to allow connections
+between the nodes at the following ports:
+3306 - for mysqldump state snapshot transfer
+4567 - for replication traffic
+
+E.g. to configure iptables to allow connections from a local subnet:
+
+iptables -A INPUT -i eth0 -p tcp -m tcp \
+         --source 192.168.0.1/24 --dport 3306 -j ACCEPT
+iptables -A INPUT -i eth0 -p tcp -m tcp \
+         --source 192.168.0.1/24 --dport 4567 -j ACCEPT
+
+Substitute real values for IP address of your node and netmask. Better yet,
+use VPN.
 
 4. Using MySQL/Galera distribution in Amazon EC2
 
