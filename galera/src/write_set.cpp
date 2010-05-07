@@ -87,6 +87,9 @@ size_t galera::serialize(const WriteSet& ws, gu::byte_t* buf,
 {
     uint32_t hdr(ws.type_ | (ws.level_ << 8));
     offset = serialize(hdr, buf, buf_len, offset);
+    offset = serialize(ws.source_id_, buf, buf_len, offset);
+    offset = serialize(ws.trx_id_, buf, buf_len, offset);
+    offset = serialize(ws.last_seen_trx_, buf, buf_len, offset);
     offset = serialize<QuerySequence::const_iterator, uint32_t>(
         ws.queries_.begin(), ws.queries_.end(), buf, buf_len, offset);
     offset = serialize<uint32_t>(
@@ -103,6 +106,9 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len,
     ws.type_ = static_cast<enum wsdb_ws_type>(hdr & 0xff);
     ws.level_ = static_cast<enum wsdb_ws_level>((hdr >> 8) & 0xff);
     ws.queries_.clear();
+    offset = unserialize(buf, buf_len, offset, ws.source_id_);
+    offset = unserialize(buf, buf_len, offset, ws.trx_id_);
+    offset = unserialize(buf, buf_len, offset, ws.last_seen_trx_);
     offset = unserialize<Query, uint32_t>(
         buf, buf_len, offset, back_inserter(ws.queries_));
     ws.keys_.clear();
@@ -116,6 +122,9 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len,
 size_t galera::serial_size(const WriteSet& ws)
 {
     return (serial_size(uint32_t()) 
+            + serial_size(ws.source_id_)
+            + serial_size(ws.trx_id_)
+            + serial_size(ws.last_seen_trx_)
             + serial_size<QuerySequence::const_iterator, uint32_t>(
                 ws.queries_.begin(), ws.queries_.end())
             + serial_size<uint32_t>(

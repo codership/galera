@@ -72,8 +72,10 @@ namespace galera
         typedef boost::unordered_map<wsrep_conn_id_t, Conn> ConnMap;
 
     public:
-        TrxHandle* get_trx(wsrep_trx_id_t trx_id, bool create = false);
-        TrxHandle* get_conn_query(wsrep_conn_id_t conn_id, 
+        TrxHandle* get_trx(const wsrep_uuid_t& source_id,
+                           wsrep_trx_id_t trx_id, bool create = false);
+        TrxHandle* get_conn_query(const wsrep_uuid_t&,
+                                  wsrep_conn_id_t conn_id, 
                                   bool create = false);
         // Discard trx handle
         void discard_trx(wsrep_trx_id_t trx_id);
@@ -106,7 +108,7 @@ namespace galera
         
     private:
         // Create new trx handle
-        TrxHandle* create_trx(wsrep_trx_id_t trx_id);
+        TrxHandle* create_trx(const wsrep_uuid_t&, wsrep_trx_id_t trx_id);
         Conn& create_conn(wsrep_conn_id_t conn_id);
         
         TrxMap       trx_map_;

@@ -21,6 +21,7 @@ namespace galera
             {
                 S_IDLE,     // Slot is free
                 S_WAITING,  // Waiting to enter applying critical section
+                S_CANCELED,
                 S_APPLYING, // Applying
                 S_FINISHED  // Finished
             } state_;
@@ -38,6 +39,7 @@ namespace galera
         ApplyMonitor() 
             : 
             mutex_(), 
+            pre_enter_cond_(),
             last_entered_(-1), 
             last_left_(-1),
             appliers_(appliers_size_),
@@ -71,57 +73,49 @@ namespace galera
                      -1               == trx->get_last_depends_seqno()));
         }
         
-        void update_last_entered(wsrep_seqno_t seqno)
+        // wait until all preceding trxs have entered the monitor
+        void pre_enter(TrxHandle* trx, gu::Lock& lock, const int idx)
         {
-            if (last_entered_ + 1 == seqno)
+            while (last_entered_ + 1 != trx->get_global_seqno())
             {
-                last_entered_ = seqno;
+                trx->unlock();
+                lock.wait(pre_enter_cond_);
+                trx->lock();
             }
-            
-            // @
-            while (appliers_[indexof(last_entered_ + 1)].state_ >= Applier::S_WAITING)
-            {
-                ++last_entered_;
-                Applier& a(appliers_[indexof(last_entered_)]);
-                if (a.state_ == Applier::S_WAITING && 
-                    may_enter(a.trx_) == true &&
-                    a.trx_->get_global_seqno() != seqno)
-                {
-                    a.cond_.signal();
-                }
-            }
+            assert(appliers_[idx].state_ == Applier::S_IDLE ||
+                   appliers_[idx].state_ == Applier::S_CANCELED);
+            assert(last_entered_ + 1 == trx->get_global_seqno());
+            ++last_entered_;
+            pre_enter_cond_.broadcast();
         }
         
-        void enter_wait(const TrxHandle* trx)
-        {
-            while (enter(trx) == -EAGAIN)
-            {
-                static const struct timespec period = {0, 1000000};
-                nanosleep(&period, 0);
-            }
-        }
-        
-        int enter(const TrxHandle* trx)
+        int enter(TrxHandle* trx)
         {
             size_t idx(indexof(trx->get_global_seqno()));
             gu::Lock lock(mutex_);
             
+            pre_enter(trx, lock, idx);
             
-            if (appliers_[idx].state_ != Applier::S_IDLE)
+            if (appliers_[idx].state_ ==  Applier::S_CANCELED)
             {
-                return -EAGAIN;
+                return -ECANCELED;
             }
+            
             appliers_[idx].state_ = Applier::S_WAITING;
             appliers_[idx].trx_   = trx;
-            update_last_entered(trx->get_global_seqno());
-            // We must wait until all preceding trxs have entered
-            // the monitor and the last dependent has left
+            
             while (may_enter(trx) == false)
             {
+                trx->unlock();
                 lock.wait(appliers_[idx].cond_);
+                trx->lock();
+                if (appliers_[idx].state_ == Applier::S_CANCELED)
+                {
+                    return -ECANCELED;
+                }
             }
+            
             appliers_[idx].state_ = Applier::S_APPLYING;
-            update_last_entered(trx->get_global_seqno());
             
             if (last_left_ < trx->get_global_seqno())
             {
@@ -135,9 +129,10 @@ namespace galera
             size_t idx(indexof(trx->get_global_seqno()));
             gu::Lock lock(mutex_);
             
-            assert(appliers_[idx].state_ == Applier::S_APPLYING);
+            assert(appliers_[idx].state_ == Applier::S_APPLYING ||
+                   appliers_[idx].state_ == Applier::S_CANCELED);
             appliers_[idx].state_ = Applier::S_FINISHED;
-
+            
             assert(appliers_[indexof(last_left_)].state_ == Applier::S_IDLE);
             
             // Note: We need two scans here
@@ -161,6 +156,7 @@ namespace galera
                     assert(a.trx_ != 0);
                     ++n_waiters;
                     break;
+                case Applier::S_CANCELED:
                 case Applier::S_APPLYING:
                     break;
                 default:
@@ -181,6 +177,8 @@ namespace galera
                     --n_waiters;
                 }
             }
+            appliers_[idx].trx_ = 0;
+            
             assert(n_waiters == 0);
             assert((last_left_ >= trx->get_global_seqno() && 
                     appliers_[idx].state_ == Applier::S_IDLE) ||
@@ -191,17 +189,32 @@ namespace galera
             {
                 ++ool_;
             }
-            appliers_[idx].trx_ = 0;
+            // log_info << "apply monitor leave " << trx->get_global_seqno();
         }
+        
+        void self_cancel(TrxHandle* trx)
+        {
+            size_t idx(indexof(trx->get_global_seqno()));
+            gu::Lock lock(mutex_);
+            pre_enter(trx, lock, idx);
+            appliers_[idx].state_ = Applier::S_CANCELED;
+        }
+        
         
         void cancel(const TrxHandle* trx)
         {
-            static const struct timespec period = {0, 1000000};
-            while (enter(trx) == -EAGAIN)
+            size_t idx(indexof(trx->get_global_seqno()));
+            gu::Lock lock(mutex_);
+            switch (appliers_[idx].state_)
             {
-                nanosleep(&period, 0);
+            case Applier::S_IDLE:
+            case Applier::S_CANCELED:
+            case Applier::S_WAITING:
+                appliers_[idx].state_ = Applier::S_CANCELED;
+                appliers_[idx].cond_.signal();
+            default:
+                log_info << "cacel, applier state " << appliers_[idx].state_;
             }
-            leave(trx);
         }
         
     private:
@@ -210,6 +223,7 @@ namespace galera
         void operator=(const ApplyMonitor&);
         
         gu::Mutex mutex_;
+        gu::Cond pre_enter_cond_;
         wsrep_seqno_t last_entered_;
         wsrep_seqno_t last_left_;
         std::vector<Applier> appliers_;

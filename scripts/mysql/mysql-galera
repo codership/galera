@@ -81,6 +81,7 @@ ROOT_USER=${ROOT_USER:-"-uroot"}
 ROOT_PSWD=${ROOT_PSWD:-"-prootpass"}
 
 MASTER_SLAVE=no
+MULTIMASTER=no
 LD_LIBRARY_PATH="$GALERA_BASE_DIR/lib"
 LD_PRELOAD=$(echo "$MYSQL_BASE_DIR/lib/mysql/libmysqlclient.so "\
 "$GALERA_BASE_DIR/lib/libgalerautils.so "\
@@ -204,7 +205,10 @@ galera_start()
 
     if [ "$MASTER_SLAVE" == "yes" ]
     then
-        WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmsgalera.so"}
+        WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmsgalera++.so"}
+    elif [ "$MULTIMASTER" == "yes" ]
+    then
+        WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera++.so"}
     else
         WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera.so"}
     fi
@@ -465,6 +469,9 @@ case $1 in
             ;;
     --master-slave)
             MASTER_SLAVE="yes"
+            ;;
+    --multimaster)
+            MULTIMASTER="yes"
             ;;
     -u|--user)
             ROOT_USER="-u$2"

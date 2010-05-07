@@ -17,27 +17,29 @@ namespace galera
     {
     public:
         // Get trx handle from wsdb
-        virtual TrxHandle* get_trx(wsrep_trx_id_t trx_id, 
-                                     bool create = false) = 0;
-
-        virtual TrxHandle* get_conn_query(wsrep_conn_id_t conn_id, 
+        virtual TrxHandle* get_trx(const wsrep_uuid_t& source_id,
+                                   wsrep_trx_id_t trx_id, 
+                                   bool create = false) = 0;
+        
+        virtual TrxHandle* get_conn_query(const wsrep_uuid_t& source_id,
+                                          wsrep_conn_id_t conn_id, 
                                           bool create = false) = 0;
         
         // Discard trx handle
         virtual void discard_trx(wsrep_trx_id_t trx_id) = 0;
         virtual void discard_conn(wsrep_conn_id_t conn_id) = 0;
-
+        
         virtual void discard_conn_query(wsrep_conn_id_t conn_id) = 0;
-
+        
         // Append query
         virtual void append_query(TrxHandle*,
                                   const void* query,
                                   size_t query_len,
                                   time_t time,
                                   uint32_t rnd) = 0;
-
-
-
+        
+        
+        
         // Append row key
         virtual void append_row_key(TrxHandle*,
                                     const void* dbtable, 
@@ -45,7 +47,7 @@ namespace galera
                                     const void* key, 
                                     size_t key_len,
                                     int action) = 0;
-
+        
         virtual void append_conn_query(TrxHandle*, const void* query,
                                        size_t query_len) = 0;
         
@@ -57,13 +59,13 @@ namespace galera
         virtual void create_write_set(TrxHandle*, 
                                       const void* rbr_data = 0,
                                       size_t rbr_data_len = 0) = 0;
-
+        
 
         virtual std::ostream& operator<<(std::ostream&) const = 0;
-
+        
         // Create wsdb instance
         static Wsdb* create(const std::string& conf);
-
+        
         virtual ~Wsdb() { }
 
     protected:

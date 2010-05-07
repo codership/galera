@@ -48,14 +48,15 @@ ostream& galera::GaleraWsdb::operator<<(ostream& os) const
 
 
 galera::TrxHandle*
-galera::GaleraWsdb::create_trx(wsrep_trx_id_t trx_id)
+galera::GaleraWsdb::create_trx(const wsrep_uuid_t& source_id, 
+                               wsrep_trx_id_t trx_id)
 {
     pair<TrxMap::iterator, bool> i = trx_map_.insert(
         make_pair(trx_id, 
                   new TrxHandle(-1, trx_id, true)));
     if (i.second == false)
         gu_throw_fatal;
-    i.first->second->assign_write_set(new WriteSet(WSDB_WS_TYPE_TRX));
+    i.first->second->assign_write_set(new WriteSet(source_id, trx_id, WSDB_WS_TYPE_TRX));
     return i.first->second;
 }
 
@@ -72,7 +73,8 @@ galera::GaleraWsdb::create_conn(wsrep_conn_id_t conn_id)
 
 
 galera::TrxHandle*
-galera::GaleraWsdb::get_trx(wsrep_trx_id_t trx_id, 
+galera::GaleraWsdb::get_trx(const wsrep_uuid_t& source_id,
+                            wsrep_trx_id_t trx_id, 
                             bool create)
 {
     Lock lock(mutex_);
@@ -81,7 +83,7 @@ galera::GaleraWsdb::get_trx(wsrep_trx_id_t trx_id,
     {
         if (create == true)
         {
-            return create_trx(trx_id);
+            return create_trx(source_id, trx_id);
         }
         else
         {
@@ -91,19 +93,22 @@ galera::GaleraWsdb::get_trx(wsrep_trx_id_t trx_id,
     return i->second;
 }
 
-galera::TrxHandle* galera::GaleraWsdb::get_conn_query(wsrep_trx_id_t conn_id, 
-                                                      bool create)
+galera::TrxHandle* 
+galera::GaleraWsdb::get_conn_query(const wsrep_uuid_t& source_id,
+                                   wsrep_trx_id_t conn_id, 
+                                   bool create)
 {
     Lock lock(mutex_);
     ConnMap::iterator i;
-
+    
     if ((i = conn_map_.find(conn_id)) == conn_map_.end())
     {
         if (create == true)
         {
             Conn& conn(create_conn(conn_id));
             TrxHandle* trx(new TrxHandle(conn_id, -1, true));
-            trx->assign_write_set(new WriteSet(WSDB_WS_TYPE_CONN));
+            trx->assign_write_set(new WriteSet(source_id, -1, 
+                                               WSDB_WS_TYPE_CONN));
             conn.assign_trx(trx);
             return trx;
         }
@@ -115,7 +120,7 @@ galera::TrxHandle* galera::GaleraWsdb::get_conn_query(wsrep_trx_id_t conn_id,
     if (i->second.get_trx() == 0)
     {
         TrxHandle* trx(new TrxHandle(conn_id, -1, true));
-        trx->assign_write_set(new WriteSet(WSDB_WS_TYPE_CONN));
+        trx->assign_write_set(new WriteSet(source_id, -1, WSDB_WS_TYPE_CONN));
         i->second.assign_trx(trx);
     }
     return i->second.get_trx();

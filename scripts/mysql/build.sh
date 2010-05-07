@@ -324,7 +324,8 @@ then
     cp -P $SCONS_VD/gcs/src/libgcs.so* $GALERA_LIBS
     cp -P $SCONS_VD/wsdb/src/libwsdb.so* $GALERA_LIBS
     cp -P $SCONS_VD/galera/src/libgalera++.so* $GALERA_LIBS
-    cp -P $SCONS_VD/galera/src/libmsgalera.so* $GALERA_LIBS
+    cp -P $SCONS_VD/galera/src/libmsgalera++.so* $GALERA_LIBS
+    cp -P $SCONS_VD/galera/src/libmmgalera++.so* $GALERA_LIBS
     cp -P $SCONS_VD/galera/src/libmmgalera.so* $GALERA_LIBS
 
 else

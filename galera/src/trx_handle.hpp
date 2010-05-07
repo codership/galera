@@ -22,6 +22,7 @@ namespace galera
         TrxHandle(wsrep_conn_id_t conn_id,
                   wsrep_trx_id_t trx_id, 
                   bool local) : 
+            source_id_(),
             conn_id_(conn_id),
             trx_id_(trx_id),
             local_(local),
@@ -41,29 +42,39 @@ namespace galera
         void lock() { mutex_.lock(); }
         void unlock() { mutex_.unlock(); }
         
+        void assign_source_id(const wsrep_uuid_t& source_id)
+        {
+            source_id_ = source_id;
+        }
+
+        const wsrep_uuid_t& get_source_id() const
+        {
+            return source_id_;
+        }
+        
         wsrep_trx_id_t get_trx_id() const { return trx_id_; }
         void assign_conn_id(wsrep_conn_id_t conn_id) { conn_id_ = conn_id; }
         wsrep_conn_id_t get_conn_id() const { return conn_id_; }
         bool is_local() const { return local_; }
         
-        virtual void assign_seqnos(wsrep_seqno_t seqno_l, 
-                                   wsrep_seqno_t seqno_g)
+        void assign_seqnos(wsrep_seqno_t seqno_l, 
+                           wsrep_seqno_t seqno_g)
         {
             local_seqno_ = seqno_l; 
             global_seqno_ = seqno_g; 
         }
-
+        
         void assign_last_depends_seqno(wsrep_seqno_t seqno_lt)
         {
             last_depends_seqno_ = seqno_lt;
         }
         
-        virtual void assign_state(enum wsdb_trx_state state) 
+        void assign_state(enum wsdb_trx_state state) 
         { 
             state_ = state; 
         }
-
-        virtual void assign_position(enum wsdb_trx_position pos)
+        
+        void assign_position(enum wsdb_trx_position pos)
         { 
             position_ = pos; 
         }
@@ -87,10 +98,17 @@ namespace galera
         wsrep_seqno_t get_last_depends_seqno() const { return last_depends_seqno_; }
         enum wsdb_trx_position get_position() const { return position_; }
         
-        virtual void assign_write_set(WriteSet* ws) 
+        
+
+        void assign_write_set(WriteSet* ws) 
         {
             assert(write_set_ == 0);
             write_set_ = ws;
+            if (ws != 0)
+            {
+                source_id_ = ws->get_source_id();
+                trx_id_ = ws->get_trx_id();
+            }
         }
 
         WriteSet& get_write_set()
@@ -104,15 +122,17 @@ namespace galera
             assert(write_set_ != 0);
             return *write_set_; 
         }
-        virtual void clear() { if (write_set_ != 0) write_set_->clear(); }
 
+        void clear() { if (write_set_ != 0) write_set_->clear(); }
+        
         void ref() { ++refcnt_; }
         void unref() { --refcnt_; if (refcnt_ == 0) delete this; }
-        
+        size_t refcnt() const { return refcnt_; }
     private:
         virtual ~TrxHandle() { delete write_set_; write_set_ = 0; }        
         TrxHandle(const TrxHandle&);
         void operator=(const TrxHandle& other);
+        wsrep_uuid_t        source_id_;
         wsrep_conn_id_t     conn_id_;
         wsrep_trx_id_t      trx_id_;
         bool                local_;

@@ -68,6 +68,7 @@ galera::RowKeyEntry::unref(TrxHandle* trx)
 }
 
 
+
 bool 
 galera::GaleraCertification::same_source(const TrxHandle* a, const TrxHandle* b)
 {
@@ -75,9 +76,8 @@ galera::GaleraCertification::same_source(const TrxHandle* a, const TrxHandle* b)
     {
     case R_SLAVE:
         return (a->is_local() == b->is_local());
-        // @todo Assing source uuid for trx
-        // case R_MULTIMASTER:
-        // return (a->get_source() == b->get_source());
+    case R_MULTIMASTER:
+        return (a->get_source_id() == b->get_source_id());
     default:
         gu_throw_fatal << "not implemented";
         throw;
@@ -87,7 +87,6 @@ galera::GaleraCertification::same_source(const TrxHandle* a, const TrxHandle* b)
 void
 galera::GaleraCertification::purge_for_trx(TrxHandle* trx)
 {
-    TrxHandleLock lock(*trx);
     deque<RowKeyEntry*>& refs(trx->cert_keys_);
     for (deque<RowKeyEntry*>::iterator i = refs.begin(); i != refs.end();
          ++i)
@@ -106,7 +105,7 @@ galera::GaleraCertification::purge_for_trx(TrxHandle* trx)
 }
 
 
-int galera::GaleraCertification::do_test(TrxHandle* trx)
+int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
 {
     RowKeySequence rk;
     trx->get_write_set().get_keys(rk);
@@ -114,9 +113,6 @@ int galera::GaleraCertification::do_test(TrxHandle* trx)
     wsrep_seqno_t last_depends_seqno(-1);
     assert(match.empty() == true);
 
-    //log_info << "test for " << trx->get_global_seqno() << " keys "
-    //        << rk.size() << " index size " << cert_index_.size();
-    
     // Scan over all row keys
     for (RowKeySequence::const_iterator i = rk.begin(); i != rk.end(); ++i)
     {
@@ -135,31 +131,32 @@ int galera::GaleraCertification::do_test(TrxHandle* trx)
                 trx->get_write_set().get_last_seen_trx())
             {
                 // Cert conflict if trx write set didn't see ti committed
-                log_info << "trx conflict";
+                log_debug << "trx conflict " << ref_trx->get_global_seqno() 
+                          << " " << trx->get_write_set().get_last_seen_trx();
                 goto cert_fail;
             }
             last_depends_seqno = max(last_depends_seqno, 
                                      ref_trx->get_global_seqno());
         }
-        else
+        else if (store_keys == true)
         {
             RowKeyEntry* cie(new RowKeyEntry(*i));
             ci = cert_index_.insert(make_pair(cie->get_row_key(), cie)).first;
         }
         
-        if (ci->second->get_ref_trx() != trx)
+        if (store_keys == true && ci->second->get_ref_trx() != trx)
         {
             match.push_back(ci->second);
             ci->second->ref(trx);
         }
     }
     
-    // log_info << "refs after scan " << match.size();
     trx->assign_last_depends_seqno(last_depends_seqno);
     
     return WSDB_OK;
     
 cert_fail:
+    Lock lock(mutex_);
     purge_for_trx(trx);
     return WSDB_CERTIFICATION_FAIL;
 }
@@ -218,6 +215,7 @@ galera::TrxHandle* galera::GaleraCertification::create_trx(
 int galera::GaleraCertification::append_trx(TrxHandle* trx)
 {
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
+    assert(trx->get_global_seqno() > position_);
     
     if (trx->is_local() == true)
     {
@@ -226,11 +224,14 @@ int galera::GaleraCertification::append_trx(TrxHandle* trx)
     
     {
         Lock lock(mutex_);
+        
 
         if (trx->get_global_seqno() != position_ + 1)
         {
-            log_warn << "seqno gap, position: " << position_
-                     << " trx seqno " << trx->get_global_seqno();
+            // this is perfectly normal if trx is rolled back just after 
+            // replication, keeping the log though
+            log_debug << "seqno gap, position: " << position_
+                      << " trx seqno " << trx->get_global_seqno();
         }
         position_ = trx->get_global_seqno();
         if (trx_map_.insert(make_pair(trx->get_global_seqno(), 
@@ -263,7 +264,7 @@ int galera::GaleraCertification::test(TrxHandle* trx, bool bval)
     case R_SLAVE:
         if (trx->is_local() == false)
         {
-            return do_test(trx);
+            return do_test(trx, bval);
         }
         else
         {
@@ -271,6 +272,8 @@ int galera::GaleraCertification::test(TrxHandle* trx, bool bval)
         }
     case R_MASTER:
         return (trx->is_local() == true ? WSDB_OK : WSDB_CERTIFICATION_FAIL);
+    case R_MULTIMASTER:
+        return do_test(trx, bval);
     default:
         gu_throw_fatal << "role " << role_ << " not implemented";
         throw;

@@ -101,8 +101,11 @@ namespace galera
     class WriteSet 
     {
     public:
-        WriteSet() 
+        WriteSet(const wsrep_uuid_t& source_id = WSREP_UUID_UNDEFINED,
+                 wsrep_trx_id_t trx_id = -1) 
             : 
+            source_id_(source_id),
+            trx_id_(trx_id),
             type_(),
             level_(WSDB_WS_QUERY),
             last_seen_trx_(),
@@ -112,8 +115,12 @@ namespace galera
             rbr_()
         { }
         
-        WriteSet(enum wsdb_ws_type type) 
+        WriteSet(const wsrep_uuid_t& source_id, 
+                 wsrep_trx_id_t trx_id,
+                 enum wsdb_ws_type type) 
             : 
+            source_id_(source_id),
+            trx_id_(trx_id),
             type_(type),
             level_(WSDB_WS_QUERY),
             last_seen_trx_(),
@@ -123,8 +130,11 @@ namespace galera
             rbr_()
         { }
         
+        const wsrep_uuid_t& get_source_id() const { return source_id_; }
+        wsrep_trx_id_t get_trx_id() const { return trx_id_; }
         enum wsdb_ws_type get_type() const { return type_; }
         enum wsdb_ws_level get_level() const { return level_; }
+        void assign_last_seen_trx(wsrep_seqno_t seqno) { last_seen_trx_ = seqno; }
         wsrep_seqno_t get_last_seen_trx() const { return last_seen_trx_; }
         const gu::Buffer& get_rbr() const { return rbr_; }
         
@@ -168,6 +178,8 @@ namespace galera
         friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&);
         friend size_t serial_size(const WriteSet&);
         
+        wsrep_uuid_t   source_id_;
+        wsrep_trx_id_t trx_id_;
         enum wsdb_ws_type type_;
         enum wsdb_ws_level level_;
         wsrep_seqno_t last_seen_trx_;
@@ -177,6 +189,11 @@ namespace galera
         KeyRefMap key_refs_;
         gu::Buffer rbr_;
     };
+
+    inline bool operator==(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
+    {
+        return (memcmp(&a, &b, sizeof(a)) == 0);
+    }
 }
 
 

@@ -56,7 +56,7 @@ namespace galera
         TrxHandle* get_trx(wsrep_seqno_t);
     private:
         bool same_source(const TrxHandle*, const TrxHandle*);
-        int do_test(TrxHandle*);
+        int do_test(TrxHandle*, bool);
         void purge_for_trx(TrxHandle*);
         class PurgeAndDiscard
         {
@@ -64,7 +64,10 @@ namespace galera
             PurgeAndDiscard(GaleraCertification* cert) : cert_(cert) { }
             void operator()(TrxMap::value_type& vt) const
             {
-                cert_->purge_for_trx(vt.second);
+                {
+                    TrxHandleLock lock(*vt.second);
+                    cert_->purge_for_trx(vt.second);
+                }
                 vt.second->unref();
             }
             PurgeAndDiscard(const PurgeAndDiscard& other) : cert_(other.cert_) { }
