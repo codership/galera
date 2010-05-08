@@ -467,7 +467,7 @@ struct wsrep_ {
                                  const void*         app_data,
                                  size_t              data_len,
                                  wsrep_seqno_t*      seqno);
-
+    
   /*!
    * @brief Releases resources after transaction commit.
    *
@@ -581,6 +581,12 @@ struct wsrep_ {
                                      size_t              key_len, 
                                      wsrep_action_t      action);
 
+#if 0
+    wsrep_status_t (*append_data)(wsrep_t*            wsrep, 
+                                  wsrep_trx_handle_t* trx_handle, 
+                                  const void*         data, 
+                                  size_t              data_len);
+#endif /* 0 */
   /*!
    * This call will block until causal ordering with all possible
    * preceding writes in the cluster is guaranteed. If pointer to

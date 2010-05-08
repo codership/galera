@@ -195,6 +195,11 @@ if not conf.CheckCXXHeader('boost/shared_ptr.hpp'):
     if not conf.CheckCXXHeader('boost/shared_ptr.hpp'):
         print 'boost/shared_ptr.hpp not found or not usable'
         Exit(1)
+conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_SHARED_PTR_HPP')
+
+
+if conf.CheckCXXHeader('boost/unordered_map.hpp'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_UNORDERED_MAP_HPP')
 
 if boost == 1:
     # Use nanosecond time precision

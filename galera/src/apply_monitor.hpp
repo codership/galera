@@ -9,7 +9,8 @@
 
 namespace galera
 {
-    class ApplyMonitor
+    template <class C>
+    class Monitor
     {
     private:
         struct Applier
@@ -36,8 +37,16 @@ namespace galera
         static const size_t appliers_size_ = (1 << 14);
         static const size_t appliers_mask_ = appliers_size_ - 1;
     public:
-        ApplyMonitor() 
+        enum Mode
+        {
+            M_BYPASS,
+            M_NORMAL
+        };
+
+        Monitor() 
             : 
+            condition_(),
+            mode_(M_NORMAL),
             mutex_(), 
             pre_enter_cond_(),
             last_entered_(-1), 
@@ -46,11 +55,13 @@ namespace galera
             ooe_(0),
             ool_(0)
         { }
-
-        ~ApplyMonitor()
+        
+        ~Monitor()
         {
             log_info << "ooe " << ooe_ << " ool " << ool_;
         }
+        
+        void assign_mode(Mode mode) { mode_ = mode; }
         
         void assign_initial_position(wsrep_seqno_t seqno) 
         {
@@ -59,38 +70,9 @@ namespace galera
             last_entered_ = last_left_ = seqno; 
         }
         
-        size_t indexof(wsrep_seqno_t seqno)
-        {
-            return (seqno & appliers_mask_);
-        }
-
-        bool may_enter(const TrxHandle* trx) const
-        {
-            // 1) all preceding trxs have entered
-            // 2) no dependencies or dependent has left the monitor
-            return (last_entered_ + 1 >= trx->get_global_seqno() &&
-                    (last_left_       >= trx->get_last_depends_seqno() ||
-                     -1               == trx->get_last_depends_seqno()));
-        }
-        
-        // wait until all preceding trxs have entered the monitor
-        void pre_enter(TrxHandle* trx, gu::Lock& lock, const int idx)
-        {
-            while (last_entered_ + 1 != trx->get_global_seqno())
-            {
-                trx->unlock();
-                lock.wait(pre_enter_cond_);
-                trx->lock();
-            }
-            assert(appliers_[idx].state_ == Applier::S_IDLE ||
-                   appliers_[idx].state_ == Applier::S_CANCELED);
-            assert(last_entered_ + 1 == trx->get_global_seqno());
-            ++last_entered_;
-            pre_enter_cond_.broadcast();
-        }
-        
         int enter(TrxHandle* trx)
         {
+            if (mode_ == M_BYPASS) return 0;
             size_t idx(indexof(trx->get_global_seqno()));
             gu::Lock lock(mutex_);
             
@@ -126,6 +108,7 @@ namespace galera
         
         void leave(const TrxHandle* trx)
         {
+            if (mode_ == M_BYPASS) return;
             size_t idx(indexof(trx->get_global_seqno()));
             gu::Lock lock(mutex_);
             
@@ -194,6 +177,7 @@ namespace galera
         
         void self_cancel(TrxHandle* trx)
         {
+            if (mode_ == M_BYPASS) return;
             size_t idx(indexof(trx->get_global_seqno()));
             gu::Lock lock(mutex_);
             pre_enter(trx, lock, idx);
@@ -203,6 +187,7 @@ namespace galera
         
         void cancel(const TrxHandle* trx)
         {
+            if (mode_ == M_BYPASS) return;
             size_t idx(indexof(trx->get_global_seqno()));
             gu::Lock lock(mutex_);
             switch (appliers_[idx].state_)
@@ -218,10 +203,39 @@ namespace galera
         }
         
     private:
+        size_t indexof(wsrep_seqno_t seqno)
+        {
+            return (seqno & appliers_mask_);
+        }
+
+        bool may_enter(const TrxHandle* trx) const
+        {
+            // 1) all preceding trxs have entered
+            // 2) no dependencies or dependent has left the monitor
+            return condition_(last_entered_, last_left_, trx);
+        }
         
-        ApplyMonitor(const ApplyMonitor&);
-        void operator=(const ApplyMonitor&);
+        // wait until all preceding trxs have entered the monitor
+        void pre_enter(TrxHandle* trx, gu::Lock& lock, const int idx)
+        {
+            while (last_entered_ + 1 != trx->get_global_seqno())
+            {
+                trx->unlock();
+                lock.wait(pre_enter_cond_);
+                trx->lock();
+            }
+            assert(appliers_[idx].state_ == Applier::S_IDLE ||
+                   appliers_[idx].state_ == Applier::S_CANCELED);
+            assert(last_entered_ + 1 == trx->get_global_seqno());
+            ++last_entered_;
+            pre_enter_cond_.broadcast();
+        }
         
+        Monitor(const Monitor&);
+        void operator=(const Monitor&);
+        
+        const C condition_;
+        Mode mode_;
         gu::Mutex mutex_;
         gu::Cond pre_enter_cond_;
         wsrep_seqno_t last_entered_;

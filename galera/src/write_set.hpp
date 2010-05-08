@@ -84,19 +84,19 @@ namespace galera
     
     typedef std::deque<RowKey> RowKeySequence;
     
-        class RowKeyHash
+    class RowKeyHash
+    {
+    public:
+        size_t operator()(const RowKey& rk) const
         {
-        public:
-            size_t operator()(const RowKey& rk) const
-            {
-                const gu::byte_t* b(reinterpret_cast<const gu::byte_t*>(
-                                        rk.get_key()));
-                const gu::byte_t* e(reinterpret_cast<const gu::byte_t*>(
-                                        rk.get_key()) + rk.get_key_len());
-                return boost::hash_range(b, e);
-            }
-        };
-
+            const gu::byte_t* b(reinterpret_cast<const gu::byte_t*>(
+                                    rk.get_key()));
+            const gu::byte_t* e(reinterpret_cast<const gu::byte_t*>(
+                                    rk.get_key()) + rk.get_key_len());
+            return boost::hash_range(b, e);
+        }
+    };
+    
     
     class WriteSet 
     {

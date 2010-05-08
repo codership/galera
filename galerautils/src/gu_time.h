@@ -12,6 +12,10 @@
 #include <sys/time.h>
 #include <time.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /** Returns seconds */
 static inline double
 gu_timeval_diff (struct timeval* left, struct timeval* right)
@@ -113,6 +117,10 @@ gu_time_thread_cputime()
     return -1;
 #endif
 }
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 
 #endif /* _gu_time_h_ */

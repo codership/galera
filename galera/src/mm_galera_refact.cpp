@@ -31,6 +31,17 @@ extern "C"
 #include "certification.hpp"
 #include "wsdb.hpp"
 
+// #define GALERA_PROFILING
+#ifdef GALERA_PROFILING
+#define GU_PROFILE
+#endif
+#include "gu_profile.hpp"
+#ifdef GALERA_PROFILING
+static gu::prof::Profile galera_prof("galera");
+#else
+#define galera_prof ""
+#endif // GALERA_PROFILE
+
 using namespace gu;
 using namespace std;
 using namespace galera;
@@ -70,7 +81,40 @@ typedef enum
 } ApplyLevel;
 
 static ApplyLevel preferred_apply_level = AL_RBR;
-static ApplyMonitor       apply_monitor;
+
+class ApplyCondition
+{
+public:
+    bool operator()(wsrep_seqno_t last_entered, wsrep_seqno_t last_left,
+                    const TrxHandle* trx) const
+    {
+        return (last_entered + 1 >= trx->get_global_seqno() &&
+                (last_left       >= trx->get_last_depends_seqno() ||
+                 -1               == trx->get_last_depends_seqno()));
+    }
+};
+
+class CertCondition
+{
+public:
+    bool operator()(wsrep_seqno_t last_entered, wsrep_seqno_t last_left,
+                    const TrxHandle* trx) const
+    {
+        return (last_left + 1 == trx->get_global_seqno());
+    }
+};
+
+class CommitCondition
+{
+public:
+    bool operator()(wsrep_seqno_t last_entered, wsrep_seqno_t last_left,
+                    const TrxHandle* trx) const
+    {
+        return (last_left + 1 == trx->get_global_seqno());
+    }
+};
+
+static Monitor<ApplyCondition> apply_monitor;
 
 static struct galera_status status =
 {
@@ -117,6 +161,7 @@ static inline galera::TrxHandle* get_trx(galera::Wsdb* wsdb,
     }
     return trx;
 }
+
 
 // a wrapper to re-try functions which can return -EAGAIN
 static inline long while_eagain (
@@ -473,6 +518,8 @@ void mm_galera_tear_down(wsrep_t *gh)
         assert (0);
         abort();
     }
+
+    log_info << galera_prof;
 
     return;
 }
@@ -1705,6 +1752,7 @@ static int check_certification_status_for_aborted(
 }
 
 #include <iostream>
+
 extern "C"
 enum wsrep_status mm_galera_pre_commit(
     wsrep_t *gh, wsrep_conn_id_t conn_id, 
@@ -1724,9 +1772,7 @@ enum wsrep_status mm_galera_pre_commit(
     *global_seqno = WSREP_SEQNO_UNDEFINED;
 
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_CONN_FAIL;
-
-
-
+    
     TrxHandle* trx(get_trx(wsdb, trx_handle));
     if (trx == 0)
     {
@@ -1744,7 +1790,7 @@ enum wsrep_status mm_galera_pre_commit(
 #else
     bool wait(false);
 #endif
-
+    profile_enter(galera_prof);
     do {
         switch (trx->get_state()) {
         case WSDB_TRX_MUST_ABORT:
@@ -1771,6 +1817,8 @@ enum wsrep_status mm_galera_pre_commit(
              (status.fc_waits++, trx->unlock(),
               usleep (GALERA_USLEEP_FLOW_CONTROL), trx->lock(),
               (--flow_control_waits > 0)));
+    profile_leave(galera_prof);
+
     if (flow_control_waits == 0)
     {
         gu_warn("max flow control waits %d exceeded",
@@ -1812,6 +1860,7 @@ enum wsrep_status mm_galera_pre_commit(
     trx->assign_state(WSDB_TRX_REPLICATING);
     trx->unlock();
     
+    profile_enter(galera_prof);
     /* replicate through gcs */
     do {
         
@@ -1819,7 +1868,8 @@ enum wsrep_status mm_galera_pre_commit(
                          &seqno_g, &seqno_l);
         
     } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
-    
+    profile_leave(galera_prof);
+
     trx->lock();
     *global_seqno = seqno_g;
     
@@ -1847,8 +1897,10 @@ enum wsrep_status mm_galera_pre_commit(
     trx->assign_seqnos(seqno_l, seqno_g);
     trx->assign_state(WSDB_TRX_REPLICATED);
 
+    profile_enter(galera_prof);
     rcode = while_eagain_or_trx_abort(trx, 
                                       gu_to_grab, cert_queue, seqno_l);
+    profile_leave(galera_prof);
     if (rcode) 
     {
         gu_debug("gu_to_grab aborted for seqno %lld: %d (%s)",
@@ -1869,7 +1921,8 @@ enum wsrep_status mm_galera_pre_commit(
             goto post_repl_out;
         }
     }
-    
+
+    profile_enter(galera_prof);
 #ifdef GALERA_WORKAROUND_197
     rcode = cert->append_trx(trx);
     if (gu_likely(galera_update_last_received (seqno_g))) 
@@ -1912,9 +1965,12 @@ enum wsrep_status mm_galera_pre_commit(
         retcode = WSREP_TRX_FAIL;
     }
 
-
     // call release only if grab was successfull
     GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
+    
+    profile_leave(galera_prof);
+
+    profile_enter(galera_prof);
     
     if (retcode == WSREP_OK)
     {
@@ -1933,8 +1989,8 @@ enum wsrep_status mm_galera_pre_commit(
     else
     {
         apply_monitor.self_cancel(trx);
-    }
-    
+    }    
+
     if (retcode == WSREP_OK) 
     {
         assert (seqno_l >= 0);
@@ -1960,6 +2016,7 @@ enum wsrep_status mm_galera_pre_commit(
         }     
     }
     
+    profile_leave(galera_prof);
     
 post_repl_out:
     
