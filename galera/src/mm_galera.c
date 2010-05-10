@@ -2138,9 +2138,10 @@ static enum wsrep_status mm_galera_append_query(
     errno = 0;
 
     switch (wsdb_append_query(trx_id, (char*)query, timeval, randseed)) {
-    case WSDB_OK:              return WSREP_OK;
-    case WSDB_ERR_TRX_UNKNOWN: return WSREP_TRX_FAIL;
-    default:                   return WSREP_CONN_FAIL;
+    case WSDB_OK:                   return WSREP_OK;
+    case WSDB_ERR_TRX_UNKNOWN: 
+    case WSDB_ERR_TOO_MANY_QUERIES: return WSREP_TRX_FAIL;
+    default:                        return WSREP_CONN_FAIL;
     }
     return WSREP_OK;
 }
