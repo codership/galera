@@ -31,7 +31,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "16"
+#define WSREP_INTERFACE_VERSION "17"
 
 /* Empty backend spec */
 #define WSREP_NONE "none"
@@ -344,19 +344,23 @@ struct wsrep_status_var
 };
 
 
-struct wsrep_trx_handle_
+/*! Transaction handle struct passed for wsrep transaction handling calls */
+typedef struct wsrep_trx_handle_
 {
-    wsrep_trx_id_t trx_id;
-    void*          opaque;
-}; 
-
-typedef struct wsrep_trx_handle_ wsrep_trx_handle_t;
+    wsrep_trx_id_t trx_id; //!< transaction ID
+    void*          opaque; //!< opaque provider transaction context data
+} wsrep_trx_handle_t; 
 
 /*! 
  * @brief Helper method to reset trx handle state when trx id changes 
+ *
+ * Instead of passing wsrep_trx_handle_t directly for wsrep calls,
+ * wrapping handle with this call offloads bookkeeping from
+ * application.
  */
 static inline wsrep_trx_handle_t* wsrep_trx_handle_for_id(
-    wsrep_trx_handle_t* trx_handle, wsrep_trx_id_t trx_id)
+    wsrep_trx_handle_t* trx_handle, 
+    wsrep_trx_id_t      trx_id)
 {
     if (trx_handle->trx_id != trx_id)
     {
@@ -449,12 +453,12 @@ struct wsrep_ {
    * In case of WSREP_OK, starts commit critical section, transaction can
    * commit. Otherwise transaction must rollback.
    *
-   * @param wsrep    this wsrep handle
-   * @param trx_id   transaction which is committing
-   * @param conn_id
-   * @param app_data application specific applying data
-   * @param data_len the size of the applying data
-   * @param seqno    seqno part of the global transaction ID
+   * @param wsrep      this wsrep handle
+   * @param trx_handle transaction which is committing
+   * @param conn_id    connection ID
+   * @param app_data   application specific applying data
+   * @param data_len   the size of the applying data
+   * @param seqno      seqno part of the global transaction ID
    *
    * @retval WSREP_OK         cluster-wide commit succeeded
    * @retval WSREP_TRX_FAIL   must rollback transaction
@@ -467,26 +471,28 @@ struct wsrep_ {
                                  const void*         app_data,
                                  size_t              data_len,
                                  wsrep_seqno_t*      seqno);
-    
+
   /*!
    * @brief Releases resources after transaction commit.
    *
    * Ends commit critical section.
    *
    * @param wsrep      this wsrep handle
-   * @param trx_id     transaction which is committing
+   * @param trx_handle transaction which is committing
    * @retval WSREP_OK  post_commit succeeded
    */
-    wsrep_status_t (*post_commit) (wsrep_t* wsrep, wsrep_trx_handle_t* trx_handle);
+    wsrep_status_t (*post_commit) (wsrep_t*            wsrep, 
+                                   wsrep_trx_handle_t* trx_handle);
 
   /*!
    * @brief Releases resources after transaction rollback.
    *
    * @param wsrep      this wsrep handle
-   * @param trx_id     transaction which is committing
+   * @param trx_handle transaction which is committing
    * @retval WSREP_OK  post_rollback succeeded
    */
-    wsrep_status_t (*post_rollback)(wsrep_t* wsrep, wsrep_trx_handle_t* trx_handle);    
+    wsrep_status_t (*post_rollback)(wsrep_t*            wsrep, 
+                                    wsrep_trx_handle_t* trx_handle);    
 
   /*!
    * @brief Replay trx as a slave write set
@@ -496,9 +502,9 @@ struct wsrep_ {
    * slave trx. Note that slave nodes see only trx write sets and certification
    * test based on write set content can be different to DBMS lock conflicts.
    *
-   * @param wsrep this wsrep handle
-   * @param trx_id transaction which is committing
-   * @param trx_ctx transaction context
+   * @param wsrep      this wsrep handle
+   * @param trx_handle transaction which is committing
+   * @param trx_ctx    transaction context
    *
    * @retval WSREP_OK         cluster commit succeeded
    * @retval WSREP_TRX_FAIL   must rollback transaction
@@ -550,11 +556,11 @@ struct wsrep_ {
   /*!
    * @brief Appends a query in transaction's write set
    *
-   * @param wsrep this wsrep handle
-   * @param trx_id transaction ID
-   * @param query  SQL statement string
-   * @param timeval time to use for time functions
-   * @param randseed seed for rand
+   * @param wsrep      this wsrep handle
+   * @param trx_handle transaction handle
+   * @param query      SQL statement string
+   * @param timeval    time to use for time functions
+   * @param randseed   seed for rand
    */
     wsrep_status_t (*append_query)(wsrep_t*            wsrep,
                                    wsrep_trx_handle_t* trx_handle,
@@ -566,7 +572,7 @@ struct wsrep_ {
    * @brief Appends a row reference in transaction's write set
    *
    * @param wsrep       this wsrep handle
-   * @param trx_id      transaction ID
+   * @param trx_handle  transaction handle
    * @param dbtable     unique name of the table "db.table"
    * @param dbtable_len length of table name (does not end with 0)
    * @param key         binary key data
@@ -580,14 +586,26 @@ struct wsrep_ {
                                      const char*         key, 
                                      size_t              key_len, 
                                      wsrep_action_t      action);
-
-#if 0
+   /*!
+    * @brief Appends data in transaction's write set
+    *
+    * This method can be called any time before commit and it
+    * appends data block into transaction's write set.
+    *
+    * @param wsrep      this wsrep handle
+    * @param trx_handle transaction handle
+    * @param data data  buffer
+    * @param data_len   data buffer length
+    */
     wsrep_status_t (*append_data)(wsrep_t*            wsrep, 
                                   wsrep_trx_handle_t* trx_handle, 
                                   const void*         data, 
                                   size_t              data_len);
-#endif /* 0 */
+
+
   /*!
+   * @brief Get causal ordering for read operation
+   *
    * This call will block until causal ordering with all possible
    * preceding writes in the cluster is guaranteed. If pointer to
    * seqno is non-null, the call stores the global transaction ID

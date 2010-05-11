@@ -2272,6 +2272,15 @@ static enum wsrep_status mm_galera_append_row_key(
     }
 }
 
+static wsrep_status_t mm_galera_append_data(
+    wsrep_t*            wsrep,
+    wsrep_trx_handle_t* trx_handle,
+    const void*         data,
+    size_t              data_len)
+{
+    return WSREP_NOT_IMPLEMENTED;
+}
+
 static wsrep_status_t mm_galera_causal_read(
     wsrep_t* wsrep, 
     wsrep_seqno_t* seqno)
@@ -2775,6 +2784,7 @@ static wsrep_t mm_galera_str = {
     &mm_galera_abort_slave_trx,
     &mm_galera_append_query,
     &mm_galera_append_row_key,
+    &mm_galera_append_data,
     &mm_galera_causal_read,
     &mm_galera_set_variable,
     &mm_galera_set_database,
