@@ -595,8 +595,9 @@ void gcomm::evs::Proto::check_inactive()
     
     // All other nodes are under suspicion, set all others as inactive.
     // This will speed up recovery when this node has been isolated from
-    // other group.
-    if (n_suspected + 1 == known.size())
+    // other group. Note that this should be done only if known size is 
+    // greater than 2 in order to avoid immediate split brain.
+    if (known.size() > 2 && n_suspected + 1 == known.size())
     {
         for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
         {
@@ -956,7 +957,7 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
         seq_range = min(static_cast<seqno_t>(0xff), seq_range);
         if (seq_range != 0)
         {
-            log_info << "adjusted seq range to: " << seq_range;
+            log_debug << "adjusted seq range to: " << seq_range;
             last_msg_seq = seq + seq_range;
         }
     }
@@ -1475,7 +1476,6 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
         else
         {
             evs_log_debug(D_RETRANS) << "retransmitted " << um;
-            log_info << "retrans " << um;
         }
         seq = seq + msg.get_seq_range() + 1;
         retrans_msgs++;
@@ -1557,7 +1557,7 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
         }
         else
         {
-            log_info << "recover " << um;
+            evs_log_info(D_RETRANS) << "recover " << um;
         }
         seq = seq + msg.get_seq_range() + 1;
         recovered_msgs++;
@@ -2542,7 +2542,7 @@ void gcomm::evs::Proto::handle_delegate(const DelegateMessage& msg,
 {
     gcomm_assert(ii != known.end());
     // evs_log_debug(D_DELEGATE_MSGS) << "delegate message " << msg;
-    log_info << "delegate";
+    log_debug << "delegate";
     Message umsg;
     size_t offset;
     gu_trace(offset = unserialize_message(UUID::nil(), rb, &umsg));
@@ -2561,7 +2561,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
 
     if ((msg.get_flags() & Message::F_COMMIT) != 0)
     {
-        log_info << self_string() << " commit gap from " << msg.get_source();
+        log_debug << self_string() << " commit gap from " << msg.get_source();
         if (get_state()                           == S_GATHER &&
             install_message                       != 0 &&
             install_message->get_fifo_seq()       == msg.get_seq())
@@ -2816,8 +2816,9 @@ void gcomm::evs::Proto::check_suspects(const UUID& source,
                 if (kn.get_operational() == true && 
                     s_cnt > current_view.get_members().size()/2)
                 {
-                    evs_log_info(I_STATE) << " declaring suspected " 
-                                          << uuid << " as inactive";
+                    evs_log_info(I_STATE) 
+                        << " declaring suspected " 
+                        << uuid << " as inactive";
                     set_inactive(uuid);
                 }
             }
