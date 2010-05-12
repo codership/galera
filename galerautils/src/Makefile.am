@@ -82,7 +82,8 @@ libgalerautils___la_SOURCES = \
 	gu_poll.cpp           \
 	gu_network.cpp        \
 	gu_prodcons.cpp	      \
-	gu_datetime.cpp
+	gu_datetime.cpp       \
+	gu_buffer.cpp
 
 
 libgalerautils___la_LIBADD = libgaleraresolver.la
