@@ -93,8 +93,8 @@ env = DefaultEnvironment()
 
 # Set up environment for ccache and distcc
 env['ENV']['HOME']          = os.environ['HOME']
-env['ENV']['DISTCC_HOSTS']  = os.environ['DISTCC_HOSTS']
-env['ENV']['CCACHE_PREFIX'] = os.environ['CCACHE_PREFIX']
+#env['ENV']['DISTCC_HOSTS']  = os.environ['DISTCC_HOSTS']
+#env['ENV']['CCACHE_PREFIX'] = os.environ['CCACHE_PREFIX']
 
 # Set CC and CXX compilers
 cc = os.getenv('CC', 'default')
