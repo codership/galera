@@ -50,6 +50,9 @@ namespace galera
         
         virtual void append_conn_query(TrxHandle*, const void* query,
                                        size_t query_len) = 0;
+
+        virtual void append_data(TrxHandle*, const void* data,
+                                 size_t data_len) = 0;
         
         virtual void set_conn_variable(TrxHandle*, const void*, size_t,
                                        const void*, size_t) = 0;

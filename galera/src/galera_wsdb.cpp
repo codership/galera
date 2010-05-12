@@ -167,7 +167,7 @@ void galera::GaleraWsdb::create_write_set(TrxHandle* trx,
 
     if (rbr_data != 0 && rbr_data_len > 0)
     {
-        trx->get_write_set().assign_rbr(rbr_data, rbr_data_len);
+        trx->get_write_set().append_data(rbr_data, rbr_data_len);
     }
     
     if (trx->get_write_set().get_queries().empty() == false)
@@ -212,6 +212,13 @@ void galera::GaleraWsdb::append_row_key(TrxHandle* trx,
 {
     trx->get_write_set().append_row_key(dbtable, dbtable_len, 
                                         key, key_len, action);
+}
+
+void galera::GaleraWsdb::append_data(TrxHandle* trx,
+                                     const void* data,
+                                     size_t data_len)
+{
+    trx->get_write_set().append_data(data, data_len);
 }
 
 

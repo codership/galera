@@ -156,13 +156,12 @@ namespace galera
                             int action);
         
         
-        void assign_rbr(const void* rbr_data, size_t rbr_data_len)
+        void append_data(const void*data, size_t data_len)
         {
-            assert(rbr_.empty() == true);
-            rbr_.reserve(rbr_data_len);
-            rbr_.insert(rbr_.begin(),
-                        reinterpret_cast<const gu::byte_t*>(rbr_data),
-                        reinterpret_cast<const gu::byte_t*>(rbr_data) + rbr_data_len);
+            rbr_.reserve(rbr_.size() + data_len);
+            rbr_.insert(rbr_.end(),
+                        reinterpret_cast<const gu::byte_t*>(data),
+                        reinterpret_cast<const gu::byte_t*>(data) + data_len);
             level_ = WSDB_WS_DATA_RBR;
         }
         

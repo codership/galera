@@ -532,7 +532,6 @@ static wsrep_status_t apply_write_set(void *recv_ctx,
     wsrep_status_t rcode = WSREP_OK;
     assert (global_seqno > 0);
     
-    // log_info << "applying ws " << ws.get_type() << " " << ws.get_level();
     GU_DBUG_ENTER("apply_write_set");
     if (bf_apply_cb == NULL) {
         gu_error("data applier has not been defined"); 
@@ -559,7 +558,6 @@ static wsrep_status_t apply_write_set(void *recv_ctx,
         const QuerySequence& qs(ws.get_queries());
         for (QuerySequence::const_iterator i = qs.begin(); i != qs.end(); ++i)
         {
-            // log_info << "applying query: " << *i;
             wsrep_apply_data_t data;
             data.type           = WSREP_APPLY_SQL;
             data.u.sql.stm      = reinterpret_cast<const char*>(&i->get_query()[0]);
@@ -838,11 +836,6 @@ static wsrep_status_t process_query_write_set(
         /* Outdated writeset, skip */
         rcode = WSDB_CERTIFICATION_SKIP;
         ret_code = WSREP_OK;
-        // log_info << "skip " << seqno_g << " " << last_recved;        
-    }
-    else
-    {
-        // log_info << "process " << seqno_g << " " << last_recved;
     }
 #else
     if (gu_likely(galera_update_last_received(seqno_g))) {
@@ -903,7 +896,6 @@ static wsrep_status_t process_query_write_set(
             GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
         } else {
             /* replaying job has grabbed commit queue in the beginning */
-            // log_info << "cert skip update last applied" << seqno_g;
             GALERA_UPDATE_LAST_APPLIED (seqno_g);
             GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
         }
@@ -1464,8 +1456,6 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
     if (victim == 0)
     {
         // Victim has probably already aborted
-        //log_info << "missing victim " << victim_trx 
-        //       << " bf seqno " << bf_seqno;
         return WSREP_OK;
     }
 
@@ -1557,7 +1547,7 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
         }
         apply_monitor.cancel(victim);
     }
-    // log_info << "abort pre commit returning " << ret_code;
+
     return ret_code;
 }
 
@@ -2043,7 +2033,6 @@ post_repl_out:
         throw;
     }
     
-    // log_info << "pre_commit " << trx->get_trx_id() << " " << retcode;
     GU_DBUG_RETURN(retcode);
 }
 
@@ -2115,7 +2104,26 @@ wsrep_status_t mm_galera_append_data(
     const void*         data,
     size_t              data_len)
 {
-    return WSREP_NOT_IMPLEMENTED;
+    if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
+
+    TrxHandle* trx(get_trx(wsdb, trx_handle));
+    
+    if (trx == 0)
+    {
+        return WSREP_TRX_MISSING;
+    }
+    
+    TrxHandleLock lock(*trx);
+
+    try
+    {
+        wsdb->append_data(trx, data, data_len);
+    }
+    catch (...)
+    {
+        return WSREP_CONN_FAIL;
+    }
+    return WSREP_OK;
 }
 
 extern "C"

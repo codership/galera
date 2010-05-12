@@ -90,7 +90,9 @@ namespace galera
                             const void* key, 
                             size_t key_len,
                             int action);
-        
+        void append_data(TrxHandle*,
+                         const void* data,
+                         size_t data_len);
         void append_conn_query(TrxHandle*, const void* query,
                                size_t query_len);
         void discard_conn_query(wsrep_conn_id_t conn_id);

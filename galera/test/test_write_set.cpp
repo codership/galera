@@ -86,7 +86,7 @@ START_TEST(test_write_set)
     log_info << "ws2 " << serial_size(ws);
     
     fail_unless(ws.get_level() == WSDB_WS_QUERY);
-    ws.assign_rbr(rbr, rbr_len);
+    ws.append_data(rbr, rbr_len);
     
     gu::Buffer rbrbuf(rbr, rbr + rbr_len);
     log_info << "rbrlen " << serial_size<uint32_t>(rbrbuf);
