@@ -112,7 +112,7 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
     wsrep_seqno_t last_depends_seqno(-1);
     deque<RowKeyEntry*>& match(trx->cert_keys_);
     assert(match.empty() == true);    
-    
+
     while (offset < wscoll.size())
     {
         WriteSet ws;
@@ -146,8 +146,9 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
                               << " " << trx->get_last_seen_seqno();
                     goto cert_fail;
                 }
-                last_depends_seqno = max(last_depends_seqno, 
-                                         ref_trx->get_global_seqno());
+                if (ref_trx->get_global_seqno() != trx->get_global_seqno())
+                    last_depends_seqno = max(last_depends_seqno, 
+                                             ref_trx->get_global_seqno());
             }
             else if (store_keys == true)
             {
@@ -215,16 +216,24 @@ galera::TrxHandle* galera::GaleraCertification::create_trx(
 
     TrxHandle* trx(0);
     WriteSet ws;
-    (void)unserialize(reinterpret_cast<const byte_t*>(data), data_len, 0, ws, true);
-    
-    trx = new TrxHandle(ws.get_source_id(),
-                        ws.get_conn_id(), ws.get_trx_id(), false);
+    size_t offset(0);
+    while (offset < data_len)
+    {
+        offset = unserialize(reinterpret_cast<const byte_t*>(data), 
+                             data_len, offset, ws);
+        if (trx == 0)
+        {
+            trx = new TrxHandle(ws.get_source_id(),
+                                ws.get_conn_id(), ws.get_trx_id(), false);
+        }
+        trx->assign_last_seen_seqno(ws.get_last_seen_trx());
+        trx->assign_write_set_type(ws.get_type());
+        trx->assign_write_set_flags(WriteSet::F_COMMIT);
+    }
     trx->assign_seqnos(seqno_l, seqno_g);
     trx->append_write_set(data, data_len);
-    trx->assign_last_seen_seqno(ws.get_last_seen_trx());
-    trx->assign_write_set_type(ws.get_type());
-    trx->assign_write_set_flags(WriteSet::F_COMMIT);
     
+    assert(offset == data_len);
     return trx;
 }
 
