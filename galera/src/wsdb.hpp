@@ -63,7 +63,7 @@ namespace galera
                                       const void* rbr_data = 0,
                                       size_t rbr_data_len = 0) = 0;
         
-
+        virtual void flush_trx(TrxHandle*, bool force = false) { }
         virtual std::ostream& operator<<(std::ostream&) const = 0;
         
         // Create wsdb instance

@@ -148,7 +148,7 @@ END_TEST
 START_TEST(test_mapped_buffer)
 {
     string wd("/tmp");
-    MappedBuffer mb(0, 0, wd, 1 << 8);
+    MappedBuffer mb(wd, 1 << 8);
 
     mb.resize(16);
     for (size_t i = 0; i < 16; ++i)

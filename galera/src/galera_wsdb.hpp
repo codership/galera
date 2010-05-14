@@ -104,6 +104,7 @@ namespace galera
         void create_write_set(TrxHandle*, 
                               const void* rbr_data,
                               size_t rbr_data_len);
+        void flush_trx(TrxHandle*, bool force = false);
         std::ostream& operator<<(std::ostream& os) const;
         GaleraWsdb();
         ~GaleraWsdb();
@@ -113,6 +114,7 @@ namespace galera
         TrxHandle* create_trx(const wsrep_uuid_t&, wsrep_trx_id_t trx_id);
         Conn& create_conn(wsrep_conn_id_t conn_id);
         
+        static const size_t trx_mem_limit_ = 1 << 20;
         TrxMap       trx_map_;
         ConnMap      conn_map_;
         gu::Mutex    mutex_;

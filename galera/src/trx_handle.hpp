@@ -18,6 +18,8 @@ namespace galera
 {
     
     class RowKeyEntry; // Forward declaration
+
+    static const std::string working_dir = "/tmp";
         
     class TrxHandle
     {
@@ -31,7 +33,7 @@ namespace galera
             local_(local),
             mutex_(),
             write_set_(0),
-            write_set_collection_(),
+            write_set_collection_(working_dir),
             state_(WSDB_TRX_VOID),
             position_(WSDB_TRX_POS_VOID),
             local_seqno_(WSREP_SEQNO_UNDEFINED),
@@ -132,7 +134,16 @@ namespace galera
             return *write_set_; 
         }
 
-        void clear() { if (write_set_ != 0) write_set_->clear(); }
+        const MappedBuffer& get_write_set_collection() const
+        {
+            return write_set_collection_;
+        }
+
+        void clear() 
+        { 
+            if (write_set_ != 0) write_set_->clear(); 
+            write_set_collection_.clear();
+        }
         
         void ref() { ++refcnt_; }
         void unref() { --refcnt_; if (refcnt_ == 0) delete this; }

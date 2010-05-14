@@ -1822,30 +1822,22 @@ enum wsrep_status mm_galera_pre_commit(
     // generate write set
     wsdb->create_write_set(trx, rbr_data, rbr_data_len);
     WriteSet& ws(trx->get_write_set());
+    ws.assign_last_seen_trx(cert->get_safe_to_discard_seqno());
     
-    if (ws.empty() == false && ws.get_key_buf().empty() == true)
-    {
-        log_warn << "non empty ws without keys";
-        copy(ws.get_queries().begin(), ws.get_queries().end(),
-             ostream_iterator<const Query>(cerr));
-        return WSREP_TRX_FAIL;
-    }
+    // flush trx write set(s) into mapped buffer
+    wsdb->flush_trx(trx, true);
+    const MappedBuffer& wscoll(trx->get_write_set_collection());
     
     assert (WSREP_SEQNO_UNDEFINED == trx->get_global_seqno());
     
     /* this is possibly autocommit query, need to let it continue */
     /* avoid sending empty write sets */
-    if (ws.empty() == true) 
+    if (wscoll.empty() == true) 
     {
         gu_warn("empty write set for: %llu", trx->get_trx_id());
         trx->clear();
         GU_DBUG_RETURN(WSREP_OK);
     }
-    
-    ws.assign_last_seen_trx(cert->get_safe_to_discard_seqno());
-
-    Buffer ws_buf;
-    ws.serialize(ws_buf);
     
     trx->assign_state(WSDB_TRX_REPLICATING);
     trx->unlock();
@@ -1854,12 +1846,12 @@ enum wsrep_status mm_galera_pre_commit(
     /* replicate through gcs */
     do {
         
-        rcode = gcs_repl(gcs_conn, &ws_buf[0], ws_buf.size(), GCS_ACT_TORDERED,
+        rcode = gcs_repl(gcs_conn, &wscoll[0], wscoll.size(), GCS_ACT_TORDERED,
                          &seqno_g, &seqno_l);
         
     } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
     profile_leave(galera_prof);
-
+    
     trx->lock();
     *global_seqno = seqno_g;
     
@@ -1868,9 +1860,9 @@ enum wsrep_status mm_galera_pre_commit(
               "GCS_ACT_TORDERED", len, seqno_g, seqno_l, rcode);
 #endif
 
-    if (rcode != static_cast<int>(ws_buf.size())) {
+    if (rcode != static_cast<int>(wscoll.size())) {
         gu_error("gcs_repl() failed for: %llu, len: %d, rcode: %d (%s)",
-                 trx->get_trx_id(), ws_buf.size(), rcode, strerror (-rcode));
+                 trx->get_trx_id(), wscoll.size(), rcode, strerror (-rcode));
         assert (GCS_SEQNO_ILL == seqno_l);
         assert (GCS_SEQNO_ILL == seqno_g);
         trx->clear();
@@ -1882,11 +1874,11 @@ enum wsrep_status mm_galera_pre_commit(
     assert (GCS_SEQNO_ILL != seqno_l);
     
     status.replicated++;
-    status.replicated_bytes += ws_buf.size();
+    status.replicated_bytes += wscoll.size();
     
     trx->assign_seqnos(seqno_l, seqno_g);
     trx->assign_state(WSDB_TRX_REPLICATED);
-
+    
     profile_enter(galera_prof);
     rcode = while_eagain_or_trx_abort(trx, 
                                       gu_to_grab, cert_queue, seqno_l);

@@ -1,3 +1,6 @@
+//
+// Copyright (C) 2010 Codership Oy <info@codership.com>
+//
 
 #include "mapped_buffer.hpp"
 
@@ -12,9 +15,7 @@ using namespace std;
 using namespace gu;
 
 
-galera::MappedBuffer::MappedBuffer(const_iterator begin, 
-                                   const_iterator end,
-                                   const std::string& working_dir,
+galera::MappedBuffer::MappedBuffer(const std::string& working_dir,
                                    size_t threshold)
     :
     working_dir_  (working_dir),
@@ -25,8 +26,6 @@ galera::MappedBuffer::MappedBuffer(const_iterator begin,
     buf_size_     (0),
     real_buf_size_(0)
 { 
-    resize(end - begin);
-    copy(begin, end, buf_);
 }
 
 

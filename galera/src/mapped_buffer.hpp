@@ -16,9 +16,7 @@ namespace galera
         typedef gu::byte_t* iterator;
         typedef gu::byte_t const* const_iterator;
         
-        MappedBuffer(const_iterator begin = 0,
-                     const_iterator end = 0,
-                     const std::string& working_dir = "/tmp", 
+        MappedBuffer(const std::string& working_dir, 
                      size_t threshold = 1 << 20);
         
         ~MappedBuffer();
@@ -32,6 +30,7 @@ namespace galera
         void clear();
 
         size_t size() const { return buf_size_; }
+        bool empty() const { return (buf_size_ == 0); }
         
         iterator begin() { return buf_; }
         iterator end() { return (buf_ + buf_size_); }

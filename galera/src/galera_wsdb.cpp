@@ -219,6 +219,7 @@ void galera::GaleraWsdb::append_data(TrxHandle* trx,
                                      size_t data_len)
 {
     trx->get_write_set().append_data(data, data_len);
+    flush_trx(trx);
 }
 
 
@@ -238,5 +239,17 @@ void galera::GaleraWsdb::set_conn_database(TrxHandle* trx,
     {
         Conn& conn(conn_map_.find(trx->get_conn_id())->second);
         conn.assing_default_db(Query(query, query_len));
+    }
+}
+
+
+void galera::GaleraWsdb::flush_trx(TrxHandle* trx, bool force)
+{
+    if (serial_size(trx->get_write_set()) >= trx_mem_limit_ || force == true)
+    {
+        Buffer buf;
+        trx->get_write_set().serialize(buf);
+        trx->append_write_set(buf);
+        trx->get_write_set().clear();
     }
 }

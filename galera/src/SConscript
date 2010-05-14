@@ -22,6 +22,7 @@ env.StaticLibrary('galera++', [
 ])
 
 env.SharedLibrary('galera++', [
+        'mapped_buffer.cpp',
         'write_set.cpp',
         'wsdb.cpp',
         'certification.cpp',
