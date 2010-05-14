@@ -137,9 +137,9 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf,
     install_timeout =
         conf_param_def_range(uri,
                              Conf::EvsInstallTimeout,
-                             retrans_period*4,
+                             inactive_timeout,
                              retrans_period*2,
-                             suspect_timeout);
+                             inactive_timeout);
     join_retrans_period = 
         conf_param_def_range(uri,
                              Conf::EvsJoinRetransPeriod,
