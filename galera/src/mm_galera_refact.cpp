@@ -324,7 +324,7 @@ enum wsrep_status mm_galera_init(wsrep_t* gh,
     status.last_applied = args->state_seqno;
 
     /* 2. initialize wsdb */
-    wsdb_init(data_dir, (gu_log_cb_t)args->logger_cb);    
+    // wsdb_init(data_dir, (gu_log_cb_t)args->logger_cb);    
     wsdb = Wsdb::create("galera");
     cert = Certification::create("galera");
 
@@ -505,7 +505,7 @@ void mm_galera_tear_down(wsrep_t *gh)
         gcs_conn = NULL;
         delete wsdb; wsdb = 0;
         delete cert; cert = 0;
-        wsdb_close();
+        // wsdb_close();
         
         if (cert_queue)   gu_to_destroy(&cert_queue);
         cert_queue = NULL;
@@ -1100,8 +1100,10 @@ galera_handle_configuration (wsrep_t* gh,
 #endif
 
     wsrep_view_info_t* view_info(galera_view_info_create(conf, st_required));
-    my_uuid = view_info->members[view_info->my_idx].id;
-    
+    if (view_info->my_idx >= 0)
+    {
+        my_uuid = view_info->members[view_info->my_idx].id;
+    }
     // @todo view handler consumes view_info, this should be changed so
     // that handler has responsibility of taking copy if it wants to 
     // store info permanently

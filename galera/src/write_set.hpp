@@ -146,11 +146,7 @@ namespace galera
         wsrep_trx_id_t get_trx_id() const { return trx_id_; }
         enum wsdb_ws_type get_type() const { return type_; }
         enum wsdb_ws_level get_level() const { return level_; }
-        void assign_flags(int flags) 
-        { 
-            log_info << "flags " << flags;
-            flags_ = flags; 
-        }
+        void assign_flags(int flags) { flags_ = flags; }
         int get_flags() const { return flags_; }
         
         void assign_last_seen_trx(wsrep_seqno_t seqno) { last_seen_trx_ = seqno; }

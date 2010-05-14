@@ -189,10 +189,13 @@ galera::GaleraCertification::GaleraCertification(const string& conf)
 }
 
 
+
+
 galera::GaleraCertification::~GaleraCertification()
 {
     log_info << "cert index usage at exit " << cert_index_.size();
     log_info << "cert trx map usage at exit " << trx_map_.size();
+    for_each(cert_index_.begin(), cert_index_.end(), DiscardRK());
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
 }
 
@@ -249,10 +252,12 @@ galera::TrxHandle* galera::GaleraCertification::create_trx(
             trx->assign_last_seen_seqno(ws.get_last_seen_trx());
             trx->assign_write_set_type(ws.get_type());
             trx->assign_write_set_flags(WriteSet::F_COMMIT);
+            trx_hash_.erase(TrxId(ws.get_source_id(), ws.get_conn_id(), ws.get_trx_id()));
         }
         else if ((ws.get_flags() & WriteSet::F_ROLLBACK) != 0)
         {
             trx->assign_write_set_flags(WriteSet::F_ROLLBACK);
+            trx_hash_.erase(TrxId(ws.get_source_id(), ws.get_conn_id(), ws.get_trx_id()));
         }
         else
         {
@@ -345,6 +350,7 @@ void galera::GaleraCertification::purge_trxs_upto(wsrep_seqno_t seqno)
     assert(seqno >= 0);
     Lock lock(mutex_); 
     TrxMap::iterator lower_bound(trx_map_.lower_bound(seqno));
+    // log_info << "purge " << seqno;
     for_each(trx_map_.begin(), lower_bound, PurgeAndDiscard(this));
     trx_map_.erase(trx_map_.begin(), lower_bound);
     if (trx_map_.size() > 10000)

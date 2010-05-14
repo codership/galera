@@ -38,7 +38,16 @@ namespace galera
     {
     private:
 
+
         typedef boost::unordered_map<RowKey, RowKeyEntry*, RowKeyHash> CertIndex;
+        class DiscardRK
+        {
+        public:
+            void operator()(CertIndex::value_type& vt) const
+            {
+                delete vt.second;
+            }
+        };
         typedef std::map<wsrep_seqno_t, TrxHandle*> TrxMap;
 
         class TrxId
@@ -103,12 +112,6 @@ namespace galera
             {
                 {
                     TrxHandleLock lock(*vt.second);
-                    if (vt.second->is_local() == false)
-                    {
-                        cert_->trx_hash_.erase(TrxId(vt.second->get_source_id(),
-                                                     vt.second->get_conn_id(),
-                                                     vt.second->get_trx_id()));
-                    }
                     cert_->purge_for_trx(vt.second);
                 }
                 vt.second->unref();
