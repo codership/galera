@@ -107,47 +107,59 @@ galera::GaleraCertification::purge_for_trx(TrxHandle* trx)
 
 int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
 {
-    RowKeySequence rk;
-    trx->get_write_set().get_keys(rk);
-    deque<RowKeyEntry*>& match(trx->cert_keys_);
+    size_t offset(0);
+    const MappedBuffer& wscoll(trx->get_write_set_collection());
     wsrep_seqno_t last_depends_seqno(-1);
-    assert(match.empty() == true);
-
-    // Scan over all row keys
-    for (RowKeySequence::const_iterator i = rk.begin(); i != rk.end(); ++i)
+    deque<RowKeyEntry*>& match(trx->cert_keys_);
+    assert(match.empty() == true);    
+    
+    while (offset < wscoll.size())
     {
-        CertIndex::iterator ci;
-        if ((ci = cert_index_.find(*i)) != cert_index_.end())
+        WriteSet ws;
+        if ((offset = unserialize(&wscoll[0], wscoll.size(), offset, ws)) == 0)
         {
-            // Found matching entry, scan over dependent transactions
-            const TrxHandle* ref_trx(ci->second->get_ref_trx());
-            assert(ref_trx != 0);
-            // We assume that certification is done only once per trx
-            // and in total order
-            assert(ref_trx->get_global_seqno() < trx->get_global_seqno() ||
-                   same_source(ref_trx, trx));
-            if (same_source(ref_trx, trx) == false &&
-                ref_trx->get_global_seqno() > 
-                trx->get_write_set().get_last_seen_trx())
-            {
-                // Cert conflict if trx write set didn't see ti committed
-                log_debug << "trx conflict " << ref_trx->get_global_seqno() 
-                          << " " << trx->get_write_set().get_last_seen_trx();
-                goto cert_fail;
-            }
-            last_depends_seqno = max(last_depends_seqno, 
-                                     ref_trx->get_global_seqno());
-        }
-        else if (store_keys == true)
-        {
-            RowKeyEntry* cie(new RowKeyEntry(*i));
-            ci = cert_index_.insert(make_pair(cie->get_row_key(), cie)).first;
+            gu_throw_fatal << "failed to unserialize write set";
         }
         
-        if (store_keys == true && ci->second->get_ref_trx() != trx)
+        RowKeySequence rk;
+        ws.get_keys(rk);
+        
+        // Scan over all row keys
+        for (RowKeySequence::const_iterator i = rk.begin(); i != rk.end(); ++i)
         {
-            match.push_back(ci->second);
-            ci->second->ref(trx);
+            CertIndex::iterator ci;
+            if ((ci = cert_index_.find(*i)) != cert_index_.end())
+            {
+                // Found matching entry, scan over dependent transactions
+                const TrxHandle* ref_trx(ci->second->get_ref_trx());
+                assert(ref_trx != 0);
+                // We assume that certification is done only once per trx
+                // and in total order
+                assert(ref_trx->get_global_seqno() < trx->get_global_seqno() ||
+                       same_source(ref_trx, trx));
+                if (same_source(ref_trx, trx) == false &&
+                    ref_trx->get_global_seqno() > 
+                    trx->get_last_seen_seqno())
+                {
+                    // Cert conflict if trx write set didn't see ti committed
+                    log_debug << "trx conflict " << ref_trx->get_global_seqno() 
+                              << " " << trx->get_last_seen_seqno();
+                    goto cert_fail;
+                }
+                last_depends_seqno = max(last_depends_seqno, 
+                                         ref_trx->get_global_seqno());
+            }
+            else if (store_keys == true)
+            {
+                RowKeyEntry* cie(new RowKeyEntry(*i));
+                ci = cert_index_.insert(make_pair(cie->get_row_key(), cie)).first;
+            }
+            
+            if (store_keys == true && ci->second->get_ref_trx() != trx)
+            {
+                match.push_back(ci->second);
+                ci->second->ref(trx);
+            }
         }
     }
     
@@ -166,6 +178,7 @@ cert_fail:
 galera::GaleraCertification::GaleraCertification(const string& conf) 
     : 
     trx_map_(), 
+    trx_hash_(),
     cert_index_(),
     mutex_(), 
     trx_size_warn_count_(0), 
@@ -197,17 +210,57 @@ galera::TrxHandle* galera::GaleraCertification::create_trx(
     wsrep_seqno_t seqno_g)
 {
     assert(seqno_l >= 0 && seqno_g >= 0);
-    TrxHandle* trx(new TrxHandle(-1, -1, false));
+
+    TrxHandle* trx(0);
+    size_t offset(0);
     
-    WriteSet* ws(new WriteSet());
-    if (unserialize(reinterpret_cast<const byte_t*>(data), 
-                    data_len, 0, *ws) == 0)
+    while (offset < data_len)
     {
-        gu_throw_fatal << "could not unserialize write set";
+        WriteSet ws;
+        if ((offset = unserialize(reinterpret_cast<const byte_t*>(data), 
+                                  data_len, offset, ws)) == 0)
+        {
+            gu_throw_fatal << "could not unserialize write set";
+        }
+        
+        if (trx == 0)
+        {
+            TrxId id(TrxId(ws.get_source_id(), ws.get_conn_id(), ws.get_trx_id()));
+            TrxHash::iterator i(trx_hash_.find(id));
+            if (i == trx_hash_.end())
+            {
+                trx = new TrxHandle(ws.get_source_id(),
+                                    ws.get_conn_id(), ws.get_trx_id(), false);
+                trx_hash_[id] = trx;
+            }
+            else
+            {
+                trx = i->second;
+            }
+        }
+        assert(trx != 0);
+        
+        // we need seqnos in any case to cancel cert/apply/commit queues
+        trx->assign_seqnos(seqno_l, seqno_g);
+        // log_info << "ws flags " << ws.get_flags();
+        if ((ws.get_flags() & WriteSet::F_COMMIT) != 0)
+        {
+            trx->append_write_set(data, data_len);
+            trx->assign_last_seen_seqno(ws.get_last_seen_trx());
+            trx->assign_write_set_type(ws.get_type());
+            trx->assign_write_set_flags(WriteSet::F_COMMIT);
+        }
+        else if ((ws.get_flags() & WriteSet::F_ROLLBACK) != 0)
+        {
+            trx->assign_write_set_flags(WriteSet::F_ROLLBACK);
+        }
+        else
+        {
+            trx->append_write_set(data, data_len);
+        }
     }
-    trx->assign_write_set(ws);
-    trx->assign_seqnos(seqno_l, seqno_g);
     
+    assert(offset == data_len);
     return trx;
 }
 

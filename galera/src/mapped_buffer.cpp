@@ -114,7 +114,7 @@ void galera::MappedBuffer::resize(size_t sz)
 
 void galera::MappedBuffer::clear()
 {
-    if (fd_ != 0)
+    if (fd_ != -1)
     {
         munmap(buf_, real_buf_size_);
         while (close(fd_) == EINTR) { }

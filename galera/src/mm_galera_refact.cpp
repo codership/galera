@@ -74,6 +74,8 @@ static gu_to_t            *cert_queue   = NULL;
 static gu_to_t            *commit_queue = NULL;
 static gcs_conn_t         *gcs_conn     = NULL;
 
+static size_t trx_frag_size = (1 << 20);
+
 typedef enum
 {
     AL_QUERY,
@@ -559,6 +561,7 @@ static wsrep_status_t apply_write_set(void *recv_ctx,
         for (QuerySequence::const_iterator i = qs.begin(); i != qs.end(); ++i)
         {
             wsrep_apply_data_t data;
+            // log_info << "applying " << *i;
             data.type           = WSREP_APPLY_SQL;
             data.u.sql.stm      = reinterpret_cast<const char*>(&i->get_query()[0]);
             data.u.sql.len      = i->get_query().size();
@@ -706,10 +709,21 @@ static wsrep_status_t process_conn_write_set(
         if (gu_likely(galera_update_last_received(trx->get_global_seqno()))) 
         {
             /* Global seqno ok, certification ok (not needed?) */
-            rcode = apply_write_set(recv_ctx, trx->get_write_set(), 
-                                    trx->get_global_seqno());
-            if (rcode) {
-                gu_error ("unknown galera fail: %d trx: %llu", rcode, seqno_l);
+            const MappedBuffer& wscoll(trx->get_write_set_collection());
+            size_t offset(0);
+            while (offset < wscoll.size())
+            {
+                WriteSet ws;
+                if ((offset = unserialize(&wscoll[0], wscoll.size(), offset, ws)) == 0)
+                {
+                    gu_fatal("could not unserialize write set");
+                    return WSREP_FATAL;
+                }
+                rcode = apply_write_set(recv_ctx, ws, 
+                                        trx->get_global_seqno());
+                if (rcode) {
+                    gu_error ("unknown galera fail: %d trx: %llu", rcode, seqno_l);
+                }
             }
         }
     }
@@ -741,35 +755,49 @@ enum wsrep_status process_query_write_set_applying(
     
     static const size_t max_apply_attempts(10);
     size_t attempts(0);
-    int rcode;
+    int rcode(WSREP_OK);
     
     do
     {
-        if ((rcode = apply_write_set(recv_ctx, 
-                                     trx->get_write_set(),
-                                     trx->get_global_seqno()))) 
+        size_t offset(0);
+        const MappedBuffer& wscoll(trx->get_write_set_collection());
+        while (offset < wscoll.size())
         {
-            gu_warn("ws apply failed, rcode: %d, seqno: %lld, "
-                    "last_seen: %lld attempt: %zd", 
-                    rcode, trx->get_global_seqno(), 
-                    trx->get_write_set().get_last_seen_trx(), attempts);
-            
-            if (apply_query(recv_ctx, "rollback\0", 9, 
-                            trx->get_global_seqno())) {
-                gu_warn("ws apply rollback failed, seqno: %lld, "
-                        "last_seen: %lld", 
-                        trx->get_global_seqno(), 
-                        trx->get_write_set().get_last_seen_trx());
-                rcode = WSREP_FATAL;
-            }
-            ++attempts;
-            
-            /* avoid retrying if fatal error happened */
-            if (rcode == WSREP_FATAL)
+            WriteSet ws;
+            if ((offset = unserialize(&wscoll[0], wscoll.size(), 
+                                      offset, ws)) == 0)
             {
-                attempts = max_apply_attempts;
+                
+                return WSREP_FATAL;
+            }
+            // log_info << "applying ws at offset " << offset;
+            if ((rcode = apply_write_set(recv_ctx, 
+                                         ws,
+                                         trx->get_global_seqno()))) 
+            {
+                gu_warn("ws apply failed, rcode: %d, seqno: %lld, "
+                        "last_seen: %lld attempt: %zd", 
+                        rcode, trx->get_global_seqno(), 
+                        trx->get_last_seen_seqno(), attempts);
+                
+                if (apply_query(recv_ctx, "rollback\0", 9, 
+                                trx->get_global_seqno())) {
+                    gu_warn("ws apply rollback failed, seqno: %lld, "
+                            "last_seen: %lld", 
+                            trx->get_global_seqno(), 
+                            trx->get_last_seen_seqno());
+                    rcode = WSREP_FATAL;
+                }
+                ++attempts;
+                
+                /* avoid retrying if fatal error happened */
+                if (rcode == WSREP_FATAL)
+                {
+                    attempts = max_apply_attempts;
+                }
             }
         }
+        assert(offset == wscoll.size());
     }
     while (attempts < max_apply_attempts && rcode != WSREP_OK);
     
@@ -795,7 +823,7 @@ enum wsrep_status process_query_write_set_applying(
                  "last_seen: %lld", 
                  trx->get_global_seqno(), 
                  seqno_l, 
-                 trx->get_write_set().get_last_seen_trx());
+                 trx->get_last_seen_seqno());
         gu_throw_fatal << "ws apply commit failed";
     }
     
@@ -853,7 +881,7 @@ static wsrep_status_t process_query_write_set(
     GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
     
     gu_debug("remote trx seqno: %lld %lld last_seen_trx: %lld %lld, cert: %d", 
-             seqno_g, seqno_l, trx->get_write_set().get_last_seen_trx(), 
+             seqno_g, seqno_l, trx->get_last_seen_seqno(),
              last_recved, rcode);
 
     switch (rcode) {
@@ -872,7 +900,7 @@ static wsrep_status_t process_query_write_set(
     case WSDB_CERTIFICATION_FAIL:
         /* certification failed, release */
         gu_debug("trx certification failed: (%lld %lld) last_seen: %lld",
-                 seqno_g, seqno_l, trx->get_write_set().get_last_seen_trx());
+                 seqno_g, seqno_l, trx->get_last_seen_seqno());
 
         ret_code = WSREP_TRX_FAIL;
         /* fall through */
@@ -921,16 +949,30 @@ static wsrep_status_t process_write_set(
     
     TrxHandle* trx(cert->create_trx(data, data_len, seqno_l, seqno_g));
     TrxHandleLock lock(*trx);
-    switch (trx->get_write_set().get_type()) 
+    if ((trx->get_write_set_flags() & WriteSet::F_COMMIT) != 0)
     {
-    case WSDB_WS_TYPE_TRX:
-        rcode = process_query_write_set(recv_ctx, trx, seqno_l);
-        break;
-    case WSDB_WS_TYPE_CONN:
-        rcode = process_conn_write_set(recv_ctx, trx, seqno_l);
-        break;
+        switch (trx->get_write_set_type()) 
+        {
+        case WSDB_WS_TYPE_TRX:
+            rcode = process_query_write_set(recv_ctx, trx, seqno_l);
+            break;
+        case WSDB_WS_TYPE_CONN:
+            rcode = process_conn_write_set(recv_ctx, trx, seqno_l);
+            break;
+        }
     }
-
+    else
+    {
+        if ((trx->get_write_set_flags() & WriteSet::F_ROLLBACK) != 0)
+        {
+            trx->clear();
+        }
+        GALERA_SELF_CANCEL_QUEUE(cert_queue, seqno_l);
+        apply_monitor.self_cancel(trx);
+        apply_monitor.leave(trx);
+        GALERA_SELF_CANCEL_QUEUE(commit_queue, seqno_l);        
+    }
+    
     return rcode;
 }
 
@@ -1623,7 +1665,7 @@ enum wsrep_status mm_galera_post_commit(
 
     // Additional ref so that trx is not freed during discard
     trx->ref();
-    wsdb->discard_trx(trx_handle->trx_id);
+    wsdb->discard_trx(trx->get_trx_id());
     // trx should still be owned by cert
     assert(trx->refcnt() == 2);
     trx->unref();
@@ -1720,7 +1762,7 @@ static int check_certification_status_for_aborted(
         gu_debug ("BF conflicting local trx %lld has certified, "
                   "cert. interval: %lld - %lld", 
                   seqno_l, 
-                  trx->get_write_set().get_last_seen_trx(), 
+                  trx->get_last_seen_seqno(), 
                   trx->get_global_seqno());
         /* certification ok */
         return WSREP_OK;
@@ -1729,7 +1771,7 @@ static int check_certification_status_for_aborted(
         /* certification failed, release */
         gu_debug("BF conflicting local trx %lld certification failed: "
                  "%lld - %lld", seqno_l, 
-                 trx->get_write_set().get_last_seen_trx(), 
+                 trx->get_last_seen_seqno(), 
                  trx->get_global_seqno());
         return WSREP_TRX_FAIL;
         
@@ -1823,7 +1865,7 @@ enum wsrep_status mm_galera_pre_commit(
     wsdb->create_write_set(trx, rbr_data, rbr_data_len);
     WriteSet& ws(trx->get_write_set());
     ws.assign_last_seen_trx(cert->get_safe_to_discard_seqno());
-    
+    ws.assign_flags(WriteSet::F_COMMIT);
     // flush trx write set(s) into mapped buffer
     wsdb->flush_trx(trx, true);
     const MappedBuffer& wscoll(trx->get_write_set_collection());
@@ -1846,7 +1888,8 @@ enum wsrep_status mm_galera_pre_commit(
     /* replicate through gcs */
     do {
         
-        rcode = gcs_repl(gcs_conn, &wscoll[0], wscoll.size(), GCS_ACT_TORDERED,
+        rcode = gcs_repl(gcs_conn, &wscoll[0] + trx->get_repl_offset(), 
+                         wscoll.size() - trx->get_repl_offset(), GCS_ACT_TORDERED,
                          &seqno_g, &seqno_l);
         
     } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
@@ -1860,7 +1903,7 @@ enum wsrep_status mm_galera_pre_commit(
               "GCS_ACT_TORDERED", len, seqno_g, seqno_l, rcode);
 #endif
 
-    if (rcode != static_cast<int>(wscoll.size())) {
+    if (rcode != static_cast<int>(wscoll.size() - trx->get_repl_offset())) {
         gu_error("gcs_repl() failed for: %llu, len: %d, rcode: %d (%s)",
                  trx->get_trx_id(), wscoll.size(), rcode, strerror (-rcode));
         assert (GCS_SEQNO_ILL == seqno_l);
@@ -2070,7 +2113,7 @@ enum wsrep_status mm_galera_append_row_key(
 
     TrxHandle* trx(get_trx(wsdb, trx_handle, true));
     TrxHandleLock lock(*trx);
-
+    
     switch (action) {
     case WSREP_UPDATE: wsdb_action=WSDB_ACTION_UPDATE; break;
     case WSREP_DELETE: wsdb_action=WSDB_ACTION_DELETE; break;
@@ -2110,6 +2153,37 @@ wsrep_status_t mm_galera_append_data(
     try
     {
         wsdb->append_data(trx, data, data_len);
+        const MappedBuffer& wscoll(trx->get_write_set_collection());
+        if (wscoll.size() >= trx_frag_size + trx->get_repl_offset())
+        {
+            long rcode;
+            gcs_seqno_t seqno_g(-1), seqno_l(-1);
+            do {
+                
+                rcode = gcs_repl(gcs_conn, &wscoll[0] + trx->get_repl_offset(), 
+                                 wscoll.size() - trx->get_repl_offset(), 
+                                 GCS_ACT_TORDERED,
+                                 &seqno_g, &seqno_l);
+                
+            } while (-EAGAIN == rcode && 
+                     (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
+            if (rcode != static_cast<long>(wscoll.size() - trx->get_repl_offset()))
+            {
+                trx->clear();
+                return WSREP_CONN_FAIL;
+            }
+            // log_info << "replicated fragment " 
+            //         << trx->get_repl_offset() << " - " << wscoll.size();
+            status.replicated++;
+            status.replicated_bytes += wscoll.size();
+            trx->assign_repl_offset(wscoll.size());
+            trx->assign_seqnos(seqno_l, seqno_g);
+            GALERA_SELF_CANCEL_QUEUE(cert_queue, seqno_l);
+            apply_monitor.self_cancel(trx);
+            apply_monitor.leave(trx);
+            GALERA_SELF_CANCEL_QUEUE(commit_queue, seqno_l);
+            trx->assign_seqnos(-1, -1);
+        }
     }
     catch (...)
     {
@@ -2256,15 +2330,16 @@ enum wsrep_status mm_galera_to_execute_start(
     TrxHandleLock lock(*trx);
     wsdb->append_conn_query(trx, query, query_len);
     wsdb->create_write_set(trx);
-    trx->get_write_set().assign_last_seen_trx(cert->get_safe_to_discard_seqno());
-
-    Buffer query_buf;
-    trx->get_write_set().serialize(query_buf);
+    WriteSet& ws(trx->get_write_set());
+    ws.assign_last_seen_trx(cert->get_safe_to_discard_seqno());
+    ws.assign_flags(WriteSet::F_COMMIT);
+    wsdb->flush_trx(trx, true);
+    const MappedBuffer& wscoll(trx->get_write_set_collection());
     
     /* replicate through gcs */
     do {
-        rcode = gcs_repl(gcs_conn, &query_buf[0], 
-                         query_buf.size(), GCS_ACT_TORDERED, &seqno_g,
+        rcode = gcs_repl(gcs_conn, &wscoll[0], 
+                         wscoll.size(), GCS_ACT_TORDERED, &seqno_g,
                          &seqno_l);
     } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
     
@@ -2278,10 +2353,10 @@ enum wsrep_status mm_galera_to_execute_start(
     }
     
     status.replicated++;
-    status.replicated_bytes += query_buf.size();
+    status.replicated_bytes += wscoll.size();
     
-    // Don't need it anymore
-    query_buf.clear();
+    // trx write set data is not needed anymore
+    trx->clear();
     
     assert (GCS_SEQNO_ILL != seqno_g);
     assert (GCS_SEQNO_ILL != seqno_l);
@@ -2298,7 +2373,7 @@ enum wsrep_status mm_galera_to_execute_start(
     
     /* update global seqno */
     do_apply = galera_update_last_received (seqno_g);
-
+    
     if (rcode == WSDB_OK) {
         /* Grab commit queue */
         apply_monitor.enter(trx);
@@ -2375,11 +2450,11 @@ enum wsrep_status mm_galera_replay_trx(
     TrxHandle* trx(get_trx(wsdb, trx_handle));
     TrxHandleLock lock(*trx);
     
-    gu_debug("trx_replay for: %lld %lld state: %d, rbr len: %d", 
+    gu_debug("trx_replay for: %lld %lld state: %d, data len: %d", 
              trx->get_local_seqno(), 
              trx->get_global_seqno(), 
              trx->get_state(), 
-             trx->get_write_set().get_data().size());
+             trx->get_write_set_collection().size());
     
     if (trx->get_state() != WSDB_TRX_MUST_REPLAY) {
         gu_error("replayed trx in bad state: %d", trx->get_state());
@@ -2412,7 +2487,7 @@ enum wsrep_status mm_galera_replay_trx(
      * when job is done, we will reset the seqno back to 0
      */
 
-    if (trx->get_write_set().get_type() == WSDB_WS_TYPE_TRX) 
+    if (trx->get_write_set_type() == WSDB_WS_TYPE_TRX) 
     {
         switch (trx->get_position()) {
         case WSDB_TRX_POS_CERT_QUEUE:
@@ -2445,7 +2520,7 @@ enum wsrep_status mm_galera_replay_trx(
         }
     }
     else {
-        gu_error("replayed trx ws has bad type: %d", trx->get_write_set().get_type());
+        gu_error("replayed trx ws has bad type: %d", trx->get_write_set_type());
         return WSREP_NODE_FAIL;
     }
     trx->assign_state(WSDB_TRX_REPLICATED);

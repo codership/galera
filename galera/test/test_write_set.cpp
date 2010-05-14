@@ -54,7 +54,7 @@ START_TEST(test_write_set)
     wsrep_uuid_t uuid = 
         {{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf}};
     wsrep_trx_id_t trx_id(4774);
-    WriteSet ws(uuid, trx_id, WSDB_WS_TYPE_TRX);
+    WriteSet ws(uuid, -1, trx_id, WSDB_WS_TYPE_TRX);
 
     const char* query1 = "select 0";
     size_t query1_len = strlen(query1);
@@ -101,6 +101,7 @@ START_TEST(test_write_set)
     size_t expected_size = 
         4 // hdr
         + 16 // source id
+        + 8 // conn id
         + 8  // trx id
         + 8 // last seen trx
         + 4 // query sequence size

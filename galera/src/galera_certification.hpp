@@ -40,6 +40,43 @@ namespace galera
 
         typedef boost::unordered_map<RowKey, RowKeyEntry*, RowKeyHash> CertIndex;
         typedef std::map<wsrep_seqno_t, TrxHandle*> TrxMap;
+
+        class TrxId
+        {
+        public:
+            TrxId(const wsrep_uuid_t& source_id, 
+                  wsrep_conn_id_t conn_id,
+                  wsrep_trx_id_t trx_id)
+                : 
+                source_id_(source_id),
+                conn_id_(conn_id),
+                trx_id_(trx_id)
+            { }
+            bool operator==(const TrxId& other) const
+            {
+                return (trx_id_ == other.trx_id_ &&
+                        conn_id_ == other.conn_id_ &&
+                        memcmp(&source_id_, &other.source_id_, 
+                               sizeof(source_id_)) == 0);
+                
+            }
+            class Hash
+            {
+            public:
+                size_t operator()(const TrxId& trx_id) const
+                {
+                    return boost::hash_value(trx_id.trx_id_) ^
+                        boost::hash_value(trx_id.conn_id_);
+                }
+            };
+        private:
+            wsrep_uuid_t source_id_;
+            wsrep_conn_id_t conn_id_;
+            wsrep_trx_id_t trx_id_;
+        };
+
+
+        typedef boost::unordered_map<TrxId, TrxHandle*, TrxId::Hash> TrxHash;
     public:
         
         GaleraCertification(const std::string& conf);
@@ -66,6 +103,12 @@ namespace galera
             {
                 {
                     TrxHandleLock lock(*vt.second);
+                    if (vt.second->is_local() == false)
+                    {
+                        cert_->trx_hash_.erase(TrxId(vt.second->get_source_id(),
+                                                     vt.second->get_conn_id(),
+                                                     vt.second->get_trx_id()));
+                    }
                     cert_->purge_for_trx(vt.second);
                 }
                 vt.second->unref();
@@ -77,6 +120,7 @@ namespace galera
             GaleraCertification* cert_;
         };
         TrxMap        trx_map_;
+        TrxHash       trx_hash_;
         CertIndex     cert_index_;
         gu::Mutex     mutex_;
         size_t        trx_size_warn_count_;

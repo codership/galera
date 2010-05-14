@@ -27,6 +27,9 @@ galera::GaleraWsdb::~GaleraWsdb()
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
 }
 
+
+
+
 ostream& galera::GaleraWsdb::operator<<(ostream& os) const
 {
     os << "trx map: ";
@@ -53,10 +56,9 @@ galera::GaleraWsdb::create_trx(const wsrep_uuid_t& source_id,
 {
     pair<TrxMap::iterator, bool> i = trx_map_.insert(
         make_pair(trx_id, 
-                  new TrxHandle(-1, trx_id, true)));
+                  new TrxHandle(source_id, -1, trx_id, true)));
     if (i.second == false)
         gu_throw_fatal;
-    i.first->second->assign_write_set(new WriteSet(source_id, trx_id, WSDB_WS_TYPE_TRX));
     return i.first->second;
 }
 
@@ -106,9 +108,7 @@ galera::GaleraWsdb::get_conn_query(const wsrep_uuid_t& source_id,
         if (create == true)
         {
             Conn& conn(create_conn(conn_id));
-            TrxHandle* trx(new TrxHandle(conn_id, -1, true));
-            trx->assign_write_set(new WriteSet(source_id, -1, 
-                                               WSDB_WS_TYPE_CONN));
+            TrxHandle* trx(new TrxHandle(source_id, conn_id, -1, true));
             conn.assign_trx(trx);
             return trx;
         }
@@ -119,8 +119,7 @@ galera::GaleraWsdb::get_conn_query(const wsrep_uuid_t& source_id,
     }
     if (i->second.get_trx() == 0)
     {
-        TrxHandle* trx(new TrxHandle(conn_id, -1, true));
-        trx->assign_write_set(new WriteSet(source_id, -1, WSDB_WS_TYPE_CONN));
+        TrxHandle* trx(new TrxHandle(source_id, conn_id, -1, true));
         i->second.assign_trx(trx);
     }
     return i->second.get_trx();
@@ -164,7 +163,7 @@ void galera::GaleraWsdb::create_write_set(TrxHandle* trx,
                                           const void* rbr_data,
                                           size_t rbr_data_len)
 {
-
+    
     if (rbr_data != 0 && rbr_data_len > 0)
     {
         trx->get_write_set().append_data(rbr_data, rbr_data_len);

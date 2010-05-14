@@ -8,19 +8,11 @@
 
 namespace galera
 {
-    
+
+
     class GaleraWsdb : public Wsdb
     {
-        // TODO: This can be optimized
-        class TrxHash
-        {
-        public:
-            size_t operator()(const wsrep_trx_id_t& key) const
-            {
-                return (key & 0xffff);
-            }
-        };
-
+    
         class Conn
         {
         public:
@@ -67,6 +59,17 @@ namespace galera
             Query default_db_;
             TrxHandle* trx_;
         };
+
+
+        class TrxHash
+        {
+        public:
+            size_t operator()(const wsrep_trx_id_t& key) const
+            {
+                return (key & 0xffff);
+            }
+        };
+
 
         typedef boost::unordered_map<wsrep_trx_id_t, TrxHandle*, TrxHash> TrxMap;
         typedef boost::unordered_map<wsrep_conn_id_t, Conn> ConnMap;

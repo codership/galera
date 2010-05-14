@@ -9,6 +9,7 @@
 #include "wsdb_api.h"
 #include "wsrep_api.h"
 #include "gu_buffer.hpp"
+#include "gu_logger.hpp"
 
 #include <vector>
 #include <deque>
@@ -101,13 +102,20 @@ namespace galera
     class WriteSet 
     {
     public:
-        WriteSet(const wsrep_uuid_t& source_id = WSREP_UUID_UNDEFINED,
-                 wsrep_trx_id_t trx_id = -1) 
+        enum
+        {
+            F_COMMIT = 1 << 0,
+            F_ROLLBACK = 1 << 1
+        };
+        
+        WriteSet() 
             : 
-            source_id_(source_id),
-            trx_id_(trx_id),
+            source_id_(WSREP_UUID_UNDEFINED),
+            conn_id_(-1),
+            trx_id_(-1),
             type_(),
             level_(WSDB_WS_QUERY),
+            flags_(0),
             last_seen_trx_(),
             queries_(),
             keys_(),
@@ -116,13 +124,16 @@ namespace galera
         { }
         
         WriteSet(const wsrep_uuid_t& source_id, 
+                 wsrep_conn_id_t conn_id,
                  wsrep_trx_id_t trx_id,
                  enum wsdb_ws_type type) 
             : 
             source_id_(source_id),
+            conn_id_(conn_id),
             trx_id_(trx_id),
             type_(type),
             level_(WSDB_WS_QUERY),
+            flags_(0),
             last_seen_trx_(),
             queries_(),
             keys_(),
@@ -131,9 +142,17 @@ namespace galera
         { }
         
         const wsrep_uuid_t& get_source_id() const { return source_id_; }
+        wsrep_conn_id_t get_conn_id() const { return conn_id_; }
         wsrep_trx_id_t get_trx_id() const { return trx_id_; }
         enum wsdb_ws_type get_type() const { return type_; }
         enum wsdb_ws_level get_level() const { return level_; }
+        void assign_flags(int flags) 
+        { 
+            log_info << "flags " << flags;
+            flags_ = flags; 
+        }
+        int get_flags() const { return flags_; }
+        
         void assign_last_seen_trx(wsrep_seqno_t seqno) { last_seen_trx_ = seqno; }
         wsrep_seqno_t get_last_seen_trx() const { return last_seen_trx_; }
         const gu::Buffer& get_data() const { return data_; }
@@ -145,7 +164,7 @@ namespace galera
             queries_.push_back(Query(query,
                                      query_len, tstamp, rndseed));
         }
-
+        
         void prepend_query(const Query& query)
         {
             queries_.push_front(query);
@@ -160,8 +179,8 @@ namespace galera
         {
             data_.reserve(data_.size() + data_len);
             data_.insert(data_.end(),
-                        reinterpret_cast<const gu::byte_t*>(data),
-                        reinterpret_cast<const gu::byte_t*>(data) + data_len);
+                         reinterpret_cast<const gu::byte_t*>(data),
+                         reinterpret_cast<const gu::byte_t*>(data) + data_len);
             level_ = WSDB_WS_DATA_RBR;
         }
         
@@ -178,9 +197,12 @@ namespace galera
         friend size_t serial_size(const WriteSet&);
         
         wsrep_uuid_t   source_id_;
+        wsrep_conn_id_t conn_id_;
         wsrep_trx_id_t trx_id_;
+        
         enum wsdb_ws_type type_;
         enum wsdb_ws_level level_;
+        int flags_;
         wsrep_seqno_t last_seen_trx_;
         QuerySequence queries_;
         gu::Buffer keys_;
