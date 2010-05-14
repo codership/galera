@@ -112,7 +112,7 @@ namespace galera
             queries_(),
             keys_(),
             key_refs_(),
-            rbr_()
+            data_()
         { }
         
         WriteSet(const wsrep_uuid_t& source_id, 
@@ -127,7 +127,7 @@ namespace galera
             queries_(),
             keys_(),
             key_refs_(),
-            rbr_()
+            data_()
         { }
         
         const wsrep_uuid_t& get_source_id() const { return source_id_; }
@@ -136,7 +136,7 @@ namespace galera
         enum wsdb_ws_level get_level() const { return level_; }
         void assign_last_seen_trx(wsrep_seqno_t seqno) { last_seen_trx_ = seqno; }
         wsrep_seqno_t get_last_seen_trx() const { return last_seen_trx_; }
-        const gu::Buffer& get_rbr() const { return rbr_; }
+        const gu::Buffer& get_data() const { return data_; }
         
         void append_query(const void* query, size_t query_len, 
                           time_t tstamp = -1,
@@ -158,8 +158,8 @@ namespace galera
         
         void append_data(const void*data, size_t data_len)
         {
-            rbr_.reserve(rbr_.size() + data_len);
-            rbr_.insert(rbr_.end(),
+            data_.reserve(data_.size() + data_len);
+            data_.insert(data_.end(),
                         reinterpret_cast<const gu::byte_t*>(data),
                         reinterpret_cast<const gu::byte_t*>(data) + data_len);
             level_ = WSDB_WS_DATA_RBR;
@@ -168,10 +168,10 @@ namespace galera
         void get_keys(RowKeySequence&) const;
         const gu::Buffer& get_key_buf() const { return keys_; }
         const QuerySequence& get_queries() const { return queries_; }
-        bool empty() const { return (rbr_.size() == 0 && queries_.size() == 0); }
+        bool empty() const { return (data_.size() == 0 && queries_.size() == 0); }
         void serialize(gu::Buffer& buf) const;
         void clear() { keys_.clear(), key_refs_.clear(),
-                rbr_.clear(), queries_.clear(); }
+                data_.clear(), queries_.clear(); }
     private:
         friend size_t serialize(const WriteSet&, gu::byte_t*, size_t, size_t);
         friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&);
@@ -186,9 +186,9 @@ namespace galera
         gu::Buffer keys_;
         typedef boost::unordered_multimap<size_t, size_t> KeyRefMap;
         KeyRefMap key_refs_;
-        gu::Buffer rbr_;
+        gu::Buffer data_;
     };
-
+    
     inline bool operator==(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
     {
         return (memcmp(&a, &b, sizeof(a)) == 0);

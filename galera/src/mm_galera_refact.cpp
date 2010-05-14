@@ -546,8 +546,8 @@ static wsrep_status_t apply_write_set(void *recv_ctx,
         {
             wsrep_apply_data_t data;
             data.type = WSREP_APPLY_APP;
-            data.u.app.buffer = (uint8_t *)&ws.get_rbr()[0];
-            data.u.app.len = ws.get_rbr().size();
+            data.u.app.buffer = (uint8_t *)&ws.get_data()[0];
+            data.u.app.len = ws.get_data().size();
             rcode = bf_apply_cb(recv_ctx, &data, global_seqno);
             break;
         }
@@ -2387,7 +2387,7 @@ enum wsrep_status mm_galera_replay_trx(
              trx->get_local_seqno(), 
              trx->get_global_seqno(), 
              trx->get_state(), 
-             trx->get_write_set().get_rbr().size());
+             trx->get_write_set().get_data().size());
     
     if (trx->get_state() != WSDB_TRX_MUST_REPLAY) {
         gu_error("replayed trx in bad state: %d", trx->get_state());

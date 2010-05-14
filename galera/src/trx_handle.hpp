@@ -7,6 +7,7 @@
 #define GALERA_TRX_HANDLE_HPP
 
 #include "write_set.hpp"
+#include "mapped_buffer.hpp"
 
 #include "wsrep_api.h"
 #include "wsdb_api.h"
@@ -15,7 +16,9 @@
 
 namespace galera
 {
-    class RowKeyEntry;
+    
+    class RowKeyEntry; // Forward declaration
+        
     class TrxHandle
     {
     public:
@@ -28,6 +31,7 @@ namespace galera
             local_(local),
             mutex_(),
             write_set_(0),
+            write_set_collection_(),
             state_(WSDB_TRX_VOID),
             position_(WSDB_TRX_POS_VOID),
             local_seqno_(WSREP_SEQNO_UNDEFINED),
@@ -36,8 +40,6 @@ namespace galera
             refcnt_(1),
             cert_keys_()
         { }
-        
-
         
         void lock() { mutex_.lock(); }
         void unlock() { mutex_.unlock(); }
@@ -110,6 +112,13 @@ namespace galera
                 trx_id_ = ws->get_trx_id();
             }
         }
+        
+        void append_write_set(const gu::Buffer& ws)
+        {
+            const size_t offset(write_set_collection_.size());
+            write_set_collection_.resize(offset + ws.size());
+            std::copy(ws.begin(), ws.end(), &write_set_collection_[0] + offset);
+        }
 
         WriteSet& get_write_set()
         {
@@ -132,19 +141,22 @@ namespace galera
         virtual ~TrxHandle() { delete write_set_; write_set_ = 0; }        
         TrxHandle(const TrxHandle&);
         void operator=(const TrxHandle& other);
-        wsrep_uuid_t        source_id_;
-        wsrep_conn_id_t     conn_id_;
-        wsrep_trx_id_t      trx_id_;
-        bool                local_;
-        gu::Mutex           mutex_;
-    protected:
-        WriteSet* write_set_;
-        enum wsdb_trx_state state_;
+
+        wsrep_uuid_t           source_id_;
+        wsrep_conn_id_t        conn_id_;
+        wsrep_trx_id_t         trx_id_;
+        bool                   local_;
+        gu::Mutex              mutex_;
+        WriteSet*              write_set_;
+        MappedBuffer           write_set_collection_;
+        enum wsdb_trx_state    state_;
         enum wsdb_trx_position position_;
-        wsrep_seqno_t local_seqno_;
-        wsrep_seqno_t global_seqno_;
-        wsrep_seqno_t last_depends_seqno_;
-        size_t refcnt_;
+        wsrep_seqno_t          local_seqno_;
+        wsrep_seqno_t          global_seqno_;
+        wsrep_seqno_t          last_depends_seqno_;
+        size_t                 refcnt_;
+        
+        // 
         friend class GaleraCertification;
         std::deque<RowKeyEntry*> cert_keys_;
     };

@@ -1,5 +1,6 @@
 
 #include "write_set.cpp"
+#include "mapped_buffer.cpp"
 #include "gu_logger.hpp"
 
 #include <cstdlib>
@@ -101,6 +102,7 @@ START_TEST(test_write_set)
         4 // hdr
         + 16 // source id
         + 8  // trx id
+        + 8 // last seen trx
         + 4 // query sequence size
         + 16 + query1_len // query1
         + 16 + query2_len // query2
@@ -131,13 +133,51 @@ START_TEST(test_write_set)
 
     RowKeySequence rks;
     ws.get_keys(rks);
-
+    
     RowKeySequence rks2;
     ws.get_keys(rks2);
 
     fail_unless(rks2 == rks);
 
-    fail_unless(ws2.get_rbr() == ws.get_rbr());
+    fail_unless(ws2.get_data() == ws.get_data());
+
+}
+END_TEST
+
+
+START_TEST(test_mapped_buffer)
+{
+    string wd("/tmp");
+    MappedBuffer mb(0, 0, wd, 1 << 8);
+
+    mb.resize(16);
+    for (size_t i = 0; i < 16; ++i)
+    {
+        mb[i] = static_cast<byte_t>(i);
+    }
+    
+    mb.resize(1 << 8);
+    for (size_t i = 0; i < 16; ++i)
+    {
+        fail_unless(mb[i] == static_cast<byte_t>(i));
+    }
+    
+    for (size_t i = 16; i < (1 << 8); ++i)
+    {
+        mb[i] = static_cast<byte_t>(i);
+    }
+
+    mb.resize(1 << 20);
+
+    for (size_t i = 0; i < (1 << 8); ++i)
+    {
+        fail_unless(mb[i] == static_cast<byte_t>(i));
+    }
+
+    for (size_t i = 0; i < (1 << 20); ++i)
+    {
+        mb[i] = static_cast<byte_t>(i);
+    }
 
 }
 END_TEST
@@ -166,6 +206,11 @@ Suite* suite()
     tc = tcase_create("test_write_set");
     tcase_add_test(tc, test_write_set);
     suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_mapped_buffer");
+    tcase_add_test(tc, test_mapped_buffer);
+    suite_add_tcase(s, tc);
+
     return s;
 }
 

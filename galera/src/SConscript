@@ -13,6 +13,7 @@ env.SharedLibrary('mmgalera', [
 ])
 
 env.StaticLibrary('galera++', [
+        'mapped_buffer.cpp',
         'write_set.cpp',
         'wsdb.cpp',
         'certification.cpp',

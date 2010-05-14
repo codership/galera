@@ -11,6 +11,7 @@
 using namespace std;
 using namespace gu;
 
+
 ostream& galera::operator<<(ostream& os, const Query& q)
 {
     return (os << string(q.get_query().begin(), q.get_query().end()));
@@ -28,6 +29,7 @@ inline size_t galera::serialize(const Query& q, gu::byte_t* buf,
     return offset;
 }
 
+
 inline size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len,
                                   size_t offset, Query& q)
 {
@@ -40,12 +42,14 @@ inline size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len,
     return offset;
 }
 
+
 inline size_t galera::serial_size(const Query& q)
 {
     return (serial_size<uint32_t>(q.query_) 
             + serial_size(int64_t())
             + serial_size(uint32_t()));
 }
+
 
 size_t galera::serialize(const RowKey& row_key, 
                                 gu::byte_t*   buf,
@@ -94,9 +98,10 @@ size_t galera::serialize(const WriteSet& ws, gu::byte_t* buf,
         ws.queries_.begin(), ws.queries_.end(), buf, buf_len, offset);
     offset = serialize<uint32_t>(
         &ws.keys_[0], ws.keys_.size(), buf, buf_len, offset);
-    offset = serialize<uint32_t>(ws.rbr_, buf, buf_len, offset);
+    offset = serialize<uint32_t>(ws.data_, buf, buf_len, offset);
     return offset;
 }
+
 
 size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len,
                            size_t offset, WriteSet& ws)
@@ -114,7 +119,7 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len,
     ws.keys_.clear();
     offset = unserialize<uint32_t>(
         buf, buf_len, offset, ws.keys_);
-    offset = unserialize<uint32_t>(buf, buf_len, offset, ws.rbr_);
+    offset = unserialize<uint32_t>(buf, buf_len, offset, ws.data_);
     return offset;
 }
 
@@ -129,7 +134,7 @@ size_t galera::serial_size(const WriteSet& ws)
                 ws.queries_.begin(), ws.queries_.end())
             + serial_size<uint32_t>(
                 &ws.keys_[0], ws.keys_.size())
-            + serial_size<uint32_t>(ws.rbr_));
+            + serial_size<uint32_t>(ws.data_));
 }
 
 
