@@ -74,8 +74,6 @@ static gu_to_t            *cert_queue   = NULL;
 static gu_to_t            *commit_queue = NULL;
 static gcs_conn_t         *gcs_conn     = NULL;
 
-static size_t trx_frag_size = (1 << 20);
-
 typedef enum
 {
     AL_QUERY,
@@ -561,7 +559,6 @@ static wsrep_status_t apply_write_set(void *recv_ctx,
         for (QuerySequence::const_iterator i = qs.begin(); i != qs.end(); ++i)
         {
             wsrep_apply_data_t data;
-            // log_info << "applying " << *i;
             data.type           = WSREP_APPLY_SQL;
             data.u.sql.stm      = reinterpret_cast<const char*>(&i->get_query()[0]);
             data.u.sql.len      = i->get_query().size();
@@ -711,20 +708,20 @@ static wsrep_status_t process_conn_write_set(
             /* Global seqno ok, certification ok (not needed?) */
             const MappedBuffer& wscoll(trx->get_write_set_collection());
             size_t offset(0);
+            WriteSet ws;
             while (offset < wscoll.size())
             {
-                WriteSet ws;
-                if ((offset = unserialize(&wscoll[0], wscoll.size(), offset, ws)) == 0)
-                {
-                    gu_fatal("could not unserialize write set");
-                    return WSREP_FATAL;
-                }
+                offset = unserialize(&wscoll[0], wscoll.size(), offset, ws);
                 rcode = apply_write_set(recv_ctx, ws, 
                                         trx->get_global_seqno());
-                if (rcode) {
-                    gu_error ("unknown galera fail: %d trx: %llu", rcode, seqno_l);
+                if (rcode) 
+                {
+                    gu_error ("unknown galera fail: %d trx: %llu", 
+                              rcode, seqno_l);
+                    break;
                 }
             }
+            assert(offset == wscoll.size() || rcode != WSREP_OK);
         }
     }
     
@@ -756,21 +753,15 @@ enum wsrep_status process_query_write_set_applying(
     static const size_t max_apply_attempts(10);
     size_t attempts(0);
     int rcode(WSREP_OK);
-    
+    const MappedBuffer& wscoll(trx->get_write_set_collection());
+
     do
     {
         size_t offset(0);
-        const MappedBuffer& wscoll(trx->get_write_set_collection());
+        WriteSet ws;
         while (offset < wscoll.size())
         {
-            WriteSet ws;
-            if ((offset = unserialize(&wscoll[0], wscoll.size(), 
-                                      offset, ws)) == 0)
-            {
-                
-                return WSREP_FATAL;
-            }
-            // log_info << "applying ws at offset " << offset;
+            offset = unserialize(&wscoll[0], wscoll.size(), offset, ws);
             if ((rcode = apply_write_set(recv_ctx, 
                                          ws,
                                          trx->get_global_seqno()))) 
@@ -794,10 +785,11 @@ enum wsrep_status process_query_write_set_applying(
                 if (rcode == WSREP_FATAL)
                 {
                     attempts = max_apply_attempts;
+                    break;
                 }
             }
         }
-        assert(offset == wscoll.size());
+        assert(offset == wscoll.size() || rcode != WSREP_OK);
     }
     while (attempts < max_apply_attempts && rcode != WSREP_OK);
     
@@ -949,28 +941,15 @@ static wsrep_status_t process_write_set(
     
     TrxHandle* trx(cert->create_trx(data, data_len, seqno_l, seqno_g));
     TrxHandleLock lock(*trx);
-    if ((trx->get_write_set_flags() & WriteSet::F_COMMIT) != 0)
+    
+    switch (trx->get_write_set_type()) 
     {
-        switch (trx->get_write_set_type()) 
-        {
-        case WSDB_WS_TYPE_TRX:
-            rcode = process_query_write_set(recv_ctx, trx, seqno_l);
-            break;
-        case WSDB_WS_TYPE_CONN:
-            rcode = process_conn_write_set(recv_ctx, trx, seqno_l);
-            break;
-        }
-    }
-    else
-    {
-        if ((trx->get_write_set_flags() & WriteSet::F_ROLLBACK) != 0)
-        {
-            trx->clear();
-        }
-        GALERA_SELF_CANCEL_QUEUE(cert_queue, seqno_l);
-        apply_monitor.self_cancel(trx);
-        apply_monitor.leave(trx);
-        GALERA_SELF_CANCEL_QUEUE(commit_queue, seqno_l);        
+    case WSDB_WS_TYPE_TRX:
+        rcode = process_query_write_set(recv_ctx, trx, seqno_l);
+        break;
+    case WSDB_WS_TYPE_CONN:
+        rcode = process_conn_write_set(recv_ctx, trx, seqno_l);
+        break;
     }
     
     return rcode;
@@ -1868,7 +1847,6 @@ enum wsrep_status mm_galera_pre_commit(
     WriteSet& ws(trx->get_write_set());
     ws.assign_last_seen_trx(cert->get_safe_to_discard_seqno());
     ws.assign_flags(WriteSet::F_COMMIT);
-    // flush trx write set(s) into mapped buffer
     wsdb->flush_trx(trx, true);
     const MappedBuffer& wscoll(trx->get_write_set_collection());
     
@@ -1890,8 +1868,8 @@ enum wsrep_status mm_galera_pre_commit(
     /* replicate through gcs */
     do {
         
-        rcode = gcs_repl(gcs_conn, &wscoll[0] + trx->get_repl_offset(), 
-                         wscoll.size() - trx->get_repl_offset(), GCS_ACT_TORDERED,
+        rcode = gcs_repl(gcs_conn, &wscoll[0], 
+                         wscoll.size(), GCS_ACT_TORDERED,
                          &seqno_g, &seqno_l);
         
     } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
@@ -1905,7 +1883,7 @@ enum wsrep_status mm_galera_pre_commit(
               "GCS_ACT_TORDERED", len, seqno_g, seqno_l, rcode);
 #endif
 
-    if (rcode != static_cast<int>(wscoll.size() - trx->get_repl_offset())) {
+    if (rcode != static_cast<int>(wscoll.size())) {
         gu_error("gcs_repl() failed for: %llu, len: %d, rcode: %d (%s)",
                  trx->get_trx_id(), wscoll.size(), rcode, strerror (-rcode));
         assert (GCS_SEQNO_ILL == seqno_l);
@@ -2155,37 +2133,6 @@ wsrep_status_t mm_galera_append_data(
     try
     {
         wsdb->append_data(trx, data, data_len);
-        const MappedBuffer& wscoll(trx->get_write_set_collection());
-        if (wscoll.size() >= trx_frag_size + trx->get_repl_offset())
-        {
-            long rcode;
-            gcs_seqno_t seqno_g(-1), seqno_l(-1);
-            do {
-                
-                rcode = gcs_repl(gcs_conn, &wscoll[0] + trx->get_repl_offset(), 
-                                 wscoll.size() - trx->get_repl_offset(), 
-                                 GCS_ACT_TORDERED,
-                                 &seqno_g, &seqno_l);
-                
-            } while (-EAGAIN == rcode && 
-                     (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
-            if (rcode != static_cast<long>(wscoll.size() - trx->get_repl_offset()))
-            {
-                trx->clear();
-                return WSREP_CONN_FAIL;
-            }
-            // log_info << "replicated fragment " 
-            //         << trx->get_repl_offset() << " - " << wscoll.size();
-            status.replicated++;
-            status.replicated_bytes += wscoll.size();
-            trx->assign_repl_offset(wscoll.size());
-            trx->assign_seqnos(seqno_l, seqno_g);
-            GALERA_SELF_CANCEL_QUEUE(cert_queue, seqno_l);
-            apply_monitor.self_cancel(trx);
-            apply_monitor.leave(trx);
-            GALERA_SELF_CANCEL_QUEUE(commit_queue, seqno_l);
-            trx->assign_seqnos(-1, -1);
-        }
     }
     catch (...)
     {

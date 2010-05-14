@@ -244,11 +244,13 @@ void galera::GaleraWsdb::set_conn_database(TrxHandle* trx,
 
 void galera::GaleraWsdb::flush_trx(TrxHandle* trx, bool force)
 {
-    if (serial_size(trx->get_write_set()) >= trx_mem_limit_ || force == true)
+    WriteSet& ws(trx->get_write_set());
+    if (ws.get_key_buf().size() + ws.get_data().size() 
+        >= trx_mem_limit_ || force == true)
     {
         Buffer buf;
         trx->get_write_set().serialize(buf);
         trx->append_write_set(buf);
-        trx->get_write_set().clear();
+        ws.clear();
     }
 }

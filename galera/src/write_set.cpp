@@ -105,7 +105,7 @@ size_t galera::serialize(const WriteSet& ws, gu::byte_t* buf,
 
 
 size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len,
-                           size_t offset, WriteSet& ws)
+                           size_t offset, WriteSet& ws, bool skip_data)
 {
     uint32_t hdr;
     offset = unserialize(buf, buf_len, offset, hdr);
@@ -117,12 +117,15 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buf_len,
     offset = unserialize(buf, buf_len, offset, ws.conn_id_);
     offset = unserialize(buf, buf_len, offset, ws.trx_id_);
     offset = unserialize(buf, buf_len, offset, ws.last_seen_trx_);
-    offset = unserialize<Query, uint32_t>(
-        buf, buf_len, offset, back_inserter(ws.queries_));
-    ws.keys_.clear();
-    offset = unserialize<uint32_t>(
-        buf, buf_len, offset, ws.keys_);
-    offset = unserialize<uint32_t>(buf, buf_len, offset, ws.data_);
+    if (skip_data == false)
+    {
+        offset = unserialize<Query, uint32_t>(
+            buf, buf_len, offset, back_inserter(ws.queries_));
+        ws.keys_.clear();
+        offset = unserialize<uint32_t>(
+            buf, buf_len, offset, ws.keys_);
+        offset = unserialize<uint32_t>(buf, buf_len, offset, ws.data_);
+    }
     return offset;
 }
 

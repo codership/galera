@@ -178,7 +178,6 @@ cert_fail:
 galera::GaleraCertification::GaleraCertification(const string& conf) 
     : 
     trx_map_(), 
-    trx_hash_(),
     cert_index_(),
     mutex_(), 
     trx_size_warn_count_(0), 
@@ -215,57 +214,17 @@ galera::TrxHandle* galera::GaleraCertification::create_trx(
     assert(seqno_l >= 0 && seqno_g >= 0);
 
     TrxHandle* trx(0);
-    size_t offset(0);
+    WriteSet ws;
+    (void)unserialize(reinterpret_cast<const byte_t*>(data), data_len, 0, ws, true);
     
-    while (offset < data_len)
-    {
-        WriteSet ws;
-        if ((offset = unserialize(reinterpret_cast<const byte_t*>(data), 
-                                  data_len, offset, ws)) == 0)
-        {
-            gu_throw_fatal << "could not unserialize write set";
-        }
-        
-        if (trx == 0)
-        {
-            TrxId id(TrxId(ws.get_source_id(), ws.get_conn_id(), ws.get_trx_id()));
-            TrxHash::iterator i(trx_hash_.find(id));
-            if (i == trx_hash_.end())
-            {
-                trx = new TrxHandle(ws.get_source_id(),
-                                    ws.get_conn_id(), ws.get_trx_id(), false);
-                trx_hash_[id] = trx;
-            }
-            else
-            {
-                trx = i->second;
-            }
-        }
-        assert(trx != 0);
-        
-        // we need seqnos in any case to cancel cert/apply/commit queues
-        trx->assign_seqnos(seqno_l, seqno_g);
-        // log_info << "ws flags " << ws.get_flags();
-        if ((ws.get_flags() & WriteSet::F_COMMIT) != 0)
-        {
-            trx->append_write_set(data, data_len);
-            trx->assign_last_seen_seqno(ws.get_last_seen_trx());
-            trx->assign_write_set_type(ws.get_type());
-            trx->assign_write_set_flags(WriteSet::F_COMMIT);
-            trx_hash_.erase(TrxId(ws.get_source_id(), ws.get_conn_id(), ws.get_trx_id()));
-        }
-        else if ((ws.get_flags() & WriteSet::F_ROLLBACK) != 0)
-        {
-            trx->assign_write_set_flags(WriteSet::F_ROLLBACK);
-            trx_hash_.erase(TrxId(ws.get_source_id(), ws.get_conn_id(), ws.get_trx_id()));
-        }
-        else
-        {
-            trx->append_write_set(data, data_len);
-        }
-    }
+    trx = new TrxHandle(ws.get_source_id(),
+                        ws.get_conn_id(), ws.get_trx_id(), false);
+    trx->assign_seqnos(seqno_l, seqno_g);
+    trx->append_write_set(data, data_len);
+    trx->assign_last_seen_seqno(ws.get_last_seen_trx());
+    trx->assign_write_set_type(ws.get_type());
+    trx->assign_write_set_flags(WriteSet::F_COMMIT);
     
-    assert(offset == data_len);
     return trx;
 }
 
@@ -350,7 +309,6 @@ void galera::GaleraCertification::purge_trxs_upto(wsrep_seqno_t seqno)
     assert(seqno >= 0);
     Lock lock(mutex_); 
     TrxMap::iterator lower_bound(trx_map_.lower_bound(seqno));
-    // log_info << "purge " << seqno;
     for_each(trx_map_.begin(), lower_bound, PurgeAndDiscard(this));
     trx_map_.erase(trx_map_.begin(), lower_bound);
     if (trx_map_.size() > 10000)

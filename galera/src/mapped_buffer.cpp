@@ -51,12 +51,11 @@ void galera::MappedBuffer::reserve(size_t sz)
     
     if (sz >= threshold_)
     {
+        sz = (sz/threshold_ + 1)*threshold_;
         // buffer size exceeds in-memory threshold, have to mmap
         if (fd_ == -1)
         {
-            log_info << working_dir_;
             file_ = working_dir_ + "/gmb_XXXXXX";
-            log_info << file_;
             fd_ = mkstemp(&file_[0]);
             if (fd_ == -1)
             {

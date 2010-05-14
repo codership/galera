@@ -41,7 +41,6 @@ namespace galera
             global_seqno_(WSREP_SEQNO_UNDEFINED),
             last_seen_seqno_(WSREP_SEQNO_UNDEFINED),
             last_depends_seqno_(WSREP_SEQNO_UNDEFINED),
-            repl_offset_(0),
             refcnt_(1),            
             write_set_(source_id, conn_id, trx_id, (conn_id == static_cast<wsrep_conn_id_t>(-1) ? WSDB_WS_TYPE_TRX : WSDB_WS_TYPE_CONN)),
             write_set_flags_(0),
@@ -111,8 +110,6 @@ namespace galera
 
         enum wsdb_trx_position get_position() const { return position_; }
         
-        void assign_repl_offset(size_t offset) { repl_offset_ = offset; }
-        size_t get_repl_offset() const { return repl_offset_; }
 
         void assign_write_set_flags(int flags) { write_set_flags_ = flags; }
         int get_write_set_flags() const { return write_set_flags_; }
@@ -150,6 +147,7 @@ namespace galera
         
         void clear() 
         { 
+            write_set_.clear();
             write_set_collection_.clear();
         }
         
@@ -173,7 +171,6 @@ namespace galera
         wsrep_seqno_t          global_seqno_;
         wsrep_seqno_t          last_seen_seqno_;
         wsrep_seqno_t          last_depends_seqno_;
-        size_t                 repl_offset_;
         size_t                 refcnt_;
         WriteSet               write_set_;
         int                    write_set_flags_;
@@ -182,8 +179,6 @@ namespace galera
         //
         friend class GaleraCertification;
         std::deque<RowKeyEntry*> cert_keys_;
-        
-        
     };
     
     

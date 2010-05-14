@@ -189,7 +189,7 @@ namespace galera
                 data_.clear(), queries_.clear(); }
     private:
         friend size_t serialize(const WriteSet&, gu::byte_t*, size_t, size_t);
-        friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&);
+        friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&, bool skip_data = false);
         friend size_t serial_size(const WriteSet&);
         
         wsrep_uuid_t   source_id_;
