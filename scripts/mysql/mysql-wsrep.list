@@ -84,6 +84,7 @@ f 755 root root $BINS_DST/resolve_stack_dump   $MYSQL_SRC/extra/resolve_stack_du
 f 755 root root $BINS_DST/resolveip            $MYSQL_SRC/extra/resolveip
 f 755 root root $BINS_DST/mysqlhotcopy         $MYSQL_SRC/scripts/mysqlhotcopy
 f 755 root root $BINS_DST/wsrep_sst_mysqldump  $MYSQL_SRC/scripts/wsrep_sst_mysqldump
+f 755 root root $BINS_DST/wsrep_sst_rsync      $MYSQL_SRC/scripts/wsrep_sst_rsync
 
 f 644 root root $SHAR_DST/errmsg.txt           $MYSQL_SRC/sql/share/errmsg.txt
 f 644 root root $SHAR_DST/mysqld_multi.server  $MYSQL_SRC/support-files/mysqld_multi.server

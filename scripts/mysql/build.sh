@@ -8,26 +8,27 @@ fi
 
 usage()
 {
-    echo -e "Usage: build.sh [OPTIONS] \n" \
-"Options:                      \n" \
-"    --stage <initial stage>   \n" \
-"    --last-stage <last stage> \n" \
-"    -s|--scratch    build everything from scratch\n"\
-"    -c|--configure  reconfigure the build system (implies -s)\n"\
-"    -b|--bootstap   rebuild the build system (implies -c)\n"\
-"    -o|--opt        configure build with debug disabled (implies -c)\n"\
-"    -m32/-m64       build 32/64-bit binaries on x86\n"\
-"    -d|--debug      configure build with debug enabled (implies -c)\n"\
-"    --dl|--debug-level debug level for scons build \n"\
-"    --with-spread   configure build with Spread (implies -c)\n"\
-"    --no-strip      prevent stripping of release binaries\n"\
-"    -r|--release <galera release>, otherwise revisions will be used\n"\
-"    -p|--package    create DEB/RPM packages (depending on the distribution)\n"\
-"    --sb|--skip-build skip the actual build, use the existing binaries\n"\
-"    --sc|--skip-configure skip configure\n"\
-"    --skip-clients  don't include client binaries in test package\n"\
-"    --scons         use scons to build galera libraries\n"\
-"\n -s and -b options affect only Galera build.\n"
+    cat <<EOF
+Usage: build.sh [OPTIONS]
+Options:
+    --stage <initial stage>
+    --last-stage <last stage>
+    -s|--scratch      build everything from scratch
+    -c|--configure    reconfigure the build system (implies -s)
+    -b|--bootstap     rebuild the build system (implies -c)
+    -o|--opt          configure build with debug disabled (implies -c)
+    -m32/-m64         build 32/64-bit binaries on x86
+    -d|--debug        configure build with debug enabled (implies -c)
+    --with-spread     configure build with Spread (implies -c)
+    --no-strip        prevent stripping of release binaries
+    -p|--package      create DEB/RPM packages (depending on the distribution)
+    --sb|--skip-build skip the actual build, use the existing binaries
+    --sc|--skip-configure skip configure
+    --skip-clients    don't include client binaries in test package
+    --scons           use scons to build galera libraries
+    -r|--release <galera release>, otherwise revisions will be used
+-s and -b options affect only Galera build.
+EOF
 }
 
 # Initializing variables to defaults
@@ -201,7 +202,7 @@ fi
 cd $MYSQL_SRC
 MYSQL_REV=$(bzr revno)
 # this does not work on an unconfigured source MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
-MYSQL_VER=$(grep PACKAGE_VERSION include/my_config.h | awk '{gsub(/\"/,""); print $3; }')
+MYSQL_VER=`grep PACKAGE_VERSION include/my_config.h | awk '{gsub(/\"/,""); print $3; }'`
 
 if [ "$PACKAGE" == "yes" ] # fetch and patch pristine sources
 then
@@ -286,55 +287,54 @@ MYSQL_DIST_CNF=$MYSQL_DIST_DIR/etc/my.cnf
 GALERA_DIST_DIR=$DIST_DIR/galera
 cd $BUILD_ROOT
 rm -rf $DIST_DIR
-
 # Install required MySQL files in the DIST_DIR
+MYSQL_BINS=$MYSQL_DIST_DIR/bin
 MYSQL_LIBS=$MYSQL_DIST_DIR/lib/mysql
-mkdir -p $MYSQL_LIBS
 MYSQL_PLUGINS=$MYSQL_DIST_DIR/lib/mysql/plugin
-mkdir -p $MYSQL_PLUGINS
-install -m 644 LICENSE $DIST_DIR
-install -m 755 mysql-galera $DIST_DIR
-install -m 644 LICENSE.mysql $MYSQL_DIST_DIR
-install -m 644 README $DIST_DIR
-install -m 644 QUICK_START $DIST_DIR
-install -D -m 644 $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/mysql/english/errmsg.sys
-install -D -m 755 $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/libexec/mysqld
-install -D -m 755 $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS
-install -D -m 755 $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so $MYSQL_PLUGINS
+MYSQL_CHARSETS=$MYSQL_DIST_DIR/share/mysql/charsets
+install -m 644 -D $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/mysql/english/errmsg.sys
+install -m 755 -D $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/libexec/mysqld
+install -m 755 -D $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS/libmysqlclient.so
+install -m 755 -D $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so $MYSQL_PLUGINS/ha_innodb_plugin.so
+install -m 755 -d $MYSQL_BINS
 if [ "$SKIP_CLIENTS" == "no" ]
 then
-    install -D -m 755 $MYSQL_SRC/client/.libs/mysql       $MYSQL_DIST_DIR/bin/mysql
-    install -D -m 755 $MYSQL_SRC/client/.libs/mysqldump   $MYSQL_DIST_DIR/bin/mysqldump
-    install -D -m 755 $MYSQL_SRC/client/.libs/mysqladmin     $MYSQL_DIST_DIR/bin/mysqladmin
+install -m 755 -s -t $MYSQL_BINS  $MYSQL_SRC/client/.libs/mysql
+install -m 755 -s -t $MYSQL_BINS  $MYSQL_SRC/client/.libs/mysqldump
+install -m 755 -s -t $MYSQL_BINS  $MYSQL_SRC/client/.libs/mysqladmin
 fi
-install -D -m 755 $MYSQL_SRC/scripts/wsrep_sst_mysqldump $MYSQL_DIST_DIR/bin/wsrep_sst_mysqldump
-install -D -m 644 my.cnf $MYSQL_DIST_CNF
+install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_mysqldump
+install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_rsync
+install -m 755 -d $MYSQL_CHARSETS
+install -m 644 -t $MYSQL_CHARSETS $MYSQL_SRC/sql/share/charsets/*.xml
+install -m 644 -t $MYSQL_CHARSETS $MYSQL_SRC/sql/share/charsets/README
+install -m 644 -D my.cnf $MYSQL_DIST_CNF
 cat $MYSQL_SRC/support-files/wsrep.cnf >> $MYSQL_DIST_CNF
 tar -xzf mysql_var.tgz -C $MYSQL_DIST_DIR
+install -m 644 LICENSE.mysql $MYSQL_DIST_DIR
 
 # Copy required Galera libraries
 GALERA_LIBS=$GALERA_DIST_DIR/lib
-mkdir -p $GALERA_LIBS
-install -m 644 LICENSE.galera $GALERA_DIST_DIR
+install -m 644 -D LICENSE.galera $GALERA_DIST_DIR/LICENSE.galera
+install -m 755 -d $GALERA_LIBS
 if [ "$SCONS" == "yes" ]
 then
     cp -P $SCONS_VD/galerautils/src/libgalerautils.so*   $GALERA_LIBS
     cp -P $SCONS_VD/galerautils/src/libgalerautils++.so* $GALERA_LIBS
-    cp -P $SCONS_VD/gcomm/src/libgcomm.so* $GALERA_LIBS
-    cp -P $SCONS_VD/gcs/src/libgcs.so* $GALERA_LIBS
-    cp -P $SCONS_VD/wsdb/src/libwsdb.so* $GALERA_LIBS
-    cp -P $SCONS_VD/galera/src/libgalera++.so* $GALERA_LIBS
-    cp -P $SCONS_VD/galera/src/libmsgalera++.so* $GALERA_LIBS
-    cp -P $SCONS_VD/galera/src/libmmgalera++.so* $GALERA_LIBS
-    cp -P $SCONS_VD/galera/src/libmmgalera.so* $GALERA_LIBS
-
+    cp -P $SCONS_VD/gcomm/src/libgcomm.so*               $GALERA_LIBS
+    cp -P $SCONS_VD/gcs/src/libgcs.so*                   $GALERA_LIBS
+    cp -P $SCONS_VD/wsdb/src/libwsdb.so*                 $GALERA_LIBS
+    cp -P $SCONS_VD/galera/src/libgalera++.so*           $GALERA_LIBS
+    cp -P $SCONS_VD/galera/src/libmsgalera++.so*         $GALERA_LIBS
+    cp -P $SCONS_VD/galera/src/libmmgalera++.so*         $GALERA_LIBS
+    cp -P $SCONS_VD/galera/src/libmmgalera.so*           $GALERA_LIBS
 else
     cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils.so*   $GALERA_LIBS
     cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils++.so* $GALERA_LIBS
-    cp -P $GALERA_SRC/gcomm/src/.libs/libgcomm.so* $GALERA_LIBS
-    cp -P $GALERA_SRC/gcs/src/.libs/libgcs.so* $GALERA_LIBS
-    cp -P $GALERA_SRC/wsdb/src/.libs/libwsdb.so* $GALERA_LIBS
-    cp -P $GALERA_SRC/galera/src/.libs/libmmgalera.so* $GALERA_LIBS
+    cp -P $GALERA_SRC/gcomm/src/.libs/libgcomm.so*               $GALERA_LIBS
+    cp -P $GALERA_SRC/gcs/src/.libs/libgcs.so*                   $GALERA_LIBS
+    cp -P $GALERA_SRC/wsdb/src/.libs/libwsdb.so*                 $GALERA_LIBS
+    cp -P $GALERA_SRC/galera/src/.libs/libmmgalera.so*           $GALERA_LIBS
 fi
 
 # Install vsbes stuff if it is available
@@ -347,12 +347,11 @@ GALERA_SBIN="$GALERA_DIST_DIR/galera/sbin"
     install -D -m 755 $GALERA_SRC/galeracomm/vs/src/.libs/vsbes $GALERA_SBIN/vsbes && \
     install -m 755 vsbes $DIST_DIR || echo "Skipping vsbes"
 
-if [ "$SKIP_CLIENTS" == "no" ]
-then
-    strip $MYSQL_DIST_DIR/bin/mysql
-    strip $MYSQL_DIST_DIR/bin/mysqladmin
-    strip $MYSQL_DIST_DIR/bin/mysqldump
-fi
+install -m 644 LICENSE       $DIST_DIR
+install -m 755 mysql-galera  $DIST_DIR
+install -m 644 README        $DIST_DIR
+install -m 644 QUICK_START   $DIST_DIR
+
 # Strip binaries if not instructed otherwise
 if test "$NO_STRIP" != "yes"
 then

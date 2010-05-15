@@ -88,8 +88,10 @@ LD_PRELOAD=$(echo "$MYSQL_BASE_DIR/lib/mysql/libmysqlclient.so "\
 "$GALERA_BASE_DIR/lib/libgalerautils++.so "\
 "$GALERA_BASE_DIR/lib/libgcomm.so "\
 "$GALERA_BASE_DIR/lib/libgcs.so "\
-"$GALERA_BASE_DIR/lib/libwsdb.so "\
-"$GALERA_BASE_DIR/lib/libgalera++.so ")
+"$GALERA_BASE_DIR/lib/libwsdb.so ")
+
+[ -x "$GALERA_BASE_DIR/lib/libgalera++.so" ] && \
+LD_PRELOAD="$LD_PRELOAD $GALERA_BASE_DIR/lib/libgalera++.so"
 
 # Mandatory stuff
 INNODB_OPTS=" --default-storage-engine=InnoDB "
@@ -248,7 +250,7 @@ galera_start()
             --pid-file="$MYSQL_PID" \
             --port=$MYSQL_PORT \
             --socket=$MYSQL_SOCKET \
-            --skip-locking \
+            --skip-external-locking \
             --log_error=$err_log \
             $MYSQLD_OPTS \
             $INNODB_OPTS \
@@ -267,7 +269,7 @@ galera_start()
             --pid-file="$MYSQL_PID" \
             --port=$MYSQL_PORT \
             --socket=$MYSQL_SOCKET \
-            --skip-locking \
+            --skip-external-locking \
             --log_error=$err_log \
             $MYSQLD_OPTS \
             $INNODB_OPTS \
