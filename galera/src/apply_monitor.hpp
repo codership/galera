@@ -190,15 +190,19 @@ namespace galera
             if (mode_ == M_BYPASS) return;
             size_t idx(indexof(trx->get_global_seqno()));
             gu::Lock lock(mutex_);
-            switch (appliers_[idx].state_)
+            assert(last_left_ <= last_entered_);
+            while (last_entered_ - last_left_ >= appliers_size_)
             {
-            case Applier::S_IDLE:
-            case Applier::S_CANCELED:
-            case Applier::S_WAITING:
+                lock.wait(pre_enter_cond_);
+            }
+            if (appliers_[idx].state_ <= Applier::S_WAITING)
+            {
                 appliers_[idx].state_ = Applier::S_CANCELED;
                 appliers_[idx].cond_.signal();
-            default:
-                log_info << "cacel, applier state " << appliers_[idx].state_;
+            }
+            else
+            {
+                log_info << "cancel, applier state " << appliers_[idx].state_;
             }
         }
         

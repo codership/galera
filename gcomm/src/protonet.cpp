@@ -15,7 +15,7 @@ using namespace gcomm;
 
 void gcomm::Protonet::insert(Protostack* pstack) 
 {
-    log_info << "insert pstack " << pstack;
+    log_debug << "insert pstack " << pstack;
     if (find(protos_.begin(), protos_.end(), pstack) != protos_.end())
     {
         gu_throw_fatal;
@@ -25,7 +25,7 @@ void gcomm::Protonet::insert(Protostack* pstack)
 
 void gcomm::Protonet::erase(Protostack* pstack)
 {
-    log_info << "erase pstack " << pstack;
+    log_debug << "erase pstack " << pstack;
     std::deque<Protostack*>::iterator i;
     if ((i = find(protos_.begin(), protos_.end(), pstack)) == protos_.end())
     {

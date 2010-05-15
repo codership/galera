@@ -213,6 +213,7 @@ void galera::GaleraWsdb::append_row_key(TrxHandle* trx,
                                         key, key_len, action);
 }
 
+
 void galera::GaleraWsdb::append_data(TrxHandle* trx,
                                      const void* data,
                                      size_t data_len)

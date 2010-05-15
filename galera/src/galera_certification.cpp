@@ -165,7 +165,8 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
     }
     
     trx->assign_last_depends_seqno(last_depends_seqno);
-    
+    assert(trx->get_last_depends_seqno() < trx->get_global_seqno());
+
     return WSDB_OK;
     
 cert_fail:
@@ -204,6 +205,7 @@ void galera::GaleraCertification::assign_initial_position(wsrep_seqno_t seqno)
 {
     assert(seqno >= 0);
     position_ = seqno;
+    purge_trxs_upto(position_);
 }
 
 galera::TrxHandle* galera::GaleraCertification::create_trx(

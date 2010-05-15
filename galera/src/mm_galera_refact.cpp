@@ -836,99 +836,100 @@ enum wsrep_status process_query_write_set_applying(
     return WSREP_OK;
 }
 
-/*
-  similar to post gcs_repl part of `galera_commit' to apply remote WS
-*/
+//
+//  similar to post gcs_repl part of `galera_commit' to apply remote WS
+//
 static wsrep_status_t process_query_write_set( 
     void *recv_ctx, TrxHandle* trx, 
     gcs_seqno_t seqno_l
-) {
+    ) {
     int rcode;
     enum wsrep_status ret_code;
     gcs_seqno_t seqno_g = trx->get_global_seqno();
-
+    
     assert (seqno_g > 0);
-    /* wait for total order */
+    
+    // wait for total order
     GALERA_GRAB_QUEUE (cert_queue, seqno_l);
-#ifdef GALERA_WORKAROUND_197
-    rcode = cert->append_trx(trx);
-    if (gu_unlikely(!galera_update_last_received(seqno_g))) {
-        /* Outdated writeset, skip */
-        rcode = WSDB_CERTIFICATION_SKIP;
-        ret_code = WSREP_OK;
-    }
-#else
-    if (gu_likely(galera_update_last_received(seqno_g))) {
-        /* Global seqno OK, do certification test */
+    
+    if (gu_likely(galera_update_last_received(seqno_g))) 
+    {
+        // append into cert index and certify
         rcode = cert->append_trx(trx);
     }
-    else {
-        /* Outdated writeset, skip */
+    else
+    {
+        // outdated write set, skip
         rcode = WSDB_CERTIFICATION_SKIP;
         ret_code = WSREP_OK;
     }
-#endif
-
-    /* release total order */
+    
+    // release total order
     GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
     
     gu_debug("remote trx seqno: %lld %lld last_seen_trx: %lld %lld, cert: %d", 
              seqno_g, seqno_l, trx->get_last_seen_seqno(),
              last_recved, rcode);
-
-    switch (rcode) {
-    case WSDB_OK:   /* certification ok */
+    
+    switch (rcode) 
     {
+    case WSDB_OK:
+        // certification ok
         rcode = process_query_write_set_applying(recv_ctx, trx, seqno_l);
-
-        /* stop for any dbms error */
-        if (rcode != WSDB_OK) {
+        // stop for any dbms error
+        if (rcode != WSDB_OK) 
+        {
             gu_fatal("could not apply trx: %lld %lld", seqno_g, seqno_l);
             return WSREP_FATAL;
         }
         ret_code = WSREP_OK;
         break;
-    }
+        
     case WSDB_CERTIFICATION_FAIL:
-        /* certification failed, release */
+        // certification failed, release
         gu_debug("trx certification failed: (%lld %lld) last_seen: %lld",
                  seqno_g, seqno_l, trx->get_last_seen_seqno());
-
-        ret_code = WSREP_TRX_FAIL;
-        /* fall through */
-        /* Cancel commit queue */
-        if (trx->is_local() == false) {
+        if (trx->is_local() == false) 
+        {
+            // cancel apply monitor and commit queue
             apply_monitor.self_cancel(trx);
             apply_monitor.leave(trx);
             GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
-        } else {
-            /* replaying job has grabbed commit queue in the beginning */
+        } 
+        else 
+        {
+            // replaying job has grabbed commit queue in the beginning
             GALERA_UPDATE_LAST_APPLIED (seqno_g);
             apply_monitor.leave(trx);
             GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
         }
-
         ret_code = WSREP_TRX_FAIL;
         break;
+        
     case WSDB_CERTIFICATION_SKIP:
-        /* Cancel commit queue */
-        if (trx->is_local() == false) {
+        if (trx->is_local() == false) 
+        {
+            // cancel apply monitor and commit queue 
+            apply_monitor.self_cancel(trx);
+            apply_monitor.leave(trx);
             GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
-        } else {
-            /* replaying job has grabbed commit queue in the beginning */
+        } 
+        else 
+        {
+            // replaying job has grabbed commit queue in the beginning
             GALERA_UPDATE_LAST_APPLIED (seqno_g);
             GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
         }
         ret_code = WSREP_OK;
         break;
+        
     default:
-        gu_error(
-            "unknown galera fail: %d trdx: %lld %lld", rcode, seqno_g, seqno_l
-        );
+        gu_error("unknown galera fail: %d trdx: %lld %lld", 
+                 rcode, seqno_g, seqno_l);
         ret_code = WSREP_FATAL;
         break;
     }
-
+    
     return ret_code;
 }
 
@@ -1075,6 +1076,7 @@ galera_handle_configuration (wsrep_t* gh,
     {
         cert->assign_initial_position(conf->seqno);
         apply_monitor.assign_initial_position(conf->seqno);
+        galera_update_last_received(conf->seqno);
     }
 #endif
 
@@ -1970,13 +1972,7 @@ enum wsrep_status mm_galera_pre_commit(
         retcode = WSREP_TRX_FAIL;
     }
 
-    // call release only if grab was successfull
-    GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
-    
-    profile_leave(galera_prof);
-
-    profile_enter(galera_prof);
-    
+    // keep cert queue grabbed to streamline entering apply monitor
     if (retcode == WSREP_OK)
     {
         rcode = apply_monitor.enter(trx);
@@ -1995,7 +1991,10 @@ enum wsrep_status mm_galera_pre_commit(
     {
         apply_monitor.self_cancel(trx);
     }    
-
+    
+    // call release only if grab was successfull
+    GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
+    
     if (retcode == WSREP_OK) 
     {
         assert (seqno_l >= 0);
@@ -2020,6 +2019,8 @@ enum wsrep_status mm_galera_pre_commit(
             abort();
         }     
     }
+    
+
     
     profile_leave(galera_prof);
     

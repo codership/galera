@@ -26,6 +26,7 @@ galera::MappedBuffer::MappedBuffer(const std::string& working_dir,
     buf_size_     (0),
     real_buf_size_(0)
 { 
+
 }
 
 
@@ -49,7 +50,7 @@ void galera::MappedBuffer::reserve(size_t sz)
         return;
     }
     
-    if (sz >= threshold_)
+    if (sz > threshold_)
     {
         sz = (sz/threshold_ + 1)*threshold_;
         // buffer size exceeds in-memory threshold, have to mmap
@@ -93,6 +94,7 @@ void galera::MappedBuffer::reserve(size_t sz)
     }
     else
     {
+        sz = min(threshold_, sz*2);
         byte_t* tmp(reinterpret_cast<byte_t*>(realloc(buf_, sz)));
         if (tmp == 0)
         {
