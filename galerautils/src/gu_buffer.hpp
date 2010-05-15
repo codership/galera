@@ -34,7 +34,7 @@ namespace gu
     private:
         void operator=(const BufferDeleter&);
     };
-    
+
     typedef boost::shared_ptr<Buffer> SharedBuffer;
 #ifdef GALERA_USE_BOOST_POOL_ALLOC
     typedef boost::fast_pool_allocator<SharedBuffer> SharedBufferAllocator;
@@ -45,8 +45,5 @@ namespace gu
 #endif // GALERA_USE_BOOST_POOL_ALLOC
 
 }
-
-
-
 
 #endif // GU_BUFFER_HPP

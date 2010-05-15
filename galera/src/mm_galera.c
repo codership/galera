@@ -524,11 +524,6 @@ static wsrep_status_t apply_queries(void *recv_ctx, struct wsdb_write_set *ws)
     wsrep_apply_data_t data;
     data.type = WSREP_APPLY_SQL;
 
-    if (bf_apply_cb == NULL) {
-        gu_error("data applier has not been defined"); 
-        GU_DBUG_RETURN(WSREP_FATAL);
-    }
-
     /* SQL statement apply method */
     for (i=0; i < ws->query_count; i++) {
         data.u.sql.stm      = ws->queries[i].query;
@@ -2710,7 +2705,8 @@ static wsrep_status_t mm_galera_sst_sent (wsrep_t* gh,
         return WSREP_CONN_FAIL;
     }
 
-    if (memcmp (uuid, &status.state_uuid, sizeof(wsrep_uuid_t))) {
+    if (memcmp (uuid, &status.state_uuid, sizeof(wsrep_uuid_t)) &&
+        seqno >= 0) {
         // state we have sent no longer corresponds to the current group state
         // mark an error.
         seqno = -EREMCHG;

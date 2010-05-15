@@ -78,14 +78,14 @@ libgalerautils___la_SOURCES = \
 	gu_logger.cpp         \
 	gu_regex.cpp          \
 	gu_uri.cpp            \
-	gu_epoll.cpp	      \
+	gu_epoll.cpp          \
 	gu_poll.cpp           \
 	gu_network.cpp        \
-	gu_prodcons.cpp	      \
+	gu_prodcons.cpp       \
 	gu_datetime.cpp       \
 	gu_buffer.cpp
 
-
+#libgalerautils___la_CXXFLAGS = @AM_CXXFLAGS@ -DGALERA_USE_BOOST_POOL_ALLOC
 libgalerautils___la_LIBADD = libgaleraresolver.la
 
 INTERFACEPP = 4

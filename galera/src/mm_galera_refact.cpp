@@ -2502,7 +2502,8 @@ wsrep_status_t mm_galera_sst_sent (wsrep_t* gh,
         return WSREP_CONN_FAIL;
     }
 
-    if (memcmp (uuid, &status.state_uuid, sizeof(wsrep_uuid_t))) {
+    if (memcmp (uuid, &status.state_uuid, sizeof(wsrep_uuid_t)) &&
+        seqno >= 0) {
         // state we have sent no longer corresponds to the current group state
         // mark an error.
         seqno = -EREMCHG;
