@@ -18,7 +18,7 @@ copy_config()
     case $DBMS in
     MYSQL)
         cnf="${NODE_MY_CNF[$node]}"
-        cnf_dir="${NODE_TEST_DIR[$node]}/mysql/etc/"
+        cnf_dir="${NODE_TEST_DIR[$node]}/mysql/etc"
         ;;
     PGSQL|*)
         echo "Unsupported DBMS: '$DBMS'" >&2
@@ -34,7 +34,8 @@ copy_config()
         then
             cp "$cnf" "$cnf_dir"
         else
-            scp -q "$cnf" $location":$cnf_dir"
+            local cnf_file="$(basename $cnf)"
+            cat "$cnf" | ssh $location "cat > $cnf_dir/$cnf_file"
         fi
     fi
 }
