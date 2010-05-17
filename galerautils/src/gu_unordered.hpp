@@ -2,7 +2,7 @@
 #ifndef GU_UNORDERED_HPP
 #define GU_UNORDERED_HPP
 
-#if defined(HAVE_BOOST_UNORDERED_MAP)
+#if defined(HAVE_BOOST_UNORDERED_MAP_HPP)
 #include <boost/unordered_map.hpp>
 #elif defined(HAVE_TR1_UNORDERED_MAP)
 #include <tr1/unordered_map>
