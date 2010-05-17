@@ -41,8 +41,7 @@ namespace gu
             return type(k);
         }
     };
-    
-    
+
     template <typename K>
     size_t HashValue(const K& key)
     {

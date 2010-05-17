@@ -90,18 +90,19 @@ namespace galera
     class RowKeyHash
     {
     public:
+
         size_t operator()(const RowKey& rk) const
         {
+            // djb2
 	    size_t prime(5381);
             const gu::byte_t* b(reinterpret_cast<const gu::byte_t*>(
                                     rk.get_key()));
-            const gu::byte_t* e(reinterpret_cast<const gu::byte_t*>(
-                                    rk.get_key()) + rk.get_key_len());
-	    const gu::byte_t* i(b);
-	    while (i != e)
+            const gu::byte_t* const e(reinterpret_cast<const gu::byte_t*>(
+				    rk.get_key()) + rk.get_key_len());
+	    while (b != e)
 	    {
-	      prime = ((prime << 5) + prime) + *i;
-	      ++i;
+	      prime = ((prime << 5) + prime) + *b;
+	      ++b;
 	    }
 	    return prime;
         }
