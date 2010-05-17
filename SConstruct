@@ -189,6 +189,8 @@ if conf.CheckHeader('sys/endian.h'):
 
 # Additional C headers and libraries
 
+# boost headers
+
 if not conf.CheckCXXHeader('boost/shared_ptr.hpp'):
     print 'boost/shared_ptr.hpp not found or not usable, trying without -Weffc++'
     conf.env.Replace(CXXFLAGS = conf.env['CXXFLAGS'].replace('-Weffc++', ''))
@@ -200,7 +202,16 @@ conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_SHARED_PTR_HPP')
 
 if conf.CheckCXXHeader('boost/unordered_map.hpp'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_UNORDERED_MAP_HPP')
+else: 
+    # note, tr1 header will probably not compile with -Weffc++
+    conf.env.Replace(CXXFLAGS = conf.env['CXXFLAGS'].replace('-Weffc++', ''))
+    if not conf.CheckCXXHeader('tr1/unordered_map'):
+        print 'no unordered map header available'
+        Exit(1)
+    else:
+       conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_UNORDERED_MAP')
 
+# pool allocator/asio
 if boost == 1:
     # Use nanosecond time precision
     conf.env.Append(CPPFLAGS = ' -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG=1')

@@ -1,7 +1,9 @@
 
-env = DefaultEnvironment()
+env = DefaultEnvironment().Clone()
 
-env.Replace(CXXFLAGS = '-DGALERA_LOG_H_ENABLE_CXX -Wno-long-long -Wno-deprecated -Weffc++ -ansi')
+env.Replace(CXXFLAGS = env['CXXFLAGS'].replace('-pedantic',''))
+env.Append(CXXFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX')
+
 
 env.SharedLibrary('mmgalera', [
         'galera_info.c',

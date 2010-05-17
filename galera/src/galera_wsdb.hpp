@@ -4,7 +4,7 @@
 
 #include "wsdb.hpp"
 #include "wsrep_api.h"
-#include <boost/unordered_map.hpp>
+#include "gu_unordered.hpp"
 
 namespace galera
 {
@@ -71,8 +71,8 @@ namespace galera
         };
 
 
-        typedef boost::unordered_map<wsrep_trx_id_t, TrxHandle*, TrxHash> TrxMap;
-        typedef boost::unordered_map<wsrep_conn_id_t, Conn> ConnMap;
+        typedef gu::unordered_map<wsrep_trx_id_t, TrxHandle*, TrxHash>::type TrxMap;
+        typedef gu::unordered_map<wsrep_conn_id_t, Conn, TrxHash>::type ConnMap;
 
     public:
         TrxHandle* get_trx(const wsrep_uuid_t& source_id,

@@ -546,7 +546,7 @@ static wsrep_status_t apply_write_set(void *recv_ctx,
         {
             wsrep_apply_data_t data;
             data.type = WSREP_APPLY_APP;
-            data.u.app.buffer = (uint8_t *)&ws.get_data()[0];
+            data.u.app.buffer = const_cast<uint8_t*>(&ws.get_data()[0]);
             data.u.app.len = ws.get_data().size();
             rcode = bf_apply_cb(recv_ctx, &data, global_seqno);
             break;
@@ -615,7 +615,7 @@ static wsrep_status_t apply_query(void *recv_ctx, const char *query, int len,
     data.type           = WSREP_APPLY_SQL;
     data.u.sql.stm      = query;
     data.u.sql.len      = strlen (data.u.sql.stm) + 1 /* terminating 0 */;
-    data.u.sql.timeval  = (time_t)0;
+    data.u.sql.timeval  = static_cast<time_t>(0);
     data.u.sql.randseed = 0;
 
     assert (seqno_g > 0);
@@ -991,7 +991,7 @@ static bool
 galera_st_required (const gcs_act_conf_t* conf)
 {
     bool st_required           = (conf->my_state == GCS_NODE_STATE_PRIM);
-    const gu_uuid_t* conf_uuid = (const gu_uuid_t*)(conf->group_uuid);
+    const gu_uuid_t* conf_uuid = reinterpret_cast<const gu_uuid_t*>(conf->group_uuid);
 
     if (st_required) {
 
@@ -1038,7 +1038,7 @@ galera_handle_configuration (wsrep_t* gh,
                              gcs_seqno_t conf_seqno)
 {
     long ret             = 0;
-    gu_uuid_t* conf_uuid = (gu_uuid_t*)conf->group_uuid;
+    const gu_uuid_t* conf_uuid = reinterpret_cast<const gu_uuid_t*>(conf->group_uuid);
     bool st_required;
     void*   app_req = NULL;
     ssize_t app_req_len;
@@ -1049,7 +1049,8 @@ galera_handle_configuration (wsrep_t* gh,
               "seqno: %lld, group UUID: "GU_UUID_FORMAT
               ", members: %zu, my idx: %zd",
               conf->conf_id > 0 ? "PRIMARY" : "NON-PRIMARY",
-              (long long)conf->conf_id, (long long)conf->seqno,
+              static_cast<long long>(conf->conf_id), 
+	      static_cast<long long>(conf->seqno),
               GU_UUID_ARGS(conf_uuid), conf->memb_num, conf->my_idx);
 
     my_idx = conf->my_idx; // this is always true.

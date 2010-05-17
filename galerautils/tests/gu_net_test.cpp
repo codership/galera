@@ -615,6 +615,7 @@ public:
     const byte_t* get_data() const { return data; }
     size_t get_data_size() const { return data_size; }
     MsgData(const MsgData& md) :
+        MessageData(),
         data(md.data),
         data_size(md.data_size)
     { }

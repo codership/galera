@@ -10,13 +10,13 @@
 #include "wsrep_api.h"
 #include "gu_buffer.hpp"
 #include "gu_logger.hpp"
+#include "gu_unordered.hpp"
 
 #include <vector>
 #include <deque>
 
 #include <cstring>
 
-#include <boost/unordered_map.hpp>
 
 namespace galera
 {
@@ -92,11 +92,18 @@ namespace galera
     public:
         size_t operator()(const RowKey& rk) const
         {
+	    size_t prime(5381);
             const gu::byte_t* b(reinterpret_cast<const gu::byte_t*>(
                                     rk.get_key()));
             const gu::byte_t* e(reinterpret_cast<const gu::byte_t*>(
                                     rk.get_key()) + rk.get_key_len());
-            return boost::hash_range(b, e);
+	    const gu::byte_t* i(b);
+	    while (i != e)
+	    {
+	      prime = ((prime << 5) + prime) + *i;
+	      ++i;
+	    }
+	    return prime;
         }
     };
     
@@ -204,7 +211,7 @@ namespace galera
         wsrep_seqno_t last_seen_trx_;
         QuerySequence queries_;
         gu::Buffer keys_;
-        typedef boost::unordered_multimap<size_t, size_t> KeyRefMap;
+        typedef gu::unordered_multimap<size_t, size_t>::type KeyRefMap;
         KeyRefMap key_refs_;
         gu::Buffer data_;
     };

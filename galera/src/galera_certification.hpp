@@ -6,10 +6,11 @@
 #define GALERA_GALERA_CERTIFICATION_HPP
 
 #include "certification.hpp"
+#include "gu_unordered.hpp"
 
 #include <map>
 
-#include <boost/unordered_map.hpp>
+
 
 namespace galera
 {
@@ -42,7 +43,7 @@ namespace galera
     private:
 
 
-        typedef boost::unordered_map<RowKey, RowKeyEntry*, RowKeyHash> CertIndex;
+        typedef gu::unordered_map<RowKey, RowKeyEntry*, RowKeyHash>::type CertIndex;
         class DiscardRK
         {
         public:
