@@ -8,6 +8,7 @@
 
 #include "gu_network.hpp"
 #include "gu_logger.hpp"
+#include "gu_throw.hpp"
 
 #include <algorithm>
 

@@ -1,6 +1,11 @@
+//
+// Copyright (C) 2010 Codership Oy <info@codership.com>
+//
 
 #ifndef GALERA_SERIALIZATION_HPP
 #define GALERA_SERIALIZATION_HPP
+
+#include "gu_throw.hpp"
 
 namespace galera
 {

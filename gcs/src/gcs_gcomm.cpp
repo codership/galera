@@ -461,11 +461,10 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
     }
     else
     {
-        Datagram dg(SharedBuffer(
-                        new Buffer(reinterpret_cast<const byte_t*>(buf), 
-                                   reinterpret_cast<const byte_t*>(buf) + len),
-                        BufferDeleter(),
-                        shared_buffer_allocator));
+        Datagram dg(
+            SharedBuffer(
+                new Buffer(reinterpret_cast<const byte_t*>(buf), 
+                           reinterpret_cast<const byte_t*>(buf) + len)));
         Critical<Protonet> crit(conn.get_pnet());
         int err = conn.send_down(
             dg,

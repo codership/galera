@@ -113,6 +113,8 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
     deque<RowKeyEntry*>& match(trx->cert_keys_);
     assert(match.empty() == true);    
 
+    Lock lock(mutex_);
+    
     while (offset < wscoll.size())
     {
         WriteSet ws;
@@ -170,7 +172,6 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
     return WSDB_OK;
     
 cert_fail:
-    Lock lock(mutex_);
     purge_for_trx(trx);
     return WSDB_CERTIFICATION_FAIL;
 }
@@ -203,8 +204,11 @@ galera::GaleraCertification::~GaleraCertification()
 
 void galera::GaleraCertification::assign_initial_position(wsrep_seqno_t seqno)
 {
-    assert(seqno >= 0);
-    position_ = seqno;
+    assert(seqno >= 0 && seqno >= position_);
+    {
+        Lock lock(mutex_);
+        position_ = seqno;
+    }
     purge_trxs_upto(position_);
 }
 
@@ -253,7 +257,6 @@ int galera::GaleraCertification::append_trx(TrxHandle* trx)
     {
         Lock lock(mutex_);
         
-
         if (trx->get_global_seqno() != position_ + 1)
         {
             // this is perfectly normal if trx is rolled back just after 
@@ -336,7 +339,9 @@ void galera::GaleraCertification::set_trx_committed(TrxHandle* trx)
 {
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
     if (last_committed_ < trx->get_global_seqno())
+    {
         last_committed_ = trx->get_global_seqno();
+    }
     trx->clear();
 }
 

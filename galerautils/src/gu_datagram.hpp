@@ -9,6 +9,8 @@
 
 #include <limits>
 
+#include <cstring>
+
 namespace gu
 {
     class Datagram;
@@ -27,7 +29,7 @@ public:
         :
         header_       (),
         header_offset_(header_size_),
-        payload_      (new Buffer(), BufferDeleter(), shared_buffer_allocator), 
+        payload_      (new Buffer()), 
         offset_       (0)
     { }
     /*!
@@ -43,9 +45,7 @@ public:
         :
         header_       (),
         header_offset_(header_size_),
-        payload_      (new Buffer(buf), 
-                       BufferDeleter(), 
-                       shared_buffer_allocator),
+        payload_      (new Buffer(buf)),
         offset_       (offset)
     {
         assert(offset_ <= payload_->size());
@@ -91,9 +91,7 @@ public:
     void normalize()
     {
         const SharedBuffer old_payload(payload_);
-        payload_ = SharedBuffer(new Buffer,
-                                BufferDeleter(),
-                                shared_buffer_allocator);
+        payload_ = SharedBuffer(new Buffer);
         payload_->reserve(get_header_len() + old_payload->size() - offset_);
 
         if (get_header_len() > offset_)

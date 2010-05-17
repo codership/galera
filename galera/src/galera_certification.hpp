@@ -1,3 +1,6 @@
+//
+// Copyright (C) 2010 Codership Oy <info@codership.com>
+//
 
 #ifndef GALERA_GALERA_CERTIFICATION_HPP
 #define GALERA_GALERA_CERTIFICATION_HPP

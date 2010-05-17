@@ -14,6 +14,8 @@
 #include <vector>
 #include <deque>
 
+#include <cstring>
+
 #include <boost/unordered_map.hpp>
 
 namespace galera

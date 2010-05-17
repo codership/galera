@@ -1071,9 +1071,7 @@ int gcomm::evs::Proto::send_user(const seqno_t win)
             ++i;
         }
         Datagram dg(SharedBuffer(new Buffer(send_buf_.begin(), 
-                                            send_buf_.end()),
-                                 BufferDeleter(),
-                                 shared_buffer_allocator));
+                                            send_buf_.end())));
         if ((ret = send_user(dg, 0xff, ord, win, -1, n)) == 0)
         {
             while (n-- > 0)
@@ -2143,9 +2141,7 @@ void gcomm::evs::Proto::deliver_finish(const InputMapMsg& msg)
                         &msg.get_rb().get_payload()[0] 
                         + offset 
                         + am.serial_size()
-                        + am.get_len()),
-                    BufferDeleter(),
-                    shared_buffer_allocator));
+                        + am.get_len())));
             ProtoUpMeta um(msg.get_msg().get_source(), 
                            msg.get_msg().get_source_view_id(),
                            0,
