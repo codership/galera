@@ -7,6 +7,8 @@
 
 #include "gu_throw.hpp"
 
+#include <limits>
+
 namespace galera
 {
     // Helper templates to serialize integer types

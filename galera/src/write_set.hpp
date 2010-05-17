@@ -211,7 +211,7 @@ namespace galera
         wsrep_seqno_t last_seen_trx_;
         QuerySequence queries_;
         gu::Buffer keys_;
-        typedef gu::unordered_multimap<size_t, size_t>::type KeyRefMap;
+        typedef gu::UnorderedMultimap<size_t, size_t> KeyRefMap;
         KeyRefMap key_refs_;
         gu::Buffer data_;
     };

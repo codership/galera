@@ -42,8 +42,7 @@ namespace galera
     {
     private:
 
-
-        typedef gu::unordered_map<RowKey, RowKeyEntry*, RowKeyHash>::type CertIndex;
+        typedef gu::UnorderedMap<RowKey, RowKeyEntry*, RowKeyHash> CertIndex;
         class DiscardRK
         {
         public:

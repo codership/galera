@@ -71,8 +71,8 @@ namespace galera
         };
 
 
-        typedef gu::unordered_map<wsrep_trx_id_t, TrxHandle*, TrxHash>::type TrxMap;
-        typedef gu::unordered_map<wsrep_conn_id_t, Conn, TrxHash>::type ConnMap;
+        typedef gu::UnorderedMap<wsrep_trx_id_t, TrxHandle*, TrxHash> TrxMap;
+        typedef gu::UnorderedMap<wsrep_conn_id_t, Conn, TrxHash> ConnMap;
 
     public:
         TrxHandle* get_trx(const wsrep_uuid_t& source_id,
