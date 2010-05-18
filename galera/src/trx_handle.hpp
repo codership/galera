@@ -14,6 +14,8 @@
 
 #include "gu_mutex.hpp"
 
+#include <set>
+
 namespace galera
 {
     
@@ -178,7 +180,8 @@ namespace galera
         
         //
         friend class GaleraCertification;
-        std::deque<RowKeyEntry*> cert_keys_;
+        typedef std::set<RowKeyEntry*> CertKeySet;
+        CertKeySet cert_keys_;
     };
     
     

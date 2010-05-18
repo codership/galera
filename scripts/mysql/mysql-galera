@@ -208,11 +208,8 @@ galera_start()
     if [ "$MASTER_SLAVE" == "yes" ]
     then
         WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmsgalera++.so"}
-    elif [ "$MULTIMASTER" == "yes" ]
-    then
-        WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera++.so"}
     else
-        WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera.so"}
+        WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera++.so"}
     fi
 
     if test -f $WSREP || test $WSREP == "none"

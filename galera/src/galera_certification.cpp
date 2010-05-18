@@ -87,8 +87,8 @@ galera::GaleraCertification::same_source(const TrxHandle* a, const TrxHandle* b)
 void
 galera::GaleraCertification::purge_for_trx(TrxHandle* trx)
 {
-    deque<RowKeyEntry*>& refs(trx->cert_keys_);
-    for (deque<RowKeyEntry*>::iterator i = refs.begin(); i != refs.end();
+    TrxHandle::CertKeySet& refs(trx->cert_keys_);
+    for (TrxHandle::CertKeySet::iterator i = refs.begin(); i != refs.end();
          ++i)
     {
         // Unref all referenced and remove if was referenced by us
@@ -110,7 +110,7 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
     size_t offset(0);
     const MappedBuffer& wscoll(trx->get_write_set_collection());
     wsrep_seqno_t last_depends_seqno(-1);
-    deque<RowKeyEntry*>& match(trx->cert_keys_);
+    TrxHandle::CertKeySet& match(trx->cert_keys_);
     assert(match.empty() == true);    
 
     Lock lock(mutex_);
@@ -158,17 +158,22 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
                 ci = cert_index_.insert(make_pair(cie->get_row_key(), cie)).first;
             }
             
-            if (store_keys == true && ci->second->get_ref_trx() != trx)
+            if (store_keys == true)
             {
-                match.push_back(ci->second);
-                ci->second->ref(trx);
+                match.insert(ci->second);
+
             }
         }
     }
     
     trx->assign_last_depends_seqno(last_depends_seqno);
     assert(trx->get_last_depends_seqno() < trx->get_global_seqno());
-
+    for (TrxHandle::CertKeySet::iterator i = trx->cert_keys_.begin();
+         i != trx->cert_keys_.end(); ++i)
+    {
+        (*i)->ref(trx);
+    }
+    
     return WSDB_OK;
     
 cert_fail:
