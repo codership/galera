@@ -190,6 +190,7 @@ namespace galera
     private:
         TrxHandle& trx_;
     };
+
     
     template <typename T>
     class Unref2nd

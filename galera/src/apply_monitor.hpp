@@ -190,11 +190,7 @@ namespace galera
             if (mode_ == M_BYPASS) return;
             size_t idx(indexof(trx->get_global_seqno()));
             gu::Lock lock(mutex_);
-            assert(last_left_ <= last_entered_);
-            while (last_entered_ - last_left_ >= appliers_size_)
-            {
-                lock.wait(pre_enter_cond_);
-            }
+            pre_enter(0, lock, idx);
             if (appliers_[idx].state_ <= Applier::S_WAITING)
             {
                 appliers_[idx].state_ = Applier::S_CANCELED;
@@ -214,24 +210,58 @@ namespace galera
 
         bool may_enter(const TrxHandle* trx) const
         {
-            // 1) all preceding trxs have entered
-            // 2) no dependencies or dependent has left the monitor
             return condition_(last_entered_, last_left_, trx);
         }
         
-        // wait until all preceding trxs have entered the monitor
+        // wait until it is possible to grab slot in monitor, 
+        // update last entered
         void pre_enter(TrxHandle* trx, gu::Lock& lock, const int idx)
         {
-            while (last_entered_ + 1 != trx->get_global_seqno())
+            assert(last_left_ <= last_entered_);
+            while (last_entered_ - last_left_ >= appliers_size_)
             {
-                trx->unlock();
+                if (trx != 0)
+                {
+                    trx->unlock();
+                }
                 lock.wait(pre_enter_cond_);
-                trx->lock();
+                if (trx != 0)
+                {
+                    trx->lock();
+                }
             }
-            assert(appliers_[idx].state_ == Applier::S_IDLE ||
-                   appliers_[idx].state_ == Applier::S_CANCELED);
-            assert(last_entered_ + 1 == trx->get_global_seqno());
-            ++last_entered_;
+
+            if (trx != 0)
+            {
+                assert(appliers_[idx].state_ == Applier::S_IDLE ||
+                       appliers_[idx].state_ == Applier::S_CANCELED);
+                while (appliers_[indexof(last_entered_ + 1)].state_ 
+                       > Applier::S_IDLE)
+                {
+                    Applier& a(appliers_[indexof(last_entered_ + 1)]);
+                    if (a.state_ == Applier::S_WAITING &&
+                        may_enter(a.trx_) == true)
+                    {
+                        a.cond_.signal();
+                    }
+                    ++last_entered_;
+                }
+                if (last_entered_ + 1 == trx->get_global_seqno())
+                {
+                    last_entered_ = trx->get_global_seqno();
+                }
+                while (appliers_[indexof(last_entered_ + 1)].state_ 
+                       > Applier::S_IDLE)
+                {
+                    Applier& a(appliers_[indexof(last_entered_ + 1)]);
+                    if (a.state_ == Applier::S_WAITING &&
+                        may_enter(a.trx_) == true)
+                    {
+                        a.cond_.signal();
+                    }
+                    ++last_entered_;
+                }
+            }
             pre_enter_cond_.broadcast();
         }
         
