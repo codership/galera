@@ -19,6 +19,7 @@ Options:
     -o|--opt          configure build with debug disabled (implies -c)
     -m32/-m64         build 32/64-bit binaries on x86
     -d|--debug        configure build with debug enabled (implies -c)
+    -dl|--debug-level set debug level (1, implies -c)
     --with-spread     configure build with Spread (implies -c)
     --no-strip        prevent stripping of release binaries
     -p|--package      create DEB/RPM packages (depending on the distribution)
@@ -142,7 +143,7 @@ which dpkg >/dev/null 2>&1 && DEBIAN=1 || DEBIAN=0
 
 # export command options for Galera build
 export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD CFLAGS CXXFLAGS \
-       PACKAGE CPU SKIP_BUILD RELEASE DEBIAN
+       PACKAGE CPU SKIP_BUILD RELEASE DEBIAN SCONS JOBS DEBUG_LEVEL
 
 set -eu
 
@@ -152,8 +153,6 @@ GALERA_SRC=${GALERA_SRC:-$BUILD_ROOT/../../}
 # Source paths are either absolute or relative to script, get absolute
 MYSQL_SRC=$(cd $MYSQL_SRC; pwd -P; cd $BUILD_ROOT)
 GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
-# Scons variant dir, defaults to GALERA_SRC
-SCONS_VD=$GALERA_SRC
 
 ######################################
 ##                                  ##
@@ -166,31 +165,7 @@ then
     cd $GALERA_SRC
     GALERA_REV=$(svnversion | sed s/\:/,/g)
     export GALERA_VER=${RELEASE:-$GALERA_REV}
-    if [ "$SCONS" == "yes" ]
-    then
-        scons_args=""
-        if [ "$CPU" == "pentium" ]
-        then
-            scons_args="$scons_args arch=i386"
-        elif [ "$CPU" == "amd64" ]
-        then
-            scons_args="$scons_args arch=x86_64"
-        fi
-        if [ "$DEBUG" == "yes" ]
-        then
-            scons_args="$scons_args debug=$DEBUG_LEVEL"
-        fi
-        if [ "$SCRATCH" == "yes" ]
-        then
-            scons -Q -c $scons_args
-        fi
-        if [ "$SKIP_BUILD" != "yes" ]
-        then
-            scons $scons_args -j $JOBS
-        fi
-    else
-        scripts/build.sh # options are passed via environment variables
-    fi
+    scripts/build.sh # options are passed via environment variables
 fi
 
 ######################################

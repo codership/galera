@@ -4,22 +4,27 @@
 
 usage()
 {
-    echo -e "Usage: build.sh [OPTIONS] \n" \
-    "Options:                      \n" \
-    "    --stage <initial stage>   \n" \
-    "    --last-stage <last stage> \n" \
-    "    -s|--scratch    build everything from scratch\n"\
-    "    -c|--configure  reconfigure the build system (implies -s)\n"\
-    "    -b|--bootstap   rebuild the build system (implies -c)\n"\
-    "    -o|--opt        configure build with debug disabled (implies -c)\n" \
-    "    -d|--debug      configure build with debug enabled (implies -c)\n" \
-    "    -r|--release    release number\n"\
-    "    -m32/-m64       build 32/64-bit binaries for x86\n" \
-    "    -p|--package    build RPM and DEB packages at the end.\n" \
-    "    --with-spread   configure build with spread backend (implies -c to gcs)\n" \
-    "    --source        build source packages\n"\
-    "    --sb            skip actual build, use the existing binaries\n"\
+    cat << EOF
+Usage: build.sh [OPTIONS]
+Options:
+    --stage <initial stage>
+    --last-stage <last stage>
+    -s|--scratch    build everything from scratch
+    -c|--configure  reconfigure the build system (implies -s)
+    -b|--bootstap   rebuild the build system (implies -c)
+    -o|--opt        configure build with debug disabled (implies -c)
+    -d|--debug      configure build with debug enabled (implies -c)
+    --dl            set debug level for Scons build (1, implies -c)
+    -r|--release    release number
+    -m32/-m64       build 32/64-bit binaries for x86
+    -p|--package    build RPM and DEB packages at the end.
+    --with-spread   configure build with spread backend (implies -c to gcs)
+    --source        build source packages
+    --sb            skip actual build, use the existing binaries
+    --scons         build using Scons build system (no)
+    -j|--jobs       how many parallel jobs to use for Scons (1)
     "\nSet DISABLE_GCOMM/DISABLE_VSBES to 'yes' to disable respective modules"
+EOF
 }
 
 # disable building vsbes by default
@@ -28,6 +33,10 @@ PACKAGE=${PACKAGE:-"no"}
 SKIP_BUILD=${SKIP_BUILD:-"no"}
 RELEASE=${RELEASE:-""}
 SOURCE=${SOURCE:-"no"}
+DEBUG=${DEBUG:-"no"}
+DEBUG_LEVEL=${DEBUG_LEVEL:-"1"}
+SCONS=${SCONS:-"no"}
+JOBS=${JOBS:-"1"}
 
 which dpkg >/dev/null 2>&1 && DEBIAN=${DEBIAN:-1} || DEBIAN=${DEBIAN:-0}
 
@@ -106,6 +115,13 @@ do
 	--sb)
 	    SKIP_BUILD="yes"
 	    ;;
+	--scons)
+	    SCONS="yes"
+	    ;;
+	-j|--jobs)
+	    JOBS=$2
+	    shift
+	    ;;
 	*)
 	    if test ! -z "$1"; then
 	       echo "Unrecognized option: $1"
@@ -129,7 +145,7 @@ if [ "$CONFIGURE" == "yes" ]; then SCRATCH="yes"; fi
 set -x
 
 # Build process base directory
-build_base=$(cd $(dirname $0); cd ..; pwd -P)
+build_base=$(cd $(dirname $0)/..; pwd -P)
 
 # Define branches to be used
 galerautils_src=$build_base/galerautils
@@ -320,7 +336,32 @@ then
     popd
 fi
 
-if test "$SKIP_BUILD" == "no"; then
+if [ "$SCONS" == "yes" ] # Build using Scons
+then
+    # Scons variant dir, defaults to GALERA_SRC 
+    export SCONS_VD=$build_base
+    scons_args="-C $build_base"
+    if [ "$CPU" == "pentium" ]
+    then
+        scons_args="$scons_args arch=i386"
+    elif [ "$CPU" == "amd64" ]
+    then
+        scons_args="$scons_args arch=x86_64"
+    fi
+    if [ "$DEBUG" == "yes" ]
+    then
+        scons_args="$scons_args debug=$DEBUG_LEVEL"
+    fi
+    if [ "$SCRATCH" == "yes" ]
+    then
+        scons -Q -c $scons_args
+    fi
+    if [ "$SKIP_BUILD" != "yes" ]
+    then
+        scons $scons_args -j $JOBS
+    fi
+
+elif test "$SKIP_BUILD" == "no"; then # Build using autotools
 
 build_module "galerautils"
 build_module "gcache"
@@ -358,7 +399,7 @@ build_module "gemini"
 build_module "wsdb"
 build_module "galera"
 
-fi # SKIP_BUILD
+fi # SKIP_BUILD / SCONS
 
 if test "$PACKAGE" == "yes"
 then

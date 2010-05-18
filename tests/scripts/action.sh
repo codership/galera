@@ -166,7 +166,7 @@ _cluster_up()
         then
             # must make sure 1st node completely operational
             case "$GCS_TYPE" in
-            "gcomm") $cmd "-g gcomm://${GCOMM_EXTRA_PARAMS}" "$@" 0 ;;
+            "gcomm") $cmd "-g gcomm://:${NODE_GCS_PORT[$node]}${GCOMM_EXTRA_PARAMS}" "$@" 0 ;;
             "vsbes") $cmd "-g vsbes://$VSBES_ADDRESS" "$@" 0 ;;
             esac
         else
