@@ -294,6 +294,7 @@ install -m 644 -D LICENSE.galera $GALERA_DIST_DIR/LICENSE.galera
 install -m 755 -d $GALERA_LIBS
 if [ "$SCONS" == "yes" ]
 then
+    SCONS_VD=$GALERA_SRC
     cp -P $SCONS_VD/galerautils/src/libgalerautils.so*   $GALERA_LIBS
     cp -P $SCONS_VD/galerautils/src/libgalerautils++.so* $GALERA_LIBS
     cp -P $SCONS_VD/gcomm/src/libgcomm.so*               $GALERA_LIBS
