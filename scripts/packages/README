@@ -48,7 +48,7 @@ a node failure or a new node added to cluster:
      ,-------.     ,-------.    ,--------.
      | node1 |-----| node2 |<---| client |
      `-------'  G  `-------'    `--------'
-             \     /       
+             \     /
             ,-------.    ,--------.
             | node3 |<---| client |
             `-------'    `--------'
@@ -202,16 +202,16 @@ To fine-tune performance (especially in high latency networks):
 All options in this group are prefixed by 'gmcast.' (see example above).
 
 group
-        String denoting group name. Max length of string is 16. Peer nodes
-        accept GMCast connection only if the group names match. It is set
-        automatically from wsrep options.
+    String denoting group name. Max length of string is 16. Peer nodes
+    accept GMCast connection only if the group names match. It is set
+    automatically from wsrep options.
 
 listen_addr
-        Listening address for GMCast. Address is currently passed in URI format
-        (for example tcp://192.168.3.1:4567) and it should be passed as the last
-        configuration parameter in order to avoid confusion. If parameter value
-        is undefined, GMCast starts listening all interfaces at default port
-        4567
+    Listening address for GMCast. Address is currently passed in URI format
+    (for example tcp://192.168.3.1:4567) and it should be passed as the last
+    configuration parameter in order to avoid confusion. If parameter value
+    is undefined, GMCast starts listening all interfaces at default port
+    4567
 
 3.2.2 EVS option group.
 
@@ -222,75 +222,75 @@ the time interval representation
 (e.g. 02:01:37.2 -> PT2H1M37.2S == PT121M37.2S == PT7297.2S)
 
 suspect_timeout
-        This timeout controls how long node can remain silent until it is put
-        under suspicion. If majority of the current group agree that the node
-        is under suspicion, it is discarded from group and new group view is
-        formed immediately. If majority of the group does not agree about
-        suspicion, <inactive_timeout> is waited until forming of new group will
-        be attempted. Default value is 5 seconds.
+    This timeout controls how long node can remain silent until it is put
+    under suspicion. If majority of the current group agree that the node
+    is under suspicion, it is discarded from group and new group view is
+    formed immediately. If majority of the group does not agree about
+    suspicion, <inactive_timeout> is waited until forming of new group will
+    be attempted. Default value is 5 seconds.
 
 inactive_timeout
-        This timeout control how long node can remain completely silent until it
-        is discarded from the group. This is hard limit, unlike
-        <suspect_timeout>, and the node is discarded even if it becomes live
-        during the formation of the new group (so it is inclusive of
-        <suspect_timeout>). Default value is 15 seconds.
+    This timeout control how long node can remain completely silent until it
+    is discarded from the group. This is hard limit, unlike <suspect_timeout>,
+    and the node is discarded even if it becomes live during the formation of
+    the new group (so it is inclusive of <suspect_timeout>).
+    Default value is 15 seconds.
 
 inactive_check_period
-        This period controls how often node liveness is checked. Default is
-        1 second and there is no need to change this unless <suspect_timeout> or
-        <inactive_timeout> is adjusted to smaller value. Minimum is 0.1 seconds
-        and maximum is <suspect_timeout>/2.
+    This period controls how often node liveness is checked. Default is
+    1 second and there is no need to change this unless <suspect_timeout> or
+    <inactive_timeout> is adjusted to smaller value. Minimum is 0.1 seconds
+    and maximum is <suspect_timeout>/2.
 
 keepalive_period
-        This timeout controls how often keepalive messages are sent into network.
-        Node liveness is determined with these keepalives, so the value sould be
-        considerably smaller than <suspect_timeout>. Default value is 1 second,
-        minimum is 0.1 seconds and maximum is <suspect_timeout>/3.
+    This timeout controls how often keepalive messages are sent into network.
+    Node liveness is determined with these keepalives, so the value sould be
+    considerably smaller than <suspect_timeout>. Default value is 1 second,
+    minimum is 0.1 seconds and maximum is <suspect_timeout>/3.
 
 consensus_timeout
-        This timeout defines how long forming of new group is attempted.
-        If there is no consensus after this time has passed since starting of
-        consensus protocol, every node discards all other nodes from the group
-        and forming of new group is attempted through singleton groups.
-        Default value is 30 seconds, minimum is <inactive_timeout> and maximum
-        is <inactive_timeout>*5.
+    This timeout defines how long forming of new group is attempted.
+    If there is no consensus after this time has passed since starting of
+    consensus protocol, every node discards all other nodes from the group
+    and forming of new group is attempted through singleton groups.
+    Default value is 30 seconds, minimum is <inactive_timeout> and maximum
+    is <inactive_timeout>*5.
 
 join_retrans_period
-        This parameter controls how often join messages are retransmitted
-        during group formation. There is usually no need to adjust this value.
-        Default value is 0.3 seconds, minimum is 0.1 seconds and maximum is
-        <suspect_timeout>/3.
+    This parameter controls how often join messages are retransmitted
+    during group formation. There is usually no need to adjust this value.
+    Default value is 0.3 seconds, minimum is 0.1 seconds and maximum is
+    <suspect_timeout>/3.
 
 view_forget_timeout
-        This timeout controls how long information about known group views is
-        maintained. This information is needed to filter out delayed messages
-        from previous views that are not live anymore. Default value is
-        5 minutes and there is usually no need to change it.
+    This timeout controls how long information about known group views is
+    maintained. This information is needed to filter out delayed messages
+    from previous views that are not live anymore. Default value is
+    5 minutes and there is usually no need to change it.
 
 debug_log_mask
-        This mask controls what debug information is printed in the logs if
-        debug logging is turned on. Mask value is bitwise-OR from values
-        gcomm::evs::Proto::DebugFlags. By default only state information is
-        printed.
+    This mask controls what debug information is printed in the logs if
+    debug logging is turned on. Mask value is bitwise-OR from values
+    gcomm::evs::Proto::DebugFlags. By default only state information is
+    printed.
 
 info_log_mask
-        This mask controls what info log is printed in the logs.
-        Mask value is bitwise-or from values gcomm::evs::Proto::InfoFlags.
+    This mask controls what info log is printed in the logs.
+    Mask value is bitwise-or from values gcomm::evs::Proto::InfoFlags.
 
 stats_report_period
-        This parameter controls how often statistics information is printed in
-        the log. This parameter has effect only if statistics reporting is
-        enabled via Conf::EvsInfoLogMask. Default value is 1 minute.
+    This parameter controls how often statistics information is printed in
+    the log. This parameter has effect only if statistics reporting is
+    enabled via Conf::EvsInfoLogMask. Default value is 1 minute.
 
 send_window
-        This parameter controls how many messages protocol layer is allowed
-        to send without getting all acknowledgements for any of them.
-        Default value is 32.
+    This parameter controls how many messages protocol layer is allowed
+    to send without getting all acknowledgements for any of them.
+    Default value is 32.
 
 user_send_window
-        Like <send_window>, but for messages which sending is initiated by a
-        call from the upper layer. Default value is 16.
+    Like <send_window>, but for messages which sending is initiated by a
+    call from the upper layer. Default value is 16.
 
 
 4. SPECIAL NOTES
