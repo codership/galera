@@ -1262,6 +1262,12 @@ gcs_wait (gcs_conn_t* conn)
 }
 
 long
+gcs_queue_len (gcs_conn_t* conn)
+{
+    return conn->queue_len;
+}
+
+long
 gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size)
 {
     return gcs_core_set_pkt_size (conn->core, pkt_size);

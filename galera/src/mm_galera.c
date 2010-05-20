@@ -2027,13 +2027,13 @@ static enum wsrep_status mm_galera_pre_commit(
         goto cleanup;
     }
 
-    status.replicated++;
-    status.replicated_bytes += len;
-
     assert (GCS_SEQNO_ILL != seqno_g);
     assert (GCS_SEQNO_ILL != seqno_l);
 
     gu_mutex_lock(&commit_mtx);
+
+    status.replicated++;
+    status.replicated_bytes += len;
 
     /* record seqnos for local transaction */
     wsdb_assign_trx_seqno(trx_id, seqno_l, seqno_g, WSDB_TRX_REPLICATED, ws, handle);
@@ -2762,7 +2762,10 @@ static void mm_galera_status_free (wsrep_t* gh,
     galera_status_free (s);
 }
 
-
+long galera_slave_queue()
+{
+    return gcs_queue_len(gcs_conn);
+}
 
 static wsrep_t mm_galera_str = {
     WSREP_INTERFACE_VERSION,
@@ -2792,7 +2795,7 @@ static wsrep_t mm_galera_str = {
     &mm_galera_status_get,
     &mm_galera_status_free,
     "Galera",
-    "0.7pre",
+    "0.8pre",
     "Codership Oy <info@codership.com>",
     &mm_galera_tear_down,
     NULL,

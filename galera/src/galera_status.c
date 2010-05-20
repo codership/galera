@@ -33,8 +33,10 @@ enum status_vars
     STATUS_LOCAL_CERT_FAILURES,
     STATUS_LOCAL_BF_ABORTS,
     STATUS_LOCAL_REPLAYS,
+    STATUS_LOCAL_SLAVE_QUEUE,
     STATUS_FC_WAITS,
     STATUS_LOCAL_STATUS,
+    STATUS_LOCAL_STATUS_COMMENT,
     STATUS_MAX
 };
 
@@ -50,10 +52,37 @@ static struct wsrep_status_var wsrep_status[STATUS_MAX + 1] =
     {"local_cert_failures", WSREP_STATUS_INT64,  { 0 }                      },
     {"local_bf_aborts",     WSREP_STATUS_INT64,  { 0 }                      },
     {"local_replays",       WSREP_STATUS_INT64,  { 0 }                      },
+    {"local_slave_queue",   WSREP_STATUS_INT64,  { 0 }                      },
     {"flow_control_waits",  WSREP_STATUS_INT64,  { 0 }                      },
-    {"local_status",        WSREP_STATUS_STRING, { 0 }                      },
+    {"local_status",        WSREP_STATUS_INT64,  { 0 }                      },
+    {"local_status_comment",WSREP_STATUS_STRING, { 0 }                      },
     {NULL, 0, { 0 }}
 };
+
+static wsrep_member_status_t
+stage2status (galera_stage_t stage)
+{
+    switch (stage)
+    {
+    case GALERA_STAGE_INIT:
+        return WSREP_MEMBER_EMPTY;
+    case GALERA_STAGE_JOINING:
+    case GALERA_STAGE_SST_PREPARE:
+    case GALERA_STAGE_RST_SENT:
+    case GALERA_STAGE_SST_WAIT:
+        return WSREP_MEMBER_JOINER;
+    case GALERA_STAGE_JOINED:
+        return WSREP_MEMBER_JOINED;
+    case GALERA_STAGE_SYNCED:
+        return WSREP_MEMBER_SYNCED;
+    case GALERA_STAGE_DONOR:
+        return WSREP_MEMBER_DONOR;
+    default:
+        return WSREP_MEMBER_ERROR;
+    }
+}
+
+extern long galera_slave_queue ();
 
 /* Returns array of status variables */
 struct wsrep_status_var*
@@ -75,8 +104,12 @@ galera_status_get (const struct galera_status* s)
         s->local_cert_failures;
     wsrep_status[STATUS_LOCAL_BF_ABORTS    ].value._int64 = s->local_bf_aborts;
     wsrep_status[STATUS_LOCAL_REPLAYS      ].value._int64 = s->local_replays;
+    wsrep_status[STATUS_LOCAL_SLAVE_QUEUE  ].value._int64 =
+        galera_slave_queue();
     wsrep_status[STATUS_FC_WAITS           ].value._int64 = s->fc_waits;
-    wsrep_status[STATUS_LOCAL_STATUS       ].value._string = 
+    wsrep_status[STATUS_LOCAL_STATUS       ].value._int64 =
+        stage2status(s->stage);
+    wsrep_status[STATUS_LOCAL_STATUS_COMMENT].value._string = 
         status_str[s->stage];
 
     return wsrep_status;

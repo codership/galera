@@ -108,6 +108,12 @@ extern long gcs_destroy (gcs_conn_t *conn);
  */
 extern long gcs_wait (gcs_conn_t *conn);
 
+/*! @brief Returns length of the action queue (unread actions)
+ * 
+ * @return length of the action queue or negative error code
+ */
+extern long gcs_queue_len (gcs_conn_t *conn);
+
 /*! @typedef @brief Action types.
  * There is a conceptual difference between "messages"
  * and "actions". Messages are ELEMENTARY pieces of information

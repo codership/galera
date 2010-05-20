@@ -126,7 +126,9 @@ typedef enum wsrep_member_status {
     WSREP_MEMBER_JOINER, //!< incomplete state, requested state transfer
     WSREP_MEMBER_DONOR,  //!< complete state, donates state transfer
     WSREP_MEMBER_JOINED, //!< complete state
-    WSREP_MEMBER_SYNCED  //!< complete state, synchronized with group
+    WSREP_MEMBER_SYNCED, //!< complete state, synchronized with group
+    WSREP_MEMBER_ERROR,  //!< this and above is provider-specific error code
+    WSREP_MEMBER_MAX
 } wsrep_member_status_t;
 
 /*!

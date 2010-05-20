@@ -1912,9 +1912,6 @@ enum wsrep_status mm_galera_pre_commit(
     assert (GCS_SEQNO_ILL != seqno_g);
     assert (GCS_SEQNO_ILL != seqno_l);
     
-    status.replicated++;
-    status.replicated_bytes += wscoll.size();
-    
     trx->assign_seqnos(seqno_l, seqno_g);
     trx->assign_state(WSDB_TRX_REPLICATED);
     
@@ -1922,6 +1919,10 @@ enum wsrep_status mm_galera_pre_commit(
     rcode = while_eagain_or_trx_abort(trx, 
                                       gu_to_grab, cert_queue, seqno_l);
     profile_leave(galera_prof);
+
+    status.replicated++;
+    status.replicated_bytes += wscoll.size();
+    
     if (rcode) 
     {
         gu_debug("gu_to_grab aborted for seqno %lld: %d (%s)",
@@ -2577,6 +2578,12 @@ void mm_galera_status_free (wsrep_t* gh,
     galera_status_free (s);
 }
 
+extern "C" long
+galera_slave_queue()
+{
+    return gcs_queue_len(gcs_conn);
+}
+
 
 static wsrep_t mm_galera_str = {
     WSREP_INTERFACE_VERSION,
@@ -2606,7 +2613,7 @@ static wsrep_t mm_galera_str = {
     &mm_galera_status_get,
     &mm_galera_status_free,
     "Galera",
-    "0.7pre",
+    "0.8pre",
     "Codership Oy <info@codership.com>",
     &mm_galera_tear_down,
     NULL,
