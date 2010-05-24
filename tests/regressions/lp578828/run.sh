@@ -1,4 +1,4 @@
-#!/bin/bash -eu
+#!/bin/bash -u
 
 declare -r DIST_BASE=$(cd $(dirname $0)/../..; pwd -P)
 TEST_BASE=${TEST_BASE:-"$DIST_BASE"}
@@ -26,6 +26,12 @@ $MYSQL -e "DROP TABLE IF EXISTS test.lp578828"
 $MYSQL -e "$create_stmt"
 $MYSQL -e "$insert_stmt"
 $MYSQL -e "$insert_stmt"
+if test $? == 0
+then
+    echo "duplicate insert succeeded"
+    exit 1
+fi
+
 
 $MYSQL -e "DROP TABLE test.lp578828"
 
