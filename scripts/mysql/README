@@ -12,7 +12,7 @@ RESULTING DIRECTLY OR INDIRECTLY FROM THE USE OF THIS SOFTWARE.
 
 Trademark Information.
 
-MySQL is a trademark or registered trademark of Sun Microsystems, Inc. or
+MySQL is a trademark or registered trademark of Oracle Corporation or
 its subsidiaries in the US and other countries. Other marks are the property
 of their respective owners.
 
@@ -465,11 +465,11 @@ wsrep_convert_LOCK_to_trx=0
    database from going into logically inconsistent state. Disabled by default
    because of possible memory issues with DB dumps that contain LOCK statements.
 
-wsrep_retry_autocommit=1
-   Retry autocommit queries and single statement transactions should they fail
-   certification test. This is analogous to rescheduling an autocommit query
-   should it go into deadlock with other transactions in the database lock
-   manager.
+wsrep_retry_autocommit=5
+   Retry autocommit queries and single statement transactions up to 5 times
+   should they fail certification test. This is analogous to rescheduling an 
+   autocommit query should it go into deadlock with other transactions in the 
+   database lock manager.
 
 wsrep_auto_increment_control=1
    Automatically adjust auto_increment_increment and auto_increment_offset
