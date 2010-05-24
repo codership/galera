@@ -767,6 +767,7 @@ static wsrep_status_t process_conn_write_set(
     GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
     GALERA_UPDATE_LAST_APPLIED (seqno_g);
     do_report = report_check_counter();
+
     GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
 
     wsdb_set_global_trx_committed(seqno_g);
@@ -1922,6 +1923,8 @@ static enum wsrep_status mm_galera_pre_commit(
         GU_DBUG_RETURN(WSREP_OK);
     }
 
+    ws->last_seen_trx = status.last_applied;
+
     /* encode with xdr */
     /* TODO: is not optimal to allocate data buffer for xdr encoding
      *       intermediate result.
@@ -2435,8 +2438,8 @@ static enum wsrep_status mm_galera_to_execute_end(
              conn_info.seqno_l, conn_info.seqno_g
     );
 
-    GALERA_UPDATE_LAST_APPLIED (conn_info.seqno_g)
-
+    GALERA_UPDATE_LAST_APPLIED (conn_info.seqno_g);
+    wsdb_set_global_trx_committed(conn_info.seqno_g);
     do_report = report_check_counter ();
 
     /* release queues */
