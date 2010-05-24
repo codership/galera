@@ -9,7 +9,7 @@ experienced MySQL users. For more detailed information please see README.
 MySQL/Galera cluster is a multi-master MySQL server cluster. It provides
  - True high-availability (no committed transaction is lost, no single
    point of failure)
- - Performance scalability even foe write-intensive loads.
+ - Performance scalability even for write-intensive loads.
  - Semantics of a single MySQL server.
 
 This distribution is all you need to install and run MySQL/Galera cluster.
