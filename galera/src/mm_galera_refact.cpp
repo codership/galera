@@ -31,6 +31,9 @@ extern "C"
 #include "certification.hpp"
 #include "wsdb.hpp"
 
+#if defined(GALERA_MASTER_SLAVE)
+#define GALERA_OOO_COMMIT
+#endif
 // #define GALERA_PROFILING
 #ifdef GALERA_PROFILING
 #define GU_PROFILE
@@ -259,15 +262,16 @@ static void *galera_wsdb_configurator (
     }
 }
 
+#ifndef GALERA_OOO_COMMIT
 #define GALERA_UPDATE_LAST_APPLIED(seqno)                              \
     if (status.last_applied > seqno) gu_fatal ("last_applied: %lld, seqno: %lld", status.last_applied, seqno); \
     assert (status.last_applied <= seqno);                             \
     status.last_applied = seqno;                                       \
     assert (status.last_applied <= last_recved);
-
-
-
-
+#else
+#define GALERA_UPDATE_LAST_APPLIED(seqno)                               \
+    if (status.last_applied < seqno) status.last_applied = seqno;
+#endif /* GALERA_OOO_COMMIT */
 
 static gcs_conn_t* galera_init_gcs (wsrep_t*      gh,
                                     const char*   node_name,
@@ -803,11 +807,12 @@ enum wsrep_status process_query_write_set_applying(
         return WSREP_TRX_FAIL;
     }
     
+#ifndef GALERA_OOO_COMMIT
     if (trx->is_local() == false)
     {
-        apply_monitor.leave(trx);
         GALERA_GRAB_QUEUE(commit_queue, seqno_l);
     }
+#endif /* GALERA_OOO_COMMIT */
     
     if (rcode == WSREP_OK && 
         (rcode = apply_query(recv_ctx, "commit\0", 7, 
@@ -829,8 +834,13 @@ enum wsrep_status process_query_write_set_applying(
     {
         GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
         bool do_report(report_check_counter());
+        apply_monitor.leave(trx);
+#ifndef GALERA_OOO_COMMIT
         GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
-        
+#else
+        GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
+#endif /*GALERA_OOO_COMMIT */
+
         cert->set_trx_committed(trx);
         if (do_report) report_last_committed(gcs_conn);
     }

@@ -1,9 +1,9 @@
-
-
+/*
+ * Copyright (C) 2010 Codership Oy <info@codership.com>
+ */
 #include "galera_wsdb.hpp"
 #include "trx_handle.hpp"
 #include "write_set.hpp"
-
 
 #include "gu_lock.hpp"
 #include "gu_throw.hpp"
@@ -20,15 +20,11 @@ galera::GaleraWsdb::GaleraWsdb()
 }
 
 galera::GaleraWsdb::~GaleraWsdb()
-{
-    
+{    
     log_info << "wsdb trx map usage " << trx_map_.size() 
              << " conn query map usage " << conn_map_.size();
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
 }
-
-
-
 
 ostream& galera::GaleraWsdb::operator<<(ostream& os) const
 {
@@ -48,7 +44,6 @@ ostream& galera::GaleraWsdb::operator<<(ostream& os) const
     os << "\n";
     return os;
 }
-
 
 galera::TrxHandle*
 galera::GaleraWsdb::create_trx(const wsrep_uuid_t& source_id, 
@@ -72,7 +67,6 @@ galera::GaleraWsdb::create_conn(wsrep_conn_id_t conn_id)
         gu_throw_fatal;
     return i.first->second;
 }
-
 
 galera::TrxHandle*
 galera::GaleraWsdb::get_trx(const wsrep_uuid_t& source_id,

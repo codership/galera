@@ -11,11 +11,10 @@
 galera::Certification* galera::Certification::create(const std::string& conf)
 {
 #if GALERA_USE_WSDB
-    if (conf == "wsdb")
-        return new WsdbCertification();
+    if (conf == "wsdb") return new WsdbCertification();
 #endif
-    if (conf == "galera")
-        return new GaleraCertification(conf);
+    if (conf == "galera") return new GaleraCertification(conf);
+
     gu_throw_fatal << "not implemented: " << conf;
     throw;
 }

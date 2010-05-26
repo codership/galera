@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -42,7 +42,9 @@ galera::TrxHandle* galera::WsdbCertification::create_trx(
     assert(seqno_l >= 0 && seqno_g >= 0);
     TrxHandle* ret(new WsdbTrxHandle(-1, -1, false));
     WsdbTrxHandle* trx(static_cast<WsdbTrxHandle*>(ret));
-    struct wsdb_write_set* ws(reinterpret_cast<struct wsdb_write_set*>(gu_malloc(sizeof(struct wsdb_write_set))));
+    struct wsdb_write_set* ws(
+        reinterpret_cast<struct wsdb_write_set*>(
+            gu_malloc(sizeof(struct wsdb_write_set))));
     
     XDR xdrs;
     

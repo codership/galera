@@ -1,4 +1,6 @@
-
+/*
+ * Copyright (C) 2010 Codership Oy <info@codership.com>
+ */
 #ifndef GALERA_BYPASS_WSDB_HPP
 #define GALERA_GALERA_WSDB_HPP
 

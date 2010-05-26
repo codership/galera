@@ -104,12 +104,13 @@ galera::GaleraCertification::purge_for_trx(TrxHandle* trx)
     refs.clear();
 }
 
-
 int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
 {
     size_t offset(0);
     const MappedBuffer& wscoll(trx->get_write_set_collection());
     wsrep_seqno_t last_depends_seqno(-1);
+    wsrep_seqno_t min_depends_seqno(trx->get_last_seen_seqno() + 1);
+    const wsrep_seqno_t trx_global_seqno = trx->get_global_seqno();
     TrxHandle::CertKeySet& match(trx->cert_keys_);
     assert(match.empty() == true);    
 
@@ -137,20 +138,25 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
                 assert(ref_trx != 0);
                 // We assume that certification is done only once per trx
                 // and in total order
-                assert(ref_trx->get_global_seqno() < trx->get_global_seqno() ||
+                const wsrep_seqno_t ref_global_seqno =
+                    ref_trx->get_global_seqno();
+
+                assert(ref_global_seqno < trx_global_seqno ||
                        same_source(ref_trx, trx));
                 if (same_source(ref_trx, trx) == false &&
-                    ref_trx->get_global_seqno() > 
-                    trx->get_last_seen_seqno())
+                    ref_global_seqno > trx->get_last_seen_seqno())
                 {
                     // Cert conflict if trx write set didn't see ti committed
-                    log_debug << "trx conflict " << ref_trx->get_global_seqno() 
+                    log_debug << "trx conflict " << ref_global_seqno 
                               << " " << trx->get_last_seen_seqno();
                     goto cert_fail;
                 }
-                if (ref_trx->get_global_seqno() != trx->get_global_seqno())
-                    last_depends_seqno = max(last_depends_seqno, 
-                                             ref_trx->get_global_seqno());
+                if (ref_global_seqno != trx_global_seqno)
+                    last_depends_seqno = max(last_depends_seqno,
+                                             ref_global_seqno);
+
+                // TODO: make it a property of CertIndex
+                min_depends_seqno = min (ref_global_seqno, min_depends_seqno);
             }
             else if (store_keys == true)
             {
@@ -165,7 +171,9 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
             }
         }
     }
-    
+
+    min_depends_seqno--; // notice +1 in initialization
+    last_depends_seqno = max (last_depends_seqno, min_depends_seqno);
     trx->assign_last_depends_seqno(last_depends_seqno);
     assert(trx->get_last_depends_seqno() < trx->get_global_seqno());
     for (TrxHandle::CertKeySet::iterator i = trx->cert_keys_.begin();
