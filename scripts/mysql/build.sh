@@ -173,6 +173,12 @@ then
         tar -xzf $mysql_orig_tar_gz
         cd $mysql_tag/
         patch -p1 -f < $patch_file >/dev/null || :
+	if test -n $(grep LT_PREREQ configure.in 2>/dev/null)
+	then
+	    cat configure.in | \
+		sed -e 's/^LT_PREREQ.*//' -e 's/^LT_INIT/AC_PROG_LIBTOOL/' > configure.in.patch
+	    mv configure.in.patch configure.in
+	fi
         chmod a+x ./BUILD/*wsrep
         CONFIGURE="yes"
     else
