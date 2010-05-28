@@ -305,7 +305,17 @@ fi
 
 if [ "$RELEASE" != "" ]
 then
-    GALERA_RELEASE="galera-$RELEASE-$(uname -m)"
+    tar_arch=""
+    if [ "$CPU" == "pentium" ]
+    then
+        tar_arch="i386"
+    elif [ "$CPU" == "amd64" ]
+    then
+        tar_arch="x86_64"
+    else
+        echo "Unknown CPU type: $CPU"
+    fi
+    GALERA_RELEASE="galera-$RELEASE-$tar_arch"
 else
     GALERA_RELEASE="$MYSQL_REV,$GALERA_REV"
 fi
