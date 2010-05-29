@@ -210,16 +210,13 @@ static inline long while_eagain_or_trx_abort (
     return rcode;
 }
 
-#define GALERA_QUEUE_NAME(queue)                                \
-    ((queue) == cert_queue ? "cert_queue" : "commit_queue")
-
 // the following are made as macros to allow for correct line number reporting
 #define GALERA_GRAB_QUEUE(queue, seqno)                                 \
     {                                                                   \
         long ret = while_eagain (gu_to_grab, queue, seqno);             \
         if (gu_unlikely(ret)) {                                         \
             gu_fatal("Failed to grab %s at %lld: %ld (%s)",             \
-                     GALERA_QUEUE_NAME(queue), seqno, ret, strerror(-ret)); \
+                     #queue, seqno, ret, strerror(-ret));               \
             assert(0);                                                  \
             abort();                                                    \
         }                                                               \
@@ -230,7 +227,7 @@ static inline long while_eagain_or_trx_abort (
         long ret = gu_to_release (queue, seqno);                        \
         if (gu_unlikely(ret)) {                                         \
             gu_fatal("Failed to release %s at %lld: %ld (%s)",          \
-                     GALERA_QUEUE_NAME(queue), seqno, ret, strerror(-ret)); \
+                     #queue, seqno, ret, strerror(-ret));               \
             assert(0);                                                  \
             abort();                                                    \
         }                                                               \
@@ -241,7 +238,7 @@ static inline long while_eagain_or_trx_abort (
         long ret = while_eagain (gu_to_self_cancel, queue, seqno);      \
         if (gu_unlikely(ret)) {                                         \
             gu_fatal("Failed to self-cancel %s at %lld: %ld (%s)",      \
-                     GALERA_QUEUE_NAME(queue), seqno, ret, strerror(-ret)); \
+                     #queue, seqno, ret, strerror(-ret));               \
             assert(0);                                                  \
             abort();                                                    \
         }                                                               \
