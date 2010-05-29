@@ -1600,12 +1600,23 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
 extern "C"
 enum wsrep_status mm_galera_abort_slave_trx(
     wsrep_t *gh, wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno
-    ) {
+    )
+{
     enum wsrep_status ret_code = WSREP_OK;
     int rcode;
-    
-    gu_throw_fatal << "abort slave trx " << bf_seqno << " " << victim_seqno;
-    
+
+    TrxHandle* victim(cert->get_trx(victim_seqno));
+    TrxHandleLock vlock(*victim);
+    TrxHandle* bf(cert->get_trx(bf_seqno));
+    TrxHandleLock block(*victim);
+
+    log_warn << "Trx " << bf << " tries to abort";
+    log_warn << "Trx " << victim;
+    log_warn << "This call is bogus and should be removed from API. See #335";
+    return WSREP_WARNING;
+
+//    gu_throw_fatal << "abort slave trx " << bf_seqno << " " << victim_seqno;
+
     /* take commit mutex to be sure, committing trx does not
      * conflict with us
      */
@@ -1615,8 +1626,6 @@ enum wsrep_status mm_galera_abort_slave_trx(
                  victim_seqno, bf_seqno);
         ret_code = WSREP_WARNING;
     } else {
-        TrxHandle* victim(cert->get_trx(victim_seqno));
-        TrxHandleLock lock(*victim);
         gu_debug("interrupting trx commit: seqno_g %lld seqno_l %lld", 
                  victim_seqno, victim->get_local_seqno());
         

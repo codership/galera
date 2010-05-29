@@ -17,6 +17,7 @@ env.SharedLibrary('mmgalera', [
 env.StaticLibrary('galera++', [
         'mapped_buffer.cpp',
         'write_set.cpp',
+        'trx_handle.cpp',
         'wsdb.cpp',
         'certification.cpp',
         'galera_wsdb.cpp',
@@ -26,6 +27,7 @@ env.StaticLibrary('galera++', [
 env.SharedLibrary('galera++', [
         'mapped_buffer.cpp',
         'write_set.cpp',
+        'trx_handle.cpp',
         'wsdb.cpp',
         'certification.cpp',
         'galera_wsdb.cpp',
