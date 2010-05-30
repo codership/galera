@@ -26,6 +26,8 @@ gcs_sm_create (unsigned long len)
         sm->wait_q_head = 0;
         sm->wait_q_len  = -1; // -n where n is a number of simult. users
         sm->ret         = 0;
+        sm->pause       = false;
+        sm->entered     = false;
         memset (sm->wait_q, 0, sm->wait_q_size * sizeof(gu_cond_t*));
     }
 
@@ -35,6 +37,8 @@ gcs_sm_create (unsigned long len)
 extern long
 gcs_sm_close (gcs_sm_t* sm)
 {
+    gu_info ("Closing send monitor...");
+
     if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
 
     sm->ret = -EBADFD;
@@ -53,6 +57,8 @@ gcs_sm_close (gcs_sm_t* sm)
     sm->wait_q_len--;
 
     gu_mutex_unlock (&sm->lock);
+
+    gu_info ("Closed send monitor.");
 
     return 0;
 }

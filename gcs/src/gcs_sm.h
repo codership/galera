@@ -21,6 +21,8 @@ typedef struct gcs_sm
     unsigned long wait_q_head;
     long          wait_q_len;
     long          ret;
+    bool          pause;
+    bool          entered;
     gu_cond_t*    wait_q[];
 }
 gcs_sm_t;
@@ -37,10 +39,11 @@ gcs_sm_destroy (gcs_sm_t* sm);
 static inline void
 _gcs_sm_leave_unsafe (gcs_sm_t* sm)
 {
+    register bool next = (sm->wait_q_len > 0);
+    sm->wait_q_head = (sm->wait_q_head + next) & sm->wait_q_mask;
     sm->wait_q_len--;
-
-    if (sm->wait_q_len >= 0) {
-        sm->wait_q_head = (sm->wait_q_head + 1) & sm->wait_q_mask;
+    
+    if (sm->wait_q_len >= 0 && !sm->pause) {
         assert (sm->wait_q[sm->wait_q_head] != NULL);
         gu_cond_signal (sm->wait_q[sm->wait_q_head]);
     }
@@ -74,12 +77,17 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond)
 
     sm->wait_q_len++;
 
-    if (sm->wait_q_len > 0 && 0 == sm->ret) {
+    if ((sm->wait_q_len > 0 || sm->pause) && 0 == sm->ret) {
         _gcs_sm_enqueue_unsafe (sm, cond);
     }
 
     ret = sm->ret;
-    if (gu_unlikely(ret)) _gcs_sm_leave_unsafe(sm);
+    if (gu_likely(0 == ret)) {
+        sm->entered = true;
+    }
+    else {
+        _gcs_sm_leave_unsafe(sm);
+    }
 
     gu_mutex_unlock (&sm->lock);
 
@@ -93,7 +101,42 @@ gcs_sm_leave (gcs_sm_t* sm)
 
     _gcs_sm_leave_unsafe(sm);
 
+    sm->entered = false;
+
     gu_mutex_unlock (&sm->lock);
+}
+
+static inline void
+gcs_sm_pause (gcs_sm_t* sm)
+{
+    if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
+
+    sm->pause = true;
+
+    gu_mutex_unlock (&sm->lock);    
+}
+
+static inline void
+gcs_sm_continue (gcs_sm_t* sm)
+{
+    if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
+
+    if (gu_likely(sm->pause)) {
+
+        sm->pause = false;
+
+        if (!sm->entered && sm->wait_q_len >= 0) {
+            // there's no one to leave the monitor and signal the rest
+            assert (sm->wait_q[sm->wait_q_head] != NULL);
+            gu_cond_signal (sm->wait_q[sm->wait_q_head]);
+        }
+    }
+    else {
+        gu_debug ("Trying to continue unpaused monitor");
+        assert(0);
+    }
+
+    gu_mutex_unlock (&sm->lock);    
 }
 
 #endif /* _gcs_sm_h_ */
