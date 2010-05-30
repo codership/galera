@@ -6,26 +6,28 @@ gcs_tests_env = check_env.Clone()
 gcs_tests_sources = Split('''
                              gcs_tests.c
                              gcs_fifo_test.c
-	                     ../gcs_fifo_lite.c
-	                     gcs_comp_test.c
-	                     ../gcs_comp_msg.c
-	                     gcs_state_msg_test.c
-	                     ../gcs_state_msg.c
-	                     gcs_backend_test.c
-	                     ../gcs_backend.c
-	                     gcs_proto_test.c
-	                     ../gcs_act_proto.c
-	                     gcs_defrag_test.c
-	                     ../gcs_defrag.c
-	                     gcs_node_test.c
+                             ../gcs_fifo_lite.c
+                             gcs_sm_test.c
+                             ../gcs_sm.c
+                             gcs_comp_test.c
+                             ../gcs_comp_msg.c
+                             gcs_state_msg_test.c
+                             ../gcs_state_msg.c
+                             gcs_backend_test.c
+                             ../gcs_backend.c
+                             gcs_proto_test.c
+                             ../gcs_act_proto.c
+                             gcs_defrag_test.c
+                             ../gcs_defrag.c
+                             gcs_node_test.c
                              ../gcs_node.c
-	                     gcs_group_test.c
-	                     ../gcs_group.c
-	                     gcs_core_test.c
-	                     ../gcs_core.c
-	                     ../gcs_dummy.c
-	                     ../gcs_msg_type.c
-	                     ../gcs.c
+                             gcs_group_test.c
+                             ../gcs_group.c
+                             gcs_core_test.c
+                             ../gcs_core.c
+                             ../gcs_dummy.c
+                             ../gcs_msg_type.c
+                             ../gcs.c
                           ''')
 
 
@@ -37,6 +39,6 @@ gcs_tests_env.Prepend(LIBS = Split('''
                                       m
                                    '''))
 gcs_tests_env.Program(target = 'gcs_tests',
-                      source = gcs_tests_sources, 
+                      source = gcs_tests_sources,
                       OBJPREFIX = 'gcs-tests-')
 

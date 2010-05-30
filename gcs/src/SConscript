@@ -17,6 +17,7 @@ libgcs_sources = Split('''
                           gcs_fifo_lite.c
                           gcs_msg_type.c
                           gcs_comp_msg.c
+                          gcs_sm.c
                           gcs_backend.c
                           gcs_dummy.c
                           gcs_act_proto.c

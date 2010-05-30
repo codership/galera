@@ -661,10 +661,12 @@ static inline void report_last_committed (
 
 static inline void truncate_trx_history (gcs_seqno_t seqno)
 {
-    static long const truncate_interval = 100;
+    static long const truncate_interval = 64;
+    static long const truncate_offset   = 32;
     static gcs_seqno_t last_truncated = 0;
 
-    if (last_truncated + truncate_interval < seqno) {
+    if (last_truncated + truncate_interval + truncate_offset < seqno) {
+        seqno -= truncate_offset; // avoid purging too much
         gu_debug ("Purging history up to %llu", seqno);
         cert->purge_trxs_upto(seqno);
         last_truncated = seqno;
