@@ -39,7 +39,7 @@ _gcs_sm_leave_unsafe (gcs_sm_t* sm)
 {
     sm->wait_q_len--;
 
-    if (sm->wait_q_len > 0) {
+    if (sm->wait_q_len >= 0) {
         sm->wait_q_head = (sm->wait_q_head + 1) & sm->wait_q_mask;
         assert (sm->wait_q[sm->wait_q_head] != NULL);
         gu_cond_signal (sm->wait_q[sm->wait_q_head]);

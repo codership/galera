@@ -52,7 +52,6 @@ START_TEST (gcs_sm_test_close)
     gu_cond_init (&cond, NULL);
 
     int ret = gcs_sm_enter(sm, &cond);
-    gu_cond_destroy(&cond);
     fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
     fail_if(order != 0);
 
@@ -62,6 +61,8 @@ START_TEST (gcs_sm_test_close)
     sleep(1);
     order = 2;
     gcs_sm_leave(sm);
+
+    gu_cond_destroy(&cond);
 }
 END_TEST
 
