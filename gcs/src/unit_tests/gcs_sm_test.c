@@ -12,11 +12,11 @@ START_TEST (gcs_sm_test_basic)
     gcs_sm_t* sm = gcs_sm_create(4);
     fail_if(!sm);
 
-    pthread_cond_t cond;
-    pthread_cond_init (&cond, NULL);
+    gu_cond_t cond;
+    gu_cond_init (&cond, NULL);
 
     int ret = gcs_sm_enter(sm, &cond);
-    pthread_cond_destroy(&cond);
+    gu_cond_destroy(&cond);
     fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
 
     gcs_sm_leave(sm);
@@ -48,17 +48,17 @@ START_TEST (gcs_sm_test_close)
     gcs_sm_t* sm = gcs_sm_create(4);
     fail_if(!sm);
 
-    pthread_cond_t cond;
-    pthread_cond_init (&cond, NULL);
+    gu_cond_t cond;
+    gu_cond_init (&cond, NULL);
 
     int ret = gcs_sm_enter(sm, &cond);
-    pthread_cond_destroy(&cond);
+    gu_cond_destroy(&cond);
     fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
     fail_if(order != 0);
 
     order = 1;
-    pthread_t tmp;
-    pthread_create (&tmp, NULL, closing_thread, sm);
+    gu_thread_t tmp;
+    gu_thread_create (&tmp, NULL, closing_thread, sm);
     sleep(1);
     order = 2;
     gcs_sm_leave(sm);

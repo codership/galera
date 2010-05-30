@@ -12,17 +12,16 @@
 #define _gcs_sm_h_
 
 #include <galerautils.h>
-#include <pthread.h>
 
 typedef struct gcs_sm
 {
-    pthread_mutex_t lock;
-    unsigned long   wait_q_size;
-    unsigned long   wait_q_mask;
-    unsigned long   wait_q_head;
-    long            wait_q_len;
-    long            ret;
-    pthread_cond_t* wait_q[];
+    gu_mutex_t    lock;
+    unsigned long wait_q_size;
+    unsigned long wait_q_mask;
+    unsigned long wait_q_head;
+    long          wait_q_len;
+    long          ret;
+    gu_cond_t*    wait_q[];
 }
 gcs_sm_t;
 
@@ -43,18 +42,18 @@ _gcs_sm_leave_unsafe (gcs_sm_t* sm)
     if (sm->wait_q_len > 0) {
         sm->wait_q_head = (sm->wait_q_head + 1) & sm->wait_q_mask;
         assert (sm->wait_q[sm->wait_q_head] != NULL);
-        pthread_cond_signal (sm->wait_q[sm->wait_q_head]);
+        gu_cond_signal (sm->wait_q[sm->wait_q_head]);
     }
 }
 
 static inline void
-_gcs_sm_enqueue_unsafe (gcs_sm_t* sm, pthread_cond_t* cond)
+_gcs_sm_enqueue_unsafe (gcs_sm_t* sm, gu_cond_t* cond)
 {
     unsigned long tail =
         (sm->wait_q_head + sm->wait_q_len) & sm->wait_q_mask;
 
     sm->wait_q[tail] = cond;
-    pthread_cond_wait (cond, &sm->lock);
+    gu_cond_wait (cond, &sm->lock);
     assert(tail == sm->wait_q_head);
     assert(sm->wait_q[tail] == cond);
     sm->wait_q[tail] = NULL;
@@ -67,7 +66,7 @@ _gcs_sm_enqueue_unsafe (gcs_sm_t* sm, pthread_cond_t* cond)
  * @param cond condition to signal to wake up thread in case of wait
  */
 static inline long
-gcs_sm_enter (gcs_sm_t* sm, pthread_cond_t* cond)
+gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond)
 {
     long ret;
 
