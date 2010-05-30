@@ -691,6 +691,14 @@ gcs_handle_actions (gcs_conn_t*                conn,
         }
 //        gu_info ("RECEIVED %s", fc->stop ? "STOP" : "CONT");
         conn->stop_count += ((fc->stop != 0) << 1) - 1; // +1 if !0, -1 if 0
+#ifdef GCS_USE_SM
+        if (1 == conn->stop_count) {
+            gcs_sm_pause (conn->sm);    // first STOP request
+        }
+        else if (0 == conn->stop_count) {
+            gcs_sm_continue (conn->sm); // last CONT request
+        }
+#endif /* GCS_USE_SM */
         break;
     }
     case GCS_ACT_CONF:
