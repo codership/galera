@@ -111,9 +111,21 @@ gcs_sm_pause (gcs_sm_t* sm)
 {
     if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
 
-    sm->pause = true;
+    sm->pause = (sm->ret == 0); // don't pause closed monitor
 
     gu_mutex_unlock (&sm->lock);    
+}
+
+static inline void
+_gcs_sm_continue_unsafe (gcs_sm_t* sm)
+{
+    sm->pause = false;
+
+    if (!sm->entered && sm->wait_q_len >= 0) {
+        // there's no one to leave the monitor and signal the rest
+        assert (sm->wait_q[sm->wait_q_head] != NULL);
+        gu_cond_signal (sm->wait_q[sm->wait_q_head]);
+    }
 }
 
 static inline void
@@ -122,14 +134,7 @@ gcs_sm_continue (gcs_sm_t* sm)
     if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
 
     if (gu_likely(sm->pause)) {
-
-        sm->pause = false;
-
-        if (!sm->entered && sm->wait_q_len >= 0) {
-            // there's no one to leave the monitor and signal the rest
-            assert (sm->wait_q[sm->wait_q_head] != NULL);
-            gu_cond_signal (sm->wait_q[sm->wait_q_head]);
-        }
+        _gcs_sm_continue_unsafe (sm);
     }
     else {
         gu_debug ("Trying to continue unpaused monitor");

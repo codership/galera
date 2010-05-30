@@ -41,7 +41,13 @@ gcs_sm_close (gcs_sm_t* sm)
 
     if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
 
-    sm->ret = -EBADFD;
+    sm->ret   = -EBADFD;
+
+    if (sm->pause) {
+        sm->pause = false;
+
+        if (!sm->entered) _gcs_sm_continue_unsafe (sm);
+    }
 
     sm->wait_q_len++;
 
