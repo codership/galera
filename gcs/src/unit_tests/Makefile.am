@@ -9,6 +9,9 @@ gcs_tests_SOURCES =           \
 	gcs_fifo_test.c       \
 	gcs_fifo_test.h       \
 	../gcs_fifo_lite.c    \
+	gcs_sm_test.c         \
+	gcs_sm_test.h         \
+	../gcs_sm.c           \
 	gcs_comp_test.c       \
 	gcs_comp_test.h       \
 	../gcs_comp_msg.c     \

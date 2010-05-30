@@ -15,6 +15,7 @@ endif
 
 GCS_SRCS = \
 	gcs_conf.c      \
+	gcs_sm.c        \
 	gcs_fifo_lite.c \
 	gcs_msg_type.c  \
 	gcs_comp_msg.c  \
@@ -28,6 +29,7 @@ GCS_SRCS = \
 	gcs_core.c      \
 	gcs.c           \
 \
+	gcs_act.h       \
 	gcs_act_proto.h \
 	gcs_backend.h   \
 	gcs_comp_msg.h  \
@@ -39,9 +41,9 @@ GCS_SRCS = \
 	gcs_group.h     \
 	gcs_msg_type.h  \
 	gcs_node.h      \
-	gcs_act.h       \
 	gcs_recv_msg.h  \
 	gcs_seqno.h     \
+	gcs_sm.h        \
 	gcs_state_msg.h
 
 if WITH_SPREAD
@@ -64,7 +66,7 @@ include_HEADERS   = gcs.h
 lib_LTLIBRARIES   = libgcs.la
 libgcs_la_SOURCES = $(GCS_SRCS)
 INTERFACE = 16
-REVISION  = 0
+REVISION  = 1
 AGE       = 1
 libgcs_la_LDFLAGS = \
 	-version-info $(INTERFACE):$(REVISION):$(AGE)
