@@ -3,7 +3,7 @@
  *
  * $Id$
  */
- 
+
 /*!
  * @file gcs.c Public GCS API
  */
@@ -46,7 +46,7 @@ typedef struct gcs_conn gcs_conn_t;
 extern gcs_conn_t*
 gcs_create  (const char* node_name, const char* inc_addr);
 
-/*! @brief Initialize group history values (optional). 
+/*! @brief Initialize group history values (optional).
  * Serves to provide group history persistence after process restart (in case
  * these data were saved somewhere on persistent storage or the like). If these
  * values are provided, it is only a hint for the group, as they might be
@@ -109,7 +109,7 @@ extern long gcs_destroy (gcs_conn_t *conn);
 extern long gcs_wait (gcs_conn_t *conn);
 
 /*! @brief Returns length of the action queue (unread actions)
- * 
+ *
  * @return length of the action queue or negative error code
  */
 extern long gcs_queue_len (gcs_conn_t *conn);
@@ -164,11 +164,13 @@ extern const char* gcs_act_type_to_str(gcs_act_type_t);
  * @param conn opened connection
  * @param act_type action type
  * @param act_size action size
+ * @param scheduled whether the call was preceded by gcs_schedule()
  * @param action action buffer
  * @return negative error code, action size in case of success
  */
 extern long gcs_send (gcs_conn_t          *conn,
                       const void          *action,
+                      bool                 scheduled,
                       const size_t         act_size,
                       const gcs_act_type_t act_type);
 
@@ -180,7 +182,7 @@ extern long gcs_send (gcs_conn_t          *conn,
  * of the application for the state snapshot purposes. Local action ID is a
  * monotonic gapless number sequence starting with 1 which can be used
  * to serialize access to critical sections.
- * 
+ *
  * @param conn opened connection to group
  * @param act_type action type
  * @param act_size action size

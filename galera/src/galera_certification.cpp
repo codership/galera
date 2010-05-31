@@ -191,6 +191,7 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
         ++n_certified_;
         deps_dist_ += (trx->get_global_seqno() - trx->get_last_depends_seqno());
     }
+
     return WSDB_OK;
 
 cert_fail:
@@ -332,7 +333,6 @@ int galera::GaleraCertification::test(TrxHandle* trx, bool bval)
 {
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
 
-
     if (bval == true)
     {
         // optimistic guess, cert test may adjust this to tighter value
@@ -428,4 +428,3 @@ galera::TrxHandle* galera::GaleraCertification::get_trx(wsrep_seqno_t seqno)
     }
     return i->second;
 }
-

@@ -70,7 +70,7 @@ typedef enum
     GCS_CONN_JOINED,   // state transfer complete
     GCS_CONN_DONOR,    // in state transfer, donor
     GCS_CONN_JOINER,   // in state transfer, joiner
-    GCS_CONN_PRIMARY,  // in primary conf, needs state transfer   
+    GCS_CONN_PRIMARY,  // in primary conf, needs state transfer
     GCS_CONN_OPEN,     // just connected to group, non-primary
     GCS_CONN_CLOSED,
     GCS_CONN_DESTROYED,
@@ -604,7 +604,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     const gcs_conn_state_t old_state = conn->state;
     switch (conf->my_state) {
     case GCS_NODE_STATE_PRIM:   gcs_become_primary(conn);      return;
-        /* Below are not real state transitions, rather state recovery, 
+        /* Below are not real state transitions, rather state recovery,
          * so bypassing state transition matrix */
     case GCS_NODE_STATE_JOINER: conn->state = GCS_CONN_JOINER; break;
     case GCS_NODE_STATE_DONOR:  conn->state = GCS_CONN_DONOR;  break;
@@ -707,7 +707,7 @@ gcs_handle_actions (gcs_conn_t*                conn,
         break;
     case GCS_ACT_STATE_REQ:
         ret = gcs_handle_act_state_req (conn, rcvd);
-        break; 
+        break;
     case GCS_ACT_JOIN:
         ret = gcs_handle_state_change (conn, &rcvd->act);
         gcs_become_joined (conn);
@@ -801,7 +801,7 @@ static void *gcs_recv_thread (void *arg)
             (repl_act_ptr = gcs_fifo_lite_get_head (conn->repl_q)) &&
             (gu_likely ((*repl_act_ptr)->action == rcvd.act.buf)   ||
              /* at this point repl_q is locked and we need to unlock it and
-              * return false to fall to the 'else' branch; unlikely case */ 
+              * return false to fall to the 'else' branch; unlikely case */
              (gcs_fifo_lite_release (conn->repl_q), false)))
         {
             /* local action from repl_q */
@@ -827,7 +827,7 @@ static void *gcs_recv_thread (void *arg)
 
                 recv_act->rcvd     = rcvd;
                 recv_act->local_id = this_act_id;
-  
+
                 conn->queue_len = gu_fifo_length (conn->recv_q) + 1;
                 bool send_stop  = gcs_fc_stop_begin (conn);
 
@@ -1082,6 +1082,7 @@ long gcs_destroy (gcs_conn_t *conn)
 /* Puts action in the send queue and returns */
 long gcs_send (gcs_conn_t*          conn,
                const void*          action,
+               const bool           scheduled,
                const size_t         act_size,
                const gcs_act_type_t act_type)
 {
@@ -1093,10 +1094,10 @@ long gcs_send (gcs_conn_t*          conn,
 #ifdef GCS_USE_SM
     gu_cond_t tmp_cond;
     gu_cond_init (&tmp_cond, NULL);
-    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, false))) {
+    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, scheduled))) {
 #else
     if (!(ret = gu_mutex_lock (&conn->lock))) {
-#endif /* GCS_USE_SM */ 
+#endif /* GCS_USE_SM */
         if (GCS_CONN_OPEN >= conn->state) {
             /* need to make a copy of the action, since receiving thread
              * has no way of knowing that it shares this buffer.

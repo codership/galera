@@ -27,7 +27,7 @@
 
 #define gcs_malloc(a) ((a*) malloc (sizeof (a)))
 
-static pthread_mutex_t gcs_test_lock = PTHREAD_MUTEX_INITIALIZER; 
+static pthread_mutex_t gcs_test_lock = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct gcs_test_log
 {
@@ -125,7 +125,7 @@ static long gcs_test_thread_pool_create (gcs_test_thread_pool_t *pool,
     {
 	error (0, errno,
 	       "Failed to allocate %ld thread objects", n_threads);
-	err = errno; 
+	err = errno;
 	goto out1;
     }
 
@@ -203,7 +203,7 @@ test_log_open (gcs_test_log_t **log, const char *name)
     gcs_test_log_t *l = gcs_malloc (gcs_test_log_t);
 
     if (!l) return errno;
-    
+
     snprintf (real_name, 1024, "%s.%d", name, getpid());
     if (!(l->file = fopen (real_name, "w"))) return errno;
     pthread_mutex_init (&l->lock, NULL);
@@ -216,7 +216,7 @@ test_log_close (gcs_test_log_t **log)
 {
     long err = 0;
     gcs_test_log_t *l = *log;
-    
+
     if (l)
     {
 	pthread_mutex_lock (&l->lock);
@@ -328,7 +328,7 @@ test_before_send (gcs_test_thread_t* thread)
     /* create a message */
     thread->msg_len = test_make_msg (thread->msg, msg_len);
     if (thread->msg_len <= 0) return -1;
-    
+
     if (!throughput) {
         /* log message before replication */
         ret = test_send_log_create (thread);
@@ -415,10 +415,11 @@ void *gcs_test_send (void *arg)
     {
         ret = test_before_send (thread);
         if (ret < 0) break;
-	
+
 	/* send message to group */
 	ret = gcs_send (gcs,
                         thread->msg,
+                        false,
                         thread->msg_len,
                         GCS_ACT_TORDERED);
         if (ret < 0) break;
@@ -454,7 +455,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
             fprintf (stdout, "Gap in configurations: ours: %lld, group: %lld.\n",
                      (long long)conf_id, (long long)conf->conf_id);
             fflush (stdout);
-            
+
             fprintf (stdout, "Requesting state transfer up to %lld: %s\n",
                      (long long)conf->seqno, // this is global seqno
                      strerror (-gcs_request_state_transfer (gcs, &conf->seqno,
@@ -487,8 +488,8 @@ void *gcs_test_recv (void *arg)
     while (thread->n_tries)
     {
         /*
-         * gcs_recv() allocates memory for new messages, thread_create() 
-         * pre-allocates thread->msg, so free() and set to NULL before 
+         * gcs_recv() allocates memory for new messages, thread_create()
+         * pre-allocates thread->msg, so free() and set to NULL before
          * passing to gcs_recv()
          */
         free(thread->msg);
@@ -584,7 +585,7 @@ static long gcs_test_thread_pool_start (gcs_test_thread_pool_t *pool)
 	    break;
     }
     pool->n_started = i;
-    
+
     printf ("Started %ld threads of %s type (pool: %p)\n",
             pool->n_started,
 	     GCS_TEST_REPL == pool->type ? "REPL" :
@@ -668,7 +669,7 @@ static long gcs_test_conf (gcs_test_conf_t *conf, long argc, char *argv[])
     default:
 	break;
     }
-    
+
     printf ("Config: n_tries = %ld, n_repl = %ld, n_send = %ld, n_recv = %ld, "
             "backend = %s\n",
 	    conf->n_tries, conf->n_repl, conf->n_send, conf->n_recv,
@@ -709,7 +710,7 @@ int main (int argc, char *argv[])
     to = gu_to_create ((conf.n_repl + conf.n_recv + 1)*2, GCS_SEQNO_FIRST);
     if (!to) goto out;
 //    total_tries = conf.n_tries * (conf.n_repl + conf.n_send);
-    
+
     printf ("Opening connection: channel = %s, backend = %s\n",
              channel, conf.backend);
 
@@ -719,7 +720,7 @@ int main (int argc, char *argv[])
     printf ("Connected\n");
 
     msg_len = 1300;
-    if (msg_len > MAX_MSG_LEN) msg_len = MAX_MSG_LEN; 
+    if (msg_len > MAX_MSG_LEN) msg_len = MAX_MSG_LEN;
     gcs_conf_set_pkt_size (gcs, 7570); // to test fragmentation
 
     if ((err = gcs_test_thread_pool_create
@@ -770,9 +771,9 @@ int main (int argc, char *argv[])
             0.000001*t_end.tv_usec - 0.000001*t_begin.tv_usec;
 
         printf ("Actions sent:       ");
-        test_print_stat (msg_sent, size_sent, interval); 
+        test_print_stat (msg_sent, size_sent, interval);
         printf ("Actions received:   ");
-        test_print_stat (msg_recvd, size_recvd, interval); 
+        test_print_stat (msg_recvd, size_recvd, interval);
         printf ("Actions replicated: ");
         test_print_stat (msg_repld, size_repld, interval);
         puts("---------------------------------------------------------------");
