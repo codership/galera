@@ -226,7 +226,7 @@ namespace galera
             }
             else
             {
-                log_info << "cancel, applier state " << appliers_[idx].state_;
+                log_debug << "cancel, applier state " << appliers_[idx].state_;
             }
         }
 

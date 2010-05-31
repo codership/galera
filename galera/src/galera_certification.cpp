@@ -176,21 +176,26 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
         }
     }
 
-    trx->assign_last_depends_seqno(max(min_depends_seqno, max_depends_seqno));
-    assert(trx->get_last_depends_seqno() < trx->get_global_seqno());
-    for (TrxHandle::CertKeySet::iterator i = trx->cert_keys_.begin();
-         i != trx->cert_keys_.end(); ++i)
+    if (store_keys == true)
     {
-        (*i)->ref(trx);
-    }
+        trx->assign_last_depends_seqno(max(min_depends_seqno,
+                                           max_depends_seqno));
+        assert(trx->get_last_depends_seqno() < trx->get_global_seqno());
+        for (TrxHandle::CertKeySet::iterator i = trx->cert_keys_.begin();
+             i != trx->cert_keys_.end(); ++i)
+        {
+            (*i)->ref(trx);
+        }
 
-    trx->set_certified();
-    ++n_certified_;
-    deps_dist_ += (trx->get_global_seqno() - trx->get_last_depends_seqno());
+        trx->set_certified();
+        ++n_certified_;
+        deps_dist_ += (trx->get_global_seqno() - trx->get_last_depends_seqno());
+    }
     return WSDB_OK;
 
 cert_fail:
     purge_for_trx(trx);
+    trx->assign_last_depends_seqno(-1);
     return WSDB_CERTIFICATION_FAIL;
 }
 
@@ -304,10 +309,20 @@ int galera::GaleraCertification::append_trx(TrxHandle* trx)
 
     const int retval(test(trx));
 
-    Lock lock(mutex_);
-    deps_set_.insert(trx->get_last_seen_seqno());
-    assert(deps_set_.size() <= trx_map_.size());
-    assert(trx->get_last_depends_seqno() >= trx->get_last_seen_seqno());
+    if (trx->get_last_depends_seqno() > -1)
+    {
+        Lock lock(mutex_);
+        deps_set_.insert(trx->get_last_seen_seqno());
+        assert(deps_set_.size() <= trx_map_.size());
+        // assert(trx->get_last_depends_seqno() >= trx->get_last_seen_seqno());
+    }
+    else
+    {
+        // we cleanup here so that caller can just forget about the trx
+        assert(retval != WSDB_OK);
+        trx->set_committed();
+        trx->clear();
+    }
 
     return retval;
 }
@@ -317,9 +332,12 @@ int galera::GaleraCertification::test(TrxHandle* trx, bool bval)
 {
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
 
-    // optimistic guess, cert test may adjust this to tighter value
-    trx->assign_last_depends_seqno(trx->get_last_seen_seqno());
 
+    if (bval == true)
+    {
+        // optimistic guess, cert test may adjust this to tighter value
+        trx->assign_last_depends_seqno(trx->get_last_seen_seqno());
+    }
     switch (role_)
     {
     case R_BYPASS:
@@ -382,7 +400,10 @@ void galera::GaleraCertification::set_trx_committed(TrxHandle* trx)
 {
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
 
+    if (trx->get_last_depends_seqno() > -1)
     {
+        // trxs with last_depends_seqno == -1 haven't gone through
+        // append_trx
         Lock lock(mutex_);
         DepsSet::iterator i(deps_set_.find(trx->get_last_seen_seqno()));
         assert(i != deps_set_.end());
@@ -391,9 +412,9 @@ void galera::GaleraCertification::set_trx_committed(TrxHandle* trx)
             safe_to_discard_seqno_ = *i;
         }
         deps_set_.erase(i);
-        trx->set_committed();
     }
 
+    trx->set_committed();
     trx->clear();
 }
 

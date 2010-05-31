@@ -43,9 +43,9 @@ namespace galera
             global_seqno_      (WSREP_SEQNO_UNDEFINED),
             last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
             last_depends_seqno_(WSREP_SEQNO_UNDEFINED),
-            refcnt_            (1),            
-            write_set_(source_id, conn_id, trx_id, 
-                      (conn_id == static_cast<wsrep_conn_id_t>(-1) ? 
+            refcnt_            (1),
+            write_set_(source_id, conn_id, trx_id,
+                      (conn_id == static_cast<wsrep_conn_id_t>(-1) ?
                        WSDB_WS_TYPE_TRX : WSDB_WS_TYPE_CONN)),
             write_set_flags_   (0),
             write_set_type_    (),
@@ -73,7 +73,7 @@ namespace galera
 
         bool is_committed() const { return committed_; }
         void set_committed() { committed_ = true; }
-        
+
         void assign_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g)
 
         {

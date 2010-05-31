@@ -1498,7 +1498,7 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
 
     TrxHandleLock lock(*victim);
 
-    gu_info("abort_pre_commit trx state: %d seqno: %lld trx %lld bf_seqno %lld",
+    gu_debug("abort_pre_commit trx state: %d seqno: %lld trx %lld bf_seqno %lld",
             victim->get_state(), victim->get_local_seqno(), victim_trx, bf_seqno);
 
     /* continue to kill the victim */
