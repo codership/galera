@@ -38,6 +38,8 @@ struct galera_status
     gcs_seqno_t  local_replays;      //!< number of local trx replays
     gcs_seqno_t  fc_waits;           //!< how many times had to wait for FC
     double       cert_deps_dist;     //!< avg distance between cert dependencies
+    double       apply_oooe;
+    double       apply_oool;
     galera_stage_t stage;            //!< operational stage (see above)
 };
 

@@ -36,6 +36,8 @@ enum status_vars
     STATUS_LOCAL_SLAVE_QUEUE,
     STATUS_FC_WAITS,
     STATUS_CERT_DEPS_DISTANCE,
+    STATUS_APPLY_OOOE,
+    STATUS_APPLY_OOOL,
     STATUS_LOCAL_STATUS,
     STATUS_LOCAL_STATUS_COMMENT,
     STATUS_MAX
@@ -56,6 +58,8 @@ static struct wsrep_status_var wsrep_status[STATUS_MAX + 1] =
     {"local_slave_queue",   WSREP_STATUS_INT64,  { 0 }                      },
     {"flow_control_waits",  WSREP_STATUS_INT64,  { 0 }                      },
     {"cert_deps_distance",  WSREP_STATUS_DOUBLE, { .0}                      },
+    {"apply_oooe",          WSREP_STATUS_DOUBLE, { .0}                      },
+    {"apply_oool",          WSREP_STATUS_DOUBLE, { .0}                      },
     {"local_status",        WSREP_STATUS_INT64,  { 0 }                      },
     {"local_status_comment",WSREP_STATUS_STRING, { 0 }                      },
     {NULL, 0, { 0 }}
@@ -110,6 +114,8 @@ galera_status_get (const struct galera_status* s)
         galera_slave_queue();
     wsrep_status[STATUS_FC_WAITS           ].value._int64 = s->fc_waits;
     wsrep_status[STATUS_CERT_DEPS_DISTANCE ].value._double = s->cert_deps_dist;
+    wsrep_status[STATUS_APPLY_OOOE         ].value._double = s->apply_oooe;
+    wsrep_status[STATUS_APPLY_OOOL         ].value._double = s->apply_oool;
     wsrep_status[STATUS_LOCAL_STATUS       ].value._int64 =
         stage2status(s->stage);
     wsrep_status[STATUS_LOCAL_STATUS_COMMENT].value._string = 

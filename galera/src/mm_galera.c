@@ -50,7 +50,7 @@ static struct galera_status status =
 {
     { { 0 } },
     WSREP_SEQNO_UNDEFINED,
-    0, 0, 0, 0, 0, 0, 0, 0, .0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, .0, .0, .0, 0,
     GALERA_STAGE_INIT
 };
 

@@ -12,16 +12,16 @@ using namespace std;
 using namespace gu;
 
 galera::GaleraWsdb::GaleraWsdb()
-    : 
-    trx_map_(), 
-    conn_map_(), 
-    mutex_() 
+    :
+    trx_map_(),
+    conn_map_(),
+    mutex_()
 {
 }
 
 galera::GaleraWsdb::~GaleraWsdb()
-{    
-    log_info << "wsdb trx map usage " << trx_map_.size() 
+{
+    log_info << "wsdb trx map usage " << trx_map_.size()
              << " conn query map usage " << conn_map_.size();
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
 }
@@ -35,7 +35,7 @@ ostream& galera::GaleraWsdb::operator<<(ostream& os) const
         os << i->first << " ";
     }
     os << "\n conn query map: ";
-    for (ConnMap::const_iterator i = conn_map_.begin(); 
+    for (ConnMap::const_iterator i = conn_map_.begin();
          i != conn_map_.end();
          ++i)
     {
@@ -46,11 +46,11 @@ ostream& galera::GaleraWsdb::operator<<(ostream& os) const
 }
 
 galera::TrxHandle*
-galera::GaleraWsdb::create_trx(const wsrep_uuid_t& source_id, 
+galera::GaleraWsdb::create_trx(const wsrep_uuid_t& source_id,
                                wsrep_trx_id_t trx_id)
 {
     pair<TrxMap::iterator, bool> i = trx_map_.insert(
-        make_pair(trx_id, 
+        make_pair(trx_id,
                   new TrxHandle(source_id, -1, trx_id, true)));
     if (i.second == false)
         gu_throw_fatal;
@@ -70,7 +70,7 @@ galera::GaleraWsdb::create_conn(wsrep_conn_id_t conn_id)
 
 galera::TrxHandle*
 galera::GaleraWsdb::get_trx(const wsrep_uuid_t& source_id,
-                            wsrep_trx_id_t trx_id, 
+                            wsrep_trx_id_t trx_id,
                             bool create)
 {
     Lock lock(mutex_);
@@ -89,14 +89,14 @@ galera::GaleraWsdb::get_trx(const wsrep_uuid_t& source_id,
     return i->second;
 }
 
-galera::TrxHandle* 
+galera::TrxHandle*
 galera::GaleraWsdb::get_conn_query(const wsrep_uuid_t& source_id,
-                                   wsrep_trx_id_t conn_id, 
+                                   wsrep_trx_id_t conn_id,
                                    bool create)
 {
     Lock lock(mutex_);
     ConnMap::iterator i;
-    
+
     if ((i = conn_map_.find(conn_id)) == conn_map_.end())
     {
         if (create == true)
@@ -157,12 +157,12 @@ void galera::GaleraWsdb::create_write_set(TrxHandle* trx,
                                           const void* rbr_data,
                                           size_t rbr_data_len)
 {
-    
+
     if (rbr_data != 0 && rbr_data_len > 0)
     {
         trx->get_write_set().append_data(rbr_data, rbr_data_len);
     }
-    
+
     if (trx->get_write_set().get_queries().empty() == false)
     {
         ConnMap::const_iterator i(conn_map_.find(trx->get_conn_id()));
@@ -180,7 +180,7 @@ void galera::GaleraWsdb::create_write_set(TrxHandle* trx,
 
 void galera::GaleraWsdb::append_query(TrxHandle* trx,
                                       const void* query,
-                                      size_t query_len, 
+                                      size_t query_len,
                                       time_t t,
                                       uint32_t rnd)
 {
@@ -197,13 +197,13 @@ void galera::GaleraWsdb::append_conn_query(TrxHandle* trx,
 
 
 void galera::GaleraWsdb::append_row_key(TrxHandle* trx,
-                                        const void* dbtable, 
+                                        const void* dbtable,
                                         size_t dbtable_len,
-                                        const void* key, 
+                                        const void* key,
                                         size_t key_len,
                                         int action)
 {
-    trx->get_write_set().append_row_key(dbtable, dbtable_len, 
+    trx->get_write_set().append_row_key(dbtable, dbtable_len,
                                         key, key_len, action);
 }
 
@@ -240,7 +240,7 @@ void galera::GaleraWsdb::set_conn_database(TrxHandle* trx,
 void galera::GaleraWsdb::flush_trx(TrxHandle* trx, bool force)
 {
     WriteSet& ws(trx->get_write_set());
-    if (ws.get_key_buf().size() + ws.get_data().size() 
+    if (ws.get_key_buf().size() + ws.get_data().size()
         >= trx_mem_limit_ || force == true)
     {
         trx->assign_last_seen_seqno(ws.get_last_seen_trx());

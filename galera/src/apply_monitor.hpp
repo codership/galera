@@ -67,13 +67,13 @@ namespace galera
             oool_(0)
         { }
 
-        ~Monitor() 
-        { 
+        ~Monitor()
+        {
             if (entered_ > 0)
             {
                 log_info << "apply mon: entered " << entered_
-                         << " oooe fraction " << double(oooe_)/entered_ 
-                         << " oool fraction " << double(oool_)/entered_; 
+                         << " oooe fraction " << double(oooe_)/entered_
+                         << " oool fraction " << double(oool_)/entered_;
             }
             else
             {
@@ -97,14 +97,14 @@ namespace galera
             wsrep_seqno_t trx_seqno(trx->get_global_seqno());
             size_t        idx(indexof(trx_seqno));
             gu::Lock      lock(mutex_);
-            
+
             pre_enter(trx, lock, idx);
-            
+
             if (appliers_[idx].state_ ==  Applier::S_CANCELED)
             {
                 return -ECANCELED;
             }
-            
+
             appliers_[idx].state_ = Applier::S_WAITING;
             appliers_[idx].trx_   = trx;
 
@@ -118,12 +118,12 @@ namespace galera
                     return -ECANCELED;
                 }
             }
-            
+
             appliers_[idx].state_ = Applier::S_APPLYING;
 
             ++entered_;
             oooe_ += (last_left_ + 1 < trx_seqno);
-            
+
             return 0;
         }
 
@@ -172,7 +172,7 @@ namespace galera
                 }
             }
 
-            for (wsrep_seqno_t i = prev_last_left + 1; 
+            for (wsrep_seqno_t i = prev_last_left + 1;
                  n_waiters > 0 && i <= last_entered_; ++i)
             {
                 Applier& a(appliers_[indexof(i)]);
@@ -188,7 +188,7 @@ namespace galera
             appliers_[idx].trx_ = 0;
 
             assert(n_waiters == 0);
-            assert((last_left_ >= trx_seqno && 
+            assert((last_left_ >= trx_seqno &&
                     appliers_[idx].state_ == Applier::S_IDLE) ||
                    appliers_[idx].state_ == Applier::S_FINISHED);
             assert(last_left_ != last_entered_ ||
@@ -230,6 +230,14 @@ namespace galera
             }
         }
 
+        std::pair<double, double> get_ooo_stats() const
+        {
+            gu::Lock lock(mutex_);
+            double oooe(entered_ == 0 ? .0 : double(oooe_)/entered_);
+            double oool(entered_ == 0 ? .0 : double(oool_)/entered_);
+            return std::make_pair(oooe, oool);
+        }
+
     private:
 
         size_t indexof(wsrep_seqno_t seqno)
@@ -242,7 +250,7 @@ namespace galera
             return condition_(last_entered_, last_left_, trx);
         }
 
-        // wait until it is possible to grab slot in monitor, 
+        // wait until it is possible to grab slot in monitor,
         // update last entered
         void pre_enter(TrxHandle* trx, gu::Lock& lock, const int idx)
         {
@@ -262,7 +270,7 @@ namespace galera
                 assert(appliers_[idx].state_ == Applier::S_IDLE ||
                        appliers_[idx].state_ == Applier::S_CANCELED);
 
-                while (appliers_[indexof(last_entered_ + 1)].state_ 
+                while (appliers_[indexof(last_entered_ + 1)].state_
                        > Applier::S_IDLE)
                 {
                     Applier& a(appliers_[indexof(last_entered_ + 1)]);
@@ -281,7 +289,7 @@ namespace galera
                     last_entered_ = trx_seqno;
                 }
 
-                while (appliers_[indexof(last_entered_ + 1)].state_ 
+                while (appliers_[indexof(last_entered_ + 1)].state_
                        > Applier::S_IDLE)
                 {
                     Applier& a(appliers_[indexof(last_entered_ + 1)]);
@@ -296,10 +304,10 @@ namespace galera
             }
             pre_enter_cond_.broadcast();
         }
-        
+
         Monitor(const Monitor&);
         void operator=(const Monitor&);
-        
+
         const C condition_;
         Mode mode_;
         gu::Mutex mutex_;
