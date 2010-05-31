@@ -382,6 +382,7 @@ void *gcs_test_repl (void *arg)
                         thread->msg,
                         thread->msg_len,
                         GCS_ACT_TORDERED,
+                        false,
                         &thread->act_id,
                         &thread->local_act_id);
 	if (ret < 0) {

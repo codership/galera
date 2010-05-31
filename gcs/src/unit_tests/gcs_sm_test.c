@@ -13,7 +13,7 @@ START_TEST (gcs_sm_test_basic)
 {
     int ret;
 
-    gcs_sm_t* sm = gcs_sm_create(2);
+    gcs_sm_t* sm = gcs_sm_create(2, 1);
     fail_if(!sm);
 
     gu_cond_t cond;
@@ -21,7 +21,7 @@ START_TEST (gcs_sm_test_basic)
 
     int i;
     for (i = 1; i < 5; i++) {
-        ret = gcs_sm_enter(sm, &cond);
+        ret = gcs_sm_enter(sm, &cond, false);
         fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
         fail_if(sm->wait_q_len != 0, "wait_q_len = %ld, expected 0",
                 sm->wait_q_len);
@@ -58,13 +58,13 @@ static void* closing_thread (void* data)
 
 START_TEST (gcs_sm_test_close)
 {
-    gcs_sm_t* sm = gcs_sm_create(2);
+    gcs_sm_t* sm = gcs_sm_create(2, 1);
     fail_if(!sm);
 
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
 
-    int ret = gcs_sm_enter(sm, &cond);
+    int ret = gcs_sm_enter(sm, &cond, false);
     fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
     fail_if(sm->wait_q_len != 0, "wait_q_len = %ld, expected 0",
             sm->wait_q_len);
@@ -92,8 +92,10 @@ static void* pausing_thread (void* data)
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
 
+    gcs_sm_schedule (sm);
+    fail_if (order != 0, "order = %d, expected 0");
     order = 1;
-    gcs_sm_enter (sm, &cond);
+    gcs_sm_enter (sm, &cond, true);
     fail_if (order != 2, "order = %d, expected 2");
     order = 3;
     gcs_sm_leave (sm);
@@ -105,7 +107,7 @@ static void* pausing_thread (void* data)
 
 START_TEST (gcs_sm_test_pause)
 {
-    gcs_sm_t* sm = gcs_sm_create(4);
+    gcs_sm_t* sm = gcs_sm_create(4, 1);
     fail_if(!sm);
 
     gu_cond_t cond;
@@ -124,14 +126,17 @@ START_TEST (gcs_sm_test_pause)
     gu_thread_join (thr, NULL);
     fail_if (order != 3, "order = %d, expected 3");
 
+    // Testing scheduling capability
+    gcs_sm_schedule (sm);
+    gu_thread_create (&thr, NULL, pausing_thread, sm);
+    usleep (TEST_USLEEP);
+    fail_if (order != 3, "order = %d, expected 3");
     order = 0;
-    int ret = gcs_sm_enter(sm, &cond);
+
+    int ret = gcs_sm_enter(sm, &cond, true);
     fail_if (ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
     fail_if (sm->wait_q_len != 0, "wait_q_len = %ld, expected 0",
             sm->wait_q_len);
-    fail_if (order != 0);
-
-    gu_thread_create (&thr, NULL, pausing_thread, sm);
     usleep  (TEST_USLEEP);
     fail_if (order != 1, "order = %d, expected 1");
     fail_if (sm->wait_q_len != 1, "wait_q_len = %ld, expected 1",
@@ -156,7 +161,7 @@ START_TEST (gcs_sm_test_pause)
     fail_if (order != 2, "order = %d, expected 2");
 
     gcs_sm_continue (sm); // paused thread should continue
-    gcs_sm_enter (sm, &cond);
+    gcs_sm_enter (sm, &cond, false);
     fail_if (order != 3, "order = %d, expected 3");
     gcs_sm_leave (sm);
 

@@ -205,6 +205,7 @@ extern long gcs_recv (gcs_conn_t      *conn,
  * @param act_type action type
  * @param act_size action size
  * @param action action buffer
+ * @param whether the call was preceded by gcs_schedule()
  * @param act_id global action ID (sequence number)
  * @param local_act_id local action ID (sequence number)
  * @return negative error code, action size in case of success
@@ -213,8 +214,14 @@ extern long gcs_repl (gcs_conn_t          *conn,
                       const void          *action,
                       const size_t         act_size,
                       const gcs_act_type_t act_type,
+                      bool                 scheduled,
                       gcs_seqno_t         *act_id,
                       gcs_seqno_t         *local_act_id);
+
+/*!
+ * Schedules entry to CGS send monitor. Should be quickly followed by gcs_repl()
+ */
+extern void gcs_schedule (gcs_conn_t* conn);
 
 /*!
  * After action with this seqno is applied, this thread is guaranteed to see

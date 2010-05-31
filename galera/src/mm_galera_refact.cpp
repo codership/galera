@@ -1900,13 +1900,13 @@ enum wsrep_status mm_galera_pre_commit(
     
     profile_enter(galera_prof);
     /* replicate through gcs */
-    do {
-        
-        rcode = gcs_repl(gcs_conn, &wscoll[0], 
-                         wscoll.size(), GCS_ACT_TORDERED,
-                         &seqno_g, &seqno_l);
-        
-    } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
+    do
+    {
+        rcode = gcs_repl(gcs_conn, &wscoll[0], wscoll.size(),
+                         GCS_ACT_TORDERED, false, &seqno_g, &seqno_l);
+    }
+    while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
+
     profile_leave(galera_prof);
     
     trx->lock();
@@ -2321,10 +2321,10 @@ enum wsrep_status mm_galera_to_execute_start(
     
     /* replicate through gcs */
     do {
-        rcode = gcs_repl(gcs_conn, &wscoll[0], 
-                         wscoll.size(), GCS_ACT_TORDERED, &seqno_g,
-                         &seqno_l);
-    } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
+        rcode = gcs_repl(gcs_conn, &wscoll[0], wscoll.size(),
+                         GCS_ACT_TORDERED, false, &seqno_g, &seqno_l);
+    }
+    while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
     
     *global_seqno = seqno_g;   
     

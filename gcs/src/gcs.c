@@ -22,7 +22,7 @@
 #include "gcs_core.h"
 #include "gcs_fifo_lite.h"
 
-//#define GCS_USE_SM
+#define GCS_USE_SM
 #ifdef GCS_USE_SM
 #include "gcs_sm.h"
 #endif /* GCS_USE_SM */
@@ -188,7 +188,7 @@ gcs_create (const char* node_name, const char* inc_addr)
                     conn->local_act_id = GCS_SEQNO_FIRST;
                     conn->global_seqno = 0;
 #ifdef GCS_USE_SM
-                    conn->sm = gcs_sm_create(1<<16); // TODO: check!
+                    conn->sm = gcs_sm_create(1<<16, 1); // TODO: check!
 #else
                     gu_mutex_init (&conn->lock, NULL);
 #endif /* GCS_USE_SM */
@@ -736,7 +736,7 @@ static void *gcs_recv_thread (void *arg)
 #ifdef GCS_USE_SM
     gu_cond_t tmp_cond; /* TODO: rework when concurrency in SM is allowed */
     gu_cond_init (&tmp_cond, NULL);
-    gcs_sm_enter(conn->sm, &tmp_cond);
+    gcs_sm_enter(conn->sm, &tmp_cond, false);
     gcs_sm_leave(conn->sm);
     gu_cond_destroy (&tmp_cond);
 #else
@@ -889,7 +889,7 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
 #ifdef GCS_USE_SM
     gu_cond_t tmp_cond; /* TODO: rework when concurrency in SM is allowed */
     gu_cond_init (&tmp_cond, NULL);
-    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond))) {
+    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, false))) {
 #else
     if (!(ret = gu_mutex_lock (&conn->lock))) {
 #endif /* GCS_USE_SM */
@@ -1016,7 +1016,7 @@ long gcs_destroy (gcs_conn_t *conn)
 #ifdef GCS_USE_SM
     gu_cond_t tmp_cond;
     gu_cond_init (&tmp_cond, NULL);
-    if ((err = gcs_sm_enter (conn->sm, &tmp_cond))) // need an error here
+    if ((err = gcs_sm_enter (conn->sm, &tmp_cond, false))) // need an error here
 #else
     if (!(err = gu_mutex_lock (&conn->lock)))
 #endif /* GCS_USE_SM */
@@ -1093,7 +1093,7 @@ long gcs_send (gcs_conn_t*          conn,
 #ifdef GCS_USE_SM
     gu_cond_t tmp_cond;
     gu_cond_init (&tmp_cond, NULL);
-    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond))) {
+    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, false))) {
 #else
     if (!(ret = gu_mutex_lock (&conn->lock))) {
 #endif /* GCS_USE_SM */ 
@@ -1122,13 +1122,21 @@ long gcs_send (gcs_conn_t*          conn,
     return ret;
 }
 
+void gcs_schedule (gcs_conn_t* conn)
+{
+#ifdef GCS_USE_SM
+    gcs_sm_schedule (conn->sm);
+#endif /* GCS_USE_SM */
+}
+
 /* Puts action in the send queue and returns after it is replicated */
-long gcs_repl (gcs_conn_t          *conn,
-               const void          *action,
-               const size_t         act_size,
-               const gcs_act_type_t act_type,
-               gcs_seqno_t         *act_id, 
-               gcs_seqno_t         *local_act_id)
+long gcs_repl (gcs_conn_t          *conn,         //!<in
+               const void          *action,       //!<in
+               const size_t         act_size,     //!<in
+               const gcs_act_type_t act_type,     //!<in
+               bool                 scheduled,    //!<in
+               gcs_seqno_t         *act_id,       //!>out
+               gcs_seqno_t         *local_act_id) //!>out
 {
     long ret;
 
@@ -1157,7 +1165,7 @@ long gcs_repl (gcs_conn_t          *conn,
         //    gcs_send()
         // 2. avoids race with gcs_close() and gcs_destroy()
 #ifdef GCS_USE_SM
-        if (!(ret = gcs_sm_enter (conn->sm, &act.wait_cond)))
+        if (!(ret = gcs_sm_enter (conn->sm, &act.wait_cond, scheduled)))
 #else
         if (!(ret = gu_mutex_lock (&conn->lock)))
 #endif /* GCS_USE_SM */
@@ -1253,7 +1261,8 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
         memcpy (rst, donor, donor_len);
         memcpy (rst + donor_len, req, size);
 
-        ret = gcs_repl(conn, rst, rst_size, GCS_ACT_STATE_REQ, &global, local);
+        ret = gcs_repl(conn, rst, rst_size, GCS_ACT_STATE_REQ, false,
+                       &global, local);
 
         if (ret > 0) {
             assert (ret == (ssize_t)rst_size);

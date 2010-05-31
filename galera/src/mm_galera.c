@@ -2001,7 +2001,7 @@ static enum wsrep_status mm_galera_pre_commit(
     /* replicate through gcs */
     do {
         rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_TORDERED,
-                         &seqno_g, &seqno_l);
+                         false, &seqno_g, &seqno_l);
     } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
 
     *global_seqno = seqno_g;
@@ -2413,8 +2413,8 @@ static enum wsrep_status mm_galera_to_execute_start(
 
     /* replicate through gcs */
     do {
-        rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_TORDERED, &seqno_g,
-	                 &seqno_l);
+        rcode = gcs_repl(gcs_conn, data, len, GCS_ACT_TORDERED, false,
+                         &seqno_g, &seqno_l);
     } while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
 
     *global_seqno = seqno_g;
