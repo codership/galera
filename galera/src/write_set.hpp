@@ -94,16 +94,28 @@ namespace galera
         size_t operator()(const RowKey& rk) const
         {
             // djb2
+            // size_t i(0);
 	    size_t prime(5381);
-            const gu::byte_t* b(reinterpret_cast<const gu::byte_t*>(
-                                    rk.get_key()));
-            const gu::byte_t* const e(reinterpret_cast<const gu::byte_t*>(
-				    rk.get_key()) + rk.get_key_len());
-	    while (b != e)
+            const gu::byte_t* dbtb(reinterpret_cast<const gu::byte_t*>(
+                                       rk.get_dbtable()));
+            const gu::byte_t* const dbte(reinterpret_cast<const gu::byte_t*>(
+                                             rk.get_dbtable()) + rk.get_dbtable_len());
+	    while (dbtb != dbte)
 	    {
-	      prime = ((prime << 5) + prime) + *b;
-	      ++b;
+                prime = ((prime << 5) + prime) + *dbtb;
+                ++dbtb;
 	    }
+            
+            const gu::byte_t* kb(reinterpret_cast<const gu::byte_t*>(
+                                     rk.get_key()));
+            const gu::byte_t* const ke(reinterpret_cast<const gu::byte_t*>(
+                                           rk.get_key()) + rk.get_key_len());
+	    while (kb != ke)
+	    {
+                prime = ((prime << 5) + prime) + *kb;
+                ++kb;
+	    }
+            
 	    return prime;
         }
     };

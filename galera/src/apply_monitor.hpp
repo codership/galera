@@ -62,11 +62,24 @@ namespace galera
             last_entered_(-1),
             last_left_(-1),
             appliers_(appliers_size_),
-            ooe_(0),
-            ool_(0)
+            entered_(0),
+            oooe_(0),
+            oool_(0)
         { }
 
-        ~Monitor() { log_info << "ooe " << ooe_ << " ool " << ool_; }
+        ~Monitor() 
+        { 
+            if (entered_ > 0)
+            {
+                log_info << "apply mon: entered " << entered_
+                         << " oooe fraction " << double(oooe_)/entered_ 
+                         << " oool fraction " << double(oool_)/entered_; 
+            }
+            else
+            {
+                log_info << "apply mon: entered 0";
+            }
+        }
 
         void assign_mode(Mode mode) { mode_ = mode; }
 
@@ -81,17 +94,17 @@ namespace galera
         {
             if (mode_ == M_BYPASS) return 0;
 
-            wsrep_seqno_t trx_seqno = trx->get_global_seqno();
-            size_t   idx(indexof(trx_seqno));
-            gu::Lock lock(mutex_);
-
+            wsrep_seqno_t trx_seqno(trx->get_global_seqno());
+            size_t        idx(indexof(trx_seqno));
+            gu::Lock      lock(mutex_);
+            
             pre_enter(trx, lock, idx);
-
+            
             if (appliers_[idx].state_ ==  Applier::S_CANCELED)
             {
                 return -ECANCELED;
             }
-
+            
             appliers_[idx].state_ = Applier::S_WAITING;
             appliers_[idx].trx_   = trx;
 
@@ -105,11 +118,12 @@ namespace galera
                     return -ECANCELED;
                 }
             }
-
+            
             appliers_[idx].state_ = Applier::S_APPLYING;
 
-            ooe_ += (last_left_ < trx_seqno);
-
+            ++entered_;
+            oooe_ += (last_left_ + 1 < trx_seqno);
+            
             return 0;
         }
 
@@ -180,7 +194,7 @@ namespace galera
             assert(last_left_ != last_entered_ ||
                    appliers_[indexof(last_left_)].state_ == Applier::S_IDLE);
 
-            ool_ += (last_left_ > trx_seqno);
+            oool_ += (last_left_ > trx_seqno);
 
             // log_info << "apply monitor leave " << trx_seqno;
         }
@@ -261,7 +275,7 @@ namespace galera
                     ++last_entered_;
                 }
 
-                wsrep_seqno_t trx_seqno = trx->get_global_seqno();
+                const wsrep_seqno_t trx_seqno(trx->get_global_seqno());
                 if (last_entered_ + 1 == trx_seqno)
                 {
                     last_entered_ = trx_seqno;
@@ -293,8 +307,9 @@ namespace galera
         wsrep_seqno_t last_entered_;
         wsrep_seqno_t last_left_;
         std::vector<Applier> appliers_;
-        size_t ooe_;
-        size_t ool_;
+        size_t entered_; // entered
+        size_t oooe_; // out of order entered
+        size_t oool_; // out of order left
     };
 }
 

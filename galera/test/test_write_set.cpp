@@ -2,7 +2,10 @@
 #include "write_set.cpp"
 #include "mapped_buffer.cpp"
 #include "gu_logger.hpp"
-
+#include "galera_wsdb.cpp"
+#include "galera_certification.cpp"
+#include "certification.cpp"
+#include "wsdb.cpp"
 #include <cstdlib>
 
 #include <check.h>
@@ -183,36 +186,96 @@ START_TEST(test_mapped_buffer)
 }
 END_TEST
 
-#if 0
+
 START_TEST(test_cert)
 {
+    Wsdb* wsdb(Wsdb::create("galera"));
     Certification* cert(Certification::create("galera"));
+    cert->set_role(Certification::R_SLAVE);
+    cert->assign_initial_position(0);
+    wsrep_uuid_t uuid = {{1, }};
+    
+    struct ws_
+    { 
+        const char* dbtable;
+        const size_t dbtable_len;
+        const char* rk;
+        const size_t rk_len;
+    } wss[] = {
+        {"foo", strlen("foo"), "1", 1},
+        {"foo", strlen("foo"), "2", 1},
+        {"foo", strlen("foo"), "3", 1},
+        {"foo", strlen("foo"), "1", 1},
+        {"foo", strlen("foo"), "2", 1},
+        {"foo", strlen("foo"), "3", 1}
+    };
+    
+    const size_t n_ws(sizeof(wss)/sizeof(wss[0]));
+    
+    for (size_t i = 0; i < n_ws; ++i)
+    {
+        TrxHandle* trx(wsdb->get_trx(uuid, i + 1, true));
+        wsdb->append_row_key(trx, wss[i].dbtable, wss[i].dbtable_len,
+                             wss[i].rk, wss[i].rk_len, WSDB_ACTION_UPDATE);
+        WriteSet& ws(trx->get_write_set());
+        ws.assign_last_seen_trx(i);
+        trx->assign_last_seen_seqno(ws.get_last_seen_trx());
+        trx->assign_write_set_type(ws.get_type());
+        trx->assign_write_set_flags(WriteSet::F_COMMIT);
+        wsdb->flush_trx(trx, true);
+        const MappedBuffer& wscoll(trx->get_write_set_collection());
+        
+        TrxHandle* trx2(cert->create_trx(&wscoll[0], wscoll.size(),
+                                         i + 1, i + 1));
+        
+        cert->append_trx(trx2);
+        wsdb->discard_trx(trx->get_trx_id());
+    }
+    
+    TrxHandle* trx(cert->get_trx(n_ws));
+    fail_unless(trx != 0);
+    cert->set_trx_committed(trx);
+    fail_unless(cert->get_safe_to_discard_seqno() == 0);
+    
+    trx = cert->get_trx(1);
+    fail_unless(trx != 0);
+    cert->set_trx_committed(trx);
+    fail_unless(cert->get_safe_to_discard_seqno() == 1);
+    
+    trx = cert->get_trx(4);
+    fail_unless(trx != 0);
+    cert->set_trx_committed(trx);
+    fail_unless(cert->get_safe_to_discard_seqno() == 1);
 
+    cert->purge_trxs_upto(cert->get_safe_to_discard_seqno());
+
+    delete wsdb;
     delete cert;
 
 }
 END_TEST
-#endif
-
 
 Suite* suite()
 {
     Suite* s = suite_create("write_set");
     TCase* tc;
 
-    tc = tcase_create("test_query_sequence");
-    tcase_add_test(tc, test_query_sequence);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_query_sequence");
+        tcase_add_test(tc, test_query_sequence);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_write_set");
-    tcase_add_test(tc, test_write_set);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_write_set");
+        tcase_add_test(tc, test_write_set);
+        suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_mapped_buffer");
-    tcase_add_test(tc, test_mapped_buffer);
-    suite_add_tcase(s, tc);
+        tc = tcase_create("test_mapped_buffer");
+        tcase_add_test(tc, test_mapped_buffer);
+        suite_add_tcase(s, tc);
 
-    return s;
+        tc = tcase_create("test_cert");
+        tcase_add_test(tc, test_cert);
+        suite_add_tcase(s, tc);
+        return s;
 }
 
 

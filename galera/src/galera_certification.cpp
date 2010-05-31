@@ -108,12 +108,11 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
 {
     size_t offset(0);
     const MappedBuffer& wscoll(trx->get_write_set_collection());
-    wsrep_seqno_t last_depends_seqno(-1);
-    wsrep_seqno_t min_depends_seqno(trx->get_last_seen_seqno() + 1);
-    const wsrep_seqno_t trx_global_seqno = trx->get_global_seqno();
+    wsrep_seqno_t last_depends_seqno(trx->get_last_seen_seqno());
+    const wsrep_seqno_t trx_global_seqno(trx->get_global_seqno());
     TrxHandle::CertKeySet& match(trx->cert_keys_);
     assert(match.empty() == true);    
-
+    
     Lock lock(mutex_);
     
     while (offset < wscoll.size())
@@ -138,11 +137,10 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
                 assert(ref_trx != 0);
                 // We assume that certification is done only once per trx
                 // and in total order
-                const wsrep_seqno_t ref_global_seqno =
-                    ref_trx->get_global_seqno();
-
+                const wsrep_seqno_t ref_global_seqno(ref_trx->get_global_seqno());
+                
                 assert(ref_global_seqno < trx_global_seqno ||
-                       same_source(ref_trx, trx));
+                       same_source(ref_trx, trx) == true);
                 if (same_source(ref_trx, trx) == false &&
                     ref_global_seqno > trx->get_last_seen_seqno())
                 {
@@ -151,12 +149,14 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
                               << " " << trx->get_last_seen_seqno();
                     goto cert_fail;
                 }
-                if (ref_global_seqno != trx_global_seqno)
+                if (ref_global_seqno > trx->get_last_seen_seqno() &&
+                    ref_global_seqno != trx_global_seqno)
+                {
+                    // as with conflict check, we should track dependency
+                    // only in range of (last seen, trx global seqno)
                     last_depends_seqno = max(last_depends_seqno,
                                              ref_global_seqno);
-
-                // TODO: make it a property of CertIndex
-                min_depends_seqno = min (ref_global_seqno, min_depends_seqno);
+                }                
             }
             else if (store_keys == true)
             {
@@ -171,16 +171,14 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
             }
         }
     }
-
-    min_depends_seqno--; // notice +1 in initialization
-    last_depends_seqno = max (last_depends_seqno, min_depends_seqno);
+    
     trx->assign_last_depends_seqno(last_depends_seqno);
     assert(trx->get_last_depends_seqno() < trx->get_global_seqno());
     for (TrxHandle::CertKeySet::iterator i = trx->cert_keys_.begin();
          i != trx->cert_keys_.end(); ++i)
     {
         (*i)->ref(trx);
-    }
+    }    
     
     return WSDB_OK;
     
@@ -195,10 +193,11 @@ galera::GaleraCertification::GaleraCertification(const string& conf)
     : 
     trx_map_(), 
     cert_index_(),
+    deps_set_(),
     mutex_(), 
     trx_size_warn_count_(0), 
     position_(-1),
-    last_committed_(-1)
+    safe_to_discard_seqno_(-1)
 { 
     // TODO: Adjust role by configuration
 }
@@ -210,6 +209,7 @@ galera::GaleraCertification::~GaleraCertification()
 {
     log_info << "cert index usage at exit " << cert_index_.size();
     log_info << "cert trx map usage at exit " << trx_map_.size();
+    log_info << "deps set usage at exit " << deps_set_.size();
     for_each(cert_index_.begin(), cert_index_.end(), DiscardRK());
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
 }
@@ -221,6 +221,7 @@ void galera::GaleraCertification::assign_initial_position(wsrep_seqno_t seqno)
     {
         Lock lock(mutex_);
         position_ = seqno;
+        safe_to_discard_seqno_ = seqno;
     }
     purge_trxs_upto(position_);
 }
@@ -286,21 +287,29 @@ int galera::GaleraCertification::append_trx(TrxHandle* trx)
         
         if (trx_map_.size() > 10000 && (trx_size_warn_count_++ % 1000 == 0))
         {
-            log_warn << "trx map size " << trx_map_.size();
+            log_warn << "trx map size " << trx_map_.size() 
+                     << " check if status.last_committed is incrementing";
         }
     }
     
-    return test(trx);
+    const int retval(test(trx));
+    
+    Lock lock(mutex_);
+    deps_set_.insert(trx->get_last_seen_seqno());
+    assert(deps_set_.size() <= trx_map_.size());
+    assert(trx->get_last_depends_seqno() >= trx->get_last_seen_seqno());
+    
+    return retval;
 }
-
-
-
 
 
 int galera::GaleraCertification::test(TrxHandle* trx, bool bval)
 {
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
-    // log_info << "test: " << role_ << " " << trx->is_local();
+    
+    // optimistic guess, cert test may adjust this to tighter value
+    trx->assign_last_depends_seqno(trx->get_last_seen_seqno());
+
     switch (role_)
     {
     case R_BYPASS:
@@ -327,13 +336,23 @@ int galera::GaleraCertification::test(TrxHandle* trx, bool bval)
 
 wsrep_seqno_t galera::GaleraCertification::get_safe_to_discard_seqno() const
 {
-    return last_committed_;
+    Lock lock(mutex_);
+    wsrep_seqno_t retval;
+    if (deps_set_.empty() == true)
+    {
+        retval = safe_to_discard_seqno_;
+    }
+    else
+    {
+        retval = *deps_set_.begin();
+    }
+    return retval;
 }
 
 
 void galera::GaleraCertification::purge_trxs_upto(wsrep_seqno_t seqno)
 {
-    assert(seqno >= 0);
+    assert(seqno >= 0 && seqno <= get_safe_to_discard_seqno());
     Lock lock(mutex_); 
     TrxMap::iterator lower_bound(trx_map_.lower_bound(seqno));
     for_each(trx_map_.begin(), lower_bound, PurgeAndDiscard(this));
@@ -348,13 +367,23 @@ void galera::GaleraCertification::purge_trxs_upto(wsrep_seqno_t seqno)
     }
 }
 
+
 void galera::GaleraCertification::set_trx_committed(TrxHandle* trx)
 {
     assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
-    if (last_committed_ < trx->get_global_seqno())
+    
     {
-        last_committed_ = trx->get_global_seqno();
+        Lock lock(mutex_);
+        DepsSet::iterator i(deps_set_.find(trx->get_last_seen_seqno()));
+        assert(i != deps_set_.end());
+        if (deps_set_.size() == 1)
+        {
+            safe_to_discard_seqno_ = *i;
+        }
+        deps_set_.erase(i);
+        trx->set_committed();
     }
+    
     trx->clear();
 }
 

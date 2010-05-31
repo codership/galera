@@ -205,7 +205,7 @@ extern long gcs_recv (gcs_conn_t      *conn,
  * @param act_type action type
  * @param act_size action size
  * @param action action buffer
- * @param whether the call was preceded by gcs_schedule()
+ * @param scheduled whether the call was preceded by gcs_schedule()
  * @param act_id global action ID (sequence number)
  * @param local_act_id local action ID (sequence number)
  * @return negative error code, action size in case of success

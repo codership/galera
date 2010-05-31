@@ -2,6 +2,9 @@
 // Copyright (C) 2010 Codership Oy <info@codership.com>
 //
 
+#ifndef GALERA_MAPPED_BUFFER_HPP
+#define GALERA_MAPPED_BUFFER_HPP
+
 #include <string>
 
 #include "gu_buffer.hpp"
@@ -52,3 +55,5 @@ namespace galera
         size_t       real_buf_size_; // real buffer size (allocated size)
     };
 }
+
+#endif // GALERA_MAPPED_BUFFER_HPP

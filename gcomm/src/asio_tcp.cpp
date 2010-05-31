@@ -204,9 +204,7 @@ void gcomm::asio::TcpSocket::read_handler(const boost::system::error_code& ec,
         {
             Datagram dg(SharedBuffer(
                             new Buffer(&recv_buf_[0] + 4, 
-                                       &recv_buf_[0] + 4 + len),
-                            BufferDeleter(),
-                            shared_buffer_allocator));
+                                       &recv_buf_[0] + 4 + len)));
             ProtoUpMeta um;
             net_.dispatch(get_id(), dg, um);
             recv_offset_ -= 4 + len;

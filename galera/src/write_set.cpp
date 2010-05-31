@@ -52,9 +52,9 @@ inline size_t galera::serial_size(const Query& q)
 
 
 size_t galera::serialize(const RowKey& row_key, 
-                                gu::byte_t*   buf,
-                                size_t        buf_len,
-                                size_t        offset)
+                         gu::byte_t*   buf,
+                         size_t        buf_len,
+                         size_t        offset)
 {
     offset = serialize<uint16_t>(row_key.dbtable_, row_key.dbtable_len_,
                                  buf, buf_len, offset);
@@ -152,7 +152,8 @@ void galera::WriteSet::append_row_key(const void* dbtable,
                                       int action)
 {
     RowKey rk(dbtable, dbtable_len, key, key_len, action);
-    size_t hash(RowKeyHash()(rk));
+    static const RowKeyHash hasher = RowKeyHash();
+    size_t hash(hasher(rk));
     
     pair<KeyRefMap::const_iterator, KeyRefMap::const_iterator> 
         range(key_refs_.equal_range(hash));
@@ -170,7 +171,6 @@ void galera::WriteSet::append_row_key(const void* dbtable,
     size_t offset(keys_.size());
     keys_.resize(offset + rk_size);
     (void)galera::serialize(rk, &keys_[0], keys_.size(), offset);
-    (void)galera::unserialize(&keys_[0], keys_.size(), offset, rk); 
     (void)key_refs_.insert(make_pair(hash, offset));
 }
 

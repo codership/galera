@@ -43,13 +43,14 @@ namespace galera
             global_seqno_      (WSREP_SEQNO_UNDEFINED),
             last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
             last_depends_seqno_(WSREP_SEQNO_UNDEFINED),
-            refcnt_            (1),
-            write_set_(source_id, conn_id, trx_id,
-                       (conn_id == static_cast<wsrep_conn_id_t>(-1) ?
-                        WSDB_WS_TYPE_TRX : WSDB_WS_TYPE_CONN)),
-            write_set_flags_  (0),
-            write_set_type_   (),
-            cert_keys_        ()
+            refcnt_            (1),            
+            write_set_(source_id, conn_id, trx_id, 
+                      (conn_id == static_cast<wsrep_conn_id_t>(-1) ? 
+                       WSDB_WS_TYPE_TRX : WSDB_WS_TYPE_CONN)),
+            write_set_flags_   (0),
+            write_set_type_    (),
+            committed_         (false),
+            cert_keys_         ()
         { }
 
         void lock()   const { mutex_.lock();   }
@@ -66,7 +67,11 @@ namespace galera
 
         bool is_local() const { return local_; }
 
+        bool is_committed() const { return committed_; }
+        void set_committed() { committed_ = true; }
+        
         void assign_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g)
+
         {
             local_seqno_  = seqno_l;
             global_seqno_ = seqno_g;
@@ -184,6 +189,8 @@ namespace galera
         WriteSet               write_set_;
         int                    write_set_flags_;
         enum wsdb_ws_type      write_set_type_;
+
+        bool                   committed_;
 
         //
         friend class GaleraCertification;

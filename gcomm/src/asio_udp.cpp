@@ -176,9 +176,7 @@ void gcomm::asio::UdpSocket::read_handler(const system::error_code& ec,
         else
         {
             Datagram dg(SharedBuffer(new Buffer(&recv_buf_[0] + 4,
-                                                &recv_buf_[0] + 4 + len),
-                                     BufferDeleter(),
-                                     shared_buffer_allocator));
+                                                &recv_buf_[0] + 4 + len)));
             net_.dispatch(get_id(), dg, ProtoUpMeta());
         }
     }

@@ -9,7 +9,7 @@
 #include "gu_unordered.hpp"
 
 #include <map>
-
+#include <set>
 
 
 namespace galera
@@ -51,6 +51,7 @@ namespace galera
                 delete vt.second;
             }
         };
+        typedef std::multiset<wsrep_seqno_t> DepsSet;
         typedef std::map<wsrep_seqno_t, TrxHandle*> TrxMap;
     public:
         
@@ -68,6 +69,10 @@ namespace galera
         TrxHandle* get_trx(wsrep_seqno_t);
     private:
         bool same_source(const TrxHandle*, const TrxHandle*);
+        bool collect_cert_index()
+        {
+            return (role_ == R_SLAVE || role_ == R_MULTIMASTER);
+        }
         int do_test(TrxHandle*, bool);
         void purge_for_trx(TrxHandle*);
         class PurgeAndDiscard
@@ -78,6 +83,7 @@ namespace galera
             {
                 {
                     TrxHandleLock lock(*vt.second);
+                    assert(vt.second->is_committed() == true);
                     cert_->purge_for_trx(vt.second);
                 }
                 vt.second->unref();
@@ -88,12 +94,14 @@ namespace galera
             void operator=(const PurgeAndDiscard&);
             GaleraCertification* cert_;
         };
+
         TrxMap        trx_map_;
         CertIndex     cert_index_;
+        DepsSet       deps_set_;
         gu::Mutex     mutex_;
         size_t        trx_size_warn_count_;
         wsrep_seqno_t position_;
-        wsrep_seqno_t last_committed_;
+        wsrep_seqno_t safe_to_discard_seqno_;
     };
 }
 

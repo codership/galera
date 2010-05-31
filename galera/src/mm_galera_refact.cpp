@@ -1876,11 +1876,12 @@ enum wsrep_status mm_galera_pre_commit(
     // generate write set
     wsdb->create_write_set(trx, rbr_data, rbr_data_len);
     WriteSet& ws(trx->get_write_set());
-    ws.assign_last_seen_trx(cert->get_safe_to_discard_seqno());
+    
+    // grab gcs resource before setting last applied to ensure
+    // monotonous increase of last seen seqno
+    gcs_schedule(gcs_conn);
+    ws.assign_last_seen_trx(status.last_applied);
     ws.assign_flags(WriteSet::F_COMMIT);
-    trx->assign_last_seen_seqno(ws.get_last_seen_trx());
-    trx->assign_write_set_type(ws.get_type());
-    trx->assign_write_set_flags(WriteSet::F_COMMIT);
     wsdb->flush_trx(trx, true);
     const MappedBuffer& wscoll(trx->get_write_set_collection());
     
@@ -1890,6 +1891,7 @@ enum wsrep_status mm_galera_pre_commit(
     /* avoid sending empty write sets */
     if (wscoll.empty() == true) 
     {
+        gu_throw_fatal << "empty write set";
         gu_warn("empty write set for: %llu", trx->get_trx_id());
         trx->clear();
         GU_DBUG_RETURN(WSREP_OK);
@@ -1903,7 +1905,7 @@ enum wsrep_status mm_galera_pre_commit(
     do
     {
         rcode = gcs_repl(gcs_conn, &wscoll[0], wscoll.size(),
-                         GCS_ACT_TORDERED, false, &seqno_g, &seqno_l);
+                         GCS_ACT_TORDERED, true, &seqno_g, &seqno_l);
     }
     while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
 
@@ -2153,6 +2155,7 @@ wsrep_status_t mm_galera_append_data(
     const void*         data,
     size_t              data_len)
 {
+    return WSREP_NOT_IMPLEMENTED;
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
 
     TrxHandle* trx(get_trx(wsdb, trx_handle));
@@ -2312,9 +2315,15 @@ enum wsrep_status mm_galera_to_execute_start(
     TrxHandle* trx(wsdb->get_conn_query(my_uuid, conn_id, true));
     TrxHandleLock lock(*trx);
     wsdb->append_conn_query(trx, query, query_len);
+
+    // generate write set
     wsdb->create_write_set(trx);
     WriteSet& ws(trx->get_write_set());
-    ws.assign_last_seen_trx(cert->get_safe_to_discard_seqno());
+    
+    // grab gcs resource before setting last applied to ensure
+    // monotonous increase of last seen seqno
+    gcs_schedule(gcs_conn);
+    ws.assign_last_seen_trx(status.last_applied);
     ws.assign_flags(WriteSet::F_COMMIT);
     wsdb->flush_trx(trx, true);
     const MappedBuffer& wscoll(trx->get_write_set_collection());
@@ -2322,7 +2331,7 @@ enum wsrep_status mm_galera_to_execute_start(
     /* replicate through gcs */
     do {
         rcode = gcs_repl(gcs_conn, &wscoll[0], wscoll.size(),
-                         GCS_ACT_TORDERED, false, &seqno_g, &seqno_l);
+                         GCS_ACT_TORDERED, true, &seqno_g, &seqno_l);
     }
     while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
     
@@ -2416,7 +2425,7 @@ enum wsrep_status mm_galera_to_execute_end(
     GALERA_RELEASE_QUEUE (cert_queue, trx->get_local_seqno());
     GALERA_RELEASE_QUEUE (commit_queue, trx->get_local_seqno());
     
-    // don't do this: cert->set_trx_committed(trx);
+    cert->set_trx_committed(trx);
     if (do_report) report_last_committed (gcs_conn);
 
     wsdb->discard_conn_query(trx->get_conn_id());    
