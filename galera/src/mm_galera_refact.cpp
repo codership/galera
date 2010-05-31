@@ -125,7 +125,7 @@ static struct galera_status status =
 {
     { { 0 } },
     WSREP_SEQNO_UNDEFINED,
-    0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, .0, 0,
     GALERA_STAGE_INIT
 };
 
@@ -2595,6 +2595,7 @@ wsrep_status_t mm_galera_snapshot(
 extern "C"
 struct wsrep_status_var* mm_galera_status_get (wsrep_t* gh)
 {
+    status.cert_deps_dist = cert->get_avg_deps_dist();
     return galera_status_get (&status);
 }
 

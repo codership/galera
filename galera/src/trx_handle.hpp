@@ -49,6 +49,7 @@ namespace galera
                        WSDB_WS_TYPE_TRX : WSDB_WS_TYPE_CONN)),
             write_set_flags_   (0),
             write_set_type_    (),
+            certified_         (false),
             committed_         (false),
             cert_keys_         ()
         { }
@@ -66,6 +67,9 @@ namespace galera
         wsrep_conn_id_t get_conn_id() const { return conn_id_; }
 
         bool is_local() const { return local_; }
+
+        bool is_certified() const { return certified_; }
+        void set_certified() { certified_ = true; }
 
         bool is_committed() const { return committed_; }
         void set_committed() { committed_ = true; }
@@ -190,6 +194,7 @@ namespace galera
         int                    write_set_flags_;
         enum wsdb_ws_type      write_set_type_;
 
+        bool                   certified_;
         bool                   committed_;
 
         //

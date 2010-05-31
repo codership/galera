@@ -119,6 +119,8 @@ namespace galera
         virtual ~Certification() { }
 
         void set_role(Role role) { role_ = role; }
+
+        virtual double get_avg_deps_dist() const = 0;
         
         //!
         // @brief Factory method

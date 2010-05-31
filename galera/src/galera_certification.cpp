@@ -108,7 +108,12 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
 {
     size_t offset(0);
     const MappedBuffer& wscoll(trx->get_write_set_collection());
-    wsrep_seqno_t last_depends_seqno(trx->get_last_seen_seqno());
+
+    // max_depends_seqno, start from -1 and maximize on all dependencies
+    // min_depends_seqno, start from last seen and minimize on all dependencies
+    // last depends seqno is max(min_depends_seqno, max_depends_seqno)
+    wsrep_seqno_t max_depends_seqno(-1);
+    wsrep_seqno_t min_depends_seqno(trx->get_last_seen_seqno());
     const wsrep_seqno_t trx_global_seqno(trx->get_global_seqno());
     TrxHandle::CertKeySet& match(trx->cert_keys_);
     assert(match.empty() == true);    
@@ -149,14 +154,13 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
                               << " " << trx->get_last_seen_seqno();
                     goto cert_fail;
                 }
-                if (ref_global_seqno > trx->get_last_seen_seqno() &&
-                    ref_global_seqno != trx_global_seqno)
+                if (ref_global_seqno != trx_global_seqno)
                 {
-                    // as with conflict check, we should track dependency
-                    // only in range of (last seen, trx global seqno)
-                    last_depends_seqno = max(last_depends_seqno,
-                                             ref_global_seqno);
-                }                
+                    max_depends_seqno = max(max_depends_seqno,
+                                            ref_global_seqno);
+                    min_depends_seqno = min(min_depends_seqno,
+                                            ref_global_seqno);
+                }
             }
             else if (store_keys == true)
             {
@@ -172,7 +176,7 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
         }
     }
     
-    trx->assign_last_depends_seqno(last_depends_seqno);
+    trx->assign_last_depends_seqno(max(min_depends_seqno, max_depends_seqno));
     assert(trx->get_last_depends_seqno() < trx->get_global_seqno());
     for (TrxHandle::CertKeySet::iterator i = trx->cert_keys_.begin();
          i != trx->cert_keys_.end(); ++i)
@@ -180,6 +184,9 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
         (*i)->ref(trx);
     }    
     
+    trx->set_certified();
+    ++n_certified_;
+    deps_dist_ += (trx->get_global_seqno() - trx->get_last_depends_seqno());
     return WSDB_OK;
     
 cert_fail:
@@ -197,7 +204,9 @@ galera::GaleraCertification::GaleraCertification(const string& conf)
     mutex_(), 
     trx_size_warn_count_(0), 
     position_(-1),
-    safe_to_discard_seqno_(-1)
+    safe_to_discard_seqno_(-1),
+    n_certified_(0),
+    deps_dist_(0)
 { 
     // TODO: Adjust role by configuration
 }
@@ -210,6 +219,7 @@ galera::GaleraCertification::~GaleraCertification()
     log_info << "cert index usage at exit " << cert_index_.size();
     log_info << "cert trx map usage at exit " << trx_map_.size();
     log_info << "deps set usage at exit " << deps_set_.size();
+    log_info << "avg deps dist " << get_avg_deps_dist();
     for_each(cert_index_.begin(), cert_index_.end(), DiscardRK());
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
 }

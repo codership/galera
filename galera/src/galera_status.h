@@ -37,6 +37,7 @@ struct galera_status
     gcs_seqno_t  local_bf_aborts;    //!< number of brute-forced transactions
     gcs_seqno_t  local_replays;      //!< number of local trx replays
     gcs_seqno_t  fc_waits;           //!< how many times had to wait for FC
+    double       cert_deps_dist;     //!< avg distance between cert dependencies
     galera_stage_t stage;            //!< operational stage (see above)
 };
 
