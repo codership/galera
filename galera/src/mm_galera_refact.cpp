@@ -54,7 +54,7 @@ static Certification* cert;
 #define GALERA_USLEEP_1_SECOND      1000000 //  1 sec
 #define GALERA_USLEEP_10_SECONDS   10000000 // 10 sec
 #define GALERA_WORKAROUND_197   1 //w/around for #197: lack of cert db on joiner
-#define GALERA_USE_FLOW_CONTROL 1
+//#define GALERA_USE_FLOW_CONTROL 1
 #define GALERA_USLEEP_FLOW_CONTROL    1000 //  0.1 sec
 #define GALERA_USLEEP_FLOW_CONTROL_MAX (GALERA_USLEEP_1_SECOND*10)
 
@@ -91,11 +91,12 @@ public:
     bool operator()(wsrep_seqno_t last_entered, wsrep_seqno_t last_left,
                     const TrxHandle* trx) const
     {
-        // 1) all preceding trxs have entered
+//        // 1) all preceding trxs have entered
         // 2) no dependencies or dependent has left the monitor
-        return (last_entered + 1 >= trx->get_global_seqno() &&
-                (last_left       >= trx->get_last_depends_seqno() ||
-                 -1               == trx->get_last_depends_seqno()));
+//        return (last_entered + 1 >= trx->get_global_seqno() &&
+//                (last_left       >= trx->get_last_depends_seqno() ||
+//                 -1               == trx->get_last_depends_seqno()));
+        return (last_left >= trx->get_last_depends_seqno());
     }
 };
 
@@ -125,7 +126,7 @@ static struct galera_status status =
 {
     { { 0 } },
     WSREP_SEQNO_UNDEFINED,
-    0, 0, 0, 0, 0, 0, 0, 0, .0, .0, .0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, .0, .0, .0,
     GALERA_STAGE_INIT
 };
 
@@ -787,8 +788,8 @@ enum wsrep_status process_query_write_set_applying(
         }
         assert(offset == wscoll.size() || rcode != WSREP_OK);
     }
-    while (attempts < max_apply_attempts && rcode != WSREP_OK);
-
+    while (WSREP_OK != rcode && attempts < max_apply_attempts);
+    
     if (attempts == max_apply_attempts) {
         gu_warn("ws applying is not possible, %lld - %lld",
                 trx->get_global_seqno(), seqno_l);
@@ -1797,9 +1798,9 @@ enum wsrep_status mm_galera_pre_commit(
     int                    rcode;
     gcs_seqno_t            seqno_g, seqno_l;
     enum wsrep_status      retcode;
-#ifdef GALERA_USE_FLOW_CONTROL
+//#ifdef GALERA_USE_FLOW_CONTROL
     int flow_control_waits = GALERA_USLEEP_FLOW_CONTROL_MAX/GALERA_USLEEP_FLOW_CONTROL;
-#endif /* GALERA_USER_FLOW_CONTROL */
+//#endif /* GALERA_USE_FLOW_CONTROL */
 
     GU_DBUG_ENTER("galera_pre_commit");
 

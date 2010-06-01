@@ -162,6 +162,7 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
 
     if (store_keys == true)
     {
+        min_depends_seqno = 0;
         trx->assign_last_depends_seqno(max(min_depends_seqno,
                                            max_depends_seqno));
         assert(trx->get_last_depends_seqno() < trx->get_global_seqno());
@@ -173,7 +174,7 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
 
         trx->set_certified();
         ++n_certified_;
-        deps_dist_ += (trx->get_global_seqno() - trx->get_last_depends_seqno());
+        deps_dist_ += (trx->get_global_seqno() - trx->get_last_seen_seqno());
     }
 
     return WSDB_OK;

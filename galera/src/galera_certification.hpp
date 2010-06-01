@@ -94,7 +94,7 @@ namespace galera
                     if (trx->is_certified() == true)
                     {
                         cert_->n_certified_--;
-                        cert_->deps_dist_ -= (trx->get_global_seqno() - trx->get_last_depends_seqno());
+                        cert_->deps_dist_ -= (trx->get_global_seqno() - trx->get_last_seen_seqno());
                     }
                 }
                 vt.second->unref();

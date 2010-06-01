@@ -256,7 +256,9 @@ namespace galera
         {
             assert(last_left_ <= last_entered_);
 
-            while (last_entered_ >= last_left_ + appliers_size_)
+            const wsrep_seqno_t trx_seqno(trx->get_global_seqno());
+
+            while (trx_seqno - last_left_>= static_cast<ssize_t>(appliers_size_))
             {
                 if (trx != 0) { trx->unlock(); }
 
