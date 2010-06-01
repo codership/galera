@@ -77,10 +77,8 @@ namespace galera
         }
 
     private:
-        bool same_source(const TrxHandle*, const TrxHandle*);
         int do_test(TrxHandle*, bool);
         void purge_for_trx(TrxHandle*);
-
 
         class PurgeAndDiscard
         {

@@ -25,11 +25,10 @@ namespace galera
     class Certification
     {
     public:
-        typedef enum 
+        typedef enum
         {
             R_BYPASS,
-            R_SLAVE,
-            R_MASTER,
+            R_MASTER_SLAVE,
             R_MULTIMASTER
         } Role;
 
@@ -53,7 +52,7 @@ namespace galera
         virtual TrxHandle* create_trx(const void* data, size_t data_len,
                                       wsrep_seqno_t seqno_l,
                                       wsrep_seqno_t seqno_g) = 0;
-        
+
         //!
         // @brief Append new transaction into certification
         //
@@ -66,7 +65,7 @@ namespace galera
         //       and require that test() method is called for certification
         //       verdict?
         virtual int append_trx(TrxHandle* trx) = 0;
-        
+
         //!
         // @brief Perform certification test for write set
         //
@@ -75,7 +74,7 @@ namespace galera
         virtual int test(TrxHandle*, bool) = 0;
 
         //!
-        // @brief Get sequence number that is guaranteed to be 
+        // @brief Get sequence number that is guaranteed to be
         //        unreferenced by any preceding transaction
         //
         // @return Safe to discard seqno
@@ -85,9 +84,9 @@ namespace galera
         //!
         // @brief Remove transactions' write sets from transaction index
         //
-        // After purge only transactions with seqno higher than seqno 
+        // After purge only transactions with seqno higher than seqno
         // are maintainend in certification index and participate in
-        // certification process. Precondition, seqno must higher or 
+        // certification process. Precondition, seqno must higher or
         // equal to safe to discard seqno.
         //
         // @param seqno Sequence number
@@ -112,7 +111,7 @@ namespace galera
         //         to zero if not found.
         //
         virtual TrxHandle* get_trx(wsrep_seqno_t seqno) = 0;
-        
+
         //!
         // @brief Virtual destructor to allow inheritance
         //
@@ -121,7 +120,7 @@ namespace galera
         void set_role(Role role) { role_ = role; }
 
         virtual double get_avg_deps_dist() const = 0;
-        
+
         //!
         // @brief Factory method
         //

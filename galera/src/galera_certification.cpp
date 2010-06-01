@@ -68,22 +68,6 @@ galera::RowKeyEntry::unref(TrxHandle* trx)
 }
 
 
-
-bool
-galera::GaleraCertification::same_source(const TrxHandle* a, const TrxHandle* b)
-{
-    switch (role_)
-    {
-    case R_SLAVE:
-        return (a->is_local() == b->is_local());
-    case R_MULTIMASTER:
-        return (a->get_source_id() == b->get_source_id());
-    default:
-        gu_throw_fatal << "not implemented";
-        throw;
-    }
-}
-
 void
 galera::GaleraCertification::purge_for_trx(TrxHandle* trx)
 {
@@ -145,8 +129,8 @@ int galera::GaleraCertification::do_test(TrxHandle* trx, bool store_keys)
                 const wsrep_seqno_t ref_global_seqno(ref_trx->get_global_seqno());
 
                 assert(ref_global_seqno < trx_global_seqno ||
-                       same_source(ref_trx, trx) == true);
-                if (same_source(ref_trx, trx) == false &&
+                       ref_trx->get_source_id() == trx->get_source_id());
+                if (ref_trx->get_source_id() != trx->get_source_id() &&
                     ref_global_seqno > trx->get_last_seen_seqno())
                 {
                     // Cert conflict if trx write set didn't see ti committed
@@ -342,17 +326,7 @@ int galera::GaleraCertification::test(TrxHandle* trx, bool bval)
     {
     case R_BYPASS:
         return WSDB_OK;
-    case R_SLAVE:
-        if (trx->is_local() == false)
-        {
-            return do_test(trx, bval);
-        }
-        else
-        {
-            return WSDB_CERTIFICATION_FAIL;
-        }
-    case R_MASTER:
-        return (trx->is_local() == true ? WSDB_OK : WSDB_CERTIFICATION_FAIL);
+    case R_MASTER_SLAVE:
     case R_MULTIMASTER:
         return do_test(trx, bval);
     default:

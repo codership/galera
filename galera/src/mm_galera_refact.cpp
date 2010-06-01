@@ -423,17 +423,8 @@ enum wsrep_status mm_galera_connect (wsrep_t *gh,
 
 #if defined(GALERA_MASTER_SLAVE)
     URI uri(cluster_url);
-    if (uri.get_host() == "")
-    {
-        log_info << "WSREP: certification role master";
-        cert->set_role(Certification::R_MASTER);
-    }
-    else
-    {
-        log_info << "WSREP: certification role slave";
-        // Bypass would be enough if no parallel applying
-        cert->set_role(Certification::R_SLAVE);
-    }
+    log_info << "WSREP: certification role master/slave";
+    cert->set_role(Certification::R_MASTER_SLAVE);
 #elif defined(GALERA_MULTIMASTER)
     log_info << "WSREP: certification role multimaster";
     cert->set_role(Certification::R_MULTIMASTER);
@@ -1670,7 +1661,6 @@ enum wsrep_status mm_galera_post_commit(
     bool do_report(report_check_counter());
     status.local_commits++;
     GALERA_RELEASE_QUEUE(commit_queue, trx->get_local_seqno());
-
     cert->set_trx_committed(trx);
 
     if (do_report) report_last_committed (gcs_conn);
