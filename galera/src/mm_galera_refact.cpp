@@ -623,7 +623,7 @@ static wsrep_status_t apply_query(void *recv_ctx, const char *query, int len,
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static ulong const report_interval = 32;
+static ulong const report_interval = 64;
 static ulong       report_counter  = 0;
 
 // fast function to be run inside commit_queue critical section
