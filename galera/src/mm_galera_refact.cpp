@@ -96,7 +96,7 @@ public:
 //        return (last_entered + 1 >= trx->get_global_seqno() &&
 //                (last_left       >= trx->get_last_depends_seqno() ||
 //                 -1               == trx->get_last_depends_seqno()));
-        return (last_left >= trx->get_last_depends_seqno());
+        return (trx->is_local() || last_left >= trx->get_last_depends_seqno());
     }
 };
 
@@ -789,7 +789,7 @@ enum wsrep_status process_query_write_set_applying(
         assert(offset == wscoll.size() || rcode != WSREP_OK);
     }
     while (WSREP_OK != rcode && attempts < max_apply_attempts);
-    
+
     if (attempts == max_apply_attempts) {
         gu_warn("ws applying is not possible, %lld - %lld",
                 trx->get_global_seqno(), seqno_l);
@@ -1649,7 +1649,6 @@ enum wsrep_status mm_galera_post_commit(
     }
 
     TrxHandleLock lock(*trx);
-    apply_monitor.leave(trx);
 
     GU_DBUG_ENTER("galera_post_commit");
 
@@ -1659,9 +1658,17 @@ enum wsrep_status mm_galera_post_commit(
     assert (trx->get_global_seqno() != WSREP_SEQNO_UNDEFINED);
 
     GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
+
     bool do_report(report_check_counter());
+
     status.local_commits++;
+
+    apply_monitor.leave(trx);
+
+#ifndef GALERA_OOO_COMMIT
     GALERA_RELEASE_QUEUE(commit_queue, trx->get_local_seqno());
+#endif
+
     cert->set_trx_committed(trx);
 
     if (do_report) report_last_committed (gcs_conn);
@@ -1998,7 +2005,9 @@ enum wsrep_status mm_galera_pre_commit(
         retcode = WSREP_TRX_FAIL;
     }
 
-    // keep cert queue grabbed to streamline entering apply monitor
+    // call release only if grab was successfull
+    GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
+
     if (retcode == WSREP_OK)
     {
         rcode = apply_monitor.enter(trx);
@@ -2018,9 +2027,7 @@ enum wsrep_status mm_galera_pre_commit(
         apply_monitor.self_cancel(trx);
     }
 
-    // call release only if grab was successfull
-    GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
-
+#ifndef GALERA_OOO_COMMIT
     if (retcode == WSREP_OK)
     {
         assert (seqno_l >= 0);
@@ -2045,8 +2052,7 @@ enum wsrep_status mm_galera_pre_commit(
             abort();
         }
     }
-
-
+#endif /* GALERA_OOO_COMMIT */
 
     profile_leave(galera_prof);
 
