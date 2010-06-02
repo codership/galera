@@ -2,6 +2,9 @@
     Added flow control monitor and ability to synchronize with gcs_send()
     and gcs_repl() calls thus guranteeing FIFO order. Version 0.13.0
 
+2010-05-20 Alex 
+    Added gcs_slave_queue_len() query to API.
+
 2009-11-21 Alex 
     Extended state message to contain previous primary configuraiton info.
     Many bugfixes and cleanups. Version 0.12.0
