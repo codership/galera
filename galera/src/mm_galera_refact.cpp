@@ -2052,6 +2052,8 @@ enum wsrep_status mm_galera_pre_commit(
             abort();
         }
     }
+#else
+    GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
 #endif /* GALERA_OOO_COMMIT */
 
     profile_leave(galera_prof);
