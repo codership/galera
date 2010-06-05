@@ -1923,8 +1923,6 @@ static enum wsrep_status mm_galera_pre_commit(
         GU_DBUG_RETURN(WSREP_OK);
     }
 
-    ws->last_seen_trx = status.last_applied;
-
     /* encode with xdr */
     /* TODO: is not optimal to allocate data buffer for xdr encoding
      *       intermediate result.
