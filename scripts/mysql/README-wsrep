@@ -181,6 +181,7 @@ an unprivileged user can do). See SELinux documentation about it.
 Now you're ready to connect to cluster by setting wsrep_cluster_address variable
 and monitor status of wsrep provider:
 
+mysql> SET wsrep_on=OFF;
 mysql> SET GLOBAL wsrep_cluster_address='<cluster address string>';
 mysql> SHOW STATUS LIKE 'wsrep%';
 
