@@ -58,9 +58,10 @@ namespace galera
             condition_(),
             mode_(M_NORMAL),
             mutex_(),
-            pre_enter_cond_(),
+            cond_(),
             last_entered_(-1),
             last_left_(-1),
+            drain_seqno_(-1),
             appliers_(appliers_size_),
             entered_(0),
             oooe_(0),
@@ -132,17 +133,17 @@ namespace galera
 
             assert(appliers_[idx].state_ == Applier::S_CANCELED);
 
-            // TODO: we actually should run waiters check here
-            appliers_[idx].state_ = Applier::S_FINISHED;
-            return -ECANCELED;
+            return -EINTR;
         }
 
         void leave(const TrxHandle* trx)
         {
             if (mode_ == M_BYPASS) return;
 
-            wsrep_seqno_t trx_seqno = trx->get_global_seqno();
+#ifndef NDEBUG
+            wsrep_seqno_t trx_seqno(trx->get_global_seqno());
             size_t   idx(indexof(trx_seqno));
+#endif // NDEBUG
             gu::Lock lock(mutex_);
 
             assert(appliers_[idx].state_ == Applier::S_APPLYING ||
@@ -150,6 +151,138 @@ namespace galera
 
             assert(appliers_[indexof(last_left_)].state_ == Applier::S_IDLE);
 
+            post_leave(trx, lock);
+            // log_info << "apply monitor leave " << trx_seqno;
+        }
+
+        void self_cancel(TrxHandle* trx)
+        {
+            if (mode_ == M_BYPASS) return;
+
+            size_t   idx(indexof(trx->get_global_seqno()));
+            gu::Lock lock(mutex_);
+
+            pre_enter(trx, lock);
+
+            assert(appliers_[idx].state_ == Applier::S_IDLE ||
+                   appliers_[idx].state_ == Applier::S_CANCELED);
+
+            post_leave(trx, lock);
+        }
+
+        void interrupt(const TrxHandle* trx)
+        {
+            if (mode_ == M_BYPASS) return;
+
+            size_t   idx (indexof(trx->get_global_seqno()));
+            gu::Lock lock(mutex_);
+
+            while (trx->get_global_seqno() - last_left_ >=
+                   static_cast<ssize_t>(appliers_size_)) // TODO: exit on error
+            {
+                lock.wait(cond_);
+            }
+
+            if (appliers_[idx].state_ <= Applier::S_WAITING)
+            {
+                appliers_[idx].state_ = Applier::S_CANCELED;
+                appliers_[idx].cond_.signal();
+                // since last_left + 1 cannot be <= S_WAITING we're not
+                // modifying a window here. No broadcasting.
+            }
+            else
+            {
+                log_debug << "cancel, applier state " << appliers_[idx].state_;
+            }
+        }
+
+        wsrep_seqno_t last_left() const { return last_left_; }
+
+        void drain(wsrep_seqno_t seqno)
+        {
+            assert(last_left_ <= seqno);
+            assert(drain_seqno_ == -1);
+            gu::Lock lock(mutex_);
+            drain_seqno_ = seqno;
+            while (drain_seqno_ != last_left_)
+            {
+                lock.wait(cond_);
+            }
+            drain_seqno_ = -1;
+        }
+
+        std::pair<double, double> get_ooo_stats() const
+        {
+            gu::Lock lock(mutex_);
+            double oooe(entered_ == 0 ? .0 : double(oooe_)/entered_);
+            double oool(entered_ == 0 ? .0 : double(oool_)/entered_);
+            return std::make_pair(oooe, oool);
+        }
+
+    private:
+
+        size_t indexof(wsrep_seqno_t seqno)
+        {
+            return (seqno & appliers_mask_);
+        }
+
+        bool may_enter(const TrxHandle* trx) const
+        {
+            return condition_(last_entered_, last_left_, trx);
+        }
+
+        // wait until it is possible to grab slot in monitor,
+        // update last entered
+        void pre_enter(const TrxHandle* trx, gu::Lock& lock)
+        {
+            assert(last_left_ <= last_entered_);
+
+            const wsrep_seqno_t trx_seqno(trx->get_global_seqno());
+
+            while (trx_seqno - last_left_ >=
+                   static_cast<ssize_t>(appliers_size_)) // TODO: exit on error
+            {
+                trx->unlock();
+                lock.wait(cond_);
+                trx->lock();
+            }
+
+            if (last_entered_ < trx_seqno) last_entered_ = trx_seqno;
+
+#if 0 // only leaving guys should signal, entering does not relax anything
+            while (appliers_[indexof(last_entered_ + 1)].state_
+                   > Applier::S_IDLE)
+            {
+                Applier& a(appliers_[indexof(last_entered_ + 1)]);
+
+                if (a.state_ == Applier::S_WAITING &&
+                    may_enter(a.trx_) == true)
+                {
+                    a.cond_.signal();
+                }
+                ++last_entered_;
+            }
+
+            while (appliers_[indexof(last_entered_ + 1)].state_
+                   > Applier::S_IDLE)
+            {
+                Applier& a(appliers_[indexof(last_entered_ + 1)]);
+
+                if (a.state_ == Applier::S_WAITING &&
+                    may_enter(a.trx_) == true)
+                {
+                    a.cond_.signal();
+                }
+                ++last_entered_;
+            }
+#endif
+// nothing in this function increases available space pre_enter_cond_.broadcast();
+        }
+
+        void post_leave(const TrxHandle* trx, gu::Lock& lock)
+        {
+            const wsrep_seqno_t trx_seqno(trx->get_global_seqno());
+            const size_t idx(indexof(trx_seqno));
             if (last_left_ + 1 == trx_seqno) // we're shrinking window
             {
                 appliers_[idx].state_ = Applier::S_IDLE;
@@ -180,7 +313,7 @@ namespace galera
             {
                 Applier& a(appliers_[indexof(i)]);
 
-                if (a.state_ == Applier::S_WAITING && may_enter(a.trx_))
+                if (a.state_ == Applier::S_WAITING && may_enter(a.trx_) == true)
                 {
                     // We need to set state to APPLYING here because if it is
                     // the last_left_ + 1 and it gets canceled in the race
@@ -245,121 +378,12 @@ namespace galera
             assert(last_left_ != last_entered_ ||
                    appliers_[indexof(last_left_)].state_ == Applier::S_IDLE);
 
-            if (last_left_ >= trx_seqno) // occupied window shrinked
+            if ((last_left_ >= trx_seqno) || // occupied window shrinked
+                (last_left_ == drain_seqno_)) // draining requested
             {
                 oool_ += (last_left_ > trx_seqno);
-                pre_enter_cond_.broadcast();
+                cond_.broadcast();
             }
-            // log_info << "apply monitor leave " << trx_seqno;
-        }
-
-        void self_cancel(TrxHandle* trx)
-        {
-            if (mode_ == M_BYPASS) return;
-
-            size_t   idx(indexof(trx->get_global_seqno()));
-            gu::Lock lock(mutex_);
-
-            pre_enter(trx, lock);
-
-            assert(appliers_[idx].state_ == Applier::S_IDLE ||
-                   appliers_[idx].state_ == Applier::S_CANCELED);
-
-            appliers_[idx].state_ = Applier::S_FINISHED;
-        }
-
-        void cancel(const TrxHandle* trx)
-        {
-            if (mode_ == M_BYPASS) return;
-
-            size_t   idx (indexof(trx->get_global_seqno()));
-            gu::Lock lock(mutex_);
-
-            while (trx->get_global_seqno() - last_left_ >=
-                   static_cast<ssize_t>(appliers_size_)) // TODO: exit on error
-            {
-                lock.wait(pre_enter_cond_);
-            }
-
-            if (appliers_[idx].state_ <= Applier::S_WAITING)
-            {
-                appliers_[idx].state_ = Applier::S_CANCELED;
-                appliers_[idx].cond_.signal();
-                // since last_left + 1 cannot be <= S_WAITING we're not
-                // modifying a window here. No broadcasting.
-            }
-            else
-            {
-                log_debug << "cancel, applier state " << appliers_[idx].state_;
-            }
-        }
-
-        std::pair<double, double> get_ooo_stats() const
-        {
-            gu::Lock lock(mutex_);
-            double oooe(entered_ == 0 ? .0 : double(oooe_)/entered_);
-            double oool(entered_ == 0 ? .0 : double(oool_)/entered_);
-            return std::make_pair(oooe, oool);
-        }
-
-    private:
-
-        size_t indexof(wsrep_seqno_t seqno)
-        {
-            return (seqno & appliers_mask_);
-        }
-
-        bool may_enter(const TrxHandle* trx) const
-        {
-            return condition_(last_entered_, last_left_, trx);
-        }
-
-        // wait until it is possible to grab slot in monitor,
-        // update last entered
-        void pre_enter(TrxHandle* trx, gu::Lock& lock)
-        {
-            assert(last_left_ <= last_entered_);
-
-            const wsrep_seqno_t trx_seqno(trx->get_global_seqno());
-
-            while (trx_seqno - last_left_ >=
-                   static_cast<ssize_t>(appliers_size_)) // TODO: exit on error
-            {
-                trx->unlock();
-                lock.wait(pre_enter_cond_);
-                trx->lock();
-            }
-
-            if (last_entered_ < trx_seqno) last_entered_ = trx_seqno;
-
-#if 0 // only leaving guys should signal, entering does not relax anything
-            while (appliers_[indexof(last_entered_ + 1)].state_
-                   > Applier::S_IDLE)
-            {
-                Applier& a(appliers_[indexof(last_entered_ + 1)]);
-
-                if (a.state_ == Applier::S_WAITING &&
-                    may_enter(a.trx_) == true)
-                {
-                    a.cond_.signal();
-                }
-                ++last_entered_;
-            }
-
-            while (appliers_[indexof(last_entered_ + 1)].state_
-                   > Applier::S_IDLE)
-            {
-                Applier& a(appliers_[indexof(last_entered_ + 1)]);
-
-                if (a.state_ == Applier::S_WAITING &&
-                    may_enter(a.trx_) == true)
-                {
-                    a.cond_.signal();
-                }
-                ++last_entered_;
-            }
-#endif
-// nothing in this function increases available space pre_enter_cond_.broadcast();
         }
 
         Monitor(const Monitor&);
@@ -368,9 +392,10 @@ namespace galera
         const C condition_;
         Mode mode_;
         gu::Mutex mutex_;
-        gu::Cond pre_enter_cond_;
+        gu::Cond  cond_;
         wsrep_seqno_t last_entered_;
         wsrep_seqno_t last_left_;
+        wsrep_seqno_t drain_seqno_;
         std::vector<Applier> appliers_;
         size_t entered_; // entered
         size_t oooe_; // out of order entered

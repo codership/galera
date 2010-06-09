@@ -896,11 +896,11 @@ static wsrep_status_t process_query_write_set(
         {
             // cancel apply monitor and commit queue
             apply_monitor.self_cancel(trx);
-            apply_monitor.leave(trx);
             GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
         }
         else
         {
+            gu_warn("certification failed for replaying trx %lld", seqno_g);
             // replaying job has grabbed commit queue in the beginning
             GALERA_UPDATE_LAST_APPLIED (seqno_g);
             apply_monitor.leave(trx);
@@ -914,11 +914,11 @@ static wsrep_status_t process_query_write_set(
         {
             // cancel apply monitor and commit queue
             apply_monitor.self_cancel(trx);
-            apply_monitor.leave(trx);
             GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
         }
         else
         {
+            gu_warn("local trx %lld skipped", seqno_g);
             // replaying job has grabbed commit queue in the beginning
             GALERA_UPDATE_LAST_APPLIED (seqno_g);
             GALERA_RELEASE_QUEUE (commit_queue, seqno_l);
@@ -1395,6 +1395,11 @@ enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx)
             /* Actions processed below are special and very rare, so they are
              * processed in isolation */
             GALERA_GRAB_QUEUE (cert_queue,   seqno_l);
+            if (apply_monitor.last_left() != -1 &&
+                apply_monitor.last_left() != last_recved)
+            {
+                apply_monitor.drain(last_recved);
+            }
             GALERA_GRAB_QUEUE (commit_queue, seqno_l);
 
             switch (action_type) {
@@ -1416,7 +1421,6 @@ enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx)
                 status.stage = GALERA_STAGE_DONOR;
                 /* To snap out of donor state application must call
                  * wsrep->sst_sent() when it is really done */
-
                 sst_donate_cb (NULL,
                                recv_ctx,
                                action,
@@ -1581,7 +1585,7 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
         }
         if (victim->get_global_seqno() != GCS_SEQNO_ILL)
         {
-            apply_monitor.cancel(victim);
+            apply_monitor.interrupt(victim);
         }
     }
 
@@ -1957,7 +1961,7 @@ enum wsrep_status mm_galera_pre_commit(
             retcode = WSREP_TRX_FAIL;
             trx->assign_state(WSDB_TRX_ABORTING_REPL);
             GALERA_SELF_CANCEL_QUEUE(cert_queue, seqno_l);
-            apply_monitor.self_cancel(trx);
+            // apply monitor is self canceled in post_repl_out
             goto post_repl_out;
         }
     }
@@ -2011,20 +2015,17 @@ enum wsrep_status mm_galera_pre_commit(
     if (retcode == WSREP_OK)
     {
         rcode = apply_monitor.enter(trx);
-        assert(rcode == 0 || rcode == -ECANCELED);
+        assert(rcode == 0 || rcode == -EINTR);
         switch (rcode)
         {
         case 0:
             break;
-        case -ECANCELED:
+        case -EINTR:
+            // todo - must be replayed?
             trx->assign_state(WSDB_TRX_ABORTING_REPL);
             retcode = WSREP_TRX_FAIL;
             break;
         }
-    }
-    else
-    {
-        apply_monitor.self_cancel(trx);
     }
 
 #ifndef GALERA_OOO_COMMIT
@@ -2073,7 +2074,7 @@ post_repl_out:
         // We want to do this already here to allow early release of
         // commit queue in case of rollback
         bool do_report(report_check_counter ());
-        apply_monitor.leave(trx);
+        apply_monitor.self_cancel(trx);
         GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
         if (do_report) report_last_committed (gcs_conn);
         break;
@@ -2378,7 +2379,7 @@ enum wsrep_status mm_galera_to_execute_start(
                  "current seqno %lld, action seqno %lld", last_recved, seqno_g);
 
         GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
-        apply_monitor.cancel(trx);
+        apply_monitor.self_cancel(trx);
         GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
         // this situation is as good as failed gcs_repl() call.
         rcode = WSREP_CONN_FAIL;
