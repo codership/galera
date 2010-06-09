@@ -328,7 +328,7 @@ enum wsrep_status mm_galera_init(wsrep_t* gh,
     /* 2. initialize wsdb */
     // wsdb_init(data_dir, (gu_log_cb_t)args->logger_cb);
     wsdb = Wsdb::create("galera");
-    cert = Certification::create("galera");
+    cert = new Certification;
 
     /* 3. try to read saved state from file */
     if (status.last_applied == WSREP_SEQNO_UNDEFINED &&
@@ -421,17 +421,6 @@ enum wsrep_status mm_galera_connect (wsrep_t *gh,
 
     status.stage = GALERA_STAGE_JOINING;
     conn_state   = GALERA_CONNECTED;
-
-#if defined(GALERA_MASTER_SLAVE)
-    URI uri(cluster_url);
-    log_info << "WSREP: certification role master/slave";
-    cert->set_role(Certification::R_MASTER_SLAVE);
-#elif defined(GALERA_MULTIMASTER)
-    log_info << "WSREP: certification role multimaster";
-    cert->set_role(Certification::R_MULTIMASTER);
-#else
-#error "Unknown replication type"
-#endif
 
     GU_DBUG_RETURN(WSREP_OK);
 }
@@ -1395,10 +1384,9 @@ enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx)
             /* Actions processed below are special and very rare, so they are
              * processed in isolation */
             GALERA_GRAB_QUEUE (cert_queue,   seqno_l);
-            if (apply_monitor.last_left() != -1 &&
-                apply_monitor.last_left() != last_recved)
+            if (cert->position() != -1)
             {
-                apply_monitor.drain(last_recved);
+                apply_monitor.drain(cert->position());
             }
             GALERA_GRAB_QUEUE (commit_queue, seqno_l);
 
@@ -1947,8 +1935,8 @@ enum wsrep_status mm_galera_pre_commit(
 
     if (rcode)
     {
-        gu_debug("gu_to_grab aborted for seqno %lld: %d (%s)",
-                 seqno_l, rcode, strerror(-rcode));
+        gu_debug("gu_to_grab aborted for seqno %lld - %lld: %d (%s)",
+                 seqno_l, seqno_g, rcode, strerror(-rcode));
 
         if (check_certification_status_for_aborted(seqno_l, trx) == WSREP_OK)
         {
@@ -2022,6 +2010,7 @@ enum wsrep_status mm_galera_pre_commit(
             break;
         case -EINTR:
             // todo - must be replayed?
+            log_warn << "aborting certified";
             trx->assign_state(WSDB_TRX_ABORTING_REPL);
             retcode = WSREP_TRX_FAIL;
             break;
@@ -2442,7 +2431,7 @@ enum wsrep_status mm_galera_replay_trx(
     TrxHandle* trx(get_trx(wsdb, trx_handle));
     TrxHandleLock lock(*trx);
 
-    gu_debug("trx_replay for: %lld %lld state: %d, data len: %d",
+    gu_info("trx_replay for: %lld %lld state: %d, data len: %d",
              trx->get_local_seqno(),
              trx->get_global_seqno(),
              trx->get_state(),

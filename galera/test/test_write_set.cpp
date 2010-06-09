@@ -2,7 +2,6 @@
 #include "mapped_buffer.cpp"
 #include "gu_logger.hpp"
 #include "galera_wsdb.cpp"
-#include "galera_certification.cpp"
 #include "certification.cpp"
 #include "wsdb.cpp"
 #include <cstdlib>
@@ -189,8 +188,7 @@ END_TEST
 START_TEST(test_cert)
 {
     Wsdb* wsdb(Wsdb::create("galera"));
-    Certification* cert(Certification::create("galera"));
-    cert->set_role(Certification::R_MASTER_SLAVE);
+    Certification* cert(new Certification);
     cert->assign_initial_position(0);
     wsrep_uuid_t uuid = {{1, }};
 

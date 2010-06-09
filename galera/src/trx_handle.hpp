@@ -173,7 +173,7 @@ namespace galera
 
     private:
 
-        virtual ~TrxHandle() { }
+        ~TrxHandle() { }
         TrxHandle(const TrxHandle&);
         void operator=(const TrxHandle& other);
 
@@ -198,7 +198,7 @@ namespace galera
         bool                   committed_;
 
         //
-        friend class GaleraCertification;
+        friend class Certification;
         typedef std::set<RowKeyEntry*> CertKeySet;
         CertKeySet cert_keys_;
     };
