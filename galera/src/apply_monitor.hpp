@@ -159,7 +159,9 @@ namespace galera
         {
             if (mode_ == M_BYPASS) return;
 
+#ifndef NDEBUG
             size_t   idx(indexof(trx->get_global_seqno()));
+#endif // NDEBUG
             gu::Lock lock(mutex_);
 
             pre_enter(trx, lock);
@@ -202,6 +204,7 @@ namespace galera
         {
             assert(last_left_ <= seqno);
             assert(drain_seqno_ == -1);
+            log_info << "draining up to " << seqno;
             gu::Lock lock(mutex_);
             drain_seqno_ = seqno;
             while (drain_seqno_ != last_left_)
