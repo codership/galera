@@ -152,7 +152,6 @@ namespace galera
             assert(appliers_[indexof(last_left_)].state_ == Applier::S_IDLE);
 
             post_leave(trx, lock);
-            // log_info << "apply monitor leave " << trx_seqno;
         }
 
         void self_cancel(TrxHandle* trx)
@@ -202,12 +201,28 @@ namespace galera
 
         void drain(wsrep_seqno_t seqno)
         {
-            assert(last_left_ <= seqno);
             assert(drain_seqno_ == -1);
-            log_info << "draining up to " << seqno;
+            log_info << "DEBUG: draining up to " << seqno;
             gu::Lock lock(mutex_);
             drain_seqno_ = seqno;
-            while (drain_seqno_ != last_left_)
+
+            while (drain_seqno_ - last_left_ >=
+                   static_cast<ssize_t>(appliers_size_)) // TODO: exit on error
+            {
+                lock.wait(cond_);
+            }
+
+            if (drain_seqno_ < last_left_)
+            {
+                for (wsrep_seqno_t i = drain_seqno_; i <= last_left_; ++i)
+                {
+                    const Applier& a(appliers_[indexof(i)]);
+                    log_info << "DEBUG: applier " << i
+                             << " in state " << a.state_;
+                }
+            }
+
+            while (drain_seqno_ < last_left_)
             {
                 lock.wait(cond_);
             }
