@@ -9,4 +9,9 @@ env.Append(LIBS = ['galera++',
                    'galerautils++',
                    'galerautils'])
 
-env.Program(target='test_write_set', source='test_write_set.cpp')
+env.Program(target='galera_check',
+            source=Split('''
+                            galera_check.cpp
+                            write_set_check.cpp
+                         ''')
+            )

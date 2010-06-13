@@ -52,41 +52,86 @@ namespace galera
     class RowKey
     {
     public:
-        RowKey(const void* dbtable = 0, uint16_t dbtable_len = 0,
-               const void* key = 0, uint16_t key_len = 0, gu::byte_t action = 0)
+
+        RowKey(const void* table     = 0,
+               uint16_t    table_len = 0,
+               const void* key       = 0,
+               uint16_t    key_len   = 0,
+               gu::byte_t  action    = 0)
             :
-            dbtable_(dbtable),
-            dbtable_len_(dbtable_len),
-            key_(key),
-            key_len_(key_len),
-            action_(action)
+            table_    (table),
+            key_      (key),
+            table_len_(table_len),
+            key_len_  (key_len),
+            action_   (action)
         { }
-        const void* get_dbtable() const { return dbtable_; }
-        size_t get_dbtable_len() const { return dbtable_len_; }
-        const void* get_key() const { return key_; }
-        size_t get_key_len() const { return key_len_; }
+
+        const void* get_table()     const { return table_; }
+        size_t      get_table_len() const { return table_len_; }
+        const void* get_key()       const { return key_; }
+        size_t      get_key_len()   const { return key_len_; }
+
+        size_t get_hash() const
+        {
+            // djb2
+            // size_t i(0);
+	    size_t prime(5381);
+            const gu::byte_t* tb(reinterpret_cast<const gu::byte_t*>(table_));
+            const gu::byte_t* const te(tb + table_len_);
+
+	    for (; tb != te; ++tb)
+	    {
+                prime = ((prime << 5) + prime) + *tb;
+	    }
+
+            const gu::byte_t* kb(reinterpret_cast<const gu::byte_t*>(key_));
+            const gu::byte_t* const ke(kb + key_len_);
+
+            for (; kb != ke; ++kb)
+	    {
+                prime = ((prime << 5) + prime) + *kb;
+	    }
+
+	    return prime;
+        }
+
+
     private:
+
         friend size_t serialize(const RowKey&, gu::byte_t*, size_t, size_t);
         friend size_t unserialize(const gu::byte_t*, size_t, size_t, RowKey&);
         friend size_t serial_size(const RowKey&);
         friend bool operator==(const RowKey& a, const RowKey& b);
-        const void* dbtable_;
-        uint16_t dbtable_len_;
+        const void* table_;
         const void* key_;
-        uint16_t key_len_;
-        gu::byte_t action_;
+        uint16_t    table_len_;
+        uint16_t    key_len_;
+        gu::byte_t  action_;
     };
 
     inline bool operator==(const RowKey& a, const RowKey&b)
     {
-        if (a.dbtable_len_ != b.dbtable_len_) return false;
-        if (a.key_len_ != b.key_len_) return false;
-        if (memcmp(a.dbtable_, b.dbtable_, a.dbtable_len_) != 0) return false;
-        return (memcmp(a.key_, b.key_, a.key_len_) == 0);
+//        if (a.dbtable_len_ != b.dbtable_len_) return false;
+//        if (a.key_len_ != b.key_len_) return false;
+//        if (memcmp(a.dbtable_, b.dbtable_, a.dbtable_len_) != 0) return false;
+//        return (memcmp(a.key_, b.key_, a.key_len_) == 0);
+
+        return (a.table_len_ == b.table_len_              &&
+                a.key_len_   == b.key_len_                &&
+                !memcmp(a.table_, b.table_, a.table_len_) &&
+                !memcmp(a.key_, b.key_, a.key_len_));
     }
 
     typedef std::deque<RowKey> RowKeySequence;
 
+    // This is needed for unordered map
+    class RowKeyHash
+    {
+    public:
+        size_t operator() (const RowKey& rk) const { return rk.get_hash(); }
+    };
+
+#if 0 // DELETE
     class RowKeyHash
     {
     public:
@@ -119,7 +164,7 @@ namespace galera
 	    return prime;
         }
     };
-
+#endif
 
     class WriteSet
     {
@@ -164,14 +209,19 @@ namespace galera
         { }
 
         const wsrep_uuid_t& get_source_id() const { return source_id_; }
-        wsrep_conn_id_t get_conn_id() const { return conn_id_; }
-        wsrep_trx_id_t get_trx_id() const { return trx_id_; }
-        enum wsdb_ws_type get_type() const { return type_; }
-        enum wsdb_ws_level get_level() const { return level_; }
-        void assign_flags(int flags) { flags_ = flags; }
-        int get_flags() const { return flags_; }
+        wsrep_conn_id_t     get_conn_id()   const { return conn_id_;   }
+        wsrep_trx_id_t      get_trx_id()    const { return trx_id_;    }
+        enum wsdb_ws_type   get_type()      const { return type_;      }
+        enum wsdb_ws_level  get_level()     const { return level_;     }
 
-        void assign_last_seen_trx(wsrep_seqno_t seqno) { last_seen_trx_ = seqno; }
+        void assign_flags(int flags) { flags_ = flags; }
+        int  get_flags() const { return flags_; }
+
+        void assign_last_seen_trx(wsrep_seqno_t seqno)
+        {
+            last_seen_trx_ = seqno;
+        }
+
         wsrep_seqno_t get_last_seen_trx() const { return last_seen_trx_; }
         const gu::Buffer& get_data() const { return data_; }
 
@@ -205,13 +255,20 @@ namespace galera
         void get_keys(RowKeySequence&) const;
         const gu::Buffer& get_key_buf() const { return keys_; }
         const QuerySequence& get_queries() const { return queries_; }
-        bool empty() const { return (data_.size() == 0 && queries_.size() == 0); }
+        bool is_empty() const
+        {
+            return (data_.size() == 0 && queries_.size() == 0);
+        }
+
         void serialize(gu::Buffer& buf) const;
         void clear() { keys_.clear(), key_refs_.clear(),
                 data_.clear(), queries_.clear(); }
+
     private:
+
         friend size_t serialize(const WriteSet&, gu::byte_t*, size_t, size_t);
-        friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&, bool skip_data = false);
+        friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&,
+                                  bool skip_data = false);
         friend size_t serial_size(const WriteSet&);
 
         wsrep_uuid_t   source_id_;

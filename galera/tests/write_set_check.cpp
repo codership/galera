@@ -252,30 +252,30 @@ START_TEST(test_cert)
 }
 END_TEST
 
-Suite* suite()
+Suite* write_set_suite()
 {
     Suite* s = suite_create("write_set");
     TCase* tc;
 
-        tc = tcase_create("test_query_sequence");
-        tcase_add_test(tc, test_query_sequence);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_query_sequence");
+    tcase_add_test(tc, test_query_sequence);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_write_set");
-        tcase_add_test(tc, test_write_set);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_write_set");
+    tcase_add_test(tc, test_write_set);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_mapped_buffer");
-        tcase_add_test(tc, test_mapped_buffer);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_mapped_buffer");
+    tcase_add_test(tc, test_mapped_buffer);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_cert");
-        tcase_add_test(tc, test_cert);
-        suite_add_tcase(s, tc);
-        return s;
+    tc = tcase_create("test_cert");
+    tcase_add_test(tc, test_cert);
+    suite_add_tcase(s, tc);
+    return s;
 }
 
-
+#if 0 // DELETE
 int main(int argc, char** argv)
 {
     SRunner* sr = srunner_create(suite());
@@ -284,3 +284,4 @@ int main(int argc, char** argv)
     srunner_free(sr);
     return n_fail == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
+#endif

@@ -20,6 +20,7 @@ namespace galera
     class RowKeyEntry
     {
     public:
+
         RowKeyEntry(const RowKey& row_key);
 
         const RowKey& get_row_key() const;
@@ -34,6 +35,7 @@ namespace galera
         { }
 
     private:
+
         void operator=(const RowKeyEntry&);
         RowKey row_key_;
         gu::Buffer row_key_buf_;
@@ -45,6 +47,7 @@ namespace galera
     private:
 
         typedef gu::UnorderedMap<RowKey, RowKeyEntry*, RowKeyHash> CertIndex;
+
         class DiscardRK
         {
         public:
@@ -53,8 +56,11 @@ namespace galera
                 delete vt.second;
             }
         };
-        typedef std::multiset<wsrep_seqno_t> DepsSet;
+
+        typedef std::multiset<wsrep_seqno_t>        DepsSet;
+
         typedef std::map<wsrep_seqno_t, TrxHandle*> TrxMap;
+
     public:
 
         Certification(const std::string& conf = "");
