@@ -66,33 +66,31 @@ namespace galera
             action_   (action)
         { }
 
-        const void* get_table()     const { return table_; }
+        const void* get_table()     const { return table_;     }
         size_t      get_table_len() const { return table_len_; }
-        const void* get_key()       const { return key_; }
-        size_t      get_key_len()   const { return key_len_; }
+        const void* get_key()       const { return key_;       }
+        size_t      get_key_len()   const { return key_len_;   }
 
         size_t get_hash() const
         {
-            // djb2
-            // size_t i(0);
-	    size_t prime(5381);
+            size_t prime(5381);
             const gu::byte_t* tb(reinterpret_cast<const gu::byte_t*>(table_));
             const gu::byte_t* const te(tb + table_len_);
 
-	    for (; tb != te; ++tb)
-	    {
+            for (; tb != te; ++tb)
+            {
                 prime = ((prime << 5) + prime) + *tb;
-	    }
+            }
 
             const gu::byte_t* kb(reinterpret_cast<const gu::byte_t*>(key_));
             const gu::byte_t* const ke(kb + key_len_);
 
             for (; kb != ke; ++kb)
-	    {
+            {
                 prime = ((prime << 5) + prime) + *kb;
-	    }
+            }
 
-	    return prime;
+            return prime;
         }
 
 
@@ -111,11 +109,6 @@ namespace galera
 
     inline bool operator==(const RowKey& a, const RowKey&b)
     {
-//        if (a.dbtable_len_ != b.dbtable_len_) return false;
-//        if (a.key_len_ != b.key_len_) return false;
-//        if (memcmp(a.dbtable_, b.dbtable_, a.dbtable_len_) != 0) return false;
-//        return (memcmp(a.key_, b.key_, a.key_len_) == 0);
-
         return (a.table_len_ == b.table_len_              &&
                 a.key_len_   == b.key_len_                &&
                 !memcmp(a.table_, b.table_, a.table_len_) &&
@@ -130,41 +123,6 @@ namespace galera
     public:
         size_t operator() (const RowKey& rk) const { return rk.get_hash(); }
     };
-
-#if 0 // DELETE
-    class RowKeyHash
-    {
-    public:
-
-        size_t operator()(const RowKey& rk) const
-        {
-            // djb2
-            // size_t i(0);
-	    size_t prime(5381);
-            const gu::byte_t* dbtb(reinterpret_cast<const gu::byte_t*>(
-                                       rk.get_dbtable()));
-            const gu::byte_t* const dbte(reinterpret_cast<const gu::byte_t*>(
-                                             rk.get_dbtable()) + rk.get_dbtable_len());
-	    while (dbtb != dbte)
-	    {
-                prime = ((prime << 5) + prime) + *dbtb;
-                ++dbtb;
-	    }
-
-            const gu::byte_t* kb(reinterpret_cast<const gu::byte_t*>(
-                                     rk.get_key()));
-            const gu::byte_t* const ke(reinterpret_cast<const gu::byte_t*>(
-                                           rk.get_key()) + rk.get_key_len());
-	    while (kb != ke)
-	    {
-                prime = ((prime << 5) + prime) + *kb;
-                ++kb;
-	    }
-
-	    return prime;
-        }
-    };
-#endif
 
     class WriteSet
     {

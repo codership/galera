@@ -274,14 +274,3 @@ Suite* write_set_suite()
     suite_add_tcase(s, tc);
     return s;
 }
-
-#if 0 // DELETE
-int main(int argc, char** argv)
-{
-    SRunner* sr = srunner_create(suite());
-    srunner_run_all(sr, CK_NORMAL);
-    int n_fail = srunner_ntests_failed(sr);
-    srunner_free(sr);
-    return n_fail == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
-}
-#endif
