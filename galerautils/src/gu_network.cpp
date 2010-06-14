@@ -873,7 +873,9 @@ const gu::Datagram* gu::net::Socket::recv(const int flags)
         {
             if (dgram.checksum() != hdr.crc32())
             {
-                gu_throw_error(EINVAL) << "invalid checksum";
+                log_warn << "checksum failed for socket " << fd;
+                set_state(S_FAILED, EINVAL);
+                return 0;
             }
         }
 
@@ -963,7 +965,9 @@ const gu::Datagram* gu::net::Socket::recv(const int flags)
             {
                 if (dgram.checksum() != hdr.crc32())
                 {
-                    gu_throw_error(EINVAL) << "invalid checksum";
+                    log_warn << "checksum failed for socket " << fd;
+                    set_state(S_FAILED, EINVAL);
+                    return 0;
                 }
             }
             return &dgram;
