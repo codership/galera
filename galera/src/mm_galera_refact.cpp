@@ -27,6 +27,7 @@ extern "C"
 #include "gu_lock.hpp"
 #include "gu_uri.hpp"
 
+#include "galera_service_thd.hpp"
 #include "apply_monitor.hpp"
 #include "certification.hpp"
 #include "wsdb.hpp"
@@ -42,7 +43,6 @@ static gu::prof::Profile galera_prof("galera");
 #define galera_prof ""
 #endif // GALERA_PROFILE
 
-using namespace gu;
 using namespace std;
 using namespace galera;
 static Wsdb* wsdb;
@@ -64,7 +64,6 @@ typedef enum galera_repl_state {
 /* application's handlers */
 static void*                    app_ctx            = NULL;
 static wsrep_bf_apply_cb_t      bf_apply_cb        = NULL;
-//DELETE static wsrep_ws_start_cb_t      ws_start_cb        = NULL;
 static wsrep_view_cb_t          view_handler_cb    = NULL;
 static wsrep_synced_cb_t        synced_cb          = NULL;
 static wsrep_sst_donate_cb_t    sst_donate_cb      = NULL;
@@ -72,6 +71,7 @@ static wsrep_sst_donate_cb_t    sst_donate_cb      = NULL;
 /* gcs parameters */
 static gu_to_t            *cert_queue   = NULL;
 static gcs_conn_t         *gcs_conn     = NULL;
+static ServiceThd         *service_thd  = 0;
 
 typedef enum
 {
@@ -87,11 +87,8 @@ public:
     bool operator()(wsrep_seqno_t last_entered, wsrep_seqno_t last_left,
                     const TrxHandle* trx) const
     {
-//        // 1) all preceding trxs have entered
-        // 2) no dependencies or dependent has left the monitor
-//        return (last_entered + 1 >= trx->get_global_seqno() &&
-//                (last_left       >= trx->get_last_depends_seqno() ||
-//                 -1               == trx->get_last_depends_seqno()));
+        // 1) local trx is already applied
+        // 2) dependencies have left the monitor
         return (trx->is_local() || last_left >= trx->get_last_depends_seqno());
     }
 };
@@ -347,6 +344,8 @@ enum wsrep_status mm_galera_init(wsrep_t* gh,
         GU_DBUG_RETURN(WSREP_NODE_FAIL);
     }
 
+    service_thd = new ServiceThd (gcs_conn);
+
     last_recved = status.last_applied;
 
     my_idx = 0;
@@ -394,6 +393,8 @@ enum wsrep_status mm_galera_connect (wsrep_t *gh,
     if (sst_donor) free ((char*)sst_donor);
     sst_donor = strdup (state_donor);
     if (!sst_donor) GU_DBUG_RETURN(WSREP_FATAL);
+
+    service_thd->reset();
 
     rcode = gcs_open(gcs_conn, cluster_name, cluster_url);
     if (rcode) {
@@ -469,7 +470,8 @@ void mm_galera_tear_down(wsrep_t *gh)
         data_dir = NULL;
         if (sst_donor) free ((char*)sst_donor);
         sst_donor = NULL;
-        if (gcs_conn)     gcs_destroy (gcs_conn);
+        delete service_thd; service_thd = 0;
+        if (gcs_conn)  gcs_destroy (gcs_conn);
         gcs_conn = NULL;
         delete wsdb; wsdb = 0;
         delete cert; cert = 0;
@@ -607,31 +609,35 @@ static inline bool report_check_counter ()
 }
 
 // this should be run after commit_queue is released
-static inline void report_last_committed (
-    gcs_conn_t* gcs_conn
-) {
+static inline void report_last_committed (gcs_conn_t* gcs_conn)
+{
     gcs_seqno_t safe_seqno = cert->get_safe_to_discard_seqno();
-    long ret;
 
     gu_debug ("Reporting: safe to discard: %lld, last applied: %lld, "
               "last received: %lld",
               safe_seqno, status.last_applied, last_recved);
 
+    service_thd->report_last_committed (safe_seqno);
+
+#if 0 /* DELETE */
+    long ret;
     if ((ret = gcs_set_last_applied(gcs_conn, safe_seqno))) {
         gu_warn ("Failed to report last committed %llu, %d (%s)",
                  safe_seqno, ret, strerror (-ret));
         // failure, set counter to trigger new attempt
         report_counter += report_interval;
     }
+#endif
 }
 
 static inline void truncate_trx_history (gcs_seqno_t seqno)
 {
-    static long const truncate_interval = 64;
-    static long const truncate_offset   = 32;
-    static gcs_seqno_t last_truncated = 0;
+    static long const  truncate_interval = 64;
+    static long const  truncate_offset   = 0;
+    static gcs_seqno_t last_truncated    = 0;
 
-    if (last_truncated + truncate_interval + truncate_offset < seqno) {
+    if (last_truncated + truncate_interval + truncate_offset < seqno)
+    {
         seqno -= truncate_offset; // avoid purging too much
         gu_debug ("Purging history up to %llu", seqno);
         cert->purge_trxs_upto(seqno);
@@ -952,7 +958,8 @@ static bool
 galera_st_required (const gcs_act_conf_t* conf)
 {
     bool st_required           = (conf->my_state == GCS_NODE_STATE_PRIM);
-    const gu_uuid_t* conf_uuid = reinterpret_cast<const gu_uuid_t*>(conf->group_uuid);
+    const gu_uuid_t* conf_uuid =
+        reinterpret_cast<const gu_uuid_t*>(conf->group_uuid);
 
     if (st_required) {
 
@@ -969,16 +976,6 @@ galera_st_required (const gcs_act_conf_t* conf)
                 st_required = (status.last_applied != conf->seqno);
             }
         }
-
-#if 0 // probably not needed anymore?
-        if (st_required) {
-            status.stage = GALERA_STAGE_JOINING;
-        }
-        else {
-            // rewrote conf->st_required, tell GCS about it
-            galera_join();
-        }
-#endif
     }
     else {
         /* some sanity checks */
@@ -998,11 +995,13 @@ galera_handle_configuration (wsrep_t* gh,
                              const gcs_act_conf_t* conf,
                              gcs_seqno_t conf_seqno)
 {
-    long ret             = 0;
-    const gu_uuid_t* conf_uuid = reinterpret_cast<const gu_uuid_t*>(conf->group_uuid);
-    bool st_required;
+    long    ret = 0;
+    bool    st_required;
     void*   app_req = NULL;
     ssize_t app_req_len;
+
+    const gu_uuid_t* conf_uuid =
+        reinterpret_cast<const gu_uuid_t*>(conf->group_uuid);
 
     GU_DBUG_ENTER("galera_handle_configuration");
 
@@ -1050,14 +1049,8 @@ galera_handle_configuration (wsrep_t* gh,
     // @todo view handler consumes view_info, this should be changed so
     // that handler has responsibility of taking copy if it wants to
     // store info permanently
-    view_handler_cb (NULL, recv_ctx,
-                     view_info,
-                     NULL, 0,
-                     &app_req,
-                     &app_req_len
-        );
-
-
+    view_handler_cb (NULL, recv_ctx, view_info, NULL, 0,
+                     &app_req, &app_req_len);
 
     if (conf->conf_id >= 0) {                // PRIMARY configuration
 
@@ -1174,6 +1167,8 @@ galera_handle_configuration (wsrep_t* gh,
             }
 
             gu_mutex_unlock (&sst_mtx);
+
+            service_thd->reset();
         }
         else {                              /* no state transfer required */
             /* sanity check */
@@ -1291,11 +1286,7 @@ enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx)
         return WSREP_OK;
     }
 
-    /* we must have gcs connection */
-    if (!gcs_conn) {
-        gu_info("recv method cannot start, no gcs connection");
-        return WSREP_NODE_FAIL;
-    }
+    assert(gcs_conn);
 
     while (!shutdown) {
         gcs_act_type_t  action_type;
@@ -1350,7 +1341,7 @@ enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx)
         else if (0 <= seqno_l) {
             /* Actions processed below are special and very rare, so they are
              * processed in isolation */
-            GALERA_GRAB_QUEUE (cert_queue,   seqno_l);
+            GALERA_GRAB_QUEUE (cert_queue, seqno_l);
             if (cert->position() != -1)
             {
                 apply_monitor.drain(cert->position());
@@ -1359,7 +1350,8 @@ enum wsrep_status mm_galera_recv(wsrep_t *gh, void *recv_ctx)
             switch (action_type) {
             case GCS_ACT_CONF:
             {
-                galera_handle_configuration (gh, recv_ctx, (gcs_act_conf_t*)action, seqno_l);
+                galera_handle_configuration (gh, recv_ctx,
+                                             (gcs_act_conf_t*)action, seqno_l);
                 if (-1 == my_idx /* self-leave */)
                 {
                     status.stage = GALERA_STAGE_INIT;
@@ -1432,7 +1424,6 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
      * this call must be allowed even if conn_state != GALERA_CONNECTED,
      * slave applier must be able to kill remaining conflicting trxs
      */
-
 
     /* take commit mutex to be sure, committing trx does not
      * conflict with us

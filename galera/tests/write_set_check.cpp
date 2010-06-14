@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2010 Codership Oy <info@codership.com>
+ */
+
 #include "write_set.cpp"
 #include "mapped_buffer.cpp"
 #include "gu_logger.hpp"

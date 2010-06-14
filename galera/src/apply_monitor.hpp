@@ -3,7 +3,7 @@
 #define GALERA_APPLY_MONITOR_HPP
 
 #include "trx_handle.hpp"
-#include "gu_lock.hpp"
+#include <galerautils.hpp>
 
 #include <vector>
 

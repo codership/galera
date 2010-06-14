@@ -1,4 +1,6 @@
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+/*
+ * Copyright (C) 2010 Codership Oy <info@codership.com>
+ */
 
 #include <cstdlib>
 #include <cstdio>
@@ -11,10 +13,12 @@
 typedef Suite* (*suite_creator_t) (void);
 
 extern Suite* write_set_suite();
+extern Suite* service_thd_suite();
 
 static suite_creator_t suites[] =
 {
     write_set_suite,
+    service_thd_suite,
     0
 };
 

@@ -29,17 +29,17 @@ struct gu_mutex
 /** @name Usual mutex operations storing FILE and LINE information */
 /*@{*/
 int gu_mutex_init_dbg    (struct gu_mutex *mutex,
-			  const pthread_mutexattr_t *attr,
-			  const char *file, unsigned int line);
+                          const pthread_mutexattr_t *attr,
+                          const char *file, unsigned int line);
 int gu_mutex_lock_dbg    (struct gu_mutex *mutex,
-			  const char *file, unsigned int line);
+                          const char *file, unsigned int line);
 int gu_mutex_unlock_dbg  (struct gu_mutex *mutex,
-			  const char *file, unsigned int line);
+                          const char *file, unsigned int line);
 int gu_mutex_destroy_dbg (struct gu_mutex *mutex,
-			  const char *file, unsigned int line);
+                          const char *file, unsigned int line);
 int gu_cond_wait_dbg     (pthread_cond_t *cond,
-			  struct gu_mutex *mutex, 
-			  const char *file, unsigned int line);
+                          struct gu_mutex *mutex, 
+                          const char *file, unsigned int line);
 /*@}*/
 
 /** Shorter mutex API for applications.

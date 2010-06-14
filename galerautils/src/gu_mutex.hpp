@@ -11,6 +11,7 @@
 #include <cstring>
 
 #include "gu_macros.h"
+#include "gu_mutex.h"
 #include "gu_throw.hpp"
 
 namespace gu
@@ -21,12 +22,12 @@ namespace gu
 
         Mutex () : value()
         {
-            pthread_mutex_init (&value, NULL); // always succeeds
+            gu_mutex_init (&value, NULL); // always succeeds
         }
 
         ~Mutex ()
         {
-            int err = pthread_mutex_destroy (&value);
+            int err = gu_mutex_destroy (&value);
             if (gu_unlikely(err != 0))
             {
                 gu_throw_error (err) << "pthread_mutex_destroy()";
@@ -35,17 +36,17 @@ namespace gu
 
         void lock()
         {
-            pthread_mutex_lock(&value);
+            gu_mutex_lock(&value);
         }
 
         void unlock()
         {
-            pthread_mutex_unlock(&value);
+            gu_mutex_unlock(&value);
         }
 
     protected:
 
-        pthread_mutex_t mutable value;
+        gu_mutex_t mutable value;
 
     private:
 
@@ -83,8 +84,8 @@ namespace gu
         }
         
     private:
-        RecursiveMutex(const Mutex&);
-        void operator=(const Mutex&);
+        RecursiveMutex(const RecursiveMutex&);
+        void operator=(const RecursiveMutex&);
         
         pthread_mutex_t mutex_;
     };

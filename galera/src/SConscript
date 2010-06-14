@@ -21,6 +21,7 @@ env.StaticLibrary('galera++', [
         'wsdb.cpp',
         'certification.cpp',
         'galera_wsdb.cpp',
+        'galera_service_thd.cpp',
 ])
 
 env.SharedLibrary('galera++', [
@@ -30,6 +31,7 @@ env.SharedLibrary('galera++', [
         'wsdb.cpp',
         'certification.cpp',
         'galera_wsdb.cpp',
+        'galera_service_thd.cpp',
 ])
 
 

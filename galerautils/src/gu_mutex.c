@@ -13,18 +13,18 @@
 /* Is it usable? */
 static const struct gu_mutex
 gu_mutex_init = { .target_mutex      = PTHREAD_MUTEX_INITIALIZER,
-		  .control_mutex     = PTHREAD_MUTEX_INITIALIZER,
-		  .lock_waiter_count = 0,
-		  .cond_waiter_count = 0,
-		  .holder_count      = 0,
-		  .thread            = 0, // unknown thread
-		  .file              = __FILE__,
-		  .line              = __LINE__
+                  .control_mutex     = PTHREAD_MUTEX_INITIALIZER,
+                  .lock_waiter_count = 0,
+                  .cond_waiter_count = 0,
+                  .holder_count      = 0,
+                  .thread            = 0, // unknown thread
+                  .file              = __FILE__,
+                  .line              = __LINE__
 };
 
 int gu_mutex_init_dbg (struct gu_mutex *m,
-		       const pthread_mutexattr_t* attr,
-		       const char *file, unsigned int line)
+                       const pthread_mutexattr_t* attr,
+                       const char *file, unsigned int line)
 {
     m->file              = file;
     m->line              = line;
@@ -40,7 +40,7 @@ int gu_mutex_init_dbg (struct gu_mutex *m,
 }
 
 int gu_mutex_lock_dbg(struct gu_mutex *m,
-		      const char *file, unsigned int line)
+                      const char *file, unsigned int line)
 {
     int err = 0;
 
@@ -53,7 +53,7 @@ int gu_mutex_lock_dbg(struct gu_mutex *m,
                      "at %s:%d, first locked at %s:%d",
                      pthread_self(), file, line, m->file, m->line);
             assert(0);
-	    err = EDEADLK; /* return error in case assert is not defined */
+            err = EDEADLK; /* return error in case assert is not defined */
         }
         m->lock_waiter_count++;
     }
@@ -67,12 +67,12 @@ int gu_mutex_lock_dbg(struct gu_mutex *m,
         /* This i a valid situation - mutex could be destroyed */
         gu_debug("%lu mutex lock error (%d: %s) at %s:%d",
                   pthread_self(), err, strerror(err), file, line);
-	return err;
+        return err;
     }
 
     /* need control mutex for info field changes */
     if ((err = pthread_mutex_lock(&m->control_mutex))) {
-	// do we need this check - it's only a control mutex?
+        // do we need this check - it's only a control mutex?
         gu_fatal("%lu mutex lock error (%d: %s) at %s:%d",
                   pthread_self(), err, strerror(err), file, line);
         assert(0);
@@ -98,7 +98,7 @@ int gu_mutex_lock_dbg(struct gu_mutex *m,
 }
 
 int gu_mutex_unlock_dbg (struct gu_mutex *m,
-			 const char *file, unsigned int line)
+                         const char *file, unsigned int line)
 {
     int err = 0;
 
@@ -112,20 +112,20 @@ int gu_mutex_unlock_dbg (struct gu_mutex *m,
             gu_fatal ("%lu attempts to unlock unlocked mutex at %s:%d. "
                       "Last use at %s:%d",
                       pthread_self(), file, line,
-		      m->file ? m->file : "" , m->line);
+            m->file ? m->file : "" , m->line);
             assert(0);
         }
-        
+
         if (m->holder_count > 0  && !pthread_equal(pthread_self(), m->thread)) {
-	    /** last time pthread_t was unsigned long int */
+        /** last time pthread_t was unsigned long int */
             gu_fatal ("%lu attempts to unlock mutex owned by %lu at %s:%d. "
                       "Locked at %s:%d",
-		      pthread_self(), m->thread,
+                      pthread_self(), m->thread,
                       file, line, m->file, m->line);
             assert(0);
-	    return EPERM; /** return in case assert is undefined */
+            return EPERM; /** return in case assert is undefined */
         }
-        
+
         err = pthread_mutex_unlock (&m->target_mutex);
         if (gu_likely(!err)) {
             m->file   = file;
@@ -152,7 +152,7 @@ int gu_mutex_unlock_dbg (struct gu_mutex *m,
             gu_fatal("Error: (%d,%d) during mutex unlock at %s:%d", 
                      err, errno, file, line);
             assert(0);
-	}
+        }
     }
     pthread_mutex_unlock(&m->control_mutex);
 
@@ -160,7 +160,7 @@ int gu_mutex_unlock_dbg (struct gu_mutex *m,
 }
 
 int gu_mutex_destroy_dbg (struct gu_mutex *m,
-			  const char *file, unsigned int line)
+                          const char *file, unsigned int line)
 {
     int err=0;
 
@@ -171,19 +171,19 @@ int gu_mutex_destroy_dbg (struct gu_mutex *m,
                      pthread_self(), file, line);
             assert(0);
         }
-        
+
         if (m->holder_count != 0) {
-	    if (pthread_self() == m->thread) {
-	        gu_fatal ("%lu attempts to destroy mutex locked by "
-		          "itself at %s:%d",
-			   pthread_self(), m->file, m->line);
+            if (pthread_self() == m->thread) {
+                gu_fatal ("%lu attempts to destroy mutex locked by "
+                          "itself at %s:%d",
+                           pthread_self(), m->file, m->line);
                 assert (0); /* logical error in program */
-	    }
+            }
             else {
                 gu_debug("%lu attempts to destroy a mutex at %s:%d "
                          "locked by %lu at %s:%d (not error)",
                          pthread_self(),
-		         file, line, m->thread, m->file, m->line);
+                         file, line, m->thread, m->file, m->line);
 //                         assert (0); // DELETE when not needed!
             }
         }
@@ -199,23 +199,23 @@ int gu_mutex_destroy_dbg (struct gu_mutex *m,
         if ((err = pthread_mutex_destroy(&m->target_mutex))) {
             gu_debug("Error (%d: %s, %d) during mutex destroy at %s:%d",
                      err, strerror(err), errno, file, line);
-	    pthread_mutex_unlock (&m->control_mutex);
-	    return err;
+            pthread_mutex_unlock (&m->control_mutex);
+            return err;
         }
-        
+
         m->file   = 0;
         m->line   = 0;
         m->thread = 0;
-        
+
     }
     pthread_mutex_unlock(&m->control_mutex);
     while (pthread_mutex_destroy(&m->control_mutex));
-        
+
     return err;
 }
 
 int gu_cond_wait_dbg (pthread_cond_t *cond, struct gu_mutex *m, 
-		      const char *file, unsigned int line)
+                      const char *file, unsigned int line)
 {
     int err = 0;
 
@@ -224,17 +224,17 @@ int gu_cond_wait_dbg (pthread_cond_t *cond, struct gu_mutex *m,
 
     pthread_mutex_lock (&m->control_mutex);
     {
-	if (gu_unlikely(m->holder_count <= 0)) {
-	    gu_fatal ("%lu tries to wait for condition on unlocked mutex "
-	              "at %s %d",
-		      pthread_self(), file, line);
-	    assert (0);
-	}
-	else if (!pthread_equal(pthread_self(), m->thread)) {
-	    gu_fatal ("%lu tries to wait for condition on the mutex that"
-	              "belongs to %lu at %s %d",
-		      pthread_self(), m->thread, file, line);
-	    assert (0);
+        if (gu_unlikely(m->holder_count <= 0)) {
+            gu_fatal ("%lu tries to wait for condition on unlocked mutex "
+                      "at %s %d",
+                      pthread_self(), file, line);
+            assert (0);
+        }
+        else if (!pthread_equal(pthread_self(), m->thread)) {
+            gu_fatal ("%lu tries to wait for condition on the mutex that"
+                      "belongs to %lu at %s %d",
+                      pthread_self(), m->thread, file, line);
+            assert (0);
         }
         /** pthread_cond_wait frees the mutex */
         m->holder_count--;
@@ -246,7 +246,7 @@ int gu_cond_wait_dbg (pthread_cond_t *cond, struct gu_mutex *m,
 
     if ((err = pthread_cond_wait (cond, &m->target_mutex))) {
         gu_fatal("Error (%d: %s, %d) during cond_wait at %s:%d",
-		 err, strerror(err), errno, file, line);
+                 err, strerror(err), errno, file, line);
         assert(0);
     }
 
