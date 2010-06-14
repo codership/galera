@@ -7,20 +7,24 @@
 
 #include "gu_buffer.hpp"
 
+#include <boost/crc.hpp>
+
 #include <limits>
 
 #include <cstring>
+#include <stdint.h>
 
 namespace gu
 {
     class Datagram;
 }
 
+
 /*!
  * @brief  Datagram container
  *
- * Datagram class provides consistent interface for managing 
- * datagrams/byte buffers. 
+ * Datagram class provides consistent interface for managing
+ * datagrams/byte buffers.
  */
 class gu::Datagram
 {
@@ -29,7 +33,7 @@ public:
         :
         header_       (),
         header_offset_(header_size_),
-        payload_      (new Buffer()), 
+        payload_      (new Buffer()),
         offset_       (0)
     { }
     /*!
@@ -38,10 +42,10 @@ public:
      * @param[in] buf Const pointer to data buffer
      * @param[in] buflen Length of data buffer
      *
-     * @throws std::bad_alloc 
+     * @throws std::bad_alloc
      */
 
-    Datagram(const Buffer& buf, size_t offset = 0) 
+    Datagram(const Buffer& buf, size_t offset = 0)
         :
         header_       (),
         header_offset_(header_size_),
@@ -76,10 +80,10 @@ public:
         header_offset_(dgram.header_offset_),
         payload_(dgram.payload_),
         offset_(off == std::numeric_limits<size_t>::max() ? dgram.offset_ : off)
-    { 
+    {
         assert(offset_ <= dgram.get_len());
-        memcpy(header_ + header_offset_, 
-               dgram.header_ + dgram.get_header_offset(), 
+        memcpy(header_ + header_offset_,
+               dgram.header_ + dgram.get_header_offset(),
                dgram.get_header_len());
     }
 
@@ -96,8 +100,8 @@ public:
 
         if (get_header_len() > offset_)
         {
-            payload_->insert(payload_->end(), 
-                             header_ + header_offset_ + offset_, 
+            payload_->insert(payload_->end(),
+                             header_ + header_offset_ + offset_,
                              header_ + header_size_);
             offset_ = 0;
         }
@@ -116,7 +120,7 @@ public:
     size_t get_header_size() const { return header_size_; }
     size_t get_header_len() const { return (header_size_ - header_offset_); }
     size_t get_header_offset() const { return header_offset_; }
-    void set_header_offset(const size_t off) 
+    void set_header_offset(const size_t off)
     {
         assert(off <= header_size_);
         header_offset_ = off;
@@ -134,6 +138,14 @@ public:
     }
     size_t get_len() const { return (header_size_ - header_offset_ + payload_->size()); }
     size_t get_offset() const { return offset_; }
+
+    uint32_t checksum() const
+    {
+        boost::crc_32_type crc;
+        crc.process_block(header_ + header_offset_, header_ + header_size_);
+        crc.process_block(&(*payload_)[0], &(*payload_)[0] + payload_->size());
+        return crc.checksum();
+    }
 private:
     static const size_t header_size_ = 128;
     gu::byte_t          header_[header_size_];

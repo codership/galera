@@ -1,15 +1,15 @@
 // Copyright (C) 2009 Codership Oy <info@codership.com>
 
-/*! 
+/*!
  * @file gu_network.hpp Network API
  *
- * These classes provide simple API for datagram oriented network 
- * communication. Because datagram-like communication emulation over stream 
- * channels is provided, connectivity over this interface may 
- * not be transparent/compatible with communication over standard 
- * socket interface. This is the case especially with TCP. 
+ * These classes provide simple API for datagram oriented network
+ * communication. Because datagram-like communication emulation over stream
+ * channels is provided, connectivity over this interface may
+ * not be transparent/compatible with communication over standard
+ * socket interface. This is the case especially with TCP.
  *
- * If fully transparet stream communication is desired, library 
+ * If fully transparet stream communication is desired, library
  * must be extended to work with Stream class (along with Datagram).
  *
  * All addresses are represented in human readable URL like strings.
@@ -109,27 +109,26 @@ private:
     int event_mask;     /*!< Bitfield for waited network events     */
     Addrinfo* listener_ai;
     Sockaddr* sendto_addr; // Needed for dgram sockets
-    
+
     std::string local_addr;
     std::string remote_addr;
-    
-    static const size_t hdrlen = sizeof(uint32_t);
+
     size_t mtu;             // For outgoing data
     size_t max_packet_size; // For incoming date
     size_t max_pending;
-    
+
     gu::Buffer recv_buf;  /*!< Buffer for received data        */
     size_t recv_buf_offset; /*! Offset to the end of read data */
     gu::Datagram dgram;       /*!< Datagram container               */
     gu::Buffer pending;  /*!< Buffer for pending outgoing data */
     State state;        /*!< Socket state                       */
-    
+
     /* Network integration */
     friend class Network;
     Network& net;       /*!< Network object this socket belongs to */
-    
+
     /* Private methods */
-    
+
     /*!
      * @brief Constructor
      */
@@ -140,7 +139,7 @@ private:
            const size_t mtu = default_mtu,
            const size_t max_packet_size = default_mtu,
            const size_t max_pending = default_mtu*5);
-    
+
     /*!
      * @brief Change socket state
      */
@@ -151,7 +150,7 @@ private:
 
     Socket(const Socket&);
     void operator=(const Socket&);
-    
+
 public:
 
     /*!
@@ -164,12 +163,12 @@ public:
         return fd;
     }
 private:
-    
+
     // Set options before connect
     static void set_opt(Socket*, const Addrinfo&, int opt);
 
 
-    
+
     /*!
      * @brief Get current event mask for socket.
      */
@@ -185,12 +184,12 @@ private:
     {
         return event_mask;
     }
-    
+
     /*!
      * @brief Get max pending bytes
      */
     size_t get_max_pending_len() const;
-    
+
     /*!
      * @brief Send pending bytes
      */
@@ -203,17 +202,18 @@ public:
     {
         /* NOTE: O_NON_BLOCKING is needed for non-blocking connect() */
         O_NON_BLOCKING = 1 << 0, /*!< Socket operations are non-blocking */
-        O_NO_INTERRUPT = 1 << 1  /*!< Socket methods calls are not 
+        O_NO_INTERRUPT = 1 << 1, /*!< Socket methods calls are not
                                   * interruptible */
+        O_CRC32        = 1 << 2  /*!< Add crc32 in outgoing datagrams */
     };
 
     int get_opt() const { return options; }
-        
+
     /*!
      * @brief Destructor
      */
     ~Socket();
-    
+
     /*!
      * @brief Connect socket
      *
@@ -235,9 +235,9 @@ public:
      * @throws std::logic_error If socket was not open (connected, listening or accepted)
      */
     void close();
-        
+
     /*!
-     * @brief Start listening on @p addr 
+     * @brief Start listening on @p addr
      *
      * @param[in] addr Address URL to bind and start listening to
      * @param[in] backlog Backlog parameter passed to underlying listen call
@@ -250,38 +250,38 @@ public:
      *
      * @return New connected socket
      *
-     * @throws std::logic_error If accept is called for socket that is 
+     * @throws std::logic_error If accept is called for socket that is
      *         not listening
      */
     Socket* accept();
 
     /**
-     * @brief Receive complete datagram from socket. 
+     * @brief Receive complete datagram from socket.
      *
-     * @param[in] flags Optional flags for underlying system recv call 
+     * @param[in] flags Optional flags for underlying system recv call
      *            (default none)
      *
-     * @return Const pointer to Datagram object containing received 
+     * @return Const pointer to Datagram object containing received
      *         datagram or 0 if no complete datagram was received.
      *
-     * @throws InterruptedException If underlying system call was 
-     *         interrupted by signal and socket option O_NO_INTERRUPT 
+     * @throws InterruptedException If underlying system call was
+     *         interrupted by signal and socket option O_NO_INTERRUPT
      *         was not set
      * @throws std::runtime_error If other error was encountered during call
      */
     const Datagram* recv(int flags = 0);
 
     /**
-     * @brief Send complete datagram 
+     * @brief Send complete datagram
      *
-     * Send complete datagram over socket connection. Whole datagram 
+     * Send complete datagram over socket connection. Whole datagram
      * is sent or scheduled to be sent when this call returs. However,
-     * note that if the socket is made non-blocking, some parts of the 
+     * note that if the socket is made non-blocking, some parts of the
      * datagram may still be scheduled for sending. If Network.wait_event()
      * returns event indicating that this socket has become writable again,
      * @f send() must be called to schedule resending of remaining bytes.
      *
-     * 
+     *
      *
      * @param[in] dgram Const pointer to datagram to be send
      * @param[in] flags Optional flags for send call (default none)
@@ -289,10 +289,10 @@ public:
      * @return Zero if send call was successfull or error number (EAGAIN) in
      *         case of error
      *
-     * @throws InterruptedException if underlying system call was 
+     * @throws InterruptedException if underlying system call was
      *         interrupted by signal and socket option O_NO_INTERRUPT was
      *         not set
-     * @throws std::runtime_error If other error was encountered 
+     * @throws std::runtime_error If other error was encountered
      */
     int send(const Datagram* dgram = 0, int flags = 0);
 
@@ -316,27 +316,14 @@ public:
      * @return Error string
      */
     const std::string get_errstr() const;
-    
+
     std::string get_local_addr() const { return local_addr; }
     std::string get_remote_addr() const { return remote_addr; }
     size_t get_mtu() const { return mtu; }
-    
-    bool has_unread_data() const { return (recv_buf_offset > 0 && 
+
+    bool has_unread_data() const { return (recv_buf_offset > 0 &&
                                            recv_buf_offset == dgram.get_payload().size()); }
-    
-    size_t get_recv_buf_offset() const { return recv_buf_offset; }
-    size_t get_recv_buf_hdr_len() const
-    {
-        if (recv_buf_offset > hdrlen)
-        {
-            return *reinterpret_cast<const uint32_t*>(&recv_buf[0]);
-        }
-        else
-        {
-            return 0;
-        }
-    }
-    
+
     void release();
 };
 
@@ -345,14 +332,14 @@ public:
  */
 class gu::net::NetworkEvent
 {
-public:    
+public:
     /*!
      * @brief Get event type
      *
      * @return Event type
      */
     int get_event_mask() const;
-    
+
     /*!
      * @brief Get pointer to corresponding socket
      *
@@ -363,7 +350,7 @@ public:
 private:
     int event_mask;             /*!< Event mask              */
     Socket* socket;             /*!< Socket related to event */
-    friend class Network;        
+    friend class Network;
     NetworkEvent(int, Socket*); /*!< Private constructor */
 };
 
@@ -375,12 +362,12 @@ private:
 class gu::net::Network
 {
 public:
-    
+
     /*!
      * @brief Default constructor
      */
     Network();
-    
+
     /*!
      * @brief Destructor
      */
@@ -388,7 +375,7 @@ public:
 
     Socket* connect(const std::string& addr);
     Socket* listen(const std::string& addr);
-    
+
     /*!
      * @brief Wait network event
      *
@@ -402,14 +389,14 @@ public:
      *         was interrupted by signal
      * @throws std::runtime_error If error was encountered
      */
-    NetworkEvent wait_event(const gu::datetime::Period& = gu::datetime::Period(-1), 
+    NetworkEvent wait_event(const gu::datetime::Period& = gu::datetime::Period(-1),
                             bool auto_handle = true);
-    
+
     /*!
      * Interrupt network wait_event()
      */
     void interrupt();
-    
+
     /*!
      * @brief Set event mask for @p sock
      *
@@ -417,13 +404,13 @@ public:
      * @param[in] mask Event mask
      *
      * @throws std::invalid_argument If event mask was invalid
-     * @throws std::logic_error If socket was not found or was in 
+     * @throws std::logic_error If socket was not found or was in
      *         invalid state
      */
     void set_event_mask(Socket* sock, int mask);
-    
+
     /*!
-     * 
+     *
      */
     static size_t get_mtu() { return default_mtu; }
 
@@ -439,7 +426,7 @@ private:
     Socket* find(int);
     /* Don't allow assignment or copy construction */
     Network operator=(const Network&);
-    Network(const Network&);    
+    Network(const Network&);
 };
 
 #endif /* __GU_NETWORK_HPP__ */
