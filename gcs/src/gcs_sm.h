@@ -56,7 +56,7 @@ _gcs_sm_leave_unsafe (gcs_sm_t* sm)
     register bool next = (sm->wait_q_len > 0);
     sm->wait_q_head = (sm->wait_q_head + next) & sm->wait_q_mask;
     sm->wait_q_len--;
-    
+
     if (sm->wait_q_len >= 0 && !sm->pause) {
         assert (sm->wait_q[sm->wait_q_head] != NULL);
         gu_cond_signal (sm->wait_q[sm->wait_q_head]);
@@ -76,7 +76,7 @@ _gcs_sm_enqueue_unsafe (gcs_sm_t* sm, gu_cond_t* cond)
     sm->wait_q[tail] = NULL;
 }
 
-/*! 
+/*!
  * Enter send monitor critical section
  *
  * @param sm   send monitor object
@@ -147,7 +147,7 @@ gcs_sm_pause (gcs_sm_t* sm)
 
     sm->pause = (sm->ret == 0); // don't pause closed monitor
 
-    gu_mutex_unlock (&sm->lock);    
+    gu_mutex_unlock (&sm->lock);
 }
 
 static inline void
@@ -175,7 +175,7 @@ gcs_sm_continue (gcs_sm_t* sm)
         assert(0);
     }
 
-    gu_mutex_unlock (&sm->lock);    
+    gu_mutex_unlock (&sm->lock);
 }
 
 #endif /* _gcs_sm_h_ */

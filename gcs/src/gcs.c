@@ -1376,13 +1376,15 @@ gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
 #ifdef GCS_USE_SM
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
+
     long ret = gcs_sm_enter (conn->sm, &cond, false);
 
     if (!ret) {
         ret = gcs_core_set_last_applied (conn->core, seqno);
         gcs_sm_leave (conn->sm);
-        gu_cond_destroy (&cond);
     }
+
+    gu_cond_destroy (&cond);
 
     return ret;
 #else
