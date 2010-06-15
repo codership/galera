@@ -78,17 +78,17 @@ START_TEST (gcs_backend_test)
 //    gcs_dummy.o
 
     ret = gcs_backend_init (&backend,
-                  "gcomm://0.0.0.0:4567?gmcast.node=gcomm+tcp://1.2.3.4:4567");
+                  "gcomm://0.0.0.0:4567");
     fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
     fail_if (backend.name != gcs_gcomm_name);
 
-    ret = gcs_backend_init (&backend, "vsbes://kkk");
-    fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
-    fail_if (backend.name != gcs_vs_name);
+//    ret = gcs_backend_init (&backend, "vsbes://kkk");
+//    fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
+//    fail_if (backend.name != gcs_vs_name);
 
-    ret = gcs_backend_init (&backend, "spread://");
-    fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
-    fail_if (backend.name != gcs_spread_name);
+//    ret = gcs_backend_init (&backend, "spread://");
+//    fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
+//    fail_if (backend.name != gcs_spread_name);
 
 }
 END_TEST
