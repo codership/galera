@@ -1,3 +1,7 @@
+2010-06-16 Alex 
+    Added gcs_interrupt() call to be able to interrupt scheduled threads.
+    Version 0.13.1
+
 2010-05-31 Alex 
     Added flow control monitor and ability to synchronize with gcs_send()
     and gcs_repl() calls thus guranteeing FIFO order. Version 0.13.0

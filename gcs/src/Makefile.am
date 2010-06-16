@@ -65,7 +65,7 @@ endif
 include_HEADERS   = gcs.h
 lib_LTLIBRARIES   = libgcs.la
 libgcs_la_SOURCES = $(GCS_SRCS)
-INTERFACE = 17
+INTERFACE = 18
 REVISION  = 0
 AGE       = 0
 libgcs_la_LDFLAGS = \

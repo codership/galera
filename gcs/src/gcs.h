@@ -211,6 +211,7 @@ extern long gcs_recv (gcs_conn_t      *conn,
  * @param act_id global action ID (sequence number)
  * @param local_act_id local action ID (sequence number)
  * @return negative error code, action size in case of success
+ * @retval -EINTR: thread was interrupted while waiting to enter the monitor
  */
 extern long gcs_repl (gcs_conn_t          *conn,
                       const void          *action,
@@ -221,9 +222,26 @@ extern long gcs_repl (gcs_conn_t          *conn,
                       gcs_seqno_t         *local_act_id);
 
 /*!
- * Schedules entry to CGS send monitor. Should be quickly followed by gcs_repl()
+ * @brief Schedules entry to CGS send monitor.
+ * Locks send monitor and should be quickly followed by gcs_repl()/gcs_send()
+ *
+ * @retval 0       - won't queue
+ * @retval >0      - queue handle
+ * @retval -EAGAIN - too many queued threads
+ * @retval -EBADFD - connection is closed
  */
-extern void gcs_schedule (gcs_conn_t* conn);
+extern long gcs_schedule (gcs_conn_t* conn);
+
+/*!
+ * @brief Interrupt a thread waiting to enter send monitor.
+ *
+ * @param  conn    GCS connection
+ * @param  handle  queue handle returned by @func gcs_schedule(). Must be > 0
+ *
+ * @retval 0       success
+ * @retval -ESRCH  no such thread/already interrupted
+ */
+extern long gcs_interrupt (gcs_conn_t* conn, long handle);
 
 /*!
  * After action with this seqno is applied, this thread is guaranteed to see

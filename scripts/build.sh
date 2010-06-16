@@ -139,7 +139,7 @@ fi
 if [ "$DEBUG" == "yes" ]; then CONFIGURE="yes"; fi
 if [ -n "$WITH_SPREAD" ]; then CONFIGURE="yes"; fi
 
-if [ "$CONFIGURE" == "yes" ]; then SCRATCH="yes"; fi
+if [ "$CONFIGURE" == "yes" ] && [ "$SCONS" != "yes" ]; then SCRATCH="yes"; fi
 
 # Be quite verbose
 set -x

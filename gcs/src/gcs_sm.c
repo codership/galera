@@ -25,8 +25,10 @@ gcs_sm_create (long len, long n)
         return NULL;
     }
 
-    size_t    sm_size = sizeof(gcs_sm_t) + len * sizeof(gu_cond_t*);
-    gcs_sm_t* sm      = gu_malloc(sm_size);
+    size_t sm_size = sizeof(gcs_sm_t) +
+        len * sizeof(((gcs_sm_t*)(0))->wait_q[0]);
+
+    gcs_sm_t* sm = gu_malloc(sm_size);
 
     if (sm) {
         gu_mutex_init (&sm->lock, NULL);
@@ -36,8 +38,9 @@ gcs_sm_create (long len, long n)
         sm->wait_q_len  = -n; // -n where n is a number of simult. users
         sm->entered     = 0;
         sm->ret         = 0;
+        sm->c           = sm->wait_q_len; // concurrency param.
         sm->pause       = false;
-        memset (sm->wait_q, 0, sm->wait_q_size * sizeof(gu_cond_t*));
+        memset (sm->wait_q, 0, sm->wait_q_size * sizeof(sm->wait_q[0]));
     }
 
     return sm;

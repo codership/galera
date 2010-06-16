@@ -1123,10 +1123,21 @@ long gcs_send (gcs_conn_t*          conn,
     return ret;
 }
 
-void gcs_schedule (gcs_conn_t* conn)
+long gcs_schedule (gcs_conn_t* conn)
 {
 #ifdef GCS_USE_SM
-    gcs_sm_schedule (conn->sm);
+    return gcs_sm_schedule (conn->sm);
+#else
+    return 0;
+#endif /* GCS_USE_SM */
+}
+
+long gcs_interrupt (gcs_conn_t* conn, long handle)
+{
+#ifdef GCS_USE_SM
+    return gcs_sm_interrupt (conn->sm, handle);
+#else
+    return 0;
 #endif /* GCS_USE_SM */
 }
 

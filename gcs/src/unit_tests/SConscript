@@ -32,7 +32,8 @@ gcs_tests_sources = Split('''
 
 
 
-gcs_tests_env.Append(CPPFLAGS = ' -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING -DGCS_USE_GCOMM')
+gcs_tests_env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM')
+gcs_tests_env.Append(CPPFLAGS = ' -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING')
 gcs_tests_env.Replace(CFLAGS = ' -std=gnu99 -fno-strict-aliasing')
 gcs_tests_env.Prepend(LIBS = Split('''
                                       galerautils
