@@ -611,7 +611,7 @@ static inline bool report_check_counter ()
 // this should be run after commit_queue is released
 static inline void report_last_committed (gcs_conn_t* gcs_conn)
 {
-    gcs_seqno_t safe_seqno = cert->get_safe_to_discard_seqno();
+    const gcs_seqno_t safe_seqno(cert->get_safe_to_discard_seqno());
 
     gu_debug ("Reporting: safe to discard: %lld, last applied: %lld, "
               "last received: %lld",
@@ -1463,6 +1463,12 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
     case WSDB_TRX_REPLICATING:
         gu_debug("victim trx is replicating: %lld", victim->local_seqno());
         victim->set_state(WSDB_TRX_MUST_ABORT);
+        int rc;
+        if (victim->gcs_handle() > 0 &&
+            (rc = gcs_interrupt(gcs_conn, victim->gcs_handle())) != 0)
+        {
+            log_warn << "gcs_interrupt(): " << strerror(-rc);
+        }
         ret_code = WSREP_OK;
         break;
 
@@ -1738,6 +1744,12 @@ enum wsrep_status mm_galera_pre_commit(
     GU_DBUG_PRINT("galera", ("trx: %llu", trx->trx_id()));
 
     TrxHandleLock lock(*trx);
+
+    if (trx->state() == WSDB_TRX_MUST_ABORT)
+    {
+        return WSREP_TRX_FAIL;
+    }
+
     trx->set_conn_id(conn_id);
 
     assert(trx->state() == WSDB_TRX_VOID);
@@ -1748,8 +1760,14 @@ enum wsrep_status mm_galera_pre_commit(
 
     // grab gcs resource before setting last applied to ensure
     // monotonous increase of last seen seqno
-    gcs_schedule(gcs_conn);
+    const long gcs_handle(gcs_schedule(gcs_conn));
+    if (gcs_handle < 0)
+    {
+        log_warn << "gcs_schedule(): " << strerror(-gcs_handle);
+        return WSREP_TRX_FAIL;
+    }
 
+    trx->set_gcs_handle(gcs_handle);
     trx->set_write_set_type(WSDB_WS_TYPE_TRX);
     trx->set_last_seen_seqno(apply_monitor.last_left());
     trx->set_flags(TrxHandle::F_COMMIT);
@@ -1784,6 +1802,7 @@ enum wsrep_status mm_galera_pre_commit(
     profile_leave(galera_prof);
 
     trx->lock();
+    trx->set_gcs_handle(-1);
     *global_seqno = seqno_g;
 
 #ifdef EXTRA_DEBUG
@@ -1807,6 +1826,7 @@ enum wsrep_status mm_galera_pre_commit(
     trx->set_seqnos(seqno_l, seqno_g);
     if (trx->state() != WSDB_TRX_REPLICATING)
     {
+        log_info << "replicating trx changed state to " << trx->state();
         if (check_certification_status_for_aborted(seqno_l, trx) == WSREP_OK)
         {
             trx->set_position(WSDB_TRX_POS_CERT_QUEUE);
@@ -1822,7 +1842,6 @@ enum wsrep_status mm_galera_pre_commit(
             goto post_repl_out;
         }
     }
-
 
     trx->set_state(WSDB_TRX_REPLICATED);
 

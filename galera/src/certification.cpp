@@ -331,9 +331,14 @@ wsrep_seqno_t galera::Certification::get_safe_to_discard_seqno() const
 
 void galera::Certification::purge_trxs_upto(wsrep_seqno_t seqno)
 {
-    assert(seqno >= 0 && seqno <= get_safe_to_discard_seqno());
+    assert(seqno >= 0
+           /* see note below && seqno <= get_safe_to_discard_seqno() */);
+    const wsrep_seqno_t stds(get_safe_to_discard_seqno());
     Lock lock(mutex_);
-    TrxMap::iterator lower_bound(trx_map_.lower_bound(seqno));
+    // Note: setting trx committed is not done in total order so
+    // safe to discard seqno may decrease. Enable assertion above when this
+    // issue is fixed.
+    TrxMap::iterator lower_bound(trx_map_.lower_bound(min(seqno, stds)));
     for_each(trx_map_.begin(), lower_bound, PurgeAndDiscard(*this));
     trx_map_.erase(trx_map_.begin(), lower_bound);
     if (trx_map_.size() > 10000)

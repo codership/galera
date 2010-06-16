@@ -104,6 +104,10 @@ namespace galera
                         cert_.n_certified_--;
                         cert_.deps_dist_ -= (trx->global_seqno() - trx->last_seen_seqno());
                     }
+                    if (trx->refcnt() > 1)
+                    {
+                        log_warn << "trx " << trx->trx_id() << " refcnt " << trx->refcnt();
+                    }
                 }
                 vt.second->unref();
             }

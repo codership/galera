@@ -55,6 +55,7 @@ namespace galera
             write_set_type_    (),
             certified_         (false),
             committed_         (false),
+            gcs_handle_        (-1),
             cert_keys_         ()
         { }
 
@@ -113,6 +114,9 @@ namespace galera
                 throw;
             }
         }
+
+        void set_gcs_handle(long gcs_handle) { gcs_handle_ = gcs_handle; }
+        long gcs_handle() const { return gcs_handle_; }
 
         wsrep_seqno_t local_seqno() const { return local_seqno_; }
 
@@ -211,6 +215,7 @@ namespace galera
 
         bool                   certified_;
         bool                   committed_;
+        long                   gcs_handle_;
 
         //
         friend class Wsdb;
