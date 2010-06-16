@@ -89,7 +89,7 @@ public:
     {
         // 1) local trx is already applied
         // 2) dependencies have left the monitor
-        return (trx->is_local() || last_left >= trx->get_last_depends_seqno());
+        return (trx->is_local() || last_left >= trx->last_depends_seqno());
     }
 };
 
@@ -99,7 +99,7 @@ public:
     bool operator()(wsrep_seqno_t last_entered, wsrep_seqno_t last_left,
                     const TrxHandle* trx) const
     {
-        return (last_left + 1 == trx->get_global_seqno());
+        return (last_left + 1 == trx->global_seqno());
     }
 };
 
@@ -109,7 +109,7 @@ public:
     bool operator()(wsrep_seqno_t last_entered, wsrep_seqno_t last_left,
                     const TrxHandle* trx) const
     {
-        return (last_left + 1 == trx->get_global_seqno());
+        return (last_left + 1 == trx->global_seqno());
     }
 };
 
@@ -151,7 +151,7 @@ static inline galera::TrxHandle* get_trx(galera::Wsdb* wsdb,
     {
         trx = reinterpret_cast<TrxHandle*>(trx_handle->opaque);
         assert(wsdb->get_trx(my_uuid, trx_handle->trx_id) == trx);
-        assert(trx->get_trx_id() == trx_handle->trx_id);
+        assert(trx->trx_id() == trx_handle->trx_id);
     }
     else
     {
@@ -186,17 +186,17 @@ static inline long while_eagain_or_trx_abort (
     if (-EAGAIN == (rcode = function (to, seqno)))
     {
         trx->lock();
-        assert(trx->get_local_seqno() == seqno);
-        if (trx->get_state() == WSDB_TRX_MUST_ABORT) {
+        assert(trx->local_seqno() == seqno);
+        if (trx->state() == WSDB_TRX_MUST_ABORT) {
             gu_debug("WSDB_TRX_MUST_ABORT for trx: %lld %lld",
-                     trx->get_global_seqno(), trx->get_local_seqno());
+                     trx->global_seqno(), trx->local_seqno());
             return -EINTR;
         }
 
         gu_debug("INTRERRUPT for trx: %lld %lld in state: %d",
-                trx->get_global_seqno(),
-                 trx->get_local_seqno(),
-                 trx->get_state());
+                trx->global_seqno(),
+                 trx->local_seqno(),
+                 trx->state());
 
         return -EINTR;
     }
@@ -313,7 +313,7 @@ enum wsrep_status mm_galera_init(wsrep_t* gh,
 
     /* 2. initialize wsdb */
     // wsdb_init(data_dir, (gu_log_cb_t)args->logger_cb);
-    wsdb = Wsdb::create("galera");
+    wsdb = new Wsdb;
     cert = new Certification;
 
     /* 3. try to read saved state from file */
@@ -670,11 +670,13 @@ static wsrep_status_t process_conn_write_set(
     bool do_report;
     wsrep_status_t rcode = WSREP_OK;
 
-    assert (trx->get_global_seqno() > 0);
+    assert (trx->global_seqno() > 0);
 
     /* wait for total order */
     GALERA_GRAB_QUEUE (cert_queue,   seqno_l);
+
     int cert_ret(cert->append_trx(trx));
+
     /* release total order */
     GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
 
@@ -682,17 +684,17 @@ static wsrep_status_t process_conn_write_set(
 
     if (cert_ret == WSDB_OK)
     {
-        if (gu_likely(galera_update_last_received(trx->get_global_seqno())))
+        if (gu_likely(galera_update_last_received(trx->global_seqno())))
         {
             /* Global seqno ok, certification ok (not needed?) */
-            const MappedBuffer& wscoll(trx->get_write_set_collection());
-            size_t offset(0);
+            const MappedBuffer& wscoll(trx->write_set_collection());
+            size_t offset(serial_size(*trx));
             WriteSet ws;
             while (offset < wscoll.size())
             {
                 offset = unserialize(&wscoll[0], wscoll.size(), offset, ws);
                 rcode = apply_write_set(recv_ctx, ws,
-                                        trx->get_global_seqno());
+                                        trx->global_seqno());
                 if (rcode)
                 {
                     gu_error ("unknown galera fail: %d trx: %llu",
@@ -704,7 +706,7 @@ static wsrep_status_t process_conn_write_set(
         }
     }
 
-    GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
+    GALERA_UPDATE_LAST_APPLIED (trx->global_seqno());
     do_report = report_check_counter();
 
     apply_monitor.leave(trx);
@@ -730,30 +732,30 @@ enum wsrep_status process_query_write_set_applying(
     static const size_t max_apply_attempts(10);
     size_t attempts(0);
     int rcode(WSREP_OK);
-    const MappedBuffer& wscoll(trx->get_write_set_collection());
+    const MappedBuffer& wscoll(trx->write_set_collection());
 
     do
     {
-        size_t offset(0);
+        size_t offset(serial_size(*trx));
         WriteSet ws;
         while (offset < wscoll.size())
         {
             offset = unserialize(&wscoll[0], wscoll.size(), offset, ws);
             if ((rcode = apply_write_set(recv_ctx,
                                          ws,
-                                         trx->get_global_seqno())))
+                                         trx->global_seqno())))
             {
                 gu_warn("ws apply failed, rcode: %d, seqno: %lld, "
                         "last_seen: %lld attempt: %zd",
-                        rcode, trx->get_global_seqno(),
-                        trx->get_last_seen_seqno(), attempts);
+                        rcode, trx->global_seqno(),
+                        trx->last_seen_seqno(), attempts);
 
                 if (apply_query(recv_ctx, "rollback\0", 9,
-                                trx->get_global_seqno())) {
+                                trx->global_seqno())) {
                     gu_warn("ws apply rollback failed, seqno: %lld, "
                             "last_seen: %lld",
-                            trx->get_global_seqno(),
-                            trx->get_last_seen_seqno());
+                            trx->global_seqno(),
+                            trx->last_seen_seqno());
                     rcode = WSREP_FATAL;
                 }
                 ++attempts;
@@ -772,7 +774,7 @@ enum wsrep_status process_query_write_set_applying(
 
     if (attempts == max_apply_attempts) {
         gu_warn("ws applying is not possible, %lld - %lld",
-                trx->get_global_seqno(), seqno_l);
+                trx->global_seqno(), seqno_l);
         // We don't release commit queue here to disallow following
         // transactions to commit
         return WSREP_TRX_FAIL;
@@ -780,23 +782,23 @@ enum wsrep_status process_query_write_set_applying(
 
     if (rcode == WSREP_OK &&
         (rcode = apply_query(recv_ctx, "commit\0", 7,
-                             trx->get_global_seqno())) != WSREP_OK)
+                             trx->global_seqno())) != WSREP_OK)
     {
         gu_fatal("ws apply commit failed, seqno: %lld %lld, "
                  "last_seen: %lld",
-                 trx->get_global_seqno(),
+                 trx->global_seqno(),
                  seqno_l,
-                 trx->get_last_seen_seqno());
+                 trx->last_seen_seqno());
         gu_throw_fatal << "ws apply commit failed";
     }
 
-    gu_debug("GALERA ws commit for: %lld %lld", trx->get_global_seqno(),
+    gu_debug("GALERA ws commit for: %lld %lld", trx->global_seqno(),
              seqno_l);
 
     // Bookkeeping for local trxs is done in post commit
     if (trx->is_local() == false)
     {
-        GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
+        GALERA_UPDATE_LAST_APPLIED (trx->global_seqno());
         bool do_report(report_check_counter());
         apply_monitor.leave(trx);
 
@@ -816,12 +818,13 @@ static wsrep_status_t process_query_write_set(
     ) {
     int rcode;
     enum wsrep_status ret_code;
-    gcs_seqno_t seqno_g = trx->get_global_seqno();
+    gcs_seqno_t seqno_g = trx->global_seqno();
 
     assert (seqno_g > 0);
 
     // wait for total order
     GALERA_GRAB_QUEUE (cert_queue, seqno_l);
+
 
     if (gu_likely(galera_update_last_received(seqno_g)))
     {
@@ -839,7 +842,7 @@ static wsrep_status_t process_query_write_set(
     GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
 
     gu_debug("remote trx seqno: %lld %lld last_seen_trx: %lld %lld, cert: %d",
-             seqno_g, seqno_l, trx->get_last_seen_seqno(),
+             seqno_g, seqno_l, trx->last_seen_seqno(),
              last_recved, rcode);
 
     switch (rcode)
@@ -859,7 +862,7 @@ static wsrep_status_t process_query_write_set(
     case WSDB_CERTIFICATION_FAIL:
         // certification failed, release
         gu_debug("trx certification failed: (%lld %lld) last_seen: %lld",
-                 seqno_g, seqno_l, trx->get_last_seen_seqno());
+                 seqno_g, seqno_l, trx->last_seen_seqno());
         if (trx->is_local() == false)
         {
             // cancel apply monitor and commit queue
@@ -910,7 +913,7 @@ static wsrep_status_t process_write_set(
     TrxHandle* trx(cert->create_trx(data, data_len, seqno_l, seqno_g));
     TrxHandleLock lock(*trx);
 
-    switch (trx->get_write_set_type())
+    switch (trx->write_set_type())
     {
     case WSDB_WS_TYPE_TRX:
         rcode = process_query_write_set(recv_ctx, trx, seqno_l);
@@ -1439,10 +1442,10 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
     TrxHandleLock lock(*victim);
 
     gu_debug("abort_pre_commit trx state: %d seqno: %lld trx %lld bf_seqno %lld",
-            victim->get_state(), victim->get_local_seqno(), victim_trx, bf_seqno);
+            victim->state(), victim->local_seqno(), victim_trx, bf_seqno);
 
     /* continue to kill the victim */
-    switch (victim->get_state()) {
+    switch (victim->state()) {
     case WSDB_TRX_ABORTING_REPL:
     case WSDB_TRX_ABORTING_NONREPL:
     case WSDB_TRX_MUST_REPLAY:
@@ -1452,34 +1455,34 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
         break;
 
     case WSDB_TRX_VOID:
-        victim->assign_state(WSDB_TRX_MUST_ABORT);
+        victim->set_state(WSDB_TRX_MUST_ABORT);
         ret_code = WSREP_WARNING;
         gu_debug("no seqno for trx, marked trx aborted: %llu", victim_trx);
         break;
 
     case WSDB_TRX_REPLICATING:
-        gu_debug("victim trx is replicating: %lld", victim->get_local_seqno());
-        victim->assign_state(WSDB_TRX_MUST_ABORT);
+        gu_debug("victim trx is replicating: %lld", victim->local_seqno());
+        victim->set_state(WSDB_TRX_MUST_ABORT);
         ret_code = WSREP_OK;
         break;
 
     default:
-        assert(victim->get_global_seqno() != -1);
-        if (victim->get_global_seqno() < bf_seqno)
+        assert(victim->global_seqno() != -1);
+        if (victim->global_seqno() < bf_seqno)
         {
             gu_debug("trying to interrupt earlier trx:  %lld - %lld",
-                     victim->get_global_seqno(), bf_seqno);
+                     victim->global_seqno(), bf_seqno);
             ret_code = WSREP_WARNING;
         }
         else
         {
             gu_debug("interrupting trx commit: trx_id %llu, seqno %lld",
-                     victim_trx, victim->get_local_seqno());
+                     victim_trx, victim->local_seqno());
 
             /*
              * MUST_ABORT needs to be set only if TO interrupt does not work
              */
-            rcode = gu_to_interrupt(cert_queue, victim->get_local_seqno());
+            rcode = gu_to_interrupt(cert_queue, victim->local_seqno());
             switch (rcode) {
             case 0:
                 ret_code = WSREP_OK;
@@ -1492,18 +1495,18 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
                  */
                 gu_warn("victim trx does not fit cert TO queue");
 
-                victim->assign_state(WSDB_TRX_MUST_ABORT);
+                victim->set_state(WSDB_TRX_MUST_ABORT);
                 ret_code = WSREP_OK;
 
                 break;
             case -ERANGE:
                 /* victim was canceled or used already */
                 gu_debug("trx interupt fail in cert_queue for %lld: %d (%s)",
-                         victim->get_local_seqno(), rcode, strerror(-rcode));
+                         victim->local_seqno(), rcode, strerror(-rcode));
                 ret_code = WSREP_OK;
             }
         }
-        if (victim->get_global_seqno() != GCS_SEQNO_ILL)
+        if (victim->global_seqno() != GCS_SEQNO_ILL)
         {
             apply_monitor.interrupt(victim);
         }
@@ -1542,9 +1545,9 @@ enum wsrep_status mm_galera_abort_slave_trx(
         ret_code = WSREP_WARNING;
     } else {
         gu_debug("interrupting trx commit: seqno_g %lld seqno_l %lld",
-                 victim_seqno, victim->get_local_seqno());
+                 victim_seqno, victim->local_seqno());
 
-        rcode = gu_to_interrupt(cert_queue, victim->get_local_seqno());
+        rcode = gu_to_interrupt(cert_queue, victim->local_seqno());
         if (rcode) {
             gu_debug("BF trx interupt fail in cert_queue: %d", rcode);
         }
@@ -1571,12 +1574,12 @@ enum wsrep_status mm_galera_post_commit(
 
     GU_DBUG_ENTER("galera_post_commit");
 
-    GU_DBUG_PRINT("galera", ("trx: %llu", trx->get_trx_id()));
+    GU_DBUG_PRINT("galera", ("trx: %llu", trx->trx_id()));
 
-    assert (trx->get_state() == WSDB_TRX_REPLICATED);
-    assert (trx->get_global_seqno() != WSREP_SEQNO_UNDEFINED);
+    assert (trx->state() == WSDB_TRX_REPLICATED);
+    assert (trx->global_seqno() != WSREP_SEQNO_UNDEFINED);
 
-    GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
+    GALERA_UPDATE_LAST_APPLIED (trx->global_seqno());
 
     bool do_report(report_check_counter());
 
@@ -1590,7 +1593,7 @@ enum wsrep_status mm_galera_post_commit(
 
     // Additional ref so that trx is not freed during discard
     trx->ref();
-    wsdb->discard_trx(trx->get_trx_id());
+    wsdb->discard_trx(trx->trx_id());
     // trx should still be owned by cert
     assert(trx->refcnt() == 2);
     trx->unref();
@@ -1615,13 +1618,13 @@ enum wsrep_status mm_galera_post_rollback(
 
     GU_DBUG_ENTER("galera_post_rollback");
 
-    GU_DBUG_PRINT("galera", ("trx: %llu", trx->get_trx_id()));
+    GU_DBUG_PRINT("galera", ("trx: %llu", trx->trx_id()));
 
     gu_debug("trx state: %d at post_rollback for: %lld",
-             trx->get_state(),
-             trx->get_local_seqno());
+             trx->state(),
+             trx->local_seqno());
 
-    switch (trx->get_state())
+    switch (trx->state())
     {
     case WSDB_TRX_MISSING:
         trx->unlock();
@@ -1634,7 +1637,7 @@ enum wsrep_status mm_galera_post_rollback(
     case WSDB_TRX_REPLICATED:
     case WSDB_TRX_ABORTING_REPL:
         /* these have replicated */
-        assert (trx->get_local_seqno() > 0);
+        assert (trx->local_seqno() > 0);
         cert->set_trx_committed(trx);
         // trx->clear();
         // Note: commit queue should have been released already in
@@ -1644,12 +1647,12 @@ enum wsrep_status mm_galera_post_rollback(
         /* local trx was removed in pre_commit phase already */
         assert(trx->refcnt() >= 1);
         trx->unlock();
-        wsdb->discard_trx(trx->get_trx_id());
+        wsdb->discard_trx(trx->trx_id());
         break;
     default:
         trx->unlock();
         gu_debug("trx state: %d at galera_rolledback for: %lld",
-                 trx->get_state(), trx->get_local_seqno()
+                 trx->state(), trx->local_seqno()
             );
         break;
     }
@@ -1686,8 +1689,8 @@ static int check_certification_status_for_aborted(
         gu_debug ("BF conflicting local trx %lld has certified, "
                   "cert. interval: %lld - %lld",
                   seqno_l,
-                  trx->get_last_seen_seqno(),
-                  trx->get_global_seqno());
+                  trx->last_seen_seqno(),
+                  trx->global_seqno());
         /* certification ok */
         return WSREP_OK;
 
@@ -1695,13 +1698,13 @@ static int check_certification_status_for_aborted(
         /* certification failed, release */
         gu_debug("BF conflicting local trx %lld certification failed: "
                  "%lld - %lld", seqno_l,
-                 trx->get_last_seen_seqno(),
-                 trx->get_global_seqno());
+                 trx->last_seen_seqno(),
+                 trx->global_seqno());
         return WSREP_TRX_FAIL;
 
     default:
         gu_fatal("wsdb append failed: seqno_g %lld seqno_l %lld",
-                 trx->get_global_seqno(), seqno_l);
+                 trx->global_seqno(), seqno_l);
         abort();
         break;
     }
@@ -1732,39 +1735,41 @@ enum wsrep_status mm_galera_pre_commit(
         return WSREP_OK;
     }
 
-    GU_DBUG_PRINT("galera", ("trx: %llu", trx->get_trx_id()));
+    GU_DBUG_PRINT("galera", ("trx: %llu", trx->trx_id()));
 
     TrxHandleLock lock(*trx);
-    trx->assign_conn_id(conn_id);
+    trx->set_conn_id(conn_id);
 
-    assert(trx->get_state() == WSDB_TRX_VOID);
+    assert(trx->state() == WSDB_TRX_VOID);
 
     // generate write set
+
     wsdb->create_write_set(trx, rbr_data, rbr_data_len);
-    WriteSet& ws(trx->get_write_set());
 
     // grab gcs resource before setting last applied to ensure
     // monotonous increase of last seen seqno
     gcs_schedule(gcs_conn);
 
-    ws.assign_last_seen_trx(status.last_applied);
-    ws.assign_flags(WriteSet::F_COMMIT);
+    trx->set_write_set_type(WSDB_WS_TYPE_TRX);
+    trx->set_last_seen_seqno(apply_monitor.last_left());
+    trx->set_flags(TrxHandle::F_COMMIT);
     wsdb->flush_trx(trx, true);
-    const MappedBuffer& wscoll(trx->get_write_set_collection());
 
-    assert (WSREP_SEQNO_UNDEFINED == trx->get_global_seqno());
+    const MappedBuffer& wscoll(trx->write_set_collection());
+
+    assert (WSREP_SEQNO_UNDEFINED == trx->global_seqno());
 
     /* this is possibly autocommit query, need to let it continue */
     /* avoid sending empty write sets */
     if (wscoll.empty() == true)
     {
         gu_throw_fatal << "empty write set";
-        gu_warn("empty write set for: %llu", trx->get_trx_id());
+        gu_warn("empty write set for: %llu", trx->trx_id());
         trx->clear();
         GU_DBUG_RETURN(WSREP_OK);
     }
 
-    trx->assign_state(WSDB_TRX_REPLICATING);
+    trx->set_state(WSDB_TRX_REPLICATING);
     trx->unlock();
 
     profile_enter(galera_prof);
@@ -1788,30 +1793,30 @@ enum wsrep_status mm_galera_pre_commit(
 
     if (rcode != static_cast<int>(wscoll.size())) {
         gu_error("gcs_repl() failed for: %llu, len: %d, rcode: %d (%s)",
-                 trx->get_trx_id(), wscoll.size(), rcode, strerror (-rcode));
+                 trx->trx_id(), wscoll.size(), rcode, strerror (-rcode));
         assert (GCS_SEQNO_ILL == seqno_l);
         assert (GCS_SEQNO_ILL == seqno_g);
         trx->clear();
-        trx->assign_state(WSDB_TRX_ABORTING_NONREPL);
+        trx->set_state(WSDB_TRX_ABORTING_NONREPL);
         GU_DBUG_RETURN(WSREP_CONN_FAIL);
     }
 
     assert (GCS_SEQNO_ILL != seqno_g);
     assert (GCS_SEQNO_ILL != seqno_l);
 
-    trx->assign_seqnos(seqno_l, seqno_g);
-    if (trx->get_state() != WSDB_TRX_REPLICATING)
+    trx->set_seqnos(seqno_l, seqno_g);
+    if (trx->state() != WSDB_TRX_REPLICATING)
     {
         if (check_certification_status_for_aborted(seqno_l, trx) == WSREP_OK)
         {
-            trx->assign_position(WSDB_TRX_POS_CERT_QUEUE);
-            trx->assign_state(WSDB_TRX_MUST_REPLAY);
+            trx->set_position(WSDB_TRX_POS_CERT_QUEUE);
+            trx->set_state(WSDB_TRX_MUST_REPLAY);
             GU_DBUG_RETURN(WSREP_BF_ABORT);
         }
         else
         {
             retcode = WSREP_TRX_FAIL;
-            trx->assign_state(WSDB_TRX_ABORTING_REPL);
+            trx->set_state(WSDB_TRX_ABORTING_REPL);
             GALERA_SELF_CANCEL_QUEUE(cert_queue, seqno_l);
             // apply monitor is self canceled in post_repl_out
             goto post_repl_out;
@@ -1819,7 +1824,7 @@ enum wsrep_status mm_galera_pre_commit(
     }
 
 
-    trx->assign_state(WSDB_TRX_REPLICATED);
+    trx->set_state(WSDB_TRX_REPLICATED);
 
     profile_enter(galera_prof);
 
@@ -1837,14 +1842,14 @@ enum wsrep_status mm_galera_pre_commit(
 
         if (check_certification_status_for_aborted(seqno_l, trx) == WSREP_OK)
         {
-            trx->assign_position(WSDB_TRX_POS_CERT_QUEUE);
-            trx->assign_state(WSDB_TRX_MUST_REPLAY);
+            trx->set_position(WSDB_TRX_POS_CERT_QUEUE);
+            trx->set_state(WSDB_TRX_MUST_REPLAY);
             GU_DBUG_RETURN(WSREP_BF_ABORT);
         }
         else
         {
             retcode = WSREP_TRX_FAIL;
-            trx->assign_state(WSDB_TRX_ABORTING_REPL);
+            trx->set_state(WSDB_TRX_ABORTING_REPL);
             GALERA_SELF_CANCEL_QUEUE(cert_queue, seqno_l);
             // apply monitor is self canceled in post_repl_out
             goto post_repl_out;
@@ -1866,7 +1871,7 @@ enum wsrep_status mm_galera_pre_commit(
         case WSDB_OK:
             gu_debug ("local trx %lld certified, cert. interval: %lld - %lld",
                       seqno_l,
-                      ws.get_last_seen_trx(),
+                      trx->last_seen_seqno(),
                       seqno_g);
             /* certification ok */
             retcode = WSREP_OK;
@@ -1875,7 +1880,7 @@ enum wsrep_status mm_galera_pre_commit(
             /* certification failed, release */
             retcode = WSREP_TRX_FAIL;
             gu_debug("local trx %lld certification failed: %lld - %lld",
-                     seqno_l, ws.get_last_seen_trx(), seqno_g);
+                     seqno_l, trx->last_seen_seqno(), seqno_g);
             status.local_cert_failures++;
             break;
         default:
@@ -1908,7 +1913,7 @@ enum wsrep_status mm_galera_pre_commit(
         case -EINTR:
             // todo - must be replayed?
             log_warn << "aborting certified";
-            trx->assign_state(WSDB_TRX_ABORTING_REPL);
+            trx->set_state(WSDB_TRX_ABORTING_REPL);
             retcode = WSREP_TRX_FAIL;
             break;
         }
@@ -2163,15 +2168,15 @@ enum wsrep_status mm_galera_to_execute_start(
 
     // generate write set
     wsdb->create_write_set(trx);
-    WriteSet& ws(trx->get_write_set());
 
     // grab gcs resource before setting last applied to ensure
     // monotonous increase of last seen seqno
     gcs_schedule(gcs_conn);
-    ws.assign_last_seen_trx(status.last_applied);
-    ws.assign_flags(WriteSet::F_COMMIT);
+    trx->set_last_seen_seqno(apply_monitor.last_left());
+    trx->set_write_set_type(WSDB_WS_TYPE_CONN);
+    trx->set_flags(TrxHandle::F_COMMIT);
     wsdb->flush_trx(trx, true);
-    const MappedBuffer& wscoll(trx->get_write_set_collection());
+    const MappedBuffer& wscoll(trx->write_set_collection());
 
     /* replicate through gcs */
     do {
@@ -2201,7 +2206,7 @@ enum wsrep_status mm_galera_to_execute_start(
     gu_debug("TO isolation applier starting, seqnos: %lld - %lld",
              seqno_g, seqno_l);
 
-    trx->assign_seqnos(seqno_l, seqno_g);
+    trx->set_seqnos(seqno_l, seqno_g);
 
     /* wait for total order */
     GALERA_GRAB_QUEUE (cert_queue, seqno_l);
@@ -2249,26 +2254,25 @@ enum wsrep_status mm_galera_to_execute_end(
     TrxHandle* trx(wsdb->get_conn_query(my_uuid, conn_id));
     if (trx == 0)
     {
-        gu_throw_fatal << "conn query " << conn_id << " not found from wsdb: "
-                       << *wsdb;
+        gu_throw_fatal << "conn query " << conn_id << " not found from wsdb";
 
     }
     TrxHandleLock lock(*trx);
 
     /* release monitors */
     do_report = report_check_counter();
-    GALERA_RELEASE_QUEUE (cert_queue, trx->get_local_seqno());
+    GALERA_RELEASE_QUEUE (cert_queue, trx->local_seqno());
     apply_monitor.leave(trx);
 
     gu_debug("TO applier ending  seqnos: %lld - %lld",
-             trx->get_local_seqno(), trx->get_global_seqno());
+             trx->local_seqno(), trx->global_seqno());
 
-    GALERA_UPDATE_LAST_APPLIED (trx->get_global_seqno());
+    GALERA_UPDATE_LAST_APPLIED (trx->global_seqno());
 
     cert->set_trx_committed(trx);
     if (do_report) report_last_committed (gcs_conn);
 
-    wsdb->discard_conn_query(trx->get_conn_id());
+    wsdb->discard_conn_query(trx->conn_id());
     GU_DBUG_RETURN(WSREP_OK);
 }
 
@@ -2282,19 +2286,19 @@ enum wsrep_status mm_galera_replay_trx(
     TrxHandleLock lock(*trx);
 
     gu_info("trx_replay for: %lld %lld state: %d, data len: %d",
-             trx->get_local_seqno(),
-             trx->get_global_seqno(),
-             trx->get_state(),
-             trx->get_write_set_collection().size());
+             trx->local_seqno(),
+             trx->global_seqno(),
+             trx->state(),
+             trx->write_set_collection().size());
 
-    if (trx->get_state() != WSDB_TRX_MUST_REPLAY) {
-        gu_error("replayed trx in bad state: %d", trx->get_state());
+    if (trx->state() != WSDB_TRX_MUST_REPLAY) {
+        gu_error("replayed trx in bad state: %d", trx->state());
         return WSREP_NODE_FAIL;
     }
 
-    trx->assign_state(WSDB_TRX_REPLAYING);
+    trx->set_state(WSDB_TRX_REPLAYING);
 
-    if (trx->get_position() == WSDB_TRX_POS_CERT_QUEUE)
+    if (trx->position() == WSDB_TRX_POS_CERT_QUEUE)
     {
         apply_monitor.enter(trx);
     }
@@ -2313,47 +2317,47 @@ enum wsrep_status mm_galera_replay_trx(
      * when job is done, we will reset the seqno back to 0
      */
 
-    if (trx->get_write_set_type() == WSDB_WS_TYPE_TRX)
+    if (trx->write_set_type() == WSDB_WS_TYPE_TRX)
     {
-        switch (trx->get_position()) {
+        switch (trx->position()) {
         case WSDB_TRX_POS_CERT_QUEUE:
             ret_code = process_query_write_set(
                 recv_ctx, trx,
-                trx->get_local_seqno());
+                trx->local_seqno());
             break;
 
         case WSDB_TRX_POS_COMMIT_QUEUE:
             ret_code = process_query_write_set_applying(
-                recv_ctx, trx, trx->get_local_seqno());
+                recv_ctx, trx, trx->local_seqno());
 
             /* register committed transaction */
             if (ret_code != WSREP_OK) {
                 gu_fatal(
                     "could not re-apply trx: %lld %lld",
-                    trx->get_global_seqno(), trx->get_local_seqno()
+                    trx->global_seqno(), trx->local_seqno()
                     );
                 abort();
             }
             break;
         default:
             gu_fatal("bad trx pos in reapplying: %d %lld",
-                     trx->get_position(),
-                     trx->get_global_seqno(),
-                     trx->get_local_seqno());
+                     trx->position(),
+                     trx->global_seqno(),
+                     trx->local_seqno());
             abort();
         }
     }
     else
     {
-        gu_error("replayed trx ws has bad type: %d", trx->get_write_set_type());
+        gu_error("replayed trx ws has bad type: %d", trx->write_set_type());
         return WSREP_NODE_FAIL;
     }
-    trx->assign_state(WSDB_TRX_REPLICATED);
+    trx->set_state(WSDB_TRX_REPLICATED);
 
     gu_debug("replaying over for applier: %d rcode: %d, seqno: %lld %lld",
              -1, ret_code,
-             trx->get_global_seqno(),
-             trx->get_local_seqno());
+             trx->global_seqno(),
+             trx->local_seqno());
 
     if (ret_code != WSREP_OK)
     {

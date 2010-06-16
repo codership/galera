@@ -94,12 +94,8 @@ size_t galera::serialize(const WriteSet& ws,
                          size_t          buf_len,
                          size_t          offset)
 {
-    uint32_t hdr(ws.type_ | (ws.level_ << 8) | (ws.flags_ << 16));
+    uint32_t hdr(ws.level_ & 0xff);
     offset = serialize(hdr, buf, buf_len, offset);
-    offset = serialize(ws.source_id_, buf, buf_len, offset);
-    offset = serialize(ws.conn_id_, buf, buf_len, offset);
-    offset = serialize(ws.trx_id_, buf, buf_len, offset);
-    offset = serialize(ws.last_seen_trx_, buf, buf_len, offset);
     offset = serialize<QuerySequence::const_iterator, uint32_t>(
         ws.queries_.begin(), ws.queries_.end(), buf, buf_len, offset);
     offset = serialize<uint32_t>(
@@ -112,32 +108,19 @@ size_t galera::serialize(const WriteSet& ws,
 size_t galera::unserialize(const gu::byte_t* buf,
                            size_t            buf_len,
                            size_t            offset,
-                           WriteSet&         ws,
-                           bool              skip_data)
+                           WriteSet&         ws)
 {
     uint32_t hdr;
     offset = unserialize(buf, buf_len, offset, hdr);
 
-    ws.type_  = static_cast<enum wsdb_ws_type>(hdr & 0xff);
-    ws.level_ = static_cast<enum wsdb_ws_level>((hdr >> 8) & 0xff);
-    ws.flags_ = static_cast<int>((hdr >> 16) & 0xff);
-
+    ws.level_ = static_cast<enum wsdb_ws_level>(hdr & 0xff);
     ws.queries_.clear();
-
-    offset = unserialize(buf, buf_len, offset, ws.source_id_);
-    offset = unserialize(buf, buf_len, offset, ws.conn_id_);
-    offset = unserialize(buf, buf_len, offset, ws.trx_id_);
-    offset = unserialize(buf, buf_len, offset, ws.last_seen_trx_);
-
-    if (skip_data == false)
-    {
-        offset = unserialize<Query, uint32_t>(
-            buf, buf_len, offset, back_inserter(ws.queries_));
-        ws.keys_.clear();
-        offset = unserialize<uint32_t>(
-            buf, buf_len, offset, ws.keys_);
-        offset = unserialize<uint32_t>(buf, buf_len, offset, ws.data_);
-    }
+    offset = unserialize<Query, uint32_t>(
+        buf, buf_len, offset, back_inserter(ws.queries_));
+    ws.keys_.clear();
+    offset = unserialize<uint32_t>(
+        buf, buf_len, offset, ws.keys_);
+    offset = unserialize<uint32_t>(buf, buf_len, offset, ws.data_);
 
     return offset;
 }
@@ -146,10 +129,6 @@ size_t galera::unserialize(const gu::byte_t* buf,
 size_t galera::serial_size(const WriteSet& ws)
 {
     return (serial_size(uint32_t())
-            + serial_size(ws.source_id_)
-            + serial_size(ws.conn_id_)
-            + serial_size(ws.trx_id_)
-            + serial_size(ws.last_seen_trx_)
             + serial_size<QuerySequence::const_iterator, uint32_t>(
                 ws.queries_.begin(), ws.queries_.end())
             + serial_size<uint32_t>(
@@ -201,12 +180,3 @@ void galera::WriteSet::get_keys(RowKeySequence& s) const
     assert(offset == keys_.size());
 }
 
-
-void galera::WriteSet::serialize(Buffer& buf) const
-{
-    buf.resize(serial_size(*this));
-    if (galera::serialize(*this, &buf[0], buf.size(), 0) == 0)
-    {
-        gu_throw_fatal << "failed to serialize write set";
-    }
-}

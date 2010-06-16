@@ -26,10 +26,16 @@ namespace galera
     class TrxHandle
     {
     public:
-        TrxHandle(const wsrep_uuid_t& source_id,
-                  wsrep_conn_id_t     conn_id,
-                  wsrep_trx_id_t      trx_id,
-                  bool                local)
+        enum
+        {
+            F_COMMIT =   1 << 0,
+            F_ROLLBACK = 1 << 1
+        };
+
+        TrxHandle(const wsrep_uuid_t& source_id = WSREP_UUID_UNDEFINED,
+                  wsrep_conn_id_t     conn_id   = -1,
+                  wsrep_trx_id_t      trx_id    = -1,
+                  bool                local     = false)
             :
             source_id_         (source_id),
             conn_id_           (conn_id),
@@ -44,9 +50,7 @@ namespace galera
             last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
             last_depends_seqno_(WSREP_SEQNO_UNDEFINED),
             refcnt_            (1),
-            write_set_(source_id, conn_id, trx_id,
-                      (conn_id == static_cast<wsrep_conn_id_t>(-1) ?
-                       WSDB_WS_TYPE_TRX : WSDB_WS_TYPE_CONN)),
+            write_set_         (),
             write_set_flags_   (0),
             write_set_type_    (),
             certified_         (false),
@@ -57,51 +61,47 @@ namespace galera
         void lock()   const { mutex_.lock();   }
         void unlock() const { mutex_.unlock(); }
 
-        const wsrep_uuid_t& get_source_id() const
-        {
-            return source_id_;
-        }
+        const wsrep_uuid_t& source_id() const { return source_id_; }
 
-        wsrep_trx_id_t get_trx_id() const { return trx_id_; }
-        void assign_conn_id(wsrep_conn_id_t conn_id) { conn_id_ = conn_id; }
-        wsrep_conn_id_t get_conn_id() const { return conn_id_; }
+        wsrep_trx_id_t trx_id() const { return trx_id_; }
+        void set_conn_id(wsrep_conn_id_t conn_id) { conn_id_ = conn_id; }
+        wsrep_conn_id_t conn_id() const { return conn_id_; }
 
         bool is_local() const { return local_; }
 
         bool is_certified() const { return certified_; }
-        void set_certified() { certified_ = true; }
+        void mark_certified() { certified_ = true; }
 
         bool is_committed() const { return committed_; }
-        void set_committed() { committed_ = true; }
+        void mark_committed() { committed_ = true; }
 
-        void assign_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g)
-
+        void set_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g)
         {
             local_seqno_  = seqno_l;
             global_seqno_ = seqno_g;
         }
 
-        void assign_last_seen_seqno(wsrep_seqno_t last_seen_seqno)
+        void set_last_seen_seqno(wsrep_seqno_t last_seen_seqno)
         {
             last_seen_seqno_ = last_seen_seqno;
         }
 
-        void assign_last_depends_seqno(wsrep_seqno_t seqno_lt)
+        void set_last_depends_seqno(wsrep_seqno_t seqno_lt)
         {
             last_depends_seqno_ = seqno_lt;
         }
 
-        void assign_state(enum wsdb_trx_state state)
+        void set_state(enum wsdb_trx_state state)
         {
             state_ = state;
         }
 
-        void assign_position(enum wsdb_trx_position pos)
+        void set_position(enum wsdb_trx_position pos)
         {
             position_ = pos;
         }
 
-        enum wsdb_trx_state get_state() const
+        enum wsdb_trx_state state() const
         {
             if (is_local() == true)
             {
@@ -114,33 +114,48 @@ namespace galera
             }
         }
 
-        wsrep_seqno_t get_local_seqno() const { return local_seqno_; }
+        wsrep_seqno_t local_seqno() const { return local_seqno_; }
 
-        wsrep_seqno_t get_global_seqno() const { return global_seqno_; }
+        wsrep_seqno_t global_seqno() const { return global_seqno_; }
 
-        wsrep_seqno_t get_last_seen_seqno() const { return last_seen_seqno_; }
+        wsrep_seqno_t last_seen_seqno() const { return last_seen_seqno_; }
 
-        wsrep_seqno_t get_last_depends_seqno() const { return last_depends_seqno_; }
+        wsrep_seqno_t last_depends_seqno() const { return last_depends_seqno_; }
 
-        enum wsdb_trx_position get_position() const { return position_; }
+        enum wsdb_trx_position position() const { return position_; }
 
-        void assign_write_set_flags(int flags) { write_set_flags_ = flags; }
-        int get_write_set_flags() const { return write_set_flags_; }
+        void set_flags(int flags) { write_set_flags_ = flags; }
+        int flags() const { return write_set_flags_; }
 
-        void assign_write_set_type(enum wsdb_ws_type type)
+        void set_write_set_type(enum wsdb_ws_type type)
         {
             write_set_type_ = type;
         }
 
-        enum wsdb_ws_type get_write_set_type() const { return write_set_type_; }
+        enum wsdb_ws_type write_set_type() const { return write_set_type_; }
 
 
-        const WriteSet& get_write_set() const { return write_set_; }
-        WriteSet& get_write_set()             { return write_set_; }
+        const WriteSet& write_set() const { return write_set_; }
+
+        size_t prepare_write_set_collection()
+        {
+            size_t offset;
+            if (write_set_collection_.empty() == true)
+            {
+                offset = serial_size(*this);
+                write_set_collection_.resize(offset);
+            }
+            else
+            {
+                offset = write_set_collection_.size();
+            }
+            (void)serialize(*this, &write_set_collection_[0], offset, 0);
+            return offset;
+        }
 
         void append_write_set(const void* data, size_t data_len)
         {
-            const size_t offset(write_set_collection_.size());
+            const size_t offset(prepare_write_set_collection());
             write_set_collection_.resize(offset + data_len);
             std::copy(reinterpret_cast<const gu::byte_t*>(data),
                       reinterpret_cast<const gu::byte_t*>(data) + data_len,
@@ -149,12 +164,12 @@ namespace galera
 
         void append_write_set(const gu::Buffer& ws)
         {
-            const size_t offset(write_set_collection_.size());
+            const size_t offset(prepare_write_set_collection());
             write_set_collection_.resize(offset + ws.size());
             std::copy(ws.begin(), ws.end(), &write_set_collection_[0] + offset);
         }
 
-        const MappedBuffer& get_write_set_collection() const
+        const MappedBuffer& write_set_collection() const
         {
             return write_set_collection_;
         }
@@ -198,12 +213,20 @@ namespace galera
         bool                   committed_;
 
         //
+        friend class Wsdb;
         friend class Certification;
         typedef std::set<RowKeyEntry*> CertKeySet;
         CertKeySet cert_keys_;
+
+        friend size_t serialize(const TrxHandle&, gu::byte_t* buf,
+                                size_t buflen, size_t offset);
+        friend size_t unserialize(const gu::byte_t*, size_t, size_t, TrxHandle&);
+        friend size_t serial_size(const TrxHandle&);
+
+        friend std::ostream& operator<<(std::ostream& os, const TrxHandle& trx);
     };
 
-    std::ostream& operator<<(std::ostream& os, const TrxHandle& trx);
+
 
     class TrxHandleLock
     {

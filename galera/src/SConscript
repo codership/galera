@@ -20,7 +20,6 @@ env.StaticLibrary('galera++', [
         'trx_handle.cpp',
         'wsdb.cpp',
         'certification.cpp',
-        'galera_wsdb.cpp',
         'galera_service_thd.cpp',
 ])
 
@@ -30,7 +29,6 @@ env.SharedLibrary('galera++', [
         'trx_handle.cpp',
         'wsdb.cpp',
         'certification.cpp',
-        'galera_wsdb.cpp',
         'galera_service_thd.cpp',
 ])
 

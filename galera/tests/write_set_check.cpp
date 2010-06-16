@@ -5,7 +5,6 @@
 #include "write_set.cpp"
 #include "mapped_buffer.cpp"
 #include "gu_logger.hpp"
-#include "galera_wsdb.cpp"
 #include "certification.cpp"
 #include "wsdb.cpp"
 #include <cstdlib>
@@ -56,10 +55,7 @@ END_TEST
 
 START_TEST(test_write_set)
 {
-    wsrep_uuid_t uuid =
-        {{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf}};
-    wsrep_trx_id_t trx_id(4774);
-    WriteSet ws(uuid, -1, trx_id, WSDB_WS_TYPE_TRX);
+    WriteSet ws;
 
     const char* query1 = "select 0";
     size_t query1_len = strlen(query1);
@@ -100,15 +96,12 @@ START_TEST(test_write_set)
 
     fail_unless(ws.get_level() == WSDB_WS_DATA_RBR);
 
-    gu::Buffer buf;
-    ws.serialize(buf);
+    gu::Buffer buf(serial_size(ws));
+
+    serialize(ws, &buf[0], buf.size(), 0);
 
     size_t expected_size =
         4 // hdr
-        + 16 // source id
-        + 8 // conn id
-        + 8  // trx id
-        + 8 // last seen trx
         + 4 // query sequence size
         + 16 + query1_len // query1
         + 16 + query2_len // query2
@@ -124,9 +117,6 @@ START_TEST(test_write_set)
 
     size_t ret = unserialize(&buf[0], buf.size(), 0, ws2);
     fail_unless(ret == expected_size);
-    fail_unless(ws2.get_trx_id() == trx_id);
-    fail_unless(ws2.get_source_id() == uuid);
-    fail_unless(ws2.get_type() == ws.get_type());
     fail_unless(ws2.get_level() == ws.get_level());
     fail_unless(ws2.get_queries().size() == 2);
     for (size_t i = 0; i < 2; ++i)
@@ -191,7 +181,7 @@ END_TEST
 
 START_TEST(test_cert)
 {
-    Wsdb* wsdb(Wsdb::create("galera"));
+    Wsdb* wsdb(new Wsdb);
     Certification* cert(new Certification);
     cert->assign_initial_position(0);
     wsrep_uuid_t uuid = {{1, }};
@@ -218,19 +208,20 @@ START_TEST(test_cert)
         TrxHandle* trx(wsdb->get_trx(uuid, i + 1, true));
         wsdb->append_row_key(trx, wss[i].dbtable, wss[i].dbtable_len,
                              wss[i].rk, wss[i].rk_len, WSDB_ACTION_UPDATE);
-        WriteSet& ws(trx->get_write_set());
-        ws.assign_last_seen_trx(i);
-        trx->assign_last_seen_seqno(ws.get_last_seen_trx());
-        trx->assign_write_set_type(ws.get_type());
-        trx->assign_write_set_flags(WriteSet::F_COMMIT);
         wsdb->flush_trx(trx, true);
-        const MappedBuffer& wscoll(trx->get_write_set_collection());
+        string data("foobardata");
+        wsdb->create_write_set(trx, data.c_str(), data.size());
+        trx->set_last_seen_seqno(i);
+        trx->set_write_set_type(WSDB_WS_TYPE_TRX);
+        trx->set_flags(TrxHandle::F_COMMIT);
+        wsdb->flush_trx(trx, true);
+        const MappedBuffer& wscoll(trx->write_set_collection());
 
         TrxHandle* trx2(cert->create_trx(&wscoll[0], wscoll.size(),
                                          i + 1, i + 1));
 
         cert->append_trx(trx2);
-        wsdb->discard_trx(trx->get_trx_id());
+        wsdb->discard_trx(trx->trx_id());
     }
 
     TrxHandle* trx(cert->get_trx(n_ws));

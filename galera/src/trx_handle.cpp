@@ -3,20 +3,66 @@
 //
 
 #include "trx_handle.hpp"
+#include "serialization.hpp"
 
-namespace galera {
 
 std::ostream&
-operator<<(std::ostream& os, const TrxHandle& th)
+galera::operator<<(std::ostream& os, const TrxHandle& th)
 {
-    os << "(l: "  << th.get_local_seqno()
-       << ", g: " << th.get_global_seqno()
-       << ", s: " << th.get_last_seen_seqno()
-       << ", d: " << th.get_last_depends_seqno()
+    os << *reinterpret_cast<const int*>(th.source_id_.uuid)
+       << " "
+       << th.write_set_type()
+       << " "
+       << th.flags()
+       << " "
+       << th.conn_id()
+       << " "
+       << th.trx_id()
+       << " ";
+
+    os << "(l: "  << th.local_seqno()
+       << ", g: " << th.global_seqno()
+       << ", s: " << th.last_seen_seqno()
+       << ", d: " << th.last_depends_seqno()
        << ')';
 
     return os;
 }
 
+
+size_t galera::serialize(const TrxHandle& trx, gu::byte_t* buf,
+                         size_t buflen, size_t offset)
+{
+    uint32_t hdr((trx.write_set_type_ << 8) | (trx.write_set_flags_ & 0xff));
+    offset = serialize(hdr, buf, buflen, offset);
+    offset = serialize(trx.source_id_, buf, buflen, offset);
+    offset = serialize(trx.conn_id_, buf, buflen, offset);
+    offset = serialize(trx.trx_id_, buf, buflen, offset);
+    offset = serialize(trx.last_seen_seqno_, buf, buflen, offset);
+    return offset;
 }
 
+
+size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
+                           TrxHandle& trx)
+{
+    uint32_t hdr;
+    offset = unserialize(buf, buflen, offset, hdr);
+    trx.write_set_flags_ = hdr & 0xff;
+    trx.write_set_type_ = static_cast<enum wsdb_ws_type>((hdr >> 8) & 0xff);
+    offset = unserialize(buf, buflen, offset, trx.source_id_);
+    offset = unserialize(buf, buflen, offset, trx.conn_id_);
+    offset = unserialize(buf, buflen, offset, trx.trx_id_);
+    offset = unserialize(buf, buflen, offset, trx.last_seen_seqno_);
+    return offset;
+}
+
+
+size_t galera::serial_size(const TrxHandle& trx)
+{
+    return (sizeof(uint32_t) // hdr
+            + serial_size(trx.source_id_)
+            + serial_size(trx.conn_id_)
+            + serial_size(trx.trx_id_)
+            + serial_size(trx.last_seen_seqno_));
+}

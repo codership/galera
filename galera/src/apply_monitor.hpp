@@ -97,7 +97,7 @@ namespace galera
 
             assert(last_left_ <= last_entered_);
 
-            const wsrep_seqno_t trx_seqno(trx->get_global_seqno());
+            const wsrep_seqno_t trx_seqno(trx->global_seqno());
             const size_t        idx(indexof(trx_seqno));
             gu::Lock            lock(mutex_);
 
@@ -141,7 +141,7 @@ namespace galera
             if (mode_ == M_BYPASS) return;
 
 #ifndef NDEBUG
-            wsrep_seqno_t trx_seqno(trx->get_global_seqno());
+            wsrep_seqno_t trx_seqno(trx->global_seqno());
             size_t   idx(indexof(trx_seqno));
 #endif // NDEBUG
             gu::Lock lock(mutex_);
@@ -159,7 +159,7 @@ namespace galera
             if (mode_ == M_BYPASS) return;
 
 #ifndef NDEBUG
-            size_t   idx(indexof(trx->get_global_seqno()));
+            size_t   idx(indexof(trx->global_seqno()));
 #endif // NDEBUG
             gu::Lock lock(mutex_);
 
@@ -175,10 +175,10 @@ namespace galera
         {
             if (mode_ == M_BYPASS) return;
 
-            size_t   idx (indexof(trx->get_global_seqno()));
+            size_t   idx (indexof(trx->global_seqno()));
             gu::Lock lock(mutex_);
 
-            while (trx->get_global_seqno() - last_left_ >=
+            while (trx->global_seqno() - last_left_ >=
                    static_cast<ssize_t>(appliers_size_)) // TODO: exit on error
             {
                 lock.wait(cond_);
@@ -255,7 +255,7 @@ namespace galera
         {
             assert(last_left_ <= last_entered_);
 
-            const wsrep_seqno_t trx_seqno(trx->get_global_seqno());
+            const wsrep_seqno_t trx_seqno(trx->global_seqno());
 
             while (trx_seqno - last_left_ >=
                    static_cast<ssize_t>(appliers_size_)) // TODO: exit on error
@@ -299,7 +299,7 @@ namespace galera
 
         void post_leave(const TrxHandle* trx, gu::Lock& lock)
         {
-            const wsrep_seqno_t trx_seqno(trx->get_global_seqno());
+            const wsrep_seqno_t trx_seqno(trx->global_seqno());
             const size_t idx(indexof(trx_seqno));
             if (last_left_ + 1 == trx_seqno) // we're shrinking window
             {

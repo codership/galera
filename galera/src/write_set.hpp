@@ -127,60 +127,17 @@ namespace galera
     class WriteSet
     {
     public:
-        enum
-        {
-            F_COMMIT = 1 << 0,
-            F_ROLLBACK = 1 << 1
-        };
-
         WriteSet()
             :
-            source_id_(WSREP_UUID_UNDEFINED),
-            conn_id_(-1),
-            trx_id_(-1),
-            type_(),
             level_(WSDB_WS_QUERY),
-            flags_(0),
-            last_seen_trx_(),
             queries_(),
             keys_(),
             key_refs_(),
             data_()
         { }
 
-        WriteSet(const wsrep_uuid_t& source_id,
-                 wsrep_conn_id_t conn_id,
-                 wsrep_trx_id_t trx_id,
-                 enum wsdb_ws_type type)
-            :
-            source_id_(source_id),
-            conn_id_(conn_id),
-            trx_id_(trx_id),
-            type_(type),
-            level_(WSDB_WS_QUERY),
-            flags_(0),
-            last_seen_trx_(),
-            queries_(),
-            keys_(),
-            key_refs_(),
-            data_()
-        { }
-
-        const wsrep_uuid_t& get_source_id() const { return source_id_; }
-        wsrep_conn_id_t     get_conn_id()   const { return conn_id_;   }
-        wsrep_trx_id_t      get_trx_id()    const { return trx_id_;    }
-        enum wsdb_ws_type   get_type()      const { return type_;      }
         enum wsdb_ws_level  get_level()     const { return level_;     }
 
-        void assign_flags(int flags) { flags_ = flags; }
-        int  get_flags() const { return flags_; }
-
-        void assign_last_seen_trx(wsrep_seqno_t seqno)
-        {
-            last_seen_trx_ = seqno;
-        }
-
-        wsrep_seqno_t get_last_seen_trx() const { return last_seen_trx_; }
         const gu::Buffer& get_data() const { return data_; }
 
         void append_query(const void* query, size_t query_len,
@@ -215,33 +172,25 @@ namespace galera
         const QuerySequence& get_queries() const { return queries_; }
         bool is_empty() const
         {
-            return (data_.size() == 0 && queries_.size() == 0);
+            return (data_.size() == 0 && keys_.size() == 0 && queries_.size() == 0);
         }
 
-        void serialize(gu::Buffer& buf) const;
         void clear() { keys_.clear(), key_refs_.clear(),
                 data_.clear(), queries_.clear(); }
 
     private:
 
         friend size_t serialize(const WriteSet&, gu::byte_t*, size_t, size_t);
-        friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&,
-                                  bool skip_data = false);
+        friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&);
         friend size_t serial_size(const WriteSet&);
 
-        wsrep_uuid_t   source_id_;
-        wsrep_conn_id_t conn_id_;
-        wsrep_trx_id_t trx_id_;
-
-        enum wsdb_ws_type type_;
-        enum wsdb_ws_level level_;
-        int flags_;
-        wsrep_seqno_t last_seen_trx_;
-        QuerySequence queries_;
-        gu::Buffer keys_;
         typedef gu::UnorderedMultimap<size_t, size_t> KeyRefMap;
-        KeyRefMap key_refs_;
-        gu::Buffer data_;
+
+        enum wsdb_ws_level level_;
+        QuerySequence      queries_;
+        gu::Buffer         keys_;
+        KeyRefMap          key_refs_;
+        gu::Buffer         data_;
     };
 
     inline bool operator==(const wsrep_uuid_t& a, const wsrep_uuid_t& b)

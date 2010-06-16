@@ -51,7 +51,7 @@ inline void
 galera::RowKeyEntry::ref(TrxHandle* trx)
 {
     assert(ref_trx_ == 0 ||
-           ref_trx_->get_global_seqno() < trx->get_global_seqno());
+           ref_trx_->global_seqno() < trx->global_seqno());
     ref_trx_ = trx;
 }
 
@@ -88,15 +88,15 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
 
 int galera::Certification::do_test(TrxHandle* trx, bool store_keys)
 {
-    size_t offset(0);
-    const MappedBuffer& wscoll(trx->get_write_set_collection());
+    size_t offset(serial_size(*trx));
+    const MappedBuffer& wscoll(trx->write_set_collection());
 
     // max_depends_seqno, start from -1 and maximize on all dependencies
     // min_depends_seqno, start from last seen and minimize on all dependencies
     // last depends seqno is max(min_depends_seqno, max_depends_seqno)
     wsrep_seqno_t max_depends_seqno(-1);
-    wsrep_seqno_t min_depends_seqno(trx->get_last_seen_seqno());
-    const wsrep_seqno_t trx_global_seqno(trx->get_global_seqno());
+    wsrep_seqno_t min_depends_seqno(trx->last_seen_seqno());
+    const wsrep_seqno_t trx_global_seqno(trx->global_seqno());
     TrxHandle::CertKeySet& match(trx->cert_keys_);
     assert(match.empty() == true);
 
@@ -124,16 +124,16 @@ int galera::Certification::do_test(TrxHandle* trx, bool store_keys)
                 assert(ref_trx != 0);
                 // We assume that certification is done only once per trx
                 // and in total order
-                const wsrep_seqno_t ref_global_seqno(ref_trx->get_global_seqno());
+                const wsrep_seqno_t ref_global_seqno(ref_trx->global_seqno());
 
                 assert(ref_global_seqno < trx_global_seqno ||
-                       ref_trx->get_source_id() == trx->get_source_id());
-                if (ref_trx->get_source_id() != trx->get_source_id() &&
-                    ref_global_seqno > trx->get_last_seen_seqno())
+                       ref_trx->source_id() == trx->source_id());
+                if (ref_trx->source_id() != trx->source_id() &&
+                    ref_global_seqno > trx->last_seen_seqno())
                 {
                     // Cert conflict if trx write set didn't see ti committed
                     log_debug << "trx conflict " << ref_global_seqno
-                              << " " << trx->get_last_seen_seqno();
+                              << " " << trx->last_seen_seqno();
                     goto cert_fail;
                 }
                 if (ref_global_seqno != trx_global_seqno)
@@ -161,25 +161,25 @@ int galera::Certification::do_test(TrxHandle* trx, bool store_keys)
     if (store_keys == true)
     {
         min_depends_seqno = 0;
-        trx->assign_last_depends_seqno(max(min_depends_seqno,
-                                           max_depends_seqno));
-        assert(trx->get_last_depends_seqno() < trx->get_global_seqno());
+        trx->set_last_depends_seqno(max(min_depends_seqno,
+                                        max_depends_seqno));
+        assert(trx->last_depends_seqno() < trx->global_seqno());
         for (TrxHandle::CertKeySet::iterator i = trx->cert_keys_.begin();
              i != trx->cert_keys_.end(); ++i)
         {
             (*i)->ref(trx);
         }
 
-        trx->set_certified();
+        trx->mark_certified();
         ++n_certified_;
-        deps_dist_ += (trx->get_global_seqno() - trx->get_last_seen_seqno());
+        deps_dist_ += (trx->global_seqno() - trx->last_seen_seqno());
     }
 
     return WSDB_OK;
 
 cert_fail:
     purge_for_trx(trx);
-    trx->assign_last_depends_seqno(-1);
+    trx->set_last_depends_seqno(-1);
     return WSDB_CERTIFICATION_FAIL;
 }
 
@@ -233,34 +233,23 @@ galera::TrxHandle* galera::Certification::create_trx(
 {
     assert(seqno_l >= 0 && seqno_g >= 0);
 
-    TrxHandle* trx(0);
-    WriteSet ws;
-    size_t offset(0);
-    while (offset < data_len)
-    {
-        offset = unserialize(reinterpret_cast<const byte_t*>(data),
-                             data_len, offset, ws);
-        if (trx == 0)
-        {
-            trx = new TrxHandle(ws.get_source_id(),
-                                ws.get_conn_id(), ws.get_trx_id(), false);
-        }
-        trx->assign_last_seen_seqno(ws.get_last_seen_trx());
-        trx->assign_write_set_type(ws.get_type());
-        trx->assign_write_set_flags(WriteSet::F_COMMIT);
-    }
-    trx->assign_seqnos(seqno_l, seqno_g);
-    trx->append_write_set(data, data_len);
+    TrxHandle* trx(new TrxHandle());
+    size_t offset(unserialize(reinterpret_cast<const byte_t*>(data),
+                              data_len, 0, *trx));
 
-    assert(offset == data_len);
+    trx->set_seqnos(seqno_l, seqno_g);
+    trx->append_write_set(reinterpret_cast<const byte_t*>(data) + offset,
+                          data_len - offset);
     return trx;
 }
 
 
 int galera::Certification::append_trx(TrxHandle* trx)
 {
-    assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
-    assert(trx->get_global_seqno() > position_);
+    // todo: enable when source id bug is fixed
+    // assert(trx->source_id() != WSREP_UUID_UNDEFINED);
+    assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
+    assert(trx->global_seqno() > position_);
 
     if (trx->is_local() == true)
     {
@@ -270,15 +259,15 @@ int galera::Certification::append_trx(TrxHandle* trx)
     {
         Lock lock(mutex_);
 
-        if (trx->get_global_seqno() != position_ + 1)
+        if (trx->global_seqno() != position_ + 1)
         {
             // this is perfectly normal if trx is rolled back just after
             // replication, keeping the log though
             log_debug << "seqno gap, position: " << position_
-                      << " trx seqno " << trx->get_global_seqno();
+                      << " trx seqno " << trx->global_seqno();
         }
-        position_ = trx->get_global_seqno();
-        if (trx_map_.insert(make_pair(trx->get_global_seqno(),
+        position_ = trx->global_seqno();
+        if (trx_map_.insert(make_pair(trx->global_seqno(),
                                       trx)).second == false)
         {
             gu_throw_fatal;
@@ -293,18 +282,17 @@ int galera::Certification::append_trx(TrxHandle* trx)
 
     const int retval(test(trx));
 
-    if (trx->get_last_depends_seqno() > -1)
+    if (trx->last_depends_seqno() > -1)
     {
         Lock lock(mutex_);
-        deps_set_.insert(trx->get_last_seen_seqno());
+        deps_set_.insert(trx->last_seen_seqno());
         assert(deps_set_.size() <= trx_map_.size());
-        // assert(trx->get_last_depends_seqno() >= trx->get_last_seen_seqno());
     }
     else
     {
         // we cleanup here so that caller can just forget about the trx
         assert(retval != WSDB_OK);
-        trx->set_committed();
+        trx->mark_committed();
         trx->clear();
     }
 
@@ -314,12 +302,12 @@ int galera::Certification::append_trx(TrxHandle* trx)
 
 int galera::Certification::test(TrxHandle* trx, bool bval)
 {
-    assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
+    assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
 
     if (bval == true)
     {
         // optimistic guess, cert test may adjust this to tighter value
-        trx->assign_last_depends_seqno(trx->get_last_seen_seqno());
+        trx->set_last_depends_seqno(trx->last_seen_seqno());
     }
     return do_test(trx, bval);
 }
@@ -352,7 +340,7 @@ void galera::Certification::purge_trxs_upto(wsrep_seqno_t seqno)
     {
         log_warn << "trx map after purge: "
                  << trx_map_.size() << " "
-                 << trx_map_.begin()->second->get_global_seqno()
+                 << trx_map_.begin()->second->global_seqno()
                  << " purge seqno " << seqno;
         log_warn << "last committed seqno updating is probably broken";
     }
@@ -361,14 +349,14 @@ void galera::Certification::purge_trxs_upto(wsrep_seqno_t seqno)
 
 void galera::Certification::set_trx_committed(TrxHandle* trx)
 {
-    assert(trx->get_global_seqno() >= 0 && trx->get_local_seqno() >= 0);
+    assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
 
-    if (trx->get_last_depends_seqno() > -1)
+    if (trx->last_depends_seqno() > -1)
     {
         // trxs with last_depends_seqno == -1 haven't gone through
         // append_trx
         Lock lock(mutex_);
-        DepsSet::iterator i(deps_set_.find(trx->get_last_seen_seqno()));
+        DepsSet::iterator i(deps_set_.find(trx->last_seen_seqno()));
         assert(i != deps_set_.end());
         if (deps_set_.size() == 1)
         {
@@ -377,7 +365,7 @@ void galera::Certification::set_trx_committed(TrxHandle* trx)
         deps_set_.erase(i);
     }
 
-    trx->set_committed();
+    trx->mark_committed();
     trx->clear();
 }
 

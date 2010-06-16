@@ -243,11 +243,8 @@ void galera::GaleraWsdb::flush_trx(TrxHandle* trx, bool force)
     if (ws.get_key_buf().size() + ws.get_data().size()
         >= trx_mem_limit_ || force == true)
     {
-        trx->assign_last_seen_seqno(ws.get_last_seen_trx());
-        trx->assign_write_set_type(ws.get_type());
-        trx->assign_write_set_flags(ws.get_flags());
-        Buffer buf;
-        trx->get_write_set().serialize(buf);
+        Buffer buf(serial_size(ws));
+        (void)serialize(ws, &buf[0], buf.size(), 0);
         trx->append_write_set(buf);
         ws.clear();
     }
