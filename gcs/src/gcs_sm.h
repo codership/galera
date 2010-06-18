@@ -190,6 +190,11 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled)
         else {
             if (gu_likely(-EINTR == ret)) {
                 /* was interrupted, will be handled by the leaving guy */
+                if (sm->entered == 0 && sm->pause == false &&
+                    sm->wait_q_len == sm->c + 1)
+                {
+                    _gcs_sm_leave_unsafe(sm);
+                }
             }
             else {
                 /* monitor is closed, wake up others */
