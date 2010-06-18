@@ -147,11 +147,46 @@ public:
         return crc.checksum();
     }
 private:
+    friend uint16_t crc16(const Datagram&, size_t);
+    friend uint32_t crc32(const Datagram&);
+
     static const size_t header_size_ = 128;
     gu::byte_t          header_[header_size_];
     size_t              header_offset_;
     SharedBuffer        payload_;
     size_t              offset_;
 };
+
+
+namespace gu
+{
+    inline uint16_t crc16(const gu::Datagram& dg, size_t offset = 0)
+    {
+        boost::crc_16_type crc;
+        assert(offset < dg.get_len());
+        if (offset < dg.get_header_len())
+        {
+            crc.process_block(dg.header_ + dg.header_offset_ + offset,
+                              dg.header_ + dg.header_size_);
+            offset = 0;
+        }
+        else
+        {
+            offset -= dg.get_header_len();
+        }
+        crc.process_block(&(*dg.payload_)[0] + offset, &(*dg.payload_)[0]
+                          + dg.payload_->size());
+    return crc.checksum();
+}
+
+inline uint32_t crc32(const gu::Datagram& dg)
+{
+    boost::crc_32_type crc;
+    crc.process_block(dg.header_ + dg.header_offset_,
+                      dg.header_ + dg.header_size_);
+    crc.process_block(&(*dg.payload_)[0], &(*dg.payload_)[0] + dg.payload_->size());
+    return crc.checksum();
+}
+}
 
 #endif // GU_DATAGRAM_HPP

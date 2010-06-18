@@ -76,6 +76,7 @@ START_TEST(test_pc_messages)
     check_serialization(pci, expt_size, InstallMessage());
 
     UserMessage pcu(7);
+    pcu.checksum(0xfefe, true);
 
     expt_size = 4 + 4;
     check_serialization(pcu, expt_size, UserMessage(-1U));
@@ -1265,11 +1266,49 @@ START_TEST(test_fifo_violation)
     try
     {
         pc1.handle_up(0, *dg2, ProtoUpMeta(uuid1));
+        fail("");
     }
     catch (Exception& e)
     {
         fail_unless(e.get_errno() == ENOTRECOVERABLE);
     }
+    delete dg1;
+    delete dg2;
+}
+END_TEST
+
+START_TEST(test_checksum)
+{
+    UUID uuid1(1);
+    ProtoUpMeta pum1(uuid1);
+    Proto pc1(uuid1);
+    DummyTransport tp1;
+    PCUser pu1(uuid1, &tp1, &pc1);
+    single_boot(&pu1);
+
+    assert(pc1.get_state() == Proto::S_PRIM);
+    pu1.send();
+    Datagram* dg(tp1.get_out());
+    fail_unless(dg != 0);
+    dg->normalize();
+    pc1.handle_up(0, *dg, ProtoUpMeta(uuid1));
+    delete dg;
+
+    pu1.send();
+    dg = tp1.get_out();
+    fail_unless(dg != 0);
+    dg->normalize();
+    *(&dg->get_payload()[0] + dg->get_payload().size() - 1) ^= 0x10;
+    try
+    {
+        pc1.handle_up(0, *dg, ProtoUpMeta(uuid1));
+        fail("");
+    }
+    catch (Exception& e)
+    {
+        fail_unless(e.get_errno() == ENOTRECOVERABLE);
+    }
+    delete dg;
 }
 END_TEST
 
@@ -1342,6 +1381,10 @@ Suite* pc_suite()
 
     tc = tcase_create("test_fifo_violation");
     tcase_add_test(tc, test_fifo_violation);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_checksum");
+    tcase_add_test(tc, test_checksum);
     suite_add_tcase(s, tc);
 
     return s;
