@@ -27,7 +27,7 @@ using namespace gu::datetime;
 using namespace gcomm;
 using namespace gcomm::pc;
 
-static const string pnet_backend("asio");
+static const string pnet_backend("gu");
 
 
 START_TEST(test_pc_messages)

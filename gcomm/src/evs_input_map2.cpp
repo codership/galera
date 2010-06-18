@@ -261,7 +261,8 @@ gcomm::evs::InputMap::insert(const size_t uuid,
         << "aru seq " << aru_seq_ << " msg seq " << msg.get_seq() 
         << " index size " << msg_index_->size();
     
-    InputMapNode& node(node_index_->at(uuid));
+    gcomm_assert(uuid < node_index_->size());
+    InputMapNode& node((*node_index_)[uuid]);
     range = node.get_range();
     
     // User should check LU before inserting. This check is left 

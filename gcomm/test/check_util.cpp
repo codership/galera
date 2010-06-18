@@ -90,7 +90,7 @@ END_TEST
 
 START_TEST(test_protonet)
 {
-    Protonet* pn(Protonet::create("asio"));
+    Protonet* pn(Protonet::create("gu"));
     pn->event_loop(1);
 }
 END_TEST
