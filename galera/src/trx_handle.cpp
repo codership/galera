@@ -5,11 +5,17 @@
 #include "trx_handle.hpp"
 #include "serialization.hpp"
 
+#include "gu_uuid.h"
 
 std::ostream&
 galera::operator<<(std::ostream& os, const TrxHandle& th)
 {
-    os << *reinterpret_cast<const int*>(th.source_id_.uuid)
+    char uuid_buf[GU_UUID_STR_LEN];
+    gu_uuid_t gu_uuid;
+    memcpy(gu_uuid.data, th.source_id_.uuid, sizeof(gu_uuid.data));
+
+    sprintf(uuid_buf, GU_UUID_FORMAT, GU_UUID_ARGS(&gu_uuid));
+    os << uuid_buf
        << " "
        << th.write_set_type()
        << " "
