@@ -241,6 +241,7 @@ static void* interrupt_thread(void* arg)
 }
 
 #define TEST_CREATE_THREAD(t, h, q)                                     \
+    global_handle = -1;                                                 \
     pthread_create ((t), NULL, interrupt_thread, sm);                   \
     WAIT_FOR(global_handle == (h));                                     \
     fail_if (global_handle != (h), "global_handle = %ld, expected %ld", \
