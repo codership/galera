@@ -1467,7 +1467,10 @@ enum wsrep_status mm_galera_abort_pre_commit(wsrep_t *gh,
         if (victim->gcs_handle() > 0 &&
             (rc = gcs_interrupt(gcs_conn, victim->gcs_handle())) != 0)
         {
-            log_warn << "gcs_interrupt(): " << strerror(-rc);
+            log_debug << "gcs_interrupt(): handle "
+                      << victim->gcs_handle()
+                      << " trx id " << victim->trx_id()
+                      << ": " << strerror(-rc);
         }
         ret_code = WSREP_OK;
         break;
@@ -1747,6 +1750,7 @@ enum wsrep_status mm_galera_pre_commit(
 
     if (trx->state() == WSDB_TRX_MUST_ABORT)
     {
+        trx->set_state(WSDB_TRX_ABORTING_NONREPL);
         return WSREP_TRX_FAIL;
     }
 
@@ -1802,7 +1806,7 @@ enum wsrep_status mm_galera_pre_commit(
     profile_leave(galera_prof);
 
     trx->lock();
-    trx->set_gcs_handle(-1);
+
     *global_seqno = seqno_g;
 
 #ifdef EXTRA_DEBUG
@@ -1811,22 +1815,34 @@ enum wsrep_status mm_galera_pre_commit(
 #endif
 
     if (rcode != static_cast<int>(wscoll.size())) {
-        gu_error("gcs_repl() failed for: %llu, len: %d, rcode: %d (%s)",
-                 trx->trx_id(), wscoll.size(), rcode, strerror (-rcode));
+        if (rcode != -EINTR)
+        {
+            gu_error("gcs_repl() failed for: %llu, len: %d, handle: %ld, rcode: %d (%s)",
+                     trx->trx_id(), wscoll.size(), trx->gcs_handle(),
+                     rcode, strerror (-rcode));
+        }
+        else
+        {
+            log_debug << "gcs_repl() interrupted for: " << trx->trx_id()
+                      << " state " << trx->state();
+        }
+        assert(rcode != -EINTR || trx->state() == WSDB_TRX_MUST_ABORT);
         assert (GCS_SEQNO_ILL == seqno_l);
         assert (GCS_SEQNO_ILL == seqno_g);
         trx->clear();
         trx->set_state(WSDB_TRX_ABORTING_NONREPL);
+        trx->set_gcs_handle(-1);
         GU_DBUG_RETURN(WSREP_CONN_FAIL);
     }
 
     assert (GCS_SEQNO_ILL != seqno_g);
     assert (GCS_SEQNO_ILL != seqno_l);
 
+    trx->set_gcs_handle(-1);
     trx->set_seqnos(seqno_l, seqno_g);
     if (trx->state() != WSDB_TRX_REPLICATING)
     {
-        log_info << "replicating trx changed state to " << trx->state();
+        log_debug << "replicating trx changed state to " << trx->state();
         if (check_certification_status_for_aborted(seqno_l, trx) == WSREP_OK)
         {
             trx->set_position(WSDB_TRX_POS_CERT_QUEUE);
@@ -2304,7 +2320,7 @@ enum wsrep_status mm_galera_replay_trx(
     TrxHandle* trx(get_trx(wsdb, trx_handle));
     TrxHandleLock lock(*trx);
 
-    gu_info("trx_replay for: %lld %lld state: %d, data len: %d",
+    gu_debug("trx_replay for: %lld %lld state: %d, data len: %d",
              trx->local_seqno(),
              trx->global_seqno(),
              trx->state(),
