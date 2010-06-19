@@ -2188,7 +2188,6 @@ static enum wsrep_status mm_galera_append_query(
     wsrep_trx_id_t trx_id = trx_handle->trx_id;
     wsdb_trx_handle_t** handle = (wsdb_trx_handle_t**)&trx_handle->opaque;
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
-    if (gu_likely(galera_opts.append_queries == false)) return WSREP_OK; 
     
     errno = 0;
 

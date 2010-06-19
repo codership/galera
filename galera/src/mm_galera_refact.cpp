@@ -1991,7 +1991,6 @@ enum wsrep_status mm_galera_append_query(
     ) {
 
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
-    if (gu_likely(galera_opts.append_queries == false)) return WSREP_OK;
 
     TrxHandle* trx(get_trx(wsdb, trx_handle, true));
     TrxHandleLock lock(*trx);

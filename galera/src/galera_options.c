@@ -18,14 +18,12 @@
 #define PERSISTENT_WS_KEY    "persistent_writesets"
 #define LOCAL_CACHE_SIZE_KEY "local_cache_size"
 #define DBUG_SPEC_KEY        "dbug_spec"
-#define APPEND_QUERIES_KEY   "append_queries"
 
 const struct galera_options galera_defaults = { 
     false,
     false,
     20971520, /* 20Mb */ // should be WSDB_LOCAL_CACHE_SIZE
-    NULL,
-    false
+    NULL
 };
 
 // NOTE: it is guaranteed that var starts with alnum character.
@@ -105,14 +103,6 @@ options_set_dbug_spec (struct galera_options* opts, const char* val)
     }
 }
 
-static void
-options_set_append_queries (struct galera_options* opts, const char* val)
-{
-    if (val) {
-        opts->append_queries = strtobool (val);
-    }
-}
-
 wsrep_status_t
 galera_options_from_string (struct galera_options* opts, const char* opts_str)
 {
@@ -139,9 +129,6 @@ galera_options_from_string (struct galera_options* opts, const char* opts_str)
             }
             else if (!strcmp (key, DBUG_SPEC_KEY)) {
                 options_set_dbug_spec (opts, val);
-            }
-            else if (!strcmp(key, APPEND_QUERIES_KEY)) {
-                options_set_append_queries(opts, val);
             }
             else {
                 gu_warn ("Unrecognized option key: '%s', skipping.", key);
