@@ -2134,7 +2134,6 @@ static enum wsrep_status mm_galera_append_query(
 ) {
 
     if (gu_unlikely(conn_state != GALERA_CONNECTED)) return WSREP_OK;
-    if (gu_likely(galera_opts.append_queries == false)) return WSREP_OK; 
     
     errno = 0;
 
