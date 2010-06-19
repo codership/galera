@@ -35,6 +35,7 @@ gcs_sm_create (long len, long n)
         sm->wait_q_size = len;
         sm->wait_q_mask = sm->wait_q_size - 1;
         sm->wait_q_head = 0;
+        sm->wait_q_tail = 0;
         sm->wait_q_len  = -n; // -n where n is a number of simult. users
         sm->entered     = 0;
         sm->ret         = 0;
@@ -53,22 +54,21 @@ gcs_sm_close (gcs_sm_t* sm)
 
     if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
 
-    sm->ret   = -EBADFD;
+    sm->ret = -EBADFD;
 
-    if (sm->pause) _gcs_sm_continue_unsafe (sm);
+    if (sm->pause) _gcs_sm_continue_common (sm);
 
-    sm->wait_q_len++;
+    gu_cond_t cond;
+    gu_cond_init (&cond, NULL);
 
-    if (sm->wait_q_len > 0) { // wait for cleared queue
-        gu_cond_t cond;
-        gu_cond_init (&cond, NULL);
-
-        _gcs_sm_enqueue_unsafe (sm, &cond);
-
-        gu_cond_destroy (&cond);
+    // @todo: this will fail if the queue is full
+    while (sm->wait_q_len > sm->c) { // wait for cleared queue
+        sm->wait_q_len++;
+        GCS_SM_INCREMENT(sm->wait_q_tail);
+        _gcs_sm_enqueue_common (sm, &cond);
     }
 
-    sm->wait_q_len--;
+    gu_cond_destroy (&cond);
 
     gu_mutex_unlock (&sm->lock);
 

@@ -47,28 +47,6 @@ END_TEST
 
 static volatile int order = 0; // global variable to trac the order of events
 
-#if 0 // looks like we have to use sleeps here lest we run into deadlock
-static pthread_mutex_t _mtx  = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  _cond = PTHREAD_COND_INITIALIZER;
-
-static void crit_enter()
-{
-    pthread_mutex_lock (&_mtx);
-}
-
-static void crit_wait()
-{
-    pthread_cond_signal (&_cond);
-    pthread_cond_wait (&_cond, &_mtx);
-}
-
-static void crit_leave()
-{
-    pthread_cond_signal (&_cond);
-    pthread_mutex_unlock (&_mtx);
-}
-#endif
-
 static void* closing_thread (void* data)
 {
     gcs_sm_t* sm = (gcs_sm_t*)data;
@@ -110,6 +88,8 @@ START_TEST (gcs_sm_test_close)
     gu_info ("Started close thread, wait_q_len = %ld", sm->wait_q_len);
 
     gcs_sm_leave(sm);
+    mark_point();
+    gu_thread_join(thr, NULL);
 
     gu_cond_destroy(&cond);
 }
@@ -157,6 +137,7 @@ START_TEST (gcs_sm_test_pause)
     gu_thread_create (&thr, NULL, pausing_thread, sm);
     WAIT_FOR(1 == pause_order);
     fail_if (pause_order != 1, "pause_order = %d, expected 1");
+    usleep(TEST_USLEEP); // make sure pausing_thread blocked in gcs_sm_enter()
     pause_order = 2;
     gcs_sm_continue (sm);
     gu_thread_join (thr, NULL);
@@ -195,8 +176,8 @@ START_TEST (gcs_sm_test_pause)
     fail_if (sm->wait_q_len != 1, "wait_q_len = %ld, expected 1",
              sm->wait_q_len);
     gcs_sm_leave (sm);
-    fail_if (sm->wait_q_len != 0, "wait_q_len = %ld, expected 0",
-             sm->wait_q_len);
+    fail_if (sm->wait_q_len != 1, "wait_q_len = %ld, expected 1",
+             sm->wait_q_len); // gcs_sm_continue() should take care of q_len
     fail_if (sm->entered != 0, "entered = %ld, expected 1", sm->entered);
     usleep (TEST_USLEEP); // nothing should change, since monitor is paused
     fail_if (pause_order != 2, "pause_order = %d, expected 2");
@@ -240,19 +221,21 @@ static void* interrupt_thread(void* arg)
     return NULL;
 }
 
-#define TEST_CREATE_THREAD(t, h, q)                                     \
+#define TEST_CREATE_THREAD(thr, tail, h, q)                             \
     global_handle = -1;                                                 \
-    pthread_create ((t), NULL, interrupt_thread, sm);                   \
-    WAIT_FOR(global_handle == (h));                                     \
-    fail_if (global_handle != (h), "global_handle = %ld, expected %ld", \
-             global_handle, (h));                                       \
-    fail_if (sm->wait_q_len != (q), "wait_q_len = %ld, expected %ld",   \
-                 sm->wait_q_len, (q));
+    gu_thread_create (thr, NULL, interrupt_thread, sm);                 \
+    WAIT_FOR(global_handle == h);                                       \
+    fail_if (sm->wait_q_tail != tail, "wait_q_tail = %lu, expected %lu", \
+             sm->wait_q_tail, tail);                                    \
+    fail_if (global_handle != h, "global_handle = %ld, expected %ld",   \
+             global_handle, h);                                         \
+    fail_if (sm->wait_q_len != q, "wait_q_len = %ld, expected %ld",     \
+             sm->wait_q_len, q);
 
 #define TEST_INTERRUPT_THREAD(h, t)                                     \
     ret = gcs_sm_interrupt (sm, (h));                                   \
     fail_if (ret != 0);                                                 \
-    pthread_join ((t), NULL);                                           \
+    gu_thread_join ((t), NULL);                                        \
     fail_if (global_ret != -EINTR, "global_ret = %ld, expected %ld (-EINTR)", \
              global_ret, -EINTR);
 
@@ -271,60 +254,62 @@ START_TEST (gcs_sm_test_interrupt)
 
     long handle = gcs_sm_schedule (sm);
     fail_if (handle != 0, "handle = %ld, expected 0");
+    fail_if (sm->wait_q_tail != 1, "wait_q_tail = %lu, expected 1",
+             sm->wait_q_tail);
 
     long ret = gcs_sm_enter (sm, &cond, true);
     fail_if (ret != 0);
 
     /* 1. Test interrupting blocked by previous thread */
-    TEST_CREATE_THREAD(&thr1, 2, 1);
+    TEST_CREATE_THREAD(&thr1, 2, 3, 1);
 
-    TEST_CREATE_THREAD(&thr2, 3, 2);
+    TEST_CREATE_THREAD(&thr2, 3, 4, 2);
 
-    TEST_INTERRUPT_THREAD(2, thr1);
+    TEST_INTERRUPT_THREAD(3, thr1);
 
     gcs_sm_leave (sm); // this should let 2nd enter monitor
-    pthread_join (thr2, NULL);
+    gu_thread_join (thr2, NULL);
     fail_if (global_ret != 0, "global_ret = %ld, expected 0", global_ret);
     fail_if (sm->wait_q_len != -1, "wait_q_len = %ld, expected %ld",
              sm->wait_q_len, -1);
 
-    ret = gcs_sm_interrupt (sm, 3); // try to interrupt 2nd which has exited
+    ret = gcs_sm_interrupt (sm, 4); // try to interrupt 2nd which has exited
     fail_if (ret != -ESRCH);
 
     /* 2. Test interrupting blocked by pause */
     gcs_sm_pause (sm);
 
-    TEST_CREATE_THREAD(&thr1, 3, 0);
+    TEST_CREATE_THREAD(&thr1, 0, 1, 0);
 
-    TEST_INTERRUPT_THREAD(3, thr1);
+    TEST_INTERRUPT_THREAD(1, thr1);
 
-    TEST_CREATE_THREAD(&thr2, 4, 1); /* test queueing after interrupted */
+    TEST_CREATE_THREAD(&thr2, 1, 2, 1); /* test queueing after interrupted */
 
-    TEST_CREATE_THREAD(&thr3, 1, 2);
+    TEST_CREATE_THREAD(&thr3, 2, 3, 2);
 
-    TEST_INTERRUPT_THREAD(1, thr3); /* test interrupting last waiter */
+    TEST_INTERRUPT_THREAD(3, thr3); /* test interrupting last waiter */
 
     gcs_sm_continue (sm);
 
-    pthread_join (thr2, NULL);
+    gu_thread_join (thr2, NULL);
     fail_if (global_ret != 0, "global_ret = %ld, expected 0", global_ret);
 
     /* 3. Unpausing totally interrupted monitor */
     gcs_sm_pause (sm);
 
-    TEST_CREATE_THREAD(&thr1, 1, 0);
-    TEST_INTERRUPT_THREAD(1, thr1);
+    TEST_CREATE_THREAD(&thr1, 3, 4, 0);
+    TEST_INTERRUPT_THREAD(4, thr1);
 
-    TEST_CREATE_THREAD(&thr1, 2, 1);
-    TEST_INTERRUPT_THREAD(2, thr1);
+    TEST_CREATE_THREAD(&thr1, 0, 1, 1);
+    TEST_INTERRUPT_THREAD(1, thr1);
 
     gcs_sm_continue (sm);
 
     /* check that monitor is still functional */
-    ret = gcs_sm_enter (sm, &cond, false); // handle inc to 3
+    ret = gcs_sm_enter (sm, &cond, false);
     fail_if (ret != 0);
 
-    TEST_CREATE_THREAD(&thr1, 4, 1);
+    TEST_CREATE_THREAD(&thr1, 2, 3, 1);
 
     gcs_sm_leave (sm);
     pthread_join (thr1, NULL);

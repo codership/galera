@@ -27,6 +27,7 @@ typedef struct gcs_sm
     unsigned long wait_q_size;
     unsigned long wait_q_mask;
     unsigned long wait_q_head;
+    unsigned long wait_q_tail;
     long          wait_q_len;
     long          entered;
     long          ret;
@@ -58,56 +59,42 @@ gcs_sm_close (gcs_sm_t* sm);
 extern void
 gcs_sm_destroy (gcs_sm_t* sm);
 
-#if 0
+#define GCS_SM_INCREMENT(cursor) (cursor = ((cursor + 1) & sm->wait_q_mask))
+
 static inline void
-_gcs_sm_leave_unsafe (gcs_sm_t* sm)
+_gcs_sm_wake_up_next (gcs_sm_t* sm)
 {
-    do {
+    long entered = sm->entered;
+
+    while (entered < -sm->c && sm->wait_q_len > sm->c) {
         sm->wait_q_len--;
-
-        register bool next = (sm->wait_q_len >= 0);
-        sm->wait_q_head = (sm->wait_q_head + next) & sm->wait_q_mask;
-
-        if (next && !sm->pause) {
-            if (gu_unlikely(false == sm->wait_q[sm->wait_q_head].wait)) {
-                assert (NULL == sm->wait_q[sm->wait_q_head].cond);
-                continue; /* interrupted */
-            }
-            assert (NULL != sm->wait_q[sm->wait_q_head].cond);
-            gu_cond_signal (sm->wait_q[sm->wait_q_head].cond);
-        }
-        break;
-    } while (true);
-}
-#else
-static inline void
-_gcs_sm_leave_unsafe (gcs_sm_t* sm)
-{
-    sm->wait_q_len--;
-
-    while (sm->wait_q_len > sm->c) {
-
-        sm->wait_q_head = (sm->wait_q_head + 1) & sm->wait_q_mask;
-
+        GCS_SM_INCREMENT(sm->wait_q_head);
         if (gu_likely(sm->wait_q[sm->wait_q_head].wait)) {
-            assert (NULL != sm->wait_q[sm->wait_q_head].cond);
-            if (!sm->pause) {
-                gu_cond_signal (sm->wait_q[sm->wait_q_head].cond);
-            }
-            return;
+            assert (sm->wait_q[sm->wait_q_head].cond != NULL);
+            gu_cond_signal (sm->wait_q[sm->wait_q_head].cond);
+            entered++;
         }
-        assert (NULL == sm->wait_q[sm->wait_q_head].cond);
-        sm->wait_q_len--;
+        else { /* skip interrupted */
+            gu_debug ("Skipping interrupted waiter: %lu", sm->wait_q_head);
+        }
     }
 }
-#endif
 
-#define GCS_SM_TAIL(sm) ((sm->wait_q_head + sm->wait_q_len) & sm->wait_q_mask)
+static inline void
+_gcs_sm_leave_common (gcs_sm_t* sm)
+{
+    if (!sm->pause) {
+        _gcs_sm_wake_up_next(sm);
+    }
+    else {
+        /* gcs_sm_continue() will do the job */
+    }
+}
 
 static inline bool
-_gcs_sm_enqueue_unsafe (gcs_sm_t* sm, gu_cond_t* cond)
+_gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond)
 {
-    unsigned long tail = GCS_SM_TAIL(sm);
+    unsigned long tail = sm->wait_q_tail;
 
     sm->wait_q[tail].cond = cond;
     sm->wait_q[tail].wait = true;
@@ -139,8 +126,12 @@ gcs_sm_schedule (gcs_sm_t* sm)
                   (0 == ret))) {
 
         sm->wait_q_len++;
+        GCS_SM_INCREMENT(sm->wait_q_tail); /* even if we don't queue, cursor
+                                            * needs to be advanced */
 
-        if ((sm->wait_q_len > 0 || sm->pause)) ret = GCS_SM_TAIL(sm) + 1;
+        if ((sm->wait_q_len > 0 || sm->pause)) {
+            ret = sm->wait_q_tail + 1;
+        }
 
         return ret; // success
     }
@@ -174,7 +165,7 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled)
     if (gu_likely (scheduled || (ret = gcs_sm_schedule(sm)) >= 0)) {
 
         if (sm->wait_q_len > 0 || sm->pause) {
-            if (gu_likely(_gcs_sm_enqueue_unsafe (sm, cond))) {
+            if (gu_likely(_gcs_sm_enqueue_common (sm, cond))) {
                 ret = sm->ret;
             }
             else {
@@ -189,16 +180,11 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled)
         }
         else {
             if (gu_likely(-EINTR == ret)) {
-                /* was interrupted, will be handled by the leaving guy */
-                if (sm->entered == 0 && sm->pause == false &&
-                    sm->wait_q_len == sm->c + 1)
-                {
-                    _gcs_sm_leave_unsafe(sm);
-                }
+                /* was interrupted, will be handled by someone else */
             }
             else {
                 /* monitor is closed, wake up others */
-                _gcs_sm_leave_unsafe(sm);
+                _gcs_sm_leave_common(sm);
             }
         }
 
@@ -216,7 +202,7 @@ gcs_sm_leave (gcs_sm_t* sm)
     sm->entered--;
     assert(sm->entered >= 0);
 
-    _gcs_sm_leave_unsafe(sm);
+    _gcs_sm_leave_common(sm);
 
     gu_mutex_unlock (&sm->lock);
 }
@@ -232,23 +218,13 @@ gcs_sm_pause (gcs_sm_t* sm)
 }
 
 static inline void
-_gcs_sm_continue_unsafe (gcs_sm_t* sm)
+_gcs_sm_continue_common (gcs_sm_t* sm)
 {
     sm->pause = false;
 
-    if (0 == sm->entered) {
-        // there's no one to leave the monitor and signal the rest
-        while (sm->wait_q_len > sm->c) {
-            if (gu_likely(sm->wait_q[sm->wait_q_head].wait)) {
-                assert (sm->wait_q[sm->wait_q_head].cond != NULL);
-                gu_cond_signal (sm->wait_q[sm->wait_q_head].cond);
-                return;
-            }
-            /* skip interrupted */
-            gu_debug ("Skipping interrupted thread");
-            sm->wait_q_len--;
-            sm->wait_q_head = (sm->wait_q_head + 1) & sm->wait_q_mask;
-        }
+    if (sm->entered < -sm->c) {
+        // new waiter can enter the monitor - wake it up
+        _gcs_sm_wake_up_next(sm);
     }
 }
 
@@ -258,7 +234,7 @@ gcs_sm_continue (gcs_sm_t* sm)
     if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
 
     if (gu_likely(sm->pause)) {
-        _gcs_sm_continue_unsafe (sm);
+        _gcs_sm_continue_common (sm);
     }
     else {
         gu_debug ("Trying to continue unpaused monitor");
@@ -292,6 +268,12 @@ gcs_sm_interrupt (gcs_sm_t* sm, long handle)
         gu_cond_signal (sm->wait_q[handle].cond);
         sm->wait_q[handle].cond = NULL;
         ret = 0;
+        if ((long)sm->wait_q_head == handle && !sm->pause) {
+            /* gcs_sm_interrupt() was called right after the interrupted was
+             * signaled by gcs_sm_continue() or gcs_sm_leave() but before
+             * the interrupted has woken up. Wake up the next waiter */
+            _gcs_sm_wake_up_next(sm);
+        }
     }
     else {
         ret = -ESRCH;
