@@ -15,12 +15,12 @@
 extern gcs_sm_t*
 gcs_sm_create (long len, long n)
 {
-    if ((len < 1 /* 2 is minimum */) || (len & (len - 1))) {
+    if ((len < 2 /* 2 is minimum */) || (len & (len - 1))) {
         gu_error ("Monitor length parameter is not a power of 2: %ld", len);
         return NULL;
     }
 
-    if (n <= 0) {
+    if (n < 1) {
         gu_error ("Invalid monitor concurrency parameter: %ld", n);
         return NULL;
     }
@@ -32,16 +32,16 @@ gcs_sm_create (long len, long n)
 
     if (sm) {
         gu_mutex_init (&sm->lock, NULL);
-        sm->wait_q_size = len;
-        sm->wait_q_mask = sm->wait_q_size - 1;
+        sm->wait_q_len  = len;
+        sm->wait_q_mask = sm->wait_q_len - 1;
         sm->wait_q_head = 1;
         sm->wait_q_tail = 0;
-        sm->wait_q_len  = -n; // -n where n is a number of simult. users
+        sm->users       = -n; // -n where n is a number of simult. users
         sm->entered     = 0;
         sm->ret         = 0;
-        sm->c           = sm->wait_q_len; // concurrency param.
+        sm->c           = sm->users; // concurrency param.
         sm->pause       = false;
-        memset (sm->wait_q, 0, sm->wait_q_size * sizeof(sm->wait_q[0]));
+        memset (sm->wait_q, 0, sm->wait_q_len * sizeof(sm->wait_q[0]));
     }
 
     return sm;
@@ -62,17 +62,17 @@ gcs_sm_close (gcs_sm_t* sm)
     gu_cond_init (&cond, NULL);
 
     // in case the queue is full
-    while (sm->wait_q_len - sm->c >= (long)sm->wait_q_size) {
+    while (sm->users - sm->c >= (long)sm->wait_q_len) {
         gu_mutex_unlock (&sm->lock);
         usleep(1000);
         gu_mutex_lock (&sm->lock);
     }
 
-    while (sm->wait_q_len > sm->c) { // wait for cleared queue
-        sm->wait_q_len++;
+    while (sm->users > sm->c) { // wait for cleared queue
+        sm->users++;
         GCS_SM_INCREMENT(sm->wait_q_tail);
         _gcs_sm_enqueue_common (sm, &cond);
-        sm->wait_q_len--;
+        sm->users--;
         GCS_SM_INCREMENT(sm->wait_q_head);
     }
 

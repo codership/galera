@@ -24,11 +24,11 @@ gcs_sm_user_t;
 typedef struct gcs_sm
 {
     gu_mutex_t    lock;
-    unsigned long wait_q_size;
+    unsigned long wait_q_len;
     unsigned long wait_q_mask;
     unsigned long wait_q_head;
     unsigned long wait_q_tail;
-    long          wait_q_len;
+    long          users;
     long          entered;
     long          ret;
     long          c;
@@ -47,7 +47,7 @@ extern gcs_sm_t*
 gcs_sm_create (long len, long n);
 
 /*!
- * Closes monitor for entering and makes all waiters to exit with error.
+ * Closes monitor for entering and makes all users to exit with error.
  * (entered users are not affected). Blocks until everybody exits
  */
 extern long
@@ -69,10 +69,10 @@ _gcs_sm_wake_up_next (gcs_sm_t* sm)
     assert (woken >= 0);
     assert (woken <= -sm->c);
 
-    while (woken < -sm->c && sm->wait_q_len > sm->c) {
+    while (woken < -sm->c && sm->users > sm->c) {
         if (gu_likely(sm->wait_q[sm->wait_q_head].wait)) {
             assert (NULL != sm->wait_q[sm->wait_q_head].cond);
-            assert (sm->wait_q_len > sm->c); // there is at least this waiter
+            assert (sm->users > sm->c); // there is at least this waiter
             // gu_debug ("Waking up: %lu", sm->wait_q_head);
             gu_cond_signal (sm->wait_q[sm->wait_q_head].cond);
             woken++;
@@ -80,12 +80,12 @@ _gcs_sm_wake_up_next (gcs_sm_t* sm)
         else { /* skip interrupted */
             assert (NULL == sm->wait_q[sm->wait_q_head].cond);
             gu_debug ("Skipping interrupted waiter: %lu", sm->wait_q_head);
-            sm->wait_q_len--;
+            sm->users--;
             GCS_SM_INCREMENT(sm->wait_q_head);
         }
     }
 
-    assert (sm->wait_q_len >= sm->c);
+    assert (sm->users >= sm->c);
 }
 
 static inline void
@@ -93,7 +93,7 @@ _gcs_sm_leave_common (gcs_sm_t* sm)
 {
     assert (sm->entered < -sm->c);
 
-    sm->wait_q_len--;
+    sm->users--;
     GCS_SM_INCREMENT(sm->wait_q_head);
 
     if (!sm->pause) {
@@ -135,14 +135,14 @@ gcs_sm_schedule (gcs_sm_t* sm)
 
     long ret = sm->ret;
 
-    if (gu_likely(((sm->wait_q_len - sm->c) < (long)sm->wait_q_size) &&
+    if (gu_likely(((sm->users - sm->c) < (long)sm->wait_q_len) &&
                   (0 == ret))) {
 
-        sm->wait_q_len++;
+        sm->users++;
         GCS_SM_INCREMENT(sm->wait_q_tail); /* even if we don't queue, cursor
                                             * needs to be advanced */
 
-        if ((sm->wait_q_len > 0 || sm->pause)) {
+        if ((sm->users > 0 || sm->pause)) {
             ret = sm->wait_q_tail + 1;
         }
 
@@ -177,7 +177,7 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled)
 
     if (gu_likely (scheduled || (ret = gcs_sm_schedule(sm)) >= 0)) {
 
-        if (sm->wait_q_len > 0 || sm->pause) {
+        if (sm->users > 0 || sm->pause) {
             if (gu_likely(_gcs_sm_enqueue_common (sm, cond))) {
                 ret = sm->ret;
             }
@@ -189,7 +189,7 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled)
         assert (ret <= 0);
 
         if (gu_likely(0 == ret)) {
-            assert(sm->wait_q_len > sm->c);
+            assert(sm->users > sm->c);
             assert(sm->entered < -sm->c);
             sm->entered++;
         }
@@ -199,7 +199,7 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled)
             }
             else {
                 /* monitor is closed, wake up others */
-                assert(sm->wait_q_len > sm->c);
+                assert(sm->users > sm->c);
                 _gcs_sm_leave_common(sm);
             }
         }
