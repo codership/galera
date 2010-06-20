@@ -36,10 +36,12 @@ gcs_sm_create (long len, long n)
         sm->wait_q_mask = sm->wait_q_len - 1;
         sm->wait_q_head = 1;
         sm->wait_q_tail = 0;
-        sm->users       = -n; // -n where n is a number of simult. users
+        sm->users       = 0;
         sm->entered     = 0;
         sm->ret         = 0;
-        sm->c           = sm->users; // concurrency param.
+#ifdef GCS_SM_CONCURRENCY
+        sm->cc          = n; // concurrency param.
+#endif /* GCS_SM_CONCURRENCY */
         sm->pause       = false;
         memset (sm->wait_q, 0, sm->wait_q_len * sizeof(sm->wait_q[0]));
     }
@@ -62,13 +64,13 @@ gcs_sm_close (gcs_sm_t* sm)
     gu_cond_init (&cond, NULL);
 
     // in case the queue is full
-    while (sm->users - sm->c >= (long)sm->wait_q_len) {
+    while (sm->users >= (long)sm->wait_q_len) {
         gu_mutex_unlock (&sm->lock);
         usleep(1000);
         gu_mutex_lock (&sm->lock);
     }
 
-    while (sm->users > sm->c) { // wait for cleared queue
+    while (sm->users > 0) { // wait for cleared queue
         sm->users++;
         GCS_SM_INCREMENT(sm->wait_q_tail);
         _gcs_sm_enqueue_common (sm, &cond);

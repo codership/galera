@@ -14,6 +14,12 @@
 #include <galerautils.h>
 #include <errno.h>
 
+#ifdef GCS_SM_CONCURRENCY
+#define GCS_SM_CC sm->cc
+#else
+#define GCS_SM_CC 1
+#endif /* GCS_SM_CONCURRENCY */
+
 typedef struct gcs_sm_user
 {
     gu_cond_t* cond;
@@ -31,7 +37,9 @@ typedef struct gcs_sm
     long          users;
     long          entered;
     long          ret;
-    long          c;
+#ifdef GCS_SM_CONCURRENCY
+    long          cc;
+#endif /* GCS_SM_CONCURRENCY */
     bool          pause;
     gcs_sm_user_t wait_q[];
 }
@@ -67,32 +75,33 @@ _gcs_sm_wake_up_next (gcs_sm_t* sm)
     long woken = sm->entered;
 
     assert (woken >= 0);
-    assert (woken <= -sm->c);
+    assert (woken <= GCS_SM_CC);
 
-    while (woken < -sm->c && sm->users > sm->c) {
+    while (woken < GCS_SM_CC && sm->users > 0) {
         if (gu_likely(sm->wait_q[sm->wait_q_head].wait)) {
             assert (NULL != sm->wait_q[sm->wait_q_head].cond);
-            assert (sm->users > sm->c); // there is at least this waiter
             // gu_debug ("Waking up: %lu", sm->wait_q_head);
             gu_cond_signal (sm->wait_q[sm->wait_q_head].cond);
             woken++;
         }
         else { /* skip interrupted */
             assert (NULL == sm->wait_q[sm->wait_q_head].cond);
-            gu_debug ("Skipping interrupted waiter: %lu", sm->wait_q_head);
+            gu_debug ("Skipping interrupted: %lu", sm->wait_q_head);
             sm->users--;
             GCS_SM_INCREMENT(sm->wait_q_head);
         }
     }
 
-    assert (sm->users >= sm->c);
+    assert (woken <= GCS_SM_CC);
+    assert (sm->users >= 0);
 }
 
 static inline void
 _gcs_sm_leave_common (gcs_sm_t* sm)
 {
-    assert (sm->entered < -sm->c);
+    assert (sm->entered < GCS_SM_CC);
 
+    assert (sm->users > 0);
     sm->users--;
     GCS_SM_INCREMENT(sm->wait_q_head);
 
@@ -120,6 +129,7 @@ _gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond)
     return ret;
 }
 
+#define GCS_SM_HAS_TO_WAIT (sm->entered >= GCS_SM_CC || sm->pause)
 /*!
  * Synchronize with entry order to the monitor. Must be always followed by
  * gcs_sm_enter(sm, cond, true)
@@ -135,20 +145,20 @@ gcs_sm_schedule (gcs_sm_t* sm)
 
     long ret = sm->ret;
 
-    if (gu_likely(((sm->users - sm->c) < (long)sm->wait_q_len) &&
-                  (0 == ret))) {
+    if (gu_likely((sm->users < (long)sm->wait_q_len) && (0 == ret))) {
 
         sm->users++;
         GCS_SM_INCREMENT(sm->wait_q_tail); /* even if we don't queue, cursor
                                             * needs to be advanced */
 
-        if ((sm->users > 0 || sm->pause)) {
-            ret = sm->wait_q_tail + 1;
+        if (GCS_SM_HAS_TO_WAIT) {
+            ret = sm->wait_q_tail + 1; // waiter handle
         }
 
         return ret; // success
     }
     else if (0 == ret) {
+        assert (sm->users == (long)sm->wait_q_len);
         ret = -EAGAIN;
     }
 
@@ -177,7 +187,7 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled)
 
     if (gu_likely (scheduled || (ret = gcs_sm_schedule(sm)) >= 0)) {
 
-        if (sm->users > 0 || sm->pause) {
+        if (GCS_SM_HAS_TO_WAIT) {
             if (gu_likely(_gcs_sm_enqueue_common (sm, cond))) {
                 ret = sm->ret;
             }
@@ -189,8 +199,8 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled)
         assert (ret <= 0);
 
         if (gu_likely(0 == ret)) {
-            assert(sm->users > sm->c);
-            assert(sm->entered < -sm->c);
+            assert(sm->users   > 0);
+            assert(sm->entered < GCS_SM_CC);
             sm->entered++;
         }
         else {
@@ -199,7 +209,7 @@ gcs_sm_enter (gcs_sm_t* sm, gu_cond_t* cond, bool scheduled)
             }
             else {
                 /* monitor is closed, wake up others */
-                assert(sm->users > sm->c);
+                assert(sm->users > 0);
                 _gcs_sm_leave_common(sm);
             }
         }
@@ -282,9 +292,9 @@ gcs_sm_interrupt (gcs_sm_t* sm, long handle)
         sm->wait_q[handle].cond = NULL;
         ret = 0;
         if (!sm->pause && (long)sm->wait_q_head == handle) {
-            /* gcs_sm_interrupt() was called right after the interrupted was
+            /* gcs_sm_interrupt() was called right after the waiter was
              * signaled by gcs_sm_continue() or gcs_sm_leave() but before
-             * the interrupted has woken up. Wake up the next waiter */
+             * the waiter has woken up. Wake up the next waiter */
             _gcs_sm_wake_up_next(sm);
         }
     }

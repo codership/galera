@@ -1,4 +1,4 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+// Copyright (C) 2010 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -27,8 +27,8 @@ START_TEST (gcs_sm_test_basic)
     for (i = 1; i < 5; i++) {
         ret = gcs_sm_enter(sm, &cond, false);
         fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
-        fail_if(sm->users != 0, "users = %ld, expected 0", sm->users);
-        fail_if(sm->entered != 1, "entered = %d, expected %d", sm->entered, 1);
+        fail_if(sm->users != 1, "users = %ld, expected 1", sm->users);
+        fail_if(sm->entered != 1, "entered = %d, expected 1", sm->entered);
 
         gcs_sm_leave(sm);
         fail_if(sm->entered != 0, "entered = %d, expected %d", sm->entered, 0);
@@ -73,7 +73,7 @@ START_TEST (gcs_sm_test_simple)
 
     ret = gcs_sm_enter(sm, &cond, false);
     fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
-    fail_if(sm->users != 0, "users = %ld, expected 0", sm->users);
+    fail_if(sm->users != 1, "users = %ld, expected 1", sm->users);
     fail_if(sm->entered != true, "entered = %d, expected %d",
             sm->users, true);
 
@@ -84,11 +84,8 @@ START_TEST (gcs_sm_test_simple)
     gu_thread_create (&t3, NULL, simple_thread, sm);
 
     usleep (TEST_USLEEP);
-    fail_if(3 != sm->users, "users = %ld, expected 3",
-            sm->users);
-    fail_if((long)sm->wait_q_len != (sm->users - sm->c),
-            "wait_q_len = %lu, users - c = %ld",
-            sm->wait_q_len, sm->users - sm->c);
+    fail_if((long)sm->wait_q_len != sm->users, "wait_q_len = %lu, users = %ld",
+            sm->wait_q_len, sm->users);
 
     gu_thread_create (&t4, NULL, simple_thread, sm);
 
@@ -100,12 +97,12 @@ START_TEST (gcs_sm_test_simple)
              sm->wait_q_tail);
     fail_if (1 != sm->wait_q_head, "wait_q_head = %lu, expected 1",
              sm->wait_q_head);
-    fail_if (3 != sm->users, "users = %lu, expected 3", sm->users);
+    fail_if (4 != sm->users, "users = %lu, expected 4", sm->users);
 
     gu_info ("Calling gcs_sm_leave()");
     gcs_sm_leave(sm);
 
-    fail_unless(3 > sm->users, "users = %lu, expected 3", sm->users);
+    fail_unless(4 > sm->users, "users = %lu, expected 4", sm->users);
 
     gu_info ("Calling gcs_sm_close()");
     ret = gcs_sm_close(sm);
@@ -151,7 +148,7 @@ START_TEST (gcs_sm_test_close)
 
     int ret = gcs_sm_enter(sm, &cond, false);
     fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
-    fail_if(sm->users != 0, "users = %ld, expected 0", sm->users);
+    fail_if(sm->users != 1, "users = %ld, expected 1", sm->users);
     fail_if(order != 0);
 
     fail_if(1 != sm->wait_q_head, "wait_q_head = %lu, expected 1",
@@ -165,7 +162,7 @@ START_TEST (gcs_sm_test_close)
     fail_if(order != 1, "order is %d, expected 1", order);
     usleep(TEST_USLEEP); // make sure closing_thread() blocks in gcs_sm_close()
 
-    fail_if(sm->users != 1, "users = %ld, expected 1", sm->users);
+    fail_if(sm->users != 2, "users = %ld, expected 2", sm->users);
     gu_info ("Started close thread, users = %ld", sm->users);
 
     fail_if(1 != sm->wait_q_head, "wait_q_head = %lu, expected 1",
@@ -259,7 +256,7 @@ START_TEST (gcs_sm_test_pause)
     // set pause_order to 1
     WAIT_FOR(1 == pause_order);
     fail_if (pause_order != 1, "pause_order = %d, expected 1");
-    fail_if (sm->users != 1, "users = %ld, expected 1", sm->users);
+    fail_if (sm->users != 2, "users = %ld, expected 2", sm->users);
 
     fail_if(2 != sm->wait_q_head, "wait_q_head = %lu, expected 2",
             sm->wait_q_head);
@@ -279,11 +276,10 @@ START_TEST (gcs_sm_test_pause)
 
     // Now test pausing when monitor is left
     gcs_sm_pause (sm);
-    fail_if (sm->users != 1, "users = %ld, expected 1", sm->users);
+    fail_if (sm->users != 2, "users = %ld, expected 2", sm->users);
 
     gcs_sm_leave (sm);
-    fail_if (sm->users != 0, "users = %ld, expected 0",
-             sm->users);
+    fail_if (sm->users   != 1, "users = %ld, expected 1", sm->users);
     fail_if (sm->entered != 0, "entered = %ld, expected 1", sm->entered);
 
     fail_if(3 != sm->wait_q_head, "wait_q_head = %lu, expected 3",
@@ -294,8 +290,7 @@ START_TEST (gcs_sm_test_pause)
     usleep (TEST_USLEEP); // nothing should change, since monitor is paused
     fail_if (pause_order != 2, "pause_order = %d, expected 2");
     fail_if (sm->entered != 0, "entered = %ld, expected 0", sm->entered);
-    fail_if (sm->users != 0, "users = %ld, expected 0",
-             sm->users);
+    fail_if (sm->users   != 1, "users = %ld, expected 1", sm->users);
 
     gcs_sm_continue (sm); // paused thread should continue
     WAIT_FOR(3 == pause_order);
@@ -303,7 +298,7 @@ START_TEST (gcs_sm_test_pause)
 
     gcs_sm_enter (sm, &cond, false); // by now paused thread exited monitor
     fail_if (sm->entered != 1, "entered = %ld, expected 1", sm->entered);
-    fail_if (sm->users != 0, "users = %ld, expected 0", sm->users);
+    fail_if (sm->users   != 1, "users = %ld, expected 1", sm->users);
     fail_if(0 != sm->wait_q_head, "wait_q_head = %lu, expected 0",
             sm->wait_q_head);
     fail_if(0 != sm->wait_q_tail, "wait_q_tail = %lu, expected 0",
@@ -346,7 +341,7 @@ static void* interrupt_thread(void* arg)
     return NULL;
 }
 
-#define TEST_CREATE_THREAD(thr, tail, h, q)                             \
+#define TEST_CREATE_THREAD(thr, tail, h, u)                             \
     global_handle = -1;                                                 \
     gu_thread_create (thr, NULL, interrupt_thread, sm);                 \
     WAIT_FOR(global_handle == h);                                       \
@@ -354,7 +349,7 @@ static void* interrupt_thread(void* arg)
              sm->wait_q_tail, tail);                                    \
     fail_if (global_handle != h, "global_handle = %ld, expected %ld",   \
              global_handle, h);                                         \
-    fail_if (sm->users != q, "users = %ld, expected %ld", sm->users, q);
+    fail_if (sm->users != u, "users = %ld, expected %ld", sm->users, u);
 
 #define TEST_INTERRUPT_THREAD(h, t)                                     \
     ret = gcs_sm_interrupt (sm, (h));                                   \
@@ -385,16 +380,16 @@ START_TEST (gcs_sm_test_interrupt)
     fail_if (ret != 0);
 
     /* 1. Test interrupting blocked by previous thread */
-    TEST_CREATE_THREAD(&thr1, 2, 3, 1);
+    TEST_CREATE_THREAD(&thr1, 2, 3, 2);
 
-    TEST_CREATE_THREAD(&thr2, 3, 4, 2);
+    TEST_CREATE_THREAD(&thr2, 3, 4, 3);
 
     TEST_INTERRUPT_THREAD(3, thr1);
 
     gcs_sm_leave (sm); // this should let 2nd enter monitor
     gu_thread_join (thr2, NULL);
     fail_if (global_ret != 0, "global_ret = %ld, expected 0", global_ret);
-    fail_if (sm->users != -1, "users = %ld, expected %ld", sm->users, -1);
+    fail_if (sm->users  != 0, "users = %ld, expected 0", sm->users);
 
     ret = gcs_sm_interrupt (sm, 4); // try to interrupt 2nd which has exited
     fail_if (ret != -ESRCH);
@@ -402,13 +397,13 @@ START_TEST (gcs_sm_test_interrupt)
     /* 2. Test interrupting blocked by pause */
     gcs_sm_pause (sm);
 
-    TEST_CREATE_THREAD(&thr1, 0, 1, 0);
+    TEST_CREATE_THREAD(&thr1, 0, 1, 1);
 
     TEST_INTERRUPT_THREAD(1, thr1);
 
-    TEST_CREATE_THREAD(&thr2, 1, 2, 1); /* test queueing after interrupted */
+    TEST_CREATE_THREAD(&thr2, 1, 2, 2); /* test queueing after interrupted */
 
-    TEST_CREATE_THREAD(&thr3, 2, 3, 2);
+    TEST_CREATE_THREAD(&thr3, 2, 3, 3);
 
     TEST_INTERRUPT_THREAD(3, thr3); /* test interrupting last waiter */
 
@@ -420,10 +415,10 @@ START_TEST (gcs_sm_test_interrupt)
     /* 3. Unpausing totally interrupted monitor */
     gcs_sm_pause (sm);
 
-    TEST_CREATE_THREAD(&thr1, 3, 4, 0);
+    TEST_CREATE_THREAD(&thr1, 3, 4, 1);
     TEST_INTERRUPT_THREAD(4, thr1);
 
-    TEST_CREATE_THREAD(&thr1, 0, 1, 1);
+    TEST_CREATE_THREAD(&thr1, 0, 1, 2);
     TEST_INTERRUPT_THREAD(1, thr1);
 
     gcs_sm_continue (sm);
@@ -436,9 +431,9 @@ START_TEST (gcs_sm_test_interrupt)
             sm->wait_q_head);
     fail_if(1 != sm->wait_q_tail, "wait_q_tail = %lu, expected 1",
             sm->wait_q_tail);
-    fail_if (sm->users != 0, "users = %ld, expected %ld", sm->users, 0);
+    fail_if (sm->users != 1, "users = %ld, expected 1", sm->users);
 
-    TEST_CREATE_THREAD(&thr1, 2, 3, 1);
+    TEST_CREATE_THREAD(&thr1, 2, 3, 2);
 
     gu_info ("Calling gcs_sm_leave()");
     gcs_sm_leave (sm);
