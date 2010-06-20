@@ -15,7 +15,7 @@
 extern gcs_sm_t*
 gcs_sm_create (long len, long n)
 {
-    if ((len < 0) || (len & (len - 1))) {
+    if ((len < 1 /* 2 is minimum */) || (len & (len - 1))) {
         gu_error ("Monitor length parameter is not a power of 2: %ld", len);
         return NULL;
     }
@@ -34,7 +34,7 @@ gcs_sm_create (long len, long n)
         gu_mutex_init (&sm->lock, NULL);
         sm->wait_q_size = len;
         sm->wait_q_mask = sm->wait_q_size - 1;
-        sm->wait_q_head = 0;
+        sm->wait_q_head = 1;
         sm->wait_q_tail = 0;
         sm->wait_q_len  = -n; // -n where n is a number of simult. users
         sm->entered     = 0;
@@ -61,11 +61,19 @@ gcs_sm_close (gcs_sm_t* sm)
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
 
-    // @todo: this will fail if the queue is full
+    // in case the queue is full
+    while (sm->wait_q_len - sm->c >= (long)sm->wait_q_size) {
+        gu_mutex_unlock (&sm->lock);
+        usleep(1000);
+        gu_mutex_lock (&sm->lock);
+    }
+
     while (sm->wait_q_len > sm->c) { // wait for cleared queue
         sm->wait_q_len++;
         GCS_SM_INCREMENT(sm->wait_q_tail);
         _gcs_sm_enqueue_common (sm, &cond);
+        sm->wait_q_len--;
+        GCS_SM_INCREMENT(sm->wait_q_head);
     }
 
     gu_cond_destroy (&cond);
