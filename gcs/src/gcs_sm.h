@@ -133,9 +133,9 @@ _gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond)
 
 #ifdef GCS_SM_CONCURRENCY
 #define GCS_SM_HAS_TO_WAIT                                              \
-    (sm->users > sm->entered || sm->entered >= GCS_SM_CC || sm->pause)
+    (sm->users > (sm->entered + 1) || sm->entered >= GCS_SM_CC || sm->pause)
 #else
-#define GCS_SM_HAS_TO_WAIT (sm->users > GCS_SM_CC || sm->pause)
+#define GCS_SM_HAS_TO_WAIT (sm->users > 1 || sm->pause)
 #endif /* GCS_SM_CONCURRENCY */
 
 /*!
