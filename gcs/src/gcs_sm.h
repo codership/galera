@@ -103,6 +103,8 @@ _gcs_sm_leave_common (gcs_sm_t* sm)
 
     assert (sm->users > 0);
     sm->users--;
+    assert (false == sm->wait_q[sm->wait_q_head].wait);
+    assert (NULL  == sm->wait_q[sm->wait_q_head].cond);
     GCS_SM_INCREMENT(sm->wait_q_head);
 
     if (!sm->pause) {
@@ -129,7 +131,13 @@ _gcs_sm_enqueue_common (gcs_sm_t* sm, gu_cond_t* cond)
     return ret;
 }
 
-#define GCS_SM_HAS_TO_WAIT (sm->entered >= GCS_SM_CC || sm->pause)
+#ifdef GCS_SM_CONCURRENCY
+#define GCS_SM_HAS_TO_WAIT                                              \
+    (sm->users > sm->entered || sm->entered >= GCS_SM_CC || sm->pause)
+#else
+#define GCS_SM_HAS_TO_WAIT (sm->users > 0 || sm->pause)
+#endif /* GCS_SM_CONCURRENCY */
+
 /*!
  * Synchronize with entry order to the monitor. Must be always followed by
  * gcs_sm_enter(sm, cond, true)
@@ -291,7 +299,7 @@ gcs_sm_interrupt (gcs_sm_t* sm, long handle)
         gu_cond_signal (sm->wait_q[handle].cond);
         sm->wait_q[handle].cond = NULL;
         ret = 0;
-        if (!sm->pause && (long)sm->wait_q_head == handle) {
+        if (!sm->pause && handle == (long)sm->wait_q_head) {
             /* gcs_sm_interrupt() was called right after the waiter was
              * signaled by gcs_sm_continue() or gcs_sm_leave() but before
              * the waiter has woken up. Wake up the next waiter */
