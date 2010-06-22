@@ -2249,12 +2249,18 @@ enum wsrep_status mm_galera_to_execute_start(
     /* update global seqno */
     do_apply = galera_update_last_received (seqno_g);
 
-    if (rcode == WSDB_OK) {
-        /* Grab commit queue */
-        apply_monitor.enter(trx);
+    if (rcode == WSDB_OK)
+    {
+        // @todo the following should be changed to apply_monitor.enter()
+        // once table/db level certification is supported
+        //
+        // drain apply monitor, self cancel apply monitor in to_execute_end()
+        apply_monitor.drain(seqno_g);
+        // apply_monitor.enter(trx);
         rcode = WSREP_OK;
     }
-    else {
+    else
+    {
         // theoretically it is possible with poorly written application
         // (trying to replicate something before completing state transfer)
         gu_warn ("Local action replicated with outdated seqno: "
@@ -2296,7 +2302,7 @@ enum wsrep_status mm_galera_to_execute_end(
     /* release monitors */
     do_report = report_check_counter();
     GALERA_RELEASE_QUEUE (cert_queue, trx->local_seqno());
-    apply_monitor.leave(trx);
+    apply_monitor.self_cancel(trx);
 
     gu_debug("TO applier ending  seqnos: %lld - %lld",
              trx->local_seqno(), trx->global_seqno());
