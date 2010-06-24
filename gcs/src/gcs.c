@@ -558,7 +558,7 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         conn->sync_sent = false;
 
         // need to wake up send monitor if it was paused during CC
-        if (conn->sm->pause == true) gcs_sm_continue(conn->sm);
+        gcs_sm_continue(conn->sm);
     }
     gu_fifo_release (conn->recv_q);
 

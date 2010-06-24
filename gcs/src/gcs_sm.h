@@ -269,7 +269,6 @@ gcs_sm_continue (gcs_sm_t* sm)
     }
     else {
         gu_debug ("Trying to continue unpaused monitor");
-        assert(0);
     }
 
     gu_mutex_unlock (&sm->lock);
