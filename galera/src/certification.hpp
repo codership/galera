@@ -123,6 +123,7 @@ namespace galera
         DepsSet       deps_set_;
         gu::Mutex     mutex_;
         size_t        trx_size_warn_count_;
+        wsrep_seqno_t initial_position_;
         wsrep_seqno_t position_;
         wsrep_seqno_t safe_to_discard_seqno_;
         size_t        n_certified_;

@@ -680,7 +680,11 @@ static wsrep_status_t process_conn_write_set(
     /* release total order */
     GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
 
-    apply_monitor.enter(trx);
+    // @todo the following should be changed to apply_monitor.enter()
+    // once table/db level certification is supported
+    //
+    // drain apply monitor, self cancel apply monitor in to_execute_end()
+    apply_monitor.drain(trx->global_seqno() - 1);
 
     if (cert_ret == WSDB_OK)
     {
@@ -709,7 +713,7 @@ static wsrep_status_t process_conn_write_set(
     GALERA_UPDATE_LAST_APPLIED (trx->global_seqno());
     do_report = report_check_counter();
 
-    apply_monitor.leave(trx);
+    apply_monitor.self_cancel(trx);
 
     cert->set_trx_committed(trx);
     if (do_report) report_last_committed(gcs_conn);
@@ -867,6 +871,7 @@ static wsrep_status_t process_query_write_set(
         {
             // cancel apply monitor and commit queue
             apply_monitor.self_cancel(trx);
+            cert->set_trx_committed(trx);
         }
         else
         {
@@ -1946,10 +1951,10 @@ enum wsrep_status mm_galera_pre_commit(
         case 0:
             break;
         case -EINTR:
-            // todo - must be replayed?
-            log_warn << "aborting certified";
-            trx->set_state(WSDB_TRX_ABORTING_REPL);
-            retcode = WSREP_TRX_FAIL;
+            log_debug << "aborting certified " << *trx;
+            trx->set_position(WSDB_TRX_POS_COMMIT_QUEUE);
+            trx->set_state(WSDB_TRX_MUST_REPLAY);
+            retcode = WSREP_BF_ABORT;
             break;
         }
     }
@@ -2255,7 +2260,7 @@ enum wsrep_status mm_galera_to_execute_start(
         // once table/db level certification is supported
         //
         // drain apply monitor, self cancel apply monitor in to_execute_end()
-        apply_monitor.drain(seqno_g);
+        apply_monitor.drain(seqno_g - 1);
         // apply_monitor.enter(trx);
         rcode = WSREP_OK;
     }
@@ -2490,7 +2495,7 @@ void mm_galera_status_free (wsrep_t* gh,
 extern "C" long
 galera_slave_queue()
 {
-    return gcs_queue_len(gcs_conn);
+    return (gcs_conn != 0 ? gcs_queue_len(gcs_conn) : 0);
 }
 
 

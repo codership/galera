@@ -202,7 +202,7 @@ namespace galera
         void drain(wsrep_seqno_t seqno)
         {
             assert(drain_seqno_ == -1);
-            log_info << "DEBUG: draining up to " << seqno;
+            log_debug << "draining up to " << seqno;
             gu::Lock lock(mutex_);
             drain_seqno_ = seqno;
 
@@ -212,11 +212,14 @@ namespace galera
                 lock.wait(cond_);
             }
 
-            for (wsrep_seqno_t i = drain_seqno_; i <= last_left_; ++i)
+            if (last_left_ > drain_seqno_)
             {
-                const Applier& a(appliers_[indexof(i)]);
-                log_info << "DEBUG: applier " << i
-                         << " in state " << a.state_;
+                for (wsrep_seqno_t i = drain_seqno_; i <= last_left_; ++i)
+                {
+                    const Applier& a(appliers_[indexof(i)]);
+                    log_info << "DEBUG: applier " << i
+                             << " in state " << a.state_;
+                }
             }
 
             while (last_left_ < drain_seqno_)
