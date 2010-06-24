@@ -212,17 +212,14 @@ namespace galera
                 lock.wait(cond_);
             }
 
-            if (drain_seqno_ < last_left_)
+            for (wsrep_seqno_t i = drain_seqno_; i <= last_left_; ++i)
             {
-                for (wsrep_seqno_t i = drain_seqno_; i <= last_left_; ++i)
-                {
-                    const Applier& a(appliers_[indexof(i)]);
-                    log_info << "DEBUG: applier " << i
-                             << " in state " << a.state_;
-                }
+                const Applier& a(appliers_[indexof(i)]);
+                log_info << "DEBUG: applier " << i
+                         << " in state " << a.state_;
             }
 
-            while (drain_seqno_ < last_left_)
+            while (last_left_ < drain_seqno_)
             {
                 lock.wait(cond_);
             }
