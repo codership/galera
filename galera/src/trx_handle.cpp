@@ -10,26 +10,21 @@
 std::ostream&
 galera::operator<<(std::ostream& os, const TrxHandle& th)
 {
-    char uuid_buf[GU_UUID_STR_LEN];
+    char uuid_buf[GU_UUID_STR_LEN + 1];
     gu_uuid_t gu_uuid;
     memcpy(gu_uuid.data, th.source_id_.uuid, sizeof(gu_uuid.data));
 
     sprintf(uuid_buf, GU_UUID_FORMAT, GU_UUID_ARGS(&gu_uuid));
-    os << uuid_buf
-       << " "
-       << th.write_set_type()
-       << " "
-       << th.flags()
-       << " "
-       << th.conn_id()
-       << " "
-       << th.trx_id()
-       << " ";
-
-    os << "(l: "  << th.local_seqno()
-       << ", g: " << th.global_seqno()
-       << ", s: " << th.last_seen_seqno()
-       << ", d: " << th.last_depends_seqno()
+    os << "source: " << uuid_buf
+       << " state: " << th.state_
+       << " wst: " << th.write_set_type_
+       << " flags: " << th.write_set_flags_
+       << " conn_id: " << th.conn_id_
+       << " trx_id: " << th.trx_id_
+       << " seqnos (l: "  << th.local_seqno_
+       << ", g: " << th.global_seqno_
+       << ", s: " << th.last_seen_seqno_
+       << ", d: " << th.last_depends_seqno_
        << ')';
 
     return os;
