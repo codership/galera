@@ -39,9 +39,9 @@ galera::ServiceThd::thd_func (void* arg)
                 if ((ret = gcs_set_last_applied(st->gcs_,
                                                 data.last_committed_)))
                 {
-                    log_warn << "Failed to report last committed"
+                    log_warn << "Failed to report last committed "
                              << data.last_committed_ << ", " << ret
-                             <<" (" << strerror (-ret) << ')';
+                             << " (" << strerror (-ret) << ')';
                     // @todo: figure out what to do in this case
                 }
             }

@@ -7,10 +7,13 @@ env.Append(LIBS = ['galera++',
                    'galerautils',
                    'pthread'])
 
-env.Program(target='galera_check',
-            source=Split('''
-                            galera_check.cpp
-                            write_set_check.cpp
-                            service_thd_check.cpp
-                         ''')
-            )
+galera_check = env.Program(target='galera_check',
+                           source=Split('''
+                               galera_check.cpp
+                               write_set_check.cpp
+                               service_thd_check.cpp
+                           '''))
+
+stamp = "galera_check.passed"
+env.Test(stamp, galera_check)
+env.Alias("test", stamp)

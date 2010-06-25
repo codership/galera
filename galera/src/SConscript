@@ -33,18 +33,6 @@ env.SharedLibrary('galera++', [
 ])
 
 
-msenv = env.Clone()
-msenv.Append(CPPFLAGS = ' -DGALERA_MASTER_SLAVE')
-msenv.Replace(SHOBJPREFIX = 'libmsgalera++-')
-msenv.SharedLibrary('msgalera++', [
-        'galera_info.c',
-        'galera_job_queue.c',
-        'galera_options.c',
-        'galera_state.c',
-        'galera_status.c',
-        'mm_galera_refact.cpp'
-])
-
 mmenv = env.Clone()
 mmenv.Append(CPPFLAGS = ' -DGALERA_MULTIMASTER')
 mmenv.Replace(SHOBJPREFIX = 'libmmgalera++-')

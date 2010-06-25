@@ -8,8 +8,8 @@ env.Prepend(LIBS = Split('''
                             galerautils
                          '''))
 
-env.Program(target = 'check_wsdb', 
-            source = Split('''
+wsdb_check = env.Program(target = 'check_wsdb',
+                         source = Split('''
                               test_file.c
                               test_hash.c
                               test_cache.c
@@ -21,4 +21,7 @@ env.Program(target = 'check_wsdb',
                               wsdb_test.c
                            '''))
 
+stamp = str(wsdb_check[0].path) + ".passed"
+env.Test(stamp, wsdb_check)
+env.Alias("test", stamp)
 

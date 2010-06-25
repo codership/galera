@@ -4,8 +4,8 @@ Import('check_env')
 env = check_env.Clone()
 
 env.Prepend(LIBS = 'galerautils')
-env.Program(target = 'gu_tests',
-            source = Split('''
+gu_tests = env.Program(target = 'gu_tests',
+                       source = Split('''
                             gu_tests.c
                             gu_mem_test.c
                             gu_bswap_test.c
@@ -18,13 +18,19 @@ env.Program(target = 'gu_tests',
                             gu_str_test.c
                          '''))
 
+env.Test("gu_tests.passed", gu_tests)
+env.Alias("test", "gu_tests.passed")
 
 
 env.Prepend(LIBS = 'libgalerautils++')
-env.Program(target = 'gu_tests++',
-            source = Split('''gu_tests++.cpp
+gu_testspp = env.Program(target = 'gu_tests++',
+                         source = Split('''
+                              gu_tests++.cpp
                               gu_string_test.cpp
                               gu_uri_test.cpp
                               gu_net_test.cpp
                               gu_datetime_test.cpp
                            '''))
+
+env.Test("gu_tests++.passed", gu_testspp)
+env.Alias("test", "gu_tests++.passed")

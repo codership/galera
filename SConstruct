@@ -262,6 +262,20 @@ conf.Finish()
 # Link unit tests statically
 check_env.Append(LINKFLAGS = ' -static')
 
+#
+# this follows recipes from http://www.scons.org/wiki/UnitTests
+#
+
+def builder_unit_test(target, source, env):
+    app = str(source[0].abspath)
+    if os.spawnl(os.P_WAIT, app, app)==0:
+        open(str(target[0]),'w').write("PASSED\n")
+    else:
+        return 1
+# Create a builder for tests
+bld = Builder(action = builder_unit_test)
+check_env.Append(BUILDERS = {'Test' :  bld})
+
 Export('check_env')
 
 

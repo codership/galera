@@ -1,7 +1,7 @@
 
 Import('check_env')
 
-gcs_tests_env = check_env.Clone()
+env = check_env.Clone()
 
 gcs_tests_sources = Split('''
                              gcs_tests.c
@@ -32,14 +32,17 @@ gcs_tests_sources = Split('''
 
 
 
-gcs_tests_env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM')
-gcs_tests_env.Append(CPPFLAGS = ' -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING')
-gcs_tests_env.Replace(CFLAGS = ' -std=gnu99 -fno-strict-aliasing')
-gcs_tests_env.Prepend(LIBS = Split('''
-                                      galerautils
-                                      m
-                                   '''))
-gcs_tests_env.Program(target = 'gcs_tests',
-                      source = gcs_tests_sources,
-                      OBJPREFIX = 'gcs-tests-')
+env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM')
+env.Append(CPPFLAGS = ' -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING')
+env.Replace(CFLAGS = ' -std=gnu99 -fno-strict-aliasing')
+env.Prepend(LIBS = Split('''
+                            galerautils
+                            m
+                         '''))
 
+gcs_tests = env.Program(target = 'gcs_tests',
+                        source = gcs_tests_sources,
+                        OBJPREFIX = 'gcs-tests-')
+
+env.Test("gcs_tests.passed", gcs_tests)
+env.Alias("test", "gcs_tests.passed")

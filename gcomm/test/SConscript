@@ -9,8 +9,8 @@ env.Prepend(LIBS = Split('''
                             galerautils
                          '''))
 
-env.Program(target = 'check_gcomm',
-            source = Split('''
+gcomm_check = env.Program(target = 'check_gcomm',
+                          source = Split('''
                               check_gcomm.cpp
                               check_trace.cpp
                               check_types.cpp
@@ -19,3 +19,6 @@ env.Program(target = 'check_gcomm',
                               check_evs2.cpp
                               check_pc.cpp
                            '''))
+
+# temporarily disabled env.Test("gcomm_check.passed", gcomm_check)
+env.Alias("test", "gcomm_check.passed")

@@ -12,7 +12,7 @@ libwsdb_files = Split('''
                          conn.c
                          key_array.c
                          mempool.c
-                         wsdb.c  
+                         wsdb.c
                       ''')
 env.SharedLibrary('wsdb', libwsdb_files)
 env.StaticLibrary('wsdb', libwsdb_files)

@@ -266,41 +266,13 @@ namespace galera
             }
 
             if (last_entered_ < trx_seqno) last_entered_ = trx_seqno;
-
-#if 0 // only leaving guys should signal, entering does not relax anything
-            while (appliers_[indexof(last_entered_ + 1)].state_
-                   > Applier::S_IDLE)
-            {
-                Applier& a(appliers_[indexof(last_entered_ + 1)]);
-
-                if (a.state_ == Applier::S_WAITING &&
-                    may_enter(a.trx_) == true)
-                {
-                    a.cond_.signal();
-                }
-                ++last_entered_;
-            }
-
-            while (appliers_[indexof(last_entered_ + 1)].state_
-                   > Applier::S_IDLE)
-            {
-                Applier& a(appliers_[indexof(last_entered_ + 1)]);
-
-                if (a.state_ == Applier::S_WAITING &&
-                    may_enter(a.trx_) == true)
-                {
-                    a.cond_.signal();
-                }
-                ++last_entered_;
-            }
-#endif
-// nothing in this function increases available space pre_enter_cond_.broadcast();
         }
 
         void post_leave(const TrxHandle* trx, gu::Lock& lock)
         {
             const wsrep_seqno_t trx_seqno(trx->global_seqno());
             const size_t idx(indexof(trx_seqno));
+
             if (last_left_ + 1 == trx_seqno) // we're shrinking window
             {
                 appliers_[idx].state_ = Applier::S_IDLE;
@@ -341,55 +313,6 @@ namespace galera
                     a.cond_.signal();
                 }
             }
-#if 0
-            // Note: We need two scans here
-            // 1) Update last left
-            // 2) Check waiters that may enter due to updated last left
-            const wsrep_seqno_t prev_last_left(last_left_);
-            size_t              n_waiters(0);
-
-            for (wsrep_seqno_t i = last_left_ + 1; i <= last_entered_; ++i)
-            {
-                Applier& a(appliers_[indexof(i)]);
-                switch (a.state_)
-                {
-                case Applier::S_FINISHED:
-                    if (last_left_ + 1 == i)
-                    {
-                        a.state_   = Applier::S_IDLE;
-                        a.trx_     = 0;
-                        last_left_ = i;
-                    }
-                    break;
-                case Applier::S_WAITING:
-                    assert(a.trx_ != 0);
-                    ++n_waiters;
-                    break;
-                case Applier::S_CANCELED:
-                case Applier::S_APPLYING:
-                    break;
-                default:
-                    gu_throw_fatal << "invalid state " << a.state_;
-                }
-            }
-
-            for (wsrep_seqno_t i = prev_last_left + 1;
-                 n_waiters > 0 && i <= last_entered_; ++i)
-            {
-                Applier& a(appliers_[indexof(i)]);
-                if (a.state_ == Applier::S_WAITING)
-                {
-                    if (may_enter(a.trx_) == true)
-                    {
-                        a.cond_.signal();
-                    }
-                    --n_waiters;
-                }
-            }
-            appliers_[idx].trx_ = 0;
-
-            assert(n_waiters == 0);
-#endif
             assert((last_left_ >= trx_seqno &&
                     appliers_[idx].state_ == Applier::S_IDLE) ||
                    appliers_[idx].state_ == Applier::S_FINISHED);

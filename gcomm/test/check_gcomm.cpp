@@ -31,12 +31,7 @@ struct GCommSuite
 static GCommSuite suites[] = {
     {"util", util_suite},
     {"types", types_suite},
-//    {"buffer", buffer_suite},
-//    {"event", event_suite},
-    //   {"concurrent", concurrent_suite},
-    //{"tcp", tcp_suite},
     {"gmcast", gmcast_suite},
-    // {"evs", evs_suite},
     {"evs2", evs2_suite},
     {"pc", pc_suite},
     {"", 0}
@@ -57,7 +52,7 @@ int main(int argc, char* argv[])
         if (!log_file) return EXIT_FAILURE;
         gu_conf_set_log_file (log_file);
     }
-    
+
     if (::getenv("CHECK_GCOMM_DEBUG"))
     {
         gu_log_max_level = GU_LOG_DEBUG;
@@ -69,7 +64,7 @@ int main(int argc, char* argv[])
     {
         suits = new vector<string>(gu::strsplit(::getenv("CHECK_GCOMM_SUITES"), ','));
     }
-    
+
     for (size_t i = 0; suites[i].suite != 0; ++i)
     {
         if (suits == 0 || 
