@@ -48,9 +48,9 @@ gcs_act_proto_write (gcs_act_frag_t* frag, void* buf, size_t buf_len)
 {
 #ifdef GCS_DEBUG_PROTO
     if ((frag->act_id   > PROTO_ACT_ID_MAX)   ||
-	(frag->act_size > PROTO_ACT_SIZE_MAX) ||
-	(frag->frag_no  > PROTO_FRAG_NO_MAX)  ||
-	(frag->act_type > PROTO_AT_MAX)) {
+        (frag->act_size > PROTO_ACT_SIZE_MAX) ||
+        (frag->frag_no  > PROTO_FRAG_NO_MAX)  ||
+        (frag->act_type > PROTO_AT_MAX)) {
         gu_error ("Exceeded protocol limits: %d(%d), %d(%d), %d(%d), %d(%d)",
                   frag->act_id,   PROTO_ACT_ID_MAX,
                   frag->act_size, PROTO_ACT_SIZE_MAX,
@@ -77,7 +77,7 @@ gcs_act_proto_write (gcs_act_frag_t* frag, void* buf, size_t buf_len)
 
 /*! Reads header data from the actual header of the message
  *  Remainig fragment buf and length is in frag->frag and frag->frag_len
- * 
+ *
  * @return 0 on success */
 long
 gcs_act_proto_read (gcs_act_frag_t* frag, const void* buf, size_t buf_len)
