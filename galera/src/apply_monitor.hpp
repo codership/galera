@@ -86,9 +86,18 @@ namespace galera
 
         void assign_initial_position(wsrep_seqno_t seqno)
         {
-            assert(last_entered_ == last_left_);
-            log_info << "initial position " << seqno;
-            last_entered_ = last_left_ = seqno;
+            gu::Lock lock(mutex_);
+            if (last_entered_ == -1 || seqno == -1)
+            {
+                // first call or reset
+                last_entered_ = last_left_ = seqno;
+            }
+            else
+            {
+                // drain monitor up to seqno but don't reset last_entered_
+                // or last_left_
+                drain_common(seqno, lock);
+            }
         }
 
         int enter(TrxHandle* trx)
@@ -199,34 +208,12 @@ namespace galera
 
         wsrep_seqno_t last_left() const { return last_left_; }
 
+
+
         void drain(wsrep_seqno_t seqno)
         {
-            assert(drain_seqno_ == -1);
-            log_debug << "draining up to " << seqno;
             gu::Lock lock(mutex_);
-            drain_seqno_ = seqno;
-
-            while (drain_seqno_ - last_left_ >=
-                   static_cast<ssize_t>(appliers_size_)) // TODO: exit on error
-            {
-                lock.wait(cond_);
-            }
-
-            if (last_left_ > drain_seqno_)
-            {
-                for (wsrep_seqno_t i = drain_seqno_; i <= last_left_; ++i)
-                {
-                    const Applier& a(appliers_[indexof(i)]);
-                    log_info << "DEBUG: applier " << i
-                             << " in state " << a.state_;
-                }
-            }
-
-            while (last_left_ < drain_seqno_)
-            {
-                lock.wait(cond_);
-            }
-            drain_seqno_ = -1;
+            drain_common(seqno, lock);
         }
 
         std::pair<double, double> get_ooo_stats() const
@@ -313,6 +300,7 @@ namespace galera
                     a.cond_.signal();
                 }
             }
+            appliers_[idx].trx_ = 0;
             assert((last_left_ >= trx_seqno &&
                     appliers_[idx].state_ == Applier::S_IDLE) ||
                    appliers_[idx].state_ == Applier::S_FINISHED);
@@ -325,6 +313,36 @@ namespace galera
                 oool_ += (last_left_ > trx_seqno);
                 cond_.broadcast();
             }
+        }
+
+        void drain_common(wsrep_seqno_t seqno, gu::Lock& lock)
+        {
+            assert(drain_seqno_ == -1);
+            log_debug << "draining up to " << seqno;
+            drain_seqno_ = seqno;
+
+            while (drain_seqno_ - last_left_ >=
+                   static_cast<ssize_t>(appliers_size_)) // TODO: exit on error
+            {
+                lock.wait(cond_);
+            }
+
+            if (last_left_ > drain_seqno_)
+            {
+                log_debug << "last left greater than drain seqno";
+                for (wsrep_seqno_t i = drain_seqno_; i <= last_left_; ++i)
+                {
+                    const Applier& a(appliers_[indexof(i)]);
+                    log_debug << "applier " << i
+                              << " in state " << a.state_;
+                }
+            }
+
+            while (last_left_ < drain_seqno_)
+            {
+                lock.wait(cond_);
+            }
+            drain_seqno_ = -1;
         }
 
         Monitor(const Monitor&);

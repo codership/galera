@@ -806,11 +806,12 @@ gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act)
 //                (group->nodes[group->my_idx].status < GCS_NODE_STATE_JOINER);
             conf->my_state = group->nodes[group->my_idx].status;
 
+            char* ptr = &conf->data[0];
             for (idx = 0; idx < group->num; idx++)
             {
-                char* node_id = &conf->data[idx * GCS_MEMBER_NAME_MAX];
-                strncpy (node_id, group->nodes[idx].id, GCS_MEMBER_NAME_MAX);
-                node_id[GCS_MEMBER_NAME_MAX - 1] = '\0';
+                strncpy (ptr, group->nodes[idx].id, GCS_MEMBER_NAME_MAX);
+                ptr[GCS_MEMBER_NAME_MAX - 1] = '\0';
+                ptr += strlen(ptr) + 1;
             }
         }
         else {

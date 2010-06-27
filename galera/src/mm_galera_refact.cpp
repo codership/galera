@@ -667,18 +667,24 @@ static wsrep_status_t process_conn_write_set(
     void *recv_ctx, TrxHandle* trx,
     gcs_seqno_t seqno_l
 ) {
-    bool do_report;
     wsrep_status_t rcode = WSREP_OK;
 
-    assert (trx->global_seqno() > 0);
+    assert(trx->global_seqno() > 0);
+    assert(trx->is_local() == false);
 
     /* wait for total order */
-    GALERA_GRAB_QUEUE (cert_queue,   seqno_l);
+    GALERA_GRAB_QUEUE (cert_queue, seqno_l);
+
+    if (trx->global_seqno() <= cert->position())
+    {
+        log_info << "discarding trx below cert position " << *trx;
+        GALERA_RELEASE_QUEUE(cert_queue, seqno_l);
+        apply_monitor.self_cancel(trx);
+        return WSREP_TRX_FAIL;
+    }
 
     int cert_ret(cert->append_trx(trx));
-
-    /* release total order */
-    GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
+    bool do_report(report_check_counter());
 
     // @todo the following should be changed to apply_monitor.enter()
     // once table/db level certification is supported
@@ -711,10 +717,9 @@ static wsrep_status_t process_conn_write_set(
     }
 
     GALERA_UPDATE_LAST_APPLIED (trx->global_seqno());
-    do_report = report_check_counter();
-
+    /* release total order */
+    GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
     apply_monitor.self_cancel(trx);
-
     cert->set_trx_committed(trx);
     if (do_report) report_last_committed(gcs_conn);
 
@@ -726,13 +731,6 @@ enum wsrep_status process_query_write_set_applying(
     TrxHandle* trx,
     gcs_seqno_t seqno_l)
 {
-    // Locals grab apply_monitor and commit queue already in pre commit so
-    // replaying trxs have it already
-    if (trx->is_local() == false)
-    {
-        apply_monitor.enter(trx);
-    }
-
     static const size_t max_apply_attempts(10);
     size_t attempts(0);
     int rcode(WSREP_OK);
@@ -777,10 +775,10 @@ enum wsrep_status process_query_write_set_applying(
     while (WSREP_OK != rcode && attempts < max_apply_attempts);
 
     if (attempts == max_apply_attempts) {
-        gu_warn("ws applying is not possible, %lld - %lld",
-                trx->global_seqno(), seqno_l);
+        log_warn << "write set applying not possible for trx " << *trx;
         // We don't release commit queue here to disallow following
         // transactions to commit
+        assert(0);
         return WSREP_TRX_FAIL;
     }
 
@@ -799,17 +797,6 @@ enum wsrep_status process_query_write_set_applying(
     gu_debug("GALERA ws commit for: %lld %lld", trx->global_seqno(),
              seqno_l);
 
-    // Bookkeeping for local trxs is done in post commit
-    if (trx->is_local() == false)
-    {
-        GALERA_UPDATE_LAST_APPLIED (trx->global_seqno());
-        bool do_report(report_check_counter());
-        apply_monitor.leave(trx);
-
-        cert->set_trx_committed(trx);
-        if (do_report) report_last_committed(gcs_conn);
-    }
-
     return WSREP_OK;
 }
 
@@ -820,90 +807,64 @@ static wsrep_status_t process_query_write_set(
     void *recv_ctx, TrxHandle* trx,
     gcs_seqno_t seqno_l
     ) {
-    int rcode;
+
     enum wsrep_status ret_code;
     gcs_seqno_t seqno_g = trx->global_seqno();
 
     assert (seqno_g > 0);
+    assert(trx->is_local() == false);
 
     // wait for total order
     GALERA_GRAB_QUEUE (cert_queue, seqno_l);
 
-
-    if (gu_likely(galera_update_last_received(seqno_g)))
+    if (trx->global_seqno() <= cert->position())
     {
-        // append into cert index and certify
-        rcode = cert->append_trx(trx);
-    }
-    else
-    {
-        // outdated write set, skip
-        rcode = WSDB_CERTIFICATION_SKIP;
-        ret_code = WSREP_OK;
+        log_info << "discarding trx below cert position " << *trx;
+        GALERA_RELEASE_QUEUE(cert_queue, seqno_l);
+        apply_monitor.self_cancel(trx);
+        return WSREP_TRX_FAIL;
     }
 
+    // append into cert index and certify
+    int cert_ret(cert->append_trx(trx));
+    bool do_report(report_check_counter());
     // release total order
     GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
 
-    gu_debug("remote trx seqno: %lld %lld last_seen_trx: %lld %lld, cert: %d",
-             seqno_g, seqno_l, trx->last_seen_seqno(),
-             last_recved, rcode);
-
-    switch (rcode)
+    switch (cert_ret)
     {
     case WSDB_OK:
         // certification ok
-        rcode = process_query_write_set_applying(recv_ctx, trx, seqno_l);
+        apply_monitor.enter(trx);
+        ret_code = process_query_write_set_applying(recv_ctx, trx, seqno_l);
+        apply_monitor.leave(trx);
         // stop for any dbms error
-        if (rcode != WSDB_OK)
+        if (ret_code != WSREP_OK)
         {
             gu_fatal("could not apply trx: %lld %lld", seqno_g, seqno_l);
             return WSREP_FATAL;
         }
-        ret_code = WSREP_OK;
         break;
 
     case WSDB_CERTIFICATION_FAIL:
         // certification failed, release
         gu_debug("trx certification failed: (%lld %lld) last_seen: %lld",
                  seqno_g, seqno_l, trx->last_seen_seqno());
-        if (trx->is_local() == false)
-        {
-            // cancel apply monitor and commit queue
-            apply_monitor.self_cancel(trx);
-            cert->set_trx_committed(trx);
-        }
-        else
-        {
-            gu_warn("certification failed for replaying trx %lld", seqno_g);
-            // replaying job has grabbed commit queue in the beginning
-            GALERA_UPDATE_LAST_APPLIED (seqno_g);
-            apply_monitor.leave(trx);
-        }
+        // cancel apply monitor and commit queue
+        apply_monitor.self_cancel(trx);
         ret_code = WSREP_TRX_FAIL;
-        break;
-
-    case WSDB_CERTIFICATION_SKIP:
-        if (trx->is_local() == false)
-        {
-            // cancel apply monitor and commit queue
-            apply_monitor.self_cancel(trx);
-        }
-        else
-        {
-            gu_warn("local trx %lld skipped", seqno_g);
-            // replaying job has grabbed commit queue in the beginning
-            GALERA_UPDATE_LAST_APPLIED (seqno_g);
-        }
-        ret_code = WSREP_OK;
         break;
 
     default:
         gu_error("unknown galera fail: %d trdx: %lld %lld",
-                 rcode, seqno_g, seqno_l);
+                 cert_ret, seqno_g, seqno_l);
         ret_code = WSREP_FATAL;
         break;
     }
+
+    GALERA_UPDATE_LAST_APPLIED (trx->global_seqno());
+    cert->set_trx_committed(trx);
+    if (do_report) report_last_committed(gcs_conn);
 
     return ret_code;
 }
@@ -1053,6 +1014,7 @@ galera_handle_configuration (wsrep_t* gh,
     if (view_info->my_idx >= 0)
     {
         my_uuid = view_info->members[view_info->my_idx].id;
+        assert(my_uuid != WSREP_UUID_UNDEFINED);
     }
     // @todo view handler consumes view_info, this should be changed so
     // that handler has responsibility of taking copy if it wants to
@@ -1675,10 +1637,10 @@ enum wsrep_status mm_galera_post_rollback(
     GU_DBUG_RETURN(WSREP_OK);
 }
 
-static int check_certification_status_for_aborted(
-    trx_seqno_t seqno_l, TrxHandle* trx
-) {
+static int check_certification_status_for_aborted(TrxHandle* trx)
+{
     int rcode;
+    wsrep_seqno_t seqno_l(trx->local_seqno());
     /*
      * not sure if certification needs to wait for total order or not.
      * local trx has conflicted with some remote trx and we are interested
@@ -1724,6 +1686,73 @@ static int check_certification_status_for_aborted(
     }
 }
 
+static wsrep_status_t trx_repl(TrxHandle* trx)
+{
+    long rcode;
+    gcs_seqno_t seqno_l(GCS_SEQNO_ILL), seqno_g(GCS_SEQNO_ILL);
+    const MappedBuffer& wscoll(trx->write_set_collection());
+
+    do
+    {
+        assert (WSREP_SEQNO_UNDEFINED == trx->global_seqno());
+        // grab gcs resource before setting last applied to ensure
+        // monotonous increase of last seen seqno
+        const long gcs_handle(gcs_schedule(gcs_conn));
+        if (gcs_handle < 0)
+        {
+            log_warn << "gcs_schedule(): " << strerror(-gcs_handle);
+            return WSREP_CONN_FAIL;
+        }
+
+        trx->set_gcs_handle(gcs_handle);
+        trx->set_last_seen_seqno(apply_monitor.last_left());
+        // rewrite trx header
+        wsdb->flush_trx(trx, true);
+
+
+
+        trx->unlock();
+        rcode = gcs_repl(gcs_conn, &wscoll[0], wscoll.size(),
+                         GCS_ACT_TORDERED, true, &seqno_g, &seqno_l);
+        trx->lock();
+    }
+    while (rcode == -EAGAIN && trx->state() != WSDB_TRX_MUST_ABORT &&
+           (usleep(GALERA_USLEEP_FLOW_CONTROL), true));
+
+
+    if (rcode < 0)
+    {
+        if (rcode != -EINTR)
+        {
+            log_info << "gcs_repl() failed with '" << strerror(-rcode)
+                     << "' for trx " << *trx;
+        }
+        else
+        {
+            log_debug << "gcs_repl() interrupted for: " << trx->trx_id()
+                      << " state " << trx->state();
+        }
+        assert(rcode != -EINTR || trx->state() == WSDB_TRX_MUST_ABORT);
+        assert (GCS_SEQNO_ILL == seqno_l);
+        assert (GCS_SEQNO_ILL == seqno_g);
+        trx->clear();
+        trx->set_state(WSDB_TRX_ABORTING_NONREPL);
+        trx->set_gcs_handle(-1);
+        return WSREP_CONN_FAIL;
+    }
+
+    assert (GCS_SEQNO_ILL != seqno_g);
+    assert (GCS_SEQNO_ILL != seqno_l);
+
+    trx->set_gcs_handle(-1);
+    trx->set_seqnos(seqno_l, seqno_g);
+
+    status.replicated++;
+    status.replicated_bytes += wscoll.size();
+
+    return WSREP_OK;
+}
+
 
 extern "C"
 enum wsrep_status mm_galera_pre_commit(
@@ -1732,9 +1761,7 @@ enum wsrep_status mm_galera_pre_commit(
     const void *rbr_data, size_t rbr_data_len, wsrep_seqno_t* global_seqno
     )
 {
-    int                    rcode;
-    gcs_seqno_t            seqno_g, seqno_l;
-    enum wsrep_status      retcode;
+    wsrep_status_t retcode;
 
     GU_DBUG_ENTER("galera_pre_commit");
 
@@ -1758,97 +1785,31 @@ enum wsrep_status mm_galera_pre_commit(
         trx->set_state(WSDB_TRX_ABORTING_NONREPL);
         return WSREP_TRX_FAIL;
     }
-
-    trx->set_conn_id(conn_id);
-
     assert(trx->state() == WSDB_TRX_VOID);
+    trx->set_state(WSDB_TRX_REPLICATING);
 
-    // generate write set
-
+    // set up trx metadata and create write set
+    trx->set_conn_id(conn_id);
+    trx->set_write_set_type(WSDB_WS_TYPE_TRX);
+    trx->set_flags(TrxHandle::F_COMMIT);
     wsdb->create_write_set(trx, rbr_data, rbr_data_len);
 
-    // grab gcs resource before setting last applied to ensure
-    // monotonous increase of last seen seqno
-    const long gcs_handle(gcs_schedule(gcs_conn));
-    if (gcs_handle < 0)
+    retcode = trx_repl(trx);
+    if (retcode != WSREP_OK)
     {
-        log_warn << "gcs_schedule(): " << strerror(-gcs_handle);
-        return WSREP_TRX_FAIL;
+        // replication failed
+        return retcode;
     }
+    *global_seqno = trx->global_seqno();
 
-    trx->set_gcs_handle(gcs_handle);
-    trx->set_write_set_type(WSDB_WS_TYPE_TRX);
-    trx->set_last_seen_seqno(apply_monitor.last_left());
-    trx->set_flags(TrxHandle::F_COMMIT);
-    wsdb->flush_trx(trx, true);
+    bool do_report(false);
+    int cert_ret;
+    long rcode;
 
-    const MappedBuffer& wscoll(trx->write_set_collection());
-
-    assert (WSREP_SEQNO_UNDEFINED == trx->global_seqno());
-
-    /* this is possibly autocommit query, need to let it continue */
-    /* avoid sending empty write sets */
-    if (wscoll.empty() == true)
-    {
-        gu_throw_fatal << "empty write set";
-        gu_warn("empty write set for: %llu", trx->trx_id());
-        trx->clear();
-        GU_DBUG_RETURN(WSREP_OK);
-    }
-
-    trx->set_state(WSDB_TRX_REPLICATING);
-    trx->unlock();
-
-    profile_enter(galera_prof);
-    /* replicate through gcs */
-    do
-    {
-        rcode = gcs_repl(gcs_conn, &wscoll[0], wscoll.size(),
-                         GCS_ACT_TORDERED, true, &seqno_g, &seqno_l);
-    }
-    while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
-
-    profile_leave(galera_prof);
-
-    trx->lock();
-
-    *global_seqno = seqno_g;
-
-#ifdef EXTRA_DEBUG
-    gu_debug ("gcs_repl(): size: %u, seqno_g: %llu, seqno_l: %llu, ret: %d",
-              "GCS_ACT_TORDERED", len, seqno_g, seqno_l, rcode);
-#endif
-
-    if (rcode != static_cast<int>(wscoll.size())) {
-        if (rcode != -EINTR)
-        {
-            gu_error("gcs_repl() failed for: %llu, len: %d, handle: %ld, rcode: %d (%s)",
-                     trx->trx_id(), wscoll.size(), trx->gcs_handle(),
-                     rcode, strerror (-rcode));
-        }
-        else
-        {
-            log_debug << "gcs_repl() interrupted for: " << trx->trx_id()
-                      << " state " << trx->state();
-        }
-        assert(rcode != -EINTR || trx->state() == WSDB_TRX_MUST_ABORT);
-        assert (GCS_SEQNO_ILL == seqno_l);
-        assert (GCS_SEQNO_ILL == seqno_g);
-        trx->clear();
-        trx->set_state(WSDB_TRX_ABORTING_NONREPL);
-        trx->set_gcs_handle(-1);
-        GU_DBUG_RETURN(WSREP_CONN_FAIL);
-    }
-
-    assert (GCS_SEQNO_ILL != seqno_g);
-    assert (GCS_SEQNO_ILL != seqno_l);
-
-    trx->set_gcs_handle(-1);
-    trx->set_seqnos(seqno_l, seqno_g);
     if (trx->state() != WSDB_TRX_REPLICATING)
     {
-        log_debug << "replicating trx changed state to " << trx->state();
-        if (check_certification_status_for_aborted(seqno_l, trx) == WSREP_OK)
+        log_debug << "replicating trx changed state " << *trx;
+        if (check_certification_status_for_aborted(trx) == WSREP_OK)
         {
             trx->set_position(WSDB_TRX_POS_CERT_QUEUE);
             trx->set_state(WSDB_TRX_MUST_REPLAY);
@@ -1856,31 +1817,25 @@ enum wsrep_status mm_galera_pre_commit(
         }
         else
         {
-            retcode = WSREP_TRX_FAIL;
-            trx->set_state(WSDB_TRX_ABORTING_REPL);
-            GALERA_SELF_CANCEL_QUEUE(cert_queue, seqno_l);
+            GALERA_SELF_CANCEL_QUEUE(cert_queue, trx->local_seqno());
+            // state set to non-repl since this won't enter certification
+            trx->set_state(WSDB_TRX_ABORTING_NONREPL);
             // apply monitor is self canceled in post_repl_out
+            retcode = WSREP_TRX_FAIL;
             goto post_repl_out;
         }
     }
 
     trx->set_state(WSDB_TRX_REPLICATED);
 
-    profile_enter(galera_prof);
+    // wait for total order
+    rcode = while_eagain_or_trx_abort(
+        trx, gu_to_grab, cert_queue, trx->local_seqno());
 
-    rcode = while_eagain_or_trx_abort(trx,
-                                      gu_to_grab, cert_queue, seqno_l);
-    profile_leave(galera_prof);
-
-    status.replicated++;
-    status.replicated_bytes += wscoll.size();
-
-    if (rcode)
+    if (rcode != 0)
     {
-        gu_debug("gu_to_grab aborted for seqno %lld - %lld: %d (%s)",
-                 seqno_l, seqno_g, rcode, strerror(-rcode));
-
-        if (check_certification_status_for_aborted(seqno_l, trx) == WSREP_OK)
+        log_debug << "cert queue grab failed for trx " << *trx;
+        if (check_certification_status_for_aborted(trx) == WSREP_OK)
         {
             trx->set_position(WSDB_TRX_POS_CERT_QUEUE);
             trx->set_state(WSDB_TRX_MUST_REPLAY);
@@ -1888,59 +1843,48 @@ enum wsrep_status mm_galera_pre_commit(
         }
         else
         {
-            retcode = WSREP_TRX_FAIL;
-            trx->set_state(WSDB_TRX_ABORTING_REPL);
-            GALERA_SELF_CANCEL_QUEUE(cert_queue, seqno_l);
+            GALERA_SELF_CANCEL_QUEUE(cert_queue, trx->local_seqno());
+            // state set to non-repl since this won't enter certification
+            trx->set_state(WSDB_TRX_ABORTING_NONREPL);
             // apply monitor is self canceled in post_repl_out
+            retcode = WSREP_TRX_FAIL;
             goto post_repl_out;
         }
     }
 
-    profile_enter(galera_prof);
-#ifdef GALERA_WORKAROUND_197
-    rcode = cert->append_trx(trx);
-    if (gu_likely(galera_update_last_received (seqno_g)))
-    {
-#else
-        /*    if (gu_likely(galera_update_last_received (seqno_g))) {
-              Global seqno OK, do certification test
-              rcode = cert->append_trx(trx); */
-#endif
+    do_report = report_check_counter();
 
-        switch (rcode) {
-        case WSDB_OK:
-            gu_debug ("local trx %lld certified, cert. interval: %lld - %lld",
-                      seqno_l,
-                      trx->last_seen_seqno(),
-                      seqno_g);
-            /* certification ok */
-            retcode = WSREP_OK;
-            break;
-        case WSDB_CERTIFICATION_FAIL:
-            /* certification failed, release */
-            retcode = WSREP_TRX_FAIL;
-            gu_debug("local trx %lld certification failed: %lld - %lld",
-                     seqno_l, trx->last_seen_seqno(), seqno_g);
-            status.local_cert_failures++;
-            break;
-        default:
-            retcode = WSREP_CONN_FAIL;
-            gu_fatal("wsdb append failed: seqno_g %lld seqno_l %lld",
-                     seqno_g, seqno_l);
-            abort();
-            break;
-        }
+    if (trx->global_seqno() <= cert->position())
+    {
+        log_info << "discarding trx below cert position " << *trx;
+        GALERA_RELEASE_QUEUE(cert_queue, trx->local_seqno());
+        apply_monitor.self_cancel(trx);
+        // state set to non-repl since this won't enter certification
+        trx->set_state(WSDB_TRX_ABORTING_NONREPL);
+        return WSREP_TRX_FAIL;
     }
-    else {
-        // This cannot really happen. Perhaps we should abort in this case
-        gu_warn ("Local action replicated with outdated seqno: "
-                 "current seqno %lld, action seqno %lld", last_recved, seqno_g);
-        // this situation is as good as cancelled transaction. See above.
+
+    cert_ret = cert->append_trx(trx);
+
+    switch (cert_ret) {
+    case WSDB_OK:
+        log_debug << "local certified " << *trx;
+        /* certification ok */
+        retcode = WSREP_OK;
+        break;
+    case WSDB_CERTIFICATION_FAIL:
+        log_debug << "local certification failed " << *trx;
+        status.local_cert_failures++;
+        /* certification failed, release */
         retcode = WSREP_TRX_FAIL;
+        break;
+    default:
+        gu_throw_fatal << "unknown certification return code " << cert_ret;
+        break;
     }
 
     // call release only if grab was successfull
-    GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
+    GALERA_RELEASE_QUEUE (cert_queue, trx->local_seqno());
 
     if (retcode == WSREP_OK)
     {
@@ -1959,8 +1903,6 @@ enum wsrep_status mm_galera_pre_commit(
         }
     }
 
-    profile_leave(galera_prof);
-
 post_repl_out:
 
     switch (retcode)
@@ -1973,9 +1915,6 @@ post_repl_out:
         break;
     case WSREP_TRX_FAIL:
     {
-        // We want to do this already here to allow early release of
-        // commit queue in case of rollback
-        bool do_report(report_check_counter ());
         apply_monitor.self_cancel(trx);
         if (do_report) report_last_committed (gcs_conn);
         break;
@@ -2189,9 +2128,7 @@ enum wsrep_status mm_galera_to_execute_start(
     wsrep_seqno_t* global_seqno)
 {
 
-    int                    rcode;
-    gcs_seqno_t            seqno_g, seqno_l;
-    bool                   do_apply;
+    wsrep_status_t retcode;
 
     GU_DBUG_ENTER("galera_to_execute_start");
 
@@ -2203,85 +2140,67 @@ enum wsrep_status mm_galera_to_execute_start(
 
     TrxHandle* trx(wsdb->get_conn_query(my_uuid, conn_id, true));
     TrxHandleLock lock(*trx);
-    wsdb->append_conn_query(trx, query, query_len);
 
     // generate write set
-    wsdb->create_write_set(trx);
-
-    // grab gcs resource before setting last applied to ensure
-    // monotonous increase of last seen seqno
-    gcs_schedule(gcs_conn);
-    trx->set_last_seen_seqno(apply_monitor.last_left());
+    wsdb->append_conn_query(trx, query, query_len);
     trx->set_write_set_type(WSDB_WS_TYPE_CONN);
     trx->set_flags(TrxHandle::F_COMMIT);
-    wsdb->flush_trx(trx, true);
-    const MappedBuffer& wscoll(trx->write_set_collection());
+    wsdb->create_write_set(trx);
 
-    /* replicate through gcs */
-    do {
-        rcode = gcs_repl(gcs_conn, &wscoll[0], wscoll.size(),
-                         GCS_ACT_TORDERED, true, &seqno_g, &seqno_l);
-    }
-    while (-EAGAIN == rcode && (usleep (GALERA_USLEEP_FLOW_CONTROL), true));
-
-    *global_seqno = seqno_g;
-
-    if (rcode < 0) {
-        gu_error("gcs_repl() failed for: %llu, %d (%s)",
-                 conn_id, rcode, strerror (-rcode));
-        assert (GCS_SEQNO_ILL == seqno_l);
-        return WSREP_CONN_FAIL;
-    }
-
-    status.replicated++;
-    status.replicated_bytes += wscoll.size();
-
+    retcode = trx_repl(trx);
     // trx write set data is not needed anymore
-    trx->clear();
+    // but keep it for debug purposes
+    // trx->clear();
 
-    assert (GCS_SEQNO_ILL != seqno_g);
-    assert (GCS_SEQNO_ILL != seqno_l);
+    if (retcode != WSREP_OK)
+    {
+        return retcode;
+    }
+    *global_seqno = trx->global_seqno();
 
-    gu_debug("TO isolation applier starting, seqnos: %lld - %lld",
-             seqno_g, seqno_l);
-
-    trx->set_seqnos(seqno_l, seqno_g);
+    log_debug << "TO isolation starting for " << *trx;
 
     /* wait for total order */
-    GALERA_GRAB_QUEUE (cert_queue, seqno_l);
-    rcode = cert->append_trx(trx);
+    GALERA_GRAB_QUEUE(cert_queue, trx->local_seqno());
 
     /* update global seqno */
-    do_apply = galera_update_last_received (seqno_g);
+    galera_update_last_received(trx->global_seqno());
 
-    if (rcode == WSDB_OK)
+    if (trx->global_seqno() <= cert->position())
+    {
+        log_info << "discarding trx below cert position " << *trx;
+        GALERA_RELEASE_QUEUE(cert_queue, trx->local_seqno());
+        apply_monitor.self_cancel(trx);
+        // state set to non-repl since this won't enter certification
+        trx->set_state(WSDB_TRX_ABORTING_NONREPL);
+        return WSREP_TRX_FAIL;
+    }
+
+    int cert_ret(cert->append_trx(trx));
+
+    if (cert_ret == WSDB_OK)
     {
         // @todo the following should be changed to apply_monitor.enter()
         // once table/db level certification is supported
         //
         // drain apply monitor, self cancel apply monitor in to_execute_end()
-        apply_monitor.drain(seqno_g - 1);
+        apply_monitor.drain(trx->global_seqno() - 1);
         // apply_monitor.enter(trx);
-        rcode = WSREP_OK;
+        retcode = WSREP_OK;
     }
     else
     {
-        // theoretically it is possible with poorly written application
-        // (trying to replicate something before completing state transfer)
-        gu_warn ("Local action replicated with outdated seqno: "
-                 "current seqno %lld, action seqno %lld", last_recved, seqno_g);
-
-        GALERA_RELEASE_QUEUE (cert_queue, seqno_l);
+        log_warn << "TO isolation certification failed for trx " << *trx;
+        GALERA_RELEASE_QUEUE (cert_queue, trx->local_seqno());
         apply_monitor.self_cancel(trx);
+        cert->set_trx_committed(trx);
         // this situation is as good as failed gcs_repl() call.
-        rcode = WSREP_CONN_FAIL;
+        retcode = WSREP_CONN_FAIL;
     }
 
-    gu_debug("TO isolation applied for: seqnos: %lld - %lld",
-             seqno_g, seqno_l
-        );
+    log_debug << "TO isolation applied for trx " << *trx;
 
-    GU_DBUG_RETURN(static_cast<wsrep_status_t>(rcode));
+    GU_DBUG_RETURN(retcode);
 }
 
 
@@ -2326,15 +2245,10 @@ enum wsrep_status mm_galera_replay_trx(
     wsrep_t *gh, wsrep_trx_handle_t* trx_handle, void *recv_ctx
     ) {
 
-    enum wsrep_status  ret_code = WSREP_OK;
     TrxHandle* trx(get_trx(wsdb, trx_handle));
     TrxHandleLock lock(*trx);
 
-    gu_debug("trx_replay for: %lld %lld state: %d, data len: %d",
-             trx->local_seqno(),
-             trx->global_seqno(),
-             trx->state(),
-             trx->write_set_collection().size());
+    log_debug << "replaying trx " << *trx;
 
     if (trx->state() != WSDB_TRX_MUST_REPLAY) {
         gu_error("replayed trx in bad state: %d", trx->state());
@@ -2342,53 +2256,55 @@ enum wsrep_status mm_galera_replay_trx(
     }
 
     trx->set_state(WSDB_TRX_REPLAYING);
-
-    if (trx->position() == WSDB_TRX_POS_CERT_QUEUE)
-    {
-        apply_monitor.enter(trx);
-    }
-    /*
-     * grab commit_queue already here, to make sure the conflicting BF applier
-     * has completed before we start.
-     * commit_queue will be released at post_commit(), which the application
-     * has reponsibility to call.
-     */
-
+    // Adjust last depends seqno to ensure that all possibly conflicting
+    // transactions have finished before applying.
     gu_debug("replaying applier starting");
 
     status.local_replays++;
-    /*
-     * tell app, that replaying will start with allocated seqno
-     * when job is done, we will reset the seqno back to 0
-     */
 
     if (trx->write_set_type() == WSDB_WS_TYPE_TRX)
     {
-        switch (trx->position()) {
+        switch (trx->position())
+        {
         case WSDB_TRX_POS_CERT_QUEUE:
-            ret_code = process_query_write_set(
-                recv_ctx, trx,
-                trx->local_seqno());
-            break;
-
+        {
+            GALERA_GRAB_QUEUE(cert_queue, trx->local_seqno());
+            if (trx->global_seqno() <= cert->position())
+            {
+                log_info << "discarding trx below cert position " << *trx;
+                GALERA_RELEASE_QUEUE(cert_queue, trx->local_seqno());
+                apply_monitor.self_cancel(trx);
+                trx->set_state(WSDB_TRX_ABORTING_NONREPL);
+                return WSREP_TRX_FAIL;
+            }
+            int cert_ret(cert->append_trx(trx));
+            GALERA_RELEASE_QUEUE(cert_queue, trx->local_seqno());
+            if (cert_ret != WSDB_OK)
+            {
+                apply_monitor.self_cancel(trx);
+                trx->set_state(WSDB_TRX_MUST_ABORT);
+                return WSREP_TRX_FAIL;
+            }
+            // fall through
+        }
         case WSDB_TRX_POS_COMMIT_QUEUE:
-            ret_code = process_query_write_set_applying(
-                recv_ctx, trx, trx->local_seqno());
-
-            /* register committed transaction */
+        {
+            // safety measure: make sure that all preceding trxs have
+            // committed in case there are hidden dependencies
+            trx->set_last_depends_seqno(trx->global_seqno() - 1);
+            apply_monitor.enter(trx);
+            int ret_code(process_query_write_set_applying(
+                             recv_ctx, trx, trx->local_seqno()));
+            // apply monitor is released in post_commit()
+            // apply_monitor.leave(trx);
             if (ret_code != WSREP_OK) {
-                gu_fatal(
-                    "could not re-apply trx: %lld %lld",
-                    trx->global_seqno(), trx->local_seqno()
-                    );
-                abort();
+                log_error << "could not replay trx " << *trx;
+                return WSREP_FATAL;
             }
             break;
+        }
         default:
-            gu_fatal("bad trx pos in reapplying: %d %lld",
-                     trx->position(),
-                     trx->global_seqno(),
-                     trx->local_seqno());
+            log_fatal << "bad position in replay for trx " << *trx;
             abort();
         }
     }
@@ -2399,19 +2315,9 @@ enum wsrep_status mm_galera_replay_trx(
     }
     trx->set_state(WSDB_TRX_REPLICATED);
 
-    gu_debug("replaying over for applier: %d rcode: %d, seqno: %lld %lld",
-             -1, ret_code,
-             trx->global_seqno(),
-             trx->local_seqno());
+    log_debug << "replaying over for trx " << *trx;
 
-    if (ret_code != WSREP_OK)
-    {
-        // this trx wont hit post_commit() so we need to do bookkeeping here
-        cert->set_trx_committed(trx);
-    }
-
-    // return only OK or TRX_FAIL
-    return (ret_code == WSREP_OK) ? WSREP_OK : WSREP_TRX_FAIL;
+    return WSREP_OK;
 }
 
 extern "C"
