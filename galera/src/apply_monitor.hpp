@@ -65,7 +65,8 @@ namespace galera
             appliers_(appliers_size_),
             entered_(0),
             oooe_(0),
-            oool_(0)
+            oool_(0),
+            win_size_(0)
         { }
 
         ~Monitor()
@@ -73,8 +74,9 @@ namespace galera
             if (entered_ > 0)
             {
                 log_info << "apply mon: entered " << entered_
-                         << " oooe fraction " << double(oooe_)/entered_
-                         << " oool fraction " << double(oool_)/entered_;
+                         << ", oooe fraction " << double(oooe_)/entered_
+                         << ", oool fraction " << double(oool_)/entered_
+                         << ", avg. window " << double(win_size_)/entered_;
             }
             else
             {
@@ -134,7 +136,8 @@ namespace galera
                     appliers_[idx].state_ = Applier::S_APPLYING;
 
                     ++entered_;
-                    oooe_ += (last_left_ + 1 < trx_seqno);
+                    oooe_     += (last_left_ + 1 < trx_seqno);
+                    win_size_ += (last_entered_ - last_left_);
 
                     return 0;
                 }
@@ -216,12 +219,24 @@ namespace galera
             drain_common(seqno, lock);
         }
 
-        std::pair<double, double> get_ooo_stats() const
+        void get_stats(double* oooe, double* oool, double* win_size)
         {
             gu::Lock lock(mutex_);
-            double oooe(entered_ == 0 ? .0 : double(oooe_)/entered_);
-            double oool(entered_ == 0 ? .0 : double(oool_)/entered_);
-            return std::make_pair(oooe, oool);
+
+            if (entered_ > 0)
+            {
+                *oooe = (oooe_ > 0 ? double(oooe_)/entered_ : .0);
+                *oool = (oool_ > 0 ? double(oool_)/entered_ : .0);
+                *win_size = (win_size_ > 0 ? double(win_size_)/entered_ : .0);
+            }
+            else
+            {
+                *oooe = .0; *oool = .0; *win_size = .0;
+            }
+
+            oooe_ = 0; oool_ = 0; win_size_ = 0; entered_ = 0;
+
+            return;
         }
 
     private:
@@ -279,27 +294,33 @@ namespace galera
                         break;
                     }
                 }
+
+                /* wake up waiters that may remain above us
+                 * (last_left_ now is max) */
+                for (wsrep_seqno_t i = last_left_ + 1; i <= last_entered_; ++i)
+                {
+                    Applier& a(appliers_[indexof(i)]);
+
+                    if (a.state_ == Applier::S_WAITING &&
+                        may_enter(a.trx_) == true)
+                    {
+                        /* We need to set state to APPLYING here because if it
+                         * is the (last_left_ + 1) and it gets canceled in the
+                         * race that follows exit from this function, there
+                         * will be nobody to clean up and advance last_left_.
+                         * So this effectively cancels possibility to cancel
+                         * this waiter any more. Which is ok at this point. */
+                        a.state_ = Applier::S_APPLYING;
+                        a.cond_.signal();
+                    }
+                }
             }
             else
             {
+                oool_++; // leaving before someone with a lower seqno
                 appliers_[idx].state_ = Applier::S_FINISHED;
             }
 
-            // wake up waiters that may remain above us (last_left_ now is max)
-            for (wsrep_seqno_t i = last_left_ + 1; i <= last_entered_; ++i)
-            {
-                Applier& a(appliers_[indexof(i)]);
-
-                if (a.state_ == Applier::S_WAITING && may_enter(a.trx_) == true)
-                {
-                    // We need to set state to APPLYING here because if it is
-                    // the last_left_ + 1 and it gets canceled in the race
-                    // that follows exit from this function, there will be
-                    // nobody to clean up and advance last_left_.
-                    a.state_ = Applier::S_APPLYING;
-                    a.cond_.signal();
-                }
-            }
             appliers_[idx].trx_ = 0;
             assert((last_left_ >= trx_seqno &&
                     appliers_[idx].state_ == Applier::S_IDLE) ||
@@ -310,7 +331,6 @@ namespace galera
             if ((last_left_ >= trx_seqno) || // occupied window shrinked
                 (last_left_ == drain_seqno_)) // draining requested
             {
-                oool_ += (last_left_ > trx_seqno);
                 cond_.broadcast();
             }
         }
@@ -356,9 +376,10 @@ namespace galera
         wsrep_seqno_t last_left_;
         wsrep_seqno_t drain_seqno_;
         std::vector<Applier> appliers_;
-        size_t entered_; // entered
-        size_t oooe_; // out of order entered
-        size_t oool_; // out of order left
+        long entered_; // entered
+        long oooe_;    // out of order entered
+        long oool_;    // out of order left
+        long win_size_;// window between last_left_ and last_entered_
     };
 }
 

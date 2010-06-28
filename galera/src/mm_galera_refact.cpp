@@ -119,7 +119,7 @@ static struct galera_status status =
 {
     { { 0 } },
     WSREP_SEQNO_UNDEFINED,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, .0, .0, .0,
+    0, 0, 0, 0, 0, 0, 0, 0, .0, .0, .0, .0,
     GALERA_STAGE_INIT
 };
 
@@ -2385,9 +2385,9 @@ extern "C"
 struct wsrep_status_var* mm_galera_status_get (wsrep_t* gh)
 {
     status.cert_deps_dist = cert->get_avg_deps_dist();
-    pair<double, double> app_stat(apply_monitor.get_ooo_stats());
-    status.apply_oooe = app_stat.first;
-    status.apply_oool = app_stat.second;
+    apply_monitor.get_stats(&status.apply_oooe,
+                            &status.apply_oool,
+                            &status.apply_window);
     return galera_status_get (&status);
 }
 

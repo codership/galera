@@ -10,8 +10,7 @@ env.SharedLibrary('mmgalera', [
         'galera_job_queue.c',
         'galera_options.c',
         'galera_state.c',
-        'galera_status.c',
-        'mm_galera.c'
+        'galera_status.c'
 ])
 
 env.StaticLibrary('galera++', [
