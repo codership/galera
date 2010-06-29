@@ -11,7 +11,7 @@
 #include "gu_logger.hpp"
 #include "gu_epoll.hpp"
 #include "gu_serialize.hpp"
-
+#include "gu_macros.h"
 
 /* C-includes */
 #include <cstring>
@@ -38,8 +38,8 @@ using namespace gu::datetime;
 class NetHeader
 {
 public:
-    NetHeader(uint32_t len)
-        :
+
+    NetHeader(uint32_t len) :
         len_(len),
         crc32_(0)
     {
@@ -54,6 +54,7 @@ public:
         crc32_ = crc32;
         len_ |= F_CRC32;
     }
+
     bool has_crc32() const { return (len_ & F_CRC32); }
     uint32_t crc32() const { return crc32_; }
 
@@ -63,6 +64,7 @@ public:
                               NetHeader& hdr);
 
     static const size_t serial_size_ = 8;
+
 private:
 
     static const uint32_t len_mask_ = 0x00ffffff;
@@ -74,18 +76,16 @@ private:
     uint32_t crc32_;
 };
 
-
 inline size_t serialize(const NetHeader& hdr, byte_t* buf, size_t buflen,
-                 size_t offset)
+                        size_t offset)
 {
     offset = serialize(hdr.len_, buf, buflen, offset);
     offset = serialize(hdr.crc32_, buf, buflen, offset);
     return offset;
 }
 
-
 inline size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
-                   NetHeader& hdr)
+                          NetHeader& hdr)
 {
     offset = unserialize(buf, buflen, offset, &hdr.len_);
     offset = unserialize(buf, buflen, offset, &hdr.crc32_);
@@ -100,12 +100,14 @@ inline size_t serial_size(const NetHeader& hdr)
 static int get_opt(const URI& uri)
 {
     int ret(0);
+
     try
     {
         bool val(from_string<bool>(uri.get_option("socket.non_blocking")));
         ret |= (val == true ? gu::net::Socket::O_NON_BLOCKING : 0);
     }
     catch (NotFound&) { }
+
     try
     {
         bool val(from_string<bool>(uri.get_option("socket.crc32")));
@@ -113,23 +115,20 @@ static int get_opt(const URI& uri)
     }
     catch (NotFound&)
     {
-        ret |= gu::net::Socket::O_CRC32;
+        ret |= gu::net::Socket::O_CRC32; // do it by default
     }
+
     return ret;
 }
 
 int gu::net::closefd(int fd)
 {
     int err;
-    do
-    {
-        err = ::close(fd);
-    }
-    while (err == -1 && errno == EINTR);
-    if (err == -1)
-    {
-        err = errno;
-    }
+
+    do { err = ::close(fd); } while (err == -1 && errno == EINTR);
+
+    if (err == -1) { err = errno; }
+
     return err;
 }
 
@@ -145,13 +144,13 @@ int gu::net::closefd(int fd)
  * Socket implementation
  **************************************************************************/
 
-gu::net::Socket::Socket(Network& net_,
-                        const int fd_,
+gu::net::Socket::Socket(Network&      net_,
+                        const int     fd_,
                         const string& local_addr_,
                         const string& remote_addr_,
-                        const size_t mtu_,
-                        const size_t max_packet_size_,
-                        const size_t max_pending_) :
+                        const size_t  mtu_,
+                        const size_t  max_packet_size_,
+                        const size_t  max_pending_) :
     fd              (fd_),
     err_no          (0),
     options         (O_NO_INTERRUPT),
@@ -175,12 +174,8 @@ gu::net::Socket::Socket(Network& net_,
 
 gu::net::Socket::~Socket()
 {
-    if (fd != -1)
-    {
-        close();
-    }
+    if (fd != -1) { close(); }
 }
-
 
 /*
  * State handling
@@ -207,20 +202,6 @@ void gu::net::Socket::set_state(const State s, const int err)
     err_no = err;
 }
 
-gu::net::Socket::State gu::net::Socket::get_state() const
-{
-    return state;
-}
-
-int gu::net::Socket::get_errno() const
-{
-    return err_no;
-}
-
-const string gu::net::Socket::get_errstr() const
-{
-    return ::strerror(err_no);
-}
 
 void gu::net::Socket::set_opt(Socket* s,
                               const Addrinfo& ai,
@@ -266,6 +247,7 @@ socklen_t gu::net::Socket::get_sendto_addr_len() const
 {
     return (sendto_addr != 0 ? sendto_addr->get_sockaddr_len() : 0 );
 }
+
 
 void gu::net::Socket::connect(const string& addr)
 {
@@ -458,7 +440,8 @@ void gu::net::Socket::listen(const std::string& addr, const int backlog)
 
     local_addr = ai.to_string();
 
-    if ((fd = ::socket(ai.get_family(), ai.get_socktype(), ai.get_protocol())) == -1)
+    fd = ::socket(ai.get_family(), ai.get_socktype(), ai.get_protocol());
+    if (-1 == fd)
     {
         set_state(S_FAILED, errno);
         gu_throw_error(errno) << "failed to open socket";
@@ -1165,29 +1148,22 @@ gu::net::NetworkEvent gu::net::Network::wait_event(const Period& timeout,
          ++i)
     {
         Socket* s = i->second;
-        if (s->get_state()       == Socket::S_CONNECTED     &&
-            (s->get_event_mask() & E_IN) != 0 &&
-            s->has_unread_data() == true                    &&
-            s->recv(MSG_PEEK)    != 0)
+        if (s->get_state()               == Socket::S_CONNECTED &&
+            (s->get_event_mask() & E_IN) != 0                   &&
+            s->has_unread_data()         == true                &&
+            s->recv(MSG_PEEK)            != 0)
         {
             return NetworkEvent(E_IN, s);
         }
         // Some validation
-        assert(s->pending.size() == 0 ||
-               (s->get_event_mask() & E_OUT) != 0);
+        assert(s->pending.size() == 0 || (s->get_event_mask() & E_OUT) != 0);
     }
 
-    if (poll->empty() == true)
-    {
-        poll->poll(timeout);
-    }
+    if (poll->empty() == true) { poll->poll(timeout); }
 
     do
     {
-        if (poll->empty())
-        {
-            return NetworkEvent(E_EMPTY, 0);
-        }
+        if (gu_unlikely(poll->empty())) { return NetworkEvent(E_EMPTY, 0); }
 
         PollEvent ev = poll->front();
         poll->pop_front();

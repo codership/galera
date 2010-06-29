@@ -32,15 +32,15 @@ namespace gu
     namespace net
     {
         /*!
-         * @class Sockaddr 
+         * @class Sockaddr
          *
          * @brief Class encapsulating struct sockaddr.
          *
-         * Class encapsulating struct sockaddr and providing 
+         * Class encapsulating struct sockaddr and providing
          * simple interface to access sockaddr fields.
-         */ 
+         */
         class Sockaddr;
-        
+
         /*!
          * @class IMReq
          *
@@ -57,7 +57,7 @@ namespace gu
          * to access addrinfo fields.
          */
         class Addrinfo;
-        
+
         /*!
          * Resolve address given in @uri
          *
@@ -80,26 +80,26 @@ public:
      * @param sa_len Length of sockaddr struct
      */
     Sockaddr(const sockaddr* sa, socklen_t sa_len);
-            
+
     /*!
      * Copy constructor.
      *
      * @param sa Reference to Sockaddr
      */
     Sockaddr(const Sockaddr& sa);
-            
+
     /*!
      * Destructor
      */
     ~Sockaddr();
-            
+
     /*!
      * Get address family.
      *
      * @return Address family
      */
     sa_family_t get_family() const { return sa_->sa_family; }
-            
+
     /*!
      * Get port in network byte order. This is applicable only
      * for AF_INET, AF_INET6.
@@ -118,7 +118,7 @@ public:
             gu_throw_fatal; throw;
         }
     }
-            
+
     /*!
      * Get pointer to address. Return value is pointer to void,
      * user must do casting by himself.
@@ -137,7 +137,7 @@ public:
             return &reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_addr;
         default:
             gu_throw_fatal  << "invalid address family: " << sa_->sa_family; throw;
-        }                
+        }
     }
 
     socklen_t get_addr_len() const
@@ -150,9 +150,9 @@ public:
             return sizeof(reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_addr);
         default:
             gu_throw_fatal; throw;
-        }                
+        }
     }
-            
+
     /*!
      * Get non-const reference to sockaddr struct. 
      *
@@ -173,11 +173,11 @@ public:
      * @return Length of sockaddr struct
      */
     socklen_t get_sockaddr_len() const { return sa_len_; }
-            
+
     bool is_multicast() const;
     bool is_broadcast() const;
     bool is_anyaddr()   const;
-    
+
     static Sockaddr get_anyaddr(const Sockaddr& sa)
     {
         Sockaddr ret(sa);
@@ -201,8 +201,7 @@ public:
         return *this;
     }
 
-public:
-
+private:
 
     sockaddr* sa_;
     socklen_t sa_len_;
@@ -212,21 +211,26 @@ public:
 class gu::net::MReq
 {
 public:
+
     MReq(const Sockaddr& mcast_addr, const Sockaddr& if_addr);
     ~MReq();
-    const void* get_mreq() const { return mreq_; }
-    socklen_t get_mreq_len() const { return mreq_len_; }
-    int get_ipproto() const { return ipproto_; }
-    int get_add_membership_opt() const { return add_membership_opt_; }
+
+    const void* get_mreq() const        { return mreq_; }
+    socklen_t get_mreq_len() const      { return mreq_len_; }
+    int get_ipproto() const             { return ipproto_; }
+    int get_add_membership_opt() const  { return add_membership_opt_; }
     int get_drop_membership_opt() const { return drop_membership_opt_; }
-    int get_multicast_if_opt() const { return multicast_if_opt_; }
+    int get_multicast_if_opt() const    { return multicast_if_opt_; }
+    int get_multicast_loop_opt() const  { return multicast_loop_opt_; }
+    int get_multicast_ttl_opt() const   { return multicast_ttl_opt_; }
     const void* get_multicast_if_value() const;
     int get_multicast_if_value_size() const;
-    int get_multicast_loop_opt() const { return multicast_loop_opt_; }
-    int get_multicast_ttl_opt() const { return multicast_ttl_opt_; }
+
 private:
+
     MReq(const MReq&);
     void operator=(const MReq&);
+
     void* mreq_;
     socklen_t mreq_len_;
     int ipproto_;
@@ -237,7 +241,7 @@ private:
     int multicast_ttl_opt_;
 };
 
-        
+
 class gu::net::Addrinfo
 {
 public:
@@ -250,7 +254,7 @@ public:
 
     /*!
      * Copy costructor.
-     * 
+     *
      * @param ai Const reference to Addrinfo object to copy
      */
     Addrinfo(const Addrinfo& ai);
@@ -289,7 +293,7 @@ public:
      * @return Protocol
      */
     int get_protocol() const { return ai_.ai_protocol; }
-            
+
     /*!
      * Get length of associated sockaddr struct
      *
@@ -312,9 +316,11 @@ public:
      * @return String representation of the addrinfo
      */
     std::string to_string() const;
+
 private:
+
     addrinfo ai_;
 };
-        
+
 
 #endif /* __GU_RESOLVER_HPP__ */

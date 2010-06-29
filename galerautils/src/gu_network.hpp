@@ -76,12 +76,6 @@ namespace gu
 }
 
 
-
-
-
-
-
-
 /*!
  * @brief Socket interface
  */
@@ -101,55 +95,22 @@ public:
         S_FAILED,      /*!< Socket is in failed state but not closed yet */
         S_MAX
     };
-private:
-    /* Private data */
-    int fd;             /*!< Socket file descriptor                 */
-    int err_no;         /*!< Error number for last error            */
-    int options;        /*!< Bitfield for general socket options    */
-    int event_mask;     /*!< Bitfield for waited network events     */
-    Addrinfo* listener_ai;
-    Sockaddr* sendto_addr; // Needed for dgram sockets
 
-    std::string local_addr;
-    std::string remote_addr;
-
-    size_t mtu;             // For outgoing data
-    size_t max_packet_size; // For incoming date
-    size_t max_pending;
-
-    gu::Buffer recv_buf;  /*!< Buffer for received data        */
-    size_t recv_buf_offset; /*! Offset to the end of read data */
-    gu::Datagram dgram;       /*!< Datagram container               */
-    gu::Buffer pending;  /*!< Buffer for pending outgoing data */
-    State state;        /*!< Socket state                       */
-
-    /* Network integration */
-    friend class Network;
-    Network& net;       /*!< Network object this socket belongs to */
-
-    /* Private methods */
+public:
 
     /*!
-     * @brief Constructor
+     * Socket options
      */
-    Socket(Network& net,
-           const int fd = -1,
-           const std::string& local_addr = "",
-           const std::string& remote_addr = "",
-           const size_t mtu = default_mtu,
-           const size_t max_packet_size = default_mtu,
-           const size_t max_pending = default_mtu*5);
+    enum SockOpt
+    {
+        /* NOTE: O_NON_BLOCKING is needed for non-blocking connect() */
+        O_NON_BLOCKING = 1 << 0, /*!< Socket operations are non-blocking */
+        O_NO_INTERRUPT = 1 << 1, /*!< Socket methods calls are not
+                                  *   interruptible */
+        O_CRC32        = 1 << 2  /*!< Add crc32 in outgoing datagrams */
+    };
 
-    /*!
-     * @brief Change socket state
-     */
-    void set_state(State, int err = 0);
-
-    void* get_sendto_addr() const;
-    socklen_t get_sendto_addr_len() const;
-
-    Socket(const Socket&);
-    void operator=(const Socket&);
+    int get_opt() const { return options; }
 
 public:
 
@@ -158,56 +119,7 @@ public:
      *
      * @note This method should not be used except for testing.
      */
-    int get_fd() const
-    {
-        return fd;
-    }
-private:
-
-    // Set options before connect
-    static void set_opt(Socket*, const Addrinfo&, int opt);
-
-
-
-    /*!
-     * @brief Get current event mask for socket.
-     */
-    void set_event_mask(const int m)
-    {
-        event_mask = m;
-    }
-
-    /*!
-     * @brief Set event mask for socket.
-     */
-    int get_event_mask() const
-    {
-        return event_mask;
-    }
-
-    /*!
-     * @brief Get max pending bytes
-     */
-    size_t get_max_pending_len() const;
-
-    /*!
-     * @brief Send pending bytes
-     */
-    int send_pending(int);
-public:
-    /*!
-     * Socket options
-     */
-    enum
-    {
-        /* NOTE: O_NON_BLOCKING is needed for non-blocking connect() */
-        O_NON_BLOCKING = 1 << 0, /*!< Socket operations are non-blocking */
-        O_NO_INTERRUPT = 1 << 1, /*!< Socket methods calls are not
-                                  * interruptible */
-        O_CRC32        = 1 << 2  /*!< Add crc32 in outgoing datagrams */
-    };
-
-    int get_opt() const { return options; }
+    int get_fd() const { return fd; }
 
     /*!
      * @brief Destructor
@@ -232,7 +144,8 @@ public:
      *
      * Close socket (more about possible side effects here)
      *
-     * @throws std::logic_error If socket was not open (connected, listening or accepted)
+     * @throws std::logic_error If socket was not open (connected, listening
+     *                          or accepted)
      */
     void close();
 
@@ -282,7 +195,6 @@ public:
      * @f send() must be called to schedule resending of remaining bytes.
      *
      *
-     *
      * @param[in] dgram Const pointer to datagram to be send
      * @param[in] flags Optional flags for send call (default none)
      *
@@ -301,30 +213,109 @@ public:
      *
      * @return Current state of the socket
      */
-    State get_state() const;
+    State get_state() const { return state; }
 
     /*!
      * @brief Get errno corresponding to last error
      *
      * @return Error number corresponding to the last error
      */
-    int get_errno() const;
+    int get_errno() const { return err_no; }
 
     /*!
      * @brief Get human readable error string corresponding to last error
      *
      * @return Error string
      */
-    const std::string get_errstr() const;
+    const std::string get_errstr() const { return ::strerror(err_no); }
 
-    std::string get_local_addr() const { return local_addr; }
+    std::string get_local_addr()  const { return local_addr;  }
     std::string get_remote_addr() const { return remote_addr; }
-    size_t get_mtu() const { return mtu; }
+    size_t      get_mtu()         const { return mtu; }
 
-    bool has_unread_data() const { return (recv_buf_offset > 0 &&
-                                           recv_buf_offset == dgram.get_payload().size()); }
+    bool has_unread_data() const
+    {
+        return (recv_buf_offset > 0 &&
+                recv_buf_offset == dgram.get_payload().size());
+    }
 
     void release();
+
+private:
+
+    /* Private data */
+    int fd;             /*!< Socket file descriptor                 */
+    int err_no;         /*!< Error number for last error            */
+    int options;        /*!< Bitfield for general socket options    */
+    int event_mask;     /*!< Bitfield for waited network events     */
+    Addrinfo* listener_ai;
+    Sockaddr* sendto_addr; // Needed for dgram sockets
+
+    std::string local_addr;
+    std::string remote_addr;
+
+    size_t mtu;             // For outgoing data
+    size_t max_packet_size; // For incoming date
+    size_t max_pending;
+
+    gu::Buffer recv_buf;    /*!< Buffer for received data         */
+    size_t recv_buf_offset; /*! Offset to the end of read data    */
+    gu::Datagram dgram;     /*!< Datagram container               */
+    gu::Buffer pending;     /*!< Buffer for pending outgoing data */
+    State state;            /*!< Socket state                     */
+
+    /* Network integration */
+    friend class Network;
+    Network& net;       /*!< Network object this socket belongs to */
+
+    /* Private methods */
+
+    /*!
+     * @brief Constructor
+     */
+    Socket(Network& net,
+           const int fd = -1,
+           const std::string& local_addr = "",
+           const std::string& remote_addr = "",
+           const size_t mtu = default_mtu,
+           const size_t max_packet_size = default_mtu,
+           const size_t max_pending = default_mtu*5);
+
+    /*!
+     * @brief Change socket state
+     */
+    void set_state(State, int err = 0);
+
+    void*     get_sendto_addr() const;
+    socklen_t get_sendto_addr_len() const;
+
+    Socket(const Socket&);
+    void operator=(const Socket&);
+
+private:
+
+    /*! @brief Set options before connect */
+    static void set_opt(Socket*, const Addrinfo&, int opt);
+
+    /*!
+     * @brief Set current event mask for socket.
+     */
+    void set_event_mask(const int m) { event_mask = m; }
+
+    /*!
+     * @brief Get event mask for socket.
+     */
+    int get_event_mask() const { return event_mask; }
+
+    /*!
+     * @brief Get max pending bytes
+     */
+    size_t get_max_pending_len() const;
+
+    /*!
+     * @brief Send pending bytes
+     */
+    int send_pending(int);
 };
 
 /*!
@@ -351,9 +342,8 @@ private:
     int event_mask;             /*!< Event mask              */
     Socket* socket;             /*!< Socket related to event */
     friend class Network;
-    NetworkEvent(int, Socket*); /*!< Private constructor */
+    NetworkEvent(int, Socket*); /*!< Private constructor     */
 };
-
 
 
 /*!
@@ -389,7 +379,8 @@ public:
      *         was interrupted by signal
      * @throws std::runtime_error If error was encountered
      */
-    NetworkEvent wait_event(const gu::datetime::Period& = gu::datetime::Period(-1),
+    NetworkEvent wait_event(const gu::datetime::Period& =
+                                  gu::datetime::Period(-1),
                             bool auto_handle = true);
 
     /*!
@@ -415,6 +406,7 @@ public:
     static size_t get_mtu() { return default_mtu; }
 
 private:
+
     friend class Socket;
     SocketList* sockets;
     std::vector<Socket*> released;

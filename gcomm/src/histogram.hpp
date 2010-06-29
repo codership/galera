@@ -21,7 +21,7 @@ namespace gcomm
     private:
         std::map<const double, long long> cnt;
     };
-    
+
     std::ostream& operator<<(std::ostream&, const Histogram&);
 }
 

@@ -1,10 +1,14 @@
-
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ *
+ * $Id$
+ */
 
 #include "gu.hpp"
 
 #ifdef GALERA_USE_BOOST_ASIO
 #include "asio.hpp"
-#endif // GALERA_USE_BOOST_ASIO
+#endif /* GALERA_USE_BOOST_ASIO */
 
 #include "gcomm/util.hpp"
 
@@ -56,7 +60,7 @@ gcomm::Protonet* gcomm::Protonet::create(const std::string conf)
 #ifdef GALERA_USE_BOOST_ASIO
     else if (conf == "asio")
         return new asio::Protonet();
-#endif // GALERA_USE_BOOST_ASIO
+#endif /* GALERA_USE_BOOST_ASIO */
     gu_throw_fatal << "protonet " << conf << " not supported";
     throw;
 }

@@ -85,8 +85,7 @@ LD_PRELOAD=$(echo "$MYSQL_BASE_DIR/lib/mysql/libmysqlclient.so "\
 "$GALERA_BASE_DIR/lib/libgalerautils.so "\
 "$GALERA_BASE_DIR/lib/libgalerautils++.so "\
 "$GALERA_BASE_DIR/lib/libgcomm.so "\
-"$GALERA_BASE_DIR/lib/libgcs.so "\
-"$GALERA_BASE_DIR/lib/libwsdb.so ")
+"$GALERA_BASE_DIR/lib/libgcs.so ")
 
 [ -x "$GALERA_BASE_DIR/lib/libgalera++.so" ] && \
 LD_PRELOAD="$LD_PRELOAD $GALERA_BASE_DIR/lib/libgalera++.so"

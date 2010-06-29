@@ -1,5 +1,10 @@
-
-// gu::Network based implementation
+/*
+ * Copyright (C) 2009 Codership Oy <info@codership.com>
+ *
+ * @file gu::Network based implementation
+ *
+ * $Id$
+ */
 
 #include "gu.hpp"
 #include "gcomm/protostack.hpp"
@@ -11,11 +16,11 @@ using namespace gu::datetime;
 using namespace std::rel_ops;
 
 
-
 gcomm::SocketPtr gcomm::GuProtonet::socket(const gu::URI& uri)
 {
     return SocketPtr(new GuSocket(*this, uri));
 }
+
 
 gcomm::Acceptor* gcomm::GuProtonet::acceptor(const gu::URI& uri)
 {
@@ -23,19 +28,18 @@ gcomm::Acceptor* gcomm::GuProtonet::acceptor(const gu::URI& uri)
 }
 
 
-
 void gcomm::GuProtonet::event_loop(const Period& p)
 {
     Date stop = Date::now() + p;
     do
     {
-        
+
         Date next_time(handle_timers());
         Period sleep_p(min(stop - Date::now(), next_time - Date::now()));
-        
+
         if (sleep_p < 0)
             sleep_p = 0;
-        
+
         NetworkEvent ev(net.wait_event(sleep_p, false));
         if ((ev.get_event_mask() & E_OUT) != 0)
         {
@@ -51,11 +55,11 @@ void gcomm::GuProtonet::event_loop(const Period& p)
                 (mask & E_IN))
             {
                 dg = s.recv();
-                gcomm_assert(dg != 0 
+                gcomm_assert(dg != 0
                              || s.get_state() == gu::net::Socket::S_CLOSED
                              || s.get_state() == gu::net::Socket::S_FAILED);
             }
-            
+
             Lock lock(mutex);
             ProtoUpMeta up_um(s.get_errno());
             Datagram up_dg(dg != 0 ? *dg : Datagram());

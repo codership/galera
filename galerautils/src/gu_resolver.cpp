@@ -26,36 +26,36 @@ public:
 
     typedef map<string, addrinfo> Map;
     typedef Map::const_iterator const_iterator;
-    
+
     SchemeMap() : ai_map()
     {
-        
+
         ai_map.insert(make_pair("tcp",
                                 get_addrinfo(0, AF_UNSPEC, SOCK_STREAM, 0)));
         ai_map.insert(make_pair("udp",
                                 get_addrinfo(0, AF_UNSPEC, SOCK_DGRAM,  0)));
         // TODO:
     }
-    
+
     const_iterator find(const string& key) const
     {
         return ai_map.find(key);
     }
-    
+
     const_iterator end() const
     {
         return ai_map.end();
     }
-    
+
     static const addrinfo* get_addrinfo(const_iterator i)
     {
         return &i->second;
     }
-    
+
 private:
-    
+
     Map ai_map;
-    
+
     struct addrinfo get_addrinfo(int flags, int family, int socktype,
                                  int protocol)
     {
@@ -84,7 +84,7 @@ static void copy(const addrinfo& from, addrinfo& to)
     to.ai_socktype = from.ai_socktype;
     to.ai_protocol = from.ai_protocol;
     to.ai_addrlen = from.ai_addrlen;
-    
+
     if (from.ai_addr != 0)
     {
         if ((to.ai_addr =
@@ -94,10 +94,10 @@ static void copy(const addrinfo& from, addrinfo& to)
                 << "out of memory while trying to allocate " 
                 << to.ai_addrlen << " bytes";
         }
-        
+
         memcpy(to.ai_addr, from.ai_addr, to.ai_addrlen);
     }
-    
+
     to.ai_canonname = 0;
     to.ai_next = 0;
 }
@@ -140,11 +140,7 @@ gu::net::Sockaddr::Sockaddr(const sockaddr* sa, socklen_t sa_len) :
     sa_    (0     ),
     sa_len_(sa_len)
 {
-    
-    if ((sa_ = reinterpret_cast<sockaddr*>(malloc(sa_len_))) == 0)
-    {
-        gu_throw_fatal;
-    }
+    if ((sa_ = reinterpret_cast<sockaddr*>(malloc(sa_len_))) == 0) { gu_throw_fatal; }
     memcpy(sa_, sa, sa_len_);
 }
 
