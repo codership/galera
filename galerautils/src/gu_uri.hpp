@@ -27,11 +27,10 @@ namespace gu
     /*!
      * @brief URIQueryList
      *
-     * std::multimap is used to implement query list in URI. 
-     * @todo This should be changed to real class having
-     *       get_key(), get_value() methods for iterators 
-     *       and to get rid of std::multimap dependency in 
-     *       header.
+     * std::multimap is used to implement query list in URI.
+     * @todo This should be changed to real class having get_key(),
+     *       get_value() methods for iterators and to get rid of std::multimap
+     *       dependency in header.
      */
     typedef std::multimap<const std::string, std::string> URIQueryList;
 
@@ -40,30 +39,6 @@ namespace gu
      */
     class URI
     {
-    private:
-
-        bool         modified;
-        mutable std::string  str; /*! URI string */
-
-        RegEx::Match scheme;    /*! URI scheme part */
-        RegEx::Match user;      /*! URI user part */
-        RegEx::Match host;      /*! URI host part */
-        RegEx::Match port;      /*! URI port part */
-        RegEx::Match path;      /*! URI path part */
-        RegEx::Match fragment;  /*! URI fragment part */
-
-        URIQueryList query_list; /*! URI query list */
-
-        /*!
-         * @brief Parse URI from str
-         */
-        void parse (const std::string& s) throw (Exception);
-
-        /*!
-         * @brief Recompose URI in str
-         */
-        void recompose() const;
-
     public:
 
         /*!
@@ -183,7 +158,33 @@ namespace gu
             try                { return get_option(opt); }
             catch (NotFound& ) { return def            ; }
         }
-        
+
+    private:
+
+        bool         modified;
+        mutable std::string  str; /*! URI string */
+
+        RegEx::Match scheme;    /*! URI scheme part */
+        RegEx::Match user;      /*! URI user part */
+        RegEx::Match host;      /*! URI host part */
+        RegEx::Match port;      /*! URI port part */
+        RegEx::Match path;      /*! URI path part */
+        RegEx::Match fragment;  /*! URI fragment part */
+
+        URIQueryList query_list; /*! URI query list */
+
+        /*!
+         * @brief Parse URI from str
+         */
+        void parse (const std::string& s) throw (Exception);
+
+        /*!
+         * @brief Recompose URI in str
+         */
+        void recompose() const;
+
+        static const char* const uri_regex; /*! regexp string to parse URI */
+        static RegEx const regex;           /*! URI regexp parser */
     };
 }
 

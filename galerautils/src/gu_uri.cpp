@@ -114,27 +114,27 @@ gu::URI::URI(const string& uri_str) throw (gu::Exception)
     parse(uri_str);
 }
 
+/*! regexp suggested by RFC 3986 to parse URI into 5 canonical parts */
+const char* const gu::URI::uri_regex =
+        "^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\\?([^#]*))?(#(.*))?";
+/*        12            3  4          5       6  7        8 9        */
+
+/*! positions of URI components as matched by the above pattern */
+enum
+{
+    SCHEME     = 2,
+    AUTHORITY  = 4,
+    PATH       = 5,
+    QUERY      = 7,
+    FRAGMENT   = 9,
+    NUM_PARTS
+};
+
+gu::RegEx const gu::URI::regex(uri_regex);
+
 void gu::URI::parse (const string& uri_str) throw (gu::Exception)
 {
     log_debug << "URI: " << uri_str;
-
-    /*! regexp suggested by RFC 3986 to parse URI into 5 canonical parts */
-    static const char* const uri_regex =
-        "^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\\?([^#]*))?(#(.*))?";
-    /*    12            3  4          5       6  7        8 9            */
-
-    /*! positions of URI components as matched by the above pattern */
-    enum
-    {
-        SCHEME     = 2,
-        AUTHORITY  = 4,
-        PATH       = 5,
-        QUERY      = 7,
-        FRAGMENT   = 9,
-        NUM_PARTS
-    };
-
-    static const RegEx regex (uri_regex);
 
     vector<RegEx::Match> parts = regex.match (uri_str, NUM_PARTS);
 
@@ -142,7 +142,7 @@ void gu::URI::parse (const string& uri_str) throw (gu::Exception)
 
     if (!scheme.is_set() || !scheme.str().length())
     {
-        gu_throw_error (EINVAL) << "URI '" << uri_str << "' has empty scheme"; 
+        gu_throw_error (EINVAL) << "URI '" << uri_str << "' has empty scheme";
     }
 
     try

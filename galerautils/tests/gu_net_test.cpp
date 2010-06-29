@@ -74,10 +74,10 @@ START_TEST(test_datagram)
         b[i] = i;
     }
     Buffer buf(b, b + sizeof(b));
-    
+
     Datagram dg(buf);
     fail_unless(dg.get_len() == sizeof(b));
-    
+
     // Normal copy construction
     Datagram dgcopy(buf);
     fail_unless(dgcopy.get_len() == sizeof(b));
@@ -85,7 +85,7 @@ START_TEST(test_datagram)
                        dg.get_header() + dg.get_header_offset(),
                        dg.get_header_len()) == 0);
     fail_unless(dgcopy.get_payload() == dg.get_payload());
-    
+
     // Copy construction from offset of 16
     Datagram dg16(dg, 16);
     log_info << dg16.get_len();
@@ -94,19 +94,19 @@ START_TEST(test_datagram)
     {
         fail_unless(dg16.get_payload()[i + dg16.get_offset()] == i + 16);
     }
-    
+
 #if 0
     // Normalize datagram, all data is moved into payload, data from
     // beginning to offset is discarded. Normalization must not change
     // dg
     dg16.normalize();
-    
+
     fail_unless(dg16.get_len() == sizeof(b) - 16);
     for (byte_t i = 0; i < sizeof(b) - 16; ++i)
     {
         fail_unless(dg16.get_payload()[i] == i + 16);
     }
-    
+
     fail_unless(dg.get_len() == sizeof(b));
     for (byte_t i = 0; i < sizeof(b); ++i)
     {
@@ -123,20 +123,20 @@ START_TEST(test_datagram)
     {
         *(&dgoff.get_header()[0] + i) = i;
     }
-    
+
     dgoff.normalize();
-    
+
     fail_unless(dgoff.get_len() == sizeof(b) - 16 + 4);
     fail_unless(dgoff.get_header_offset() == 0);
     fail_unless(dgoff.get_header().size() == 0);
-#endif // 0    
+#endif // 0
 }
 END_TEST
 
 START_TEST(test_resolver)
 {
     std::string tcp_lh4("tcp://127.0.0.1:2002");
-    
+
     Addrinfo tcp_lh4_ai(resolve(tcp_lh4));
     fail_unless(tcp_lh4_ai.get_family() == AF_INET);
     fail_unless(tcp_lh4_ai.get_socktype() == SOCK_STREAM);
@@ -145,7 +145,7 @@ START_TEST(test_resolver)
                 tcp_lh4_ai.to_string().c_str(), tcp_lh4.c_str());
 
     std::string tcp_lh6("tcp://[::1]:2002");
-    
+
     Addrinfo tcp_lh6_ai(resolve(tcp_lh6));
     fail_unless(tcp_lh6_ai.get_family() == AF_INET6);
     fail_unless(tcp_lh6_ai.get_socktype() == SOCK_STREAM);
@@ -195,7 +195,7 @@ void* listener_thd(void* arg)
         NetworkEvent ev = net->wait_event(-1);
         Socket* sock = ev.get_socket();
         const int em = ev.get_event_mask();
-        
+
         if (em & E_ACCEPTED)
         {
             log_info << "accepted local " << sock->get_local_addr();
@@ -247,7 +247,7 @@ void* listener_thd(void* arg)
         }
         else if (em & E_EMPTY)
         {
-            
+
         }
         else if (sock == 0)
         {
@@ -274,14 +274,14 @@ START_TEST(test_network_connect)
     Socket* listener = net->listen("tcp://localhost:2112");
 
     log_info << "listener " << listener->get_local_addr();
-    
+
     listener_thd_args args = {net, 2, 0, 0};
     pthread_t th;
     pthread_create(&th, 0, &listener_thd, &args);
-    
+
     Network* net2 = new Network;
     Socket* conn = net2->connect("tcp://localhost:2112");
-    
+
     fail_unless(conn != 0);
     fail_unless(conn->get_state() == Socket::S_CONNECTED);
 
@@ -291,8 +291,6 @@ START_TEST(test_network_connect)
     Socket* conn2 = net2->connect("tcp://localhost:2112");
     fail_unless(conn2 != 0);
     fail_unless(conn2->get_state() == Socket::S_CONNECTED);
-
-    
 
     conn->close();
     delete conn;
@@ -327,23 +325,22 @@ START_TEST(test_network_send)
     {
         buf[i] = static_cast<byte_t>(i);
     }
-    
+
     Network* net = new Network;
     Socket* listener = net->listen("tcp://localhost:2112");
     listener_thd_args args = {net, 2, buf, bufsize};
     pthread_t th;
     pthread_create(&th, 0, &listener_thd, &args);
-    
+
     Network* net2 = new Network;
     Socket* conn = net2->connect("tcp://localhost:2112");
-    
+
     fail_unless(conn != 0);
     fail_unless(conn->get_state() == Socket::S_CONNECTED);
-    
+
     Socket* conn2 = net2->connect("tcp://localhost:2112");
     fail_unless(conn2 != 0);
     fail_unless(conn2->get_state() == Socket::S_CONNECTED);
-    
 
     try
     {
@@ -357,10 +354,9 @@ START_TEST(test_network_send)
         log_info << e.what();
         fail_unless(e.get_errno() == EMSGSIZE);
     }
-    
 
     size_t sent(0);
-    
+
     for (int i = 0; i < 1000; ++i)
     {
         size_t dlen = std::min(bufsize, static_cast<size_t>(1 + i*11));
@@ -418,19 +414,19 @@ START_TEST(test_network_send)
     log_info << "sent " << sent;
     conn->close();
     delete conn;
-    
+
     conn2->close();
     delete conn2;
-    
+
     void* rval = 0;
     pthread_join(th, &rval);
-    
+
     listener->close();
     delete listener;
-    
+
     delete net;
     delete net2;
-    
+
     delete[] buf;
 
 }
@@ -446,11 +442,11 @@ void* interrupt_thd(void* arg)
 
 START_TEST(test_network_interrupt)
 {
-    log_info << "START";    
+    log_info << "START";
     Network net;
     pthread_t th;
     pthread_create(&th, 0, &interrupt_thd, &net);
-    
+
     sleep(1);
 
     net.interrupt();
@@ -528,14 +524,14 @@ START_TEST(test_network_nonblocking)
 {
     log_info << "START";
     Network net;
-    
+
     Socket* listener = net.listen("tcp://localhost:2112?socket.non_blocking=1");
-    
+
     vector<Socket*> cl;
     vector<Socket*> sr;
     gu_log_max_level = GU_LOG_DEBUG;
     make_connections(net, cl, sr, 3);
-    
+
     close_connections(net, cl, sr);
 
     for_each(cl.begin(), cl.end(), DeleteObject());
@@ -559,30 +555,29 @@ public:
         self()
     {
     }
-    
+
     virtual ~Thread()
     {
     }
-    
 
-    
+
     virtual void interrupt()
     {
         interrupted = true;
         pthread_cancel(self);
     }
-    
+
     bool is_interrupted() const
     {
         return interrupted;
     }
-    
+
     static void start_fn(Thread* thd)
     {
         thd->run();
         pthread_exit(0);
     }
-    
+
     void start()
     {
         int err = pthread_create(&self, 0, 
@@ -592,7 +587,7 @@ public:
             gu_throw_error(err) << "could not start thread";
         }
     }
-    
+
     void stop()
     {
         interrupt();
@@ -635,12 +630,12 @@ class NetConsumer : public Consumer, public Thread
     Network net;
     Socket* listener;
     Socket* send_sock;
-    
+
     NetConsumer(const NetConsumer&);
     void operator=(const NetConsumer&);
-    
+
 public:
-    
+
     void connect(const string& url)
     {
         send_sock = net.connect(url);
@@ -697,13 +692,13 @@ public:
         while (is_interrupted() == false)
         {
             const Message* msg = get_next_msg();
-            
+
             if (msg != 0)
             {
                 const MsgData* md(reinterpret_cast<const MsgData*>(msg->get_data()));
                 const Datagram dg(Buffer(md->get_data(), 
                                          md->get_data() + md->get_data_size()));
-                
+
                 int err = send_sock->send(&dg);
                 if (err != 0)
                 {
@@ -712,9 +707,9 @@ public:
                 sent += dg.get_len();
                 Message ack(&msg->get_producer(), 0, err);
                 return_ack(ack);
-                
+
             }
-            
+
             NetworkEvent ev = net.wait_event(-1);
             const int em = ev.get_event_mask();
             Socket* sock = ev.get_socket();
@@ -760,9 +755,9 @@ START_TEST(test_net_consumer)
     string url("tcp://localhost:2112?socket.non_blocking=1");
     NetConsumer cons(url);
     cons.connect(url);
-    
+
     cons.start();
-    
+
     Producer prod(cons);
     byte_t buf[128];
     memset(buf, 0xab, sizeof(buf));
@@ -807,7 +802,7 @@ void* producer_thd(void* arg)
     producer_thd_args* pargs = reinterpret_cast<producer_thd_args*>(arg);
 
     byte_t buf[128];
-    memset(buf, 0xab, sizeof(buf));    
+    memset(buf, 0xab, sizeof(buf));
     Producer prod(pargs->cons);
     int ret = pthread_barrier_wait(&pargs->barrier);
     if (ret != 0 && ret != PTHREAD_BARRIER_SERIAL_THREAD)
@@ -820,7 +815,7 @@ void* producer_thd(void* arg)
         Message msg(&prod, &md);
         Message ack(&prod);
         prod.send(msg, &ack);
-        test_assert(ack.get_val() == 0 || ack.get_val() == EAGAIN);        
+        test_assert(ack.get_val() == 0 || ack.get_val() == EAGAIN);
     }
     return 0;
 }
@@ -835,13 +830,13 @@ START_TEST(test_net_consumer_nto1)
     cons.start();
 
     pthread_t thds[8];
-    
+
     producer_thd_args pargs(cons, 1000, 8);
     for (size_t i = 0; i < 8; ++i)
     {
         pthread_create(&thds[i], 0, &producer_thd, &pargs);
     }
-    
+
     for (size_t i = 0; i < 8; ++i)
     {
         pthread_join(thds[i], 0);
@@ -857,25 +852,25 @@ START_TEST(test_multicast)
 {
     string maddr("[ff30::8000:1]");
     string ifaddr("[::]");
-    
+
     // Check that MReq works
-    
+
     Sockaddr sa1(resolve(URI("udp://" + ifaddr + ":0")).get_addr());
     MReq mreq(resolve(URI("udp://" + maddr + ":4567")).get_addr(), sa1);
-    
+
     string mc1("udp://" + maddr + ":4567?socket.if_addr=" + ifaddr 
                + "&socket.if_loop=1");
     string mc2("udp://" + maddr + ":4567?socket.if_addr=" + ifaddr
                + "&socket.if_loop=1");
-    
+
     Network net;
     Socket* s1(net.connect(mc1));
     Socket* s2(net.connect(mc2));
-    
+
     byte_t msg[2] = {0, 1};
     Datagram dg(Buffer(msg, msg + 2));
     s1->send(&dg);
-    
+
     net.wait_event(-1);
     net.wait_event(1 * gu::datetime::Sec);
     const Datagram* rdg1(s1->recv());

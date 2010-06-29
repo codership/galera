@@ -13,6 +13,7 @@
 
 
 #include "gu_exception.hpp"
+#include "gu_regex.hpp"
 
 #include <iostream>
 #include <string>
@@ -33,7 +34,7 @@ namespace gu
         const long long Year = 12*Month;
 
         /*!
-         * @brief Class representing time periods instead of 
+         * @brief Class representing time periods instead of
          *        system clock time.
          */
         class Period
@@ -45,22 +46,20 @@ namespace gu
              * Duration format is PnYnMnDTnHnMnS where Y is year, M is month,
              * D is day, T is the time designator separating date and time
              * parts, H denotes hours, M (after T) is minutes and S seconds.
-             * 
+             *
              * All other n:s are expected to be integers except the one
              * before S which can be decimal to represent fractions of second.
-             * 
+             *
              * @param str Time period represented in ISO8601 duration format.
              */
             Period(const std::string& str = "") :
                 nsecs()
             {
-                if (str != "")
-                    parse(str);
+                if (str != "") parse(str);
             }
 
-            Period(const long long nsecs_) :
-                nsecs(nsecs_) { }
-            
+            Period(const long long nsecs_) : nsecs(nsecs_) { }
+
             bool operator==(const Period& cmp) const
             { return (nsecs == cmp.nsecs); }
 
@@ -85,27 +84,31 @@ namespace gu
 
             friend class Date;
             friend std::istream& operator>>(std::istream&, Period&);
+
+            static const char* const period_regex; /*! regexp string */
+            static RegEx       const regex;        /*! period string parser */
+
             /*!
              * @brief Parse period string.
              */
-            void parse(const std::string&)
-                throw (gu::Exception);
+            void parse(const std::string&) throw (gu::Exception);
+
             long long nsecs;
         };
 
 
         /*!
-         * @brief Date/time representation. 
+         * @brief Date/time representation.
          *
          * @todo Parsing date from string is not implemented yet,
-         *       only possible to get current system time or 
+         *       only possible to get current system time or
          *       maximum time.
          */
         class Date
         {
         public:
 
-            /*! 
+            /*!
              * @brief Get system time.
              */
             static Date now();
@@ -128,16 +131,16 @@ namespace gu
             long long get_utc() const { return utc; }
 
             /* Standard comparision operators */
-            bool operator==(const Date cmp) const 
+            bool operator==(const Date cmp) const
             { return (utc == cmp.utc); }
 
-            bool operator<(const Date cmp) const 
+            bool operator<(const Date cmp) const
             { return (utc < cmp.utc); }
 
             /*!
              * @brief Add period to Date
              */
-            Date operator+(const Period& add) const 
+            Date operator+(const Period& add) const
             { return (utc + add.get_nsecs()); }
 
             /*!
@@ -161,8 +164,7 @@ namespace gu
              * @brief Parse date from string.
              * @todo Not implemented yet
              */
-            void parse(const std::string& str_)
-                throw (gu::Exception);
+            void parse(const std::string& str_) throw (gu::Exception);
         };
 
         /*!
@@ -187,4 +189,4 @@ namespace gu
     } // namespace datetime
 } // namespace gu
 
-#endif // __GU_DATETIME__ 
+#endif // __GU_DATETIME__
