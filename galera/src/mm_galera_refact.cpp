@@ -238,7 +238,7 @@ static inline long while_eagain_or_trx_abort (
         }                                                               \
     }
 
-
+#if 0 // remove
 static void *galera_wsdb_configurator (
     enum wsdb_conf_param_id id, enum wsdb_conf_param_type type
 ) {
@@ -252,6 +252,7 @@ static void *galera_wsdb_configurator (
         return NULL;
     }
 }
+#endif //0
 
 #define GALERA_UPDATE_LAST_APPLIED(seqno)                               \
     if (status.last_applied < seqno) status.last_applied = seqno;
@@ -303,7 +304,7 @@ enum wsrep_status mm_galera_init(wsrep_t* gh,
     /* Set up options if any */
     if (args->options) galera_options_from_string (&galera_opts, args->options);
 
-    wsdb_set_conf_param_cb(galera_wsdb_configurator);
+// remove    wsdb_set_conf_param_cb(galera_wsdb_configurator);
 
     /* Set up initial state: */
 
