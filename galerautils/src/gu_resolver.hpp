@@ -49,7 +49,7 @@ namespace gu
         class MReq;
 
         /*!
-         * @class Addrinfo 
+         * @class Addrinfo
          *
          * @brief Class encapsulating struct addrinfo.
          *
@@ -77,7 +77,7 @@ public:
      * Default constuctor.
      *
      * @param sa     Pointer to sockaddr struct
-     * @param sa_len Length of sockaddr struct
+     * @param sa_len Length  of sockaddr struct
      */
     Sockaddr(const sockaddr* sa, socklen_t sa_len);
 
@@ -136,7 +136,8 @@ public:
         case AF_INET6:
             return &reinterpret_cast<const sockaddr_in6*>(sa_)->sin6_addr;
         default:
-            gu_throw_fatal  << "invalid address family: " << sa_->sa_family; throw;
+            gu_throw_fatal  << "invalid address family: " << sa_->sa_family;
+            throw;
         }
     }
 
@@ -154,7 +155,7 @@ public:
     }
 
     /*!
-     * Get non-const reference to sockaddr struct. 
+     * Get non-const reference to sockaddr struct.
      *
      * @return Non-const reference to sockaddr struct.
      */
@@ -187,10 +188,12 @@ public:
             reinterpret_cast<sockaddr_in*>(ret.sa_)->sin_addr.s_addr = 0;
             break;
         case AF_INET6:
-            memset(&reinterpret_cast<sockaddr_in6*>(ret.sa_)->sin6_addr, 0, sizeof(struct in6_addr));
+            memset(&reinterpret_cast<sockaddr_in6*>(ret.sa_)->sin6_addr,
+                   0, sizeof(struct in6_addr));
             break;
         default:
-            gu_throw_fatal << "invalid address family: " << ret.sa_->sa_family; throw;
+            gu_throw_fatal << "invalid address family: " << ret.sa_->sa_family;
+            throw;
         }
         return ret;
     }
@@ -307,7 +310,7 @@ public:
      * @return Associated Sockaddr object
      */
 
-    Sockaddr get_addr() const 
+    Sockaddr get_addr() const
     { return Sockaddr(ai_.ai_addr, ai_.ai_addrlen); }
 
     /*!

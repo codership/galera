@@ -110,7 +110,7 @@ namespace gcomm
         std::string       listen_addr;
         std::string       initial_addr;
         std::string       mcast_addr;
-        std::string       outbind_addr;
+        std::string       bind_ip;
         int               mcast_ttl;
         Acceptor*         listener;
         SocketPtr         mcast;

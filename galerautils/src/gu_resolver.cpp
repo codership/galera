@@ -351,7 +351,7 @@ gu::net::Addrinfo::Addrinfo(const addrinfo& ai) :
 
 gu::net::Addrinfo::Addrinfo(const Addrinfo& ai) :
     ai_()
-{ 
+{
     copy(ai.ai_, ai_);
 }
 
@@ -380,9 +380,9 @@ string gu::net::Addrinfo::to_string() const
                                             INET6_ADDRSTRLEN + 2 /* [] */ +
                                             6 /* :portt */);
     string ret;
-    
+
     ret.reserve(max_addr_str_len);
-    
+
     Sockaddr addr(ai_.ai_addr, ai_.ai_addrlen);
 
     switch (get_socktype())
@@ -396,15 +396,14 @@ string gu::net::Addrinfo::to_string() const
     default:
         gu_throw_error(EINVAL) << "invalid socktype: " << get_socktype();
     }
-    
+
     char dst[INET6_ADDRSTRLEN + 1];
 
-    if (inet_ntop(get_family(), addr.get_addr(), 
-                  dst, sizeof(dst)) == 0)
+    if (inet_ntop(get_family(), addr.get_addr(), dst, sizeof(dst)) == 0)
     {
         gu_throw_error(errno) << "inet ntop failed";
     }
-    
+
     switch (get_family())
     {
     case AF_INET:
@@ -418,7 +417,7 @@ string gu::net::Addrinfo::to_string() const
     default:
         gu_throw_error(EINVAL) << "invalid address family: " << get_family();
     }
-    
+
     ret += ":" + gu::to_string(ntohs(addr.get_port()));
     ret.reserve(0); // free unused space if possible
     return ret;
@@ -435,11 +434,12 @@ string gu::net::Addrinfo::to_string() const
 gu::net::Addrinfo gu::net::resolve(const URI& uri)
 {
     SchemeMap::const_iterator i(scheme_map.find(uri.get_scheme()));
+
     if (i == scheme_map.end())
     {
         gu_throw_error(EINVAL) << "invalid scheme: " << uri.get_scheme();
     }
-    
+
     try
     {
         string host(uri.get_host());
@@ -451,21 +451,32 @@ gu::net::Addrinfo gu::net::resolve(const URI& uri)
             pos = host.find_first_of(']');
             if (pos == string::npos)
             {
-                gu_throw_error(EINVAL) << "invalid host: " << uri.get_host(); 
+                gu_throw_error(EINVAL) << "invalid host: " << uri.get_host();
 
-            } 
+            }
             host.erase(pos, pos + 1);
         }
-        
+
         int err;
         addrinfo* ai(0);
-        if ((err = getaddrinfo(host.c_str(), uri.get_port().c_str(),
-                               SchemeMap::get_addrinfo(i), &ai)) != 0)
+        try
         {
-            gu_throw_error(errno) 
-                << "getaddrinfo failed with error code " 
+            err = getaddrinfo(host.c_str(), uri.get_port().c_str(),
+                              SchemeMap::get_addrinfo(i), &ai);
+        }
+        catch (NotSet&)
+        {
+            err = getaddrinfo(host.c_str(), NULL,
+                              SchemeMap::get_addrinfo(i), &ai);
+        }
+
+        if (err != 0)
+        {
+            gu_throw_error(errno)
+                << "getaddrinfo failed with error code "
                 << err << " for " << uri.to_string();
         }
+
         // Assume that the first entry is ok
         Addrinfo ret(*ai);
         freeaddrinfo(ai);

@@ -96,8 +96,6 @@ public:
         S_MAX
     };
 
-public:
-
     /*!
      * Socket options
      */
@@ -112,7 +110,14 @@ public:
 
     int get_opt() const { return options; }
 
-public:
+    /*!
+     * Symbolic option names (to specify in URI)
+     */
+    static const std::string OptNonBlocking; /*! socket.non_blocking */
+    static const std::string OptIfAddr;      /*! socket.if_addr      */
+    static const std::string OptIfLoop;      /*! socket.if_loop      */
+    static const std::string OptCRC32;       /*! socket.crc32        */
+    static const std::string OptMcastTTL;    /*! socket.mcast_ttl    */
 
     /*!
      * @brief Get file descriptor corresponding to socket.
@@ -120,11 +125,6 @@ public:
      * @note This method should not be used except for testing.
      */
     int get_fd() const { return fd; }
-
-    /*!
-     * @brief Destructor
-     */
-    ~Socket();
 
     /*!
      * @brief Connect socket
@@ -240,6 +240,11 @@ public:
     }
 
     void release();
+
+    /*!
+     * @brief Destructor
+     */
+    ~Socket();
 
 private:
 

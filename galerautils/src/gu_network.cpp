@@ -103,14 +103,14 @@ static int get_opt(const URI& uri)
 
     try
     {
-        bool val(from_string<bool>(uri.get_option("socket.non_blocking")));
+        bool val(from_string<bool>(uri.get_option(Socket::OptNonBlocking)));
         ret |= (val == true ? gu::net::Socket::O_NON_BLOCKING : 0);
     }
     catch (NotFound&) { }
 
     try
     {
-        bool val(from_string<bool>(uri.get_option("socket.crc32")));
+        bool val(from_string<bool>(uri.get_option(Socket::OptCRC32)));
         ret |= (val == true ? gu::net::Socket::O_CRC32 : 0);
     }
     catch (NotFound&)
@@ -137,12 +137,17 @@ int gu::net::closefd(int fd)
  * Datagram implementation
  **************************************************************************/
 
-
-
-
 /**************************************************************************
  * Socket implementation
  **************************************************************************/
+static const string SocketOptPrefix = "socket.";
+
+const string Socket::OptNonBlocking = SocketOptPrefix + "non_blocking";
+const string Socket::OptIfAddr      = SocketOptPrefix + "if_addr";
+const string Socket::OptIfLoop      = SocketOptPrefix + "if_loop";
+const string Socket::OptCRC32       = SocketOptPrefix + "crc32";
+const string Socket::OptMcastTTL    = SocketOptPrefix + "mcast_ttl";
+
 
 gu::net::Socket::Socket(Network&      net_,
                         const int     fd_,
@@ -265,9 +270,34 @@ void gu::net::Socket::connect(const string& addr)
     set_opt(this, ai, ::get_opt(uri));
 
     Sockaddr sa(ai.get_addr());
+    Sockaddr if_sa(Sockaddr::get_anyaddr(sa));
+
+    try
+    {
+        local_addr = uri.get_option(OptIfAddr);
+    }
+    catch (NotFound&) { }
+
+    if (local_addr != "")
+    {
+        local_addr = uri.get_scheme() + local_addr;
+        log_debug << "Found if_addr = " << local_addr;
+//            Addrinfo if_ai(resolve("udp://" + if_addr + ":0"));
+        Addrinfo if_ai(resolve(local_addr));
+        log_debug << "Addrinfo: " << if_ai.to_string();
+        if_sa = if_ai.get_addr();
+    }
 
     if (sa.is_multicast() == false)
     {
+        if (if_sa.is_anyaddr() == false &&
+            ::bind(fd, &if_sa.get_sockaddr(), if_sa.get_sockaddr_len()) == -1)
+        {
+            const int err(errno);
+            set_state(S_FAILED, err);
+            gu_throw_error(err) << "bind to " << local_addr << " failed";
+        }
+
         if (::connect(fd, &sa.get_sockaddr(), sa.get_sockaddr_len()) == -1)
         {
             if ((get_opt() & O_NON_BLOCKING) && errno == EINPROGRESS)
@@ -284,37 +314,27 @@ void gu::net::Socket::connect(const string& addr)
         else
         {
             socklen_t sa_len(sa.get_sockaddr_len());
+
             if (::getsockname(fd, &sa.get_sockaddr(), &sa_len) == -1)
             {
                 set_state(S_FAILED, errno);
                 gu_throw_error(errno);
             }
+
             if (sa_len != sa.get_sockaddr_len())
             {
                 set_state(S_FAILED, EINVAL);
                 gu_throw_fatal << "addr len mismatch";
             }
+
             local_addr = Addrinfo(ai, sa).to_string();
             set_state(S_CONNECTED);
         }
     }
     else
     {
-        string if_addr("");
-        try { if_addr = uri.get_option("socket.if_addr"); }
-        catch (NotFound&) { }
-
-        Sockaddr anyaddr(Sockaddr::get_anyaddr(sa));
-        Sockaddr if_sa(anyaddr);
-        if (if_addr != "")
-        {
-            log_debug << if_addr;
-            Addrinfo if_ai(resolve("udp://" + if_addr + ":0"));
-            log_debug << if_ai.to_string();
-            if_sa = if_ai.get_addr();
-        }
-
         MReq mr(sa, if_sa);
+
         if (::setsockopt(fd,
                          mr.get_ipproto(),
                          mr.get_add_membership_opt(),
@@ -337,9 +357,8 @@ void gu::net::Socket::connect(const string& addr)
             gu_throw_error(err) << "setsockopt(IP_MULTICAST_IF_OPT): ";
         }
 
-
         string if_loop("0");
-        try { if_loop = uri.get_option("socket.if_loop"); }
+        try { if_loop = uri.get_option(OptIfLoop); }
         catch (NotFound&) { }
 
         const int loop(from_string<int>(if_loop));
@@ -355,10 +374,10 @@ void gu::net::Socket::connect(const string& addr)
         }
 
         string mcast_ttl("1");
-        try { mcast_ttl = uri.get_option("socket.mcast_ttl"); }
+        try { mcast_ttl = uri.get_option(OptMcastTTL); }
         catch (NotFound&) { }
-
         const int ttl(from_string<int>(mcast_ttl));
+
         if (::setsockopt(fd,
                          mr.get_ipproto(),
                          mr.get_multicast_ttl_opt(),

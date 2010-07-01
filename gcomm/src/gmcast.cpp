@@ -27,7 +27,7 @@ static void set_tcp_defaults (URI* uri)
 }
 
 
-static bool check_uri(const URI& uri)
+static bool check_tcp_uri(const URI& uri)
 {
     return (uri.get_scheme() == Conf::TcpScheme);
 }
@@ -41,7 +41,7 @@ GMCast::GMCast(Protonet& net, const string& uri)
     listen_addr   (Conf::TcpScheme + "://0.0.0.0"), // how to make it IPv6 safe?
     initial_addr  (""),
     mcast_addr    (""),
-    outbind_addr  (""),
+    bind_ip       (""),
     mcast_ttl     (1),
     listener      (0),
     mcast         (),
@@ -87,7 +87,7 @@ GMCast::GMCast(Protonet& net, const string& uri)
                 Conf::TcpScheme + "://" + uri_.get_host() + ":" + port
                 ).to_string();
 
-            if (check_uri(initial_addr) == false)
+            if (check_tcp_uri(initial_addr) == false)
             {
                 gu_throw_error (EINVAL) << "initial addr '" << initial_addr
                                         << "' is not valid";
@@ -109,11 +109,35 @@ GMCast::GMCast(Protonet& net, const string& uri)
     }
     catch (gu::NotFound&) {}
 
-    string port(Defaults::GMCastTcpPort);
-
     try
     {
-        port = gu::URI(listen_addr).get_port();
+        gu::URI uri(listen_addr); /* check validity of the address */
+    }
+    catch (Exception&)
+    {
+        /* most probably no scheme, try to append one and see if it succeeds */
+        listen_addr = Conf::TcpScheme + "://" + listen_addr;
+        gu_trace(gu::URI uri(listen_addr));
+    }
+
+    URI listen_uri(listen_addr);
+
+    if (check_tcp_uri(listen_uri) == false)
+    {
+        gu_throw_error (EINVAL) << "listen addr '" << listen_addr
+                                << "' does not specify supported protocol";
+    }
+
+    if (resolve(listen_uri).get_addr().is_anyaddr() == false)
+    {
+        // bind outgoing connections to the same address as listening.
+        gu_trace(bind_ip = listen_uri.get_host());
+    }
+
+    string port(Defaults::GMCastTcpPort);
+    try
+    {
+        port = listen_uri.get_port();
     }
     catch (gu::NotSet&)
     {
@@ -129,18 +153,6 @@ GMCast::GMCast(Protonet& net, const string& uri)
     }
 
     listen_addr = resolve(listen_addr).to_string();
-
-    if (check_uri(listen_addr) == false)
-    {
-        gu_throw_error (EINVAL) << "listen addr '" << listen_addr
-                                << "' is not valid";
-    }
-
-    if (resolve(listen_addr).get_addr().is_anyaddr() == false)
-    {
-        // bind outgoing connections to the same address as listening.
-        outbind_addr = URI(listen_addr).get_host();
-    }
 
     try
     {
@@ -187,19 +199,20 @@ void GMCast::connect()
     listener = get_pnet().acceptor(listen_uri);
     gu_trace (listener->listen(listen_uri));
 
-    if (mcast_addr != "")
+    if (!mcast_addr.empty())
     {
-        URI mcast_uri(mcast_addr
-                      + "?socket.if_addr="
-                      + URI(listen_addr).get_host()
-                      + "&socket.non_blocking=1&socket.mcast_ttl="
-                      + to_string(mcast_ttl));
+        URI mcast_uri(
+            mcast_addr + '?'
+            + gu::net::Socket::OptIfAddr + '=' + URI(listen_addr).get_host()+'&'
+            + gu::net::Socket::OptNonBlocking + "=1&"
+            + gu::net::Socket::OptMcastTTL    + '=' + to_string(mcast_ttl)
+            );
 
         mcast = get_pnet().socket(mcast_uri);
         gu_trace(mcast->connect(mcast_uri));
     }
 
-    if (initial_addr != "")
+    if (!initial_addr.empty())
     {
         insert_address(initial_addr, UUID(), pending_addrs);
         gu_trace (gmcast_connect(initial_addr));
@@ -271,6 +284,11 @@ void GMCast::gmcast_connect(const string& remote_addr)
     URI connect_uri(remote_addr);
 
     set_tcp_defaults (&connect_uri);
+
+    if (!bind_ip.empty())
+    {
+        connect_uri.set_query_param(gu::net::Socket::OptIfAddr, bind_ip);
+    }
 
     SocketPtr tp = get_pnet().socket(connect_uri);
 
@@ -656,7 +674,7 @@ void GMCast::reconnect()
         {
             if (ae.get_retry_cnt() > max_retry_cnt)
             {
-                log_debug << "Forgetting " << pending_addr;
+                log_info << "Forgetting " << pending_addr;
                 pending_addrs.erase(i);
                 continue; // no reference to pending_addr after this
             }
