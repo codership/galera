@@ -280,9 +280,8 @@ void gu::net::Socket::connect(const string& addr)
 
     if (local_addr != "")
     {
-        local_addr = uri.get_scheme() + local_addr;
+        local_addr = uri.get_scheme() + "://" + local_addr;
         log_debug << "Found if_addr = " << local_addr;
-//            Addrinfo if_ai(resolve("udp://" + if_addr + ":0"));
         Addrinfo if_ai(resolve(local_addr));
         log_debug << "Addrinfo: " << if_ai.to_string();
         if_sa = if_ai.get_addr();
