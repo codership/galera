@@ -7,7 +7,7 @@
 
 #include <galerautils.h>
 #include <galerautils.hpp>
-#include <gcs.h>
+#include "gcs.hpp"
 
 namespace galera
 {
@@ -15,7 +15,7 @@ namespace galera
     {
     public:
 
-        ServiceThd (gcs_conn_t* gcs);
+        ServiceThd (GcsI& gcs);
 
         ~ServiceThd ();
 
@@ -25,10 +25,10 @@ namespace galera
 
     private:
 
-        gcs_conn_t* const gcs_;
-        gu_thread_t       thd_;
-        gu::Mutex         mtx_;
-        gu::Cond          cond_;
+        GcsI&       gcs_;
+        gu_thread_t thd_;
+        gu::Mutex   mtx_;
+        gu::Cond    cond_;
 
         static const uint32_t A_NONE;
 

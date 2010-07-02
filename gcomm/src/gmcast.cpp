@@ -832,7 +832,7 @@ void GMCast::handle_up(const void*        id,
         }
         else
         {
-            log_warn << "socket in state " << p->get_socket()->get_state();
+            log_debug << "socket in state " << p->get_socket()->get_state();
             p->set_state(Proto::S_FAILED);
             handle_failed(p);
         }

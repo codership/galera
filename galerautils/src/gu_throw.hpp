@@ -96,7 +96,6 @@ namespace gu
             Exception e(os.str(), Exception::E_NOTRECOVERABLE);
 
             e.trace (file, func, line);
-
             throw e;
         }
     };

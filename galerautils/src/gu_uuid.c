@@ -188,3 +188,20 @@ gu_uuid_older (const gu_uuid_t* left,
     if (time_left > time_right) return -1;
     return 0;
 }
+
+
+ssize_t gu_uuid_print(const gu_uuid_t* uuid, char* buf, size_t buflen)
+{
+    if (buflen < GU_UUID_STR_LEN) return -1;
+    return sprintf(buf, GU_UUID_FORMAT, GU_UUID_ARGS(uuid));
+}
+
+
+ssize_t gu_uuid_scan(const char* buf, size_t buflen, gu_uuid_t* uuid)
+{
+    ssize_t ret;
+    if (buflen < GU_UUID_STR_LEN) return -1;
+    ret = sscanf(buf, GU_UUID_FORMAT, GU_UUID_ARGS_REF(uuid));
+    if (ret != sizeof(uuid->data)) return -1;
+    return ret;
+}

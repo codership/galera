@@ -80,6 +80,20 @@ extern long
 gu_uuid_older (const gu_uuid_t* left,
                const gu_uuid_t* right);
 
+/**
+ * Print UUID into buffer
+ * @return Number of bytes printed (not including trailing '\0') or -1 on error.
+ */
+extern ssize_t
+gu_uuid_print(const gu_uuid_t* uuid, char* buf, size_t buflen);
+
+/**
+ * Scan UUID from buffer
+ * @return Number of bytes read (should match to sizeof(uuid)) or -1 on error
+ */
+extern ssize_t
+gu_uuid_scan(const char* buf, size_t buflen, gu_uuid_t* uuid);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

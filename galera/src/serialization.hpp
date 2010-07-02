@@ -6,6 +6,7 @@
 #define GALERA_SERIALIZATION_HPP
 
 #include "gu_throw.hpp"
+#include "gu_buffer.hpp"
 
 #include <limits>
 

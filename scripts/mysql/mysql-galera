@@ -399,7 +399,7 @@ echo $CS
 }
 
 # to use valgrind or not
-VALGRIND=""
+VALGRIND=${VALGRIND:-""}
 
 # write set level, SQL, RBR or ROW
 WS_LEVEL="RBR"

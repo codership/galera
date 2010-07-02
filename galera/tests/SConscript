@@ -5,12 +5,14 @@ env = check_env.Clone()
 env.Append(LIBS = ['galera++',
                    'galerautils++',
                    'galerautils',
-                   'pthread'])
+                   'pthread',
+                   'rt'])
 
 galera_check = env.Program(target='galera_check',
                            source=Split('''
                                galera_check.cpp
                                write_set_check.cpp
+                               trx_handle_check.cpp
                                service_thd_check.cpp
                            '''))
 

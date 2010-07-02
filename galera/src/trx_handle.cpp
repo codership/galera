@@ -5,36 +5,131 @@
 #include "trx_handle.hpp"
 #include "serialization.hpp"
 
-#include "gu_uuid.h"
+#include "uuid.hpp"
+
+std::ostream& galera::operator<<(std::ostream& os, TrxHandle::State s)
+{
+    switch (s)
+    {
+    case TrxHandle::S_EXECUTING:
+        return (os << "EXECUTING");
+    case TrxHandle::S_MUST_ABORT:
+        return (os << "MUST_ABORT");
+    case TrxHandle::S_ABORTING:
+        return (os << "ABORTING");
+    case TrxHandle::S_REPLICATING:
+        return (os << "REPLICATING");
+    case TrxHandle::S_REPLICATED:
+        return (os << "REPLICATED");
+    case TrxHandle::S_CERTIFYING:
+        return (os << "CERTIFYING");
+    case TrxHandle::S_CERTIFIED:
+        return (os << "CERTIFIED");
+    case TrxHandle::S_MUST_CERT_AND_REPLAY:
+        return (os << "MUST_CERT_AND_REPLAY");
+    case TrxHandle::S_MUST_REPLAY:
+        return (os << "MUST_REPLAY");
+    case TrxHandle::S_REPLAYING:
+        return (os << "REPLAYING");
+    case TrxHandle::S_REPLAYED:
+        return (os << "REPLAYED");
+    case TrxHandle::S_APPLYING:
+        return (os << "APPLYING");
+    case TrxHandle::S_COMMITTED:
+        return (os << "COMMITTED");
+    case TrxHandle::S_ROLLED_BACK:
+        return (os << "ROLLED_BACK");
+    }
+    gu_throw_fatal << "invalid state " << static_cast<int>(s);
+    throw;
+}
+
+
 
 std::ostream&
 galera::operator<<(std::ostream& os, const TrxHandle& th)
 {
-    char uuid_buf[GU_UUID_STR_LEN + 1];
-    gu_uuid_t gu_uuid;
-    memcpy(gu_uuid.data, th.source_id_.uuid, sizeof(gu_uuid.data));
-
-    sprintf(uuid_buf, GU_UUID_FORMAT, GU_UUID_ARGS(&gu_uuid));
-    os << "source: " << uuid_buf
-       << " state: " << th.state_
-       << " wst: " << th.write_set_type_
-       << " flags: " << th.write_set_flags_
-       << " conn_id: " << th.conn_id_
-       << " trx_id: " << th.trx_id_
-       << " seqnos (l: "  << th.local_seqno_
-       << ", g: " << th.global_seqno_
-       << ", s: " << th.last_seen_seqno_
-       << ", d: " << th.last_depends_seqno_
-       << ')';
-
-    return os;
+    return (os << "source: " << th.source_id_
+            << " state: " << th.state_()
+            << " flags: " << th.write_set_flags_
+            << " conn_id: " << th.conn_id_
+            << " trx_id: " << th.trx_id_
+            << " seqnos (l: "  << th.local_seqno_
+            << ", g: " << th.global_seqno_
+            << ", s: " << th.last_seen_seqno_
+            << ", d: " << th.last_depends_seqno_
+            << ')');
 }
+
+
+galera::TrxHandle::Fsm::TransMap galera::TrxHandle::trans_map_;
+
+static class TransMapBuilder
+{
+public:
+    void add(galera::TrxHandle::State from, galera::TrxHandle::State to)
+    {
+        using galera::TrxHandle;
+        using std::make_pair;
+        typedef TrxHandle::Transition Transition;
+        typedef TrxHandle::Fsm::TransAttr TransAttr;
+        TrxHandle::Fsm::TransMap& trans_map(TrxHandle::trans_map_);
+        trans_map.insert_unique(make_pair(Transition(from, to), TransAttr()));
+    }
+
+    TransMapBuilder()
+    {
+        using galera::TrxHandle;
+
+        add(TrxHandle::S_EXECUTING, TrxHandle::S_MUST_ABORT);
+        add(TrxHandle::S_EXECUTING, TrxHandle::S_ABORTING);
+        add(TrxHandle::S_EXECUTING, TrxHandle::S_REPLICATING);
+        add(TrxHandle::S_EXECUTING, TrxHandle::S_APPLYING);
+        add(TrxHandle::S_EXECUTING, TrxHandle::S_ROLLED_BACK);
+
+        add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_CERT_AND_REPLAY);
+        add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY);
+        add(TrxHandle::S_MUST_ABORT, TrxHandle::S_ABORTING);
+
+        add(TrxHandle::S_ABORTING, TrxHandle::S_ROLLED_BACK);
+
+        add(TrxHandle::S_REPLICATING, TrxHandle::S_REPLICATED);
+        add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_CERT_AND_REPLAY);
+        add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_ABORT);
+        add(TrxHandle::S_REPLICATING, TrxHandle::S_ABORTING);
+
+        add(TrxHandle::S_REPLICATED, TrxHandle::S_CERTIFYING);
+
+        add(TrxHandle::S_CERTIFYING, TrxHandle::S_CERTIFIED);
+        add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_CERT_AND_REPLAY);
+        add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_ABORT);
+        add(TrxHandle::S_CERTIFYING, TrxHandle::S_ABORTING);
+
+        add(TrxHandle::S_CERTIFIED, TrxHandle::S_EXECUTING);
+        add(TrxHandle::S_CERTIFIED, TrxHandle::S_APPLYING);
+        add(TrxHandle::S_CERTIFIED, TrxHandle::S_REPLAYING);
+        add(TrxHandle::S_CERTIFIED, TrxHandle::S_MUST_ABORT);
+
+        add(TrxHandle::S_APPLYING, TrxHandle::S_COMMITTED);
+
+        add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_CERTIFYING);
+        add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_ABORTING);
+
+        add(TrxHandle::S_MUST_REPLAY, TrxHandle::S_REPLAYING);
+
+        add(TrxHandle::S_REPLAYING, TrxHandle::S_REPLAYED);
+        add(TrxHandle::S_REPLAYING, TrxHandle::S_ABORTING);
+
+        add(TrxHandle::S_REPLAYED, TrxHandle::S_COMMITTED);
+
+    }
+} trans_map_builder_;
 
 
 size_t galera::serialize(const TrxHandle& trx, gu::byte_t* buf,
                          size_t buflen, size_t offset)
 {
-    uint32_t hdr((trx.write_set_type_ << 8) | (trx.write_set_flags_ & 0xff));
+    uint32_t hdr(trx.write_set_flags_ & 0xff);
     offset = serialize(hdr, buf, buflen, offset);
     offset = serialize(trx.source_id_, buf, buflen, offset);
     offset = serialize(trx.conn_id_, buf, buflen, offset);
@@ -50,7 +145,6 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
     uint32_t hdr;
     offset = unserialize(buf, buflen, offset, hdr);
     trx.write_set_flags_ = hdr & 0xff;
-    trx.write_set_type_ = static_cast<enum wsdb_ws_type>((hdr >> 8) & 0xff);
     offset = unserialize(buf, buflen, offset, trx.source_id_);
     offset = unserialize(buf, buflen, offset, trx.conn_id_);
     offset = unserialize(buf, buflen, offset, trx.trx_id_);

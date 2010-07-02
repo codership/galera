@@ -23,22 +23,23 @@
 #error "no unordered map available"
 #endif
 
+#include "gu_throw.hpp"
 
 namespace gu
 {
-    
+
     template <typename K>
     class Hash
     {
     public:
 #if defined(HAVE_BOOST_UNORDERED_MAP_HPP)
-        typedef boost::hash<K> type;
+        typedef boost::hash<K> Type;
 #elif defined(HAVE_TR1_UNORDERED_MAP)
-        typedef std::tr1::hash<K> type;
+        typedef std::tr1::hash<K> Type;
 #endif
         size_t operator()(const K& k) const
         {
-            return type(k);
+            return Type()(k);
         }
     };
 
@@ -47,8 +48,7 @@ namespace gu
     {
         return Hash<K>()(key);
     }
-    
-    
+
     template <typename K, typename V, typename H = Hash<K> >
     class UnorderedMap
     {
@@ -62,22 +62,28 @@ namespace gu
         typedef typename type::value_type value_type;
         typedef typename type::iterator iterator;
         typedef typename type::const_iterator const_iterator;
-        
+
         UnorderedMap() : impl_() { }
-        
+
         iterator begin() { return impl_.begin(); }
         const_iterator begin() const { return impl_.begin(); }
         iterator end() { return impl_.end(); }
         const_iterator end() const { return impl_.end(); }
         std::pair<iterator, bool> insert(const std::pair<K, V>& kv)
         { return impl_.insert(kv); }
+        iterator insert_unique(const std::pair<K, V>& kv)
+        {
+            std::pair<iterator, bool> ret(insert(kv));
+            if (ret.second == false) gu_throw_fatal << "insert unique failed";
+            return ret.first;
+        }
         iterator find(const K& key) { return impl_.find(key); }
         const_iterator find(const K& key) const { return impl_.find(key); }
         void erase(iterator i) { impl_.erase(i); }
         size_t size() const { return impl_.size(); }
         bool empty() const { return impl_.empty(); }
+        void clear() { return impl_.clear(); }
     };
-    
 
     template <typename K, typename V, typename H = Hash<K> >
     class UnorderedMultimap

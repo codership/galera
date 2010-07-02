@@ -18,10 +18,10 @@ ostream& galera::operator<<(ostream& os, const Query& q)
 }
 
 
-inline size_t galera::serialize(const Query& q,
-                                gu::byte_t*  buf,
-                                size_t       buf_len,
-                                size_t       offset)
+size_t galera::serialize(const Query& q,
+                         gu::byte_t*  buf,
+                         size_t       buf_len,
+                         size_t       offset)
 {
     offset = serialize<uint32_t>(q.query_, buf, buf_len, offset);
     offset = serialize(static_cast<int64_t>(q.tstamp_), buf, buf_len, offset);
@@ -30,10 +30,10 @@ inline size_t galera::serialize(const Query& q,
 }
 
 
-inline size_t galera::unserialize(const gu::byte_t* buf,
-                                  size_t            buf_len,
-                                  size_t            offset,
-                                  Query&            q)
+size_t galera::unserialize(const gu::byte_t* buf,
+                           size_t            buf_len,
+                           size_t            offset,
+                           Query&            q)
 {
     q.query_.clear();
     offset = unserialize<uint32_t>(buf, buf_len, offset, q.query_);
@@ -45,7 +45,7 @@ inline size_t galera::unserialize(const gu::byte_t* buf,
 }
 
 
-inline size_t galera::serial_size(const Query& q)
+size_t galera::serial_size(const Query& q)
 {
     return (serial_size<uint32_t>(q.query_)
             + serial_size(int64_t())
@@ -113,7 +113,7 @@ size_t galera::unserialize(const gu::byte_t* buf,
     uint32_t hdr;
     offset = unserialize(buf, buf_len, offset, hdr);
 
-    ws.level_ = static_cast<enum wsdb_ws_level>(hdr & 0xff);
+    ws.level_ = static_cast<WriteSet::Level>(hdr & 0xff);
     ws.queries_.clear();
     offset = unserialize<Query, uint32_t>(
         buf, buf_len, offset, back_inserter(ws.queries_));

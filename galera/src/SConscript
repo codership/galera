@@ -5,13 +5,14 @@ env.Replace(CXXFLAGS = env['CXXFLAGS'].replace('-pedantic',''))
 env.Append(CXXFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX')
 
 
-env.SharedLibrary('mmgalera', [
-        'galera_info.c',
-        'galera_job_queue.c',
-        'galera_options.c',
-        'galera_state.c',
-        'galera_status.c'
-])
+#env.SharedLibrary('mmgalera', [
+#        'galera_info.c',
+#        'galera_job_queue.c',
+#        'galera_options.c',
+#        'galera_state.c',
+#        'galera_status.c',
+#        'mm_galera.c'
+#])
 
 env.StaticLibrary('galera++', [
         'mapped_buffer.cpp',
@@ -39,7 +40,6 @@ mmenv.SharedLibrary('mmgalera++', [
         'galera_info.c',
         'galera_job_queue.c',
         'galera_options.c',
-        'galera_state.c',
-        'galera_status.c',
-        'mm_galera_refact.cpp'
+        'mm_provider.cpp',
+        'mm_galera.cpp'
 ])

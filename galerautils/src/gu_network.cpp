@@ -235,7 +235,7 @@ void gu::net::Socket::set_opt(Socket* s,
 
     if ((opt & O_CRC32) != 0)
     {
-        log_info << "enabling datagram checksumming";
+        log_debug << "enabling datagram checksumming";
         s->options |= O_CRC32;
     }
 

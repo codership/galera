@@ -6,7 +6,6 @@
 #ifndef GALERA_WRITE_SET_HPP
 #define GALERA_WRITE_SET_HPP
 
-#include "wsdb_api.h"
 #include "wsrep_api.h"
 #include "gu_buffer.hpp"
 #include "gu_logger.hpp"
@@ -20,10 +19,11 @@
 
 namespace galera
 {
-    class Query
+    class Statement
     {
     public:
-        Query(const void* query = 0,
+
+        Statement(const void* query = 0,
               size_t query_len = 0,
               time_t tstamp = -1,
               uint32_t rnd_seed = 0) :
@@ -37,27 +37,31 @@ namespace galera
         time_t get_tstamp() const { return tstamp_; }
         uint32_t get_rnd_seed() const { return rnd_seed_; }
     private:
-        friend size_t serialize(const Query&, gu::byte_t*, size_t, size_t);
-        friend size_t unserialize(const gu::byte_t*, size_t, size_t, Query&);
-        friend size_t serial_size(const Query&);
+        friend size_t serialize(const Statement&, gu::byte_t*, size_t, size_t);
+        friend size_t unserialize(const gu::byte_t*, size_t, size_t, Statement&);
+        friend size_t serial_size(const Statement&);
         gu::Buffer query_;
         time_t tstamp_;
         uint32_t rnd_seed_;
     };
 
-    std::ostream& operator<<(std::ostream&, const Query& q);
+    size_t serialize(const Statement&, gu::byte_t*, size_t, size_t);
+    size_t unserialize(const gu::byte_t*, size_t, size_t, Statement&);
+    size_t serial_size(const Statement&);
 
-    typedef std::deque<Query> QuerySequence;
+    std::ostream& operator<<(std::ostream&, const Statement& q);
 
-    class RowKey
+    typedef std::deque<Statement> StatementSequence;
+
+    class RowId
     {
     public:
 
-        RowKey(const void* table     = 0,
-               uint16_t    table_len = 0,
-               const void* key       = 0,
-               uint16_t    key_len   = 0,
-               gu::byte_t  action    = 0)
+        RowId(const void* table     = 0,
+              uint16_t    table_len = 0,
+              const void* key       = 0,
+              uint16_t    key_len   = 0,
+              gu::byte_t  action    = 0)
             :
             table_    (table),
             key_      (key),
@@ -96,10 +100,10 @@ namespace galera
 
     private:
 
-        friend size_t serialize(const RowKey&, gu::byte_t*, size_t, size_t);
-        friend size_t unserialize(const gu::byte_t*, size_t, size_t, RowKey&);
-        friend size_t serial_size(const RowKey&);
-        friend bool operator==(const RowKey& a, const RowKey& b);
+        friend size_t serialize(const RowId&, gu::byte_t*, size_t, size_t);
+        friend size_t unserialize(const gu::byte_t*, size_t, size_t, RowId&);
+        friend size_t serial_size(const RowId&);
+        friend bool operator==(const RowId& a, const RowId& b);
         const void* table_;
         const void* key_;
         uint16_t    table_len_;
@@ -107,7 +111,7 @@ namespace galera
         gu::byte_t  action_;
     };
 
-    inline bool operator==(const RowKey& a, const RowKey&b)
+    inline bool operator==(const RowId& a, const RowId&b)
     {
         return (a.table_len_ == b.table_len_              &&
                 a.key_len_   == b.key_len_                &&
@@ -115,28 +119,41 @@ namespace galera
                 !memcmp(a.key_, b.key_, a.key_len_));
     }
 
-    typedef std::deque<RowKey> RowKeySequence;
+    typedef std::deque<RowId> RowIdSequence;
 
     // This is needed for unordered map
-    class RowKeyHash
+    class RowIdHash
     {
     public:
-        size_t operator() (const RowKey& rk) const { return rk.get_hash(); }
+        size_t operator() (const RowId& ri) const { return ri.get_hash(); }
     };
 
     class WriteSet
     {
     public:
+        typedef enum
+        {
+            L_STATEMENT,
+            L_DATA
+        } Level;
+
+        typedef enum
+        {
+            A_INSERT = 0,
+            A_UPDATE = 1,
+            A_DELETE = 2
+        } Action;
+
         WriteSet()
             :
-            level_(WSDB_WS_QUERY),
+            level_(L_STATEMENT),
             queries_(),
             keys_(),
             key_refs_(),
             data_()
         { }
 
-        enum wsdb_ws_level  get_level()     const { return level_;     }
+        Level get_level()     const { return level_;     }
 
         const gu::Buffer& get_data() const { return data_; }
 
@@ -144,13 +161,22 @@ namespace galera
                           time_t tstamp = -1,
                           uint32_t rndseed = -1)
         {
-            queries_.push_back(Query(query,
+            queries_.push_back(Statement(query,
                                      query_len, tstamp, rndseed));
         }
 
-        void prepend_query(const Query& query)
+        void prepend_query(const Statement& query)
         {
             queries_.push_front(query);
+        }
+
+        void append_statement(const Statement& stmt)
+        {
+            queries_.push_back(stmt);
+        }
+        void prepend_statment(const Statement& stmt)
+        {
+            queries_.push_front(stmt);
         }
 
         void append_row_key(const void* dbtable, size_t dbtable_len,
@@ -164,13 +190,13 @@ namespace galera
             data_.insert(data_.end(),
                          reinterpret_cast<const gu::byte_t*>(data),
                          reinterpret_cast<const gu::byte_t*>(data) + data_len);
-            level_ = WSDB_WS_DATA_RBR;
+            level_ = L_DATA;
         }
 
-        void get_keys(RowKeySequence&) const;
+        void get_keys(RowIdSequence&) const;
         const gu::Buffer& get_key_buf() const { return keys_; }
-        const QuerySequence& get_queries() const { return queries_; }
-        bool is_empty() const
+        const StatementSequence& get_queries() const { return queries_; }
+        bool empty() const
         {
             return (data_.size() == 0 && keys_.size() == 0 && queries_.size() == 0);
         }
@@ -186,22 +212,22 @@ namespace galera
 
         typedef gu::UnorderedMultimap<size_t, size_t> KeyRefMap;
 
-        enum wsdb_ws_level level_;
-        QuerySequence      queries_;
+        Level              level_;
+        StatementSequence  queries_;
         gu::Buffer         keys_;
         KeyRefMap          key_refs_;
         gu::Buffer         data_;
     };
 
-    inline bool operator==(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
-    {
-        return (memcmp(&a, &b, sizeof(a)) == 0);
-    }
+    // Backwards compatible typedefs
+    // @todo Remove when other code has been fixed
+    typedef RowId RowKey;
+    typedef RowIdSequence RowKeySequence;
+    typedef RowIdHash RowKeyHash;
+    typedef Statement Query;
+    typedef StatementSequence QuerySequence;
 
-    inline bool operator!=(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
-    {
-        return !(a == b);
-    }
+
 }
 
 

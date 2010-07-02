@@ -34,10 +34,9 @@ galera::ServiceThd::thd_func (void* arg)
         {
             if (data.act_ & A_LAST_COMMITTED)
             {
-                long ret;
+                ssize_t ret;
 
-                if ((ret = gcs_set_last_applied(st->gcs_,
-                                                data.last_committed_)))
+                if ((ret = st->gcs_.set_last_applied(data.last_committed_)))
                 {
                     log_warn << "Failed to report last committed "
                              << data.last_committed_ << ", " << ret
@@ -51,7 +50,7 @@ galera::ServiceThd::thd_func (void* arg)
     return 0;
 }
 
-galera::ServiceThd::ServiceThd (gcs_conn_t* gcs)
+galera::ServiceThd::ServiceThd (GcsI& gcs)
   : gcs_  (gcs),
     thd_  (-1),
     mtx_  (),

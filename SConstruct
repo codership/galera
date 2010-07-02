@@ -74,7 +74,7 @@ if dbug:
 arch = ARGUMENTS.get('arch', '')
 
 if arch == 'i386':
-    compile_arch = '-m32'
+    compile_arch = '-m32 -march=i686'
     link_arch    = compile_arch + ' -Wl,-melf_i386'
 elif arch == 'x86-64':
     compile_arch = '-m64'

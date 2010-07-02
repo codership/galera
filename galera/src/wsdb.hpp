@@ -79,37 +79,18 @@ namespace galera
     public:
         TrxHandle* get_trx(const wsrep_uuid_t& source_id,
                            wsrep_trx_id_t trx_id, bool create = false);
+        void unref_trx(TrxHandle* trx);
         TrxHandle* get_conn_query(const wsrep_uuid_t&,
                                   wsrep_conn_id_t conn_id,
                                   bool create = false);
         // Discard trx handle
         void discard_trx(wsrep_trx_id_t trx_id);
         void discard_conn(wsrep_conn_id_t conn_id);
-
-        void append_query(TrxHandle*, const void* query, size_t query_len,
-                          time_t, uint32_t);
-
-        void append_row_key(TrxHandle*,
-                            const void* dbtable,
-                            size_t dbtable_len,
-                            const void* key,
-                            size_t key_len,
-                            int action);
-        void append_data(TrxHandle*,
-                         const void* data,
-                         size_t data_len);
-        void append_conn_query(TrxHandle*, const void* query,
-                               size_t query_len);
         void discard_conn_query(wsrep_conn_id_t conn_id);
-
-        void set_conn_variable(TrxHandle*,
+        void set_conn_variable(TrxHandle&,
                                const void*, size_t,
                                const void*, size_t);
-        void set_conn_database(TrxHandle*, const void*, size_t);
-        void create_write_set(TrxHandle*,
-                              const void* rbr_data = 0,
-                              size_t rbr_data_len = 0);
-        void flush_trx(TrxHandle*, bool force = false);
+        void set_conn_database(wsrep_conn_id_t, const void*, size_t);
         std::ostream& operator<<(std::ostream& os) const;
         Wsdb();
         ~Wsdb();

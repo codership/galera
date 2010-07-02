@@ -2,10 +2,11 @@
  * Copyright (C) 2010 Codership Oy <info@codership.com>
  */
 
-#include "write_set.cpp"
-#include "mapped_buffer.cpp"
+#include "serialization.hpp"
+#include "write_set.hpp"
+#include "mapped_buffer.hpp"
 #include "gu_logger.hpp"
-#include "certification.cpp"
+#include "certification.hpp"
 #include "wsdb.cpp"
 #include <cstdlib>
 
@@ -17,9 +18,9 @@ using namespace galera;
 
 START_TEST(test_query_sequence)
 {
-    QuerySequence qs;
+    StatementSequence qs;
 
-    Query q1("foo", 3), q2("foobar", 6);
+    Statement q1("foo", 3), q2("foobar", 6);
     size_t q1s(serial_size(q1));
     size_t q2s(serial_size(q2));
 
@@ -27,25 +28,25 @@ START_TEST(test_query_sequence)
     fail_unless(q2s == 22);
 
     qs.push_back(q1);
-    size_t s1 = serial_size<QuerySequence::const_iterator, uint16_t>(
+    size_t s1 = serial_size<StatementSequence::const_iterator, uint16_t>(
         qs.begin(), qs.end());
 
     fail_unless(s1 == q1s + 2, "%zd <-> %zd", s1, q1s + 2);
     qs.push_back(q2);
-    size_t s2 = serial_size<QuerySequence::const_iterator, uint32_t>(
+    size_t s2 = serial_size<StatementSequence::const_iterator, uint32_t>(
         qs.begin(), qs.end());
     fail_unless(s2 == q1s + q2s + 4, "%zd <-> %zd", s2, q1s + q2s + 4);
 
     log_info << "1";
     gu::Buffer buf(s2);
-    size_t ret = serialize<QuerySequence::const_iterator, uint32_t>(
+    size_t ret = serialize<StatementSequence::const_iterator, uint32_t>(
         qs.begin(), qs.end(), &buf[0], buf.size(), 0);
     fail_unless(ret == buf.size());
 
     log_info << "2";
-    QuerySequence qs2;
+    StatementSequence qs2;
 
-    size_t ret2 = unserialize<Query, uint32_t>(
+    size_t ret2 = unserialize<Statement, uint32_t>(
         &buf[0], buf.size(), 0, back_inserter(qs2));
 
     fail_unless(ret2 == buf.size());
@@ -82,19 +83,19 @@ START_TEST(test_write_set)
     log_info << "q2 " << serial_size(ws);
 
     log_info << "ws0 " << serial_size(ws);
-    ws.append_row_key(dbtable1, dbtable1_len, key1, key1_len, WSDB_ACTION_INSERT);
+    ws.append_row_key(dbtable1, dbtable1_len, key1, key1_len, WriteSet::A_INSERT);
     log_info << "ws1 " << serial_size(ws);
-    ws.append_row_key(dbtable2, dbtable2_len, key2, key2_len, WSDB_ACTION_UPDATE);
+    ws.append_row_key(dbtable2, dbtable2_len, key2, key2_len, WriteSet::A_UPDATE);
     log_info << "ws2 " << serial_size(ws);
 
-    fail_unless(ws.get_level() == WSDB_WS_QUERY);
+    fail_unless(ws.get_level() == WriteSet::L_STATEMENT);
     ws.append_data(rbr, rbr_len);
 
     gu::Buffer rbrbuf(rbr, rbr + rbr_len);
     log_info << "rbrlen " << serial_size<uint32_t>(rbrbuf);
     log_info << "wsrbr " << serial_size(ws);
 
-    fail_unless(ws.get_level() == WSDB_WS_DATA_RBR);
+    fail_unless(ws.get_level() == WriteSet::L_DATA);
 
     gu::Buffer buf(serial_size(ws));
 
@@ -181,9 +182,8 @@ END_TEST
 
 START_TEST(test_cert)
 {
-    Wsdb* wsdb(new Wsdb);
-    Certification* cert(new Certification);
-    cert->assign_initial_position(0);
+    Certification cert;
+    cert.assign_initial_position(0);
     wsrep_uuid_t uuid = {{1, }};
 
     struct ws_
@@ -205,44 +205,39 @@ START_TEST(test_cert)
 
     for (size_t i = 0; i < n_ws; ++i)
     {
-        TrxHandle* trx(wsdb->get_trx(uuid, i + 1, true));
-        wsdb->append_row_key(trx, wss[i].dbtable, wss[i].dbtable_len,
-                             wss[i].rk, wss[i].rk_len, WSDB_ACTION_UPDATE);
-        wsdb->flush_trx(trx, true);
+        TrxHandle* trx(new TrxHandle(uuid, i, i + 1, true));
+        trx->append_row_id(wss[i].dbtable, wss[i].dbtable_len,
+                           wss[i].rk, wss[i].rk_len, WriteSet::A_UPDATE);
+        trx->flush(0);
         string data("foobardata");
-        wsdb->create_write_set(trx, data.c_str(), data.size());
+        trx->append_data(data.c_str(), data.size());
         trx->set_last_seen_seqno(i);
-        trx->set_write_set_type(WSDB_WS_TYPE_TRX);
         trx->set_flags(TrxHandle::F_COMMIT);
-        wsdb->flush_trx(trx, true);
+        trx->flush(0);
         const MappedBuffer& wscoll(trx->write_set_collection());
 
-        TrxHandle* trx2(cert->create_trx(&wscoll[0], wscoll.size(),
+        TrxHandle* trx2(cert.create_trx(&wscoll[0], wscoll.size(),
                                          i + 1, i + 1));
 
-        cert->append_trx(trx2);
-        wsdb->discard_trx(trx->trx_id());
+        cert.append_trx(trx2);
     }
 
-    TrxHandle* trx(cert->get_trx(n_ws));
+    TrxHandle* trx(cert.get_trx(n_ws));
     fail_unless(trx != 0);
-    cert->set_trx_committed(trx);
-    fail_unless(cert->get_safe_to_discard_seqno() == 0);
+    cert.set_trx_committed(trx);
+    fail_unless(cert.get_safe_to_discard_seqno() == 0);
 
-    trx = cert->get_trx(1);
+    trx = cert.get_trx(1);
     fail_unless(trx != 0);
-    cert->set_trx_committed(trx);
-    fail_unless(cert->get_safe_to_discard_seqno() == 1);
+    cert.set_trx_committed(trx);
+    fail_unless(cert.get_safe_to_discard_seqno() == 1);
 
-    trx = cert->get_trx(4);
+    trx = cert.get_trx(4);
     fail_unless(trx != 0);
-    cert->set_trx_committed(trx);
-    fail_unless(cert->get_safe_to_discard_seqno() == 1);
+    cert.set_trx_committed(trx);
+    fail_unless(cert.get_safe_to_discard_seqno() == 1);
 
-    cert->purge_trxs_upto(cert->get_safe_to_discard_seqno());
-
-    delete wsdb;
-    delete cert;
+    cert.purge_trxs_upto(cert.get_safe_to_discard_seqno());
 
 }
 END_TEST

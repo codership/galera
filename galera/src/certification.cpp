@@ -3,11 +3,10 @@
 //
 
 #include "certification.hpp"
+#include "uuid.hpp"
 
 #include "gu_lock.hpp"
 #include "gu_throw.hpp"
-
-#include "wsdb_api.h"
 
 #include <map>
 
@@ -86,13 +85,14 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
     refs.clear();
 }
 
-int galera::Certification::do_test(TrxHandle* trx, bool store_keys)
+galera::Certification::TestResult
+galera::Certification::do_test(TrxHandle* trx, bool store_keys)
 {
     if (trx->last_seen_seqno() < initial_position_)
     {
-        log_warn << "last seen seqno below initial position for trx "
-                 << *trx;
-        return WSDB_CERTIFICATION_FAIL;
+        log_debug << "last seen seqno below initial position for trx "
+                  << *trx;
+        return TEST_FAILED;
     }
 
     size_t offset(serial_size(*trx));
@@ -128,7 +128,6 @@ int galera::Certification::do_test(TrxHandle* trx, bool store_keys)
             {
                 // Found matching entry, scan over dependent transactions
                 const TrxHandle* ref_trx(ci->second->get_ref_trx());
-                assert(ref_trx != 0);
                 // We assume that certification is done only once per trx
                 // and in total order
                 const wsrep_seqno_t ref_global_seqno(ref_trx->global_seqno());
@@ -167,7 +166,7 @@ int galera::Certification::do_test(TrxHandle* trx, bool store_keys)
 
     if (store_keys == true)
     {
-        min_depends_seqno = 0;
+        min_depends_seqno = safe_to_discard_seqno_;
         trx->set_last_depends_seqno(max(min_depends_seqno,
                                         max_depends_seqno));
         assert(trx->last_depends_seqno() < trx->global_seqno());
@@ -177,17 +176,16 @@ int galera::Certification::do_test(TrxHandle* trx, bool store_keys)
             (*i)->ref(trx);
         }
 
-        trx->mark_certified();
         ++n_certified_;
-        deps_dist_ += (trx->global_seqno() - trx->last_seen_seqno());
+        deps_dist_ += (trx->global_seqno() - trx->last_depends_seqno());
     }
 
-    return WSDB_OK;
+    return TEST_OK;
 
 cert_fail:
     purge_for_trx(trx);
     trx->set_last_depends_seqno(-1);
-    return WSDB_CERTIFICATION_FAIL;
+    return TEST_FAILED;
 }
 
 
@@ -204,9 +202,7 @@ galera::Certification::Certification(const string& conf)
     safe_to_discard_seqno_(-1),
     n_certified_(0),
     deps_dist_(0)
-{
-    // TODO: Adjust role by configuration
-}
+{ }
 
 
 
@@ -224,14 +220,24 @@ galera::Certification::~Certification()
 
 void galera::Certification::assign_initial_position(wsrep_seqno_t seqno)
 {
-    assert(seqno >= 0 && seqno >= position_);
+    if (seqno >= position_)
     {
-        Lock lock(mutex_);
-        initial_position_      = seqno;
-        position_              = seqno;
-        safe_to_discard_seqno_ = seqno;
+        purge_trxs_upto(seqno);
     }
-    purge_trxs_upto(position_);
+    else
+    {
+        log_warn << "moving position backwards";
+        for_each(cert_index_.begin(), cert_index_.end(), DiscardRK());
+        for_each(trx_map_.begin(), trx_map_.end(),
+                 Unref2nd<TrxMap::value_type>());
+        cert_index_.clear();
+        trx_map_.clear();
+    }
+
+    Lock lock(mutex_);
+    initial_position_      = seqno;
+    position_              = seqno;
+    safe_to_discard_seqno_ = seqno;
 }
 
 galera::TrxHandle* galera::Certification::create_trx(
@@ -253,18 +259,15 @@ galera::TrxHandle* galera::Certification::create_trx(
 }
 
 
-int galera::Certification::append_trx(TrxHandle* trx)
+galera::Certification::TestResult
+galera::Certification::append_trx(TrxHandle* trx)
 {
     // todo: enable when source id bug is fixed
-    // assert(trx->source_id() != WSREP_UUID_UNDEFINED);
+    assert(trx->source_id() != WSREP_UUID_UNDEFINED);
     assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
     assert(trx->global_seqno() > position_);
 
-    if (trx->is_local() == true)
-    {
-        trx->ref();
-    }
-
+    trx->ref();
     {
         Lock lock(mutex_);
 
@@ -276,11 +279,6 @@ int galera::Certification::append_trx(TrxHandle* trx)
                       << " trx seqno " << trx->global_seqno();
         }
         position_ = trx->global_seqno();
-        if (trx_map_.insert(make_pair(trx->global_seqno(),
-                                      trx)).second == false)
-        {
-            gu_throw_fatal;
-        }
 
         if (trx_map_.size() > 10000 && (trx_size_warn_count_++ % 1000 == 0))
         {
@@ -289,20 +287,22 @@ int galera::Certification::append_trx(TrxHandle* trx)
         }
     }
 
-    const int retval(test(trx));
+    const TestResult retval(test(trx));
 
-    if (trx->last_depends_seqno() > -1)
-    {
-        Lock lock(mutex_);
-        deps_set_.insert(trx->last_seen_seqno());
-        assert(deps_set_.size() <= trx_map_.size());
-    }
+    Lock lock(mutex_);
+    if (trx_map_.insert(
+            make_pair(trx->global_seqno(), trx)).second == false)
+        gu_throw_fatal << "duplicate trx entry " << *trx;
+    deps_set_.insert(trx->last_seen_seqno());
+    assert(deps_set_.size() <= trx_map_.size());
+    trx->mark_certified();
 
     return retval;
 }
 
 
-int galera::Certification::test(TrxHandle* trx, bool bval)
+galera::Certification::TestResult
+galera::Certification::test(TrxHandle* trx, bool bval)
 {
     assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
 
@@ -311,8 +311,8 @@ int galera::Certification::test(TrxHandle* trx, bool bval)
         // optimistic guess, cert test may adjust this to tighter value
         trx->set_last_depends_seqno(trx->last_seen_seqno());
     }
-    const int ret(do_test(trx, bval));
-    if (ret != WSDB_OK)
+    const TestResult ret(do_test(trx, bval));
+    if (ret != TEST_OK)
     {
         // make sure that last depends seqno is -1 for trxs that failed
         // certification
@@ -340,8 +340,8 @@ wsrep_seqno_t galera::Certification::get_safe_to_discard_seqno() const
 
 void galera::Certification::purge_trxs_upto(wsrep_seqno_t seqno)
 {
-    assert(seqno >= 0
-           /* see note below && seqno <= get_safe_to_discard_seqno() */);
+    // commented out, see note below
+    // assert(seqno <= get_safe_to_discard_seqno());
     const wsrep_seqno_t stds(get_safe_to_discard_seqno());
     Lock lock(mutex_);
     // Note: setting trx committed is not done in total order so
@@ -366,7 +366,7 @@ void galera::Certification::set_trx_committed(TrxHandle* trx)
     assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0 &&
            trx->is_committed() == false);
 
-    if (trx->last_depends_seqno() > -1)
+    if (trx->is_certified() == true)
     {
         // trxs with last_depends_seqno == -1 haven't gone through
         // append_trx

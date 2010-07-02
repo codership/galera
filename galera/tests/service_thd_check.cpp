@@ -11,38 +11,11 @@
 
 using namespace galera;
 
-extern "C" {
-    struct gcs_conn
-    {
-        volatile gcs_seqno_t seqno;
-    };
-}
-
-static gcs_conn_t test_conn;
-
-static const gcs_seqno_t test_limit = 10;
-
-long
-gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
-{
-    long ret = 0;
-
-    if (seqno < test_limit)
-    {
-        conn->seqno = seqno;
-    }
-    else
-    {
-        conn->seqno = test_limit - seqno; // just to verify that there was error
-        ret = -ERANGE;
-    }
-
-    return ret;
-}
 
 START_TEST(service_thd1)
 {
-    ServiceThd* thd = new ServiceThd(&test_conn);
+    DummyGcs conn;
+    ServiceThd* thd = new ServiceThd(conn);
     fail_if (thd == 0);
     delete thd;
 }
@@ -52,40 +25,36 @@ END_TEST
 
 START_TEST(service_thd2)
 {
-    ServiceThd* thd = new ServiceThd(&test_conn);
+    DummyGcs conn;
+    ServiceThd* thd = new ServiceThd(conn);
     fail_if (thd == 0);
 
-    test_conn.seqno = 0;
+    conn.set_last_applied(0);
 
     gcs_seqno_t seqno = 1;
     thd->report_last_committed (seqno);
     usleep (TEST_USLEEP);
-    fail_if (test_conn.seqno != seqno, "seqno = %"PRId64", expected %"PRId64,
-             test_conn.seqno, seqno);
+    fail_if (conn.last_applied() != seqno,
+             "seqno = %"PRId64", expected %"PRId64, conn.last_applied(), seqno);
 
     seqno = 5;
     thd->report_last_committed (seqno);
     usleep (TEST_USLEEP);
-    fail_if (test_conn.seqno != seqno, "seqno = %"PRId64", expected %"PRId64,
-             test_conn.seqno, seqno);
+    fail_if (conn.last_applied() != seqno,
+             "seqno = %"PRId64", expected %"PRId64, conn.last_applied(), seqno);
 
     thd->report_last_committed (3);
     usleep (TEST_USLEEP);
-    fail_if (test_conn.seqno != seqno, "seqno = %"PRId64", expected %"PRId64,
-             test_conn.seqno, seqno);
+    fail_if (conn.last_applied() != seqno,
+             "seqno = %"PRId64", expected %"PRId64, conn.last_applied(), seqno);
 
     thd->reset();
 
     seqno = 3;
     thd->report_last_committed (seqno);
     usleep (TEST_USLEEP);
-    fail_if (test_conn.seqno != seqno, "seqno = %"PRId64", expected %"PRId64,
-             test_conn.seqno, seqno);
-
-    thd->report_last_committed (test_limit + seqno);
-    usleep (TEST_USLEEP);
-    fail_if (test_conn.seqno != -seqno, "seqno = %"PRId64", expected %"PRId64,
-             test_conn.seqno, -seqno);
+    fail_if (conn.last_applied() != seqno,
+             "seqno = %"PRId64", expected %"PRId64, conn.last_applied(), seqno);
 
     delete thd;
 }
