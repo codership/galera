@@ -69,7 +69,7 @@ namespace galera
             public:
                 size_t operator()(Transition const& tr) const
                 {
-                    return (gu::HashValue(tr.from_) ^ gu::HashValue(tr.to_));
+		  return (gu::HashValue(static_cast<int>(tr.from_)) ^ gu::HashValue(static_cast<int>(tr.to_)));
                 }
             };
         private:
