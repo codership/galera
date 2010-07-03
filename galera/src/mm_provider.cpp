@@ -236,6 +236,7 @@ galera::MM::MM(const struct wsrep_init_args* args)
 
     state_.add_transition(Transition(S_JOINING, S_CLOSING));
     state_.add_transition(Transition(S_JOINING, S_JOINED));
+    state_.add_transition(Transition(S_JOINING, S_SYNCED));
 
     state_.add_transition(Transition(S_JOINED, S_CLOSING));
     state_.add_transition(Transition(S_JOINED, S_SYNCED));

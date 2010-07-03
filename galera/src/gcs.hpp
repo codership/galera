@@ -19,7 +19,7 @@ namespace galera
     public:
         GcsI() { }
         virtual ~GcsI() { }
-        virtual int connect(const std::string& cluster_name,
+        virtual ssize_t connect(const std::string& cluster_name,
                             const std::string& cluster_url) = 0;
         virtual ssize_t set_initial_position(const wsrep_uuid_t& uuid,
                                              gcs_seqno_t seqno) = 0;
@@ -118,7 +118,7 @@ namespace galera
             last_applied_(GCS_SEQNO_ILL)
         { }
         ~DummyGcs() {}
-        int connect(const std::string& cluster_name,
+        ssize_t connect(const std::string& cluster_name,
                     const std::string& cluster_url) { return 0; }
         ssize_t set_initial_position(const wsrep_uuid_t& uuid,
                                      gcs_seqno_t seqno) { return 0; }
