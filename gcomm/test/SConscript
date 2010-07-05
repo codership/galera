@@ -20,5 +20,5 @@ gcomm_check = env.Program(target = 'check_gcomm',
                               check_pc.cpp
                            '''))
 
-# temporarily disabled env.Test("gcomm_check.passed", gcomm_check)
-env.Alias("test", "gcomm_check.passed")
+env.Test("gcomm_check.passed", gcomm_check)
+
