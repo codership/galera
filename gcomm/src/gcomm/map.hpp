@@ -276,6 +276,5 @@ namespace gcomm
     {
         return vt.second;
     }
-
 }
 #endif /* GCOMM_MAP_HPP */

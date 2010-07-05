@@ -358,10 +358,10 @@ namespace gcomm
                 const size_t available(get_available(rb));
 
                 
-                log_info << um.get_source() << " " << get_uuid() 
-                         << " " << available ;
-                log_info << rb.get_len() << " " << rb.get_offset() << " "
-                         << rb.get_header_len();
+                // log_debug << um.get_source() << " " << get_uuid() 
+                //         << " " << available ;
+                // log_debug << rb.get_len() << " " << rb.get_offset() << " "
+                //         << rb.get_header_len();
                 if (available != 8)
                 {
                     log_info << "check_trace fail";

@@ -35,6 +35,7 @@ namespace gcomm
         class LeaveMessage;
         class InstallMessage;
         class SelectNodesOp;
+        class RangeLuCmp;
         class RangeHsCmp;
     }
 }
@@ -651,14 +652,29 @@ private:
 };
 
 
+class gcomm::evs::RangeLuCmp
+{
+public:
+    bool operator()(const MessageNodeList::value_type& a,
+                    const MessageNodeList::value_type& b) const
+    {
+        gcomm_assert(MessageNodeList::get_value(a).get_view_id() ==
+                     MessageNodeList::get_value(b).get_view_id());
+        return (MessageNodeList::get_value(a).get_im_range().get_lu() <
+                MessageNodeList::get_value(b).get_im_range().get_lu());
+    }
+};
+
 class gcomm::evs::RangeHsCmp
 {
 public:
     bool operator()(const MessageNodeList::value_type& a,
                     const MessageNodeList::value_type& b) const
     {
-        return MessageNodeList::get_value(a).get_im_range().get_hs() < 
-            MessageNodeList::get_value(b).get_im_range().get_hs();
+        gcomm_assert(MessageNodeList::get_value(a).get_view_id() ==
+                     MessageNodeList::get_value(b).get_view_id());
+        return (MessageNodeList::get_value(a).get_im_range().get_hs() <
+                MessageNodeList::get_value(b).get_im_range().get_hs());
     }
 };
 

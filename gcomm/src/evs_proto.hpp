@@ -131,7 +131,7 @@ public:
     
     void resend(const UUID&, const Range);
     void recover(const UUID&, const UUID&, const Range);
-    bool retrans_leaves(const MessageNodeList&);
+    void retrans_leaves(const MessageNodeList&);
 
     void set_inactive(const UUID&);
     void check_inactive();

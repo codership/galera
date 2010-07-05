@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
 
     for (size_t i = 0; suites[i].suite != 0; ++i)
     {
-        if (suits == 0 || 
+        if (suits == 0 ||
             find(suits->begin(), suits->end(), suites[i].name) != suits->end())
         {
             srunner_add_suite(sr, suites[i].suite());
