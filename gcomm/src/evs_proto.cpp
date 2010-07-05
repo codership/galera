@@ -2415,7 +2415,10 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                     evs_log_info(I_STATE)
                         << " shift to RECOVERY, no consensus after "
                         << "handling user message from new view";
-                    gu_trace(shift_to(S_GATHER));
+                    // Don't change state here but continue waiting for
+                    // install gaps. Other nodes should time out eventually
+                    // if consensus can't be reached.
+                    // gu_trace(shift_to(S_GATHER));
                     profile_leave(shift_to_prof);
                     return;
                 }
