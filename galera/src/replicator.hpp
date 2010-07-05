@@ -2,14 +2,12 @@
 // Copyright (C) 2010 Codership Oy <info@codership.com>
 //
 
-#ifndef GALERA_PROVIDER_HPP
-#define GALERA_PROVIDER_HPP
+#ifndef GALERA_REPLICATOR_HPP
+#define GALERA_REPLICATOR_HPP
 
 #include "wsrep_api.h"
 
 #include <string>
-
-
 
 namespace galera
 {
@@ -19,12 +17,13 @@ namespace galera
 
     //! @class Galera
     //
-    // @brief Abstract Galera provider interface
-    class Provider
+    // @brief Abstract Galera replicator interface
+
+    class Replicator
     {
     public:
-        Provider() { }
-        virtual ~Provider() { }
+        Replicator() { }
+        virtual ~Replicator() { }
         virtual wsrep_status_t connect(const std::string& cluster_name,
                                        const std::string& cluster_url,
                                        const std::string& state_donor) = 0;
@@ -61,4 +60,4 @@ namespace galera
     };
 }
 
-#endif // GALERA_PROVIDER_HPP
+#endif // GALERA_REPLICATOR_HPP

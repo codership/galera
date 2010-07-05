@@ -40,6 +40,6 @@ mmenv.SharedLibrary('mmgalera++', [
         'galera_info.c',
         'galera_job_queue.c',
         'galera_options.c',
-        'mm_provider.cpp',
-        'mm_galera.cpp'
+        'replicator_smm.cpp',
+        'wsrep_provider.cpp'
 ])

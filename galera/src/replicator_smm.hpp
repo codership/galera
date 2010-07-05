@@ -4,13 +4,13 @@
 
 //! @file mm_provider.hpp
 //
-// @brief Galera multi-master provider
+// @brief Galera Synchronous Multi-Master replicator
 //
 
-#ifndef GALERA_MM_PROVIDER_HPP
-#define GALERA_MM_PROVIDER_HPP
+#ifndef GALERA_REPLICATOR_SMM_HPP
+#define GALERA_REPLICATOR_SMM_HPP
 
-#include "provider.hpp"
+#include "replicator.hpp"
 
 #include "gcs.hpp"
 #include "monitor.hpp"
@@ -27,7 +27,7 @@
 
 namespace galera
 {
-    class MM : public Provider
+    class ReplicatorSMM : public Replicator
     {
     public:
         typedef enum
@@ -52,8 +52,10 @@ namespace galera
 
         static const size_t N_STATES = S_DONOR + 1;
 
-        MM(const wsrep_init_args* args);
-        ~MM();
+        ReplicatorSMM(const wsrep_init_args* args);
+
+        ~ReplicatorSMM();
+
         wsrep_status_t connect(const std::string& cluster_name,
                                const std::string& cluster_url,
                                const std::string& state_donor);
@@ -102,8 +104,8 @@ namespace galera
 
     private:
 
-        MM(const MM&);
-        void operator=(const MM&);
+        ReplicatorSMM(const ReplicatorSMM&);
+        void operator=(const ReplicatorSMM&);
 
         void report_last_committed();
 
@@ -196,14 +198,16 @@ namespace galera
             public:
                 size_t operator()(Transition const& tr) const
                 {
-		  return (gu::HashValue(static_cast<int>(tr.from_))
-			  ^ gu::HashValue(static_cast<int>(tr.to_)));
+                    return (gu::HashValue(static_cast<int>(tr.from_))
+                            ^ gu::HashValue(static_cast<int>(tr.to_)));
                 }
             };
+
         private:
             State from_;
             State to_;
         };
+
         FSM<State, Transition> state_;
         SstState               sst_state_;
 
@@ -260,14 +264,10 @@ namespace galera
         size_t report_interval_;
         gu::Atomic<size_t> report_counter_;
 
-
         std::vector<struct wsrep_status_var> wsrep_status_;
     };
 
-
-    std::ostream& operator<<(std::ostream& os, MM::State state);
-
+    std::ostream& operator<<(std::ostream& os, ReplicatorSMM::State state);
 }
 
-
-#endif // GALERA_MM_PROVIDER
+#endif /* GALERA_REPLICATOR_SMM_HPP */

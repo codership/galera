@@ -3,7 +3,7 @@
 //
 
 
-#include "mm_provider.hpp"
+#include "replicator_smm.hpp"
 #include "uuid.hpp"
 #include "serialization.hpp"
 
@@ -166,16 +166,16 @@ static wsrep_status_t apply_trx_ws(void* recv_ctx,
     return retval;
 }
 
-std::ostream& galera::operator<<(std::ostream& os, MM::State state)
+std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
 {
     switch (state)
     {
-    case MM::S_CLOSED: return (os << "CLOSED");
-    case MM::S_CLOSING: return (os << "CLOSING");
-    case MM::S_JOINING: return (os << "JOINING");
-    case MM::S_JOINED: return (os << "JOINED");
-    case MM::S_SYNCED: return (os << "SYNCED");
-    case MM::S_DONOR: return (os << "DONOR");
+    case ReplicatorSMM::S_CLOSED: return (os << "CLOSED");
+    case ReplicatorSMM::S_CLOSING: return (os << "CLOSING");
+    case ReplicatorSMM::S_JOINING: return (os << "JOINING");
+    case ReplicatorSMM::S_JOINED: return (os << "JOINED");
+    case ReplicatorSMM::S_SYNCED: return (os << "SYNCED");
+    case ReplicatorSMM::S_DONOR: return (os << "DONOR");
     }
     gu_throw_fatal << "invalid state " << static_cast<int>(state);
     throw;
@@ -189,7 +189,7 @@ std::ostream& galera::operator<<(std::ostream& os, MM::State state)
 //////////////////////////////////////////////////////////////////////
 
 
-galera::MM::MM(const struct wsrep_init_args* args)
+galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     :
     state_(S_CLOSED),
     sst_state_(SST_NONE),
@@ -254,7 +254,7 @@ galera::MM::MM(const struct wsrep_init_args* args)
     local_monitor_.set_initial_position(0);
 }
 
-galera::MM::~MM()
+galera::ReplicatorSMM::~ReplicatorSMM()
 {
     switch (state_())
     {
@@ -271,7 +271,7 @@ galera::MM::~MM()
 }
 
 
-wsrep_status_t galera::MM::connect(const std::string& cluster_name,
+wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
                                    const std::string& cluster_url,
                                    const std::string& state_donor)
 {
@@ -285,7 +285,7 @@ wsrep_status_t galera::MM::connect(const std::string& cluster_name,
 }
 
 
-wsrep_status_t galera::MM::close()
+wsrep_status_t galera::ReplicatorSMM::close()
 {
     assert(state_() != S_CLOSED);
     gcs_.close();
@@ -294,7 +294,7 @@ wsrep_status_t galera::MM::close()
 
 
 
-wsrep_status_t galera::MM::async_recv(void* recv_ctx)
+wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 {
     assert(recv_ctx != 0);
     if (state_() == S_CLOSED || state_() == S_CLOSING)
@@ -330,13 +330,13 @@ wsrep_status_t galera::MM::async_recv(void* recv_ctx)
 }
 
 galera::TrxHandle*
-galera::MM::local_trx(wsrep_trx_id_t trx_id)
+galera::ReplicatorSMM::local_trx(wsrep_trx_id_t trx_id)
 {
     return wsdb_.get_trx(uuid_, trx_id, false);
 }
 
 galera::TrxHandle*
-galera::MM::local_trx(wsrep_trx_handle_t* handle, bool create)
+galera::ReplicatorSMM::local_trx(wsrep_trx_handle_t* handle, bool create)
 {
     TrxHandle* trx;
     assert(handle != 0);
@@ -356,38 +356,38 @@ galera::MM::local_trx(wsrep_trx_handle_t* handle, bool create)
 }
 
 
-void galera::MM::unref_local_trx(TrxHandle* trx)
+void galera::ReplicatorSMM::unref_local_trx(TrxHandle* trx)
 {
     wsdb_.unref_trx(trx);
 }
 
-void galera::MM::discard_local_trx(wsrep_trx_id_t trx_id)
+void galera::ReplicatorSMM::discard_local_trx(wsrep_trx_id_t trx_id)
 {
     wsdb_.discard_trx(trx_id);
 }
 
 
 galera::TrxHandle*
-galera::MM::local_conn_trx(wsrep_conn_id_t conn_id, bool create)
+galera::ReplicatorSMM::local_conn_trx(wsrep_conn_id_t conn_id, bool create)
 {
     return wsdb_.get_conn_query(uuid_, conn_id, create);
 }
 
 
-void galera::MM::set_default_context(wsrep_conn_id_t conn_id,
+void galera::ReplicatorSMM::set_default_context(wsrep_conn_id_t conn_id,
                                      const void* ctx, size_t ctx_len)
 {
     wsdb_.set_conn_database(conn_id, ctx, ctx_len);
 }
 
 
-void galera::MM::discard_local_conn(wsrep_conn_id_t conn_id)
+void galera::ReplicatorSMM::discard_local_conn(wsrep_conn_id_t conn_id)
 {
     wsdb_.discard_conn(conn_id);
 }
 
 
-wsrep_status_t galera::MM::process_trx_ws(void* recv_ctx,
+wsrep_status_t galera::ReplicatorSMM::process_trx_ws(void* recv_ctx,
                                           TrxHandle* trx)
 {
     assert(trx != 0);
@@ -434,7 +434,7 @@ wsrep_status_t galera::MM::process_trx_ws(void* recv_ctx,
 }
 
 
-wsrep_status_t galera::MM::process_conn_ws(void* recv_ctx, TrxHandle* trx)
+wsrep_status_t galera::ReplicatorSMM::process_conn_ws(void* recv_ctx, TrxHandle* trx)
 {
     assert(trx != 0);
     assert(trx->global_seqno() > 0);
@@ -476,7 +476,7 @@ wsrep_status_t galera::MM::process_conn_ws(void* recv_ctx, TrxHandle* trx)
 }
 
 
-wsrep_status_t galera::MM::replicate(TrxHandle* trx)
+wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
 {
     if (state_() < S_JOINED) return WSREP_TRX_FAIL;
 
@@ -563,7 +563,7 @@ wsrep_status_t galera::MM::replicate(TrxHandle* trx)
 }
 
 
-wsrep_status_t galera::MM::abort(TrxHandle* trx)
+wsrep_status_t galera::ReplicatorSMM::abort(TrxHandle* trx)
 {
     assert(trx != 0);
     assert(trx->is_local() == true);
@@ -626,7 +626,7 @@ wsrep_status_t galera::MM::abort(TrxHandle* trx)
 }
 
 
-wsrep_status_t galera::MM::pre_commit(TrxHandle* trx)
+wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle* trx)
 {
     if (state_() < S_JOINED) return WSREP_TRX_FAIL;
 
@@ -682,7 +682,7 @@ wsrep_status_t galera::MM::pre_commit(TrxHandle* trx)
     return retval;
 }
 
-wsrep_status_t galera::MM::replay(TrxHandle* trx, void* trx_ctx)
+wsrep_status_t galera::ReplicatorSMM::replay(TrxHandle* trx, void* trx_ctx)
 {
     assert(trx->state() == TrxHandle::S_MUST_CERT_AND_REPLAY ||
            trx->state() == TrxHandle::S_MUST_REPLAY);
@@ -733,7 +733,7 @@ wsrep_status_t galera::MM::replay(TrxHandle* trx, void* trx_ctx)
 }
 
 
-wsrep_status_t galera::MM::post_commit(TrxHandle* trx)
+wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
 {
     assert(trx->state() == TrxHandle::S_APPLYING ||
            trx->state() == TrxHandle::S_REPLAYED);
@@ -748,7 +748,7 @@ wsrep_status_t galera::MM::post_commit(TrxHandle* trx)
 }
 
 
-wsrep_status_t galera::MM::post_rollback(TrxHandle* trx)
+wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandle* trx)
 {
     assert(trx->state() == TrxHandle::S_ABORTING ||
            trx->state() == TrxHandle::S_EXECUTING);
@@ -761,13 +761,13 @@ wsrep_status_t galera::MM::post_rollback(TrxHandle* trx)
 }
 
 
-wsrep_status_t galera::MM::causal_read(wsrep_seqno_t* seqno) const
+wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno) const
 {
     return WSREP_NOT_IMPLEMENTED;
 }
 
 
-wsrep_status_t galera::MM::to_isolation_begin(TrxHandle* trx)
+wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle* trx)
 {
     assert(trx->state() == TrxHandle::S_REPLICATED);
     assert(trx->trx_id() == static_cast<wsrep_trx_id_t>(-1));
@@ -812,7 +812,7 @@ wsrep_status_t galera::MM::to_isolation_begin(TrxHandle* trx)
 }
 
 
-wsrep_status_t galera::MM::to_isolation_end(TrxHandle* trx)
+wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandle* trx)
 {
     assert(trx->state() == TrxHandle::S_APPLYING);
 
@@ -830,7 +830,7 @@ wsrep_status_t galera::MM::to_isolation_end(TrxHandle* trx)
 
 
 wsrep_status_t
-galera::MM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
+galera::ReplicatorSMM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
 {
     if (state_() != S_DONOR)
     {
@@ -860,7 +860,7 @@ galera::MM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
 
 
 wsrep_status_t
-galera::MM::sst_received(const wsrep_uuid_t& uuid,
+galera::ReplicatorSMM::sst_received(const wsrep_uuid_t& uuid,
                          wsrep_seqno_t seqno,
                          const void* state,
                          size_t state_len)
@@ -879,7 +879,7 @@ galera::MM::sst_received(const wsrep_uuid_t& uuid,
 }
 
 
-void galera::MM::store_state(const std::string& file) const
+void galera::ReplicatorSMM::store_state(const std::string& file) const
 {
     std::ofstream fs(file.c_str(), std::ios::trunc);
     if (fs.fail() == true)
@@ -893,7 +893,7 @@ void galera::MM::store_state(const std::string& file) const
     fs << "cert_index:\n";
 }
 
-void galera::MM::restore_state(const std::string& file)
+void galera::ReplicatorSMM::restore_state(const std::string& file)
 {
     std::ifstream fs(file.c_str());
     if (fs.fail() == true)
@@ -944,7 +944,7 @@ void galera::MM::restore_state(const std::string& file)
 }
 
 
-void galera::MM::invalidate_state(const std::string& file) const
+void galera::ReplicatorSMM::invalidate_state(const std::string& file) const
 {
     std::ofstream fs(file.c_str(), std::ios::trunc);
     if (fs.fail() == true)
@@ -973,43 +973,43 @@ static const char* status_str[GALERA_STAGE_MAX] =
     "SST failed (-)",
 };
 
-static wsrep_member_status_t state2status(galera::MM::State state)
+static wsrep_member_status_t state2status(galera::ReplicatorSMM::State state)
 {
-    using galera::MM;
+//    using galera::ReplicatorSMM;
     switch (state)
     {
-    case galera::MM::S_CLOSED: return WSREP_MEMBER_EMPTY;
-    case galera::MM::S_CLOSING: return WSREP_MEMBER_EMPTY;
-    case galera::MM::S_JOINING: return WSREP_MEMBER_JOINER;
-    case galera::MM::S_JOINED: return WSREP_MEMBER_JOINED;
-    case galera::MM::S_SYNCED: return WSREP_MEMBER_SYNCED;
-    case galera::MM::S_DONOR: return WSREP_MEMBER_DONOR;
+    case galera::ReplicatorSMM::S_CLOSED  : return WSREP_MEMBER_EMPTY;
+    case galera::ReplicatorSMM::S_CLOSING : return WSREP_MEMBER_EMPTY;
+    case galera::ReplicatorSMM::S_JOINING : return WSREP_MEMBER_JOINER;
+    case galera::ReplicatorSMM::S_JOINED  : return WSREP_MEMBER_JOINED;
+    case galera::ReplicatorSMM::S_SYNCED  : return WSREP_MEMBER_SYNCED;
+    case galera::ReplicatorSMM::S_DONOR   : return WSREP_MEMBER_DONOR;
     }
     gu_throw_fatal << "invalid state " << state;
     throw;
 }
 
-static const char* state2status_str(galera::MM::State state,
-                                    galera::MM::SstState sst_state)
+static const char* state2status_str(galera::ReplicatorSMM::State state,
+                                    galera::ReplicatorSMM::SstState sst_state)
 {
-    using galera::MM;
+    using galera::ReplicatorSMM;
     switch (state)
     {
-    case galera::MM::S_CLOSED:
-    case galera::MM::S_CLOSING:
+    case galera::ReplicatorSMM::S_CLOSED :
+    case galera::ReplicatorSMM::S_CLOSING:
     {
-        if (sst_state == MM::SST_REQ_FAILED)  return status_str[8];
-        else if (sst_state == MM::SST_FAILED) return status_str[9];
-        else                                  return status_str[0];
+        if (sst_state == ReplicatorSMM::SST_REQ_FAILED)  return status_str[8];
+        else if (sst_state == ReplicatorSMM::SST_FAILED) return status_str[9];
+        else                                             return status_str[0];
     }
-    case galera::MM::S_JOINING:
+    case galera::ReplicatorSMM::S_JOINING:
     {
-        if (sst_state == MM::SST_WAIT) return status_str[4];
-        else                           return status_str[1];
+        if (sst_state == ReplicatorSMM::SST_WAIT) return status_str[4];
+        else                                      return status_str[1];
     }
-    case galera::MM::S_JOINED: return status_str[5];
-    case galera::MM::S_SYNCED: return status_str[6];
-    case galera::MM::S_DONOR: return status_str[7];
+    case galera::ReplicatorSMM::S_JOINED : return status_str[5];
+    case galera::ReplicatorSMM::S_SYNCED : return status_str[6];
+    case galera::ReplicatorSMM::S_DONOR  : return status_str[7];
     }
     gu_throw_fatal << "invalid state " << state;
     throw;
@@ -1052,10 +1052,10 @@ static struct wsrep_status_var wsrep_status[STATUS_MAX + 1] =
     {"local_replays",       WSREP_STATUS_INT64,  { 0 }                      },
     {"local_slave_queue",   WSREP_STATUS_INT64,  { 0 }                      },
     {"flow_control_waits",  WSREP_STATUS_INT64,  { 0 }                      },
-    {"cert_deps_distance",  WSREP_STATUS_DOUBLE, { 0}                       },
-    {"apply_oooe",          WSREP_STATUS_DOUBLE, { 0}                       },
-    {"apply_oool",          WSREP_STATUS_DOUBLE, { 0}                       },
-    {"apply_window",        WSREP_STATUS_DOUBLE, { 0}                       },
+    {"cert_deps_distance",  WSREP_STATUS_DOUBLE, { 0 }                      },
+    {"apply_oooe",          WSREP_STATUS_DOUBLE, { 0 }                      },
+    {"apply_oool",          WSREP_STATUS_DOUBLE, { 0 }                      },
+    {"apply_window",        WSREP_STATUS_DOUBLE, { 0 }                      },
     {"local_status",        WSREP_STATUS_INT64,  { 0 }                      },
     {"local_status_comment",WSREP_STATUS_STRING, { 0 }                      },
     {0, WSREP_STATUS_STRING, { 0 }}
@@ -1072,7 +1072,7 @@ static void build_status_vars(std::vector<struct wsrep_status_var>& status)
     while (ptr++->name != 0);
 }
 
-const struct wsrep_status_var* galera::MM::status() const
+const struct wsrep_status_var* galera::ReplicatorSMM::status() const
 {
     std::vector<struct wsrep_status_var>&
         sv(const_cast<std::vector<struct wsrep_status_var>& >(wsrep_status_));
@@ -1123,7 +1123,7 @@ const struct wsrep_status_var* galera::MM::status() const
 //////////////////////////////////////////////////////////////////////
 
 
-wsrep_status_t galera::MM::cert(TrxHandle* trx)
+wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
 {
     assert(trx->state() == TrxHandle::S_REPLICATED ||
            trx->state() == TrxHandle::S_MUST_CERT_AND_REPLAY);
@@ -1173,7 +1173,7 @@ wsrep_status_t galera::MM::cert(TrxHandle* trx)
 }
 
 
-wsrep_status_t galera::MM::cert_for_aborted(TrxHandle* trx)
+wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(TrxHandle* trx)
 {
     wsrep_status_t retval(WSREP_OK);
     switch (cert_.test(trx, false))
@@ -1190,7 +1190,7 @@ wsrep_status_t galera::MM::cert_for_aborted(TrxHandle* trx)
     return retval;
 }
 
-void galera::MM::report_last_committed()
+void galera::ReplicatorSMM::report_last_committed()
 {
     size_t i(report_counter_.fetch_and_add(1));
     if (i % report_interval_ == 0)
@@ -1198,7 +1198,7 @@ void galera::MM::report_last_committed()
 }
 
 
-wsrep_status_t galera::MM::process_global_action(void* recv_ctx,
+wsrep_status_t galera::ReplicatorSMM::process_global_action(void* recv_ctx,
                                                  const void* act,
                                                  size_t act_size,
                                                  wsrep_seqno_t seqno_l,
@@ -1240,7 +1240,7 @@ wsrep_status_t galera::MM::process_global_action(void* recv_ctx,
 
 
 
-wsrep_status_t galera::MM::request_sst(wsrep_uuid_t const& group_uuid,
+wsrep_status_t galera::ReplicatorSMM::request_sst(wsrep_uuid_t const& group_uuid,
                                        wsrep_seqno_t const group_seqno,
                                        const void* req, size_t req_len)
 {
@@ -1318,7 +1318,7 @@ wsrep_status_t galera::MM::request_sst(wsrep_uuid_t const& group_uuid,
 }
 
 
-bool galera::MM::st_required(const gcs_act_conf_t& conf)
+bool galera::ReplicatorSMM::st_required(const gcs_act_conf_t& conf)
 {
     bool retval(conf.my_state == GCS_NODE_STATE_PRIM);
     const wsrep_uuid_t* group_uuid(
@@ -1356,7 +1356,7 @@ bool galera::MM::st_required(const gcs_act_conf_t& conf)
 }
 
 
-wsrep_status_t galera::MM::process_conf(void* recv_ctx,
+wsrep_status_t galera::ReplicatorSMM::process_conf(void* recv_ctx,
                                         const gcs_act_conf_t* conf)
 {
     assert(conf != 0);
@@ -1434,7 +1434,7 @@ wsrep_status_t galera::MM::process_conf(void* recv_ctx,
 }
 
 
-wsrep_status_t galera::MM::process_to_action(void* recv_ctx,
+wsrep_status_t galera::ReplicatorSMM::process_to_action(void* recv_ctx,
                                              const void* act,
                                              size_t act_size,
                                              gcs_act_type_t act_type,
@@ -1482,7 +1482,7 @@ wsrep_status_t galera::MM::process_to_action(void* recv_ctx,
 
 
 
-wsrep_status_t galera::MM::dispatch(void* recv_ctx,
+wsrep_status_t galera::ReplicatorSMM::dispatch(void* recv_ctx,
                                     const void* act,
                                     size_t act_size,
                                     gcs_act_type_t act_type,
