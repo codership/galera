@@ -1321,13 +1321,13 @@ wsrep_status_t galera::MM::request_sst(wsrep_uuid_t const& group_uuid,
 bool galera::MM::st_required(const gcs_act_conf_t& conf)
 {
     bool retval(conf.my_state == GCS_NODE_STATE_PRIM);
-    const wsrep_uuid_t group_uuid(
-        *reinterpret_cast<const wsrep_uuid_t*>(conf.group_uuid));
+    const wsrep_uuid_t* group_uuid(
+        reinterpret_cast<const wsrep_uuid_t*>(conf.group_uuid));
 
     if (retval == true)
     {
         assert(conf.conf_id >= 0);
-        if (state_uuid_ == group_uuid)
+        if (state_uuid_ == *group_uuid)
         {
             // common history
             if (state_() >= S_JOINED)
@@ -1363,9 +1363,8 @@ wsrep_status_t galera::MM::process_conf(void* recv_ctx,
 
     bool st_req(st_required(*conf));
     const wsrep_seqno_t group_seqno(conf->seqno);
-    const wsrep_uuid_t group_uuid(
-        *reinterpret_cast<const wsrep_uuid_t*>(conf->group_uuid));
-
+    const wsrep_uuid_t* group_uuid(
+        reinterpret_cast<const wsrep_uuid_t*>(conf->group_uuid));
     wsrep_view_info_t* view_info(galera_view_info_create(conf, st_req));
 
     uuid_ = view_info->members[view_info->my_idx].id;
@@ -1385,14 +1384,14 @@ wsrep_status_t galera::MM::process_conf(void* recv_ctx,
 
         if (st_req == true)
         {
-            retval = request_sst(group_uuid, group_seqno, app_req, app_req_len);
+            retval = request_sst(*group_uuid, group_seqno, app_req, app_req_len);
         }
         else
         {
             // sanity checks here
             if (conf->conf_id == 1)
             {
-                state_uuid_ = group_uuid;
+                state_uuid_ = *group_uuid;
                 apply_monitor_.set_initial_position(conf->seqno);
             }
 
