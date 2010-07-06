@@ -1313,71 +1313,67 @@ START_TEST(test_checksum)
 END_TEST
 
 
-static bool skip(true);
 
 Suite* pc_suite()
 {
     Suite* s = suite_create("gcomm::pc");
     TCase* tc;
 
-    if (skip == false)
-    {
-        tc = tcase_create("test_pc_messages");
-        tcase_add_test(tc, test_pc_messages);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_pc_messages");
+    tcase_add_test(tc, test_pc_messages);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_pc_view_changes_single");
-        tcase_add_test(tc, test_pc_view_changes_single);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_pc_view_changes_single");
+    tcase_add_test(tc, test_pc_view_changes_single);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_pc_view_changes_double");
-        tcase_add_test(tc, test_pc_view_changes_double);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_pc_view_changes_double");
+    tcase_add_test(tc, test_pc_view_changes_double);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_pc_view_changes_reverse");
-        tcase_add_test(tc, test_pc_view_changes_reverse);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_pc_view_changes_reverse");
+    tcase_add_test(tc, test_pc_view_changes_reverse);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_pc_state1");
-        tcase_add_test(tc, test_pc_state1);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_pc_state1");
+    tcase_add_test(tc, test_pc_state1);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_pc_state2");
-        tcase_add_test(tc, test_pc_state2);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_pc_state2");
+    tcase_add_test(tc, test_pc_state2);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_pc_state3");
-        tcase_add_test(tc, test_pc_state3);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_pc_state3");
+    tcase_add_test(tc, test_pc_state3);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_pc_conflicting_prims");
-        tcase_add_test(tc, test_pc_conflicting_prims);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_pc_conflicting_prims");
+    tcase_add_test(tc, test_pc_conflicting_prims);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_pc_split_merge");
-        tcase_add_test(tc, test_pc_split_merge);
-        tcase_set_timeout(tc, 15);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_pc_split_merge");
+    tcase_add_test(tc, test_pc_split_merge);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_pc_split_merge_w_user_msg");
-        tcase_add_test(tc, test_pc_split_merge_w_user_msg);
-        tcase_set_timeout(tc, 15);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_pc_split_merge_w_user_msg");
+    tcase_add_test(tc, test_pc_split_merge_w_user_msg);
+    tcase_set_timeout(tc, 15);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_pc_complete_split_merge");
-        tcase_add_test(tc, test_pc_complete_split_merge);
-        tcase_set_timeout(tc, 25);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_pc_complete_split_merge");
+    tcase_add_test(tc, test_pc_complete_split_merge);
+    tcase_set_timeout(tc, 25);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_pc_transport");
-        tcase_add_test(tc, test_pc_transport);
-        tcase_set_timeout(tc, 35);
-        suite_add_tcase(s, tc);
+    tc = tcase_create("test_pc_transport");
+    tcase_add_test(tc, test_pc_transport);
+    tcase_set_timeout(tc, 35);
+    suite_add_tcase(s, tc);
 
-        tc = tcase_create("test_trac_191");
-        tcase_add_test(tc, test_trac_191);
-        suite_add_tcase(s, tc);
-    }
+    tc = tcase_create("test_trac_191");
+    tcase_add_test(tc, test_trac_191);
+    suite_add_tcase(s, tc);
 
     tc = tcase_create("test_fifo_violation");
     tcase_add_test(tc, test_fifo_violation);

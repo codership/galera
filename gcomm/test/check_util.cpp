@@ -6,6 +6,8 @@
 #include "histogram.hpp"
 #include "gcomm/protonet.hpp"
 
+// ASIO test disabled temporarily
+#undef GALERA_USE_BOOST_ASIO
 #ifdef GALERA_USE_BOOST_ASIO
 #include "asio.hpp"
 #endif // GALERA_USE_BOOST_ASIO
@@ -53,7 +55,7 @@ START_TEST(test_histogram)
 END_TEST
 
 
-#ifdef GALERA_USE_BOOST_ASIO
+#if defined(GALERA_USE_BOOST_ASIO)
 START_TEST(test_asio)
 {
     asio::Protonet pn;

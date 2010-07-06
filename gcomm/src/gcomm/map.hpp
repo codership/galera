@@ -194,7 +194,7 @@ namespace gcomm
     template <typename K, typename V>
     std::ostream& operator<<(std::ostream& os, const std::pair<K, V>& p)
     {
-        return (os << p.first << "," << p.second);
+        return (os << "\t" << p.first << "," << p.second << "\n");
     }
     
     template <typename K, typename V, typename C>

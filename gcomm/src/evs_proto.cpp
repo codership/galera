@@ -210,7 +210,7 @@ ostream& gcomm::evs::operator<<(ostream& os, const Proto& p)
     os << "input_map=" << *p.input_map << ",\n";
     os << "fifo_seq=" << p.fifo_seq << ",\n";
     os << "last_sent=" << p.last_sent << ",\n";
-    os << "known={ " << p.known << " } \n";
+    os << "known={\n" << p.known << " } \n";
     if (p.install_message != 0)
         os << "install msg=" << p.install_message << "\n";
     os << " }";
@@ -425,7 +425,7 @@ void gcomm::evs::Proto::handle_install_timer()
     {
         log_info << "no install message received";
     }
-
+    log_debug << "state dump: " << *this;
     shift_to(S_GATHER, true);
 }
 
@@ -2920,6 +2920,21 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                 gu_trace(send_leave(false));
                 profile_leave(send_leave_prof);
             }
+            for (NodeMap::const_iterator i = known.begin(); i != known.end();
+                 ++i)
+            {
+                const UUID& uuid(NodeMap::get_key(i));
+                const Node& node(NodeMap::get_value(i));
+                if (current_view.is_member(uuid) == true)
+                {
+                    const Range r(input_map->get_range(node.get_index()));
+                    if (r.get_lu() <= last_sent)
+                    {
+                        send_gap(uuid, current_view.get_id(),
+                                 Range(r.get_lu(), last_sent));
+                    }
+                }
+            }
             profile_leave(input_map_prof);
         }
         return;
@@ -3026,7 +3041,8 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         const Range im_range(input_map->get_range(local_node.get_index()));
 
         if (local_node.get_operational() == false  &&
-            im_range.get_lu()            >  min_lu)
+            im_range.get_lu()            >  min_lu &&
+            min_lu                       <= max_hs)
         {
             // gcomm_assert(im_range.get_hs() <= max_hs);
             gu_trace(recover(msg.get_source(), min_lu_uuid,

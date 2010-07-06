@@ -19,11 +19,11 @@ ostream& gcomm::evs::operator<<(ostream& os, const Node& n)
     os << "fifo_seq=" << n.get_fifo_seq() << ",";
     if (n.get_join_message() != 0)
     {
-        os << "join_message=" << *n.get_join_message() << ",";
+        os << "join_message=\n" << *n.get_join_message() << ",\n";
     }
     if (n.get_leave_message() != 0)
     {
-        os << "leave_message=" << *n.get_leave_message() << ",";
+        os << "leave_message=\n" << *n.get_leave_message() << ",\n";
     }
     os << "}";
     return os;
