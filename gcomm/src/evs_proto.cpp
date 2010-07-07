@@ -2011,8 +2011,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
     {
         gcomm_assert(output.empty() == true);
         gcomm_assert(install_message != 0);
-        assert(consensus.is_consistent(*install_message));
-        assert(consensus.is_consistent_same_view(*install_message));
+        gcomm_assert(consensus.is_consistent(*install_message));
         gcomm_assert(is_all_installed() == true);
         gu_trace(deliver());
         gu_trace(deliver_trans_view(false));
