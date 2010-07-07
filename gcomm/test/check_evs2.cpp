@@ -1366,14 +1366,14 @@ Suite* evs2_suite()
 
     tc = tcase_create("test_proto_leave_n_lossy");
     tcase_add_test(tc, test_proto_leave_n_lossy);
-    tcase_set_timeout(tc, 5);
+    tcase_set_timeout(tc, 25);
     suite_add_tcase(s, tc);
 
     if (skip == false)
     {
         tc = tcase_create("test_proto_leave_n_lossy_w_user_msg");
         tcase_add_test(tc, test_proto_leave_n_lossy_w_user_msg);
-        tcase_set_timeout(tc, 20);
+        tcase_set_timeout(tc, 25);
         suite_add_tcase(s, tc);
 
 
@@ -1399,6 +1399,7 @@ Suite* evs2_suite()
 
         tc = tcase_create("test_proto_stop_cont");
         tcase_add_test(tc, test_proto_stop_cont);
+        tcase_set_timeout(tc, 10);
         suite_add_tcase(s, tc);
 
         tc = tcase_create("test_proto_split_two");

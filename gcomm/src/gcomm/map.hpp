@@ -5,8 +5,8 @@
 /*!
  * @file map.hpp
  *
- * This file contains templates that are thin wrappers for std::map 
- * and std::multimap with some extra functionality. 
+ * This file contains templates that are thin wrappers for std::map
+ * and std::multimap with some extra functionality.
  */
 
 #ifndef GCOMM_MAP_HPP
@@ -41,17 +41,17 @@ namespace gcomm
 
         MapType map;
     public:
-        
+
         MapBase() : map() {}
-        
+
         virtual ~MapBase() {}
-        
+
         iterator begin()          { return map.begin(); }
-        
+
         iterator end()            { return map.end();   }
 
         iterator find(const K& k) { return map.find(k); }
-        
+
         iterator find_checked(const K& k)
         {
             iterator ret = map.find(k);
@@ -61,20 +61,20 @@ namespace gcomm
             }
             return ret;
         }
-        
+
         iterator lower_bound(const K& k) { return map.lower_bound(k); }
-        
+
         const_iterator begin()          const { return map.begin(); }
 
         const_iterator end()            const { return map.end();   }
 
         const_reverse_iterator rbegin()         const { return map.rbegin(); }
-        
+
         const_reverse_iterator rend()           const { return map.rend(); }
-        
+
         const_iterator find(const K& k) const { return map.find(k); }
-        
-        const_iterator find_checked(const K& k) const 
+
+        const_iterator find_checked(const K& k) const
         {
             const_iterator ret = map.find(k);
             if (ret == map.end())
@@ -83,9 +83,9 @@ namespace gcomm
             }
             return ret;
         }
-        
+
         mapped_type& operator[](const key_type& k) { return map[k]; }
-    
+
         void erase(iterator i) { map.erase(i); }
 
         void erase(iterator i, iterator j) { map.erase(i, j); }
@@ -93,13 +93,13 @@ namespace gcomm
         void erase(const K& k) { map.erase(k); }
 
         void clear()           { map.clear(); }
-    
+
         size_t size() const    { return map.size(); }
 
         bool empty() const     { return map.empty(); }
 
         size_t serialize(gu::byte_t* const buf,
-                         size_t  const buflen, 
+                         size_t  const buflen,
                          size_t        offset) const
             throw (gu::Exception)
         {
@@ -112,18 +112,18 @@ namespace gcomm
             }
             return offset;
         }
-        
-        size_t unserialize(const gu::byte_t* buf, 
-                           size_t const  buflen, 
+
+        size_t unserialize(const gu::byte_t* buf,
+                           size_t const  buflen,
                            size_t        offset)
             throw (gu::Exception)
         {
             uint32_t len;
             // Clear map in case this object is reused
             map.clear();
-            
+
             gu_trace(offset = gcomm::unserialize(buf, buflen, offset, &len));;
-            
+
             for (uint32_t i = 0; i < len; ++i)
             {
                 K k;
@@ -137,12 +137,12 @@ namespace gcomm
             }
             return offset;
         }
-        
+
         size_t serial_size() const
         {
             return sizeof(uint32_t) + size()*(K::serial_size() + V::serial_size());
         }
-        
+
         bool operator==(const MapBase& other) const
         {
             return (map == other.map);
@@ -152,7 +152,7 @@ namespace gcomm
         {
             return !(map == other.map);
         }
-        
+
         static const K& get_key(const_iterator i)
         {
             return i->first;
@@ -177,7 +177,7 @@ namespace gcomm
         {
             return vt.first;
         }
-        
+
         static V& get_value(value_type& vt)
         {
             return vt.second;
@@ -188,23 +188,23 @@ namespace gcomm
             return vt.second;
         }
     };
-    
-    // @todo For some reason map key must be declared in gcomm namespace 
+
+    // @todo For some reason map key must be declared in gcomm namespace
     //       in order this to work. Find out the reason why and fix.
     template <typename K, typename V>
     std::ostream& operator<<(std::ostream& os, const std::pair<K, V>& p)
     {
         return (os << "\t" << p.first << "," << p.second << "\n");
     }
-    
+
     template <typename K, typename V, typename C>
     std::ostream& operator<<(std::ostream& os, const MapBase<K, V, C>& map)
     {
         std::copy(map.begin(), map.end(),
-                  std::ostream_iterator<const std::pair<const K, V> >(os, " "));
+                  std::ostream_iterator<const std::pair<const K, V> >(os, ""));
         return os;
     }
-    
+
 
     template <typename K, typename V, typename C = std::map<K, V> >
     class Map : public MapBase<K, V, C>
@@ -215,13 +215,13 @@ namespace gcomm
         {
             return MapBase<K, V, C>::map.insert(p);
         }
-        
+
         iterator insert_unique(const typename MapBase<K, V, C>::value_type& p)
         {
             std::pair<iterator, bool> ret = MapBase<K, V, C>::map.insert(p);
             if (false == ret.second)
             {
-                gu_throw_fatal << "duplicate entry " 
+                gu_throw_fatal << "duplicate entry "
                                << "key=" << get_key(p) << " "
                                << "value=" << get_value(p) << " "
                                << "map=" << *this;
@@ -233,7 +233,7 @@ namespace gcomm
 
 
 
-    
+
     template <typename K, typename V, typename C = std::multimap<K, V> >
     class MultiMap : public MapBase<K, V, C>
     {
@@ -247,12 +247,12 @@ namespace gcomm
         {
             return MapBase<K, V, C>::map.insert(p);
         }
-        
+
         iterator insert(iterator position, const value_type& vt)
         {
             return MapBase<K, V, C>::map.insert(position, vt);
         }
-        
+
         std::pair<const_iterator, const_iterator> equal_range(const K& k) const
         {
             return MapBase<K, V, C>::map.equal_range(k);

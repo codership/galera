@@ -1244,6 +1244,8 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
         }
         gu_trace((void)node_list->insert_unique(make_pair(uuid, mnode)));
     }
+
+    evs_log_debug(D_CONSENSUS) << "populate node list:\n" << *node_list;
 }
 
 const JoinMessage& gcomm::evs::Proto::create_join()
@@ -2008,8 +2010,9 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
     case S_OPERATIONAL:
     {
         gcomm_assert(output.empty() == true);
-        gcomm_assert(install_message != 0 &&
-                     consensus.is_consistent(*install_message) == true);
+        gcomm_assert(install_message != 0);
+        assert(consensus.is_consistent(*install_message));
+        assert(consensus.is_consistent_same_view(*install_message));
         gcomm_assert(is_all_installed() == true);
         gu_trace(deliver());
         gu_trace(deliver_trans_view(false));
@@ -2294,7 +2297,29 @@ void gcomm::evs::Proto::deliver_trans()
 
         if (deliver == true)
         {
-            deliver_finish(msg);
+            if (install_message != 0)
+            {
+                const MessageNode& mn(
+                    MessageNodeList::get_value(
+                        install_message->get_node_list().find_checked(
+                            msg.get_msg().get_source())));
+                if (msg.get_msg().get_seq() <= mn.get_im_range().get_hs())
+                {
+                    deliver_finish(msg);
+                }
+                else
+                {
+                    gcomm_assert(mn.get_operational() == false);
+                    log_info << "filtering out trans message higher than "
+                             << "install message hs "
+                             << mn.get_im_range().get_hs()
+                             << ": " << msg.get_msg();
+                }
+            }
+            else
+            {
+                deliver_finish(msg);
+            }
             gu_trace(input_map->erase(i));
         }
     }
@@ -2536,7 +2561,8 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     if (get_state()                  == S_GATHER &&
         consensus.highest_reachable_safe_seq() == input_map->get_aru_seq() &&
         (prev_aru                    != input_map->get_aru_seq() ||
-         prev_safe                   != input_map->get_safe_seq()))
+         prev_safe                   != input_map->get_safe_seq()) &&
+        (msg.get_flags() & Message::F_RETRANS) == 0)
     {
         gcomm_assert(output.empty() == true);
         if (consensus.is_consensus() == false)
@@ -2670,6 +2696,12 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     //
     if (msg.get_range_uuid() == get_uuid())
     {
+        if (msg.get_range().get_hs() > last_sent)
+        {
+            // This could be leaving node requesting messages up to
+            // its last sent.
+            gu_trace(complete_user(msg.get_range().get_hs()));
+        }
         gu_trace(resend(msg.get_source(), msg.get_range()));
     }
 
@@ -2744,6 +2776,38 @@ bool gcomm::evs::Proto::update_im_safe_seqs(const MessageNodeList& node_list)
     return updated;
 }
 
+
+void gcomm::evs::Proto::retrans_user(const UUID& nl_uuid,
+                                     const MessageNodeList& node_list)
+{
+    for (MessageNodeList::const_iterator i = node_list.begin();
+         i != node_list.end(); ++i)
+    {
+        const UUID& uuid(MessageNodeList::get_key(i));
+        const MessageNode& mn(MessageNodeList::get_value(i));
+        const Node& n(NodeMap::get_value(known.find_checked(uuid)));
+        const Range r(input_map->get_range(n.get_index()));
+
+        if (uuid == get_uuid() &&
+            mn.get_im_range().get_lu() != r.get_lu())
+        {
+            // Source member is missing messages from us
+            gcomm_assert(mn.get_im_range().get_hs() <= last_sent);
+            gu_trace(resend(nl_uuid,
+                            Range(mn.get_im_range().get_lu(), last_sent)));
+        }
+        else if ((mn.get_operational() == false ||
+                  mn.get_leaving() == true) &&
+                 uuid != get_uuid() &&
+                 (mn.get_im_range().get_lu() < r.get_lu() ||
+                  mn.get_im_range().get_hs() < r.get_hs()))
+        {
+            gu_trace(recover(nl_uuid, uuid,
+                             Range(mn.get_im_range().get_lu(),
+                                   r.get_hs())));
+        }
+    }
+}
 
 void gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
 {
@@ -2936,6 +3000,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                 }
             }
             profile_leave(input_map_prof);
+            gu_trace(retrans_user(msg.get_source(), same_view));
         }
         return;
     }
@@ -2992,64 +3057,22 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     if (msg.get_source()         != get_uuid() &&
         msg.get_source_view_id() == current_view.get_id())
     {
+        gcomm_assert(nlself_i != same_view.end());
         // Update input map state
         (void)update_im_safe_seqs(same_view);
 
-        // See if we need to retrans some user messages
-        if (nlself_i != same_view.end())
+        // Find out max hs and complete up to that if needed
+        MessageNodeList::const_iterator max_hs_i(
+            max_element(same_view.begin(), same_view.end(), RangeHsCmp()));
+        const seqno_t max_hs(MessageNodeList::get_value(max_hs_i).get_im_range().get_hs());
+        if (last_sent < max_hs)
         {
-            const MessageNode& msg_node(MessageNodeList::get_value(nlself_i));
-            const Range mn_im_range(msg_node.get_im_range());
-            const Range im_range(
-                input_map->get_range(
-                    NodeMap::get_value(self_i).get_index()));
-            if (mn_im_range.get_lu() < mn_im_range.get_hs())
-            {
-                gu_trace(resend(msg.get_source(), mn_im_range));
-            }
-
-            if (mn_im_range.get_hs() < im_range.get_hs())
-            {
-                gu_trace(resend(msg.get_source(),
-                                Range(mn_im_range.get_hs() + 1,
-                                      im_range.get_hs())));
-            }
+            gu_trace(complete_user(max_hs));
         }
     }
 
-    // Find out max hs and complete up to that if needed
-    MessageNodeList::const_iterator max_hs_i(
-        max_element(same_view.begin(), same_view.end(), RangeHsCmp()));
-    const seqno_t max_hs(max_hs_i == same_view.end() ? -1 :
-                         MessageNodeList::get_value(max_hs_i).get_im_range().get_hs());
-    if (last_sent < max_hs)
-    {
-        gu_trace(complete_user(max_hs));
-    }
-
-    if (max_hs != -1)
-    {
-        // Find out min lu and try to recover messages if
-        // min lu uuid is not operational
-        MessageNodeList::const_iterator min_lu_i(
-            min_element(same_view.begin(), same_view.end(), RangeLuCmp()));
-        gcomm_assert(min_lu_i != same_view.end());
-        const UUID& min_lu_uuid(MessageNodeList::get_key(min_lu_i));
-        const seqno_t min_lu(MessageNodeList::get_value(min_lu_i).get_im_range().get_lu());
-        const NodeMap::const_iterator local_i(known.find_checked(min_lu_uuid));
-        const Node& local_node(NodeMap::get_value(local_i));
-        const Range im_range(input_map->get_range(local_node.get_index()));
-
-        if (local_node.get_operational() == false  &&
-            im_range.get_lu()            >  min_lu &&
-            min_lu                       <= max_hs)
-        {
-            // gcomm_assert(im_range.get_hs() <= max_hs);
-            gu_trace(recover(msg.get_source(), min_lu_uuid,
-                             Range(min_lu, max_hs)));
-        }
-    }
-
+    //
+    gu_trace(retrans_user(msg.get_source(), same_view));
     // Retrans leave messages that others are missing
     gu_trace(retrans_leaves(same_view));
 
@@ -3238,7 +3261,6 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         profile_leave(shift_to_prof);
         return;
     }
-
 
     assert(install_message == 0);
 

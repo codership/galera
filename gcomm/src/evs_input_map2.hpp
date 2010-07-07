@@ -5,12 +5,12 @@
  */
 
 /*!
- * @file Input map for EVS messaging. Provides simple interface for 
+ * @file Input map for EVS messaging. Provides simple interface for
  *       handling messages with different safety guarantees.
  *
- * @note When operating with iterators, note that evs::Message 
- *       accessed through iterator may have different sequence 
- *       number as it position dictates. Use sequence number 
+ * @note When operating with iterators, note that evs::Message
+ *       accessed through iterator may have different sequence
+ *       number as it position dictates. Use sequence number
  *       found from key part.
  *
  * @todo Fix issue in above note if feasible.
@@ -52,14 +52,14 @@ namespace gcomm
 class gcomm::InputMapMsgKey
 {
 public:
-    InputMapMsgKey(const size_t index, const evs::seqno_t seq) : 
-        index_ (index), 
-        seq_   (seq) 
+    InputMapMsgKey(const size_t index, const evs::seqno_t seq) :
+        index_ (index),
+        seq_   (seq)
     { }
-    
+
     size_t       get_index() const { return index_; }
     evs::seqno_t get_seq  () const { return seq_;   }
-    
+
     bool operator<(const InputMapMsgKey& cmp) const
     {
         return (seq_ < cmp.seq_ || (seq_ == cmp.seq_ && index_ < cmp.index_));
@@ -71,29 +71,29 @@ private:
 };
 
 
-        
+
 /* Internal message representation */
 class gcomm::evs::InputMapMsg
 {
 public:
-    InputMapMsg(const UserMessage&       msg_, 
+    InputMapMsg(const UserMessage&       msg_,
                 const gu::Datagram& rb_   ) :
         msg  (msg_ ),
         rb   (rb_  )
     { }
-    
+
     InputMapMsg(const InputMapMsg& m) :
         msg  (m.msg ),
         rb   (m.rb  )
     { }
 
     ~InputMapMsg() { }
-    
+
     const UserMessage& get_msg () const { return msg;  }
     const gu::Datagram&    get_rb  () const { return rb;   }
 private:
     void operator=(const InputMapMsg&);
-    
+
     UserMessage const msg;
     gu::Datagram rb;
 };
@@ -108,10 +108,10 @@ public:
     void unlock() {}
 };
 
-class gcomm::evs::InputMapMsgIndex : 
+class gcomm::evs::InputMapMsgIndex :
     public Map<InputMapMsgKey, InputMapMsg,
-               std::map<InputMapMsgKey, 
-                        InputMapMsg, 
+               std::map<InputMapMsgKey,
+                        InputMapMsg,
                         std::less<InputMapMsgKey>,
                         boost::fast_pool_allocator<
                             std::pair<const InputMapMsgKey, InputMapMsg>,
@@ -120,10 +120,10 @@ class gcomm::evs::InputMapMsgIndex :
 { };
 #else
 
-class gcomm::evs::InputMapMsgIndex : 
+class gcomm::evs::InputMapMsgIndex :
     public Map<InputMapMsgKey, InputMapMsg> { };
-//               std::map<InputMapMsgKey, 
-//                        InputMapMsg, 
+//               std::map<InputMapMsgKey,
+//                        InputMapMsg,
 //                        std::less<InputMapMsgKey>,
 //                        boost::fast_pool_allocator<
 //                            std::pair<const InputMapMsgKey, InputMapMsg> > > >
@@ -138,7 +138,7 @@ public:
     void   set_range     (const Range   r)       { range_     = r; }
     void   set_safe_seq  (const seqno_t s)       { safe_seq_  = s; }
     void   set_index     (const size_t  i)       { idx_       = i; }
-    
+
     Range   get_range     ()               const { return range_;     }
     seqno_t get_safe_seq  ()               const { return safe_seq_;  }
     size_t  get_index     ()               const { return idx_;       }
@@ -149,7 +149,7 @@ private:
     seqno_t safe_seq_;
 };
 
-        
+
 
 
 
@@ -159,22 +159,22 @@ private:
  */
 class gcomm::evs::InputMap
 {
-public:                
+public:
 
     /* Iterators exposed to user */
     typedef InputMapMsgIndex::iterator iterator;
     typedef InputMapMsgIndex::const_iterator const_iterator;
-            
+
     /*!
      * Default constructor.
      */
     InputMap();
-    
+
     /*!
      * Default destructor.
      */
     ~InputMap();
-            
+
     /*!
      * Get current value of aru_seq.
      *
@@ -183,12 +183,12 @@ public:
     seqno_t get_aru_seq () const { return aru_seq_;  }
 
     /*!
-     * Get current value of safe_seq. 
+     * Get current value of safe_seq.
      *
      * @return Current value of safe_seq
      */
     seqno_t get_safe_seq() const { return safe_seq_; }
-    
+
     /*!
      * Set sequence number safe for node.
      *
@@ -200,7 +200,7 @@ public:
      */
     void  set_safe_seq(const size_t uuid, const seqno_t seq)
         throw (gu::Exception);
-    
+
     /*!
      * Get current value of safe_seq for node.
      *
@@ -210,71 +210,71 @@ public:
      *
      * @throws FatalException if node was not found
      */
-    seqno_t get_safe_seq(const size_t uuid) const 
+    seqno_t get_safe_seq(const size_t uuid) const
         throw (gu::Exception)
     {
         return node_index_->at(uuid).get_safe_seq();
     }
-    
+
     /*!
      * Get current range parameter for node
      *
      * @param uuid Node uuid
-     * 
+     *
      * @return Range parameter for node
      *
      * @throws FatalException if node was not found
      */
-    Range get_range   (const size_t uuid) const 
+    Range get_range   (const size_t uuid) const
         throw (gu::Exception)
     {
         return node_index_->at(uuid).get_range();
     }
-    
+
     seqno_t get_min_hs() const
         throw (gu::Exception);
-    
+
     seqno_t get_max_hs() const
         throw (gu::Exception);
-    
+
     /*!
      * Get iterator to the beginning of the input map
      *
      * @return Iterator pointing to the first element
      */
     iterator begin() const { return msg_index_->begin(); }
-    
+
     /*!
      * Get iterator next to the last element of the input map
      *
      * @return Iterator pointing past the last element
      */
     iterator end  () const { return msg_index_->end(); }
-     
+
     /*!
      * Check if message pointed by iterator fulfills O_SAFE condition.
      *
      * @return True or false
      */
-    bool is_safe  (iterator i) const 
+    bool is_safe  (iterator i) const
         throw (gu::Exception)
     {
         const seqno_t seq(InputMapMsgIndex::get_key(i).get_seq());
         return (seq <= safe_seq_);
     }
-    
+
     /*!
      * Check if message pointed by iterator fulfills O_AGREED condition.
      *
      * @return True or false
      */
-    bool is_agreed(iterator i) const 
+    bool is_agreed(iterator i) const
         throw (gu::Exception)
     {
         const seqno_t seq(InputMapMsgIndex::get_key(i).get_seq());
         return (seq <= aru_seq_);
     }
-    
+
     /*!
      * Check if message pointed by iterator fulfills O_FIFO condition.
      *
@@ -288,7 +288,7 @@ public:
                                      InputMapMsgIndex::get_key(i).get_index()));
         return (node.get_range().get_lu() > seq);
     }
-    
+
     bool has_deliverables() const
     {
         if (msg_index_->empty() == false)
@@ -308,27 +308,27 @@ public:
             return false;
         }
     }
-    
+
     /*!
      * Insert new message into input map.
      *
      * @param uuid   Node uuid of the message source
-     * @param msg    EVS message 
+     * @param msg    EVS message
      * @param rb     ReadBuf pointer associated to message
      * @param offset Offset to the beginning of the payload
      *
      * @return Range parameter of the node
      *
-     * @throws FatalException if node not found or message sequence 
+     * @throws FatalException if node not found or message sequence
      *         number is out of allowed range
      */
-    Range insert(const size_t uuid, const UserMessage& msg, 
+    Range insert(const size_t uuid, const UserMessage& msg,
                  const gu::Datagram& dg = gu::Datagram())
         throw (gu::Exception);
-    
+
     /*!
      * Erase message pointed by iterator. Note that message may still
-     * be recovered through recover() method as long as it does not 
+     * be recovered through recover() method as long as it does not
      * fulfill O_SAFE constraint.
      *
      * @param i Iterator
@@ -337,7 +337,7 @@ public:
      */
     void erase(iterator i)
         throw (gu::Exception);
-    
+
     /*!
      * Find message.
      *
@@ -350,7 +350,7 @@ public:
      */
     iterator find(const size_t uuid, const seqno_t seq) const
         throw (gu::Exception);
-    
+
     /*!
      * Recover message.
      *
@@ -363,31 +363,31 @@ public:
      */
     iterator recover(const size_t uuid, const seqno_t seq) const
         throw (gu::Exception);
-    
+
     /*!
      *
      */
     void reset(const size_t, const seqno_t = 256)
         throw (gu::Exception);
-    
+
     /*!
      * Clear input map state.
      */
     void clear();
-    
-    
+
+
 private:
-    friend std::ostream& operator<<(std::ostream&, const InputMap&);    
+    friend std::ostream& operator<<(std::ostream&, const InputMap&);
     /* Non-copyable */
     InputMap(const InputMap&);
     void operator=(const InputMap&);
-            
-    /*! 
+
+    /*!
      * Update aru_seq value to represent current state.
      */
     void update_aru()
         throw (gu::Exception);
-            
+
     /*!
      * Clean up recovery index. All messages up to safe_seq are removed.
      */
@@ -400,7 +400,7 @@ private:
     InputMapNodeIndex* node_index_;     /*!< Index of nodes          */
     InputMapMsgIndex*  msg_index_;      /*!< Index of messages       */
     InputMapMsgIndex*  recovery_index_; /*!< Recovery index          */
-    
+
     std::vector<size_t> n_msgs_;
     size_t max_droppable_;
 };

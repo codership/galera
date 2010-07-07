@@ -59,8 +59,8 @@ public:
         safe_seq_   (safe_seq   ),
         im_range_   (im_range   )
     { }
-    
-    MessageNode(const MessageNode& mn) 
+
+    MessageNode(const MessageNode& mn)
         :
         operational_ (mn.operational_),
         suspected_   (mn.suspected_  ),
@@ -69,7 +69,7 @@ public:
         safe_seq_    (mn.safe_seq_   ),
         im_range_    (mn.im_range_   )
     { }
-    
+
     bool          get_operational() const { return operational_       ; }
     bool          get_suspected()   const { return suspected_         ; }
     bool          get_leaving()     const { return (leave_seq_ != -1) ; }
@@ -77,24 +77,24 @@ public:
     const ViewId& get_view_id()     const { return view_id_           ; }
     seqno_t       get_safe_seq()    const { return safe_seq_          ; }
     Range         get_im_range()    const { return im_range_          ; }
-    
+
     bool operator==(const MessageNode& cmp) const
     {
         return (operational_ == cmp.operational_ &&
                 suspected_   == cmp.suspected_   &&
                 leave_seq_   == cmp.leave_seq_   &&
-                view_id_     == cmp.view_id_     && 
+                view_id_     == cmp.view_id_     &&
                 safe_seq_    == cmp.safe_seq_    &&
                 im_range_    == cmp.im_range_);
     }
-    
+
     size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
         throw(gu::Exception);
     static size_t serial_size();
 private:
-    enum 
+    enum
     {
         F_OPERATIONAL = 1 << 0,
         F_SUSPECTED   = 1 << 1
@@ -107,7 +107,7 @@ private:
     Range    im_range_;        // Input map range as seen...
 };
 
-class gcomm::evs::MessageNodeList : 
+class gcomm::evs::MessageNodeList :
     public gcomm::Map<gcomm::UUID, MessageNode>
 {
 };
@@ -128,15 +128,15 @@ public:
         T_INSTALL  = 5, /*!< Install message        */
         T_LEAVE    = 6  /*!< Leave message          */
     };
-    
-    
+
+
     static const uint8_t F_MSG_MORE = 0x1; /*!< Sender has more messages to send  */
     static const uint8_t F_RETRANS   = 0x2; /*!< Message is resent upon request    */
-    
-    /*! 
+
+    /*!
      * @brief Message source has been set explicitly via set_source()
      */
-    static const uint8_t F_SOURCE   = 0x4;  
+    static const uint8_t F_SOURCE   = 0x4;
 
     static const uint8_t F_AGGREGATE = 0x8; /*!< Message contains aggregated payload */
     static const uint8_t F_COMMIT    = 0x10;
@@ -146,14 +146,14 @@ public:
      * @return Version number
      */
     uint8_t get_version() const { return version; }
-    
+
     /*!
      * Get type of the message
      *
      * @return Message type
      */
     Type get_type() const { return type; }
-    
+
     /*!
      * Check wheter message is of membership type
      *
@@ -163,22 +163,22 @@ public:
     {
         return type == T_JOIN || type == T_INSTALL || type == T_LEAVE;
     }
-    
+
     /*!
-     * Get user type of the message. This is applicable only for 
+     * Get user type of the message. This is applicable only for
      * messages of type T_USER.
      *
      * @return User type of the message.
      */
     uint8_t get_user_type() const { return user_type; }
-    
+
     /*!
      * Get message order type.
      *
      * @return Order type of the message.
      */
     Order get_order() const { return order; }
-    
+
     /*!
      * Get sequence number associated to the message.
      *
@@ -188,7 +188,7 @@ public:
 
     /*!
      * Get sequence numer range associated to the message.
-     * 
+     *
      * @return Sequence number range associated to the message.
      */
     seqno_t get_seq_range() const { return seq_range; }
@@ -199,25 +199,25 @@ public:
      * @return All-received-upto sequence number associated to the message.
      */
     seqno_t get_aru_seq() const { return aru_seq; }
-    
+
     /*!
      * Get message flags.
      *
      * @return Message flags.
      */
     uint8_t get_flags() const { return flags; }
-    
+
     /*!
      * Set message source
      *
      * @param uuid Source node uuid
      */
-    void set_source(const UUID& uuid) 
-    { 
-        source = uuid; 
+    void set_source(const UUID& uuid)
+    {
+        source = uuid;
         flags |= F_SOURCE;
     }
-    
+
     /*!
      * Get message source UUID.
      *
@@ -232,7 +232,7 @@ public:
      * @return Message source view id.
      */
     const gcomm::ViewId& get_source_view_id() const { return source_view_id; }
-    
+
     const gcomm::ViewId& get_install_view_id() const { return install_view_id; }
 
     /*!
@@ -244,13 +244,13 @@ public:
 
     /*!
      * Get range associated to the message.
-     *     
+     *
      * @return Range associated to the message.
      */
     Range get_range() const { return range; }
-    
+
     /*!
-     * Get fifo sequence number associated to the message. This is 
+     * Get fifo sequence number associated to the message. This is
      * applicable only for messages of membership type.
      *
      * @return Fifo sequence number associated to the message.
@@ -263,21 +263,21 @@ public:
      * @return Const reference to message node list.
      */
     const MessageNodeList& get_node_list() const { return node_list; }
-    
+
     /*!
      * Get timestamp associated to the message.
      */
     gu::datetime::Date get_tstamp() const { return tstamp; }
-    
+
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
         throw(gu::Exception);
-    
+
     bool operator==(const Message& cmp) const;
-    
+
     /*!
      * Copy constructor.
      */
-    
+
     Message(const Message& msg) :
         version         (msg.version),
         type            (msg.type),
@@ -361,7 +361,7 @@ protected:
         throw(gu::Exception);
 
     size_t serial_size() const;
-    
+
     uint8_t            version;
     Type               type;
     uint8_t            user_type;
@@ -378,7 +378,7 @@ protected:
     Range              range;
     gu::datetime::Date tstamp;
     MessageNodeList    node_list;
-    
+
 
 };
 
@@ -412,9 +412,9 @@ public:
                 UUID(),
                 Range())
     { }
-    
+
     void set_aru_seq(const seqno_t as) { aru_seq = as; }
-    
+
     size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
@@ -434,11 +434,11 @@ public:
         user_type_(user_type),
         len_      (gu::convert(len, uint16_t(0)))
     { }
-    
+
     int    get_flags() const { return flags_; }
     size_t get_len()   const { return len_;   }
     uint8_t get_user_type() const { return user_type_; }
-    
+
     size_t serialize(gu::byte_t* buf, size_t buflen, size_t offset) const
         throw(gu::Exception);
     size_t unserialize(const gu::byte_t* buf, size_t buflen, size_t offset)
@@ -464,10 +464,10 @@ inline std::ostream& gcomm::evs::operator<<(std::ostream& os, const AggregateMes
 class gcomm::evs::DelegateMessage : public Message
 {
 public:
-    DelegateMessage(const UUID&   source         = UUID::nil(), 
+    DelegateMessage(const UUID&   source         = UUID::nil(),
                     const ViewId& source_view_id = ViewId(),
-                    const int64_t fifo_seq       = -1) : 
-        Message(0, 
+                    const int64_t fifo_seq       = -1) :
+        Message(0,
                 T_DELEGATE,
                 source,
                 source_view_id,
@@ -494,11 +494,11 @@ public:
                const int64_t fifo_seq       = -1,
                const UUID&   range_uuid     = UUID::nil(),
                const Range   range          = Range(),
-               const uint8_t flags          = 0) : 
-        Message(0, 
+               const uint8_t flags          = 0) :
+        Message(0,
                 T_GAP,
                 source,
-                source_view_id,                
+                source_view_id,
                 ViewId(),
                 0xff,
                 O_UNRELIABLE,
@@ -523,7 +523,7 @@ class gcomm::evs::JoinMessage : public Message
 public:
     JoinMessage(const UUID&            source         = UUID::nil(),
                 const ViewId&          source_view_id = ViewId(),
-                const seqno_t            seq            = -1, 
+                const seqno_t            seq            = -1,
                 const seqno_t            aru_seq        = -1,
                 const int64_t          fifo_seq       = -1,
                 const MessageNodeList& node_list      = MessageNodeList()) :
@@ -557,7 +557,7 @@ public:
     InstallMessage(const UUID&            source          = UUID::nil(),
                    const ViewId&          source_view_id  = ViewId(),
                    const ViewId&          install_view_id = ViewId(),
-                   const seqno_t            seq             = -1, 
+                   const seqno_t            seq             = -1,
                    const seqno_t            aru_seq         = -1,
                    const int64_t          fifo_seq        = -1,
                    const MessageNodeList& node_list       = MessageNodeList()) :
@@ -619,27 +619,27 @@ public:
 class gcomm::evs::SelectNodesOp
 {
 public:
-    SelectNodesOp(MessageNodeList& nl, 
-                  const gcomm::ViewId& view_id, 
+    SelectNodesOp(MessageNodeList& nl,
+                  const gcomm::ViewId& view_id,
                   const bool operational,
                   const bool leaving)
-        : 
-        nl_          (nl), 
+        :
+        nl_          (nl),
         view_id_     (view_id),
         operational_ (operational),
         leaving_     (leaving)
     { }
-    
+
     void operator()(const MessageNodeList::value_type& vt) const
     {
         const MessageNode& node(MessageNodeList::get_value(vt));
         if ((view_id_                  == ViewId() ||
              node.get_view_id()        == view_id_    ) &&
-            ((operational_             == true          && 
+            ((operational_             == true          &&
               leaving_                 == true   ) ||
              (node.get_operational() == operational_ &&
               node.get_leaving()     == leaving_ ) ) )
-            
+
         {
             nl_.insert_unique(vt);
         }

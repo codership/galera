@@ -435,6 +435,11 @@ bool gcomm::evs::Consensus::is_consistent(const Message& msg) const
     {
         return false;
     }
+    if (msg.get_source_view_id() == current_view.get_id())
+    {
+        return (is_consistent_same_view(msg) == true &&
+                equal(msg, *my_jm) == true);
+    }
     else
     {
         return equal(msg, *my_jm);
