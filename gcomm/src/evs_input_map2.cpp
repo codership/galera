@@ -91,7 +91,7 @@ ostream& gcomm::operator<<(ostream& os, const InputMapMsgKey& mk)
 
 ostream& gcomm::evs::operator<<(ostream& os, const InputMapMsg& m)
 {
-    return os;
+    return (os << m.get_msg());
 }
 
 
@@ -283,7 +283,6 @@ gcomm::evs::InputMap::insert(const size_t uuid,
 
     // Loop over message seqno range and insert messages when not
     // already found
-
     for (seqno_t s = msg.get_seq(); s <= msg.get_seq() + msg.get_seq_range(); ++s)
     {
         InputMapMsgIndex::iterator msg_i;

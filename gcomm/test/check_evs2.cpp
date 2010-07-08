@@ -611,7 +611,7 @@ static DummyNode* create_dummy_node(size_t idx,
         + Conf::EvsConsensusTimeout + "=" + to_string(Period(inactive_timeout)*2) + "&"
         + Conf::EvsKeepalivePeriod + "=" + retrans_period + "&"
         + Conf::EvsJoinRetransPeriod + "=" + retrans_period + "&"
-        + Conf::EvsInfoLogMask + "=0x3";
+        + Conf::EvsInfoLogMask + "=0x7";
     if (::getenv("EVS_DEBUG_MASK") != 0)
     {
         conf += "&" + Conf::EvsDebugLogMask + "="
@@ -660,7 +660,7 @@ static void set_cvi(vector<DummyNode*>& nvec, size_t i_begin, size_t i_end,
 
 START_TEST(test_proto_join_n)
 {
-    log_info << "START";
+    log_info << "START (join_n)";
     init_rand();
 
     const size_t n_nodes(4);
@@ -687,7 +687,7 @@ END_TEST
 START_TEST(test_proto_join_n_w_user_msg)
 {
     gu_conf_self_tstamp_on();
-    log_info << "START";
+    log_info << "START (join_n_w_user_msg)";
     init_rand();
 
     const size_t n_nodes(4);
@@ -727,7 +727,7 @@ END_TEST
 START_TEST(test_proto_join_n_lossy)
 {
     gu_conf_self_tstamp_on();
-    log_info << "START";
+    log_info << "START (join_n_lossy)";
     init_rand();
 
     const size_t n_nodes(4);
@@ -761,7 +761,8 @@ END_TEST
 
 START_TEST(test_proto_join_n_lossy_w_user_msg)
 {
-    log_info << "START";
+    gu_conf_self_tstamp_on();
+    log_info << "START (join_n_lossy_w_user_msg)";
     init_rand();
 
     const size_t n_nodes(4);
@@ -798,7 +799,8 @@ END_TEST
 
 START_TEST(test_proto_leave_n)
 {
-    log_info << "START";
+    gu_conf_self_tstamp_on();
+    log_info << "START (leave_n)";
     init_rand();
 
     const size_t n_nodes(4);
@@ -834,7 +836,8 @@ END_TEST
 
 START_TEST(test_proto_leave_n_w_user_msg)
 {
-    log_info << "START";
+    gu_conf_self_tstamp_on();
+    log_info << "START (leave_n_w_user_msg)";
     init_rand();
 
     const size_t n_nodes(4);
@@ -877,7 +880,8 @@ END_TEST
 
 START_TEST(test_proto_leave_n_lossy)
 {
-    log_info << "START";
+    gu_conf_self_tstamp_on();
+    log_info << "START (leave_n_lossy)";
     init_rand();
     const size_t n_nodes(4);
     PropagationMatrix prop;
@@ -925,7 +929,8 @@ END_TEST
 
 START_TEST(test_proto_leave_n_lossy_w_user_msg)
 {
-    log_info << "START";
+    gu_conf_self_tstamp_on();
+    log_info << "START (leave_n_lossy_w_user_msg)";
     init_rand();
 
     const size_t n_nodes(4);
@@ -1086,7 +1091,8 @@ static void test_proto_split_merge_gen(const size_t n_nodes,
 
 START_TEST(test_proto_split_merge)
 {
-    log_info << "START";
+    gu_conf_self_tstamp_on();
+    log_info << "START (split_merge)";
     init_rand();
 
     test_proto_split_merge_gen(4, false, 1.);
@@ -1096,7 +1102,8 @@ END_TEST
 
 START_TEST(test_proto_split_merge_lossy)
 {
-    log_info << "START";
+    gu_conf_self_tstamp_on();
+    log_info << "START (split_merge_lossy)";
     init_rand();
 
     test_proto_split_merge_gen(4, false, .9);
@@ -1107,7 +1114,8 @@ END_TEST
 
 START_TEST(test_proto_split_merge_w_user_msg)
 {
-    log_info << "START";
+    gu_conf_self_tstamp_on();
+    log_info << "START (split_merge_w_user_msg)";
     init_rand();
 
     for (size_t i = 0; i < 10; ++i)
@@ -1120,7 +1128,8 @@ END_TEST
 
 START_TEST(test_proto_split_merge_lossy_w_user_msg)
 {
-    log_info << "START";
+    gu_conf_self_tstamp_on();
+    log_info << "START (split_merge_lossy_w_user_msg)";
     init_rand();
 
     test_proto_split_merge_gen(4, true, .9);

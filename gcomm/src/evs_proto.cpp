@@ -1807,14 +1807,11 @@ void gcomm::evs::Proto::handle_up(const void* cid,
 
     gcomm_assert(um.get_source() != UUID::nil());
 
-#ifdef NDEBUG
     try
     {
-#endif
         size_t offset;
         gu_trace(offset = unserialize_message(um.get_source(), rb, &msg));
         handle_msg(msg, Datagram(rb, offset));
-#ifdef NDEBUG
     }
     catch (Exception& e)
     {
@@ -1829,7 +1826,6 @@ void gcomm::evs::Proto::handle_up(const void* cid,
             throw;
         }
     }
-#endif
 }
 
 
@@ -2623,7 +2619,7 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         }
         else
         {
-            log_warn << self_string() << " unhandled commit gap " << msg;
+            evs_log_debug(D_GAP_MSGS) << " unhandled commit gap " << msg;
         }
         return;
     }
