@@ -1,7 +1,8 @@
 // Copyright (C) 2009 Codership Oy <info@codership.com>
 
-#include <string.h>
 #include "galera_info.h"
+#include <galerautils.h>
+#include <string.h>
 
 static size_t
 view_info_size (int members)
@@ -31,9 +32,12 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf,
 
         for (m = 0; m < ret->memb_num; m++) {
             wsrep_member_info_t* member = &ret->members[m];
-            snprintf ((char*)&member->id,   sizeof(wsrep_uuid_t), "%s", str);
-            str = str + strlen (str) + 1;
-            member->status          = WSREP_MEMBER_EMPTY;
+            size_t str_len = strlen(str);
+
+            gu_uuid_scan (str, str_len, (gu_uuid_t*)&member->id);
+            str = str + str_len + 1;
+
+            member->status          = WSREP_MEMBER_UNDEFINED;
             member->last_committed  = WSREP_SEQNO_UNDEFINED;
             member->slave_queue_len = WSREP_SEQNO_UNDEFINED;
             member->cpu_usage       = -1;

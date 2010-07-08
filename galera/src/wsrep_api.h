@@ -122,7 +122,7 @@ wsrep_uuid_print (const wsrep_uuid_t* uuid, char* str, size_t str_len);
  * member status
  */
 typedef enum wsrep_member_status {
-    WSREP_MEMBER_EMPTY,  //!< incomplete state
+    WSREP_MEMBER_UNDEFINED, //!< undefined state
     WSREP_MEMBER_JOINER, //!< incomplete state, requested state transfer
     WSREP_MEMBER_DONOR,  //!< complete state, donates state transfer
     WSREP_MEMBER_JOINED, //!< complete state

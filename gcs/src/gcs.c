@@ -129,7 +129,7 @@ struct gcs_conn
     /* Flow control */
     gu_mutex_t   fc_lock;
     uint32_t     conf_id;     // configuration ID
-    long         stop_sent;   // how many STOPs - CONTs were send
+    long         stop_sent;   // how many STOPs - CONTs were sent
     long         stop_count;  // counts stop requests received
     long         queue_len;   // slave queue length
     long         upper_limit; // upper slave queue limit

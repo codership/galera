@@ -978,8 +978,8 @@ static wsrep_member_status_t state2status(galera::ReplicatorSMM::State state)
 //    using galera::ReplicatorSMM;
     switch (state)
     {
-    case galera::ReplicatorSMM::S_CLOSED  : return WSREP_MEMBER_EMPTY;
-    case galera::ReplicatorSMM::S_CLOSING : return WSREP_MEMBER_EMPTY;
+    case galera::ReplicatorSMM::S_CLOSED  : return WSREP_MEMBER_UNDEFINED;
+    case galera::ReplicatorSMM::S_CLOSING : return WSREP_MEMBER_UNDEFINED;
     case galera::ReplicatorSMM::S_JOINING : return WSREP_MEMBER_JOINER;
     case galera::ReplicatorSMM::S_JOINED  : return WSREP_MEMBER_JOINED;
     case galera::ReplicatorSMM::S_SYNCED  : return WSREP_MEMBER_SYNCED;
