@@ -32,21 +32,24 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf,
 
         for (m = 0; m < ret->memb_num; m++) {
             wsrep_member_info_t* member = &ret->members[m];
-            size_t str_len = strlen(str);
 
-            gu_uuid_scan (str, str_len, (gu_uuid_t*)&member->id);
-            str = str + str_len + 1;
+            size_t id_len = strlen(str);
+            gu_uuid_scan (str, id_len, (gu_uuid_t*)&member->id);
+            str = str + id_len + 1;
+
+            strncpy(member->name, str, sizeof(member->name) - 1);
+            member->name[sizeof(member->name) - 1] = '\0';
+            str = str + strlen(str) + 1;
+
+            strncpy(member->incoming, str, sizeof(member->incoming) - 1);
+            member->incoming[sizeof(member->incoming) - 1] = '\0';
+            str = str + strlen(str) + 1;
 
             member->status          = WSREP_MEMBER_UNDEFINED;
             member->last_committed  = WSREP_SEQNO_UNDEFINED;
             member->slave_queue_len = WSREP_SEQNO_UNDEFINED;
             member->cpu_usage       = -1;
             member->load_avg        = -1;
-
-            snprintf (member->name,     sizeof(member->name),
-                      "not supported yet");
-            snprintf (member->incoming, sizeof(member->incoming),
-                      "not supported yet");
         }
     }
 

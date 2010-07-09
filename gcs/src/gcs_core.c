@@ -267,7 +267,7 @@ gcs_core_send (gcs_core_t*      const conn,
 
     core_act_t*    local_act;
 
-    /* 
+    /*
      * Action header will be replicated with every message.
      * It may seem like an extra overhead, but it is tiny
      * so far and simplifies A LOT.
@@ -301,7 +301,7 @@ gcs_core_send (gcs_core_t*      const conn,
 
 	/* Here is the only time we have to cast frg.frag */
 	memcpy ((char*)frg.frag, action, chunk_size);
-	
+
 	send_size = hdr_size + chunk_size;
 
 #ifdef GCS_CORE_TESTING
@@ -592,7 +592,7 @@ core_handle_comp_msg (gcs_core_t*          core,
 
     switch (ret) {
     case GCS_GROUP_PRIMARY:
-        /* New primary configuration. This happens if: 
+        /* New primary configuration. This happens if:
          * - this is first node in group OR
          * - some nodes disappeared no new nodes appeared
          * No need for state exchange, return new conf_act right away */
@@ -626,7 +626,7 @@ core_handle_comp_msg (gcs_core_t*          core,
                                               sizeof(uuid),
                                               GCS_MSG_STATE_UUID);
                     if (ret < 0) {
-                        // if send() failed, it means new configuration change 
+                        // if send() failed, it means new configuration change
                         // is on the way. Probably should ignore.
                         gu_warn ("Failed to send state UUID: %d (%s)",
                                  ret, strerror (-ret));
@@ -777,7 +777,7 @@ core_handle_state_msg (gcs_core_t*          core,
             // state exchange is over, create configuration action
             if (gu_mutex_lock (&core->send_lock)) abort();
             {
-                // if core is closing we do nothing    
+                // if core is closing we do nothing
                 if (CORE_CLOSED > core->state) {
                     assert (CORE_EXCHANGE == core->state);
                     switch (ret) {
@@ -895,7 +895,7 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
     *recv_act = zero_act;
     *is_local = false;
 
-    /* receive messages from group and demultiplex them 
+    /* receive messages from group and demultiplex them
      * until finally some complete action is ready */
     do
     {

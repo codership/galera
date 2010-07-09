@@ -331,22 +331,20 @@ gcs_node_state_t;
 extern const char*
 gcs_node_state_to_str (gcs_node_state_t state);
 
-/*! Member name max length (including terminating null) */
-#define GCS_MEMBER_NAME_MAX 40
-
 /*! New configuration action */
 typedef struct gcs_act_conf {
-    gcs_seqno_t      seqno;    /// last global seqno applied by this group
-    gcs_seqno_t      conf_id;  /// configuration ID (-1 if non-primary)
+    gcs_seqno_t      seqno;    //! last global seqno applied by this group
+    gcs_seqno_t      conf_id;  //! configuration ID (-1 if non-primary)
     uint8_t          group_uuid[GCS_UUID_LEN];/// group UUID
-//    bool         st_required;   /// state transfer is required (gap in seqnos)
-    long             memb_num; /// number of members in configuration
-    long             my_idx;   /// index of this node in the configuration
-    gcs_node_state_t my_state; /// current node state
-    char             data[1];   /// member array (null-terminated IDs)
+//    bool         st_required;   //! state transfer is required (gap in seqnos)
+    long             memb_num; //! number of members in configuration
+    long             my_idx;   //! index of this node in the configuration
+    gcs_node_state_t my_state; //! current node state
+    char             data[1];  /*! member array (null-terminated ID, name,
+                                *  incoming address) */
 } gcs_act_conf_t;
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 }
 #endif
 

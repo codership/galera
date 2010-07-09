@@ -29,7 +29,7 @@ struct gcs_node
 //    long             queue_len;    // action queue length on that node
     gcs_node_state_t   status;       // node status
     gcs_proto_t        proto_min;    // supported protocol versions
-    gcs_proto_t        proto_max;    // 
+    gcs_proto_t        proto_max;    //
     gcs_defrag_t       app;          // defragmenter for application actions
     gcs_defrag_t       oob;        // defragmenter for out-of-band service acts.
 

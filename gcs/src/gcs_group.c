@@ -426,7 +426,7 @@ static void group_print_state_debug(gcs_state_msg_t* state)
     size_t str_len = 1024;
     char state_str[str_len];
     gcs_state_msg_snprintf (state_str, str_len, state);
-    gu_debug ("%s", state_str);
+    gu_info ("%s", state_str);
 }
 
 gcs_group_state_t
@@ -784,11 +784,26 @@ gcs_group_handle_state_request (gcs_group_t*         group,
     return act->act.buf_len;
 }
 
+static ssize_t
+group_memb_record_size (gcs_group_t* group)
+{
+    ssize_t ret = 0;
+    long idx;
+
+    for (idx = 0; idx < group->num; idx++) {
+        ret += strlen(group->nodes[idx].id) + 1;
+        ret += strlen(group->nodes[idx].name) + 1;
+        ret += strlen(group->nodes[idx].inc_addr) + 1;
+    }
+
+    return ret;
+}
+
 /* Creates new configuration action */
 ssize_t
 gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act)
 {
-    ssize_t conf_size = sizeof(gcs_act_conf_t) + group->num*GCS_MEMBER_NAME_MAX;
+    ssize_t conf_size = sizeof(gcs_act_conf_t) + group_memb_record_size(group);
     gcs_act_conf_t* conf = malloc (conf_size);
 
     if (conf) {
@@ -809,8 +824,11 @@ gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act)
             char* ptr = &conf->data[0];
             for (idx = 0; idx < group->num; idx++)
             {
-                strncpy (ptr, group->nodes[idx].id, GCS_MEMBER_NAME_MAX);
-                ptr[GCS_MEMBER_NAME_MAX - 1] = '\0';
+                strcpy (ptr, group->nodes[idx].id);
+                ptr += strlen(ptr) + 1;
+                strcpy (ptr, group->nodes[idx].name);
+                ptr += strlen(ptr) + 1;
+                strcpy (ptr, group->nodes[idx].inc_addr);
                 ptr += strlen(ptr) + 1;
             }
         }

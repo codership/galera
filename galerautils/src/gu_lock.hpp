@@ -30,7 +30,7 @@ namespace gu
 
             int err = pthread_mutex_lock (value);
             if (err)
-	    {
+            {
                 std::string msg = "Mutex lock failed: ";
                 msg = msg + strerror(err);
                 throw Exception(msg.c_str(), err);
