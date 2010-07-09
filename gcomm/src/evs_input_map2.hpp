@@ -284,8 +284,8 @@ public:
         throw (gu::Exception)
     {
         const seqno_t seq(InputMapMsgIndex::get_key(i).get_seq());
-        const InputMapNode& node(node_index_->at(
-                                     InputMapMsgIndex::get_key(i).get_index()));
+        const InputMapNode& node((*node_index_)[
+                                     InputMapMsgIndex::get_key(i).get_index()]);
         return (node.get_range().get_lu() > seq);
     }
 

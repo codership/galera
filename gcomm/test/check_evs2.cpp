@@ -317,6 +317,7 @@ private:
 START_TEST(test_input_map_random_insert)
 {
     log_info << "START";
+    init_rand();
     seqno_t window(1024);
     seqno_t n_seqnos(1024);
     size_t n_uuids(4);
@@ -1118,10 +1119,8 @@ START_TEST(test_proto_split_merge_w_user_msg)
     log_info << "START (split_merge_w_user_msg)";
     init_rand();
 
-    for (size_t i = 0; i < 10; ++i)
-    {
-        test_proto_split_merge_gen(4, true, 1.);
-    }
+    test_proto_split_merge_gen(4, true, 1.);
+
 }
 END_TEST
 

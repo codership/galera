@@ -212,7 +212,7 @@ ostream& gcomm::evs::operator<<(ostream& os, const Proto& p)
     os << "last_sent=" << p.last_sent << ",\n";
     os << "known={\n" << p.known << " } \n";
     if (p.install_message != 0)
-        os << "install msg=" << p.install_message << "\n";
+        os << "install msg=" << *p.install_message << "\n";
     os << " }";
     return os;
 }
@@ -305,11 +305,10 @@ void gcomm::evs::Proto::handle_inactivity_timer()
 
 void gcomm::evs::Proto::handle_retrans_timer()
 {
+    evs_log_debug(D_TIMERS) << "retrans timer";
     if (get_state() == S_GATHER)
     {
-        profile_enter(send_join_prof);
-        send_join(true);
-        profile_leave(send_join_prof);
+        gu_trace(send_join(true));
         if (install_message != 0)
         {
             gu_trace(send_gap(UUID::nil(),
@@ -2196,10 +2195,6 @@ void gcomm::evs::Proto::deliver()
         bool deliver = false;
         switch (msg.get_msg().get_order())
         {
-        case O_DROP:
-            deliver = true;
-            break;
-
         case O_SAFE:
             if (input_map->is_safe(i) == true)
             {
@@ -2213,6 +2208,7 @@ void gcomm::evs::Proto::deliver()
             }
             break;
         case O_FIFO:
+        case O_DROP:
             if (input_map->is_fifo(i) == true)
             {
                 deliver = true;
@@ -2275,12 +2271,10 @@ void gcomm::evs::Proto::deliver_trans()
         bool deliver = false;
         switch (msg.get_msg().get_order())
         {
-        case O_DROP:
-            deliver = true;
-            break;
         case O_SAFE:
         case O_AGREED:
         case O_FIFO:
+        case O_DROP:
             if (input_map->is_fifo(i) == true)
             {
                 deliver = true;
@@ -2671,7 +2665,6 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         return;
     }
 
-
     gcomm_assert(msg.get_source_view_id() == current_view.get_id());
 
     //
@@ -3009,7 +3002,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         {
             evs_log_info(I_STATE)
                 << "shift to gather due to representative join";
-            gu_trace(shift_to(S_GATHER, false));
+            gu_trace(shift_to(S_GATHER, msg.get_source() != get_uuid()));
         }
         else if (consensus.is_consistent(*install_message) == true &&
                  consensus.is_consistent(msg)              == true)
@@ -3022,7 +3015,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                 << "shift to GATHER, install message is "
                 << "inconsistent when handling join from "
                 << msg.get_source() << " " << msg.get_source_view_id();
-            gu_trace(shift_to(S_GATHER, false));
+            gu_trace(shift_to(S_GATHER, msg.get_source() != get_uuid()));
         }
     }
     else if (get_state() != S_GATHER)
@@ -3259,16 +3252,12 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
 
     assert(install_message == 0);
 
-    bool is_consistent_p;
-    profile_enter(consistent_prof);
-    is_consistent_p = consensus.is_consistent(msg);
-    profile_leave(consistent_prof);
-
-    if (is_consistent_p == false)
+    bool ic;
+    if ((ic = consensus.is_consistent(msg)) == false)
     {
-        // Try constructing join message representing install message,
-        // handling it and then checking again. This may be needed if
-        // representative gains complete information first
+        gcomm_assert(msg.get_source() != get_uuid());
+        // Construct join from install message so that the most recent
+        // information from representative is updated to local state.
         const MessageNode& mn(
             MessageNodeList::get_value(
                 msg.get_node_list().find_checked(msg.get_source())));
@@ -3278,14 +3267,11 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
                        msg.get_aru_seq(),
                        msg.get_fifo_seq(),
                        msg.get_node_list());
-
         handle_join(jm, ii);
-        profile_enter(consistent_prof);
-        is_consistent_p = consensus.is_consistent(msg);
-        profile_leave(consistent_prof);
+        ic = consensus.is_consistent(msg);
     }
 
-    if (is_consistent_p == true)
+    if (ic == true)
     {
         inst.set_tstamp(Date::now());
         install_message = new InstallMessage(msg);
