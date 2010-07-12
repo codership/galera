@@ -27,14 +27,14 @@ gcomm::asio::TcpSocket::TcpSocket(Protonet& net, const URI& uri)
 { }
 
 gcomm::asio::TcpSocket::~TcpSocket()
-{ 
+{
     close();
 }
 
 void gcomm::asio::TcpSocket::failed_handler(const boost::system::error_code& ec)
 {
-    
-    log_info << "failed handler " << get_id() << " " << ec 
+
+    log_info << "failed handler " << get_id() << " " << ec
              << " " << socket_.is_open();
     if (get_state() != S_FAILED)
     {
@@ -64,26 +64,28 @@ void gcomm::asio::TcpSocket::connect_handler(const boost::system::error_code& ec
         async_receive();
     }
 }
-    
+
 void gcomm::asio::TcpSocket::connect(const URI& uri)
 {
     Critical<Protonet> crit(net_);
     Protonet& net(static_cast<Protonet&>(net_));
     ip::tcp::resolver resolver(net.io_service_);
-    ip::tcp::resolver::query query(unescape_addr(uri.get_host()), 
+    ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
                                    uri.get_port());
     ip::tcp::resolver::iterator i(resolver.resolve(query));
-    socket_.async_connect(*i, boost::bind(&TcpSocket::connect_handler, 
-                                          shared_from_this(), 
+    socket_.async_connect(*i, boost::bind(&TcpSocket::connect_handler,
+                                          shared_from_this(),
                                           placeholders::error));
     state_ = S_CONNECTING;
 }
-    
+
 void gcomm::asio::TcpSocket::close()
 {
-    Critical<Protonet> crit(net_);
+    // Note: Protonet mutex can be destructed already at this phase...
+    // figure out if socket_.close() is safe to call without protection
+    // Critical<Protonet> crit(net_);
     log_info << "closing " << get_id() << " state " << get_state();
-        
+
     try
     {
         socket_.close();
@@ -94,11 +96,11 @@ void gcomm::asio::TcpSocket::close()
     }
     state_ = S_CLOSED;
 }
-    
 
 
 
-    
+
+
 void gcomm::asio::TcpSocket::write_handler(const boost::system::error_code& ec,
                                            size_t bytes_transferred)
 {
@@ -122,11 +124,11 @@ void gcomm::asio::TcpSocket::write_handler(const boost::system::error_code& ec,
             Datagram& dg(send_q_.front());
             array<const_buffer, 2> cbs;
             cbs[0] = const_buffer(dg.get_header()
-                                  + dg.get_header_offset(), 
+                                  + dg.get_header_offset(),
                                   dg.get_header_len());
-            cbs[1] = const_buffer(&dg.get_payload()[0], 
+            cbs[1] = const_buffer(&dg.get_payload()[0],
                                   dg.get_payload().size());
-            
+
             async_write(socket_, cbs, boost::bind(&TcpSocket::write_handler,
                                                   shared_from_this(),
                                                   placeholders::error,
@@ -139,7 +141,7 @@ void gcomm::asio::TcpSocket::write_handler(const boost::system::error_code& ec,
     }
 }
 
-    
+
 int gcomm::asio::TcpSocket::send(const Datagram& dg)
 {
     gcomm_assert(get_state() == S_CONNECTED);
@@ -152,21 +154,21 @@ int gcomm::asio::TcpSocket::send(const Datagram& dg)
     {
         gu_throw_fatal;
     }
-    
+
     Datagram priv_dg(dg);
-    
+
     priv_dg.set_header_offset(priv_dg.get_header_offset() - sizeof(len));
-    serialize(len, 
-              priv_dg.get_header(), 
-              priv_dg.get_header_size(), 
+    serialize(len,
+              priv_dg.get_header(),
+              priv_dg.get_header_size(),
               priv_dg.get_header_offset());
     send_q_.push_back(priv_dg);
-    
+
     array<const_buffer, 2> cbs;
     cbs[0] = const_buffer(priv_dg.get_header()
-                               + priv_dg.get_header_offset(), 
+                               + priv_dg.get_header_offset(),
                                priv_dg.get_header_len());
-    cbs[1] = const_buffer(&priv_dg.get_payload()[0], 
+    cbs[1] = const_buffer(&priv_dg.get_payload()[0],
                           priv_dg.get_payload().size());
 
     if (send_q_.size() == 1)
@@ -178,8 +180,8 @@ int gcomm::asio::TcpSocket::send(const Datagram& dg)
     }
     return 0;
 }
-    
-    
+
+
 void gcomm::asio::TcpSocket::read_handler(const boost::system::error_code& ec,
                                           const size_t bytes_transferred)
 {
@@ -189,9 +191,9 @@ void gcomm::asio::TcpSocket::read_handler(const boost::system::error_code& ec,
         failed_handler(ec);
         return;
     }
-    
+
     recv_offset_ += bytes_transferred;
-    
+
     // log_info << "read handler " << recv_offset_ << " " << bytes_transferred;
     while (recv_offset_ >= 4)
     {
@@ -199,16 +201,16 @@ void gcomm::asio::TcpSocket::read_handler(const boost::system::error_code& ec,
         unserialize(&recv_buf_[0], recv_buf_.size(), 0, &len);
 
         // log_info << "read handler " << bytes_transferred << " " << len;
-        
+
         if (recv_offset_ >= len + 4)
         {
             Datagram dg(SharedBuffer(
-                            new Buffer(&recv_buf_[0] + 4, 
+                            new Buffer(&recv_buf_[0] + 4,
                                        &recv_buf_[0] + 4 + len)));
             ProtoUpMeta um;
             net_.dispatch(get_id(), dg, um);
             recv_offset_ -= 4 + len;
-            
+
             if (recv_offset_ > 0)
             {
                 memmove(&recv_buf_[0], &recv_buf_[0] + 4 + len, recv_offset_);
@@ -219,11 +221,11 @@ void gcomm::asio::TcpSocket::read_handler(const boost::system::error_code& ec,
             break;
         }
     }
-    
+
     array<mutable_buffer, 1> mbs;
-    mbs[0] = mutable_buffer(&recv_buf_[0] + recv_offset_, 
+    mbs[0] = mutable_buffer(&recv_buf_[0] + recv_offset_,
                             recv_buf_.size() - recv_offset_);
-    async_read(socket_, mbs, 
+    async_read(socket_, mbs,
                boost::bind(&TcpSocket::read_completion_condition,
                            shared_from_this(),
                            placeholders::error,
@@ -244,7 +246,7 @@ size_t gcomm::asio::TcpSocket::read_completion_condition(
         failed_handler(ec);
         return 0;
     }
-    
+
     if (recv_offset_ + bytes_transferred >= 4)
     {
         uint32_t len;
@@ -254,7 +256,7 @@ size_t gcomm::asio::TcpSocket::read_completion_condition(
             return 0;
         }
     }
-    
+
     return (recv_buf_.size() - recv_offset_);
 
 }
@@ -267,7 +269,7 @@ void gcomm::asio::TcpSocket::async_receive()
     gcomm_assert(no_delay.value() == true);
     array<mutable_buffer, 1> mbs;
     mbs[0] = mutable_buffer(&recv_buf_[0], recv_buf_.size());
-    async_read(socket_, mbs, 
+    async_read(socket_, mbs,
                boost::bind(&TcpSocket::read_completion_condition,
                            shared_from_this(),
                            placeholders::error,
@@ -278,24 +280,24 @@ void gcomm::asio::TcpSocket::async_receive()
                            placeholders::bytes_transferred));
 }
 
-size_t gcomm::asio::TcpSocket::get_mtu() const 
-{ 
+size_t gcomm::asio::TcpSocket::get_mtu() const
+{
     return net_.get_mtu();
 }
 
 
 
-std::string gcomm::asio::TcpSocket::get_local_addr() const 
-{ 
-    return "tcp://" 
-        + escape_addr(socket_.local_endpoint().address()) 
+std::string gcomm::asio::TcpSocket::get_local_addr() const
+{
+    return "tcp://"
+        + escape_addr(socket_.local_endpoint().address())
         + ":"
         + to_string(socket_.local_endpoint().port());
 }
 
-std::string gcomm::asio::TcpSocket::get_remote_addr() const 
-{ 
-    return "tcp://" 
+std::string gcomm::asio::TcpSocket::get_remote_addr() const
+{
+    return "tcp://"
         + escape_addr(socket_.remote_endpoint().address())
         + ":"
         + to_string(socket_.remote_endpoint().port());
@@ -310,7 +312,7 @@ gcomm::asio::TcpAcceptor::TcpAcceptor(asio::Protonet& net, const URI& uri)
     net_            (net),
     acceptor_       (net_.io_service_),
     accepted_socket_()
-{ 
+{
 
 }
 
@@ -331,9 +333,9 @@ void gcomm::asio::TcpAcceptor::accept_handler(
         accepted_socket_ = socket;
         net_.dispatch(get_id(), Datagram(), ProtoUpMeta(error.value()));
         TcpSocket* new_socket(new TcpSocket(
-                                  static_cast<asio::Protonet&>(net_), 
+                                  static_cast<asio::Protonet&>(net_),
                                   URI(scheme_ + "://")));
-        acceptor_.async_accept(new_socket->socket_, 
+        acceptor_.async_accept(new_socket->socket_,
                                boost::bind(&TcpAcceptor::accept_handler,
                                            this,
                                            SocketPtr(new_socket),
@@ -345,11 +347,11 @@ void gcomm::asio::TcpAcceptor::accept_handler(
     }
 }
 
-    
+
 void gcomm::asio::TcpAcceptor::listen(const URI& uri)
 {
     ip::tcp::resolver resolver(net_.io_service_);
-    ip::tcp::resolver::query query(unescape_addr(uri.get_host()), 
+    ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
                                    uri.get_port());
     ip::tcp::resolver::iterator i(resolver.resolve(query));
     acceptor_.open(i->endpoint().protocol());
@@ -357,13 +359,13 @@ void gcomm::asio::TcpAcceptor::listen(const URI& uri)
     acceptor_.bind(*i);
     acceptor_.listen();
     TcpSocket* new_socket(new TcpSocket(net_, uri));
-    acceptor_.async_accept(new_socket->socket_, 
+    acceptor_.async_accept(new_socket->socket_,
                            boost::bind(&TcpAcceptor::accept_handler,
                                        this,
                                        SocketPtr(new_socket),
                                        placeholders::error));
 }
-    
+
 void gcomm::asio::TcpAcceptor::close()
 {
     try
@@ -372,8 +374,8 @@ void gcomm::asio::TcpAcceptor::close()
     }
     catch (...) { }
 }
-    
-    
+
+
 gcomm::SocketPtr gcomm::asio::TcpAcceptor::accept()
 {
     accepted_socket_->async_receive();

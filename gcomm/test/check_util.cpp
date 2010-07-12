@@ -7,7 +7,7 @@
 #include "gcomm/protonet.hpp"
 
 // ASIO test disabled temporarily
-#undef GALERA_USE_BOOST_ASIO
+//#undef GALERA_USE_BOOST_ASIO
 #ifdef GALERA_USE_BOOST_ASIO
 #include "asio.hpp"
 #endif // GALERA_USE_BOOST_ASIO

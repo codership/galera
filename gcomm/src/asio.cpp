@@ -27,7 +27,7 @@ using namespace boost;
 using namespace boost::asio;
 
 
-gcomm::asio::Protonet::Protonet() 
+gcomm::asio::Protonet::Protonet()
     :
     gcomm::Protonet("asio"),
     poll_until_(Date::max()),
@@ -41,7 +41,7 @@ gcomm::asio::Protonet::Protonet()
 
 gcomm::asio::Protonet::~Protonet()
 {
-    
+
 }
 
 void gcomm::asio::Protonet::enter()
@@ -85,7 +85,7 @@ Period handle_timers_helper(gcomm::Protonet& pnet, const Period& period)
 {
     const Date now(Date::now());
     const Date stop(now + period);
-    
+
     const Date next_time(pnet.handle_timers());
     const Period sleep_p(min(stop - now, next_time - now));
     return (sleep_p < 0 ? 0 : sleep_p);
@@ -96,7 +96,7 @@ void gcomm::asio::Protonet::event_loop(const Period& period)
 {
     io_service_.reset();
     poll_until_ = Date::now() + period;
-    
+
     const Period p(handle_timers_helper(*this, period));
     timer_.expires_from_now(posix_time::nanosec(p.get_nsecs()));
     timer_.async_wait(boost::bind(&asio::Protonet::handle_wait, this,
@@ -109,7 +109,7 @@ void gcomm::asio::Protonet::dispatch(const SocketId& id,
                                    const Datagram& dg,
                                    const ProtoUpMeta& um)
 {
-    for (deque<Protostack*>::iterator i = protos_.begin(); 
+    for (deque<Protostack*>::iterator i = protos_.begin();
          i != protos_.end(); ++i)
     {
         (*i)->dispatch(id, dg, um);
