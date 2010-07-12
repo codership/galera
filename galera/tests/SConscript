@@ -2,10 +2,10 @@
 Import('check_env')
 
 env = check_env.Clone()
-env.Append(LIBS = ['galera++',
-                   'galerautils++',
-                   'galerautils',
-                   'pthread',
+env.Append(LIBS=File('#/galera/src/libgalera++.a'))
+env.Append(LIBS=File('#/galerautils/src/libgalerautils++.a'))
+env.Append(LIBS=File('#/galerautils/src/libgalerautils.a'))
+env.Append(LIBS = ['pthread',
                    'rt'])
 
 galera_check = env.Program(target='galera_check',

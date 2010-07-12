@@ -74,7 +74,7 @@ if dbug:
 arch = ARGUMENTS.get('arch', '')
 
 if arch == 'i386':
-    compile_arch = '-m32 -march=i686'
+    compile_arch = '-m32 -march=i486'
     link_arch    = compile_arch + ' -Wl,-melf_i386'
 elif arch == 'x86-64':
     compile_arch = '-m64'
@@ -123,12 +123,12 @@ env.Append(CPPPATH = Split('''#/galerautils/src
                                '''))
 
 # Library paths
-env.Append(LIBPATH = Split('''#/galerautils/src
-                               #/gcomm/src
-                               #/gcs/src
-                               #/wsdb/src
-                               #/galera/src
-                               '''))
+#env.Append(LIBPATH = Split('''#/galerautils/src
+#                               #/gcomm/src
+#                               #/gcs/src
+#                               #/wsdb/src
+#                               #/galera/src
+#                               '''))
 
 # Common C/CXX flags
 # These should be kept minimal as they are appended after C/CXX specific flags
@@ -259,8 +259,9 @@ if not conf.CheckLib('check'):
 
 conf.Finish()
 
+# Note: Don't do this, glibc does not like static linking
 # Link unit tests statically
-check_env.Append(LINKFLAGS = ' -static')
+# check_env.Append(LINKFLAGS = ' -static')
 
 #
 # this follows recipes from http://www.scons.org/wiki/UnitTests

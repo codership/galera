@@ -14,6 +14,7 @@
 
 #include "gu_exception.hpp"
 #include "gu_regex.hpp"
+#include "gu_time.h"
 
 #include <iostream>
 #include <string>
@@ -111,18 +112,17 @@ namespace gu
             /*!
              * @brief Get system time.
              */
-            static Date now();
+            static inline Date now() {return gu_time_calendar(); }
 
             /*!
              * @brief Get maximum representable timestamp.
              */
-            static Date max();
+            static inline Date max() {return std::numeric_limits<long long>::max(); }
 
             /*!
              * @brief Get zero time
              */
-
-            static Date zero();
+            static inline Date zero() {return 0; }
 
             /*!
              * Return 64-bit timestamp representing system time in nanosecond

@@ -46,22 +46,6 @@ ostream& gu::datetime::operator<<(ostream& os, const Period& p)
     return os;
 }
 
-
-gu::datetime::Date gu::datetime::Date::now()
-{
-    return gu_time_calendar();
-}
-
-gu::datetime::Date gu::datetime::Date::max()
-{
-    return numeric_limits<int64_t>::max();
-}
-
-gu::datetime::Date gu::datetime::Date::zero()
-{
-    return 0;
-}
-
 void gu::datetime::Date::parse(const string& str)
     throw (gu::Exception)
 {

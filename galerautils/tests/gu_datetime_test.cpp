@@ -79,6 +79,10 @@ START_TEST(test_date)
     Date d2 = d1 + Period("PT6S");
     fail_unless(d2.get_utc() == d1.get_utc() + 6*Sec);
     fail_unless(d2 - Period("PT6S") == d1);
+
+    Date max(Date::max());
+    fail_unless(d1 < max);
+
 }
 END_TEST
 
