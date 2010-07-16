@@ -235,7 +235,11 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_.add_transition(Transition(S_CLOSING, S_CLOSED));
 
     state_.add_transition(Transition(S_JOINING, S_CLOSING));
+    // the following is possible if one non-prim conf follows another
+    state_.add_transition(Transition(S_JOINING, S_JOINING));
     state_.add_transition(Transition(S_JOINING, S_JOINED));
+    // the following is possible only when bootstrapping new cluster
+    // (trivial wsrep_cluster_address)
     state_.add_transition(Transition(S_JOINING, S_SYNCED));
 
     state_.add_transition(Transition(S_JOINED, S_CLOSING));
@@ -975,7 +979,6 @@ static const char* status_str[GALERA_STAGE_MAX] =
 
 static wsrep_member_status_t state2status(galera::ReplicatorSMM::State state)
 {
-//    using galera::ReplicatorSMM;
     switch (state)
     {
     case galera::ReplicatorSMM::S_CLOSED  : return WSREP_MEMBER_UNDEFINED;
@@ -1384,7 +1387,7 @@ wsrep_status_t galera::ReplicatorSMM::process_conf(void* recv_ctx,
 
         if (st_req == true)
         {
-            retval = request_sst(*group_uuid, group_seqno, app_req, app_req_len);
+            retval = request_sst(*group_uuid, group_seqno, app_req,app_req_len);
         }
         else
         {
@@ -1421,6 +1424,7 @@ wsrep_status_t galera::ReplicatorSMM::process_conf(void* recv_ctx,
         {
             store_state(state_file_);
         }
+
         if (conf->my_idx >= 0)
         {
             state_.shift_to(S_JOINING);
