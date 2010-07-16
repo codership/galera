@@ -54,10 +54,11 @@ public:
     }
 
 
-    Proto(const UUID& uuid)
+    Proto(const UUID& uuid, bool allow_sb = false)
         :
         my_uuid_       (uuid),
         start_prim_    (),
+        allow_sb_      (allow_sb),
         state_         (S_CLOSED),
         last_sent_seq_ (0),
         checksum_      (true),
@@ -150,6 +151,7 @@ private:
 
     UUID   const      my_uuid_;       // Node uuid
     bool              start_prim_;    // Is allowed to start in prim comp
+    bool              allow_sb_;      // Split-brain condition is allowed
     State             state_;         // State
     uint32_t          last_sent_seq_; // Msg seqno of last sent message
     bool              checksum_;      // Enable message checksumming
