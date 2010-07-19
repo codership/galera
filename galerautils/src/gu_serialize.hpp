@@ -3,12 +3,12 @@
  */
 
 /*!
- * @file Helper templates for serialization/unserialization. 
- * As we are usually working on little endian platforms, integer 
+ * @file Helper templates for serialization/unserialization.
+ * As we are usually working on little endian platforms, integer
  * storage order is little endian.
  *
- * @todo Templates are safe to use with integer types only. Adjust them 
- *       to work also with classes that have special serialization 
+ * @todo Templates are safe to use with integer types only. Adjust them
+ *       to work also with classes that have special serialization
  *       routines.
  * @todo Big endian is not supported yet.
  * @todo Alignment issues.
@@ -20,31 +20,33 @@
 
 #include "gu_throw.hpp"
 
+#include <stdint.h>
+
 namespace gu
 {
-    
-    
+
+
     template <typename T>
     inline size_t serial_size(const T& t)
     { return t.serial_size(); }
-    
+
     template <>
-    inline size_t serial_size(const uint8_t& b) 
+    inline size_t serial_size(const uint8_t& b)
     { return sizeof(b); }
-    
+
     template <>
-    inline size_t serial_size(const uint16_t& b) 
+    inline size_t serial_size(const uint16_t& b)
     { return sizeof(b); }
-    
+
     template <>
-    inline size_t serial_size(const uint32_t& b) 
+    inline size_t serial_size(const uint32_t& b)
     { return sizeof(b); }
-    
+
     template <>
-    inline size_t serial_size(const uint64_t& b) 
+    inline size_t serial_size(const uint64_t& b)
     { return sizeof(b); }
-    
-    
+
+
     template <typename T>
     inline size_t serialize(const T& t, byte_t* buf, size_t buflen, size_t offset)
         throw (Exception)
@@ -60,7 +62,7 @@ namespace gu
 #endif // __BYTE_ORDER
         return (offset + serial_size(t));
     }
-    
+
     template <typename T>
     inline size_t unserialize(const byte_t* buf, size_t buflen, size_t offset, T* t)
     {
@@ -75,7 +77,7 @@ namespace gu
 #endif // __BYTE_ORDER
         return (offset + serial_size(*t));
     }
-    
+
     template <typename T>
     inline size_t serialize(const T& t, Buffer& buf, size_t offset)
     {
@@ -88,7 +90,7 @@ namespace gu
 #endif // __BYTE_ORDER
         return (offset + serial_size(t));
     }
-    
+
     template <typename T>
     inline size_t unserialize(const Buffer& buf, size_t offset, T* t)
     {

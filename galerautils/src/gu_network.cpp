@@ -35,68 +35,6 @@ using namespace gu::net;
 using namespace gu::datetime;
 
 
-class NetHeader
-{
-public:
-
-    NetHeader(uint32_t len) :
-        len_(len),
-        crc32_(0)
-    {
-        if (len > len_mask_)
-            gu_throw_error(EINVAL) << "msg too long " << len_;
-    }
-
-    uint32_t len() const { return (len_ & len_mask_); }
-
-    void set_crc32(uint32_t crc32)
-    {
-        crc32_ = crc32;
-        len_ |= F_CRC32;
-    }
-
-    bool has_crc32() const { return (len_ & F_CRC32); }
-    uint32_t crc32() const { return crc32_; }
-
-    friend size_t serialize(const NetHeader& hdr, byte_t* buf, size_t buflen,
-                            size_t offset);
-    friend size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
-                              NetHeader& hdr);
-
-    static const size_t serial_size_ = 8;
-
-private:
-
-    static const uint32_t len_mask_ = 0x00ffffff;
-    enum
-    {
-        F_CRC32 = 1 << 31
-    };
-    uint32_t len_;
-    uint32_t crc32_;
-};
-
-inline size_t serialize(const NetHeader& hdr, byte_t* buf, size_t buflen,
-                        size_t offset)
-{
-    offset = serialize(hdr.len_, buf, buflen, offset);
-    offset = serialize(hdr.crc32_, buf, buflen, offset);
-    return offset;
-}
-
-inline size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
-                          NetHeader& hdr)
-{
-    offset = unserialize(buf, buflen, offset, &hdr.len_);
-    offset = unserialize(buf, buflen, offset, &hdr.crc32_);
-    return offset;
-}
-
-inline size_t serial_size(const NetHeader& hdr)
-{
-    return NetHeader::serial_size_;
-}
-
 static int get_opt(const URI& uri)
 {
     int ret(0);

@@ -32,9 +32,9 @@ class gcomm::asio::Protonet : public gcomm::Protonet
 public:
     Protonet();
     ~Protonet();
-    void event_loop(const gu::datetime::Period& p);  
+    void event_loop(const gu::datetime::Period& p);
     void dispatch(const SocketId&,
-                  const gu::Datagram&, 
+                  const gu::Datagram&,
                   const ProtoUpMeta&);
     void interrupt();
     SocketPtr socket(const gu::URI&);
@@ -55,7 +55,7 @@ private:
     boost::asio::deadline_timer timer_;
     gu::RecursiveMutex          mutex_;
     size_t                      mtu_;
+    bool                        checksum_;
 };
 
 #endif // GCOMM_ASIO_HPP
-

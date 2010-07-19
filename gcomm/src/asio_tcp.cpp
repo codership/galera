@@ -21,7 +21,7 @@ gcomm::asio::TcpSocket::TcpSocket(Protonet& net, const URI& uri)
     Socket      (uri),
     net_        (net),
     socket_     (net.io_service_),
-    recv_buf_   (net_.get_mtu() + 4),
+    recv_buf_   (net_.get_mtu() + NetHeader::serial_size_),
     recv_offset_(0),
     state_      (S_CLOSED)
 { }
@@ -149,16 +149,17 @@ int gcomm::asio::TcpSocket::send(const Datagram& dg)
     socket_.get_option(no_delay);
     gcomm_assert(no_delay.value() == true);
 
-    uint32_t len(static_cast<uint32_t>(dg.get_len()));
-    if (dg.get_header_offset() < sizeof(len))
-    {
-        gu_throw_fatal;
-    }
 
+    NetHeader hdr(static_cast<uint32_t>(dg.get_len()));
+    if (net_.checksum_ == true)
+    {
+        hdr.set_crc32(dg.checksum());
+    }
     Datagram priv_dg(dg);
 
-    priv_dg.set_header_offset(priv_dg.get_header_offset() - sizeof(len));
-    serialize(len,
+    priv_dg.set_header_offset(priv_dg.get_header_offset() -
+                              NetHeader::serial_size_);
+    serialize(hdr,
               priv_dg.get_header(),
               priv_dg.get_header_size(),
               priv_dg.get_header_offset());
@@ -166,8 +167,8 @@ int gcomm::asio::TcpSocket::send(const Datagram& dg)
 
     array<const_buffer, 2> cbs;
     cbs[0] = const_buffer(priv_dg.get_header()
-                               + priv_dg.get_header_offset(),
-                               priv_dg.get_header_len());
+                          + priv_dg.get_header_offset(),
+                          priv_dg.get_header_len());
     cbs[1] = const_buffer(&priv_dg.get_payload()[0],
                           priv_dg.get_payload().size());
 
@@ -195,25 +196,37 @@ void gcomm::asio::TcpSocket::read_handler(const boost::system::error_code& ec,
     recv_offset_ += bytes_transferred;
 
     // log_info << "read handler " << recv_offset_ << " " << bytes_transferred;
-    while (recv_offset_ >= 4)
+    while (recv_offset_ >= NetHeader::serial_size_)
     {
-        uint32_t len;
-        unserialize(&recv_buf_[0], recv_buf_.size(), 0, &len);
+        NetHeader hdr(0);
+        unserialize(&recv_buf_[0], recv_buf_.size(), 0, hdr);
 
         // log_info << "read handler " << bytes_transferred << " " << len;
 
-        if (recv_offset_ >= len + 4)
+        if (recv_offset_ >= hdr.len() + NetHeader::serial_size_)
         {
             Datagram dg(SharedBuffer(
-                            new Buffer(&recv_buf_[0] + 4,
-                                       &recv_buf_[0] + 4 + len)));
+                            new Buffer(&recv_buf_[0] + NetHeader::serial_size_,
+                                       &recv_buf_[0] + NetHeader::serial_size_
+                                       + hdr.len())));
+            if (net_.checksum_ == true && hdr.has_crc32() == true)
+            {
+                if (dg.checksum() != hdr.crc32())
+                {
+                    log_warn << "checksum failed";
+                    failed_handler(system::error_code(system::posix_error::protocol_error, system::posix_category));
+                    return;
+                }
+            }
             ProtoUpMeta um;
             net_.dispatch(get_id(), dg, um);
-            recv_offset_ -= 4 + len;
+            recv_offset_ -= NetHeader::serial_size_ + hdr.len();
 
             if (recv_offset_ > 0)
             {
-                memmove(&recv_buf_[0], &recv_buf_[0] + 4 + len, recv_offset_);
+                memmove(&recv_buf_[0],
+                        &recv_buf_[0] + NetHeader::serial_size_ + hdr.len(),
+                        recv_offset_);
             }
         }
         else
@@ -247,11 +260,11 @@ size_t gcomm::asio::TcpSocket::read_completion_condition(
         return 0;
     }
 
-    if (recv_offset_ + bytes_transferred >= 4)
+    if (recv_offset_ + bytes_transferred >= NetHeader::serial_size_)
     {
-        uint32_t len;
-        unserialize(&recv_buf_[0], 4, 0, &len);
-        if (recv_offset_ + bytes_transferred >= 4 + len)
+        NetHeader hdr(0);
+        unserialize(&recv_buf_[0], NetHeader::serial_size_, 0, hdr);
+        if (recv_offset_ + bytes_transferred >= NetHeader::serial_size_ + hdr.len())
         {
             return 0;
         }

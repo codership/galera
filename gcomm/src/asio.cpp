@@ -34,7 +34,8 @@ gcomm::asio::Protonet::Protonet()
     io_service_(),
     timer_(io_service_),
     mutex_(),
-    mtu_(1 << 15)
+    mtu_(1 << 15),
+    checksum_(true)
 {
 
 }
