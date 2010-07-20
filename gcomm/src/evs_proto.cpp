@@ -424,11 +424,14 @@ void gcomm::evs::Proto::handle_install_timer()
     {
         log_info << "no install message received";
     }
+    const bool is_cons(consensus.is_consensus());
+    const bool is_repr(is_representative(get_uuid()));
+    log_info << "consensus: " << is_cons;
+    log_info << "repr     : " << is_repr;
     log_info << "state dump for diagnosis (stderr):";
     std::cerr << *this;
     shift_to(S_GATHER, true);
-    if (consensus.is_consensus()      == true &&
-        is_representative(get_uuid()) == true)
+    if (is_cons == true && is_repr == true)
     {
         send_install();
     }

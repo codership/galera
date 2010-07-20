@@ -136,7 +136,10 @@ gcomm::evs::seqno_t gcomm::evs::Consensus::highest_reachable_safe_seq() const
         {
             if (lm != 0)
             {
-                seq_list.push_back(lm->get_seq());
+                if (node.is_suspected() == false)
+                {
+                    seq_list.push_back(lm->get_seq());
+                }
             }
             else if (node.get_operational() == false)
             {
