@@ -2463,12 +2463,6 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
 
     gcomm_assert(msg.get_source_view_id() == current_view.get_id());
 
-    if (get_state() == S_INSTALL)
-    {
-        // don't alter state anymore
-        return;
-    }
-
     Range range;
     Range prev_range;
     seqno_t prev_aru;
@@ -2521,7 +2515,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     // Seqno range completion and acknowledgement
     const seqno_t max_hs(input_map->get_max_hs());
     if (output.empty()                          == true            &&
-        get_state()                             != S_LEAVING       &&
+        (get_state() == S_OPERATIONAL || get_state() == S_GATHER)  &&
         (msg.get_flags() & Message::F_MSG_MORE) == 0               &&
         (last_sent                              <  max_hs))
     {
