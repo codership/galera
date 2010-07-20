@@ -1169,16 +1169,16 @@ START_TEST(test_pc_transport)
                 "gmcast.group=pc&"
                 "node.name=n1");
     PCUser2 pu2(*net,
-                "pc://localhost:10001?"
+                "pc://127.0.0.1:10001?"
                 "evs.info_log_mask=0xff&"
                 "gmcast.group=pc&"
-                "gmcast.listen_addr=tcp://localhost:10002&"
+                "gmcast.listen_addr=tcp://127.0.0.1:10002&"
                 "node.name=n2");
     PCUser2 pu3(*net,
-                "pc://localhost:10001?"
+                "pc://127.0.0.1:10001?"
                 "evs.info_log_mask=0xff&"
                 "gmcast.group=pc&"
-                "gmcast.listen_addr=tcp://localhost:10003&"
+                "gmcast.listen_addr=tcp://127.0.0.1:10003&"
                 "node.name=n3");
 
     gu_conf_self_tstamp_on();
