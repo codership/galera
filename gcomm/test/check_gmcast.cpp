@@ -282,7 +282,7 @@ START_TEST(test_gmcast_auto_addr)
     log_info << "START";
     auto_ptr<Protonet> pnet(Protonet::create(pnet_backend));
     Transport* tp1 = Transport::create(*pnet, "gmcast://?gmcast.group=test");
-    Transport* tp2 = Transport::create(*pnet, "gmcast://localhost:4567?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:10002");
+    Transport* tp2 = Transport::create(*pnet, "gmcast://127.0.0.1:4567?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:10002");
 
     pnet->insert(&tp1->get_pstack());
     pnet->insert(&tp2->get_pstack());
