@@ -424,8 +424,14 @@ void gcomm::evs::Proto::handle_install_timer()
     {
         log_info << "no install message received";
     }
-    log_debug << "state dump: " << *this;
+    log_info << "state dump for diagnosis (stderr):";
+    std::cerr << *this;
     shift_to(S_GATHER, true);
+    if (consensus.is_consensus()      == true &&
+        is_representative(get_uuid()) == true)
+    {
+        send_install();
+    }
 }
 
 void gcomm::evs::Proto::handle_stats_timer()
@@ -1415,8 +1421,7 @@ void gcomm::evs::Proto::send_install()
                         node_list);
 
     evs_log_debug(D_INSTALL_MSGS) << "sending install " << imsg;
-
-
+    gcomm_assert(consensus.is_consistent(imsg));
 
     Buffer buf;
     serialize(imsg, buf);
@@ -2006,7 +2011,11 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
     {
         gcomm_assert(output.empty() == true);
         gcomm_assert(install_message != 0);
-        gcomm_assert(consensus.is_consistent(*install_message));
+        gcomm_assert(NodeMap::get_value(self_i).get_join_message() != 0 &&
+                     consensus.equal(
+                         *NodeMap::get_value(self_i).get_join_message(),
+                         *install_message))
+            << "install message not consistent with own join, state: " << *this;
         gcomm_assert(is_all_installed() == true);
         gu_trace(deliver());
         gu_trace(deliver_trans_view(false));
@@ -2451,6 +2460,12 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
 
     gcomm_assert(msg.get_source_view_id() == current_view.get_id());
 
+    if (get_state() == S_INSTALL)
+    {
+        // don't alter state anymore
+        return;
+    }
+
     Range range;
     Range prev_range;
     seqno_t prev_aru;
@@ -2684,7 +2699,8 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
     //
     if (msg.get_range_uuid() == get_uuid())
     {
-        if (msg.get_range().get_hs() > last_sent)
+        if (msg.get_range().get_hs() > last_sent &&
+            (get_state() == S_OPERATIONAL || get_state() == S_GATHER))
         {
             // This could be leaving node requesting messages up to
             // its last sent.
@@ -2998,11 +3014,13 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     }
     else if (install_message != 0)
     {
+        // Note: don't send join from this branch yet, join is
+        // sent at the end of this method
         if (install_message->get_source() == msg.get_source())
         {
             evs_log_info(I_STATE)
                 << "shift to gather due to representative join";
-            gu_trace(shift_to(S_GATHER, msg.get_source() != get_uuid()));
+            gu_trace(shift_to(S_GATHER, false));
         }
         else if (consensus.is_consistent(*install_message) == true &&
                  consensus.is_consistent(msg)              == true)
@@ -3015,7 +3033,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                 << "shift to GATHER, install message is "
                 << "inconsistent when handling join from "
                 << msg.get_source() << " " << msg.get_source_view_id();
-            gu_trace(shift_to(S_GATHER, msg.get_source() != get_uuid()));
+            gu_trace(shift_to(S_GATHER, false));
         }
     }
     else if (get_state() != S_GATHER)
