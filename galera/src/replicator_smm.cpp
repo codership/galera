@@ -187,7 +187,7 @@ std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
 //                           Public
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
-
+static void build_status_vars (std::vector<struct wsrep_status_var>&);
 
 galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     :
@@ -256,6 +256,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
 
     gu_conf_set_log_callback(reinterpret_cast<gu_log_cb_t>(args->logger_cb));
     local_monitor_.set_initial_position(0);
+
+    build_status_vars(wsrep_status_);
 }
 
 galera::ReplicatorSMM::~ReplicatorSMM()
@@ -962,7 +964,9 @@ void galera::ReplicatorSMM::invalidate_state(const std::string& file) const
     fs << "cert_index:\n";
 }
 
+// @todo: should be protected static member of the parent class
 static const size_t GALERA_STAGE_MAX(10);
+// @todo: should be protected static member of the parent class
 static const char* status_str[GALERA_STAGE_MAX] =
 {
     "Initialized (0)",
@@ -977,6 +981,7 @@ static const char* status_str[GALERA_STAGE_MAX] =
     "SST failed (-)",
 };
 
+// @todo: should be protected static member of the parent class
 static wsrep_member_status_t state2status(galera::ReplicatorSMM::State state)
 {
     switch (state)
@@ -992,6 +997,7 @@ static wsrep_member_status_t state2status(galera::ReplicatorSMM::State state)
     throw;
 }
 
+// @todo: should be protected static member of the parent class
 static const char* state2status_str(galera::ReplicatorSMM::State state,
                                     galera::ReplicatorSMM::SstState sst_state)
 {
@@ -1030,8 +1036,13 @@ typedef enum status_vars
     STATUS_LOCAL_CERT_FAILURES,
     STATUS_LOCAL_BF_ABORTS,
     STATUS_LOCAL_REPLAYS,
-    STATUS_LOCAL_SLAVE_QUEUE,
-    STATUS_FC_WAITS,
+    STATUS_LOCAL_SEND_QUEUE,
+    STATUS_LOCAL_SEND_QUEUE_AVG,
+    STATUS_LOCAL_RECV_QUEUE,
+    STATUS_LOCAL_RECV_QUEUE_AVG,
+    STATUS_FC_PAUSED,
+    STATUS_FC_SENT,
+    STATUS_FC_RECEIVED,
     STATUS_CERT_DEPS_DISTANCE,
     STATUS_APPLY_OOOE,
     STATUS_APPLY_OOOL,
@@ -1043,24 +1054,29 @@ typedef enum status_vars
 
 static struct wsrep_status_var wsrep_status[STATUS_MAX + 1] =
 {
-    {"local_state_uuid",    WSREP_STATUS_STRING, { 0 }                      },
-    {"last_committed",      WSREP_STATUS_INT64,  { -1 }                     },
-    {"replicated",          WSREP_STATUS_INT64,  { 0 }                      },
-    {"replicated_bytes",    WSREP_STATUS_INT64,  { 0 }                      },
-    {"received",            WSREP_STATUS_INT64,  { 0 }                      },
-    {"received_bytes",      WSREP_STATUS_INT64,  { 0 }                      },
-    {"local_commits",       WSREP_STATUS_INT64,  { 0 }                      },
-    {"local_cert_failures", WSREP_STATUS_INT64,  { 0 }                      },
-    {"local_bf_aborts",     WSREP_STATUS_INT64,  { 0 }                      },
-    {"local_replays",       WSREP_STATUS_INT64,  { 0 }                      },
-    {"local_slave_queue",   WSREP_STATUS_INT64,  { 0 }                      },
-    {"flow_control_waits",  WSREP_STATUS_INT64,  { 0 }                      },
-    {"cert_deps_distance",  WSREP_STATUS_DOUBLE, { 0 }                      },
-    {"apply_oooe",          WSREP_STATUS_DOUBLE, { 0 }                      },
-    {"apply_oool",          WSREP_STATUS_DOUBLE, { 0 }                      },
-    {"apply_window",        WSREP_STATUS_DOUBLE, { 0 }                      },
-    {"local_status",        WSREP_STATUS_INT64,  { 0 }                      },
-    {"local_status_comment",WSREP_STATUS_STRING, { 0 }                      },
+    {"local_state_uuid",     WSREP_STATUS_STRING, { 0 }                    },
+    {"last_committed",       WSREP_STATUS_INT64,  { -1 }                   },
+    {"replicated",           WSREP_STATUS_INT64,  { 0 }                    },
+    {"replicated_bytes",     WSREP_STATUS_INT64,  { 0 }                    },
+    {"received",             WSREP_STATUS_INT64,  { 0 }                    },
+    {"received_bytes",       WSREP_STATUS_INT64,  { 0 }                    },
+    {"local_commits",        WSREP_STATUS_INT64,  { 0 }                    },
+    {"local_cert_failures",  WSREP_STATUS_INT64,  { 0 }                    },
+    {"local_bf_aborts",      WSREP_STATUS_INT64,  { 0 }                    },
+    {"local_replays",        WSREP_STATUS_INT64,  { 0 }                    },
+    {"local_send_queue",     WSREP_STATUS_INT64,  { 0 }                    },
+    {"local_send_queue_avg", WSREP_STATUS_DOUBLE, { 0 }                    },
+    {"local_recv_queue",     WSREP_STATUS_INT64,  { 0 }                    },
+    {"local_recv_queue_avg", WSREP_STATUS_DOUBLE, { 0 }                    },
+    {"flow_control_paused",  WSREP_STATUS_DOUBLE, { 0 }                    },
+    {"flow_control_sent",    WSREP_STATUS_INT64,  { 0 }                    },
+    {"flow_control_recv",    WSREP_STATUS_INT64,  { 0 }                    },
+    {"cert_deps_distance",   WSREP_STATUS_DOUBLE, { 0 }                    },
+    {"apply_oooe",           WSREP_STATUS_DOUBLE, { 0 }                    },
+    {"apply_oool",           WSREP_STATUS_DOUBLE, { 0 }                    },
+    {"apply_window",         WSREP_STATUS_DOUBLE, { 0 }                    },
+    {"local_status",         WSREP_STATUS_INT64,  { 0 }                    },
+    {"local_status_comment", WSREP_STATUS_STRING, { 0 }                    },
     {0, WSREP_STATUS_STRING, { 0 }}
 };
 
@@ -1077,43 +1093,56 @@ static void build_status_vars(std::vector<struct wsrep_status_var>& status)
 
 const struct wsrep_status_var* galera::ReplicatorSMM::status() const
 {
+#if 0
     std::vector<struct wsrep_status_var>&
         sv(const_cast<std::vector<struct wsrep_status_var>& >(wsrep_status_));
     if (sv.empty() == true)
     {
         build_status_vars(sv);;
     }
+#endif // 0
+    std::vector<struct wsrep_status_var>& sv(wsrep_status_);
 
     free(const_cast<char*>(sv[STATUS_STATE_UUID].value._string));
     std::ostringstream os;
     os << state_uuid_;
-    sv[STATUS_STATE_UUID].value._string = strdup(os.str().c_str());
-    sv[STATUS_LAST_APPLIED       ].value._int64 =
-        apply_monitor_.last_left();;
-    sv[STATUS_REPLICATED         ].value._int64 = replicated_();
-    sv[STATUS_REPLICATED_BYTES   ].value._int64 =
-        replicated_bytes_();
-    sv[STATUS_RECEIVED           ].value._int64 = received_();
-    sv[STATUS_RECEIVED_BYTES     ].value._int64 = received_bytes_();
-    sv[STATUS_LOCAL_COMMITS      ].value._int64 = local_commits_();
-    sv[STATUS_LOCAL_CERT_FAILURES].value._int64 =
-        local_cert_failures_();
-    sv[STATUS_LOCAL_BF_ABORTS    ].value._int64 = local_bf_aborts_();
-    sv[STATUS_LOCAL_REPLAYS      ].value._int64 = local_replays_();
-    sv[STATUS_LOCAL_SLAVE_QUEUE  ].value._int64 =
-        gcs_.queue_len();
-    sv[STATUS_FC_WAITS           ].value._int64 = 0;
-    sv[STATUS_CERT_DEPS_DISTANCE ].value._double =
-        cert_.get_avg_deps_dist();
+    sv[STATUS_STATE_UUID         ].value._string = strdup(os.str().c_str());
+    sv[STATUS_LAST_APPLIED       ].value._int64  = apply_monitor_.last_left();;
+    sv[STATUS_REPLICATED         ].value._int64  = replicated_();
+    sv[STATUS_REPLICATED_BYTES   ].value._int64  = replicated_bytes_();
+    sv[STATUS_RECEIVED           ].value._int64  = received_();
+    sv[STATUS_RECEIVED_BYTES     ].value._int64  = received_bytes_();
+    sv[STATUS_LOCAL_COMMITS      ].value._int64  = local_commits_();
+    sv[STATUS_LOCAL_CERT_FAILURES].value._int64  = local_cert_failures_();
+    sv[STATUS_LOCAL_BF_ABORTS    ].value._int64  = local_bf_aborts_();
+    sv[STATUS_LOCAL_REPLAYS      ].value._int64  = local_replays_();
+
+    struct gcs_stats stats;
+    gcs_.get_stats (&stats);
+
+    sv[STATUS_LOCAL_SEND_QUEUE    ].value._double = stats.send_q_len;
+    sv[STATUS_LOCAL_SEND_QUEUE_AVG].value._double = stats.send_q_len_avg;
+    sv[STATUS_LOCAL_RECV_QUEUE    ].value._double = stats.recv_q_len;
+    sv[STATUS_LOCAL_RECV_QUEUE_AVG].value._double = stats.recv_q_len_avg;
+    sv[STATUS_FC_PAUSED           ].value._double = stats.fc_paused;
+    sv[STATUS_FC_SENT             ].value._int64  = stats.fc_sent;
+    sv[STATUS_FC_RECEIVED         ].value._int64  = stats.fc_received;
+
+    sv[STATUS_CERT_DEPS_DISTANCE  ].value._double = cert_.get_avg_deps_dist();
+
     double oooe;
     double oool;
     double win;
-    const_cast<Monitor<ApplyOrder>&>(apply_monitor_).get_stats(&oooe, &oool, &win);
-    sv[STATUS_APPLY_OOOE         ].value._double = oooe;
-    sv[STATUS_APPLY_OOOL         ].value._double = oool;
-    sv[STATUS_APPLY_WINDOW       ].value._double = win;
-    sv[STATUS_LOCAL_STATUS       ].value._int64 =  state2status(state_());
-    sv[STATUS_LOCAL_STATUS_COMMENT].value._string = state2status_str(state_(), sst_state_);
+    const_cast<Monitor<ApplyOrder>&>(apply_monitor_).
+        get_stats(&oooe, &oool, &win);
+
+    sv[STATUS_APPLY_OOOE          ].value._double = oooe;
+    sv[STATUS_APPLY_OOOL          ].value._double = oool;
+    sv[STATUS_APPLY_WINDOW        ].value._double = win;
+
+    sv[STATUS_LOCAL_STATUS        ].value._int64  = state2status(state_());
+    sv[STATUS_LOCAL_STATUS_COMMENT].value._string = state2status_str(state_(),
+                                                                    sst_state_);
 
     return &wsrep_status_[0];
 }

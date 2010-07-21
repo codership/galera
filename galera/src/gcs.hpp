@@ -36,7 +36,7 @@ namespace galera
                                                const std::string& sst_donor,
                                                gcs_seqno_t* seqno_l) = 0;
         virtual ssize_t join(gcs_seqno_t seqno) = 0;
-        virtual ssize_t queue_len() const = 0;
+        virtual void    get_stats(gcs_stats*) const = 0;
     };
 
     class Gcs : public GcsI
@@ -113,7 +113,10 @@ namespace galera
 
         ssize_t join(gcs_seqno_t seqno) { return gcs_join(conn_, seqno); }
 
-        ssize_t queue_len() const { return gcs_queue_len(conn_); }
+        void get_stats(gcs_stats* stats) const
+        {
+            return gcs_get_stats(conn_, stats);
+        }
 
     private:
 
@@ -171,7 +174,10 @@ namespace galera
 
         ssize_t join(gcs_seqno_t seqno) { return -ENOTCONN; }
 
-        ssize_t queue_len() const { return 0; }
+        void get_stats(gcs_stats* stats) const
+        {
+            memset (stats, 0, sizeof(*stats));
+        }
 
     private:
 

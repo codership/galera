@@ -183,5 +183,7 @@ start()
 
 restart()
 {
-    _cluster_up restart_node "$@"
+    stop
+    _cluster_up start_node "$@"
 }
+

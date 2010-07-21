@@ -12,7 +12,17 @@
 
 #include <string.h>
 
-extern gcs_sm_t*
+static void
+sm_init_stats (gcs_sm_stats_t* stats)
+{
+    stats->sample_start   = gu_time_monotonic();
+    stats->pause_start    = 0;
+    stats->paused_for     = 0;
+    stats->send_q_samples = 0;
+    stats->send_q_len     = 0;
+}
+
+gcs_sm_t*
 gcs_sm_create (long len, long n)
 {
     if ((len < 2 /* 2 is minimum */) || (len & (len - 1))) {
@@ -31,6 +41,7 @@ gcs_sm_create (long len, long n)
     gcs_sm_t* sm = gu_malloc(sm_size);
 
     if (sm) {
+        sm_init_stats (&sm->stats);
         gu_mutex_init (&sm->lock, NULL);
         sm->wait_q_len  = len;
         sm->wait_q_mask = sm->wait_q_len - 1;
@@ -49,7 +60,7 @@ gcs_sm_create (long len, long n)
     return sm;
 }
 
-extern long
+long
 gcs_sm_close (gcs_sm_t* sm)
 {
     gu_info ("Closing send monitor...");
@@ -87,10 +98,56 @@ gcs_sm_close (gcs_sm_t* sm)
     return 0;
 }
 
-extern void
+void
 gcs_sm_destroy (gcs_sm_t* sm)
 {
     gu_mutex_destroy(&sm->lock);
     gu_free (sm);
 }
 
+void
+gcs_sm_stats (gcs_sm_t* sm, long* q_len, double* q_len_avg, double* paused_for)
+{
+    gcs_sm_stats_t tmp;
+    long long      now;
+    bool           paused;
+
+    if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
+
+    *q_len = sm->users;
+    tmp    = sm->stats;
+    now    = gu_time_monotonic();
+    paused = sm->pause;
+
+    sm->stats.sample_start = now;
+    sm->stats.pause_start  = now; // if we are in paused state this is true
+                                  // and if not - gcs_sm_pause() will correct it
+    sm->stats.paused_for     = 0;
+    sm->stats.send_q_samples = 0;
+    sm->stats.send_q_len     = 0;
+
+    gu_mutex_unlock (&sm->lock);
+
+    if (paused) { // taking sample in a middle of a pause
+        tmp.paused_for += now - tmp.pause_start;
+    }
+
+    if (tmp.paused_for >= 0) {
+        *paused_for = ((double)tmp.paused_for) / (now - tmp.sample_start);
+    }
+    else {
+        *paused_for = -1.0;
+    }
+
+    if (tmp.send_q_len >= 0 && tmp.send_q_samples >= 0){
+        if (tmp.send_q_samples > 0) {
+            *q_len_avg = ((double)tmp.send_q_len) / tmp.send_q_samples;
+        }
+        else {
+            *q_len_avg = 0.0;
+        }
+    }
+    else {
+        *q_len_avg = -1.0;
+    }
+}

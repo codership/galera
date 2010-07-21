@@ -41,7 +41,9 @@ extern void  gu_fifo_pop_head  (gu_fifo_t* q);
 extern void* gu_fifo_get_tail  (gu_fifo_t* q);
 /*! Advance FIFO tail pointer and release FIFO. */
 extern void  gu_fifo_push_tail (gu_fifo_t* q);
-/*! Return how many items are in the queue */
-extern unsigned long gu_fifo_length (gu_fifo_t* q);
+/*! Return how many items are in the queue (unprotected) */
+extern long  gu_fifo_length    (gu_fifo_t* q);
+/*! Return how many items were in the queue on average per push_tail() */
+extern void  gu_fifo_stats     (gu_fifo_t* q, long* q_len, double* q_len_avg);
 
 #endif // _gu_fifo_h_

@@ -26,7 +26,7 @@ Options:
     --sb|--skip-build skip the actual build, use the existing binaries
     --sc|--skip-configure skip configure
     --skip-clients    don't include client binaries in test package
-    --scons           use scons to build galera libraries
+    --scons           use scons to build galera libraries (yes)
     -r|--release <galera release>, otherwise revisions will be used
 -s and -b options affect only Galera build.
 EOF
@@ -46,7 +46,7 @@ SKIP_BUILD=no
 SKIP_CONFIGURE=no
 SKIP_CLIENTS=no
 SCRATCH=no
-SCONS=no
+SCONS="yes"
 JOBS=1
 GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
 

@@ -21,7 +21,7 @@ Options:
     --with-spread   configure build with spread backend (implies -c to gcs)
     --source        build source packages
     --sb            skip actual build, use the existing binaries
-    --scons         build using Scons build system (no)
+    --scons         build using Scons build system (yes)
     -j|--jobs       how many parallel jobs to use for Scons (1)
     "\nSet DISABLE_GCOMM/DISABLE_VSBES to 'yes' to disable respective modules"
 EOF
@@ -35,7 +35,7 @@ RELEASE=${RELEASE:-""}
 SOURCE=${SOURCE:-"no"}
 DEBUG=${DEBUG:-"no"}
 DEBUG_LEVEL=${DEBUG_LEVEL:-"1"}
-SCONS=${SCONS:-"no"}
+SCONS=${SCONS:-"yes"}
 JOBS=${JOBS:-"1"}
 
 which dpkg >/dev/null 2>&1 && DEBIAN=${DEBIAN:-1} || DEBIAN=${DEBIAN:-0}

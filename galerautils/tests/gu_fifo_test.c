@@ -6,14 +6,14 @@
 #include "gu_fifo_test.h"
 #include "../src/galerautils.h"
 
-#define FIFO_LENGTH 10000UL
+#define FIFO_LENGTH 10000L
 
 START_TEST (gu_fifo_test)
 {
     gu_fifo_t* fifo;
-    size_t i;
+    long i;
     size_t* item;
-    size_t used;
+    long used;
 
     fifo = gu_fifo_create (0, 1);
     fail_if (fifo != NULL);
@@ -49,7 +49,7 @@ START_TEST (gu_fifo_test)
     for (i = 0; i < used; i++) {
         item = gu_fifo_get_head (fifo);
         fail_if (item == NULL, "could not get item %ld", i);
-        fail_if (*item != i, "got %ld, expected %ld", *item, i);
+        fail_if (*item != (ulong)i, "got %ld, expected %ld", *item, i);
         gu_fifo_pop_head (fifo);
     }
 

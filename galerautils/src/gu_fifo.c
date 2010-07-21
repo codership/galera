@@ -43,6 +43,8 @@ struct gu_fifo
     ulong alloc;
     long  get_wait;
     long  put_wait;
+    long  q_len;
+    long  q_len_samples;
     bool  closed;
 
     gu_mutex_t   lock;
@@ -330,7 +332,9 @@ void* gu_fifo_get_tail (gu_fifo_t* q)
 void gu_fifo_push_tail (gu_fifo_t* q)
 {
     q->tail = FIFO_INC(q, q->tail);
+    q->q_len += q->used;
     q->used++;
+    q->q_len_samples++;
 
     if (fifo_unlock_put(q)) {
         gu_fatal ("Faled to unlock queue to put item.");
@@ -339,9 +343,40 @@ void gu_fifo_push_tail (gu_fifo_t* q)
 }
 
 /*! returns how many items are in the queue */
-ulong gu_fifo_length (gu_fifo_t* q)
+long gu_fifo_length (gu_fifo_t* q)
 {
     return q->used;
+}
+
+/*! returns how many items were in the queue per push_tail() */
+void gu_fifo_stats (gu_fifo_t* q, long* q_len, double* q_len_avg)
+{
+    fifo_lock (q);
+
+    *q_len = q->used;
+
+    long len     = q->q_len;
+    long samples = q->q_len_samples;
+
+    q->q_len = 0;
+    q->q_len_samples = 0;
+
+    fifo_unlock (q);
+
+    if (len >= 0 && samples >= 0) {
+        if (samples > 0)
+        {
+            *q_len_avg = ((double)len) / samples;
+        }
+        else
+        {
+            assert (0 == len);
+            *q_len_avg = 0.0;
+        }
+    }
+    else {
+        *q_len_avg = -1.0;
+    }
 }
 
 /* destructor - would block until all members are dequeued */
@@ -403,7 +438,8 @@ char *gu_fifo_print (gu_fifo_t *queue)
 	      "\tcolumns = %lu\n"
 	      "\tused    = %lu (%lu bytes)\n"
 	      "\talloctd = %lu bytes\n"
-              "\thead    = %lu, tail = %lu"
+              "\thead    = %lu, tail = %lu\n"
+              "\tavg.len = %f"
               //", next = %lu"
               ,
 	      (void*)queue,
@@ -412,7 +448,9 @@ char *gu_fifo_print (gu_fifo_t *queue)
 	      queue->col_mask + 1,
 	      queue->used, queue->used * queue->item_size,
 	      queue->alloc,
-              queue->head, queue->tail
+              queue->head, queue->tail,
+              queue->q_len_samples > 0 ?
+              ((double)queue->q_len)/queue->q_len_samples : 0.0
               //, queue->next
 	);
     

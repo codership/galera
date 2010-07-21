@@ -100,19 +100,13 @@ extern long gcs_close (gcs_conn_t *conn);
  */
 extern long gcs_destroy (gcs_conn_t *conn);
 
-/*! @brief Waits until the group catches up.
+/*! @brief Deprecated. Waits until the group catches up.
  * This call checks if any member of the group (including this one) has a
  * long slave queue. Should be called before gcs_repl(), gcs_send().
  *
  * @return negative error code, 1 if wait is required, 0 otherwise
  */
 extern long gcs_wait (gcs_conn_t *conn);
-
-/*! @brief Returns length of the action queue (unread actions)
- *
- * @return length of the action queue or negative error code
- */
-extern long gcs_queue_len (gcs_conn_t *conn);
 
 /*! @typedef @brief Action types.
  * There is a conceptual difference between "messages"
@@ -336,13 +330,26 @@ typedef struct gcs_act_conf {
     gcs_seqno_t      seqno;    //! last global seqno applied by this group
     gcs_seqno_t      conf_id;  //! configuration ID (-1 if non-primary)
     uint8_t          group_uuid[GCS_UUID_LEN];/// group UUID
-//    bool         st_required;   //! state transfer is required (gap in seqnos)
     long             memb_num; //! number of members in configuration
     long             my_idx;   //! index of this node in the configuration
     gcs_node_state_t my_state; //! current node state
     char             data[1];  /*! member array (null-terminated ID, name,
                                 *  incoming address) */
 } gcs_act_conf_t;
+
+struct gcs_stats
+{
+    double send_q_len_avg;  //! average send queue length per send call
+    double recv_q_len_avg;  //! average recv queue length per queued action
+    double fc_paused;       //! faction of time paused due to flow control
+    long   send_q_len;      //! current send queue length
+    long   recv_q_len;      //! current send queue length
+    long   fc_sent;         //! flow control stops sent
+    long   fc_received;     //! flow control stops received
+};
+
+/*! Fills stats struct and resets stats counters */
+extern void gcs_get_stats (gcs_conn_t *conn, struct gcs_stats* stats);
 
 #ifdef __cplusplus
 }

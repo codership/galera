@@ -134,6 +134,8 @@ struct gcs_conn
     long         queue_len;   // slave queue length
     long         upper_limit; // upper slave queue limit
     long         lower_limit; // lower slave queue limit
+    long         stats_fc_sent;
+    long         stats_fc_received;
 
     /* sync control */
     bool         sync_sent;
@@ -299,6 +301,7 @@ gcs_fc_stop_end (gcs_conn_t* conn)
 
     if (ret >= 0) {
         ret = 0;
+        conn->stats_fc_sent++;
     }
     else {
         conn->stop_sent--;
@@ -694,6 +697,7 @@ gcs_handle_actions (gcs_conn_t*                conn,
         }
 //        gu_info ("RECEIVED %s", fc->stop ? "STOP" : "CONT");
         conn->stop_count += ((fc->stop != 0) << 1) - 1; // +1 if !0, -1 if 0
+        conn->stats_fc_received++;
 #ifdef GCS_USE_SM
         if (1 == conn->stop_count) {
             gcs_sm_pause (conn->sm);    // first STOP request
@@ -892,10 +896,11 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
 #ifdef GCS_USE_SM
     gu_cond_t tmp_cond; /* TODO: rework when concurrency in SM is allowed */
     gu_cond_init (&tmp_cond, NULL);
-    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, false))) {
+    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, false)))
 #else
-    if (!(ret = gu_mutex_lock (&conn->lock))) {
+    if (!(ret = gu_mutex_lock (&conn->lock)))
 #endif /* GCS_USE_SM */
+    {
         if (GCS_CONN_CLOSED == conn->state) {
 
             if (!(ret = gcs_core_open (conn->core, channel, url))) {
@@ -1097,10 +1102,11 @@ long gcs_send (gcs_conn_t*          conn,
 #ifdef GCS_USE_SM
     gu_cond_t tmp_cond;
     gu_cond_init (&tmp_cond, NULL);
-    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, scheduled))) {
+    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, scheduled)))
 #else
-    if (!(ret = gu_mutex_lock (&conn->lock))) {
+    if (!(ret = gu_mutex_lock (&conn->lock)))
 #endif /* GCS_USE_SM */
+    {
         if (GCS_CONN_OPEN >= conn->state) {
             /* need to make a copy of the action, since receiving thread
              * has no way of knowing that it shares this buffer.
@@ -1373,12 +1379,6 @@ gcs_wait (gcs_conn_t* conn)
 }
 
 long
-gcs_queue_len (gcs_conn_t* conn)
-{
-    return conn->queue_len;
-}
-
-long
 gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size)
 {
     return gcs_core_set_pkt_size (conn->core, pkt_size);
@@ -1410,4 +1410,20 @@ long
 gcs_join (gcs_conn_t* conn, gcs_seqno_t seqno)
 {
     return gcs_core_send_join (conn->core, seqno);
+}
+
+void
+gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
+{
+    gu_fifo_stats (conn->recv_q,
+                   &stats->recv_q_len,
+                   &stats->recv_q_len_avg);
+
+    gcs_sm_stats  (conn->sm,
+                   &stats->send_q_len,
+                   &stats->send_q_len_avg,
+                   &stats->fc_paused);
+
+    stats->fc_sent     = conn->stats_fc_sent;     conn->stats_fc_sent     = 0;
+    stats->fc_received = conn->stats_fc_received; conn->stats_fc_received = 0;
 }

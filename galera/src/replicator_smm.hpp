@@ -30,6 +30,7 @@ namespace galera
     class ReplicatorSMM : public Replicator
     {
     public:
+
         typedef enum
         {
             S_CLOSED,
@@ -40,7 +41,6 @@ namespace galera
             S_DONOR
         } State;
 
-
         typedef enum
         {
             SST_NONE,
@@ -48,7 +48,6 @@ namespace galera
             SST_REQ_FAILED,
             SST_FAILED
         } SstState;
-
 
         static const size_t N_STATES = S_DONOR + 1;
 
@@ -94,9 +93,8 @@ namespace galera
                                     wsrep_seqno_t       seqno,
                                     const void*         state,
                                     size_t              state_len);
-        // wsrep_status_t snapshot();
-        const struct wsrep_status_var* status() const;
 
+        const struct wsrep_status_var* status() const;
 
         void store_state(const std::string& file) const;
         void restore_state(const std::string& file);
@@ -114,9 +112,12 @@ namespace galera
                                              size_t act_size,
                                              wsrep_seqno_t seqno_l,
                                              wsrep_seqno_t seqno_g);
+
         wsrep_status_t request_sst(const wsrep_uuid_t&, wsrep_seqno_t,
                                    const void*, size_t);
+
         bool st_required(const gcs_act_conf_t&);
+
         wsrep_status_t process_conf(void* recv_ctx, const gcs_act_conf_t* conf);
 
 
@@ -137,25 +138,32 @@ namespace galera
         class LocalOrder
         {
         public:
+
             LocalOrder(TrxHandle& trx)
                 :
                 seqno_(trx.local_seqno()),
                 trx_(&trx)
             { }
+
             LocalOrder(wsrep_seqno_t seqno)
                 :
                 seqno_(seqno),
                 trx_(0)
             { }
-            void lock() { if (trx_ != 0) trx_->lock(); }
+
+            void lock()   { if (trx_ != 0) trx_->lock();   }
             void unlock() { if (trx_ != 0) trx_->unlock(); }
+
             wsrep_seqno_t seqno() const { return seqno_; }
+
             bool condition(wsrep_seqno_t last_entered,
                            wsrep_seqno_t last_left) const
             {
                 return (last_left + 1 == seqno_);
             }
+
         private:
+
             wsrep_seqno_t seqno_;
             TrxHandle*    trx_;
         };
@@ -163,17 +171,23 @@ namespace galera
         class ApplyOrder
         {
         public:
+
             ApplyOrder(TrxHandle& trx) : trx_(trx) { }
-            void lock() { trx_.lock(); }
+
+            void lock()   { trx_.lock();   }
             void unlock() { trx_.unlock(); }
+
             wsrep_seqno_t seqno() const { return trx_.global_seqno(); }
+
             bool condition(wsrep_seqno_t last_entered,
                            wsrep_seqno_t last_left) const
             {
                 return (trx_.is_local() == true ||
                         last_left >= trx_.last_depends_seqno());
             }
+
         private:
+
             TrxHandle& trx_;
         };
 
@@ -181,13 +195,15 @@ namespace galera
         class Transition
         {
         public:
-            Transition(State const from, State const to)
-                :
+
+            Transition(State const from, State const to) :
                 from_(from),
                 to_(to)
             { }
+
             State from() const { return from_; }
-            State to() const { return to_; }
+            State to()   const { return to_;   }
+
             bool operator==(Transition const& other) const
             {
                 return (from_ == other.from_ && to_ == other.to_);
@@ -204,6 +220,7 @@ namespace galera
             };
 
         private:
+
             State from_;
             State to_;
         };
@@ -231,9 +248,9 @@ namespace galera
         std::string   sst_donor_;
         wsrep_uuid_t  sst_uuid_;
         wsrep_seqno_t sst_seqno_;
-        gu::Mutex sst_mutex_;
-        gu::Cond  sst_cond_;
-        int sst_retry_sec_;
+        gu::Mutex     sst_mutex_;
+        gu::Cond      sst_cond_;
+        int           sst_retry_sec_;
 
         // services
         Gcs        gcs_;
@@ -248,7 +265,6 @@ namespace galera
         Monitor<ApplyOrder> apply_monitor_;
 
         // counters
-
         gu::Atomic<size_t>    receivers_;
         gu::Atomic<long long> replicated_;
         gu::Atomic<long long> replicated_bytes_;
@@ -261,10 +277,10 @@ namespace galera
         gu::Atomic<long long> local_replays_;
 
         // reporting last committed
-        size_t report_interval_;
+        size_t             report_interval_;
         gu::Atomic<size_t> report_counter_;
 
-        std::vector<struct wsrep_status_var> wsrep_status_;
+        mutable std::vector<struct wsrep_status_var> wsrep_status_;
     };
 
     std::ostream& operator<<(std::ostream& os, ReplicatorSMM::State state);

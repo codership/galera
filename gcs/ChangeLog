@@ -1,3 +1,9 @@
+2010-07-18 Alex 
+    Substituted gcs_slave_queue_len() with gcs_get_stats() to return
+    a wider range of gcs performance statistics. At this time it includes
+    average slave queue length, average send queue length, fraction of
+    time spent paused and number of flow control events sent and received.
+
 2010-06-16 Alex 
     Added gcs_interrupt() call to be able to interrupt scheduled threads.
     Version 0.13.1

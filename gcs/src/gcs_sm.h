@@ -27,8 +27,19 @@ typedef struct gcs_sm_user
 }
 gcs_sm_user_t;
 
+typedef struct gcs_sm_stats
+{
+    long long sample_start;
+    long long pause_start;
+    long long paused_for;
+    long      send_q_samples;
+    long      send_q_len;
+}
+gcs_sm_stats_t;
+
 typedef struct gcs_sm
 {
+    gcs_sm_stats_t stats;
     gu_mutex_t    lock;
     unsigned long wait_q_len;
     unsigned long wait_q_mask;
@@ -158,9 +169,13 @@ gcs_sm_schedule (gcs_sm_t* sm)
         sm->users++;
         GCS_SM_INCREMENT(sm->wait_q_tail); /* even if we don't queue, cursor
                                             * needs to be advanced */
+        sm->stats.send_q_samples++;
 
         if (GCS_SM_HAS_TO_WAIT) {
             ret = sm->wait_q_tail + 1; // waiter handle
+
+            /* here we want to distinguish between FC pause and real queue */
+            sm->stats.send_q_len += sm->users - 1;
         }
 
         return ret; // success
@@ -246,7 +261,8 @@ gcs_sm_pause (gcs_sm_t* sm)
 {
     if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
 
-    sm->pause = (sm->ret == 0); /* don't pause closed monitor */
+    sm->pause = (!sm->pause && sm->ret == 0 && /* don't pause closed monitor */
+                 (sm->stats.pause_start = gu_time_monotonic()));
 
     gu_mutex_unlock (&sm->lock);
 }
@@ -266,6 +282,8 @@ gcs_sm_continue (gcs_sm_t* sm)
 
     if (gu_likely(sm->pause)) {
         _gcs_sm_continue_common (sm);
+
+        sm->stats.paused_for += gu_time_monotonic() - sm->stats.pause_start;
     }
     else {
         gu_debug ("Trying to continue unpaused monitor");
@@ -313,5 +331,17 @@ gcs_sm_interrupt (gcs_sm_t* sm, long handle)
 
     return ret;
 }
+
+/*!
+ * Each call to this function resets stats and starts new sampling interval
+ *
+ * @param q_len      current send queue length
+ * @param q_len_avg  set to an average number of preceding users seen by each
+ *                   new one (not including itself) (-1 if stats overflown)
+ * @param paused_for set to a fraction of time which monitor spent in a paused
+ *                   state (-1 if stats overflown)
+ */
+extern void
+gcs_sm_stats (gcs_sm_t* sm, long* q_len, double* q_len_avg, double* paused_for);
 
 #endif /* _gcs_sm_h_ */
