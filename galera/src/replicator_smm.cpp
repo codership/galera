@@ -1120,9 +1120,9 @@ const struct wsrep_status_var* galera::ReplicatorSMM::status() const
     struct gcs_stats stats;
     gcs_.get_stats (&stats);
 
-    sv[STATUS_LOCAL_SEND_QUEUE    ].value._double = stats.send_q_len;
+    sv[STATUS_LOCAL_SEND_QUEUE    ].value._int64  = stats.send_q_len;
     sv[STATUS_LOCAL_SEND_QUEUE_AVG].value._double = stats.send_q_len_avg;
-    sv[STATUS_LOCAL_RECV_QUEUE    ].value._double = stats.recv_q_len;
+    sv[STATUS_LOCAL_RECV_QUEUE    ].value._int64  = stats.recv_q_len;
     sv[STATUS_LOCAL_RECV_QUEUE_AVG].value._double = stats.recv_q_len_avg;
     sv[STATUS_FC_PAUSED           ].value._double = stats.fc_paused;
     sv[STATUS_FC_SENT             ].value._int64  = stats.fc_sent;
