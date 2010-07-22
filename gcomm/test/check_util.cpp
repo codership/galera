@@ -6,11 +6,9 @@
 #include "histogram.hpp"
 #include "gcomm/protonet.hpp"
 
-// ASIO test disabled temporarily
-//#undef GALERA_USE_BOOST_ASIO
-#ifdef GALERA_USE_BOOST_ASIO
-#include "asio.hpp"
-#endif // GALERA_USE_BOOST_ASIO
+#ifdef HAVE_ASIO_HPP
+#include "asio_protonet.hpp"
+#endif // HAVE_ASIO_HPP
 
 #include "check_gcomm.hpp"
 
@@ -37,7 +35,7 @@ START_TEST(test_histogram)
 {
 
     Histogram hs("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.");
-    
+
     hs.insert(0.001);
     log_info << hs;
 
@@ -45,22 +43,22 @@ START_TEST(test_histogram)
     {
         hs.insert(double(::rand())/RAND_MAX);
     }
-    
+
     log_info << hs;
-    
+
     hs.clear();
-    
+
     log_info << hs;
 }
 END_TEST
 
 
-#if defined(GALERA_USE_BOOST_ASIO)
+#if defined(HAVE_ASIO_HPP)
 START_TEST(test_asio)
 {
-    asio::Protonet pn;
+    AsioProtonet pn;
     const string uri_str("tcp://localhost:10001");
-    
+
     Acceptor* acc = pn.acceptor(uri_str);
     acc->listen(uri_str);
 
@@ -70,7 +68,7 @@ START_TEST(test_asio)
 
     SocketPtr sr = acc->accept();
     fail_unless(sr->get_state() == Socket::S_CONNECTED);
-    
+
     vector<byte_t> buf(cl->get_mtu());
     for (size_t i = 0; i < buf.size(); ++i)
     {
@@ -85,10 +83,10 @@ START_TEST(test_asio)
     pn.event_loop(datetime::Sec);
 
     delete acc;
-    
+
 }
 END_TEST
-#endif // GALERA_USE_BOOST_ASIO
+#endif // HAVE_ASIO_HPP
 
 START_TEST(test_protonet)
 {
@@ -107,12 +105,12 @@ Suite* util_suite()
     tcase_add_test(tc, test_histogram);
     suite_add_tcase(s, tc);
 
-#ifdef GALERA_USE_BOOST_ASIO
+#ifdef HAVE_ASIO_HPP
     tc = tcase_create("test_asio");
     tcase_add_test(tc, test_asio);
     suite_add_tcase(s, tc);
-#endif // GALERA_USE_BOOST_ASIO
-    
+#endif // HAVE_ASIO_HPP
+
     tc = tcase_create("test_protonet");
     tcase_add_test(tc, test_protonet);
     suite_add_tcase(s, tc);

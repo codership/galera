@@ -6,7 +6,7 @@
 #include "asio_tcp.hpp"
 #include "asio_udp.hpp"
 #include "asio_addr.hpp"
-#include "asio.hpp"
+#include "asio_protonet.hpp"
 
 #include "socket.hpp"
 
@@ -23,50 +23,48 @@ using namespace std::rel_ops;
 using namespace gu;
 using namespace gu::net;
 using namespace gu::datetime;
-using namespace boost;
-using namespace boost::asio;
 
 
-gcomm::asio::Protonet::Protonet()
+gcomm::AsioProtonet::AsioProtonet()
     :
     gcomm::Protonet("asio"),
+    mutex_(),
     poll_until_(Date::max()),
     io_service_(),
     timer_(io_service_),
-    mutex_(),
     mtu_(1 << 15),
     checksum_(true)
 {
 
 }
 
-gcomm::asio::Protonet::~Protonet()
+gcomm::AsioProtonet::~AsioProtonet()
 {
 
 }
 
-void gcomm::asio::Protonet::enter()
+void gcomm::AsioProtonet::enter()
 {
     mutex_.lock();
 }
 
 
 
-void gcomm::asio::Protonet::leave()
+void gcomm::AsioProtonet::leave()
 {
     mutex_.unlock();
 }
 
-gcomm::SocketPtr gcomm::asio::Protonet::socket(const URI& uri)
+gcomm::SocketPtr gcomm::AsioProtonet::socket(const URI& uri)
 {
     if (uri.get_scheme() == "tcp")
     {
-        return shared_ptr<TcpSocket>(new TcpSocket(*this, uri));
+        return boost::shared_ptr<AsioTcpSocket>(new AsioTcpSocket(*this, uri));
 
     }
     else if (uri.get_scheme() == "udp")
     {
-        return shared_ptr<UdpSocket>(new UdpSocket(*this, uri));
+        return boost::shared_ptr<AsioUdpSocket>(new AsioUdpSocket(*this, uri));
     }
     else
     {
@@ -75,9 +73,9 @@ gcomm::SocketPtr gcomm::asio::Protonet::socket(const URI& uri)
     }
 }
 
-gcomm::Acceptor* gcomm::asio::Protonet::acceptor(const URI& uri)
+gcomm::Acceptor* gcomm::AsioProtonet::acceptor(const URI& uri)
 {
-    return new TcpAcceptor(*this, uri);
+    return new AsioTcpAcceptor(*this, uri);
 }
 
 
@@ -93,20 +91,20 @@ Period handle_timers_helper(gcomm::Protonet& pnet, const Period& period)
 }
 
 
-void gcomm::asio::Protonet::event_loop(const Period& period)
+void gcomm::AsioProtonet::event_loop(const Period& period)
 {
     io_service_.reset();
     poll_until_ = Date::now() + period;
 
     const Period p(handle_timers_helper(*this, period));
-    timer_.expires_from_now(posix_time::nanosec(p.get_nsecs()));
-    timer_.async_wait(boost::bind(&asio::Protonet::handle_wait, this,
-                                  placeholders::error));
+    timer_.expires_from_now(boost::posix_time::nanosec(p.get_nsecs()));
+    timer_.async_wait(boost::bind(&AsioProtonet::handle_wait, this,
+                                  asio::placeholders::error));
     io_service_.run();
 }
 
 
-void gcomm::asio::Protonet::dispatch(const SocketId& id,
+void gcomm::AsioProtonet::dispatch(const SocketId& id,
                                    const Datagram& dg,
                                    const ProtoUpMeta& um)
 {
@@ -118,21 +116,21 @@ void gcomm::asio::Protonet::dispatch(const SocketId& id,
 }
 
 
-void gcomm::asio::Protonet::interrupt()
+void gcomm::AsioProtonet::interrupt()
 {
     io_service_.stop();
 }
 
 
-void gcomm::asio::Protonet::handle_wait(const boost::system::error_code& ec)
+void gcomm::AsioProtonet::handle_wait(const asio::error_code& ec)
 {
     Date now(Date::now());
     const Period p(handle_timers_helper(*this, poll_until_ - now));
-    if (ec == 0 && poll_until_ >= now)
+    if (ec == asio::error_code() && poll_until_ >= now)
     {
-        timer_.expires_from_now(posix_time::nanosec(p.get_nsecs()));
-        timer_.async_wait(boost::bind(&asio::Protonet::handle_wait, this,
-                                      placeholders::error));
+        timer_.expires_from_now(boost::posix_time::nanosec(p.get_nsecs()));
+        timer_.async_wait(boost::bind(&AsioProtonet::handle_wait, this,
+                                      asio::placeholders::error));
     }
     else
     {

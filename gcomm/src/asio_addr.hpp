@@ -7,11 +7,12 @@
 
 #include "gu_exception.hpp"
 
-#include <boost/asio.hpp>
+#include "asio_protonet.hpp"
+
 #include <string>
 #include <algorithm>
 
-static inline std::string escape_addr(const boost::asio::ip::address& addr)
+static inline std::string escape_addr(const asio::ip::address& addr)
 {
     if (addr.is_v4())
     {
@@ -32,7 +33,7 @@ static inline std::string unescape_addr(const std::string& addr)
 }
 
 
-static inline std::string anyaddr(const boost::asio::ip::address& addr)
+static inline std::string anyaddr(const asio::ip::address& addr)
 {
     if (addr.is_v4() == true)
     {

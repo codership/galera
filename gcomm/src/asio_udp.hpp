@@ -6,30 +6,27 @@
 #define GCOMM_ASIO_UDP_HPP
 
 #include "socket.hpp"
-#include <boost/asio.hpp>
+#include "asio_protonet.hpp"
 #include <boost/enable_shared_from_this.hpp>
 #include <vector>
 
 namespace gcomm
 {
-    namespace asio
-    {
-        class UdpSocket;
-        class Protonet;
-    }
+    class AsioUdpSocket;
+    class AsioProtonet;
 }
 
-class gcomm::asio::UdpSocket : 
+class gcomm::AsioUdpSocket :
     public gcomm::Socket,
-    public boost::enable_shared_from_this<UdpSocket>
+    public boost::enable_shared_from_this<AsioUdpSocket>
 {
 public:
-    UdpSocket(Protonet& net, const gu::URI& uri);
-    ~UdpSocket();
+    AsioUdpSocket(AsioProtonet& net, const gu::URI& uri);
+    ~AsioUdpSocket();
     void connect(const gu::URI& uri);
     void close();
     int send(const gu::Datagram& dg);
-    void read_handler(const boost::system::error_code&, size_t);
+    void read_handler(const asio::error_code&, size_t);
     void async_receive();
     size_t get_mtu() const;
     std::string get_local_addr() const;
@@ -38,12 +35,12 @@ public:
     SocketId get_id() const { return &socket_; }
 
 private:
-    Protonet&          net_;
-    State              state_;
-    boost::asio::ip::udp::socket    socket_;
-    boost::asio::ip::udp::endpoint  target_ep_;
-    boost::asio::ip::udp::endpoint  source_ep_;
-    std::vector<gu::byte_t> recv_buf_;
+    AsioProtonet&            net_;
+    State                    state_;
+    asio::ip::udp::socket    socket_;
+    asio::ip::udp::endpoint  target_ep_;
+    asio::ip::udp::endpoint  source_ep_;
+    std::vector<gu::byte_t>  recv_buf_;
 };
 
 #endif // GCOMM_ASIO_UDP_HPP

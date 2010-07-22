@@ -103,7 +103,9 @@ if cc != 'default':
 cxx = os.getenv('CXX', 'default')
 if cxx != 'default':
     env.Replace(CXX = cxx)
-
+link = os.getenv('LINK', 'default')
+if link != 'default':
+    env.Replace(LINK = link)
 # Freebsd ports are installed under /usr/local 
 if sysname == 'freebsd':
     env.Append(LIBPATH = '-L/usr/local/lib')
@@ -224,12 +226,8 @@ if boost == 1:
         print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
 
 
-    if conf.CheckCXXHeader('boost/asio.hpp'):
-        if conf.CheckLib('boost_system-mt'):
-            print 'Using boost asio'
-            conf.env.Append(CPPFLAGS = ' -DGALERA_USE_BOOST_ASIO=1')
-        else:
-            print 'Library boost_system-mt not usable, disabling asio'
+    if conf.CheckCXXHeader('asio.hpp'):
+        conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
 else:
     print 'Not using boost'
 

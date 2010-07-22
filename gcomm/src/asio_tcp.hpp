@@ -6,42 +6,38 @@
 #define GCOMM_ASIO_TCP_HPP
 
 #include "socket.hpp"
+#include "asio_protonet.hpp"
 
-#include <boost/asio.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <vector>
 #include <deque>
 
 namespace gcomm
 {
-    namespace asio
-    {
-        class Protonet;
-        class TcpSocket;
-        class TcpAcceptor;
-    }
+    class AsioTcpSocket;
+    class AsioTcpAcceptor;
 }
 
 // TCP Socket implementation
 
-class gcomm::asio::TcpSocket : 
+class gcomm::AsioTcpSocket :
     public gcomm::Socket,
-    public boost::enable_shared_from_this<TcpSocket>
+    public boost::enable_shared_from_this<AsioTcpSocket>
 {
 public:
-    TcpSocket(Protonet& net, const gu::URI& uri);
-    ~TcpSocket();
-    void failed_handler(const boost::system::error_code& ec);
-    void connect_handler(const boost::system::error_code& ec);
+    AsioTcpSocket(AsioProtonet& net, const gu::URI& uri);
+    ~AsioTcpSocket();
+    void failed_handler(const asio::error_code& ec);
+    void connect_handler(const asio::error_code& ec);
     void connect(const gu::URI& uri);
     void close();
-    void write_handler(const boost::system::error_code& ec,
-                       size_t bytes_transferred);    
+    void write_handler(const asio::error_code& ec,
+                       size_t bytes_transferred);
     int send(const gu::Datagram& dg);
     size_t read_completion_condition(
-        const boost::system::error_code& ec,
+        const asio::error_code& ec,
         const size_t bytes_transferred);
-    void read_handler(const boost::system::error_code& ec,
+    void read_handler(const asio::error_code& ec,
                       const size_t bytes_transferred);
     void async_receive();
     size_t get_mtu() const;
@@ -50,44 +46,44 @@ public:
     State get_state() const { return state_; }
     SocketId get_id() const { return &socket_; }
 private:
-    friend class gcomm::asio::TcpAcceptor;
+    friend class gcomm::AsioTcpAcceptor;
 
-    TcpSocket(const TcpSocket&);
-    void operator=(const TcpSocket&);
+    AsioTcpSocket(const AsioTcpSocket&);
+    void operator=(const AsioTcpSocket&);
 
-    Protonet&                     net_;
-    boost::asio::ip::tcp::socket  socket_;
-    std::deque<gu::Datagram> send_q_;
+    AsioProtonet&                 net_;
+    asio::ip::tcp::socket         socket_;
+    std::deque<gu::Datagram>      send_q_;
     std::vector<gu::byte_t>       recv_buf_;
     size_t                        recv_offset_;
     State                         state_;
 };
 
 
-class gcomm::asio::TcpAcceptor : public gcomm::Acceptor
+class gcomm::AsioTcpAcceptor : public gcomm::Acceptor
 {
 public:
-    
-    TcpAcceptor(asio::Protonet& net, const gu::URI& uri);
-    ~TcpAcceptor();
+
+    AsioTcpAcceptor(AsioProtonet& net, const gu::URI& uri);
+    ~AsioTcpAcceptor();
     void accept_handler(
         SocketPtr socket,
-        const boost::system::error_code& error);
+        const asio::error_code& error);
     void listen(const gu::URI& uri);
     void close();
     SocketPtr accept();
-    
+
     State get_state() const
     {
         gu_throw_fatal << "TODO:";
         throw;
     }
-    
-    SocketId get_id() const { return &acceptor_; } 
-    
+
+    SocketId get_id() const { return &acceptor_; }
+
 private:
-    Protonet& net_;
-    boost::asio::ip::tcp::acceptor acceptor_;
+    AsioProtonet& net_;
+    asio::ip::tcp::acceptor acceptor_;
     SocketPtr accepted_socket_;
 };
 
