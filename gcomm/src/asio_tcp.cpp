@@ -181,7 +181,7 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
                                         const size_t bytes_transferred)
 {
     Critical<AsioProtonet> crit(net_);
-    if (!ec)
+    if (ec)
     {
         failed_handler(ec);
         return;

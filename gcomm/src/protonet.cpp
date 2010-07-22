@@ -6,9 +6,9 @@
 
 #include "gu.hpp"
 
-#ifdef GALERA_USE_BOOST_ASIO
+#ifdef HAVE_ASIO_HPP
 #include "asio_protonet.hpp"
-#endif /* GALERA_USE_BOOST_ASIO */
+#endif // HAVE_ASIO_HPP
 
 #include "gcomm/util.hpp"
 
@@ -57,10 +57,10 @@ gcomm::Protonet* gcomm::Protonet::create(const std::string conf)
 {
     if (conf == "gu")
         return new GuProtonet();
-#ifdef GALERA_USE_BOOST_ASIO
+#ifdef HAVE_ASIO_HPP
     else if (conf == "asio")
         return new AsioProtonet();
-#endif /* GALERA_USE_BOOST_ASIO */
+#endif // HAVE_ASIO_HPP
     gu_throw_fatal << "protonet " << conf << " not supported";
     throw;
 }
