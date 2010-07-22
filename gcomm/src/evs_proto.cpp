@@ -426,10 +426,9 @@ void gcomm::evs::Proto::handle_install_timer()
     }
     const bool is_cons(consensus.is_consensus());
     const bool is_repr(is_representative(get_uuid()));
-    log_info << "consensus: " << is_cons;
-    log_info << "repr     : " << is_repr;
-    log_info << "state dump for diagnosis (stderr):";
-    std::cerr << *this;
+    evs_log_info(I_STATE) << "consensus: " << is_cons;
+    evs_log_info(I_STATE) << "repr     : " << is_repr;
+    evs_log_info(I_STATE) << "state dump for diagnosis:" << *this;
     shift_to(S_GATHER, true);
     if (is_cons == true && is_repr == true)
     {
@@ -1960,10 +1959,6 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         break;
     case S_GATHER:
     {
-        if (get_state() != S_GATHER)
-        {
-            cleanup_joins();
-        }
         setall_committed(false);
         setall_installed(false);
         delete install_message;
@@ -2070,10 +2065,8 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
 
         cleanup_unoperational();
         cleanup_views();
-        for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
-        {
-            NodeMap::get_value(i).set_join_message(0);
-        }
+        cleanup_joins();
+
         delete install_message;
         install_message = 0;
 
@@ -3019,10 +3012,18 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                 << "shift to gather due to representative join";
             gu_trace(shift_to(S_GATHER, false));
         }
-        else if (consensus.is_consistent(*install_message) == true &&
-                 consensus.is_consistent(msg)              == true)
+        else if (consensus.is_consistent(*install_message) == true)
         {
-            return;
+            if (consensus.is_consistent(msg) == true)
+            {
+                return;
+            }
+            else
+            {
+                evs_log_info(I_STATE) << "join message not consistent " << msg;
+                evs_log_info(I_STATE) << "state:" << *this;
+                gu_trace(shift_to(S_GATHER, false));
+            }
         }
         else
         {
@@ -3030,6 +3031,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
                 << "shift to GATHER, install message is "
                 << "inconsistent when handling join from "
                 << msg.get_source() << " " << msg.get_source_view_id();
+            evs_log_info(I_STATE) << "state: " << *this;
             gu_trace(shift_to(S_GATHER, false));
         }
     }
