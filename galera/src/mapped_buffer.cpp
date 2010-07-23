@@ -25,7 +25,7 @@ galera::MappedBuffer::MappedBuffer(const std::string& working_dir,
     buf_          (0),
     buf_size_     (0),
     real_buf_size_(0)
-{ 
+{
 
 }
 
@@ -49,7 +49,7 @@ void galera::MappedBuffer::reserve(size_t sz)
         // no need for reallocation
         return;
     }
-    
+
     if (sz > threshold_)
     {
         sz = (sz/threshold_ + 1)*threshold_;
@@ -64,10 +64,10 @@ void galera::MappedBuffer::reserve(size_t sz)
             }
             if (ftruncate(fd_, sz) == -1)
             {
-                gu_throw_error(errno) << "fruncate() failed";
+                gu_throw_error(errno) << "ftruncate() failed";
             }
             byte_t* tmp(reinterpret_cast<byte_t*>(
-                            mmap(NULL, sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, 
+                            mmap(NULL, sz, PROT_READ | PROT_WRITE, MAP_PRIVATE,
                                  fd_, 0)));
             if (tmp == 0)
             {
@@ -79,15 +79,19 @@ void galera::MappedBuffer::reserve(size_t sz)
         }
         else
         {
+            if (munmap(buf_, real_buf_size_) != 0)
+            {
+                gu_throw_error(errno) << "munmap() failed";
+            }
             if (ftruncate(fd_, sz) == -1)
             {
                 gu_throw_error(errno) << "fruncate() failed";
             }
             byte_t* tmp(reinterpret_cast<byte_t*>(
-                            mremap(buf_, real_buf_size_, sz, MREMAP_MAYMOVE)));
+                            mmap(NULL, sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd_, 0)));
             if (tmp == 0)
             {
-                gu_throw_error(ENOMEM) << "mremap failed";
+                gu_throw_error(ENOMEM) << "mmap() failed";
             }
             buf_ = tmp;
         }
@@ -125,7 +129,7 @@ void galera::MappedBuffer::clear()
     {
         free(buf_);
     }
-    
+
     fd_            = -1;
     buf_           = 0;
     buf_size_      = 0;
