@@ -131,7 +131,7 @@ START_TEST(test_resolver)
                 tcp_lh6_ai.to_string().c_str(), tcp_lh6.c_str());
 
 
-    std::string lh("tcp://localhost:2002");
+    std::string lh("tcp://127.0.0.1:2002");
     Addrinfo lh_ai(resolve(lh));
     fail_unless(lh_ai.to_string() == "tcp://127.0.0.1:2002" ||
                 lh_ai.to_string() == "tcp://[::1]:2002");
@@ -144,7 +144,7 @@ START_TEST(test_network_listen)
 {
     log_info << "START";
     Network net;
-    Socket* listener = net.listen("tcp://localhost:2112");
+    Socket* listener = net.listen("tcp://127.0.0.1:2112");
     listener->close();
     delete listener;
 }
@@ -257,7 +257,7 @@ START_TEST(test_network_connect)
     gu_log_max_level = GU_LOG_DEBUG;
     log_info << "START";
     Network* net = new Network;
-    Socket* listener = net->listen("tcp://localhost:2112");
+    Socket* listener = net->listen("tcp://127.0.0.1:2112");
 
     log_info << "listener " << listener->get_local_addr();
     
@@ -266,7 +266,7 @@ START_TEST(test_network_connect)
     pthread_create(&th, 0, &listener_thd, &args);
     
     Network* net2 = new Network;
-    Socket* conn = net2->connect("tcp://localhost:2112");
+    Socket* conn = net2->connect("tcp://127.0.0.1:2112");
     
     fail_unless(conn != 0);
     fail_unless(conn->get_state() == Socket::S_CONNECTED);
@@ -274,7 +274,7 @@ START_TEST(test_network_connect)
     log_info << "connected remote " << conn->get_remote_addr();
     log_info << "connected local " << conn->get_local_addr();
 
-    Socket* conn2 = net2->connect("tcp://localhost:2112");
+    Socket* conn2 = net2->connect("tcp://127.0.0.1:2112");
     fail_unless(conn2 != 0);
     fail_unless(conn2->get_state() == Socket::S_CONNECTED);
 
@@ -315,18 +315,18 @@ START_TEST(test_network_send)
     }
     
     Network* net = new Network;
-    Socket* listener = net->listen("tcp://localhost:2112");
+    Socket* listener = net->listen("tcp://127.0.0.1:2112");
     listener_thd_args args = {net, 2, buf, bufsize};
     pthread_t th;
     pthread_create(&th, 0, &listener_thd, &args);
     
     Network* net2 = new Network;
-    Socket* conn = net2->connect("tcp://localhost:2112");
+    Socket* conn = net2->connect("tcp://127.0.0.1:2112");
     
     fail_unless(conn != 0);
     fail_unless(conn->get_state() == Socket::S_CONNECTED);
     
-    Socket* conn2 = net2->connect("tcp://localhost:2112");
+    Socket* conn2 = net2->connect("tcp://127.0.0.1:2112");
     fail_unless(conn2 != 0);
     fail_unless(conn2->get_state() == Socket::S_CONNECTED);
     
@@ -421,7 +421,7 @@ static void make_connections(Network& net,
     sr.resize(n);
     for (size_t i = 0; i < n; ++i)
     {
-        cl[i] = net.connect("tcp://localhost:2112?socket.non_blocking=1");
+        cl[i] = net.connect("tcp://127.0.0.1:2112?socket.non_blocking=1");
     }
     size_t sr_cnt = 0;
     size_t cl_cnt = 0;
@@ -481,7 +481,7 @@ START_TEST(test_network_nonblocking)
     log_info << "START";
     Network net;
     
-    Socket* listener = net.listen("tcp://localhost:2112?socket.non_blocking=1");
+    Socket* listener = net.listen("tcp://127.0.0.1:2112?socket.non_blocking=1");
     
     vector<Socket*> cl;
     vector<Socket*> sr;
@@ -707,7 +707,7 @@ public:
 START_TEST(test_net_consumer)
 {
     log_info << "START";
-    string url("tcp://localhost:2112?socket.non_blocking=1");
+    string url("tcp://127.0.0.1:2112?socket.non_blocking=1");
     NetConsumer cons(url);
     cons.connect(url);
     
@@ -778,7 +778,7 @@ void* producer_thd(void* arg)
 START_TEST(test_net_consumer_nto1)
 {
     log_info << "START";
-    string url("tcp://localhost:2112?socket.non_blocking=1");
+    string url("tcp://127.0.0.1:2112?socket.non_blocking=1");
     NetConsumer cons(url);
     cons.connect(url);
 
