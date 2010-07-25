@@ -302,11 +302,11 @@ state_report_uuids (char* buf, size_t buf_len,
 
 #define GCS_STATE_MAX_LEN 720
 
-/* Get quorum decision from state messages */
-long 
-gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
-                          long                   states_num,
-                          gcs_state_quorum_t*    quorum)
+/*! checks for inherited primary configuration, returns representative */
+static const gcs_state_msg_t*
+state_quorum_inherit (const gcs_state_msg_t* states[],
+                      long                   states_num,
+                      gcs_state_quorum_t*    quorum)
 {
     /* We count only nodes which come from primary configuraton -
      * prim_seqno != GCS_SEQNO_ILL
@@ -317,19 +317,8 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
      * Of those with the status >= GCS_STATE_JOINED we choose the most
      * representative: with the highest act_seqno and prim_seqno.
      */
-
     long i, j;
     const gcs_state_msg_t* rep = NULL;
-    gcs_state_quorum_t GCS_STATE_QUORUM_NON_PRIMARY =
-        {
-            GU_UUID_NIL,
-            GCS_SEQNO_ILL,
-            GCS_SEQNO_ILL,
-            false,
-            -1
-        };
-
-    *quorum = GCS_STATE_QUORUM_NON_PRIMARY; // pessimistic assumption
 
     // find at least one JOINED/DONOR (donor was once joined)
     for (i = 0; i < states_num; i++) {
@@ -342,14 +331,16 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
     if (!rep) {
         size_t buf_len = states_num * GCS_STATE_MAX_LEN;
         char*  buf = gu_malloc (buf_len);
+
         if (buf) {
             state_report_uuids (buf, buf_len, states, states_num,
                                 GCS_NODE_STATE_NON_PRIM);
-            gu_warn ("Quorum impossible: No node with complete state:\n%s",
+            gu_warn ("Quorum: No node with complete state:\n%s",
                      buf);
             gu_free (buf);
         }
-        return 0;
+
+        return NULL;
     }
 
     // Check that all JOINED/DONOR have the same group UUID
@@ -366,18 +357,10 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
                     gu_fatal("Quorum impossible: conflicting group UUIDs:\n%s");
                     gu_free (buf);
                 }
-                return 0;
+
+                return NULL;
             }
             rep = state_nodes_compare (rep, states[i]);
-        }
-    }
-
-    // 1. select the highest commonly supported protocol: min(proto_max)
-    quorum->proto = rep->proto_max;
-    for (i = 0; i < states_num; i++) {
-        if (states[i]->proto_max <  quorum->proto &&
-            states[i]->proto_max >= rep->proto_min) {
-            quorum->proto = states[i]->proto_max;
         }
     }
 
@@ -385,6 +368,148 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
     quorum->conf_id    = rep->prim_seqno;
     quorum->group_uuid = rep->group_uuid;
     quorum->primary    = true;
+
+    return rep;
+}
+
+/*! checks for full prim remerge after non-prim */
+static const gcs_state_msg_t*
+state_quorum_remerge (const gcs_state_msg_t* states[],
+                      long                   states_num,
+                      gcs_state_quorum_t*    quorum)
+{
+    const gcs_state_msg_t* rep = NULL;
+
+    struct candidate /* merge candidate */
+    {
+        gu_uuid_t              prim_uuid;
+        const gcs_state_msg_t* rep;
+        long                   prim_joined;
+        long                   found;
+    };
+
+    struct candidate* candidates = GU_CALLOC(states_num, struct candidate);
+
+    if (candidates) {
+        long i, j;
+        long candidates_found = 0;
+        long merge_cnt        = 0;
+
+        /* 1. Sort and count all nodes who have ever been JOINED by primary
+         *    component UUID */
+        for (i = 0; i < states_num; i++) {
+            if (states[i]->prim_state >= GCS_NODE_STATE_DONOR) {
+                assert(gu_uuid_compare(&states[i]->prim_uuid, &GU_UUID_NIL));
+
+                for (j = 0; j < candidates_found; j++) {
+                    if (0 == gu_uuid_compare(&states[i]->prim_uuid,
+                                             &candidates[j].prim_uuid)) {
+                        assert(states[i]->prim_joined ==
+                               candidates[j].prim_joined);
+                        assert(candidates[j].found < candidates[j].prim_joined);
+                        assert(candidates[j].found > 0);
+
+                        candidates[j].found++;
+
+                        candidates[j].rep =
+                            state_nodes_compare (candidates[j].rep, states[i]);
+
+                        break;
+                    }
+                }
+
+                if (j == candidates_found) {
+                    // we don't have this primary UUID in the list yet
+                    candidates[j].prim_uuid   = states[i]->prim_uuid;
+                    candidates[j].prim_joined = states[i]->prim_joined;
+                    candidates[j].rep         = states[i];
+                    candidates[j].found       = 1;
+                    candidates_found++;
+
+                    assert(candidates_found <= states_num);
+                }
+
+                if (candidates[j].prim_joined == candidates[j].found) {
+                    gu_info ("Complete merge of primary "GU_UUID_FORMAT
+                             " found: %ld of %ld.",
+                             GU_UUID_ARGS(&candidates[j].prim_uuid),
+                             candidates[j].found, candidates[j].prim_joined);
+                    merge_cnt++;
+                    // will be used only if merge_count == 1
+                    rep = candidates[j].rep;
+                }
+            }
+        }
+
+        if (1 == merge_cnt) {
+            assert (NULL != rep);
+
+            quorum->act_id     = rep->act_seqno;
+            quorum->conf_id    = rep->prim_seqno;
+            quorum->group_uuid = rep->group_uuid;
+            quorum->primary    = true;
+        }
+        else if (0 == merge_cnt) {
+            assert (NULL == rep);
+            gu_warn ("No completely re-merged primary component found.");
+        }
+        else {
+            assert (merge_cnt > 1);
+            gu_error ("Found more than one re-merged primary component.");
+            rep = NULL;
+        }
+
+        gu_free (candidates);
+    }
+    else {
+        gu_error ("Quorum: could not allocate %zd bytes for re-merge check.",
+                  states_num * sizeof(struct candidate));
+    }
+
+    return rep;
+}
+
+
+/* Get quorum decision from state messages */
+long 
+gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
+                          long                   states_num,
+                          gcs_state_quorum_t*    quorum)
+{
+    long i;
+    const gcs_state_msg_t*   rep = NULL;
+    const gcs_state_quorum_t STATE_QUORUM_NON_PRIMARY =
+        {
+            GU_UUID_NIL,
+            GCS_SEQNO_ILL,
+            GCS_SEQNO_ILL,
+            false,
+            -1
+        };
+
+    *quorum = STATE_QUORUM_NON_PRIMARY; // pessimistic assumption
+
+    rep = state_quorum_inherit (states, states_num, quorum);
+
+    if (!quorum->primary) {
+        rep = state_quorum_remerge (states, states_num, quorum);
+
+        if (!quorum->primary) {
+            gu_error ("Failed to establish quorum.");
+            return 0;
+        }
+    }
+
+    assert (rep != NULL);
+
+    // select the highest commonly supported protocol: min(proto_max)
+    quorum->proto = rep->proto_max;
+    for (i = 0; i < states_num; i++) {
+        if (states[i]->proto_max <  quorum->proto &&
+            states[i]->proto_max >= rep->proto_min) {
+            quorum->proto = states[i]->proto_max;
+        }
+    }
 
     return 0;
 }
