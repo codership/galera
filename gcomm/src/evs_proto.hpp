@@ -304,6 +304,8 @@ private:
     gu::datetime::Period join_retrans_period;
     gu::datetime::Period stats_report_period;
     
+    gu::datetime::Date last_inactive_check;
+
     // Current view id
     // ViewId current_view;
     View current_view;

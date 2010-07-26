@@ -78,6 +78,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf) :
     retrans_period        (),
     join_retrans_period   (),
     stats_report_period   (),
+    last_inactive_check   (gu::datetime::Date::now()),
     current_view(ViewId(V_TRANS, my_uuid, 0)),
     previous_view(),
     previous_views(),
@@ -506,6 +507,15 @@ Date gcomm::evs::Proto::handle_timers()
 
 void gcomm::evs::Proto::check_inactive()
 {
+    const Date now(Date::now());
+    if (last_inactive_check + inactive_check_period*3 < now)
+    {
+        log_warn << "last inactive check more than " << inactive_check_period*3
+                 << " ago, skipping check";
+        last_inactive_check = now;
+        return;
+    }
+
     bool has_inactive(false);
     size_t n_suspected(0);
     for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
@@ -538,13 +548,17 @@ void gcomm::evs::Proto::check_inactive()
     
     // All other nodes are under suspicion, set all others as inactive.
     // This will speed up recovery when this node has been isolated from
-    // other group.
-    if (n_suspected + 1 == known.size())
+    // other group. Note that this should be done only if known size is
+    // greater than 2 in order to avoid immediate split brain.
+    if (known.size() > 2 && n_suspected + 1 == known.size())
     {
         for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
         {
             if (NodeMap::get_key(i) != get_uuid())
             {
+                evs_log_info(I_STATE)
+                    << " setting source " << NodeMap::get_key(i)
+                    << " inactive (other nodes under suspicion)";
                 set_inactive(NodeMap::get_key(i));
             }
         }
@@ -564,6 +578,8 @@ void gcomm::evs::Proto::check_inactive()
         gu_trace(shift_to(S_CLOSED));
         profile_leave(shift_to_prof);
     }
+
+    last_inactive_check = now;
 }
 
 
