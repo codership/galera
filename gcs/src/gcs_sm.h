@@ -261,8 +261,11 @@ gcs_sm_pause (gcs_sm_t* sm)
 {
     if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
 
-    sm->pause = (!sm->pause && sm->ret == 0 && /* don't pause closed monitor */
-                 (sm->stats.pause_start = gu_time_monotonic()));
+    /* don't pause closed monitor */
+    if (gu_likely(0 == sm->ret) && !sm->pause) {
+        sm->stats.pause_start = gu_time_monotonic();
+        sm->pause = true;
+    }
 
     gu_mutex_unlock (&sm->lock);
 }
