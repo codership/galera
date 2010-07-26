@@ -128,6 +128,14 @@ check_node()
     return $(cat $BASE_RUN/check_cmd_$node_id.ret)
 }
 
+extra_params()
+{
+    local node=$1
+    local extra_params
+    [ -z "$GCOMM_EXTRA_PARAMS" ] && extra_params="?" || extra_params="?${GCOMM_EXTRA_PARAMS}&"
+    echo "${extra_params}gmcast.listen_addr=tcp://${NODE_GCS_HOST[$node]}:${NODE_GCS_PORT[$node]}"
+}
+
 # return GCS address at which node N should connect to group
 gcs_address()
 {
@@ -139,11 +147,12 @@ gcs_address()
 #        local peer=0 # use the first node as a connection handle
 
         if [ $peer -lt 0 ]; then peer=$NODE_MAX; fi # rollover
+        
 
-        echo "gcomm://${NODE_GCS_HOST[$peer]}:${NODE_GCS_PORT[$peer]}${GCOMM_EXTRA_PARAMS}"
+        echo "'gcomm://${NODE_GCS_HOST[$peer]}:${NODE_GCS_PORT[$peer]}$(extra_params $node)'"
         ;;
     "vsbes")
-        echo "vsbes://$VSBES_ADDRESS"
+        echo "'vsbes://$VSBES_ADDRESS'"
         ;;
     *)
         return 1
@@ -166,8 +175,8 @@ _cluster_up()
         then
             # must make sure 1st node completely operational
             case "$GCS_TYPE" in
-            "gcomm") $cmd "-g gcomm://:${NODE_GCS_PORT[$node]}${GCOMM_EXTRA_PARAMS}" "$@" 0 ;;
-            "vsbes") $cmd "-g vsbes://$VSBES_ADDRESS" "$@" 0 ;;
+            "gcomm") $cmd "-g 'gcomm://:${NODE_GCS_PORT[$node]}$(extra_params $node)'" "$@" 0 ;;
+            "vsbes") $cmd "-g 'vsbes://$VSBES_ADDRESS'" "$@" 0 ;;
             esac
         else
             $cmd "-g $(gcs_address $node)" "$@" $node &

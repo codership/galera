@@ -32,10 +32,9 @@ copy_config()
 
         if [ "$location" == "local" ]
         then
-            cp "$cnf" "$cnf_dir"
+            cp "$cnf" "$cnf_dir/my.cnf"
         else
-            local cnf_file="$(basename $cnf)"
-            cat "$cnf" | ssh $location "cat > $cnf_dir/$cnf_file"
+            cat "$cnf" | ssh $location "cat > $cnf_dir/my.cnf"
         fi
     fi
 }
