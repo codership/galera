@@ -349,7 +349,6 @@ galera::ReplicatorSMM::local_trx(wsrep_trx_handle_t* handle, bool create)
     if (handle->opaque != 0)
     {
         trx = reinterpret_cast<TrxHandle*>(handle->opaque);
-        assert(wsdb_.get_trx(uuid_, handle->trx_id) == trx);
         assert(trx->trx_id() == handle->trx_id);
         trx->ref();
     }
