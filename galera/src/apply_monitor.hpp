@@ -106,8 +106,6 @@ namespace galera
         {
             if (mode_ == M_BYPASS) return 0;
 
-            assert(last_left_ <= last_entered_);
-
             const wsrep_seqno_t trx_seqno(trx->global_seqno());
             const size_t        idx(indexof(trx_seqno));
             gu::Lock            lock(mutex_);
