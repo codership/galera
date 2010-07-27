@@ -345,7 +345,7 @@ void gu::net::Socket::connect(const string& addr)
         sendto_addr = new Sockaddr(sa);
         set_state(S_CONNECTED);
     }
-    set_opt(this, ai, 0);
+
     assert(get_state() == S_CONNECTING || get_state() == S_CONNECTED);
 }
 
