@@ -1399,7 +1399,10 @@ wsrep_status_t galera::ReplicatorSMM::process_conf(void* recv_ctx,
         reinterpret_cast<const wsrep_uuid_t*>(conf->group_uuid));
     wsrep_view_info_t* view_info(galera_view_info_create(conf, st_req));
 
-    uuid_ = view_info->members[view_info->my_idx].id;
+    if (view_info->my_idx >= 0)
+    {
+        uuid_ = view_info->members[view_info->my_idx].id;
+    }
 
     void* app_req(0);
     ssize_t app_req_len(0);
