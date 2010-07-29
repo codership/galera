@@ -122,6 +122,10 @@ do
 	    JOBS=$2
 	    shift
 	    ;;
+	--dl)
+	    DEBUG_LEVEL=$2
+	    shift
+	    ;;
 	*)
 	    if test ! -z "$1"; then
 	       echo "Unrecognized option: $1"

@@ -38,8 +38,10 @@ mmenv.Append(CPPFLAGS = ' -DGALERA_MULTIMASTER')
 mmenv.Replace(SHOBJPREFIX = 'libmmgalera++-')
 mmenv.SharedLibrary('mmgalera++', [
         'galera_info.c',
-        'galera_job_queue.c',
-        'galera_options.c',
         'replicator_smm.cpp',
         'wsrep_provider.cpp'
 ])
+
+#        'galera_job_queue.c',
+#        'galera_options.c',
+

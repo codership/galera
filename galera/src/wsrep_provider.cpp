@@ -15,6 +15,7 @@ using galera::WriteSet;
 using galera::TrxHandle;
 using galera::TrxHandleLock;
 
+
 extern "C"
 wsrep_status_t galera_init(wsrep_t* gh,
                               const struct wsrep_init_args* args)
@@ -43,6 +44,7 @@ void galera_tear_down(wsrep_t *gh)
         gh->ctx = 0;
     }
 }
+
 
 extern "C"
 wsrep_status_t galera_options_set (wsrep_t* gh, const char* opts_str)
@@ -85,6 +87,7 @@ wsrep_status_t galera_connect (wsrep_t *gh,
     }
 }
 
+
 extern "C"
 wsrep_status_t galera_disconnect(wsrep_t *gh)
 {
@@ -105,7 +108,6 @@ wsrep_status_t galera_disconnect(wsrep_t *gh)
         return WSREP_FATAL;
     }
 }
-
 
 
 extern "C"
@@ -134,6 +136,7 @@ wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
         return WSREP_FATAL;
     }
 }
+
 
 extern "C"
 wsrep_status_t galera_abort_pre_commit(wsrep_t *gh,
@@ -167,6 +170,7 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t *gh,
 
     return retval;
 }
+
 
 extern "C"
 wsrep_status_t galera_abort_slave_trx(
@@ -216,6 +220,7 @@ wsrep_status_t galera_post_commit(wsrep_t *gh,
 
     return retval;
 }
+
 
 extern "C"
 wsrep_status_t galera_post_rollback(wsrep_t *gh,
@@ -394,6 +399,7 @@ wsrep_status_t galera_append_data(wsrep_t*            wsrep,
     return WSREP_NOT_IMPLEMENTED;
 }
 
+
 extern "C"
 wsrep_status_t galera_causal_read(wsrep_t* wsrep,
                                      wsrep_seqno_t* seqno)
@@ -435,6 +441,7 @@ wsrep_status_t galera_set_variable(wsrep_t *gh,
 
     return WSREP_OK;
 }
+
 
 extern "C"
 wsrep_status_t galera_set_database(wsrep_t *gh,
@@ -543,6 +550,7 @@ wsrep_status_t galera_to_execute_end(wsrep_t *gh,
     }
 }
 
+
 extern "C"
 wsrep_status_t galera_replay_trx(wsrep_t *gh,
                                     wsrep_trx_handle_t* trx_handle,
@@ -574,6 +582,7 @@ wsrep_status_t galera_replay_trx(wsrep_t *gh,
     return retval;
 }
 
+
 extern "C"
 wsrep_status_t galera_sst_sent (wsrep_t* gh,
                                    const wsrep_uuid_t* uuid,
@@ -583,6 +592,7 @@ wsrep_status_t galera_sst_sent (wsrep_t* gh,
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     return repl->sst_sent(*uuid, seqno);
 }
+
 
 extern "C"
 wsrep_status_t galera_sst_received (wsrep_t* gh,
@@ -596,6 +606,7 @@ wsrep_status_t galera_sst_received (wsrep_t* gh,
     return repl->sst_received(*uuid, seqno, state, state_len);
 }
 
+
 extern "C"
 wsrep_status_t galera_snapshot(wsrep_t*     wsrep,
                                   const void*  msg,
@@ -605,6 +616,7 @@ wsrep_status_t galera_snapshot(wsrep_t*     wsrep,
     return WSREP_NOT_IMPLEMENTED;
 }
 
+
 extern "C"
 struct wsrep_status_var* galera_status_get (wsrep_t* gh)
 {
@@ -613,11 +625,13 @@ struct wsrep_status_var* galera_status_get (wsrep_t* gh)
     return const_cast<struct wsrep_status_var*>(repl->status());
 }
 
+
 extern "C"
 void galera_status_free (wsrep_t* gh,
                             struct wsrep_status_var* s)
 {
 }
+
 
 static wsrep_t galera_str = {
     WSREP_INTERFACE_VERSION,
@@ -654,9 +668,11 @@ static wsrep_t galera_str = {
     NULL
 };
 
+
 /* Prototype to make compiler happy */
 extern "C"
 int wsrep_loader(wsrep_t *hptr);
+
 
 extern "C"
 int wsrep_loader(wsrep_t *hptr)
@@ -675,3 +691,4 @@ int wsrep_loader(wsrep_t *hptr)
 
     return WSREP_OK;
 }
+

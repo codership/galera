@@ -96,8 +96,6 @@ namespace galera
 
         int enter(C& obj)
         {
-            assert(last_left_ <= last_entered_);
-
             const wsrep_seqno_t obj_seqno(obj.seqno());
             const size_t        idx(indexof(obj_seqno));
             gu::Lock            lock(mutex_);
