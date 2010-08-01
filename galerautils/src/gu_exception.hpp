@@ -50,11 +50,14 @@ namespace gu {
     };
 }
 
+/* to mark a place where exception was caught */
+#define GU_TRACE(_exception_) _exception_.trace(__FILE__, __FUNCTION__, __LINE__)
+
 #ifndef NDEBUG /* enabled together with assert() */
 
 #define gu_trace(_expr_)                                                 \
-    try { _expr_; } catch (gu::Exception& e)                             \
-    { e.trace(__FILE__, __FUNCTION__, __LINE__); throw; }
+    try { _expr_; } catch (gu::Exception& e) { GU_TRACE(e); throw; }
+//    { e.trace(__FILE__, __FUNCTION__, __LINE__); throw; }
 
 #else
 

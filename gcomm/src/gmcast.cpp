@@ -755,22 +755,32 @@ void GMCast::handle_up(const void*        id,
     {
         Message msg;
 
-        if (dg.get_offset() < dg.get_header_len())
+        try
         {
-            msg.unserialize(dg.get_header(), dg.get_header_size(),
-                            dg.get_header_offset() + dg.get_offset());
+            if (dg.get_offset() < dg.get_header_len())
+            {
+                gu_trace(msg.unserialize(dg.get_header(), dg.get_header_size(),
+                                         dg.get_header_offset() +
+                                         dg.get_offset()));
+            }
+            else
+            {
+                gu_trace(msg.unserialize(&dg.get_payload()[0],
+                                         dg.get_len(),
+                                         dg.get_offset()));
+            }
         }
-        else
+        catch (Exception& e)
         {
-            msg.unserialize(&dg.get_payload()[0],
-                            dg.get_len(),
-                            dg.get_offset());
+            GU_TRACE(e);
+            log_warn << e.what();
+            return;
         }
 
         if (msg.get_type() >= Message::T_USER_BASE)
         {
-            send_up(Datagram(dg, dg.get_offset() + msg.serial_size()),
-                    ProtoUpMeta(msg.get_source_uuid()));
+            gu_trace(send_up(Datagram(dg, dg.get_offset() + msg.serial_size()),
+                             ProtoUpMeta(msg.get_source_uuid())));
         }
         else
         {
@@ -795,8 +805,20 @@ void GMCast::handle_up(const void*        id,
 
             Message msg;
 
-            msg.unserialize(&dg.get_payload()[0], dg.get_len(),
-                            dg.get_offset());
+            try
+            {
+                msg.unserialize(&dg.get_payload()[0], dg.get_len(),
+                                dg.get_offset());
+            }
+            catch (Exception& e)
+            {
+                GU_TRACE(e);
+                log_warn << e.what();
+                p->set_state(Proto::S_FAILED);
+                p->get_socket()->close();
+                handle_failed(p);
+                return;
+            }
 
             if (msg.get_type() >= Message::T_USER_BASE)
             {

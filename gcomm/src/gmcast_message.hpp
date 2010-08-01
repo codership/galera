@@ -271,7 +271,8 @@ public:
         case 0:
             gu_trace (return read_v0(buf, buflen, off));
         default:
-            return 0;
+            gu_throw_error(EPROTO) << "Unsupported/unrecognized gmcast protocol version: " << version;
+            throw;
         }
     }
     
