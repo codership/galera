@@ -472,6 +472,7 @@ void GMCast::handle_failed(Proto* failed)
     }
 
     proto_map->erase(failed->get_socket()->get_id());
+    failed->get_socket()->close();
     delete failed;
     update_addresses();
 }
@@ -815,7 +816,6 @@ void GMCast::handle_up(const void*        id,
                 GU_TRACE(e);
                 log_warn << e.what();
                 p->set_state(Proto::S_FAILED);
-                p->get_socket()->close();
                 handle_failed(p);
                 return;
             }

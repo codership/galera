@@ -75,15 +75,7 @@ public:
 
     ~GuSocket()
     {
-        if (socket_ != 0)
-        {
-            if (socket_->get_state() != gu::net::Socket::S_CLOSED)
-            {
-                socket_->close();
-            }
-            socket_->release();
-        }
-        socket_ = 0;
+        close();
     }
 
     void connect(const gu::URI& uri)

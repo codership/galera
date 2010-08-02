@@ -927,7 +927,8 @@ const gu::Datagram* gu::net::Socket::recv(const int flags)
                     (hdr.has_crc32() == false && hdr.crc32() != 0))
                 {
                     log_warn << "checksum failed for socket " << *this;
-                    log_warn << "hdr: has_crc32=" << hdr.has_crc32()
+                    log_warn << "hdr: len " << hdr.len()
+                             << " has_crc32=" << hdr.has_crc32()
                              << " crc32=" << hdr.crc32();
                     set_state(S_FAILED, EINVAL);
                     return 0;

@@ -183,7 +183,9 @@ void gcomm::AsioUdpSocket::read_handler(const asio::error_code& ec,
                 if ((hdr.has_crc32() == true && dg.checksum() != hdr.crc32()) ||
                     (hdr.has_crc32() == false && hdr.crc32() != 0))
                 {
-                    log_warn << "checksum failed";
+                    log_warn << "checksum failed, hdr: len=" << hdr.len()
+                             << " has_crc32=" << hdr.has_crc32()
+                             << " crc32=" << hdr.crc32();
                 }
             }
             else
