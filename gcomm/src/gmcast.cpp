@@ -334,6 +334,7 @@ void GMCast::gmcast_forget(const UUID& uuid)
         Proto* rp = ProtoMap::get_value(pi);
         if (rp->get_remote_uuid() == uuid)
         {
+            rp->get_socket()->close();
             delete rp;
             proto_map->erase(pi);
         }
@@ -701,8 +702,8 @@ void GMCast::reconnect()
         {
             if (ae.get_retry_cnt() > max_retry_cnt)
             {
-                log_debug << " Forgetting " << remote_uuid << " ("
-                          << remote_addr << ")";
+                log_info << " Forgetting " << remote_uuid << " ("
+                         << remote_addr << ")";
                 remote_addrs.erase(i);
                 continue;//no reference to remote_addr or remote_uuid after this
             }
