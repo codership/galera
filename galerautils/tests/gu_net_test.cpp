@@ -526,7 +526,7 @@ START_TEST(test_network_nonblocking)
     Network net;
 
     Socket* listener = net.listen("tcp://localhost:2112?socket.non_blocking=1");
-
+    log_info << "listener: " << *listener;
     vector<Socket*> cl;
     vector<Socket*> sr;
     gu_log_max_level = GU_LOG_DEBUG;

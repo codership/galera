@@ -120,6 +120,22 @@ gu::net::Socket::~Socket()
     if (fd != -1) { close(); }
 }
 
+std::ostream& gu::net::operator<<(std::ostream& os, const Socket& socket)
+{
+    os << "fd=" << socket.fd << " ";
+    os << "opt=" << socket.options << " ";
+    os << "em=" << socket.event_mask << " ";
+    os << "mtu=" << socket.mtu << " ";
+    os << "mps=" << socket.max_packet_size << " ";
+    os << "mp=" << socket.max_pending << " ";
+    os << "rbo=" << socket.recv_buf_offset << " ";
+    os << "dghl=" << socket.dgram.get_header_len() << " ";
+    os << "dgpl=" << socket.dgram.get_payload().size() << " ";
+    os << "ps=" << socket.pending.size();
+    return os;
+}
+
+
 /*
  * State handling
  */
@@ -814,7 +830,9 @@ const gu::Datagram* gu::net::Socket::recv(const int flags)
                  dgram.checksum() != hdr.crc32()) ||
                 (hdr.has_crc32() == false && hdr.crc32() != 0))
             {
-                log_warn << "checksum failed for socket " << fd;
+                log_warn << "checksum failed for socket: " << *this;
+                log_warn << "hdr: has_crc32=" << hdr.has_crc32()
+                         << " crc32=" << hdr.crc32();
                 set_state(S_FAILED, EINVAL);
                 return 0;
             }
@@ -908,7 +926,9 @@ const gu::Datagram* gu::net::Socket::recv(const int flags)
                      dgram.checksum() != hdr.crc32()) ||
                     (hdr.has_crc32() == false && hdr.crc32() != 0))
                 {
-                    log_warn << "checksum failed for socket " << fd;
+                    log_warn << "checksum failed for socket " << *this;
+                    log_warn << "hdr: has_crc32=" << hdr.has_crc32()
+                             << " crc32=" << hdr.crc32();
                     set_state(S_FAILED, EINVAL);
                     return 0;
                 }

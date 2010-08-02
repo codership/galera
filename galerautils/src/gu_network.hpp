@@ -62,6 +62,7 @@ namespace gu
     namespace net
     {
         class Socket;
+        std::ostream& operator<<(std::ostream&, const Socket&);
         class SocketList;
         class EPoll;
         class NetworkEvent;
@@ -246,7 +247,10 @@ public:
      */
     ~Socket();
 
+
+
 private:
+    friend std::ostream& operator<<(std::ostream&, const Socket&);
 
     /* Private data */
     int fd;             /*!< Socket file descriptor                 */
