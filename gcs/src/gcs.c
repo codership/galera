@@ -697,7 +697,7 @@ gcs_handle_actions (gcs_conn_t*                conn,
         }
 //        gu_info ("RECEIVED %s", fc->stop ? "STOP" : "CONT");
         conn->stop_count += ((fc->stop != 0) << 1) - 1; // +1 if !0, -1 if 0
-        conn->stats_fc_received++;
+        conn->stats_fc_received += (fc->stop != 0);
 #ifdef GCS_USE_SM
         if (1 == conn->stop_count) {
             gcs_sm_pause (conn->sm);    // first STOP request
