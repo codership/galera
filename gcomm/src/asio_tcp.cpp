@@ -203,9 +203,10 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
                             new Buffer(&recv_buf_[0] + NetHeader::serial_size_,
                                        &recv_buf_[0] + NetHeader::serial_size_
                                        + hdr.len())));
-            if (net_.checksum_ == true && hdr.has_crc32() == true)
+            if (net_.checksum_ == true)
             {
-                if (dg.checksum() != hdr.crc32())
+                if ((hdr.has_crc32() == true && dg.checksum() != hdr.crc32()) ||
+                    (hdr.has_crc32() == false && hdr.crc32() != 0))
                 {
                     log_warn << "checksum failed";
                     close();

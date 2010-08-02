@@ -808,9 +808,11 @@ const gu::Datagram* gu::net::Socket::recv(const int flags)
             recv_buf_offset = dgram.get_payload().size();
         }
 
-        if ((get_opt() & O_CRC32) && hdr.has_crc32())
+        if ((get_opt() & O_CRC32))
         {
-            if (dgram.checksum() != hdr.crc32())
+            if ((hdr.has_crc32() == true &&
+                 dgram.checksum() != hdr.crc32()) ||
+                (hdr.has_crc32() == false && hdr.crc32() != 0))
             {
                 log_warn << "checksum failed for socket " << fd;
                 set_state(S_FAILED, EINVAL);
@@ -900,9 +902,11 @@ const gu::Datagram* gu::net::Socket::recv(const int flags)
                 recv_buf_offset = 0;
             }
 
-            if ((get_opt() & O_CRC32) && hdr.has_crc32())
+            if ((get_opt() & O_CRC32))
             {
-                if (dgram.checksum() != hdr.crc32())
+                if ((hdr.has_crc32() == true &&
+                     dgram.checksum() != hdr.crc32()) ||
+                    (hdr.has_crc32() == false && hdr.crc32() != 0))
                 {
                     log_warn << "checksum failed for socket " << fd;
                     set_state(S_FAILED, EINVAL);

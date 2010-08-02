@@ -228,6 +228,9 @@ namespace gu
     {
         boost::crc_16_type crc;
         assert(offset < dg.get_len());
+        byte_t lenb[4];
+        serialize<uint32_t>(dg.get_len() - offset, lenb, sizeof(lenb), 0);
+        crc.process_block(lenb, lenb + sizeof(lenb));
         if (offset < dg.get_header_len())
         {
             crc.process_block(dg.header_ + dg.header_offset_ + offset,
@@ -240,17 +243,20 @@ namespace gu
         }
         crc.process_block(&(*dg.payload_)[0] + offset, &(*dg.payload_)[0]
                           + dg.payload_->size());
-    return crc.checksum();
-}
+        return crc.checksum();
+    }
 
-inline uint32_t crc32(const gu::Datagram& dg)
-{
-    boost::crc_32_type crc;
-    crc.process_block(dg.header_ + dg.header_offset_,
-                      dg.header_ + dg.header_size_);
-    crc.process_block(&(*dg.payload_)[0], &(*dg.payload_)[0] + dg.payload_->size());
-    return crc.checksum();
-}
+    inline uint32_t crc32(const gu::Datagram& dg)
+    {
+        boost::crc_32_type crc;
+        byte_t lenb[4];
+        serialize<uint32_t>(dg.get_len(), lenb, sizeof(lenb), 0);
+        crc.process_block(lenb, lenb + sizeof(lenb));
+        crc.process_block(dg.header_ + dg.header_offset_,
+                          dg.header_ + dg.header_size_);
+        crc.process_block(&(*dg.payload_)[0], &(*dg.payload_)[0] + dg.payload_->size());
+        return crc.checksum();
+    }
 }
 
 #endif // GU_DATAGRAM_HPP

@@ -178,9 +178,13 @@ void gcomm::AsioUdpSocket::read_handler(const asio::error_code& ec,
         {
             Datagram dg(SharedBuffer(new Buffer(&recv_buf_[0] + NetHeader::serial_size_,
                                                 &recv_buf_[0] + NetHeader::serial_size_ + hdr.len())));
-            if (net_.checksum_ == true && dg.checksum() != hdr.crc32())
+            if (net_.checksum_ == true)
             {
-                log_warn << "checksum failed";
+                if ((hdr.has_crc32() == true && dg.checksum() != hdr.crc32()) ||
+                    (hdr.has_crc32() == false && hdr.crc32() != 0))
+                {
+                    log_warn << "checksum failed";
+                }
             }
             else
             {
