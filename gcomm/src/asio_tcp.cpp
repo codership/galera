@@ -15,12 +15,13 @@ using namespace gu::net;
 
 gcomm::AsioTcpSocket::AsioTcpSocket(AsioProtonet& net, const URI& uri)
     :
-    Socket      (uri),
-    net_        (net),
-    socket_     (net.io_service_),
-    recv_buf_   (net_.get_mtu() + NetHeader::serial_size_),
-    recv_offset_(0),
-    state_      (S_CLOSED)
+    Socket       (uri),
+    net_         (net),
+    socket_      (net.io_service_),
+    send_q_      (),
+    recv_buf_    (net_.get_mtu() + NetHeader::serial_size_),
+    recv_offset_ (0),
+    state_       (S_CLOSED)
 { }
 
 gcomm::AsioTcpSocket::~AsioTcpSocket()
@@ -92,15 +93,13 @@ void gcomm::AsioTcpSocket::close()
 }
 
 
-
-
-
 void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
                                          size_t bytes_transferred)
 {
-    Critical<AsioProtonet> crit(net_);
+
     if (!ec)
     {
+        Critical<AsioProtonet> crit(net_);
         // log_info << "write handler " << bytes_transferred;
         gcomm_assert(send_q_.empty() == false);
         gcomm_assert(send_q_.front().get_len() >= bytes_transferred);
@@ -115,7 +114,7 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
         }
         if (send_q_.empty() == false)
         {
-            Datagram& dg(send_q_.front());
+            const Datagram& dg(send_q_.front());
             boost::array<asio::const_buffer, 2> cbs;
             cbs[0] = asio::const_buffer(dg.get_header()
                                         + dg.get_header_offset(),
@@ -143,10 +142,6 @@ int gcomm::AsioTcpSocket::send(const Datagram& dg)
         return ENOTCONN;
     }
 
-    asio::ip::tcp::no_delay no_delay;
-    socket_.get_option(no_delay);
-    gcomm_assert(no_delay.value() == true);
-
     NetHeader hdr(static_cast<uint32_t>(dg.get_len()));
     if (net_.checksum_ == true)
     {
@@ -160,6 +155,8 @@ int gcomm::AsioTcpSocket::send(const Datagram& dg)
               priv_dg.get_header(),
               priv_dg.get_header_size(),
               priv_dg.get_header_offset());
+
+    Critical<AsioProtonet> crit(net_);
     send_q_.push_back(priv_dg);
 
     boost::array<asio::const_buffer, 2> cbs;
@@ -279,15 +276,14 @@ size_t gcomm::AsioTcpSocket::read_completion_condition(
     }
 
     return (recv_buf_.size() - recv_offset_);
-
 }
+
 
 void gcomm::AsioTcpSocket::async_receive()
 {
+    Critical<AsioProtonet> crit(net_);
     gcomm_assert(get_state() == S_CONNECTED);
-    asio::ip::tcp::no_delay no_delay;
-    socket_.get_option(no_delay);
-    gcomm_assert(no_delay.value() == true);
+
     boost::array<asio::mutable_buffer, 1> mbs;
     mbs[0] = asio::mutable_buffer(&recv_buf_[0], recv_buf_.size());
     async_read(socket_, mbs,
