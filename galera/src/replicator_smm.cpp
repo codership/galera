@@ -281,20 +281,39 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
                                    const std::string& cluster_url,
                                    const std::string& state_donor)
 {
-    state_.shift_to(S_JOINING);
     restore_state(state_file_);
     sst_donor_ = state_donor;
     service_thd_.reset();
-    gcs_.set_initial_position(state_uuid_, cert_.position());
-    gcs_.connect(cluster_name, cluster_url);
-    return WSREP_OK;
+
+    ssize_t err;
+    wsrep_status_t ret(WSREP_OK);
+    if ((err = gcs_.set_initial_position(state_uuid_, cert_.position())) != 0)
+    {
+        log_error << "gcs init failed:" << strerror(-err);
+        ret = WSREP_NODE_FAIL;
+    }
+
+    if (ret == WSREP_OK &&
+        (err = gcs_.connect(cluster_name, cluster_url)) != 0)
+    {
+        log_error << "gcs connect failed: " << strerror(-err);
+        ret = WSREP_NODE_FAIL;
+    }
+
+    if (ret == WSREP_OK)
+    {
+        state_.shift_to(S_JOINING);
+    }
+    return ret;
 }
 
 
 wsrep_status_t galera::ReplicatorSMM::close()
 {
-    assert(state_() != S_CLOSED);
-    gcs_.close();
+    if (state_() != S_CLOSED)
+    {
+        gcs_.close();
+    }
     return WSREP_OK;
 }
 
