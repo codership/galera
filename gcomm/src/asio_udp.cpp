@@ -166,8 +166,15 @@ void gcomm::AsioUdpSocket::read_handler(const asio::error_code& ec,
     {
         Critical<AsioProtonet> crit(net_);
         NetHeader hdr(0);
-        unserialize(&recv_buf_[0], NetHeader::serial_size_, 0, hdr);
-
+        try
+        {
+            unserialize(&recv_buf_[0], NetHeader::serial_size_, 0, hdr);
+        }
+        catch (Exception& e)
+        {
+            log_warn << "hdr unserialize failed: " << e.get_errno();
+            return;
+        }
         if (NetHeader::serial_size_ + hdr.len() != bytes_transferred)
         {
             log_warn << "len " << hdr.len()

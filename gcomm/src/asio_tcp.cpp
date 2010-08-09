@@ -32,8 +32,8 @@ gcomm::AsioTcpSocket::~AsioTcpSocket()
 void gcomm::AsioTcpSocket::failed_handler(const asio::error_code& ec)
 {
 
-    log_info << "failed handler " << get_id() << " " << ec
-             << " " << socket_.is_open();
+    log_debug << "failed handler " << get_id() << " " << ec
+              << " " << socket_.is_open();
     if (get_state() != S_FAILED)
     {
         net_.dispatch(get_id(), Datagram(), ProtoUpMeta(ec.value()));
@@ -48,7 +48,7 @@ void gcomm::AsioTcpSocket::failed_handler(const asio::error_code& ec)
 void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
 {
     Critical<AsioProtonet> crit(net_);
-    log_info << "connect handler " << get_id() << " " << ec;
+    log_debug << "connect handler " << get_id() << " " << ec;
     if (ec)
     {
         failed_handler(ec);
@@ -79,7 +79,7 @@ void gcomm::AsioTcpSocket::connect(const URI& uri)
 void gcomm::AsioTcpSocket::close()
 {
     Critical<AsioProtonet> crit(net_);
-    log_info << "closing " << get_id() << " state " << get_state();
+    log_debug << "closing " << get_id() << " state " << get_state();
 
     try
     {
@@ -100,7 +100,6 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
     if (!ec)
     {
         Critical<AsioProtonet> crit(net_);
-        // log_info << "write handler " << bytes_transferred;
         gcomm_assert(send_q_.empty() == false);
         gcomm_assert(send_q_.front().get_len() >= bytes_transferred);
         if (send_q_.front().get_len() < bytes_transferred)
@@ -189,14 +188,19 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
 
     recv_offset_ += bytes_transferred;
 
-    // log_info << "read handler " << recv_offset_ << " " << bytes_transferred;
     while (recv_offset_ >= NetHeader::serial_size_)
     {
         NetHeader hdr(0);
-        unserialize(&recv_buf_[0], recv_buf_.size(), 0, hdr);
-
-        // log_info << "read handler " << bytes_transferred << " " << len;
-
+        try
+        {
+            unserialize(&recv_buf_[0], recv_buf_.size(), 0, hdr);
+        }
+        catch (Exception& e)
+        {
+            failed_handler(asio::error_code(e.get_errno(),
+                                            asio::error::system_category));
+            return;
+        }
         if (recv_offset_ >= hdr.len() + NetHeader::serial_size_)
         {
             Datagram dg(SharedBuffer(
@@ -268,7 +272,16 @@ size_t gcomm::AsioTcpSocket::read_completion_condition(
     if (recv_offset_ + bytes_transferred >= NetHeader::serial_size_)
     {
         NetHeader hdr(0);
-        unserialize(&recv_buf_[0], NetHeader::serial_size_, 0, hdr);
+        try
+        {
+            unserialize(&recv_buf_[0], NetHeader::serial_size_, 0, hdr);
+        }
+        catch (Exception& e)
+        {
+            failed_handler(asio::error_code(e.get_errno(),
+                                            asio::error::system_category));
+            return 0;
+        }
         if (recv_offset_ + bytes_transferred >= NetHeader::serial_size_ + hdr.len())
         {
             return 0;

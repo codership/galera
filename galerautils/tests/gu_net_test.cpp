@@ -68,6 +68,36 @@ END_TEST
 
 START_TEST(test_datagram)
 {
+
+    // Header check
+    NetHeader hdr(42, 0);
+    fail_unless(hdr.len() == 42);
+    fail_unless(hdr.has_crc32() == false);
+    fail_unless(hdr.version() == 0);
+
+    hdr.set_crc32(1234);
+    fail_unless(hdr.has_crc32() == true);
+    fail_unless(hdr.len() == 42);
+
+    NetHeader hdr1(42, 1);
+    fail_unless(hdr1.len() == 42);
+    fail_unless(hdr1.has_crc32() == false);
+    fail_unless(hdr1.version() == 1);
+
+    byte_t hdrbuf[NetHeader::serial_size_];
+    fail_unless(serialize(hdr1, hdrbuf, sizeof(hdrbuf), 0) ==
+                NetHeader::serial_size_);
+    try
+    {
+        unserialize(hdrbuf, sizeof(hdrbuf), 0, hdr);
+        fail("");
+    }
+    catch (Exception& e)
+    {
+        // ok
+    }
+
+
     byte_t b[128];
     for (byte_t i = 0; i < sizeof(b); ++i)
     {

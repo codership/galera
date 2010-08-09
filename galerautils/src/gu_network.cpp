@@ -802,7 +802,15 @@ const gu::Datagram* gu::net::Socket::recv(const int flags)
             gu_throw_error(EINVAL);
         }
         NetHeader hdr(0);
-        unserialize(buf, sizeof(buf), 0, &hdr);
+        try
+        {
+            unserialize(buf, sizeof(buf), 0, &hdr);
+        }
+        catch (Exception& e)
+        {
+            set_state(S_FAILED, e.get_errno());
+            return 0;
+        }
         dgram.get_payload().resize(hdr.len());
         struct iovec iov[2] = {
             {buf, sizeof(buf)},
@@ -878,9 +886,16 @@ const gu::Datagram* gu::net::Socket::recv(const int flags)
 
     assert(dgram.get_len() >= NetHeader::serial_size_);
     NetHeader hdr(0);
-    unserialize(dgram.get_header() + dgram.get_header_offset(),
-                dgram.get_header_len(), 0, &hdr);
-
+    try
+    {
+        unserialize(dgram.get_header() + dgram.get_header_offset(),
+                    dgram.get_header_len(), 0, &hdr);
+    }
+    catch (Exception& e)
+    {
+        set_state(S_FAILED, e.get_errno());
+        return 0;
+    }
     if (dgram.get_payload().size() != hdr.len())
     {
         dgram.get_payload().resize(static_cast<size_t>(hdr.len()));
