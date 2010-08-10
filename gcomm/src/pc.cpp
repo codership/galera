@@ -200,7 +200,8 @@ PC::PC(Protonet& net, const string& uri) :
     evs = new evs::Proto(uuid, uri_.to_string(), gmcast->get_mtu() - 2*evsum.serial_size());
 
     bool allow_sb(conf_param_def<bool>(uri, Conf::PcAllowSb, true));
-    pc  = new pc::Proto (uuid, allow_sb);
+    bool checksum(conf_param_def<bool>(uri, Conf::PcChecksum, true));
+    pc  = new pc::Proto (uuid, allow_sb, checksum);
 }
 
 

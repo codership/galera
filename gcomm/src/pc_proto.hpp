@@ -54,14 +54,14 @@ public:
     }
 
 
-    Proto(const UUID& uuid, bool allow_sb = false)
+    Proto(const UUID& uuid, bool allow_sb = false, bool checksum = true)
         :
         my_uuid_       (uuid),
         start_prim_    (),
         allow_sb_      (allow_sb),
         state_         (S_CLOSED),
         last_sent_seq_ (0),
-        checksum_      (true),
+        checksum_      (checksum),
         instances_     (),
         self_i_        (),
         state_msgs_    (),

@@ -268,6 +268,15 @@ namespace gcomm
          * operation despite of possible split brain condition.
          */
         static std::string const PcAllowSb;
+
+        /*!
+         * @brief PC message checksumming
+         *
+         * This parameter controls whether PC layer does message
+         * checksumming.
+         */
+        static std::string const PcChecksum;
+
     };
 
 

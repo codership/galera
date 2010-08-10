@@ -57,3 +57,4 @@ std::string const gcomm::Conf::EvsUseAggregate =
 // PC
 std::string const gcomm::Conf::PcScheme = "pc";
 std::string const gcomm::Conf::PcAllowSb = PcScheme + Delim + "allow_sb";
+std::string const gcomm::Conf::PcChecksum = PcScheme + Delim + "checksum";
