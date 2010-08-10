@@ -184,11 +184,8 @@ PC::PC(Protonet& net, const string& uri) :
     {
         log_fatal << "invalid uri: " << uri_.to_string();
     }
-    URI tp_uri(uri_);
 
-    tp_uri._set_scheme(Conf::GMCastScheme); // why do we need this?
-
-    gmcast = new GMCast(get_pnet(), tp_uri.to_string());
+    gmcast = new GMCast(get_pnet(), uri_);
 
     const UUID& uuid(gmcast->get_uuid());
 
@@ -197,11 +194,8 @@ PC::PC(Protonet& net, const string& uri) :
         gu_throw_fatal << "invalid UUID: " << uuid;
     }
     evs::UserMessage evsum;
-    evs = new evs::Proto(uuid, uri_.to_string(), gmcast->get_mtu() - 2*evsum.serial_size());
-
-    bool allow_sb(conf_param_def<bool>(uri, Conf::PcAllowSb, true));
-    bool checksum(conf_param_def<bool>(uri, Conf::PcChecksum, true));
-    pc  = new pc::Proto (uuid, allow_sb, checksum);
+    evs = new evs::Proto(uuid, uri_, gmcast->get_mtu() - 2*evsum.serial_size());
+    pc  = new pc::Proto (uuid, uri_);
 }
 
 

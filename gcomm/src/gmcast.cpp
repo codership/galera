@@ -33,9 +33,10 @@ static bool check_tcp_uri(const URI& uri)
 }
 
 
-GMCast::GMCast(Protonet& net, const string& uri)
+GMCast::GMCast(Protonet& net, const gu::URI& uri)
     :
     Transport     (net, uri),
+    version(gu::from_string<int>(uri.get_option(Conf::GMCastVersion, "0"))),
     my_uuid       (0, 0),
     group_name    (),
     listen_addr   (Conf::TcpScheme + "://0.0.0.0"), // how to make it IPv6 safe?
@@ -52,10 +53,8 @@ GMCast::GMCast(Protonet& net, const string& uri)
     check_period  ("PT1S"),
     next_check    (Date::now())
 {
-    if (uri_.get_scheme() != Conf::GMCastScheme)
-    {
-        gu_throw_error (EINVAL) << "Invalid URL scheme: " << uri_.get_scheme();
-    }
+
+    log_info << "GMCast version " << version;
 
     // @todo: technically group name should be in path component
     try

@@ -67,6 +67,11 @@ namespace gcomm
         static std::string const GMCastScheme;
 
         /*!
+         * @brief GMCast protocol version
+         */
+        static std::string const GMCastVersion;
+
+        /*!
          * @brief GMCast group name ("gmcast.group")
          *
          * String denoting group name. Max length of string is 16. Peer nodes
@@ -118,6 +123,11 @@ namespace gcomm
          * @brief EVS scheme for transport URI ("evs")
          */
         static std::string const EvsScheme;
+
+        /*!
+         * @brief EVS protocol version
+         */
+        static std::string const EvsVersion;
 
         /*!
          * @brief EVS view forget timeout ("evs.view_forget_timeout")
@@ -260,6 +270,11 @@ namespace gcomm
          * @brief PC scheme for transport URI ("pc")
          */
         static std::string const PcScheme;
+
+        /*!
+         * @brief PC protocol version
+         */
+        static std::string const PcVersion;
 
         /*!
          * @brief PC split-brain mode

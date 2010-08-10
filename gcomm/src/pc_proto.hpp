@@ -9,8 +9,10 @@
 
 #include "gcomm/uuid.hpp"
 #include "gcomm/protolay.hpp"
+#include "gcomm/conf.hpp"
 #include "pc_message.hpp"
 
+#include "gu_uri.hpp"
 
 namespace gcomm
 {
@@ -54,22 +56,23 @@ public:
     }
 
 
-    Proto(const UUID& uuid, bool allow_sb = false, bool checksum = true)
+    Proto(const UUID& uuid, const gu::URI& uri = gu::URI("pc://"))
         :
+        version_(gu::from_string<int>(uri.get_option(Conf::PcVersion, "0"))),
         my_uuid_       (uuid),
         start_prim_    (),
-        allow_sb_      (allow_sb),
+        allow_sb_      (gu::from_string<bool>(uri.get_option(Conf::PcAllowSb, "true"))),
         state_         (S_CLOSED),
         last_sent_seq_ (0),
-        checksum_      (checksum),
+        checksum_      (gu::from_string<bool>(uri.get_option(Conf::PcChecksum, "true"))),
         instances_     (),
-        self_i_        (),
+        self_i_        (instances_.insert_unique(std::make_pair(uuid, Node()))),
         state_msgs_    (),
         current_view_  (V_TRANS),
         pc_view_       (V_NON_PRIM),
         views_         ()
     {
-        self_i_ = instances_.insert_unique(std::make_pair(get_uuid(), Node()));
+        log_info << "PC version " << version_;
     }
 
     ~Proto() { }
@@ -149,6 +152,7 @@ private:
                      const ProtoUpMeta&);
     void deliver_view();
 
+    int               version_;
     UUID   const      my_uuid_;       // Node uuid
     bool              start_prim_;    // Is allowed to start in prim comp
     bool              allow_sb_;      // Split-brain condition is allowed

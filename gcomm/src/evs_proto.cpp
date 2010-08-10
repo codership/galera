@@ -41,9 +41,11 @@ using namespace gcomm::evs;
 
 
 
-gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf,
-                         const size_t mtu_) :
+gcomm::evs::Proto::Proto(const UUID& my_uuid_, const gu::URI& uri,
+                         const size_t mtu_)
+    :
     timers(),
+    version(gu::from_string<int>(uri.get_option(Conf::EvsVersion, "0"))),
     debug_mask(D_STATE | D_INSTALL_MSGS),
     info_mask(0),
     last_stats_report(Date::now()),
@@ -101,7 +103,8 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const string& conf,
     state(S_CLOSED),
     shift_to_rfcnt(0)
 {
-    URI uri(conf);
+
+    log_info << "EVS version " << version;
 
     view_forget_timeout =
         conf_param_def_min(uri,
@@ -1833,12 +1836,17 @@ void gcomm::evs::Proto::handle_up(const void* cid,
     }
     catch (Exception& e)
     {
-        if (e.get_errno() == EINVAL)
+        switch (e.get_errno())
         {
+        case EPROTONOSUPPORT:
+            log_warn << e.what();
+            break;
+
+        case EINVAL:
             log_warn << "invalid message: " << msg;
-        }
-        else
-        {
+            break;
+
+        default:
             log_fatal << "exception caused by message: " << msg;
             log_fatal << " state after handling message: " << *this;
             throw;

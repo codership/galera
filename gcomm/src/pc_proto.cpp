@@ -928,9 +928,33 @@ void gcomm::pc::Proto::handle_up(const void* cid,
         Message msg;
         const byte_t* b(get_begin(rb));
         const size_t available(get_available(rb));
-        if (msg.unserialize(b, available, 0) == 0)
+        try
         {
-            gu_throw_fatal << "Could not read message";
+            (void)msg.unserialize(b, available, 0);
+        }
+        catch (Exception& e)
+        {
+            switch (e.get_errno())
+            {
+            case EPROTONOSUPPORT:
+                if (get_prim() == false)
+                {
+                    gu_throw_fatal << e.what() << " terminating";
+                }
+                else
+                {
+                    log_warn << "unknown/unsupported protocol version: "
+                             << msg.get_version()
+                             << " dropping message";
+                    return;
+                }
+
+                break;
+
+            default:
+                GU_TRACE(e);
+                throw;
+            }
         }
 
         if (checksum_ == true && msg.flags() & Message::F_CRC16)

@@ -14,6 +14,8 @@ std::string const gcomm::Conf::TcpNonBlocking =
 
 // GMCast
 std::string const gcomm::Conf::GMCastScheme = "gmcast";
+std::string const gcomm::Conf::GMCastVersion =
+    GMCastScheme + Delim + "version";
 std::string const gcomm::Conf::GMCastGroup =
     GMCastScheme + Delim + "group";
 std::string const gcomm::Conf::GMCastListenAddr =
@@ -26,6 +28,8 @@ std::string const gcomm::Conf::GMCastMCastTTL =
     GMCastScheme + Delim + "mcast_ttl";
 // EVS
 std::string const gcomm::Conf::EvsScheme = "evs";
+std::string const gcomm::Conf::EvsVersion = 
+    EvsScheme + Delim + "version";
 std::string const gcomm::Conf::EvsViewForgetTimeout = 
     EvsScheme + Delim + "view_forget_timeout";
 std::string const gcomm::Conf::EvsInactiveTimeout = 
@@ -56,5 +60,6 @@ std::string const gcomm::Conf::EvsUseAggregate =
     EvsScheme + Delim + "use_aggregate";
 // PC
 std::string const gcomm::Conf::PcScheme = "pc";
+std::string const gcomm::Conf::PcVersion = PcScheme + Delim + "version";
 std::string const gcomm::Conf::PcAllowSb = PcScheme + Delim + "allow_sb";
 std::string const gcomm::Conf::PcChecksum = PcScheme + Delim + "checksum";

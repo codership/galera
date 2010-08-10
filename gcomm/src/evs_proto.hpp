@@ -86,7 +86,7 @@ public:
     /*!
      * Default constructor.
      */
-    Proto(const UUID& my_uuid_, const std::string& conf = "evs://", 
+    Proto(const UUID& my_uuid_, const gu::URI& uri = gu::URI("evs://"),
           const size_t mtu_ = std::numeric_limits<size_t>::max());
     ~Proto();
     
@@ -284,7 +284,7 @@ public:
     };
 private:
 
-    
+    int version;
     int debug_mask;
     int info_mask;
     gu::datetime::Date last_stats_report;

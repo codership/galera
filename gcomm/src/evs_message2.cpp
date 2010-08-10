@@ -156,7 +156,7 @@ size_t gcomm::evs::Message::unserialize(const byte_t* const buf,
     version = static_cast<uint8_t>(b & 0x3);
     if (version != 0)
     {
-        gu_throw_error(EINVAL) << "invalid version " << version;
+        gu_throw_error(EPROTONOSUPPORT) << "protocol version not supported: " << version;
     }
     
     type    = static_cast<Type>((b >> 2) & 0x7);

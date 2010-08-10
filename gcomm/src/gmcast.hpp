@@ -28,7 +28,7 @@ namespace gcomm
     {
     public:
 
-        GMCast (Protonet&, const std::string&);
+        GMCast (Protonet&, const gu::URI&);
         ~GMCast();
 
         // Protolay interface
@@ -105,6 +105,7 @@ namespace gcomm
 
         class AddrList : public Map<std::string, AddrEntry> { };
 
+        int               version;
         UUID              my_uuid;
         std::string       group_name;
         std::string       listen_addr;
