@@ -673,7 +673,8 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
     else if (no_block == true && pending.size() > 0)
     {
         assert(sendto_addr == 0);
-        NetHeader hdr(dgram->get_len());
+
+        NetHeader hdr(dgram->get_len(), net.version_);
         if (get_opt() & O_CRC32)
         {
             hdr.set_crc32(dgram->checksum());
@@ -703,7 +704,7 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
         }
         assert(ret == 0 && pending.size() == 0);
 
-        NetHeader hdr(dgram->get_len());
+        NetHeader hdr(dgram->get_len(), net.version_);
         if (get_opt() & O_CRC32)
         {
             hdr.set_crc32(dgram->checksum());
@@ -801,10 +802,10 @@ const gu::Datagram* gu::net::Socket::recv(const int flags)
         {
             gu_throw_error(EINVAL);
         }
-        NetHeader hdr(0);
+        NetHeader hdr;
         try
         {
-            unserialize(buf, sizeof(buf), 0, &hdr);
+            unserialize(buf, sizeof(buf), 0, hdr);
         }
         catch (Exception& e)
         {
@@ -885,11 +886,11 @@ const gu::Datagram* gu::net::Socket::recv(const int flags)
     }
 
     assert(dgram.get_len() >= NetHeader::serial_size_);
-    NetHeader hdr(0);
+    NetHeader hdr;
     try
     {
         unserialize(dgram.get_header() + dgram.get_header_offset(),
-                    dgram.get_header_len(), 0, &hdr);
+                    dgram.get_header_len(), 0, hdr);
     }
     catch (Exception& e)
     {
@@ -1024,13 +1025,13 @@ gu::net::Socket* gu::net::NetworkEvent::get_socket() const
 }
 
 
-gu::net::Network::Network() :
+gu::net::Network::Network(int version) :
+    version_ (version),
     sockets  (new SocketList()),
     released (),
     poll     (Poll::create())
 {
     if (pipe(wake_fd) == -1) gu_throw_error(errno) << "could not create pipe";
-
     poll->insert(PollEvent(wake_fd[0], E_IN, 0));
 }
 

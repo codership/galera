@@ -27,7 +27,7 @@ namespace gcomm
 class gcomm::AsioProtonet : public gcomm::Protonet
 {
 public:
-    AsioProtonet();
+    AsioProtonet(int version = 0);
     ~AsioProtonet();
     void event_loop(const gu::datetime::Period& p);
     void dispatch(const SocketId&,
@@ -52,6 +52,7 @@ private:
     asio::io_service            io_service_;
     asio::deadline_timer        timer_;
 
+    int                         version_;
     size_t                      mtu_;
     bool                        checksum_;
 };

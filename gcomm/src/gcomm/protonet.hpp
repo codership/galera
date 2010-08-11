@@ -103,7 +103,7 @@ public:
     //!
     // Factory method for creating Protonets
     // 
-    static Protonet* create(const std::string conf);
+    static Protonet* create(const std::string conf, int version = 0);
 
     const std::string& get_type() const { return type_; }
 protected:

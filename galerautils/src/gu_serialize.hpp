@@ -64,25 +64,12 @@ namespace gu
     }
 
     template <typename T>
-    inline size_t unserialize(const byte_t* buf, size_t buflen, size_t offset, T* t)
+    inline size_t unserialize(const byte_t* buf, size_t buflen, size_t offset, T& t)
     {
-        if (offset + serial_size(*t) > buflen)
+        if (offset + serial_size(t) > buflen)
             gu_throw_fatal;
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-        *t = *reinterpret_cast<const T*>(buf + offset);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-#error "Big endian not supported yet"
-#else
-#error "Byte order unrecognized"
-#endif // __BYTE_ORDER
-        return (offset + serial_size(*t));
-    }
-
-    template <typename T>
-    inline size_t serialize(const T& t, Buffer& buf, size_t offset)
-    {
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-        buf.insert(buf.begin() + offset, &t, &t + serial_size(t));
+        t = *reinterpret_cast<const T*>(buf + offset);
 #elif __BYTE_ORDER == __BIG_ENDIAN
 #error "Big endian not supported yet"
 #else
@@ -91,19 +78,6 @@ namespace gu
         return (offset + serial_size(t));
     }
 
-    template <typename T>
-    inline size_t unserialize(const Buffer& buf, size_t offset, T* t)
-    {
-        (void)buf.at[offset + serial_size(*t)];
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-        copy(buf.begin() + offset, buf.begin() + offset + sserial_size(*t), t);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-#error "Big endian not supported yet"
-#else
-#error "Byte order unrecognized"
-#endif // __BYTE_ORDER
-        return offset + sserial_size(*t);
-    }
 } // namespace gu
 
 #endif // GU_SERIALIZE_HPP

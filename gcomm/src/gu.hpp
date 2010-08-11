@@ -29,7 +29,7 @@ class gcomm::GuProtonet : public Protonet
 {
 public:
 
-    GuProtonet() : Protonet("gu"), net(), mutex(), interrupted(false) { }
+    GuProtonet(int version = 0) : Protonet("gu"), net(version), mutex(), interrupted(false) { }
     ~GuProtonet() { }
 
     gu::net::Network& get_net() { return net; }

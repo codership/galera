@@ -152,7 +152,9 @@ public:
         thd(),
         uri_base("pc://" + uri_base_),
         use_prod_cons(false),
-        net(Protonet::create(URI(uri_base).get_option("gcomm.protonet_backend", "gu"))),
+        net(Protonet::create(
+                URI(uri_base).get_option("gcomm.protonet_backend", "gu"),
+                gu::from_string<int>(URI(uri_base).get_option("gcomm.protonet_version", "0")))),
         tp(0),
         mutex(),
         refcnt(0),

@@ -7,7 +7,7 @@
 
 #include "gu_buffer.hpp"
 #include "gu_serialize.hpp"
-
+#include "gu_utils.hpp"
 #include <boost/crc.hpp>
 
 #include <limits>
@@ -32,7 +32,13 @@ namespace gu
     {
     public:
 
-        NetHeader(uint32_t len, int version = 0)
+        NetHeader()
+            :
+            len_(),
+            crc32_()
+        { }
+
+        NetHeader(uint32_t len, int version)
             :
             len_(len),
             crc32_(0)
@@ -61,7 +67,6 @@ namespace gu
         static const size_t serial_size_ = 8;
 
     private:
-
         static const uint32_t len_mask_      = 0x00ffffff;
         static const uint32_t flags_mask_    = 0x0f000000;
         static const uint32_t flags_shift_   = 24;
@@ -86,8 +91,8 @@ namespace gu
     inline size_t unserialize(const byte_t* buf, size_t buflen, size_t offset,
                               NetHeader& hdr)
     {
-        offset = unserialize(buf, buflen, offset, &hdr.len_);
-        offset = unserialize(buf, buflen, offset, &hdr.crc32_);
+        offset = unserialize(buf, buflen, offset, hdr.len_);
+        offset = unserialize(buf, buflen, offset, hdr.crc32_);
         switch (hdr.version())
         {
         case 0:

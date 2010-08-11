@@ -53,13 +53,14 @@ Date gcomm::Protonet::handle_timers()
     return next_time;
 }
 
-gcomm::Protonet* gcomm::Protonet::create(const std::string conf)
+gcomm::Protonet* gcomm::Protonet::create(const std::string conf, int version)
 {
+    log_info << "protonet " << conf << " version " << version;
     if (conf == "gu")
-        return new GuProtonet();
+        return new GuProtonet(version);
 #ifdef HAVE_ASIO_HPP
     else if (conf == "asio")
-        return new AsioProtonet();
+        return new AsioProtonet(version);
 #endif // HAVE_ASIO_HPP
     gu_throw_fatal << "protonet " << conf << " not supported";
     throw;

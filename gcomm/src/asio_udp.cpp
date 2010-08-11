@@ -137,7 +137,7 @@ int gcomm::AsioUdpSocket::send(const Datagram& dg)
 {
     Critical<AsioProtonet> crit(net_);
     boost::array<asio::const_buffer, 3> cbs;
-    NetHeader hdr(dg.get_len());
+    NetHeader hdr(dg.get_len(), net_.version_);
     if (net_.checksum_ == true)
     {
         hdr.set_crc32(dg.checksum());
@@ -165,7 +165,7 @@ void gcomm::AsioUdpSocket::read_handler(const asio::error_code& ec,
     if (bytes_transferred >= NetHeader::serial_size_)
     {
         Critical<AsioProtonet> crit(net_);
-        NetHeader hdr(0);
+        NetHeader hdr;
         try
         {
             unserialize(&recv_buf_[0], NetHeader::serial_size_, 0, hdr);

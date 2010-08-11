@@ -365,7 +365,7 @@ public:
     /*!
      * @brief Default constructor
      */
-    Network();
+    Network(int version = 0);
 
     /*!
      * @brief Destructor
@@ -417,6 +417,7 @@ public:
 private:
 
     friend class Socket;
+    int version_;
     SocketList* sockets;
     std::vector<Socket*> released;
     int wake_fd[2];

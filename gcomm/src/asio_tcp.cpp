@@ -141,7 +141,7 @@ int gcomm::AsioTcpSocket::send(const Datagram& dg)
         return ENOTCONN;
     }
 
-    NetHeader hdr(static_cast<uint32_t>(dg.get_len()));
+    NetHeader hdr(static_cast<uint32_t>(dg.get_len()), net_.version_);
     if (net_.checksum_ == true)
     {
         hdr.set_crc32(dg.checksum());
@@ -190,7 +190,7 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
 
     while (recv_offset_ >= NetHeader::serial_size_)
     {
-        NetHeader hdr(0);
+        NetHeader hdr;
         try
         {
             unserialize(&recv_buf_[0], recv_buf_.size(), 0, hdr);
@@ -271,7 +271,7 @@ size_t gcomm::AsioTcpSocket::read_completion_condition(
 
     if (recv_offset_ + bytes_transferred >= NetHeader::serial_size_)
     {
-        NetHeader hdr(0);
+        NetHeader hdr;
         try
         {
             unserialize(&recv_buf_[0], NetHeader::serial_size_, 0, hdr);

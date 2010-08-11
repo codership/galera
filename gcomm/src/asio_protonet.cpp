@@ -25,13 +25,14 @@ using namespace gu::net;
 using namespace gu::datetime;
 
 
-gcomm::AsioProtonet::AsioProtonet()
+gcomm::AsioProtonet::AsioProtonet(int version)
     :
     gcomm::Protonet("asio"),
     mutex_(),
     poll_until_(Date::max()),
     io_service_(),
     timer_(io_service_),
+    version_(version),
     mtu_(1 << 15),
     checksum_(true)
 {
