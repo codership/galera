@@ -104,11 +104,12 @@ public:
     {}
 
     /* Ctor for handshake, handshake ok and handshake fail */
-    Message (const Type  type_,
+    Message (int v,
+             const Type  type_,
              const UUID& handshake_uuid_,
              const UUID& source_uuid_)
         :
-        version        (0),
+        version        (v),
         type           (type_),
         flags          (F_HANDSHAKE_UUID),
         handshake_uuid (handshake_uuid_),
@@ -124,11 +125,12 @@ public:
     }
 
     /* Ctor for user message */
-    Message (const Type    type_,
+    Message (int v,
+             const Type    type_,
              const UUID&   source_uuid_,
              const uint8_t ttl_)
         :
-        version        (0),
+        version        (v),
         type           (type_),
         flags          (0),
         handshake_uuid (),
@@ -143,13 +145,14 @@ public:
     }
 
     /* Ctor for handshake response */
-    Message (const Type         type_,
+    Message (int v,
+             const Type         type_,
              const gcomm::UUID& handshake_uuid_,
              const gcomm::UUID& source_uuid_,
              const std::string& node_address_,
              const std::string& group_name_)
         :
-        version        (0),
+        version        (v),
         type           (type_),
         flags          (F_GROUP_NAME | F_NODE_ADDRESS | F_HANDSHAKE_UUID),
         handshake_uuid (handshake_uuid_),
@@ -165,12 +168,13 @@ public:
     }
 
     /* Ctor for topology change */
-    Message (const Type         type_,
+    Message (int v,
+             const Type         type_,
              const gcomm::UUID& source_uuid_,
              const std::string& group_name_,
              const NodeList&    nodes)
         :
-        version        (0),
+        version        (v),
         type           (type_),
         flags          (F_GROUP_NAME | F_NODE_LIST),
         handshake_uuid (),
@@ -289,7 +293,7 @@ public:
             + (flags & F_NODE_LIST ? node_list.serial_size() : 0);
     }
 
-    uint8_t get_version() const { return version; }
+    int get_version() const { return version; }
 
     Type    get_type()    const { return type;    }
 

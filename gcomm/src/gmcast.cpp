@@ -260,7 +260,7 @@ void GMCast::gmcast_accept()
         return;
     }
 
-    Proto* peer = new Proto (tp, listen_addr, "", mcast_addr,
+    Proto* peer = new Proto (version, tp, listen_addr, "", mcast_addr,
                              get_uuid(), group_name);
     pair<ProtoMap::iterator, bool> ret =
         proto_map->insert(make_pair(tp->get_id(), peer));
@@ -302,7 +302,8 @@ void GMCast::gmcast_connect(const string& remote_addr)
         return;
     }
 
-    Proto* peer = new Proto (tp,
+    Proto* peer = new Proto (version,
+                             tp,
                              listen_addr,
                              remote_addr,
                              mcast_addr,
@@ -867,7 +868,7 @@ void GMCast::handle_up(const void*        id,
 
 int GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 {
-    Message msg(Message::T_USER_BASE, get_uuid(), 1);
+    Message msg(version, Message::T_USER_BASE, get_uuid(), 1);
 
     gu_trace(push_header(msg, dg));
 

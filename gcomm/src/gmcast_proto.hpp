@@ -60,13 +60,15 @@ public:
     
     
     
-    Proto (SocketPtr          tp_, 
+    Proto (int v,
+           SocketPtr          tp_, 
            const std::string& local_addr_, 
            const std::string& remote_addr_, 
            const std::string& mcast_addr_,
            const gcomm::UUID& local_uuid_, 
            const std::string& group_name_)
         : 
+        version(v),
         handshake_uuid   (),
         local_uuid       (local_uuid_),
         remote_uuid      (),
@@ -110,12 +112,13 @@ public:
         changed = false;
         return ret;
     }
-
+    int get_version() const { return version; }
 private:
     
     Proto(const Proto&);
     void operator=(const Proto&);
-    
+
+    int version;
     gcomm::UUID       handshake_uuid;
     gcomm::UUID       local_uuid;  // @todo: do we need it here?
     gcomm::UUID       remote_uuid;

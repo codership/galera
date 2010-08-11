@@ -63,7 +63,7 @@ void gcomm::gmcast::Proto::send_msg(const Message& msg)
 void gcomm::gmcast::Proto::send_handshake() 
 {
     handshake_uuid = UUID(0, 0);
-    Message hs (Message::T_HANDSHAKE, handshake_uuid, local_uuid);
+    Message hs (version, Message::T_HANDSHAKE, handshake_uuid, local_uuid);
     
     send_msg(hs);
         
@@ -83,10 +83,16 @@ void gcomm::gmcast::Proto::handle_handshake(const Message& hs)
     if (get_state() != S_HANDSHAKE_WAIT)
         gu_throw_fatal << "Invalid state: " << to_string(get_state());
     
+    if (hs.get_version() != version)
+    {
+        log_warn << "incompatible protocol version: " << hs.get_version();
+        set_state(S_FAILED);
+        return;
+    }
     handshake_uuid = hs.get_handshake_uuid();
     remote_uuid = hs.get_source_uuid();
     
-    Message hsr (Message::T_HANDSHAKE_RESPONSE, 
+    Message hsr (version, Message::T_HANDSHAKE_RESPONSE, 
                  handshake_uuid,
                  local_uuid, 
                  local_addr,
@@ -117,7 +123,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
                 + URI(hs.get_node_address()).get_port();
             
             propagate_remote = true;
-            Message ok(Message::T_HANDSHAKE_OK, handshake_uuid, local_uuid);
+            Message ok(version, Message::T_HANDSHAKE_OK, handshake_uuid, local_uuid);
             send_msg(ok);
             set_state(S_OK);
         }
@@ -126,7 +132,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
             log_warn << "Parsing peer address '"
                      << hs.get_node_address() << "' failed: " << e.what();
             
-            Message nok (Message::T_HANDSHAKE_FAIL, handshake_uuid, local_uuid);
+            Message nok (version, Message::T_HANDSHAKE_FAIL, handshake_uuid, local_uuid);
             
             send_msg (nok);
             set_state(S_FAILED);
@@ -184,7 +190,7 @@ void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
                                    Node(LinkMap::get_value(i).get_addr())));
     }
     
-    Message msg(Message::T_TOPOLOGY_CHANGE, local_uuid,
+    Message msg(version, Message::T_TOPOLOGY_CHANGE, local_uuid,
                 group_name, nl);
         
     send_msg(msg);

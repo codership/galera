@@ -110,11 +110,26 @@ void PC::connect()
     evs->shift_to(evs::Proto::S_JOINING);
     pc->connect(start_prim);
 
+    Date try_until(Date::now() + Period("PT15S"));
     while (start_prim == false && evs->get_known_size() <= 1)
     {
         // Send join messages without handling them
         evs->send_join(false);
         get_pnet().event_loop(Sec/2);
+        if (try_until < Date::now())
+        {
+            gmcast->close();
+            evs->close();
+            pc->close();
+
+            get_pnet().erase(&pstack_);
+            pstack_.pop_proto(this);
+            pstack_.pop_proto(pc);
+            pstack_.pop_proto(evs);
+            pstack_.pop_proto(gmcast);
+
+            gu_throw_error(ETIMEDOUT) << "failed to join group";
+        }
     }
 
     log_debug << "PC/EVS Proto initial state: " << *evs;
