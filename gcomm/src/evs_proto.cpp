@@ -103,6 +103,10 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const gu::URI& uri,
     state(S_CLOSED),
     shift_to_rfcnt(0)
 {
+    if (version > max_version_)
+    {
+        gu_throw_error(EINVAL) << "invalid evs version " << version;
+    }
 
     log_info << "EVS version " << version;
 

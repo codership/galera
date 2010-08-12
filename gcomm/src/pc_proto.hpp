@@ -72,6 +72,10 @@ public:
         pc_view_       (V_NON_PRIM),
         views_         ()
     {
+        if (version_ > max_version_)
+        {
+            gu_throw_error(EINVAL) << "invalid pc version " << version_;
+        }
         log_info << "PC version " << version_;
     }
 
@@ -153,6 +157,7 @@ private:
     void deliver_view();
 
     int               version_;
+    static const int max_version_ = 0;
     UUID   const      my_uuid_;       // Node uuid
     bool              start_prim_;    // Is allowed to start in prim comp
     bool              allow_sb_;      // Split-brain condition is allowed

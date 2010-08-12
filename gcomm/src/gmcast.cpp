@@ -53,7 +53,10 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     check_period  ("PT1S"),
     next_check    (Date::now())
 {
-
+    if (version > max_version_)
+    {
+        gu_throw_error(EINVAL) << "invalid gmcast version " << version;
+    }
     log_info << "GMCast version " << version;
 
     // @todo: technically group name should be in path component

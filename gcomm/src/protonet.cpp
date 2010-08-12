@@ -55,6 +55,10 @@ Date gcomm::Protonet::handle_timers()
 
 gcomm::Protonet* gcomm::Protonet::create(const std::string conf, int version)
 {
+    if (version > max_version_)
+    {
+        gu_throw_error(EINVAL) << "invalid protonet version: " << version;
+    }
     log_info << "protonet " << conf << " version " << version;
     if (conf == "gu")
         return new GuProtonet(version);

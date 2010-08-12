@@ -285,6 +285,7 @@ public:
 private:
 
     int version;
+    static const int max_version_ = 0;
     int debug_mask;
     int info_mask;
     gu::datetime::Date last_stats_report;

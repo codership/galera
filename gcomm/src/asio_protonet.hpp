@@ -52,7 +52,6 @@ private:
     asio::io_service            io_service_;
     asio::deadline_timer        timer_;
 
-    int                         version_;
     size_t                      mtu_;
     bool                        checksum_;
 };

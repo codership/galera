@@ -106,6 +106,7 @@ namespace gcomm
         class AddrList : public Map<std::string, AddrEntry> { };
 
         int               version;
+        static const int max_version_ = 0;
         UUID              my_uuid;
         std::string       group_name;
         std::string       listen_addr;

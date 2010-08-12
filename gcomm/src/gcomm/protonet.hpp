@@ -34,12 +34,18 @@ namespace gcomm
 class gcomm::Protonet
 {
 public:
-    Protonet(const std::string& type) : protos_(), type_(type) { }
+    Protonet(const std::string& type, int version)
+        :
+        protos_ (),
+        version_(version),
+        type_   (type)
+    { }
+
     virtual ~Protonet() { }
 
     //!
     // Insert Protostack to be handled by Protonet
-    // 
+    //
     // @param pstack Pointer to Protostack
     //
     void insert(Protostack* pstack);
@@ -69,9 +75,9 @@ public:
     // @return Acceptor
     //
     virtual Acceptor* acceptor(const gu::URI& uri) = 0;
-    
+
     //!
-    // Dispatch events until period p has passed or event 
+    // Dispatch events until period p has passed or event
     // loop is interrupted.
     //
     // @param p Period to run event_loop(), negative value means forever
@@ -102,12 +108,14 @@ public:
 
     //!
     // Factory method for creating Protonets
-    // 
+    //
     static Protonet* create(const std::string conf, int version = 0);
 
     const std::string& get_type() const { return type_; }
 protected:
     std::deque<Protostack*> protos_;
+    int version_;
+    static const int max_version_ = 0;
 private:
     std::string type_;
 };
