@@ -14,6 +14,10 @@
 #include "gcomm/transport.hpp"
 #include "gcomm/types.hpp"
 
+#ifndef GCOMM_GMCAST_MAX_VERSION
+#define GCOMM_GMCAST_MAX_VERSION 0
+#endif // GCOMM_GMCAST_MAX_VERSION
+
 namespace gcomm
 {
     namespace gmcast
@@ -106,7 +110,7 @@ namespace gcomm
         class AddrList : public Map<std::string, AddrEntry> { };
 
         int               version;
-        static const int max_version_ = 0;
+        static const int max_version_ = GCOMM_GMCAST_MAX_VERSION;
         UUID              my_uuid;
         std::string       group_name;
         std::string       listen_addr;

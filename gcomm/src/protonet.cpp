@@ -59,6 +59,7 @@ gcomm::Protonet* gcomm::Protonet::create(const std::string conf, int version)
     {
         gu_throw_error(EINVAL) << "invalid protonet version: " << version;
     }
+
     log_info << "protonet " << conf << " version " << version;
     if (conf == "gu")
         return new GuProtonet(version);

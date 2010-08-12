@@ -29,6 +29,10 @@
 #include <vector>
 #include <limits>
 
+#ifndef GCOMM_EVS_MAX_VERSION
+#define GCOMM_EVS_MAX_VERSION 0
+#endif // GCOMM_EVS_MAX_VERSION
+
 namespace gcomm
 {
     namespace evs
@@ -285,7 +289,7 @@ public:
 private:
 
     int version;
-    static const int max_version_ = 0;
+    static const int max_version_ = GCOMM_EVS_MAX_VERSION;
     int debug_mask;
     int info_mask;
     gu::datetime::Date last_stats_report;

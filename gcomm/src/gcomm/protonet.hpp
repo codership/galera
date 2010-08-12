@@ -21,6 +21,9 @@
 
 #include <deque>
 
+#ifndef GCOMM_PROTONET_MAX_VERSION
+#define GCOMM_PROTONET_MAX_VERSION 0
+#endif // GCOMM_PROTONET_MAX_VERSION
 
 namespace gcomm
 {
@@ -115,7 +118,7 @@ public:
 protected:
     std::deque<Protostack*> protos_;
     int version_;
-    static const int max_version_ = 0;
+    static const int max_version_ = GCOMM_PROTONET_MAX_VERSION;
 private:
     std::string type_;
 };

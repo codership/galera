@@ -14,6 +14,10 @@
 
 #include "gu_uri.hpp"
 
+#ifndef GCOMM_PC_MAX_VERSION
+#define GCOMM_PC_MAX_VERSION 0
+#endif // GCOMM_PC_MAX_VERSION
+
 namespace gcomm
 {
     namespace pc
@@ -157,7 +161,7 @@ private:
     void deliver_view();
 
     int               version_;
-    static const int max_version_ = 0;
+    static const int max_version_ = GCOMM_PC_MAX_VERSION;
     UUID   const      my_uuid_;       // Node uuid
     bool              start_prim_;    // Is allowed to start in prim comp
     bool              allow_sb_;      // Split-brain condition is allowed
