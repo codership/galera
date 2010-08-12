@@ -20,7 +20,7 @@ namespace gcomm
     {
     public:
         
-        PC (Protonet&, const std::string&);
+        PC (Protonet&, const gu::URI&);
         
         ~PC();
         

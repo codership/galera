@@ -306,7 +306,8 @@ gcomm::evs::InputMap::insert(const size_t uuid,
                                    InputMapMsg(
                                        (s == msg.get_seq() ?
                                         msg :
-                                        UserMessage(msg.get_source(),
+                                        UserMessage(msg.get_version(),
+                                                    msg.get_source(),
                                                     msg.get_source_view_id(),
                                                     s,
                                                     msg.get_aru_seq(),

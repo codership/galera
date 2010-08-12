@@ -118,9 +118,10 @@ void PC::connect()
         get_pnet().event_loop(Sec/2);
         if (try_until < Date::now())
         {
-            gmcast->close();
-            evs->close();
+
             pc->close();
+            evs->close();
+            gmcast->close();
 
             get_pnet().erase(&pstack_);
             pstack_.pop_proto(this);
@@ -187,7 +188,7 @@ void PC::close()
 }
 
 
-PC::PC(Protonet& net, const string& uri) :
+PC::PC(Protonet& net, const gu::URI& uri) :
     Transport (net, uri),
     gmcast    (0),
     evs       (0),

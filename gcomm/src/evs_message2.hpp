@@ -140,6 +140,7 @@ public:
 
     static const uint8_t F_AGGREGATE = 0x8; /*!< Message contains aggregated payload */
     static const uint8_t F_COMMIT    = 0x10;
+    static const uint8_t F_BC        = 0x20; /*!< Message was sent in backward compatibility mode */
     /*!
      * Get version of the message
      *
@@ -388,7 +389,8 @@ protected:
 class gcomm::evs::UserMessage : public Message
 {
 public:
-    UserMessage(const UUID&        source         = UUID::nil(),
+    UserMessage(const int          version = -1,
+                const UUID&        source         = UUID::nil(),
                 const ViewId&      source_view_id = ViewId(),
                 const seqno_t        seq            = -1,
                 const seqno_t        aru_seq        = -1,
@@ -397,7 +399,7 @@ public:
                 const int64_t      fifo_seq       = -1,
                 const uint8_t      user_type      = 0xff,
                 const uint8_t      flags          = 0) :
-        Message(0,
+        Message(version,
                 Message::T_USER,
                 source,
                 source_view_id,
@@ -428,7 +430,9 @@ public:
 class gcomm::evs::AggregateMessage
 {
 public:
-    AggregateMessage(const int flags = 0, const size_t len = 0, const uint8_t user_type = 0xff)
+    AggregateMessage(const int     flags     = 0,
+                     const size_t  len       = 0,
+                     const uint8_t user_type = 0xff)
         :
         flags_    (gu::convert(flags, uint8_t(0))),
         user_type_(user_type),
@@ -464,10 +468,11 @@ inline std::ostream& gcomm::evs::operator<<(std::ostream& os, const AggregateMes
 class gcomm::evs::DelegateMessage : public Message
 {
 public:
-    DelegateMessage(const UUID&   source         = UUID::nil(),
+    DelegateMessage(const int     version   = -1,
+                    const UUID&   source         = UUID::nil(),
                     const ViewId& source_view_id = ViewId(),
                     const int64_t fifo_seq       = -1) :
-        Message(0,
+        Message(version,
                 T_DELEGATE,
                 source,
                 source_view_id,
@@ -487,7 +492,8 @@ public:
 class gcomm::evs::GapMessage : public Message
 {
 public:
-    GapMessage(const UUID&   source         = UUID::nil(),
+    GapMessage(const int     version   = -1,
+               const UUID&   source         = UUID::nil(),
                const ViewId& source_view_id = ViewId(),
                const seqno_t   seq            = -1,
                const seqno_t   aru_seq        = -1,
@@ -495,7 +501,7 @@ public:
                const UUID&   range_uuid     = UUID::nil(),
                const Range   range          = Range(),
                const uint8_t flags          = 0) :
-        Message(0,
+        Message(version,
                 T_GAP,
                 source,
                 source_view_id,
@@ -521,13 +527,14 @@ public:
 class gcomm::evs::JoinMessage : public Message
 {
 public:
-    JoinMessage(const UUID&            source         = UUID::nil(),
+    JoinMessage(const int     version   = -1,
+                const UUID&            source         = UUID::nil(),
                 const ViewId&          source_view_id = ViewId(),
                 const seqno_t            seq            = -1,
                 const seqno_t            aru_seq        = -1,
                 const int64_t          fifo_seq       = -1,
                 const MessageNodeList& node_list      = MessageNodeList()) :
-        Message(0,
+        Message(version,
                 Message::T_JOIN,
                 source,
                 source_view_id,
@@ -554,14 +561,15 @@ public:
 class gcomm::evs::InstallMessage : public Message
 {
 public:
-    InstallMessage(const UUID&            source          = UUID::nil(),
+    InstallMessage(const int     version   = -1,
+                   const UUID&            source          = UUID::nil(),
                    const ViewId&          source_view_id  = ViewId(),
                    const ViewId&          install_view_id = ViewId(),
                    const seqno_t            seq             = -1,
                    const seqno_t            aru_seq         = -1,
                    const int64_t          fifo_seq        = -1,
                    const MessageNodeList& node_list       = MessageNodeList()) :
-        Message(0,
+        Message(version,
                 Message::T_INSTALL,
                 source,
                 source_view_id,
@@ -588,13 +596,14 @@ public:
 class gcomm::evs::LeaveMessage : public Message
 {
 public:
-    LeaveMessage(const UUID&   source         = UUID::nil(),
+    LeaveMessage(const int     version   = -1,
+                 const UUID&   source         = UUID::nil(),
                  const ViewId& source_view_id = ViewId(),
                  const seqno_t   seq            = -1,
                  const seqno_t   aru_seq        = -1,
                  const int64_t fifo_seq       = -1,
                  const uint8_t flags          = 0) :
-        Message(0,
+        Message(version,
                 T_LEAVE,
                 source,
                 source_view_id,

@@ -1005,7 +1005,8 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
     }
     gcomm_assert(seq_range >= 0 && seq_range <= 0xff);
 
-    UserMessage msg(get_uuid(),
+    UserMessage msg(version,
+                    get_uuid(),
                     current_view.get_id(),
                     seq,
                     input_map->get_aru_seq(),
@@ -1155,7 +1156,7 @@ void gcomm::evs::Proto::complete_user(const seqno_t high_seq)
 
 int gcomm::evs::Proto::send_delegate(Datagram& wb)
 {
-    DelegateMessage dm(get_uuid(), current_view.get_id(), ++fifo_seq);
+    DelegateMessage dm(version, get_uuid(), current_view.get_id(), ++fifo_seq);
     push_header(dm, wb);
     int ret = send_down(wb, ProtoDownMeta());
     pop_header(dm, wb);
@@ -1179,7 +1180,8 @@ void gcomm::evs::Proto::send_gap(const UUID&   range_uuid,
     // flooding network with gap messages won't probably make
     // conditions better
 
-    GapMessage gm(get_uuid(),
+    GapMessage gm(version,
+                  get_uuid(),
                   source_view_id,
                   (source_view_id == current_view.get_id() ? last_sent :
                    (commit == true ? install_message->get_fifo_seq() : -1)),
@@ -1276,7 +1278,8 @@ const JoinMessage& gcomm::evs::Proto::create_join()
     MessageNodeList node_list;
 
     gu_trace(populate_node_list(&node_list));
-    JoinMessage jm(get_uuid(),
+    JoinMessage jm(version,
+                   get_uuid(),
                    current_view.get_id(),
                    input_map->get_safe_seq(),
                    input_map->get_aru_seq(),
@@ -1373,7 +1376,8 @@ void gcomm::evs::Proto::send_leave(bool handle)
     }
 
 
-    LeaveMessage lm(get_uuid(),
+    LeaveMessage lm(version,
+                    get_uuid(),
                     current_view.get_id(),
                     last_sent,
                     input_map->get_aru_seq(),
@@ -1429,7 +1433,8 @@ void gcomm::evs::Proto::send_install()
     MessageNodeList node_list;
     populate_node_list(&node_list);
 
-    InstallMessage imsg(get_uuid(),
+    InstallMessage imsg(version,
+                        get_uuid(),
                         current_view.get_id(),
                         ViewId(V_REG, get_uuid(), max_view_id_seq + 1),
                         input_map->get_safe_seq(),
@@ -1488,7 +1493,8 @@ void gcomm::evs::Proto::resend(const UUID& gap_source, const Range range)
         Datagram rb(InputMapMsgIndex::get_value(msg_i).get_rb());
         assert(rb.get_offset() == 0);
 
-        UserMessage um(msg.get_source(),
+        UserMessage um(msg.get_version(),
+                       msg.get_source(),
                        msg.get_source_view_id(),
                        msg.get_seq(),
                        input_map->get_aru_seq(),
@@ -1569,7 +1575,8 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
 
         Datagram rb(InputMapMsgIndex::get_value(msg_i).get_rb());
         assert(rb.get_offset() == 0);
-        UserMessage um(msg.get_source(),
+        UserMessage um(msg.get_version(),
+                       msg.get_source(),
                        msg.get_source_view_id(),
                        msg.get_seq(),
                        msg.get_aru_seq(),
@@ -1663,6 +1670,14 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
     {
         return;
     }
+
+    if (msg.get_version() != version)
+    {
+        log_info << "incompatible protocol version " << msg.get_version();
+        return;
+    }
+
+
 
     gcomm_assert(msg.get_source() != UUID::nil());
 
@@ -1767,7 +1782,6 @@ size_t gcomm::evs::Proto::unserialize_message(const UUID& source,
                                               const Datagram& rb,
                                               Message* msg)
 {
-
     size_t offset;
     const byte_t* begin(get_begin(rb));
     const size_t available(get_available(rb));
@@ -2838,7 +2852,8 @@ void gcomm::evs::Proto::retrans_leaves(const MessageNodeList& node_list)
                 MessageNodeList::get_value(msg_li).get_leaving() == false)
             {
                 const LeaveMessage& lm(*NodeMap::get_value(li).get_leave_message());
-                LeaveMessage send_lm(lm.get_source(),
+                LeaveMessage send_lm(lm.get_version(),
+                                     lm.get_source(),
                                      lm.get_source_view_id(),
                                      lm.get_seq(),
                                      lm.get_aru_seq(),
@@ -3298,7 +3313,8 @@ void gcomm::evs::Proto::handle_install(const InstallMessage& msg,
         const MessageNode& mn(
             MessageNodeList::get_value(
                 msg.get_node_list().find_checked(msg.get_source())));
-        JoinMessage jm(msg.get_source(),
+        JoinMessage jm(msg.get_version(),
+                       msg.get_source(),
                        mn.get_view_id(),
                        msg.get_seq(),
                        msg.get_aru_seq(),

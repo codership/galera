@@ -81,25 +81,30 @@ gcomm::Transport::Transport(Protonet& pnet, const URI& uri) :
 gcomm::Transport::~Transport() {}
 
 
-gcomm::Transport* 
-gcomm::Transport::create(Protonet& pnet, const string& uri_str)
+
+
+gcomm::Transport*
+gcomm::Transport::create(Protonet& pnet, const gu::URI& uri)
 {
-    const URI uri(uri_str);
+
     const std::string& scheme = uri.get_scheme();
-    
+
     if (scheme == Conf::GMCastScheme)
     {
-        return new GMCast(pnet, uri_str);
+        return new GMCast(pnet, uri);
     }
     else if (scheme == Conf::PcScheme)
     {
-        return new PC(pnet, uri_str);
+        return new PC(pnet, uri);
     }
-    
+
     gu_throw_fatal << "scheme not supported";
-    
+
     throw; // to make compiler happy
 }
 
-
-
+gcomm::Transport*
+gcomm::Transport::create(Protonet& pnet, const string& uri_str)
+{
+    return create(pnet, URI(uri_str));
+}

@@ -82,7 +82,7 @@ public:
     Protonet&   get_pnet()   { return pnet_; }
     
     static Transport* create(Protonet&, const std::string&);
-    
+    static Transport* create(Protonet&, const gu::URI&);
 protected:
     Transport (Protonet&, const gu::URI&);
     void              set_state(State);

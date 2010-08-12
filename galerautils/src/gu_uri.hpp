@@ -139,7 +139,10 @@ namespace gu
          * @brief Add query param to URI
          */
         void set_query_param(const std::string&, const std::string&);
-
+        void set_option(const std::string& key, const std::string& val)
+        {
+            set_query_param(key, val);
+        }
         /*!
          * @brief Get URI query list
          *        It seems that this is needed only in unit tests
