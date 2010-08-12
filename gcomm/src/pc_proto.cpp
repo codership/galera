@@ -82,7 +82,7 @@ void gcomm::pc::Proto::send_state()
 {
     log_debug << self_id() << " sending state";
 
-    StateMessage pcs;
+    StateMessage pcs(version_);
 
     NodeMap& im(pcs.get_node_map());
 
@@ -111,7 +111,7 @@ void gcomm::pc::Proto::send_install()
 {
     log_debug << self_id() << " send install";
 
-    InstallMessage pci;
+    InstallMessage pci(version_);
 
     NodeMap& im(pci.get_node_map());
 
@@ -975,7 +975,7 @@ int gcomm::pc::Proto::handle_down(Datagram& dg, const ProtoDownMeta& dm)
     }
 
     uint32_t    seq(last_sent_seq_ + 1);
-    UserMessage um(seq);
+    UserMessage um(version_, seq);
 
     push_header(um, dg);
     if (checksum_ == true)

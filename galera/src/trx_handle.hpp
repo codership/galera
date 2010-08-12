@@ -86,6 +86,7 @@ namespace galera
                   wsrep_trx_id_t      trx_id    = -1,
                   bool                local     = false)
             :
+            version_           (0),
             source_id_         (source_id),
             conn_id_           (conn_id),
             trx_id_            (trx_id),
@@ -258,6 +259,7 @@ namespace galera
         TrxHandle(const TrxHandle&);
         void operator=(const TrxHandle& other);
 
+        int version_;
         wsrep_uuid_t           source_id_;
         wsrep_conn_id_t        conn_id_;
         wsrep_trx_id_t         trx_id_;

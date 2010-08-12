@@ -129,7 +129,7 @@ public:
 size_t galera::serialize(const TrxHandle& trx, gu::byte_t* buf,
                          size_t buflen, size_t offset)
 {
-    uint32_t hdr(trx.write_set_flags_ & 0xff);
+    uint32_t hdr((trx.version_ << 24) | (trx.write_set_flags_ & 0xff));
     offset = serialize(hdr, buf, buflen, offset);
     offset = serialize(trx.source_id_, buf, buflen, offset);
     offset = serialize(trx.conn_id_, buf, buflen, offset);
@@ -145,6 +145,8 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
     uint32_t hdr;
     offset = unserialize(buf, buflen, offset, hdr);
     trx.write_set_flags_ = hdr & 0xff;
+    trx.version_ = hdr >> 24;
+    if (trx.version_ != 0) gu_throw_error(EPROTONOSUPPORT);
     offset = unserialize(buf, buflen, offset, trx.source_id_);
     offset = unserialize(buf, buflen, offset, trx.conn_id_);
     offset = unserialize(buf, buflen, offset, trx.trx_id_);

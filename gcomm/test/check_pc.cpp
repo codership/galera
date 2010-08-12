@@ -32,7 +32,7 @@ static const string pnet_backend("gu");
 
 START_TEST(test_pc_messages)
 {
-    StateMessage pcs;
+    StateMessage pcs(0);
     pc::NodeMap& sim(pcs.get_node_map());
 
     sim.insert(std::make_pair(UUID(0,0),
@@ -52,9 +52,9 @@ START_TEST(test_pc_messages)
     size_t expt_size = 4 // hdr
         + 4              // seq
         + 4 + 3*(UUID::serial_size() + sizeof(uint32_t) + 4 + 20 + 8); // NodeMap
-    check_serialization(pcs, expt_size, StateMessage());
+    check_serialization(pcs, expt_size, StateMessage(-1));
 
-    InstallMessage pci;
+    InstallMessage pci(0);
     pc::NodeMap& iim = pci.get_node_map();
 
     iim.insert(std::make_pair(UUID(0,0),
@@ -73,13 +73,13 @@ START_TEST(test_pc_messages)
     expt_size = 4 // hdr
         + 4              // seq
         + 4 + 4*(UUID::serial_size() + sizeof(uint32_t) + 4 + 20 + 8); // NodeMap
-    check_serialization(pci, expt_size, InstallMessage());
+    check_serialization(pci, expt_size, InstallMessage(-1));
 
-    UserMessage pcu(7);
+    UserMessage pcu(0, 7);
     pcu.checksum(0xfefe, true);
 
     expt_size = 4 + 4;
-    check_serialization(pcu, expt_size, UserMessage(-1U));
+    check_serialization(pcu, expt_size, UserMessage(-1, -1U));
     fail_unless(pcu.serial_size() % 4 == 0);
 }
 END_TEST
@@ -1233,7 +1233,7 @@ START_TEST(test_trac_191)
 
     // Handle first sm from uuid3
 
-    StateMessage sm3;
+    StateMessage sm3(0);
     pc::NodeMap& im3(sm3.get_node_map());
     im3.insert_unique(make_pair(uuid1,
                                 pc::Node(true, 254, ViewId(V_PRIM, uuid1, 3), 20)));

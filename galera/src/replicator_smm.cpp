@@ -1265,7 +1265,24 @@ wsrep_status_t galera::ReplicatorSMM::process_global_action(void* recv_ctx,
         return WSREP_OK;
     }
 
-    TrxHandle* trx(cert_.create_trx(act, act_size, seqno_l, seqno_g));
+    TrxHandle* trx(0);
+    try
+    {
+        trx = cert_.create_trx(act, act_size, seqno_l, seqno_g);
+    }
+    catch (gu::Exception& e)
+    {
+        switch (e.get_errno())
+        {
+        case EPROTONOSUPPORT:
+            log_error << "incompatible protocol version: " << e.what();
+            return WSREP_NODE_FAIL;
+        default:
+            log_warn << "could not read trx " << seqno_g;
+            return WSREP_FATAL;
+        }
+    }
+
     if (trx == 0)
     {
         log_warn << "could not read trx " << seqno_g;

@@ -64,7 +64,7 @@ size_t PC::get_mtu() const
     if (gmcast == 0) gu_throw_fatal << "not open";
 
     evs::UserMessage evsm;
-    pc::UserMessage  pcm(0);
+    pc::UserMessage  pcm(0, 0);
 
     if (gmcast->get_mtu() < 2*evsm.serial_size() + pcm.serial_size())
     {

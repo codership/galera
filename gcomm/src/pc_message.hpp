@@ -308,21 +308,21 @@ inline std::ostream& gcomm::pc::operator<<(std::ostream& os, const Message& m)
 class gcomm::pc::StateMessage : public Message
 {
 public:
-    StateMessage() :  Message(0, Message::T_STATE, 0) {}
+    StateMessage(int version) :  Message(version, Message::T_STATE, 0) {}
 };
 
 
 class gcomm::pc::InstallMessage : public Message
 {
 public:
-    InstallMessage() : Message(0, Message::T_INSTALL, 0) {}
+    InstallMessage(int version) : Message(version, Message::T_INSTALL, 0) {}
 };
 
 
 class gcomm::pc::UserMessage : public Message
 {
 public:
-    UserMessage(uint32_t seq) : Message(0, Message::T_USER, seq) {}
+    UserMessage(int version, uint32_t seq) : Message(version, Message::T_USER, seq) {}
 };
 
 
