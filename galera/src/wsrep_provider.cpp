@@ -140,8 +140,8 @@ wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
 
 extern "C"
 wsrep_status_t galera_abort_pre_commit(wsrep_t *gh,
-                                          wsrep_seqno_t bf_seqno,
-                                          wsrep_trx_id_t victim_trx)
+                                       wsrep_seqno_t bf_seqno,
+                                       wsrep_trx_id_t victim_trx)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
@@ -269,6 +269,9 @@ wsrep_status_t galera_pre_commit(wsrep_t *gh,
                                     wsrep_seqno_t* global_seqno)
 {
     assert(gh != 0 && gh->ctx != 0);
+
+    *global_seqno = WSREP_SEQNO_UNDEFINED;
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     TrxHandle* trx(repl->local_trx(trx_handle, rbr_data != 0));
@@ -287,8 +290,13 @@ wsrep_status_t galera_pre_commit(wsrep_t *gh,
         trx->set_flags(TrxHandle::F_COMMIT);
 
         retval = repl->replicate(trx);
+
+        assert((retval == WSREP_OK && trx->global_seqno() > 0) ||
+               (retval != WSREP_OK && trx->global_seqno() < 0));
+
         if (retval == WSREP_OK)
         {
+            *global_seqno = trx->global_seqno();
             retval = repl->pre_commit(trx);
         }
         assert(retval == WSREP_OK || retval == WSREP_TRX_FAIL ||
@@ -484,6 +492,9 @@ wsrep_status_t galera_to_execute_start(wsrep_t *gh,
                                           wsrep_seqno_t* global_seqno)
 {
     assert(gh != 0 && gh->ctx != 0);
+
+    *global_seqno = WSREP_SEQNO_UNDEFINED;
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     TrxHandle* trx(repl->local_conn_trx(conn_id, true));
@@ -494,9 +505,15 @@ wsrep_status_t galera_to_execute_start(wsrep_t *gh,
         TrxHandleLock lock(*trx);
         trx->append_statement(query, query_len);
         trx->set_flags(TrxHandle::F_COMMIT);
+
         retval = repl->replicate(trx);
+
+        assert((retval == WSREP_OK && trx->global_seqno() > 0) ||
+               (retval != WSREP_OK && trx->global_seqno() < 0));
+
         if (retval == WSREP_OK)
         {
+            *global_seqno = trx->global_seqno();
             retval = repl->to_isolation_begin(trx);
         }
     }
