@@ -337,7 +337,6 @@ void GMCast::gmcast_forget(const UUID& uuid)
         Proto* rp = ProtoMap::get_value(pi);
         if (rp->get_remote_uuid() == uuid)
         {
-            rp->get_socket()->close();
             delete rp;
             proto_map->erase(pi);
         }
@@ -351,6 +350,18 @@ void GMCast::gmcast_forget(const UUID& uuid)
         AddrEntry& ae(AddrList::get_value(ai));
         if (ae.get_uuid() == uuid)
         {
+            ProtoMap::iterator pi, pi_next;
+            for (pi = proto_map->begin(); pi != proto_map->end(); pi = pi_next)
+            {
+                pi_next = pi, ++pi_next;
+                Proto* rp = ProtoMap::get_value(pi);
+                if (rp->get_remote_addr() == AddrList::get_key(ai))
+                {
+                    log_info << "deleting entry " << AddrList::get_key(ai);
+                    delete rp;
+                    proto_map->erase(pi);
+                }
+            }
             ae.set_retry_cnt(max_retry_cnt + 1);
             ae.set_next_reconnect(Date::now() + Period("PT5S"));
         }
@@ -391,6 +402,14 @@ void GMCast::handle_established(Proto* est)
 
         insert_address (remote_addr, est->get_remote_uuid(), remote_addrs);
         i = remote_addrs.find(remote_addr);
+    }
+
+    if (AddrList::get_value(i).get_retry_cnt() > max_retry_cnt)
+    {
+        log_warn << "cleaned up " << AddrList::get_key(i) << " got established";
+        delete est;
+        update_addresses();
+        return;
     }
 
     AddrList::get_value(i).set_retry_cnt(-1);
@@ -476,7 +495,6 @@ void GMCast::handle_failed(Proto* failed)
     }
 
     proto_map->erase(failed->get_socket()->get_id());
-    failed->get_socket()->close();
     delete failed;
     update_addresses();
 }

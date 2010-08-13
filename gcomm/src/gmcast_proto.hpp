@@ -83,7 +83,7 @@ public:
         link_map         ()
     { }
     
-    ~Proto() { }
+    ~Proto() { tp->close(); }
     
     void send_msg(const Message& msg);
     void send_handshake();    
