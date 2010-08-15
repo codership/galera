@@ -12,7 +12,9 @@ utilsxx_sources = [
         'gu_regex.cpp',
         'gu_string.cpp',
         'gu_uri.cpp',
-        'gu_buffer.cpp']
+        'gu_buffer.cpp',
+        'gu_config.cpp'
+        ]
 
 if env['CPPFLAGS'].find('-DGALERA_USE_GU_NETWORK') != -1:
     utilsxx_sources = [utilsxx_sources, 
