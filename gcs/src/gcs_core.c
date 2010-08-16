@@ -35,6 +35,8 @@ core_state_t;
 
 struct gcs_core
 {
+    gu_config_t*    config;
+
     /* connection per se */
     long            prim_comp_no;
     core_state_t    state;
@@ -80,12 +82,17 @@ typedef struct core_act
 core_act_t;
 
 gcs_core_t*
-gcs_core_create (const char* node_name,
-                 const char* inc_addr)
+gcs_core_create (const char*  node_name,
+                 const char*  inc_addr,
+                 gu_config_t* conf)
 {
+    assert (conf);
+
     gcs_core_t* core = GU_CALLOC (1, gcs_core_t);
 
     if (NULL != core) {
+
+        core->config = conf;
 
         // Need to allocate something, otherwise Spread 3.17.3 freaks out.
         core->recv_msg.buf = gu_malloc(CORE_INIT_BUF_SIZE);
@@ -149,7 +156,7 @@ gcs_core_open (gcs_core_t* core,
     }
 
     gu_debug ("Initializing backend IO layer");
-    if (!(ret = gcs_backend_init (&core->backend, url))) {
+    if (!(ret = gcs_backend_init (&core->backend, url, core->config))) {
 
         assert (NULL != core->backend.conn);
 
@@ -1128,6 +1135,28 @@ gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size)
         ret = 0;
     }
     return ret;
+}
+
+long
+gcs_core_param_set (gcs_core_t* core, const char* key, const char* value)
+{
+    if (core->backend.conn) {
+        return core->backend.param_set (&core->backend, key, value);
+    }
+    else {
+        return 1;
+    }
+}
+
+const char*
+gcs_core_param_get (gcs_core_t* core, const char* key)
+{
+    if (core->backend.conn) {
+        return core->backend.param_get (&core->backend, key);
+    }
+    else {
+        return NULL;
+    }
 }
 
 #ifdef GCS_CORE_TESTING

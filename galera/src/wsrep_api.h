@@ -324,17 +324,17 @@ struct wsrep_init_args
     wsrep_synced_cb_t         synced_cb;       //!< synced with group
 };
 
-/*! Type of the status variable value in struct wsrep_status_var */
+/*! Type of the stats variable value in struct wsrep_status_var */
 typedef enum wsrep_var_type
 {
-    WSREP_STATUS_STRING, //!< pointer to null-terminated string
-    WSREP_STATUS_INT64,  //!< int64_t
-    WSREP_STATUS_DOUBLE  //!< double
+    WSREP_VAR_STRING, //!< pointer to null-terminated string
+    WSREP_VAR_INT64,  //!< int64_t
+    WSREP_VAR_DOUBLE  //!< double
 }
 wsrep_var_type_t;
 
-/*! Generalized status variable representation */
-struct wsrep_status_var
+/*! Generalized stats variable representation */
+struct wsrep_stats_var
 {
     const char*      name;     //!< variable name
     wsrep_var_type_t type;     //!< variable value type
@@ -741,14 +741,14 @@ struct wsrep_ {
    * @param wsrep this wsrep handle
    * @return array of struct wsrep_status_var
    */
-    struct wsrep_status_var* (*status_get) (wsrep_t* wsrep);
+    struct wsrep_stats_var* (*stats_get) (wsrep_t* wsrep);
 
   /*!
    * @brief Release resources that might be associated with the array
    *
    * @param wsrep this wsrep handle
    */
-    void (*status_free) (wsrep_t* wsrep, struct wsrep_status_var* var_array);
+    void (*stats_free) (wsrep_t* wsrep, struct wsrep_stats_var* var_array);
 
   /*!
    * wsrep provider name

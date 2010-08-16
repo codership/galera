@@ -32,7 +32,7 @@ static const gcs_seqno_t GCS_SEQNO_FIRST =  1;
 #define GCS_UUID_LEN 16
 
 /*! Connection handle type */
-typedef struct gcs_conn gcs_conn_t;
+typedef struct gcs_conn  gcs_conn_t;
 
 /*! @brief Creates GCS connection handle.
  *
@@ -40,11 +40,12 @@ typedef struct gcs_conn gcs_conn_t;
  * @param node_name human readable name of the node, can be null.
  * @param inc_addr  address at which application accepts incoming requests.
  *                  Used for load balancing, can be null.
+ * @param conf      gu_config_t* configuration object, can be null.
  *
  * @return pointer to GCS connection handle, NULL in case of failure.
  */
 extern gcs_conn_t*
-gcs_create  (const char* node_name, const char* inc_addr);
+gcs_create  (const char* node_name, const char* inc_addr, void* conf);
 
 /*! @brief Initialize group history values (optional).
  * Serves to provide group history persistence after process restart (in case
@@ -288,6 +289,18 @@ extern long gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno);
 
 /* GCS Configuration */
 
+/*! sets the key to a given value
+ * 
+ * @return 0 in case of success, 1 if key not found or negative error code */
+extern long
+gcs_param_set (gcs_conn_t* conn, const char* key, const char *value);
+
+/*! returns the value of the key
+ * 
+ * @return NULL if key not found */
+extern const char*
+gcs_param_get (gcs_conn_t* conn, const char* key);
+
 /* Logging options */
 extern long gcs_conf_set_log_file     (FILE *file);
 extern long gcs_conf_set_log_callback (void (*logger) (int, const char*));
@@ -296,12 +309,12 @@ extern long gcs_conf_self_tstamp_off  ();
 extern long gcs_conf_debug_on         ();
 extern long gcs_conf_debug_off        ();
 
-/* Sending options */
+/* Sending options (deprecated, use gcs_param_set instead) */
 /* Sets maximum DESIRED network packet size.
  * For best results should be multiple of MTU */
 extern long
 gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size);
-//#define GCS_DEFAULT_PKT_SIZE 1500 /* Standard Ethernet frame */
+
 #define GCS_DEFAULT_PKT_SIZE 64500 /* 43 Eth. frames to carry max IP packet */
 
 /*

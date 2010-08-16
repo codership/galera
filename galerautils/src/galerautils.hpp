@@ -20,6 +20,9 @@
 #include "gu_macros.hpp"
 #include "gu_utils.hpp"
 #include "gu_convert.hpp"
+#include "gu_string.hpp"
+#include "gu_config.hpp"
+#include "gu_prodcons.hpp"
 
 extern "C" {
 #include "gu_macros.h"
@@ -33,4 +36,4 @@ extern "C" {
 #include "gu_uuid.h"
 }
 
-#endif /* _galerautilspp_hpp_ */
+#endif /* _galerautils_hpp_ */

@@ -1,4 +1,4 @@
-// Copyright (C) 2009 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2010 Codership Oy <info@codership.com>
 
 #ifndef __GU_STRING_HPP__
 #define __GU_STRING_HPP__
@@ -26,6 +26,9 @@ namespace gu
                                       char sep   = ' ',
                                       char esc   = '\\',
                                       bool empty = false);
+
+    /*! Remove non-alnum symbols from the beginning and end of string */
+    void trim (std::string& s);
 }
 
 #endif /* __GU_STRING_HPP__ */

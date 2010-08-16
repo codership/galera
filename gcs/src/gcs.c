@@ -18,6 +18,7 @@
 #include <galerautils.h>
 
 #include "gcs.h"
+#include "gcs_params.h"
 #include "gcs_seqno.h"
 #include "gcs_core.h"
 #include "gcs_fifo_lite.h"
@@ -60,10 +61,6 @@ const char* gcs_act_type_to_str (gcs_act_type_t type)
 
 static const long GCS_MAX_REPL_THREADS = 16384;
 
-// Flow control parameters
-static const long   fc_base_queue_limit = 32;
-static const double fc_resume_factor    = 0.5;
-
 typedef enum
 {
     GCS_CONN_SYNCED,   // caught up with the rest of the group
@@ -102,13 +99,19 @@ __attribute__((__packed__));
 
 struct gcs_conn
 {
-    int    my_idx;
-    char  *my_name;
-    char  *channel;
-    char  *socket;
+    long  my_idx;
+    long  memb_num;
+    char* my_name;
+    char* channel;
+    char* socket;
 
     gcs_conn_state_t state;
-    int err;
+    int              err;
+
+    gu_config_t*      config;
+    bool              config_is_local;
+    struct gcs_params params;
+
 #ifdef GCS_USE_SM
     gcs_sm_t*    sm;
 #else
@@ -119,23 +122,25 @@ struct gcs_conn
     gcs_seqno_t  global_seqno;
 
     /* A queue for threads waiting for replicated actions */
-    gcs_fifo_lite_t*  repl_q;
-    gu_thread_t  send_thread;
+    gcs_fifo_lite_t* repl_q;
+    gu_thread_t      send_thread;
 
     /* A queue for threads waiting for received actions */
     gu_fifo_t*   recv_q;
     gu_thread_t  recv_thread;
 
-    /* Flow control */
+    /* Flow Control */
     gu_mutex_t   fc_lock;
-    uint32_t     conf_id;     // configuration ID
-    long         stop_sent;   // how many STOPs - CONTs were sent
-    long         stop_count;  // counts stop requests received
-    long         queue_len;   // slave queue length
-    long         upper_limit; // upper slave queue limit
-    long         lower_limit; // lower slave queue limit
-    long         stats_fc_sent;
-    long         stats_fc_received;
+//    long         fc_base_queue_limit; // Base FC configuraton parameters
+//    double       fc_resume_factor;    //
+    uint32_t     conf_id;             // configuration ID
+    long         stop_sent;           // how many STOPs - CONTs were sent
+    long         stop_count;          // counts stop requests received
+    long         queue_len;           // slave queue length
+    long         upper_limit;         // upper slave queue limit
+    long         lower_limit;         // lower slave queue limit
+    long         stats_fc_sent;       // FC stats counters
+    long         stats_fc_received;   // 
 
     /* sync control */
     bool         sync_sent;
@@ -163,15 +168,44 @@ struct gcs_repl_act
     gu_cond_t      wait_cond;
 };
 
+static long
+_init_params (gcs_conn_t* conn, gu_config_t* conf)
+{
+    long rc;
+
+    conn->config = conf;
+    conn->config_is_local = false;
+
+    if (!conn->config) {
+        conn->config = gu_config_create("");
+
+        if (!conn->config) return -ENOMEM;
+
+        conn->config_is_local = true;
+    }
+
+    rc = gcs_params_init (&conn->params, conn->config);
+
+    if (rc && conn->config_is_local) gu_config_destroy (conn->config);
+
+    return rc;
+}
+
 /* Creates a group connection handle */
 gcs_conn_t*
-gcs_create (const char* node_name, const char* inc_addr)
+gcs_create (const char* node_name, const char* inc_addr, void* conf)
 {
     gcs_conn_t* conn = GU_CALLOC (1, gcs_conn_t);
 
     if (conn) {
+
+        if (_init_params (conn, conf)) {
+            free (conn);
+            return 0;
+        }
+
         conn->state = GCS_CONN_DESTROYED;
-        conn->core  = gcs_core_create (node_name, inc_addr);
+        conn->core  = gcs_core_create (node_name, inc_addr, conf);
 
         if (conn->core) {
             conn->repl_q = gcs_fifo_lite_create (GCS_MAX_REPL_THREADS,
@@ -189,12 +223,14 @@ gcs_create (const char* node_name, const char* inc_addr)
                     conn->my_idx       = -1;
                     conn->local_act_id = GCS_SEQNO_FIRST;
                     conn->global_seqno = 0;
+
 #ifdef GCS_USE_SM
                     conn->sm = gcs_sm_create(1<<16, 1); // TODO: check!
 #else
                     gu_mutex_init (&conn->lock, NULL);
 #endif /* GCS_USE_SM */
                     gu_mutex_init (&conn->fc_lock, NULL);
+
                     return conn; // success
                 }
                 else {
@@ -212,6 +248,8 @@ gcs_create (const char* node_name, const char* inc_addr)
         else {
             gu_error ("Failed to create core.");
         }
+
+        if (conn->config_is_local) gu_config_destroy(conn->config);
         gu_free (conn);
     }
     else {
@@ -528,6 +566,26 @@ gcs_become_synced (gcs_conn_t* conn)
     conn->sync_sent = false;
 }
 
+/* to be called under protection of both recv_q and fc_lock */
+static void
+_set_fc_limits (gcs_conn_t* conn)
+{
+    if (conn->memb_num > 1) {
+        conn->upper_limit =
+            conn->params.fc_base_limit * sqrt(conn->memb_num - 1.0) + .5;
+        conn->lower_limit =
+            conn->upper_limit * conn->params.fc_resume_factor + .5;
+    }
+    else {
+        // otherwise any non-repl'ed message may cause waits.
+        conn->upper_limit = 1.0;
+        conn->lower_limit = 0.0;
+    }
+
+    gu_info ("Flow-control interval: [%ld, %ld]",
+             conn->lower_limit, conn->upper_limit);
+}
+
 /*! Handles configuration action */
 // TODO: this function does not provide any way for recv_thread to gracefully
 //       exit in case of self-leave message.
@@ -542,21 +600,21 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     gu_fifo_lock(conn->recv_q);
     {
         /* reset flow control as membership is most likely changed */
-        if (gu_mutex_lock (&conn->fc_lock)) {
+        if (!gu_mutex_lock (&conn->fc_lock)) {
+            conn->stop_sent   = 0;
+            conn->stop_count  = 0;
+            conn->conf_id     = conf->conf_id;
+            conn->memb_num    = conf->memb_num;
+
+            _set_fc_limits (conn);
+
+            gu_mutex_unlock (&conn->fc_lock);
+        }
+        else {
             gu_fatal ("Failed to lock mutex.");
             abort();
         }
-
-        conn->conf_id     = conf->conf_id;
-        conn->stop_sent   = 0;
-        conn->stop_count  = 0;
-        conn->upper_limit = fc_base_queue_limit * sqrt(conf->memb_num - 1) + .5;
-        conn->lower_limit = conn->upper_limit * fc_resume_factor + .5;
-
-        if (0 == conn->upper_limit) conn->upper_limit = 1;
-        // otherwise any non-repl'ed message may cause waits.
-
-        gu_mutex_unlock (&conn->fc_lock);
+ 
 
         conn->sync_sent = false;
 
@@ -564,9 +622,6 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
         gcs_sm_continue(conn->sm);
     }
     gu_fifo_release (conn->recv_q);
-
-    gu_info ("Flow-control interval: [%ld, %ld]",
-             conn->lower_limit, conn->upper_limit);
 
     if (conf->conf_id < 0) {
         if (0 == conf->memb_num) {
@@ -886,6 +941,20 @@ static void *gcs_recv_thread (void *arg)
     return NULL;
 }
 
+static long
+gcs_set_pkt_size (gcs_conn_t *conn, long pkt_size)
+{
+    long ret = gcs_core_set_pkt_size (conn->core, pkt_size);
+
+    if (ret >= 0) {
+        conn->params.max_packet_size = ret;
+        gu_config_set_int64 (conn->config, GCS_PARAMS_MAX_PKT_SIZE,
+                             conn->params.max_packet_size);
+    }
+
+    return ret;
+}
+
 /* Opens connection to group */
 long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
 {
@@ -905,8 +974,8 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
 
             if (!(ret = gcs_core_open (conn->core, channel, url))) {
 
-                if (0 < (ret = gcs_core_set_pkt_size (conn->core,
-                                                      GCS_DEFAULT_PKT_SIZE))) {
+                if (0 < (ret = gcs_set_pkt_size
+                         (conn, conn->params.max_packet_size))) {
 
                     if (!(ret = gu_thread_create (&conn->recv_thread,
                                                   NULL,
@@ -1081,6 +1150,8 @@ long gcs_destroy (gcs_conn_t *conn)
     while (gu_mutex_destroy (&conn->lock));
 #endif
     while (gu_mutex_destroy (&conn->fc_lock));
+
+    if (conn->config_is_local) gu_config_destroy (conn->config);
 
     gu_free (conn);
 
@@ -1381,7 +1452,9 @@ gcs_wait (gcs_conn_t* conn)
 long
 gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size)
 {
-    return gcs_core_set_pkt_size (conn->core, pkt_size);
+    if (conn->params.max_packet_size == pkt_size) return pkt_size;
+
+    return gcs_set_pkt_size (conn, pkt_size);
 }
 
 long
@@ -1426,4 +1499,111 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
 
     stats->fc_sent     = conn->stats_fc_sent;     conn->stats_fc_sent     = 0;
     stats->fc_received = conn->stats_fc_received; conn->stats_fc_received = 0;
+}
+
+static long
+_set_fc_limit (gcs_conn_t* conn, const char* value)
+{
+    char* endptr = NULL;
+    long  limit  = strtol (value, &endptr, 0);
+
+    if (limit > 0 && *endptr == '\0') {
+
+        gu_fifo_lock(conn->recv_q);
+        {
+            if (!gu_mutex_lock (&conn->fc_lock)) {
+                conn->params.fc_base_limit = limit;
+                _set_fc_limits (conn);
+                gu_config_set_int64 (conn->config, GCS_PARAMS_FC_LIMIT,
+                                     conn->params.fc_base_limit);
+                gu_mutex_unlock (&conn->fc_lock);
+            }
+            else {
+                gu_fatal ("Failed to lock mutex.");
+                abort();
+            }
+        }
+        gu_fifo_release (conn->recv_q);
+
+        return 0;
+    }
+    else {
+        return -EINVAL;
+    }
+}
+
+static long
+_set_fc_factor (gcs_conn_t* conn, const char* value)
+{
+    char*  endptr = NULL;
+    double factor = strtod (value, &endptr);
+
+    if (factor >= 0.0 && factor <= 1.0 && *endptr == '\0') {
+
+        if (factor == conn->params.fc_resume_factor) return 0;
+
+        gu_fifo_lock(conn->recv_q);
+        {
+            if (!gu_mutex_lock (&conn->fc_lock)) {
+                conn->params.fc_resume_factor = factor;
+                _set_fc_limits (conn);
+                gu_config_set_double (conn->config, GCS_PARAMS_FC_LIMIT,
+                                      conn->params.fc_resume_factor);
+                gu_mutex_unlock (&conn->fc_lock);
+            }
+            else {
+                gu_fatal ("Failed to lock mutex.");
+                abort();
+            }
+        }
+        gu_fifo_release (conn->recv_q);
+
+        return 0;
+    }
+    else {
+        return -EINVAL;
+    }
+}
+
+static long
+_set_pkt_size (gcs_conn_t* conn, const char* value)
+{
+    char* endptr   = NULL;
+    long  pkt_size = strtol (value, &endptr, 0);
+
+    if (pkt_size > 0 && *endptr == '\0') {
+
+        if (conn->params.max_packet_size == pkt_size) return 0;
+
+        long ret = gcs_set_pkt_size (conn, pkt_size);
+
+        return (ret >= 0 ? 0 : ret);
+    }
+    else {
+//        gu_warn ("Invalid value for %s: '%s'", GCS_PARAMS_PKT_SIZE, value);
+        return -EINVAL;
+    }
+}
+
+long gcs_param_set  (gcs_conn_t* conn, const char* key, const char *value)
+{
+    if (!strcmp (key, GCS_PARAMS_FC_LIMIT)) {
+        return _set_fc_limit (conn, value);
+    }
+    else if (!strcmp (key, GCS_PARAMS_FC_FACTOR)) {
+        return _set_fc_factor (conn, value);
+    }
+    else if (!strcmp (key, GCS_PARAMS_MAX_PKT_SIZE)) {
+        return _set_pkt_size (conn, value);
+    }
+    else {
+        return gcs_core_param_set (conn->core, key, value);
+    }
+}
+
+const char* gcs_param_get (gcs_conn_t* conn, const char* key)
+{
+    gu_warn ("Not implemented: %s", __FUNCTION__);
+
+    return NULL;
 }

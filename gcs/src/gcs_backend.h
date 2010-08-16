@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2010 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -12,12 +12,14 @@
 #ifndef _gcs_backend_h_
 #define _gcs_backend_h_
 
-#include <stdlib.h>
 #include "gcs.h"
 #include "gcs_msg_type.h"
 
+#include <galerautils.h>
+#include <stdlib.h>
+
 typedef struct gcs_backend_conn gcs_backend_conn_t;
-typedef struct gcs_backend gcs_backend_t;
+typedef struct gcs_backend      gcs_backend_t;
 
 /*
  * The macros below are declarations of backend functions
@@ -26,8 +28,9 @@ typedef struct gcs_backend gcs_backend_t;
 
 /*! Allocates backend context and sets up the backend structure */
 #define GCS_BACKEND_CREATE_FN(fn)         \
-long fn (gcs_backend_t*    backend,       \
-         const char* const socket)
+long fn (gcs_backend_t*     backend,      \
+         const char*  const socket,       \
+         gu_config_t* const cnf)
 
 /*! Deallocates backend context */
 #define GCS_BACKEND_DESTROY_FN(fn)        \
@@ -116,25 +119,55 @@ const char* fn (void)
 long fn (gcs_backend_t* const backend,      \
          long           const pkt_size)
 
-typedef GCS_BACKEND_CREATE_FN   ((*gcs_backend_create_t));
-typedef GCS_BACKEND_DESTROY_FN  ((*gcs_backend_destroy_t));
-typedef GCS_BACKEND_OPEN_FN     ((*gcs_backend_open_t));
-typedef GCS_BACKEND_CLOSE_FN    ((*gcs_backend_close_t));
-typedef GCS_BACKEND_SEND_FN     ((*gcs_backend_send_t));
-typedef GCS_BACKEND_RECV_FN     ((*gcs_backend_recv_t));
-typedef GCS_BACKEND_NAME_FN     ((*gcs_backend_name_t));
-typedef GCS_BACKEND_MSG_SIZE_FN ((*gcs_backend_msg_size_t));
+/*!
+ * @param backend
+ *        backend handle
+ * @param key
+ *        parameter name
+ * @param value
+ *        parameter value
+ * @return 1 if parameter not recognized, 0 in case of success and negative
+ *         error code in case of error
+ */
+#define GCS_BACKEND_PARAM_SET_FN(fn)  \
+long fn (gcs_backend_t* backend,      \
+         const char*    key,          \
+         const char*    value)
+
+/*!
+ * @param backend
+ *        backend handle
+ * @param key
+ *        parameter name
+ * @return NULL if parameter not recognized
+ */
+#define GCS_BACKEND_PARAM_GET_FN(fn)        \
+const char* fn (gcs_backend_t* backend,     \
+                const char*    key)
+
+typedef GCS_BACKEND_CREATE_FN    ((*gcs_backend_create_t));
+typedef GCS_BACKEND_DESTROY_FN   ((*gcs_backend_destroy_t));
+typedef GCS_BACKEND_OPEN_FN      ((*gcs_backend_open_t));
+typedef GCS_BACKEND_CLOSE_FN     ((*gcs_backend_close_t));
+typedef GCS_BACKEND_SEND_FN      ((*gcs_backend_send_t));
+typedef GCS_BACKEND_RECV_FN      ((*gcs_backend_recv_t));
+typedef GCS_BACKEND_NAME_FN      ((*gcs_backend_name_t));
+typedef GCS_BACKEND_MSG_SIZE_FN  ((*gcs_backend_msg_size_t));
+typedef GCS_BACKEND_PARAM_SET_FN ((*gcs_backend_param_set_t));
+typedef GCS_BACKEND_PARAM_GET_FN ((*gcs_backend_param_get_t));
 
 struct gcs_backend
 {
-    gcs_backend_conn_t*    conn;
-    gcs_backend_open_t     open;
-    gcs_backend_close_t    close;
-    gcs_backend_destroy_t  destroy;
-    gcs_backend_send_t     send;
-    gcs_backend_recv_t     recv;
-    gcs_backend_name_t     name;
-    gcs_backend_msg_size_t msg_size;
+    gcs_backend_conn_t*     conn;
+    gcs_backend_open_t      open;
+    gcs_backend_close_t     close;
+    gcs_backend_destroy_t   destroy;
+    gcs_backend_send_t      send;
+    gcs_backend_recv_t      recv;
+    gcs_backend_name_t      name;
+    gcs_backend_msg_size_t  msg_size;
+    gcs_backend_param_set_t param_set;
+    gcs_backend_param_get_t param_get;
 };
 
 /*!
@@ -142,7 +175,8 @@ struct gcs_backend
  * (sort of like 'new')
  */
 long
-gcs_backend_init (gcs_backend_t* const bk,
-		  const char*    const uri);
+gcs_backend_init (gcs_backend_t* bk,
+		  const char*    uri,
+		  gu_config_t*   cnf);
 
 #endif /* _gcs_backend_h_ */

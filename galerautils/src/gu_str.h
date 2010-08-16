@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2010 Codership Oy <info@codership.com>
+ */
 
 #ifndef GU_STR_H
 #define GU_STR_H

@@ -12,6 +12,7 @@
 
 #include "replicator.hpp"
 
+#include "parameter_list.hpp"
 #include "gcs.hpp"
 #include "monitor.hpp"
 #include "wsdb.hpp"
@@ -94,11 +95,18 @@ namespace galera
                                     const void*         state,
                                     size_t              state_len);
 
-        const struct wsrep_status_var* status() const;
+        const struct wsrep_stats_var* stats() const;
 
-        void store_state(const std::string& file) const;
-        void restore_state(const std::string& file);
-        void invalidate_state(const std::string& file) const;
+        void           param_set (const std::string& key,
+                                  const std::string& value)
+            throw (gu::Exception, gu::NotFound);
+
+        std::string    param_get (const std::string& key) const
+            throw (gu::Exception, gu::NotFound);
+
+        void store_state      (const std::string& file) const;
+        void restore_state    (const std::string& file);
+        void invalidate_state (const std::string& file) const;
 
     private:
 
@@ -225,6 +233,16 @@ namespace galera
             State to_;
         };
 
+        void build_stats_vars (std::vector<struct wsrep_stats_var>& stats);
+
+        class Logger
+        {
+        public:
+            Logger (gu_log_cb_t cb) { gu_conf_set_log_callback(cb); }
+        };
+
+        Logger                 logger_;
+        gu::Config             config_;
         FSM<State, Transition> state_;
         SstState               sst_state_;
 
@@ -238,7 +256,6 @@ namespace galera
 
         // application callbacks
         void*                 app_ctx_;
-        wsrep_log_cb_t        logger_cb_;
         wsrep_view_cb_t       view_cb_;
         wsrep_bf_apply_cb_t   bf_apply_cb_;
         wsrep_sst_donate_cb_t sst_donate_cb_;
@@ -280,7 +297,7 @@ namespace galera
         size_t             report_interval_;
         gu::Atomic<size_t> report_counter_;
 
-        mutable std::vector<struct wsrep_status_var> wsrep_status_;
+        mutable std::vector<struct wsrep_stats_var> wsrep_stats_;
     };
 
     std::ostream& operator<<(std::ostream& os, ReplicatorSMM::State state);

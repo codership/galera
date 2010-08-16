@@ -65,20 +65,23 @@ START_TEST (gcs_backend_test)
     gcs_backend_t backend;
     long ret;
 
-    ret = gcs_backend_init (&backend, "wrong://kkk");
+    gu_config_t* config = gu_config_create ("");
+    fail_if (config == NULL);
+
+    ret = gcs_backend_init (&backend, "wrong://kkk", config);
     fail_if (ret != -ESOCKTNOSUPPORT);
 
-    ret = gcs_backend_init (&backend, "spread:");
+    ret = gcs_backend_init (&backend, "spread:", config);
     fail_if (ret != -EINVAL);
 
-    ret = gcs_backend_init (&backend, "dummy://");
+    ret = gcs_backend_init (&backend, "dummy://", config);
     fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
 //    fail_if (backend.name != gcs_test_name); this test is broken since we can
 //    no longer use global gcs_dummy_create() symbol because linking with real
 //    gcs_dummy.o
 
     ret = gcs_backend_init (&backend,
-                  "gcomm://0.0.0.0:4567");
+                  "gcomm://0.0.0.0:4567", config);
     fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
     fail_if (backend.name != gcs_gcomm_name);
 

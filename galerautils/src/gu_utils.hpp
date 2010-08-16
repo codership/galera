@@ -15,6 +15,7 @@
 #include <limits>
 
 #include "gu_exception.hpp"
+#include "gu_string.hpp"
 
 namespace gu {
 
@@ -83,10 +84,33 @@ template <> inline bool from_string<bool> (const std::string& s,
 
     if ((iss >> ret).fail())
     {
-        /* of 1|0 didn't work, try true|false */
+        /* if 1|0 didn't work, try true|false */
         iss.clear();
         iss.seekg(0);
-        if ((iss >> std::boolalpha >> ret).fail()) throw NotFound();
+        if ((iss >> std::boolalpha >> ret).fail())
+        {
+            /* try On/Off */
+            std::string tmp(s);
+
+            gu::trim(tmp);
+
+            if (tmp.length() >=2 && tmp.length() <= 3 &&
+                (tmp[0] == 'o' || tmp[0] == 'O'))
+            {
+                if (tmp.length() == 2 && (tmp[1] == 'n' || tmp[1] == 'N'))
+                {
+                    return true;
+                }
+                else if (tmp.length() == 3 &&
+                         (tmp[1] == 'f' || tmp[1] == 'F') &&
+                         (tmp[2] == 'f' || tmp[2] == 'F'))
+                {
+                    return false;
+                }
+            }
+
+            throw NotFound();
+        }
     }
 
     return ret;

@@ -7,6 +7,7 @@
 
 #include "wsrep_api.h"
 
+#include <galerautils.hpp>
 #include <string>
 
 namespace galera
@@ -56,7 +57,14 @@ namespace galera
                                             const void*         state,
                                             size_t              state_len) = 0;
         // wsrep_status_t snapshot();
-        virtual const struct wsrep_status_var* status() const = 0;
+        virtual const struct wsrep_stats_var* stats() const = 0;
+
+        virtual void           param_set (const std::string& key,
+                                          const std::string& value)
+            throw (gu::Exception, gu::NotFound) = 0;
+
+        virtual std::string    param_get (const std::string& key) const
+            throw (gu::Exception, gu::NotFound) = 0;
     };
 }
 

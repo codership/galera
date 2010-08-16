@@ -37,8 +37,9 @@ typedef struct gcs_core gcs_core_t;
  * generic communicaton layer - send/recieve buffers and the like.
  */
 extern gcs_core_t*
-gcs_core_create (const char* node_name,
-                 const char* inc_addr);
+gcs_core_create (const char*  node_name,
+                 const char*  inc_addr,
+                 gu_config_t* conf);
 
 /* initializes action history (global seqno, group UUID). See gcs.h */
 extern long
@@ -133,6 +134,12 @@ gcs_core_send_sync (gcs_core_t* core, gcs_seqno_t seqno);
 /* sends flow control message */
 extern long
 gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size);
+
+extern long
+gcs_core_param_set (gcs_core_t* core, const char* key, const char* value);
+
+extern const char*
+gcs_core_param_get (gcs_core_t* core, const char* key);
 
 #ifdef GCS_CORE_TESTING
 

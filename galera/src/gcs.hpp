@@ -37,15 +37,24 @@ namespace galera
                                                gcs_seqno_t* seqno_l) = 0;
         virtual ssize_t join(gcs_seqno_t seqno) = 0;
         virtual void    get_stats(gcs_stats*) const = 0;
+
+        virtual void    param_set (const std::string& key,
+                                   const std::string& value)
+            throw (gu::Exception, gu::NotFound) = 0;
+
+        virtual char*   param_get (const std::string& key) const 
+            throw (gu::Exception, gu::NotFound) = 0;
     };
 
     class Gcs : public GcsI
     {
     public:
 
-        Gcs(const char* node_name = 0, const char* node_incoming = 0)
+        Gcs(gu::Config& config,
+            const char* node_name     = 0,
+            const char* node_incoming = 0)
             :
-            conn_(gcs_create(node_name, node_incoming))
+            conn_(gcs_create(node_name, node_incoming, &config))
         {
             if (conn_ == 0) gu_throw_fatal << "could not create gcs connection";
         }
@@ -118,6 +127,29 @@ namespace galera
             return gcs_get_stats(conn_, stats);
         }
 
+        void param_set (const std::string& key, const std::string& value)
+            throw (gu::Exception, gu::NotFound)
+        {
+            long ret = gcs_param_set (conn_, key.c_str(), value.c_str());
+
+            if (1 == ret)
+            {
+                throw gu::NotFound();
+            }
+            else if (ret)
+            {
+                gu_throw_error(-ret) << "Setting '" << key << "' to '"
+                                     << value << "' failed";
+            }
+        }
+
+        char* param_get (const std::string& key) const
+            throw (gu::Exception, gu::NotFound)
+        {
+            gu_throw_error(ENOSYS) << "Not implemented: " << __FUNCTION__;
+            return 0;
+        }
+
     private:
 
         Gcs(const Gcs&);
@@ -178,6 +210,14 @@ namespace galera
         {
             memset (stats, 0, sizeof(*stats));
         }
+
+        void  param_set (const std::string& key, const std::string& value)
+            throw (gu::Exception, gu::NotFound)
+        {}
+
+        char* param_get (const std::string& key) const
+            throw (gu::Exception, gu::NotFound)
+        { return 0; }
 
     private:
 

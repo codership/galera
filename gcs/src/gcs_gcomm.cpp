@@ -24,9 +24,10 @@ extern "C"
 }
 
 
+#include <galerautils.hpp>
 #include "gcomm/transport.hpp"
 #include "gcomm/util.hpp"
-#include "gu_prodcons.hpp"
+//#include "gu_prodcons.hpp"
 
 #ifdef PROFILE_GCS_GCOMM
 #define GCOMM_PROFILE 1
@@ -147,7 +148,8 @@ class GCommConn : public Consumer, public Toplay
 {
 public:
 
-    GCommConn(const URI& u) :
+    GCommConn(const URI& u, gu::Config& cnf) :
+        conf(cnf),
         uuid(),
         thd(),
         uri(u),
@@ -254,8 +256,11 @@ public:
         terminated = true;
         net->interrupt();
     }
+    
+    void handle_up     (const void*        id,
+                        const Datagram&    dg,
+                        const ProtoUpMeta& um);
 
-    void handle_up     (const void* id, const Datagram& dg, const ProtoUpMeta& um);
     void queue_and_wait(const Message& msg, Message* ack);
 
     RecvBuf&  get_recv_buf()            { return recv_buf; }
@@ -310,6 +315,7 @@ private:
 
     void unref() { }
 
+    gu::Config& conf;
     UUID uuid;
     pthread_t thd;
     URI uri;
@@ -424,7 +430,7 @@ void GCommConn::run()
 ////////////////////////////////////////////////////////////////////////////
 
 
-static GCS_BACKEND_MSG_SIZE_FN(gcs_gcomm_msg_size)
+static GCS_BACKEND_MSG_SIZE_FN(gcomm_msg_size)
 {
     GCommConn::Ref ref(backend);
     if (ref.get() == 0)
@@ -435,7 +441,7 @@ static GCS_BACKEND_MSG_SIZE_FN(gcs_gcomm_msg_size)
 }
 
 
-static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
+static GCS_BACKEND_SEND_FN(gcomm_send)
 {
     GCommConn::Ref ref(backend);
 
@@ -460,7 +466,7 @@ static GCS_BACKEND_SEND_FN(gcs_gcomm_send)
             SharedBuffer(
                 new Buffer(reinterpret_cast<const byte_t*>(buf),
                            reinterpret_cast<const byte_t*>(buf) + len)));
-        Critical<Protonet> crit(conn.get_pnet());
+        gcomm::Critical<Protonet> crit(conn.get_pnet());
         int err = conn.send_down(
             dg,
             ProtoDownMeta(msg_type));
@@ -494,7 +500,7 @@ static void fill_cmp_msg(const View& view, const UUID& my_uuid,
     }
 }
 
-static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
+static GCS_BACKEND_RECV_FN(gcomm_recv)
 {
     GCommConn::Ref ref(backend);
 
@@ -568,14 +574,14 @@ static GCS_BACKEND_RECV_FN(gcs_gcomm_recv)
 }
 
 
-static GCS_BACKEND_NAME_FN(gcs_gcomm_name)
+static GCS_BACKEND_NAME_FN(gcomm_name)
 {
     static const char *name = "gcomm";
     return name;
 }
 
 
-static GCS_BACKEND_OPEN_FN(gcs_gcomm_open)
+static GCS_BACKEND_OPEN_FN(gcomm_open)
 {
     GCommConn::Ref ref(backend);
 
@@ -601,7 +607,7 @@ static GCS_BACKEND_OPEN_FN(gcs_gcomm_open)
 }
 
 
-static GCS_BACKEND_CLOSE_FN(gcs_gcomm_close)
+static GCS_BACKEND_CLOSE_FN(gcomm_close)
 {
     GCommConn::Ref ref(backend);
 
@@ -627,7 +633,7 @@ static GCS_BACKEND_CLOSE_FN(gcs_gcomm_close)
 }
 
 
-static GCS_BACKEND_DESTROY_FN(gcs_gcomm_destroy)
+static GCS_BACKEND_DESTROY_FN(gcomm_destroy)
 {
     GCommConn::Ref ref(backend, true);
 
@@ -652,14 +658,34 @@ static GCS_BACKEND_DESTROY_FN(gcs_gcomm_destroy)
 }
 
 
+static
+GCS_BACKEND_PARAM_SET_FN(gcomm_param_set)
+{
+    return 1;
+}
+
+
+static
+GCS_BACKEND_PARAM_GET_FN(gcomm_param_get)
+{
+    return NULL;
+}
+
+
 GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
 {
     GCommConn* conn(0);
 
+    if (!cnf)
+    {
+        log_error << "Null config object passed to constructor.";
+        return -EINVAL;
+    }
+
     try
     {
         gu::URI uri(std::string("pc://") + socket);
-        conn = new GCommConn(uri);
+        conn = new GCommConn(uri, *(reinterpret_cast<gu::Config*>(cnf)));
     }
     catch (Exception& e)
     {
@@ -669,14 +695,16 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
         return -e.get_errno();
     }
 
-    backend->open     = &gcs_gcomm_open;
-    backend->close    = &gcs_gcomm_close;
-    backend->destroy  = &gcs_gcomm_destroy;
-    backend->send     = &gcs_gcomm_send;
-    backend->recv     = &gcs_gcomm_recv;
-    backend->name     = &gcs_gcomm_name;
-    backend->msg_size = &gcs_gcomm_msg_size;
-    backend->conn     = reinterpret_cast<gcs_backend_conn_t*>(conn);
+    backend->open      = gcomm_open;
+    backend->close     = gcomm_close;
+    backend->destroy   = gcomm_destroy;
+    backend->send      = gcomm_send;
+    backend->recv      = gcomm_recv;
+    backend->name      = gcomm_name;
+    backend->msg_size  = gcomm_msg_size;
+    backend->param_set = gcomm_param_set;
+    backend->param_get = gcomm_param_get;
+    backend->conn      = reinterpret_cast<gcs_backend_conn_t*>(conn);
 
     return 0;
 }

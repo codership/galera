@@ -170,12 +170,12 @@ std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
 {
     switch (state)
     {
-    case ReplicatorSMM::S_CLOSED: return (os << "CLOSED");
+    case ReplicatorSMM::S_CLOSED:  return (os << "CLOSED");
     case ReplicatorSMM::S_CLOSING: return (os << "CLOSING");
     case ReplicatorSMM::S_JOINING: return (os << "JOINING");
-    case ReplicatorSMM::S_JOINED: return (os << "JOINED");
-    case ReplicatorSMM::S_SYNCED: return (os << "SYNCED");
-    case ReplicatorSMM::S_DONOR: return (os << "DONOR");
+    case ReplicatorSMM::S_JOINED:  return (os << "JOINED");
+    case ReplicatorSMM::S_SYNCED:  return (os << "SYNCED");
+    case ReplicatorSMM::S_DONOR:   return (os << "DONOR");
     }
     gu_throw_fatal << "invalid state " << static_cast<int>(state);
     throw;
@@ -187,47 +187,47 @@ std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
 //                           Public
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
-static void build_status_vars (std::vector<struct wsrep_status_var>&);
 
 galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     :
-    state_(S_CLOSED),
-    sst_state_(SST_NONE),
-    data_dir_(),
-    state_file_("grastate.dat"),
-    uuid_(WSREP_UUID_UNDEFINED),
-    state_uuid_(WSREP_UUID_UNDEFINED),
-    app_ctx_(args->app_ctx),
-    logger_cb_(args->logger_cb),
-    view_cb_(args->view_handler_cb),
-    bf_apply_cb_(args->bf_apply_cb),
-    sst_donate_cb_(args->sst_donate_cb),
-    synced_cb_(args->synced_cb),
-    sst_donor_(),
-    sst_uuid_(WSREP_UUID_UNDEFINED),
-    sst_seqno_(WSREP_SEQNO_UNDEFINED),
-    sst_mutex_(),
-    sst_cond_(),
-    sst_retry_sec_(1),
-    gcs_(args->node_name, args->node_incoming),
-    service_thd_(gcs_),
-    wsdb_(),
-    cert_(),
-    local_monitor_(),
-    apply_monitor_(),
-    receivers_(),
-    replicated_(),
-    replicated_bytes_(),
-    received_(),
-    received_bytes_(),
-    local_commits_(),
-    local_rollbacks_(),
+    logger_             (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
+    config_             (args->options),
+    state_              (S_CLOSED),
+    sst_state_          (SST_NONE),
+    data_dir_           (),
+    state_file_         ("grastate.dat"),
+    uuid_               (WSREP_UUID_UNDEFINED),
+    state_uuid_         (WSREP_UUID_UNDEFINED),
+    app_ctx_            (args->app_ctx),
+    view_cb_            (args->view_handler_cb),
+    bf_apply_cb_        (args->bf_apply_cb),
+    sst_donate_cb_      (args->sst_donate_cb),
+    synced_cb_          (args->synced_cb),
+    sst_donor_          (),
+    sst_uuid_           (WSREP_UUID_UNDEFINED),
+    sst_seqno_          (WSREP_SEQNO_UNDEFINED),
+    sst_mutex_          (),
+    sst_cond_           (),
+    sst_retry_sec_      (1),
+    gcs_                (config_, args->node_name, args->node_incoming),
+    service_thd_        (gcs_),
+    wsdb_               (),
+    cert_               (),
+    local_monitor_      (),
+    apply_monitor_      (),
+    receivers_          (),
+    replicated_         (),
+    replicated_bytes_   (),
+    received_           (),
+    received_bytes_     (),
+    local_commits_      (),
+    local_rollbacks_    (),
     local_cert_failures_(),
-    local_bf_aborts_(),
-    local_replays_(),
-    report_interval_(32),
-    report_counter_(),
-    wsrep_status_()
+    local_bf_aborts_    (),
+    local_replays_      (),
+    report_interval_    (32),
+    report_counter_     (),
+    wsrep_stats_        ()
 {
     // @todo add guards (and perhaps actions)
     state_.add_transition(Transition(S_CLOSED, S_JOINING));
@@ -254,10 +254,9 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_.add_transition(Transition(S_DONOR, S_SYNCED));
     state_.add_transition(Transition(S_DONOR, S_CLOSING));
 
-    gu_conf_set_log_callback(reinterpret_cast<gu_log_cb_t>(args->logger_cb));
     local_monitor_.set_initial_position(0);
 
-    build_status_vars(wsrep_status_);
+    build_stats_vars(wsrep_stats_);
 }
 
 galera::ReplicatorSMM::~ReplicatorSMM()
@@ -278,8 +277,8 @@ galera::ReplicatorSMM::~ReplicatorSMM()
 
 
 wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
-                                   const std::string& cluster_url,
-                                   const std::string& state_donor)
+                                              const std::string& cluster_url,
+                                              const std::string& state_donor)
 {
     restore_state(state_file_);
     sst_donor_ = state_donor;
@@ -982,193 +981,9 @@ void galera::ReplicatorSMM::invalidate_state(const std::string& file) const
     fs << "cert_index:\n";
 }
 
-// @todo: should be protected static member of the parent class
-static const size_t GALERA_STAGE_MAX(10);
-// @todo: should be protected static member of the parent class
-static const char* status_str[GALERA_STAGE_MAX] =
-{
-    "Initialized (0)",
-    "Joining (1)",
-    "Prepare for SST (2)",
-    "SST request sent (3)",
-    "Waiting for SST (4)",
-    "Joined (5)",
-    "Synced (6)",
-    "Donor (+)"
-    "SST request failed (-)",
-    "SST failed (-)",
-};
-
-// @todo: should be protected static member of the parent class
-static wsrep_member_status_t state2status(galera::ReplicatorSMM::State state)
-{
-    switch (state)
-    {
-    case galera::ReplicatorSMM::S_CLOSED  : return WSREP_MEMBER_UNDEFINED;
-    case galera::ReplicatorSMM::S_CLOSING : return WSREP_MEMBER_UNDEFINED;
-    case galera::ReplicatorSMM::S_JOINING : return WSREP_MEMBER_JOINER;
-    case galera::ReplicatorSMM::S_JOINED  : return WSREP_MEMBER_JOINED;
-    case galera::ReplicatorSMM::S_SYNCED  : return WSREP_MEMBER_SYNCED;
-    case galera::ReplicatorSMM::S_DONOR   : return WSREP_MEMBER_DONOR;
-    }
-    gu_throw_fatal << "invalid state " << state;
-    throw;
-}
-
-// @todo: should be protected static member of the parent class
-static const char* state2status_str(galera::ReplicatorSMM::State state,
-                                    galera::ReplicatorSMM::SstState sst_state)
-{
-    using galera::ReplicatorSMM;
-    switch (state)
-    {
-    case galera::ReplicatorSMM::S_CLOSED :
-    case galera::ReplicatorSMM::S_CLOSING:
-    {
-        if (sst_state == ReplicatorSMM::SST_REQ_FAILED)  return status_str[8];
-        else if (sst_state == ReplicatorSMM::SST_FAILED) return status_str[9];
-        else                                             return status_str[0];
-    }
-    case galera::ReplicatorSMM::S_JOINING:
-    {
-        if (sst_state == ReplicatorSMM::SST_WAIT) return status_str[4];
-        else                                      return status_str[1];
-    }
-    case galera::ReplicatorSMM::S_JOINED : return status_str[5];
-    case galera::ReplicatorSMM::S_SYNCED : return status_str[6];
-    case galera::ReplicatorSMM::S_DONOR  : return status_str[7];
-    }
-    gu_throw_fatal << "invalid state " << state;
-    throw;
-}
-
-typedef enum status_vars
-{
-    STATUS_STATE_UUID = 0,
-    STATUS_LAST_APPLIED,
-    STATUS_REPLICATED,
-    STATUS_REPLICATED_BYTES,
-    STATUS_RECEIVED,
-    STATUS_RECEIVED_BYTES,
-    STATUS_LOCAL_COMMITS,
-    STATUS_LOCAL_CERT_FAILURES,
-    STATUS_LOCAL_BF_ABORTS,
-    STATUS_LOCAL_REPLAYS,
-    STATUS_LOCAL_SEND_QUEUE,
-    STATUS_LOCAL_SEND_QUEUE_AVG,
-    STATUS_LOCAL_RECV_QUEUE,
-    STATUS_LOCAL_RECV_QUEUE_AVG,
-    STATUS_FC_PAUSED,
-    STATUS_FC_SENT,
-    STATUS_FC_RECEIVED,
-    STATUS_CERT_DEPS_DISTANCE,
-    STATUS_APPLY_OOOE,
-    STATUS_APPLY_OOOL,
-    STATUS_APPLY_WINDOW,
-    STATUS_LOCAL_STATUS,
-    STATUS_LOCAL_STATUS_COMMENT,
-    STATUS_MAX
-} StatusVars;
-
-static struct wsrep_status_var wsrep_status[STATUS_MAX + 1] =
-{
-    {"local_state_uuid",     WSREP_STATUS_STRING, { 0 }                    },
-    {"last_committed",       WSREP_STATUS_INT64,  { -1 }                   },
-    {"replicated",           WSREP_STATUS_INT64,  { 0 }                    },
-    {"replicated_bytes",     WSREP_STATUS_INT64,  { 0 }                    },
-    {"received",             WSREP_STATUS_INT64,  { 0 }                    },
-    {"received_bytes",       WSREP_STATUS_INT64,  { 0 }                    },
-    {"local_commits",        WSREP_STATUS_INT64,  { 0 }                    },
-    {"local_cert_failures",  WSREP_STATUS_INT64,  { 0 }                    },
-    {"local_bf_aborts",      WSREP_STATUS_INT64,  { 0 }                    },
-    {"local_replays",        WSREP_STATUS_INT64,  { 0 }                    },
-    {"local_send_queue",     WSREP_STATUS_INT64,  { 0 }                    },
-    {"local_send_queue_avg", WSREP_STATUS_DOUBLE, { 0 }                    },
-    {"local_recv_queue",     WSREP_STATUS_INT64,  { 0 }                    },
-    {"local_recv_queue_avg", WSREP_STATUS_DOUBLE, { 0 }                    },
-    {"flow_control_paused",  WSREP_STATUS_DOUBLE, { 0 }                    },
-    {"flow_control_sent",    WSREP_STATUS_INT64,  { 0 }                    },
-    {"flow_control_recv",    WSREP_STATUS_INT64,  { 0 }                    },
-    {"cert_deps_distance",   WSREP_STATUS_DOUBLE, { 0 }                    },
-    {"apply_oooe",           WSREP_STATUS_DOUBLE, { 0 }                    },
-    {"apply_oool",           WSREP_STATUS_DOUBLE, { 0 }                    },
-    {"apply_window",         WSREP_STATUS_DOUBLE, { 0 }                    },
-    {"local_status",         WSREP_STATUS_INT64,  { 0 }                    },
-    {"local_status_comment", WSREP_STATUS_STRING, { 0 }                    },
-    {0, WSREP_STATUS_STRING, { 0 }}
-};
-
-
-static void build_status_vars(std::vector<struct wsrep_status_var>& status)
-{
-    struct wsrep_status_var* ptr(wsrep_status);
-    do
-    {
-        status.push_back(*ptr);
-    }
-    while (ptr++->name != 0);
-}
-
-const struct wsrep_status_var* galera::ReplicatorSMM::status() const
-{
-#if 0
-    std::vector<struct wsrep_status_var>&
-        sv(const_cast<std::vector<struct wsrep_status_var>& >(wsrep_status_));
-    if (sv.empty() == true)
-    {
-        build_status_vars(sv);;
-    }
-#endif // 0
-    std::vector<struct wsrep_status_var>& sv(wsrep_status_);
-
-    free(const_cast<char*>(sv[STATUS_STATE_UUID].value._string));
-    std::ostringstream os;
-    os << state_uuid_;
-    sv[STATUS_STATE_UUID         ].value._string = strdup(os.str().c_str());
-    sv[STATUS_LAST_APPLIED       ].value._int64  = apply_monitor_.last_left();;
-    sv[STATUS_REPLICATED         ].value._int64  = replicated_();
-    sv[STATUS_REPLICATED_BYTES   ].value._int64  = replicated_bytes_();
-    sv[STATUS_RECEIVED           ].value._int64  = received_();
-    sv[STATUS_RECEIVED_BYTES     ].value._int64  = received_bytes_();
-    sv[STATUS_LOCAL_COMMITS      ].value._int64  = local_commits_();
-    sv[STATUS_LOCAL_CERT_FAILURES].value._int64  = local_cert_failures_();
-    sv[STATUS_LOCAL_BF_ABORTS    ].value._int64  = local_bf_aborts_();
-    sv[STATUS_LOCAL_REPLAYS      ].value._int64  = local_replays_();
-
-    struct gcs_stats stats;
-    gcs_.get_stats (&stats);
-
-    sv[STATUS_LOCAL_SEND_QUEUE    ].value._int64  = stats.send_q_len;
-    sv[STATUS_LOCAL_SEND_QUEUE_AVG].value._double = stats.send_q_len_avg;
-    sv[STATUS_LOCAL_RECV_QUEUE    ].value._int64  = stats.recv_q_len;
-    sv[STATUS_LOCAL_RECV_QUEUE_AVG].value._double = stats.recv_q_len_avg;
-    sv[STATUS_FC_PAUSED           ].value._double = stats.fc_paused;
-    sv[STATUS_FC_SENT             ].value._int64  = stats.fc_sent;
-    sv[STATUS_FC_RECEIVED         ].value._int64  = stats.fc_received;
-
-    sv[STATUS_CERT_DEPS_DISTANCE  ].value._double = cert_.get_avg_deps_dist();
-
-    double oooe;
-    double oool;
-    double win;
-    const_cast<Monitor<ApplyOrder>&>(apply_monitor_).
-        get_stats(&oooe, &oool, &win);
-
-    sv[STATUS_APPLY_OOOE          ].value._double = oooe;
-    sv[STATUS_APPLY_OOOL          ].value._double = oool;
-    sv[STATUS_APPLY_WINDOW        ].value._double = win;
-
-    sv[STATUS_LOCAL_STATUS        ].value._int64  = state2status(state_());
-    sv[STATUS_LOCAL_STATUS_COMMENT].value._string = state2status_str(state_(),
-                                                                    sst_state_);
-
-    return &wsrep_status_[0];
-}
-
-
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
-//                           Private
+////                           Private
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
@@ -1550,7 +1365,6 @@ wsrep_status_t galera::ReplicatorSMM::process_to_action(void* recv_ctx,
     local_monitor_.leave(lo);
     return retval;
 }
-
 
 
 wsrep_status_t galera::ReplicatorSMM::dispatch(void* recv_ctx,

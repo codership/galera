@@ -28,6 +28,7 @@ gcs_tests_sources = Split('''
                              ../gcs_dummy.c
                              ../gcs_msg_type.c
                              ../gcs.c
+                             ../gcs_params.c
                           ''')
 
 
@@ -36,12 +37,14 @@ env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM')
 env.Append(CPPFLAGS = ' -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING')
 env.Replace(CFLAGS = ' -std=gnu99 -fno-strict-aliasing')
 
-env.Append(LIBS=File('#/galerautils/src/libgalerautils.a'))
+env.Append(LIBS = File('#/galerautils/src/libgalerautils.a'))
+env.Append(LIBS = File('#/galerautils/src/libgalerautils++.a'))
 env.Append(LIBS = ['m'])
 
-gcs_tests = env.Program(target = 'gcs_tests',
-                        source = gcs_tests_sources,
-                        OBJPREFIX = 'gcs-tests-')
+gcs_tests = env.Program(target    = 'gcs_tests',
+                        source    = gcs_tests_sources,
+                        OBJPREFIX = 'gcs-tests-',
+                        LINK      = env['CXX'])
 
 env.Test("gcs_tests.passed", gcs_tests)
 env.Alias("test", "gcs_tests.passed")

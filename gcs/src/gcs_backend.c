@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2010 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -59,7 +59,8 @@ backend_type_is (const char* uri, const char* type, const size_t len)
 
 long
 gcs_backend_init (gcs_backend_t* const bk,
-		  const char*    const uri)
+		  const char*    const uri,
+		  gu_config_t*   const conf)
 {
     char* sep;
 
@@ -75,7 +76,7 @@ gcs_backend_init (gcs_backend_t* const bk,
         /* try to match any of specified backends */
         for (i = 0; backend[i].id != NULL; i++) {
             if (backend_type_is (uri, backend[i].id, type_len))
-                return backend[i].create (bk, addr);
+                return backend[i].create (bk, addr, conf);
         }
 
         /* no backends matched */

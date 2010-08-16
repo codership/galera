@@ -9,6 +9,8 @@
 #error "Not implemented"
 #endif
 
+#include "wsrep_params.hpp"
+
 #include <cassert>
 
 using galera::WriteSet;
@@ -17,8 +19,7 @@ using galera::TrxHandleLock;
 
 
 extern "C"
-wsrep_status_t galera_init(wsrep_t* gh,
-                              const struct wsrep_init_args* args)
+wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
 {
     try
     {
@@ -38,6 +39,7 @@ void galera_tear_down(wsrep_t *gh)
 {
     assert(gh != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
     if (repl != 0)
     {
         delete repl;
@@ -47,26 +49,51 @@ void galera_tear_down(wsrep_t *gh)
 
 
 extern "C"
-wsrep_status_t galera_options_set (wsrep_t* gh, const char* opts_str)
+wsrep_status_t galera_parameters_set (wsrep_t* gh, const char* params)
 {
-    // return galera_options_from_string (&galera_opts, opts_str);
-    return WSREP_OK;
+    assert(gh != 0);
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
+    if (gh)
+    {
+        try
+        {
+            wsrep_set_params (*repl, params);
+            return WSREP_OK;
+        }
+        catch (gu::Exception& e)
+        {
+            log_error << e.what();
+        }
+        catch (...)
+        {
+            log_fatal << "uncaught exception";
+            return WSREP_FATAL;
+        }
+    }
+    else
+    {
+        log_error << "Attempt to set parameter(s) on uninitialized replicator.";
+    }
+
+    return WSREP_NODE_FAIL;
 }
 
 
 extern "C"
-char* galera_options_get (wsrep_t* gh)
+char* galera_parameters_get (wsrep_t* gh)
 {
     // return galera_options_to_string (&galera_opts);
-    return 0;
+    log_warn << "Not implemented: " << __FUNCTION__;
+    return NULL;
 }
 
 
 extern "C"
-wsrep_status_t galera_connect (wsrep_t *gh,
-                                  const char* cluster_name,
-                                  const char* cluster_url,
-                                  const char* state_donor)
+wsrep_status_t galera_connect (wsrep_t*    gh,
+                               const char* cluster_name,
+                               const char* cluster_url,
+                               const char* state_donor)
 {
     assert(gh != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
@@ -93,6 +120,7 @@ wsrep_status_t galera_disconnect(wsrep_t *gh)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
     try
     {
         return repl->close();
@@ -115,6 +143,7 @@ wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
     try
     {
         return repl->async_recv(recv_ctx);
@@ -139,18 +168,20 @@ wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
 
 
 extern "C"
-wsrep_status_t galera_abort_pre_commit(wsrep_t *gh,
-                                       wsrep_seqno_t bf_seqno,
+wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
+                                       wsrep_seqno_t  bf_seqno,
                                        wsrep_trx_id_t victim_trx)
 {
     assert(gh != 0 && gh->ctx != 0);
-    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+    REPL_CLASS *   repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     wsrep_status_t retval;
     TrxHandle* trx(repl->local_trx(victim_trx));
+
     if (trx == 0)
     {
         return WSREP_OK;
     }
+
     try
     {
         TrxHandleLock lock(*trx);
@@ -166,6 +197,7 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t *gh,
         log_fatal << "uncaught exception";
         retval = WSREP_FATAL;
     }
+
     repl->unref_local_trx(trx);
 
     return retval;
@@ -173,8 +205,9 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t *gh,
 
 
 extern "C"
-wsrep_status_t galera_abort_slave_trx(
-    wsrep_t *gh, wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno
+wsrep_status_t galera_abort_slave_trx (wsrep_t*      gh,
+                                       wsrep_seqno_t bf_seqno,
+                                       wsrep_seqno_t victim_seqno
     )
 {
     log_warn << "Trx " << bf_seqno << " tries to abort";
@@ -185,12 +218,13 @@ wsrep_status_t galera_abort_slave_trx(
 
 
 extern "C"
-wsrep_status_t galera_post_commit(wsrep_t *gh,
-                                     wsrep_trx_handle_t* trx_handle)
+wsrep_status_t galera_post_commit (wsrep_t*            gh,
+                                   wsrep_trx_handle_t* trx_handle)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     TrxHandle* trx(repl->local_trx(trx_handle, false));
+
     if (trx == 0)
     {
         log_debug << "trx " << trx_handle->trx_id << " not found";
@@ -198,6 +232,7 @@ wsrep_status_t galera_post_commit(wsrep_t *gh,
     }
 
     wsrep_status_t retval;
+
     try
     {
         TrxHandleLock lock(*trx);
@@ -223,12 +258,13 @@ wsrep_status_t galera_post_commit(wsrep_t *gh,
 
 
 extern "C"
-wsrep_status_t galera_post_rollback(wsrep_t *gh,
-                                       wsrep_trx_handle_t* trx_handle)
+wsrep_status_t galera_post_rollback(wsrep_t*            gh,
+                                    wsrep_trx_handle_t* trx_handle)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     TrxHandle* trx(repl->local_trx(trx_handle, false));
+
     if (trx == 0)
     {
         log_debug << "trx " << trx_handle->trx_id << " not found";
@@ -236,6 +272,7 @@ wsrep_status_t galera_post_rollback(wsrep_t *gh,
     }
 
     wsrep_status_t retval;
+
     try
     {
         TrxHandleLock lock(*trx);
@@ -261,12 +298,12 @@ wsrep_status_t galera_post_rollback(wsrep_t *gh,
 
 
 extern "C"
-wsrep_status_t galera_pre_commit(wsrep_t *gh,
-                                    wsrep_conn_id_t conn_id,
-                                    wsrep_trx_handle_t* trx_handle,
-                                    const void *rbr_data,
-                                    size_t rbr_data_len,
-                                    wsrep_seqno_t* global_seqno)
+wsrep_status_t galera_pre_commit(wsrep_t*            gh,
+                                 wsrep_conn_id_t     conn_id,
+                                 wsrep_trx_handle_t* trx_handle,
+                                 const void*         rbr_data,
+                                 size_t              rbr_data_len,
+                                 wsrep_seqno_t*      global_seqno)
 {
     assert(gh != 0 && gh->ctx != 0);
 
@@ -275,6 +312,7 @@ wsrep_status_t galera_pre_commit(wsrep_t *gh,
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     TrxHandle* trx(repl->local_trx(trx_handle, rbr_data != 0));
+
     if (trx == 0)
     {
         // no data to replicate
@@ -282,6 +320,7 @@ wsrep_status_t galera_pre_commit(wsrep_t *gh,
     }
 
     wsrep_status_t retval;
+
     try
     {
         TrxHandleLock lock(*trx);
@@ -312,6 +351,7 @@ wsrep_status_t galera_pre_commit(wsrep_t *gh,
         log_fatal << "uncaught exception";
         retval = WSREP_FATAL;
     }
+
     repl->unref_local_trx(trx);
 
     return retval;
@@ -319,11 +359,11 @@ wsrep_status_t galera_pre_commit(wsrep_t *gh,
 
 
 extern "C"
-wsrep_status_t galera_append_query(wsrep_t *gh,
-                                      wsrep_trx_handle_t* trx_handle,
-                                      const char *query,
-                                      const time_t timeval,
-                                      const uint32_t randseed)
+wsrep_status_t galera_append_query(wsrep_t*            gh,
+                                   wsrep_trx_handle_t* trx_handle,
+                                   const char*         query,
+                                   const time_t        timeval,
+                                   const uint32_t      randseed)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
@@ -332,6 +372,7 @@ wsrep_status_t galera_append_query(wsrep_t *gh,
     assert(trx != 0);
 
     wsrep_status_t retval;
+
     try
     {
         TrxHandleLock lock(*trx);
@@ -348,6 +389,7 @@ wsrep_status_t galera_append_query(wsrep_t *gh,
         log_fatal << "uncaught exception";
         retval = WSREP_FATAL;
     }
+
     repl->unref_local_trx(trx);
 
     return retval;
@@ -355,13 +397,13 @@ wsrep_status_t galera_append_query(wsrep_t *gh,
 
 
 extern "C"
-wsrep_status_t galera_append_row_key(wsrep_t *gh,
-                                        wsrep_trx_handle_t* trx_handle,
-                                        const char    *dbtable,
-                                        size_t dbtable_len,
-                                        const char *key,
-                                        size_t key_len,
-                                        enum wsrep_action action)
+wsrep_status_t galera_append_row_key(wsrep_t*            gh,
+                                     wsrep_trx_handle_t* trx_handle,
+                                     const char*         dbtable,
+                                     size_t              dbtable_len,
+                                     const char*         key,
+                                     size_t              key_len,
+                                     enum wsrep_action   action)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
@@ -369,6 +411,7 @@ wsrep_status_t galera_append_row_key(wsrep_t *gh,
     assert(trx != 0);
 
     wsrep_status_t retval;
+
     try
     {
         TrxHandleLock lock(*trx);
@@ -400,29 +443,29 @@ wsrep_status_t galera_append_row_key(wsrep_t *gh,
 
 extern "C"
 wsrep_status_t galera_append_data(wsrep_t*            wsrep,
-                                     wsrep_trx_handle_t* trx_handle,
-                                     const void*         data,
-                                     size_t              data_len)
+                                  wsrep_trx_handle_t* trx_handle,
+                                  const void*         data,
+                                  size_t              data_len)
 {
     return WSREP_NOT_IMPLEMENTED;
 }
 
 
 extern "C"
-wsrep_status_t galera_causal_read(wsrep_t* wsrep,
-                                     wsrep_seqno_t* seqno)
+wsrep_status_t galera_causal_read(wsrep_t*       wsrep,
+                                  wsrep_seqno_t* seqno)
 {
     return WSREP_NOT_IMPLEMENTED;
 }
 
 
 extern "C"
-wsrep_status_t galera_set_variable(wsrep_t *gh,
-                                      const wsrep_conn_id_t  conn_id,
-                                      const char *key,
-                                      const size_t key_len,
-                                      const char *query,
-                                      const size_t query_len)
+wsrep_status_t galera_set_variable(wsrep_t*              gh,
+                                   const wsrep_conn_id_t conn_id,
+                                   const char*           key,
+                                   const size_t          key_len,
+                                   const char*           query,
+                                   const size_t          query_len)
 {
 
     if (!strncmp(key, "wsrep_debug", key_len)) {
@@ -452,13 +495,14 @@ wsrep_status_t galera_set_variable(wsrep_t *gh,
 
 
 extern "C"
-wsrep_status_t galera_set_database(wsrep_t *gh,
-                                      const wsrep_conn_id_t conn_id,
-                                      const char *query,
-                                      const size_t query_len)
+wsrep_status_t galera_set_database(wsrep_t*              gh,
+                                   const wsrep_conn_id_t conn_id,
+                                   const char*           query,
+                                   const size_t          query_len)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
     try
     {
         if (query != 0)
@@ -485,11 +529,11 @@ wsrep_status_t galera_set_database(wsrep_t *gh,
 
 
 extern "C"
-wsrep_status_t galera_to_execute_start(wsrep_t *gh,
-                                          wsrep_conn_id_t conn_id,
-                                          const void *query,
-                                          size_t query_len,
-                                          wsrep_seqno_t* global_seqno)
+wsrep_status_t galera_to_execute_start(wsrep_t*        gh,
+                                       wsrep_conn_id_t conn_id,
+                                       const void*     query,
+                                       size_t          query_len,
+                                       wsrep_seqno_t*  global_seqno)
 {
     assert(gh != 0 && gh->ctx != 0);
 
@@ -499,7 +543,9 @@ wsrep_status_t galera_to_execute_start(wsrep_t *gh,
 
     TrxHandle* trx(repl->local_conn_trx(conn_id, true));
     assert(trx != 0);
+
     wsrep_status_t retval;
+
     try
     {
         TrxHandleLock lock(*trx);
@@ -542,8 +588,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t *gh,
 
 
 extern "C"
-wsrep_status_t galera_to_execute_end(wsrep_t *gh,
-                                        wsrep_conn_id_t conn_id)
+wsrep_status_t galera_to_execute_end(wsrep_t* gh, wsrep_conn_id_t conn_id)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
@@ -569,9 +614,9 @@ wsrep_status_t galera_to_execute_end(wsrep_t *gh,
 
 
 extern "C"
-wsrep_status_t galera_replay_trx(wsrep_t *gh,
-                                    wsrep_trx_handle_t* trx_handle,
-                                    void *recv_ctx)
+wsrep_status_t galera_replay_trx(wsrep_t*            gh,
+                                 wsrep_trx_handle_t* trx_handle,
+                                 void*               recv_ctx)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
@@ -579,6 +624,7 @@ wsrep_status_t galera_replay_trx(wsrep_t *gh,
     assert(trx != 0);
 
     wsrep_status_t retval;
+
     try
     {
         TrxHandleLock lock(*trx);
@@ -594,6 +640,7 @@ wsrep_status_t galera_replay_trx(wsrep_t *gh,
         log_fatal << "uncaught exception";
         retval = WSREP_FATAL;
     }
+
     repl->unref_local_trx(trx);
 
     return retval;
@@ -601,9 +648,9 @@ wsrep_status_t galera_replay_trx(wsrep_t *gh,
 
 
 extern "C"
-wsrep_status_t galera_sst_sent (wsrep_t* gh,
-                                   const wsrep_uuid_t* uuid,
-                                   wsrep_seqno_t seqno)
+wsrep_status_t galera_sst_sent (wsrep_t*            gh,
+                                const wsrep_uuid_t* uuid,
+                                wsrep_seqno_t       seqno)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
@@ -612,11 +659,11 @@ wsrep_status_t galera_sst_sent (wsrep_t* gh,
 
 
 extern "C"
-wsrep_status_t galera_sst_received (wsrep_t* gh,
-                                       const wsrep_uuid_t* uuid,
-                                       wsrep_seqno_t seqno,
-                                       const char* state,
-                                       size_t state_len)
+wsrep_status_t galera_sst_received (wsrep_t*            gh,
+                                    const wsrep_uuid_t* uuid,
+                                    wsrep_seqno_t       seqno,
+                                    const char*         state,
+                                    size_t              state_len)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
@@ -625,27 +672,26 @@ wsrep_status_t galera_sst_received (wsrep_t* gh,
 
 
 extern "C"
-wsrep_status_t galera_snapshot(wsrep_t*     wsrep,
-                                  const void*  msg,
-                                  size_t       msg_len,
-                                  const char*  donor_spec)
+wsrep_status_t galera_snapshot(wsrep_t*    wsrep,
+                               const void* msg,
+                               size_t      msg_len,
+                               const char* donor_spec)
 {
     return WSREP_NOT_IMPLEMENTED;
 }
 
 
 extern "C"
-struct wsrep_status_var* galera_status_get (wsrep_t* gh)
+struct wsrep_stats_var* galera_stats_get (wsrep_t* gh)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    return const_cast<struct wsrep_status_var*>(repl->status());
+    return const_cast<struct wsrep_stats_var*>(repl->stats());
 }
 
 
 extern "C"
-void galera_status_free (wsrep_t* gh,
-                            struct wsrep_status_var* s)
+void galera_stats_free (wsrep_t* gh, struct wsrep_stats_var* s)
 {
 }
 
@@ -653,8 +699,8 @@ void galera_status_free (wsrep_t* gh,
 static wsrep_t galera_str = {
     WSREP_INTERFACE_VERSION,
     &galera_init,
-    &galera_options_set,
-    &galera_options_get,
+    &galera_parameters_set,
+    &galera_parameters_get,
     &galera_connect,
     &galera_disconnect,
     &galera_recv,
@@ -675,8 +721,8 @@ static wsrep_t galera_str = {
     &galera_sst_sent,
     &galera_sst_received,
     &galera_snapshot,
-    &galera_status_get,
-    &galera_status_free,
+    &galera_stats_get,
+    &galera_stats_free,
     "Galera",
     "0.8pre",
     "Codership Oy <info@codership.com>",

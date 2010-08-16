@@ -252,16 +252,30 @@ GCS_BACKEND_CLOSE_FN(dummy_close)
 }
 
 static
+GCS_BACKEND_PARAM_SET_FN(dummy_param_set)
+{
+    return 1;
+}
+
+static
+GCS_BACKEND_PARAM_GET_FN(dummy_param_get)
+{
+    return NULL;
+}
+
+static
 const gcs_backend_t dummy_backend =
 {
-    .conn     = NULL,
-    .open     = dummy_open,
-    .close    = dummy_close,
-    .destroy  = dummy_destroy,
-    .send     = dummy_send,
-    .recv     = dummy_recv,
-    .name     = dummy_name,
-    .msg_size = dummy_msg_size
+    .conn      = NULL,
+    .open      = dummy_open,
+    .close     = dummy_close,
+    .destroy   = dummy_destroy,
+    .send      = dummy_send,
+    .recv      = dummy_recv,
+    .name      = dummy_name,
+    .msg_size  = dummy_msg_size,
+    .param_set = dummy_param_set,
+    .param_get = dummy_param_get
 };
 
 GCS_BACKEND_CREATE_FN(gcs_dummy_create)

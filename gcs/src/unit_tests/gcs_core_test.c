@@ -273,13 +273,16 @@ core_test_set_payload_size (ssize_t s)
 static inline void
 core_test_init ()
 {
-    long           ret;
-    action_t       act;
+    long     ret;
+    action_t act;
 
     mark_point();
 
+    gu_config_t* config = gu_config_create ("");
+    fail_if (config == NULL);
+
     Core = gcs_core_create ("core_test",
-                            "aaa.bbb.ccc.ddd:xxxx");
+                            "aaa.bbb.ccc.ddd:xxxx", config);
 
     fail_if (NULL == Core);
 
