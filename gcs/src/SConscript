@@ -13,6 +13,7 @@ libgcs_env.Replace(CFLAGS = '-std=gnu99 -fno-strict-aliasing')
 libgcs_env.Replace(CXXFLAGS = '-Wno-long-long -Wno-deprecated -Weffc++ -ansi')
 
 libgcs_sources = Split('''
+                          gcs_params.c
                           gcs_conf.c
                           gcs_fifo_lite.c
                           gcs_msg_type.c
