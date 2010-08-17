@@ -12,7 +12,6 @@
 
 #include "replicator.hpp"
 
-#include "parameter_list.hpp"
 #include "gcs.hpp"
 #include "monitor.hpp"
 #include "wsdb.hpp"
