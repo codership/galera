@@ -19,7 +19,6 @@ include_HEADERS =      \
 	gu_uuid.h      \
 	gu_to.h        \
 	gu_lock_step.h \
-	gu_options.h   \
 	galerautils.hpp  \
 	gu_exception.hpp \
 	gu_macros.hpp    \
@@ -55,11 +54,11 @@ libgalerautils_la_SOURCES = \
 	gu_uuid.c      \
 	gu_to.c        \
 	gu_lock_step.c \
-	gu_options.c
+	gu_utils.c
 
-INTERFACE = 11
+INTERFACE = 12
 REVISION  = 0
-AGE       = 1
+AGE       = 0
 libgalerautils_la_LDFLAGS = @AM_LDFLAGS@ \
 	-version-info $(INTERFACE):$(REVISION):$(AGE)
 

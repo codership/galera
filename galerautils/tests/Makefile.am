@@ -13,7 +13,6 @@ gu_tests_SOURCES  = \
 	gu_fifo_test.c      gu_fifo_test.h      \
 	gu_uuid_test.c      gu_uuid_test.h      \
 	gu_dbug_test.c      gu_dbug_test.h      \
-	gu_options_test.c   gu_options_test.h   \
 	gu_lock_step_test.c gu_lock_step_test.h \
 	gu_str_test.c       gu_str_test.h
 

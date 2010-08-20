@@ -15,7 +15,6 @@ gu_tests = env.Program(target = 'gu_tests',
                             gu_fifo_test.c
                             gu_uuid_test.c
                             gu_dbug_test.c
-                            gu_options_test.c
                             gu_lock_step_test.c
                             gu_str_test.c
                          '''))

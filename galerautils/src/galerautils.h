@@ -23,6 +23,7 @@
 #include "gu_uuid.h"
 #include "gu_to.h"
 #include "gu_lock_step.h"
+#include "gu_utils.h"
 #include "gu_config.h"
 
 #endif /* _galerautils_h_ */

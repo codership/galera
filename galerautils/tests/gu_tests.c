@@ -14,7 +14,6 @@
 #include "gu_time_test.h"
 #include "gu_fifo_test.h"
 #include "gu_uuid_test.h"
-#include "gu_options_test.h"
 #include "gu_lock_step_test.h"
 #include "gu_str_test.h"
 
@@ -28,7 +27,6 @@ static suite_creator_t suites[] =
         gu_time_suite,
         gu_fifo_suite,
 	gu_uuid_suite,
-	gu_options_suite,
 	gu_lock_step_suite,
         gu_str_suite,
 	NULL

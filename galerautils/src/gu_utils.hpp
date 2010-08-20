@@ -1,9 +1,9 @@
-// Copyright (C) 2009 Codership Oy <info@codership.com>
+// Copyright (C) 2009-2010 Codership Oy <info@codership.com>
 
 /**
  * @file General-purpose functions and templates
  *
- * $Id: gu_macros.hpp 980 2009-08-23 13:41:42Z alex $
+ * $Id$
  */
 
 #ifndef _gu_utils_hpp_
