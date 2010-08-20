@@ -16,20 +16,22 @@
 #include "gu_uuid_test.h"
 #include "gu_lock_step_test.h"
 #include "gu_str_test.h"
+#include "gu_utils_test.h"
 
 typedef Suite *(*suite_creator_t)(void);
 
 static suite_creator_t suites[] =
     {
-	gu_mem_suite,
-	gu_bswap_suite,
-	gu_dbug_suite,
+        gu_mem_suite,
+        gu_bswap_suite,
+        gu_dbug_suite,
         gu_time_suite,
         gu_fifo_suite,
-	gu_uuid_suite,
-	gu_lock_step_suite,
+        gu_uuid_suite,
+        gu_lock_step_suite,
         gu_str_suite,
-	NULL
+        gu_utils_suite,
+        NULL
     };
 
 int main(int argc, char* argv[])
