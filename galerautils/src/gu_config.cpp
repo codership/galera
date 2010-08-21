@@ -19,7 +19,7 @@ const char gu::Config::ESCAPE        = '\\'; // escape symbol
 
 void
 gu::Config::parse (param_map_t& pmap, const std::string& params)
-    throw (gu::Exception)
+    throw (Exception)
 {
     if (0 == params[0]) return;
 
@@ -111,13 +111,12 @@ gu::Config::set_int64 (const std::string& key, int64_t val)
 void
 gu::Config::check_conversion (const char* str,
                               const char* endptr,
-                              const char* type,
-                              const std::string& key) throw (Exception)
+                              const char* type) throw (Exception)
 {
     if (endptr == str || endptr[0] != '\0')
     {
         gu_throw_error(EINVAL) << "Invalid value '" << str << "' for " << type
-                               << " parameter '" <<key<< '\'';
+                               << " type.";
     }
 }
 

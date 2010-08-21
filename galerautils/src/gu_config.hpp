@@ -35,8 +35,29 @@ public:
 
     typedef std::map <std::string, std::string> param_map_t;
 
-    static void parse (param_map_t& list, const std::string& params)
-        throw (gu::Exception);
+    static void
+    parse (param_map_t& list, const std::string& params) throw (Exception);
+
+    /*! Convert string configuration values to other types.
+     *  General template for integers, specialized templates follow below. */
+    template <typename T> static inline T
+    from_config (const std::string& value) throw (Exception)
+    {
+        const char* str    = value.c_str();
+        long long   ret;
+        const char* endptr = gu_str2ll (str, &ret);
+
+        check_conversion (str, endptr, "integer");
+
+        switch (sizeof(T))
+        {
+        case 1: return overflow_char  (ret);
+        case 2: return overflow_short (ret);
+        case 4: return overflow_int   (ret);
+        }
+
+        return ret;
+    }
 
     Config () throw();
     Config (const std::string& params) throw (Exception);
@@ -74,31 +95,17 @@ public:
         return i->second;
     }
 
-    /*! Common template for integers */
     template <typename T> inline T
     get (const std::string& key) const throw (NotFound, Exception)
     {
-        const char* str = get(key).c_str();
-        long long   ret;
-        const char* endptr = gu_str2ll (str, &ret);
-
-        check_conversion (str, endptr, "integer", key);
-
-        switch (sizeof(T))
-        {
-        case 1: return overflow_char  (ret);
-        case 2: return overflow_short (ret);
-        case 4: return overflow_int   (ret);
-        }
-
-        return ret;
+        return from_config <T> (get(key));
     }
 
 private:
 
     static void
-    check_conversion (const char* ptr, const char* endptr, const char* type,
-                      const std::string& key) throw (Exception);
+    check_conversion (const char* ptr, const char* endptr, const char* type)
+        throw (Exception);
 
     static char
     overflow_char(long long ret) throw (Exception);
@@ -122,6 +129,42 @@ namespace gu
 {
     /*! Specialized templates for "funny" types */
 
+    template <> inline double
+    Config::from_config (const std::string& value) throw (Exception)
+    {
+        const char* str    = value.c_str();
+        double      ret;
+        const char* endptr = gu_str2dbl (str, &ret);
+
+        check_conversion (str, endptr, "double");
+
+        return ret;
+    }
+
+    template <> inline bool
+    Config::from_config (const std::string& value) throw (Exception)
+    {
+        const char* str    = value.c_str();
+        bool        ret;
+        const char* endptr = gu_str2bool (str, &ret);
+
+        check_conversion (str, endptr, "boolean");
+
+        return ret;
+    }
+
+    template <> inline void*
+    Config::from_config (const std::string& value) throw (Exception)
+    {
+        const char* str    = value.c_str();
+        void*       ret;
+        const char* endptr = gu_str2ptr (str, &ret);
+
+        check_conversion (str, endptr, "pointer");
+
+        return ret;
+    }
+
     template <> inline void
     Config::set (const std::string& key, const void* value) throw ()
     {
@@ -139,42 +182,6 @@ namespace gu
     {
         const char* val_str(val ? "ON" : "OFF"); // ON/OFF is most common here
         set (key, val_str);
-    }
-
-    template <> inline double
-    Config::get (const std::string& key) const throw (NotFound, Exception)
-    {
-        const char* str    = get(key).c_str();
-        double      ret;
-        const char* endptr = gu_str2dbl (str, &ret);
-
-        check_conversion (str, endptr, "double", key);
-
-        return ret;
-    }
-
-    template <> inline bool
-    Config::get (const std::string& key) const throw (NotFound, Exception)
-    {
-        const char* str    = get(key).c_str();
-        bool        ret;
-        const char* endptr = gu_str2bool (str, &ret);
-
-        check_conversion (str, endptr, "boolean", key);
-
-        return ret;
-    }
-
-    template <> inline void*
-    Config::get (const std::string& key) const throw (NotFound, Exception)
-    {
-        const char* str    = get(key).c_str();
-        void*       ret;
-        const char* endptr = gu_str2ptr (str, &ret);
-
-        check_conversion (str, endptr, "pointer", key);
-
-        return ret;
     }
 }
 #endif /* _gu_config_hpp_ */
