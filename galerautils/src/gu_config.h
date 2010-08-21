@@ -52,7 +52,7 @@ void
 gu_config_set_double (gu_config_t* cnf, const char* key, double val);
 
 void
-gu_config_set_ptr    (gu_config_t* cnf, const char* key, void* val);
+gu_config_set_ptr    (gu_config_t* cnf, const char* key, const void* val);
 
 void
 gu_config_set_bool   (gu_config_t* cnf, const char* key, bool val);

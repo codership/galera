@@ -11,6 +11,10 @@
 
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * The string conversion functions below are slighly customized
  * versions of standard libc functions designed to undestand 'on'/'off' and
@@ -31,5 +35,9 @@ gu_str2bool (const char* str, bool*      b);
 
 extern const char*
 gu_str2ptr  (const char* str, void**     ptr);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _gu_utils_h_ */

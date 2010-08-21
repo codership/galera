@@ -73,6 +73,84 @@ gu::Config::Config (const std::string& params) throw (gu::Exception)
     Config::parse (params_, params);
 }
 
+void
+gu::Config::set_int64 (const std::string& key, int64_t val)
+{
+    const char* num_mod = "";
+
+    /* Shift preserves sign! */
+    if (val != 0)
+    {
+        if (!(val & ((1LL << 40) - 1)))
+        {
+            val >>= 40;
+            num_mod = "T";
+        }
+        if (!(val & ((1 << 30) - 1)))
+        {
+            val >>= 30;
+            num_mod = "G";
+        }
+        else if (!(val & ((1 << 20) - 1)))
+        {
+            val >>= 20;
+            num_mod = "M";
+        }
+        else if (!(val & ((1 << 10) - 1)))
+        {
+            val >>= 10;
+            num_mod = "K";
+        }
+    }
+
+    std::ostringstream ost;
+    ost << val << num_mod;
+    set (key, ost.str());
+}
+
+void
+gu::Config::check_conversion (const char* str,
+                              const char* endptr,
+                              const char* type,
+                              const std::string& key) throw (Exception)
+{
+    if (endptr == str || endptr[0] != '\0')
+    {
+        gu_throw_error(EINVAL) << "Invalid value '" << str << "' for " << type
+                               << " parameter '" <<key<< '\'';
+    }
+}
+
+char
+gu::Config::overflow_char(long long ret) throw (Exception)
+{
+    if (ret >= CHAR_MIN && ret <= CHAR_MAX) return ret;
+
+    gu_throw_error(ERANGE) << "Value " << ret
+                           << " too large for requested type (char).";
+    throw;
+}
+
+short
+gu::Config::overflow_short(long long ret) throw (Exception)
+{
+    if (ret >= SHRT_MIN && ret <= SHRT_MAX) return ret;
+
+    gu_throw_error(ERANGE) << "Value " << ret
+                           << " too large for requested type (short).";
+    throw;
+}
+
+int
+gu::Config::overflow_int(long long ret) throw (Exception)
+{
+    if (ret >= INT_MIN && ret <= INT_MAX) return ret;
+
+    gu_throw_error(ERANGE) << "Value " << ret
+                           << " too large for requested type (int).";
+    throw;
+}
+
 gu_config_t*
 gu_config_create (const char* params)
 {
@@ -272,7 +350,7 @@ gu_config_set_int64  (gu_config_t* cnf, const char* key, int64_t val)
 
     gu::Config* conf = reinterpret_cast<gu::Config*>(cnf);
 
-    conf->set (key, gu::to_string<int64_t>(val));
+    conf->set (key, val);
 }
 
 void
@@ -282,25 +360,25 @@ gu_config_set_double (gu_config_t* cnf, const char* key, double val)
 
     gu::Config* conf = reinterpret_cast<gu::Config*>(cnf);
 
-    conf->set (key, gu::to_string<double>(val));
+    conf->set(key, val);
 }
 
 void
-gu_config_set_ptr    (gu_config_t* cnf, const char* key, void* val)
+gu_config_set_ptr    (gu_config_t* cnf, const char* key, const void* val)
 {
     if (config_check_set_args (cnf, key, __FUNCTION__)) abort();
 
     gu::Config* conf = reinterpret_cast<gu::Config*>(cnf);
 
-    conf->set (key, gu::to_string<void*>(val));
+    conf->set<const void*>(key, val);
 }
 
 void
-gu_config_set_ptr    (gu_config_t* cnf, const char* key, bool val)
+gu_config_set_bool  (gu_config_t* cnf, const char* key, bool val)
 {
     if (config_check_set_args (cnf, key, __FUNCTION__)) abort();
 
     gu::Config* conf = reinterpret_cast<gu::Config*>(cnf);
 
-    conf->set (key, gu::to_string<bool>(val));
+    conf->set<bool>(key, val);
 }

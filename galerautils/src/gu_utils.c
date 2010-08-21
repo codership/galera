@@ -23,6 +23,9 @@ gu_str2ll (const char* str, long long* ll)
 
     switch (ret[0])
     {
+    case 't':
+    case 'T':
+        shift += 10;
     case 'g':
     case 'G':
         shift += 10;
@@ -35,7 +38,7 @@ gu_str2ll (const char* str, long long* ll)
         ret++;
 
         if (llret == ((llret << (shift + 1)) >> (shift + 1))) {
-            llret = llret << shift;
+            llret <<= shift;
         }
         else { /* ERANGE */
             if (llret > 0) llret = LLONG_MAX;

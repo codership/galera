@@ -21,9 +21,9 @@ START_TEST (gu_strconv_test)
     fail_if (strret[0] != '\0');
     fail_if ((1 << 10) != llret);
 
-    strret = gu_str2ll ("1m", &llret);
+    strret = gu_str2ll ("-1m", &llret);
     fail_if (strret[0] != '\0');
-    fail_if ((1 << 20) != llret);
+    fail_if (-(1 << 20) != llret);
 
     strret = gu_str2ll ("354G0", &llret);
     fail_if (strret[0] != '0');
