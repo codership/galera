@@ -74,7 +74,7 @@ gu::Config::Config (const std::string& params) throw (gu::Exception)
 }
 
 void
-gu::Config::set_int64 (const std::string& key, int64_t val)
+gu::Config::set_longlong (const std::string& key, long long val)
 {
     const char* num_mod = "";
 

@@ -84,7 +84,7 @@ public:
     template <typename T> void
     set (const std::string& key, T val) throw ()
     {
-        set_int64 (key, val);
+        set_longlong (key, val);
     }
 
     const std::string&
@@ -116,7 +116,7 @@ private:
     static int
     overflow_int(long long ret) throw (Exception);
 
-    void set_int64 (const std::string& key, int64_t value);
+    void set_longlong (const std::string& key, long long value);
 
     param_map_t params_;
 };
