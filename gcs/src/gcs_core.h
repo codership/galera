@@ -28,6 +28,7 @@
 
 #include "gcs.h"
 #include "gcs_act.h"
+#include <gcache.h>
 
 struct gcs_core;
 typedef struct gcs_core gcs_core_t; 
@@ -39,7 +40,8 @@ typedef struct gcs_core gcs_core_t;
 extern gcs_core_t*
 gcs_core_create (const char*  node_name,
                  const char*  inc_addr,
-                 gu_config_t* conf);
+                 gu_config_t* conf,
+                 gcache_t*    cache);
 
 /* initializes action history (global seqno, group UUID). See gcs.h */
 extern long

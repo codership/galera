@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2010 Codership Oy <info@codership.com>
  */
 
 #ifndef __GCACHE_H__
@@ -8,6 +8,9 @@
 #include <string>
 #include <iostream>
 #include <map>
+#ifndef NDEBUG
+#include <set>
+#endif
 #include <stdint.h>
 
 #include <galerautils.hpp>
@@ -24,15 +27,10 @@ namespace gcache
     public:
 
         /*!
-         * Creates a new gcache using file fname of size megs megabytes.
-         * If file already exists, it gets overwritten
+         * Creates a new gcache file in "gcache.name" conf parameter or
+         * in data_dir. If file already exists, it gets overwritten.
          */
-        GCache (std::string& fname, size_t megs);
-
-        /*!
-         * Creates a new gcache from existing file fname.
-         */
-        GCache (std::string& fname);
+        GCache (gu::Config& cfg, const std::string& data_dir);
 
         virtual ~GCache();
 
@@ -47,9 +45,15 @@ namespace gcache
         /* Seqno related functions */
 
         /*!
+         * Reinitialize seqno sequence (after SST or such)
+         * Clears cache and sets seqno_min to seqno.
+         */
+        void    seqno_init    (int64_t seqno);
+
+        /*!
          * Assign sequence number to buffer pointed to by ptr
          */
-        void    seqno_assign  (void* ptr, int64_t seqno);
+        void    seqno_assign  (const void* ptr, int64_t seqno);
 
         /*!
          * Get the smallest seqno present in the cache.
@@ -61,14 +65,32 @@ namespace gcache
          * Get pointer to buffer identified by seqno.
          * Moves lock to the given seqno.
          */
-        void*   seqno_get_ptr (int64_t seqno);
+        const void* seqno_get_ptr (int64_t seqno);
 
         /*!
          * Releases any seqno locks present.
          */
-        void    seqno_release ();
+        void seqno_release ();
+
+        void
+        param_set (const std::string& key, const std::string& val)
+            throw (gu::Exception, gu::NotFound);
+
+        static size_t const PREAMBLE_LEN;
 
     private:
+
+        gu::Config&     config;
+
+        class Params
+        {
+        public:
+            Params(gu::Config&, const std::string&) throw (gu::Exception);
+            const std::string name;
+            ssize_t           ram_size;
+            const ssize_t     disk_size;
+        }
+                        params;
 
         gu::Mutex       mtx;
         gu::Cond        cond;
@@ -78,8 +100,6 @@ namespace gcache
         MMap            mmap;
 
         bool            open;
-
-        static size_t  const PREAMBLE_LEN;
 
         char*     const preamble; // ASCII text preamble
         int64_t*  const header;   // cache binary header
@@ -102,8 +122,17 @@ namespace gcache
 
         char     const  version;
 
-        typedef std::map<int64_t, void*> seqno2ptr_t;
+        typedef std::map<int64_t, const void*> seqno2ptr_t;
         seqno2ptr_t     seqno2ptr;
+
+        typedef seqno2ptr_t::iterator    seqno2ptr_it;
+        seqno2ptr_it    last_insert;
+
+        typedef std::pair<int64_t, const void*> seqno2ptr_pair;
+
+#ifndef NDEBUG
+        std::set<const void*> buf_tracker;
+#endif
 
         void header_read();
         void header_write();
@@ -114,8 +143,8 @@ namespace gcache
 
         void* get_new_buffer (size_t size);
 
-        inline void order_buffer   (void* ptr, int64_t seqno);
-        inline void discard_buffer (void* bh);
+        inline void order_buffer (const void* ptr, int64_t seqno);
+        inline void discard_buffer (struct BufferHeader* bh);
         // disable copying
         GCache (const GCache&);
         GCache& operator = (const GCache);

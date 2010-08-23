@@ -93,7 +93,8 @@ namespace gcache
         /* Validate all buffers and populate seqno map */
         log_info << "Validating cached buffers...";
         uint8_t*      buf = first;
-        BufferHeader* bh  = BH (buf);
+        BufferHeader* bh  = reinterpret_cast<BufferHeader*>(buf);
+
         while (bh->size > 0) {
             if (bh->seqno != SEQNO_NONE) {
                 seqno2ptr.insert (std::pair<int64_t, void*>(bh->seqno, bh + 1));
@@ -105,12 +106,15 @@ namespace gcache
             }
 
             buf += bh->size;
+
             if (buf > (end - sizeof(BufferHeader))) break;
-            bh = BH (buf);
+
+            bh = reinterpret_cast<BufferHeader*>(buf);
+
             if (0 == bh->size && buf != next) {
                 // buffer list continues from the beginning
                 buf = start;
-                bh = BH (buf);
+                bh = reinterpret_cast<BufferHeader*>(buf);
             }
         }
 
@@ -120,6 +124,7 @@ namespace gcache
             reset_cache();
             return;
         }
+
         log_info << "Validating cached buffers done.";
 
         if (seqno_min != SEQNO_NONE) {

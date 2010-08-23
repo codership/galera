@@ -181,7 +181,7 @@ std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
     throw;
 }
 
-
+/*! @todo: move the following two functions to gcache */
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 //                           Public
@@ -194,8 +194,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     config_             (args->options),
     state_              (S_CLOSED),
     sst_state_          (SST_NONE),
-    data_dir_           (),
-    state_file_         ("grastate.dat"),
+    data_dir_           (args->data_dir),
+    state_file_         (data_dir_ + "/grastate.dat"),
     uuid_               (WSREP_UUID_UNDEFINED),
     state_uuid_         (WSREP_UUID_UNDEFINED),
     app_ctx_            (args->app_ctx),
@@ -209,7 +209,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_mutex_          (),
     sst_cond_           (),
     sst_retry_sec_      (1),
-    gcs_                (config_, args->node_name, args->node_incoming),
+    gcache_             (config_, data_dir_),
+    gcs_                (config_, gcache_, args->node_name,args->node_incoming),
     service_thd_        (gcs_),
     wsdb_               (),
     cert_               (),
@@ -292,6 +293,8 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
         ret = WSREP_NODE_FAIL;
     }
 
+    gcache_.seqno_init(cert_.position());
+
     if (ret == WSREP_OK &&
         (err = gcs_.connect(cluster_name, cluster_url)) != 0)
     {
@@ -342,7 +345,15 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
         }
         retval = dispatch(recv_ctx, act, act_size, act_type,
                           seqno_l, seqno_g);
-        free(act);
+        if (gu_likely(GCS_ACT_TORDERED  == act_type ||
+                      GCS_ACT_STATE_REQ == act_type))
+        {
+            gcache_.free(act);
+        }
+        else
+        {
+            free(act);
+        }
         if (retval == WSREP_FATAL || retval == WSREP_NODE_FAIL) break;
     }
 
@@ -895,7 +906,7 @@ galera::ReplicatorSMM::sst_received(const wsrep_uuid_t& uuid,
         return WSREP_CONN_FAIL;
     }
     gu::Lock lock(sst_mutex_);
-    sst_uuid_ = uuid;
+    sst_uuid_  = uuid;
     sst_seqno_ = seqno;
     sst_cond_.signal();
     return WSREP_OK;
@@ -1186,6 +1197,7 @@ wsrep_status_t galera::ReplicatorSMM::request_sst(wsrep_uuid_t const& group_uuid
             state_uuid_ = sst_uuid_;
             apply_monitor_.set_initial_position(-1);
             apply_monitor_.set_initial_position(sst_seqno_);
+            gcache_.seqno_init(sst_seqno_);
             log_debug << "Initial state " << state_uuid_ << ":" << sst_seqno_;
             sst_state_ = SST_NONE;
             gcs_.join(sst_seqno_);

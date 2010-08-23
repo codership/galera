@@ -41,11 +41,13 @@ typedef struct gcs_conn  gcs_conn_t;
  * @param inc_addr  address at which application accepts incoming requests.
  *                  Used for load balancing, can be null.
  * @param conf      gu_config_t* configuration object, can be null.
+ * @param cache     pointer to the gcache object
  *
  * @return pointer to GCS connection handle, NULL in case of failure.
  */
 extern gcs_conn_t*
-gcs_create  (const char* node_name, const char* inc_addr, void* conf);
+gcs_create  (const char* node_name, const char* inc_addr, void* conf,
+             void* cache);
 
 /*! @brief Initialize group history values (optional).
  * Serves to provide group history persistence after process restart (in case

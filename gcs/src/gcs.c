@@ -112,6 +112,8 @@ struct gcs_conn
     bool              config_is_local;
     struct gcs_params params;
 
+    gcache_t*    cache;
+
 #ifdef GCS_USE_SM
     gcs_sm_t*    sm;
 #else
@@ -193,7 +195,8 @@ _init_params (gcs_conn_t* conn, gu_config_t* conf)
 
 /* Creates a group connection handle */
 gcs_conn_t*
-gcs_create (const char* node_name, const char* inc_addr, void* conf)
+gcs_create (const char* node_name, const char* inc_addr, void* conf,
+            void* cache)
 {
     gcs_conn_t* conn = GU_CALLOC (1, gcs_conn_t);
 
@@ -205,7 +208,7 @@ gcs_create (const char* node_name, const char* inc_addr, void* conf)
         }
 
         conn->state = GCS_CONN_DESTROYED;
-        conn->core  = gcs_core_create (node_name, inc_addr, conf);
+        conn->core  = gcs_core_create (node_name, inc_addr, conf, cache);
 
         if (conn->core) {
             conn->repl_q = gcs_fifo_lite_create (GCS_MAX_REPL_THREADS,
@@ -223,6 +226,8 @@ gcs_create (const char* node_name, const char* inc_addr, void* conf)
                     conn->my_idx       = -1;
                     conn->local_act_id = GCS_SEQNO_FIRST;
                     conn->global_seqno = 0;
+
+                    conn->cache = cache;
 
 #ifdef GCS_USE_SM
                     conn->sm = gcs_sm_create(1<<16, 1); // TODO: check!
@@ -1183,7 +1188,7 @@ long gcs_send (gcs_conn_t*          conn,
              * has no way of knowing that it shares this buffer.
              * also the contents of action may be changed afterwards by
              * the sending thread */
-            void* act = malloc (act_size);
+            void* act = gcache_malloc (conn->cache, act_size);
             if (act != NULL) {
                 memcpy (act, action, act_size);
                 while ((ret = gcs_core_send (conn->core, act,

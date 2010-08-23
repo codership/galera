@@ -17,9 +17,11 @@ const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
 };
 
 long
-gcs_group_init (gcs_group_t* group, const char* node_name, const char* inc_addr)
+gcs_group_init (gcs_group_t* group, gcache_t* const cache,
+                const char* node_name, const char* inc_addr)
 {
     // here we also create default node instance.
+    group->cache        = cache;
     group->act_id       = GCS_SEQNO_ILL;
     group->conf_id      = GCS_SEQNO_ILL;
     group->state_uuid   = GU_UUID_NIL;
@@ -37,7 +39,7 @@ gcs_group_init (gcs_group_t* group, const char* node_name, const char* inc_addr)
 
     if (!group->nodes) return -ENOMEM;
 
-    gcs_node_init (&group->nodes[group->my_idx], NODE_NO_ID,
+    gcs_node_init (&group->nodes[group->my_idx], group->cache, NODE_NO_ID,
                    group->my_name, group->my_address);
 
     group->prim_uuid  = GU_UUID_NIL;
@@ -82,10 +84,11 @@ group_nodes_init (const gcs_group_t* group, const gcs_comp_msg_t* comp)
     if (ret) {
         for (i = 0; i < nodes_num; i++) {
             if (my_idx != i) {
-                gcs_node_init (&ret[i], gcs_comp_msg_id (comp, i), NULL, NULL);
+                gcs_node_init (&ret[i], group->cache, gcs_comp_msg_id (comp, i),
+                               NULL, NULL);
             }
             else { // this node
-                gcs_node_init (&ret[i], gcs_comp_msg_id (comp, i),
+                gcs_node_init (&ret[i], group->cache, gcs_comp_msg_id (comp, i),
                                group->nodes[group->my_idx].name,
                                group->nodes[group->my_idx].inc_addr);
             }
@@ -711,9 +714,14 @@ group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
 
 /* Cleanup ignored state request */
 void
-gcs_group_ignore_action (struct gcs_act_rcvd* act)
+gcs_group_ignore_action (gcs_group_t* group, struct gcs_act_rcvd* act)
 {
-    if (act->act.type <= GCS_ACT_STATE_REQ) free ((void*)act->act.buf);
+    if (act->act.type == GCS_ACT_TORDERED && group->cache) {
+        gcache_free (group->cache, (void*)act->act.buf);
+    }
+    else if (act->act.type <= GCS_ACT_STATE_REQ) {
+        free ((void*)act->act.buf);
+    }
 
     act->act.buf     = NULL;
     act->act.buf_len = 0;
@@ -752,7 +760,7 @@ gcs_group_handle_state_request (gcs_group_t*         group,
             gu_error ("Node %ld (%s) requested state transfer, "
                       "but its state is %s. Ignoring.",
                       joiner_idx, joiner_name, joiner_status_string);
-            gcs_group_ignore_action (act);
+            gcs_group_ignore_action (group, act);
             return 0;
         }
     }
@@ -763,7 +771,7 @@ gcs_group_handle_state_request (gcs_group_t*         group,
 
     if (group->my_idx != joiner_idx && group->my_idx != donor_idx) {
         // if neither DONOR nor JOINER, ignore request
-        gcs_group_ignore_action (act);
+        gcs_group_ignore_action (group, act);
         return 0;
     }
     else if (group->my_idx == donor_idx) {

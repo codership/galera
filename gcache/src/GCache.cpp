@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2010 Codership Oy <info@codership.com>
  */
 
 #include <cerrno>
@@ -13,15 +13,11 @@ namespace gcache
 {
     const size_t  GCache::PREAMBLE_LEN = 1024; // reserved for text preamble
 
-    static size_t check_size (size_t megs)
+    static size_t check_size (ssize_t s)
     {
-        // overflow check (2^20 == 1Mb)
-        if (megs != ((megs << 20) >> 20)) {
-            std::ostringstream msg;
-            msg << "Requested cache size too high: " << megs << "Mb";
-            throw gu::Exception (msg.str().c_str(), ERANGE);
-        }
-        return (megs << 20);
+        if (s < 0) gu_throw_error(EINVAL) << "Negative cache file size: " << s;
+
+        return s + GCache::PREAMBLE_LEN;
     }
 
     void
@@ -30,13 +26,22 @@ namespace gcache
         first = start;
         next  = start;
 
-        BH_clear (BH (next));
+        BH_clear (reinterpret_cast<BufferHeader*>(next));
 
         size_free = size_cache;
         size_used = 0;
 
-        seqno_min = SEQNO_NONE;
-        seqno_max = SEQNO_NONE;
+        mallocs  = 0;
+        reallocs = 0;
+
+        seqno_locked = SEQNO_NONE;
+        seqno_min    = SEQNO_NONE;
+        seqno_max    = SEQNO_NONE;
+
+        seqno2ptr.clear();
+#ifndef NDEBUG
+        buf_tracker.clear();
+#endif
     }
 
     void
@@ -46,59 +51,38 @@ namespace gcache
         preamble_write ();
     }
 
-    GCache::GCache (std::string& fname, size_t megs)
-        : mtx       (),
-          cond      (),
-          fd        (fname, check_size(megs)),
-          mmap      (fd),
-          open      (true),
-          preamble  (static_cast<char*>(mmap.ptr)),
-          header    (reinterpret_cast<int64_t*>(preamble + PREAMBLE_LEN)),
-          header_len(32),
-          start     (reinterpret_cast<uint8_t*>(header + header_len)),
-          end       (reinterpret_cast<uint8_t*>(preamble + mmap.size)),
-          first     (start),
-          next      (first),
-          size_cache(end - start),
-          size_free (size_cache),
-          size_used (0),
-          mallocs   (0),
-          reallocs  (0),
-          seqno_locked(SEQNO_NONE),
-          seqno_min   (SEQNO_NONE),
-          seqno_max   (SEQNO_NONE),
-          version   (0),
-          seqno2ptr ()
+    GCache::GCache (gu::Config& cfg, const std::string& data_dir)
+        :
+        config    (cfg),
+        params    (config, data_dir),
+        mtx       (),
+        cond      (),
+        fd        (params.name, check_size(params.disk_size)),
+        mmap      (fd),
+        open      (true),
+        preamble  (static_cast<char*>(mmap.ptr)),
+        header    (reinterpret_cast<int64_t*>(preamble + PREAMBLE_LEN)),
+        header_len(32),
+        start     (reinterpret_cast<uint8_t*>(header + header_len)),
+        end       (reinterpret_cast<uint8_t*>(preamble + mmap.size)),
+        first     (start),
+        next      (first),
+        size_cache(end - start),
+        size_free (size_cache),
+        size_used (0),
+        mallocs   (0),
+        reallocs  (0),
+        seqno_locked(SEQNO_NONE),
+        seqno_min   (SEQNO_NONE),
+        seqno_max   (SEQNO_NONE),
+        version     (0),
+        seqno2ptr   (),
+        last_insert (seqno2ptr.begin())
+#ifndef NDEBUG
+        ,buf_tracker()
+#endif
     {
-        BH_clear (BH (next));
-        constructor_common ();
-    }
-
-    GCache::GCache (std::string& fname)
-        : mtx       (),
-          cond      (),
-          fd        (fname),
-          mmap      (fd),
-          open      (true),
-          preamble  (static_cast<char*>(mmap.ptr)),
-          header    (reinterpret_cast<int64_t*>(preamble + PREAMBLE_LEN)),
-          header_len(gu::convert(header[0], header_len)),
-          start     (reinterpret_cast<uint8_t*>(header + header_len)),
-          end       (reinterpret_cast<uint8_t*>(preamble + mmap.size)),
-          first     (0),
-          next      (first),
-          size_cache(-1),
-          size_free (size_cache),
-          size_used (0),
-          mallocs   (0),
-          reallocs  (0),
-          seqno_locked(SEQNO_NONE),
-          seqno_min   (SEQNO_NONE),
-          seqno_max   (SEQNO_NONE),
-          version   (0),
-          seqno2ptr ()
-    {
-        header_read ();
+        BH_clear (reinterpret_cast<BufferHeader*>(next));
         constructor_common ();
     }
 
@@ -121,3 +105,36 @@ namespace gcache
     {
     }
 }
+
+#include "gcache.h"
+
+void* gcache_malloc  (gcache_t* gc, size_t size)
+{
+    gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
+    return gcache->malloc (size);
+}
+
+void  gcache_free    (gcache_t* gc, void* ptr)
+{
+    gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
+    gcache->free (ptr);
+}
+
+void* gcache_realloc (gcache_t* gc, void* ptr, size_t size)
+{
+    gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
+    return gcache->realloc (ptr, size);
+}
+
+void  gcache_seqno_init   (gcache_t* gc, int64_t seqno)
+{
+    gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
+    gcache->seqno_init (seqno);
+}
+
+void  gcache_seqno_assign(gcache_t* gc, const void* ptr, int64_t seqno)
+{
+    gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
+    gcache->seqno_assign (ptr, seqno);
+}
+

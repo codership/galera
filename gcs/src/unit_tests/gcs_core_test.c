@@ -282,7 +282,7 @@ core_test_init ()
     fail_if (config == NULL);
 
     Core = gcs_core_create ("core_test",
-                            "aaa.bbb.ccc.ddd:xxxx", config);
+                            "aaa.bbb.ccc.ddd:xxxx", config, NULL);
 
     fail_if (NULL == Core);
 

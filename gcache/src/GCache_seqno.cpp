@@ -13,11 +13,11 @@
 namespace gcache
 {
     inline void
-    GCache::order_buffer (void* ptr, int64_t seqno)
+    GCache::order_buffer (const void* ptr, int64_t seqno)
     {
-        BufferHeader* bh = BH(ptr);
+        BufferHeader* bh = ptr2BH(ptr);
 
-        assert (bh->seqno = SEQNO_NONE);
+        assert (bh->seqno == SEQNO_NONE);
         assert (!BH_is_released(bh));
 
         bh->seqno = seqno;
@@ -26,22 +26,63 @@ namespace gcache
     }
 
     /*!
-     * Assign sequence number to buffer pointed to by ptr
+     * Reinitialize seqno sequence (after SST or such)
+     * Clears cache and sets seqno_min to seqno.
      */
     void
-    GCache::seqno_assign  (void* ptr, int64_t seqno)
+    GCache::seqno_init (int64_t seqno)
     {
         gu::Lock lock(mtx);
 
+        reset_cache();
+        seqno_min = seqno;
+    }
+
+    /*!
+     * Assign sequence number to buffer pointed to by ptr
+     */
+    void
+    GCache::seqno_assign (const void* ptr, int64_t seqno)
+    {
+        gu::Lock lock(mtx);
+
+#if 1
+        BufferHeader* bh = ptr2BH(ptr);
+
+        assert (SEQNO_NONE == bh->seqno);
+        assert (!BH_is_released(bh));
+
+        bh->seqno = seqno;
+
+        if (gu_likely(seqno > seqno_max))
+        {
+            last_insert = seqno2ptr.insert (last_insert,
+                                            seqno2ptr_pair(seqno, ptr));
+            seqno_max = seqno > seqno_max ? seqno : seqno_max;
+        }
+        else
+        {
+            const std::pair<seqno2ptr_it, bool>& res(
+                seqno2ptr.insert (seqno2ptr_pair(seqno, ptr)));
+
+            if (false == res.second)
+            {
+                gu_throw_fatal << "Attempt to reuse the same seqno: " << seqno
+                               <<". New ptr = " << ptr << ", previous ptr = "
+                               << res.first->second;
+            }
+        }
+
+#else // old stuff, delete
         if (seqno_max != SEQNO_NONE && seqno == seqno_max + 1) {
             // normal case
-            order_buffer (ptr, seqno);
+            order_buffer (const_cast<void*>(ptr), seqno);
         }
         else {
             if (SEQNO_NONE == seqno_max) {
                 // bootstrapping the map
                 assert (SEQNO_NONE == seqno_min);
-                order_buffer (ptr, seqno);
+                order_buffer (const_cast<void*>(ptr), seqno);
                 seqno_min = seqno;
             }
 
@@ -57,6 +98,7 @@ namespace gcache
                 throw gu::Exception(msg.str().c_str(), EAGAIN);
             }
         }
+#endif
     }
 
     /*!
@@ -74,11 +116,10 @@ namespace gcache
 
         if (!seqno2ptr.empty()) {
 #ifndef NDEBUG
-            seqno2ptr_t::iterator b = seqno2ptr.begin();
+            seqno2ptr_it b = seqno2ptr.begin();
             if (b->first != seqno_min) {
-                log_fatal << "Expected smallest seqno: " << seqno_min
-                          << ", but found: " << b->first;
-                abort();
+                gu_throw_fatal << "Expected smallest seqno: " << seqno_min
+                               << ", but found: " << b->first;
             }
 #endif
             seqno_locked = seqno_min;
@@ -92,12 +133,12 @@ namespace gcache
      * Get pointer to buffer identified by seqno.
      * Moves lock to the given seqno.
      */
-    void*   GCache::seqno_get_ptr (int64_t seqno)
+    const void* GCache::seqno_get_ptr (int64_t seqno)
     {
         gu::Lock lock(mtx);
 
         if (seqno >= seqno_locked) {
-            seqno2ptr_t::iterator p = seqno2ptr.find(seqno);
+            seqno2ptr_it p = seqno2ptr.find(seqno);
             if (p != seqno2ptr.end()) {
                 if (seqno_locked != seqno) {
                     seqno_locked = seqno;
@@ -107,11 +148,9 @@ namespace gcache
             }
         }
         else {
-            std::ostringstream msg;
-            msg << "Attempt to acquire buffer by seqno out of order: "
-                << "locked seqno: " << seqno_locked << ", requested seqno: "
-                << seqno;
-            throw gu::Exception(msg.str().c_str(), ENOTRECOVERABLE);
+            gu_throw_fatal << "Attempt to acquire buffer by seqno out of order:"
+                           << " locked seqno: " << seqno_locked
+                           << ", requested seqno: " << seqno;
         }
 
         return 0;
@@ -120,7 +159,7 @@ namespace gcache
     /*!
      * Releases any history locks present.
      */
-    void    GCache::seqno_release ()
+    void GCache::seqno_release ()
     {
         gu::Lock lock(mtx);
         seqno_locked = SEQNO_NONE;

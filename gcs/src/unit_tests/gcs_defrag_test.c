@@ -87,7 +87,7 @@ START_TEST (gcs_defrag_test)
     mark_point();
 
     // ready for the first fragment
-    gcs_defrag_init (&defrag);
+    gcs_defrag_init (&defrag, NULL);
     defrag_check_init (&defrag);
 
     mark_point();

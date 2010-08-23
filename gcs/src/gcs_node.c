@@ -11,6 +11,7 @@
 /*! Initialize node context */
 void
 gcs_node_init (gcs_node_t* node,
+               gcache_t*   cache,
                const char* id,
                const char* name,
                const char* inc_addr)
@@ -25,8 +26,8 @@ gcs_node_init (gcs_node_t* node,
     node->inc_addr  = strdup (inc_addr ? inc_addr : NODE_NO_ADDR);
     node->proto_min = GCS_ACT_PROTO_MIN;
     node->proto_max = GCS_ACT_PROTO_MAX;
-    gcs_defrag_init (&node->app);
-    gcs_defrag_init (&node->oob);
+    gcs_defrag_init (&node->app, cache); // GCS_ACT_TORDERED goes only here
+    gcs_defrag_init (&node->oob, NULL);
 }
 
 /*! Move data from one node object to another */

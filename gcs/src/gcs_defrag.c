@@ -76,8 +76,12 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
 
                 /* We need to allocate buffer for it.
                  * This buffer will be returned to application,
-                 * so it must be allocated by standard malloc */
-                df->head = malloc (df->size);
+                 * so it must be allocated in gcache */
+                if (gu_likely(df->cache != NULL))
+                    df->head = gcache_malloc (df->cache, df->size);
+                else
+                    df->head = malloc (df->size);
+
                 if(gu_likely(df->head != NULL))
                     df->tail = df->head;
                 else {
@@ -125,7 +129,7 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
         assert (df->received == df->size);
         act->buf     = df->head;
         act->buf_len = df->received;
-        gcs_defrag_init (df);
+        gcs_defrag_init (df, df->cache);
         return act->buf_len;
     }
 }

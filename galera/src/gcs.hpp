@@ -10,6 +10,7 @@
 #include "gcs.h"
 #include "wsrep_api.h"
 
+#include <GCache.hpp>
 #include <cerrno>
 
 namespace galera
@@ -51,10 +52,11 @@ namespace galera
     public:
 
         Gcs(gu::Config& config,
+            gcache::GCache& cache,
             const char* node_name     = 0,
             const char* node_incoming = 0)
             :
-            conn_(gcs_create(node_name, node_incoming, &config))
+            conn_(gcs_create(node_name, node_incoming, &config, &cache))
         {
             if (conn_ == 0) gu_throw_fatal << "could not create gcs connection";
         }

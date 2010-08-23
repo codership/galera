@@ -298,6 +298,7 @@ then
     cp -P $SCONS_VD/galerautils/src/libgalerautils.so*   $GALERA_LIBS
     cp -P $SCONS_VD/galerautils/src/libgalerautils++.so* $GALERA_LIBS
     cp -P $SCONS_VD/gcomm/src/libgcomm.so*               $GALERA_LIBS
+    cp -P $SCONS_VD/gcache/src/libgcache.so*             $GALERA_LIBS
     cp -P $SCONS_VD/gcs/src/libgcs.so*                   $GALERA_LIBS
 # remove   cp -P $SCONS_VD/wsdb/src/libwsdb.so*                 $GALERA_LIBS || :
     cp -P $SCONS_VD/galera/src/libgalera++.so*           $GALERA_LIBS
@@ -308,6 +309,7 @@ else
     cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils.so*   $GALERA_LIBS
     cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils++.so* $GALERA_LIBS
     cp -P $GALERA_SRC/gcomm/src/.libs/libgcomm.so*               $GALERA_LIBS
+    cp -P $GALERA_SRC/gcache/src/.libs/libgcache.so*             $GALERA_LIBS
     cp -P $GALERA_SRC/gcs/src/.libs/libgcs.so*                   $GALERA_LIBS
     cp -P $GALERA_SRC/wsdb/src/.libs/libwsdb.so*                 $GALERA_LIBS
     cp -P $GALERA_SRC/galera/src/.libs/libmmgalera.so*           $GALERA_LIBS

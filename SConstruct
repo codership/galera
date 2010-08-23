@@ -119,6 +119,7 @@ if sysname == 'freebsd':
 env.Append(CPPPATH = Split('''#/galerautils/src
                                #/gcomm/src
                                #/gcomm/src/gcomm
+                               #/gcache/src
                                #/gcs/src
                                #/wsdb/src
                                #/galera/src

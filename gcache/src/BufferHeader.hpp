@@ -19,13 +19,16 @@ namespace gcache
 
     struct BufferHeader
     {
-        ssize_t  size;
+        ssize_t  size; /*! total buffer size, including header */
         int64_t  seqno;
         uint64_t flags;
     }__attribute__((__packed__));
 
     static inline BufferHeader*
-    BH (void* ptr) { return static_cast<BufferHeader*>(ptr); }
+    ptr2BH (const void* ptr)
+    {
+        return (static_cast<BufferHeader*>(const_cast<void*>(ptr)) - 1);
+    }
 
     static inline void
     BH_clear (BufferHeader* bh)
@@ -50,6 +53,7 @@ namespace gcache
     static inline bool
     BH_is_canceled (BufferHeader* bh)
     { return (bh->flags & BUFFER_CANCELED); }
+
 }
 
 #endif /* __GCACHE_BUFHEAD__ */

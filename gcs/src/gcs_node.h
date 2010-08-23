@@ -18,6 +18,8 @@
 #include "gcs_comp_msg.h"
 #include "gcs_state_msg.h"
 
+#include <gcache.h>
+
 #define NODE_NO_ID   "undefined"
 #define NODE_NO_NAME "unknown"
 #define NODE_NO_ADDR "unknown"
@@ -49,6 +51,7 @@ typedef struct gcs_node gcs_node_t;
 /*! Initialize node context */
 extern void
 gcs_node_init (gcs_node_t* node,
+               gcache_t*   gcache,
                const char* id,
                const char* name,      ///< can be null
                const char* inc_addr); ///< can be null

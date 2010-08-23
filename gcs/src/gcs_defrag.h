@@ -19,8 +19,11 @@
 #include "gcs_act_proto.h"
 #include "gcs_act.h"
 
+#include <gcache.h>
+
 typedef struct gcs_defrag
 {
+    gcache_t*      cache;
     gcs_seqno_t    sent_id; // sent id (unique for a node)
     uint8_t*       head;    // head of action buffer
     uint8_t*       tail;    // tail of action data
@@ -32,9 +35,10 @@ typedef struct gcs_defrag
 gcs_defrag_t;
 
 static inline void
-gcs_defrag_init (gcs_defrag_t* df)
+gcs_defrag_init (gcs_defrag_t* df, gcache_t* cache)
 {
     memset (df, 0, sizeof (*df));
+    df->cache   = cache;
     df->sent_id = GCS_SEQNO_ILL;
 }
 
@@ -55,15 +59,19 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
 static inline void
 gcs_defrag_forget (gcs_defrag_t* df)
 {
-    gcs_defrag_init (df);
+    gcs_defrag_init (df, df->cache);
 }
 
 /*! Free resources associated with defrag (for lost node cleanup) */
 static inline void
 gcs_defrag_free (gcs_defrag_t* df)
 {
-    free (df->head); // alloc'ed with standard malloc
-    gcs_defrag_init (df);
+    if (gu_likely(NULL != df->cache))
+        gcache_free (df->cache, df->head);
+    else
+        free (df->head); // alloc'ed with standard malloc
+
+    gcs_defrag_init (df, df->cache);
 }
 
 /*! Mark current action as reset */

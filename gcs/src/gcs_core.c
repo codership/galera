@@ -36,6 +36,7 @@ core_state_t;
 struct gcs_core
 {
     gu_config_t*    config;
+    gcache_t*       cache;
 
     /* connection per se */
     long            prim_comp_no;
@@ -84,7 +85,8 @@ core_act_t;
 gcs_core_t*
 gcs_core_create (const char*  node_name,
                  const char*  inc_addr,
-                 gu_config_t* conf)
+                 gu_config_t* const conf,
+                 gcache_t*    const cache)
 {
     assert (conf);
 
@@ -93,6 +95,7 @@ gcs_core_create (const char*  node_name,
     if (NULL != core) {
 
         core->config = conf;
+        core->cache  = cache;
 
         // Need to allocate something, otherwise Spread 3.17.3 freaks out.
         core->recv_msg.buf = gu_malloc(CORE_INIT_BUF_SIZE);
@@ -104,7 +107,7 @@ gcs_core_create (const char*  node_name,
                                                sizeof (core_act_t));
             if (core->fifo) {
                 gu_mutex_init  (&core->send_lock, NULL);
-                gcs_group_init (&core->group, node_name, inc_addr);
+                gcs_group_init (&core->group, cache, node_name, inc_addr);
                 core->proto_ver = 0;
                 core->state = CORE_CLOSED;
 #ifdef GCS_CORE_TESTING

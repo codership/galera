@@ -12,6 +12,7 @@
 
 #include "replicator.hpp"
 
+#include "GCache.hpp"
 #include "gcs.hpp"
 #include "monitor.hpp"
 #include "wsdb.hpp"
@@ -269,8 +270,9 @@ namespace galera
         int           sst_retry_sec_;
 
         // services
-        Gcs        gcs_;
-        ServiceThd service_thd_;
+        gcache::GCache gcache_;
+        Gcs            gcs_;
+        ServiceThd     service_thd_;
 
         // trx processing
         Wsdb          wsdb_;

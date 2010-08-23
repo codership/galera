@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2010 Codership Oy <info@codership.com>
  *
  */
 
@@ -106,7 +106,10 @@ namespace gcache
             offset += page_size;
         }
 
-        if (offset > size && fsync (value) == 0) {
+        if (offset > size &&
+            lseek (value, size - 1, SEEK_SET) > 0 &&
+            write (value, &byte, sizeof(byte)) == sizeof(byte) &&
+            fsync (value) == 0) {
             log_info << "Preallocating " << size << " bytes in '" << name
                      << "' done.";
             return;

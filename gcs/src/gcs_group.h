@@ -20,6 +20,8 @@
 #include "gcs_seqno.h"
 #include "gcs_state_msg.h"
 
+#include <gcache.h>
+
 typedef enum gcs_group_state
 {
     GCS_GROUP_NON_PRIMARY,
@@ -34,6 +36,7 @@ extern const char* gcs_group_state_str[];
 
 typedef struct gcs_group
 {
+    gcache_t*     cache;
     gcs_seqno_t   act_id;       // current(last) action seqno
     gcs_seqno_t   conf_id;      // current configuration seqno
     gu_uuid_t     state_uuid;   // state exchange id
@@ -62,6 +65,7 @@ gcs_group_t;
  */
 extern long
 gcs_group_init (gcs_group_t* group,
+                gcache_t*    cache,
                 const char*  node_name, ///< can be null
                 const char*  inc_addr); ///< can be null
 
@@ -81,7 +85,7 @@ gcs_group_free (gcs_group_t* group);
 
 /*! Forget the action if it is not to be delivered */
 extern void
-gcs_group_ignore_action (struct gcs_act_rcvd* rcvd);
+gcs_group_ignore_action (gcs_group_t* group, struct gcs_act_rcvd* rcvd);
 
 /*!
  * Handles component message - installs new membership,
@@ -155,6 +159,10 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
              * increment and assign act_id only for totally ordered actions
              * and only in PRIM (skip messages while in state exchange) */
             rcvd->id = ++group->act_id;
+
+            if (!local && group->cache)
+                //! @todo: remove if() after local actions get in gcache
+                gcache_seqno_assign (group->cache, rcvd->act.buf, rcvd->id);
         }
         else if (GCS_ACT_TORDERED  == rcvd->act.type) {
             /* Rare situations */
@@ -172,7 +180,7 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
             else {
                 /* Just ignore it */
                 ret = 0;
-                gcs_group_ignore_action (rcvd);
+                gcs_group_ignore_action (group, rcvd);
             }
         }
     }
