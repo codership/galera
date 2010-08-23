@@ -1,0 +1,77 @@
+2010-07-18 Alex 
+    Substituted gcs_slave_queue_len() with gcs_get_stats() to return
+    a wider range of gcs performance statistics. At this time it includes
+    average slave queue length, average send queue length, fraction of
+    time spent paused and number of flow control events sent and received.
+
+2010-06-16 Alex 
+    Added gcs_interrupt() call to be able to interrupt scheduled threads.
+    Version 0.13.1
+
+2010-05-31 Alex 
+    Added flow control monitor and ability to synchronize with gcs_send()
+    and gcs_repl() calls thus guranteeing FIFO order. Version 0.13.0
+
+2010-05-20 Alex 
+    Added gcs_slave_queue_len() query to API.
+
+2009-11-21 Alex 
+    Extended state message to contain previous primary configuraiton info.
+    Many bugfixes and cleanups. Version 0.12.0
+
+2009-08-09 Alex 
+    Added possibility to specify desired donor. Version 0.11.0
+
+2009-08-06 Alex 
+    Refactored interface. Now connection URL is supplied to gcs_open() and
+    not gcs_create(). It is done to satisfy wsrep API changes and is generally
+    cleaner as it separates library initialisation from connection
+    establishment. Version: 0.10.0
+
+2009-07-21 Alex 
+    Added node name and incoming address arguments to gcs_create(). Thus
+    it should be possible to give nodes sensible names and see them in logs.
+    Version: 0.9.0
+
+2009-06-21 Alex 
+    Moved TO module out of the library. Since it no longer offers this
+    interface, bumped minor version: 0.8.0
+
+2008-11-16 Alex 
+    Many bugfixes. 
+    Fixed handling of self-leave meassages.
+    Switched to "mallocless" FIFO implementaiton in gu_fifo.c
+    Resolved apparent race condition and optimized FC message sending.
+    Package version 0.7.2
+
+2008-11-09 Alex 
+    Changed state transfer protocol to require join message to be sent by
+    both parties involved in state transfer. Package version 0.7.1, library
+    interface 9.0.0.
+
+2008-10-21 Alex 
+    First implementation of state transfer request protocol. Bumped package
+    version to 0.7.0, library interface to 8.0.0.
+
+2008-09-29 Alex (postfactum)
+    State exchange (GCS state exchange, not application state exchange)
+    implemented. Now we have some sort of quourum calculations and global-scope
+    sequence numbers. New nodes can join without having to restart the whole
+    group. Bumped package version to 0.6.0.
+
+2008-08-01 Alex (postfactum)
+    START/STOP-based flow control. A little bit ahead of the plan.
+
+2008-07-30 Alex 
+    Added gcs_join() and gcs_wait() getting closer to final API.
+    gcs_join() moves conneciton to JOINED state.
+    gcs_wait() blocks waiting for the group memebers to catch up.
+
+2008-05-14 Alex 
+    Added gcs_create() and gcs_destroy() for safe and clean initialization and
+    deinitialization of GCS connection handle.
+
+2008-03-23 Alex 
+    Added gcs_set_last_applied() and gcs_get_last_applied() - calls for voting
+    for the last applied action.
+

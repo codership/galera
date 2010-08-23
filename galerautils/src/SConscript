@@ -1,0 +1,29 @@
+
+env = DefaultEnvironment().Clone()
+
+env.SharedLibrary('galerautils', Glob('*.c'))
+env.StaticLibrary('galerautils', Glob('*.c'))
+
+utilsxx_sources = [
+        'gu_datetime.cpp',
+        'gu_exception.cpp',
+        'gu_logger.cpp',
+        'gu_prodcons.cpp',
+        'gu_regex.cpp',
+        'gu_string.cpp',
+        'gu_uri.cpp',
+        'gu_buffer.cpp',
+        'gu_config.cpp'
+        ]
+
+if env['CPPFLAGS'].find('-DGALERA_USE_GU_NETWORK') != -1:
+    utilsxx_sources = [utilsxx_sources, 
+                       'gu_epoll.cpp',
+                       'gu_network.cpp',
+                       'gu_poll.cpp',
+                       'gu_resolver.cpp']
+    env.Append(CXXFLAGS = ' -Wno-old-style-cast')
+
+env.SharedLibrary('galerautils++', utilsxx_sources)
+env.StaticLibrary('galerautils++', utilsxx_sources)
+

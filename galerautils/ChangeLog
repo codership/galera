@@ -1,0 +1,48 @@
+2009-09-20 Alex 
+    Added RegEx class for matching strings with POSIX regular expressions.
+    Renamed URL class to URI to better reflect what it does.
+    Added get_host(), get_user() and get_port() methods and a unit test.
+    Modularized galerautils++ unit tests.
+    Version 0.3.5
+
+2009-09-17 Alex 
+    Added gu_utils.hpp to hold general-purpose templates and functions
+    (now with to_string() template functions).
+    Logger class cleanups.
+    Exception class cleanups. Added stack tracing macro.
+    New Throw class for composing verbose exception messages.
+    Version 0.3.4
+    
+2009-09-01 Alex 
+    Added a simple option line parser. Some optimizations and cleanups.
+    Version 0.3.3
+
+2009-07-07 Alex 
+    Slightly changed gu_fifo interface. Added gu_lock_step object.
+    Version 0.3.2.
+
+2009-06-21 Alex 
+    Moved TO monitor module from GCS to galerautils. Version 0.3.1.
+
+2009-06-08 Alex 
+    Started galerautils++ project. Added galerautils.hpp and C++-style
+    logger and assert variants. Version 0.3.0.
+
+2008-11-16 Alex 
+    Added gu_fifo_t class for mallocless FIFO queue. Version 0.2.9.
+    
+2008-03-23 Alex 
+    Added gu_timeval_diff() and gu_clock_diff() functions.
+    Bumped interface version.
+
+2008-02-21 Teemu 
+    Made DBUG thread safe.
+    
+2007-11-01 Alex 
+    Fixed thread safe compilation without MySQL
+    Tagged release 0.2.5
+
+2007-10-18 Alex 
+    Fixed compilation. Added gtohl/htogl/gtohs/htogs functions.
+    Tagged release 0.2.4
+    

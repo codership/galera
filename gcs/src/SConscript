@@ -1,0 +1,51 @@
+#
+
+# Clone environment as we need to tune compilation flags
+libgcs_env = DefaultEnvironment().Clone()
+
+# Backends (TODO: Get from global options)
+libgcs_env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM')
+
+# Need to live without -pedantic and use gnu99 std
+libgcs_env.Replace(CFLAGS = '-std=gnu99 -fno-strict-aliasing')
+
+# Need to live without -pedantic
+libgcs_env.Replace(CXXFLAGS = '-Wno-long-long -Wno-deprecated -Weffc++ -ansi')
+
+libgcs_sources = Split('''
+                          gcs_params.c
+                          gcs_conf.c
+                          gcs_fifo_lite.c
+                          gcs_msg_type.c
+                          gcs_comp_msg.c
+                          gcs_sm.c
+                          gcs_backend.c
+                          gcs_dummy.c
+                          gcs_act_proto.c
+                          gcs_defrag.c
+                          gcs_state_msg.c
+                          gcs_node.c
+                          gcs_group.c
+                          gcs_core.c
+                          gcs.c
+                          gcs_gcomm.cpp
+                       ''')
+
+libgcs_env.SharedLibrary('gcs', libgcs_sources)
+libgcs_env.StaticLibrary('gcs', libgcs_sources)
+
+# TODO: How to tell scons portably that C++ linker should be used
+# and program should be linked statically
+gcs_test_env = libgcs_env.Clone()
+
+gcs_test_env.Append(LIBS = File('#/gcs/src/libgcs.a'))
+gcs_test_env.Append(LIBS = File('#/gcomm/src/libgcomm.a'))
+gcs_test_env.Append(LIBS = File('#/galerautils/src/libgalerautils++.a'))
+gcs_test_env.Append(LIBS = File('#/galerautils/src/libgalerautils.a'))
+gcs_test_env.Append(LIBS = ['pthread'])
+
+gcs_test_env.Program(target = 'gcs_test',
+                     source = 'gcs_test.c',
+                     LINK = libgcs_env['CXX'])
+
+SConscript('unit_tests/SConscript')

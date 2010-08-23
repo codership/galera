@@ -1,0 +1,50 @@
+
+Import('check_env')
+
+env = check_env.Clone()
+
+gcs_tests_sources = Split('''
+                             gcs_tests.c
+                             gcs_fifo_test.c
+                             ../gcs_fifo_lite.c
+                             gcs_sm_test.c
+                             ../gcs_sm.c
+                             gcs_comp_test.c
+                             ../gcs_comp_msg.c
+                             gcs_state_msg_test.c
+                             ../gcs_state_msg.c
+                             gcs_backend_test.c
+                             ../gcs_backend.c
+                             gcs_proto_test.c
+                             ../gcs_act_proto.c
+                             gcs_defrag_test.c
+                             ../gcs_defrag.c
+                             gcs_node_test.c
+                             ../gcs_node.c
+                             gcs_group_test.c
+                             ../gcs_group.c
+                             gcs_core_test.c
+                             ../gcs_core.c
+                             ../gcs_dummy.c
+                             ../gcs_msg_type.c
+                             ../gcs.c
+                             ../gcs_params.c
+                          ''')
+
+
+
+env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM')
+env.Append(CPPFLAGS = ' -DGCS_CORE_TESTING -DGCS_DUMMY_TESTING')
+env.Replace(CFLAGS  = ' -std=gnu99 -fno-strict-aliasing')
+
+env.Append(LIBS = File('#/galerautils/src/libgalerautils++.a'))
+env.Append(LIBS = File('#/galerautils/src/libgalerautils.a'))
+env.Append(LIBS = ['m'])
+
+gcs_tests = env.Program(target    = 'gcs_tests',
+                        source    = gcs_tests_sources,
+                        OBJPREFIX = 'gcs-tests-',
+                        LINK      = env['CXX'])
+
+env.Test("gcs_tests.passed", gcs_tests)
+env.Alias("test", "gcs_tests.passed")
