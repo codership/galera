@@ -1,0 +1,154 @@
+# This is a MySQL-wsrep package description for ESP package manager
+
+%product     wsrep-enabled MySQL server, clients and libraries.
+%copyright   MySQL AB, Codership Oy, All Rights Reserved
+%vendor      Codership Oy
+%license     COPYING
+%readme      README
+%description MySQL + wsrep patch (https://launchpad.net/codership-mysql). All-in-one: contains libraries, client and server.
+$mysql_version=${MYSQL_VER}
+$wsrep_version=${WSREP_VER}
+%version     ${mysql_version}-${wsrep_version}
+
+# This includes dependencies and directory structore information
+%format deb
+%include debian/mysql-wsrep.list
+%format rpm
+%include centos/mysql-wsrep.list
+%format all
+
+##############################################
+# Below files sorted into paragraphs         #
+# according to Debian division into packages #
+##############################################
+
+# Documentation
+d 755 root root $DOCS_DST -
+f 644 root root $DOCS_DST/COPYING           $MYSQL_SRC/COPYING
+f 644 root root $DOCS_DST/EXCEPTIONS-CLIENT $MYSQL_SRC/EXCEPTIONS-CLIENT
+f 644 root root $DOCS_DST/README            $MYSQL_SRC/README
+f 644 root root $DOCS_DST/README-wsrep      ${GALERA_SRC}/scripts/mysql/README-wsrep
+
+# libmysqlclient part
+d 755 root root $LIBS_DST -
+f 755 root root $LIBS_DST/libmysqlclient.so.16.0.0   $MYSQL_SRC/libmysql/.libs/libmysqlclient.so.16.0.0
+f 755 root root $LIBS_DST/libmysqlclient_r.so.16.0.0 $MYSQL_SRC/libmysql_r/.libs/libmysqlclient_r.so.16.0.0
+
+# mysql-common part (see distribution-specific includes too)
+d 755 root  root  $CONF_DST/conf.d             -
+c 640 mysql mysql $CONF_DST/conf.d/wsrep.cnf   $MYSQL_SRC/support-files/wsrep.cnf
+
+# mysql-client part
+d 755 root root $BINS_DST -
+f 755 root root $BINS_DST/innochecksum         $MYSQL_SRC/extra/innochecksum
+f 755 root root $BINS_DST/myisam_ftdump        $MYSQL_SRC/storage/myisam/myisam_ftdump
+f 755 root root $BINS_DST/mysql                $MYSQL_SRC/client/.libs/mysql
+f 755 root root $BINS_DST/mysqlaccess          $MYSQL_SRC/scripts/mysqlaccess
+f 755 root root $BINS_DST/mysqladmin           $MYSQL_SRC/client/.libs/mysqladmin
+f 755 root root $BINS_DST/mysqlbug             $MYSQL_SRC/scripts/mysqlbug
+f 755 root root $BINS_DST/mysqlcheck           $MYSQL_SRC/client/.libs/mysqlcheck
+f 755 root root $BINS_DST/mysqldump            $MYSQL_SRC/client/.libs/mysqldump
+f 755 root root $BINS_DST/mysqldumpslow        $MYSQL_SRC/scripts/mysqldumpslow
+f 755 root root $BINS_DST/mysqlimport          $MYSQL_SRC/client/.libs/mysqlimport
+f 755 root root $BINS_DST/mysqlshow            $MYSQL_SRC/client/.libs/mysqlshow
+f 755 root root $BINS_DST/mysqlslap            $MYSQL_SRC/client/.libs/mysqlslap
+f 755 root root $BINS_DST/mysql_client_test    $MYSQL_SRC/tests/mysql_client_test
+f 755 root root $BINS_DST/mysql_find_rows      $MYSQL_SRC/scripts/mysql_find_rows
+f 755 root root $BINS_DST/mysql_fix_extensions $MYSQL_SRC/scripts/mysql_fix_extensions
+f 755 root root $BINS_DST/mysql_waitpid        $MYSQL_SRC/extra/mysql_waitpid
+d 755 root root $SBIN_DST -
+f 755 root root $SBIN_DST/mysqlmanager         $MYSQL_SRC/server-tools/instance-manager/mysqlmanager
+
+# mysql-server-5.1 part
+f 644 root root $CONF_DST/conf.d/mysqld_safe_syslog.cnf $GALERA_SRC/scripts/mysql/debian/mysqld_safe_syslog.cnf
+f 755 root root $BINS_DST/msql2mysql           $MYSQL_SRC/scripts/msql2mysql
+f 755 root root $BINS_DST/my_print_defaults    $MYSQL_SRC/extra/my_print_defaults
+f 755 root root $BINS_DST/myisamchk            $MYSQL_SRC/storage/myisam/myisamchk
+f 755 root root $BINS_DST/myisamlog            $MYSQL_SRC/storage/myisam/myisamlog
+f 755 root root $BINS_DST/myisampack           $MYSQL_SRC/storage/myisam/myisampack
+f 755 root root $BINS_DST/mysql_convert_table_format $MYSQL_SRC/scripts/mysql_convert_table_format
+f 755 root root $BINS_DST/mysql_fix_privilege_tables $MYSQL_SRC/scripts/mysql_fix_privilege_tables
+f 755 root root $BINS_DST/mysql_install_db     $MYSQL_SRC/scripts/mysql_install_db
+f 755 root root $BINS_DST/mysql_secure_installation $MYSQL_SRC/scripts/mysql_secure_installation
+f 755 root root $BINS_DST/mysql_setpermission  $MYSQL_SRC/scripts/mysql_setpermission
+f 755 root root $BINS_DST/mysql_tzinfo_to_sql  $MYSQL_SRC/sql/mysql_tzinfo_to_sql
+f 755 root root $BINS_DST/mysql_upgrade        $MYSQL_SRC/client/.libs/mysql_upgrade
+f 755 root root $BINS_DST/mysql_zap            $MYSQL_SRC/scripts/mysql_zap
+f 755 root root $BINS_DST/mysqlbinlog          $MYSQL_SRC/client/.libs/mysqlbinlog
+f 755 root root $BINS_DST/mysqld_multi         $MYSQL_SRC/scripts/mysqld_multi
+f 755 root root $BINS_DST/mysqld_safe          $MYSQL_SRC/scripts/mysqld_safe
+f 755 root root $BINS_DST/mysqltest            $MYSQL_SRC/client/.libs/mysqltest
+f 755 root root $BINS_DST/perror               $MYSQL_SRC/extra/perror
+f 755 root root $BINS_DST/replace              $MYSQL_SRC/extra/replace
+f 755 root root $BINS_DST/resolve_stack_dump   $MYSQL_SRC/extra/resolve_stack_dump
+f 755 root root $BINS_DST/resolveip            $MYSQL_SRC/extra/resolveip
+f 755 root root $BINS_DST/mysqlhotcopy         $MYSQL_SRC/scripts/mysqlhotcopy
+f 755 root root $BINS_DST/wsrep_sst_mysqldump  $MYSQL_SRC/scripts/wsrep_sst_mysqldump
+f 755 root root $BINS_DST/wsrep_sst_rsync      $MYSQL_SRC/scripts/wsrep_sst_rsync
+
+f 644 root root $SHAR_DST/errmsg.txt           $MYSQL_SRC/sql/share/errmsg.txt
+f 644 root root $SHAR_DST/mysqld_multi.server  $MYSQL_SRC/support-files/mysqld_multi.server
+f 644 root root $SHAR_DST                      $MYSQL_SRC/scripts/*.sql
+
+d 755 root root $DOCS_DST/examples -
+f 644 root root $DOCS_DST/examples             $MYSQL_SRC/support-files/*.cnf
+
+d 755 mysql root /var/run/mysqld -
+d 755 mysql adm  /var/log/mysql  -
+
+# mysql-server-core-5.1
+d 755 root root $LIBEXEC_DST -
+f 755 root root $LIBEXEC_DST/mysqld            $MYSQL_SRC/sql/mysqld
+%format deb
+l 000 root root $SBIN_DST/mysqld               ../libexec/mysqld
+%format all
+d 755 root root $SHAR_DST/english -
+f 644 root root $SHAR_DST/english/errmsg.sys   $MYSQL_SRC/sql/share/english/errmsg.sys
+d 755 root root $SHAR_DST/charsets -
+f 644 root root $SHAR_DST/charsets             $MYSQL_SRC/sql/share/charsets/*
+
+# manpages
+d 755 root root $MAN_DST/man1 -
+f 644 root root $MAN_DST/man1/innochecksum.1.gz      $MYSQL_SRC/man/innochecksum.1.gz
+f 644 root root $MAN_DST/man1/msql2mysql.1.gz        $MYSQL_SRC/man/msql2mysql.1.gz
+f 644 root root $MAN_DST/man1/myisamchk.1.gz         $MYSQL_SRC/man/myisamchk.1.gz
+f 644 root root $MAN_DST/man1/myisam_ftdump.1.gz     $MYSQL_SRC/man/myisam_ftdump.1.gz
+f 644 root root $MAN_DST/man1/myisamlog.1.gz         $MYSQL_SRC/man/myisamlog.1.gz
+f 644 root root $MAN_DST/man1/myisampack.1.gz        $MYSQL_SRC/man/myisampack.1.gz
+f 644 root root $MAN_DST/man1/my_print_defaults.1.gz $MYSQL_SRC/man/my_print_defaults.1.gz
+f 644 root root $MAN_DST/man1/mysql.1.gz             $MYSQL_SRC/man/mysql.1.gz
+f 644 root root $MAN_DST/man1/mysqlaccess.1.gz       $MYSQL_SRC/man/mysqlaccess.1.gz
+f 644 root root $MAN_DST/man1/mysqladmin.1.gz        $MYSQL_SRC/man/mysqladmin.1.gz
+f 644 root root $MAN_DST/man1/mysqlbinlog.1.gz       $MYSQL_SRC/man/mysqlbinlog.1.gz
+f 644 root root $MAN_DST/man1/mysqlbug.1.gz          $MYSQL_SRC/man/mysqlbug.1.gz
+f 644 root root $MAN_DST/man1/mysqlcheck.1.gz        $MYSQL_SRC/man/mysqlcheck.1.gz
+f 644 root root $MAN_DST/man1/mysql_client_test.1.gz $MYSQL_SRC/man/mysql_client_test.1.gz
+f 644 root root $MAN_DST/man1/mysql_convert_table_format.1.gz $MYSQL_SRC/man/mysql_convert_table_format.1.gz
+f 644 root root $MAN_DST/man1/mysqld_multi.1.gz      $MYSQL_SRC/man/mysqld_multi.1.gz
+f 644 root root $MAN_DST/man1/mysqld_safe.1.gz       $MYSQL_SRC/man/mysqld_safe.1.gz
+f 644 root root $MAN_DST/man1/mysqldump.1.gz         $MYSQL_SRC/man/mysqldump.1.gz
+f 644 root root $MAN_DST/man1/mysqldumpslow.1.gz     $MYSQL_SRC/man/mysqldumpslow.1.gz
+f 644 root root $MAN_DST/man1/mysql_find_rows.1.gz   $MYSQL_SRC/man/mysql_find_rows.1.gz
+f 644 root root $MAN_DST/man1/mysql_fix_extensions.1.gz $MYSQL_SRC/man/mysql_fix_extensions.1.gz
+f 644 root root $MAN_DST/man1/mysql_fix_privilege_tables.1.gz $MYSQL_SRC/man/mysql_fix_privilege_tables.1.gz
+f 644 root root $MAN_DST/man1/mysqlhotcopy.1.gz      $MYSQL_SRC/man/mysqlhotcopy.1.gz
+f 644 root root $MAN_DST/man1/mysqlimport.1.gz       $MYSQL_SRC/man/mysqlimport.1.gz
+f 644 root root $MAN_DST/man1/mysql_install_db.1.gz  $MYSQL_SRC/man/mysql_install_db.1.gz
+f 644 root root $MAN_DST/man1/mysql_secure_installation.1.gz $MYSQL_SRC/man/mysql_secure_installation.1.gz
+f 644 root root $MAN_DST/man1/mysql_setpermission.1.gz $MYSQL_SRC/man/mysql_setpermission.1.gz
+f 644 root root $MAN_DST/man1/mysqlshow.1.gz         $MYSQL_SRC/man/mysqlshow.1.gz
+f 644 root root $MAN_DST/man1/mysqlslap.1.gz         $MYSQL_SRC/man/mysqlslap.1.gz
+f 644 root root $MAN_DST/man1/mysqltest.1.gz         $MYSQL_SRC/man/mysqltest.1.gz
+f 644 root root $MAN_DST/man1/mysql_tzinfo_to_sql.1.gz $MYSQL_SRC/man/mysql_tzinfo_to_sql.1.gz
+f 644 root root $MAN_DST/man1/mysql_upgrade.1.gz     $MYSQL_SRC/man/mysql_upgrade.1.gz
+f 644 root root $MAN_DST/man1/mysql_waitpid.1.gz     $MYSQL_SRC/man/mysql_waitpid.1.gz
+f 644 root root $MAN_DST/man1/mysql_zap.1.gz         $MYSQL_SRC/man/mysql_zap.1.gz
+f 644 root root $MAN_DST/man1/perror.1.gz            $MYSQL_SRC/man/perror.1.gz
+f 644 root root $MAN_DST/man1/replace.1.gz           $MYSQL_SRC/man/replace.1.gz
+f 644 root root $MAN_DST/man1/resolveip.1.gz         $MYSQL_SRC/man/resolveip.1.gz
+f 644 root root $MAN_DST/man1/resolve_stack_dump.1.gz $MYSQL_SRC/man/resolve_stack_dump.1.gz
+d 755 root root $MAN_DST/man8 -
+f 644 root root $MAN_DST/man8/mysqld.8.gz           $MYSQL_SRC/man/mysqld.8.gz
+f 644 root root $MAN_DST/man8/mysqlmanager.8.gz     $MYSQL_SRC/man/mysqlmanager.8.gz
+
+#

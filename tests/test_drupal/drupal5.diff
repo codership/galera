@@ -1,0 +1,167 @@
+Index: includes/database.mysql.inc
+===================================================================
+--- includes/database.mysql.inc	(revision 5)
++++ includes/database.mysql.inc	(revision 8)
+@@ -167,11 +167,13 @@
+     print '<p>query: '. $query .'<br />error:'. mysql_error($active_db) .'</p>';
+   }
+ 
+-  if (!mysql_errno($active_db)) {
++  $my_err = mysql_errno($active_db);
++  if (!$my_err) {
+     return $result;
+   }
+   else {
+-    trigger_error(check_plain(mysql_error($active_db) ."\nquery: ". $query), E_USER_WARNING);
++    if ($my_err != 1213) // don't warn on deadlock
++      trigger_error(check_plain(mysql_error($active_db) ."\nquery: ". $query), E_USER_WARNING);
+     return FALSE;
+   }
+ }
+@@ -261,11 +263,21 @@
+  * with table prefixes. For example, db_next_id('{node}_nid');
+  */
+ function db_next_id($name) {
++  global $active_db;
+   $name = db_prefix_tables($name);
++
+   db_query('LOCK TABLES {sequences} WRITE');
+-  $id = db_result(db_query("SELECT id FROM {sequences} WHERE name = '%s'", $name)) + 1;
+-  db_query("REPLACE INTO {sequences} VALUES ('%s', %d)", $name, $id);
+-  db_query('UNLOCK TABLES');
++  do {
++    $id = db_result(db_query("SELECT id FROM {sequences} WHERE name = '%s' FOR UPDATE", $name)) + 1;
++    if (mysql_errno($active_db)) continue;
++    if ($id > 1) { // exitsting row
++      db_query("UPDATE {sequences} SET id = %d WHERE name = '%s'", $id, $name);
++    } else {       // new row
++      db_query("INSERT INTO {sequences} VALUES ('%s', %d)", $name, $id);
++    }
++    if (mysql_errno($active_db)) continue;
++    db_query('UNLOCK TABLES');
++  } while (mysql_errno($active_db) == 1213); // ER_LOCK_DEADLOCK
+ 
+   return $id;
+ }
+Index: includes/bootstrap.inc
+===================================================================
+--- includes/bootstrap.inc	(revision 5)
++++ includes/bootstrap.inc	(revision 8)
+@@ -466,9 +466,13 @@
+   global $conf;
+ 
+   db_lock_table('variable');
+-  db_query("DELETE FROM {variable} WHERE name = '%s'", $name);
+-  db_query("INSERT INTO {variable} (name, value) VALUES ('%s', '%s')", $name, serialize($value));
+-  db_unlock_tables();
++  do {
++    db_query("DELETE FROM {variable} WHERE name = '%s'", $name);
++    if (db_error()) continue;
++    db_query("INSERT INTO {variable} (name, value) VALUES ('%s', '%s')", $name, serialize($value));
++    if (db_error()) continue;
++    db_unlock_tables();
++  } while (db_error() == 1213);
+ 
+   cache_clear_all('variables', 'cache');
+ 
+Index: includes/database.mysqli.inc
+===================================================================
+--- includes/database.mysqli.inc	(revision 5)
++++ includes/database.mysqli.inc	(revision 8)
+@@ -149,11 +149,13 @@
+     print '<p>query: '. $query .'<br />error:'. mysqli_error($active_db) .'</p>';
+   }
+ 
+-  if (!mysqli_errno($active_db)) {
++  $my_err = mysqli_errno($active_db);
++  if (!$my_err) {
+     return $result;
+   }
+   else {
+-    trigger_error(check_plain(mysqli_error($active_db) ."\nquery: ". $query), E_USER_WARNING);
++    if ($my_err != 1213)
++      trigger_error(check_plain(mysqli_error($active_db) ."\nquery: ". $query), E_USER_WARNING);
+     return FALSE;
+   }
+ }
+@@ -244,11 +246,21 @@
+  * with table prefixes. For example, db_next_id('{node}_nid');
+  */
+ function db_next_id($name) {
++  global $active_db;
+   $name = db_prefix_tables($name);
++
+   db_query('LOCK TABLES {sequences} WRITE');
+-  $id = db_result(db_query("SELECT id FROM {sequences} WHERE name = '%s'", $name)) + 1;
+-  db_query("REPLACE INTO {sequences} VALUES ('%s', %d)", $name, $id);
+-  db_query('UNLOCK TABLES');
++  do {
++    $id = db_result(db_query("SELECT id FROM {sequences} WHERE name = '%s' FOR UPDATE", $name)) + 1;
++    if (mysqli_errno($active_db)) continue;
++    if ($id > 1) { // exitsting row
++      db_query("UPDATE {sequences} SET id = %d WHERE name = '%s'", $id, $name);
++    } else {       // new row
++      db_query("INSERT INTO {sequences} VALUES ('%s', %d)", $name, $id);
++    }
++    if (mysqli_errno($active_db)) continue;
++    db_query('UNLOCK TABLES');
++  } while (mysqli_errno($active_db) == 1213); // ER_LOCK_DEADLOCK
+ 
+   return $id;
+ }
+Index: includes/cache.inc
+===================================================================
+--- includes/cache.inc	(revision 5)
++++ includes/cache.inc	(revision 8)
+@@ -93,11 +93,15 @@
+  */
+ function cache_set($cid, $table = 'cache', $data, $expire = CACHE_PERMANENT, $headers = NULL) {
+   db_lock_table($table);
+-  db_query("UPDATE {". $table. "} SET data = %b, created = %d, expire = %d, headers = '%s' WHERE cid = '%s'", $data, time(), $expire, $headers, $cid);
+-  if (!db_affected_rows()) {
+-    @db_query("INSERT INTO {". $table. "} (cid, data, created, expire, headers) VALUES ('%s', %b, %d, %d, '%s')", $cid, $data, time(), $expire, $headers);
+-  }
+-  db_unlock_tables();
++  do {
++    db_query("UPDATE {". $table. "} SET data = %b, created = %d, expire = %d, headers = '%s' WHERE cid = '%s'", $data, time(), $expire, $headers, $cid);
++    if (db_error()) continue;
++    if (!db_affected_rows()) {
++      @db_query("INSERT INTO {". $table. "} (cid, data, created, expire, headers) VALUES ('%s', %b, %d, %d, '%s')", $cid, $data, time(), $expire, $headers);
++    }
++    if (db_error()) continue;
++    db_unlock_tables();
++  } while (db_error() == 1213); // deadlock
+ }
+ 
+ /**
+Index: modules/block/block.module
+===================================================================
+--- modules/block/block.module	(revision 5)
++++ modules/block/block.module	(revision 8)
+@@ -188,14 +188,19 @@
+   }
+ 
+   db_lock_table('blocks');
+-  // Remove all blocks from table.
+-  db_query("DELETE FROM {blocks} WHERE theme = '%s'", $theme_key);
++  do {
++    // Remove all blocks from table.
++    db_query("DELETE FROM {blocks} WHERE theme = '%s'", $theme_key);
++    if (db_error()) continue;
+ 
+-  // Reinsert new set of blocks into table.
+-  foreach ($blocks as $block) {
+-    db_query("INSERT INTO {blocks} (module, delta, theme, status, weight, region, visibility, pages, custom, throttle, title) VALUES ('%s', '%s', '%s', %d, %d, '%s', %d, '%s', %d, %d, '%s')", $block['module'], $block['delta'], $theme_key, $block['status'], $block['weight'], $block['region'], $block['visibility'], $block['pages'], $block['custom'], $block['throttle'], $block['title']);
+-  }
+-  db_unlock_tables();
++    // Reinsert new set of blocks into table.
++    foreach ($blocks as $block) {
++      db_query("INSERT INTO {blocks} (module, delta, theme, status, weight, region, visibility, pages, custom, throttle, title) VALUES ('%s', '%s', '%s', %d, %d, '%s', %d, '%s', %d, %d, '%s')", $block['module'], $block['delta'], $theme_key, $block['status'], $block['weight'], $block['region'], $block['visibility'], $block['pages'], $block['custom'], $block['throttle'], $block['title']);
++      if (db_error()) break;
++    }
++    if (db_error()) continue;
++    db_unlock_tables();
++  } while (db_error() == 1213); // replay on deadlock
+ 
+   return $blocks;
+ }

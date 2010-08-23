@@ -1,0 +1,112 @@
+# This is a MySQL-wsrep package description for ESP package manager
+# CentOS specific part
+
+%requires /bin/sh
+%requires /sbin/install-info
+%requires /sbin/ldconfig
+%requires /usr/bin/perl
+%requires /usr/sbin/useradd
+%requires bash
+%requires chkconfig
+%requires fileutils
+%requires grep
+%requires libc.so.6
+%requires libcrypt.so.1
+%requires libcrypto.so.6
+%requires libdl.so.2
+%requires libgcc_s.so.1
+%requires libm.so.6
+%requires libmysqlclient.so.16
+%requires libmysqlclient_r.so.16
+%requires libncurses.so.5
+%requires libnsl.so.1
+%requires libpthread.so.0
+%requires libssl.so.6
+%requires libstdc++.so.6
+%requires libz.so.1
+%requires perl
+%requires perl-DBD-MySQL
+%requires perl-DBI
+%requires rtld(GNU_HASH)
+%requires sh-utils
+#config(mysql) = 5.0.77-4.el5_4.1 ???
+
+%provides libmysqlclient.so.16     0.0.0 ${mysql_version}
+%provides libmysqlclient_r.so.16   0.0.0 ${mysql_version}
+%provides mysql
+%provides config(mysql)
+%provides mysql-server
+%provides config(mysql-server)
+%provides MySQL
+%provides MySQL-server
+%provides MySQL-client
+%provides MySQL-shared
+
+
+#%incompat libmysqlclient16      0.0.0 ${mysql_version}
+#%incompat mysql
+#%incompat mysql-server
+#%incompat MySQL
+#%incompat MySQL-server
+#%incompat MySQL-client
+#%incompat MySQL-shared
+
+$prefix=/usr
+
+$CONF_DST=/etc/mysql
+d 755 root root $CONF_DST               -
+c 644 root root /etc/my.cnf             $GALERA_SRC/scripts/mysql/centos/my.cnf
+
+d 755 root root /etc/rc.d/init.d        -
+f 755 root root /etc/rc.d/init.d/mysqld $GALERA_SRC/scripts/mysql/centos/init.centos
+
+%if x86_64 # CentOS (read Red Hat) never fails to screw up things
+$LIBS_DST=${prefix}/lib64
+%else
+$LIBS_DST=${prefix}/lib
+%endif
+$SHAR_DST=${prefix}/share/mysql
+$SBIN_DST=${prefix}/sbin
+$BINS_DST=${prefix}/bin
+$DOCS_DST=${prefix}/share/doc/mysql
+$LIBEXEC_DST=${prefix}/libexec
+$MAN_DST=${prefix}/share/man
+
+# Commented out CentOS pieces of code which don't seem to make sense here
+
+$mysql_data=/var/lib/mysql
+d 755 root root ${mysql_data} -
+
+%preinstall <<EOF_PREINSTALL
+/usr/sbin/useradd -M -o -r -d /var/lib/mysql -s /bin/bash \
+                  -c "MySQL Server" -u 27 mysql > /dev/null 2>&1 || :
+EOF_PREINSTALL
+
+# Postinstall script is a combination of those from CentOS and MySQL RPMs
+%postinstall <<EOF_POSTINSTALL
+ldconfig -n $LIBS_DST
+if [ $$1 = 1 ]; then
+    /sbin/chkconfig --add mysqld
+fi
+/bin/chmod 0755 ${mysql_data}
+/bin/touch /var/log/mysqld.log
+#/bin/chown -R mysql:mysql ${mysql_data}
+#mysql_install_db --user=mysql --datadir=${mysql_data}
+#/bin/chown -R mysql:mysql ${mysql_data}
+#/bin/chmod -R og-rw ${mysql_data}/mysql
+EOF_POSTINSTALL
+
+%preremove  <<EOF_PREREMOVE
+if [ $$1 = 0 ]; then
+    /sbin/service mysqld stop >/dev/null 2>&1 || :
+    /sbin/chkconfig --del mysqld
+fi
+EOF_PREREMOVE
+
+%postremove <<EOF_POSTREMOVE
+if [ $$1 -ge 1 ]; then
+    /sbin/service mysqld condrestart >/dev/null 2>&1 || :
+fi
+EOF_POSTREMOVE
+
+#

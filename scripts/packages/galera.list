@@ -1,0 +1,54 @@
+# This is Galera package description for ESP package manager
+
+%include galera-common.inc
+
+# this line is required by rpmbuild
+#d 755 root root /usr
+d 755 root root $LIBS_DEST -
+f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils.so.*.*.*
+f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils++.so.*.*.*
+%ifdef GCOMM
+f 755 root root $LIBS_DEST $BUILD_BASE/gcomm/src/.libs/libgcomm.so.*.*.*
+%endif
+%ifdef VSBES
+f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/common/src/.libs/libgcommcommonpp.so.*.*.*
+f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/transport/src/.libs/libgcommtransportpp.so.*.*.*
+f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/vs/src/.libs/libgcommvspp.so.*.*.*
+%endif
+f 755 root root $LIBS_DEST $BUILD_BASE/gcs/src/.libs/libgcs.so.*.*.*
+f 755 root root $LIBS_DEST $BUILD_BASE/wsdb/src/.libs/libwsdb.so.*.*.*
+f 755 root root $LIBS_DEST $BUILD_BASE/galera/src/.libs/libmmgalera.so.*.*.*
+
+%ifdef VSBES
+d 755 root root $SBIN_DEST -
+f 755 root root $SBIN_DEST/vsbes $BUILD_BASE/galeracomm/vs/src/.libs/vsbes
+%endif
+
+d 755 root root $DOCS_DEST -
+f 644 root root $DOCS_DEST/COPYING      $BUILD_BASE/scripts/mysql/LICENSE.galera
+f 644 root root $DOCS_DEST/README       README
+f 644 root root $DOCS_DEST/README-MySQL README-MySQL
+
+$LD_SO_CONF_D=/etc/ld.so.conf.d
+d 755 root root $LD_SO_CONF_D -
+# the reason we don't create this file in postinstall script is to have it
+# in the package database
+f 644 root root $LD_SO_CONF_D/galera.conf empty
+
+%postinstall <<EOF_POSTINSTALL
+# Debian packages come with bad file ownership
+#chown -R root.root $SBIN_DEST $LIBS_DEST
+echo $LIBS_DEST > $LD_SO_CONF_D/galera.conf
+ldconfig $LIBS_DEST
+# The following is to provide constant libmmgalera location across upgrades
+cd $LIBS_DEST
+rm -rf libmmgalera.so
+ln -s $$(/bin/ls libmmgalera.so.* | /usr/bin/tail -n1) libmmgalera.so
+EOF_POSTINSTALL
+
+%format all
+%preremove <<EOF_PREREMOVE
+rm -f $$(find $LIBS_DEST -type l)
+EOF_PREREMOVE
+
+#

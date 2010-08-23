@@ -1,0 +1,67 @@
+#
+# Cluster resources configuration.
+#
+
+# List of available nodes, preferably IP addresses.
+# If hostnames are used, /etc/hosts file should be up to date
+# on each network node.
+export CLUSTER_NODES=${CLUSTER_NODES:-"gw vs1 vs2"}
+
+# DBMS that will be used for tests
+export DBMS=${DBMS:-"MYSQL"}
+
+# DBMS superuser username and password for administrative purposes
+export DBMS_ROOT_USER=${DBMS_ROOT_USER:-"root"}
+export DBMS_ROOT_PSWD=${DBMS_ROOT_PSWD:-"rootpass"}
+
+# DBMS test use username and password
+export DBMS_TEST_USER=${DBMS_TEST_USER:-"test"}
+export DBMS_TEST_PSWD=${DBMS_TEST_PSWD:-"testpass"}
+
+# DBMS schema to use for tests
+export DBMS_TEST_SCHEMA=${DBMS_TEST_SCHEMA:-"test"}
+
+# is this needed?
+## Base directory where MySQL is installed in. May also be 
+## symbolic link pointing to real directory
+#export MYSQL_BASE=${MYSQL_BASE:-"~/galera/mysql"}
+
+# Host for clients to connect to
+export DBMS_HOST=${DBMS_HOST:-"127.0.0.1"}
+
+# Port for MySQL specific tests
+export MYSQL_PORT=${MYSQL_PORT:-"3306"}
+
+# Port for PostgreSQL specific tests
+export PGSQL_PORT=${PGSQL_PORT:-"5432"}
+
+# Port for crossplatform tests
+case "$DBMS" in
+"MYSQL") export DBMS_PORT=${DBMS_PORT:-"$MYSQL_PORT"} ;;
+"PGSQL") export DBMS_PORT=${DBMS_PORT:-"$PGSQL_PORT"} ;;
+esac
+
+# How many concurrent clients to use
+export DBMS_CLIENTS=${DBMS_CLIENTS:-"16"}
+
+# Type of GCS backend
+export GCS_TYPE=${GCS_TYPE:-"gcomm"}
+
+case "$GCS_TYPE" in
+"gcomm")
+    ;;
+"vsbes")
+    if [ -z "$VSBES_ADDRESS" ]; then echo "VSBES_ADDRESS is not set"; exit 1; fi
+    ;;
+*) echo "Urecognized GCS_TYPE: '$GCS_TYPE'" ; exit 1 ;;
+esac
+
+# Extra parameters passed to gcomm backend.
+#
+# export GCOMM_EXTRA_PARAMS=${GCOMM_EXTRA_PARAMS:-"gmcast.mcast_addr=239.192.0.11"}
+
+export GCS_PORT=4567
+
+. $BASE_CONF/nodes.conf
+
+# end

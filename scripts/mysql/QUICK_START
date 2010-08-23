@@ -1,0 +1,92 @@
+MySQL/Galera Demo Quick Start Guide
+===================================
+
+version 0.7.x
+
+This is an informal guide to quick setup of MySQL/Galera demo cluster for 
+experienced MySQL users. For more detailed information please see README.
+
+MySQL/Galera cluster is a multi-master MySQL server cluster. It provides
+ - True high-availability (no committed transaction is lost, no single
+   point of failure)
+ - Performance scalability even foe write-intensive loads.
+ - Semantics of a single MySQL server.
+
+This distribution is all you need to install and run MySQL/Galera cluster.
+You don't need to be root or to uninstall/disable any software.
+
+
+MYSQL CLUSTER IN 3 EASY STEPS:
+
+Suppose you have three networked computers Node1, Node2, Node3 of roughly the
+same performance and Node1 has IP address 192.168.1.1
+
+1. Copy and unpack this distribution on each node to the directory of your
+   choice (hereafter INSTALL_DIR). The location must have at least 1Gb of free
+   space for database files.
+
+2. Start first MySQL server on Node1:
+
+   <INSTALL_DIR>/mysql-galera -g gcomm:// start
+
+3. Start remaining nodes:
+
+   <INSTALL_DIR>/mysql-galera -g gcomm://192.168.1.1 start
+
+NOTE1: First node of the cluster is started by supplying an empty gcomm address.
+       When you want to add a node to a cluster, you must supply an address
+       of any working cluster node.
+NOTE2: Beginning from the second node, each node you start will automatically
+       copy the contents of the database from one of the working nodes. Allow
+       some time for it to complete - it depends on the size of the database.
+       mysql-galera script will return when copying is done and node is ready
+       to use. See README for details.
+
+That's it. You've got a multi-master MySQL/Galera cluster. Node1, Node2 and 
+Node3 will now synchronize all writes with the rest of the cluster.
+Root password is 'rootpass' and there is also 'test' user with password 
+'testpass' and privileges on 'test.*'. You can now populate your database 
+with mysqldump by loading your database dump to (any) one of the nodes.
+
+
+LIMITATIONS:
+
+1. Currently replication works only with InnoDB storage engine. Any writes to 
+   tables of other types, including system (mysql.*) tables are not replicated. 
+   (GRANT command is an exception and is replicated)
+
+2. Rows in tables without primary keys may appear in different order on
+   different nodes. As a result SELECT...LIMIT... may return slightly different
+   sets.
+
+3. Unsupported in this release:
+   commands: LOAD DATA may result in a transaction that is too big and will be
+             rejected.
+   features: LOCKed sessions and locking functions.
+   Use at your own risk.
+
+
+QUICK ANSWERS:
+
+1. Arbitrator is gone an is no longer supported.
+
+2. Yes, it works anywhere TCP works, including Amazon EC2(TM).
+
+3. Yes, it'd be faster if there were a dedicated network for replication
+   connections and a separate network for MySQL client connections.
+
+4. Yes, it is highly configurable and flexible. For more info see README, 
+   mysql-galera --help and my.cnf that comes with the distribution.
+
+5. If your application cannot utilize more than one server, you can use TCP 
+   connection balancer like GLB (http://www.codership.com/products/downloads) 
+   or pen (http://siag.nu/pen/).
+   Note however, that SQL traffic balancing is very CPU consuming (due to high
+   number of small packets), so it is recommended to have a dedicated 
+   machine for load balancer.
+
+6. The patch for MySQL can be obtained at: bzr branch lp:codership-mysql
+
+
+Please direct all your suggestions, opinions and inquiries to info@codership.com
+

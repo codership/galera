@@ -1,0 +1,182 @@
+#!/bin/bash
+
+SELF=$(cd $(dirname $0); pwd -P)/$(basename $0)
+# Copyright (C) 2007, 2008 Codership Oy <info@codership.com>
+#
+# This file is free software; as a special exception the author gives
+# unlimited permission to copy and/or distribute it, with or without
+# modifications, as long as this notice is preserved.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
+# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+
+# This script starts Galera group communication daemon
+# to be run from /etc/init.d directory for automatic server startup.
+#
+# ENVIRONMENT VARIABLES:
+#
+# GALERA_BASE_DIR - specifies the Galera installation root
+# GCS_ADDRESS     - overrides default listening address 0.0.0.0:4567
+#                   (currently only TCP transport is supported)
+
+# Where Galera installation is located
+# (by default determined from this script location)
+GALERA_BASE_DIR=${GALERA_BASE_DIR:-"$(dirname $SELF)/galera"}
+LD_LIBRARY_PATH="$GALERA_BASE_DIR/lib"
+
+# Group Communication Address
+GCS_ADDRESS=${GCS_ADDRESS:-"0.0.0.0:4567"}
+# allow users to specify full gcs address (for cut'n'paste)
+GCS_ADDRESS_STRIPPED=$(echo $GCS_ADDRESS | sed s/vsbes:\\/\\///)
+
+VSBES=$GALERA_BASE_DIR/sbin/vsbes
+
+VSBES_PID=/tmp/vsbes.pid
+VSBES_ERR=/tmp/vsbes.err
+
+usage() { cat - << EOF
+
+usage: vsbes [options] command
+
+Options:
+    -g|--gcs_address  : vsbes listen address (0.0.0.0:4567)
+    -h|--help         : print help message
+
+Commands:
+start                 : start vsbes
+stop                  : stop vsbes
+restart               : stop and start vsbes
+status                : show if vsbes is running
+
+pid file:  $VSBES_PID
+error log: $VSBES_ERR
+
+EOF
+}
+
+# Checks if a process with a given PID is still running
+find_pid()
+{
+    ps axc | grep $(basename $VSBES) | grep -w ^\ *$1 > /dev/null
+}
+
+vsbes_start()
+{
+    local failed
+    
+    if ! test -x $VSBES
+    then
+	echo "$VSBES executable not found"
+	exit -1
+    fi
+    
+    if test -f $VSBES_PID
+    then
+        echo "Found existing '$VSBES_PID'. Please run '$0 stop'"
+        exit 1;
+    fi
+
+    export LD_LIBRARY_PATH
+    nohup $VSBES $GCS_ADDRESS_STRIPPED 1>/dev/null 2>$VSBES_ERR &
+    pid=$!
+    sleep 1
+    
+    if find_pid $pid
+    then
+        echo "Done (PID:$pid)"
+	echo $pid > $VSBES_PID
+	exit 0
+    else
+        echo "Failed (PID:$pid)"
+	exit 1
+    fi
+}
+
+vsbes_stop()
+{
+    # check pid file
+    if test -r $VSBES_PID
+    then
+        if find_pid $(cat $VSBES_PID)
+        then
+            echo -n "Killing PID $(cat $VSBES_PID)... "
+	    kill $(cat $VSBES_PID)
+	else
+	    echo -n "Removing stale PID file $VSBES_PID... "
+	fi
+        rm -rf $VSBES_PID
+	echo "Done"
+    else
+	echo "PID file not found: $VSBES_PID"
+    fi
+}
+
+vsbes_restart()
+{
+    vsbes_stop
+    vsbes_start
+}
+
+vsbes_status()
+{
+    # check pid file
+    if test -r $VSBES_PID
+    then
+        if find_pid $(cat $VSBES_PID)
+        then
+            echo "vsbes is running: `cat $VSBES_PID`"
+        else
+            echo "vsbes is stopped, but stale pid file: `cat $VSBES_PID`"
+        fi
+    else
+            echo "vsbes is stoppped"
+    fi
+}
+
+#if [ $# -eq 0 ]; then usage; exit 1; fi
+
+# start by default
+COMMAND=vsbes_start
+
+while [ $# -gt 0 ]; do
+case $1 in
+    -h|--help)
+            usage
+            exit 0
+            ;;
+    -g|--gcs_address)
+            GCS_ADDRESS_STRIPPED=$2
+            shift
+            ;;
+'start')
+            COMMAND=vsbes_start
+            ;;
+'stop')
+            COMMAND=vsbes_stop
+            ;;
+'restart')
+            COMMAND=vsbes_restart
+            ;;
+'status')
+            COMMAND=vsbes_status
+            ;;
+    *)
+        # must be command
+            usage
+            exit 1
+            ;;
+esac
+shift
+done
+
+if [ -z "$COMMAND" ]
+then
+    usage
+    exit 1
+fi
+
+$COMMAND
+
+#

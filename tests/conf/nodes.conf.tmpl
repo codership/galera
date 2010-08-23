@@ -1,0 +1,73 @@
+#
+# Nodes specific configuration
+#
+
+# Symbolic node ID - for output, for future use shoudl be unique
+declare -a NODE_ID
+
+# Location of the node. "local" - means this machine, anything else
+# is interpreted as SSH arguments
+declare -a NODE_LOCATION
+
+# Absolute path to where to unpack the distribution
+declare -a NODE_TEST_DIR
+
+# Address for incoming requests
+declare -a NODE_INCOMING_HOST
+declare -a NODE_INCOMING_PORT
+
+# Address for group communicaiton
+declare -a NODE_GCS_HOST
+declare -a NODE_GCS_PORT
+
+# Optional server configuration file to be copied to node
+declare -a NODE_MY_CNF
+declare -a NODE_PG_CNF
+
+# 1st node
+idx=0
+NODE_ID[$idx]="home"
+NODE_INCOMING_HOST[$idx]=127.0.0.1
+NODE_INCOMING_PORT[$idx]=$(( $DBMS_PORT - 1 ))
+NODE_GCS_HOST[$idx]=192.168.0.1
+NODE_GCS_PORT[$idx]=$GCS_PORT
+NODE_LOCATION[$idx]="local"
+NODE_TEST_DIR[$idx]=/tmp/galera
+NODE_MY_CNF[$idx]="$TEST_BASE/conf/my.cnf"
+
+# 2nd node
+idx=$(( $idx + 1 ))
+NODE_ID[$idx]="bernhard"
+NODE_INCOMING_HOST[$idx]=192.168.0.3
+NODE_INCOMING_PORT[$idx]=$DBMS_PORT
+NODE_GCS_HOST[$idx]=${NODE_INCOMING_HOST[$idx]}
+NODE_GCS_PORT[$idx]=$GCS_PORT
+NODE_LOCATION[$idx]="alex@${NODE_INCOMING_HOST[$idx]}"
+NODE_TEST_DIR[$idx]=/home/alex/codership/galera
+NODE_MY_CNF[$idx]="$TEST_BASE/conf/my.cnf"
+
+# 3rd node
+#idx=$(( $idx + 1 ))
+#NODE_ID[$idx]="bulldog"
+#NODE_INCOMING_HOST[$idx]=192.168.0.12
+#NODE_INCOMING_PORT[$idx]=$DBMS_PORT
+#NODE_GCS_HOST[$idx]=${NODE_INCOMING_HOST[$idx]}
+#NODE_GCS_PORT[$idx]=$GCS_PORT
+#NODE_LOCATION[$idx]="alex@${NODE_INCOMING_HOST[$idx]}"
+#NODE_TEST_DIR[$idx]=/home/alex/codership/galera
+#NODE_MY_CNF[$idx]="$TEST_BASE/conf/my.cnf"
+
+declare -xr NODE_MAX=$idx
+declare -xr NODE_LIST=$(seq 0 $NODE_MAX)
+
+declare -xr NODE_ID
+declare -xr NODE_LOCATION
+declare -xr NODE_TEST_DIR
+declare -xr NODE_INCOMING_HOST
+declare -xr NODE_INCOMING_PORT
+declare -xr NODE_GCS_HOST
+declare -xr NODE_GCS_PORT
+declare -xr NODE_MY_CNF
+declare -xr NODE_PG_CNF
+
+#

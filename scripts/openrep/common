@@ -1,0 +1,5 @@
+set -x
+
+MYSQL_BIN=${MYSQL_BIN:-"$MYSQL_ROOT/libexec/mysqld"}
+MYSQL_DATA_DIR=${MYSQL_DATA_DIR:-"$MYSQL_ROOT/var"}
+MYSQL_CNF=${MYSQL_CNF:-"$MYSQL_ROOT/etc/my.cnf"}

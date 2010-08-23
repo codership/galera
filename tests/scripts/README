@@ -1,0 +1,56 @@
+THIS DIRECTORY
+
+This directory contains a library of cluster manipulation scripts.
+
+The main idea is facilitation of parallel operations and minimizaiton
+of code duplicaiton.
+
+Executable file is command.sh. It sources the configuration and the rest of
+the scripts which implement different funcitons:
+
+jobs.sh - the main file which defines generic command execution framework.
+          It implements parallel and per-node command execution routines and
+	  enables unified logging behaviour. Other scripts just have to define
+	  the actual command functions following certain conventions, so far
+	  there is only one: node index is appended to the list of command line
+	  parameters, then everything is passed to the function.
+
+install.sh - implements a cluster-wide 'install' command which takes a name
+             of the distribution file as the first argument
+
+remove.sh  - implements a cluster-wide "remove" command.
+
+action.sh  - usual start/stop/restart/check commands, both cluster-wide and
+             per node.
+
+kill.sh    - a per-node kill -9 command
+
+Assumed convention: cluster-wide commands are just commnads, per-node commands
+have _node suffix. E.g.
+
+./command.sh start
+
+starts all nodes,
+
+./command.sh stop_node 1
+
+stops only node number 1. Numbering is 0-based.
+
+It is intended that each command should implement its own help.
+
+
+SPECIAL FILES AND DIRECTORIES:
+
+../conf directory contains configuration files.
+
+Each command creates at least 4 files named <command>_<node_id>.<ext> where
+<ext> is:
+
+out - standard output of the command
+err - standard error of the command
+pid - pid of the porcess executing command
+ret - return code of the command
+
+"out" files are placed into $BASE_OUT directory, other files are placed in
+$BASE_RUN. The reason to separate is unclear.
+

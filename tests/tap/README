@@ -1,0 +1,8 @@
+
+Required packages to run run_test_set.pl
+
+- TAP::Parser perl module
+  + 
+  + Ubuntu package: libtap-parser-perl 
+  + CentOS: ?
+  + Directly from CPAN: http://search.cpan.org/dist/TAP-Parser/

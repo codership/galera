@@ -1,0 +1,30 @@
+# This is Galera development package description for ESP package manager
+
+%include galera-common.inc
+
+d 755 root root $INCS_DEST -
+f 644 root root $INCS_DEST/gcs.h       $BUILD_BASE/gcs/src/gcs.h
+f 644 root root $INCS_DEST/wsdb_api.h  $BUILD_BASE/wsdb/src/wsdb_api.h
+f 644 root root $INCS_DEST/wsrep_api.h $BUILD_BASE/galera/src/wsrep_api.h
+
+d 755 root root $LIBS_DEST -
+f 755 root root $LIBS_DEST/libgalerautils.a      $BUILD_BASE/galerautils/src/.libs/libgalerautils.a
+f 755 root root $LIBS_DEST/libgalerautils++.a    $BUILD_BASE/galerautils/src/.libs/libgalerautils++.a
+%ifdef GCOMM
+#f 755 root root $LIBS_DEST/libgcomm.a            $BUILD_BASE//gcomm/src/.libs/libgcomm.a
+%endif
+%ifdef VSBES
+f 755 root root $LIBS_DEST/libgcommcommonpp.a    $BUILD_BASE/galeracomm/common/src/.libs/libgcommcommonpp.a
+f 755 root root $LIBS_DEST/libgcommtransportpp.a $BUILD_BASE/galeracomm/transport/src/.libs/libgcommtransportpp.a
+f 755 root root $LIBS_DEST/libgcommvspp.a        $BUILD_BASE/galeracomm/vs/src/.libs/libgcommvspp.a
+%endif
+f 755 root root $LIBS_DEST/libgcs.a              $BUILD_BASE/gcs/src/.libs/libgcs.a
+f 755 root root $LIBS_DEST/libwsdb.a             $BUILD_BASE/wsdb/src/.libs/libwsdb.a
+f 755 root root $LIBS_DEST/libmmgalera.a         $BUILD_BASE/galera/src/.libs/libmmgalera.a
+
+%format deb # Debian packages come with bad file ownership
+%postinstall <<EOF_DEB
+chown -R root.root $LIBS_DEST $INCS_DEST
+EOF_DEB
+
+#

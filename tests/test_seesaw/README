@@ -1,0 +1,19 @@
+The test runs sqlgen load against the cluster and in round robin order kills
+and restarts nodes. After each transition consistency check is done. This
+facilitates testing configration changes under highly concurrent load with lots
+of certification conflicts.
+
+Sometimes the first consistency check fails, perhaps due to some race
+condition. In that case a second consistency check is attempted and if that
+fails the script exits with error code.
+
+Usage with gcomm backend:
+
+./run.sh [N]
+
+Usage with vsbes backend:
+
+GCS_TYPE=vsbes VSBES_ADDRESS=192.168.0.1:5678 ./run.sh [N]
+
+where N is the number of off/on transitions. I.e. N=1 means that 1 node will
+be killed and restarted. If N is omitted it goes forever.

@@ -1,0 +1,262 @@
+#!/bin/bash -x
+
+# Copyright (C) 2009 Codership Oy <info@codership.com>
+
+PLUGIN_BASE_DIR=$(cd $(dirname $0); pwd -P)
+SELF=$PLUGIN_BASE_DIR/$(basename $0)
+
+WSREP_CLUSTER_NAME=${1:-"tor_galera_cluster"}
+WSREP_NODE_NAME=${2:-"$(hostname)"}
+PLUGIN_CONF=${3:-"$PLUGIN_BASE_DIR/plugin.cnf"}
+
+. $PLUGIN_CONF
+
+#=============== Fall back to reasonable defaults =======================
+
+# MySQL configuration file
+MYSQL_CNF=${MYSQL_CNF:-"$MYSQL_BASE_DIR/etc/my.cnf"}
+if test -s "$MYSQL_CNF"
+then
+    DEFAULTS_OPTION=" --defaults-file=$MYSQL_CNF "
+    my_cnf_datadir=$(grep ^datadir $MYSQL_CNF | sed s/[^/]*//)
+else
+    DEFAULTS_OPTION=" --no-defaults "
+fi
+
+# If it was not given explicitely, use the one from my.cnf
+MYSQL_DATA_DIR=${MYSQL_DATA_DIR:-"$my_cnf_datadir"}
+# If it was not found in my.cnf, use distribution default
+MYSQL_DATA_DIR=${MYSQL_DATA_DIR:-"$MYSQL_BASE_DIR/var"}
+
+# use mysqld server directly, better not have automatic restarting
+MYSQLD=${MYSQLD:-"$MYSQL_BASE_DIR/libexec/mysqld"}
+MYSQLADMIN=${MYSQLADMIN:-"$MYSQL_BASE_DIR/bin/mysqladmin"}
+# Port, socket and pid files
+MYSQL_PORT=${MYSQL_PORT:-3306}
+MYSQL_SOCKET=${MYSQL_SOCKET:-"$MYSQL_DATA_DIR/mysqld.sock"}
+MYSQL_PID=${MYSQL_PID:-"$MYSQL_DATA_DIR/mysqld.pid"}
+# Shutdown wait timeout.
+MYSQL_SHUTDOWN_WAIT=60
+
+#============= Nothing servicable below ================================
+
+# User to run as if started under superuser
+MYSQLD_USER=$(whoami)
+if test "$MYSQLD_USER" = "root"
+then
+    MYSQLD_USER=mysql
+fi
+
+#ROOT_USER=${ROOT_USER:-"-uroot"}
+#ROOT_PSWD=${ROOT_PSWD:-"-prootpass"}
+
+#mysql_log="$MYSQL_DATA_DIR/$(hostname).log"
+
+
+usage() { cat - << EOF
+
+usage: service <command>
+
+Commands:
+check                 : check cosistency either locally or through network
+start                 : start servers
+stop                  : stop servers
+restart               : stop and start servers
+status                : show running servers
+
+EOF
+}
+
+# Checks if a process with a given PID is still running
+find_pid()
+{
+    ps axc | grep mysqld | grep -w ^\ *$1 > /dev/null
+}
+
+galera_start()
+{
+    local failed
+    
+    if ! test -x $MYSQLD
+    then
+	echo "$MYSQLD executable not found"
+	exit -1
+    fi
+    
+    if test -f $MYSQL_PID
+    then
+        echo "Found existing '$MYSQL_PID'. Please run '$0 stop'"
+        exit -1;
+    fi
+
+    if test -f $WSREP_PROVIDER || test $WSREP_PROVIDER == "none"
+    then
+	WSREP_OPTS="$WSREP_OPTS --wsrep_provider=$WSREP_PROVIDER"
+    else
+	echo "WSREP provider '$WSREP_PROVIDER' not found"
+	exit -1
+    fi
+
+    WSREP_OPTS="$WSREP_OPTS \
+		--wsrep_cluster_name=$WSREP_CLUSTER_NAME \
+                --wsrep_cluster_address=$WSREP_CLUSTER_ADDRESS \
+		--wsrep_sst_method=$WSREP_SST_METHOD \
+		--wsrep_local_cache_size=$WSREP_LOCAL_CACHE_SIZE \
+		--wsrep_start_position=$WSREP_START_POSITION \
+		--wsrep_debug=$WSREP_DEBUG \
+		--wsrep_auto_increment_control=$WSREP_AUTO_INCREMENT_CONTROL \
+		--wsrep_retry_autocommit=$WSREP_RETRY_AUTOCOMMIT \
+		--wsrep_convert_LOCK_to_trx=$WSREP_CONVERT_LOCK_TO_TRX \
+		--wsrep_drupal_282555_workaround=$WSREP_DRUPAL_282555_WORKAROUND \
+		--wsrep_ws_persistency=$WSREP_WS_PERSISTENCY \
+                --wsrep_slave_threads=$WSREP_SLAVE_THREADS "
+
+    MYSQLD_OPTS=" --user=$MYSQLD_USER \
+	          --basedir=$MYSQL_BASE_DIR \
+	          --datadir=$MYSQL_DATA_DIR \
+	          --pid-file=$MYSQL_PID \
+	          --port=$MYSQL_PORT \
+	          --socket=$MYSQL_SOCKET \
+	          --skip-locking \
+                  --binlog_format=ROW \
+		  --default-storage-engine=InnoDB "
+
+    INNODB_OPTS=" --innodb_autoinc_lock_mode=2 \
+                  --innodb_flush_log_at_trx_commit=0 \
+		  --innodb_doublewrite=0"
+
+    err_log="$MYSQL_DATA_DIR/$(hostname).err"
+    
+    echo -n "Starting mysqld instance with data dir $MYSQL_DATA_DIR and listening at port $MYSQL_PORT and socket $MYSQL_SOCKET..."
+
+    LD_LIBRARY_PATH=$(cd $(dirname $WSREP_PROVIDER) && pwd -P)
+    export LD_LIBRARY_PATH
+    export PATH=$MYSQL_BASE_DIR/bin:$PATH
+
+    nohup $MYSQLD $DEFAULTS_OPTION $MYSQLD_OPTS $INNODB_OPTS $WSREP_OPTS \
+          1>/dev/null 2>>$err_log &
+
+    my_pid=$!
+	
+#    echo "Waiting for pid file" 
+    while ! test -r $MYSQL_PID
+    do
+        sleep 1
+        if find_pid $my_pid
+        then
+            # process is alive, wait for pid file
+	    echo -n "."
+	else
+            failed="yes"
+	    break
+	fi		
+    done
+
+    if test "$failed" != "yes"
+    then
+        echo " Done (PID:$(cat $MYSQL_PID))"
+    else
+        echo " Failed (PID:$my_pid)"
+    fi
+}
+
+galera_stop()
+{
+    # check pid file
+    if test -r $MYSQL_PID
+    then
+        # check if corresponding mysqld is running
+#        if ps axc | grep mysqld | grep $(cat $MYSQL_PID) >/dev/null 2>&1
+	local my_pid=$(cat $MYSQL_PID)
+        if find_pid $my_pid
+        then
+            echo -n "Killing PID $my_pid"
+	    kill $my_pid
+            # wait for pid file to disappear
+	    for second in $(seq 1 $MYSQL_SHUTDOWN_WAIT)
+	    do
+	        echo -n "."
+	        sleep 1
+	        if test ! -r $MYSQL_PID
+	        then
+	            break
+		fi
+	    done
+	    echo ""
+	    if test "$second" = "$MYSQL_SHUTDOWN_WAIT"
+	    then
+	        echo -n "Failed to stop mysqld safely. Killing with -9... "
+	        kill -9 $my_pid
+	    fi
+	else
+	    echo -n "Removing stale PID file $MYSQL_PID... "
+	fi
+	
+	rm -rf $MYSQL_PID
+	echo "Done"
+    else
+	echo "PID file not found: $MYSQL_PID"
+    fi
+}
+
+galera_restart()
+{
+    galera_stop
+    galera_start
+}
+
+dump()
+{
+#local ROUTINES="--routines" # don't dump routines yet, will cause false err.
+local DUMP_OPTIONS=" --skip-opt --compact --flush-logs --lock-all-tables \
+           --quick --create-options --set-charset --skip-comments $ROUTINES "
+DB=${DB:-"--all-databases"}
+#set -x
+mysqldump $DUMP_OPTIONS $ROOT_USER $ROOT_PSWD -h127.0.0.1 -P$MYSQL_PORT  \
+          $IGNORE_TABLES $DB
+#set +x
+}
+
+checksum()
+{
+CS=`dump | md5sum`
+
+echo $CS
+}
+
+# write set level, SQL, RBR or ROW
+WS_LEVEL="RBR"
+
+#DB="test" # use 'test' database if none given
+IGNORE_TABLES=""
+
+case $(basename $0) in
+'dump')
+            COMMAND="dump"
+            ;;
+'check')
+            COMMAND="checksum"
+            ;;
+'online')
+            COMMAND=galera_start
+            ;;
+'stop'|'halt'|'kill'|'offline')
+            COMMAND=galera_stop
+            ;;
+'restart')
+            COMMAND=galera_restart
+            ;;
+'status')
+            COMMAND=status
+            ;;
+    *)
+            echo $0
+        # must be command
+            usage
+            exit 1
+            ;;
+esac
+
+$COMMAND
+
+#
