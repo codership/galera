@@ -21,7 +21,9 @@ START_TEST(service_thd1)
 }
 END_TEST
 
-#define TEST_USLEEP 10000 // 10ms
+#define TEST_USLEEP 1000 // 1ms
+#define WAIT_FOR(cond)                                                  \
+    { int count = 1000; while (--count && !(cond)) { usleep (TEST_USLEEP); }}
 
 START_TEST(service_thd2)
 {
@@ -33,18 +35,18 @@ START_TEST(service_thd2)
 
     gcs_seqno_t seqno = 1;
     thd->report_last_committed (seqno);
-    usleep (TEST_USLEEP);
+    WAIT_FOR(conn.last_applied() == seqno);
     fail_if (conn.last_applied() != seqno,
              "seqno = %"PRId64", expected %"PRId64, conn.last_applied(), seqno);
 
     seqno = 5;
     thd->report_last_committed (seqno);
-    usleep (TEST_USLEEP);
+    WAIT_FOR(conn.last_applied() == seqno);
     fail_if (conn.last_applied() != seqno,
              "seqno = %"PRId64", expected %"PRId64, conn.last_applied(), seqno);
 
     thd->report_last_committed (3);
-    usleep (TEST_USLEEP);
+    WAIT_FOR(conn.last_applied() == seqno);
     fail_if (conn.last_applied() != seqno,
              "seqno = %"PRId64", expected %"PRId64, conn.last_applied(), seqno);
 
@@ -52,7 +54,7 @@ START_TEST(service_thd2)
 
     seqno = 3;
     thd->report_last_committed (seqno);
-    usleep (TEST_USLEEP);
+    WAIT_FOR(conn.last_applied() == seqno);
     fail_if (conn.last_applied() != seqno,
              "seqno = %"PRId64", expected %"PRId64, conn.last_applied(), seqno);
 
