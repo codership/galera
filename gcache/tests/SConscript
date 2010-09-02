@@ -1,0 +1,19 @@
+
+Import('check_env')
+
+env = check_env.Clone()
+
+env.Append(LIBS=File('#/gcache/src/libgcache.a'))
+env.Append(LIBS=File('#/galerautils/src/libgalerautils++.a'))
+env.Append(LIBS=File('#/galerautils/src/libgalerautils.a'))
+
+gcache_tests = env.Program(target = 'gcache_tests', source = Glob('*.cpp'))
+
+#                           source = Split('''
+#                                 gcache_tests.cpp
+#                           '''))
+
+stamp="gcache_tests.passed"
+env.Test(stamp, gcache_tests)
+env.Alias("test", stamp)
+

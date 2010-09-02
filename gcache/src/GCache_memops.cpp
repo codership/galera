@@ -2,157 +2,63 @@
  * Copyright (C) 2009 Codership Oy <info@codership.com>
  */
 
-#include <cassert>
-
-#include <galerautils.hpp>
-#include "SeqnoNone.hpp"
-#include "BufferHeader.hpp"
 #include "GCache.hpp"
+
+#include <cassert>
 
 namespace gcache
 {
-    // Discarding always should happen in TO
     inline void
-    GCache::discard_buffer (BufferHeader* bh) {
-        seqno2ptr.erase (bh->seqno);
-        seqno_min = (seqno_min < bh->seqno) ? bh->seqno : seqno_min;
-        bh->seqno = SEQNO_NONE;
-        size_free += bh->size;
-    }
-
-    // returns pointer to buffer data area or 0 if no space found
-    void*
-    GCache::get_new_buffer (size_t const size)
+    GCache::discard_seqno (int64_t seqno)
     {
-        // reserve space for the closing header (this->next)
-        ssize_t const size_next = size + sizeof(BufferHeader);
+        for (seqno2ptr_t::iterator i = seqno2ptr.begin();
+             i != seqno2ptr.end() && i->first <= seqno;)
+        {
+            seqno2ptr_t::iterator j = i; ++i;
+            BufferHeader* bh = ptr2BH (j->second);
+            seqno2ptr.erase (j);
+            bh->seqno = SEQNO_NONE;
 
-        // don't even try if there's not enough unused space
-        if (size_next > (size_cache - size_used)) return 0;
-
-        uint8_t* ret = next;
-
-        if (ret >= first) {
-            // try to find space at the end
-            if ((end - ret) >= size_next) {
-                goto found_space;
-            }
-            else {
-                // no space at the end, go from the start
-                ret = start;
-            }
-        }
-
-        while ((first - ret) < size_next) {
-            // try to discard first buffer to get more space
-            BufferHeader* bh = reinterpret_cast<BufferHeader*>(first);
-
-            // this will be automatically true also when (first == next)
-            if (!BH_is_released(bh) ||
-                ((seqno_locked != SEQNO_NONE) && (bh->seqno >= seqno_locked)))
-                return 0; // can't free any more space, so no buffer
-
-            if (bh->seqno != SEQNO_NONE) {
-                // we need to discard this buffer, and therefore all buffers
-                // with preceding seqnos
-                int64_t seqno;
-                for (seqno = seqno_min + 1; seqno < bh->seqno; seqno++) {
-                    BufferHeader* _bh = ptr2BH(seqno2ptr[seqno]);
-                    if (!BH_is_released(_bh)) return 0;
-                    discard_buffer (_bh);
-                }
-
-                discard_buffer (bh);
-            }
-
-            first += bh->size;
-
-            if (0     == (reinterpret_cast<BufferHeader*>(first))->size &&
-                first != next)
+            switch (bh->store)
             {
-                // empty header and not next: check if we fit at the end
-                // and roll over if not
-                first = start;
-                if ((end - ret) >= size_next) {
-                    goto found_space;
-                }
-                else {
-                    ret = start;
-                }
+            case BUFFER_IN_RAM:
+                /* add what to do when buffer is in RAM */
+                break;
+            case BUFFER_IN_RB:
+                if (gu_likely(BH_is_released(bh))) rb.discard_buffer (bh);
+                break;
+            case BUFFER_IN_PAGE:
+                break;
             }
         }
-
-#ifndef NDEBUG
-        if ((first - ret) < size_next) {
-            log_fatal << "Assertion ((first - ret) >= size_next) failed: "
-                      << std::endl
-                      << "first offt = " << (first - start) << std::endl
-                      << "next  offt = " << (next  - start) << std::endl
-                      << "end   offt = " << (end   - start) << std::endl
-                      << "ret   offt = " << (ret   - start) << std::endl
-                      << "size_next  = " << size_next       << std::endl;
-            abort();
-        }
-#endif
-
-    found_space:
-        size_used += size;
-        assert (size_used <= size_cache);
-        size_free -= size;
-        assert (size_free >= 0);
-
-        next = ret + size;
-        assert (next + sizeof(BufferHeader) < end);
-
-        BH_clear (reinterpret_cast<BufferHeader*>(next));
-
-        BufferHeader* bh = reinterpret_cast<BufferHeader*>(ret);
-        bh->size  = size;
-        bh->seqno = SEQNO_NONE;
-        bh->flags = 0;
-
-        return (bh + 1); // pointer to data area
     }
 
     void* 
-    GCache::malloc (size_t size)
+    GCache::malloc (ssize_t size) throw (gu::Exception)
     {
-        size = size + sizeof(BufferHeader);
+        gu::Lock lock(mtx);
+        void*    ptr;
 
-        // We can reliably allocate continuous buffer which is twice as small
-        // as total cache area. So compare to half the space
-        if (static_cast<ssize_t>(size) < (size_cache / 2))
-        {
-            gu::Lock lock(mtx);
-            void*    ptr;
+        mallocs++;
 
-            mallocs++;
-            // (size_cache - size_used) is how much memory we can potentially
-            // reserve right now. If it is too low, don't even try, wait.
-            while (0 == (ptr = get_new_buffer (size)))
-            {
-                log_warn << "Waiting to allocate " << size
-                         << " bytes in the cache";
-                lock.wait(cond); // wait until more memory is freed
-            }
+        ptr = rb.malloc(size);
 
-            assert (0 != ptr);
+        if (0 == ptr) ptr = ps.malloc(size);
 
-            cond.signal(); // there might be other mallocs waiting.
 #ifndef NDEBUG
-            buf_tracker.insert (ptr);
+        if (0 != ptr) buf_tracker.insert (ptr);
 #endif
-            return (ptr);
-        }
-
-        return 0; // "out of memory"
+        return ptr;
     }
 
     void
-    GCache::free (void* ptr)
+    GCache::free (void* ptr) throw ()
     {
-        if (gu_likely(NULL != ptr))
+        if (gu_likely(0 != ptr))
         {
+            BufferHeader* bh = ptr2BH(ptr);
+            gu::Lock      lock(mtx);
+
 #ifndef NDEBUG
             std::set<const void*>::iterator it = buf_tracker.find(ptr);
             if (it == buf_tracker.end())
@@ -163,75 +69,72 @@ namespace gcache
             buf_tracker.erase(it);
 #endif
 
-            BufferHeader* bh = ptr2BH(ptr);
-            gu::Lock      lock(mtx);
-
-            size_used -= bh->size;
-            assert(size_used >= 0);
-            // space is unused but not free
-            // space counted as free only when it is erased from the map
-            BH_release (bh);
-            cond.signal();
+            switch (bh->store)
+            {
+            case BUFFER_IN_RAM:  /* add RAM store */ break;
+            case BUFFER_IN_RB:   rb.free (ptr); break;
+            case BUFFER_IN_PAGE:
+                if (gu_likely(SEQNO_NONE != bh->seqno))
+                {
+                    discard_seqno (bh->seqno);
+                }
+                ps.free (ptr); break;
+            }
         }
     }
 
     void*
-    GCache::realloc (void* ptr, size_t size)
+    GCache::realloc (void* ptr, ssize_t size) throw (gu::Exception)
     {
-        size = size + sizeof(BufferHeader);
+        void*         new_ptr = 0;
+        BufferHeader* bh      = ptr2BH(ptr);
 
-        // We can reliably allocate continuous buffer which is twice as small
-        // as total cache area. So compare to half the space
-        if (static_cast<ssize_t>(size) >= (size_cache / 2)) return 0;
-
-        BufferHeader* bh = ptr2BH(ptr);
-
-        // first check if we can grow this buffer by allocating
-        // adjacent buffer
+        if (bh->seqno != SEQNO_NONE) // sanity check
         {
-            uint8_t* adj_ptr  = reinterpret_cast<uint8_t*>(bh) + bh->size;
-            size_t   adj_size = size - bh->size;
-            void*    adj_buff = 0;
+            log_fatal << "Internal program error: changing size of an ordered "
+                      << "buffer, seqno: " << bh->seqno << ". Aborting.";
+            abort();
+        }
 
-            gu::Lock lock(mtx);
+        gu::Lock      lock(mtx);
 
-            reallocs++;
-            // do the same stuff as in malloc(), conditional that we have
-            // adjacent space
-            while ((adj_ptr == next) &&
-                   (0 == (adj_buff = get_new_buffer (adj_size)))) {
-                lock.wait(cond); // wait until more memory is freed
+        reallocs++;
+
+        switch (bh->store)
+        {
+        case BUFFER_IN_RAM:  /* add RAM store */ break;
+
+        case BUFFER_IN_RB:
+            new_ptr = rb.realloc (ptr, size);
+
+            if (0 == new_ptr)
+            {
+                new_ptr = ps.malloc (size);
+
+                if (0 != new_ptr)
+                {
+                    memcpy (new_ptr, ptr, bh->size - sizeof(BufferHeader));
+                    rb.free (ptr);
+                }
             }
+            break;
 
-            if (0 != adj_buff) {
+        case BUFFER_IN_PAGE:
+            new_ptr = ps.realloc (ptr, size); break;
+        }
+
 #ifndef NDEBUG
-                bool fail = false;
-                if (adj_ptr != adj_buff) {
-                    log_fatal << "Assertion (adj_ptr == adj_buff) failed: "
-                              << adj_ptr << " != " << adj_buff;
-                    fail = true;
-                }
-                if (adj_ptr + adj_size != next) {
-                    log_fatal << "Assertion (adj_ptr + adj_size == next) "
-                              << "failed: " << (adj_ptr + adj_size) << " != "
-                              << next;
-                    fail = true;
-                }
-                if (fail) abort();
+        if (ptr != new_ptr && 0 != new_ptr)
+        {
+            std::set<const void*>::iterator it = buf_tracker.find(ptr);
+
+            if (it != buf_tracker.end()) buf_tracker.erase(it);
+            
+            it = buf_tracker.find(new_ptr);
+
+        }
 #endif
-                cond.signal();
-                // allocated adjacent space, buffer pointer not changed
-                return ptr;
-            }
-        }
 
-        // find non-adjacent buffer
-        void* ptr_new = this->malloc (size);
-        if (ptr_new != 0) {
-            memcpy (ptr_new, ptr, bh->size - sizeof(BufferHeader));
-            this->free (ptr);
-        }
-
-        return ptr_new;
+        return new_ptr;
     } 
 }

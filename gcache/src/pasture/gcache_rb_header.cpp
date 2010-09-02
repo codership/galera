@@ -1,16 +1,14 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2010 Codership Oy <info@codership.com>
  */
+
+#include "gcache_rb_header.hpp"
+
+#include <galerautils.hpp>
 
 #include <cstdio>
 #include <cerrno>
 #include <cstring>
-
-#include <galerautils.hpp>
-
-#include "SeqnoNone.hpp"
-#include "BufferHeader.hpp"
-#include "GCache.hpp"
 
 namespace gcache
 {
@@ -27,7 +25,7 @@ namespace gcache
     };
 
     void
-    GCache::header_read ()
+    RingBuffer::header_read ()
     {
         std::ostringstream error;
         error << "Can't load gcache data file: ";
@@ -142,7 +140,7 @@ namespace gcache
     }
 
     void
-    GCache::header_write ()
+    RingBuffer::header_write ()
     {
         header[HEADER_LEN]     = header_len;
         header[HEADER_VERSION] = version;
@@ -156,7 +154,7 @@ namespace gcache
     }
 
     void
-    GCache::preamble_write ()
+    RingBuffer::preamble_write ()
     {
         std::ostringstream pstream;
 

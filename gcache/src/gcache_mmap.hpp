@@ -6,7 +6,7 @@
 #ifndef __GCACHE_MMAP__
 #define __GCACHE_MMAP__
 
-#include "FileDescriptor.hpp"
+#include "gcache_fd.hpp"
 
 namespace gcache
 {
@@ -15,8 +15,8 @@ namespace gcache
 
     public:
 
-        void*  const ptr;
         size_t const size;
+        void*  const ptr;
 
         MMap (const FileDescriptor& fd);
 

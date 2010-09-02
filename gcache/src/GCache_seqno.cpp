@@ -7,24 +7,11 @@
 
 #include <galerautils.hpp>
 #include "SeqnoNone.hpp"
-#include "BufferHeader.hpp"
+#include "gcache_bh.hpp"
 #include "GCache.hpp"
 
 namespace gcache
 {
-    inline void
-    GCache::order_buffer (const void* ptr, int64_t seqno)
-    {
-        BufferHeader* bh = ptr2BH(ptr);
-
-        assert (bh->seqno == SEQNO_NONE);
-        assert (!BH_is_released(bh));
-
-        bh->seqno = seqno;
-        seqno2ptr[seqno] = ptr;
-        seqno_max = seqno;
-    }
-
     /*!
      * Reinitialize seqno sequence (after SST or such)
      * Clears cache and sets seqno_min to seqno.
@@ -34,7 +21,7 @@ namespace gcache
     {
         gu::Lock lock(mtx);
 
-        reset_cache();
+        reset ();
         seqno_min = seqno;
     }
 
@@ -56,14 +43,13 @@ namespace gcache
 
         if (gu_likely(seqno > seqno_max))
         {
-            last_insert = seqno2ptr.insert (last_insert,
-                                            seqno2ptr_pair(seqno, ptr));
-            seqno_max = seqno > seqno_max ? seqno : seqno_max;
+            seqno2ptr.insert (seqno2ptr.end(), seqno2ptr_pair_t(seqno, ptr));
+            seqno_max = seqno;
         }
-        else
+        else // this actually should never happen. seqnos should be assinged in TO.
         {
-            const std::pair<seqno2ptr_it, bool>& res(
-                seqno2ptr.insert (seqno2ptr_pair(seqno, ptr)));
+            const std::pair<seqno2ptr_iter_t, bool>& res(
+                seqno2ptr.insert (seqno2ptr_pair_t(seqno, ptr)));
 
             if (false == res.second)
             {
@@ -115,14 +101,7 @@ namespace gcache
         while (seqno_locked != SEQNO_NONE) lock.wait(cond);
 
         if (!seqno2ptr.empty()) {
-#ifndef NDEBUG
-            seqno2ptr_it b = seqno2ptr.begin();
-            if (b->first != seqno_min) {
-                gu_throw_fatal << "Expected smallest seqno: " << seqno_min
-                               << ", but found: " << b->first;
-            }
-#endif
-            seqno_locked = seqno_min;
+            seqno_locked = seqno2ptr.begin()->first;
             return seqno_locked;
         }
 
@@ -138,7 +117,7 @@ namespace gcache
         gu::Lock lock(mtx);
 
         if (seqno >= seqno_locked) {
-            seqno2ptr_it p = seqno2ptr.find(seqno);
+            seqno2ptr_iter_t p = seqno2ptr.find(seqno);
             if (p != seqno2ptr.end()) {
                 if (seqno_locked != seqno) {
                     seqno_locked = seqno;

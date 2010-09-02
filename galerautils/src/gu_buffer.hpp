@@ -18,8 +18,6 @@ namespace gu
     typedef unsigned char byte_t;
     typedef std::vector<byte_t> Buffer;
     typedef boost::shared_ptr<Buffer> SharedBuffer;
-    
-
 }
 
 #endif // GU_BUFFER_HPP

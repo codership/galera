@@ -7,22 +7,32 @@
 #define __GCACHE_BUFHEAD__
 
 #include <cstring>
-//#include <tr1/cstdint>
 #include <stdint.h>
 
 #include "SeqnoNone.hpp"
 
 namespace gcache
 {
-    static uint64_t const BUFFER_RELEASED = 1 << 0;
-    static uint64_t const BUFFER_CANCELED = 1 << 1;
+    static uint64_t const BUFFER_RELEASED = 1LL << 0;
+    static uint64_t const BUFFER_CANCELED = 1LL << 1;
 
+    enum StorageType
+    {
+        BUFFER_IN_RAM,
+        BUFFER_IN_RB,
+        BUFFER_IN_PAGE
+    };
+    
     struct BufferHeader
     {
         ssize_t  size; /*! total buffer size, including header */
         int64_t  seqno;
-        uint64_t flags;
+        void*    ctx;
+        uint32_t flags;
+        int32_t  store;
     }__attribute__((__packed__));
+
+#define BH_cast(bh) reinterpret_cast<BufferHeader*>(bh)
 
     static inline BufferHeader*
     ptr2BH (const void* ptr)
@@ -33,9 +43,7 @@ namespace gcache
     static inline void
     BH_clear (BufferHeader* bh)
     {
-        bh->size  = 0;
-        bh->seqno = SEQNO_NONE;
-        bh->flags = 0;
+        memset (bh, 0, sizeof(BufferHeader));
     }
 
     static inline void

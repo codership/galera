@@ -5,6 +5,11 @@
 #ifndef __GCACHE_H__
 #define __GCACHE_H__
 
+#include "gcache_rb_store.hpp"
+#include "gcache_page_store.hpp"
+
+#include <galerautils.hpp>
+
 #include <string>
 #include <iostream>
 #include <map>
@@ -13,15 +18,10 @@
 #endif
 #include <stdint.h>
 
-#include <galerautils.hpp>
-
-#include "FileDescriptor.hpp"
-#include "MMap.hpp"
-
 namespace gcache
 {
 
-    class GCache
+    class GCache : public MemOps
     {
 
     public:
@@ -38,9 +38,9 @@ namespace gcache
         void print (std::ostream& os);
 
         /* Memory allocation functions */
-        void* malloc  (size_t size);
-        void  free    (void* ptr);
-        void* realloc (void* ptr, size_t size);
+        void* malloc  (ssize_t size) throw (gu::Exception);
+        void  free    (void* ptr) throw ();
+        void* realloc (void* ptr, ssize_t size) throw (gu::Exception);
 
         /* Seqno related functions */
 
@@ -86,32 +86,26 @@ namespace gcache
         {
         public:
             Params(gu::Config&, const std::string&) throw (gu::Exception);
-            const std::string name;
+            std::string const rb_name;
+            std::string const dir_name;
             ssize_t           ram_size;
-            const ssize_t     disk_size;
+            ssize_t     const disk_size;
+            ssize_t     const page_size;
+            // theoretically dir_name and page size can be changed for new pages
         }
-                        params;
+            params;
 
         gu::Mutex       mtx;
         gu::Cond        cond;
 
-        FileDescriptor  fd;       // cache file descriptor
+        typedef std::map<int64_t, const void*> seqno2ptr_t;
+        seqno2ptr_t     seqno2ptr;
 
-        MMap            mmap;
+        typedef seqno2ptr_t::iterator           seqno2ptr_iter_t;
+        typedef std::pair<int64_t, const void*> seqno2ptr_pair_t;
 
-        bool            open;
-
-        char*     const preamble; // ASCII text preamble
-        int64_t*  const header;   // cache binary header
-        size_t    const header_len;
-        uint8_t*  const start;    // start of cache area
-        uint8_t*  const end;      // first byte after cache area
-        uint8_t*        first;    // pointer to the first (oldest) buffer
-        uint8_t*        next;     // pointer to the next free space
-
-        ssize_t   const size_cache;
-        ssize_t         size_free;
-        ssize_t         size_used;
+        RingBuffer      rb;
+        PageStore       ps;
 
         long long       mallocs;
         long long       reallocs;
@@ -120,34 +114,26 @@ namespace gcache
         int64_t         seqno_min;
         int64_t         seqno_max;
 
-        char     const  version;
-
-        typedef std::map<int64_t, const void*> seqno2ptr_t;
-        seqno2ptr_t     seqno2ptr;
-
-        typedef seqno2ptr_t::iterator    seqno2ptr_it;
-        seqno2ptr_it    last_insert;
-
-        typedef std::pair<int64_t, const void*> seqno2ptr_pair;
-
 #ifndef NDEBUG
         std::set<const void*> buf_tracker;
 #endif
 
-        void header_read();
-        void header_write();
-        void preamble_write();
+//        void header_read();
+//        void header_write();
+//        void preamble_write();
 
-        void reset_cache();
+        void reset();
         void constructor_common();
+        void discard_seqno (int64_t);
 
-        void* get_new_buffer (size_t size);
+//        void* get_new_buffer (size_t size);
 
-        inline void order_buffer (const void* ptr, int64_t seqno);
-        inline void discard_buffer (struct BufferHeader* bh);
+//        inline void order_buffer   (const void* ptr, int64_t seqno);
+//        inline void discard_buffer (struct BufferHeader* bh);
+
         // disable copying
         GCache (const GCache&);
-        GCache& operator = (const GCache);
+        GCache& operator = (const GCache&);
     };
 }
 

@@ -2,13 +2,15 @@
 gcache_env = DefaultEnvironment().Clone()
 
 gcache_sources = Split ('''
-        FileDescriptor.cpp
-        GCache_header.cpp
+        gcache_fd.cpp
+        gcache_mmap.cpp
         GCache_seqno.cpp
         gcache_params.cpp
-        GCache.cpp
+        gcache_page.cpp
+        gcache_page_store.cpp
+        gcache_rb_store.cpp
         GCache_memops.cpp
-        MMap.cpp
+        GCache.cpp
 ''')
 
 gcache_env.SharedLibrary('gcache', gcache_sources)
