@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2010 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -11,6 +11,10 @@
 #include "../src/gu_log.h"
 #include "../src/gu_lock_step.h"
 #include "gu_lock_step_test.h"
+
+#define TEST_USLEEP 1000 // 1ms
+#define WAIT_FOR(cond)                                                  \
+    { int count = 1000; while (--count && !(cond)) { usleep (TEST_USLEEP); }}
 
 gu_lock_step_t LS;
 
@@ -35,7 +39,7 @@ START_TEST (gu_lock_step_test)
     // first try with lock-stepping disabled
     ret = gu_thread_create (&thr1, NULL, lock_step_thread, NULL);
     fail_if (ret != 0);
-    usleep (10000); // 10ms
+    WAIT_FOR(0 == LS.wait); // 10ms
     fail_if (LS.wait != 0); // by default lock-step is disabled
 
     ret = gu_thread_join (thr1, NULL);
@@ -53,12 +57,12 @@ START_TEST (gu_lock_step_test)
 
     ret = gu_thread_create (&thr1, NULL, lock_step_thread, NULL);
     fail_if (ret != 0);
-    usleep (10000); // 10ms
+    WAIT_FOR(1 == LS.wait); // 10ms
     fail_if (LS.wait != 1);
 
     ret = gu_thread_create (&thr2, NULL, lock_step_thread, NULL);
     fail_if (ret != 0);
-    usleep (10000); // 10ms
+    WAIT_FOR(2 == LS.wait); // 10ms
     fail_if (LS.wait != 2);
 
     ret = gu_lock_step_cont (&LS, timeout);

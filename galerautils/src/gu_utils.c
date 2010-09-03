@@ -68,14 +68,19 @@ gu_str2bool (const char* str, bool* b)
     switch (len)
     {
     case 1:
-        if ('1' == str[0]) res = 1;
-        if ('0' == str[0]) res = 0;
+        switch (str[0])
+        {
+        case '0': case 'N': case 'n': res = 0; break;
+        case '1': case 'Y': case 'y': res = 1; break;
+        }
         break;
     case 2:
         if (!strcasecmp(str, "on")) res = 1;
+        if (!strcasecmp(str, "no")) res = 0;
         break;
     case 3:
         if (!strcasecmp(str, "off")) res = 0;
+        if (!strcasecmp(str, "yes")) res = 1;
         break;
     case 4:
         if (!strcasecmp(str, "true")) res = 1;
