@@ -180,7 +180,7 @@ namespace gu
     template <> inline void
     Config::set (const std::string& key, bool val) throw ()
     {
-        const char* val_str(val ? "ON" : "OFF"); // ON/OFF is most common here
+        const char* val_str(val ? "YES" : "NO"); // YES/NO is most generic
         set (key, val_str);
     }
 }

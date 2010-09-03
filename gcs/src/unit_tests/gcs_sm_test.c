@@ -7,11 +7,11 @@
 #include "gcs_sm_test.h"
 #include "../gcs_sm.h"
 
-#define TEST_USLEEP 10000 // 10 ms
+#define TEST_USLEEP 10000
 
 /* we can't use pthread functions for waiting for certain conditions */
 #define WAIT_FOR(cond)                                                  \
-    { int count = 100; while (--count && !(cond)) { usleep (1000); }}
+    { int count = 1000; while (--count && !(cond)) { usleep (1000); }}
 
 START_TEST (gcs_sm_test_basic)
 {
@@ -83,7 +83,7 @@ START_TEST (gcs_sm_test_simple)
     gu_thread_create (&t2, NULL, simple_thread, sm);
     gu_thread_create (&t3, NULL, simple_thread, sm);
 
-    usleep (TEST_USLEEP);
+    WAIT_FOR ((long)sm->wait_q_len == sm->users);
     fail_if((long)sm->wait_q_len != sm->users, "wait_q_len = %lu, users = %ld",
             sm->wait_q_len, sm->users);
 
