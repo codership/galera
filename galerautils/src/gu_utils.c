@@ -12,6 +12,7 @@
 #include <string.h>
 #include <strings.h>
 #include <limits.h>
+#include <stdint.h>
 
 const char*
 gu_str2ll (const char* str, long long* ll)
@@ -99,7 +100,7 @@ const char*
 gu_str2ptr (const char* str, void** ptr)
 {
     char* ret;
-    *ptr = (void*) strtoll (str, &ret, 16);
+    *ptr = (void*) (intptr_t)strtoll (str, &ret, 16);
     return ret;
 }
 
