@@ -59,7 +59,7 @@ namespace gcache
         free_page_ptr (Page* page, void* ptr)
         {
             page->free(ptr);
-            if (0 == page->count()) cleanup();
+            if (0 == page->used()) cleanup();
         }
 
         PageStore(const gcache::PageStore&);

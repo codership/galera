@@ -716,11 +716,13 @@ group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
 void
 gcs_group_ignore_action (gcs_group_t* group, struct gcs_act_rcvd* act)
 {
-    if (act->act.type == GCS_ACT_TORDERED && group->cache) {
-        gcache_free (group->cache, (void*)act->act.buf);
-    }
-    else if (act->act.type <= GCS_ACT_STATE_REQ) {
-        free ((void*)act->act.buf);
+    if (act->act.type <= GCS_ACT_STATE_REQ) {
+        if (NULL != group->cache) {
+            gcache_free (group->cache, (void*)act->act.buf);
+        }
+        else {
+            free ((void*)act->act.buf);
+        }
     }
 
     act->act.buf     = NULL;

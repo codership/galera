@@ -56,7 +56,7 @@ remove_file (void* __restrict__ arg)
         log_error << "Null file name in " << __FUNCTION__;
     }
 
-    return NULL;
+    pthread_exit(NULL);
 }
 
 bool
@@ -64,7 +64,7 @@ gcache::PageStore::delete_page () throw (gu::Exception)
 {
     Page* const page = pages_.front();
 
-    if (page->count() > 0) return false;
+    if (page->used() > 0) return false;
 
     pages_.pop_front();
 
