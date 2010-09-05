@@ -7,6 +7,7 @@
 #include "../src/gu_utils.h"
 
 #include <limits.h>
+#include <stdint.h>
 
 START_TEST (gu_strconv_test)
 {
@@ -110,8 +111,8 @@ START_TEST (gu_strconv_test)
     void* ptr;
     strret = gu_str2ptr ("-01234abc", &ptr);
     fail_if (strret[0] != '\0');
-    fail_if (-0x1234abcLL != (long long)ptr, "Expected %lld, got %lld",
-             -0x1234abcLL, (long long)ptr);
+    fail_if (-0x1234abcLL != (intptr_t)ptr, "Expected %lld, got %lld",
+             -0x1234abcLL, (intptr_t)ptr);
 }
 END_TEST
 
