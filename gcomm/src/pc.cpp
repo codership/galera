@@ -155,6 +155,7 @@ void PC::close()
 {
 
     log_debug << "PC/EVS Proto leaving";
+    pc->close();
     evs->close();
 
     Date wait_until(Date::now() + leave_grace_period);
