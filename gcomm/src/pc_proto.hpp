@@ -66,6 +66,7 @@ public:
         my_uuid_       (uuid),
         start_prim_    (),
         allow_sb_      (gu::from_string<bool>(uri.get_option(Conf::PcAllowSb, "true"))),
+        closing_       (false),
         state_         (S_CLOSED),
         last_sent_seq_ (0),
         checksum_      (gu::from_string<bool>(uri.get_option(Conf::PcChecksum, "true"))),
@@ -139,10 +140,11 @@ public:
     {
         log_debug << self_id() << " start_prim " << first;
         start_prim_ = first;
+        closing_    = false;
         shift_to(S_JOINING);
     }
 
-    void close() { }
+    void close() { closing_ = true; }
 
     void handle_view (const View&);
 private:
@@ -165,6 +167,7 @@ private:
     UUID   const      my_uuid_;       // Node uuid
     bool              start_prim_;    // Is allowed to start in prim comp
     bool              allow_sb_;      // Split-brain condition is allowed
+    bool              closing_;       // Protocol is in closing stage
     State             state_;         // State
     uint32_t          last_sent_seq_; // Msg seqno of last sent message
     bool              checksum_;      // Enable message checksumming
