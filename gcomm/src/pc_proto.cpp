@@ -298,9 +298,10 @@ void gcomm::pc::Proto::handle_trans(const View& view)
 
     if (ViewId(V_PRIM, view.get_id()) == get_last_prim())
     {
-        if (allow_sb_                          == true &&
-            current_view_.get_members().size() == 2    &&
-            view.get_members().size()          == 1    &&
+        if (closing_                           == false &&
+            allow_sb_                          == true  &&
+            current_view_.get_members().size() == 2     &&
+            view.get_members().size()          == 1     &&
             view.get_partitioned().size()      == 1)
         {
             // configured to allow split brain
