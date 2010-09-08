@@ -118,6 +118,7 @@ namespace gcomm
          */
         static std::string const GMCastMCastTTL;
 
+        static std::string const GMCastTimeWait;
 
         /*!
          * @brief EVS scheme for transport URI ("evs")
@@ -292,6 +293,8 @@ namespace gcomm
          */
         static std::string const PcChecksum;
 
+
+        static std::string const PcLinger;
     };
 
 

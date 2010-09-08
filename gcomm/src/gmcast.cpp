@@ -50,7 +50,8 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     remote_addrs  (),
     proto_map     (new ProtoMap()),
     mcast_tree    (),
-    check_period  ("PT1S"),
+    time_wait     (uri.get_option(Conf::GMCastTimeWait, "PT5S")),
+    check_period  ("PT0.5S"),
     next_check    (Date::now())
 {
     if (version > max_version_)
@@ -350,6 +351,9 @@ void GMCast::gmcast_forget(const UUID& uuid)
         AddrEntry& ae(AddrList::get_value(ai));
         if (ae.get_uuid() == uuid)
         {
+            log_info << "forgetting " << uuid
+                     << " (" << AddrList::get_key(ai) << ")";
+
             ProtoMap::iterator pi, pi_next;
             for (pi = proto_map->begin(); pi != proto_map->end(); pi = pi_next)
             {
@@ -363,7 +367,7 @@ void GMCast::gmcast_forget(const UUID& uuid)
                 }
             }
             ae.set_retry_cnt(max_retry_cnt + 1);
-            ae.set_next_reconnect(Date::now() + Period("PT5S"));
+            ae.set_next_reconnect(Date::now() + time_wait);
         }
     }
 
@@ -373,7 +377,7 @@ void GMCast::gmcast_forget(const UUID& uuid)
 
 void GMCast::handle_connected(Proto* rp)
 {
-    const SocketPtr tp = rp->get_socket();
+    const SocketPtr tp(rp->get_socket());
     assert(tp->get_state() == Socket::S_CONNECTED);
     log_debug << "transport " << tp << " connected";
 }
@@ -406,11 +410,16 @@ void GMCast::handle_established(Proto* est)
 
     if (AddrList::get_value(i).get_retry_cnt() > max_retry_cnt)
     {
-        log_warn << "cleaned up " << AddrList::get_key(i) << " got established";
+        log_warn << "discarding established (time wait) "
+                 << est->get_remote_uuid()
+                 << " (" << est->get_remote_addr() << ") ";
+        proto_map->erase(proto_map->find(est->get_socket()->get_id()));
         delete est;
         update_addresses();
         return;
     }
+
+    // send_up(Datagram(), p->get_remote_uuid());
 
     AddrList::get_value(i).set_retry_cnt(-1);
 
@@ -693,11 +702,12 @@ void GMCast::reconnect()
         const string& pending_addr(AddrList::get_key(i));
         const AddrEntry& ae(AddrList::get_value(i));
 
-        if (is_connected (pending_addr, UUID::nil()) == false)
+        if (is_connected (pending_addr, UUID::nil()) == false &&
+            ae.get_next_reconnect()                  <= now)
         {
             if (ae.get_retry_cnt() > max_retry_cnt)
             {
-                log_info << "Forgetting " << pending_addr;
+                log_info << "cleaning up pending addr " << pending_addr;
                 pending_addrs.erase(i);
                 continue; // no reference to pending_addr after this
             }
@@ -719,11 +729,12 @@ void GMCast::reconnect()
 
         gcomm_assert(remote_uuid != get_uuid());
 
-        if (is_connected (remote_addr, remote_uuid) == false)
+        if (is_connected (remote_addr, remote_uuid) == false &&
+            ae.get_next_reconnect()                 <= now)
         {
             if (ae.get_retry_cnt() > max_retry_cnt)
             {
-                log_info << " Forgetting " << remote_uuid << " ("
+                log_info << " cleaning up " << remote_uuid << " ("
                          << remote_addr << ")";
                 remote_addrs.erase(i);
                 continue;//no reference to remote_addr or remote_uuid after this
@@ -870,7 +881,7 @@ void GMCast::handle_up(const void*        id,
         }
         else if (p->get_socket()->get_state() == Socket::S_CONNECTED)
         {
-            log_warn << "zero len datagram";
+            log_warn << "connection closed by peer";
             p->set_state(Proto::S_FAILED);
             handle_failed(p);
         }

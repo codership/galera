@@ -19,11 +19,11 @@ namespace gcomm
 }
 
 
-class gcomm::gmcast::Proto 
+class gcomm::gmcast::Proto
 {
 public:
-    
-    enum State 
+
+    enum State
     {
         S_INIT,
         S_HANDSHAKE_SENT,
@@ -34,16 +34,16 @@ public:
         S_CLOSED
     };
 
-    
+
 public:
 
-    void set_state(State new_state);    
-    State get_state() const 
+    void set_state(State new_state);
+    State get_state() const
     {
         return state;
     }
-    
-    static std::string to_string (State s) 
+
+    static std::string to_string (State s)
     {
         switch (s)
         {
@@ -57,17 +57,17 @@ public:
         default: return "UNKNOWN";
         }
     }
-    
-    
-    
+
+
+
     Proto (int v,
-           SocketPtr          tp_, 
-           const std::string& local_addr_, 
-           const std::string& remote_addr_, 
+           SocketPtr          tp_,
+           const std::string& local_addr_,
+           const std::string& remote_addr_,
            const std::string& mcast_addr_,
-           const gcomm::UUID& local_uuid_, 
+           const gcomm::UUID& local_uuid_,
            const std::string& group_name_)
-        : 
+        :
         version(v),
         handshake_uuid   (),
         local_uuid       (local_uuid_),
@@ -82,11 +82,11 @@ public:
         tp               (tp_),
         link_map         ()
     { }
-    
+
     ~Proto() { tp->close(); }
-    
+
     void send_msg(const Message& msg);
-    void send_handshake();    
+    void send_handshake();
     void wait_handshake();
     void handle_handshake(const Message& hs);
     void handle_handshake_response(const Message& hs);
@@ -95,17 +95,17 @@ public:
     void handle_topology_change(const Message& msg);
     void send_topology_change(LinkMap& um);
     void handle_message(const Message& msg);
-    
+
     const gcomm::UUID& get_handshake_uuid() const { return handshake_uuid; }
     const gcomm::UUID& get_local_uuid() const { return local_uuid; }
     const gcomm::UUID& get_remote_uuid() const { return remote_uuid; }
 
     SocketPtr get_socket() const { return tp; }
-    
+
     const std::string& get_remote_addr() const { return remote_addr; }
     const std::string& get_mcast_addr() const { return mcast_addr; }
     const LinkMap& get_link_map() const { return link_map; }
-    
+
     bool get_changed()
     {
         bool ret = changed;
@@ -114,7 +114,7 @@ public:
     }
     int get_version() const { return version; }
 private:
-    
+
     Proto(const Proto&);
     void operator=(const Proto&);
 

@@ -26,6 +26,8 @@ std::string const gcomm::Conf::GMCastMCastPort =
     GMCastScheme + Delim + "mcast_port";
 std::string const gcomm::Conf::GMCastMCastTTL =
     GMCastScheme + Delim + "mcast_ttl";
+std::string const gcomm::Conf::GMCastTimeWait =
+    GMCastScheme + Delim + "time_wait";
 // EVS
 std::string const gcomm::Conf::EvsScheme = "evs";
 std::string const gcomm::Conf::EvsVersion = 
@@ -63,3 +65,4 @@ std::string const gcomm::Conf::PcScheme = "pc";
 std::string const gcomm::Conf::PcVersion = PcScheme + Delim + "version";
 std::string const gcomm::Conf::PcAllowSb = PcScheme + Delim + "allow_sb";
 std::string const gcomm::Conf::PcChecksum = PcScheme + Delim + "checksum";
+std::string const gcomm::Conf::PcLinger = PcScheme + Delim + "linger";
