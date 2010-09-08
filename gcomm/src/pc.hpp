@@ -15,24 +15,24 @@ namespace gcomm
     {
         class Proto;
     }
-    
+
     class PC : public Transport
     {
     public:
-        
+
         PC (Protonet&, const gu::URI&);
-        
+
         ~PC();
-        
+
         void connect();
         void close();
-        
+
         void handle_up(const void*, const gu::Datagram&, const ProtoUpMeta&);
         int  handle_down(gu::Datagram&, const ProtoDownMeta&);
 
         bool supports_uuid() const;
         const UUID& get_uuid() const;
-        
+
         size_t get_mtu() const;
 
     private:
@@ -42,11 +42,11 @@ namespace gcomm
         pc::Proto*  pc;                 // PC protocol layer
         bool        closed;             // flag for destructor
                                         // Period to wait graceful leave
-        gu::datetime::Period leave_grace_period;
+        gu::datetime::Period linger;
 
         PC(const PC&);
         void operator=(const PC&);
-        
+
     };
-    
+
 } // namespace gcomm

@@ -126,6 +126,7 @@ namespace gcomm
         gmcast::ProtoMap*  proto_map;
         std::list<Socket*> mcast_tree;
 
+        gu::datetime::Period time_wait;
         gu::datetime::Period check_period;
         gu::datetime::Date next_check;
         gu::datetime::Date handle_timers();

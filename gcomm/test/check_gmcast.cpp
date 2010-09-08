@@ -124,6 +124,7 @@ START_TEST(test_gmcast_w_user_messages)
             uri += "tcp.non_blocking=1";
             uri += "&";
             uri += "gmcast.group=testgrp";
+            uri += "&gmcast.time_wait=PT0.5S";
             if (test_multicast == true)
             {
                 uri += "&" + mcast_param;

@@ -156,7 +156,7 @@ public:
         use_prod_cons(from_string<bool>(
                           uri.get_option("gcomm.use_prod_cons", "false"))),
         net(Protonet::create(
-                uri.get_option("gcomm.protonet_backend", "gu"),
+                uri.get_option("gcomm.protonet_backend", "asio"),
                 gu::from_string<int>(
                     uri.get_option("protonet.version", "0")))),
         tp(0),

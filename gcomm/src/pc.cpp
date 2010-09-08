@@ -118,7 +118,6 @@ void PC::connect()
         get_pnet().event_loop(Sec/2);
         if (try_until < Date::now())
         {
-
             pc->close();
             evs->close();
             gmcast->close();
@@ -158,7 +157,7 @@ void PC::close()
     pc->close();
     evs->close();
 
-    Date wait_until(Date::now() + leave_grace_period);
+    Date wait_until(Date::now() + linger);
 
     do
     {
@@ -177,13 +176,13 @@ void PC::close()
         log_warn << "PCProto didn't reach closed state";
     }
 
+    gmcast->close();
+
     get_pnet().erase(&pstack_);
     pstack_.pop_proto(this);
     pstack_.pop_proto(pc);
     pstack_.pop_proto(evs);
     pstack_.pop_proto(gmcast);
-
-    gmcast->close();
 
     closed = true;
 }
@@ -195,7 +194,7 @@ PC::PC(Protonet& net, const gu::URI& uri) :
     evs       (0),
     pc        (0),
     closed    (true),
-    leave_grace_period("PT5S")
+    linger    (uri.get_option(Conf::PcLinger, "PT2S"))
 {
     if (uri_.get_scheme() != Conf::PcScheme)
     {
