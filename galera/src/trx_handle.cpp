@@ -45,7 +45,6 @@ std::ostream& galera::operator<<(std::ostream& os, TrxHandle::State s)
 }
 
 
-
 std::ostream&
 galera::operator<<(std::ostream& os, const TrxHandle& th)
 {
@@ -96,14 +95,14 @@ public:
         add(TrxHandle::S_REPLICATING, TrxHandle::S_REPLICATED);
         add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_CERT_AND_REPLAY);
         add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_ABORT);
-        add(TrxHandle::S_REPLICATING, TrxHandle::S_ABORTING);
+//        add(TrxHandle::S_REPLICATING, TrxHandle::S_ABORTING);
 
         add(TrxHandle::S_REPLICATED, TrxHandle::S_CERTIFYING);
 
         add(TrxHandle::S_CERTIFYING, TrxHandle::S_CERTIFIED);
         add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_CERT_AND_REPLAY);
         add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_ABORT);
-        add(TrxHandle::S_CERTIFYING, TrxHandle::S_ABORTING);
+//        add(TrxHandle::S_CERTIFYING, TrxHandle::S_ABORTING);
 
         add(TrxHandle::S_CERTIFIED, TrxHandle::S_EXECUTING);
         add(TrxHandle::S_CERTIFIED, TrxHandle::S_APPLYING);

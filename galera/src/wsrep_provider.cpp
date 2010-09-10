@@ -537,8 +537,6 @@ wsrep_status_t galera_to_execute_start(wsrep_t*        gh,
 {
     assert(gh != 0 && gh->ctx != 0);
 
-    *global_seqno = WSREP_SEQNO_UNDEFINED;
-
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     TrxHandle* trx(repl->local_conn_trx(conn_id, true));
@@ -557,9 +555,10 @@ wsrep_status_t galera_to_execute_start(wsrep_t*        gh,
         assert((retval == WSREP_OK && trx->global_seqno() > 0) ||
                (retval != WSREP_OK && trx->global_seqno() < 0));
 
+        *global_seqno = trx->global_seqno();
+
         if (retval == WSREP_OK)
         {
-            *global_seqno = trx->global_seqno();
             retval = repl->to_isolation_begin(trx);
         }
     }
@@ -574,15 +573,16 @@ wsrep_status_t galera_to_execute_start(wsrep_t*        gh,
         retval = WSREP_FATAL;
     }
 
-    if (retval != WSREP_OK)
+    if (retval != WSREP_OK) // galera_to_execute_end() won't be called
     {
-        // trx is not needed anymore
-        trx->unref();
+        repl->discard_local_conn_trx(conn_id); // trx is not needed anymore
+
+        if (*global_seqno < 0) // no seqno -> no index -> no automatic purging
+        {
+            trx->unref(); // implicit destructor
+        }
     }
-    else if (global_seqno)
-    {
-        *global_seqno = trx->global_seqno();
-    }
+
     return retval;
 }
 
@@ -593,12 +593,16 @@ wsrep_status_t galera_to_execute_end(wsrep_t* gh, wsrep_conn_id_t conn_id)
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
+    wsrep_status_t retval;
+    TrxHandle* trx(repl->local_conn_trx(conn_id, false));
+
     try
     {
-        TrxHandle* trx(repl->local_conn_trx(conn_id, false));
         TrxHandleLock lock(*trx);
         repl->to_isolation_end(trx);
+        repl->discard_local_conn_trx(conn_id);
         return WSREP_OK;
+        // trx will be unreferenced (destructed) during purge
     }
     catch (gu::Exception& e)
     {
@@ -610,6 +614,8 @@ wsrep_status_t galera_to_execute_end(wsrep_t* gh, wsrep_conn_id_t conn_id)
         log_fatal << "uncaught exception";
         return WSREP_FATAL;
     }
+
+    return retval;
 }
 
 

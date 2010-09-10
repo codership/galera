@@ -50,12 +50,13 @@ START_TEST(test_states)
     trx->unref();
 
     // aborted during replication and certifies but does not certify
-    // during replay
+    // during replay (is this even possible?)
     trx = new TrxHandle(uuid, -1, 1, true);
     trx->set_state(TrxHandle::S_REPLICATING);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
     trx->set_state(TrxHandle::S_CERTIFYING);
+    trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_ABORTING);
     trx->set_state(TrxHandle::S_ROLLED_BACK);
     trx->unref();

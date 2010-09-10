@@ -205,8 +205,6 @@ galera::Certification::Certification(const string& conf)
 { }
 
 
-
-
 galera::Certification::~Certification()
 {
     log_info << "cert index usage at exit " << cert_index_.size();
