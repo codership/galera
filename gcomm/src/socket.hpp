@@ -32,21 +32,22 @@ public:
         S_CLOSED,
         S_CONNECTING,
         S_CONNECTED,
-        S_FAILED
+        S_FAILED,
+        S_CLOSING
     } State;
-    
-    Socket(const gu::URI& uri) 
-        : 
+
+    Socket(const gu::URI& uri)
+        :
         scheme_(uri.get_scheme())
     { }
-    
+
     virtual ~Socket() { }
     virtual void connect(const gu::URI& uri) = 0;
     virtual void close() = 0;
-    
+
     virtual int send(const gu::Datagram& dg) = 0;
     virtual void async_receive() = 0;
-    
+
     virtual size_t get_mtu() const = 0;
     virtual std::string get_local_addr() const = 0;
     virtual std::string get_remote_addr() const = 0;
@@ -66,12 +67,12 @@ public:
         S_LISTENING,
         S_FAILED
     } State;
-    
-    Acceptor(const gu::URI& uri) 
+
+    Acceptor(const gu::URI& uri)
         :
         scheme_(uri.get_scheme())
     { }
-    
+
     virtual ~Acceptor() { }
 
     virtual void listen(const gu::URI& uri) = 0;

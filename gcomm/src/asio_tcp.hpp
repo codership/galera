@@ -27,7 +27,7 @@ class gcomm::AsioTcpSocket :
 public:
     AsioTcpSocket(AsioProtonet& net, const gu::URI& uri);
     ~AsioTcpSocket();
-    void failed_handler(const asio::error_code& ec);
+    void failed_handler(const asio::error_code& ec, const std::string& func, int line);
     void connect_handler(const asio::error_code& ec);
     void connect(const gu::URI& uri);
     void close();

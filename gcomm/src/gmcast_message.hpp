@@ -38,7 +38,7 @@ public:
         T_TOPOLOGY_CHANGE    = 5,
         /* Leave room for future use */
         T_USER_BASE          = 8,
-        T_MAX
+        T_MAX                = 255
     };
 
     class NodeList : public Map<UUID, Node> { };
@@ -233,6 +233,20 @@ public:
 
         gu_trace (off = gcomm::unserialize(buf, buflen, offset, &t));
         type = static_cast<Type>(t);
+        switch (type)
+        {
+        case T_HANDSHAKE:
+        case T_HANDSHAKE_RESPONSE:
+        case T_HANDSHAKE_OK:
+        case T_HANDSHAKE_FAIL:
+        case T_TOPOLOGY_CHANGE:
+        case T_USER_BASE:
+            break;
+        default:
+            gu_throw_error(EINVAL) << "invalid message type "
+                                   << static_cast<int>(type);
+            throw;
+        }
         gu_trace (off = gcomm::unserialize(buf, buflen, off, &flags));
         gu_trace (off = gcomm::unserialize(buf, buflen, off, &t));
         if (t != 0)

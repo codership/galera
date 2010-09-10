@@ -13,6 +13,9 @@ using namespace std;
 using namespace gu;
 using namespace gu::net;
 
+#define FAILED_HANDLER(_e) failed_handler(_e, __FUNCTION__, __LINE__)
+
+
 gcomm::AsioTcpSocket::AsioTcpSocket(AsioProtonet& net, const URI& uri)
     :
     Socket       (uri),
@@ -22,26 +25,36 @@ gcomm::AsioTcpSocket::AsioTcpSocket(AsioProtonet& net, const URI& uri)
     recv_buf_    (net_.get_mtu() + NetHeader::serial_size_),
     recv_offset_ (0),
     state_       (S_CLOSED)
-{ }
+{
+    log_debug << "ctor for " << get_id();
+}
 
 gcomm::AsioTcpSocket::~AsioTcpSocket()
 {
-    close();
+    log_debug << "dtor for " << get_id();
+    try
+    {
+        socket_.close();
+    }
+    catch (...) { }
 }
 
-void gcomm::AsioTcpSocket::failed_handler(const asio::error_code& ec)
+void gcomm::AsioTcpSocket::failed_handler(const asio::error_code& ec,
+                                          const std::string& func,
+                                          int line)
 {
-
-    log_debug << "failed handler " << get_id() << " " << ec
-              << " " << socket_.is_open();
-    if (get_state() != S_FAILED)
+    log_debug << "failed handler from " << func << ":" << line
+              << " socket " << get_id()
+              << " error " << ec
+              << " " << socket_.is_open() << " state " << get_state();
+    const State prev_state(get_state());
+    if (get_state() != S_CLOSED)
     {
-        net_.dispatch(get_id(), Datagram(), ProtoUpMeta(ec.value()));
         state_ = S_FAILED;
     }
-    else
+    if (prev_state != S_FAILED && prev_state != S_CLOSED)
     {
-        // gu_throw_fatal << "failed handler state " << get_state();
+        net_.dispatch(get_id(), Datagram(), ProtoUpMeta(ec.value()));
     }
 }
 
@@ -51,12 +64,16 @@ void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
     log_debug << "connect handler " << get_id() << " " << ec;
     if (ec)
     {
-        failed_handler(ec);
+        FAILED_HANDLER(ec);
         return;
     }
     else
     {
         socket_.set_option(asio::ip::tcp::no_delay(true));
+        socket_.set_option(asio::ip::tcp::socket::linger(true, 1));
+        log_debug << "socket " << get_id() << " connected, remote endpoint "
+                  << get_remote_addr() << " local endpoint "
+                  << get_local_addr();
         state_ = S_CONNECTED;
         net_.dispatch(get_id(), Datagram(), ProtoUpMeta(ec.value()));
         async_receive();
@@ -79,38 +96,53 @@ void gcomm::AsioTcpSocket::connect(const URI& uri)
 void gcomm::AsioTcpSocket::close()
 {
     Critical<AsioProtonet> crit(net_);
-    log_debug << "closing " << get_id() << " state " << get_state();
+    if (get_state() == S_CLOSED || get_state() == S_CLOSING) return;
 
-    try
+    log_debug << "closing " << get_id() << " state " << get_state()
+              << " send_q size " << send_q_.size();
+
+    if (send_q_.empty() == true || get_state() != S_CONNECTED)
     {
-        socket_.close();
+        try
+        {
+            socket_.close();
+        }
+        catch (...) { }
+        state_ = S_CLOSED;
     }
-    catch (std::exception& e)
+    else
     {
-        log_warn << "exception caught while closing: " << e.what();
+        state_ = S_CLOSING;
     }
-    state_ = S_CLOSED;
 }
 
 
 void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
                                          size_t bytes_transferred)
 {
+    Critical<AsioProtonet> crit(net_);
+
+    if (get_state() != S_CONNECTED && get_state() != S_CLOSING)
+    {
+        log_debug << "write handler for " << get_id()
+                  << " state " << get_state();
+        return;
+    }
 
     if (!ec)
     {
-        Critical<AsioProtonet> crit(net_);
         gcomm_assert(send_q_.empty() == false);
         gcomm_assert(send_q_.front().get_len() >= bytes_transferred);
         if (send_q_.front().get_len() < bytes_transferred)
         {
-            log_warn << "short write";
+            gu_throw_fatal << "short write for " << get_id();
             return;
         }
         else
         {
             send_q_.pop_front();
         }
+
         if (send_q_.empty() == false)
         {
             const Datagram& dg(send_q_.front());
@@ -126,16 +158,30 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
                                                   asio::placeholders::error,
                                                   asio::placeholders::bytes_transferred));
         }
+        else if (state_ == S_CLOSING)
+        {
+            log_debug << "deferred close of " << get_id();
+            socket_.close();
+            state_ = S_CLOSED;
+        }
+    }
+    else if (state_ == S_CLOSING)
+    {
+        log_debug << "deferred close of " << get_id() << " error " << ec;
+        socket_.close();
+        state_ = S_CLOSED;
     }
     else
     {
-        log_warn << "write handler: " << ec;
+        FAILED_HANDLER(ec);
     }
 }
 
 
 int gcomm::AsioTcpSocket::send(const Datagram& dg)
 {
+    Critical<AsioProtonet> crit(net_);
+
     if (get_state() != S_CONNECTED)
     {
         return ENOTCONN;
@@ -155,7 +201,8 @@ int gcomm::AsioTcpSocket::send(const Datagram& dg)
               priv_dg.get_header_size(),
               priv_dg.get_header_offset());
 
-    Critical<AsioProtonet> crit(net_);
+
+
     send_q_.push_back(priv_dg);
 
     boost::array<asio::const_buffer, 2> cbs;
@@ -180,9 +227,34 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
                                         const size_t bytes_transferred)
 {
     Critical<AsioProtonet> crit(net_);
+
     if (ec)
     {
-        failed_handler(ec);
+        FAILED_HANDLER(ec);
+        return;
+    }
+
+    if (get_state() == S_CLOSING)
+    {
+        // keep on reading data in case of deferred shutdown too
+        boost::array<asio::mutable_buffer, 1> mbs;
+        mbs[0] = asio::mutable_buffer(&recv_buf_[0],
+                                      recv_buf_.size());
+        async_read(socket_, mbs,
+                   boost::bind(&AsioTcpSocket::read_completion_condition,
+                               shared_from_this(),
+                               asio::placeholders::error,
+                               asio::placeholders::bytes_transferred),
+                   boost::bind(&AsioTcpSocket::read_handler,
+                               shared_from_this(),
+                               asio::placeholders::error,
+                               asio::placeholders::bytes_transferred));
+        return;
+    }
+    else if (get_state() != S_CONNECTED)
+    {
+        log_debug << "read handler for " << get_id()
+                  << " state " << get_state();
         return;
     }
 
@@ -197,7 +269,7 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
         }
         catch (Exception& e)
         {
-            failed_handler(asio::error_code(e.get_errno(),
+            FAILED_HANDLER(asio::error_code(e.get_errno(),
                                             asio::error::system_category));
             return;
         }
@@ -223,7 +295,7 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
                     log_warn << "checksum failed, hdr: len=" << hdr.len()
                              << " has_crc32=" << hdr.has_crc32()
                              << " crc32=" << hdr.crc32();
-                    failed_handler(asio::error_code(EPROTO, asio::error::system_category));
+                    FAILED_HANDLER(asio::error_code(EPROTO, asio::error::system_category));
                     return;
                 }
             }
@@ -265,7 +337,20 @@ size_t gcomm::AsioTcpSocket::read_completion_condition(
     Critical<AsioProtonet> crit(net_);
     if (ec)
     {
-        failed_handler(ec);
+        FAILED_HANDLER(ec);
+        return 0;
+    }
+
+    if (get_state() == S_CLOSING)
+    {
+        log_debug << "read completion condition for " << get_id()
+                  << " state " << get_state();
+        return 0;
+    }
+    else if (state_ != S_CONNECTED)
+    {
+        log_debug << "read completion condition for " << get_id()
+                  << " state " << get_state();
         return 0;
     }
 
@@ -278,7 +363,7 @@ size_t gcomm::AsioTcpSocket::read_completion_condition(
         }
         catch (Exception& e)
         {
-            failed_handler(asio::error_code(e.get_errno(),
+            FAILED_HANDLER(asio::error_code(e.get_errno(),
                                             asio::error::system_category));
             return 0;
         }
@@ -358,9 +443,12 @@ void gcomm::AsioTcpAcceptor::accept_handler(
 {
     if (!error)
     {
-        static_cast<AsioTcpSocket*>(socket.get())->socket_.set_option(asio::ip::tcp::no_delay(true));
-        static_cast<AsioTcpSocket*>(socket.get())->state_ = Socket::S_CONNECTED;
+        AsioTcpSocket* s(static_cast<AsioTcpSocket*>(socket.get()));
+        s->socket_.set_option(asio::ip::tcp::no_delay(true));
+        s->socket_.set_option(asio::ip::tcp::socket::linger(true, 1));
+        s->state_ = Socket::S_CONNECTED;
         accepted_socket_ = socket;
+        log_debug << "accepted socket " << socket->get_id();
         net_.dispatch(get_id(), Datagram(), ProtoUpMeta(error.value()));
         AsioTcpSocket* new_socket(new AsioTcpSocket(
                                       net_,
