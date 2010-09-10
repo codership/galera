@@ -437,7 +437,7 @@ void GMCast::handle_established(Proto* est)
         {
             if (p->get_handshake_uuid() < est->get_handshake_uuid())
             {
-                log_debug << self_string()
+                log_info << self_string()
                           << " cleaning up duplicate "
                           << p->get_socket()
                           << " after established "
@@ -447,11 +447,11 @@ void GMCast::handle_established(Proto* est)
             }
             else if (p->get_handshake_uuid() > est->get_handshake_uuid())
             {
-                log_debug << self_string()
-                          << " cleaning up established "
-                          << est->get_socket()
-                          << " which is duplicate of "
-                          << p->get_socket();
+                log_info << self_string()
+                         << " cleaning up established "
+                         << est->get_socket()
+                         << " which is duplicate of "
+                         << p->get_socket();
                 proto_map->erase(
                     proto_map->find_checked(est->get_socket()->get_id()));
                 delete est;
@@ -881,7 +881,8 @@ void GMCast::handle_up(const void*        id,
         }
         else if (p->get_socket()->get_state() == Socket::S_CONNECTED)
         {
-            log_warn << "connection closed by peer";
+            log_warn << "connection " << p->get_socket()->get_id()
+                     << " closed by peer";
             p->set_state(Proto::S_FAILED);
             handle_failed(p);
         }

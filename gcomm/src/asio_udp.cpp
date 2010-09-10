@@ -88,6 +88,7 @@ void gcomm::AsioUdpSocket::connect(const URI& uri)
 
     socket_.open(conn_i->endpoint().protocol());
     socket_.set_option(asio::ip::udp::socket::reuse_address(true));
+    socket_.set_option(asio::ip::udp::socket::linger(true, 1));
     asio::ip::udp::socket::non_blocking_io cmd(true);
     socket_.io_control(cmd);
 
