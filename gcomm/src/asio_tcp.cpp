@@ -44,9 +44,14 @@ void gcomm::AsioTcpSocket::failed_handler(const asio::error_code& ec,
                                           int line)
 {
     log_debug << "failed handler from " << func << ":" << line
-              << " socket " << get_id()
+              << " socket " << get_id() << " " << socket_.native()
               << " error " << ec
               << " " << socket_.is_open() << " state " << get_state();
+    try
+    {
+        log_debug << "local endpoint " << get_local_addr()
+                  << " remote endpoint " << get_remote_addr();
+    } catch (...) { }
     const State prev_state(get_state());
     if (get_state() != S_CLOSED)
     {
@@ -70,7 +75,7 @@ void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
     else
     {
         socket_.set_option(asio::ip::tcp::no_delay(true));
-        socket_.set_option(asio::ip::tcp::socket::linger(true, 1));
+        // socket_.set_option(asio::ip::tcp::socket::linger(true, 1));
         log_debug << "socket " << get_id() << " connected, remote endpoint "
                   << get_remote_addr() << " local endpoint "
                   << get_local_addr();
@@ -133,15 +138,15 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
     {
         gcomm_assert(send_q_.empty() == false);
         gcomm_assert(send_q_.front().get_len() >= bytes_transferred);
-        if (send_q_.front().get_len() < bytes_transferred)
+
+        while (send_q_.empty() == false &&
+               bytes_transferred >= send_q_.front().get_len())
         {
-            gu_throw_fatal << "short write for " << get_id();
-            return;
-        }
-        else
-        {
+            const Datagram& dg(send_q_.front());
+            bytes_transferred -= dg.get_len();
             send_q_.pop_front();
         }
+        gcomm_assert(bytes_transferred == 0);
 
         if (send_q_.empty() == false)
         {
@@ -152,7 +157,6 @@ void gcomm::AsioTcpSocket::write_handler(const asio::error_code& ec,
                                         dg.get_header_len());
             cbs[1] = asio::const_buffer(&dg.get_payload()[0],
                                         dg.get_payload().size());
-
             async_write(socket_, cbs, boost::bind(&AsioTcpSocket::write_handler,
                                                   shared_from_this(),
                                                   asio::placeholders::error,
@@ -187,12 +191,16 @@ int gcomm::AsioTcpSocket::send(const Datagram& dg)
         return ENOTCONN;
     }
 
+
+
     NetHeader hdr(static_cast<uint32_t>(dg.get_len()), net_.version_);
     if (net_.checksum_ == true)
     {
-        hdr.set_crc32(dg.checksum());
+        hdr.set_crc32(crc32(dg));
     }
-    Datagram priv_dg(dg);
+
+    send_q_.push_back(dg); // makes copy of dg
+    Datagram& priv_dg(send_q_.back());
 
     priv_dg.set_header_offset(priv_dg.get_header_offset() -
                               NetHeader::serial_size_);
@@ -201,19 +209,14 @@ int gcomm::AsioTcpSocket::send(const Datagram& dg)
               priv_dg.get_header_size(),
               priv_dg.get_header_offset());
 
-
-
-    send_q_.push_back(priv_dg);
-
-    boost::array<asio::const_buffer, 2> cbs;
-    cbs[0] = asio::const_buffer(priv_dg.get_header()
-                                + priv_dg.get_header_offset(),
-                                priv_dg.get_header_len());
-    cbs[1] = asio::const_buffer(&priv_dg.get_payload()[0],
-                                priv_dg.get_payload().size());
-
     if (send_q_.size() == 1)
     {
+        boost::array<asio::const_buffer, 2> cbs;
+        cbs[0] = asio::const_buffer(priv_dg.get_header()
+                                    + priv_dg.get_header_offset(),
+                                    priv_dg.get_header_len());
+        cbs[1] = asio::const_buffer(&priv_dg.get_payload()[0],
+                                    priv_dg.get_payload().size());
         async_write(socket_, cbs, boost::bind(&AsioTcpSocket::write_handler,
                                               shared_from_this(),
                                               asio::placeholders::error,
@@ -289,7 +292,7 @@ void gcomm::AsioTcpSocket::read_handler(const asio::error_code& ec,
                 }
 #endif // TEST_NET_CHECKSUM_ERROR
 
-                if ((hdr.has_crc32() == true && dg.checksum() != hdr.crc32()) ||
+                if ((hdr.has_crc32() == true && crc32(dg) != hdr.crc32()) ||
                     (hdr.has_crc32() == false && hdr.crc32() != 0))
                 {
                     log_warn << "checksum failed, hdr: len=" << hdr.len()
@@ -363,6 +366,7 @@ size_t gcomm::AsioTcpSocket::read_completion_condition(
         }
         catch (Exception& e)
         {
+            log_warn << "unserialize error " << e.what();
             FAILED_HANDLER(asio::error_code(e.get_errno(),
                                             asio::error::system_category));
             return 0;
@@ -445,7 +449,7 @@ void gcomm::AsioTcpAcceptor::accept_handler(
     {
         AsioTcpSocket* s(static_cast<AsioTcpSocket*>(socket.get()));
         s->socket_.set_option(asio::ip::tcp::no_delay(true));
-        s->socket_.set_option(asio::ip::tcp::socket::linger(true, 1));
+        // s->socket_.set_option(asio::ip::tcp::socket::linger(true, 1));
         s->state_ = Socket::S_CONNECTED;
         accepted_socket_ = socket;
         log_debug << "accepted socket " << socket->get_id();

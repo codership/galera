@@ -238,16 +238,9 @@ namespace gu
         size_t get_len() const { return (header_size_ - header_offset_ + payload_->size()); }
         size_t get_offset() const { return offset_; }
 
-        uint32_t checksum() const
-        {
-            boost::crc_32_type crc;
-            crc.process_block(header_ + header_offset_, header_ + header_size_);
-            crc.process_block(&(*payload_)[0], &(*payload_)[0] + payload_->size());
-            return crc.checksum();
-        }
     private:
         friend uint16_t crc16(const Datagram&, size_t);
-        friend uint32_t crc32(const Datagram&);
+        friend uint32_t crc32(const Datagram&, size_t);
 
         static const size_t header_size_ = 128;
         gu::byte_t          header_[header_size_];
@@ -273,20 +266,29 @@ namespace gu
         {
             offset -= dg.get_header_len();
         }
-        crc.process_block(&(*dg.payload_)[0] + offset, &(*dg.payload_)[0]
-                          + dg.payload_->size());
+        crc.process_block(&(*dg.payload_)[0] + offset,
+                          &(*dg.payload_)[0] + dg.payload_->size());
         return crc.checksum();
     }
 
-    inline uint32_t crc32(const gu::Datagram& dg)
+    inline uint32_t crc32(const gu::Datagram& dg, size_t offset = 0)
     {
         boost::crc_32_type crc;
         byte_t lenb[4];
-        serialize<uint32_t>(dg.get_len(), lenb, sizeof(lenb), 0);
+        serialize<uint32_t>(dg.get_len() - offset, lenb, sizeof(lenb), 0);
         crc.process_block(lenb, lenb + sizeof(lenb));
-        crc.process_block(dg.header_ + dg.header_offset_,
-                          dg.header_ + dg.header_size_);
-        crc.process_block(&(*dg.payload_)[0], &(*dg.payload_)[0] + dg.payload_->size());
+        if (offset < dg.get_header_len())
+        {
+            crc.process_block(dg.header_ + dg.header_offset_ + offset,
+                              dg.header_ + dg.header_size_);
+            offset = 0;
+        }
+        else
+        {
+            offset -= dg.get_header_len();
+        }
+        crc.process_block(&(*dg.payload_)[0] + offset,
+                          &(*dg.payload_)[0] + dg.payload_->size());
         return crc.checksum();
     }
 }
