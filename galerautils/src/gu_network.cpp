@@ -677,7 +677,7 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
         NetHeader hdr(dgram->get_len(), net.version_);
         if (get_opt() & O_CRC32)
         {
-            hdr.set_crc32(dgram->checksum());
+            hdr.set_crc32(crc32(*dgram));
         }
         byte_t hdrbuf[NetHeader::serial_size_];
         serialize(hdr, hdrbuf, NetHeader::serial_size_, 0);
@@ -707,7 +707,7 @@ int gu::net::Socket::send(const Datagram* const dgram, const int flags)
         NetHeader hdr(dgram->get_len(), net.version_);
         if (get_opt() & O_CRC32)
         {
-            hdr.set_crc32(dgram->checksum());
+            hdr.set_crc32(crc32(*dgram));
         }
         byte_t hdrbuf[NetHeader::serial_size_];
         serialize(hdr, hdrbuf, NetHeader::serial_size_, 0);
@@ -836,7 +836,7 @@ const gu::Datagram* gu::net::Socket::recv(const int flags)
         if ((get_opt() & O_CRC32))
         {
             if ((hdr.has_crc32() == true &&
-                 dgram.checksum() != hdr.crc32()) ||
+                 crc32(dgram) != hdr.crc32()) ||
                 (hdr.has_crc32() == false && hdr.crc32() != 0))
             {
                 log_warn << "checksum failed for socket: " << *this;
@@ -939,7 +939,7 @@ const gu::Datagram* gu::net::Socket::recv(const int flags)
             if ((get_opt() & O_CRC32))
             {
                 if ((hdr.has_crc32() == true &&
-                     dgram.checksum() != hdr.crc32()) ||
+                     crc32(dgram) != hdr.crc32()) ||
                     (hdr.has_crc32() == false && hdr.crc32() != 0))
                 {
                     log_warn << "checksum failed for socket " << *this;

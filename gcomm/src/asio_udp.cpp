@@ -141,7 +141,7 @@ int gcomm::AsioUdpSocket::send(const Datagram& dg)
     NetHeader hdr(dg.get_len(), net_.version_);
     if (net_.checksum_ == true)
     {
-        hdr.set_crc32(dg.checksum());
+        hdr.set_crc32(crc32(dg));
     }
     byte_t buf[NetHeader::serial_size_];
     gcomm::serialize(hdr, buf, sizeof(buf), 0);
@@ -188,7 +188,7 @@ void gcomm::AsioUdpSocket::read_handler(const asio::error_code& ec,
                                                 &recv_buf_[0] + NetHeader::serial_size_ + hdr.len())));
             if (net_.checksum_ == true)
             {
-                if ((hdr.has_crc32() == true && dg.checksum() != hdr.crc32()) ||
+                if ((hdr.has_crc32() == true && crc32(dg) != hdr.crc32()) ||
                     (hdr.has_crc32() == false && hdr.crc32() != 0))
                 {
                     log_warn << "checksum failed, hdr: len=" << hdr.len()
