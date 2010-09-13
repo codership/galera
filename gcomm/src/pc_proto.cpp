@@ -691,20 +691,25 @@ void gcomm::pc::Proto::handle_state(const Message& msg, const UUID& source)
         const Node& si(NodeMap::get_value(msg.get_node_map().find(source)));
         if (si.get_prim() == true && si.get_last_prim() != get_last_prim())
         {
-            log_warn << self_id() << " conflicting prims: my prim "
+            log_warn << self_id() << " conflicting prims: my prim: "
                      << get_last_prim()
                      << " other prim: "
                      << si.get_last_prim();
 
-            if (get_last_prim() < si.get_last_prim())
+            if ((npvo_ == true  && get_last_prim() < si.get_last_prim()) ||
+                (npvo_ == false && get_last_prim() > si.get_last_prim()))
             {
-                log_warn << "discarding other";
+                log_warn << self_id() << " discarding other prim view: "
+                         << (npvo_ == true ? "newer" : "older" )
+                         << " overrides";
                 return;
             }
             else
             {
                 gu_throw_fatal << self_id()
-                               << " aborting due to conflicting prims";
+                               << " aborting due to conflicting prims: "
+                               << (npvo_ == true ? "newer" : "older" )
+                               << " overrides";
             }
         }
     }

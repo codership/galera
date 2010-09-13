@@ -50,17 +50,28 @@ END_TEST
 
 START_TEST(test_view)
 {
-    ViewId v1(V_REG,   UUID(1), 1);
-    ViewId v2(V_TRANS, UUID(1), 1);
-    ViewId v3(V_REG,   UUID(2), 1);
-    ViewId v4(V_REG,   UUID(1), 2);
-    ViewId v5(V_TRANS, UUID(1), 2);
-    ViewId v6(V_REG,   UUID(2), 2);
-    ViewId v7(V_TRANS, UUID(3), 2);
+    const UUID uuid1(1);
+    const UUID uuid2(2);
+    const UUID uuid3(3);
+
+    // View id ordering:
+    // 1) view seq less than
+    // 2) uuid newer than (higher timestamp, greater leading bytes)
+    // 3) view type (reg, trans, non-prim, prim)
+    ViewId v1(V_REG,   uuid2, 1);
+    ViewId v2(V_REG,   uuid1, 1);
+    ViewId v3(V_TRANS, uuid1, 1);
+
+    ViewId v4(V_TRANS, uuid3, 2);
+    ViewId v5(V_REG,   uuid2, 2);
+
+    ViewId v6(V_REG,   uuid1, 2);
+    ViewId v7(V_TRANS, uuid1, 2);
 
     fail_unless(v1 < v2);
     fail_unless(v2 < v3);
     fail_unless(v3 < v4);
+    fail_unless(v4 < v5);
     fail_unless(v5 < v6);
     fail_unless(v6 < v7);
 

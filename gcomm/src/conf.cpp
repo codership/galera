@@ -66,3 +66,4 @@ std::string const gcomm::Conf::PcVersion = PcScheme + Delim + "version";
 std::string const gcomm::Conf::PcAllowSb = PcScheme + Delim + "allow_sb";
 std::string const gcomm::Conf::PcChecksum = PcScheme + Delim + "checksum";
 std::string const gcomm::Conf::PcLinger = PcScheme + Delim + "linger";
+std::string const gcomm::Conf::PcNpvo = PcScheme + Delim + "npvo";

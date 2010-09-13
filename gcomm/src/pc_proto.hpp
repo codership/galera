@@ -65,8 +65,9 @@ public:
         version_(gu::from_string<int>(uri.get_option(Conf::PcVersion, "0"))),
         my_uuid_       (uuid),
         start_prim_    (),
+        npvo_          (gu::from_string<bool>(uri.get_option(Conf::PcNpvo, "false"))),
         allow_sb_      (gu::from_string<bool>(uri.get_option(Conf::PcAllowSb, "true"))),
-        closing_       (false),
+                        closing_       (false),
         state_         (S_CLOSED),
         last_sent_seq_ (0),
         checksum_      (gu::from_string<bool>(uri.get_option(Conf::PcChecksum, "true"))),
@@ -163,9 +164,10 @@ private:
     void deliver_view();
 
     int               version_;
-    static const int max_version_ = GCOMM_PC_MAX_VERSION;
+    static const int  max_version_ = GCOMM_PC_MAX_VERSION;
     UUID   const      my_uuid_;       // Node uuid
     bool              start_prim_;    // Is allowed to start in prim comp
+    bool              npvo_;          // Newer prim view overrides
     bool              allow_sb_;      // Split-brain condition is allowed
     bool              closing_;       // Protocol is in closing stage
     State             state_;         // State
