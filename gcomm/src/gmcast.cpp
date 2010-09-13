@@ -860,8 +860,24 @@ void GMCast::handle_up(const void*        id,
             }
             else
             {
-                gu_trace(p->handle_message(msg));
-                if (p->get_changed() == true)
+                try
+                {
+                    gu_trace(p->handle_message(msg));
+                }
+                catch (Exception& e)
+                {
+                    log_warn << "handling gmcast protocol message failed: "
+                             << e.what();
+                    handle_failed(p);
+                    return;
+                }
+
+                if (p->get_state() == Proto::S_FAILED)
+                {
+                    handle_failed(p);
+                    return;
+                }
+                else if (p->get_changed() == true)
                 {
                     update_addresses();
                     reconnect();
