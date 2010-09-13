@@ -28,7 +28,7 @@ class gcomm::UUID
 public:
 
     UUID() : uuid(GU_UUID_NIL) {}
-    
+
     UUID(const void* node, const size_t node_len) :
         uuid()
     {
@@ -54,42 +54,47 @@ public:
         if (buflen < offset + sizeof(gu_uuid_t))
             gu_throw_error (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
                                            << (buflen - offset);
-        
+
         memcpy(&uuid, buf + offset, sizeof(gu_uuid_t));
-        
+
         return offset + sizeof(gu_uuid_t);
     }
-    
+
     size_t serialize(gu::byte_t* buf, const size_t buflen, const size_t offset) const
         throw (gu::Exception)
     {
         if (buflen < offset + sizeof(gu_uuid_t))
             gu_throw_error (EMSGSIZE) << sizeof(gu_uuid_t) << " > "
                                            << (buflen - offset);
-        
+
         memcpy(buf + offset, &uuid, sizeof(gu_uuid_t));
-        
+
         return offset + sizeof(gu_uuid_t);
     }
-    
-    static size_t serial_size() 
+
+    static size_t serial_size()
     {
         return sizeof(gu_uuid_t);
     }
-    
-    const gu_uuid_t* get_uuid_ptr() const 
+
+    const gu_uuid_t* get_uuid_ptr() const
     {
         return &uuid;
     }
 
-    bool operator<(const UUID& cmp) const 
-    { 
-        return gu_uuid_compare(&uuid, &cmp.uuid) < 0; 
+    bool operator<(const UUID& cmp) const
+    {
+        return (gu_uuid_compare(&uuid, &cmp.uuid) < 0);
     }
 
     bool operator==(const UUID& cmp) const
     {
-        return gu_uuid_compare(&uuid, &cmp.uuid) == 0; 
+        return (gu_uuid_compare(&uuid, &cmp.uuid) == 0);
+    }
+
+    bool older(const UUID& cmp) const
+    {
+        return (gu_uuid_older(&uuid, &cmp.uuid) > 0);
     }
 
     std::ostream& to_stream(std::ostream& os) const

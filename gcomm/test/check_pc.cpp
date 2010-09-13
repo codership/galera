@@ -824,6 +824,78 @@ START_TEST(test_pc_conflicting_prims)
 }
 END_TEST
 
+START_TEST(test_pc_conflicting_prims_npvo)
+{
+    log_info << "START";
+    UUID uuid1(1);
+    ProtoUpMeta pum1(uuid1);
+    Proto pc1(uuid1, URI("pc://?pc.npvo=true"));
+    DummyTransport tp1;
+    PCUser pu1(uuid1, &tp1, &pc1);
+    single_boot(&pu1);
+
+    UUID uuid2(2);
+    ProtoUpMeta pum2(uuid2);
+    Proto pc2(uuid2, URI("pc://?pc.npvo=true"));
+    DummyTransport tp2;
+    PCUser pu2(uuid2, &tp2, &pc2);
+    single_boot(&pu2);
+
+    View tr1(ViewId(V_TRANS, pu1.pc->get_current_view().get_id()));
+    tr1.add_member(uuid1);
+    pu1.pc->handle_view(tr1);
+    View tr2(ViewId(V_TRANS, pu2.pc->get_current_view().get_id()));
+    tr2.add_member(uuid2);
+    pu2.pc->handle_view(tr2);
+
+    View reg(ViewId(V_REG, uuid1, tr1.get_id().get_seq() + 1));
+    reg.add_member(uuid1);
+    reg.add_member(uuid2);
+    pu1.pc->handle_view(reg);
+    pu2.pc->handle_view(reg);
+
+    Message msg1, msg2;
+
+    /* First node must discard msg2 and stay in states exch waiting for
+     * trans view */
+    get_msg(pu1.tp->get_out(), &msg1);
+    get_msg(pu2.tp->get_out(), &msg2);
+    fail_unless(pu1.pc->get_state() == Proto::S_STATES_EXCH);
+
+    pu1.pc->handle_msg(msg1, Datagram(), pum1);
+    pu2.pc->handle_msg(msg1, Datagram(), pum1);
+
+    /* First node must abort */
+    try
+    {
+        pu1.pc->handle_msg(msg2, Datagram(), pum2);
+        fail("not aborted");
+    }
+    catch (Exception& e)
+    {
+        log_info << e.what();
+    }
+
+    fail_unless(pu2.tp->get_out() == 0);
+
+    View tr3(ViewId(V_TRANS, reg.get_id()));
+    tr3.add_member(uuid2);
+    pu2.pc->handle_view(tr3);
+    View reg3(ViewId(V_REG, uuid2, tr3.get_id().get_seq() + 1));
+    reg3.add_member(uuid2);
+    pu2.pc->handle_view(reg3);
+
+    get_msg(pu2.tp->get_out(), &msg2);
+    pu2.pc->handle_msg(msg2, Datagram(), pum2);
+
+    get_msg(pu2.tp->get_out(), &msg2);
+    pu2.pc->handle_msg(msg2, Datagram(), pum2);
+
+    fail_unless(pu2.pc->get_state() == Proto::S_PRIM);
+
+}
+END_TEST
+
 
 static void join_node(PropagationMatrix* p,
                       DummyNode* n, bool first)
@@ -1352,6 +1424,10 @@ Suite* pc_suite()
 
     tc = tcase_create("test_pc_conflicting_prims");
     tcase_add_test(tc, test_pc_conflicting_prims);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_pc_conflicting_prims_npvo");
+    tcase_add_test(tc, test_pc_conflicting_prims_npvo);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_pc_split_merge");

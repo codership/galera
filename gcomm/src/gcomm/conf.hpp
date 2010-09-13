@@ -293,8 +293,15 @@ namespace gcomm
          */
         static std::string const PcChecksum;
 
-
+        /*!
+         * @brief PC close linger timeout
+         */
         static std::string const PcLinger;
+
+        /*!
+         * @brief PC newer prim view overrides
+         */
+        static std::string const PcNpvo;
     };
 
 
