@@ -12,37 +12,18 @@
 %requires    libwrap0          7.6
 %requires    perl
 %requires    zlib1g            1.1.4
+%requires    mysql-client-5.1  5.1
 
 %provides    mysql-server-core-5.1
 %provides    mysql-server-core
 %provides    mysql-server-5.1
 %provides    mysql-server
-%provides    mysql-client-5.1
-%provides    mysql-client
-%provides    mysql-common-5.1
-%provides    mysql-common
-%provides    libmysqlclient16
-#%provides    mysql
 
 %replaces    mysql-server-core     0.0.0 ${mysql_version}
-#%replaces    mysql-server-core-4.1
-#%replaces    mysql-server-core-5.0
 %replaces    mysql-server-core-5.1 0.0.0 ${mysql_version}
 %replaces    mysql-server          0.0.0 ${mysql_version}
-%replaces    mysql-server-4.1
-%replaces    mysql-server-5.0
 %replaces    mysql-server-5.1      0.0.0 ${mysql_version}
-%replaces    mysql-client          0.0.0 ${mysql_version}
-%replaces    mysql-client-4.1
-%replaces    mysql-client-5.0
-%replaces    mysql-client-5.1      0.0.0 ${mysql_version}
-%replaces    mysql-common          0.0.0 ${mysql_version}
-%replaces    mysql-common-4.1
-%replaces    mysql-common-5.0
-%replaces    mysql-common-5.1      0.0.0 ${mysql_version}
-%replaces    libmysqlclient16      0.0.0 ${mysql_version}
 
-#%incompat    mysql-server-core
 %incompat    mysql-server-core-4.1
 %incompat    mysql-server-core-5.0
 %incompat    mysql-server-core-5.1
@@ -50,21 +31,8 @@
 %incompat    mysql-server-4.1
 %incompat    mysql-server-5.0
 %incompat    mysql-server-5.1
-%incompat    mysql-client
-%incompat    mysql-client-4.1
-%incompat    mysql-client-5.0
-%incompat    mysql-client-5.1
-#%incompat    mysql-common
-%incompat    mysql-common-4.1
-%incompat    mysql-common-5.0
-#%incompat    mysql-common-5.1
-#%incompat    libmysqlclient16
 
 $prefix=/usr
-
-$CONF_DST=/etc/mysql
-d 755 root root $CONF_DST         -
-c 644 root root $CONF_DST/my.cnf  $GALERA_SRC/scripts/mysql/debian/my.cnf
 
 d 755 root root /etc/init.d       -
 f 755 root root /etc/init.d/mysql $GALERA_SRC/scripts/mysql/debian/mysql
