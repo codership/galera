@@ -99,7 +99,6 @@ f 644 root root $MAN_DST/man1/mysqlhotcopy.1.gz      $MYSQL_SRC/man/mysqlhotcopy
 f 644 root root $MAN_DST/man1/mysql_install_db.1.gz  $MYSQL_SRC/man/mysql_install_db.1.gz
 f 644 root root $MAN_DST/man1/mysql_secure_installation.1.gz $MYSQL_SRC/man/mysql_secure_installation.1.gz
 f 644 root root $MAN_DST/man1/mysql_setpermission.1.gz $MYSQL_SRC/man/mysql_setpermission.1.gz
-f 644 root root $MAN_DST/man1/mysqlslap.1.gz         $MYSQL_SRC/man/mysqlslap.1.gz
 f 644 root root $MAN_DST/man1/mysqltest.1.gz         $MYSQL_SRC/man/mysqltest.1.gz
 f 644 root root $MAN_DST/man1/mysql_tzinfo_to_sql.1.gz $MYSQL_SRC/man/mysql_tzinfo_to_sql.1.gz
 f 644 root root $MAN_DST/man1/mysql_upgrade.1.gz     $MYSQL_SRC/man/mysql_upgrade.1.gz
