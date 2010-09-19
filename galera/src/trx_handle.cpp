@@ -81,13 +81,14 @@ public:
         using galera::TrxHandle;
 
         add(TrxHandle::S_EXECUTING, TrxHandle::S_MUST_ABORT);
-        add(TrxHandle::S_EXECUTING, TrxHandle::S_ABORTING);
+//        add(TrxHandle::S_EXECUTING, TrxHandle::S_ABORTING);
         add(TrxHandle::S_EXECUTING, TrxHandle::S_REPLICATING);
         add(TrxHandle::S_EXECUTING, TrxHandle::S_APPLYING);
         add(TrxHandle::S_EXECUTING, TrxHandle::S_ROLLED_BACK);
 
         add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_CERT_AND_REPLAY);
         add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY);
+        add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_ABORT);
         add(TrxHandle::S_MUST_ABORT, TrxHandle::S_ABORTING);
 
         add(TrxHandle::S_ABORTING, TrxHandle::S_ROLLED_BACK);
@@ -95,14 +96,12 @@ public:
         add(TrxHandle::S_REPLICATING, TrxHandle::S_REPLICATED);
         add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_CERT_AND_REPLAY);
         add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_ABORT);
-//        add(TrxHandle::S_REPLICATING, TrxHandle::S_ABORTING);
 
         add(TrxHandle::S_REPLICATED, TrxHandle::S_CERTIFYING);
 
         add(TrxHandle::S_CERTIFYING, TrxHandle::S_CERTIFIED);
         add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_CERT_AND_REPLAY);
         add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_ABORT);
-//        add(TrxHandle::S_CERTIFYING, TrxHandle::S_ABORTING);
 
         add(TrxHandle::S_CERTIFIED, TrxHandle::S_EXECUTING);
         add(TrxHandle::S_CERTIFIED, TrxHandle::S_APPLYING);

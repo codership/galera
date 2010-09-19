@@ -91,6 +91,7 @@ namespace galera
         }
 
     private:
+
         TestResult do_test(TrxHandle*, bool);
         void purge_for_trx(TrxHandle*);
 

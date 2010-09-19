@@ -73,8 +73,9 @@ namespace galera
             {
                 log_fatal << "FSM: no such a transition "
                           << state_ << " -> " << state;
-                gu_throw_fatal << "FSM: no such a transition "
-                               << state_ << " -> " << state;
+//                gu_throw_fatal << "FSM: no such a transition "
+//                               << state_ << " -> " << state;
+                abort(); // we want to catch it in the stack
             }
 
             typename std::list<Guard>::const_iterator gi;

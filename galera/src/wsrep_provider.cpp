@@ -24,13 +24,22 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
     try
     {
         gh->ctx = new REPL_CLASS (args);
+        return WSREP_OK;
     }
     catch (gu::Exception& e)
     {
         log_error << e.what();
-        return WSREP_NODE_FAIL;
     }
-    return WSREP_OK;
+    catch (std::exception& e)
+    {
+        log_error << e.what();
+    }
+    catch (...)
+    {
+        log_fatal << "non-standard exception";
+    }
+
+    return WSREP_NODE_FAIL;
 }
 
 
@@ -61,14 +70,9 @@ wsrep_status_t galera_parameters_set (wsrep_t* gh, const char* params)
             wsrep_set_params (*repl, params);
             return WSREP_OK;
         }
-        catch (gu::Exception& e)
+        catch (std::exception& e)
         {
             log_error << e.what();
-        }
-        catch (...)
-        {
-            log_fatal << "uncaught exception";
-            return WSREP_FATAL;
         }
     }
     else
@@ -102,14 +106,14 @@ wsrep_status_t galera_connect (wsrep_t*    gh,
     {
         return repl->connect(cluster_name, cluster_url, state_donor);
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_error << e.what();
         return WSREP_NODE_FAIL;
     }
     catch (...)
     {
-        log_fatal << "uncaught exception";
+        log_fatal << "non-standard exception";
         return WSREP_FATAL;
     }
 }
@@ -125,14 +129,14 @@ wsrep_status_t galera_disconnect(wsrep_t *gh)
     {
         return repl->close();
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_error << e.what();
         return WSREP_NODE_FAIL;
     }
     catch (...)
     {
-        log_fatal << "uncaught exception";
+        log_fatal << "non-standard exception";
         return WSREP_FATAL;
     }
 }
@@ -159,11 +163,16 @@ wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
             return WSREP_NODE_FAIL;
         }
     }
+    catch (std::exception& e)
+    {
+        log_error << e.what();
+    }
     catch (...)
     {
-        log_fatal << "uncaught exception";
-        return WSREP_FATAL;
+        log_fatal << "non-standard exception";
     }
+
+    return WSREP_FATAL;
 }
 
 
@@ -185,16 +194,16 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
     try
     {
         TrxHandleLock lock(*trx);
-        retval = repl->abort(trx);
+        retval = repl->abort_trx(trx);
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_error << e.what();
         retval = WSREP_NODE_FAIL;
     }
     catch (...)
     {
-        log_fatal << "uncaught exception";
+        log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
 
@@ -207,8 +216,7 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
 extern "C"
 wsrep_status_t galera_abort_slave_trx (wsrep_t*      gh,
                                        wsrep_seqno_t bf_seqno,
-                                       wsrep_seqno_t victim_seqno
-    )
+                                       wsrep_seqno_t victim_seqno)
 {
     log_warn << "Trx " << bf_seqno << " tries to abort";
     log_warn << "Trx " << victim_seqno;
@@ -238,14 +246,14 @@ wsrep_status_t galera_post_commit (wsrep_t*            gh,
         TrxHandleLock lock(*trx);
         retval = repl->post_commit(trx);
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_error << e.what();
         retval = WSREP_NODE_FAIL;
     }
     catch (...)
     {
-        log_fatal << "uncaught exception";
+        log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
 
@@ -278,14 +286,14 @@ wsrep_status_t galera_post_rollback(wsrep_t*            gh,
         TrxHandleLock lock(*trx);
         retval = repl->post_rollback(trx);
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_error << e.what();
         retval = WSREP_NODE_FAIL;
     }
     catch (...)
     {
-        log_fatal << "uncaught exception";
+        log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
 
@@ -341,14 +349,14 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
         assert(retval == WSREP_OK || retval == WSREP_TRX_FAIL ||
                retval == WSREP_BF_ABORT);
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_error << e.what();
         retval = WSREP_NODE_FAIL;
     }
     catch (...)
     {
-        log_fatal << "uncaught exception";
+        log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
 
@@ -379,14 +387,14 @@ wsrep_status_t galera_append_query(wsrep_t*            gh,
         trx->append_statement(query, strlen(query), timeval, randseed);
         retval = WSREP_OK;
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_warn << e.what();
         retval = WSREP_CONN_FAIL;
     }
     catch (...)
     {
-        log_fatal << "uncaught exception";
+        log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
 
@@ -425,14 +433,14 @@ wsrep_status_t galera_append_row_key(wsrep_t*            gh,
         trx->append_row_id(dbtable, dbtable_len, key, key_len, ac);
         retval = WSREP_OK;
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_warn << e.what();
         retval = WSREP_CONN_FAIL;
     }
     catch (...)
     {
-        log_fatal << "uncaught exception";
+        log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
     repl->unref_local_trx(trx);
@@ -515,14 +523,14 @@ wsrep_status_t galera_set_database(wsrep_t*              gh,
         }
         return WSREP_OK;
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_warn << e.what();
         return WSREP_CONN_FAIL;
     }
     catch (...)
     {
-        log_fatal << "uncaught exception";
+        log_fatal << "non-standard exception";
         return WSREP_FATAL;
     }
 }
@@ -562,14 +570,14 @@ wsrep_status_t galera_to_execute_start(wsrep_t*        gh,
             retval = repl->to_isolation_begin(trx);
         }
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_warn << e.what();
         retval = WSREP_CONN_FAIL;
     }
     catch (...)
     {
-        log_fatal << "uncaught exception";
+        log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
 
@@ -604,14 +612,14 @@ wsrep_status_t galera_to_execute_end(wsrep_t* gh, wsrep_conn_id_t conn_id)
         return WSREP_OK;
         // trx will be unreferenced (destructed) during purge
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_warn << e.what();
         return WSREP_CONN_FAIL;
     }
     catch (...)
     {
-        log_fatal << "uncaught exception";
+        log_fatal << "non-standard exception";
         return WSREP_FATAL;
     }
 
@@ -634,16 +642,16 @@ wsrep_status_t galera_replay_trx(wsrep_t*            gh,
     try
     {
         TrxHandleLock lock(*trx);
-        retval = repl->replay(trx, recv_ctx);
+        retval = repl->replay_trx(trx, recv_ctx);
     }
-    catch (gu::Exception& e)
+    catch (std::exception& e)
     {
         log_warn << e.what();
         retval = WSREP_CONN_FAIL;
     }
     catch (...)
     {
-        log_fatal << "uncaught exception";
+        log_fatal << "non-standard exception";
         retval = WSREP_FATAL;
     }
 

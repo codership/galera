@@ -21,6 +21,8 @@ START_TEST(test_states)
 
     log_info << *trx;
     fail_unless(trx->state() == TrxHandle::S_EXECUTING);
+
+#if 0 // now setting wrong state results in abort
     try
     {
         trx->set_state(TrxHandle::S_COMMITTED);
@@ -30,6 +32,8 @@ START_TEST(test_states)
     {
         fail_unless(trx->state() == TrxHandle::S_EXECUTING);
     }
+#endif
+
     trx->set_state(TrxHandle::S_REPLICATING);
     fail_unless(trx->state() == TrxHandle::S_REPLICATING);
     trx->unref();

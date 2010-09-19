@@ -78,9 +78,9 @@ namespace galera
 
 
         wsrep_status_t replicate(TrxHandle* trx);
-        wsrep_status_t abort(TrxHandle* trx);
+        wsrep_status_t abort_trx(TrxHandle* trx);
         wsrep_status_t pre_commit(TrxHandle*  trx);
-        wsrep_status_t replay(TrxHandle* trx, void* replay_ctx);
+        wsrep_status_t replay_trx(TrxHandle* trx, void* replay_ctx);
 
         wsrep_status_t post_commit(TrxHandle* trx);
         wsrep_status_t post_rollback(TrxHandle* trx);
