@@ -38,12 +38,16 @@ d 755 root root $BINS_DST -
 f 644 root root $CONF_DST/conf.d/mysqld_safe_syslog.cnf $GALERA_SRC/scripts/mysql/debian/mysqld_safe_syslog.cnf
 f 755 root root $BINS_DST/msql2mysql           $MYSQL_SRC/scripts/msql2mysql
 f 755 root root $BINS_DST/my_print_defaults    $MYSQL_SRC/extra/my_print_defaults
+%format rpm
 f 755 root root $BINS_DST/innochecksum         $MYSQL_SRC/extra/innochecksum
+%format all
 f 755 root root $BINS_DST/myisamchk            $MYSQL_SRC/storage/myisam/myisamchk
 f 755 root root $BINS_DST/myisamlog            $MYSQL_SRC/storage/myisam/myisamlog
 f 755 root root $BINS_DST/myisampack           $MYSQL_SRC/storage/myisam/myisampack
 f 755 root root $BINS_DST/mysql_convert_table_format $MYSQL_SRC/scripts/mysql_convert_table_format
+%format rpm
 f 755 root root $BINS_DST/mysql_fix_extensions $MYSQL_SRC/scripts/mysql_fix_extensions
+%format all
 f 755 root root $BINS_DST/mysql_fix_privilege_tables $MYSQL_SRC/scripts/mysql_fix_privilege_tables
 f 755 root root $BINS_DST/mysql_install_db     $MYSQL_SRC/scripts/mysql_install_db
 f 755 root root $BINS_DST/mysql_secure_installation $MYSQL_SRC/scripts/mysql_secure_installation
@@ -90,6 +94,7 @@ f 644 root root $SHAR_DST/charsets             $MYSQL_SRC/sql/share/charsets/*
 
 # manpages
 d 755 root root $MAN_DST/man1 -
+%format rpm
 f 644 root root $MAN_DST/man1/innochecksum.1.gz      $MYSQL_SRC/man/innochecksum.1.gz
 %format deb
 f 644 root root $MAN_DST/man1/msql2mysql.1.gz        $MYSQL_SRC/man/msql2mysql.1.gz
@@ -104,7 +109,9 @@ f 644 root root $MAN_DST/man1/mysqlbinlog.1.gz       $MYSQL_SRC/man/mysqlbinlog.
 f 644 root root $MAN_DST/man1/mysql_convert_table_format.1.gz $MYSQL_SRC/man/mysql_convert_table_format.1.gz
 f 644 root root $MAN_DST/man1/mysqld_multi.1.gz      $MYSQL_SRC/man/mysqld_multi.1.gz
 f 644 root root $MAN_DST/man1/mysqld_safe.1.gz       $MYSQL_SRC/man/mysqld_safe.1.gz
+%format rpm
 f 644 root root $MAN_DST/man1/mysql_fix_extensions.1.gz $MYSQL_SRC/man/mysql_fix_extensions.1.gz
+%format all
 f 644 root root $MAN_DST/man1/mysql_fix_privilege_tables.1.gz $MYSQL_SRC/man/mysql_fix_privilege_tables.1.gz
 f 644 root root $MAN_DST/man1/mysqlhotcopy.1.gz      $MYSQL_SRC/man/mysqlhotcopy.1.gz
 f 644 root root $MAN_DST/man1/mysql_install_db.1.gz  $MYSQL_SRC/man/mysql_install_db.1.gz
