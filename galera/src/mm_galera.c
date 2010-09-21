@@ -2683,7 +2683,7 @@ static wsrep_t mm_galera_str = {
     &mm_galera_status_get,
     &mm_galera_status_free,
     "Galera",
-    "0.7pre",
+    "0.7.5",
     "Codership Oy <info@codership.com>",
     &mm_galera_tear_down,
     NULL,
