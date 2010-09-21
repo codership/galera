@@ -1,11 +1,11 @@
 # This is a MySQL-wsrep package description for ESP package manager
 
-%product     wsrep-enabled MySQL server, clients and libraries.
+%product     wsrep-enabled MySQL server
 %copyright   MySQL AB, Codership Oy, All Rights Reserved
 %vendor      Codership Oy
 %license     COPYING
 %readme      README
-%description MySQL + wsrep patch (https://launchpad.net/codership-mysql). All-in-one: contains libraries, client and server.
+%description MySQL server + wsrep patch (https://launchpad.net/codership-mysql).
 $mysql_version=${MYSQL_VER}
 $wsrep_version=${WSREP_VER}
 %version     ${mysql_version}-${wsrep_version}
@@ -38,10 +38,12 @@ d 755 root root $BINS_DST -
 f 644 root root $CONF_DST/conf.d/mysqld_safe_syslog.cnf $GALERA_SRC/scripts/mysql/debian/mysqld_safe_syslog.cnf
 f 755 root root $BINS_DST/msql2mysql           $MYSQL_SRC/scripts/msql2mysql
 f 755 root root $BINS_DST/my_print_defaults    $MYSQL_SRC/extra/my_print_defaults
+f 755 root root $BINS_DST/innochecksum         $MYSQL_SRC/extra/innochecksum
 f 755 root root $BINS_DST/myisamchk            $MYSQL_SRC/storage/myisam/myisamchk
 f 755 root root $BINS_DST/myisamlog            $MYSQL_SRC/storage/myisam/myisamlog
 f 755 root root $BINS_DST/myisampack           $MYSQL_SRC/storage/myisam/myisampack
 f 755 root root $BINS_DST/mysql_convert_table_format $MYSQL_SRC/scripts/mysql_convert_table_format
+f 755 root root $BINS_DST/mysql_fix_extensions $MYSQL_SRC/scripts/mysql_fix_extensions
 f 755 root root $BINS_DST/mysql_fix_privilege_tables $MYSQL_SRC/scripts/mysql_fix_privilege_tables
 f 755 root root $BINS_DST/mysql_install_db     $MYSQL_SRC/scripts/mysql_install_db
 f 755 root root $BINS_DST/mysql_secure_installation $MYSQL_SRC/scripts/mysql_secure_installation
@@ -49,9 +51,13 @@ f 755 root root $BINS_DST/mysql_setpermission  $MYSQL_SRC/scripts/mysql_setpermi
 f 755 root root $BINS_DST/mysql_tzinfo_to_sql  $MYSQL_SRC/sql/mysql_tzinfo_to_sql
 f 755 root root $BINS_DST/mysql_upgrade        $MYSQL_SRC/client/.libs/mysql_upgrade
 f 755 root root $BINS_DST/mysql_zap            $MYSQL_SRC/scripts/mysql_zap
+# Official RPMs have mysqlbinlog in client package
+%format deb
 f 755 root root $BINS_DST/mysqlbinlog          $MYSQL_SRC/client/.libs/mysqlbinlog
+%format all
 f 755 root root $BINS_DST/mysqld_multi         $MYSQL_SRC/scripts/mysqld_multi
 f 755 root root $BINS_DST/mysqld_safe          $MYSQL_SRC/scripts/mysqld_safe
+f 755 root root $BINS_DST/mysqlhotcopy         $MYSQL_SRC/scripts/mysqlhotcopy
 f 755 root root $BINS_DST/mysqltest            $MYSQL_SRC/client/.libs/mysqltest
 f 755 root root $BINS_DST/perror               $MYSQL_SRC/extra/perror
 f 755 root root $BINS_DST/replace              $MYSQL_SRC/extra/replace
@@ -85,15 +91,20 @@ f 644 root root $SHAR_DST/charsets             $MYSQL_SRC/sql/share/charsets/*
 # manpages
 d 755 root root $MAN_DST/man1 -
 f 644 root root $MAN_DST/man1/innochecksum.1.gz      $MYSQL_SRC/man/innochecksum.1.gz
+%format deb
 f 644 root root $MAN_DST/man1/msql2mysql.1.gz        $MYSQL_SRC/man/msql2mysql.1.gz
+%format all
 f 644 root root $MAN_DST/man1/myisamchk.1.gz         $MYSQL_SRC/man/myisamchk.1.gz
 f 644 root root $MAN_DST/man1/myisamlog.1.gz         $MYSQL_SRC/man/myisamlog.1.gz
 f 644 root root $MAN_DST/man1/myisampack.1.gz        $MYSQL_SRC/man/myisampack.1.gz
 f 644 root root $MAN_DST/man1/my_print_defaults.1.gz $MYSQL_SRC/man/my_print_defaults.1.gz
+%format deb
 f 644 root root $MAN_DST/man1/mysqlbinlog.1.gz       $MYSQL_SRC/man/mysqlbinlog.1.gz
+%format all
 f 644 root root $MAN_DST/man1/mysql_convert_table_format.1.gz $MYSQL_SRC/man/mysql_convert_table_format.1.gz
 f 644 root root $MAN_DST/man1/mysqld_multi.1.gz      $MYSQL_SRC/man/mysqld_multi.1.gz
 f 644 root root $MAN_DST/man1/mysqld_safe.1.gz       $MYSQL_SRC/man/mysqld_safe.1.gz
+f 644 root root $MAN_DST/man1/mysql_fix_extensions.1.gz $MYSQL_SRC/man/mysql_fix_extensions.1.gz
 f 644 root root $MAN_DST/man1/mysql_fix_privilege_tables.1.gz $MYSQL_SRC/man/mysql_fix_privilege_tables.1.gz
 f 644 root root $MAN_DST/man1/mysqlhotcopy.1.gz      $MYSQL_SRC/man/mysqlhotcopy.1.gz
 f 644 root root $MAN_DST/man1/mysql_install_db.1.gz  $MYSQL_SRC/man/mysql_install_db.1.gz

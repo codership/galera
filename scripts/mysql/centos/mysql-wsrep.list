@@ -29,27 +29,16 @@
 %requires perl-DBI
 %requires rtld(GNU_HASH)
 %requires sh-utils
+
+# Required MySQL packages
+%requires MySQL-shared 5.1.44
+%requires MySQL-client 5.1.44
+# Conflicting mysql packages
+%incompat mysql-server
+
 #config(mysql) = 5.0.77-4.el5_4.1 ???
 
-%provides libmysqlclient.so.16     0.0.0 ${mysql_version}
-%provides libmysqlclient_r.so.16   0.0.0 ${mysql_version}
-%provides mysql
-%provides config(mysql)
-%provides mysql-server
-%provides config(mysql-server)
-%provides MySQL
 %provides MySQL-server
-%provides MySQL-client
-%provides MySQL-shared
-
-
-#%incompat libmysqlclient16      0.0.0 ${mysql_version}
-#%incompat mysql
-#%incompat mysql-server
-#%incompat MySQL
-#%incompat MySQL-server
-#%incompat MySQL-client
-#%incompat MySQL-shared
 
 $prefix=/usr
 
