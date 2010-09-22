@@ -797,6 +797,9 @@ gu::net::Network::~Network()
     poll->erase(PollEvent(wake_fd[0], 0, 0));
     closefd(wake_fd[1]);
     closefd(wake_fd[0]);
+
+    for_each(released.begin(), released.end(), DeleteObject());
+    released.clear();
     
     /* NOTE: Deleting socket modifies also socket list (erases corresponding
      * entry) and iterator becomes invalid. Therefore i = sockets->begin()
