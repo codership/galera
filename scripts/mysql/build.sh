@@ -279,6 +279,7 @@ install -m 755 -s -t $MYSQL_BINS  $MYSQL_SRC/client/.libs/mysqldump
 install -m 755 -s -t $MYSQL_BINS  $MYSQL_SRC/client/.libs/mysqladmin
 fi
 install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_mysqldump
+install -m 644 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_mysqldump_fix.sql
 install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_rsync
 install -m 755 -d $MYSQL_CHARSETS
 install -m 644 -t $MYSQL_CHARSETS $MYSQL_SRC/sql/share/charsets/*.xml
