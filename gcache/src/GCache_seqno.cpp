@@ -21,7 +21,13 @@ namespace gcache
     {
         gu::Lock lock(mtx);
 
-        reset ();
+        int64_t old_min = seqno2ptr.begin()->first;
+        int64_t old_max = seqno2ptr.rbegin()->first;
+
+        log_info << "Discarding old history seqnos from cache: " << old_min
+                 << '-' << old_max;
+
+        discard_seqno (old_max); // forget all previous seqnos
         seqno_min = seqno;
     }
 

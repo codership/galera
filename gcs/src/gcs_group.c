@@ -827,8 +827,14 @@ gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act)
 
         if (group->num) {
             assert (conf->my_idx >= 0);
-//            conf->st_required = (group->conf_id >= 0) &&
-//                (group->nodes[group->my_idx].status < GCS_NODE_STATE_JOINER);
+
+            /* See #395 - if we're likely to need SST, clear up outdated
+             * seqno map */
+            if ((group->conf_id >= 0) &&
+                (group->nodes[group->my_idx].status < GCS_NODE_STATE_JOINER)) {
+                gcache_seqno_init (group->cache, conf->seqno);
+            }
+
             conf->my_state = group->nodes[group->my_idx].status;
 
             char* ptr = &conf->data[0];

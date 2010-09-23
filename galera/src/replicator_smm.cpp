@@ -293,7 +293,8 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
         ret = WSREP_NODE_FAIL;
     }
 
-    gcache_.seqno_init(cert_.position());
+//    gcache_.seqno_init(cert_.position());
+    gcache_.reset();
 
     if (ret == WSREP_OK &&
         (err = gcs_.connect(cluster_name, cluster_url)) != 0)
@@ -1353,7 +1354,6 @@ wsrep_status_t galera::ReplicatorSMM::process_conf(void* recv_ctx,
 
         if (st_req == true)
         {
-            gcache_.seqno_init(conf->seqno);
             retval = request_sst(*group_uuid, group_seqno, app_req,app_req_len);
         }
         else

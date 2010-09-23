@@ -37,6 +37,9 @@ namespace gcache
         /*! prints object properties */
         void print (std::ostream& os);
 
+        /* Resets storage */
+        void reset();
+
         /* Memory allocation functions */
         void* malloc  (ssize_t size) throw (gu::Exception);
         void  free    (void* ptr) throw ();
@@ -46,7 +49,7 @@ namespace gcache
 
         /*!
          * Reinitialize seqno sequence (after SST or such)
-         * Clears cache and sets seqno_min to seqno.
+         * Clears cache from buffers with seqnos and sets seqno_min to seqno.
          */
         void    seqno_init    (int64_t seqno);
 
@@ -118,18 +121,8 @@ namespace gcache
         std::set<const void*> buf_tracker;
 #endif
 
-//        void header_read();
-//        void header_write();
-//        void preamble_write();
-
-        void reset();
         void constructor_common();
         void discard_seqno (int64_t);
-
-//        void* get_new_buffer (size_t size);
-
-//        inline void order_buffer   (const void* ptr, int64_t seqno);
-//        inline void discard_buffer (struct BufferHeader* bh);
 
         // disable copying
         GCache (const GCache&);

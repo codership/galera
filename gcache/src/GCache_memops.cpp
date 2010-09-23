@@ -8,7 +8,7 @@
 
 namespace gcache
 {
-    inline void
+    void
     GCache::discard_seqno (int64_t seqno)
     {
         for (seqno2ptr_t::iterator i = seqno2ptr.begin();
