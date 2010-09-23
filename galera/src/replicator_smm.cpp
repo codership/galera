@@ -936,19 +936,22 @@ galera::ReplicatorSMM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
 
 wsrep_status_t
 galera::ReplicatorSMM::sst_received(const wsrep_uuid_t& uuid,
-                         wsrep_seqno_t seqno,
-                         const void* state,
-                         size_t state_len)
+                                    wsrep_seqno_t       seqno,
+                                    const void*         state,
+                                    size_t              state_len)
 {
     log_info << "Received SST: " << uuid << ':' << seqno;
+
     if (state_() != S_JOINING)
     {
         log_error << "not in joining state when sst received called, state "
                   << state_();
         return WSREP_CONN_FAIL;
     }
+
     gu::Lock lock(sst_mutex_);
-    sst_uuid_ = uuid;
+
+    sst_uuid_  = uuid;
     sst_seqno_ = seqno;
     sst_cond_.signal();
     return WSREP_OK;
@@ -958,6 +961,7 @@ galera::ReplicatorSMM::sst_received(const wsrep_uuid_t& uuid,
 void galera::ReplicatorSMM::store_state(const std::string& file) const
 {
     std::ofstream fs(file.c_str(), std::ios::trunc);
+
     if (fs.fail() == true)
     {
         gu_throw_fatal << "could not store state";
@@ -1181,10 +1185,10 @@ wsrep_status_t galera::ReplicatorSMM::process_global_action(void* recv_ctx,
 }
 
 
-
-wsrep_status_t galera::ReplicatorSMM::request_sst(wsrep_uuid_t const& group_uuid,
-                                       wsrep_seqno_t const group_seqno,
-                                       const void* req, size_t req_len)
+wsrep_status_t
+galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
+                                   wsrep_seqno_t const  group_seqno,
+                                   const void* req, size_t req_len)
 {
     assert(req != 0);
     log_info << "State transfer required: "
@@ -1194,13 +1198,17 @@ wsrep_status_t galera::ReplicatorSMM::request_sst(wsrep_uuid_t const& group_uuid
              << ":" << apply_monitor_.last_left();
 
     wsrep_status_t retval(WSREP_OK);
-    gu::Lock lock(sst_mutex_);
     long ret;
+    gu::Lock lock(sst_mutex_);
+
     do
     {
         invalidate_state(state_file_);
+
         gcs_seqno_t seqno_l;
+
         ret = gcs_.request_state_transfer(req, req_len, sst_donor_, &seqno_l);
+
         if (ret < 0)
         {
             if (ret != -EAGAIN)
@@ -1230,7 +1238,9 @@ wsrep_status_t galera::ReplicatorSMM::request_sst(wsrep_uuid_t const& group_uuid
     {
         log_info << "Requesting state transfer: success, donor " << ret;
         sst_state_ = SST_WAIT;
+
         lock.wait(sst_cond_);
+
         if (sst_uuid_ != group_uuid || sst_seqno_ < group_seqno)
         {
             log_fatal << "Application received wrong state: "
@@ -1246,7 +1256,7 @@ wsrep_status_t galera::ReplicatorSMM::request_sst(wsrep_uuid_t const& group_uuid
             state_uuid_ = sst_uuid_;
             apply_monitor_.set_initial_position(-1);
             apply_monitor_.set_initial_position(sst_seqno_);
-            log_debug << "Initial state " << state_uuid_ << ":" << sst_seqno_;
+            log_debug << "Initial state: " << state_uuid_ << ":" << sst_seqno_;
             sst_state_ = SST_NONE;
             gcs_.join(sst_seqno_);
         }
@@ -1294,12 +1304,13 @@ bool galera::ReplicatorSMM::st_required(const gcs_act_conf_t& conf)
         // non-prim component
         // assert(conf.conf_id < 0);
     }
+
     return retval;
 }
 
 
 wsrep_status_t galera::ReplicatorSMM::process_conf(void* recv_ctx,
-                                        const gcs_act_conf_t* conf)
+                                                   const gcs_act_conf_t* conf)
 {
     assert(conf != 0);
 
@@ -1314,11 +1325,13 @@ wsrep_status_t galera::ReplicatorSMM::process_conf(void* recv_ctx,
         uuid_ = view_info->members[view_info->my_idx].id;
     }
 
-    void* app_req(0);
+    void*   app_req(0);
     ssize_t app_req_len(0);
+
     view_cb_(app_ctx_, recv_ctx, view_info, 0, 0, &app_req, &app_req_len);
 
     wsrep_status_t retval(WSREP_OK);
+
     if (conf->conf_id >= 0)
     {
         // Primary configuration
