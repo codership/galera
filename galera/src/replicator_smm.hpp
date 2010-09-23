@@ -69,17 +69,17 @@ namespace galera
         TrxHandle* local_conn_trx(wsrep_conn_id_t, bool);
         void set_default_context(wsrep_conn_id_t conn_id,
                                  const void* cxt, size_t cxt_len);
+        void discard_local_conn_trx(wsrep_conn_id_t conn_id);
         void discard_local_conn(wsrep_conn_id_t conn_id);
-
 
         wsrep_status_t process_trx_ws(void* recv_ctx, TrxHandle* trx);
         wsrep_status_t process_conn_ws(void* recv_ctx, TrxHandle* trx);
 
 
         wsrep_status_t replicate(TrxHandle* trx);
-        wsrep_status_t abort(TrxHandle* trx);
+        wsrep_status_t abort_trx(TrxHandle* trx);
         wsrep_status_t pre_commit(TrxHandle*  trx);
-        wsrep_status_t replay(TrxHandle* trx, void* replay_ctx);
+        wsrep_status_t replay_trx(TrxHandle* trx, void* replay_ctx);
 
         wsrep_status_t post_commit(TrxHandle* trx);
         wsrep_status_t post_rollback(TrxHandle* trx);
@@ -142,6 +142,9 @@ namespace galera
                                 gcs_act_type_t,
                                 wsrep_seqno_t seqno_l,
                                 wsrep_seqno_t seqno_g);
+
+        void to_isolation_cleanup (TrxHandle* trx);
+
         class LocalOrder
         {
         public:

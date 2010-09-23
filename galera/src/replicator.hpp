@@ -40,13 +40,15 @@ namespace galera
                                           bool create) = 0;
         virtual void set_default_context(wsrep_conn_id_t conn_id,
                                          const void* cxt, size_t cxt_len) = 0;
+        virtual void discard_local_conn_trx(wsrep_conn_id_t conn_id) = 0;
         virtual void discard_local_conn(wsrep_conn_id_t conn_id) = 0;
+
         virtual wsrep_status_t replicate(TrxHandle* trx) = 0;
         virtual wsrep_status_t pre_commit(TrxHandle* trx) = 0;
         virtual wsrep_status_t post_commit(TrxHandle* trx) = 0;
         virtual wsrep_status_t post_rollback(TrxHandle* trx) = 0;
-        virtual wsrep_status_t replay(TrxHandle* trx, void* replay_ctx) = 0;
-        virtual wsrep_status_t abort(TrxHandle* trx) = 0;
+        virtual wsrep_status_t replay_trx(TrxHandle* trx, void* replay_ctx) = 0;
+        virtual wsrep_status_t abort_trx(TrxHandle* trx) = 0;
         virtual wsrep_status_t causal_read(wsrep_seqno_t*) const = 0;
         virtual wsrep_status_t to_isolation_begin(TrxHandle* trx) = 0;
         virtual wsrep_status_t to_isolation_end(TrxHandle* trx) = 0;

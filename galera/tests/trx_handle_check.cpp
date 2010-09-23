@@ -21,6 +21,8 @@ START_TEST(test_states)
 
     log_info << *trx;
     fail_unless(trx->state() == TrxHandle::S_EXECUTING);
+
+#if 0 // now setting wrong state results in abort
     try
     {
         trx->set_state(TrxHandle::S_COMMITTED);
@@ -30,6 +32,8 @@ START_TEST(test_states)
     {
         fail_unless(trx->state() == TrxHandle::S_EXECUTING);
     }
+#endif
+
     trx->set_state(TrxHandle::S_REPLICATING);
     fail_unless(trx->state() == TrxHandle::S_REPLICATING);
     trx->unref();
@@ -50,12 +54,13 @@ START_TEST(test_states)
     trx->unref();
 
     // aborted during replication and certifies but does not certify
-    // during replay
+    // during replay (is this even possible?)
     trx = new TrxHandle(uuid, -1, 1, true);
     trx->set_state(TrxHandle::S_REPLICATING);
     trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_MUST_CERT_AND_REPLAY);
     trx->set_state(TrxHandle::S_CERTIFYING);
+    trx->set_state(TrxHandle::S_MUST_ABORT);
     trx->set_state(TrxHandle::S_ABORTING);
     trx->set_state(TrxHandle::S_ROLLED_BACK);
     trx->unref();

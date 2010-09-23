@@ -64,7 +64,7 @@ debug = ARGUMENTS.get('debug', -1)
 dbug  = ARGUMENTS.get('dbug', False)
 
 if int(debug) >= 0:
-    opt_flags = '-g -O%d' % int(debug)
+    opt_flags = '-g -O%d -fno-inline' % int(debug)
     dbug = True
 
 if dbug:

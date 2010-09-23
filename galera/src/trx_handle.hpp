@@ -53,26 +53,30 @@ namespace galera
         class Transition
         {
         public:
-            Transition(State const from, State const to)
-                :
-                from_(from),
-                to_(to)
+
+            Transition(State const from, State const to) : from_(from), to_(to)
             { }
+
             State from() const { return from_; }
-            State to() const { return to_; }
+            State to()   const { return to_;   }
+
             bool operator==(Transition const& other) const
             {
                 return (from_ == other.from_ && to_ == other.to_);
             }
+
             class Hash
             {
             public:
                 size_t operator()(Transition const& tr) const
                 {
-		  return (gu::HashValue(static_cast<int>(tr.from_)) ^ gu::HashValue(static_cast<int>(tr.to_)));
+                    return (gu::HashValue(static_cast<int>(tr.from_)) ^
+                            gu::HashValue(static_cast<int>(tr.to_)));
                 }
             };
+
         private:
+
             State from_;
             State to_;
         };

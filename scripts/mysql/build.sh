@@ -214,6 +214,8 @@ echo  "Building mysqld"
 
 export MYSQL_REV
 export GALERA_REV
+export MAKE="make -j$JOBS"
+
 if [ "$SKIP_BUILD" == "no" ]
 then
     if [ "$CONFIGURE" == "yes" ] && [ "$SKIP_CONFIGURE" == "no" ]

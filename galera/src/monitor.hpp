@@ -196,8 +196,6 @@ namespace galera
 
         wsrep_seqno_t last_left() const { return last_left_; }
 
-
-
         void drain(wsrep_seqno_t seqno)
         {
             gu::Lock lock(mutex_);
