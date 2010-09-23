@@ -18,12 +18,12 @@ namespace gcache
     static const int OPEN_FLAGS   = O_RDWR | O_NOATIME;
     static const int CREATE_FLAGS = OPEN_FLAGS | O_CREAT | O_TRUNC;
  
-    FileDescriptor::FileDescriptor (const std::string& fname, bool sync)
+    FileDescriptor::FileDescriptor (const std::string& fname, bool sync_)
         throw (gu::Exception)
         : value (open (fname.c_str(), OPEN_FLAGS, S_IRUSR | S_IWUSR)),
           name  (fname),
           size  (lseek (value, 0, SEEK_END)),
-          sync  (sync)
+          sync  (sync_)
     {
         constructor_common();
     }
@@ -31,12 +31,12 @@ namespace gcache
     FileDescriptor::FileDescriptor (const std::string& fname,
                                     size_t             length,
                                     bool               allocate,
-                                    bool               sync)
+                                    bool               sync_)
         throw (gu::Exception)
         : value (open (fname.c_str(), CREATE_FLAGS, S_IRUSR | S_IWUSR)),
           name  (fname),
           size  (length),
-          sync  (sync)
+          sync  (sync_)
     {
         constructor_common();
 

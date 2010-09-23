@@ -141,6 +141,7 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
                            TrxHandle& trx)
 {
     uint32_t hdr;
+
     try
     {
         offset = unserialize(buf, buflen, offset, hdr);
