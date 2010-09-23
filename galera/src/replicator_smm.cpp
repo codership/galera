@@ -888,6 +888,7 @@ galera::ReplicatorSMM::sst_received(const wsrep_uuid_t& uuid,
                          const void* state,
                          size_t state_len)
 {
+    log_info << "Received SST: " << uuid << ':' << seqno;
     if (state_() != S_JOINING)
     {
         log_error << "not in joining state when sst received called, state "
@@ -1087,15 +1088,15 @@ wsrep_status_t galera::ReplicatorSMM::process_global_action(void* recv_ctx,
     }
     catch (gu::Exception& e)
     {
-        switch (e.get_errno())
-        {
-        case EPROTONOSUPPORT:
-            log_error << "incompatible protocol version: " << e.what();
-            return WSREP_NODE_FAIL;
-        default:
-            log_warn << "could not read trx " << seqno_g;
-            return WSREP_FATAL;
-        }
+        GU_TRACE(e);
+
+        log_fatal << "Failed to create trx from a writeset: " << e.what()
+                  << std::endl << "Global:    " << seqno_g
+                  << std::endl << "Local:     " << seqno_l
+                  << std::endl << "Buffer:    " << act
+                  << std::endl << "Size:      " << act_size;
+
+        return WSREP_FATAL;
     }
 
     if (trx == 0)

@@ -32,6 +32,7 @@ gcomm::AsioTcpSocket::AsioTcpSocket(AsioProtonet& net, const URI& uri)
 gcomm::AsioTcpSocket::~AsioTcpSocket()
 {
     log_debug << "dtor for " << get_id();
+
     try
     {
         socket_.close();
@@ -47,16 +48,20 @@ void gcomm::AsioTcpSocket::failed_handler(const asio::error_code& ec,
               << " socket " << get_id() << " " << socket_.native()
               << " error " << ec
               << " " << socket_.is_open() << " state " << get_state();
+
     try
     {
         log_debug << "local endpoint " << get_local_addr()
                   << " remote endpoint " << get_remote_addr();
     } catch (...) { }
+
     const State prev_state(get_state());
+
     if (get_state() != S_CLOSED)
     {
         state_ = S_FAILED;
     }
+
     if (prev_state != S_FAILED && prev_state != S_CLOSED)
     {
         net_.dispatch(get_id(), Datagram(), ProtoUpMeta(ec.value()));
@@ -66,7 +71,9 @@ void gcomm::AsioTcpSocket::failed_handler(const asio::error_code& ec,
 void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
 {
     Critical<AsioProtonet> crit(net_);
+
     log_debug << "connect handler " << get_id() << " " << ec;
+
     if (ec)
     {
         FAILED_HANDLER(ec);
@@ -88,10 +95,14 @@ void gcomm::AsioTcpSocket::connect_handler(const asio::error_code& ec)
 void gcomm::AsioTcpSocket::connect(const URI& uri)
 {
     Critical<AsioProtonet> crit(net_);
-    asio::ip::tcp::resolver resolver(net_.io_service_);
-    asio::ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
-                                         uri.get_port());
+
+    asio::ip::tcp::resolver           resolver(net_.io_service_);
+
+    asio::ip::tcp::resolver::query    query(unescape_addr(uri.get_host()),
+                                            uri.get_port());
+
     asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
+
     socket_.async_connect(*i, boost::bind(&AsioTcpSocket::connect_handler,
                                           shared_from_this(),
                                           asio::placeholders::error));
@@ -101,6 +112,7 @@ void gcomm::AsioTcpSocket::connect(const URI& uri)
 void gcomm::AsioTcpSocket::close()
 {
     Critical<AsioProtonet> crit(net_);
+
     if (get_state() == S_CLOSED || get_state() == S_CLOSING) return;
 
     log_debug << "closing " << get_id() << " state " << get_state()
@@ -384,10 +396,13 @@ size_t gcomm::AsioTcpSocket::read_completion_condition(
 void gcomm::AsioTcpSocket::async_receive()
 {
     Critical<AsioProtonet> crit(net_);
+
     gcomm_assert(get_state() == S_CONNECTED);
 
     boost::array<asio::mutable_buffer, 1> mbs;
+
     mbs[0] = asio::mutable_buffer(&recv_buf_[0], recv_buf_.size());
+
     async_read(socket_, mbs,
                boost::bind(&AsioTcpSocket::read_completion_condition,
                            shared_from_this(),

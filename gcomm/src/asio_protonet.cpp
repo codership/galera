@@ -60,7 +60,6 @@ gcomm::SocketPtr gcomm::AsioProtonet::socket(const URI& uri)
     if (uri.get_scheme() == "tcp")
     {
         return boost::shared_ptr<AsioTcpSocket>(new AsioTcpSocket(*this, uri));
-
     }
     else if (uri.get_scheme() == "udp")
     {

@@ -10,7 +10,7 @@
 
 #include <map>
 
-
+#define WARNING_LIMIT 10000
 
 using namespace std;
 using namespace gu;
@@ -249,10 +249,12 @@ galera::TrxHandle* galera::Certification::create_trx(
     assert(seqno_l >= 0 && seqno_g >= 0);
 
     TrxHandle* trx(new TrxHandle());
+
+    trx->set_seqnos(seqno_l, seqno_g);
+
     size_t offset(unserialize(reinterpret_cast<const byte_t*>(data),
                               data_len, 0, *trx));
 
-    trx->set_seqnos(seqno_l, seqno_g);
     trx->append_write_set(reinterpret_cast<const byte_t*>(data) + offset,
                           data_len - offset);
     return trx;
@@ -280,7 +282,8 @@ galera::Certification::append_trx(TrxHandle* trx)
         }
         position_ = trx->global_seqno();
 
-        if (trx_map_.size() > 10000 && (trx_size_warn_count_++ % 1000 == 0))
+        if (trx_map_.size() > WARNING_LIMIT &&
+            (trx_size_warn_count_++ % WARNING_LIMIT == 0))
         {
             log_warn << "trx map size " << trx_map_.size()
                      << " check if status.last_committed is incrementing";
@@ -352,11 +355,8 @@ void galera::Certification::purge_trxs_upto(wsrep_seqno_t seqno)
     trx_map_.erase(trx_map_.begin(), lower_bound);
     if (trx_map_.size() > 10000)
     {
-        log_warn << "trx map after purge: "
-                 << trx_map_.size() << " "
-                 << trx_map_.begin()->second->global_seqno()
-                 << " purge seqno " << seqno;
-        log_warn << "last committed seqno updating is probably broken";
+        log_debug << "trx map after purge: length: " << trx_map_.size()
+                  << ", purge seqno " << seqno;
     }
 }
 

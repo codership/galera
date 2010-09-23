@@ -143,15 +143,34 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
                            TrxHandle& trx)
 {
     uint32_t hdr;
-    offset = unserialize(buf, buflen, offset, hdr);
-    trx.write_set_flags_ = hdr & 0xff;
-    trx.version_ = hdr >> 24;
-    if (trx.version_ != 0) gu_throw_error(EPROTONOSUPPORT);
-    offset = unserialize(buf, buflen, offset, trx.source_id_);
-    offset = unserialize(buf, buflen, offset, trx.conn_id_);
-    offset = unserialize(buf, buflen, offset, trx.trx_id_);
-    offset = unserialize(buf, buflen, offset, trx.last_seen_seqno_);
-    return offset;
+    try
+    {
+        offset = unserialize(buf, buflen, offset, hdr);
+        trx.write_set_flags_ = hdr & 0xff;
+        trx.version_ = hdr >> 24;
+
+        if (trx.version_ != 0) gu_throw_error(EPROTONOSUPPORT);
+
+        offset = unserialize(buf, buflen, offset, trx.source_id_);
+        offset = unserialize(buf, buflen, offset, trx.conn_id_);
+        offset = unserialize(buf, buflen, offset, trx.trx_id_);
+        offset = unserialize(buf, buflen, offset, trx.last_seen_seqno_);
+        return offset;
+    }
+    catch (gu::Exception& e)
+    {
+        GU_TRACE(e);
+
+        log_fatal << "Writeset deserialization failed: " << e.what()
+                  << std::endl << "WS flags:      " << trx.write_set_flags_
+                  << std::endl << "Trx proto:     " << trx.version_
+                  << std::endl << "Trx source:    " << trx.source_id_
+                  << std::endl << "Trx conn_id:   " << trx.conn_id_
+                  << std::endl << "Trx trx_id:    " << trx.trx_id_
+                  << std::endl << "Trx last_seen: " << trx.last_seen_seqno_;
+
+        throw;
+    }
 }
 
 
