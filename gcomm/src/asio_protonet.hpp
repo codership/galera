@@ -22,11 +22,10 @@ namespace gcomm
 }
 
 
-
-
 class gcomm::AsioProtonet : public gcomm::Protonet
 {
 public:
+
     AsioProtonet(int version = 0);
     ~AsioProtonet();
     void event_loop(const gu::datetime::Period& p);
@@ -39,7 +38,9 @@ public:
     void enter();
     void leave();
     size_t get_mtu() const { return mtu_; }
+
 private:
+
     friend class AsioTcpSocket;
     friend class AsioTcpAcceptor;
     friend class AsioUdpSocket;
