@@ -44,8 +44,9 @@ typedef struct gcs_group
     const char*   my_name;
     const char*   my_address;
     gcs_group_state_t state;    // group state: PRIMARY | NON_PRIMARY
-    volatile
+//    volatile
     gcs_seqno_t   last_applied; // last_applied action group-wide
+    gcs_seqno_t   max_applied;  // most recent last_applied action
     long          last_node;    // node that reported last_applied
     bool          frag_reset;   // indicate that fragmentation was reset
     gcs_node_t*   nodes;        // array of node contexts

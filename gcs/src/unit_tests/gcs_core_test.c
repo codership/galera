@@ -391,15 +391,19 @@ START_TEST (gcs_core_test_api)
 
         gu_info ("Iteration %ld: act: %s, size: %zu, frags: %ld",
                  i, ACT, act_size, frags);
+
         fail_if (CORE_SEND_START (&act_s));
+
         while ((ret = gcs_core_send_step (Core, 3*tout)) > 0) {
             frags--; gu_info ("frags: %ld", frags);
 //            usleep (1000);
         }
+
         fail_if (ret != 0, "gcs_core_send_step() returned: %ld (%s)",
                  ret, strerror(-ret));
         fail_if (frags != 0, "frags = %ld, instead of 0", frags);
         fail_if (CORE_SEND_END (&act_s, act_size));
+
         fail_if (CORE_RECV_ACT (&act_r, ACT, act_size, GCS_ACT_TORDERED));
 
         ret = gcs_core_set_last_applied (Core, Seqno);
