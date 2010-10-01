@@ -89,7 +89,8 @@ ostream& gcomm::operator<<(ostream& os, const Histogram& hs)
         ++i_next;
         if (i_next == hs.cnt.end())
             break;
-        os << i->first << " -> " << i_next->first << ": " << 100.*double(i_next->second)/double(norm) << " ";
+        os << i->first << " -> " << i_next->first << ": "
+           << 100.*double(i_next->second + (i == hs.cnt.begin() ? i->second : 0))/double(norm) << " ";
     }
     os << "total: " << norm;
 

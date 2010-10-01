@@ -52,13 +52,14 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const gu::URI& uri,
     collect_stats(true),
     hs_agreed("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
     hs_safe("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
+    hs_local_causal("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
     send_queue_s(0),
     n_send_queue_s(0),
     sent_msgs(7, 0),
     retrans_msgs(0),
     recovered_msgs(0),
     recvd_msgs(7, 0),
-    delivered_msgs(O_SAFE + 1),
+    delivered_msgs(O_LOCAL_CAUSAL + 1),
     send_user_prof    ("send_user"),
     send_gap_prof     ("send_gap"),
     send_join_prof    ("send_join"),
@@ -87,6 +88,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const gu::URI& uri,
     previous_view(),
     previous_views(),
     input_map(new InputMap()),
+    causal_queue_(),
     consensus(my_uuid, known, *input_map, current_view),
     cac(0),
     install_message(0),
@@ -231,6 +233,7 @@ string gcomm::evs::Proto::get_stats() const
     os << "\n\tnodes " << current_view.get_members().size();
     os << "\n\tagreed deliv hist {" << hs_agreed << "} ";
     os << "\n\tsafe deliv hist {" << hs_safe << "} ";
+    os << "\n\tcaus deliv hist {" << hs_local_causal << "} ";
     os << "\n\toutq avg " << double(send_queue_s)/double(n_send_queue_s);
     os << "\n\tsent {";
     copy(sent_msgs.begin(), sent_msgs.end(),
@@ -255,13 +258,17 @@ string gcomm::evs::Proto::get_stats() const
     copy(delivered_msgs.begin(), delivered_msgs.end(),
          ostream_iterator<long long int>(os, ", "));
     os << "}\n\teff(delivered/sent) " <<
-        double(accumulate(delivered_msgs.begin() + 1, delivered_msgs.end(), 0))/double(accumulate(sent_msgs.begin(), sent_msgs.end(), 0));
+        double(accumulate(delivered_msgs.begin() + 1,
+                          delivered_msgs.begin() + O_SAFE + 1, 0))
+        /double(accumulate(sent_msgs.begin(), sent_msgs.end(), 0));
     return os.str();
 }
 
 void gcomm::evs::Proto::reset_stats()
 {
+    hs_agreed.clear();
     hs_safe.clear();
+    hs_local_causal.clear();
     send_queue_s = 0;
     n_send_queue_s = 0;
     fill(sent_msgs.begin(), sent_msgs.end(), 0LL);
@@ -1048,6 +1055,7 @@ int gcomm::evs::Proto::send_user(Datagram& dg,
     {
         gu_trace(deliver());
     }
+    gu_trace(deliver_local());
     return 0;
 }
 
@@ -1886,12 +1894,22 @@ int gcomm::evs::Proto::handle_down(Datagram& wb, const ProtoDownMeta& dm)
         return ENOTCONN;
     }
 
-    // This is rather useless restriction, user might not want to know
-    // anything about message types.
-    // if (dm.get_user_type() == 0xff)
-    // {
-    //    return EINVAL;
-    // }
+    if (dm.get_order() == O_LOCAL_CAUSAL)
+    {
+        if (causal_queue_.empty() == true &&
+            last_sent == input_map->get_safe_seq())
+        {
+            hs_local_causal.insert(0.0);
+            deliver_causal(dm.get_user_type(), last_sent, wb);
+        }
+        else
+        {
+            causal_queue_.push_back(CausalMessage(dm.get_user_type(),
+                                                  input_map->get_aru_seq(), wb));
+        }
+        return 0;
+    }
+
 
     send_queue_s += output.size();
     ++n_send_queue_s;
@@ -1974,10 +1992,13 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
     case S_CLOSED:
         gcomm_assert(get_state() == S_LEAVING);
         gu_trace(deliver());
+        gu_trace(deliver_local());
         setall_installed(false);
         NodeMap::get_value(self_i).set_installed(true);
         gu_trace(deliver_trans_view(true));
         gu_trace(deliver_trans());
+        gu_trace(deliver_local(true));
+        gcomm_assert(causal_queue_.empty() == true);
         if (collect_stats == true)
         {
             handle_stats_timer();
@@ -2054,8 +2075,11 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
             << "install message not consistent with own join, state: " << *this;
         gcomm_assert(is_all_installed() == true);
         gu_trace(deliver());
+        gu_trace(deliver_local());
         gu_trace(deliver_trans_view(false));
         gu_trace(deliver_trans());
+        gu_trace(deliver_local(true));
+        gcomm_assert(causal_queue_.empty() == true);
         input_map->clear();
         if (collect_stats == true)
         {
@@ -2125,6 +2149,35 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
 // Message delivery
 ////////////////////////////////////////////////////////////////////////////
 
+void gcomm::evs::Proto::deliver_causal(uint8_t user_type,
+                                       seqno_t seqno,
+                                       const gu::Datagram& datagram)
+{
+    send_up(datagram, ProtoUpMeta(get_uuid(),
+                                  current_view.get_id(),
+                                  0,
+                                  user_type,
+                                  O_LOCAL_CAUSAL,
+                                  seqno));
+    ++delivered_msgs[O_LOCAL_CAUSAL];
+}
+
+
+void gcomm::evs::Proto::deliver_local(bool trans)
+{
+    // local causal
+    const seqno_t causal_seq(trans == false ? input_map->get_safe_seq() : last_sent);
+    gu::datetime::Date now(gu::datetime::Date::now());
+    while (causal_queue_.empty() == false &&
+           causal_queue_.front().seqno() <= causal_seq)
+    {
+        const CausalMessage& cm(causal_queue_.front());
+        hs_local_causal.insert(double(now.get_utc() - cm.tstamp().get_utc())/gu::datetime::Sec);
+        deliver_causal(cm.user_type(), cm.seqno(), cm.datagram());
+        causal_queue_.pop_front();
+    }
+}
+
 void gcomm::evs::Proto::validate_reg_msg(const UserMessage& msg)
 {
     if (msg.get_source_view_id() != current_view.get_id())
@@ -2163,6 +2216,7 @@ void gcomm::evs::Proto::deliver_finish(const InputMapMsg& msg)
                            msg.get_msg().get_source_view_id(),
                            0,
                            msg.get_msg().get_user_type(),
+                           msg.get_msg().get_order(),
                            msg.get_msg().get_seq());
             try
             {
@@ -2200,6 +2254,7 @@ void gcomm::evs::Proto::deliver_finish(const InputMapMsg& msg)
                            msg.get_msg().get_source_view_id(),
                            0,
                            am.get_user_type(),
+                           msg.get_msg().get_order(),
                            msg.get_msg().get_seq());
             gu_trace(send_up(dg, um));
             offset += am.serial_size() + am.get_len();
@@ -2586,6 +2641,7 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     {
         gu_trace(deliver());
     }
+    gu_trace(deliver_local());
     profile_leave(delivery_prof);
 
     // If in recovery state, send join each time input map aru seq reaches
@@ -2762,12 +2818,13 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
         }
     }
 
+    profile_enter(delivery_prof);
     if (input_map->has_deliverables() == true)
     {
-        profile_enter(delivery_prof);
         gu_trace(deliver());
-        profile_leave(delivery_prof);
     }
+    gu_trace(deliver_local());
+    profile_leave(delivery_prof);
 
     //
     if (get_state()                            == S_GATHER                  &&

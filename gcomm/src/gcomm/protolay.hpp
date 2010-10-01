@@ -80,20 +80,23 @@ public:
         source(),
         source_view_id(),
         user_type(),
+        order(),
         to_seq(),
         err_no(err_no_),
         view(0)
     { }
-    
+
     ProtoUpMeta(const UUID    source_         = UUID::nil(),
                 const ViewId  source_view_id_ = ViewId(),
                 const View*   view_           = 0,
                 const uint8_t user_type_      = 0xff,
+                const Order   order_          = O_DROP,
                 const int64_t to_seq_         = -1,
                 const int err_no_ = 0) :
         source         (source_      ),
         source_view_id (source_view_id_ ),
         user_type      (user_type_   ),
+        order          (order_),
         to_seq         (to_seq_      ),
         err_no         (err_no_),
         view           (view_ != 0 ? new View(*view_) : 0)
@@ -103,6 +106,7 @@ public:
         source         (um.source      ),
         source_view_id (um.source_view_id ),
         user_type      (um.user_type   ),
+        order          (um.order       ),
         to_seq         (um.to_seq      ),
         err_no         (um.err_no),
         view           (um.view ? new View(*um.view) : 0)
@@ -115,6 +119,8 @@ public:
     const ViewId& get_source_view_id() const { return source_view_id; }
 
     uint8_t       get_user_type()      const { return user_type; }
+
+    Order         get_order()          const { return order; }
     
     int64_t       get_to_seq()         const { return to_seq; }
 
@@ -130,6 +136,7 @@ private:
     UUID    const source;
     ViewId  const source_view_id;
     uint8_t const user_type;
+    Order   const order;
     int64_t const to_seq;
     int     const err_no;
     View*   const view;

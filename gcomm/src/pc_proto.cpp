@@ -825,8 +825,11 @@ void gcomm::pc::Proto::handle_user(const Message& msg, const Datagram& dg,
 
     if (get_prim() == true)
     {
-        set_to_seq(get_to_seq() + 1);
-        to_seq = get_to_seq();
+        if (um.get_order() == O_SAFE)
+        {
+            set_to_seq(get_to_seq() + 1);
+            to_seq = get_to_seq();
+        }
     }
     else if (current_view_.get_members().find(um.get_source()) ==
              current_view_.get_members().end())
@@ -838,17 +841,20 @@ void gcomm::pc::Proto::handle_user(const Message& msg, const Datagram& dg,
     }
 
 
-    Node& state(NodeMap::get_value(instances_.find_checked(um.get_source())));
-    if (state.get_last_seq() + 1 != msg.get_seq())
+    if (um.get_order() == O_SAFE)
     {
-        gu_throw_fatal << "gap in message sequence: source="
-                       << um.get_source()
-                       << " expected_seq="
-                       << state.get_last_seq() + 1
-                       << " seq="
-                       << msg.get_seq();
+        Node& state(NodeMap::get_value(instances_.find_checked(um.get_source())));
+        if (state.get_last_seq() + 1 != msg.get_seq())
+        {
+            gu_throw_fatal << "gap in message sequence: source="
+                           << um.get_source()
+                           << " expected_seq="
+                           << state.get_last_seq() + 1
+                           << " seq="
+                           << msg.get_seq();
+        }
+        state.set_last_seq(msg.get_seq());
     }
-    state.set_last_seq(msg.get_seq());
 
     Datagram up_dg(dg, dg.get_offset() + msg.serial_size());
     gu_trace(send_up(up_dg,
@@ -856,6 +862,7 @@ void gcomm::pc::Proto::handle_user(const Message& msg, const Datagram& dg,
                                  pc_view_.get_id(),
                                  0,
                                  um.get_user_type(),
+                                 um.get_order(),
                                  to_seq)));
 }
 
@@ -980,7 +987,7 @@ int gcomm::pc::Proto::handle_down(Datagram& dg, const ProtoDownMeta& dm)
         return EAGAIN;
     }
 
-    uint32_t    seq(last_sent_seq_ + 1);
+    uint32_t    seq(dm.get_order() == O_SAFE ? last_sent_seq_ + 1 : last_sent_seq_);
     UserMessage um(version_, seq);
 
     push_header(um, dg);
