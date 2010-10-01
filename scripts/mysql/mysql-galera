@@ -144,7 +144,9 @@ get_status()
     local stat_var=$1
     set -o pipefail
     mysql $ROOT_USER $ROOT_PSWD --socket $MYSQL_SOCKET  --skip-column-names \
-          -Be "SHOW STATUS LIKE '$stat_var'" | cut -f 2
+          --reconnect -Be "SET wsrep_on=0; SHOW STATUS LIKE '$stat_var'" |  \
+          cut -f 2
+    # mysql connection can be interrupted by SST code, don't fail on it
 }
 
 # Loop until wsrep_ready == ON
