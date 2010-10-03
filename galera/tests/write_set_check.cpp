@@ -225,17 +225,19 @@ START_TEST(test_cert)
     TrxHandle* trx(cert.get_trx(n_ws));
     fail_unless(trx != 0);
     cert.set_trx_committed(trx);
-    fail_unless(cert.get_safe_to_discard_seqno() == 0);
+    fail_unless(cert.get_safe_to_discard_seqno() == -1,
+                "get_safe_to_discard_seqno() = %lld, expected -1",
+                static_cast<long long>(cert.get_safe_to_discard_seqno()));
 
     trx = cert.get_trx(1);
     fail_unless(trx != 0);
     cert.set_trx_committed(trx);
-    fail_unless(cert.get_safe_to_discard_seqno() == 1);
+    fail_unless(cert.get_safe_to_discard_seqno() == 0);
 
     trx = cert.get_trx(4);
     fail_unless(trx != 0);
     cert.set_trx_committed(trx);
-    fail_unless(cert.get_safe_to_discard_seqno() == 1);
+    fail_unless(cert.get_safe_to_discard_seqno() == 0);
 
     cert.purge_trxs_upto(cert.get_safe_to_discard_seqno());
 

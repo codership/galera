@@ -53,7 +53,7 @@ cycle()
         stop_node $node
     fi
 
-    pause
+    pause 5 3 # wait long enough to be forgotten
     consistency_check $sqlgen_pid
 
     echo "Restarting node $node_id..."

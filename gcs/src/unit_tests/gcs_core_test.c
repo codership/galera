@@ -403,7 +403,6 @@ START_TEST (gcs_core_test_api)
                  ret, strerror(-ret));
         fail_if (frags != 0, "frags = %ld, instead of 0", frags);
         fail_if (CORE_SEND_END (&act_s, act_size));
-
         fail_if (CORE_RECV_ACT (&act_r, ACT, act_size, GCS_ACT_TORDERED));
 
         ret = gcs_core_set_last_applied (Core, Seqno);
