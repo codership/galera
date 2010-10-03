@@ -10,11 +10,14 @@
 
 #include <map>
 
-#define WARNING_LIMIT 10000
+static const long TRIM_LIMIT = 1 << 14; // purge trx_map_ when it exceeds 16K
+                                         // NOTE: this effectively sets a limit
+                                         // on trx certification interval
+
+static const ulong TRIM_MASK  = (1 << 10) - 1; // check for trim limit every 1K
 
 using namespace std;
 using namespace gu;
-
 
 inline galera::RowKeyEntry::RowKeyEntry(
     const RowKey& row_key)
@@ -88,10 +91,23 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
 galera::Certification::TestResult
 galera::Certification::do_test(TrxHandle* trx, bool store_keys)
 {
-    if (trx->last_seen_seqno() < initial_position_)
+    const wsrep_seqno_t trx_last_seen_seqno (trx->last_seen_seqno());
+    const wsrep_seqno_t trx_global_seqno    (trx->global_seqno());
+
+    if (gu_unlikely(trx_last_seen_seqno < initial_position_ ||
+                    (trx_global_seqno - trx_last_seen_seqno) > TRIM_LIMIT))
     {
-        log_debug << "last seen seqno below initial position for trx "
-                  << *trx;
+        if (trx_last_seen_seqno < initial_position_)
+        {
+            log_debug << "last seen seqno below limit for trx " << *trx;
+        }
+
+        if ((trx_global_seqno - trx_last_seen_seqno) > TRIM_LIMIT)
+        {
+            log_warn << "certification interval for trx " << *trx
+                     << " exceeds the limit of " << TRIM_LIMIT;
+        }
+
         return TEST_FAILED;
     }
 
@@ -99,11 +115,7 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
     const MappedBuffer& wscoll(trx->write_set_collection());
 
     // max_depends_seqno, start from -1 and maximize on all dependencies
-    // min_depends_seqno, start from last seen and minimize on all dependencies
-    // last depends seqno is max(min_depends_seqno, max_depends_seqno)
     wsrep_seqno_t max_depends_seqno(-1);
-    wsrep_seqno_t min_depends_seqno(trx->last_seen_seqno());
-    const wsrep_seqno_t trx_global_seqno(trx->global_seqno());
     TrxHandle::CertKeySet& match(trx->cert_keys_);
     assert(match.empty() == true);
 
@@ -134,19 +146,19 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
 
                 assert(ref_global_seqno < trx_global_seqno ||
                        ref_trx->source_id() == trx->source_id());
+
                 if (ref_trx->source_id() != trx->source_id() &&
-                    ref_global_seqno > trx->last_seen_seqno())
+                    ref_global_seqno > trx_last_seen_seqno)
                 {
-                    // Cert conflict if trx write set didn't see ti committed
+                    // Cert conflict if trx write set didn't see it committed
                     log_debug << "trx conflict " << ref_global_seqno
-                              << " " << trx->last_seen_seqno();
+                              << " " << trx_last_seen_seqno;
                     goto cert_fail;
                 }
+
                 if (ref_global_seqno != trx_global_seqno)
                 {
                     max_depends_seqno = max(max_depends_seqno,
-                                            ref_global_seqno);
-                    min_depends_seqno = min(min_depends_seqno,
                                             ref_global_seqno);
                 }
             }
@@ -159,17 +171,17 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
             if (store_keys == true)
             {
                 match.insert(ci->second);
-
             }
         }
     }
 
     if (store_keys == true)
     {
-        min_depends_seqno = safe_to_discard_seqno_;
-        trx->set_last_depends_seqno(max(min_depends_seqno,
+        trx->set_last_depends_seqno(max(safe_to_discard_seqno_,
                                         max_depends_seqno));
+
         assert(trx->last_depends_seqno() < trx->global_seqno());
+
         for (TrxHandle::CertKeySet::iterator i = trx->cert_keys_.begin();
              i != trx->cert_keys_.end(); ++i)
         {
@@ -278,13 +290,28 @@ galera::Certification::append_trx(TrxHandle* trx)
             log_debug << "seqno gap, position: " << position_
                       << " trx seqno " << trx->global_seqno();
         }
+
         position_ = trx->global_seqno();
 
-        if (trx_map_.size() > WARNING_LIMIT &&
-            (trx_size_warn_count_++ % WARNING_LIMIT == 0))
+        if (gu_unlikely(!(position_ & TRIM_MASK) &&
+                        (trx_map_.size() > static_cast<size_t>(TRIM_LIMIT))))
         {
-            log_warn << "trx map size " << trx_map_.size()
-                     << " check if status.last_committed is incrementing";
+            log_debug << "trx map size: " << trx_map_.size()
+                      << " - check if status.last_committed is incrementing";
+
+            const wsrep_seqno_t trim_seqno(position_ - TRIM_LIMIT);
+            const wsrep_seqno_t stds(get_safe_to_discard_seqno_());
+
+            if (trim_seqno > stds)
+            {
+                log_warn << "Attempt to trim certification index at "
+                         << trim_seqno << ", above safe-to-discard: " << stds;
+                purge_trxs_upto_(stds);
+            }
+            else
+            {
+                purge_trxs_upto_(trim_seqno);
+            }
         }
     }
 
@@ -317,7 +344,7 @@ galera::Certification::test(TrxHandle* trx, bool bval)
 
     const TestResult ret(do_test(trx, bval));
 
-    if (ret != TEST_OK)
+    if (gu_unlikely(ret != TEST_OK))
     {
         // make sure that last depends seqno is -1 for trxs that failed
         // certification
@@ -328,9 +355,8 @@ galera::Certification::test(TrxHandle* trx, bool bval)
 }
 
 
-wsrep_seqno_t galera::Certification::get_safe_to_discard_seqno() const
+wsrep_seqno_t galera::Certification::get_safe_to_discard_seqno_() const
 {
-    Lock lock(mutex_);
     wsrep_seqno_t retval;
     if (deps_set_.empty() == true)
     {
@@ -338,25 +364,18 @@ wsrep_seqno_t galera::Certification::get_safe_to_discard_seqno() const
     }
     else
     {
-        retval = *deps_set_.begin();
+        retval = (*deps_set_.begin()) - 1;
     }
     return retval;
 }
 
 
-void galera::Certification::purge_trxs_upto(wsrep_seqno_t seqno)
+void galera::Certification::purge_trxs_upto_(wsrep_seqno_t seqno)
 {
-    // commented out, see note below
-    // assert(seqno <= get_safe_to_discard_seqno());
-    const wsrep_seqno_t stds(get_safe_to_discard_seqno());
-    Lock lock(mutex_);
-    // Note: setting trx committed is not done in total order so
-    // safe to discard seqno may decrease. Enable assertion above when this
-    // issue is fixed.
-    TrxMap::iterator lower_bound(trx_map_.lower_bound(min(seqno, stds)));
+    TrxMap::iterator lower_bound(trx_map_.lower_bound(seqno));
     for_each(trx_map_.begin(), lower_bound, PurgeAndDiscard(*this));
     trx_map_.erase(trx_map_.begin(), lower_bound);
-    if (trx_map_.size() > 10000)
+    if (0 == ((trx_map_.size() + 1) % 10000))
     {
         log_debug << "trx map after purge: length: " << trx_map_.size()
                   << ", purge seqno " << seqno;

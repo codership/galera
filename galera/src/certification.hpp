@@ -71,6 +71,7 @@ namespace galera
 
         Certification(const std::string& conf = "");
         ~Certification();
+
         void assign_initial_position(wsrep_seqno_t seqno);
         TrxHandle* create_trx(const void* data, size_t data_len,
                               wsrep_seqno_t seqno_l,
@@ -78,8 +79,26 @@ namespace galera
         TestResult append_trx(TrxHandle*);
         TestResult test(TrxHandle*, bool = true);
         wsrep_seqno_t position() const { return position_; }
-        wsrep_seqno_t get_safe_to_discard_seqno() const;
-        void purge_trxs_upto(wsrep_seqno_t);
+
+        wsrep_seqno_t
+        get_safe_to_discard_seqno() const
+        {
+            gu::Lock lock(mutex_);
+            return get_safe_to_discard_seqno_();
+        }
+
+        void
+        purge_trxs_upto(wsrep_seqno_t seqno)
+        {
+            gu::Lock lock(mutex_);
+            const wsrep_seqno_t stds(get_safe_to_discard_seqno_());
+            // assert(seqno <= get_safe_to_discard_seqno());
+            // Note: setting trx committed is not done in total order so
+            // safe to discard seqno may decrease. Enable assertion above when
+            // this issue is fixed.
+            purge_trxs_upto_(std::min(seqno, stds));
+        }
+
         void set_trx_committed(TrxHandle*);
         TrxHandle* get_trx(wsrep_seqno_t);
 
@@ -94,6 +113,10 @@ namespace galera
 
         TestResult do_test(TrxHandle*, bool);
         void purge_for_trx(TrxHandle*);
+
+        // unprotected variants for internal use
+        wsrep_seqno_t get_safe_to_discard_seqno_() const;
+        void          purge_trxs_upto_(wsrep_seqno_t);
 
         class PurgeAndDiscard
         {
