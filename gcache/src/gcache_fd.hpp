@@ -16,11 +16,16 @@ namespace gcache
     {
     public:
 
-        FileDescriptor (const std::string& fname, bool sync = true)
+        /* open existing file */
+        FileDescriptor (const std::string& fname,
+                        bool               sync  = true)
             throw (gu::Exception);
 
-        FileDescriptor (const std::string& fname, size_t length,
-                        bool allocate = true, bool sync = true)
+        /* (re)create file */
+        FileDescriptor (const std::string& fname,
+                        size_t             length,
+                        bool               allocate = true,
+                        bool               sync     = true)
             throw (gu::Exception);
 
         virtual ~FileDescriptor ();
@@ -28,6 +33,7 @@ namespace gcache
         int                get()      const throw() { return value; };
         const std::string& get_name() const throw() { return name;  };
         size_t             get_size() const throw() { return size;  };
+
         void               flush()    const throw (gu::Exception);
 
     private:
@@ -35,7 +41,7 @@ namespace gcache
         const int         value;
         const std::string name;
         const size_t      size;
-        const bool        sync;
+        const bool        sync; // sync on close
 
         bool write_byte (ssize_t offset) throw (gu::Exception);
         void prealloc   ()               throw (gu::Exception); 

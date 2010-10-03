@@ -7,6 +7,10 @@
 
 #include <galerautils.hpp>
 
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 600
+#endif
+
 #include <cerrno>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -18,7 +22,8 @@ namespace gcache
     static const int OPEN_FLAGS   = O_RDWR | O_NOATIME;
     static const int CREATE_FLAGS = OPEN_FLAGS | O_CREAT | O_TRUNC;
  
-    FileDescriptor::FileDescriptor (const std::string& fname, bool sync_)
+    FileDescriptor::FileDescriptor (const std::string& fname,
+                                    bool               sync_)
         throw (gu::Exception)
         : value (open (fname.c_str(), OPEN_FLAGS, S_IRUSR | S_IWUSR)),
           name  (fname),
@@ -108,6 +113,7 @@ namespace gcache
         return true;
     }
 
+#if 0
     void
     FileDescriptor::prealloc() throw (gu::Exception)
     {
@@ -130,5 +136,17 @@ namespace gcache
         }
 
         gu_throw_error (errno) << "File preallocation failed";
+    }
+#endif
+    void
+    FileDescriptor::prealloc() throw (gu::Exception)
+    {
+        log_info << "Preallocating " << size << " bytes in '" << name
+                 << "'...";
+
+        if (0 != posix_fallocate (value, 0, size))
+        {
+            gu_throw_error (errno) << "File preallocation failed";
+        }
     }
 }

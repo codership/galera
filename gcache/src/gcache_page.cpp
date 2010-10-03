@@ -6,6 +6,12 @@
 
 #include "gcache_page.hpp"
 
+// for posix_fadvise()
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 600
+#endif
+#include <sys/fcntl.h>
+
 static ssize_t
 check_size (ssize_t size)
 {
@@ -37,6 +43,13 @@ gcache::Page::Page (const std::string& name, ssize_t size) throw (gu::Exception)
     space_(mmap_.size),
     used_ (0)
 {
+    const int err = posix_fadvise (fd_.get(), 0, fd_.get_size(),
+                                   POSIX_FADV_DONTNEED);
+    if (err != 0)
+    {
+        log_warn << "Failed to set POSIX_FADV_DONTNEED on " << fd_.get_name();
+    }
+
     log_debug << "Created a page of size " << space_ << " bytes";
     BH_clear (reinterpret_cast<BufferHeader*>(next_));
 }
