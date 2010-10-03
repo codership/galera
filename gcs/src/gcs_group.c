@@ -31,7 +31,6 @@ gcs_group_init (gcs_group_t* group, const char* node_name, const char* inc_addr)
     group->my_address   = strdup(inc_addr  ? inc_addr  : NODE_NO_ADDR);
     group->state        = GCS_GROUP_NON_PRIMARY;
     group->last_applied = GCS_SEQNO_ILL; // mark for recalculation
-    group->max_applied  = group->last_applied;
     group->last_node    = -1;
     group->frag_reset   = true; // just in case
     group->nodes        = GU_CALLOC(group->num, gcs_node_t);
@@ -145,19 +144,16 @@ group_redo_last_applied (gcs_group_t* group)
 {
     long n;
 
-    group->last_node    = -1;
-    group->last_applied = group->max_applied;
+    group->last_node    = 0;
+    group->last_applied = gcs_node_get_last_applied (&group->nodes[0]);
 //    gu_debug (" last_applied[0]: %lld", group->last_applied);
 
-    for (n = 0; n < group->num; n++) {
-        gcs_node_t* node = &group->nodes[n];
-        if (gu_likely(gcs_node_is_replicating (node))) {
-            gcs_seqno_t seqno = gcs_node_get_last_applied (node);
-//            gu_debug ("last_applied[%ld]: %lld", n, seqno);
-            if (seqno <= group->last_applied) {
-                group->last_applied = seqno;
-                group->last_node    = n;
-            }
+    for (n = 1; n < group->num; n++) {
+        gcs_seqno_t seqno = gcs_node_get_last_applied (&group->nodes[n]);
+//        gu_debug ("last_applied[%ld]: %lld", n, seqno);
+        if (seqno < group->last_applied) {
+            group->last_applied = seqno;
+            group->last_node    = n;
         }
     }
 }
@@ -264,24 +260,6 @@ group_check_comp_msg (bool prim, long my_idx, long members)
 
     assert (0);
     abort ();
-}
-
-static void
-group_calc_max_applied (gcs_group_t* group)
-{
-    long n;
-
-    group->max_applied = 0;
-
-    for (n = 0; n < group->num; n++) {
-        gcs_node_t* node = &group->nodes[n];
-
-        if (gu_likely(gcs_node_is_replicating (node))) {
-            gcs_seqno_t seqno = gcs_node_get_last_applied (node);
-//            gu_debug ("max_applied[%ld]: %lld", n, seqno);
-            if (seqno > group->max_applied) group->max_applied = seqno;
-        }
-    }    
 }
 
 gcs_group_state_t
@@ -416,8 +394,6 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                 group_post_state_exchange (group);
             }
         }
-
-        group_calc_max_applied (group);
         group_redo_last_applied (group);
     }
 
@@ -508,11 +484,6 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
     seqno = gcs_seqno_le(*(gcs_seqno_t*)(msg->buf));
 
-    if (group->max_applied < seqno &&
-        gcs_node_is_replicating (&group->nodes[msg->sender_idx])) {
-        group->max_applied = seqno;
-    }
-
     // This assert is too restrictive. It requires application to send
     // last applied messages while holding TO, otherwise there's a race
     // between threads.
@@ -520,8 +491,7 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
     gcs_node_set_last_applied (&group->nodes[msg->sender_idx], seqno);
 
-    if ((msg->sender_idx == group->last_node && seqno > group->last_applied)
-        || (group->last_node < 0)) {
+    if (msg->sender_idx == group->last_node && seqno > group->last_applied) {
         /* node that was responsible for the last value, has changed it.
          * need to recompute it */
         gcs_seqno_t old_val = group->last_applied;
@@ -568,7 +538,6 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             peer_id = sender->donor;
             st_dir  = "from";
             if (seqno >= 0) sender->status = GCS_NODE_STATE_JOINED;
-            group_redo_last_applied (group);
         }
 
         // Try to find peer.

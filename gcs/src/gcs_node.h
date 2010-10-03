@@ -111,13 +111,6 @@ gcs_node_get_last_applied (gcs_node_t* node)
     return node->last_applied;
 }
 
-static inline bool
-gcs_node_is_replicating (gcs_node_t* node)
-{
-    /* As of now we can be certain only that joiner is not replicating */
-    return (node->status > GCS_NODE_STATE_JOINER);
-}
-
 /*! Record state message from the node */
 extern void
 gcs_node_record_state (gcs_node_t* node, gcs_state_msg_t* state);
