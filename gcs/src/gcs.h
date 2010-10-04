@@ -242,9 +242,9 @@ extern long gcs_interrupt (gcs_conn_t* conn, long handle);
  * After action with this seqno is applied, this thread is guaranteed to see
  * all the changes made by the client, even on other nodes.
  *
- * @return local sequence number or negative error code
+ * @return global sequence number or negative error code
  */
-extern gcs_seqno_t gcs_caused();
+extern gcs_seqno_t gcs_caused(gcs_conn_t* conn);
 
 /*! @brief Sends state transfer request
  * Broadcasts state transfer request which will be passed to one of the

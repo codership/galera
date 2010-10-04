@@ -1221,6 +1221,11 @@ long gcs_interrupt (gcs_conn_t* conn, long handle)
 #endif /* GCS_USE_SM */
 }
 
+gcs_seqno_t gcs_caused(gcs_conn_t* conn)
+{
+    return gcs_core_caused(conn->core);
+}
+
 /* Puts action in the send queue and returns after it is replicated */
 long gcs_repl (gcs_conn_t          *conn,         //!<in
                const void          *action,       //!<in
