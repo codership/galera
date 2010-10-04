@@ -17,9 +17,13 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#ifndef O_CLOEXEC // CentOS does not have it
+#define O_CLOEXEC 0
+#endif
+
 namespace gcache
 {
-    static const int OPEN_FLAGS   = O_RDWR | O_NOATIME;
+    static const int OPEN_FLAGS   = O_RDWR | O_NOATIME | O_CLOEXEC;
     static const int CREATE_FLAGS = OPEN_FLAGS | O_CREAT | O_TRUNC;
  
     FileDescriptor::FileDescriptor (const std::string& fname,
@@ -61,7 +65,15 @@ namespace gcache
         if (value < 0) {
             gu_throw_error(errno) << "Failed to open file '" + name + '\'';
         }
+/* benefits are questionable
+        int err(posix_fadvise (value, 0, size, POSIX_FADV_SEQUENTIAL));
 
+        if (err != 0)
+        {
+            log_warn << "Failed to set POSIX_FADV_SEQUENTIAL on "
+                     << name << ": " << err << " (" << strerror(err) << ")";
+        }
+*/
         log_debug << "Opened file '" << name << "'";
         log_debug << "File descriptor: " << value;
     }
@@ -70,14 +82,14 @@ namespace gcache
     {
         if (sync && fsync(value) != 0)
         {
-            int err = errno;
+            int const err (errno);
             log_error << "Failed to flush file '" << name << "': "
                       << gu::to_string(err) << " (" << strerror(err) << '\'';
         }
 
         if (close(value) != 0)
         {
-            int err = errno;
+            int const err (errno);
             log_error << "Failed to close file '" << name << "': "
                       << gu::to_string(err) << " (" << strerror(err) << '\'';
         }
@@ -102,7 +114,7 @@ namespace gcache
     bool
     FileDescriptor::write_byte (ssize_t offset) throw (gu::Exception)
     {
-        unsigned char const byte = 0;
+        unsigned char const byte (0);
 
         if (lseek (value, offset, SEEK_SET) != offset)
             gu_throw_error(errno) << "lseek() failed on '" << name << '\'';

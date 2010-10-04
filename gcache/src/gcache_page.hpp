@@ -45,6 +45,9 @@ namespace gcache
 
         void reset () throw ();
 
+        /* Drop filesystem cache on the file */
+        void drop_fs_cache() const throw();
+
     private:
 
         FileDescriptor fd_;

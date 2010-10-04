@@ -22,7 +22,14 @@ make_base_name (const std::string& dir_name)
     }
     else
     {
-        return (dir_name + '/' + base_name);
+        if (dir_name[dir_name.length() - 1] == '/')
+        {
+            return (dir_name + base_name);
+        }
+        else
+        {
+            return (dir_name + '/' + base_name);
+        }
     }
 }
 
@@ -47,6 +54,10 @@ remove_file (void* __restrict__ arg)
 
             log_error << "Failed to remove page file '" << file_name << "': "
                       << gu::to_string(err) << " (" << strerror(err) << ")";
+        }
+        else
+        {
+            log_info << "Deleted page " << file_name;
         }
 
         free (file_name);
@@ -175,6 +186,8 @@ gcache::PageStore::malloc (ssize_t size) throw (gu::Exception)
         register void* ret = current_->malloc (size);
 
         if (gu_likely(0 != ret)) return ret;
+
+        current_->drop_fs_cache();
     }
 
     return malloc_new (size);

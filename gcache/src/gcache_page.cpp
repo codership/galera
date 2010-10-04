@@ -35,6 +35,20 @@ gcache::Page::reset () throw ()
     next_  = static_cast<uint8_t*>(mmap_.ptr);
 }
 
+void
+gcache::Page::drop_fs_cache() const throw()
+{
+    mmap_.dont_need();
+
+    int const err (posix_fadvise (fd_.get(), 0, fd_.get_size(),
+                                  POSIX_FADV_DONTNEED));
+    if (err != 0)
+    {
+        log_warn << "Failed to set POSIX_FADV_DONTNEED on " << fd_.get_name()
+                 << ": " << err << " (" << strerror(err) << ")";
+    }
+}
+
 gcache::Page::Page (const std::string& name, ssize_t size) throw (gu::Exception)
     :
     fd_   (name, check_size(size), false, false),
@@ -43,21 +57,15 @@ gcache::Page::Page (const std::string& name, ssize_t size) throw (gu::Exception)
     space_(mmap_.size),
     used_ (0)
 {
-    const int err = posix_fadvise (fd_.get(), 0, fd_.get_size(),
-                                   POSIX_FADV_DONTNEED);
-    if (err != 0)
-    {
-        log_warn << "Failed to set POSIX_FADV_DONTNEED on " << fd_.get_name();
-    }
-
-    log_debug << "Created a page of size " << space_ << " bytes";
+    log_info << "Created a temporary page " << name << "of size " << space_
+             << " bytes";
     BH_clear (reinterpret_cast<BufferHeader*>(next_));
 }
 
 void*
 gcache::Page::malloc (ssize_t size) throw ()
 {
-    ssize_t const buf_size = size + sizeof(BufferHeader);
+    ssize_t const buf_size (size + sizeof(BufferHeader));
 
     if (buf_size <= space_)
     {
@@ -98,11 +106,11 @@ gcache::Page::realloc (void* ptr, ssize_t size) throw ()
 {
     BufferHeader* bh(ptr2BH(ptr));
 
-    ssize_t old_size = bh->size - sizeof(BufferHeader);
+    ssize_t const old_size (bh->size - sizeof(BufferHeader));
 
-    if (bh == BH_cast(next_ - bh->size))
-    { // last buffer, can both shrink and expand
-        ssize_t diff_size = size - old_size;
+    if (bh == BH_cast(next_ - bh->size)) // last buffer, can shrink and expand
+    {
+        ssize_t const diff_size (size - old_size);
 
         if (gu_likely (diff_size < space_))
         {
@@ -119,7 +127,7 @@ gcache::Page::realloc (void* ptr, ssize_t size) throw ()
     {
         if (gu_likely(size > old_size))
         {
-            void* ret = malloc (size);
+            void* const ret (malloc (size));
 
             if (ret)
             {

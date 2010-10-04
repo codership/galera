@@ -24,10 +24,24 @@ namespace gcache
     {
         if (!mapped)
         {
-            int err = errno;
-            gu_throw_error(err) << "mmap() on '" << fd.get_name() << "' failed";
+            gu_throw_error(errno) << "mmap() on '" << fd.get_name()
+                                  << "' failed";
         }
 
+        if (posix_madvise (ptr, size, MADV_DONTFORK))
+        {
+            int const err(errno);
+            log_warn << "Failed to set MADV_DONTFORK on " << fd.get_name()
+                     << ": " << err << " (" << strerror(err) << ")";
+        }
+/* benefits are questionable
+        if (posix_madvise (ptr, size, MADV_SEQUENTIAL))
+        {
+            int const err(errno);
+            log_warn << "Failed to set MADV_SEQUENTIAL on " << fd.get_name()
+                     << ": " << err << " (" << strerror(err) << ")";
+        }
+*/
         log_debug << "Memory mapped: " << ptr << " (" << size << " bytes)";
     }
 
@@ -38,8 +52,8 @@ namespace gcache
 
         if (msync (ptr, size, MS_SYNC) < 0)
         {
-            int err = errno;
-            gu_throw_error(err) << "msync(" << ptr << ", " << size <<") failed";
+            gu_throw_error(errno) << "msync(" << ptr << ", " << size
+                                  << ") failed";
         }
     }
 
@@ -48,13 +62,23 @@ namespace gcache
     {
         if (munmap (ptr, size) < 0)
         {
-            int err = errno;
-            gu_throw_error(err) << "munmap(" << ptr << ", " << size<<") failed";
+            gu_throw_error(errno) << "munmap(" << ptr << ", " << size
+                                  << ") failed";
         }
 
         mapped = false;
 
         log_debug << "Memory unmapped: " << ptr << " (" << size <<" bytes)";
+    }
+
+    void
+    MMap::dont_need() const
+    {
+        if (madvise(ptr, size, MADV_DONTNEED))
+        {
+            log_warn << "Failed to set MADV_DONTNEED on " << ptr << ": "
+                     << errno << " (" << strerror(errno) << ')';
+        }
     }
 
     MMap::~MMap ()

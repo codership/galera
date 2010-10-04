@@ -22,8 +22,9 @@ namespace gcache
 
         virtual ~MMap ();
 
-        void  sync() const;
-        void  unmap();
+        void sync() const;
+        void unmap();
+        void dont_need() const;
 
     private:
 
