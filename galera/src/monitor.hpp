@@ -19,18 +19,19 @@ namespace galera
 
         struct Process
         {
-            Process() : obj_(0), cond_(), state_(S_IDLE) { }
+            Process() : obj_(0), cond_(), wait_cond_(), state_(S_IDLE) { }
 
             Process(const Process& other)
                 :
                 obj_  (other.obj_),
                 cond_ (other.cond_),
+                wait_cond_(other.wait_cond_),
                 state_(other.state_)
             { }
 
             const C* obj_;
             gu::Cond cond_;
-
+            gu::Cond wait_cond_;
             enum State
             {
                 S_IDLE,     // Slot is free
@@ -202,6 +203,16 @@ namespace galera
             drain_common(seqno, lock);
         }
 
+        void wait(wsrep_seqno_t seqno)
+        {
+            gu::Lock lock(mutex_);
+            if (last_left_ < seqno)
+            {
+                size_t idx(indexof(seqno));
+                lock.wait(process_[idx].wait_cond_);
+            }
+        }
+
         void get_stats(double* oooe, double* oool, double* win_size)
         {
             gu::Lock lock(mutex_);
@@ -311,6 +322,7 @@ namespace galera
                 oool_ += (last_left_ > obj_seqno);
                 cond_.broadcast();
             }
+            process_[idx].wait_cond_.broadcast();
         }
 
         void drain_common(wsrep_seqno_t seqno, gu::Lock& lock)

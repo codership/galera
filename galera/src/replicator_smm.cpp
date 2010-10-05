@@ -848,9 +848,13 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandle* trx)
 }
 
 
-wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno) const
+wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno)
 {
-    return WSREP_NOT_IMPLEMENTED;
+    wsrep_seqno_t cseq(static_cast<wsrep_seqno_t>(gcs_.caused()));
+    if (cseq < 0) return WSREP_TRX_FAIL;
+    apply_monitor_.wait(cseq);
+    if (seqno != 0) *seqno = cseq;
+    return WSREP_OK;
 }
 
 

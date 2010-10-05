@@ -463,7 +463,24 @@ extern "C"
 wsrep_status_t galera_causal_read(wsrep_t*       wsrep,
                                   wsrep_seqno_t* seqno)
 {
-    return WSREP_NOT_IMPLEMENTED;
+    assert(wsrep != 0 && wsrep->ctx != 0);
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(wsrep->ctx));
+    wsrep_status_t retval;
+    try
+    {
+        retval = repl->causal_read(seqno);
+    }
+    catch (std::exception& e)
+    {
+        log_warn << e.what();
+        retval = WSREP_CONN_FAIL;
+    }
+    catch (...)
+    {
+        log_fatal << "non-standard exception";
+        retval = WSREP_FATAL;
+    }
+    return retval;
 }
 
 

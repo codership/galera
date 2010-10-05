@@ -30,6 +30,7 @@ namespace galera
         virtual ssize_t send(const void*, size_t, gcs_act_type_t, bool) = 0;
         virtual ssize_t repl(const void*, size_t, gcs_act_type_t, bool,
                              gcs_seqno_t* seqno_l, gcs_seqno_t* seqno_g) = 0;
+        virtual gcs_seqno_t caused() = 0;
         virtual ssize_t schedule() = 0;
         virtual ssize_t interrupt(ssize_t) = 0;
         virtual ssize_t set_last_applied(gcs_seqno_t) = 0;
@@ -101,6 +102,8 @@ namespace galera
             return gcs_repl(conn_, act, act_len, act_type, scheduled, seqno_g,
                             seqno_l);
         }
+
+        gcs_seqno_t caused() { return gcs_caused(conn_); }
 
         ssize_t schedule() { return gcs_schedule(conn_); }
 
@@ -188,6 +191,8 @@ namespace galera
         ssize_t repl(const void*, size_t, gcs_act_type_t, bool,
                      gcs_seqno_t* seqno_l, gcs_seqno_t* seqno_g)
         { return -ENOTCONN; }
+
+        gcs_seqno_t caused() { return -ENOTCONN; }
 
         ssize_t schedule() { return -ENOTCONN; }
 

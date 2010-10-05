@@ -85,7 +85,7 @@ namespace galera
         wsrep_status_t post_commit(TrxHandle* trx);
         wsrep_status_t post_rollback(TrxHandle* trx);
 
-        wsrep_status_t causal_read(wsrep_seqno_t*) const;
+        wsrep_status_t causal_read(wsrep_seqno_t*);
         wsrep_status_t to_isolation_begin(TrxHandle* trx);
         wsrep_status_t to_isolation_end(TrxHandle* trx);
         wsrep_status_t sst_sent(const wsrep_uuid_t& uuid,
