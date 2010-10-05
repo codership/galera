@@ -411,7 +411,8 @@ void GCommConn::run()
                 const MsgData* md(static_cast<const MsgData*>(msg->get_data()));
                 Buffer buf(md->get_data(), md->get_data() + md->get_data_size());
                 Datagram dg(buf);
-                int err = send_down(dg, ProtoDownMeta(md->get_msg_type()));
+                int err = send_down(dg, ProtoDownMeta(md->get_msg_type(),
+                                                      md->get_msg_type() == GCS_MSG_CAUSAL ? O_LOCAL_CAUSAL : O_SAFE));
 
                 return_ack(Message(&msg->get_producer(), 0, err != 0 ?
                                    -err : static_cast<int>(dg.get_len())));
@@ -469,7 +470,7 @@ static GCS_BACKEND_SEND_FN(gcomm_send)
         gcomm::Critical<Protonet> crit(conn.get_pnet());
         int err = conn.send_down(
             dg,
-            ProtoDownMeta(msg_type));
+            ProtoDownMeta(msg_type, msg_type == GCS_MSG_CAUSAL ? O_LOCAL_CAUSAL : O_SAFE));
         return (err == 0 ? len : -err);
     }
 }

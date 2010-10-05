@@ -82,6 +82,13 @@ typedef struct core_act
 }
 core_act_t;
 
+typedef struct causal_act
+{
+    gcs_seqno_t* act_id;
+    gu_mutex_t*  mtx;
+    gu_cond_t*   cond;
+} causal_act_t;
+
 gcs_core_t*
 gcs_core_create (const char*  node_name,
                  const char*  inc_addr,
@@ -887,6 +894,24 @@ core_msg_to_action (gcs_core_t*          core,
     return ret;
 }
 
+static long core_msg_causal(gcs_core_t* conn,
+                            struct gcs_recv_msg* msg)
+{
+    causal_act_t* act;
+    if (msg->size != sizeof(*act))
+    {
+        gu_error("invalid causal act len %ld, expected %ld",
+                 msg->size, sizeof(*act));
+        return -EPROTO;
+    }
+    act = (causal_act_t*)msg->buf;
+    gu_mutex_lock(act->mtx);
+    *act->act_id = conn->group.act_id;
+    gu_cond_signal(act->cond);
+    gu_mutex_unlock(act->mtx);
+    return msg->size;
+}
+
 /*! Receives action */
 ssize_t gcs_core_recv (gcs_core_t*          conn,
                        struct gcs_act_rcvd* recv_act,
@@ -952,6 +977,12 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
         case GCS_MSG_FLOW:
             ret = core_msg_to_action (conn, recv_msg, &recv_act->act);
             assert (ret == recv_act->act.buf_len || ret <= 0);
+            break;
+        case GCS_MSG_CAUSAL:
+            ret = core_msg_causal(conn, recv_msg);
+            assert(recv_msg->sender_idx == gcs_group_my_idx(&conn->group));
+            assert(ret == recv_msg->size || ret <= 0);
+            ret = 0; // continue waiting for messages
             break;
         default:
             // this normaly should not happen, shall we bother with
@@ -1138,6 +1169,31 @@ gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size)
         ret = 0;
     }
     return ret;
+}
+
+gcs_seqno_t
+gcs_core_caused(gcs_core_t* core)
+{
+    long ret;
+    gcs_seqno_t act_id = GCS_SEQNO_ILL;
+    gu_mutex_t mtx;
+    gu_cond_t  cond;
+    causal_act_t act = {&act_id, &mtx, &cond};
+    gu_mutex_init(&mtx, NULL);
+    gu_cond_init(&cond, NULL);
+    gu_mutex_lock(&mtx);
+    ret = core_msg_send_retry(core, &act, sizeof(act), GCS_MSG_CAUSAL);
+    if (ret == sizeof(act))
+    {
+        gu_cond_wait(&cond, &mtx);
+    }
+    else
+    {
+        assert(ret < 0);
+        act_id = ret;
+    }
+    gu_mutex_unlock(&mtx);
+    return act_id;
 }
 
 long

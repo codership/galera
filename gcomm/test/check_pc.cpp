@@ -1219,7 +1219,7 @@ public:
             Datagram dg(Buffer(buf, buf + sizeof(buf)));
             // dg.get_header().resize(128);
             // dg.set_header_offset(128);
-            int ret = send_down(dg, ProtoDownMeta(my_type));
+            int ret = send_down(dg, ProtoDownMeta(my_type, rand() % 10 == 0 ? O_SAFE : O_LOCAL_CAUSAL));
             if (ret != 0)
             {
                 // log_debug << "send down " << ret;
@@ -1337,10 +1337,10 @@ START_TEST(test_fifo_violation)
     fail_unless(dg1 != 0);
     Datagram* dg2(tp1.get_out());
     fail_unless(dg2 != 0);
-    dg2->normalize();
+
     try
     {
-        pc1.handle_up(0, *dg2, ProtoUpMeta(uuid1));
+        pc1.handle_up(0, *dg2, ProtoUpMeta(uuid1, ViewId(), 0, 0xff, O_SAFE));
         fail("");
     }
     catch (Exception& e)

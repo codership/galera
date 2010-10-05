@@ -151,6 +151,8 @@ public:
     void validate_reg_msg(const UserMessage&);
     void deliver_finish(const InputMapMsg&);
     void deliver();
+    void deliver_local(bool trans = false);
+    void deliver_causal(uint8_t user_type, seqno_t seqno, const gu::Datagram&);
     void validate_trans_msg(const UserMessage&);
     void deliver_trans();
     void deliver_reg_view();
@@ -296,6 +298,7 @@ private:
     bool collect_stats;
     Histogram hs_agreed;
     Histogram hs_safe;
+    Histogram hs_local_causal;
     long long int send_queue_s;
     long long int n_send_queue_s;
     std::vector<long long int> sent_msgs;
@@ -340,7 +343,31 @@ private:
     
     // Map containing received messages and aru/safe seqnos
     InputMap* input_map;
-
+    // Helper container for local causal messages
+    class CausalMessage
+    {
+    public:
+        CausalMessage(uint8_t             user_type,
+                      seqno_t             seqno,
+                      const gu::Datagram& datagram)
+            :
+            user_type_(user_type),
+            seqno_    (seqno    ),
+            datagram_ (datagram ),
+            tstamp_   (gu::datetime::Date::now())
+        { }
+        uint8_t             user_type() const { return user_type_; }
+        seqno_t             seqno()     const { return seqno_    ; }
+        const gu::Datagram& datagram()  const { return datagram_ ; }
+        const gu::datetime::Date& tstamp()    const { return tstamp_   ; }
+    private:
+        uint8_t      user_type_;
+        seqno_t      seqno_;
+        gu::Datagram datagram_;
+        gu::datetime::Date     tstamp_;
+    };
+    // Queue containing local causal messages
+    std::deque<CausalMessage> causal_queue_;
     // Consensus module
     Consensus consensus;
     // Consensus attempt count
