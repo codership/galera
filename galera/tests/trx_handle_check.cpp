@@ -19,6 +19,8 @@ START_TEST(test_states)
     // 3) valid state changes change state
     TrxHandle* trx(new TrxHandle(uuid, -1, 1, true));
 
+    trx->append_statement("statement1", strlen("statement1"));
+    trx->append_statement("statement2", strlen("statement2"));
     log_info << *trx;
     fail_unless(trx->state() == TrxHandle::S_EXECUTING);
 

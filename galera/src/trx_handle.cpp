@@ -48,16 +48,22 @@ std::ostream& galera::operator<<(std::ostream& os, TrxHandle::State s)
 std::ostream&
 galera::operator<<(std::ostream& os, const TrxHandle& th)
 {
-    return (os << "source: " << th.source_id_
-            << " state: " << th.state_()
-            << " flags: " << th.write_set_flags_
-            << " conn_id: " << th.conn_id_
-            << " trx_id: " << th.trx_id_
-            << " seqnos (l: "  << th.local_seqno_
-            << ", g: " << th.global_seqno_
-            << ", s: " << th.last_seen_seqno_
-            << ", d: " << th.last_depends_seqno_
-            << ')');
+    os << "source: " << th.source_id_
+       << " state: " << th.state_()
+       << " flags: " << th.write_set_flags_
+       << " conn_id: " << th.conn_id_
+       << " trx_id: " << th.trx_id_
+       << " seqnos (l: "  << th.local_seqno_
+       << ", g: " << th.global_seqno_
+       << ", s: " << th.last_seen_seqno_
+       << ", d: " << th.last_depends_seqno_
+       << ") ";
+    os << "statements:\n";
+    for (StatementSequence::const_iterator i = th.write_set_.get_queries().begin(); i != th.write_set_.get_queries().end(); ++i)
+    {
+        os << "\t" << *i << "\n";
+    }
+    return os;
 }
 
 
