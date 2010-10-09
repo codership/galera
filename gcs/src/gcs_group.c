@@ -174,6 +174,36 @@ group_go_non_primary (gcs_group_t* group)
     // what else? Do we want to change anything about the node here?
 }
 
+static const char group_empty_id[GCS_COMP_MEMB_ID_MAX_LEN + 1] = { 0, };
+ 
+static void
+group_check_donor (gcs_group_t* group)
+{
+    gcs_node_state_t const my_state = group->nodes[group->my_idx].status;
+    const char*      const donor_id = group->nodes[group->my_idx].donor;
+
+    if (GCS_NODE_STATE_JOINER == my_state &&
+        memcmp (donor_id, group_empty_id, sizeof(group_empty_id)))
+    {
+        long i;
+
+        for (i = 0; i < group->num; i++)
+        {
+            if (i != group->my_idx &&
+                !memcmp (donor_id, group->nodes[i].id,
+                         sizeof (group->nodes[i].id)))
+                return;
+        }
+
+        gu_warn ("Donor %s is no longer in the group. State transfer cannot "
+                 "be completed, need to abort.", donor_id);
+
+        abort();
+    }
+
+    return;
+}
+
 /*! Processes state messages and sets group parameters accordingly */
 static void
 group_post_state_exchange (gcs_group_t* group)
@@ -244,6 +274,8 @@ group_post_state_exchange (gcs_group_t* group)
              quorum.primary ? "PRIMARY" : "NON-PRIMARY",
              quorum.act_id, quorum.conf_id, group->last_applied, quorum.proto,
              GU_UUID_ARGS(&quorum.group_uuid));
+
+    group_check_donor(group);
 }
 
 // does basic sanity check of the component message (in response to #145)
@@ -557,6 +589,10 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
         if (j == group->num) {
             gu_warn ("Could not find peer: %s", peer_id);
+        }
+        else if (GCS_NODE_STATE_DONOR  == sender->status) {
+            // donor is done with the job and is no longer need
+            memcpy (peer->donor, group_empty_id, sizeof (group_empty_id));
         }
 
         if (seqno < 0) {

@@ -593,6 +593,8 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     }
 
     assert(seqno_l != GCS_SEQNO_ILL && seqno_g != GCS_SEQNO_ILL);
+    ++replicated_;
+    replicated_bytes_ += wscoll.size();
     trx->set_gcs_handle(-1);
     trx->set_seqnos(seqno_l, seqno_g);
 
@@ -617,8 +619,6 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     else
     {
         trx->set_state(TrxHandle::S_REPLICATED);
-        ++replicated_;
-        replicated_bytes_ += wscoll.size();
         retval = WSREP_OK;
     }
 
