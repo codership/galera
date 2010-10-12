@@ -323,7 +323,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     assert(recv_ctx != 0);
     if (state_() == S_CLOSED || state_() == S_CLOSING)
     {
-        log_error << "async recv cannot start, provider in closed/closing state";
+        log_error <<"async recv cannot start, provider in closed/closing state";
         return WSREP_FATAL;
     }
 
@@ -335,14 +335,17 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
         gcs_act_type_t act_type;
         gcs_seqno_t seqno_g, seqno_l;
         ssize_t rc(gcs_.recv(&act, &act_size, &act_type, &seqno_l, &seqno_g));
+
         if (rc <= 0)
         {
             retval = WSREP_CONN_FAIL;
             break;
         }
+
         retval = dispatch(recv_ctx, act, act_size, act_type,
                           seqno_l, seqno_g);
         free(act);
+
         if (retval == WSREP_FATAL || retval == WSREP_NODE_FAIL) break;
     }
 
@@ -1330,6 +1333,13 @@ wsrep_status_t galera::ReplicatorSMM::process_conf(void* recv_ctx,
 
     view_cb_(app_ctx_, recv_ctx, view_info, 0, 0, &app_req, &app_req_len);
 
+    if (app_req_len < 0)
+    {
+        log_error << "View callback failed: " << -app_req_len
+                  << " (" << strerror(-app_req_len) << ')';
+        return WSREP_NODE_FAIL;
+    }
+
     wsrep_status_t retval(WSREP_OK);
 
     if (conf->conf_id >= 0)
@@ -1401,10 +1411,12 @@ wsrep_status_t galera::ReplicatorSMM::process_to_action(void* recv_ctx,
 {
     assert(seqno_l > -1);
     LocalOrder lo(seqno_l);
+
     local_monitor_.enter(lo);
     apply_monitor_.drain(cert_.position());
 
-    wsrep_status_t retval(WSREP_OK);
+    wsrep_status_t retval(WSREP_NODE_FAIL);
+
     switch (act_type)
     {
     case GCS_ACT_CONF:
@@ -1431,11 +1443,19 @@ wsrep_status_t galera::ReplicatorSMM::process_to_action(void* recv_ctx,
         break;
 
     default:
-        log_fatal << "invalid gcs act type " << act_type;
         gu_throw_fatal << "invalid gcs act type " << act_type;
-        throw;
+//        throw;
     }
-    local_monitor_.leave(lo);
+
+    if (WSREP_OK == retval)
+    {
+        local_monitor_.leave(lo);
+    }
+    else
+    {
+        gu_throw_fatal << "TO action failed. Can't continue.";
+    }
+
     return retval;
 }
 
@@ -1449,6 +1469,7 @@ wsrep_status_t galera::ReplicatorSMM::dispatch(void* recv_ctx,
 {
     assert(recv_ctx != 0);
     assert(act != 0);
+
     switch (act_type)
     {
     case GCS_ACT_TORDERED:
@@ -1458,7 +1479,6 @@ wsrep_status_t galera::ReplicatorSMM::dispatch(void* recv_ctx,
         received_bytes_ += act_size;
         return process_global_action(recv_ctx, act, act_size, seqno_l, seqno_g);
     }
-
     case GCS_ACT_COMMIT_CUT:
     {
         assert(seqno_g == GCS_SEQNO_ILL);
@@ -1470,7 +1490,6 @@ wsrep_status_t galera::ReplicatorSMM::dispatch(void* recv_ctx,
         local_monitor_.leave(lo);
         return WSREP_OK;
     }
-
     default:
     {
         // assert(seqno_g == GCS_SEQNO_ILL);
