@@ -154,20 +154,18 @@ wait_for_wsrep_ready()
 {
     echo -n "Waiting for wsrep_ready"
 
-    local ret=0
+    local pid=$1
+    local ret=1
     local ready
 
-    while [ $ret ]
+    while find_pid $pid
     do
         echo -n "."
         sleep 1
     # mysql connection can be interrupted by SST code,
     # don't fail on it rigth away
-        ready=$(get_status "wsrep_ready" || \
-                get_status "wsrep_ready" || \
-                get_status "wsrep_ready")
-        ret=$?
-        if [ "$ready" == "ON" ]; then break; fi
+        ready=$(get_status "wsrep_ready") && \
+        if [ $ret ] && [ "$ready" == "ON" ]; then ret=0; break; fi
     done
 
     if [ $ret ]
@@ -298,7 +296,7 @@ galera_start()
         return 1
     fi
 
-    wait_for_wsrep_ready
+    wait_for_wsrep_ready $my_pid
 }
 
 galera_stop()
