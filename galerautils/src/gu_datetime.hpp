@@ -113,7 +113,7 @@ namespace gu
             /*!
              * @brief Get system time.
              */
-            static inline Date now() {return gu_time_calendar(); }
+            static inline Date now() {return gu_time_monotonic(); }
 
             /*!
              * @brief Get maximum representable timestamp.
