@@ -813,7 +813,7 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
         {
             if (local == false)
             {
-                const MessageNodeList& instances = install_message->get_node_list();
+                const MessageNodeList& instances(install_message->get_node_list());
                 MessageNodeList::const_iterator inst_i;
                 if ((inst_i = instances.find(NodeMap::get_key(i))) != instances.end())
                 {
@@ -826,6 +826,10 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
                         view.add_partitioned(NodeMap::get_key(i), "");
                     }
                 }
+                else
+                {
+                    view.add_partitioned(NodeMap::get_key(i), "");
+                }
             }
             else
             {
@@ -833,6 +837,9 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
                 // for leaving node anyway and it is not guaranteed if
                 // the others get the leave message, so it is not safe
                 // to assume then as left.
+                log_info << self_string()
+                         << " uuid " << NodeMap::get_key(i)
+                         << " missing from install message, assuming partitioned";
                 view.add_partitioned(NodeMap::get_key(i), "");
             }
         }

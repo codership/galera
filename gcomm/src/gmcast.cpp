@@ -390,13 +390,12 @@ void GMCast::handle_established(Proto* est)
 
     // If address is found from pending_addrs, move it to remote_addrs list
     // and set retry cnt to -1
-    const string& remote_addr = est->get_remote_addr();
-    AddrList::iterator i = pending_addrs.find (remote_addr);
+    const string& remote_addr(est->get_remote_addr());
+    AddrList::iterator i(pending_addrs.find(remote_addr));
 
     if (i != pending_addrs.end())
     {
         log_debug << "Erasing " << remote_addr << " from panding list";
-
         pending_addrs.erase(i);
     }
 
@@ -406,6 +405,18 @@ void GMCast::handle_established(Proto* est)
 
         insert_address (remote_addr, est->get_remote_uuid(), remote_addrs);
         i = remote_addrs.find(remote_addr);
+    }
+    else if (AddrList::get_value(i).get_uuid() != est->get_remote_uuid())
+    {
+        log_info << "remote endpoint " << est->get_remote_addr()
+                 << " changed identity " << AddrList::get_value(i).get_uuid()
+                 << " -> " << est->get_remote_uuid();
+        remote_addrs.erase(i);
+        i = remote_addrs.insert_unique(
+            make_pair(est->get_remote_addr(),
+                      AddrEntry(Date::now(),
+                                Date::max(),
+                                est->get_remote_uuid())));
     }
 
     if (AddrList::get_value(i).get_retry_cnt() > max_retry_cnt)

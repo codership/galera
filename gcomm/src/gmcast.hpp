@@ -99,13 +99,14 @@ namespace gcomm
             int get_retry_cnt() const { return retry_cnt; }
 
         private:
-
+            friend std::ostream& operator<<(std::ostream&, const AddrEntry&);
             void operator=(const AddrEntry&);
             UUID uuid;
             gu::datetime::Date last_seen;
             gu::datetime::Date next_reconnect;
             int  retry_cnt;
         };
+
 
         class AddrList : public Map<std::string, AddrEntry> { };
 
@@ -161,7 +162,18 @@ namespace gcomm
             os << '(' << my_uuid << ", '" << listen_addr << "')";
             return os.str();
         }
+
+        friend std::ostream& operator<<(std::ostream&, const AddrEntry&);
     };
+
+    inline std::ostream& operator<<(std::ostream& os, const GMCast::AddrEntry& ae)
+    {
+        return (os << ae.uuid
+                << " last_seen=" << ae.last_seen
+                << " next_reconnect=" << ae.next_reconnect
+                << " retry_cnt=" << ae.retry_cnt);
+    }
+
 }
 
 #endif // TRANSPORT_GMCAST_HPP
