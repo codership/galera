@@ -826,7 +826,7 @@ void gcomm::evs::Proto::deliver_trans_view(bool local)
                         view.add_partitioned(NodeMap::get_key(i), "");
                     }
                 }
-                else
+                else if (current_view.is_member(NodeMap::get_key(i)) == true)
                 {
                     view.add_partitioned(NodeMap::get_key(i), "");
                 }
@@ -3152,6 +3152,20 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     if (inst.get_join_message() != 0)
         inst.set_tstamp(Date::now());
     inst.set_join_message(&msg);
+
+    // Add unseen nodes to known list. No need to adjust node state here,
+    // it is done later on in check_suspects()/cross_check_inactives().
+    for (MessageNodeList::const_iterator i(msg.get_node_list().begin());
+         i != msg.get_node_list().end(); ++i)
+    {
+        NodeMap::iterator ni(known.find(MessageNodeList::get_key(i)));
+        if (ni == known.end())
+        {
+            known.insert_unique(
+                make_pair(MessageNodeList::get_key(i),
+                          Node(inactive_timeout, suspect_timeout)));
+        }
+    }
 
     // Select nodes that are coming from the same view as seen by
     // message source
