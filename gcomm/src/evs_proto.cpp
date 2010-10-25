@@ -296,9 +296,19 @@ void gcomm::evs::Proto::handle_retrans_timer()
         {
             if (is_representative(get_uuid()) == true)
             {
-                profile_enter(send_install_prof);
-                gu_trace(send_install());
-                profile_leave(send_install_prof);
+                if (consensus.is_consensus() == true)
+                {
+                    profile_enter(send_install_prof);
+                    gu_trace(send_install());
+                    profile_leave(send_install_prof);
+                }
+                else
+                {
+                    log_warn << self_string()
+                             << " install message is consistent but "
+                             << "no consensus, state (stderr)";
+                    std::cerr << *this;
+                }
             }
             else
             {
@@ -2665,6 +2675,21 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     
     inst.set_join_message(&msg);
     inst.set_tstamp(Date::now());    
+
+    // Add unseen nodes to known list. No need to adjust node state here,
+    // it is done later on in check_suspects()/cross_check_inactives().
+    for (MessageNodeList::const_iterator i(msg.get_node_list().begin());
+         i != msg.get_node_list().end(); ++i)
+    {
+        NodeMap::iterator ni(known.find(MessageNodeList::get_key(i)));
+        if (ni == known.end())
+        {
+            known.insert_unique(
+                make_pair(MessageNodeList::get_key(i),
+                          Node(inactive_timeout, suspect_timeout)));
+        }
+    }
+
     
     // Select nodes that are coming from the same view as seen by
     // message source
