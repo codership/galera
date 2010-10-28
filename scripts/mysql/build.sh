@@ -128,6 +128,29 @@ GALERA_SRC=${GALERA_SRC:-$BUILD_ROOT/../../}
 MYSQL_SRC=$(cd $MYSQL_SRC; pwd -P; cd $BUILD_ROOT)
 GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
 
+# If packaging with epm, make sure that mysql user exists in build system to
+# get file ownerships right.
+if [ "$PACKAGE" == "yes" ]
+then
+    echo "Checking for mysql user and group for epm:"
+    getent passwd mysql >/dev/null
+    if [ $? != 0 ]
+    then
+        echo "Error: user 'mysql' does not exist"
+        exit 1
+    else
+        echo "User 'mysql' ok"
+    fi
+    getent group mysql >/dev/null
+    if [ $? != 0 ]
+    then
+        echo "Error: group 'mysql' doest not exist"
+        exit 1
+    else
+        echo "Group 'mysql' ok"
+    fi
+fi
+
 ######################################
 ##                                  ##
 ##          Build Galera            ##
