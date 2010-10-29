@@ -110,7 +110,7 @@ void PC::connect()
     evs->shift_to(evs::Proto::S_JOINING);
     pc->connect(start_prim);
 
-    Date try_until(Date::now() + Period("PT15S"));
+    Date try_until(Date::now() + Period("PT30S"));
     while (start_prim == false && evs->get_known_size() <= 1)
     {
         // Send join messages without handling them
