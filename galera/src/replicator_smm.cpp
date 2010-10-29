@@ -27,11 +27,13 @@ static wsrep_status_t apply_statement(void* recv_ctx,
     assert(apply_cb != 0);
 
     wsrep_apply_data_t data;
+
     data.type           = WSREP_APPLY_SQL;
     data.u.sql.stm      = query;
     data.u.sql.len      = strlen (data.u.sql.stm) + 1; // terminating 0
     data.u.sql.timeval  = static_cast<time_t>(0);
     data.u.sql.randseed = 0;
+
     return apply_cb(recv_ctx, &data, seqno_g);
 }
 
@@ -47,6 +49,7 @@ static wsrep_status_t apply_ws(void* recv_ctx,
     using galera::StatementSequence;
 
     wsrep_status_t retval(WSREP_OK);
+
     switch (ws.get_level())
     {
     case WriteSet::L_DATA:
@@ -70,6 +73,7 @@ static wsrep_status_t apply_ws(void* recv_ctx,
             data.u.sql.len      = i->get_query().size();
             data.u.sql.timeval  = i->get_tstamp();
             data.u.sql.randseed = i->get_rnd_seed();
+
             switch ((retval = apply_cb(recv_ctx, &data, seqno_g)))
             {
             case WSREP_OK: break;
@@ -82,6 +86,7 @@ static wsrep_status_t apply_ws(void* recv_ctx,
                 break;
             }
         }
+
         break;
     }
 
@@ -90,6 +95,7 @@ static wsrep_status_t apply_ws(void* recv_ctx,
                  << " not supported";
         retval = WSREP_TRX_FAIL;
     }
+
     return retval;
 }
 
@@ -104,16 +110,20 @@ static wsrep_status_t apply_wscoll(void* recv_ctx,
     // skip over trx header
     size_t offset(galera::serial_size(trx));
     galera::WriteSet ws;
+
     while (offset < wscoll.size())
     {
         offset = unserialize(&wscoll[0], wscoll.size(), offset, ws);
+
         if ((retval = apply_ws(recv_ctx, apply_cb,
                                ws, trx.global_seqno())) != WSREP_OK)
         {
             break;
         }
     }
+
     assert(offset == wscoll.size() || retval != WSREP_OK);
+
     return retval;
 }
 
@@ -126,6 +136,7 @@ static wsrep_status_t apply_trx_ws(void* recv_ctx,
     static const size_t max_apply_attempts(10);
     size_t attempts(0);
     wsrep_status_t retval(WSREP_OK);
+
     do
     {
         retval = apply_wscoll(recv_ctx, apply_cb, trx);
@@ -163,6 +174,7 @@ static wsrep_status_t apply_trx_ws(void* recv_ctx,
             retval = WSREP_FATAL;
         }
     }
+
     return retval;
 }
 
@@ -177,6 +189,7 @@ std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
     case ReplicatorSMM::S_SYNCED:  return (os << "SYNCED");
     case ReplicatorSMM::S_DONOR:   return (os << "DONOR");
     }
+
     gu_throw_fatal << "invalid state " << static_cast<int>(state);
     throw;
 }
@@ -287,6 +300,7 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
 
     ssize_t err;
     wsrep_status_t ret(WSREP_OK);
+
     if ((err = gcs_.set_initial_position(state_uuid_, cert_.position())) != 0)
     {
         log_error << "gcs init failed:" << strerror(-err);
@@ -307,6 +321,7 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
     {
         state_.shift_to(S_JOINING);
     }
+
     return ret;
 }
 
@@ -317,6 +332,7 @@ wsrep_status_t galera::ReplicatorSMM::close()
     {
         gcs_.close();
     }
+
     return WSREP_OK;
 }
 
@@ -325,6 +341,7 @@ wsrep_status_t galera::ReplicatorSMM::close()
 wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 {
     assert(recv_ctx != 0);
+
     if (state_() == S_CLOSED || state_() == S_CLOSING)
     {
         log_error <<"async recv cannot start, provider in closed/closing state";
@@ -332,6 +349,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     }
 
     wsrep_status_t retval(WSREP_OK);
+
     while (state_() != S_CLOSING)
     {
         void* act;
@@ -366,6 +384,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     {
         state_.shift_to(S_CLOSED);
     }
+
     return retval;
 }
 
@@ -380,6 +399,7 @@ galera::ReplicatorSMM::local_trx(wsrep_trx_handle_t* handle, bool create)
 {
     TrxHandle* trx;
     assert(handle != 0);
+
     if (handle->opaque != 0)
     {
         trx = reinterpret_cast<TrxHandle*>(handle->opaque);
@@ -391,6 +411,7 @@ galera::ReplicatorSMM::local_trx(wsrep_trx_handle_t* handle, bool create)
         trx = wsdb_.get_trx(uuid_, handle->trx_id, create);
         handle->opaque = trx;
     }
+
     return trx;
 }
 
@@ -448,6 +469,7 @@ galera::ReplicatorSMM::process_trx_ws(void* recv_ctx, TrxHandle* trx)
     local_monitor_.leave(lo);
 
     wsrep_status_t retval(WSREP_OK);
+
     if (trx->global_seqno() > apply_monitor_.last_left())
     {
         switch (cert_ret)
@@ -473,6 +495,7 @@ galera::ReplicatorSMM::process_trx_ws(void* recv_ctx, TrxHandle* trx)
         // drop the action earlier to build cert index properly.
         log_debug << "skipping applying of trx " << *trx;
     }
+
     cert_.set_trx_committed(trx);
     report_last_committed();
 
@@ -1420,11 +1443,12 @@ wsrep_status_t galera::ReplicatorSMM::process_conf(void* recv_ctx,
 }
 
 
-wsrep_status_t galera::ReplicatorSMM::process_to_action(void* recv_ctx,
-                                             const void* act,
-                                             size_t act_size,
-                                             gcs_act_type_t act_type,
-                                             wsrep_seqno_t seqno_l)
+wsrep_status_t
+galera::ReplicatorSMM::process_to_action(void*          recv_ctx,
+                                         const void*    act,
+                                         size_t         act_size,
+                                         gcs_act_type_t act_type,
+                                         wsrep_seqno_t  seqno_l)
 {
     assert(seqno_l > -1);
     LocalOrder lo(seqno_l);
@@ -1461,7 +1485,6 @@ wsrep_status_t galera::ReplicatorSMM::process_to_action(void* recv_ctx,
 
     default:
         gu_throw_fatal << "invalid gcs act type " << act_type;
-//        throw;
     }
 
     if (WSREP_OK == retval)
