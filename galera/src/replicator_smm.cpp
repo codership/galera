@@ -978,47 +978,71 @@ void galera::ReplicatorSMM::store_state(const std::string& file) const
 
 void galera::ReplicatorSMM::restore_state(const std::string& file)
 {
-    std::ifstream fs(file.c_str());
+    wsrep_uuid_t  uuid  (WSREP_UUID_UNDEFINED);
+    wsrep_seqno_t seqno (WSREP_SEQNO_UNDEFINED);
+    std::ifstream fs    (file.c_str());
+
     if (fs.fail() == true)
     {
-        log_warn << "could not restore state from file " << file;
-        return;
+        log_warn << "state file not found: " << file;
     }
-
-    std::string line;
-    std::string param;
-    wsrep_uuid_t uuid(WSREP_UUID_UNDEFINED);
-    wsrep_seqno_t seqno(WSREP_SEQNO_UNDEFINED);
-
-    getline(fs, line);
-    if (fs.good() == false)
+    else
     {
-        gu_throw_fatal << "could not read header from file " << file;
-    }
-    log_debug << "read state header: "<< line;
+        std::string line;
 
-    while (fs.good() == true)
-    {
         getline(fs, line);
-        if (fs.good() == false) break;
 
-        std::istringstream istr(line);
-        istr >> param;
-        if (param == "uuid:")
+        if (fs.good() == false)
         {
-            istr >> uuid;
-            log_debug << "read state uuid " << uuid;
+            log_warn << "could not read header from state file: " << file;
         }
-        else if (param == "seqno:")
+        else
         {
-            istr >> seqno;
-            log_debug << "read seqno " << seqno;
+            log_debug << "read state header: "<< line;
+
+            while (fs.good() == true)
+            {
+                getline(fs, line);
+
+                if (fs.good() == false) break;
+
+                std::istringstream istr(line);
+                std::string        param;
+
+                istr >> param;
+
+                if (param == "uuid:")
+                {
+                    try
+                    {
+                        istr >> uuid;
+                        log_debug << "read state uuid " << uuid;
+                    }
+                    catch (gu::Exception& e)
+                    {
+                        log_error << e.what();
+                        uuid = WSREP_UUID_UNDEFINED;
+                    }
+                }
+                else if (param == "seqno:")
+                {
+                    istr >> seqno;
+                    log_debug << "read seqno " << seqno;
+                }
+                else if (param == "cert_index:")
+                {
+                    // @todo
+                    log_debug << "cert index restore not implemented yet";
+                }
+            }
         }
-        else if (param == "cert_index:")
-        {
-            // @todo
-            log_debug << "cert index restore not implemented yet";
-        }
+    }
+
+    if (seqno < 0 && uuid != WSREP_UUID_UNDEFINED)
+    {
+        log_warn << "Negative seqno with valid UUID: "
+                 << uuid << ':' << seqno << ". Discarding UUID.";
+        uuid = WSREP_UUID_UNDEFINED;
     }
 
     state_uuid_ = uuid;
