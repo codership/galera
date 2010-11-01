@@ -84,10 +84,28 @@ repository to satisfy package dependencies.
 
 2.1.1 On Debian and Debian-derived distributions.
 
-If you're installing over an existing mysql installation, mysql-wsrep may
-conflict with mysql-server and mysql-client meta-packages, so remove them first:
+If you're installing over an existing mysql installation, mysql-wsrep will
+conflict with mysql-server-5.1 and mysql-server-core-5.1  packages, so
+remove them first:
 
-$ sudo dpkg -r mysql-server mysql-client
+$ sudo apt-get remove mysql-server-5.1 mysql-server-core-5.1
+
+From 0.7.5 upwards, mysql-wsrep will require psmisc and mysql-client-5.1.47
+or newer. MySQL 5.1 packages can be found from backports repositories.
+For further information about configuring and using Debian or Ubuntu
+backports, see:
+
+* http://backports.debian.org
+
+* https://help.ubuntu.com/community/UbuntuBackports
+
+For example, installation of required packages on Debian Lenny:
+
+$ sudo apt-get install psmisc
+$ sudo apt-get -t lenny-backports install mysql-client-5.1
+
+Now you should be able to install mysql-wsrep package:
+
 $ sudo dpkg -i <mysql-wsrep DEB>
 
 2.1.2 On CentOS and similar distributions.
