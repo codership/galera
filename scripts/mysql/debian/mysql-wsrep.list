@@ -37,6 +37,7 @@ $prefix=/usr
 d 755 root root /etc/init.d       -
 f 755 root root /etc/init.d/mysql $GALERA_SRC/scripts/mysql/debian/mysql
 
+$CONF_DST=/etc/mysql
 $LIBS_DST=${prefix}/lib
 $SHAR_DST=${prefix}/share/mysql
 $SBIN_DST=${prefix}/sbin
