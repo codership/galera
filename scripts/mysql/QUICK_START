@@ -57,7 +57,7 @@ LIMITATIONS:
 
 2. Rows in tables without primary keys may appear in different order on
    different nodes. As a result SELECT...LIMIT... may return slightly different
-   sets.
+   sets. DELETE operation on such tables is not supported.
 
 3. Unsupported in this release:
    commands: LOAD DATA may result in a transaction that is too big and will be
@@ -68,25 +68,25 @@ LIMITATIONS:
 
 QUICK ANSWERS:
 
-1. Arbitrator is gone an is no longer supported.
+1. Yes, it works anywhere TCP works, including Amazon EC2(TM).
 
-2. Yes, it works anywhere TCP works, including Amazon EC2(TM).
-
-3. Yes, it'd be faster if there were a dedicated network for replication
+2. Yes, it'd be faster if there were a dedicated network for replication
    connections and a separate network for MySQL client connections.
 
-4. Yes, it is highly configurable and flexible. For more info see README, 
+3. Yes, it is highly configurable and flexible. For more info see README, 
    mysql-galera --help and my.cnf that comes with the distribution.
 
-5. If your application cannot utilize more than one server, you can use TCP 
+4. If your application cannot utilize more than one server, you can use TCP 
    connection balancer like GLB (http://www.codership.com/products/downloads) 
    or pen (http://siag.nu/pen/).
    Note however, that SQL traffic balancing is very CPU consuming (due to high
    number of small packets), so it is recommended to have a dedicated 
    machine for load balancer.
 
-6. The patch for MySQL can be obtained at: bzr branch lp:codership-mysql
+5. The patch for MySQL can be obtained at: bzr branch lp:codership-mysql/0.7
 
 
-Please direct all your suggestions, opinions and inquiries to info@codership.com
+Please direct all your suggestions, opinions and inquiries to
+info@codership.com
+or our mailing list at http://groups.google.com/group/codership-team
 

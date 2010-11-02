@@ -12,9 +12,8 @@ RESULTING DIRECTLY OR INDIRECTLY FROM THE USE OF THIS SOFTWARE.
 
 Trademark Information.
 
-MySQL is a trademark or registered trademark of Sun Microsystems, Inc. or
-its subsidiaries in the US and other countries or whoever owns it. Other
-trademarks are the property of their respective owners.
+MySQL is a trademark or registered trademark of Oracle and/or its affiliates.
+Other trademarks are the property of their respective owners.
 
 Licensing Information.
 
@@ -329,9 +328,9 @@ wsrep_sst_donor=
    So, you can safely issue: CREATE USER..., 
    but issuing: INSERT INTO mysql.user..., will not be replicated.
 
-2) Rows in tables without primary keys may appear in different order on
-   different nodes. As a result SELECT...LIMIT... may return slightly different
-   sets.
+2) DELETE operation is unsupported on tables without primary key. Also rows in
+   tables without primary key may appear in different order on different nodes.
+   As a result SELECT...LIMIT... may return slightly different sets.
 
 3) Unsupported queries:
     * LOAD DATA (limited to ~1Gb, use mysqldump instead)
