@@ -83,14 +83,17 @@ repository to satisfy package dependencies.
 
 2.1.1 On Debian and Debian-derived distributions.
 
+Upgrade from mysql-server-5.0 to mysql-wsrep is not supported yet, please 
+upgrade to mysql-server-5.1 first.
+
 If you're installing over an existing mysql installation, mysql-wsrep will
-conflict with mysql-server-5.1 and mysql-server-core-5.1  packages, so
+conflict with mysql-server-5.1 and mysql-server-core-5.1 packages, so
 remove them first:
 
 $ sudo apt-get remove mysql-server-5.1 mysql-server-core-5.1
 
 From 0.7.5 upwards, mysql-wsrep will require psmisc and mysql-client-5.1.47
-or newer. MySQL 5.1 packages can be found from backports repositories.
+(or later). MySQL 5.1 packages can be found from backports repositories.
 For further information about configuring and using Debian or Ubuntu
 backports, see:
 
@@ -109,25 +112,23 @@ $ sudo dpkg -i <mysql-wsrep DEB>
 
 2.1.2 On CentOS and similar distributions.
 
-CentOS is tricky as it resorts to putting both MySQL client libraries and client
-program in the same package. This makes it impossible to cleanly upgrade or
-install a different major MySQL version without breaking library dependencies
-of other packages. To install mysql-wsrep RPM on CentOS:
+From 0.7.5 upwards, mysql-wsrep will require official MySQL-shared-5.1.47 and
+MySQL-client-5.1.47 (or later).
+
+To install mysql-wsrep RPM on CentOS:
 
   1) Make sure that the following packages are not installed:
-  # rpm -e --allmatches --nodeps mysql-server mysql-test mysql-devel mysql-bench
+  # rpm --nodeps --allmatches -e mysql-server mysql-test mysql-devel mysql-bench
 
-  2) Make sure that mysql package is installed (client library contained in it
-     will be needed by other packages):
-  # yum install mysql
+  2) Install MySQL-shared-5.1 and MySQL-client-5.1
+  # rpm -i <MySQL-shared RPM> <MySQL-client RPM>
 
-  3) Try to install mysql-wsrep and satisfy all package requirements except for
-     conflict with native mysql package:
-  # rpm -U <mysql-wsrep RPM>
+  3) Try to install mysql-wsrep and satisfy all remaining package requirements:
+  # rpm -i <mysql-wsrep RPM>
 
-  4) When all packages required by mysql-wsrep are installed, overwrite the
-     native mysql package:
-  # rpm -U --nodeps --replacefiles <mysql-wsrep RPM>
+  4) If MySQL 5.0 shared libraries are needed (required by perl-DBD-MySQL etc.),
+  they can be found in package mysqlclient15 in Remi repository (see
+  http://blog.famillecollet.com/pages/Config-en)
 
 2.2 Upgrade system tables.
 

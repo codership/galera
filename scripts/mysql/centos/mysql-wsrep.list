@@ -79,10 +79,10 @@ if [ $$1 = 1 ]; then
 fi
 /bin/chmod 0755 ${mysql_data}
 /bin/touch /var/log/mysqld.log
-#/bin/chown -R mysql:mysql ${mysql_data}
-#mysql_install_db --user=mysql --datadir=${mysql_data}
-#/bin/chown -R mysql:mysql ${mysql_data}
-#/bin/chmod -R og-rw ${mysql_data}/mysql
+/bin/chown -R mysql:mysql ${mysql_data}
+mysql_install_db --user=mysql --datadir=${mysql_data}
+/bin/chown -R mysql:mysql ${mysql_data}
+/bin/chmod -R og-rw ${mysql_data}/mysql
 EOF_POSTINSTALL
 
 %preremove  <<EOF_PREREMOVE
