@@ -120,7 +120,8 @@ To install mysql-wsrep RPM on CentOS:
   1) Make sure that the following packages are not installed:
   # rpm --nodeps --allmatches -e mysql-server mysql-test mysql-devel mysql-bench
 
-  2) Install MySQL-shared-5.1 and MySQL-client-5.1
+  2) Install *official* MySQL RPMs (not the ones that go with the distro):
+  MySQL-shared-community-5.1.47 and MySQL-client-community-5.1.47
   # rpm -i <MySQL-shared RPM> <MySQL-client RPM>
 
   3) Try to install mysql-wsrep and satisfy all remaining package requirements:

@@ -1,4 +1,4 @@
-# This is a MySQL-wsrep package description for ESP package manager
+# This is a MySQ L-wsrep package description for ESP package manager
 # CentOS specific part
 
 %requires /bin/sh
@@ -8,7 +8,7 @@
 %requires /usr/sbin/useradd
 %requires bash
 %requires chkconfig
-%requires fileutils
+%requires coreutils
 %requires grep
 %requires libc.so.6
 %requires libcrypt.so.1
@@ -16,29 +16,27 @@
 %requires libdl.so.2
 %requires libgcc_s.so.1
 %requires libm.so.6
-%requires libmysqlclient.so.16
-%requires libmysqlclient_r.so.16
+#%requires libmysqlclient
+#%requires libmysqlclient_r
 %requires libncurses.so.5
 %requires libnsl.so.1
 %requires libpthread.so.0
 %requires libssl.so.6
 %requires libstdc++.so.6
 %requires libz.so.1
-%requires perl
-%requires perl-DBD-MySQL
-%requires perl-DBI
+%requires procps
 %requires rtld(GNU_HASH)
-%requires sh-utils
+%requires shadow-utils
 
 # Required MySQL packages
-%requires MySQL-shared 5.1.44
-%requires MySQL-client 5.1.44
-# Conflicting mysql packages
-%incompat mysql-server
-
-#config(mysql) = 5.0.77-4.el5_4.1 ???
+%requires MySQL-shared-community 5.1.47
+%requires MySQL-client-community 5.1.47
 
 %provides MySQL-server
+%provides mysql-server
+
+# Conflicting mysql packages
+#%incompat mysql-server
 
 $prefix=/usr
 
