@@ -40,6 +40,7 @@ then
     export CC CXX
 fi
 
+
 initial_stage="galerautils"
 last_stage="galera"
 gainroot=""
@@ -116,6 +117,27 @@ do
     esac
     shift
 done
+
+# check whether sudo accepts -E to preserve environment
+if [ "$PACKAGE" == "yes" ]
+then
+    echo "testing sudo"
+    if sudo -E /bin/true >/dev/null 2>&1
+    then
+        echo "sudo accepts -E"
+        SUDO="sudo -E"
+    else
+        echo "sudo does not accept param -E"
+        if [ $(id -ur) != 0 ]
+        then
+            echo "error, must build as root"
+            exit 1
+        else
+            echo "I'm root, can continue"
+            SUDO=""
+        fi
+    fi
+fi
 
 if [ "$OPT"   == "yes" ]; then CONFIGURE="yes";
    conf_flags="$conf_flags --disable-debug --disable-dbug";
@@ -209,12 +231,12 @@ build_packages()
     set +e
     if [ $DEBIAN -ne 0 ]
     then # build DEB
-        sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
+        $SUDO /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
              --output-dir $ARCH $STRIP_OPT galera # && \
 #       sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
 #            --output-dir $ARCH $STRIP_OPT galera-dev
     else # build RPM
-        (sudo -E /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
+        ($SUDO /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
               --output-dir $ARCH --keep-files -k $STRIP_OPT galera || \
          /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/galera.spec" \
               --buildroot="$ARCH/buildroot" ) # && \
@@ -223,7 +245,7 @@ build_packages()
     fi
     local RET=$?
 
-    sudo /bin/chown -R $WHOAMI.users $ARCH
+    $SUDO /bin/chown -R $WHOAMI.users $ARCH
     set -e
 
     if [ $RET -eq 0 ] && [ $DEBIAN -eq 0 ]
