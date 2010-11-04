@@ -36,12 +36,13 @@ c 640 mysql mysql $CONF_DST/conf.d/wsrep.cnf   $MYSQL_SRC/support-files/wsrep.cn
 # mysql-server-5.1 part
 d 755 root root $BINS_DST -
 f 644 root root $CONF_DST/conf.d/mysqld_safe_syslog.cnf $GALERA_SRC/scripts/mysql/debian/mysqld_safe_syslog.cnf
+%format deb
 f 755 root root $BINS_DST/msql2mysql           $MYSQL_SRC/scripts/msql2mysql
-f 755 root root $BINS_DST/my_print_defaults    $MYSQL_SRC/extra/my_print_defaults
 %format rpm
 f 755 root root $BINS_DST/innochecksum         $MYSQL_SRC/extra/innochecksum
+f 755 root root $BINS_DST/myisam_ftdump        $MYSQL_SRC/storage/myisam/myisam_ftdump
 %format all
-f 755 root root $BINS_DST/myisamchk            $MYSQL_SRC/storage/myisam/myisamchk
+f 755 root root $BINS_DST/my_print_defaults    $MYSQL_SRC/extra/my_print_defaults
 f 755 root root $BINS_DST/myisamlog            $MYSQL_SRC/storage/myisam/myisamlog
 f 755 root root $BINS_DST/myisampack           $MYSQL_SRC/storage/myisam/myisampack
 f 755 root root $BINS_DST/mysql_convert_table_format $MYSQL_SRC/scripts/mysql_convert_table_format
@@ -59,8 +60,10 @@ f 755 root root $BINS_DST/mysql_zap            $MYSQL_SRC/scripts/mysql_zap
 %format deb
 f 755 root root $BINS_DST/mysqlbinlog          $MYSQL_SRC/client/.libs/mysqlbinlog
 %format all
+f 755 root root $BINS_DST/mysqlbug             $MYSQL_SRC/scripts/mysqlbug
 f 755 root root $BINS_DST/mysqld_multi         $MYSQL_SRC/scripts/mysqld_multi
 f 755 root root $BINS_DST/mysqld_safe          $MYSQL_SRC/scripts/mysqld_safe
+f 755 root root $BINS_DST/mysqldumpslow        $MYSQL_SRC/scripts/mysqldumpslow
 f 755 root root $BINS_DST/mysqlhotcopy         $MYSQL_SRC/scripts/mysqlhotcopy
 f 755 root root $BINS_DST/mysqltest            $MYSQL_SRC/client/.libs/mysqltest
 f 755 root root $BINS_DST/perror               $MYSQL_SRC/extra/perror
@@ -68,6 +71,7 @@ f 755 root root $BINS_DST/replace              $MYSQL_SRC/extra/replace
 f 755 root root $BINS_DST/resolve_stack_dump   $MYSQL_SRC/extra/resolve_stack_dump
 f 755 root root $BINS_DST/resolveip            $MYSQL_SRC/extra/resolveip
 f 755 root root $BINS_DST/mysqlhotcopy         $MYSQL_SRC/scripts/mysqlhotcopy
+f 755 root root $BINS_DST/mysqltest            $MYSQL_SRC/scripts/mysqltest
 f 755 root root $BINS_DST/wsrep_sst_mysqldump  $MYSQL_SRC/scripts/wsrep_sst_mysqldump
 f 644 root root $BINS_DST/wsrep_sst_mysqldump_fix.sql  $MYSQL_SRC/scripts/wsrep_sst_mysqldump_fix.sql
 

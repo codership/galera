@@ -45,7 +45,7 @@ d 755 root root $CONF_DST               -
 c 644 root root /etc/my.cnf             $GALERA_SRC/scripts/mysql/centos/my.cnf
 
 d 755 root root /etc/rc.d/init.d        -
-f 755 root root /etc/rc.d/init.d/mysqld $GALERA_SRC/scripts/mysql/centos/init.centos
+f 755 root root /etc/rc.d/init.d/mysql $GALERA_SRC/scripts/mysql/centos/init.oracle
 
 %if x86_64 # CentOS (read Red Hat) never fails to screw up things
 $LIBS_DST=${prefix}/lib64
