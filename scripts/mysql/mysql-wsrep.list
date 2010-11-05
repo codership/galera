@@ -148,8 +148,8 @@ f 644 root root $SHAR_DST                      $MYSQL_SRC/support-files/config.*
 f 644 root root $SHAR_DST/errmsg.txt           $MYSQL_SRC/sql/share/errmsg.txt
 f 644 root root $SHAR_DST                      $MYSQL_SRC/scripts/*.sql
 %format rpm
-f 755 root root $SHAR_DST/mi_test_all          $MYSQL_SRC/storage_myisam/mi_test_all
-f 755 root root $SHAR_DST/mi_test_all.res      $MYSQL_SRC/storage_myisam/mi_test_all.res
+f 755 root root $SHAR_DST/mi_test_all          $MYSQL_SRC/storage/myisam/mi_test_all
+f 755 root root $SHAR_DST/mi_test_all.res      $MYSQL_SRC/storage/myisam/mi_test_all.res
 f 644 root root $SHAR_DST                      $MYSQL_SRC/support-files/my-*.cnf
 f 644 root root $SHAR_DST/mysql-log-rotate     $MYSQL_SRC/support-files/mysql-log-rotate
 f 755 root root $SHAR_DST/mysql.server         $MYSQL_SRC/support-files/mysql.server
