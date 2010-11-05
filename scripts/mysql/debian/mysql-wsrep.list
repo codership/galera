@@ -12,39 +12,65 @@
 %requires    libwrap0          7.6
 %requires    perl
 %requires    zlib1g            1.1.4
-%requires    mysql-client-5.1  5.1.44
+%requires    mysql-client-5.1  5.1.47
+
+%replaces    mysql-server-core     0.0.0 ${mysql_version}
+%replaces    mysql-server-core-5.0 0.0.0 ${mysql_version}
+%replaces    mysql-server-core-5.1 0.0.0 ${mysql_version}
+%replaces    mysql-server          0.0.0 ${mysql_version}
+%replaces    mysql-server-5.0      0.0.0 ${mysql_version}
+%replaces    mysql-server-5.1      0.0.0 ${mysql_version}
 
 %provides    mysql-server-core-5.1
 %provides    mysql-server-core
 %provides    mysql-server-5.1
 %provides    mysql-server
 
-%replaces    mysql-server-core     0.0.0 ${mysql_version}
-%replaces    mysql-server-core-5.1 0.0.0 ${mysql_version}
-%replaces    mysql-server          0.0.0 ${mysql_version}
-%replaces    mysql-server-5.1      0.0.0 ${mysql_version}
-
-%incompat    mysql-server-core-4.1
-%incompat    mysql-server-core-5.0
-%incompat    mysql-server-core-5.1
-%incompat    mysql-server
-%incompat    mysql-server-4.1
-%incompat    mysql-server-5.0
-%incompat    mysql-server-5.1
+#%incompat    mysql-server-core
+#%incompat    mysql-server-core-4.1
+#%incompat    mysql-server-core-5.0
+#%incompat    mysql-server-core-5.1
+#%incompat    mysql-server
+#%incompat    mysql-server-4.1
+#%incompat    mysql-server-5.0
+#%incompat    mysql-server-5.1
 
 $prefix=/usr
 
-d 755 root root /etc/init.d       -
-f 755 root root /etc/init.d/mysql $GALERA_SRC/scripts/mysql/debian/mysql
-
 $CONF_DST=/etc/mysql
-$LIBS_DST=${prefix}/lib
+$LIBS_DST=${prefix}/lib/mysql
 $SHAR_DST=${prefix}/share/mysql
 $SBIN_DST=${prefix}/sbin
 $BINS_DST=${prefix}/bin
-$DOCS_DST=${prefix}/share/doc/mysql
+$DOCS_DST=${prefix}/share/doc/mysql-server-5.1
 $LIBEXEC_DST=${prefix}/libexec
 $MAN_DST=${prefix}/share/man
+
+# Distribution dependent files
+
+$SRC=$GALERA_SRC/scripts/mysql/debian
+$ETC=$SRC/etc
+
+d 755 root root /etc/init.d       -
+f 755 root root /etc/init.d/mysql $SRC/mysql
+d 755 root root /etc/logrotate.d  -
+f 755 root root /etc/logrotate.d/mysql-server      $ETC/logrotate.d/mysql-server
+d 755 root root /etc/logcheck                      -
+d 755 root root /etc/logcheck/ignore.d.paranoid    -
+f 644 root root /etc/logcheck/ignore.d.paranoid/mysql-server-5_1 $ETC/logcheck/ignore.d.paranoid/mysql-server-5_1
+d 755 root root /etc/logcheck/ignore.d.server      -
+f 644 root root /etc/logcheck/ignore.d.server/mysql-server-5_1 $ETC/logcheck/ignore.d.server/mysql-server-5_1
+d 755 root root /etc/logcheck/ignore.d.workstation -
+f 644 root root /etc/logcheck/ignore.d.workstation/mysql-server-5_1 $ETC/logcheck/ignore.d.workstation/mysql-server-5_1
+
+d 755 root root $CONF_DST
+f 755 root root $CONF_DST/debian-start                  $ETC/mysql/debian-start
+d 755 root root $CONF_DST/conf.d
+f 644 root root $CONF_DST/conf.d/mysqld_safe_syslog.cnf $ETC/mysql/conf.d/mysqld_safe_syslog.cnf
+
+d 755 root root $SHAR_DST -
+f 755 root root $SHAR_DST/debian-start.inc.sh           $SRC/debian-start.inc.sh
+f 755 root root $SHAR_DST/echo_stderr                   $SRC/echo_stderr
 
 # Distribution dependent scripts
 

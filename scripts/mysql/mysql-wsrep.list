@@ -22,20 +22,10 @@ $wsrep_version=${WSREP_VER}
 # according to Debian division into packages #
 ##############################################
 
-# Documentation
-d 755 root root $DOCS_DST -
-f 644 root root $DOCS_DST/COPYING           $MYSQL_SRC/COPYING
-f 644 root root $DOCS_DST/EXCEPTIONS-CLIENT $MYSQL_SRC/EXCEPTIONS-CLIENT
-f 644 root root $DOCS_DST/README            $MYSQL_SRC/README
-f 644 root root $DOCS_DST/README-wsrep      ${GALERA_SRC}/scripts/mysql/README-wsrep
-
-# mysql-common part (see distribution-specific includes too)
-d 755 root  root  $CONF_DST/conf.d             -
-c 640 mysql mysql $CONF_DST/conf.d/wsrep.cnf   $MYSQL_SRC/support-files/wsrep.cnf
-
-# mysql-server-5.1 part
+############################
+#   mysql-server-5.1 part  #
+############################
 d 755 root root $BINS_DST -
-f 644 root root $CONF_DST/conf.d/mysqld_safe_syslog.cnf $GALERA_SRC/scripts/mysql/debian/mysqld_safe_syslog.cnf
 %format deb
 f 755 root root $BINS_DST/msql2mysql           $MYSQL_SRC/scripts/msql2mysql
 %format rpm
@@ -43,6 +33,7 @@ f 755 root root $BINS_DST/innochecksum         $MYSQL_SRC/extra/innochecksum
 f 755 root root $BINS_DST/myisam_ftdump        $MYSQL_SRC/storage/myisam/myisam_ftdump
 %format all
 f 755 root root $BINS_DST/my_print_defaults    $MYSQL_SRC/extra/my_print_defaults
+f 755 root root $BINS_DST/myisamchk            $MYSQL_SRC/storage/myisam/myisamchk
 f 755 root root $BINS_DST/myisamlog            $MYSQL_SRC/storage/myisam/myisamlog
 f 755 root root $BINS_DST/myisampack           $MYSQL_SRC/storage/myisam/myisampack
 f 755 root root $BINS_DST/mysql_convert_table_format $MYSQL_SRC/scripts/mysql_convert_table_format
@@ -59,78 +50,215 @@ f 755 root root $BINS_DST/mysql_zap            $MYSQL_SRC/scripts/mysql_zap
 # Official RPMs have mysqlbinlog in client package
 %format deb
 f 755 root root $BINS_DST/mysqlbinlog          $MYSQL_SRC/client/.libs/mysqlbinlog
-%format all
+%format rpm
 f 755 root root $BINS_DST/mysqlbug             $MYSQL_SRC/scripts/mysqlbug
+%format all
 f 755 root root $BINS_DST/mysqld_multi         $MYSQL_SRC/scripts/mysqld_multi
-f 755 root root $BINS_DST/mysqld_safe          $MYSQL_SRC/scripts/mysqld_safe
+%format deb
+f 755 root root $BINS_DST/mysqld_safe          $GALERA_SRC/scripts/mysql/debian/mysqld_safe
+%format rpm
+f 755 root root $BINS_DST/mysqld_safe          $GALERA_SRC/scripts/mysql/centos/mysqld_safe
 f 755 root root $BINS_DST/mysqldumpslow        $MYSQL_SRC/scripts/mysqldumpslow
+%format all
 f 755 root root $BINS_DST/mysqlhotcopy         $MYSQL_SRC/scripts/mysqlhotcopy
 f 755 root root $BINS_DST/mysqltest            $MYSQL_SRC/client/.libs/mysqltest
 f 755 root root $BINS_DST/perror               $MYSQL_SRC/extra/perror
 f 755 root root $BINS_DST/replace              $MYSQL_SRC/extra/replace
 f 755 root root $BINS_DST/resolve_stack_dump   $MYSQL_SRC/extra/resolve_stack_dump
 f 755 root root $BINS_DST/resolveip            $MYSQL_SRC/extra/resolveip
-f 755 root root $BINS_DST/mysqlhotcopy         $MYSQL_SRC/scripts/mysqlhotcopy
-f 755 root root $BINS_DST/mysqltest            $MYSQL_SRC/scripts/mysqltest
-f 755 root root $BINS_DST/wsrep_sst_mysqldump  $MYSQL_SRC/scripts/wsrep_sst_mysqldump
-f 644 root root $BINS_DST/wsrep_sst_mysqldump_fix.sql  $MYSQL_SRC/scripts/wsrep_sst_mysqldump_fix.sql
 
-f 644 root root $SHAR_DST/errmsg.txt           $MYSQL_SRC/sql/share/errmsg.txt
-f 644 root root $SHAR_DST/mysqld_multi.server  $MYSQL_SRC/support-files/mysqld_multi.server
-f 644 root root $SHAR_DST                      $MYSQL_SRC/scripts/*.sql
+d 755 root root $LIBS_DST        -
+d 755 root root $LIBS_DST/plugin -
+f 755 root root $LIBS_DST/plugin/ha_innodb_plugin.so.0.0.0 $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so.0.0.0
+l 000 root root $LIBS_DST/plugin/ha_innodb_plugin.so.0 ha_innodb_plugin.so.0.0.0
+l 000 root root $LIBS_DST/plugin/ha_innodb_plugin.so   ha_innodb_plugin.so.0.0.0
 
-d 755 root root $DOCS_DST/examples -
-f 644 root root $DOCS_DST/examples             $MYSQL_SRC/support-files/*.cnf
-
-d 755 mysql root /var/run/mysqld -
-d 755 mysql adm  /var/log/mysql  -
-
-# mysql-server-core-5.1
-d 755 root root $LIBEXEC_DST -
-f 755 root root $LIBEXEC_DST/mysqld            $MYSQL_SRC/sql/mysqld
+# /usr/share/doc/...
+d 755 root root $DOCS_DST -
+f 644 root root $DOCS_DST/COPYING           $MYSQL_SRC/COPYING
 %format deb
-d 755 root root $SBIN_DST -
-l 000 root root $SBIN_DST/mysqld               ../libexec/mysqld
+d 755 root root $DOCS_DST/examples -
+f 644 root root $DOCS_DST/examples          $MYSQL_SRC/support-files/*.cnf
+f 644 root root $DOCS_DST/EXCEPTIONS-CLIENT $MYSQL_SRC/EXCEPTIONS-CLIENT
+%format rpm
+f 644 root root $DOCS_DST/README            $MYSQL_SRC/README
+f 644 root root $DOCS_DST                   $MYSQL_SRC/support-files/*.cnf
 %format all
-d 755 root root $SHAR_DST/english -
-f 644 root root $SHAR_DST/english/errmsg.sys   $MYSQL_SRC/sql/share/english/errmsg.sys
-d 755 root root $SHAR_DST/charsets -
-f 644 root root $SHAR_DST/charsets             $MYSQL_SRC/sql/share/charsets/*
 
 # manpages
 d 755 root root $MAN_DST/man1 -
-%format rpm
 f 644 root root $MAN_DST/man1/innochecksum.1.gz      $MYSQL_SRC/man/innochecksum.1.gz
 %format deb
 f 644 root root $MAN_DST/man1/msql2mysql.1.gz        $MYSQL_SRC/man/msql2mysql.1.gz
 %format all
+f 644 root root $MAN_DST/man1/my_print_defaults.1.gz $MYSQL_SRC/man/my_print_defaults.1.gz
+%format rpm
+f 644 root root $MAN_DST/man1/myisam_ftdump.1.gz     $MYSQL_SRC/man/myisam_ftdump.1.gz
+%format all
 f 644 root root $MAN_DST/man1/myisamchk.1.gz         $MYSQL_SRC/man/myisamchk.1.gz
 f 644 root root $MAN_DST/man1/myisamlog.1.gz         $MYSQL_SRC/man/myisamlog.1.gz
 f 644 root root $MAN_DST/man1/myisampack.1.gz        $MYSQL_SRC/man/myisampack.1.gz
-f 644 root root $MAN_DST/man1/my_print_defaults.1.gz $MYSQL_SRC/man/my_print_defaults.1.gz
-%format deb
-f 644 root root $MAN_DST/man1/mysqlbinlog.1.gz       $MYSQL_SRC/man/mysqlbinlog.1.gz
+%format rpm
+f 644 root root $MAN_DST/man1/mysql.server.1.gz      $MYSQL_SRC/man/mysql.server.1.gz
 %format all
 f 644 root root $MAN_DST/man1/mysql_convert_table_format.1.gz $MYSQL_SRC/man/mysql_convert_table_format.1.gz
-f 644 root root $MAN_DST/man1/mysqld_multi.1.gz      $MYSQL_SRC/man/mysqld_multi.1.gz
-f 644 root root $MAN_DST/man1/mysqld_safe.1.gz       $MYSQL_SRC/man/mysqld_safe.1.gz
 %format rpm
 f 644 root root $MAN_DST/man1/mysql_fix_extensions.1.gz $MYSQL_SRC/man/mysql_fix_extensions.1.gz
 %format all
 f 644 root root $MAN_DST/man1/mysql_fix_privilege_tables.1.gz $MYSQL_SRC/man/mysql_fix_privilege_tables.1.gz
-f 644 root root $MAN_DST/man1/mysqlhotcopy.1.gz      $MYSQL_SRC/man/mysqlhotcopy.1.gz
 f 644 root root $MAN_DST/man1/mysql_install_db.1.gz  $MYSQL_SRC/man/mysql_install_db.1.gz
 f 644 root root $MAN_DST/man1/mysql_secure_installation.1.gz $MYSQL_SRC/man/mysql_secure_installation.1.gz
 f 644 root root $MAN_DST/man1/mysql_setpermission.1.gz $MYSQL_SRC/man/mysql_setpermission.1.gz
-f 644 root root $MAN_DST/man1/mysqltest.1.gz         $MYSQL_SRC/man/mysqltest.1.gz
 f 644 root root $MAN_DST/man1/mysql_tzinfo_to_sql.1.gz $MYSQL_SRC/man/mysql_tzinfo_to_sql.1.gz
 f 644 root root $MAN_DST/man1/mysql_upgrade.1.gz     $MYSQL_SRC/man/mysql_upgrade.1.gz
 f 644 root root $MAN_DST/man1/mysql_zap.1.gz         $MYSQL_SRC/man/mysql_zap.1.gz
+%format deb
+f 644 root root $MAN_DST/man1/mysqlbinlog.1.gz       $MYSQL_SRC/man/mysqlbinlog.1.gz
+%format rpm
+f 644 root root $MAN_DST/man1/mysqlbug.1.gz          $MYSQL_SRC/man/mysqlbug.1.gz
+%format all
+f 644 root root $MAN_DST/man1/mysqld_multi.1.gz      $MYSQL_SRC/man/mysqld_multi.1.gz
+f 644 root root $MAN_DST/man1/mysqld_safe.1.gz       $MYSQL_SRC/man/mysqld_safe.1.gz
+%format rpm
+f 644 root root $MAN_DST/man1/mysqldumpslow.1.gz     $MYSQL_SRC/man/mysqldumpslow.1.gz
+%format all
+f 644 root root $MAN_DST/man1/mysqlhotcopy.1.gz      $MYSQL_SRC/man/mysqlhotcopy.1.gz
+%format rpm
+f 644 root root $MAN_DST/man1/mysqlman.1.gz          $MYSQL_SRC/man/mysqlman.1.gz
+%format all
+f 644 root root $MAN_DST/man1/mysqltest.1.gz         $MYSQL_SRC/man/mysqltest.1.gz
+%format deb
+l 000 root root $MAN_DST/man1/mysqltest_embedded.1.gz mysqltest.1.gz
+%format all
 f 644 root root $MAN_DST/man1/perror.1.gz            $MYSQL_SRC/man/perror.1.gz
 f 644 root root $MAN_DST/man1/replace.1.gz           $MYSQL_SRC/man/replace.1.gz
-f 644 root root $MAN_DST/man1/resolveip.1.gz         $MYSQL_SRC/man/resolveip.1.gz
 f 644 root root $MAN_DST/man1/resolve_stack_dump.1.gz $MYSQL_SRC/man/resolve_stack_dump.1.gz
+f 644 root root $MAN_DST/man1/resolveip.1.gz         $MYSQL_SRC/man/resolveip.1.gz
+
+%format deb
+d 755 root root $SHAR_DST/mysql-test -
+l 000 root root $SHAR_DST/mysql-test/mtr            mysql-test-run.pl
+l 000 root root $SHAR_DST/mysql-test/mysql-test-run mysql-test-run.pl
+%format rpm
+d 755 root root $SHAR_DST -
+f 644 root root $SHAR_DST/ChangeLog            $MYSQL_SRC/ChangeLog
+f 755 root root $SHAR_DST/binary-configure     $MYSQL_SRC/support-files/binary-configure
+%format all
+f 644 root root $SHAR_DST                      $MYSQL_SRC/support-files/config.*.ini
+f 644 root root $SHAR_DST/errmsg.txt           $MYSQL_SRC/sql/share/errmsg.txt
+f 644 root root $SHAR_DST                      $MYSQL_SRC/scripts/*.sql
+%format rpm
+f 755 root root $SHAR_DST/mi_test_all          $MYSQL_SRC/storage_myisam/mi_test_all
+f 755 root root $SHAR_DST/mi_test_all.res      $MYSQL_SRC/storage_myisam/mi_test_all.res
+f 644 root root $SHAR_DST                      $MYSQL_SRC/support-files/my-*.cnf
+f 644 root root $SHAR_DST/mysql-log-rotate     $MYSQL_SRC/support-files/mysql-log-rotate
+f 755 root root $SHAR_DST/mysql.server         $MYSQL_SRC/support-files/mysql.server
+%format all
+f 644 root root $SHAR_DST/mysqld_multi.server  $MYSQL_SRC/support-files/mysqld_multi.server
+f 644 root root $SHAR_DST/innodb-config-2-node.ini $MYSQL_SRC/support-files/ndb-config-2-node.ini
+
+#server RPM does not have anything in /var
+%format deb
+#d 755 mysql root /var/run/mysqld -
+#d 755 mysql adm  /var/log/mysql  -
+d 755 root root /var/lib/mysql-upgrade -
+%format all
+
+############################
+#   mysql-server-core-5.1  #
+############################
+
+d 755 root root $SBIN_DST -
+f 755 root root $SBIN_DST/mysqld               $MYSQL_SRC/sql/mysqld
+%format rpm
+f 755 root root $SBIN_DST/mysqmanager          $MYSQL_SRC/server-tools/instance-manager/mysqlmanager
+%format all
+
+d 755 root root $SHAR_DST/charsets -
+f 644 root root $SHAR_DST/charsets             $MYSQL_SRC/sql/share/charsets/*
+$lang00=czech
+d 755 root root $SHAR_DST/${lang00} -
+f 644 root root $SHAR_DST/${lang00}            $MYSQL_SRC/sql/share/${lang00}/*
+$lang01=danish
+d 755 root root $SHAR_DST/${lang01} -
+f 644 root root $SHAR_DST/${lang01}            $MYSQL_SRC/sql/share/${lang01}/*
+$lang02=dutch
+d 755 root root $SHAR_DST/${lang02} -
+f 644 root root $SHAR_DST/${lang02}            $MYSQL_SRC/sql/share/${lang02}/*
+$lang03=english
+d 755 root root $SHAR_DST/${lang03} -
+f 644 root root $SHAR_DST/${lang03}            $MYSQL_SRC/sql/share/${lang03}/*
+$lang04=estonian
+d 755 root root $SHAR_DST/${lang04} -
+f 644 root root $SHAR_DST/${lang04}            $MYSQL_SRC/sql/share/${lang04}/*
+$lang05=french
+d 755 root root $SHAR_DST/${lang05} -
+f 644 root root $SHAR_DST/${lang05}            $MYSQL_SRC/sql/share/${lang05}/*
+$lang06=german
+d 755 root root $SHAR_DST/${lang06} -
+f 644 root root $SHAR_DST/${lang06}            $MYSQL_SRC/sql/share/${lang06}/*
+$lang07=greek
+d 755 root root $SHAR_DST/${lang07} -
+f 644 root root $SHAR_DST/${lang07}            $MYSQL_SRC/sql/share/${lang07}/*
+$lang08=hungarian
+d 755 root root $SHAR_DST/${lang08} -
+f 644 root root $SHAR_DST/${lang08}            $MYSQL_SRC/sql/share/${lang08}/*
+$lang09=italian
+d 755 root root $SHAR_DST/${lang09} -
+f 644 root root $SHAR_DST/${lang09}            $MYSQL_SRC/sql/share/${lang09}/*
+$lang10=japanese
+d 755 root root $SHAR_DST/${lang10} -
+f 644 root root $SHAR_DST/${lang10}            $MYSQL_SRC/sql/share/${lang10}/*
+$lang11=korean
+d 755 root root $SHAR_DST/${lang11} -
+f 644 root root $SHAR_DST/${lang11}            $MYSQL_SRC/sql/share/${lang11}/*
+$lang12=norwegian
+d 755 root root $SHAR_DST/${lang12} -
+f 644 root root $SHAR_DST/${lang12}            $MYSQL_SRC/sql/share/${lang12}/*
+$lang13=norwegian-ny
+d 755 root root $SHAR_DST/${lang13} -
+f 644 root root $SHAR_DST/${lang13}            $MYSQL_SRC/sql/share/${lang13}/*
+$lang14=polish
+d 755 root root $SHAR_DST/${lang14} -
+f 644 root root $SHAR_DST/${lang14}            $MYSQL_SRC/sql/share/${lang14}/*
+$lang15=portuguese
+d 755 root root $SHAR_DST/${lang15} -
+f 644 root root $SHAR_DST/${lang15}            $MYSQL_SRC/sql/share/${lang15}/*
+$lang16=romanian
+d 755 root root $SHAR_DST/${lang16} -
+f 644 root root $SHAR_DST/${lang16}            $MYSQL_SRC/sql/share/${lang16}/*
+$lang17=russian
+d 755 root root $SHAR_DST/${lang17} -
+f 644 root root $SHAR_DST/${lang17}            $MYSQL_SRC/sql/share/${lang17}/*
+$lang18=serbian
+d 755 root root $SHAR_DST/${lang18} -
+f 644 root root $SHAR_DST/${lang18}            $MYSQL_SRC/sql/share/${lang18}/*
+$lang19=slovak
+d 755 root root $SHAR_DST/${lang19} -
+f 644 root root $SHAR_DST/${lang19}            $MYSQL_SRC/sql/share/${lang19}/*
+$lang20=spanish
+d 755 root root $SHAR_DST/${lang20} -
+f 644 root root $SHAR_DST/${lang20}            $MYSQL_SRC/sql/share/${lang20}/*
+$lang21=swedish
+d 755 root root $SHAR_DST/${lang21} -
+f 644 root root $SHAR_DST/${lang21}            $MYSQL_SRC/sql/share/${lang21}/*
+$lang22=ukrainian
+d 755 root root $SHAR_DST/${lang22} -
+f 644 root root $SHAR_DST/${lang22}            $MYSQL_SRC/sql/share/${lang22}/*
+
 d 755 root root $MAN_DST/man8 -
-f 644 root root $MAN_DST/man8/mysqld.8.gz           $MYSQL_SRC/man/mysqld.8.gz
+f 644 root root $MAN_DST/man8/mysqld.8.gz       $MYSQL_SRC/man/mysqld.8.gz
+%format rpm
+f 644 root root $MAN_DST/man8/mysqlmanager.8.gz $MYSQL_SRC/man/mysqlmanager.8.gz
+%format all
+
+##########################
+#  wsrep-specific files  #
+##########################
+
+# should be created in format-dependent lists d 755 root  root  $CONF_DST/conf.d             -
+c 640 mysql mysql $CONF_DST/conf.d/wsrep.cnf   $MYSQL_SRC/support-files/wsrep.cnf
+f 755 root root $BINS_DST/wsrep_sst_mysqldump  $MYSQL_SRC/scripts/wsrep_sst_mysqldump
+f 644 root root $DOCS_DST/README-wsrep      ${GALERA_SRC}/scripts/mysql/README-wsrep
 
 #
