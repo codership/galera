@@ -115,7 +115,8 @@ then
     if sudo -E epm --version >/dev/null 2>&1
     then
         echo "sudo accepts -E"
-        SUDO="sudo -E"
+        SUDO_ENV="sudo -E"
+        SUDO="sudo"
     else
         echo "sudo does not accept param -E"
         if [ $(id -ur) != 0 ]
@@ -123,6 +124,7 @@ then
             echo "error, must build as root"
             exit 1
         else
+            SUDO_ENV=""
             SUDO=""
             echo "I'm root, can continue"
         fi
@@ -422,10 +424,10 @@ build_packages()
     set +e
     if [ $DEBIAN -ne 0 ]
     then #build DEB
-        $SUDO /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
+        $SUDO_ENV /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
              --output-dir $ARCH $STRIP_OPT mysql-wsrep
     else # build RPM
-        ($SUDO -E /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
+        ($SUDO_ENV /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
               --output-dir $ARCH --keep-files -k $STRIP_OPT mysql-wsrep || \
         /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/mysql-wsrep.spec" \
               --buildroot="$ARCH/buildroot" )
