@@ -112,7 +112,7 @@ done
 if [ "$PACKAGE" == "yes" ]
 then
     echo "testing sudo"
-    if sudo -E /bin/true >/dev/null 2>&1
+    if sudo -E epm --version >/dev/null 2>&1
     then
         echo "sudo accepts -E"
         SUDO="sudo -E"
