@@ -58,31 +58,53 @@ $SHAR_DST=${prefix}/share/mysql
 $SBIN_DST=${prefix}/sbin
 $BINS_DST=${prefix}/bin
 $DOCS_DST=${prefix}/share/doc/MySQL-server-5.1.47
-$LIBEXEC_DST=${prefix}/libexec
 $MAN_DST=${prefix}/share/man
 
 # Commented out CentOS pieces of code which don't seem to make sense here
 
-$mysql_data=/var/lib/mysql
+$mysql_datadir=/var/lib/mysql
 #d 755 root root ${mysql_data} -
 
 %preinstall <<EOF_PREINSTALL
-/usr/sbin/useradd -M -o -r -d /var/lib/mysql -s /bin/bash \
-                  -c "MySQL Server" -u 27 mysql > /dev/null 2>&1 || :
+if [ -x /etc/init.d/mysql ] ; then
+    /etc/init.d/mysql stop > /dev/null 2>&1
+    echo "Giving mysqld 5 seconds to exit nicely"
+    sleep 5
+fi
 EOF_PREINSTALL
 
 # Postinstall script is a combination of those from CentOS and MySQL RPMs
 %postinstall <<EOF_POSTINSTALL
 ldconfig -n $LIBS_DST
-if [ $$1 = 1 ]; then
+
+if [ ! -d $mysql_datadir ] ; then mkdir -m 755 $mysql_datadirdir; fi
+if [ ! -d $mysql_datadir/mysql ] ; then mkdir $mysql_datadirdir/mysql; fi
+if [ ! -d $mysql_datadir/test ] ; then mkdir $mysql_datadirdir/test; fi
+
+if [ -x /sbin/chkconfig ] ; then
     /sbin/chkconfig --add mysql
 fi
-/bin/chmod 0755 ${mysql_data}
+
+groupadd -r mysql 2> /dev/null || true
+useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL Server" \
+        -g mysql mysql 2> /dev/null || true
+# in case user existed
+usermod -g mysql mysql 2> /dev/null || true
+
+/bin/chmod 0755 ${mysql_datadir}
 /bin/touch /var/log/mysqld.log
-/bin/chown -R mysql:mysql ${mysql_data}
-mysql_install_db --rpm --user=mysql --datadir=${mysql_data} --wsrep-on=0
-/bin/chown -R mysql:mysql ${mysql_data}
-/bin/chmod -R og-rw ${mysql_data}/mysql
+/bin/chown -R mysql:mysql ${mysql_datadir}
+/usr/bin/mysql_install_db --rpm --user=mysql --wsrep-on=0
+/bin/chown -R mysql:mysql ${mysql_datadir}
+/bin/chmod -R og-rw ${mysql_datadir}/mysql
+
+if [ -x /etc/init.d/mysql ] ; then
+    /etc/init.d/mysql start
+    echo "Giving mysqld 2 seconds to start"
+    sleep 2
+fi
+
+sleep 2
 EOF_POSTINSTALL
 
 %preremove  <<EOF_PREREMOVE
@@ -92,10 +114,10 @@ if [ $$1 = 0 ]; then
 fi
 EOF_PREREMOVE
 
-%postremove <<EOF_POSTREMOVE
-if [ $$1 -ge 1 ]; then
-    /sbin/service mysql condrestart >/dev/null 2>&1 || :
-fi
-EOF_POSTREMOVE
+#%postremove <<EOF_POSTREMOVE
+#if [ $$1 -ge 1 ]; then
+#    /sbin/service mysql condrestart >/dev/null 2>&1 || :
+#fi
+#EOF_POSTREMOVE
 
 #

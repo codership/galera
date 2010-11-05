@@ -43,7 +43,6 @@ $SHAR_DST=${prefix}/share/mysql
 $SBIN_DST=${prefix}/sbin
 $BINS_DST=${prefix}/bin
 $DOCS_DST=${prefix}/share/doc/mysql-server-5.1
-$LIBEXEC_DST=${prefix}/libexec
 $MAN_DST=${prefix}/share/man
 
 # Distribution dependent files
