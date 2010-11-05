@@ -75,26 +75,26 @@ EOF_PREINSTALL
 %postinstall <<EOF_POSTINSTALL
 ldconfig -n $LIBS_DST
 if [ $$1 = 1 ]; then
-    /sbin/chkconfig --add mysqld
+    /sbin/chkconfig --add mysql
 fi
 /bin/chmod 0755 ${mysql_data}
 /bin/touch /var/log/mysqld.log
 /bin/chown -R mysql:mysql ${mysql_data}
-mysql_install_db --user=mysql --datadir=${mysql_data} --wsrep-on=0
+mysql_install_db --rpm --user=mysql --datadir=${mysql_data} --wsrep-on=0
 /bin/chown -R mysql:mysql ${mysql_data}
 /bin/chmod -R og-rw ${mysql_data}/mysql
 EOF_POSTINSTALL
 
 %preremove  <<EOF_PREREMOVE
 if [ $$1 = 0 ]; then
-    /sbin/service mysqld stop >/dev/null 2>&1 || :
-    /sbin/chkconfig --del mysqld
+    /sbin/service mysql stop >/dev/null 2>&1 || :
+    /sbin/chkconfig --del mysql
 fi
 EOF_PREREMOVE
 
 %postremove <<EOF_POSTREMOVE
 if [ $$1 -ge 1 ]; then
-    /sbin/service mysqld condrestart >/dev/null 2>&1 || :
+    /sbin/service mysql condrestart >/dev/null 2>&1 || :
 fi
 EOF_POSTREMOVE
 
