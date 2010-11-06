@@ -57,7 +57,8 @@ f 755 root root $BINS_DST/mysqld_multi         $MYSQL_SRC/scripts/mysqld_multi
 %format deb
 f 755 root root $BINS_DST/mysqld_safe          $GALERA_SRC/scripts/mysql/debian/mysqld_safe
 %format rpm
-f 755 root root $BINS_DST/mysqld_safe          $GALERA_SRC/scripts/mysql/centos/mysqld_safe
+#f 755 root root $BINS_DST/mysqld_safe          $GALERA_SRC/scripts/mysql/centos/mysqld_safe
+f 755 root root $BINS_DST/mysqld_safe          $MYSQL_SRC/scripts/mysqld_safe
 f 755 root root $BINS_DST/mysqldumpslow        $MYSQL_SRC/scripts/mysqldumpslow
 %format all
 f 755 root root $BINS_DST/mysqlhotcopy         $MYSQL_SRC/scripts/mysqlhotcopy

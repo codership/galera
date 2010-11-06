@@ -77,9 +77,9 @@ EOF_PREINSTALL
 %postinstall <<EOF_POSTINSTALL
 ldconfig -n $LIBS_DST
 
-if [ ! -d $mysql_datadir ] ; then mkdir -m 755 $mysql_datadirdir; fi
-if [ ! -d $mysql_datadir/mysql ] ; then mkdir $mysql_datadirdir/mysql; fi
-if [ ! -d $mysql_datadir/test ] ; then mkdir $mysql_datadirdir/test; fi
+if [ ! -d $mysql_datadir ] ; then mkdir -m 755 $mysql_datadir ; fi
+if [ ! -d $mysql_datadir/mysql ] ; then mkdir $mysql_datadir/mysql ; fi
+if [ ! -d $mysql_datadir/test ] ; then mkdir $mysql_datadir/test ; fi
 
 if [ -x /sbin/chkconfig ] ; then
     /sbin/chkconfig --add mysql
@@ -103,8 +103,8 @@ if [ -x /etc/init.d/mysql ] ; then
     echo "Giving mysqld 2 seconds to start"
     sleep 2
 fi
-
 sleep 2
+
 EOF_POSTINSTALL
 
 %preremove  <<EOF_PREREMOVE

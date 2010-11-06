@@ -255,6 +255,15 @@ then
         fi
 
         export MYSQL_BUILD_PREFIX="/usr"
+        
+	if [ "$PACKAGE" == "yes" ]
+	then
+#	    [ $DEBIAN -eq 0 ] && export MYSQL_BUILD_PREFIX="/"
+	    export wsrep_configs="--exec-prefix=/usr \
+	                          --libexecdir=/usr/sbin \
+	                          --localstatedir=/var/lib/mysql \
+	                          --with-extra-charsets=all"
+    	fi
 
         [ $DEBIAN -ne 0 ] && \
         export MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
