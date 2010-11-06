@@ -310,7 +310,7 @@ build_sources()
 
     local ret="galera-source-r$RELEASE.tar"
     tar --transform 's/.*\///' -cf $ret $srcs \
-    "source/README_BUILD" "source/COPYING" "source/build.sh"
+    "source/README" "source/COPYING" "source/build.sh"
 
     # return absolute path for scripts
     echo $PWD/$ret
