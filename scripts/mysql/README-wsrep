@@ -12,9 +12,8 @@ RESULTING DIRECTLY OR INDIRECTLY FROM THE USE OF THIS SOFTWARE.
 
 Trademark Information.
 
-MySQL is a trademark or registered trademark of Sun Microsystems, Inc. or
-its subsidiaries in the US and other countries or whoever owns it. Other
-trademarks are the property of their respective owners.
+MySQL is a trademark or registered trademark of Oracle and/or its affiliates.
+Other trademarks are the property of their respective owners.
 
 Licensing Information.
 
@@ -33,7 +32,7 @@ administration of MySQL server per se. The reader is assumed to know how to
 install, configure, administer and use standard MySQL server version 5.1.xx.
 
 
-                        MYSQL-5.1.x/wsrep-0.7.x
+                        MYSQL-5.1.x/wsrep-0.8.x
 
 CONTENTS:
 =========
@@ -84,33 +83,53 @@ repository to satisfy package dependencies.
 
 2.1.1 On Debian and Debian-derived distributions.
 
-If you're installing over an existing mysql installation, mysql-wsrep may
-conflict with mysql-server and mysql-client meta-packages, so remove them first:
+Upgrade from mysql-server-5.0 to mysql-wsrep is not supported yet, please 
+upgrade to mysql-server-5.1 first.
 
-$ sudo dpkg -r mysql-server mysql-client
+If you're installing over an existing mysql installation, mysql-wsrep will
+conflict with mysql-server-5.1 and mysql-server-core-5.1 packages, so
+remove them first:
+
+$ sudo apt-get remove mysql-server-5.1 mysql-server-core-5.1
+
+From 0.7.5 upwards, mysql-wsrep will require psmisc and mysql-client-5.1.47
+(or later). MySQL 5.1 packages can be found from backports repositories.
+For further information about configuring and using Debian or Ubuntu
+backports, see:
+
+* http://backports.debian.org
+
+* https://help.ubuntu.com/community/UbuntuBackports
+
+For example, installation of required packages on Debian Lenny:
+
+$ sudo apt-get install psmisc
+$ sudo apt-get -t lenny-backports install mysql-client-5.1
+
+Now you should be able to install mysql-wsrep package:
+
 $ sudo dpkg -i <mysql-wsrep DEB>
 
 2.1.2 On CentOS and similar distributions.
 
-CentOS is tricky as it resorts to putting both MySQL client libraries and client
-program in the same package. This makes it impossible to cleanly upgrade or
-install a different major MySQL version without breaking library dependencies
-of other packages. To install mysql-wsrep RPM on CentOS:
+From 0.7.5 upwards, mysql-wsrep will require official MySQL-shared-5.1.47 and
+MySQL-client-5.1.47 (or later).
+
+To install mysql-wsrep RPM on CentOS:
 
   1) Make sure that the following packages are not installed:
-  # rpm -e --allmatches --nodeps mysql-server mysql-test mysql-devel mysql-bench
+  # rpm --nodeps --allmatches -e mysql-server mysql-test mysql-devel mysql-bench
 
-  2) Make sure that mysql package is installed (client library contained in it
-     will be needed by other packages):
-  # yum install mysql
+  2) Install *official* MySQL RPMs (not the ones that go with the distro):
+  MySQL-shared-community-5.1.47 and MySQL-client-community-5.1.47
+  # rpm -i <MySQL-shared RPM> <MySQL-client RPM>
 
-  3) Try to install mysql-wsrep and satisfy all package requirements except for
-     conflict with native mysql package:
-  # rpm -U <mysql-wsrep RPM>
+  3) Try to install mysql-wsrep and satisfy all remaining package requirements:
+  # rpm -i <mysql-wsrep RPM>
 
-  4) When all packages required by mysql-wsrep are installed, overwrite the
-     native mysql package:
-  # rpm -U --nodeps --replacefiles <mysql-wsrep RPM>
+  4) If MySQL 5.0 shared libraries are needed (required by perl-DBD-MySQL etc.),
+  they can be found in package mysqlclient15 in Remi repository (see
+  http://blog.famillecollet.com/pages/Config-en)
 
 2.2 Upgrade system tables.
 
@@ -310,9 +329,9 @@ wsrep_sst_donor=
    So, you can safely issue: CREATE USER..., 
    but issuing: INSERT INTO mysql.user..., will not be replicated.
 
-2) Rows in tables without primary keys may appear in different order on
-   different nodes. As a result SELECT...LIMIT... may return slightly different
-   sets.
+2) DELETE operation is unsupported on tables without primary key. Also rows in
+   tables without primary key may appear in different order on different nodes.
+   As a result SELECT...LIMIT... may return slightly different sets.
 
 3) Unsupported queries:
     * LOAD DATA (limited to ~1Gb, use mysqldump instead)

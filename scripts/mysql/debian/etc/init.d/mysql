@@ -105,17 +105,8 @@ case "${1:-''}" in
 	    # Could be removed during boot
 	    test -e /var/run/mysqld || install -m 755 -o mysql -g root -d /var/run/mysqld
 
-	    # Check for additional wsrep options
-	    WSREP_OPTS=${WSREP_OPTS:-""}
-	    WSREP_PROVIDER=${WSREP_PROVIDER:-""}
-	    WSREP_CLUSTER_ADDRESS=${WSREP_CLUSTER_ADDRESS:-""}
-	    test -n "$WSREP_PROVIDER" && \
-	    WSREP_OPTS="$WSREP_OPTS --wsrep_provider=$WSREP_PROVIDER"
-	    test -n "$WSREP_CLUSTER_ADDRESS" && \
-	    WSREP_OPTS="$WSREP_OPTS --wsrep_cluster_address=$WSREP_CLUSTER_ADDRESS"
-
-	    # Start MySQL!.
-	    /usr/bin/mysqld_safe $WSREP_OPTS > /dev/null 2>&1 &
+	    # Start MySQL! 
+  	    /usr/bin/mysqld_safe > /dev/null 2>&1 &
 
 	    # 6s was reported in #352070 to be too few when using ndbcluster
 	    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14; do
@@ -126,8 +117,8 @@ case "${1:-''}" in
 	    if mysqld_status check_alive warn; then
                 log_end_msg 0
 	        # Now start mysqlcheck or whatever the admin wants.
-#	        output=$(/etc/mysql/debian-start)
-#		[ -n "$output" ] && log_action_msg "$output"
+	        output=$(/etc/mysql/debian-start)
+		[ -n "$output" ] && log_action_msg "$output"
 	    else
 	        log_end_msg 1
 		log_failure_msg "Please take a look at the syslog"
