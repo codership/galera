@@ -134,6 +134,29 @@ do
     shift
 done
 
+# check whether sudo accepts -E to preserve environment
+if [ "$PACKAGE" == "yes" ]
+then
+    echo "testing sudo"
+    if sudo -E epm --version >/dev/null 2>&1
+    then
+        echo "sudo accepts -E"
+        SUDO_ENV="sudo -E"
+        SUDO="sudo"
+    else
+        echo "sudo does not accept param -E"
+        if [ $(id -ur) != 0 ]
+        then
+            echo "error, must build as root"
+            exit 1
+        else
+            SUDO_ENV=""
+            SUDO=""
+            echo "I'm root, can continue"
+        fi
+    fi
+fi
+
 if [ "$OPT"     == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$DEBUG"   == "yes" ]; then CONFIGURE="yes"; fi
 if [ "$INSTALL" == "yes" ]; then TAR="yes"; fi
@@ -153,6 +176,29 @@ GALERA_SRC=${GALERA_SRC:-$BUILD_ROOT/../../}
 # Source paths are either absolute or relative to script, get absolute
 MYSQL_SRC=$(cd $MYSQL_SRC; pwd -P; cd $BUILD_ROOT)
 GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
+
+# If packaging with epm, make sure that mysql user exists in build system to
+# get file ownerships right.
+if [ "$PACKAGE" == "yes" ]
+then
+    echo "Checking for mysql user and group for epm:"
+    getent passwd mysql >/dev/null
+    if [ $? != 0 ]
+    then
+        echo "Error: user 'mysql' does not exist"
+        exit 1
+    else
+        echo "User 'mysql' ok"
+    fi
+    getent group mysql >/dev/null
+    if [ $? != 0 ]
+    then
+        echo "Error: group 'mysql' doest not exist"
+        exit 1
+    else
+        echo "Group 'mysql' ok"
+    fi
+fi
 
 ######################################
 ##                                  ##
@@ -229,6 +275,15 @@ then
         fi
 
         export MYSQL_BUILD_PREFIX="/usr"
+        
+	if [ "$PACKAGE" == "yes" ]
+	then
+#	    [ $DEBIAN -eq 0 ] && export MYSQL_BUILD_PREFIX="/"
+	    export wsrep_configs="--exec-prefix=/usr \
+	                          --libexecdir=/usr/sbin \
+	                          --localstatedir=/var/lib/mysql \
+	                          --with-extra-charsets=all"
+    	fi
 
         [ $DEBIAN -ne 0 ] && \
         export MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
@@ -408,17 +463,17 @@ build_packages()
     set +e
     if [ $DEBIAN -ne 0 ]
     then #build DEB
-        sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
+        $SUDO_ENV /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
              --output-dir $ARCH $STRIP_OPT mysql-wsrep
     else # build RPM
-        (sudo -E /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
+        ($SUDO_ENV /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
               --output-dir $ARCH --keep-files -k $STRIP_OPT mysql-wsrep || \
         /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/mysql-wsrep.spec" \
               --buildroot="$ARCH/buildroot" )
     fi
     local RET=$?
 
-    sudo /bin/chown -R $WHOAMI.users $ARCH
+    $SUDO /bin/chown -R $WHOAMI.users $ARCH
     set -e
 
     if [ $RET -eq 0 ] && [ $DEBIAN -eq 0 ]
