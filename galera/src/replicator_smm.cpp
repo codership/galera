@@ -1188,9 +1188,11 @@ wsrep_status_t galera::ReplicatorSMM::process_global_action(void* recv_ctx,
     assert(seqno_l > 0);
     assert(seqno_g > 0);
 
-    if (seqno_g <= cert_.position())
+    if (gu_unlikely(seqno_g <= cert_.position()))
     {
         log_debug << "global trx below cert position" << seqno_g;
+        LocalOrder lo(seqno_l);
+        local_monitor_.self_cancel(lo);
         return WSREP_OK;
     }
 
