@@ -141,6 +141,7 @@ struct gcs_conn
     long         queue_len;           // slave queue length
     long         upper_limit;         // upper slave queue limit
     long         lower_limit;         // lower slave queue limit
+    long         fc_offset;           // offset for catchup phase
     long         stats_fc_sent;       // FC stats counters
     long         stats_fc_received;   // 
 
@@ -226,7 +227,7 @@ gcs_create (const char* node_name, const char* inc_addr, void* conf,
                     conn->my_idx       = -1;
                     conn->local_act_id = GCS_SEQNO_FIRST;
                     conn->global_seqno = 0;
-
+                    conn->fc_offset    = 0;
                     conn->cache = cache;
 
 #ifdef GCS_USE_SM
@@ -315,7 +316,7 @@ gcs_fc_stop_begin (gcs_conn_t* conn)
 {
     long err = 0;
 
-    bool ret = (conn->queue_len  >  conn->upper_limit &&
+    bool ret = (conn->queue_len  >  (conn->upper_limit + conn->fc_offset) &&
                 GCS_CONN_SYNCED  == conn->state       &&
                 conn->stop_count <= 0                 &&
                 conn->stop_sent  <= 0                 &&
@@ -324,6 +325,9 @@ gcs_fc_stop_begin (gcs_conn_t* conn)
     if (gu_unlikely(err)) {
             gu_fatal ("Mutex lock failed: %d (%s)", err, strerror(err));
             abort();
+    }
+    if (ret == true && conn->fc_offset > 0) {
+        gu_debug("FC stop begin, FC offset %ld", conn->fc_offset);
     }
 
     conn->stop_sent += ret;
@@ -364,7 +368,8 @@ gcs_fc_cont_begin (gcs_conn_t* conn)
 {
     long err = 0;
 
-    bool ret = (conn->lower_limit >= conn->queue_len &&
+    bool ret = ((conn->fc_offset > 0 ? conn->fc_offset - 1 : conn->lower_limit)
+                >= conn->queue_len                   &&
                 conn->stop_sent   >  0               &&
                 GCS_CONN_SYNCED   == conn->state     &&
                 !(err = gu_mutex_lock (&conn->fc_lock)));
@@ -372,6 +377,10 @@ gcs_fc_cont_begin (gcs_conn_t* conn)
     if (gu_unlikely(err)) {
         gu_fatal ("Mutex lock failed: %d (%s)", err, strerror(err));
         abort();
+    }
+
+    if (ret == true && conn->fc_offset > 0) {
+        gu_debug("FC cont begin, FC offset %ld", conn->fc_offset);
     }
 
     conn->stop_sent -= ret; // decrement optimistically to allow for parallel
@@ -553,6 +562,8 @@ gcs_become_joined (gcs_conn_t* conn)
 {
     /* See also gcs_handle_act_conf () for a case of cluster bootstrapping */
     if (gcs_shift_state (conn, GCS_CONN_JOINED)) {
+        conn->fc_offset = conn->queue_len;
+        gu_debug("Become joined, FC offset %ld", conn->fc_offset);
         /* One of the cases when the node can become SYNCED */
         long ret;
         if ((ret = gcs_send_sync (conn))) {
@@ -569,6 +580,8 @@ gcs_become_synced (gcs_conn_t* conn)
 {
     gcs_shift_state (conn, GCS_CONN_SYNCED);
     conn->sync_sent = false;
+    gu_debug("Become synced, FC offset %ld", conn->fc_offset);
+    conn->fc_offset = 0;
 }
 
 /* to be called under protection of both recv_q and fc_lock */
@@ -896,6 +909,9 @@ static void *gcs_recv_thread (void *arg)
                 recv_act->local_id = this_act_id;
 
                 conn->queue_len = gu_fifo_length (conn->recv_q) + 1;
+                conn->fc_offset = (conn->fc_offset > 0                      ?
+                                   GU_MIN(conn->queue_len, conn->fc_offset) :
+                                   0);
                 bool send_stop  = gcs_fc_stop_begin (conn);
 
                 gu_fifo_push_tail (conn->recv_q); // release queue
@@ -1398,6 +1414,9 @@ long gcs_recv (gcs_conn_t*     conn,
     if ((act = gu_fifo_get_head (conn->recv_q)))
     {
         conn->queue_len = gu_fifo_length (conn->recv_q) - 1;
+        conn->fc_offset = (conn->fc_offset > 0                      ?
+                           GU_MIN(conn->queue_len, conn->fc_offset) :
+                           0);
         bool send_cont  = gcs_fc_cont_begin   (conn);
         bool send_sync  = gcs_send_sync_begin (conn);
 
