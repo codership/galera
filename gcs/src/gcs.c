@@ -317,7 +317,8 @@ gcs_fc_stop_begin (gcs_conn_t* conn)
     long err = 0;
 
     bool ret = (conn->queue_len  >  (conn->upper_limit + conn->fc_offset) &&
-                GCS_CONN_SYNCED  == conn->state       &&
+                (GCS_CONN_SYNCED == conn->state ||
+                 GCS_CONN_JOINED == conn->state )     &&
                 conn->stop_count <= 0                 &&
                 conn->stop_sent  <= 0                 &&
                 !(err = gu_mutex_lock (&conn->fc_lock)));
@@ -329,7 +330,7 @@ gcs_fc_stop_begin (gcs_conn_t* conn)
     if (ret == true && conn->fc_offset > 0) {
         gu_debug("FC stop begin, FC offset %ld", conn->fc_offset);
     }
-
+    conn->fc_offset = GU_MIN(conn->fc_offset, conn->queue_len);
     conn->stop_sent += ret;
 
     return ret;
@@ -371,7 +372,8 @@ gcs_fc_cont_begin (gcs_conn_t* conn)
     bool ret = ((conn->fc_offset > 0 ? conn->fc_offset - 1 : conn->lower_limit)
                 >= conn->queue_len                   &&
                 conn->stop_sent   >  0               &&
-                GCS_CONN_SYNCED   == conn->state     &&
+                (GCS_CONN_SYNCED   == conn->state ||
+                 GCS_CONN_JOINED   == conn->state)   &&
                 !(err = gu_mutex_lock (&conn->fc_lock)));
 
     if (gu_unlikely(err)) {
@@ -382,7 +384,7 @@ gcs_fc_cont_begin (gcs_conn_t* conn)
     if (ret == true && conn->fc_offset > 0) {
         gu_debug("FC cont begin, FC offset %ld", conn->fc_offset);
     }
-
+    conn->fc_offset = GU_MIN(conn->fc_offset, conn->queue_len);
     conn->stop_sent -= ret; // decrement optimistically to allow for parallel
                             // recv threads
     return ret;
@@ -909,9 +911,6 @@ static void *gcs_recv_thread (void *arg)
                 recv_act->local_id = this_act_id;
 
                 conn->queue_len = gu_fifo_length (conn->recv_q) + 1;
-                conn->fc_offset = (conn->fc_offset > 0                      ?
-                                   GU_MIN(conn->queue_len, conn->fc_offset) :
-                                   0);
                 bool send_stop  = gcs_fc_stop_begin (conn);
 
                 gu_fifo_push_tail (conn->recv_q); // release queue
@@ -1414,9 +1413,6 @@ long gcs_recv (gcs_conn_t*     conn,
     if ((act = gu_fifo_get_head (conn->recv_q)))
     {
         conn->queue_len = gu_fifo_length (conn->recv_q) - 1;
-        conn->fc_offset = (conn->fc_offset > 0                      ?
-                           GU_MIN(conn->queue_len, conn->fc_offset) :
-                           0);
         bool send_cont  = gcs_fc_cont_begin   (conn);
         bool send_sync  = gcs_send_sync_begin (conn);
 
