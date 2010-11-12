@@ -316,21 +316,17 @@ gcs_fc_stop_begin (gcs_conn_t* conn)
 {
     long err = 0;
 
-    bool ret = (conn->queue_len  >  (conn->upper_limit + conn->fc_offset) &&
-                (GCS_CONN_SYNCED == conn->state ||
-                 GCS_CONN_JOINED == conn->state )     &&
-                conn->stop_count <= 0                 &&
+    bool ret = (conn->stop_count <= 0                 &&
                 conn->stop_sent  <= 0                 &&
+                conn->queue_len  >  (conn->upper_limit + conn->fc_offset) &&
+                conn->state      <= GCS_CONN_JOINED   &&
                 !(err = gu_mutex_lock (&conn->fc_lock)));
 
     if (gu_unlikely(err)) {
             gu_fatal ("Mutex lock failed: %d (%s)", err, strerror(err));
             abort();
     }
-    if (ret == true && conn->fc_offset > 0) {
-        gu_debug("FC stop begin, FC offset %ld", conn->fc_offset);
-    }
-    conn->fc_offset = GU_MIN(conn->fc_offset, conn->queue_len);
+
     conn->stop_sent += ret;
 
     return ret;
@@ -343,7 +339,8 @@ gcs_fc_stop_end (gcs_conn_t* conn)
     long ret;
     struct gcs_fc fc  = { htogl(conn->conf_id), 1 };
 
-    gu_debug ("SENDING FC_STOP (%llu)", conn->local_act_id); //track freq
+    gu_debug ("SENDING FC_STOP (local seqno: %lld, fc_offset: %ld)",
+              conn->local_act_id, conn->fc_offset);
 
     ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
 
@@ -369,11 +366,11 @@ gcs_fc_cont_begin (gcs_conn_t* conn)
 {
     long err = 0;
 
-    bool ret = ((conn->fc_offset > 0 ? conn->fc_offset - 1 : conn->lower_limit)
-                >= conn->queue_len                   &&
-                conn->stop_sent   >  0               &&
-                (GCS_CONN_SYNCED   == conn->state ||
-                 GCS_CONN_JOINED   == conn->state)   &&
+    bool ret = (conn->stop_sent    >  0                       &&
+                (conn->lower_limit >= conn->queue_len     ||
+                 (conn->fc_offset  >  conn->queue_len &&
+                  (conn->fc_offset =  conn->queue_len,true))) &&
+                conn->state        <= GCS_CONN_JOINED         &&
                 !(err = gu_mutex_lock (&conn->fc_lock)));
 
     if (gu_unlikely(err)) {
@@ -381,10 +378,6 @@ gcs_fc_cont_begin (gcs_conn_t* conn)
         abort();
     }
 
-    if (ret == true && conn->fc_offset > 0) {
-        gu_debug("FC cont begin, FC offset %ld", conn->fc_offset);
-    }
-    conn->fc_offset = GU_MIN(conn->fc_offset, conn->queue_len);
     conn->stop_sent -= ret; // decrement optimistically to allow for parallel
                             // recv threads
     return ret;
@@ -399,7 +392,8 @@ gcs_fc_cont_end (gcs_conn_t* conn)
 
     assert (GCS_CONN_SYNCED == conn->state);
 
-    gu_debug ("SENDING FC_CONT (%llu)", conn->local_act_id);
+    gu_debug ("SENDING FC_CONT (local seqno: %lld, fc_offset: %ld)",
+              conn->local_act_id, conn->fc_offset);
 
     ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
 
