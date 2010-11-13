@@ -361,11 +361,12 @@ gcs_fc_cont_begin (gcs_conn_t* conn)
 {
     long err = 0;
 
-    bool ret = (conn->stop_sent    >  0                       &&
-                (conn->lower_limit >= conn->queue_len     ||
-                 (conn->fc_offset  >  conn->queue_len &&
-                  (conn->fc_offset =  conn->queue_len,true))) &&
-                conn->state        <= GCS_CONN_JOINED         &&
+    bool queue_decreased = (conn->fc_offset > conn->queue_len &&
+                            (conn->fc_offset = conn->queue_len, true));
+
+    bool ret = (conn->stop_sent    >  0                                   &&
+                (conn->lower_limit >= conn->queue_len || queue_decreased) &&
+                conn->state        <= GCS_CONN_JOINED                     &&
                 !(err = gu_mutex_lock (&conn->fc_lock)));
 
     if (gu_unlikely(err)) {
