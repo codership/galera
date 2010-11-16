@@ -342,9 +342,18 @@ namespace gcomm
 
         bool in_cvi() const
         {
-            return (tr.get_view_traces().empty() == false &&
-                    tr.get_view_traces().find(cvi) !=
-                    tr.get_view_traces().end());
+            for (Trace::ViewTraceMap::const_reverse_iterator i(
+                     tr.get_view_traces().rbegin());
+                 i != tr.get_view_traces().rend(); ++i)
+            {
+                if (i->first.get_uuid() == cvi.get_uuid() &&
+                    i->first.get_type() == cvi.get_type() &&
+                    i->first.get_seq()  >= cvi.get_seq())
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         void handle_up(const void* cid, const gu::Datagram& rb,

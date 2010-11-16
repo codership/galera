@@ -92,6 +92,7 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const gu::URI& uri,
     consensus(my_uuid, known, *input_map, current_view),
     cac(0),
     install_message(0),
+    attempt_seq(1),
     fifo_seq(-1),
     last_sent(-1),
     send_window(8),
@@ -1455,12 +1456,12 @@ void gcomm::evs::Proto::send_install()
     InstallMessage imsg(version,
                         get_uuid(),
                         current_view.get_id(),
-                        ViewId(V_REG, get_uuid(), max_view_id_seq + 1),
+                        ViewId(V_REG, get_uuid(), max_view_id_seq + attempt_seq),
                         input_map->get_safe_seq(),
                         input_map->get_aru_seq(),
                         ++fifo_seq,
                         node_list);
-
+    ++attempt_seq;
     evs_log_debug(D_INSTALL_MSGS) << "sending install " << imsg;
     gcomm_assert(consensus.is_consistent(imsg));
 
@@ -1758,10 +1759,16 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
             get_state()                    != S_LEAVING)
         {
             evs_log_info(I_STATE)
-                << " detected new view from operational source: "
+                << " detected new view from operational source "
+                << msg.get_source() << ": "
                 << msg.get_source_view_id();
-            set_inactive(msg.get_source());
-            gu_trace(shift_to(S_GATHER, true));
+            // Note: Commented out, this causes problems with
+            // attempt_seq. Newly generated install message
+            // followed by commit gap may cause undesired
+            // node inactivation and shift to gather.
+            //
+            // set_inactive(msg.get_source());
+            // gu_trace(shift_to(S_GATHER, true));
         }
         return;
     }
@@ -2138,6 +2145,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
 
         delete install_message;
         install_message = 0;
+        attempt_seq = 1;
 
         profile_enter(send_gap_prof);
         gu_trace(send_gap(UUID::nil(), current_view.get_id(), Range()));;
@@ -2524,15 +2532,25 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
                 inst.set_tstamp(Date::now());
                 if (consensus.is_consensus() == true)
                 {
-                    profile_enter(shift_to_prof);
-                    gu_trace(shift_to(S_OPERATIONAL));
-                    profile_leave(shift_to_prof);
+                    if (get_state() == S_INSTALL)
+                    {
+                        profile_enter(shift_to_prof);
+                        gu_trace(shift_to(S_OPERATIONAL));
+                        profile_leave(shift_to_prof);
+                    }
+                    else
+                    {
+                        log_warn << self_string()
+                                 << "received user message from new "
+                                 << "view while in GATHER, dropping";
+                        return;
+                    }
                 }
                 else
                 {
                     profile_enter(shift_to_prof);
                     evs_log_info(I_STATE)
-                        << " shift to RECOVERY, no consensus after "
+                        << " no consensus after "
                         << "handling user message from new view";
                     // Don't change state here but continue waiting for
                     // install gaps. Other nodes should time out eventually
@@ -3112,7 +3130,8 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         if (install_message->get_source() == msg.get_source())
         {
             evs_log_info(I_STATE)
-                << "shift to gather due to representative join";
+                << "shift to gather due to representative "
+                << msg.get_source() << " join";
             gu_trace(shift_to(S_GATHER, false));
         }
         else if (consensus.is_consistent(*install_message) == true)

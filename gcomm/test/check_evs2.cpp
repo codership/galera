@@ -659,6 +659,28 @@ static void set_cvi(vector<DummyNode*>& nvec, size_t i_begin, size_t i_end,
     }
 }
 
+template <class C>
+class ViewSeq
+{
+public:
+    ViewSeq() { }
+    bool operator()(const C& a, const C& b) const
+    {
+        return (a->get_trace().get_current_view_trace().get_view().get_id().get_seq() < b->get_trace().get_current_view_trace().get_view().get_id().get_seq());
+    }
+};
+
+static uint32_t get_max_view_seq(const std::vector<DummyNode*>& dnv,
+                                 size_t i, size_t j)
+{
+    if (i == dnv.size()) return static_cast<uint32_t>(-1);
+    return (*std::max_element(dnv.begin() + i,
+                              dnv.begin() + j,
+                              ViewSeq<const DummyNode*>()))->get_trace().get_current_view_trace().get_view().get_id().get_seq();
+}
+
+
+
 START_TEST(test_proto_join_n)
 {
     log_info << "START (join_n)";
@@ -673,11 +695,13 @@ START_TEST(test_proto_join_n)
         gu_trace(dn.push_back(create_dummy_node(i)));
     }
 
+    uint32_t max_view_seq(0);
     for (size_t i = 0; i < n_nodes; ++i)
     {
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
-        set_cvi(dn, 0, i, i + 1);
+        set_cvi(dn, 0, i, max_view_seq + 1);
         gu_trace(prop.propagate_until_cvi(false));
+        max_view_seq = get_max_view_seq(dn, 0, i);
     }
     gu_trace(check_trace(dn));
     for_each(dn.begin(), dn.end(), DeleteObject());
@@ -703,10 +727,11 @@ START_TEST(test_proto_join_n_w_user_msg)
         gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
     }
 
+    uint32_t max_view_seq(0);
     for (size_t i = 0; i < n_nodes; ++i)
     {
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
-        set_cvi(dn, 0, i, i + 1);
+        set_cvi(dn, 0, i, max_view_seq + 1);
         gu_trace(prop.propagate_until_cvi(true));
         for (size_t j = 0; j <= i; ++j)
         {
@@ -717,6 +742,7 @@ START_TEST(test_proto_join_n_w_user_msg)
         {
             gu_trace(send_n(dn[j], 5 + ::rand() % 4));
         }
+        max_view_seq = get_max_view_seq(dn, 0, i);
     }
 
     gu_trace(check_trace(dn));
@@ -743,16 +769,18 @@ START_TEST(test_proto_join_n_lossy)
         gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
     }
 
+    uint32_t max_view_seq(0);
     for (size_t i = 0; i < n_nodes; ++i)
     {
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
-        set_cvi(dn, 0, i, i + 1);
+        set_cvi(dn, 0, i, max_view_seq + 1);
         for (size_t j = 1; j < i + 1; ++j)
         {
             prop.set_loss(i + 1, j, 0.9);
             prop.set_loss(j, i + 1, 0.9);
         }
         gu_trace(prop.propagate_until_cvi(true));
+        max_view_seq = get_max_view_seq(dn, 0, i);
     }
     gu_trace(check_trace(dn));
     for_each(dn.begin(), dn.end(), DeleteObject());
@@ -777,10 +805,11 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
         gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
     }
 
+    uint32_t max_view_seq(0);
     for (size_t i = 0; i < n_nodes; ++i)
     {
         gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
-        set_cvi(dn, 0, i, i + 1);
+        set_cvi(dn, 0, i, max_view_seq + 1);
         for (size_t j = 1; j < i + 1; ++j)
         {
             prop.set_loss(i + 1, j, 0.9);
@@ -792,6 +821,7 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
         {
             gu_trace(send_n(dn[j], 5 + ::rand() % 4));
         }
+        max_view_seq = get_max_view_seq(dn, 0, i);
     }
     gu_trace(check_trace(dn));
     for_each(dn.begin(), dn.end(), DeleteObject());
@@ -820,14 +850,15 @@ START_TEST(test_proto_leave_n)
         gu_trace(prop.propagate_until_cvi(true));
     }
 
-    uint32_t last_view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
+    uint32_t max_view_seq(get_max_view_seq(dn, 0, n_nodes));
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
         dn[i]->close();
         dn[i]->set_cvi(V_REG);
-        set_cvi(dn, i + 1, n_nodes - 1, last_view_seq + i + 1);
+        set_cvi(dn, i + 1, n_nodes - 1, max_view_seq + 1);
         gu_trace(prop.propagate_until_cvi(true));
+        max_view_seq = get_max_view_seq(dn, i + 1, n_nodes);
     }
 
     gu_trace(check_trace(dn));
@@ -859,7 +890,7 @@ START_TEST(test_proto_leave_n_w_user_msg)
         gu_trace(prop.propagate_until_cvi(false));
     }
 
-    uint32_t last_view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
+    uint32_t max_view_seq(get_max_view_seq(dn, 0, n_nodes));
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
@@ -869,8 +900,9 @@ START_TEST(test_proto_leave_n_w_user_msg)
         }
         dn[i]->close();
         dn[i]->set_cvi(V_REG);
-        set_cvi(dn, i + 1, n_nodes - 1, last_view_seq + i + 1);
+        set_cvi(dn, i + 1, n_nodes - 1, max_view_seq + 1);
         gu_trace(prop.propagate_until_cvi(true));
+        max_view_seq = get_max_view_seq(dn, i + 1, n_nodes);
     }
 
     gu_trace(check_trace(dn));
@@ -902,7 +934,7 @@ START_TEST(test_proto_leave_n_lossy)
         gu_trace(prop.propagate_until_cvi(false));
     }
 
-    uint32_t last_view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
+    uint32_t max_view_seq(get_max_view_seq(dn, 0, n_nodes));
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
@@ -916,9 +948,10 @@ START_TEST(test_proto_leave_n_lossy)
     for (size_t i = 0; i < n_nodes; ++i)
     {
         dn[i]->set_cvi(V_REG);
-        set_cvi(dn, i + 1, n_nodes - 1, last_view_seq + i + 1);
+        set_cvi(dn, i + 1, n_nodes - 1, max_view_seq + 1);
         dn[i]->close();
         gu_trace(prop.propagate_until_cvi(true));
+        max_view_seq = get_max_view_seq(dn, i + 1, n_nodes);
     }
 
     gu_trace(check_trace(dn));
@@ -952,7 +985,6 @@ START_TEST(test_proto_leave_n_lossy_w_user_msg)
         gu_trace(prop.propagate_until_cvi(false));
     }
 
-    uint32_t last_view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
 
     for (size_t i = 0; i < n_nodes; ++i)
     {
@@ -963,6 +995,8 @@ START_TEST(test_proto_leave_n_lossy_w_user_msg)
         }
     }
 
+    uint32_t max_view_seq(get_max_view_seq(dn, 0, n_nodes));
+
     for (size_t i = 0; i < n_nodes; ++i)
     {
         for (size_t j = i; j < n_nodes; ++j)
@@ -970,9 +1004,10 @@ START_TEST(test_proto_leave_n_lossy_w_user_msg)
             gu_trace(send_n(dn[j], 5 + ::rand() % 4));
         }
         dn[i]->set_cvi(V_REG);
-        set_cvi(dn, i + 1, n_nodes - 1, last_view_seq + i + 1);
+        set_cvi(dn, i + 1, n_nodes - 1, max_view_seq + 1);
         dn[i]->close();
         gu_trace(prop.propagate_until_cvi(true));
+        max_view_seq = get_max_view_seq(dn, i + 1, n_nodes);
     }
 
     gu_trace(check_trace(dn));
@@ -1018,8 +1053,7 @@ static void test_proto_split_merge_gen(const size_t n_nodes,
         split.push_back(static_cast<int32_t>(i + 1));
     }
 
-    uint32_t view_seq = dn[0]->get_trace().get_current_view_trace().get_view().get_id().get_seq();
-    uint32_t view_seq_inc = 0;
+    uint32_t max_view_seq(get_max_view_seq(dn, 0, n_nodes));
 
     for (size_t i = 1; i < n_nodes; ++i)
     {
@@ -1045,9 +1079,8 @@ static void test_proto_split_merge_gen(const size_t n_nodes,
             }
         }
 
-        ++view_seq_inc;
-        set_cvi(dn, 0, i - 1, view_seq + view_seq_inc);
-        set_cvi(dn, i, n_nodes - 1, view_seq + view_seq_inc);
+        set_cvi(dn, 0, i - 1, max_view_seq + 1);
+        set_cvi(dn, i, n_nodes - 1, max_view_seq + 1);
 
         if (send_msgs == true)
         {
@@ -1058,7 +1091,7 @@ static void test_proto_split_merge_gen(const size_t n_nodes,
         }
 
         gu_trace(prop.propagate_until_cvi(true));
-
+        max_view_seq = get_max_view_seq(dn, 0, n_nodes);
         log_info << "merge " << i;
         for (size_t j = 0; j < i; ++j)
         {
@@ -1069,8 +1102,7 @@ static void test_proto_split_merge_gen(const size_t n_nodes,
             }
         }
 
-        ++view_seq_inc;
-        set_cvi(dn, 0, n_nodes - 1, view_seq + view_seq_inc);
+        set_cvi(dn, 0, n_nodes - 1, max_view_seq + 1);
 
         if (send_msgs == true)
         {
@@ -1080,6 +1112,7 @@ static void test_proto_split_merge_gen(const size_t n_nodes,
             }
         }
         gu_trace(prop.propagate_until_cvi(true));
+        max_view_seq = get_max_view_seq(dn, 0, n_nodes);
     }
 
     gu_trace(prop.propagate_until_empty());
