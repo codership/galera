@@ -374,6 +374,8 @@ private:
     size_t cac;
     // Last received install message
     InstallMessage* install_message;
+    // Install attempt counter
+    uint32_t attempt_seq;
     // Sequence number to maintain membership message FIFO order
     int64_t fifo_seq;
     // Last sent seq
