@@ -73,8 +73,10 @@ namespace galera
         void discard_local_conn_trx(wsrep_conn_id_t conn_id);
         void discard_local_conn(wsrep_conn_id_t conn_id);
 
-        wsrep_status_t process_trx_ws(void* recv_ctx, TrxHandle* trx);
-        wsrep_status_t process_conn_ws(void* recv_ctx, TrxHandle* trx);
+        wsrep_status_t process_trx_ws(void* recv_ctx, TrxHandle* trx)
+            throw (gu::Exception);
+        wsrep_status_t process_conn_ws(void* recv_ctx, TrxHandle* trx)
+            throw (gu::Exception);
 
 
         wsrep_status_t replicate(TrxHandle* trx);

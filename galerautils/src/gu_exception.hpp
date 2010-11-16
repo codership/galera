@@ -57,7 +57,6 @@ namespace gu {
 
 #define gu_trace(_expr_)                                                 \
     try { _expr_; } catch (gu::Exception& e) { GU_TRACE(e); throw; }
-//    { e.trace(__FILE__, __FUNCTION__, __LINE__); throw; }
 
 #else
 

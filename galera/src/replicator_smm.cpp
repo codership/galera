@@ -4,6 +4,7 @@
 
 
 #include "replicator_smm.hpp"
+#include "galera_exception.hpp"
 #include "uuid.hpp"
 #include "serialization.hpp"
 
@@ -16,67 +17,121 @@ extern "C"
 #include <sstream>
 #include <iostream>
 
+static wsrep_apply_data_t
+init_apply_data (const char* stmt) // NOTE: stmt is NOT copied!
+{
+    wsrep_apply_data_t ret;
 
-static wsrep_status_t apply_statement(void* recv_ctx,
-                                      wsrep_bf_apply_cb_t apply_cb,
-                                      const char* query,
-                                      size_t len,
-                                      wsrep_seqno_t seqno_g)
+    ret.type           = WSREP_APPLY_SQL;
+    ret.u.sql.stm      = stmt;
+    ret.u.sql.len      = strlen(ret.u.sql.stm) + 1; // + terminating 0
+    ret.u.sql.timeval  = static_cast<time_t>(0);
+    ret.u.sql.randseed = 0;
+
+    return ret;
+}
+
+static wsrep_apply_data_t commit_stmt  (init_apply_data("COMMIT"));
+static wsrep_apply_data_t rollback_stmt(init_apply_data("ROLLBACK"));
+
+
+static void
+apply_data (void*               recv_ctx,
+            wsrep_bf_apply_cb_t apply_cb,
+            wsrep_apply_data_t& data,
+            wsrep_seqno_t       seqno_g) throw (galera::ApplyException)
 {
     assert(seqno_g > 0);
     assert(apply_cb != 0);
 
-    wsrep_apply_data_t data;
+    wsrep_status_t err = apply_cb (recv_ctx, &data, seqno_g);
 
-    data.type           = WSREP_APPLY_SQL;
-    data.u.sql.stm      = query;
-    data.u.sql.len      = strlen (data.u.sql.stm) + 1; // terminating 0
-    data.u.sql.timeval  = static_cast<time_t>(0);
-    data.u.sql.randseed = 0;
+    if (gu_unlikely(err != WSREP_OK))
+    {
+        const char* const err_str(galera::wsrep_status_str(err));
+        std::ostringstream os;
 
-    return apply_cb(recv_ctx, &data, seqno_g);
+        switch (data.type)
+        {
+        case WSREP_APPLY_SQL:
+            os << "Failed to apply SQL statement:\n"
+               << "Status: " << err_str << '\n'
+               << "Seqno:  " << seqno_g << '\n'
+               << "SQL:    " << data.u.sql.stm;
+            break;
+        case WSREP_APPLY_ROW:
+            os << "Failed to apply row buffer: " << data.u.row.buffer
+               << ", seqno: "<< seqno_g << ", status: " << err_str;
+            break;
+        case WSREP_APPLY_APP:
+            os << "Failed to apply app buffer: " << data.u.app.buffer
+               << ", seqno: "<< seqno_g << ", status: " << err_str;
+            break;
+        default:
+            os << "Unrecognized data type: " << data.type;
+        }
+
+        galera::ApplyException ae(os.str(), err);
+
+        GU_TRACE(ae);
+
+        throw ae;
+    }
+
+    return;
 }
 
 
-static wsrep_status_t apply_ws(void* recv_ctx,
-                               wsrep_bf_apply_cb_t apply_cb,
-                               const galera::WriteSet& ws,
-                               wsrep_seqno_t seqno_g)
+static void
+apply_ws (void*                   recv_ctx,
+          wsrep_bf_apply_cb_t     apply_cb,
+          const galera::WriteSet& ws,
+          wsrep_seqno_t           seqno_g)
+    throw (galera::ApplyException, gu::Exception)
 {
     assert(seqno_g > 0);
     assert(apply_cb != 0);
+
     using galera::WriteSet;
     using galera::StatementSequence;
-
-    wsrep_status_t retval(WSREP_OK);
 
     switch (ws.get_level())
     {
     case WriteSet::L_DATA:
     {
         wsrep_apply_data_t data;
-        data.type = WSREP_APPLY_APP;
+
+        data.type         = WSREP_APPLY_APP;
         data.u.app.buffer = const_cast<uint8_t*>(&ws.get_data()[0]);
         data.u.app.len    = ws.get_data().size();
-        retval = apply_cb(recv_ctx, &data, seqno_g);
+
+        gu_trace(apply_data (recv_ctx, apply_cb, data, seqno_g));
+
         break;
     }
+
     case WriteSet::L_STATEMENT:
     {
         const StatementSequence& ss(ws.get_queries());
+
         for (StatementSequence::const_iterator i = ss.begin();
              i != ss.end(); ++i)
         {
             wsrep_apply_data_t data;
+
             data.type      = WSREP_APPLY_SQL;
             data.u.sql.stm = reinterpret_cast<const char*>(&i->get_query()[0]);
             data.u.sql.len      = i->get_query().size();
             data.u.sql.timeval  = i->get_tstamp();
             data.u.sql.randseed = i->get_rnd_seed();
 
+            gu_trace(apply_data (recv_ctx, apply_cb, data, seqno_g));
+
+#if 0
             switch ((retval = apply_cb(recv_ctx, &data, seqno_g)))
             {
-            case WSREP_OK: break;
+            case WSREP_OK:
+                break;
             case WSREP_NOT_IMPLEMENTED:
                 log_warn << "bf applier returned not implemented for " << *i;
                 break;
@@ -85,27 +140,26 @@ static wsrep_status_t apply_ws(void* recv_ctx,
                 retval = WSREP_FATAL;
                 break;
             }
+#endif // 0
         }
-
         break;
     }
 
     default:
-        log_warn << "data replication level " << ws.get_level()
-                 << " not supported";
-        retval = WSREP_TRX_FAIL;
+        gu_throw_error(EINVAL) << "Data replication level " << ws.get_level()
+                               << " not supported, seqno: " << seqno_g;
     }
 
-    return retval;
+    return;
 }
 
 
-
-static wsrep_status_t apply_wscoll(void* recv_ctx,
-                                   wsrep_bf_apply_cb_t apply_cb,
-                                   const galera::TrxHandle& trx)
+static inline void
+apply_wscoll(void*                    recv_ctx,
+             wsrep_bf_apply_cb_t      apply_cb,
+             const galera::TrxHandle& trx)
+    throw (galera::ApplyException, gu::Exception)
 {
-    wsrep_status_t retval(WSREP_OK);
     const galera::MappedBuffer& wscoll(trx.write_set_collection());
     // skip over trx header
     size_t offset(galera::serial_size(trx));
@@ -115,67 +169,72 @@ static wsrep_status_t apply_wscoll(void* recv_ctx,
     {
         offset = unserialize(&wscoll[0], wscoll.size(), offset, ws);
 
-        if ((retval = apply_ws(recv_ctx, apply_cb,
-                               ws, trx.global_seqno())) != WSREP_OK)
-        {
-            break;
-        }
+        gu_trace(apply_ws (recv_ctx, apply_cb, ws, trx.global_seqno()));
     }
 
-    assert(offset == wscoll.size() || retval != WSREP_OK);
+    assert(offset == wscoll.size());
 
-    return retval;
+    return;
 }
 
 
-
-static wsrep_status_t apply_trx_ws(void* recv_ctx,
-                                   wsrep_bf_apply_cb_t apply_cb,
-                                   const galera::TrxHandle& trx)
+static void
+apply_trx_ws(void*                    recv_ctx,
+             wsrep_bf_apply_cb_t      apply_cb,
+             const galera::TrxHandle& trx)
+    throw (galera::ApplyException, gu::Exception)
 {
     static const size_t max_apply_attempts(10);
-    size_t attempts(0);
-    wsrep_status_t retval(WSREP_OK);
+    size_t attempts(1);
 
     do
     {
-        retval = apply_wscoll(recv_ctx, apply_cb, trx);
-        if (retval != WSREP_OK)
+        try
         {
-            retval = apply_statement(recv_ctx,
-                                     apply_cb,
-                                     "rollback\0", 9,
-                                     trx.global_seqno());
-            if (retval != WSREP_OK)
+            gu_trace(apply_wscoll(recv_ctx, apply_cb, trx));
+            break;
+        }
+        catch (galera::ApplyException& e)
+        {
+            wsrep_status_t err = e.wsrep_status();
+
+            if (WSREP_TRX_FAIL == err)
             {
-                attempts = max_apply_attempts;
-                retval = WSREP_FATAL;
+                gu_trace(apply_data(recv_ctx, apply_cb, rollback_stmt,
+                                    trx.global_seqno()));
+                ++attempts;
+
+                if (attempts <= max_apply_attempts)
+                {
+                    log_warn << e.what()
+                             << "\nRetrying " << attempts << "th time";
+                }
             }
             else
             {
-                ++attempts;
+                GU_TRACE(e);
+                throw;
             }
         }
     }
-    while (retval != WSREP_OK && attempts < max_apply_attempts);
+    while (attempts <= max_apply_attempts);
 
-    if (attempts == max_apply_attempts)
+    if (gu_likely(attempts <= max_apply_attempts))
     {
-        assert(0);
-        retval = WSREP_TRX_FAIL;
+        gu_trace(apply_data(recv_ctx, apply_cb, commit_stmt,
+                            trx.global_seqno()));
     }
     else
     {
-        retval = apply_statement(recv_ctx, apply_cb,
-                                 "commit\0", 7, trx.global_seqno());
-        if (retval != WSREP_OK)
-        {
-            assert(0);
-            retval = WSREP_FATAL;
-        }
+        std::ostringstream msg;
+
+        msg << "Failed to apply trx " << trx.global_seqno() << " "
+            << max_apply_attempts << " times";
+
+        throw galera::ApplyException(msg.str(), WSREP_TRX_FAIL);
     }
 
-    return retval;
+    return;
 }
 
 std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
@@ -456,6 +515,7 @@ void galera::ReplicatorSMM::discard_local_conn(wsrep_conn_id_t conn_id)
 
 wsrep_status_t
 galera::ReplicatorSMM::process_trx_ws(void* recv_ctx, TrxHandle* trx)
+    throw (gu::Exception)
 {
     assert(trx != 0);
     assert(trx->global_seqno() > 0);
@@ -470,23 +530,20 @@ galera::ReplicatorSMM::process_trx_ws(void* recv_ctx, TrxHandle* trx)
 
     wsrep_status_t retval(WSREP_OK);
 
-    if (trx->global_seqno() > apply_monitor_.last_left())
+    if (gu_likely(trx->global_seqno() > apply_monitor_.last_left()))
     {
-        switch (cert_ret)
+        if (gu_likely(Certification::TEST_OK == cert_ret))
         {
-        case Certification::TEST_OK:
             apply_monitor_.enter(ao);
-            retval = apply_trx_ws(recv_ctx, bf_apply_cb_, *trx);
+            gu_trace(apply_trx_ws(recv_ctx, bf_apply_cb_, *trx));
+            // at this point any exception in apply_trx_ws() is fatal, not
+            // catching anything.
             apply_monitor_.leave(ao);
-            if (retval != WSREP_OK)
-            {
-                log_warn << "failed to apply trx " << *trx;
-            }
-            break;
-        case Certification::TEST_FAILED:
+        }
+        else
+        {
             apply_monitor_.self_cancel(ao);
             retval = WSREP_TRX_FAIL;
-            break;
         }
     }
     else
@@ -505,6 +562,7 @@ galera::ReplicatorSMM::process_trx_ws(void* recv_ctx, TrxHandle* trx)
 
 wsrep_status_t
 galera::ReplicatorSMM::process_conn_ws(void* recv_ctx, TrxHandle* trx)
+    throw (gu::Exception)
 {
     assert(trx != 0);
     assert(trx->global_seqno() > 0);
@@ -517,20 +575,32 @@ galera::ReplicatorSMM::process_conn_ws(void* recv_ctx, TrxHandle* trx)
 
     Certification::TestResult cert_ret(cert_.append_trx(trx));
 
-    wsrep_status_t retval(WSREP_OK);
+    wsrep_status_t      retval (WSREP_OK);
+    wsrep_seqno_t const seqno  (trx->global_seqno());
 
-    if (trx->global_seqno() > apply_monitor_.last_left())
+    if (gu_likely(seqno > apply_monitor_.last_left()))
     {
-        switch (cert_ret)
+        if (gu_likely(Certification::TEST_OK == cert_ret))
         {
-        case Certification::TEST_OK:
-            apply_monitor_.drain(trx->global_seqno() - 1);
-            retval = apply_wscoll(recv_ctx, bf_apply_cb_, *trx);
-            break;
-        case Certification::TEST_FAILED:
-            retval = WSREP_TRX_FAIL;
-            break;
+            apply_monitor_.drain(seqno - 1);
+
+            try
+            {
+                gu_trace(apply_wscoll(recv_ctx, bf_apply_cb_, *trx));
+            }
+            catch (ApplyException& e)
+            {
+                // In isolation we don't know if this trx was valid at all,
+                // so warning only
+                log_warn << e.what();
+                retval = WSREP_TRX_FAIL;
+            }
         }
+        else
+        {
+            retval = WSREP_TRX_FAIL;
+        }
+
         apply_monitor_.self_cancel(ao);
     }
     else
@@ -538,7 +608,6 @@ galera::ReplicatorSMM::process_conn_ws(void* recv_ctx, TrxHandle* trx)
         // This action was already contained in SST. Note that we can't
         // drop the action earlier to build cert index properly.
         log_debug << "skipping applying of iso trx " << *trx;
-
     }
 
     cert_.set_trx_committed(trx);
@@ -670,12 +739,10 @@ wsrep_status_t galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
     case TrxHandle::S_ABORTING: // guess this is here because we can have a race
         return retval;
     case TrxHandle::S_EXECUTING:
-//        trx->set_state(TrxHandle::S_MUST_ABORT);
         break;
     case TrxHandle::S_REPLICATING:
     {
         // trx is in gcs repl
-//        trx->set_state(TrxHandle::S_MUST_ABORT);
         int rc;
         if (trx->gcs_handle() > 0 &&
             ((rc = gcs_.interrupt(trx->gcs_handle()))) != 0)
@@ -690,7 +757,6 @@ wsrep_status_t galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
     case TrxHandle::S_CERTIFYING:
     {
         // trx is waiting in local monitor
-//        trx->set_state(TrxHandle::S_MUST_ABORT);
         LocalOrder lo(*trx);
         trx->unlock();
         local_monitor_.interrupt(lo);
@@ -700,7 +766,6 @@ wsrep_status_t galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
     case TrxHandle::S_CERTIFIED:
     {
         // trx is waiting in apply monitor
-//        trx->set_state(TrxHandle::S_MUST_ABORT);
         ApplyOrder ao(*trx);
         trx->unlock();
         apply_monitor_.interrupt(ao);
@@ -798,6 +863,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
     assert(trx->global_seqno() > apply_monitor_.last_left());
 
     wsrep_status_t retval(WSREP_OK);
+
     switch (trx->state())
     {
     case TrxHandle::S_MUST_CERT_AND_REPLAY:
@@ -815,28 +881,36 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
         // replaying
         trx->set_last_depends_seqno(trx->global_seqno() - 1);
         trx->set_state(TrxHandle::S_REPLAYING);
+
         ApplyOrder ao(*trx);
+
         apply_monitor_.enter(ao);
-        retval = apply_trx_ws(trx_ctx, bf_apply_cb_, *trx);
         ++local_replays_;
+
+        try
+        {
+            gu_trace(apply_trx_ws(trx_ctx, bf_apply_cb_, *trx));
+            log_debug << "Replaying successfull for trx " << trx;
+            trx->set_state(TrxHandle::S_REPLAYED);
+            return WSREP_OK;
+        }
+        catch (ApplyException& e)
+        {
+            log_debug << e.what();
+            retval = e.wsrep_status();
+        }
+
         // apply monitor is released in post commit
         // apply_monitor_.leave(ao);
         break;
     }
     default:
-        gu_throw_fatal << "invalid state in replay for trx " << *trx;
+        gu_throw_fatal << "Invalid state in replay for trx " << *trx;
     }
 
-    if (retval != WSREP_OK)
-    {
-        log_debug << "replaying failed for trx " << trx;
-        trx->set_state(TrxHandle::S_ABORTING);
-    }
-    else
-    {
-        log_debug << "replaying successfull for trx " << trx;
-        trx->set_state(TrxHandle::S_REPLAYED);
-    }
+    log_debug << "Replaying failed for trx " << trx;
+    trx->set_state(TrxHandle::S_ABORTING);
+
     return retval;
 }
 
@@ -1194,11 +1268,12 @@ void galera::ReplicatorSMM::report_last_committed()
 }
 
 
-wsrep_status_t galera::ReplicatorSMM::process_global_action(void* recv_ctx,
-                                                 const void* act,
-                                                 size_t act_size,
-                                                 wsrep_seqno_t seqno_l,
-                                                 wsrep_seqno_t seqno_g)
+wsrep_status_t
+galera::ReplicatorSMM::process_global_action(void*         recv_ctx,
+                                             const void*   act,
+                                             size_t        act_size,
+                                             wsrep_seqno_t seqno_l,
+                                             wsrep_seqno_t seqno_g)
 {
     assert(recv_ctx != 0);
     assert(act != 0);
@@ -1236,8 +1311,10 @@ wsrep_status_t galera::ReplicatorSMM::process_global_action(void* recv_ctx,
         log_warn << "could not read trx " << seqno_g;
         return WSREP_FATAL;
     }
+
     wsrep_status_t retval;
     TrxHandleLock lock(*trx);
+
     if (trx->trx_id() != static_cast<wsrep_trx_id_t>(-1))
     {
         // normal trx
@@ -1248,6 +1325,7 @@ wsrep_status_t galera::ReplicatorSMM::process_global_action(void* recv_ctx,
         // trx to be run in isolation
         retval = process_conn_ws(recv_ctx, trx);
     }
+
     trx->unref();
 
     return retval;
@@ -1526,12 +1604,13 @@ galera::ReplicatorSMM::process_to_action(void*          recv_ctx,
 }
 
 
-wsrep_status_t galera::ReplicatorSMM::dispatch(void* recv_ctx,
-                                    const void* act,
-                                    size_t act_size,
-                                    gcs_act_type_t act_type,
-                                    wsrep_seqno_t seqno_l,
-                                    wsrep_seqno_t seqno_g)
+wsrep_status_t
+galera::ReplicatorSMM::dispatch(void*          recv_ctx,
+                                const void*    act,
+                                size_t         act_size,
+                                gcs_act_type_t act_type,
+                                wsrep_seqno_t  seqno_l,
+                                wsrep_seqno_t  seqno_g)
 {
     assert(recv_ctx != 0);
     assert(act != 0);
