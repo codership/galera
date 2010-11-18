@@ -6,32 +6,6 @@ then
     exit -1
 fi
 
-usage()
-{
-    cat <<EOF
-Usage: build.sh [OPTIONS]
-Options:
-    --stage <initial stage>
-    --last-stage <last stage>
-    -s|--scratch      build everything from scratch
-    -c|--configure    reconfigure the build system (implies -s)
-    -b|--bootstap     rebuild the build system (implies -c)
-    -o|--opt          configure build with debug disabled (implies -c)
-    -m32/-m64         build 32/64-bit binaries on x86
-    -d|--debug        configure build with debug enabled (implies -c)
-    -dl|--debug-level set debug level (1, implies -c)
-    --with-spread     configure build with Spread (implies -c)
-    --no-strip        prevent stripping of release binaries
-    -p|--package      create DEB/RPM packages (depending on the distribution)
-    --sb|--skip-build skip the actual build, use the existing binaries
-    --sc|--skip-configure skip configure
-    --skip-clients    don't include client binaries in test package
-    --scons           use scons to build galera libraries (yes)
-    -r|--release <galera release>, otherwise revisions will be used
--s and -b options affect only Galera build.
-EOF
-}
-
 # Initializing variables to defaults
 uname -m | grep -q i686 && CPU=pentium || CPU=amd64
 DEBUG=no
@@ -49,6 +23,34 @@ SCRATCH=no
 SCONS="yes"
 JOBS=1
 GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
+
+usage()
+{
+    cat <<EOF
+Usage: build.sh [OPTIONS]
+Options:
+    --stage <initial stage>
+    --last-stage <last stage>
+    -s|--scratch      build everything from scratch
+    -c|--configure    reconfigure the build system (implies -s)
+    -b|--bootstap     rebuild the build system (implies -c)
+    -o|--opt          configure build with debug disabled (implies -c)
+    -m32/-m64         build 32/64-bit binaries on x86
+    -d|--debug        configure build with debug enabled (implies -c)
+    -dl|--debug-level set debug level (1, implies -c)
+    --with-spread     configure build with Spread (implies -c)
+    --no-strip        prevent stripping of release binaries
+    -j|--jobs         number of parallel compilation jobs (${JOBS})
+    -p|--package      create DEB/RPM packages (depending on the distribution)
+    --sb|--skip-build skip the actual build, use the existing binaries
+    --sc|--skip-configure skip configure
+    --skip-clients    don't include client binaries in test package
+    --scons           use scons to build galera libraries (yes)
+    -r|--release <galera release>, otherwise revisions will be used
+
+-s and -b options affect only Galera build.
+EOF
+}
 
 # Parse command line
 while test $# -gt 0
@@ -87,7 +89,7 @@ do
         -p|--package)
             PACKAGE="yes"   # Create a DEB package
             ;;
-        -j)
+        -j|--jobs)
             shift;
             JOBS=$1
             ;;
