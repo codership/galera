@@ -103,7 +103,7 @@ namespace galera
 
             pre_enter(obj, lock);
 
-            if (process_[idx].state_ !=  Process::S_CANCELED)
+            if (gu_likely(process_[idx].state_ != Process::S_CANCELED))
             {
                 assert(process_[idx].state_ == Process::S_IDLE);
 
@@ -126,7 +126,7 @@ namespace galera
                     process_[idx].state_ = Process::S_APPLYING;
 
                     ++entered_;
-                    oooe_     += (last_left_ + 1 < obj_seqno);
+                    oooe_     += ((last_left_ + 1) < obj_seqno);
                     win_size_ += (last_entered_ - last_left_);
                     return 0;
                 }
@@ -271,6 +271,7 @@ namespace galera
             {
                 process_[idx].state_ = Process::S_IDLE;
                 last_left_           = obj_seqno;
+                process_[idx].wait_cond_.broadcast();
 
                 for (wsrep_seqno_t i = last_left_ + 1; i <= last_entered_; ++i)
                 {
@@ -280,6 +281,7 @@ namespace galera
                     {
                         a.state_   = Process::S_IDLE;
                         last_left_ = i;
+                        a.wait_cond_.broadcast();
                     }
                     else
                     {
@@ -295,9 +297,9 @@ namespace galera
                         may_enter(*a.obj_) == true)
                     {
                         // We need to set state to APPLYING here because if
-                        // it is  the last_left_ + 1 and it gets canceled in
-                        // the race  that follows exit from this function,
-                        // there will be  nobody to clean up and advance
+                        // it is the last_left_ + 1 and it gets canceled in
+                        // the race that follows the exit from this function,
+                        // there will be nobody to clean up and advance
                         // last_left_.
                         a.state_ = Process::S_APPLYING;
                         a.cond_.signal();
@@ -322,7 +324,6 @@ namespace galera
                 oool_ += (last_left_ > obj_seqno);
                 cond_.broadcast();
             }
-            process_[idx].wait_cond_.broadcast();
         }
 
         void drain_common(wsrep_seqno_t seqno, gu::Lock& lock)
