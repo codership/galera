@@ -15,7 +15,7 @@ static const char* state_str[GALERA_STAGE_MAX] =
     "Waiting for SST (4)",
     "Joined (5)",
     "Synced (6)",
-    "Donor (+)"
+    "Donor (+)",
     "SST request failed (-)",
     "SST failed (-)",
 };
