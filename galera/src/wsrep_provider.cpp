@@ -338,7 +338,8 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
 
         retval = repl->replicate(trx);
 
-        assert((retval == WSREP_OK && trx->global_seqno() > 0) ||
+        assert(((retval == WSREP_OK || retval == WSREP_BF_ABORT) &&
+                trx->global_seqno() > 0) ||
                (retval != WSREP_OK && trx->global_seqno() < 0));
 
         if (retval == WSREP_OK)

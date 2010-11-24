@@ -659,8 +659,26 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         trx->set_last_seen_seqno(apply_monitor_.last_left());
         trx->flush(0);
 
-        trx->unlock();
+        if (trx->action() == 0)
+        {
+            try
+            {
+                trx->set_action(gcache_.malloc(wscoll.size()));
+                if (trx->action() == 0)
+                {
+                    rcode = -ENOMEM;
+                    break;
+                }
+            }
+            catch (gu::Exception& e)
+            {
+                rcode = -ENOMEM;
+                break;
+            }
+        }
+        memcpy(trx->action(), &wscoll[0], wscoll.size());
 
+        trx->unlock();
         rcode = gcs_.repl(&wscoll[0], wscoll.size(),
                           GCS_ACT_TORDERED, true, &seqno_l, &seqno_g);
         trx->lock();
@@ -693,6 +711,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     replicated_bytes_ += wscoll.size();
     trx->set_gcs_handle(-1);
     trx->set_seqnos(seqno_l, seqno_g);
+    gcache_.seqno_assign(trx->action(), seqno_g);
 
     if (trx->state() == TrxHandle::S_MUST_ABORT)
     {
@@ -924,6 +943,15 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
     ApplyOrder ao(*trx);
     apply_monitor_.leave(ao);
     cert_.set_trx_committed(trx);
+    if (trx->action() != 0)
+    {
+        gcache_.free(trx->action());
+        trx->set_action(0);
+    }
+    else
+    {
+        log_warn << "no assigned cached action for " << *trx;
+    }
     report_last_committed();
     ++local_commits_;
     return WSREP_OK;
@@ -942,6 +970,11 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandle* trx)
            trx->state() == TrxHandle::S_EXECUTING);
 
     trx->set_state(TrxHandle::S_ROLLED_BACK);
+    if (trx->action() != 0)
+    {
+        gcache_.free(trx->action());
+        trx->set_action(0);
+    }
     report_last_committed();
     ++local_rollbacks_;
 
@@ -964,6 +997,15 @@ void galera::ReplicatorSMM::to_isolation_cleanup (TrxHandle* trx)
     ApplyOrder ao(*trx);
     apply_monitor_.self_cancel(ao);
     cert_.set_trx_committed(trx);
+    if (trx->action() != 0)
+    {
+        gcache_.free(trx->action());
+        trx->set_action(0);
+    }
+    else
+    {
+        log_warn << "no assigned cached action for " << *trx;
+    }
 //    wsdb_.discard_conn_query(trx->conn_id()); this should be done by caller
     report_last_committed();
 }
