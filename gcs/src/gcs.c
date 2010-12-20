@@ -386,7 +386,7 @@ gcs_fc_cont_end (gcs_conn_t* conn)
     long ret;
     struct gcs_fc fc  = { htogl(conn->conf_id), 0 };
 
-    assert (GCS_CONN_SYNCED == conn->state);
+    assert (GCS_CONN_SYNCED == conn->state || GCS_CONN_JOINED == conn->state);
 
     gu_debug ("SENDING FC_CONT (local seqno: %lld, fc_offset: %ld)",
               conn->local_act_id, conn->fc_offset);
