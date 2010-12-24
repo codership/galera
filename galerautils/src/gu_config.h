@@ -11,6 +11,7 @@
 #define _gu_config_h_
 
 #include <stdint.h>
+#include <unistd.h> // for ssize_t
 
 #ifdef __cplusplus 
 extern "C" {
@@ -56,6 +57,9 @@ gu_config_set_ptr    (gu_config_t* cnf, const char* key, const void* val);
 
 void
 gu_config_set_bool   (gu_config_t* cnf, const char* key, bool val);
+
+ssize_t
+gu_config_print      (gu_config_t* cnf, char* buf, ssize_t buf_len);
 
 #ifdef __cplusplus 
 }

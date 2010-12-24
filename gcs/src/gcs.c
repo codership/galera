@@ -19,6 +19,7 @@
 
 #include "gcs.h"
 #include "gcs_params.h"
+#include "gcs_fc.h"
 #include "gcs_seqno.h"
 #include "gcs_core.h"
 #include "gcs_fifo_lite.h"
@@ -89,8 +90,11 @@ static const char* gcs_conn_state_str[GCS_CONN_STATE_MAX] =
     "DESTROYED"
 };
 
+static bool const GCS_FC_STOP = true;
+static bool const GCS_FC_CONT = false;
+
 /** Flow control message */
-struct gcs_fc
+struct gcs_fc_event
 {
     uint32_t conf_id; // least significant part of configuraiton seqno
     uint32_t stop;    // boolean value
@@ -129,12 +133,11 @@ struct gcs_conn
 
     /* A queue for threads waiting for received actions */
     gu_fifo_t*   recv_q;
+    ssize_t      recv_q_size;
     gu_thread_t  recv_thread;
 
     /* Flow Control */
     gu_mutex_t   fc_lock;
-//    long         fc_base_queue_limit; // Base FC configuraton parameters
-//    double       fc_resume_factor;    //
     uint32_t     conf_id;             // configuration ID
     long         stop_sent;           // how many STOPs - CONTs were sent
     long         stop_count;          // counts stop requests received
@@ -143,7 +146,8 @@ struct gcs_conn
     long         lower_limit;         // lower slave queue limit
     long         fc_offset;           // offset for catchup phase
     long         stats_fc_sent;       // FC stats counters
-    long         stats_fc_received;   // 
+    long         stats_fc_received;   //
+    gcs_fc_t     stfc; // state transfer FC object
 
     /* sync control */
     bool         sync_sent;
@@ -171,6 +175,7 @@ struct gcs_repl_act
     gu_cond_t      wait_cond;
 };
 
+/*! Creatres local configuration object if no external is submitted */
 static long
 _init_params (gcs_conn_t* conn, gu_config_t* conf)
 {
@@ -204,6 +209,15 @@ gcs_create (const char* node_name, const char* inc_addr, void* conf,
     if (conn) {
 
         if (_init_params (conn, conf)) {
+            free (conn);
+            return 0;
+        }
+
+        if (gcs_fc_init (&conn->stfc,
+                         conn->params.recv_q_hard_limit,
+                         conn->params.recv_q_soft_limit,
+                         conn->params.max_throttle)) {
+            gu_error ("FC initialization failed");
             free (conn);
             return 0;
         }
@@ -310,6 +324,13 @@ gcs_check_error (long err, const char* warning)
     return err;
 }
 
+static inline long
+gcs_send_fc_event (gcs_conn_t* conn, bool stop)
+{
+    struct gcs_fc_event fc  = { htogl(conn->conf_id), stop };
+    return gcs_core_send_fc (conn->core, &fc, sizeof(fc));
+}
+
 /* To be called under slave queue lock. Returns true if FC_STOP must be sent */
 static inline bool
 gcs_fc_stop_begin (gcs_conn_t* conn)
@@ -337,12 +358,11 @@ static inline long
 gcs_fc_stop_end (gcs_conn_t* conn)
 {
     long ret;
-    struct gcs_fc fc  = { htogl(conn->conf_id), 1 };
 
     gu_debug ("SENDING FC_STOP (local seqno: %lld, fc_offset: %ld)",
               conn->local_act_id, conn->fc_offset);
 
-    ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
+    ret = gcs_send_fc_event (conn, GCS_FC_STOP);
 
     if (ret >= 0) {
         ret = 0;
@@ -389,14 +409,13 @@ static inline long
 gcs_fc_cont_end (gcs_conn_t* conn)
 {
     long ret;
-    struct gcs_fc fc  = { htogl(conn->conf_id), 0 };
 
     assert (GCS_CONN_SYNCED == conn->state || GCS_CONN_JOINED == conn->state);
 
     gu_debug ("SENDING FC_CONT (local seqno: %lld, fc_offset: %ld)",
               conn->local_act_id, conn->fc_offset);
 
-    ret = gcs_core_send_fc (conn->core, &fc, sizeof(fc));
+    ret = gcs_send_fc_event (conn, GCS_FC_CONT);
 
     if (gu_likely (ret >= 0)) { ret = 0; }
 
@@ -525,6 +544,16 @@ gcs_become_joiner (gcs_conn_t* conn)
         assert (0);
         abort();
     }
+
+    if (gcs_fc_init (&conn->stfc,
+                     conn->params.recv_q_hard_limit,
+                     conn->params.recv_q_soft_limit,
+                     conn->params.max_throttle)) {
+        gu_fatal ("Becoming JOINER: FC initialization failed, can't continue.");
+        abort();
+    }
+
+    gcs_fc_reset (&conn->stfc, conn->recv_q_size);
 }
 
 // returns 1 if accepts, 0 if rejects, negative error code if fails.
@@ -757,7 +786,7 @@ gcs_handle_actions (gcs_conn_t*                conn,
     switch (rcvd->act.type) {
     case GCS_ACT_FLOW:
     { // this is frequent, so leave it inlined.
-        const struct gcs_fc* fc = rcvd->act.buf;
+        const struct gcs_fc_event* fc = rcvd->act.buf;
 
         assert (sizeof(*fc) == rcvd->act.buf_len);
 
@@ -795,6 +824,38 @@ gcs_handle_actions (gcs_conn_t*                conn,
         break;
     default:
         break;
+    }
+
+    return ret;
+}
+
+static inline void
+GCS_FIFO_PUSH_TAIL (gcs_conn_t* conn, ssize_t size)
+{
+    conn->recv_q_size += size;
+    gu_fifo_push_tail(conn->recv_q);
+}
+
+static long
+gcs_check_slave_queue_growth (gcs_conn_t* conn, ssize_t size)
+{
+    long ret = 0;
+
+    struct timespec pause;
+
+    if ((ret = gcs_fc_process (&conn->stfc, size, &pause)) && ret > 0) {
+        /* replication needs throttling */
+        if ((ret = gcs_send_fc_event (conn, GCS_FC_STOP)) >= 0) {
+
+            nanosleep (&pause, NULL);
+
+            do {
+                ret = gcs_send_fc_event (conn, GCS_FC_CONT);
+            }
+            while (-EAGAIN == ret); // we need to send CONT here at all costs
+
+            if (ret >= 0) ret = 0; // success
+        }
     }
 
     return ret;
@@ -842,7 +903,7 @@ static void *gcs_recv_thread (void *arg)
             err_act->rcvd     = rcvd;
             err_act->local_id = GCS_SEQNO_ILL;
 
-            gu_fifo_push_tail(conn->recv_q);
+            GCS_FIFO_PUSH_TAIL (conn, rcvd.act.buf_len);
 
             gu_debug ("gcs_core_recv returned %d: %s", ret, strerror(-ret));
             break;
@@ -908,7 +969,13 @@ static void *gcs_recv_thread (void *arg)
                 conn->queue_len = gu_fifo_length (conn->recv_q) + 1;
                 bool send_stop  = gcs_fc_stop_begin (conn);
 
-                gu_fifo_push_tail (conn->recv_q); // release queue
+                // release queue
+                GCS_FIFO_PUSH_TAIL (conn, rcvd.act.buf_len);
+
+                if (gu_unlikely(GCS_CONN_JOINER == conn->state)) {
+                    ret = gcs_check_slave_queue_growth (conn, rcvd.act.buf_len);
+                    assert (ret <= 0);
+                }
 
                 if (gu_unlikely(send_stop) && (ret = gcs_fc_stop_end(conn))) {
                     gu_error ("gcs_fc_stop() returned %d: %s",
@@ -927,13 +994,11 @@ static void *gcs_recv_thread (void *arg)
         }
         else if (conn->my_idx == rcvd.sender_idx)
         {
-#ifndef NDEBUG
-            gu_warn ("Protocol violation: unordered local action not in repl_q:"
-                     " { {%p, %zd, %s}, %ld, %lld }, ignoring.",
+            gu_fatal("Protocol violation: unordered local action not in repl_q:"
+                     " { {%p, %zd, %s}, %ld, %lld }.",
                      rcvd.act.buf, rcvd.act.buf_len,
                      gcs_act_type_to_str(rcvd.act.type), rcvd.sender_idx,
                      rcvd.id);
-#endif
             assert(0);
             ret = -ENOTRECOVERABLE;
             break;
@@ -1388,6 +1453,14 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
     return ret;
 }
 
+static inline void
+GCS_FIFO_POP_HEAD (gcs_conn_t* conn, ssize_t size)
+{
+    assert (conn->recv_q_size >= size);
+    conn->recv_q_size -= size;
+    gu_fifo_pop_head (conn->recv_q);
+}
+
 /* Returns when an action from another process is received */
 long gcs_recv (gcs_conn_t*     conn,
                void**          action,
@@ -1417,7 +1490,7 @@ long gcs_recv (gcs_conn_t*     conn,
         *act_id       = act->rcvd.id;
         *local_act_id = act->local_id;
 
-        gu_fifo_pop_head (conn->recv_q); // release the queue
+        GCS_FIFO_POP_HEAD (conn, *act_size); // release the queue
 
         if (gu_unlikely(send_cont) && (err = gcs_fc_cont_end(conn))) {
             // We have successfully received an action, but failed to send
@@ -1512,6 +1585,8 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
                    &stats->recv_q_len,
                    &stats->recv_q_len_avg);
 
+    stats->recv_q_size = conn->recv_q_size;
+
     gcs_sm_stats  (conn->sm,
                    &stats->send_q_len,
                    &stats->send_q_len_avg,
@@ -1605,6 +1680,66 @@ _set_pkt_size (gcs_conn_t* conn, const char* value)
     }
 }
 
+static long
+_set_recv_q_hard_limit (gcs_conn_t* conn, const char* value)
+{
+    char*   endptr = NULL;
+    ssize_t limit  = strtoll (value, &endptr, 0);
+
+    if (limit > 0 && *endptr == '\0') {
+
+        if (conn->params.recv_q_hard_limit == limit) return 0;
+
+        gu_config_set_int64 (conn->config, GCS_PARAMS_RECV_Q_HARD_LIMIT, limit);
+        conn->params.recv_q_hard_limit = limit * gcs_fc_hard_limit_fix;
+
+        return 0;
+    }
+    else {
+        return -EINVAL;
+    }
+}
+
+static long
+_set_recv_q_soft_limit (gcs_conn_t* conn, const char* value)
+{
+    char*  endptr = NULL;
+    double dbl    = strtod (value, &endptr);
+
+    if (dbl >= 0.0 && dbl < 1.0 && *endptr == '\0') {
+
+        if (dbl == conn->params.recv_q_soft_limit) return 0;
+
+        gu_config_set_double (conn->config, GCS_PARAMS_RECV_Q_SOFT_LIMIT, dbl);
+        conn->params.recv_q_soft_limit = dbl;
+
+        return 0;
+    }
+    else {
+        return -EINVAL;
+    }
+}
+
+static long
+_set_max_throttle (gcs_conn_t* conn, const char* value)
+{
+    char*  endptr = NULL;
+    double dbl    = strtod (value, &endptr);
+
+    if (dbl >= 0.0 && dbl < 1.0 && *endptr == '\0') {
+
+        if (dbl == conn->params.max_throttle) return 0;
+
+        gu_config_set_double (conn->config, GCS_PARAMS_MAX_THROTTLE, dbl);
+        conn->params.max_throttle = dbl;
+
+        return 0;
+    }
+    else {
+        return -EINVAL;
+    }
+}
+
 long gcs_param_set  (gcs_conn_t* conn, const char* key, const char *value)
 {
     if (!strcmp (key, GCS_PARAMS_FC_LIMIT)) {
@@ -1615,6 +1750,15 @@ long gcs_param_set  (gcs_conn_t* conn, const char* key, const char *value)
     }
     else if (!strcmp (key, GCS_PARAMS_MAX_PKT_SIZE)) {
         return _set_pkt_size (conn, value);
+    }
+    else if (!strcmp (key, GCS_PARAMS_RECV_Q_HARD_LIMIT)) {
+        return _set_recv_q_hard_limit (conn, value);
+    }
+    else if (!strcmp (key, GCS_PARAMS_RECV_Q_SOFT_LIMIT)) {
+        return _set_recv_q_soft_limit (conn, value);
+    }
+    else if (!strcmp (key, GCS_PARAMS_MAX_THROTTLE)) {
+        return _set_max_throttle (conn, value);
     }
     else {
         return gcs_core_param_set (conn->core, key, value);

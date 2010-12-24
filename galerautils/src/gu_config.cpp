@@ -150,6 +150,19 @@ gu::Config::overflow_int(long long ret) throw (Exception)
     throw;
 }
 
+std::ostream& operator<<(std::ostream& ost, const gu::Config& c)
+{
+    const gu::Config::param_map_t& pmap = c.params();
+
+    for (gu::Config::param_map_t::const_iterator pi = pmap.begin();
+         pi != pmap.end(); ++pi)
+    {
+        ost << "'" << pi->first << "' = '" << pi->second << "'\n";
+    }
+
+    return ost;
+}
+
 gu_config_t*
 gu_config_create (const char* params)
 {
@@ -195,7 +208,7 @@ config_check_set_args (gu_config_t* cnf, const char* key, const char* func)
 }
 
 static long
-config_check_get_args (gu_config_t* cnf, const char* key, const void* val_ptr,\
+config_check_get_args (gu_config_t* cnf, const char* key, const void* val_ptr,
                        const char* func)
 {
     if (cnf && key && key[0] != '\0' && val_ptr) return 0;
@@ -380,4 +393,19 @@ gu_config_set_bool  (gu_config_t* cnf, const char* key, bool val)
     gu::Config* conf = reinterpret_cast<gu::Config*>(cnf);
 
     conf->set<bool>(key, val);
+}
+
+ssize_t
+gu_config_print (gu_config_t* cnf, char* buf, ssize_t buf_len)
+{
+    std::ostringstream os;
+
+    os << *(reinterpret_cast<gu::Config*>(cnf));
+
+    const std::string& str = os.str();
+
+    strncpy (buf, str.c_str(), buf_len - 1);
+    buf[buf_len - 1] = '\0';
+
+    return str.length();
 }

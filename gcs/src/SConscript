@@ -27,6 +27,7 @@ libgcs_sources = Split('''
                           gcs_node.c
                           gcs_group.c
                           gcs_core.c
+                          gcs_fc.c
                           gcs.c
                           gcs_gcomm.cpp
                        ''')

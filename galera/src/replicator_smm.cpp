@@ -253,7 +253,6 @@ std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
     throw;
 }
 
-/*! @todo: move the following two functions to gcache */
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 //                           Public

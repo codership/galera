@@ -136,7 +136,7 @@ END_TEST
 
 Suite *gcs_comp_suite(void)
 {
-    Suite *suite = suite_create("GCS Component Message");
+    Suite *suite = suite_create("GCS component message");
     TCase *tcase = tcase_create("gcs_comp");
 
     suite_add_tcase (suite, tcase);
