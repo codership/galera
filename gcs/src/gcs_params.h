@@ -10,14 +10,20 @@
 
 struct gcs_params
 {
-    double fc_resume_factor;
-    long   fc_base_limit;
-    long   max_packet_size;
+    double  fc_resume_factor;
+    double  recv_q_soft_limit;
+    double  max_throttle;
+    ssize_t recv_q_hard_limit;
+    long    fc_base_limit;
+    long    max_packet_size;
 };
 
-extern const char* GCS_PARAMS_FC_FACTOR;
-extern const char* GCS_PARAMS_FC_LIMIT;
-extern const char* GCS_PARAMS_MAX_PKT_SIZE;
+extern const char* const GCS_PARAMS_FC_FACTOR;
+extern const char* const GCS_PARAMS_FC_LIMIT;
+extern const char* const GCS_PARAMS_MAX_PKT_SIZE;
+extern const char* const GCS_PARAMS_RECV_Q_HARD_LIMIT;
+extern const char* const GCS_PARAMS_RECV_Q_SOFT_LIMIT;
+extern const char* const GCS_PARAMS_MAX_THROTTLE;
 
 /*! Initializes parameters from config or defaults (and updates config)
  *

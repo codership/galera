@@ -9,83 +9,120 @@
 #include <inttypes.h>
 #include <errno.h>
 
-const char* GCS_PARAMS_FC_FACTOR    = "gcs.fc_factor";
-const char* GCS_PARAMS_FC_LIMIT     = "gcs.fc_limit";
-const char* GCS_PARAMS_MAX_PKT_SIZE = "gcs.max_packet_size";
+const char* const GCS_PARAMS_FC_FACTOR          = "gcs.fc_factor";
+const char* const GCS_PARAMS_FC_LIMIT           = "gcs.fc_limit";
+const char* const GCS_PARAMS_MAX_PKT_SIZE       = "gcs.max_packet_size";
+const char* const GCS_PARAMS_RECV_Q_HARD_LIMIT = "gcs.recv_q_hard_limit";
+const char* const GCS_PARAMS_RECV_Q_SOFT_LIMIT = "gcs.recv_q_soft_limit";
+const char* const GCS_PARAMS_MAX_THROTTLE       = "gcs.max_throttle";
 
-static const double GCS_PARAMS_DEFAULT_FC_FACTOR    = 0.5;
-static const long   GCS_PARAMS_DEFAULT_FC_LIMIT     = 16;
-static const long   GCS_PARAMS_DEFAULT_MAX_PKT_SIZE = 64500;
+static double  const GCS_PARAMS_DEFAULT_FC_FACTOR          = 0.5;
+static long    const GCS_PARAMS_DEFAULT_FC_LIMIT           = 16;
+static long    const GCS_PARAMS_DEFAULT_MAX_PKT_SIZE       = 64500;
+static ssize_t const GCS_PARAMS_DEFAULT_RECV_Q_HARD_LIMIT = LLONG_MAX;
+static double  const GCS_PARAMS_DEFAULT_RECV_Q_SOFT_LIMIT = 0.25;
+static double  const GCS_PARAMS_DEFAULT_MAX_THROTTLE       = 0.25;
 
 static long
-params_init_fc_limit (gu_config_t* config, long* val)
+params_init_long (gu_config_t* conf, const char* const name,
+                  long const def_val, long min_val, long max_val,
+                  long* const var)
 {
-    int64_t limit;
+    int64_t val;
 
-    long rc = gu_config_get_int64(config, GCS_PARAMS_FC_LIMIT, &limit);
+    long rc = gu_config_get_int64(conf, name, &val);
 
     if (rc < 0) {
-        gu_error ("Bad %s value", GCS_PARAMS_FC_LIMIT);
+        /* Cannot parse parameter value */
+        gu_error ("Bad %s value", name);
         return -EINVAL;
     }
     else if (rc > 0) {
-        limit = GCS_PARAMS_DEFAULT_FC_LIMIT;
+        /* Parameter value not set, use default */
+        val = def_val;
+        gu_config_set_int64 (conf, name, val);
     }
-    else if (limit < 0 || limit > LONG_MAX) {
-        gu_error ("Bad %s value: %"PRIi64, GCS_PARAMS_FC_LIMIT, limit);
-        return -EINVAL;
-    }
+    else {
+        /* Found parameter value */
+        if (max_val == min_val) {
+            max_val = LONG_MAX;
+            min_val = LONG_MIN;
+        }
 
-    *val = limit;
-
-    if (rc > 0) gu_config_set_int64 (config, GCS_PARAMS_FC_LIMIT, *val);
-
-    return 0;
-}
-
-static long
-params_init_fc_factor (gu_config_t* config, double* val)
-{
-    long rc = gu_config_get_double (config, GCS_PARAMS_FC_FACTOR, val);
-
-    if (rc < 0) {
-        gu_error ("Bad %s value", GCS_PARAMS_FC_FACTOR);
-        return -EINVAL;
-    }
-    else if (rc > 0) {
-        *val = GCS_PARAMS_DEFAULT_FC_FACTOR;
-        gu_config_set_double (config, GCS_PARAMS_FC_FACTOR, *val);
-    }
-    else if (*val < 0.0 || *val > 1.0) {
-            gu_error ("Bad %s value: %f", GCS_PARAMS_FC_FACTOR, *val);
+        if (val < min_val || val > max_val) {
+            gu_error ("%s value out of range [%ld, %ld]: %"PRIi64,
+                      name, min_val, max_val, val);
             return -EINVAL;
+        }
     }
+
+    *var = val;
 
     return 0;
 }
 
 static long
-params_init_max_pkt_size (gu_config_t* config, long* val)
+params_init_int64 (gu_config_t* conf, const char* const name,
+                   int64_t const def_val, int64_t const min_val,
+                   int64_t const max_val, int64_t* const var)
 {
-    int64_t pkt_size;
+    int64_t val;
 
-    long rc = gu_config_get_int64(config, GCS_PARAMS_MAX_PKT_SIZE, &pkt_size);
+    long rc = gu_config_get_int64(conf, name, &val);
 
     if (rc < 0) {
-        gu_error ("Bad %s value", GCS_PARAMS_MAX_PKT_SIZE);
+        /* Cannot parse parameter value */
+        gu_error ("Bad %s value", name);
         return -EINVAL;
     }
     else if (rc > 0) {
-        pkt_size = GCS_PARAMS_DEFAULT_MAX_PKT_SIZE;
+        /* Parameter value not set, use default */
+        val = def_val;
+        gu_config_set_int64 (conf, name, val);
     }
-    else if (pkt_size < 0 || pkt_size > LONG_MAX) {
-        gu_error ("Bad %s value: %"PRIi64, GCS_PARAMS_MAX_PKT_SIZE, pkt_size);
+    else {
+        /* Found parameter value */
+        if ((min_val != max_val) && (val < min_val || val > max_val)) {
+            gu_error ("%s value out of range [%"PRIi64", %"PRIi64"]: %"PRIi64,
+                      name, min_val, max_val, val);
+            return -EINVAL;
+        }
+    }
+
+    *var = val;
+
+    return 0;
+}
+
+static long
+params_init_double (gu_config_t* conf, const char* const name,
+                    double const def_val, double const min_val,
+                    double const max_val, double* const var)
+{
+    double val;
+
+    long rc = gu_config_get_double(conf, name, &val);
+
+    if (rc < 0) {
+        /* Cannot parse parameter value */
+        gu_error ("Bad %s value", name);
         return -EINVAL;
     }
+    else if (rc > 0) {
+        /* Parameter value not set, use default */
+        val = def_val;
+        gu_config_set_double (conf, name, val);
+    }
+    else {
+        /* Found parameter value */
+        if ((min_val != max_val) && (val < min_val || val > max_val)) {
+            gu_error ("%s value out of range [%f, %f]: %f",
+                      name, min_val, max_val, val);
+            return -EINVAL;
+        }
+    }
 
-    *val = pkt_size;
-
-    if (rc > 0) gu_config_set_int64 (config, GCS_PARAMS_MAX_PKT_SIZE, *val);
+    *var = val;
 
     return 0;
 }
@@ -93,10 +130,35 @@ params_init_max_pkt_size (gu_config_t* config, long* val)
 long
 gcs_params_init (struct gcs_params* params, gu_config_t* config)
 {
-    if (params_init_fc_limit     (config, &params->fc_base_limit)    ||
-        params_init_fc_factor    (config, &params->fc_resume_factor) ||
-        params_init_max_pkt_size (config, &params->max_packet_size))
-        return -EINVAL;
-    else
-        return 0;
+    long ret;
+
+    if ((ret = params_init_long (config, GCS_PARAMS_FC_LIMIT,
+                                 GCS_PARAMS_DEFAULT_FC_LIMIT, 0, LONG_MAX,
+                                 &params->fc_base_limit))) return ret;
+
+    if ((ret = params_init_long (config, GCS_PARAMS_MAX_PKT_SIZE,
+                                 GCS_PARAMS_DEFAULT_MAX_PKT_SIZE,0,LONG_MAX,
+                                 &params->max_packet_size))) return ret;
+
+    if ((ret = params_init_double (config, GCS_PARAMS_FC_FACTOR,
+                                   GCS_PARAMS_DEFAULT_FC_FACTOR, 0.0, 1.0,
+                                   &params->fc_resume_factor))) return ret;
+
+    if ((ret = params_init_double (config, GCS_PARAMS_RECV_Q_SOFT_LIMIT,
+                                   GCS_PARAMS_DEFAULT_RECV_Q_SOFT_LIMIT,
+                                   0.0, 1.0 - 1.e-9,
+                                   &params->recv_q_soft_limit))) return ret;
+
+    if ((ret = params_init_double (config, GCS_PARAMS_MAX_THROTTLE,
+                                   GCS_PARAMS_DEFAULT_MAX_THROTTLE,
+                                   0.0, 1.0 - 1.e-9,
+                                   &params->max_throttle))) return ret;
+
+    int64_t tmp;
+    if ((ret = params_init_int64 (config, GCS_PARAMS_RECV_Q_HARD_LIMIT,
+                                  GCS_PARAMS_DEFAULT_RECV_Q_HARD_LIMIT, 0, 0,
+                                  &tmp))) return ret;
+    params->recv_q_hard_limit = tmp * 0.9; // allow for some meta overhead
+
+    return 0;
 }

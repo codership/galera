@@ -107,7 +107,7 @@ END_TEST
 
 Suite *gcs_proto_suite(void)
 {
-  Suite *suite = suite_create("GCS Core protocol");
+  Suite *suite = suite_create("GCS core protocol");
   TCase *tcase = tcase_create("gcs_proto");
 
   suite_add_tcase (suite, tcase);

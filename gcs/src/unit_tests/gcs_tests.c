@@ -20,6 +20,7 @@
 #include "gcs_group_test.h"
 #include "gcs_backend_test.h"
 #include "gcs_core_test.h"
+#include "gcs_fc_test.h"
 
 typedef Suite *(*suite_creator_t)(void);
 
@@ -35,6 +36,7 @@ static suite_creator_t suites[] =
 //	gcs_group_suite,
 	gcs_backend_suite,
 	gcs_core_suite,
+        gcs_fc_suite,
 	NULL
     };
 
