@@ -56,6 +56,7 @@ namespace galera
             :
             conn_(gcs_create(node_name, node_incoming, &config))
         {
+            log_info << "Passing config to GCS: " << config;
             if (conn_ == 0) gu_throw_fatal << "could not create gcs connection";
         }
 

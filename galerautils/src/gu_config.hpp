@@ -101,6 +101,8 @@ public:
         return from_config <T> (get(key));
     }
 
+    const param_map_t& params () const throw() { return params_; }
+
 private:
 
     static void
@@ -120,6 +122,8 @@ private:
 
     param_map_t params_;
 };
+
+std::ostream& operator<<(std::ostream&, const gu::Config&);
 
 extern "C" const char* gu_str2dbl  (const char* str, double* dbl);
 extern "C" const char* gu_str2bool (const char* str, bool*   bl);
