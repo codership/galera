@@ -155,12 +155,24 @@ void gu_fifo_release (gu_fifo_t *q)
     fifo_unlock(q);
 }
 
-void gu_fifo_close (gu_fifo_t* q)
+static long fifo_flush (gu_fifo_t* q)
 {
-    fifo_lock (q)
+    long ret = 0;
 
+    /* if there are items in the queue, wait until they are all fetched */
+    while (q->used > 0 && 0 == ret) {
+        /* will make getters to signal every time item is removed */
+        gu_warn ("Waiting for %lu items to be fetched.", q->used);
+        q->put_wait++;
+        ret = gu_cond_wait (&q->put_cond, &q->lock);
+    }
+
+    return ret;
+}
+
+static void fifo_close (gu_fifo_t* q)
+{
     if (!q->closed) {
-        long ret = 0;
 
         q->length = 0;    /* prevent appending */
         q->closed = true; /* force putters to quit */
@@ -171,15 +183,16 @@ void gu_fifo_close (gu_fifo_t* q)
         gu_cond_broadcast (&q->get_cond);
         q->get_wait = 0;
 
-        /* if there are items in the queue, wait until they are all fetched */
-        while (q->used > 0 && 0 == ret) {
-            /* will make getters to signal every time item is removed */
-            gu_warn ("Waiting for %lu items to be fetched.", q->used);
-            q->put_wait++;
-            ret = gu_cond_wait (&q->put_cond, &q->lock);
-        }
+#if 0
+        (void) fifo_flush (q);
+#endif
     }
+}
 
+void gu_fifo_close (gu_fifo_t* q)
+{
+    fifo_lock   (q);
+    fifo_close  (q);
     fifo_unlock (q);
 }
 
@@ -382,15 +395,13 @@ void gu_fifo_stats (gu_fifo_t* q, long* q_len, double* q_len_avg)
 /* destructor - would block until all members are dequeued */
 void gu_fifo_destroy   (gu_fifo_t *queue)
 {
-    bool closed;
-
     fifo_lock (queue);
-    closed = queue->closed;
-    fifo_unlock (queue);
+    {
+        if (!queue->closed) fifo_close(queue);
 
-    if (!closed) {
-        gu_fifo_close (queue);
+        fifo_flush (queue);
     }
+    fifo_unlock (queue);
 
     assert (queue->tail == queue->head);
 

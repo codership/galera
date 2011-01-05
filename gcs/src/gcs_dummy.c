@@ -65,6 +65,7 @@ dummy_msg_destroy (dummy_msg_t *msg)
 
 typedef enum dummy_state
 {
+    DUMMY_DESTROYED,
     DUMMY_CLOSED,
     DUMMY_NON_PRIM,
     DUMMY_TRANS,
@@ -115,8 +116,9 @@ GCS_BACKEND_SEND_FN(dummy_send)
                                     backend->conn->my_idx);
     }
     else {
-        static long dummy_error[DUMMY_PRIM] = { -EBADFD, -ENOTCONN, -EAGAIN };
-	err = dummy_error[dummy->state];
+        static long send_error[DUMMY_PRIM] =
+            { -EBADFD, -EBADFD, -ENOTCONN, -EAGAIN };
+	err = send_error[dummy->state];
     }
 
     return err;
@@ -135,7 +137,7 @@ GCS_BACKEND_RECV_FN(dummy_recv)
 
     /* skip it if we already have popped a message from the queue
      * in the previous call */
-    if (gu_likely(DUMMY_CLOSED < conn->state))
+    if (gu_likely(DUMMY_CLOSED <= conn->state))
     {
         dummy_msg_t** ptr = gu_fifo_get_head (conn->gc_q);
 

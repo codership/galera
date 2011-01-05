@@ -1186,6 +1186,9 @@ long gcs_destroy (gcs_conn_t *conn)
             return -EBADFD;
         }
 
+    /* this should cancel all recv calls */
+    gu_fifo_destroy (conn->recv_q);
+
         gcs_shift_state (conn, GCS_CONN_DESTROYED);
         conn->err   = -EBADFD;
         /* we must unlock the mutex here to allow unfortunate threads
@@ -1211,9 +1214,6 @@ long gcs_destroy (gcs_conn_t *conn)
         gu_debug ("Error destroying repl FIFO: %d (%s)", err, strerror(-err));
         return err;
     }
-
-    /* this should cancel all recv calls */
-    gu_fifo_destroy (conn->recv_q);
 
     if ((err = gcs_core_destroy (conn->core))) {
         gu_debug ("Error destroying core: %d (%s)", err, strerror(-err));
