@@ -19,7 +19,7 @@ const char* const GCS_PARAMS_MAX_THROTTLE       = "gcs.max_throttle";
 static double  const GCS_PARAMS_DEFAULT_FC_FACTOR          = 0.5;
 static long    const GCS_PARAMS_DEFAULT_FC_LIMIT           = 16;
 static long    const GCS_PARAMS_DEFAULT_MAX_PKT_SIZE       = 64500;
-static ssize_t const GCS_PARAMS_DEFAULT_RECV_Q_HARD_LIMIT = LLONG_MAX;
+static ssize_t const GCS_PARAMS_DEFAULT_RECV_Q_HARD_LIMIT = SSIZE_MAX;
 static double  const GCS_PARAMS_DEFAULT_RECV_Q_SOFT_LIMIT = 0.25;
 static double  const GCS_PARAMS_DEFAULT_MAX_THROTTLE       = 0.25;
 
