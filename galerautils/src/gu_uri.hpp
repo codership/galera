@@ -32,7 +32,7 @@ namespace gu
      *       get_value() methods for iterators and to get rid of std::multimap
      *       dependency in header.
      */
-    typedef std::multimap<const std::string, std::string> URIQueryList;
+    typedef std::multimap<std::string, std::string> URIQueryList;
 
     /*!
      * @brief Utility class to parse URIs
@@ -138,16 +138,20 @@ namespace gu
         /*!
          * @brief Add query param to URI
          */
-        void set_query_param(const std::string&, const std::string&);
+        void set_query_param(const std::string&, const std::string&,
+                             bool override);
         void set_option(const std::string& key, const std::string& val)
         {
-            set_query_param(key, val);
+            set_query_param(key, val, true);
+        }
+        void append_option(const std::string& key, const std::string& val)
+        {
+            set_query_param(key, val, false);
         }
         /*!
          * @brief Get URI query list
-         *        It seems that this is needed only in unit tests
          */
-        const URIQueryList& _get_query_list() const { return query_list; }
+        const URIQueryList& get_query_list() const { return query_list; }
 
         /*!
          * @brief return opton by name

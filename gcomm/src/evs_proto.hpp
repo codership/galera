@@ -70,7 +70,7 @@ public:
         S_MAX
     };
 
-    static std::string to_string(const State s) 
+    static std::string to_string(const State s)
     {
         switch (s) {
         case S_CLOSED:      return "CLOSED";
@@ -84,19 +84,20 @@ public:
             throw;
         }
     }
-    
+
     friend std::ostream& operator<<(std::ostream&, const Proto&);
 
     /*!
      * Default constructor.
      */
-    Proto(const UUID& my_uuid_, const gu::URI& uri = gu::URI("evs://"),
+    Proto(gu::Config& conf,
+          const UUID& my_uuid_, const gu::URI& uri = gu::URI("evs://"),
           const size_t mtu_ = std::numeric_limits<size_t>::max());
     ~Proto();
-    
+
     const UUID& get_uuid() const { return my_uuid; }
 
-    std::string self_string() const 
+    std::string self_string() const
     {
         std::ostringstream os;
         os << "evs::proto(" << get_uuid() << ", " << to_string(get_state())
@@ -105,19 +106,19 @@ public:
     }
 
     State get_state() const { return state; }
-    
+
     size_t get_known_size() const { return known.size(); }
-    
+
     bool is_output_empty() const { return output.empty(); }
-    
+
     std::string get_stats() const;
     void reset_stats();
 
     bool is_flow_control(const seqno_t, const seqno_t win) const;
-    int send_user(gu::Datagram&, 
+    int send_user(gu::Datagram&,
                   uint8_t,
-                  Order, 
-                  seqno_t, 
+                  Order,
+                  seqno_t,
                   seqno_t,
                   size_t n_aggregated = 1);
     size_t get_mtu() const { return mtu; }
@@ -132,7 +133,7 @@ public:
     void set_leave(const LeaveMessage&, const UUID&);
     void send_leave(bool handle = true);
     void send_install();
-    
+
     void resend(const UUID&, const Range);
     void recover(const UUID&, const UUID&, const Range);
 
@@ -147,7 +148,7 @@ public:
     void cleanup_joins();
 
     size_t n_operational() const;
-    
+
     void validate_reg_msg(const UserMessage&);
     void deliver_finish(const InputMapMsg&);
     void deliver();
@@ -164,12 +165,12 @@ public:
     void setall_installed(bool val);
     bool is_all_installed() const;
 
-    
+
     bool is_representative(const UUID& pid) const;
 
     void shift_to(const State, const bool send_j = true);
-    
-    
+
+
     // Message handlers
 private:
 
@@ -184,17 +185,17 @@ private:
 
     /*!
      * Update input map safe seqs according to message node list. Only
-     * inactive nodes are allowed to be in 
+     * inactive nodes are allowed to be in
      */
     bool update_im_safe_seqs(const MessageNodeList&);
     bool is_msg_from_previous_view(const Message&);
     void check_suspects(const UUID&, const MessageNodeList&);
     void cross_check_inactives(const UUID&, const MessageNodeList&);
     void handle_foreign(const Message&);
-    void handle_user(const UserMessage&, 
-                     NodeMap::iterator, 
+    void handle_user(const UserMessage&,
+                     NodeMap::iterator,
                      const gu::Datagram&);
-    void handle_delegate(const DelegateMessage&, 
+    void handle_delegate(const DelegateMessage&,
                          NodeMap::iterator,
                          const gu::Datagram&);
     void handle_gap(const GapMessage&, NodeMap::iterator);
@@ -203,11 +204,11 @@ private:
     void handle_install(const InstallMessage&, NodeMap::iterator);
     void populate_node_list(MessageNodeList*) const;
 public:
-    static size_t unserialize_message(const UUID&, 
+    static size_t unserialize_message(const UUID&,
                                       const gu::Datagram&,
                                       Message*);
-    void handle_msg(const Message& msg, 
-                    const gu::Datagram& dg = gu::Datagram());    
+    void handle_msg(const Message& msg,
+                    const gu::Datagram& dg = gu::Datagram());
     // Protolay
     void handle_up(const void*, const gu::Datagram&, const ProtoUpMeta&);
     int handle_down(gu::Datagram& wb, const ProtoDownMeta& dm);
@@ -228,8 +229,8 @@ public:
         set_inactive(uuid);
     }
 
-    // gu::datetime::Date functions do appropriate actions for timer handling 
-    // and return next expiration time 
+    // gu::datetime::Date functions do appropriate actions for timer handling
+    // and return next expiration time
 private:
 public:
     enum Timer
@@ -241,9 +242,9 @@ public:
         T_STATS
     };
     /*!
-     * Internal timer list 
+     * Internal timer list
      */
-    class TimerList : 
+    class TimerList :
         public  MultiMap<gu::datetime::Date, Timer> { };
 private:
     TimerList timers;
@@ -259,7 +260,7 @@ public:
     gu::datetime::Date handle_timers();
 
     /*!
-     * @brief Flags controlling what debug information is logged if 
+     * @brief Flags controlling what debug information is logged if
      *        debug logging is turned on.
      */
     enum DebugFlags
@@ -318,21 +319,21 @@ private:
     prof::Profile delivery_prof;
     bool delivering;
     UUID my_uuid;
-    // 
-    // Known instances 
+    //
+    // Known instances
     NodeMap known;
     NodeMap::iterator self_i;
-    // 
+    //
     gu::datetime::Period view_forget_timeout;
     gu::datetime::Period inactive_timeout;
     gu::datetime::Period suspect_timeout;
     gu::datetime::Period inactive_check_period;
     gu::datetime::Period consensus_timeout;
-    gu::datetime::Period install_timeout;
     gu::datetime::Period retrans_period;
+    gu::datetime::Period install_timeout;
     gu::datetime::Period join_retrans_period;
     gu::datetime::Period stats_report_period;
-    
+
     gu::datetime::Date last_inactive_check;
 
     // Current view id
@@ -340,7 +341,7 @@ private:
     View current_view;
     View previous_view;
     std::list<std::pair<ViewId, gu::datetime::Date> > previous_views;
-    
+
     // Map containing received messages and aru/safe seqnos
     InputMap* input_map;
     // Helper container for local causal messages

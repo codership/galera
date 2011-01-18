@@ -20,7 +20,6 @@ using namespace gu::datetime;
 
 static bool test_multicast(false);
 string mcast_param("gmcast.mcast_addr=239.192.0.11&gmcast.mcast_port=4567");
-string pnet_backend("gu");
 
 START_TEST(test_gmcast_messages)
 {
@@ -33,7 +32,8 @@ START_TEST(test_gmcast_multicast)
 {
 
     string uri1("gmcast://?gmcast.group=test&gmcast.mcast_addr=239.192.0.11");
-    auto_ptr<Protonet> pnet(Protonet::create(pnet_backend));
+    gu::Config conf;
+    auto_ptr<Protonet> pnet(Protonet::create(conf));
     Transport* gm1(Transport::create(*pnet, uri1));
 
     gm1->connect();
@@ -47,7 +47,8 @@ END_TEST
 START_TEST(test_gmcast)
 {
     log_info << "START";
-    auto_ptr<Protonet> pnet(Protonet::create(pnet_backend));
+    gu::Config conf;
+    auto_ptr<Protonet> pnet(Protonet::create(conf));
 
     Transport* tp1 = Transport::create(
         *pnet,
@@ -114,6 +115,7 @@ START_TEST(test_gmcast_w_user_messages)
     public:
 
         User(Protonet& pnet, const char* listen_addr, const char* remote_addr) :
+            Toplay(pnet.conf()),
             tp(0),
             recvd(0),
             pstack()
@@ -190,7 +192,8 @@ START_TEST(test_gmcast_w_user_messages)
     };
 
     log_info << "START";
-    auto_ptr<Protonet> pnet(Protonet::create(pnet_backend));
+    gu::Config conf;
+    auto_ptr<Protonet> pnet(Protonet::create(conf));
 
     const char* addr1 = "127.0.0.1:20001";
     const char* addr2 = "127.0.0.1:20002";
@@ -281,7 +284,8 @@ END_TEST
 START_TEST(test_gmcast_auto_addr)
 {
     log_info << "START";
-    auto_ptr<Protonet> pnet(Protonet::create(pnet_backend));
+    gu::Config conf;
+    auto_ptr<Protonet> pnet(Protonet::create(conf));
     Transport* tp1 = Transport::create(*pnet, "gmcast://?gmcast.group=test");
     Transport* tp2 = Transport::create(*pnet, "gmcast://127.0.0.1:4567?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:10002");
 
@@ -313,8 +317,8 @@ START_TEST(test_gmcast_forget)
 {
     gu_conf_self_tstamp_on();
     log_info << "START";
-
-    auto_ptr<Protonet> pnet(Protonet::create(pnet_backend));
+    gu::Config conf;
+    auto_ptr<Protonet> pnet(Protonet::create(conf));
     Transport* tp1 = Transport::create(*pnet, "gmcast://?gmcast.group=test");
     Transport* tp2 = Transport::create(*pnet, "gmcast://127.0.0.1:4567?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:10002");
     Transport* tp3 = Transport::create(*pnet, "gmcast://127.0.0.1:4567?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:10003");

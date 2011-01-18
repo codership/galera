@@ -7,7 +7,7 @@
  *
  * @brief Protocol layer interface definitions.
  *
- * Protocol layer interface allows construction of protocol stacks 
+ * Protocol layer interface allows construction of protocol stacks
  * with consistent interface to send messages upwards or downwards in
  * stack.
  */
@@ -22,6 +22,7 @@
 #include "gu_logger.hpp"
 #include "gu_datetime.hpp"
 #include "gu_datagram.hpp"
+#include "gu_config.hpp"
 
 #include <cerrno>
 
@@ -39,7 +40,7 @@ namespace gcomm
      */
     class ProtoUpMeta;
     std::ostream& operator<<(std::ostream&, const ProtoUpMeta&);
-    
+
     /*!
      * @class ProtoDownMeta
      *
@@ -67,7 +68,7 @@ namespace gcomm
      * Protolay that is on the bottom of the protocol stack.
      */
     class Bottomlay;
-    
+
     void connect(Protolay*, Protolay*);
     void disconnect(Protolay*, Protolay*);
 }
@@ -113,26 +114,26 @@ public:
     { }
 
     ~ProtoUpMeta() { delete view; }
-    
+
     const UUID&   get_source()         const { return source; }
-    
+
     const ViewId& get_source_view_id() const { return source_view_id; }
 
     uint8_t       get_user_type()      const { return user_type; }
 
     Order         get_order()          const { return order; }
-    
+
     int64_t       get_to_seq()         const { return to_seq; }
 
     int           get_errno()          const { return err_no; }
-    
+
     bool          has_view()           const { return view != 0; }
-    
+
     const View&   get_view()           const { return *view; }
 
 private:
     ProtoUpMeta& operator=(const ProtoUpMeta&);
-    
+
     UUID    const source;
     ViewId  const source_view_id;
     uint8_t const user_type;
@@ -166,15 +167,15 @@ inline std::ostream& gcomm::operator<<(std::ostream& os, const ProtoUpMeta& um)
 /* message context to pass down? */
 class gcomm::ProtoDownMeta
 {
-public:    
+public:
     ProtoDownMeta(const uint8_t user_type_ = 0xff,
                   const Order   order_     = O_SAFE,
-                  const UUID&   uuid_      = UUID::nil()) : 
-        user_type (user_type_), 
+                  const UUID&   uuid_      = UUID::nil()) :
+        user_type (user_type_),
         order     (order_),
         source    (uuid_)
     { }
-    
+
     uint8_t     get_user_type() const { return user_type; }
     Order       get_order()     const { return order;     }
     const UUID& get_source()    const { return source;    }
@@ -187,108 +188,112 @@ private:
 class gcomm::Protolay
 {
     typedef std::list<Protolay*> CtxList;
-    CtxList up_context;
-    CtxList down_context;
-    
+    CtxList     up_context_;
+    CtxList     down_context_;
+
+
     Protolay (const Protolay&);
     Protolay& operator=(const Protolay&);
-    
+
 protected:
-    Protolay() : 
-        up_context(0), 
-        down_context(0)
-    {}
-    
+    gu::Config& conf_;
+    Protolay(gu::Config& conf)
+        :
+        up_context_(0),
+        down_context_(0),
+        conf_(conf)
+    { }
+
 public:
     virtual ~Protolay() {}
-    
+
     virtual void connect(bool) { }
     virtual void close() { }
     virtual void close(const UUID& uuid) { }
-    
+
     /* apparently handles data from upper layer. what is return value? */
     virtual int  handle_down (gu::Datagram&, const ProtoDownMeta&) = 0;
     virtual void handle_up   (const void*, const gu::Datagram&, const ProtoUpMeta&) = 0;
-    
+
     void set_up_context(Protolay *up)
     {
-	if (std::find(up_context.begin(), 
-                      up_context.end(), 
-                      up) != up_context.end())
+	if (std::find(up_context_.begin(),
+                      up_context_.end(),
+                      up) != up_context_.end())
         {
             gu_throw_fatal << "up context already exists";
         }
-	up_context.push_back(up);
+	up_context_.push_back(up);
     }
-    
+
     void set_down_context(Protolay *down)
     {
-	if (std::find(down_context.begin(), 
-                      down_context.end(),
-                      down) != down_context.end())
+	if (std::find(down_context_.begin(),
+                      down_context_.end(),
+                      down) != down_context_.end())
         {
             gu_throw_fatal << "down context already exists";
         }
-	down_context.push_back(down);
+	down_context_.push_back(down);
     }
-    
+
     void unset_up_context(Protolay* up)
     {
         CtxList::iterator i;
-	if ((i = std::find(up_context.begin(), 
-                           up_context.end(),
-                           up)) == up_context.end())
-        { 
+	if ((i = std::find(up_context_.begin(),
+                           up_context_.end(),
+                           up)) == up_context_.end())
+        {
             gu_throw_fatal << "up context does not exist";
         }
-        up_context.erase(i);
+        up_context_.erase(i);
     }
-    
-    
+
+
     void unset_down_context(Protolay* down)
     {
         CtxList::iterator i;
-	if ((i = std::find(down_context.begin(), 
-                           down_context.end(),
-                           down)) == down_context.end()) 
+	if ((i = std::find(down_context_.begin(),
+                           down_context_.end(),
+                           down)) == down_context_.end())
         {
             gu_throw_fatal << "down context does not exist";
         }
-        down_context.erase(i);
+        down_context_.erase(i);
     }
-    
+
     /* apparently passed data buffer to the upper layer */
     void send_up(const gu::Datagram& dg, const ProtoUpMeta& up_meta)
     {
-	if (up_context.empty() == true)
+	if (up_context_.empty() == true)
         {
 	    gu_throw_fatal << this << " up context(s) not set";
 	}
-        
+
         CtxList::iterator i, i_next;
-        for (i = up_context.begin(); i != up_context.end(); i = i_next)
+        for (i = up_context_.begin(); i != up_context_.end(); i = i_next)
         {
             i_next = i, ++i_next;
             (*i)->handle_up(this, dg, up_meta);
         }
     }
-    
+
     /* apparently passes data buffer to lower layer, what is return value? */
     int send_down(gu::Datagram& dg, const ProtoDownMeta& down_meta)
     {
-	if (down_context.empty() == true)
+	if (down_context_.empty() == true)
         {
             log_warn << this << " down context(s) not set";
             return 0;
 	}
-        
+
 	int    ret         = 0;
-        for (CtxList::iterator i = down_context.begin(); 
-             i != down_context.end(); ++i)
+        for (CtxList::iterator i = down_context_.begin();
+             i != down_context_.end(); ++i)
         {
             const size_t hdr_offset(dg.get_header_offset());
             int err = (*i)->handle_down(dg, down_meta);
-            // Verify that lower layer rolls back any modifications to 
+            // Verify that lower layer rolls back any modifications to
             // header
             if (hdr_offset != dg.get_header_offset())
             {
@@ -300,16 +305,27 @@ public:
             }
         }
 	return ret;
-    }    
-    
-    virtual gu::datetime::Date handle_timers() { return gu::datetime::Date::max(); }
-    
+    }
+
+    virtual gu::datetime::Date handle_timers()
+    {
+        return gu::datetime::Date::max();
+    }
+
+    virtual bool set_param(const std::string& key, const std::string& val)
+    {
+        return false;
+    }
+
     const Protolay* get_id() const { return this; }
-    
+
 };
 
 class gcomm::Toplay : public Protolay
 {
+public:
+    Toplay(gu::Config& conf) : Protolay(conf) { }
+private:
     int handle_down(gu::Datagram& dg, const ProtoDownMeta& dm)
     {
 	gu_throw_fatal << "Toplay handle_down() called";
@@ -319,6 +335,9 @@ class gcomm::Toplay : public Protolay
 
 class gcomm::Bottomlay : public Protolay
 {
+public:
+    Bottomlay(gu::Config& conf) : Protolay(conf) { }
+private:
     void handle_up(const void* id, const gu::Datagram&, const ProtoUpMeta& um)
     {
 	gu_throw_fatal << "Bottomlay handle_up() called";

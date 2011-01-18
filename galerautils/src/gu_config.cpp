@@ -150,7 +150,7 @@ gu::Config::overflow_int(long long ret) throw (Exception)
     throw;
 }
 
-std::ostream& operator<<(std::ostream& ost, const gu::Config& c)
+std::ostream& gu::operator<<(std::ostream& ost, const gu::Config& c)
 {
     const gu::Config::param_map_t& pmap = c.params();
 

@@ -247,7 +247,10 @@ namespace gcomm
     class DummyNode : public Toplay
     {
     public:
-        DummyNode(const size_t index_, const std::list<Protolay*>& protos_) :
+        DummyNode(gu::Config& conf,
+                  const size_t index_,
+                  const std::list<Protolay*>& protos_) :
+            Toplay (conf),
             index  (index_),
             uuid   (UUID(static_cast<int32_t>(index))),
             protos (protos_),
@@ -429,15 +432,16 @@ namespace gcomm
     class Channel : public Bottomlay
     {
     public:
-        Channel(const size_t ttl_ = 1,
+        Channel(gu::Config& conf,
+                const size_t ttl_ = 1,
                 const size_t latency_ = 1,
                 const double loss_ = 1.) :
+            Bottomlay(conf),
             ttl(ttl_),
             latency(latency_),
             loss(loss_),
             queue()
-        {
-        }
+        { }
 
 
 

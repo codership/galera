@@ -272,9 +272,25 @@ void gu::URI::_set_authority(const std::string& s)
     modified = true;
 }
 
-void gu::URI::set_query_param(const string& key, const string& val)
+void gu::URI::set_query_param(const string& key, const string& val,
+                              bool override)
 {
-    query_list.insert(make_pair(key, val));
+    if (override == false)
+    {
+        query_list.insert(make_pair(key, val));
+    }
+    else
+    {
+        URIQueryList::iterator i(query_list.find(key));
+        if (i == query_list.end())
+        {
+            query_list.insert(make_pair(key, val));
+        }
+        else
+        {
+            i->second = val;
+        }
+    }
     modified = true;
 }
 

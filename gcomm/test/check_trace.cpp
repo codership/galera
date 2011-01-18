@@ -14,6 +14,8 @@ using namespace std;
 using namespace gu;
 using namespace gcomm;
 
+static gu::Config check_trace_conf;
+
 
 ostream& gcomm::operator<<(ostream& os, const TraceMsg& msg)
 {
@@ -53,7 +55,7 @@ ostream& gcomm::operator<<(ostream& os, const MatrixElem& me)
 ostream& gcomm::operator<<(ostream& os, const PropagationMatrix& prop)
 {
     os << "(";
-    copy(prop.prop.begin(), prop.prop.end(), 
+    copy(prop.prop.begin(), prop.prop.end(),
          ostream_iterator<const ChannelMap::value_type>(os, ","));
     os << ")";
     return os;
@@ -64,24 +66,24 @@ ostream& gcomm::operator<<(ostream& os, const PropagationMatrix& prop)
 class LinkOp
 {
 public:
-    LinkOp(DummyNode& node_, ChannelMap& prop_) : 
+    LinkOp(DummyNode& node_, ChannelMap& prop_) :
         node(node_), prop(prop_) { }
-    
+
     void operator()(NodeMap::value_type& l)
     {
         if (NodeMap::get_key(l) != node.get_index())
         {
             ChannelMap::iterator ii;
             gu_trace(ii = prop.insert_unique(
-                         make_pair(MatrixElem(node.get_index(), 
-                                              NodeMap::get_key(l)), 
-                                   new Channel())));
+                         make_pair(MatrixElem(node.get_index(),
+                                              NodeMap::get_key(l)),
+                                   new Channel(check_trace_conf))));
             gcomm::connect(ChannelMap::get_value(ii), node.get_protos().front());
             gu_trace(ii = prop.insert_unique(
                          make_pair(MatrixElem(NodeMap::get_key(l),
-                                              node.get_index()), 
-                                   new Channel())));
-            gcomm::connect(ChannelMap::get_value(ii), 
+                                              node.get_index()),
+                                   new Channel(check_trace_conf))));
+            gcomm::connect(ChannelMap::get_value(ii),
                            NodeMap::get_value(l)->get_protos().front());
         }
     }
@@ -96,7 +98,7 @@ class PropagateOp
 {
 public:
     PropagateOp(NodeMap& tp_) : tp(tp_) { }
-    
+
     void operator()(ChannelMap::value_type& vt)
     {
         ChannelMsg cmsg(vt.second->get());
@@ -124,8 +126,8 @@ public:
     }
 };
 
-void gcomm::Channel::put(const Datagram& rb, const UUID& source) 
-{ 
+void gcomm::Channel::put(const Datagram& rb, const UUID& source)
+{
     Datagram dg(rb);
 //    if (dg.is_normalized() == false)
     //  {
@@ -176,7 +178,7 @@ void gcomm::PropagationMatrix::insert_tp(DummyNode* t)
 }
 
 
-void gcomm::PropagationMatrix::set_latency(const size_t ii, const size_t jj, 
+void gcomm::PropagationMatrix::set_latency(const size_t ii, const size_t jj,
                                            const size_t lat)
 {
     ChannelMap::iterator i;
@@ -185,7 +187,7 @@ void gcomm::PropagationMatrix::set_latency(const size_t ii, const size_t jj,
 }
 
 
-void gcomm::PropagationMatrix::set_loss(const size_t ii, const size_t jj, 
+void gcomm::PropagationMatrix::set_loss(const size_t ii, const size_t jj,
                                         const double loss)
 {
     ChannelMap::iterator i;
@@ -252,7 +254,7 @@ void gcomm::PropagationMatrix::propagate_until_cvi(bool handle_timers)
 size_t gcomm::PropagationMatrix::count_channel_msgs() const
 {
     size_t ret = 0;
-    for (ChannelMap::const_iterator i = prop.begin(); 
+    for (ChannelMap::const_iterator i = prop.begin();
          i != prop.end(); ++i)
     {
         ret += ChannelMap::get_value(i)->get_n_msgs();
@@ -263,7 +265,7 @@ size_t gcomm::PropagationMatrix::count_channel_msgs() const
 
 bool gcomm::PropagationMatrix::all_in_cvi() const
 {
-    for (map<size_t, DummyNode*>::const_iterator i = tp.begin(); 
+    for (map<size_t, DummyNode*>::const_iterator i = tp.begin();
          i != tp.end(); ++i)
     {
         if (i->second->in_cvi() == false)
@@ -278,7 +280,7 @@ bool gcomm::PropagationMatrix::all_in_cvi() const
 
 static void check_traces(const Trace& t1, const Trace& t2)
 {
-    for (Trace::ViewTraceMap::const_iterator 
+    for (Trace::ViewTraceMap::const_iterator
              i = t1.get_view_traces().begin(); i != t1.get_view_traces().end();
          ++i)
     {
@@ -286,14 +288,14 @@ static void check_traces(const Trace& t1, const Trace& t2)
         ++i_next;
         if (i_next != t1.get_view_traces().end())
         {
-            const Trace::ViewTraceMap::const_iterator 
+            const Trace::ViewTraceMap::const_iterator
                 j(t2.get_view_traces().find(Trace::ViewTraceMap::get_key(i)));
             Trace::ViewTraceMap::const_iterator j_next(j);
             ++j_next;
-            // Note: Comparision is meaningful if also next view is the 
+            // Note: Comparision is meaningful if also next view is the
             //       same.
             // @todo Proper checks for PRIM and NON_PRIM
-            if (j             != t2.get_view_traces().end() && 
+            if (j             != t2.get_view_traces().end() &&
                 j_next        != t2.get_view_traces().end() &&
                 i_next->first == j_next->first              &&
                 i_next->second.get_view().get_members() ==
@@ -302,7 +304,7 @@ static void check_traces(const Trace& t1, const Trace& t2)
                 if (i->first.get_type() != V_NON_PRIM &&
                     i->first.get_type() != V_PRIM)
                 {
-                    gcomm_assert(*i == *j) 
+                    gcomm_assert(*i == *j)
                         << "traces differ: \n\n" << *i << "\n\n" << *j << "\n\n"
                         << "next views: \n\n" << *i_next << "\n\n" << *j_next;
                 }
@@ -319,10 +321,10 @@ class CheckTraceOp
 {
 public:
     CheckTraceOp(const vector<DummyNode*>& nvec_) : nvec(nvec_) { }
-    
+
     void operator()(const DummyNode* n) const
     {
-        for (vector<DummyNode*>::const_iterator i = nvec.begin(); 
+        for (vector<DummyNode*>::const_iterator i = nvec.begin();
              i != nvec.end();
              ++i)
         {
@@ -343,4 +345,4 @@ void gcomm::check_trace(const vector<DummyNode*>& nvec)
 }
 
 
-auto_ptr<Protonet> DummyTransport::dummy_net(Protonet::create("gu"));
+auto_ptr<Protonet> DummyTransport::dummy_net(Protonet::create(check_trace_conf));

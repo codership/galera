@@ -25,9 +25,9 @@ using namespace gu::net;
 using namespace gu::datetime;
 
 
-gcomm::AsioProtonet::AsioProtonet(int version)
+gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
     :
-    gcomm::Protonet("asio", version),
+    gcomm::Protonet(conf, "asio", version),
     mutex_(),
     poll_until_(Date::max()),
     io_service_(),

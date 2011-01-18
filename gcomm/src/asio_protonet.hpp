@@ -26,7 +26,7 @@ class gcomm::AsioProtonet : public gcomm::Protonet
 {
 public:
 
-    AsioProtonet(int version = 0);
+    AsioProtonet(gu::Config& conf, int version = 0);
     ~AsioProtonet();
     void event_loop(const gu::datetime::Period& p);
     void dispatch(const SocketId&,

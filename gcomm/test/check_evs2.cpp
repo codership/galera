@@ -442,19 +442,23 @@ static void single_join(DummyTransport* t, Proto* p)
 class DummyUser : public Toplay
 {
 public:
+    DummyUser(gu::Config& conf) : Toplay(conf) { }
     void handle_up(const void*, const Datagram&, const ProtoUpMeta&)
     {
 
     }
+private:
 };
+
 
 START_TEST(test_proto_single_join)
 {
     log_info << "START";
+    gu::Config conf;
     UUID uuid(1);
     DummyTransport t(uuid);
-    DummyUser u;
-    Proto p(uuid);
+    DummyUser u(conf);
+    Proto p(conf, uuid);
     gcomm::connect(&t, &p);
     gcomm::connect(&p, &u);
     single_join(&t, &p);
@@ -583,10 +587,11 @@ static void double_join(DummyTransport* t1, Proto* p1,
 START_TEST(test_proto_double_join)
 {
     log_info << "START";
+    gu::Config conf;
     UUID uuid1(1), uuid2(2);
     DummyTransport t1(uuid1), t2(uuid2);
-    DummyUser u1, u2;
-    Proto p1(uuid1), p2(uuid2);
+    DummyUser u1(conf), u2(conf);
+    Proto p1(conf, uuid1), p2(conf, uuid2);
 
     gcomm::connect(&t1, &p1);
     gcomm::connect(&p1, &u1);
@@ -600,6 +605,7 @@ START_TEST(test_proto_double_join)
 }
 END_TEST
 
+static gu::Config gu_conf;
 
 static DummyNode* create_dummy_node(size_t idx,
                                     const string& inactive_timeout = "PT1H",
@@ -623,8 +629,8 @@ static DummyNode* create_dummy_node(size_t idx,
     {
         UUID uuid(static_cast<int32_t>(idx));
         protos.push_back(new DummyTransport(uuid, false));
-        protos.push_back(new Proto(uuid, conf));
-        return new DummyNode(idx, protos);
+        protos.push_back(new Proto(gu_conf, uuid, conf));
+        return new DummyNode(gu_conf, idx, protos);
     }
     catch (...)
     {

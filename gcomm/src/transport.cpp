@@ -8,9 +8,6 @@
 #include "pc.hpp"
 #include "gcomm/conf.hpp"
 
-using namespace std;
-
-using namespace gu;
 
 // Private methods
 
@@ -32,13 +29,13 @@ const gcomm::UUID& gcomm::Transport::get_uuid() const
     throw;
 }
 
-string gcomm::Transport::get_local_addr() const
+std::string gcomm::Transport::get_local_addr() const
 {
     gu_throw_fatal << "get local url not supported";
     throw;
 }
 
-string gcomm::Transport::get_remote_addr() const
+std::string gcomm::Transport::get_remote_addr() const
 {
     gu_throw_fatal << "get remote url not supported";
     throw;
@@ -70,7 +67,9 @@ gcomm::Transport* gcomm::Transport::accept()
 
 // CTOR/DTOR
 
-gcomm::Transport::Transport(Protonet& pnet, const URI& uri) :
+gcomm::Transport::Transport(Protonet& pnet, const gu::URI& uri)
+    :
+    Protolay(pnet.conf()),
     pstack_(),
     pnet_(pnet),
     uri_(uri),
@@ -78,9 +77,9 @@ gcomm::Transport::Transport(Protonet& pnet, const URI& uri) :
     error_no_(0)
 { }
 
-gcomm::Transport::~Transport() {}
 
-
+gcomm::Transport::~Transport()
+{ }
 
 
 gcomm::Transport*
@@ -98,13 +97,14 @@ gcomm::Transport::create(Protonet& pnet, const gu::URI& uri)
         return new PC(pnet, uri);
     }
 
-    gu_throw_fatal << "scheme not supported";
+    gu_throw_fatal << "scheme '" << uri.get_scheme() << "' not supported";
 
     throw; // to make compiler happy
 }
 
+
 gcomm::Transport*
-gcomm::Transport::create(Protonet& pnet, const string& uri_str)
+gcomm::Transport::create(Protonet& pnet, const std::string& uri_str)
 {
-    return create(pnet, URI(uri_str));
+    return create(pnet, gu::URI(uri_str));
 }

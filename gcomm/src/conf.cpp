@@ -6,6 +6,10 @@
 
 static std::string const Delim = ".";
 
+// Protonet
+std::string const gcomm::Conf::ProtonetBackend("protonet.backend");
+std::string const gcomm::Conf::ProtonetVersion("protonet.version");
+
 // TCP
 std::string const gcomm::Conf::TcpScheme = "tcp";
 std::string const gcomm::Conf::UdpScheme = "udp";

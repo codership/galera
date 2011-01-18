@@ -1011,3 +1011,15 @@ int gcomm::pc::Proto::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 
     return ret;
 }
+
+
+bool gcomm::pc::Proto::set_param(const std::string& key,
+                                 const std::string& value)
+{
+    if (key == gcomm::Conf::PcAllowSb)
+    {
+        allow_sb_ = gu::from_string<bool>(value);
+        return true;
+    }
+    return false;
+}

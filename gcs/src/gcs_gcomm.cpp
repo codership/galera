@@ -149,16 +149,14 @@ class GCommConn : public Consumer, public Toplay
 public:
 
     GCommConn(const URI& u, gu::Config& cnf) :
+        Toplay(cnf),
         conf(cnf),
         uuid(),
         thd(),
         uri(u),
         use_prod_cons(from_string<bool>(
                           uri.get_option("gcomm.use_prod_cons", "false"))),
-        net(Protonet::create(
-                uri.get_option("gcomm.protonet_backend", "asio"),
-                gu::from_string<int>(
-                    uri.get_option("protonet.version", "0")))),
+        net(Protonet::create(conf)),
         tp(0),
         mutex(),
         refcnt(0),
@@ -256,17 +254,18 @@ public:
         terminated = true;
         net->interrupt();
     }
-    
+
     void handle_up     (const void*        id,
                         const Datagram&    dg,
                         const ProtoUpMeta& um);
 
     void queue_and_wait(const Message& msg, Message* ack);
 
-    RecvBuf&  get_recv_buf()            { return recv_buf; }
-    size_t    get_mtu()           const { return tp->get_mtu(); }
-    bool      get_use_prod_cons() const { return use_prod_cons; }
-    Protonet& get_pnet()                { return *net; }
+    RecvBuf&    get_recv_buf()            { return recv_buf; }
+    size_t      get_mtu()           const { return tp->get_mtu(); }
+    bool        get_use_prod_cons() const { return use_prod_cons; }
+    Protonet&   get_pnet()                { return *net; }
+    gu::Config& get_conf()                { return conf; }
 
     class Ref
     {
@@ -662,7 +661,37 @@ static GCS_BACKEND_DESTROY_FN(gcomm_destroy)
 static
 GCS_BACKEND_PARAM_SET_FN(gcomm_param_set)
 {
-    return 1;
+    GCommConn::Ref ref(backend);
+    if (ref.get() == 0)
+    {
+        return -EBADFD;
+    }
+
+    GCommConn& conn(*ref.get());
+    try
+    {
+        gcomm::Critical<Protonet> crit(conn.get_pnet());
+        if (conn.get_pnet().set_param(key, value) == false)
+        {
+            log_warn << "param " << key << " not recognized";
+            return 1;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+    catch (gu::Exception& e)
+    {
+        log_warn << "error setting param " << key << " to value " << value
+                 << ": " << e.what();
+        return -e.get_errno();
+    }
+    catch (...)
+    {
+        log_fatal << "gcomm param set: caught unknown exception";
+        return -ENOTRECOVERABLE;
+    }
 }
 
 
@@ -671,6 +700,9 @@ GCS_BACKEND_PARAM_GET_FN(gcomm_param_get)
 {
     return NULL;
 }
+
+
+
 
 
 GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
@@ -686,7 +718,8 @@ GCS_BACKEND_CREATE_FN(gcs_gcomm_create)
     try
     {
         gu::URI uri(std::string("pc://") + socket);
-        conn = new GCommConn(uri, *(reinterpret_cast<gu::Config*>(cnf)));
+        gu::Config& conf(*reinterpret_cast<gu::Config*>(cnf));
+        conn = new GCommConn(uri, conf);
     }
     catch (Exception& e)
     {

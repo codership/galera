@@ -40,10 +40,10 @@ void gcomm::GuProtonet::event_loop(const Period& p)
         if (sleep_p < 0)
             sleep_p = 0;
 
-        NetworkEvent ev(net.wait_event(sleep_p, false));
+        NetworkEvent ev(net_.wait_event(sleep_p, false));
         if ((ev.get_event_mask() & E_OUT) != 0)
         {
-            Lock lock(mutex);
+            Lock lock(mutex_);
             ev.get_socket()->send();
         }
         else if ((ev.get_event_mask() & E_EMPTY) == 0)
@@ -60,7 +60,7 @@ void gcomm::GuProtonet::event_loop(const Period& p)
                              || s.get_state() == gu::net::Socket::S_FAILED);
             }
 
-            Lock lock(mutex);
+            Lock lock(mutex_);
             ProtoUpMeta up_um(s.get_errno());
             Datagram up_dg(dg != 0 ? *dg : Datagram());
             for (deque<Protostack*>::iterator i = protos_.begin();
@@ -69,10 +69,10 @@ void gcomm::GuProtonet::event_loop(const Period& p)
                 (*i)->dispatch(ev.get_socket(), up_dg, up_um);
             }
         }
-        Lock lock(mutex);
-        if (interrupted == true)
+        Lock lock(mutex_);
+        if (interrupted_ == true)
         {
-            interrupted = false;
+            interrupted_ = false;
             break;
         }
     }

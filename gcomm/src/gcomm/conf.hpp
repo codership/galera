@@ -11,6 +11,7 @@
 #ifndef GCOMM_CONF_HPP
 #define GCOMM_CONF_HPP
 
+#include "gu_config.hpp"
 #include "gu_uri.hpp"
 #include "gu_throw.hpp"
 
@@ -43,6 +44,9 @@ namespace gcomm
      */
     struct Conf
     {
+        static std::string const ProtonetBackend;
+        static std::string const ProtonetVersion;
+
         /*!
          * @brief TCP scheme for transport URI ("tcp")
          */
@@ -393,6 +397,35 @@ namespace gcomm
                                                  const T& max_value)
     {
         return _conf_param(uri, param, &default_value, &min_value, &max_value);
+    }
+
+
+
+    template <typename T>
+    T param(gu::Config&        conf,
+            const gu::URI&     uri,
+            const std::string& key,
+            const std::string& def,
+            std::ios_base& (*f)(std::ios_base&) = std::dec)
+    {
+        std::string ret(def);
+        ret = conf.get(key, ret);
+        return gu::from_string<T>(uri.get_option(key, ret), f);
+    }
+
+    template <typename T>
+    T check_range(const std::string& key,
+                  const T&           val,
+                  const T&           min,
+                  const T&           max)
+    {
+        if (val < min || val >= max)
+        {
+            gu_throw_error(EINVAL) << "param '" << key << "' value " << val
+                                   << " out of range [" << min
+                                   << "," << max << ")";
+        }
+        return val;
     }
 
 } // namespace gcomm
