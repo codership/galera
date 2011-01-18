@@ -95,10 +95,24 @@ public:
         return i->second;
     }
 
+    const std::string&
+    get(const std::string& key, const std::string& def) const throw (Exception)
+    {
+        try               { return get(key); }
+        catch (NotFound&) { return def     ; }
+    }
+
     template <typename T> inline T
     get (const std::string& key) const throw (NotFound, Exception)
     {
         return from_config <T> (get(key));
+    }
+
+    template <typename T> inline T
+    get(const std::string& key, const T& def) const throw (Exception)
+    {
+        try { return get<T>(key); }
+        catch (NotFound&) { return def; }
     }
 
     const param_map_t& params () const throw() { return params_; }
@@ -123,7 +137,7 @@ private:
     param_map_t params_;
 };
 
-std::ostream& operator<<(std::ostream&, const gu::Config&);
+
 
 extern "C" const char* gu_str2dbl  (const char* str, double* dbl);
 extern "C" const char* gu_str2bool (const char* str, bool*   bl);
@@ -131,6 +145,7 @@ extern "C" const char* gu_str2ptr  (const char* str, void**  ptr);
 
 namespace gu
 {
+    std::ostream& operator<<(std::ostream&, const gu::Config&);
     /*! Specialized templates for "funny" types */
 
     template <> inline double

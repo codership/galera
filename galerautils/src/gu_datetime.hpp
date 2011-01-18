@@ -62,6 +62,9 @@ namespace gu
 
             Period(const long long nsecs_) : nsecs(nsecs_) { }
 
+            static Period min() { return 0; }
+            static Period max() { return std::numeric_limits<long long>::max();}
+
             bool operator==(const Period& cmp) const
             { return (nsecs == cmp.nsecs); }
 
@@ -178,6 +181,13 @@ namespace gu
          * @brief Output operator for Period type.
          */
         std::ostream& operator<<(std::ostream&, const Period&);
+
+        inline std::string to_string(const Period& p)
+        {
+            std::ostringstream os;
+            os << p;
+            return os.str();
+        }
 
         inline std::istream& operator>>(std::istream& is, Period& p)
         {

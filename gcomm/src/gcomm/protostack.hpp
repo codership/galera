@@ -31,6 +31,7 @@ public:
     gu::datetime::Date handle_timers();
     void dispatch(const void* id, const gu::Datagram& dg,
                   const ProtoUpMeta& um);
+    bool set_param(const std::string&, const std::string&);
     void enter() { mutex_.lock(); }
     void leave() { mutex_.unlock(); }
 private:

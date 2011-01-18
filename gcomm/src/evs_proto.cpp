@@ -40,14 +40,20 @@ using namespace gcomm::evs;
     else log_info << self_string() << ": "
 
 
+// const int gcomm::evs::Proto::max_version_(GCOMM_EVS_MAX_VERSION);
 
-gcomm::evs::Proto::Proto(const UUID& my_uuid_, const gu::URI& uri,
+gcomm::evs::Proto::Proto(gu::Config& conf,
+                         const UUID& my_uuid_,
+                         const gu::URI& uri,
                          const size_t mtu_)
     :
+    Protolay(conf),
     timers(),
-    version(gu::from_string<int>(uri.get_option(Conf::EvsVersion, "0"))),
-    debug_mask(D_STATE | D_INSTALL_MSGS),
-    info_mask(0),
+    version(check_range(Conf::EvsVersion,
+                        param<int>(conf, uri, Conf::EvsVersion, "0"),
+                        0, max_version_ + 1)),
+    debug_mask(param<int>(conf, uri, Conf::EvsDebugLogMask, "0x1", std::hex)),
+    info_mask(param<int>(conf, uri, Conf::EvsInfoLogMask, "0x0", std::hex)),
     last_stats_report(Date::now()),
     collect_stats(true),
     hs_agreed("0.0,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.5,1.,5.,10.,30."),
@@ -74,15 +80,58 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const gu::URI& uri,
     my_uuid(my_uuid_),
     known(),
     self_i(),
-    view_forget_timeout   (),
-    inactive_timeout      (),
-    suspect_timeout       (),
-    inactive_check_period (),
-    consensus_timeout     (),
-    install_timeout       (),
-    retrans_period        (),
-    join_retrans_period   (),
-    stats_report_period   (),
+    view_forget_timeout(
+        check_range(Conf::EvsViewForgetTimeout,
+                    param<Period>(conf, uri, Conf::EvsViewForgetTimeout,
+                                  Defaults::EvsViewForgetTimeout),
+                    gu::from_string<Period>(Defaults::EvsViewForgetTimeoutMin),
+                    Period::max())),
+    inactive_timeout(
+        check_range(Conf::EvsInactiveTimeout,
+                    param<Period>(conf, uri, Conf::EvsInactiveTimeout,
+                                  Defaults::EvsInactiveTimeout),
+                    gu::from_string<Period>(Defaults::EvsInactiveTimeoutMin),
+                    Period::max())),
+    suspect_timeout(
+        check_range(Conf::EvsSuspectTimeout,
+                    param<Period>(conf, uri, Conf::EvsSuspectTimeout,
+                                  Defaults::EvsSuspectTimeout),
+                    gu::from_string<Period>(Defaults::EvsSuspectTimeoutMin),
+                    Period::max())),
+    inactive_check_period(
+        check_range(Conf::EvsInactiveCheckPeriod,
+                    param<Period>(conf, uri, Conf::EvsInactiveCheckPeriod,
+                                  Defaults::EvsInactiveCheckPeriod),
+                    Period::min(),
+                    suspect_timeout/2 + 1)),
+    consensus_timeout(
+        check_range(Conf::EvsConsensusTimeout,
+                    param<Period>(conf, uri, Conf::EvsConsensusTimeout,
+                                  Defaults::EvsConsensusTimeout),
+                    inactive_timeout, inactive_timeout*5 + 1)),
+    retrans_period(
+        check_range(Conf::EvsKeepalivePeriod,
+                    param<Period>(conf, uri, Conf::EvsKeepalivePeriod,
+                                  Defaults::EvsRetransPeriod),
+                    gu::from_string<Period>(Defaults::EvsRetransPeriodMin),
+                    suspect_timeout/3 + 1)),
+    install_timeout(
+        check_range(Conf::EvsInstallTimeout,
+                    param<Period>(conf, uri, Conf::EvsInstallTimeout,
+                                  gu::to_string(inactive_timeout)),
+                    retrans_period*2, inactive_timeout + 1)),
+    join_retrans_period(
+        check_range(Conf::EvsJoinRetransPeriod,
+                    param<Period>(conf, uri, Conf::EvsJoinRetransPeriod,
+                                  Defaults::EvsJoinRetransPeriod),
+                    gu::from_string<Period>(Defaults::EvsRetransPeriodMin),
+                    Period::max())),
+    stats_report_period(
+        check_range(Conf::EvsStatsReportPeriod,
+                    param<Period>(conf, uri, Conf::EvsStatsReportPeriod,
+                                  Defaults::EvsStatsReportPeriod),
+                    gu::from_string<Period>(Defaults::EvsStatsReportPeriodMin),
+                    Period::max())),
     last_inactive_check   (gu::datetime::Date::now()),
     current_view(ViewId(V_TRANS, my_uuid, 0)),
     previous_view(),
@@ -95,101 +144,47 @@ gcomm::evs::Proto::Proto(const UUID& my_uuid_, const gu::URI& uri,
     attempt_seq(1),
     fifo_seq(-1),
     last_sent(-1),
-    send_window(8),
-    user_send_window(3),
+    send_window(
+        check_range(Conf::EvsSendWindow,
+                    param<seqno_t>(conf, uri, Conf::EvsSendWindow,
+                                   Defaults::EvsSendWindow),
+                    gu::from_string<seqno_t>(Defaults::EvsSendWindowMin),
+                    std::numeric_limits<seqno_t>::max())),
+    user_send_window(
+        check_range(Conf::EvsUserSendWindow,
+                    param<seqno_t>(conf, uri, Conf::EvsUserSendWindow,
+                                   Defaults::EvsUserSendWindow),
+                    gu::from_string<seqno_t>(Defaults::EvsUserSendWindowMin),
+                    send_window + 1)),
     output(),
     send_buf_(),
     max_output_size(128),
     mtu(mtu_),
-    use_aggregate(true),
+    use_aggregate(param<bool>(conf, uri, Conf::EvsUseAggregate, "true")),
     self_loopback(false),
     state(S_CLOSED),
     shift_to_rfcnt(0)
 {
-    if (version > max_version_)
-    {
-        gu_throw_error(EINVAL) << "invalid evs version " << version;
-    }
-
     log_info << "EVS version " << version;
 
-    view_forget_timeout =
-        conf_param_def_min(uri,
-                           Conf::EvsViewForgetTimeout,
-                           Period(Defaults::EvsViewForgetTimeout),
-                           Period(Defaults::EvsViewForgetTimeoutMin));
-    suspect_timeout =
-        conf_param_def_min(uri,
-                           Conf::EvsSuspectTimeout,
-                           Period(Defaults::EvsSuspectTimeout),
-                           Period(Defaults::EvsSuspectTimeoutMin));
-    inactive_timeout =
-        conf_param_def_min(uri,
-                           Conf::EvsInactiveTimeout,
-                           Period(Defaults::EvsInactiveTimeout),
-                           Period(Defaults::EvsInactiveTimeoutMin));
-    retrans_period =
-        conf_param_def_range(uri,
-                             Conf::EvsKeepalivePeriod,
-                             Period(Defaults::EvsRetransPeriod),
-                             Period(Defaults::EvsRetransPeriodMin),
-                             suspect_timeout/3);
-    inactive_check_period =
-        conf_param_def_max(uri,
-                           Conf::EvsInactiveCheckPeriod,
-                           Period(Defaults::EvsInactiveCheckPeriod),
-                           suspect_timeout/2);
-    consensus_timeout =
-        conf_param_def_range(uri,
-                             Conf::EvsConsensusTimeout,
-                             Period(Defaults::EvsConsensusTimeout),
-                             inactive_timeout,
-                             inactive_timeout*5);
-    install_timeout =
-        conf_param_def_range(uri,
-                             Conf::EvsInstallTimeout,
-                             inactive_timeout,
-                             retrans_period*2,
-                             inactive_timeout);
-    join_retrans_period =
-        conf_param_def_range(uri,
-                             Conf::EvsJoinRetransPeriod,
-                             Period(Defaults::EvsJoinRetransPeriod),
-                             Period(Defaults::EvsRetransPeriodMin),
-                             suspect_timeout/3);
-    stats_report_period =
-        conf_param_def_min(uri,
-                           Conf::EvsStatsReportPeriod,
-                           Period(Defaults::EvsStatsReportPeriod),
-                           Period(Defaults::EvsStatsReportPeriodMin));
+    conf.set(Conf::EvsVersion, gu::to_string(version));
+    conf.set(Conf::EvsViewForgetTimeout, gu::to_string(view_forget_timeout));
+    conf.set(Conf::EvsSuspectTimeout, gu::to_string(suspect_timeout));
+    conf.set(Conf::EvsInactiveTimeout, gu::to_string(inactive_timeout));
+    conf.set(Conf::EvsKeepalivePeriod, gu::to_string(retrans_period));
+    conf.set(Conf::EvsInactiveCheckPeriod,
+             gu::to_string(inactive_check_period));
+    conf.set(Conf::EvsConsensusTimeout, gu::to_string(consensus_timeout));
+    conf.set(Conf::EvsJoinRetransPeriod, gu::to_string(join_retrans_period));
+    conf.set(Conf::EvsInstallTimeout, gu::to_string(install_timeout));
+    conf.set(Conf::EvsStatsReportPeriod, gu::to_string(stats_report_period));
+    conf.set(Conf::EvsSendWindow, gu::to_string(send_window));
+    conf.set(Conf::EvsUserSendWindow, gu::to_string(user_send_window));
+    conf.set(Conf::EvsUseAggregate, gu::to_string(use_aggregate));
+    conf.set(Conf::EvsDebugLogMask, gu::to_string(debug_mask, std::hex));
+    conf.set(Conf::EvsInfoLogMask, gu::to_string(info_mask, std::hex));
 
-    send_window =
-        conf_param_def_min(uri,
-                           Conf::EvsSendWindow,
-                           from_string<seqno_t>(Defaults::EvsSendWindow),
-                           from_string<seqno_t>(Defaults::EvsSendWindowMin));
-    user_send_window =
-        conf_param_def_range(uri,
-                             Conf::EvsUserSendWindow,
-                             from_string<seqno_t>(Defaults::EvsUserSendWindow),
-                             from_string<seqno_t>(Defaults::EvsUserSendWindowMin),
-                             send_window);
-    use_aggregate =
-        conf_param_def(uri,
-                       Conf::EvsUseAggregate,
-                       true);
-
-    try
-    {
-        const string& dlm_str(uri.get_option(Conf::EvsDebugLogMask));
-        debug_mask = gu::from_string<int>(dlm_str, hex);
-    } catch (NotFound&) { }
-
-    try
-    {
-        const string& ilm_str(uri.get_option(Conf::EvsInfoLogMask));
-        info_mask = gu::from_string<int>(ilm_str, hex);
-    } catch (NotFound&) { }
+    //
 
     known.insert_unique(make_pair(my_uuid, Node(inactive_timeout, suspect_timeout)));
     self_i = known.begin();

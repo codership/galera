@@ -29,10 +29,16 @@ class gcomm::GuProtonet : public Protonet
 {
 public:
 
-    GuProtonet(int version = 0) : Protonet("gu", version), net(version), mutex(), interrupted(false) { }
+    GuProtonet(gu::Config& conf, int version = 0)
+        :
+        Protonet    (conf, "gu", version),
+        net_        (version),
+        mutex_      (),
+        interrupted_(false)
+    { }
     ~GuProtonet() { }
 
-    gu::net::Network& get_net() { return net; }
+    gu::net::Network& get_net() { return net_; }
 
     void insert(Protostack* pstack);
     void erase (Protostack* pstack);
@@ -44,22 +50,22 @@ public:
 
     void interrupt()
     {
-        gu::Lock lock(mutex);
-        interrupted = true;
-        net.interrupt();
+        gu::Lock lock(mutex_);
+        interrupted_ = true;
+        net_.interrupt();
     }
 
-    gu::Mutex& get_mutex() { return mutex; }
-    void enter() { mutex.lock(); }
-    void leave() { mutex.unlock(); }
+    gu::Mutex& get_mutex() { return mutex_; }
+    void enter() { mutex_.lock(); }
+    void leave() { mutex_.unlock(); }
 
 private:
 
     GuProtonet(const GuProtonet&);
     void operator=(const GuProtonet&);
-    gu::net::Network net;
-    gu::Mutex mutex;
-    bool interrupted;
+    gu::net::Network net_;
+    gu::Mutex        mutex_;
+    bool             interrupted_;
 };
 
 
@@ -67,9 +73,10 @@ class gcomm::GuSocket : public gcomm::Socket
 {
 public:
 
-    GuSocket(GuProtonet& net, const gu::URI& uri) :
-        Socket(uri),
-        net_(net),
+    GuSocket(GuProtonet& net, const gu::URI& uri)
+        :
+        Socket (uri),
+        net_   (net),
         socket_(0)
     { }
 
@@ -163,8 +170,8 @@ public:
     GuAcceptor(GuProtonet& net, const gu::URI& uri)
         :
         Acceptor(uri),
-        net_(net),
-        socket_(0)
+        net_    (net),
+        socket_ (0)
     { }
 
     void listen(const gu::URI& uri)

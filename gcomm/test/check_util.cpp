@@ -56,7 +56,8 @@ END_TEST
 #if defined(HAVE_ASIO_HPP)
 START_TEST(test_asio)
 {
-    AsioProtonet pn;
+    gu::Config conf;
+    AsioProtonet pn(conf);
     const string uri_str("tcp://localhost:10001");
 
     Acceptor* acc = pn.acceptor(uri_str);
@@ -90,7 +91,8 @@ END_TEST
 
 START_TEST(test_protonet)
 {
-    Protonet* pn(Protonet::create("gu"));
+    gu::Config conf;
+    Protonet* pn(Protonet::create(conf));
     pn->event_loop(1);
 }
 END_TEST

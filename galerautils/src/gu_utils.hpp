@@ -23,15 +23,20 @@ namespace gu {
  * String conversion functions for primitive types 
  */
 /*! Generic to_string() template function */
-template <typename T> inline std::string to_string(const T& x)
+template <typename T>
+inline std::string to_string(const T& x,
+                             std::ios_base& (*f)(std::ios_base&) = std::dec)
 {
     std::ostringstream out;
-    out << x;
+    out << std::showbase << f << x;
     return out.str();
 }
 
+
 /*! Specialized template: make bool translate into 'true' or 'false' */
-template <> inline std::string to_string<bool>(const bool& x)
+template <>
+inline std::string to_string<bool>(const bool& x,
+                                   std::ios_base& (*f)(std::ios_base&))
 {
     std::ostringstream out;
     out << std::boolalpha << x;
@@ -39,7 +44,9 @@ template <> inline std::string to_string<bool>(const bool& x)
 }
 
 /*! Specialized template: make double to print with full precision */
-template <> inline std::string to_string<double>(const double& x)
+template <>
+inline std::string to_string<double>(const double& x,
+                                     std::ios_base& (*f)(std::ios_base&))
 {
     const int sigdigits = std::numeric_limits<double>::digits10;
     // or perhaps std::numeric_limits<double>::max_digits10?
@@ -59,6 +66,15 @@ from_string(const std::string& s,
     if ((iss >> f >> ret).fail()) throw NotFound();
 
     return ret;
+}
+
+/*! Specialized template for reading strings. This is to avoid throwing
+ *  NotFound in case of empty string. */
+template <> inline std::string
+from_string<std::string>(const std::string& s,
+                         std::ios_base& (*f)(std::ios_base&))
+{
+    return s;
 }
 
 /*! Specialized template for reading pointers. Default base is hex */

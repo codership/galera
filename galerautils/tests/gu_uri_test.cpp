@@ -110,7 +110,7 @@ START_TEST (uri_test1) // checking normal URI
             fail ("Authority not set in '%s'", uri_str.c_str());
         }
 
-        URIQueryList ql = uri._get_query_list();
+        URIQueryList ql = uri.get_query_list();
 
         fail_if (ql.size() != 2, "Query list size %zu, expected 2", ql.size());
 
@@ -182,7 +182,7 @@ START_TEST (uri_test2) // checking corner cases
         try { uri.get_fragment(); fail ("Fragment should be unset"); }
         catch (NotSet&) {}
 
-        fail_if (uri._get_query_list().size() != 0, "Query list must be empty");
+        fail_if (uri.get_query_list().size() != 0, "Query list must be empty");
     }
     catch (Exception& e)
     {
@@ -302,20 +302,20 @@ START_TEST (uri_test3) // Test from gcomm
     fail_unless(simple_valid1.get_scheme()    == "http");
     fail_unless(simple_valid1.get_authority() == "example.com");
     fail_unless(simple_valid1.get_path()      == "");
-    fail_unless(simple_valid1._get_query_list().size() == 0);
+    fail_unless(simple_valid1.get_query_list().size() == 0);
 
     URI with_path("http://example.com/path/to/file.html");
     fail_unless(with_path.get_scheme()    == "http");
     fail_unless(with_path.get_authority() == "example.com");
     fail_unless(with_path.get_path()      == "/path/to/file.html");
-    fail_unless(with_path._get_query_list().size() == 0);
+    fail_unless(with_path.get_query_list().size() == 0);
 
     URI with_query("http://example.com?key1=val1&key2=val2");
     fail_unless(with_query.get_scheme()    == "http");
     fail_unless(with_query.get_authority() == "example.com");
     fail_unless(with_query.get_path()      == "");
 
-    const URIQueryList& qlist = with_query._get_query_list();
+    const URIQueryList& qlist = with_query.get_query_list();
     fail_unless(qlist.size() == 2);
 
     URIQueryList::const_iterator i;
@@ -328,7 +328,7 @@ START_TEST (uri_test3) // Test from gcomm
     fail_unless(with_uri_in_query.get_scheme()    == "gcomm+gmcast");
     fail_unless(with_uri_in_query.get_authority() == "localhost:10001");
 
-    const URIQueryList& qlist2 = with_uri_in_query._get_query_list();
+    const URIQueryList& qlist2 = with_uri_in_query.get_query_list();
     fail_unless(qlist2.size() == 2);
 
     pair<URIQueryList::const_iterator, URIQueryList::const_iterator> ii;

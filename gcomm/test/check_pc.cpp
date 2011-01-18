@@ -27,8 +27,6 @@ using namespace gu::datetime;
 using namespace gcomm;
 using namespace gcomm::pc;
 
-static const string pnet_backend("gu");
-
 
 START_TEST(test_pc_messages)
 {
@@ -93,7 +91,9 @@ public:
     UUID uuid;
     DummyTransport* tp;
     Proto* pc;
-    PCUser(const UUID& uuid_, DummyTransport *tp_, Proto* pc_) :
+    PCUser(gu::Config& conf, const UUID& uuid_,
+           DummyTransport *tp_, Proto* pc_) :
+        Toplay(conf),
         views(),
         uuid(uuid_),
         tp(tp_),
@@ -197,10 +197,11 @@ void single_boot(PCUser* pu1)
 
 START_TEST(test_pc_view_changes_single)
 {
+    gu::Config conf;
     UUID uuid1(0, 0);
-    Proto pc1(uuid1);
+    Proto pc1(conf, uuid1);
     DummyTransport tp1;
-    PCUser pu1(uuid1, &tp1, &pc1);
+    PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
 }
@@ -296,18 +297,19 @@ static void double_boot(PCUser* pu1, PCUser* pu2)
 
 START_TEST(test_pc_view_changes_double)
 {
+    gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(uuid1);
+    Proto pc1(conf, uuid1);
     DummyTransport tp1;
-    PCUser pu1(uuid1, &tp1, &pc1);
+    PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(uuid2);
+    Proto pc2(conf, uuid2);
     DummyTransport tp2;
-    PCUser pu2(uuid2, &tp2, &pc2);
+    PCUser pu2(conf, uuid2, &tp2, &pc2);
 
     double_boot(&pu1, &pu2);
 
@@ -353,18 +355,19 @@ END_TEST
 /* Test that UUID ordering does not matter when starting nodes */
 START_TEST(test_pc_view_changes_reverse)
 {
+    gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(uuid1);
+    Proto pc1(conf, uuid1);
     DummyTransport tp1;
-    PCUser pu1(uuid1, &tp1, &pc1);
+    PCUser pu1(conf, uuid1, &tp1, &pc1);
 
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(uuid2);
+    Proto pc2(conf, uuid2);
     DummyTransport tp2;
-    PCUser pu2(uuid2, &tp2, &pc2);
+    PCUser pu2(conf, uuid2, &tp2, &pc2);
 
     single_boot(&pu2);
     double_boot(&pu2, &pu1);
@@ -375,18 +378,19 @@ END_TEST
 
 START_TEST(test_pc_state1)
 {
+    gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(uuid1);
+    Proto pc1(conf, uuid1);
     DummyTransport tp1;
-    PCUser pu1(uuid1, &tp1, &pc1);
+    PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(uuid2);
+    Proto pc2(conf, uuid2);
     DummyTransport tp2;
-    PCUser pu2(uuid2, &tp2, &pc2);
+    PCUser pu2(conf, uuid2, &tp2, &pc2);
 
     // n1: PRIM -> TRANS -> STATES_EXCH -> RTR -> PRIM
     // n2: JOINING -> STATES_EXCH -> RTR -> PRIM
@@ -511,18 +515,19 @@ END_TEST
 
 START_TEST(test_pc_state2)
 {
+    gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(uuid1);
+    Proto pc1(conf, uuid1);
     DummyTransport tp1;
-    PCUser pu1(uuid1, &tp1, &pc1);
+    PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(uuid2);
+    Proto pc2(conf, uuid2);
     DummyTransport tp2;
-    PCUser pu2(uuid2, &tp2, &pc2);
+    PCUser pu2(conf, uuid2, &tp2, &pc2);
 
     // n1: PRIM -> TRANS -> STATES_EXCH -> RTR -> PRIM
     // n2: JOINING -> STATES_EXCH -> RTR -> PRIM
@@ -632,18 +637,19 @@ END_TEST
 START_TEST(test_pc_state3)
 {
     log_info << "START";
+    gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(uuid1);
+    Proto pc1(conf, uuid1);
     DummyTransport tp1;
-    PCUser pu1(uuid1, &tp1, &pc1);
+    PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(uuid2);
+    Proto pc2(conf, uuid2);
     DummyTransport tp2;
-    PCUser pu2(uuid2, &tp2, &pc2);
+    PCUser pu2(conf, uuid2, &tp2, &pc2);
 
     // n1: PRIM -> TRANS -> STATES_EXCH -> RTR -> PRIM
     // n2: JOINING -> STATES_EXCH -> RTR -> PRIM
@@ -755,18 +761,19 @@ END_TEST
 START_TEST(test_pc_conflicting_prims)
 {
     log_info << "START";
+    gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(uuid1);
+    Proto pc1(conf, uuid1);
     DummyTransport tp1;
-    PCUser pu1(uuid1, &tp1, &pc1);
+    PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(uuid2);
+    Proto pc2(conf, uuid2);
     DummyTransport tp2;
-    PCUser pu2(uuid2, &tp2, &pc2);
+    PCUser pu2(conf, uuid2, &tp2, &pc2);
     single_boot(&pu2);
 
     View tr1(ViewId(V_TRANS, pu1.pc->get_current_view().get_id()));
@@ -827,18 +834,19 @@ END_TEST
 START_TEST(test_pc_conflicting_prims_npvo)
 {
     log_info << "START";
+    gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(uuid1, URI("pc://?pc.npvo=true"));
+    Proto pc1(conf, uuid1, URI("pc://?pc.npvo=true"));
     DummyTransport tp1;
-    PCUser pu1(uuid1, &tp1, &pc1);
+    PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     UUID uuid2(2);
     ProtoUpMeta pum2(uuid2);
-    Proto pc2(uuid2, URI("pc://?pc.npvo=true"));
+    Proto pc2(conf, uuid2, URI("pc://?pc.npvo=true"));
     DummyTransport tp2;
-    PCUser pu2(uuid2, &tp2, &pc2);
+    PCUser pu2(conf, uuid2, &tp2, &pc2);
     single_boot(&pu2);
 
     View tr1(ViewId(V_TRANS, pu1.pc->get_current_view().get_id()));
@@ -926,6 +934,8 @@ static void set_cvi(vector<DummyNode*>& nvec, size_t i_begin, size_t i_end,
     }
 }
 
+static gu::Config gu_conf;
+
 static DummyNode* create_dummy_node(size_t idx,
                                     const string& inactive_timeout = "PT1H",
                                     const string& retrans_period = "PT1H")
@@ -941,9 +951,9 @@ static DummyNode* create_dummy_node(size_t idx,
     {
         UUID uuid(static_cast<int32_t>(idx));
         protos.push_back(new DummyTransport(uuid, false));
-        protos.push_back(new evs::Proto(uuid, conf));
-        protos.push_back(new Proto(uuid));
-        return new DummyNode(idx, protos);
+        protos.push_back(new evs::Proto(gu_conf, uuid, conf));
+        protos.push_back(new Proto(gu_conf, uuid));
+        return new DummyNode(gu_conf, idx, protos);
     }
     catch (...)
     {
@@ -1153,6 +1163,7 @@ class PCUser2 : public Toplay
     void operator=(const PCUser2);
 public:
     PCUser2(Protonet& net, const string& uri, const bool send_ = true) :
+        Toplay(net.conf()),
         tp(Transport::create(net, uri)),
         sending(false),
         my_type(static_cast<uint8_t>(1 + ::rand()%4)),
@@ -1233,7 +1244,8 @@ public:
 
 START_TEST(test_pc_transport)
 {
-    auto_ptr<Protonet> net(Protonet::create(pnet_backend));
+    gu::Config conf;
+    auto_ptr<Protonet> net(Protonet::create(conf));
     PCUser2 pu1(*net,
                 "pc://?"
                 "evs.info_log_mask=0xff&"
@@ -1284,8 +1296,10 @@ END_TEST
 
 START_TEST(test_trac_191)
 {
+
+    gu::Config conf;
     UUID uuid1(1), uuid2(2), uuid3(3), uuid4(4);
-    Proto p(uuid4);
+    Proto p(conf, uuid4);
     DummyTransport tp(uuid4, true);
     gcomm::connect(&tp, &p);
 
@@ -1323,11 +1337,12 @@ END_TEST
 
 START_TEST(test_fifo_violation)
 {
+    gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(uuid1);
+    Proto pc1(conf, uuid1);
     DummyTransport tp1;
-    PCUser pu1(uuid1, &tp1, &pc1);
+    PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     assert(pc1.get_state() == Proto::S_PRIM);
@@ -1354,11 +1369,12 @@ END_TEST
 
 START_TEST(test_checksum)
 {
+    gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
-    Proto pc1(uuid1);
+    Proto pc1(conf, uuid1);
     DummyTransport tp1;
-    PCUser pu1(uuid1, &tp1, &pc1);
+    PCUser pu1(conf, uuid1, &tp1, &pc1);
     single_boot(&pu1);
 
     assert(pc1.get_state() == Proto::S_PRIM);

@@ -194,7 +194,7 @@ PC::PC(Protonet& net, const gu::URI& uri) :
     evs       (0),
     pc        (0),
     closed    (true),
-    linger    (uri.get_option(Conf::PcLinger, "PT2S"))
+    linger    (param<Period>(conf_, uri, Conf::PcLinger, "PT2S"))
 {
     if (uri_.get_scheme() != Conf::PcScheme)
     {
@@ -210,8 +210,11 @@ PC::PC(Protonet& net, const gu::URI& uri) :
         gu_throw_fatal << "invalid UUID: " << uuid;
     }
     evs::UserMessage evsum;
-    evs = new evs::Proto(uuid, uri_, gmcast->get_mtu() - 2*evsum.serial_size());
-    pc  = new pc::Proto (uuid, uri_);
+    evs = new evs::Proto(get_pnet().conf(),
+                         uuid, uri_, gmcast->get_mtu() - 2*evsum.serial_size());
+    pc  = new pc::Proto (get_pnet().conf(), uuid, uri_);
+
+    conf_.set(Conf::PcLinger, gu::to_string(linger));
 }
 
 

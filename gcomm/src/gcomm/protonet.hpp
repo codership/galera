@@ -15,7 +15,7 @@
 #include "gu_uri.hpp"
 #include "gu_datetime.hpp"
 #include "protostack.hpp"
-
+#include "gu_config.hpp"
 
 #include "socket.hpp"
 
@@ -37,11 +37,12 @@ namespace gcomm
 class gcomm::Protonet
 {
 public:
-    Protonet(const std::string& type, int version)
+    Protonet(gu::Config& conf, const std::string& type, int version)
         :
         protos_ (),
         version_(version),
-        type_   (type)
+        type_   (type),
+        conf_   (conf)
     { }
 
     virtual ~Protonet() { }
@@ -109,18 +110,26 @@ public:
     //
     virtual void leave() = 0;
 
+    bool set_param(const std::string& key, const std::string& val);
+    gu::Config& conf() { return conf_; }
+
     //!
     // Factory method for creating Protonets
     //
-    static Protonet* create(const std::string conf, int version = 0);
+    static Protonet* create(gu::Config& conf);
 
     const std::string& get_type() const { return type_; }
+
+
+
 protected:
+
     std::deque<Protostack*> protos_;
     int version_;
     static const int max_version_ = GCOMM_PROTONET_MAX_VERSION;
 private:
     std::string type_;
+    gu::Config& conf_;
 };
 
 #endif // GCOMM_PROTONET_HPP

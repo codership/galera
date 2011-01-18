@@ -23,7 +23,7 @@ using namespace gu::datetime;
 static void set_tcp_defaults (URI* uri)
 {
     // what happens if there is already this parameter?
-    uri->set_query_param(Conf::TcpNonBlocking, gu::to_string(1));
+    uri->set_option(Conf::TcpNonBlocking, gu::to_string(1));
 }
 
 
@@ -36,36 +36,33 @@ static bool check_tcp_uri(const URI& uri)
 GMCast::GMCast(Protonet& net, const gu::URI& uri)
     :
     Transport     (net, uri),
-    version(gu::from_string<int>(uri.get_option(Conf::GMCastVersion, "0"))),
+    version(check_range(Conf::GMCastVersion,
+                        param<int>(conf_, uri, Conf::GMCastVersion, "0"),
+                        0, max_version_ + 1)),
     my_uuid       (0, 0),
-    group_name    (),
+    // @todo: technically group name should be in path component
+    group_name    (param<std::string>(conf_, uri, Conf::GMCastGroup, "")),
     listen_addr   (Conf::TcpScheme + "://0.0.0.0"), // how to make it IPv6 safe?
     initial_addr  (""),
-    mcast_addr    (""),
+    mcast_addr    (param<std::string>(conf_, uri, Conf::GMCastMCastAddr, "")),
     bind_ip       (""),
-    mcast_ttl     (1),
+    mcast_ttl     (check_range(
+                       Conf::GMCastMCastTTL,
+                       param<int>(conf_, uri, Conf::GMCastMCastTTL, "1"),
+                       1, 256)),
     listener      (0),
     mcast         (),
     pending_addrs (),
     remote_addrs  (),
     proto_map     (new ProtoMap()),
     mcast_tree    (),
-    time_wait     (uri.get_option(Conf::GMCastTimeWait, "PT5S")),
+    time_wait     (param<Period>(conf_, uri, Conf::GMCastTimeWait, "PT5S")),
     check_period  ("PT0.5S"),
     next_check    (Date::now())
 {
-    if (version > max_version_)
-    {
-        gu_throw_error(EINVAL) << "invalid gmcast version " << version;
-    }
     log_info << "GMCast version " << version;
 
-    // @todo: technically group name should be in path component
-    try
-    {
-        group_name = uri_.get_option (Conf::GMCastGroup);
-    }
-    catch (gu::NotFound&)
+    if (group_name == "")
     {
         gu_throw_error (EINVAL) << "Group not defined in URL: "
                                 << uri_.to_string();
@@ -157,30 +154,26 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
 
     listen_addr = resolve(listen_addr).to_string();
 
-    try
+    if (mcast_addr != "")
     {
-        mcast_addr = uri_.get_option(Conf::GMCastMCastAddr);
-
         try
         {
             port = uri_.get_option(Conf::GMCastMCastPort);
         }
         catch (NotFound&) { }
-
         mcast_addr = resolve("udp://" + mcast_addr + ":" + port).to_string();
-
-        try
-        {
-            mcast_ttl = from_string<int>(uri_.get_option(Conf::GMCastMCastTTL));
-        }
-        catch (NotFound&) { }
-
     }
-    catch (NotFound&) { }
 
     log_info << self_string() << " listening at " << listen_addr;
     log_info << self_string() << " multicast: " << mcast_addr
              << ", ttl: " << mcast_ttl;
+
+    conf_.set(Conf::GMCastListenAddr, listen_addr);
+    conf_.set(Conf::GMCastMCastAddr, mcast_addr);
+    conf_.set(Conf::GMCastVersion, gu::to_string(version));
+    conf_.set(Conf::GMCastTimeWait, gu::to_string(time_wait));
+    conf_.set(Conf::GMCastMCastTTL, gu::to_string(mcast_ttl));
+
 }
 
 GMCast::~GMCast()
@@ -290,7 +283,7 @@ void GMCast::gmcast_connect(const string& remote_addr)
 
     if (!bind_ip.empty())
     {
-        connect_uri.set_query_param(gu::net::Socket::OptIfAddr, bind_ip);
+        connect_uri.set_option(gu::net::Socket::OptIfAddr, bind_ip);
     }
 
     SocketPtr tp = get_pnet().socket(connect_uri);

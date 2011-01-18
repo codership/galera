@@ -60,17 +60,23 @@ public:
     }
 
 
-    Proto(const UUID& uuid, const gu::URI& uri = gu::URI("pc://"))
+    Proto(gu::Config&    conf,
+          const UUID&    uuid,
+          const gu::URI& uri = gu::URI("pc://"))
         :
-        version_(gu::from_string<int>(uri.get_option(Conf::PcVersion, "0"))),
+        Protolay(conf),
+        version_(
+            check_range(Conf::PcVersion,
+                        param<int>(conf, uri, Conf::PcVersion, "0"),
+                        0, max_version_ + 1)),
         my_uuid_       (uuid),
         start_prim_    (),
-        npvo_          (gu::from_string<bool>(uri.get_option(Conf::PcNpvo, "false"))),
-        allow_sb_      (gu::from_string<bool>(uri.get_option(Conf::PcAllowSb, "true"))),
-                        closing_       (false),
+        npvo_          (param<bool>(conf, uri, Conf::PcNpvo, "false")),
+        allow_sb_      (param<bool>(conf, uri, Conf::PcAllowSb, "true")),
+        closing_       (false),
         state_         (S_CLOSED),
         last_sent_seq_ (0),
-        checksum_      (gu::from_string<bool>(uri.get_option(Conf::PcChecksum, "true"))),
+        checksum_      (param<bool>(conf, uri, Conf::PcChecksum, "true")),
         instances_     (),
         self_i_        (instances_.insert_unique(std::make_pair(uuid, Node()))),
         state_msgs_    (),
@@ -78,11 +84,11 @@ public:
         pc_view_       (V_NON_PRIM),
         views_         ()
     {
-        if (version_ > max_version_)
-        {
-            gu_throw_error(EINVAL) << "invalid pc version " << version_;
-        }
         log_info << "PC version " << version_;
+        conf.set(Conf::PcVersion,  gu::to_string(version_));
+        conf.set(Conf::PcNpvo,     gu::to_string(npvo_));
+        conf.set(Conf::PcAllowSb,  gu::to_string(allow_sb_));
+        conf.set(Conf::PcChecksum, gu::to_string(checksum_));
     }
 
     ~Proto() { }
@@ -148,6 +154,9 @@ public:
     void close() { closing_ = true; }
 
     void handle_view (const View&);
+
+    bool set_param(const std::string& key, const std::string& val);
+
 private:
 
     Proto (const Proto&);
