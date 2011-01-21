@@ -20,25 +20,16 @@ namespace galera
     class RowKeyEntry
     {
     public:
-
         RowKeyEntry(const RowKey& row_key);
-
-        const RowKey& get_row_key() const;
+        ~RowKeyEntry();
+        RowKey get_row_key() const;
         void ref(TrxHandle* trx);
         void unref(TrxHandle* trx);
         TrxHandle* get_ref_trx() const;
-        RowKeyEntry(const RowKeyEntry& other)
-            :
-            row_key_(other.row_key_),
-            row_key_buf_(other.row_key_buf_),
-            ref_trx_(other.ref_trx_)
-        { }
-
     private:
-
+        RowKeyEntry(const RowKeyEntry& other);
         void operator=(const RowKeyEntry&);
-        RowKey row_key_;
-        gu::Buffer row_key_buf_;
+        gu::byte_t* row_key_buf_;
         TrxHandle* ref_trx_;
     };
 
