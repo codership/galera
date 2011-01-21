@@ -22,23 +22,27 @@ using namespace gu;
 inline galera::RowKeyEntry::RowKeyEntry(
     const RowKey& row_key)
     :
-    row_key_(),
-    row_key_buf_(),
+    row_key_buf_(0),
     ref_trx_(0)
 {
-    // @todo optimize this by passing original row key
-    // buffer as argument
-    row_key_buf_.resize(serial_size(row_key));
-    (void)serialize(row_key, &row_key_buf_[0],
-                    row_key_buf_.size(), 0);
-    (void)unserialize(&row_key_buf_[0],
-                      row_key_buf_.size(), 0, row_key_);
+    const size_t ss(serial_size(row_key));
+    row_key_buf_ = new gu::byte_t[sizeof(uint32_t) + ss];
+    *reinterpret_cast<uint32_t*>(row_key_buf_) = ss;
+    (void)serialize(row_key, row_key_buf_ + sizeof(uint32_t), ss, 0);
 }
 
-inline const galera::RowKey&
+inline galera::RowKeyEntry::~RowKeyEntry()
+{
+    delete[] row_key_buf_;
+}
+
+inline galera::RowKey
 galera::RowKeyEntry::get_row_key() const
 {
-    return row_key_;
+    RowKey rk;
+    uint32_t ss(*reinterpret_cast<uint32_t*>(row_key_buf_));
+    (void)unserialize(row_key_buf_ + sizeof(uint32_t), ss, 0, rk);
+    return rk;
 }
 
 
