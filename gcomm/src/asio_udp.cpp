@@ -149,7 +149,15 @@ int gcomm::AsioUdpSocket::send(const Datagram& dg)
     cbs[1] = asio::const_buffer(dg.get_header() + dg.get_header_offset(),
                           dg.get_header_len());
     cbs[2] = asio::const_buffer(&dg.get_payload()[0], dg.get_payload().size());
-    socket_.send_to(cbs, target_ep_);
+    try
+    {
+        socket_.send_to(cbs, target_ep_);
+    }
+    catch (asio::system_error& err)
+    {
+        log_warn << "Error: " << err.what();
+        return err.code().value();
+    }
     return 0;
 }
 
@@ -184,17 +192,17 @@ void gcomm::AsioUdpSocket::read_handler(const asio::error_code& ec,
         }
         else
         {
-            Datagram dg(SharedBuffer(new Buffer(&recv_buf_[0] + NetHeader::serial_size_,
-                                                &recv_buf_[0] + NetHeader::serial_size_ + hdr.len())));
-            if (net_.checksum_ == true)
+            Datagram dg(SharedBuffer(
+                            new Buffer(&recv_buf_[0] + NetHeader::serial_size_,
+                                       &recv_buf_[0] + NetHeader::serial_size_
+                                       + hdr.len())));
+            if (net_.checksum_ == true &&
+                ((hdr.has_crc32() == true && crc32(dg) != hdr.crc32()) ||
+                 (hdr.has_crc32() == false && hdr.crc32() != 0)))
             {
-                if ((hdr.has_crc32() == true && crc32(dg) != hdr.crc32()) ||
-                    (hdr.has_crc32() == false && hdr.crc32() != 0))
-                {
-                    log_warn << "checksum failed, hdr: len=" << hdr.len()
-                             << " has_crc32=" << hdr.has_crc32()
-                             << " crc32=" << hdr.crc32();
-                }
+                log_warn << "checksum failed, hdr: len=" << hdr.len()
+                         << " has_crc32=" << hdr.has_crc32()
+                         << " crc32=" << hdr.crc32();
             }
             else
             {
