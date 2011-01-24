@@ -42,7 +42,10 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     my_uuid       (0, 0),
     // @todo: technically group name should be in path component
     group_name    (param<std::string>(conf_, uri, Conf::GMCastGroup, "")),
-    listen_addr   (Conf::TcpScheme + "://0.0.0.0"), // how to make it IPv6 safe?
+    listen_addr   (
+        param<std::string>(
+            conf_, uri, Conf::GMCastListenAddr,
+            Conf::TcpScheme + "://0.0.0.0")), // how to make it IPv6 safe?
     initial_addr  (""),
     mcast_addr    (param<std::string>(conf_, uri, Conf::GMCastMCastAddr, "")),
     bind_ip       (""),
@@ -915,7 +918,7 @@ void GMCast::handle_up(const void*        id,
     }
     else
     {
-        // log_debug << "proto entry not found";
+        // log_info << "proto entry " << id << " not found";
     }
 }
 
