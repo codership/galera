@@ -80,17 +80,6 @@ MYSQL_SHUTDOWN_WAIT=60
 ROOT_USER=${ROOT_USER:-"-uroot"}
 ROOT_PSWD=${ROOT_PSWD:-"-prootpass"}
 
-LD_LIBRARY_PATH="$GALERA_BASE_DIR/lib"
-LD_PRELOAD=$(echo "$MYSQL_BASE_DIR/lib/mysql/libmysqlclient.so "\
-"$GALERA_BASE_DIR/lib/libgalerautils.so "\
-"$GALERA_BASE_DIR/lib/libgalerautils++.so "\
-"$GALERA_BASE_DIR/lib/libgcomm.so "\
-"$GALERA_BASE_DIR/lib/libgcache.so "\
-"$GALERA_BASE_DIR/lib/libgcs.so ")
-
-[ -x "$GALERA_BASE_DIR/lib/libgalera++.so" ] && \
-LD_PRELOAD="$LD_PRELOAD $GALERA_BASE_DIR/lib/libgalera++.so"
-
 # Mandatory stuff
 INNODB_OPTS=" --default-storage-engine=InnoDB "
 
@@ -206,7 +195,7 @@ galera_start()
         RBR_OPTS=" --binlog_format=STATEMENT "
     fi
 
-    WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera++.so"}
+    WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera.so"}
 
     if test -f $WSREP || test $WSREP == "none"
     then
@@ -522,8 +511,7 @@ then
     exit 1
 fi
 
-export LD_LIBRARY_PATH
-export LD_PRELOAD
+export LD_LIBRARY_PATH=$MYSQL_BASE_DIR/lib/mysql
 export PATH=$MYSQL_BASE_DIR/bin:$PATH
 
 $COMMAND

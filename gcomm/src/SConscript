@@ -1,10 +1,6 @@
-# 
+#
 
 env = DefaultEnvironment()
-
-
-
-libgcomm_env = env.Clone()
 
 libgcomm_sources = [
     'conf.cpp',
@@ -26,7 +22,7 @@ libgcomm_sources = [
     'uuid.cpp',
     'view.cpp']
 
-
+libgcomm_env = env.Clone()
 libgcomm_env.Append(CPPFLAGS = ' ')
 libgcomm_env.Append(CXXFLAGS = ' -fno-strict-aliasing ')
 
@@ -37,16 +33,21 @@ if libgcomm_env['CPPFLAGS'].find('-DHAVE_ASIO_HPP') != -1:
         'asio_udp.cpp',
         'asio_protonet.cpp']
     libgcomm_asio_env = libgcomm_env.Clone()
-    libgcomm_asio_env.Replace(CXXFLAGS = ' -Wctor-dtor-privacy -Wreorder -Wold-style-cast -Woverloaded-virtual -pedantic -ansi -Wno-long-long')
-    libgcomm_asio_shared_objs = libgcomm_asio_env.SharedObject(libgcomm_asio_sources)
+    libgcomm_asio_env.Replace(
+        CXXFLAGS = ' -Wctor-dtor-privacy -Wreorder -Wold-style-cast '
+        + '-Woverloaded-virtual -pedantic -ansi -Wno-long-long')
+    libgcomm_asio_shared_objs = libgcomm_asio_env.SharedObject(
+        libgcomm_asio_sources)
     libgcomm_asio_static_objs = libgcomm_asio_env.Object(libgcomm_asio_sources)
 else:
     libgcomm_asio_shared_objs = []
     libgcomm_asio_static_objs = []
 
-libgcomm_env.SharedLibrary('gcomm', 
-                           [libgcomm_sources, 
-                            libgcomm_asio_shared_objs])
+
 libgcomm_env.StaticLibrary('gcomm', 
                            [libgcomm_sources, 
                             libgcomm_asio_static_objs])
+
+env.Append(LIBGALERA_OBJS = libgcomm_env.SharedObject(libgcomm_sources))
+env.Append(LIBGALERA_OBJS = libgcomm_asio_shared_objs)
+

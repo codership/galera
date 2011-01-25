@@ -1,5 +1,7 @@
 
-gcache_env = DefaultEnvironment().Clone()
+env = DefaultEnvironment()
+
+gcache_env = env.Clone()
 
 gcache_sources = Split ('''
         gcache_fd.cpp
@@ -13,7 +15,6 @@ gcache_sources = Split ('''
         GCache.cpp
 ''')
 
-gcache_env.SharedLibrary('gcache', gcache_sources)
 gcache_env.StaticLibrary('gcache', gcache_sources)
 
 test_env = gcache_env.Clone()
@@ -23,3 +24,4 @@ test_env.Append(LIBS=File('#/galerautils/src/libgalerautils.a'))
 
 test_env.Program(source='test.cpp')
 
+env.Append(LIBGALERA_OBJS = gcache_env.SharedObject(gcache_sources))
