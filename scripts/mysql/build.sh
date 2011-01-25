@@ -330,7 +330,10 @@ install -m 644 -D $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/
 install -m 755 -D $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/libexec/mysqld
 if [ "$SKIP_CLIENTS" == "no" ]
 then
-install -m 755 -D $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS/libmysqlclient.so
+# Hack alert: install libmysqlclient.so as libmysqlclient.so.16 as client binaries
+# seem to be linked against explicit version. Figure out better way to deal with
+# this.
+install -m 755 -D $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS/libmysqlclient.so.16
 fi
 install -m 755 -D $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so $MYSQL_PLUGINS/ha_innodb_plugin.so
 install -m 755 -d $MYSQL_BINS

@@ -6,6 +6,7 @@
 #include "../gcs_fc.h"
 
 #include <stdbool.h>
+#include <string.h>
 
 START_TEST(gcs_fc_test_limits)
 {
