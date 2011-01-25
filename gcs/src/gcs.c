@@ -23,11 +23,7 @@
 #include "gcs_seqno.h"
 #include "gcs_core.h"
 #include "gcs_fifo_lite.h"
-
-#define GCS_USE_SM
-#ifdef GCS_USE_SM
 #include "gcs_sm.h"
-#endif /* GCS_USE_SM */
 
 const char* gcs_node_state_to_str (gcs_node_state_t state)
 {
@@ -118,11 +114,7 @@ struct gcs_conn
 
     gcache_t*    cache;
 
-#ifdef GCS_USE_SM
     gcs_sm_t*    sm;
-#else
-    gu_mutex_t   lock;
-#endif /* GCS_USE_SM */
 
     gcs_seqno_t  local_act_id; /* local seqno of the action */
     gcs_seqno_t  global_seqno;
@@ -237,21 +229,24 @@ gcs_create (const char* node_name, const char* inc_addr, void* conf,
                                                sizeof(struct gcs_recv_act));
 
                 if (conn->recv_q) {
-                    conn->state        = GCS_CONN_CLOSED;
-                    conn->my_idx       = -1;
-                    conn->local_act_id = GCS_SEQNO_FIRST;
-                    conn->global_seqno = 0;
-                    conn->fc_offset    = 0;
-                    conn->cache = cache;
+                    conn->sm = gcs_sm_create(1<<16, 1);
 
-#ifdef GCS_USE_SM
-                    conn->sm = gcs_sm_create(1<<16, 1); // TODO: check!
-#else
-                    gu_mutex_init (&conn->lock, NULL);
-#endif /* GCS_USE_SM */
-                    gu_mutex_init (&conn->fc_lock, NULL);
+                    if (conn->sm) {
+                        conn->state        = GCS_CONN_CLOSED;
+                        conn->my_idx       = -1;
+                        conn->local_act_id = GCS_SEQNO_FIRST;
+                        conn->global_seqno = 0;
+                        conn->fc_offset    = 0;
+                        conn->cache        = cache;
+                        gu_mutex_init (&conn->fc_lock, NULL);
 
-                    return conn; // success
+                        return conn; // success
+                    }
+                    else {
+                        gu_error ("Failed to create send monitor");
+                    }
+
+                    gu_fifo_destroy (conn->recv_q);
                 }
                 else {
                     gu_error ("Failed to create recv_q.");
@@ -630,6 +625,30 @@ _set_fc_limits (gcs_conn_t* conn)
              conn->lower_limit, conn->upper_limit);
 }
 
+/*! Handles flow control events
+ *  (this is frequent, so leave it inlined) */
+static inline void
+gcs_handle_flow_control (gcs_conn_t*                conn,
+                         const struct gcs_fc_event* fc)
+{
+    if (gtohl(fc->conf_id) != (uint32_t)conn->conf_id) {
+        // obsolete fc request
+        return;
+    }
+
+    conn->stop_count += ((fc->stop != 0) << 1) - 1; // +1 if !0, -1 if 0
+    conn->stats_fc_received += (fc->stop != 0);
+
+    if (1 == conn->stop_count) {
+        gcs_sm_pause (conn->sm);    // first STOP request
+    }
+    else if (0 == conn->stop_count) {
+        gcs_sm_continue (conn->sm); // last CONT request
+    }
+
+    return;
+}
+
 /*! Handles configuration action */
 // TODO: this function does not provide any way for recv_thread to gracefully
 //       exit in case of self-leave message.
@@ -785,28 +804,9 @@ gcs_handle_actions (gcs_conn_t*                conn,
 
     switch (rcvd->act.type) {
     case GCS_ACT_FLOW:
-    { // this is frequent, so leave it inlined.
-        const struct gcs_fc_event* fc = rcvd->act.buf;
-
         assert (sizeof(*fc) == rcvd->act.buf_len);
-
-        if (gtohl(fc->conf_id) != (uint32_t)conn->conf_id) {
-            // obsolete fc request
-            break;
-        }
-//        gu_info ("RECEIVED %s", fc->stop ? "STOP" : "CONT");
-        conn->stop_count += ((fc->stop != 0) << 1) - 1; // +1 if !0, -1 if 0
-        conn->stats_fc_received += (fc->stop != 0);
-#ifdef GCS_USE_SM
-        if (1 == conn->stop_count) {
-            gcs_sm_pause (conn->sm);    // first STOP request
-        }
-        else if (0 == conn->stop_count) {
-            gcs_sm_continue (conn->sm); // last CONT request
-        }
-#endif /* GCS_USE_SM */
+        gcs_handle_flow_control (conn, rcvd->act.buf);
         break;
-    }
     case GCS_ACT_CONF:
         gcs_handle_act_conf (conn, rcvd->act.buf);
         ret = 1;
@@ -871,16 +871,11 @@ static void *gcs_recv_thread (void *arg)
     ssize_t     ret  = -ECONNABORTED;
 
     // To avoid race between gcs_open() and the following state check in while()
-#ifdef GCS_USE_SM
     gu_cond_t tmp_cond; /* TODO: rework when concurrency in SM is allowed */
     gu_cond_init (&tmp_cond, NULL);
     gcs_sm_enter(conn->sm, &tmp_cond, false);
     gcs_sm_leave(conn->sm);
     gu_cond_destroy (&tmp_cond);
-#else
-    gu_mutex_lock   (&conn->lock);
-    gu_mutex_unlock (&conn->lock);
-#endif /* GCS_USE_SM */
 
     while (conn->state < GCS_CONN_CLOSED)
     {
@@ -1042,13 +1037,9 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
 
 //    if ((ret = gcs_queue_reset (conn->recv_q))) return ret;
 
-#ifdef GCS_USE_SM
     gu_cond_t tmp_cond; /* TODO: rework when concurrency in SM is allowed */
     gu_cond_init (&tmp_cond, NULL);
     if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, false)))
-#else
-    if (!(ret = gu_mutex_lock (&conn->lock)))
-#endif /* GCS_USE_SM */
     {
         if (GCS_CONN_CLOSED == conn->state) {
 
@@ -1088,12 +1079,8 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
             ret = -EBADFD;
         }
 out:
-#ifdef GCS_USE_SM
         gcs_sm_leave (conn->sm);
         gu_cond_destroy (&tmp_cond);
-#else
-        gu_mutex_unlock (&conn->lock);
-#endif /* GCS_USE_SM */
     }
 
     return ret;
@@ -1107,34 +1094,25 @@ long gcs_close (gcs_conn_t *conn)
 {
     long ret;
 
-#ifdef GCS_USE_SM
     if ((ret = gcs_sm_close (conn->sm))) return ret;
-#else
-    if ((ret = gu_mutex_lock (&conn->lock))) return ret;
-#endif /* GCS_USE_SM */
-    {
-        if (GCS_CONN_CLOSED <= conn->state)
-        {
-            ret = -EBADFD;
-        }
-        else if (!(ret = gcs_core_close (conn->core))) {
 
-            /* here we synchronize with SELF_LEAVE event */
-            gu_thread_join (conn->recv_thread, NULL);
-            gu_info ("recv_thread() joined.");
-
-            if (GCS_CONN_CLOSED != conn->state) {
-                gu_warn ("Broken shutdown sequence: GCS connection state is %s,"
-                         " expected %s", gcs_conn_state_str[conn->state],
-                         gcs_conn_state_str[GCS_CONN_CLOSED]);
-                gcs_shift_state (conn, GCS_CONN_CLOSED);
-            }
-            conn->err = -ECONNABORTED;
-        }
+    if (GCS_CONN_CLOSED <= conn->state) {
+        ret = -EBADFD;
     }
-#ifndef GCS_USE_SM
-    gu_mutex_unlock (&conn->lock);
-#endif /* GCS_USE_SM */
+    else if (!(ret = gcs_core_close (conn->core))) {
+
+        /* here we synchronize with SELF_LEAVE event */
+        gu_thread_join (conn->recv_thread, NULL);
+        gu_info ("recv_thread() joined.");
+
+        if (GCS_CONN_CLOSED != conn->state) {
+            gu_warn ("Broken shutdown sequence: GCS connection state is %s,"
+                     " expected %s", gcs_conn_state_str[conn->state],
+                     gcs_conn_state_str[GCS_CONN_CLOSED]);
+            gcs_shift_state (conn, GCS_CONN_CLOSED);
+        }
+        conn->err = -ECONNABORTED;
+    }
 
     if (!ret) {
         struct gcs_repl_act** act_ptr;
@@ -1170,50 +1148,39 @@ long gcs_destroy (gcs_conn_t *conn)
 {
     long err;
 
-#ifdef GCS_USE_SM
     gu_cond_t tmp_cond;
     gu_cond_init (&tmp_cond, NULL);
+
     if ((err = gcs_sm_enter (conn->sm, &tmp_cond, false))) // need an error here
-#else
-    if (!(err = gu_mutex_lock (&conn->lock)))
-#endif /* GCS_USE_SM */
     {
         if (GCS_CONN_CLOSED != conn->state)
         {
             if (GCS_CONN_CLOSED > conn->state)
                 gu_error ("Attempt to call gcs_destroy() before gcs_close(): "
                           "state = %d", conn->state);
-#ifdef GCS_USE_SM
+
             gu_cond_destroy (&tmp_cond);
-#else
-            gu_mutex_unlock (&conn->lock);
-#endif /* GCS_USE_SM */
+
             return -EBADFD;
         }
 
-    /* this should cancel all recv calls */
-    gu_fifo_destroy (conn->recv_q);
+        /* this should cancel all recv calls */
+        gu_fifo_destroy (conn->recv_q);
 
         gcs_shift_state (conn, GCS_CONN_DESTROYED);
         conn->err   = -EBADFD;
         /* we must unlock the mutex here to allow unfortunate threads
          * to acquire the lock and give up gracefully */
-#ifndef GCS_USE_SM
-        gu_mutex_unlock (&conn->lock);
-#endif /* GCS_USE_SM */
     }
     else {
-#ifdef GCS_USE_SM
         gcs_sm_leave (conn->sm);
         gu_cond_destroy (&tmp_cond);
         err = -EBADFD;
-#endif /* GCS_USE_SM */
         return err;
     }
-#ifdef GCS_USE_SM
+
     gu_cond_destroy (&tmp_cond);
     gcs_sm_destroy (conn->sm);
-#endif /* GCS_USE_SM */
 
     if ((err = gcs_fifo_lite_destroy (conn->repl_q))) {
         gu_debug ("Error destroying repl FIFO: %d (%s)", err, strerror(-err));
@@ -1226,9 +1193,6 @@ long gcs_destroy (gcs_conn_t *conn)
     }
 
     /* This must not last for long */
-#ifndef GCS_USE_SM
-    while (gu_mutex_destroy (&conn->lock));
-#endif
     while (gu_mutex_destroy (&conn->fc_lock));
 
     if (conn->config_is_local) gu_config_destroy (conn->config);
@@ -1250,13 +1214,10 @@ long gcs_send (gcs_conn_t*          conn,
     /*! locking connection here to avoid race with gcs_close()
      *  @note: gcs_repl() and gcs_recv() cannot lock connection
      *         because they block indefinitely waiting for actions */
-#ifdef GCS_USE_SM
     gu_cond_t tmp_cond;
     gu_cond_init (&tmp_cond, NULL);
+
     if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, scheduled)))
-#else
-    if (!(ret = gu_mutex_lock (&conn->lock)))
-#endif /* GCS_USE_SM */
     {
         if (GCS_CONN_OPEN >= conn->state) {
             /* need to make a copy of the action, since receiving thread
@@ -1273,32 +1234,22 @@ long gcs_send (gcs_conn_t*          conn,
                 ret = -ENOMEM;
             }
         }
-#ifdef GCS_USE_SM
+
         gcs_sm_leave (conn->sm);
         gu_cond_destroy (&tmp_cond);
-#else
-        gu_mutex_unlock (&conn->lock);
-#endif
     }
+
     return ret;
 }
 
 long gcs_schedule (gcs_conn_t* conn)
 {
-#ifdef GCS_USE_SM
     return gcs_sm_schedule (conn->sm);
-#else
-    return 0;
-#endif /* GCS_USE_SM */
 }
 
 long gcs_interrupt (gcs_conn_t* conn, long handle)
 {
-#ifdef GCS_USE_SM
     return gcs_sm_interrupt (conn->sm, handle);
-#else
-    return 0;
-#endif /* GCS_USE_SM */
 }
 
 gcs_seqno_t gcs_caused(gcs_conn_t* conn)
@@ -1341,11 +1292,7 @@ long gcs_repl (gcs_conn_t          *conn,         //!<in
         // 1. serializes gcs_core_send() access between gcs_repl() and
         //    gcs_send()
         // 2. avoids race with gcs_close() and gcs_destroy()
-#ifdef GCS_USE_SM
         if (!(ret = gcs_sm_enter (conn->sm, &act.wait_cond, scheduled)))
-#else
-        if (!(ret = gu_mutex_lock (&conn->lock)))
-#endif /* GCS_USE_SM */
         {
             struct gcs_repl_act** act_ptr;
             // some hack here to achieve one if() instead of two:
@@ -1374,11 +1321,8 @@ long gcs_repl (gcs_conn_t          *conn,         //!<in
                     assert (ret == (ssize_t)act_size);
                 }
             }
-#ifdef GCS_USE_SM
+
             gcs_sm_leave (conn->sm);
-#else
-            gu_mutex_unlock (&conn->lock);
-#endif
 
             assert(ret);
             /* now we can go waiting for action delivery */
@@ -1553,7 +1497,6 @@ gcs_conf_set_pkt_size (gcs_conn_t *conn, long pkt_size)
 long
 gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
 {
-#ifdef GCS_USE_SM
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
 
@@ -1567,9 +1510,6 @@ gcs_set_last_applied (gcs_conn_t* conn, gcs_seqno_t seqno)
     gu_cond_destroy (&cond);
 
     return ret;
-#else
-    return gcs_core_set_last_applied (conn->core, seqno);
-#endif /* GCS_USE_SM */
 }
 
 long

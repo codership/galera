@@ -111,12 +111,12 @@ namespace galera
         gu::byte_t  action_;
     };
 
-    inline bool operator==(const RowId& a, const RowId&b)
+    inline bool operator==(const RowId& a, const RowId& b)
     {
-        return (a.table_len_ == b.table_len_              &&
-                a.key_len_   == b.key_len_                &&
-                !memcmp(a.table_, b.table_, a.table_len_) &&
-                !memcmp(a.key_, b.key_, a.key_len_));
+        return (a.key_len_   == b.key_len_                &&
+                a.table_len_ == b.table_len_              &&
+                !memcmp(a.key_, b.key_, a.key_len_)       &&
+                !memcmp(a.table_, b.table_, a.table_len_));
     }
 
     typedef std::deque<RowId> RowIdSequence;
