@@ -1,61 +1,35 @@
 
-env = DefaultEnvironment().Clone()
+env = DefaultEnvironment()
 
-env.Replace(CXXFLAGS = env['CXXFLAGS'].replace('-pedantic',''))
-env.Append(CXXFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX')
+libgaleraxx_env = env.Clone()
 
-
-#env.SharedLibrary('mmgalera', [
-#        'galera_info.c',
-#        'galera_job_queue.c',
-#        'galera_options.c',
-#        'galera_state.c',
-#        'galera_status.c',
-#        'mm_galera.c'
-#])
-
-galera_common_srcs = Split('''
-        mapped_buffer.cpp
-        write_set.cpp
-        trx_handle.cpp
-        wsdb.cpp
-        certification.cpp
-        galera_service_thd.cpp
-        wsrep_params.cpp
-''')
-
-env.StaticLibrary('galera++', galera_common_srcs)
-#env.StaticLibrary('galera++', [
-#        'mapped_buffer.cpp',
-#        'write_set.cpp',
-#        'trx_handle.cpp',
-#        'wsdb.cpp',
-#        'certification.cpp',
-#        'galera_service_thd.cpp',
-#])
-
-env.SharedLibrary('galera++', galera_common_srcs)
-#env.SharedLibrary('galera++', [
-#        'mapped_buffer.cpp',
-#        'write_set.cpp',
-#        'trx_handle.cpp',
-#        'wsdb.cpp',
-#        'certification.cpp',
-#        'galera_service_thd.cpp',
-#])
+libgaleraxx_env.Replace(CXXFLAGS = env['CXXFLAGS'].replace('-pedantic',''))
+libgaleraxx_env.Append(CXXFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX')
 
 
-mmenv = env.Clone()
+libgaleraxx_srcs = [
+    'mapped_buffer.cpp',
+    'write_set.cpp',
+    'trx_handle.cpp',
+    'wsdb.cpp',
+    'certification.cpp',
+    'galera_service_thd.cpp',
+    'wsrep_params.cpp']
+
+libgaleraxx_env.StaticLibrary('galera++', libgaleraxx_srcs)
+
+# Environment for multimaster library build
+mmenv = libgaleraxx_env.Clone()
 mmenv.Append(CPPFLAGS = ' -DGALERA_MULTIMASTER')
 mmenv.Replace(SHOBJPREFIX = 'libmmgalera++-')
-mmenv.SharedLibrary('mmgalera++', [
-        'galera_info.c',
-        'replicator_smm.cpp',
-        'replicator_smm_stats.cpp',
-        'replicator_smm_params.cpp',
-        'wsrep_provider.cpp'
-])
 
-#        'galera_job_queue.c',
-#        'galera_options.c',
 
+#
+env.Append(LIBGALERA_OBJS = libgaleraxx_env.SharedObject(libgaleraxx_srcs))
+env.Append(LIBMMGALERA_OBJS = mmenv.SharedObject([
+            'galera_info.c',
+            'replicator_smm.cpp',
+            'replicator_smm_stats.cpp',
+            'replicator_smm_params.cpp',
+            'wsrep_provider.cpp'
+            ]))

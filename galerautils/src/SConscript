@@ -1,29 +1,47 @@
+env = DefaultEnvironment()
 
-env = DefaultEnvironment().Clone()
+libgalerautils_env = env.Clone()
 
-env.SharedLibrary('galerautils', Glob('*.c'))
-env.StaticLibrary('galerautils', Glob('*.c'))
+# C part
+libgalerautils_sources = [
+    'gu_dbug.c',
+    'gu_fifo.c',
+    'gu_lock_step.c',
+    'gu_log.c',
+    'gu_mem.c',
+    'gu_mutex.c',
+    'gu_to.c',
+    'gu_utils.c',
+    'gu_uuid.c'
+]
 
-utilsxx_sources = [
-        'gu_datetime.cpp',
-        'gu_exception.cpp',
-        'gu_logger.cpp',
-        'gu_prodcons.cpp',
-        'gu_regex.cpp',
-        'gu_string.cpp',
-        'gu_uri.cpp',
-        'gu_buffer.cpp',
-        'gu_config.cpp'
-        ]
+libgalerautils_env.StaticLibrary('galerautils', libgalerautils_sources)
 
-if env['CPPFLAGS'].find('-DGALERA_USE_GU_NETWORK') != -1:
-    utilsxx_sources = [utilsxx_sources, 
-                       'gu_epoll.cpp',
-                       'gu_network.cpp',
-                       'gu_poll.cpp',
-                       'gu_resolver.cpp']
-    env.Append(CXXFLAGS = ' -Wno-old-style-cast')
+# C++ part
+libgalerautilsxx_sources = [
+    'gu_datetime.cpp',
+    'gu_exception.cpp',
+    'gu_logger.cpp',
+    'gu_prodcons.cpp',
+    'gu_regex.cpp',
+    'gu_string.cpp',
+    'gu_uri.cpp',
+    'gu_buffer.cpp',
+    'gu_config.cpp']
 
-env.SharedLibrary('galerautils++', utilsxx_sources)
-env.StaticLibrary('galerautils++', utilsxx_sources)
+if libgalerautils_env['CPPFLAGS'].find('-DGALERA_USE_GU_NETWORK') != -1:
+    libgalerautilsxx_sources = [libgalerautilsxx_sources, 
+                                'gu_epoll.cpp',
+                                'gu_network.cpp',
+                                'gu_poll.cpp',
+                                'gu_resolver.cpp']
+    libgalerautils_env.Append(CXXFLAGS = ' -Wno-old-style-cast')
 
+libgalerautils_env.StaticLibrary('galerautils++', libgalerautilsxx_sources)
+
+
+#
+env.Append(LIBGALERA_OBJS = libgalerautils_env.SharedObject(
+        libgalerautils_sources))
+env.Append(LIBGALERA_OBJS = libgalerautils_env.SharedObject(
+        libgalerautilsxx_sources))

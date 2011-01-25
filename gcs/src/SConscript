@@ -1,7 +1,9 @@
 #
 
+env = DefaultEnvironment()
+
 # Clone environment as we need to tune compilation flags
-libgcs_env = DefaultEnvironment().Clone()
+libgcs_env = env.Clone()
 
 # Backends (TODO: Get from global options)
 libgcs_env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM')
@@ -32,7 +34,6 @@ libgcs_sources = Split('''
                           gcs_gcomm.cpp
                        ''')
 
-libgcs_env.SharedLibrary('gcs', libgcs_sources)
 libgcs_env.StaticLibrary('gcs', libgcs_sources)
 
 # TODO: How to tell scons portably that C++ linker should be used
@@ -50,3 +51,6 @@ gcs_test_env.Program(target = 'gcs_test',
                      LINK = libgcs_env['CXX'])
 
 SConscript('unit_tests/SConscript')
+
+#
+env.Append(LIBGALERA_OBJS = libgcs_env.SharedObject(libgcs_sources))

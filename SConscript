@@ -1,8 +1,12 @@
-SConscript(Split('''
-                    galerautils/SConscript
-                    gcomm/SConscript
-                    gcs/SConscript
-                    galera/SConscript
-                    '''))
+SConscript(['galerautils/SConscript',
+            'gcomm/SConscript',
+            'gcs/SConscript',
+            'galera/SConscript'])
 
-                    # wsdb/SConscript
+
+env = DefaultEnvironment()
+
+libmmgalera_objs = env['LIBGALERA_OBJS']
+libmmgalera_objs.extend(env['LIBMMGALERA_OBJS'])
+
+env.SharedLibrary('mmgalera', libmmgalera_objs)

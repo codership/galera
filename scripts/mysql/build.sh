@@ -328,7 +328,10 @@ MYSQL_PLUGINS=$MYSQL_DIST_DIR/lib/mysql/plugin
 MYSQL_CHARSETS=$MYSQL_DIST_DIR/share/mysql/charsets
 install -m 644 -D $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/mysql/english/errmsg.sys
 install -m 755 -D $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/libexec/mysqld
+if [ "$SKIP_CLIENTS" == "no" ]
+then
 install -m 755 -D $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS/libmysqlclient.so
+fi
 install -m 755 -D $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so $MYSQL_PLUGINS/ha_innodb_plugin.so
 install -m 755 -d $MYSQL_BINS
 if [ "$SKIP_CLIENTS" == "no" ]
@@ -354,15 +357,8 @@ install -m 755 -d $GALERA_LIBS
 if [ "$SCONS" == "yes" ]
 then
     SCONS_VD=$GALERA_SRC
-    cp -P $SCONS_VD/galerautils/src/libgalerautils.so*   $GALERA_LIBS
-    cp -P $SCONS_VD/galerautils/src/libgalerautils++.so* $GALERA_LIBS
-    cp -P $SCONS_VD/gcomm/src/libgcomm.so*               $GALERA_LIBS
-    cp -P $SCONS_VD/gcs/src/libgcs.so*                   $GALERA_LIBS
-# remove   cp -P $SCONS_VD/wsdb/src/libwsdb.so*                 $GALERA_LIBS || :
-    cp -P $SCONS_VD/galera/src/libgalera++.so*           $GALERA_LIBS
-# remove   cp -P $SCONS_VD/galera/src/libmsgalera++.so*         $GALERA_LIBS || :
-    cp -P $SCONS_VD/galera/src/libmmgalera++.so*         $GALERA_LIBS
-# remove    cp -P $SCONS_VD/galera/src/libmmgalera.so*           $GALERA_LIBS || :
+    cp -P $SCONS_VD/libmmgalera.so*         $GALERA_LIBS
+
 else
     cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils.so*   $GALERA_LIBS
     cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils++.so* $GALERA_LIBS
