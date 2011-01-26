@@ -187,3 +187,4 @@ size_t galera::serial_size(const TrxHandle& trx)
             + serial_size(trx.trx_id_)
             + serial_size(trx.last_seen_seqno_));
 }
+

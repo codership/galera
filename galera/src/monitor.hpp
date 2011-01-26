@@ -101,6 +101,8 @@ namespace galera
             const size_t        idx(indexof(obj_seqno));
             gu::Lock            lock(mutex_);
 
+            assert(obj_seqno > last_left_);
+
             pre_enter(obj, lock);
 
             if (gu_likely(process_[idx].state_ != Process::S_CANCELED))
@@ -161,6 +163,8 @@ namespace galera
             size_t   idx(indexof(obj.seqno()));
 #endif // NDEBUG
             gu::Lock lock(mutex_);
+
+            assert(obj.seqno() > last_left_);
 
             pre_enter(obj, lock);
 

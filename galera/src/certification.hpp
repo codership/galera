@@ -64,9 +64,6 @@ namespace galera
         ~Certification();
 
         void assign_initial_position(wsrep_seqno_t seqno);
-        TrxHandle* create_trx(const void* data, size_t data_len,
-                              wsrep_seqno_t seqno_l,
-                              wsrep_seqno_t seqno_g);
         TestResult append_trx(TrxHandle*);
         TestResult test(TrxHandle*, bool = true);
         wsrep_seqno_t position() const { return position_; }
@@ -140,6 +137,7 @@ namespace galera
         };
 
         TrxMap        trx_map_;
+        TrxMap        to_isolation_;
         CertIndex     cert_index_;
         DepsSet       deps_set_;
         gu::Mutex     mutex_;

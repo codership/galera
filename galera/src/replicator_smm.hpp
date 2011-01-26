@@ -2,7 +2,7 @@
 // Copyright (C) 2010 Codership Oy <info@codership.com>
 //
 
-//! @file mm_provider.hpp
+//! @file replicator_smm.hpp
 //
 // @brief Galera Synchronous Multi-Master replicator
 //
@@ -21,6 +21,7 @@
 #include "write_set.hpp"
 #include "galera_service_thd.hpp"
 #include "fsm.hpp"
+#include "gcs_action_source.hpp"
 
 #include "gu_atomic.hpp"
 
@@ -31,16 +32,6 @@ namespace galera
     class ReplicatorSMM : public Replicator
     {
     public:
-
-        typedef enum
-        {
-            S_CLOSED,
-            S_CLOSING,
-            S_JOINING,
-            S_JOINED,
-            S_SYNCED,
-            S_DONOR
-        } State;
 
         typedef enum
         {
@@ -73,11 +64,8 @@ namespace galera
         void discard_local_conn_trx(wsrep_conn_id_t conn_id);
         void discard_local_conn(wsrep_conn_id_t conn_id);
 
-        wsrep_status_t process_trx_ws(void* recv_ctx, TrxHandle* trx)
-            throw (gu::Exception);
-        wsrep_status_t process_conn_ws(void* recv_ctx, TrxHandle* trx)
-            throw (gu::Exception);
-
+        void apply_trx(void* recv_ctx, TrxHandle* trx)
+            throw (ApplyException);
 
         wsrep_status_t replicate(TrxHandle* trx);
         wsrep_status_t abort_trx(TrxHandle* trx);
@@ -96,7 +84,22 @@ namespace galera
                                     wsrep_seqno_t       seqno,
                                     const void*         state,
                                     size_t              state_len);
-
+        void process_trx(void* recv_ctx, TrxHandle* trx)
+            throw (ApplyException);
+        void process_commit_cut(wsrep_seqno_t seq, wsrep_seqno_t seqno_l)
+            throw (gu::Exception);
+        void process_view_info(void* recv_ctx,
+                               const wsrep_view_info_t& view_info,
+                               State next_state,
+                               wsrep_seqno_t seqno_l)
+            throw (gu::Exception);
+        void process_state_req(void* recv_ctx, const void* req,
+                               size_t req_size, wsrep_seqno_t seqno_l)
+            throw (gu::Exception);
+        void process_join(wsrep_seqno_t seqno_l)
+            throw (gu::Exception);
+        void process_sync(wsrep_seqno_t seqno_l)
+            throw (gu::Exception);
         const struct wsrep_stats_var* stats() const;
 
         void           param_set (const std::string& key,
@@ -117,36 +120,12 @@ namespace galera
 
         void report_last_committed();
 
-        wsrep_status_t process_global_action(void* recv_ctx,
-                                             const void* act,
-                                             size_t act_size,
-                                             wsrep_seqno_t seqno_l,
-                                             wsrep_seqno_t seqno_g);
-
         wsrep_status_t request_sst(const wsrep_uuid_t&, wsrep_seqno_t,
                                    const void*, size_t);
-
-        bool st_required(const gcs_act_conf_t&);
-
-        wsrep_status_t process_conf(void* recv_ctx, const gcs_act_conf_t* conf);
-
 
 
         wsrep_status_t cert(TrxHandle* trx);
         wsrep_status_t cert_for_aborted(TrxHandle* trx);
-        wsrep_status_t process_to_action(void*,
-                                         const void*,
-                                         size_t,
-                                         gcs_act_type_t act_type,
-                                         wsrep_seqno_t seqno_l);
-        wsrep_status_t dispatch(void*,
-                                const void*,
-                                size_t,
-                                gcs_act_type_t,
-                                wsrep_seqno_t seqno_l,
-                                wsrep_seqno_t seqno_g);
-
-        void to_isolation_cleanup (TrxHandle* trx);
 
         class LocalOrder
         {
@@ -238,6 +217,7 @@ namespace galera
             State to_;
         };
 
+
         void build_stats_vars (std::vector<struct wsrep_stats_var>& stats);
 
         class Logger
@@ -279,9 +259,13 @@ namespace galera
         Gcs            gcs_;
         ServiceThd     service_thd_;
 
+        // action sources
+        ActionSource*   as_;
+        GcsActionSource gcs_as_;
+
         // trx processing
-        Wsdb          wsdb_;
-        Certification cert_;
+        Wsdb            wsdb_;
+        Certification   cert_;
 
         // concurrency control
         Monitor<LocalOrder> local_monitor_;
@@ -291,8 +275,6 @@ namespace galera
         gu::Atomic<size_t>    receivers_;
         gu::Atomic<long long> replicated_;
         gu::Atomic<long long> replicated_bytes_;
-        gu::Atomic<long long> received_;
-        gu::Atomic<long long> received_bytes_;
         gu::Atomic<long long> local_commits_;
         gu::Atomic<long long> local_rollbacks_;
         gu::Atomic<long long> local_cert_failures_;

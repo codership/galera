@@ -8,6 +8,7 @@
 #include "gu_logger.hpp"
 #include "certification.hpp"
 #include "wsdb.cpp"
+#include "gcs_action_source.hpp"
 #include <cstdlib>
 
 #include <check.h>
@@ -216,10 +217,10 @@ START_TEST(test_cert)
         trx->flush(0);
         const MappedBuffer& wscoll(trx->write_set_collection());
 
-        TrxHandle* trx2(cert.create_trx(&wscoll[0], wscoll.size(),
-                                         i + 1, i + 1));
 
-        cert.append_trx(trx2);
+        GcsActionTrx trx2(&wscoll[0], wscoll.size(), i + 1, i + 1);
+        cert.append_trx(trx2.trx());
+        trx->unref();
     }
 
     TrxHandle* trx(cert.get_trx(n_ws));
@@ -228,18 +229,84 @@ START_TEST(test_cert)
     fail_unless(cert.get_safe_to_discard_seqno() == -1,
                 "get_safe_to_discard_seqno() = %lld, expected -1",
                 static_cast<long long>(cert.get_safe_to_discard_seqno()));
+    trx->unref();
 
     trx = cert.get_trx(1);
     fail_unless(trx != 0);
     cert.set_trx_committed(trx);
     fail_unless(cert.get_safe_to_discard_seqno() == 0);
+    trx->unref();
 
     trx = cert.get_trx(4);
     fail_unless(trx != 0);
     cert.set_trx_committed(trx);
     fail_unless(cert.get_safe_to_discard_seqno() == 0);
+    trx->unref();
 
     cert.purge_trxs_upto(cert.get_safe_to_discard_seqno());
+
+}
+END_TEST
+
+
+START_TEST(test_cert_iso)
+{
+    Certification cert;
+    cert.assign_initial_position(0);
+    wsrep_uuid_t uuid = {{1, }};
+
+
+    TrxHandle* trx(new TrxHandle(uuid, 0, 1, true));
+    trx->append_row_id("foo", strlen("foo"), "1", 1, WriteSet::A_UPDATE);
+    trx->set_last_seen_seqno(0);
+    trx->set_flags(TrxHandle::F_COMMIT);
+    trx->flush(0);
+    trx->set_seqnos(0, 1);
+    Certification::TestResult tres(cert.append_trx(trx));
+    fail_unless(tres == Certification::TEST_OK);
+    fail_unless(trx->last_depends_seqno() == 0);
+    trx->unref();
+
+    trx = new TrxHandle(uuid, 1, -1, true);
+    trx->set_last_seen_seqno(0);
+    trx->set_flags(TrxHandle::F_COMMIT);
+    trx->flush(0);
+    trx->set_seqnos(1, 2);
+    tres = cert.append_trx(trx);
+    fail_unless(tres == Certification::TEST_OK);
+    fail_unless(trx->last_depends_seqno() == 1,
+                "expected last depends seqno 1, got %lld",
+                trx->last_depends_seqno());
+    trx->unref();
+
+    trx = new TrxHandle(uuid, 2, 3, true);
+    trx->append_row_id("foo", strlen("foo"), "3", 1, WriteSet::A_UPDATE);
+    trx->set_last_seen_seqno(0);
+    trx->set_flags(TrxHandle::F_COMMIT);
+    trx->flush(0);
+    trx->set_seqnos(2, 3);
+    tres = cert.append_trx(trx);
+    fail_unless(tres == Certification::TEST_OK);
+    fail_unless(trx->last_depends_seqno() == 2);
+    trx->unref();
+
+    trx = cert.get_trx(2);
+    cert.set_trx_committed(trx);
+    fail_unless(trx->is_committed() == true);
+    trx->unref();
+
+    trx = new TrxHandle(uuid, 3, 4, true);
+    trx->append_row_id("foo", strlen("foo"), "1", 1, WriteSet::A_UPDATE);
+    trx->set_last_seen_seqno(0);
+    trx->set_flags(TrxHandle::F_COMMIT);
+    trx->flush(0);
+    trx->set_seqnos(3, 4);
+    tres = cert.append_trx(trx);
+    fail_unless(tres == Certification::TEST_OK);
+    fail_unless(trx->last_depends_seqno() == 1,
+                "expected last depends seqno 1, got %lld",
+                trx->last_depends_seqno());
+    trx->unref();
 
 }
 END_TEST
@@ -264,5 +331,10 @@ Suite* write_set_suite()
     tc = tcase_create("test_cert");
     tcase_add_test(tc, test_cert);
     suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_cert_iso");
+    tcase_add_test(tc, test_cert_iso);
+    suite_add_tcase(s, tc);
+
     return s;
 }
