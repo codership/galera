@@ -147,8 +147,8 @@ galera::ReplicatorSMM::stats() const
     sv[STATS_LAST_APPLIED       ].value._int64  = apply_monitor_.last_left();
     sv[STATS_REPLICATED         ].value._int64  = replicated_();
     sv[STATS_REPLICATED_BYTES   ].value._int64  = replicated_bytes_();
-    sv[STATS_RECEIVED           ].value._int64  = received_();
-    sv[STATS_RECEIVED_BYTES     ].value._int64  = received_bytes_();
+    sv[STATS_RECEIVED           ].value._int64  = gcs_as_.received();
+    sv[STATS_RECEIVED_BYTES     ].value._int64  = gcs_as_.received_bytes();
     sv[STATS_LOCAL_COMMITS      ].value._int64  = local_commits_();
     sv[STATS_LOCAL_CERT_FAILURES].value._int64  = local_cert_failures_();
     sv[STATS_LOCAL_BF_ABORTS    ].value._int64  = local_bf_aborts_();

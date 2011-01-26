@@ -6,6 +6,7 @@
 #define GALERA_REPLICATOR_HPP
 
 #include "wsrep_api.h"
+#include "galera_exception.hpp"
 
 #include <galerautils.hpp>
 #include <string>
@@ -23,6 +24,16 @@ namespace galera
     class Replicator
     {
     public:
+        typedef enum
+        {
+            S_CLOSED,
+            S_CLOSING,
+            S_JOINING,
+            S_JOINED,
+            S_SYNCED,
+            S_DONOR
+        } State;
+
         Replicator() { }
         virtual ~Replicator() { }
         virtual wsrep_status_t connect(const std::string& cluster_name,
@@ -58,6 +69,26 @@ namespace galera
                                             wsrep_seqno_t       seqno,
                                             const void*         state,
                                             size_t              state_len) = 0;
+
+        // action source interface
+        virtual void process_trx(void* recv_ctx, TrxHandle* trx)
+            throw (ApplyException) = 0;
+        virtual void process_commit_cut(wsrep_seqno_t seq,
+                                        wsrep_seqno_t seqno_l)
+            throw (gu::Exception) = 0;
+        virtual void process_view_info(void* recv_ctx,
+                                       const wsrep_view_info_t& view_info,
+                                       State next_state,
+                                       wsrep_seqno_t seqno_l)
+            throw (gu::Exception) = 0;
+        virtual void process_state_req(void* recv_ctx, const void* req,
+                                       size_t req_size,
+                                       wsrep_seqno_t seqno_l)
+            throw (gu::Exception) = 0;
+        virtual void process_join(wsrep_seqno_t seqno_l)
+            throw (gu::Exception) = 0;
+        virtual void process_sync(wsrep_seqno_t seqno_l) = 0;
+
         // wsrep_status_t snapshot();
         virtual const struct wsrep_stats_var* stats() const = 0;
 

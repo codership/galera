@@ -63,7 +63,7 @@ build_dir = ARGUMENTS.get('build_dir', '')
 debug = ARGUMENTS.get('debug', -1)
 dbug  = ARGUMENTS.get('dbug', False)
 
-if int(debug) >= 0:
+if int(debug) >= 0 and int(debug) < 3:
     opt_flags = '-g -O%d -fno-inline' % int(debug)
     dbug = True
 

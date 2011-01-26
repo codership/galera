@@ -7,6 +7,7 @@
 
 #include "gu_atomic.hpp"
 #include "gu_throw.hpp"
+#include "gu_config.hpp"
 #include "gcs.h"
 #include "wsrep_api.h"
 

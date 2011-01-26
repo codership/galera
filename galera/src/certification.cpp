@@ -119,11 +119,23 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
     const MappedBuffer& wscoll(trx->write_set_collection());
 
     // max_depends_seqno, start from -1 and maximize on all dependencies
-    wsrep_seqno_t max_depends_seqno(-1);
+    wsrep_seqno_t max_depends_seqno(to_isolation_.empty() == true ? -1 :
+                                    to_isolation_.rbegin()->first);
     TrxHandle::CertKeySet& match(trx->cert_keys_);
     assert(match.empty() == true);
 
     Lock lock(mutex_);
+
+    // this must be run in TO isolation
+    if (trx->trx_id() == static_cast<wsrep_trx_id_t>(-1))
+    {
+        if (to_isolation_.insert(std::make_pair(trx->global_seqno(),
+                                                trx)).second == false)
+        {
+            gu_throw_fatal << "duplicate trx entry " << *trx;
+        }
+        max_depends_seqno = trx->global_seqno() - 1;
+    }
 
     while (offset < wscoll.size())
     {
@@ -209,6 +221,7 @@ cert_fail:
 galera::Certification::Certification(const string& conf)
     :
     trx_map_(),
+    to_isolation_(),
     cert_index_(),
     deps_set_(),
     mutex_(),
@@ -252,26 +265,6 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno)
     initial_position_      = seqno;
     position_              = seqno;
     safe_to_discard_seqno_ = seqno;
-}
-
-galera::TrxHandle* galera::Certification::create_trx(
-    const void* data,
-    size_t data_len,
-    wsrep_seqno_t seqno_l,
-    wsrep_seqno_t seqno_g)
-{
-    assert(seqno_l >= 0 && seqno_g >= 0);
-
-    TrxHandle* trx(new TrxHandle());
-
-    trx->set_seqnos(seqno_l, seqno_g);
-
-    size_t offset(unserialize(reinterpret_cast<const byte_t*>(data),
-                              data_len, 0, *trx));
-
-    trx->append_write_set(reinterpret_cast<const byte_t*>(data) + offset,
-                          data_len - offset);
-    return trx;
 }
 
 
@@ -397,6 +390,14 @@ void galera::Certification::set_trx_committed(TrxHandle* trx)
         // trxs with last_depends_seqno == -1 haven't gone through
         // append_trx
         Lock lock(mutex_);
+
+        if (trx->trx_id() == static_cast<wsrep_trx_id_t>(-1))
+        {
+            assert(to_isolation_.find(trx->global_seqno()) !=
+                   to_isolation_.end());
+            to_isolation_.erase(trx->global_seqno());
+        }
+
         DepsSet::iterator i(deps_set_.find(trx->last_seen_seqno()));
         assert(i != deps_set_.end());
 
@@ -415,6 +416,8 @@ galera::TrxHandle* galera::Certification::get_trx(wsrep_seqno_t seqno)
     TrxMap::iterator i(trx_map_.find(seqno));
 
     if (i == trx_map_.end()) return 0;
+
+    i->second->ref();
 
     return i->second;
 }

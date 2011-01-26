@@ -31,7 +31,7 @@ public:
     wsrep_status () { return static_cast<wsrep_status_t>(get_errno()); }
 };
 
-static const char* wsrep_status_str(wsrep_status_t& status)
+static inline const char* wsrep_status_str(wsrep_status_t& status)
 {
     switch (status)
     {
@@ -46,7 +46,7 @@ static const char* wsrep_status_str(wsrep_status_t& status)
     case WSREP_NOT_IMPLEMENTED: return "WSREP_NOT_IMPLEMENTED";
     default: return "(unknown code)";
     }
-};
+}
 
 /*!
  * And exception to handle replication errors

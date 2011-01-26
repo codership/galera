@@ -14,7 +14,9 @@ libgaleraxx_srcs = [
     'wsdb.cpp',
     'certification.cpp',
     'galera_service_thd.cpp',
-    'wsrep_params.cpp']
+    'wsrep_params.cpp',
+    'gcs_action_source.cpp',
+    'galera_info.c']
 
 libgaleraxx_env.StaticLibrary('galera++', libgaleraxx_srcs)
 
@@ -27,7 +29,6 @@ mmenv.Replace(SHOBJPREFIX = 'libmmgalera++-')
 #
 env.Append(LIBGALERA_OBJS = libgaleraxx_env.SharedObject(libgaleraxx_srcs))
 env.Append(LIBMMGALERA_OBJS = mmenv.SharedObject([
-            'galera_info.c',
             'replicator_smm.cpp',
             'replicator_smm_stats.cpp',
             'replicator_smm_params.cpp',

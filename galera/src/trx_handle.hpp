@@ -300,6 +300,7 @@ namespace galera
 
     size_t serial_size(const TrxHandle&);
 
+
     class TrxHandleLock
     {
     public:

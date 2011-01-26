@@ -17,6 +17,7 @@ extern "C"
 #include <sstream>
 #include <iostream>
 
+
 static wsrep_apply_data_t
 init_apply_data (const char* stmt) // NOTE: stmt is NOT copied!
 {
@@ -237,6 +238,7 @@ apply_trx_ws(void*                    recv_ctx,
     return;
 }
 
+
 std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
 {
     switch (state)
@@ -282,6 +284,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_retry_sec_      (1),
     gcs_                (config_, args->node_name, args->node_incoming),
     service_thd_        (gcs_),
+    as_                 (0),
+    gcs_as_             (gcs_, *this),
     wsdb_               (),
     cert_               (),
     local_monitor_      (),
@@ -289,8 +293,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     receivers_          (),
     replicated_         (),
     replicated_bytes_   (),
-    received_           (),
-    received_bytes_     (),
     local_commits_      (),
     local_rollbacks_    (),
     local_cert_failures_(),
@@ -332,6 +334,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
 
 galera::ReplicatorSMM::~ReplicatorSMM()
 {
+    log_info << "dtor state: " << state_();
     switch (state_())
     {
     case S_JOINING:
@@ -402,27 +405,19 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
         return WSREP_FATAL;
     }
 
+    ++receivers_;
+    as_ = &gcs_as_;
+
     wsrep_status_t retval(WSREP_OK);
 
     while (state_() != S_CLOSING)
     {
-        void* act;
-        size_t act_size;
-        gcs_act_type_t act_type;
-        gcs_seqno_t seqno_g, seqno_l;
-        ssize_t rc(gcs_.recv(&act, &act_size, &act_type, &seqno_l, &seqno_g));
-
+        ssize_t rc(as_->process(recv_ctx));
         if (rc <= 0)
         {
             retval = WSREP_CONN_FAIL;
             break;
         }
-
-        retval = dispatch(recv_ctx, act, act_size, act_type,
-                          seqno_l, seqno_g);
-        free(act);
-
-        if (retval == WSREP_FATAL || retval == WSREP_NODE_FAIL) break;
     }
 
     if (receivers_.sub_and_fetch(1) == 0)
@@ -499,107 +494,25 @@ void galera::ReplicatorSMM::discard_local_conn(wsrep_conn_id_t conn_id)
 }
 
 
-wsrep_status_t
-galera::ReplicatorSMM::process_trx_ws(void* recv_ctx, TrxHandle* trx)
-    throw (gu::Exception)
+void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
+    throw (ApplyException)
 {
     assert(trx != 0);
     assert(trx->global_seqno() > 0);
-    assert(trx->is_local() == false);
+    assert(trx->is_certified() == true);
+    assert(trx->global_seqno() > apply_monitor_.last_left());
 
-    LocalOrder lo(*trx);
     ApplyOrder ao(*trx);
-
-    local_monitor_.enter(lo);
-    Certification::TestResult cert_ret(cert_.append_trx(trx));
-    local_monitor_.leave(lo);
-
-    wsrep_status_t retval(WSREP_OK);
-
-    if (gu_likely(trx->global_seqno() > apply_monitor_.last_left()))
+    if (apply_monitor_.enter(ao) != 0)
     {
-        if (gu_likely(Certification::TEST_OK == cert_ret))
-        {
-            apply_monitor_.enter(ao);
-            gu_trace(apply_trx_ws(recv_ctx, bf_apply_cb_, *trx));
-            // at this point any exception in apply_trx_ws() is fatal, not
-            // catching anything.
-            apply_monitor_.leave(ao);
-        }
-        else
-        {
-            apply_monitor_.self_cancel(ao);
-            retval = WSREP_TRX_FAIL;
-        }
+        gu_throw_fatal << "unable to enter apply monitor";
     }
-    else
-    {
-        // This action was already contained in SST. Note that we can't
-        // drop the action earlier to build cert index properly.
-        log_debug << "skipping applying of trx " << *trx;
-    }
-
+    gu_trace(apply_trx_ws(recv_ctx, bf_apply_cb_, *trx));
+    // at this point any exception in apply_trx_ws() is fatal, not
+    // catching anything.
+    apply_monitor_.leave(ao);
     cert_.set_trx_committed(trx);
     report_last_committed();
-
-    return retval;
-}
-
-
-wsrep_status_t
-galera::ReplicatorSMM::process_conn_ws(void* recv_ctx, TrxHandle* trx)
-    throw (gu::Exception)
-{
-    assert(trx != 0);
-    assert(trx->global_seqno() > 0);
-    assert(trx->is_local() == false);
-
-    LocalOrder lo(*trx);
-    ApplyOrder ao(*trx);
-
-    local_monitor_.enter(lo);
-
-    Certification::TestResult cert_ret(cert_.append_trx(trx));
-
-    wsrep_status_t      retval (WSREP_OK);
-    wsrep_seqno_t const seqno  (trx->global_seqno());
-
-    if (gu_likely(seqno > apply_monitor_.last_left()))
-    {
-        if (gu_likely(Certification::TEST_OK == cert_ret))
-        {
-            apply_monitor_.drain(seqno - 1);
-
-            try
-            {
-                gu_trace(apply_wscoll(recv_ctx, bf_apply_cb_, *trx));
-            }
-            catch (ApplyException& e)
-            {
-                // In isolation we don't know if this trx was valid at all,
-                // so warning only
-                log_warn << e.what();
-                retval = WSREP_TRX_FAIL;
-            }
-        }
-        else
-        {
-            retval = WSREP_TRX_FAIL;
-        }
-
-        apply_monitor_.self_cancel(ao);
-    }
-    else
-    {
-        // This action was already contained in SST. Note that we can't
-        // drop the action earlier to build cert index properly.
-        log_debug << "skipping applying of iso trx " << *trx;
-    }
-
-    cert_.set_trx_committed(trx);
-    local_monitor_.leave(lo);
-
-    return retval;
 }
 
 
@@ -767,6 +680,11 @@ wsrep_status_t galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
     {
     case TrxHandle::S_MUST_ABORT:
     case TrxHandle::S_ABORTING:
+        // must cert and replay, must replay are ok too
+        // since trx is supposed to release locks before
+        // going to replay mode
+    case TrxHandle::S_MUST_CERT_AND_REPLAY:
+    case TrxHandle::S_MUST_REPLAY:
         break;
     default:
         trx->set_state(TrxHandle::S_MUST_ABORT);
@@ -856,8 +774,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
         retval = cert(trx);
         if (retval != WSREP_OK)
         {
-            ApplyOrder ao(*trx);
-            apply_monitor_.self_cancel(ao);
+            // apply monitor is self canceled in cert
             break;
         }
         // fall through
@@ -941,15 +858,6 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno) const
 }
 
 
-void galera::ReplicatorSMM::to_isolation_cleanup (TrxHandle* trx)
-{
-    ApplyOrder ao(*trx);
-    apply_monitor_.self_cancel(ao);
-    cert_.set_trx_committed(trx);
-//    wsdb_.discard_conn_query(trx->conn_id()); this should be done by caller
-    report_last_committed();
-}
-
 
 wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle* trx)
 {
@@ -958,34 +866,33 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle* trx)
     assert(trx->local_seqno() > -1 && trx->global_seqno() > -1);
     assert(trx->global_seqno() > apply_monitor_.last_left());
 
-    trx->set_state(TrxHandle::S_CERTIFYING);
-    LocalOrder lo(*trx);
-
-    if (0 == local_monitor_.enter(lo))
+    wsrep_status_t retval;
+    switch ((retval = cert(trx)))
     {
-        if (Certification::TEST_OK == cert_.append_trx(trx))
+    case WSREP_OK:
+    {
+        ApplyOrder ao(*trx);
+        if (apply_monitor_.enter(ao) != 0)
         {
-            trx->set_state(TrxHandle::S_CERTIFIED);
-            apply_monitor_.drain(trx->global_seqno() - 1);
-            trx->set_state(TrxHandle::S_APPLYING);
-            return WSREP_OK;
+            gu_throw_fatal << "unable to enter apply monitor: " << *trx;
         }
-
-        local_monitor_.leave(lo);
-        trx->set_state(TrxHandle::S_MUST_ABORT);
+        trx->set_state(TrxHandle::S_APPLYING);
+        break;
     }
-    else
-    {
-        local_monitor_.self_cancel(lo);
-        trx->set_state(TrxHandle::S_MUST_ABORT);
+    case WSREP_TRX_FAIL:
+        // Apply monitor is released in cert() in case of failure.
+        trx->set_state(TrxHandle::S_ABORTING);
+        report_last_committed();
+        break;
+    default:
+        log_error << "unrecognized retval "
+                  << retval
+                  << " for to isolation certification for "
+                  << *trx;
+        retval = WSREP_FATAL;
+        break;
     }
-
-    assert(trx->state() == TrxHandle::S_MUST_ABORT);
-    trx->set_state(TrxHandle::S_ABORTING);
-
-    to_isolation_cleanup(trx);
-
-    return WSREP_TRX_FAIL;
+    return retval;
 }
 
 
@@ -993,11 +900,10 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_end(TrxHandle* trx)
 {
     assert(trx->state() == TrxHandle::S_APPLYING);
 
-    LocalOrder lo(*trx);
-    local_monitor_.leave(lo);
-    trx->set_state(TrxHandle::S_COMMITTED);
-
-    to_isolation_cleanup(trx);
+    ApplyOrder ao(*trx);
+    apply_monitor_.leave(ao);
+    cert_.set_trx_committed(trx);
+    report_last_committed();
 
     return WSREP_OK;
 }
@@ -1054,6 +960,224 @@ galera::ReplicatorSMM::sst_received(const wsrep_uuid_t& uuid,
     sst_seqno_ = seqno;
     sst_cond_.signal();
     return WSREP_OK;
+}
+
+
+void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
+    throw (ApplyException)
+{
+    assert(recv_ctx != 0);
+    assert(trx != 0);
+    assert(trx->local_seqno() > 0);
+    assert(trx->global_seqno() > 0);
+    assert(trx->last_seen_seqno() > 0);
+    assert(trx->last_depends_seqno() == -1);
+    assert(trx->state() == TrxHandle::S_REPLICATED);
+
+    wsrep_status_t retval;
+    switch ((retval = cert(trx)))
+    {
+    case WSREP_OK:
+        gu_trace(apply_trx(recv_ctx, trx));
+        break;
+    case WSREP_TRX_FAIL:
+        // certification failed, apply monitor has been canceled
+        break;
+    default:
+        // this should not happen for remote actions
+        gu_throw_error(EINVAL)
+            << "unrecognized retval for remote trx certification: "
+            << retval << " trx: " << *trx;
+    }
+}
+
+
+void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
+                                               wsrep_seqno_t seqno_l)
+    throw (gu::Exception)
+{
+    assert(seq > 0);
+    assert(seqno_l > 0);
+    LocalOrder lo(seqno_l);
+    int ret;
+    if ((ret = local_monitor_.enter(lo)) != 0)
+    {
+        gu_throw_fatal << "failed to enter local monitor: " << ret;
+    }
+    cert_.purge_trxs_upto(seq);
+    local_monitor_.leave(lo);
+}
+
+
+void galera::ReplicatorSMM::process_view_info(void* recv_ctx,
+                                              const wsrep_view_info_t& view_info,
+                                              State next_state,
+                                              wsrep_seqno_t seqno_l)
+    throw (gu::Exception)
+{
+    assert(seqno_l > -1);
+    LocalOrder lo(seqno_l);
+
+    int ret;
+    if ((ret = local_monitor_.enter(lo)) != 0)
+    {
+        gu_throw_fatal << "failed to enter local monitor: " << ret;
+    }
+    apply_monitor_.drain(cert_.position());
+
+    const wsrep_seqno_t group_seqno(view_info.first - 1);
+    const wsrep_uuid_t& group_uuid(view_info.id);
+    if (view_info.my_idx >= 0)
+    {
+        uuid_ = view_info.members[view_info.my_idx].id;
+    }
+
+    bool st_req(view_info.state_gap);
+    if (st_req == true)
+    {
+        assert(view_info.conf >= 0);
+        if (state_uuid_ == group_uuid)
+        {
+            // common history
+            if (state_() >= S_JOINED)
+            {
+                st_req = (apply_monitor_.last_left() < group_seqno);
+            }
+            else
+            {
+                st_req = (apply_monitor_.last_left() != group_seqno);
+            }
+        }
+    }
+
+    void* app_req(0);
+    ssize_t app_req_len(0);
+    // copy that will be eaten by callback
+    wsrep_view_info_t *cb_view_info(galera_view_info_copy(&view_info));
+    cb_view_info->state_gap = st_req;
+    view_cb_(app_ctx_, recv_ctx, cb_view_info, 0, 0, &app_req, &app_req_len);
+
+    if (app_req_len < 0)
+    {
+        gu_throw_fatal << "View callback failed: " << -app_req_len
+                       << " (" << strerror(-app_req_len) << ')';
+    }
+
+    if (view_info.conf >= 0)
+    {
+        // Primary configuration
+
+        // we have to reset cert initial position here, SST does not contain
+        // cert index yet (see #197).
+        cert_.assign_initial_position(group_seqno);
+
+        if (st_req == true)
+        {
+            if (request_sst(group_uuid, group_seqno,
+                            app_req, app_req_len) != WSREP_OK)
+            {
+                gu_throw_fatal << "faield to request sst";
+            }
+        }
+        else
+        {
+            if (view_info.conf == 1)
+            {
+                state_uuid_ = group_uuid;
+                apply_monitor_.set_initial_position(group_seqno);
+            }
+
+            if (state_() == S_JOINING || state_() == S_DONOR)
+            {
+                switch (next_state)
+                {
+                case S_JOINED:
+                    state_.shift_to(S_JOINED);
+                    break;
+                case S_SYNCED:
+                    state_.shift_to(S_SYNCED);
+                    synced_cb_(app_ctx_);
+                    break;
+                default:
+                    log_debug << "next_state " << next_state;
+                    break;
+                }
+            }
+            invalidate_state(state_file_);
+        }
+    }
+    else
+    {
+        // Non-primary configuration
+        if (state_uuid_ != WSREP_UUID_UNDEFINED)
+        {
+            store_state(state_file_);
+        }
+
+        if (next_state != S_JOINING && next_state != S_CLOSING)
+        {
+            gu_throw_fatal << "unexpected next state for non-prim: "
+                           << next_state;
+        }
+        state_.shift_to(next_state);
+    }
+
+    local_monitor_.leave(lo);
+}
+
+
+void galera::ReplicatorSMM::process_state_req(void* recv_ctx,
+                                              const void* req,
+                                              size_t req_size,
+                                              wsrep_seqno_t seqno_l)
+    throw (gu::Exception)
+{
+    assert(recv_ctx != 0);
+    assert(seqno_l > -1);
+    assert(req != 0);
+
+    LocalOrder lo(seqno_l);
+    int ret;
+    if ((ret = local_monitor_.enter(lo)) != 0)
+    {
+        gu_throw_fatal << "failed to enter local monitor: " << ret;
+    }
+    apply_monitor_.drain(cert_.position());
+    state_.shift_to(S_DONOR);
+    sst_donate_cb_(app_ctx_, recv_ctx, req, req_size, &state_uuid_,
+                   cert_.position(), 0, 0);
+    local_monitor_.leave(lo);
+}
+
+
+void galera::ReplicatorSMM::process_join(wsrep_seqno_t seqno_l)
+    throw (gu::Exception)
+{
+    LocalOrder lo(seqno_l);
+    int ret;
+    if ((ret = local_monitor_.enter(lo)) != 0)
+    {
+        gu_throw_fatal << "failed to enter local monitor: " << ret;
+    }
+    apply_monitor_.drain(cert_.position());
+    state_.shift_to(S_JOINED);
+    local_monitor_.leave(lo);
+}
+
+
+void galera::ReplicatorSMM::process_sync(wsrep_seqno_t seqno_l)
+    throw (gu::Exception)
+{
+    LocalOrder lo(seqno_l);
+    int ret;
+    if ((ret = local_monitor_.enter(lo)) != 0)
+    {
+        gu_throw_fatal << "failed to enter local monitor: " << ret;
+    }
+    apply_monitor_.drain(cert_.position());
+    state_.shift_to(S_SYNCED);
+    synced_cb_(app_ctx_);
+    local_monitor_.leave(lo);
 }
 
 
@@ -1202,13 +1326,29 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
         switch (cert_.append_trx(trx))
         {
         case Certification::TEST_OK:
-            trx->set_state(TrxHandle::S_CERTIFIED);
-            retval = WSREP_OK;
+            if (trx->global_seqno() > apply_monitor_.last_left())
+            {
+                trx->set_state(TrxHandle::S_CERTIFIED);
+                retval = WSREP_OK;
+            }
+            else
+            {
+                // this can happen after SST position has been submitted
+                // but not all actions preceding SST initial position
+                // have been processed
+                trx->set_state(TrxHandle::S_MUST_ABORT);
+                if (trx->is_local() == true) ++local_cert_failures_;
+                cert_.set_trx_committed(trx);
+                retval = WSREP_TRX_FAIL;
+            }
             break;
         case Certification::TEST_FAILED:
-            apply_monitor_.self_cancel(ao);
+            if (trx->global_seqno() > apply_monitor_.last_left())
+            {
+                apply_monitor_.self_cancel(ao);
+            }
             trx->set_state(TrxHandle::S_MUST_ABORT);
-            ++local_cert_failures_;
+            if (trx->is_local() == true) ++local_cert_failures_;
             cert_.set_trx_committed(trx);
             retval = WSREP_TRX_FAIL;
             break;
@@ -1250,68 +1390,6 @@ void galera::ReplicatorSMM::report_last_committed()
 }
 
 
-wsrep_status_t
-galera::ReplicatorSMM::process_global_action(void*         recv_ctx,
-                                             const void*   act,
-                                             size_t        act_size,
-                                             wsrep_seqno_t seqno_l,
-                                             wsrep_seqno_t seqno_g)
-{
-    assert(recv_ctx != 0);
-    assert(act != 0);
-    assert(seqno_l > 0);
-    assert(seqno_g > 0);
-
-    if (gu_unlikely(seqno_g <= cert_.position()))
-    {
-        log_debug << "global trx below cert position" << seqno_g;
-        LocalOrder lo(seqno_l);
-        local_monitor_.self_cancel(lo);
-        return WSREP_OK;
-    }
-
-    TrxHandle* trx(0);
-    try
-    {
-        trx = cert_.create_trx(act, act_size, seqno_l, seqno_g);
-    }
-    catch (gu::Exception& e)
-    {
-        GU_TRACE(e);
-
-        log_fatal << "Failed to create trx from a writeset: " << e.what()
-                  << std::endl << "Global:    " << seqno_g
-                  << std::endl << "Local:     " << seqno_l
-                  << std::endl << "Buffer:    " << act
-                  << std::endl << "Size:      " << act_size;
-
-        return WSREP_FATAL;
-    }
-
-    if (trx == 0)
-    {
-        log_warn << "could not read trx " << seqno_g;
-        return WSREP_FATAL;
-    }
-
-    wsrep_status_t retval;
-    TrxHandleLock lock(*trx);
-
-    if (trx->trx_id() != static_cast<wsrep_trx_id_t>(-1))
-    {
-        // normal trx
-        retval = process_trx_ws(recv_ctx, trx);
-    }
-    else
-    {
-        // trx to be run in isolation
-        retval = process_conn_ws(recv_ctx, trx);
-    }
-
-    trx->unref();
-
-    return retval;
-}
 
 
 wsrep_status_t
@@ -1397,236 +1475,3 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
     }
     return retval;
 }
-
-
-bool galera::ReplicatorSMM::st_required(const gcs_act_conf_t& conf)
-{
-    bool retval(conf.my_state == GCS_NODE_STATE_PRIM);
-    const wsrep_uuid_t* group_uuid(
-        reinterpret_cast<const wsrep_uuid_t*>(conf.group_uuid));
-
-    if (retval == true)
-    {
-        assert(conf.conf_id >= 0);
-        if (state_uuid_ == *group_uuid)
-        {
-            // common history
-            if (state_() >= S_JOINED)
-            {
-                // if we took ST already, it may exceed conf->seqno
-                // (ST is asynchronous!)
-                retval = (apply_monitor_.last_left() < conf.seqno);
-            }
-            else
-            {
-                // here we are supposed to have continuous history
-                retval = (apply_monitor_.last_left() != conf.seqno);
-            }
-        }
-        else
-        {
-            // no common history
-        }
-    }
-    else
-    {
-        // non-prim component
-        // assert(conf.conf_id < 0);
-    }
-
-    return retval;
-}
-
-
-wsrep_status_t galera::ReplicatorSMM::process_conf(void* recv_ctx,
-                                                   const gcs_act_conf_t* conf)
-{
-    assert(conf != 0);
-
-    bool st_req(st_required(*conf));
-    const wsrep_seqno_t group_seqno(conf->seqno);
-    const wsrep_uuid_t* group_uuid(
-        reinterpret_cast<const wsrep_uuid_t*>(conf->group_uuid));
-    wsrep_view_info_t* view_info(galera_view_info_create(conf, st_req));
-
-    if (view_info->my_idx >= 0)
-    {
-        uuid_ = view_info->members[view_info->my_idx].id;
-    }
-
-    void*   app_req(0);
-    ssize_t app_req_len(0);
-
-    view_cb_(app_ctx_, recv_ctx, view_info, 0, 0, &app_req, &app_req_len);
-
-    if (app_req_len < 0)
-    {
-        log_error << "View callback failed: " << -app_req_len
-                  << " (" << strerror(-app_req_len) << ')';
-        return WSREP_NODE_FAIL;
-    }
-
-    wsrep_status_t retval(WSREP_OK);
-
-    if (conf->conf_id >= 0)
-    {
-        // Primary configuration
-
-        // we have to reset cert initial position here, SST does not contain
-        // cert index yet (see #197).
-        cert_.assign_initial_position(conf->seqno);
-
-        if (st_req == true)
-        {
-            retval = request_sst(*group_uuid, group_seqno, app_req,app_req_len);
-        }
-        else
-        {
-            // sanity checks here
-            if (conf->conf_id == 1)
-            {
-                state_uuid_ = *group_uuid;
-                apply_monitor_.set_initial_position(conf->seqno);
-            }
-
-            if (state_() == S_JOINING || state_() == S_DONOR)
-            {
-                switch (conf->my_state)
-                {
-                case GCS_NODE_STATE_JOINED:
-                    state_.shift_to(S_JOINED);
-                    break;
-                case GCS_NODE_STATE_SYNCED:
-                    state_.shift_to(S_SYNCED);
-                    synced_cb_(app_ctx_);
-                    break;
-                default:
-                    log_debug << "gcs state " << conf->my_state;
-                    break;
-                }
-            }
-            invalidate_state(state_file_);
-        }
-    }
-    else
-    {
-        // Non-primary configuration
-        if (state_uuid_ != WSREP_UUID_UNDEFINED)
-        {
-            store_state(state_file_);
-        }
-
-        if (conf->my_idx >= 0)
-        {
-            state_.shift_to(S_JOINING);
-        }
-        else
-        {
-            state_.shift_to(S_CLOSING);
-        }
-    }
-    return retval;
-}
-
-
-wsrep_status_t
-galera::ReplicatorSMM::process_to_action(void*          recv_ctx,
-                                         const void*    act,
-                                         size_t         act_size,
-                                         gcs_act_type_t act_type,
-                                         wsrep_seqno_t  seqno_l)
-{
-    assert(seqno_l > -1);
-    LocalOrder lo(seqno_l);
-
-    local_monitor_.enter(lo);
-    apply_monitor_.drain(cert_.position());
-
-    wsrep_status_t retval(WSREP_NODE_FAIL);
-
-    switch (act_type)
-    {
-    case GCS_ACT_CONF:
-        retval = process_conf(recv_ctx,
-                              reinterpret_cast<const gcs_act_conf_t*>(act));
-        break;
-
-    case GCS_ACT_STATE_REQ:
-        state_.shift_to(S_DONOR);
-        sst_donate_cb_(app_ctx_, recv_ctx, act, act_size,
-                       &state_uuid_, cert_.position(), 0, 0);
-        retval = WSREP_OK;
-        break;
-
-    case GCS_ACT_JOIN:
-        state_.shift_to(S_JOINED);
-        retval = WSREP_OK;
-        break;
-
-    case GCS_ACT_SYNC:
-        state_.shift_to(S_SYNCED);
-        synced_cb_(app_ctx_);
-        retval = WSREP_OK;
-        break;
-
-    default:
-        gu_throw_fatal << "invalid gcs act type " << act_type;
-    }
-
-    if (WSREP_OK == retval)
-    {
-        local_monitor_.leave(lo);
-    }
-    else
-    {
-        gu_throw_fatal << "TO action failed. Can't continue.";
-    }
-
-    return retval;
-}
-
-
-wsrep_status_t
-galera::ReplicatorSMM::dispatch(void*          recv_ctx,
-                                const void*    act,
-                                size_t         act_size,
-                                gcs_act_type_t act_type,
-                                wsrep_seqno_t  seqno_l,
-                                wsrep_seqno_t  seqno_g)
-{
-    assert(recv_ctx != 0);
-    assert(act != 0);
-
-    switch (act_type)
-    {
-    case GCS_ACT_TORDERED:
-    {
-        assert(seqno_l != GCS_SEQNO_ILL && seqno_g != GCS_SEQNO_ILL);
-        ++received_;
-        received_bytes_ += act_size;
-        return process_global_action(recv_ctx, act, act_size, seqno_l, seqno_g);
-    }
-    case GCS_ACT_COMMIT_CUT:
-    {
-        assert(seqno_g == GCS_SEQNO_ILL);
-        LocalOrder lo(seqno_l);
-        local_monitor_.enter(lo);
-        wsrep_seqno_t seq;
-        unserialize(reinterpret_cast<const gu::byte_t*>(act), act_size, 0, seq);
-        cert_.purge_trxs_upto(seq);
-        local_monitor_.leave(lo);
-        return WSREP_OK;
-    }
-    default:
-    {
-        // assert(seqno_g == GCS_SEQNO_ILL);
-        if (seqno_l < 0)
-        {
-            log_error << "got error " << gcs_act_type_to_str(act_type);
-            return WSREP_OK;
-        }
-        return process_to_action(recv_ctx, act, act_size, act_type, seqno_l);
-    }
-    }
-}
-
