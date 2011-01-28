@@ -31,7 +31,22 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "17"
+#define WSREP_INTERFACE_VERSION "18"
+
+/*!
+ *  Certain provider capabilities application may need to know
+ */
+#define WSREP_CAP_MULTI_MASTER          ( 1ULL << 0 )
+#define WSREP_CAP_CERTIFICATION         ( 1ULL << 1 )
+#define WSREP_CAP_PARALLEL_APPLYING     ( 1ULL << 2 )
+#define WSREP_CAP_TRX_REPLAY            ( 1ULL << 3 )
+#define WSREP_CAP_ISOLATION             ( 1ULL << 4 )
+#define WSREP_CAP_CAUSAL_READS          ( 1ULL << 5 )
+#define WSREP_CAP_CAUSAL_TRX            ( 1ULL << 6 )
+#define WSREP_CAP_WRITE_SET_INCREMENTS  ( 1ULL << 7 )
+#define WSREP_CAP_SESSION_LOCKS         ( 1ULL << 8 )
+#define WSREP_CAP_DISTRIBUTED_LOCKS     ( 1ULL << 9 )
+#define WSREP_CAP_CONSISTENCY_CHECK     ( 1ULL << 10 )
 
 /* Empty backend spec */
 #define WSREP_NONE "none"
@@ -65,8 +80,6 @@ typedef enum wsrep_status {
 
 /*!
  * @brief log severity levels, passed as first argument to log handler
- *
- * @todo: how to synchronize it automatically with wsreputils?
  */
 typedef enum wsrep_log_level
 {
@@ -83,7 +96,7 @@ typedef enum wsrep_log_level
  *        All messages from wsrep library are directed to this
  *        handler, if present.
  *
- * @param level log level
+ * @param level   log level
  * @param message log message
  */
 typedef void (*wsrep_log_cb_t)(wsrep_log_level_t, const char *);
@@ -384,10 +397,18 @@ struct wsrep_ {
   /*!
    * @brief Initializes wsrep provider
    *
-   * @param args wsrep initialization parameters
+   * @param wsrep this wsrep handle
+   * @param args  wsrep initialization parameters
    */
     wsrep_status_t (*init)   (wsrep_t*                      wsrep,
                               const struct wsrep_init_args* args);
+
+  /*!
+   * @brief Returns provider capabilities flag bitmap
+   *
+   * @param wsrep this wsrep handle
+   */
+    uint64_t (*capabilities) (wsrep_t* wsrep);
 
   /*!
    * @brief Passes provider-specific configuration string to provider.
