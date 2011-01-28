@@ -44,7 +44,18 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
 
 
 extern "C"
-void galera_tear_down(wsrep_t *gh)
+uint64_t galera_capabilities(wsrep_t* gh)
+{
+    return (WSREP_CAP_MULTI_MASTER      |
+            WSREP_CAP_CERTIFICATION     |
+            WSREP_CAP_PARALLEL_APPLYING |
+            WSREP_CAP_TRX_REPLAY        |
+            WSREP_CAP_ISOLATION);
+}
+
+
+extern "C"
+void galera_tear_down(wsrep_t* gh)
 {
     assert(gh != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
@@ -714,6 +725,7 @@ void galera_stats_free (wsrep_t* gh, struct wsrep_stats_var* s)
 static wsrep_t galera_str = {
     WSREP_INTERFACE_VERSION,
     &galera_init,
+    &galera_capabilities,
     &galera_parameters_set,
     &galera_parameters_get,
     &galera_connect,

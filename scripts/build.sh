@@ -175,12 +175,9 @@ build_base=$(cd $(dirname $0)/..; pwd -P)
 
 # Define branches to be used
 galerautils_src=$build_base/galerautils
-gcache_src=$build_base/gcache
 galeracomm_src=$build_base/galeracomm
 gcomm_src=$build_base/gcomm
 gcs_src=$build_base/gcs
-gemini_src=$build_base/gemini
-wsdb_src=$build_base/wsdb
 galera_src=$build_base/galera
 
 # Function to build single project
@@ -285,7 +282,7 @@ build_module()
     local module="$1"
     shift
     local build_dir="$build_base/$module"
-    if test "$initial_stage" == "$module" || "$building" = "true"
+    if test "$initial_stage" == "$module" || "$building" == "true"
     then
         build $build_dir $conf_flags $@ && building="true" || return 1
     fi
@@ -324,7 +321,7 @@ build_sources()
     local module
     local srcs=""
 
-    for module in "galerautils" "gcomm" "gcs" "wsdb" "galera"
+    for module in "galerautils" "gcomm" "gcs" "galera"
     do
         src=$(build_source $module | tail -n 1)
         srcs="$srcs $src"
@@ -339,18 +336,6 @@ build_sources()
 }
 
 building="false"
-
-# The whole purpose of ccache is to be able to safely make clean and not rebuild
-#if test $initial_stage = "scratch"
-#then
-## Commented out, not sure where this does its tricks (teemu)
-##    rm -rf
-#    if test $have_ccache = "true"
-#    then
-#        ccache -C
-#    fi
-#    building="true"
-#fi
 
 echo "CC: $CC"
 echo "CPPFLAGS: $CPPFLAGS"
@@ -386,45 +371,10 @@ then
     then
         scons $scons_args -j $JOBS
     fi
-
+    
 elif test "$SKIP_BUILD" == "no"; then # Build using autotools
-
-build_module "galerautils"
-build_module "gcache"
-
-if test "$DISABLE_GCOMM" != "yes"
-then 
-    build_module "gcomm"
-else
-    gcs_conf_flags="$gcs_conf_flags --disable-gcomm"
-fi
-
-if test "$DISABLE_VSBES" != "yes"
-then 
-    if test $initial_stage = "galeracomm" || $building = "true"
-    then
-        build $galeracomm_src $conf_flags
-        building="true"
-    fi
-
-    # Galera comm is not particularly easy to handle
-    CPPFLAGS="$CPPFLAGS -I$galeracomm_src/vs/include" # non-standard location
-    CPPFLAGS="$CPPFLAGS -I$galeracomm_src/common/include" # non-standard location
-    LDFLAGS="$LDFLAGS -L$galeracomm_src/common/src/.libs"
-    LDFLAGS="$LDFLAGS -L$galeracomm_src/transport/src/.libs"
-    LDFLAGS="$LDFLAGS -L$galeracomm_src/vs/src/.libs"
-    LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/common/src/.libs"
-    LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/transport/src/.libs"
-    LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$galeracomm_src/vs/src/.libs"
-else
-    gcs_conf_flags="$gcs_conf_flags --disable-vs"
-fi
-
-build_module "gcs" $gcs_conf_flags
-build_module "gemini"
-build_module "wsdb"
-build_module "galera"
-
+    echo "Error: autotools not supported anymore! Nothing was built."
+    exit 1
 fi # SKIP_BUILD / SCONS
 
 if test "$PACKAGE" == "yes"
@@ -437,7 +387,4 @@ then
     build_sources
 fi
 
-if test $building != "true"
-then
-    echo "Warn: Nothing was built!"
-fi
+

@@ -357,29 +357,15 @@ install -m 644 LICENSE.mysql $MYSQL_DIST_DIR
 GALERA_LIBS=$GALERA_DIST_DIR/lib
 install -m 644 -D LICENSE.galera $GALERA_DIST_DIR/LICENSE.galera
 install -m 755 -d $GALERA_LIBS
+
 if [ "$SCONS" == "yes" ]
 then
     SCONS_VD=$GALERA_SRC
     cp -P $SCONS_VD/libmmgalera.so*         $GALERA_LIBS
-
 else
-    cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils.so*   $GALERA_LIBS
-    cp -P $GALERA_SRC/galerautils/src/.libs/libgalerautils++.so* $GALERA_LIBS
-    cp -P $GALERA_SRC/gcomm/src/.libs/libgcomm.so*               $GALERA_LIBS
-    cp -P $GALERA_SRC/gcs/src/.libs/libgcs.so*                   $GALERA_LIBS
-    cp -P $GALERA_SRC/wsdb/src/.libs/libwsdb.so*                 $GALERA_LIBS
-    cp -P $GALERA_SRC/galera/src/.libs/libmmgalera.so*           $GALERA_LIBS
+    echo "Autotools compilation not supported any more."
+    exit 1
 fi
-
-# Install vsbes stuff if it is available
-GALERA_SBIN="$GALERA_DIST_DIR/galera/sbin"
-    cp -P $GALERA_SRC/galeracomm/common/src/.libs/libgcommcommonpp.so* $GALERA_LIBS && \
-    cp -P $GALERA_SRC/galeracomm/transport/src/.libs/libgcommtransportpp.so* $GALERA_LIBS && \
-    cp -P $GALERA_SRC/galeracomm/vs/src/.libs/libgcommvspp.so* $GALERA_LIBS && \
-    GALERA_SBIN=$GALERA_DIST_DIR/sbin && \
-    mkdir -p $GALERA_SBIN && \
-    install -D -m 755 $GALERA_SRC/galeracomm/vs/src/.libs/vsbes $GALERA_SBIN/vsbes && \
-    install -m 755 vsbes $DIST_DIR || echo "Skipping vsbes"
 
 install -m 644 LICENSE       $DIST_DIR
 install -m 755 mysql-galera  $DIST_DIR
