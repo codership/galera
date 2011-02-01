@@ -10,6 +10,8 @@
 
 #include "gu_monitor.hpp"
 
+#pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 #include <asio.hpp>
 
 #include <vector>

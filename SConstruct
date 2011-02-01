@@ -15,10 +15,11 @@
 ####################################################################
 
 import os
+import platform
 
 sysname = os.uname()[0].lower()
-print sysname
-
+machine = platform.machine()
+print 'Host: ' + sysname + ' ' + machine
 
 #
 # Print Help
@@ -30,7 +31,7 @@ Default target: all
 
 Commandline Options:
     debug=n       debug build with optimization level n
-    arch=str      target architecture [i386|x86-64]
+    arch=str      target architecture [i686|x86_64]
     build_dir=dir build directory, default .
     boost=[0|1]   disable or enable boost libraries
 ''')
@@ -71,18 +72,21 @@ if dbug:
     opt_flags = opt_flags + ' -DGU_DBUG_ON'
 
 # Target arch
-arch = ARGUMENTS.get('arch', '')
+arch = ARGUMENTS.get('arch', machine)
+print 'Target: ' + sysname + ' ' + arch
 
-if arch == 'i386':
+if arch == 'i386' or arch == 'i686':
     compile_arch = '-m32 -march=i686'
     link_arch    = compile_arch + ' -Wl,-melf_i386'
-elif arch == 'x86-64':
+elif arch == 'x86_64' or arch == 'amd64':
     compile_arch = '-m64'
     link_arch    = compile_arch + ' -Wl,-melf_x86_64'
+else:
+    print 'Unrecognized target architecture: ' + arch
+    Exit(1)
 
 
 boost = int(ARGUMENTS.get('boost', 1))
-
 
 
 #
@@ -116,7 +120,8 @@ if sysname == 'freebsd':
 # 
 
 # Include paths
-env.Append(CPPPATH = Split('''#/galerautils/src
+env.Append(CPPPATH = Split('''#/asio
+                               #/galerautils/src
                                #/gcomm/src
                                #/gcomm/src/gcomm
                                #/gcs/src
@@ -213,7 +218,7 @@ else:
     else:
        conf.env.Append(CPPFLAGS = ' -DHAVE_TR1_UNORDERED_MAP')
 
-# pool allocator/asio
+# pool allocator
 if boost == 1:
     # Use nanosecond time precision
     conf.env.Append(CPPFLAGS = ' -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG=1')
@@ -224,12 +229,11 @@ if boost == 1:
         conf.env.Append(CPPFLAGS = ' -DGALERA_USE_BOOST_POOL_ALLOC=1')
     else:
         print 'Error: boost/pool/pool_alloc.hpp not found or not usable'
-
-
-    if conf.CheckCXXHeader('asio.hpp'):
-        conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
 else:
     print 'Not using boost'
+
+conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
+
 
 conf.env.Append(CFLAGS = ' -pedantic');
 

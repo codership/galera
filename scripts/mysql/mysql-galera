@@ -196,7 +196,7 @@ galera_start()
         RBR_OPTS=" --binlog_format=STATEMENT "
     fi
 
-    WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libmmgalera.so"}
+    WSREP=${WSREP:-"$GALERA_BASE_DIR/lib/libgalera_smm.so"}
 
     if test -f $WSREP || test $WSREP == "none"
     then

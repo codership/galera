@@ -361,7 +361,7 @@ install -m 755 -d $GALERA_LIBS
 if [ "$SCONS" == "yes" ]
 then
     SCONS_VD=$GALERA_SRC
-    cp -P $SCONS_VD/libmmgalera.so*         $GALERA_LIBS
+    cp -P $SCONS_VD/libgalera_smm.so* $GALERA_LIBS
 else
     echo "Autotools compilation not supported any more."
     exit 1
