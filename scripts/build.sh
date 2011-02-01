@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -eu
 
 # $Id$
 
@@ -37,6 +37,9 @@ DEBUG=${DEBUG:-"no"}
 DEBUG_LEVEL=${DEBUG_LEVEL:-"1"}
 SCONS=${SCONS:-"yes"}
 JOBS=${JOBS:-"1"}
+SCRATCH=${SCRATCH:-"no"}
+OPT="yes"
+WITH_SPREAD="no"
 
 which dpkg >/dev/null 2>&1 && DEBIAN=${DEBIAN:-1} || DEBIAN=${DEBIAN:-0}
 
@@ -49,10 +52,14 @@ then
     export CC CXX
 fi
 
+CFLAGS=${CFLAGS:-"-O2"}
+CXXFLAGS=${CXXFLAGS:-"$CFLAGS"}
+CPPFLAGS=${CPPFLAGS:-}
 
 initial_stage="galerautils"
 last_stage="galera"
 gainroot=""
+TARGET="" # default target
 
 while test $# -gt 0 
 do
@@ -94,11 +101,13 @@ do
 	    CFLAGS="$CFLAGS -m32"
 	    CXXFLAGS="$CXXFLAGS -m32"
 	    SCRATCH="yes"
+	    TARGET="i686"
 	    ;;
 	-m64)
 	    CFLAGS="$CFLAGS -m64"
 	    CXXFLAGS="$CXXFLAGS -m64"
 	    SCRATCH="yes"
+	    TARGET="x86_64"
 	    ;;
 	-p|--package)
 	    PACKAGE="yes"   # build binary packages
@@ -160,7 +169,7 @@ then
 fi
 
 if [ "$OPT"   == "yes" ]; then CONFIGURE="yes";
-   conf_flags="$conf_flags --disable-debug --disable-dbug";
+   conf_flags="--disable-debug --disable-dbug";
 fi
 if [ "$DEBUG" == "yes" ]; then CONFIGURE="yes"; fi
 if [ -n "$WITH_SPREAD" ]; then CONFIGURE="yes"; fi
@@ -284,7 +293,7 @@ build_module()
     local build_dir="$build_base/$module"
     if test "$initial_stage" == "$module" || "$building" == "true"
     then
-        build $build_dir $conf_flags $@ && building="true" || return 1
+        build $build_dir ${conf_flags:-} $@ && building="true" || return 1
     fi
 
     build_flags $build_dir || return 1
@@ -352,21 +361,22 @@ then
     # Scons variant dir, defaults to GALERA_SRC 
     export SCONS_VD=$build_base
     scons_args="-C $build_base"
-    if [ "$CPU" == "pentium" ]
+
+    if [ -n "$TARGET" ]
     then
-        scons_args="$scons_args arch=i386"
-    elif [ "$CPU" == "amd64" ]
-    then
-        scons_args="$scons_args arch=x86_64"
+        scons_args="$scons_args arch=$TARGET"
     fi
+
     if [ "$DEBUG" == "yes" ]
     then
         scons_args="$scons_args debug=$DEBUG_LEVEL"
     fi
+
     if [ "$SCRATCH" == "yes" ]
     then
         scons -Q -c $scons_args
     fi
+
     if [ "$SKIP_BUILD" != "yes" ]
     then
         scons $scons_args -j $JOBS

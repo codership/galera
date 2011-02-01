@@ -28,26 +28,13 @@ libgcomm_env.Append(CXXFLAGS = ' -fno-strict-aliasing ')
 
 if libgcomm_env['CPPFLAGS'].find('-DHAVE_ASIO_HPP') != -1:
     # ASIO sources need to be built with relaxed C++ flags
-    libgcomm_asio_sources = [
-        'asio_tcp.cpp',
-        'asio_udp.cpp',
-        'asio_protonet.cpp']
-    libgcomm_asio_env = libgcomm_env.Clone()
-    libgcomm_asio_env.Replace(
-        CXXFLAGS = ' -Wctor-dtor-privacy -Wreorder -Wold-style-cast '
-        + '-Woverloaded-virtual -pedantic -ansi -Wno-long-long')
-    libgcomm_asio_shared_objs = libgcomm_asio_env.SharedObject(
-        libgcomm_asio_sources)
-    libgcomm_asio_static_objs = libgcomm_asio_env.Object(libgcomm_asio_sources)
-else:
-    libgcomm_asio_shared_objs = []
-    libgcomm_asio_static_objs = []
+    libgcomm_sources.extend([
+            'asio_tcp.cpp',
+            'asio_udp.cpp',
+            'asio_protonet.cpp'])
 
 
-libgcomm_env.StaticLibrary('gcomm', 
-                           [libgcomm_sources, 
-                            libgcomm_asio_static_objs])
+libgcomm_env.StaticLibrary('gcomm', libgcomm_sources)
 
 env.Append(LIBGALERA_OBJS = libgcomm_env.SharedObject(libgcomm_sources))
-env.Append(LIBGALERA_OBJS = libgcomm_asio_shared_objs)
 

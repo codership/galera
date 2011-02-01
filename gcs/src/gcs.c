@@ -804,7 +804,7 @@ gcs_handle_actions (gcs_conn_t*                conn,
 
     switch (rcvd->act.type) {
     case GCS_ACT_FLOW:
-        assert (sizeof(*fc) == rcvd->act.buf_len);
+        assert (sizeof(struct gcs_fc_event) == rcvd->act.buf_len);
         gcs_handle_flow_control (conn, rcvd->act.buf);
         break;
     case GCS_ACT_CONF:

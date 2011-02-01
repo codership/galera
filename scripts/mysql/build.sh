@@ -361,7 +361,7 @@ install -m 755 -d $GALERA_LIBS
 if [ "$SCONS" == "yes" ]
 then
     SCONS_VD=$GALERA_SRC
-    cp -P $SCONS_VD/libmmgalera.so*         $GALERA_LIBS
+    cp -P $SCONS_VD/libgalera_smm.so* $GALERA_LIBS
 else
     echo "Autotools compilation not supported any more."
     exit 1
@@ -376,9 +376,9 @@ install -m 644 QUICK_START   $DIST_DIR
 if test "$NO_STRIP" != "yes"
 then
     strip $GALERA_LIBS/lib*.so
-#    if test $GCOMM_IMPL = "galeracomm"
+#    if test $GCOMM_IMPL == "galeracomm"
 #    then
-        strip $GALERA_SBIN/* || echo "skipped"
+#        strip $GALERA_SBIN/* || echo "skipped"
 #    fi
     strip $MYSQL_DIST_DIR/libexec/mysqld
 fi

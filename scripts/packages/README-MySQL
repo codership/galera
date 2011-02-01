@@ -72,8 +72,8 @@ To setup MySQL/Galera node you will need to
 
 2) Configure it to use Galera library as a wsrep provider. For that set
    wsrep_provider option to
-   wsrep_provider=/usr/lib/galera/libmmgalera.so   (DEB systems) or
-   wsrep_provider=/usr/lib64/galera/libmmgalera.so (RPM systems).
+   wsrep_provider=/usr/lib/galera/libgalera_smm.so   (DEB systems) or
+   wsrep_provider=/usr/lib64/galera/libgalera_smm.so (RPM systems).
 
 3) Start MySQL server.
 

@@ -10,5 +10,4 @@ env = DefaultEnvironment()
 libmmgalera_objs = env['LIBGALERA_OBJS']
 libmmgalera_objs.extend(env['LIBMMGALERA_OBJS'])
 
-env.SharedLibrary('mmgalera', libmmgalera_objs)
-
+env.SharedLibrary('galera_smm', libmmgalera_objs)
