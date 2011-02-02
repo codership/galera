@@ -1190,7 +1190,7 @@ void galera::ReplicatorSMM::store_state(const std::string& file) const
         gu_throw_fatal << "could not store state";
     }
 
-    fs << "# GALERA saved state, version: " << 0.7 << ", date: (todo)\n";
+    fs << "# GALERA saved state, version: " << 0.8 << ", date: (todo)\n";
     fs << "uuid:  " << state_uuid_ << "\n";
     fs << "seqno: " << apply_monitor_.last_left() << "\n";
     fs << "cert_index:\n";
@@ -1279,7 +1279,7 @@ void galera::ReplicatorSMM::invalidate_state(const std::string& file) const
         gu_throw_fatal << "could not store state";
     }
 
-    fs << "# GALERA saved state, version: " << 0.7 << ", date: (todo)\n";
+    fs << "# GALERA saved state, version: " << 0.8 << ", date: (todo)\n";
     fs << "uuid:  " << WSREP_UUID_UNDEFINED << "\n";
     fs << "seqno: " << WSREP_SEQNO_UNDEFINED << "\n";
     fs << "cert_index:\n";
