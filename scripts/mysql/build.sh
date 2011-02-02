@@ -104,12 +104,14 @@ do
             CXXFLAGS="$CXXFLAGS -m32"
             CONFIGURE="yes"
             CPU="pentium"
+            TARGET="i686"
             ;;
         -m64)
             CFLAGS="$CFLAGS -m64"
             CXXFLAGS="$CXXFLAGS -m64"
             CONFIGURE="yes"
             CPU="amd64"
+            TARGET="x86_64"
             ;;
         --sb|--skip-build)
             SKIP_BUILD="yes"
@@ -168,7 +170,7 @@ which dpkg >/dev/null 2>&1 && DEBIAN=1 || DEBIAN=0
 
 # export command options for Galera build
 export BOOTSTRAP CONFIGURE SCRATCH OPT DEBUG WITH_SPREAD CFLAGS CXXFLAGS \
-       PACKAGE CPU SKIP_BUILD RELEASE DEBIAN SCONS JOBS DEBUG_LEVEL
+       PACKAGE CPU TARGET SKIP_BUILD RELEASE DEBIAN SCONS JOBS DEBUG_LEVEL
 
 set -eu
 

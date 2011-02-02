@@ -59,7 +59,7 @@ CPPFLAGS=${CPPFLAGS:-}
 initial_stage="galerautils"
 last_stage="galera"
 gainroot=""
-TARGET="" # default target
+TARGET=${TARGET:-""} # default target
 
 while test $# -gt 0 
 do
@@ -374,7 +374,7 @@ then
 
     if [ "$SCRATCH" == "yes" ]
     then
-        scons -Q -c $scons_args
+        scons -Q -c --conf=force $scons_args
     fi
 
     if [ "$SKIP_BUILD" != "yes" ]
