@@ -714,7 +714,8 @@ group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
         donor_idx = group_find_node_by_status (group, GCS_NODE_STATE_SYNCED);
         if (donor_idx < 0) {
             // then check simply JOINED, they have full state
-            donor_idx = group_find_node_by_status (group,GCS_NODE_STATE_JOINED);
+// #422            donor_idx = group_find_node_by_status (group,GCS_NODE_STATE_JOINED);
+            donor_idx = -EAGAIN;
         }
     }
 
