@@ -67,6 +67,8 @@ dbug  = ARGUMENTS.get('dbug', False)
 if int(debug) >= 0 and int(debug) < 3:
     opt_flags = '-g -O%d -fno-inline' % int(debug)
     dbug = True
+elif int(debug) == 3:
+    opt_flags = '-g -O3'
 
 if dbug:
     opt_flags = opt_flags + ' -DGU_DBUG_ON'

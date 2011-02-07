@@ -21,7 +21,7 @@ Please see COPYING file that came with this distribution.
 Source code can be found at http://www.codership.com/en/downloads/galera
 
 
-                        GALERA v0.7.3
+                        GALERA v0.8.x
 
 CONTENTS:
 =========
@@ -212,6 +212,18 @@ listen_addr
     configuration parameter in order to avoid confusion. If parameter value
     is undefined, GMCast starts listening all interfaces at default port
     4567
+
+mcast_addr
+    Multicast address in dotted decimal notation, enables using multicast to
+    transmit group communication messages. Defaults to none. Must have
+    the same value on all nodes.
+
+mcast_port
+    Port used for UDP multicast messages. Defaults to listen_addr port.
+    Must have same value on all of the nodes.
+
+mcast_ttl
+    Time to live for multicast packets. Defaults to 1.
 
 3.2.2 EVS option group.
 
