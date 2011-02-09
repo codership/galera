@@ -87,11 +87,12 @@ gcache::PageStore::delete_page () throw (gu::Exception)
 
     delete page;
 
-    pthread_t tmp;
-    int err = pthread_create (&tmp, NULL, remove_file, file_name);
+    pthread_t thr;
+    int       err = pthread_create (&thr, &delete_page_attr_, remove_file,
+                                    file_name);
     if (0 != err)
     {
-        gu_throw_error(err) << "Starting of page file deletion thread failed";
+        gu_throw_error(err) << "Failed to create page file deletion thread";
     }
 
     return true;
@@ -136,8 +137,26 @@ gcache::PageStore::PageStore (const std::string& dir_name,
     count_     (0),
     pages_     (),
     current_   (0),
-    total_size_(0)
-{}
+    total_size_(0),
+    delete_page_attr_()
+{
+    int err = pthread_attr_init (&delete_page_attr_);
+
+    if (0 != err)
+    {
+        gu_throw_error(err) << "Failed to initialize page file deletion "
+                            << "thread attributes";
+    }
+
+    err = pthread_attr_setdetachstate (&delete_page_attr_,
+                                       PTHREAD_CREATE_DETACHED);
+    if (0 != err)
+    {
+        pthread_attr_destroy (&delete_page_attr_);
+        gu_throw_error(err) << "Failed to set DETACHED attribute to "
+                            << "page file deletion thread";
+    }
+}
 
 gcache::PageStore::~PageStore ()
 {
@@ -155,6 +174,8 @@ gcache::PageStore::~PageStore ()
         log_error << "Could not delete " << pages_.size()
                   << " page files: some buffers are still \"mmapped\".";
     }
+
+    pthread_attr_destroy (&delete_page_attr_);
 }
 
 inline void*

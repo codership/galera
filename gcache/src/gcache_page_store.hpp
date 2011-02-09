@@ -44,6 +44,7 @@ namespace gcache
         std::deque<Page*> pages_;
         Page*             current_;
         ssize_t           total_size_;
+        pthread_attr_t    delete_page_attr_;
 
         void new_page    (ssize_t size) throw (gu::Exception);
 
