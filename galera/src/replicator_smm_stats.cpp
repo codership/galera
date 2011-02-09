@@ -133,6 +133,8 @@ galera::ReplicatorSMM::build_stats_vars (
         stats.push_back(*ptr);
     }
     while (ptr++->name != 0);
+
+    stats[STATS_STATE_UUID].value._string = state_uuid_str_;
 }
 
 const struct wsrep_stats_var*
@@ -140,10 +142,6 @@ galera::ReplicatorSMM::stats() const
 {
     std::vector<struct wsrep_stats_var>& sv(wsrep_stats_);
 
-    free(const_cast<char*>(sv[STATS_STATE_UUID].value._string));
-    std::ostringstream os;
-    os << state_uuid_;
-    sv[STATS_STATE_UUID         ].value._string = strdup(os.str().c_str());
     sv[STATS_LAST_APPLIED       ].value._int64  = apply_monitor_.last_left();
     sv[STATS_REPLICATED         ].value._int64  = replicated_();
     sv[STATS_REPLICATED_BYTES   ].value._int64  = replicated_bytes_();
