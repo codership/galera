@@ -304,7 +304,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     wsrep_stats_        ()
 {
     strncpy (const_cast<char*>(state_uuid_str_), 
-             "01010101-0000-0000-0000-000000000000", sizeof(state_uuid_str_));
+             "00000000-0000-0000-0000-000000000000", sizeof(state_uuid_str_));
 
     // @todo add guards (and perhaps actions)
     state_.add_transition(Transition(S_CLOSED, S_JOINING));
@@ -1488,8 +1488,6 @@ galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid)
     if (state_uuid_ != uuid)
     {
         *(const_cast<wsrep_uuid_t*>(&state_uuid_)) = uuid;
-
-        log_info << "################### Setting state_uuid_ to " <<state_uuid_;
 
         std::ostringstream os; os << state_uuid_;
 
