@@ -56,6 +56,7 @@ static galera::Replicator::State state2repl(const gcs_act_conf_t* conf)
         if (conf->my_idx >= 0) return galera::Replicator::S_JOINING;
         else                   return galera::Replicator::S_CLOSING;
     case GCS_NODE_STATE_PRIM:
+    case GCS_NODE_STATE_JOINER:
         return galera::Replicator::S_JOINING;
     case GCS_NODE_STATE_JOINED:
         return galera::Replicator::S_JOINED;
@@ -125,9 +126,13 @@ void galera::GcsActionSource::dispatch(void*          recv_ctx,
     }
     case GCS_ACT_CONF:
     {
-        const gcs_act_conf_t* conf(reinterpret_cast<const gcs_act_conf_t*>(act));
+        const gcs_act_conf_t* conf(
+            reinterpret_cast<const gcs_act_conf_t*>(act)
+            );
         wsrep_view_info_t* view_info(
-            galera_view_info_create(conf, conf->my_state == GCS_NODE_STATE_PRIM));
+            galera_view_info_create(conf, conf->my_state == GCS_NODE_STATE_PRIM)
+            );
+
         replicator_.process_view_info(recv_ctx, *view_info,
                                       state2repl(conf), seqno_l);
         free(view_info);

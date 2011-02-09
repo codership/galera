@@ -378,10 +378,6 @@ install -m 644 QUICK_START   $DIST_DIR
 if test "$NO_STRIP" != "yes"
 then
     strip $GALERA_LIBS/lib*.so
-#    if test $GCOMM_IMPL == "galeracomm"
-#    then
-#        strip $GALERA_SBIN/* || echo "skipped"
-#    fi
     strip $MYSQL_DIST_DIR/libexec/mysqld
 fi
 
@@ -391,6 +387,7 @@ then
 else
     GALERA_RELEASE="$MYSQL_REV,$GALERA_REV"
 fi
+
 RELEASE_NAME=$(echo mysql-$MYSQL_VER-$GALERA_RELEASE | sed s/\:/_/g)
 rm -rf $RELEASE_NAME
 mv $DIST_DIR $RELEASE_NAME
