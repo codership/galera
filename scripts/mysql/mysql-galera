@@ -358,7 +358,7 @@ dump()
 #local OPTIONS="--create-options" gives false positives on AUTO_INCREMENT tbls
 # --flush-logs --lock-all-tables # this blocks waiting for all trx to complete
                                  # thus impossible to use with -STOP/CONT
-local DUMP_OPTIONS=" --skip-opt --compact --quick \
+local DUMP_OPTIONS=" --skip-opt --compact --quick --order-by-primary \
                      $OPTIONS --set-charset --skip-comments $ROUTINES "
 DB=${DB:-"--all-databases"}
 #set -x
