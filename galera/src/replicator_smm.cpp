@@ -271,6 +271,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_file_         (data_dir_ + "/grastate.dat"),
     uuid_               (WSREP_UUID_UNDEFINED),
     state_uuid_         (WSREP_UUID_UNDEFINED),
+    state_uuid_str_     (),
     app_ctx_            (args->app_ctx),
     view_cb_            (args->view_handler_cb),
     bf_apply_cb_        (args->bf_apply_cb),
@@ -303,6 +304,9 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     report_counter_     (),
     wsrep_stats_        ()
 {
+    strncpy (const_cast<char*>(state_uuid_str_), 
+             "01010101-0000-0000-0000-000000000000", sizeof(state_uuid_str_));
+
     // @todo add guards (and perhaps actions)
     state_.add_transition(Transition(S_CLOSED, S_JOINING));
 
@@ -1123,7 +1127,7 @@ void galera::ReplicatorSMM::process_view_info(void* recv_ctx,
         {
             if (view_info.conf == 1)
             {
-                state_uuid_ = group_uuid;
+                update_state_uuid (group_uuid);
                 apply_monitor_.set_initial_position(group_seqno);
             }
 
@@ -1178,10 +1182,12 @@ void galera::ReplicatorSMM::process_state_req(void* recv_ctx,
 
     LocalOrder lo(seqno_l);
     int ret;
+
     if ((ret = local_monitor_.enter(lo)) != 0)
     {
         gu_throw_fatal << "failed to enter local monitor: " << ret;
     }
+
     apply_monitor_.drain(cert_.position());
     state_.shift_to(S_DONOR);
     sst_donate_cb_(app_ctx_, recv_ctx, req, req_size, &state_uuid_,
@@ -1305,7 +1311,7 @@ void galera::ReplicatorSMM::restore_state(const std::string& file)
         uuid = WSREP_UUID_UNDEFINED;
     }
 
-    state_uuid_ = uuid;
+    update_state_uuid (uuid);
     apply_monitor_.set_initial_position(seqno);
     cert_.assign_initial_position(seqno);
 }
@@ -1330,6 +1336,99 @@ void galera::ReplicatorSMM::invalidate_state(const std::string& file) const
 ////                           Private
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
+
+
+void galera::ReplicatorSMM::report_last_committed()
+{
+    size_t i(report_counter_.fetch_and_add(1));
+    if (i % report_interval_ == 0)
+        service_thd_.report_last_committed(apply_monitor_.last_left());
+}
+
+
+wsrep_status_t
+galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
+                                   wsrep_seqno_t const  group_seqno,
+                                   const void* req, size_t req_len)
+{
+    assert(req != 0);
+    log_info << "State transfer required: "
+             << "\n\tGroup state: "
+             << group_uuid << ":" << group_seqno
+             << "\n\tLocal state: " << state_uuid_
+             << ":" << apply_monitor_.last_left();
+
+    wsrep_status_t retval(WSREP_OK);
+    long ret;
+    gu::Lock lock(sst_mutex_);
+
+    do
+    {
+        invalidate_state(state_file_);
+
+        gcs_seqno_t seqno_l;
+
+        ret = gcs_.request_state_transfer(req, req_len, sst_donor_, &seqno_l);
+
+        if (ret < 0)
+        {
+            if (ret != -EAGAIN)
+            {
+                store_state(state_file_);
+                log_error << "Requesting state snapshot transfer failed: "
+                          << ret << "(" << strerror(-ret) << ")";
+            }
+            else
+            {
+                log_info << "Requesting state snapshot transfer failed: "
+                         << ret << "(" << strerror(-ret) << "). "
+                         << "Retrying in " << sst_retry_sec_ << " seconds";
+            }
+        }
+        if (seqno_l != GCS_SEQNO_ILL)
+        {
+            // we are already holding local monitor
+            LocalOrder lo(seqno_l);
+            local_monitor_.self_cancel(lo);
+        }
+    }
+    while ((ret == -EAGAIN) && (usleep(sst_retry_sec_ * 1000000), true));
+
+
+    if (ret >= 0)
+    {
+        log_info << "Requesting state transfer: success, donor " << ret;
+        sst_state_ = SST_WAIT;
+
+        lock.wait(sst_cond_);
+
+        if (sst_uuid_ != group_uuid || sst_seqno_ < group_seqno)
+        {
+            log_fatal << "Application received wrong state: "
+                      << "\n\tReceived: "
+                      << sst_uuid_ <<   ":    " << sst_seqno_
+                      << "\n\tRequired: "
+                      << group_uuid << ": >= " << group_seqno;
+            sst_state_ = SST_FAILED;
+            gu_throw_fatal << "Application state transfer failed";
+        }
+        else
+        {
+            update_state_uuid (sst_uuid_);
+            apply_monitor_.set_initial_position(-1);
+            apply_monitor_.set_initial_position(sst_seqno_);
+            log_debug << "Initial state: " << state_uuid_ << ":" << sst_seqno_;
+            sst_state_ = SST_NONE;
+            gcs_.join(sst_seqno_);
+        }
+    }
+    else
+    {
+        sst_state_ = SST_REQ_FAILED;
+        retval = WSREP_FATAL;
+    }
+    return retval;
+}
 
 
 wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
@@ -1422,96 +1521,19 @@ wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(TrxHandle* trx)
     return retval;
 }
 
-void galera::ReplicatorSMM::report_last_committed()
+
+void
+galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid)
 {
-    size_t i(report_counter_.fetch_and_add(1));
-    if (i % report_interval_ == 0)
-        service_thd_.report_last_committed(apply_monitor_.last_left());
-}
-
-
-
-
-wsrep_status_t
-galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
-                                   wsrep_seqno_t const  group_seqno,
-                                   const void* req, size_t req_len)
-{
-    assert(req != 0);
-    log_info << "State transfer required: "
-             << "\n\tGroup state: "
-             << group_uuid << ":" << group_seqno
-             << "\n\tLocal state: " << state_uuid_
-             << ":" << apply_monitor_.last_left();
-
-    wsrep_status_t retval(WSREP_OK);
-    long ret;
-    gu::Lock lock(sst_mutex_);
-
-    do
+    if (state_uuid_ != uuid)
     {
-        invalidate_state(state_file_);
+        *(const_cast<wsrep_uuid_t*>(&state_uuid_)) = uuid;
 
-        gcs_seqno_t seqno_l;
+        log_info << "################### Setting state_uuid_ to " <<state_uuid_;
 
-        ret = gcs_.request_state_transfer(req, req_len, sst_donor_, &seqno_l);
+        std::ostringstream os; os << state_uuid_;
 
-        if (ret < 0)
-        {
-            if (ret != -EAGAIN)
-            {
-                store_state(state_file_);
-                log_error << "Requesting state snapshot transfer failed: "
-                          << ret << "(" << strerror(-ret) << ")";
-            }
-            else
-            {
-                log_info << "Requesting state snapshot transfer failed: "
-                         << ret << "(" << strerror(-ret) << "). "
-                         << "Retrying in " << sst_retry_sec_ << " seconds";
-            }
-        }
-        if (seqno_l != GCS_SEQNO_ILL)
-        {
-            // we are already holding local monitor
-            LocalOrder lo(seqno_l);
-            local_monitor_.self_cancel(lo);
-        }
+        strncpy(const_cast<char*>(state_uuid_str_), os.str().c_str(),
+                sizeof(state_uuid_str_));
     }
-    while ((ret == -EAGAIN) && (usleep(sst_retry_sec_ * 1000000), true));
-
-
-    if (ret >= 0)
-    {
-        log_info << "Requesting state transfer: success, donor " << ret;
-        sst_state_ = SST_WAIT;
-
-        lock.wait(sst_cond_);
-
-        if (sst_uuid_ != group_uuid || sst_seqno_ < group_seqno)
-        {
-            log_fatal << "Application received wrong state: "
-                      << "\n\tReceived: "
-                      << sst_uuid_ <<   ":    " << sst_seqno_
-                      << "\n\tRequired: "
-                      << group_uuid << ": >= " << group_seqno;
-            sst_state_ = SST_FAILED;
-            gu_throw_fatal << "Application state transfer failed";
-        }
-        else
-        {
-            state_uuid_ = sst_uuid_;
-            apply_monitor_.set_initial_position(-1);
-            apply_monitor_.set_initial_position(sst_seqno_);
-            log_debug << "Initial state: " << state_uuid_ << ":" << sst_seqno_;
-            sst_state_ = SST_NONE;
-            gcs_.join(sst_seqno_);
-        }
-    }
-    else
-    {
-        sst_state_ = SST_REQ_FAILED;
-        retval = WSREP_FATAL;
-    }
-    return retval;
 }
