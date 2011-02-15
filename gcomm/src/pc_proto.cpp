@@ -79,6 +79,9 @@ void gcomm::pc::Proto::send_state()
         im.insert_unique(make_pair(NodeMap::get_key(i), local_state));
     }
     
+    log_debug << self_id() << " local to seq " << get_to_seq();
+    log_debug << self_id() << " sending state: " << pcs;
+
     Buffer buf;
     serialize(pcs, buf);
     
@@ -110,6 +113,8 @@ void gcomm::pc::Proto::send_install()
         }
     }
     
+    log_debug << self_id() << " sending install: " << pci;
+
     Buffer buf;
     serialize(pci, buf);
     
@@ -145,25 +150,43 @@ void gcomm::pc::Proto::deliver_view()
 }
 
 
+void gcomm::pc::Proto::mark_non_prim()
+{
+    pc_view_ = ViewId(V_NON_PRIM, current_view_.get_id());
+    for (NodeMap::iterator i = instances_.begin(); i != instances_.end();
+         ++i)
+    {
+        const UUID& uuid(NodeMap::get_key(i));
+        Node& inst(NodeMap::get_value(i));
+        if (current_view_.get_members().find(uuid) !=
+            current_view_.get_members().end())
+        {
+            inst.set_prim(false);
+            pc_view_.add_member(uuid, "");
+        }
+    }
+
+    set_prim(false);
+
+}
+
 void gcomm::pc::Proto::shift_to(const State s)
 {
     // State graph
     static const bool allowed[S_MAX][S_MAX] = {
         
         // Closed
-        { false, true, false,  false, false, false, false },
-        // Joining
-        { true,  false, false,  false, false, true, false },
+        { false, false,  false, false, false, true },
         // States exch
-        { true,  false, false, true,  false, true,  true  },
+        { true,  false, true,  false, true,  true  },
         // Install
-        { true,  false, false, false, true,  true,  true  },
+        { true,  false, false, true,  true,  true  },
         // Prim
-        { true,  false, false, false, false, true,  true  },
+        { true,  false, false, false, true,  true  },
         // Trans
-        { true,  false, true,  false, false, false, true  },
+        { true,  true,  false, false, false, true  },
         // Non-prim
-        { true,  false, true,  false, false, true,  true  }
+        { true,  false,  false, false, true,  true  }
     };
     
 
@@ -178,8 +201,6 @@ void gcomm::pc::Proto::shift_to(const State s)
     {
     case S_CLOSED:
         break;
-    case S_JOINING:
-        break;
     case S_STATES_EXCH:
         state_msgs_.clear();
         break;
@@ -187,6 +208,7 @@ void gcomm::pc::Proto::shift_to(const State s)
         break;
     case S_PRIM:
     {
+        pc_view_ = ViewId(V_PRIM, current_view_.get_id());
         for (NodeMap::iterator i = instances_.begin(); i != instances_.end();
              ++i)
         {
@@ -195,11 +217,11 @@ void gcomm::pc::Proto::shift_to(const State s)
             if (current_view_.get_members().find(uuid) != 
                 current_view_.get_members().end())
             {
-
                 inst.set_prim(true);
                 inst.set_last_prim(ViewId(V_PRIM, current_view_.get_id()));
                 inst.set_last_seq(0);
                 inst.set_to_seq(get_to_seq());
+                pc_view_.add_member(uuid, "");
             }
             else
             {
@@ -208,27 +230,12 @@ void gcomm::pc::Proto::shift_to(const State s)
         }
         last_sent_seq_ = 0;
         set_prim(true);
-        pc_view_ = ViewId(V_PRIM, current_view_.get_id());
         break;
     }
     case S_TRANS:
         break;
     case S_NON_PRIM:
-        for (NodeMap::iterator i = instances_.begin(); i != instances_.end();
-             ++i)
-        {
-            const UUID& uuid(NodeMap::get_key(i));
-            Node& inst(NodeMap::get_value(i));
-            if (current_view_.get_members().find(uuid) != 
-                current_view_.get_members().end())
-            {
-                
-                inst.set_prim(false);
-            }
-        }
-
-        set_prim(false);
-        pc_view_ = ViewId(V_NON_PRIM, current_view_.get_id());
+        mark_non_prim();
         break;
     default:
         ;
@@ -246,7 +253,7 @@ void gcomm::pc::Proto::shift_to(const State s)
 
 void gcomm::pc::Proto::handle_first_trans(const View& view)
 {
-    gcomm_assert(get_state() == S_JOINING);
+    gcomm_assert(get_state() == S_NON_PRIM);
     gcomm_assert(view.get_type() == V_TRANS);
     
     if (start_prim_ == true)
@@ -277,65 +284,34 @@ void gcomm::pc::Proto::handle_trans(const View& view)
     gcomm_assert(view.get_id().get_uuid() == current_view_.get_id().get_uuid() &&
                  view.get_id().get_seq()  == current_view_.get_id().get_seq());
     
-    if (ViewId(V_PRIM, view.get_id()) == get_last_prim())
+    log_debug << self_id() << " \n\n current view " << current_view_
+              << "\n\n next view " << view
+              << "\n\n pc view " << pc_view_;
+    if (view.get_members().size()*2 + view.get_left().size() <=
+             pc_view_.get_members().size())
     {
-        if (view.get_members().size()*2 + view.get_left().size() <=
-            current_view_.get_members().size())
-        {
-            current_view_ = view;
-            shift_to(S_NON_PRIM);
-            deliver_view();
-            return;
-        }
+        current_view_ = view;
+        // shift_to(S_NON_PRIM);
+        mark_non_prim();
+        deliver_view();
+        shift_to(S_TRANS);
+        return;
     }
     else
     {
-        if (get_last_prim().get_uuid() != view.get_id().get_uuid() &&
-            get_last_prim().get_seq()  != view.get_id().get_seq() )
-        {
-            log_debug << self_id() 
-                      << " trans view during " << to_string(get_state());
-        }
+        log_debug << self_id() << " quorum ok";
     }
     current_view_ = view;
     shift_to(S_TRANS);
 }
 
 
-void gcomm::pc::Proto::handle_first_reg(const View& view)
+void gcomm::pc::Proto::handle_reg(const View& view)
 {
     gcomm_assert(view.get_type() == V_REG);
     gcomm_assert(get_state() == S_TRANS);
     
-    if (start_prim_ == true)
-    {
-        if (view.get_members().size() > 1 || view.is_empty())
-        {
-            gu_throw_fatal << self_id() << " starting primary "
-                              <<"but first reg view is not singleton";
-        }
-    }
-    
-    if (view.get_id().get_seq() <= current_view_.get_id().get_seq())
-    {
-        gu_throw_fatal << "Non-increasing view ids: current view " 
-                          << current_view_.get_id() 
-                          << " new view "
-                          << view.get_id();
-    }
-    
-    current_view_ = view;
-    views_.push_back(current_view_);
-    shift_to(S_STATES_EXCH);
-    send_state();
-}
-
-
-void gcomm::pc::Proto::handle_reg(const View& view)
-{
-    gcomm_assert(view.get_type() == V_REG);
-    
-    if (view.is_empty() == false && 
+    if (view.is_empty() == false &&
         view.get_id().get_seq() <= current_view_.get_id().get_seq())
     {
         gu_throw_fatal << "Non-increasing view ids: current view " 
@@ -382,7 +358,7 @@ void gcomm::pc::Proto::handle_view(const View& view)
     
     if (view.get_type() == V_TRANS)
     {
-        if (get_state() == S_JOINING)
+        if (current_view_.get_type() == V_NONE)
         {
             handle_first_trans(view);
         }
@@ -393,14 +369,7 @@ void gcomm::pc::Proto::handle_view(const View& view)
     }
     else
     {
-        if (get_state() == S_JOINING)
-        {
-            handle_first_reg(view);
-        }
-        else
-        {
-            handle_reg(view);
-        }  
+        handle_reg(view);
     }
 }
 
@@ -842,8 +811,6 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
         // NONE,   STATE,   INSTALL,  USER
         {  FAIL,   FAIL,    FAIL,     FAIL    },  // Closed
 
-        {  FAIL,   FAIL,    FAIL,     FAIL    },  // Joining
-        
         {  FAIL,   ACCEPT,  FAIL,     FAIL    },  // States exch
 
         {  FAIL,   FAIL,    ACCEPT,   FAIL    },  // INSTALL

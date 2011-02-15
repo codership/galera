@@ -94,7 +94,7 @@ namespace gcomm
     class Node : public String<16> 
     { 
     public:
-        Node() : String<16>("") { }
+        Node(const std::string& name = "") : String<16>(name) { }
         bool operator==(const Node& cmp) const { return true; }
     };
     
@@ -142,6 +142,8 @@ namespace gcomm
         const NodeList& get_left        () const;
         const NodeList& get_partitioned () const;
         
+
+        NodeList& get_members() { return members; }
 
         bool is_member(const UUID& uuid) const
         { return members.find(uuid) != members.end(); }
