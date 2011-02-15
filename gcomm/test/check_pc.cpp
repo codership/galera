@@ -197,6 +197,7 @@ void single_boot(PCUser* pu1)
 
 START_TEST(test_pc_view_changes_single)
 {
+    log_info << "START (test_pc_view_changes_single)";
     gu::Config conf;
     UUID uuid1(0, 0);
     Proto pc1(conf, uuid1);
@@ -297,6 +298,7 @@ static void double_boot(PCUser* pu1, PCUser* pu2)
 
 START_TEST(test_pc_view_changes_double)
 {
+    log_info << "START (test_pc_view_changes_double)";
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -318,7 +320,17 @@ START_TEST(test_pc_view_changes_double)
     View tnp(ViewId(V_TRANS, pu1.pc->get_current_view().get_id()));
     tnp.add_member(uuid1, "n1");
     pu1.pc->handle_view(tnp);
+    fail_unless(pu1.pc->get_state() == Proto::S_TRANS);
+    View reg(ViewId(V_REG, uuid1,
+                    pu1.pc->get_current_view().get_id().get_seq() + 1));
+    reg.add_member(uuid1, "n1");
+    pu1.pc->handle_view(reg);
+    fail_unless(pu1.pc->get_state() == Proto::S_STATES_EXCH);
+    rb = pu1.tp->get_out();
+    fail_unless(rb != 0);
+    pu1.pc->handle_up(0, *rb, ProtoUpMeta(uuid1));
     fail_unless(pu1.pc->get_state() == Proto::S_NON_PRIM);
+    delete rb;
 
     View tpv2(ViewId(V_TRANS, pu2.pc->get_current_view().get_id()));
     tpv2.add_member(uuid2, "n2");
@@ -355,6 +367,7 @@ END_TEST
 /* Test that UUID ordering does not matter when starting nodes */
 START_TEST(test_pc_view_changes_reverse)
 {
+    log_info << "START (test_pc_view_changes_reverse)";
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -378,6 +391,7 @@ END_TEST
 
 START_TEST(test_pc_state1)
 {
+    log_info << "START (test_pc_state1)";
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -515,6 +529,7 @@ END_TEST
 
 START_TEST(test_pc_state2)
 {
+    log_info << "START (test_pc_state2)";
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -636,7 +651,7 @@ END_TEST
 
 START_TEST(test_pc_state3)
 {
-    log_info << "START";
+    log_info << "START (test_pc_state3)";
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -668,8 +683,8 @@ START_TEST(test_pc_state3)
     tr12.add_member(uuid2, "n2");
     pu2.pc->handle_view(tr12);
 
-    fail_unless(pu1.pc->get_state() == Proto::S_NON_PRIM);
-    fail_unless(pu2.pc->get_state() == Proto::S_NON_PRIM);
+    fail_unless(pu1.pc->get_state() == Proto::S_TRANS);
+    fail_unless(pu2.pc->get_state() == Proto::S_TRANS);
 
     fail_unless(pu1.tp->get_out() == 0);
     fail_unless(pu2.tp->get_out() == 0);
@@ -760,7 +775,7 @@ END_TEST
 
 START_TEST(test_pc_conflicting_prims)
 {
-    log_info << "START";
+    log_info << "START (test_pc_conflicting_prims)";
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -833,7 +848,7 @@ END_TEST
 
 START_TEST(test_pc_conflicting_prims_npvo)
 {
-    log_info << "START";
+    log_info << "START (test_pc_conflicting_npvo)";
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -971,7 +986,7 @@ static ViewType view_type(const size_t i_begin, const size_t i_end,
 
 START_TEST(test_pc_split_merge)
 {
-    log_info << "START";
+    log_info << "START (test_pc_split_merge)";
     size_t n_nodes(5);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
@@ -982,7 +997,6 @@ START_TEST(test_pc_split_merge)
     for (size_t i = 0; i < n_nodes; ++i)
     {
         dn.push_back(create_dummy_node(i + 1, inactive_timeout, retrans_period));
-        log_info << "i " << i;
         gu_trace(join_node(&prop, dn[i], i == 0));
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
         gu_trace(prop.propagate_until_cvi(false));
@@ -1026,7 +1040,7 @@ END_TEST
 
 START_TEST(test_pc_split_merge_w_user_msg)
 {
-    log_info << "START";
+    log_info << "START (test_pc_split_merge_w_user_msg)";
     size_t n_nodes(5);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
@@ -1037,7 +1051,6 @@ START_TEST(test_pc_split_merge_w_user_msg)
     for (size_t i = 0; i < n_nodes; ++i)
     {
         dn.push_back(create_dummy_node(i + 1, inactive_timeout, retrans_period));
-        log_info << "i " << i;
         gu_trace(join_node(&prop, dn[i], i == 0));
         set_cvi(dn, 0, i, ++view_seq, V_PRIM);
         gu_trace(prop.propagate_until_cvi(false));
@@ -1086,7 +1099,7 @@ END_TEST
 
 START_TEST(test_pc_complete_split_merge)
 {
-    log_info << "START";
+    log_info << "START (test_pc_complete_split_merge)";
     size_t n_nodes(5);
     vector<DummyNode*> dn;
     PropagationMatrix prop;
@@ -1244,6 +1257,7 @@ public:
 
 START_TEST(test_pc_transport)
 {
+    log_info << "START (test_pc_transport)";
     gu::Config conf;
     auto_ptr<Protonet> net(Protonet::create(conf));
     PCUser2 pu1(*net,
@@ -1296,14 +1310,14 @@ END_TEST
 
 START_TEST(test_trac_191)
 {
-
+    log_info << "START (test_trac_191)";
     gu::Config conf;
     UUID uuid1(1), uuid2(2), uuid3(3), uuid4(4);
     Proto p(conf, uuid4);
     DummyTransport tp(uuid4, true);
     gcomm::connect(&tp, &p);
 
-    p.shift_to(Proto::S_JOINING);
+    p.shift_to(Proto::S_NON_PRIM);
     View t0(ViewId(V_TRANS, uuid4, 0));
     t0.add_member(uuid4);
     p.handle_view(t0);
@@ -1335,8 +1349,187 @@ START_TEST(test_trac_191)
 }
 END_TEST
 
+START_TEST(test_trac_413)
+{
+    log_info << "START (test_trac_413)";
+    class TN : gcomm::Toplay // test node
+    {
+    public:
+        TN(gu::Config conf, const UUID& uuid)
+            :
+            Toplay(conf),
+            p_(conf, uuid),
+            tp_(uuid, true)
+        {
+            gcomm::connect(&tp_, &p_);
+            gcomm::connect(&p_, this);
+        }
+        const UUID& uuid() const { return p_.get_uuid(); }
+        gcomm::pc::Proto& p() { return p_; }
+        DummyTransport& tp() { return tp_; }
+        void handle_up(const void* id, const gu::Datagram& dg,
+                       const gcomm::ProtoUpMeta& um)
+        {
+            // void
+        }
+    private:
+        pc::Proto p_;
+        DummyTransport tp_;
+    };
+
+    gu::Config conf;
+    TN n1(conf, 1), n2(conf, 2), n3(conf, 3);
+
+
+    // boot to first prim
+    {
+        gcomm::View tr(ViewId(V_TRANS, n1.uuid(), 0));
+        tr.get_members().insert_unique(std::make_pair(n1.uuid(), ""));
+        n1.p().connect(true);
+        n1.p().handle_view(tr);
+        Datagram* dg(n1.tp().get_out());
+        fail_unless(dg == 0 && n1.p().get_state() == gcomm::pc::Proto::S_TRANS);
+        gcomm::View reg(ViewId(V_REG, n1.uuid(), 1));
+        reg.get_members().insert_unique(std::make_pair(n1.uuid(), ""));
+        n1.p().handle_view(reg);
+        dg = n1.tp().get_out();
+        fail_unless(dg != 0 &&
+                    n1.p().get_state() == gcomm::pc::Proto::S_STATES_EXCH);
+        n1.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n1.uuid()));
+        delete dg;
+        dg = n1.tp().get_out();
+        fail_unless(dg != 0 &&
+                    n1.p().get_state() == gcomm::pc::Proto::S_INSTALL);
+        n1.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n1.uuid()));
+        delete dg;
+        dg = n1.tp().get_out();
+        fail_unless(dg == 0 && n1.p().get_state() == gcomm::pc::Proto::S_PRIM);
+    }
+
+    // add remaining nodes
+    {
+        gcomm::View tr(ViewId(V_TRANS, n1.uuid(), 1));
+        tr.get_members().insert_unique(std::make_pair(n1.uuid(), ""));
+        n1.p().handle_view(tr);
+    }
+    {
+        gcomm::View tr(ViewId(V_TRANS, n2.uuid(), 0));
+        tr.get_members().insert_unique(std::make_pair(n2.uuid(), ""));
+        n2.p().connect(false);
+        n2.p().handle_view(tr);
+    }
+    {
+        gcomm::View tr(ViewId(V_TRANS, n3.uuid(), 0));
+        tr.get_members().insert_unique(std::make_pair(n3.uuid(), ""));
+        n3.p().connect(false);
+        n3.p().handle_view(tr);
+    }
+
+    {
+        gcomm::View reg(ViewId(V_REG, n1.uuid(), 2));
+        reg.get_members().insert_unique(std::make_pair(n1.uuid(), ""));
+        reg.get_members().insert_unique(std::make_pair(n2.uuid(), ""));
+        reg.get_members().insert_unique(std::make_pair(n3.uuid(), ""));
+        n1.p().handle_view(reg);
+        n2.p().handle_view(reg);
+        n3.p().handle_view(reg);
+
+        gu::Datagram* dg(n1.tp().get_out());
+        fail_unless(dg != 0);
+        n1.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n1.uuid()));
+        n2.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n1.uuid()));
+        n3.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n1.uuid()));
+        delete dg;
+
+        dg = n2.tp().get_out();
+        fail_unless(dg != 0);
+        n1.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n2.uuid()));
+        n2.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n2.uuid()));
+        n3.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n2.uuid()));
+        delete dg;
+
+        dg = n3.tp().get_out();
+        fail_unless(dg != 0);
+        n1.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n3.uuid()));
+        n2.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n3.uuid()));
+        n3.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n3.uuid()));
+        delete dg;
+
+        dg = n1.tp().get_out();
+        fail_unless(dg != 0);
+        n1.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n1.uuid()));
+        n2.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n1.uuid()));
+        n3.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n1.uuid()));
+        delete dg;
+
+        fail_unless(n1.tp().get_out() == 0 &&
+                    n1.p().get_state() == gcomm::pc::Proto::S_PRIM);
+        fail_unless(n2.tp().get_out() == 0 &&
+                    n2.p().get_state() == gcomm::pc::Proto::S_PRIM);
+        fail_unless(n3.tp().get_out() == 0 &&
+                    n3.p().get_state() == gcomm::pc::Proto::S_PRIM);
+    }
+
+    mark_point();
+    // drop n1 from view and deliver only state messages in
+    // the following reg view
+    {
+        gcomm::View tr(gcomm::ViewId(V_TRANS, n1.uuid(), 2));
+        tr.get_members().insert_unique(std::make_pair(n2.uuid(), ""));
+        tr.get_members().insert_unique(std::make_pair(n3.uuid(), ""));
+
+        n2.p().handle_view(tr);
+        n3.p().handle_view(tr);
+
+        gcomm::View reg(gcomm::ViewId(V_REG, n2.uuid(), 3));
+        reg.get_members().insert_unique(std::make_pair(n2.uuid(), ""));
+        reg.get_members().insert_unique(std::make_pair(n3.uuid(), ""));
+        n2.p().handle_view(reg);
+        n3.p().handle_view(reg);
+
+
+        gu::Datagram* dg(n2.tp().get_out());
+        n2.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n2.uuid()));
+        n3.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n2.uuid()));
+        delete dg;
+
+        dg = n3.tp().get_out();
+        n2.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n3.uuid()));
+        n3.p().handle_up(0, *dg, gcomm::ProtoUpMeta(n3.uuid()));
+        delete dg;
+    }
+
+    mark_point();
+    // drop n2 from view and make sure that n3 ends in non-prim
+    {
+        gcomm::View tr(gcomm::ViewId(V_TRANS, n2.uuid(), 3));
+        tr.get_members().insert_unique(std::make_pair(n3.uuid(), ""));
+        n3.p().handle_view(tr);
+        fail_unless(n3.tp().get_out() == 0 &&
+                    n3.p().get_state() == gcomm::pc::Proto::S_TRANS);
+
+        gcomm::View reg(gcomm::ViewId(V_REG, n3.uuid(), 4));
+        reg.get_members().insert_unique(std::make_pair(n3.uuid(), ""));
+        n3.p().handle_view(reg);
+
+        fail_unless(n3.p().get_state() == gcomm::pc::Proto::S_STATES_EXCH);
+
+        gu::Datagram* dg(n3.tp().get_out());
+        fail_unless(dg != 0);
+        n3.p().handle_up(0, *dg, ProtoUpMeta(n3.uuid()));
+        dg = n3.tp().get_out();
+        fail_unless(dg == 0 &&
+                    n3.p().get_state() == gcomm::pc::Proto::S_NON_PRIM,
+                    "%p %d", dg, n3.p().get_state());
+    }
+
+}
+END_TEST
+
+
 START_TEST(test_fifo_violation)
 {
+    log_info << "START (test_fifo_violation)";
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -1369,6 +1562,7 @@ END_TEST
 
 START_TEST(test_checksum)
 {
+    log_info << "START (test_checksum)";
     gu::Config conf;
     UUID uuid1(1);
     ProtoUpMeta pum1(uuid1);
@@ -1468,6 +1662,10 @@ Suite* pc_suite()
 
     tc = tcase_create("test_trac_191");
     tcase_add_test(tc, test_trac_191);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_trac_413");
+    tcase_add_test(tc, test_trac_413);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_fifo_violation");
