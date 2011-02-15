@@ -34,7 +34,6 @@ public:
     enum State
     {
         S_CLOSED,
-        S_JOINING,
         S_STATES_EXCH,
         S_INSTALL,
         S_PRIM,
@@ -48,7 +47,6 @@ public:
         switch (s)
         {
         case S_CLOSED:      return "CLOSED";
-        case S_JOINING:     return "JOINING";
         case S_STATES_EXCH: return "STATES_EXCH";
         case S_INSTALL:     return "INSTALL";
         case S_TRANS:       return "TRANS";
@@ -80,7 +78,7 @@ public:
         instances_     (),
         self_i_        (instances_.insert_unique(std::make_pair(uuid, Node()))),
         state_msgs_    (),
-        current_view_  (V_TRANS),
+        current_view_  (V_NONE),
         pc_view_       (V_NON_PRIM),
         views_         ()
     {
@@ -98,6 +96,9 @@ public:
     bool get_prim() const { return NodeMap::get_value(self_i_).get_prim(); }
 
     void set_prim(const bool val) { NodeMap::get_value(self_i_).set_prim(val); }
+
+    void mark_non_prim();
+
 
     const ViewId& get_last_prim() const
     { return NodeMap::get_value(self_i_).get_last_prim(); }
@@ -133,7 +134,6 @@ public:
     void send_install();
 
     void handle_first_trans (const View&);
-    void handle_first_reg   (const View&);
     void handle_trans       (const View&);
     void handle_reg         (const View&);
 
@@ -148,7 +148,7 @@ public:
         log_debug << self_id() << " start_prim " << first;
         start_prim_ = first;
         closing_    = false;
-        shift_to(S_JOINING);
+        shift_to(S_NON_PRIM);
     }
 
     void close() { closing_ = true; }
