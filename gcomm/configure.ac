@@ -1,5 +1,5 @@
 AC_PREREQ(2.57)
-AC_INIT([libgcomm], [0.7.5], [info@codership.com])
+AC_INIT([libgcomm], [0.7.6], [info@codership.com])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE
