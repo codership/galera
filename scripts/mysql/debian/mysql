@@ -23,7 +23,7 @@ test -x /usr/sbin/mysqld || exit 0
 
 SELF=$(cd $(dirname $0); pwd -P)/$(basename $0)
 CONF=/etc/mysql/my.cnf
-MYADMIN="/usr/bin/mysqladmin --defaults-file=/etc/mysql/debian.cnf"
+# MYADMIN="/usr/bin/mysqladmin --defaults-file=/etc/mysql/debian.cnf"
 
 # priority can be overriden and "-s" adds output to stderr
 ERR_LOGGER="logger -p daemon.err -t /etc/init.d/mysql -i"
@@ -72,22 +72,24 @@ sanity_checks() {
 #
 # Usage: boolean mysqld_status [check_alive|check_dead] [warn|nowarn]
 mysqld_status () {
-    ping_output=`$MYADMIN ping 2>&1`; ping_alive=$(( ! $? ))
+#    ping_output=`$MYADMIN ping 2>&1`; ping_alive=$(( ! $? ))
 
     ps_alive=0
     pidfile=`mysqld_get_param pid-file`
     if [ -f "$pidfile" ] && ps `cat $pidfile` >/dev/null 2>&1; then ps_alive=1; fi
     
-    if [ "$1" = "check_alive"  -a  $ping_alive = 1 ] ||
-       [ "$1" = "check_dead"   -a  $ping_alive = 0  -a  $ps_alive = 0 ]; then
+    if [ "$1" = "check_alive"  -a  $ps_alive = 1 ] ||
+       [ "$1" = "check_dead"   -a  $ps_alive = 0 ]; then
 	return 0 # EXIT_SUCCESS
     else
   	if [ "$2" = "warn" ]; then
-  	    echo -e "$ps_alive processes alive and '$MYADMIN ping' resulted in\n$ping_output\n" | $ERR_LOGGER -p daemon.debug
+#  	    echo -e "$ps_alive processes alive and '$MYADMIN ping' resulted in\n$ping_output\n" | $ERR_LOGGER -p daemon.debug
+  	    echo -e "$ps_alive processes alive\n" | $ERR_LOGGER -p daemon.debug
 	fi
   	return 1 # EXIT_FAILURE
     fi
 }
+
 
 #
 # main()
@@ -142,21 +144,19 @@ case "${1:-''}" in
 	# users home and not /root)
 	log_daemon_msg "Stopping MySQL database server" "mysqld"
 	if ! mysqld_status check_dead nowarn; then
-	  set +e
-	  shutdown_out=`$MYADMIN shutdown 2>&1`; r=$?
-	  set -e
-	  if [ "$r" -ne 0 ]; then
-	    log_end_msg 1
-	    [ "$VERBOSE" != "no" ] && log_failure_msg "Error: $shutdown_out"
-	    log_daemon_msg "Killing MySQL database server by signal" "mysqld"
-	    killall -15 mysqld
-            server_down=
-	    for i in 1 2 3 4 5 6 7 8 9 10; do
-              sleep 1
-              if mysqld_status check_dead nowarn; then server_down=1; break; fi
-            done
-          if test -z "$server_down"; then killall -9 mysqld; fi
-	  fi
+	  log_daemon_msg "Killing MySQL database server by signal" "mysqld"
+          pid=$(cat `mysqld_get_param pid-file` || echo 0)
+          if [ $pid -eq 0 ]; then
+            log_failure_msg "Failed to get MySQL server pid"
+            exit 1
+          fi
+	  kill -15 $pid
+          server_down=
+	  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+            log_progress_msg "."
+            sleep 1
+            if mysqld_status check_dead nowarn; then server_down=1; break; fi
+          done
         fi
 
         if ! mysqld_status check_dead warn; then
