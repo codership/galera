@@ -1191,6 +1191,8 @@ galera_handle_configuration (wsrep_t* gh,
             status.stage = GALERA_STAGE_SST_PREPARE;
             app_req_len = sst_prepare_cb (&app_req);
 
+            int req_tries = 0;
+
             if (app_req_len < 0) {
 
                 status.stage = GALERA_STAGE_JOINING;
@@ -1209,6 +1211,8 @@ galera_handle_configuration (wsrep_t* gh,
                 if (galera_invalidate_state (data_dir)) abort();
 
                 status.stage = GALERA_STAGE_RST_SENT;
+                req_tries++;
+
                 ret = gcs_request_state_transfer (gcs_conn,
                                                   app_req, app_req_len,
                                                   sst_donor, &seqno_l);
@@ -1223,10 +1227,10 @@ galera_handle_configuration (wsrep_t* gh,
                         // try not to lose state information if RST fails
                         galera_store_state (data_dir, &st);
                     }
-                    else {
-                        gu_info ("Requesting state snapshot transfer failed: "
-                                 "%d (%s). Retrying in %d seconds",
-                                 ret, strerror(-ret), retry_sec);
+                    else if (!(req_tries % 10) || 1 == req_tries) {
+                        gu_info ("Requesting state snapshot transfer failed "
+                                 "(try %d): %d (%s). Retrying in %d seconds",
+                                 req_tries, ret, strerror(-ret), retry_sec);
                     }
                 }
 
