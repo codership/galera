@@ -117,7 +117,7 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
         long long end   = gu_time_monotonic();
         double interval = ((end - fc->start) * 1.0e-9);
 
-        if (gu_unlikely (fc->last_sleep == fc->init_size)) {
+        if (gu_unlikely (0 == fc->last_sleep)) {
             /* just tripped the soft limit, preparing constants for throttle */
 
             fc->max_rate = (double)(fc->size - fc->init_size) / interval;
@@ -126,15 +126,16 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
             assert (s < 0.0);
 
             fc->scale  = s * fc->max_rate;
-            fc->offset = (fc->max_throttle - s*fc->soft_limit) * fc->max_rate;
+            fc->offset = (1.0 - s*fc->soft_limit) * fc->max_rate;
 
-            fc->last_sleep = fc->soft_limit;
             // calculate time interval from the soft limit
             interval = interval * (double)(fc->size - fc->soft_limit) /
                 (fc->size - fc->init_size);
 
-            gu_warn("Soft slave queue limit exceeded, "
+            gu_warn("Soft recv queue limit exceeded, "
                     "starting replication throttle.");
+
+            fc->last_sleep = fc->soft_limit;
         }
 
         /* throttling operation */
@@ -144,7 +145,14 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
         double sleep = (double)(fc->size - fc->last_sleep) / desired_rate
             - interval;
 
-        if (gu_likely(sleep < min_sleep)) return 0;
+        if (gu_likely(sleep < min_sleep)) {
+            gu_info ("Skipping sleep: desired_rate = %f, sleep = %f (%f), "
+                     "interval = %f, fc->scale = %f, fc->offset = %f, "
+                     "fc->size = %zd",
+                     desired_rate, sleep, min_sleep, interval,
+                     fc->scale, fc->offset, fc->size);
+            return 0;
+        }
 
         period->tv_sec  = sleep;
         period->tv_nsec = (sleep - period->tv_sec)*1.0e+9;
