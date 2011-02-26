@@ -739,10 +739,12 @@ group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
         memcpy (joiner->donor, donor->id,  GCS_COMP_MEMB_ID_MAX_LEN+1);
     }
     else {
+#if 0
         gu_warn ("Node %ld (%s) requested State Transfer from '%s', "
                  "but it is impossible to select State Transfer donor: %s",
                  joiner_idx, group->nodes[joiner_idx].name,
                  required_donor ? donor_name : "*any*", strerror (-donor_idx));
+#endif
     }
 
     return donor_idx;

@@ -1360,11 +1360,14 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
 
     wsrep_status_t retval(WSREP_OK);
     long ret;
+    long tries = 0;
     gu::Lock lock(sst_mutex_);
 
     do
     {
         invalidate_state(state_file_);
+
+        tries++;
 
         gcs_seqno_t seqno_l;
 
@@ -1378,9 +1381,10 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
                 log_error << "Requesting state snapshot transfer failed: "
                           << ret << "(" << strerror(-ret) << ")";
             }
-            else
+            else if (1 == tries || !(tries % 10))
             {
-                log_info << "Requesting state snapshot transfer failed: "
+                log_info << "Requesting state snapshot transfer failed (try "
+                         << tries << "): "
                          << ret << "(" << strerror(-ret) << "). "
                          << "Retrying in " << sst_retry_sec_ << " seconds";
             }
@@ -1397,7 +1401,16 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
 
     if (ret >= 0)
     {
-        log_info << "Requesting state transfer: success, donor " << ret;
+        if (1 == tries)
+        {
+            log_info << "Requesting state transfer: success, donor: " << ret;
+        }
+        else
+        {
+            log_info << "Requesting state transfer: success after "
+                     << tries << " tries, donor: " << ret;
+        }
+
         sst_state_ = SST_WAIT;
 
         lock.wait(sst_cond_);

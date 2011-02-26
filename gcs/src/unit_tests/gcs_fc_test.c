@@ -51,15 +51,17 @@ START_TEST(gcs_fc_test_basic)
     fail_if (ret != 0);
 
     gcs_fc_reset (&fc, 8);
+    usleep (1000);
     SKIP_N_ACTIONS(&fc, 7);
 
     /* Here we exceed soft limit almost instantly, which should give a very high
      * data rate and as a result a need to sleep */
-    ret = gcs_fc_process (&fc, 1, &p);
+    ret = gcs_fc_process (&fc, 7, &p);
     fail_if(ret != 1, "Soft limit trip returned %d (%s)", ret, strerror(-ret));
     fail_if(p.tv_sec == 0 && p.tv_nsec == 0, "0 period returned");
 
     gcs_fc_reset (&fc, 7);
+    usleep (1000);
     SKIP_N_ACTIONS(&fc, 7);
 
     /* Here we reach soft limit almost instantly, which should give a very high
@@ -68,12 +70,13 @@ START_TEST(gcs_fc_test_basic)
     fail_if(ret != 0, "Soft limit touch returned %d (%s)", ret, strerror(-ret));
 
     SKIP_N_ACTIONS(&fc, 7);
-    ret = gcs_fc_process (&fc, 1, &p);
+    usleep (1000);
+    ret = gcs_fc_process (&fc, 8, &p);
     fail_if(ret != 1, "Soft limit trip returned %d (%s)", ret, strerror(-ret));
     fail_if(p.tv_sec == 0 && p.tv_nsec == 0, "0 period returned");
 
     /* hard limit excess should be detected instantly */
-    ret = gcs_fc_process (&fc, 8, &p);
+    ret = gcs_fc_process (&fc, 1, &p);
     fail_if(ret != -ENOMEM, "Hard limit trip returned %d (%s)",
             ret, strerror(-ret));
 }
@@ -82,9 +85,9 @@ END_TEST
 static inline bool
 double_equals (double a, double b)
 {
-    static double const eps = 0.01;
+    static double const eps = 0.02;
     double diff = (a - b) / (a + b); // roughly relative difference
-    return (diff > eps || diff < -eps);
+    return !(diff > eps || diff < -eps);
 }
 
 START_TEST(gcs_fc_test_precise)

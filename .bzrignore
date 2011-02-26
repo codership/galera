@@ -52,11 +52,6 @@ config.sub
 stamp-h
 stamp-h.in
 stamp-h1
-Makefile
-Makefile.in
-.deps
-.libs
-libtool
 scons*
 .sconf*
 {arch}
@@ -69,8 +64,8 @@ gcs_tests
 cluster.conf
 nodes.conf
 tests/conf/my.cnf
-tests/run
-tests/out
+tests/run/*
+tests/out/*
 tests/bin/*
 gcache/src/test
 gcache/tests/gcache_tests
