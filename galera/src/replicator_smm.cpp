@@ -1014,7 +1014,7 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
     assert(trx != 0);
     assert(trx->local_seqno() > 0);
     assert(trx->global_seqno() > 0);
-    assert(trx->last_seen_seqno() > 0);
+    assert(trx->last_seen_seqno() >= 0);
     assert(trx->last_depends_seqno() == -1);
     assert(trx->state() == TrxHandle::S_REPLICATED);
 

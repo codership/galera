@@ -98,6 +98,7 @@ namespace galera
 
         virtual std::string    param_get (const std::string& key) const
             throw (gu::Exception, gu::NotFound) = 0;
+        virtual const gu::Config& params() const = 0;
     };
 }
 

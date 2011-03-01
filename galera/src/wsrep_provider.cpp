@@ -98,9 +98,22 @@ wsrep_status_t galera_parameters_set (wsrep_t* gh, const char* params)
 extern "C"
 char* galera_parameters_get (wsrep_t* gh)
 {
-    // return galera_options_to_string (&galera_opts);
-    log_warn << "Not implemented: " << __FUNCTION__;
-    return NULL;
+    assert(gh != 0);
+    try
+    {
+        REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+        return wsrep_get_params(*repl);
+    }
+    catch (std::exception& e)
+    {
+        log_error << e.what();
+        return 0;
+    }
+    catch (...)
+    {
+        log_fatal << "non-standard exception";
+        return 0;
+    }
 }
 
 
