@@ -1341,12 +1341,12 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
                 log_error << "Requesting state snapshot transfer failed: "
                           << ret << "(" << strerror(-ret) << ")";
             }
-            else if (1 == tries || !(tries % 10))
+            else if (1 == tries)
             {
-                log_info << "Requesting state snapshot transfer failed (try "
-                         << tries << "): "
+                log_info << "Requesting state snapshot transfer failed: "
                          << ret << "(" << strerror(-ret) << "). "
-                         << "Retrying in " << sst_retry_sec_ << " seconds";
+                         << "Will keep retrying every " << sst_retry_sec_
+                         << " second(s)";
             }
         }
         if (seqno_l != GCS_SEQNO_ILL)
