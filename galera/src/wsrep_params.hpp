@@ -13,5 +13,5 @@
 void
 wsrep_set_params (galera::Replicator& repl, const char* params)
     throw (gu::Exception);
-
+char* wsrep_get_params(const galera::Replicator& repl);
 #endif /* WSREP_PARAMS_HPP */

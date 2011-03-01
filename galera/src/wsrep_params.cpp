@@ -33,3 +33,10 @@ wsrep_set_params (galera::Replicator& repl, const char* params)
         }
     }
 }
+
+char* wsrep_get_params(const galera::Replicator& repl)
+{
+    std::ostringstream os;
+    os << repl.params();
+    return strdup(os.str().c_str());
+}

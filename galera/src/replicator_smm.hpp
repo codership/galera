@@ -107,7 +107,7 @@ namespace galera
 
         std::string    param_get (const std::string& key) const
             throw (gu::Exception, gu::NotFound);
-
+        const gu::Config& params() const { return config_; }
         void store_state      (const std::string& file) const;
         void restore_state    (const std::string& file);
         void invalidate_state (const std::string& file) const;
