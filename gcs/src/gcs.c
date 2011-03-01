@@ -970,6 +970,7 @@ static void *gcs_recv_thread (void *arg)
                 if (gu_unlikely(GCS_CONN_JOINER == conn->state)) {
                     ret = gcs_check_slave_queue_growth (conn, rcvd.act.buf_len);
                     assert (ret <= 0);
+                    if (ret < 0) break;
                 }
 
                 if (gu_unlikely(send_stop) && (ret = gcs_fc_stop_end(conn))) {

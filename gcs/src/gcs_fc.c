@@ -110,6 +110,7 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
         return 0;
     }
     else if (fc->size > fc->hard_limit) {
+        gu_error ("Recv queue hard limit exceded. Can't continue.");
         return -ENOMEM;
     }
     else if (!(fc->act_count & 7)) { // do this for every 8th action
@@ -146,11 +147,13 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
             - interval;
 
         if (gu_likely(sleep < min_sleep)) {
+#if 0
             gu_info ("Skipping sleep: desired_rate = %f, sleep = %f (%f), "
                      "interval = %f, fc->scale = %f, fc->offset = %f, "
                      "fc->size = %zd",
                      desired_rate, sleep, min_sleep, interval,
                      fc->scale, fc->offset, fc->size);
+#endif
             return 0;
         }
 
