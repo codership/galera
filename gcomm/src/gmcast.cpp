@@ -428,7 +428,7 @@ void GMCast::handle_established(Proto* est)
 
     // send_up(Datagram(), p->get_remote_uuid());
 
-    AddrList::get_value(i).set_retry_cnt(-1);
+    AddrList::get_value(i).set_retry_cnt(max_retry_cnt - 60);
 
     // Cleanup all previously established entries with same
     // remote uuid. It is assumed that the most recent connection
@@ -944,4 +944,47 @@ int GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
     return 0;
 }
 
+void gcomm::GMCast::handle_stable_view(const View& view)
+{
+    log_info << "GMCast::handle_stable_view: " << view;
+    if (view.get_type() == V_PRIM)
+    {
+        std::set<UUID> gmcast_lst;
+        for (AddrList::const_iterator i(remote_addrs.begin());
+             i != remote_addrs.end(); ++i)
+        {
+            gmcast_lst.insert(i->second.get_uuid());
+        }
+        std::set<UUID> view_lst;
+        for (NodeList::const_iterator i(view.get_members().begin());
+             i != view.get_members().end(); ++i)
+        {
+            view_lst.insert(i->first);
+        }
+        std::list<UUID> diff;
+        std::set_difference(gmcast_lst.begin(),
+                            gmcast_lst.end(),
+                            view_lst.begin(),
+                            view_lst.end(),
+                            std::back_inserter(diff));
+
+        for (std::list<UUID>::const_iterator i(diff.begin());
+             i != diff.end(); ++i)
+        {
+            gmcast_forget(*i);
+        }
+
+        for (std::set<UUID>::const_iterator i(view_lst.begin());
+             i != view_lst.end(); ++i)
+        {
+            AddrList::iterator ai;
+            if ((ai = find_if(remote_addrs.begin(), remote_addrs.end(),
+                              AddrListUUIDCmp(*i))) != remote_addrs.end())
+            {
+                log_info << "declaring " << *i << " stable";
+                ai->second.set_retry_cnt(-1);
+            }
+        }
+    }
+}
 

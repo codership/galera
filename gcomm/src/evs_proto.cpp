@@ -362,8 +362,9 @@ void gcomm::evs::Proto::handle_consensus_timer()
 {
     if (get_state() != S_OPERATIONAL)
     {
-        log_warn << self_string() << " consensus timer expired, state dump follows:";
-        std::cerr << *this << "\n";
+        log_warn << self_string()
+                 << " consensus timer expired, state dump follows:";
+        std::cerr << *this << std::endl;
 
         ++cac;
         if (cac == 2)
@@ -439,7 +440,8 @@ void gcomm::evs::Proto::handle_install_timer()
     const bool is_repr(is_representative(get_uuid()));
     evs_log_info(I_STATE) << "consensus: " << is_cons;
     evs_log_info(I_STATE) << "repr     : " << is_repr;
-    evs_log_info(I_STATE) << "state dump for diagnosis:" << *this;
+    evs_log_info(I_STATE) << "state dump for diagnosis:";
+    std::cerr << *this << std::endl;
     shift_to(S_GATHER, true);
     if (is_cons == true && is_repr == true)
     {

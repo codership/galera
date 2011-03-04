@@ -166,6 +166,7 @@ void gcomm::pc::Proto::deliver_view()
     ProtoUpMeta um(UUID::nil(), ViewId(), &v);
     log_debug << self_id() << " delivering view " << v;
     send_up(Datagram(), um);
+    set_stable_view(v);
 }
 
 

@@ -38,7 +38,7 @@ namespace gcomm
         // Protolay interface
         void handle_up(const void*, const gu::Datagram&, const ProtoUpMeta&);
         int  handle_down(gu::Datagram&, const ProtoDownMeta&);
-
+        void handle_stable_view(const View& view);
         // Transport interface
         bool supports_uuid()   const { return true; }
         const UUID& get_uuid() const { return my_uuid; }
@@ -108,7 +108,19 @@ namespace gcomm
         };
 
 
-        class AddrList : public Map<std::string, AddrEntry> { };
+
+        typedef Map<std::string, AddrEntry> AddrList;
+        class AddrListUUIDCmp
+        {
+        public:
+            AddrListUUIDCmp(const UUID& uuid) : uuid_(uuid) { }
+            bool operator()(const AddrList::value_type& cmp) const
+            {
+                return (cmp.second.get_uuid() == uuid_);
+            }
+        private:
+            UUID uuid_;
+        };
 
         int               version;
         static const int max_version_ = GCOMM_GMCAST_MAX_VERSION;
