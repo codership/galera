@@ -212,6 +212,10 @@ public:
     // Protolay
     void handle_up(const void*, const gu::Datagram&, const ProtoUpMeta&);
     int handle_down(gu::Datagram& wb, const ProtoDownMeta& dm);
+    void handle_stable_view(const View& view)
+    {
+        set_stable_view(view);
+    }
     void connect(bool first)
     {
         gu_trace(shift_to(S_JOINING));

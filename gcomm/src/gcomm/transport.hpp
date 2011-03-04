@@ -77,7 +77,7 @@ public:
     
     virtual int  handle_down(gu::Datagram&, const ProtoDownMeta&) = 0;
     virtual void handle_up  (const void*, const gu::Datagram&, const ProtoUpMeta&) = 0;
-    
+    virtual void handle_stable_view(const View& view) { }
     Protostack& get_pstack() { return pstack_; }
     Protonet&   get_pnet()   { return pnet_; }
     

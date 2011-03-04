@@ -307,6 +307,17 @@ public:
 	return ret;
     }
 
+    virtual void handle_stable_view(const View& view) { }
+
+    void set_stable_view(const View& view)
+    {
+        for (CtxList::iterator i(down_context_.begin());
+             i != down_context_.end(); ++i)
+        {
+            (*i)->handle_stable_view(view);
+        }
+    }
+
     virtual gu::datetime::Date handle_timers()
     {
         return gu::datetime::Date::max();
