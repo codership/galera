@@ -26,6 +26,7 @@ void PC::handle_up(int cid, const Datagram& rb,
                    const ProtoUpMeta& um)
 {
     
+#if 0
     if (um.has_view() == true && um.get_view().get_type() == V_PRIM)
     {
         /* Call close gmcast transport for all nodes that have left 
@@ -43,7 +44,7 @@ void PC::handle_up(int cid, const Datagram& rb,
             gmcast->close(NodeList::get_key(i));
         }
     }
-    
+#endif // 0
     send_up(rb, um);
 }
 

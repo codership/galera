@@ -305,6 +305,16 @@ public:
 
     int get_id() const { return id; }
 
+    virtual void handle_stable_view(const View& view) { }
+
+    void set_stable_view(const View& view)
+    {
+        for (CtxList::iterator i(down_context.begin());
+             i != down_context.end(); ++i)
+        {
+            i->first->handle_stable_view(view);
+        }
+    }
 };
 
 class gcomm::Toplay : public Protolay

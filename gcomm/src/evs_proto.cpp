@@ -345,8 +345,9 @@ void gcomm::evs::Proto::handle_consensus_timer()
 {
     if (get_state() != S_OPERATIONAL)
     {
-        log_warn << self_string() << " consensus timer expired, state dump follows:";
-        std::cerr << *this << "\n";
+        log_warn << self_string()
+                 << " consensus timer expired, state dump follows:";
+        std::cerr << *this << std::endl;
 
         ++cac;
         if (cac == 2)
@@ -385,6 +386,7 @@ void gcomm::evs::Proto::handle_consensus_timer()
         }
     }
 }
+
 
 void gcomm::evs::Proto::handle_stats_timer()
 {

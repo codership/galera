@@ -33,7 +33,8 @@ namespace gcomm
         // Protolay interface 
         void handle_up(int, const gu::net::Datagram&, const ProtoUpMeta&);
         int handle_down(const gu::net::Datagram&, const ProtoDownMeta&);
-        
+        void handle_stable_view(const View& view);
+
         // Transport interface
         bool supports_uuid() const { return true; }
         const UUID& get_uuid() const { return my_uuid; }
@@ -95,9 +96,20 @@ namespace gcomm
             gu::datetime::Date next_reconnect;
             int  retry_cnt;
         };
-        
-        class AddrList : public Map<std::string, AddrEntry> { };
-        
+
+        typedef Map<std::string, AddrEntry> AddrList;
+        class AddrListUUIDCmp
+        {
+        public:
+            AddrListUUIDCmp(const UUID& uuid) : uuid_(uuid) { }
+            bool operator()(const AddrList::value_type& cmp) const
+            {
+                return (cmp.second.get_uuid() == uuid_);
+            }
+        private:
+            UUID uuid_;
+        };
+
         UUID              my_uuid;
         std::string       group_name;
         std::string       listen_addr;
