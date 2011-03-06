@@ -1338,22 +1338,39 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
             if (ret != -EAGAIN)
             {
                 store_state(state_file_);
-                log_error << "Requesting state snapshot transfer failed: "
+                log_error << "Requesting state transfer failed: "
                           << ret << "(" << strerror(-ret) << ")";
             }
             else if (1 == tries)
             {
-                log_info << "Requesting state snapshot transfer failed: "
+                log_info << "Requesting state transfer failed: "
                          << ret << "(" << strerror(-ret) << "). "
                          << "Will keep retrying every " << sst_retry_sec_
                          << " second(s)";
             }
         }
+
         if (seqno_l != GCS_SEQNO_ILL)
         {
-            // we are already holding local monitor
-            LocalOrder lo(seqno_l);
-            local_monitor_.self_cancel(lo);
+            /* Check that we're not running out of space in monitor. */
+            if (local_monitor_.would_block(seqno_l))
+            {
+                long const seconds = sst_retry_sec_ * local_monitor_.size();
+                double const hours = (seconds/360) * 0.1;
+                log_error << "We ran out of resources, seemingly because "
+                          << "we've been unsuccessfully requesting state "
+                          << "transfer for over " << seconds << " seconds (>"
+                          << hours << " hours). Please check that there is at "
+                          << "least one fully synced member in the group. "
+                          << "Application must be restarted.";
+                ret = -EDEADLK;
+            }
+            else
+            {
+                // we are already holding local monitor
+                LocalOrder lo(seqno_l);
+                local_monitor_.self_cancel(lo);
+            }
         }
     }
     while ((ret == -EAGAIN) && (usleep(sst_retry_sec_ * 1000000), true));
@@ -1400,6 +1417,7 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
         sst_state_ = SST_REQ_FAILED;
         retval = WSREP_FATAL;
     }
+
     return retval;
 }
 
