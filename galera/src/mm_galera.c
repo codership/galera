@@ -1902,6 +1902,7 @@ static enum wsrep_status mm_galera_pre_commit(
     {
         gu_warn("max flow control waits %d exceeded",
                 GALERA_USLEEP_FLOW_CONTROL_MAX/GALERA_USLEEP_FLOW_CONTROL);
+        wsdb_assign_trx_state(trx_id, WSDB_TRX_ABORTING_NONREPL);
         GU_DBUG_RETURN(WSREP_TRX_FAIL);
     }
 #endif

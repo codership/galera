@@ -81,7 +81,7 @@ ROOT_USER=${ROOT_USER:-"-uroot"}
 ROOT_PSWD=${ROOT_PSWD:-"-prootpass"}
 
 LD_LIBRARY_PATH="$GALERA_BASE_DIR/lib"
-LD_PRELOAD="$MYSQL_BASE_DIR/lib/mysql/libmysqlclient.so"
+#LD_PRELOAD="$MYSQL_BASE_DIR/lib/mysql/libmysqlclient.so"
 
 # Mandatory stuff
 INNODB_OPTS=" --default-storage-engine=InnoDB "
@@ -511,7 +511,7 @@ fi
 
 export LD_LIBRARY_PATH
 export LD_PRELOAD
-export PATH=$MYSQL_BASE_DIR/bin:$PATH
+export PATH=$PATH:$MYSQL_BASE_DIR/bin
 
 $COMMAND
 
