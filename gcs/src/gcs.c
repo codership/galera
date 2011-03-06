@@ -1390,6 +1390,9 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
 
         gu_free (rst);
     }
+    else {
+        *local = GCS_SEQNO_ILL;
+    }
 
     return ret;
 }
