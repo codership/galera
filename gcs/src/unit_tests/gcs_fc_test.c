@@ -85,7 +85,7 @@ END_TEST
 static inline bool
 double_equals (double a, double b)
 {
-    static double const eps = 0.02;
+    static double const eps = 0.001;
     double diff = (a - b) / (a + b); // roughly relative difference
     return !(diff > eps || diff < -eps);
 }
@@ -114,7 +114,8 @@ START_TEST(gcs_fc_test_precise)
     // (500/5ms == 100000 b/s)
     // additional sleep must be 1.6667 ms (500/(5 + 1.6667) ~ 75000 b/s)
 
-    double const expected_sleep = 0.001666667;
+    double const correction = 100000.0/fc.max_rate; // due to imprecise sleep
+    double const expected_sleep = 0.001666667*correction;
     double sleep = p.tv_sec + (double)p.tv_nsec*1.0e-9;
     fail_if(!double_equals(sleep, expected_sleep),
             "Sleep: %f, expected %f", sleep, expected_sleep);
