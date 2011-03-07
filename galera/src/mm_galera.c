@@ -42,6 +42,7 @@ static wsrep_sst_prepare_cb_t   sst_prepare_cb     = NULL;
 static wsrep_sst_donate_cb_t    sst_donate_cb      = NULL;
 
 /* gcs parameters */
+static long const GALERA_TO_QUEUE_SIZE  = 1 << 16;
 static gu_to_t            *cert_queue   = NULL;
 static gu_to_t            *commit_queue = NULL;
 static gcs_conn_t         *gcs_conn     = NULL;
@@ -277,13 +278,13 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
 
     data_dir = strdup (args->data_dir);
     if (!data_dir) return WSREP_FATAL;
-    
+
     /* Set up logging */
     gu_conf_set_log_callback((gu_log_cb_t)args->logger_cb);
-    
+
     /* Set up options if any */
     if (args->options) galera_options_from_string (&galera_opts, args->options);
-    
+
     wsdb_set_conf_param_cb(galera_wsdb_configurator);
 
     /* Set up initial state: */
@@ -292,27 +293,26 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
     status.state_uuid   = *(gu_uuid_t*)args->state_uuid;
     status.last_applied = args->state_seqno;
 
-    
     /* 2. initialize wsdb */
     wsdb_init(data_dir, (gu_log_cb_t)args->logger_cb);    
 
     /* 3. try to read saved state from file */
     if (status.last_applied == WSREP_SEQNO_UNDEFINED &&
         !memcmp (&WSREP_UUID_UNDEFINED, &status.state_uuid, sizeof(gu_uuid_t))){
-        
+
         rcode = galera_restore_state(data_dir, &saved_state);
-        
+
         if (rcode) {
             gu_warn("GALERA state restore failed");
         } else {
             status.state_uuid   = saved_state.uuid;
             status.last_applied = saved_state.last_applied_seqno;
         }
-        
+
         gu_info("Found stored state: " GU_UUID_FORMAT ":%lli",
                 GU_UUID_ARGS(&status.state_uuid), status.last_applied);
     }
-    
+
     gu_info("Configured state:   " GU_UUID_FORMAT ":%lli",
             GU_UUID_ARGS(&status.state_uuid), status.last_applied);
 
@@ -321,35 +321,35 @@ static enum wsrep_status mm_galera_init(wsrep_t* gh,
                                 status.last_applied, status.state_uuid.data);
     if (!gcs_conn) {
         gu_error ("Failed to initialize GCS state");
-        GU_DBUG_RETURN(WSREP_NODE_FAIL);            
+        GU_DBUG_RETURN(WSREP_NODE_FAIL);
     }
-    
+
     last_recved = status.last_applied;
-    
+
     my_idx = 0;
-    
+
     /* set the rest of callbacks */
     bf_apply_cb       = args->bf_apply_cb;
     ws_start_cb       = args->ws_start_cb;
     view_handler_cb   = args->view_handler_cb;
     sst_prepare_cb    = args->sst_prepare_cb;
     sst_donate_cb     = args->sst_donate_cb;
-    
+
     gu_mutex_init(&commit_mtx, NULL);
     gu_mutex_init(&sst_mtx,    NULL);
     gu_cond_init (&sst_cond,   NULL);
-    
+
     /* create worker queue */
     applier_queue = job_queue_create(16, ws_conflict_check, ws_cmp_order);
-    
+
     /* initialize total order queue */
-    cert_queue = gu_to_create(16384, GCS_SEQNO_FIRST);
-    
+    cert_queue = gu_to_create(GALERA_TO_QUEUE_SIZE, GCS_SEQNO_FIRST);
+
     /* initialize commit queue */
-    commit_queue = gu_to_create(16384, GCS_SEQNO_FIRST);
-    
+    commit_queue = gu_to_create(GALERA_TO_QUEUE_SIZE, GCS_SEQNO_FIRST);
+
     conn_state = GALERA_INITIALIZED;
-    
+
 #ifdef EXTRA_DEBUG
     /* debug level printing to /tmp directory */
     {
@@ -1227,7 +1227,7 @@ galera_handle_configuration (wsrep_t* gh,
                         // try not to lose state information if RST fails
                         galera_store_state (data_dir, &st);
                     }
-                    else if (!(req_tries % 10) || 1 == req_tries) {
+                    else if (!(req_tries % 60) || 1 == req_tries) {
                         gu_info ("Requesting state snapshot transfer failed "
                                  "(try %d): %d (%s). Retrying in %d seconds",
                                  req_tries, ret, strerror(-ret), retry_sec);
@@ -1235,9 +1235,23 @@ galera_handle_configuration (wsrep_t* gh,
                 }
 
                 if (seqno_l > GCS_SEQNO_NIL) {
-
-                    GALERA_SELF_CANCEL_QUEUE (cert_queue,   seqno_l);
-                    GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
+                    if ((seqno_l - gu_to_seqno(cert_queue)) >=
+                        GALERA_TO_QUEUE_SIZE) {
+                        long const seconds = GALERA_TO_QUEUE_SIZE * retry_sec;
+                        double const hours = (seconds/360) * 0.1;
+                        gu_error ("We ran out of resources, seemingly because "
+                                  "we've been unsuccessfully requesting state "
+                                  "transfer for over %ld seconds (%5.1f hours)"
+                                  ". Please check that there is at least one "
+                                  "fully synced member in the group. "
+                                  "Application must be restarted.",
+                                  seconds, hours);
+                        ret = -EDEADLK;
+                    }
+                    else {
+                        GALERA_SELF_CANCEL_QUEUE (cert_queue,   seqno_l);
+                        GALERA_SELF_CANCEL_QUEUE (commit_queue, seqno_l);
+                    }
                 }
 
             } while ((ret == -EAGAIN) &&
@@ -1252,7 +1266,7 @@ galera_handle_configuration (wsrep_t* gh,
                 /* Commented out, assertion is not correct in case
                  * of rapid successive conf changes */
                 /* assert (ret != my_idx); */
-                
+
                 /* Here wait for application to call galera_state_received(),
                  * which will set my_uuid and my_seqno */
                 gu_cond_wait (&sst_cond, &sst_mtx);

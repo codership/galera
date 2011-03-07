@@ -61,7 +61,7 @@ to_get_waiter (gu_to_t* to, gu_seqno_t seqno)
     // Check for queue overflow. Tell application that it should wait.
     if (seqno >= to->seqno + to->qlen) {
         return NULL;
-    }        
+    }
 
     return (to->queue + (seqno & to->qmask));
 }
@@ -78,7 +78,7 @@ gu_to_t *gu_to_create (int len, gu_seqno_t seqno)
     }
 
     ret = GU_CALLOC (1, gu_to_t);
-    
+
     if (ret) {
 
         /* Make queue length a power of 2 */
@@ -104,7 +104,7 @@ gu_to_t *gu_to_create (int len, gu_seqno_t seqno)
                 w->state       = RELEASED;
             }
             gu_mutex_init (&ret->lock, NULL);
-        
+
             return ret;
         }
         gu_free (ret);
@@ -124,7 +124,7 @@ long gu_to_destroy (gu_to_t** to)
         gu_mutex_unlock (&t->lock);
         return -EBUSY;
     }
-    
+
     for (i = 0; i < t->qlen; i++) {
         to_waiter_t *w = t->queue + i;
 #ifdef TO_USE_SIGNAL
@@ -138,9 +138,9 @@ long gu_to_destroy (gu_to_t** to)
             gu_warn ("Failed to destroy mutex %d. Should not happen", i);
         }
 #endif
-    }    
+    }
     t->qlen = 0;
-    
+
     gu_mutex_unlock (&t->lock);
     /* What else can be done here? */
     ret = gu_mutex_destroy (&t->lock);
@@ -172,7 +172,7 @@ long gu_to_grab (gu_to_t* to, gu_seqno_t seqno)
     if ((w = to_get_waiter (to, seqno)) == NULL) {
         gu_mutex_unlock(&to->lock);
         return -EAGAIN;
-    }        
+    }
     /* we have a valid waiter now */
 
     switch (w->state) {
@@ -230,7 +230,7 @@ long gu_to_grab (gu_to_t* to, gu_seqno_t seqno)
         gu_fatal("TO queue over wrap");
         abort();
     }
-    
+
     gu_mutex_unlock(&to->lock);
     return err;
 }
@@ -256,7 +256,7 @@ to_wake_waiter (to_waiter_t* w)
 static inline void
 to_release_and_wake_next (gu_to_t* to, to_waiter_t* w) {
     w->state = RELEASED;
-    /* 
+    /*
      * Iterate over CANCELED waiters and set states as RELEASED
      * We look for waiter in the head of queue, which guarantees that
      * to_get_waiter() will always return a valid waiter pointer
@@ -284,9 +284,9 @@ long gu_to_release (gu_to_t *to, gu_seqno_t seqno)
     if ((w = to_get_waiter (to, seqno)) == NULL) {
         gu_mutex_unlock(&to->lock);
         return -EAGAIN;
-    }        
+    }
     /* we have a valid waiter now */
-    
+
     if (seqno == to->seqno) {
         to_release_and_wake_next (to, w);
     } else if (seqno > to->seqno) {
@@ -324,12 +324,12 @@ long gu_to_cancel (gu_to_t *to, gu_seqno_t seqno)
         gu_fatal("Mutex lock failed (%d): %s", err, strerror(err));
         abort();
     }
-    
+
     // Check for queue overflow. This is totally unrecoverable. Abort.
     if ((w = to_get_waiter (to, seqno)) == NULL) {
         gu_mutex_unlock(&to->lock);
         abort();
-    }        
+    }
     /* we have a valid waiter now */
 
     if ((seqno > to->seqno) || 
@@ -343,9 +343,9 @@ long gu_to_cancel (gu_to_t *to, gu_seqno_t seqno)
     } else {
         gu_warn("trying to cancel used seqno: state %d cancel seqno = %llu, "
                 "TO seqno = %llu", w->state, seqno, to->seqno);
-        err = -ECANCELED;        
+        err = -ECANCELED;
     }
-    
+
     gu_mutex_unlock (&to->lock);
     return err;
 }
@@ -365,7 +365,7 @@ long gu_to_self_cancel(gu_to_t *to, gu_seqno_t seqno)
     if ((w = to_get_waiter (to, seqno)) == NULL) {
         gu_mutex_unlock(&to->lock);
         return -EAGAIN;
-    }        
+    }
     /* we have a valid waiter now */
 
     if (seqno > to->seqno) { // most probable case
@@ -379,9 +379,9 @@ long gu_to_self_cancel(gu_to_t *to, gu_seqno_t seqno)
         // This waiter must have been canceled or even released by preceding
         // waiter. Do nothing.
     }
-    
+
     gu_mutex_unlock(&to->lock);
-    
+
     return err;
 }
 
@@ -401,7 +401,7 @@ long gu_to_interrupt (gu_to_t *to, gu_seqno_t seqno)
         if ((w = to_get_waiter (to, seqno)) == NULL) {
             gu_mutex_unlock(&to->lock);
             return -EAGAIN;
-        }        
+        }
         /* we have a valid waiter now */
 
         switch (w->state) {
