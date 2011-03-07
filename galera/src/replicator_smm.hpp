@@ -93,7 +93,8 @@ namespace galera
                                wsrep_seqno_t seqno_l)
             throw (gu::Exception);
         void process_state_req(void* recv_ctx, const void* req,
-                               size_t req_size, wsrep_seqno_t seqno_l)
+                               size_t req_size, wsrep_seqno_t seqno_l,
+                               wsrep_seqno_t donor_seq)
             throw (gu::Exception);
         void process_join(wsrep_seqno_t seqno_l)
             throw (gu::Exception);

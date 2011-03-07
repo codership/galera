@@ -749,13 +749,15 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
 }
 
 static long
-gcs_handle_act_state_req (gcs_conn_t*                conn,
-                          const struct gcs_act_rcvd* rcvd)
+gcs_handle_act_state_req (gcs_conn_t*          conn,
+                          struct gcs_act_rcvd* rcvd)
 {
     if ((gcs_seqno_t)conn->my_idx == rcvd->id) {
         int donor_idx = (int)rcvd->id; // to pacify valgrind
         gu_info ("Got GCS_ACT_STATE_REQ to %i, my idx: %ld",
                  donor_idx, conn->my_idx);
+        // rewrite to pass global seqno for application
+        rcvd->id = conn->global_seqno;
         return gcs_become_donor (conn);
         // gu_info ("Becoming donor: %s", 1 == ret ? "yes" : "no");
     }
@@ -793,8 +795,8 @@ gcs_handle_state_change (gcs_conn_t*           conn,
  *         passed to application.
  */
 static long
-gcs_handle_actions (gcs_conn_t*                conn,
-                    const struct gcs_act_rcvd* rcvd)
+gcs_handle_actions (gcs_conn_t*          conn,
+                    struct gcs_act_rcvd* rcvd)
 {
     long ret = 0;
 
@@ -922,6 +924,10 @@ static void *gcs_recv_thread (void *arg)
         if (gu_unlikely (conn->state   > GCS_CONN_JOINER   &&
                          rcvd.act.type < GCS_ACT_STATE_REQ &&
                          !act_is_local)) {
+            if (gu_unlikely(rcvd.id != GCS_SEQNO_ILL))
+            {
+                conn->global_seqno = rcvd.id;
+            }
             free ((void*)rcvd.act.buf);
             continue;
         }

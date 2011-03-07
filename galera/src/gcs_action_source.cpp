@@ -120,7 +120,7 @@ void galera::GcsActionSource::dispatch(void*          recv_ctx,
         break;
     }
     case GCS_ACT_STATE_REQ:
-        replicator_.process_state_req(recv_ctx, act, act_size, seqno_l);
+        replicator_.process_state_req(recv_ctx, act, act_size, seqno_l, seqno_g);
         break;
     case GCS_ACT_JOIN:
         replicator_.process_join(seqno_l);
