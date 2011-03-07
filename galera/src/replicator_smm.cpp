@@ -1173,7 +1173,8 @@ void galera::ReplicatorSMM::process_view_info(void* recv_ctx,
 void galera::ReplicatorSMM::process_state_req(void* recv_ctx,
                                               const void* req,
                                               size_t req_size,
-                                              wsrep_seqno_t seqno_l)
+                                              wsrep_seqno_t seqno_l,
+                                              wsrep_seqno_t donor_seq)
     throw (gu::Exception)
 {
     assert(recv_ctx != 0);
@@ -1188,10 +1189,10 @@ void galera::ReplicatorSMM::process_state_req(void* recv_ctx,
         gu_throw_fatal << "failed to enter local monitor: " << ret;
     }
 
-    apply_monitor_.drain(cert_.position());
+    apply_monitor_.drain(donor_seq);
     state_.shift_to(S_DONOR);
     sst_donate_cb_(app_ctx_, recv_ctx, req, req_size, &state_uuid_,
-                   cert_.position(), 0, 0);
+                   donor_seq, 0, 0);
     local_monitor_.leave(lo);
 }
 
