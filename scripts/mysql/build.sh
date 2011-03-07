@@ -337,7 +337,10 @@ then
 # this.
 install -m 755 -D $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS/libmysqlclient.so.16
 fi
+if test -f $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so
+then
 install -m 755 -D $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so $MYSQL_PLUGINS/ha_innodb_plugin.so
+fi
 install -m 755 -d $MYSQL_BINS
 if [ "$SKIP_CLIENTS" == "no" ]
 then

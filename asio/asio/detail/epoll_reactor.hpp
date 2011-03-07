@@ -43,9 +43,11 @@
 #include "asio/detail/timer_queue_fwd.hpp"
 #include "asio/detail/timer_queue_set.hpp"
 
+#if !defined(ASIO_DISABLE_TIMERFD)
 #if (__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 8)
 # define ASIO_HAS_TIMERFD 1
 #endif // (__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 8)
+#endif // !defined(ASIO_DISABLE_TIMERFD)
 
 #if defined(ASIO_HAS_TIMERFD)
 # include "asio/detail/push_options.hpp"
