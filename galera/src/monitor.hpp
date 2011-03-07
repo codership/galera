@@ -46,7 +46,7 @@ namespace galera
             void operator=(const Process&);
         };
 
-        static const size_t process_size_ = (1 << 14);
+        static const size_t process_size_ = (1 << 16);
         static const size_t process_mask_ = process_size_ - 1;
 
     public:
@@ -199,7 +199,13 @@ namespace galera
             }
         }
 
-        wsrep_seqno_t last_left() const { return last_left_; }
+        wsrep_seqno_t last_left()   const { return last_left_;    }
+        ssize_t       size()        const { return process_size_; }
+
+        bool would_block (wsrep_seqno_t seqno) const
+        {
+            return (seqno - last_left_ >= static_cast<ssize_t>(process_size_));
+        }
 
         void drain(wsrep_seqno_t seqno)
         {
@@ -255,8 +261,7 @@ namespace galera
 
             const wsrep_seqno_t obj_seqno(obj.seqno());
 
-            while (obj_seqno - last_left_ >=
-                   static_cast<ssize_t>(process_size_)) // TODO: exit on error
+            while (would_block (obj_seqno)) // TODO: exit on error
             {
                 obj.unlock();
                 lock.wait(cond_);

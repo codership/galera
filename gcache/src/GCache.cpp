@@ -97,3 +97,9 @@ void  gcache_seqno_assign(gcache_t* gc, const void* ptr, int64_t seqno)
     gcache->seqno_assign (ptr, seqno);
 }
 
+void  gcache_seqno_release(gcache_t* gc, const void* ptr)
+{
+    gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
+    gcache->seqno_release ();
+}
+
