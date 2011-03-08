@@ -660,16 +660,18 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 }
 
 static long
-group_find_node_by_name (gcs_group_t* group, long joiner_idx, const char* name)
+group_find_node_by_name (gcs_group_t* group, long joiner_idx, const char* name,
+                         gcs_node_state_t status)
 {
     long idx;
+
     for (idx = 0; idx < group->num; idx++) {
         gcs_node_t* node = &group->nodes[idx];
         if (!strcmp(node->name, name)) {
             if (joiner_idx == idx) {
                 return -EHOSTDOWN;
             }
-            else if (node->status >= GCS_NODE_STATE_JOINED) {
+            else if (node->status >= status) {
                 return idx;
             }
             else {
@@ -677,17 +679,20 @@ group_find_node_by_name (gcs_group_t* group, long joiner_idx, const char* name)
             }
         }
     }
+
     return -EHOSTUNREACH;
 }
 
 static long
-group_find_node_by_status (gcs_group_t* group, gcs_node_state_t status)
+group_find_node_by_state (gcs_group_t* group, gcs_node_state_t status)
 {
     long idx;
+
     for (idx = 0; idx < group->num; idx++) {
         gcs_node_t* node = &group->nodes[idx];
         if (status == node->status) return idx;
     }
+
     return -EAGAIN;
 }
 
@@ -703,20 +708,17 @@ group_find_node_by_status (gcs_group_t* group, gcs_node_state_t status)
 static long
 group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
 {
+    static gcs_node_state_t const min_donor_state = GCS_NODE_STATE_SYNCED;
+
     long donor_idx;
     bool required_donor = (strlen(donor_name) > 0);
 
     if (required_donor) {
-        donor_idx = group_find_node_by_name (group, joiner_idx, donor_name);
+        donor_idx = group_find_node_by_name (group, joiner_idx, donor_name,
+                                             min_donor_state);
     }
     else {
-        // first, check SYNCED, they can process state request immediately
-        donor_idx = group_find_node_by_status (group, GCS_NODE_STATE_SYNCED);
-        if (donor_idx < 0) {
-            // then check simply JOINED, they have full state
-// #422            donor_idx = group_find_node_by_status (group,GCS_NODE_STATE_JOINED);
-            donor_idx = -EAGAIN;
-        }
+        donor_idx = group_find_node_by_state (group, min_donor_state);
     }
 
     if (donor_idx >= 0) {
