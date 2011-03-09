@@ -1043,7 +1043,8 @@ void galera::ReplicatorSMM::process_view_info(void* recv_ctx,
         if (state_uuid_ == group_uuid)
         {
             // common history
-            if (state_() >= S_JOINED)
+            if (state_() >= S_JOINING) /* See #442 - S_JOINING should be
+                                          a valid state here */
             {
                 st_req = (apply_monitor_.last_left() < group_seqno);
             }
