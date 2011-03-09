@@ -9,19 +9,45 @@
 #include <inttypes.h>
 #include <errno.h>
 
-const char* const GCS_PARAMS_FC_FACTOR          = "gcs.fc_factor";
-const char* const GCS_PARAMS_FC_LIMIT           = "gcs.fc_limit";
-const char* const GCS_PARAMS_MAX_PKT_SIZE       = "gcs.max_packet_size";
+const char* const GCS_PARAMS_FC_FACTOR         = "gcs.fc_factor";
+const char* const GCS_PARAMS_FC_LIMIT          = "gcs.fc_limit";
+const char* const GCS_PARAMS_FC_MASTER_SLAVE   = "gcs.fc_master_slave";
+const char* const GCS_PARAMS_MAX_PKT_SIZE      = "gcs.max_packet_size";
 const char* const GCS_PARAMS_RECV_Q_HARD_LIMIT = "gcs.recv_q_hard_limit";
 const char* const GCS_PARAMS_RECV_Q_SOFT_LIMIT = "gcs.recv_q_soft_limit";
-const char* const GCS_PARAMS_MAX_THROTTLE       = "gcs.max_throttle";
+const char* const GCS_PARAMS_MAX_THROTTLE      = "gcs.max_throttle";
 
-static double  const GCS_PARAMS_DEFAULT_FC_FACTOR          = 0.5;
-static long    const GCS_PARAMS_DEFAULT_FC_LIMIT           = 16;
-static long    const GCS_PARAMS_DEFAULT_MAX_PKT_SIZE       = 64500;
+static double  const GCS_PARAMS_DEFAULT_FC_FACTOR         = 0.5;
+static long    const GCS_PARAMS_DEFAULT_FC_LIMIT          = 16;
+static bool    const GCS_PARAMS_DEFAULT_FC_MASTER_SLAVE   = false;
+static long    const GCS_PARAMS_DEFAULT_MAX_PKT_SIZE      = 64500;
 static ssize_t const GCS_PARAMS_DEFAULT_RECV_Q_HARD_LIMIT = SSIZE_MAX;
 static double  const GCS_PARAMS_DEFAULT_RECV_Q_SOFT_LIMIT = 0.25;
-static double  const GCS_PARAMS_DEFAULT_MAX_THROTTLE       = 0.25;
+static double  const GCS_PARAMS_DEFAULT_MAX_THROTTLE      = 0.25;
+
+static long
+params_init_bool (gu_config_t* conf, const char* const name,
+                  bool const def_val, bool* const var)
+{
+    bool val;
+
+    long rc = gu_config_get_bool(conf, name, &val);
+
+    if (rc < 0) {
+        /* Cannot parse parameter value */
+        gu_error ("Bad %s value", name);
+        return rc;
+    }
+    else if (rc > 0) {
+        /* Parameter value not set, use default */
+        val = def_val;
+        gu_config_set_bool (conf, name, val);
+    }
+
+    *var = val;
+
+    return 0;
+}
 
 static long
 params_init_long (gu_config_t* conf, const char* const name,
@@ -35,7 +61,7 @@ params_init_long (gu_config_t* conf, const char* const name,
     if (rc < 0) {
         /* Cannot parse parameter value */
         gu_error ("Bad %s value", name);
-        return -EINVAL;
+        return rc;
     }
     else if (rc > 0) {
         /* Parameter value not set, use default */
@@ -73,7 +99,7 @@ params_init_int64 (gu_config_t* conf, const char* const name,
     if (rc < 0) {
         /* Cannot parse parameter value */
         gu_error ("Bad %s value", name);
-        return -EINVAL;
+        return rc;
     }
     else if (rc > 0) {
         /* Parameter value not set, use default */
@@ -106,7 +132,7 @@ params_init_double (gu_config_t* conf, const char* const name,
     if (rc < 0) {
         /* Cannot parse parameter value */
         gu_error ("Bad %s value", name);
-        return -EINVAL;
+        return rc;
     }
     else if (rc > 0) {
         /* Parameter value not set, use default */
@@ -160,5 +186,8 @@ gcs_params_init (struct gcs_params* params, gu_config_t* config)
                                   &tmp))) return ret;
     params->recv_q_hard_limit = tmp * 0.9; // allow for some meta overhead
 
+    if ((ret = params_init_bool (config, GCS_PARAMS_FC_MASTER_SLAVE,
+                                 GCS_PARAMS_DEFAULT_FC_MASTER_SLAVE,
+                                 &params->fc_master_slave))) return ret;
     return 0;
 }
