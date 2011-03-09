@@ -609,17 +609,12 @@ gcs_become_synced (gcs_conn_t* conn)
 static void
 _set_fc_limits (gcs_conn_t* conn)
 {
-    if (conn->memb_num > 1) {
-        conn->upper_limit =
-            conn->params.fc_base_limit * sqrt(conn->memb_num - 1.0) + .5;
-        conn->lower_limit =
-            conn->upper_limit * conn->params.fc_resume_factor + .5;
-    }
-    else {
-        // otherwise any non-repl'ed message may cause waits.
-        conn->upper_limit = 1.0;
-        conn->lower_limit = 0.0;
-    }
+    /* Killing two hares with one stone: flat FC profile for master-slave setups
+     * plus #440: giving single node some slack at some math correctness exp.*/
+    double fn = conn->params.fc_master_slave ? 1.0 : sqrt(conn->memb_num);
+
+    conn->upper_limit = conn->params.fc_base_limit * fn + .5;
+    conn->lower_limit = conn->upper_limit * conn->params.fc_resume_factor + .5;
 
     gu_info ("Flow-control interval: [%ld, %ld]",
              conn->lower_limit, conn->upper_limit);

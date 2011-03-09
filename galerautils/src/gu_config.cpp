@@ -334,7 +334,7 @@ gu_config_get_bool   (gu_config_t* cnf, const char* key, bool* val)
     }
     catch (gu::NotFound&)
     {
-        return -ENOENT;
+        return 1;
     }
     catch (gu::Exception& e)
     {
