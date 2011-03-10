@@ -63,10 +63,12 @@ gcs_test
 gcs_tests
 cluster.conf
 nodes.conf
-tests/conf/my.cnf
-tests/run/*
-tests/out/*
+tests/conf/*.cnf
+tests/run
+tests/out
 tests/bin/*
 gcache/src/test
 gcache/tests/gcache_tests
-
+Makefile
+.deps
+.libs

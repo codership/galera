@@ -549,6 +549,7 @@ gcs_become_joiner (gcs_conn_t* conn)
     }
 
     gcs_fc_reset (&conn->stfc, conn->recv_q_size);
+    gcs_fc_debug (&conn->stfc, conn->params.fc_debug);
 }
 
 // returns 1 if accepts, 0 if rejects, negative error code if fails.
@@ -1617,6 +1618,26 @@ _set_fc_factor (gcs_conn_t* conn, const char* value)
 }
 
 static long
+_set_fc_debug (gcs_conn_t* conn, const char* value)
+{
+    char* endptr = NULL;
+    long  debug  = strtol (value, &endptr, 0);
+
+    if (debug >= 0 && *endptr == '\0') {
+
+        if (conn->params.fc_debug == debug) return 0;
+
+        conn->params.fc_debug = debug;
+        gcs_fc_debug (&conn->stfc, debug);
+
+        return 0;
+    }
+    else {
+        return -EINVAL;
+    }
+}
+
+static long
 _set_pkt_size (gcs_conn_t* conn, const char* value)
 {
     char* endptr   = NULL;
@@ -1703,6 +1724,9 @@ long gcs_param_set  (gcs_conn_t* conn, const char* key, const char *value)
     }
     else if (!strcmp (key, GCS_PARAMS_FC_FACTOR)) {
         return _set_fc_factor (conn, value);
+    }
+    else if (!strcmp (key, GCS_PARAMS_FC_DEBUG)) {
+        return _set_fc_debug (conn, value);
     }
     else if (!strcmp (key, GCS_PARAMS_MAX_PKT_SIZE)) {
         return _set_pkt_size (conn, value);

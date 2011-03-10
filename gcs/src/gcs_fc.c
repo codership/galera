@@ -65,6 +65,8 @@ gcs_fc_reset (gcs_fc_t* const fc, ssize_t const queue_size)
     fc->max_rate   = -1.0;
     fc->scale      =  0.0;
     fc->offset     =  0.0;
+    fc->sleep_count= 0;
+    fc->sleeps     = 0.0;
 }
 
 /*
@@ -113,8 +115,8 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
         gu_error ("Recv queue hard limit exceded. Can't continue.");
         return -ENOMEM;
     }
-    else if (!(fc->act_count & 7)) { // do this for every 8th action
-
+//    else if (!(fc->act_count & 7)) { // do this for every 8th action
+    else {
         long long end   = gu_time_monotonic();
         double interval = ((end - fc->start) * 1.0e-9);
 
@@ -133,18 +135,32 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
             interval = interval * (double)(fc->size - fc->soft_limit) /
                 (fc->size - fc->init_size);
 
-            gu_warn("Soft recv queue limit exceeded, "
-                    "starting replication throttle.");
-
             fc->last_sleep = fc->soft_limit;
+
+            gu_warn("Soft recv queue limit exceeded, starting replication "
+                    "throttle. Measured avg. rate: %f bytes/sec; "
+                    "Throttle parameters: scale=%f, offset=%f",
+                    fc->max_rate, fc->scale, fc->offset);
         }
 
         /* throttling operation */
         double desired_rate = fc->size * fc->scale + fc->offset; // linear decay
         //double desired_rate = fc->max_rate * fc->max_throttle; // square wave
+        assert (desired_rate <= fc->max_rate);
 
         double sleep = (double)(fc->size - fc->last_sleep) / desired_rate
             - interval;
+
+        if (gu_unlikely(fc->debug > 0 && !(fc->act_count % fc->debug))) {
+            gu_info ("FC: queue size: %zdb, length: %zdb, "
+                     "measured rate: %fb/s, desired rate: %fb/s, "
+                     "interval: %5.3fs, sleep: %5.4fs. "
+                     "Sleeps initiated: %zd, for total of %6.3s",
+                     fc->size, fc->act_count, fc->max_rate, desired_rate,
+                     interval, sleep, fc->sleep_count, fc->sleeps);
+            fc->sleep_count = 0;
+            fc->sleeps = 0.0;
+        }
 
         if (gu_likely(sleep < min_sleep)) {
 #if 0
@@ -162,9 +178,13 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
 
         fc->last_sleep = fc->size;
         fc->start      = end + sleep*1.0e+9;
+        fc->sleep_count++;
+        fc->sleeps += sleep;
 
         return 1;
     }
 
     return 0;
 }
+
+void gcs_fc_debug (gcs_fc_t* fc, long debug_level) { fc->debug = debug_level; }
