@@ -27,6 +27,9 @@ typedef struct gcs_fc
     double  scale;      // data rate scale factor
     double  offset;     // data rate offset (rate = scale*size + offset)
     long long start;    // beginning of the time interval (nanosec, monotonic)
+    long    debug;      // how often to print debug messages, 0 - never
+    ssize_t sleep_count;
+    double  sleeps;
 }
 gcs_fc_t;
 
@@ -48,5 +51,9 @@ gcs_fc_reset (gcs_fc_t* fc, ssize_t queue_size);
  *          hard limit */
 extern int
 gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period);
+
+/*! Print debug info every debug_level'th call to gcs_fc_process. */
+extern void
+gcs_fc_debug (gcs_fc_t* fc, long debug_level);
 
 #endif /* _gcs_fc_h_ */
