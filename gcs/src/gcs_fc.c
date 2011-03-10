@@ -109,6 +109,10 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
 
     if (fc->size <= fc->soft_limit) {
         /* normal operation */
+        if (gu_unlikely(fc->debug > 0 && !(fc->act_count % fc->debug))) {
+            gu_info ("FC: queue size: %zdb (%4.1f\% of soft limit)",
+                     fc->size, ((double)fc->size)/fc->soft_limit*100.0);
+        }
         return 0;
     }
     else if (fc->size > fc->hard_limit) {
@@ -152,12 +156,14 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
             - interval;
 
         if (gu_unlikely(fc->debug > 0 && !(fc->act_count % fc->debug))) {
-            gu_info ("FC: queue size: %zdb, length: %zdb, "
+            gu_info ("FC: queue size: %zdb, length: %zd, "
                      "measured rate: %fb/s, desired rate: %fb/s, "
                      "interval: %5.3fs, sleep: %5.4fs. "
-                     "Sleeps initiated: %zd, for total of %6.3s",
-                     fc->size, fc->act_count, fc->max_rate, desired_rate,
-                     interval, sleep, fc->sleep_count, fc->sleeps);
+                     "Sleeps initiated: %zd, for a total of %6.3fs",
+                     fc->size, fc->act_count,
+                     ((double)(fc->size - fc->last_sleep))/interval,
+                     desired_rate, interval, sleep, fc->sleep_count,
+                     fc->sleeps);
             fc->sleep_count = 0;
             fc->sleeps = 0.0;
         }
