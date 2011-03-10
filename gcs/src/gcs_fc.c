@@ -110,7 +110,7 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
     if (fc->size <= fc->soft_limit) {
         /* normal operation */
         if (gu_unlikely(fc->debug > 0 && !(fc->act_count % fc->debug))) {
-            gu_info ("FC: queue size: %zdb (%4.1f\% of soft limit)",
+            gu_info ("FC: queue size: %zdb (%4.1f%% of soft limit)",
                      fc->size, ((double)fc->size)/fc->soft_limit*100.0);
         }
         return 0;
@@ -138,8 +138,11 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
             // calculate time interval from the soft limit
             interval = interval * (double)(fc->size - fc->soft_limit) /
                 (fc->size - fc->init_size);
+            assert (interval >= 0.0);
 
+            // Move reference point to soft limit
             fc->last_sleep = fc->soft_limit;
+            fc->start      = end - interval;
 
             gu_warn("Soft recv queue limit exceeded, starting replication "
                     "throttle. Measured avg. rate: %f bytes/sec; "
