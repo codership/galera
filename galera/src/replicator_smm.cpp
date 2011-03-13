@@ -1460,8 +1460,17 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
         case Certification::TEST_OK:
             if (trx->global_seqno() > apply_monitor_.last_left())
             {
-                trx->set_state(TrxHandle::S_CERTIFIED);
-                retval = WSREP_OK;
+		if (trx->state() == TrxHandle::S_CERTIFYING)
+		{
+		    trx->set_state(TrxHandle::S_CERTIFIED);
+		    retval = WSREP_OK;
+		}
+		else
+		{
+		    assert(trx->state() == TrxHandle::S_MUST_ABORT);
+		    trx->set_state(TrxHandle::S_MUST_REPLAY);
+		    retval = WSREP_BF_ABORT;
+		}
             }
             else
             {
