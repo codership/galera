@@ -3139,8 +3139,12 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
             }
             else
             {
-                evs_log_info(I_STATE) << "join message not consistent " << msg;
-                evs_log_info(I_STATE) << "state:" << *this;
+                // evs_log_info(I_STATE) << "join message not consistent " << msg;
+                // evs_log_info(I_STATE) << "state:" << *this;
+                log_warn << "join message not consistent " << msg;
+                log_info << "state (stderr): ";
+                std::cerr << *this << std::endl;
+
                 gu_trace(shift_to(S_GATHER, false));
             }
         }
