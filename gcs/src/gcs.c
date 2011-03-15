@@ -474,6 +474,7 @@ _release_flow_control (gcs_conn_t* conn)
 
     if (conn->stop_sent) {
         assert (1 == conn->stop_sent);
+        conn->stop_sent--;
         err = gcs_fc_cont_end (conn);
     }
     else {
