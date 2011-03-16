@@ -17,10 +17,11 @@ pause() #min_sleep #var_sleep
 consistency_check() #pids
 {
     local ret=0
+    local pids="$@"
 
-    kill -STOP $@
+    kill -STOP $pids
     sleep 1
     check || (sleep 2; check) || ret=$?
-    kill -CONT $@ # processes will receive SIGHUP in case of script exit
+    kill -CONT $pids # processes will receive SIGHUP in case of script exit
     return $ret
 }
