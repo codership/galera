@@ -1053,10 +1053,11 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
 }
 
 
-void galera::ReplicatorSMM::process_view_info(void* recv_ctx,
-                                              const wsrep_view_info_t& view_info,
-                                              State next_state,
-                                              wsrep_seqno_t seqno_l)
+void
+galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
+                                         const wsrep_view_info_t& view_info,
+                                         State                    next_state,
+                                         wsrep_seqno_t            seqno_l)
     throw (gu::Exception)
 {
     assert(seqno_l > -1);
@@ -1118,11 +1119,7 @@ void galera::ReplicatorSMM::process_view_info(void* recv_ctx,
 
         if (st_req == true)
         {
-            if (request_sst(group_uuid, group_seqno,
-                            app_req, app_req_len) != WSREP_OK)
-            {
-                gu_throw_fatal << "faield to request sst";
-            }
+            request_sst(group_uuid, group_seqno, app_req, app_req_len);
         }
         else
         {
@@ -1347,11 +1344,11 @@ void galera::ReplicatorSMM::report_last_committed()
         service_thd_.report_last_committed(apply_monitor_.last_left());
 }
 
-
-wsrep_status_t
+void
 galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
                                    wsrep_seqno_t const  group_seqno,
                                    const void* req, size_t req_len)
+    throw (gu::Exception)
 {
     assert(req != 0);
     log_info << "State transfer required: "
@@ -1360,7 +1357,6 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
              << "\n\tLocal state: " << state_uuid_
              << ":" << apply_monitor_.last_left();
 
-    wsrep_status_t retval(WSREP_OK);
     long ret;
     long tries = 0;
     gu::Lock lock(sst_mutex_);
@@ -1451,16 +1447,23 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
             apply_monitor_.set_initial_position(sst_seqno_);
             log_debug << "Initial state: " << state_uuid_ << ":" << sst_seqno_;
             sst_state_ = SST_NONE;
-            gcs_.join(sst_seqno_);
+
+            ssize_t ret;
+            while (-EAGAIN == (ret = gcs_.join(sst_seqno_)))
+            {
+                log_warn << "Retrying sending JOIN message (seqno: "
+                         << sst_seqno_ << ')';
+                usleep (100000); // 0.1s
+            }
+
+            if (ret < 0) gu_throw_error(-ret) << "Could not send JOIN";
         }
     }
     else
     {
         sst_state_ = SST_REQ_FAILED;
-        retval = WSREP_FATAL;
+        gu_throw_error(-ret) << "State transfer request failed";
     }
-
-    return retval;
 }
 
 

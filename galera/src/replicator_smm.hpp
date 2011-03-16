@@ -121,9 +121,9 @@ namespace galera
 
         void report_last_committed();
 
-        wsrep_status_t request_sst(const wsrep_uuid_t&, wsrep_seqno_t,
-                                   const void*, size_t);
-
+        void request_sst(const wsrep_uuid_t&, wsrep_seqno_t, const void*,
+                         size_t)
+            throw (gu::Exception);
 
         wsrep_status_t cert(TrxHandle* trx);
         wsrep_status_t cert_for_aborted(TrxHandle* trx);
