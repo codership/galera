@@ -548,11 +548,36 @@ gcs_become_joiner (gcs_conn_t* conn)
     gcs_fc_debug (&conn->stfc, conn->params.fc_debug);
 }
 
+static long
+_release_flow_control (gcs_conn_t* conn)
+{
+    int err = 0;
+
+    if (gu_unlikely(err = gu_mutex_lock (&conn->fc_lock))) {
+        gu_fatal ("Mutex lock failed: %d (%s)", err, strerror(err));
+        abort();
+    }
+
+    if (conn->stop_sent) {
+        assert (1 == conn->stop_sent);
+        conn->stop_sent--;
+        err = gcs_fc_cont_end (conn);
+    }
+    else {
+        gu_mutex_unlock (&conn->fc_lock);
+    }
+
+    return err;
+}
+
 // returns 1 if accepts, 0 if rejects, negative error code if fails.
 static long
 gcs_become_donor (gcs_conn_t* conn)
 {
-    if (gcs_shift_state (conn, GCS_CONN_DONOR)) { return 1; }
+    if (gcs_shift_state (conn, GCS_CONN_DONOR)) {
+        long err = _release_flow_control (conn);
+        return (0 == err ? 1 : err);
+    }
 
     gu_warn ("Rejecting SST request in state '%s'. Joiner should be restarted.",
              gcs_conn_state_str[conn->state]);
