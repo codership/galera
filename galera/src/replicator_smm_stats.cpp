@@ -25,12 +25,13 @@ static wsrep_member_status_t state2stats(galera::ReplicatorSMM::State state)
 {
     switch (state)
     {
-    case galera::ReplicatorSMM::S_CLOSED  : return WSREP_MEMBER_UNDEFINED;
-    case galera::ReplicatorSMM::S_CLOSING : return WSREP_MEMBER_UNDEFINED;
-    case galera::ReplicatorSMM::S_JOINING : return WSREP_MEMBER_JOINER;
-    case galera::ReplicatorSMM::S_JOINED  : return WSREP_MEMBER_JOINED;
-    case galera::ReplicatorSMM::S_SYNCED  : return WSREP_MEMBER_SYNCED;
-    case galera::ReplicatorSMM::S_DONOR   : return WSREP_MEMBER_DONOR;
+    case galera::ReplicatorSMM::S_CLOSED    :
+    case galera::ReplicatorSMM::S_CLOSING   :
+    case galera::ReplicatorSMM::S_CONNECTED : return WSREP_MEMBER_UNDEFINED;
+    case galera::ReplicatorSMM::S_JOINING   : return WSREP_MEMBER_JOINER;
+    case galera::ReplicatorSMM::S_JOINED    : return WSREP_MEMBER_JOINED;
+    case galera::ReplicatorSMM::S_SYNCED    : return WSREP_MEMBER_SYNCED;
+    case galera::ReplicatorSMM::S_DONOR     : return WSREP_MEMBER_DONOR;
     }
 
     gu_throw_fatal << "invalid state " << state;
@@ -47,6 +48,7 @@ static const char* state2stats_str(galera::ReplicatorSMM::State    state,
     {
     case galera::ReplicatorSMM::S_CLOSED :
     case galera::ReplicatorSMM::S_CLOSING:
+    case galera::ReplicatorSMM::S_CONNECTED:
     {
         if (sst_state == ReplicatorSMM::SST_REQ_FAILED)  return state_str[8];
         else if (sst_state == ReplicatorSMM::SST_FAILED) return state_str[9];

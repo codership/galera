@@ -210,15 +210,13 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
     wsrep_status_t retval;
     TrxHandle* trx(repl->local_trx(victim_trx));
 
-    if (trx == 0)
-    {
-        return WSREP_OK;
-    }
+    if (!trx) return WSREP_OK;
 
     try
     {
         TrxHandleLock lock(*trx);
-        retval = repl->abort_trx(trx);
+        repl->abort_trx(trx);
+        retval = WSREP_OK;
     }
     catch (std::exception& e)
     {

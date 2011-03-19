@@ -253,7 +253,8 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno)
     }
     else
     {
-        log_warn << "moving position backwards";
+        log_warn << "moving position backwards: " << position_ << " -> "
+                 << seqno;
         for_each(cert_index_.begin(), cert_index_.end(), DiscardRK());
         for_each(trx_map_.begin(), trx_map_.end(),
                  Unref2nd<TrxMap::value_type>());
