@@ -53,9 +53,10 @@ static galera::Replicator::State state2repl(const gcs_act_conf_t* conf)
     switch (conf->my_state)
     {
     case GCS_NODE_STATE_NON_PRIM:
-        if (conf->my_idx >= 0) return galera::Replicator::S_JOINING;
+        if (conf->my_idx >= 0) return galera::Replicator::S_CONNECTED;
         else                   return galera::Replicator::S_CLOSING;
     case GCS_NODE_STATE_PRIM:
+        return galera::Replicator::S_CONNECTED;
     case GCS_NODE_STATE_JOINER:
         return galera::Replicator::S_JOINING;
     case GCS_NODE_STATE_JOINED:

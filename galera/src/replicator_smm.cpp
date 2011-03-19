@@ -243,12 +243,13 @@ std::ostream& galera::operator<<(std::ostream& os, ReplicatorSMM::State state)
 {
     switch (state)
     {
-    case ReplicatorSMM::S_CLOSED:  return (os << "CLOSED");
-    case ReplicatorSMM::S_CLOSING: return (os << "CLOSING");
-    case ReplicatorSMM::S_JOINING: return (os << "JOINING");
-    case ReplicatorSMM::S_JOINED:  return (os << "JOINED");
-    case ReplicatorSMM::S_SYNCED:  return (os << "SYNCED");
-    case ReplicatorSMM::S_DONOR:   return (os << "DONOR");
+    case ReplicatorSMM::S_CLOSED:    return (os << "CLOSED");
+    case ReplicatorSMM::S_CLOSING:   return (os << "CLOSING");
+    case ReplicatorSMM::S_CONNECTED: return (os << "CONNECTED");
+    case ReplicatorSMM::S_JOINING:   return (os << "JOINING");
+    case ReplicatorSMM::S_JOINED:    return (os << "JOINED");
+    case ReplicatorSMM::S_SYNCED:    return (os << "SYNCED");
+    case ReplicatorSMM::S_DONOR:     return (os << "DONOR");
     }
 
     gu_throw_fatal << "invalid state " << static_cast<int>(state);
@@ -308,29 +309,37 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
              "00000000-0000-0000-0000-000000000000", sizeof(state_uuid_str_));
 
     // @todo add guards (and perhaps actions)
-    state_.add_transition(Transition(S_CLOSED, S_JOINING));
-
+    state_.add_transition(Transition(S_CLOSED,  S_CONNECTED));
     state_.add_transition(Transition(S_CLOSING, S_CLOSED));
+
+    state_.add_transition(Transition(S_CONNECTED, S_CLOSING));
+    state_.add_transition(Transition(S_CONNECTED, S_CONNECTED));
+    state_.add_transition(Transition(S_CONNECTED, S_JOINING));
+    // the following is possible only when bootstrapping new cluster
+    // (trivial wsrep_cluster_address)
+    state_.add_transition(Transition(S_CONNECTED, S_JOINED));
+//    state_.add_transition(Transition(S_CONNECTED, S_SYNCED));
 
     state_.add_transition(Transition(S_JOINING, S_CLOSING));
     // the following is possible if one non-prim conf follows another
-    state_.add_transition(Transition(S_JOINING, S_JOINING));
+    state_.add_transition(Transition(S_JOINING, S_CONNECTED));
     state_.add_transition(Transition(S_JOINING, S_JOINED));
     // the following is possible only when bootstrapping new cluster
     // (trivial wsrep_cluster_address)
-    state_.add_transition(Transition(S_JOINING, S_SYNCED));
+//    state_.add_transition(Transition(S_JOINING, S_SYNCED));
 
     state_.add_transition(Transition(S_JOINED, S_CLOSING));
+    state_.add_transition(Transition(S_JOINED, S_CONNECTED));
     state_.add_transition(Transition(S_JOINED, S_SYNCED));
 
     state_.add_transition(Transition(S_SYNCED, S_CLOSING));
-    state_.add_transition(Transition(S_SYNCED, S_JOINING));
+    state_.add_transition(Transition(S_SYNCED, S_CONNECTED));
     state_.add_transition(Transition(S_SYNCED, S_DONOR));
 
-    state_.add_transition(Transition(S_DONOR, S_JOINING));
-    state_.add_transition(Transition(S_DONOR, S_JOINED));
-    state_.add_transition(Transition(S_DONOR, S_SYNCED));
     state_.add_transition(Transition(S_DONOR, S_CLOSING));
+    state_.add_transition(Transition(S_DONOR, S_CONNECTED));
+    state_.add_transition(Transition(S_DONOR, S_JOINED));
+//    state_.add_transition(Transition(S_DONOR, S_SYNCED));
 
     local_monitor_.set_initial_position(0);
 
@@ -342,6 +351,7 @@ galera::ReplicatorSMM::~ReplicatorSMM()
     log_info << "dtor state: " << state_();
     switch (state_())
     {
+    case S_CONNECTED:
     case S_JOINING:
     case S_JOINED:
     case S_SYNCED:
@@ -366,6 +376,9 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
     ssize_t err;
     wsrep_status_t ret(WSREP_OK);
 
+    log_info << "Setting initial position to " << state_uuid_ << ':'
+             << cert_.position();
+
     if ((err = gcs_.set_initial_position(state_uuid_, cert_.position())) != 0)
     {
         log_error << "gcs init failed:" << strerror(-err);
@@ -384,7 +397,7 @@ wsrep_status_t galera::ReplicatorSMM::connect(const std::string& cluster_name,
 
     if (ret == WSREP_OK)
     {
-        state_.shift_to(S_JOINING);
+        state_.shift_to(S_CONNECTED);
     }
 
     return ret;
@@ -647,8 +660,8 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     return retval;
 }
 
-
-wsrep_status_t galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
+void
+galera::ReplicatorSMM::abort_trx(TrxHandle* trx) throw (gu::Exception)
 {
     assert(trx != 0);
     assert(trx->is_local() == true);
@@ -657,13 +670,11 @@ wsrep_status_t galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
 
     ++local_bf_aborts_;
 
-    wsrep_status_t retval(WSREP_OK);
-
     switch (trx->state())
     {
     case TrxHandle::S_MUST_ABORT:
     case TrxHandle::S_ABORTING: // guess this is here because we can have a race
-        return retval;
+        return;
     case TrxHandle::S_EXECUTING:
         break;
     case TrxHandle::S_REPLICATING:
@@ -716,8 +727,6 @@ wsrep_status_t galera::ReplicatorSMM::abort_trx(TrxHandle* trx)
     default:
         trx->set_state(TrxHandle::S_MUST_ABORT);
     }
-
-    return retval;
 }
 
 
@@ -993,7 +1002,7 @@ galera::ReplicatorSMM::sst_received(const wsrep_uuid_t& uuid,
 
     if (state_() != S_JOINING)
     {
-        log_error << "not in joining state when sst received called, state "
+        log_error << "not JOINING when sst_received() called, state: "
                   << state_();
         return WSREP_CONN_FAIL;
     }
@@ -1003,6 +1012,7 @@ galera::ReplicatorSMM::sst_received(const wsrep_uuid_t& uuid,
     sst_uuid_  = uuid;
     sst_seqno_ = seqno;
     sst_cond_.signal();
+
     return WSREP_OK;
 }
 
@@ -1072,13 +1082,15 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
 
     const wsrep_seqno_t group_seqno(view_info.first - 1);
     const wsrep_uuid_t& group_uuid(view_info.id);
+
     if (view_info.my_idx >= 0)
     {
         uuid_ = view_info.members[view_info.my_idx].id;
     }
 
     bool st_req(view_info.state_gap);
-    if (st_req == true)
+
+    if (st_req)
     {
         assert(view_info.conf >= 0);
         if (state_uuid_ == group_uuid)
@@ -1096,10 +1108,13 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
         }
     }
 
+    if (st_req && S_CONNECTED != state_()) state_.shift_to(S_CONNECTED);
+
     void* app_req(0);
     ssize_t app_req_len(0);
     // copy that will be eaten by callback
     wsrep_view_info_t *cb_view_info(galera_view_info_copy(&view_info));
+
     cb_view_info->state_gap = st_req;
     view_cb_(app_ctx_, recv_ctx, cb_view_info, 0, 0, &app_req, &app_req_len);
 
@@ -1112,7 +1127,6 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
     if (view_info.conf >= 0)
     {
         // Primary configuration
-
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
         cert_.assign_initial_position(group_seqno);
@@ -1129,7 +1143,7 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
                 apply_monitor_.set_initial_position(group_seqno);
             }
 
-            if (state_() == S_JOINING || state_() == S_DONOR)
+            if (state_() == S_CONNECTED || state_() == S_DONOR)
             {
                 switch (next_state)
                 {
@@ -1145,6 +1159,7 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
                     break;
                 }
             }
+
             invalidate_state(state_file_);
         }
     }
@@ -1156,11 +1171,12 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
             store_state(state_file_);
         }
 
-        if (next_state != S_JOINING && next_state != S_CLOSING)
+        if (next_state != S_CONNECTED && next_state != S_CLOSING)
         {
             gu_throw_fatal << "unexpected next state for non-prim: "
                            << next_state;
         }
+
         state_.shift_to(next_state);
     }
 
@@ -1301,6 +1317,8 @@ void galera::ReplicatorSMM::restore_state(const std::string& file)
                 }
             }
         }
+
+        log_info << "Found saved state: " << uuid << ':' << seqno;
     }
 
     if (seqno < 0 && uuid != WSREP_UUID_UNDEFINED)
@@ -1426,6 +1444,7 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
                      << tries << " tries, donor: " << ret;
         }
 
+        state_.shift_to(S_JOINING);
         sst_state_ = SST_WAIT;
 
         lock.wait(sst_cond_);

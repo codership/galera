@@ -68,7 +68,7 @@ namespace galera
             throw (ApplyException);
 
         wsrep_status_t replicate(TrxHandle* trx);
-        wsrep_status_t abort_trx(TrxHandle* trx);
+        void abort_trx(TrxHandle* trx) throw (gu::Exception);
         wsrep_status_t pre_commit(TrxHandle*  trx);
         wsrep_status_t replay_trx(TrxHandle* trx, void* replay_ctx);
 
