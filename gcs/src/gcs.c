@@ -167,7 +167,14 @@ struct gcs_repl_act
     gu_cond_t      wait_cond;
 };
 
-/*! Creatres local configuration object if no external is submitted */
+/*! Releases resources associated with parameters */
+static void
+_cleanup_params (gcs_conn_t* conn)
+{
+    if (conn->config_is_local) gu_config_destroy(conn->config);
+}
+
+/*! Creates local configuration object if no external is submitted */
 static long
 _init_params (gcs_conn_t* conn, gu_config_t* conf)
 {
@@ -179,14 +186,24 @@ _init_params (gcs_conn_t* conn, gu_config_t* conf)
     if (!conn->config) {
         conn->config = gu_config_create("");
 
-        if (!conn->config) return -ENOMEM;
-
-        conn->config_is_local = true;
+        if (conn->config) {
+            conn->config_is_local = true;
+        }
+        else {
+            rc = -ENOMEM;
+            goto enomem;
+        }
     }
 
     rc = gcs_params_init (&conn->params, conn->config);
 
-    if (rc && conn->config_is_local) gu_config_destroy (conn->config);
+    if (!rc) return 0;
+
+    _cleanup_params (conn);
+
+enomem:
+
+    gu_error ("Parameter initialization failed: %s", strerror (-rc));
 
     return rc;
 }
@@ -198,81 +215,88 @@ gcs_create (const char* node_name, const char* inc_addr, void* conf,
 {
     gcs_conn_t* conn = GU_CALLOC (1, gcs_conn_t);
 
-    if (conn) {
-
-        if (_init_params (conn, conf)) {
-            free (conn);
-            return 0;
-        }
-
-        if (gcs_fc_init (&conn->stfc,
-                         conn->params.recv_q_hard_limit,
-                         conn->params.recv_q_soft_limit,
-                         conn->params.max_throttle)) {
-            gu_error ("FC initialization failed");
-            free (conn);
-            return 0;
-        }
-
-        conn->state = GCS_CONN_DESTROYED;
-        conn->core  = gcs_core_create (node_name, inc_addr, conf, cache);
-
-        if (conn->core) {
-            conn->repl_q = gcs_fifo_lite_create (GCS_MAX_REPL_THREADS,
-                                                 sizeof (struct gcs_repl_act*));
-
-            if (conn->repl_q) {
-                size_t recv_q_len = GU_AVPHYS_PAGES * GU_PAGE_SIZE /
-                                    sizeof(struct gcs_recv_act) / 4;
-                gu_debug ("Requesting recv queue len: %zu", recv_q_len);
-                conn->recv_q = gu_fifo_create (recv_q_len,
-                                               sizeof(struct gcs_recv_act));
-
-                if (conn->recv_q) {
-                    conn->sm = gcs_sm_create(1<<16, 1);
-
-                    if (conn->sm) {
-                        conn->state        = GCS_CONN_CLOSED;
-                        conn->my_idx       = -1;
-                        conn->local_act_id = GCS_SEQNO_FIRST;
-                        conn->global_seqno = 0;
-                        conn->fc_offset    = 0;
-                        conn->cache        = cache;
-                        gu_mutex_init (&conn->fc_lock, NULL);
-
-                        return conn; // success
-                    }
-                    else {
-                        gu_error ("Failed to create send monitor");
-                    }
-
-                    gu_fifo_destroy (conn->recv_q);
-                }
-                else {
-                    gu_error ("Failed to create recv_q.");
-                }
-
-                gcs_fifo_lite_destroy (conn->repl_q);
-            }
-            else {
-                gu_error ("Failed to create repl_q.");
-            }
-
-            gcs_core_destroy (conn->core);
-        }
-        else {
-            gu_error ("Failed to create core.");
-        }
-
-        if (conn->config_is_local) gu_config_destroy(conn->config);
-        gu_free (conn);
-    }
-    else {
+    if (!conn) {
         gu_error ("Could not allocate GCS connection handle: %s",
                   strerror (ENOMEM));
+        return NULL;
     }
-    gu_error ("Failed to create GCS connection handle.");
 
+    if (_init_params (conn, conf)) {
+        goto init_params_failed;
+    }
+
+    if (gcs_fc_init (&conn->stfc,
+                     conn->params.recv_q_hard_limit,
+                     conn->params.recv_q_soft_limit,
+                     conn->params.max_throttle)) {
+        gu_error ("FC initialization failed");
+        goto fc_init_failed;
+    }
+
+    conn->state = GCS_CONN_DESTROYED;
+    conn->core  = gcs_core_create (node_name, inc_addr, conf, cache);
+    if (!conn->core) {
+        gu_error ("Failed to create core.");
+        goto core_create_failed;
+    }
+
+    conn->repl_q = gcs_fifo_lite_create (GCS_MAX_REPL_THREADS,
+                                         sizeof (struct gcs_repl_act*));
+    if (conn->repl_q) {
+        gu_error ("Failed to create repl_q.");
+        goto repl_q_failed;
+    }
+
+    size_t recv_q_len = GU_AVPHYS_PAGES * GU_PAGE_SIZE /
+        sizeof(struct gcs_recv_act) / 4;
+
+    gu_debug ("Requesting recv queue len: %zu", recv_q_len);
+    conn->recv_q = gu_fifo_create (recv_q_len, sizeof(struct gcs_recv_act));
+
+    if (!conn->recv_q) {
+        gu_error ("Failed to create recv_q.");
+        goto recv_q_failed;
+    }
+
+    conn->sm = gcs_sm_create(1<<16, 1);
+
+    if (!conn->sm) {
+        gu_error ("Failed to create send monitor");
+        goto sm_create_failed;
+    }
+
+    conn->state        = GCS_CONN_CLOSED;
+    conn->my_idx       = -1;
+    conn->local_act_id = GCS_SEQNO_FIRST;
+    conn->global_seqno = 0;
+    conn->fc_offset    = 0;
+    conn->cache        = cache;
+    gu_mutex_init (&conn->fc_lock, NULL);
+
+    return conn; // success
+
+sm_create_failed:
+
+    gu_fifo_destroy (conn->recv_q);
+
+recv_q_failed:
+
+    gcs_fifo_lite_destroy (conn->repl_q);
+
+repl_q_failed:
+
+    gcs_core_destroy (conn->core);
+
+core_create_failed:
+fc_init_failed:
+
+    _cleanup_params (conn);
+
+init_params_failed:
+
+    gu_free (conn);
+
+    gu_error ("Failed to create GCS connection handle.");
     return NULL; // failure
 }
 
@@ -1234,7 +1258,7 @@ long gcs_destroy (gcs_conn_t *conn)
     /* This must not last for long */
     while (gu_mutex_destroy (&conn->fc_lock));
 
-    if (conn->config_is_local) gu_config_destroy (conn->config);
+    _cleanup_params (conn);
 
     gu_free (conn);
 
