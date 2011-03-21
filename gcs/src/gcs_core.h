@@ -98,9 +98,14 @@ gcs_core_send (gcs_core_t*    core,
 
 /*
  * gcs_core_recv() blocks until some action is received from group.
+ * 
+ * @param timeout - absolute timeout date (as in pthread_cond_timedwait())
+ *
  * Return values:
  * non-negative - the size of action received
  * negative     - error code
+ *
+ * @retval -ETIMEDOUT means no messages were received until timeout.
  *
  * NOTE: Action status (replicated or not) is carried in act_id. E.g. -ENOTCONN
  *       means connection to primary component was lost while sending,
@@ -110,7 +115,8 @@ gcs_core_send (gcs_core_t*    core,
 extern ssize_t
 gcs_core_recv (gcs_core_t*          conn,
                struct gcs_act_rcvd* recv_act,
-               bool*                is_local);
+               bool*                is_local,
+               long long            timeout);
 
 /* Configuration functions */
 /* Sets maximum message size to achieve requested network packet size. 

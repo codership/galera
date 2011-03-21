@@ -28,7 +28,7 @@
 typedef struct dummy_msg
 {
     gcs_msg_type_t type;
-    size_t         len;
+    ssize_t        len;
     long           sender_idx;
     uint8_t        buf[];
 }
@@ -130,8 +130,8 @@ GCS_BACKEND_RECV_FN(dummy_recv)
     long     ret = 0;
     dummy_t* conn = backend->conn;
 
-    *sender_idx = GCS_SENDER_NONE;
-    *msg_type   = GCS_MSG_ERROR;
+    msg->sender_idx = GCS_SENDER_NONE;
+    msg->type   = GCS_MSG_ERROR;
 
     assert (conn);
 
@@ -147,18 +147,19 @@ GCS_BACKEND_RECV_FN(dummy_recv)
 
             assert (NULL != dmsg);
 
-            *msg_type   = dmsg->type;
-            *sender_idx = dmsg->sender_idx;
-            ret         = dmsg->len;
+            msg->type       = dmsg->type;
+            msg->sender_idx = dmsg->sender_idx;
+            ret             = dmsg->len;
+            msg->size       = ret;
 
-            if (gu_likely(dmsg->len <= len)) {
+            if (gu_likely(dmsg->len <= msg->buf_len)) {
                 gu_fifo_pop_head (conn->gc_q);
-                memcpy (buf, dmsg->buf, dmsg->len);
+                memcpy (msg->buf, dmsg->buf, dmsg->len);
                 dummy_msg_destroy (dmsg);
             }
             else {
                 // supplied recv buffer too short, leave the message in queue
-                memcpy (buf, dmsg->buf, len);
+                memcpy (msg->buf, dmsg->buf, msg->buf_len);
                 gu_fifo_release (conn->gc_q);
             }
         }

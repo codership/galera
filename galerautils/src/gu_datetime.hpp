@@ -25,15 +25,15 @@ namespace gu
     namespace datetime
     {
         /* Multiplier constants */
-        const long long NSec = 1;
-        const long long USec = 1000*NSec;
-        const long long MSec = 1000*USec;
-        const long long Sec  = 1000*MSec;
-        const long long Min  = 60*Sec;
-        const long long Hour = 60*Min;
-        const long long Day  = 24*Hour;
+        const long long NSec  = 1;
+        const long long USec  = 1000*NSec;
+        const long long MSec  = 1000*USec;
+        const long long Sec   = 1000*MSec;
+        const long long Min   = 60*Sec;
+        const long long Hour  = 60*Min;
+        const long long Day   = 24*Hour;
         const long long Month = 30*Day;
-        const long long Year = 12*Month;
+        const long long Year  = 12*Month;
 
         /*!
          * @brief Class representing time periods instead of
@@ -116,17 +116,18 @@ namespace gu
             /*!
              * @brief Get system time.
              */
-            static inline Date now() {return gu_time_monotonic(); }
+            static inline Date now() { return gu_time_monotonic(); }
 
             /*!
              * @brief Get maximum representable timestamp.
              */
-            static inline Date max() {return std::numeric_limits<long long>::max(); }
+            static inline Date max()
+            { return std::numeric_limits<long long>::max(); }
 
             /*!
              * @brief Get zero time
              */
-            static inline Date zero() {return 0; }
+            static inline Date zero() { return 0; }
 
             /*!
              * Return 64-bit timestamp representing system time in nanosecond
@@ -159,6 +160,13 @@ namespace gu
 
 
             Date(const long long utc_ = 0) : utc(utc_) { }
+
+            /*! convert to timespec - for internal use */
+            void _timespec(timespec& ts) const
+            {
+                ts.tv_sec  = utc / 1000000000L;
+                ts.tv_nsec = utc % 1000000000L;
+            }
 
         private:
 

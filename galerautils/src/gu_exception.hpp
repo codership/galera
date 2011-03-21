@@ -21,14 +21,14 @@ namespace gu {
     public:
 
         enum
-	{
-	    E_UNSPEC = 255,                     // unspecified error
+        {
+            E_UNSPEC = 255,                     // unspecified error
 #ifdef ENOTRECOVERABLE
-	    E_NOTRECOVERABLE = ENOTRECOVERABLE  // not recoverable
+            E_NOTRECOVERABLE = ENOTRECOVERABLE  // not recoverable
 #else
-	    E_NOTRECOVERABLE = E_UNSPEC         // not recoverable
+            E_NOTRECOVERABLE = E_UNSPEC         // not recoverable
 #endif
-	};
+        };
 
         Exception (const std::string& msg_, int err_ = E_UNSPEC) throw()
             : msg (msg_),

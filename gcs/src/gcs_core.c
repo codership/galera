@@ -383,17 +383,14 @@ out:
  * Deals with fetching complete message from backend
  * and reallocates recv buf if needed */
 static inline long
-core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg)
+core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg,
+               long long timeout)
 {
     long ret;
 
-    ret = backend->recv (backend,
-			 recv_msg->buf,
-			 recv_msg->buf_len,
-			 &recv_msg->type,
-			 &recv_msg->sender_idx);
+    ret = backend->recv (backend, recv_msg, timeout);
 
-    while (ret > recv_msg->buf_len) {
+    while (gu_unlikely(ret > recv_msg->buf_len)) {
 	/* recv_buf too small, reallocate */
         /* sometimes - like in case of component message, we may need to
          * do reallocation 2 times. This should be fixed in backend */
@@ -405,11 +402,7 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg)
 	    recv_msg->buf     = msg;
 	    recv_msg->buf_len = ret;
 
-	    ret = backend->recv (backend,
-				 recv_msg->buf,
-				 recv_msg->buf_len,
-				 &recv_msg->type,
-				 &recv_msg->sender_idx);
+	    ret = backend->recv (backend, recv_msg, timeout);
 
 	    /* should be either an error or an exact match */
 	    assert ((ret < 0) || (ret >= recv_msg->buf_len));
@@ -422,12 +415,10 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg)
 	}
     }
 
-    if (ret >= 0) {
-	recv_msg->size = ret;
-    }
-    else {
+    if (gu_unlikely(ret < 0)) {
 	gu_debug ("returning %d: %s\n", ret, strerror(-ret));
     }
+
     return ret;
 }
 
@@ -912,7 +903,8 @@ static long core_msg_causal(gcs_core_t* conn,
 /*! Receives action */
 ssize_t gcs_core_recv (gcs_core_t*          conn,
                        struct gcs_act_rcvd* recv_act,
-                       bool*                is_local)
+                       bool*                is_local,
+                       long long            timeout)
 {
 //    struct gcs_act_rcvd  recv_act;
     struct gcs_recv_msg* recv_msg = &conn->recv_msg;
@@ -937,7 +929,7 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
         assert (recv_act->id          == GCS_SEQNO_ILL);
         assert (recv_act->sender_idx  == -1);
 
-        ret = core_msg_recv (&conn->backend, recv_msg);
+        ret = core_msg_recv (&conn->backend, recv_msg, timeout);
         if (gu_unlikely (ret <= 0)) {
             goto out; /* backend error while receiving message */
         }
