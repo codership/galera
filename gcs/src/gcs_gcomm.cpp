@@ -549,7 +549,7 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
 
             msg->size = pload_len;
 
-            if (gu_likely(pload_len < msg->buf_len))
+            if (gu_likely(pload_len <= msg->buf_len))
             {
                 memcpy(msg->buf, b, pload_len);
                 msg->type = static_cast<gcs_msg_type_t>(um.get_user_type());
