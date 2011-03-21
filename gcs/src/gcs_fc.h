@@ -47,10 +47,10 @@ extern void
 gcs_fc_reset (gcs_fc_t* fc, ssize_t queue_size);
 
 /*! Processes a new action added to a slave queue.
- *  @return 1 if sleep is needed, 0 if not and -ENOMEM in case of hitting
+ *  @return nanoseconds to sleep or -ENOMEM in case of hitting
  *          hard limit */
-extern int
-gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period);
+extern long long
+gcs_fc_process (gcs_fc_t* fc, ssize_t act_size);
 
 /*! Print debug info every debug_level'th call to gcs_fc_process. */
 extern void

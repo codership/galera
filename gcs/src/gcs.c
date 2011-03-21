@@ -891,6 +891,14 @@ _handle_timeout (gcs_conn_t* conn)
 
     if (conn->timeout <= now) {
 
+        /* TODO: now the only point for timeout is flow control (#412), 
+         *       later we might need to handle more events. */
+        long ret;
+        do {
+            ret = gcs_send_fc_event (conn, GCS_FC_CONT);
+        }
+        while (-EAGAIN == ret); // we need to send CONT here at all costs
+
         conn->timeout = GU_TIME_ETERNITY;
 
         return true;
@@ -903,26 +911,22 @@ _handle_timeout (gcs_conn_t* conn)
 static long
 _check_slave_queue_growth (gcs_conn_t* conn, ssize_t size)
 {
-    long ret = 0;
+    long      ret   = 0;
+    long long pause = gcs_fc_process (&conn->stfc, size);
 
-    struct timespec pause;
-
-    if ((ret = gcs_fc_process (&conn->stfc, size, &pause)) && ret > 0) {
+    if (pause > 0) {
         /* replication needs throttling */
         if ((ret = gcs_send_fc_event (conn, GCS_FC_STOP)) >= 0) {
 
-            nanosleep (&pause, NULL);
+            conn->timeout = gu_time_calendar() + pause;
 
-            do {
-                ret = gcs_send_fc_event (conn, GCS_FC_CONT);
-            }
-            while (-EAGAIN == ret); // we need to send CONT here at all costs
-
-            if (ret >= 0) ret = 0; // success
+            ret = 0; // success
         }
+        return ret;
     }
-
-    return ret;
+    else {
+        return pause; // 0 or error code
+    }
 }
 
 /*

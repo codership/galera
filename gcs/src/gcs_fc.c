@@ -100,9 +100,9 @@ gcs_fc_reset (gcs_fc_t* const fc, ssize_t const queue_size)
  */
 
 /*! Processes a new action added to a slave queue.
- *  @return true if sleep is needed */
-int
-gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
+ *  @return length of sleep in nanoseconds or negative error code */
+long long
+gcs_fc_process (gcs_fc_t* fc, ssize_t act_size)
 {
     fc->size += act_size;
     fc->act_count++;
@@ -182,15 +182,12 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size, struct timespec* period)
             return 0;
         }
 
-        period->tv_sec  = sleep;
-        period->tv_nsec = (sleep - period->tv_sec)*1.0e+9;
-
         fc->last_sleep = fc->size;
-        fc->start      = end + sleep*1.0e+9;
+        fc->start      = end;
         fc->sleep_count++;
         fc->sleeps += sleep;
 
-        return 1;
+        return (1000000000LL * sleep);
     }
 
     return 0;
