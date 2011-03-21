@@ -128,6 +128,9 @@ struct gcs_conn
     ssize_t      recv_q_size;
     gu_thread_t  recv_thread;
 
+    /* Message receiving timeout - absolute date in nanoseconds */
+    long long    timeout;
+
     /* Flow Control */
     gu_mutex_t   fc_lock;
     uint32_t     conf_id;             // configuration ID
@@ -242,7 +245,7 @@ gcs_create (const char* node_name, const char* inc_addr, void* conf,
 
     conn->repl_q = gcs_fifo_lite_create (GCS_MAX_REPL_THREADS,
                                          sizeof (struct gcs_repl_act*));
-    if (conn->repl_q) {
+    if (!conn->repl_q) {
         gu_error ("Failed to create repl_q.");
         goto repl_q_failed;
     }
@@ -270,7 +273,9 @@ gcs_create (const char* node_name, const char* inc_addr, void* conf,
     conn->local_act_id = GCS_SEQNO_FIRST;
     conn->global_seqno = 0;
     conn->fc_offset    = 0;
+    conn->timeout      = GU_TIME_ETERNITY;
     conn->cache        = cache;
+
     gu_mutex_init (&conn->fc_lock, NULL);
 
     return conn; // success
@@ -883,8 +888,25 @@ GCS_FIFO_PUSH_TAIL (gcs_conn_t* conn, ssize_t size)
     gu_fifo_push_tail(conn->recv_q);
 }
 
+/* Returns true if timeout was handled and false otherwise */
+static bool
+_handle_timeout (gcs_conn_t* conn)
+{
+    long long now = gu_time_calendar();
+
+    if (conn->timeout <= now) {
+
+        conn->timeout = GU_TIME_ETERNITY;
+
+        return true;
+    }
+
+    gu_error ("Unplanned timeout! (tout: %lld, now: %lld)", conn->timeout, now);
+    return false;
+}
+
 static long
-gcs_check_slave_queue_growth (gcs_conn_t* conn, ssize_t size)
+_check_slave_queue_growth (gcs_conn_t* conn, ssize_t size)
 {
     long ret = 0;
 
@@ -931,9 +953,13 @@ static void *gcs_recv_thread (void *arg)
         struct gcs_act_rcvd   rcvd;
         bool                  act_is_local;
 
-        ret = gcs_core_recv (conn->core, &rcvd, &act_is_local);
+        ret = gcs_core_recv (conn->core, &rcvd, &act_is_local,
+                             conn->timeout);
 
         if (gu_unlikely(ret <= 0)) {
+
+            if (-ETIMEDOUT == ret && _handle_timeout(conn)) continue;
+
             struct gcs_recv_act *err_act = gu_fifo_get_tail(conn->recv_q);
 
             assert (NULL          == rcvd.act.buf);
@@ -1030,7 +1056,7 @@ static void *gcs_recv_thread (void *arg)
                 GCS_FIFO_PUSH_TAIL (conn, rcvd.act.buf_len);
 
                 if (gu_unlikely(GCS_CONN_JOINER == conn->state)) {
-                    ret = gcs_check_slave_queue_growth (conn, rcvd.act.buf_len);
+                    ret = _check_slave_queue_growth (conn, rcvd.act.buf_len);
                     assert (ret <= 0);
                     if (ret < 0) break;
                 }

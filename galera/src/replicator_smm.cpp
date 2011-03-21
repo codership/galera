@@ -312,6 +312,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_.add_transition(Transition(S_CLOSED,  S_CONNECTED));
     state_.add_transition(Transition(S_CLOSING, S_CLOSED));
 
+//    state_.add_transition(Transition(S_CONNECTED, S_CLOSED));
     state_.add_transition(Transition(S_CONNECTED, S_CLOSING));
     state_.add_transition(Transition(S_CONNECTED, S_CONNECTED));
     state_.add_transition(Transition(S_CONNECTED, S_JOINING));
@@ -434,10 +435,11 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
     while (state_() != S_CLOSING)
     {
         ssize_t rc(as_->process(recv_ctx));
+
         if (rc <= 0)
         {
             retval = WSREP_CONN_FAIL;
-            break;
+//            break;
         }
     }
 

@@ -43,6 +43,7 @@ gu_clock_diff (clock_t left, clock_t right)
     return ((double)(left - right)) * SEC_PER_CLOCK;
 }
 
+#include "gu_limits.h" // for GU_LONG_LONG_MAX
 #include <unistd.h>
 
 /**
@@ -50,6 +51,9 @@ gu_clock_diff (clock_t left, clock_t right)
  *
  * All funcitons return nanoseconds.
  */
+
+/* Maximum date representable by long long and compatible with timespec */
+#define GU_TIME_ETERNITY 9223372035999999999LL
 
 static inline long long
 gu_time_getres()

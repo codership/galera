@@ -83,7 +83,7 @@ core_recv_thread (void* arg)
     struct gcs_act_rcvd recv_act;
     bool is_local;
 
-    act->size = gcs_core_recv (Core, &recv_act, &is_local);
+    act->size = gcs_core_recv (Core, &recv_act, &is_local, GU_TIME_ETERNITY);
     act->data = recv_act.act.buf;
     act->type = recv_act.act.type;
     act->seqno = recv_act.id;
@@ -175,7 +175,7 @@ static bool CORE_RECV_ACT (action_t*      act,
     struct gcs_act_rcvd recv_act;
     bool is_local;
 
-    act->size  = gcs_core_recv (Core, &recv_act, &is_local);
+    act->size  = gcs_core_recv (Core, &recv_act, &is_local, GU_TIME_ETERNITY);
     act->data  = recv_act.act.buf;
     act->type  = recv_act.act.type;
     act->seqno = recv_act.id;

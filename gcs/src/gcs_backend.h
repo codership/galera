@@ -13,7 +13,7 @@
 #define _gcs_backend_h_
 
 #include "gcs.h"
-#include "gcs_msg_type.h"
+#include "gcs_recv_msg.h"
 
 #include <galerautils.h>
 #include <stdlib.h>
@@ -80,18 +80,18 @@ long fn (gcs_backend_t* const backend,    \
  *        type of the message
  * @param sender_id
  *        unique sender ID in this configuration
+ * @param timeout
+ *        absolute timeout date in nanoseconds
  * @return
  *        negative error code in case of error
  *        OR
  *        the length of the message, so if it is bigger
  *        than len, it has to be reread with a bigger buffer
  */
-#define GCS_BACKEND_RECV_FN(fn)           \
-long fn (gcs_backend_t*  const backend,   \
-	 void*           const buf,       \
-	 size_t          const len,       \
-	 gcs_msg_type_t* const msg_type,  \
-	 long*           const sender_idx)
+#define GCS_BACKEND_RECV_FN(fn)                 \
+long fn (gcs_backend_t*  const backend,         \
+         gcs_recv_msg_t* const msg,             \
+         long long       const timeout)
 
 /* for lack of better place define it here */
 static const long GCS_SENDER_NONE = -1; /** When there's no sender */

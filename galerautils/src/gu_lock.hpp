@@ -13,6 +13,7 @@
 #include "gu_logger.hpp"
 #include "gu_mutex.hpp"
 #include "gu_cond.hpp"
+#include "gu_datetime.hpp"
 
 namespace gu
 {
@@ -56,6 +57,18 @@ namespace gu
             cond.ref_count--;
         }
 
+        inline void wait (const Cond& cond, const datetime::Date& date)
+            throw (Exception)
+        {
+            timespec ts;
+
+            date._timespec(ts);
+            cond.ref_count++;
+            int ret = pthread_cond_timedwait (&(cond.cond), value, &ts);
+            cond.ref_count--;
+
+            if (gu_unlikely(ret)) gu_throw_error(ret);
+        }
     };
 }
 

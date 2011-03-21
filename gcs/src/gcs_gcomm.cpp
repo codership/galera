@@ -71,29 +71,48 @@ private:
 
 class RecvBuf
 {
+private:
+
+    class Waiting
+    {
+    public:
+        Waiting (bool& w) : w_(w) { w_ = true;  }
+        ~Waiting()                { w_ = false; }
+    private:
+        bool& w_;
+    };
+
 public:
+
     RecvBuf() : mutex(), cond(), queue(), waiting(false) { }
 
     void push_back(const RecvBufData& p)
     {
         Lock lock(mutex);
+
         queue.push_back(p);
-        if (waiting == true)
-        {
-            cond.signal();
-        }
+
+        if (waiting == true) { cond.signal(); }
     }
 
-    const RecvBufData& front()
+    const RecvBufData& front(const Date& timeout) throw (Exception)
     {
         Lock lock(mutex);
-        if (queue.empty() == true)
+
+        while (queue.empty())
         {
-            waiting = true;
-            lock.wait(cond);
-            waiting = false;
+            Waiting w(waiting);
+            if (gu_likely (timeout == GU_TIME_ETERNITY))
+            {
+                lock.wait(cond);
+            }
+            else
+            {
+                lock.wait(cond, timeout);
+            }
         }
-        assert(queue.empty() == false);
+        assert (false == waiting);
+
         return queue.front();
     }
 
@@ -104,13 +123,15 @@ public:
         queue.pop_front();
     }
 
-public:
+private:
+
     class DummyMutex
     {
     public:
-        void lock() { }
+        void lock()   {}
         void unlock() {}
     };
+
     Mutex mutex;
     Cond cond;
     deque<RecvBufData,
@@ -504,72 +525,86 @@ static GCS_BACKEND_RECV_FN(gcomm_recv)
 {
     GCommConn::Ref ref(backend);
 
-    if (ref.get() == 0)
+    if (gu_unlikely(ref.get() == 0)) return -EBADFD;
+
+    try
     {
-        return -EBADFD;
-    }
+        GCommConn& conn(*ref.get());
 
-    GCommConn& conn(*ref.get());
+        RecvBuf& recv_buf(conn.get_recv_buf());
 
-    RecvBuf& recv_buf(conn.get_recv_buf());
+        const RecvBufData& d(recv_buf.front(timeout));
 
-    const RecvBufData& d(recv_buf.front());
+        msg->sender_idx = d.get_source_idx();
 
-    *sender_idx = d.get_source_idx();
+        const Datagram&    dg(d.get_dgram());
+        const ProtoUpMeta& um(d.get_um());
 
-    const Datagram&    dg(d.get_dgram());
-    const ProtoUpMeta& um(d.get_um());
-
-    if (dg.get_len() == 0)
-    {
-        assert(um.has_view() == true);
-
-        const View& view(um.get_view());
-
-        assert(view.get_type() == V_PRIM || view.get_type() == V_NON_PRIM);
-
-        gcs_comp_msg_t* cm(gcs_comp_msg_new(view.get_type() == V_PRIM,
-                                            view.is_empty() ? -1 : 0,
-                                            view.get_members().size()));
-
-        const size_t cm_size(gcs_comp_msg_size(cm));
-
-        if (cm->my_idx == -1)
+        if (gu_likely(dg.get_len() != 0))
         {
-            log_debug << "gcomm recv: self leave";
+            assert(dg.get_len() > dg.get_offset());
+
+            const byte_t* b(get_begin(dg));
+            const ssize_t pload_len(get_available(dg));
+
+            msg->size = pload_len;
+
+            if (gu_likely(pload_len < msg->buf_len))
+            {
+                memcpy(msg->buf, b, pload_len);
+                msg->type = static_cast<gcs_msg_type_t>(um.get_user_type());
+                recv_buf.pop_front();
+            }
+            else
+            {
+                msg->type = GCS_MSG_ERROR;
+            }
         }
-
-        if (cm_size > len)
+        else
         {
+            assert(um.has_view() == true);
+
+            const View& view(um.get_view());
+
+            assert(view.get_type() == V_PRIM || view.get_type() == V_NON_PRIM);
+
+            gcs_comp_msg_t* cm(gcs_comp_msg_new(view.get_type() == V_PRIM,
+                                                view.is_empty() ? -1 : 0,
+                                                view.get_members().size()));
+
+            const ssize_t cm_size(gcs_comp_msg_size(cm));
+
+            if (cm->my_idx == -1)
+            {
+                log_debug << "gcomm recv: self leave";
+            }
+
+            msg->size = cm_size;
+
+            if (gu_likely(cm_size <= msg->buf_len))
+            {
+                fill_cmp_msg(view, conn.get_uuid(), cm);
+                memcpy(msg->buf, cm, cm_size);
+                recv_buf.pop_front();
+                msg->type = GCS_MSG_COMPONENT;
+            }
+            else
+            {
+                msg->type = GCS_MSG_ERROR;
+            }
+
             gcs_comp_msg_delete(cm);
-            *msg_type = GCS_MSG_ERROR;
-            return cm_size;
         }
 
-        fill_cmp_msg(view, conn.get_uuid(), cm);
-        memcpy(buf, cm, cm_size);
-        gcs_comp_msg_delete(cm);
-        recv_buf.pop_front();
-        *msg_type = GCS_MSG_COMPONENT;
-        return cm_size;
+        return msg->size;
     }
-    else
+    catch (Exception& e)
     {
-        assert(dg.get_len() > dg.get_offset());
+        long err = e.get_errno();
 
-        const byte_t* b(get_begin(dg));
-        const size_t pload_len(get_available(dg));
+        if (ETIMEDOUT != err) { log_error << e.what(); }
 
-        if (pload_len > len)
-        {
-            *msg_type = GCS_MSG_ERROR;
-            return pload_len;
-        }
-
-        memcpy(buf, b, pload_len);
-        *msg_type = static_cast<gcs_msg_type_t>(um.get_user_type());
-        recv_buf.pop_front();
-        return pload_len;
+        return -err;
     }
 }
 
