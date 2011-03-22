@@ -942,7 +942,7 @@ _handle_timeout (gcs_conn_t* conn)
 }
 
 static long
-_check_slave_queue_growth (gcs_conn_t* conn, ssize_t size)
+_check_recv_queue_growth (gcs_conn_t* conn, ssize_t size)
 {
     assert (GCS_CONN_JOINER == conn->state);
 
@@ -969,8 +969,10 @@ _check_slave_queue_growth (gcs_conn_t* conn, ssize_t size)
 
             conn->timeout += pause; // we need to track pauses regardless
         }
-        else {
+        else if (conn->timeout != GU_TIME_ETERNITY) {
             conn->timeout = GU_TIME_ETERNITY;
+            gu_warn ("Replication paused until state transfer is complete "
+                     "due to reaching hard limit on the writeset queue size.");
         }
 
         return ret;
@@ -1106,7 +1108,7 @@ static void *gcs_recv_thread (void *arg)
                 GCS_FIFO_PUSH_TAIL (conn, rcvd.act.buf_len);
 
                 if (gu_unlikely(GCS_CONN_JOINER == conn->state)) {
-                    ret = _check_slave_queue_growth (conn, rcvd.act.buf_len);
+                    ret = _check_recv_queue_growth (conn, rcvd.act.buf_len);
                     assert (ret <= 0);
                     if (ret < 0) break;
                 }
