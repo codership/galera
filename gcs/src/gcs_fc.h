@@ -48,7 +48,7 @@ gcs_fc_reset (gcs_fc_t* fc, ssize_t queue_size);
 
 /*! Processes a new action added to a slave queue.
  *  @return nanoseconds to sleep or -ENOMEM in case of hitting
- *          hard limit */
+ *          hard limit or GU_TIME_ETERNITY to pause forever */
 extern long long
 gcs_fc_process (gcs_fc_t* fc, ssize_t act_size);
 

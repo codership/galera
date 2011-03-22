@@ -100,7 +100,8 @@ gcs_fc_reset (gcs_fc_t* const fc, ssize_t const queue_size)
  */
 
 /*! Processes a new action added to a slave queue.
- *  @return length of sleep in nanoseconds or negative error code */
+ *  @return length of sleep in nanoseconds or negative error code
+ *          or GU_TIME_ETERNITY for complete stop */
 long long
 gcs_fc_process (gcs_fc_t* fc, ssize_t act_size)
 {
@@ -115,9 +116,15 @@ gcs_fc_process (gcs_fc_t* fc, ssize_t act_size)
         }
         return 0;
     }
-    else if (fc->size > fc->hard_limit) {
-        gu_error ("Recv queue hard limit exceded. Can't continue.");
-        return -ENOMEM;
+    else if (fc->size >= fc->hard_limit) {
+        if (0.0 == fc->max_throttle) {
+            /* we can accept total service outage */
+            return GU_TIME_ETERNITY;
+        }
+        else {
+            gu_error ("Recv queue hard limit exceded. Can't continue.");
+            return -ENOMEM;
+        }
     }
 //    else if (!(fc->act_count & 7)) { // do this for every 8th action
     else {
