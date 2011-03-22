@@ -311,22 +311,19 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_.add_transition(Transition(S_CLOSED,  S_CONNECTED));
     state_.add_transition(Transition(S_CLOSING, S_CLOSED));
 
-//    state_.add_transition(Transition(S_CONNECTED, S_CLOSED));
     state_.add_transition(Transition(S_CONNECTED, S_CLOSING));
     state_.add_transition(Transition(S_CONNECTED, S_CONNECTED));
     state_.add_transition(Transition(S_CONNECTED, S_JOINING));
     // the following is possible only when bootstrapping new cluster
     // (trivial wsrep_cluster_address)
     state_.add_transition(Transition(S_CONNECTED, S_JOINED));
-//    state_.add_transition(Transition(S_CONNECTED, S_SYNCED));
+    // the following is possible on group remerge
+    state_.add_transition(Transition(S_CONNECTED, S_SYNCED));
 
     state_.add_transition(Transition(S_JOINING, S_CLOSING));
     // the following is possible if one non-prim conf follows another
     state_.add_transition(Transition(S_JOINING, S_CONNECTED));
     state_.add_transition(Transition(S_JOINING, S_JOINED));
-    // the following is possible only when bootstrapping new cluster
-    // (trivial wsrep_cluster_address)
-//    state_.add_transition(Transition(S_JOINING, S_SYNCED));
 
     state_.add_transition(Transition(S_JOINED, S_CLOSING));
     state_.add_transition(Transition(S_JOINED, S_CONNECTED));
@@ -339,7 +336,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     state_.add_transition(Transition(S_DONOR, S_CLOSING));
     state_.add_transition(Transition(S_DONOR, S_CONNECTED));
     state_.add_transition(Transition(S_DONOR, S_JOINED));
-//    state_.add_transition(Transition(S_DONOR, S_SYNCED));
 
     local_monitor_.set_initial_position(0);
 
