@@ -633,15 +633,43 @@ gcs_become_donor (gcs_conn_t* conn)
     return 0; // do not pass to application
 }
 
+static long
+_release_sst_flow_control (gcs_conn_t* conn)
+{
+    long ret = 0;
+
+    do {
+        if (conn->stop_sent > 0) {
+            ret = gcs_send_fc_event (conn, GCS_FC_CONT);
+            conn->stop_sent -= (ret >= 0);
+        }
+    }
+    while (ret < 0 && -EAGAIN == ret); // we need to send CONT here at all costs
+
+    ret = gcs_check_error (ret, "Failed to release SST flow control.");
+
+    return ret;
+}
+
 static void
 gcs_become_joined (gcs_conn_t* conn)
 {
+    long ret;
+
+    if (GCS_CONN_JOINER == conn->state) {
+        ret = _release_sst_flow_control (conn);
+        if (ret < 0) {
+            gu_fatal ("Releasing SST flow control failed: %ld (%s)",
+                      ret, strerror (-ret));
+            abort();
+        }
+    }
+
     /* See also gcs_handle_act_conf () for a case of cluster bootstrapping */
     if (gcs_shift_state (conn, GCS_CONN_JOINED)) {
         conn->fc_offset = conn->queue_len;
         gu_debug("Become joined, FC offset %ld", conn->fc_offset);
         /* One of the cases when the node can become SYNCED */
-        long ret;
         if ((ret = gcs_send_sync (conn))) {
             gu_warn ("Sending SYNC failed: %ld (%s)", ret, strerror (-ret));
         }
@@ -892,37 +920,40 @@ GCS_FIFO_PUSH_TAIL (gcs_conn_t* conn, ssize_t size)
 static bool
 _handle_timeout (gcs_conn_t* conn)
 {
+    bool ret;
     long long now = gu_time_calendar();
 
+    /* TODO: now the only point for timeout is flow control (#412), 
+     *       later we might need to handle more timers. */
     if (conn->timeout <= now) {
-
-        /* TODO: now the only point for timeout is flow control (#412), 
-         *       later we might need to handle more events. */
-        long ret;
-        do {
-            ret = gcs_send_fc_event (conn, GCS_FC_CONT);
-        }
-        while (-EAGAIN == ret); // we need to send CONT here at all costs
-
-        conn->timeout = GU_TIME_ETERNITY;
-
-        return true;
+        ret = ((GCS_CONN_JOINER != conn->state) ||
+               (_release_sst_flow_control (conn) >= 0));
+    }
+    else {
+        gu_error ("Unplanned timeout! (tout: %lld, now: %lld)",
+                  conn->timeout, now);
+        ret = false;
     }
 
-    gu_error ("Unplanned timeout! (tout: %lld, now: %lld)", conn->timeout, now);
-    return false;
+    conn->timeout = GU_TIME_ETERNITY;
+
+    return ret;
 }
 
 static long
 _check_slave_queue_growth (gcs_conn_t* conn, ssize_t size)
 {
+    assert (GCS_CONN_JOINER == conn->state);
+
     long      ret   = 0;
     long long pause = gcs_fc_process (&conn->stfc, size);
 
     if (pause > 0) {
         /* replication needs throttling */
-        if ((ret = gcs_send_fc_event (conn, GCS_FC_STOP)) >= 0) {
-
+        if ((conn->stop_sent > 0) ||
+            (conn->stop_sent +=
+             (ret = gcs_send_fc_event (conn, GCS_FC_STOP)) >= 0))
+        {
             conn->timeout = gu_time_calendar() + pause;
 
             ret = 0; // success
