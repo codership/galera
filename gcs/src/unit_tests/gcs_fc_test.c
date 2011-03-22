@@ -70,7 +70,7 @@ START_TEST(gcs_fc_test_basic)
 
     SKIP_N_ACTIONS(&fc, 7);
     usleep (1000);
-    pause = gcs_fc_process (&fc, 8);
+    pause = gcs_fc_process (&fc, 7);
     fail_if(pause <= 0, "Soft limit trip returned %lld (%s)",
             pause, strerror(-pause));
 

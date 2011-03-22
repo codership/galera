@@ -663,6 +663,7 @@ gcs_become_joined (gcs_conn_t* conn)
                       ret, strerror (-ret));
             abort();
         }
+        conn->timeout = GU_TIME_ETERNITY;
     }
 
     /* See also gcs_handle_act_conf () for a case of cluster bootstrapping */
@@ -950,14 +951,28 @@ _check_slave_queue_growth (gcs_conn_t* conn, ssize_t size)
 
     if (pause > 0) {
         /* replication needs throttling */
-        if ((conn->stop_sent > 0) ||
-            (conn->stop_sent +=
-             (ret = gcs_send_fc_event (conn, GCS_FC_STOP)) >= 0))
-        {
-            conn->timeout = gu_time_calendar() + pause;
-
-            ret = 0; // success
+        if (conn->stop_sent <= 0) {
+            if ((ret = gcs_send_fc_event (conn, GCS_FC_STOP)) >= 0) {
+                conn->stop_sent++;
+                ret = 0;
+            }
+            else {
+                ret = gcs_check_error (ret, "Failed to send SST FC_STOP.");
+            }
         }
+
+        if (gu_likely(pause != GU_TIME_ETERNITY)) {
+
+            if (GU_TIME_ETERNITY == conn->timeout) {
+                conn->timeout = gu_time_calendar();
+            }
+
+            conn->timeout += pause; // we need to track pauses regardless
+        }
+        else {
+            conn->timeout = GU_TIME_ETERNITY;
+        }
+
         return ret;
     }
     else {
