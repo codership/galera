@@ -6,13 +6,20 @@
 static bool
 my_key (const std::string& key)
 {
+    if (key == "replicator.co_mode") return true;
     return false;
 }
 
 static void
 set_param (const std::string& key, const std::string& value)
     throw (gu::Exception)
-{}
+{
+    if (key == "replicator.co_mode")
+    {
+        gu_throw_error(EPERM)
+            << "setting replicator.co_mode during runtime not allowed";
+    }
+}
 
 void
 galera::ReplicatorSMM::param_set (const std::string& key,

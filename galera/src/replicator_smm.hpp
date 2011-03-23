@@ -157,7 +157,7 @@ namespace galera
             }
 
         private:
-
+            LocalOrder(const LocalOrder&);
             wsrep_seqno_t seqno_;
             TrxHandle*    trx_;
         };
@@ -181,10 +181,71 @@ namespace galera
             }
 
         private:
-
+            ApplyOrder(const ApplyOrder&);
             TrxHandle& trx_;
         };
+    public:
+        class CommitOrder
+        {
+        public:
+            typedef enum
+            {
+                BYPASS     = 0,
+                OOOC       = 1,
+                LOCAL_OOOC = 2,
+                NO_OOOC    = 3
+            } Mode;
+            static Mode from_string(const std::string& str)
+            {
+                int ret(gu::from_string<int>(str));
+                switch (ret)
+                {
+                case BYPASS:
+                case OOOC:
+                case LOCAL_OOOC:
+                case NO_OOOC:
+                    break;
+                default:
+                    gu_throw_error(EINVAL)
+                        << "invalid value " << str << " for commit order mode";
+                    throw;
+                }
+                return static_cast<Mode>(ret);
+            }
+            CommitOrder(const TrxHandle& trx, Mode mode)
+                :
+                trx_ (trx ),
+                mode_(mode)
+            { }
+            void lock() { }
+            void unlock() { }
+            wsrep_seqno_t seqno() const { return trx_.global_seqno(); }
+            bool condition(wsrep_seqno_t last_entered,
+                           wsrep_seqno_t last_left) const
+            {
+                switch (mode_)
+                {
+                case BYPASS:
+                    gu_throw_fatal << "commit order condition called in bypass mode";
+                    throw;
+                case OOOC:
+                    return true;
+                case LOCAL_OOOC:
+                    if (trx_.is_local() == true) return true;
+                    // in case of remote trx fall through
+                case NO_OOOC:
+                    return (last_left + 1 == trx_.global_seqno());
+                }
+                gu_throw_fatal << "invalid commit mode value " << mode_;
+                throw;
+            }
+        private:
+            CommitOrder(const CommitOrder&);
+            const TrxHandle& trx_;
+            const Mode mode_;
+        };
 
+    private:
         // state machine
         class Transition
         {
@@ -233,6 +294,9 @@ namespace galera
         FSM<State, Transition> state_;
         SstState               sst_state_;
 
+        // configurable params
+        const CommitOrder::Mode co_mode_; // commit order mode
+
         // persistent data location
         std::string           data_dir_;
         std::string           state_file_;
@@ -272,6 +336,7 @@ namespace galera
         // concurrency control
         Monitor<LocalOrder> local_monitor_;
         Monitor<ApplyOrder> apply_monitor_;
+        Monitor<CommitOrder> commit_monitor_;
 
         // counters
         gu::Atomic<size_t>    receivers_;
