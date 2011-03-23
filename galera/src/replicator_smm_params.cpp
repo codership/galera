@@ -3,21 +3,38 @@
 #include "replicator_smm.hpp"
 #include "gcs.hpp"
 
-static bool
-my_key (const std::string& key)
+static const std::string common_prefix = "replicator.";
+
+const std::string galera::ReplicatorSMM::Param::commit_order =
+    common_prefix + "commit_order";
+
+galera::ReplicatorSMM::Defaults::Defaults() : map_()
 {
-    if (key == "replicator.co_mode") return true;
-    return false;
+    map_.insert(Default(Param::commit_order, "3"));
 }
 
-static void
-set_param (const std::string& key, const std::string& value)
+const galera::ReplicatorSMM::Defaults galera::ReplicatorSMM::defaults;
+
+galera::ReplicatorSMM::SetDefaults::SetDefaults(gu::Config&     conf,
+                                                const Defaults& def)
+{
+    std::map<std::string, std::string>::const_iterator i;
+
+    for (i = def.map_.begin(); i != def.map_.end(); ++i)
+    {
+        if (!conf.has(i->first)) conf.set(i->first, i->second);
+    }
+}
+
+void
+galera::ReplicatorSMM::set_param (const std::string& key,
+                                  const std::string& value)
     throw (gu::Exception)
 {
-    if (key == "replicator.co_mode")
+    if (key == Param::commit_order)
     {
         gu_throw_error(EPERM)
-            << "setting replicator.co_mode during runtime not allowed";
+            << "setting '" << key << "' during runtime not allowed";
     }
 }
 
@@ -34,14 +51,14 @@ galera::ReplicatorSMM::param_set (const std::string& key,
 
     bool found(false);
 
-    if (my_key(key))
+    if (defaults.map_.find(key) != defaults.map_.end()) // is my key?
     {
         found = true;
         set_param (key, value);
         config_.set (key, value);
     }
 
-    if (0 != key.find("replicator.")) // this key might be for another module
+    if (0 != key.find(common_prefix)) // this key might be for another module
     {
         try
         {

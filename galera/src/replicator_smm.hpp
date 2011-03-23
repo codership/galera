@@ -103,13 +103,20 @@ namespace galera
             throw (gu::Exception);
         const struct wsrep_stats_var* stats() const;
 
+        // helper function
+        void           set_param (const std::string& key,
+                                  const std::string& value)
+            throw (gu::Exception);
+
         void           param_set (const std::string& key,
                                   const std::string& value)
             throw (gu::Exception, gu::NotFound);
 
         std::string    param_get (const std::string& key) const
             throw (gu::Exception, gu::NotFound);
+
         const gu::Config& params() const { return config_; }
+
         void store_state      (const std::string& file) const;
         void restore_state    (const std::string& file);
         void invalidate_state (const std::string& file) const;
@@ -118,6 +125,22 @@ namespace galera
 
         ReplicatorSMM(const ReplicatorSMM&);
         void operator=(const ReplicatorSMM&);
+
+        struct Param
+        {
+            static const std::string commit_order;
+        };
+
+        typedef std::pair<std::string, std::string> Default;
+
+        struct Defaults
+        {
+            std::map<std::string, std::string> map_;
+            Defaults ();
+        };
+
+        static const Defaults defaults;
+        // both a list of parameters and a list of default values
 
         void report_last_committed();
 
@@ -185,7 +208,9 @@ namespace galera
             ApplyOrder(const ApplyOrder&);
             TrxHandle& trx_;
         };
+
     public:
+
         class CommitOrder
         {
         public:
@@ -196,6 +221,7 @@ namespace galera
                 LOCAL_OOOC = 2,
                 NO_OOOC    = 3
             } Mode;
+
             static Mode from_string(const std::string& str)
             {
                 int ret(gu::from_string<int>(str));
@@ -213,12 +239,14 @@ namespace galera
                 }
                 return static_cast<Mode>(ret);
             }
+
             CommitOrder(const TrxHandle& trx, Mode mode)
                 :
                 trx_ (trx ),
                 mode_(mode)
             { }
-            void lock() { }
+
+            void lock()   { }
             void unlock() { }
             wsrep_seqno_t seqno() const { return trx_.global_seqno(); }
             bool condition(wsrep_seqno_t last_entered,
@@ -227,7 +255,8 @@ namespace galera
                 switch (mode_)
                 {
                 case BYPASS:
-                    gu_throw_fatal << "commit order condition called in bypass mode";
+                    gu_throw_fatal 
+                        << "commit order condition called in bypass mode";
                     throw;
                 case OOOC:
                     return true;
@@ -292,6 +321,13 @@ namespace galera
 
         Logger                 logger_;
         gu::Config             config_;
+
+        struct SetDefaults
+        {
+            SetDefaults(gu::Config&, const Defaults&);
+        }
+            set_defaults_; // sets missing parameters to default values
+
         FSM<State, Transition> state_;
         SstState               sst_state_;
 

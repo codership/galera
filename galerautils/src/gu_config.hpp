@@ -138,7 +138,6 @@ private:
 };
 
 
-
 extern "C" const char* gu_str2dbl  (const char* str, double* dbl);
 extern "C" const char* gu_str2bool (const char* str, bool*   bl);
 extern "C" const char* gu_str2ptr  (const char* str, void**  ptr);

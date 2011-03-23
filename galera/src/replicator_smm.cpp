@@ -261,10 +261,11 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     :
     logger_             (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
     config_             (args->options),
+    set_defaults_       (config_, defaults),
     state_              (S_CLOSED),
     sst_state_          (SST_NONE),
     co_mode_            (CommitOrder::from_string(
-                             config_.get("replicator.co_mode", "3"))),
+                             config_.get(Param::commit_order))),
     data_dir_           (args->data_dir),
     state_file_         (data_dir_ + "/grastate.dat"),
     uuid_               (WSREP_UUID_UNDEFINED),
@@ -339,8 +340,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     local_monitor_.set_initial_position(0);
 
     build_stats_vars(wsrep_stats_);
-
-    config_.set("replicator.co_mode", gu::to_string(co_mode_));
 }
 
 galera::ReplicatorSMM::~ReplicatorSMM()
