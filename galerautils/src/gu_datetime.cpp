@@ -34,14 +34,7 @@ ostream& gu::datetime::operator<<(ostream& os, const Period& p)
     if (nsecs/Hour  > 0) { os << (nsecs/Hour)  << "H"; nsecs %= Hour;  }
     if (nsecs/Min   > 0) { os << (nsecs/Min)   << "M"; nsecs %= Min;   }
 
-    if (double(nsecs)/Sec >= 1.e-9)
-    {
-        os << (double(nsecs)/Sec) << "S";
-    }
-    else
-    {
-        os << "S0";
-    }
+    if (double(nsecs)/Sec >= 1.e-9) { os << (double(nsecs)/Sec) << "S"; }
 
     return os;
 }
