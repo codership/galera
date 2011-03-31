@@ -74,12 +74,7 @@ In the examples below mysql authentication options are omitted for brevity.
 2.1 Download and install mysql-wsrep package.
 
 Download binary package for your Linux distribution from
-https://launchpad.net/codership-mysql/0.7
-
-mysql-wsrep binary package contains client, server and client libraries in one
-package because all of them are required for correct cluster operation. You
-might need to manually install additional packages from your distribution
-repository to satisfy package dependencies.
+https://launchpad.net/codership-mysql/0.8
 
 2.1.1 On Debian and Debian-derived distributions.
 
@@ -87,8 +82,7 @@ Upgrade from mysql-server-5.0 to mysql-wsrep is not supported yet, please
 upgrade to mysql-server-5.1 first.
 
 If you're installing over an existing mysql installation, mysql-wsrep will
-conflict with mysql-server-5.1 and mysql-server-core-5.1 packages, so
-remove them first:
+conflict with mysql-server-5.1 package, so remove it first:
 
 $ sudo apt-get remove mysql-server-5.1 mysql-server-core-5.1
 
@@ -118,7 +112,7 @@ MySQL-client-5.1.47 (or later).
 To install mysql-wsrep RPM on CentOS:
 
   1) Make sure that the following packages are not installed:
-  # rpm --nodeps --allmatches -e mysql-server mysql-test mysql-devel mysql-bench
+  # rpm --nodeps --allmatches -e mysql-server mysql-test mysql-bench
 
   2) Install *official* MySQL RPMs (not the ones that go with the distro):
   MySQL-shared-community-5.1.47 and MySQL-client-community-5.1.47
@@ -220,6 +214,9 @@ innodb_autoinc_lock_mode=2
    autoinc lock modes 0 and 1 can cause unresolved deadlock, and make
    system unresponsive.
 
+innodb_locks_unsafe_for_binlog=1
+   This option is required for parallel applying.
+
 4.2 WSREP OPTIONS
 
 All options are optional except for wsrep_provider, wsrep_cluster_address, and
@@ -230,7 +227,8 @@ wsrep_provider=none
    specified, the server behaves like a regular mysqld.
 
 wsrep_provider_options=
-   Provider-specific option string. Check wsrep provider documentation.
+   Provider-specific option string. Check wsrep provider documentation or
+   http://www.codership.com/wiki
 
 wsrep_cluster_address=
    Provider-specific cluster address string. This is used to connect a node to
@@ -245,11 +243,11 @@ wsrep_node_name=
 
 wsrep_slave_threads=1
    Number of threads dedicated to processing of writesets from other nodes.
-   Values greater than 1 not tested.
+   For best performance should be few per CPU core.
 
 wsrep_dbug_option
    Options for the built-in DBUG library (independent from what MySQL uses).
-   Empty by default.
+   Empty by default. Not currently in use.
 
 wsrep_local_cache_size=20M
    Amount of RAM reserved for writeset cache in bytes. Excess writesets are
@@ -296,13 +294,16 @@ The options below govern how this happens and should be set up before attempting
 to join or start a cluster.
 
 wsrep_sst_method=mysqldump
-   What method to use to copy database state to a newly joined node. Currently
-   only mysqldump is supported. Slow but sure.
+   What method to use to copy database state to a newly joined node. Supported
+   methods:
+   - mysqldump: slow (except for small datasets) but most tested.
+   - rsync:     much faster on large datasets.
+   - rsync_wan: same as rsync but with deltaxfer to minimize network traffic.
 
 wsrep_sst_receive_address=
    Address (hostname:port) at which this node wants to receive state snapshot.
-   Defaults to mysqld bind address, and if that is not specified (0.0.0.0) - to
-   the first IP of eth0 + mysqld bind port.
+   Defaults to mysqld bind address, and if that is not specified (0.0.0.0) -
+   to the first IP of eth0 + mysqld bind port.
    NOTE: check that your firewall allows connections to this address from other
          cluster nodes.
 
@@ -325,8 +326,8 @@ wsrep_sst_donor=
 1) Currently replication works only with InnoDB storage engine. Any writes to 
    tables of other types, including system (mysql.*) tables are not replicated. 
    However, DDL statements are replicated in statement level, and changes
-   to mysql.* tables will get replicated that way. 
-   So, you can safely issue: CREATE USER..., 
+   to mysql.* tables will get replicated that way.
+   So, you can safely issue: CREATE USER...,
    but issuing: INSERT INTO mysql.user..., will not be replicated.
 
 2) DELETE operation is unsupported on tables without primary key. Also rows in
@@ -334,6 +335,7 @@ wsrep_sst_donor=
    As a result SELECT...LIMIT... may return slightly different sets.
 
 3) Unsupported queries:
+    * LOCK/UNLOCK TABLES cannot be supported in multi-master setups.
     * LOAD DATA (limited to ~1Gb, use mysqldump instead)
     * lock functions (GET_LOCK(), RELEASE_LOCK()... )
 
@@ -345,6 +347,5 @@ wsrep_sst_donor=
 
 5) XA transactions can not be supported due to possible rollback on commit.
 
-6) Traditional MySQL replication cannot be used with MySQL-wsrep _yet_.
 
 

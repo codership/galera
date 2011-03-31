@@ -9,7 +9,7 @@ experienced MySQL users. For more detailed information please see README.
 MySQL/Galera cluster is a multi-master MySQL server cluster. It provides
  - True high-availability (no committed transaction is lost, no single
    point of failure)
- - Performance scalability even foe write-intensive loads.
+ - Performance scalability even for write-intensive loads.
  - Semantics of a single MySQL server.
 
 This distribution is all you need to install and run MySQL/Galera cluster.
@@ -83,10 +83,13 @@ QUICK ANSWERS:
    number of small packets), so it is recommended to have a dedicated 
    machine for load balancer.
 
-5. The patch for MySQL can be obtained at: bzr branch lp:codership-mysql/0.8
+5. The patch for MySQL can be obtained at
+   https://code.launchpad.net/codership-mysql
 
+6. Galera 0.8 sources can be obtained at
+   https://code.launchpad.net/galera
 
 Please direct all your suggestions, opinions and inquiries to
 info@codership.com
-or our mailing list at http://groups.google.com/group/codership-team
+or (better) our mailing list at http://groups.google.com/group/codership-team
 
