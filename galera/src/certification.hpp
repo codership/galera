@@ -9,6 +9,7 @@
 
 #include "gu_unordered.hpp"
 #include "gu_lock.hpp"
+#include "gu_config.hpp"
 
 #include <map>
 #include <set>
@@ -60,7 +61,7 @@ namespace galera
             TEST_FAILED
         } TestResult;
 
-        Certification(const std::string& conf = "");
+        Certification(const gu::Config& conf = gu::Config());
         ~Certification();
 
         void assign_initial_position(wsrep_seqno_t seqno);
@@ -109,27 +110,37 @@ namespace galera
         class PurgeAndDiscard
         {
         public:
+
             PurgeAndDiscard(Certification& cert) : cert_(cert) { }
+
             void operator()(TrxMap::value_type& vt) const
             {
                 {
                     TrxHandle* trx(vt.second);
                     TrxHandleLock lock(*trx);
+
                     assert(trx->is_committed() == true);
                     cert_.purge_for_trx(trx);
+
                     if (trx->last_depends_seqno() > -1)
                     {
                         cert_.n_certified_--;
-                        cert_.deps_dist_ -= (trx->global_seqno() - trx->last_depends_seqno());
+                        cert_.deps_dist_ -=
+                            (trx->global_seqno() - trx->last_depends_seqno());
                     }
+
                     if (trx->refcnt() > 1)
                     {
-                        log_debug << "trx " << trx->trx_id() << " refcnt " << trx->refcnt();
+                        log_debug << "trx "     << trx->trx_id()
+                                  << " refcnt " << trx->refcnt();
                     }
                 }
                 vt.second->unref();
             }
-            PurgeAndDiscard(const PurgeAndDiscard& other) : cert_(other.cert_) { }
+
+            PurgeAndDiscard(const PurgeAndDiscard& other) : cert_(other.cert_)
+            { }
+
         private:
 
             void operator=(const PurgeAndDiscard&);
@@ -147,6 +158,17 @@ namespace galera
         wsrep_seqno_t safe_to_discard_seqno_;
         size_t        n_certified_;
         wsrep_seqno_t deps_dist_;
+
+        /* The only reason those are not static constants is because
+         * there might be a need to thange them without recompilation.
+         * see #454 */
+        long          const max_length_; /* Purge trx_map_ when it exceeds this
+                                          * NOTE: this effectively sets a limit
+                                          * on trx certification interval */
+        static long   const max_length_default;
+
+        unsigned long const max_length_check_; /* Mask how often to check */
+        static unsigned long  const max_length_check_default;
     };
 }
 

@@ -57,12 +57,19 @@ galera::operator<<(std::ostream& os, const TrxHandle& th)
        << ", g: " << th.global_seqno_
        << ", s: " << th.last_seen_seqno_
        << ", d: " << th.last_depends_seqno_
-       << ") ";
-    os << "statements:\n";
-    for (StatementSequence::const_iterator i = th.write_set_.get_queries().begin(); i != th.write_set_.get_queries().end(); ++i)
+       << ")";
+
+    if (!th.write_set_.get_queries().empty())
     {
-        os << "\t" << *i << "\n";
+        os << " statements:\n";
+        for (StatementSequence::const_iterator i =
+                 th.write_set_.get_queries().begin();
+             i != th.write_set_.get_queries().end(); ++i)
+        {
+            os << "\t" << *i << "\n";
+        }
     }
+
     return os;
 }
 
