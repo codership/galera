@@ -119,4 +119,10 @@ gcs_node_record_state (gcs_node_t* node, gcs_state_msg_t* state);
 extern void
 gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum);
 
+static inline gcs_node_state_t
+gcs_node_get_status (gcs_node_t* node)
+{
+    return node->status;
+}
+
 #endif /* _gcs_node_h_ */

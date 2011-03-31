@@ -142,19 +142,38 @@ group_nodes_reset (gcs_group_t* group)
 static inline void
 group_redo_last_applied (gcs_group_t* group)
 {
-    long n;
+    long       n;
+    long       last_node    = -1;
+    gu_seqno_t last_applied = GU_LONG_LONG_MAX;
 
-    group->last_node    = 0;
-    group->last_applied = gcs_node_get_last_applied (&group->nodes[0]);
-//    gu_debug (" last_applied[0]: %lld", group->last_applied);
+    for (n = 0; n < group->num; n++) {
+        gcs_node_t*      node  = &group->nodes[n];
+        gcs_seqno_t      seqno = gcs_node_get_last_applied (node);
 
-    for (n = 1; n < group->num; n++) {
-        gcs_seqno_t seqno = gcs_node_get_last_applied (&group->nodes[n]);
 //        gu_debug ("last_applied[%ld]: %lld", n, seqno);
-        if (seqno < group->last_applied) {
-            group->last_applied = seqno;
-            group->last_node    = n;
+
+        /* NOTE: It is crucial for consistency that last_applied algorithm
+         *       is absolutely identical on all nodes. Therefore for the 
+         *       generality sake and future compatibility we have to assume
+         *       non-blocking donor.
+         *       GCS_BLOCKING_DONOR should never be defined unless in some
+         *       very custom builds. Commenting it out for safety sake. */
+//#ifndef GCS_BLOCKING_DONOR
+        if ((GCS_NODE_STATE_SYNCED == node->status ||
+             GCS_NODE_STATE_DONOR  == node->status)
+//#else
+//        if ((GCS_NODE_STATE_SYNCED == node->status) /* ignore donor */
+//#endif
+            && (seqno < last_applied)) {
+            assert (seqno >= 0);
+            last_applied = seqno;
+            last_node    = n;
         }
+    }
+
+    if (gu_likely (last_node >= 0)) {
+        group->last_applied = last_applied;
+        group->last_node    = last_node;
     }
 }
 
@@ -527,10 +546,10 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
         /* node that was responsible for the last value, has changed it.
          * need to recompute it */
         gcs_seqno_t old_val = group->last_applied;
+
         group_redo_last_applied (group);
-        if (old_val < group->last_applied) {
-            return group->last_applied;
-        }
+
+        if (old_val < group->last_applied) return group->last_applied;
     }
 
     return 0;
@@ -564,7 +583,9 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             peer_id    = sender->joiner;
             from_donor = true;
             st_dir     = "to";
-            sender->status = GCS_NODE_STATE_JOINED;
+            /* #454 - we don't switch to JOINED here, 
+             *        instead going straignt to SYNCED */
+            // sender->status = GCS_NODE_STATE_JOINED;
         }
         else {
             peer_id = sender->donor;
@@ -587,14 +608,14 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         if (j == group->num) {
             gu_warn ("Could not find peer: %s", peer_id);
         }
+#if 0 // the meaning of this code is lost in time
         else if (GCS_NODE_STATE_DONOR  == sender->status) {
             // donor is done with the job and is no longer need
             memcpy (peer->donor, group_empty_id, sizeof (group_empty_id));
         }
-
+#endif
         if (seqno < 0) {
-            gu_warn ("%ld(%s): State transfer %s %ld(%s) failed: "
-                     "%d (%s)",
+            gu_warn ("%ld (%s): State transfer %s %ld (%s) failed: %d (%s)",
                      sender_idx, sender->name, st_dir, peer_idx, peer_name,
                      (int)seqno, strerror((int)-seqno));
 
@@ -608,7 +629,7 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             }
         }
         else {
-            gu_info ("%ld(%s): State transfer %s %ld(%s) complete.",
+            gu_info ("%ld (%s): State transfer %s %ld (%s) complete.",
                      sender_idx, sender->name, st_dir, peer_idx, peer_name);
         }
     }
@@ -637,9 +658,13 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
     assert (GCS_MSG_SYNC == msg->type);
 
-    if (GCS_NODE_STATE_JOINED == sender->status) {
+    if (GCS_NODE_STATE_JOINED == sender->status ||
+        /* #454 - at this layer we jump directly from DONOR to SYNCED */
+        GCS_NODE_STATE_DONOR  == sender->status) {
 
         sender->status = GCS_NODE_STATE_SYNCED;
+
+        group_redo_last_applied (group);//from now on this node must be counted
 
         gu_info ("Member %ld (%s) synced with group.",
                  sender_idx, sender->name);

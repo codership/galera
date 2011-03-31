@@ -10,12 +10,6 @@
 
 #include <map>
 
-static const long TRIM_LIMIT = 1 << 14; // purge trx_map_ when it exceeds 16K
-                                         // NOTE: this effectively sets a limit
-                                         // on trx certification interval
-
-static const ulong TRIM_MASK  = (1 << 10) - 1; // check for trim limit every 1K
-
 using namespace std;
 using namespace gu;
 
@@ -72,6 +66,15 @@ galera::RowKeyEntry::unref(TrxHandle* trx)
 }
 
 
+/*** It is EXTREMELY important that these constants are the same on all nodes.
+ *** Don't change them ever!!! ***/
+long const
+galera::Certification::max_length_default = 16384;
+
+unsigned long const
+galera::Certification::max_length_check_default = 127;
+
+
 void
 galera::Certification::purge_for_trx(TrxHandle* trx)
 {
@@ -92,6 +95,7 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
     refs.clear();
 }
 
+
 galera::Certification::TestResult
 galera::Certification::do_test(TrxHandle* trx, bool store_keys)
 {
@@ -99,17 +103,17 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
     const wsrep_seqno_t trx_global_seqno    (trx->global_seqno());
 
     if (gu_unlikely(trx_last_seen_seqno < initial_position_ ||
-                    (trx_global_seqno - trx_last_seen_seqno) > TRIM_LIMIT))
+                    (trx_global_seqno - trx_last_seen_seqno) > max_length_))
     {
         if (trx_last_seen_seqno < initial_position_)
         {
             log_debug << "last seen seqno below limit for trx " << *trx;
         }
 
-        if ((trx_global_seqno - trx_last_seen_seqno) > TRIM_LIMIT)
+        if ((trx_global_seqno - trx_last_seen_seqno) > max_length_)
         {
             log_warn << "certification interval for trx " << *trx
-                     << " exceeds the limit of " << TRIM_LIMIT;
+                     << " exceeds the limit of " << max_length_;
         }
 
         return TEST_FAILED;
@@ -218,28 +222,36 @@ cert_fail:
 
 
 
-galera::Certification::Certification(const string& conf)
+galera::Certification::Certification(const gu::Config& conf)
     :
-    trx_map_(),
-    to_isolation_(),
-    cert_index_(),
-    deps_set_(),
-    mutex_(),
-    trx_size_warn_count_(0),
-    initial_position_(-1),
-    position_(-1),
-    safe_to_discard_seqno_(-1),
-    n_certified_(0),
-    deps_dist_(0)
+    trx_map_               (),
+    to_isolation_          (),
+    cert_index_            (),
+    deps_set_              (),
+    mutex_                 (),
+    trx_size_warn_count_   (0),
+    initial_position_      (-1),
+    position_              (-1),
+    safe_to_discard_seqno_ (-1),
+    n_certified_           (0),
+    deps_dist_             (0),
+
+    /* The defaults below are deliberately not reflected in conf: people
+     * should not know about these dangerous setting uless they read RTFM. */
+    max_length_       (conf.get<long>("cert.max_length",
+                                      max_length_default)),
+    max_length_check_ (conf.get<unsigned long>("cert.max_length_check",
+                                               max_length_check_default))
 { }
 
 
 galera::Certification::~Certification()
 {
-    log_info << "cert index usage at exit " << cert_index_.size();
+    log_info << "cert index usage at exit "   << cert_index_.size();
     log_info << "cert trx map usage at exit " << trx_map_.size();
-    log_info << "deps set usage at exit " << deps_set_.size();
-    log_info << "avg deps dist " << get_avg_deps_dist();
+    log_info << "deps set usage at exit "     << deps_set_.size();
+    log_info << "avg deps dist "              << get_avg_deps_dist();
+
     for_each(cert_index_.begin(), cert_index_.end(), DiscardRK());
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
 }
@@ -281,7 +293,7 @@ galera::Certification::append_trx(TrxHandle* trx)
     {
         Lock lock(mutex_);
 
-        if (trx->global_seqno() != position_ + 1)
+        if (gu_unlikely(trx->global_seqno() != position_ + 1))
         {
             // this is perfectly normal if trx is rolled back just after
             // replication, keeping the log though
@@ -291,13 +303,13 @@ galera::Certification::append_trx(TrxHandle* trx)
 
         position_ = trx->global_seqno();
 
-        if (gu_unlikely(!(position_ & TRIM_MASK) &&
-                        (trx_map_.size() > static_cast<size_t>(TRIM_LIMIT))))
+        if (gu_unlikely(!(position_ & max_length_check_) &&
+                        (trx_map_.size() > static_cast<size_t>(max_length_))))
         {
             log_debug << "trx map size: " << trx_map_.size()
                       << " - check if status.last_committed is incrementing";
 
-            const wsrep_seqno_t trim_seqno(position_ - TRIM_LIMIT);
+            const wsrep_seqno_t trim_seqno(position_ - max_length_);
             const wsrep_seqno_t stds(get_safe_to_discard_seqno_());
 
             if (trim_seqno > stds)

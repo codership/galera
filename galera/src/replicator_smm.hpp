@@ -141,7 +141,12 @@ namespace galera
         static const Defaults defaults;
         // both a list of parameters and a list of default values
 
-        void report_last_committed();
+        inline void report_last_committed()
+        {
+            size_t i(report_counter_.fetch_and_add(1));
+            if (gu_unlikely(i % report_interval_ == 0))
+                service_thd_.report_last_committed(apply_monitor_.last_left());
+        }
 
         void request_sst(const wsrep_uuid_t&, wsrep_seqno_t, const void*,
                          size_t)

@@ -287,7 +287,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     as_                 (0),
     gcs_as_             (gcs_, *this),
     wsdb_               (),
-    cert_               (),
+    cert_               (config_),
     local_monitor_      (),
     apply_monitor_      (),
     commit_monitor_     (),
@@ -299,7 +299,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     local_cert_failures_(),
     local_bf_aborts_    (),
     local_replays_      (),
-    report_interval_    (32),
+    report_interval_    (128),
     report_counter_     (),
     wsrep_stats_        ()
 {
@@ -534,7 +534,6 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
                         trx->global_seqno()));
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
     apply_monitor_.leave(ao);
-
 
     cert_.set_trx_committed(trx);
     report_last_committed();
@@ -1361,14 +1360,6 @@ void galera::ReplicatorSMM::invalidate_state(const std::string& file) const
 ////                           Private
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
-
-
-void galera::ReplicatorSMM::report_last_committed()
-{
-    size_t i(report_counter_.fetch_and_add(1));
-    if (i % report_interval_ == 0)
-        service_thd_.report_last_committed(apply_monitor_.last_left());
-}
 
 void
 galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
