@@ -49,11 +49,13 @@ CONTENTS:
    2.4 ADDING NEW NODE TO A CLUSTER
    2.5 A "REFERENCE NODE"
    2.6 "SPLIT-BRAIN" CONDITION
+   2.7 SWAP SIZE REQUIREMENTS
 3. CONFIGURATION
    3.1 MANDATORY MYSQL OPTIONS
-   3.2 WSREP OPTIONS
-   3.3 CONFIGURING LOCAL MYSQL CLIENTS
-   3.4 FIREWALLS
+   3.2 OPTIONAL OPTIMIZATIONS
+   3.3 WSREP OPTIONS
+   3.4 CONFIGURING LOCAL MYSQL CLIENTS
+   3.5 FIREWALLS
 4. Using MySQL/Galera in Amazon EC2
 5. LIMITATIONS
 
@@ -68,7 +70,7 @@ a node failure or a new node added to cluster:
      ,--------.    ,--------.    ,--------.
      | mysqld |----| mysqld |<---| client |
      `--------'    `--------'    `--------'
-              \    /       
+              \    /
             ,--------.    ,--------.
             | mysqld |<---| client |
             `--------'    `--------'
@@ -331,6 +333,9 @@ The process of joining new node into the cluster consists of two phases:
    should be avoided. Duration of this phase depends on the load profile and
    duration of the first phase.
 
+NOTE: Transaction buffering is currently happening in memory, so prepare
+      enough swap space.
+
 By default cluster chooses the most suitable node to receive state transfer 
 from. There is also an option wsrep_sst_donor to specify desired state snapshot 
 source in my.cnf or on the command line. See CONFIGURATION section for 
@@ -382,6 +387,20 @@ failure can lead to this, thus making 3 nodes a minimum requirement for
 a highly-available cluster.
 
 
+2.7 SWAP SPACE REQUIREMENTS
+
+While in normal operation MySQL/Galera server requires only slightly more
+memory than stock MySQL, there are two situations when extra swap will be
+needed:
+  - forking processes (state transfer and notification scripts).
+  - caching transactions during state transfer.
+It is recommentded that swap size is at least 2 times that of RAM.
+
+NOTE: It is a common practice to have 0 swap on Amazon EC2 instances
+      by default. Make sure to allocate sufficient amount before running
+      MySQL/Galera.
+
+
 3. CONFIGURATION
 
 Each MySQL/Galera node is configured just like the usual MySQL server, we just
@@ -403,11 +422,23 @@ innodb_autoinc_lock_mode=2
    autoinc lock modes 0 and 1 can cause unresolved deadlock, and make
    system unresponsive.
 
+innodb_locks_unsafe_for_binlog=1
+   This setting is required for relaiable parallel applying operation.
+
 Mandatory options are hardcoded both in distribution's my.cnf file and in
 mysql-galera script.
 
 
-3.2 WSREP OPTIONS
+3.2 OPTIONAL OPTIMIZATIONS
+
+While not required for correct operation of MySQL/Galera cluster, the
+following options may be safely set due to the guarantees of synchronous
+replication:
+
+innodb_flush_log_at_trx_commit=0
+
+
+3.3 WSREP OPTIONS
 
 Here WSREP stands for Write-Set REPlication - a synchronous replication API
 that Codership is developing for transactional databases. Galera is a library
@@ -423,7 +454,8 @@ wsrep_provider=none
    with WSREP environment variable.
 
 wsrep_provider_options=
-   Provider-specific option string.
+   Provider-specific option string. See http://www.codership.com/wiki for
+   details.
 
 wsrep_cluster_address="dummy://"
    Group Communication System address. Depends on the WSREP provider. This
@@ -443,11 +475,11 @@ wsrep_node_name=
 
 wsrep_slave_threads=1
    Number of threads dedicated to processing of writesets from other nodes.
-   Values greater than 1 not tested.
+   For better performance we recommend few per CPU core.
 
 wsrep_dbug_option
    Options for the built-in DBUG library (independent from what MySQL uses).
-   Empty by default.
+   Empty by default. Not used in 0.8.
 
 wsrep_local_cache_size=20M
    Amount of RAM reserved for writeset cache in bytes. Excess writesets are
@@ -455,6 +487,7 @@ wsrep_local_cache_size=20M
 
 wsrep_ws_persistency=0
    Save writesets in binary files. For debugging purposes only.
+   Not used in 0.8.
 
 wsrep_debug=0
    Enable debug-level logging.
@@ -486,7 +519,10 @@ wsrep_drupal_282555_workaround=1
 
 wsrep_sst_method=mysqldump
    What method to use to copy database state to a newly joined node. Currently
-   only mysqldump is supported. Slow but sure.
+   supported methods:
+   - mysqldump: generally slow (except on small datasets), but most tested
+   - rsync:     the fastest method, especially on large datasets
+   - rsync_wan: same as rsync, but uses deltaxfer to minimize network traffic.
 
 wsrep_sst_receive_address=
    Address at which this node wants to receive state snapshot. Defaults to
@@ -507,7 +543,7 @@ wsrep_sst_donor=
    most suitable node is chosen by GCS.
 
 
-3.3 CONFIGURING LOCAL MYSQL CLIENTS
+3.4 CONFIGURING LOCAL MYSQL CLIENTS
 
 This MySQL/Galera distribution runs mysqld in the "sandbox". Thus mysql clients
 won't find mysqld socket at default system location. Running mysql client
@@ -525,7 +561,7 @@ system-wide my.cnf file:
 [client]
 socket = <INST_ROOT>/mysql/var/mysqld.sock
 
-3.4 FIREWALLS
+3.5 FIREWALLS
 
 If there are any firewalls used, they should be configured to allow connections
 between the nodes at the following ports:
@@ -572,7 +608,7 @@ NOTE: this distribution may be binary incompatible with some older Linux
     * LOAD DATA size is limited to ~1Gb
     * lock functions (GET_LOCK(), RELEASE_LOCK()... )
 
-4) Locking sessions (LOCK TABLE...UNLOCK) are not supported in multi-master
+4) Locking sessions (LOCK TABLES...UNLOCK) are not supported in multi-master
    mode. However if there's only one node that executes locking sessions, then
    it'll work.
 
@@ -594,7 +630,5 @@ NOTE: this distribution may be binary incompatible with some older Linux
    log file name
 
 8) XA transactions can not be supported due to possible rollback on commit.
-
-9) MySQL replication cannot be used together with MySQL/Galera _yet_.
 
 
