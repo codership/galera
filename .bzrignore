@@ -68,5 +68,7 @@ tests/run
 tests/out
 tests/bin/*
 Makefile
+Makefile.in
 .deps
 .libs
+
