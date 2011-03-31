@@ -70,5 +70,7 @@ tests/bin/*
 gcache/src/test
 gcache/tests/gcache_tests
 Makefile
+Makefile.in
 .deps
 .libs
+
