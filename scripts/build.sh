@@ -29,6 +29,7 @@ EOF
 
 # disable building vsbes by default
 DISABLE_VSBES=${DISABLE_VSBES:-"yes"}
+DISABLE_GCOMM=${DISABLE_GCOMM:-"no"}
 PACKAGE=${PACKAGE:-"no"}
 SKIP_BUILD=${SKIP_BUILD:-"no"}
 RELEASE=${RELEASE:-""}
@@ -238,12 +239,9 @@ build_packages()
     local ARCH=$(get_arch)
     local WHOAMI=$(whoami)
 
-    [ "$DISABLE_GCOMM" != "yes" ] && export GCOMM="yes"
-    [ "$DISABLE_VSBES" != "yes" ] && export VSBES="yes"
-
     export BUILD_BASE=$build_base
     export GALERA_VER=$RELEASE
-    echo "GCOMM=$GCOMM VSBES=$VSBES ARCH=$ARCH"
+    echo "ARCH=$ARCH"
 
     if [ $DEBIAN -eq 0 ] && [ "$ARCH" == "amd64" ]
     then
@@ -274,6 +272,7 @@ build_packages()
     local RET=$?
 
     $SUDO /bin/chown -R $WHOAMI.users $ARCH
+
     set -e
 
     if [ $RET -eq 0 ] && [ $DEBIAN -eq 0 ]

@@ -5,24 +5,7 @@
 # this line is required by rpmbuild
 #d 755 root root /usr
 d 755 root root $LIBS_DEST -
-f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils.so.*.*.*
-f 755 root root $LIBS_DEST $BUILD_BASE/galerautils/src/.libs/libgalerautils++.so.*.*.*
-%ifdef GCOMM
-f 755 root root $LIBS_DEST $BUILD_BASE/gcomm/src/.libs/libgcomm.so.*.*.*
-%endif
-%ifdef VSBES
-f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/common/src/.libs/libgcommcommonpp.so.*.*.*
-f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/transport/src/.libs/libgcommtransportpp.so.*.*.*
-f 755 root root $LIBS_DEST $BUILD_BASE/galeracomm/vs/src/.libs/libgcommvspp.so.*.*.*
-%endif
-f 755 root root $LIBS_DEST $BUILD_BASE/gcs/src/.libs/libgcs.so.*.*.*
-f 755 root root $LIBS_DEST $BUILD_BASE/wsdb/src/.libs/libwsdb.so.*.*.*
-f 755 root root $LIBS_DEST $BUILD_BASE/galera/src/.libs/libmmgalera.so.*.*.*
-
-%ifdef VSBES
-d 755 root root $SBIN_DEST -
-f 755 root root $SBIN_DEST/vsbes $BUILD_BASE/galeracomm/vs/src/.libs/vsbes
-%endif
+f 755 root root $LIBS_DEST/libgalera_smm.so $BUILD_BASE/libgalera_smm.so
 
 d 755 root root $DOCS_DEST -
 f 644 root root $DOCS_DEST/COPYING      $BUILD_BASE/scripts/mysql/LICENSE.galera
@@ -40,13 +23,8 @@ f 644 root root $LD_SO_CONF_D/galera.conf empty
 #chown -R root.root $SBIN_DEST $LIBS_DEST
 echo $LIBS_DEST > $LD_SO_CONF_D/galera.conf
 ldconfig $LIBS_DEST
-# The following is to provide constant libmmgalera location across upgrades
-cd $LIBS_DEST
-rm -rf libmmgalera.so
-ln -s $$(/bin/ls libmmgalera.so.* | /usr/bin/tail -n1) libmmgalera.so
 EOF_POSTINSTALL
 
-%format all
 %preremove <<EOF_PREREMOVE
 rm -f $$(find $LIBS_DEST -type l)
 EOF_PREREMOVE

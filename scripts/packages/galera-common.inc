@@ -1,7 +1,7 @@
 # This is Galera package description for ESP package manager
 
 %product     Galera Replication Framework
-%copyright   2007-2010 by Codership Oy, All Rights Reserved
+%copyright   2007-2011 by Codership Oy, All Rights Reserved
 %vendor      Codership Oy
 %license     COPYING
 %readme      README
@@ -12,15 +12,14 @@
 
 %format deb
 %replaces    galera
-
 %requires    libc6      2.4
 %requires    libstdc++6 4.1.1
 %requires    libgcc1    4.1.1
 %format rpm
 #%replaces    galera
 %requires    glibc      2.4
-%requires    libstdc++  4.1.1
-%requires    libgcc     4.1.1
+%requires    libstdc++  4.1.2
+%requires    libgcc     4.1.2
 %format all
 
 $prefix=/usr
