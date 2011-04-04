@@ -233,6 +233,8 @@ public:
         set_inactive(uuid);
     }
 
+    bool set_param(const std::string& key, const std::string& val);
+
     // gu::datetime::Date functions do appropriate actions for timer handling
     // and return next expiration time
 private:

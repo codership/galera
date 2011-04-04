@@ -421,7 +421,7 @@ namespace gcomm
     {
         if (val < min || val >= max)
         {
-            gu_throw_error(EINVAL) << "param '" << key << "' value " << val
+            gu_throw_error(ERANGE) << "param '" << key << "' value " << val
                                    << " out of range [" << min
                                    << "," << max << ")";
         }
