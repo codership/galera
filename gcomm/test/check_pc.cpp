@@ -1599,6 +1599,62 @@ START_TEST(test_checksum)
 END_TEST
 
 
+START_TEST(test_set_param)
+{
+    log_info << "START (test_pc_transport)";
+    gu::Config conf;
+    auto_ptr<Protonet> net(Protonet::create(conf));
+    PCUser2 pu1(*net,
+                "pc://?"
+                "evs.info_log_mask=0xff&"
+                "gmcast.listen_addr=tcp://127.0.0.1:10001&"
+                "gmcast.group=pc&"
+                "gmcast.time_wait=PT0.5S&"
+                "node.name=n1");
+    pu1.start();
+    // no such a parameter
+    fail_unless(net->set_param("foo.bar", "1") == false);
+
+    const evs::seqno_t send_window(
+        gu::from_string<evs::seqno_t>(conf.get("evs.send_window")));
+    const evs::seqno_t user_send_window(
+        gu::from_string<evs::seqno_t>(conf.get("evs.user_send_window")));
+
+    try
+    {
+        net->set_param("evs.send_window", gu::to_string(user_send_window - 1));
+        fail("exception not thrown");
+    }
+    catch (gu::Exception& e)
+    {
+        fail_unless(e.get_errno() == ERANGE, "%d: %s", e.get_errno(), e.what());
+    }
+
+    try
+    {
+        net->set_param("evs.user_send_window",
+                      gu::to_string(send_window + 1));
+        fail("exception not thrown");
+    }
+    catch (gu::Exception& e)
+    {
+        fail_unless(e.get_errno() == ERANGE, "%d: %s", e.get_errno(), e.what());
+    }
+
+    // Note: These checks may have to change if defaults are changed
+    fail_unless(net->set_param(
+                    "evs.send_window",
+                    gu::to_string(send_window - 1)) == true);
+    fail_unless(gu::from_string<evs::seqno_t>(conf.get("evs.send_window")) ==
+                send_window - 1);
+    fail_unless(net->set_param(
+                    "evs.user_send_window",
+                    gu::to_string(user_send_window + 1)) == true);
+    fail_unless(gu::from_string<evs::seqno_t>(
+                    conf.get("evs.user_send_window")) == user_send_window + 1);
+    pu1.stop();
+}
+END_TEST
 
 Suite* pc_suite()
 {
@@ -1676,6 +1732,11 @@ Suite* pc_suite()
     tc = tcase_create("test_checksum");
     tcase_add_test(tc, test_checksum);
     suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_set_param");
+    tcase_add_test(tc, test_set_param);
+    suite_add_tcase(s, tc);
+
 
     return s;
 }

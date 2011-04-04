@@ -207,6 +207,33 @@ gcomm::evs::Proto::~Proto()
     delete input_map;
 }
 
+
+bool
+gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
+{
+    if (key == gcomm::Conf::EvsSendWindow)
+    {
+        send_window = check_range(Conf::EvsSendWindow,
+                                  gu::from_string<seqno_t>(val),
+                                  user_send_window,
+                                  std::numeric_limits<seqno_t>::max());
+        conf_.set(Conf::EvsSendWindow, gu::to_string(send_window));
+        return true;
+    }
+    else if (key == gcomm::Conf::EvsUserSendWindow)
+    {
+        user_send_window = check_range(
+            Conf::EvsUserSendWindow,
+            gu::from_string<seqno_t>(val),
+            gu::from_string<seqno_t>(Defaults::EvsUserSendWindowMin),
+            send_window + 1);
+        conf_.set(Conf::EvsUserSendWindow, gu::to_string(user_send_window));
+        return true;
+    }
+    return false;
+}
+
+
 ostream& gcomm::evs::operator<<(ostream& os, const Proto& p)
 {
     os << "evs::proto("
