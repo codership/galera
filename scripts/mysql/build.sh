@@ -279,15 +279,15 @@ then
         fi
 
         export MYSQL_BUILD_PREFIX="/usr"
-        
-	if [ "$PACKAGE" == "yes" ]
-	then
-#	    [ $DEBIAN -eq 0 ] && export MYSQL_BUILD_PREFIX="/"
-	    export wsrep_configs="--exec-prefix=/usr \
-	                          --libexecdir=/usr/sbin \
-	                          --localstatedir=/var/lib/mysql \
-	                          --with-extra-charsets=all"
-    	fi
+
+        if [ "$PACKAGE" == "yes" ]
+        then
+#            [ $DEBIAN -eq 0 ] && export MYSQL_BUILD_PREFIX="/"
+            export wsrep_configs="--exec-prefix=/usr \
+                                  --libexecdir=/usr/sbin \
+                                  --localstatedir=/var/lib/mysql \
+                                  --with-extra-charsets=all"
+        fi
 
         [ $DEBIAN -ne 0 ] && \
         export MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
@@ -339,14 +339,25 @@ install -m 755 -D $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS/libmys
 fi
 if test -f $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so
 then
-install -m 755 -D $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so $MYSQL_PLUGINS/ha_innodb_plugin.so
+install -m 755 -D $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so \
+                  $MYSQL_PLUGINS/ha_innodb_plugin.so
 fi
 install -m 755 -d $MYSQL_BINS
 if [ "$SKIP_CLIENTS" == "no" ]
 then
-install -m 755 -s -t $MYSQL_BINS  $MYSQL_SRC/client/.libs/mysql
-install -m 755 -s -t $MYSQL_BINS  $MYSQL_SRC/client/.libs/mysqldump
-install -m 755 -s -t $MYSQL_BINS  $MYSQL_SRC/client/.libs/mysqladmin
+    if [ -x $MYSQL_SRC/client/.libs/mysql ]    # MySQL
+    then
+        MYSQL_CLIENTS=$MYSQL_SRC/client/.libs
+    elif [ -x $MYSQL_SRC/client/mysql ]        # MariaDB
+    then
+        MYSQL_CLIENTS=$MYSQL_SRC/client
+    else
+        echo "Can't find MySQL clients. Aborting."
+        exit 1
+    fi
+install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysql
+install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysqldump
+install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysqladmin
 fi
 install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_mysqldump
 install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_rsync
