@@ -50,7 +50,8 @@ uint64_t galera_capabilities(wsrep_t* gh)
             WSREP_CAP_CERTIFICATION     |
             WSREP_CAP_PARALLEL_APPLYING |
             WSREP_CAP_TRX_REPLAY        |
-            WSREP_CAP_ISOLATION);
+            WSREP_CAP_ISOLATION         |
+            WSREP_CAP_PAUSE);
 }
 
 
@@ -750,6 +751,33 @@ void galera_stats_free (wsrep_t* gh, struct wsrep_stats_var* s)
 }
 
 
+extern "C"
+wsrep_seqno_t galera_pause (wsrep_t* gh)
+{
+    assert(gh != 0 && gh->ctx != 0);
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
+    try
+    {
+        return repl->pause();
+    }
+    catch (gu::Exception& e)
+    {
+        log_error << e.what();
+        return -e.get_errno();
+    }
+}
+
+
+extern "C"
+void galera_resume (wsrep_t* gh)
+{
+    assert(gh != 0 && gh->ctx != 0);
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+    repl->resume();
+}
+
+
 static wsrep_t galera_str = {
     WSREP_INTERFACE_VERSION,
     &galera_init,
@@ -778,6 +806,8 @@ static wsrep_t galera_str = {
     &galera_snapshot,
     &galera_stats_get,
     &galera_stats_free,
+    &galera_pause,
+    &galera_resume,
     "Galera",
     "0.8pre",
     "Codership Oy <info@codership.com>",

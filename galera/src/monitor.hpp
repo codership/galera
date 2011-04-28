@@ -46,8 +46,8 @@ namespace galera
             void operator=(const Process&);
         };
 
-        static const size_t process_size_ = (1 << 16);
-        static const size_t process_mask_ = process_size_ - 1;
+        static const ssize_t process_size_ = (1ULL << 16);
+        static const size_t  process_mask_ = process_size_ - 1;
 
     public:
 
@@ -57,12 +57,13 @@ namespace galera
             cond_(),
             last_entered_(-1),
             last_left_(-1),
-            drain_seqno_(-1),
+            drain_seqno_(LLONG_MAX),
             process_(process_size_),
             entered_(0),
             oooe_(0),
             oool_(0),
-            win_size_(0)
+            win_size_(0),
+            locked_(false)
         { }
 
         ~Monitor()
@@ -92,10 +93,11 @@ namespace galera
                 // drain monitor up to seqno but don't reset last_entered_
                 // or last_left_
                 drain_common(seqno, lock);
+                drain_seqno_ = LLONG_MAX;
             }
         }
 
-        int enter(C& obj)
+        void enter(C& obj) throw (gu::Exception)
         {
             const wsrep_seqno_t obj_seqno(obj.seqno());
             const size_t        idx(indexof(obj_seqno));
@@ -130,21 +132,20 @@ namespace galera
                     ++entered_;
                     oooe_     += ((last_left_ + 1) < obj_seqno);
                     win_size_ += (last_entered_ - last_left_);
-                    return 0;
+                    return;
                 }
             }
 
             assert(process_[idx].state_ == Process::S_CANCELED);
             process_[idx].state_ = Process::S_IDLE;
 
-            return -EINTR;
+            gu_throw_error(EINTR);
         }
 
         void leave(const C& obj)
         {
 #ifndef NDEBUG
-            wsrep_seqno_t obj_seqno(obj.seqno());
-            size_t   idx(indexof(obj_seqno));
+            size_t   idx(indexof(obj.seqno()));
 #endif // NDEBUG
             gu::Lock lock(mutex_);
 
@@ -158,20 +159,39 @@ namespace galera
 
         void self_cancel(C& obj)
         {
-
-#ifndef NDEBUG
-            size_t   idx(indexof(obj.seqno()));
-#endif // NDEBUG
+            wsrep_seqno_t const obj_seqno(obj.seqno());
+            size_t   idx(indexof(obj_seqno));
             gu::Lock lock(mutex_);
 
-            assert(obj.seqno() > last_left_);
+            assert(obj_seqno > last_left_);
 
-            pre_enter(obj, lock);
+            while (obj_seqno - last_left_ >= process_size_)
+                // TODO: exit on error
+            {
+                log_warn << "Trying to self-cancel seqno out of process "
+                         << "space: obj_seqno - last_left_ = " << obj_seqno
+                         << " - " << last_left_ << " = "
+                         << (obj_seqno - last_left_)
+                         << ", process_size_: "  << process_size_
+                         << ". Deadlock is very likely.";
+                obj.unlock();
+                lock.wait(cond_);
+                obj.lock();
+            }
 
             assert(process_[idx].state_ == Process::S_IDLE ||
                    process_[idx].state_ == Process::S_CANCELED);
 
-            post_leave(obj, lock);
+            if (obj_seqno > last_entered_) last_entered_ = obj_seqno;
+
+            if (obj_seqno <= drain_seqno_)
+            {
+                post_leave(obj, lock);
+            }
+            else
+            {
+                process_[idx].state_ = Process::S_FINISHED;
+            }
         }
 
         void interrupt(const C& obj)
@@ -180,8 +200,8 @@ namespace galera
             size_t   idx (indexof(obj.seqno()));
             gu::Lock lock(mutex_);
 
-            while (obj.seqno() - last_left_ >=
-                   static_cast<ssize_t>(process_size_)) // TODO: exit on error
+            while (obj.seqno() - last_left_ >= process_size_)
+                // TODO: exit on error
             {
                 lock.wait(cond_);
             }
@@ -204,13 +224,29 @@ namespace galera
 
         bool would_block (wsrep_seqno_t seqno) const
         {
-            return (seqno - last_left_ >= static_cast<ssize_t>(process_size_));
+            return (seqno - last_left_ >= process_size_ ||
+                    seqno > drain_seqno_);
         }
 
         void drain(wsrep_seqno_t seqno)
         {
             gu::Lock lock(mutex_);
+
+            while (drain_seqno_ != LLONG_MAX)
+            {
+                lock.wait(cond_);
+            }
+
             drain_common(seqno, lock);
+
+            if (last_left_ == seqno)
+            {
+                // there can be some stale canceled entries
+                update_last_left();
+            }
+
+            drain_seqno_ = LLONG_MAX;
+            cond_.broadcast();
         }
 
         void wait(wsrep_seqno_t seqno)
@@ -239,6 +275,50 @@ namespace galera
             }
 
             oooe_ = 0; oool_ = 0; win_size_ = 0; entered_ = 0;
+        }
+
+        void lock()
+        {
+            gu::Lock lock(mutex_);
+
+            if (locked_)
+            {
+                const char* msg = "Attempt to lock an already locked monitor.";
+                log_error << msg;
+                gu_throw_error(EDEADLK) << msg;
+            }
+
+            if (last_entered_ != -1)
+            {
+                while (drain_seqno_ != LLONG_MAX) lock.wait(cond_);
+                /*! @note: last_entered_ probably changed since last check */
+                drain_common(last_entered_, lock);
+                /* would_block() should return true when drain_seqno_ is set
+                 * so the monitor should be totally empty at this point. */
+            }
+
+            locked_ = true;
+
+            log_debug << "Locked local monitor at " << (last_left_ + 1);
+        }
+
+        void unlock()
+        {
+            gu::Lock lock(mutex_);
+
+            if (!locked_)
+            {
+                log_warn << "Attempt to unlock an already unlocked monitor.";
+                return;
+            }
+
+            locked_ = false;
+            update_last_left();
+
+            drain_seqno_ = LLONG_MAX;
+            cond_.broadcast();
+
+            log_debug << "Unlocked local monitor at " << last_left_;
         }
 
     private:
@@ -271,6 +351,44 @@ namespace galera
             if (last_entered_ < obj_seqno) last_entered_ = obj_seqno;
         }
 
+        void update_last_left()
+        {
+            for (wsrep_seqno_t i = last_left_ + 1; i <= last_entered_; ++i)
+            {
+                Process& a(process_[indexof(i)]);
+
+                if (Process::S_FINISHED == a.state_)
+                {
+                    a.state_   = Process::S_IDLE;
+                    last_left_ = i;
+                    a.wait_cond_.broadcast();
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+
+        void wake_up_next()
+        {
+            for (wsrep_seqno_t i = last_left_ + 1; i <= last_entered_; ++i)
+            {
+                Process& a(process_[indexof(i)]);
+                if (a.state_           == Process::S_WAITING &&
+                    may_enter(*a.obj_) == true)
+                {
+                    // We need to set state to APPLYING here because if
+                    // it is  the last_left_ + 1 and it gets canceled in
+                    // the race  that follows exit from this function,
+                    // there will be  nobody to clean up and advance
+                    // last_left_.
+                    a.state_ = Process::S_APPLYING;
+                    a.cond_.signal();
+                }
+            }
+        }
+
         void post_leave(const C& obj, gu::Lock& lock)
         {
             const wsrep_seqno_t obj_seqno(obj.seqno());
@@ -282,38 +400,11 @@ namespace galera
                 last_left_           = obj_seqno;
                 process_[idx].wait_cond_.broadcast();
 
-                for (wsrep_seqno_t i = last_left_ + 1; i <= last_entered_; ++i)
-                {
-                    Process& a(process_[indexof(i)]);
-
-                    if (Process::S_FINISHED == a.state_)
-                    {
-                        a.state_   = Process::S_IDLE;
-                        last_left_ = i;
-                        a.wait_cond_.broadcast();
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
+                update_last_left();
+                oool_ += (last_left_ > obj_seqno);
                 // wake up waiters that may remain above us (last_left_
                 // now is max)
-                for (wsrep_seqno_t i = last_left_ + 1; i <= last_entered_; ++i)
-                {
-                    Process& a(process_[indexof(i)]);
-                    if (a.state_           == Process::S_WAITING &&
-                        may_enter(*a.obj_) == true)
-                    {
-                        // We need to set state to APPLYING here because if
-                        // it is the last_left_ + 1 and it gets canceled in
-                        // the race that follows the exit from this function,
-                        // there will be nobody to clean up and advance
-                        // last_left_.
-                        a.state_ = Process::S_APPLYING;
-                        a.cond_.signal();
-                    }
-                }
+                wake_up_next();
             }
             else
             {
@@ -321,16 +412,17 @@ namespace galera
             }
 
             process_[idx].obj_ = 0;
+
             assert((last_left_ >= obj_seqno &&
                     process_[idx].state_ == Process::S_IDLE) ||
                    process_[idx].state_ == Process::S_FINISHED);
             assert(last_left_ != last_entered_ ||
                    process_[indexof(last_left_)].state_ == Process::S_IDLE);
 
-            if ((last_left_ >= obj_seqno) || // occupied window shrinked
-                (last_left_ == drain_seqno_)) // draining requested
+            if ((last_left_ >= obj_seqno) ||  // - occupied window shrinked
+                (last_left_ >= drain_seqno_)) // - this is to notify drain that
+                                              //   we reached drain_seqno_
             {
-                oool_ += (last_left_ > obj_seqno);
                 cond_.broadcast();
             }
         }
@@ -338,13 +430,8 @@ namespace galera
         void drain_common(wsrep_seqno_t seqno, gu::Lock& lock)
         {
             log_debug << "draining up to " << seqno;
-            drain_seqno_ = seqno;
 
-            while (drain_seqno_ - last_left_ >=
-                   static_cast<ssize_t>(process_size_)) // TODO: exit on error
-            {
-                lock.wait(cond_);
-            }
+            drain_seqno_ = seqno;
 
             if (last_left_ > drain_seqno_)
             {
@@ -357,11 +444,7 @@ namespace galera
                 }
             }
 
-            while (last_left_ < drain_seqno_)
-            {
-                lock.wait(cond_);
-            }
-            drain_seqno_ = -1;
+            while (last_left_ < drain_seqno_) lock.wait(cond_);
         }
 
         Monitor(const Monitor&);
@@ -377,6 +460,7 @@ namespace galera
         long oooe_;     // out of order entered
         long oool_;     // out of order left
         long win_size_; // window between last_left_ and last_entered_
+        bool locked_;
     };
 }
 

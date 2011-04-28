@@ -523,20 +523,24 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
 
     ApplyOrder ao(*trx);
     CommitOrder co(*trx, co_mode_);
-    if (apply_monitor_.enter(ao) != 0)
-    {
-        gu_throw_fatal << "unable to enter apply monitor";
-    }
+
+    gu_trace(apply_monitor_.enter(ao));
     gu_trace(apply_trx_ws(recv_ctx, bf_apply_cb_, *trx));
     // at this point any exception in apply_trx_ws() is fatal, not
     // catching anything.
-    if (co_mode_ != CommitOrder::BYPASS && commit_monitor_.enter(co) != 0)
+    if (gu_likely(co_mode_ != CommitOrder::BYPASS))
     {
-        gu_throw_fatal << "unable to enter commit monitor";
+        gu_trace(commit_monitor_.enter(co));
+        gu_trace(apply_data(recv_ctx, bf_apply_cb_, commit_stmt,
+                            trx->global_seqno()));
+        commit_monitor_.leave(co);
     }
-    gu_trace(apply_data(recv_ctx, bf_apply_cb_, commit_stmt,
-                        trx->global_seqno()));
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
+    else
+    {
+        gu_trace(apply_data(recv_ctx, bf_apply_cb_, commit_stmt,
+                            trx->global_seqno()));
+    }
+
     apply_monitor_.leave(ao);
 
     cert_.set_trx_committed(trx);
@@ -766,10 +770,19 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle* trx)
 
     ApplyOrder ao(*trx);
     CommitOrder co(*trx, co_mode_);
-    int rc(apply_monitor_.enter(ao));
-    assert(rc == 0 || rc == -EINTR);
+    bool interrupted(false);
 
-    if (rc == -EINTR)
+    try
+    {
+        gu_trace(apply_monitor_.enter(ao));
+    }
+    catch (gu::Exception& e)
+    {
+        if (e.get_errno() == EINTR) { interrupted = true; }
+        else throw;
+    }
+
+    if (gu_unlikely(interrupted))
     {
         assert(trx->state() == TrxHandle::S_MUST_ABORT);
 
@@ -788,11 +801,9 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle* trx)
     }
     else if ((trx->flags() & TrxHandle::F_COMMIT) != 0)
     {
-        if (co_mode_ != CommitOrder::BYPASS && commit_monitor_.enter(co) != 0)
-        {
-            gu_throw_fatal << "unable to enter commit monitor in pre commit: "
-                           << *trx;
-        }
+        if (co_mode_ != CommitOrder::BYPASS)
+            gu_trace(commit_monitor_.enter(co));
+
         trx->set_state(TrxHandle::S_APPLYING);
     }
     else
@@ -839,24 +850,28 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
 
         ApplyOrder ao(*trx);
 
-        if (apply_monitor_.enter(ao) != 0)
-        {
-            gu_throw_fatal << "failed to enter apply monitor in trx replay: "
-                           << *trx;
-        }
+        gu_trace(apply_monitor_.enter(ao));
         ++local_replays_;
 
         try
         {
             gu_trace(apply_trx_ws(trx_ctx, bf_apply_cb_, *trx));
             log_debug << "replay applying successfull for trx " << trx;
+
             CommitOrder co(*trx, co_mode_);
-            if (co_mode_ != CommitOrder::BYPASS && commit_monitor_.enter(co) != 0)
-            {
-                gu_throw_fatal
-                    << "failed to enter commit monitor in trx replay: "
-                    << *trx;
-            }
+
+            if (co_mode_ != CommitOrder::BYPASS)
+                try
+                {
+                    commit_monitor_.enter(co);
+                }
+                catch (...)
+                {
+                    gu_throw_fatal
+                        << "failed to enter commit monitor in trx replay: "
+                        << *trx;
+                }
+
             gu_trace(apply_data(trx_ctx, bf_apply_cb_, commit_stmt,
                                 trx->global_seqno()));
             trx->set_state(TrxHandle::S_REPLAYED);
@@ -957,14 +972,19 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle* trx)
     {
         ApplyOrder ao(*trx);
         CommitOrder co(*trx, co_mode_);
-        if (apply_monitor_.enter(ao) != 0)
-        {
-            gu_throw_fatal << "unable to enter apply monitor: " << *trx;
-        }
-        if (co_mode_ != CommitOrder::BYPASS && commit_monitor_.enter(co) != 0)
-        {
-            gu_throw_fatal << "unable to enter commit monitor: " << *trx;
-        }
+
+        gu_trace(apply_monitor_.enter(ao));
+
+        if (co_mode_ != CommitOrder::BYPASS)
+            try
+            {
+                commit_monitor_.enter(co);
+            }
+            catch (...)
+            {
+                gu_throw_fatal << "unable to enter commit monitor: " << *trx;
+            }
+
         trx->set_state(TrxHandle::S_APPLYING);
         break;
     }
@@ -1068,8 +1088,9 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
     assert(trx->last_depends_seqno() == -1);
     assert(trx->state() == TrxHandle::S_REPLICATED);
 
-    wsrep_status_t retval;
-    switch ((retval = cert(trx)))
+    wsrep_status_t const retval(cert(trx));
+
+    switch (retval)
     {
     case WSREP_OK:
         gu_trace(apply_trx(recv_ctx, trx));
@@ -1093,11 +1114,8 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
     assert(seq > 0);
     assert(seqno_l > 0);
     LocalOrder lo(seqno_l);
-    int ret;
-    if ((ret = local_monitor_.enter(lo)) != 0)
-    {
-        gu_throw_fatal << "failed to enter local monitor: " << ret;
-    }
+
+    gu_trace(local_monitor_.enter(lo));
     cert_.purge_trxs_upto(seq);
     local_monitor_.leave(lo);
 }
@@ -1113,15 +1131,15 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
     assert(seqno_l > -1);
     LocalOrder lo(seqno_l);
 
-    int ret;
-    if ((ret = local_monitor_.enter(lo)) != 0)
-    {
-        gu_throw_fatal << "failed to enter local monitor: " << ret;
-    }
-    apply_monitor_.drain(cert_.position());
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(cert_.position());
+    gu_trace(local_monitor_.enter(lo));
 
-    const wsrep_seqno_t group_seqno(view_info.first - 1);
+    wsrep_seqno_t const upto(cert_.position());
+
+    apply_monitor_.drain(upto);
+
+    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
+
+    wsrep_seqno_t const group_seqno(view_info.first - 1);
     const wsrep_uuid_t& group_uuid(view_info.id);
 
     if (view_info.my_idx >= 0)
@@ -1230,8 +1248,8 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
 void galera::ReplicatorSMM::process_state_req(void* recv_ctx,
                                               const void* req,
                                               size_t req_size,
-                                              wsrep_seqno_t seqno_l,
-                                              wsrep_seqno_t donor_seq)
+                                              wsrep_seqno_t const seqno_l,
+                                              wsrep_seqno_t const donor_seq)
     throw (gu::Exception)
 {
     assert(recv_ctx != 0);
@@ -1239,15 +1257,12 @@ void galera::ReplicatorSMM::process_state_req(void* recv_ctx,
     assert(req != 0);
 
     LocalOrder lo(seqno_l);
-    int ret;
 
-    if ((ret = local_monitor_.enter(lo)) != 0)
-    {
-        gu_throw_fatal << "failed to enter local monitor: " << ret;
-    }
-
+    gu_trace(local_monitor_.enter(lo));
     apply_monitor_.drain(donor_seq);
+
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(donor_seq);
+
     state_.shift_to(S_DONOR);
     sst_donate_cb_(app_ctx_, recv_ctx, req, req_size, &state_uuid_,
                    donor_seq, 0, 0);
@@ -1259,13 +1274,15 @@ void galera::ReplicatorSMM::process_join(wsrep_seqno_t seqno_l)
     throw (gu::Exception)
 {
     LocalOrder lo(seqno_l);
-    int ret;
-    if ((ret = local_monitor_.enter(lo)) != 0)
-    {
-        gu_throw_fatal << "failed to enter local monitor: " << ret;
-    }
-    apply_monitor_.drain(cert_.position());
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(cert_.position());
+
+    gu_trace(local_monitor_.enter(lo));
+
+    wsrep_seqno_t const upto(cert_.position());
+
+    apply_monitor_.drain(upto);
+
+    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
+
     state_.shift_to(S_JOINED);
     local_monitor_.leave(lo);
 }
@@ -1275,18 +1292,45 @@ void galera::ReplicatorSMM::process_sync(wsrep_seqno_t seqno_l)
     throw (gu::Exception)
 {
     LocalOrder lo(seqno_l);
-    int ret;
-    if ((ret = local_monitor_.enter(lo)) != 0)
-    {
-        gu_throw_fatal << "failed to enter local monitor: " << ret;
-    }
-    apply_monitor_.drain(cert_.position());
-    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(cert_.position());
+
+    gu_trace(local_monitor_.enter(lo));
+
+    wsrep_seqno_t const upto(cert_.position());
+
+    apply_monitor_.drain(upto);
+
+    if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
+
     state_.shift_to(S_SYNCED);
     synced_cb_(app_ctx_);
     local_monitor_.leave(lo);
 }
 
+wsrep_seqno_t galera::ReplicatorSMM::pause() throw (gu::Exception)
+{
+    gu_trace(local_monitor_.lock());
+
+    wsrep_seqno_t const ret(cert_.position());
+
+    apply_monitor_.drain(ret);
+    assert (apply_monitor_.last_left() == ret);
+
+    if (co_mode_ != CommitOrder::BYPASS)
+    {
+        commit_monitor_.drain(ret);
+        assert (commit_monitor_.last_left() == ret);
+    }
+
+    log_info << "Provider paused at " << state_uuid_ << ':' << ret;
+
+    return ret;
+}
+
+void galera::ReplicatorSMM::resume() throw ()
+{
+    local_monitor_.unlock();
+    log_info << "Provider resumed.";
+}
 
 void galera::ReplicatorSMM::store_state(const std::string& file) const
 {
@@ -1544,41 +1588,38 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
     LocalOrder lo(*trx);
     ApplyOrder ao(*trx);
     CommitOrder co(*trx, co_mode_);
+    bool interrupted(false);
 
-    const int rcode(local_monitor_.enter(lo));
-    assert(rcode == 0 || rcode == -EINTR);
+    try
+    {
+        gu_trace(local_monitor_.enter(lo));
+    }
+    catch (gu::Exception& e)
+    {
+        if (e.get_errno() == EINTR) { interrupted = true; }
+        else throw;
+    }
 
     wsrep_status_t retval(WSREP_OK);
 
-    if (rcode == -EINTR)
-    {
-        retval = cert_for_aborted(trx);
-
-        if (retval != WSREP_BF_ABORT)
-        {
-            local_monitor_.self_cancel(lo);
-            apply_monitor_.self_cancel(ao);
-            if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
-        }
-    }
-    else
+    if (gu_likely (!interrupted))
     {
         switch (cert_.append_trx(trx))
         {
         case Certification::TEST_OK:
             if (trx->global_seqno() > apply_monitor_.last_left())
             {
-		if (trx->state() == TrxHandle::S_CERTIFYING)
-		{
-		    trx->set_state(TrxHandle::S_CERTIFIED);
-		    retval = WSREP_OK;
-		}
-		else
-		{
-		    assert(trx->state() == TrxHandle::S_MUST_ABORT);
-		    trx->set_state(TrxHandle::S_MUST_REPLAY);
-		    retval = WSREP_BF_ABORT;
-		}
+                if (trx->state() == TrxHandle::S_CERTIFYING)
+                {
+                    trx->set_state(TrxHandle::S_CERTIFIED);
+                    retval = WSREP_OK;
+                }
+                else
+                {
+                    assert(trx->state() == TrxHandle::S_MUST_ABORT);
+                    trx->set_state(TrxHandle::S_MUST_REPLAY);
+                    retval = WSREP_BF_ABORT;
+                }
             }
             else
             {
@@ -1606,6 +1647,19 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
         }
 
         local_monitor_.leave(lo);
+    }
+    else
+    {
+        retval = cert_for_aborted(trx);
+
+        if (retval != WSREP_BF_ABORT)
+        {
+            local_monitor_.self_cancel(lo);
+            apply_monitor_.self_cancel(ao);
+
+            if (co_mode_ != CommitOrder::BYPASS)
+                commit_monitor_.self_cancel(co);
+        }
     }
 
     log_debug << "cert for " << *trx << " " << retval;

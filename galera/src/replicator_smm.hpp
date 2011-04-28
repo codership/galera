@@ -117,6 +117,9 @@ namespace galera
 
         const gu::Config& params() const { return config_; }
 
+        wsrep_seqno_t pause()  throw (gu::Exception);
+        void          resume() throw ();
+
         void store_state      (const std::string& file) const;
         void restore_state    (const std::string& file);
         void invalidate_state (const std::string& file) const;

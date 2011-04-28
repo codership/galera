@@ -31,7 +31,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "18"
+#define WSREP_INTERFACE_VERSION "19"
 
 /*!
  *  Certain provider capabilities application may need to know
@@ -41,12 +41,13 @@ extern "C" {
 #define WSREP_CAP_PARALLEL_APPLYING     ( 1ULL << 2 )
 #define WSREP_CAP_TRX_REPLAY            ( 1ULL << 3 )
 #define WSREP_CAP_ISOLATION             ( 1ULL << 4 )
-#define WSREP_CAP_CAUSAL_READS          ( 1ULL << 5 )
-#define WSREP_CAP_CAUSAL_TRX            ( 1ULL << 6 )
-#define WSREP_CAP_WRITE_SET_INCREMENTS  ( 1ULL << 7 )
-#define WSREP_CAP_SESSION_LOCKS         ( 1ULL << 8 )
-#define WSREP_CAP_DISTRIBUTED_LOCKS     ( 1ULL << 9 )
-#define WSREP_CAP_CONSISTENCY_CHECK     ( 1ULL << 10 )
+#define WSREP_CAP_PAUSE                 ( 1ULL << 5 )
+#define WSREP_CAP_CAUSAL_READS          ( 1ULL << 6 )
+#define WSREP_CAP_CAUSAL_TRX            ( 1ULL << 7 )
+#define WSREP_CAP_WRITE_SET_INCREMENTS  ( 1ULL << 8 )
+#define WSREP_CAP_SESSION_LOCKS         ( 1ULL << 9 )
+#define WSREP_CAP_DISTRIBUTED_LOCKS     ( 1ULL << 10 )
+#define WSREP_CAP_CONSISTENCY_CHECK     ( 1ULL << 11 )
 
 /* Empty backend spec */
 #define WSREP_NONE "none"
@@ -770,6 +771,18 @@ struct wsrep_ {
    * @param wsrep this wsrep handle
    */
     void (*stats_free) (wsrep_t* wsrep, struct wsrep_stats_var* var_array);
+
+  /*!
+   * @brief Pauses writeset applying/committing
+   *
+   * @return global sequence number of the paused state or negative error code
+   */
+    wsrep_seqno_t (*pause) (wsrep_t* wsrep);
+
+  /*!
+   * @brief Resumes writeset applying/committing
+   */
+    void (*resume) (wsrep_t* wsrep);
 
   /*!
    * wsrep provider name
