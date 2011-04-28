@@ -238,32 +238,11 @@ namespace galera
 
             drain_common(seqno, lock);
 
-            if (last_left_ == seqno)
-            {
-                // there can be some stale canceled entries
-                update_last_left();
-            }
+            // there can be some stale canceled entries
+            update_last_left();
 
             drain_seqno_ = LLONG_MAX;
             cond_.broadcast();
-        }
-
-        void get_stats(double* oooe, double* oool, double* win_size)
-        {
-            gu::Lock lock(mutex_);
-
-            if (entered_ > 0)
-            {
-                *oooe = (oooe_ > 0 ? double(oooe_)/entered_ : .0);
-                *oool = (oool_ > 0 ? double(oool_)/entered_ : .0);
-                *win_size = (win_size_ > 0 ? double(win_size_)/entered_ : .0);
-            }
-            else
-            {
-                *oooe = .0; *oool = .0; *win_size = .0;
-            }
-
-            oooe_ = 0; oool_ = 0; win_size_ = 0; entered_ = 0;
         }
 
         void lock()
@@ -308,6 +287,24 @@ namespace galera
             cond_.broadcast();
 
             log_debug << "Unlocked local monitor at " << last_left_;
+        }
+
+        void get_stats(double* oooe, double* oool, double* win_size)
+        {
+            gu::Lock lock(mutex_);
+
+            if (entered_ > 0)
+            {
+                *oooe = (oooe_ > 0 ? double(oooe_)/entered_ : .0);
+                *oool = (oool_ > 0 ? double(oool_)/entered_ : .0);
+                *win_size = (win_size_ > 0 ? double(win_size_)/entered_ : .0);
+            }
+            else
+            {
+                *oooe = .0; *oool = .0; *win_size = .0;
+            }
+
+            oooe_ = 0; oool_ = 0; win_size_ = 0; entered_ = 0;
         }
 
     private:
