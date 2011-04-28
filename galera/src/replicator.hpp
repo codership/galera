@@ -94,13 +94,17 @@ namespace galera
         // wsrep_status_t snapshot();
         virtual const struct wsrep_stats_var* stats() const = 0;
 
-        virtual void           param_set (const std::string& key,
-                                          const std::string& value)
+        virtual void        param_set (const std::string& key,
+                                       const std::string& value)
             throw (gu::Exception, gu::NotFound) = 0;
 
-        virtual std::string    param_get (const std::string& key) const
+        virtual std::string param_get (const std::string& key) const
             throw (gu::Exception, gu::NotFound) = 0;
+
         virtual const gu::Config& params() const = 0;
+
+        virtual wsrep_seqno_t pause()  throw (gu::Exception) = 0;
+        virtual void          resume() throw () = 0;
     };
 }
 
