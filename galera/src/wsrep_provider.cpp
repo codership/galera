@@ -579,7 +579,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*        gh,
     try
     {
         TrxHandleLock lock(*trx);
-        trx->append_statement(query, query_len);
+        trx->append_data(query, query_len);
         trx->set_flags(TrxHandle::F_COMMIT);
 
         retval = repl->replicate(trx);
