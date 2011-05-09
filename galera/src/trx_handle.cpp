@@ -48,29 +48,17 @@ std::ostream& galera::operator<<(std::ostream& os, TrxHandle::State s)
 std::ostream&
 galera::operator<<(std::ostream& os, const TrxHandle& th)
 {
-    os << "source: " << th.source_id_
-       << " state: " << th.state_()
-       << " flags: " << th.write_set_flags_
-       << " conn_id: " << th.conn_id_
-       << " trx_id: " << th.trx_id_
-       << " seqnos (l: "  << th.local_seqno_
-       << ", g: " << th.global_seqno_
-       << ", s: " << th.last_seen_seqno_
-       << ", d: " << th.last_depends_seqno_
-       << ")";
-
-    if (!th.write_set_.get_queries().empty())
-    {
-        os << " statements:\n";
-        for (StatementSequence::const_iterator i =
-                 th.write_set_.get_queries().begin();
-             i != th.write_set_.get_queries().end(); ++i)
-        {
-            os << "\t" << *i << "\n";
-        }
-    }
-
-    return os;
+    return (os << "source: " << th.source_id_
+            << " state: " << th.state_()
+            << " flags: " << th.write_set_flags_
+            << " conn_id: " << th.conn_id_
+            << " trx_id: " << th.trx_id_
+            << " seqnos (l: "  << th.local_seqno_
+            << ", g: " << th.global_seqno_
+            << ", s: " << th.last_seen_seqno_
+            << ", d: " << th.last_depends_seqno_
+            << ", ts: " << th.timestamp_
+            << ")");
 }
 
 
@@ -137,6 +125,40 @@ public:
 } trans_map_builder_;
 
 
+size_t galera::serialize(const TrxHandle::Mac& mac, gu::byte_t* buf,
+                                size_t buflen, size_t offset)
+{
+    // header:
+    // type: 1 byte
+    // len:  1 byte
+    return serialize(uint16_t(0), buf, buflen, offset);
+}
+
+
+size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
+                           TrxHandle::Mac& mac)
+{
+    uint16_t hdr;
+    offset = unserialize(buf, buflen, offset, hdr);
+    switch ((hdr >> 8) & 0xff)
+    {
+    case 0:
+        break;
+    default:
+        log_warn << "unrecognized mac type" << ((hdr >> 8) & 0xff);
+    }
+    // skip over the body
+    offset += (hdr & 0xff);
+    return offset;
+}
+
+
+size_t galera::serial_size(const TrxHandle::Mac& mac)
+{
+    return serial_size(uint16_t());
+}
+
+
 size_t galera::serialize(const TrxHandle& trx, gu::byte_t* buf,
                          size_t buflen, size_t offset)
 {
@@ -146,6 +168,11 @@ size_t galera::serialize(const TrxHandle& trx, gu::byte_t* buf,
     offset = serialize(trx.conn_id_, buf, buflen, offset);
     offset = serialize(trx.trx_id_, buf, buflen, offset);
     offset = serialize(trx.last_seen_seqno_, buf, buflen, offset);
+    offset = serialize<int64_t>(trx.timestamp_, buf, buflen, offset);
+    if (TrxHandle::has_mac(trx.write_set_flags_) == true)
+    {
+        offset = serialize(trx.mac_, buf, buflen, offset);
+    }
     return offset;
 }
 
@@ -167,6 +194,11 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
         offset = unserialize(buf, buflen, offset, trx.conn_id_);
         offset = unserialize(buf, buflen, offset, trx.trx_id_);
         offset = unserialize(buf, buflen, offset, trx.last_seen_seqno_);
+        offset = unserialize<int64_t>(buf, buflen, offset, trx.timestamp_);
+        if (TrxHandle::has_mac(trx.write_set_flags_) == true)
+        {
+            offset = unserialize(buf, buflen, offset, trx.mac_);
+        }
         return offset;
     }
     catch (gu::Exception& e)
@@ -192,6 +224,9 @@ size_t galera::serial_size(const TrxHandle& trx)
             + serial_size(trx.source_id_)
             + serial_size(trx.conn_id_)
             + serial_size(trx.trx_id_)
-            + serial_size(trx.last_seen_seqno_));
+            + serial_size(trx.last_seen_seqno_)
+            + serial_size(static_cast<uint64_t>(trx.timestamp_))
+            + (TrxHandle::has_mac(trx.write_set_flags_) == true ?
+               serial_size(trx.mac_) : 0));
 }
 

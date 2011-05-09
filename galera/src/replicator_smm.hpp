@@ -59,8 +59,6 @@ namespace galera
         void discard_local_trx(wsrep_trx_id_t trx_id);
 
         TrxHandle* local_conn_trx(wsrep_conn_id_t, bool);
-        void set_default_context(wsrep_conn_id_t conn_id,
-                                 const void* cxt, size_t cxt_len);
         void discard_local_conn_trx(wsrep_conn_id_t conn_id);
         void discard_local_conn(wsrep_conn_id_t conn_id);
 

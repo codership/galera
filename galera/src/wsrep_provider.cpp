@@ -397,34 +397,8 @@ wsrep_status_t galera_append_query(wsrep_t*            gh,
                                    const time_t        timeval,
                                    const uint32_t      randseed)
 {
-    assert(gh != 0 && gh->ctx != 0);
-    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-
-    TrxHandle* trx(repl->local_trx(trx_handle, true));
-    assert(trx != 0);
-
-    wsrep_status_t retval;
-
-    try
-    {
-        TrxHandleLock lock(*trx);
-        trx->append_statement(query, strlen(query), timeval, randseed);
-        retval = WSREP_OK;
-    }
-    catch (std::exception& e)
-    {
-        log_warn << e.what();
-        retval = WSREP_CONN_FAIL;
-    }
-    catch (...)
-    {
-        log_fatal << "non-standard exception";
-        retval = WSREP_FATAL;
-    }
-
-    repl->unref_local_trx(trx);
-
-    return retval;
+    log_warn << "galera_append_query() is deprecated";
+    return WSREP_CONN_FAIL;
 }
 
 
@@ -447,14 +421,7 @@ wsrep_status_t galera_append_row_key(wsrep_t*            gh,
     try
     {
         TrxHandleLock lock(*trx);
-        WriteSet::Action ac;
-        switch (action)
-        {
-        case WSREP_INSERT: ac = WriteSet::A_INSERT;
-        case WSREP_UPDATE: ac = WriteSet::A_UPDATE;
-        case WSREP_DELETE: ac = WriteSet::A_DELETE;
-        }
-        trx->append_row_id(dbtable, dbtable_len, key, key_len, ac);
+        trx->append_row_id(dbtable, dbtable_len, key, key_len);
         retval = WSREP_OK;
     }
     catch (std::exception& e)
@@ -554,14 +521,7 @@ wsrep_status_t galera_set_database(wsrep_t*              gh,
 
     try
     {
-        if (query != 0)
-        {
-            repl->set_default_context(conn_id, query, query_len);
-        }
-        else
-        {
-            repl->discard_local_conn(conn_id);
-        }
+        if (query == 0) repl->discard_local_conn(conn_id);
         return WSREP_OK;
     }
     catch (std::exception& e)

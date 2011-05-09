@@ -13,13 +13,14 @@
 #include "wsrep_api.h"
 #include "gu_mutex.hpp"
 #include "gu_atomic.hpp"
+#include "gu_datetime.hpp"
 
 #include <set>
 
 namespace galera
 {
 
-    class RowKeyEntry; // Forward declaration
+    class RowIdEntry; // Forward declaration
 
     static const std::string working_dir = "/tmp";
 
@@ -28,9 +29,17 @@ namespace galera
     public:
         enum
         {
-            F_COMMIT =   1 << 0,
-            F_ROLLBACK = 1 << 1
+            F_COMMIT      = 1 << 0,
+            F_ROLLBACK    = 1 << 1,
+            F_OOC         = 1 << 2,
+            F_MAC_HEADER  = 1 << 3,
+            F_MAC_PAYLOAD = 1 << 4
         };
+
+        static inline bool has_mac(int flags)
+        {
+            return ((flags & (F_MAC_HEADER | F_MAC_PAYLOAD)) != 0);
+        }
 
         typedef enum
         {
@@ -84,6 +93,22 @@ namespace galera
         typedef FSM<State, Transition> Fsm;
         static Fsm::TransMap trans_map_;
 
+        // Placeholder for message authentication code
+        class Mac
+        {
+        public:
+            Mac() { }
+            ~Mac() { }
+        private:
+            friend size_t serialize(const galera::TrxHandle::Mac& mac,
+                                    gu::byte_t* buf, size_t buflen, size_t offset);
+            friend size_t unserialize(const gu::byte_t* buf, size_t buflen,
+                                      size_t offset,
+                                      galera::TrxHandle::Mac& mac);
+            friend size_t serial_size(const galera::TrxHandle::Mac&);
+        };
+
+
         explicit
         TrxHandle(const wsrep_uuid_t& source_id = WSREP_UUID_UNDEFINED,
                   wsrep_conn_id_t     conn_id   = -1,
@@ -109,6 +134,8 @@ namespace galera
             committed_         (false),
             gcs_handle_        (-1),
             action_            (0),
+            timestamp_         (gu_time_calendar()),
+            mac_               (),
             cert_keys_         ()
         { }
 
@@ -172,22 +199,11 @@ namespace galera
         void set_flags(int flags) { write_set_flags_ = flags; }
         int flags() const { return write_set_flags_; }
 
-        void append_statement(const void* stmt,
-                              size_t stmt_len,
-                              time_t timeval = -1,
-                              uint32_t randseed = -1)
-        {
-            write_set_.append_statement(
-                Statement(stmt, stmt_len,timeval, randseed));
-        }
-
         void append_row_id(const void* dbtable, size_t dbtable_len,
-                           const void* row_id, size_t row_id_len,
-                           int action)
+                           const void* row_id, size_t row_id_len)
         {
-            write_set_.append_row_key(dbtable, dbtable_len,
-                                      row_id, row_id_len,
-                                      action);
+            write_set_.append_row_id(dbtable, dbtable_len,
+                                     row_id, row_id_len);
         }
 
         void append_data(const void* data, const size_t data_len)
@@ -289,11 +305,13 @@ namespace galera
         bool                   committed_;
         long                   gcs_handle_;
         void*                  action_;
+        long long              timestamp_;
+        Mac                    mac_;
 
         //
         friend class Wsdb;
         friend class Certification;
-        typedef std::set<RowKeyEntry*> CertKeySet;
+        typedef std::set<RowIdEntry*> CertKeySet;
         CertKeySet cert_keys_;
 
         friend size_t serialize(const TrxHandle&, gu::byte_t* buf,
@@ -307,7 +325,6 @@ namespace galera
     std::ostream& operator<<(std::ostream& os, TrxHandle::State s);
 
     size_t serial_size(const TrxHandle&);
-
 
     class TrxHandleLock
     {
