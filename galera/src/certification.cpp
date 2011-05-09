@@ -13,42 +13,42 @@
 using namespace std;
 using namespace gu;
 
-inline galera::RowKeyEntry::RowKeyEntry(
-    const RowKey& row_key)
+inline galera::RowIdEntry::RowIdEntry(
+    const RowId& row_id)
     :
-    row_key_buf_(0),
+    row_id_buf_(0),
     ref_trx_(0)
 {
-    const size_t ss(serial_size(row_key));
-    row_key_buf_ = new gu::byte_t[sizeof(uint32_t) + ss];
-    *reinterpret_cast<uint32_t*>(row_key_buf_) = ss;
-    (void)serialize(row_key, row_key_buf_ + sizeof(uint32_t), ss, 0);
+    const size_t ss(serial_size(row_id));
+    row_id_buf_ = new gu::byte_t[sizeof(uint32_t) + ss];
+    *reinterpret_cast<uint32_t*>(row_id_buf_) = ss;
+    (void)serialize(row_id, row_id_buf_ + sizeof(uint32_t), ss, 0);
 }
 
-inline galera::RowKeyEntry::~RowKeyEntry()
+inline galera::RowIdEntry::~RowIdEntry()
 {
-    delete[] row_key_buf_;
+    delete[] row_id_buf_;
 }
 
-inline galera::RowKey
-galera::RowKeyEntry::get_row_key() const
+inline galera::RowId
+galera::RowIdEntry::get_row_id() const
 {
-    RowKey rk;
-    uint32_t ss(*reinterpret_cast<uint32_t*>(row_key_buf_));
-    (void)unserialize(row_key_buf_ + sizeof(uint32_t), ss, 0, rk);
+    RowId rk;
+    uint32_t ss(*reinterpret_cast<uint32_t*>(row_id_buf_));
+    (void)unserialize(row_id_buf_ + sizeof(uint32_t), ss, 0, rk);
     return rk;
 }
 
 
 inline galera::TrxHandle*
-galera::RowKeyEntry::get_ref_trx() const
+galera::RowIdEntry::get_ref_trx() const
 {
     return ref_trx_;
 }
 
 
 inline void
-galera::RowKeyEntry::ref(TrxHandle* trx)
+galera::RowIdEntry::ref(TrxHandle* trx)
 {
     assert(ref_trx_ == 0 ||
            ref_trx_->global_seqno() < trx->global_seqno());
@@ -57,7 +57,7 @@ galera::RowKeyEntry::ref(TrxHandle* trx)
 
 
 inline void
-galera::RowKeyEntry::unref(TrxHandle* trx)
+galera::RowIdEntry::unref(TrxHandle* trx)
 {
     if (ref_trx_ == trx)
     {
@@ -86,7 +86,7 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
         (*i)->unref(trx);
         if ((*i)->get_ref_trx() == 0)
         {
-            CertIndex::iterator ci(cert_index_.find((*i)->get_row_key()));
+            CertIndex::iterator ci(cert_index_.find((*i)->get_row_id()));
             assert(ci != cert_index_.end());
             delete ci->second;
             cert_index_.erase(ci);
@@ -149,11 +149,11 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
             gu_throw_fatal << "failed to unserialize write set";
         }
 
-        RowKeySequence rk;
-        ws.get_keys(rk);
+        RowIdSequence rk;
+        ws.get_row_ids(rk);
 
         // Scan over all row keys
-        for (RowKeySequence::const_iterator i = rk.begin(); i != rk.end(); ++i)
+        for (RowIdSequence::const_iterator i = rk.begin(); i != rk.end(); ++i)
         {
             CertIndex::iterator ci;
             if ((ci = cert_index_.find(*i)) != cert_index_.end())
@@ -184,8 +184,8 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
             }
             else if (store_keys == true)
             {
-                RowKeyEntry* cie(new RowKeyEntry(*i));
-                ci = cert_index_.insert(make_pair(cie->get_row_key(), cie)).first;
+                RowIdEntry* cie(new RowIdEntry(*i));
+                ci = cert_index_.insert(make_pair(cie->get_row_id(), cie)).first;
             }
 
             if (store_keys == true)

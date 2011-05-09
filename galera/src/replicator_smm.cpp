@@ -93,63 +93,11 @@ apply_ws (void*                   recv_ctx,
     assert(seqno_g > 0);
     assert(apply_cb != 0);
 
-    using galera::WriteSet;
-    using galera::StatementSequence;
+    wsrep_apply_data_t data = {WSREP_APPLY_APP, {}};
+    data.u.app.buffer = const_cast<uint8_t*>(&ws.get_data()[0]);
+    data.u.app.len    = ws.get_data().size();
 
-    switch (ws.get_level())
-    {
-    case WriteSet::L_DATA:
-    {
-        wsrep_apply_data_t data;
-
-        data.type         = WSREP_APPLY_APP;
-        data.u.app.buffer = const_cast<uint8_t*>(&ws.get_data()[0]);
-        data.u.app.len    = ws.get_data().size();
-
-        gu_trace(apply_data (recv_ctx, apply_cb, data, seqno_g));
-
-        break;
-    }
-
-    case WriteSet::L_STATEMENT:
-    {
-        const StatementSequence& ss(ws.get_queries());
-
-        for (StatementSequence::const_iterator i = ss.begin();
-             i != ss.end(); ++i)
-        {
-            wsrep_apply_data_t data;
-
-            data.type      = WSREP_APPLY_SQL;
-            data.u.sql.stm = reinterpret_cast<const char*>(&i->get_query()[0]);
-            data.u.sql.len      = i->get_query().size();
-            data.u.sql.timeval  = i->get_tstamp();
-            data.u.sql.randseed = i->get_rnd_seed();
-
-            gu_trace(apply_data (recv_ctx, apply_cb, data, seqno_g));
-
-#if 0
-            switch ((retval = apply_cb(recv_ctx, &data, seqno_g)))
-            {
-            case WSREP_OK:
-                break;
-            case WSREP_NOT_IMPLEMENTED:
-                log_warn << "bf applier returned not implemented for " << *i;
-                break;
-            default:
-                log_error << "apply failed for " << *i;
-                retval = WSREP_FATAL;
-                break;
-            }
-#endif // 0
-        }
-        break;
-    }
-
-    default:
-        gu_throw_error(EINVAL) << "Data replication level " << ws.get_level()
-                               << " not supported, seqno: " << seqno_g;
-    }
+    gu_trace(apply_data (recv_ctx, apply_cb, data, seqno_g));
 
     return;
 }
@@ -486,13 +434,6 @@ galera::TrxHandle*
 galera::ReplicatorSMM::local_conn_trx(wsrep_conn_id_t conn_id, bool create)
 {
     return wsdb_.get_conn_query(uuid_, conn_id, create);
-}
-
-
-void galera::ReplicatorSMM::set_default_context(wsrep_conn_id_t conn_id,
-                                     const void* ctx, size_t ctx_len)
-{
-    wsdb_.set_conn_database(conn_id, ctx, ctx_len);
 }
 
 

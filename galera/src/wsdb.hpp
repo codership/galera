@@ -19,14 +19,12 @@ namespace galera
             Conn(wsrep_conn_id_t conn_id)
                 :
                 conn_id_(conn_id),
-                default_db_(),
                 trx_(0)
             { }
 
             Conn(const Conn& other)
                 :
                 conn_id_(other.conn_id_),
-                default_db_(other.default_db_),
                 trx_(other.trx_)
             { }
 
@@ -43,20 +41,9 @@ namespace galera
                 return trx_;
             }
 
-            void assing_default_db(const Query& query)
-            {
-                default_db_ = query;
-            }
-
-            const Query& get_default_db() const
-            {
-                return default_db_;
-            }
-
         private:
             void operator=(const Conn&);
             wsrep_conn_id_t conn_id_;
-            Query default_db_;
             TrxHandle* trx_;
         };
 
@@ -87,10 +74,6 @@ namespace galera
         void discard_trx(wsrep_trx_id_t trx_id);
         void discard_conn(wsrep_conn_id_t conn_id);
         void discard_conn_query(wsrep_conn_id_t conn_id);
-        void set_conn_variable(TrxHandle&,
-                               const void*, size_t,
-                               const void*, size_t);
-        void set_conn_database(wsrep_conn_id_t, const void*, size_t);
         std::ostream& operator<<(std::ostream& os) const;
         Wsdb();
         ~Wsdb();

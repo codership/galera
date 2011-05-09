@@ -19,40 +19,6 @@
 
 namespace galera
 {
-    class Statement
-    {
-    public:
-
-        Statement(const void* query = 0,
-              size_t query_len = 0,
-              time_t tstamp = -1,
-              uint32_t rnd_seed = 0) :
-            query_(reinterpret_cast<const gu::byte_t*>(query),
-                   reinterpret_cast<const gu::byte_t*>(query) + query_len),
-            tstamp_(tstamp),
-            rnd_seed_(rnd_seed)
-        { }
-
-        const gu::Buffer& get_query() const { return query_; }
-        time_t get_tstamp() const { return tstamp_; }
-        uint32_t get_rnd_seed() const { return rnd_seed_; }
-    private:
-        friend size_t serialize(const Statement&, gu::byte_t*, size_t, size_t);
-        friend size_t unserialize(const gu::byte_t*, size_t, size_t, Statement&);
-        friend size_t serial_size(const Statement&);
-        gu::Buffer query_;
-        time_t tstamp_;
-        uint32_t rnd_seed_;
-    };
-
-    size_t serialize(const Statement&, gu::byte_t*, size_t, size_t);
-    size_t unserialize(const gu::byte_t*, size_t, size_t, Statement&);
-    size_t serial_size(const Statement&);
-
-    std::ostream& operator<<(std::ostream&, const Statement& q);
-
-    typedef std::deque<Statement> StatementSequence;
-
     class RowId
     {
     public:
@@ -60,14 +26,12 @@ namespace galera
         RowId(const void* table     = 0,
               uint16_t    table_len = 0,
               const void* key       = 0,
-              uint16_t    key_len   = 0,
-              gu::byte_t  action    = 0)
+              uint16_t    key_len   = 0)
             :
             table_    (table),
             key_      (key),
             table_len_(table_len),
-            key_len_  (key_len),
-            action_   (action)
+            key_len_  (key_len)
         { }
 
         const void* get_table()     const { return table_;     }
@@ -108,7 +72,6 @@ namespace galera
         const void* key_;
         uint16_t    table_len_;
         uint16_t    key_len_;
-        gu::byte_t  action_;
     };
 
     inline bool operator==(const RowId& a, const RowId& b)
@@ -131,57 +94,17 @@ namespace galera
     class WriteSet
     {
     public:
-        typedef enum
-        {
-            L_STATEMENT,
-            L_DATA
-        } Level;
-
-        typedef enum
-        {
-            A_INSERT = 0,
-            A_UPDATE = 1,
-            A_DELETE = 2
-        } Action;
-
         WriteSet()
             :
-            level_(L_STATEMENT),
-            queries_(),
-            keys_(),
-            key_refs_(),
+            row_ids_(),
+            row_id_refs_(),
             data_()
         { }
 
-        Level get_level()     const { return level_;     }
-
         const gu::Buffer& get_data() const { return data_; }
 
-        void append_query(const void* query, size_t query_len,
-                          time_t tstamp = -1,
-                          uint32_t rndseed = -1)
-        {
-            queries_.push_back(Statement(query,
-                                     query_len, tstamp, rndseed));
-        }
-
-        void prepend_query(const Statement& query)
-        {
-            queries_.push_front(query);
-        }
-
-        void append_statement(const Statement& stmt)
-        {
-            queries_.push_back(stmt);
-        }
-        void prepend_statment(const Statement& stmt)
-        {
-            queries_.push_front(stmt);
-        }
-
-        void append_row_key(const void* dbtable, size_t dbtable_len,
-                            const void* key, size_t key_len,
-                            int action);
+        void append_row_id(const void* dbtable, size_t dbtable_len,
+                           const void* key, size_t key_len);
 
 
         void append_data(const void*data, size_t data_len)
@@ -190,19 +113,16 @@ namespace galera
             data_.insert(data_.end(),
                          reinterpret_cast<const gu::byte_t*>(data),
                          reinterpret_cast<const gu::byte_t*>(data) + data_len);
-            level_ = L_DATA;
         }
 
-        void get_keys(RowIdSequence&) const;
-        const gu::Buffer& get_key_buf() const { return keys_; }
-        const StatementSequence& get_queries() const { return queries_; }
+        void get_row_ids(RowIdSequence&) const;
+        const gu::Buffer& get_key_buf() const { return row_ids_; }
         bool empty() const
         {
-            return (data_.size() == 0 && keys_.size() == 0 && queries_.size() == 0);
+            return (data_.size() == 0 && row_ids_.size() == 0);
         }
 
-        void clear() { keys_.clear(), key_refs_.clear(),
-                data_.clear(), queries_.clear(); }
+        void clear() { row_ids_.clear(), row_id_refs_.clear(), data_.clear(); }
 
     private:
 
@@ -210,24 +130,12 @@ namespace galera
         friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&);
         friend size_t serial_size(const WriteSet&);
 
-        typedef gu::UnorderedMultimap<size_t, size_t> KeyRefMap;
+        typedef gu::UnorderedMultimap<size_t, size_t> RowIdRefMap;
 
-        Level              level_;
-        StatementSequence  queries_;
-        gu::Buffer         keys_;
-        KeyRefMap          key_refs_;
+        gu::Buffer         row_ids_;
+        RowIdRefMap        row_id_refs_;
         gu::Buffer         data_;
     };
-
-    // Backwards compatible typedefs
-    // @todo Remove when other code has been fixed
-    typedef RowId RowKey;
-    typedef RowIdSequence RowKeySequence;
-    typedef RowIdHash RowKeyHash;
-    typedef Statement Query;
-    typedef StatementSequence QuerySequence;
-
-
 }
 
 

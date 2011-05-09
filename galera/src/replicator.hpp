@@ -50,8 +50,6 @@ namespace galera
 
         virtual TrxHandle* local_conn_trx(wsrep_conn_id_t conn_id,
                                           bool create) = 0;
-        virtual void set_default_context(wsrep_conn_id_t conn_id,
-                                         const void* cxt, size_t cxt_len) = 0;
         virtual void discard_local_conn_trx(wsrep_conn_id_t conn_id) = 0;
         virtual void discard_local_conn(wsrep_conn_id_t conn_id) = 0;
 

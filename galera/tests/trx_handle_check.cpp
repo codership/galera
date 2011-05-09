@@ -3,6 +3,7 @@
 //
 
 #include "trx_handle.hpp"
+#include "uuid.hpp"
 
 #include <check.h>
 
@@ -19,8 +20,6 @@ START_TEST(test_states)
     // 3) valid state changes change state
     TrxHandle* trx(new TrxHandle(uuid, -1, 1, true));
 
-    trx->append_statement("statement1", strlen("statement1"));
-    trx->append_statement("statement2", strlen("statement2"));
     log_info << *trx;
     fail_unless(trx->state() == TrxHandle::S_EXECUTING);
 
@@ -121,6 +120,38 @@ START_TEST(test_states)
 END_TEST
 
 
+START_TEST(test_serialization)
+{
+    wsrep_uuid_t uuid;
+    gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
+    TrxHandle* trx(new TrxHandle(uuid, 4567, 8910, true));
+
+    fail_unless(serial_size(*trx) == 4 + 16 + 8 + 8 + 8 + 8);
+
+    trx->set_flags(trx->flags() | TrxHandle::F_MAC_HEADER);
+
+    fail_unless(serial_size(*trx) == 4 + 16 + 8 + 8 + 8 + 8 + 2);
+
+    trx->set_flags(trx->flags() & ~TrxHandle::F_MAC_HEADER);
+
+    fail_unless(serial_size(*trx) == 4 + 16 + 8 + 8 + 8 + 8);
+
+
+    TrxHandle* trx2(new TrxHandle());
+
+    std::vector<gu::byte_t> buf(serial_size(*trx));
+    fail_unless(serialize(*trx, &buf[0], buf.size(), 0) > 0);
+    fail_unless(unserialize(&buf[0], buf.size(), 0, *trx2) > 0);
+
+    trx->set_flags(trx->flags() | TrxHandle::F_MAC_PAYLOAD);
+    buf.resize(serial_size(*trx));
+    fail_unless(serialize(*trx, &buf[0], buf.size(), 0) > 0);
+    fail_unless(unserialize(&buf[0], buf.size(), 0, *trx2) > 0);
+
+    trx2->unref();
+    trx->unref();
+}
+END_TEST
 
 Suite* trx_handle_suite()
 {
@@ -129,6 +160,11 @@ Suite* trx_handle_suite()
 
     tc = tcase_create("test_states");
     tcase_add_test(tc, test_states);
+    suite_add_tcase(s, tc);
+
+
+    tc = tcase_create("test_serialization");
+    tcase_add_test(tc, test_serialization);
     suite_add_tcase(s, tc);
 
     return s;

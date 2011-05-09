@@ -18,19 +18,19 @@
 namespace galera
 {
 
-    class RowKeyEntry
+    class RowIdEntry
     {
     public:
-        RowKeyEntry(const RowKey& row_key);
-        ~RowKeyEntry();
-        RowKey get_row_key() const;
+        RowIdEntry(const RowId& row_key);
+        ~RowIdEntry();
+        RowId get_row_id() const;
         void ref(TrxHandle* trx);
         void unref(TrxHandle* trx);
         TrxHandle* get_ref_trx() const;
     private:
-        RowKeyEntry(const RowKeyEntry& other);
-        void operator=(const RowKeyEntry&);
-        gu::byte_t* row_key_buf_;
+        RowIdEntry(const RowIdEntry& other);
+        void operator=(const RowIdEntry&);
+        gu::byte_t* row_id_buf_;
         TrxHandle* ref_trx_;
     };
 
@@ -38,7 +38,7 @@ namespace galera
     {
     private:
 
-        typedef gu::UnorderedMap<RowKey, RowKeyEntry*, RowKeyHash> CertIndex;
+        typedef gu::UnorderedMap<RowId, RowIdEntry*, RowIdHash> CertIndex;
 
         class DiscardRK
         {

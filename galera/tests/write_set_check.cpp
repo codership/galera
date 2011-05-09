@@ -17,52 +17,9 @@ using namespace std;
 using namespace gu;
 using namespace galera;
 
-START_TEST(test_query_sequence)
-{
-    StatementSequence qs;
-
-    Statement q1("foo", 3), q2("foobar", 6);
-    size_t q1s(serial_size(q1));
-    size_t q2s(serial_size(q2));
-
-    fail_unless(q1s == 19);
-    fail_unless(q2s == 22);
-
-    qs.push_back(q1);
-    size_t s1 = serial_size<StatementSequence::const_iterator, uint16_t>(
-        qs.begin(), qs.end());
-
-    fail_unless(s1 == q1s + 2, "%zd <-> %zd", s1, q1s + 2);
-    qs.push_back(q2);
-    size_t s2 = serial_size<StatementSequence::const_iterator, uint32_t>(
-        qs.begin(), qs.end());
-    fail_unless(s2 == q1s + q2s + 4, "%zd <-> %zd", s2, q1s + q2s + 4);
-
-    log_info << "1";
-    gu::Buffer buf(s2);
-    size_t ret = serialize<StatementSequence::const_iterator, uint32_t>(
-        qs.begin(), qs.end(), &buf[0], buf.size(), 0);
-    fail_unless(ret == buf.size());
-
-    log_info << "2";
-    StatementSequence qs2;
-
-    size_t ret2 = unserialize<Statement, uint32_t>(
-        &buf[0], buf.size(), 0, back_inserter(qs2));
-
-    fail_unless(ret2 == buf.size());
-
-}
-END_TEST
-
 START_TEST(test_write_set)
 {
     WriteSet ws;
-
-    const char* query1 = "select 0";
-    size_t query1_len = strlen(query1);
-    const char* query2 = "insert into foo";
-    size_t query2_len = strlen(query2);
 
     const char* dbtable1 = "dbt\0t1";
     size_t dbtable1_len = 6;
@@ -77,39 +34,26 @@ START_TEST(test_write_set)
     const char* rbr = "rbrbuf";
     size_t rbr_len = 6;
 
-    log_info << "q0 " << serial_size(ws);
-    ws.append_query(query1, query1_len);
-    log_info << "q1 " << serial_size(ws);
-    ws.append_query(query2, query2_len);
-    log_info << "q2 " << serial_size(ws);
-
     log_info << "ws0 " << serial_size(ws);
-    ws.append_row_key(dbtable1, dbtable1_len, key1, key1_len, WriteSet::A_INSERT);
+    ws.append_row_id(dbtable1, dbtable1_len, key1, key1_len);
     log_info << "ws1 " << serial_size(ws);
-    ws.append_row_key(dbtable2, dbtable2_len, key2, key2_len, WriteSet::A_UPDATE);
+    ws.append_row_id(dbtable2, dbtable2_len, key2, key2_len);
     log_info << "ws2 " << serial_size(ws);
 
-    fail_unless(ws.get_level() == WriteSet::L_STATEMENT);
     ws.append_data(rbr, rbr_len);
 
     gu::Buffer rbrbuf(rbr, rbr + rbr_len);
     log_info << "rbrlen " << serial_size<uint32_t>(rbrbuf);
     log_info << "wsrbr " << serial_size(ws);
 
-    fail_unless(ws.get_level() == WriteSet::L_DATA);
-
     gu::Buffer buf(serial_size(ws));
 
     serialize(ws, &buf[0], buf.size(), 0);
 
     size_t expected_size =
-        4 // hdr
-        + 4 // query sequence size
-        + 16 + query1_len // query1
-        + 16 + query2_len // query2
-        + 4 // row key sequence size
-        + 2 + 6 + 2 + 3 + 1 // key1
-        + 2 + 6 + 2 + 4 + 1 // key2
+        4 // row key sequence size
+        + 2 + 6 + 2 + 3 // key1
+        + 2 + 6 + 2 + 4 // key2
         + 4 + 6; // rbr
     fail_unless(buf.size() == expected_size, "%zd <-> %zd <-> %zd",
                 buf.size(), expected_size, serial_size(ws));
@@ -119,21 +63,12 @@ START_TEST(test_write_set)
 
     size_t ret = unserialize(&buf[0], buf.size(), 0, ws2);
     fail_unless(ret == expected_size);
-    fail_unless(ws2.get_level() == ws.get_level());
-    fail_unless(ws2.get_queries().size() == 2);
-    for (size_t i = 0; i < 2; ++i)
-    {
-        fail_unless(ws.get_queries()[i].get_query() ==
-                    ws2.get_queries()[i].get_query());
-        const gu::Buffer& q(ws.get_queries()[i].get_query());
-        log_info << string(&q[0], &q[0] + q.size());
-    }
 
-    RowKeySequence rks;
-    ws.get_keys(rks);
+    RowIdSequence rks;
+    ws.get_row_ids(rks);
 
-    RowKeySequence rks2;
-    ws.get_keys(rks2);
+    RowIdSequence rks2;
+    ws.get_row_ids(rks2);
 
     fail_unless(rks2 == rks);
 
@@ -208,7 +143,7 @@ START_TEST(test_cert)
     {
         TrxHandle* trx(new TrxHandle(uuid, i, i + 1, true));
         trx->append_row_id(wss[i].dbtable, wss[i].dbtable_len,
-                           wss[i].rk, wss[i].rk_len, WriteSet::A_UPDATE);
+                           wss[i].rk, wss[i].rk_len);
         trx->flush(0);
         string data("foobardata");
         trx->append_data(data.c_str(), data.size());
@@ -257,7 +192,7 @@ START_TEST(test_cert_iso)
 
 
     TrxHandle* trx(new TrxHandle(uuid, 0, 1, true));
-    trx->append_row_id("foo", strlen("foo"), "1", 1, WriteSet::A_UPDATE);
+    trx->append_row_id("foo", strlen("foo"), "1", 1);
     trx->set_last_seen_seqno(0);
     trx->set_flags(TrxHandle::F_COMMIT);
     trx->flush(0);
@@ -280,7 +215,7 @@ START_TEST(test_cert_iso)
     trx->unref();
 
     trx = new TrxHandle(uuid, 2, 3, true);
-    trx->append_row_id("foo", strlen("foo"), "3", 1, WriteSet::A_UPDATE);
+    trx->append_row_id("foo", strlen("foo"), "3", 1);
     trx->set_last_seen_seqno(0);
     trx->set_flags(TrxHandle::F_COMMIT);
     trx->flush(0);
@@ -296,7 +231,7 @@ START_TEST(test_cert_iso)
     trx->unref();
 
     trx = new TrxHandle(uuid, 3, 4, true);
-    trx->append_row_id("foo", strlen("foo"), "1", 1, WriteSet::A_UPDATE);
+    trx->append_row_id("foo", strlen("foo"), "1", 1);
     trx->set_last_seen_seqno(0);
     trx->set_flags(TrxHandle::F_COMMIT);
     trx->flush(0);
@@ -315,10 +250,6 @@ Suite* write_set_suite()
 {
     Suite* s = suite_create("write_set");
     TCase* tc;
-
-    tc = tcase_create("test_query_sequence");
-    tcase_add_test(tc, test_query_sequence);
-    suite_add_tcase(s, tc);
 
     tc = tcase_create("test_write_set");
     tcase_add_test(tc, test_write_set);
