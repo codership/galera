@@ -297,7 +297,7 @@ namespace galera
         bool                   certified_;
         bool                   committed_;
         long                   gcs_handle_;
-        long long              timestamp_;
+        int64_t                timestamp_;
         Mac                    mac_;
 
         //

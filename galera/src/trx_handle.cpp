@@ -168,7 +168,7 @@ size_t galera::serialize(const TrxHandle& trx, gu::byte_t* buf,
     offset = serialize(trx.conn_id_, buf, buflen, offset);
     offset = serialize(trx.trx_id_, buf, buflen, offset);
     offset = serialize(trx.last_seen_seqno_, buf, buflen, offset);
-    offset = serialize<int64_t>(trx.timestamp_, buf, buflen, offset);
+    offset = serialize(trx.timestamp_, buf, buflen, offset);
     if (TrxHandle::has_mac(trx.write_set_flags_) == true)
     {
         offset = serialize(trx.mac_, buf, buflen, offset);
@@ -193,7 +193,7 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
         offset = unserialize(buf, buflen, offset, trx.conn_id_);
         offset = unserialize(buf, buflen, offset, trx.trx_id_);
         offset = unserialize(buf, buflen, offset, trx.last_seen_seqno_);
-        offset = unserialize<int64_t>(buf, buflen, offset, trx.timestamp_);
+        offset = unserialize(buf, buflen, offset, trx.timestamp_);
         if (TrxHandle::has_mac(trx.write_set_flags_) == true)
         {
             offset = unserialize(buf, buflen, offset, trx.mac_);
@@ -224,7 +224,7 @@ size_t galera::serial_size(const TrxHandle& trx)
             + serial_size(trx.conn_id_)
             + serial_size(trx.trx_id_)
             + serial_size(trx.last_seen_seqno_)
-            + serial_size(static_cast<uint64_t>(trx.timestamp_))
+            + serial_size(trx.timestamp_)
             + (TrxHandle::has_mac(trx.write_set_flags_) == true ?
                serial_size(trx.mac_) : 0));
 }
