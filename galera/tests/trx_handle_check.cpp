@@ -129,13 +129,16 @@ START_TEST(test_serialization)
     fail_unless(serial_size(*trx) == 4 + 16 + 8 + 8 + 8 + 8);
 
     trx->set_flags(trx->flags() | TrxHandle::F_MAC_HEADER);
-
     fail_unless(serial_size(*trx) == 4 + 16 + 8 + 8 + 8 + 8 + 2);
-
     trx->set_flags(trx->flags() & ~TrxHandle::F_MAC_HEADER);
-
     fail_unless(serial_size(*trx) == 4 + 16 + 8 + 8 + 8 + 8);
 
+    trx->append_annotation(reinterpret_cast<const gu::byte_t*>("foobar"),
+                           strlen("foobar"));
+    trx->set_flags(trx->flags() | TrxHandle::F_ANNOTATION);
+    fail_unless(serial_size(*trx) == 4 + 16 + 8 + 8 + 8 + 8 + 4 + 6);
+    trx->set_flags(trx->flags() & ~TrxHandle::F_ANNOTATION);
+    fail_unless(serial_size(*trx) == 4 + 16 + 8 + 8 + 8 + 8);
 
     TrxHandle* trx2(new TrxHandle());
 
@@ -147,6 +150,12 @@ START_TEST(test_serialization)
     buf.resize(serial_size(*trx));
     fail_unless(serialize(*trx, &buf[0], buf.size(), 0) > 0);
     fail_unless(unserialize(&buf[0], buf.size(), 0, *trx2) > 0);
+
+    trx->set_flags(trx->flags() | TrxHandle::F_ANNOTATION);
+    buf.resize(serial_size(*trx));
+    fail_unless(serialize(*trx, &buf[0], buf.size(), 0) > 0);
+    fail_unless(unserialize(&buf[0], buf.size(), 0, *trx2) > 0);
+    fail_unless(serial_size(*trx2) == serial_size(*trx));
 
     trx2->unref();
     trx->unref();
