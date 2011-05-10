@@ -33,12 +33,18 @@ namespace galera
             F_ROLLBACK    = 1 << 1,
             F_OOC         = 1 << 2,
             F_MAC_HEADER  = 1 << 3,
-            F_MAC_PAYLOAD = 1 << 4
+            F_MAC_PAYLOAD = 1 << 4,
+            F_ANNOTATION  = 1 << 5
         };
 
         static inline bool has_mac(int flags)
         {
             return ((flags & (F_MAC_HEADER | F_MAC_PAYLOAD)) != 0);
+        }
+
+        static inline bool has_annotation(int flags)
+        {
+            return ((flags & F_ANNOTATION) != 0);
         }
 
         typedef enum
@@ -136,6 +142,7 @@ namespace galera
             action_            (0),
             timestamp_         (gu_time_calendar()),
             mac_               (),
+            annotation_        (),
             cert_keys_         ()
         { }
 
@@ -210,6 +217,18 @@ namespace galera
         {
             write_set_.append_data(data, data_len);
         }
+
+
+        static const size_t max_annotation_size_ = (1 << 16);
+
+        void append_annotation(const gu::byte_t* buf, size_t buf_len)
+        {
+            buf_len = std::min(buf_len,
+                               max_annotation_size_ - annotation_.size());
+            annotation_.insert(annotation_.end(), buf, buf + buf_len);
+        }
+
+        const gu::Buffer& annotation() const { return annotation_; }
 
         const WriteSet& write_set() const { return write_set_; }
 
@@ -307,6 +326,7 @@ namespace galera
         void*                  action_;
         int64_t                timestamp_;
         Mac                    mac_;
+        gu::Buffer             annotation_;
 
         //
         friend class Wsdb;
