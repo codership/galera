@@ -305,7 +305,7 @@ namespace galera
         bool                   committed_;
         long                   gcs_handle_;
         void*                  action_;
-        long long              timestamp_;
+        int64_t                timestamp_;
         Mac                    mac_;
 
         //
