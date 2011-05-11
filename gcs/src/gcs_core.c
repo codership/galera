@@ -507,8 +507,7 @@ core_handle_act_msg (gcs_core_t*          core,
             }
 
             if (gu_unlikely(GCS_ACT_STATE_REQ == act->act.type && ret > 0)) {
-                ret = gcs_group_handle_state_request (group, msg->sender_idx,
-                                                      act);
+                ret = gcs_group_handle_state_request (group, act);
                 assert (ret <= 0 || ret == act->act.buf_len);
             }
 //          gu_debug ("Received action: seqno: %lld, sender: %d, size: %d, "
@@ -1166,25 +1165,32 @@ gcs_core_send_fc (gcs_core_t* core, const void* fc, size_t fc_size)
 gcs_seqno_t
 gcs_core_caused(gcs_core_t* core)
 {
-    long ret;
-    gcs_seqno_t act_id = GCS_SEQNO_ILL;
-    gu_mutex_t mtx;
-    gu_cond_t  cond;
+    long         ret;
+    gcs_seqno_t  act_id = GCS_SEQNO_ILL;
+    gu_mutex_t   mtx;
+    gu_cond_t    cond;
     causal_act_t act = {&act_id, &mtx, &cond};
-    gu_mutex_init(&mtx, NULL);
-    gu_cond_init(&cond, NULL);
-    gu_mutex_lock(&mtx);
-    ret = core_msg_send_retry(core, &act, sizeof(act), GCS_MSG_CAUSAL);
-    if (ret == sizeof(act))
+
+    gu_mutex_init (&mtx, NULL);
+    gu_cond_init  (&cond, NULL);
+    gu_mutex_lock (&mtx);
     {
-        gu_cond_wait(&cond, &mtx);
+        ret = core_msg_send_retry (core, &act, sizeof(act), GCS_MSG_CAUSAL);
+
+        if (ret == sizeof(act))
+        {
+            gu_cond_wait (&cond, &mtx);
+        }
+        else
+        {
+            assert (ret < 0);
+            act_id = ret;
+        }
     }
-    else
-    {
-        assert(ret < 0);
-        act_id = ret;
-    }
-    gu_mutex_unlock(&mtx);
+    gu_mutex_unlock  (&mtx);
+    gu_mutex_destroy (&mtx);
+    gu_cond_destroy  (&cond);
+
     return act_id;
 }
 

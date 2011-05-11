@@ -52,9 +52,10 @@ typedef struct gcs_group
     bool          frag_reset;   // indicate that fragmentation was reset
     gcs_node_t*   nodes;        // array of node contexts
 
-    gu_uuid_t       prim_uuid;
-    gu_seqno_t      prim_seqno;
-    long            prim_num;
+    /* values from the last primary component */
+    gu_uuid_t        prim_uuid;
+    gu_seqno_t       prim_seqno;
+    long             prim_num;
     gcs_node_state_t prim_state;
 }
 gcs_group_t;
@@ -116,9 +117,9 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
 extern long
 gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg);
 
+/*! @return 0 if request is ignored, request size if it should be passed up */
 extern long
 gcs_group_handle_state_request (gcs_group_t*         group,
-                                long                 joiner_idx,
                                 struct gcs_act_rcvd* act);
 /*!
  * Handles action message. Is called often - therefore, inlined

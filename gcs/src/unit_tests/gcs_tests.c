@@ -17,6 +17,7 @@
 #include "gcs_proto_test.h"
 #include "gcs_defrag_test.h"
 #include "gcs_node_test.h"
+#include "gcs_memb_test.h"
 #include "gcs_group_test.h"
 #include "gcs_backend_test.h"
 #include "gcs_core_test.h"
@@ -33,6 +34,7 @@ static suite_creator_t suites[] =
 	gcs_proto_suite,
 	gcs_defrag_suite,
 	gcs_node_suite,
+	gcs_memb_suite,
 //	gcs_group_suite,
 	gcs_backend_suite,
 	gcs_core_suite,

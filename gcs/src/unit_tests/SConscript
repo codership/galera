@@ -22,6 +22,7 @@ gcs_tests_sources = Split('''
                              gcs_node_test.c
                              ../gcs_node.c
                              gcs_group_test.c
+                             gcs_memb_test.c
                              ../gcs_group.c
                              gcs_core_test.c
                              ../gcs_core.c

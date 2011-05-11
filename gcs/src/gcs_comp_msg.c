@@ -31,9 +31,9 @@ gcs_comp_msg_new (bool prim, long my_idx, long memb_num)
     ret = gu_calloc (1, comp_msg_size(memb_num));
 
     if (NULL != ret) {
-	ret->primary  = prim;
-	ret->my_idx   = my_idx;
-	ret->memb_num = memb_num;
+        ret->primary  = prim;
+        ret->my_idx   = my_idx;
+        ret->memb_num = memb_num;
     }
 
     return ret;
@@ -76,18 +76,19 @@ gcs_comp_msg_add (gcs_comp_msg_t* comp, const char* id)
     if (!id_len) return -EINVAL;
     if (id_len > GCS_COMP_MEMB_ID_MAX_LEN) return -ENAMETOOLONG;
 
-    /* find the free id slot */
+    long free_slot = -1;
+
+    /* find the free id slot and check for id uniqueness */
     for (i = 0; i < comp->memb_num; i++) {
-	if (0 == comp->memb[i].id[0]) break;
-	/* check for id uniqueness */
-	if (0 == strcmp (comp->memb[i].id, id))
-	    return -ENOTUNIQ;
+        if (0 == comp->memb[i].id[0] && free_slot < 0) free_slot = i;
+        if (0 == strcmp (comp->memb[i].id, id)) return -ENOTUNIQ;
     }
-    if (i == comp->memb_num) return -1;
 
-    memcpy (comp->memb[i].id, id, id_len);
+    if (free_slot < 0) return -1;
 
-    return i;
+    memcpy (comp->memb[free_slot].id, id, id_len);
+
+    return free_slot;
 }
 
 /*! Creates a copy of the component message */
@@ -107,9 +108,9 @@ const char*
 gcs_comp_msg_id (const gcs_comp_msg_t* comp, long idx)
 {
     if (0 <= idx && idx < comp->memb_num)
-	return comp->memb[idx].id;
+        return comp->memb[idx].id;
     else
-	return NULL;
+        return NULL;
 }
 
 /*! Returns member index by ID, -1 if none */
@@ -120,13 +121,13 @@ gcs_comp_msg_idx (const gcs_comp_msg_t* comp, const char* id)
     long   idx = comp->memb_num;
 
     if (id_len > 0 && id_len <= GCS_COMP_MEMB_ID_MAX_LEN)
-	for (idx = 0; idx < comp->memb_num; idx++)
-	    if (0 == strcmp (comp->memb[idx].id, id)) break;
+        for (idx = 0; idx < comp->memb_num; idx++)
+            if (0 == strcmp (comp->memb[idx].id, id)) break;
 
     if (comp->memb_num == idx)
-	return -1;
+        return -1;
     else
-	return idx;
+        return idx;
 }
 
 /*! Returns primary status of the component */

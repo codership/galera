@@ -28,7 +28,7 @@ typedef struct gcs_comp_msg
     bool            primary;   /// 1 if we have a quorum, 0 if not
     long            my_idx;    /// this node's index in membership
     long            memb_num;  /// number of members in configuration
-    gcs_comp_memb_t memb[];   /// member array
+    gcs_comp_memb_t memb[];    /// member array
 }
 gcs_comp_msg_t;
 
