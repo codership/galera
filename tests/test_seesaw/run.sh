@@ -34,7 +34,7 @@ trap terminate SIGINT SIGTERM SIGHUP SIGPIPE
 
 trap "kill $sqlgen_pid" EXIT
 
-pause
+pause 5 5
 consistency_check $sqlgen_pid
 
 # kills a node and restarts it after a while

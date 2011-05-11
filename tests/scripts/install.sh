@@ -18,8 +18,9 @@ copy_config()
 
     case $DBMS in
     MYSQL)
-        cnf="${NODE_MY_CNF[$node]}"
-        cnf_dir="${NODE_TEST_DIR[$node]}/mysql/etc"
+        common_cnf="$COMMON_MY_CNF"
+        cnf_src="${NODE_MY_CNF[$node]}"
+        cnf_dst="${NODE_TEST_DIR[$node]}/mysql/etc/my.cnf"
         ;;
     PGSQL|*)
         echo "Unsupported DBMS: '$DBMS'" >&2
@@ -27,15 +28,16 @@ copy_config()
         ;;
     esac
 
-    if [ -n "$cnf" ]
+    if [ -n "$common_cnf" ] || [ -n "$cnf_src" ]
     then
-        local -r location="${NODE_LOCATION[$node]}"
-
-        if [ "$location" == "local" ]
+        if [ "${NODE_LOCATION[$node]}" == "local" ]
         then
-            cp "$cnf" "$cnf_dir/my.cnf"
+            ([ -n "$common_cnf" ] && cat "$common_cnf" && \
+             [ -n "$cnf_src" ]    && cat "$cnf_src") > "$cnf_dst"
         else
-            cat "$cnf" | ssh $location "cat > $cnf_dir/my.cnf"
+            ([ -n "$common_cnf" ] && cat "$common_cnf" && \
+             [ -n "$cnf_src" ]    && cat "$cnf_src")    | \
+            ssh ${NODE_LOCATION[$node]} "cat > $cnf_dst"
         fi
     fi
 }
