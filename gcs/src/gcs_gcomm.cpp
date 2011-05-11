@@ -497,7 +497,7 @@ static GCS_BACKEND_SEND_FN(gcomm_send)
 
 
 static void fill_cmp_msg(const View& view, const UUID& my_uuid,
-                         gcs_comp_msg_t* cm)
+                         gcs_comp_msg_t* cm) throw (gu::Exception)
 {
     size_t n(0);
 
@@ -508,8 +508,13 @@ static void fill_cmp_msg(const View& view, const UUID& my_uuid,
 
         log_debug << "member: " << n << " uuid: " << uuid;
 
-        (void)snprintf(cm->memb[n].id, GCS_COMP_MEMB_ID_MAX_LEN, "%s",
-                       uuid._str().c_str());
+//        (void)snprintf(cm->memb[n].id, GCS_COMP_MEMB_ID_MAX_LEN, "%s",
+//                       uuid._str().c_str());
+        long ret = gcs_comp_msg_add (cm, uuid._str().c_str());
+        if (ret < 0) {
+            gu_throw_error(-ret) << "Failed to add member '" << uuid
+                                 << "' to component message.";
+        }
 
         if (uuid == my_uuid)
         {

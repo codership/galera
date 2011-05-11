@@ -560,7 +560,7 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 long
 gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 {
-    long        sender_idx = msg->sender_idx;
+    long const  sender_idx = msg->sender_idx;
     gcs_node_t* sender     = &group->nodes[sender_idx];
 
     assert (GCS_MSG_JOIN == msg->type);
@@ -608,12 +608,7 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         if (j == group->num) {
             gu_warn ("Could not find peer: %s", peer_id);
         }
-#if 0 // the meaning of this code is lost in time
-        else if (GCS_NODE_STATE_DONOR  == sender->status) {
-            // donor is done with the job and is no longer need
-            memcpy (peer->donor, group_empty_id, sizeof (group_empty_id));
-        }
-#endif
+
         if (seqno < 0) {
             gu_warn ("%ld (%s): State transfer %s %ld (%s) failed: %d (%s)",
                      sender_idx, sender->name, st_dir, peer_idx, peer_name,
@@ -731,7 +726,8 @@ group_find_node_by_state (gcs_group_t* group, gcs_node_state_t status)
  *         -EAGAIN       if there were no nodes in the proper state.
  */
 static long
-group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
+group_select_donor (gcs_group_t* group, long const joiner_idx,
+                    const char* const donor_name)
 {
     static gcs_node_state_t const min_donor_state = GCS_NODE_STATE_SYNCED;
 
@@ -747,12 +743,12 @@ group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
     }
 
     if (donor_idx >= 0) {
-        gcs_node_t* joiner = &group->nodes[joiner_idx];
-        gcs_node_t* donor  = &group->nodes[donor_idx];
+        gcs_node_t* const joiner = &group->nodes[joiner_idx];
+        gcs_node_t* const donor  = &group->nodes[donor_idx];
 
         assert(donor_idx != joiner_idx);
 
-        gu_info ("Node %ld (%s) requested State Transfer from '%s'. "
+        gu_info ("Node %ld (%s) requested state transfer from '%s'. "
                  "Selected %ld (%s)(%s) as donor.",
                  joiner_idx, joiner->name, required_donor ? donor_name :"*any*",
                  donor_idx, donor->name, gcs_node_state_to_str(donor->status));
@@ -765,7 +761,7 @@ group_select_donor (gcs_group_t* group, long joiner_idx, const char* donor_name)
     }
     else {
 #if 0
-        gu_warn ("Node %ld (%s) requested State Transfer from '%s', "
+        gu_warn ("Node %ld (%s) requested state transfer from '%s', "
                  "but it is impossible to select State Transfer donor: %s",
                  joiner_idx, group->nodes[joiner_idx].name,
                  required_donor ? donor_name : "*any*", strerror (-donor_idx));
@@ -792,13 +788,13 @@ gcs_group_ignore_action (struct gcs_act_rcvd* act)
 /*! Returns 0 if request is ignored, request size if it should be passed up */
 long
 gcs_group_handle_state_request (gcs_group_t*         group,
-                                long                 joiner_idx,
                                 struct gcs_act_rcvd* act)
 {
     // pass only to sender and to one potential donor
     const char*      donor_name     = act->act.buf;
     size_t           donor_name_len = strlen(donor_name);
     long             donor_idx      = -1;
+    long const       joiner_idx     = act->sender_idx;
     const char*      joiner_name    = group->nodes[joiner_idx].name;
     gcs_node_state_t joiner_status  = group->nodes[joiner_idx].status;
 

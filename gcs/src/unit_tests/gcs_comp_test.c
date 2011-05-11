@@ -33,7 +33,7 @@ static char long_id[] =
 
 static void
 check_msg_identity (const gcs_comp_msg_t* m,
-		    const gcs_comp_msg_t* n)
+                    const gcs_comp_msg_t* n)
 {
     long i;
 
@@ -41,13 +41,13 @@ check_msg_identity (const gcs_comp_msg_t* m,
     fail_if (n->my_idx   != m->my_idx);
     fail_if (n->memb_num != m->memb_num);
     for (i = 0; i < m->memb_num; i++) {
-	fail_if (strlen(n->memb[i].id) != strlen(m->memb[i].id),
-		 "member %d id len does not match: %d vs %d",
-		 i, strlen(n->memb[i].id), strlen(m->memb[i].id));
-	fail_if (strncmp (n->memb[i].id, m->memb[i].id,
-			  GCS_COMP_MEMB_ID_MAX_LEN),
-		 "member %d IDs don't not match: got '%s', should be '%s'",
-		 i, members[i], m->memb[i].id);
+        fail_if (strlen(n->memb[i].id) != strlen(m->memb[i].id),
+                 "member %d id len does not match: %d vs %d",
+                 i, strlen(n->memb[i].id), strlen(m->memb[i].id));
+        fail_if (strncmp (n->memb[i].id, m->memb[i].id,
+                          GCS_COMP_MEMB_ID_MAX_LEN),
+                 "member %d IDs don't not match: got '%s', should be '%s'",
+                 i, members[i], m->memb[i].id);
     }
 }
 
@@ -62,7 +62,6 @@ START_TEST (gcs_comp_test)
     char   buf[buf_len];
     long i, j;
     long ret;
-    
 
     fail_if (NULL == m);
     fail_if (memb_num != gcs_comp_msg_num  (m));
@@ -70,35 +69,42 @@ START_TEST (gcs_comp_test)
 
     // add members except for the last
     for (i = 0; i < memb_num - 1; i++) {
-	ret = gcs_comp_msg_add (m, members[i]);
-	fail_if (ret != i, "gcs_comp_msg_add() returned %d, expected %d",
-		 ret, i);
+        ret = gcs_comp_msg_add (m, members[i]);
+        fail_if (ret != i, "gcs_comp_msg_add() returned %d, expected %d",
+                 ret, i);
     }
 
     // try to add a id that was added already
     if (my_idx < i) {
-	j = my_idx;
+        j = my_idx;
     } else {
-	j = i - 1;
+        j = i - 1;
     }
     ret = gcs_comp_msg_add (m, members[j]);
     fail_if (ret != -ENOTUNIQ, "gcs_comp_msg_add() returned %d, expected "
-	     "-ENOTUNIQ (%d)", ret, -ENOTUNIQ);
+             "-ENOTUNIQ (%d)", ret, -ENOTUNIQ);
 
     // try to add empty id
     ret = gcs_comp_msg_add (m, "");
     fail_if (ret != -EINVAL, "gcs_comp_msg_add() returned %d, expected "
-	     "-EINVAL (%d)", ret, -EINVAL);
+             "-EINVAL (%d)", ret, -EINVAL);
 
     // try to add id that is too long
     ret = gcs_comp_msg_add (m, long_id);
     fail_if (ret != -ENAMETOOLONG, "gcs_comp_msg_add() returned %d, expected "
-	     "-ENAMETOOLONG (%d)", ret, -ENAMETOOLONG);
+             "-ENAMETOOLONG (%d)", ret, -ENAMETOOLONG);
 
     // add final id
     ret = gcs_comp_msg_add (m, members[i]);
     fail_if (ret != i, "gcs_comp_msg_add() returned %d, expected %d",
-	     ret, i);
+             ret, i);
+
+    // check that all added correctly
+    for (i = 0; i < memb_num; i++) {
+        const char* const id = gcs_comp_msg_id (m, i);
+        fail_if (strcmp (members[i], id),
+                 "Memeber %ld (%s) recorded as %s", i, members[i], id);
+    }
 
     // check that memcpy preserves the message
     // (it can be treated just as a byte array)
@@ -117,9 +123,9 @@ START_TEST (gcs_comp_test)
     // test gcs_comp_msg_id()
     fail_unless (NULL == gcs_comp_msg_id (n, -1));
     for (i = 0; i < memb_num; i++) {
-	const char* id = gcs_comp_msg_id (n, i);
-	fail_if (NULL == id);
-	fail_if (strcmp(members[i], id));
+        const char* id = gcs_comp_msg_id (n, i);
+        fail_if (NULL == id);
+        fail_if (strcmp(members[i], id));
     }
     fail_unless (NULL == gcs_comp_msg_id (n, i));
 
@@ -127,7 +133,7 @@ START_TEST (gcs_comp_test)
     fail_if (-1 != gcs_comp_msg_idx (n, ""));
     fail_if (-1 != gcs_comp_msg_idx (n, long_id));
     for (i = 0; i < memb_num; i++)
-	fail_if (i != gcs_comp_msg_idx (n, members[i]));
+        fail_if (i != gcs_comp_msg_idx (n, members[i]));
 
     // test gcs_comp_msg_primary()
     fail_if (n->primary != gcs_comp_msg_primary(n));
