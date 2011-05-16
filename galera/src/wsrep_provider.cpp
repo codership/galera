@@ -13,6 +13,7 @@
 
 #include <cassert>
 
+using galera::Key;
 using galera::WriteSet;
 using galera::TrxHandle;
 using galera::TrxHandleLock;
@@ -421,7 +422,11 @@ wsrep_status_t galera_append_row_key(wsrep_t*            gh,
     try
     {
         TrxHandleLock lock(*trx);
-        trx->append_row_id(dbtable, dbtable_len, key, key_len);
+        struct iovec iov[2] = {
+            {galera::void_cast(dbtable), dbtable_len},
+            {galera::void_cast(key)    , key_len}
+        };
+        trx->append_key(galera::Key(iov, 2));
         retval = WSREP_OK;
     }
     catch (std::exception& e)
@@ -556,8 +561,9 @@ wsrep_status_t galera_to_execute_start(wsrep_t*        gh,
     try
     {
         TrxHandleLock lock(*trx);
+        trx->append_key(Key(reinterpret_cast<struct iovec*>(0), 0));
         trx->append_data(query, query_len);
-        trx->set_flags(TrxHandle::F_COMMIT);
+        trx->set_flags(TrxHandle::F_COMMIT | TrxHandle::F_ISOLATION);
 
         retval = repl->replicate(trx);
 

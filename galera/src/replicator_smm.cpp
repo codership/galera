@@ -1034,7 +1034,15 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
     switch (retval)
     {
     case WSREP_OK:
-        gu_trace(apply_trx(recv_ctx, trx));
+        try
+        {
+            gu_trace(apply_trx(recv_ctx, trx));
+        }
+        catch (...)
+        {
+            log_fatal << "failed to apply trx: " << *trx;
+            throw;
+        }
         break;
     case WSREP_TRX_FAIL:
         // certification failed, apply monitor has been canceled
