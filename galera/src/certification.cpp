@@ -10,45 +10,48 @@
 
 #include <map>
 
-using namespace std;
-using namespace gu;
+static const bool cert_debug_on(false);
+#define cert_debug                              \
+    if (cert_debug_on == false) { }             \
+    else log_debug << "cert debug: "
 
-inline galera::RowIdEntry::RowIdEntry(
-    const RowId& row_id)
+
+inline galera::KeyEntry::KeyEntry(
+    const Key& key)
     :
-    row_id_buf_(0),
+    key_buf_(0),
     ref_trx_(0)
 {
-    const size_t ss(serial_size(row_id));
-    row_id_buf_ = new gu::byte_t[sizeof(uint32_t) + ss];
-    *reinterpret_cast<uint32_t*>(row_id_buf_) = ss;
-    (void)serialize(row_id, row_id_buf_ + sizeof(uint32_t), ss, 0);
+    const size_t ss(serial_size(key));
+    key_buf_ = new gu::byte_t[sizeof(uint32_t) + ss];
+    *reinterpret_cast<uint32_t*>(key_buf_) = ss;
+    (void)serialize(key, key_buf_ + sizeof(uint32_t), ss, 0);
 }
 
-inline galera::RowIdEntry::~RowIdEntry()
+inline galera::KeyEntry::~KeyEntry()
 {
-    delete[] row_id_buf_;
+    delete[] key_buf_;
 }
 
-inline galera::RowId
-galera::RowIdEntry::get_row_id() const
+inline galera::Key
+galera::KeyEntry::get_key() const
 {
-    RowId rk;
-    uint32_t ss(*reinterpret_cast<uint32_t*>(row_id_buf_));
-    (void)unserialize(row_id_buf_ + sizeof(uint32_t), ss, 0, rk);
+    Key rk;
+    uint32_t ss(*reinterpret_cast<uint32_t*>(key_buf_));
+    (void)unserialize(key_buf_ + sizeof(uint32_t), ss, 0, rk);
     return rk;
 }
 
 
 inline galera::TrxHandle*
-galera::RowIdEntry::get_ref_trx() const
+galera::KeyEntry::get_ref_trx() const
 {
     return ref_trx_;
 }
 
 
 inline void
-galera::RowIdEntry::ref(TrxHandle* trx)
+galera::KeyEntry::ref(TrxHandle* trx)
 {
     assert(ref_trx_ == 0 ||
            ref_trx_->global_seqno() < trx->global_seqno());
@@ -57,7 +60,7 @@ galera::RowIdEntry::ref(TrxHandle* trx)
 
 
 inline void
-galera::RowIdEntry::unref(TrxHandle* trx)
+galera::KeyEntry::unref(TrxHandle* trx)
 {
     if (ref_trx_ == trx)
     {
@@ -86,7 +89,7 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
         (*i)->unref(trx);
         if ((*i)->get_ref_trx() == 0)
         {
-            CertIndex::iterator ci(cert_index_.find((*i)->get_row_id()));
+            CertIndex::iterator ci(cert_index_.find((*i)->get_key()));
             assert(ci != cert_index_.end());
             delete ci->second;
             cert_index_.erase(ci);
@@ -99,6 +102,12 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
 galera::Certification::TestResult
 galera::Certification::do_test(TrxHandle* trx, bool store_keys)
 {
+    cert_debug << *trx;
+    if (trx->flags() & TrxHandle::F_ISOLATION)
+    {
+        log_debug << "trx in isolation mode: " << *trx;
+    }
+
     const wsrep_seqno_t trx_last_seen_seqno (trx->last_seen_seqno());
     const wsrep_seqno_t trx_global_seqno    (trx->global_seqno());
 
@@ -122,24 +131,17 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
     size_t offset(serial_size(*trx));
     const MappedBuffer& wscoll(trx->write_set_collection());
 
-    // max_depends_seqno, start from -1 and maximize on all dependencies
-    wsrep_seqno_t max_depends_seqno(to_isolation_.empty() == true ? -1 :
-                                    to_isolation_.rbegin()->first);
+    // max_depends_seqno:
+    // 1) initialize to the position just before known history
+    // 2) maximize on all dependencies
+    wsrep_seqno_t max_depends_seqno(trx_map_.empty() ?
+                                    position_ - 1    :
+                                    trx_map_.begin()->second->global_seqno()
+                                    - 1);
     TrxHandle::CertKeySet& match(trx->cert_keys_);
     assert(match.empty() == true);
 
-    Lock lock(mutex_);
-
-    // this must be run in TO isolation
-    if (trx->trx_id() == static_cast<wsrep_trx_id_t>(-1))
-    {
-        if (to_isolation_.insert(std::make_pair(trx->global_seqno(),
-                                                trx)).second == false)
-        {
-            gu_throw_fatal << "duplicate trx entry " << *trx;
-        }
-        max_depends_seqno = trx->global_seqno() - 1;
-    }
+    gu::Lock lock(mutex_);
 
     while (offset < wscoll.size())
     {
@@ -149,61 +151,96 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
             gu_throw_fatal << "failed to unserialize write set";
         }
 
-        RowIdSequence rk;
-        ws.get_row_ids(rk);
+        WriteSet::KeySequence rk;
+        ws.get_keys(rk);
 
         // Scan over all row keys
-        for (RowIdSequence::const_iterator i = rk.begin(); i != rk.end(); ++i)
+        for (WriteSet::KeySequence::const_iterator i(rk.begin());
+             i != rk.end(); ++i)
         {
-            CertIndex::iterator ci;
-            if ((ci = cert_index_.find(*i)) != cert_index_.end())
+            typedef std::deque<KeyPart> KPS;
+            KPS key_parts(i->key_parts<KPS>());
+
+            if (key_parts.size() == 0)
             {
-                // Found matching entry, scan over dependent transactions
-                const TrxHandle* ref_trx(ci->second->get_ref_trx());
-                // We assume that certification is done only once per trx
-                // and in total order
-                const wsrep_seqno_t ref_global_seqno(ref_trx->global_seqno());
-
-                assert(ref_global_seqno < trx_global_seqno ||
-                       ref_trx->source_id() == trx->source_id());
-
-                if (ref_trx->source_id() != trx->source_id() &&
-                    ref_global_seqno > trx_last_seen_seqno)
-                {
-                    // Cert conflict if trx write set didn't see it committed
-                    log_debug << "trx conflict " << ref_global_seqno
-                              << " " << trx_last_seen_seqno;
-                    goto cert_fail;
-                }
-
-                if (ref_global_seqno != trx_global_seqno)
-                {
-                    max_depends_seqno = max(max_depends_seqno,
-                                            ref_global_seqno);
-                }
-            }
-            else if (store_keys == true)
-            {
-                RowIdEntry* cie(new RowIdEntry(*i));
-                ci = cert_index_.insert(make_pair(cie->get_row_id(), cie)).first;
+                // TO isolation
+                max_depends_seqno = trx->global_seqno() - 1;
             }
 
-            if (store_keys == true)
+            // Scan over partial matches and full match
+            KPS::const_iterator begin(key_parts.begin()), end;
+            bool full_key(false);
+            for (end = begin; full_key == false;
+                 end != key_parts.end() ? ++end : end)
             {
-                match.insert(ci->second);
+                full_key = (end == key_parts.end());
+                CertIndex::iterator ci;
+                Key key(begin, end);
+                cert_debug << "key: " << key;
+                if ((ci = cert_index_.find(key)) != cert_index_.end())
+                {
+                    // Found matching entry, scan over dependent transactions
+                    const TrxHandle* ref_trx(ci->second->get_ref_trx());
+                    // We assume that certification is done only once per trx
+                    // and in total order
+                    const wsrep_seqno_t ref_global_seqno(ref_trx->global_seqno());
+
+                    cert_debug << "trx: " << *trx
+                               << (full_key ? " full " : " partial ")
+                               << "match: " << *ref_trx;
+                    assert(ref_global_seqno < trx_global_seqno ||
+                           ref_trx->source_id() == trx->source_id());
+
+                    if (((full_key == true  &&
+                          ref_trx->source_id() != trx->source_id()) ||
+                         (ref_trx->flags() & TrxHandle::F_ISOLATION)) &&
+                        ref_global_seqno     > trx_last_seen_seqno)
+                    {
+                        // Cert conflict if trx write set didn't
+                        // see it committed
+                        log_debug << "trx conflict " << ref_global_seqno
+                                  << " " << trx_last_seen_seqno << " key "
+                                  << key << " isolation "
+                                  << (ref_trx->flags() & TrxHandle::F_ISOLATION);
+                        goto cert_fail;
+                    }
+
+                    if (ref_global_seqno != trx_global_seqno)
+                    {
+                        max_depends_seqno = std::max(max_depends_seqno,
+                                                     ref_global_seqno);
+                    }
+                }
+                else if ((full_key == true ||
+                          (trx->flags() & TrxHandle::F_ISOLATION)) &&
+                         store_keys == true)
+                {
+                    cert_debug << "store key: " << key;
+                    KeyEntry* cie(new KeyEntry(key));
+                    ci = cert_index_.insert(std::make_pair(cie->get_key(),
+                                                           cie)).first;
+                }
+
+                if ((full_key == true ||
+                     (trx->flags() & TrxHandle::F_ISOLATION)) &&
+                    store_keys == true)
+                {
+                    cert_debug << "match: " << ci->first;
+                    match.insert(ci->second);
+                }
             }
         }
     }
 
     if (store_keys == true)
     {
-        trx->set_last_depends_seqno(max(safe_to_discard_seqno_,
-                                        max_depends_seqno));
+        trx->set_last_depends_seqno(std::max(safe_to_discard_seqno_,
+                                             max_depends_seqno));
 
         assert(trx->last_depends_seqno() < trx->global_seqno());
 
-        for (TrxHandle::CertKeySet::iterator i = trx->cert_keys_.begin();
-             i != trx->cert_keys_.end(); ++i)
+        for (TrxHandle::CertKeySet::iterator i(match.begin());
+             i != match.end(); ++i)
         {
             (*i)->ref(trx);
         }
@@ -225,7 +262,6 @@ cert_fail:
 galera::Certification::Certification(const gu::Config& conf)
     :
     trx_map_               (),
-    to_isolation_          (),
     cert_index_            (),
     deps_set_              (),
     mutex_                 (),
@@ -274,7 +310,7 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno)
         trx_map_.clear();
     }
 
-    Lock lock(mutex_);
+    gu::Lock lock(mutex_);
     initial_position_      = seqno;
     position_              = seqno;
     safe_to_discard_seqno_ = seqno;
@@ -291,7 +327,7 @@ galera::Certification::append_trx(TrxHandle* trx)
 
     trx->ref();
     {
-        Lock lock(mutex_);
+        gu::Lock lock(mutex_);
 
         if (gu_unlikely(trx->global_seqno() != position_ + 1))
         {
@@ -327,10 +363,10 @@ galera::Certification::append_trx(TrxHandle* trx)
 
     const TestResult retval(test(trx));
 
-    Lock lock(mutex_);
+    gu::Lock lock(mutex_);
 
     if (trx_map_.insert(
-            make_pair(trx->global_seqno(), trx)).second == false)
+            std::make_pair(trx->global_seqno(), trx)).second == false)
         gu_throw_fatal << "duplicate trx entry " << *trx;
 
     deps_set_.insert(trx->last_seen_seqno());
@@ -402,14 +438,7 @@ void galera::Certification::set_trx_committed(TrxHandle* trx)
     {
         // trxs with last_depends_seqno == -1 haven't gone through
         // append_trx
-        Lock lock(mutex_);
-
-        if (trx->trx_id() == static_cast<wsrep_trx_id_t>(-1))
-        {
-            assert(to_isolation_.find(trx->global_seqno()) !=
-                   to_isolation_.end());
-            to_isolation_.erase(trx->global_seqno());
-        }
+        gu::Lock lock(mutex_);
 
         DepsSet::iterator i(deps_set_.find(trx->last_seen_seqno()));
         assert(i != deps_set_.end());
@@ -425,7 +454,7 @@ void galera::Certification::set_trx_committed(TrxHandle* trx)
 
 galera::TrxHandle* galera::Certification::get_trx(wsrep_seqno_t seqno)
 {
-    Lock lock(mutex_);
+    gu::Lock lock(mutex_);
     TrxMap::iterator i(trx_map_.find(seqno));
 
     if (i == trx_map_.end()) return 0;

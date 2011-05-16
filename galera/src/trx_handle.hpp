@@ -20,7 +20,7 @@
 namespace galera
 {
 
-    class RowIdEntry; // Forward declaration
+    class KeyEntry; // Forward declaration
 
     static const std::string working_dir = "/tmp";
 
@@ -34,7 +34,8 @@ namespace galera
             F_OOC         = 1 << 2,
             F_MAC_HEADER  = 1 << 3,
             F_MAC_PAYLOAD = 1 << 4,
-            F_ANNOTATION  = 1 << 5
+            F_ANNOTATION  = 1 << 5,
+            F_ISOLATION   = 1 << 6
         };
 
         static inline bool has_mac(int flags)
@@ -199,11 +200,9 @@ namespace galera
         void set_flags(int flags) { write_set_flags_ = flags; }
         int flags() const { return write_set_flags_; }
 
-        void append_row_id(const void* dbtable, size_t dbtable_len,
-                           const void* row_id, size_t row_id_len)
+        void append_key(const Key& key)
         {
-            write_set_.append_row_id(dbtable, dbtable_len,
-                                     row_id, row_id_len);
+            write_set_.append_key(key);
         }
 
         void append_data(const void* data, const size_t data_len)
@@ -323,7 +322,7 @@ namespace galera
         //
         friend class Wsdb;
         friend class Certification;
-        typedef std::set<RowIdEntry*> CertKeySet;
+        typedef std::set<KeyEntry*> CertKeySet;
         CertKeySet cert_keys_;
 
         friend size_t serialize(const TrxHandle&, gu::byte_t* buf,
