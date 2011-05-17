@@ -191,8 +191,7 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
                     assert(ref_global_seqno < trx_global_seqno ||
                            ref_trx->source_id() == trx->source_id());
 
-                    if (((full_key == true  &&
-                          ref_trx->source_id() != trx->source_id()) ||
+                    if (((ref_trx->source_id() != trx->source_id()) ||
                          (ref_trx->flags() & TrxHandle::F_ISOLATION)) &&
                         ref_global_seqno     > trx_last_seen_seqno)
                     {
