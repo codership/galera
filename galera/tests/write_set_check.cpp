@@ -223,7 +223,7 @@ START_TEST(test_cert_hierarchical)
         { { {1, } }, 1, 1,
           { {void_cast("1"), 1}, }, 1,
           1, 1, 0, 0, 0, Certification::TEST_OK},
-        // 2: depends on 1 (partial match)
+        // 2: depends on 1 (partial match, same source)
         { { {1, } }, 1, 2,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {0, 0}}, 2,
           2, 2, 0, 1, 0, Certification::TEST_OK},
@@ -239,22 +239,27 @@ START_TEST(test_cert_hierarchical)
         { { {2, } }, 1, 1,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {0, 0}}, 2,
           5, 5, 0, -1, 0, Certification::TEST_FAILED},
-        // 6: depends on 3 (partial match, different source)
+        // 6: conflicts with 3 (partial match, different source)
         { { {2, } }, 1, 2,
           { {void_cast("2"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3,
-          6, 6, 0, 3, 0, Certification::TEST_OK},
+          6, 6, 0, -1, 0, Certification::TEST_FAILED},
         // 7: depends on 6 (TO isolation)
         { { {1, } }, 1, 5,
           { {0, 0}, {0, 0}, {0, 0} }, 0,
           7, 7, 0, 6, 0, Certification::TEST_OK},
-        // 8: depends on 7 (TO isolation within cert range)
-        { { {2, } }, 1, 3,
-          { {void_cast("3"), 1}, {void_cast("1"), 1}, {0, 0}}, 2,
-          8, 8, 0, 7, TrxHandle::F_ISOLATION, Certification::TEST_OK},
-        // 9: conflicts with 8 (isolation flag set for 8, partial match)
-        { { {1, } }, 1, 4,
-          { {void_cast("3"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3,
-          9, 9, 0, -1, 0, Certification::TEST_FAILED}
+        // 8: depends on 7 (same source, TO isolation)
+        { { {1, } }, 1, 3,
+          { {void_cast("4"), 1}, {void_cast("1"), 1}, {0, 0}}, 2,
+          8, 8, 0, 7, 0, Certification::TEST_OK},
+        // 9: depends on 8
+        { { {1, } }, 1, 3,
+          { {void_cast("4"), 1}, {void_cast("1"), 1}, {0, 0}}, 2,
+          9, 9, 8, 8, TrxHandle::F_ISOLATION, Certification::TEST_OK},
+        // 10: conflicts with 9 (F_ISOLATION, same source)
+        { { {1, } }, 1, 3,
+          { {void_cast("4"), 1}, {void_cast("1"), 1}, {0, 0}}, 2,
+          10, 10, 8, -1, 0, Certification::TEST_FAILED},
+
     };
 
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
