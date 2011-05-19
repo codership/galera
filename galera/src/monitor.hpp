@@ -353,6 +353,7 @@ namespace galera
                     break;
                 }
             }
+            assert(last_left_ <= last_entered_);
         }
 
         void wake_up_next()
