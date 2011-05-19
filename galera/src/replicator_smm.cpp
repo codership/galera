@@ -507,6 +507,8 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         return retval;
     }
 
+    trx->set_last_seen_seqno(apply_monitor_.last_left());
+    trx->flush(0);
     trx->set_state(TrxHandle::S_REPLICATING);
 
     gcs_seqno_t seqno_l(GCS_SEQNO_ILL), seqno_g(GCS_SEQNO_ILL);
@@ -528,9 +530,6 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         }
 
         trx->set_gcs_handle(gcs_handle);
-        trx->set_last_seen_seqno(apply_monitor_.last_left());
-        trx->flush(0);
-
         if (trx->action() == 0)
         {
             try
