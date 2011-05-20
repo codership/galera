@@ -3160,20 +3160,23 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         }
         else if (consensus.is_consistent(*install_message) == true)
         {
-            if (consensus.is_consistent(msg) == true)
-            {
-                return;
-            }
-            else
-            {
-                // evs_log_info(I_STATE) << "join message not consistent " << msg;
-                // evs_log_info(I_STATE) << "state:" << *this;
-                log_warn << "join message not consistent " << msg;
-                log_info << "state (stderr): ";
-                std::cerr << *this << std::endl;
+            return;
+            // Commented out: It seems to be better strategy to
+            // just wait source of inconsistent join to time out
+            // instead of shifting to gather. #443
 
-                gu_trace(shift_to(S_GATHER, false));
-            }
+            // if (consensus.is_consistent(msg) == true)
+            // {
+            //   return;
+            // }
+            // else
+            // {
+            //   log_warn << "join message not consistent " << msg;
+            //   log_info << "state (stderr): ";
+            //   std::cerr << *this << std::endl;
+            //
+            // gu_trace(shift_to(S_GATHER, false));
+            // }
         }
         else
         {
