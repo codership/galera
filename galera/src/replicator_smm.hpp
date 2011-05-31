@@ -245,14 +245,14 @@ namespace galera
                 return static_cast<Mode>(ret);
             }
 
-            CommitOrder(const TrxHandle& trx, Mode mode)
+            CommitOrder(TrxHandle& trx, Mode mode)
                 :
                 trx_ (trx ),
                 mode_(mode)
             { }
 
-            void lock()   { }
-            void unlock() { }
+            void lock()   { trx_.lock();   }
+            void unlock() { trx_.unlock(); }
             wsrep_seqno_t seqno() const { return trx_.global_seqno(); }
             bool condition(wsrep_seqno_t last_entered,
                            wsrep_seqno_t last_left) const
@@ -276,7 +276,7 @@ namespace galera
             }
         private:
             CommitOrder(const CommitOrder&);
-            const TrxHandle& trx_;
+            TrxHandle& trx_;
             const Mode mode_;
         };
 

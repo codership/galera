@@ -54,14 +54,14 @@ namespace galera
             S_MUST_ABORT,
             S_ABORTING,
             S_REPLICATING,
-            S_REPLICATED,
             S_CERTIFYING,
-            S_CERTIFIED,
             S_MUST_CERT_AND_REPLAY,
-            S_MUST_REPLAY,
+            S_MUST_REPLAY_AM, // grab apply_monitor, commit_monitor, replay
+            S_MUST_REPLAY_CM, // commit_monitor, replay
+            S_MUST_REPLAY,    // replay
             S_REPLAYING,
-            S_REPLAYED,
-            S_APPLYING,
+            S_APPLYING,   // grabbing apply monitor, applying
+            S_COMMITTING, // grabbing commit monitor, committing changes
             S_COMMITTED,
             S_ROLLED_BACK
         } State;

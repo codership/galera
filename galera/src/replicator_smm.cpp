@@ -477,7 +477,6 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
         gu_trace(apply_data(recv_ctx, bf_apply_cb_, commit_stmt,
                             trx->global_seqno()));
     }
-
     apply_monitor_.leave(ao);
 
     cert_.set_trx_committed(trx);
@@ -583,7 +582,6 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     }
     else
     {
-        trx->set_state(TrxHandle::S_REPLICATED);
         retval = WSREP_OK;
     }
 
@@ -606,9 +604,11 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx) throw (gu::Exception)
     case TrxHandle::S_ABORTING: // guess this is here because we can have a race
         return;
     case TrxHandle::S_EXECUTING:
+        trx->set_state(TrxHandle::S_MUST_ABORT);
         break;
     case TrxHandle::S_REPLICATING:
     {
+        trx->set_state(TrxHandle::S_MUST_ABORT);
         // trx is in gcs repl
         int rc;
         if (trx->gcs_handle() > 0 &&
@@ -623,6 +623,7 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx) throw (gu::Exception)
     }
     case TrxHandle::S_CERTIFYING:
     {
+        trx->set_state(TrxHandle::S_MUST_ABORT);
         // trx is waiting in local monitor
         LocalOrder lo(*trx);
         trx->unlock();
@@ -630,8 +631,9 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx) throw (gu::Exception)
         trx->lock();
         break;
     }
-    case TrxHandle::S_CERTIFIED:
+    case TrxHandle::S_APPLYING:
     {
+        trx->set_state(TrxHandle::S_MUST_ABORT);
         // trx is waiting in apply monitor
         ApplyOrder ao(*trx);
         trx->unlock();
@@ -639,23 +641,20 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx) throw (gu::Exception)
         trx->lock();
         break;
     }
+    case TrxHandle::S_COMMITTING:
+        trx->set_state(TrxHandle::S_MUST_ABORT);
+        if (co_mode_ != CommitOrder::BYPASS)
+        {
+            // trx waiting in commit monitor
+            CommitOrder co(*trx, co_mode_);
+            trx->unlock();
+            commit_monitor_.interrupt(co);
+            trx->lock();
+        }
+        break;
     default:
         gu_throw_fatal << "invalid state " << trx->state();
         throw;
-    }
-
-    switch (trx->state())
-    {
-    case TrxHandle::S_MUST_ABORT:
-    case TrxHandle::S_ABORTING:
-        // must cert and replay, must replay are ok too
-        // since trx is supposed to release locks before
-        // going to replay mode
-    case TrxHandle::S_MUST_CERT_AND_REPLAY:
-    case TrxHandle::S_MUST_REPLAY:
-        break;
-    default:
-        trx->set_state(TrxHandle::S_MUST_ABORT);
     }
 }
 
@@ -664,7 +663,7 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle* trx)
 {
     if (state_() < S_JOINED) return WSREP_TRX_FAIL;
 
-    assert(trx->state() == TrxHandle::S_REPLICATED);
+    assert(trx->state() == TrxHandle::S_REPLICATING);
     assert(trx->local_seqno() > -1 && trx->global_seqno() > -1);
 
     wsrep_status_t retval(cert(trx));
@@ -672,6 +671,7 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle* trx)
     if (gu_unlikely(retval != WSREP_OK))
     {
         assert(trx->state() == TrxHandle::S_MUST_ABORT ||
+               trx->state() == TrxHandle::S_MUST_REPLAY_AM ||
                trx->state() == TrxHandle::S_MUST_CERT_AND_REPLAY);
 
         if (trx->state() == TrxHandle::S_MUST_ABORT)
@@ -682,8 +682,9 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle* trx)
         return retval;
     }
 
-    assert(trx->state() == TrxHandle::S_CERTIFIED);
+    assert(trx->state() == TrxHandle::S_CERTIFYING);
     assert(trx->global_seqno() > apply_monitor_.last_left());
+    trx->set_state(TrxHandle::S_APPLYING);
 
     ApplyOrder ao(*trx);
     CommitOrder co(*trx, co_mode_);
@@ -699,42 +700,52 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle* trx)
         else throw;
     }
 
-    if (gu_unlikely(interrupted))
+    if (gu_unlikely(interrupted) || trx->state() == TrxHandle::S_MUST_ABORT)
     {
         assert(trx->state() == TrxHandle::S_MUST_ABORT);
-
-        if (cert_for_aborted(trx) == WSREP_OK)
-        {
-            assert(trx->state() == TrxHandle::S_MUST_REPLAY);
-            retval = WSREP_BF_ABORT;
-        }
-        else
-        {
-            apply_monitor_.self_cancel(ao);
-            if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
-            trx->set_state(TrxHandle::S_ABORTING);
-            retval = WSREP_TRX_FAIL;
-        }
+        if (interrupted) trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
+        else             trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
+        retval = WSREP_BF_ABORT;
     }
     else if ((trx->flags() & TrxHandle::F_COMMIT) != 0)
     {
+        trx->set_state(TrxHandle::S_COMMITTING);
         if (co_mode_ != CommitOrder::BYPASS)
-            gu_trace(commit_monitor_.enter(co));
+        {
+            try
+            {
+                gu_trace(commit_monitor_.enter(co));
+            }
+            catch (gu::Exception& e)
+            {
+                if (e.get_errno() == EINTR) { interrupted = true; }
+                else throw;
+            }
 
-        trx->set_state(TrxHandle::S_APPLYING);
+            if (gu_unlikely(interrupted) ||
+                trx->state() == TrxHandle::S_MUST_ABORT)
+            {
+                assert(trx->state() == TrxHandle::S_MUST_ABORT);
+                if (interrupted) trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
+                else             trx->set_state(TrxHandle::S_MUST_REPLAY);
+                retval = WSREP_BF_ABORT;
+            }
+        }
     }
     else
     {
         trx->set_state(TrxHandle::S_EXECUTING);
     }
 
-    assert((retval == WSREP_OK && (trx->state() == TrxHandle::S_APPLYING ||
+    assert((retval == WSREP_OK && (trx->state() == TrxHandle::S_COMMITTING ||
                                    trx->state() == TrxHandle::S_EXECUTING))
            ||
            (retval == WSREP_TRX_FAIL && trx->state() == TrxHandle::S_ABORTING)
            ||
-           (retval == WSREP_BF_ABORT &&
-            trx->state() == TrxHandle::S_MUST_REPLAY));
+           (retval == WSREP_BF_ABORT && (
+               trx->state() == TrxHandle::S_MUST_REPLAY_AM ||
+               trx->state() == TrxHandle::S_MUST_REPLAY_CM ||
+               trx->state() == TrxHandle::S_MUST_REPLAY)));
 
     return retval;
 }
@@ -742,6 +753,8 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle* trx)
 wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
 {
     assert(trx->state() == TrxHandle::S_MUST_CERT_AND_REPLAY ||
+           trx->state() == TrxHandle::S_MUST_REPLAY_AM       ||
+           trx->state() == TrxHandle::S_MUST_REPLAY_CM       ||
            trx->state() == TrxHandle::S_MUST_REPLAY);
     assert(trx->trx_id() != static_cast<wsrep_trx_id_t>(-1));
     assert(trx->global_seqno() > apply_monitor_.last_left());
@@ -757,58 +770,40 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
             // apply monitor is self canceled in cert
             break;
         }
+        trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
         // fall through
-    case TrxHandle::S_MUST_REPLAY:
+    case TrxHandle::S_MUST_REPLAY_AM:
     {
         // safety measure to make sure that all preceding trxs finish before
         // replaying
         trx->set_last_depends_seqno(trx->global_seqno() - 1);
-        trx->set_state(TrxHandle::S_REPLAYING);
-
         ApplyOrder ao(*trx);
-
         gu_trace(apply_monitor_.enter(ao));
-        ++local_replays_;
-
-        try
-        {
-            gu_trace(apply_trx_ws(trx_ctx, bf_apply_cb_, *trx));
-            log_debug << "replay applying successfull for trx " << trx;
-
-            CommitOrder co(*trx, co_mode_);
-
-            if (co_mode_ != CommitOrder::BYPASS)
-                try
-                {
-                    commit_monitor_.enter(co);
-                }
-                catch (...)
-                {
-                    gu_throw_fatal
-                        << "failed to enter commit monitor in trx replay: "
-                        << *trx;
-                }
-
-            gu_trace(apply_data(trx_ctx, bf_apply_cb_, commit_stmt,
-                                trx->global_seqno()));
-            trx->set_state(TrxHandle::S_REPLAYED);
-            return WSREP_OK;
-        }
-        catch (ApplyException& e)
-        {
-            log_debug << e.what();
-            retval = e.wsrep_status();
-        }
-
-        // apply monitor is released in post commit
-        // apply_monitor_.leave(ao);
-        break;
+        trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
+        // fall through
     }
+    case TrxHandle::S_MUST_REPLAY_CM:
+        if (co_mode_ != CommitOrder::BYPASS)
+        {
+            CommitOrder co(*trx, co_mode_);
+            gu_trace(commit_monitor_.enter(co));
+        }
+        trx->set_state(TrxHandle::S_MUST_REPLAY);
+        // fall through
+    case TrxHandle::S_MUST_REPLAY:
+        ++local_replays_;
+        trx->set_state(TrxHandle::S_REPLAYING);
+        gu_trace(apply_trx_ws(trx_ctx, bf_apply_cb_, *trx));
+        gu_trace(apply_data(trx_ctx, bf_apply_cb_, commit_stmt,
+                            trx->global_seqno()));
+
+        // apply, commit monitors are released in post commit
+        return WSREP_OK;
     default:
         gu_throw_fatal << "Invalid state in replay for trx " << *trx;
     }
 
-    log_debug << "Replaying failed for trx " << trx;
+    log_debug << "replaying failed for trx " << *trx;
     trx->set_state(TrxHandle::S_ABORTING);
 
     return retval;
@@ -817,8 +812,20 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
 
 wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
 {
-    assert(trx->state() == TrxHandle::S_APPLYING ||
-           trx->state() == TrxHandle::S_REPLAYED);
+    if (trx->state() == TrxHandle::S_MUST_ABORT)
+    {
+        // This is possible in case of ALG: BF applier BF aborts
+        // trx that has already grabbed commit monitor and is committing.
+        // However, this should be acceptable assuming that commit
+        // operation does not reserve any more resources and is able
+        // to release already reserved resources.
+        log_debug << "trx was BF aborted during commit: " << *trx;
+        // manipulate state to avoid crash
+        trx->set_state(TrxHandle::S_MUST_REPLAY);
+        trx->set_state(TrxHandle::S_REPLAYING);
+    }
+    assert(trx->state() == TrxHandle::S_COMMITTING ||
+           trx->state() == TrxHandle::S_REPLAYING);
     assert(trx->local_seqno() > -1 && trx->global_seqno() > -1);
 
     CommitOrder co(*trx, co_mode_);
@@ -826,6 +833,7 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
     ApplyOrder ao(*trx);
     apply_monitor_.leave(ao);
     cert_.set_trx_committed(trx);
+    trx->set_state(TrxHandle::S_COMMITTED);
     report_last_committed();
     ++local_commits_;
     return WSREP_OK;
@@ -860,7 +868,7 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno) const
 
 wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle* trx)
 {
-    assert(trx->state() == TrxHandle::S_REPLICATED);
+    assert(trx->state() == TrxHandle::S_REPLICATING);
     assert(trx->trx_id() == static_cast<wsrep_trx_id_t>(-1));
     assert(trx->local_seqno() > -1 && trx->global_seqno() > -1);
     assert(trx->global_seqno() > apply_monitor_.last_left());
@@ -986,7 +994,7 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
     assert(trx->global_seqno() > 0);
     assert(trx->last_seen_seqno() >= 0);
     assert(trx->last_depends_seqno() == -1);
-    assert(trx->state() == TrxHandle::S_REPLICATED);
+    assert(trx->state() == TrxHandle::S_REPLICATING);
 
     wsrep_status_t const retval(cert(trx));
 
@@ -1484,7 +1492,7 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
 
 wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
 {
-    assert(trx->state() == TrxHandle::S_REPLICATED ||
+    assert(trx->state() == TrxHandle::S_REPLICATING ||
            trx->state() == TrxHandle::S_MUST_CERT_AND_REPLAY);
 
     assert(trx->local_seqno()     != WSREP_SEQNO_UNDEFINED &&
@@ -1519,13 +1527,12 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
             {
                 if (trx->state() == TrxHandle::S_CERTIFYING)
                 {
-                    trx->set_state(TrxHandle::S_CERTIFIED);
                     retval = WSREP_OK;
                 }
                 else
                 {
                     assert(trx->state() == TrxHandle::S_MUST_ABORT);
-                    trx->set_state(TrxHandle::S_MUST_REPLAY);
+                    trx->set_state(TrxHandle::S_MUST_REPLAY_AM);
                     retval = WSREP_BF_ABORT;
                 }
             }
