@@ -114,7 +114,6 @@ void galera::GcsActionSource::dispatch(void*          recv_ctx,
         assert(seqno_g > 0);
         GcsActionTrx trx(act, act_size, seqno_l, seqno_g);
         trx.trx()->set_state(TrxHandle::S_REPLICATING);
-        trx.trx()->set_state(TrxHandle::S_REPLICATED);
         replicator_.process_trx(recv_ctx, trx.trx());
         break;
     }

@@ -19,22 +19,22 @@ std::ostream& galera::operator<<(std::ostream& os, TrxHandle::State s)
         return (os << "ABORTING");
     case TrxHandle::S_REPLICATING:
         return (os << "REPLICATING");
-    case TrxHandle::S_REPLICATED:
-        return (os << "REPLICATED");
     case TrxHandle::S_CERTIFYING:
         return (os << "CERTIFYING");
-    case TrxHandle::S_CERTIFIED:
-        return (os << "CERTIFIED");
     case TrxHandle::S_MUST_CERT_AND_REPLAY:
         return (os << "MUST_CERT_AND_REPLAY");
+    case TrxHandle::S_MUST_REPLAY_AM:
+        return (os << "MUST_REPLAY_AM");
+    case TrxHandle::S_MUST_REPLAY_CM:
+        return (os << "MUST_REPLAY_CM");
     case TrxHandle::S_MUST_REPLAY:
         return (os << "MUST_REPLAY");
     case TrxHandle::S_REPLAYING:
         return (os << "REPLAYING");
-    case TrxHandle::S_REPLAYED:
-        return (os << "REPLAYED");
     case TrxHandle::S_APPLYING:
         return (os << "APPLYING");
+    case TrxHandle::S_COMMITTING:
+        return (os << "COMMITTING");
     case TrxHandle::S_COMMITTED:
         return (os << "COMMITTED");
     case TrxHandle::S_ROLLED_BACK:
@@ -82,45 +82,40 @@ public:
         using galera::TrxHandle;
 
         add(TrxHandle::S_EXECUTING, TrxHandle::S_MUST_ABORT);
-//        add(TrxHandle::S_EXECUTING, TrxHandle::S_ABORTING);
+
         add(TrxHandle::S_EXECUTING, TrxHandle::S_REPLICATING);
-        add(TrxHandle::S_EXECUTING, TrxHandle::S_APPLYING);
         add(TrxHandle::S_EXECUTING, TrxHandle::S_ROLLED_BACK);
 
         add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_CERT_AND_REPLAY);
+        add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY_AM);
+        add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY_CM);
         add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_REPLAY);
         add(TrxHandle::S_MUST_ABORT, TrxHandle::S_MUST_ABORT);
         add(TrxHandle::S_MUST_ABORT, TrxHandle::S_ABORTING);
 
         add(TrxHandle::S_ABORTING, TrxHandle::S_ROLLED_BACK);
 
-        add(TrxHandle::S_REPLICATING, TrxHandle::S_REPLICATED);
+        add(TrxHandle::S_REPLICATING, TrxHandle::S_CERTIFYING);
         add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_CERT_AND_REPLAY);
         add(TrxHandle::S_REPLICATING, TrxHandle::S_MUST_ABORT);
 
-        add(TrxHandle::S_REPLICATED, TrxHandle::S_CERTIFYING);
-
-        add(TrxHandle::S_CERTIFYING, TrxHandle::S_CERTIFIED);
-        add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_CERT_AND_REPLAY);
         add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_ABORT);
+        add(TrxHandle::S_CERTIFYING, TrxHandle::S_APPLYING);
+        add(TrxHandle::S_CERTIFYING, TrxHandle::S_MUST_REPLAY_AM); // trx replay
 
-        add(TrxHandle::S_CERTIFIED, TrxHandle::S_EXECUTING);
-        add(TrxHandle::S_CERTIFIED, TrxHandle::S_APPLYING);
-        add(TrxHandle::S_CERTIFIED, TrxHandle::S_REPLAYING);
-        add(TrxHandle::S_CERTIFIED, TrxHandle::S_MUST_ABORT);
+        add(TrxHandle::S_APPLYING, TrxHandle::S_MUST_ABORT);
+        add(TrxHandle::S_APPLYING, TrxHandle::S_COMMITTING);
 
-        add(TrxHandle::S_APPLYING, TrxHandle::S_COMMITTED);
+        add(TrxHandle::S_COMMITTING, TrxHandle::S_COMMITTED);
+        add(TrxHandle::S_COMMITTING, TrxHandle::S_MUST_ABORT);
 
         add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_CERTIFYING);
         add(TrxHandle::S_MUST_CERT_AND_REPLAY, TrxHandle::S_ABORTING);
 
+        add(TrxHandle::S_MUST_REPLAY_AM, TrxHandle::S_MUST_REPLAY_CM);
+        add(TrxHandle::S_MUST_REPLAY_CM, TrxHandle::S_MUST_REPLAY);
         add(TrxHandle::S_MUST_REPLAY, TrxHandle::S_REPLAYING);
-
-        add(TrxHandle::S_REPLAYING, TrxHandle::S_REPLAYED);
-        add(TrxHandle::S_REPLAYING, TrxHandle::S_ABORTING);
-
-        add(TrxHandle::S_REPLAYED, TrxHandle::S_COMMITTED);
-
+        add(TrxHandle::S_REPLAYING, TrxHandle::S_COMMITTED);
     }
 } trans_map_builder_;
 
