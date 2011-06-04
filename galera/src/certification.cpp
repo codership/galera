@@ -181,33 +181,43 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
                 {
                     // Found matching entry, scan over dependent transactions
                     const TrxHandle* ref_trx(ci->second->get_ref_trx());
-                    // We assume that certification is done only once per trx
-                    // and in total order
-                    const wsrep_seqno_t ref_global_seqno(ref_trx->global_seqno());
-
-                    cert_debug << "trx: " << *trx
-                               << (full_key ? " full " : " partial ")
-                               << "match: " << *ref_trx;
-                    assert(ref_global_seqno < trx_global_seqno ||
-                           ref_trx->source_id() == trx->source_id());
-
-                    if (((ref_trx->source_id() != trx->source_id()) ||
-                         (ref_trx->flags() & TrxHandle::F_ISOLATION)) &&
-                        ref_global_seqno     > trx_last_seen_seqno)
+                    if (ref_trx == 0)
                     {
-                        // Cert conflict if trx write set didn't
-                        // see it committed
-                        log_debug << "trx conflict " << ref_global_seqno
-                                  << " " << trx_last_seen_seqno << " key "
-                                  << key << " isolation "
-                                  << (ref_trx->flags() & TrxHandle::F_ISOLATION);
-                        goto cert_fail;
+                        // trx may have a partial match on own key which does
+                        // not have ref_trx assigned yet
+                        assert(full_key == false);
                     }
-
-                    if (ref_global_seqno != trx_global_seqno)
+                    else
                     {
-                        max_depends_seqno = std::max(max_depends_seqno,
-                                                     ref_global_seqno);
+                        // We assume that certification is done only once per
+                        // trx and in total order
+                        const wsrep_seqno_t ref_global_seqno(
+                            ref_trx->global_seqno());
+
+                        cert_debug << "trx: " << *trx
+                                   << (full_key ? " full " : " partial ")
+                                   << "match: " << *ref_trx;
+                        assert(ref_global_seqno < trx_global_seqno ||
+                               ref_trx->source_id() == trx->source_id());
+
+                        if (((ref_trx->source_id() != trx->source_id()) ||
+                             (ref_trx->flags() & TrxHandle::F_ISOLATION)) &&
+                            ref_global_seqno     > trx_last_seen_seqno)
+                        {
+                            // Cert conflict if trx write set didn't
+                            // see it committed
+                            log_debug << "trx conflict " << ref_global_seqno
+                                      << " " << trx_last_seen_seqno << " key "
+                                      << key << " isolation "
+                                      << (ref_trx->flags() & TrxHandle::F_ISOLATION);
+                            goto cert_fail;
+                        }
+
+                        if (ref_global_seqno != trx_global_seqno)
+                        {
+                            max_depends_seqno = std::max(max_depends_seqno,
+                                                         ref_global_seqno);
+                        }
                     }
                 }
                 else if ((full_key == true ||
