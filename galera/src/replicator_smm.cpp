@@ -145,24 +145,33 @@ apply_trx_ws(void*                    recv_ctx,
         }
         catch (galera::ApplyException& e)
         {
-            wsrep_status_t err = e.wsrep_status();
-
-            if (WSREP_TRX_FAIL == err)
+            if (trx.flags() & galera::TrxHandle::F_ISOLATION)
             {
-                gu_trace(apply_data(recv_ctx, apply_cb, rollback_stmt,
-                                    trx.global_seqno()));
-                ++attempts;
-
-                if (attempts <= max_apply_attempts)
-                {
-                    log_warn << e.what()
-                             << "\nRetrying " << attempts << "th time";
-                }
+                log_debug << "ignoring applying error for trx in isolation: "
+                          << trx;
+                break;
             }
             else
             {
-                GU_TRACE(e);
-                throw;
+                wsrep_status_t err = e.wsrep_status();
+
+                if (WSREP_TRX_FAIL == err)
+                {
+                    gu_trace(apply_data(recv_ctx, apply_cb, rollback_stmt,
+                                        trx.global_seqno()));
+                    ++attempts;
+
+                    if (attempts <= max_apply_attempts)
+                    {
+                        log_warn << e.what()
+                                 << "\nRetrying " << attempts << "th time";
+                    }
+                }
+                else
+                {
+                    GU_TRACE(e);
+                    throw;
+                }
             }
         }
     }
