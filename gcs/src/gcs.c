@@ -1047,21 +1047,6 @@ static void *gcs_recv_thread (void *arg)
             if (gu_likely(ret <= 0)) continue; // not for application
         }
 
-        /* #434 - do not cache slave TO actions before becoming a JOINER */
-        if (gu_unlikely (conn->state   > GCS_CONN_JOINER   &&
-                         rcvd.act.type < GCS_ACT_STATE_REQ &&
-                         !act_is_local)) {
-            if (gu_unlikely(rcvd.id != GCS_SEQNO_ILL))
-            {
-                conn->global_seqno = rcvd.id;
-            }
-            if (gu_likely (conn->cache != NULL))
-                gcache_free (conn->cache, (void*)rcvd.act.buf);
-            else
-                free ((void*)rcvd.act.buf);
-            continue;
-        }
-
         /* deliver to application (note matching assert in the bottom-half of
          * gcs_repl()) */
         if (gu_likely (rcvd.act.type != GCS_ACT_TORDERED ||
