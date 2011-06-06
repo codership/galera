@@ -44,6 +44,11 @@ check_cmd()
     action_cmd "check" "$@"
 }
 
+dump_cmd()
+{
+    action_cmd "dump" "$@"
+}
+
 action()
 {
     start_jobs "$@"
@@ -53,6 +58,11 @@ action()
 stop()
 {
     action "stop_cmd" "$@"
+}
+
+dump()
+{
+    action "dump_cmd" "$@"
 }
 
 check()
@@ -117,6 +127,11 @@ restart_node()
     node_job "restart_cmd" "$@"
 }
 
+dump_node()
+{
+    node_job "dump_cmd" "$@"
+}
+
 # unlike bulk check this one returns error when the node could not be checked
 check_node()
 {
@@ -147,7 +162,6 @@ gcs_address()
 #        local peer=0 # use the first node as a connection handle
 
         if [ $peer -lt 0 ]; then peer=$NODE_MAX; fi # rollover
-        
 
         echo "'gcomm://${NODE_GCS_HOST[$peer]}:${NODE_GCS_PORT[$peer]}$(extra_params $node)'"
         ;;

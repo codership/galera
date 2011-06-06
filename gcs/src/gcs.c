@@ -753,7 +753,6 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
             abort();
         }
  
-
         conn->sync_sent = false;
 
         // need to wake up send monitor if it was paused during CC
@@ -822,8 +821,18 @@ gcs_handle_act_conf (gcs_conn_t* conn, const void* action)
     }
 
     /* One of the cases when the node can become SYNCED */
-    if (GCS_CONN_JOINED == conn->state && (ret = gcs_send_sync_end (conn))) {
-        gu_warn ("Sending SYNC failed: %ld (%s)", ret, strerror (-ret));
+    if (GCS_CONN_JOINED == conn->state) {
+        bool send_sync = false;
+
+        gu_fifo_lock(conn->recv_q);
+        {
+            send_sync = gcs_send_sync_begin(conn);
+        }
+        gu_fifo_release (conn->recv_q);
+
+        if (send_sync && (ret = gcs_send_sync_end (conn))) {
+            gu_warn ("CC: sending SYNC failed: %ld (%s)", ret, strerror (-ret));
+        }
     }
 }
 
