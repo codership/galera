@@ -22,10 +22,11 @@ Source code can be found at http://www.codership.com/en/downloads/galera
 
 ABOUT THIS DOCUMENT
 
-This document explains how to use Galera wsrep provider with MySQL RDBMS.
+This document briefly explains how to use Galera wsrep provider with MySQL
+RDBMS. For more information check http://www.codership.com/wiki/doku.php
 
 
-                     Using MySQL with GALERA v0.7.x
+                     Using MySQL with GALERA v0.8.x
 
 CONTENTS:
 =========
@@ -64,7 +65,7 @@ From the client perspective that means:
 
 
 2. MYSQL/GALERA NODE SETUP
-               
+
 To setup MySQL/Galera node you will need to
 
 1) Install wsrep-patched MySQL from https://launchpad.net/codership-mysql/0.7.
@@ -111,21 +112,23 @@ this.
    So, you can safely issue: CREATE USER..., 
    but issuing: INSERT INTO mysql.user..., will not be replicated.
 
-2) Rows in tables without primary keys may appear in different order on
-   different nodes. As a result SELECT...LIMIT... may return slightly different
-   sets.
+2) DELETE operation is unsupported on tables without primary keys.
+   Rows in tables without primary keys may appear in different order on
+   different nodes. As a result SELECT...LIMIT... may return slightly
+   different sets.
 
 3) Unsupported queries:
-    * LOAD DATA (limited to ~1Gb, use mysqldump instead)
+    * LOCK/UNLOCK tables is not supported in multimaster configuration.
     * lock functions (GET_LOCK(), RELEASE_LOCK()... )
 
-4) Locking sessions (LOCK TABLE...UNLOCK), are not supported. There is
-   an option to convert locking sessions to transactions on the fly:
-   wsrep_convert_LOCK_to_trx. Use at your own risk.
+4) Query log cannot be directed to table. If you enable query logging,
+   you must forward the log to a file:
+       log_output = FILE
+   Use general_log and general_log_file to choose query logging and the 
+   log file name
 
-5) Transaction isolation level should be REPEATABLE_READ (the default).
-   Galera implements implicit snapshot isolation for cluster wide
-   transactions.
+5) Maximum allowed transaction size is defined by wsrep_max_ws_rows and
+   wsrep_max_ws_size. Anything bigger (e.g. huge LOAD DATA) will be rejected.
 
 6) Due to cluster level optimistic concurrency control, transaction issuing
    COMMIT may still be aborted at that stage. There can be two transactions 
@@ -134,14 +137,11 @@ this.
    For cluster level aborts, MySQL/galera cluster gives back deadlock error 
    code (Error: 1213 SQLSTATE: 40001  (ER_LOCK_DEADLOCK)).
 
-7) Query log cannot be directed to table. If you enable query logging,
-   you must forward the log to a file:
-       log_output = FILE
-   Use general_log and general_log_file to choose query logging and the 
-   log file name
+7) XA transactions can not be supported due to possible rollback on commit.
 
-8) XA transactions can not be supported due to possible rollback on commit.
-
-9) MySQL replication cannot be used together with MySQL/Galera _yet_.
-
+8) Currently supported only in master-slave mode without parallel applying
+   (will be fixed in the nearest release):
+    * cascading foreign key constraints,
+    * secondary unique indexes and
+    * primary varchar indexes with non-binary collation.
 

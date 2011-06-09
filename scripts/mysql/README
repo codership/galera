@@ -600,7 +600,8 @@ NOTE: this distribution may be binary incompatible with some older Linux
    So, you can safely issue: CREATE USER..., 
    but issuing: INSERT INTO mysql.user..., will not be replicated.
 
-2) Rows in tables without primary keys may appear in different order on
+2) DELETE operation is not supported on tables without primary keys.
+   Rows in tables without primary keys may appear in different order on
    different nodes. As a result SELECT...LIMIT... may return slightly different
    sets.
 

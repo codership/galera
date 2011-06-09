@@ -40,6 +40,7 @@ SCONS=${SCONS:-"yes"}
 JOBS=${JOBS:-"1"}
 SCRATCH=${SCRATCH:-"no"}
 OPT="yes"
+NO_STRIP=${NO_STRIP:-"no"}
 WITH_SPREAD="no"
 
 which dpkg >/dev/null 2>&1 && DEBIAN=${DEBIAN:-1} || DEBIAN=${DEBIAN:-0}
@@ -88,7 +89,6 @@ do
 	    ;;
 	-o|--opt)
 	    OPT="yes"       # Compile without debug
-	    NO_STRIP="no"
 	    ;;
 	-d|--debug)
 	    DEBUG="yes"     # Compile with debug
@@ -277,7 +277,7 @@ build_packages()
 
     if [ $RET -eq 0 ] && [ $DEBIAN -eq 0 ]
     then
-        mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ && \
+#        mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ && \
         rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms # $ARCH/galera.spec
     fi
 

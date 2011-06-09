@@ -336,7 +336,6 @@ wsrep_sst_donor=
 
 3) Unsupported queries:
     * LOCK/UNLOCK TABLES cannot be supported in multi-master setups.
-    * LOAD DATA (limited to ~1Gb, use mysqldump instead)
     * lock functions (GET_LOCK(), RELEASE_LOCK()... )
 
 4) Query log cannot be directed to table. If you enable query logging,
@@ -345,7 +344,21 @@ wsrep_sst_donor=
    Use general_log and general_log_file to choose query logging and the 
    log file name
 
-5) XA transactions can not be supported due to possible rollback on commit.
+5) Maximum allowed transaction size is defined by wsrep_max_ws_rows and
+   wsrep_max_ws_size. Anything bigger (e.g. huge LOAD DATA) will be rejected.
 
+6) Due to cluster level optimistic concurrency control, transaction issuing
+   COMMIT may still be aborted at that stage. There can be two transactions.
+   writing to same rows and committing in separate cluster nodes, and only one
+   of the them can successfully commit. The failing one will be aborted.
+   For cluster level aborts, MySQL/galera cluster gives back deadlock error.
+   code (Error: 1213 SQLSTATE: 40001  (ER_LOCK_DEADLOCK)).
 
+7) XA transactions can not be supported due to possible rollback on commit.
+
+8) Currently supported only in master-slave mode without parallel applying
+   (will be fixed in the nearest release):
+    * cascading foreign key constraints,
+    * secondary unique indexes and
+    * primary varchar indexes with non-binary collation.
 
