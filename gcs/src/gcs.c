@@ -1716,7 +1716,7 @@ _set_fc_factor (gcs_conn_t* conn, const char* value)
             if (!gu_mutex_lock (&conn->fc_lock)) {
                 conn->params.fc_resume_factor = factor;
                 _set_fc_limits (conn);
-                gu_config_set_double (conn->config, GCS_PARAMS_FC_LIMIT,
+                gu_config_set_double (conn->config, GCS_PARAMS_FC_FACTOR,
                                       conn->params.fc_resume_factor);
                 gu_mutex_unlock (&conn->fc_lock);
             }
