@@ -156,8 +156,8 @@ categorized in three groups:
 
 3.1 Cluster URL.
 
-Galera uses URL (RFC 3986) syntax for addressing with optional parameters passed
-in the URL query part. Galera cluster address looks as follows:
+Galera can use URL (RFC 3986) syntax for addressing with optional parameters
+passed in the URL query part. Galera cluster address looks as follows:
 
 <backend schema>://<cluster address>[?option1=value1[&option2=value2]]
 
