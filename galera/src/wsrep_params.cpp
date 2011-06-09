@@ -18,9 +18,28 @@ wsrep_set_params (galera::Replicator& repl, const char* params)
     {
         try
         {
-            log_debug << "Setting param '" << i->first << "' = '" << i->second
-                      << "'";
-            repl.param_set(i->first, i->second);
+            if (i->first == "debug")
+            {
+                bool val(gu::from_string<bool>(i->second));
+                if (val == true)
+                {
+                    log_info << "enabling debug logging";
+                    gu_conf_debug_on();
+                }
+                else
+                {
+                    log_info << "disabling debug logging";
+                    gu_conf_debug_off();
+                }
+            }
+            else
+            {
+                log_debug << "Setting param '" << i->first
+                          << "' = '" << i->second
+                          << "'";
+                repl.param_set(i->first, i->second);
+            }
+
         }
         catch (gu::NotFound&)
         {

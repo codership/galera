@@ -488,30 +488,7 @@ wsrep_status_t galera_set_variable(wsrep_t*              gh,
                                    const char*           query,
                                    const size_t          query_len)
 {
-
-    if (!strncmp(key, "wsrep_debug", key_len)) {
-        char value[256] = {0,};
-        gu_debug("GALERA set value: %s" , value);
-        strncpy(value, query, query_len);
-        const char *set_query= "wsrep_debug=ON";
-
-        if (strstr(value, set_query)) {
-            gu_info("GALERA enabling debug logging: %s" , value);
-            gu_conf_debug_on();
-        } else {
-            gu_info("GALERA disabling debug logging: %s %s" , value, set_query);
-            gu_conf_debug_off();
-        }
-        return WSREP_OK;
-    }
-
-    {
-        char var[256] = {0,};
-        strncpy(var, key, sizeof(var) - 1);
-        gu_debug("GALERA set var: %s" , var);
-    }
-
-    return WSREP_OK;
+    return WSREP_NOT_IMPLEMENTED;
 }
 
 
