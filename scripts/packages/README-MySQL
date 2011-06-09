@@ -103,7 +103,26 @@ nodes may be unable to process client requests. Other nodes are unaffected by
 this.
 
 
-4. LIMITATIONS
+4. SETTING GALERA PARAMETERS IN MYSQL
+
+To configure Galera parameteres set wsrep_provider_options variable either
+in my.cnf or in the command line:
+
+   wsrep_provider_options="gcs.fc_limit = 128; gcs.fc_master_slave = yes"
+
+Certain parameteres can be changed in runtime:
+
+   mysql> SET GLOBAL wsrep_provider_options="evs.send_window=16";
+
+will only change the value of evs.send_window parameter. For the list of all
+Galera parameters see main README and http://www.codership.com/wiki.
+
+   mysql> SHOW VARIABLES like 'wsrep_provider_options';
+
+Will show all parameters and their current values.
+
+
+5. LIMITATIONS
 
 1) Currently replication works only with InnoDB storage engine. Any writes to 
    tables of other types, including system (mysql.*) tables are not replicated. 
