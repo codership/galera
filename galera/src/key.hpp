@@ -11,6 +11,7 @@
 #include "gu_throw.hpp"
 
 #include <deque>
+#include <iomanip>
 
 #include <cstring>
 #include <stdint.h>
@@ -45,10 +46,17 @@ namespace galera
 
     inline std::ostream& operator<<(std::ostream& os, const KeyPart& kp)
     {
-        for (size_t i(0); i != kp.key_len(); ++i)
+        const std::ostream::fmtflags prev_flags(os.flags(std::ostream::hex));
+        const char                   prev_fill(os.fill('0'));
+
+        for (const gu::byte_t* i(kp.key()); i != kp.key() + kp.key_len();
+             ++i)
         {
-            os << std::hex << static_cast<int>(kp.key()[i]);
+            os << std::setw(2) << static_cast<int>(*i);
         }
+        os.flags(prev_flags);
+        os.fill(prev_fill);
+
         return os;
     }
 

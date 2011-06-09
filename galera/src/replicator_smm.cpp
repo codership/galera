@@ -1586,7 +1586,6 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
         }
     }
 
-    log_debug << "cert for " << *trx << " " << retval;
     return retval;
 }
 

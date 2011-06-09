@@ -206,10 +206,11 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
                         {
                             // Cert conflict if trx write set didn't
                             // see it committed
-                            log_debug << "trx conflict " << ref_global_seqno
-                                      << " " << trx_last_seen_seqno << " key "
-                                      << key << " isolation "
-                                      << (ref_trx->flags() & TrxHandle::F_ISOLATION);
+                            log_debug << "trx conflict for key "
+                                      << key << ": "
+                                      << *trx
+                                      << " <--X--> "
+                                      << *ref_trx;
                             goto cert_fail;
                         }
 
