@@ -278,11 +278,14 @@ then
             DEBUG_OPT=""
         fi
 
+        # This will be put to --prefix by SETUP.sh.
         export MYSQL_BUILD_PREFIX="/usr"
 
         if [ "$PACKAGE" == "yes" ]
         then
 #            [ $DEBIAN -eq 0 ] && export MYSQL_BUILD_PREFIX="/"
+            # There is no other way to pass these options to SETUP.sh but
+            # via env. variable
             export wsrep_configs="--exec-prefix=/usr \
                                   --libexecdir=/usr/sbin \
                                   --localstatedir=/var/lib/mysql \
@@ -460,12 +463,16 @@ build_packages()
     set +e
     if [ $DEBIAN -ne 0 ]
     then #build DEB
+	local deb_basename="mysql-server-wsrep"
+	ln -sf mysql-wsrep.list $deb_basename.list
         $SUDO_ENV /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
-             --output-dir $ARCH $STRIP_OPT mysql-wsrep
+             --output-dir $ARCH $STRIP_OPT $deb_basename
     else # build RPM
+	local rpm_basename="MySQL-server-wsrep"
+	ln -sf mysql-wsrep.list $rpm_basename.list
         ($SUDO_ENV /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
-              --output-dir $ARCH --keep-files -k $STRIP_OPT mysql-wsrep || \
-        /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/mysql-wsrep.spec" \
+              --output-dir $ARCH --keep-files -k $STRIP_OPT $rpm_basename || \
+        /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/$rpm_basename.spec" \
               --buildroot="$ARCH/buildroot" )
     fi
     local RET=$?
