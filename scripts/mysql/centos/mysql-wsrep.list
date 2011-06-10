@@ -4,7 +4,6 @@
 %requires /bin/sh
 %requires /sbin/install-info
 %requires /sbin/ldconfig
-%requires /usr/bin/perl
 %requires /usr/sbin/useradd
 %requires bash
 %requires chkconfig
@@ -16,8 +15,6 @@
 %requires libdl.so.2
 %requires libgcc_s.so.1
 %requires libm.so.6
-#%requires libmysqlclient
-#%requires libmysqlclient_r
 %requires libncurses.so.5
 %requires libnsl.so.1
 %requires libpthread.so.0
@@ -29,10 +26,14 @@
 %requires shadow-utils
 
 # Required MySQL packages
-%requires MySQL-shared-community 5.1.47
-%requires MySQL-client-community 5.1.47
+# for PHP-mysql on RHEL5:
+# %requires MySQL-shared-compat $MYSQL_VER
+# for mysqldump SST:
+# %requires MySQL-client-community $MYSQL_VER
 
+%provides MySQL
 %provides MySQL-server
+%provides mysql
 %provides mysql-server
 
 # Conflicting mysql packages
@@ -57,7 +58,7 @@ $LIBS_DST=${prefix}/lib/mysql
 $SHAR_DST=${prefix}/share/mysql
 $SBIN_DST=${prefix}/sbin
 $BINS_DST=${prefix}/bin
-$DOCS_DST=${prefix}/share/doc/MySQL-server-5.1.47
+$DOCS_DST=${prefix}/share/doc/MySQL-server-$MYSQL_VER
 $MAN_DST=${prefix}/share/man
 
 # Commented out CentOS pieces of code which don't seem to make sense here
@@ -91,10 +92,14 @@ useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL Server" \
 # in case user existed
 usermod -g mysql mysql 2> /dev/null || true
 
+/bin/chown -R mysql:mysql ${CONF_DST}
+
 /bin/chmod 0755 ${mysql_datadir}
 /bin/touch /var/log/mysqld.log
 /bin/chown -R mysql:mysql ${mysql_datadir}
+
 /usr/bin/mysql_install_db --rpm --user=mysql --wsrep-on=0
+
 /bin/chown -R mysql:mysql ${mysql_datadir}
 /bin/chmod -R og-rw ${mysql_datadir}/mysql
 
