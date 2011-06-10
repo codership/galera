@@ -153,11 +153,17 @@ gu::Config::overflow_int(long long ret) throw (Exception)
 std::ostream& gu::operator<<(std::ostream& ost, const gu::Config& c)
 {
     const gu::Config::param_map_t& pmap = c.params();
+    gu::Config::param_map_t::const_iterator pi = pmap.begin();
 
-    for (gu::Config::param_map_t::const_iterator pi = pmap.begin();
-         pi != pmap.end(); ++pi)
+    if (pi != pmap.end())
     {
-        ost << "'" << pi->first << "' = '" << pi->second << "'\n";
+        ost << pi->first << " = " << pi->second;
+        ++pi;
+        for (; pi != pmap.end(); ++pi)
+        {
+//        ost << "'" << pi->first << "' = '" << pi->second << "'\n";
+            ost << "; " << pi->first << " = " << pi->second;
+        }
     }
 
     return ost;
