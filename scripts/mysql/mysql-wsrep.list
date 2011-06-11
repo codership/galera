@@ -172,7 +172,7 @@ d 755 root root /var/lib/mysql-upgrade -
 d 755 root root $SBIN_DST -
 f 755 root root $SBIN_DST/mysqld               $MYSQL_SRC/sql/mysqld
 %format rpm
-f 755 root root $SBIN_DST/mysqmanager          $MYSQL_SRC/server-tools/instance-manager/mysqlmanager
+f 755 root root $SBIN_DST/mysqlmanager          $MYSQL_SRC/server-tools/instance-manager/mysqlmanager
 %format all
 
 d 755 root root $SHAR_DST/charsets -
