@@ -31,8 +31,8 @@ f 755 root root $BINS_DST/msql2mysql           $MYSQL_SRC/scripts/msql2mysql
 %format rpm
 f 755 root root $BINS_DST/innochecksum         $MYSQL_SRC/extra/innochecksum
 f 755 root root $BINS_DST/myisam_ftdump        $MYSQL_SRC/storage/myisam/myisam_ftdump
-%format all
 f 755 root root $BINS_DST/my_print_defaults    $MYSQL_SRC/extra/my_print_defaults
+%format all
 f 755 root root $BINS_DST/myisamchk            $MYSQL_SRC/storage/myisam/myisamchk
 f 755 root root $BINS_DST/myisamlog            $MYSQL_SRC/storage/myisam/myisamlog
 f 755 root root $BINS_DST/myisampack           $MYSQL_SRC/storage/myisam/myisampack
@@ -63,7 +63,9 @@ f 755 root root $BINS_DST/mysqldumpslow        $MYSQL_SRC/scripts/mysqldumpslow
 %format all
 f 755 root root $BINS_DST/mysqlhotcopy         $MYSQL_SRC/scripts/mysqlhotcopy
 f 755 root root $BINS_DST/mysqltest            $MYSQL_SRC/client/.libs/mysqltest
+%format rpm
 f 755 root root $BINS_DST/perror               $MYSQL_SRC/extra/perror
+%format all
 f 755 root root $BINS_DST/replace              $MYSQL_SRC/extra/replace
 f 755 root root $BINS_DST/resolve_stack_dump   $MYSQL_SRC/extra/resolve_stack_dump
 f 755 root root $BINS_DST/resolveip            $MYSQL_SRC/extra/resolveip
@@ -92,8 +94,8 @@ f 644 root root $MAN_DST/man1/innochecksum.1.gz      $MYSQL_SRC/man/innochecksum
 %format deb
 f 644 root root $MAN_DST/man1/msql2mysql.1.gz        $MYSQL_SRC/man/msql2mysql.1.gz
 %format all
-f 644 root root $MAN_DST/man1/my_print_defaults.1.gz $MYSQL_SRC/man/my_print_defaults.1.gz
 %format rpm
+f 644 root root $MAN_DST/man1/my_print_defaults.1.gz $MYSQL_SRC/man/my_print_defaults.1.gz
 f 644 root root $MAN_DST/man1/myisam_ftdump.1.gz     $MYSQL_SRC/man/myisam_ftdump.1.gz
 %format all
 f 644 root root $MAN_DST/man1/myisamchk.1.gz         $MYSQL_SRC/man/myisamchk.1.gz
@@ -130,8 +132,9 @@ f 644 root root $MAN_DST/man1/mysqlman.1.gz          $MYSQL_SRC/man/mysqlman.1.g
 f 644 root root $MAN_DST/man1/mysqltest.1.gz         $MYSQL_SRC/man/mysqltest.1.gz
 %format deb
 l 000 root root $MAN_DST/man1/mysqltest_embedded.1.gz mysqltest.1.gz
-%format all
+%format rpm
 f 644 root root $MAN_DST/man1/perror.1.gz            $MYSQL_SRC/man/perror.1.gz
+%format all
 f 644 root root $MAN_DST/man1/replace.1.gz           $MYSQL_SRC/man/replace.1.gz
 f 644 root root $MAN_DST/man1/resolve_stack_dump.1.gz $MYSQL_SRC/man/resolve_stack_dump.1.gz
 f 644 root root $MAN_DST/man1/resolveip.1.gz         $MYSQL_SRC/man/resolveip.1.gz
