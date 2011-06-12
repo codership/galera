@@ -25,18 +25,19 @@ gcs_group_init (gcs_group_t* group, const char* node_name, const char* inc_addr)
     group->state_uuid   = GU_UUID_NIL;
     group->group_uuid   = GU_UUID_NIL;
     group->proto        = -1;
-    group->num          = 1;
-    group->my_idx       = 0;
+    group->num          = 1; // this must be removed (#474)
+    group->my_idx       = 0; // this must be -1 (#474)
     group->my_name      = strdup(node_name ? node_name : NODE_NO_NAME);
     group->my_address   = strdup(inc_addr  ? inc_addr  : NODE_NO_ADDR);
     group->state        = GCS_GROUP_NON_PRIMARY;
     group->last_applied = GCS_SEQNO_ILL; // mark for recalculation
     group->last_node    = -1;
     group->frag_reset   = true; // just in case
-    group->nodes        = GU_CALLOC(group->num, gcs_node_t);
+    group->nodes        = GU_CALLOC(group->num, gcs_node_t); // this must be removed (#474)
 
-    if (!group->nodes) return -ENOMEM;
+    if (!group->nodes) return -ENOMEM; // this should be removed (#474)
 
+/// this should be removed (#474)
     gcs_node_init (&group->nodes[group->my_idx], NODE_NO_ID,
                    group->my_name, group->my_address);
 
@@ -86,8 +87,8 @@ group_nodes_init (const gcs_group_t* group, const gcs_comp_msg_t* comp)
             }
             else { // this node
                 gcs_node_init (&ret[i], gcs_comp_msg_id (comp, i),
-                               group->nodes[group->my_idx].name,
-                               group->nodes[group->my_idx].inc_addr);
+                               group->my_name,
+                               group->my_address);
             }
         }
     }
@@ -386,7 +387,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
                     gu_info ("Starting new group from scratch: "GU_UUID_FORMAT,
                              GU_UUID_ARGS(&group->group_uuid));
                 }
-
+// the following should be removed under #474
                 group->nodes[0].status = GCS_NODE_STATE_JOINED;
                 /* initialize node ID to the one given by the backend - this way
                  * we'll be recognized as coming from prev. conf. in node array
@@ -401,7 +402,6 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     }
 
     /* Remap old node array to new one to preserve action continuity */
-    assert (group->nodes);
     for (new_idx = 0; new_idx < new_nodes_num; new_idx++) {
         /* find member index in old component by unique member id */
         for (old_idx = 0; old_idx < group->num; old_idx++) {

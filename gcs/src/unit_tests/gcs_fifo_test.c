@@ -31,6 +31,7 @@ START_TEST (gcs_fifo_lite_test)
     fail_if (fifo->used != 0, "fifo->used is %z for an empty FIFO",
              fifo->used);
 
+    gcs_fifo_lite_open (fifo);
     // fill FIFO
     for (i = 1; i <= FIFO_LENGTH; i++) {
         item = gcs_fifo_lite_get_tail (fifo);

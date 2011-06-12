@@ -116,7 +116,7 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
              "gcs_core_recv(): expected %lld, returned %zd (%s)",
              (long long) size, act->size, strerror (-act->size));
     FAIL_IF (act->type != type,
-             "type does not match");
+             "type does not match: expected %d, got %d", type, act->type);
     FAIL_IF (act->size > 0 && act->data == NULL,
              "null buffer with positive size: %zu", act->size);
 

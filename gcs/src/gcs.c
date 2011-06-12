@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2011 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -68,6 +68,7 @@ typedef enum
     GCS_CONN_OPEN,     // just connected to group, non-primary
     GCS_CONN_CLOSED,
     GCS_CONN_DESTROYED,
+    GCS_CONN_ERROR,
     GCS_CONN_STATE_MAX
 }
 gcs_conn_state_t;
@@ -83,7 +84,8 @@ static const char* gcs_conn_state_str[GCS_CONN_STATE_MAX] =
     "PRIMARY",
     "OPEN",
     "CLOSED",
-    "DESTROYED"
+    "DESTROYED",
+    "ERROR"
 };
 
 static bool const GCS_FC_STOP = true;
@@ -106,7 +108,7 @@ struct gcs_conn
     char* socket;
 
     gcs_conn_state_t state;
-    int              err;
+//DELETE    int              err;
 
     gu_config_t*      config;
     bool              config_is_local;
@@ -1166,53 +1168,59 @@ long gcs_open (gcs_conn_t* conn, const char* channel, const char* url)
 {
     long ret = 0;
 
-//    if ((ret = gcs_queue_reset (conn->recv_q))) return ret;
+    if ((ret = gcs_sm_open(conn->sm))) return ret; // open in case it is closed
 
     gu_cond_t tmp_cond; /* TODO: rework when concurrency in SM is allowed */
     gu_cond_init (&tmp_cond, NULL);
-    if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, false)))
+
+    if ((ret = gcs_sm_enter (conn->sm, &tmp_cond, false)))
     {
-        if (GCS_CONN_CLOSED == conn->state) {
+        gu_error("Failed to enter send monitor: %d (%s)", ret, strerror(-ret));
+        return ret;
+    }
 
-            if (!(ret = gcs_core_open (conn->core, channel, url))) {
+    if (GCS_CONN_CLOSED == conn->state) {
 
-                if (0 < (ret = gcs_set_pkt_size
-                         (conn, conn->params.max_packet_size))) {
+        if (!(ret = gcs_core_open (conn->core, channel, url))) {
 
-                    if (!(ret = gu_thread_create (&conn->recv_thread,
-                                                  NULL,
-                                                  gcs_recv_thread,
-                                                  conn))) {
-                        // conn->state = GCS_CONN_OPEN; // by default
-                        gcs_shift_state (conn, GCS_CONN_OPEN);
-                        gu_info ("Opened channel '%s'", channel);
-                        goto out;
-                    }
-                    else {
-                        gu_error ("Failed to create main receive thread: "
-                                  "%ld (%s)", ret, strerror(-ret));
-                    }
+            if (0 < (ret = gcs_set_pkt_size
+                     (conn, conn->params.max_packet_size))) {
 
+                if (!(ret = gu_thread_create (&conn->recv_thread,
+                                              NULL,
+                                              gcs_recv_thread,
+                                              conn))) {
+                    gcs_fifo_lite_open(conn->repl_q);
+                    gu_fifo_open(conn->recv_q);
+                    gcs_shift_state (conn, GCS_CONN_OPEN);
+                    gu_info ("Opened channel '%s'", channel);
+                    goto out;
                 }
                 else {
-                    gu_error ("Failed to set packet size: %ld (%s)",
+                    gu_error ("Failed to create main receive thread: %ld (%s)",
                               ret, strerror(-ret));
                 }
-
-                gcs_core_close (conn->core);
             }
             else {
-                gu_error ("Failed to open channel '%s' at '%s': %d (%s)",
-                          channel, url, ret, strerror(-ret));
+                gu_error ("Failed to set packet size: %ld (%s)",
+                          ret, strerror(-ret));
             }
+
+            gcs_core_close (conn->core);
         }
         else {
-            ret = -EBADFD;
+            gu_error ("Failed to open channel '%s' at '%s': %d (%s)",
+                      channel, url, ret, strerror(-ret));
         }
-out:
-        gcs_sm_leave (conn->sm);
-        gu_cond_destroy (&tmp_cond);
     }
+    else {
+        gu_error ("Bad GCS connection state: %d (%s)",
+                  conn->state, gcs_conn_state_str[conn->state]);
+        ret = -EBADFD;
+    }
+out:
+    gcs_sm_leave (conn->sm);
+    gu_cond_destroy (&tmp_cond);
 
     return ret;
 }
@@ -1228,7 +1236,7 @@ long gcs_close (gcs_conn_t *conn)
     if ((ret = gcs_sm_close (conn->sm))) return ret;
 
     if (GCS_CONN_CLOSED <= conn->state) {
-        ret = -EBADFD;
+        return -EBADFD;
     }
     else if (!(ret = gcs_core_close (conn->core))) {
 
@@ -1242,7 +1250,7 @@ long gcs_close (gcs_conn_t *conn)
                      gcs_conn_state_str[GCS_CONN_CLOSED]);
             gcs_shift_state (conn, GCS_CONN_CLOSED);
         }
-        conn->err = -ECONNABORTED;
+//DELETE        conn->err = -ECONNABORTED;
     }
 
     if (!ret) {
@@ -1299,7 +1307,7 @@ long gcs_destroy (gcs_conn_t *conn)
         gu_fifo_destroy (conn->recv_q);
 
         gcs_shift_state (conn, GCS_CONN_DESTROYED);
-        conn->err   = -EBADFD;
+//DELETE        conn->err   = -EBADFD;
         /* we must unlock the mutex here to allow unfortunate threads
          * to acquire the lock and give up gracefully */
     }
