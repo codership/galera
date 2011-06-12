@@ -24,6 +24,8 @@ typedef struct gu_fifo gu_fifo_t;
 extern gu_fifo_t* gu_fifo_create (size_t length, size_t unit);
 /*! puts FIFO into closed state, waking up waiting threads */
 extern void gu_fifo_close (gu_fifo_t *queue);
+/*! (re)opens FIFO */
+extern void gu_fifo_open (gu_fifo_t *queue);
 /*! destructor - would block until all members are dequeued */
 extern void gu_fifo_destroy (gu_fifo_t *queue);
 /*! for logging purposes */

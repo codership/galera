@@ -98,6 +98,26 @@ gcs_sm_close (gcs_sm_t* sm)
     return 0;
 }
 
+long
+gcs_sm_open (gcs_sm_t* sm)
+{
+    long ret = -1;
+
+    if (gu_unlikely(gu_mutex_lock (&sm->lock))) abort();
+
+    if (-EBADFD == sm->ret)  /* closed */
+    {
+        sm->ret = 0;
+    }
+    ret = sm->ret;
+
+    gu_mutex_unlock (&sm->lock);
+
+    if (ret) { gu_error ("Can't open send monitor: wrong state %d", ret); }
+
+    return ret;
+}
+
 void
 gcs_sm_destroy (gcs_sm_t* sm)
 {

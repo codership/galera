@@ -171,6 +171,7 @@ gcs_core_open (gcs_core_t* core,
         assert (NULL != core->backend.conn);
 
         if (!(ret = core->backend.open (&core->backend, channel))) {
+            gcs_fifo_lite_open (core->fifo);
             core->state = CORE_NON_PRIMARY;
         }
         else {
@@ -1012,8 +1013,8 @@ long gcs_core_close (gcs_core_t* core)
     }
     else {
         ret = core->backend.close (&core->backend);
+        gcs_fifo_lite_close (core->fifo);
     }
-
     gu_mutex_unlock (&core->send_lock);
 
     return ret;
@@ -1047,7 +1048,6 @@ long gcs_core_destroy (gcs_core_t* core)
     /* after that we must be able to destroy mutexes */
     while (gu_mutex_destroy (&core->send_lock));
     /* now noone will interfere */
-    gcs_fifo_lite_close (core->fifo);
     while ((tmp = gcs_fifo_lite_get_head (core->fifo))) {
         // whatever is in tmp.action is allocated by app., just forget it.
         gcs_fifo_lite_pop_head (core->fifo);

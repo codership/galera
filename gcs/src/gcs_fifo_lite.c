@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2011 Codership Oy <info@codership.com>
  *
  * $Id$
  *
@@ -41,9 +41,10 @@ gcs_fifo_lite_t* gcs_fifo_lite_create (size_t length, size_t item_size)
     ret = GU_CALLOC (1, gcs_fifo_lite_t);
 
     if (ret) {
-        ret->item_size = item_size;
         ret->length    = l;
+        ret->item_size = item_size;
 	ret->mask      = ret->length - 1;
+        ret->closed    = true;
 	ret->queue     = gu_malloc (ret->length * item_size);
 
 	if (ret->queue) {
@@ -61,11 +62,15 @@ gcs_fifo_lite_t* gcs_fifo_lite_create (size_t length, size_t item_size)
     return ret;
 }
 
-long gcs_fifo_lite_close (gcs_fifo_lite_t* fifo)
+void gcs_fifo_lite_close (gcs_fifo_lite_t* fifo)
 {
-    int ret = gu_mutex_lock (&fifo->lock);
+    GCS_FIFO_LITE_LOCK;
 
-    if (!ret) {
+    if (fifo->closed) {
+        gu_error ("Trying to close a closed FIFO");
+        assert(0);
+    }
+    else {
         fifo->closed = true;
 
         // wake whoever is waiting
@@ -73,21 +78,31 @@ long gcs_fifo_lite_close (gcs_fifo_lite_t* fifo)
         gu_cond_broadcast (&fifo->put_cond);
         fifo->get_wait = 0;
         gu_cond_broadcast (&fifo->get_cond);
-
-        gu_mutex_unlock (&fifo->lock);
     }
 
-    return ret;
+    gu_mutex_unlock (&fifo->lock);
+}
+
+void gcs_fifo_lite_open (gcs_fifo_lite_t* fifo)
+{
+    GCS_FIFO_LITE_LOCK;
+
+    if (!fifo->closed) {
+        gu_error ("Trying to open an open FIFO.");
+        assert(0);
+    }
+    else {
+        fifo->closed = false;
+    }
+
+    gu_mutex_unlock(&fifo->lock);
 }
 
 long gcs_fifo_lite_destroy (gcs_fifo_lite_t* f)
 {
-    int ret;
-
     if (f) {
-	if ((ret = gu_mutex_lock (&f->lock))) {
-	    return -ret; /* something's wrong */
-	}
+	if (gu_mutex_lock (&f->lock)) { abort(); }
+
 	if (f->destroyed) {
 	    gu_mutex_unlock (&f->lock);
 	    return -EALREADY;

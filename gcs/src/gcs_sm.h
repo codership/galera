@@ -73,6 +73,12 @@ extern long
 gcs_sm_close (gcs_sm_t* sm);
 
 /*!
+ * (Re)opens monitor for entering.
+ */
+extern long
+gcs_sm_open (gcs_sm_t* sm);
+
+/*!
  * Deallocates resources associated with the monitor
  */
 extern void

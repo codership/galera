@@ -174,7 +174,7 @@ static void fifo_close (gu_fifo_t* q)
 {
     if (!q->closed) {
 
-        q->length = 0;    /* prevent appending */
+//        q->length = 0;    /* prevent appending */
         q->closed = true; /* force putters to quit */
 
         // signal all the idle waiting threads
@@ -193,6 +193,13 @@ void gu_fifo_close (gu_fifo_t* q)
 {
     fifo_lock   (q);
     fifo_close  (q);
+    fifo_unlock (q);
+}
+
+void gu_fifo_open (gu_fifo_t* q)
+{
+    fifo_lock   (q);
+    q->closed = false;
     fifo_unlock (q);
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2011 Codership Oy <info@codership.com>
  *
  * $Id$
  *
@@ -49,7 +49,8 @@ gcs_fifo_lite_t;
  * of overflow situation.
  */
 gcs_fifo_lite_t* gcs_fifo_lite_create  (size_t length, size_t item_size);
-long             gcs_fifo_lite_close   (gcs_fifo_lite_t* fifo);
+void             gcs_fifo_lite_close   (gcs_fifo_lite_t* fifo);
+void             gcs_fifo_lite_open    (gcs_fifo_lite_t* fifo);
 long             gcs_fifo_lite_destroy (gcs_fifo_lite_t* fifo);
 
 static inline void*

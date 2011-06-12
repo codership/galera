@@ -752,7 +752,7 @@ static wsrep_t galera_str = {
     &galera_pause,
     &galera_resume,
     "Galera",
-    "0.8pre",
+    "0.8.0",
     "Codership Oy <info@codership.com>",
     &galera_tear_down,
     NULL,
