@@ -213,9 +213,9 @@ group_check_donor (gcs_group_t* group)
         }
 
         gu_warn ("Donor %s is no longer in the group. State transfer cannot "
-                 "be completed, need to abort.", donor_id);
+                 "be completed, need to abort. Aborting...", donor_id);
 
-        abort();
+        gu_abort();
     }
 
     return;
@@ -311,7 +311,7 @@ group_check_comp_msg (bool prim, long my_idx, long members)
               prim ? "PRIMARY" : "NON-PRIMARY", my_idx, members);
 
     assert (0);
-    abort ();
+    gu_abort ();
 }
 
 gcs_group_state_t
@@ -619,8 +619,8 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
                 // this node will be waiting for SST forever. If it has only
                 // one recv thread there is no (generic) way to wake it up.
                 gu_fatal ("Will never receive state. Need to abort.");
+                // return to core to shutdown the backend before aborting
                 return -ENOTRECOVERABLE;
-                // abort();
             }
         }
         else {

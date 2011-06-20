@@ -852,7 +852,7 @@ core_msg_to_action (gcs_core_t*          core,
                 // See #165.
                 // There is nobody to pass this error to for graceful shutdown:
                 // application thread is blocked waiting for SST.
-                abort();
+                gu_abort();
             }
             act_type = GCS_ACT_JOIN;
             break;

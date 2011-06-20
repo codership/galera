@@ -34,6 +34,7 @@ extern "C" {
 #include "gu_dbug.h"
 #include "gu_fifo.h"
 #include "gu_uuid.h"
+#include "gu_utils.h" // gu_abort()
 }
 
 #endif /* _galerautils_hpp_ */
