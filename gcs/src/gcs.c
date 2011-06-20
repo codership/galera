@@ -1595,9 +1595,9 @@ long gcs_recv (gcs_conn_t*     conn,
             }
             else {
                 gu_fatal ("Last opportunity to send CONT message failed: "
-                          "%d (%s). Crashing to avoid cluster lock-up",
+                          "%d (%s). Aborting to avoid cluster lock-up...",
                           err, strerror(-err));
-                abort();
+                gu_abort();
             }
         }
         else if (gu_unlikely(send_sync) && (err = gcs_send_sync_end (conn))) {
