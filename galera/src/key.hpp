@@ -12,6 +12,7 @@
 
 #include <deque>
 #include <iomanip>
+#include <iterator>
 
 #include <cstring>
 #include <stdint.h>
