@@ -10,11 +10,14 @@
 
 /*! Initialize node context */
 void
-gcs_node_init (gcs_node_t* node,
+gcs_node_init (gcs_node_t* const node,
                gcache_t*   cache,
-               const char* id,
-               const char* name,
-               const char* inc_addr)
+               const char* const id,
+               const char* const name,
+               const char* const inc_addr,
+               int const gcs_proto_ver,
+               int const repl_proto_ver,
+               int const appl_proto_ver)
 {
     assert(strlen(id) > 0);
     assert(strlen(id) < sizeof(node->id));
@@ -24,10 +27,12 @@ gcs_node_init (gcs_node_t* node,
     node->status    = GCS_NODE_STATE_NON_PRIM;
     node->name      = strdup (name     ? name     : NODE_NO_NAME);
     node->inc_addr  = strdup (inc_addr ? inc_addr : NODE_NO_ADDR);
-    node->proto_min = GCS_ACT_PROTO_MIN;
-    node->proto_max = GCS_ACT_PROTO_MAX;
     gcs_defrag_init (&node->app, cache); // GCS_ACT_TORDERED goes only here
     gcs_defrag_init (&node->oob, NULL);
+
+    node->gcs_proto_ver  = gcs_proto_ver;
+    node->repl_proto_ver = repl_proto_ver;
+    node->appl_proto_ver = appl_proto_ver;
 }
 
 /*! Move data from one node object to another */
@@ -74,10 +79,12 @@ gcs_node_free (gcs_node_t* node)
         free ((char*)node->name);     // was strdup'ed
         node->name = NULL;
     }
+
     if (node->inc_addr) {
         free ((char*)node->inc_addr); // was strdup'ed
         node->inc_addr = NULL;
     }
+
     if (node->state_msg) {
         gcs_state_msg_destroy ((gcs_state_msg_t*)node->state_msg);
         node->state_msg = NULL;
@@ -93,10 +100,13 @@ gcs_node_record_state (gcs_node_t* node, gcs_state_msg_t* state_msg)
     }
     node->state_msg = state_msg;
 
-    // copy relevant stuff from state into node
-    node->status    = gcs_state_msg_current_state (state_msg);
-    node->proto_min = gcs_state_msg_proto_min (state_msg);
-    node->proto_max = gcs_state_msg_proto_max (state_msg);
+    // copy relevant stuff from state msg into node
+    node->status = gcs_state_msg_current_state (state_msg);
+
+    gcs_state_msg_get_proto_ver (state_msg,
+                                 &node->gcs_proto_ver,
+                                 &node->repl_proto_ver,
+                                 &node->appl_proto_ver);
 
     if (node->name) free ((char*)node->name);
     node->name = strdup (gcs_state_msg_name (state_msg));

@@ -41,7 +41,6 @@ typedef struct gcs_group
     gcs_seqno_t   conf_id;      // current configuration seqno
     gu_uuid_t     state_uuid;   // state exchange id
     gu_uuid_t     group_uuid;   // group UUID
-    gcs_proto_t   proto;        // protocol version to use
     long          num;          // number of nodes
     long          my_idx;       // my index in the group
     const char*   my_name;
@@ -57,6 +56,13 @@ typedef struct gcs_group
     gu_seqno_t       prim_seqno;
     long             prim_num;
     gcs_node_state_t prim_state;
+
+    /* max supported protocols */
+    gcs_proto_t const gcs_proto_ver;
+    int         const repl_proto_ver;
+    int         const appl_proto_ver;
+
+    gcs_state_quorum_t quorum;
 }
 gcs_group_t;
 
@@ -67,7 +73,10 @@ extern long
 gcs_group_init (gcs_group_t* group,
                 gcache_t*    cache,
                 const char*  node_name, ///< can be null
-                const char*  inc_addr); ///< can be null
+                const char*  inc_addr,  ///< can be null
+                gcs_proto_t  gcs_proto_ver,
+                int          repl_proto_ver,
+                int          appl_proto_ver);
 
 /*!
  * Initialize group action history parameters. See gcs.h
@@ -206,9 +215,14 @@ gcs_group_my_idx (gcs_group_t* group)
     return group->my_idx;
 }
 
-/*! Creates new configuration action */
+/*!
+ * Creates new configuration action
+ * @param group group handle
+ * @param act   GCS action object
+ * @param proto protocol version gcs should use for this configuration
+ */
 extern ssize_t
-gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act);
+gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act, int* proto);
 
 /*! Returns state object for state message */
 extern gcs_state_msg_t*

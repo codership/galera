@@ -41,6 +41,8 @@ extern gcs_core_t*
 gcs_core_create (const char*  node_name,
                  const char*  inc_addr,
                  gu_config_t* conf,
+                 int          repl_proto_ver,
+                 int          appl_proto_ver,
                  gcache_t*    cache);
 
 /* initializes action history (global seqno, group UUID). See gcs.h */

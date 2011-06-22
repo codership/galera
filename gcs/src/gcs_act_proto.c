@@ -8,7 +8,6 @@
  * (to be extended to support protocol versions, currently supports only v0)
  */
 #include <errno.h>
-#include <galerautils.h>
 #include "gcs_act_proto.h"
 
 /*
@@ -37,7 +36,7 @@ static const size_t    PROTO_ACT_SIZE_MAX = 0xFFFFFFFF;
 static const ulong     PROTO_FRAG_NO_MAX  = 0xFFFFFFFF;
 static const ulong     PROTO_AT_MAX       = 0xFF;
 
-static const char   PROTO_VERSION = 0x0;
+static const int       PROTO_VERSION = GCS_ACT_PROTO_MAX;
 
 /*! Writes header data into actual header of the message.
  *  Remainig fragment buf and length is in frag->frag and frag->frag_len
@@ -84,10 +83,10 @@ gcs_act_proto_read (gcs_act_frag_t* frag, const void* buf, size_t buf_len)
 {
     frag->proto_ver = ((uint8_t*)buf)[PROTO_PV_OFFSET];
 #ifdef GCS_DEBUG_PROTO
-    if (gu_unlikely(frag->proto_ver != PROTO_VERSION)) {
+    if (gu_unlikely(frag->proto_ver > PROTO_VERSION)) {
         gu_error ("Bad protocol version %d, expected %d",
                   frag->proto_ver, PROTO_VERSION);
-        return -EPROTO;
+        return -EPROTO; // this fragment should be dropped
     }
     if (gu_unlikely(buf_len < PROTO_DATA_OFFSET)) {
         gu_error ("Action message too short: %zu, expected at least %d",
@@ -106,27 +105,11 @@ gcs_act_proto_read (gcs_act_frag_t* frag, const void* buf, size_t buf_len)
     return 0;
 }
 
-/*! Increments fragment counter when action remains the same.
- *
- * @return non-negative counter value on success
- */
-long
-gcs_act_proto_inc (void* buf)
-{
-    register uint32_t frag_no = gtohl(((uint32_t*)buf)[3]) + 1;
-#ifdef GCS_DEBUG_PROTO
-    if (((uint8_t*)buf)[PROTO_PV_OFFSET] != PROTO_VERSION) return -EPROTO;
-    if (!frag_no) return -EOVERFLOW;
-#endif
-    ((uint32_t*)buf)[3] = htogl(frag_no);
-    return frag_no;
-}
-
 /*! Returns protocol header size */
 long
 gcs_act_proto_hdr_size (long version)
 {
-    if (GCS_ACT_PROTO_MAX < version || GCS_ACT_PROTO_MIN > version) {
+    if (GCS_ACT_PROTO_MAX < version || version < 0) {
         return -EPROTONOSUPPORT;
     }
     return PROTO_DATA_OFFSET;

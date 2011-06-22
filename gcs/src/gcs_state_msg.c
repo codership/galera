@@ -11,6 +11,8 @@
 #include <string.h>
 #include <galerautils.h>
 
+#define GCS_STATE_MSG_VER 0
+
 #define GCS_STATE_MSG_ACCESS
 #include "gcs_state_msg.h"
 
@@ -25,12 +27,23 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       gcs_node_state_t current_state,
                       const char*      name,
                       const char*      inc_addr,
-                      gcs_proto_t      proto_min,
-                      gcs_proto_t      proto_max,
+                      int              gcs_proto_ver,
+                      int              repl_proto_ver,
+                      int              appl_proto_ver,
                       uint8_t          flags)
 {
-    size_t name_len  = strlen(name) + 1;
-    size_t addr_len  = strlen(inc_addr) + 1;
+#define CHECK_PROTO_RANGE(LEVEL)                                        \
+    if (LEVEL < 0 || LEVEL > UINT8_MAX) {                               \
+        gu_error ("#LEVEL value %d is out of range [0, %d]", LEVEL,UINT8_MAX); \
+        return NULL;                                                       \
+    }
+
+    CHECK_PROTO_RANGE(gcs_proto_ver);
+    CHECK_PROTO_RANGE(repl_proto_ver);
+    CHECK_PROTO_RANGE(appl_proto_ver);
+
+    size_t name_len = strlen(name) + 1;
+    size_t addr_len = strlen(inc_addr) + 1;
     gcs_state_msg_t* ret =
         gu_calloc (1, sizeof (gcs_state_msg_t) + name_len + addr_len);
 
@@ -43,8 +56,10 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
         ret->act_seqno     = act_seqno;
         ret->prim_state    = prim_state;
         ret->current_state = current_state;
-        ret->proto_min     = proto_min;
-        ret->proto_max     = proto_max;
+        ret->version       = GCS_STATE_MSG_VER;
+        ret->gcs_proto_ver = gcs_proto_ver;
+        ret->repl_proto_ver= repl_proto_ver;
+        ret->appl_proto_ver= appl_proto_ver;
         ret->name          = (void*)(ret) + sizeof (gcs_state_msg_t);
         ret->inc_addr      = ret->name + name_len;
         ret->flags         = flags;
@@ -73,8 +88,8 @@ gcs_state_msg_len (gcs_state_msg_t* state)
     return (
         sizeof (int8_t)      +   // version (reserved)
         sizeof (int8_t)      +   // flags
-        sizeof (int8_t)      +   // proto_min
-        sizeof (int8_t)      +   // proto_max
+        sizeof (int8_t)      +   // gcs_proto_ver
+        sizeof (int8_t)      +   // repl_proto_ver
         sizeof (int8_t)      +   // prim_state
         sizeof (int8_t)      +   // curr_state
         sizeof (int16_t)     +   // prim_joined
@@ -84,24 +99,25 @@ gcs_state_msg_len (gcs_state_msg_t* state)
         sizeof (int64_t)     +   // act_seqno
         sizeof (int64_t)     +   // prim_seqno
         strlen (state->name) + 1 +
-        strlen (state->inc_addr) + 1
+        strlen (state->inc_addr) + 1 +
+        sizeof (uint8_t)         // appl_proto_ver (in preparation for V1)
         );
 }
 
-#define STATE_MSG_FIELDS_V0(_const,buf)                            \
-    _const int8_t*    version     = (buf);                         \
-    _const int8_t*    flags       = version    + 1;                \
-    _const int8_t*    proto_min   = flags      + 1;                \
-    _const int8_t*    proto_max   = proto_min  + 1;                \
-    _const int8_t*    prim_state  = proto_max  + 1;                \
-    _const int8_t*    curr_state  = prim_state + 1;                \
-    _const int16_t*   prim_joined = (int16_t*)(curr_state + 1);    \
-    _const gu_uuid_t* state_uuid  = (gu_uuid_t*)(prim_joined + 1); \
-    _const gu_uuid_t* group_uuid  = state_uuid + 1;                \
-    _const gu_uuid_t* prim_uuid   = group_uuid + 1;                \
-    _const int64_t*   act_seqno   = (int64_t*)(prim_uuid + 1);     \
-    _const int64_t*   prim_seqno  = act_seqno + 1;                 \
-    _const char*      name        = (char*)(prim_seqno + 1);
+#define STATE_MSG_FIELDS_V0(_const,buf)                                 \
+    _const int8_t*    version        = (buf);                           \
+    _const int8_t*    flags          = version        + 1;              \
+    _const int8_t*    gcs_proto_ver  = flags          + 1;              \
+    _const int8_t*    repl_proto_ver = gcs_proto_ver  + 1;              \
+    _const int8_t*    prim_state     = repl_proto_ver + 1;              \
+    _const int8_t*    curr_state     = prim_state     + 1;              \
+    _const int16_t*   prim_joined    = (int16_t*)(curr_state + 1);      \
+    _const gu_uuid_t* state_uuid     = (gu_uuid_t*)(prim_joined + 1);   \
+    _const gu_uuid_t* group_uuid     = state_uuid     + 1;              \
+    _const gu_uuid_t* prim_uuid      = group_uuid     + 1;              \
+    _const int64_t*   act_seqno      = (int64_t*)(prim_uuid + 1);       \
+    _const int64_t*   prim_seqno     = act_seqno      + 1;              \
+    _const char*      name           = (char*)(prim_seqno + 1);
 
 /* Serialize gcs_state_msg_t into buf */
 ssize_t
@@ -109,56 +125,60 @@ gcs_state_msg_write (void* buf, const gcs_state_msg_t* state)
 {
     STATE_MSG_FIELDS_V0(,buf);
     char*     inc_addr  = name + strlen (state->name) + 1;
+    uint8_t*  appl_proto_ver = (void*)(inc_addr + strlen(state->inc_addr) + 1);
 
-    *version     = 0;
-    *flags       = state->flags;
-    *proto_min   = state->proto_min;
-    *proto_max   = state->proto_max;
-    *prim_state  = state->prim_state;
-    *curr_state  = state->current_state;
-    *prim_joined = gu_le16(((int16_t)state->prim_joined));
-    *state_uuid  = state->state_uuid;
-    *group_uuid  = state->group_uuid;
-    *prim_uuid   = state->prim_uuid;
-    *act_seqno   = gu_le64(state->act_seqno);
-    *prim_seqno  = gu_le64(state->prim_seqno);
+    *version        = GCS_STATE_MSG_VER;
+    *flags          = state->flags;
+    *gcs_proto_ver  = state->gcs_proto_ver;
+    *repl_proto_ver = state->repl_proto_ver;
+    *prim_state     = state->prim_state;
+    *curr_state     = state->current_state;
+    *prim_joined    = gu_le16(((int16_t)state->prim_joined));
+    *state_uuid     = state->state_uuid;
+    *group_uuid     = state->group_uuid;
+    *prim_uuid      = state->prim_uuid;
+    *act_seqno      = gu_le64(state->act_seqno);
+    *prim_seqno     = gu_le64(state->prim_seqno);
     strcpy (name,     state->name);
     strcpy (inc_addr, state->inc_addr);
+    *appl_proto_ver = state->appl_proto_ver; // in preparation for V1
 
-    return (inc_addr + strlen(inc_addr) + 1 - (char*)buf);
+    return (appl_proto_ver + 1 - (uint8_t*)buf);
 }
 
 /* De-serialize gcs_state_msg_t from buf */
 gcs_state_msg_t*
 gcs_state_msg_read (const void* buf, size_t buf_len)
 {
-    unsigned char version = *((uint8_t*)buf);
+    /* beginning of the message is always version 0 */
+    STATE_MSG_FIELDS_V0(const,buf);
+    const char* inc_addr = name + strlen (name) + 1;
 
-    switch (version) {
-    case 0: {
-        STATE_MSG_FIELDS_V0(const,buf);
-        const char* inc_addr = name + strlen (name) + 1;
+    int appl_proto_ver = 0;
+    if (*version >= 1) {
+        appl_proto_ver = *(uint8_t*)(inc_addr + strlen(inc_addr) + 1);
+    }
 
-        return gcs_state_msg_create (
-            state_uuid,
-            group_uuid,
-            prim_uuid,
-            gu_le16(*prim_joined),
-            gu_le64(*prim_seqno),
-            gu_le64(*act_seqno),
-            *prim_state,
-            *curr_state,
-            name,
-            inc_addr,
-            *proto_min,
-            *proto_max,
-            *flags
-            );
-    }
-    default:
-        gu_error ("Unrecognized state message v. %u", version);
-        return NULL;
-    }
+    gcs_state_msg_t* ret = gcs_state_msg_create (
+        state_uuid,
+        group_uuid,
+        prim_uuid,
+        gu_le16(*prim_joined),
+        gu_le64(*prim_seqno),
+        gu_le64(*act_seqno),
+        *prim_state,
+        *curr_state,
+        name,
+        inc_addr,
+        *gcs_proto_ver,
+        *repl_proto_ver,
+        appl_proto_ver,
+        *flags
+        );
+
+    if (ret) ret->version = *version; // dirty hack
+
+    return ret;
 }
 
 /* Print state message contents to buffer */
@@ -167,8 +187,9 @@ gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
 {
     str[size - 1] = '\0'; // preventive termination
     return snprintf (str, size - 1,
+                     "\n\tVersion      : %d"
                      "\n\tFlags        : %u"
-                     "\n\tProtocols    : %u - %u"
+                     "\n\tProtocols    : %d / %d / %d"
                      "\n\tState        : %s"
                      "\n\tPrim state   : %s"
                      "\n\tPrim UUID    : "GU_UUID_FORMAT
@@ -179,8 +200,10 @@ gcs_state_msg_snprintf (char* str, size_t size, const gcs_state_msg_t* state)
                      "\n\tGroup UUID   : "GU_UUID_FORMAT
                      "\n\tName         : '%s'"
                      "\n\tIncoming addr: '%s'\n",
+                     state->version,
                      state->flags,
-                     state->proto_min, state->proto_max,
+                     state->gcs_proto_ver, state->repl_proto_ver,
+                     state->appl_proto_ver,
                      gcs_node_state_to_str(state->current_state),
                      gcs_node_state_to_str(state->prim_state),
                      GU_UUID_ARGS(&state->prim_uuid),
@@ -244,16 +267,15 @@ gcs_state_msg_inc_addr (const gcs_state_msg_t* state)
 }
 
 /* Get supported protocols */
-gcs_proto_t
-gcs_state_msg_proto_min (const gcs_state_msg_t* state)
+void
+gcs_state_msg_get_proto_ver (const gcs_state_msg_t* state,
+                             int* gcs_proto_ver,
+                             int* repl_proto_ver,
+                             int* appl_proto_ver)
 {
-    return state->proto_min;
-}
-
-gcs_proto_t
-gcs_state_msg_proto_max (const gcs_state_msg_t* state)
-{
-    return state->proto_max;
+    *gcs_proto_ver  = state->gcs_proto_ver;
+    *repl_proto_ver = state->repl_proto_ver;
+    *appl_proto_ver = state->appl_proto_ver;
 }
 
 /* Returns the node which is most representative of a group */
@@ -300,7 +322,7 @@ state_report_uuids (char* buf, size_t buf_len,
     }
 }
 
-#define GCS_STATE_MAX_LEN 720
+#define GCS_STATE_MAX_LEN 721
 
 /*! checks for inherited primary configuration, returns representative */
 static const gcs_state_msg_t*
@@ -469,7 +491,6 @@ state_quorum_remerge (const gcs_state_msg_t* states[],
     return rep;
 }
 
-
 /* Get quorum decision from state messages */
 long 
 gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
@@ -478,16 +499,8 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
 {
     long i;
     const gcs_state_msg_t*   rep = NULL;
-    const gcs_state_quorum_t STATE_QUORUM_NON_PRIMARY =
-        {
-            GU_UUID_NIL,
-            GCS_SEQNO_ILL,
-            GCS_SEQNO_ILL,
-            false,
-            -1
-        };
 
-    *quorum = STATE_QUORUM_NON_PRIMARY; // pessimistic assumption
+    *quorum = GCS_QUORUM_NON_PRIMARY; // pessimistic assumption
 
     rep = state_quorum_inherit (states, states_num, quorum);
 
@@ -503,12 +516,33 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
     assert (rep != NULL);
 
     // select the highest commonly supported protocol: min(proto_max)
-    quorum->proto = rep->proto_max;
+#define INIT_PROTO_VER(LEVEL) quorum->LEVEL = rep->LEVEL
+    INIT_PROTO_VER(version);
+    INIT_PROTO_VER(gcs_proto_ver);
+    INIT_PROTO_VER(repl_proto_ver);
+    INIT_PROTO_VER(appl_proto_ver);
+
     for (i = 0; i < states_num; i++) {
-        if (states[i]->proto_max <  quorum->proto &&
-            states[i]->proto_max >= rep->proto_min) {
-            quorum->proto = states[i]->proto_max;
+
+#define CHECK_MIN_PROTO_VER(LEVEL)                              \
+        if (states[i]->LEVEL <  quorum->LEVEL) {                \
+            quorum->LEVEL = states[i]->LEVEL;                   \
         }
+
+        CHECK_MIN_PROTO_VER(version);
+
+        if (states[i]->prim_state >= GCS_NODE_STATE_JOINED) {
+            CHECK_MIN_PROTO_VER(gcs_proto_ver);
+            CHECK_MIN_PROTO_VER(repl_proto_ver);
+            CHECK_MIN_PROTO_VER(appl_proto_ver);
+        }
+    }
+
+    if (quorum->version < 2) {;} // for future generations
+
+    if (quorum->version < 1) {
+        // appl_proto_ver is not supported by all members
+        quorum->appl_proto_ver = 0;
     }
 
     return 0;

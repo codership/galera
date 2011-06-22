@@ -397,7 +397,7 @@ START_TEST(gcs_memb_test_465)
 
         sprintf(name_str, "node%d", i);
         sprintf(addr_str, "addr%d", i);
-        gcs_group_init (&nodes[i].group, NULL, name_str, addr_str);
+        gcs_group_init (&nodes[i].group, NULL, name_str, addr_str, 0, 0, 0);
     }
 
     gcs_node_state_t node_state;
@@ -447,10 +447,12 @@ START_TEST(gcs_memb_test_465)
 
     fail_if (verify_node_state_across_group (&group, 1, GCS_NODE_STATE_SYNCED));
     struct gcs_act act;
-    ret = gcs_group_act_conf (&group.nodes[1]->group, &act);
+    int            proto_ver = -1;
+    ret = gcs_group_act_conf (&group.nodes[1]->group, &act, &proto_ver);
     fail_if (ret <= 0, "gcs_group_act_cnf() retruned %zd (%s)",
              ret, strerror (-ret));
     fail_if (ret != act.buf_len);
+    fail_if (proto_ver != 0 /* current version */, "proto_ver = %d", proto_ver);
     const gcs_act_conf_t* conf = act.buf;
     fail_if (NULL == conf);
     fail_if (conf->my_idx != 1);

@@ -43,7 +43,7 @@ struct gcs_core
     core_state_t    state;
 
     /* protocol */
-    long            proto_ver;
+    int             proto_ver;
 
     /* send part */
     gu_mutex_t      send_lock; // serves 3 purposes:
@@ -93,6 +93,8 @@ gcs_core_t*
 gcs_core_create (const char*  node_name,
                  const char*  inc_addr,
                  gu_config_t* const conf,
+                 int const    repl_proto_ver,
+                 int const    appl_proto_ver,
                  gcache_t*    const cache)
 {
     assert (conf);
@@ -114,8 +116,10 @@ gcs_core_create (const char*  node_name,
                                                sizeof (core_act_t));
             if (core->fifo) {
                 gu_mutex_init  (&core->send_lock, NULL);
-                gcs_group_init (&core->group, cache, node_name, inc_addr);
-                core->proto_ver = 0;
+                core->proto_ver = 0; // will be bumped in gcs_group_act_conf()
+                gcs_group_init (&core->group, cache, node_name, inc_addr,
+                                GCS_ACT_PROTO_MAX, repl_proto_ver,
+                                appl_proto_ver);
                 core->state = CORE_CLOSED;
 #ifdef GCS_CORE_TESTING
                 gu_lock_step_init (&core->ls);
@@ -445,7 +449,16 @@ core_handle_act_msg (gcs_core_t*          core,
 
     if ((CORE_PRIMARY == core->state) || my_msg){//should always handle own msgs
 
+        if (gu_unlikely(GCS_ACT_PROTO_MAX < gcs_act_proto_ver(msg->buf))) {
+            // this is most likely due to #482
+            gu_info ("Message with protocol version %d > max supported: %d. "
+                     "Need to abort.",
+                     gcs_act_proto_ver(msg->buf), GCS_ACT_PROTO_MAX);
+            return -ENOTRECOVERABLE;
+        }
+
         ret = gcs_act_proto_read (&frg, msg->buf, msg->size);
+
         if (gu_unlikely(ret)) {
             gu_fatal ("Error parsing action fragment header: %zd (%s).",
                       ret, strerror (-ret));
@@ -611,7 +624,7 @@ core_handle_comp_msg (gcs_core_t*          core,
         }
         gu_mutex_unlock (&core->send_lock);
 
-        ret = gcs_group_act_conf (group, act);
+        ret = gcs_group_act_conf (group, act, &core->proto_ver);
         if (ret < 0) {
             gu_fatal ("Failed create PRIM CONF action: %d (%s)",
                       ret, strerror (-ret));
@@ -658,7 +671,7 @@ core_handle_comp_msg (gcs_core_t*          core,
         if (gu_mutex_lock (&core->send_lock)) abort();
         {
             if (core->state < CORE_CLOSED) {
-                ret = gcs_group_act_conf (group, act);
+                ret = gcs_group_act_conf (group, act, &core->proto_ver);
                 if (ret < 0) {
                     gu_fatal ("Failed create NON-PRIM CONF action: %d (%s)",
                               ret, strerror (-ret));
@@ -802,7 +815,7 @@ core_handle_state_msg (gcs_core_t*          core,
             }
             gu_mutex_unlock (&core->send_lock);
 
-            ret = gcs_group_act_conf (group, act);
+            ret = gcs_group_act_conf (group, act, &core->proto_ver);
             if (ret < 0) {
                 gu_fatal ("Failed create CONF action: %d (%s)",
                           ret, strerror (-ret));
@@ -997,6 +1010,11 @@ out:
             recv_act->act.type   != GCS_ACT_TORDERED);
 
 //    gu_debug ("Returning %d", ret);
+
+    if (-ENOTRECOVERABLE == ret) {
+        conn->backend.close(&conn->backend);
+        gu_abort();
+    }
 
     return ret;
 }

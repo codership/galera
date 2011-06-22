@@ -240,7 +240,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_cond_           (),
     sst_retry_sec_      (1),
     gcache_             (config_, data_dir_),
-    gcs_                (config_, gcache_, args->node_name,args->node_incoming),
+    gcs_                (config_, gcache_, 0, 0, args->node_name, args->node_incoming),
     service_thd_        (gcs_),
     as_                 (0),
     gcs_as_             (gcs_, *this, gcache_),
