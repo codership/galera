@@ -17,14 +17,15 @@ const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
 };
 
 long
-gcs_group_init (gcs_group_t* group, const char* node_name, const char* inc_addr)
+gcs_group_init (gcs_group_t* group, const char* node_name, const char* inc_addr,
+                gcs_proto_t const gcs_proto_ver, int const repl_proto_ver,
+                int const appl_proto_ver)
 {
     // here we also create default node instance.
     group->act_id       = GCS_SEQNO_ILL;
     group->conf_id      = GCS_SEQNO_ILL;
     group->state_uuid   = GU_UUID_NIL;
     group->group_uuid   = GU_UUID_NIL;
-    group->proto        = -1;
     group->num          = 1; // this must be removed (#474)
     group->my_idx       = 0; // this must be -1 (#474)
     group->my_name      = strdup(node_name ? node_name : NODE_NO_NAME);
@@ -39,12 +40,19 @@ gcs_group_init (gcs_group_t* group, const char* node_name, const char* inc_addr)
 
 /// this should be removed (#474)
     gcs_node_init (&group->nodes[group->my_idx], NODE_NO_ID,
-                   group->my_name, group->my_address);
+                   group->my_name, group->my_address, gcs_proto_ver,
+                   repl_proto_ver, appl_proto_ver);
 
     group->prim_uuid  = GU_UUID_NIL;
     group->prim_seqno = GCS_SEQNO_ILL;
     group->prim_num   = 0;
     group->prim_state = GCS_NODE_STATE_NON_PRIM;
+
+    *(gcs_proto_t*)&group->gcs_proto_ver = gcs_proto_ver;
+    *(int*)&group->repl_proto_ver = repl_proto_ver;
+    *(int*)&group->appl_proto_ver = appl_proto_ver;
+
+    group->quorum = GCS_QUORUM_NON_PRIMARY;
 
     return 0;
 }
@@ -83,12 +91,14 @@ group_nodes_init (const gcs_group_t* group, const gcs_comp_msg_t* comp)
     if (ret) {
         for (i = 0; i < nodes_num; i++) {
             if (my_idx != i) {
-                gcs_node_init (&ret[i], gcs_comp_msg_id (comp, i), NULL, NULL);
+                gcs_node_init (&ret[i], gcs_comp_msg_id (comp, i), NULL, NULL,
+                               -1, -1, -1);
             }
             else { // this node
                 gcs_node_init (&ret[i], gcs_comp_msg_id (comp, i),
-                               group->my_name,
-                               group->my_address);
+                               group->my_name, group->my_address,
+                               group->gcs_proto_ver, group->repl_proto_ver,
+                               group->appl_proto_ver);
             }
         }
     }
@@ -226,7 +236,7 @@ static void
 group_post_state_exchange (gcs_group_t* group)
 {
     const gcs_state_msg_t* states[group->num];
-    gcs_state_quorum_t quorum;
+    gcs_state_quorum_t* quorum = &group->quorum;
     bool new_exchange = gu_uuid_compare (&group->state_uuid, &GU_UUID_NIL);
     long i;
 
@@ -246,22 +256,21 @@ group_post_state_exchange (gcs_group_t* group)
     gu_debug ("STATE EXCHANGE: "GU_UUID_FORMAT" complete.",
               GU_UUID_ARGS(&group->state_uuid));
 
-    gcs_state_msg_get_quorum (states, group->num, &quorum);
+    gcs_state_msg_get_quorum (states, group->num, quorum);
 
-    if (quorum.primary) {
+    if (quorum->primary) {
         // primary configuration
-        group->proto = quorum.proto;
         if (new_exchange) {
             // new state exchange happened
             group->state      = GCS_GROUP_PRIMARY;
-            group->act_id     = quorum.act_id;
-            group->conf_id    = quorum.conf_id + 1;
-            group->group_uuid = quorum.group_uuid;
+            group->act_id     = quorum->act_id;
+            group->conf_id    = quorum->conf_id + 1;
+            group->group_uuid = quorum->group_uuid;
 
             // Update each node state based on quorum outcome:
             // is it up to date, does it need SST and stuff
             for (i = 0; i < group->num; i++) {
-                gcs_node_update_status (&group->nodes[i], &quorum);
+                gcs_node_update_status (&group->nodes[i], quorum);
             }
 
             group->prim_uuid  = group->state_uuid;
@@ -282,15 +291,21 @@ group_post_state_exchange (gcs_group_t* group)
     }
 
     gu_info ("Quorum results:"
-             "\n\t%s,"
+             "\n\tversion    = %u,"
+             "\n\tcomponent  = %s,"
              "\n\tact_id     = %lld,"
              "\n\tconf_id    = %lld,"
              "\n\tlast_appl. = %lld,"
-             "\n\tprotocol   = %hd,"
+             "\n\tprotocols  = %d/%d/%d (gcs/repl/appl),"
              "\n\tgroup UUID = "GU_UUID_FORMAT,
-             quorum.primary ? "PRIMARY" : "NON-PRIMARY",
-             quorum.act_id, quorum.conf_id, group->last_applied, quorum.proto,
-             GU_UUID_ARGS(&quorum.group_uuid));
+             quorum->version,
+             quorum->primary ? "PRIMARY" : "NON-PRIMARY",
+             quorum->act_id,
+             quorum->conf_id,
+             group->last_applied,
+             quorum->gcs_proto_ver, quorum->repl_proto_ver,
+             quorum->appl_proto_ver,
+             GU_UUID_ARGS(&quorum->group_uuid));
 
     group_check_donor(group);
 }
@@ -428,6 +443,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     if (gcs_comp_msg_primary(comp)) {
         /* TODO: for now pretend that we always have new nodes and perform
          * state exchange because old states can carry outdated node status.
+         * (also protocol voting needs to be redone)
          * However this means aborting ongoing actions. Find a way to avoid
          * this extra state exchange. Generate new state messages on behalf
          * of other nodes? see #238 */
@@ -863,18 +879,30 @@ group_memb_record_size (gcs_group_t* group)
 
 /* Creates new configuration action */
 ssize_t
-gcs_group_act_conf (gcs_group_t* group, struct gcs_act* act)
+gcs_group_act_conf (gcs_group_t*    group,
+                    struct gcs_act* act,
+                    int*            gcs_proto_ver)
 {
+    if (*gcs_proto_ver < group->quorum.gcs_proto_ver)
+        *gcs_proto_ver = group->quorum.gcs_proto_ver; // only go up, see #482
+    else {
+        gu_warn ("Refusing GCS protocol version downgrade from %d to %d",
+                 *gcs_proto_ver, group->quorum.gcs_proto_ver);
+    }
+
     ssize_t conf_size = sizeof(gcs_act_conf_t) + group_memb_record_size(group);
     gcs_act_conf_t* conf = malloc (conf_size);
 
     if (conf) {
         long idx;
 
-        conf->seqno       = group->act_id;
-        conf->conf_id     = group->conf_id;
-        conf->memb_num    = group->num;
-        conf->my_idx      = group->my_idx;
+        conf->seqno          = group->act_id;
+        conf->conf_id        = group->conf_id;
+        conf->memb_num       = group->num;
+        conf->my_idx         = group->my_idx;
+        conf->repl_proto_ver = group->quorum.repl_proto_ver;
+        conf->appl_proto_ver = group->quorum.appl_proto_ver;
+
         memcpy (conf->group_uuid, &group->group_uuid, sizeof (gu_uuid_t));
 
         if (group->num) {
@@ -933,8 +961,9 @@ group_get_node_state (gcs_group_t* group, long node_idx)
         node->status,
         node->name,
         node->inc_addr,
-        node->proto_min,
-        node->proto_max,
+        node->gcs_proto_ver,
+        node->repl_proto_ver,
+        node->appl_proto_ver,
         flags
         );
 }

@@ -256,13 +256,14 @@ core_test_set_payload_size (ssize_t s)
 
     ret = gcs_core_set_pkt_size (Core, arbitrary_pkt_size);
     if (ret <= 0) {
-        gu_error("set_pkt_size() returned: %ld (%s)", ret, strerror (-ret));
+        gu_error("set_pkt_size(%zd) returned: %ld (%s)", arbitrary_pkt_size,
+                 ret, strerror (-ret));
         return ret;
     }
 
     ret = gcs_core_set_pkt_size (Core, arbitrary_pkt_size - ret + s);
     if (ret != s) {
-        gu_error("set_pkt_size() returned: %ld instead of %zu", ret, s);
+        gu_error("set_pkt_size() returned: %ld instead of %zd", ret, s);
         return ret;
     }
 
@@ -282,7 +283,7 @@ core_test_init ()
     fail_if (config == NULL);
 
     Core = gcs_core_create ("core_test",
-                            "aaa.bbb.ccc.ddd:xxxx", config);
+                            "aaa.bbb.ccc.ddd:xxxx", config, 0, 0);
 
     fail_if (NULL == Core);
 

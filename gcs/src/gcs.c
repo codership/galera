@@ -213,7 +213,8 @@ enomem:
 
 /* Creates a group connection handle */
 gcs_conn_t*
-gcs_create (const char* node_name, const char* inc_addr, void* conf)
+gcs_create (const char* node_name, const char* inc_addr, void* const conf,
+            int const repl_proto_ver, int const appl_proto_ver)
 {
     gcs_conn_t* conn = GU_CALLOC (1, gcs_conn_t);
 
@@ -236,7 +237,8 @@ gcs_create (const char* node_name, const char* inc_addr, void* conf)
     }
 
     conn->state = GCS_CONN_DESTROYED;
-    conn->core  = gcs_core_create (node_name, inc_addr, conf);
+    conn->core  = gcs_core_create (node_name, inc_addr, conf, repl_proto_ver, 
+                                   appl_proto_ver);
     if (!conn->core) {
         gu_error ("Failed to create core.");
         goto core_create_failed;

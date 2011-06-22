@@ -25,11 +25,11 @@
 struct gcs_node
 {
     gcs_seqno_t        last_applied; // last applied action on that node
-//    long             protocol;     // highest supported protocol
 //    long             queue_len;    // action queue length on that node
     gcs_node_state_t   status;       // node status
-    gcs_proto_t        proto_min;    // supported protocol versions
-    gcs_proto_t        proto_max;    //
+    int                gcs_proto_ver;// supported protocol versions
+    int                repl_proto_ver;//
+    int                appl_proto_ver;
     gcs_defrag_t       app;          // defragmenter for application actions
     gcs_defrag_t       oob;        // defragmenter for out-of-band service acts.
 
@@ -50,8 +50,11 @@ typedef struct gcs_node gcs_node_t;
 extern void
 gcs_node_init (gcs_node_t* node,
                const char* id,
-               const char* name,      ///< can be null
-               const char* inc_addr); ///< can be null
+               const char* name,     ///< can be null
+               const char* inc_addr, ///< can be null
+               int         gcs_proto_ver,
+               int         repl_proto_ver,
+               int         appl_proto_ver);
 
 /*! Move data from one node object to another */
 extern void

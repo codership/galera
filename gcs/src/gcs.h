@@ -45,7 +45,8 @@ typedef struct gcs_conn  gcs_conn_t;
  * @return pointer to GCS connection handle, NULL in case of failure.
  */
 extern gcs_conn_t*
-gcs_create  (const char* node_name, const char* inc_addr, void* conf);
+gcs_create  (const char* node_name, const char* inc_addr, void* conf,
+             int repl_proto_ver, int appl_proto_ver);
 
 /*! @brief Initialize group history values (optional).
  * Serves to provide group history persistence after process restart (in case
@@ -346,6 +347,8 @@ typedef struct gcs_act_conf {
     long             memb_num; //! number of members in configuration
     long             my_idx;   //! index of this node in the configuration
     gcs_node_state_t my_state; //! current node state
+    int              repl_proto_ver; //! replicator  protocol version to use
+    int              appl_proto_ver; //! application protocol version to use
     char             data[1];  /*! member array (null-terminated ID, name,
                                 *  incoming address) */
 } gcs_act_conf_t;

@@ -52,10 +52,13 @@ namespace galera
     public:
 
         Gcs(gu::Config& config,
+            int repl_proto_ver        = 0,
+            int appl_proto_ver        = 0,
             const char* node_name     = 0,
             const char* node_incoming = 0)
             :
-            conn_(gcs_create(node_name, node_incoming, &config))
+            conn_(gcs_create(node_name, node_incoming, &config, repl_proto_ver,
+                             appl_proto_ver))
         {
             log_info << "Passing config to GCS: " << config;
             if (conn_ == 0) gu_throw_fatal << "could not create gcs connection";

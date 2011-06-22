@@ -11,13 +11,13 @@
 #ifndef _gcs_act_proto_h_
 #define _gcs_act_proto_h_
 
+#include "gcs.h" // for gcs_seqno_t
+
+#include <galerautils.h>
 #include <stdint.h>
 typedef uint8_t gcs_proto_t;
 
-#include "gcs.h" // for gcs_seqno_t
-
 /*! Supported protocol range (for now only version 0 is supported) */
-#define GCS_ACT_PROTO_MIN 0
 #define GCS_ACT_PROTO_MAX 0
 
 /*! Internal action fragment data representation */
@@ -29,7 +29,7 @@ typedef struct gcs_act_frag
     size_t         frag_len;
     unsigned long  frag_no;
     gcs_act_type_t act_type;
-    gcs_proto_t    proto_ver;
+    int            proto_ver;
 }
 gcs_act_frag_t;
 
@@ -43,12 +43,30 @@ gcs_act_proto_write (gcs_act_frag_t* frag, void* buf, size_t buf_len);
 extern long
 gcs_act_proto_read (gcs_act_frag_t* frag, const void* buf, size_t buf_len);
 
-/*! Increments fragment counter when action remains the same */
-extern long
-gcs_act_proto_inc (void* buf);
+/*! Increments fragment counter when action remains the same.
+ *
+ * @return non-negative counter value on success
+ */
+static inline long
+gcs_act_proto_inc (void* buf)
+{
+    register uint32_t frag_no = gtohl(((uint32_t*)buf)[3]) + 1;
+#ifdef GCS_DEBUG_PROTO
+    if (!frag_no) return -EOVERFLOW;
+#endif
+    ((uint32_t*)buf)[3] = htogl(frag_no);
+    return frag_no;
+}
 
 /*! Returns protocol header size */
 extern long
 gcs_act_proto_hdr_size (long version);
+
+/*! Returns message protocol version */
+static inline int
+gcs_act_proto_ver (void* buf)
+{
+    return *((uint8_t*)buf);
+}
 
 #endif /* _gcs_act_proto_h_ */

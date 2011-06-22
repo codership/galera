@@ -31,8 +31,9 @@ START_TEST (gcs_state_msg_test_basic)
                                        GCS_NODE_STATE_NON_PRIM, // current_state
                                        "My Name",          // name
                                        "192.168.0.1:2345", // inc_addr
-                                       0,                  // proto_min
-                                       1,                  // proto_max
+                                       0,                  // gcs_proto_ver
+                                       1,                  // repl_proto_ver
+                                       1,                  // appl_proto_ver
                                        GCS_STATE_FREP      // flags
         );
 
@@ -52,10 +53,13 @@ START_TEST (gcs_state_msg_test_basic)
         fail_if (NULL == recv_state);
     }
 
-    fail_if (send_state->flags         != recv_state->flags);
-    fail_if (send_state->proto_min     != recv_state->proto_min);
-    fail_if (send_state->proto_max     != recv_state->proto_max);
-    fail_if (send_state->act_seqno     != recv_state->act_seqno,
+    fail_if (send_state->flags          != recv_state->flags);
+    fail_if (send_state->gcs_proto_ver  != recv_state->gcs_proto_ver);
+    fail_if (send_state->repl_proto_ver != recv_state->repl_proto_ver);
+    fail_if (send_state->appl_proto_ver == recv_state->appl_proto_ver);
+    fail_if (recv_state->appl_proto_ver != 0, "appl_proto_ver: %d",
+             recv_state->appl_proto_ver); // V0 does not have appl proto field
+    fail_if (send_state->act_seqno      != recv_state->act_seqno,
              "act_seqno: sent %lld, recv %lld",
              send_state->act_seqno, recv_state->act_seqno);
     fail_if (send_state->prim_seqno    != recv_state->prim_seqno);
@@ -75,7 +79,7 @@ START_TEST (gcs_state_msg_test_basic)
 
         fail_if (gcs_state_msg_snprintf (send_str, str_len, send_state) <= 0);
         fail_if (gcs_state_msg_snprintf (recv_str, str_len, recv_state) <= 0);
-        fail_if (strncmp (send_str, recv_str, str_len));
+// no longer true fail_if (strncmp (send_str, recv_str, str_len));
     }
 
     gcs_state_msg_destroy (send_state);

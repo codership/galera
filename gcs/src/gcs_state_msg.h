@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2011 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -34,8 +34,10 @@ typedef struct gcs_state_msg
     gcs_node_state_t current_state; // current state of the node
     const char*      name;          // human assigned node name
     const char*      inc_addr;      // incoming address string
-    gcs_proto_t      proto_min;
-    gcs_proto_t      proto_max;
+    int              version;       // version of state message
+    int              gcs_proto_ver;
+    int              repl_proto_ver;
+    int              appl_proto_ver;
     uint8_t          flags;
 }
 gcs_state_msg_t;
@@ -46,13 +48,24 @@ typedef struct gcs_state_msg gcs_state_msg_t;
 /*! Quorum decisions */
 typedef struct gcs_state_quorum
 {
-    gu_uuid_t   group_uuid; // group UUID
-    gcs_seqno_t act_id;     // next global seqno
-    gcs_seqno_t conf_id;    // configuration id
-    bool        primary;    // primary configuration or not
-    long        proto;      // protocol to use
+    gu_uuid_t   group_uuid;     //! group UUID
+    gcs_seqno_t act_id;         //! next global seqno
+    gcs_seqno_t conf_id;        //! configuration id
+    bool        primary;        //! primary configuration or not
+    int         version;      //! state excahnge version (max understood by all)
+    int         gcs_proto_ver;
+    int         repl_proto_ver;
+    int         appl_proto_ver;
 }
 gcs_state_quorum_t;
+
+#define GCS_QUORUM_NON_PRIMARY (gcs_state_quorum_t){    \
+        GU_UUID_NIL,                                    \
+        GCS_SEQNO_ILL,                                  \
+        GCS_SEQNO_ILL,                                  \
+        false,                                          \
+        -1, -1, -1, -1                                  \
+    }
 
 extern gcs_state_msg_t*
 gcs_state_msg_create (const gu_uuid_t* state_uuid,
@@ -65,8 +78,9 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
                       gcs_node_state_t current_state,
                       const char*      name,
                       const char*      inc_addr,
-                      gcs_proto_t      proto_min,
-                      gcs_proto_t      proto_max,
+                      int              gcs_proto_ver,
+                      int              repl_proto_ver,
+                      int              appl_proto_ver,
                       uint8_t          flags);
 
 extern void
@@ -117,10 +131,11 @@ extern const char*
 gcs_state_msg_inc_addr (const gcs_state_msg_t* state);
 
 /* Get supported protocols */
-extern gcs_proto_t
-gcs_state_msg_proto_min (const gcs_state_msg_t* state);
-extern gcs_proto_t
-gcs_state_msg_proto_max (const gcs_state_msg_t* state);
+extern void
+gcs_state_msg_get_proto_ver (const gcs_state_msg_t* state,
+                             int* gcs_proto_ver,
+                             int* repl_proto_ver,
+                             int* appl_proto_ver);
 
 /* Get state message flags */
 extern uint8_t
@@ -128,9 +143,9 @@ gcs_state_msg_flags (const gcs_state_msg_t* state);
 
 /* Get quorum decision from state messages */
 extern long
-gcs_state_msg_get_quorum (const gcs_state_msg_t*  states[],
-                      long                states_num,
-                      gcs_state_quorum_t* quorum);
+gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
+                          long                   states_num,
+                          gcs_state_quorum_t*    quorum);
 
 /* Print state message contents to buffer */
 extern int
