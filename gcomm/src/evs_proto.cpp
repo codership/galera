@@ -2153,7 +2153,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         if (previous_view.get_id().get_type() == V_REG &&
             previous_view.get_members() == current_view.get_members())
         {
-            log_warn << "subsequencent views have same members, prev view "
+            log_warn << "subsequent views have same members, prev view "
                      << previous_view << " current view " << current_view;
         }
 

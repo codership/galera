@@ -52,7 +52,7 @@ galera::ServiceThd::thd_func (void* arg)
 
 galera::ServiceThd::ServiceThd (GcsI& gcs)
   : gcs_  (gcs),
-    thd_  (-1),
+    thd_  (),
     mtx_  (),
     cond_ (),
     data_ ()

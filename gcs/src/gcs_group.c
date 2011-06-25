@@ -892,7 +892,7 @@ gcs_group_act_conf (gcs_group_t*    group,
                     struct gcs_act* act,
                     int*            gcs_proto_ver)
 {
-    if (*gcs_proto_ver < group->quorum.gcs_proto_ver)
+    if (*gcs_proto_ver <= group->quorum.gcs_proto_ver)
         *gcs_proto_ver = group->quorum.gcs_proto_ver; // only go up, see #482
     else {
         gu_warn ("Refusing GCS protocol version downgrade from %d to %d",
