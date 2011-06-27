@@ -31,7 +31,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "19"
+#define WSREP_INTERFACE_VERSION "20"
 
 /*!
  *  Certain provider capabilities application may need to know
@@ -180,6 +180,7 @@ typedef struct wsrep_view_info {
     bool                state_gap; //!< discontinuity between group and member states
     int                 my_idx;    //!< index of this member in the view
     int                 memb_num;  //!< number of members in the view
+    int                 proto_ver; //!< application protocol agreed on in the view
     wsrep_member_info_t members[1]; //!< array of member information
 } wsrep_view_info_t;
 
@@ -317,8 +318,9 @@ struct wsrep_init_args
     /* Configuration parameters */
     const char* node_name;     //!< Symbolic name of this node (e.g. hostname)
     const char* node_incoming; //!< Address for incoming client connections
-    const char* data_dir;      //!< directory where wsrep files are kept if any
-    const char* options;       //!< provider-specific configuration string
+    const char* data_dir;      //!< Directory where wsrep files are kept if any
+    const char* options;       //!< Provider-specific configuration string
+    int         proto_ver;     //!< Max supported application protocol version
 
     /* Application initial state information. */
     const wsrep_uuid_t* state_uuid;  //!< Application state sequence UUID
@@ -562,22 +564,6 @@ struct wsrep_ {
                                        wsrep_trx_id_t victim_trx);
 
   /*!
-   * @brief Abort another slave transaction
-   *
-   * This routine is needed only if parallel applying is enabled.
-   *
-   * @param wsrep        this wsrep handle
-   * @param bf_seqno     seqno of brute force trx, running this cancel
-   * @param victim_seqno seqno of transaction to be aborted
-   *
-   * @retval WSREP_OK         abort secceded
-   * @retval WSREP_WARNING    abort failed
-   */
-    wsrep_status_t (*abort_slave_trx)(wsrep_t*      wsrep,
-                                      wsrep_seqno_t bf_seqno,
-                                      wsrep_seqno_t victim_seqno);
-
-  /*!
    * @brief Appends a query in transaction's write set
    *
    * @param wsrep      this wsrep handle
@@ -642,33 +628,20 @@ struct wsrep_ {
     wsrep_status_t (*causal_read)(wsrep_t* wsrep, wsrep_seqno_t* seqno);
 
   /*!
-   * @brief Appends a set variable command connection's write set
+   * @brief Clears allocated connection context.
    *
-   * @param wsrep       this wsrep handle
-   * @param conn_id     connection ID
-   * @param key         name of the variable, must be unique
-   * @param key_len     length of the key data
-   * @param query       the set variable query
-   * @param query_len   length of query (does not end with 0)
-   */
-    wsrep_status_t (*set_variable)(wsrep_t*        wsrep,
-                                   wsrep_conn_id_t conn_id,
-                                   const char*     key,
-                                   size_t          key_len,
-                                   const char*     query,
-                                   size_t          query_len);
-  /*!
-   * @brief Appends a set database command connection's write set
+   * Whenever a new connection ID is passed to wsrep provider through
+   * any of the API calls, a connection context is allocated for this
+   * connection. This call is to explicitly notify provider fo connection
+   * closing.
    *
    * @param wsrep       this wsrep handle
    * @param conn_id     connection ID
    * @param query       the 'set database' query
    * @param query_len   length of query (does not end with 0)
    */
-    wsrep_status_t (*set_database)(wsrep_t*        wsrep,
-                                   wsrep_conn_id_t conn_id,
-                                   const char*     query,
-                                   size_t          query_len);
+    wsrep_status_t (*free_connection)(wsrep_t*        wsrep,
+                                      wsrep_conn_id_t conn_id);
 
   /*!
    * @brief Replicates a query and starts "total order isolation" section.
@@ -761,28 +734,45 @@ struct wsrep_ {
    *        Array is terminated by Null variable name.
    *
    * @param wsrep this wsrep handle
-   * @return array of struct wsrep_status_var
+   * @return array of struct wsrep_status_var.
    */
     struct wsrep_stats_var* (*stats_get) (wsrep_t* wsrep);
 
   /*!
-   * @brief Release resources that might be associated with the array
+   * @brief Release resources that might be associated with the array.
    *
-   * @param wsrep this wsrep handle
+   * @param wsrep this wsrep handle.
    */
     void (*stats_free) (wsrep_t* wsrep, struct wsrep_stats_var* var_array);
 
   /*!
-   * @brief Pauses writeset applying/committing
+   * @brief Pauses writeset applying/committing.
    *
-   * @return global sequence number of the paused state or negative error code
+   * @return global sequence number of the paused state or negative error code.
    */
     wsrep_seqno_t (*pause) (wsrep_t* wsrep);
 
   /*!
-   * @brief Resumes writeset applying/committing
+   * @brief Resumes writeset applying/committing.
    */
-    void (*resume) (wsrep_t* wsrep);
+    wsrep_status_t (*resume) (wsrep_t* wsrep);
+
+  /*!
+   * @brief Desynchronize from cluster
+   *
+   * Effectively turns off flow control.
+   * @return global sequence number of the last synced writeset or negative
+   *         error code.
+   */
+    wsrep_seqno_t (*desync) (wsrep_t* wsrep);
+
+  /*!
+   * @brief Request to resynchronize with cluster.
+   *
+   * Effectively turns on flow control. Asynchronous - actual synchronization
+   * event to be deliverred via sync_cb.
+   */
+    wsrep_status_t (*resync) (wsrep_t* wsrep);
 
   /*!
    * wsrep provider name

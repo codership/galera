@@ -29,6 +29,7 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf,
         ret->state_gap = st_required;
         ret->my_idx    = conf->my_idx;
         ret->memb_num  = conf->memb_num;
+        ret->proto_ver = conf->appl_proto_ver;
 
         for (m = 0; m < ret->memb_num; m++) {
             wsrep_member_info_t* member = &ret->members[m];
