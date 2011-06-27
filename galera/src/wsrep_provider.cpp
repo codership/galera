@@ -238,18 +238,6 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
 
 
 extern "C"
-wsrep_status_t galera_abort_slave_trx (wsrep_t*      gh,
-                                       wsrep_seqno_t bf_seqno,
-                                       wsrep_seqno_t victim_seqno)
-{
-    log_warn << "Trx " << bf_seqno << " tries to abort";
-    log_warn << "Trx " << victim_seqno;
-    log_warn << "This call is bogus and should be removed from API. See #335";
-    return WSREP_WARNING;
-}
-
-
-extern "C"
 wsrep_status_t galera_post_commit (wsrep_t*            gh,
                                    wsrep_trx_handle_t* trx_handle)
 {
@@ -481,29 +469,15 @@ wsrep_status_t galera_causal_read(wsrep_t*       wsrep,
 
 
 extern "C"
-wsrep_status_t galera_set_variable(wsrep_t*              gh,
-                                   const wsrep_conn_id_t conn_id,
-                                   const char*           key,
-                                   const size_t          key_len,
-                                   const char*           query,
-                                   const size_t          query_len)
-{
-    return WSREP_NOT_IMPLEMENTED;
-}
-
-
-extern "C"
-wsrep_status_t galera_set_database(wsrep_t*              gh,
-                                   const wsrep_conn_id_t conn_id,
-                                   const char*           query,
-                                   const size_t          query_len)
+wsrep_status_t galera_free_connection(wsrep_t*              gh,
+                                      const wsrep_conn_id_t conn_id)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     try
     {
-        if (query == 0) repl->discard_local_conn(conn_id);
+        repl->discard_local_conn(conn_id);
         return WSREP_OK;
     }
     catch (std::exception& e)
@@ -713,11 +687,48 @@ wsrep_seqno_t galera_pause (wsrep_t* gh)
 
 
 extern "C"
-void galera_resume (wsrep_t* gh)
+wsrep_status_t galera_resume (wsrep_t* gh)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    repl->resume();
+
+    try
+    {
+        repl->resume();
+        return WSREP_OK;
+    }
+    catch (gu::Exception& e)
+    {
+        log_error << e.what();
+        return WSREP_NODE_FAIL;
+    }
+}
+
+
+extern "C"
+wsrep_seqno_t galera_desync (wsrep_t* gh)
+{
+    assert(gh != 0 && gh->ctx != 0);
+//    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
+    try
+    {
+        return -ENOSYS;
+    }
+    catch (gu::Exception& e)
+    {
+        log_error << e.what();
+        return -e.get_errno();
+    }
+}
+
+
+extern "C"
+wsrep_status_t galera_resync (wsrep_t* gh)
+{
+    assert(gh != 0 && gh->ctx != 0);
+//    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+    return WSREP_OK;
 }
 
 
@@ -735,13 +746,11 @@ static wsrep_t galera_str = {
     &galera_post_rollback,
     &galera_replay_trx,
     &galera_abort_pre_commit,
-    &galera_abort_slave_trx,
     &galera_append_query,
     &galera_append_row_key,
     &galera_append_data,
     &galera_causal_read,
-    &galera_set_variable,
-    &galera_set_database,
+    &galera_free_connection,
     &galera_to_execute_start,
     &galera_to_execute_end,
     &galera_sst_sent,
@@ -751,8 +760,10 @@ static wsrep_t galera_str = {
     &galera_stats_free,
     &galera_pause,
     &galera_resume,
+    &galera_desync,
+    &galera_resync,
     "Galera",
-    "0.8.0",
+    "0.8.1",
     "Codership Oy <info@codership.com>",
     &galera_tear_down,
     NULL,
