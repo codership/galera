@@ -322,7 +322,7 @@ state_report_uuids (char* buf, size_t buf_len,
     }
 }
 
-#define GCS_STATE_MAX_LEN 721
+#define GCS_STATE_MAX_LEN 722
 
 /*! checks for inherited primary configuration, returns representative */
 static const gcs_state_msg_t*
@@ -542,7 +542,11 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
 
     if (quorum->version < 1) {
         // appl_proto_ver is not supported by all members
-        quorum->appl_proto_ver = 0;
+        assert (quorum->repl_proto_ver <= 1);
+        if (1 == quorum->repl_proto_ver)
+            quorum->appl_proto_ver = 1;
+        else
+            quorum->appl_proto_ver = 0;
     }
 
     return 0;
