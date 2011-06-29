@@ -260,6 +260,12 @@ group_post_state_exchange (gcs_group_t* group)
 
     gcs_state_msg_get_quorum (states, group->num, quorum);
 
+    // Update each node state based on quorum outcome:
+    // is it up to date, does it need SST and stuff
+    for (i = 0; i < group->num; i++) {
+        gcs_node_update_status (&group->nodes[i], quorum);
+    }
+
     if (quorum->primary) {
         // primary configuration
         if (new_exchange) {
@@ -268,13 +274,6 @@ group_post_state_exchange (gcs_group_t* group)
             group->act_id     = quorum->act_id;
             group->conf_id    = quorum->conf_id + 1;
             group->group_uuid = quorum->group_uuid;
-
-            // Update each node state based on quorum outcome:
-            // is it up to date, does it need SST and stuff
-            for (i = 0; i < group->num; i++) {
-                gcs_node_update_status (&group->nodes[i], quorum);
-            }
-
             group->prim_uuid  = group->state_uuid;
             group->state_uuid = GU_UUID_NIL;
         }
@@ -285,7 +284,16 @@ group_post_state_exchange (gcs_group_t* group)
         }
 
         group->prim_seqno = group->conf_id;
-        group->prim_num   = group->num;
+    if (quorum->repl_proto_ver > 0) { /* compatibility with 0.8.0, see #486 */
+        group->prim_num   = 0;
+        for (i = 0; i < group->num; i++) {
+            group->prim_num += gcs_node_is_joined (group->nodes[i].status);
+        }
+        assert (group->prim_num > 0);
+    }
+    else { /* compatibility with 0.8.0, #486 */
+        group->prim_num   = group->num; // REMOVE in next release
+    }
     }
     else {
         // non-primary configuration
@@ -892,9 +900,10 @@ gcs_group_act_conf (gcs_group_t*    group,
                     struct gcs_act* act,
                     int*            gcs_proto_ver)
 {
-    if (*gcs_proto_ver <= group->quorum.gcs_proto_ver)
+    if (*gcs_proto_ver < group->quorum.gcs_proto_ver)
         *gcs_proto_ver = group->quorum.gcs_proto_ver; // only go up, see #482
-    else {
+    else if (group->quorum.gcs_proto_ver >= 0 &&
+             group->quorum.gcs_proto_ver < *gcs_proto_ver) {
         gu_warn ("Refusing GCS protocol version downgrade from %d to %d",
                  *gcs_proto_ver, group->quorum.gcs_proto_ver);
     }
