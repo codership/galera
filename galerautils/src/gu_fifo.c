@@ -120,12 +120,12 @@ gu_fifo_t *gu_fifo_create (size_t length, size_t item_size)
             gu_mutex_init (&ret->lock, NULL);
             gu_cond_init  (&ret->get_cond, NULL);
             gu_cond_init  (&ret->put_cond, NULL);
-	}
+        }
         else {
             gu_error ("Failed to allocate %zu bytes for FIFO", alloc_size);
         }
     }
-    
+
     return ret;
 }
 
@@ -174,7 +174,6 @@ static void fifo_close (gu_fifo_t* q)
 {
     if (!q->closed) {
 
-//        q->length = 0;    /* prevent appending */
         q->closed = true; /* force putters to quit */
 
         // signal all the idle waiting threads
@@ -413,17 +412,17 @@ void gu_fifo_destroy   (gu_fifo_t *queue)
     assert (queue->tail == queue->head);
 
     while (gu_cond_destroy (&queue->put_cond)) {
-	fifo_lock      (queue);
-	gu_cond_signal (&queue->put_cond);
-	fifo_unlock    (queue);
-	/* when thread sees that ret->used == 0, it must terminate */
+        fifo_lock      (queue);
+        gu_cond_signal (&queue->put_cond);
+        fifo_unlock    (queue);
+        /* when thread sees that ret->used == 0, it must terminate */
     }
 
     while (gu_cond_destroy (&queue->get_cond)) {
-	fifo_lock      (queue);
-	gu_cond_signal (&queue->get_cond);
-	fifo_unlock    (queue);
-	/* when thread sees that ret->used == 0, it must terminate */
+        fifo_lock      (queue);
+        gu_cond_signal (&queue->get_cond);
+        fifo_unlock    (queue);
+        /* when thread sees that ret->used == 0, it must terminate */
     }
 
     while (gu_mutex_destroy (&queue->lock)) continue;
@@ -450,28 +449,28 @@ char *gu_fifo_print (gu_fifo_t *queue)
     char *ret;
 
     snprintf (tmp, tmp_len,
-	      "Queue (%p):\n"
-	      "\tlength  = %lu\n"
-	      "\trows    = %lu\n"
-	      "\tcolumns = %lu\n"
-	      "\tused    = %lu (%lu bytes)\n"
-	      "\talloctd = %lu bytes\n"
+              "Queue (%p):\n"
+              "\tlength  = %lu\n"
+              "\trows    = %lu\n"
+              "\tcolumns = %lu\n"
+              "\tused    = %lu (%lu bytes)\n"
+              "\talloctd = %lu bytes\n"
               "\thead    = %lu, tail = %lu\n"
               "\tavg.len = %f"
               //", next = %lu"
               ,
-	      (void*)queue,
-	      queue->length,
-	      queue->rows_num,
-	      queue->col_mask + 1,
-	      queue->used, queue->used * queue->item_size,
-	      queue->alloc,
+              (void*)queue,
+              queue->length,
+              queue->rows_num,
+              queue->col_mask + 1,
+              queue->used, queue->used * queue->item_size,
+              queue->alloc,
               queue->head, queue->tail,
               queue->q_len_samples > 0 ?
               ((double)queue->q_len)/queue->q_len_samples : 0.0
               //, queue->next
-	);
-    
+        );
+
     ret = strdup (tmp);
     return ret;
 }

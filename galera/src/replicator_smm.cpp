@@ -1104,8 +1104,10 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
 
     if (app_req_len < 0)
     {
-        gu_throw_fatal << "View callback failed: " << -app_req_len
-                       << " (" << strerror(-app_req_len) << ')';
+        log_fatal << "View callback failed: " << -app_req_len << " ("
+                  << strerror(-app_req_len) << ". This is unrecoverable, "
+                  << "restart required.";
+        gu_abort();
     }
 
     if (view_info.conf >= 0)
@@ -1148,6 +1150,24 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
 
             invalidate_state(state_file_);
         }
+
+        if (state_() == S_JOINING && sst_state_ != SST_NONE)
+        {
+            /* There are two reasons we can be here:
+             * 1) we just got state transfer in request_sst() above;
+             * 2) we failed here previously (probably due to partition).
+             */
+            ssize_t ret;
+
+            while (-EAGAIN == (ret = gcs_.join(sst_seqno_)))
+            {
+                log_warn << "Retrying sending JOIN message (seqno: "
+                         << sst_seqno_ << ')';
+                usleep (100000); // 0.1s
+            }
+
+            if (ret >= 0) sst_state_ = SST_NONE;
+        }
     }
     else
     {
@@ -1159,8 +1179,9 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
 
         if (next_state != S_CONNECTED && next_state != S_CLOSING)
         {
-            gu_throw_fatal << "unexpected next state for non-prim: "
-                           << next_state;
+            log_fatal << "Internal error: unexpected next state for "
+                      << "non-prim: " << next_state << ". Restart required.";
+            gu_abort();
         }
 
         state_.shift_to(next_state);
@@ -1370,6 +1391,12 @@ void galera::ReplicatorSMM::invalidate_state(const std::string& file) const
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+static bool
+retry_sst_request(int ret)
+{
+    return (ret == -EAGAIN || ret == -ENOTCONN);
+}
+
 void
 galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
                                    wsrep_seqno_t const  group_seqno,
@@ -1399,7 +1426,7 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
 
         if (ret < 0)
         {
-            if (ret != -EAGAIN)
+            if (!retry_sst_request(ret))
             {
                 store_state(state_file_);
                 log_error << "Requesting state transfer failed: "
@@ -1437,7 +1464,7 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
             }
         }
     }
-    while ((ret == -EAGAIN) && (usleep(sst_retry_sec_ * 1000000), true));
+    while (retry_sst_request(ret) && (usleep(sst_retry_sec_ * 1000000), true));
 
 
     if (ret >= 0)
@@ -1465,36 +1492,41 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
                       << "\n\tRequired: "
                       << group_uuid << ": >= " << group_seqno;
             sst_state_ = SST_FAILED;
-            gu_throw_fatal << "Application state transfer failed";
+            log_fatal << "Application state transfer failed. This is "
+                      << "unrecoverable condition, restart required.";
+            gu_abort();
         }
         else
         {
             update_state_uuid (sst_uuid_);
             apply_monitor_.set_initial_position(-1);
             apply_monitor_.set_initial_position(sst_seqno_);
+
             if (co_mode_ != CommitOrder::BYPASS)
             {
                 commit_monitor_.set_initial_position(-1);
                 commit_monitor_.set_initial_position(sst_seqno_);
             }
+
             log_debug << "Initial state: " << state_uuid_ << ":" << sst_seqno_;
-            sst_state_ = SST_NONE;
-
-            ssize_t ret;
-            while (-EAGAIN == (ret = gcs_.join(sst_seqno_)))
-            {
-                log_warn << "Retrying sending JOIN message (seqno: "
-                         << sst_seqno_ << ')';
-                usleep (100000); // 0.1s
-            }
-
-            if (ret < 0) gu_throw_error(-ret) << "Could not send JOIN";
         }
     }
     else
     {
         sst_state_ = SST_REQ_FAILED;
-        gu_throw_error(-ret) << "State transfer request failed";
+
+        if (state_() > S_CLOSING)
+        {
+            log_fatal << "State transfer request failed unrecoverably: "
+                      << -ret << " (" << strerror(-ret) << "). Most likely "
+                      << "it is due to inability to communicate with cluster "
+                      << "primary component. Restart required.";
+            gu_abort();
+        }
+        else
+        {
+            // connection is being closed, send failure is expected
+        }
     }
 }
 

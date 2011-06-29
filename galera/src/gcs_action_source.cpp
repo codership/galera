@@ -28,14 +28,13 @@ private:
 };
 
 
-static galera::Replicator::State state2repl(const gcs_act_conf_t* conf)
+static galera::Replicator::State state2repl(const gcs_act_conf_t& conf)
 {
-    assert(conf != 0);
-    switch (conf->my_state)
+    switch (conf.my_state)
     {
     case GCS_NODE_STATE_NON_PRIM:
-        if (conf->my_idx >= 0) return galera::Replicator::S_CONNECTED;
-        else                   return galera::Replicator::S_CLOSING;
+        if (conf.my_idx >= 0) return galera::Replicator::S_CONNECTED;
+        else                  return galera::Replicator::S_CLOSING;
     case GCS_NODE_STATE_PRIM:
         return galera::Replicator::S_CONNECTED;
     case GCS_NODE_STATE_JOINER:
@@ -47,7 +46,7 @@ static galera::Replicator::State state2repl(const gcs_act_conf_t* conf)
     case GCS_NODE_STATE_DONOR:
         return galera::Replicator::S_DONOR;
     default:
-        gu_throw_fatal << "unhandled gcs state: " << conf->my_state;
+        gu_throw_fatal << "unhandled gcs state: " << conf.my_state;
         throw;
     }
 }
@@ -115,7 +114,7 @@ void galera::GcsActionSource::dispatch(void*          recv_ctx,
             );
 
         replicator_.process_view_info(recv_ctx, *view_info,
-                                      state2repl(conf), seqno_l);
+                                      state2repl(*conf), seqno_l);
         free(view_info);
         break;
     }
