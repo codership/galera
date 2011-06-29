@@ -128,4 +128,10 @@ gcs_node_get_status (gcs_node_t* node)
     return node->status;
 }
 
+static inline bool
+gcs_node_is_joined (gcs_node_state_t st)
+{
+    return (st >= GCS_NODE_STATE_DONOR);
+}
+
 #endif /* _gcs_node_h_ */

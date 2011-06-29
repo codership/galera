@@ -15,6 +15,7 @@
 
 #define GCS_STATE_MSG_ACCESS
 #include "gcs_state_msg.h"
+#include "gcs_node.h"
 
 gcs_state_msg_t*
 gcs_state_msg_create (const gu_uuid_t* state_uuid,
@@ -344,7 +345,7 @@ state_quorum_inherit (const gcs_state_msg_t* states[],
 
     // find at least one JOINED/DONOR (donor was once joined)
     for (i = 0; i < states_num; i++) {
-        if (states[i]->current_state >= GCS_NODE_STATE_DONOR) {
+        if (gcs_node_is_joined(states[i]->current_state)) {
             rep = states[i];
             break;
         }
@@ -368,7 +369,7 @@ state_quorum_inherit (const gcs_state_msg_t* states[],
     // Check that all JOINED/DONOR have the same group UUID
     // and find most updated
     for (j = i+1; j < states_num; j++) {
-        if (states[j]->current_state >= GCS_NODE_STATE_DONOR) {
+        if (gcs_node_is_joined(states[j]->current_state)) {
             if (gu_uuid_compare (&rep->group_uuid, &states[i]->group_uuid)) {
                 // for now just freak out and print all conflicting nodes
                 size_t buf_len = states_num * GCS_STATE_MAX_LEN;
@@ -400,93 +401,118 @@ state_quorum_remerge (const gcs_state_msg_t* states[],
                       long                   states_num,
                       gcs_state_quorum_t*    quorum)
 {
-    const gcs_state_msg_t* rep = NULL;
-
     struct candidate /* merge candidate */
     {
         gu_uuid_t              prim_uuid;
         const gcs_state_msg_t* rep;
-        long                   prim_joined;
-        long                   found;
+        int                    prim_joined;
+        int                    found;
+        int                    ver; /* compatibility with 0.8.0, #486 */
     };
 
     struct candidate* candidates = GU_CALLOC(states_num, struct candidate);
 
-    if (candidates) {
-        long i, j;
-        long candidates_found = 0;
-        long merge_cnt        = 0;
-
-        /* 1. Sort and count all nodes who have ever been JOINED by primary
-         *    component UUID */
-        for (i = 0; i < states_num; i++) {
-            if (states[i]->prim_state >= GCS_NODE_STATE_DONOR) {
-                assert(gu_uuid_compare(&states[i]->prim_uuid, &GU_UUID_NIL));
-
-                for (j = 0; j < candidates_found; j++) {
-                    if (0 == gu_uuid_compare(&states[i]->prim_uuid,
-                                             &candidates[j].prim_uuid)) {
-                        assert(states[i]->prim_joined ==
-                               candidates[j].prim_joined);
-                        assert(candidates[j].found < candidates[j].prim_joined);
-                        assert(candidates[j].found > 0);
-
-                        candidates[j].found++;
-
-                        candidates[j].rep =
-                            state_nodes_compare (candidates[j].rep, states[i]);
-
-                        break;
-                    }
-                }
-
-                if (j == candidates_found) {
-                    // we don't have this primary UUID in the list yet
-                    candidates[j].prim_uuid   = states[i]->prim_uuid;
-                    candidates[j].prim_joined = states[i]->prim_joined;
-                    candidates[j].rep         = states[i];
-                    candidates[j].found       = 1;
-                    candidates_found++;
-
-                    assert(candidates_found <= states_num);
-                }
-
-                if (candidates[j].prim_joined == candidates[j].found) {
-                    gu_info ("Complete merge of primary "GU_UUID_FORMAT
-                             " found: %ld of %ld.",
-                             GU_UUID_ARGS(&candidates[j].prim_uuid),
-                             candidates[j].found, candidates[j].prim_joined);
-                    merge_cnt++;
-                    // will be used only if merge_count == 1
-                    rep = candidates[j].rep;
-                }
-            }
-        }
-
-        if (1 == merge_cnt) {
-            assert (NULL != rep);
-
-            quorum->act_id     = rep->act_seqno;
-            quorum->conf_id    = rep->prim_seqno;
-            quorum->group_uuid = rep->group_uuid;
-            quorum->primary    = true;
-        }
-        else if (0 == merge_cnt) {
-            assert (NULL == rep);
-            gu_warn ("No completely re-merged primary component found.");
-        }
-        else {
-            assert (merge_cnt > 1);
-            gu_error ("Found more than one re-merged primary component.");
-            rep = NULL;
-        }
-
-        gu_free (candidates);
-    }
-    else {
+    if (!candidates) {
         gu_error ("Quorum: could not allocate %zd bytes for re-merge check.",
                   states_num * sizeof(struct candidate));
+        return NULL;
     }
+
+    int i, j;
+    int candidates_found = 0;
+    int merge_cnt        = 0;
+    int merged           = 0; /* compatibility with 0.8.0 */
+
+    /* 1. Sort and count all nodes who have ever been JOINED by primary
+     *    component UUID */
+    for (i = 0; i < states_num; i++) {
+        if (gcs_node_is_joined(states[i]->prim_state)) {
+            assert(gu_uuid_compare(&states[i]->prim_uuid, &GU_UUID_NIL));
+
+            for (j = 0; j < candidates_found; j++) {
+                if (0 == gu_uuid_compare(&states[i]->prim_uuid,
+                                         &candidates[j].prim_uuid)) {
+                    assert(states[i]->prim_joined == candidates[j].prim_joined);
+                    assert(candidates[j].found < candidates[j].prim_joined);
+                    assert(candidates[j].found > 0);
+
+                    candidates[j].found++;
+
+                    candidates[j].rep =
+                        state_nodes_compare (candidates[j].rep, states[i]);
+
+                    /* compatibility with 0.8.0, #486 */
+                    candidates[j].ver =
+                        candidates[j].ver <= states[i]->repl_proto_ver ?
+                        candidates[j].ver :  states[i]->repl_proto_ver;
+
+                    break;
+                }
+            }
+
+            if (j == candidates_found) {
+                // we don't have this primary UUID in the list yet
+                candidates[j].prim_uuid   = states[i]->prim_uuid;
+                candidates[j].prim_joined = states[i]->prim_joined;
+                candidates[j].rep         = states[i];
+                /* compatibility with 0.8.0, #486 */
+                candidates[j].ver         = states[i]->repl_proto_ver;
+                candidates[j].found       = 1;
+                candidates_found++;
+
+                assert(candidates_found <= states_num);
+            }
+// compatibility with 0.8.0, #486
+            if (candidates[j].prim_joined == candidates[j].found) {
+                gu_info ("Complete merge of primary "GU_UUID_FORMAT
+                         " found: %ld of %ld.",
+                         GU_UUID_ARGS(&candidates[j].prim_uuid),
+                         candidates[j].found, candidates[j].prim_joined);
+                merge_cnt++;
+                merged = j;
+//                // will be used only if merge_count == 1
+//                rep = candidates[j].rep;
+            }
+// #endif compat 0.8.0
+        }
+    }
+
+    const gcs_state_msg_t* rep = NULL;
+
+    if (1 == candidates_found) {
+if (candidates[0].ver == 0) { /* compatibility with 0.8.0 */
+    if (0 == merge_cnt) {
+        gu_warn ("No fully re-merged primary component found.");
+        goto compatibility_080;
+    }
+}
+else {
+    merged = 0;
+        gu_info ("%s re-merge of primary "GU_UUID_FORMAT" found: %ld of %ld.",
+                 candidates[0].found == candidates[0].prim_joined ?
+                 "Full" : "Partial",
+                 GU_UUID_ARGS(&candidates[0].prim_uuid),
+                 candidates[0].found, candidates[0].prim_joined);
+}
+        rep = candidates[merged].rep;
+        assert (NULL != rep);
+        assert (gcs_node_is_joined(rep->prim_state));
+
+        quorum->act_id     = rep->act_seqno;
+        quorum->conf_id    = rep->prim_seqno;
+        quorum->group_uuid = rep->group_uuid;
+        quorum->primary    = true;
+    }
+    else if (0 == candidates_found) {
+        gu_warn ("No re-merged primary component found.");
+    }
+    else {
+        assert (candidates_found > 1);
+        gu_error ("Found more than one re-merged primary component candidate.");
+        rep = NULL;
+    }
+compatibility_080:
+    gu_free (candidates);
 
     return rep;
 }
