@@ -71,6 +71,7 @@ static const char* state2stats_str(galera::ReplicatorSMM::State    state,
 typedef enum status_vars
 {
     STATS_STATE_UUID = 0,
+    STATS_PROTOCOL_VERSION,
     STATS_LAST_APPLIED,
     STATS_REPLICATED,
     STATS_REPLICATED_BYTES,
@@ -96,12 +97,14 @@ typedef enum status_vars
     STATS_COMMIT_WINDOW,
     STATS_LOCAL_STATE,
     STATS_LOCAL_STATE_COMMENT,
+    STATS_CERT_INDEX_SIZE,
     STATS_MAX
 } StatusVars;
 
 static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
 {
     { "local_state_uuid",     WSREP_VAR_STRING, { 0 }  },
+    { "protocol_version",     WSREP_VAR_INT64,  { 0 }  },
     { "last_committed",       WSREP_VAR_INT64,  { -1 } },
     { "replicated",           WSREP_VAR_INT64,  { 0 }  },
     { "replicated_bytes",     WSREP_VAR_INT64,  { 0 }  },
@@ -127,6 +130,7 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "commit_window",        WSREP_VAR_DOUBLE, { 0 }  },
     { "local_state",          WSREP_VAR_INT64,  { 0 }  },
     { "local_state_comment",  WSREP_VAR_STRING, { 0 }  },
+    { "cert_index_size",      WSREP_VAR_INT64,  { 0 }  },
     { 0,                      WSREP_VAR_STRING, { 0 }  }
 };
 
@@ -150,6 +154,7 @@ galera::ReplicatorSMM::stats() const
 {
     std::vector<struct wsrep_stats_var>& sv(wsrep_stats_);
 
+    sv[STATS_PROTOCOL_VERSION   ].value._int64  = protocol_version_;
     sv[STATS_LAST_APPLIED       ].value._int64  = apply_monitor_.last_left();
     sv[STATS_REPLICATED         ].value._int64  = replicated_();
     sv[STATS_REPLICATED_BYTES   ].value._int64  = replicated_bytes_();
@@ -194,6 +199,6 @@ galera::ReplicatorSMM::stats() const
     sv[STATS_LOCAL_STATE         ].value._int64  = state2stats(state_());
     sv[STATS_LOCAL_STATE_COMMENT ].value._string = state2stats_str(state_(),
                                                                    sst_state_);
-
+    sv[STATS_CERT_INDEX_SIZE].value._int64 = cert_.index_size();
     return &wsrep_stats_[0];
 }

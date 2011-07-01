@@ -31,7 +31,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "20"
+#define WSREP_INTERFACE_VERSION "21"
 
 /*!
  *  Certain provider capabilities application may need to know
@@ -361,6 +361,12 @@ struct wsrep_stats_var
     } value;                   //!< variable value
 };
 
+/*! Key struct used to pass certification keys for transaction handling calls */
+typedef struct wsrep_key_
+{
+    const void* key;
+    size_t      key_len;
+} wsrep_key_t;
 
 /*! Transaction handle struct passed for wsrep transaction handling calls */
 typedef struct wsrep_trx_handle_
@@ -583,19 +589,15 @@ struct wsrep_ {
    *
    * @param wsrep       this wsrep handle
    * @param trx_handle  transaction handle
-   * @param dbtable     unique name of the table "db.table"
-   * @param dbtable_len length of table name (does not end with 0)
-   * @param key         binary key data
-   * @param key_len     length of the key data
+   * @param key         array of key parts
+   * @param key_len     length of the array of key parts
    * @param action      action code according to enum wsrep_action
    */
-    wsrep_status_t (*append_row_key)(wsrep_t*            wsrep,
-                                     wsrep_trx_handle_t* trx_handle,
-                                     const char*         dbtable,
-                                     size_t              dbtable_len,
-                                     const char*         key,
-                                     size_t              key_len,
-                                     wsrep_action_t      action);
+    wsrep_status_t (*append_key)(wsrep_t*            wsrep,
+                                 wsrep_trx_handle_t* trx_handle,
+                                 const wsrep_key_t*  key,
+                                 size_t              key_len,
+                                 wsrep_action_t      action);
    /*!
     * @brief Appends data in transaction's write set
     *
@@ -652,6 +654,8 @@ struct wsrep_ {
    *
    * @param wsrep       this wsrep handle
    * @param conn_id     connection ID
+   * @param key         array of key parts
+   * @param key_len     lenght of the array of key parts
    * @param query       query to be executed
    * @param query_len   length of the query string
    * @param seqno       seqno part of the action ID
@@ -660,11 +664,13 @@ struct wsrep_ {
    * @retval WSREP_CONN_FAIL  must close client connection
    * @retval WSREP_NODE_FAIL  must close all connections and reinit
    */
-    wsrep_status_t (*to_execute_start)(wsrep_t*        wsrep,
-                                       wsrep_conn_id_t conn_id,
-                                       const void*     query,
-                                       size_t          query_len,
-                                       wsrep_seqno_t*  seqno);
+    wsrep_status_t (*to_execute_start)(wsrep_t*           wsrep,
+                                       wsrep_conn_id_t    conn_id,
+                                       const wsrep_key_t* key,
+                                       size_t             key_len,
+                                       const void*        query,
+                                       size_t             query_len,
+                                       wsrep_seqno_t*     seqno);
 
   /*!
    * @brief Ends the total order isolation section.

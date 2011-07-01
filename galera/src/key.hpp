@@ -6,6 +6,7 @@
 #define GALERA_KEY_HPP
 
 #include "serialization.hpp"
+#include "wsrep_api.h"
 
 #include "gu_unordered.hpp"
 #include "gu_throw.hpp"
@@ -16,7 +17,6 @@
 
 #include <cstring>
 #include <stdint.h>
-#include <sys/uio.h>
 
 namespace galera
 {
@@ -72,7 +72,7 @@ namespace galera
 
         Key() : keys_() { }
 
-        Key(const iovec* keys, size_t keys_len)
+        Key(const wsrep_key_t* keys, size_t keys_len)
             :
             keys_ ()
         {
@@ -84,15 +84,15 @@ namespace galera
 
             for (size_t i(0); i < keys_len; ++i)
             {
-                if (keys[i].iov_len > 256)
+                if (keys[i].key_len > 256)
                 {
                     gu_throw_error(EINVAL)
-                        << "key part length " << keys[i].iov_len
+                        << "key part length " << keys[i].key_len
                         << " greater than max 256";
                 }
-                gu::byte_t len(keys[i].iov_len);
+                gu::byte_t len(keys[i].key_len);
                 const gu::byte_t* base(reinterpret_cast<const gu::byte_t*>(
-                                           keys[i].iov_base));
+                                           keys[i].key));
                 keys_.push_back(len);
                 keys_.insert(keys_.end(), base, base + len);
             }

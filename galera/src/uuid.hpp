@@ -12,16 +12,6 @@
 
 namespace galera
 {
-    inline bool operator==(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
-    {
-        return (memcmp(&a, &b, sizeof(a)) == 0);
-    }
-
-    inline bool operator!=(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
-    {
-        return !(a == b);
-    }
-
     inline std::ostream& operator<<(std::ostream& os, const wsrep_uuid_t& uuid)
     {
         char uuid_buf[GU_UUID_STR_LEN + 1];
@@ -53,4 +43,16 @@ namespace galera
     }
 
 }
+
+inline bool operator==(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
+{
+    return (memcmp(&a, &b, sizeof(a)) == 0);
+}
+
+inline bool operator!=(const wsrep_uuid_t& a, const wsrep_uuid_t& b)
+{
+    return !(a == b);
+}
+
+
 #endif // GALERA_UUID_HPP

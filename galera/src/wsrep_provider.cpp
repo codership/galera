@@ -25,6 +25,8 @@ wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
     try
     {
         gh->ctx = new REPL_CLASS (args);
+        wsrep_set_params(*reinterpret_cast<REPL_CLASS*>(gh->ctx),
+                         args->options);
         return WSREP_OK;
     }
     catch (gu::Exception& e)
@@ -392,13 +394,11 @@ wsrep_status_t galera_append_query(wsrep_t*            gh,
 
 
 extern "C"
-wsrep_status_t galera_append_row_key(wsrep_t*            gh,
-                                     wsrep_trx_handle_t* trx_handle,
-                                     const char*         dbtable,
-                                     size_t              dbtable_len,
-                                     const char*         key,
-                                     size_t              key_len,
-                                     enum wsrep_action   action)
+wsrep_status_t galera_append_key(wsrep_t*            gh,
+                                 wsrep_trx_handle_t* trx_handle,
+                                 const wsrep_key_t*  key,
+                                 size_t              key_len,
+                                 enum wsrep_action   action)
 {
     assert(gh != 0 && gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
@@ -410,11 +410,7 @@ wsrep_status_t galera_append_row_key(wsrep_t*            gh,
     try
     {
         TrxHandleLock lock(*trx);
-        struct iovec iov[2] = {
-            {galera::void_cast(dbtable), dbtable_len},
-            {galera::void_cast(key)    , key_len}
-        };
-        trx->append_key(galera::Key(iov, 2));
+        trx->append_key(galera::Key(key, key_len));
         retval = WSREP_OK;
     }
     catch (std::exception& e)
@@ -494,11 +490,13 @@ wsrep_status_t galera_free_connection(wsrep_t*              gh,
 
 
 extern "C"
-wsrep_status_t galera_to_execute_start(wsrep_t*        gh,
-                                       wsrep_conn_id_t conn_id,
-                                       const void*     query,
-                                       size_t          query_len,
-                                       wsrep_seqno_t*  global_seqno)
+wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
+                                       wsrep_conn_id_t    conn_id,
+                                       const wsrep_key_t* key,
+                                       size_t             key_len,
+                                       const void*        query,
+                                       size_t             query_len,
+                                       wsrep_seqno_t*     global_seqno)
 {
     assert(gh != 0 && gh->ctx != 0);
 
@@ -512,7 +510,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*        gh,
     try
     {
         TrxHandleLock lock(*trx);
-        trx->append_key(Key(reinterpret_cast<struct iovec*>(0), 0));
+        trx->append_key(Key(key, key_len));
         trx->append_data(query, query_len);
         trx->set_flags(TrxHandle::F_COMMIT | TrxHandle::F_ISOLATION);
 
@@ -604,6 +602,7 @@ wsrep_status_t galera_replay_trx(wsrep_t*            gh,
     }
     catch (std::exception& e)
     {
+        log_warn << "failed to replay trx: " << *trx;
         log_warn << e.what();
         retval = WSREP_CONN_FAIL;
     }
@@ -747,7 +746,7 @@ static wsrep_t galera_str = {
     &galera_replay_trx,
     &galera_abort_pre_commit,
     &galera_append_query,
-    &galera_append_row_key,
+    &galera_append_key,
     &galera_append_data,
     &galera_causal_read,
     &galera_free_connection,

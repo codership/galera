@@ -219,6 +219,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     logger_             (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
     config_             (args->options),
     set_defaults_       (config_, defaults),
+    protocol_version_   (max_protocol_version_),
     state_              (S_CLOSED),
     sst_state_          (SST_NONE),
     co_mode_            (CommitOrder::from_string(
@@ -240,7 +241,8 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_cond_           (),
     sst_retry_sec_      (1),
     gcache_             (config_, data_dir_),
-    gcs_                (config_, gcache_, 0, 0, args->node_name, args->node_incoming),
+    gcs_                (config_, gcache_, protocol_version_, args->proto_ver,
+                         args->node_name, args->node_incoming),
     service_thd_        (gcs_),
     as_                 (0),
     gcs_as_             (gcs_, *this, gcache_),
@@ -406,7 +408,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 galera::TrxHandle*
 galera::ReplicatorSMM::local_trx(wsrep_trx_id_t trx_id)
 {
-    return wsdb_.get_trx(uuid_, trx_id, false);
+    return wsdb_.get_trx(protocol_version_, uuid_, trx_id, false);
 }
 
 galera::TrxHandle*
@@ -423,7 +425,7 @@ galera::ReplicatorSMM::local_trx(wsrep_trx_handle_t* handle, bool create)
     }
     else
     {
-        trx = wsdb_.get_trx(uuid_, handle->trx_id, create);
+        trx = wsdb_.get_trx(protocol_version_, uuid_, handle->trx_id, create);
         handle->opaque = trx;
     }
 
@@ -446,7 +448,7 @@ void galera::ReplicatorSMM::discard_local_trx(wsrep_trx_id_t trx_id)
 galera::TrxHandle*
 galera::ReplicatorSMM::local_conn_trx(wsrep_conn_id_t conn_id, bool create)
 {
-    return wsdb_.get_conn_query(uuid_, conn_id, create);
+    return wsdb_.get_conn_query(protocol_version_, uuid_, conn_id, create);
 }
 
 
@@ -1155,7 +1157,8 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
         // Primary configuration
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
-        cert_.assign_initial_position(group_seqno);
+        protocol_version_ = view_info.proto_ver;
+        cert_.assign_initial_position(group_seqno, protocol_version_);
 
         if (st_req == true)
         {
@@ -1407,7 +1410,7 @@ void galera::ReplicatorSMM::restore_state(const std::string& file)
     update_state_uuid (uuid);
     apply_monitor_.set_initial_position(seqno);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.set_initial_position(seqno);
-    cert_.assign_initial_position(seqno);
+    cert_.assign_initial_position(seqno, protocol_version_);
 }
 
 

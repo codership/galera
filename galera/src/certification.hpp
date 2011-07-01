@@ -13,7 +13,7 @@
 
 #include <map>
 #include <set>
-
+#include <list>
 
 namespace galera
 {
@@ -24,22 +24,23 @@ namespace galera
         KeyEntry(const Key& row_key);
         ~KeyEntry();
         Key get_key() const;
-        void ref(TrxHandle* trx);
-        void unref(TrxHandle* trx);
-        TrxHandle* get_ref_trx() const;
+        void ref(TrxHandle* trx, bool full_key);
+        void unref(TrxHandle* trx, bool full_key);
+        const TrxHandle* ref_trx() const;
+        const TrxHandle* ref_full_trx() const;
     private:
         KeyEntry(const KeyEntry& other);
         void operator=(const KeyEntry&);
         gu::byte_t* key_buf_;
         TrxHandle* ref_trx_;
+        TrxHandle* ref_full_trx_;
     };
 
     class Certification
     {
-    private:
-
+    public:
         typedef gu::UnorderedMap<Key, KeyEntry*, KeyHash> CertIndex;
-
+    private:
         class DiscardRK
         {
         public:
@@ -64,7 +65,7 @@ namespace galera
         Certification(const gu::Config& conf = gu::Config());
         ~Certification();
 
-        void assign_initial_position(wsrep_seqno_t seqno);
+        void assign_initial_position(wsrep_seqno_t seqno, int versiono);
         TestResult append_trx(TrxHandle*);
         TestResult test(TrxHandle*, bool = true);
         wsrep_seqno_t position() const { return position_; }
@@ -98,9 +99,16 @@ namespace galera
             return (n_certified_ == 0 ? 0 : double(deps_dist_)/n_certified_);
         }
 
-    private:
+        size_t index_size() const
+        {
+            gu::Lock lock(mutex_);
+            return cert_index_.size();
+        }
 
+    private:
         TestResult do_test(TrxHandle*, bool);
+        TestResult do_test_v0(TrxHandle*, bool);
+        TestResult do_test_v1(TrxHandle*, bool);
         void purge_for_trx(TrxHandle*);
 
         // unprotected variants for internal use
@@ -119,7 +127,11 @@ namespace galera
                     TrxHandle* trx(vt.second);
                     TrxHandleLock lock(*trx);
 
-                    assert(trx->is_committed() == true);
+                    if (trx->is_committed() == false)
+                    {
+                        log_warn << "trx not committed in purge and discard: "
+                                 << *trx;
+                    }
                     cert_.purge_for_trx(trx);
 
                     if (trx->last_depends_seqno() > -1)
@@ -147,6 +159,7 @@ namespace galera
             Certification& cert_;
         };
 
+        int           version_;
         TrxMap        trx_map_;
         CertIndex     cert_index_;
         DepsSet       deps_set_;
