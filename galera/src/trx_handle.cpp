@@ -186,21 +186,28 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
         trx.write_set_flags_ = hdr & 0xff;
         trx.version_ = hdr >> 24;
 
-        if (trx.version_ != 0) gu_throw_error(EPROTONOSUPPORT);
-
-        offset = unserialize(buf, buflen, offset, trx.source_id_);
-        offset = unserialize(buf, buflen, offset, trx.conn_id_);
-        offset = unserialize(buf, buflen, offset, trx.trx_id_);
-        offset = unserialize(buf, buflen, offset, trx.last_seen_seqno_);
-        offset = unserialize(buf, buflen, offset, trx.timestamp_);
-        if (TrxHandle::has_annotation(trx.write_set_flags_) == true)
+        switch (trx.version_)
         {
-            offset = unserialize<uint32_t>(buf, buflen, offset,
-                                           trx.annotation_);
-        }
-        if (TrxHandle::has_mac(trx.write_set_flags_) == true)
-        {
-            offset = unserialize(buf, buflen, offset, trx.mac_);
+        case 0:
+        case 1:
+            offset = unserialize(buf, buflen, offset, trx.source_id_);
+            offset = unserialize(buf, buflen, offset, trx.conn_id_);
+            offset = unserialize(buf, buflen, offset, trx.trx_id_);
+            offset = unserialize(buf, buflen, offset, trx.last_seen_seqno_);
+            offset = unserialize(buf, buflen, offset, trx.timestamp_);
+            if (TrxHandle::has_annotation(trx.write_set_flags_) == true)
+            {
+                offset = unserialize<uint32_t>(buf, buflen, offset,
+                                               trx.annotation_);
+            }
+            if (TrxHandle::has_mac(trx.write_set_flags_) == true)
+            {
+                offset = unserialize(buf, buflen, offset, trx.mac_);
+            }
+            break;
+        default:
+            gu_throw_error(EPROTONOSUPPORT);
+            throw;
         }
         return offset;
     }

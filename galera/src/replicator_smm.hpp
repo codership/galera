@@ -333,6 +333,9 @@ namespace galera
         }
             set_defaults_; // sets missing parameters to default values
 
+        static const int       max_protocol_version_ = 1;
+        int                    protocol_version_;
+
         FSM<State, Transition> state_;
         SstState               sst_state_;
 

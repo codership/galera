@@ -23,10 +23,10 @@ typedef std::vector<galera::KeyPart> KeyPartSequence;
 START_TEST(test_key)
 {
 
-    const struct iovec kiovec[3] = {
-        {galera::void_cast("k1"),   2 },
-        {galera::void_cast("k2"),   2 },
-        {galera::void_cast("key3"), 4 }
+    const wsrep_key_t kiovec[3] = {
+        {"k1",   2 },
+        {"k2",   2 },
+        {"key3", 4 }
     };
 
     galera::Key key(kiovec, 3);
@@ -49,12 +49,12 @@ START_TEST(test_write_set)
 {
     WriteSet ws;
 
-    struct iovec key1[2] = {
+    const wsrep_key_t key1[2] = {
         {void_cast("dbt\0t1"), 6},
         {void_cast("aaa")    , 3}
     };
 
-    struct iovec key2[2] = {
+    const wsrep_key_t key2[2] = {
         {void_cast("dbt\0t2"), 6},
         {void_cast("bbbb"), 4}
     };
@@ -147,10 +147,10 @@ END_TEST
 START_TEST(test_cert)
 {
     Certification cert;
-    cert.assign_initial_position(0);
+    cert.assign_initial_position(0, 0);
     wsrep_uuid_t uuid = {{1, }};
 
-    struct iovec wss[6][2] = {
+    const wsrep_key_t wss[6][2] = {
         {{void_cast("foo"), strlen("foo")}, {void_cast("1"), 1}},
         {{void_cast("foo"), strlen("foo")}, {void_cast("2"), 1}},
         {{void_cast("foo"), strlen("foo")}, {void_cast("3"), 1}},
@@ -163,7 +163,7 @@ START_TEST(test_cert)
 
     for (size_t i = 0; i < n_ws; ++i)
     {
-        TrxHandle* trx(new TrxHandle(uuid, i, i + 1, true));
+        TrxHandle* trx(new TrxHandle(0, uuid, i, i + 1, true));
         trx->append_key(Key(wss[i], 2));
         trx->flush(0);
         string data("foobardata");
@@ -203,14 +203,14 @@ START_TEST(test_cert)
 END_TEST
 
 
-START_TEST(test_cert_hierarchical)
+START_TEST(test_cert_hierarchical_v0)
 {
-    log_info << "test_cert_hierarchical";
+    log_info << "test_cert_hierarchical_v1";
     struct wsinfo_ {
         wsrep_uuid_t    uuid;
         wsrep_conn_id_t conn_id;
         wsrep_trx_id_t  trx_id;
-        struct iovec    key[3];
+        wsrep_key_t     key[3];
         size_t          iov_len;
         wsrep_seqno_t   local_seqno;
         wsrep_seqno_t   global_seqno;
@@ -265,10 +265,10 @@ START_TEST(test_cert_hierarchical)
     size_t nws(sizeof(wsi)/sizeof(wsi[0]));
 
     galera::Certification cert;
-    cert.assign_initial_position(0);
+    cert.assign_initial_position(0, 0);
     for (size_t i(0); i < nws; ++i)
     {
-        TrxHandle* trx(new TrxHandle(wsi[i].uuid, wsi[i].conn_id,
+        TrxHandle* trx(new TrxHandle(0, wsi[i].uuid, wsi[i].conn_id,
                                      wsi[i].trx_id, false));
         trx->append_key(Key(wsi[i].key, wsi[i].iov_len));
         trx->set_last_seen_seqno(wsi[i].last_seen_seqno);
@@ -284,6 +284,93 @@ START_TEST(test_cert_hierarchical)
                     trx->global_seqno(),
                     trx->last_depends_seqno(),
                     wsi[i].expected_last_depends_seqno);
+        trx->unref();
+    }
+}
+END_TEST
+
+
+START_TEST(test_cert_hierarchical_v1)
+{
+    log_info << "test_cert_hierarchical_v1";
+    struct wsinfo_ {
+        wsrep_uuid_t    uuid;
+        wsrep_conn_id_t conn_id;
+        wsrep_trx_id_t  trx_id;
+        wsrep_key_t     key[3];
+        size_t          iov_len;
+        wsrep_seqno_t   local_seqno;
+        wsrep_seqno_t   global_seqno;
+        wsrep_seqno_t   last_seen_seqno;
+        wsrep_seqno_t   expected_last_depends_seqno;
+        int             flags;
+        Certification::TestResult result;
+    } wsi[] = {
+        // 1 - 3, test symmetric case for dependencies
+        // 1: no dependencies
+        { { {1, } }, 1, 1,
+          { {void_cast("1"), 1}, }, 1,
+          1, 1, 0, 0, 0, Certification::TEST_OK},
+        // 2: depends on 1, no conflict
+        { { {1, } }, 1, 1,
+          { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2,
+          2, 2, 0, 1, 0, Certification::TEST_OK},
+        // 3: depends on 2, no conflict
+        { { {1, } }, 1, 1,
+          { {void_cast("1"), 1}, }, 1,
+          3, 3, 0, 2, 0, Certification::TEST_OK},
+        // 4 - 8, test symmetric case for conflicts
+        // 4: depends on 3, no conflict
+        { { {1, } }, 1, 1,
+          { {void_cast("1"), 1}, }, 1,
+          4, 4, 3, 3, 0, Certification::TEST_OK},
+        // 5: conflict with 4
+        { { {2, } }, 1, 1,
+          { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2,
+          5, 5, 3, -1, 0, Certification::TEST_FAILED},
+        // 6: depends on 4 (failed 5 not present in index), no conflict
+        { { {2, } }, 1, 1,
+          { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2,
+          6, 6, 5, 4, 0, Certification::TEST_OK},
+        // 7: conflicts with 6
+        { { {1, } }, 1, 1,
+          { {void_cast("1"), 1}, }, 1,
+          7, 7, 5, -1, 0, Certification::TEST_FAILED},
+        // 8: to isolation: must not conflict, depends on global_seqno - 1
+        { { {1, } }, 1, 1,
+          { {void_cast("1"), 1}, }, 1,
+          8, 8, 5, 7, TrxHandle::F_ISOLATION, Certification::TEST_OK},
+        // 9: to isolation: must not conflict, depends on global_seqno - 1
+        { { {2, } }, 1, 1,
+          { {void_cast("1"), 1}, }, 1,
+          9, 9, 5, 8, TrxHandle::F_ISOLATION, Certification::TEST_OK},
+
+
+    };
+
+    size_t nws(sizeof(wsi)/sizeof(wsi[0]));
+
+    galera::Certification cert;
+    cert.assign_initial_position(0, 1);
+    for (size_t i(0); i < nws; ++i)
+    {
+        TrxHandle* trx(new TrxHandle(1, wsi[i].uuid, wsi[i].conn_id,
+                                     wsi[i].trx_id, false));
+        trx->append_key(Key(wsi[i].key, wsi[i].iov_len));
+        trx->set_last_seen_seqno(wsi[i].last_seen_seqno);
+        trx->set_flags(trx->flags() | wsi[i].flags);
+        trx->flush(0);
+        trx->set_seqnos(wsi[i].local_seqno, wsi[i].global_seqno);
+        Certification::TestResult result(cert.append_trx(trx));
+        fail_unless(result == wsi[i].result, "g: %lld r: %d er: %d",
+                    trx->global_seqno(), result, wsi[i].result);
+        fail_unless(trx->last_depends_seqno() ==
+                    wsi[i].expected_last_depends_seqno,
+                    "g: %lld ld: %lld eld: %lld",
+                    trx->global_seqno(),
+                    trx->last_depends_seqno(),
+                    wsi[i].expected_last_depends_seqno);
+        cert.set_trx_committed(trx);
         trx->unref();
     }
 }
@@ -311,9 +398,14 @@ Suite* write_set_suite()
     tcase_add_test(tc, test_cert);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_cert_hierarchical");
-    tcase_add_test(tc, test_cert_hierarchical);
+    tc = tcase_create("test_cert_hierarchical_v0");
+    tcase_add_test(tc, test_cert_hierarchical_v0);
     suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_cert_hierarchical_v1");
+    tcase_add_test(tc, test_cert_hierarchical_v1);
+    suite_add_tcase(s, tc);
+
 
     return s;
 }

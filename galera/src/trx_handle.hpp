@@ -117,12 +117,13 @@ namespace galera
 
 
         explicit
-        TrxHandle(const wsrep_uuid_t& source_id = WSREP_UUID_UNDEFINED,
+        TrxHandle(int                 version   = -1,
+                  const wsrep_uuid_t& source_id = WSREP_UUID_UNDEFINED,
                   wsrep_conn_id_t     conn_id   = -1,
                   wsrep_trx_id_t      trx_id    = -1,
                   bool                local     = false)
             :
-            version_           (0),
+            version_           (version),
             source_id_         (source_id),
             conn_id_           (conn_id),
             trx_id_            (trx_id),
@@ -149,6 +150,7 @@ namespace galera
         void lock()   const { mutex_.lock();   }
         void unlock() const { mutex_.unlock(); }
 
+        int version() const { return version_; }
         const wsrep_uuid_t& source_id() const { return source_id_; }
 
         wsrep_trx_id_t trx_id() const { return trx_id_; }
@@ -322,7 +324,7 @@ namespace galera
         //
         friend class Wsdb;
         friend class Certification;
-        typedef std::set<KeyEntry*> CertKeySet;
+        typedef std::list<std::pair<KeyEntry*, bool> > CertKeySet;
         CertKeySet cert_keys_;
 
         friend size_t serialize(const TrxHandle&, gu::byte_t* buf,
