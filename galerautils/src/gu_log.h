@@ -9,6 +9,8 @@
 #ifndef _gu_log_h_
 #define _gu_log_h_
 
+#include <stdlib.h> /* For NULL */
+
 #if defined(__cplusplus)
 extern "C"
 {

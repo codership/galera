@@ -25,5 +25,6 @@
 #include "gu_lock_step.h"
 #include "gu_utils.h"
 #include "gu_config.h"
+#include "gu_abort.h"
 
 #endif /* _galerautils_h_ */
