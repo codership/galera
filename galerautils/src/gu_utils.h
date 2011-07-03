@@ -36,9 +36,6 @@ gu_str2bool (const char* str, bool*      b);
 extern const char*
 gu_str2ptr  (const char* str, void**     ptr);
 
-/* This function is for clean aborts, when we can't gracefully exit otherwise*/
-extern void gu_abort();
-
 #ifdef __cplusplus
 }
 #endif

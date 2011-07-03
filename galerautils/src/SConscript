@@ -4,6 +4,7 @@ libgalerautils_env = env.Clone()
 
 # C part
 libgalerautils_sources = [
+    'gu_abort.c',
     'gu_dbug.c',
     'gu_fifo.c',
     'gu_lock_step.c',
