@@ -162,7 +162,9 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     {
         gu_throw_error(EINVAL) << "connect address points to listen address '"
                                << listen_addr
-                               << "', check that cluster address is correct";
+                               << "', check that cluster address '"
+                               << uri.get_host() << ":" << port
+                               << "' is correct";
     }
 
     if (mcast_addr != "")
@@ -401,9 +403,10 @@ void GMCast::handle_established(Proto* est)
                 proto_map->find_checked(est->get_socket()->get_id()));
             delete est;
             gu_throw_error(EINVAL)
-                << "connected to own listening address, "
-                << "check that cluster address '"
-                << initial_addr
+                << "connected to own listening address '"
+                <<  initial_addr
+                << "', check that cluster address '"
+                << uri_.get_host()
                 << "' points to correct location";
         }
         else
