@@ -57,6 +57,7 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     mcast         (),
     pending_addrs (),
     remote_addrs  (),
+    addr_blacklist(),
     proto_map     (new ProtoMap()),
     mcast_tree    (),
     time_wait     (param<Period>(conf_, uri, Conf::GMCastTimeWait, "PT5S")),
@@ -156,6 +157,13 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     }
 
     listen_addr = resolve(listen_addr).to_string();
+
+    if (listen_addr == initial_addr)
+    {
+        gu_throw_error(EINVAL) << "connect address points to listen address '"
+                               << listen_addr
+                               << "', check that cluster address is correct";
+    }
 
     if (mcast_addr != "")
     {
@@ -384,6 +392,43 @@ void GMCast::handle_established(Proto* est)
               << est->get_remote_uuid() << " "
               << est->get_remote_addr();
 
+    if (est->get_remote_uuid() == get_uuid())
+    {
+        // connected to self
+        if (est->get_remote_addr() == initial_addr)
+        {
+            proto_map->erase(
+                proto_map->find_checked(est->get_socket()->get_id()));
+            delete est;
+            gu_throw_error(EINVAL)
+                << "connected to own listening address, "
+                << "check that cluster address '"
+                << initial_addr
+                << "' points to correct location";
+        }
+        else
+        {
+            AddrList::iterator i(pending_addrs.find(est->get_remote_addr()));
+            if (i != pending_addrs.end())
+            {
+                log_warn << self_string()
+                         << " address '" << est->get_remote_addr()
+                         << "' points to own listening address, blacklisting";
+                pending_addrs.erase(i);
+                addr_blacklist.insert(make_pair(est->get_remote_addr(),
+                                                AddrEntry(Date::now(),
+                                                          Date::now(),
+                                                          est->get_remote_uuid())));
+            }
+            proto_map->erase(
+                proto_map->find_checked(est->get_socket()->get_id()));
+            delete est;
+            update_addresses();
+        }
+        return;
+    }
+
+
     // If address is found from pending_addrs, move it to remote_addrs list
     // and set retry cnt to -1
     const string& remote_addr(est->get_remote_addr());
@@ -540,7 +585,7 @@ void GMCast::insert_address (const string& addr,
 {
     if (addr == listen_addr)
     {
-        gu_throw_fatal << "Trying to add self to addr list";
+        gu_throw_fatal << "Trying to add self addr " << addr << " to addr list";
     }
 
     if (alist.insert(make_pair(addr,
@@ -634,6 +679,15 @@ void GMCast::update_addresses()
                 const UUID& link_uuid(LinkMap::get_key(j));
                 const string& link_addr(LinkMap::get_value(j).get_addr());
                 gcomm_assert(link_uuid != UUID::nil() && link_addr != "");
+
+                if (addr_blacklist.find(link_addr) != addr_blacklist.end())
+                {
+                    log_info << self_string()
+                             << " address '" << link_addr
+                             << "' pointing to uuid " << link_uuid
+                             << " is blacklisted, skipping";
+                    continue;
+                }
 
                 if (link_uuid                     != get_uuid()         &&
                     remote_addrs.find(link_addr)  == remote_addrs.end() &&
