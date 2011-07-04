@@ -362,6 +362,53 @@ START_TEST(test_gmcast_forget)
 }
 END_TEST
 
+START_TEST(test_trac_380)
+{
+    gu_conf_self_tstamp_on();
+    log_info << "START";
+    gu::Config conf;
+    std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
+
+    // caused either assertion or exception
+    gcomm::Transport* tp1(gcomm::Transport::create(
+                              *pnet,
+                              "gmcast://127.0.0.1:4567?"
+                              "gmcast.group=test"));
+    pnet->insert(&tp1->get_pstack());
+    tp1->connect();
+    try
+    {
+        pnet->event_loop(Sec);
+    }
+    catch (gu::Exception& e)
+    {
+        fail_unless(e.get_errno() == EINVAL,
+                    "unexpected errno: %d, cause %s",
+                    e.get_errno(), e.what());
+    }
+    pnet->erase(&tp1->get_pstack());
+    tp1->close();
+    delete tp1;
+    pnet->event_loop(0);
+
+
+    try
+    {
+        tp1 = gcomm::Transport::create(
+            *pnet,
+            "gmcast://127.0.0.1:4567?"
+            "gmcast.group=test&"
+            "gmcast.listen_addr=tcp://127.0.0.1:4567");
+    }
+    catch (gu::Exception& e)
+    {
+        fail_unless(e.get_errno() == EINVAL,
+                    "unexpected errno: %d, cause %s",
+                    e.get_errno(), e.what());
+    }
+    pnet->event_loop(0);
+}
+END_TEST
 
 
 Suite* gmcast_suite()
@@ -397,6 +444,10 @@ Suite* gmcast_suite()
     tc = tcase_create("test_gmcast_forget");
     tcase_add_test(tc, test_gmcast_forget);
     tcase_set_timeout(tc, 20);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_trac_380");
+    tcase_add_test(tc, test_trac_380);
     suite_add_tcase(s, tc);
 
     return s;

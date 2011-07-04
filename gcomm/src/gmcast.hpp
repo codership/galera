@@ -135,6 +135,7 @@ namespace gcomm
         SocketPtr         mcast;
         AddrList          pending_addrs;
         AddrList          remote_addrs;
+        AddrList          addr_blacklist;
 
         gmcast::ProtoMap*  proto_map;
         std::list<Socket*> mcast_tree;
