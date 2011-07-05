@@ -30,8 +30,7 @@ namespace
         const galera::TrxHandle* trx_;
     };
 
-    typedef std::list<std::pair<
-                          galera::Certification::CertIndex::iterator, bool> > KeyList;
+    typedef std::list<std::pair<galera::Key, bool> > KeyList;
 }
 
 
@@ -356,7 +355,7 @@ certify_v1(galera::TrxHandle*                              trx,
                              ref_trx->global_seqno()));
             }
         }
-        key_list.push_back(std::make_pair(ci, full_key));
+        key_list.push_back(std::make_pair(key, full_key));
     }
     return true;
 }
@@ -380,7 +379,7 @@ galera::Certification::do_test_v1(TrxHandle* trx, bool store_keys)
 
     size_t offset(serial_size(*trx));
     const MappedBuffer& wscoll(trx->write_set_collection());
-    std::list<std::pair<CertIndex::iterator, bool> > key_list;
+    KeyList key_list;
     gu::Lock lock(mutex_);
 
     // Scan over write sets
@@ -410,12 +409,19 @@ galera::Certification::do_test_v1(TrxHandle* trx, bool store_keys)
     {
         for (KeyList::iterator i(key_list.begin()); i != key_list.end(); ++i)
         {
-            const KeyEntry* ke(i->first->second);
-            if ((i->second == false && ke->ref_trx() != trx) ||
-                (i->second == true  && ke->ref_full_trx() != trx))
+            CertIndex::const_iterator ci(cert_index_.find(i->first));
+            if (ci == cert_index_.end())
             {
-                trx->cert_keys_.push_back(std::make_pair(i->first->second, i->second));
-                i->first->second->ref(trx, i->second);
+                gu_throw_fatal << "could not find key '"
+                               << i->first << "' from cert index";
+            }
+            KeyEntry* ke(ci->second);
+            const bool full_key(i->second);
+            if ((full_key == false && ke->ref_trx() != trx) ||
+                (full_key == true  && ke->ref_full_trx() != trx))
+            {
+                trx->cert_keys_.push_back(std::make_pair(ke, i->second));
+                ke->ref(trx, i->second);
             }
         }
     }
@@ -428,11 +434,18 @@ cert_fail:
         // Clean up cert_index_ entries which were added by this trx
         for (KeyList::iterator i(key_list.begin()); i != key_list.end(); ++i)
         {
-            KeyEntry* ke(i->first->second);
+            CertIndex::iterator ci(cert_index_.find(i->first));
+            if (ci == cert_index_.end())
+            {
+                log_debug << "could not find key '"
+                          << i->first << "' from cert index";
+                continue;
+            }
+            KeyEntry* ke(ci->second);
             if (ke->ref_trx() == 0)
             {
                 assert(ke->ref_full_trx() == 0);
-                cert_index_.erase(i->first);
+                cert_index_.erase(ci);
             }
         }
     }
