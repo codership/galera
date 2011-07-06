@@ -1056,10 +1056,13 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
         {
             gu_trace(apply_trx(recv_ctx, trx));
         }
-        catch (...)
+        catch (std::exception& e)
         {
-            log_fatal << "failed to apply trx: " << *trx;
-            throw;
+            log_fatal << "Failed to apply trx: " << *trx;
+            log_fatal << e.what();
+            log_fatal << "Node consistency compromized, aborting...";
+            abort();
+//            throw;
         }
         break;
     case WSREP_TRX_FAIL:
@@ -1149,7 +1152,7 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
         log_fatal << "View callback failed: " << -app_req_len << " ("
                   << strerror(-app_req_len) << ". This is unrecoverable, "
                   << "restart required.";
-        gu_abort();
+        abort();
     }
 
     if (view_info.conf >= 0)
@@ -1224,7 +1227,7 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
         {
             log_fatal << "Internal error: unexpected next state for "
                       << "non-prim: " << next_state << ". Restart required.";
-            gu_abort();
+            abort();
         }
 
         state_.shift_to(next_state);
@@ -1537,7 +1540,7 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
             sst_state_ = SST_FAILED;
             log_fatal << "Application state transfer failed. This is "
                       << "unrecoverable condition, restart required.";
-            gu_abort();
+            abort();
         }
         else
         {
@@ -1564,7 +1567,7 @@ galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
                       << -ret << " (" << strerror(-ret) << "). Most likely "
                       << "it is due to inability to communicate with cluster "
                       << "primary component. Restart required.";
-            gu_abort();
+            abort();
         }
         else
         {
@@ -1698,4 +1701,11 @@ galera::ReplicatorSMM::update_state_uuid (const wsrep_uuid_t& uuid)
         strncpy(const_cast<char*>(state_uuid_str_), os.str().c_str(),
                 sizeof(state_uuid_str_));
     }
+}
+
+void
+galera::ReplicatorSMM::abort() throw() /* aborts the program in a clean way */
+{
+    gcs_.close();
+    gu_abort();
 }

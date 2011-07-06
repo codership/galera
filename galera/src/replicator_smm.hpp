@@ -159,6 +159,8 @@ namespace galera
 
         void update_state_uuid (const wsrep_uuid_t& u);
 
+        void abort() throw(); /* aborts the program in a clean way */
+
         class LocalOrder
         {
         public:
