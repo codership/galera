@@ -113,6 +113,8 @@ Options:
     -u|--user         : mysql root user
     --valgrind        : run under valgrind
     --ws_level        : RBR (default) or SQL
+    -P|--port         : port for MySQL client connections
+    -S|--socket       : location of mysqld socket
 
 Commands:
 check                 : check cosistency of database given with --db option
@@ -168,6 +170,26 @@ wait_for_wsrep_ready()
     return $ret
 }
 
+check_gcs_address()
+{
+    local addr="$1"
+
+    if [ -n "$addr" ]
+    then
+        case "$addr" in
+        "gcomm://"*)
+            # we could be checking address here, but generally it does not
+            # have to exist yet.
+            ;;
+        "dummy://"*)
+            ;;
+        *)
+            echo "Cluster address should start with either 'gcomm://' or 'dummy://'. Server not started." >&2
+            exit 1
+        esac
+    fi
+}
+
 galera_start()
 {
     local failed
@@ -208,6 +230,7 @@ galera_start()
 
     if test -n "$GCS_ADDRESS"
     then
+        check_gcs_address $GCS_ADDRESS
         WSREP_OPTS="$WSREP_OPTS --wsrep_cluster_address=$GCS_ADDRESS"
     fi
 
@@ -473,6 +496,14 @@ case $1 in
             ;;
     --mysql-opt)
             MYSQLD_OPTS="$MYSQLD_OPTS $2"
+            shift
+            ;;
+    -P|--port)
+            MYSQL_PORT="$2"
+            shift
+            ;;
+    -S|--socket)
+            MYSQL_SOCKET="$2"
             shift
             ;;
 'dump')
