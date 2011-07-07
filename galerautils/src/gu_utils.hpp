@@ -90,46 +90,14 @@ template <> inline void* from_string<void*>(const std::string& s,
     return ret;
 }
 
+extern bool _to_bool (const std::string& s) throw (NotFound);
+
 /*! Specialized template for reading bool. Tries both 1|0 and true|false */
 template <> inline bool from_string<bool> (const std::string& s,
                                            std::ios_base& (*f)(std::ios_base&))
     throw(NotFound)
 {
-    std::istringstream iss(s);
-    bool               ret;
-
-    if ((iss >> ret).fail())
-    {
-        /* if 1|0 didn't work, try true|false */
-        iss.clear();
-        iss.seekg(0);
-        if ((iss >> std::boolalpha >> ret).fail())
-        {
-            /* try On/Off */
-            std::string tmp(s);
-
-            gu::trim(tmp);
-
-            if (tmp.length() >=2 && tmp.length() <= 3 &&
-                (tmp[0] == 'o' || tmp[0] == 'O'))
-            {
-                if (tmp.length() == 2 && (tmp[1] == 'n' || tmp[1] == 'N'))
-                {
-                    return true;
-                }
-                else if (tmp.length() == 3 &&
-                         (tmp[1] == 'f' || tmp[1] == 'F') &&
-                         (tmp[2] == 'f' || tmp[2] == 'F'))
-                {
-                    return false;
-                }
-            }
-
-            throw NotFound();
-        }
-    }
-
-    return ret;
+    return _to_bool(s);
 }
 
 /*! 

@@ -28,7 +28,9 @@ libgalerautilsxx_sources = [
     'gu_string.cpp',
     'gu_uri.cpp',
     'gu_buffer.cpp',
-    'gu_config.cpp']
+    'gu_utils++.cpp',
+    'gu_config.cpp'
+]
 
 if libgalerautils_env['CPPFLAGS'].find('-DGALERA_USE_GU_NETWORK') != -1:
     libgalerautilsxx_sources = [libgalerautilsxx_sources, 
