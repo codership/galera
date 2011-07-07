@@ -70,7 +70,7 @@ public:
         my_uuid_       (uuid),
         start_prim_    (),
         npvo_          (param<bool>(conf, uri, Conf::PcNpvo, "false")),
-        allow_sb_      (param<bool>(conf, uri, Conf::PcAllowSb, "true")),
+        allow_sb_      (param<bool>(conf, uri, Conf::PcAllowSb, "false")),
         closing_       (false),
         state_         (S_CLOSED),
         last_sent_seq_ (0),
