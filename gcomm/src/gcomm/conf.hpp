@@ -180,18 +180,6 @@ namespace gcomm
          */
         static std::string const EvsInactiveCheckPeriod;
 
-        /*!
-         * @brief EVS consensus timeout ("evs.consensus_timeout")
-         *
-         * This timeout defines how long forming of new group is attempted.
-         * If there is no consensus after this time has passed since
-         * starting of consensus protocol, every node discards all other
-         * nodes from the group and forming of new group is attempted
-         * through singleton groups. Default value is 30 seconds,
-         * minimum is Conf::EvsInactiveTimeout and maximum is
-         * Conf::EvsInactiveTimeout*5.
-         */
-        static std::string const EvsConsensusTimeout;
 
         static std::string const EvsInstallTimeout;
 
@@ -270,6 +258,15 @@ namespace gcomm
          * adviced so.
          */
         static std::string const EvsUseAggregate;
+
+        /*!
+         * @brief EVS maximum install timeouts ("evs.max_install_timeouts")
+         *
+         * This parameter controls how many install attempts are done
+         * before declaring other nodes as inactive and trying to re-establish
+         * group via singleton views.
+         */
+        static std::string const EvsMaxInstallTimeouts;
 
         /*!
          * @brief PC scheme for transport URI ("pc")

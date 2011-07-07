@@ -19,7 +19,6 @@ namespace gcomm
         static std::string const EvsSuspectTimeoutMin     ;
         static std::string const EvsInactiveTimeout       ;
         static std::string const EvsInactiveTimeoutMin    ;
-        static std::string const EvsConsensusTimeout      ;
         static std::string const EvsInstallTimeout        ;
         static std::string const EvsRetransPeriod         ;
         static std::string const EvsRetransPeriodMin      ;
@@ -30,6 +29,7 @@ namespace gcomm
         static std::string const EvsSendWindowMin         ;
         static std::string const EvsUserSendWindow        ;
         static std::string const EvsUserSendWindowMin     ;
+        static std::string const EvsMaxInstallTimeouts    ;
     };
 }
 

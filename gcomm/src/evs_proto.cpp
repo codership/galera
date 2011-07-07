@@ -104,11 +104,6 @@ gcomm::evs::Proto::Proto(gu::Config& conf,
                                   Defaults::EvsInactiveCheckPeriod),
                     Period::min(),
                     suspect_timeout/2 + 1)),
-    consensus_timeout(
-        check_range(Conf::EvsConsensusTimeout,
-                    param<Period>(conf, uri, Conf::EvsConsensusTimeout,
-                                  Defaults::EvsConsensusTimeout),
-                    inactive_timeout, inactive_timeout*5 + 1)),
     retrans_period(
         check_range(Conf::EvsKeepalivePeriod,
                     param<Period>(conf, uri, Conf::EvsKeepalivePeriod,
@@ -139,9 +134,14 @@ gcomm::evs::Proto::Proto(gu::Config& conf,
     input_map(new InputMap()),
     causal_queue_(),
     consensus(my_uuid, known, *input_map, current_view),
-    cac(0),
     install_message(0),
     attempt_seq(1),
+    max_install_timeouts(
+        check_range(Conf::EvsMaxInstallTimeouts,
+                    param<int>(conf, uri, Conf::EvsMaxInstallTimeouts,
+                               Defaults::EvsMaxInstallTimeouts),
+                    0, std::numeric_limits<int>::max())),
+    install_timeout_count(0),
     fifo_seq(-1),
     last_sent(-1),
     send_window(
@@ -174,7 +174,6 @@ gcomm::evs::Proto::Proto(gu::Config& conf,
     conf.set(Conf::EvsKeepalivePeriod, gu::to_string(retrans_period));
     conf.set(Conf::EvsInactiveCheckPeriod,
              gu::to_string(inactive_check_period));
-    conf.set(Conf::EvsConsensusTimeout, gu::to_string(consensus_timeout));
     conf.set(Conf::EvsJoinRetransPeriod, gu::to_string(join_retrans_period));
     conf.set(Conf::EvsInstallTimeout, gu::to_string(install_timeout));
     conf.set(Conf::EvsStatsReportPeriod, gu::to_string(stats_report_period));
@@ -183,7 +182,7 @@ gcomm::evs::Proto::Proto(gu::Config& conf,
     conf.set(Conf::EvsUseAggregate, gu::to_string(use_aggregate));
     conf.set(Conf::EvsDebugLogMask, gu::to_string(debug_mask, std::hex));
     conf.set(Conf::EvsInfoLogMask, gu::to_string(info_mask, std::hex));
-
+    conf.set(Conf::EvsMaxInstallTimeouts, gu::to_string(max_install_timeouts));
     //
 
     known.insert_unique(make_pair(my_uuid, Node(inactive_timeout, suspect_timeout)));
@@ -228,6 +227,15 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val)
             gu::from_string<seqno_t>(Defaults::EvsUserSendWindowMin),
             send_window + 1);
         conf_.set(Conf::EvsUserSendWindow, gu::to_string(user_send_window));
+        return true;
+    }
+    else if (key == gcomm::Conf::EvsMaxInstallTimeouts)
+    {
+        max_install_timeouts = check_range(
+            Conf::EvsMaxInstallTimeouts,
+            gu::from_string<int>(val),
+            0, std::numeric_limits<int>::max());
+        conf_.set(Conf::EvsMaxInstallTimeouts, gu::to_string(max_install_timeouts));
         return true;
     }
     return false;
@@ -385,28 +393,33 @@ void gcomm::evs::Proto::handle_retrans_timer()
 }
 
 
-void gcomm::evs::Proto::handle_consensus_timer()
+void gcomm::evs::Proto::handle_install_timer()
 {
-    if (get_state() != S_OPERATIONAL)
+    gcomm_assert(get_state() == S_GATHER || get_state() == S_INSTALL);
+    log_warn << self_string() << " install timer expired";
+
+    if (install_timeout_count == max_install_timeouts - 1)
     {
-        log_warn << self_string()
-                 << " consensus timer expired, state dump follows:";
-        std::cerr << *this << std::endl;
-
-        ++cac;
-        if (cac == 2)
+        // before reaching max_install_timeouts, declare only inconsistent
+        // nodes as inactive
+        for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
         {
-            gu_throw_fatal << self_string() << "unable to reach consensus on "
-                           << cac << " attempts, giving up";
+            const Node& node(NodeMap::get_value(i));
+            if (NodeMap::get_key(i) != get_uuid() &&
+                (node.get_join_message() == 0 ||
+                 consensus.is_consistent(*node.get_join_message()) == false))
+            {
+                evs_log_info(I_STATE)
+                    << " setting source " << NodeMap::get_key(i)
+                    << " as inactive due to expired consensus timer";
+                set_inactive(NodeMap::get_key(i));
+            }
         }
-
-        // Consensus timer expiration indicates that for some reason
-        // nodes fail to form new group. Set all other nodes
-        // unoperational to form singleton group and retry
-        // forming new group after a while.
-        //
-        // @todo This should be improved so that only the nodes that
-        //       are not in agreement with current node are discarded.
+    }
+    else if (install_timeout_count == max_install_timeouts)
+    {
+        // max install timeouts reached, declare all other nodes
+        // as inactive
         for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
         {
             if (NodeMap::get_key(i) != get_uuid())
@@ -417,32 +430,18 @@ void gcomm::evs::Proto::handle_consensus_timer()
                 set_inactive(NodeMap::get_key(i));
             }
         }
-        profile_enter(shift_to_prof);
-        gu_trace(shift_to(S_GATHER, true));
-        profile_leave(shift_to_prof);
     }
-
-    if (get_state() != S_LEAVING)
+    else if (install_timeout_count > max_install_timeouts)
     {
-        for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
-        {
-            Node& node(NodeMap::get_value(i));
-            if (node.get_leave_message() != 0 && node.is_inactive() == true)
-            {
-                log_debug << self_string()
-                          << " removing leave message of previously leaving node "
-                          << NodeMap::get_key(i);
-                node.set_leave_message(0);
-            }
-        }
+        log_info << "going to give up, state dump for diagnosis:";
+        std::cerr << *this << std::endl;
+        gu_throw_fatal << self_string()
+                       << " failed to form singleton view after exceeding "
+                       << "max_install_timeouts " << max_install_timeouts
+                       << ", giving up";
     }
-}
 
 
-void gcomm::evs::Proto::handle_install_timer()
-{
-    gcomm_assert(get_state() == S_GATHER || get_state() == S_INSTALL);
-    log_warn << self_string() << " install timer expired";
     if (install_message != 0)
     {
         for (NodeMap::iterator i = known.begin(); i != known.end(); ++i)
@@ -474,6 +473,7 @@ void gcomm::evs::Proto::handle_install_timer()
     {
         send_install();
     }
+    install_timeout_count++;
 }
 
 void gcomm::evs::Proto::handle_stats_timer()
@@ -539,14 +539,6 @@ Date gcomm::evs::Proto::get_next_expiration(const Timer t) const
         default:
             return Date::max();
         }
-    case T_CONSENSUS:
-        switch (get_state())
-        {
-        case S_GATHER:
-            return (now + consensus_timeout);
-        default:
-            return Date::max();
-        }
     case T_STATS:
         return (now + stats_report_period);
     }
@@ -562,8 +554,6 @@ void gcomm::evs::Proto::reset_timers()
                  make_pair(get_next_expiration(T_INACTIVITY), T_INACTIVITY)));
     gu_trace((void)timers.insert(
                  make_pair(get_next_expiration(T_RETRANS), T_RETRANS)));
-    gu_trace((void)timers.insert(
-                 make_pair(get_next_expiration(T_CONSENSUS), T_CONSENSUS)));
     gu_trace((void)timers.insert(
                  make_pair(get_next_expiration(T_INSTALL), T_INSTALL)));
     gu_trace((void)timers.insert(
@@ -587,9 +577,6 @@ Date gcomm::evs::Proto::handle_timers()
             break;
         case T_RETRANS:
             handle_retrans_timer();
-            break;
-        case T_CONSENSUS:
-            handle_consensus_timer();
             break;
         case T_INSTALL:
             handle_install_timer();
@@ -2159,7 +2146,6 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
 
         input_map->reset(current_view.get_members().size());
         last_sent = -1;
-        cac = 0;
         state = S_OPERATIONAL;
         deliver_reg_view();
 
@@ -2170,7 +2156,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
         delete install_message;
         install_message = 0;
         attempt_seq = 1;
-
+        install_timeout_count = 0;
         profile_enter(send_gap_prof);
         gu_trace(send_gap(UUID::nil(), current_view.get_id(), Range()));;
         profile_leave(send_gap_prof);
