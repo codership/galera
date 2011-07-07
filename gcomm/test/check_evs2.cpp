@@ -615,7 +615,7 @@ static DummyNode* create_dummy_node(size_t idx,
         + Conf::EvsInactiveCheckPeriod + "=" + to_string(Period(inactive_timeout)/3) + "&"
         + Conf::EvsSuspectTimeout + "=" + inactive_timeout + "&"
         + Conf::EvsInactiveTimeout + "=" + inactive_timeout + "&"
-        + Conf::EvsConsensusTimeout + "=" + to_string(Period(inactive_timeout)*2) + "&"
+
         + Conf::EvsKeepalivePeriod + "=" + retrans_period + "&"
         + Conf::EvsJoinRetransPeriod + "=" + retrans_period + "&"
         + Conf::EvsInfoLogMask + "=0x7";

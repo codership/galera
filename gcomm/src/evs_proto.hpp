@@ -243,7 +243,6 @@ public:
     {
         T_INACTIVITY,
         T_RETRANS,
-        T_CONSENSUS,
         T_INSTALL,
         T_STATS
     };
@@ -258,7 +257,6 @@ public:
     // These need currently to be public for unit tests
     void handle_inactivity_timer();
     void handle_retrans_timer();
-    void handle_consensus_timer();
     void handle_install_timer();
     void handle_stats_timer();
     gu::datetime::Date get_next_expiration(const Timer) const;
@@ -334,7 +332,6 @@ private:
     gu::datetime::Period inactive_timeout;
     gu::datetime::Period suspect_timeout;
     gu::datetime::Period inactive_check_period;
-    gu::datetime::Period consensus_timeout;
     gu::datetime::Period retrans_period;
     gu::datetime::Period install_timeout;
     gu::datetime::Period join_retrans_period;
@@ -377,12 +374,13 @@ private:
     std::deque<CausalMessage> causal_queue_;
     // Consensus module
     Consensus consensus;
-    // Consensus attempt count
-    size_t cac;
     // Last received install message
     InstallMessage* install_message;
     // Install attempt counter
     uint32_t attempt_seq;
+    // Install timeout counting
+    int max_install_timeouts;
+    int install_timeout_count;
     // Sequence number to maintain membership message FIFO order
     int64_t fifo_seq;
     // Last sent seq

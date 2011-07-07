@@ -44,8 +44,6 @@ std::string const gcomm::Conf::EvsSuspectTimeout =
     EvsScheme + Delim + "suspect_timeout";
 std::string const gcomm::Conf::EvsInactiveCheckPeriod = 
     EvsScheme + Delim + "inactive_check_period";
-std::string const gcomm::Conf::EvsConsensusTimeout = 
-    EvsScheme + Delim + "consensus_timeout";
 std::string const gcomm::Conf::EvsInstallTimeout =
     EvsScheme + Delim + "install_timeout";
 std::string const gcomm::Conf::EvsKeepalivePeriod = 
@@ -64,6 +62,8 @@ std::string const gcomm::Conf::EvsUserSendWindow =
     EvsScheme + Delim + "user_send_window";
 std::string const gcomm::Conf::EvsUseAggregate =
     EvsScheme + Delim + "use_aggregate";
+std::string const gcomm::Conf::EvsMaxInstallTimeouts =
+    EvsScheme + Delim + "max_install_timeouts";
 // PC
 std::string const gcomm::Conf::PcScheme = "pc";
 std::string const gcomm::Conf::PcVersion = PcScheme + Delim + "version";
