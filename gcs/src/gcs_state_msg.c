@@ -557,11 +557,11 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
 
         CHECK_MIN_PROTO_VER(version);
 
-        if (states[i]->prim_state >= GCS_NODE_STATE_JOINED) {
+//        if (!gu_uuid_compare(&states[i]->group_uuid, &quorum->group_uuid)) {
             CHECK_MIN_PROTO_VER(gcs_proto_ver);
             CHECK_MIN_PROTO_VER(repl_proto_ver);
             CHECK_MIN_PROTO_VER(appl_proto_ver);
-        }
+//        }
     }
 
     if (quorum->version < 2) {;} // for future generations

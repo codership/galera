@@ -303,15 +303,17 @@ group_post_state_exchange (gcs_group_t* group)
     gu_info ("Quorum results:"
              "\n\tversion    = %u,"
              "\n\tcomponent  = %s,"
-             "\n\tact_id     = %lld,"
              "\n\tconf_id    = %lld,"
+             "\n\tmembers    = %d/%d (joined/total),"
+             "\n\tact_id     = %lld,"
              "\n\tlast_appl. = %lld,"
              "\n\tprotocols  = %d/%d/%d (gcs/repl/appl),"
              "\n\tgroup UUID = "GU_UUID_FORMAT,
              quorum->version,
              quorum->primary ? "PRIMARY" : "NON-PRIMARY",
-             quorum->act_id,
              quorum->conf_id,
+             group->prim_num, group->num,
+             quorum->act_id,
              group->last_applied,
              quorum->gcs_proto_ver, quorum->repl_proto_ver,
              quorum->appl_proto_ver,
