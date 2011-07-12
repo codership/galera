@@ -55,9 +55,9 @@ inline galera::KeyEntry::~KeyEntry()
 }
 
 inline galera::Key
-galera::KeyEntry::get_key() const
+galera::KeyEntry::get_key(int version) const
 {
-    Key rk;
+    Key rk(version);
     uint32_t ss(*reinterpret_cast<uint32_t*>(key_buf_));
     (void)unserialize(key_buf_ + sizeof(uint32_t), ss, 0, rk);
     return rk;
@@ -124,7 +124,7 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
         if (ke->ref_trx() == 0)
         {
             assert(ke->ref_full_trx() == 0);
-            CertIndex::iterator ci(cert_index_.find(ke->get_key()));
+            CertIndex::iterator ci(cert_index_.find(ke->get_key(version_)));
             assert(ci != cert_index_.end());
             delete ci->second;
             cert_index_.erase(ci);
@@ -164,7 +164,7 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
 
     while (offset < wscoll.size())
     {
-        WriteSet ws;
+        WriteSet ws(0);
         if ((offset = unserialize(&wscoll[0], wscoll.size(), offset, ws)) == 0)
         {
             gu_throw_fatal << "failed to unserialize write set";
@@ -177,8 +177,8 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
         for (WriteSet::KeySequence::const_iterator i(rk.begin());
              i != rk.end(); ++i)
         {
-            typedef std::deque<KeyPart> KPS;
-            KPS key_parts(i->key_parts<KPS>());
+            typedef std::deque<KeyPart0> KPS;
+            KPS key_parts(i->key_parts0<KPS>());
 
             if (key_parts.size() == 0)
             {
@@ -194,7 +194,7 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
             {
                 full_key = (end == key_parts.end());
                 CertIndex::iterator ci;
-                Key key(begin, end);
+                Key key(0, begin, end);
                 cert_debug << "key: " << key;
                 if ((ci = cert_index_.find(key)) != cert_index_.end())
                 {
@@ -246,8 +246,8 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
                 {
                     cert_debug << "store key: " << key;
                     KeyEntry* cie(new KeyEntry(key));
-                    ci = cert_index_.insert(std::make_pair(cie->get_key(),
-                                                           cie)).first;
+                    ci = cert_index_.insert(
+                        std::make_pair(cie->get_key(version_), cie)).first;
                 }
 
                 if ((full_key == true ||
@@ -291,16 +291,16 @@ certify_v1(galera::TrxHandle*                              trx,
            galera::WriteSet::KeySequence::const_iterator   key_seq_iter,
            KeyList& key_list, bool store_keys)
 {
-    typedef std::list<galera::KeyPart> KPS;
+    typedef std::list<galera::KeyPart1> KPS;
 
-    KPS key_parts(key_seq_iter->key_parts<KPS>());
+    KPS key_parts(key_seq_iter->key_parts1<KPS>());
     KPS::const_iterator begin(key_parts.begin()), end;
     bool full_key(false);
     for (end = begin; full_key == false; end != key_parts.end() ? ++end : end)
     {
         full_key = (end == key_parts.end());
         galera::Certification::CertIndex::iterator ci;
-        galera::Key key(begin, end);
+        galera::Key key(1, begin, end);
 
         cert_debug << "key: " << key
                    << " ("
@@ -385,7 +385,7 @@ galera::Certification::do_test_v1(TrxHandle* trx, bool store_keys)
     // Scan over write sets
     while (offset < wscoll.size())
     {
-        WriteSet ws;
+        WriteSet ws(1);
         if ((offset = unserialize(&wscoll[0], wscoll.size(), offset, ws)) == 0)
         {
             gu_throw_fatal << "failed to unserialize write set";

@@ -136,7 +136,7 @@ namespace galera
             last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
             last_depends_seqno_(WSREP_SEQNO_UNDEFINED),
             refcnt_            (1),
-            write_set_         (),
+            write_set_         (version),
             write_set_flags_   (0),
             certified_         (false),
             committed_         (false),
@@ -211,6 +211,14 @@ namespace galera
 
         void append_key(const Key& key)
         {
+            if (key.version() != version_)
+            {
+                gu_throw_error(EINVAL)
+                    << "key version '"
+                    << key.version()
+                    << "' does not match to trx version' "
+                    << version_ << "'";
+            }
             write_set_.append_key(key);
         }
 
@@ -345,6 +353,9 @@ namespace galera
 
     std::ostream& operator<<(std::ostream& os, TrxHandle::State s);
 
+    size_t serialize(const TrxHandle&, gu::byte_t* buf,
+                     size_t buflen, size_t offset);
+    size_t unserialize(const gu::byte_t*, size_t, size_t, TrxHandle&);
     size_t serial_size(const TrxHandle&);
 
     class TrxHandleLock

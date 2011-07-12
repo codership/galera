@@ -23,7 +23,7 @@ namespace galera
     public:
         KeyEntry(const Key& row_key);
         ~KeyEntry();
-        Key get_key() const;
+        Key get_key(int version) const;
         void ref(TrxHandle* trx, bool full_key);
         void unref(TrxHandle* trx, bool full_key);
         const TrxHandle* ref_trx() const;
