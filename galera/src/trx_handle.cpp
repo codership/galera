@@ -49,6 +49,8 @@ std::ostream&
 galera::operator<<(std::ostream& os, const TrxHandle& th)
 {
     return (os << "source: " << th.source_id_
+            << " version: " << th.version_
+            << " local: " << th.local_
             << " state: " << th.state_()
             << " flags: " << th.write_set_flags_
             << " conn_id: " << th.conn_id_
@@ -185,6 +187,7 @@ size_t galera::unserialize(const gu::byte_t* buf, size_t buflen, size_t offset,
         offset = unserialize(buf, buflen, offset, hdr);
         trx.write_set_flags_ = hdr & 0xff;
         trx.version_ = hdr >> 24;
+        trx.write_set_.set_version(trx.version_);
 
         switch (trx.version_)
         {

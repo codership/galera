@@ -46,6 +46,7 @@ namespace galera
 
         ~ReplicatorSMM();
 
+        int protocol_version() const { return protocol_version_; }
         wsrep_status_t connect(const std::string& cluster_name,
                                const std::string& cluster_url,
                                const std::string& state_donor);

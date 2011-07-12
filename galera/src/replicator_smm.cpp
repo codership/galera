@@ -112,7 +112,7 @@ apply_wscoll(void*                    recv_ctx,
     const galera::MappedBuffer& wscoll(trx.write_set_collection());
     // skip over trx header
     size_t offset(galera::serial_size(trx));
-    galera::WriteSet ws;
+    galera::WriteSet ws(trx.version());
 
     while (offset < wscoll.size())
     {
@@ -219,7 +219,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     logger_             (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
     config_             (args->options),
     set_defaults_       (config_, defaults),
-    protocol_version_   (max_protocol_version_),
+    protocol_version_   (args->proto_ver),
     state_              (S_CLOSED),
     sst_state_          (SST_NONE),
     co_mode_            (CommitOrder::from_string(
@@ -262,6 +262,17 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     report_counter_     (),
     wsrep_stats_        ()
 {
+    switch (protocol_version_)
+    {
+    case 0:
+    case 1:
+        break;
+    default:
+        gu_throw_fatal << "unsupported protocol version: "
+                       << protocol_version_;
+        throw;
+    }
+
     strncpy (const_cast<char*>(state_uuid_str_), 
              "00000000-0000-0000-0000-000000000000", sizeof(state_uuid_str_));
 

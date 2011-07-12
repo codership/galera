@@ -31,6 +31,7 @@ gu_testspp = env.Program(target = 'gu_tests++',
                               gu_uri_test.cpp
                               gu_net_test.cpp
                               gu_datetime_test.cpp
+                              gu_vlq_test.cpp
                            '''))
 
 env.Test("gu_tests++.passed", gu_testspp)

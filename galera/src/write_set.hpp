@@ -25,13 +25,15 @@ namespace galera
     public:
         typedef std::deque<Key> KeySequence;
 
-        WriteSet()
+        WriteSet(int version)
             :
+            version_(version),
             keys_(),
             key_refs_(),
             data_()
         { }
 
+        void set_version(int version) { version_ = version; }
         const gu::Buffer& get_data() const { return data_; }
 
         void append_key(const Key&);
@@ -54,13 +56,13 @@ namespace galera
         void clear() { keys_.clear(), key_refs_.clear(), data_.clear(); }
 
     private:
-
         friend size_t serialize(const WriteSet&, gu::byte_t*, size_t, size_t);
         friend size_t unserialize(const gu::byte_t*, size_t, size_t, WriteSet&);
         friend size_t serial_size(const WriteSet&);
 
         typedef gu::UnorderedMultimap<size_t, size_t> KeyRefMap;
 
+        int                version_;
         gu::Buffer         keys_;
         KeyRefMap          key_refs_;
         gu::Buffer         data_;

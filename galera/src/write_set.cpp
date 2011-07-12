@@ -47,7 +47,7 @@ void galera::WriteSet::append_key(const Key& key)
 
     for (KeyRefMap::const_iterator i(range.first); i != range.second; ++i)
     {
-        Key cmp;
+        Key cmp(version_);
 
         (void)galera::unserialize(&keys_[0], keys_.size(), i->second, cmp);
 
@@ -67,7 +67,7 @@ void galera::WriteSet::get_keys(KeySequence& s) const
     size_t offset(0);
     while (offset < keys_.size())
     {
-        Key key;
+        Key key(version_);
         if ((offset = unserialize(&keys_[0], keys_.size(), offset, key)) == 0)
         {
             gu_throw_fatal << "failed to unserialize key";

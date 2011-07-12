@@ -17,10 +17,11 @@ using namespace std;
 using namespace gu;
 using namespace galera;
 
-typedef std::vector<galera::KeyPart> KeyPartSequence;
+typedef std::vector<galera::KeyPart0> KeyPart0Sequence;
+typedef std::vector<galera::KeyPart1> KeyPart1Sequence;
 
 
-START_TEST(test_key)
+START_TEST(test_key0)
 {
 
     const wsrep_key_t kiovec[3] = {
@@ -29,25 +30,66 @@ START_TEST(test_key)
         {"key3", 4 }
     };
 
-    galera::Key key(kiovec, 3);
+    galera::Key key(0, kiovec, 3);
     fail_unless(galera::serial_size(key) == 2 + 3 + 3 + 5, "%ld <-> %ld",
                 galera::serial_size(key), 2 + 3 + 3 + 5);
 
-    KeyPartSequence kp(key.key_parts<KeyPartSequence>());
+    KeyPart0Sequence kp(key.key_parts0<KeyPart0Sequence>());
     fail_unless(kp.size() == 3);
 
     gu::Buffer buf(galera::serial_size(key));
     galera::serialize(key, &buf[0], buf.size(), 0);
-    galera::Key key2;
+    galera::Key key2(0);
+    galera::unserialize(&buf[0], buf.size(), 0, key2);
+    fail_unless(key2 == key);
+}
+END_TEST
+
+START_TEST(test_key1)
+{
+    static char k1[16];
+    static char k2[256];
+    static char k3[1 << 21];
+    static char k4[(1 << 22) - 5];
+
+    memset(k1, 0xab, sizeof(k1));
+    memset(k2, 0xcd, sizeof(k2));
+    memset(k3, 0x9e, sizeof(k3));
+    memset(k4, 0x8f, sizeof(k4));
+
+    const wsrep_key_t kiovec[4] = {
+        {k1, sizeof k1 },
+        {k2, sizeof k2 },
+        {k3, sizeof k3 },
+        {k4, sizeof k4 }
+    };
+
+    galera::Key key(1, kiovec, 4);
+    size_t expected_size(0);
+    expected_size += gu::uleb128_size(sizeof k1) + sizeof k1;
+    expected_size += gu::uleb128_size(sizeof k2) + sizeof k2;
+    expected_size += gu::uleb128_size(sizeof k3) + sizeof k3;
+    expected_size += gu::uleb128_size(sizeof k4) + sizeof k4;
+    expected_size += gu::uleb128_size(expected_size);
+
+    fail_unless(galera::serial_size(key) == expected_size, "%ld <-> %ld",
+                galera::serial_size(key), expected_size);
+
+    KeyPart1Sequence kp(key.key_parts1<KeyPart1Sequence>());
+    fail_unless(kp.size() == 4);
+
+    gu::Buffer buf(galera::serial_size(key));
+    galera::serialize(key, &buf[0], buf.size(), 0);
+    galera::Key key2(1);
     galera::unserialize(&buf[0], buf.size(), 0, key2);
     fail_unless(key2 == key);
 }
 END_TEST
 
 
-START_TEST(test_write_set)
+START_TEST(test_write_set0)
 {
-    WriteSet ws;
+    WriteSet ws(0);
 
     const wsrep_key_t key1[2] = {
         {void_cast("dbt\0t1"), 6},
@@ -63,9 +105,9 @@ START_TEST(test_write_set)
     size_t rbr_len = 6;
 
     log_info << "ws0 " << serial_size(ws);
-    ws.append_key(galera::Key(key1, 2));
+    ws.append_key(galera::Key(0, key1, 2));
     log_info << "ws1 " << serial_size(ws);
-    ws.append_key(galera::Key(key2, 2));
+    ws.append_key(galera::Key(0, key2, 2));
     log_info << "ws2 " << serial_size(ws);
 
     ws.append_data(rbr, rbr_len);
@@ -87,7 +129,7 @@ START_TEST(test_write_set)
                 buf.size(), expected_size, serial_size(ws));
 
 
-    WriteSet ws2;
+    WriteSet ws2(0);
 
     size_t ret = unserialize(&buf[0], buf.size(), 0, ws2);
     fail_unless(ret == expected_size);
@@ -104,6 +146,67 @@ START_TEST(test_write_set)
 
 }
 END_TEST
+
+START_TEST(test_write_set1)
+{
+    WriteSet ws(1);
+
+    const wsrep_key_t key1[2] = {
+        {void_cast("dbt\0t1"), 6},
+        {void_cast("aaa")    , 3}
+    };
+
+    const wsrep_key_t key2[2] = {
+        {void_cast("dbt\0t2"), 6},
+        {void_cast("bbbb"), 4}
+    };
+
+    const char* rbr = "rbrbuf";
+    size_t rbr_len = 6;
+
+    log_info << "ws0 " << serial_size(ws);
+    ws.append_key(galera::Key(1, key1, 2));
+    log_info << "ws1 " << serial_size(ws);
+    ws.append_key(galera::Key(1, key2, 2));
+    log_info << "ws2 " << serial_size(ws);
+
+    ws.append_data(rbr, rbr_len);
+
+    gu::Buffer rbrbuf(rbr, rbr + rbr_len);
+    log_info << "rbrlen " << serial_size<uint32_t>(rbrbuf);
+    log_info << "wsrbr " << serial_size(ws);
+
+    gu::Buffer buf(serial_size(ws));
+
+    serialize(ws, &buf[0], buf.size(), 0);
+
+    size_t expected_size =
+        4 // row key sequence size
+        + 1 + 1 + 6 + 1 + 3 // key1
+        + 1 + 1 + 6 + 1 + 4 // key2
+        + 4 + 6; // rbr
+    fail_unless(buf.size() == expected_size, "%zd <-> %zd <-> %zd",
+                buf.size(), expected_size, serial_size(ws));
+
+
+    WriteSet ws2(0);
+
+    size_t ret = unserialize(&buf[0], buf.size(), 0, ws2);
+    fail_unless(ret == expected_size);
+
+    WriteSet::KeySequence rks;
+    ws.get_keys(rks);
+
+    WriteSet::KeySequence rks2;
+    ws.get_keys(rks2);
+
+    fail_unless(rks2 == rks);
+
+    fail_unless(ws2.get_data() == ws.get_data());
+
+}
+END_TEST
+
 
 
 START_TEST(test_mapped_buffer)
@@ -164,7 +267,7 @@ START_TEST(test_cert)
     for (size_t i = 0; i < n_ws; ++i)
     {
         TrxHandle* trx(new TrxHandle(0, uuid, i, i + 1, true));
-        trx->append_key(Key(wss[i], 2));
+        trx->append_key(Key(0, wss[i], 2));
         trx->flush(0);
         string data("foobardata");
         trx->append_data(data.c_str(), data.size());
@@ -270,7 +373,7 @@ START_TEST(test_cert_hierarchical_v0)
     {
         TrxHandle* trx(new TrxHandle(0, wsi[i].uuid, wsi[i].conn_id,
                                      wsi[i].trx_id, false));
-        trx->append_key(Key(wsi[i].key, wsi[i].iov_len));
+        trx->append_key(Key(0, wsi[i].key, wsi[i].iov_len));
         trx->set_last_seen_seqno(wsi[i].last_seen_seqno);
         trx->set_flags(trx->flags() | wsi[i].flags);
         trx->flush(0);
@@ -356,10 +459,21 @@ START_TEST(test_cert_hierarchical_v1)
     {
         TrxHandle* trx(new TrxHandle(1, wsi[i].uuid, wsi[i].conn_id,
                                      wsi[i].trx_id, false));
-        trx->append_key(Key(wsi[i].key, wsi[i].iov_len));
+        trx->append_key(Key(1, wsi[i].key, wsi[i].iov_len));
         trx->set_last_seen_seqno(wsi[i].last_seen_seqno);
         trx->set_flags(trx->flags() | wsi[i].flags);
         trx->flush(0);
+
+        // serialize/unserialize to verify that ver1 trx is serializable
+        const galera::MappedBuffer& wc(trx->write_set_collection());
+        gu::Buffer buf(wc.size());
+        std::copy(&wc[0], &wc[0] + wc.size(), &buf[0]);
+        trx->unref();
+        trx = new TrxHandle();
+        size_t offset(galera::unserialize(&buf[0], buf.size(), 0, *trx));
+        log_info << "ws: " << buf.size() - offset;
+        trx->append_write_set(&buf[0] + offset, buf.size() - offset);
+
         trx->set_seqnos(wsi[i].local_seqno, wsi[i].global_seqno);
         Certification::TestResult result(cert.append_trx(trx));
         fail_unless(result == wsi[i].result, "g: %lld r: %d er: %d",
@@ -382,12 +496,20 @@ Suite* write_set_suite()
     Suite* s = suite_create("write_set");
     TCase* tc;
 
-    tc = tcase_create("test_key");
-    tcase_add_test(tc, test_key);
+    tc = tcase_create("test_key0");
+    tcase_add_test(tc, test_key0);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_write_set");
-    tcase_add_test(tc, test_write_set);
+    tc = tcase_create("test_key1");
+    tcase_add_test(tc, test_key1);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_write_set0");
+    tcase_add_test(tc, test_write_set0);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_write_set1");
+    tcase_add_test(tc, test_write_set1);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_mapped_buffer");
