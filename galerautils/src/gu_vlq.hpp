@@ -93,7 +93,7 @@ namespace gu
         while (true)
         {
             // check if input is representable with sizeof(value) bytes
-            if (shift >= sizeof(value) << 3)
+            if (shift >= (sizeof(value) << 3) - 7)
             {
                 gu_throw_error(ERANGE)
                     << "read value not representable with "

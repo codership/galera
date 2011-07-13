@@ -76,13 +76,26 @@ START_TEST(test_uleb128_decode)
         size_t offset(gu::uleb128_encode(valarr[i].val, &buf[0],
                                          buf.size(), 0));
         unsigned long long val;
-        offset = gu::uleb128_decode(&buf[0], buf.size(), 0, val);
-        fail_unless(offset == valarr[i].size,
-                    "got offset %zu, expected %zu for value 0x%llx",
-                    offset, valarr[i].size, valarr[i].val);
-        fail_unless(val == valarr[i].val,
-                    "got value 0x%llx, expected 0x%llx",
-                    val, valarr[i].val);
+        try
+        {
+            offset = gu::uleb128_decode(&buf[0], buf.size(), 0, val);
+            fail_unless(offset == valarr[i].size,
+                        "got offset %zu, expected %zu for value 0x%llx",
+                        offset, valarr[i].size, valarr[i].val);
+            fail_unless(val == valarr[i].val,
+                        "got value 0x%llx, expected 0x%llx",
+                        val, valarr[i].val);
+
+            if (valarr[i].size > 9)
+                fail ("Expected exception for encoding longer than %zu bytes",
+                      valarr[i].size > 9);
+        }
+        catch (gu::Exception& e)
+        {
+            if (valarr[i].size <= 9)
+                fail("Exception in round %zu for encoding of size %zu: %s",
+                     i, valarr[i].size, e.what());
+        }
     }
 }
 END_TEST

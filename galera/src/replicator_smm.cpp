@@ -1121,7 +1121,7 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
     if (app_req_len < 0)
     {
         log_fatal << "View callback failed: " << -app_req_len << " ("
-                  << strerror(-app_req_len) << ". This is unrecoverable, "
+                  << strerror(-app_req_len) << "). This is unrecoverable, "
                   << "restart required.";
         abort();
     }
