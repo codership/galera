@@ -120,7 +120,10 @@ galera::Certification::purge_for_trx(TrxHandle* trx)
     {
         // Unref all referenced and remove if was referenced by us
         KeyEntry* ke(i->first);
-        ke->unref(trx, i->second);
+        if (ke->ref_trx() == trx || ke->ref_full_trx() == trx)
+        {
+            ke->unref(trx, i->second);
+        }
         if (ke->ref_trx() == 0)
         {
             assert(ke->ref_full_trx() == 0);
@@ -445,6 +448,7 @@ cert_fail:
             if (ke->ref_trx() == 0)
             {
                 assert(ke->ref_full_trx() == 0);
+                delete ke;
                 cert_index_.erase(ci);
             }
         }
