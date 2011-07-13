@@ -543,15 +543,9 @@ void galera::Certification::assign_initial_position(wsrep_seqno_t seqno, int ver
 {
     if (seqno >= position_)
     {
-        purge_trxs_upto(seqno);
-        if (cert_index_.size() > 0)
-        {
-            log_warn << "cert index size afer purge: " << cert_index_.size();
-        }
-        if (trx_map_.size() > 0)
-        {
-            log_warn << "trx map size after purge: " << trx_map_.size();
-        }
+        for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
+        assert(cert_index_.size() == 0);
+        trx_map_.clear();
     }
     else
     {
