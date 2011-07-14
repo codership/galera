@@ -5,13 +5,16 @@
 #include "gu_vlq.hpp"
 #include "gu_vlq_test.hpp"
 
+#include <stdint.h>
+#include <inttypes.h>
 #include <cstdlib>
 #include <vector>
+#include <limits>
 
 static struct valarr
 {
-    unsigned long long val;
-    size_t             size;
+    const unsigned long long val;
+    const size_t             size;
 } valarr[] =
 {
     {0x00                 , 1},
@@ -85,16 +88,11 @@ START_TEST(test_uleb128_decode)
             fail_unless(val == valarr[i].val,
                         "got value 0x%llx, expected 0x%llx",
                         val, valarr[i].val);
-
-            if (valarr[i].size > 9)
-                fail ("Expected exception for encoding longer than %zu bytes",
-                      valarr[i].size > 9);
         }
         catch (gu::Exception& e)
         {
-            if (valarr[i].size <= 9)
-                fail("Exception in round %zu for encoding of size %zu: %s",
-                     i, valarr[i].size, e.what());
+            fail("Exception in round %zu for encoding of size %zu: %s",
+                 i, valarr[i].size, e.what());
         }
     }
 }
@@ -104,25 +102,73 @@ END_TEST
 START_TEST(test_uleb128_misc)
 {
     std::vector<gu::byte_t> buf(10);
+
+    // check uint8_t whole range
+    for (size_t i(0); i <= std::numeric_limits<uint8_t>::max(); ++i)
+    {
+        (void)gu::uleb128_encode<uint8_t>(static_cast<uint8_t>(i), &buf[0],
+                                          buf.size(), 0);
+        uint8_t val;
+        (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val);
+        if (i != val) fail("0x%x != 0x%x", i, val);
+    }
+
+    // check uint16_t whole range
+    for (size_t i(0); i <= std::numeric_limits<uint16_t>::max(); ++i)
+    {
+        (void)gu::uleb128_encode<uint16_t>(static_cast<uint16_t>(i),
+                                           &buf[0], buf.size(), 0);
+        uint16_t val;
+        (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val);
+        if (i != val) fail("0x%x != 0x%x", i, val);
+    }
+
+    // check uint32_t: 0 -> 1^20
+    for (size_t i(0); i < (1 << 20); ++i)
+    {
+        (void)gu::uleb128_encode<uint32_t>(static_cast<uint32_t>(i),
+                                           &buf[0], buf.size(), 0);
+        uint32_t val;
+        (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val);
+        if (i != val) fail("0x%x != 0x%x", i, val);
+    }
+
+    // check uin32_t: max - 1^20 -> max
+    for (uint64_t i(std::numeric_limits<uint32_t>::max() - (1 << 20));
+         i <= std::numeric_limits<uint32_t>::max(); ++i)
+    {
+        (void)gu::uleb128_encode<uint32_t>(static_cast<uint32_t>(i),
+                                           &buf[0], buf.size(), 0);
+        uint32_t val;
+        (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val);
+        if (i != val) fail("0x%x != 0x%x", i, val);
+    }
+
+
+    // uint64_t is tested for representation byte boundaries earlier,
+    // run test just for random values
     for (size_t i(0); i < (1 << 16); ++i)
     {
-        unsigned long long val(static_cast<unsigned long long>(rand())
-                               * static_cast<unsigned long long>(rand()));
+        unsigned long long val(static_cast<uint64_t>(rand())
+                               * static_cast<uint64_t>(rand()));
         (void)gu::uleb128_encode(val, &buf[0], buf.size(), 0);
         unsigned long long val2;
         (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val2);
         if (val != val2) fail("0x%llx != 0x%llx", val, val2);
     }
 
-
     {
-        unsigned long long val(0xefffff);
+        // check that exception is thrown if target type is not
+        // wide enough
+
+        // uint8_t
+        uint64_t val(static_cast<uint64_t>(std::numeric_limits<uint8_t>::max())
+                     + 1);
         buf.resize(gu::uleb128_size(val));
         (void)gu::uleb128_encode(val, &buf[0], buf.size(), 0);
-
         try
         {
-            unsigned char cval;
+            uint8_t cval;
             (void)gu::uleb128_decode(&buf[0], buf.size(), 0, cval);
             fail("exception was not thrown");
         }
@@ -130,11 +176,63 @@ START_TEST(test_uleb128_misc)
         {
             log_info << "expected exception: " << e.what();
         }
+
+        // uint16_t
+        val = static_cast<uint64_t>(std::numeric_limits<uint16_t>::max()) + 1;
+        buf.resize(gu::uleb128_size(val));
+        (void)gu::uleb128_encode(val, &buf[0], buf.size(), 0);
+        try
+        {
+            uint16_t cval;
+            (void)gu::uleb128_decode(&buf[0], buf.size(), 0, cval);
+            fail("exception was not thrown");
+        }
+        catch (gu::Exception& e)
+        {
+            log_info << "expected exception: " << e.what();
+        }
+
+        // uint32_t
+        val = static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()) + 1;
+        buf.resize(gu::uleb128_size(val));
+        (void)gu::uleb128_encode(val, &buf[0], buf.size(), 0);
+        try
+        {
+            uint32_t cval;
+            (void)gu::uleb128_decode(&buf[0], buf.size(), 0, cval);
+            fail("exception was not thrown");
+        }
+        catch (gu::Exception& e)
+        {
+            log_info << "expected exception: " << e.what();
+        }
+
+        // check that exception is thrown if terminating byte is missing
         buf.resize(buf.size() - 1);
         try
         {
-            unsigned long long val2;
-            (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val2);
+            uint64_t cval;
+            (void)gu::uleb128_decode(&buf[0], buf.size(), 0, cval);
+            fail("exception was not thrown");
+        }
+        catch (gu::Exception& e)
+        {
+            log_info << "expected exception: " << e.what();
+        }
+
+
+        // finally check the representation that cannot be stored with
+        // uint64_t
+
+        gu::byte_t b[] = {0x80, 0x80, 0x80, 0x80,
+                          0x80, 0x80, 0x80, 0x80,
+                          0x80, // <--- up here 9 * 7 = 63 bits
+                          0x02}; // <--- requires two additional bits
+        try
+        {
+            uint64_t cval;
+            (void)gu::uleb128_decode(b, sizeof(b), 0, cval);
+            fail("exception was not thrown");
         }
         catch (gu::Exception& e)
         {
@@ -142,7 +240,6 @@ START_TEST(test_uleb128_misc)
         }
 
     }
-
 
 
 

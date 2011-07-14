@@ -18,6 +18,8 @@
 #include "gu_throw.hpp"
 #include "gu_logger.hpp"
 
+#include "gu_macros.h"
+
 namespace gu
 {
     //!
@@ -90,27 +92,13 @@ namespace gu
     {
         value = 0;
         size_t shift(0);
+
+        // initial check for overflow, at least one byte must be readable
+        if (offset >= buflen) gu_throw_fatal;
+
         while (true)
         {
-            // check if input is representable with sizeof(value) bytes
-            if (shift >= (sizeof(value) << 3) - 7)
-            {
-                gu_throw_error(ERANGE)
-                    << "read value not representable with "
-                    << sizeof(value)
-                    << " bytes, read " << shift << " bits";
-            }
-            // check if trying to read past last byte in buffer without
-            // encountering byte without 0x80 bit set
-            if (offset >= buflen)
-            {
-                gu_throw_error(EINVAL)
-                    << "read value is not uleb128 representation, missing "
-                    << "terminating byte before end of input";
-            }
-
             value |= (static_cast<UI>(buf[offset] & 0x7f) << shift);
-
             if ((buf[offset] & 0x80) == 0)
             {
                 // last byte
@@ -118,6 +106,46 @@ namespace gu
                 break;
             }
             ++offset;
+
+            // Check if trying to read past last byte in buffer without
+            // encountering byte without 0x80 bit set.
+            if (gu_unlikely(offset >= buflen))
+            {
+                gu_throw_error(EINVAL)
+                    << "read value is not uleb128 representation, missing "
+                    << "terminating byte before end of input";
+            }
+
+            //
+            // determine proper bit shift
+            //
+
+            // type width
+            static const size_t width(sizeof(value) * 8);
+            // bits available after shift
+            const ssize_t avail_bits(width - (shift + 7));
+            assert(avail_bits > 0);
+
+            if (gu_unlikely(avail_bits < 7))
+            {
+                // mask to check if the remaining value can be represented
+                // with available bits
+                gu::byte_t mask(~((1 << avail_bits) - 1));
+                if ((buf[offset] & mask) != 0)
+                {
+                    gu_throw_error(ERANGE)
+                        << "read value not representable with "
+                        << width
+                        << " bits, shift: " << shift + 7 << " avail bits: "
+                        << avail_bits
+                        << " mask: 0x"
+                        << std::hex << static_cast<int>(mask)
+                        << " buf: 0x"
+                        << std::hex << static_cast<int>(buf[offset])
+                        << " excess: 0x"
+                        << std::hex << static_cast<int>(mask & buf[offset]);
+                }
+            }
             shift += 7;
         }
         return offset;
