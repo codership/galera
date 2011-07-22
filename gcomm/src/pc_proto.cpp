@@ -298,6 +298,20 @@ void gcomm::pc::Proto::handle_first_trans(const View& view)
 }
 
 
+bool gcomm::pc::Proto::have_quorum(const View& view) const
+{
+    return (view.get_members().size()*2 + view.get_left().size() >
+            pc_view_.get_members().size());
+}
+
+
+bool gcomm::pc::Proto::have_split_brain(const View& view) const
+{
+    return (view.get_members().size()*2 + view.get_left().size() ==
+            pc_view_.get_members().size());
+}
+
+
 void gcomm::pc::Proto::handle_trans(const View& view)
 {
     gcomm_assert(view.get_id().get_type() == V_TRANS);
@@ -307,25 +321,32 @@ void gcomm::pc::Proto::handle_trans(const View& view)
     log_debug << self_id() << " \n\n current view " << current_view_
               << "\n\n next view " << view
               << "\n\n pc view " << pc_view_;
-    if (closing_                           == false &&
-        allow_sb_                          == true  &&
-        pc_view_.get_members().size()      == 2     &&
-        view.get_members().size()          == 1     &&
-        view.get_partitioned().size()      == 1)
+
+    if (!have_quorum(view))
     {
-        // configured to allow split brain
-        log_warn << "possible split-brain from view:\n"
-                 << current_view_ << "\nto view:\n" << view;
-    }
-    else if (view.get_members().size()*2 + view.get_left().size() <=
-             pc_view_.get_members().size())
-    {
-        current_view_ = view;
-        // shift_to(S_NON_PRIM);
-        mark_non_prim();
-        deliver_view();
-        shift_to(S_TRANS);
-        return;
+        if (closing_ == false && ignore_sb_ == true && have_split_brain(view))
+        {
+            // configured to ignore split brain
+            log_warn << "Ignoring possible split-brain "
+                     << "(allowed by configuration) from view:\n"
+                     << current_view_ << "\nto view:\n" << view;
+        }
+        else if (closing_ == false && ignore_quorum_ == true)
+        {
+            // configured to ignore lack of quorum
+            log_warn << "Ignoring lack of quorum "
+                     << "(allowed by configuration) from view:\n"
+                     << current_view_ << "\nto view:\n" << view;
+        }
+        else
+        {
+            current_view_ = view;
+            // shift_to(S_NON_PRIM);
+            mark_non_prim();
+            deliver_view();
+            shift_to(S_TRANS);
+            return;
+        }
     }
     else
     {
@@ -984,10 +1005,17 @@ int gcomm::pc::Proto::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 bool gcomm::pc::Proto::set_param(const std::string& key,
                                  const std::string& value)
 {
-    if (key == gcomm::Conf::PcAllowSb)
+    if (key == gcomm::Conf::PcIgnoreSb)
     {
-        allow_sb_ = gu::from_string<bool>(value);
+        ignore_sb_ = gu::from_string<bool>(value);
         return true;
     }
+
+    if (key == gcomm::Conf::PcIgnoreQuorum)
+    {
+        ignore_quorum_ = gu::from_string<bool>(value);
+        return true;
+    }
+
     return false;
 }
