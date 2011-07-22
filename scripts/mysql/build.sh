@@ -217,7 +217,7 @@ GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
 if [ "$TAR" == "yes" ] || [ "$BIN_DIST" == "yes" ]
 then
     cd $GALERA_SRC
-    GALERA_REV=$(svnversion | sed s/\:/,/g)
+    GALERA_REV=$(bzr revno)
     export GALERA_VER=${RELEASE:-$GALERA_REV}
     scripts/build.sh # options are passed via environment variables
 fi
@@ -229,7 +229,7 @@ fi
 ######################################
 # Obtain MySQL version and revision of Galera patch
 cd $MYSQL_SRC
-MYSQL_REV=$(bzr revno)
+WSREP_REV=$(bzr revno)
 # this does not work on an unconfigured source MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
 MYSQL_VER=`grep PACKAGE_VERSION include/my_config.h | awk '{gsub(/\"/,""); print $3; }'`
 
@@ -267,7 +267,7 @@ fi
 
 echo  "Building mysqld"
 
-export MYSQL_REV
+export WSREP_REV
 export GALERA_REV
 export MAKE="make -j$JOBS"
 
@@ -416,7 +416,7 @@ if [ "$RELEASE" != "" ]
 then
     GALERA_RELEASE="galera-$RELEASE-$(uname -m)"
 else
-    GALERA_RELEASE="$MYSQL_REV,$GALERA_REV"
+    GALERA_RELEASE="$WSREP_REV,$GALERA_REV"
 fi
 
 RELEASE_NAME=$(echo mysql-$MYSQL_VER-$GALERA_RELEASE | sed s/\:/_/g)
@@ -466,7 +466,7 @@ build_packages()
     [ "$NO_STRIP" == "yes" ] && STRIP_OPT="-g"
 
     export MYSQL_VER MYSQL_SRC GALERA_SRC RELEASE_NAME
-    export WSREP_VER=${RELEASE:-"$MYSQL_REV"}
+    export WSREP_VER=${RELEASE:-"$WSREP_REV"}
 
     echo $MYSQL_SRC $MYSQL_VER $ARCH
     rm -rf $ARCH
