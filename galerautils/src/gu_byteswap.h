@@ -18,7 +18,7 @@
 #include <endian.h>   // for __BYTE_ORDER et al.
 #elif defined(HAVE_SYS_ENDIAN_H)
 #include <sys/endian.h>
-#endif 
+#endif
 
 #if defined(HAVE_BYTESWAP_H)
 #include <byteswap.h> // for bswap_16(x), bswap_32(x), bswap_64(x) 
