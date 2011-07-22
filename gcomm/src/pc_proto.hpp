@@ -70,7 +70,8 @@ public:
         my_uuid_       (uuid),
         start_prim_    (),
         npvo_          (param<bool>(conf, uri, Conf::PcNpvo, "false")),
-        allow_sb_      (param<bool>(conf, uri, Conf::PcAllowSb, "false")),
+        ignore_sb_     (param<bool>(conf, uri, Conf::PcIgnoreSb, "false")),
+        ignore_quorum_ (param<bool>(conf, uri, Conf::PcIgnoreQuorum, "false")),
         closing_       (false),
         state_         (S_CLOSED),
         last_sent_seq_ (0),
@@ -83,10 +84,11 @@ public:
         views_         ()
     {
         log_info << "PC version " << version_;
-        conf.set(Conf::PcVersion,  gu::to_string(version_));
-        conf.set(Conf::PcNpvo,     gu::to_string(npvo_));
-        conf.set(Conf::PcAllowSb,  gu::to_string(allow_sb_));
-        conf.set(Conf::PcChecksum, gu::to_string(checksum_));
+        conf.set(Conf::PcVersion,      gu::to_string(version_));
+        conf.set(Conf::PcNpvo,         gu::to_string(npvo_));
+        conf.set(Conf::PcIgnoreSb,     gu::to_string(ignore_sb_));
+        conf.set(Conf::PcIgnoreQuorum, gu::to_string(ignore_quorum_));
+        conf.set(Conf::PcChecksum,     gu::to_string(checksum_));
     }
 
     ~Proto() { }
@@ -164,6 +166,8 @@ private:
 
     bool requires_rtr() const;
     bool is_prim() const;
+    bool have_quorum(const View&) const;
+    bool have_split_brain(const View&) const;
     void validate_state_msgs() const;
     void cleanup_instances();
     void handle_state(const Message&, const UUID&);
@@ -177,7 +181,8 @@ private:
     UUID   const      my_uuid_;       // Node uuid
     bool              start_prim_;    // Is allowed to start in prim comp
     bool              npvo_;          // Newer prim view overrides
-    bool              allow_sb_;      // Split-brain condition is allowed
+    bool              ignore_sb_;     // Ignore split-brain condition
+    bool              ignore_quorum_; // Ignore lack of quorum
     bool              closing_;       // Protocol is in closing stage
     State             state_;         // State
     uint32_t          last_sent_seq_; // Msg seqno of last sent message

@@ -284,7 +284,15 @@ namespace gcomm
          * This parameter controls whether PC is allowed to continue
          * operation despite of possible split brain condition.
          */
-        static std::string const PcAllowSb;
+        static std::string const PcIgnoreSb;
+
+        /*!
+         * @brief PC quorum mode
+         *
+         * This parameter controls whether PC is allowed to continue
+         * operation despite of quorum loss.
+         */
+        static std::string const PcIgnoreQuorum;
 
         /*!
          * @brief PC message checksumming
