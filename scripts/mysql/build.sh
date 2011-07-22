@@ -13,6 +13,7 @@ DEBUG_LEVEL=1
 NO_STRIP=no
 RELEASE=""
 TAR=no
+BIN_DIST=no
 PACKAGE=no
 INSTALL=no
 CONFIGURE=no
@@ -21,7 +22,7 @@ SKIP_CONFIGURE=no
 SKIP_CLIENTS=no
 SCRATCH=no
 SCONS="yes"
-JOBS=1
+JOBS=$(cat /proc/cpuinfo | grep -c ^processor)
 GCOMM_IMPL=${GCOMM_IMPL:-"galeracomm"}
 
 usage()
@@ -42,6 +43,8 @@ Options:
     --no-strip        prevent stripping of release binaries
     -j|--jobs         number of parallel compilation jobs (${JOBS})
     -p|--package      create DEB/RPM packages (depending on the distribution)
+    --bin             create binary tar package
+    -t|--tar          create a demo test distribution
     --sb|--skip-build skip the actual build, use the existing binaries
     --sc|--skip-configure skip configure
     --skip-clients    don't include client binaries in test package
@@ -58,6 +61,9 @@ do
     case $1 in
         -b|--bootstrap)
             BOOTSTRAP="yes" # Bootstrap the build system
+            ;;
+        --bin)
+            BIN_DIST="yes"
             ;;
         -c|--configure)
             CONFIGURE="yes" # Reconfigure the build system
@@ -138,11 +144,11 @@ do
     shift
 done
 
-# check whether sudo accepts -E to preserve environment
 if [ "$PACKAGE" == "yes" ]
 then
+# check whether sudo accepts -E to preserve environment
     echo "testing sudo"
-    if sudo -E epm --version >/dev/null 2>&1
+    if sudo -E $(which epm) --version >/dev/null 2>&1
     then
         echo "sudo accepts -E"
         SUDO_ENV="sudo -E"
@@ -158,6 +164,26 @@ then
             SUDO=""
             echo "I'm root, can continue"
         fi
+    fi
+
+# If packaging with epm, make sure that mysql user exists in build system to
+# get file ownerships right.
+    echo "Checking for mysql user and group for epm:"
+    getent passwd mysql >/dev/null
+    if [ $? != 0 ]
+    then
+        echo "Error: user 'mysql' does not exist"
+        exit 1
+    else
+        echo "User 'mysql' ok"
+    fi
+    getent group mysql >/dev/null
+    if [ $? != 0 ]
+    then
+        echo "Error: group 'mysql' doest not exist"
+        exit 1
+    else
+        echo "Group 'mysql' ok"
     fi
 fi
 
@@ -181,28 +207,6 @@ GALERA_SRC=${GALERA_SRC:-$BUILD_ROOT/../../}
 MYSQL_SRC=$(cd $MYSQL_SRC; pwd -P; cd $BUILD_ROOT)
 GALERA_SRC=$(cd $GALERA_SRC; pwd -P; cd $BUILD_ROOT)
 
-# If packaging with epm, make sure that mysql user exists in build system to
-# get file ownerships right.
-if [ "$PACKAGE" == "yes" ]
-then
-    echo "Checking for mysql user and group for epm:"
-    getent passwd mysql >/dev/null
-    if [ $? != 0 ]
-    then
-        echo "Error: user 'mysql' does not exist"
-        exit 1
-    else
-        echo "User 'mysql' ok"
-    fi
-    getent group mysql >/dev/null
-    if [ $? != 0 ]
-    then
-        echo "Error: group 'mysql' doest not exist"
-        exit 1
-    else
-        echo "Group 'mysql' ok"
-    fi
-fi
 
 ######################################
 ##                                  ##
@@ -210,7 +214,7 @@ fi
 ##                                  ##
 ######################################
 # Also obtain SVN revision information
-if [ "$TAR" == "yes" ]
+if [ "$TAR" == "yes" ] || [ "$BIN_DIST" == "yes" ]
 then
     cd $GALERA_SRC
     GALERA_REV=$(svnversion | sed s/\:/,/g)
@@ -229,8 +233,9 @@ MYSQL_REV=$(bzr revno)
 # this does not work on an unconfigured source MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
 MYSQL_VER=`grep PACKAGE_VERSION include/my_config.h | awk '{gsub(/\"/,""); print $3; }'`
 
-if [ "$PACKAGE" == "yes" ] # fetch and patch pristine sources
+if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
 then
+    # fetch and patch pristine sources
     cd /tmp
     mysql_tag=mysql-$MYSQL_VER
     if [ "$SKIP_BUILD" == "no" ] || [ ! -d $mysql_tag ]
@@ -239,7 +244,7 @@ then
         url1=http://mysql.dataphone.se/Downloads/MySQL-5.1
         url2=http://downloads.mysql.com/archives/mysql-5.1
         echo "Downloading $mysql_orig_tar_gz... currently works only for 5.1.x"
-        wget -N $url1/$mysql_orig_tar_gz || wget -N $url2/$mysql_orig_tar_gz
+#        wget -N $url1/$mysql_orig_tar_gz || wget -N $url2/$mysql_orig_tar_gz
         echo "Getting wsrep patch..."
         patch_file=$(${BUILD_ROOT}/get_patch.sh $mysql_tag $MYSQL_SRC)
         echo "Patching source..."
@@ -281,9 +286,8 @@ then
         # This will be put to --prefix by SETUP.sh.
         export MYSQL_BUILD_PREFIX="/usr"
 
-        if [ "$PACKAGE" == "yes" ]
+        if [ "$PACKAGE" == "yes" || "$BIN_DIST" == "yes" ]
         then
-#            [ $DEBIAN -eq 0 ] && export MYSQL_BUILD_PREFIX="/"
             # There is no other way to pass these options to SETUP.sh but
             # via env. variable
             export wsrep_configs="--exec-prefix=/usr \
@@ -399,6 +403,16 @@ then
     strip $MYSQL_DIST_DIR/libexec/mysqld
 fi
 
+fi # if [ $TAR == "yes" ]
+
+if [ "$BIN_DIST" == "yes" ]
+then
+. bin_dist.sh
+fi
+
+if [ "$TAR" == "yes" ] || [ "$BIN_DIST" == "yes" ]
+then
+
 if [ "$RELEASE" != "" ]
 then
     GALERA_RELEASE="galera-$RELEASE-$(uname -m)"
@@ -412,22 +426,19 @@ mv $DIST_DIR $RELEASE_NAME
 
 # Hack to avoid 'file changed as we read it'-error 
 sync
-sleep 2
+sleep 1
 
 # Pack the release
-#if [ "$TAR" == "yes" ]
-#then
-    tar -czf $RELEASE_NAME.tgz $RELEASE_NAME
-#fi
+tar -czf $RELEASE_NAME.tgz $RELEASE_NAME
 
-if [ "$INSTALL" == "yes" ]
+fi # if [ $TAR == "yes"  || "$BIN_DIST" == "yes" ]
+
+if [ "$TAR" == "yes" ] && [ "$INSTALL" == "yes" ]
 then
     cmd="$GALERA_SRC/tests/scripts/command.sh"
     $cmd stop
     $cmd install $RELEASE_NAME.tgz
 fi
-
-fi # if [ $TAR == "yes " ]
 
 get_arch()
 {
@@ -464,17 +475,17 @@ build_packages()
     set +e
     if [ $DEBIAN -ne 0 ]
     then #build DEB
-	local deb_basename="mysql-server-wsrep"
-	ln -sf mysql-wsrep.list $deb_basename.list
-        $SUDO_ENV /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
+        local deb_basename="mysql-server-wsrep"
+        ln -sf mysql-wsrep.list $deb_basename.list
+        $SUDO_ENV $(which epm) -n -m "$ARCH" -a "$ARCH" -f "deb" \
              --output-dir $ARCH $STRIP_OPT $deb_basename
     else # build RPM
-	local rpm_basename="MySQL-server-wsrep"
-	ln -sf mysql-wsrep.list $rpm_basename.list
-        ($SUDO_ENV /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
+        local rpm_basename="MySQL-server-wsrep"
+        ln -sf mysql-wsrep.list $rpm_basename.list
+        ($SUDO_ENV $(which epm) -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
               --output-dir $ARCH --keep-files -k $STRIP_OPT $rpm_basename || \
-        /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/$rpm_basename.spec" \
-              --buildroot="$ARCH/buildroot" )
+         $SUDO_ENV $(which rpmbuild) -bb --target "$ARCH" \
+              --buildroot="$ARCH/buildroot" "$ARCH/$rpm_basename.spec" )
     fi
     local RET=$?
 
