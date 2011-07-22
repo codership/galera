@@ -66,11 +66,20 @@ START_TEST(test_key1)
 
     galera::Key key(1, kiovec, 4);
     size_t expected_size(0);
+
+#ifndef GALERA_KEY_VLQ
+    expected_size += 1 + std::min(sizeof k1, 0xffUL);
+    expected_size += 1 + std::min(sizeof k2, 0xffUL);
+    expected_size += 1 + std::min(sizeof k3, 0xffUL);
+    expected_size += 1 + std::min(sizeof k4, 0xffUL);
+    expected_size += sizeof(uint16_t);
+#else
     expected_size += gu::uleb128_size(sizeof k1) + sizeof k1;
     expected_size += gu::uleb128_size(sizeof k2) + sizeof k2;
     expected_size += gu::uleb128_size(sizeof k3) + sizeof k3;
     expected_size += gu::uleb128_size(sizeof k4) + sizeof k4;
     expected_size += gu::uleb128_size(expected_size);
+#endif
 
     fail_unless(galera::serial_size(key) == expected_size, "%ld <-> %ld",
                 galera::serial_size(key), expected_size);
@@ -182,8 +191,13 @@ START_TEST(test_write_set1)
 
     size_t expected_size =
         4 // row key sequence size
+#ifndef GALERA_KEY_VLQ
+        + 2 + 1 + 6 + 1 + 3 // key1
+        + 2 + 1 + 6 + 1 + 4 // key2
+#else
         + 1 + 1 + 6 + 1 + 3 // key1
         + 1 + 1 + 6 + 1 + 4 // key2
+#endif
         + 4 + 6; // rbr
     fail_unless(buf.size() == expected_size, "%zd <-> %zd <-> %zd",
                 buf.size(), expected_size, serial_size(ws));

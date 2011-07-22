@@ -77,9 +77,13 @@ namespace galera
         size_t size() const { return buf_size_; }
         size_t key_len() const
         {
+#ifndef GALERA_KEY_VLQ
+            return buf_[0];
+#else
             size_t ret;
             (void)gu::uleb128_decode(buf_, buf_size_, 0, ret);
             return ret;
+#endif
         }
         const gu::byte_t* key() const { return buf_ + key_len(); }
         bool operator==(const KeyPart1& other) const
@@ -147,14 +151,22 @@ namespace galera
             case 1:
                 for (size_t i(0); i < keys_len; ++i)
                 {
-                    size_t len_size(gu::uleb128_size(keys[i].key_len));
                     size_t offset(keys_.size());
-                    keys_.resize(offset + len_size);
-                    (void)gu::uleb128_encode(
-                        keys[i].key_len, &keys_[0], keys_.size(), offset);
+                    size_t key_len(keys[i].key_len);
                     const gu::byte_t* base(reinterpret_cast<const gu::byte_t*>(
                                                keys[i].key));
+#ifndef GALERA_KEY_VLQ
+                    if (gu_unlikely(key_len > 0xff)) key_len = 0xff;
+                    keys_.reserve(offset + 1 + key_len);
+                    keys_.insert(keys_.end(), key_len);
+                    keys_.insert(keys_.end(), base, base + key_len);
+#else
+                    size_t len_size(gu::uleb128_size(key_len));
+                    keys_.resize(offset + len_size);
+                    (void)gu::uleb128_encode(
+                        key_len, &keys_[0], keys_.size(), offset);
                     keys_.insert(keys_.end(), base, base + keys[i].key_len);
+#endif
                 }
                 break;
             default:
@@ -181,13 +193,22 @@ namespace galera
         {
             C ret;
             size_t i;
-            for (i = 0; i < keys_.size(); )
+            size_t const keys_size(keys_.size());
+
+            for (i = 0; i < keys_size; )
             {
+                size_t const key_len(1 + keys_[i]);
+                if (gu_unlikely(i + key_len > keys_size))
+                {
+                    gu_throw_fatal
+                        << "Keys buffer overflow by " << i+key_len - keys_size
+                        << " bytes: " << i + key_len << '/' << keys_size;
+                }
+
                 KeyPart0 kp(&keys_[i]);
                 ret.push_back(kp);
-                i += kp.size();
+                i += key_len;
             }
-            if (i != keys_.size()) gu_throw_fatal;
             return ret;
         }
 
@@ -195,18 +216,32 @@ namespace galera
         C key_parts1() const
         {
             C ret;
-            size_t i;
-            for (i = 0; i < keys_.size(); )
+            size_t i(0);
+            size_t const keys_size(keys_.size());
+
+            do
             {
+#ifndef GALERA_KEY_VLQ
+                size_t key_len(keys_[i] + 1);
+#else
                 size_t key_len;
                 size_t offset(
-                    gu::uleb128_decode(
-                        &keys_[0], keys_.size(), i, key_len));
-                KeyPart1 kp(&keys_[0] + i, key_len + (offset - i));
+                    gu::uleb128_decode(&keys_[0], keys_size, i, key_len));
+                key_len += offset - i;
+#endif
+                if (gu_unlikely(i + key_len > keys_size))
+                {
+                    gu_throw_fatal
+                        << "Keys buffer overflow by " << i + key_len - keys_size
+                        << " bytes: " << i + key_len << '/' << keys_size;
+                }
+
+                KeyPart1 kp(&keys_[i], key_len);
                 ret.push_back(kp);
-                i += kp.size();
+                i += key_len;
             }
-            if (i != keys_.size()) gu_throw_fatal;
+            while (i != keys_size);
+
             return ret;
         }
 
@@ -272,17 +307,26 @@ namespace galera
     {
         switch (key.version_)
         {
+#ifndef GALERA_KEY_VLQ
+        case 0:
+        case 1:
+            return serialize<uint16_t>(key.keys_, buf, buflen, offset);
+#else
         case 0:
             return serialize<uint16_t>(key.keys_, buf, buflen, offset);
         case 1:
-            offset = gu::uleb128_encode(key.keys_.size(), buf, buflen, offset);
-            if (offset + key.keys_.size() > buflen) gu_throw_fatal;
-            std::copy(&key.keys_[0], &key.keys_[0] + key.keys_.size(),
-                      buf + offset);
-            return (offset + key.keys_.size());
+        {
+            size_t keys_size(key.keys_.size());
+            offset = gu::uleb128_encode(keys_size, buf, buflen, offset);
+            assert (offset + key_size <= buflen);
+            std::copy(&key.keys_[0], &key.keys_[0] + keys_size, buf + offset);
+            return (offset + keys_size);
+#endif
         default:
-            gu_throw_fatal << "unsupported key version: " << key.version_;
-            throw;
+            log_fatal << "Internal error: unsupported key version: "
+                      << key.version_;
+            abort();
+            return 0;
         }
     }
 
@@ -291,6 +335,11 @@ namespace galera
     {
         switch (key.version_)
         {
+#ifndef GALERA_KEY_VLQ
+        case 0:
+        case 1:
+            return unserialize<uint16_t>(buf, buflen, offset, key.keys_);
+#else
         case 0:
             return unserialize<uint16_t>(buf, buflen, offset, key.keys_);
         case 1:
@@ -301,8 +350,10 @@ namespace galera
             std::copy(buf + offset, buf + offset + len, key.keys_.begin());
             return (offset + len);
         }
+#endif
         default:
-            gu_throw_fatal << "unsupported key version: " << key.version_;
+            gu_throw_error(EPROTONOSUPPORT) << "unsupported key version: "
+                                            << key.version_;
             throw;
         }
     }
@@ -311,6 +362,11 @@ namespace galera
     {
         switch (key.version_)
         {
+#ifndef GALERA_KEY_VLQ
+        case 0:
+        case 1:
+            return serial_size<uint16_t>(key.keys_);
+#else
         case 0:
             return serial_size<uint16_t>(key.keys_);
         case 1:
@@ -318,9 +374,12 @@ namespace galera
             size_t size(gu::uleb128_size(key.keys_.size()));
             return (size + key.keys_.size());
         }
+#endif
         default:
-            gu_throw_fatal << "unsupported key version: " << key.version_;
-            throw;
+            log_fatal << "Internal error: unsupported key version: "
+                      << key.version_;
+            abort();
+            return 0;
         }
     }
 
