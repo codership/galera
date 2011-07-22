@@ -20,6 +20,9 @@
 
 #include "gu_macros.h"
 
+#define GU_VLQ_CHECKS
+//#define GU_VLQ_ALEX
+
 namespace gu
 {
     //!
@@ -33,13 +36,11 @@ namespace gu
     template <typename UI>
     inline size_t uleb128_size(UI value)
     {
-        size_t i(0);
-        do
-        {
-            value >>= 7;
-            ++i;
-        }
-        while (value != 0);
+        size_t i(1);
+        value >>= 7;
+
+        for (; value != 0; value >>= 7, ++i) {}
+
         return i;
     }
 
@@ -59,19 +60,37 @@ namespace gu
                                  size_t   buflen,
                                  size_t   offset)
     {
+#ifdef GU_VLQ_ALEX
+        assert (offset < buflen);
+        buf[offset] = value & 0x7f;
+
+        while (value >>= 7)
+        {
+            buf[offset] |= 0x80;
+            ++offset;
+            assert(offset < buflen);
+            buf[offset] = value & 0x7f;
+        }
+
+        return offset + 1;
+#else
         do
         {
-            if (offset >= buflen) gu_throw_fatal;
+#ifdef GU_VLQ_CHECKS
+            if (gu_unlikely(offset >= buflen)) gu_throw_fatal;
+#endif
             buf[offset] = value & 0x7f;
             value >>= 7;
-            if (value != 0)
+            if (gu_unlikely(value != 0))
             {
                 buf[offset] |= 0x80;
             }
             ++offset;
         }
         while (value != 0);
+
         return offset;
+#endif
     }
 
     //!
@@ -90,23 +109,17 @@ namespace gu
                                  size_t        offset,
                                  UI&           value)
     {
-        value = 0;
+#ifdef GU_VLQ_ALEX
+        assert (offset < buflen);
+        value = buf[offset] & 0x7f;
         size_t shift(0);
 
-        // initial check for overflow, at least one byte must be readable
-        if (offset >= buflen) gu_throw_fatal;
-
-        while (true)
+        while (buf[offset] & 0x80)
         {
-            value |= (static_cast<UI>(buf[offset] & 0x7f) << shift);
-            if ((buf[offset] & 0x80) == 0)
-            {
-                // last byte
-                ++offset;
-                break;
-            }
             ++offset;
+            shift +=7;
 
+#ifdef GU_VLQ_CHECKS
             // Check if trying to read past last byte in buffer without
             // encountering byte without 0x80 bit set.
             if (gu_unlikely(offset >= buflen))
@@ -121,9 +134,11 @@ namespace gu
             //
 
             // type width
-            static const size_t width(sizeof(value) * 8);
+            static const size_t width(sizeof(UI) * 8);
+
             // bits available after shift
-            const ssize_t avail_bits(width - (shift + 7));
+            const ssize_t avail_bits(width - shift);
+
             assert(avail_bits > 0);
 
             if (gu_unlikely(avail_bits < 7))
@@ -136,7 +151,7 @@ namespace gu
                     gu_throw_error(ERANGE)
                         << "read value not representable with "
                         << width
-                        << " bits, shift: " << shift + 7 << " avail bits: "
+                        << " bits, shift: " << shift << " avail bits: "
                         << avail_bits
                         << " mask: 0x"
                         << std::hex << static_cast<int>(mask)
@@ -146,9 +161,78 @@ namespace gu
                         << std::hex << static_cast<int>(mask & buf[offset]);
                 }
             }
-            shift += 7;
+#endif
+            value |= (static_cast<UI>(buf[offset] & 0x7f) << shift);
         }
+
+        return offset + 1;
+#else /* GU_VLQ_ALEX */
+        value = 0;
+        size_t shift(0);
+
+        // initial check for overflow, at least one byte must be readable
+#ifdef GU_VLQ_CHECKS
+        if (gu_unlikely(offset >= buflen)) gu_throw_fatal;
+#endif
+        while (true)
+        {
+            value |= (static_cast<UI>(buf[offset] & 0x7f) << shift);
+            if (gu_likely((buf[offset] & 0x80) == 0))
+            {
+                // last byte
+                ++offset;
+                break;
+            }
+            ++offset;
+            shift += 7;
+
+#ifdef GU_VLQ_CHECKS
+            // Check if trying to read past last byte in buffer without
+            // encountering byte without 0x80 bit set.
+            if (gu_unlikely(offset >= buflen))
+            {
+                gu_throw_error(EINVAL)
+                    << "read value is not uleb128 representation, missing "
+                    << "terminating byte before end of input";
+            }
+
+            //
+            // determine proper bit shift
+            //
+
+            // type width
+            static const size_t width(sizeof(UI) * 8);
+
+            // bits available after shift
+            const ssize_t avail_bits(width - shift);
+
+            assert(avail_bits > 0);
+
+            if (gu_unlikely(avail_bits < 7))
+            {
+                // mask to check if the remaining value can be represented
+                // with available bits
+                gu::byte_t mask(~((1 << avail_bits) - 1));
+                if ((buf[offset] & mask) != 0)
+                {
+                    gu_throw_error(ERANGE)
+                        << "read value not representable with "
+                        << width
+                        << " bits, shift: " << shift << " avail bits: "
+                        << avail_bits
+                        << " mask: 0x"
+                        << std::hex << static_cast<int>(mask)
+                        << " buf: 0x"
+                        << std::hex << static_cast<int>(buf[offset])
+                        << " excess: 0x"
+                        << std::hex << static_cast<int>(mask & buf[offset]);
+                }
+            }
+#endif
+        }
+
         return offset;
+#endif /* GU_VLQ_NEW */
     }
 }
 
