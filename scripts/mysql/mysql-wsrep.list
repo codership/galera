@@ -82,7 +82,7 @@ f 644 root root $DOCS_DST/COPYING           $MYSQL_SRC/COPYING
 %format deb
 d 755 root root $DOCS_DST/examples -
 f 644 root root $DOCS_DST/examples          $MYSQL_SRC/support-files/*.cnf
-f 644 root root $DOCS_DST/EXCEPTIONS-CLIENT $MYSQL_SRC/EXCEPTIONS-CLIENT
+# not in 5.1.57 f 644 root root $DOCS_DST/EXCEPTIONS-CLIENT $MYSQL_SRC/EXCEPTIONS-CLIENT
 %format rpm
 f 644 root root $DOCS_DST/README            $MYSQL_SRC/README
 f 644 root root $DOCS_DST                   $MYSQL_SRC/support-files/*.cnf
