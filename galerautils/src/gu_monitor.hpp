@@ -60,14 +60,14 @@ public:
         holder = pthread_self();
 #endif
     }
-    
+
     void leave() const
     {
         Lock lock(mutex);
-	
+
         assert(refcnt > 0);
         assert(pthread_equal(holder, pthread_self()) != 0);
-	
+
         refcnt--;
         if (refcnt == 0)
         {

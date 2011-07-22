@@ -140,6 +140,12 @@ apply_trx_ws(void*                    recv_ctx,
     {
         try
         {
+#if 0
+            if (trx.flags() & galera::TrxHandle::F_ISOLATION)
+            {
+                log_debug << "Executing TO isolated action: " << trx;
+            }
+#endif
             gu_trace(apply_wscoll(recv_ctx, apply_cb, trx));
             break;
         }
@@ -147,8 +153,7 @@ apply_trx_ws(void*                    recv_ctx,
         {
             if (trx.flags() & galera::TrxHandle::F_ISOLATION)
             {
-                log_debug << "ignoring applying error for trx in isolation: "
-                          << trx;
+                log_warn << "Ignoring error for TO isolated action: " << trx;
                 break;
             }
             else
@@ -887,7 +892,6 @@ wsrep_status_t galera::ReplicatorSMM::causal_read(wsrep_seqno_t* seqno) const
 }
 
 
-
 wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle* trx)
 {
     assert(trx->state() == TrxHandle::S_REPLICATING);
@@ -916,10 +920,12 @@ wsrep_status_t galera::ReplicatorSMM::to_isolation_begin(TrxHandle* trx)
             }
 
         trx->set_state(TrxHandle::S_APPLYING);
+        log_debug << "Executing TO isolated action: " << *trx;
         break;
     }
     case WSREP_TRX_FAIL:
         // Apply monitor is released in cert() in case of failure.
+        log_warn << "Certification for TO isolated action faled: " << *trx;
         trx->set_state(TrxHandle::S_ABORTING);
         report_last_committed();
         break;
@@ -1037,6 +1043,11 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
         }
         break;
     case WSREP_TRX_FAIL:
+        if (trx->flags() & galera::TrxHandle::F_ISOLATION) // REMOVE
+        {
+            log_warn << "Certification failed for TO isolated action: "
+                     << *trx;
+        }
         // certification failed, apply monitor has been canceled
         break;
     default:

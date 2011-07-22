@@ -53,8 +53,8 @@ galera::operator<<(std::ostream& os, const TrxHandle& th)
             << " local: " << th.local_
             << " state: " << th.state_()
             << " flags: " << th.write_set_flags_
-            << " conn_id: " << th.conn_id_
-            << " trx_id: " << th.trx_id_
+            << " conn_id: " << int64_t(th.conn_id_)
+            << " trx_id: " << int64_t(th.trx_id_) // for readability
             << " seqnos (l: "  << th.local_seqno_
             << ", g: " << th.global_seqno_
             << ", s: " << th.last_seen_seqno_
