@@ -34,6 +34,7 @@ Commandline Options:
     arch=str      target architecture [i686|x86_64]
     build_dir=dir build directory, default .
     boost=[0|1]   disable or enable boost libraries
+    revno=XXXX    source code revision number
 ''')
 
 
@@ -87,9 +88,9 @@ else:
     print 'Unrecognized target architecture: ' + arch
     Exit(1)
 
-
 boost = int(ARGUMENTS.get('boost', 1))
 
+revno = ARGUMENTS.get('revno', 'XXXX')
 
 #
 # Set up and export default build environment
@@ -112,6 +113,9 @@ if cxx != 'default':
 link = os.getenv('LINK', 'default')
 if link != 'default':
     env.Replace(LINK = link)
+
+env.Append(CPPFLAGS = '-DGALERA_REV=\\"' + revno + '\\"')
+
 # Freebsd ports are installed under /usr/local 
 if sysname == 'freebsd':
     env.Append(LIBPATH = '-L/usr/local/lib')

@@ -494,6 +494,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
     {
         TrxHandleLock lock(*trx);
         trx->append_key(Key(repl->protocol_version(), key, key_len));
+//        trx->append_key(Key(repl->protocol_version(), static_cast<wsrep_key_t*>(0),0));
         trx->append_data(query, query_len);
         trx->set_flags(TrxHandle::F_COMMIT | TrxHandle::F_ISOLATION);
 
@@ -745,7 +746,7 @@ static wsrep_t galera_str = {
     &galera_desync,
     &galera_resync,
     "Galera",
-    "0.8.1",
+    "0.8.1(r"GALERA_REV")",
     "Codership Oy <info@codership.com>",
     &galera_tear_down,
     NULL,

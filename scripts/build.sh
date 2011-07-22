@@ -183,45 +183,6 @@ set -x
 # Build process base directory
 build_base=$(cd $(dirname $0)/..; pwd -P)
 
-# Define branches to be used
-galerautils_src=$build_base/galerautils
-galeracomm_src=$build_base/galeracomm
-gcomm_src=$build_base/gcomm
-gcs_src=$build_base/gcs
-galera_src=$build_base/galera
-
-# Function to build single project
-build()
-{
-    local build_dir=$1
-    shift
-    echo "Building: $build_dir ($@)"
-    pushd $build_dir
-    export LD_LIBRARY_PATH
-    export CPPFLAGS
-    export LDFLAGS
-
-    if   [ ! -x "configure" ]; then BOOTSTRAP=yes;
-    elif [ ! -s "Makefile"  ]; then CONFIGURE=yes;
-    fi
-
-    if [ "$BOOTSTRAP" == "yes" ]; then ./bootstrap.sh; CONFIGURE=yes ; fi
-    if [ "$CONFIGURE" == "yes" ]; then rm -rf config.status; ./configure $@; SCRATCH=yes ; fi
-    if [ "$SCRATCH"   == "yes" ]; then make clean ; fi
-    make || return 1
-#    $gainroot make install
-    popd
-}
-
-# Updates build flags for the next stage
-build_flags()
-{
-    local build_dir=$1
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$build_dir/src/.libs
-    CPPFLAGS="$CPPFLAGS -I$build_dir/src "
-    LDFLAGS="$LDFLAGS -L$build_dir/src/.libs"
-}
-
 get_arch()
 {
     if file $build_base/gcs/src/gcs.o | grep "80386" >/dev/null 2>&1
@@ -284,27 +245,6 @@ build_packages()
     return $RET
 }
 
-# Most modules are standard, so we can use a single function
-build_module()
-{
-    local module="$1"
-    shift
-    local build_dir="$build_base/$module"
-    if test "$initial_stage" == "$module" || "$building" == "true"
-    then
-        build $build_dir ${conf_flags:-} $@ && building="true" || return 1
-    fi
-
-    build_flags $build_dir || return 1
-}
-
-fix_buildroot()
-{
-    rm -rf ~/rpmbuild/BUILDROOT
-    mkdir -p ~/rpmbuild
-    ln -s $(pwd)/$1/buildroot ~/rpmbuild/BUILDROOT
-}
-
 build_source()
 {
     local module="$1"
@@ -343,23 +283,24 @@ build_sources()
     echo $PWD/$ret
 }
 
-building="false"
-
-echo "CC: $CC"
-echo "CPPFLAGS: $CPPFLAGS"
+pushd "$build_base"
+#GALERA_REV="$(svnversion | sed s/\:/,/g)"
+#if [ "$GALERA_REV" == "exported" ]
+#then
+    GALERA_REV=$(bzr revno)
+#fi
+popd
 
 if [ -z "$RELEASE" ]
 then
-    pushd "$build_base"
-    RELEASE="$(svnversion | sed s/\:/,/g)"
-    popd
+    RELEASE=$GALERA_REV
 fi
 
 if [ "$SCONS" == "yes" ] # Build using Scons
 then
-    # Scons variant dir, defaults to GALERA_SRC 
+    # Scons variant dir, defaults to GALERA_SRC
     export SCONS_VD=$build_base
-    scons_args="-C $build_base"
+    scons_args="-C $build_base revno=$GALERA_REV"
 
     if [ -n "$TARGET" ]
     then
