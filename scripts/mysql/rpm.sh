@@ -44,8 +44,8 @@ then # configure should help us here
     export MYSQL_VER=`grep PACKAGE_VERSION include/config.h | awk '{gsub(/\"/,""); print $3; }'`
     if test -z "$MYSQL_VER"
     then
-	echo "Could not determine mysql version."
-	exit -1
+        echo "Could not determine mysql version."
+        exit -1
     fi
 fi
 
@@ -107,9 +107,7 @@ rm -rf $MYSQL_DIST
 ##                                  ##
 ######################################
 wsrep_cflags="-DWSREP_PROC_INFO -DMYSQL_MAX_VARIABLE_VALUE_LEN=2048"
-fast_cflags="-O3 -fno-omit-frame-pointer -mtune=core2"
-#i686_cflags="-march=i686 -mtune=i686"
-#amd64_cflags="-m64 -mtune=opteron"
+fast_cflags="-O3 -fno-omit-frame-pointer"
 uname -m | grep -q i686 && \
 cpu_cflags="-mtune=i686" || cpu_cflags="-mtune=core2"
 export RPM_OPT_FLAGS="$fast_cflags $cpu_cflags $wsrep_cflags"
@@ -118,8 +116,8 @@ export MAKE="make -j $(cat /proc/cpuinfo | grep -c ^processor)"
 RPMBUILD()
 {
 $(which rpmbuild) --clean --rmsource --define "_topdir $RPM_BUILD_ROOT" \
-        	  --define "optflags $RPM_OPT_FLAGS" --with wsrep \
-        	  -ba $WSREP_SPEC
+                  --define "optflags $RPM_OPT_FLAGS" --with wsrep \
+                  -ba $WSREP_SPEC
 }
 
 pushd "$RPM_BUILD_ROOT"
@@ -137,7 +135,6 @@ popd
 ##     Copy required files here     ##
 ##                                  ##
 ######################################
-pwd
 cp $WSREP_SPEC ./
 uname -m | grep -q i686 && ARCH=i686 || ARCH=x86_64
 cp $RPM_BUILD_ROOT/RPMS/$ARCH/MySQL-server-*.rpm ./

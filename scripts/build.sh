@@ -202,13 +202,13 @@ build_packages()
 
     export BUILD_BASE=$build_base
     export GALERA_VER=$RELEASE
-    echo "ARCH=$ARCH"
 
     if [ $DEBIAN -eq 0 ] && [ "$ARCH" == "amd64" ]
     then
         ARCH="x86_64"
         export x86_64=$ARCH # for epm
     fi
+    export $ARCH
 
     local STRIP_OPT=""
     [ "$NO_STRIP" == "yes" ] && STRIP_OPT="-g"
@@ -220,27 +220,13 @@ build_packages()
     then # build DEB
         $SUDO /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
              --output-dir $ARCH $STRIP_OPT galera # && \
-#       sudo -E /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "deb" \
-#            --output-dir $ARCH $STRIP_OPT galera-dev
+        $SUDO /bin/chown -R $WHOAMI.users $ARCH
     else # build RPM
-        ($SUDO /usr/bin/epm -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
-              --output-dir $ARCH --keep-files -k $STRIP_OPT galera || \
-         /usr/bin/rpmbuild -bb --target "$ARCH" "$ARCH/galera.spec" \
-              --buildroot="$ARCH/buildroot" ) # && \
-#        /usr/bin/epm -n -m "$ARCH" -a "$ARCH" -f "rpm" \
-#             --output-dir $ARCH $STRIP_OPT galera-dev
+        ./rpm.sh $GALERA_VER
     fi
     local RET=$?
 
-    $SUDO /bin/chown -R $WHOAMI.users $ARCH
-
     set -e
-
-    if [ $RET -eq 0 ] && [ $DEBIAN -eq 0 ]
-    then
-#        mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ && \
-        rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms # $ARCH/galera.spec
-    fi
 
     return $RET
 }
@@ -321,7 +307,7 @@ then
     then
         scons $scons_args -j $JOBS
     fi
-    
+
 elif test "$SKIP_BUILD" == "no"; then # Build using autotools
     echo "Error: autotools not supported anymore! Nothing was built."
     exit 1
