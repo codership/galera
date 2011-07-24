@@ -37,16 +37,11 @@ MYSQL_DIST_TARBALL=$(cd $(dirname "$1"); pwd -P)/$(basename "$1")
 MYSQL_SRC=$(cd $MYSQL_SRC; pwd -P; cd $THIS_DIR)
 pushd $MYSQL_SRC
 export WSREP_REV=$(bzr revno)
-export MYSQL_VER=`grep PACKAGE_VERSION include/config.h | awk '{gsub(/\"/,""); print $3; }'`
+export MYSQL_VER=`grep AC_INIT configure.in | awk -F '[' '{ print $3 }'| awk -F ']' '{ print $1 }'`
 if test -z "$MYSQL_VER"
-then # configure should help us here
-    ./configure
-    export MYSQL_VER=`grep PACKAGE_VERSION include/config.h | awk '{gsub(/\"/,""); print $3; }'`
-    if test -z "$MYSQL_VER"
-    then
-        echo "Could not determine mysql version."
-        exit -1
-    fi
+then
+    echo "Could not determine mysql version."
+    exit -1
 fi
 
 popd #MYSQL_SRC
@@ -136,7 +131,7 @@ popd
 ##                                  ##
 ######################################
 cp $WSREP_SPEC ./
-uname -m | grep -q i686 && ARCH=i686 || ARCH=x86_64
+uname -m | grep -q i686 && ARCH=i386 || ARCH=x86_64
 cp $RPM_BUILD_ROOT/RPMS/$ARCH/MySQL-server-*.rpm ./
 
 # remove the patch file if is was automatically generated
