@@ -28,7 +28,7 @@ $(which rpmbuild) --clean --define "_topdir $RPM_TOP_DIR" \
                   --define "version $1" \
                   -bb --short-circuit -bi $GALERA_SPEC
 
-uname -m | grep -q i686 && ARCH=i686 || ARCH=x86_64
+uname -m | grep -q i686 && ARCH=i386 || ARCH=x86_64
 mv $RPM_TOP_DIR/RPMS/$ARCH/galera-*.rpm ./
 
 rm -rf $RPM_TOP_DIR

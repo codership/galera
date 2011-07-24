@@ -289,7 +289,7 @@ then
         # This will be put to --prefix by SETUP.sh.
         export MYSQL_BUILD_PREFIX="/usr"
 
-        if [ "$PACKAGE" == "yes" || "$BIN_DIST" == "yes" ]
+        if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
         then
             # There is no other way to pass these options to SETUP.sh but
             # via env. variable
