@@ -241,10 +241,13 @@ then
     if [ "$SKIP_BUILD" == "no" ] || [ ! -d $mysql_tag ]
     then
         mysql_orig_tar_gz=$mysql_tag.tar.gz
-        url1=http://mysql.dataphone.se/Downloads/MySQL-5.1
-        url2=http://downloads.mysql.com/archives/mysql-5.1
-        echo "Downloading $mysql_orig_tar_gz... currently works only for 5.1.x"
-#        wget -N $url1/$mysql_orig_tar_gz || wget -N $url2/$mysql_orig_tar_gz
+        url2=http://mysql.dataphone.se/Downloads/MySQL-5.1
+        url1=http://downloads.mysql.com/archives/mysql-5.1
+        if [ ! -r $mysql_orig_tar_gz ]
+        then
+            echo "Downloading $mysql_orig_tar_gz... currently works only for 5.1.x"
+            wget -N $url1/$mysql_orig_tar_gz || wget -N $url2/$mysql_orig_tar_gz
+        fi
         echo "Getting wsrep patch..."
         patch_file=$(${BUILD_ROOT}/get_patch.sh $mysql_tag $MYSQL_SRC)
         echo "Patching source..."
