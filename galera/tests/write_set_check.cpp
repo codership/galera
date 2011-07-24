@@ -68,10 +68,10 @@ START_TEST(test_key1)
     size_t expected_size(0);
 
 #ifndef GALERA_KEY_VLQ
-    expected_size += 1 + std::min(sizeof k1, 0xffUL);
-    expected_size += 1 + std::min(sizeof k2, 0xffUL);
-    expected_size += 1 + std::min(sizeof k3, 0xffUL);
-    expected_size += 1 + std::min(sizeof k4, 0xffUL);
+    expected_size += 1 + std::min(sizeof k1, size_t(0xff));
+    expected_size += 1 + std::min(sizeof k2, size_t(0xff));
+    expected_size += 1 + std::min(sizeof k3, size_t(0xff));
+    expected_size += 1 + std::min(sizeof k4, size_t(0xff));
     expected_size += sizeof(uint16_t);
 #else
     expected_size += gu::uleb128_size(sizeof k1) + sizeof k1;
