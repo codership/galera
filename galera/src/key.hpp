@@ -85,7 +85,15 @@ namespace galera
             return ret;
 #endif
         }
-        const gu::byte_t* key() const { return buf_ + key_len(); }
+#ifndef GALERA_KEY_VLQ
+        const gu::byte_t* key() const { return buf_ + 1; }
+#else
+        const gu::byte_t* key() const
+        {
+            size_t not_used;
+            return buf_ + gu::uleb128_decode(buf_, buf_size_, 0, not_used);
+        }
+#endif
         bool operator==(const KeyPart1& other) const
         {
             return (other.buf_size_ == buf_size_ &&
@@ -151,7 +159,7 @@ namespace galera
             case 1:
                 for (size_t i(0); i < keys_len; ++i)
                 {
-                    size_t offset(keys_.size());
+                    size_t const offset(keys_.size());
                     size_t key_len(keys[i].key_len);
                     const gu::byte_t* base(reinterpret_cast<const gu::byte_t*>(
                                                keys[i].key));
@@ -219,7 +227,7 @@ namespace galera
             size_t i(0);
             size_t const keys_size(keys_.size());
 
-            do
+            while (i < keys_size)
             {
 #ifndef GALERA_KEY_VLQ
                 size_t key_len(keys_[i] + 1);
@@ -229,7 +237,7 @@ namespace galera
                     gu::uleb128_decode(&keys_[0], keys_size, i, key_len));
                 key_len += offset - i;
 #endif
-                if (gu_unlikely(i + key_len > keys_size))
+                if (gu_unlikely((i + key_len) > keys_size))
                 {
                     gu_throw_fatal
                         << "Keys buffer overflow by " << i + key_len - keys_size
@@ -240,11 +248,10 @@ namespace galera
                 ret.push_back(kp);
                 i += key_len;
             }
-            while (i != keys_size);
+            assert(i == keys_size);
 
             return ret;
         }
-
 
         bool operator==(const Key& other) const
         {
