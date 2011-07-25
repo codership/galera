@@ -61,6 +61,7 @@ do
     case $1 in
         -b|--bootstrap)
             BOOTSTRAP="yes" # Bootstrap the build system
+            CONFIGURE="yes"
             ;;
         --bin)
             BIN_DIST="yes"
@@ -231,7 +232,7 @@ fi
 cd $MYSQL_SRC
 WSREP_REV=$(bzr revno)
 # this does not work on an unconfigured source MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
-MYSQL_VER=`grep PACKAGE_VERSION include/my_config.h | awk '{gsub(/\"/,""); print $3; }'`
+MYSQL_VER=`grep AC_INIT configure.in | awk -F '[' '{ print $3 }' | awk -F ']' '{ print $1 }'`
 
 if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
 then
