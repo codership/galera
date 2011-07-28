@@ -1,17 +1,29 @@
+Codership Oy
+http://www.codership.com
+<info@codership.com>
+
 This is release 0.8 of Galera - Codership's implementation of wsrep interface
-(https://launchpad.net/wsrep/).
-
-For details, see https://launchpad.net/galera/
-
-Software Requirements:
-* Scons build system (http://www.scons.org/)
-* Check unit test library (http://check.sourceforge.net/)
+(https://launchpad.net/wsrep/). The software and other files in this directory
+unless otherwise noted are distributed under GPLv3, see COPYING for details.
 
 
-To build Galera library just run 'scons' in the root directory.
-Result of build will be 'libgalera_smm.so' library in the root directory.
-This library is ready to use as a provider for wsrep-enabled app (MySQL).
+Build Requirements:
+* Scons build system http://www.scons.org/
+* Check unit test library http://check.sourceforge.net/
+* Boost devel libraries http://www.boost.org/
+
+To build MySQL/Galera demo distribution, branch lp:codership-mysql into
+some directory (hereafter <MYSQL_DIR>) and run build script from this
+directory (hereafter <GALERA_DIR>):
+
+  cd <MYSQL_DIR>
+  bzr branch lp:codership-mysql
+  cd <GALERA_DIR>
+  MYSQL_SRC=<MYSQL_DIR>/codership-mysql ./scripts/mysql/build.sh -b -s -o -t
+
+After successful build, demo package can be found under scripts/mysql.
 
 For more information, see:
+* https://launchpad.net/galera/
 * Codership home page http://www.codership.com
 * Codership mailing list http://groups.google.com/group/codership-team

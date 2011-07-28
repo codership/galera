@@ -59,7 +59,7 @@ namespace galera
         virtual wsrep_status_t post_rollback(TrxHandle* trx) = 0;
         virtual wsrep_status_t replay_trx(TrxHandle* trx, void* replay_ctx) = 0;
         virtual void abort_trx(TrxHandle* trx) throw (gu::Exception) = 0;
-        virtual wsrep_status_t causal_read(wsrep_seqno_t*) = 0;
+        virtual wsrep_status_t causal_read(wsrep_seqno_t*) const = 0;
         virtual wsrep_status_t to_isolation_begin(TrxHandle* trx) = 0;
         virtual wsrep_status_t to_isolation_end(TrxHandle* trx) = 0;
         virtual wsrep_status_t sst_sent(const wsrep_uuid_t& uuid,

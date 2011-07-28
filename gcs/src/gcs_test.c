@@ -724,11 +724,11 @@ int main (int argc, char *argv[])
     gcs_conf_set_pkt_size (gcs, 7570); // to test fragmentation
 
     if ((err = gcs_test_thread_pool_create
-	 (&repl_pool, GCS_TEST_REPL, conf.n_repl, conf.n_tries))) goto out;
+         (&repl_pool, GCS_TEST_REPL, conf.n_repl, conf.n_tries))) goto out;
     if ((err = gcs_test_thread_pool_create
-	 (&send_pool, GCS_TEST_SEND, conf.n_send, conf.n_tries))) goto out;
+         (&send_pool, GCS_TEST_SEND, conf.n_send, conf.n_tries))) goto out;
     if ((err = gcs_test_thread_pool_create
-	 (&recv_pool, GCS_TEST_RECV, conf.n_recv, conf.n_tries))) goto out;
+         (&recv_pool, GCS_TEST_RECV, conf.n_recv, conf.n_tries))) goto out;
 
     pthread_mutex_lock (&gcs_test_lock);
 

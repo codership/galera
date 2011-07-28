@@ -80,7 +80,7 @@ gcs_core_close (gcs_core_t* conn);
 extern long
 gcs_core_destroy (gcs_core_t* conn);
 
-/* 
+/*
  * gcs_core_send() atomically sends action to group.
  *
  * NOT THREAD SAFE! Access should be serialized.
@@ -102,7 +102,7 @@ gcs_core_send (gcs_core_t*    core,
 
 /*
  * gcs_core_recv() blocks until some action is received from group.
- * 
+ *
  * @param timeout - absolute timeout date (as in pthread_cond_timedwait())
  *
  * Return values:
@@ -123,7 +123,7 @@ gcs_core_recv (gcs_core_t*          conn,
                long long            timeout);
 
 /* Configuration functions */
-/* Sets maximum message size to achieve requested network packet size. 
+/* Sets maximum message size to achieve requested network packet size.
  * In case of failure returns negative error code, in case of success -
  * resulting message payload size (size of action fragment) */
 extern long

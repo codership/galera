@@ -556,8 +556,10 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         }
 
         trx->set_gcs_handle(gcs_handle);
+
         if (trx->action() == 0)
         {
+            //FIXME: this either should be a try{} or pointer check - not both
             try
             {
                 trx->set_action(gcache_.malloc(wscoll.size()));
@@ -883,6 +885,7 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
     ApplyOrder ao(*trx);
     apply_monitor_.leave(ao);
     cert_.set_trx_committed(trx);
+
     if (trx->action() != 0)
     {
         gcache_.free(trx->action());
@@ -892,6 +895,7 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
     {
         log_warn << "no assigned cached action for " << *trx;
     }
+
     trx->set_state(TrxHandle::S_COMMITTED);
     report_last_committed();
     ++local_commits_;
