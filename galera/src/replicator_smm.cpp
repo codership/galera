@@ -1238,9 +1238,28 @@ void galera::ReplicatorSMM::process_state_req(void* recv_ctx,
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(donor_seq);
 
     state_.shift_to(S_DONOR);
-    sst_donate_cb_(app_ctx_, recv_ctx, req, req_size, &state_uuid_,
-                   donor_seq, 0, 0);
+
+    // somehow the following does not work, string is initialized beyond
+    // the first \0:
+    // std::string const req_str(reinterpret_cast<const char*>(req), req_size);
+    // have to resort to C ways.
+    char* const tmp(strndup(reinterpret_cast<const char*>(req), req_size));
+    std::string const req_str(tmp);
+    free (tmp);
+    bool const trivial_sst(req_str == TRIVIAL_SST);
+
+    if (!trivial_sst)
+    {
+        sst_donate_cb_(app_ctx_, recv_ctx, req, req_size, &state_uuid_,
+                       donor_seq, 0, 0);
+    }
+
     local_monitor_.leave(lo);
+
+    if (trivial_sst)
+    {
+        gcs_.join(donor_seq);
+    }
 }
 
 

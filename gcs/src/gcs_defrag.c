@@ -73,7 +73,7 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
             df->reset   = false;
 
             if (gu_likely(!local)) {
-
+#ifndef GCS_FOR_GARB
                 /* We need to allocate buffer for it.
                  * This buffer will be returned to application,
                  * so it must be allocated by standard malloc */
@@ -86,6 +86,11 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                     assert(0);
                     return -ENOMEM;
                 }
+#else
+                /* we don't store actions locally at all */
+                df->head = NULL;
+                df->tail = df->head;
+#endif
             }
         }
         else {
@@ -113,9 +118,15 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
     assert (df->received <= df->size);
 
     if (gu_likely(!local)) {
+#ifndef GCS_FOR_GARB
         assert (df->tail);
         memcpy (df->tail, frg->frag, frg->frag_len);
         df->tail += frg->frag_len;
+#else
+        /* we skip memcpy since have not allocated any buffer */
+        assert (NULL == df->tail);
+        assert (NULL == df->head);
+#endif
     }
 
     if (gu_likely (df->received != df->size)) {

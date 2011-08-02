@@ -75,6 +75,7 @@ fi
 # patch freaks out on .bzrignore which doesn't exist in source dist and
 # returns error code - running in subshell to ignore it
 (patch -p1 -f < $WSREP_PATCH)
+chmod a+x ./BUILD/*wsrep
 time ./BUILD/autorun.sh # update configure script
 time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/$(basename "$MYSQL_DIST_TARBALL") \
               "$MYSQL_DIST"

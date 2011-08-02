@@ -14,6 +14,8 @@ libgcs_env.Replace(CFLAGS = '-std=gnu99 -fno-strict-aliasing')
 # Need to live without -pedantic
 libgcs_env.Replace(CXXFLAGS = '-Wno-long-long -Wno-deprecated -Weffc++ -ansi')
 
+gcs4garb_env = libgcs_env.Clone()
+
 libgcs_sources = Split('''
                           gcs_params.c
                           gcs_conf.c
@@ -33,7 +35,7 @@ libgcs_sources = Split('''
                           gcs.c
                           gcs_gcomm.cpp
                        ''')
-
+#libgcs_env.VariantDir('.gcs', '.', duplicate=0)
 libgcs_env.StaticLibrary('gcs', libgcs_sources)
 
 # TODO: How to tell scons portably that C++ linker should be used
@@ -54,3 +56,12 @@ SConscript('unit_tests/SConscript')
 
 #
 env.Append(LIBGALERA_OBJS = libgcs_env.SharedObject(libgcs_sources))
+
+gcs4garb_env.Append(CPPFLAGS = ' -DGCS_FOR_GARB')
+garb_obj_dir = '.garb'
+gcs4garb_env.VariantDir(garb_obj_dir, '.', duplicate = 0)
+#garb_objects = [os.path.splitext(src)[0] + '_garb' + 
+#                env['OBJSUFFIX'] for src in libgcs_sources]
+garb_sources = [ garb_obj_dir + '/' + src for src in libgcs_sources ]
+gcs4garb_env.StaticLibrary('gcs4garb', garb_sources)
+

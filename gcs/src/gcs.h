@@ -368,6 +368,9 @@ struct gcs_stats
 /*! Fills stats struct and resets stats counters */
 extern void gcs_get_stats (gcs_conn_t *conn, struct gcs_stats* stats);
 
+/*! A node with this name will be treated as a stateless arbitrator */
+#define GCS_ARBITRATOR_NAME "garb"
+
 #ifdef __cplusplus
 }
 #endif

@@ -639,6 +639,9 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             gu_warn ("%ld (%s): State transfer %s %ld (%s) failed: %d (%s)",
                      sender_idx, sender->name, st_dir, peer_idx, peer_name,
                      (int)seqno, strerror((int)-seqno));
+// REMOVE
+         gu_info("from_donor: %d, peer_idx: %ld, my_idx: %ld, peer state: %d",
+                 from_donor, peer_idx, group->my_idx, group->nodes[peer_idx].status);
 
             if (from_donor && peer_idx == group->my_idx &&
                 GCS_NODE_STATE_JOINER == group->nodes[peer_idx].status) {
@@ -736,7 +739,9 @@ group_find_node_by_state (gcs_group_t* group, gcs_node_state_t status)
 
     for (idx = 0; idx < group->num; idx++) {
         gcs_node_t* node = &group->nodes[idx];
-        if (status == node->status) return idx;
+        if (status == node->status &&
+            strcmp (node->name, GCS_ARBITRATOR_NAME)) // avoid arbitrator
+            return idx;
     }
 
     return -EAGAIN;

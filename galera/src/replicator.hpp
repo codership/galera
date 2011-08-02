@@ -24,6 +24,12 @@ namespace galera
     class Replicator
     {
     public:
+
+        // this state transfer request won't be passed to application
+        // #define is needed to be able to use that value without linking
+        #define GALERA_REPLICATOR_TRIVIAL_SST "none"
+        static const char* const TRIVIAL_SST;
+
         typedef enum
         {
             S_CLOSED,
