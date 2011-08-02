@@ -169,9 +169,10 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
              * and only in PRIM (skip messages while in state exchange) */
             rcvd->id = ++group->act_id;
 
-            if (!local && group->cache)
-                //! @todo: remove if() after local actions get in gcache
+#ifndef GCS_FOR_GARB
+            if (group->cache)
                 gcache_seqno_assign (group->cache, rcvd->act.buf, rcvd->id);
+#endif
         }
         else if (GCS_ACT_TORDERED  == rcvd->act.type) {
             /* Rare situations */

@@ -1368,7 +1368,14 @@ long gcs_send (gcs_conn_t*          conn,
              * has no way of knowing that it shares this buffer.
              * also the contents of action may be changed afterwards by
              * the sending thread */
-            void* act = gcache_malloc (conn->cache, act_size);
+            void* act;
+#ifndef GCS_FOR_GARB
+            if (conn->cache)
+                act = gcache_malloc (conn->cache, act_size);
+            else
+#endif
+                act = malloc (act_size);
+
             if (act != NULL) {
                 memcpy (act, action, act_size);
                 while ((ret = gcs_core_send (conn->core, act,

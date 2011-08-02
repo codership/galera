@@ -66,10 +66,14 @@ gcs_defrag_forget (gcs_defrag_t* df)
 static inline void
 gcs_defrag_free (gcs_defrag_t* df)
 {
+#ifndef GCS_FOR_GARB
     if (gu_likely(NULL != df->cache))
         gcache_free (df->cache, df->head);
     else
         free (df->head); // alloc'ed with standard malloc
+#else
+    assert(NULL == df->head);
+#endif
 
     gcs_defrag_init (df, df->cache);
 }
