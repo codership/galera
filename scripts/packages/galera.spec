@@ -67,6 +67,8 @@ RBD=$RPM_BUILD_DIR
 [ "$RBR" != "/" ] && [ -d $RBR ] && rm -rf $RBR;
 mkdir -p $RBR
 
+install -d $RBR%{_bindir}
+install -m 755 $RBD/garb/garbd                    $RBR%{_bindir}/garbd
 install -d $RBR%{libs}
 install -m 755 $RBD/libgalera_smm.so              $RBR%{libs}/libgalera_smm.so
 install -d $RBR%{docs}
@@ -83,6 +85,8 @@ rm -f $(find %{libs} -type l)
 
 %files
 %defattr(-,root,root,0755)
+%attr(0755,root,root) %dir %{_bindir}
+%attr(0755,root,root) %{_bindir}/garbd
 %attr(0755,root,root) %dir %{libs}
 %attr(0755,root,root) %{libs}/libgalera_smm.so
 %attr(0755,root,root) %dir %{docs}

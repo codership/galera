@@ -2,7 +2,8 @@ SConscript(['galerautils/SConscript',
             'gcache/SConscript',
             'gcomm/SConscript',
             'gcs/SConscript',
-            'galera/SConscript'])
+            'galera/SConscript',
+            'garb/SConscript'])
 
 
 env = DefaultEnvironment()

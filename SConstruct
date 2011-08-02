@@ -216,7 +216,7 @@ conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_SHARED_PTR_HPP')
 
 if conf.CheckCXXHeader('boost/unordered_map.hpp'):
     conf.env.Append(CPPFLAGS = ' -DHAVE_BOOST_UNORDERED_MAP_HPP')
-else: 
+else:
     # note, tr1 header will probably not compile with -Weffc++
     conf.env.Replace(CXXFLAGS = conf.env['CXXFLAGS'].replace('-Weffc++', ''))
     if not conf.CheckCXXHeader('tr1/unordered_map'):
@@ -240,7 +240,6 @@ else:
     print 'Not using boost'
 
 conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
-
 
 conf.env.Append(CFLAGS = ' -pedantic');
 

@@ -399,32 +399,32 @@ core_msg_recv (gcs_backend_t* backend, gcs_recv_msg_t* recv_msg,
     ret = backend->recv (backend, recv_msg, timeout);
 
     while (gu_unlikely(ret > recv_msg->buf_len)) {
-	/* recv_buf too small, reallocate */
+        /* recv_buf too small, reallocate */
         /* sometimes - like in case of component message, we may need to
          * do reallocation 2 times. This should be fixed in backend */
-	void* msg = gu_realloc (recv_msg->buf, ret);
-	gu_debug ("Reallocating buffer from %d to %d bytes",
-		  recv_msg->buf_len, ret);
-	if (msg) {
-	    /* try again */
-	    recv_msg->buf     = msg;
-	    recv_msg->buf_len = ret;
+        void* msg = gu_realloc (recv_msg->buf, ret);
+        gu_debug ("Reallocating buffer from %d to %d bytes",
+                  recv_msg->buf_len, ret);
+        if (msg) {
+            /* try again */
+            recv_msg->buf     = msg;
+            recv_msg->buf_len = ret;
 
-	    ret = backend->recv (backend, recv_msg, timeout);
+            ret = backend->recv (backend, recv_msg, timeout);
 
-	    /* should be either an error or an exact match */
-	    assert ((ret < 0) || (ret >= recv_msg->buf_len));
-	}
-	else {
-	    /* realloc unsuccessfull, old recv_buf remains */
-	    gu_error ("Failed to reallocate buffer to %d bytes", ret);
-	    ret = -ENOMEM;
+            /* should be either an error or an exact match */
+            assert ((ret < 0) || (ret >= recv_msg->buf_len));
+        }
+        else {
+            /* realloc unsuccessfull, old recv_buf remains */
+            gu_error ("Failed to reallocate buffer to %d bytes", ret);
+            ret = -ENOMEM;
             break;
-	}
+        }
     }
 
     if (gu_unlikely(ret < 0)) {
-	gu_debug ("returning %d: %s\n", ret, strerror(-ret));
+        gu_debug ("returning %d: %s\n", ret, strerror(-ret));
     }
 
     return ret;
@@ -474,9 +474,14 @@ core_handle_act_msg (gcs_core_t*          core,
 
             if (gu_likely(!my_msg)) {
                 /* foreign action, must be passed from gcs_group */
-                assert (NULL != act->act.buf);
                 assert (ret  == act->act.buf_len);
                 assert (GCS_ACT_TORDERED != act->act.type || act->id > 0);
+#ifndef GCS_FOR_GARB
+                assert (NULL != act->act.buf);
+#else
+                assert (NULL == act->act.buf);
+                act->act.buf_len = 0;
+#endif
             }
             else {
                 /* local action, get from FIFO, should be there already */
@@ -521,8 +526,20 @@ core_handle_act_msg (gcs_core_t*          core,
             }
 
             if (gu_unlikely(GCS_ACT_STATE_REQ == act->act.type && ret > 0)) {
+#ifdef GCS_FOR_GARB
+            if (my_msg) {
+                /* ignoring state requests from other nodes (not allocated) */
+#endif
                 ret = gcs_group_handle_state_request (group, act);
                 assert (ret <= 0 || ret == act->act.buf_len);
+#ifdef GCS_FOR_GARB
+            }
+            else {
+                act->id = GCS_SEQNO_ILL;
+                act->act.type = GCS_ACT_ERROR;
+                ret = 0;
+            }
+#endif
             }
 //          gu_debug ("Received action: seqno: %lld, sender: %d, size: %d, "
 //                    "act: %p", act->id, msg->sender_idx, ret, act->buf);

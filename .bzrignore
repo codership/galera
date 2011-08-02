@@ -73,4 +73,6 @@ Makefile
 Makefile.in
 .deps
 .libs
+garb/garbd
+gcs/src/.garb
 
