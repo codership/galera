@@ -53,6 +53,11 @@ namespace gcomm
         static std::string const TcpScheme;
 
         /*!
+         * @brief SSL scheme for transport URI ("ssl")
+         */
+        static std::string const SslScheme;
+
+        /*!
          * @brief UDP scheme for transport URI ("udp");
          */
         static std::string const UdpScheme;
@@ -64,6 +69,41 @@ namespace gcomm
          * the socket should or should not be in non-blocking state.
          */
         static std::string const TcpNonBlocking;
+
+        /*!
+         * @brief Use SSL sockets for communication
+         *
+         * Boolean describing whether underlying transport should use SSL
+         * connections.
+         */
+        static std::string const SocketUseSsl;
+
+        /*!
+         * @brief File containing CA certificates in PEM format
+         *        ("socket.ssl_verify_file")
+         */
+        static std::string const SocketSslVerifyFile;
+
+        /*!
+         * @brief File containing certificate to use in PEM format
+         *        ("socket.ssl_certificate_file")
+         */
+        static std::string const SocketSslCertificateFile;
+
+        /*!
+         * @brief File containing private key associated with certificate
+         *        ("socket.ssl_private_key_file")
+         *
+         * If private key file is protected with password,
+         * SocketSslPasswordFile ("socket.ssl_password_file") must also be set.
+         */
+        static std::string const SocketSslPrivateKeyFile;
+
+        /*!
+         * @brief File containing password used to protect private key file
+         *        ("socket.ssl_password_file")
+         */
+        static std::string const SocketSslPasswordFile;
 
         /*!
          * @brief GMCast scheme for transport URI ("gmcast")

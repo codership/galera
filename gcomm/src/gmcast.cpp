@@ -29,7 +29,17 @@ static void set_tcp_defaults (URI* uri)
 
 static bool check_tcp_uri(const URI& uri)
 {
-    return (uri.get_scheme() == Conf::TcpScheme);
+    return (uri.get_scheme() == Conf::TcpScheme ||
+            uri.get_scheme() == Conf::SslScheme);
+}
+
+static std::string get_scheme(bool use_ssl)
+{
+    if (use_ssl == true)
+    {
+        return gcomm::Conf::SslScheme;
+    }
+    return gcomm::Conf::TcpScheme;
 }
 
 
@@ -40,12 +50,13 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
                         param<int>(conf_, uri, Conf::GMCastVersion, "0"),
                         0, max_version_ + 1)),
     my_uuid       (0, 0),
+    use_ssl       (param<bool>(conf_, uri, Conf::SocketUseSsl, "false")),
     // @todo: technically group name should be in path component
     group_name    (param<std::string>(conf_, uri, Conf::GMCastGroup, "")),
     listen_addr   (
         param<std::string>(
             conf_, uri, Conf::GMCastListenAddr,
-            Conf::TcpScheme + "://0.0.0.0")), // how to make it IPv6 safe?
+            get_scheme(use_ssl) + "://0.0.0.0")), // how to make it IPv6 safe?
     initial_addr  (""),
     mcast_addr    (param<std::string>(conf_, uri, Conf::GMCastMCastAddr, "")),
     bind_ip       (""),
@@ -88,8 +99,14 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
             }
 
             initial_addr = resolve(
-                Conf::TcpScheme + "://" + uri_.get_host() + ":" + port
+                get_scheme(use_ssl) + "://" + uri_.get_host() + ":" + port
                 ).to_string();
+
+            // resolving sets scheme to tcp, have to rewrite for ssl
+            if (use_ssl == true)
+            {
+                initial_addr.replace(0, 3, "ssl");
+            }
 
             if (check_tcp_uri(initial_addr) == false)
             {
@@ -120,7 +137,7 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     catch (Exception&)
     {
         /* most probably no scheme, try to append one and see if it succeeds */
-        listen_addr = Conf::TcpScheme + "://" + listen_addr;
+        listen_addr = get_scheme(use_ssl) + "://" + listen_addr;
         gu_trace(gu::URI uri(listen_addr));
     }
 
@@ -157,6 +174,11 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     }
 
     listen_addr = resolve(listen_addr).to_string();
+    // resolving sets scheme to tcp, have to rewrite for ssl
+    if (use_ssl == true)
+    {
+        listen_addr.replace(0, 3, "ssl");
+    }
 
     if (listen_addr == initial_addr)
     {
@@ -186,7 +208,6 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     conf_.set(Conf::GMCastVersion, gu::to_string(version));
     conf_.set(Conf::GMCastTimeWait, gu::to_string(time_wait));
     conf_.set(Conf::GMCastMCastTTL, gu::to_string(mcast_ttl));
-
 }
 
 GMCast::~GMCast()
@@ -280,8 +301,14 @@ void GMCast::gmcast_accept()
         delete peer;
         gu_throw_fatal << "Failed to add peer to map";
     }
-
-    peer->send_handshake();
+    if (tp->get_state() == Socket::S_CONNECTED)
+    {
+        peer->send_handshake();
+    }
+    else
+    {
+        log_debug << "accepted socket is connecting";
+    }
     log_debug << "handshake sent";
 }
 
@@ -386,6 +413,13 @@ void GMCast::handle_connected(Proto* rp)
     const SocketPtr tp(rp->get_socket());
     assert(tp->get_state() == Socket::S_CONNECTED);
     log_debug << "transport " << tp << " connected";
+    if (rp->get_state() == Proto::S_INIT)
+    {
+        log_debug << "sending hanshake";
+        // accepted socket was waiting for underlying transport
+        // handshake to finish
+        rp->send_handshake();
+    }
 }
 
 void GMCast::handle_established(Proto* est)

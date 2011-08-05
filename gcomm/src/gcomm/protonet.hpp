@@ -41,8 +41,8 @@ public:
         :
         protos_ (),
         version_(version),
-        type_   (type),
-        conf_   (conf)
+        conf_   (conf),
+        type_   (type)
     { }
 
     virtual ~Protonet() { }
@@ -127,9 +127,9 @@ protected:
     std::deque<Protostack*> protos_;
     int version_;
     static const int max_version_ = GCOMM_PROTONET_MAX_VERSION;
+    gu::Config& conf_;
 private:
     std::string type_;
-    gu::Config& conf_;
 };
 
 #endif // GCOMM_PROTONET_HPP

@@ -20,7 +20,7 @@ void gcomm::gmcast::Proto:: set_state(State new_state)
     static const bool allowed[][7] =
         {
             // INIT  HS_SENT HS_WAIT HSR_SENT   OK    FAILED CLOSED
-            { false,  true,   true,   false,  false,  false, false },// INIT
+            { false,  true,   true,   false,  false,  true, false },// INIT
 
             { false,  false,  false,  false,  true,   true,  false },// HS_SENT
 

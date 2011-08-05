@@ -12,9 +12,20 @@ std::string const gcomm::Conf::ProtonetVersion("protonet.version");
 
 // TCP
 std::string const gcomm::Conf::TcpScheme = "tcp";
+std::string const gcomm::Conf::SslScheme = "ssl";
 std::string const gcomm::Conf::UdpScheme = "udp";
 std::string const gcomm::Conf::TcpNonBlocking =
     "socket" + Delim + "non_blocking";
+std::string const gcomm::Conf::SocketUseSsl =
+    "socket" + Delim + "use_ssl";
+std::string const gcomm::Conf::SocketSslVerifyFile =
+    "socket" + Delim + "ssl_verify_file";
+std::string const gcomm::Conf::SocketSslCertificateFile =
+    "socket" + Delim + "ssl_certificate_file";
+std::string const gcomm::Conf::SocketSslPrivateKeyFile =
+    "socket" + Delim + "ssl_private_key_file";
+std::string const gcomm::Conf::SocketSslPasswordFile =
+    "socket" + Delim + "ssl_password_file";
 
 // GMCast
 std::string const gcomm::Conf::GMCastScheme = "gmcast";

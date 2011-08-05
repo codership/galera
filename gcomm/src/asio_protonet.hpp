@@ -12,7 +12,10 @@
 
 #pragma GCC diagnostic ignored "-Weffc++"
 #pragma GCC diagnostic ignored "-Wold-style-cast"
-#include <asio.hpp>
+#include "asio.hpp"
+#ifdef HAVE_ASIO_SSL_HPP
+#include "asio/ssl.hpp"
+#endif // HAVE_ASIO_SSL_HPP
 
 #include <vector>
 #include <deque>
@@ -41,6 +44,10 @@ public:
     void leave();
     size_t get_mtu() const { return mtu_; }
 
+#ifdef HAVE_ASIO_SSL_HPP
+    std::string get_ssl_password() const;
+#endif // HAVE_ASIO_SSL_HPP
+
 private:
 
     friend class AsioTcpSocket;
@@ -54,9 +61,12 @@ private:
     gu::datetime::Date          poll_until_;
     asio::io_service            io_service_;
     asio::deadline_timer        timer_;
-
+#ifdef HAVE_ASIO_SSL_HPP
+    asio::ssl::context          ssl_context_;
+#endif // HAVE_ASIO_SSL_HPP
     size_t                      mtu_;
     bool                        checksum_;
+
 };
 
 #endif // GCOMM_ASIO_PROTONET_HPP
