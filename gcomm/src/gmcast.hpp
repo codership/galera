@@ -125,6 +125,7 @@ namespace gcomm
         int               version;
         static const int max_version_ = GCOMM_GMCAST_MAX_VERSION;
         UUID              my_uuid;
+        bool              use_ssl;
         std::string       group_name;
         std::string       listen_addr;
         std::string       initial_addr;
@@ -136,6 +137,7 @@ namespace gcomm
         AddrList          pending_addrs;
         AddrList          remote_addrs;
         AddrList          addr_blacklist;
+
 
         gmcast::ProtoMap*  proto_map;
         std::list<Socket*> mcast_tree;

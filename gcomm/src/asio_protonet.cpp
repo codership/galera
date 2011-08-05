@@ -11,6 +11,7 @@
 #include "socket.hpp"
 
 #include "gcomm/util.hpp"
+#include "gcomm/conf.hpp"
 
 #include "gu_logger.hpp"
 
@@ -18,11 +19,51 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 
+#include <fstream>
+
 using namespace std;
 using namespace std::rel_ops;
 using namespace gu;
 using namespace gu::net;
 using namespace gu::datetime;
+
+
+#ifdef HAVE_ASIO_SSL_HPP
+
+namespace
+{
+    static std::string
+    get_file(const gu::Config& conf, const std::string& fname)
+    {
+        try
+        {
+            return conf.get(fname);
+        }
+        catch (gu::NotFound& e)
+        {
+            log_error << "could not find '" << fname << "' from configuration";
+            throw;
+        }
+    }
+}
+
+
+std::string gcomm::AsioProtonet::get_ssl_password() const
+{
+    std::string   file(get_file(conf_, Conf::SocketSslPasswordFile));
+    std::ifstream ifs(file.c_str(), ios_base::in);
+    if (ifs.good() == false)
+    {
+        gu_throw_error(errno) << "could not open password file '" << file
+                              << "'";
+    }
+    std::string ret;
+    std::getline(ifs, ret);
+    return ret;
+}
+
+
+#endif // HAVE_ASIO_SSL_HPP
 
 
 gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
@@ -32,10 +73,74 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
     poll_until_(Date::max()),
     io_service_(),
     timer_(io_service_),
+#ifdef HAVE_ASIO_SSL_HPP
+    ssl_context_(io_service_, asio::ssl::context::sslv23),
+#endif // HAVE_ASIO_SSL_HPP
     mtu_(1 << 15),
     checksum_(true)
 {
+#ifdef HAVE_ASIO_SSL_HPP
+    if (gu::from_string<bool>(conf_.get(Conf::SocketUseSsl, "false")) == true)
+    {
+        log_info << "initializing ssl context";
+        ssl_context_.set_verify_mode(asio::ssl::context::verify_peer);
+        ssl_context_.set_password_callback(
+            boost::bind(&gcomm::AsioProtonet::get_ssl_password, this));
 
+        // verify file
+        const std::string verify_file(
+            get_file(conf_, Conf::SocketSslVerifyFile));
+        try
+        {
+            ssl_context_.load_verify_file(verify_file);
+        }
+        catch (std::exception& e)
+        {
+            log_error << "could not load verify file '"
+                      << verify_file
+                      << "': " << e.what();
+            throw;
+        }
+
+        // certificate file
+        const std::string certificate_file(
+            get_file(conf_, Conf::SocketSslCertificateFile));
+        try
+        {
+            ssl_context_.use_certificate_file(certificate_file,
+                                              asio::ssl::context::pem);
+        }
+        catch (std::exception& e)
+        {
+            log_error << "could not load certificate file'"
+                      << certificate_file
+                      << "': " << e.what();
+            throw;
+        }
+
+        // private key file
+        const std::string private_key_file(
+            get_file(conf_, Conf::SocketSslPrivateKeyFile));
+        try
+        {
+            ssl_context_.use_private_key_file(
+                private_key_file, asio::ssl::context::pem);
+        }
+        catch (gu::NotFound& e)
+        {
+            log_error << "could not load private key file '"
+                      << private_key_file << "'";
+            throw;
+        }
+        catch (std::exception& e)
+        {
+            log_error << "could not use private key file '"
+                      << private_key_file
+                      << "': " << e.what();
+            throw;
+        }
+    }
+#endif // HAVE_ASIO_SSL_HPP
 }
 
 gcomm::AsioProtonet::~AsioProtonet()
@@ -57,7 +162,7 @@ void gcomm::AsioProtonet::leave()
 
 gcomm::SocketPtr gcomm::AsioProtonet::socket(const URI& uri)
 {
-    if (uri.get_scheme() == "tcp")
+    if (uri.get_scheme() == "tcp" || uri.get_scheme() == "ssl")
     {
         return boost::shared_ptr<AsioTcpSocket>(new AsioTcpSocket(*this, uri));
     }
@@ -136,3 +241,4 @@ void gcomm::AsioProtonet::handle_wait(const asio::error_code& ec)
         io_service_.stop();
     }
 }
+

@@ -87,7 +87,7 @@ public:
 
     void connect(const gu::URI& uri)
     {
-        gcomm_assert(uri.get_scheme() == scheme_);
+        gcomm_assert(uri.get_scheme() == uri_.get_scheme());
         socket_ = net_.get_net().connect(uri.to_string());
         gcomm_assert((socket_->get_opt() & gu::net::Socket::O_NON_BLOCKING)
                      != 0);
@@ -176,7 +176,7 @@ public:
 
     void listen(const gu::URI& uri)
     {
-        gcomm_assert(uri.get_scheme() == scheme_);
+        gcomm_assert(uri.get_scheme() == uri_.get_scheme());
         socket_ = net_.get_net().listen(uri.to_string());
     }
 

@@ -89,6 +89,7 @@ else:
     Exit(1)
 
 boost = int(ARGUMENTS.get('boost', 1))
+ssl   = int(ARGUMENTS.get('ssl', 1))
 
 revno = ARGUMENTS.get('revno', 'XXXX')
 
@@ -238,6 +239,34 @@ if boost == 1:
 else:
     print 'Not using boost'
 
+
+# asio
+conf.env.Replace(CXXFLAGS = conf.env['CXXFLAGS'].replace('-Weffc++', ''))
+conf.env.Replace(CXXFLAGS = conf.env['CXXFLAGS'].replace('-Wold-style-cast', ''))
+if conf.CheckCXXHeader('asio.hpp'):
+    conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
+else:
+    print 'asio headers not found or not usable'
+    Exit(1)
+
+# asio/ssl
+if ssl == 1:
+    if conf.CheckCXXHeader('asio/ssl.hpp'):
+        conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_SSL_HPP')
+    else:
+        print 'ssl support required but asio/ssl.hpp not found or not usable'
+        print 'compile with ssl=0 or check that openssl devel headers are usable'
+        Exit(1)
+    if conf.CheckLib('ssl'):
+        conf.env.Append(LINKFLAGS = ' -lssl')
+    else:
+        print 'ssl support required but openssl library not found'
+        print 'compile with ssl=0 or check that openssl library is usable'
+        Exit(1)
+
+
+conf.env.Append(CXXFLAGS = ' -Weffc++')
+conf.env.Append(CXXFLAGS = ' -Wold-style-cast')
 conf.env.Append(CPPFLAGS = ' -DHAVE_ASIO_HPP')
 
 conf.env.Append(CFLAGS = ' -pedantic');

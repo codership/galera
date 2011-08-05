@@ -38,7 +38,7 @@ public:
 
     Socket(const gu::URI& uri)
         :
-        scheme_(uri.get_scheme())
+        uri_(uri)
     { }
 
     virtual ~Socket() { }
@@ -54,7 +54,7 @@ public:
     virtual State get_state() const = 0;
     virtual SocketId get_id() const = 0;
 protected:
-    std::string scheme_;
+    const gu::URI uri_;
 };
 
 
@@ -70,7 +70,7 @@ public:
 
     Acceptor(const gu::URI& uri)
         :
-        scheme_(uri.get_scheme())
+        uri_(uri)
     { }
 
     virtual ~Acceptor() { }
@@ -81,7 +81,7 @@ public:
     virtual SocketPtr accept() = 0;
     virtual SocketId get_id() const = 0;
 protected:
-    std::string scheme_;
+    const gu::URI uri_;
 };
 
 #endif // GCOMM_SOCKET_HPP

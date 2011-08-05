@@ -32,6 +32,8 @@ public:
 
         ai_map.insert(make_pair("tcp",
                                 get_addrinfo(0, AF_UNSPEC, SOCK_STREAM, 0)));
+        ai_map.insert(make_pair("ssl",
+                                get_addrinfo(0, AF_UNSPEC, SOCK_STREAM, 0)));
         ai_map.insert(make_pair("udp",
                                 get_addrinfo(0, AF_UNSPEC, SOCK_DGRAM,  0)));
         // TODO:

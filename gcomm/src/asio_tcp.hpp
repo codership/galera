@@ -8,6 +8,8 @@
 #include "socket.hpp"
 #include "asio_protonet.hpp"
 
+#include <boost/bind.hpp>
+#include <boost/array.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <vector>
 #include <deque>
@@ -28,6 +30,9 @@ public:
     AsioTcpSocket(AsioProtonet& net, const gu::URI& uri);
     ~AsioTcpSocket();
     void failed_handler(const asio::error_code& ec, const std::string& func, int line);
+#ifdef HAVE_ASIO_SSL_HPP
+    void handshake_handler(const asio::error_code& ec);
+#endif // HAVE_ASIO_SSL_HPP
     void connect_handler(const asio::error_code& ec);
     void connect(const gu::URI& uri);
     void close();
@@ -51,12 +56,19 @@ private:
     AsioTcpSocket(const AsioTcpSocket&);
     void operator=(const AsioTcpSocket&);
 
-    AsioProtonet&                 net_;
-    asio::ip::tcp::socket         socket_;
-    std::deque<gu::Datagram>      send_q_;
-    std::vector<gu::byte_t>       recv_buf_;
-    size_t                        recv_offset_;
-    State                         state_;
+    void read_one(boost::array<asio::mutable_buffer, 1>& mbs);
+    void write_one(const boost::array<asio::const_buffer, 2>& cbs);
+    void close_socket();
+
+    AsioProtonet&                             net_;
+    asio::ip::tcp::socket                     socket_;
+#ifdef HAVE_ASIO_SSL_HPP
+    asio::ssl::stream<asio::ip::tcp::socket>* ssl_socket_;
+#endif // HAVE_ASIO_SSL_HPP
+    std::deque<gu::Datagram>                  send_q_;
+    std::vector<gu::byte_t>                   recv_buf_;
+    size_t                                    recv_offset_;
+    State                                     state_;
 };
 
 
