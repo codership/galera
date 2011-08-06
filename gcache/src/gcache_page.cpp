@@ -18,7 +18,7 @@ check_size (ssize_t size)
     if (size < 0)
         gu_throw_error(EINVAL) << "Negative page size: " << size;
 
-    return (size + sizeof(gcache::BufferHeader));
+    return size;
 }
 
 void
@@ -65,20 +65,18 @@ gcache::Page::Page (const std::string& name, ssize_t size) throw (gu::Exception)
 void*
 gcache::Page::malloc (ssize_t size) throw ()
 {
-    ssize_t const buf_size (size + sizeof(BufferHeader));
-
-    if (buf_size <= space_)
+    if (size <= space_)
     {
         BufferHeader* bh(BH_cast(next_));
 
-        bh->size  = buf_size;
+        bh->size  = size;
         bh->seqno = SEQNO_NONE;
         bh->ctx   = this;
         bh->flags = 0;
         bh->store = BUFFER_IN_PAGE;
 
-        space_ -= buf_size;
-        next_  += buf_size;
+        space_ -= size;
+        next_  += size;
         used_++;
 
 #ifndef NDEBUG
@@ -94,7 +92,7 @@ gcache::Page::malloc (ssize_t size) throw ()
     }
     else
     {
-        log_debug << "Failed to allocate " << buf_size << " bytes, space left: "
+        log_debug << "Failed to allocate " << size << " bytes, space left: "
                   << space_ << " bytes, total allocated: "
                   << next_ - static_cast<uint8_t*>(mmap_.ptr);
         return 0;
@@ -106,11 +104,9 @@ gcache::Page::realloc (void* ptr, ssize_t size) throw ()
 {
     BufferHeader* bh(ptr2BH(ptr));
 
-    ssize_t const old_size (bh->size - sizeof(BufferHeader));
-
     if (bh == BH_cast(next_ - bh->size)) // last buffer, can shrink and expand
     {
-        ssize_t const diff_size (size - old_size);
+        ssize_t const diff_size (size - bh->size);
 
         if (gu_likely (diff_size < space_))
         {
@@ -125,13 +121,13 @@ gcache::Page::realloc (void* ptr, ssize_t size) throw ()
     }
     else
     {
-        if (gu_likely(size > old_size))
+        if (gu_likely(size > bh->size))
         {
             void* const ret (malloc (size));
 
             if (ret)
             {
-                memcpy (ret, ptr, old_size);
+                memcpy (ret, ptr, bh->size - sizeof(BufferHeader));
                 used_--;
             }
 

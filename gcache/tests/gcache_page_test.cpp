@@ -11,22 +11,23 @@
 START_TEST(test1)
 {
     const char* const dir_name = "";
-    ssize_t const disk_size = 1;
-    ssize_t const page_size = 2;
+    ssize_t const bh_size = sizeof(gcache::BufferHeader);
+    ssize_t const keep_size = 1;
+    ssize_t const page_size = 2 + bh_size;
 
-    gcache::PageStore ps (dir_name, disk_size, page_size);
+    gcache::PageStore ps (dir_name, keep_size, page_size);
 
     mark_point();
 
-    void* buf = ps.malloc (3);
+    void* buf = ps.malloc (3 + bh_size);
 
     fail_if (0 == buf);
 
-    void* tmp = ps.realloc (buf, 2);
+    void* tmp = ps.realloc (buf, 2 + bh_size);
 
     fail_if (buf != tmp);
 
-    tmp = ps.realloc (buf, 4); // here new page should be allocated
+    tmp = ps.realloc (buf, 4 + bh_size); // here new page should be allocated
 
     fail_if (0 == tmp);
     fail_if (buf == tmp);
@@ -38,10 +39,11 @@ END_TEST
 START_TEST(test2)
 {
     const char* const dir_name = "";
-    ssize_t const disk_size = 1;
-    ssize_t page_size = 1 << 20;
+    ssize_t const bh_size = sizeof(gcache::BufferHeader);
+    ssize_t const keep_size = 1;
+    ssize_t page_size = (1 << 20) + bh_size;
 
-    gcache::PageStore ps (dir_name, disk_size, page_size);
+    gcache::PageStore ps (dir_name, keep_size, page_size);
 
     mark_point();
 
@@ -63,14 +65,14 @@ END_TEST
 START_TEST(test3) // check that all page size is efficiently used
 {
     const char* const dir_name = "";
-    ssize_t const disk_size = 1;
+    ssize_t const keep_size = 1;
     ssize_t const page_size = 1024;
 
-    gcache::PageStore ps (dir_name, disk_size, page_size);
+    gcache::PageStore ps (dir_name, keep_size, page_size);
 
     mark_point();
 
-    ssize_t ptr_size = (page_size / 2) - sizeof(gcache::BufferHeader);
+    ssize_t ptr_size = (page_size / 2);
 
     void* ptr1 = ps.malloc (ptr_size);
     fail_if (0 == ptr1);
@@ -81,8 +83,7 @@ START_TEST(test3) // check that all page size is efficiently used
     fail_if (ps.count() != 1, "ps.count() = %zd, expected 1", ps.count());
 
     // check that ptr2 is adjacent to ptr1
-    void* tmp = static_cast<uint8_t*>(ptr1) + ptr_size +
-        sizeof(gcache::BufferHeader);
+    void* tmp = static_cast<uint8_t*>(ptr1) + ptr_size;
 
     fail_if (tmp != ptr2, "tmp = %p, ptr2 = %p", tmp, ptr2);
 }

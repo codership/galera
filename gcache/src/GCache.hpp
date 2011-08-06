@@ -5,6 +5,7 @@
 #ifndef __GCACHE_H__
 #define __GCACHE_H__
 
+#include "gcache_mem_store.hpp"
 #include "gcache_rb_store.hpp"
 #include "gcache_page_store.hpp"
 
@@ -91,10 +92,10 @@ namespace gcache
             Params(gu::Config&, const std::string&) throw (gu::Exception);
             std::string const rb_name;
             std::string const dir_name;
-            ssize_t           ram_size;
-            ssize_t     const disk_size;
-            ssize_t     const page_size;
-            // theoretically dir_name and page size can be changed for new pages
+            ssize_t           mem_size;
+            ssize_t     const rb_size;
+            ssize_t           page_size;
+            ssize_t           keep_pages_size;
         }
             params;
 
@@ -107,6 +108,7 @@ namespace gcache
         typedef seqno2ptr_t::iterator           seqno2ptr_iter_t;
         typedef std::pair<int64_t, const void*> seqno2ptr_pair_t;
 
+        MemStore        mem;
         RingBuffer      rb;
         PageStore       ps;
 

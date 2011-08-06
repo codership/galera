@@ -21,8 +21,8 @@ namespace gcache
 
             switch (bh->store)
             {
-            case BUFFER_IN_RAM:
-                /* add what to do when buffer is in RAM */
+            case BUFFER_IN_MEM:
+                if (gu_likely(BH_is_released(bh))) free (bh);
                 break;
             case BUFFER_IN_RB:
                 if (gu_likely(BH_is_released(bh))) rb.discard_buffer (bh);
@@ -36,12 +36,16 @@ namespace gcache
     void* 
     GCache::malloc (ssize_t size) throw (gu::Exception)
     {
+        size += sizeof(BufferHeader);
+
         gu::Lock lock(mtx);
         void*    ptr;
 
         mallocs++;
 
-        ptr = rb.malloc(size);
+        ptr = mem.malloc(size);
+
+        if (0 == ptr) ptr = rb.malloc(size);
 
         if (0 == ptr) ptr = ps.malloc(size);
 
@@ -71,8 +75,8 @@ namespace gcache
 
             switch (bh->store)
             {
-            case BUFFER_IN_RAM:  /* add RAM store */ break;
-            case BUFFER_IN_RB:   rb.free (ptr); break;
+            case BUFFER_IN_MEM:  mem.free (ptr); break;
+            case BUFFER_IN_RB:   rb.free  (ptr); break;
             case BUFFER_IN_PAGE:
                 if (gu_likely(SEQNO_NONE != bh->seqno))
                 {
@@ -83,16 +87,19 @@ namespace gcache
         }
     }
 
+    // this will crash if ptr == 0
     void*
     GCache::realloc (void* ptr, ssize_t size) throw (gu::Exception)
     {
+        size += sizeof(BufferHeader);
+
         void*         new_ptr = 0;
         BufferHeader* bh      = ptr2BH(ptr);
 
-        if (bh->seqno != SEQNO_NONE) // sanity check
+        if (gu_unlikely(bh->seqno != SEQNO_NONE)) // sanity check
         {
-            log_fatal << "Internal program error: changing size of an ordered "
-                      << "buffer, seqno: " << bh->seqno << ". Aborting.";
+            log_fatal << "Internal program error: changing size of an ordered"
+                      << " buffer, seqno: " << bh->seqno << ". Aborting.";
             abort();
         }
 
@@ -100,27 +107,30 @@ namespace gcache
 
         reallocs++;
 
+        MemOps* store(0);
+
         switch (bh->store)
         {
-        case BUFFER_IN_RAM:  /* add RAM store */ break;
+        case BUFFER_IN_MEM:  store = &mem; break;
+        case BUFFER_IN_RB:   store = &rb;  break;
+        case BUFFER_IN_PAGE: store = &ps;  break;
+        default:
+            log_fatal << "Memory corruption: unrecognized store: "
+                      << bh->store;
+            abort();
+        }
 
-        case BUFFER_IN_RB:
-            new_ptr = rb.realloc (ptr, size);
+        new_ptr = store->realloc (ptr, size);
 
-            if (0 == new_ptr)
+        if (0 == new_ptr)
+        {
+            new_ptr = malloc (size);
+
+            if (0 != new_ptr)
             {
-                new_ptr = ps.malloc (size);
-
-                if (0 != new_ptr)
-                {
-                    memcpy (new_ptr, ptr, bh->size - sizeof(BufferHeader));
-                    rb.free (ptr);
-                }
+                memcpy (new_ptr, ptr, bh->size - sizeof(BufferHeader));
+                store->free (ptr);
             }
-            break;
-
-        case BUFFER_IN_PAGE:
-            new_ptr = ps.realloc (ptr, size); break;
         }
 
 #ifndef NDEBUG
@@ -129,7 +139,7 @@ namespace gcache
             std::set<const void*>::iterator it = buf_tracker.find(ptr);
 
             if (it != buf_tracker.end()) buf_tracker.erase(it);
-            
+
             it = buf_tracker.find(new_ptr);
 
         }

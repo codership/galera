@@ -104,7 +104,7 @@ gcache::PageStore::delete_page () throw (gu::Exception)
 inline void
 gcache::PageStore::cleanup () throw (gu::Exception)
 {
-    while (total_size_   > disk_size_ &&
+    while (total_size_   > keep_size_ &&
            pages_.size() > 0          &&
            delete_page())
     {}
@@ -128,11 +128,11 @@ gcache::PageStore::new_page (ssize_t size) throw (gu::Exception)
 }
 
 gcache::PageStore::PageStore (const std::string& dir_name,
-                              ssize_t            disk_size,
+                              ssize_t            keep_size,
                               ssize_t            page_size)
     :
     base_name_ (make_base_name(dir_name)),
-    disk_size_ (disk_size),
+    keep_size_ (keep_size),
     page_size_ (page_size),
     count_     (0),
     pages_     (),
@@ -187,7 +187,7 @@ gcache::PageStore::malloc_new (ssize_t size) throw ()
     {
         new_page (page_size_ > size ? page_size_ : size);
         ret = current_->malloc (size);
-        cleanup(); 
+        cleanup();
     }
     catch (gu::Exception& e)
     {
@@ -231,7 +231,7 @@ gcache::PageStore::realloc (void* ptr, ssize_t size) throw (gu::Exception)
 
     ret = page->realloc (ptr, size);
 
-    if (gu_likely(0 != ret)) return ret;
+    if (0 != ret) return ret;
 
     ret = malloc_new (size);
 

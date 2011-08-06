@@ -81,8 +81,8 @@ namespace gcache
 
             switch (bh->store)
             {
-            case BUFFER_IN_RAM:
-                /* add what to do when buffer is in RAM */
+            case BUFFER_IN_MEM:
+                (reinterpret_cast<MemOps*>(bh->ctx))->free(bh + 1);
                 break;
             case BUFFER_IN_RB:
                 if (gu_likely(BH_is_released(bh))) discard_buffer (bh);
@@ -178,13 +178,11 @@ namespace gcache
     void* 
     RingBuffer::malloc (ssize_t size) throw ()
     {
-        size = size + sizeof(BufferHeader);
-
-        // We can reliably allocate continuous buffer which is twice as small
-        // as total cache area. So compare to half the space
+        // We can reliably allocate continuous buffer which is 1/2
+        // of a total cache space. So compare to half the space
         if (static_cast<ssize_t>(size) < (size_cache_ / 2))
         {
-            void*    ptr;
+            void* ptr;
 
             mallocs_++;
 
@@ -217,8 +215,6 @@ namespace gcache
     void*
     RingBuffer::realloc (void* ptr, ssize_t size) throw ()
     {
-        size = size + sizeof(BufferHeader);
-
         // We can reliably allocate continuous buffer which is twice as small
         // as total cache area. So compare to half the space
         if (size >= (size_cache_ / 2)) return 0;

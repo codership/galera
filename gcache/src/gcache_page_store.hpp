@@ -20,7 +20,7 @@ namespace gcache
     public:
 
         PageStore (const std::string& dir_name,
-                   ssize_t            disk_size,
+                   ssize_t            keep_size,
                    ssize_t            page_size);
 
         ~PageStore ();
@@ -35,11 +35,15 @@ namespace gcache
 
         ssize_t count() const throw() { return count_; } // for unit tests
 
+        void  set_page_size (ssize_t size) throw () { page_size_ = size; }
+
+        void  set_keep_size (ssize_t size) throw () { keep_size_ = size; }
+
     private:
 
         std::string const base_name_; /* /.../.../gcache.page. */
-        ssize_t     const disk_size_; /* free pages be deleted when exceeded */
-        ssize_t     const page_size_; /* min size of the individual page */
+        ssize_t           keep_size_; /* how much pages to keep after freeing*/
+        ssize_t           page_size_; /* min size of the individual page */
         ssize_t           count_;
         std::deque<Page*> pages_;
         Page*             current_;
