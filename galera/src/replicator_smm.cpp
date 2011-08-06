@@ -548,7 +548,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
 
         const ssize_t gcs_handle(gcs_.schedule());
 
-        if (gcs_handle < 0)
+        if (gu_unlikely(gcs_handle < 0))
         {
             log_debug << "gcs schedule " << strerror(-gcs_handle);
             trx->set_state(TrxHandle::S_MUST_ABORT);
@@ -556,28 +556,8 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         }
 
         trx->set_gcs_handle(gcs_handle);
-
-        if (trx->action() == 0)
-        {
-            //FIXME: this either should be a try{} or pointer check - not both
-            try
-            {
-                trx->set_action(gcache_.malloc(wscoll.size()));
-                if (trx->action() == 0)
-                {
-                    rcode = -ENOMEM;
-                    break;
-                }
-            }
-            catch (gu::Exception& e)
-            {
-                rcode = -ENOMEM;
-                break;
-            }
-        }
-        memcpy(trx->action(), &wscoll[0], wscoll.size());
-
         trx->unlock();
+
         rcode = gcs_.repl(&wscoll[0], wscoll.size(),
                           GCS_ACT_TORDERED, true, &seqno_l, &seqno_g);
         trx->lock();
@@ -610,7 +590,6 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     replicated_bytes_ += wscoll.size();
     trx->set_gcs_handle(-1);
     trx->set_seqnos(seqno_l, seqno_g);
-    gcache_.seqno_assign(trx->action(), seqno_g);
 
     if (trx->state() == TrxHandle::S_MUST_ABORT)
     {
@@ -885,7 +864,7 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
     ApplyOrder ao(*trx);
     apply_monitor_.leave(ao);
     cert_.set_trx_committed(trx);
-
+#if 0 // REMOVE
     if (trx->action() != 0)
     {
         gcache_.free(trx->action());
@@ -895,7 +874,7 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
     {
         log_warn << "no assigned cached action for " << *trx;
     }
-
+#endif
     trx->set_state(TrxHandle::S_COMMITTED);
     report_last_committed();
     ++local_commits_;
@@ -1084,7 +1063,6 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
             log_fatal << e.what();
             log_fatal << "Node consistency compromized, aborting...";
             abort();
-//            throw;
         }
         break;
     case WSREP_TRX_FAIL:

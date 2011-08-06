@@ -487,8 +487,18 @@ core_handle_act_msg (gcs_core_t*          core,
                 /* local action, get from FIFO, should be there already */
                 core_act_t* local_act;
                 gcs_seqno_t sent_act_id;
-                assert (NULL == act->act.buf);
+
                 assert (ret  == act->act.buf_len);
+
+#ifndef GCS_FOR_GARB
+                assert (NULL != act->act.buf);
+                if (core->cache)
+                    gcache_free (core->cache, (void*)act->act.buf);
+                else
+                    free ((void*)act->act.buf);
+                act->act.buf = NULL;
+#endif
+                assert (NULL == act->act.buf);
 
                 if ((local_act = gcs_fifo_lite_get_head (core->fifo))){
                     act->act.buf     = local_act->action;

@@ -170,8 +170,9 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
             rcvd->id = ++group->act_id;
 
 #ifndef GCS_FOR_GARB
-            if (group->cache)
+            if (gu_likely(group->cache)) {
                 gcache_seqno_assign (group->cache, rcvd->act.buf, rcvd->id);
+            }
 #endif
         }
         else if (GCS_ACT_TORDERED  == rcvd->act.type) {

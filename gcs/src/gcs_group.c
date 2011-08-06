@@ -284,16 +284,16 @@ group_post_state_exchange (gcs_group_t* group)
         }
 
         group->prim_seqno = group->conf_id;
-    if (quorum->repl_proto_ver > 0) { /* compatibility with 0.8.0, see #486 */
+//    if (quorum->repl_proto_ver > 0) { /* compatibility with 0.8.0, see #486 */
         group->prim_num   = 0;
         for (i = 0; i < group->num; i++) {
             group->prim_num += gcs_node_is_joined (group->nodes[i].status);
         }
         assert (group->prim_num > 0);
-    }
-    else { /* compatibility with 0.8.0, #486 */
-        group->prim_num   = group->num; // REMOVE in next release
-    }
+//    }
+//    else { /* compatibility with 0.8.0, #486 */
+//        group->prim_num   = group->num; // REMOVE in next release
+//    }
     }
     else {
         // non-primary configuration
@@ -641,9 +641,6 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             gu_warn ("%ld (%s): State transfer %s %ld (%s) failed: %d (%s)",
                      sender_idx, sender->name, st_dir, peer_idx, peer_name,
                      (int)seqno, strerror((int)-seqno));
-// REMOVE
-         gu_info("from_donor: %d, peer_idx: %ld, my_idx: %ld, peer state: %d",
-                 from_donor, peer_idx, group->my_idx, group->nodes[peer_idx].status);
 
             if (from_donor && peer_idx == group->my_idx &&
                 GCS_NODE_STATE_JOINER == group->nodes[peer_idx].status) {
