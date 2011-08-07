@@ -19,16 +19,14 @@ namespace gcache
             seqno2ptr.erase (j);
             bh->seqno = SEQNO_NONE;
 
-            switch (bh->store)
+            if (gu_likely(BH_is_released(bh)))
             {
-            case BUFFER_IN_MEM:
-                if (gu_likely(BH_is_released(bh))) free (bh);
-                break;
-            case BUFFER_IN_RB:
-                if (gu_likely(BH_is_released(bh))) rb.discard_buffer (bh);
-                break;
-            case BUFFER_IN_PAGE:
-                break;
+                switch (bh->store)
+                {
+                case BUFFER_IN_MEM:  mem.discard (bh); break;
+                case BUFFER_IN_RB:   rb.discard  (bh); break;
+                case BUFFER_IN_PAGE: break;
+                }
             }
         }
     }

@@ -2,7 +2,7 @@
  * Copyright (C) 2010-2011 Codership Oy <info@codership.com>
  */
 
-/*! @file page file class */
+/*! @file mem store class */
 
 #ifndef _gcache_mem_store_hpp_
 #define _gcache_mem_store_hpp_
@@ -20,31 +20,34 @@ namespace gcache
     {
     public:
 
-        MemStore (ssize_t max_size) throw ()
-            : max_size_(max_size), size_(0), count_(0)
+        MemStore (ssize_t max_size,
+                  std::map<int64_t, const void*> & seqno2ptr) throw ()
+            : max_size_ (max_size),
+              size_     (0),
+              seqno2ptr_(seqno2ptr)
         {}
 
         ~MemStore () {}
 
         void* malloc  (ssize_t size) throw ()
         {
-            if (size + size_ <= max_size_)
+            if (size > max_size_ || have_free_space(size) == false) return 0;
+
+            assert (size_ + size <= max_size_);
+
+            BufferHeader* bh (BH_cast (::malloc (size)));
+
+            if (gu_likely(0 != bh))
             {
-                BufferHeader* bh(reinterpret_cast<BufferHeader*>(malloc(size)));
+                bh->size  = size;
+                bh->seqno = SEQNO_NONE;
+                bh->flags = 0;
+                bh->store = BUFFER_IN_MEM;
+                bh->ctx   = this;
 
-                if (gu_likely(0 != bh))
-                {
-                    bh->size  = size;
-                    bh->seqno = SEQNO_NONE;
-                    bh->flags = 0;
-                    bh->store = BUFFER_IN_MEM;
-                    bh->ctx   = this;
+                size_ += size;
 
-                    size_ += size;
-                    count_++;
-
-                    return (bh + 1);
-                }
+                return (bh + 1);
             }
 
             return 0;
@@ -61,11 +64,8 @@ namespace gcache
                 assert(bh->store == BUFFER_IN_MEM);
                 assert(bh->ctx == this);
 
-                size_ -= bh->size;
-                count_--;
-
                 BH_release (bh);
-                if (SEQNO_NONE == bh->seqno) free (bh);
+                if (SEQNO_NONE == bh->seqno) discard (bh);
             }
         }
 
@@ -77,37 +77,53 @@ namespace gcache
             if (ptr)
             {
                 bh = ptr2BH(ptr);
+                assert (SEQNO_NONE == bh->seqno);
                 old_size = bh->size;
             }
 
-            if (size_ + size - old_size <= max_size_)
+            ssize_t const diff_size(size - old_size);
+
+            if (size > max_size_ ||
+                have_free_space(diff_size) == false) return 0;
+
+            assert (size_ + diff_size <= max_size_);
+
+            void* tmp = ::realloc (bh, size);
+
+            if (tmp)
             {
-                void* tmp = realloc (bh, size);
+                bh = BH_cast(tmp);
+                assert (bh->size == old_size);
+                bh->size  = size;
 
-                if (tmp)
-                {
-                    bh = ptr2BH(tmp);
-                    assert (bh->size == old_size);
-                    bh->size = size;
+                size_ += diff_size;
 
-                    size_ += size - old_size;
-
-                    return (bh + 1);
-                }
+                return (bh + 1);
             }
 
             return 0;
         }
 
-        ssize_t count () const throw() { return count_; }
+        void discard (BufferHeader* bh) throw ()
+        {
+            assert (BH_is_released(bh));
+
+            size_ -= bh->size;
+            ::free (bh);
+        }
 
         void set_max_size (ssize_t size) throw() { max_size_ = size; }
 
+        // for unit tests only
+        ssize_t _allocd () const throw() { return size_; }
+
     private:
+
+        bool have_free_space (ssize_t size) throw();
 
         ssize_t        max_size_;
         ssize_t        size_;
-        ssize_t        count_;
+        std::map<int64_t, const void*>& seqno2ptr_;
     };
 }
 

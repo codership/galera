@@ -11,6 +11,7 @@ gcache_sources = Split ('''
         gcache_page.cpp
         gcache_page_store.cpp
         gcache_rb_store.cpp
+        gcache_mem_store.cpp
         GCache_memops.cpp
         GCache.cpp
 ''')

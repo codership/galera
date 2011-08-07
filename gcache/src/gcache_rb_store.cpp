@@ -77,16 +77,21 @@ namespace gcache
             seqno2ptr_t::iterator j = i; ++i;
             BufferHeader* bh = ptr2BH (j->second);
             seqno2ptr_.erase (j);
+
+            // this buffer will never ever be accessed by seqno again anyways
             bh->seqno = SEQNO_NONE;
 
-            switch (bh->store)
+            if (gu_likely (BH_is_released(bh)))
             {
-            case BUFFER_IN_MEM:
-                (reinterpret_cast<MemOps*>(bh->ctx))->free(bh + 1);
-                break;
-            case BUFFER_IN_RB:
-                if (gu_likely(BH_is_released(bh))) discard_buffer (bh);
-                break;
+                switch (bh->store)
+                {
+                case BUFFER_IN_MEM:
+                    bh->ctx->discard(bh);
+                    break;
+                case BUFFER_IN_RB:
+                    discard (bh);
+                    break;
+                }
             }
         }
     }
@@ -208,7 +213,7 @@ namespace gcache
             // space is unused but not free
             // space counted as free only when it is erased from the map
             BH_release (bh);
-            if (SEQNO_NONE == bh->seqno) discard_buffer(bh);
+            if (SEQNO_NONE == bh->seqno) discard (bh);
         }
     }
 

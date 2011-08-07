@@ -84,6 +84,8 @@ namespace gcache
 
     private:
 
+        void discard (BufferHeader*) throw() {}
+
         gu::Config&     config;
 
         class Params

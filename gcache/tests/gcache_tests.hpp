@@ -1,4 +1,4 @@
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2011 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -10,6 +10,7 @@
 
 #define LOG_FILE "gcache_tests.log"
 
+#include "gcache_mem_test.hpp"
 #include "gcache_page_test.hpp"
 
 extern "C" {
@@ -20,6 +21,7 @@ typedef Suite *(*suite_creator_t)(void);
 
 static suite_creator_t suites[] =
 {
+    gcache_mem_suite,
     gcache_page_suite,
     0
 };

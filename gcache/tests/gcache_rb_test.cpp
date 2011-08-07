@@ -10,8 +10,8 @@
 
 START_TEST(test1)
 {
-    const char* const dir_name = "";
-    ssize_t const bh_size = sizeof(gcache::BufferHeader);
+//    const char* const dir_name = "";
+//    ssize_t const bh_size = sizeof(gcache::BufferHeader);
 }
 END_TEST
 

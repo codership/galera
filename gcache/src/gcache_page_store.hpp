@@ -31,6 +31,8 @@ namespace gcache
 
         void* realloc (void*   ptr, ssize_t size) throw (gu::Exception);
 
+        void  discard (BufferHeader* bh) throw() {};
+
         void  reset() throw (gu::Exception);
 
         ssize_t count() const throw() { return count_; } // for unit tests

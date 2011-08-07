@@ -36,6 +36,8 @@ namespace gcache
 
         void* realloc (void*  ptr, ssize_t size) throw ();
 
+        void discard (BufferHeader* ptr) throw() {}
+
         ssize_t used () const throw() { return used_; }
 
         ssize_t size () const throw() /* total page size */

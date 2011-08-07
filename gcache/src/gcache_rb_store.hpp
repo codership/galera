@@ -34,6 +34,11 @@ namespace gcache
 
         void* realloc (void*  ptr, ssize_t size) throw ();
 
+        void  discard (BufferHeader* bh) throw ()
+        {
+            size_free_ += bh->size;
+        }
+
         ssize_t size () const throw() /* total page size */
         { 
             return fd_.get_size() - sizeof(BufferHeader);
@@ -47,8 +52,6 @@ namespace gcache
         void  reset();
 
         void  discard_seqno  (int64_t seqno);
-
-        void  discard_buffer (BufferHeader* bh) { size_free_ += bh->size; }
 
     private:
 

@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include "SeqnoNone.hpp"
+#include "gcache_memops.hpp"
 
 namespace gcache
 {
@@ -28,12 +29,12 @@ namespace gcache
     {
         ssize_t  size; /*! total buffer size, including header */
         int64_t  seqno;
-        void*    ctx;
+        MemOps*  ctx;
         uint32_t flags;
         int32_t  store;
     }__attribute__((__packed__));
 
-#define BH_cast(bh) reinterpret_cast<BufferHeader*>(bh)
+#define BH_cast(ptr) reinterpret_cast<BufferHeader*>(ptr)
 
     static inline BufferHeader*
     ptr2BH (const void* ptr)

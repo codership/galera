@@ -42,7 +42,7 @@ namespace gcache
         mtx       (),
         cond      (),
         seqno2ptr (),
-        mem       (params.mem_size),
+        mem       (params.mem_size, seqno2ptr),
         rb        (params.rb_name, params.rb_size, seqno2ptr),
         ps        (params.dir_name, params.keep_pages_size, params.page_size),
         mallocs   (0),
