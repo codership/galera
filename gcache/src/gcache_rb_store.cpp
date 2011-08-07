@@ -9,13 +9,11 @@
 
 namespace gcache
 {
-    static size_t  const PREAMBLE_LEN = 1024; // reserved for text preamble
-
     static size_t check_size (ssize_t s)
     {
         if (s < 0) gu_throw_error(EINVAL) << "Negative cache file size: " << s;
 
-        return s + PREAMBLE_LEN;
+        return s + RingBuffer::pad_size() + sizeof(BufferHeader);
     }
 
     void
@@ -45,17 +43,16 @@ namespace gcache
         open_      (true),
         preamble_  (static_cast<char*>(mmap_.ptr)),
         header_    (reinterpret_cast<int64_t*>(preamble_ + PREAMBLE_LEN)),
-        header_len_(32),
-        start_     (reinterpret_cast<uint8_t*>(header_ + header_len_)),
+        start_     (reinterpret_cast<uint8_t*>(header_   + HEADER_LEN)),
         end_       (reinterpret_cast<uint8_t*>(preamble_ + mmap_.size)),
         first_     (start_),
         next_      (first_),
-        size_cache_(end_ - start_),
+        size_cache_(end_ - start_ - sizeof(BufferHeader)),
         size_free_ (size_cache_),
         size_used_ (0),
         mallocs_   (0),
         reallocs_  (0),
-        seqno2ptr_(seqno2ptr)
+        seqno2ptr_ (seqno2ptr)
     {
         constructor_common ();
         BH_clear (reinterpret_cast<BufferHeader*>(next_));
@@ -97,16 +94,11 @@ namespace gcache
     }
 
     // returns pointer to buffer data area or 0 if no space found
-    void*
+    BufferHeader*
     RingBuffer::get_new_buffer (ssize_t const size)
     {
-        // reserve space for the closing header (this->next_)
-        ssize_t const size_next = size + sizeof(BufferHeader);
-
-        // don't even try if there's not enough unused space
-        if (size_next > (size_cache_ - size_used_)) return 0;
-
         uint8_t* ret = next_;
+        ssize_t const size_next (size + sizeof(BufferHeader));
 
         if (ret >= first_) {
             // try to find space at the end
@@ -121,7 +113,7 @@ namespace gcache
 
         while ((first_ - ret) < size_next) {
             // try to discard first buffer to get more space
-            BufferHeader* bh = reinterpret_cast<BufferHeader*>(first_);
+            BufferHeader* bh = BH_cast(first_);
 
             // this will be automatically true also when (first_ == next_)
             if (!BH_is_released(bh))
@@ -131,8 +123,7 @@ namespace gcache
 
             first_ += bh->size;
 
-            if (0      == (reinterpret_cast<BufferHeader*>(first_))->size &&
-                first_ != next_)
+            if (0 == (BH_cast(first_))->size /*&& first_ != next_*/)
             {
                 // empty header and not next: check if we fit at the end
                 // and roll over if not
@@ -166,18 +157,18 @@ namespace gcache
         assert (size_free_ >= 0);
 
         next_ = ret + size;
-        assert (next_ + sizeof(BufferHeader) < end_);
+        assert (next_ + sizeof(BufferHeader) <= end_);
 
-        BH_clear (reinterpret_cast<BufferHeader*>(next_));
+        BH_clear (BH_cast(next_));
 
-        BufferHeader* bh = reinterpret_cast<BufferHeader*>(ret);
+        BufferHeader* bh = BH_cast(ret);
         bh->size  = size;
         bh->seqno = SEQNO_NONE;
         bh->flags = 0;
         bh->store = BUFFER_IN_RB;
         bh->ctx   = this;
 
-        return (bh + 1); // pointer to data area
+        return bh;
     }
 
     void* 
@@ -185,17 +176,13 @@ namespace gcache
     {
         // We can reliably allocate continuous buffer which is 1/2
         // of a total cache space. So compare to half the space
-        if (static_cast<ssize_t>(size) < (size_cache_ / 2))
+        if (size <= (size_cache_ / 2) && size <= (size_cache_ - size_used_))
         {
-            void* ptr;
+            BufferHeader* const bh (get_new_buffer (size));
 
             mallocs_++;
 
-            if (0 == (ptr = get_new_buffer (size))) return 0;
-
-            assert (0 != ptr);
-
-            return (ptr);
+            if (gu_likely (0 != bh)) return (bh + 1);
         }
 
         return 0; // "out of memory"
@@ -222,53 +209,55 @@ namespace gcache
     {
         // We can reliably allocate continuous buffer which is twice as small
         // as total cache area. So compare to half the space
-        if (size >= (size_cache_ / 2)) return 0;
+        if (size > (size_cache_ / 2)) return 0;
 
         BufferHeader* bh = ptr2BH(ptr);
+
+        reallocs_++;
 
         // first check if we can grow this buffer by allocating
         // adjacent buffer
         {
             uint8_t* adj_ptr  = reinterpret_cast<uint8_t*>(bh) + bh->size;
             size_t   adj_size = size - bh->size;
-            void*    adj_buff = 0;
 
-            reallocs_++;
-            // do the same stuff as in malloc(), conditional that we have
-            // adjacent space
-            while ((adj_ptr == next_) &&
-                   (0 == (adj_buff = get_new_buffer (adj_size)))) {
-                return 0;
-            }
+            if (adj_ptr == next_)
+            {
+                void* const adj_buf (get_new_buffer (adj_size));
 
-            if (0 != adj_buff) {
-#ifndef NDEBUG
-                bool fail = false;
-                if (adj_ptr != adj_buff) {
-                    log_fatal << "Assertion (adj_ptr == adj_buff) failed: "
-                              << adj_ptr << " != " << adj_buff;
-                    fail = true;
+                if (adj_ptr == adj_buf)
+                {
+                    bh->size = size;
+                    return ptr;
                 }
-                if (adj_ptr + adj_size != next_) {
-                    log_fatal << "Assertion (adj_ptr + adj_size == next) "
-                              << "failed: " << (adj_ptr + adj_size) << " != "
-                              << next_;
-                    fail = true;
+                else // adjacent buffer allocation failed, return it back
+                {
+                    next_ = adj_ptr;
+                    size_used_ -= adj_size;
+                    size_free_ += adj_size;
                 }
-                if (fail) abort();
-#endif
-                // allocated adjacent space, buffer pointer not changed
-                return ptr;
             }
         }
 
         // find non-adjacent buffer
-        void* ptr_new = this->malloc (size);
+        void* ptr_new = malloc (size);
         if (ptr_new != 0) {
             memcpy (ptr_new, ptr, bh->size - sizeof(BufferHeader));
-            this->free (ptr);
+            free (ptr);
         }
 
         return ptr_new;
-    } 
+    }
+
+    std::ostream& operator<< (std::ostream& os, const RingBuffer& rb)
+    {
+        os  << "\nstart_ : " << reinterpret_cast<void*>(rb.start_)
+            << "\nend_   : " << reinterpret_cast<void*>(rb.end_)
+            << "\nfirst  : " << rb.first_ - rb.start_
+            << "\nnext   : " << rb.next_ - rb.start_
+            << "\nsize   : " << rb.size_cache_
+            << "\nfree   : " << rb.size_free_
+            << "\nused   : " << rb.size_used_;
+        return os;
+    }
 }

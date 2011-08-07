@@ -39,28 +39,33 @@ namespace gcache
             size_free_ += bh->size;
         }
 
-        ssize_t size () const throw() /* total page size */
-        { 
-            return fd_.get_size() - sizeof(BufferHeader);
-        }
+        ssize_t size      () const throw() { return size_cache_ ; }
 
-        const std::string& name()
-        {
-            return fd_.get_name();
-        }
+        ssize_t rb_size   () const throw() { return fd_.get_size(); }
+
+        const std::string& rb_name() const throw() { return fd_.get_name(); }
 
         void  reset();
 
         void  discard_seqno  (int64_t seqno);
 
+        static ssize_t pad_size()
+        {
+            RingBuffer* rb(0);
+            return (PREAMBLE_LEN * sizeof(*(rb->preamble_)) +
+                    HEADER_LEN * sizeof(*(rb->header_)));
+        }
+
     private:
+
+        static ssize_t const PREAMBLE_LEN = 1024;
+        static ssize_t const HEADER_LEN = 32;
 
         FileDescriptor  fd_;
         MMap            mmap_;
         bool            open_;
         char*     const preamble_; // ASCII text preamble
         int64_t*  const header_;   // cache binary header
-        ssize_t   const header_len_;
         uint8_t*  const start_;    // start of cache area
         uint8_t*  const end_;      // first byte after cache area
         uint8_t*        first_;    // pointer to the first (oldest) buffer
@@ -77,13 +82,17 @@ namespace gcache
 
         seqno2ptr_t&    seqno2ptr_;
 
-        void* get_new_buffer (ssize_t size);
+        BufferHeader* get_new_buffer (ssize_t size);
 
         void  constructor_common();
 
         RingBuffer(const gcache::RingBuffer&);
         RingBuffer& operator=(const gcache::RingBuffer&);
+
+        friend std::ostream& operator<< (std::ostream&, const RingBuffer&);
     };
+
+    std::ostream& operator<< (std::ostream&, const RingBuffer&);
 }
 
 #endif /* _gcache_rb_store_hpp_ */
