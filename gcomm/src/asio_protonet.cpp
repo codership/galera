@@ -47,13 +47,12 @@ namespace
     }
 
 
-    static void
-    set_cipher_list(SSL_CTX* ssl_ctx, const gu::Config& conf)
+    static void set_cipher_list(SSL_CTX* ssl_ctx, const gu::Config& conf)
     {
         std::string cipher_list;
         try
         {
-            cipher_list = conf.get("socket.ssl_cipher_list");
+            cipher_list = conf.get(gcomm::Conf::SocketSslCipherList);
         }
         catch (gu::NotFound& e)
         {
@@ -63,6 +62,18 @@ namespace
         {
             gu_throw_error(EINVAL) << "could not set cipher list, check that "
                                    << "the list is valid: "<< cipher_list;
+        }
+    }
+
+    static void set_compression(const gu::Config& conf)
+    {
+        bool compression(
+            gu::from_string<bool>(
+                conf.get(gcomm::Conf::SocketSslCompression, "true")));
+        if (compression == false)
+        {
+            log_info << "disabling SSL compression";
+            sk_SSL_COMP_zero(SSL_COMP_get_compression_methods());
         }
     }
 }
@@ -103,6 +114,7 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
     if (gu::from_string<bool>(conf_.get(Conf::SocketUseSsl, "false")) == true)
     {
         log_info << "initializing ssl context";
+        set_compression(conf_);
         ssl_context_.set_verify_mode(asio::ssl::context::verify_peer);
         ssl_context_.set_password_callback(
             boost::bind(&gcomm::AsioProtonet::get_ssl_password, this));

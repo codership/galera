@@ -72,9 +72,14 @@ void gcomm::AsioTcpSocket::failed_handler(const asio::error_code& ec,
 
 namespace
 {
-    const char* get_cipher(SSL* ssl)
+    static const char* get_cipher(SSL* ssl)
     {
-        return SSL_get_cipher(ssl);
+        return SSL_get_cipher_name(ssl);
+    }
+
+    static const char* get_compression(SSL* ssl)
+    {
+        return SSL_COMP_get_name(SSL_get_current_compression(ssl));
     }
 }
 
@@ -97,10 +102,11 @@ void gcomm::AsioTcpSocket::handshake_handler(const asio::error_code& ec)
         return;
     }
 
-    log_info << "ssl handshake successful, remote endpoint "
-             << get_remote_addr() << " local endpoint "
-             << get_local_addr() << " cipher "
-             << get_cipher(ssl_socket_->impl()->ssl);
+    log_info << "SSL handshake successful, "
+             << "remote endpoint " << get_remote_addr()
+             << " local endpoint " << get_local_addr()
+             << " cipher: " << get_cipher(ssl_socket_->impl()->ssl)
+             << " compression: " << get_compression(ssl_socket_->impl()->ssl);
     state_ = S_CONNECTED;
     net_.dispatch(get_id(), Datagram(), ProtoUpMeta(ec.value()));
     async_receive();
