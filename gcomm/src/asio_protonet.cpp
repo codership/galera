@@ -45,6 +45,26 @@ namespace
             throw;
         }
     }
+
+
+    static void
+    set_cipher_list(SSL_CTX* ssl_ctx, const gu::Config& conf)
+    {
+        std::string cipher_list;
+        try
+        {
+            cipher_list = conf.get("socket.ssl_cipher_list");
+        }
+        catch (gu::NotFound& e)
+        {
+            return;
+        }
+        if (SSL_CTX_set_cipher_list(ssl_ctx, cipher_list.c_str()) == 0)
+        {
+            gu_throw_error(EINVAL) << "could not set cipher list, check that "
+                                   << "the list is valid: "<< cipher_list;
+        }
+    }
 }
 
 
@@ -139,6 +159,8 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
                       << "': " << e.what();
             throw;
         }
+
+        set_cipher_list(ssl_context_.impl(), conf_);
     }
 #endif // HAVE_ASIO_SSL_HPP
 }

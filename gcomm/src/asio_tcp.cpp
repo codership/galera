@@ -69,6 +69,15 @@ void gcomm::AsioTcpSocket::failed_handler(const asio::error_code& ec,
 }
 
 #ifdef HAVE_ASIO_SSL_HPP
+
+namespace
+{
+    const char* get_cipher(SSL* ssl)
+    {
+        return SSL_get_cipher(ssl);
+    }
+}
+
 void gcomm::AsioTcpSocket::handshake_handler(const asio::error_code& ec)
 {
     if (ec)
@@ -88,9 +97,10 @@ void gcomm::AsioTcpSocket::handshake_handler(const asio::error_code& ec)
         return;
     }
 
-    log_debug << "socket " << get_id() << " handshake done, remote endpoint "
-              << get_remote_addr() << " local endpoint "
-             << get_local_addr();
+    log_info << "ssl handshake successful, remote endpoint "
+             << get_remote_addr() << " local endpoint "
+             << get_local_addr() << " cipher "
+             << get_cipher(ssl_socket_->impl()->ssl);
     state_ = S_CONNECTED;
     net_.dispatch(get_id(), Datagram(), ProtoUpMeta(ec.value()));
     async_receive();
