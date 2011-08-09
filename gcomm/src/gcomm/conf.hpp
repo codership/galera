@@ -106,6 +106,16 @@ namespace gcomm
         static std::string const SocketSslPasswordFile;
 
         /*!
+         * @brief Cipher list for SSL connections (socket.ssl_cipher_list)
+         */
+        static std::string const SocketSslCipherList;
+
+        /*!
+         * @brief Disable compression boolean (socket.ssl_disable_compression)
+         */
+        static std::string const SocketSslCompression;
+
+        /*!
          * @brief GMCast scheme for transport URI ("gmcast")
          */
         static std::string const GMCastScheme;

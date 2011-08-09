@@ -26,6 +26,10 @@ std::string const gcomm::Conf::SocketSslPrivateKeyFile =
     "socket" + Delim + "ssl_private_key_file";
 std::string const gcomm::Conf::SocketSslPasswordFile =
     "socket" + Delim + "ssl_password_file";
+std::string const gcomm::Conf::SocketSslCipherList =
+    "socket" + Delim + "ssl_cipher_list";
+std::string const gcomm::Conf::SocketSslCompression =
+    "socket" + Delim + "ssl_compression";
 
 // GMCast
 std::string const gcomm::Conf::GMCastScheme = "gmcast";
