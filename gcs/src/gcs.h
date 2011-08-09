@@ -36,18 +36,19 @@ typedef struct gcs_conn  gcs_conn_t;
 
 /*! @brief Creates GCS connection handle.
  *
- * @param conn connection handle
+ * @param conf      gu_config_t* configuration object, can be null.
+ * @param cache     pointer to the gcache object.
  * @param node_name human readable name of the node, can be null.
  * @param inc_addr  address at which application accepts incoming requests.
  *                  Used for load balancing, can be null.
- * @param conf      gu_config_t* configuration object, can be null.
- * @param cache     pointer to the gcache object
- *
+ * @param repl_proto_ver max replicator protocol version.
+ * @param appl_proto_ver max application ptotocol version.
  * @return pointer to GCS connection handle, NULL in case of failure.
  */
 extern gcs_conn_t*
-gcs_create  (const char* node_name, const char* inc_addr, void* conf,
-             int repl_proto_ver, int appl_proto_ver, void* cache);
+gcs_create  (void* conf, void* cache,
+             const char* node_name, const char* inc_addr,
+             int repl_proto_ver, int appl_proto_ver);
 
 /*! @brief Initialize group history values (optional).
  * Serves to provide group history persistence after process restart (in case

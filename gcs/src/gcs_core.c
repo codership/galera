@@ -90,12 +90,12 @@ typedef struct causal_act
 } causal_act_t;
 
 gcs_core_t*
-gcs_core_create (const char*  node_name,
-                 const char*  inc_addr,
-                 gu_config_t* const conf,
-                 int const    repl_proto_ver,
-                 int const    appl_proto_ver,
-                 gcache_t*    const cache)
+gcs_core_create (gu_config_t* const conf,
+                 gcache_t*    const cache,
+                 const char*  const node_name,
+                 const char*  const inc_addr,
+                 int          const repl_proto_ver,
+                 int          const appl_proto_ver)
 {
     assert (conf);
 

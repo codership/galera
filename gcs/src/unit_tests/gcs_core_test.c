@@ -282,8 +282,8 @@ core_test_init ()
     gu_config_t* config = gu_config_create ("");
     fail_if (config == NULL);
 
-    Core = gcs_core_create ("core_test",
-                            "aaa.bbb.ccc.ddd:xxxx", config, 0, 0, NULL);
+    Core = gcs_core_create (config, NULL, "core_test",
+                            "aaa.bbb.ccc.ddd:xxxx", 0, 0);
 
     fail_if (NULL == Core);
 

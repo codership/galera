@@ -714,7 +714,7 @@ int main (int argc, char *argv[])
     printf ("Opening connection: channel = %s, backend = %s\n",
              channel, conf.backend);
 
-    if (!(gcs = gcs_create (NULL, NULL, NULL, 0, 0, NULL))) goto out;
+    if (!(gcs = gcs_create (NULL, NULL, NULL, NULL, 0, 0))) goto out;
     puts ("debug"); fflush(stdout);
     if ((err  = gcs_open   (gcs, channel, conf.backend))) goto out;
     printf ("Connected\n");

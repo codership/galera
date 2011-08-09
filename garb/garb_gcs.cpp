@@ -10,7 +10,7 @@ Gcs::Gcs (gu::Config&        gconf,
           const std::string& group) throw (gu::Exception)
 :
     closed_ (true),
-    gcs_ (gcs_create (GCS_ARBITRATOR_NAME, "", &gconf, 1, 1, NULL))
+    gcs_ (gcs_create (&gconf, NULL, GCS_ARBITRATOR_NAME, "", 1, 1))
 {
     if (!gcs_)
     {

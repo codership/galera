@@ -215,8 +215,9 @@ enomem:
 
 /* Creates a group connection handle */
 gcs_conn_t*
-gcs_create (const char* node_name, const char* inc_addr, void* const conf,
-            int const repl_proto_ver, int const appl_proto_ver, void* cache)
+gcs_create (void* const conf, void* cache,
+            const char* node_name, const char* inc_addr,
+            int const repl_proto_ver, int const appl_proto_ver)
 {
     gcs_conn_t* conn = GU_CALLOC (1, gcs_conn_t);
 
@@ -239,8 +240,8 @@ gcs_create (const char* node_name, const char* inc_addr, void* const conf,
     }
 
     conn->state = GCS_CONN_DESTROYED;
-    conn->core  = gcs_core_create (node_name, inc_addr, conf, repl_proto_ver, 
-                                   appl_proto_ver, cache);
+    conn->core  = gcs_core_create (conf, cache, node_name, inc_addr,
+                                   repl_proto_ver, appl_proto_ver);
     if (!conn->core) {
         gu_error ("Failed to create core.");
         goto core_create_failed;
@@ -1369,17 +1370,12 @@ long gcs_send (gcs_conn_t*          conn,
              * also the contents of action may be changed afterwards by
              * the sending thread */
             void* act;
-#ifndef GCS_FOR_GARB
-            if (conn->cache)
-                act = gcache_malloc (conn->cache, act_size);
-            else
-#endif
-                act = malloc (act_size);
-
+            act = malloc (act_size);
             if (act != NULL) {
                 memcpy (act, action, act_size);
                 while ((ret = gcs_core_send (conn->core, act,
                                              act_size, act_type)) == -ERESTART);
+                free (act);
             }
             else {
                 ret = -ENOMEM;

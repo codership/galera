@@ -57,7 +57,7 @@ gcache::Page::Page (const std::string& name, ssize_t size) throw (gu::Exception)
     space_(mmap_.size),
     used_ (0)
 {
-    log_info << "Created a temporary page " << name << "of size " << space_
+    log_info << "Created page " << name << " of size " << space_
              << " bytes";
     BH_clear (reinterpret_cast<BufferHeader*>(next_));
 }
