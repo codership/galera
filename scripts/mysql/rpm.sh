@@ -113,7 +113,7 @@ RPMBUILD()
 {
 $(which rpmbuild) --clean --rmsource --define "_topdir $RPM_BUILD_ROOT" \
                   --define "optflags $RPM_OPT_FLAGS" --with wsrep \
-                  -ba $WSREP_SPEC
+                  --with yassl -ba $WSREP_SPEC
 }
 
 pushd "$RPM_BUILD_ROOT"
