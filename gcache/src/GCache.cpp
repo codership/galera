@@ -44,7 +44,11 @@ namespace gcache
         seqno2ptr (),
         mem       (params.mem_size, seqno2ptr),
         rb        (params.rb_name, params.rb_size, seqno2ptr),
-        ps        (params.dir_name, params.keep_pages_size, params.page_size),
+        ps        (params.dir_name,
+                   params.keep_pages_size,
+                   params.page_size,
+                   /* keep last page if PS is the only storage */
+                   !((params.mem_size + params.rb_size) > 0)),
         mallocs   (0),
         reallocs  (0),
         seqno_locked(SEQNO_NONE),

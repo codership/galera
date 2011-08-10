@@ -143,10 +143,17 @@ apply_trx_ws(void*                    recv_ctx,
 #if 0
             if (trx.flags() & galera::TrxHandle::F_ISOLATION)
             {
-                log_debug << "Executing TO isolated action: " << trx;
+                log_info << "Executing TO isolated action: " << trx;
             }
 #endif
             gu_trace(apply_wscoll(recv_ctx, apply_cb, trx));
+#if 0
+            if (trx.flags() & galera::TrxHandle::F_ISOLATION)
+            {
+                log_info << "Done executing TO isolated action: "
+                          << trx.global_seqno();
+            }
+#endif
             break;
         }
         catch (galera::ApplyException& e)

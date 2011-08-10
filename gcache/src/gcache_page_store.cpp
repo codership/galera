@@ -37,7 +37,7 @@ static std::string
 make_page_name (const std::string& base_name, ssize_t count)
 {
     std::ostringstream os;
-    os << base_name << std::setfill ('0') << std::setw (5) << count;
+    os << base_name << std::setfill ('0') << std::setw (6) << count;
     return os.str();
 }
 
@@ -105,7 +105,7 @@ inline void
 gcache::PageStore::cleanup () throw (gu::Exception)
 {
     while (total_size_   > keep_size_ &&
-           pages_.size() > 0          &&
+           pages_.size() > keep_page_ &&
            delete_page())
     {}
 }
@@ -129,11 +129,13 @@ gcache::PageStore::new_page (ssize_t size) throw (gu::Exception)
 
 gcache::PageStore::PageStore (const std::string& dir_name,
                               ssize_t            keep_size,
-                              ssize_t            page_size)
+                              ssize_t            page_size,
+                              bool               keep_page)
     :
     base_name_ (make_base_name(dir_name)),
     keep_size_ (keep_size),
     page_size_ (page_size),
+    keep_page_ (keep_page),
     count_     (0),
     pages_     (),
     current_   (0),

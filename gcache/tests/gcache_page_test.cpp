@@ -15,7 +15,7 @@ START_TEST(test1)
     ssize_t const keep_size = 1;
     ssize_t const page_size = 2 + bh_size;
 
-    gcache::PageStore ps (dir_name, keep_size, page_size);
+    gcache::PageStore ps (dir_name, keep_size, page_size, false);
 
     mark_point();
 
@@ -43,7 +43,7 @@ START_TEST(test2)
     ssize_t const keep_size = 1;
     ssize_t page_size = (1 << 20) + bh_size;
 
-    gcache::PageStore ps (dir_name, keep_size, page_size);
+    gcache::PageStore ps (dir_name, keep_size, page_size, false);
 
     mark_point();
 
@@ -68,7 +68,7 @@ START_TEST(test3) // check that all page size is efficiently used
     ssize_t const keep_size = 1;
     ssize_t const page_size = 1024;
 
-    gcache::PageStore ps (dir_name, keep_size, page_size);
+    gcache::PageStore ps (dir_name, keep_size, page_size, false);
 
     mark_point();
 
