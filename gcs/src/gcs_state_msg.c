@@ -419,7 +419,6 @@ state_quorum_remerge (const gcs_state_msg_t* states[],
 
     int i, j;
     int candidates_found = 0;
-    int merge_cnt        = 0;
 
     /* 1. Sort and count all nodes who have ever been JOINED by primary
      *    component UUID */

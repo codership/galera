@@ -56,9 +56,9 @@ START_TEST (gcs_state_msg_test_basic)
     fail_if (send_state->flags          != recv_state->flags);
     fail_if (send_state->gcs_proto_ver  != recv_state->gcs_proto_ver);
     fail_if (send_state->repl_proto_ver != recv_state->repl_proto_ver);
-    fail_if (send_state->appl_proto_ver == recv_state->appl_proto_ver);
-    fail_if (recv_state->appl_proto_ver != 0, "appl_proto_ver: %d",
-             recv_state->appl_proto_ver); // V0 does not have appl proto field
+    fail_if (send_state->appl_proto_ver != recv_state->appl_proto_ver);
+    fail_if (recv_state->appl_proto_ver != 1, "appl_proto_ver: %d",
+             recv_state->appl_proto_ver);
     fail_if (send_state->act_seqno      != recv_state->act_seqno,
              "act_seqno: sent %lld, recv %lld",
              send_state->act_seqno, recv_state->act_seqno);
