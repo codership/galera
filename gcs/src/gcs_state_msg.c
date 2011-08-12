@@ -11,7 +11,7 @@
 #include <string.h>
 #include <galerautils.h>
 
-#define GCS_STATE_MSG_VER 0
+#define GCS_STATE_MSG_VER 1
 
 #define GCS_STATE_MSG_ACCESS
 #include "gcs_state_msg.h"
@@ -36,7 +36,7 @@ gcs_state_msg_create (const gu_uuid_t* state_uuid,
 #define CHECK_PROTO_RANGE(LEVEL)                                        \
     if (LEVEL < 0 || LEVEL > UINT8_MAX) {                               \
         gu_error ("#LEVEL value %d is out of range [0, %d]", LEVEL,UINT8_MAX); \
-        return NULL;                                                       \
+        return NULL;                                                    \
     }
 
     CHECK_PROTO_RANGE(gcs_proto_ver);
@@ -407,7 +407,6 @@ state_quorum_remerge (const gcs_state_msg_t* states[],
         const gcs_state_msg_t* rep;
         int                    prim_joined;
         int                    found;
-        int                    ver; /* compatibility with 0.8.0, #486 */
     };
 
     struct candidate* candidates = GU_CALLOC(states_num, struct candidate);
@@ -421,7 +420,6 @@ state_quorum_remerge (const gcs_state_msg_t* states[],
     int i, j;
     int candidates_found = 0;
     int merge_cnt        = 0;
-    int merged           = 0; /* compatibility with 0.8.0 */
 
     /* 1. Sort and count all nodes who have ever been JOINED by primary
      *    component UUID */
@@ -441,11 +439,6 @@ state_quorum_remerge (const gcs_state_msg_t* states[],
                     candidates[j].rep =
                         state_nodes_compare (candidates[j].rep, states[i]);
 
-                    /* compatibility with 0.8.0, #486 */
-                    candidates[j].ver =
-                        candidates[j].ver <= states[i]->repl_proto_ver ?
-                        candidates[j].ver :  states[i]->repl_proto_ver;
-
                     break;
                 }
             }
@@ -455,46 +448,24 @@ state_quorum_remerge (const gcs_state_msg_t* states[],
                 candidates[j].prim_uuid   = states[i]->prim_uuid;
                 candidates[j].prim_joined = states[i]->prim_joined;
                 candidates[j].rep         = states[i];
-                /* compatibility with 0.8.0, #486 */
-                candidates[j].ver         = states[i]->repl_proto_ver;
                 candidates[j].found       = 1;
                 candidates_found++;
 
                 assert(candidates_found <= states_num);
             }
-// compatibility with 0.8.0, #486
-            if (candidates[j].prim_joined == candidates[j].found) {
-                gu_info ("Complete merge of primary "GU_UUID_FORMAT
-                         " found: %ld of %ld.",
-                         GU_UUID_ARGS(&candidates[j].prim_uuid),
-                         candidates[j].found, candidates[j].prim_joined);
-                merge_cnt++;
-                merged = j;
-//                // will be used only if merge_count == 1
-//                rep = candidates[j].rep;
-            }
-// #endif compat 0.8.0
         }
     }
 
     const gcs_state_msg_t* rep = NULL;
 
     if (1 == candidates_found) {
-if (candidates[0].ver == 0) { /* compatibility with 0.8.0 */
-    if (0 == merge_cnt) {
-        gu_warn ("No fully re-merged primary component found.");
-        goto compatibility_080;
-    }
-}
-else {
-    merged = 0;
         gu_info ("%s re-merge of primary "GU_UUID_FORMAT" found: %ld of %ld.",
                  candidates[0].found == candidates[0].prim_joined ?
                  "Full" : "Partial",
                  GU_UUID_ARGS(&candidates[0].prim_uuid),
                  candidates[0].found, candidates[0].prim_joined);
-}
-        rep = candidates[merged].rep;
+
+        rep = candidates[0].rep;
         assert (NULL != rep);
         assert (gcs_node_is_joined(rep->prim_state));
 
@@ -511,7 +482,7 @@ else {
         gu_error ("Found more than one re-merged primary component candidate.");
         rep = NULL;
     }
-compatibility_080:
+
     gu_free (candidates);
 
     return rep;
