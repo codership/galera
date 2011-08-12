@@ -544,7 +544,7 @@ then
 fi
 
 export LD_LIBRARY_PATH=$MYSQL_BASE_DIR/lib/mysql
-export PATH=$PATH:$MYSQL_BASE_DIR/bin
+export PATH=$MYSQL_BASE_DIR/bin:$PATH
 
 $COMMAND
 
