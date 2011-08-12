@@ -314,12 +314,12 @@ then
             DEBUG_OPT=""
         fi
 
-	if [ $TAR == "yes" ]; then
+        if [ $TAR == "yes" ]; then
             export MYSQL_BUILD_PREFIX=$BUILD_ROOT/dist/mysql
-	else 
+        else 
            # This will be put to --prefix by SETUP.sh.
             export MYSQL_BUILD_PREFIX="/usr"
-	fi
+        fi
         if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
         then
             # There is no other way to pass these options to SETUP.sh but
@@ -365,33 +365,33 @@ install_mysql_5.1_demo()
     install -m 755 -D $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/libexec/mysqld
     if [ "$SKIP_CLIENTS" == "no" ]
     then
-        # Hack alert: 
+        # Hack alert:
         #  install libmysqlclient.so as libmysqlclient.so.16 as client binaries
         #  seem to be linked against explicit version. Figure out better way to 
         #  deal with this.
-	install -m 755 -D $MYSQL_SRC/$LIBMYSQLCLIENT_PATH $MYSQL_LIBS/libmysqlclient.so.16
+        install -m 755 -D $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS/libmysqlclient.so.16
     fi
     if test -f $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so
     then
-	install -m 755 -D $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so \
-            $MYSQL_PLUGINS/ha_innodb_plugin.so
+        install -m 755 -D $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so \
+                $MYSQL_PLUGINS/ha_innodb_plugin.so
     fi
     install -m 755 -d $MYSQL_BINS
     if [ "$SKIP_CLIENTS" == "no" ]
     then
-	if [ -x $MYSQL_SRC/client/.libs/mysql ]    # MySQL
-	then
+        if [ -x $MYSQL_SRC/client/.libs/mysql ]    # MySQL
+        then
             MYSQL_CLIENTS=$MYSQL_SRC/client/.libs
-	elif [ -x $MYSQL_SRC/client/mysql ]        # MariaDB
-	then
+        elif [ -x $MYSQL_SRC/client/mysql ]        # MariaDB
+        then
             MYSQL_CLIENTS=$MYSQL_SRC/client
-	else
+        else
             echo "Can't find MySQL clients. Aborting."
             exit 1
-	fi
-	install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysql
-	install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysqldump
-	install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysqladmin
+        fi
+        install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysql
+        install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysqldump
+        install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysqladmin
     fi
 
     install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_mysqldump
@@ -428,9 +428,9 @@ if [ $TAR == "yes" ]; then
 
     # Install required MySQL files in the DIST_DIR
     if [ $MYSQL_MAJOR == "5.1" ]; then
-	install_mysql_5.1_demo
+        install_mysql_5.1_demo
     else
-	install_mysql_5.5_demo
+        install_mysql_5.5_demo
     fi
 
     install -m 644 -D my.cnf $MYSQL_DIST_CNF
@@ -446,11 +446,11 @@ if [ $TAR == "yes" ]; then
 
     if [ "$SCONS" == "yes" ]
     then
-	SCONS_VD=$GALERA_SRC
-	cp -P $SCONS_VD/libgalera_smm.so* $GALERA_LIBS
+        SCONS_VD=$GALERA_SRC
+        cp -P $SCONS_VD/libgalera_smm.so* $GALERA_LIBS
     else
-	echo "Autotools compilation not supported any more."
-	exit 1
+        echo "Autotools compilation not supported any more."
+        exit 1
     fi
 
     install -m 644 LICENSE       $DIST_DIR
@@ -461,8 +461,8 @@ if [ $TAR == "yes" ]; then
     # Strip binaries if not instructed otherwise
     if test "$NO_STRIP" != "yes"
     then
-	strip $GALERA_LIBS/lib*.so
-	strip $MYSQL_DIST_DIR/libexec/mysqld
+        strip $GALERA_LIBS/lib*.so
+        strip $MYSQL_DIST_DIR/libexec/mysqld
     fi
 
 fi # if [ $TAR == "yes" ]
