@@ -6,6 +6,33 @@ then
     exit -1
 fi
 
+use_mysql_5.1_sources()
+{
+    MYSQL_MAJOR="5.1"
+    MYSQL_VER=`grep AC_INIT $MYSQL_SRC/configure.in | awk -F '[' '{ print $3 }' | awk -F ']' '{ print $1 }'`
+}
+use_mariadb_5.1_sources()
+{
+    MYSQL_MAJOR="5.1"
+    MYSQL_VER=`grep AC_INIT configure.in | awk -F '[' '{ print $3 }' | awk -F ']' '{ print $1 }'`
+}
+use_mysql_5.5_sources()
+{
+    MYSQL_MAJOR="5.5"
+    MYSQL_VER=`awk -F '=' 'BEGIN { ORS = "" } /MYSQL_VERSION_MAJOR/ { print $2 "." } /MYSQL_VERSION_MINOR/ { print $2 "." } /MYSQL_VERSION_PATCH/ { print $2 }' $MYSQL_SRC/VERSION`
+}
+
+if test -f "$MYSQL_SRC/configure.in"
+then
+    use_mysql_5.1_sources
+elif test -f "$MYSQL_SRC/VERSION"
+then
+    use_mysql_5.5_sources
+else
+    echo "Unknown MySQL version in MYSQL_SRC path. Versions 5.1 and 5.5 are supported. Can't continue."
+    exit -1
+fi
+
 # Initializing variables to defaults
 uname -m | grep -q i686 && CPU=pentium || CPU=amd64
 DEBUG=no
@@ -147,7 +174,7 @@ done
 
 if [ "$PACKAGE" == "yes" ]
 then
-# check whether sudo accepts -E to preserve environment
+    # check whether sudo accepts -E to preserve environment
     echo "testing sudo"
     if sudo -E $(which epm) --version >/dev/null 2>&1
     then
@@ -167,8 +194,8 @@ then
         fi
     fi
 
-# If packaging with epm, make sure that mysql user exists in build system to
-# get file ownerships right.
+    # If packaging with epm, make sure that mysql user exists in build system to
+    # get file ownerships right.
     echo "Checking for mysql user and group for epm:"
     getent passwd mysql >/dev/null
     if [ $? != 0 ]
@@ -232,7 +259,7 @@ fi
 cd $MYSQL_SRC
 WSREP_REV=$(bzr revno)
 # this does not work on an unconfigured source MYSQL_VER=$(grep '#define VERSION' $MYSQL_SRC/include/config.h | sed s/\"//g | cut -d ' ' -f 3 | cut -d '-' -f 1-2)
-MYSQL_VER=`grep AC_INIT configure.in | awk -F '[' '{ print $3 }' | awk -F ']' '{ print $1 }'`
+
 
 if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
 then
@@ -242,8 +269,8 @@ then
     if [ "$SKIP_BUILD" == "no" ] || [ ! -d $mysql_tag ]
     then
         mysql_orig_tar_gz=$mysql_tag.tar.gz
-        url2=http://mysql.dataphone.se/Downloads/MySQL-5.1
-        url1=http://downloads.mysql.com/archives/mysql-5.1
+        url2=http://mysql.dataphone.se/Downloads/MySQL-$MYSQL_MAJOR
+        url1=http://downloads.mysql.com/archives/mysql-$MYSQL_MAJOR
         if [ ! -r $mysql_orig_tar_gz ]
         then
             echo "Downloading $mysql_orig_tar_gz... currently works only for 5.1.x"
@@ -287,9 +314,12 @@ then
             DEBUG_OPT=""
         fi
 
-        # This will be put to --prefix by SETUP.sh.
-        export MYSQL_BUILD_PREFIX="/usr"
-
+	if [ $TAR == "yes" ]; then
+            export MYSQL_BUILD_PREFIX=$BUILD_ROOT/dist/mysql
+	else 
+           # This will be put to --prefix by SETUP.sh.
+            export MYSQL_BUILD_PREFIX="/usr"
+	fi
         if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
         then
             # There is no other way to pass these options to SETUP.sh but
@@ -325,87 +355,115 @@ fi
 ##                                  ##
 ######################################
 
-if [ $TAR == "yes" ]; then
-echo "Creating demo distribution"
-# Create build directory structure
-DIST_DIR=$BUILD_ROOT/dist
-MYSQL_DIST_DIR=$DIST_DIR/mysql
-MYSQL_DIST_CNF=$MYSQL_DIST_DIR/etc/my.cnf
-GALERA_DIST_DIR=$DIST_DIR/galera
-cd $BUILD_ROOT
-rm -rf $DIST_DIR
-# Install required MySQL files in the DIST_DIR
-MYSQL_BINS=$MYSQL_DIST_DIR/bin
-MYSQL_LIBS=$MYSQL_DIST_DIR/lib/mysql
-MYSQL_PLUGINS=$MYSQL_DIST_DIR/lib/mysql/plugin
-MYSQL_CHARSETS=$MYSQL_DIST_DIR/share/mysql/charsets
-install -m 644 -D $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/mysql/english/errmsg.sys
-install -m 755 -D $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/libexec/mysqld
-if [ "$SKIP_CLIENTS" == "no" ]
-then
-# Hack alert: install libmysqlclient.so as libmysqlclient.so.16 as client binaries
-# seem to be linked against explicit version. Figure out better way to deal with
-# this.
-install -m 755 -D $MYSQL_SRC/libmysql/.libs/libmysqlclient.so $MYSQL_LIBS/libmysqlclient.so.16
-fi
-if test -f $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so
-then
-install -m 755 -D $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so \
-                  $MYSQL_PLUGINS/ha_innodb_plugin.so
-fi
-install -m 755 -d $MYSQL_BINS
-if [ "$SKIP_CLIENTS" == "no" ]
-then
-    if [ -x $MYSQL_SRC/client/.libs/mysql ]    # MySQL
+install_mysql_5.1_demo()
+{
+
+    MYSQL_LIBS=$MYSQL_DIST_DIR/lib/mysql
+    MYSQL_PLUGINS=$MYSQL_DIST_DIR/lib/mysql/plugin
+    MYSQL_CHARSETS=$MYSQL_DIST_DIR/share/mysql/charsets
+    install -m 644 -D $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/mysql/english/errmsg.sys
+    install -m 755 -D $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/libexec/mysqld
+    if [ "$SKIP_CLIENTS" == "no" ]
     then
-        MYSQL_CLIENTS=$MYSQL_SRC/client/.libs
-    elif [ -x $MYSQL_SRC/client/mysql ]        # MariaDB
-    then
-        MYSQL_CLIENTS=$MYSQL_SRC/client
-    else
-        echo "Can't find MySQL clients. Aborting."
-        exit 1
+        # Hack alert: 
+        #  install libmysqlclient.so as libmysqlclient.so.16 as client binaries
+        #  seem to be linked against explicit version. Figure out better way to 
+        #  deal with this.
+	install -m 755 -D $MYSQL_SRC/$LIBMYSQLCLIENT_PATH $MYSQL_LIBS/libmysqlclient.so.16
     fi
-install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysql
-install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysqldump
-install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysqladmin
-fi
-install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_mysqldump
-install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_rsync
-install -m 755 -d $MYSQL_CHARSETS
-install -m 644 -t $MYSQL_CHARSETS $MYSQL_SRC/sql/share/charsets/*.xml
-install -m 644 -t $MYSQL_CHARSETS $MYSQL_SRC/sql/share/charsets/README
-install -m 644 -D my.cnf $MYSQL_DIST_CNF
-cat $MYSQL_SRC/support-files/wsrep.cnf >> $MYSQL_DIST_CNF
-pushd $MYSQL_BINS; ln -s wsrep_sst_rsync wsrep_sst_rsync_wan; popd
-tar -xzf mysql_var.tgz -C $MYSQL_DIST_DIR
-install -m 644 LICENSE.mysql $MYSQL_DIST_DIR
+    if test -f $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so
+    then
+	install -m 755 -D $MYSQL_SRC/storage/innodb_plugin/.libs/ha_innodb_plugin.so \
+            $MYSQL_PLUGINS/ha_innodb_plugin.so
+    fi
+    install -m 755 -d $MYSQL_BINS
+    if [ "$SKIP_CLIENTS" == "no" ]
+    then
+	if [ -x $MYSQL_SRC/client/.libs/mysql ]    # MySQL
+	then
+            MYSQL_CLIENTS=$MYSQL_SRC/client/.libs
+	elif [ -x $MYSQL_SRC/client/mysql ]        # MariaDB
+	then
+            MYSQL_CLIENTS=$MYSQL_SRC/client
+	else
+            echo "Can't find MySQL clients. Aborting."
+            exit 1
+	fi
+	install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysql
+	install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysqldump
+	install -m 755 -s -t $MYSQL_BINS  $MYSQL_CLIENTS/mysqladmin
+    fi
 
-# Copy required Galera libraries
-GALERA_LIBS=$GALERA_DIST_DIR/lib
-install -m 644 -D LICENSE.galera $GALERA_DIST_DIR/LICENSE.galera
-install -m 755 -d $GALERA_LIBS
+    install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_mysqldump
+    install -m 755 -t $MYSQL_BINS     $MYSQL_SRC/scripts/wsrep_sst_rsync
+    install -m 755 -d $MYSQL_CHARSETS
+    install -m 644 -t $MYSQL_CHARSETS $MYSQL_SRC/sql/share/charsets/*.xml
+    install -m 644 -t $MYSQL_CHARSETS $MYSQL_SRC/sql/share/charsets/README
+}
 
-if [ "$SCONS" == "yes" ]
-then
-    SCONS_VD=$GALERA_SRC
-    cp -P $SCONS_VD/libgalera_smm.so* $GALERA_LIBS
-else
-    echo "Autotools compilation not supported any more."
-    exit 1
-fi
+install_mysql_5.5_demo() {
+    mkdir -p $DIST_DIR/mysql/etc
+    pushd $MYSQL_SRC
+    cmake -DCMAKE_INSTALL_COMPONENT=Server -P cmake_install.cmake
+    cmake -DCMAKE_INSTALL_COMPONENT=Client -P cmake_install.cmake
+    cmake -DCMAKE_INSTALL_COMPONENT=SharedLibraries -P cmake_install.cmake
+    cmake -DCMAKE_INSTALL_COMPONENT=ManPages -P cmake_install.cmake
+    popd
+    pushd $MYSQL_DIST_DIR
+    ln -s ./bin ./libexec
+    popd
+}
 
-install -m 644 LICENSE       $DIST_DIR
-install -m 755 mysql-galera  $DIST_DIR
-install -m 644 README        $DIST_DIR
-install -m 644 QUICK_START   $DIST_DIR
+if [ $TAR == "yes" ]; then
+    echo "Creating demo distribution"
+    # Create build directory structure
+    DIST_DIR=$BUILD_ROOT/dist
+    MYSQL_DIST_DIR=$DIST_DIR/mysql
+    MYSQL_DIST_CNF=$MYSQL_DIST_DIR/etc/my.cnf
+    GALERA_DIST_DIR=$DIST_DIR/galera
+    MYSQL_BINS=$MYSQL_DIST_DIR/bin
 
-# Strip binaries if not instructed otherwise
-if test "$NO_STRIP" != "yes"
-then
-    strip $GALERA_LIBS/lib*.so
-    strip $MYSQL_DIST_DIR/libexec/mysqld
-fi
+    cd $BUILD_ROOT
+    rm -rf $DIST_DIR
+
+    # Install required MySQL files in the DIST_DIR
+    if [ $MYSQL_MAJOR == "5.1" ]; then
+	install_mysql_5.1_demo
+    else
+	install_mysql_5.5_demo
+    fi
+
+    install -m 644 -D my.cnf $MYSQL_DIST_CNF
+    cat $MYSQL_SRC/support-files/wsrep.cnf >> $MYSQL_DIST_CNF
+    pushd $MYSQL_BINS; ln -s wsrep_sst_rsync wsrep_sst_rsync_wan; popd
+    tar -xzf mysql_var_$MYSQL_MAJOR.tgz -C $MYSQL_DIST_DIR
+    install -m 644 LICENSE.mysql $MYSQL_DIST_DIR
+
+    # Copy required Galera libraries
+    GALERA_LIBS=$GALERA_DIST_DIR/lib
+    install -m 644 -D LICENSE.galera $GALERA_DIST_DIR/LICENSE.galera
+    install -m 755 -d $GALERA_LIBS
+
+    if [ "$SCONS" == "yes" ]
+    then
+	SCONS_VD=$GALERA_SRC
+	cp -P $SCONS_VD/libgalera_smm.so* $GALERA_LIBS
+    else
+	echo "Autotools compilation not supported any more."
+	exit 1
+    fi
+
+    install -m 644 LICENSE       $DIST_DIR
+    install -m 755 mysql-galera  $DIST_DIR
+    install -m 644 README        $DIST_DIR
+    install -m 644 QUICK_START   $DIST_DIR
+
+    # Strip binaries if not instructed otherwise
+    if test "$NO_STRIP" != "yes"
+    then
+	strip $GALERA_LIBS/lib*.so
+	strip $MYSQL_DIST_DIR/libexec/mysqld
+    fi
 
 fi # if [ $TAR == "yes" ]
 
