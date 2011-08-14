@@ -2,14 +2,23 @@
 // Copyright (C) 2010 Codership Oy <info@codership.com>
 //
 
+#define _FILE_OFFSET_BITS 64
+
 #include "mapped_buffer.hpp"
 
 #include "gu_throw.hpp"
 #include "gu_logger.hpp"
 
+#include "gu_macros.h"
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+
+#include <limits>
+
+// MAP_FAILED is defined as (void *) -1
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 
 using namespace std;
 using namespace gu;
@@ -52,8 +61,23 @@ void galera::MappedBuffer::reserve(size_t sz)
 
     if (sz > threshold_)
     {
-        sz = (sz/threshold_ + 1)*threshold_;
         // buffer size exceeds in-memory threshold, have to mmap
+
+        if (gu_unlikely(std::numeric_limits<size_t>::max() - sz < threshold_))
+        {
+            sz = std::numeric_limits<size_t>::max();
+        }
+        else
+        {
+            sz = (sz/threshold_ + 1)*threshold_;
+        }
+
+        if (gu_unlikely(sz >
+                        static_cast<size_t>(std::numeric_limits<off_t>::max())))
+        {
+            gu_throw_error(EINVAL) << "size exceeds maximum of off_t";
+        }
+
         if (fd_ == -1)
         {
             file_ = working_dir_ + "/gmb_XXXXXX";
@@ -69,8 +93,11 @@ void galera::MappedBuffer::reserve(size_t sz)
             byte_t* tmp(reinterpret_cast<byte_t*>(
                             mmap(NULL, sz, PROT_READ | PROT_WRITE, MAP_PRIVATE,
                                  fd_, 0)));
-            if (tmp == 0)
+            if (tmp == MAP_FAILED)
             {
+                free(buf_);
+                buf_ = 0;
+                clear();
                 gu_throw_error(ENOMEM) << "mmap() failed";
             }
             copy(buf_, buf_ + buf_size_, tmp);
@@ -89,8 +116,10 @@ void galera::MappedBuffer::reserve(size_t sz)
             }
             byte_t* tmp(reinterpret_cast<byte_t*>(
                             mmap(NULL, sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd_, 0)));
-            if (tmp == 0)
+            if (tmp == MAP_FAILED)
             {
+                buf_ = 0;
+                clear();
                 gu_throw_error(ENOMEM) << "mmap() failed";
             }
             buf_ = tmp;
@@ -121,7 +150,7 @@ void galera::MappedBuffer::clear()
 {
     if (fd_ != -1)
     {
-        munmap(buf_, real_buf_size_);
+        if (buf_ != 0) munmap(buf_, real_buf_size_);
         while (close(fd_) == EINTR) { }
         unlink(file_.c_str());
     }
