@@ -141,7 +141,13 @@ gcs_state_msg_get_proto_ver (const gcs_state_msg_t* state,
 extern uint8_t
 gcs_state_msg_flags (const gcs_state_msg_t* state);
 
-/* Get quorum decision from state messages */
+/*! Get quorum decision from state messages
+ *
+ * @param[in]  states      array of state message pointers
+ * @param[in]  states_num  length of array
+ * @param[out] quorum      quorum calculations result
+ * @retval 0 if there were no errors during processing. Quorum results are in 
+ *         quorum parameter */
 extern long
 gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
                           long                   states_num,
