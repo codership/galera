@@ -284,16 +284,13 @@ group_post_state_exchange (gcs_group_t* group)
         }
 
         group->prim_seqno = group->conf_id;
-//    if (quorum->repl_proto_ver > 0) { /* compatibility with 0.8.0, see #486 */
         group->prim_num   = 0;
+
         for (i = 0; i < group->num; i++) {
             group->prim_num += gcs_node_is_joined (group->nodes[i].status);
         }
+
         assert (group->prim_num > 0);
-//    }
-//    else { /* compatibility with 0.8.0, #486 */
-//        group->prim_num   = group->num; // REMOVE in next release
-//    }
     }
     else {
         // non-primary configuration
