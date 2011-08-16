@@ -17,17 +17,17 @@ std::string const gcomm::Conf::UdpScheme = "udp";
 std::string const gcomm::Conf::TcpNonBlocking =
     "socket" + Delim + "non_blocking";
 std::string const gcomm::Conf::SocketUseSsl =
-    "socket" + Delim + "use_ssl";
+    "socket" + Delim + "ssl";
 std::string const gcomm::Conf::SocketSslVerifyFile =
-    "socket" + Delim + "ssl_verify_file";
+    "socket" + Delim + "ssl_ca";
 std::string const gcomm::Conf::SocketSslCertificateFile =
-    "socket" + Delim + "ssl_certificate_file";
+    "socket" + Delim + "ssl_cert";
 std::string const gcomm::Conf::SocketSslPrivateKeyFile =
-    "socket" + Delim + "ssl_private_key_file";
+    "socket" + Delim + "ssl_key";
 std::string const gcomm::Conf::SocketSslPasswordFile =
     "socket" + Delim + "ssl_password_file";
 std::string const gcomm::Conf::SocketSslCipherList =
-    "socket" + Delim + "ssl_cipher_list";
+    "socket" + Delim + "ssl_cipher";
 std::string const gcomm::Conf::SocketSslCompression =
     "socket" + Delim + "ssl_compression";
 

@@ -47,34 +47,28 @@ namespace
     }
 
 
-    static void set_cipher_list(SSL_CTX* ssl_ctx, const gu::Config& conf)
+    static void set_cipher_list(SSL_CTX* ssl_ctx, gu::Config& conf)
     {
-        std::string cipher_list;
-        try
-        {
-            cipher_list = conf.get(gcomm::Conf::SocketSslCipherList);
-        }
-        catch (gu::NotFound& e)
-        {
-            return;
-        }
+        std::string cipher_list(
+            conf.get(gcomm::Conf::SocketSslCipherList, "AES128-SHA"));
         if (SSL_CTX_set_cipher_list(ssl_ctx, cipher_list.c_str()) == 0)
         {
             gu_throw_error(EINVAL) << "could not set cipher list, check that "
                                    << "the list is valid: "<< cipher_list;
         }
+        conf.set(gcomm::Conf::SocketSslCipherList, cipher_list);
     }
 
-    static void set_compression(const gu::Config& conf)
+    static void set_compression(gu::Config& conf)
     {
         bool compression(
-            gu::from_string<bool>(
-                conf.get(gcomm::Conf::SocketSslCompression, "true")));
+            conf.get<bool>(gcomm::Conf::SocketSslCompression, true));;
         if (compression == false)
         {
             log_info << "disabling SSL compression";
             sk_SSL_COMP_zero(SSL_COMP_get_compression_methods());
         }
+        conf.set(gcomm::Conf::SocketSslCompression, compression);
     }
 }
 
@@ -111,46 +105,27 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
     checksum_(true)
 {
 #ifdef HAVE_ASIO_SSL_HPP
-    if (gu::from_string<bool>(conf_.get(Conf::SocketUseSsl, "false")) == true)
+    // use ssl if either private key or cert file is specified
+    bool use_ssl(conf_.has(Conf::SocketSslPrivateKeyFile)    == true ||
+                 conf_.has(Conf::SocketSslCertificateFile)   == true);
+    try
     {
+        // overrides use_ssl is given explicitly
+        use_ssl = conf_.get<bool>(Conf::SocketUseSsl);
+    }
+    catch (gu::NotFound& nf) { }
+
+    if (use_ssl == true)
+    {
+        conf_.set(Conf::SocketUseSsl, true);
         log_info << "initializing ssl context";
         set_compression(conf_);
+        set_cipher_list(ssl_context_.impl(), conf_);
         ssl_context_.set_verify_mode(asio::ssl::context::verify_peer);
         ssl_context_.set_password_callback(
             boost::bind(&gcomm::AsioProtonet::get_ssl_password, this));
 
-        // verify file
-        const std::string verify_file(
-            get_file(conf_, Conf::SocketSslVerifyFile));
-        try
-        {
-            ssl_context_.load_verify_file(verify_file);
-        }
-        catch (std::exception& e)
-        {
-            log_error << "could not load verify file '"
-                      << verify_file
-                      << "': " << e.what();
-            throw;
-        }
-
-        // certificate file
-        const std::string certificate_file(
-            get_file(conf_, Conf::SocketSslCertificateFile));
-        try
-        {
-            ssl_context_.use_certificate_file(certificate_file,
-                                              asio::ssl::context::pem);
-        }
-        catch (std::exception& e)
-        {
-            log_error << "could not load certificate file'"
-                      << certificate_file
-                      << "': " << e.what();
-            throw;
-        }
-
-        // private key file
+        // private key file (required)
         const std::string private_key_file(
             get_file(conf_, Conf::SocketSslPrivateKeyFile));
         try
@@ -172,7 +147,37 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
             throw;
         }
 
-        set_cipher_list(ssl_context_.impl(), conf_);
+        // certificate file (required)
+        const std::string certificate_file(
+            get_file(conf_, Conf::SocketSslCertificateFile));
+        try
+        {
+            ssl_context_.use_certificate_file(certificate_file,
+                                              asio::ssl::context::pem);
+        }
+        catch (std::exception& e)
+        {
+            log_error << "could not load certificate file'"
+                      << certificate_file
+                      << "': " << e.what();
+            throw;
+        }
+
+        // verify file (optional, defaults to certificate_file)
+        const std::string verify_file(
+            conf_.get(Conf::SocketSslVerifyFile, certificate_file));
+        try
+        {
+            ssl_context_.load_verify_file(verify_file);
+        }
+        catch (std::exception& e)
+        {
+            log_error << "could not load verify file '"
+                      << verify_file
+                      << "': " << e.what();
+            throw;
+        }
+        conf_.set(Conf::SocketSslVerifyFile, verify_file);
     }
 #endif // HAVE_ASIO_SSL_HPP
 }
