@@ -15,12 +15,18 @@ copy_config()
     local -r node=$1
     local cnf
     local cnf_dir
+    local key_src="$BASE_CONF/galera_key.pem"
+    local key_dst
+    local cert_src="$BASE_CONF/galera_cert.pem"
+    local cert_dst
 
     case $DBMS in
     MYSQL)
         common_cnf="$COMMON_MY_CNF"
         cnf_src="${NODE_MY_CNF[$node]}"
         cnf_dst="${NODE_TEST_DIR[$node]}/mysql/etc/my.cnf"
+        key_dst="${NODE_TEST_DIR[$node]}/mysql/var/galera_key.pem"
+        cert_dst="${NODE_TEST_DIR[$node]}/mysql/var/galera_cert.pem"
         ;;
     PGSQL|*)
         echo "Unsupported DBMS: '$DBMS'" >&2
@@ -34,10 +40,17 @@ copy_config()
         then
             ([ -n "$common_cnf" ] && cat "$common_cnf" && \
              [ -n "$cnf_src" ]    && cat "$cnf_src") > "$cnf_dst"
+
+            cat "$key_src"  > "$key_dst"
+            cat "$cert_src" > "$cert_dst"
         else
+            local remote="${NODE_LOCATION[$node]}"
             ([ -n "$common_cnf" ] && cat "$common_cnf" && \
              [ -n "$cnf_src" ]    && cat "$cnf_src")    | \
-            ssh ${NODE_LOCATION[$node]} "cat > $cnf_dst"
+            ssh "$remote" "cat > $cnf_dst"
+
+            cat "$key_src"  | ssh "$remote" "cat > $key_dst"
+            cat "$cert_src" | ssh "$remote" "cat > $cert_dst"
         fi
     fi
 }
