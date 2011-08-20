@@ -28,7 +28,8 @@ CONTENTS:
 1. WHAT IS GALERA
 2. GALERA USE CASES
 3. GALERA CONFIGURATION PARAMETERS
-4. SPECIAL NOTES
+4. GALERA ARBITRATOR
+5. SPECIAL NOTES
 
 
 1. WHAT IS GALERA
@@ -304,10 +305,72 @@ user_send_window
     Like <send_window>, but for messages which sending is initiated by a
     call from the upper layer. Default value is 16.
 
+3.2.3 SSL parameters
 
-4. SPECIAL NOTES
+All options in this group are prefixed by 'socket.'.
 
-4.1 DEADLOCK ON COMMIT
+ssl_cert
+   Certificate file in PEM format.
+
+ssl_key
+   A private key for the certificate above, unencrypted, in PEM format.
+
+ssl
+   A boolean value to disable SSL even if certificate and key are configured.
+   Default: yes (SSL is enabled if ssl_cert and ssl_key are set)
+
+To generate private key/dertificate pair the following command may be used:
+
+$ openssl req -new -x509 -days 365000 -nodes -keyout key.pem -out cert.pem
+
+Using short-living (in most web examples - 1 year) certificates is not
+advised as it will lead to complete cluster shutdown when certificate expires.
+
+
+4. GALERA ARBITRATOR
+
+Galera arbitrator found in this package is a small stateless daemon that can
+serve as a lightweight cluster member to
+
+ * avoid split brain condition in a cluster with an otherwise even membership.
+
+ * request consistent state snapshots for backup purposes.
+
+Example usage:
+                        ,---------.
+                        |  garbd  |
+                        `---------'
+             ,---------.     |     ,---------.
+             | clients |     |     | clients |
+             `---------'     |     `---------'
+                        \    |    /
+                         \ ,---. /
+                         ('     `)
+                        (   WAN   )
+                         (.     ,)
+                         / `---' \
+                        /         \
+             ,---------.           ,---------.
+             |  node1  |           |  node2  |
+             `---------'           `---------'
+            Data Center 1         Data Center 2
+
+In this example, if one of the data centers loses WAN connection, the node
+that sees arbitrator (and therefore sees clients) will continue the operation.
+
+garbd accepts the same Galera options as the regular Galera node. Note that
+at the moment garbd needs to see all replication traffic (although it does not
+store it anywhere), so placing it in a location with poor connectivity to the
+rest of the cluster may lead to cluster performance degradation.
+
+Arbitrator failure does not affect cluster operation and a new instance can
+be reattached to cluster at any time. There can be several arbitrators in the
+cluster, although practicality of it is questionable.
+
+
+5. SPECIAL NOTES
+
+5.1 DEADLOCK ON COMMIT
 
 In multi-master mode transaction commit operation may return a deadlock error.
 This is a consequence of writeset certification and is a fundamental property
@@ -317,18 +380,19 @@ performed on the same node. This still has an advantage over the "traditional"
 master-slave replication: write load can still be distributed between nodes and
 since replication is synchronous, failover is trivial.
 
-4.2 "SPLIT-BRAIN" CONDITION
+5.2 "SPLIT-BRAIN" CONDITION
 
 Galera cluster is fully distributed and does not use any sort of centralized
 arbitrator, thus having no single point of failure. However, like any cluster
-of that kind it may fall to a dreaded "split-brain" condition where half or
-more nodes of the cluster suddenly disappear (e.g. due to network failure).
+of that kind it may fall to a dreaded "split-brain" condition where half of
+the cluster nodes suddenly disappear (e.g. due to network failure).
 In general case, having no information about the fate of disappeared nodes
 remaining nodes cannot continue to process requests and modify their states.
 
-While such situation is generally considered negligibly probable in a multi-node
-cluster (normally nodes fail one at a time), in 2-node cluster a single node
-failure can lead to this, thus making 3 nodes a minimum requirement for
-a highly-available cluster.
+While such situation is generally considered negligibly probable in a
+multi-node cluster (normally nodes fail one at a time), in 2-node cluster
+a single node failure can lead to this, thus making 3 nodes a minimum
+requirement for a highly-available cluster.
 
-
+Galera arbitrator (see above) can serve as an odd stateless cluster node
+to help avoid the possibility of an even cluster split.

@@ -365,8 +365,6 @@ wsrep_sst_donor=
 7) XA transactions can not be supported due to possible rollback on commit.
 
 8) Currently supported only in master-slave mode without parallel applying
-   (will be fixed in the nearest release):
-    * cascading foreign key constraints,
-    * secondary unique indexes and
-    * primary varchar indexes with non-binary collation.
+   (to be fixed in the nearest release):
+    * secondary unique indexes
 
