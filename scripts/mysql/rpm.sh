@@ -94,7 +94,7 @@ mv $WSREP_SPEC $RPM_BUILD_ROOT/SPECS/
 WSREP_SPEC=$RPM_BUILD_ROOT/SPECS/mysql-$MYSQL_VER.spec
 
 #cleaning intermedieate sources:
-cp $WSREP_PATCH ./mysql-$MYSQL_VER-wsrep-0.8.1.patch
+cp $WSREP_PATCH ./mysql-$MYSQL_VER-wsrep-0.8.2.patch
 rm -rf $MYSQL_DIST
 
 ######################################
