@@ -699,7 +699,9 @@ galera::ReplicatorSMM::abort_trx(TrxHandle* trx) throw (gu::Exception)
 
 wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle* trx)
 {
-    if (state_() < S_JOINED) return WSREP_TRX_FAIL;
+    // State should not be checked here: If trx has been replicated,
+    // it has to be certified and potentially applied. #528
+    // if (state_() < S_JOINED) return WSREP_TRX_FAIL;
 
     assert(trx->state() == TrxHandle::S_REPLICATING);
     assert(trx->local_seqno() > -1 && trx->global_seqno() > -1);
