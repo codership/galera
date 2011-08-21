@@ -16,7 +16,7 @@ env.Append(LIBS=File('#/gcomm/src/libgcomm.a'))
 env.Append(LIBS=File('#/galerautils/src/libgalerautils.a'))
 env.Append(LIBS=File('#/galerautils/src/libgalerautils++.a'))
 
-bpo_static = '/usr/lib/libboost_program_options1.a'
+bpo_static = '/usr/lib/libboost_program_options.a'
 
 import os
 
