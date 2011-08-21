@@ -71,7 +71,7 @@ d 755 root root $SHAR_DST -
 f 755 root root $SHAR_DST/debian-start.inc.sh           $SRC/debian-start.inc.sh
 f 755 root root $SHAR_DST/echo_stderr                   $SRC/echo_stderr
 
-f 755 root root $BINS_DST/my_print_defaults $MYSQL_SRC/extra/my_print_defaults
+#f 755 root root $BINS_DST/my_print_defaults $MYSQL_SRC/extra/my_print_defaults
 
 # Distribution dependent scripts
 
