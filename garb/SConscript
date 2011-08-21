@@ -4,19 +4,26 @@ env = DefaultEnvironment()
 
 conf = Configure(env)
 
-boost_program_options = '/usr/lib/libboost_program_options.a'
 if not conf.CheckLibWithHeader(libs=['boost_program_options'],
                                header='boost/program_options.hpp',
                                language='CXX',
                                autoadd=0):
-    print 'Error: ' + boost_program_options + ' not found'
+    print 'Error: boost_program_options not found'
     Exit (1)
 
 env.Append(LIBS=File('#/gcs/src/libgcs4garb.a'))
 env.Append(LIBS=File('#/gcomm/src/libgcomm.a'))
 env.Append(LIBS=File('#/galerautils/src/libgalerautils.a'))
 env.Append(LIBS=File('#/galerautils/src/libgalerautils++.a'))
-env.Append(LIBS=File(boost_program_options))
+
+bpo_static = '/usr/lib/libboost_program_options1.a'
+
+import os
+
+if os.path.isfile(bpo_static):
+    env.Append(LIBS=File(bpo_static))
+else:
+    env.Append(LIBS=['boost_program_options'])
 
 garb = env.Program(target = 'garbd',
                    source = Split('''
