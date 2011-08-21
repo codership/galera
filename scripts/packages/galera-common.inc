@@ -15,11 +15,13 @@
 %requires    libc6      2.4
 %requires    libstdc++6 4.1.1
 %requires    libgcc1    4.1.1
+%requires    libssl0.9.8
 %format rpm
 #%replaces    galera
 %requires    glibc      2.4
 %requires    libstdc++  4.1.2
 %requires    libgcc     4.1.2
+%requires    libssl.so.6
 %format all
 
 $prefix=/usr
