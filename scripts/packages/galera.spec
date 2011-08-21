@@ -34,7 +34,7 @@ Packager:      Codership Oy
 Vendor:        Codership Oy
 Provides:      %{name} wsrep
 Obsoletes:     %{name}
-Requires:      libssl.so.6 boost-program-options
+Requires:      boost-program-options
 # BuildRequires: scons check boost-devel
 # This will be rm -rf
 BuildRoot:     %{_tmppath}/%{name}-%{version}
