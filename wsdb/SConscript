@@ -1,3 +1,0 @@
-
-
-SConscript(Split('''src/SConscript test/SConscript'''))

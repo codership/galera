@@ -1,2 +1,0 @@
-Gemini is a 2-node Group Communication System that provides Virtual Synchrony.
-It uses standalone arbitrator process to solve split-brain situation.
