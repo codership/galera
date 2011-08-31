@@ -24,6 +24,8 @@ set -e
 SCRIPT_ROOT=$(cd $(dirname $0); pwd -P)
 THIS_DIR=$(pwd -P)
 
+export MAKE="make -j $(cat /proc/cpuinfo | grep -c -E ^processor)"
+
 set -x
 
 MYSQL_DIST_TARBALL=$(cd $(dirname "$1"); pwd -P)/$(basename "$1")
@@ -37,16 +39,28 @@ MYSQL_DIST_TARBALL=$(cd $(dirname "$1"); pwd -P)/$(basename "$1")
 MYSQL_SRC=$(cd $MYSQL_SRC; pwd -P; cd $THIS_DIR)
 pushd $MYSQL_SRC
 export WSREP_REV=$(bzr revno)
-export MYSQL_VER=`grep AC_INIT configure.in | awk -F '[' '{ print $3 }'| awk -F ']' '{ print $1 }'`
+export WSPATCH_REVNO=$WSREP_REV
+if [ -r "VERSION" ]
+then
+    . "VERSION"
+    export MYSQL_VER=$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH
+else
+    MYSQL_VERSION_MINOR=1
+    MYSQL_VERSION_EXTRA=""
+    export MYSQL_VER=`grep AC_INIT configure.in | awk -F '[' '{ print $3 }'| awk -F ']' '{ print $1 }'`
+fi
+
 if test -z "$MYSQL_VER"
 then
     echo "Could not determine mysql version."
     exit -1
 fi
 
+MYSQL_VERSION_FINAL=${MYSQL_VER}${MYSQL_VERSION_EXTRA}
+
 popd #MYSQL_SRC
 
-RPM_BUILD_ROOT=/tmp/redhat
+RPM_BUILD_ROOT=$(pwd)/redhat
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT
 pushd $RPM_BUILD_ROOT
@@ -64,6 +78,13 @@ popd; popd
 
 MYSQL_DIST=$(tar -tzf $MYSQL_DIST_TARBALL | head -n1)
 rm -rf $MYSQL_DIST; tar -xzf $MYSQL_DIST_TARBALL
+
+# rename according to MYSQL_VERSION_FINAL
+test "$MYSQL_DIST" != "mysql-$MYSQL_VERSION_FINAL/" && \
+    rm -rf "mysql-$MYSQL_VERSION_FINAL"             && \
+    mv "$MYSQL_DIST" "mysql-$MYSQL_VERSION_FINAL"   && \
+    MYSQL_DIST="mysql-$MYSQL_VERSION_FINAL"
+
 pushd $MYSQL_DIST
 
 if test -r "$2" # check if patch name was supplied
@@ -72,12 +93,16 @@ then # patch as a file
 else # generate patch for this particular MySQL version from LP
     WSREP_PATCH=$($SCRIPT_ROOT/get_patch.sh mysql-$MYSQL_VER $MYSQL_SRC)
 fi
+
 # patch freaks out on .bzrignore which doesn't exist in source dist and
-# returns error code - running in subshell to ignore it
-(patch -p1 -f < $WSREP_PATCH)
+# returns error code
+patch -p1 -f < $WSREP_PATCH || :
 chmod a+x ./BUILD/*wsrep
-time ./BUILD/autorun.sh # update configure script
-time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/$(basename "$MYSQL_DIST_TARBALL") \
+
+# update configure script for 5.1
+test $MYSQL_VERSION_MINOR -le 5 && ./BUILD/autorun.sh
+
+time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/"$MYSQL_DIST.tar.gz" \
               "$MYSQL_DIST"
 
 ######################################
@@ -86,22 +111,27 @@ time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/$(basename "$MYSQL_DIST_TARBALL") \
 ##                                  ##
 ######################################
 time ./configure --with-wsrep > /dev/null
-pushd support-files; rm -rf *.spec;  make > /dev/null; popd
+
+[ $MYSQL_VERSION_MINOR -eq 1 ] && \
+    pushd support-files && rm -rf *.spec &&  make > /dev/null &&  popd
+
 popd # MYSQL_DIST
 
-WSREP_SPEC=${WSREP_SPEC:-"$MYSQL_DIST/support-files/mysql-$MYSQL_VER.spec"}
-mv $WSREP_SPEC $RPM_BUILD_ROOT/SPECS/
-WSREP_SPEC=$RPM_BUILD_ROOT/SPECS/mysql-$MYSQL_VER.spec
+WSREP_SPEC=${WSREP_SPEC:-"$MYSQL_DIST/support-files/mysql.$MYSQL_VERSION_FINAL.spec"}
+mv $WSREP_SPEC $RPM_BUILD_ROOT/SPECS/$MYSQL_DIST.spec
+WSREP_SPEC=$RPM_BUILD_ROOT/SPECS/$MYSQL_DIST.spec
 
 #cleaning intermedieate sources:
-cp $WSREP_PATCH ./mysql-$MYSQL_VER-wsrep-0.8.2.patch
-rm -rf $MYSQL_DIST
+cp $WSREP_PATCH ./$MYSQL_DIST.patch
+# rm -rf $MYSQL_DIST
 
 ######################################
 ##                                  ##
 ##             Build it             ##
 ##                                  ##
 ######################################
+
+# cflags vars might be obsolete with 5.5
 wsrep_cflags="-DWSREP_PROC_INFO -DMYSQL_MAX_VARIABLE_VALUE_LEN=2048"
 fast_cflags="-O3 -fno-omit-frame-pointer"
 uname -m | grep -q i686 && \
@@ -111,9 +141,14 @@ export MAKE="make -j $(cat /proc/cpuinfo | grep -c ^processor)"
 
 RPMBUILD()
 {
+[ $MYSQL_VERSION_MINOR == 1 ]                     && \
+    WSREP_RPM_OPTIONS=(--with wsrep --with yassl) || \
+    WSREP_RPM_OPTIONS=(--define='with_wsrep 1' \
+                       --define='mysql_packager Codership Oy <info@codership.com>')
+
 $(which rpmbuild) --clean --rmsource --define "_topdir $RPM_BUILD_ROOT" \
-                  --define "optflags $RPM_OPT_FLAGS" --with wsrep \
-                  --with yassl -ba $WSREP_SPEC
+                  --define "optflags $RPM_OPT_FLAGS" "${WSREP_RPM_OPTIONS[@]}" \
+                  -ba $WSREP_SPEC
 }
 
 pushd "$RPM_BUILD_ROOT"
