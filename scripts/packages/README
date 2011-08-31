@@ -182,8 +182,8 @@ gcomm://<address> - if one wants to join an existing cluster. In that case
 
 3.2 Gcomm options.
 
-There is quite a few gcomm configuration options. Of particular interest to end
-user are the following options:
+There is quite a few gcomm configuration options. Of particular interest to an
+end user are the following options:
 
 To configure gcomm listen address:
     gmcast.listen_addr.
@@ -197,6 +197,9 @@ To configure how fast cluster reacts on node failure or connection loss:
 To fine-tune performance (especially in high latency networks):
     evs.user_send_window
     evs.send_window
+
+For a full options list please see
+http://www.codership.com/wiki/doku.php?id=galera_parameters_0.8
 
 3.2.1 GMCast option group.
 
@@ -305,7 +308,63 @@ user_send_window
     Like <send_window>, but for messages which sending is initiated by a
     call from the upper layer. Default value is 16.
 
-3.2.3 SSL parameters
+3.2.3 GCS option group
+
+All options in this group are prefixed by 'gcs.'.
+
+fc_debug
+    Post debug statistics about SST flow control every that many writesets.
+    Default: 0.
+
+fc_factor
+    Resume replication after recv queue drops below that fraction of
+    gcs.fc_limit. Default: 0.5.
+
+fc_limit
+    Pause replication if recv queue exceeds that many writesets.
+    Default: 16. For master-slave setups this can be increased considerably.
+
+fc_master_slave
+    Should we assume that there is only one master in the group? Default: NO.
+
+max_packet_size
+    All writesets exceeding that size will be fragmented. Default: 32616.
+
+max_throttle
+    How much we can throttle replication rate during state transfer (to avoid
+    running out of memory). Set it to 0.0 if stopping replication is acceptable
+    for the sake of completing state transfer. Default: 0.25.
+
+recv_q_hard_limit
+    Maximum allowed size of recv queue. This should normally be half of
+    (RAM + swap). If this limit is exceeded, Galera will abort the server.
+    Default: LLONG_MAX.
+
+recv_q_soft_limit
+    A fraction of gcs.recv_q_hard_limit after which replication rate will be
+    throttled. Default: 0.25.
+    The degree of throttling is a linear function of recv queue size and goes
+    from 1.0 (“full rate”) at gcs.recv_q_soft_limit to gcs.max_throttle at
+    gcs.recv_q_hard_limit. Note that “full rate”, as estimated between 0 and
+    gcs.recv_q_soft_limit is a very approximate estimate of a regular
+    replication rate.
+
+3.2.4 Replicator option group
+
+All options in this group are prefixed by 'replicator.'.
+
+commit_order
+    Whether we should allow Out-Of-Order committing (improves parallel
+    applying performance). Possible settings:
+    0 – BYPASS: all commit order monitoring is turned off (useful for
+        measuring performance penalty)
+    1 – OOOC: allow out of order committing for all transactions
+    2 – LOCAL_OOOC: allow out of order committing only for local transactions
+    3 – NO_OOOC: no out of order committing is allowed (strict total order
+        committing)
+    Default: 3.
+
+3.2.5 SSL parameters
 
 All options in this group are prefixed by 'socket.'.
 
