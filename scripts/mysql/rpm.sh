@@ -24,8 +24,6 @@ set -e
 SCRIPT_ROOT=$(cd $(dirname $0); pwd -P)
 THIS_DIR=$(pwd -P)
 
-export MAKE="make -j $(cat /proc/cpuinfo | grep -c -E ^processor)"
-
 set -x
 
 MYSQL_DIST_TARBALL=$(cd $(dirname "$1"); pwd -P)/$(basename "$1")
@@ -76,11 +74,11 @@ popd; popd
 ######################################
 #FIXME: fix spec file to make rpmbuild do it
 
-MYSQL_DIST=$(tar -tzf $MYSQL_DIST_TARBALL | head -n1)
+MYSQL_DIST=$(tar -tzf $MYSQL_DIST_TARBALL | head -n1 | sed 's/\/$//')
 rm -rf $MYSQL_DIST; tar -xzf $MYSQL_DIST_TARBALL
 
 # rename according to MYSQL_VERSION_FINAL
-test "$MYSQL_DIST" != "mysql-$MYSQL_VERSION_FINAL/" && \
+test "$MYSQL_DIST" != "mysql-$MYSQL_VERSION_FINAL" && \
     rm -rf "mysql-$MYSQL_VERSION_FINAL"             && \
     mv "$MYSQL_DIST" "mysql-$MYSQL_VERSION_FINAL"   && \
     MYSQL_DIST="mysql-$MYSQL_VERSION_FINAL"
@@ -110,10 +108,11 @@ time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/"$MYSQL_DIST.tar.gz" \
 ##         Create spec file         ##
 ##                                  ##
 ######################################
-time ./configure --with-wsrep > /dev/null
 
 [ $MYSQL_VERSION_MINOR -eq 1 ] && \
-    pushd support-files && rm -rf *.spec &&  make > /dev/null &&  popd
+    time ./configure --with-wsrep > /dev/null && \
+    pushd support-files && rm -rf *.spec &&  make > /dev/null &&  popd || \
+    time ./configure > /dev/null
 
 popd # MYSQL_DIST
 
@@ -123,7 +122,7 @@ WSREP_SPEC=$RPM_BUILD_ROOT/SPECS/$MYSQL_DIST.spec
 
 #cleaning intermedieate sources:
 cp $WSREP_PATCH ./$MYSQL_DIST.patch
-# rm -rf $MYSQL_DIST
+rm -rf $MYSQL_DIST
 
 ######################################
 ##                                  ##
@@ -131,24 +130,28 @@ cp $WSREP_PATCH ./$MYSQL_DIST.patch
 ##                                  ##
 ######################################
 
-# cflags vars might be obsolete with 5.5
-wsrep_cflags="-DWSREP_PROC_INFO -DMYSQL_MAX_VARIABLE_VALUE_LEN=2048"
-fast_cflags="-O3 -fno-omit-frame-pointer"
-uname -m | grep -q i686 && \
-cpu_cflags="-mtune=i686" || cpu_cflags="-mtune=core2"
-export RPM_OPT_FLAGS="$fast_cflags $cpu_cflags $wsrep_cflags"
+if [ $MYSQL_VERSION_MINOR == 1 ]
+then
+    # cflags vars might be obsolete with 5.5
+    wsrep_cflags="-DWSREP_PROC_INFO -DMYSQL_MAX_VARIABLE_VALUE_LEN=2048"
+    fast_cflags="-O3 -fno-omit-frame-pointer"
+    uname -m | grep -q i686 && \
+    cpu_cflags="-mtune=i686" || cpu_cflags="-mtune=core2"
+    RPM_OPT_FLAGS="$fast_cflags $cpu_cflags $wsrep_cflags"
+fi
 export MAKE="make -j $(cat /proc/cpuinfo | grep -c ^processor)"
 
 RPMBUILD()
 {
-[ $MYSQL_VERSION_MINOR == 1 ]                     && \
-    WSREP_RPM_OPTIONS=(--with wsrep --with yassl) || \
+[ $MYSQL_VERSION_MINOR == 1 ]                              && \
+    WSREP_RPM_OPTIONS=(--with wsrep --with yassl \
+                       --define "optflags $RPM_OPT_FLAGS") || \
     WSREP_RPM_OPTIONS=(--define='with_wsrep 1' \
+                       --define='distro_specific 1' \
                        --define='mysql_packager Codership Oy <info@codership.com>')
 
 $(which rpmbuild) --clean --rmsource --define "_topdir $RPM_BUILD_ROOT" \
-                  --define "optflags $RPM_OPT_FLAGS" "${WSREP_RPM_OPTIONS[@]}" \
-                  -ba $WSREP_SPEC
+                  "${WSREP_RPM_OPTIONS[@]}" -ba $WSREP_SPEC
 }
 
 pushd "$RPM_BUILD_ROOT"
