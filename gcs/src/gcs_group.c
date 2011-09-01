@@ -613,7 +613,10 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         else {
             peer_id = sender->donor;
             st_dir  = "from";
-            if (seqno >= 0) sender->status = GCS_NODE_STATE_JOINED;
+            if (seqno >= 0) {
+                sender->status = GCS_NODE_STATE_JOINED;
+                group->prim_num++;
+            }
         }
 
         // Try to find peer.
