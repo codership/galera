@@ -21,7 +21,7 @@ main (int argc, char* argv[])
     log_debug << "DEBUG output enabled";
 
     if (argc > 1) fname.assign(argv[1]); // take supplied file name if any
-    gu::Config conf("gcache.name = test.cache; gcache.ring_buffer_size = 16K");
+    gu::Config conf("gcache.name = test.cache; gcache.size = 16K");
     GCache* cache = new GCache (conf, "");
 
     log_info  << "";

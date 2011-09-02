@@ -5,11 +5,11 @@
 #include "GCache.hpp"
 
 static const std::string GCACHE_PARAMS_DIR        ("gcache.dir");
-static const std::string GCACHE_PARAMS_NAME       ("gcache.name");
+static const std::string GCACHE_PARAMS_RB_NAME    ("gcache.name");
 static const std::string GCACHE_DEFAULT_BASENAME  ("galera.cache");
 static const std::string GCACHE_PARAMS_MEM_SIZE   ("gcache.mem_size");
 static const ssize_t     GCACHE_DEFAULT_MEM_SIZE  (0);
-static const std::string GCACHE_PARAMS_RB_SIZE    ("gcache.ring_buffer_size");
+static const std::string GCACHE_PARAMS_RB_SIZE    ("gcache.size");
 static const ssize_t     GCACHE_DEFAULT_RB_SIZE   (128 << 20); // 128Mb
 static const std::string GCACHE_PARAMS_PAGE_SIZE  ("gcache.page_size");
 static const ssize_t     GCACHE_DEFAULT_PAGE_SIZE (GCACHE_DEFAULT_RB_SIZE);
@@ -35,22 +35,22 @@ name_value (gu::Config& cfg, const std::string& data_dir)
 
     try
     {
-        return cfg.get (GCACHE_PARAMS_NAME);
+        return cfg.get (GCACHE_PARAMS_RB_NAME);
     }
     catch (gu::NotFound&)
     {
         if (dir.empty())
         {
-            cfg.set (GCACHE_PARAMS_NAME, GCACHE_DEFAULT_BASENAME);
+            cfg.set (GCACHE_PARAMS_RB_NAME, GCACHE_DEFAULT_BASENAME);
         }
         else
         {
-            cfg.set (GCACHE_PARAMS_NAME,
+            cfg.set (GCACHE_PARAMS_RB_NAME,
                      dir + '/' + GCACHE_DEFAULT_BASENAME);
         }
     }
 
-    return cfg.get (GCACHE_PARAMS_NAME);
+    return cfg.get (GCACHE_PARAMS_RB_NAME);
 }
 
 static ssize_t
@@ -88,7 +88,7 @@ void
 gcache::GCache::param_set (const std::string& key, const std::string& val)
     throw (gu::Exception, gu::NotFound)
 {
-    if (key == GCACHE_PARAMS_NAME)
+    if (key == GCACHE_PARAMS_RB_NAME)
     {
         gu_throw_error(EPERM) << "Can't change ring buffer name in runtime.";
     }
