@@ -21,7 +21,7 @@ Please see COPYING file that came with this distribution.
 Source code can be found at http://www.codership.com/en/downloads/galera
 
 
-                        GALERA v0.8.x
+                        GALERA v1.x
 
 CONTENTS:
 =========
@@ -29,7 +29,8 @@ CONTENTS:
 2. GALERA USE CASES
 3. GALERA CONFIGURATION PARAMETERS
 4. GALERA ARBITRATOR
-5. SPECIAL NOTES
+5. WRITESET CACHE
+6. SPECIAL NOTES
 
 
 1. WHAT IS GALERA
@@ -180,13 +181,13 @@ gcomm://          - if one wants to start a new cluster.
 gcomm://<address> - if one wants to join an existing cluster. In that case
                     <address> is the address of one of the cluster members
 
-3.2 Gcomm options.
+3.2 Galera parameters.
 
-There is quite a few gcomm configuration options. Of particular interest to an
-end user are the following options:
+There is quite a few galera configuration parameters which affect its behavior
+and performance. Of particular interest to an end-user are the following:
 
 To configure gcomm listen address:
-    gmcast.listen_addr.
+    gmcast.listen_addr
 
 To configure how fast cluster reacts on node failure or connection loss:
     evs.suspect_timeout
@@ -198,12 +199,16 @@ To fine-tune performance (especially in high latency networks):
     evs.user_send_window
     evs.send_window
 
-For a full options list please see
-http://www.codership.com/wiki/doku.php?id=galera_parameters_0.8
+To relax or tighten replication flow control:
+    gcs.fc_limit
+    gcs.fc_factor
 
-3.2.1 GMCast option group.
+For a full parameter list please see
+http://www.codership.com/wiki/doku.php?id=galera_parameters
 
-All options in this group are prefixed by 'gmcast.' (see example above).
+3.2.1 GMCast parameters group.
+
+All parameters in this group are prefixed by 'gmcast.' (see example above).
 
 group
     String denoting group name. Max length of string is 16. Peer nodes
@@ -229,9 +234,9 @@ mcast_port
 mcast_ttl
     Time to live for multicast packets. Defaults to 1.
 
-3.2.2 EVS option group.
+3.2.2 EVS parameter group.
 
-All options in this group are prefixed by 'evs.'.
+All parameters in this group are prefixed by 'evs.'.
  
 All values for the timeout options below should follow ISO 8601 standard for
 the time interval representation
@@ -308,9 +313,9 @@ user_send_window
     Like <send_window>, but for messages which sending is initiated by a
     call from the upper layer. Default value is 16.
 
-3.2.3 GCS option group
+3.2.3 GCS parameter group
 
-All options in this group are prefixed by 'gcs.'.
+All parameters in this group are prefixed by 'gcs.'.
 
 fc_debug
     Post debug statistics about SST flow control every that many writesets.
@@ -349,9 +354,9 @@ recv_q_soft_limit
     gcs.recv_q_soft_limit is a very approximate estimate of a regular
     replication rate.
 
-3.2.4 Replicator option group
+3.2.4 Replicator parameter group
 
-All options in this group are prefixed by 'replicator.'.
+All parameters in this group are prefixed by 'replicator.'.
 
 commit_order
     Whether we should allow Out-Of-Order committing (improves parallel
@@ -364,9 +369,35 @@ commit_order
         committing)
     Default: 3.
 
-3.2.5 SSL parameters
+3.2.5 GCache parameter group
 
-All options in this group are prefixed by 'socket.'.
+All parameters in this group are prefixed by 'gcache.'.
+
+dir
+    Directory where GCache should place its files. Default: working directory.
+
+name
+    Name of the main store file (ring buffer). Default: “galera.cache”.
+
+size
+    Size of the main store file (ring buffer). This will be preallocated on
+    startup. Default: 128Mb.
+
+page_size
+    Size of a page in the page store. The limit on overall page store is free
+    disk space. Pages are prefixed by “gcache.page”. Default: 128Mb.
+
+keep_pages_size
+    Total size of the page store pages to keep for caching purposes. If only
+    page storage is enabled, one page is always present. Default: 0.
+
+mem_size
+    Size of the malloc() store (read: RAM). For configurations with spare RAM.
+    Default: 0.
+
+3.2.6 SSL parameters
+
+All parameters in this group are prefixed by 'socket.'.
 
 ssl_cert
    Certificate file in PEM format.
@@ -427,9 +458,44 @@ be reattached to cluster at any time. There can be several arbitrators in the
 cluster, although practicality of it is questionable.
 
 
-5. SPECIAL NOTES
+5. WRITESET CACHE
 
-5.1 DEADLOCK ON COMMIT
+Starting with version 1.0 Galera stores writesets in a special cache. It's
+purpose is to improve control of Galera memory usage and offload writeset
+storage to disk. Galera cache has 3 types of stores:
+
+   1. A permanent in-memory store, where writesets are allocated by a default
+      OS memory allocator. It can be useful for systems with spare RAM. It has
+      a hard size limit. By default it is disabled (size set to 0).
+
+   2. A permanent ring-buffer file which is preallocated on disk during cache
+      initialization. It is intended as the main writeset store. By default
+      its size is 128Mb.
+
+   3. An on-demand page store, which allocates memory-mapped page files during
+      runtime as necessary. Default page size is 128Mb, but it can be bigger
+      if it needs to store a bigger writeset. The size of page store is
+      limited by the free disk space. By default page files are deleted when
+      not in use, but a limit can be set on the total size of the page files
+      to keep. When all other stores are disabled, at least one page file is
+      always present on disk.
+
+Allocation algorithm is as follows: all stores are tried in the above order.
+If a store does not have enough space to allocate the writeset, then the next
+store is tried. Page store should always succeed unless the writeset is bigger
+than the available disk space.
+
+By default Galera cache allocates files in the working directory of the
+process, but a dedicated location can be specified. For configuration
+parameters see GCache group above (p. 3.2.5).
+
+NOTE: Since all cache files are memory-mapped, the process may appear to use
+more memory than it actually does.
+
+
+6. SPECIAL NOTES
+
+6.1 DEADLOCK ON COMMIT
 
 In multi-master mode transaction commit operation may return a deadlock error.
 This is a consequence of writeset certification and is a fundamental property
@@ -439,7 +505,7 @@ performed on the same node. This still has an advantage over the "traditional"
 master-slave replication: write load can still be distributed between nodes and
 since replication is synchronous, failover is trivial.
 
-5.2 "SPLIT-BRAIN" CONDITION
+6.2 "SPLIT-BRAIN" CONDITION
 
 Galera cluster is fully distributed and does not use any sort of centralized
 arbitrator, thus having no single point of failure. However, like any cluster
@@ -455,3 +521,4 @@ requirement for a highly-available cluster.
 
 Galera arbitrator (see above) can serve as an odd stateless cluster node
 to help avoid the possibility of an even cluster split.
+
