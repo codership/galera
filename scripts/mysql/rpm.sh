@@ -109,24 +109,32 @@ time tar -C .. -czf $RPM_BUILD_ROOT/SOURCES/"$MYSQL_DIST.tar.gz" \
 ##                                  ##
 ######################################
 
-[ $MYSQL_VERSION_MINOR -eq 1 ] && \
-    time ./configure --with-wsrep > /dev/null && \
-    pushd support-files && rm -rf *.spec &&  make > /dev/null &&  popd || \
-    time ./configure > /dev/null
+time ./configure --with-wsrep > /dev/null
 
+[ $MYSQL_VERSION_MINOR -eq 1 ] && \
+    pushd support-files && rm -rf *.spec &&  make > /dev/null &&  popd
+
+######################################
+##                                  ##
+##       Build binary tar.gz        ##
+##                                  ##
+######################################
+
+make package
 popd # MYSQL_DIST
 
 WSREP_SPEC=${WSREP_SPEC:-"$MYSQL_DIST/support-files/mysql.$MYSQL_VERSION_FINAL.spec"}
 mv $WSREP_SPEC $RPM_BUILD_ROOT/SPECS/$MYSQL_DIST.spec
 WSREP_SPEC=$RPM_BUILD_ROOT/SPECS/$MYSQL_DIST.spec
 
+mv $WSREP_PATCH ./$MYSQL_DIST.patch
+mv $MYSQL_DIST/$MYSQL_DIST-linux-*.tar.gz ./
 #cleaning intermedieate sources:
-cp $WSREP_PATCH ./$MYSQL_DIST.patch
 rm -rf $MYSQL_DIST
 
 ######################################
 ##                                  ##
-##             Build it             ##
+##            Build RPM             ##
 ##                                  ##
 ######################################
 
@@ -169,9 +177,9 @@ popd
 ##     Copy required files here     ##
 ##                                  ##
 ######################################
-cp $WSREP_SPEC ./
+mv $WSREP_SPEC ./
 uname -m | grep -q i686 && ARCH=i386 || ARCH=x86_64
-cp $RPM_BUILD_ROOT/RPMS/$ARCH/MySQL-server-*.rpm ./
+mv $RPM_BUILD_ROOT/RPMS/$ARCH/MySQL-server-*.rpm ./
 
 # remove the patch file if is was automatically generated
 if test ! -r "$2"; then rm -rf $WSREP_PATCH; fi
