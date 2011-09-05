@@ -32,7 +32,7 @@ administration of MySQL server per se. The reader is assumed to know how to
 install, configure, administer and use standard MySQL server version 5.1.xx.
 
 
-                        MYSQL-5.1.x/wsrep-0.8.x
+                        MYSQL-5.5.x/wsrep-21.x
 
 CONTENTS:
 =========
@@ -43,11 +43,13 @@ CONTENTS:
    3.2 DATABASE PRIVILEGES
    3.3 CHECK AND CORRECT FIREWALL SETTINGS
    3.4 SELINUX
-   3.5 CONNECT TO CLUSTER
-4. CONFIGURATION OPTIONS
-   4.1 MANDATORY MYSQL OPTIONS
-   4.2 WSREP OPTIONS
-5. LIMITATIONS
+   3.5 APPARMOR
+   3.6 CONNECT TO CLUSTER
+4. UPGRADING FROM MySQL 5.1.x
+5. CONFIGURATION OPTIONS
+   5.1 MANDATORY MYSQL OPTIONS
+   5.2 WSREP OPTIONS
+6. LIMITATIONS
 
 
 1. WHAT IS WSREP PATCH FOR MYSQL/INNODB
@@ -197,7 +199,22 @@ You'll need to either disable it or configure to allow mysqld to run external
 programs and open listen sockets at unprivileged ports (i.e. things that
 an unprivileged user can do). See SELinux documentation about it.
 
-3.5 CONNECT TO CLUSTER
+To quickly disable SELinux:
+1) run 'setenforce 0' as root.
+2) set 'SELINUX=permissive' in  /etc/selinux/config
+
+3.5 APPARMOR
+
+AppArmor automatically comes with Ubuntu and may also prevent mysqld to from
+opening additional ports or run scripts. See AppArmor documentation about its
+configuration. To disable AppArmor for mysqld:
+
+$ cd /etc/apparmor.d/disable/
+$ sudo ln -s /etc/apparmor.d/usr.sbin.mysqld
+$ sudo service apparmor restart
+
+
+3.6 CONNECT TO CLUSTER
 
 Now you're ready to connect to cluster by setting wsrep_cluster_address variable
 and monitor status of wsrep provider:
@@ -206,9 +223,33 @@ mysql> SET GLOBAL wsrep_cluster_address='<cluster address string>';
 mysql> SHOW STATUS LIKE 'wsrep%';
 
 
-4. CONFIGURATION OPTIONS
+4 UPGRADING FROM MySQL 5.1.x
 
-4.1 MANDATORY MYSQL OPTIONS
+1) BEFORE UPGRADE (while running 5.1.x):
+   - comment out 'wsrep_provider' setting from configuration files
+     (my.cnf and/or wsrep.cnf)
+   - If performing a rolling upgrade on a running cluster, set
+     wsrep_sst_method=mysqldump.
+     You might also need to configure wsrep_sst_receive_address and
+     wsrep_sst_auth appropriately. Mysqldump is the only way to transfer data
+     from 5.1.x to 5.5.x reliably.
+   - remove innodb_plugin settings from configuration files.
+
+2) Perform upgrade as usual:
+   http://dev.mysql.com/doc/refman/5.5/en/upgrading-from-previous-series.html
+   Don't forget to run 'mysql_upgrade' command.
+
+3) AFTER UPGRADING individual node:
+   - uncomment 'wsrep_provider' line in configuration file.
+   - restart the server and join the cluster.
+
+4) AFTER UPGRADING the whole cluster:
+   - revert to usual wsrep SST settings if not 'mysqldump'.
+
+
+5. CONFIGURATION OPTIONS
+
+5.1 MANDATORY MYSQL OPTIONS
 
 binlog_format=ROW
    This option is required to use row-level replication as opposed to
@@ -225,7 +266,7 @@ innodb_autoinc_lock_mode=2
 innodb_locks_unsafe_for_binlog=1
    This option is required for parallel applying.
 
-4.2 WSREP OPTIONS
+5.2 WSREP OPTIONS
 
 All options are optional except for wsrep_provider, wsrep_cluster_address, and
 wsrep_sst_auth.
@@ -294,6 +335,11 @@ wsrep_drupal_282555_workaround=1
       http://bugs.mysql.com/bug.php?id=41984
       http://drupal.org/node/282555
 
+wsrep_causal_reads=0
+   Enforce strict READ COMMITTED semantics on reads and transactions. May
+   result in additional latencies. It is a session variable.
+
+
 State snapshot transfer options.
 
 When a new node joins the cluster it has to synchronize its initial state with
@@ -329,7 +375,7 @@ wsrep_sst_donor=
    wsrep_node_name.
 
 
-5. LIMITATIONS
+6. LIMITATIONS
 
 1) Currently replication works only with InnoDB storage engine. Any writes to 
    tables of other types, including system (mysql.*) tables are not replicated. 
