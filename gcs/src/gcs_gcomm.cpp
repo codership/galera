@@ -283,7 +283,15 @@ public:
     void queue_and_wait(const Message& msg, Message* ack);
 
     RecvBuf&    get_recv_buf()            { return recv_buf; }
-    size_t      get_mtu()           const { return tp->get_mtu(); }
+    size_t      get_mtu()           const
+    {
+        if (tp == 0)
+        {
+            gu_throw_fatal << "GCommConn::get_mtu(): "
+                           << "backend connection not open";
+        }
+        return tp->get_mtu();
+    }
     bool        get_use_prod_cons() const { return use_prod_cons; }
     Protonet&   get_pnet()                { return *net; }
     gu::Config& get_conf()                { return conf; }

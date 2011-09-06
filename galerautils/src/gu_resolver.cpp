@@ -474,9 +474,10 @@ gu::net::Addrinfo gu::net::resolve(const URI& uri)
 
         if (err != 0)
         {
-            gu_throw_error(errno)
-                << "getaddrinfo failed with error code "
-                << err << " for " << uri.to_string();
+            gu_throw_error(errno == 0 ? gu::Exception::E_UNSPEC : errno)
+                << "getaddrinfo failed with error '"
+                << gai_strerror(err) << "' ("
+                << err << ") for " << uri.to_string();
         }
 
         // Assume that the first entry is ok
