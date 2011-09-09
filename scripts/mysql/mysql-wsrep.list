@@ -251,7 +251,7 @@ d 755 root root $SHAR_DST/${lang22} -
 f 644 root root $SHAR_DST/${lang22}            $MYSQL_SRC/sql/share/${lang22}/*
 
 d 755 root root $MAN_DST/man8 -
-f 644 root root $MAN_DST/man8/mysqld.8.gz       $MYSQL_SRC/man/mysqld.8.gz
+f 644 root root $MAN_DST/man8/mysqld.8.gz      $MYSQL_SRC/man/mysqld.8.gz
 %format rpm
 f 644 root root $MAN_DST/man8/mysqlmanager.8.gz $MYSQL_SRC/man/mysqlmanager.8.gz
 %format all
@@ -262,11 +262,11 @@ f 644 root root $MAN_DST/man8/mysqlmanager.8.gz $MYSQL_SRC/man/mysqlmanager.8.gz
 
 # should be created in format-dependent lists: $CONF_DST/conf.d
 %format deb
-c 640 mysql mysql $CONF_DST/conf.d/wsrep.cnf    $MYSQL_SRC/support-files/wsrep.cnf
+c 640 mysql mysql $CONF_DST/conf.d/wsrep.cnf  $MYSQL_SRC/support-files/wsrep.cnf
 %format rpm
 c 640 root root $CONF_DST/conf.d/wsrep.cnf    $MYSQL_SRC/support-files/wsrep.cnf
 %format all
-f 644 root root $DOCS_DST/README-wsrep        ${GALERA_SRC}/scripts/mysql/README-wsrep
+f 644 root root $DOCS_DST/README-wsrep        $MYSQL_SRC/Docs/README-wsrep
 f 755 root root $BINS_DST/wsrep_sst_mysqldump $MYSQL_SRC/scripts/wsrep_sst_mysqldump
 f 755 root root $BINS_DST/wsrep_sst_rsync     $MYSQL_SRC/scripts/wsrep_sst_rsync
 l 755 root root $BINS_DST/wsrep_sst_rsync_wan wsrep_sst_rsync
