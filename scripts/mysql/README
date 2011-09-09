@@ -32,7 +32,7 @@ It does not cover the use or administration of MySQL server per se. The reader
 is assumed to know how to install, configure, administer and use MySQL server.
 
 
-                        MYSQL/GALERA v0.8.x
+                     MYSQL/GALERA v21.x demo package
 
 CONTENTS:
 =========
@@ -49,7 +49,6 @@ CONTENTS:
    2.4 ADDING NEW NODE TO A CLUSTER
    2.5 A "REFERENCE NODE"
    2.6 "SPLIT-BRAIN" CONDITION
-   2.7 SWAP SIZE REQUIREMENTS
 3. CONFIGURATION
    3.1 MANDATORY MYSQL OPTIONS
    3.2 OPTIONAL OPTIMIZATIONS
@@ -386,19 +385,9 @@ cluster (normally nodes fail one by one), in 2-node cluster a single node
 failure can lead to this, thus making 3 nodes a minimum requirement for
 a highly-available cluster.
 
-
-2.7 SWAP SPACE REQUIREMENTS
-
-While in normal operation MySQL/Galera server requires only slightly more
-memory than stock MySQL, there are two situations when extra swap will be
-needed:
-  - forking processes (state transfer and notification scripts).
-  - caching transactions during state transfer.
-It is recommentded that swap size is at least 2 times that of RAM.
-
-NOTE: It is a common practice to have 0 swap on Amazon EC2 instances
-      by default. Make sure to allocate sufficient amount before running
-      MySQL/Galera.
+Dedicated Galera packages (not this distribution) contain a lightweight
+"arbitrator" daemon which can serve as an odd node substitute in situations
+where cluster size is limited to 2 real nodes.
 
 
 3. CONFIGURATION
