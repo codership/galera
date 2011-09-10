@@ -12,7 +12,7 @@
 %requires    libwrap0          7.6
 %requires    perl
 %requires    zlib1g            1.1.4
-%requires    mysql-client-5.1  5.1.47
+%requires    mysql-client-5.1  5.1.41
 
 %replaces    mysql-server-core     0.0.0 ${mysql_version}
 %replaces    mysql-server-core-5.0 0.0.0 ${mysql_version}
@@ -71,7 +71,7 @@ d 755 root root $SHAR_DST -
 f 755 root root $SHAR_DST/debian-start.inc.sh           $SRC/debian-start.inc.sh
 f 755 root root $SHAR_DST/echo_stderr                   $SRC/echo_stderr
 
-#f 755 root root $BINS_DST/my_print_defaults $MYSQL_SRC/extra/my_print_defaults
+f 755 root root $BINS_DST/my_print_defaults_wsrep       $MYSQL_SRC/extra/my_print_defaults
 
 # Distribution dependent scripts
 
@@ -83,6 +83,8 @@ getent group  mysql >/dev/null || addgroup --system mysql >/dev/null
 getent passwd mysql >/dev/null || \
 adduser --system --disabled-login --ingroup mysql --home ${mysql_data} \
         --gecos "MySQL Server" --shell /bin/false mysql >/dev/null
+[ -e "$BINS_DST/my_print_defaults" ] || \
+( cd $BINS_DST && ln -sf my_print_defaults_wsrep my_print_defaults )
 EOF_PREINSTALL
 
 %postinstall <<EOF_POSTINSTALL
@@ -91,6 +93,9 @@ ldconfig -n $LIBS_DST
 #test -d ${mysql_data} || (mysql_install_db --user=mysql --datadir=${mysql_data})
 # it seems that we can run mysql_install_db regardless of existing tables.
 mysql_install_db --wsrep-on=0 --user=mysql --datadir=${mysql_data}
+# This is a fix/workaround for AppArmor profile provided with mysql-server deb
+[ -d /etc/apparmor.d/disable ] && \
+( cd /etc/apparmor.d/disable && ln -sf ../usr.sbin.mysqld ./ )
 EOF_POSTINSTALL
 
 %preremove <<EOF_PREREMOVE
@@ -100,6 +105,8 @@ else
     /etc/init.d/mysql stop
 fi
 update-rc.d -f mysql remove >/dev/null || exit $
+[ -L $BINS_DST/my_print_defaults ] && rm -rf $BINS_DST/my_print_defaults
+[ -L /etc/apparmor.d/disable/usr.sbin.mysqld ] && rm -rf /etc/apparmor.d/disable/usr.sbin.mysqld
 EOF_PREREMOVE
 
 #
