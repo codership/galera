@@ -746,7 +746,7 @@ static wsrep_t galera_str = {
     &galera_desync,
     &galera_resync,
     "Galera",
-    "0.8.2(r"GALERA_REV")",
+    "0.8.3(r"GALERA_REV")",
     "Codership Oy <info@codership.com>",
     &galera_tear_down,
     NULL,
