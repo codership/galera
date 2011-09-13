@@ -462,13 +462,14 @@ void gcomm::evs::Proto::handle_install_timer()
     {
         log_info << "no install message received";
     }
+
+    shift_to(S_GATHER, true);
     const bool is_cons(consensus.is_consensus());
     const bool is_repr(is_representative(get_uuid()));
     evs_log_info(I_STATE) << "consensus: " << is_cons;
     evs_log_info(I_STATE) << "repr     : " << is_repr;
     evs_log_info(I_STATE) << "state dump for diagnosis:";
     std::cerr << *this << std::endl;
-    shift_to(S_GATHER, true);
     if (is_cons == true && is_repr == true)
     {
         send_install();
@@ -619,6 +620,9 @@ void gcomm::evs::Proto::check_inactive()
         last_inactive_check = now;
         return;
     }
+
+    NodeMap::get_value(self_i).set_tstamp(gu::datetime::Date::now());
+    std::for_each(known.begin(), known.end(), InspectNode());
 
     bool has_inactive(false);
     size_t n_suspected(0);
