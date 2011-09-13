@@ -34,6 +34,8 @@ gcomm::evs::Node::Node(const Node& n)
     :
     index_           (n.index_),
     operational_     (n.operational_),
+    suspected_       (n.suspected_),
+    inactive_        (n.inactive_),
     committed_       (n.committed_),
     installed_       (n.installed_),
     join_message_    (n.join_message_ != 0 ? 
@@ -90,11 +92,11 @@ void gcomm::evs::Node::set_leave_message(const LeaveMessage* lm)
 
 bool gcomm::evs::Node::is_suspected() const
 {
-    return (get_tstamp() + suspect_timeout_ < Date::now());
+    return suspected_;
 }
 
 bool gcomm::evs::Node::is_inactive() const
 {
-    return (get_tstamp() + inactive_timeout_ < Date::now());
+    return inactive_;
 }
 
