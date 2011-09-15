@@ -91,7 +91,7 @@ else:
 boost = int(ARGUMENTS.get('boost', 1))
 ssl   = int(ARGUMENTS.get('ssl', 1))
 
-revno = ARGUMENTS.get('revno', 'XXXX')
+#revno   = ARGUMENTS.get('revno', 'XXXX')
 
 #
 # Set up and export default build environment
@@ -114,8 +114,6 @@ if cxx != 'default':
 link = os.getenv('LINK', 'default')
 if link != 'default':
     env.Replace(LINK = link)
-
-env.Append(CPPFLAGS = '-DGALERA_REV=\\"' + revno + '\\"')
 
 # Freebsd ports are installed under /usr/local 
 if sysname == 'freebsd':

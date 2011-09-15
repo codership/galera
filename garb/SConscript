@@ -25,13 +25,21 @@ if os.path.isfile(bpo_static):
 else:
     env.Append(LIBS=['boost_program_options'])
 
+# special environment for garb_config.cpp
+conf_env = env.Clone()
+version = ARGUMENTS.get('version', '1.dev')
+conf_env.Append(CPPFLAGS = ' -DGALERA_VER=\\"' + version + '\\"')
+revno   = ARGUMENTS.get('revno', 'XXXX')
+conf_env.Append(CPPFLAGS = ' -DGALERA_REV=\\"' + revno + '\\"')
+
 garb = env.Program(target = 'garbd',
                    source = Split('''
                                   garb_logger.cpp
-                                  garb_config.cpp
                                   garb_gcs.cpp
                                   garb_recv_loop.cpp
                                   garb_main.cpp
                               ''')
+                              +
+                              conf_env.SharedObject(['garb_config.cpp'])
                    )
 
