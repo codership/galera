@@ -277,10 +277,10 @@ pushd "$build_base"
 #fi
 popd
 
-if [ -z "$RELEASE" ]
-then
-    RELEASE=$GALERA_REV
-fi
+#if [ -z "$RELEASE" ]
+#then
+#    RELEASE=$GALERA_REV
+#fi
 
 if [ "$SCONS" == "yes" ] # Build using Scons
 then
@@ -288,15 +288,9 @@ then
     export SCONS_VD=$build_base
     scons_args="-C $build_base revno=$GALERA_REV"
 
-    if [ -n "$TARGET" ]
-    then
-        scons_args="$scons_args arch=$TARGET"
-    fi
-
-    if [ "$DEBUG" == "yes" ]
-    then
-        scons_args="$scons_args debug=$DEBUG_LEVEL"
-    fi
+    [ -n "$TARGET"      ] && scons_args="$scons_args arch=$TARGET"
+    [ -n "$RELEASE"     ] && scons_args="$scons_args version=$RELEASE"
+    [ "$DEBUG" == "yes" ] && scons_args="$scons_args debug=$DEBUG_LEVEL"
 
     if [ "$SCRATCH" == "yes" ]
     then
