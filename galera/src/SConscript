@@ -29,10 +29,9 @@ mmlib_env.Replace(SHOBJPREFIX = 'libmmgalera++-')
 # Environment to compile provider unit (part of multimaster library)
 # This is needed to hardcode version and revision
 mmprovider_env = mmlib_env.Clone()
-version = ARGUMENTS.get('version', '1.dev')
-mmprovider_env.Append(CPPFLAGS = ' -DGALERA_VER=\\"' + version + '\\"')
-revno   = ARGUMENTS.get('revno', 'XXXX')
-mmprovider_env.Append(CPPFLAGS = ' -DGALERA_REV=\\"' + revno + '\\"')
+Import ('GALERA_VER', 'GALERA_REV')
+mmprovider_env.Append(CPPFLAGS = ' -DGALERA_VER=\\"' + GALERA_VER + '\\"')
+mmprovider_env.Append(CPPFLAGS = ' -DGALERA_REV=\\"' + GALERA_REV + '\\"')
 
 #
 env.Append(LIBGALERA_OBJS = libgaleraxx_env.SharedObject(libgaleraxx_srcs))
