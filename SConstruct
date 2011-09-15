@@ -91,7 +91,10 @@ else:
 boost = int(ARGUMENTS.get('boost', 1))
 ssl   = int(ARGUMENTS.get('ssl', 1))
 
-revno = ARGUMENTS.get('revno', 'XXXX')
+GALERA_VER = ARGUMENTS.get('version', '2.dev')
+GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
+# export to any module that might have use of those
+Export('GALERA_VER', 'GALERA_REV')
 
 #
 # Set up and export default build environment
@@ -114,8 +117,6 @@ if cxx != 'default':
 link = os.getenv('LINK', 'default')
 if link != 'default':
     env.Replace(LINK = link)
-
-env.Append(CPPFLAGS = '-DGALERA_REV=\\"' + revno + '\\"')
 
 # Freebsd ports are installed under /usr/local 
 if sysname == 'freebsd':

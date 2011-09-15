@@ -71,7 +71,7 @@ Config::Config (int argc, char* argv[]) throw (gu::Exception)
 
     if (vm.count("version"))
     {
-        log_info << "0.8.2.r" << GALERA_REV;
+        log_info << GALERA_VER << ".r" << GALERA_REV;
     }
 
     if (vm.count("cfg"))
