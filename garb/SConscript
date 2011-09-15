@@ -27,10 +27,9 @@ else:
 
 # special environment for garb_config.cpp
 conf_env = env.Clone()
-version = ARGUMENTS.get('version', '0.8dev')
-conf_env.Append(CPPFLAGS = ' -DGALERA_VER=\\"' + version + '\\"')
-revno   = ARGUMENTS.get('revno', 'XXXX')
-conf_env.Append(CPPFLAGS = ' -DGALERA_REV=\\"' + revno + '\\"')
+Import('GALERA_VER', 'GALERA_REV')
+conf_env.Append(CPPFLAGS = ' -DGALERA_VER=\\"' + GALERA_VER + '\\"')
+conf_env.Append(CPPFLAGS = ' -DGALERA_REV=\\"' + GALERA_REV + '\\"')
 
 garb = env.Program(target = 'garbd',
                    source = Split('''
