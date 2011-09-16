@@ -1637,18 +1637,17 @@ gcs_resume_recv (gcs_conn_t* conn)
 {
     int ret = GCS_CLOSED_ERROR;
 
-    if (conn->state < GCS_CONN_CLOSED) {
-        ret = gu_fifo_resume_gets (conn->recv_q);
-        if (ret) {
-            if (conn->state < GCS_CONN_CLOSED) {
-                gu_fatal ("Internal logic error: failed to resume \"gets\" on "
-                          "recv_q: %d (%s). Aborting.", ret, strerror (-ret));
-                gcs_close (conn);
-                gu_abort();
-            }
-            else {
-                ret = GCS_CLOSED_ERROR;
-            }
+    ret = gu_fifo_resume_gets (conn->recv_q);
+
+    if (ret) {
+        if (conn->state < GCS_CONN_CLOSED) {
+            gu_fatal ("Internal logic error: failed to resume \"gets\" on "
+                      "recv_q: %d (%s). Aborting.", ret, strerror (-ret));
+            gcs_close (conn);
+            gu_abort();
+        }
+        else {
+            ret = GCS_CLOSED_ERROR;
         }
     }
 
