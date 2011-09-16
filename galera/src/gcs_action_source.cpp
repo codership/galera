@@ -158,6 +158,9 @@ ssize_t galera::GcsActionSource::process(void* recv_ctx)
     size_t act_size;
     gcs_act_type_t act_type;
     gcs_seqno_t seqno_g, seqno_l;
+
+// REMOVE    log_info << "DEBUG: recv() started.";
+
     ssize_t rc(gcs_.recv(&act, &act_size, &act_type, &seqno_l, &seqno_g));
     if (rc > 0)
     {

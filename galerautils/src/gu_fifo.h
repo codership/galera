@@ -18,6 +18,8 @@
 #ifndef _gu_fifo_h_
 #define _gu_fifo_h_
 
+#include <errno.h>
+
 typedef struct gu_fifo gu_fifo_t;
 
 /*! constructor */
@@ -35,8 +37,12 @@ extern char* gu_fifo_print (gu_fifo_t *queue);
 extern void  gu_fifo_lock      (gu_fifo_t *q);
 /*! Release FIFO */
 extern void  gu_fifo_release   (gu_fifo_t *q);
-/*! Lock FIFO and get pointer to head item */
-extern void* gu_fifo_get_head  (gu_fifo_t* q);
+/*! Lock FIFO and get pointer to head item
+ * @param err contains error code if retval is NULL (otherwise - undefined):
+              -ENODATA   - queue closed,
+              -ECANCELED - gets were canceled on the queue
+ * @retval pointer to head item or NULL if error occured */
+extern void* gu_fifo_get_head  (gu_fifo_t* q, int* err);
 /*! Advance FIFO head pointer and release FIFO. */
 extern void  gu_fifo_pop_head  (gu_fifo_t* q);
 /*! Lock FIFO and get pointer to tail item */
@@ -47,5 +53,10 @@ extern void  gu_fifo_push_tail (gu_fifo_t* q);
 extern long  gu_fifo_length    (gu_fifo_t* q);
 /*! Return how many items were in the queue on average per push_tail() */
 extern void  gu_fifo_stats     (gu_fifo_t* q, long* q_len, double* q_len_avg);
+
+/*! Cancel getters (must be called while holding a FIFO lock) */
+extern int gu_fifo_cancel_gets (gu_fifo_t* q);
+/*! Resume get operations */
+extern int gu_fifo_resume_gets (gu_fifo_t* q);
 
 #endif // _gu_fifo_h_

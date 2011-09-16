@@ -1256,7 +1256,6 @@ long gcs_close (gcs_conn_t *conn)
                      gcs_conn_state_str[GCS_CONN_CLOSED]);
             gcs_shift_state (conn, GCS_CONN_CLOSED);
         }
-//DELETE        conn->err = -ECONNABORTED;
     }
 
     if (!ret) {
@@ -1563,7 +1562,7 @@ long gcs_recv (gcs_conn_t*     conn,
                gcs_seqno_t*    act_id,
                gcs_seqno_t*    local_act_id)
 {
-    long                 err;
+    int                 err;
     struct gcs_recv_act *act = NULL;
 
     *act_size     = 0;
@@ -1572,7 +1571,7 @@ long gcs_recv (gcs_conn_t*     conn,
     *local_act_id = GCS_SEQNO_ILL;
     *action       = NULL;
 
-    if ((act = gu_fifo_get_head (conn->recv_q)))
+    if ((act = gu_fifo_get_head (conn->recv_q, &err)))
     {
         conn->queue_len = gu_fifo_length (conn->recv_q) - 1;
         bool send_cont  = gcs_fc_cont_begin   (conn);
@@ -1583,6 +1582,16 @@ long gcs_recv (gcs_conn_t*     conn,
         *act_type     = act->rcvd.act.type;
         *act_id       = act->rcvd.id;
         *local_act_id = act->local_id;
+
+        if (gu_unlikely (GCS_ACT_CONF == *act_type)) {
+            err = gu_fifo_cancel_gets (conn->recv_q);
+            if (err) {
+                gu_fatal ("Internal logic error: failed to cancel recv_q "
+                          "\"gets\": %d (%s). Aborting.",
+                          err, strerror(-err));
+                gu_abort();
+            }
+        }
 
         GCS_FIFO_POP_HEAD (conn, *act_size); // release the queue
 
@@ -1601,6 +1610,7 @@ long gcs_recv (gcs_conn_t*     conn,
                 gu_fatal ("Last opportunity to send CONT message failed: "
                           "%d (%s). Aborting to avoid cluster lock-up...",
                           err, strerror(-err));
+                gcs_close(conn);
                 gu_abort();
             }
         }
@@ -1612,9 +1622,37 @@ long gcs_recv (gcs_conn_t*     conn,
         return *act_size;
     }
     else {
-        assert (GCS_CONN_CLOSED == conn->state);
-        return GCS_CLOSED_ERROR;
+        switch (err) {
+        case -ENODATA:
+            assert (GCS_CONN_CLOSED == conn->state);
+            return GCS_CLOSED_ERROR;
+        default:
+            return err;
+        }
     }
+}
+
+long
+gcs_resume_recv (gcs_conn_t* conn)
+{
+    int ret = GCS_CLOSED_ERROR;
+
+    if (conn->state < GCS_CONN_CLOSED) {
+        ret = gu_fifo_resume_gets (conn->recv_q);
+        if (ret) {
+            if (conn->state < GCS_CONN_CLOSED) {
+                gu_fatal ("Internal logic error: failed to resume \"gets\" on "
+                          "recv_q: %d (%s). Aborting.", ret, strerror (-ret));
+                gcs_close (conn);
+                gu_abort();
+            }
+            else {
+                ret = GCS_CLOSED_ERROR;
+            }
+        }
+    }
+
+    return ret;
 }
 
 long

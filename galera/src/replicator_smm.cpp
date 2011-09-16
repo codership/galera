@@ -411,7 +411,13 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 
     while (state_() != S_CLOSING)
     {
-        ssize_t rc(as_->process(recv_ctx));
+        ssize_t rc;
+
+        while ((rc = as_->process(recv_ctx)) == -ECANCELED)
+        {
+// REMOVE            log_info << "DEBUG: recv() canceled.";
+            usleep (10000); // go to IST processing
+        }
 
         if (rc <= 0)
         {
@@ -1248,6 +1254,8 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
     }
 
     local_monitor_.leave(lo);
+
+    gcs_.resume_recv();
 }
 
 

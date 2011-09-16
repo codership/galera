@@ -139,7 +139,8 @@ GCS_BACKEND_RECV_FN(dummy_recv)
      * in the previous call */
     if (gu_likely(DUMMY_CLOSED <= conn->state))
     {
-        dummy_msg_t** ptr = gu_fifo_get_head (conn->gc_q);
+        int err;
+        dummy_msg_t** ptr = gu_fifo_get_head (conn->gc_q, &err);
 
         if (gu_likely(ptr != NULL)) {
 

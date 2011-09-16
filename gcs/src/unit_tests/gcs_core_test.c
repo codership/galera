@@ -92,10 +92,11 @@ core_recv_thread (void* arg)
 }
 
 // this macro logs errors from within a function
-#define FAIL_IF(expr, format, ...)                 \
-    if (expr) {                                    \
-        gu_error(format, ## __VA_ARGS__, NULL);    \
-        return true;                               \
+#define FAIL_IF(expr, format, ...)                            \
+    if (expr) {                                               \
+        gu_fatal ("FAIL: "format, ## __VA_ARGS__, NULL);   \
+        fail_if (true, format, ## __VA_ARGS__, NULL);         \
+        return true;                                          \
     }
 
 // Start a thread to receive an action
@@ -352,7 +353,8 @@ core_test_cleanup ()
     ret = gcs_core_close (Core);
     fail_if (0 != ret, "Failed to close core: %ld (%s)",
              ret, strerror (-ret));
-    fail_if (CORE_RECV_END   (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CONF));
+    ret = CORE_RECV_END (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CONF);
+    fail_if (ret, "ret: %ld (%s)", ret, strerror(-ret));
     free ((void*)act.data);
 
     // check that backend is closed too

@@ -34,6 +34,7 @@ namespace galera
         virtual gcs_seqno_t caused() = 0;
         virtual ssize_t schedule() = 0;
         virtual ssize_t interrupt(ssize_t) = 0;
+        virtual ssize_t resume_recv() = 0;
         virtual ssize_t set_last_applied(gcs_seqno_t) = 0;
         virtual ssize_t request_state_transfer(const void* req, ssize_t req_len,
                                                const std::string& sst_donor,
@@ -115,6 +116,11 @@ namespace galera
         ssize_t interrupt(ssize_t handle)
         {
             return gcs_interrupt(conn_, handle);
+        }
+
+        ssize_t resume_recv()
+        {
+            return gcs_resume_recv(conn_);
         }
 
         ssize_t set_last_applied(gcs_seqno_t last_applied)
@@ -202,6 +208,8 @@ namespace galera
         ssize_t schedule() { return -ENOTCONN; }
 
         ssize_t interrupt(ssize_t) { return -ENOTCONN; }
+
+        ssize_t resume_recv() { return 0; }
 
         ssize_t set_last_applied(gcs_seqno_t last_applied)
         {

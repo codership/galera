@@ -242,6 +242,16 @@ extern long gcs_schedule (gcs_conn_t* conn);
 extern long gcs_interrupt (gcs_conn_t* conn, long handle);
 
 /*!
+ * Resume receivng from group.
+ *
+ * @param conn     GCS connection
+ *
+ * @retval 0       success
+ * @retval -EBADFD connection is in closed state
+ */
+extern long gcs_resume_recv (gcs_conn_t* conn);
+
+/*!
  * After action with this seqno is applied, this thread is guaranteed to see
  * all the changes made by the client, even on other nodes.
  *
