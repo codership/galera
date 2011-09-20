@@ -191,6 +191,7 @@ private:
     bool is_msg_from_previous_view(const Message&);
     void check_suspects(const UUID&, const MessageNodeList&);
     void cross_check_inactives(const UUID&, const MessageNodeList&);
+    void check_unseen();
     void handle_foreign(const Message&);
     void handle_user(const UserMessage&,
                      NodeMap::iterator,

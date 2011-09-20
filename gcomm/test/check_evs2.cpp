@@ -608,12 +608,13 @@ END_TEST
 static gu::Config gu_conf;
 
 static DummyNode* create_dummy_node(size_t idx,
+                                    const string& suspect_timeout = "PT1H",
                                     const string& inactive_timeout = "PT1H",
                                     const string& retrans_period = "PT20M")
 {
     string conf = "evs://?" + Conf::EvsViewForgetTimeout + "=PT1H&"
-        + Conf::EvsInactiveCheckPeriod + "=" + to_string(Period(inactive_timeout)/3) + "&"
-        + Conf::EvsSuspectTimeout + "=" + inactive_timeout + "&"
+        + Conf::EvsInactiveCheckPeriod + "=" + to_string(Period(suspect_timeout)/3) + "&"
+        + Conf::EvsSuspectTimeout + "=" + suspect_timeout + "&"
         + Conf::EvsInactiveTimeout + "=" + inactive_timeout + "&"
 
         + Conf::EvsKeepalivePeriod + "=" + retrans_period + "&"
@@ -725,12 +726,15 @@ START_TEST(test_proto_join_n_w_user_msg)
     PropagationMatrix prop;
     vector<DummyNode*> dn;
     // @todo This test should terminate without these timeouts
+    const string suspect_timeout("PT1H");
     const string inactive_timeout("PT1H");
     const string retrans_period("PT0.1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
     }
 
     uint32_t max_view_seq(0);
@@ -766,13 +770,16 @@ START_TEST(test_proto_join_n_lossy)
     const size_t n_nodes(4);
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    const string suspect_timeout("PT1H");
     const string inactive_timeout("PT1H");
     const string retrans_period("PT0.1S");
 
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
     }
 
     uint32_t max_view_seq(0);
@@ -803,12 +810,15 @@ START_TEST(test_proto_join_n_lossy_w_user_msg)
     const size_t n_nodes(4);
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    const string suspect_timeout("PT1H");
     const string inactive_timeout("PT1H");
     const string retrans_period("PT0.1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
     }
 
     uint32_t max_view_seq(0);
@@ -881,12 +891,15 @@ START_TEST(test_proto_leave_n_w_user_msg)
     const size_t n_nodes(4);
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    const string suspect_timeout("PT1H");
     const string inactive_timeout("PT1H");
     const string retrans_period("PT0.1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
     }
 
     for (size_t i = 0; i < n_nodes; ++i)
@@ -925,12 +938,15 @@ START_TEST(test_proto_leave_n_lossy)
     const size_t n_nodes(4);
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    const string suspect_timeout("PT0.5S");
     const string inactive_timeout("PT1S");
     const string retrans_period("PT0.1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
     }
 
     for (size_t i = 0; i < n_nodes; ++i)
@@ -976,12 +992,16 @@ START_TEST(test_proto_leave_n_lossy_w_user_msg)
     const size_t n_nodes(4);
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+
+    const string suspect_timeout("PT0.5S");
     const string inactive_timeout("PT1S");
     const string retrans_period("PT0.1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
     }
 
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1029,12 +1049,15 @@ static void test_proto_split_merge_gen(const size_t n_nodes,
 {
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    const string suspect_timeout("PT0.6S");
     const string inactive_timeout("PT1.2S");
     const string retrans_period("PT0.1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
     }
 
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1182,12 +1205,15 @@ START_TEST(test_proto_stop_cont)
     const size_t n_nodes(4);
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    const string suspect_timeout("PT0.31S");
     const string inactive_timeout("PT0.31S");
     const string retrans_period("PT0.1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
     }
 
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1224,12 +1250,16 @@ START_TEST(test_proto_arbitrate)
     const size_t n_nodes(3);
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    const string suspect_timeout("PT0.5S");
     const string inactive_timeout("PT0.5S");
     const string retrans_period("PT0.1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+        gu_trace(dn.push_back(
+                     create_dummy_node(i,
+                                       suspect_timeout,
+                                       inactive_timeout, retrans_period)));
     }
 
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1265,12 +1295,15 @@ START_TEST(test_proto_split_two)
     const size_t n_nodes(2);
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    const string suspect_timeout("PT0.31S");
     const string inactive_timeout("PT0.31S");
     const string retrans_period("PT0.1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
     }
 
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1304,12 +1337,15 @@ START_TEST(test_aggreg)
     const size_t n_nodes(2);
     PropagationMatrix prop;
     vector<DummyNode*> dn;
+    const string suspect_timeout("PT0.31S");
     const string inactive_timeout("PT0.31S");
     const string retrans_period("PT0.1S");
 
     for (size_t i = 1; i <= n_nodes; ++i)
     {
-        gu_trace(dn.push_back(create_dummy_node(i, inactive_timeout, retrans_period)));
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout, retrans_period)));
     }
 
     for (size_t i = 0; i < n_nodes; ++i)
@@ -1330,6 +1366,53 @@ START_TEST(test_aggreg)
     for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
+
+START_TEST(test_trac_538)
+{
+    gu_conf_self_tstamp_on();
+    log_info << "START (test_trac_538)";
+    init_rand();
+    const size_t n_nodes(5);
+    PropagationMatrix prop;
+    vector<DummyNode*> dn;
+    const string suspect_timeout("PT0.5S");
+    const string inactive_timeout("PT1S");
+    const string retrans_period("PT0.1S");
+
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        gu_trace(dn.push_back(
+                     create_dummy_node(i, suspect_timeout,
+                                       inactive_timeout,
+                                       retrans_period)));
+    }
+
+    for (size_t i = 0; i < n_nodes - 1; ++i)
+    {
+        gu_trace(join_node(&prop, dn[i], i == 0 ? true : false));
+        set_cvi(dn, 0, i, i + 1);
+        gu_trace(prop.propagate_until_cvi(false));
+    }
+
+    uint32_t max_view_seq(get_max_view_seq(dn, 0, n_nodes - 1));
+
+    gu_trace(join_node(&prop, dn[n_nodes - 1], false));
+    for (size_t i = 1; i <= n_nodes; ++i)
+    {
+        if (i != n_nodes - 1)
+        {
+            prop.set_loss(i, n_nodes - 1, 0);
+            prop.set_loss(n_nodes - 1, i, 0);
+        }
+    }
+    set_cvi(dn, 0, n_nodes - 1, max_view_seq + 1);
+    dn[n_nodes - 2]->set_cvi(ViewId(V_REG, n_nodes - 1, max_view_seq + 1));
+    gu_trace(prop.propagate_until_cvi(true));
+    gu_trace(check_trace(dn));
+    for_each(dn.begin(), dn.end(), DeleteObject());
+}
+END_TEST
+
 
 
 Suite* evs2_suite()
@@ -1455,8 +1538,11 @@ Suite* evs2_suite()
         tc = tcase_create("test_proto_arbitrate");
         tcase_add_test(tc, test_proto_arbitrate);
         suite_add_tcase(s, tc);
+
+        tc = tcase_create("test_trac_538");
+        tcase_add_test(tc, test_trac_538);
+        tcase_set_timeout(tc, 15);
+        suite_add_tcase(s, tc);
     }
-
-
     return s;
 }
