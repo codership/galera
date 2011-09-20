@@ -3088,6 +3088,83 @@ void gcomm::evs::Proto::cross_check_inactives(const UUID& source,
 }
 
 
+// For each node thas has no join message associated, iterate over other
+// known nodes' join messages to find out if the node without join message
+// should be declared inactive.
+void gcomm::evs::Proto::check_unseen()
+{
+    for (NodeMap::iterator i(known.begin()); i != known.end(); ++i)
+    {
+
+        const UUID& uuid(NodeMap::get_key(i));
+        Node& node(NodeMap::get_value(i));
+
+        if (uuid                         != get_uuid() &&
+            current_view.is_member(uuid) == false      &&
+            node.get_join_message()      == 0)
+        {
+            evs_log_info(I_STATE) << "checking unseen " << uuid;
+            size_t cnt(0), inact_cnt(0);
+            for (NodeMap::iterator j(known.begin()); j != known.end(); ++j)
+            {
+                const JoinMessage* jm(NodeMap::get_value(j).get_join_message());
+                if (jm == 0 || NodeMap::get_key(j) == get_uuid()) continue;
+
+                MessageNodeList::const_iterator mn_i;
+                bool all_joins_present(true);
+                for (mn_i = jm->get_node_list().begin();
+                     mn_i != jm->get_node_list().end(); ++mn_i)
+                {
+                    NodeMap::const_iterator nm_i(known.find(MessageNodeList::get_key(mn_i)));
+                    if (nm_i == known.end() ||
+                        (MessageNodeList::get_value(mn_i).get_operational() == true &&
+                         NodeMap::get_value(nm_i).get_join_message() == 0))
+                    {
+                        all_joins_present = false;
+                        break;
+                    }
+                }
+                if (all_joins_present == false)
+                {
+                    evs_log_info(I_STATE)
+                        << "all joins not locally present for "
+                        << NodeMap::get_key(j)
+                        << " join message node list";
+                    // cnt = 0;
+                    // break;
+                    return;
+                }
+                if ((mn_i = jm->get_node_list().find(uuid))
+                    != jm->get_node_list().end())
+                {
+                    const MessageNode& mn(MessageNodeList::get_value(mn_i));
+                    evs_log_info(I_STATE)
+                        << "found " << uuid << " from " <<  NodeMap::get_key(j)
+                        << " join message: "
+                        << mn.get_view_id() << " "
+                        << mn.get_operational();
+                    if (mn.get_view_id() != ViewId(V_REG))
+                    {
+                        ++cnt;
+                        if (mn.get_operational() == false) ++inact_cnt;
+                    }
+                }
+            }
+            if (cnt > 0 && cnt == inact_cnt)
+            {
+                evs_log_info(I_STATE)
+                    << "unseen node marked inactive by others (cnt="
+                    << cnt
+                    << ", inact_cnt="
+                    << inact_cnt
+                    << ")";
+                set_inactive(uuid);
+            }
+        }
+    }
+}
+
+
 void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii)
 {
     assert(ii != known.end());
@@ -3260,6 +3337,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         gu_trace(check_suspects(msg.get_source(), same_view));
         gu_trace(cross_check_inactives(msg.get_source(), same_view));
     }
+    gu_trace(check_unseen());
 
     // If current join message differs from current state, send new join
     const JoinMessage* curr_join(NodeMap::get_value(self_i).get_join_message());
