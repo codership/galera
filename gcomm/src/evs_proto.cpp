@@ -3115,10 +3115,11 @@ void gcomm::evs::Proto::check_unseen()
                 for (mn_i = jm->get_node_list().begin();
                      mn_i != jm->get_node_list().end(); ++mn_i)
                 {
-                    NodeMap::const_iterator nm_i(known.find(MessageNodeList::get_key(mn_i)));
-                    if (nm_i == known.end() ||
+                    NodeMap::const_iterator known_i(
+                        known.find(MessageNodeList::get_key(mn_i)));
+                    if (known_i == known.end() ||
                         (MessageNodeList::get_value(mn_i).get_operational() == true &&
-                         NodeMap::get_value(nm_i).get_join_message() == 0))
+                         NodeMap::get_value(known_i).get_join_message() == 0))
                     {
                         all_joins_present = false;
                         break;
@@ -3130,8 +3131,6 @@ void gcomm::evs::Proto::check_unseen()
                         << "all joins not locally present for "
                         << NodeMap::get_key(j)
                         << " join message node list";
-                    // cnt = 0;
-                    // break;
                     return;
                 }
                 if ((mn_i = jm->get_node_list().find(uuid))
@@ -3336,8 +3335,8 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     {
         gu_trace(check_suspects(msg.get_source(), same_view));
         gu_trace(cross_check_inactives(msg.get_source(), same_view));
+        gu_trace(check_unseen());
     }
-    gu_trace(check_unseen());
 
     // If current join message differs from current state, send new join
     const JoinMessage* curr_join(NodeMap::get_value(self_i).get_join_message());
