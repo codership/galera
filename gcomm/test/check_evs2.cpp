@@ -1049,7 +1049,7 @@ static void test_proto_split_merge_gen(const size_t n_nodes,
 {
     PropagationMatrix prop;
     vector<DummyNode*> dn;
-    const string suspect_timeout("PT0.6S");
+    const string suspect_timeout("PT1.2S");
     const string inactive_timeout("PT1.2S");
     const string retrans_period("PT0.1S");
 
