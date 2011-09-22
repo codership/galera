@@ -612,6 +612,8 @@ static DummyNode* create_dummy_node(size_t idx,
                                     const string& inactive_timeout = "PT1H",
                                     const string& retrans_period = "PT20M")
 {
+    // reset conf to avoid stale config in case of nofork
+    gu_conf = gu::Config();
     string conf = "evs://?" + Conf::EvsViewForgetTimeout + "=PT1H&"
         + Conf::EvsInactiveCheckPeriod + "=" + to_string(Period(suspect_timeout)/3) + "&"
         + Conf::EvsSuspectTimeout + "=" + suspect_timeout + "&"

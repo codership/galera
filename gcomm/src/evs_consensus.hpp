@@ -20,17 +20,17 @@ namespace gcomm
 
 class gcomm::evs::Consensus
 {
-public:   
-    Consensus(const UUID& uuid_,
-              const NodeMap& known_, 
-              const InputMap& input_map_,
-              const View& current_view_) :
-        uuid(uuid_),
-        known(known_),
-        input_map(input_map_),
-        current_view(current_view_)
+public:
+    Consensus(const UUID&     uuid,
+              const NodeMap&  known,
+              const InputMap& input_map,
+              const View&     current_view) :
+        uuid_(uuid),
+        known_(known),
+        input_map_(input_map),
+        current_view_(current_view)
     { }
-    
+
     /*!
      * Compare two messages if they are equal in consensus context.
      */
@@ -58,13 +58,13 @@ public:
     bool is_consistent_leaving(const Message&) const;
     bool is_consistent_same_view(const Message&) const;
     bool is_consistent(const Message&) const;
-    bool is_consensus() const;    
+    bool is_consensus() const;
 private:
-    
-    const UUID& get_uuid() const { return uuid; }
-    
-    const UUID& uuid;
-    const NodeMap& known;
-    const InputMap& input_map;
-    const View& current_view;
+
+    const UUID& get_uuid() const { return uuid_; }
+
+    const UUID& uuid_;
+    const NodeMap& known_;
+    const InputMap& input_map_;
+    const View& current_view_;
 };
