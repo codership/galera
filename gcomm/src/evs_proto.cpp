@@ -1634,7 +1634,7 @@ void gcomm::evs::Proto::recover(const UUID& gap_source,
         }
         else
         {
-            evs_log_info(D_RETRANS) << "recover " << um;
+            evs_log_debug(D_RETRANS) << "recover " << um;
         }
         seq = seq + msg.get_seq_range() + 1;
         recovered_msgs++;
