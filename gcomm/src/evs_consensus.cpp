@@ -339,9 +339,8 @@ bool gcomm::evs::Consensus::is_consistent_partitioning(const Message& msg) const
     }
 
 
-    // evs_log_debug(D_CONSENSUS)
-    log_info << " msg insts:\n" << msg_insts
-             << " local insts:\n" << local_insts;
+    evs_log_debug(D_CONSENSUS) << " msg insts:\n" << msg_insts
+                               << " local insts:\n" << local_insts;
     return (msg_insts == local_insts);
 }
 
