@@ -123,16 +123,16 @@ bool gcomm::evs::Consensus::equal(const Message& m1, const Message& m2) const
 gcomm::evs::seqno_t gcomm::evs::Consensus::highest_reachable_safe_seq() const
 {
     list<seqno_t> seq_list;
-    for (NodeMap::const_iterator i = known.begin(); i != known.end();
+    for (NodeMap::const_iterator i = known_.begin(); i != known_.end();
          ++i)
     {
         const Node& node(NodeMap::get_value(i));
         const JoinMessage* jm(node.get_join_message());
         const LeaveMessage* lm(node.get_leave_message());
 
-        if ((jm == 0 && current_view.is_member(NodeMap::get_key(i)) == true) ||
-            (jm != 0 && jm->get_source_view_id() == current_view.get_id()) ||
-            (lm != 0 && lm->get_source_view_id() == current_view.get_id()))
+        if ((jm == 0 && current_view_.is_member(NodeMap::get_key(i)) == true) ||
+            (jm != 0 && jm->get_source_view_id() == current_view_.get_id()) ||
+            (lm != 0 && lm->get_source_view_id() == current_view_.get_id()))
         {
             if (lm != 0)
             {
@@ -145,12 +145,12 @@ gcomm::evs::seqno_t gcomm::evs::Consensus::highest_reachable_safe_seq() const
             {
                 seq_list.push_back(
                     min(
-                        input_map.get_safe_seq(node.get_index()),
-                        input_map.get_range(node.get_index()).get_lu() - 1));
+                        input_map_.get_safe_seq(node.get_index()),
+                        input_map_.get_range(node.get_index()).get_lu() - 1));
             }
             else
             {
-                seq_list.push_back(input_map.get_range(node.get_index()).get_hs());
+                seq_list.push_back(input_map_.get_range(node.get_index()).get_hs());
             }
         }
     }
@@ -164,14 +164,14 @@ bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
 {
     gcomm_assert(msg.get_type() == Message::T_JOIN ||
                  msg.get_type() == Message::T_INSTALL);
-    gcomm_assert(msg.get_source_view_id() == current_view.get_id());
+    gcomm_assert(msg.get_source_view_id() == current_view_.get_id());
 
     const MessageNodeList& node_list(msg.get_node_list());
 
     // Same view
     MessageNodeList same_view;
     for_each(node_list.begin(), node_list.end(),
-             SelectNodesOp(same_view, current_view.get_id(), true, false));
+             SelectNodesOp(same_view, current_view_.get_id(), true, false));
     MessageNodeList::const_iterator max_hs_i(max_element(same_view.begin(),
                                                          same_view.end(),
                                                          RangeHsCmp()));
@@ -186,7 +186,7 @@ bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
     // Leaving nodes
     MessageNodeList leaving;
     for_each(node_list.begin(), node_list.end(),
-             SelectNodesOp(leaving, current_view.get_id(), false, true));
+             SelectNodesOp(leaving, current_view_.get_id(), false, true));
 
     if (leaving.empty() == false)
     {
@@ -202,7 +202,7 @@ bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
     // Partitioning nodes
     MessageNodeList partitioning;
     for_each(node_list.begin(), node_list.end(),
-             SelectNodesOp(partitioning, current_view.get_id(), false, false));
+             SelectNodesOp(partitioning, current_view_.get_id(), false, false));
 
     if (partitioning.empty() == false)
     {
@@ -228,12 +228,12 @@ bool gcomm::evs::Consensus::is_consistent_highest_reachable_safe_seq(
         << " max reachable safe seq " << max_reachable_safe_seq
         << " highest reachable safe seq " << highest_reachable_safe_seq()
         << " max_hs " << max_hs
-        << " input map max hs " << input_map.get_max_hs()
-        << " input map safe_seq " << input_map.get_safe_seq();
+        << " input map max hs " << input_map_.get_max_hs()
+        << " input map safe_seq " << input_map_.get_safe_seq();
 
-    return (input_map.get_max_hs()       == max_hs                 &&
+    return (input_map_.get_max_hs()       == max_hs                 &&
             highest_reachable_safe_seq() == max_reachable_safe_seq &&
-            input_map.get_safe_seq()     == max_reachable_safe_seq);
+            input_map_.get_safe_seq()     == max_reachable_safe_seq);
 }
 
 
@@ -241,37 +241,37 @@ bool gcomm::evs::Consensus::is_consistent_input_map(const Message& msg) const
 {
     gcomm_assert(msg.get_type() == Message::T_JOIN ||
                  msg.get_type() == Message::T_INSTALL);
-    gcomm_assert(msg.get_source_view_id() == current_view.get_id());
+    gcomm_assert(msg.get_source_view_id() == current_view_.get_id());
 
 
-    if (msg.get_aru_seq() != input_map.get_aru_seq())
+    if (msg.get_aru_seq() != input_map_.get_aru_seq())
     {
         evs_log_debug(D_CONSENSUS) << "message aru seq "
                                    << msg.get_aru_seq()
                                    << " not consistent with input map aru seq "
-                                   << input_map.get_aru_seq();
+                                   << input_map_.get_aru_seq();
         return false;
     }
 
-    if (msg.get_seq() != input_map.get_safe_seq())
+    if (msg.get_seq() != input_map_.get_safe_seq())
     {
         evs_log_debug(D_CONSENSUS) << "message safe seq "
                                    << msg.get_seq()
                                    << " not consistent with input map safe seq "
-                                   << input_map.get_safe_seq();
+                                   << input_map_.get_safe_seq();
         return false;
     }
 
     Map<const UUID, Range> local_insts, msg_insts;
 
-    for (NodeMap::const_iterator i = known.begin(); i != known.end(); ++i)
+    for (NodeMap::const_iterator i = known_.begin(); i != known_.end(); ++i)
     {
         const UUID& uuid(NodeMap::get_key(i));
         const Node& node(NodeMap::get_value(i));
-        if (current_view.is_member(uuid) == true)
+        if (current_view_.is_member(uuid) == true)
         {
             gu_trace((void)local_insts.insert_unique(
-                         make_pair(uuid, input_map.get_range(node.get_index()))));
+                         make_pair(uuid, input_map_.get_range(node.get_index()))));
         }
     }
 
@@ -282,7 +282,7 @@ bool gcomm::evs::Consensus::is_consistent_input_map(const Message& msg) const
     {
         const UUID& msg_uuid(MessageNodeList::get_key(i));
         const MessageNode& msg_inst(MessageNodeList::get_value(i));
-        if (msg_inst.get_view_id() == current_view.get_id())
+        if (msg_inst.get_view_id() == current_view_.get_id())
         {
             gu_trace((void)msg_insts.insert_unique(
                          make_pair(msg_uuid, msg_inst.get_im_range())));
@@ -300,24 +300,25 @@ bool gcomm::evs::Consensus::is_consistent_partitioning(const Message& msg) const
 {
     gcomm_assert(msg.get_type() == Message::T_JOIN ||
                  msg.get_type() == Message::T_INSTALL);
-    gcomm_assert(msg.get_source_view_id() == current_view.get_id());
+    gcomm_assert(msg.get_source_view_id() == current_view_.get_id());
+
 
     // Compare instances that were present in the current view but are
     // not proceeding in the next view.
 
     Map<const UUID, Range> local_insts, msg_insts;
 
-    for (NodeMap::const_iterator i = known.begin(); i != known.end(); ++i)
+    for (NodeMap::const_iterator i = known_.begin(); i != known_.end(); ++i)
     {
         const UUID& uuid(NodeMap::get_key(i));
         const Node& node(NodeMap::get_value(i));
         if (node.get_operational()       == false &&
             node.get_leave_message()     == 0     &&
-            current_view.is_member(uuid) == true)
+            current_view_.is_member(uuid) == true)
         {
             gu_trace((void)local_insts.insert_unique(
                          make_pair(uuid,
-                                   input_map.get_range(node.get_index()))));
+                                   input_map_.get_range(node.get_index()))));
         }
     }
 
@@ -330,7 +331,7 @@ bool gcomm::evs::Consensus::is_consistent_partitioning(const Message& msg) const
         const MessageNode& m_inst(MessageNodeList::get_value(i));
         if (m_inst.get_operational() == false &&
             m_inst.get_leaving()     == false &&
-            m_inst.get_view_id()     == current_view.get_id())
+            m_inst.get_view_id()     == current_view_.get_id())
         {
             gu_trace((void)msg_insts.insert_unique(
                          make_pair(m_uuid, m_inst.get_im_range())));
@@ -338,8 +339,9 @@ bool gcomm::evs::Consensus::is_consistent_partitioning(const Message& msg) const
     }
 
 
-    evs_log_debug(D_CONSENSUS) << " msg insts:\n" << msg_insts
-                               << " local insts:\n" << local_insts;
+    // evs_log_debug(D_CONSENSUS)
+    log_info << " msg insts:\n" << msg_insts
+             << " local insts:\n" << local_insts;
     return (msg_insts == local_insts);
 }
 
@@ -348,14 +350,14 @@ bool gcomm::evs::Consensus::is_consistent_leaving(const Message& msg) const
 {
     gcomm_assert(msg.get_type() == Message::T_JOIN ||
                  msg.get_type() == Message::T_INSTALL);
-    gcomm_assert(msg.get_source_view_id() == current_view.get_id());
+    gcomm_assert(msg.get_source_view_id() == current_view_.get_id());
 
     // Compare instances that were present in the current view but are
     // not proceeding in the next view.
 
     Map<const UUID, Range> local_insts, msg_insts;
 
-    for (NodeMap::const_iterator i = known.begin(); i != known.end(); ++i)
+    for (NodeMap::const_iterator i = known_.begin(); i != known_.end(); ++i)
     {
         const UUID& uuid(NodeMap::get_key(i));
         const Node& inst(NodeMap::get_value(i));
@@ -363,10 +365,10 @@ bool gcomm::evs::Consensus::is_consistent_leaving(const Message& msg) const
 
         if (inst.get_operational()   == false &&
             lm                       != 0  &&
-            lm->get_source_view_id() == current_view.get_id())
+            lm->get_source_view_id() == current_view_.get_id())
         {
             gu_trace((void)local_insts.insert_unique(
-                         make_pair(uuid, input_map.get_range(inst.get_index()))));
+                         make_pair(uuid, input_map_.get_range(inst.get_index()))));
         }
     }
 
@@ -379,7 +381,7 @@ bool gcomm::evs::Consensus::is_consistent_leaving(const Message& msg) const
         const MessageNode& m_inst(MessageNodeList::get_value(i));
         if (m_inst.get_operational() == false &&
             m_inst.get_leaving()     == true &&
-            m_inst.get_view_id()     == current_view.get_id())
+            m_inst.get_view_id()     == current_view_.get_id())
         {
             gu_trace((void)msg_insts.insert_unique(
                          make_pair(m_uuid, m_inst.get_im_range())));
@@ -396,7 +398,7 @@ bool gcomm::evs::Consensus::is_consistent_same_view(const Message& msg) const
 {
     gcomm_assert(msg.get_type() == Message::T_JOIN ||
                  msg.get_type() == Message::T_INSTALL);
-    gcomm_assert(msg.get_source_view_id() == current_view.get_id());
+    gcomm_assert(msg.get_source_view_id() == current_view_.get_id());
 
     if (is_consistent_highest_reachable_safe_seq(msg) == false)
     {
@@ -433,12 +435,12 @@ bool gcomm::evs::Consensus::is_consistent(const Message& msg) const
                  msg.get_type() == Message::T_INSTALL);
 
     const JoinMessage* my_jm =
-        NodeMap::get_value(known.find_checked(get_uuid())).get_join_message();
+        NodeMap::get_value(known_.find_checked(get_uuid())).get_join_message();
     if (my_jm == 0)
     {
         return false;
     }
-    if (msg.get_source_view_id() == current_view.get_id())
+    if (msg.get_source_view_id() == current_view_.get_id())
     {
         return (is_consistent_same_view(msg) == true &&
                 equal(msg, *my_jm) == true);
@@ -452,7 +454,7 @@ bool gcomm::evs::Consensus::is_consistent(const Message& msg) const
 bool gcomm::evs::Consensus::is_consensus() const
 {
     const JoinMessage* my_jm =
-        NodeMap::get_value(known.find_checked(get_uuid())).get_join_message();
+        NodeMap::get_value(known_.find_checked(get_uuid())).get_join_message();
 
     if (my_jm == 0)
     {
@@ -466,7 +468,7 @@ bool gcomm::evs::Consensus::is_consensus() const
         return false;
     }
 
-    for (NodeMap::const_iterator i = known.begin(); i != known.end(); ++i)
+    for (NodeMap::const_iterator i = known_.begin(); i != known_.end(); ++i)
     {
         const Node& inst(NodeMap::get_value(i));
         if (inst.get_operational() == true)
@@ -478,7 +480,9 @@ bool gcomm::evs::Consensus::is_consensus() const
                     << "no join message for " << NodeMap::get_key(i);
                 return false;
             }
-            if (equal(*my_jm, *jm) == false)
+            // call is_consistent() instead of equal() to enforce strict
+            // check for messages originating from the same view (#541)
+            if (is_consistent(*jm) == false)
             {
                 evs_log_debug(D_CONSENSUS)
                     << "join message " << *jm
