@@ -45,18 +45,25 @@ cycle()
     local -r node_id=${NODE_ID[$node]}
 
     local var_kill=3
+    local pause_var=10
     if test $(( $RANDOM % var_kill )) = 0
     then
         echo "Killing node $node_id..."
         kill_node $node
+        pause_var=$((($RANDOM % 8) + 1))
     else
         echo "Stopping node $node_id..."
         stop_node $node
     fi
 
-    pause 5 3 # wait long enough to be forgotten
-    consistency_check $sqlgen_pid
+    pause 0 $pause_var
 
+    if test $pause_var -gt 5
+    then
+        consistency_check $sqlgen_pid
+    else
+        echo "skipped consistency check due to fast recycle"
+    fi
     echo "Restarting node $node_id..."
     restart_node "-g $(gcs_address $node)" $node
 }
