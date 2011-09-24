@@ -97,37 +97,93 @@ namespace gcache
         return SEQNO_NONE;
     }
 
+
     /*!
      * Get pointer to buffer identified by seqno.
      * Moves lock to the given seqno.
      */
-    const void* GCache::seqno_get_ptr (int64_t const seqno_g,int64_t& seqno_d)
+    const void* GCache::seqno_get_ptr (int64_t const seqno_g,
+                                       int64_t&      seqno_d,
+                                       ssize_t&      size)
+        throw (gu::NotFound)
     {
-        gu::Lock lock(mtx);
+        const void* ptr(0);
 
-        if (seqno_g >= seqno_locked) {
+        {
+            gu::Lock lock(mtx);
+
             seqno2ptr_iter_t p = seqno2ptr.find(seqno_g);
+
             if (p != seqno2ptr.end())
             {
-                if (seqno_locked != seqno_g)
+                if (seqno_locked != SEQNO_NONE)
                 {
-                    seqno_locked = seqno_g;
                     cond.signal();
                 }
+                seqno_locked = seqno_g;
 
-                const void* const ptr  = p->second;
-                BufferHeader* const bh = ptr2BH(ptr);
-                seqno_d = bh->seqno_d;
-                return ptr;
+                ptr = p->second;
+            }
+            else
+            {
+                throw gu::NotFound();
             }
         }
-        else {
-            gu_throw_fatal << "Attempt to acquire buffer by seqno out of order:"
-                           << " locked seqno: " << seqno_locked
-                           << ", requested seqno: " << seqno_g;
+
+        assert (ptr);
+
+        const BufferHeader* const bh (ptr2BH(ptr)); // this can result in IO
+        seqno_d = bh->seqno_d;
+        size    = bh->size - sizeof(BufferHeader);
+
+        return ptr;
+    }
+
+    ssize_t
+    GCache::seqno_get_buffers (std::vector<Buffer>& v,
+                               int64_t const start)
+    {
+        ssize_t const max(v.size());
+
+        assert (max > 0);
+
+        ssize_t found(0);
+
+        {
+            gu::Lock lock(mtx);
+
+            seqno2ptr_iter_t p = seqno2ptr.find(start);
+
+            if (p != seqno2ptr.end())
+            {
+                if (seqno_locked != SEQNO_NONE)
+                {
+                    cond.signal();
+                }
+                seqno_locked = start;
+
+                do {
+                    assert (p->first == (start + found));
+                    assert (p->second);
+                    v[found].set_ptr(p->second);
+                }
+                while (++found < max && ++p != seqno2ptr.end());
+            }
         }
 
-        return 0;
+        // the following may cause IO
+        for (ssize_t i(0); i < found; ++i)
+        {
+            const BufferHeader* const bh (ptr2BH(v[i].ptr()));
+
+            assert (bh->seqno_g == (start + i));
+
+            v[i].set_other (bh->size - sizeof(BufferHeader),
+                            bh->seqno_g,
+                            bh->seqno_d);
+        }
+
+        return found;
     }
 
     /*!

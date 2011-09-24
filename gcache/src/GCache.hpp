@@ -68,11 +68,53 @@ namespace gcache
          */
         int64_t seqno_get_min ();
 
-        /*!
+        /*!          DEPRECATED
          * Get pointer to buffer identified by seqno.
          * Moves lock to the given seqno.
          */
-        const void* seqno_get_ptr (int64_t seqno_g, int64_t& seqno_d);
+        const void* seqno_get_ptr (int64_t  seqno_g,
+                                   int64_t& seqno_d,
+                                   ssize_t& size)
+            throw (gu::NotFound);
+
+        class Buffer
+        {
+        public:
+
+            const void* ptr()     const { return ptr_;     }
+            ssize_t     size()    const { return size_;    }
+            int64_t     seqno_g() const { return seqno_g_; }
+            int64_t     seqno_d() const { return seqno_d_; }
+
+        protected:
+
+            void set_ptr   (const void* p) { ptr_ = p; }
+
+            void set_other (ssize_t s, int64_t g, int64_t d)
+            { size_ = s; seqno_g_ = g; seqno_d_ = d; }
+
+        private:
+
+            Buffer (const Buffer&);
+            Buffer& operator= (const Buffer&);
+
+            const void* ptr_;
+            ssize_t     size_;
+            int64_t     seqno_g_;
+            int64_t     seqno_d_;
+
+            friend class GCache;
+        };
+
+        /*!
+         * Fills a vector with Buffer objects starting with seqno start
+         * until either vector length or seqno map is exhausted.
+         * Moves seqno lock to start.
+         *
+         * @retval number of buffers filled (<= v.size())
+         */
+        ssize_t seqno_get_buffers (std::vector<Buffer>& v,
+                                   int64_t start);
 
         /*!
          * Releases any seqno locks present.
