@@ -11,6 +11,7 @@
 namespace gcache
 {
     static int64_t const SEQNO_NONE = 0;
+    static int64_t const SEQNO_ILL  = -1;
 }
 
 #endif /* __GCACHE_SEQNO_NONE__ */

@@ -30,9 +30,9 @@ namespace gcache
 
         void* malloc  (ssize_t size) throw ();
 
-        void  free    (void*  ptr)  throw();
+        void  free    (const void* ptr)  throw();
 
-        void* realloc (void*  ptr, ssize_t size) throw ();
+        void* realloc (void* ptr, ssize_t size) throw ();
 
         void  discard (BufferHeader* bh) throw ()
         {

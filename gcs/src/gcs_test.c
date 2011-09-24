@@ -29,6 +29,8 @@
 
 static pthread_mutex_t gcs_test_lock = PTHREAD_MUTEX_INITIALIZER;
 
+static gcache_t* gcache = NULL;
+
 typedef struct gcs_test_log
 {
     FILE *file;
@@ -54,15 +56,12 @@ gcs_test_repl_t;
 
 typedef struct gcs_test_thread
 {
-    pthread_t       thread;
-    long            id;
-    gcs_seqno_t     act_id;
-    gcs_seqno_t     local_act_id;
-    gcs_act_type_t  act_type;
-    long            n_tries;
-    size_t          msg_len;
-    char           *msg;
-    char           *log_msg;
+    pthread_t         thread;
+    long              id;
+    struct gcs_action act;
+    long              n_tries;
+    void*             msg;
+    char*             log_msg;
 }
 gcs_test_thread_t;
 
@@ -71,16 +70,18 @@ gcs_test_thread_t;
 static long gcs_test_thread_create (gcs_test_thread_t *t, long id, long n_tries)
 {
     t->id           = id;
-    t->act_id       = GCS_SEQNO_ILL;
-    t->local_act_id = GCS_SEQNO_ILL;
-    t->act_type     = GCS_ACT_TORDERED;
+    t->msg          = calloc (MAX_MSG_LEN, sizeof(char));
+    t->act.buf      = t->msg;
+    t->act.size     = MAX_MSG_LEN;
+    t->act.seqno_g  = GCS_SEQNO_ILL;
+    t->act.seqno_l  = GCS_SEQNO_ILL;
+    t->act.type     = GCS_ACT_TORDERED;
     t->n_tries      = n_tries;
-    t->msg_len      = MAX_MSG_LEN;
-    t->msg = calloc (MAX_MSG_LEN, sizeof(char));
+
     if (t->msg)
     {
-	t->log_msg = calloc (MAX_MSG_LEN, sizeof(char));
-	if (t->log_msg) return 0;
+        t->log_msg = calloc (MAX_MSG_LEN, sizeof(char));
+        if (t->log_msg) return 0;
     }
 
     return -ENOMEM;
@@ -250,24 +251,24 @@ size_t size_recvd = 0;
 static inline long
 test_recv_log_create(gcs_test_thread_t* thread)
 {
-    return
-        snprintf (thread->log_msg, MAX_MSG_LEN - 1,
-                  "Thread %3ld(REPL): act_id = %llu, local_act_id = %llu, "
-                  "len = %llu: %s",
-                  thread->id,
-                  (long long unsigned int)thread->act_id,
-                  (long long unsigned int)thread->local_act_id,
-                  (long long unsigned int)thread->msg_len, thread->msg);
+    return snprintf (thread->log_msg, MAX_MSG_LEN - 1,
+                     "Thread %3ld(REPL): act_id = %lld, local_act_id = %lld, "
+                     "len = %lld: %s",
+                     thread->id,
+                     (long long)thread->act.seqno_g,
+                     (long long)thread->act.seqno_l,
+                     (long long)thread->act.size,
+                     (const char*)thread->act.buf);
 }
 
 static inline long
 test_send_log_create(gcs_test_thread_t* thread)
 {
-    return
-        snprintf (thread->log_msg, MAX_MSG_LEN - 1,
-                  "Thread %3ld (REPL): len = %llu, %s",
-                  thread->id, (long long unsigned int) thread->msg_len,
-                  thread->msg);
+    return snprintf (thread->log_msg, MAX_MSG_LEN - 1,
+                     "Thread %3ld (REPL): len = %lld, %s",
+                     thread->id,
+                     (long long) thread->act.size,
+                     (const char*)thread->act.buf);
 }
 
 static inline long
@@ -305,13 +306,12 @@ test_send_last_applied (gcs_conn_t* gcs, gcs_seqno_t my_seqno)
     if (!(my_seqno & SEND_LAST_MASK)) {
             ret = gcs_set_last_applied (gcs, my_seqno);
             if (ret) {
-                fprintf (stderr,"gcs_set_last_applied(%llu) returned %ld\n",
-                         (unsigned long long)my_seqno, ret);
+                fprintf (stderr,"gcs_set_last_applied(%lld) returned %ld\n",
+                         (long long)my_seqno, ret);
             }
 //            if (!throughput) {
-                fprintf (stdout, "Last applied: my = %llu, group = %llu\n",
-                         (unsigned long long)my_seqno,
-                         (unsigned long long)group_seqno);
+                fprintf (stdout, "Last applied: my = %lld, group = %lld\n",
+                         (long long)my_seqno, (long long)group_seqno);
 //            }
     }
     return ret;
@@ -326,8 +326,9 @@ test_before_send (gcs_test_thread_t* thread)
     long ret = 0;
 
     /* create a message */
-    thread->msg_len = test_make_msg (thread->msg, msg_len);
-    if (thread->msg_len <= 0) return -1;
+    thread->act.size = test_make_msg (thread->msg, msg_len);
+    thread->act.buf  = thread->msg;
+    if (thread->act.size <= 0) return -1;
 
     if (!throughput) {
         /* log message before replication */
@@ -348,17 +349,20 @@ test_after_recv (gcs_test_thread_t* thread)
     if (!throughput) {
         /* log message after replication */
         ret = test_recv_log_create (thread);
-        ret = test_log_in_to (to, thread->local_act_id, thread->log_msg);
+        ret = test_log_in_to (to, thread->act.seqno_l, thread->log_msg);
     }
     else if (total) {
-        ret = test_log_in_to (to, thread->local_act_id, NULL);
+        ret = test_log_in_to (to, thread->act.seqno_l, NULL);
     }
     else {
-        gu_to_self_cancel (to, thread->local_act_id);
+        gu_to_self_cancel (to, thread->act.seqno_l);
     }
 
-    ret = test_send_last_applied (gcs, thread->act_id);
+    ret = test_send_last_applied (gcs, thread->act.seqno_g);
 //    fprintf (stdout, "SEQNO applied %lld", thread->local_act_id);
+
+    if (thread->act.type == GCS_ACT_TORDERED)
+        gcache_free (gcache, thread->act.buf);
 
     return ret;
 }
@@ -377,25 +381,20 @@ void *gcs_test_repl (void *arg)
         ret = test_before_send (thread);
         if (ret < 0) break;
 
-	/* replicate message */
-	ret = gcs_repl (gcs,
-                        thread->msg,
-                        thread->msg_len,
-                        GCS_ACT_TORDERED,
-                        false,
-                        &thread->act_id,
-                        &thread->local_act_id);
-	if (ret < 0) {
-            assert (thread->act_id       == GCS_SEQNO_ILL);
-            assert (thread->local_act_id == GCS_SEQNO_ILL);
+        /* replicate message */
+        ret = gcs_repl (gcs, &thread->act, false);
+
+        if (ret < 0) {
+            assert (thread->act.seqno_g == GCS_SEQNO_ILL);
+            assert (thread->act.seqno_l == GCS_SEQNO_ILL);
             break;
         }
 
         msg_repld++;
-        size_repld += thread->msg_len;
-//	usleep ((rand() & 1) << 1);
+        size_repld += thread->act.size;
+//      usleep ((rand() & 1) << 1);
         test_after_recv (thread);
-//	puts (thread->log_msg); fflush (stdout);
+//      puts (thread->log_msg); fflush (stdout);
     }
 //    fprintf (stderr, "REPL thread %ld exiting: %s\n",
 //             thread->id, strerror(-ret));
@@ -416,16 +415,14 @@ void *gcs_test_send (void *arg)
         ret = test_before_send (thread);
         if (ret < 0) break;
 
-	/* send message to group */
-	ret = gcs_send (gcs,
-                        thread->msg,
-                        false,
-                        thread->msg_len,
-                        GCS_ACT_TORDERED);
+    /* send message to group */
+        ret = gcs_send (gcs, thread->act.buf, thread->act.size,
+                        GCS_ACT_TORDERED, false);
+
         if (ret < 0) break;
-	//sleep (1);
+        //sleep (1);
         msg_sent++;
-        size_sent += thread->msg_len;
+        size_sent += thread->act.size;
     }
 //    fprintf (stderr, "SEND thread %ld exiting: %s\n",
 //             thread->id, strerror(-ret));
@@ -442,17 +439,17 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
     fprintf (stdout, "Got GCS_ACT_CONF: Conf: %lld, "
              "seqno: %lld, members: %ld, my idx: %ld, local seqno: %lld\n",
              (long long)conf->conf_id, (long long)conf->seqno,
-             conf->memb_num, conf->my_idx, (long long)thread->local_act_id);
+             conf->memb_num, conf->my_idx, (long long)thread->act.seqno_l);
     fflush (stdout);
 
     // NOTE: what really needs to be checked is seqno and group_uuid, but here
     //       we don't keep track of them (and don't do real transfers),
     //       so for simplicity, just check conf_id.
-    while (-EAGAIN == (ret = gu_to_grab (to, thread->local_act_id)));
+    while (-EAGAIN == (ret = gu_to_grab (to, thread->act.seqno_l)));
     if (0 == ret) {
         if (conf->my_state == GCS_NODE_STATE_PRIM) {
             gcs_seqno_t seqno, s;
-            fprintf (stdout, "Gap in configurations: ours: %lld, group: %lld.\n",
+            fprintf (stdout,"Gap in configurations: ours: %lld, group: %lld.\n",
                      (long long)conf_id, (long long)conf->conf_id);
             fflush (stdout);
 
@@ -460,19 +457,21 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
                      (long long)conf->seqno, // this is global seqno
                      strerror (-gcs_request_state_transfer (gcs, &conf->seqno,
                                                             sizeof(conf->seqno),
-							    "",
+                                                            "",
                                                             &seqno)));
 
             // pretend that state transfer is complete, cancel every action up
             // to seqno
-            for (s = thread->local_act_id + 1; s <= seqno; s++) {
+            for (s = thread->act.seqno_l + 1; s <= seqno; s++) {
                 gu_to_self_cancel (to, s); // this is local seqno
             }
 
             fprintf (stdout, "Sending JOIN: %s\n", strerror(-gcs_join(gcs, 0)));
             fflush (stdout);
         }
-        gu_to_release (to, thread->local_act_id);
+
+        gcs_resume_recv (gcs);
+        gu_to_release (to, thread->act.seqno_l);
     }
     else {
         fprintf (stderr, "Failed to grab TO: %ld (%s)", ret, strerror(ret));
@@ -487,67 +486,57 @@ void *gcs_test_recv (void *arg)
 
     while (thread->n_tries)
     {
-        /*
-         * gcs_recv() allocates memory for new messages, thread_create()
-         * pre-allocates thread->msg, so free() and set to NULL before
-         * passing to gcs_recv()
-         */
-        free(thread->msg);
-        thread->msg = NULL;
         /* receive message from group */
-        ret = gcs_recv (gcs,
-                        (void**)&thread->msg,
-                        &thread->msg_len,
-                        &thread->act_type,
-                        &thread->act_id,
-                        &thread->local_act_id);
+        while ((ret = gcs_recv (gcs, &thread->act)) == -ECANCELED) {
+            usleep (10000);
+        }
 
         if (ret <= 0) {
             fprintf (stderr, "gcs_recv() %s: %ld (%s). Thread exits.\n",
                      ret < 0 ? "failed" : "connection closed",
                      ret, strerror(-ret));
-            assert (thread->msg          == NULL);
-            assert (thread->msg_len      == 0);
-            assert (thread->act_id       == GCS_SEQNO_ILL);
-            assert (thread->local_act_id == GCS_SEQNO_ILL);
-            assert (thread->act_type     == GCS_ACT_ERROR);
+            assert (thread->act.buf     == NULL);
+            assert (thread->act.size    == 0);
+            assert (thread->act.seqno_g == GCS_SEQNO_ILL);
+            assert (thread->act.seqno_l == GCS_SEQNO_ILL);
+            assert (thread->act.type    == GCS_ACT_ERROR);
             break;
         }
 
-        assert (thread->act_type < GCS_ACT_ERROR);
+        assert (thread->act.type < GCS_ACT_ERROR);
 
         msg_recvd++;
-        size_recvd += thread->msg_len;
+        size_recvd += thread->act.size;
 
-        switch (thread->act_type) {
+        switch (thread->act.type) {
         case GCS_ACT_TORDERED:
             test_after_recv (thread);
             //puts (thread->log_msg); fflush (stdout);
             break;
         case GCS_ACT_COMMIT_CUT:
-            group_seqno = *(gcs_seqno_t*)thread->msg;
-            gu_to_self_cancel (to, thread->local_act_id);
+            group_seqno = *(gcs_seqno_t*)thread->act.buf;
+            gu_to_self_cancel (to, thread->act.seqno_l);
             break;
         case GCS_ACT_CONF:
             gcs_test_handle_configuration (gcs, thread);
             break;
         case GCS_ACT_STATE_REQ:
             fprintf (stdout, "Got STATE_REQ\n");
-            gu_to_grab (to, thread->local_act_id);
+            gu_to_grab (to, thread->act.seqno_l);
             fprintf (stdout, "Sending JOIN: %s\n", strerror(-gcs_join(gcs, 0)));
             fflush (stdout);
-            gu_to_release (to, thread->local_act_id);
+            gu_to_release (to, thread->act.seqno_l);
             break;
         case GCS_ACT_JOIN:
             fprintf (stdout, "Joined\n");
-            gu_to_self_cancel (to, thread->local_act_id);
+            gu_to_self_cancel (to, thread->act.seqno_l);
             break;
         case GCS_ACT_SYNC:
             fprintf (stdout, "Synced\n");
-            gu_to_self_cancel (to, thread->local_act_id);
+            gu_to_self_cancel (to, thread->act.seqno_l);
             break;
         default:
-            fprintf (stderr, "Unexpected action type: %d\n", thread->act_type);
+            fprintf (stderr, "Unexpected action type: %d\n", thread->act.type);
 
         }
     }
@@ -565,31 +554,31 @@ static long gcs_test_thread_pool_start (gcs_test_thread_pool_t *pool)
     switch (pool->type)
     {
     case GCS_TEST_REPL:
-	thread_routine = gcs_test_repl;
-	break;
+        thread_routine = gcs_test_repl;
+        break;
     case GCS_TEST_SEND:
-	thread_routine = gcs_test_send;
-	break;
+        thread_routine = gcs_test_send;
+        break;
     case GCS_TEST_RECV:
-	thread_routine = gcs_test_recv;
-	break;
+        thread_routine = gcs_test_recv;
+        break;
     default:
-	error (0, 0, "Bad repl type %u\n", pool->type);
-	return -1;
+        error (0, 0, "Bad repl type %u\n", pool->type);
+        return -1;
     }
 
     for (i = 0; i < pool->n_threads; i++)
     {
-	if ((err = pthread_create (&pool->threads[i].thread, NULL,
-				   thread_routine, &pool->threads[i])))
-	    break;
+        if ((err = pthread_create (&pool->threads[i].thread, NULL,
+                                   thread_routine, &pool->threads[i])))
+        break;
     }
     pool->n_started = i;
 
     printf ("Started %ld threads of %s type (pool: %p)\n",
             pool->n_started,
-	     GCS_TEST_REPL == pool->type ? "REPL" :
-	    (GCS_TEST_SEND == pool->type ? "SEND" :"RECV"), pool);
+            GCS_TEST_REPL == pool->type ? "REPL" :
+            (GCS_TEST_SEND == pool->type ? "SEND" :"RECV"), pool);
 
     return 0;
 }
@@ -598,7 +587,7 @@ static long gcs_test_thread_pool_join (const gcs_test_thread_pool_t *pool)
 {
     long i;
     for (i = 0; i < pool->n_started; i++) {
-	pthread_join (pool->threads[i].thread, NULL);
+        pthread_join (pool->threads[i].thread, NULL);
     }
     return 0;
 }
@@ -620,7 +609,7 @@ long gcs_test_thread_pool_cancel (const gcs_test_thread_pool_t *pool)
     fflush(stdout);
     for (i = 0; i < pool->n_started; i++) {
         printf ("Cancelling %ld\n", i); fflush(stdout);
-	pthread_cancel (pool->threads[i].thread);
+        pthread_cancel (pool->threads[i].thread);
         pool->threads[i].n_tries = 0;
     }
     return 0;
@@ -652,34 +641,34 @@ static long gcs_test_conf (gcs_test_conf_t *conf, long argc, char *argv[])
     switch (argc)
     {
     case 6:
-	conf->n_recv = strtol (argv[5], &endptr, 10);
-	if ('\0' != *endptr) goto error;
+        conf->n_recv = strtol (argv[5], &endptr, 10);
+        if ('\0' != *endptr) goto error;
     case 5:
-	conf->n_send = strtol (argv[4], &endptr, 10);
-	if ('\0' != *endptr) goto error;
+        conf->n_send = strtol (argv[4], &endptr, 10);
+        if ('\0' != *endptr) goto error;
     case 4:
-	conf->n_repl = strtol (argv[3], &endptr, 10);
-	if ('\0' != *endptr) goto error;
+        conf->n_repl = strtol (argv[3], &endptr, 10);
+        if ('\0' != *endptr) goto error;
     case 3:
-	conf->n_tries = strtol (argv[2], &endptr, 10);
-	if ('\0' != *endptr) goto error;
+        conf->n_tries = strtol (argv[2], &endptr, 10);
+        if ('\0' != *endptr) goto error;
     case 2:
         conf->backend = argv[1];
-	break;
+        break;
     default:
-	break;
+        break;
     }
 
     printf ("Config: n_tries = %ld, n_repl = %ld, n_send = %ld, n_recv = %ld, "
             "backend = %s\n",
-	    conf->n_tries, conf->n_repl, conf->n_send, conf->n_recv,
+            conf->n_tries, conf->n_repl, conf->n_send, conf->n_recv,
             conf->backend);
 
     return 0;
 error:
     printf ("Usage: %s [backend] [tries:%ld] [repl threads:%ld] "
-	    "[send threads: %ld] [recv threads: %ld]\n",
-	    argv[0], conf->n_tries, conf->n_repl, conf->n_send, conf->n_recv);
+            "[send threads: %ld] [recv threads: %ld]\n",
+            argv[0], conf->n_tries, conf->n_repl, conf->n_send, conf->n_recv);
     exit (EXIT_SUCCESS);
 }
 
@@ -714,7 +703,11 @@ int main (int argc, char *argv[])
     printf ("Opening connection: channel = %s, backend = %s\n",
              channel, conf.backend);
 
-    if (!(gcs = gcs_create (NULL, NULL, NULL, NULL, 0, 0))) goto out;
+    gu_config_t* gconf = gu_config_create ("gcache.size=0; "
+                                           "gcache.page_size=1M");
+    if (!gconf) goto out;
+    if (!(gcache = gcache_create (gconf, ""))) goto out;
+    if (!(gcs = gcs_create (gconf, gcache, NULL, NULL, 0, 0))) goto out;
     puts ("debug"); fflush(stdout);
     if ((err  = gcs_open   (gcs, channel, conf.backend))) goto out;
     printf ("Connected\n");
@@ -792,6 +785,9 @@ int main (int argc, char *argv[])
     if ((err = gcs_destroy (gcs))) goto out;
     gcs = NULL;
     printf ("done\n"); fflush (stdout);
+
+    printf ("Destroying GCache object:\n");
+    gcache_destroy (gcache);
 
     gcs_test_thread_pool_destroy (&repl_pool);
     gcs_test_thread_pool_destroy (&send_pool);

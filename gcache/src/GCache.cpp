@@ -51,6 +51,7 @@ namespace gcache
                    !((params.mem_size + params.rb_size) > 0)),
         mallocs   (0),
         reallocs  (0),
+        frees     (0),
         seqno_locked(SEQNO_NONE),
         seqno_min   (SEQNO_NONE),
         seqno_max   (SEQNO_NONE)
@@ -64,6 +65,9 @@ namespace gcache
     GCache::~GCache ()
     {
         gu::Lock lock(mtx);
+        log_debug << "\n" << "GCache mallocs : " << mallocs
+                  << "\n" << "GCache reallocs: " << reallocs
+                  << "\n" << "GCache frees   : " << frees;
     }
 
     /*! prints object properties */
@@ -72,13 +76,26 @@ namespace gcache
 
 #include "gcache.h"
 
+gcache_t* gcache_create (gu_config_t* conf, const char* data_dir)
+{
+    gcache::GCache* gc = new gcache::GCache (
+        *reinterpret_cast<gu::Config*>(conf), data_dir);
+    return reinterpret_cast<gcache_t*>(gc);
+}
+
+void gcache_destroy (gcache_t* gc)
+{
+    gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
+    delete gcache;
+}
+
 void* gcache_malloc  (gcache_t* gc, size_t size)
 {
     gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
     return gcache->malloc (size);
 }
 
-void  gcache_free    (gcache_t* gc, void* ptr)
+void  gcache_free    (gcache_t* gc, const void* ptr)
 {
     gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
     gcache->free (ptr);
@@ -96,10 +113,11 @@ void  gcache_seqno_init   (gcache_t* gc, int64_t seqno)
     gcache->seqno_init (seqno);
 }
 
+#if 0 /* REMOVE */
 void  gcache_seqno_assign(gcache_t* gc, const void* ptr, int64_t seqno)
 {
     gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
-    gcache->seqno_assign (ptr, seqno);
+    gcache->seqno_assign (ptr, seqno, -1, false);
 }
 
 void  gcache_seqno_release(gcache_t* gc, const void* ptr)
@@ -107,4 +125,5 @@ void  gcache_seqno_release(gcache_t* gc, const void* ptr)
     gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);
     gcache->seqno_release ();
 }
+#endif
 

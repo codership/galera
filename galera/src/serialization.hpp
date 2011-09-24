@@ -22,7 +22,7 @@ namespace galera
         *reinterpret_cast<I*>(buf + offset) = i;
         return (offset + sizeof(i));
     }
-    
+
     template<typename I> size_t unserialize(const gu::byte_t* buf,
                                             size_t buf_len,
                                             size_t offset,
@@ -32,7 +32,7 @@ namespace galera
         i = *reinterpret_cast<const I*>(buf + offset);
         return (offset + sizeof(i));
     }
-    
+
     template<typename I> size_t serial_size(const I& i)
     {
         return sizeof(i);
@@ -58,14 +58,14 @@ namespace galera
         data = buf + offset;
         return (offset + data_len);
     }
-    
+
     template <typename ST>
     size_t serial_size(const void* data, ST data_len)
     {
         return (serial_size(data_len) + data_len);
     }
-    
-    
+
+
     template<typename ST>
     size_t serialize(const gu::Buffer& b,
                      gu::byte_t* buf,
@@ -79,7 +79,7 @@ namespace galera
         offset += b.size();
         return offset;
     }
-    
+
     template<typename ST>
     size_t unserialize(const gu::byte_t* buf,
                        size_t buf_len,
@@ -88,7 +88,7 @@ namespace galera
     {
         ST len(0);
         if (offset + serial_size(len) > buf_len) gu_throw_fatal;
-        
+
         offset = unserialize(buf, buf_len, offset, len);
         if (offset + len > buf_len) gu_throw_fatal;
         if (len > std::numeric_limits<ST>::max()) gu_throw_fatal;
@@ -97,13 +97,13 @@ namespace galera
         offset += len;
         return offset;
     }
-    
+
     template<typename ST>
     size_t serial_size(const gu::Buffer& sb)
     {
         assert(sb.size() <= std::numeric_limits<ST>::max());
         return serial_size(ST()) + sb.size();
-    }    
+    }
 
 
     template<typename I, typename ST>
@@ -120,7 +120,7 @@ namespace galera
         }
         return offset;
     }
-    
+
     template<class C, typename ST, typename BI>
     size_t unserialize(const gu::byte_t* buf, size_t buf_len, size_t offset,
                        BI bi)

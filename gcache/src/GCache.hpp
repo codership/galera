@@ -43,7 +43,7 @@ namespace gcache
 
         /* Memory allocation functions */
         void* malloc  (ssize_t size) throw (gu::Exception);
-        void  free    (void* ptr) throw ();
+        void  free    (const void* ptr) throw ();
         void* realloc (void* ptr, ssize_t size) throw (gu::Exception);
 
         /* Seqno related functions */
@@ -52,12 +52,15 @@ namespace gcache
          * Reinitialize seqno sequence (after SST or such)
          * Clears cache from buffers with seqnos and sets seqno_min to seqno.
          */
-        void    seqno_init    (int64_t seqno);
+        void    seqno_init (int64_t seqno);
 
         /*!
          * Assign sequence number to buffer pointed to by ptr
          */
-        void    seqno_assign  (const void* ptr, int64_t seqno);
+        void    seqno_assign (const void* ptr,
+                              int64_t     seqno_g,
+                              int64_t     seqno_d,
+                              bool        release);
 
         /*!
          * Get the smallest seqno present in the cache.
@@ -69,7 +72,7 @@ namespace gcache
          * Get pointer to buffer identified by seqno.
          * Moves lock to the given seqno.
          */
-        const void* seqno_get_ptr (int64_t seqno);
+        const void* seqno_get_ptr (int64_t seqno_g, int64_t& seqno_d);
 
         /*!
          * Releases any seqno locks present.
@@ -116,6 +119,7 @@ namespace gcache
 
         long long       mallocs;
         long long       reallocs;
+        long long       frees;
 
         int64_t         seqno_locked;
         int64_t         seqno_min;

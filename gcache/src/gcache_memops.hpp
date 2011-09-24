@@ -23,10 +23,10 @@ namespace gcache
         malloc  (ssize_t size) throw (gu::Exception) = 0;
 
         virtual void
-        free    (void*  ptr)   throw () = 0;
+        free    (const void* ptr)   throw () = 0;
 
         virtual void*
-        realloc (void*  ptr, ssize_t size) throw (gu::Exception) = 0;
+        realloc (void* ptr, ssize_t size) throw (gu::Exception) = 0;
 
         virtual void
         discard (BufferHeader* bh) throw() = 0;

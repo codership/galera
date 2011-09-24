@@ -22,7 +22,7 @@ START_TEST(test1)
     fail_if (NULL == buf1);
 
     BufferHeader* bh1(ptr2BH(buf1));
-    fail_if (bh1->seqno != SEQNO_NONE);
+    fail_if (bh1->seqno_g != SEQNO_NONE);
     fail_if (BH_is_released(bh1));
 
     void* buf2 = ms.malloc (1 + bh_size);
@@ -36,13 +36,13 @@ START_TEST(test1)
     fail_if (NULL == buf1);
 
     bh1 = ptr2BH(buf1);
-    fail_if (bh1->seqno != SEQNO_NONE);
+    fail_if (bh1->seqno_g != SEQNO_NONE);
     fail_if (BH_is_released(bh1));
 
     BufferHeader* bh2(ptr2BH(buf2));
-    fail_if (bh2->seqno != SEQNO_NONE);
+    fail_if (bh2->seqno_g != SEQNO_NONE);
     fail_if (BH_is_released(bh2));
-    bh2->seqno = 1;
+    bh2->seqno_g = 1;
 
     /* freeing seqno'd buffer should only release it, but not discard */
     ms.free (buf2);

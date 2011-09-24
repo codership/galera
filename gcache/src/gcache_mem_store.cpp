@@ -17,7 +17,7 @@ MemStore::have_free_space (ssize_t size) throw()
         if (BH_is_released(bh)) /* discard buffer */
         {
             seqno2ptr_.erase(seqno2ptr_.begin());
-            bh->seqno = SEQNO_NONE;
+            bh->seqno_g = SEQNO_NONE;
 
             switch (bh->store)
             {

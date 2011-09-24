@@ -422,7 +422,6 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
         if (rc <= 0)
         {
             retval = WSREP_CONN_FAIL;
-//            break;
         }
     }
 
@@ -527,7 +526,6 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     report_last_committed();
 }
 
-
 wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
 {
     if (state_() < S_JOINED) return WSREP_TRX_FAIL;
@@ -550,14 +548,21 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
     trx->flush(0);
     trx->set_state(TrxHandle::S_REPLICATING);
 
-    gcs_seqno_t seqno_l(GCS_SEQNO_ILL), seqno_g(GCS_SEQNO_ILL);
     const MappedBuffer& wscoll(trx->write_set_collection());
-
     ssize_t rcode;
+
+    gcs_action act;
+    act.size = wscoll.size();
+    act.type = GCS_ACT_TORDERED;
+#ifndef NDEBUG
+    act.seqno_g = GCS_SEQNO_ILL;
+#endif
 
     do
     {
-        assert(seqno_g == GCS_SEQNO_ILL);
+        act.buf = &wscoll[0];
+        assert(act.buf);
+        assert(act.seqno_g == GCS_SEQNO_ILL);
 
         const ssize_t gcs_handle(gcs_.schedule());
 
@@ -571,8 +576,8 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         trx->set_gcs_handle(gcs_handle);
         trx->unlock();
 
-        rcode = gcs_.repl(&wscoll[0], wscoll.size(),
-                          GCS_ACT_TORDERED, true, &seqno_l, &seqno_g);
+        rcode = gcs_.repl(act, true);
+
         trx->lock();
     }
     while (rcode == -EAGAIN && trx->state() != TrxHandle::S_MUST_ABORT &&
@@ -587,7 +592,7 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         }
 
         assert(rcode != -EINTR || trx->state() == TrxHandle::S_MUST_ABORT);
-        assert(seqno_l == GCS_SEQNO_ILL && seqno_g == GCS_SEQNO_ILL);
+        assert(act.seqno_l == GCS_SEQNO_ILL && act.seqno_g == GCS_SEQNO_ILL);
 
         if (trx->state() != TrxHandle::S_MUST_ABORT)
         {
@@ -598,11 +603,13 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
         goto must_abort;
     }
 
-    assert(seqno_l != GCS_SEQNO_ILL && seqno_g != GCS_SEQNO_ILL);
+    assert(act.buf);
+    assert(act.seqno_l != GCS_SEQNO_ILL && act.seqno_g != GCS_SEQNO_ILL);
+
     ++replicated_;
     replicated_bytes_ += wscoll.size();
     trx->set_gcs_handle(-1);
-    trx->set_seqnos(seqno_l, seqno_g);
+    trx->set_received(act.buf, act.seqno_l, act.seqno_g);
 
     if (trx->state() == TrxHandle::S_MUST_ABORT)
     {
@@ -610,19 +617,15 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandle* trx)
 
         if (retval != WSREP_BF_ABORT)
         {
-            LocalOrder lo(*trx);
-            ApplyOrder ao(*trx);
+            LocalOrder  lo(*trx);
+            ApplyOrder  ao(*trx);
             CommitOrder co(*trx, co_mode_);
             local_monitor_.self_cancel(lo);
             apply_monitor_.self_cancel(ao);
-            if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
+            if (co_mode_ !=CommitOrder::BYPASS) commit_monitor_.self_cancel(co);
         }
 
-        if (trx->state() == TrxHandle::S_MUST_ABORT)
-        {
-            trx->set_seqnos(WSREP_SEQNO_UNDEFINED, WSREP_SEQNO_UNDEFINED);
-            goto must_abort;
-        }
+        if (trx->state() == TrxHandle::S_MUST_ABORT) goto must_abort;
     }
     else
     {
@@ -822,7 +825,7 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandle* trx, void* trx_ctx)
     {
         // safety measure to make sure that all preceding trxs finish before
         // replaying
-        trx->set_last_depends_seqno(trx->global_seqno() - 1);
+        trx->set_depends_seqno(trx->global_seqno() - 1);
         ApplyOrder ao(*trx);
         gu_trace(apply_monitor_.enter(ao));
         trx->set_state(TrxHandle::S_MUST_REPLAY_CM);
@@ -876,23 +879,16 @@ wsrep_status_t galera::ReplicatorSMM::post_commit(TrxHandle* trx)
 
     CommitOrder co(*trx, co_mode_);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.leave(co);
+
     ApplyOrder ao(*trx);
     apply_monitor_.leave(ao);
+
     cert_.set_trx_committed(trx);
-#if 0 // REMOVE
-    if (trx->action() != 0)
-    {
-        gcache_.free(trx->action());
-        trx->set_action(0);
-    }
-    else
-    {
-        log_warn << "no assigned cached action for " << *trx;
-    }
-#endif
     trx->set_state(TrxHandle::S_COMMITTED);
+
     report_last_committed();
     ++local_commits_;
+
     return WSREP_OK;
 }
 
@@ -909,11 +905,7 @@ wsrep_status_t galera::ReplicatorSMM::post_rollback(TrxHandle* trx)
            trx->state() == TrxHandle::S_EXECUTING);
 
     trx->set_state(TrxHandle::S_ROLLED_BACK);
-    if (trx->action() != 0)
-    {
-        gcache_.free(trx->action());
-        trx->set_action(0);
-    }
+
     report_last_committed();
     ++local_rollbacks_;
 
@@ -1060,7 +1052,7 @@ void galera::ReplicatorSMM::process_trx(void* recv_ctx, TrxHandle* trx)
     assert(trx->local_seqno() > 0);
     assert(trx->global_seqno() > 0);
     assert(trx->last_seen_seqno() >= 0);
-    assert(trx->last_depends_seqno() == -1);
+    assert(trx->depends_seqno() == -1);
     assert(trx->state() == TrxHandle::S_REPLICATING);
 
     wsrep_status_t const retval(cert(trx));
@@ -1629,8 +1621,8 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
 
     trx->set_state(TrxHandle::S_CERTIFYING);
 
-    LocalOrder lo(*trx);
-    ApplyOrder ao(*trx);
+    LocalOrder  lo(*trx);
+    ApplyOrder  ao(*trx);
     CommitOrder co(*trx, co_mode_);
     bool interrupted(false);
 
@@ -1670,7 +1662,7 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
                 // but not all actions preceding SST initial position
                 // have been processed
                 trx->set_state(TrxHandle::S_MUST_ABORT);
-                if (trx->is_local() == true) ++local_cert_failures_;
+                local_cert_failures_ += trx->is_local();
                 cert_.set_trx_committed(trx);
                 retval = WSREP_TRX_FAIL;
             }
@@ -1683,11 +1675,19 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
                     commit_monitor_.self_cancel(co);
             }
             trx->set_state(TrxHandle::S_MUST_ABORT);
-            if (trx->is_local() == true) ++local_cert_failures_;
+            local_cert_failures_ += trx->is_local();
             cert_.set_trx_committed(trx);
             retval = WSREP_TRX_FAIL;
             break;
         }
+
+        // we probably want to do it 'in order' for std::map reasons, so keeping
+        // it inside the monitor
+        /*! @todo: benchmark both variants on SMP */
+        gcache_.seqno_assign (trx->action(),
+                              trx->global_seqno(),
+                              trx->depends_seqno(),
+                              trx->is_local());  // frees local actions
 
         local_monitor_.leave(lo);
     }
@@ -1724,6 +1724,11 @@ wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(TrxHandle* trx)
             trx->set_state(TrxHandle::S_MUST_ABORT);
         }
         retval = WSREP_TRX_FAIL;
+
+        gcache_.seqno_assign (trx->action(),
+                              trx->global_seqno(),
+                              -1,
+                              trx->is_local());
         break;
     }
     return retval;

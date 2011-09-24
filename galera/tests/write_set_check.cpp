@@ -289,7 +289,14 @@ START_TEST(test_cert)
         trx->set_flags(TrxHandle::F_COMMIT);
         trx->flush(0);
         const MappedBuffer& wscoll(trx->write_set_collection());
-        GcsActionTrx trx2(&wscoll[0], wscoll.size(), i + 1, i + 1);
+
+        gcs_action act;
+        act.buf     = &wscoll[0];
+        act.size    = wscoll.size();
+        act.seqno_g = i + 1;
+        act.seqno_l = i + 1;
+
+        GcsActionTrx trx2(act);
         cert.append_trx(trx2.trx());
         trx->unref();
     }
@@ -332,7 +339,7 @@ START_TEST(test_cert_hierarchical_v0)
         wsrep_seqno_t   local_seqno;
         wsrep_seqno_t   global_seqno;
         wsrep_seqno_t   last_seen_seqno;
-        wsrep_seqno_t   expected_last_depends_seqno;
+        wsrep_seqno_t   expected_depends_seqno;
         int             flags;
         Certification::TestResult result;
     } wsi[] = {
@@ -385,22 +392,22 @@ START_TEST(test_cert_hierarchical_v0)
     cert.assign_initial_position(0, 0);
     for (size_t i(0); i < nws; ++i)
     {
+//        gcs_action act;
+
         TrxHandle* trx(new TrxHandle(0, wsi[i].uuid, wsi[i].conn_id,
                                      wsi[i].trx_id, false));
         trx->append_key(Key(0, wsi[i].key, wsi[i].iov_len));
         trx->set_last_seen_seqno(wsi[i].last_seen_seqno);
         trx->set_flags(trx->flags() | wsi[i].flags);
         trx->flush(0);
-        trx->set_seqnos(wsi[i].local_seqno, wsi[i].global_seqno);
+        trx->set_received(0, wsi[i].local_seqno, wsi[i].global_seqno);
         Certification::TestResult result(cert.append_trx(trx));
         fail_unless(result == wsi[i].result, "g: %lld r: %d er: %d",
                     trx->global_seqno(), result, wsi[i].result);
-        fail_unless(trx->last_depends_seqno() ==
-                    wsi[i].expected_last_depends_seqno,
+        fail_unless(trx->depends_seqno() == wsi[i].expected_depends_seqno,
                     "g: %lld ld: %lld eld: %lld",
-                    trx->global_seqno(),
-                    trx->last_depends_seqno(),
-                    wsi[i].expected_last_depends_seqno);
+                    trx->global_seqno(), trx->depends_seqno(),
+                    wsi[i].expected_depends_seqno);
         trx->unref();
     }
 }
@@ -419,7 +426,7 @@ START_TEST(test_cert_hierarchical_v1)
         wsrep_seqno_t   local_seqno;
         wsrep_seqno_t   global_seqno;
         wsrep_seqno_t   last_seen_seqno;
-        wsrep_seqno_t   expected_last_depends_seqno;
+        wsrep_seqno_t   expected_depends_seqno;
         int             flags;
         Certification::TestResult result;
     } wsi[] = {
@@ -488,16 +495,14 @@ START_TEST(test_cert_hierarchical_v1)
         log_info << "ws: " << buf.size() - offset;
         trx->append_write_set(&buf[0] + offset, buf.size() - offset);
 
-        trx->set_seqnos(wsi[i].local_seqno, wsi[i].global_seqno);
+        trx->set_received(0, wsi[i].local_seqno, wsi[i].global_seqno);
         Certification::TestResult result(cert.append_trx(trx));
         fail_unless(result == wsi[i].result, "g: %lld r: %d er: %d",
                     trx->global_seqno(), result, wsi[i].result);
-        fail_unless(trx->last_depends_seqno() ==
-                    wsi[i].expected_last_depends_seqno,
+        fail_unless(trx->depends_seqno() == wsi[i].expected_depends_seqno,
                     "g: %lld ld: %lld eld: %lld",
-                    trx->global_seqno(),
-                    trx->last_depends_seqno(),
-                    wsi[i].expected_last_depends_seqno);
+                    trx->global_seqno(), trx->depends_seqno(),
+                    wsi[i].expected_depends_seqno);
         cert.set_trx_committed(trx);
         trx->unref();
     }

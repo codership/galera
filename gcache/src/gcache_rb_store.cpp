@@ -76,7 +76,7 @@ namespace gcache
             seqno2ptr_.erase (j);
 
             // this buffer will never ever be accessed by seqno again anyways
-            bh->seqno = SEQNO_NONE;
+            bh->seqno_g = SEQNO_NONE;
 
             if (gu_likely (BH_is_released(bh)))
             {
@@ -119,7 +119,7 @@ namespace gcache
             if (!BH_is_released(bh))
                 return 0; // can't free any more space, so no buffer
 
-            if (bh->seqno != SEQNO_NONE) discard_seqno (bh->seqno);
+            if (bh->seqno_g != SEQNO_NONE) discard_seqno (bh->seqno_g);
 
             first_ += bh->size;
 
@@ -162,11 +162,12 @@ namespace gcache
         BH_clear (BH_cast(next_));
 
         BufferHeader* bh = BH_cast(ret);
-        bh->size  = size;
-        bh->seqno = SEQNO_NONE;
-        bh->flags = 0;
-        bh->store = BUFFER_IN_RB;
-        bh->ctx   = this;
+        bh->size    = size;
+        bh->seqno_g = SEQNO_NONE;
+        bh->seqno_d = SEQNO_ILL;
+        bh->flags   = 0;
+        bh->store   = BUFFER_IN_RB;
+        bh->ctx     = this;
 
         return bh;
     }
@@ -189,7 +190,7 @@ namespace gcache
     }
 
     void
-    RingBuffer::free (void* ptr) throw ()
+    RingBuffer::free (const void* ptr) throw ()
     {
         if (gu_likely(NULL != ptr))
         {
@@ -200,7 +201,7 @@ namespace gcache
             // space is unused but not free
             // space counted as free only when it is erased from the map
             BH_release (bh);
-            if (SEQNO_NONE == bh->seqno) discard (bh);
+            if (SEQNO_NONE == bh->seqno_g) discard (bh);
         }
     }
 

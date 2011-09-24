@@ -15,8 +15,6 @@
 namespace gcache
 {
     static uint32_t const BUFFER_RELEASED  = 1 << 0;
-    static uint32_t const BUFFER_CANCELED  = 1 << 1;
-    static uint32_t const BUFFER_CERTIFIED = 1 << 2;
 
     enum StorageType
     {
@@ -27,8 +25,9 @@ namespace gcache
 
     struct BufferHeader
     {
-        ssize_t  size; /*! total buffer size, including header */
-        int64_t  seqno;
+        int64_t  seqno_g;
+        int64_t  seqno_d;
+        ssize_t  size;    /*! total buffer size, including header */
         MemOps*  ctx;
         uint32_t flags;
         int32_t  store;
@@ -56,6 +55,7 @@ namespace gcache
     BH_is_released (BufferHeader* bh)
     { return (bh->flags & BUFFER_RELEASED); }
 
+#if REMOVE
     static inline void
     BH_cancel (BufferHeader* bh)
     { bh->flags |= BUFFER_CANCELED; }
@@ -63,7 +63,7 @@ namespace gcache
     static inline bool
     BH_is_canceled (BufferHeader* bh)
     { return (bh->flags & BUFFER_CANCELED); }
-
+#endif
 }
 
 #endif /* __GCACHE_BUFHEAD__ */

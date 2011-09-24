@@ -134,11 +134,11 @@ namespace galera
                     }
                     cert_.purge_for_trx(trx);
 
-                    if (trx->last_depends_seqno() > -1)
+                    if (trx->depends_seqno() > -1)
                     {
                         cert_.n_certified_--;
                         cert_.deps_dist_ -=
-                            (trx->global_seqno() - trx->last_depends_seqno());
+                            (trx->global_seqno() - trx->depends_seqno());
                     }
 
                     if (trx->refcnt() > 1)

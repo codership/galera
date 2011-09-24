@@ -13,10 +13,7 @@
 
 #define DF_ALLOC()                                              \
     do {                                                        \
-        if (gu_likely(df->cache != NULL))                       \
-            df->head = gcache_malloc (df->cache, df->size);     \
-        else                                                    \
-            df->head = malloc (df->size);                       \
+        df->head = gcs_gcache_malloc (df->cache, df->size);     \
                                                                 \
         if(gu_likely(df->head != NULL))                         \
             df->tail = df->head;                                \

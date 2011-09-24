@@ -25,7 +25,7 @@ namespace gcache
 
         void* malloc  (ssize_t size) throw();
 
-        void  free    (void*   ptr)  throw()
+        void  free    (const void* ptr)  throw()
         {
             assert (ptr > mmap_.ptr);
             assert (ptr <= (static_cast<uint8_t*>(mmap_.ptr) + mmap_.size));
@@ -34,7 +34,7 @@ namespace gcache
             BH_release (ptr2BH(ptr));
         }
 
-        void* realloc (void*  ptr, ssize_t size) throw ();
+        void* realloc (void* ptr, ssize_t size) throw ();
 
         void discard (BufferHeader* ptr) throw() {}
 

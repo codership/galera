@@ -168,12 +168,6 @@ gcs_group_handle_act_msg (gcs_group_t*          group,
              * increment and assign act_id only for totally ordered actions
              * and only in PRIM (skip messages while in state exchange) */
             rcvd->id = ++group->act_id;
-
-#ifndef GCS_FOR_GARB
-            if (gu_likely(NULL != group->cache)) {
-                gcache_seqno_assign (group->cache, rcvd->act.buf, rcvd->id);
-            }
-#endif
         }
         else if (GCS_ACT_TORDERED  == rcvd->act.type) {
             /* Rare situations */

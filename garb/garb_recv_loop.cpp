@@ -52,19 +52,17 @@ RecvLoop::loop() throw (gu::Exception)
 {
     while (1)
     {
-        void*          act = 0;
-        size_t         act_size;
-        gcs_act_type_t act_type;
-        gcs_seqno_t    act_id;
+        gcs_action act;
 
-        gcs_.recv (act, act_size, act_type, act_id);
+        gcs_.recv (act);
 
-        switch (act_type)
+        switch (act.type)
         {
         case GCS_ACT_TORDERED:
-            if (gu_unlikely(!(act_id & 127))) /* == report_interval_ of 128 */
+            if (gu_unlikely(!(act.seqno_g & 127)))
+                /* == report_interval_ of 128 */
             {
-                gcs_.set_last_applied (act_id);
+                gcs_.set_last_applied (act.seqno_g);
             }
             break;
         case GCS_ACT_COMMIT_CUT:
@@ -75,7 +73,7 @@ RecvLoop::loop() throw (gu::Exception)
         case GCS_ACT_CONF:
         {
             const gcs_act_conf_t* const cc
-                (reinterpret_cast<gcs_act_conf_t*>(act));
+                (reinterpret_cast<const gcs_act_conf_t*>(act.buf));
 
             if (cc->conf_id > 0) /* PC */
             {
@@ -108,10 +106,10 @@ RecvLoop::loop() throw (gu::Exception)
             break;
         }
 
-        if (act_size > 0)
+        if (act.size > 0)
         {
-            assert (act);
-            free (act);
+            assert (act.buf);
+            free (const_cast<void*>(act.buf));
         }
     }
 }

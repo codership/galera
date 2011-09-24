@@ -20,11 +20,7 @@ public:
 
     ~Gcs ();
 
-    void recv (void*&          act,
-               size_t&         act_size,
-               gcs_act_type_t& act_type,
-               gcs_seqno_t&    act_id)
-        throw (gu::Exception);
+    void recv (gcs_action& act) throw (gu::Exception);
 
     void request_state_transfer (const std::string& request,
                                  const std::string& donor)

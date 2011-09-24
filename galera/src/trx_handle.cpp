@@ -48,18 +48,18 @@ std::ostream& galera::operator<<(std::ostream& os, TrxHandle::State s)
 std::ostream&
 galera::operator<<(std::ostream& os, const TrxHandle& th)
 {
-    return (os << "source: " << th.source_id_
-            << " version: " << th.version_
-            << " local: " << th.local_
-            << " state: " << th.state_()
-            << " flags: " << th.write_set_flags_
-            << " conn_id: " << int64_t(th.conn_id_)
-            << " trx_id: " << int64_t(th.trx_id_) // for readability
-            << " seqnos (l: "  << th.local_seqno_
-            << ", g: " << th.global_seqno_
-            << ", s: " << th.last_seen_seqno_
-            << ", d: " << th.last_depends_seqno_
-            << ", ts: " << th.timestamp_
+    return (os << "source: "  << th.source_id_
+            << " version: "   << th.version_
+            << " local: "     << th.local_
+            << " state: "     << th.state_()
+            << " flags: "     << th.write_set_flags_
+            << " conn_id: "   << int64_t(th.conn_id_)
+            << " trx_id: "    << int64_t(th.trx_id_) // for readability
+            << " seqnos (l: " << th.local_seqno_
+            << ", g: "        << th.global_seqno_
+            << ", s: "        << th.last_seen_seqno_
+            << ", d: "        << th.depends_seqno_
+            << ", ts: "       << th.timestamp_
             << ")");
 }
 

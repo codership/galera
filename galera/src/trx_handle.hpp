@@ -134,7 +134,7 @@ namespace galera
             local_seqno_       (WSREP_SEQNO_UNDEFINED),
             global_seqno_      (WSREP_SEQNO_UNDEFINED),
             last_seen_seqno_   (WSREP_SEQNO_UNDEFINED),
-            last_depends_seqno_(WSREP_SEQNO_UNDEFINED),
+            depends_seqno_     (WSREP_SEQNO_UNDEFINED),
             refcnt_            (1),
             write_set_         (version),
             write_set_flags_   (0),
@@ -166,8 +166,11 @@ namespace galera
         bool is_committed() const { return committed_; }
         void mark_committed() { committed_ = true; }
 
-        void set_seqnos(wsrep_seqno_t seqno_l, wsrep_seqno_t seqno_g)
+        void set_received (const void*   action,
+                           wsrep_seqno_t seqno_l,
+                           wsrep_seqno_t seqno_g)
         {
+            action_       = action;
             local_seqno_  = seqno_l;
             global_seqno_ = seqno_g;
         }
@@ -177,9 +180,9 @@ namespace galera
             last_seen_seqno_ = last_seen_seqno;
         }
 
-        void set_last_depends_seqno(wsrep_seqno_t seqno_lt)
+        void set_depends_seqno(wsrep_seqno_t seqno_lt)
         {
-            last_depends_seqno_ = seqno_lt;
+            depends_seqno_ = seqno_lt;
         }
 
         void set_state(State state)
@@ -191,11 +194,7 @@ namespace galera
         void set_gcs_handle(long gcs_handle) { gcs_handle_ = gcs_handle; }
         long gcs_handle() const { return gcs_handle_; }
 
-        void set_action(void* action)
-        {
-            action_ = action;
-        }
-        void* action() const { return action_; }
+        const void* action() const { return action_; }
 
         wsrep_seqno_t local_seqno() const { return local_seqno_; }
 
@@ -203,7 +202,7 @@ namespace galera
 
         wsrep_seqno_t last_seen_seqno() const { return last_seen_seqno_; }
 
-        wsrep_seqno_t last_depends_seqno() const { return last_depends_seqno_; }
+        wsrep_seqno_t depends_seqno() const { return depends_seqno_; }
 
 
         void set_flags(int flags) { write_set_flags_ = flags; }
@@ -325,14 +324,14 @@ namespace galera
         wsrep_seqno_t          local_seqno_;
         wsrep_seqno_t          global_seqno_;
         wsrep_seqno_t          last_seen_seqno_;
-        wsrep_seqno_t          last_depends_seqno_;
+        wsrep_seqno_t          depends_seqno_;
         gu::Atomic<size_t>     refcnt_;
         WriteSet               write_set_;
         int                    write_set_flags_;
         bool                   certified_;
         bool                   committed_;
         long                   gcs_handle_;
-        void*                  action_;
+        const void*            action_;
         int64_t                timestamp_;
         Mac                    mac_;
         gu::Buffer             annotation_;

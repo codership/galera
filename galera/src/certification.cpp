@@ -266,10 +266,10 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
 
     if (store_keys == true)
     {
-        trx->set_last_depends_seqno(std::max(safe_to_discard_seqno_,
-                                             max_depends_seqno));
+        trx->set_depends_seqno(std::max(safe_to_discard_seqno_,
+                                        max_depends_seqno));
 
-        assert(trx->last_depends_seqno() < trx->global_seqno());
+        assert(trx->depends_seqno() < trx->global_seqno());
 
         for (TrxHandle::CertKeySet::iterator i(match.begin());
              i != match.end(); ++i)
@@ -283,7 +283,6 @@ galera::Certification::do_test_v0(TrxHandle* trx, bool store_keys)
 
 cert_fail:
     purge_for_trx(trx);
-    trx->set_last_depends_seqno(-1);
     return TEST_FAILED;
 }
 
@@ -353,9 +352,8 @@ certify_v1(galera::TrxHandle*                              trx,
                               << *trx << " <--X--> " << *ref_trx;
                     return false;
                 }
-                trx->set_last_depends_seqno(
-                    std::max(trx->last_depends_seqno(),
-                             ref_trx->global_seqno()));
+                trx->set_depends_seqno(std::max(trx->depends_seqno(),
+                                       ref_trx->global_seqno()));
             }
         }
         key_list.push_back(std::make_pair(key, full_key));
@@ -371,13 +369,13 @@ galera::Certification::do_test_v1(TrxHandle* trx, bool store_keys)
 
     if (trx->flags() & TrxHandle::F_ISOLATION)
     {
-        trx->set_last_depends_seqno(trx->global_seqno() - 1);
+        trx->set_depends_seqno(trx->global_seqno() - 1);
     }
     else
     {
-        trx->set_last_depends_seqno(trx_map_.empty() ?
-                                    position_ - 1    :
-                                    trx_map_.begin()->second->global_seqno() - 1);
+        trx->set_depends_seqno(trx_map_.empty() ?
+                               position_ - 1    :
+                               trx_map_.begin()->second->global_seqno() - 1);
     }
 
     size_t offset(serial_size(*trx));
@@ -453,9 +451,8 @@ cert_fail:
             }
         }
     }
-    trx->set_last_depends_seqno(-1);
-    return TEST_FAILED;
 
+    return TEST_FAILED;
 }
 
 galera::Certification::TestResult
@@ -503,7 +500,7 @@ galera::Certification::do_test(TrxHandle* trx, bool store_keys)
     if (store_keys == true && res == TEST_OK)
     {
         ++n_certified_;
-        deps_dist_ += (trx->global_seqno() - trx->last_depends_seqno());
+        deps_dist_ += (trx->global_seqno() - trx->depends_seqno());
     }
     return res;
 }
@@ -637,19 +634,20 @@ galera::Certification::test(TrxHandle* trx, bool bval)
 {
     assert(trx->global_seqno() >= 0 && trx->local_seqno() >= 0);
 
+#if 0 /* REMOVE : this is taken care of in tests */
     if (bval == true)
     {
         // optimistic guess, cert test may adjust this to tighter value
-        trx->set_last_depends_seqno(trx->last_seen_seqno());
+        trx->set_depends_seqno(trx->last_seen_seqno());
     }
-
+#endif
     const TestResult ret(do_test(trx, bval));
 
     if (gu_unlikely(ret != TEST_OK))
     {
         // make sure that last depends seqno is -1 for trxs that failed
         // certification
-        trx->set_last_depends_seqno(-1);
+        trx->set_depends_seqno(WSREP_SEQNO_UNDEFINED);
     }
 
     return ret;
@@ -691,7 +689,7 @@ void galera::Certification::set_trx_committed(TrxHandle* trx)
 
     if (trx->is_certified() == true)
     {
-        // trxs with last_depends_seqno == -1 haven't gone through
+        // trxs with depends_seqno == -1 haven't gone through
         // append_trx
         gu::Lock lock(mutex_);
 

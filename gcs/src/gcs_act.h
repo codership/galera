@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2011 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -19,8 +19,9 @@ struct gcs_act
 struct gcs_act_rcvd
 {
     struct gcs_act act;
-    long           sender_idx;
-    gcs_seqno_t    id;        // total order seqno
+    const void*    repl_buf;    // pointer to local replicated buffer if any
+    gcs_seqno_t    id;          // global total order seqno
+    int            sender_idx;
 };
 
 #endif /* _gcs_act_h_ */

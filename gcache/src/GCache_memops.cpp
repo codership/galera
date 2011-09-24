@@ -17,7 +17,7 @@ namespace gcache
             seqno2ptr_t::iterator j = i; ++i;
             BufferHeader* bh = ptr2BH (j->second);
             seqno2ptr.erase (j);
-            bh->seqno = SEQNO_NONE;
+            bh->seqno_g = SEQNO_ILL; // should never be reused
 
             if (gu_likely(BH_is_released(bh)))
             {
@@ -54,7 +54,7 @@ namespace gcache
     }
 
     void
-    GCache::free (void* ptr) throw ()
+    GCache::free (const void* ptr) throw ()
     {
         if (gu_likely(0 != ptr))
         {
@@ -70,18 +70,23 @@ namespace gcache
             }
             buf_tracker.erase(it);
 #endif
+            frees++;
 
             switch (bh->store)
             {
             case BUFFER_IN_MEM:  mem.free (ptr); break;
             case BUFFER_IN_RB:   rb.free  (ptr); break;
             case BUFFER_IN_PAGE:
-                if (gu_likely(SEQNO_NONE != bh->seqno))
+                if (gu_likely(bh->seqno_g > 0))
                 {
-                    discard_seqno (bh->seqno);
+                    discard_seqno (bh->seqno_g);
                 }
                 ps.free (ptr); break;
             }
+        }
+        else {
+            log_warn << "Attempt to free a null pointer";
+            assert(0);
         }
     }
 
@@ -94,10 +99,10 @@ namespace gcache
         void*         new_ptr = 0;
         BufferHeader* bh      = ptr2BH(ptr);
 
-        if (gu_unlikely(bh->seqno != SEQNO_NONE)) // sanity check
+        if (gu_unlikely(bh->seqno_g > 0)) // sanity check
         {
             log_fatal << "Internal program error: changing size of an ordered"
-                      << " buffer, seqno: " << bh->seqno << ". Aborting.";
+                      << " buffer, seqno: " << bh->seqno_g << ". Aborting.";
             abort();
         }
 
@@ -144,5 +149,5 @@ namespace gcache
 #endif
 
         return new_ptr;
-    } 
+    }
 }

@@ -17,7 +17,11 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include <stdio.h>
+
+#include "gu_config.h"
+#include "gcache.h"
 
 /*! @typedef @brief Sequence number type. */
 typedef int64_t gcs_seqno_t;
@@ -32,7 +36,7 @@ static const gcs_seqno_t GCS_SEQNO_FIRST =  1;
 #define GCS_UUID_LEN 16
 
 /*! Connection handle type */
-typedef struct gcs_conn  gcs_conn_t;
+typedef struct gcs_conn gcs_conn_t;
 
 /*! @brief Creates GCS connection handle.
  *
@@ -46,7 +50,7 @@ typedef struct gcs_conn  gcs_conn_t;
  * @return pointer to GCS connection handle, NULL in case of failure.
  */
 extern gcs_conn_t*
-gcs_create  (void* conf, void* cache,
+gcs_create  (gu_config_t* conf, gcache_t* cache,
              const char* node_name, const char* inc_addr,
              int repl_proto_ver, int appl_proto_ver);
 
@@ -152,25 +156,32 @@ gcs_act_type_t;
 /*! String representations of action types */
 extern const char* gcs_act_type_to_str(gcs_act_type_t);
 
+struct gcs_action {
+    const void*    buf;
+    ssize_t        size;
+    gcs_seqno_t    seqno_g;
+    gcs_seqno_t    seqno_l;
+    gcs_act_type_t type;
+};
+
 /*! @brief Sends an action to group and returns.
- * Action is not duplicated, therefore action buffer
- * should not be accessed by application after the call returns.
- * Action will be either returned through gcs_recv() call, or discarded
- * (memory freed) in case it is not delivered by group. For a better
- * means to replicate an action see gcs_repl(). @see gcs_repl()
+ * A copy of action will be returned through gcs_recv() call, or discarded
+ * in case it is not delivered by group.
+ * For a better means to replicate an action see gcs_repl(). @see gcs_repl()
  *
- * @param conn opened connection
- * @param act_type action type
- * @param act_size action size
- * @param scheduled whether the call was preceded by gcs_schedule()
- * @param action action buffer
- * @return negative error code, action size in case of success
+ * @param conn group connection handle
+ * @param act_buf    action buffer
+ * @param act_size   action size
+ * @param act_type   action type
+ * @param scheduled  whether the call was scheduled by gcs_schedule()
+ * @return           negative error code, action size in case of success
+ * @retval -EINTR    thread was interrupted while waiting to enter the monitor
  */
-extern long gcs_send (gcs_conn_t          *conn,
-                      const void          *action,
-                      bool                 scheduled,
-                      const size_t         act_size,
-                      const gcs_act_type_t act_type);
+extern long gcs_send (gcs_conn_t*    conn,
+                      const void*    act_buf,
+                      size_t         act_size,
+                      gcs_act_type_t act_type,
+                      bool           scheduled);
 
 /*! @brief Receives an action from group.
  * Blocks if no actions are available. Action buffer is allocated by GCS
@@ -181,43 +192,28 @@ extern long gcs_send (gcs_conn_t          *conn,
  * monotonic gapless number sequence starting with 1 which can be used
  * to serialize access to critical sections.
  *
- * @param conn opened connection to group
- * @param act_type action type
- * @param act_size action size
- * @param action action buffer
- * @param act_id global action ID (sequence number)
- * @param local_act_id local action ID (sequence number)
- * @return negative error code, action size in case of success
+ * @param conn   group connection handle
+ * @param action action object
+ * @return       negative error code, action size in case of success,
+ * @retval 0     on connection close
  */
-extern long gcs_recv (gcs_conn_t      *conn,
-                      void           **action,
-                      size_t          *act_size,
-                      gcs_act_type_t  *act_type,
-                      gcs_seqno_t     *act_id,
-                      gcs_seqno_t     *local_act_id);
+extern long gcs_recv (gcs_conn_t*        conn,
+                      struct gcs_action* action);
 
 /*! @brief Replicates an action.
  * Sends action to group and blocks until it is received. Upon return global
  * and local IDs are set. Arguments are the same as in gcs_recv().
  * @see gcs_recv()
  *
- * @param conn opened connection to group
- * @param act_type action type
- * @param act_size action size
- * @param action action buffer
+ * @param conn      group connection handle
+ * @param action    action object
  * @param scheduled whether the call was preceded by gcs_schedule()
- * @param act_id global action ID (sequence number)
- * @param local_act_id local action ID (sequence number)
- * @return negative error code, action size in case of success
- * @retval -EINTR: thread was interrupted while waiting to enter the monitor
+ * @return          negative error code, action size in case of success
+ * @retval -EINTR:  thread was interrupted while waiting to enter the monitor
  */
-extern long gcs_repl (gcs_conn_t          *conn,
-                      const void          *action,
-                      const size_t         act_size,
-                      const gcs_act_type_t act_type,
-                      bool                 scheduled,
-                      gcs_seqno_t         *act_id,
-                      gcs_seqno_t         *local_act_id);
+extern long gcs_repl (gcs_conn_t*        conn,
+                      struct gcs_action* action,
+                      bool               scheduled);
 
 /*!
  * @brief Schedules entry to CGS send monitor.

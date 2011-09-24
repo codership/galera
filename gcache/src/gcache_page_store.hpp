@@ -28,9 +28,9 @@ namespace gcache
 
         void* malloc  (ssize_t size) throw (gu::Exception);
 
-        void  free    (void*   ptr)  throw();
+        void  free    (const void* ptr)  throw();
 
-        void* realloc (void*   ptr, ssize_t size) throw (gu::Exception);
+        void* realloc (void* ptr, ssize_t size) throw (gu::Exception);
 
         void  discard (BufferHeader* bh) throw() {};
 
@@ -68,7 +68,7 @@ namespace gcache
         void* malloc_new (ssize_t size) throw ();
 
         void
-        free_page_ptr (Page* page, void* ptr)
+        free_page_ptr (Page* page, const void* ptr)
         {
             page->free(ptr);
             if (0 == page->used()) cleanup();

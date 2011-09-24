@@ -231,7 +231,7 @@ gcache::PageStore::malloc (ssize_t size) throw (gu::Exception)
 }
 
 void
-gcache::PageStore::free (void* ptr) throw ()
+gcache::PageStore::free (const void* ptr) throw ()
 {
     Page* page = static_cast<Page*>((ptr2BH(ptr))->ctx);
 
@@ -239,7 +239,8 @@ gcache::PageStore::free (void* ptr) throw ()
 }
 
 void*
-gcache::PageStore::realloc (void* ptr, ssize_t size) throw (gu::Exception)
+gcache::PageStore::realloc (void* ptr, ssize_t size)
+    throw (gu::Exception)
 {
     void* ret = 0;
 

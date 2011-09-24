@@ -13,12 +13,13 @@
 
 #define GCS_COMP_MSG_ACCESS
 
+#include "gcs_core.h"
+
 #include "gcs_backend.h"
 #include "gcs_comp_msg.h"
 #include "gcs_fifo_lite.h"
 #include "gcs_group.h"
-
-#include "gcs_core.h"
+#include "gcs_gcache.h"
 
 const size_t CORE_FIFO_LEN = (1 << 8); // 256 elements (no need to have more)
 const size_t CORE_INIT_BUF_SIZE = 4096;
@@ -440,7 +441,7 @@ core_handle_act_msg (gcs_core_t*          core,
                      struct gcs_recv_msg* msg,
                      struct gcs_act_rcvd* act)
 {
-    ssize_t        ret = 0;
+    ssize_t        ret = -1;
     gcs_group_t*   group = &core->group;
     gcs_act_frag_t frg;
     bool  my_msg = (gcs_group_my_idx(group) == msg->sender_idx);
@@ -470,42 +471,31 @@ core_handle_act_msg (gcs_core_t*          core,
 
         if (ret > 0) { /* complete action received */
 
+            assert (ret  == act->act.buf_len);
+#ifndef GCS_FOR_GARB
+            assert (NULL != act->act.buf);
+#else
+            assert (NULL == act->act.buf);
+            act->act.buf_len = 0;
+#endif
             act->sender_idx = msg->sender_idx;
 
             if (gu_likely(!my_msg)) {
                 /* foreign action, must be passed from gcs_group */
-                assert (ret  == act->act.buf_len);
                 assert (GCS_ACT_TORDERED != act->act.type || act->id > 0);
-#ifndef GCS_FOR_GARB
-                assert (NULL != act->act.buf);
-#else
-                assert (NULL == act->act.buf);
-                act->act.buf_len = 0;
-#endif
             }
             else {
                 /* local action, get from FIFO, should be there already */
                 core_act_t* local_act;
                 gcs_seqno_t sent_act_id;
 
-                assert (ret  == act->act.buf_len);
-
-#ifndef GCS_FOR_GARB
-                assert (NULL != act->act.buf);
-                if (core->cache)
-                    gcache_free (core->cache, (void*)act->act.buf);
-                else
-                    free ((void*)act->act.buf);
-                act->act.buf = NULL;
-#endif
-                assert (NULL == act->act.buf);
-
                 if ((local_act = gcs_fifo_lite_get_head (core->fifo))){
-                    act->act.buf     = local_act->action;
+                    act->repl_buf    = local_act->action;
                     act->act.buf_len = local_act->action_size;
                     sent_act_id      = local_act->sent_act_id;
-                    assert (NULL != act->act.buf);
                     gcs_fifo_lite_pop_head (core->fifo);
+                    assert (NULL != act->repl_buf);
+
                     /* NOTE! local_act cannot be used after this point */
                     /* sanity check */
                     if (gu_unlikely(sent_act_id != frg.act_id)) {
@@ -563,16 +553,16 @@ core_handle_act_msg (gcs_core_t*          core,
         }
     }
     else {
-        /* Non-primary - ignore action on slaves, return -EAGAIN on master */
+        /* Non-primary conf, foreign message - ignore */
         gu_debug ("Action message in non-primary configuration from "
                  "member %d", msg->sender_idx);
+        ret = 0;
     }
 
 #ifndef NDEBUG
     if (ret <= 0) {
         assert (GCS_SEQNO_ILL == act->id);
         assert (GCS_ACT_ERROR == act->act.type);
-        assert (NULL == act->act.buf);
     }
 #endif
 
@@ -946,7 +936,6 @@ static long core_msg_causal(gcs_core_t* conn,
 /*! Receives action */
 ssize_t gcs_core_recv (gcs_core_t*          conn,
                        struct gcs_act_rcvd* recv_act,
-                       bool*                is_local,
                        long long            timeout)
 {
 //    struct gcs_act_rcvd  recv_act;
@@ -956,11 +945,11 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
     static struct gcs_act_rcvd zero_act = { .act = { .buf     = NULL,
                                                      .buf_len = 0,
                                                      .type    = GCS_ACT_ERROR },
-                                            .id         = -1, // GCS_SEQNO_ILL
+                                            .repl_buf   = NULL,
+                                            .id         = -1,   // GCS_SEQNO_ILL
                                             .sender_idx = -1 };
 
     *recv_act = zero_act;
-    *is_local = false;
 
     /* receive messages from group and demultiplex them
      * until finally some complete action is ready */
@@ -974,13 +963,12 @@ ssize_t gcs_core_recv (gcs_core_t*          conn,
 
         ret = core_msg_recv (&conn->backend, recv_msg, timeout);
         if (gu_unlikely (ret <= 0)) {
-            goto out; /* backend error while receiving message */
+           goto out; /* backend error while receiving message */
         }
 
         switch (recv_msg->type) {
         case GCS_MSG_ACTION:
             ret = core_handle_act_msg(conn, recv_msg, recv_act);
-            *is_local= (recv_act->sender_idx == gcs_group_my_idx(&conn->group));
             assert (ret == recv_act->act.buf_len || ret <= 0);
             assert (recv_act->sender_idx >= 0    || ret == 0);
             break;
@@ -1038,9 +1026,18 @@ out:
 
 //    gu_debug ("Returning %d", ret);
 
-    if (-ENOTRECOVERABLE == ret) {
-        conn->backend.close(&conn->backend);
-        gu_abort();
+    if (ret < 0) {
+        assert (recv_act->id < 0);
+
+        if (GCS_ACT_TORDERED == recv_act->act.type && recv_act->act.buf) {
+            gcs_gcache_free (conn->cache, recv_act->act.buf);
+            recv_act->act.buf = NULL;
+        }
+
+        if (-ENOTRECOVERABLE == ret) {
+            conn->backend.close(&conn->backend);
+            gu_abort();
+        }
     }
 
     return ret;

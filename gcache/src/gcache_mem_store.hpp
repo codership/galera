@@ -39,11 +39,12 @@ namespace gcache
 
             if (gu_likely(0 != bh))
             {
-                bh->size  = size;
-                bh->seqno = SEQNO_NONE;
-                bh->flags = 0;
-                bh->store = BUFFER_IN_MEM;
-                bh->ctx   = this;
+                bh->size    = size;
+                bh->seqno_g = SEQNO_NONE;
+                bh->seqno_d = SEQNO_ILL;
+                bh->flags   = 0;
+                bh->store   = BUFFER_IN_MEM;
+                bh->ctx     = this;
 
                 size_ += size;
 
@@ -53,7 +54,7 @@ namespace gcache
             return 0;
         }
 
-        void  free    (void*  ptr)  throw()
+        void  free (const void* ptr)  throw()
         {
             if (gu_likely (0 != ptr))
             {
@@ -65,11 +66,11 @@ namespace gcache
                 assert(bh->ctx == this);
 
                 BH_release (bh);
-                if (SEQNO_NONE == bh->seqno) discard (bh);
+                if (SEQNO_NONE == bh->seqno_g) discard (bh);
             }
         }
 
-        void* realloc (void*  ptr, ssize_t size) throw ()
+        void* realloc (void* ptr, ssize_t size) throw ()
         {
             BufferHeader* bh(0);
             ssize_t old_size(0);
@@ -77,7 +78,7 @@ namespace gcache
             if (ptr)
             {
                 bh = ptr2BH(ptr);
-                assert (SEQNO_NONE == bh->seqno);
+                assert (SEQNO_NONE == bh->seqno_g);
                 old_size = bh->size;
             }
 

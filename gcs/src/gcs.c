@@ -24,6 +24,7 @@
 #include "gcs_core.h"
 #include "gcs_fifo_lite.h"
 #include "gcs_sm.h"
+#include "gcs_gcache.h"
 
 const char* gcs_node_state_to_str (gcs_node_state_t state)
 {
@@ -107,14 +108,13 @@ struct gcs_conn
     char* channel;
     char* socket;
 
-    gcs_conn_state_t state;
-//DELETE    int              err;
+    gcs_conn_state_t  state;
 
     gu_config_t*      config;
     bool              config_is_local;
     struct gcs_params params;
 
-    gcache_t*    cache;
+    gcache_t*    gcache;
 
     gcs_sm_t*    sm;
 
@@ -163,13 +163,9 @@ struct gcs_recv_act
 
 struct gcs_repl_act
 {
-    gcs_seqno_t    act_id;
-    gcs_seqno_t    local_act_id;
-    const void*    action;
-    ssize_t        act_size;
-    gcs_act_type_t act_type;
-    gu_mutex_t     wait_mutex;
-    gu_cond_t      wait_cond;
+    struct gcs_action* action;
+    gu_mutex_t         wait_mutex;
+    gu_cond_t          wait_cond;
 };
 
 /*! Releases resources associated with parameters */
@@ -215,8 +211,8 @@ enomem:
 
 /* Creates a group connection handle */
 gcs_conn_t*
-gcs_create (void* const conf, void* cache,
-            const char* node_name, const char* inc_addr,
+gcs_create (gu_config_t* const conf, gcache_t* const gcache,
+            const char* const node_name, const char* const inc_addr,
             int const repl_proto_ver, int const appl_proto_ver)
 {
     gcs_conn_t* conn = GU_CALLOC (1, gcs_conn_t);
@@ -240,7 +236,7 @@ gcs_create (void* const conf, void* cache,
     }
 
     conn->state = GCS_CONN_DESTROYED;
-    conn->core  = gcs_core_create (conf, cache, node_name, inc_addr,
+    conn->core  = gcs_core_create (conf, gcache, node_name, inc_addr,
                                    repl_proto_ver, appl_proto_ver);
     if (!conn->core) {
         gu_error ("Failed to create core.");
@@ -278,7 +274,7 @@ gcs_create (void* const conf, void* cache,
     conn->global_seqno = 0;
     conn->fc_offset    = 0;
     conn->timeout      = GU_TIME_ETERNITY;
-    conn->cache        = cache;
+    conn->gcache       = gcache;
 
     gu_mutex_init (&conn->fc_lock, NULL);
 
@@ -1016,22 +1012,20 @@ static void *gcs_recv_thread (void *arg)
         gcs_seqno_t this_act_id = GCS_SEQNO_ILL;
         struct gcs_repl_act** repl_act_ptr;
         struct gcs_act_rcvd   rcvd;
-        bool                  act_is_local;
 
-        ret = gcs_core_recv (conn->core, &rcvd, &act_is_local,
-                             conn->timeout);
+        ret = gcs_core_recv (conn->core, &rcvd, conn->timeout);
 
         if (gu_unlikely(ret <= 0)) {
 
             if (-ETIMEDOUT == ret && _handle_timeout(conn)) continue;
 
-            struct gcs_recv_act *err_act = gu_fifo_get_tail(conn->recv_q);
+            struct gcs_recv_act* err_act = gu_fifo_get_tail(conn->recv_q);
 
             assert (NULL          == rcvd.act.buf);
             assert (0             == rcvd.act.buf_len);
             assert (GCS_ACT_ERROR == rcvd.act.type);
             assert (GCS_SEQNO_ILL == rcvd.id);
-            assert (!act_is_local);
+//            assert (NULL == repl_buf);
 
             err_act->rcvd     = rcvd;
             err_act->local_id = GCS_SEQNO_ILL;
@@ -1068,9 +1062,9 @@ static void *gcs_recv_thread (void *arg)
             this_act_id = conn->local_act_id++;
         }
 
-        if (act_is_local                                           &&
-            (repl_act_ptr = gcs_fifo_lite_get_head (conn->repl_q)) &&
-            (gu_likely ((*repl_act_ptr)->action == rcvd.act.buf)   ||
+        if (NULL != rcvd.repl_buf                                       &&
+            (repl_act_ptr = gcs_fifo_lite_get_head (conn->repl_q))      &&
+            (gu_likely ((*repl_act_ptr)->action->buf == rcvd.repl_buf)  ||
              /* at this point repl_q is locked and we need to unlock it and
               * return false to fall to the 'else' branch; unlikely case */
              (gcs_fifo_lite_release (conn->repl_q), false)))
@@ -1079,11 +1073,12 @@ static void *gcs_recv_thread (void *arg)
             struct gcs_repl_act* repl_act = *repl_act_ptr;
             gcs_fifo_lite_pop_head (conn->repl_q);
 
-            assert (repl_act->action   == rcvd.act.buf);
-            assert (repl_act->act_size == rcvd.act.buf_len);
+            assert (repl_act->action->size == rcvd.act.buf_len);
+            assert (repl_act->action->type == rcvd.act.type);
 
-            repl_act->act_id       = rcvd.id;
-            repl_act->local_act_id = this_act_id;
+            repl_act->action->buf     = rcvd.act.buf;
+            repl_act->action->seqno_g = rcvd.id;
+            repl_act->action->seqno_l = this_act_id;
 
             gu_mutex_lock   (&repl_act->wait_mutex);
             gu_cond_signal  (&repl_act->wait_cond);
@@ -1347,11 +1342,11 @@ long gcs_destroy (gcs_conn_t *conn)
 }
 
 /* Puts action in the send queue and returns */
-long gcs_send (gcs_conn_t*          conn,
-               const void*          action,
-               const bool           scheduled,
-               const size_t         act_size,
-               const gcs_act_type_t act_type)
+long gcs_send (gcs_conn_t*    const conn,
+               const void*    const act_buf,
+               size_t         const act_size,
+               gcs_act_type_t const act_type,
+               bool           const scheduled)
 {
     long ret = -ENOTCONN;
 
@@ -1363,24 +1358,9 @@ long gcs_send (gcs_conn_t*          conn,
 
     if (!(ret = gcs_sm_enter (conn->sm, &tmp_cond, scheduled)))
     {
-        if (GCS_CONN_OPEN >= conn->state) {
-            /* need to make a copy of the action, since receiving thread
-             * has no way of knowing that it shares this buffer.
-             * also the contents of action may be changed afterwards by
-             * the sending thread */
-            void* act;
-            act = malloc (act_size);
-            if (act != NULL) {
-                memcpy (act, action, act_size);
-                while ((ret = gcs_core_send (conn->core, act,
-                                             act_size, act_type)) == -ERESTART);
-                free (act);
-            }
-            else {
-                ret = -ENOMEM;
-            }
-        }
-
+        while ((GCS_CONN_OPEN >= conn->state) &&
+               (ret = gcs_core_send (conn->core, act_buf,
+                                     act_size, act_type)) == -ERESTART);
         gcs_sm_leave (conn->sm);
         gu_cond_destroy (&tmp_cond);
     }
@@ -1404,59 +1384,60 @@ gcs_seqno_t gcs_caused(gcs_conn_t* conn)
 }
 
 /* Puts action in the send queue and returns after it is replicated */
-long gcs_repl (gcs_conn_t          *conn,         //!<in
-               const void          *action,       //!<in
-               const size_t         act_size,     //!<in
-               const gcs_act_type_t act_type,     //!<in
-               bool                 scheduled,    //!<in
-               gcs_seqno_t         *act_id,       //!>out
-               gcs_seqno_t         *local_act_id) //!>out
+long gcs_repl (gcs_conn_t*        conn,      //!<in
+               struct gcs_action* act,       //!<inout
+               bool               scheduled) //!<in
 {
     long ret;
 
-    /* This is good - we don't have to do malloc because we wait */
-    struct gcs_repl_act act = { .act_size     = act_size,
-                                .act_type     = act_type,
-                                .act_id       = GCS_SEQNO_ILL,
-                                .local_act_id = GCS_SEQNO_ILL,
-                                .action       = action };
+    assert (act);
+    assert (act->buf);
+    assert (act->size > 0);
 
-    *act_id       = GCS_SEQNO_ILL;
-    *local_act_id = GCS_SEQNO_ILL;
+    act->seqno_l = GCS_SEQNO_ILL;
+    act->seqno_g = GCS_SEQNO_ILL;
 
-    assert (action);       // cannot gcs_repl() NULL messages
-    assert (act.action);
+    /* This is good - we don't have to do a copy because we wait */
+    struct gcs_repl_act repl_act = { .action = act };
 
-    gu_mutex_init (&act.wait_mutex, NULL);
-    gu_cond_init  (&act.wait_cond,  NULL);
+    gu_mutex_init (&repl_act.wait_mutex, NULL);
+    gu_cond_init  (&repl_act.wait_cond,  NULL);
 
     /* Send action and wait for signal from recv_thread
      * we need to lock a mutex before we can go wait for signal */
-    if (!(ret = gu_mutex_lock (&act.wait_mutex)))
+    if (!(ret = gu_mutex_lock (&repl_act.wait_mutex)))
     {
         // Lock here does the following:
         // 1. serializes gcs_core_send() access between gcs_repl() and
         //    gcs_send()
         // 2. avoids race with gcs_close() and gcs_destroy()
-        if (!(ret = gcs_sm_enter (conn->sm, &act.wait_cond, scheduled)))
+        if (!(ret = gcs_sm_enter (conn->sm, &repl_act.wait_cond, scheduled)))
         {
             struct gcs_repl_act** act_ptr;
+
+#ifndef NDEBUG
+            const void* const orig_buf = act->buf;
+#endif
+
             // some hack here to achieve one if() instead of two:
             // if (conn->state >= GCS_CONN_CLOSE) ret will be -ENOTCONN
             ret = -ENOTCONN;
             if ((GCS_CONN_OPEN >= conn->state) &&
                 (act_ptr = gcs_fifo_lite_get_tail (conn->repl_q)))
             {
-                *act_ptr = &act;
+                *act_ptr = &repl_act;
                 gcs_fifo_lite_push_tail (conn->repl_q);
+
                 // Keep on trying until something else comes out
-                while ((ret = gcs_core_send (conn->core, action,
-                                             act_size, act_type)) == -ERESTART);
+                while ((ret = gcs_core_send (conn->core, act->buf, act->size,
+                                             act->type)) == -ERESTART) {}
+
                 if (ret < 0) {
                     /* remove item from the queue, it will never be delivered */
                     gu_warn ("Send action {%p, %zd, %s} returned %d (%s)",
-                             action, act_size, gcs_act_type_to_str(act_type),
+                             act->buf, act->size,gcs_act_type_to_str(act->type),
                              ret, strerror(-ret));
+
                     if (!gcs_fifo_lite_remove (conn->repl_q)) {
                         gu_fatal ("Failed to remove unsent item from repl_q");
                         assert(0);
@@ -1464,46 +1445,49 @@ long gcs_repl (gcs_conn_t          *conn,         //!<in
                     }
                 }
                 else {
-                    assert (ret == (ssize_t)act_size);
+                    assert (ret == (ssize_t)act->size);
                 }
             }
 
             gcs_sm_leave (conn->sm);
 
             assert(ret);
-            /* now we can go waiting for action delivery */
-//        if (ret >= 0 && GCS_CONN_CLOSED > conn->state) {
-            if (ret >= 0) {
-                gu_cond_wait (&act.wait_cond, &act.wait_mutex);
 
-                if (act.act_id < 0) {
-                    assert (GCS_SEQNO_ILL    == act.local_act_id ||
-                            GCS_ACT_TORDERED != act_type);
-                    if (act.act_id == GCS_SEQNO_ILL) {
+            /* now we can go waiting for action delivery */
+            if (ret >= 0) {
+                gu_cond_wait (&repl_act.wait_cond, &repl_act.wait_mutex);
+
+                assert (act->buf != 0);
+                assert (act->buf != orig_buf);
+
+                if (act->seqno_g < 0) {
+                    assert (GCS_SEQNO_ILL    == act->seqno_l ||
+                            GCS_ACT_TORDERED != act->type);
+
+                    if (act->seqno_g == GCS_SEQNO_ILL) {
                         /* action was not replicated for some reason */
                         ret = -EINTR;
                     }
                     else {
-                        /* core provided an error code in act_id */
-                        ret = act.act_id;
+                        /* core provided an error code in global seqno */
+                        ret = act->seqno_g;
+                        act->seqno_g = GCS_SEQNO_ILL;
                     }
 
-                    act.act_id = GCS_SEQNO_ILL;
+                    gcs_gcache_free (conn->gcache, act->buf);
+                    act->buf = NULL;
                 }
-
-                *act_id       = act.act_id;       /* set by recv_thread */
-                *local_act_id = act.local_act_id; /* set by recv_thread */
             }
         }
-        gu_mutex_unlock  (&act.wait_mutex);
+        gu_mutex_unlock  (&repl_act.wait_mutex);
     }
-    gu_mutex_destroy (&act.wait_mutex);
-    gu_cond_destroy  (&act.wait_cond);
+    gu_mutex_destroy (&repl_act.wait_mutex);
+    gu_cond_destroy  (&repl_act.wait_cond);
 
 #ifdef GCS_DEBUG_GCS
 //    gu_debug ("\nact_size = %u\nact_type = %u\n"
 //              "act_id   = %llu\naction   = %p (%s)\n",
-//              act.act_size, act.act_type, act.act_id, act.action, act.action);
+//              act->size, act->type, act->seqno_g, act->buf, act->buf);
 #endif
     return ret;
 }
@@ -1514,11 +1498,12 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
                                  const char  *donor,
                                  gcs_seqno_t *local)
 {
-    gcs_seqno_t global;
-    long   ret       = -ENOMEM;
+    long   ret;
     size_t donor_len = strlen(donor) + 1; // include terminating \0
     size_t rst_size  = size + donor_len;
     void*  rst       = gu_malloc (rst_size);
+
+    *local = GCS_SEQNO_ILL;
 
     if (rst) {
         /* RST format: |donor name|\0|app request|
@@ -1528,19 +1513,35 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
         memcpy (rst, donor, donor_len);
         memcpy (rst + donor_len, req, size);
 
-        ret = gcs_repl(conn, rst, rst_size, GCS_ACT_STATE_REQ, false,
-                       &global, local);
+        struct gcs_action action = {
+            .buf  = rst,
+            .size = rst_size,
+            .type = GCS_ACT_STATE_REQ
+        };
 
-        if (ret > 0) {
-            assert (ret == (ssize_t)rst_size);
-            assert (global >= 0);
-            ret = global; // index of donor or error code is in the global seqno
-        }
+        ret = gcs_repl(conn, &action, false);
+
+        assert (action.buf != rst);
 
         gu_free (rst);
+        *local = action.seqno_l;
+
+        if (ret > 0) {
+            assert (action.buf != NULL);
+            assert (ret == (ssize_t)rst_size);
+            assert (action.seqno_g >= 0);
+            assert (action.seqno_l >  0);
+
+            gcs_gcache_free (conn->gcache, action.buf);
+            // index of donor is in the global seqno
+            ret = action.seqno_g;
+        }
+        else {
+            assert (action.buf == NULL);
+        }
     }
     else {
-        *local = GCS_SEQNO_ILL;
+        ret = -ENOMEM;
     }
 
     return ret;
@@ -1555,35 +1556,27 @@ GCS_FIFO_POP_HEAD (gcs_conn_t* conn, ssize_t size)
 }
 
 /* Returns when an action from another process is received */
-long gcs_recv (gcs_conn_t*     conn,
-               void**          action,
-               size_t*         act_size,
-               gcs_act_type_t* act_type,
-               gcs_seqno_t*    act_id,
-               gcs_seqno_t*    local_act_id)
+long gcs_recv (gcs_conn_t*        conn,
+               struct gcs_action* action)
 {
-    int                 err;
-    struct gcs_recv_act *act = NULL;
+    int                  err;
+    struct gcs_recv_act* recv_act = NULL;
 
-    *act_size     = 0;
-    *act_type     = GCS_ACT_ERROR;
-    *act_id       = GCS_SEQNO_ILL;
-    *local_act_id = GCS_SEQNO_ILL;
-    *action       = NULL;
+    assert (action);
 
-    if ((act = gu_fifo_get_head (conn->recv_q, &err)))
+    if ((recv_act = gu_fifo_get_head (conn->recv_q, &err)))
     {
         conn->queue_len = gu_fifo_length (conn->recv_q) - 1;
         bool send_cont  = gcs_fc_cont_begin   (conn);
         bool send_sync  = gcs_send_sync_begin (conn);
 
-        *action       = (void*)act->rcvd.act.buf;
-        *act_size     = act->rcvd.act.buf_len;
-        *act_type     = act->rcvd.act.type;
-        *act_id       = act->rcvd.id;
-        *local_act_id = act->local_id;
+        action->buf     = (void*)recv_act->rcvd.act.buf;
+        action->size    = recv_act->rcvd.act.buf_len;
+        action->type    = recv_act->rcvd.act.type;
+        action->seqno_g = recv_act->rcvd.id;
+        action->seqno_l = recv_act->local_id;
 
-        if (gu_unlikely (GCS_ACT_CONF == *act_type)) {
+        if (gu_unlikely (GCS_ACT_CONF == action->type)) {
             err = gu_fifo_cancel_gets (conn->recv_q);
             if (err) {
                 gu_fatal ("Internal logic error: failed to cancel recv_q "
@@ -1593,7 +1586,7 @@ long gcs_recv (gcs_conn_t*     conn,
             }
         }
 
-        GCS_FIFO_POP_HEAD (conn, *act_size); // release the queue
+        GCS_FIFO_POP_HEAD (conn, action->size); // release the queue
 
         if (gu_unlikely(send_cont) && (err = gcs_fc_cont_end(conn))) {
             // We have successfully received an action, but failed to send
@@ -1619,9 +1612,15 @@ long gcs_recv (gcs_conn_t*     conn,
                      err, strerror(-err));
         }
 
-        return *act_size;
+        return action->size;
     }
     else {
+        action->buf     = NULL;
+        action->size    = 0;
+        action->type    = GCS_ACT_ERROR;
+        action->seqno_g = GCS_SEQNO_ILL;
+        action->seqno_l = GCS_SEQNO_ILL;
+
         switch (err) {
         case -ENODATA:
             assert (GCS_CONN_CLOSED == conn->state);

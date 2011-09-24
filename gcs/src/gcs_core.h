@@ -103,7 +103,8 @@ gcs_core_send (gcs_core_t*    core,
 /*
  * gcs_core_recv() blocks until some action is received from group.
  *
- * @param timeout - absolute timeout date (as in pthread_cond_timedwait())
+ * @param repl_buf ptr to replicated action local buffer (NULL otherwise)
+ * @param timeout  absolute timeout date (as in pthread_cond_timedwait())
  *
  * Return values:
  * non-negative - the size of action received
@@ -119,7 +120,6 @@ gcs_core_send (gcs_core_t*    core,
 extern ssize_t
 gcs_core_recv (gcs_core_t*          conn,
                struct gcs_act_rcvd* recv_act,
-               bool*                is_local,
                long long            timeout);
 
 /* Configuration functions */

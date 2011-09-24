@@ -69,11 +69,12 @@ gcache::Page::malloc (ssize_t size) throw ()
     {
         BufferHeader* bh(BH_cast(next_));
 
-        bh->size  = size;
-        bh->seqno = SEQNO_NONE;
-        bh->ctx   = this;
-        bh->flags = 0;
-        bh->store = BUFFER_IN_PAGE;
+        bh->size    = size;
+        bh->seqno_g = SEQNO_NONE;
+        bh->seqno_d = SEQNO_ILL;
+        bh->ctx     = this;
+        bh->flags   = 0;
+        bh->store   = BUFFER_IN_PAGE;
 
         space_ -= size;
         next_  += size;

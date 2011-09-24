@@ -210,7 +210,7 @@ namespace galera
                            wsrep_seqno_t last_left) const
             {
                 return (trx_.is_local() == true ||
-                        last_left >= trx_.last_depends_seqno());
+                        last_left >= trx_.depends_seqno());
             }
 
         private:

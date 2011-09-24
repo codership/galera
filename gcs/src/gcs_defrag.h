@@ -18,6 +18,7 @@
 #include "gcs.h"     // for gcs_seqno_t et al.
 #include "gcs_act_proto.h"
 #include "gcs_act.h"
+#include "gcs_gcache.h"
 
 #include <gcache.h>
 
@@ -67,10 +68,10 @@ static inline void
 gcs_defrag_free (gcs_defrag_t* df)
 {
 #ifndef GCS_FOR_GARB
-    if (gu_likely(NULL != df->cache))
-        gcache_free (df->cache, df->head);
-    else
-        free (df->head); // alloc'ed with standard malloc
+    if (df->head) {
+        gcs_gcache_free (df->cache, df->head);
+        // df->head, df->tail will be zeroed in gcs_defrag_init() below
+    }
 #else
     assert(NULL == df->head);
 #endif

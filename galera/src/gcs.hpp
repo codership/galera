@@ -26,11 +26,9 @@ namespace galera
         virtual ssize_t set_initial_position(const wsrep_uuid_t& uuid,
                                              gcs_seqno_t seqno) = 0;
         virtual void    close() = 0;
-        virtual ssize_t recv(void**, size_t*, gcs_act_type_t*,
-                             gcs_seqno_t*, gcs_seqno_t*) = 0;
+        virtual ssize_t recv(gcs_action& act) = 0;
         virtual ssize_t send(const void*, size_t, gcs_act_type_t, bool) = 0;
-        virtual ssize_t repl(const void*, size_t, gcs_act_type_t, bool,
-                             gcs_seqno_t* seqno_l, gcs_seqno_t* seqno_g) = 0;
+        virtual ssize_t repl(gcs_action& act, bool) = 0;
         virtual gcs_seqno_t caused() = 0;
         virtual ssize_t schedule() = 0;
         virtual ssize_t interrupt(ssize_t) = 0;
@@ -54,14 +52,16 @@ namespace galera
     {
     public:
 
-        Gcs(gu::Config& config,
+        Gcs(gu::Config&     config,
             gcache::GCache& cache,
             int repl_proto_ver        = 0,
             int appl_proto_ver        = 0,
             const char* node_name     = 0,
             const char* node_incoming = 0)
             :
-            conn_(gcs_create(&config, &cache, node_name, node_incoming,
+            conn_(gcs_create(reinterpret_cast<gu_config_t*>(&config),
+                             reinterpret_cast<gcache_t*>(&cache),
+                             node_name, node_incoming,
                              repl_proto_ver, appl_proto_ver))
         {
             log_info << "Passing config to GCS: " << config;
@@ -87,26 +87,20 @@ namespace galera
             gcs_close(conn_);
         }
 
-        ssize_t recv(void** act, size_t* act_len, gcs_act_type_t* act_type,
-                     gcs_seqno_t* seqno_l, gcs_seqno_t* seqno_g)
+        ssize_t recv(struct gcs_action& act)
         {
-            // Note: seqno_l and seqno_g are reversed
-            return gcs_recv(conn_, act, act_len, act_type, seqno_g, seqno_l);
+            return gcs_recv(conn_, &act);
         }
 
         ssize_t send(const void* act, size_t act_len, gcs_act_type_t act_type,
                      bool scheduled)
         {
-            return gcs_send(conn_, act, scheduled, act_len, act_type);
+            return gcs_send(conn_, act, act_len, act_type, scheduled);
         }
 
-        ssize_t repl(const void* act, size_t act_len,
-                     gcs_act_type_t act_type, bool scheduled,
-                     gcs_seqno_t* seqno_l, gcs_seqno_t* seqno_g)
+        ssize_t repl(struct gcs_action& act, bool scheduled)
         {
-            // Note: seqno_l and seqno_g are reversed
-            return gcs_repl(conn_, act, act_len, act_type, scheduled, seqno_g,
-                            seqno_l);
+            return gcs_repl(conn_, &act, scheduled);
         }
 
         gcs_seqno_t caused() { return gcs_caused(conn_); }
@@ -192,20 +186,18 @@ namespace galera
 
         void close() {}
 
-        ssize_t recv(void**, size_t*, gcs_act_type_t*,
-                     gcs_seqno_t*, gcs_seqno_t*)
+        ssize_t recv(gcs_action& act)
         { return -ENOTCONN; }
 
         ssize_t send(const void*, size_t, gcs_act_type_t, bool)
         { return -ENOTCONN; }
 
-        ssize_t repl(const void*, size_t, gcs_act_type_t, bool,
-                     gcs_seqno_t* seqno_l, gcs_seqno_t* seqno_g)
+        ssize_t repl(gcs_action& act, bool)
         { return -ENOTCONN; }
 
         gcs_seqno_t caused() { return -ENOTCONN; }
 
-        ssize_t schedule() { return -ENOTCONN; }
+        ssize_t schedule()   { return -ENOTCONN; }
 
         ssize_t interrupt(ssize_t) { return -ENOTCONN; }
 

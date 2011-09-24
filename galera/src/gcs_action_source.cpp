@@ -19,31 +19,27 @@ extern "C"
 class Release
 {
 public:
-    Release(void* ptr, gcs_act_type_t type, gcache::GCache& gcache)
+    Release(struct gcs_action& act, gcache::GCache& gcache)
         :
-        ptr_(ptr),
-        type_(type),
+        act_(act),
         gcache_(gcache)
     { }
     ~Release()
     {
-        switch (type_)
+        switch (act_.type)
         {
         case GCS_ACT_TORDERED:
         case GCS_ACT_STATE_REQ:
-            gcache_.free(ptr_);
+            gcache_.free(act_.buf);
             break;
         default:
-            free(ptr_);
+            free(const_cast<void*>(act_.buf));
             break;
         }
     }
 private:
-    Release(const Release&);
-    void operator=(Release&);
-    void* ptr_;
-    gcs_act_type_t type_;
-    gcache::GCache& gcache_;
+    struct gcs_action& act_;
+    gcache::GCache&    gcache_;
 };
 
 
@@ -71,18 +67,19 @@ static galera::Replicator::State state2repl(const gcs_act_conf_t& conf)
 }
 
 
-galera::GcsActionTrx::GcsActionTrx(const void* act, size_t act_size,
-                                   gcs_seqno_t seqno_l, gcs_seqno_t seqno_g)
+galera::GcsActionTrx::GcsActionTrx(const struct gcs_action& act)
     :
     trx_(new TrxHandle())
 {
-    assert(seqno_l != GCS_SEQNO_ILL);
-    assert(seqno_g != GCS_SEQNO_ILL);
-    size_t offset(unserialize(reinterpret_cast<const gu::byte_t*>(act),
-                              act_size, 0, *trx_));
-    trx_->append_write_set(reinterpret_cast<const gu::byte_t*>(act) + offset,
-                           act_size - offset);
-    trx_->set_seqnos(seqno_l, seqno_g);
+    assert(act.seqno_l != GCS_SEQNO_ILL);
+    assert(act.seqno_g != GCS_SEQNO_ILL);
+
+    const gu::byte_t* const buf = reinterpret_cast<const gu::byte_t*>(act.buf);
+
+    size_t offset(unserialize(buf, act.size, 0, *trx_));
+
+    trx_->append_write_set(buf + offset, act.size - offset);
+    trx_->set_received(act.buf, act.seqno_l, act.seqno_g);
     trx_->lock();
 }
 
@@ -95,23 +92,19 @@ galera::GcsActionTrx::~GcsActionTrx()
 }
 
 
-void galera::GcsActionSource::dispatch(void*          recv_ctx,
-                                       const void*    act,
-                                       size_t         act_size,
-                                       gcs_act_type_t act_type,
-                                       wsrep_seqno_t  seqno_l,
-                                       wsrep_seqno_t  seqno_g)
+void galera::GcsActionSource::dispatch(void*                 recv_ctx,
+                                       const struct gcs_action& act)
 {
     assert(recv_ctx != 0);
-    assert(act != 0);
-    assert(seqno_l > 0);
+    assert(act.buf != 0);
+    assert(act.seqno_l > 0);
 
-    switch (act_type)
+    switch (act.type)
     {
     case GCS_ACT_TORDERED:
     {
-        assert(seqno_g > 0);
-        GcsActionTrx trx(act, act_size, seqno_l, seqno_g);
+        assert(act.seqno_g > 0);
+        GcsActionTrx trx(act);
         trx.trx()->set_state(TrxHandle::S_REPLICATING);
         replicator_.process_trx(recv_ctx, trx.trx());
         break;
@@ -119,14 +112,15 @@ void galera::GcsActionSource::dispatch(void*          recv_ctx,
     case GCS_ACT_COMMIT_CUT:
     {
         wsrep_seqno_t seq;
-        unserialize(reinterpret_cast<const gu::byte_t*>(act), act_size, 0, seq);
-        replicator_.process_commit_cut(seq, seqno_l);
+        unserialize(reinterpret_cast<const gu::byte_t*>(act.buf), act.size, 0,
+                    seq);
+        replicator_.process_commit_cut(seq, act.seqno_l);
         break;
     }
     case GCS_ACT_CONF:
     {
         const gcs_act_conf_t* conf(
-            reinterpret_cast<const gcs_act_conf_t*>(act)
+            reinterpret_cast<const gcs_act_conf_t*>(act.buf)
             );
 
         wsrep_view_info_t* view_info(
@@ -134,41 +128,37 @@ void galera::GcsActionSource::dispatch(void*          recv_ctx,
             );
 
         replicator_.process_view_info(recv_ctx, *view_info,
-                                      state2repl(*conf), seqno_l);
+                                      state2repl(*conf), act.seqno_l);
         free(view_info);
         break;
     }
     case GCS_ACT_STATE_REQ:
-        replicator_.process_state_req(recv_ctx, act, act_size, seqno_l, seqno_g);
+        replicator_.process_state_req(recv_ctx, act.buf, act.size, act.seqno_l,
+                                      act.seqno_g);
         break;
     case GCS_ACT_JOIN:
-        replicator_.process_join(seqno_l);
+        replicator_.process_join(act.seqno_l);
         break;
     case GCS_ACT_SYNC:
-        replicator_.process_sync(seqno_l);
+        replicator_.process_sync(act.seqno_l);
         break;
     default:
-        gu_throw_fatal << "unrecognized action type: " << act_type;
+        gu_throw_fatal << "unrecognized action type: " << act.type;
     }
 }
 
 
 ssize_t galera::GcsActionSource::process(void* recv_ctx)
 {
-    void* act;
-    size_t act_size;
-    gcs_act_type_t act_type;
-    gcs_seqno_t seqno_g, seqno_l;
+    struct gcs_action act;
 
-// REMOVE    log_info << "DEBUG: recv() started.";
-
-    ssize_t rc(gcs_.recv(&act, &act_size, &act_type, &seqno_l, &seqno_g));
+    ssize_t rc(gcs_.recv(act));
     if (rc > 0)
     {
-        Release release(act, act_type, gcache_);
+        Release release(act, gcache_);
         ++received_;
         received_bytes_ += rc;
-        dispatch(recv_ctx, act, act_size, act_type, seqno_l, seqno_g);
+        dispatch(recv_ctx, act);
     }
     return rc;
 }

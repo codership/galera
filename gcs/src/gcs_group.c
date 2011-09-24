@@ -7,6 +7,7 @@
 #include <errno.h>
 
 #include "gcs_group.h"
+#include "gcs_gcache.h"
 
 const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
 {
@@ -806,12 +807,7 @@ void
 gcs_group_ignore_action (gcs_group_t* group, struct gcs_act_rcvd* act)
 {
     if (act->act.type <= GCS_ACT_STATE_REQ) {
-#ifndef GCS_FOR_GARB
-        if (NULL != group->cache)
-            gcache_free (group->cache, (void*)act->act.buf);
-        else
-#endif
-            free ((void*)act->act.buf);
+        gcs_gcache_free (group->cache, act->act.buf);
     }
 
     act->act.buf     = NULL;

@@ -55,6 +55,7 @@ static gcs_seqno_t    Seqno   = 0;
 
 typedef struct action {
     const void*    data;
+    const void*    repl_buf;
     ssize_t        size;
     gcs_act_type_t type;
     gcs_seqno_t    seqno;
@@ -81,11 +82,11 @@ core_recv_thread (void* arg)
 
     // @todo: refactor according to new gcs_act types
     struct gcs_act_rcvd recv_act;
-    bool is_local;
 
-    act->size = gcs_core_recv (Core, &recv_act, &is_local, GU_TIME_ETERNITY);
-    act->data = recv_act.act.buf;
-    act->type = recv_act.act.type;
+    act->size  = gcs_core_recv (Core, &recv_act, GU_TIME_ETERNITY);
+    act->data  = recv_act.act.buf;
+    act->repl_buf = recv_act.repl_buf;
+    act->type  = recv_act.act.type;
     act->seqno = recv_act.id;
 
     return (NULL);
@@ -135,11 +136,11 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
     if (NULL != buf) {
         if (GCS_ACT_TORDERED == act->type) {
             // local action buffer should not be copied
-            FAIL_IF (act->data != buf,
+            FAIL_IF (act->repl_buf != buf,
                      "Received buffer ptr is not the same as sent");
         }
         else {
-            FAIL_IF (act->data == buf,
+            FAIL_IF (act->repl_buf == buf,
                      "Received the same buffer ptr as sent");
             FAIL_IF (memcmp (buf, act->data, act->size),
                      "Received buffer contents is not the same as sent");
@@ -174,10 +175,10 @@ static bool CORE_RECV_ACT (action_t*      act,
                            gcs_act_type_t type)
 {
     struct gcs_act_rcvd recv_act;
-    bool is_local;
 
-    act->size  = gcs_core_recv (Core, &recv_act, &is_local, GU_TIME_ETERNITY);
+    act->size  = gcs_core_recv (Core, &recv_act, GU_TIME_ETERNITY);
     act->data  = recv_act.act.buf;
+    act->repl_buf = recv_act.repl_buf;
     act->type  = recv_act.act.type;
     act->seqno = recv_act.id;
 
@@ -380,7 +381,7 @@ START_TEST (gcs_core_test_api)
     long     ret;
     long     tout = 100; // 100 ms timeout
     size_t   act_size = sizeof(ACT);
-    action_t act_s    = { ACT, act_size, GCS_ACT_TORDERED, -1, -1 };
+    action_t act_s    = { ACT, NULL, act_size, GCS_ACT_TORDERED, -1, -1 };
     action_t act_r;
     long i = 5;
 
@@ -476,8 +477,8 @@ START_TEST (gcs_core_test_own)
 #define ACT act2
     long     tout = 100; // 100 ms timeout
     size_t   act_size = sizeof(ACT);
-    action_t act_s    = { ACT, act_size, GCS_ACT_TORDERED, -1, -1 };
-    action_t act_r    = { NULL, -1, -1, -1, -1 };
+    action_t act_s    = { ACT, NULL, act_size, GCS_ACT_TORDERED, -1, -1 };
+    action_t act_r    = { NULL, NULL, -1, -1, -1, -1 };
 
     // Create primary and non-primary component messages
     gcs_comp_msg_t* prim     = gcs_comp_msg_new (true,  0, 1);

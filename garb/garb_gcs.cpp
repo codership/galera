@@ -10,7 +10,8 @@ Gcs::Gcs (gu::Config&        gconf,
           const std::string& group) throw (gu::Exception)
 :
     closed_ (true),
-    gcs_ (gcs_create (&gconf, NULL, GCS_ARBITRATOR_NAME, "", 1, 1))
+    gcs_ (gcs_create (reinterpret_cast<gu_config_t*>(&gconf), NULL,
+                      GCS_ARBITRATOR_NAME, "", 1, 1))
 {
     if (!gcs_)
     {
@@ -40,14 +41,9 @@ Gcs::~Gcs ()
 }
 
 void
-Gcs::recv (void*&          act,
-           size_t&         act_size,
-           gcs_act_type_t& act_type,
-           gcs_seqno_t&    act_id) throw (gu::Exception)
+Gcs::recv (gcs_action& act) throw (gu::Exception)
 {
-    gcs_seqno_t seqno_l;
-
-    ssize_t ret = gcs_recv(gcs_, &act, &act_size, &act_type, &act_id, &seqno_l);
+    ssize_t ret = gcs_recv(gcs_, &act);
 
     if (ret < 0)
     {
