@@ -1136,8 +1136,8 @@ gcs_core_set_pkt_size (gcs_core_t* core, ulong pkt_size)
         msg_size = hdr_size + 1;
     }
 
-    gu_info ("Changing maximum message size %u -> %u",
-              core->send_buf_len, msg_size);
+    gu_info ("Changing maximum message size %u -> %u, result: %u",
+             core->send_buf_len, pkt_size, msg_size);
 
     if (gu_mutex_lock (&core->send_lock)) abort();
     {

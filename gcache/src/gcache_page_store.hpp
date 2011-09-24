@@ -53,6 +53,9 @@ namespace gcache
         Page*             current_;
         ssize_t           total_size_;
         pthread_attr_t    delete_page_attr_;
+#ifndef GCACHE_DETACH_THREAD
+        pthread_t         delete_thr_;
+#endif /* GCACHE_DETACH_THREAD */
 
         void new_page    (ssize_t size) throw (gu::Exception);
 

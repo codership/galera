@@ -87,11 +87,17 @@ gcache::PageStore::delete_page () throw (gu::Exception)
 
     delete page;
 
-    pthread_t thr;
-    int       err = pthread_create (&thr, &delete_page_attr_, remove_file,
-                                    file_name);
+#ifdef GCACHE_DETACH_THREAD
+    pthread_t delete_thr_;
+#else
+    if (delete_thr_ != pthread_t(-1)) pthread_join (delete_thr_, NULL);
+#endif /* GCACHE_DETACH_THERAD */
+
+    int err = pthread_create (&delete_thr_, &delete_page_attr_, remove_file,
+                              file_name);
     if (0 != err)
     {
+        delete_thr_ = -1;
         gu_throw_error(err) << "Failed to create page file deletion thread";
     }
 
@@ -141,6 +147,9 @@ gcache::PageStore::PageStore (const std::string& dir_name,
     current_   (0),
     total_size_(0),
     delete_page_attr_()
+#ifndef GCACHE_DETACH_THREAD
+    , delete_thr_(-1)
+#endif /* GCACHE_DETACH_THREAD */
 {
     int err = pthread_attr_init (&delete_page_attr_);
 
@@ -150,6 +159,7 @@ gcache::PageStore::PageStore (const std::string& dir_name,
                             << "thread attributes";
     }
 
+#ifdef GCACHE_DETACH_THREAD
     err = pthread_attr_setdetachstate (&delete_page_attr_,
                                        PTHREAD_CREATE_DETACHED);
     if (0 != err)
@@ -158,6 +168,7 @@ gcache::PageStore::PageStore (const std::string& dir_name,
         gu_throw_error(err) << "Failed to set DETACHED attribute to "
                             << "page file deletion thread";
     }
+#endif /* GCACHE_DETACH_THREAD */
 }
 
 gcache::PageStore::~PageStore ()
@@ -165,6 +176,9 @@ gcache::PageStore::~PageStore ()
     try
     {
         while (pages_.size() && delete_page()) {};
+#ifndef GCACHE_DETACH_THREAD
+        if (delete_thr_ != pthread_t(-1)) pthread_join (delete_thr_, NULL);
+#endif /* GCACHE_DETACH_THREAD */
     }
     catch (gu::Exception& e)
     {

@@ -22,6 +22,8 @@ using galera::TrxHandleLock;
 extern "C"
 wsrep_status_t galera_init(wsrep_t* gh, const struct wsrep_init_args* args)
 {
+    assert(gh != 0);
+
     try
     {
         gh->ctx = new REPL_CLASS (args);
@@ -62,6 +64,8 @@ extern "C"
 void galera_tear_down(wsrep_t* gh)
 {
     assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     if (repl != 0)
@@ -76,6 +80,8 @@ extern "C"
 wsrep_status_t galera_parameters_set (wsrep_t* gh, const char* params)
 {
     assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     if (gh)
@@ -103,6 +109,8 @@ extern "C"
 char* galera_parameters_get (wsrep_t* gh)
 {
     assert(gh != 0);
+    assert(gh->ctx != 0);
+
     try
     {
         REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
@@ -128,6 +136,8 @@ wsrep_status_t galera_connect (wsrep_t*    gh,
                                const char* state_donor)
 {
     assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     try
@@ -150,7 +160,9 @@ wsrep_status_t galera_connect (wsrep_t*    gh,
 extern "C"
 wsrep_status_t galera_disconnect(wsrep_t *gh)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     try
@@ -173,7 +185,9 @@ wsrep_status_t galera_disconnect(wsrep_t *gh)
 extern "C"
 wsrep_status_t galera_recv(wsrep_t *gh, void *recv_ctx)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     try
@@ -209,10 +223,12 @@ wsrep_status_t galera_abort_pre_commit(wsrep_t*       gh,
                                        wsrep_seqno_t  bf_seqno,
                                        wsrep_trx_id_t victim_trx)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS *   repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     wsrep_status_t retval;
-    TrxHandle* trx(repl->local_trx(victim_trx));
+    TrxHandle*     trx(repl->local_trx(victim_trx));
 
     if (!trx) return WSREP_OK;
 
@@ -243,7 +259,9 @@ extern "C"
 wsrep_status_t galera_post_commit (wsrep_t*            gh,
                                    wsrep_trx_handle_t* trx_handle)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     TrxHandle* trx(repl->local_trx(trx_handle, false));
 
@@ -283,7 +301,9 @@ extern "C"
 wsrep_status_t galera_post_rollback(wsrep_t*            gh,
                                     wsrep_trx_handle_t* trx_handle)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     TrxHandle* trx(repl->local_trx(trx_handle, false));
 
@@ -327,7 +347,8 @@ wsrep_status_t galera_pre_commit(wsrep_t*            gh,
                                  size_t              rbr_data_len,
                                  wsrep_seqno_t*      global_seqno)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
 
     *global_seqno = WSREP_SEQNO_UNDEFINED;
 
@@ -400,7 +421,9 @@ wsrep_status_t galera_append_key(wsrep_t*            gh,
                                  size_t              key_len,
                                  enum wsrep_action   action)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     TrxHandle* trx(repl->local_trx(trx_handle, true));
     assert(trx != 0);
@@ -443,7 +466,9 @@ extern "C"
 wsrep_status_t galera_causal_read(wsrep_t*       wsrep,
                                   wsrep_seqno_t* seqno)
 {
-    assert(wsrep != 0 && wsrep->ctx != 0);
+    assert(wsrep != 0);
+    assert(wsrep->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(wsrep->ctx));
     wsrep_status_t retval;
     try
@@ -468,7 +493,9 @@ extern "C"
 wsrep_status_t galera_free_connection(wsrep_t*              gh,
                                       const wsrep_conn_id_t conn_id)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     try
@@ -498,7 +525,8 @@ wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
                                        size_t             query_len,
                                        wsrep_seqno_t*     global_seqno)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
 
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
@@ -555,7 +583,9 @@ wsrep_status_t galera_to_execute_start(wsrep_t*           gh,
 extern "C"
 wsrep_status_t galera_to_execute_end(wsrep_t* gh, wsrep_conn_id_t conn_id)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     wsrep_status_t retval;
@@ -589,7 +619,9 @@ wsrep_status_t galera_replay_trx(wsrep_t*            gh,
                                  wsrep_trx_handle_t* trx_handle,
                                  void*               recv_ctx)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     TrxHandle* trx(repl->local_trx(trx_handle, false));
     assert(trx != 0);
@@ -624,7 +656,8 @@ wsrep_status_t galera_sst_sent (wsrep_t*            gh,
                                 const wsrep_uuid_t* uuid,
                                 wsrep_seqno_t       seqno)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     return repl->sst_sent(*uuid, seqno);
 }
@@ -637,7 +670,8 @@ wsrep_status_t galera_sst_received (wsrep_t*            gh,
                                     const char*         state,
                                     size_t              state_len)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     return repl->sst_received(*uuid, seqno, state, state_len);
 }
@@ -656,7 +690,8 @@ wsrep_status_t galera_snapshot(wsrep_t*    wsrep,
 extern "C"
 struct wsrep_stats_var* galera_stats_get (wsrep_t* gh)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     return const_cast<struct wsrep_stats_var*>(repl->stats());
 }
@@ -671,7 +706,9 @@ void galera_stats_free (wsrep_t* gh, struct wsrep_stats_var* s)
 extern "C"
 wsrep_seqno_t galera_pause (wsrep_t* gh)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     try
@@ -689,7 +726,9 @@ wsrep_seqno_t galera_pause (wsrep_t* gh)
 extern "C"
 wsrep_status_t galera_resume (wsrep_t* gh)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     try
@@ -708,7 +747,9 @@ wsrep_status_t galera_resume (wsrep_t* gh)
 extern "C"
 wsrep_seqno_t galera_desync (wsrep_t* gh)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
 //    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     try
@@ -726,7 +767,9 @@ wsrep_seqno_t galera_desync (wsrep_t* gh)
 extern "C"
 wsrep_status_t galera_resync (wsrep_t* gh)
 {
-    assert(gh != 0 && gh->ctx != 0);
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
 //    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     return WSREP_OK;
 }
