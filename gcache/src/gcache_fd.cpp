@@ -24,7 +24,7 @@
 namespace gcache
 {
     static const int OPEN_FLAGS   = O_RDWR | O_NOATIME | O_CLOEXEC;
-    static const int CREATE_FLAGS = OPEN_FLAGS | O_CREAT | O_TRUNC;
+    static const int CREATE_FLAGS = OPEN_FLAGS | O_CREAT /*| O_TRUNC*/;
  
     FileDescriptor::FileDescriptor (const std::string& fname,
                                     bool               sync_)
@@ -49,13 +49,33 @@ namespace gcache
     {
         constructor_common();
 
-        if (allocate)
+        off_t const current_size(lseek (value, 0, SEEK_END));
+
+        if (current_size < size)
         {
-            prealloc ();           // reserve space
+            if (allocate)
+            {
+                // reserve space that hasn't been reserved
+                prealloc (current_size);
+            }
+            else
+            {
+                write_byte (size - 1); // reserve size
+            }
+        }
+        else if (current_size > size)
+        {
+            log_info << "Truncating '" << name << "' to " << size << " bytes.";
+
+            if (ftruncate(value, size))
+            {
+                gu_throw_error(errno) << "Failed to truncate '" << name
+                                      << "' to " << size << " bytes.";
+            }
         }
         else
         {
-            write_byte (size - 1); // reserve size
+            log_info << "Reusing existing '" << name << "'.";
         }
     }
 
@@ -112,7 +132,7 @@ namespace gcache
     }
 
     bool
-    FileDescriptor::write_byte (ssize_t offset) throw (gu::Exception)
+    FileDescriptor::write_byte (off_t offset) throw (gu::Exception)
     {
         unsigned char const byte (0);
 
@@ -127,14 +147,16 @@ namespace gcache
 
 #if 0
     void
-    FileDescriptor::prealloc() throw (gu::Exception)
+    FileDescriptor::prealloc(off_t const start) throw (gu::Exception)
     {
-        size_t  const page_size = sysconf (_SC_PAGE_SIZE);
+        off_t const page_size (sysconf (_SC_PAGE_SIZE));
 
-        size_t  offset = page_size - 1; // last byte of the page
+        // last byte of the start page
+        off_t offset = (start / page_size) * page_size - 1;
+        off_t const diff (size - offset);
 
-        log_info << "Preallocating " << size << " bytes in '" << name
-                 << "'...";
+        log_info << "Preallocating " << diff << '/' << size << " bytes in '"
+                 << name << "'...";
 
         while (offset < size && write_byte (offset))
         {
@@ -142,21 +164,24 @@ namespace gcache
         }
 
         if (offset > size && write_byte (size - 1) && fsync (value) == 0) {
-            log_info << "Preallocating " << size << " bytes in '" << name
-                     << "' done.";
+            log_info << "Preallocating " << diff << '/' << size
+                     << " bytes in '" << name << "' done.";
             return;
         }
 
         gu_throw_error (errno) << "File preallocation failed";
     }
 #endif
-    void
-    FileDescriptor::prealloc() throw (gu::Exception)
-    {
-        log_info << "Preallocating " << size << " bytes in '" << name
-                 << "'...";
 
-        if (0 != posix_fallocate (value, 0, size))
+    void
+    FileDescriptor::prealloc(off_t const start) throw (gu::Exception)
+    {
+        off_t const diff (size - start);
+
+        log_info << "Preallocating " << diff << '/' << size << " bytes in '"
+                 << name << "'...";
+
+        if (0 != posix_fallocate (value, start, diff))
         {
             gu_throw_error (errno) << "File preallocation failed";
         }

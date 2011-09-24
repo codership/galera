@@ -32,7 +32,7 @@ namespace gcache
 
         int                get()      const throw() { return value; };
         const std::string& get_name() const throw() { return name;  };
-        size_t             get_size() const throw() { return size;  };
+        off_t              get_size() const throw() { return size;  };
 
         void               flush()    const throw (gu::Exception);
 
@@ -40,11 +40,11 @@ namespace gcache
 
         const int         value;
         const std::string name;
-        const size_t      size;
+        const off_t       size;
         const bool        sync; // sync on close
 
-        bool write_byte (ssize_t offset) throw (gu::Exception);
-        void prealloc   ()               throw (gu::Exception); 
+        bool write_byte (off_t offset)    throw (gu::Exception);
+        void prealloc   (off_t start = 0) throw (gu::Exception); 
 
         void constructor_common() throw (gu::Exception);
 

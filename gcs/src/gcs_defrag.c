@@ -11,6 +11,23 @@
 #include "gcs_act_proto.h"
 #include "gcs_defrag.h"
 
+#define DF_ALLOC()                                              \
+    do {                                                        \
+        if (gu_likely(df->cache != NULL))                       \
+            df->head = gcache_malloc (df->cache, df->size);     \
+        else                                                    \
+            df->head = malloc (df->size);                       \
+                                                                \
+        if(gu_likely(df->head != NULL))                         \
+            df->tail = df->head;                                \
+        else {                                                  \
+            gu_error ("Could not allocate memory for new "      \
+                      "action of size: %z", df->size);          \
+            assert(0);                                          \
+            return -ENOMEM;                                     \
+        }                                                       \
+    } while (0)
+
 /*!
  * Handle action fragment
  *
@@ -48,10 +65,25 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                  * Reinit counters and continue with the new action.
                  * Note that for local actions no memory allocation is made.*/
                 gu_debug ("Local action %lld reset.", frg->act_id);
-                df->size     = frg->act_size;
                 df->frag_no  = 0;
                 df->received = 0;
                 df->reset    = false;
+
+                if (df->size != frg->act_size) {
+
+                    df->size = frg->act_size;
+
+#ifndef GCS_FOR_GARB
+                    if (df->cache !=NULL) {
+                        gcache_free (df->cache, df->head);
+                    }
+                    else {
+                        free ((void*)df->head);
+                    }
+
+                    DF_ALLOC();
+#endif /* GCS_FOR_GARB */
+                }
             }
             else {
                 gu_error ("Unordered fragment received. Protocol error.");
@@ -73,22 +105,7 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
             df->reset   = false;
 
 #ifndef GCS_FOR_GARB
-            /* We need to allocate buffer for it.
-             * This buffer will be returned to application,
-             * so it must be allocated in gcache */
-            if (gu_likely(df->cache != NULL))
-                df->head = gcache_malloc (df->cache, df->size);
-            else
-                df->head = malloc (df->size);
-
-            if(gu_likely(df->head != NULL))
-                df->tail = df->head;
-            else {
-                gu_error ("Could not allocate memory for new "
-                          "action of size: %z", df->size);
-                assert(0);
-                return -ENOMEM;
-            }
+            DF_ALLOC();
 #else
             /* we don't store actions locally at all */
             df->head = NULL;
@@ -109,7 +126,9 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                 gu_error ("Unordered fragment received. Protocol error.");
                 gu_error ("Expected: any:0(first), received: %lld:%ld",
                           frg->act_id, frg->frag_no);
-                gu_error ("Contents: '%s'", (char*)frg->frag);
+                gu_error ("Contents: '%s', local: %s, reset: %s",
+                          (char*)frg->frag, local ? "yes" : "no",
+                          df->reset ? "yes" : "no");
                 assert(0);
                 return -EPROTO;
             }

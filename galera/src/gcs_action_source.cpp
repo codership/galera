@@ -128,6 +128,7 @@ void galera::GcsActionSource::dispatch(void*          recv_ctx,
         const gcs_act_conf_t* conf(
             reinterpret_cast<const gcs_act_conf_t*>(act)
             );
+
         wsrep_view_info_t* view_info(
             galera_view_info_create(conf, conf->my_state == GCS_NODE_STATE_PRIM)
             );
