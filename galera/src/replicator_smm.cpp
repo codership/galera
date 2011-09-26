@@ -1218,6 +1218,7 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
     }
 
     local_monitor_.leave(lo);
+    free(app_req);
 }
 
 
