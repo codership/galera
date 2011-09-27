@@ -94,7 +94,7 @@ ldconfig -n $LIBS_DST
 # it seems that we can run mysql_install_db regardless of existing tables.
 mysql_install_db --wsrep-on=0 --user=mysql --datadir=${mysql_data}
 # This is a fix/workaround for AppArmor profile provided with mysql-server deb
-[ -d /etc/apparmor.d/disable ] && \
+[ ! -d /etc/apparmor.d/disable ] || \
 ( cd /etc/apparmor.d/disable && ln -sf ../usr.sbin.mysqld ./ )
 EOF_POSTINSTALL
 
@@ -105,8 +105,8 @@ else
     /etc/init.d/mysql stop
 fi
 update-rc.d -f mysql remove >/dev/null || exit $
-[ -L $BINS_DST/my_print_defaults ] && rm -rf $BINS_DST/my_print_defaults
-[ -L /etc/apparmor.d/disable/usr.sbin.mysqld ] && rm -rf /etc/apparmor.d/disable/usr.sbin.mysqld
+[ ! -L $BINS_DST/my_print_defaults ] || rm -rf $BINS_DST/my_print_defaults
+[ ! -L /etc/apparmor.d/disable/usr.sbin.mysqld ] || rm -rf /etc/apparmor.d/disable/usr.sbin.mysqld
 EOF_PREREMOVE
 
 #
