@@ -47,6 +47,8 @@ std::string const gcomm::Conf::GMCastMCastTTL =
     GMCastScheme + Delim + "mcast_ttl";
 std::string const gcomm::Conf::GMCastTimeWait =
     GMCastScheme + Delim + "time_wait";
+std::string const gcomm::Conf::GMCastPeerTimeout =
+    GMCastScheme + Delim + "peer_timeout";
 // EVS
 std::string const gcomm::Conf::EvsScheme = "evs";
 std::string const gcomm::Conf::EvsVersion = 

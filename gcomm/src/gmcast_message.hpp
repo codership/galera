@@ -25,7 +25,8 @@ public:
         F_NODE_NAME      = 1 << 1,
         F_NODE_ADDRESS   = 1 << 2,
         F_NODE_LIST      = 1 << 3,
-        F_HANDSHAKE_UUID = 1 << 4
+        F_HANDSHAKE_UUID = 1 << 4,
+        F_RELAY          = 1 << 5
     };
 
     enum Type
@@ -48,6 +49,7 @@ private:
     gu::byte_t        version;
     Type              type;
     gu::byte_t        flags;
+    gu::byte_t        segment_id;
     gcomm::UUID       handshake_uuid;
     gcomm::UUID       source_uuid;
     gcomm::String<64> node_address;
@@ -83,6 +85,7 @@ public:
         version        (msg.version),
         type           (msg.type),
         flags          (msg.flags),
+        segment_id     (msg.segment_id),
         handshake_uuid (msg.handshake_uuid),
         source_uuid    (msg.source_uuid),
         node_address   (msg.node_address),
@@ -96,6 +99,7 @@ public:
         version        (0),
         type           (T_INVALID),
         flags          (0),
+        segment_id     (0),
         handshake_uuid (),
         source_uuid    (),
         node_address   (),
@@ -112,6 +116,7 @@ public:
         version        (v),
         type           (type_),
         flags          (F_HANDSHAKE_UUID),
+        segment_id     (0),
         handshake_uuid (handshake_uuid_),
         source_uuid    (source_uuid_),
         node_address   (),
@@ -128,11 +133,12 @@ public:
     Message (int v,
              const Type    type_,
              const UUID&   source_uuid_,
-             const uint8_t ttl_)
+             const int     ttl_)
         :
         version        (v),
         type           (type_),
         flags          (0),
+        segment_id     (0),
         handshake_uuid (),
         source_uuid    (source_uuid_),
         node_address   (),
@@ -155,6 +161,7 @@ public:
         version        (v),
         type           (type_),
         flags          (F_GROUP_NAME | F_NODE_ADDRESS | F_HANDSHAKE_UUID),
+        segment_id     (0),
         handshake_uuid (handshake_uuid_),
         source_uuid    (source_uuid_),
         node_address   (node_address_),
@@ -177,6 +184,7 @@ public:
         version        (v),
         type           (type_),
         flags          (F_GROUP_NAME | F_NODE_LIST),
+        segment_id     (0),
         handshake_uuid (),
         source_uuid    (source_uuid_),
         node_address   (),
@@ -200,7 +208,7 @@ public:
         gu_trace (off = gcomm::serialize(version, buf, buflen, offset));
         gu_trace (off = gcomm::serialize(static_cast<gu::byte_t>(type),buf,buflen,off));
         gu_trace (off = gcomm::serialize(flags, buf, buflen, off));
-        gu_trace (off = gcomm::serialize<gu::byte_t>(0, buf, buflen, off));
+        gu_trace (off = gcomm::serialize(segment_id, buf, buflen, off));
         gu_trace (off = source_uuid.serialize(buf, buflen, off));
 
         if (flags & F_HANDSHAKE_UUID)
@@ -248,11 +256,7 @@ public:
             throw;
         }
         gu_trace (off = gcomm::unserialize(buf, buflen, off, &flags));
-        gu_trace (off = gcomm::unserialize(buf, buflen, off, &t));
-        if (t != 0)
-        {
-            gu_throw_error(EINVAL);
-        }
+        gu_trace (off = gcomm::unserialize(buf, buflen, off, &segment_id));
         gu_trace (off = source_uuid.unserialize(buf, buflen, off));
 
         if (flags & F_HANDSHAKE_UUID)
@@ -296,7 +300,7 @@ public:
 
     size_t serial_size() const
     {
-        return 4 /* Common header: version, type, flags, ttl */
+        return 4 /* Common header: version, type, flags, segment_id */
             + source_uuid.serial_size()
             + (flags & F_HANDSHAKE_UUID ? handshake_uuid.serial_size() : 0)
             /* GMCast address if set */
@@ -311,6 +315,7 @@ public:
 
     Type    get_type()    const { return type;    }
 
+    void set_flags(uint8_t f) { flags = f; }
     uint8_t get_flags()   const { return flags;   }
 
     const UUID& get_handshake_uuid() const { return handshake_uuid; }
