@@ -69,10 +69,12 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     pending_addrs (),
     remote_addrs  (),
     addr_blacklist(),
+    relaying      (false),
     proto_map     (new ProtoMap()),
     mcast_tree    (),
     time_wait     (param<Period>(conf_, uri, Conf::GMCastTimeWait, "PT5S")),
     check_period  ("PT0.5S"),
+    peer_timeout  (param<Period>(conf_, uri, Conf::GMCastPeerTimeout, "PT3S")),
     next_check    (Date::now())
 {
     log_info << "GMCast version " << version;
@@ -208,6 +210,7 @@ GMCast::GMCast(Protonet& net, const gu::URI& uri)
     conf_.set(Conf::GMCastVersion, gu::to_string(version));
     conf_.set(Conf::GMCastTimeWait, gu::to_string(time_wait));
     conf_.set(Conf::GMCastMCastTTL, gu::to_string(mcast_ttl));
+    conf_.set(Conf::GMCastPeerTimeout, gu::to_string(peer_timeout));
 }
 
 GMCast::~GMCast()
@@ -817,6 +820,7 @@ void GMCast::reconnect()
         }
     }
 
+
     for (i = remote_addrs.begin(); i != remote_addrs.end(); i = i_next)
     {
         i_next = i, ++i_next;
@@ -827,8 +831,8 @@ void GMCast::reconnect()
 
         gcomm_assert(remote_uuid != get_uuid());
 
-        if (is_connected (remote_addr, remote_uuid) == false &&
-            ae.get_next_reconnect()                 <= now)
+        if (is_connected(remote_addr, remote_uuid) == false &&
+            ae.get_next_reconnect()                <= now)
         {
             if (ae.get_retry_cnt() > max_retry_cnt)
             {
@@ -857,12 +861,79 @@ void GMCast::reconnect()
 }
 
 
+void gcomm::GMCast::check_liveness()
+{
+    std::set<UUID> live_uuids;
+
+    // iterate over proto map and mark all timed out entries as failed
+    gu::datetime::Date now(gu::datetime::Date::now());
+    for (ProtoMap::iterator i(proto_map->begin()); i != proto_map->end(); )
+    {
+        ProtoMap::iterator i_next(i);
+        ++i_next;
+        Proto* p(ProtoMap::get_value(i));
+        if (p->get_state() > Proto::S_INIT &&
+            p->get_state() < Proto::S_FAILED &&
+            p->get_tstamp() + peer_timeout < now)
+        {
+            log_debug << self_string()
+                      << " connection to peer "
+                      << p->get_remote_uuid() << " with addr "
+                      << p->get_remote_addr()
+                      << " timed out";
+            p->set_state(Proto::S_FAILED);
+            handle_failed(p);
+        }
+        else
+        {
+            live_uuids.insert(p->get_remote_uuid());
+        }
+        i = i_next;
+    }
+
+    bool should_relay(false);
+
+    // iterate over addr list and check if there is at least one live
+    // proto entry associated to each addr entry
+
+    std::string nonlive_peers;
+    for (AddrList::const_iterator i(remote_addrs.begin());
+         i != remote_addrs.end(); ++i)
+    {
+        const AddrEntry& ae(AddrList::get_value(i));
+        if (ae.get_retry_cnt()             <= max_retry_cnt &&
+            live_uuids.find(ae.get_uuid()) == live_uuids.end())
+        {
+            // log_info << self_string()
+            // << " missing live proto entry for " << ae.get_uuid();
+            nonlive_peers += AddrList::get_key(i) + " ";
+            should_relay = true;
+        }
+    }
+
+    if (relaying == false && should_relay == true)
+    {
+        log_info << self_string()
+                 << " turning message relay requesting on, nonlive peers: "
+                 << nonlive_peers;
+        relaying = true;
+    }
+    else if (relaying == true && should_relay == false)
+    {
+        log_info << self_string() << " turning message relay requesting off";
+        relaying = false;
+    }
+
+}
+
+
 Date gcomm::GMCast::handle_timers()
 {
     const Date now(Date::now());
 
     if (now >= next_check)
     {
+        check_liveness();
         reconnect();
         next_check = now + check_period;
     }
@@ -870,6 +941,26 @@ Date gcomm::GMCast::handle_timers()
     return next_check;
 }
 
+
+void gcomm::GMCast::relay(const Message& msg, const Datagram& dg,
+                          const void* exclude_id)
+{
+    Message relay_msg(msg);
+    relay_msg.set_flags(relay_msg.get_flags() & ~Message::F_RELAY);
+    Datagram relay_dg(dg);
+    relay_dg.normalize();
+    gu_trace(push_header(relay_msg, relay_dg));
+    for (list<Socket*>::iterator i(mcast_tree.begin());
+         i != mcast_tree.end(); ++i)
+    {
+        int err;
+        if ((*i)->get_id() != exclude_id &&
+            (err = (*i)->send(relay_dg)) != 0)
+        {
+            log_debug << "transport: " << ::strerror(err);
+        }
+    }
+}
 
 void GMCast::handle_up(const void*        id,
                        const Datagram&    dg,
@@ -953,14 +1044,22 @@ void GMCast::handle_up(const void*        id,
 
             if (msg.get_type() >= Message::T_USER_BASE)
             {
+                if (msg.get_flags() & Message::F_RELAY)
+                {
+                    relay(msg,
+                          Datagram(dg, dg.get_offset() + msg.serial_size()),
+                          id);
+                }
                 send_up(Datagram(dg, dg.get_offset() + msg.serial_size()),
                         ProtoUpMeta(msg.get_source_uuid()));
+                p->set_tstamp(gu::datetime::Date::now());
             }
             else
             {
                 try
                 {
                     gu_trace(p->handle_message(msg));
+                    p->set_tstamp(gu::datetime::Date::now());
                 }
                 catch (Exception& e)
                 {
@@ -978,6 +1077,7 @@ void GMCast::handle_up(const void*        id,
                 else if (p->get_changed() == true)
                 {
                     update_addresses();
+                    check_liveness();
                     reconnect();
                 }
             }
@@ -1019,14 +1119,32 @@ int GMCast::handle_down(Datagram& dg, const ProtoDownMeta& dm)
 
     gu_trace(push_header(msg, dg));
 
-    for (list<Socket*>::iterator i(mcast_tree.begin());
-         i != mcast_tree.end(); ++i)
+    size_t relay_idx(mcast_tree.size());
+    if (relaying == true && relay_idx > 0)
     {
-        int err;
+        relay_idx = rand() % relay_idx;
+    }
 
+    size_t idx(0);
+    for (list<Socket*>::iterator i(mcast_tree.begin());
+         i != mcast_tree.end(); ++i, ++idx)
+    {
+        if (relay_idx == idx)
+        {
+            gu_trace(pop_header(msg, dg));
+            msg.set_flags(msg.get_flags() | Message::F_RELAY);
+            gu_trace(push_header(msg, dg));
+        }
+        int err;
         if ((err = (*i)->send(dg)) != 0)
         {
             log_debug << "transport: " << ::strerror(err);
+        }
+        if (relay_idx == idx)
+        {
+            gu_trace(pop_header(msg, dg));
+            msg.set_flags(msg.get_flags() & ~Message::F_RELAY);
+            gu_trace(push_header(msg, dg));
         }
     }
 
@@ -1077,5 +1195,6 @@ void gcomm::GMCast::handle_stable_view(const View& view)
             }
         }
     }
+    check_liveness();
 }
 

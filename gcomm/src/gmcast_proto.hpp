@@ -80,7 +80,8 @@ public:
         state            (S_INIT),
         propagate_remote (false),
         tp               (tp_),
-        link_map         ()
+        link_map         (),
+        tstamp           (gu::datetime::Date::now())
     { }
 
     ~Proto() { tp->close(); }
@@ -113,6 +114,8 @@ public:
         return ret;
     }
     int get_version() const { return version; }
+    void set_tstamp(gu::datetime::Date ts) { tstamp = ts; }
+    gu::datetime::Date get_tstamp() const { return tstamp; }
 private:
 
     Proto(const Proto&);
@@ -131,6 +134,7 @@ private:
     bool              propagate_remote;
     SocketPtr         tp;
     LinkMap           link_map;
+    gu::datetime::Date tstamp;
 };
 
 

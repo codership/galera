@@ -173,6 +173,7 @@ namespace gcomm
         static std::string const GMCastMCastTTL;
 
         static std::string const GMCastTimeWait;
+        static std::string const GMCastPeerTimeout;
 
         /*!
          * @brief EVS scheme for transport URI ("evs")
