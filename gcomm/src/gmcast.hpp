@@ -137,13 +137,14 @@ namespace gcomm
         AddrList          pending_addrs;
         AddrList          remote_addrs;
         AddrList          addr_blacklist;
-
+        bool              relaying;
 
         gmcast::ProtoMap*  proto_map;
         std::list<Socket*> mcast_tree;
 
         gu::datetime::Period time_wait;
         gu::datetime::Period check_period;
+        gu::datetime::Period peer_timeout;
         gu::datetime::Date next_check;
         gu::datetime::Date handle_timers();
 
@@ -168,6 +169,10 @@ namespace gcomm
         void insert_address(const std::string& addr, const UUID& uuid, AddrList&);
         // Scan through proto entries and update address lists
         void update_addresses();
+        //
+        void check_liveness();
+        void relay(const gmcast::Message& msg, const gu::Datagram& dg,
+                   const void* exclude_id);
         // Reconnecting
         void reconnect();
 
