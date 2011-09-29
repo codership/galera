@@ -76,6 +76,9 @@ f 644 root root $MAN_DST/man1/replace.1.gz           $MYSQL_SRC/man/replace.1.gz
 f 644 root root $MAN_DST/man1/resolve_stack_dump.1.gz $MYSQL_SRC/man/resolve_stack_dump.1.gz
 f 644 root root $MAN_DST/man1/resolveip.1.gz         $MYSQL_SRC/man/resolveip.1.gz
 
+d 755 root root $MAN_DST/man8 -
+f 644 root root $MAN_DST/man8/mysqld.8.gz      $MYSQL_SRC/man/mysqld.8.gz
+
 d 755 root root $SBIN_DST -
 f 755 root root $SBIN_DST/mysqld               $MYSQL_SRC/sql/mysqld
 
@@ -159,9 +162,6 @@ f 644 root root $SHAR_DST/${lang21}            $MYSQL_SRC/sql/share/${lang21}/*
 $lang22=ukrainian
 d 755 root root $SHAR_DST/${lang22} -
 f 644 root root $SHAR_DST/${lang22}            $MYSQL_SRC/sql/share/${lang22}/*
-
-d 755 root root $MAN_DST/man8 -
-f 644 root root $MAN_DST/man8/mysqld.8.gz      $MYSQL_SRC/man/mysqld.8.gz
 
 #d 755 mysql root /var/run/mysqld -
 #d 755 mysql adm  /var/log/mysql  -
