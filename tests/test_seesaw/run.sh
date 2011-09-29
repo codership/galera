@@ -20,6 +20,7 @@ SQLGEN=${SQLGEN:-"$DIST_BASE/bin/sqlgen"}
 $SQLGEN --user $DBMS_TEST_USER --pswd $DBMS_TEST_PSWD --host $DBMS_HOST \
         --port $DBMS_PORT --users $DBMS_CLIENTS --duration 999999999 \
         --stat-interval 99999999 --sess-min 999999 --sess-max 999999 \
+        --rollbacks 0.01
         >/dev/null 2>$BASE_RUN/seesaw.err &
 declare -r sqlgen_pid=$!
 disown # forget about the job, disable waiting for it
