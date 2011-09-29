@@ -10,7 +10,7 @@ $mysql_version=${MYSQL_VER}
 $wsrep_version=${WSREP_VER}
 %version     ${mysql_version}-${wsrep_version}
 
-%include debian/mysql-wsrep.list
+%include common.list
 
 ##############################################
 # Below files sorted into paragraphs         #

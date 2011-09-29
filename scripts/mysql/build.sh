@@ -9,16 +9,19 @@ fi
 use_mysql_5.1_sources()
 {
     MYSQL_MAJOR="5.1"
+    export MYSQL_5_1=$MYSQL_MAJOR # for DEB build
     MYSQL_VER=`grep AC_INIT $MYSQL_SRC/configure.in | awk -F '[' '{ print $3 }' | awk -F ']' '{ print $1 }'`
 }
 use_mariadb_5.1_sources()
 {
     MYSQL_MAJOR="5.1"
+    export MYSQL_5_1=$MYSQL_MAJOR # for DEB build
     MYSQL_VER=`grep AC_INIT configure.in | awk -F '[' '{ print $3 }' | awk -F ']' '{ print $1 }'`
 }
 use_mysql_5.5_sources()
 {
     MYSQL_MAJOR="5.5"
+    export MYSQL_5_5=$MYSQL_MAJOR # for DEB build
     MYSQL_VER=`awk -F '=' 'BEGIN { ORS = "" } /MYSQL_VERSION_MAJOR/ { print $2 "." } /MYSQL_VERSION_MINOR/ { print $2 "." } /MYSQL_VERSION_PATCH/ { print $2 }' $MYSQL_SRC/VERSION`
 }
 
@@ -538,29 +541,17 @@ build_packages()
     if [ $DEBIAN -ne 0 ]
     then #build DEB
         local deb_basename="mysql-server-wsrep"
-        ln -sf mysql-wsrep.list $deb_basename.list
+        pushd debian
         $SUDO_ENV $(which epm) -n -m "$ARCH" -a "$ARCH" -f "deb" \
              --output-dir $ARCH $STRIP_OPT $deb_basename
+        $SUDO /bin/chown -R $WHOAMI.users $ARCH
     else # build RPM
-        local rpm_basename="MySQL-server-wsrep"
-        ln -sf mysql-wsrep.list $rpm_basename.list
-        ($SUDO_ENV $(which epm) -vv -n -m "$ARCH" -a "$ARCH" -f "rpm" \
-              --output-dir $ARCH --keep-files -k $STRIP_OPT $rpm_basename || \
-         $SUDO_ENV $(which rpmbuild) -bb --target "$ARCH" \
-              --buildroot="$ARCH/buildroot" "$ARCH/$rpm_basename.spec" )
+        echo "RPMs are now built by a separate script."
+        return 1
     fi
     local RET=$?
 
-    $SUDO /bin/chown -R $WHOAMI.users $ARCH
     set -e
-
-    if [ $RET -eq 0 ] && [ $DEBIAN -eq 0 ]
-    then # RPM cleanup (some rpm versions put the package in RPMS)
-        test -d $ARCH/RPMS/$ARCH && \
-        mv $ARCH/RPMS/$ARCH/*.rpm $ARCH/ 1>/dev/null 2>&1 || :
-
-        rm -rf $ARCH/RPMS $ARCH/buildroot $ARCH/rpms # $ARCH/mysql-wsrep.spec
-    fi
 
     return $RET
 }
