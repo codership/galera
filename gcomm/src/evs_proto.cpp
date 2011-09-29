@@ -2829,7 +2829,13 @@ void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
             // its last sent.
             gu_trace(complete_user(msg.get_range().get_hs()));
         }
-        gu_trace(resend(msg.get_source(), msg.get_range()));
+        const seqno_t upper_bound(
+            std::min(msg.get_range().get_hs(), last_sent));
+        if (msg.get_range().get_lu() <= upper_bound)
+        {
+            gu_trace(resend(msg.get_source(),
+                            Range(msg.get_range().get_lu(), upper_bound)));
+        }
     }
 
     //
