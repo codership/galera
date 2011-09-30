@@ -10,13 +10,15 @@ namespace gcache
 bool
 MemStore::have_free_space (ssize_t size) throw()
 {
-    while (size_ + size > max_size_) /* try to free some released bufs*/
+    while ((size_ + size > max_size_) && !seqno2ptr_.empty())
     {
-        BufferHeader* bh = ptr2BH (seqno2ptr_.begin()->second);
+        /* try to free some released bufs */
+        seqno2ptr_iter_t const i  (seqno2ptr_.begin());
+        BufferHeader*    const bh (ptr2BH (i->second));
 
         if (BH_is_released(bh)) /* discard buffer */
         {
-            seqno2ptr_.erase(seqno2ptr_.begin());
+            seqno2ptr_.erase(i);
             bh->seqno = SEQNO_NONE;
 
             switch (bh->store)
@@ -29,13 +31,9 @@ MemStore::have_free_space (ssize_t size) throw()
                 break;
             }
         }
-        else /* no more buffers to discard */
-        {
-            return false;
-        }
     }
 
-    return true;
+    return (size_ + size <= max_size_);
 }
 
 } /* namespace gcache */

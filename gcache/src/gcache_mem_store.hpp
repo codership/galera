@@ -18,10 +18,12 @@ namespace gcache
 {
     class MemStore : public MemOps
     {
+        typedef std::map<int64_t, const void*> seqno2ptr_t;
+        typedef seqno2ptr_t::iterator          seqno2ptr_iter_t;
+
     public:
 
-        MemStore (ssize_t max_size,
-                  std::map<int64_t, const void*> & seqno2ptr) throw ()
+        MemStore (ssize_t max_size, seqno2ptr_t& seqno2ptr) throw ()
             : max_size_ (max_size),
               size_     (0),
               seqno2ptr_(seqno2ptr)
@@ -121,9 +123,9 @@ namespace gcache
 
         bool have_free_space (ssize_t size) throw();
 
-        ssize_t        max_size_;
-        ssize_t        size_;
-        std::map<int64_t, const void*>& seqno2ptr_;
+        ssize_t      max_size_;
+        ssize_t      size_;
+        seqno2ptr_t& seqno2ptr_;
     };
 }
 
