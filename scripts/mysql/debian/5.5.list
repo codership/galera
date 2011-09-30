@@ -1,16 +1,14 @@
 # This is a MySQL-wsrep package description for ESP package manager
 
-%product     wsrep-enabled MySQL server
-%copyright   MySQL AB, Codership Oy, All Rights Reserved
-%vendor      Codership Oy
-%license     COPYING
-%readme      README
-%description MySQL server + wsrep patch (https://launchpad.net/codership-mysql).
-$mysql_version=${MYSQL_VER}
-$wsrep_version=${WSREP_VER}
-%version     ${mysql_version}-${wsrep_version}
-
 %include common.list
+
+%requires    mysql-client
+
+%replaces    mysql-server-core-5.5 0.0.0 ${mysql_version}
+%replaces    mysql-server-5.5      0.0.0 ${mysql_version}
+
+%provides    mysql-server-core-5.5
+%provides    mysql-server-5.5
 
 ##############################################
 # Below files sorted into paragraphs         #
@@ -18,9 +16,9 @@ $wsrep_version=${WSREP_VER}
 ##############################################
 
 d 755 root root $BINS_DST -
-f 755 root root $BINS_DST/innochecksum         $MYSQL_SRC/extra/innochecksum
+#in client f 755 root root $BINS_DST/innochecksum         $MYSQL_SRC/extra/innochecksum
 f 755 root root $BINS_DST/msql2mysql           $MYSQL_SRC/scripts/msql2mysql
-#f 755 root root $BINS_DST/my_print_defaults    $MYSQL_SRC/extra/my_print_defaults
+#in client f 755 root root $BINS_DST/my_print_defaults    $MYSQL_SRC/extra/my_print_defaults
 f 755 root root $BINS_DST/myisamchk            $MYSQL_SRC/storage/myisam/myisamchk
 f 755 root root $BINS_DST/myisamlog            $MYSQL_SRC/storage/myisam/myisamlog
 f 755 root root $BINS_DST/myisampack           $MYSQL_SRC/storage/myisam/myisampack
@@ -38,7 +36,7 @@ f 755 root root $BINS_DST/mysqld_multi         $MYSQL_SRC/scripts/mysqld_multi
 f 755 root root $BINS_DST/mysqld_safe          $MYSQL_SRC/scripts/mysqld_safe
 f 755 root root $BINS_DST/mysqlhotcopy         $MYSQL_SRC/scripts/mysqlhotcopy
 f 755 root root $BINS_DST/mysqltest            $MYSQL_SRC/client/mysqltest
-f 755 root root $BINS_DST/perror               $MYSQL_SRC/extra/perror
+#in client f 755 root root $BINS_DST/perror               $MYSQL_SRC/extra/perror
 f 755 root root $BINS_DST/replace              $MYSQL_SRC/extra/replace
 f 755 root root $BINS_DST/resolve_stack_dump   $MYSQL_SRC/extra/resolve_stack_dump
 f 755 root root $BINS_DST/resolveip            $MYSQL_SRC/extra/resolveip
@@ -67,9 +65,9 @@ f 644 root root $DOCS_DST/sp-imp-spec.txt   $MYSQL_SRC/Docs/sp-imp-spec.txt
 # manpages
 d 755 root root $MAN_DST/man1 -
 f 644 root root $MAN_DST/man1/comp_err.1.gz          $MYSQL_SRC/man/comp_err.1.gz
-f 644 root root $MAN_DST/man1/innochecksum.1.gz      $MYSQL_SRC/man/innochecksum.1.gz
+#in client f 644 root root $MAN_DST/man1/innochecksum.1.gz      $MYSQL_SRC/man/innochecksum.1.gz
 f 644 root root $MAN_DST/man1/msql2mysql.1.gz        $MYSQL_SRC/man/msql2mysql.1.gz
-f 644 root root $MAN_DST/man1/my_print_defaults.1.gz $MYSQL_SRC/man/my_print_defaults.1.gz
+#in client f 644 root root $MAN_DST/man1/my_print_defaults.1.gz $MYSQL_SRC/man/my_print_defaults.1.gz
 f 644 root root $MAN_DST/man1/myisamchk.1.gz         $MYSQL_SRC/man/myisamchk.1.gz
 f 644 root root $MAN_DST/man1/myisamlog.1.gz         $MYSQL_SRC/man/myisamlog.1.gz
 f 644 root root $MAN_DST/man1/myisampack.1.gz        $MYSQL_SRC/man/myisampack.1.gz
@@ -86,9 +84,8 @@ f 644 root root $MAN_DST/man1/mysqlbinlog.1.gz       $MYSQL_SRC/man/mysqlbinlog.
 f 644 root root $MAN_DST/man1/mysqld_multi.1.gz      $MYSQL_SRC/man/mysqld_multi.1.gz
 f 644 root root $MAN_DST/man1/mysqld_safe.1.gz       $MYSQL_SRC/man/mysqld_safe.1.gz
 f 644 root root $MAN_DST/man1/mysqlhotcopy.1.gz      $MYSQL_SRC/man/mysqlhotcopy.1.gz
-f 644 root root $MAN_DST/man1/mysqlman.1.gz          $MYSQL_SRC/man/mysqlman.1.gz
 f 644 root root $MAN_DST/man1/mysqltest.1.gz         $MYSQL_SRC/man/mysqltest.1.gz
-f 644 root root $MAN_DST/man1/perror.1.gz            $MYSQL_SRC/man/perror.1.gz
+#in client f 644 root root $MAN_DST/man1/perror.1.gz            $MYSQL_SRC/man/perror.1.gz
 f 644 root root $MAN_DST/man1/replace.1.gz           $MYSQL_SRC/man/replace.1.gz
 f 644 root root $MAN_DST/man1/resolve_stack_dump.1.gz $MYSQL_SRC/man/resolve_stack_dump.1.gz
 f 644 root root $MAN_DST/man1/resolveip.1.gz         $MYSQL_SRC/man/resolveip.1.gz
