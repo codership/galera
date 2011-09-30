@@ -125,6 +125,7 @@ do
             ;;
         -p|--package)
             PACKAGE="yes"   # Create a DEB package
+            CONFIGURE="yes" # don't forget to reconfigure with --prefix=/usr
             ;;
         -j|--jobs)
             shift;
