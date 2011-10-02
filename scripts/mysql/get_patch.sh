@@ -29,10 +29,11 @@ if [ -r "$WSREP_PATCH_FILE" ]
 then
     WSREP_PATCH_MD5SAVE=$(basename $WSREP_PATCH_FILE | awk -F _ '{ print $2 }' )
     WSREP_PATCH_MD5TEST=$(md5sum $WSREP_PATCH_FILE | awk '{ print $1 }')
-    if [ $WSREP_PATCH_MD5SAVE == $WSREP_PATCH_MD5TEST ]
+    if [ $WSREP_PATCH_MD5SAVE = $WSREP_PATCH_MD5TEST ]
     then
-        echo $WSREP_PATCH_FILE
-        exit 0
+# to be safe we better regenerate the patch every time
+        echo $WSREP_PATCH_FILE > /dev/null
+#        exit 0
     fi
 fi
 
@@ -58,3 +59,4 @@ WSREP_PATCH_FILE=$THIS_DIR/${WSREP_PATCH_SPEC}_${WSREP_PATCH_MD5SUM}_.diff
 mv $WSREP_PATCH_TMP $WSREP_PATCH_FILE
 
 echo $WSREP_PATCH_FILE
+

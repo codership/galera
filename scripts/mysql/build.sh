@@ -324,19 +324,30 @@ then
            # This will be put to --prefix by SETUP.sh.
             export MYSQL_BUILD_PREFIX="/usr"
         fi
+
+        if [ $PACKAGE = "yes" ] && [ $MYSQL_MAJOR = "5.5" ]
+        then
+            LAYOUT="--layout=RPM"
+        else
+            LAYOUT=""
+        fi
+
+        [ $DEBIAN -ne 0 ] && \
+        MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
+        MYSQL_SOCKET_PATH="/var/lib/mysql/mysql.sock"
+
         if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
         then
             # There is no other way to pass these options to SETUP.sh but
             # via env. variable
-            export wsrep_configs="--exec-prefix=/usr \
+            export wsrep_configs="$LAYOUT \
+                                  --exec-prefix=/usr \
                                   --libexecdir=/usr/sbin \
                                   --localstatedir=/var/lib/mysql \
-                                  --with-extra-charsets=all"
+                                  --with-extra-charsets=all \
+                                  --with-ssl \
+                                  --with-unix-socket-path=$MYSQL_SOCKET_PATH"
         fi
-
-        [ $DEBIAN -ne 0 ] && \
-        export MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
-        export MYSQL_SOCKET_PATH="/var/lib/mysql/mysql.sock"
 
         BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
     else  # just recompile and relink with old configuration
