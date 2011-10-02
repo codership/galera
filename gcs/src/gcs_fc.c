@@ -10,6 +10,7 @@
 #include "gcs_fc.h"
 
 #include <galerautils.h>
+#include <string.h>
 
 double const gcs_fc_hard_limit_fix = 0.9; //! allow for some overhead
 
@@ -42,6 +43,8 @@ gcs_fc_init (gcs_fc_t* fc,
                   "(should belong to [0.0,1.0) )", max_throttle);
         return -EINVAL;
     }
+
+    memset (fc, 0, sizeof(*fc));
 
     fc->hard_limit = hard_limit;
     fc->soft_limit = fc->hard_limit * soft_limit;
