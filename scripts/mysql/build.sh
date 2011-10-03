@@ -325,8 +325,8 @@ then
             export MYSQL_BUILD_PREFIX="/usr"
         fi
 
-        if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
-        then
+#        if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
+#        then
             # There is no other way to pass these options to SETUP.sh but
             # via env. variable
             [ $MYSQL_MAJOR = "5.5" ] && LAYOUT="--layout=RPM" || LAYOUT=""
@@ -345,7 +345,7 @@ then
                                   --with-ssl \
                                   --with-unix-socket-path=$MYSQL_SOCKET_PATH \
                                   --with-comment=$COMMENT"
-        fi
+#        fi
 
         BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
     else  # just recompile and relink with old configuration
