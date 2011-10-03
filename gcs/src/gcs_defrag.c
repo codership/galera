@@ -64,6 +64,7 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                 gu_debug ("Local action %lld reset.", frg->act_id);
                 df->frag_no  = 0;
                 df->received = 0;
+                df->tail     = df->head;
                 df->reset    = false;
 
                 if (df->size != frg->act_size) {
