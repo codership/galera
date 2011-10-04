@@ -62,7 +62,7 @@ MYSQLD_USER=$(whoami)
 ## Tweak the following if needed
 ##
 # use mysqld server directly, better not have automatic restarting
-MYSQLD="$MYSQL_BASE_DIR/libexec/mysqld"
+MYSQLD="$MYSQL_BASE_DIR/sbin/mysqld"
 MYSQLADMIN="$MYSQL_BASE_DIR/bin/mysqladmin"
 # Port, socket and pid files
 MYSQL_PORT=${MYSQL_PORT:-3306}
@@ -252,6 +252,7 @@ galera_start()
             --user="$MYSQLD_USER" \
             --basedir="$MYSQL_BASE_DIR" \
             --datadir="$MYSQL_DATA_DIR" \
+            --plugin-dir=lib/mysql/plugin \
             --pid-file="$MYSQL_PID" \
             --port=$MYSQL_PORT \
             --socket=$MYSQL_SOCKET \
