@@ -325,27 +325,24 @@ then
             export MYSQL_BUILD_PREFIX="/usr"
         fi
 
-#        if [ "$PACKAGE" == "yes" ] || [ "$BIN_DIST" == "yes" ]
-#        then
-            # There is no other way to pass these options to SETUP.sh but
-            # via env. variable
-            [ $MYSQL_MAJOR = "5.5" ] && LAYOUT="--layout=RPM" || LAYOUT=""
+        # There is no other way to pass these options to SETUP.sh but
+        # via env. variable
+        [ $MYSQL_MAJOR = "5.5" ] && LAYOUT="--layout=RPM" || LAYOUT=""
 
-            [ $DEBIAN -ne 0 ] && \
-            MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
-            MYSQL_SOCKET_PATH="/var/lib/mysql/mysql.sock"
+        [ $DEBIAN -ne 0 ] && \
+        MYSQL_SOCKET_PATH="/var/run/mysqld/mysqld.sock" || \
+        MYSQL_SOCKET_PATH="/var/lib/mysql/mysql.sock"
 
-            COMMENT="\'wsrep patch: $RELEASE.r$WSREP_REV\'"
+        COMMENT="\"wsrep patch: $RELEASE.r$WSREP_REV\""
 
-            export wsrep_configs="$LAYOUT \
-                                  --exec-prefix=/usr \
-                                  --libexecdir=/usr/sbin \
-                                  --localstatedir=/var/lib/mysql/ \
-                                  --with-extra-charsets=all \
-                                  --with-ssl \
-                                  --with-unix-socket-path=$MYSQL_SOCKET_PATH \
-                                  --with-comment=$COMMENT"
-#        fi
+        export wsrep_configs="$LAYOUT \
+                              --exec-prefix=/usr \
+                              --libexecdir=/usr/sbin \
+                              --localstatedir=/var/lib/mysql/ \
+                              --with-extra-charsets=all \
+                              --with-ssl \
+                              --with-unix-socket-path=$MYSQL_SOCKET_PATH \
+                              --with-comment=$COMMENT"
 
         BUILD/compile-${CPU}${DEBUG_OPT}-wsrep > /dev/null
     else  # just recompile and relink with old configuration
@@ -375,7 +372,7 @@ install_mysql_5.1_demo()
     MYSQL_PLUGINS=$MYSQL_DIST_DIR/lib/mysql/plugin
     MYSQL_CHARSETS=$MYSQL_DIST_DIR/share/mysql/charsets
     install -m 644 -D $MYSQL_SRC/sql/share/english/errmsg.sys $MYSQL_DIST_DIR/share/mysql/english/errmsg.sys
-    install -m 755 -D $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/libexec/mysqld
+    install -m 755 -D $MYSQL_SRC/sql/mysqld $MYSQL_DIST_DIR/sbin/mysqld
     if [ "$SKIP_CLIENTS" == "no" ]
     then
         # Hack alert:
@@ -423,7 +420,7 @@ install_mysql_5.5_demo() {
     cmake -DCMAKE_INSTALL_COMPONENT=ManPages -P cmake_install.cmake
     popd
     pushd $MYSQL_DIST_DIR
-    ln -s ./bin ./libexec
+        [ -d lib64 ] && [ ! -a lib ] && mv lib64 lib || :
     popd
 }
 
@@ -442,11 +439,12 @@ if [ $TAR == "yes" ]; then
     # Install required MySQL files in the DIST_DIR
     if [ $MYSQL_MAJOR == "5.1" ]; then
         install_mysql_5.1_demo
+        install -m 644 -D my-5.1.cnf $MYSQL_DIST_CNF
     else
         install_mysql_5.5_demo
+        install -m 644 -D my-5.5.cnf $MYSQL_DIST_CNF
     fi
 
-    install -m 644 -D my.cnf $MYSQL_DIST_CNF
     cat $MYSQL_SRC/support-files/wsrep.cnf >> $MYSQL_DIST_CNF
     pushd $MYSQL_BINS; ln -s wsrep_sst_rsync wsrep_sst_rsync_wan; popd
     tar -xzf mysql_var_$MYSQL_MAJOR.tgz -C $MYSQL_DIST_DIR
@@ -474,8 +472,14 @@ if [ $TAR == "yes" ]; then
     # Strip binaries if not instructed otherwise
     if test "$NO_STRIP" != "yes"
     then
-        strip $GALERA_LIBS/lib*.so
-        strip $MYSQL_DIST_DIR/libexec/mysqld
+        for d in $GALERA_LIBS $MYSQL_DIST_DIR/bin $MYSQL_DIST_DIR/lib \
+                 $MYSQL_DIST_DIR/sbin
+        do
+            for f in $d/*
+            do
+                file $f | grep 'not stripped' >/dev/null && strip $f || :
+            done
+        done
     fi
 
 fi # if [ $TAR == "yes" ]
