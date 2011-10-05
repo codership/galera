@@ -1,8 +1,8 @@
 //
-// context_base.hpp
-// ~~~~~~~~~~~~~~~~
+// ssl/context_base.hpp
+// ~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2005-2010 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2005-2011 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -15,14 +15,11 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include "asio/detail/push_options.hpp"
-
-#include "asio/detail/push_options.hpp"
-#include <boost/config.hpp>
+#include "asio/detail/config.hpp"
 #include <boost/detail/workaround.hpp>
-#include "asio/detail/pop_options.hpp"
-
 #include "asio/ssl/detail/openssl_types.hpp"
+
+#include "asio/detail/push_options.hpp"
 
 namespace asio {
 namespace ssl {
@@ -91,11 +88,11 @@ public:
   /// Disable TLS v1.
   static const int no_tlsv1 = implementation_defined;
 #else
-  BOOST_STATIC_CONSTANT(int, default_workarounds = SSL_OP_ALL);
-  BOOST_STATIC_CONSTANT(int, single_dh_use = SSL_OP_SINGLE_DH_USE);
-  BOOST_STATIC_CONSTANT(int, no_sslv2 = SSL_OP_NO_SSLv2);
-  BOOST_STATIC_CONSTANT(int, no_sslv3 = SSL_OP_NO_SSLv3);
-  BOOST_STATIC_CONSTANT(int, no_tlsv1 = SSL_OP_NO_TLSv1);
+  BOOST_STATIC_CONSTANT(long, default_workarounds = SSL_OP_ALL);
+  BOOST_STATIC_CONSTANT(long, single_dh_use = SSL_OP_SINGLE_DH_USE);
+  BOOST_STATIC_CONSTANT(long, no_sslv2 = SSL_OP_NO_SSLv2);
+  BOOST_STATIC_CONSTANT(long, no_sslv3 = SSL_OP_NO_SSLv3);
+  BOOST_STATIC_CONSTANT(long, no_tlsv1 = SSL_OP_NO_TLSv1);
 #endif
 
   /// File format types.
