@@ -65,8 +65,16 @@ cycle()
     else
         echo "skipped consistency check due to fast recycle"
     fi
+
     echo "Restarting node $node_id..."
-    restart_node "-g $(gcs_address $node)" $node
+
+    if test $pause_var -gt 3
+    then
+        restart_node "-g $(gcs_address $node)" $node
+    else
+        stop_node $node || : # just in case the process is still lingering
+        restart_node "-g $(gcs_address $node)" $node
+    fi
 }
 
 node=0
