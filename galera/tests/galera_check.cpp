@@ -15,12 +15,14 @@ typedef Suite* (*suite_creator_t) (void);
 extern Suite* write_set_suite();
 extern Suite* trx_handle_suite();
 extern Suite* service_thd_suite();
+extern Suite* ist_suite();
 
 static suite_creator_t suites[] =
 {
     write_set_suite,
     trx_handle_suite,
     service_thd_suite,
+    ist_suite,
     0
 };
 

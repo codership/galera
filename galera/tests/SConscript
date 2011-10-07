@@ -2,6 +2,7 @@
 Import('check_env')
 
 env = check_env.Clone()
+env.Append(LIBS=File('#/gcache/src/libgcache.a'))
 env.Append(LIBS=File('#/galera/src/libgalera++.a'))
 env.Append(LIBS=File('#/galerautils/src/libgalerautils++.a'))
 env.Append(LIBS=File('#/galerautils/src/libgalerautils.a'))
@@ -14,6 +15,7 @@ galera_check = env.Program(target='galera_check',
                                write_set_check.cpp
                                trx_handle_check.cpp
                                service_thd_check.cpp
+                               ist_check.cpp
                            '''))
 
 stamp = "galera_check.passed"

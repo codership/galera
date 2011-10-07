@@ -17,7 +17,8 @@ libgaleraxx_srcs = [
     'wsrep_params.cpp',
     'gcs_action_source.cpp',
     'galera_info.c',
-    'replicator.cpp']
+    'replicator.cpp',
+    'ist.cpp' ]
 
 libgaleraxx_env.StaticLibrary('galera++', libgaleraxx_srcs)
 
