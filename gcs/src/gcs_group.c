@@ -921,7 +921,7 @@ gcs_group_act_conf (gcs_group_t*    group,
         conf->repl_proto_ver = group->quorum.repl_proto_ver;
         conf->appl_proto_ver = group->quorum.appl_proto_ver;
 
-        memcpy (conf->group_uuid, &group->group_uuid, sizeof (gu_uuid_t));
+        memcpy (conf->uuid, &group->group_uuid, sizeof (gu_uuid_t));
 
         if (group->num) {
             assert (conf->my_idx >= 0);

@@ -20,7 +20,7 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf,
         const char* str = conf->data;
         int m;
 
-        ret->id        = *(wsrep_uuid_t*)&conf->group_uuid;
+        ret->id        = *(wsrep_uuid_t*)&conf->uuid;
         ret->conf      = conf->conf_id;
         ret->first     = conf->seqno != GCS_SEQNO_ILL ?
                          (conf->seqno + 1) : WSREP_SEQNO_UNDEFINED;

@@ -49,6 +49,7 @@ namespace galera
         virtual wsrep_status_t close() = 0;
         virtual wsrep_status_t async_recv(void* recv_ctx) = 0;
 
+        virtual int trx_proto_ver() const = 0;
         virtual TrxHandle* local_trx(wsrep_trx_id_t) = 0;
         virtual TrxHandle* local_trx(wsrep_trx_handle_t*, bool) = 0;
         virtual void unref_local_trx(TrxHandle* trx) = 0;
@@ -81,10 +82,11 @@ namespace galera
         virtual void process_commit_cut(wsrep_seqno_t seq,
                                         wsrep_seqno_t seqno_l)
             throw (gu::Exception) = 0;
-        virtual void process_view_info(void* recv_ctx,
-                                       const wsrep_view_info_t& view_info,
-                                       State next_state,
-                                       wsrep_seqno_t seqno_l)
+        virtual void process_conf_change(void*                    recv_ctx,
+                                         const wsrep_view_info_t& view_info,
+                                         int                      repl_proto,
+                                         State                    next_state,
+                                         wsrep_seqno_t            seqno_l)
             throw (gu::Exception) = 0;
         virtual void process_state_req(void* recv_ctx, const void* req,
                                        size_t req_size,

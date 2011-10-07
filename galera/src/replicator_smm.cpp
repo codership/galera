@@ -231,7 +231,9 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     logger_             (reinterpret_cast<gu_log_cb_t>(args->logger_cb)),
     config_             (args->options),
     set_defaults_       (config_, defaults),
-    protocol_version_   (args->proto_ver),
+    trx_proto_ver_      (-1),
+    str_proto_ver_      (-1),
+    protocol_version_   (-1),
     state_              (S_CLOSED),
     sst_state_          (SST_NONE),
     co_mode_            (CommitOrder::from_string(
@@ -253,7 +255,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_cond_           (),
     sst_retry_sec_      (1),
     gcache_             (config_, data_dir_),
-    gcs_                (config_, gcache_, protocol_version_, args->proto_ver,
+    gcs_                (config_, gcache_, MAX_PROTO_VER, args->proto_ver,
                          args->node_name, args->node_incoming),
     service_thd_        (gcs_),
     as_                 (0),
@@ -275,17 +277,6 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     report_counter_     (),
     wsrep_stats_        ()
 {
-    switch (protocol_version_)
-    {
-    case 0:
-    case 1:
-        break;
-    default:
-        gu_throw_fatal << "unsupported protocol version: "
-                       << protocol_version_;
-        throw;
-    }
-
     strncpy (const_cast<char*>(state_uuid_str_), 
              "00000000-0000-0000-0000-000000000000", sizeof(state_uuid_str_));
 
@@ -436,7 +427,7 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 galera::TrxHandle*
 galera::ReplicatorSMM::local_trx(wsrep_trx_id_t trx_id)
 {
-    return wsdb_.get_trx(protocol_version_, uuid_, trx_id, false);
+    return wsdb_.get_trx(trx_proto_ver_, uuid_, trx_id, false);
 }
 
 galera::TrxHandle*
@@ -453,7 +444,7 @@ galera::ReplicatorSMM::local_trx(wsrep_trx_handle_t* handle, bool create)
     }
     else
     {
-        trx = wsdb_.get_trx(protocol_version_, uuid_, handle->trx_id, create);
+        trx = wsdb_.get_trx(trx_proto_ver_, uuid_, handle->trx_id, create);
         handle->opaque = trx;
     }
 
@@ -476,7 +467,7 @@ void galera::ReplicatorSMM::discard_local_trx(wsrep_trx_id_t trx_id)
 galera::TrxHandle*
 galera::ReplicatorSMM::local_conn_trx(wsrep_conn_id_t conn_id, bool create)
 {
-    return wsdb_.get_conn_query(protocol_version_, uuid_, conn_id, create);
+    return wsdb_.get_conn_query(trx_proto_ver_, uuid_, conn_id, create);
 }
 
 
@@ -1102,12 +1093,39 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t seq,
     local_monitor_.leave(lo);
 }
 
+void galera::ReplicatorSMM::establish_protocol_versions (int proto_ver)
+{
+    switch (proto_ver)
+    {
+    case 0:
+        trx_proto_ver_ = 0;
+        str_proto_ver_ = 0;
+        break;
+    case 1: 
+        trx_proto_ver_ = 1;
+        str_proto_ver_ = 0;
+        break;
+    case 2:
+        trx_proto_ver_ = 1;
+        str_proto_ver_ = 1;
+        break;
+    default:
+        log_fatal << "Configuration change resulted in an unsupported protocol "
+            "version: " << proto_ver << ". Can't continue.";
+        abort();
+    };
+
+    protocol_version_ = proto_ver;
+    log_debug << "REPL Protocols: " << protocol_version_ << " ("
+              << trx_proto_ver_ << ", " << str_proto_ver_ << ")";
+}
 
 void
-galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
-                                         const wsrep_view_info_t& view_info,
-                                         State                    next_state,
-                                         wsrep_seqno_t            seqno_l)
+galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
+                                           const wsrep_view_info_t& view_info,
+                                           int                      repl_proto,
+                                           State                    next_state,
+                                           wsrep_seqno_t            seqno_l)
     throw (gu::Exception)
 {
     assert(seqno_l > -1);
@@ -1153,6 +1171,7 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
 
     void* app_req(0);
     ssize_t app_req_len(0);
+
     // copy that will be eaten by callback
     wsrep_view_info_t *cb_view_info(galera_view_info_copy(&view_info));
 
@@ -1167,17 +1186,18 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
         abort();
     }
 
-    if (view_info.conf >= 0)
+    if (view_info.conf >= 0) // Primary configuration
     {
-        // Primary configuration
+        establish_protocol_versions (repl_proto);
+
         // we have to reset cert initial position here, SST does not contain
         // cert index yet (see #197).
-        protocol_version_ = view_info.proto_ver;
-        cert_.assign_initial_position(group_seqno, protocol_version_);
+        cert_.assign_initial_position(group_seqno, trx_proto_ver_);
 
         if (st_req == true)
         {
-            request_sst(group_uuid, group_seqno, app_req, app_req_len);
+            request_state_transfer (group_uuid, group_seqno, app_req,
+                                    app_req_len);
         }
         else
         {
@@ -1446,7 +1466,7 @@ void galera::ReplicatorSMM::restore_state(const std::string& file)
     update_state_uuid (uuid);
     apply_monitor_.set_initial_position(seqno);
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.set_initial_position(seqno);
-    cert_.assign_initial_position(seqno, protocol_version_);
+    cert_.assign_initial_position(seqno, trx_proto_ver_);
 }
 
 
@@ -1477,9 +1497,9 @@ retry_sst_request(int ret)
 }
 
 void
-galera::ReplicatorSMM::request_sst(wsrep_uuid_t  const& group_uuid,
-                                   wsrep_seqno_t const  group_seqno,
-                                   const void* req, size_t req_len)
+galera::ReplicatorSMM::request_state_transfer (wsrep_uuid_t  const& group_uuid,
+                                               wsrep_seqno_t const  group_seqno,
+                                               const void* req, size_t req_len)
     throw (gu::Exception)
 {
     assert(req != 0);

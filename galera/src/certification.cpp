@@ -540,7 +540,8 @@ galera::Certification::~Certification()
 }
 
 
-void galera::Certification::assign_initial_position(wsrep_seqno_t seqno, int version)
+void galera::Certification::assign_initial_position(wsrep_seqno_t seqno,
+                                                    int version)
 {
     if (seqno >= position_)
     {

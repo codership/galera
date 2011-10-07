@@ -47,7 +47,8 @@ namespace galera
 
         ~ReplicatorSMM();
 
-        int protocol_version() const { return protocol_version_; }
+        int trx_proto_ver() const { return trx_proto_ver_; }
+
         wsrep_status_t connect(const std::string& cluster_name,
                                const std::string& cluster_url,
                                const std::string& state_donor);
@@ -87,10 +88,11 @@ namespace galera
             throw (ApplyException);
         void process_commit_cut(wsrep_seqno_t seq, wsrep_seqno_t seqno_l)
             throw (gu::Exception);
-        void process_view_info(void* recv_ctx,
-                               const wsrep_view_info_t& view_info,
-                               State next_state,
-                               wsrep_seqno_t seqno_l)
+        void process_conf_change(void* recv_ctx,
+                                 const wsrep_view_info_t& view,
+                                 int repl_proto,
+                                 State next_state,
+                                 wsrep_seqno_t seqno_l)
             throw (gu::Exception);
         void process_state_req(void* recv_ctx, const void* req,
                                size_t req_size, wsrep_seqno_t seqno_l,
@@ -150,10 +152,6 @@ namespace galera
             if (gu_unlikely(i % report_interval_ == 0))
                 service_thd_.report_last_committed(apply_monitor_.last_left());
         }
-
-        void request_sst(const wsrep_uuid_t&, wsrep_seqno_t, const void*,
-                         size_t)
-            throw (gu::Exception);
 
         wsrep_status_t cert(TrxHandle* trx);
         wsrep_status_t cert_for_aborted(TrxHandle* trx);
@@ -322,6 +320,12 @@ namespace galera
 
         void build_stats_vars (std::vector<struct wsrep_stats_var>& stats);
 
+        void establish_protocol_versions (int version);
+
+        void request_state_transfer (const wsrep_uuid_t&, wsrep_seqno_t,
+                                     const void*, size_t)
+            throw (gu::Exception);
+
         class Logger
         {
         public:
@@ -337,8 +341,15 @@ namespace galera
         }
             set_defaults_; // sets missing parameters to default values
 
-        static const int       max_protocol_version_ = 1;
-        int                    protocol_version_;
+        static const int       MAX_PROTO_VER = 2;
+        /* 
+         * 1 - trx_proto_ver_ = 1;
+         * 2 - str_proto_ver_ = 1;
+         */
+
+        int                    trx_proto_ver_;// transaction protocol
+        int                    str_proto_ver_;// state transfer request protocol
+        int                    protocol_version_; // general repl layer proto
 
         FSM<State, Transition> state_;
         SstState               sst_state_;

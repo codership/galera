@@ -351,7 +351,7 @@ gcs_node_state_to_str (gcs_node_state_t state);
 typedef struct gcs_act_conf {
     gcs_seqno_t      seqno;    //! last global seqno applied by this group
     gcs_seqno_t      conf_id;  //! configuration ID (-1 if non-primary)
-    uint8_t          group_uuid[GCS_UUID_LEN];/// group UUID
+    uint8_t          uuid[GCS_UUID_LEN];/// group UUID
     long             memb_num; //! number of members in configuration
     long             my_idx;   //! index of this node in the configuration
     gcs_node_state_t my_state; //! current node state

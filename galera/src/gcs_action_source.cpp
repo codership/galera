@@ -127,8 +127,9 @@ void galera::GcsActionSource::dispatch(void*                 recv_ctx,
             galera_view_info_create(conf, conf->my_state == GCS_NODE_STATE_PRIM)
             );
 
-        replicator_.process_view_info(recv_ctx, *view_info,
-                                      state2repl(*conf), act.seqno_l);
+        replicator_.process_conf_change(recv_ctx, *view_info,
+                                        conf->repl_proto_ver,
+                                        state2repl(*conf), act.seqno_l);
         free(view_info);
         break;
     }
