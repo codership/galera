@@ -56,7 +56,8 @@ uint64_t galera_capabilities(wsrep_t* gh)
             WSREP_CAP_PARALLEL_APPLYING |
             WSREP_CAP_TRX_REPLAY        |
             WSREP_CAP_ISOLATION         |
-            WSREP_CAP_PAUSE);
+            WSREP_CAP_PAUSE             |
+            WSREP_CAP_CAUSAL_READS);
 }
 
 
