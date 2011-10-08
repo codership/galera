@@ -25,6 +25,7 @@
 #include "gu_prodcons.hpp"
 
 extern "C" {
+
 #include "gu_macros.h"
 #include "gu_limits.h"
 #include "gu_byteswap.h"
@@ -34,7 +35,8 @@ extern "C" {
 #include "gu_dbug.h"
 #include "gu_fifo.h"
 #include "gu_uuid.h"
-#include "gu_utils.h" // gu_abort()
+//#include "gu_utils.h" // gu_abort()
+
 }
 
 #endif /* _galerautils_hpp_ */

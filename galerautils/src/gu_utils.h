@@ -17,7 +17,7 @@ extern "C" {
 
 /*
  * The string conversion functions below are slighly customized
- * versions of standard libc functions designed to undestand 'on'/'off' and
+ * versions of standard libc functions designed to understand 'on'/'off' and
  * K/M/G size modifiers and the like.
  *
  * They return pointer to the next character after conversion:

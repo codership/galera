@@ -282,6 +282,18 @@ namespace galera
             const Mode mode_;
         };
 
+        class StateRequest
+        {
+        public:
+            virtual const void* req     () const = 0;
+            virtual ssize_t     len     () const = 0;
+            virtual const void* sst_req () const = 0;
+            virtual ssize_t     sst_len () const = 0;
+            virtual const void* ist_req () const = 0;
+            virtual ssize_t     ist_len () const = 0;
+            virtual ~StateRequest() {}
+        };
+
     private:
         // state machine
         class Transition
@@ -322,9 +334,23 @@ namespace galera
 
         void establish_protocol_versions (int version);
 
-        void request_state_transfer (const wsrep_uuid_t&, wsrep_seqno_t,
-                                     const void*, size_t)
+        void prepare_for_IST (void*& req, ssize_t& req_len)
             throw (gu::Exception);
+
+        StateRequest* prepare_state_request (const void* sst_req,
+                                             ssize_t     sst_req_len)
+            throw ();
+
+        void send_state_request (const wsrep_uuid_t& group_uuid,
+                                 wsrep_seqno_t       group_seqno,
+                                 const StateRequest* req)
+            throw ();
+
+        void request_state_transfer (const wsrep_uuid_t& group_uuid,
+                                     wsrep_seqno_t       group_seqno,
+                                     const void*         sst_req,
+                                     ssize_t             sst_req_len)
+            throw ();
 
         class Logger
         {

@@ -22,7 +22,7 @@ namespace gu
         class MessageQueue;
         class Producer;
         class Consumer;
-    }    
+    }
 }
 
 class gu::prodcons::MessageData
@@ -42,7 +42,6 @@ class gu::prodcons::Message
 
 
 public:
-    
     /*!
      * @brief Constructor
      *
@@ -71,21 +70,21 @@ public:
         data = msg.data;
         return *this;
     }
-    
+
     /*!
      * @brief Get producer associated to the message
      *
      * @return Producer associated to the message
      */
     Producer& get_producer() const { return *producer; }
-    
+
     /*!
      * @brief Get data associated to the message
      *
      * @return Data associated to the message
      */
     const MessageData* get_data() const { return data; }
-    
+
     /*!
      * @brief Get int value associated to the message
      *
@@ -101,7 +100,7 @@ class gu::prodcons::Producer
 {
     gu::Cond cond;  /*! Condition variable */
     Consumer& cons; /*! Consumer associated to this producer */
-    
+
     /*!
      * @brief Return reference to condition variable
      *
@@ -119,7 +118,7 @@ public:
         cond(),
         cons(cons_)
     { }
-    
+
     /*!
      * @brief Send message to the consumer and wait for response
      *
@@ -137,8 +136,7 @@ class gu::prodcons::Consumer
     Mutex mutex; /*! Mutex for internal locking */
     MessageQueue* mque; /*! Message queue for producer messages */
     MessageQueue* rque; /*! Message queue for ack messages */
-    
-    
+
     Consumer(const Consumer&);
     void operator=(const Consumer&);
 protected:
@@ -151,7 +149,7 @@ protected:
      * @return Next message from the message queue
      */
     const Message* get_next_msg();
-    
+
     /*!
      * @brief Return ack message for the producer 
      *
@@ -161,7 +159,7 @@ protected:
      * @param msg Ack message corresponding the current head of mque
      */
     void return_ack(const Message& msg);
-    
+
     /*!
      * @brief Virtual method to notify consumer about queued message
      */
@@ -171,12 +169,12 @@ public:
      * @brief Default constructor
      */
     Consumer();
-    
+
     /*!
      * @brief Default destructor
      */
     virtual ~Consumer();
-    
+
     /*!
      * @brief Queue message and wait for ack
      *

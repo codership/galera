@@ -26,7 +26,7 @@
 
 #if !defined(_BYTE_ORDER) && !defined(__BYTE_ORDER)
 #error "byte order not defined"
-#endif 
+#endif
 
 #if !defined(bswap16) && !defined(bswap_16)
 #error "bswap16 or bswap_16 not defined"
