@@ -318,12 +318,8 @@ then
             DEBUG_OPT=""
         fi
 
-        if [ $TAR == "yes" ]; then
-            export MYSQL_BUILD_PREFIX=$BUILD_ROOT/dist/mysql
-        else 
-           # This will be put to --prefix by SETUP.sh.
-            export MYSQL_BUILD_PREFIX="/usr"
-        fi
+        # This will be put to --prefix by SETUP.sh.
+        export MYSQL_BUILD_PREFIX="/usr"
 
         # There is no other way to pass these options to SETUP.sh but
         # via env. variable
@@ -412,6 +408,9 @@ install_mysql_5.1_demo()
 }
 
 install_mysql_5.5_demo() {
+
+    export DESTDIR=$BUILD_ROOT/dist/mysql
+
     mkdir -p $DIST_DIR/mysql/etc
     pushd $MYSQL_SRC
     cmake -DCMAKE_INSTALL_COMPONENT=Server -P cmake_install.cmake
@@ -420,6 +419,7 @@ install_mysql_5.5_demo() {
     cmake -DCMAKE_INSTALL_COMPONENT=ManPages -P cmake_install.cmake
     popd
     pushd $MYSQL_DIST_DIR
+        mv usr/* ./ && rm -r usr
         [ -d lib64 ] && [ ! -a lib ] && mv lib64 lib || :
     popd
 }

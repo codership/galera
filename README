@@ -2,28 +2,63 @@ Codership Oy
 http://www.codership.com
 <info@codership.com>
 
-This is release 0.8 of Galera - Codership's implementation of wsrep interface
+This is Galera - Codership's implementation of wsrep interface
 (https://launchpad.net/wsrep/). The software and other files in this directory
 unless otherwise noted are distributed under GPLv3, see COPYING for details.
 
 
+BUILDING - general
+
 Build Requirements:
 * Scons build system http://www.scons.org/
 * Check unit test library http://check.sourceforge.net/
-* Boost devel libraries http://www.boost.org/
+* Boost devel package http://www.boost.org/
+* OpenSSL devel package
+
+To compile, in Galera root directory do either:
+ $ scons
+(default optimized build)
+or
+ $ ./scripts/build.sh
+(see ./scripts/build.sh --help for information on options)
 
 To build MySQL/Galera demo distribution, branch lp:codership-mysql into
 some directory (hereafter <MYSQL_DIR>) and run build script from this
 directory (hereafter <GALERA_DIR>):
 
-  cd <MYSQL_DIR>
-  bzr branch lp:codership-mysql
-  cd <GALERA_DIR>
-  MYSQL_SRC=<MYSQL_DIR>/codership-mysql ./scripts/mysql/build.sh -b -s -o -t
+ $ cd <MYSQL_DIR>
+ $ bzr branch lp:codership-mysql
+ $ cd <GALERA_DIR>
+ $ MYSQL_SRC=<MYSQL_DIR>/codership-mysql ./scripts/mysql/build.sh -b -s -o -t
 
 After successful build, demo package can be found under scripts/mysql.
 
+
+BUILDING on CentOS/RHEL 5
+
+CentOS/RHEL by default uses a very old version of GCC and a likewise ancient
+version of BOOST that lacks important features. In order to build Galera on
+CentOS/RHEL one needs to:
+
+ 1) Install gcc44 and gcc44-c++ packages and set CC and CXX variables
+    accordingly:
+    # yum install gcc44 gcc44-c++
+    # export CC=gcc44
+    # export CXX=g++44
+ 2) Remove standard boost and boost-devel packages (if present)
+ 3) Install boost141-devel package:
+    # yum install boost141-devel
+ 4) Make link from /usr/include/boost to /usr/include/boost141:
+    # cd /usr/include
+    # ln -sf boost141/boost boost
+ 5) Install scons check-devel openssl-devel
+    # yum install scons check-devel openssl-devel
+
+Then proceeed as described above.
+
+
 For more information, see:
+* Codership mailing list: http://groups.google.com/group/codership-team
 * https://launchpad.net/galera/
-* Codership home page http://www.codership.com
-* Codership mailing list http://groups.google.com/group/codership-team
+* Codership home page: http://www.codership.com
+
