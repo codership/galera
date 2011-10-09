@@ -249,7 +249,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
         {
             sst_donate_cb_(app_ctx_, recv_ctx,
                            streq->sst_req(), streq->sst_len(),
-                           &state_uuid_, donor_seq, 0, 0);
+                           &state_uuid_, donor_seq, 0, 0, false);
         }
 
         if (streq->ist_len())

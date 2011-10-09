@@ -1,4 +1,4 @@
-/* Copyright (C) 2009-2010 Codership Oy <info@codership.com>
+/* Copyright (C) 2009-2011 Codership Oy <info@codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "21"
+#define WSREP_INTERFACE_VERSION "22"
 
 /*!
  *  Certain provider capabilities application may need to know
@@ -173,11 +173,11 @@ typedef enum wsrep_view_status {
  * view on the group
  */
 typedef struct wsrep_view_info {
-    wsrep_uuid_t        id;        //!< group ID
-    wsrep_seqno_t       conf;      //!< group configuration number
-    wsrep_seqno_t       first;     //!< first seqno in this configuration
+    wsrep_uuid_t        uuid;      //!< global state UUID
+    wsrep_seqno_t       seqno;     //!< global state seqno
+    wsrep_seqno_t       view;      //!< global view number
     wsrep_view_status_t status;    //!< view status
-    bool                state_gap; //!< discontinuity between group and member states
+    bool                state_gap; //!< gap between global and local states
     int                 my_idx;    //!< index of this member in the view
     int                 memb_num;  //!< number of members in the view
     int                 proto_ver; //!< application protocol agreed on in the view
@@ -205,13 +205,13 @@ typedef struct wsrep_view_info {
  * @param sst_req     location to store SST request
  * @param sst_req_len location to store SST request length or error code
  */
-typedef void (*wsrep_view_cb_t) (void*              app_ctx,
-                                 void*              recv_ctx,
-                                 wsrep_view_info_t* view,
-                                 const char*        state,
-                                 size_t             state_len,
-                                 void**             sst_req,
-                                 ssize_t*           sst_req_len);
+typedef void (*wsrep_view_cb_t) (void*                    app_ctx,
+                                 void*                    recv_ctx,
+                                 const wsrep_view_info_t* view,
+                                 const char*              state,
+                                 size_t                   state_len,
+                                 void**                   sst_req,
+                                 ssize_t*                 sst_req_len);
 
 /*!
  * applying data representations
@@ -285,6 +285,7 @@ typedef enum wsrep_status (*wsrep_bf_apply_cb_t)(void*               recv_ctx,
  * @param seqno     current state seqno on this node
  * @param state     current wsrep internal state buffer
  * @param state_len current wsrep internal state buffer len
+ * @param bypass    bypass snapshot transfer, only transfer uuid:seqno pair
  * @return 0 for success or negative error code
  */
 typedef int (*wsrep_sst_donate_cb_t) (void*               app_ctx,
@@ -294,7 +295,8 @@ typedef int (*wsrep_sst_donate_cb_t) (void*               app_ctx,
                                       const wsrep_uuid_t* uuid,
                                       wsrep_seqno_t       seqno,
                                       const char*         state,
-                                      size_t              state_len);
+                                      size_t              state_len,
+                                      bool                bypass);
 
 /*!
  * @brief a callback to signal application that wsrep state is synced
@@ -329,15 +331,15 @@ struct wsrep_init_args
     size_t              state_len;   //!< Length of state buffer
 
     /* Application callbacks */
-    wsrep_log_cb_t            logger_cb;       //!< logging handler
-    wsrep_view_cb_t           view_handler_cb; //!< group view change handler
+    wsrep_log_cb_t        logger_cb;       //!< logging handler
+    wsrep_view_cb_t       view_handler_cb; //!< group view change handler
 
     /* applier callbacks */
-    wsrep_bf_apply_cb_t       bf_apply_cb;     //!< applying callback
+    wsrep_bf_apply_cb_t   bf_apply_cb;     //!< applying callback
 
     /* state snapshot transfer callbacks */
-    wsrep_sst_donate_cb_t     sst_donate_cb;   //!< starting to donate
-    wsrep_synced_cb_t         synced_cb;       //!< synced with group
+    wsrep_sst_donate_cb_t sst_donate_cb;   //!< starting to donate
+    wsrep_synced_cb_t     synced_cb;       //!< synced with group
 };
 
 /*! Type of the stats variable value in struct wsrep_status_var */
@@ -779,6 +781,44 @@ struct wsrep_ {
    * event to be deliverred via sync_cb.
    */
     wsrep_status_t (*resync) (wsrep_t* wsrep);
+
+  /*!
+   * @brief Acquire global named lock
+   *
+   * @param wsrep wsrep provider handle
+   * @param name  lock name
+   * @param owner 64-bit owner ID
+   * @param tout  timeout in nanoseconds.
+   *              0 - return immediately, -1 wait forever.
+   * @return wsrep status or negative error code
+   * @retval -EDEADLK lock was already acquired by this thread
+   * @retval -EBUSY   lock was busy
+   */
+    wsrep_status_t (*lock) (wsrep_t* wsrep, const char* name, int64_t owner,
+                            int64_t tout);
+
+  /*!
+   * @brief Release global named lock
+   *
+   * @param wsrep wsrep provider handle
+   * @param name  lock name
+   * @param owner 64-bit owner ID
+   * @return wsrep status or negative error code
+   * @retval -EPERM lock does not belong to this owner
+   */
+    wsrep_status_t (*unlock) (wsrep_t* wsrep, const char* name, int64_t owner);
+
+  /*!
+   * @brief Check if global named lock is locked
+   *
+   * @param wsrep wsrep provider handle
+   * @param name  lock name
+   * @param owner if not NULL will contain 64-bit owner ID
+   * @param node  if not NULL will contain owner's node UUID
+   * @return true if lock is locked
+   */
+    bool (*is_locked) (wsrep_t* wsrep, const char* name, int64_t* conn,
+                       wsrep_uuid_t* node);
 
   /*!
    * wsrep provider name
