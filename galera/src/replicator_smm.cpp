@@ -1093,8 +1093,8 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
 
     if (co_mode_ != CommitOrder::BYPASS) commit_monitor_.drain(upto);
 
-    wsrep_seqno_t const group_seqno(view_info.first - 1);
-    const wsrep_uuid_t& group_uuid(view_info.id);
+    wsrep_seqno_t const group_seqno(view_info.seqno);
+    const wsrep_uuid_t& group_uuid(view_info.uuid);
 
     if (view_info.my_idx >= 0)
     {
@@ -1125,11 +1125,9 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
 
     void* app_req(0);
     ssize_t app_req_len(0);
-    // copy that will be eaten by callback
-    wsrep_view_info_t *cb_view_info(galera_view_info_copy(&view_info));
 
-    cb_view_info->state_gap = st_req;
-    view_cb_(app_ctx_, recv_ctx, cb_view_info, 0, 0, &app_req, &app_req_len);
+    const_cast<wsrep_view_info_t&>(view_info).state_gap = st_req;
+    view_cb_(app_ctx_, recv_ctx, &view_info, 0, 0, &app_req, &app_req_len);
 
     if (app_req_len < 0)
     {
@@ -1139,7 +1137,7 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
         abort();
     }
 
-    if (view_info.conf >= 0)
+    if (view_info.view >= 0)
     {
         // Primary configuration
         // we have to reset cert initial position here, SST does not contain
@@ -1153,7 +1151,7 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
         }
         else
         {
-            if (view_info.conf == 1)
+            if (view_info.view == 1)
             {
                 update_state_uuid (group_uuid);
                 apply_monitor_.set_initial_position(group_seqno);
@@ -1254,7 +1252,7 @@ void galera::ReplicatorSMM::process_state_req(void* recv_ctx,
     if (!trivial_sst)
     {
         sst_donate_cb_(app_ctx_, recv_ctx, req, req_size, &state_uuid_,
-                       donor_seq, 0, 0);
+                       donor_seq, 0, 0, false);
     }
 
     local_monitor_.leave(lo);

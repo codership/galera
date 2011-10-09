@@ -696,7 +696,7 @@ wsrep_seqno_t galera_desync (wsrep_t* gh)
 
     try
     {
-        return -ENOSYS;
+        return WSREP_NOT_IMPLEMENTED;
     }
     catch (gu::Exception& e)
     {
@@ -712,6 +712,41 @@ wsrep_status_t galera_resync (wsrep_t* gh)
     assert(gh != 0 && gh->ctx != 0);
 //    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     return WSREP_OK;
+}
+
+
+extern "C"
+wsrep_status_t galera_lock (wsrep_t* gh,
+                            const char* name,
+                            int64_t     owner,
+                            int64_t     timeout)
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+    return WSREP_NOT_IMPLEMENTED;
+}
+
+
+extern "C"
+wsrep_status_t galera_unlock (wsrep_t* gh,
+                              const char* name,
+                              int64_t     owner)
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+    return WSREP_OK;
+}
+
+
+extern "C"
+bool galera_is_locked (wsrep_t* gh,
+                       const char*   name,
+                       int64_t*      owner,
+                       wsrep_uuid_t* node)
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+    return false;
 }
 
 
@@ -745,6 +780,9 @@ static wsrep_t galera_str = {
     &galera_resume,
     &galera_desync,
     &galera_resync,
+    &galera_lock,
+    &galera_unlock,
+    &galera_is_locked,
     "Galera",
     GALERA_VER"(r"GALERA_REV")",
     "Codership Oy <info@codership.com>",
