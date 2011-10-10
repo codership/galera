@@ -58,31 +58,10 @@ namespace gcache
     {
         if (gu_likely(0 != ptr))
         {
-            BufferHeader* bh = ptr2BH(ptr);
+            BufferHeader* const bh(ptr2BH(ptr));
             gu::Lock      lock(mtx);
 
-#ifndef NDEBUG
-            std::set<const void*>::iterator it = buf_tracker.find(ptr);
-            if (it == buf_tracker.end())
-            {
-                log_fatal << "Have not allocated this ptr: " << ptr;
-                abort();
-            }
-            buf_tracker.erase(it);
-#endif
-            frees++;
-
-            switch (bh->store)
-            {
-            case BUFFER_IN_MEM:  mem.free (ptr); break;
-            case BUFFER_IN_RB:   rb.free  (ptr); break;
-            case BUFFER_IN_PAGE:
-                if (gu_likely(bh->seqno_g > 0))
-                {
-                    discard_seqno (bh->seqno_g);
-                }
-                ps.free (ptr); break;
-            }
+            free_common (bh);
         }
         else {
             log_warn << "Attempt to free a null pointer";

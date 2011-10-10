@@ -42,7 +42,7 @@ namespace gcache
     GCache::seqno_assign (const void* const ptr,
                           int64_t     const seqno_g,
                           int64_t     const seqno_d,
-                          bool        const release)
+                          bool        const free)
     {
         gu::Lock lock(mtx);
 
@@ -73,7 +73,7 @@ namespace gcache
 
         bh->seqno_g = seqno_g;
         bh->seqno_d = seqno_d;
-        if (release) BH_release(bh);
+        if (free) free_common(bh);
     }
 
     /*!

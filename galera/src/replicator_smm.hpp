@@ -268,7 +268,7 @@ namespace galera
                 case OOOC:
                     return true;
                 case LOCAL_OOOC:
-                    if (trx_.is_local() == true) return true;
+                    return trx_.is_local();
                     // in case of remote trx fall through
                 case NO_OOOC:
                     return (last_left + 1 == trx_.global_seqno());
