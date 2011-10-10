@@ -214,59 +214,55 @@ typedef void (*wsrep_view_cb_t) (void*                    app_ctx,
                                  ssize_t*                 sst_req_len);
 
 /*!
- * applying data representations
- */
-typedef enum wsrep_apply_data_type {
-    WSREP_APPLY_SQL, //!< SQL statement as a string
-    WSREP_APPLY_ROW, //!< row data buffers
-    WSREP_APPLY_APP  //!< application specific data buffer
-} wsrep_apply_data_type_t;
-
-/*!
- * structure passed to the applier callback. wsrep_apply_data
- * contains the data for applying expressed in one of the formats:
- * SQL strings, row data images or application specific opaque buffer
- */
-typedef struct wsrep_apply_data {
-    enum wsrep_apply_data_type type; //!< defines data representation
-    union {
-        struct {
-            const char* stm;      //!< SQL statement string
-            size_t      len;      //!< length of SQL string
-            time_t      timeval;  //!< time to use for time functions
-            uint32_t    randseed; //!< seed for rand operations
-        } sql;
-        struct {
-            uint8_t* buffer;  //!< application specific data buffer
-            size_t   len;
-        } app;
-        struct {
-            uint8_t* buffer;  //!< row data buffers
-            size_t   len;
-        } row;
-    } u;
-} wsrep_apply_data_t;
-
-/*!
- * @brief brute force apply function
+ * @brief apply callback
  *
- * This handler is called from wsrep library to execute
- * the passed SQL statement in brute force.
+ * This handler is called from wsrep library to apply replicated write set
+ * Must support brute force applying for multi-master operation
  *
  * @param recv_ctx receiver context pointer provided by the application
- * @param data     the apply data buffer to be applied
- * @param seqno    global seqno part of the action to be applied
+ * @param data     data buffer containing the write set
+ * @param size     data buffer size
+ * @param seqno    global seqno part of the write set to be applied
  *
  * @return success code:
  * @retval WSREP_OK
- * @retval WSREP_NOT_IMPLEMENTED dbms has does not provide the
- *           applying feature asked for
- * @retval WSREP_ERRROR dbms failed to apply the write set
- *
+ * @retval WSREP_NOT_IMPLEMENTED appl. does not support the write set format
+ * @retval WSREP_ERRROR failed to apply the write set
  */
-typedef enum wsrep_status (*wsrep_bf_apply_cb_t)(void*               recv_ctx,
-                                                 wsrep_apply_data_t* data,
+typedef enum wsrep_status (*wsrep_apply_cb_t)   (void*               recv_ctx,
+                                                 const void*         data,
+                                                 size_t              size,
                                                  wsrep_seqno_t       seqno);
+
+/*!
+ * @brief commit callback
+ *
+ * This handler is called to commit the changes made by apply callback.
+ *
+ * @param recv_ctx receiver context pointer provided by the application
+ * @param seqno    global seqno part of the write set to be committed
+ *
+ * @return success code:
+ * @retval WSREP_OK
+ * @retval WSREP_ERRROR failed to commit the write set
+ */
+typedef enum wsrep_status (*wsrep_commit_cb_t)  (void*         recv_ctx,
+                                                 wsrep_seqno_t seqno);
+
+/*!
+ * @brief rollback callback
+ *
+ * This handler is called to roll back the changes made by apply callback.
+ *
+ * @param recv_ctx receiver context pointer provided by the application
+ * @param seqno    global seqno part of the write set to be rolled back
+ *
+ * @return success code:
+ * @retval WSREP_OK
+ * @retval WSREP_ERRROR failed to rollback the write set
+ */
+typedef enum wsrep_status (*wsrep_rollback_cb_t)(void*         recv_ctx,
+                                                 wsrep_seqno_t seqno);
 
 /*!
  * @brief a callback to donate state snapshot
@@ -335,7 +331,9 @@ struct wsrep_init_args
     wsrep_view_cb_t       view_handler_cb; //!< group view change handler
 
     /* applier callbacks */
-    wsrep_bf_apply_cb_t   bf_apply_cb;     //!< applying callback
+    wsrep_apply_cb_t      apply_cb;        //!< applying callback
+    wsrep_commit_cb_t     commit_cb;       //!< commit   callback
+    wsrep_rollback_cb_t   rollback_cb;     //!< rollback callback
 
     /* state snapshot transfer callbacks */
     wsrep_sst_donate_cb_t sst_donate_cb;   //!< starting to donate
