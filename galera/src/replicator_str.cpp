@@ -144,7 +144,7 @@ StateRequest_v1::StateRequest_v1 (
 
     memcpy (ptr, ist_req, ist_req_len);
 
-    assert (ptr - req_ == len - ist_req_len);
+    assert ((ptr - req_) == (len_ - ist_req_len));
 }
 
 // takes ownership over str buffer
