@@ -68,6 +68,12 @@ namespace gcache
          */
         int64_t seqno_get_min ();
 
+        /*!
+         * Move lock to a given seqno.
+         * Throw gu::NotFound if seqno is not in the cache.
+         */
+        void    seqno_lock (int64_t const seqno_g) throw (gu::NotFound);
+
         /*!          DEPRECATED
          * Get pointer to buffer identified by seqno.
          * Moves lock to the given seqno.
