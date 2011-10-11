@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2011 Codership Oy <info@codership.com>
  */
 
 #include <cerrno>
@@ -14,10 +14,10 @@ namespace gcache
 {
     /*!
      * Reinitialize seqno sequence (after SST or such)
-     * Clears cache and sets seqno_min to seqno.
+     * Clears seqno->ptr map // and sets seqno_min to seqno.
      */
     void
-    GCache::seqno_init (int64_t seqno)
+    GCache::seqno_reset (/*int64_t seqno*/)
     {
         gu::Lock lock(mtx);
 
@@ -32,7 +32,7 @@ namespace gcache
             discard_seqno (old_max); // forget all previous seqnos
         }
 
-        seqno_min = seqno;
+//        seqno_min = seqno;
     }
 
     /*!

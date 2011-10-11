@@ -50,9 +50,9 @@ namespace gcache
 
         /*!
          * Reinitialize seqno sequence (after SST or such)
-         * Clears cache from buffers with seqnos and sets seqno_min to seqno.
+         * Clears seqno->ptr map // and sets seqno_min to seqno.
          */
-        void    seqno_init (int64_t seqno);
+        void    seqno_reset (/*int64_t seqno*/);
 
         /*!
          * Assign sequence number to buffer pointed to by ptr
@@ -205,7 +205,7 @@ namespace gcache
         long long       frees;
 
         int64_t         seqno_locked;
-        int64_t         seqno_min;
+//        int64_t         seqno_min;
         int64_t         seqno_max;
 
 #ifndef NDEBUG

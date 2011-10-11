@@ -449,6 +449,10 @@ ReplicatorSMM::request_state_transfer (const wsrep_uuid_t& group_uuid,
     state_.shift_to(S_JOINING);
     sst_state_ = SST_WAIT;
 
+    /* while waiting for state transfer to complete is a good point
+     * to reset gcache, since it may ivolve some IO too */
+    gcache_.seqno_reset();
+
     lock.wait(sst_cond_);
 
     if (sst_uuid_ != group_uuid)
