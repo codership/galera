@@ -1048,7 +1048,8 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
 
     if (st_req)
     {
-        assert(view_info.conf >= 0);
+        assert(view_info.view >= 0);
+
         if (state_uuid_ == group_uuid)
         {
             // common history
