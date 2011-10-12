@@ -324,6 +324,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 sst_donate_cb_(app_ctx_, recv_ctx,
                                streq->sst_req(), streq->sst_len(),
                                &istr.uuid(), istr.last_applied(), 0, 0, true);
+                local_monitor_.leave(lo);
                 try
                 {
                     serve_IST (gcache_, istr);
@@ -332,7 +333,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 {
                     log_error << "failed to serve ist " << e.what();
                 }
-                goto end;
+                delete streq;
+                return;
             }
         }
 
@@ -343,7 +345,6 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                            streq->sst_req(), streq->sst_len(),
                            &state_uuid_, donor_seq, 0, 0, false);
         }
-    end:
         delete streq;
     }
 
