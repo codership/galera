@@ -14,7 +14,7 @@ namespace gcache
     void
     GCache::reset()
     {
-
+        mem.reset();
         rb.reset();
         ps.reset();
 

@@ -30,6 +30,9 @@ namespace gcache
 
         virtual void
         discard (BufferHeader* bh) throw() = 0;
+
+        virtual void
+        reset   () = 0;
     };
 }
 

@@ -13,6 +13,7 @@
 #include "gcache_bh.hpp"
 
 #include <string>
+#include <set>
 
 namespace gcache
 {
@@ -26,10 +27,23 @@ namespace gcache
         MemStore (ssize_t max_size, seqno2ptr_t& seqno2ptr) throw ()
             : max_size_ (max_size),
               size_     (0),
+              allocd_   (),
               seqno2ptr_(seqno2ptr)
         {}
 
-        ~MemStore () {}
+        void reset () throw ()
+        {
+            for (std::set<void*>::iterator buf = allocd_.begin();
+                 buf != allocd_.end(); ++buf)
+            {
+                ::free (*buf);
+            }
+
+            allocd_.clear();
+            size_ = 0;
+        }
+
+        ~MemStore () { reset(); }
 
         void* malloc  (ssize_t size) throw ()
         {
@@ -41,6 +55,8 @@ namespace gcache
 
             if (gu_likely(0 != bh))
             {
+                allocd_.insert(bh);
+
                 bh->size  = size;
                 bh->seqno = SEQNO_NONE;
                 bh->flags = 0;
@@ -94,6 +110,9 @@ namespace gcache
 
             if (tmp)
             {
+                allocd_.erase(bh);
+                allocd_.insert(tmp);
+
                 bh = BH_cast(tmp);
                 assert (bh->size == old_size);
                 bh->size  = size;
@@ -112,6 +131,7 @@ namespace gcache
 
             size_ -= bh->size;
             ::free (bh);
+            allocd_.erase(bh);
         }
 
         void set_max_size (ssize_t size) throw() { max_size_ = size; }
@@ -123,9 +143,10 @@ namespace gcache
 
         bool have_free_space (ssize_t size) throw();
 
-        ssize_t      max_size_;
-        ssize_t      size_;
-        seqno2ptr_t& seqno2ptr_;
+        ssize_t         max_size_;
+        ssize_t         size_;
+        std::set<void*> allocd_;
+        seqno2ptr_t&    seqno2ptr_;
     };
 }
 
