@@ -203,12 +203,69 @@ read_state_request (const void* const req, size_t const req_len)
 }
 
 
-static void
-serve_IST (const void* const req, ssize_t const len) throw() // stub
+class IST_request
 {
-    char* const ist(strndup (reinterpret_cast<const char*>(req), len));
-    log_info << "Got IST request: '" << ist << '\'';
-    free (ist);
+public:
+    IST_request() : peer_(), uuid_(), last_applied_(), group_seqno_() { }
+    IST_request(const std::string& peer,
+                const wsrep_uuid_t& uuid,
+                wsrep_seqno_t last_applied,
+                wsrep_seqno_t group_seqno)
+        :
+        peer_(peer),
+        uuid_(uuid),
+        last_applied_(last_applied),
+        group_seqno_(group_seqno)
+    { }
+    const std::string&  peer()  const { return peer_ ; }
+    const wsrep_uuid_t& uuid()  const { return uuid_ ; }
+    wsrep_seqno_t       last_applied() const { return last_applied_; }
+    wsrep_seqno_t       group_seqno()  const { return group_seqno_; }
+private:
+    friend std::ostream& operator<<(std::ostream&, const IST_request&);
+    friend std::istream& operator>>(std::istream&, IST_request&);
+    std::string peer_;
+    wsrep_uuid_t uuid_;
+    wsrep_seqno_t last_applied_;
+    wsrep_seqno_t group_seqno_;
+};
+
+std::ostream& operator<<(std::ostream& os, const IST_request& istr)
+{
+    return (os
+            << istr.uuid_ << ":"
+            << istr.last_applied_ << ":"
+            << istr.group_seqno_ << ":"
+            << istr.peer_);
+}
+
+std::istream& operator>>(std::istream& is, IST_request& istr)
+{
+    char c;
+    return (is >> istr.uuid_ >> c >> istr.last_applied_
+            >> c >> istr.group_seqno_ >> c >> istr.peer_);
+}
+
+static void
+serve_IST (gcache::GCache& gcache, const IST_request& istr) throw() // stub
+{
+    // char* const ist(strndup (reinterpret_cast<const char*>(req), len));
+    // log_info << "Got IST request: '" << ist << '\'';
+    // free (ist);
+    log_info << "serving IST: " << istr;
+    try
+    {
+        galera::ist::Sender ist_sender(gcache, istr.peer());
+        ist_sender.send(istr.last_applied() + 1, istr.group_seqno());
+    }
+    catch (asio::system_error& e)
+    {
+        log_error << "IST serve failed: " << e.what();
+    }
+    catch (gu::Exception& e)
+    {
+        log_error << "IST serve failed: " << e.what();
+    }
 }
 
 void ReplicatorSMM::process_state_req(void*       recv_ctx,
@@ -244,19 +301,49 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
     if (!trivial_sst)
     {
         StateRequest* const streq (read_state_request (req, req_size));
+        if (streq->ist_len())
+        {
+            IST_request istr;
+            std::string ist_str(reinterpret_cast<const char*>(streq->ist_req()),
+                                streq->ist_len());
+            std::istringstream is(ist_str);
+            is >> istr;
+            if (istr.uuid() == state_uuid_)
+            {
+                log_info << "IST request: " << istr;
+                try
+                {
+                    gcache_.seqno_lock(istr.last_applied() + 1);
+                }
+                catch(gu::NotFound& nf)
+                {
+                    log_info << "IST first seqno " << istr.last_applied() + 1
+                             << " not found from cache, falling back to SST";
+                    goto sst;
+                }
+                sst_donate_cb_(app_ctx_, recv_ctx,
+                               streq->sst_req(), streq->sst_len(),
+                               &istr.uuid(), istr.last_applied(), 0, 0, true);
+                try
+                {
+                    serve_IST (gcache_, istr);
+                }
+                catch (gu::Exception& e)
+                {
+                    log_error << "failed to serve ist " << e.what();
+                }
+                goto end;
+            }
+        }
 
+    sst:
         if (streq->sst_len())
         {
             sst_donate_cb_(app_ctx_, recv_ctx,
                            streq->sst_req(), streq->sst_len(),
                            &state_uuid_, donor_seq, 0, 0, false);
         }
-
-        if (streq->ist_len())
-        {
-            serve_IST (streq->ist_req(), streq->ist_len());
-        }
-
+    end:
         delete streq;
     }
 
@@ -270,14 +357,16 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
 
 
 void
-ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len)
+ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
+                                wsrep_seqno_t group_seqno)
     throw (gu::Exception)
 {
     std::ostringstream os;
 
-    os << "This is a mock IST request, starting position: " << state_uuid_
-       << ":" << apply_monitor_.last_left();
-
+//    os << "This is a mock IST request, starting position: " << state_uuid_
+//       << ":" << apply_monitor_.last_left();
+    os << IST_request(config_.get("ist.listen_addr"),
+                      state_uuid_, apply_monitor_.last_left(), group_seqno);
     char* str = strdup (os.str().c_str());
 
     if (!str) gu_throw_error (ENOMEM) << "Failed to allocate IST buffer.";
@@ -290,7 +379,8 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len)
 
 ReplicatorSMM::StateRequest*
 ReplicatorSMM::prepare_state_request (const void* const sst_req,
-                                      ssize_t     const sst_req_len)
+                                      ssize_t     const sst_req_len,
+                                      wsrep_seqno_t group_seqno)
     throw()
 {
     try
@@ -304,7 +394,7 @@ ReplicatorSMM::prepare_state_request (const void* const sst_req,
             void*   ist_req;
             ssize_t ist_req_len;
 
-            prepare_for_IST (ist_req, ist_req_len);
+            prepare_for_IST (ist_req, ist_req_len, group_seqno);
 
             return new StateRequest_v1 (sst_req, sst_req_len,
                                      ist_req, ist_req_len);
@@ -425,7 +515,8 @@ ReplicatorSMM::send_state_request (const wsrep_uuid_t&       group_uuid,
 
 
 void
-ReplicatorSMM::request_state_transfer (const wsrep_uuid_t& group_uuid,
+ReplicatorSMM::request_state_transfer (void* recv_ctx,
+                                       const wsrep_uuid_t& group_uuid,
                                        wsrep_seqno_t const group_seqno,
                                        const void*   const sst_req,
                                        ssize_t       const sst_req_len)
@@ -434,7 +525,8 @@ ReplicatorSMM::request_state_transfer (const wsrep_uuid_t& group_uuid,
     assert(sst_req != 0);
     assert(sst_req_len > 0);
 
-    StateRequest* const req(prepare_state_request(sst_req, sst_req_len));
+    StateRequest* const req(prepare_state_request(sst_req, sst_req_len,
+                                                  group_seqno));
 
     log_debug << "State transfer required: "
               << "\n\tGroup state: "
@@ -442,6 +534,7 @@ ReplicatorSMM::request_state_transfer (const wsrep_uuid_t& group_uuid,
               << "\n\tLocal state: " << state_uuid_
               << ":" << apply_monitor_.last_left();
 
+    ist_receiver_.prepare();
     gu::Lock lock(sst_mutex_);
 
     send_state_request (group_uuid, group_seqno, req);
@@ -477,18 +570,53 @@ ReplicatorSMM::request_state_transfer (const wsrep_uuid_t& group_uuid,
             commit_monitor_.set_initial_position(sst_seqno_);
         }
 
-        log_debug << "SST finished: " << state_uuid_ << ":" << sst_seqno_;
+        log_info << "SST finished: " << state_uuid_ << ":" << sst_seqno_;
 
         if (sst_seqno_ < group_seqno)
         {
             log_info << "Receiving IST: " << (group_seqno - sst_seqno_)
                      << " writesets.";
             // go to receive IST
+            recv_IST(recv_ctx);
         }
     }
-
+    ist_receiver_.finished();
     delete req;
 }
+
+
+void ReplicatorSMM::recv_IST(void* recv_ctx)
+{
+    while (true)
+    {
+        TrxHandle* trx(0);
+        int err;
+        if ((err = ist_receiver_.recv(&trx)) == 0)
+        {
+            assert(trx != 0);
+            if (trx->depends_seqno() == -1)
+            {
+                ApplyOrder ao(*trx);
+                apply_monitor_.self_cancel(ao);
+                if (co_mode_ != CommitOrder::BYPASS)
+                {
+                    CommitOrder co(*trx, co_mode_);
+                    commit_monitor_.self_cancel(co);
+                }
+            }
+            else
+            {
+                apply_trx(recv_ctx, trx);
+            }
+            trx->unref();
+        }
+        else
+        {
+            return;
+        }
+    }
+}
+
 
 } /* namespace galera */
 

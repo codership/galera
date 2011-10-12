@@ -28,15 +28,15 @@ namespace galera
     inline std::istream& operator>>(std::istream& is, wsrep_uuid_t& uuid)
     {
         // @todo
-        std::string str;
+        char cstr[GU_UUID_STR_LEN + 1];
+        is.width(GU_UUID_STR_LEN + 1);
+        is >> cstr;
 
-        is >> str;
-
-        ssize_t ret(gu_uuid_scan(str.c_str(), str.size(),
+        ssize_t ret(gu_uuid_scan(cstr, strlen(cstr),
                                  reinterpret_cast<gu_uuid_t*>(&uuid)));
 
         if (ret == -1)
-            gu_throw_error(EINVAL) << "could not parse UUID from '" << str
+            gu_throw_error(EINVAL) << "could not parse UUID from '" << cstr
                                    << '\'' ;
 
         return is;

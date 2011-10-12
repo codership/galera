@@ -200,6 +200,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     service_thd_        (gcs_),
     as_                 (0),
     gcs_as_             (gcs_, *this, gcache_),
+    ist_receiver_       (config_, args->node_incoming),
     wsdb_               (),
     cert_               (config_),
     local_monitor_      (),
@@ -346,8 +347,10 @@ wsrep_status_t galera::ReplicatorSMM::async_recv(void* recv_ctx)
 
         while ((rc = as_->process(recv_ctx)) == -ECANCELED)
         {
-// REMOVE            log_info << "DEBUG: recv() canceled.";
-            usleep (10000); // go to IST processing
+            recv_IST(recv_ctx);
+            // hack: prevent fast looping until ist controlling thread
+            // resumes gcs prosessing
+            usleep(10000);
         }
 
         if (rc <= 0)
@@ -455,7 +458,11 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandle* trx)
     }
     apply_monitor_.leave(ao);
 
-    cert_.set_trx_committed(trx);
+    if (trx->local_seqno() != -1)
+    {
+        // trx with local seqno -1 originates from IST (or other source not gcs)
+        cert_.set_trx_committed(trx);
+    }
     report_last_committed();
 }
 
@@ -1113,7 +1120,8 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
 
         if (st_req == true)
         {
-            request_state_transfer (group_uuid, group_seqno, app_req,
+            request_state_transfer (recv_ctx,
+                                    group_uuid, group_seqno, app_req,
                                     app_req_len);
         }
         else

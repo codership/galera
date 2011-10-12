@@ -30,14 +30,14 @@ namespace galera
         class Receiver
         {
         public:
-            Receiver(gu::Config& conf);
+            Receiver(gu::Config& conf, const char* addr);
             ~Receiver();
             void prepare();
             int recv(TrxHandle** trx);
             void finished();
             void run();
         private:
-            const gu::Config&                             conf_;
+            gu::Config&                                   conf_;
             asio::io_service                              io_service_;
             asio::ip::tcp::acceptor                       acceptor_;
             pthread_t                                     thread_;
@@ -60,14 +60,14 @@ namespace galera
                 TrxHandle* trx_;
             };
             std::stack<Consumer*> consumers_;
-            bool finished_;
+            bool running_;
         };
 
         class Sender
         {
         public:
-            Sender(gu::Config& conf, gcache::GCache& gcache,
-                      const std::string& peer);
+            Sender(gcache::GCache& gcache,
+                   const std::string& peer);
             ~Sender();
             void send(wsrep_seqno_t first, wsrep_seqno_t last);
         private:

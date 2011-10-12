@@ -260,16 +260,26 @@ void galera::ist::Proto::send_trx(asio::ip::tcp::socket&        socket,
 {
     const size_t trx_meta_size(galera::serial_size(buffer.seqno_g())
                                + galera::serial_size(buffer.seqno_d()));
-    Trx trx(version_, buffer.size() + trx_meta_size);
+    const bool rolled_back(buffer.seqno_d() == -1);
+    const size_t trx_size(rolled_back == true ? 0 : buffer.size());
+    Trx trx(version_, trx_size + trx_meta_size);
     gu::Buffer buf(serial_size(trx) + trx_meta_size);
     size_t offset(serialize(trx, &buf[0], buf.size(), 0));
     offset = galera::serialize(buffer.seqno_g(), &buf[0], buf.size(), offset);
     offset = galera::serialize(buffer.seqno_d(), &buf[0], buf.size(), offset);
     assert(offset = buf.size());
-    boost::array<asio::const_buffer, 2> cbs;
-    cbs[0] = asio::const_buffer(&buf[0], buf.size());
-    cbs[1] = asio::const_buffer(buffer.ptr(), buffer.size());
-    size_t n(asio::write(socket, cbs));
+    size_t n;
+    if (rolled_back == true)
+    {
+        n = asio::write(socket, asio::buffer(&buf[0], buf.size()));
+    }
+    else
+    {
+        boost::array<asio::const_buffer, 2> cbs;
+        cbs[0] = asio::const_buffer(&buf[0], buf.size());
+        cbs[1] = asio::const_buffer(buffer.ptr(), buffer.size());
+        n = asio::write(socket, cbs);
+    }
     log_debug << "sent " << n << " bytes";
 }
 
@@ -301,11 +311,26 @@ galera::ist::Proto::recv_trx(asio::ip::tcp::socket& socket)
         galera::TrxHandle* trx(new galera::TrxHandle);
         size_t offset(galera::unserialize(&buf[0], buf.size(), 0, seqno_g));
         offset = galera::unserialize(&buf[0], buf.size(), offset, seqno_d);
-        offset = unserialize(&buf[0], buf.size(), offset, *trx);
-        trx->append_write_set(&buf[0] + offset, buf.size() - offset);
+        if (seqno_d == -1)
+        {
+            if (offset != msg.len())
+            {
+                gu_throw_error(EINVAL)
+                    << "message size "
+                    << msg.len()
+                    << " does not match expected size "
+                    << offset;
+            }
+        }
+        else
+        {
+            offset = unserialize(&buf[0], buf.size(), offset, *trx);
+            trx->append_write_set(&buf[0] + offset, buf.size() - offset);
+        }
         trx->set_received(0, -1, seqno_g);
         trx->set_depends_seqno(seqno_d);
         trx->mark_certified();
+
         log_debug << "received trx body: " << *trx;
         return trx;
     }
@@ -335,7 +360,7 @@ galera::ist::Proto::recv_trx(asio::ip::tcp::socket& socket)
     throw;
 }
 
-galera::ist::Receiver::Receiver(gu::Config& conf)
+galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
     :
     conf_      (conf),
     io_service_(),
@@ -344,8 +369,16 @@ galera::ist::Receiver::Receiver(gu::Config& conf)
     mutex_(),
     cond_(),
     consumers_(),
-    finished_(false)
-{ }
+    running_(false)
+{
+    if (addr != 0)
+    {
+        std::string listen_addr("tcp://");
+        listen_addr += gu::URI(listen_addr + addr).get_host();
+        listen_addr += ":4568";
+        conf_.set("ist.listen_addr", listen_addr);
+    }
+}
 
 
 galera::ist::Receiver::~Receiver()
@@ -362,27 +395,45 @@ extern "C" void* run_receiver_thread(void* arg)
 void galera::ist::Receiver::prepare()
 {
     const gu::URI uri(conf_.get("ist.listen_addr"));
-    asio::ip::tcp::resolver resolver(io_service_);
-    asio::ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
-                                         uri.get_port());
-    asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
-    acceptor_.open(i->endpoint().protocol());
-    acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
-    acceptor_.bind(*i);
-    acceptor_.listen();
+    try
+    {
+        asio::ip::tcp::resolver resolver(io_service_);
+        asio::ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
+                                             uri.get_port());
+        asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
+        acceptor_.open(i->endpoint().protocol());
+        acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
+        acceptor_.bind(*i);
+        acceptor_.listen();
+    }
+    catch (asio::system_error& e)
+    {
+        gu_throw_error(e.code().value()) << "failed to open ist listener to "
+                                         << uri.to_string();
+    }
 
     int err;
     if ((err = pthread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
     {
         gu_throw_error(err) << "unable to create receiver thread";
     }
+    running_ = true;
 }
 
 
 void galera::ist::Receiver::run()
 {
     asio::ip::tcp::socket socket(io_service_);
-    acceptor_.accept(socket);
+    try
+    {
+        acceptor_.accept(socket);
+    }
+    catch (asio::system_error& e)
+    {
+        gu_throw_error(e.code().value()) << "accept() failed";
+    }
+
+
     try
     {
         Proto p;
@@ -405,14 +456,22 @@ void galera::ist::Receiver::run()
             {
                 log_debug << "eof received, closing socket";
                 socket.close();
-                return;
+                break;
             }
         }
     }
     catch (asio::system_error& e)
     {
         log_warn << "got error while reading ist stream: " << e.code();
-        socket.close();
+    }
+
+    gu::Lock lock(mutex_);
+    socket.close();
+    running_ = false;
+    while (consumers_.empty() == false)
+    {
+        consumers_.top()->cond().signal();
+        consumers_.pop();
     }
 }
 
@@ -421,7 +480,7 @@ int galera::ist::Receiver::recv(TrxHandle** trx)
 {
     Consumer cons;
     gu::Lock lock(mutex_);
-    if (finished_)
+    if (running_ == false)
     {
         return EINTR;
     }
@@ -440,11 +499,21 @@ int galera::ist::Receiver::recv(TrxHandle** trx)
 
 void galera::ist::Receiver::finished()
 {
-    // TODO: terminate receiver threads
+    int err;
+    if ((err = pthread_cancel(thread_)) == 0)
+    {
+        if ((err = pthread_join(thread_, 0)) != 0)
+        {
+            log_warn << "pthread_join() failed: " << err;
+        }
+    }
+    else
+    {
+        log_warn << "pthread_cancel() failed: " << err;
+    }
     acceptor_.close();
-    pthread_join(thread_, 0);
     gu::Lock lock(mutex_);
-    finished_ = true;
+    running_ = false;
     while (consumers_.empty() == false)
     {
         consumers_.top()->cond().signal();
@@ -453,8 +522,7 @@ void galera::ist::Receiver::finished()
 }
 
 
-galera::ist::Sender::Sender(gu::Config&        conf,
-                            gcache::GCache&    gcache,
+galera::ist::Sender::Sender(gcache::GCache&    gcache,
                             const std::string& peer)
     :
     io_service_(),
@@ -473,6 +541,7 @@ galera::ist::Sender::Sender(gu::Config&        conf,
 galera::ist::Sender::~Sender()
 {
     socket_.close();
+    gcache_.seqno_release();
 }
 
 void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
@@ -495,9 +564,10 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
         ssize_t n_read;
         while ((n_read = gcache_.seqno_get_buffers(buf_vec, first)) > 0)
         {
-            log_debug << "read " << first << " + " << n_read << " from gcache";
+            // log_info << "read " << first << " + " << n_read << " from gcache";
             for (wsrep_seqno_t i(0); i < n_read; ++i)
             {
+                // log_info << "sending " << buf_vec[i].seqno_g();
                 p.send_trx(socket_, buf_vec[i]);
                 if (buf_vec[i].seqno_g() == last)
                 {

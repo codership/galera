@@ -22,7 +22,7 @@
 #include "galera_service_thd.hpp"
 #include "fsm.hpp"
 #include "gcs_action_source.hpp"
-
+#include "ist.hpp"
 #include "gu_atomic.hpp"
 
 #include <map>
@@ -334,11 +334,13 @@ namespace galera
 
         void establish_protocol_versions (int version);
 
-        void prepare_for_IST (void*& req, ssize_t& req_len)
+        void prepare_for_IST (void*& req, ssize_t& req_len,
+                              wsrep_seqno_t group_seqno)
             throw (gu::Exception);
-
+        void recv_IST(void* recv_ctx);
         StateRequest* prepare_state_request (const void* sst_req,
-                                             ssize_t     sst_req_len)
+                                             ssize_t     sst_req_len,
+                                             wsrep_seqno_t group_seqno)
             throw ();
 
         void send_state_request (const wsrep_uuid_t& group_uuid,
@@ -346,7 +348,8 @@ namespace galera
                                  const StateRequest* req)
             throw ();
 
-        void request_state_transfer (const wsrep_uuid_t& group_uuid,
+        void request_state_transfer (void* recv_ctx,
+                                     const wsrep_uuid_t& group_uuid,
                                      wsrep_seqno_t       group_seqno,
                                      const void*         sst_req,
                                      ssize_t             sst_req_len)
@@ -417,7 +420,7 @@ namespace galera
         // action sources
         ActionSource*   as_;
         GcsActionSource gcs_as_;
-
+        galera::ist::Receiver ist_receiver_;
         // trx processing
         Wsdb            wsdb_;
         Certification   cert_;
