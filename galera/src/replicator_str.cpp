@@ -17,14 +17,13 @@ ReplicatorSMM::sst_received(const wsrep_uuid_t& uuid,
 {
     log_info << "Received SST: " << uuid << ':' << seqno;
 
+    gu::Lock lock(sst_mutex_);
     if (state_() != S_JOINING)
     {
         log_error << "not JOINING when sst_received() called, state: "
                   << state_();
         return WSREP_CONN_FAIL;
     }
-
-    gu::Lock lock(sst_mutex_);
 
     sst_uuid_  = uuid;
     sst_seqno_ = seqno;
