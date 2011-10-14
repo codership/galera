@@ -234,7 +234,7 @@ void gu::URI::recompose() const
     {
         str += '?';
     }
-    
+
     URIQueryList::const_iterator i = query_list.begin();
 
     while (i != query_list.end())

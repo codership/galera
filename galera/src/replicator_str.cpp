@@ -232,9 +232,9 @@ private:
 std::ostream& operator<<(std::ostream& os, const IST_request& istr)
 {
     return (os
-            << istr.uuid_ << ":"
-            << istr.last_applied_ << ":"
-            << istr.group_seqno_ << ":"
+            << istr.uuid_         << ":"
+            << istr.last_applied_ << "-"
+            << istr.group_seqno_  << "|"
             << istr.peer_);
 }
 
@@ -248,10 +248,8 @@ std::istream& operator>>(std::istream& is, IST_request& istr)
 static void
 serve_IST (gcache::GCache& gcache, const IST_request& istr) throw() // stub
 {
-    // char* const ist(strndup (reinterpret_cast<const char*>(req), len));
-    // log_info << "Got IST request: '" << ist << '\'';
-    // free (ist);
     log_info << "serving IST: " << istr;
+
     try
     {
         galera::ist::Sender ist_sender(gcache, istr.peer());
@@ -310,6 +308,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
             if (istr.uuid() == state_uuid_)
             {
                 log_info << "IST request: " << istr;
+
                 try
                 {
                     gcache_.seqno_lock(istr.last_applied() + 1);
@@ -320,10 +319,13 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                              << " not found from cache, falling back to SST";
                     goto sst;
                 }
+
                 sst_donate_cb_(app_ctx_, recv_ctx,
                                streq->sst_req(), streq->sst_len(),
                                &istr.uuid(), istr.last_applied(), 0, 0, true);
+
                 local_monitor_.leave(lo);
+
                 try
                 {
                     serve_IST (gcache_, istr);
@@ -332,6 +334,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 {
                     log_error << "failed to serve ist " << e.what();
                 }
+
                 delete streq;
                 return;
             }
@@ -363,10 +366,11 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
 {
     std::ostringstream os;
 
-//    os << "This is a mock IST request, starting position: " << state_uuid_
-//       << ":" << apply_monitor_.last_left();
-    os << IST_request(config_.get("ist.listen_addr"),
+    std::string recv_addr = ist_receiver_.prepare();
+
+    os << IST_request(recv_addr,
                       state_uuid_, apply_monitor_.last_left(), group_seqno);
+
     char* str = strdup (os.str().c_str());
 
     if (!str) gu_throw_error (ENOMEM) << "Failed to allocate IST buffer.";
@@ -391,13 +395,24 @@ ReplicatorSMM::prepare_state_request (const void* const sst_req,
             return new StateRequest_v0 (sst_req, sst_req_len);
         case 1:
         {
-            void*   ist_req;
-            ssize_t ist_req_len;
+            void*   ist_req(0);
+            ssize_t ist_req_len(0);
 
-            prepare_for_IST (ist_req, ist_req_len, group_seqno);
+            try
+            {
+                gu_trace(prepare_for_IST (ist_req, ist_req_len, group_seqno));
+            }
+            catch (gu::Exception& e)
+            {
+                log_error
+                    << "Failed to prepare for incremental state transfer: "
+                    << e.what() << ". It will be unavailable.";
+            }
 
-            return new StateRequest_v1 (sst_req, sst_req_len,
-                                     ist_req, ist_req_len);
+            StateRequest* ret = new StateRequest_v1 (sst_req, sst_req_len,
+                                                     ist_req, ist_req_len);
+            free (ist_req);
+            return ret;
         }
         break;
         default:
@@ -534,7 +549,6 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
               << "\n\tLocal state: " << state_uuid_
               << ":" << apply_monitor_.last_left();
 
-    ist_receiver_.prepare();
     gu::Lock lock(sst_mutex_);
 
     send_state_request (group_uuid, group_seqno, req);

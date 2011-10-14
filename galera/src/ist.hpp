@@ -30,9 +30,11 @@ namespace galera
         class Receiver
         {
         public:
+            static std::string const RECV_ADDR;
+
             Receiver(gu::Config& conf, const char* addr);
             ~Receiver();
-            void prepare();
+            std::string prepare();
             int recv(TrxHandle** trx);
             void finished();
             void run();

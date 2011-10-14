@@ -82,7 +82,7 @@ class gu::Critical
 
     Critical (const Critical&);
     Critical& operator= (const Critical&);
-    
+
 public:
 
     Critical(const Monitor& m) : mon(m)

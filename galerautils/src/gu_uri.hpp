@@ -193,6 +193,12 @@ namespace gu
         static const char* const uri_regex; /*! regexp string to parse URI */
         static RegEx const regex;           /*! URI regexp parser */
     };
+
+    inline std::ostream& operator<<(std::ostream& os, const URI& uri)
+    {
+        os << uri.to_string();
+        return os;
+    }
 }
 
 #endif /* __GU_URI_HPP__ */

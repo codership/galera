@@ -360,6 +360,9 @@ galera::ist::Proto::recv_trx(asio::ip::tcp::socket& socket)
     throw;
 }
 
+std::string const
+galera::ist::Receiver::RECV_ADDR("ist.recv_addr");
+
 galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
     :
     conf_      (conf),
@@ -371,13 +374,32 @@ galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
     consumers_(),
     running_(false)
 {
+    std::string recv_addr;
+
+    try /* check if receive address is explicitly set */
+    {
+        recv_addr = conf_.get(RECV_ADDR);
+    }
+    catch (gu::NotFound&) /* if not, check the alternative.
+                             TODO: try to find from system. */
+    {
+        if (!addr)
+            gu_throw_error(EINVAL) << "IST receive address was not configured";
+
+        recv_addr = gu::URI(std::string("tcp://") + addr).get_host();
+    }
+
+    conf_.set(RECV_ADDR, recv_addr);
+
+#if REMOVE
     if (addr != 0)
     {
-        std::string listen_addr("tcp://");
-        listen_addr += gu::URI(listen_addr + addr).get_host();
-        listen_addr += ":4568";
-        conf_.set("ist.listen_addr", listen_addr);
+        std::string recv_addr("tcp://");
+        recv_addr += gu::URI(recv_addr + addr).get_host();
+        recv_addr += ":4568";
+        conf_.set(RECV_ADDR, recv_addr);
     }
+#endif
 }
 
 
@@ -392,9 +414,74 @@ extern "C" void* run_receiver_thread(void* arg)
     return 0;
 }
 
-void galera::ist::Receiver::prepare()
+static std::string
+IST_determine_recv_addr (const gu::Config& conf)
 {
-    const gu::URI uri(conf_.get("ist.listen_addr"));
+    std::string recv_addr;
+
+    try
+    {
+        recv_addr = conf.get (galera::ist::Receiver::RECV_ADDR);
+    }
+    catch (gu::NotFound&)
+    {
+        gu_throw_error(EINVAL) << '\'' <<  galera::ist::Receiver::RECV_ADDR
+                               << '\'' << "not found.";
+    }
+
+    try /* check if explicit scheme is present */
+    {
+        gu::URI tmp(recv_addr);
+    }
+    catch (gu::Exception&)
+    {
+        bool ssl(false);
+
+        try
+        {
+            std::string ssl_key = conf.get("socket.ssl_key");
+            if (ssl_key.length() != 0) ssl = true;
+        }
+        catch (gu::NotFound&) {}
+
+        if (ssl)
+            recv_addr.insert(0, "ssl://");
+        else
+            recv_addr.insert(0, "tcp://");
+    }
+
+    try /* check for explicit port,
+           TODO: make it possible to use any free port (explicit 0?) */
+    {
+        gu::URI(recv_addr).get_port();
+    }
+    catch (gu::NotSet&) /* use gmcast listen port + 1 */
+    {
+        int port(0);
+
+        try
+        {
+            port = gu::from_string<uint16_t>(
+                gu::URI(conf.get("gmcast.listen_addr")).get_port()) + 1;
+
+        }
+        catch (...)
+        {
+            port = 4568;
+        }
+
+        recv_addr += ":" + gu::to_string(port);
+    }
+
+    return recv_addr;
+}
+
+std::string
+galera::ist::Receiver::prepare()
+{
+    std::string const recv_addr(IST_determine_recv_addr(conf_));
+    gu::URI     const uri(recv_addr);
+
     try
     {
         asio::ip::tcp::resolver resolver(io_service_);
@@ -413,11 +500,15 @@ void galera::ist::Receiver::prepare()
     }
 
     int err;
+
     if ((err = pthread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
     {
         gu_throw_error(err) << "unable to create receiver thread";
     }
+
     running_ = true;
+
+    return (recv_addr);
 }
 
 

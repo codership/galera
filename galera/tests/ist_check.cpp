@@ -112,7 +112,7 @@ extern "C" void* receiver_thd(void* arg)
     const receiver_args* rargs(reinterpret_cast<const receiver_args*>(arg));
 
     gu::Config conf;
-    conf.set("ist.listen_addr", rargs->listen_addr_);
+    conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
     galera::ist::Receiver receiver(conf, 0);
     receiver.prepare();
 
