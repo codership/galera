@@ -16,6 +16,7 @@ namespace gcache
      * Reinitialize seqno sequence (after SST or such)
      * Clears seqno->ptr map // and sets seqno_min to seqno.
      */
+#if OLD
     void
     GCache::seqno_reset (/*int64_t seqno*/)
     {
@@ -34,6 +35,21 @@ namespace gcache
 
 //        seqno_min = seqno;
     }
+#else
+    void
+    GCache::seqno_reset ()
+    {
+        gu::Lock lock(mtx);
+
+        if (seqno2ptr.empty()) return;
+
+        /* order is significant here */
+        rb.seqno_reset();
+        mem.seqno_reset();
+
+        seqno2ptr.clear();
+    }
+#endif
 
     /*!
      * Assign sequence number to buffer pointed to by ptr
@@ -75,7 +91,7 @@ namespace gcache
         bh->seqno_d = seqno_d;
         if (free) free_common(bh);
     }
-
+#if DEPRECATED
     /*!
      * Get the smallest seqno present in the cache.
      * Locks seqno from removal.
@@ -96,7 +112,7 @@ namespace gcache
 
         return SEQNO_NONE;
     }
-
+#endif
 
     /*!
      * Move lock to a given seqno. Throw gu::NotFound if seqno is not in cache.

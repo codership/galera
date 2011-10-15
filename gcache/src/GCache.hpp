@@ -61,13 +61,13 @@ namespace gcache
                               int64_t     seqno_g,
                               int64_t     seqno_d,
                               bool        release);
-
+#if DEPRECATED
         /*!
          * Get the smallest seqno present in the cache.
          * Locks seqno from removal.
          */
         int64_t seqno_get_min ();
-
+#endif
         /*!
          * Move lock to a given seqno.
          * Throw gu::NotFound if seqno is not in the cache.
@@ -86,6 +86,7 @@ namespace gcache
         class Buffer
         {
         public:
+
             Buffer() : ptr_(), size_(), seqno_g_(), seqno_d_() { }
             Buffer (const Buffer& other)
                 :

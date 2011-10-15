@@ -925,17 +925,7 @@ gcs_group_act_conf (gcs_group_t*    group,
 
         if (group->num) {
             assert (conf->my_idx >= 0);
-#if 0
-#ifndef GCS_FOR_GARB
-            /* See #395 - if we're likely to need SST, clear up outdated
-             * seqno map */
-            if ((group->conf_id >= 0) &&
-                (group->nodes[group->my_idx].status < GCS_NODE_STATE_JOINER) &&
-                NULL != group->cache) {
-                gcache_seqno_init (group->cache, conf->seqno);
-            }
-#endif
-#endif
+
             conf->my_state = group->nodes[group->my_idx].status;
 
             char* ptr = &conf->data[0];

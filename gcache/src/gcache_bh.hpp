@@ -42,20 +42,20 @@ namespace gcache
     }
 
     static inline void
-    BH_clear (BufferHeader* bh)
+    BH_clear (BufferHeader* const bh)
     {
         memset (bh, 0, sizeof(BufferHeader));
     }
 
     static inline void
-    BH_release (BufferHeader* bh)
+    BH_release (BufferHeader* const bh)
     { bh->flags |= BUFFER_RELEASED; }
 
     static inline bool
-    BH_is_released (BufferHeader* bh)
+    BH_is_released (const BufferHeader* const bh)
     { return (bh->flags & BUFFER_RELEASED); }
 
-#if REMOVE
+#if DEPRECATED
     static inline void
     BH_cancel (BufferHeader* bh)
     { bh->flags |= BUFFER_CANCELED; }

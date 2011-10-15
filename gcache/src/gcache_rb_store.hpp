@@ -47,6 +47,8 @@ namespace gcache
 
         void  reset();
 
+        void  seqno_reset();
+
         void  discard_seqno  (int64_t seqno);
 
         static ssize_t pad_size()
@@ -74,9 +76,10 @@ namespace gcache
         ssize_t   const size_cache_;
         ssize_t         size_free_;
         ssize_t         size_used_;
+        ssize_t         size_trail_;
 
-        long long       mallocs_;
-        long long       reallocs_;
+//        long long       mallocs_;
+//        long long       reallocs_;
 
         typedef std::map<int64_t, const void*> seqno2ptr_t;
 

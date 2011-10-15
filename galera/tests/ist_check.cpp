@@ -153,7 +153,6 @@ START_TEST(test_ist)
     gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
 
     gcache.reset();
-    gcache.seqno_reset();
 
     // populate gcache
     for (size_t i(1); i <= 10; ++i)

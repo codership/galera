@@ -25,9 +25,8 @@ void* gcache_malloc       (gcache_t* gc, size_t size);
 void  gcache_free         (gcache_t* gc, const void* ptr);
 void* gcache_realloc      (gcache_t* gc, void* ptr, size_t size);
 
-void  gcache_seqno_init   (gcache_t* gc, int64_t seqno);
-
 #if 0 /* REMOVE */
+void  gcache_seqno_init   (gcache_t* gc, int64_t seqno);
 void  gcache_seqno_assign (gcache_t* gc, const void* ptr, int64_t seqno);
 void  gcache_seqno_release(gcache_t* gc);
 #endif

@@ -33,7 +33,7 @@ namespace gcache
 
         void reset () throw ()
         {
-            for (std::set<void*>::iterator buf = allocd_.begin();
+            for (std::set<void*>::iterator buf(allocd_.begin());
                  buf != allocd_.end(); ++buf)
             {
                 ::free (*buf);
@@ -136,6 +136,8 @@ namespace gcache
         }
 
         void set_max_size (ssize_t size) throw() { max_size_ = size; }
+
+        void seqno_reset();
 
         // for unit tests only
         ssize_t _allocd () const throw() { return size_; }

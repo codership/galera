@@ -22,7 +22,6 @@ namespace gcache
         reallocs = 0;
 
         seqno_locked = SEQNO_NONE;
-//        seqno_min    = SEQNO_NONE;
         seqno_max    = SEQNO_NONE;
 
         seqno2ptr.clear();
@@ -53,7 +52,6 @@ namespace gcache
         reallocs  (0),
         frees     (0),
         seqno_locked(SEQNO_NONE),
-//        seqno_min   (SEQNO_NONE),
         seqno_max   (SEQNO_NONE)
 #ifndef NDEBUG
         ,buf_tracker()
@@ -107,7 +105,7 @@ void* gcache_realloc (gcache_t* gc, void* ptr, size_t size)
     return gcache->realloc (ptr, size);
 }
 
-#if REMOVE
+#if DEPRECATED
 void  gcache_seqno_init   (gcache_t* gc, int64_t seqno)
 {
     gcache::GCache* gcache = reinterpret_cast<gcache::GCache*>(gc);

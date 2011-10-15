@@ -36,4 +36,24 @@ MemStore::have_free_space (ssize_t size) throw()
     return (size_ + size <= max_size_);
 }
 
+void
+MemStore::seqno_reset()
+{
+    for (std::set<void*>::iterator buf(allocd_.begin()); buf != allocd_.end();)
+    {
+        std::set<void*>::iterator tmp(buf); ++buf;
+
+        BufferHeader* const bh(ptr2BH(*tmp));
+
+        if (bh->seqno_g != SEQNO_NONE)
+        {
+            assert (BH_is_released(bh));
+
+            size_ -= bh->size;
+            ::free (bh);
+            allocd_.erase (tmp);
+        }
+    }
+}
+
 } /* namespace gcache */
