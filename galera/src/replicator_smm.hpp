@@ -414,7 +414,7 @@ namespace galera
 
         // services
         gcache::GCache gcache_;
-        Gcs            gcs_;
+        GCS_IMPL       gcs_;
         ServiceThd     service_thd_;
 
         // action sources

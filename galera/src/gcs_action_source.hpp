@@ -19,7 +19,7 @@ namespace galera
     {
     public:
 
-        GcsActionSource(Gcs& gcs, Replicator& replicator,
+        GcsActionSource(GCS_IMPL& gcs, Replicator& replicator,
                         gcache::GCache& gcache)
             :
             gcs_           (gcs       ),
@@ -39,7 +39,7 @@ namespace galera
 
         void dispatch(void*, const gcs_action&);
 
-        Gcs&                  gcs_;
+        GCS_IMPL&             gcs_;
         Replicator&           replicator_;
         gcache::GCache&       gcache_;
         gu::Atomic<long long> received_;

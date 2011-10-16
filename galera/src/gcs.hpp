@@ -14,6 +14,8 @@
 #include <GCache.hpp>
 #include <cerrno>
 
+#define GCS_IMPL Gcs
+
 namespace galera
 {
     class GcsI
@@ -172,51 +174,106 @@ namespace galera
     {
     public:
 
-        DummyGcs() : last_applied_(GCS_SEQNO_ILL) {}
+        DummyGcs(gu::Config&     config,
+                 gcache::GCache& cache,
+                 int repl_proto_ver        = 0,
+                 int appl_proto_ver        = 0,
+                 const char* node_name     = 0,
+                 const char* node_incoming = 0);
 
-        ~DummyGcs() {}
+        DummyGcs(); // for unit tests
+
+        ~DummyGcs();
 
         ssize_t connect(const std::string& cluster_name,
-                        const std::string& cluster_url)
-        { return 0; }
+                        const std::string& cluster_url);
 
         ssize_t set_initial_position(const wsrep_uuid_t& uuid,
-                                     gcs_seqno_t seqno)
-        { return 0; }
+                                     gcs_seqno_t seqno);
 
-        void close() {}
+        void close();
 
-        ssize_t recv(gcs_action& act)
-        { return -ENOTCONN; }
+        ssize_t recv(gcs_action& act);
 
         ssize_t send(const void*, size_t, gcs_act_type_t, bool)
-        { return -ENOTCONN; }
+        { return -ENOSYS; }
 
-        ssize_t repl(gcs_action& act, bool)
-        { return -ENOTCONN; }
+        ssize_t repl(gcs_action& act, bool scheduled)
+        {
+            act.seqno_g = GCS_SEQNO_ILL;
+            act.seqno_l = GCS_SEQNO_ILL;
 
-        gcs_seqno_t caused() { return -ENOTCONN; }
+            ssize_t ret(-EBADFD);
 
-        ssize_t schedule()   { return -ENOTCONN; }
+            {
+                gu::Lock lock(mtx_);
 
-        ssize_t interrupt(ssize_t) { return -ENOTCONN; }
+                switch (state_)
+                {
+                case S_CONNECTED:
+                case S_SYNCED:
+                {
+                    ++global_seqno_;
+                    act.seqno_g = global_seqno_;
+                    ++local_seqno_;
+                    act.seqno_l = local_seqno_;
+                    ret = act.size;
+                    break;
+                }
+                case S_CLOSED:
+                    ret = -EBADFD;
+                    break;
+                case S_OPEN:
+                    ret = -ENOTCONN;
+                    break;
+                }
+            }
+
+            if (gu_likely(0 != gcache_ && ret > 0)) 
+            {
+                assert (ret == act.size);
+                void* ptr = gcache_->malloc(act.size);
+                memcpy (ptr, act.buf, act.size);
+                act.buf = ptr;
+            }
+
+            return ret;
+        }
+
+        gcs_seqno_t caused() { return global_seqno_; }
+
+        ssize_t schedule()
+        {
+            return 1;
+        }
+
+        ssize_t interrupt(ssize_t handle);
 
         ssize_t resume_recv() { return 0; }
 
         ssize_t set_last_applied(gcs_seqno_t last_applied)
         {
+            gu::Lock lock(mtx_);
+
             last_applied_ = last_applied;
+            report_last_applied_ = true;
+
+            cond_.signal();
+
             return 0;
         }
 
-        gcs_seqno_t last_applied() const { return last_applied_(); }
+        gcs_seqno_t last_applied() const { return last_applied_; }
 
         ssize_t request_state_transfer(const void* req, ssize_t req_len,
                                        const std::string& sst_donor,
                                        gcs_seqno_t* seqno_l)
-        { return -ENOTCONN; }
+        {
+            *seqno_l = GCS_SEQNO_ILL;
+            return -ENOSYS;
+        }
 
-        ssize_t join(gcs_seqno_t seqno) { return -ENOTCONN; }
+        ssize_t join(gcs_seqno_t seqno) { return global_seqno_; }
 
         void get_stats(gcs_stats* stats) const
         {
@@ -233,7 +290,37 @@ namespace galera
 
     private:
 
-        gu::Atomic<gcs_seqno_t> last_applied_;
+        typedef enum
+        {
+            S_CLOSED,
+            S_OPEN,
+            S_CONNECTED,
+            S_SYNCED
+        } conn_state_t;
+
+        ssize_t generate_seqno_action (gcs_action& act, gcs_act_type_t type);
+        ssize_t generate_cc (bool primary);
+
+        gu::Config*  gconf_;
+        gcache::GCache* gcache_;
+        gu::Mutex    mtx_;
+        gu::Cond     cond_;
+        gcs_seqno_t  global_seqno_;
+        gcs_seqno_t  local_seqno_;
+        gu_uuid_t    uuid_;
+        gcs_seqno_t  last_applied_;
+        conn_state_t state_;
+        gu::Lock*    schedule_;
+        void*        cc_;
+        ssize_t      cc_size_;
+        std::string const my_name_;
+        std::string const incoming_;
+        int          repl_proto_ver_;
+        int          appl_proto_ver_;
+        bool         report_last_applied_;
+
+        DummyGcs (const DummyGcs&);
+        DummyGcs& operator=(const DummyGcs&);
     };
 }
 

@@ -11,7 +11,6 @@
 
 using namespace galera;
 
-
 START_TEST(service_thd1)
 {
     DummyGcs conn;
