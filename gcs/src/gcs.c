@@ -1443,9 +1443,11 @@ long gcs_repl (gcs_conn_t          *conn,         //!<in
         {
             struct gcs_repl_act** act_ptr;
             // some hack here to achieve one if() instead of two:
-            // if (conn->state >= GCS_CONN_CLOSE) ret will be -ENOTCONN
-            ret = -ENOTCONN;
-            if ((GCS_CONN_OPEN >= conn->state) &&
+            // ret = -EAGAIN is a workaround for #569
+            // if (conn->state >= GCS_CONN_CLOSE) or (act_ptr == NULL)
+            // ret will be -ENOTCONN
+            if ((ret = -EAGAIN,   conn->upper_limit >= conn->queue_len) &&
+                (ret = -ENOTCONN, GCS_CONN_OPEN     >= conn->state)     &&
                 (act_ptr = gcs_fifo_lite_get_tail (conn->repl_q)))
             {
                 *act_ptr = &act;
