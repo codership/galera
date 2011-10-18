@@ -521,7 +521,7 @@ fi
 
 get_arch()
 {
-    if file $MYSQL_SRC/sql/mysqld.o | grep "80386" >/dev/null 2>&1
+    if file $MYSQL_SRC/sql/mysqld | grep "80386" >/dev/null 2>&1
     then
         echo "i386"
     else
