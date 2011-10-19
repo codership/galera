@@ -481,14 +481,6 @@ wsrep_dbug_option
    Options for the built-in DBUG library (independent from what MySQL uses).
    Empty by default. Not used in 0.8.
 
-wsrep_local_cache_size=20M
-   Amount of RAM reserved for writeset cache in bytes. Excess writesets are
-   stored on the hard drive in MySQL data directory
-
-wsrep_ws_persistency=0
-   Save writesets in binary files. For debugging purposes only.
-   Not used in 0.8.
-
 wsrep_debug=0
    Enable debug-level logging.
 
