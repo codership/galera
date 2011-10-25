@@ -398,6 +398,14 @@ void gcomm::evs::Proto::handle_install_timer()
     gcomm_assert(get_state() == S_GATHER || get_state() == S_INSTALL);
     log_warn << self_string() << " install timer expired";
 
+    bool is_cons(consensus.is_consensus());
+    bool is_repr(is_representative(get_uuid()));
+    evs_log_info(I_STATE) << "before inspection:";
+    evs_log_info(I_STATE) << "consensus: " << is_cons;
+    evs_log_info(I_STATE) << "repr     : " << is_repr;
+    evs_log_info(I_STATE) << "state dump for diagnosis:";
+    std::cerr << *this << std::endl;
+
     if (install_timeout_count == max_install_timeouts - 1)
     {
         // before reaching max_install_timeouts, declare only inconsistent
@@ -411,7 +419,7 @@ void gcomm::evs::Proto::handle_install_timer()
             {
                 evs_log_info(I_STATE)
                     << " setting source " << NodeMap::get_key(i)
-                    << " as inactive due to expired consensus timer";
+                    << " as inactive due to expired install timer";
                 set_inactive(NodeMap::get_key(i));
             }
         }
@@ -426,7 +434,7 @@ void gcomm::evs::Proto::handle_install_timer()
             {
                 evs_log_info(I_STATE)
                     << " setting source " << NodeMap::get_key(i)
-                    << " as inactive due to expired consensus timer";
+                    << " as inactive due to expired install timer";
                 set_inactive(NodeMap::get_key(i));
             }
         }
@@ -464,12 +472,11 @@ void gcomm::evs::Proto::handle_install_timer()
     }
 
     shift_to(S_GATHER, true);
-    const bool is_cons(consensus.is_consensus());
-    const bool is_repr(is_representative(get_uuid()));
+    is_cons = consensus.is_consensus();
+    is_repr = is_representative(get_uuid());
+    evs_log_info(I_STATE) << "after inspection:";
     evs_log_info(I_STATE) << "consensus: " << is_cons;
     evs_log_info(I_STATE) << "repr     : " << is_repr;
-    evs_log_info(I_STATE) << "state dump for diagnosis:";
-    std::cerr << *this << std::endl;
     if (is_cons == true && is_repr == true)
     {
         send_install();
@@ -1246,7 +1253,7 @@ void gcomm::evs::Proto::populate_node_list(MessageNodeList* node_list) const
     {
         const UUID& uuid(NodeMap::get_key(i));
         const Node& node(NodeMap::get_value(i));
-        MessageNode mnode(node.get_operational());
+        MessageNode mnode(node.get_operational(), node.get_suspected());
         if (uuid != get_uuid())
         {
             const JoinMessage* jm(node.get_join_message());
@@ -1778,7 +1785,7 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
                 << msg.get_source() << ": "
                 << msg.get_source_view_id();
             // Note: Commented out, this causes problems with
-            // attempt_seq. Newly generated install message
+            // attempt_seq. Newly (remotely?) generated install message
             // followed by commit gap may cause undesired
             // node inactivation and shift to gather.
             //
@@ -3107,17 +3114,19 @@ void gcomm::evs::Proto::check_unseen()
 
         if (uuid                         != get_uuid() &&
             current_view.is_member(uuid) == false      &&
-            node.get_join_message()      == 0)
+            node.get_join_message()      == 0          &&
+            node.get_operational()       == true        )
         {
-            evs_log_info(I_STATE) << "checking unseen " << uuid;
+            evs_log_info(I_STATE) << "checking operational unseen " << uuid;
             size_t cnt(0), inact_cnt(0);
             for (NodeMap::iterator j(known.begin()); j != known.end(); ++j)
             {
                 const JoinMessage* jm(NodeMap::get_value(j).get_join_message());
-                if (jm == 0 || NodeMap::get_key(j) == get_uuid()) continue;
-
+                if (jm == 0 || NodeMap::get_key(j) == get_uuid())
+                {
+                    continue;
+                }
                 MessageNodeList::const_iterator mn_i;
-                bool all_joins_present(true);
                 for (mn_i = jm->get_node_list().begin();
                      mn_i != jm->get_node_list().end(); ++mn_i)
                 {
@@ -3127,18 +3136,14 @@ void gcomm::evs::Proto::check_unseen()
                         (MessageNodeList::get_value(mn_i).get_operational() == true &&
                          NodeMap::get_value(known_i).get_join_message() == 0))
                     {
-                        all_joins_present = false;
-                        break;
+                        evs_log_info(I_STATE)
+                            << "all joins not locally present for "
+                            << NodeMap::get_key(j)
+                            << " join message node list";
+                        return;
                     }
                 }
-                if (all_joins_present == false)
-                {
-                    evs_log_info(I_STATE)
-                        << "all joins not locally present for "
-                        << NodeMap::get_key(j)
-                        << " join message node list";
-                    return;
-                }
+
                 if ((mn_i = jm->get_node_list().find(uuid))
                     != jm->get_node_list().end())
                 {
@@ -3165,6 +3170,48 @@ void gcomm::evs::Proto::check_unseen()
                     << ")";
                 set_inactive(uuid);
             }
+        }
+    }
+}
+
+
+// Iterate over all join messages. If some node has nil view id and suspected
+// flag true in all present join messages, declare it inactive.
+void gcomm::evs::Proto::check_nil_view_id()
+{
+    size_t join_counts(0);
+    std::map<UUID, size_t > nil_counts;
+    for (NodeMap::const_iterator i(known.begin()); i != known.end(); ++i)
+    {
+        const JoinMessage* jm(NodeMap::get_value(i).get_join_message());
+        if (jm == 0)
+        {
+            continue;
+        }
+        ++join_counts;
+        for (MessageNodeList::const_iterator j(jm->get_node_list().begin());
+             j != jm->get_node_list().end(); ++j)
+        {
+            const MessageNode& mn(MessageNodeList::get_value(j));
+            if (mn.get_view_id() == ViewId(V_REG))
+            {
+                if (mn.get_suspected() == true)
+                {
+                    const UUID& uuid(MessageNodeList::get_key(j));
+                    ++nil_counts[uuid];
+                }
+            }
+        }
+    }
+    for (std::map<UUID, size_t>::const_iterator
+             i(nil_counts.begin()); i != nil_counts.end(); ++i)
+    {
+        if (i->second == join_counts)
+        {
+            log_info << "node " << i->first
+                     << " marked with nil view id and suspected in all present"
+                     << " join messages, declaring inactive";
+            set_inactive(i->first);
         }
     }
 }
@@ -3342,6 +3389,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
         gu_trace(check_suspects(msg.get_source(), same_view));
         gu_trace(cross_check_inactives(msg.get_source(), same_view));
         gu_trace(check_unseen());
+        gu_trace(check_nil_view_id());
     }
 
     // If current join message differs from current state, send new join

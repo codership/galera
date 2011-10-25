@@ -192,6 +192,7 @@ private:
     void check_suspects(const UUID&, const MessageNodeList&);
     void cross_check_inactives(const UUID&, const MessageNodeList&);
     void check_unseen();
+    void check_nil_view_id();
     void handle_foreign(const Message&);
     void handle_user(const UserMessage&,
                      NodeMap::iterator,
