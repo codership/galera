@@ -15,6 +15,7 @@ ostream& gcomm::evs::operator<<(ostream& os, const Node& n)
 {
     os << "evs::node{";
     os << "operational=" << n.get_operational() << ",";
+    os << "suspected=" << n.get_suspected() << ",";
     os << "installed=" << n.get_installed() << ",";
     os << "fifo_seq=" << n.get_fifo_seq() << ",";
     if (n.get_join_message() != 0)
