@@ -45,12 +45,6 @@ wsrep_view_info_t* galera_view_info_create (const gcs_act_conf_t* conf,
             strncpy(member->incoming, str, sizeof(member->incoming) - 1);
             member->incoming[sizeof(member->incoming) - 1] = '\0';
             str = str + strlen(str) + 1;
-
-            member->status          = WSREP_MEMBER_UNDEFINED;
-            member->last_committed  = WSREP_SEQNO_UNDEFINED;
-            member->slave_queue_len = WSREP_SEQNO_UNDEFINED;
-            member->cpu_usage       = -1;
-            member->load_avg        = -1;
         }
     }
 

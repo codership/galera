@@ -126,37 +126,29 @@ wsrep_uuid_scan (const char* str, size_t str_len, wsrep_uuid_t* uuid);
 extern ssize_t
 wsrep_uuid_print (const wsrep_uuid_t* uuid, char* str, size_t str_len);
 
-/*!
- * maximum logical member name length
- */
-#define WSREP_MEMBER_NAME_LEN 32
-#define WSREP_INCOMING_LEN    256 // max Domain Name length + 0x00
+#define WSREP_MEMBER_NAME_LEN 32  //!< maximum logical member name length
+#define WSREP_INCOMING_LEN    256 //!< max Domain Name length + 0x00
 
 /*!
  * member status
  */
 typedef enum wsrep_member_status {
     WSREP_MEMBER_UNDEFINED, //!< undefined state
-    WSREP_MEMBER_JOINER, //!< incomplete state, requested state transfer
-    WSREP_MEMBER_DONOR,  //!< complete state, donates state transfer
-    WSREP_MEMBER_JOINED, //!< complete state
-    WSREP_MEMBER_SYNCED, //!< complete state, synchronized with group
-    WSREP_MEMBER_ERROR,  //!< this and above is provider-specific error code
+    WSREP_MEMBER_JOINER,    //!< incomplete state, requested state transfer
+    WSREP_MEMBER_DONOR,     //!< complete state, donates state transfer
+    WSREP_MEMBER_JOINED,    //!< complete state
+    WSREP_MEMBER_SYNCED,    //!< complete state, synchronized with group
+    WSREP_MEMBER_ERROR,     //!< this and above is provider-specific error code
     WSREP_MEMBER_MAX
 } wsrep_member_status_t;
 
 /*!
- * information about group member (some fields are tentative yet)
+ * static information about a group member (some fields are tentative yet)
  */
 typedef struct wsrep_member_info {
-    wsrep_uuid_t  id;                         //!< group-wide unique member ID
-    wsrep_seqno_t last_committed;             //!< last committed seqno
-    wsrep_seqno_t slave_queue_len;            //!< length of the slave queue
-    wsrep_member_status_t status;             //!< member status
-    int           cpu_usage;                  //!< CPU utilization (%) 0..100
-    int           load_avg;                   //!< Load average (%) can be > 100
-    char          name[WSREP_MEMBER_NAME_LEN];//!< human-readable name
-    char          incoming[WSREP_INCOMING_LEN];//!< address for client requests
+    wsrep_uuid_t id;                           //!< group-wide unique member ID
+    char         name[WSREP_MEMBER_NAME_LEN];  //!< human-readable name
+    char         incoming[WSREP_INCOMING_LEN]; //!< address for client requests
 } wsrep_member_info_t;
 
 /*!
@@ -170,7 +162,7 @@ typedef enum wsrep_view_status {
 } wsrep_view_status_t;
 
 /*!
- * view on the group
+ * view of the group
  */
 typedef struct wsrep_view_info {
     wsrep_uuid_t        uuid;      //!< global state UUID
