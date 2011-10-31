@@ -1,4 +1,4 @@
-/* Copyright (C) 2009-2010 Codership Oy <info@codership.com>
+/* Copyright (C) 2009-2011 Codership Oy <info@codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@ extern "C" {
  *  wsrep replication API
  */
 
-#define WSREP_INTERFACE_VERSION "21"
+#define WSREP_INTERFACE_VERSION "22"
 
 /*!
  *  Certain provider capabilities application may need to know
@@ -126,37 +126,29 @@ wsrep_uuid_scan (const char* str, size_t str_len, wsrep_uuid_t* uuid);
 extern ssize_t
 wsrep_uuid_print (const wsrep_uuid_t* uuid, char* str, size_t str_len);
 
-/*!
- * maximum logical member name length
- */
-#define WSREP_MEMBER_NAME_LEN 32
-#define WSREP_INCOMING_LEN    256 // max Domain Name length + 0x00
+#define WSREP_MEMBER_NAME_LEN 32  //!< maximum logical member name length
+#define WSREP_INCOMING_LEN    256 //!< max Domain Name length + 0x00
 
 /*!
  * member status
  */
 typedef enum wsrep_member_status {
     WSREP_MEMBER_UNDEFINED, //!< undefined state
-    WSREP_MEMBER_JOINER, //!< incomplete state, requested state transfer
-    WSREP_MEMBER_DONOR,  //!< complete state, donates state transfer
-    WSREP_MEMBER_JOINED, //!< complete state
-    WSREP_MEMBER_SYNCED, //!< complete state, synchronized with group
-    WSREP_MEMBER_ERROR,  //!< this and above is provider-specific error code
+    WSREP_MEMBER_JOINER,    //!< incomplete state, requested state transfer
+    WSREP_MEMBER_DONOR,     //!< complete state, donates state transfer
+    WSREP_MEMBER_JOINED,    //!< complete state
+    WSREP_MEMBER_SYNCED,    //!< complete state, synchronized with group
+    WSREP_MEMBER_ERROR,     //!< this and above is provider-specific error code
     WSREP_MEMBER_MAX
 } wsrep_member_status_t;
 
 /*!
- * information about group member (some fields are tentative yet)
+ * static information about a group member (some fields are tentative yet)
  */
 typedef struct wsrep_member_info {
-    wsrep_uuid_t  id;                         //!< group-wide unique member ID
-    wsrep_seqno_t last_committed;             //!< last committed seqno
-    wsrep_seqno_t slave_queue_len;            //!< length of the slave queue
-    wsrep_member_status_t status;             //!< member status
-    int           cpu_usage;                  //!< CPU utilization (%) 0..100
-    int           load_avg;                   //!< Load average (%) can be > 100
-    char          name[WSREP_MEMBER_NAME_LEN];//!< human-readable name
-    char          incoming[WSREP_INCOMING_LEN];//!< address for client requests
+    wsrep_uuid_t id;                           //!< group-wide unique member ID
+    char         name[WSREP_MEMBER_NAME_LEN];  //!< human-readable name
+    char         incoming[WSREP_INCOMING_LEN]; //!< address for client requests
 } wsrep_member_info_t;
 
 /*!
@@ -170,14 +162,14 @@ typedef enum wsrep_view_status {
 } wsrep_view_status_t;
 
 /*!
- * view on the group
+ * view of the group
  */
 typedef struct wsrep_view_info {
-    wsrep_uuid_t        id;        //!< group ID
-    wsrep_seqno_t       conf;      //!< group configuration number
-    wsrep_seqno_t       first;     //!< first seqno in this configuration
+    wsrep_uuid_t        uuid;      //!< global state UUID
+    wsrep_seqno_t       seqno;     //!< global state seqno
+    wsrep_seqno_t       view;      //!< global view number
     wsrep_view_status_t status;    //!< view status
-    bool                state_gap; //!< discontinuity between group and member states
+    bool                state_gap; //!< gap between global and local states
     int                 my_idx;    //!< index of this member in the view
     int                 memb_num;  //!< number of members in the view
     int                 proto_ver; //!< application protocol agreed on in the view
@@ -205,68 +197,64 @@ typedef struct wsrep_view_info {
  * @param sst_req     location to store SST request
  * @param sst_req_len location to store SST request length or error code
  */
-typedef void (*wsrep_view_cb_t) (void*              app_ctx,
-                                 void*              recv_ctx,
-                                 wsrep_view_info_t* view,
-                                 const char*        state,
-                                 size_t             state_len,
-                                 void**             sst_req,
-                                 ssize_t*           sst_req_len);
+typedef void (*wsrep_view_cb_t) (void*                    app_ctx,
+                                 void*                    recv_ctx,
+                                 const wsrep_view_info_t* view,
+                                 const char*              state,
+                                 size_t                   state_len,
+                                 void**                   sst_req,
+                                 ssize_t*                 sst_req_len);
 
 /*!
- * applying data representations
- */
-typedef enum wsrep_apply_data_type {
-    WSREP_APPLY_SQL, //!< SQL statement as a string
-    WSREP_APPLY_ROW, //!< row data buffers
-    WSREP_APPLY_APP  //!< application specific data buffer
-} wsrep_apply_data_type_t;
-
-/*!
- * structure passed to the applier callback. wsrep_apply_data
- * contains the data for applying expressed in one of the formats:
- * SQL strings, row data images or application specific opaque buffer
- */
-typedef struct wsrep_apply_data {
-    enum wsrep_apply_data_type type; //!< defines data representation
-    union {
-        struct {
-            const char* stm;      //!< SQL statement string
-            size_t      len;      //!< length of SQL string
-            time_t      timeval;  //!< time to use for time functions
-            uint32_t    randseed; //!< seed for rand operations
-        } sql;
-        struct {
-            uint8_t* buffer;  //!< application specific data buffer
-            size_t   len;
-        } app;
-        struct {
-            uint8_t* buffer;  //!< row data buffers
-            size_t   len;
-        } row;
-    } u;
-} wsrep_apply_data_t;
-
-/*!
- * @brief brute force apply function
+ * @brief apply callback
  *
- * This handler is called from wsrep library to execute
- * the passed SQL statement in brute force.
+ * This handler is called from wsrep library to apply replicated write set
+ * Must support brute force applying for multi-master operation
  *
  * @param recv_ctx receiver context pointer provided by the application
- * @param data     the apply data buffer to be applied
- * @param seqno    global seqno part of the action to be applied
+ * @param data     data buffer containing the write set
+ * @param size     data buffer size
+ * @param seqno    global seqno part of the write set to be applied
  *
  * @return success code:
  * @retval WSREP_OK
- * @retval WSREP_NOT_IMPLEMENTED dbms has does not provide the
- *           applying feature asked for
- * @retval WSREP_ERRROR dbms failed to apply the write set
- *
+ * @retval WSREP_NOT_IMPLEMENTED appl. does not support the write set format
+ * @retval WSREP_ERRROR failed to apply the write set
  */
-typedef enum wsrep_status (*wsrep_bf_apply_cb_t)(void*               recv_ctx,
-                                                 wsrep_apply_data_t* data,
+typedef enum wsrep_status (*wsrep_apply_cb_t)   (void*               recv_ctx,
+                                                 const void*         data,
+                                                 size_t              size,
                                                  wsrep_seqno_t       seqno);
+
+/*!
+ * @brief commit callback
+ *
+ * This handler is called to commit the changes made by apply callback.
+ *
+ * @param recv_ctx receiver context pointer provided by the application
+ * @param seqno    global seqno part of the write set to be committed
+ *
+ * @return success code:
+ * @retval WSREP_OK
+ * @retval WSREP_ERRROR failed to commit the write set
+ */
+typedef enum wsrep_status (*wsrep_commit_cb_t)  (void*         recv_ctx,
+                                                 wsrep_seqno_t seqno);
+
+/*!
+ * @brief rollback callback
+ *
+ * This handler is called to roll back the changes made by apply callback.
+ *
+ * @param recv_ctx receiver context pointer provided by the application
+ * @param seqno    global seqno part of the write set to be rolled back
+ *
+ * @return success code:
+ * @retval WSREP_OK
+ * @retval WSREP_ERRROR failed to rollback the write set
+ */
+typedef enum wsrep_status (*wsrep_rollback_cb_t)(void*         recv_ctx,
+                                                 wsrep_seqno_t seqno);
 
 /*!
  * @brief a callback to donate state snapshot
@@ -285,6 +273,7 @@ typedef enum wsrep_status (*wsrep_bf_apply_cb_t)(void*               recv_ctx,
  * @param seqno     current state seqno on this node
  * @param state     current wsrep internal state buffer
  * @param state_len current wsrep internal state buffer len
+ * @param bypass    bypass snapshot transfer, only transfer uuid:seqno pair
  * @return 0 for success or negative error code
  */
 typedef int (*wsrep_sst_donate_cb_t) (void*               app_ctx,
@@ -294,7 +283,8 @@ typedef int (*wsrep_sst_donate_cb_t) (void*               app_ctx,
                                       const wsrep_uuid_t* uuid,
                                       wsrep_seqno_t       seqno,
                                       const char*         state,
-                                      size_t              state_len);
+                                      size_t              state_len,
+                                      bool                bypass);
 
 /*!
  * @brief a callback to signal application that wsrep state is synced
@@ -329,15 +319,17 @@ struct wsrep_init_args
     size_t              state_len;   //!< Length of state buffer
 
     /* Application callbacks */
-    wsrep_log_cb_t            logger_cb;       //!< logging handler
-    wsrep_view_cb_t           view_handler_cb; //!< group view change handler
+    wsrep_log_cb_t        logger_cb;       //!< logging handler
+    wsrep_view_cb_t       view_handler_cb; //!< group view change handler
 
     /* applier callbacks */
-    wsrep_bf_apply_cb_t       bf_apply_cb;     //!< applying callback
+    wsrep_apply_cb_t      apply_cb;        //!< applying callback
+    wsrep_commit_cb_t     commit_cb;       //!< commit   callback
+    wsrep_rollback_cb_t   rollback_cb;     //!< rollback callback
 
     /* state snapshot transfer callbacks */
-    wsrep_sst_donate_cb_t     sst_donate_cb;   //!< starting to donate
-    wsrep_synced_cb_t         synced_cb;       //!< synced with group
+    wsrep_sst_donate_cb_t sst_donate_cb;   //!< starting to donate
+    wsrep_synced_cb_t     synced_cb;       //!< synced with group
 };
 
 /*! Type of the stats variable value in struct wsrep_status_var */
@@ -779,6 +771,44 @@ struct wsrep_ {
    * event to be deliverred via sync_cb.
    */
     wsrep_status_t (*resync) (wsrep_t* wsrep);
+
+  /*!
+   * @brief Acquire global named lock
+   *
+   * @param wsrep wsrep provider handle
+   * @param name  lock name
+   * @param owner 64-bit owner ID
+   * @param tout  timeout in nanoseconds.
+   *              0 - return immediately, -1 wait forever.
+   * @return wsrep status or negative error code
+   * @retval -EDEADLK lock was already acquired by this thread
+   * @retval -EBUSY   lock was busy
+   */
+    wsrep_status_t (*lock) (wsrep_t* wsrep, const char* name, int64_t owner,
+                            int64_t tout);
+
+  /*!
+   * @brief Release global named lock
+   *
+   * @param wsrep wsrep provider handle
+   * @param name  lock name
+   * @param owner 64-bit owner ID
+   * @return wsrep status or negative error code
+   * @retval -EPERM lock does not belong to this owner
+   */
+    wsrep_status_t (*unlock) (wsrep_t* wsrep, const char* name, int64_t owner);
+
+  /*!
+   * @brief Check if global named lock is locked
+   *
+   * @param wsrep wsrep provider handle
+   * @param name  lock name
+   * @param owner if not NULL will contain 64-bit owner ID
+   * @param node  if not NULL will contain owner's node UUID
+   * @return true if lock is locked
+   */
+    bool (*is_locked) (wsrep_t* wsrep, const char* name, int64_t* conn,
+                       wsrep_uuid_t* node);
 
   /*!
    * wsrep provider name
