@@ -194,6 +194,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_mutex_          (),
     sst_cond_           (),
     sst_retry_sec_      (1),
+    trivial_sst_        (false),
     gcache_             (config_, data_dir_),
     gcs_                (config_, gcache_, MAX_PROTO_VER, args->proto_ver,
                          args->node_name, args->node_incoming),
@@ -201,6 +202,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     as_                 (0),
     gcs_as_             (gcs_, *this, gcache_),
     ist_receiver_       (config_, args->node_incoming),
+    ist_senders_        (gcs_, gcache_),
     wsdb_               (),
     cert_               (config_),
     local_monitor_      (),
@@ -270,6 +272,7 @@ galera::ReplicatorSMM::~ReplicatorSMM()
     case S_CLOSING:
         // @todo wait that all users have left the building
     case S_CLOSED:
+        ist_senders_.cancel();
         break;
     }
 }
@@ -950,8 +953,9 @@ galera::ReplicatorSMM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
     // WARNING: Here we have application block on this call which
     //          may prevent application from resolving the issue.
     //          (Not that we expect that application can resolve it.)
-    ssize_t err;
-    while (-EAGAIN == (err = gcs_.join(seqno))) usleep (100000);
+    ssize_t err(0);
+    while (trivial_sst_ == false &&
+           -EAGAIN == (err = gcs_.join(seqno))) usleep (100000);
 
     if (err == 0) return WSREP_OK;
 

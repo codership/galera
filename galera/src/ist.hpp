@@ -6,15 +6,20 @@
 #ifndef GALERA_IST_HPP
 #define GALERA_IST_HPP
 
+#include <pthread.h>
+
 #include "wsrep_api.h"
+#include "gcs.hpp"
 #include "gu_config.hpp"
 #include "gu_lock.hpp"
+#include "gu_monitor.hpp"
 
 #pragma GCC diagnostic ignored "-Weffc++"
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #include "asio.hpp"
 
 #include <stack>
+#include <set>
 
 namespace gcache
 {
@@ -79,6 +84,33 @@ namespace galera
             asio::ip::tcp::socket socket_;
             gcache::GCache&       gcache_;
         };
+
+
+        class AsyncSender;
+        class AsyncSenderMap
+        {
+        public:
+            AsyncSenderMap(GCS_IMPL& gcs, gcache::GCache& gcache)
+                :
+                senders_(),
+                monitor_(),
+                gcs_(gcs),
+                gcache_(gcache) { }
+            void run(const std::string& peer,
+                     wsrep_seqno_t,
+                     wsrep_seqno_t);
+            void remove(AsyncSender*, wsrep_seqno_t);
+            void cancel();
+            gcache::GCache& gcache() { return gcache_; }
+        private:
+            std::set<AsyncSender*> senders_;
+            // use monitor instead of mutex, it provides cancellation point
+            gu::Monitor            monitor_;
+            GCS_IMPL&              gcs_;
+            gcache::GCache&        gcache_;
+        };
+
+
     } // namespace ist
 } // namespace galera
 

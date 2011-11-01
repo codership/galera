@@ -411,6 +411,7 @@ namespace galera
         gu::Mutex     sst_mutex_;
         gu::Cond      sst_cond_;
         int           sst_retry_sec_;
+        bool          trivial_sst_;
 
         // services
         gcache::GCache gcache_;
@@ -421,6 +422,7 @@ namespace galera
         ActionSource*   as_;
         GcsActionSource gcs_as_;
         galera::ist::Receiver ist_receiver_;
+        galera::ist::AsyncSenderMap ist_senders_;
         // trx processing
         Wsdb            wsdb_;
         Certification   cert_;

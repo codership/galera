@@ -245,25 +245,6 @@ std::istream& operator>>(std::istream& is, IST_request& istr)
             >> c >> istr.group_seqno_ >> c >> istr.peer_);
 }
 
-static void
-serve_IST (gcache::GCache& gcache, const IST_request& istr) throw() // stub
-{
-    log_info << "serving IST: " << istr;
-
-    try
-    {
-        galera::ist::Sender ist_sender(gcache, istr.peer());
-        ist_sender.send(istr.last_applied() + 1, istr.group_seqno());
-    }
-    catch (asio::system_error& e)
-    {
-        log_error << "IST serve failed: " << e.what();
-    }
-    catch (gu::Exception& e)
-    {
-        log_error << "IST serve failed: " << e.what();
-    }
-}
 
 void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                       const void* req,
@@ -320,20 +301,23 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                     goto sst;
                 }
 
+                trivial_sst_ = true;
                 sst_donate_cb_(app_ctx_, recv_ctx,
                                streq->sst_req(), streq->sst_len(),
                                &istr.uuid(), istr.last_applied(), 0, 0, true);
-
-                local_monitor_.leave(lo);
-
+                trivial_sst_ = false;
                 try
                 {
-                    serve_IST (gcache_, istr);
+                    ist_senders_.run(istr.peer(),
+                                     istr.last_applied() + 1,
+                                     istr.group_seqno());
                 }
                 catch (gu::Exception& e)
                 {
                     log_error << "failed to serve ist " << e.what();
+                    gcs_.join(-e.get_errno());
                 }
+                local_monitor_.leave(lo);
 
                 delete streq;
                 return;

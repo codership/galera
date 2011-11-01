@@ -164,6 +164,33 @@ namespace galera
             return offset;
         }
 
+        class AsyncSender
+        {
+        public:
+            AsyncSender(const std::string& peer,
+                        wsrep_seqno_t first,
+                        wsrep_seqno_t last,
+                        AsyncSenderMap& asmap)
+                :
+                peer_(peer),
+                first_(first),
+                last_(last),
+                asmap_(asmap),
+                thread_()
+            { }
+            const std::string& peer() { return peer_; }
+            wsrep_seqno_t first()     { return first_; }
+            wsrep_seqno_t last()      { return last_; }
+            AsyncSenderMap& asmap()   { return asmap_; }
+            pthread_t       thread()  { return thread_; }
+        private:
+            friend class AsyncSenderMap;
+            const std::string  peer_;
+            wsrep_seqno_t      first_;
+            wsrep_seqno_t      last_;
+            AsyncSenderMap&    asmap_;
+            pthread_t          thread_;
+        };
     }
 }
 
@@ -593,15 +620,13 @@ void galera::ist::Receiver::finished()
     int err;
     if ((err = pthread_cancel(thread_)) == 0)
     {
-        if ((err = pthread_join(thread_, 0)) != 0)
-        {
-            log_warn << "pthread_join() failed: " << err;
-        }
+        log_debug << "pthread_cancel() failed: " << err;
     }
-    else
+    if ((err = pthread_join(thread_, 0)) != 0)
     {
-        log_warn << "pthread_cancel() failed: " << err;
+        log_warn << "pthread_join() failed: " << err;
     }
+
     acceptor_.close();
     gu::Lock lock(mutex_);
     running_ = false;
@@ -686,4 +711,102 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
     {
         gu_throw_error(e.code().value()) << "ist send failed: " << e.code();
     }
+}
+
+
+extern "C"
+void delete_async_sender(void* ptr)
+{
+    delete reinterpret_cast<galera::ist::AsyncSender*>(ptr);
+}
+
+
+extern "C"
+void* run_async_sender(void* arg)
+{
+    galera::ist::AsyncSender* as(reinterpret_cast<galera::ist::AsyncSender*>(arg));
+    pthread_cleanup_push(&delete_async_sender, as);
+    log_info << "async IST sender starting to serve " << as->peer();
+    wsrep_seqno_t join_seqno;
+    try
+    {
+        galera::ist::Sender sender(as->asmap().gcache(), as->peer());
+        sender.send(as->first(), as->last());
+        join_seqno = as->last();
+    }
+    catch (gu::Exception& e)
+    {
+        log_error << "async IST sender failed to serve " << as->peer()
+                  << ": " << e.what();
+        join_seqno = -e.get_errno();
+    }
+    catch (...)
+    {
+        log_error << "async IST sender, failed to serve" << as->peer();
+        join_seqno = -1;
+    }
+
+    try
+    {
+        as->asmap().remove(as, join_seqno);
+        pthread_detach(as->thread());
+    }
+    catch (gu::NotFound& nf)
+    {
+        log_info << "async IST sender already removed";
+    }
+    log_info << "async IST sender served: " << as->peer();
+
+    pthread_cleanup_pop(1);
+    return 0;
+}
+
+
+void galera::ist::AsyncSenderMap::run(const std::string& peer,
+                                      wsrep_seqno_t      first,
+                                      wsrep_seqno_t      last)
+{
+    gu::Critical crit(monitor_);
+    AsyncSender* as(new AsyncSender(peer, first, last, *this));
+    int err(pthread_create(&as->thread_, 0, &run_async_sender, as));
+    if (err != 0)
+    {
+        delete as;
+        gu_throw_error(err) << "failed to start sender thread";
+    }
+    senders_.insert(as);
+}
+
+
+void galera::ist::AsyncSenderMap::remove(AsyncSender* as, wsrep_seqno_t seqno)
+{
+    gu::Critical crit(monitor_);
+    std::set<AsyncSender*>::iterator i(senders_.find(as));
+    if (i == senders_.end())
+    {
+        throw gu::NotFound();
+    }
+    senders_.erase(i);
+    gcs_.join(seqno);
+}
+
+
+void galera::ist::AsyncSenderMap::cancel()
+{
+    gu::Critical crit(monitor_);
+    while (senders_.empty() == false)
+    {
+        AsyncSender* as(*senders_.begin());
+        int err;
+        if ((err = pthread_cancel(as->thread_)) != 0)
+        {
+            log_debug << "pthread_cancel() failed: " << err;
+        }
+        if ((err = pthread_join(as->thread_, 0)) != 0)
+        {
+            log_warn << "pthread_join() failed: " << err;
+        }
+        senders_.erase(*senders_.begin());
+    }
+
 }
