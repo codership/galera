@@ -399,7 +399,10 @@ galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
     mutex_(),
     cond_(),
     consumers_(),
-    running_(false)
+    running_(false),
+    error_code_(0),
+    current_seqno_(-1),
+    last_seqno_(-1)
 {
     std::string recv_addr;
 
@@ -504,7 +507,8 @@ IST_determine_recv_addr (const gu::Config& conf)
 }
 
 std::string
-galera::ist::Receiver::prepare()
+galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
+                               wsrep_seqno_t last_seqno)
 {
     std::string const recv_addr(IST_determine_recv_addr(conf_));
     gu::URI     const uri(recv_addr);
@@ -526,12 +530,14 @@ galera::ist::Receiver::prepare()
                                          << uri.to_string();
     }
 
+    current_seqno_ = first_seqno;
+    last_seqno_    = last_seqno;
     int err;
-
     if ((err = pthread_create(&thread_, 0, &run_receiver_thread, this)) != 0)
     {
         gu_throw_error(err) << "unable to create receiver thread";
     }
+
 
     running_ = true;
 
@@ -551,7 +557,7 @@ void galera::ist::Receiver::run()
         gu_throw_error(e.code().value()) << "accept() failed";
     }
 
-
+    int ec(0);
     try
     {
         Proto p;
@@ -561,6 +567,17 @@ void galera::ist::Receiver::run()
         while (true)
         {
             TrxHandle* trx(p.recv_trx(socket));
+            if (trx != 0)
+            {
+                if (trx->global_seqno() != current_seqno_)
+                {
+                    log_error << "unexpected trx seqno: " << trx->global_seqno()
+                              << " expected: " << current_seqno_;
+                    ec = EINVAL;
+                    goto err;
+                }
+                ++current_seqno_;
+            }
             gu::Lock lock(mutex_);
             while (consumers_.empty())
             {
@@ -580,12 +597,21 @@ void galera::ist::Receiver::run()
     }
     catch (asio::system_error& e)
     {
-        log_warn << "got error while reading ist stream: " << e.code();
+        log_fatal << "got error while reading ist stream: " << e.code();
+        ec = e.code().value();
     }
 
+err:
     gu::Lock lock(mutex_);
     socket.close();
     running_ = false;
+    if (current_seqno_ - 1 != last_seqno_)
+    {
+        log_error << "IST didn't contain all write sets, expected last: "
+                  << last_seqno_ << " last received: " << current_seqno_ - 1;
+        ec = EINVAL;
+    }
+    error_code_ = ec;
     while (consumers_.empty() == false)
     {
         consumers_.top()->cond().signal();
@@ -600,6 +626,10 @@ int galera::ist::Receiver::recv(TrxHandle** trx)
     gu::Lock lock(mutex_);
     if (running_ == false)
     {
+        if (error_code_ != 0)
+        {
+            gu_throw_error(error_code_) << "IST receiver reported error";
+        }
         return EINTR;
     }
     consumers_.push(&cons);
@@ -607,7 +637,10 @@ int galera::ist::Receiver::recv(TrxHandle** trx)
     lock.wait(cons.cond());
     if (cons.trx() == 0)
     {
-        // TODO: Figure out proper errno
+        if (error_code_ != 0)
+        {
+            gu_throw_error(error_code_) << "IST receiver reported error";
+        }
         return EINTR;
     }
     *trx = cons.trx();
@@ -742,8 +775,8 @@ void* run_async_sender(void* arg)
     }
     catch (...)
     {
-        log_error << "async IST sender, failed to serve" << as->peer();
-        join_seqno = -1;
+        log_error << "async IST sender, failed to serve " << as->peer();
+        throw;
     }
 
     try

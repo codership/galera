@@ -114,7 +114,7 @@ extern "C" void* receiver_thd(void* arg)
     gu::Config conf;
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
     galera::ist::Receiver receiver(conf, 0);
-    receiver.prepare();
+    receiver.prepare(rargs->first_, rargs->last_);
 
     std::vector<pthread_t> threads(rargs->n_receivers_);
     trx_thread_args trx_thd_args(receiver);

@@ -350,7 +350,8 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
 {
     std::ostringstream os;
 
-    std::string recv_addr = ist_receiver_.prepare();
+    std::string recv_addr = ist_receiver_.prepare(
+        apply_monitor_.last_left() + 1, group_seqno);
 
     os << IST_request(recv_addr,
                       state_uuid_, apply_monitor_.last_left(), group_seqno);
@@ -585,33 +586,43 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 
 void ReplicatorSMM::recv_IST(void* recv_ctx)
 {
-    while (true)
+    try
     {
-        TrxHandle* trx(0);
-        int err;
-        if ((err = ist_receiver_.recv(&trx)) == 0)
+        while (true)
         {
-            assert(trx != 0);
-            if (trx->depends_seqno() == -1)
+            TrxHandle* trx(0);
+            int err;
+            if ((err = ist_receiver_.recv(&trx)) == 0)
             {
-                ApplyOrder ao(*trx);
-                apply_monitor_.self_cancel(ao);
-                if (co_mode_ != CommitOrder::BYPASS)
+                assert(trx != 0);
+                if (trx->depends_seqno() == -1)
                 {
-                    CommitOrder co(*trx, co_mode_);
-                    commit_monitor_.self_cancel(co);
+                    ApplyOrder ao(*trx);
+                    apply_monitor_.self_cancel(ao);
+                    if (co_mode_ != CommitOrder::BYPASS)
+                    {
+                        CommitOrder co(*trx, co_mode_);
+                        commit_monitor_.self_cancel(co);
+                    }
                 }
+                else
+                {
+                    apply_trx(recv_ctx, trx);
+                }
+                trx->unref();
             }
             else
             {
-                apply_trx(recv_ctx, trx);
+                return;
             }
-            trx->unref();
         }
-        else
-        {
-            return;
-        }
+    }
+    catch (gu::Exception& e)
+    {
+        log_fatal << "receiving IST failed, node restart required: "
+                  << e.what();
+        gcs_.close();
+        gu_abort();
     }
 }
 
