@@ -38,6 +38,7 @@ namespace galera
         return sizeof(i);
     }
 
+#if 0
     template<typename ST>
     size_t serialize(const void* data, ST data_len, gu::byte_t* buf, 
                      size_t buf_len,
@@ -64,7 +65,7 @@ namespace galera
     {
         return (serial_size(data_len) + data_len);
     }
-
+#endif
 
     template<typename ST>
     size_t serialize(const gu::Buffer& b,

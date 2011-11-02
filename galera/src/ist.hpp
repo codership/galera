@@ -17,7 +17,7 @@
 #pragma GCC diagnostic ignored "-Weffc++"
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #include "asio.hpp"
-
+#include "asio/ssl.hpp"
 #include <stack>
 #include <set>
 
@@ -47,6 +47,7 @@ namespace galera
             gu::Config&                                   conf_;
             asio::io_service                              io_service_;
             asio::ip::tcp::acceptor                       acceptor_;
+            asio::ssl::context                            ssl_ctx_;
             pthread_t                                     thread_;
             gu::Mutex                                     mutex_;
             gu::Cond                                      cond_;
@@ -71,12 +72,14 @@ namespace galera
             int error_code_;
             wsrep_seqno_t current_seqno_;
             wsrep_seqno_t last_seqno_;
+            bool use_ssl_;
         };
 
         class Sender
         {
         public:
-            Sender(gcache::GCache& gcache,
+            Sender(const gu::Config& conf,
+                   gcache::GCache& gcache,
                    const std::string& peer);
             ~Sender();
             void send(wsrep_seqno_t first, wsrep_seqno_t last);
@@ -85,6 +88,9 @@ namespace galera
             void operator=(const Sender&);
             asio::io_service      io_service_;
             asio::ip::tcp::socket socket_;
+            asio::ssl::context    ssl_ctx_;
+            asio::ssl::stream<asio::ip::tcp::socket>     ssl_stream_;
+            bool use_ssl_;
             gcache::GCache&       gcache_;
         };
 
@@ -99,7 +105,8 @@ namespace galera
                 monitor_(),
                 gcs_(gcs),
                 gcache_(gcache) { }
-            void run(const std::string& peer,
+            void run(const gu::Config& conf,
+                     const std::string& peer,
                      wsrep_seqno_t,
                      wsrep_seqno_t);
             void remove(AsyncSender*, wsrep_seqno_t);

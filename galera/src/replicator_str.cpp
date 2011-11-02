@@ -308,7 +308,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 trivial_sst_ = false;
                 try
                 {
-                    ist_senders_.run(istr.peer(),
+                    ist_senders_.run(config_,
+                                     istr.peer(),
                                      istr.last_applied() + 1,
                                      istr.group_seqno());
                 }

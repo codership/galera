@@ -77,8 +77,9 @@ struct trx_thread_args
 extern "C" void* sender_thd(void* arg)
 {
     const sender_args* sargs(reinterpret_cast<const sender_args*>(arg));
+    gu::Config conf;
     pthread_barrier_wait(&start_barrier);
-    galera::ist::Sender sender(sargs->gcache_, sargs->peer_);
+    galera::ist::Sender sender(conf, sargs->gcache_, sargs->peer_);
     sender.send(sargs->first_, sargs->last_);
     return 0;
 }
