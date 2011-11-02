@@ -758,11 +758,10 @@ struct wsrep_ {
   /*!
    * @brief Desynchronize from cluster
    *
-   * Effectively turns off flow control.
-   * @return global sequence number of the last synced writeset or negative
-   *         error code.
+   * Effectively turns off flow control for this node, allowing it
+   * to fall behind the cluster.
    */
-    wsrep_seqno_t (*desync) (wsrep_t* wsrep);
+    wsrep_status_t (*desync) (wsrep_t* wsrep);
 
   /*!
    * @brief Request to resynchronize with cluster.

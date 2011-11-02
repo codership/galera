@@ -689,7 +689,7 @@ wsrep_status_t galera_resume (wsrep_t* gh)
 
 
 extern "C"
-wsrep_seqno_t galera_desync (wsrep_t* gh)
+wsrep_status_t galera_desync (wsrep_t* gh)
 {
     assert(gh != 0 && gh->ctx != 0);
 //    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
@@ -701,7 +701,7 @@ wsrep_seqno_t galera_desync (wsrep_t* gh)
     catch (gu::Exception& e)
     {
         log_error << e.what();
-        return -e.get_errno();
+        return WSREP_NODE_FAIL;;
     }
 }
 
