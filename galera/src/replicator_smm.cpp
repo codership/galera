@@ -950,18 +950,15 @@ galera::ReplicatorSMM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
         seqno = -EREMCHG;
     }
 
-    // WARNING: Here we have application block on this call which
-    //          may prevent application from resolving the issue.
-    //          (Not that we expect that application can resolve it.)
-    ssize_t err(0);
-    while (trivial_sst_ == false &&
-           -EAGAIN == (err = gcs_.join(seqno))) usleep (100000);
-
-    if (err == 0) return WSREP_OK;
-
-    log_error << "failed to recover from DONOR state";
-
-    return WSREP_CONN_FAIL;
+    try {
+        if (!trivial_sst_) gcs_.join(seqno);
+        return WSREP_OK;
+    }
+    catch (gu::Exception& e)
+    {
+        log_error << "failed to recover from DONOR state: " << e.what();
+        return WSREP_CONN_FAIL;
+    }
 }
 
 
@@ -1164,16 +1161,14 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
              * 1) we just got state transfer in request_sst() above;
              * 2) we failed here previously (probably due to partition).
              */
-            ssize_t ret;
-
-            while (-EAGAIN == (ret = gcs_.join(sst_seqno_)))
-            {
-                log_warn << "Retrying sending JOIN message (seqno: "
-                         << sst_seqno_ << ')';
-                usleep (100000); // 0.1s
+            try {
+                gcs_.join(sst_seqno_);
+                sst_state_ = SST_NONE;
             }
-
-            if (ret >= 0) sst_state_ = SST_NONE;
+            catch (gu::Exception& e)
+            {
+                log_error << "Failed to JOIN the cluster after SST";
+            }
         }
     }
     else
@@ -1260,6 +1255,16 @@ void galera::ReplicatorSMM::resume() throw ()
 {
     local_monitor_.unlock();
     log_info << "Provider resumed.";
+}
+
+void galera::ReplicatorSMM::desync() throw (gu::Exception)
+{
+    gcs_.desync();
+}
+
+void galera::ReplicatorSMM::resync() throw (gu::Exception)
+{
+    gcs_.join(commit_monitor_.last_left());
 }
 
 void galera::ReplicatorSMM::store_state(const std::string& file) const

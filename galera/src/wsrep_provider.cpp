@@ -751,16 +751,17 @@ wsrep_seqno_t galera_desync (wsrep_t* gh)
     assert(gh != 0);
     assert(gh->ctx != 0);
 
-//    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
 
     try
     {
-        return WSREP_NOT_IMPLEMENTED;
+        repl->desync();
+        return WSREP_OK;
     }
     catch (gu::Exception& e)
     {
         log_error << e.what();
-        return -e.get_errno();
+        return WSREP_NODE_FAIL;
     }
 }
 
@@ -771,8 +772,18 @@ wsrep_status_t galera_resync (wsrep_t* gh)
     assert(gh != 0);
     assert(gh->ctx != 0);
 
-//    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    return WSREP_OK;
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
+    try
+    {
+        repl->resync();
+        return WSREP_OK;
+    }
+    catch (gu::Exception& e)
+    {
+        log_error << e.what();
+        return WSREP_NODE_FAIL;
+    }
 }
 
 

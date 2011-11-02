@@ -4,10 +4,13 @@
  * $Id$
  */
 
-#include <errno.h>
+#include "gcs_group.h"
 
 #include "gcs_group.h"
 #include "gcs_gcache.h"
+#include "gcs_priv.h"
+
+#include <errno.h>
 
 const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
 {
@@ -624,7 +627,7 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
         // Try to find peer.
         for (j = 0; j < group->num; j++) {
-            if (j == sender_idx) continue;
+// #483            if (j == sender_idx) continue;
             if (!memcmp(peer_id, group->nodes[j].id,
                         sizeof (group->nodes[j].id))) {
                 peer_idx  = j;
@@ -653,8 +656,14 @@ gcs_group_handle_join_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
             }
         }
         else {
-            gu_info ("%ld (%s): State transfer %s %ld (%s) complete.",
-                     sender_idx, sender->name, st_dir, peer_idx, peer_name);
+            if (sender_idx == peer_idx) {
+                gu_info ("Node %ld (%s) resyncs itself to group",
+                         sender_idx, sender->name);
+            }
+            else {
+                gu_info ("%ld (%s): State transfer %s %ld (%s) complete.",
+                         sender_idx, sender->name, st_dir, peer_idx, peer_name);
+            }
         }
     }
     else {
@@ -758,7 +767,7 @@ group_find_node_by_state (gcs_group_t* group, gcs_node_state_t status)
  */
 static long
 group_select_donor (gcs_group_t* group, long const joiner_idx,
-                    const char* const donor_name)
+                    const char* const donor_name, bool const desync)
 {
     static gcs_node_state_t const min_donor_state = GCS_NODE_STATE_SYNCED;
 
@@ -766,10 +775,16 @@ group_select_donor (gcs_group_t* group, long const joiner_idx,
     bool required_donor = (strlen(donor_name) > 0);
 
     if (required_donor) {
-        donor_idx = group_find_node_by_name (group, joiner_idx, donor_name,
-                                             min_donor_state);
+        if (desync) {
+            donor_idx = joiner_idx; // sender wants to become "donor" itself
+        }
+        else {
+            donor_idx = group_find_node_by_name (group, joiner_idx, donor_name,
+                                                 min_donor_state);
+        }
     }
     else {
+        assert (!desync);
         donor_idx = group_find_node_by_state (group, min_donor_state);
     }
 
@@ -777,16 +792,22 @@ group_select_donor (gcs_group_t* group, long const joiner_idx,
         gcs_node_t* const joiner = &group->nodes[joiner_idx];
         gcs_node_t* const donor  = &group->nodes[donor_idx];
 
-        assert(donor_idx != joiner_idx);
+        assert(donor_idx != joiner_idx || desync);
 
-        gu_info ("Node %ld (%s) requested state transfer from '%s'. "
-                 "Selected %ld (%s)(%s) as donor.",
-                 joiner_idx, joiner->name, required_donor ? donor_name :"*any*",
-                 donor_idx, donor->name, gcs_node_state_to_str(donor->status));
+        if (desync) {
+            gu_info ("Node %ld (%s) desyncs itself from group",
+                     donor_idx, donor->name);
+        }
+        else {
+            gu_info ("Node %ld (%s) requested state transfer from '%s'. "
+                     "Selected %ld (%s)(%s) as donor.", joiner_idx,joiner->name,
+                     required_donor ? donor_name :"*any*",donor_idx,donor->name,
+                     gcs_node_state_to_str(donor->status));
+        }
 
-        // reserve donor, confirm joiner
-        donor->status  = GCS_NODE_STATE_DONOR;
+        // reserve donor, confirm joiner (! assignment order is significant !)
         joiner->status = GCS_NODE_STATE_JOINER;
+        donor->status  = GCS_NODE_STATE_DONOR;
         memcpy (donor->joiner, joiner->id, GCS_COMP_MEMB_ID_MAX_LEN+1);
         memcpy (joiner->donor, donor->id,  GCS_COMP_MEMB_ID_MAX_LEN+1);
     }
@@ -817,6 +838,13 @@ gcs_group_ignore_action (gcs_group_t* group, struct gcs_act_rcvd* act)
     assert (GCS_SEQNO_ILL == act->id);
 }
 
+static bool
+group_desync_request (const char* const donor)
+{
+    return (strlen (GCS_DESYNC_REQ) == strlen(donor) &&
+            !strcmp(GCS_DESYNC_REQ, donor));
+}
+
 /* NOTE: check gcs_request_state_transfer() for sender part. */
 /*! Returns 0 if request is ignored, request size if it should be passed up */
 long
@@ -830,10 +858,11 @@ gcs_group_handle_state_request (gcs_group_t*         group,
     long const       joiner_idx     = act->sender_idx;
     const char*      joiner_name    = group->nodes[joiner_idx].name;
     gcs_node_state_t joiner_status  = group->nodes[joiner_idx].status;
+    bool const       desync         = group_desync_request (donor_name);
 
     assert (GCS_ACT_STATE_REQ == act->act.type);
 
-    if (joiner_status != GCS_NODE_STATE_PRIM) {
+    if (joiner_status != GCS_NODE_STATE_PRIM && !desync) {
 
         const char* joiner_status_string = gcs_node_state_to_str(joiner_status);
 
@@ -852,9 +881,10 @@ gcs_group_handle_state_request (gcs_group_t*         group,
         }
     }
 
-    donor_idx = group_select_donor(group, joiner_idx, donor_name);
+    donor_idx = group_select_donor(group, joiner_idx, donor_name, desync);
 
-    assert (donor_idx != joiner_idx);
+    assert (donor_idx != joiner_idx || desync);
+    assert (donor_idx == joiner_idx || !desync);
 
     if (group->my_idx != joiner_idx && group->my_idx != donor_idx) {
         // if neither DONOR nor JOINER, ignore request
