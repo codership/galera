@@ -119,6 +119,9 @@ namespace galera
         wsrep_seqno_t pause()  throw (gu::Exception);
         void          resume() throw ();
 
+        void          desync() throw (gu::Exception);
+        void          resync() throw (gu::Exception);
+
         void store_state      (const std::string& file) const;
         void restore_state    (const std::string& file);
         void invalidate_state (const std::string& file) const;

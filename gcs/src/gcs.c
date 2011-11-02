@@ -17,7 +17,7 @@
 
 #include <galerautils.h>
 
-#include "gcs.h"
+#include "gcs_priv.h"
 #include "gcs_params.h"
 #include "gcs_fc.h"
 #include "gcs_seqno.h"
@@ -79,7 +79,7 @@ static const char* gcs_conn_state_str[GCS_CONN_STATE_MAX] =
 {
     "SYNCED",
     "JOINED",
-    "DONOR",
+    "DONOR/DESYNCED",
     "JOINER",
     "PRIMARY",
     "OPEN",
@@ -616,8 +616,8 @@ gcs_become_donor (gcs_conn_t* conn)
         return (0 == err ? 1 : err);
     }
 
-    gu_warn ("Rejecting SST request in state '%s'. Joiner should be restarted.",
-             gcs_conn_state_str[conn->state]);
+    gu_warn ("Rejecting State Transfer Request in state '%s'. "
+             "Joiner should be restarted.", gcs_conn_state_str[conn->state]);
 
     if (conn->state < GCS_CONN_OPEN){
         ssize_t err;
@@ -849,13 +849,12 @@ gcs_handle_act_state_req (gcs_conn_t*          conn,
                           struct gcs_act_rcvd* rcvd)
 {
     if ((gcs_seqno_t)conn->my_idx == rcvd->id) {
-        int donor_idx = (int)rcvd->id; // to pacify valgrind
-        gu_info ("Got GCS_ACT_STATE_REQ to %i, my idx: %ld",
+        int const donor_idx = (int)rcvd->id; // to pacify valgrind
+        gu_debug("Got GCS_ACT_STATE_REQ to %i, my idx: %ld",
                  donor_idx, conn->my_idx);
         // rewrite to pass global seqno for application
         rcvd->id = conn->global_seqno;
         return gcs_become_donor (conn);
-        // gu_info ("Becoming donor: %s", 1 == ret ? "yes" : "no");
     }
     else {
         if (rcvd->id >= 0) {
@@ -1547,6 +1546,16 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
     else {
         *local = GCS_SEQNO_ILL;
     }
+
+    return ret;
+}
+
+long gcs_desync (gcs_conn_t* conn)
+{
+    gcs_seqno_t local;
+    long ret = gcs_request_state_transfer (conn, "", 1, GCS_DESYNC_REQ, &local);
+
+    if (ret > 0) ret = 0;
 
     return ret;
 }

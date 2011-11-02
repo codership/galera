@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2011 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -270,6 +270,15 @@ extern long gcs_request_state_transfer (gcs_conn_t  *conn,
                                         size_t       size,
                                         const char  *donor,
                                         gcs_seqno_t *local_act_id);
+
+/*! @brief Turns off flow control on the node.
+ * Effectively desynchronizes the node from the cluster (while the node keeps on
+ * receiving all the actions). Requires gcs_join() to return to normal.
+ *
+ * @param conn  connection to group
+ * @return negative error code, 0 in case of success
+ */
+extern long gcs_desync (gcs_conn_t* conn);
 
 /*! @brief Informs group on behalf of donor that state stransfer is over.
  * If status is non-negative, joiner will be considered fully joined to group.

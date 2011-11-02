@@ -109,6 +109,9 @@ namespace galera
 
         virtual wsrep_seqno_t pause()  throw (gu::Exception) = 0;
         virtual void          resume() throw () = 0;
+
+        virtual void          desync() throw (gu::Exception) = 0;
+        virtual void          resync() throw (gu::Exception) = 0;
     };
 }
 

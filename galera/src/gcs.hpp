@@ -38,7 +38,8 @@ namespace galera
         virtual ssize_t request_state_transfer(const void* req, ssize_t req_len,
                                                const std::string& sst_donor,
                                                gcs_seqno_t* seqno_l) = 0;
-        virtual ssize_t join(gcs_seqno_t seqno) = 0;
+        virtual void    desync () throw (gu::Exception) = 0;
+        virtual void    join(gcs_seqno_t seqno) throw (gu::Exception) = 0;
         virtual void    get_stats(gcs_stats*) const = 0;
 
         virtual void    param_set (const std::string& key,
@@ -130,7 +131,41 @@ namespace galera
                                               sst_donor.c_str(), seqno_l);
         }
 
-        ssize_t join(gcs_seqno_t seqno) { return gcs_join(conn_, seqno); }
+        void desync () throw (gu::Exception)
+        {
+            long err;
+
+            // WARNING: Here we have application block on this call which
+            //          may prevent application from resolving the issue.
+            //          (Not that we expect that application can resolve it.)
+            while (-EAGAIN == (err = gcs_desync(conn_)))
+            {
+                log_warn << "Retrying DESYNC request.";
+                usleep (100000); // 0.1s
+            }
+
+            if (err < 0) { gu_throw_error (-err) << "gcs_desync() failed"; }
+        }
+
+        void join (gcs_seqno_t seqno) throw (gu::Exception)
+        {
+            long err;
+
+            // WARNING: Here we have application block on this call which
+            //          may prevent application from resolving the issue.
+            //          (Not that we expect that application can resolve it.)
+            while (-EAGAIN == (err = gcs_join(conn_, seqno)))
+            {
+                log_warn << "Retrying sending JOIN message (seqno: "
+                         << seqno << ')';
+                usleep (100000); // 0.1s
+            }
+
+            if (err < 0)
+            {
+                gu_throw_error (-err) << "gcs_join(" << seqno << ") failed";
+            }
+        }
 
         void get_stats(gcs_stats* stats) const
         {
@@ -216,7 +251,15 @@ namespace galera
                                        gcs_seqno_t* seqno_l)
         { return -ENOTCONN; }
 
-        ssize_t join(gcs_seqno_t seqno) { return -ENOTCONN; }
+        void desync () throw (gu::Exception)
+        {
+            gu_throw_error(ENOTCONN);
+        }
+
+        void join(gcs_seqno_t seqno) throw (gu::Exception)
+        {
+            gu_throw_error(ENOTCONN);
+        }
 
         void get_stats(gcs_stats* stats) const
         {
