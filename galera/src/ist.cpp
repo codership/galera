@@ -238,17 +238,29 @@ namespace galera
             template <class ST>
             void recv_handshake_response(ST& socket)
             {
-                Handshake hsr;
-                gu::Buffer buf(serial_size(hsr));
+                Message msg;
+                gu::Buffer buf(serial_size(msg));
                 size_t n(asio::read(socket, asio::buffer(&buf[0], buf.size())));
                 if (n != buf.size())
                 {
                     gu_throw_error(EPROTO) << "error receiving handshake";
                 }
-                unserialize(&buf[0], buf.size(), 0, hsr);
+                unserialize(&buf[0], buf.size(), 0, msg);
 
-                log_debug << "hsr: " << hsr.version() << " " << hsr.type()
-                          << " " << hsr.len();
+                log_debug << "msg: " << msg.version() << " " << msg.type()
+                          << " " << msg.len();
+                switch (msg.type())
+                {
+                case Message::T_HANDSHAKE_RESPONSE:
+                    break;
+                case Message::T_CTRL:
+                    gu_throw_error(EINTR) << "interrupted by ctrl";
+                    throw;
+                default:
+                    gu_throw_error(EINVAL) << "unexpected message type: "
+                                           << msg.type();
+                }
+
             }
 
             template <class ST>
@@ -394,7 +406,7 @@ namespace galera
         };
 
 
-        class AsyncSender
+        class AsyncSender : public Sender
         {
         public:
             AsyncSender(const gu::Config& conf,
@@ -403,6 +415,7 @@ namespace galera
                         wsrep_seqno_t last,
                         AsyncSenderMap& asmap)
                 :
+                Sender(conf, asmap.gcache(), peer),
                 conf_(conf),
                 peer_(peer),
                 first_(first),
@@ -554,8 +567,8 @@ std::string
 galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
                                wsrep_seqno_t last_seqno)
 {
-    std::string const recv_addr(IST_determine_recv_addr(conf_));
-    gu::URI     const uri(recv_addr);
+    recv_addr_ = IST_determine_recv_addr(conf_);
+    gu::URI     const uri(recv_addr_);
     try
     {
         if (uri.get_scheme() == "ssl")
@@ -588,10 +601,9 @@ galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
         gu_throw_error(err) << "unable to create receiver thread";
     }
 
-
     running_ = true;
 
-    return (recv_addr);
+    return recv_addr_;
 }
 
 
@@ -616,7 +628,7 @@ void galera::ist::Receiver::run()
     {
         gu_throw_error(e.code().value()) << "accept() failed";
     }
-
+    acceptor_.close();
     int ec(0);
     try
     {
@@ -676,6 +688,10 @@ void galera::ist::Receiver::run()
         log_fatal << "got error while reading ist stream: " << e.code();
         ec = e.code().value();
     }
+    catch (gu::Exception& e)
+    {
+        ec = e.get_errno();
+    }
 
 err:
     gu::Lock lock(mutex_);
@@ -690,13 +706,16 @@ err:
     }
 
     running_ = false;
-    if (current_seqno_ - 1 != last_seqno_)
+    if (ec != EINTR && current_seqno_ - 1 != last_seqno_)
     {
         log_error << "IST didn't contain all write sets, expected last: "
                   << last_seqno_ << " last received: " << current_seqno_ - 1;
-        ec = EINVAL;
+        ec = EPROTO;
     }
-    error_code_ = ec;
+    if (ec != EINTR)
+    {
+        error_code_ = ec;
+    }
     while (consumers_.empty() == false)
     {
         consumers_.top()->cond().signal();
@@ -736,15 +755,11 @@ int galera::ist::Receiver::recv(TrxHandle** trx)
 void galera::ist::Receiver::finished()
 {
     int err;
-    if ((err = pthread_cancel(thread_)) == 0)
-    {
-        log_debug << "pthread_cancel() failed: " << err;
-    }
+    interrupt();
     if ((err = pthread_join(thread_, 0)) != 0)
     {
         log_warn << "pthread_join() failed: " << err;
     }
-
     acceptor_.close();
     gu::Lock lock(mutex_);
     running_ = false;
@@ -752,6 +767,43 @@ void galera::ist::Receiver::finished()
     {
         consumers_.top()->cond().signal();
         consumers_.pop();
+    }
+}
+
+
+void galera::ist::Receiver::interrupt()
+{
+    gu::URI uri(recv_addr_);
+    asio::ip::tcp::resolver resolver(io_service_);
+    asio::ip::tcp::resolver::query query(unescape_addr(uri.get_host()),
+                                         uri.get_port());
+    asio::ip::tcp::resolver::iterator i(resolver.resolve(query));
+    try
+    {
+        if (use_ssl_ == true)
+        {
+            asio::ssl::stream<asio::ip::tcp::socket>
+                ssl_stream(io_service_, ssl_ctx_);
+            ssl_stream.lowest_layer().connect(*i);
+            ssl_stream.handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
+            Proto p;
+            p.recv_handshake(ssl_stream);
+            p.send_ctrl(ssl_stream, Proto::Ctrl::C_EOF);
+            p.recv_ctrl(ssl_stream);
+        }
+        else
+        {
+            asio::ip::tcp::socket socket(io_service_);
+            socket.connect(*i);
+            Proto p;
+            p.recv_handshake(socket);
+            p.send_ctrl(socket, Proto::Ctrl::C_EOF);
+            p.recv_ctrl(socket);
+        }
+    }
+    catch (asio::system_error& e)
+    {
+        // ignore
     }
 }
 
@@ -794,6 +846,7 @@ galera::ist::Sender::~Sender()
 {
     if (use_ssl_ == true)
     {
+        ssl_stream_.lowest_layer().close();
     }
     else
     {
@@ -887,24 +940,17 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
 }
 
 
-extern "C"
-void delete_async_sender(void* ptr)
-{
-    delete reinterpret_cast<galera::ist::AsyncSender*>(ptr);
-}
 
 
 extern "C"
 void* run_async_sender(void* arg)
 {
     galera::ist::AsyncSender* as(reinterpret_cast<galera::ist::AsyncSender*>(arg));
-    pthread_cleanup_push(&delete_async_sender, as);
     log_info << "async IST sender starting to serve " << as->peer();
     wsrep_seqno_t join_seqno;
     try
     {
-        galera::ist::Sender sender(as->conf(), as->asmap().gcache(), as->peer());
-        sender.send(as->first(), as->last());
+        as->send(as->first(), as->last());
         join_seqno = as->last();
     }
     catch (gu::Exception& e)
@@ -930,7 +976,6 @@ void* run_async_sender(void* arg)
     }
     log_info << "async IST sender served: " << as->peer();
 
-    pthread_cleanup_pop(1);
     return 0;
 }
 
@@ -971,16 +1016,17 @@ void galera::ist::AsyncSenderMap::cancel()
     while (senders_.empty() == false)
     {
         AsyncSender* as(*senders_.begin());
+        senders_.erase(*senders_.begin());
         int err;
-        if ((err = pthread_cancel(as->thread_)) != 0)
-        {
-            log_debug << "pthread_cancel() failed: " << err;
-        }
+        as->cancel();
+        monitor_.leave();
         if ((err = pthread_join(as->thread_, 0)) != 0)
         {
             log_warn << "pthread_join() failed: " << err;
         }
-        senders_.erase(*senders_.begin());
+        monitor_.enter();
+
+        delete as;
     }
 
 }

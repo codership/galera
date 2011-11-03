@@ -44,7 +44,9 @@ namespace galera
             void finished();
             void run();
         private:
+            void interrupt();
             gu::Config&                                   conf_;
+            std::string                                   recv_addr_;
             asio::io_service                              io_service_;
             asio::ip::tcp::acceptor                       acceptor_;
             asio::ssl::context                            ssl_ctx_;
@@ -83,6 +85,17 @@ namespace galera
                    const std::string& peer);
             ~Sender();
             void send(wsrep_seqno_t first, wsrep_seqno_t last);
+            void cancel()
+            {
+                if (use_ssl_ == true)
+                {
+                    ssl_stream_.lowest_layer().close();
+                }
+                else
+                {
+                    socket_.close();
+                }
+            }
         private:
             Sender(const Sender&);
             void operator=(const Sender&);
