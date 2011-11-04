@@ -969,12 +969,13 @@ void* run_async_sender(void* arg)
     {
         as->asmap().remove(as, join_seqno);
         pthread_detach(as->thread());
+        delete as;
     }
     catch (gu::NotFound& nf)
     {
-        log_info << "async IST sender already removed";
+        log_debug << "async IST sender already removed";
     }
-    log_info << "async IST sender served: " << as->peer();
+    log_info << "async IST sender served";
 
     return 0;
 }
@@ -1025,7 +1026,6 @@ void galera::ist::AsyncSenderMap::cancel()
             log_warn << "pthread_join() failed: " << err;
         }
         monitor_.enter();
-
         delete as;
     }
 
