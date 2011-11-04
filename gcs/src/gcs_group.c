@@ -197,10 +197,8 @@ group_redo_last_applied (gcs_group_t* group)
 static void
 group_go_non_primary (gcs_group_t* group)
 {
-    if (GCS_GROUP_PRIMARY == group->state) {
-        group->nodes[group->my_idx].status = GCS_NODE_STATE_NON_PRIM;
-        //@todo: Perhaps the same has to be applied to the rest of the nodes[]?
-    }
+    group->nodes[group->my_idx].status = GCS_NODE_STATE_NON_PRIM;
+    //@todo: Perhaps the same has to be applied to the rest of the nodes[]?
 
     group->state   = GCS_GROUP_NON_PRIMARY;
     group->conf_id = GCS_SEQNO_ILL;
