@@ -1120,7 +1120,18 @@ galera::ReplicatorSMM::process_view_info(void*                    recv_ctx,
 
         if (st_req == true)
         {
-            request_sst(group_uuid, group_seqno, app_req, app_req_len);
+            if (app_req_len > 0)
+            {
+                assert (app_req);
+                request_sst(group_uuid, group_seqno, app_req, app_req_len);
+            }
+            else
+            {
+                assert (0 == app_req_len);
+                log_fatal << "Cannot complete state transfer: null SST request."
+                          << " Restart required.";
+                abort();
+            }
         }
         else
         {
