@@ -274,6 +274,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
     char* const tmp(strndup(reinterpret_cast<const char*>(req), req_size));
     std::string const req_str(tmp);
     free (tmp);
+
     bool const trivial_sst(req_str == TRIVIAL_SST);
 
     if (!trivial_sst)
@@ -523,8 +524,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
                                        ssize_t       const sst_req_len)
     throw()
 {
-    assert(sst_req != 0);
-    assert(sst_req_len > 0);
+    assert(sst_req_len >= 0);
 
     StateRequest* const req(prepare_state_request(sst_req, sst_req_len,
                                                   group_seqno));
