@@ -79,7 +79,7 @@ extern "C" void* sender_thd(void* arg)
     const sender_args* sargs(reinterpret_cast<const sender_args*>(arg));
     gu::Config conf;
     pthread_barrier_wait(&start_barrier);
-    galera::ist::Sender sender(conf, sargs->gcache_, sargs->peer_);
+    galera::ist::Sender sender(conf, sargs->gcache_, sargs->peer_, 1);
     sender.send(sargs->first_, sargs->last_);
     return 0;
 }
@@ -115,7 +115,7 @@ extern "C" void* receiver_thd(void* arg)
     gu::Config conf;
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
     galera::ist::Receiver receiver(conf, 0);
-    receiver.prepare(rargs->first_, rargs->last_);
+    receiver.prepare(rargs->first_, rargs->last_, 1);
 
     std::vector<pthread_t> threads(rargs->n_receivers_);
     trx_thread_args trx_thd_args(receiver);

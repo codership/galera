@@ -312,7 +312,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                     ist_senders_.run(config_,
                                      istr.peer(),
                                      istr.last_applied() + 1,
-                                     istr.group_seqno());
+                                     istr.group_seqno(),
+                                     protocol_version_);
                 }
                 catch (gu::Exception& e)
                 {
@@ -353,7 +354,7 @@ ReplicatorSMM::prepare_for_IST (void*& ptr, ssize_t& len,
     std::ostringstream os;
 
     std::string recv_addr = ist_receiver_.prepare(
-        apply_monitor_.last_left() + 1, group_seqno);
+        apply_monitor_.last_left() + 1, group_seqno, protocol_version_);
 
     os << IST_request(recv_addr,
                       state_uuid_, apply_monitor_.last_left(), group_seqno);

@@ -39,7 +39,7 @@ namespace galera
 
             Receiver(gu::Config& conf, const char* addr);
             ~Receiver();
-            std::string prepare(wsrep_seqno_t, wsrep_seqno_t);
+            std::string prepare(wsrep_seqno_t, wsrep_seqno_t, int);
             int recv(TrxHandle** trx);
             void finished();
             void run();
@@ -75,6 +75,7 @@ namespace galera
             wsrep_seqno_t current_seqno_;
             wsrep_seqno_t last_seqno_;
             bool use_ssl_;
+            int version_;
         };
 
         class Sender
@@ -82,7 +83,8 @@ namespace galera
         public:
             Sender(const gu::Config& conf,
                    gcache::GCache& gcache,
-                   const std::string& peer);
+                   const std::string& peer,
+                   int version);
             ~Sender();
             void send(wsrep_seqno_t first, wsrep_seqno_t last);
             void cancel()
@@ -99,12 +101,13 @@ namespace galera
         private:
             Sender(const Sender&);
             void operator=(const Sender&);
-            asio::io_service      io_service_;
-            asio::ip::tcp::socket socket_;
-            asio::ssl::context    ssl_ctx_;
-            asio::ssl::stream<asio::ip::tcp::socket>     ssl_stream_;
-            bool use_ssl_;
-            gcache::GCache&       gcache_;
+            asio::io_service                         io_service_;
+            asio::ip::tcp::socket                    socket_;
+            asio::ssl::context                       ssl_ctx_;
+            asio::ssl::stream<asio::ip::tcp::socket> ssl_stream_;
+            bool                                     use_ssl_;
+            gcache::GCache&                          gcache_;
+            int                                      version_;
         };
 
 
@@ -121,7 +124,8 @@ namespace galera
             void run(const gu::Config& conf,
                      const std::string& peer,
                      wsrep_seqno_t,
-                     wsrep_seqno_t);
+                     wsrep_seqno_t,
+                     int);
             void remove(AsyncSender*, wsrep_seqno_t);
             void cancel();
             gcache::GCache& gcache() { return gcache_; }

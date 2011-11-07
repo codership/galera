@@ -93,9 +93,9 @@ namespace galera
                 {
                     T_NONE = 0,
                     T_HANDSHAKE = 1,
-                    T_HANDSHAKE_RESPONSE,
-                    T_CTRL,
-                    T_TRX
+                    T_HANDSHAKE_RESPONSE = 2,
+                    T_CTRL = 3,
+                    T_TRX = 4
                 } Type;
                 Message(int version = -1, Type type = T_NONE,
                         int16_t ctrl = 0, uint64_t len = 0)
@@ -190,9 +190,7 @@ namespace galera
                 { }
             };
 
-
-
-            Proto() : version_(0) { }
+            Proto(int version) : version_(version) { }
 
             template <class ST>
             void send_handshake(ST& socket)
@@ -210,15 +208,43 @@ namespace galera
             template <class ST>
             void recv_handshake(ST& socket)
             {
-                Handshake hs;
-                gu::Buffer buf(serial_size(hs));
+                Message msg;
+                gu::Buffer buf(serial_size(msg));
                 size_t n(asio::read(socket, asio::buffer(&buf[0], buf.size())));
                 if (n != buf.size())
                 {
                     gu_throw_error(EPROTO) << "error receiving handshake";
                 }
-                unserialize(&buf[0], buf.size(), 0, hs);
-                log_debug << "hs: " << hs.version() << " " << hs.type() << " " << hs.len();
+                (void)unserialize(&buf[0], buf.size(), 0, msg);
+                log_debug << "handshake msg: " << msg.version() << " "
+                          << msg.type() << " " << msg.len();
+                switch (msg.type())
+                {
+                case Message::T_HANDSHAKE:
+                    break;
+                case Message::T_CTRL:
+                    switch (msg.ctrl())
+                    {
+                    case Ctrl::C_EOF:
+                        gu_throw_error(EINTR);
+                        throw;
+                    default:
+                        gu_throw_error(EPROTO) << "unexpected ctrl code: " <<
+                            msg.ctrl();
+                    }
+                    break;
+                default:
+                    gu_throw_error(EPROTO)
+                        << "unexpected message type: " << msg.type();
+                    throw;
+                }
+                if (msg.version() != version_)
+                {
+                    gu_throw_error(EPROTO) << "mismatching protocol version: "
+                                           << msg.version()
+                                           << " required: "
+                                           << version_;
+                }
                 // TODO: Figure out protocol versions to use
             }
 
@@ -231,7 +257,8 @@ namespace galera
                 size_t n(asio::write(socket, asio::buffer(&buf[0], buf.size())));
                 if (n != offset)
                 {
-                    gu_throw_error(EPROTO) << "error sending handshake response";
+                    gu_throw_error(EPROTO)
+                        << "error sending handshake response";
                 }
             }
 
@@ -245,26 +272,35 @@ namespace galera
                 {
                     gu_throw_error(EPROTO) << "error receiving handshake";
                 }
-                unserialize(&buf[0], buf.size(), 0, msg);
+                (void)unserialize(&buf[0], buf.size(), 0, msg);
 
-                log_debug << "msg: " << msg.version() << " " << msg.type()
+                log_debug << "handshake response msg: " << msg.version()
+                          << " " << msg.type()
                           << " " << msg.len();
                 switch (msg.type())
                 {
                 case Message::T_HANDSHAKE_RESPONSE:
                     break;
                 case Message::T_CTRL:
-                    gu_throw_error(EINTR) << "interrupted by ctrl";
-                    throw;
+                    switch (msg.ctrl())
+                    {
+                    case Ctrl::C_EOF:
+                        gu_throw_error(EINTR) << "interrupted by ctrl";
+                        throw;
+                    default:
+                        gu_throw_error(EPROTO) << "unexpected ctrl code: "
+                                               << msg.ctrl();
+                        throw;
+                    }
                 default:
                     gu_throw_error(EINVAL) << "unexpected message type: "
                                            << msg.type();
+                    throw;
                 }
-
             }
 
             template <class ST>
-            void send_ctrl(ST& socket, int32_t code)
+            void send_ctrl(ST& socket, int16_t code)
             {
                 Ctrl ctrl(version_, code);
                 gu::Buffer buf(serial_size(ctrl));
@@ -279,18 +315,26 @@ namespace galera
             template <class ST>
             int16_t recv_ctrl(ST& socket)
             {
-                Handshake ctrl;
-                gu::Buffer buf(serial_size(ctrl));
+                Message msg;
+                gu::Buffer buf(serial_size(msg));
                 size_t n(asio::read(socket, asio::buffer(&buf[0], buf.size())));
                 if (n != buf.size())
                 {
                     gu_throw_error(EPROTO) << "error receiving handshake";
                 }
-                unserialize(&buf[0], buf.size(), 0, ctrl);
-
-                log_debug << "ctrl: " << ctrl.version() << " " << ctrl.type()
-                          << " " << ctrl.len();
-                return ctrl.ctrl();
+                (void)unserialize(&buf[0], buf.size(), 0, msg);
+                log_debug << "msg: " << msg.version() << " " << msg.type()
+                          << " " << msg.len();
+                switch (msg.type())
+                {
+                case Message::T_CTRL:
+                    break;
+                default:
+                    gu_throw_error(EPROTO) << "unexpected message type: "
+                                           << msg.type();
+                    throw;
+                }
+                return msg.ctrl();
             }
 
 
@@ -335,7 +379,7 @@ namespace galera
                 {
                     gu_throw_error(EPROTO) << "error receiving trx header";
                 }
-                unserialize(&buf[0], buf.size(), 0, msg);
+                (void)unserialize(&buf[0], buf.size(), 0, msg);
                 log_debug << "received header: " << n << " bytes, type "
                           << msg.type() << " len " << msg.len();
                 switch (msg.type())
@@ -394,7 +438,8 @@ namespace galera
                         }
                     }
                 default:
-                    gu_throw_error(EPROTO) << "unexpected message type " << msg.type();
+                    gu_throw_error(EPROTO) << "unexpected message type: "
+                                           << msg.type();
                     throw;
                 }
                 gu_throw_fatal;
@@ -413,9 +458,10 @@ namespace galera
                         const std::string& peer,
                         wsrep_seqno_t first,
                         wsrep_seqno_t last,
-                        AsyncSenderMap& asmap)
+                        AsyncSenderMap& asmap,
+                        int version)
                 :
-                Sender(conf, asmap.gcache(), peer),
+                Sender(conf, asmap.gcache(), peer, version),
                 conf_(conf),
                 peer_(peer),
                 first_(first),
@@ -459,7 +505,8 @@ galera::ist::Receiver::Receiver(gu::Config& conf, const char* addr)
     error_code_(0),
     current_seqno_(-1),
     last_seqno_(-1),
-    use_ssl_(false)
+    use_ssl_(false),
+    version_(-1)
 {
     std::string recv_addr;
 
@@ -565,8 +612,10 @@ IST_determine_recv_addr (const gu::Config& conf)
 
 std::string
 galera::ist::Receiver::prepare(wsrep_seqno_t first_seqno,
-                               wsrep_seqno_t last_seqno)
+                               wsrep_seqno_t last_seqno,
+                               int           version)
 {
+    version_ = version;
     recv_addr_ = IST_determine_recv_addr(conf_);
     gu::URI     const uri(recv_addr_);
     try
@@ -632,7 +681,7 @@ void galera::ist::Receiver::run()
     int ec(0);
     try
     {
-        Proto p;
+        Proto p(version_);
         if (use_ssl_ == true)
         {
             p.send_handshake(ssl_stream);
@@ -685,12 +734,16 @@ void galera::ist::Receiver::run()
     }
     catch (asio::system_error& e)
     {
-        log_fatal << "got error while reading ist stream: " << e.code();
+        log_error << "got error while reading ist stream: " << e.code();
         ec = e.code().value();
     }
     catch (gu::Exception& e)
     {
         ec = e.get_errno();
+        if (ec != EINTR)
+        {
+            log_error << "got exception while reading ist stream: " << e.what();
+        }
     }
 
 err:
@@ -786,7 +839,7 @@ void galera::ist::Receiver::interrupt()
                 ssl_stream(io_service_, ssl_ctx_);
             ssl_stream.lowest_layer().connect(*i);
             ssl_stream.handshake(asio::ssl::stream<asio::ip::tcp::socket>::client);
-            Proto p;
+            Proto p(version_);
             p.recv_handshake(ssl_stream);
             p.send_ctrl(ssl_stream, Proto::Ctrl::C_EOF);
             p.recv_ctrl(ssl_stream);
@@ -795,7 +848,7 @@ void galera::ist::Receiver::interrupt()
         {
             asio::ip::tcp::socket socket(io_service_);
             socket.connect(*i);
-            Proto p;
+            Proto p(version_);
             p.recv_handshake(socket);
             p.send_ctrl(socket, Proto::Ctrl::C_EOF);
             p.recv_ctrl(socket);
@@ -810,14 +863,16 @@ void galera::ist::Receiver::interrupt()
 
 galera::ist::Sender::Sender(const gu::Config& conf,
                             gcache::GCache&    gcache,
-                            const std::string& peer)
+                            const std::string& peer,
+                            int version)
     :
     io_service_(),
     socket_(io_service_),
     ssl_ctx_(io_service_, asio::ssl::context::sslv23),
     ssl_stream_(io_service_, ssl_ctx_),
     use_ssl_(false),
-    gcache_(gcache)
+    gcache_(gcache),
+    version_(version)
 {
     gu::URI uri(peer);
     asio::ip::tcp::resolver resolver(io_service_);
@@ -859,7 +914,7 @@ void galera::ist::Sender::send(wsrep_seqno_t first, wsrep_seqno_t last)
 {
     try
     {
-        Proto p;
+        Proto p(version_);
         int32_t ctrl;
         if (use_ssl_ == true)
         {
@@ -981,13 +1036,14 @@ void* run_async_sender(void* arg)
 }
 
 
-void galera::ist::AsyncSenderMap::run(const gu::Config& conf,
+void galera::ist::AsyncSenderMap::run(const gu::Config&  conf,
                                       const std::string& peer,
                                       wsrep_seqno_t      first,
-                                      wsrep_seqno_t      last)
+                                      wsrep_seqno_t      last,
+                                      int                version)
 {
     gu::Critical crit(monitor_);
-    AsyncSender* as(new AsyncSender(conf, peer, first, last, *this));
+    AsyncSender* as(new AsyncSender(conf, peer, first, last, *this, version));
     int err(pthread_create(&as->thread_, 0, &run_async_sender, as));
     if (err != 0)
     {
