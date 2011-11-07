@@ -275,11 +275,13 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
     std::string const req_str(tmp);
     free (tmp);
 
-    bool const trivial_sst(req_str == TRIVIAL_SST);
+    bool const skip_state_transfer (req_str == TRIVIAL_SST);
+    wsrep_seqno_t rcode (0);
 
-    if (!trivial_sst)
+    if (!skip_state_transfer)
     {
         StateRequest* const streq (read_state_request (req, req_size));
+
         if (streq->ist_len())
         {
             IST_request istr;
@@ -287,6 +289,7 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                                 streq->ist_len());
             std::istringstream is(ist_str);
             is >> istr;
+
             if (istr.uuid() == state_uuid_)
             {
                 log_info << "IST request: " << istr;
@@ -299,49 +302,70 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 {
                     log_info << "IST first seqno " << istr.last_applied() + 1
                              << " not found from cache, falling back to SST";
-                    goto sst;
+                    // @todo: close IST channel explicitly
+                    goto full_sst;
                 }
 
-                trivial_sst_ = true;
-                sst_donate_cb_(app_ctx_, recv_ctx,
-                               streq->sst_req(), streq->sst_len(),
-                               &istr.uuid(), istr.last_applied(), 0, 0, true);
-                trivial_sst_ = false;
-                try
+                if (streq->sst_len()) // if joiner is waiting for SST, notify it
                 {
-                    ist_senders_.run(config_,
-                                     istr.peer(),
-                                     istr.last_applied() + 1,
-                                     istr.group_seqno(),
-                                     protocol_version_);
+                    ist_sst_ = true; // gcs_.join() shall be called by IST
+                    rcode = sst_donate_cb_(app_ctx_, recv_ctx,
+                                           streq->sst_req(),
+                                           streq->sst_len(),
+                                           &istr.uuid(),
+                                           istr.last_applied(), 0, 0, true);
+// this must be reset only in sst_sent() call            ist_sst_ = false;
                 }
-                catch (gu::Exception& e)
-                {
-                    log_error << "failed to serve ist " << e.what();
-                    gcs_.join(-e.get_errno());
-                }
-                local_monitor_.leave(lo);
 
-                delete streq;
-                return;
+                if (rcode >= 0)
+                {
+                    try
+                    {
+                        ist_senders_.run(config_,
+                                         istr.peer(),
+                                         istr.last_applied() + 1,
+                                         istr.group_seqno(),
+                                         protocol_version_);
+                    }
+                    catch (gu::Exception& e)
+                    {
+                        log_error << "IST failed: " << e.what();
+                        rcode = -e.get_errno();
+                    }
+                }
+                else
+                {
+                    log_error << "Failed to bypass SST: " << -rcode
+                              << " (" << strerror (-rcode) << ')';
+                }
+
+                goto out;
             }
         }
 
-    sst:
+    full_sst:
         if (streq->sst_len())
         {
+            assert(0 == rcode);
             sst_donate_cb_(app_ctx_, recv_ctx,
                            streq->sst_req(), streq->sst_len(),
                            &state_uuid_, donor_seq, 0, 0, false);
         }
+        else
+        {
+            log_warn << "SST request is null, SST canceled.";
+            rcode = -ECANCELED;
+        }
+
+    out:
         delete streq;
     }
 
     local_monitor_.leave(lo);
 
-    if (trivial_sst)
+    if (skip_state_transfer || rcode < 0)
     {
-        gcs_.join(donor_seq);
+        gcs_.join(rcode < 0 ? rcode : donor_seq);
     }
 }
 
@@ -527,61 +551,75 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
 {
     assert(sst_req_len >= 0);
 
-    StateRequest* const req(prepare_state_request(sst_req, sst_req_len,
-                                                  group_seqno));
-
     log_debug << "State transfer required: "
               << "\n\tGroup state: "
               << group_uuid << ":" << group_seqno
               << "\n\tLocal state: " << state_uuid_
               << ":" << apply_monitor_.last_left();
 
+    if (0 == sst_req_len && state_uuid_ != group_uuid)
+    {
+        log_fatal << "Local state UUID " << state_uuid_
+                  << "is different from group state UUID " << group_uuid
+                  << ", and SST request is null: restart required.";
+        abort();
+    }
+
+    StateRequest* const req(prepare_state_request(sst_req, sst_req_len,
+                                                  group_seqno));
     gu::Lock lock(sst_mutex_);
 
     send_state_request (group_uuid, group_seqno, req);
 
     state_.shift_to(S_JOINING);
-    sst_state_ = SST_WAIT;
-
     /* while waiting for state transfer to complete is a good point
      * to reset gcache, since it may ivolve some IO too */
     gcache_.seqno_reset();
 
-    lock.wait(sst_cond_);
-
-    if (sst_uuid_ != group_uuid)
+    if (sst_req_len != 0)
     {
-        log_fatal << "Application received wrong state: "
-                  << "\n\tReceived: " << sst_uuid_
-                  << "\n\tRequired: " << group_uuid;
-        sst_state_ = SST_FAILED;
-        log_fatal << "Application state transfer failed. This is "
-                  << "unrecoverable condition, restart required.";
-        abort();
+        sst_state_ = SST_WAIT;
+        lock.wait(sst_cond_);
+
+        if (sst_uuid_ != group_uuid)
+        {
+            log_fatal << "Application received wrong state: "
+                      << "\n\tReceived: " << sst_uuid_
+                      << "\n\tRequired: " << group_uuid;
+            sst_state_ = SST_FAILED;
+            log_fatal << "Application state transfer failed. This is "
+                      << "unrecoverable condition, restart required.";
+            abort();
+        }
+        else
+        {
+            update_state_uuid (sst_uuid_);
+            apply_monitor_.set_initial_position(-1);
+            apply_monitor_.set_initial_position(sst_seqno_);
+
+            if (co_mode_ != CommitOrder::BYPASS)
+            {
+                commit_monitor_.set_initial_position(-1);
+                commit_monitor_.set_initial_position(sst_seqno_);
+            }
+
+            log_info << "SST finished: " << state_uuid_ << ":" << sst_seqno_;
+        }
     }
     else
     {
-        update_state_uuid (sst_uuid_);
-        apply_monitor_.set_initial_position(-1);
-        apply_monitor_.set_initial_position(sst_seqno_);
-
-        if (co_mode_ != CommitOrder::BYPASS)
-        {
-            commit_monitor_.set_initial_position(-1);
-            commit_monitor_.set_initial_position(sst_seqno_);
-        }
-
-        log_info << "SST finished: " << state_uuid_ << ":" << sst_seqno_;
-
-        if (sst_seqno_ < group_seqno)
-        {
-            log_info << "Receiving IST: " << (group_seqno - sst_seqno_)
-                     << " writesets.";
-            // go to receive IST
-            recv_IST(recv_ctx);
-        }
+        assert (state_uuid_ == group_uuid);
     }
+
+    if (apply_monitor_.last_left() < group_seqno)
+    {
+        log_info << "Receiving IST: "
+                 << (group_seqno - apply_monitor_.last_left()) << " writesets.";
+        recv_IST(recv_ctx);
+    }
+
     ist_receiver_.finished();
+
     delete req;
 }
 

@@ -194,7 +194,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_mutex_          (),
     sst_cond_           (),
     sst_retry_sec_      (1),
-    trivial_sst_        (false),
+    ist_sst_            (false),
     gcache_             (config_, data_dir_),
     gcs_                (config_, gcache_, MAX_PROTO_VER, args->proto_ver,
                          args->node_name, args->node_incoming),
@@ -951,7 +951,8 @@ galera::ReplicatorSMM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
     }
 
     try {
-        if (!trivial_sst_) gcs_.join(seqno);
+        if (!ist_sst_) gcs_.join(seqno);
+        ist_sst_ = false;
         return WSREP_OK;
     }
     catch (gu::Exception& e)
