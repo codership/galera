@@ -572,13 +572,13 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     send_state_request (group_uuid, group_seqno, req);
 
     state_.shift_to(S_JOINING);
+    sst_state_ = SST_WAIT;
     /* while waiting for state transfer to complete is a good point
      * to reset gcache, since it may ivolve some IO too */
     gcache_.seqno_reset();
 
     if (sst_req_len != 0)
     {
-        sst_state_ = SST_WAIT;
         lock.wait(sst_cond_);
 
         if (sst_uuid_ != group_uuid)
@@ -616,6 +616,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         log_info << "Receiving IST: "
                  << (group_seqno - apply_monitor_.last_left()) << " writesets.";
         recv_IST(recv_ctx);
+        sst_seqno_ = group_seqno;
     }
 
     ist_receiver_.finished();

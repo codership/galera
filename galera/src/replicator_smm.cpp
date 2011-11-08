@@ -1159,7 +1159,7 @@ galera::ReplicatorSMM::process_conf_change(void*                    recv_ctx,
         if (state_() == S_JOINING && sst_state_ != SST_NONE)
         {
             /* There are two reasons we can be here:
-             * 1) we just got state transfer in request_sst() above;
+             * 1) we just got state transfer in request_state_transfer() above;
              * 2) we failed here previously (probably due to partition).
              */
             try {
