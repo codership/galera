@@ -773,8 +773,12 @@ group_select_donor (gcs_group_t* group, long const joiner_idx,
     bool required_donor = (strlen(donor_name) > 0);
 
     if (required_donor) {
-        if (desync) {
-            donor_idx = joiner_idx; // sender wants to become "donor" itself
+        if (desync) { // sender wants to become "donor" itself
+            gcs_node_state_t const st = group->nodes[joiner_idx].status;
+            if (st >= min_donor_state)
+                donor_idx = joiner_idx;
+            else
+                donor_idx = -EAGAIN;
         }
         else {
             donor_idx = group_find_node_by_name (group, joiner_idx, donor_name,
@@ -881,8 +885,8 @@ gcs_group_handle_state_request (gcs_group_t*         group,
 
     donor_idx = group_select_donor(group, joiner_idx, donor_name, desync);
 
-    assert (donor_idx != joiner_idx || desync);
-    assert (donor_idx == joiner_idx || !desync);
+    assert (donor_idx != joiner_idx || desync  || donor_idx < 0);
+    assert (donor_idx == joiner_idx || !desync || donor_idx < 0);
 
     if (group->my_idx != joiner_idx && group->my_idx != donor_idx) {
         // if neither DONOR nor JOINER, ignore request

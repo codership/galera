@@ -1072,8 +1072,9 @@ static void *gcs_recv_thread (void *arg)
             struct gcs_repl_act* repl_act = *repl_act_ptr;
             gcs_fifo_lite_pop_head (conn->repl_q);
 
-            assert (repl_act->action->size == rcvd.act.buf_len);
             assert (repl_act->action->type == rcvd.act.type);
+            assert (repl_act->action->size == rcvd.act.buf_len ||
+                    repl_act->action->type == GCS_ACT_STATE_REQ);
 
             repl_act->action->buf     = rcvd.act.buf;
             repl_act->action->seqno_g = rcvd.id;
@@ -1550,12 +1551,16 @@ long gcs_request_state_transfer (gcs_conn_t  *conn,
     return ret;
 }
 
-long gcs_desync (gcs_conn_t* conn)
+gcs_seqno_t gcs_desync (gcs_conn_t* conn)
 {
     gcs_seqno_t local;
-    long ret = gcs_request_state_transfer (conn, "", 1, GCS_DESYNC_REQ, &local);
+    long ret;
 
-    if (ret > 0) ret = 0;
+    ret = gcs_request_state_transfer (conn, "", 1, GCS_DESYNC_REQ, &local);
+
+    if (ret >= 0) return local;
+
+    assert (GCS_SEQNO_ILL == local);
 
     return ret;
 }

@@ -39,7 +39,7 @@ namespace galera
         virtual ssize_t request_state_transfer(const void* req, ssize_t req_len,
                                                const std::string& sst_donor,
                                                gcs_seqno_t* seqno_l) = 0;
-        virtual void    desync () throw (gu::Exception) = 0;
+        virtual gcs_seqno_t desync() throw () = 0;
         virtual void    join(gcs_seqno_t seqno) throw (gu::Exception) = 0;
         virtual void    get_stats(gcs_stats*) const = 0;
 
@@ -133,20 +133,21 @@ namespace galera
                                               sst_donor.c_str(), seqno_l);
         }
 
-        void desync () throw (gu::Exception)
+        gcs_seqno_t desync () throw ()
         {
-            long err;
+            gcs_seqno_t ret;
 
             // WARNING: Here we have application block on this call which
             //          may prevent application from resolving the issue.
             //          (Not that we expect that application can resolve it.)
-            while (-EAGAIN == (err = gcs_desync(conn_)))
+            for (long i = 0; i < 100 && (-EAGAIN == (ret = gcs_desync(conn_)));
+                 ++i) // limit blocking time to 10s
             {
                 log_warn << "Retrying DESYNC request.";
                 usleep (100000); // 0.1s
             }
 
-            if (err < 0) { gu_throw_error (-err) << "gcs_desync() failed"; }
+            return ret;
         }
 
         void join (gcs_seqno_t seqno) throw (gu::Exception)
@@ -308,9 +309,9 @@ namespace galera
             return -ENOSYS;
         }
 
-        void desync () throw (gu::Exception)
+        gcs_seqno_t desync () throw ()
         {
-            gu_throw_error(ENOTCONN);
+            return -ENOTCONN;
         }
 
         void join(gcs_seqno_t seqno) throw (gu::Exception)
