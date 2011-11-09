@@ -951,7 +951,8 @@ galera::ReplicatorSMM::sst_sent(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
     }
 
     try {
-        if (!ist_sst_) gcs_.join(seqno);
+        // #557 - remove this if() when we return back to joining after SST
+        if (!ist_sst_ || seqno < 0) gcs_.join(seqno);
         ist_sst_ = false;
         return WSREP_OK;
     }
